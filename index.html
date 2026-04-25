@@ -256,6 +256,43 @@
     white-space: nowrap;
     text-overflow: ellipsis;
   }
+  .tg-cell.tg-hour-cell {
+    min-height: 44px;
+    padding: 0;
+    position: relative;
+    overflow: visible;
+  }
+  .tg-hour-stack {
+    position: relative;
+    height: 100%;
+    min-height: 44px;
+    display: flex;
+    flex-direction: column;
+  }
+  .tg-quarter {
+    flex: 1 1 0;
+    min-height: 6px;
+    border-bottom: 1px dashed rgba(42,35,32,0.08);
+    box-sizing: border-box;
+  }
+  .tg-quarter:last-child { border-bottom: none; }
+  .tg-seg-abs {
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    border-radius: 4px;
+    cursor: pointer;
+    z-index: 2;
+    border: 1px solid rgba(42,35,32,0.35);
+    box-sizing: border-box;
+  }
+  .tg-hour-cell.tg-col-today {
+    box-shadow: inset 0 0 0 2px rgba(255,123,84,0.45);
+    background-image: linear-gradient(180deg, rgba(255,244,219,0.35) 0%, transparent 100%);
+  }
+  .tg-wrap.inverted .tg-seg-abs {
+    border-color: rgba(107,93,79,0.35);
+  }
   .tg-head { font-weight: 700; background: var(--bg); color: var(--ink); padding: 4px 2px; font-size: 0.8rem; }
   .tg-time { background: var(--bg); color: var(--ink-light); font-size: 0.7rem; padding: 2px; line-height: 22px; }
   .tg-block {
@@ -297,6 +334,14 @@
   .tg-wrap.inverted .tg-block.bucket-sleep-meal {
     background: #c8bfa8 !important;
     opacity: 0.85;
+  }
+  .tg-wrap.inverted .tg-seg-abs {
+    background: #d4ccb8 !important;
+    color: #6b5d4f;
+  }
+  .tg-wrap.inverted .tg-seg-abs.bucket-sleep-meal {
+    background: #c8bfa8 !important;
+    opacity: 0.9;
   }
 
   /* ── TIME-GRID CONTROLS (toggle + streak banner) ── */
@@ -377,8 +422,14 @@
     gap: 1.5px;
   }
   .tg-wo-brick {
-    height: 6px;
-    border-radius: 1px;
+    height: 8px;
+    border-radius: 2px;
+    border: 1px solid rgba(42,35,32,0.22);
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.35),
+      inset 0 -2px 0 rgba(0,0,0,0.06),
+      2px 0 0 0 rgba(42,35,32,0.12),
+      6px 0 0 0 rgba(42,35,32,0.12);
   }
   .tg-wo-count {
     font-size: 0.7rem;
@@ -391,8 +442,8 @@
   /* Brick colors — shared between weekly overview and MY TIME panel */
   .tg-brick-sleep-meal { background: #c8bfa8; }       /* muted tan/grey */
   .tg-brick-learning   { background: #9aa5b8; }       /* muted slate */
-  .tg-brick-free-jenn  { background: #ffd166; box-shadow: inset 0 -1px 0 rgba(0,0,0,0.08); } /* bright yellow */
-  .tg-brick-free-jess  { background: #6fb1fc; box-shadow: inset 0 -1px 0 rgba(0,0,0,0.08); } /* bright sky blue */
+  .tg-brick-free-jenn  { background: #ffd166; } /* bright yellow */
+  .tg-brick-free-jess  { background: #6fb1fc; } /* bright sky blue */
 
   /* ── MY FREE TIME TODAY summary panel (kid view) ── */
   .tg-mytime {
@@ -434,7 +485,20 @@
   }
   .tg-mytime-brick {
     height: 14px;
-    border-radius: 2px;
+    border-radius: 3px;
+    border: 1px solid rgba(42,35,32,0.2);
+    box-shadow:
+      inset 0 3px 0 rgba(255,255,255,0.28),
+      inset 0 -2px 0 rgba(0,0,0,0.06),
+      3px 0 0 0 rgba(42,35,32,0.1),
+      8px 0 0 0 rgba(42,35,32,0.1);
+  }
+  .tg-mytime--today {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .tg-mytime[data-profile="jess"].tg-mytime--today {
+    outline-color: var(--accent-blue);
   }
   .tg-mytime-breakdown {
     font-size: 0.85rem;
@@ -950,8 +1014,31 @@
     gap: 6px;
     padding: 2px 8px;
   }
-  .placed-block.compact .block-name { flex: 1; font-size: 0.94rem; }
-  .placed-block.compact .block-meta { font-size: 0.81rem; }
+  .placed-block.compact .block-name { flex: 1; font-size: 0.94rem; min-width: 0; }
+  .placed-block.compact .block-name.block-name--inline {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+  .placed-block.compact .block-name.block-name--inline .block-title {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .placed-block.compact .block-name.block-name--inline .block-note-inline {
+    flex: 1 1 0;
+    min-width: 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    opacity: 0.95;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .placed-block.compact .block-meta { font-size: 0.81rem; flex-shrink: 0; }
   /* Doodle decorations scattered around blocks */
   .tl-doodle {
     position: absolute;
@@ -3078,38 +3165,52 @@ function renderTimeGrid(keys) {
     tl.textContent = `${hr12}${ampm}`;
     grid.appendChild(tl);
 
-    keys.forEach(key => {
+    keys.forEach((key, dayIdx) => {
       const cell = document.createElement('div');
-      cell.className = 'tg-cell';
-      cell.onclick = ()=>openDay(key, keys.indexOf(key));
+      cell.className = 'tg-cell tg-hour-cell' + (key === today ? ' tg-col-today' : '');
 
       const blocks = getDayBlocks(key);
       const hourStartAbs = h*60;
       const hourEndAbs   = (h+1)*60;
-      const hit = blocks.find(b => b.startMin < hourEndAbs && (b.startMin + b.durationMin) > hourStartAbs);
+      const hits = blocks.filter(b => b.startMin < hourEndAbs && (b.startMin + b.durationMin) > hourStartAbs)
+        .sort((a,b)=>a.startMin-b.startMin);
 
-      if (hit) {
-        const act = acts.find(a=>a.id===hit.actId);
-        const bucket = categorizeBlock(hit, act);
-        const blkEl = document.createElement('div');
-        blkEl.className = 'tg-block bucket-' + bucket;
-        if (inverted) {
-          // Inverted mode: scheduled cells are neutral grey (CSS handles it).
-          // Don't override background — let .tg-wrap.inverted .tg-block win.
-        } else {
-          // Classic mode: keep original category coloring.
-          const colour = hit.colour || (act && CAT_HEX[act.cat]) || '#888';
-          blkEl.style.background = colour;
-          blkEl.style.color = '#fff';
+      if (hits.length) {
+        const stack = document.createElement('div');
+        stack.className = 'tg-hour-stack';
+        for (let q = 0; q < 4; q++) {
+          const qd = document.createElement('div');
+          qd.className = 'tg-quarter';
+          stack.appendChild(qd);
         }
-        const fullCover = (hit.startMin <= hourStartAbs) && (hit.startMin + hit.durationMin >= hourEndAbs);
-        if (!fullCover) blkEl.classList.add('partial');
-        blkEl.textContent = act ? `${act.icon}` : '•';
-        blkEl.title = act ? `${act.name} (${formatTimeFromMin(hit.startMin)})` : '';
-        cell.appendChild(blkEl);
+        hits.forEach(hit=>{
+          const act = acts.find(a=>a.id===hit.actId);
+          const bucket = categorizeBlock(hit, act);
+          const seg = document.createElement('div');
+          seg.className = 'tg-seg-abs bucket-' + bucket;
+          const segStart = Math.max(hit.startMin, hourStartAbs);
+          const segEnd = Math.min(hit.startMin + hit.durationMin, hourEndAbs);
+          const topPct = ((segStart - hourStartAbs) / 60) * 100;
+          let hPct = ((segEnd - segStart) / 60) * 100;
+          if (hPct < 12) hPct = 12;
+          seg.style.top = topPct + '%';
+          seg.style.height = hPct + '%';
+          if (!inverted) {
+            const colour = hit.colour || (act && CAT_HEX[act.cat]) || '#888';
+            seg.style.background = colour;
+            if (!isLightColour(colour)) seg.style.color = '#fff';
+          }
+          seg.title = act ? `${act.name} (${formatTimeFromMin(hit.startMin)}, ${formatDuration(hit.durationMin)})` : '';
+          seg.onclick = (e)=>{ e.stopPropagation(); openDay(key, dayIdx); };
+          stack.appendChild(seg);
+        });
+        cell.appendChild(stack);
+        cell.onclick = ()=>openDay(key, dayIdx);
       } else if (inverted) {
-        // Free cell — bright profile color
         cell.classList.add(freeCellCls);
+        cell.onclick = ()=>openDay(key, dayIdx);
+      } else {
+        cell.onclick = ()=>openDay(key, dayIdx);
       }
       grid.appendChild(cell);
     });
@@ -3203,10 +3304,12 @@ function renderTimeGridMyTime(keys) {
   if (isParent()) { panel.style.display = 'none'; return; }
 
   const today = todayKey();
-  // If today isn't in the visible week, find the closest day instead
   const todayIdx = keys.indexOf(today);
   const targetKey = todayIdx >= 0 ? today : keys[0];
-  const dayLabel  = todayIdx >= 0 ? 'TODAY' : `${DAY_LONG[0].toUpperCase()}`;
+  const targetIdx = keys.indexOf(targetKey);
+  const td = formatDayKey(targetKey);
+  const dateStr = `${DAY_SHORT[targetIdx >= 0 ? targetIdx : 0]}, ${MONTH_SHORT[td.getMonth()]} ${td.getDate()}`;
+  const dayLabel = (targetKey === today) ? `${dateStr} · Today` : `${dateStr} (this week)`;
 
   const bricks = getBrickStrip(targetKey);
   const freeCount = bricks.filter(b => b.category === 'free').length;
@@ -3218,7 +3321,8 @@ function renderTimeGridMyTime(keys) {
 
   panel.style.display = 'block';
   panel.dataset.profile = activeProfile();
-  document.querySelector('#tgMyTime .tg-mytime-label').innerHTML = `🌟 MY FREE TIME ${dayLabel}`;
+  panel.classList.toggle('tg-mytime--today', targetKey === today);
+  document.querySelector('#tgMyTime .tg-mytime-label').innerHTML = `🌟 MY FREE TIME<br><span style="font-size:0.95rem;font-family:'Patrick Hand',sans-serif;font-weight:700">${dayLabel}</span>`;
   document.getElementById('tgMyTimeValue').textContent = valueStr;
 
   // Mini brick strip showing today's 30 bricks
@@ -3313,17 +3417,32 @@ function renderDayBar(key, blocks) {
   }
 }
 
+function wfZoneOverlap(relStart, durMin, z) {
+  const blockEnd = relStart + durMin;
+  const ovStart = Math.max(relStart, z.start);
+  const ovEnd = Math.min(blockEnd, z.end);
+  return Math.max(0, ovEnd - ovStart);
+}
+function wfPickZone(relStart, durMin, zones) {
+  let best = zones[0], bestOv = -1;
+  zones.forEach(z=>{
+    const ov = wfZoneOverlap(relStart, durMin, z);
+    if (ov > bestOv) { bestOv = ov; best = z; }
+  });
+  return bestOv > 0 ? best : zones[zones.length - 1];
+}
+
 function renderFullWeek(keys) {
   const grid = document.getElementById('weeklyFullGrid');
   grid.innerHTML = '';
   const acts = getAllActivities();
 
-  // Weekday zones (4 rows). Weekends merge all into "Free Time" row.
+  /* Minutes from START_MIN (6am): before 6-8am, school 8am-3pm, after 3-6pm, evening 6pm-9pm */
   const ZONES = [
-    { id:'before',  label: '🌅 Before School', start: 0,   end: 180,          weekendLabel: '🎉 Free Time (AM)' },
-    { id:'school',  label: '🏫 School',         start: 180, end: 540,          weekendLabel: '🎉 Free Time' },
-    { id:'after',   label: '🎒 After School',   start: 540, end: 720,          weekendLabel: '🎉 Afternoon' },
-    { id:'evening', label: '🌙 Evening',        start: 720, end: DAY_MIN_SPAN, weekendLabel: '🌙 Evening' },
+    { id:'before',  label: '🌅 Before school · Morning (6–8 am)', start: 0,   end: 120 },
+    { id:'school',  label: '🏫 School · Daytime (8 am–3 pm)',    start: 120, end: 540 },
+    { id:'after',   label: '🎒 After school · Afternoon (3–6 pm)', start: 540, end: 720 },
+    { id:'evening', label: '🌙 Evening (6–9 pm)',                 start: 720, end: DAY_MIN_SPAN },
   ];
 
   // Day headers row
@@ -3347,10 +3466,6 @@ function renderFullWeek(keys) {
     grid.appendChild(zoneLabel);
 
     keys.forEach((key, ci) => {
-      const d = formatDayKey(key);
-      const dow = d.getDay();
-      const isWeekend = (dow===0 || dow===6);
-
       const cell = document.createElement('div');
       cell.className = 'wf-zone-cell' + (key===todayKey() ? ' today' : '');
       cell.onclick = (e)=>{
@@ -3363,15 +3478,10 @@ function renderFullWeek(keys) {
       const blocks = (getDayBlocks(key) || [])
         .slice().sort((a,b)=>a.startMin - b.startMin)
         .filter(b=>{
-          const start = b.startMin - START_MIN;
-          // For weekend, show all blocks in the "school" (daytime) row and evening row appropriately
-          if (isWeekend) {
-            // Merge before+school+after into one big free-time segment in the "school" row
-            if (z.id === 'school')  return start >= 0   && start < 720;
-            if (z.id === 'evening') return start >= 720 && start < DAY_MIN_SPAN;
-            return false; // before/after rows empty on weekends (school row holds them all)
-          }
-          return start >= z.start && start < z.end;
+          const relStart = b.startMin - START_MIN;
+          const dur = b.durationMin || 0;
+          const picked = wfPickZone(relStart, dur, ZONES);
+          return picked.id === z.id;
         });
 
       if (!blocks.length) {
@@ -3880,9 +3990,12 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
   const noteHtml = (!isCompact && noteTrim)
     ? `<div class="block-note">${escapeHtml(noteTrim)}</div>`
     : '';
+  const nameHtml = (isCompact && noteTrim)
+    ? `<div class="block-name block-name--inline">${act.icon} <span class="block-title">${escapeHtml(act.name)}</span><span class="block-note-inline" title="${escapeHtml(noteTrim).replace(/"/g,'&quot;')}"> · ${escapeHtml(noteTrim)}</span></div>`
+    : `<div class="block-name">${act.icon} ${escapeHtml(act.name)}</div>`;
 
   blockEl.innerHTML = `
-    <div class="block-name">${act.icon} ${act.name}</div>
+    ${nameHtml}
     <div class="block-meta">${durStr}${badges?' '+badges:''}</div>
     ${noteHtml}
   `;
@@ -4769,18 +4882,13 @@ function openEditSheet(blockId) {
     ssWrap.style.display = 'block';
     document.getElementById('publicToggle').classList.toggle('on', !!block.public);
     const inviteBtn = document.getElementById('inviteSisterBtn');
-    const isSocial = !!act.social;
     const sister = activeProfile()==='jenn' ? 'jess' : 'jenn';
     const alreadyInvited = Array.isArray(block.invitedTo) && block.invitedTo.includes(sister);
-    if (isSocial) {
-      inviteBtn.style.display = 'block';
-      inviteBtn.textContent = alreadyInvited
-        ? `💌 Invite sent to ${sister==='jenn'?'Jenn':'Jess'}`
-        : `💌 Invite your sister`;
-      inviteBtn.disabled = alreadyInvited;
-    } else {
-      inviteBtn.style.display = 'none';
-    }
+    inviteBtn.style.display = 'block';
+    inviteBtn.textContent = alreadyInvited
+      ? `💌 Invite sent to ${sister==='jenn'?'Jenn':'Jess'}`
+      : `💌 Invite your sister`;
+    inviteBtn.disabled = alreadyInvited;
   } else {
     ssWrap.style.display = 'none';
   }
@@ -5495,7 +5603,7 @@ function renderSync() {
         mini.style.color = '#555';
         mini.textContent = `${tStr} • Busy`;
       }
-      if (isMe && act.social) {
+      if (isMe) {
         mini.style.cursor='pointer';
         mini.title = 'Tap to invite your sister';
         mini.onclick = ()=>sendInvite(b, p==='jenn'?'jess':'jenn');
