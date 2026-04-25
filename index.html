@@ -110,15 +110,31 @@
 
   .profile-motto {
     margin-top: 2.2rem;
-    max-width: 460px;
+    max-width: 760px;
     text-align: center;
   }
   .profile-motto p {
     font-family: 'Caveat', cursive;
-    font-size: 1.35rem;
-    color: var(--ink-light);
+    font-size: 1.55rem;
+    color: #4b3f35;
     line-height: 1.4;
     transform: rotate(-1deg);
+  }
+  .profile-motto .profile-message {
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 1.1rem;
+    line-height: 1.45;
+    color: var(--ink);
+    margin-top: 0.8rem;
+    background: rgba(255,255,255,0.45);
+    border: 2px dashed var(--paper-line);
+    border-radius: 16px;
+    padding: 0.85rem 1rem;
+    transform: none;
+  }
+  #parentWeekKidPills .pill-btn {
+    font-size: 1.1rem;
+    padding: 0.4rem 1rem;
   }
 
   /* ═══════════ TOP BAR ═══════════ */
@@ -131,21 +147,21 @@
     box-shadow: 0 2px 0 rgba(42,35,32,0.06);
   }
   .topbar-left { display: flex; align-items: center; gap: 0.6rem; }
-  .topbar h2 { font-size: 1.6rem; }
+  .topbar h2 { font-size: 1.84rem; }
 
   .profile-badge {
     display: flex; align-items: center; gap: 0.4rem;
     background: var(--bg); border-radius: 20px;
-    padding: 0.2rem 0.7rem;
-    font-weight: 600; font-size: 1rem;
+    padding: 0.26rem 0.8rem;
+    font-weight: 600; font-size: 1.15rem;
     cursor: pointer;
     border: 2px solid var(--ink);
     transform: rotate(-1deg);
   }
   .btn-icon {
     background: var(--paper); border: 2px solid var(--ink);
-    border-radius: 12px; padding: 0.3rem 0.6rem;
-    cursor: pointer; font-size: 1.1rem;
+    border-radius: 12px; padding: 0.36rem 0.7rem;
+    cursor: pointer; font-size: 1.3rem;
     transition: all 0.15s;
     box-shadow: 2px 2px 0 var(--ink);
   }
@@ -502,10 +518,10 @@
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 0.2rem;
   }
-  .gt-col-header h3 { font-size: 1.2rem; margin: 0; }
-  .gt-add-btn { padding: 2px 10px; font-size: 1.1rem; }
+  .gt-col-header h3 { font-size: 1.38rem; margin: 0; }
+  .gt-add-btn { padding: 2px 10px; font-size: 1.27rem; }
   .gt-hint {
-    font-size: 0.82rem; color: var(--ink-light);
+    font-size: 0.95rem; color: #5a4d41;
     margin: 0 0 0.5rem 0;
   }
   .gt-item {
@@ -516,7 +532,7 @@
     border-radius: 10px;
     background: var(--bg);
     font-family: 'Patrick Hand', sans-serif;
-    font-size: 0.95rem;
+    font-size: 1.09rem;
   }
   .gt-item.done {
     text-decoration: line-through;
@@ -532,29 +548,29 @@
   .gt-text-input {
     flex: 1; border: none; background: transparent;
     font-family: 'Patrick Hand', sans-serif;
-    font-size: 0.95rem; outline: none; padding: 0; min-width: 0;
+    font-size: 1.09rem; outline: none; padding: 0; min-width: 0;
   }
   .gt-check {
     width: 22px; height: 22px; border-radius: 50%;
     border: 2px solid var(--ink); background: #fff;
     display: flex; align-items: center; justify-content: center;
-    font-size: 0.9rem; flex-shrink: 0; cursor: pointer;
+    font-size: 1.04rem; flex-shrink: 0; cursor: pointer;
   }
   .gt-item.done .gt-check { background: var(--accent); color: #fff; }
   .gt-day-tag {
-    font-size: 0.72rem; font-weight: 800;
+    font-size: 0.83rem; font-weight: 800;
     padding: 1px 6px; border: 1.5px solid var(--ink); border-radius: 8px;
     background: var(--accent-yellow); flex-shrink: 0;
     cursor: pointer;
   }
-  .gt-day-tag.unset { background: transparent; color: var(--ink-light); }
+  .gt-day-tag.unset { background: transparent; color: #5a4d41; }
   .gt-del {
-    background: transparent; border: none; color: var(--ink-light);
-    font-size: 1.2rem; cursor: pointer; padding: 0 0.2rem; flex-shrink: 0;
+    background: transparent; border: none; color: #5a4d41;
+    font-size: 1.38rem; cursor: pointer; padding: 0 0.2rem; flex-shrink: 0;
   }
   .gt-del:hover { color: #c00; }
   .gt-empty {
-    font-size: 0.88rem; color: var(--ink-light);
+    font-size: 1.01rem; color: #5a4d41;
     text-align: center; padding: 1rem 0;
   }
   @media (max-width: 720px) {
@@ -659,13 +675,13 @@
   /* ═══════════ DAY EDITOR ═══════════ */
   /* Event-zone chips */
   .zone-tabs {
-    display:flex; gap: 0.3rem; padding: 0.3rem 0.8rem;
+    display:flex; gap: 0.36rem; padding: 0.38rem 0;
     justify-content:center; flex-wrap: wrap;
   }
   .zone-tab {
     background: var(--paper); border: 2px solid var(--ink);
-    border-radius: 20px; padding: 0.25rem 0.7rem;
-    cursor: pointer; font-size: 0.85rem; font-weight: 600;
+    border-radius: 20px; padding: 0.3rem 0.8rem;
+    cursor: pointer; font-size: 0.98rem; font-weight: 700;
     font-family: 'Patrick Hand', sans-serif;
     box-shadow: 2px 2px 0 var(--ink);
     transition: all 0.15s;
@@ -697,20 +713,42 @@
   .vibe-mood.selected { background: var(--accent-yellow); transform: scale(1.2) rotate(-5deg); box-shadow: 2px 2px 0 var(--ink); }
 
   .day-controls {
-    display: flex; gap: 0.5rem; padding: 0.4rem 0.8rem;
-    align-items: center; justify-content: space-between;
+    display: flex; gap: 0.5rem; padding: 0.15rem 0;
+    align-items: center; justify-content: center;
   }
-  .day-controls h3 { font-size: 1.3rem; }
+  .day-controls h3 { font-size: 1.5rem; }
   .day-nav-center {
-    display: flex; align-items: center; gap: 0.6rem;
+    display: flex; align-items: center; gap: 0.75rem;
     flex: 1 1 auto; justify-content: center;
   }
   .day-nav-center h3 {
-    font-size: 1.6rem; margin: 0;
+    font-size: 1.84rem; margin: 0;
     text-align: center; min-width: 12rem;
   }
   .day-nav-arrow {
-    font-size: 1.1rem; padding: 0.3rem 0.7rem;
+    font-size: 1.27rem; padding: 0.35rem 0.78rem;
+  }
+  .day-toolbar {
+    position: sticky;
+    top: 58px;
+    z-index: 95;
+    background: var(--paper);
+    border-bottom: 2px dashed var(--paper-line);
+    box-shadow: 0 2px 0 rgba(42,35,32,0.06);
+    padding: 0.35rem 0.8rem 0.45rem;
+  }
+  .day-toolbar .day-toolbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+  }
+  .day-toolbar .day-toolbar-row.end {
+    justify-content: flex-end;
+    margin-top: 0.2rem;
+  }
+  .day-toolbar #daySubtitle {
+    min-width: 14rem;
   }
 
   .btn-template {
@@ -754,9 +792,9 @@
   .tl-gutter .tl-hour-label {
     position: absolute;
     right: 8px;
-    font-size: 0.8rem;
+    font-size: 0.92rem;
     font-weight: 600;
-    color: var(--ink-light);
+    color: #5a4d41;
     font-family: 'Patrick Hand', sans-serif;
     transform: translateY(-50%);
   }
@@ -778,7 +816,7 @@
     writing-mode: vertical-rl;
     text-orientation: mixed;
     font-family: 'Patrick Hand', sans-serif;
-    font-size: 0.7rem;
+    font-size: 0.81rem;
     font-weight: 700;
     color: var(--ink);
     letter-spacing: 1px;
@@ -842,7 +880,7 @@
     position: absolute;
     border-radius: 12px;
     padding: 5px 10px;
-    font-size: 0.78rem; font-weight: 700;
+    font-size: 0.9rem; font-weight: 700;
     color: #fff; z-index: 10;
     cursor: pointer;
     box-shadow: 3px 3px 0 var(--ink);
@@ -874,8 +912,8 @@
     border: 2px solid var(--ink); background: var(--paper); cursor: pointer;
     font-family: 'Patrick Hand', sans-serif;
   }
-  .placed-block .block-name { font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-  .placed-block .block-meta { font-size: 0.7rem; opacity: 0.95; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+  .placed-block .block-name { font-size: 1.04rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .placed-block .block-meta { font-size: 0.81rem; opacity: 0.98; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
   /* Compact single-line variant for short blocks (<45px tall) */
   .placed-block.compact {
     flex-direction: row;
@@ -883,8 +921,8 @@
     gap: 6px;
     padding: 2px 8px;
   }
-  .placed-block.compact .block-name { flex: 1; font-size: 0.82rem; }
-  .placed-block.compact .block-meta { font-size: 0.7rem; }
+  .placed-block.compact .block-name { flex: 1; font-size: 0.94rem; }
+  .placed-block.compact .block-meta { font-size: 0.81rem; }
   /* Doodle decorations scattered around blocks */
   .tl-doodle {
     position: absolute;
@@ -925,8 +963,8 @@
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 0.4rem;
   }
-  .tray-title { font-family: 'Gochi Hand', cursive; font-size: 1.1rem; }
-  .tray-hint { font-size: 0.85rem; color: var(--accent); font-weight: 700; }
+  .tray-title { font-family: 'Gochi Hand', cursive; font-size: 1.27rem; }
+  .tray-hint { font-size: 0.98rem; color: #c95f3d; font-weight: 700; }
 
   .tray-filter {
     display: flex; gap: 0.3rem; padding-bottom: 0.3rem;
@@ -934,8 +972,8 @@
   }
   .filter-chip {
     flex-shrink: 0; background: var(--bg); border: 2px solid var(--ink);
-    border-radius: 16px; padding: 0.2rem 0.7rem;
-    cursor: pointer; font-size: 0.8rem; font-weight: 600;
+    border-radius: 16px; padding: 0.23rem 0.8rem;
+    cursor: pointer; font-size: 0.92rem; font-weight: 700;
     font-family: 'Patrick Hand', sans-serif;
   }
   .filter-chip.active { background: var(--accent); color: #fff; }
@@ -952,45 +990,45 @@
     background: var(--paper);
     border: 2px solid var(--ink);
     border-radius: 14px;
-    padding: 0.4rem 0.55rem;
+    padding: 0.45rem 0.6rem;
     cursor: pointer;
     transition: all 0.15s;
     text-align: center;
-    min-width: 78px;
+    min-width: 88px;
     box-shadow: 3px 3px 0 var(--ink);
     position: relative;
   }
   .activity-chip:hover { transform: translate(-1px,-2px) rotate(-1deg); box-shadow: 4px 5px 0 var(--ink); }
   .activity-chip.selected { transform: translate(-1px,-4px) rotate(-2deg) scale(1.05); box-shadow: 5px 6px 0 var(--accent); background: var(--bg2); }
-  .activity-chip .chip-icon { font-size: 1.6rem; }
-  .activity-chip .chip-name { font-size: 0.78rem; font-weight: 700; margin-top: 2px; line-height: 1.15; font-family: 'Patrick Hand', sans-serif; }
-  .activity-chip .chip-dur { font-size: 0.7rem; color: var(--ink-light); font-weight: 600; }
+  .activity-chip .chip-icon { font-size: 1.84rem; }
+  .activity-chip .chip-name { font-size: 0.9rem; font-weight: 700; margin-top: 2px; line-height: 1.15; font-family: 'Patrick Hand', sans-serif; }
+  .activity-chip .chip-dur { font-size: 0.81rem; color: #5a4d41; font-weight: 700; }
   .activity-chip.locked { opacity: 0.45; cursor: not-allowed; }
   .activity-chip.locked .chip-icon { filter: grayscale(0.7); }
   .chip-level-badge {
     position: absolute; top: -6px; right: -6px;
     background: var(--accent-yellow); border: 1.5px solid var(--ink);
-    border-radius: 50%; width: 22px; height: 22px;
+    border-radius: 50%; width: 25px; height: 25px;
     display:flex; align-items:center; justify-content:center;
-    font-size: 0.7rem; font-weight: 800;
+    font-size: 0.81rem; font-weight: 800;
     font-family: 'Gochi Hand', cursive;
   }
   .chip-lock-badge {
     position: absolute; top: -4px; right: -4px;
-    font-size: 1rem;
+    font-size: 1.15rem;
   }
   .chip-add {
     flex-shrink: 0;
     background: var(--paper);
     border: 2px dashed var(--ink);
     border-radius: 14px;
-    padding: 0.4rem 0.55rem;
+    padding: 0.45rem 0.6rem;
     cursor: pointer;
-    min-width: 78px;
+    min-width: 88px;
     text-align: center;
     transition: all 0.15s;
-    color: var(--ink-light);
-    font-size: 0.85rem; font-weight: 700;
+    color: #5a4d41;
+    font-size: 0.98rem; font-weight: 700;
     font-family: 'Patrick Hand', sans-serif;
   }
   .chip-add:hover { border-color: var(--accent); color: var(--accent); }
@@ -1020,14 +1058,14 @@
 
   .sheet-handle { width: 50px; height: 5px; background: var(--paper-line); border-radius: 3px; margin: 0 auto 1rem; }
   .sheet h3 { font-family:'Gochi Hand', cursive; font-size: 1.6rem; margin-bottom: 0.8rem; }
-  .sheet h4 { font-family:'Gochi Hand', cursive; font-size: 1.2rem; margin: 0.8rem 0 0.4rem; color: var(--ink-light); }
+  .sheet h4 { font-family:'Gochi Hand', cursive; font-size: 1.38rem; margin: 0.8rem 0 0.4rem; color: #5a4d41; }
 
   .sheet-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
 
   .pill-btn {
     background: var(--paper); border: 2px solid var(--ink);
     border-radius: 20px; padding: 0.35rem 0.9rem;
-    cursor: pointer; font-size: 0.95rem; font-weight: 600;
+    cursor: pointer; font-size: 1.09rem; font-weight: 700;
     font-family: 'Patrick Hand', sans-serif;
     box-shadow: 2px 2px 0 var(--ink);
     transition: all 0.15s;
@@ -1088,7 +1126,7 @@
     border: 1.5px solid var(--ink);
   }
   .repeat-toggle.on .toggle-knob { left: 20px; }
-  .toggle-label { font-size: 0.95rem; font-weight: 700; font-family: 'Patrick Hand', sans-serif; }
+  .toggle-label { font-size: 1.09rem; font-weight: 700; font-family: 'Patrick Hand', sans-serif; }
 
   /* Multi-day picker */
   .day-picker { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.8rem; }
@@ -1096,7 +1134,7 @@
     background: var(--paper); border: 2px solid var(--ink);
     border-radius: 50%; width: 38px; height: 38px;
     display: flex; align-items: center; justify-content: center;
-    cursor: pointer; font-weight: 700; font-size: 0.85rem;
+    cursor: pointer; font-weight: 700; font-size: 0.98rem;
     font-family: 'Patrick Hand', sans-serif;
     box-shadow: 2px 2px 0 var(--ink);
   }
@@ -1364,10 +1402,10 @@
     display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.5rem;
     align-items: center;
   }
-  .minute-picker .pill-btn { padding: 0.3rem 0.7rem; font-size: 0.9rem; }
+  .minute-picker .pill-btn { padding: 0.34rem 0.76rem; font-size: 1.04rem; }
   .time-display {
     font-family: 'Gochi Hand', cursive;
-    font-size: 1.3rem;
+    font-size: 1.5rem;
     color: var(--accent);
     padding: 0.3rem 0.7rem;
     background: var(--bg2);
@@ -1389,7 +1427,7 @@
     padding: 0.3rem 0.4rem; font-family: 'Patrick Hand', sans-serif;
     font-size: 1rem; text-align: center; background: #fff;
   }
-  .custom-time-row label { font-size: 0.9rem; font-weight: 600; }
+  .custom-time-row label { font-size: 1.04rem; font-weight: 700; color: #5a4d41; }
 
   /* Checklist in edit sheet */
   .checklist-wrap { margin: 0.5rem 0 0.8rem; }
@@ -1413,11 +1451,11 @@
     font-size: 1rem; flex-shrink: 0; cursor: pointer;
   }
   .checklist-item.checked .checklist-check { background: var(--accent); color: #fff; }
-  .checklist-text { flex: 1; font-size: 0.95rem; }
+  .checklist-text { flex: 1; font-size: 1.09rem; }
   .checklist-timer-btn {
     background: var(--accent-yellow); border: 2px solid var(--ink);
     border-radius: 10px; padding: 0.2rem 0.6rem;
-    cursor: pointer; font-size: 0.8rem; font-weight: 700;
+    cursor: pointer; font-size: 0.92rem; font-weight: 700;
     font-family: 'Patrick Hand', sans-serif;
     box-shadow: 1px 1px 0 var(--ink);
     flex-shrink: 0;
@@ -1426,8 +1464,8 @@
     background: var(--accent); color: #fff; animation: pulse 1s infinite;
   }
   .checklist-item input.timer-input {
-    width: 50px; border: 1.5px solid var(--ink); border-radius: 6px;
-    padding: 2px 4px; font-size: 0.8rem; text-align: center;
+    width: 56px; border: 1.5px solid var(--ink); border-radius: 6px;
+    padding: 2px 4px; font-size: 0.92rem; text-align: center;
     font-family: 'Patrick Hand', sans-serif; background: #fff;
   }
   .checklist-item.kid-item {
@@ -1438,8 +1476,8 @@
     background: var(--accent-green);
   }
   .checklist-del-btn {
-    background: transparent; border: none; color: var(--ink-light);
-    font-size: 1.3rem; line-height: 1; cursor: pointer; padding: 0 0.3rem;
+    background: transparent; border: none; color: #5a4d41;
+    font-size: 1.5rem; line-height: 1; cursor: pointer; padding: 0 0.3rem;
     flex-shrink: 0;
   }
   .checklist-del-btn:hover { color: #c00; }
@@ -1450,7 +1488,7 @@
   .checklist-add-input {
     flex: 1; border: 2px dashed var(--ink); border-radius: 10px;
     padding: 0.4rem 0.6rem; font-family: 'Patrick Hand', sans-serif;
-    font-size: 0.95rem; background: var(--bg);
+    font-size: 1.09rem; background: var(--bg);
   }
   .checklist-add-btn { flex-shrink: 0; }
 
@@ -1491,7 +1529,7 @@
     margin-bottom: 0.5rem;
     box-shadow: 2px 2px 0 var(--ink);
   }
-  .buffer-toggle .toggle-label { font-size: 0.9rem; }
+  .buffer-toggle .toggle-label { font-size: 1.04rem; }
   .buffer-toggle.on .toggle-track { background: var(--accent); }
   .buffer-toggle.on .toggle-knob  { left: 20px; }
 
@@ -1500,12 +1538,12 @@
     margin-top: 0.6rem; padding: 0.5rem 0.7rem;
     background: var(--bg); border: 2px dashed var(--ink); border-radius: 12px;
   }
-  .date-range-wrap label { display:block; margin-top:0.3rem; font-size:0.85rem; }
+  .date-range-wrap label { display:block; margin-top:0.3rem; font-size:0.98rem; color: #5a4d41; }
   .date-range-wrap input[type="date"] {
     width:100%; padding:0.35rem; margin-top:0.2rem;
     border:2px solid var(--ink); border-radius:8px; font-family:inherit;
   }
-  .date-range-wrap .hint { font-size:0.75rem; color:var(--ink-light); margin-top:0.4rem; }
+  .date-range-wrap .hint { font-size:0.86rem; color:#5a4d41; margin-top:0.4rem; }
 
   @media(max-width:400px) {
     .week-grid { gap: 0.25rem; padding: 0.3rem 0.4rem; }
@@ -1564,6 +1602,15 @@
   </div>
   <div class="profile-motto">
     <p>✨ Plan what matters — the rest of the time is yours ✨</p>
+    <div class="profile-message">
+      This planner is not a set of "rules" to follow, nor is it a clock meant to rush you. Think of it as your Blueprint for Freedom.<br><br>
+      In the world of elite performance, the greatest athletes are not just those who train the hardest, but those who own their day. When you master your schedule, you transition from being "busy" to being intentional.<br><br>
+      By using this tool, you are choosing to:<br>
+      Design Your Success: Carve out the time needed to sharpen your skills.<br>
+      Protect Your Joy: Ensure there is always space for rest, play, and the things that make you smile.<br>
+      Lead Yourself: Develop the discipline that separates the good from the great.<br><br>
+      Remember: Do not let the clock run you; you run the clock. You are the conductor of your own symphony. Let's make every week a masterpiece of progress and resilience.
+    </div>
   </div>
   <p style="position:absolute;bottom:1rem;color:var(--ink-light);font-size:0.8rem">
     <span id="fbStatus">⚙️ Connecting...</span>
@@ -1693,33 +1740,36 @@
     </div>
   </div>
 
-  <!-- Today's Vibe (replaces balance) -->
-  <div class="vibe-card">
-    <div>
-      <div class="vibe-title">Today's Vibe</div>
-      <div style="font-size:0.8rem;color:var(--ink-light)" id="vibeSubtext">Set when the day's done</div>
+  <div class="day-toolbar">
+    <div class="day-toolbar-row">
+      <div class="day-controls">
+        <div class="day-nav-center">
+          <button class="btn-icon day-nav-arrow" onclick="navDay(-1)" title="Previous day">◀</button>
+          <h3 id="daySubtitle"></h3>
+          <button class="btn-icon day-nav-arrow" onclick="navDay(1)" title="Next day">▶</button>
+        </div>
+      </div>
     </div>
-    <div class="vibe-moods" id="vibeMoods"></div>
-  </div>
-
-  <div class="day-controls">
-    <div style="flex:0 0 auto;min-width:80px"></div>
-    <div class="day-nav-center">
-      <button class="btn-icon day-nav-arrow" onclick="navDay(-1)" title="Previous day">◀</button>
-      <h3 id="daySubtitle"></h3>
-      <button class="btn-icon day-nav-arrow" onclick="navDay(1)" title="Next day">▶</button>
+    <div class="day-toolbar-row">
+      <div class="zone-tabs">
+        <div class="zone-tab active" data-zone="all" onclick="setZone('all')">☀️ All Day</div>
+        <div class="zone-tab" data-zone="morning" onclick="setZone('morning')">🌅 Morning</div>
+        <div class="zone-tab" data-zone="afternoon" onclick="setZone('afternoon')">☀️ Afternoon</div>
+        <div class="zone-tab" data-zone="evening" onclick="setZone('evening')">🌙 Evening</div>
+      </div>
     </div>
-    <div style="display:flex;gap:0.4rem;flex:0 0 auto">
+    <div class="day-toolbar-row end">
       <button class="btn-template danger" onclick="clearDay()">🗑 Clear</button>
     </div>
   </div>
 
-  <!-- Zone tabs -->
-  <div class="zone-tabs">
-    <div class="zone-tab active" data-zone="all" onclick="setZone('all')">☀️ All Day</div>
-    <div class="zone-tab" data-zone="morning" onclick="setZone('morning')">🌅 Morning</div>
-    <div class="zone-tab" data-zone="afternoon" onclick="setZone('afternoon')">☀️ Afternoon</div>
-    <div class="zone-tab" data-zone="evening" onclick="setZone('evening')">🌙 Evening</div>
+  <!-- Today's Vibe (replaces balance) -->
+  <div class="vibe-card">
+    <div>
+      <div class="vibe-title">Today's Vibe</div>
+      <div style="font-size:0.92rem;color:#5a4d41" id="vibeSubtext">Set when the day's done</div>
+    </div>
+    <div class="vibe-moods" id="vibeMoods"></div>
   </div>
 
   <div class="timeline-wrap">
