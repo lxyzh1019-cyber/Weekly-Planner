@@ -215,6 +215,12 @@
     color: var(--ink-light);
     min-height: 1.1rem;
   }
+  .sync-debug-msg {
+    margin-top: 0.2rem;
+    font-size: 0.72rem;
+    color: #8a8a8a;
+    min-height: 1rem;
+  }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
   /* ═══════════ WEEK VIEW ═══════════ */
@@ -1809,6 +1815,7 @@
   <p style="position:absolute;bottom:1rem;color:var(--ink-light);font-size:0.8rem">
     <span id="fbStatus">⚙️ Connecting...</span>
     <br><span id="syncPendingMsg" class="sync-pending-msg"></span>
+    <br><span id="syncDebugMsg" class="sync-debug-msg"></span>
   </p>
 </div>
 
@@ -2580,6 +2587,10 @@ const FB_ROOT = 'weeklyPlanner';
 
 let fbApp = null, fbDB = null, fbConnected = false;
 let hasPendingSync = false;
+let lastSyncError = '';
+let syncRetryTimer = null;
+let lastLocalWriteAt = 0;
+let lastRemoteSeenAt = 0;
 
 function initFirebase() {
   try {
@@ -2598,11 +2609,24 @@ function initFirebase() {
         pushToFirebase();
       }
     });
+    if (!syncRetryTimer) {
+      syncRetryTimer = setInterval(() => {
+        if (fbConnected && hasPendingSync) pushToFirebase();
+      }, 5000);
+    }
 
     // Listen for changes and merge
     fbDB.ref(FB_ROOT).on('value', snap => {
       const remote = snap.val() || {};
+      const remoteTs = remote?._meta?.updatedAt || 0;
+      if (remoteTs) lastRemoteSeenAt = Math.max(lastRemoteSeenAt, remoteTs);
       mergeRemoteState(remote);
+      if (hasPendingSync && remoteTs && remoteTs >= lastLocalWriteAt) {
+        hasPendingSync = false;
+        lastSyncError = '';
+        setSyncStatus('online', 'Synced');
+        renderPendingSyncMessage();
+      }
     });
   } catch(e) {
     console.error('Firebase init failed', e);
@@ -2622,8 +2646,35 @@ function setSyncStatus(state, label) {
 }
 function renderPendingSyncMessage() {
   const pending = document.getElementById('syncPendingMsg');
-  if (!pending) return;
-  pending.textContent = hasPendingSync ? 'Pending sync: local changes will upload once online.' : '';
+  if (!pending) {
+    renderSyncDebugMessage();
+    return;
+  }
+  if (hasPendingSync && fbConnected) {
+    pending.textContent = lastSyncError
+      ? `Pending sync: upload retrying (${lastSyncError}).`
+      : 'Pending sync: upload retrying…';
+    renderSyncDebugMessage();
+    return;
+  }
+  if (hasPendingSync) {
+    pending.textContent = 'Pending sync: local changes will upload once online.';
+    renderSyncDebugMessage();
+    return;
+  }
+  pending.textContent = '';
+  renderSyncDebugMessage();
+}
+function shortTs(ts) {
+  if (!ts) return '-';
+  const d = new Date(ts);
+  if (isNaN(d)) return String(ts);
+  return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}:${d.getSeconds().toString().padStart(2,'0')}`;
+}
+function renderSyncDebugMessage() {
+  const el = document.getElementById('syncDebugMsg');
+  if (!el) return;
+  el.textContent = `dbg c:${fbConnected?1:0} p:${hasPendingSync?1:0} lw:${shortTs(lastLocalWriteAt)} rr:${shortTs(lastRemoteSeenAt)} err:${lastSyncError||'-'}`;
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -2868,6 +2919,15 @@ function loadLocal() {
   } catch(e){ console.warn('Local load failed', e); }
 }
 
+function ensureBlockId(dayKey, block, idx) {
+  if (block && block.id != null) return block.id;
+  const act = block?.actId || 'act';
+  const start = block?.startMin ?? block?.start ?? 0;
+  const dur = block?.durationMin ?? block?.slots ?? 0;
+  const note = (block?.note || '').slice(0, 24);
+  return `blk-${dayKey}-${idx}-${act}-${start}-${dur}-${note}`;
+}
+
 /* Convert legacy {start, slots} blocks → {startMin, durationMin}.
    Safe to call repeatedly; checks per block. */
 function migrateBlocks() {
@@ -2877,16 +2937,21 @@ function migrateBlocks() {
     Object.keys(weeks).forEach(key=>{
       const blocks = weeks[key];
       if (!Array.isArray(blocks)) return;
-      weeks[key] = blocks.map(b=>{
-        if (b.startMin != null && b.durationMin != null) return b;
-        if (b.start != null && b.slots != null) {
-          return {
-            ...b,
-            startMin: START_MIN + b.start*15,
-            durationMin: b.slots*15,
-          };
+      weeks[key] = blocks.map((b, idx)=>{
+        let next = b;
+        if (b.startMin == null || b.durationMin == null) {
+          if (b.start != null && b.slots != null) {
+            next = {
+              ...b,
+              startMin: START_MIN + b.start*15,
+              durationMin: b.slots*15,
+            };
+          }
         }
-        return b;
+        if (next?.id == null) {
+          next = { ...next, id: ensureBlockId(key, next, idx) };
+        }
+        return next;
       });
     });
   });
@@ -2897,24 +2962,34 @@ function saveLocal() {
 function pushToFirebase() {
   if (!fbDB || !fbConnected) {
     hasPendingSync = true;
+    lastSyncError = '';
     renderPendingSyncMessage();
     return;
   }
+  const writeAt = Date.now();
+  lastLocalWriteAt = Math.max(lastLocalWriteAt, writeAt);
   const payload = {
     profiles: state.profiles,
     shared: state.shared,
-    _meta: { updatedAt: Date.now() },
+    _meta: { updatedAt: writeAt },
   };
-  hasPendingSync = false;
+  lastSyncError = '';
   renderPendingSyncMessage();
+  setSyncStatus('syncing', 'Uploading…');
   fbDB.ref(FB_ROOT).update(payload).catch(e=>{
     hasPendingSync = true;
+    lastSyncError = e?.code || e?.message || 'write failed';
     renderPendingSyncMessage();
     console.error('FB push failed', e);
+    setSyncStatus('online', 'Synced (connection only)');
+  }).then(() => {
+    if (!hasPendingSync) setSyncStatus('online', 'Synced');
   });
 }
 function saveAll() {
   saveLocal();
+  hasPendingSync = true;
+  renderPendingSyncMessage();
   pushToFirebase();
 }
 function mergeArrayById(localArr, remoteArr) {
