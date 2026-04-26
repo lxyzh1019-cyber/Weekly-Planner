@@ -1273,7 +1273,29 @@
     align-items: start;
     margin-bottom: 0.45rem;
   }
-  .sheet-time-grid-row h4 { margin-top: 0.1rem; }
+  .sheet-time-col {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .sheet-time-grid-row h4 { margin-top: 0.1rem; min-height: 1.55rem; }
+  .sheet-time-main {
+    min-height: 168px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+  .sheet-time-main .sheet-row { margin-bottom: 0; }
+  .duration-align-spacer {
+    height: 74px;
+    margin-bottom: 0.35rem;
+  }
+  .sheet-time-custom-row {
+    min-height: 54px;
+    display: flex;
+    align-items: flex-start;
+  }
+  .sheet-time-custom-row > * { width: 100%; }
   .sheet-toggle-row { margin-top: 0.45rem; margin-bottom: 0.45rem; }
   .edit-primary-toggle-row {
     display: grid;
@@ -1309,6 +1331,8 @@
   }
   @media (max-width: 560px) {
     .sheet-time-grid-row { grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+    .sheet-time-main { min-height: 162px; }
+    .duration-align-spacer { height: 70px; }
     .sheet h4 { font-size: 1.16rem; margin: 0.5rem 0 0.28rem; }
     .repeat-toggle, .buffer-toggle { padding: 0.45rem 0.6rem; margin-bottom: 0.35rem; }
     .toggle-label { font-size: 0.96rem; }
@@ -2263,12 +2287,14 @@
     <div class="sheet-handle"></div>
     <h3 id="activitySheetTitle"></h3>
     <div class="sheet-time-grid-row">
-      <div>
+      <div class="sheet-time-col">
         <h4>START TIME</h4>
+        <div class="sheet-time-spacer" aria-hidden="true"></div>
         <div id="activityStartPicker"></div>
       </div>
-      <div>
+      <div class="sheet-time-col">
         <h4>DURATION</h4>
+        <div class="sheet-time-spacer" aria-hidden="true"></div>
         <div class="sheet-row" id="activityDurBtns"></div>
         <div id="activityCustomDur"></div>
       </div>
@@ -2321,12 +2347,14 @@
     </div>
 
     <div class="sheet-time-grid-row">
-      <div>
+      <div class="sheet-time-col">
         <h4>START TIME</h4>
+        <div class="sheet-time-spacer" aria-hidden="true"></div>
         <div id="editStartPicker"></div>
       </div>
-      <div>
+      <div class="sheet-time-col">
         <h4>DURATION</h4>
+        <div class="sheet-time-spacer" aria-hidden="true"></div>
         <div class="sheet-row" id="editDurBtns"></div>
         <div id="editCustomDur"></div>
       </div>
@@ -5037,10 +5065,10 @@ function renderCustomDuration(containerId, curMin, onChange, onAfterChange) {
   row.className = 'custom-time-row';
   row.innerHTML = `<label>Custom min:</label>`;
   const input = document.createElement('input');
-  input.type = 'number'; input.min = 5; input.max = 480; input.step = 5;
+  input.type = 'number'; input.min = 1; input.max = 480; input.step = 1;
   input.value = curMin;
   input.onchange = ()=>{
-    const m = Math.max(5, Math.min(480, Math.round(parseInt(input.value||15)/5)*5));
+    const m = Math.max(1, Math.min(480, parseInt(input.value||15, 10) || 15));
     onChange(m);
     if (typeof onAfterChange === 'function') onAfterChange(m);
   };
