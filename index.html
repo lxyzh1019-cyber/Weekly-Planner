@@ -2592,6 +2592,7 @@ let lastSyncError = '';
 let syncRetryTimer = null;
 let lastLocalWriteAt = 0;
 let lastRemoteSeenAt = 0;
+const SHOW_SYNC_DEBUG = false;
 
 function initFirebase() {
   try {
@@ -2692,6 +2693,12 @@ function shortTs(ts) {
 function renderSyncDebugMessage() {
   const el = document.getElementById('syncDebugMsg');
   if (!el) return;
+  if (!SHOW_SYNC_DEBUG) {
+    el.style.display = 'none';
+    el.textContent = '';
+    return;
+  }
+  el.style.display = '';
   el.textContent = `dbg c:${fbConnected?1:0} p:${hasPendingSync?1:0} lw:${shortTs(lastLocalWriteAt)} rr:${shortTs(lastRemoteSeenAt)} err:${lastSyncError||'-'}`;
 }
 
