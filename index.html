@@ -272,7 +272,7 @@
   .tg-quarter {
     flex: 1 1 0;
     min-height: 6px;
-    border-bottom: 1px dashed rgba(42,35,32,0.08);
+    border-bottom: 1px solid rgba(42,35,32,0.03);
     box-sizing: border-box;
   }
   .tg-quarter:last-child { border-bottom: none; }
@@ -290,15 +290,21 @@
     background-image: linear-gradient(180deg, rgba(255,244,219,0.2) 0%, transparent 100%);
   }
   .tg-hour-cell.tg-col-today-border {
-    box-shadow: inset 0 0 0 1px rgba(255,123,84,0.5);
+    border-left: 3px solid #2f8f84;
+    border-right: 3px solid #2f8f84;
+    box-shadow: none;
+  }
+  .tg-head.tg-col-today-border {
+    border-top: 3px solid #2f8f84;
+  }
+  .tg-hour-cell.tg-col-today-border.tg-col-today-bottom {
+    border-bottom: 3px solid #2f8f84;
   }
   .tg-hour-free {
-    position: absolute;
-    left: 2px;
-    right: 2px;
-    border-radius: 4px;
+    border-radius: 0;
     z-index: 1;
     pointer-events: none;
+    opacity: 0.95;
   }
   .tg-wrap.inverted .tg-seg-abs {
     border-color: rgba(107,93,79,0.35);
@@ -2873,23 +2879,69 @@ function saveLocal() {
 }
 function pushToFirebase() {
   if (!fbDB || !fbConnected) return;
-  fbDB.ref(FB_ROOT).set(state).catch(e=>console.error('FB push failed', e));
+  const payload = {
+    profiles: state.profiles,
+    shared: state.shared,
+    _meta: { updatedAt: Date.now() },
+  };
+  fbDB.ref(FB_ROOT).update(payload).catch(e=>console.error('FB push failed', e));
 }
 function saveAll() {
   saveLocal();
   pushToFirebase();
 }
+function mergeArrayById(localArr, remoteArr) {
+  const map = new Map();
+  (localArr || []).forEach(item => {
+    if (!item || item.id == null) return;
+    map.set(item.id, item);
+  });
+  (remoteArr || []).forEach(item => {
+    if (!item || item.id == null) return;
+    const prev = map.get(item.id);
+    if (!prev) {
+      map.set(item.id, item);
+      return;
+    }
+    const prevTs = prev.updatedAt || prev.createdAt || 0;
+    const nextTs = item.updatedAt || item.createdAt || 0;
+    map.set(item.id, nextTs >= prevTs ? item : prev);
+  });
+  return Array.from(map.values());
+}
+function mergeWeeks(localWeeks, remoteWeeks) {
+  const merged = { ...(localWeeks || {}) };
+  Object.entries(remoteWeeks || {}).forEach(([dayKey, remoteBlocks]) => {
+    const localBlocks = merged[dayKey] || [];
+    merged[dayKey] = mergeArrayById(localBlocks, remoteBlocks);
+  });
+  return merged;
+}
 function mergeRemoteState(remote) {
   if (!remote) return;
-  // Simple last-write-wins merge at top level; per-profile merge for weeks
   if (remote.profiles) {
     ['jenn','jess'].forEach(p => {
-      if (remote.profiles[p]) {
-        state.profiles[p] = { ...state.profiles[p], ...remote.profiles[p] };
-      }
+      const lp = state.profiles[p] || {};
+      const rp = remote.profiles[p] || {};
+      state.profiles[p] = {
+        ...lp,
+        ...rp,
+        weeks: mergeWeeks(lp.weeks, rp.weeks),
+      };
     });
   }
-  if (remote.shared) state.shared = { ...state.shared, ...remote.shared };
+  if (remote.shared) {
+    const ls = state.shared || {};
+    const rs = remote.shared || {};
+    state.shared = {
+      ...ls,
+      ...rs,
+      invites: mergeArrayById(ls.invites, rs.invites),
+      challenges: mergeArrayById(ls.challenges, rs.challenges),
+      customTasks: mergeArrayById(ls.customTasks, rs.customTasks),
+      routineTemplates: mergeArrayById(ls.routineTemplates, rs.routineTemplates),
+    };
+  }
   migrateBlocks();
   saveLocal();
   refreshCurrentScreen();
@@ -2944,8 +2996,24 @@ function getAllActivities(p=activeProfile()) {
 }
 
 /* Week utils */
+const APP_TIMEZONE = 'America/Edmonton';
+function toDayKeyInZone(date, timeZone = APP_TIMEZONE) {
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  return fmt.format(date);
+}
+function dateToLocalKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth()+1).padStart(2,'0');
+  const d = String(date.getDate()).padStart(2,'0');
+  return `${y}-${m}-${d}`;
+}
 function getWeekStart(offset=0) {
-  const now = new Date();
+  const now = formatDayKey(toDayKeyInZone(new Date()));
   const day = now.getDay();
   const mon = new Date(now);
   mon.setDate(now.getDate() - (day===0?6:day-1) + offset*7);
@@ -2956,11 +3024,11 @@ function getDayKeys(offset=0) {
   const mon = getWeekStart(offset);
   return Array.from({length:7}, (_,i)=>{
     const d = new Date(mon); d.setDate(mon.getDate()+i);
-    return d.toISOString().slice(0,10);
+    return dateToLocalKey(d);
   });
 }
 function formatDayKey(key) { const [y,m,d]=key.split('-'); return new Date(+y,+m-1,+d); }
-function todayKey() { return new Date().toISOString().slice(0,10); }
+function todayKey() { return toDayKeyInZone(new Date()); }
 const DAY_SHORT = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const DAY_LONG  = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -3187,7 +3255,7 @@ function renderTimeGrid(keys) {
   keys.forEach((key, i)=>{
     const d = formatDayKey(key);
     const head = document.createElement('div');
-    head.className = 'tg-cell tg-head tg-day-link'+(key===today?' today':'');
+    head.className = 'tg-cell tg-head tg-day-link'+(key===today?' today tg-col-today-border':'');
     head.textContent = `${DAY_SHORT[i]} ${d.getDate()}`;
     head.onclick = ()=>openDay(key, i);
     grid.appendChild(head);
@@ -3209,7 +3277,9 @@ function renderTimeGrid(keys) {
 
     keys.forEach((key, dayIdx) => {
       const cell = document.createElement('div');
-      cell.className = 'tg-cell tg-hour-cell' + (key === today ? ' tg-col-today-border' : '');
+      const isTodayCol = key === today;
+      const isLastHourRow = h === endHour - 1;
+      cell.className = 'tg-cell tg-hour-cell' + (isTodayCol ? ' tg-col-today-border' : '') + ((isTodayCol && isLastHourRow) ? ' tg-col-today-bottom' : '');
 
       const blocks = getDayBlocks(key);
       const hourStartAbs = h*60;
@@ -4254,7 +4324,7 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
           const jsDow = d.getDay();
           const internalIdx = jsDow === 0 ? 6 : jsDow - 1;
           if (!targetSet.has(internalIdx)) continue;
-          const targetKey = d.toISOString().slice(0,10);
+          const targetKey = dateToLocalKey(d);
           if (targetKey === currentDayKey) continue; // already placed
           const db = getDayBlocks(targetKey);
           // Avoid duplicating: skip if same series already on that day
@@ -5788,7 +5858,7 @@ function openChallenges() {
 function renderChallenges() {
   const list = document.getElementById('challengesList');
   list.innerHTML = '';
-  const weekStart = getWeekStart(weekOffset).toISOString().slice(0,10);
+  const weekStart = dateToLocalKey(getWeekStart(weekOffset));
   const challenges = (state.shared.challenges||[]).filter(c=>c.weekStart===weekStart);
   if (!challenges.length) {
     list.innerHTML = '<p style="color:var(--ink-light);font-size:0.95rem">No goals yet. Tap ＋ to add one!</p>';
@@ -5867,7 +5937,7 @@ function confirmNewChallenge() {
     target: parseInt(document.getElementById('chTarget').value)||1,
     who: document.getElementById('chWho').value,
     createdAt: Date.now(),
-    weekStart: getWeekStart(weekOffset).toISOString().slice(0,10),
+    weekStart: dateToLocalKey(getWeekStart(weekOffset)),
   };
   state.shared.challenges = [...(state.shared.challenges||[]), c];
   saveAll();
@@ -6440,7 +6510,7 @@ function parentSwitchView() {
 const GT_COLOURS = ['#ff7b54','#ffd166','#95d5b2','#6fb1fc','#c3aed6','#ff9eb5','#8ecae6','#b5ead7'];
 
 function getCurrentWeekKey() {
-  return getWeekStart(weekOffset).toISOString().slice(0,10);
+  return dateToLocalKey(getWeekStart(weekOffset));
 }
 
 function ensureGtFields(p) {
@@ -6798,7 +6868,7 @@ function renderParentMonthly() {
 
   for (let d = 1; d <= lastDay; d++) {
     const dateObj = new Date(year, month, d);
-    const key = dateObj.toISOString().slice(0,10);
+    const key = dateToLocalKey(dateObj);
     const dayIdx = (dateObj.getDay() + 6) % 7;
 
     // Sum durations from blocks across all weeks (data is stored by week-key)
