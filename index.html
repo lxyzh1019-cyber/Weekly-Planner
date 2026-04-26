@@ -2868,6 +2868,15 @@ function loadLocal() {
   } catch(e){ console.warn('Local load failed', e); }
 }
 
+function ensureBlockId(dayKey, block, idx) {
+  if (block && block.id != null) return block.id;
+  const act = block?.actId || 'act';
+  const start = block?.startMin ?? block?.start ?? 0;
+  const dur = block?.durationMin ?? block?.slots ?? 0;
+  const note = (block?.note || '').slice(0, 24);
+  return `blk-${dayKey}-${idx}-${act}-${start}-${dur}-${note}`;
+}
+
 /* Convert legacy {start, slots} blocks → {startMin, durationMin}.
    Safe to call repeatedly; checks per block. */
 function migrateBlocks() {
@@ -2877,16 +2886,21 @@ function migrateBlocks() {
     Object.keys(weeks).forEach(key=>{
       const blocks = weeks[key];
       if (!Array.isArray(blocks)) return;
-      weeks[key] = blocks.map(b=>{
-        if (b.startMin != null && b.durationMin != null) return b;
-        if (b.start != null && b.slots != null) {
-          return {
-            ...b,
-            startMin: START_MIN + b.start*15,
-            durationMin: b.slots*15,
-          };
+      weeks[key] = blocks.map((b, idx)=>{
+        let next = b;
+        if (b.startMin == null || b.durationMin == null) {
+          if (b.start != null && b.slots != null) {
+            next = {
+              ...b,
+              startMin: START_MIN + b.start*15,
+              durationMin: b.slots*15,
+            };
+          }
         }
-        return b;
+        if (next?.id == null) {
+          next = { ...next, id: ensureBlockId(key, next, idx) };
+        }
+        return next;
       });
     });
   });
