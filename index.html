@@ -1275,6 +1275,16 @@
   }
   .sheet-time-grid-row h4 { margin-top: 0.1rem; }
   .sheet-toggle-row { margin-top: 0.45rem; margin-bottom: 0.45rem; }
+  .edit-primary-toggle-row {
+    display: grid;
+    grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+    gap: 0.5rem;
+    margin: 0.35rem 0 0.45rem;
+  }
+  .edit-primary-toggle-row .sheet-toggle-row {
+    margin: 0;
+    min-width: 0;
+  }
   .block-stopwatch-btn {
     margin-top: 0.25rem;
     width: 100%;
@@ -1303,6 +1313,7 @@
     .repeat-toggle, .buffer-toggle { padding: 0.45rem 0.6rem; margin-bottom: 0.35rem; }
     .toggle-label { font-size: 0.96rem; }
     #inviteSisterBtn { display: none !important; }
+    .edit-primary-toggle-row { grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 0.35rem; }
   }
 
   .pill-btn {
@@ -5308,13 +5319,13 @@ function openEditSheet(blockId) {
     document.getElementById('confirmToggle').classList.toggle('on', !!block.confirmed);
   } else ppWrap.style.display = 'none';
 
-  // Sister Sync wrap (only for child profiles, not parent)
+  // Sister Sync per-activity controls: parent-only
   const ssWrap = document.getElementById('sisterSyncWrap');
-  if (!isParent() && (activeProfile()==='jenn' || activeProfile()==='jess')) {
+  if (isParent()) {
     ssWrap.style.display = 'block';
     document.getElementById('publicToggle').classList.toggle('on', !!block.public);
     const inviteBtn = document.getElementById('inviteSisterBtn');
-    const sister = activeProfile()==='jenn' ? 'jess' : 'jenn';
+    const sister = parentViewing==='jenn' ? 'jess' : 'jenn';
     const alreadyInvited = Array.isArray(block.invitedTo) && block.invitedTo.includes(sister);
     inviteBtn.style.display = 'block';
     inviteBtn.textContent = alreadyInvited
