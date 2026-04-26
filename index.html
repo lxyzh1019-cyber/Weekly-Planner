@@ -2580,6 +2580,8 @@ const FB_ROOT = 'weeklyPlanner';
 
 let fbApp = null, fbDB = null, fbConnected = false;
 let hasPendingSync = false;
+let lastSyncError = '';
+let syncRetryTimer = null;
 
 function initFirebase() {
   try {
@@ -2598,6 +2600,11 @@ function initFirebase() {
         pushToFirebase();
       }
     });
+    if (!syncRetryTimer) {
+      syncRetryTimer = setInterval(() => {
+        if (fbConnected && hasPendingSync) pushToFirebase();
+      }, 5000);
+    }
 
     // Listen for changes and merge
     fbDB.ref(FB_ROOT).on('value', snap => {
@@ -2623,7 +2630,17 @@ function setSyncStatus(state, label) {
 function renderPendingSyncMessage() {
   const pending = document.getElementById('syncPendingMsg');
   if (!pending) return;
-  pending.textContent = hasPendingSync ? 'Pending sync: local changes will upload once online.' : '';
+  if (hasPendingSync && fbConnected) {
+    pending.textContent = lastSyncError
+      ? `Pending sync: upload retrying (${lastSyncError}).`
+      : 'Pending sync: upload retrying…';
+    return;
+  }
+  if (hasPendingSync) {
+    pending.textContent = 'Pending sync: local changes will upload once online.';
+    return;
+  }
+  pending.textContent = '';
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -2911,6 +2928,7 @@ function saveLocal() {
 function pushToFirebase() {
   if (!fbDB || !fbConnected) {
     hasPendingSync = true;
+    lastSyncError = '';
     renderPendingSyncMessage();
     return;
   }
@@ -2920,11 +2938,17 @@ function pushToFirebase() {
     _meta: { updatedAt: Date.now() },
   };
   hasPendingSync = false;
+  lastSyncError = '';
   renderPendingSyncMessage();
+  setSyncStatus('syncing', 'Uploading…');
   fbDB.ref(FB_ROOT).update(payload).catch(e=>{
     hasPendingSync = true;
+    lastSyncError = e?.code || e?.message || 'write failed';
     renderPendingSyncMessage();
     console.error('FB push failed', e);
+    setSyncStatus('online', 'Synced (connection only)');
+  }).then(() => {
+    if (!hasPendingSync) setSyncStatus('online', 'Synced');
   });
 }
 function saveAll() {
