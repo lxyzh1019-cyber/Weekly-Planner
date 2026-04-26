@@ -2572,6 +2572,7 @@ const FIREBASE_CONFIG = {
 const FB_ROOT = 'weeklyPlanner';
 
 let fbApp = null, fbDB = null, fbConnected = false;
+let hasPendingSync = false;
 
 function initFirebase() {
   try {
@@ -2586,6 +2587,9 @@ function initFirebase() {
     fbDB.ref('.info/connected').on('value', snap => {
       fbConnected = !!snap.val();
       setSyncStatus(fbConnected?'online':'offline', fbConnected?'Synced':'Offline');
+      if (fbConnected && hasPendingSync) {
+        pushToFirebase();
+      }
     });
 
     // Listen for changes and merge
@@ -2878,13 +2882,20 @@ function saveLocal() {
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e){}
 }
 function pushToFirebase() {
-  if (!fbDB || !fbConnected) return;
+  if (!fbDB || !fbConnected) {
+    hasPendingSync = true;
+    return;
+  }
   const payload = {
     profiles: state.profiles,
     shared: state.shared,
     _meta: { updatedAt: Date.now() },
   };
-  fbDB.ref(FB_ROOT).update(payload).catch(e=>console.error('FB push failed', e));
+  hasPendingSync = false;
+  fbDB.ref(FB_ROOT).update(payload).catch(e=>{
+    hasPendingSync = true;
+    console.error('FB push failed', e);
+  });
 }
 function saveAll() {
   saveLocal();
