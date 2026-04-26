@@ -2582,6 +2582,8 @@ let fbApp = null, fbDB = null, fbConnected = false;
 let hasPendingSync = false;
 let lastSyncError = '';
 let syncRetryTimer = null;
+let lastLocalWriteAt = 0;
+let lastRemoteSeenAt = 0;
 
 function initFirebase() {
   try {
@@ -2609,7 +2611,15 @@ function initFirebase() {
     // Listen for changes and merge
     fbDB.ref(FB_ROOT).on('value', snap => {
       const remote = snap.val() || {};
+      const remoteTs = remote?._meta?.updatedAt || 0;
+      if (remoteTs) lastRemoteSeenAt = Math.max(lastRemoteSeenAt, remoteTs);
       mergeRemoteState(remote);
+      if (hasPendingSync && remoteTs && remoteTs >= lastLocalWriteAt) {
+        hasPendingSync = false;
+        lastSyncError = '';
+        setSyncStatus('online', 'Synced');
+        renderPendingSyncMessage();
+      }
     });
   } catch(e) {
     console.error('Firebase init failed', e);
@@ -2932,12 +2942,13 @@ function pushToFirebase() {
     renderPendingSyncMessage();
     return;
   }
+  const writeAt = Date.now();
+  lastLocalWriteAt = Math.max(lastLocalWriteAt, writeAt);
   const payload = {
     profiles: state.profiles,
     shared: state.shared,
-    _meta: { updatedAt: Date.now() },
+    _meta: { updatedAt: writeAt },
   };
-  hasPendingSync = false;
   lastSyncError = '';
   renderPendingSyncMessage();
   setSyncStatus('syncing', 'Uploading…');
@@ -2953,6 +2964,8 @@ function pushToFirebase() {
 }
 function saveAll() {
   saveLocal();
+  hasPendingSync = true;
+  renderPendingSyncMessage();
   pushToFirebase();
 }
 function mergeArrayById(localArr, remoteArr) {
