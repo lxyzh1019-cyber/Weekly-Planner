@@ -209,6 +209,12 @@
   }
   .sync-dot.offline { background: #ccc; box-shadow: none; }
   .sync-dot.syncing { background: var(--accent-yellow); animation: pulse 1s infinite; }
+  .sync-pending-msg {
+    margin-top: 0.35rem;
+    font-size: 0.78rem;
+    color: var(--ink-light);
+    min-height: 1.1rem;
+  }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
   /* ═══════════ WEEK VIEW ═══════════ */
@@ -1802,6 +1808,7 @@
   </div>
   <p style="position:absolute;bottom:1rem;color:var(--ink-light);font-size:0.8rem">
     <span id="fbStatus">⚙️ Connecting...</span>
+    <br><span id="syncPendingMsg" class="sync-pending-msg"></span>
   </p>
 </div>
 
@@ -2611,6 +2618,12 @@ function setSyncStatus(state, label) {
     if (state==='syncing') dot.classList.add('syncing');
   }
   if (fb) fb.textContent = (state==='online'?'☁️ ':state==='offline'?'💾 ':'⏳ ')+label;
+  renderPendingSyncMessage();
+}
+function renderPendingSyncMessage() {
+  const pending = document.getElementById('syncPendingMsg');
+  if (!pending) return;
+  pending.textContent = hasPendingSync ? 'Pending sync: local changes will upload once online.' : '';
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -2884,6 +2897,7 @@ function saveLocal() {
 function pushToFirebase() {
   if (!fbDB || !fbConnected) {
     hasPendingSync = true;
+    renderPendingSyncMessage();
     return;
   }
   const payload = {
@@ -2892,8 +2906,10 @@ function pushToFirebase() {
     _meta: { updatedAt: Date.now() },
   };
   hasPendingSync = false;
+  renderPendingSyncMessage();
   fbDB.ref(FB_ROOT).update(payload).catch(e=>{
     hasPendingSync = true;
+    renderPendingSyncMessage();
     console.error('FB push failed', e);
   });
 }
