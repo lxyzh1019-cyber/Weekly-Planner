@@ -8,7 +8,7 @@
 
 <!-- Firebase (compat builds for simplicity) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
 <style>
   :root {
@@ -2582,10 +2582,11 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "282740057913",
   appId: "1:282740057913:web:72defcf2e53ae13237eae8"
 };
-// Root path in your Firebase DB (won't conflict with French app data)
-const FB_ROOT = 'weeklyPlanner';
+// Shared document for planner cloud sync
+const FS_COLLECTION = 'weekly_planner';
+const FS_DOC_ID = 'shared_state';
 
-let fbApp = null, fbDB = null, fbConnected = false;
+let fbApp = null, fbStore = null, fbDocRef = null, fbConnected = false;
 let hasPendingSync = false;
 let lastSyncError = '';
 let syncRetryTimer = null;
@@ -2599,16 +2600,23 @@ function initFirebase() {
       return;
     }
     fbApp = firebase.initializeApp(FIREBASE_CONFIG);
-    fbDB = firebase.database();
+    fbStore = firebase.firestore();
+    fbDocRef = fbStore.collection(FS_COLLECTION).doc(FS_DOC_ID);
+    fbConnected = !!navigator.onLine;
     setSyncStatus('syncing','Connecting…');
 
-    fbDB.ref('.info/connected').on('value', snap => {
-      fbConnected = !!snap.val();
-      setSyncStatus(fbConnected?'online':'offline', fbConnected?'Synced':'Offline');
-      if (fbConnected && hasPendingSync) {
-        pushToFirebase();
-      }
+    window.addEventListener('online', () => {
+      fbConnected = true;
+      setSyncStatus('online', 'Synced');
+      if (hasPendingSync) pushToFirebase();
     });
+    window.addEventListener('offline', () => {
+      fbConnected = false;
+      setSyncStatus('offline', 'Offline');
+    });
+
+    if (!fbConnected) setSyncStatus('offline', 'Offline');
+
     if (!syncRetryTimer) {
       syncRetryTimer = setInterval(() => {
         if (fbConnected && hasPendingSync) pushToFirebase();
@@ -2616,8 +2624,12 @@ function initFirebase() {
     }
 
     // Listen for changes and merge
-    fbDB.ref(FB_ROOT).on('value', snap => {
-      const remote = snap.val() || {};
+    fbDocRef.onSnapshot(snap => {
+      if (!snap.exists) {
+        setSyncStatus(fbConnected ? 'online' : 'offline', fbConnected ? 'Synced' : 'Offline');
+        return;
+      }
+      const remote = snap.data() || {};
       const remoteTs = remote?._meta?.updatedAt || 0;
       if (remoteTs) lastRemoteSeenAt = Math.max(lastRemoteSeenAt, remoteTs);
       mergeRemoteState(remote);
@@ -2627,6 +2639,12 @@ function initFirebase() {
         setSyncStatus('online', 'Synced');
         renderPendingSyncMessage();
       }
+    }, err => {
+      fbConnected = !!navigator.onLine;
+      setSyncStatus(fbConnected ? 'online' : 'offline', fbConnected ? 'Synced (connection only)' : 'Offline');
+      lastSyncError = err?.code || err?.message || 'read denied';
+      renderPendingSyncMessage();
+      console.error('Firestore listen failed', err);
     });
   } catch(e) {
     console.error('Firebase init failed', e);
@@ -2960,7 +2978,7 @@ function saveLocal() {
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e){}
 }
 function pushToFirebase() {
-  if (!fbDB || !fbConnected) {
+  if (!fbDocRef || !fbConnected) {
     hasPendingSync = true;
     lastSyncError = '';
     renderPendingSyncMessage();
@@ -2976,11 +2994,11 @@ function pushToFirebase() {
   lastSyncError = '';
   renderPendingSyncMessage();
   setSyncStatus('syncing', 'Uploading…');
-  fbDB.ref(FB_ROOT).update(payload).catch(e=>{
+  fbDocRef.set(payload, { merge: true }).catch(e=>{
     hasPendingSync = true;
     lastSyncError = e?.code || e?.message || 'write failed';
     renderPendingSyncMessage();
-    console.error('FB push failed', e);
+    console.error('Firestore push failed', e);
     setSyncStatus('online', 'Synced (connection only)');
   }).then(() => {
     if (!hasPendingSync) setSyncStatus('online', 'Synced');
