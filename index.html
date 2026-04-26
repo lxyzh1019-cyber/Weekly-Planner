@@ -287,8 +287,18 @@
     box-sizing: border-box;
   }
   .tg-hour-cell.tg-col-today {
-    box-shadow: inset 0 0 0 2px rgba(255,123,84,0.45);
-    background-image: linear-gradient(180deg, rgba(255,244,219,0.35) 0%, transparent 100%);
+    background-image: linear-gradient(180deg, rgba(255,244,219,0.2) 0%, transparent 100%);
+  }
+  .tg-hour-cell.tg-col-today-border {
+    box-shadow: inset 0 0 0 1px rgba(255,123,84,0.5);
+  }
+  .tg-hour-free {
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    border-radius: 4px;
+    z-index: 1;
+    pointer-events: none;
   }
   .tg-wrap.inverted .tg-seg-abs {
     border-color: rgba(107,93,79,0.35);
@@ -597,7 +607,7 @@
   /* ═══════════ GOALS + TODOS PANEL ═══════════ */
   .gt-panel {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 0.8rem;
     padding: 0.8rem;
     padding-bottom: 4rem;
@@ -669,6 +679,10 @@
     font-size: 1.01rem; color: #5a4d41;
     text-align: center; padding: 1rem 0;
   }
+  .gt-achievement-row { align-items: flex-start; }
+  .gt-achievement-meta { font-size: 0.92rem; color: #5a4d41; }
+  .gt-achievement-controls { display:flex; flex-direction:column; gap:0.25rem; margin-left:auto; }
+  .gt-achievement-controls .pill-btn { font-size:0.85rem; padding:0.2rem 0.45rem; }
   @media (max-width: 720px) {
     .gt-panel { grid-template-columns: 1fr; }
   }
@@ -733,6 +747,10 @@
   .wf-zone-cell:nth-last-child(-n+7) { border-bottom: none; } /* last row of cells */
   .wf-zone-cell.today { background: #fff4db; }
   .wf-zone-cell:hover:not(:has(.wf-card:hover)) { background: #fff9e6; }
+  .wf-zone-before { min-height: 84px; }
+  .wf-zone-school { min-height: 190px; }
+  .wf-zone-after { min-height: 116px; }
+  .wf-zone-evening { min-height: 92px; }
   .wf-cell-empty {
     flex: 1;
     min-height: 44px;
@@ -1879,6 +1897,14 @@
       <p class="gt-hint">Just for this week. Tick them off when done.</p>
       <div id="todosList"></div>
     </div>
+    <div class="gt-col">
+      <div class="gt-col-header">
+        <h3>🏅 Achievements</h3>
+        <button class="btn-icon gt-add-btn" onclick="addAchievement()" title="Add achievement">＋</button>
+      </div>
+      <p class="gt-hint">Link to one activity and track weekly progress.</p>
+      <div id="achievementsList"></div>
+    </div>
   </div>
 </div>
 
@@ -2123,6 +2149,14 @@
       <div class="toggle-track"><div class="toggle-knob"></div></div>
       <span class="toggle-label">🚗 Needs travel time (adds 15 min before & after)</span>
     </div>
+    <div class="buffer-toggle" id="trainingReadyToggle" onclick="toggleGetReadyBuffer('training')">
+      <div class="toggle-track"><div class="toggle-knob"></div></div>
+      <span class="toggle-label">👕 Needs get ready time (adds 15 min before & after)</span>
+    </div>
+    <div id="trainingGearWrap">
+      <h4>GEAR LIST</h4>
+      <div class="checklist-wrap" id="trainingGearList"></div>
+    </div>
 
     <div class="repeat-toggle" id="trainingRepeat" onclick="toggleRepeat('trainingRepeat')">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
@@ -2225,6 +2259,14 @@
     <div class="buffer-toggle" id="editTravelToggle" onclick="toggleEditTravelBuffer()">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
       <span class="toggle-label">🚗 Needs travel time</span>
+    </div>
+    <div class="buffer-toggle" id="editReadyToggle" onclick="toggleEditGetReadyBuffer()" style="display:none">
+      <div class="toggle-track"><div class="toggle-knob"></div></div>
+      <span class="toggle-label">👕 Needs get ready time</span>
+    </div>
+    <div id="editTrainingGearWrap" style="display:none">
+      <h4>GEAR LIST</h4>
+      <div class="checklist-wrap" id="editTrainingGearList"></div>
     </div>
 
     <div class="repeat-toggle" id="editCompleteToggle" onclick="toggleEditComplete()">
@@ -2774,7 +2816,7 @@ let currentZone = 'all';
 let currentTrayFilter = 'all';
 let activeTimers = {}; // itemKey -> {remaining, interval}
 
-let ts  = { durationMin:120, colour: CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays: [], travelBuffer:false };
+let ts  = { durationMin:120, colour: CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays: [], travelBuffer:false, getReadyBuffer:false, gearState:{} };
 let as_ = { durationMin:60,  colour: COLOURS[0], note:'', repeat:false, repeatDays: [], travelBuffer:false };
 
 function isParent() { return profile === 'parent'; }
@@ -3167,7 +3209,7 @@ function renderTimeGrid(keys) {
 
     keys.forEach((key, dayIdx) => {
       const cell = document.createElement('div');
-      cell.className = 'tg-cell tg-hour-cell' + (key === today ? ' tg-col-today' : '');
+      cell.className = 'tg-cell tg-hour-cell' + (key === today ? ' tg-col-today-border' : '');
 
       const blocks = getDayBlocks(key);
       const hourStartAbs = h*60;
@@ -3175,14 +3217,15 @@ function renderTimeGrid(keys) {
       const hits = blocks.filter(b => b.startMin < hourEndAbs && (b.startMin + b.durationMin) > hourStartAbs)
         .sort((a,b)=>a.startMin-b.startMin);
 
+      const stack = document.createElement('div');
+      stack.className = 'tg-hour-stack';
+      for (let q = 0; q < 4; q++) {
+        const qd = document.createElement('div');
+        qd.className = 'tg-quarter';
+        if (inverted) qd.classList.add('tg-hour-free', freeCellCls);
+        stack.appendChild(qd);
+      }
       if (hits.length) {
-        const stack = document.createElement('div');
-        stack.className = 'tg-hour-stack';
-        for (let q = 0; q < 4; q++) {
-          const qd = document.createElement('div');
-          qd.className = 'tg-quarter';
-          stack.appendChild(qd);
-        }
         hits.forEach(hit=>{
           const act = acts.find(a=>a.id===hit.actId);
           const bucket = categorizeBlock(hit, act);
@@ -3206,10 +3249,8 @@ function renderTimeGrid(keys) {
         });
         cell.appendChild(stack);
         cell.onclick = ()=>openDay(key, dayIdx);
-      } else if (inverted) {
-        cell.classList.add(freeCellCls);
-        cell.onclick = ()=>openDay(key, dayIdx);
       } else {
+        cell.appendChild(stack);
         cell.onclick = ()=>openDay(key, dayIdx);
       }
       grid.appendChild(cell);
@@ -3461,13 +3502,14 @@ function renderFullWeek(keys) {
   // For each zone row: zone label + 7 day cells
   ZONES.forEach(z => {
     const zoneLabel = document.createElement('div');
+    zoneLabel.classList.add('wf-zone-'+z.id);
     zoneLabel.className = 'wf-zone-row-label';
     zoneLabel.textContent = z.label;
     grid.appendChild(zoneLabel);
 
     keys.forEach((key, ci) => {
       const cell = document.createElement('div');
-      cell.className = 'wf-zone-cell' + (key===todayKey() ? ' today' : '');
+      cell.className = 'wf-zone-cell wf-zone-'+z.id + (key===todayKey() ? ' today' : '');
       cell.onclick = (e)=>{
         // Only open day if clicked on empty area, not on a card
         if (e.target === cell || e.target.classList.contains('wf-cell-empty')) {
@@ -3500,6 +3542,9 @@ function renderFullWeek(keys) {
           const bg = b.colour || CAT_HEX[act.cat] || '#888';
           const card = document.createElement('div');
           card.className = 'wf-card' + (isLightColour(bg) ? ' light-bg' : '');
+          const zoneDur = Math.max(1, z.end - z.start);
+          const ratio = Math.max(0.22, Math.min(1, (b.durationMin||0) / zoneDur));
+          card.style.minHeight = Math.round(26 + ratio * 140) + 'px';
           card.style.background = bg;
           card.innerHTML = `
             <div class="wf-card-time">${timeStr}</div>
@@ -3686,7 +3731,7 @@ function buildTimeline() {
 
   // Travel buffers (rendered underneath, not counted for collision)
   blocks.forEach(b => {
-    if (!b.travelBuffer) return;
+    if (!b.travelBuffer && !b.getReadyBuffer) return;
     renderTravelBuffers(canvas, b, zMinStart, zMinEnd);
   });
 
@@ -4007,11 +4052,21 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
 }
 
 function renderTravelBuffers(canvas, b, zMinStart, zMinEnd) {
-  const bufDur = 15;
-  [
-    { startMin: b.startMin - bufDur, label: '🚗 ➡' },
-    { startMin: b.startMin + b.durationMin, label: '🚗 ⬅' },
-  ].forEach(({startMin, label})=>{
+  const entries = [];
+  if (b.travelBuffer) {
+    entries.push(
+      { startMin: b.startMin - 15, label: '🚗 ➡ travel' },
+      { startMin: b.startMin + b.durationMin, label: '🚗 ⬅ travel' },
+    );
+  }
+  if (b.getReadyBuffer) {
+    entries.push(
+      { startMin: b.startMin - 15, label: '👕 ➡ ready' },
+      { startMin: b.startMin + b.durationMin, label: '👕 ⬅ ready' },
+    );
+  }
+  entries.forEach(({startMin, label})=>{
+    const bufDur = 15;
     const endMin = startMin + bufDur;
     const bStart = startMin - START_MIN;
     const bEnd   = endMin - START_MIN;
@@ -4030,7 +4085,7 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd) {
     el.style.left = '2px';
     el.style.right = '2px';
     el.style.width = 'calc(100% - 4px)';
-    el.innerHTML = `<div class="block-meta">${label} travel</div>`;
+    el.innerHTML = `<div class="block-meta">${label}</div>`;
     canvas.appendChild(el);
   });
 }
@@ -4058,7 +4113,7 @@ function escapeHtml(str) {
   return d.innerHTML;
 }
 
-function renderSheetTimeSummary(elId, startMin, durationMin, travelOn, bufMin) {
+function renderSheetTimeSummary(elId, startMin, durationMin, travelOn, bufMin, readyOn=false, readyBufMin=15) {
   const el = document.getElementById(elId);
   if (!el) return;
   const dur = Math.max(0, durationMin|0);
@@ -4070,7 +4125,45 @@ function renderSheetTimeSummary(elId, startMin, durationMin, travelOn, bufMin) {
     const homeMin = endMin + b;
     html += `<div class="sheet-time-summary">Home about ${formatTimeFromMin(homeMin)} (after ${b}m travel)</div>`;
   }
+  if (readyOn) {
+    const b = Math.max(0, readyBufMin|0);
+    const prepMin = start - b;
+    html += `<div class="sheet-time-summary">Start getting ready by ${formatTimeFromMin(prepMin)} (adds ${b}m before + ${b}m after)</div>`;
+  }
   el.innerHTML = html;
+}
+
+function getTrainingGearPresets(tag) {
+  if (tag === 'swimming') {
+    return ['Goggles','Swim cap','Swim suit','Towel','Training earphone','Mic','Hat','Board','Hand fins','Leg fins'];
+  }
+  if (tag === 'skating') {
+    return ['Dress','Gloves','Skate','Training list'];
+  }
+  return [];
+}
+
+function renderTrainingGearChecklist(containerId, stateObj, tag) {
+  const wrap = document.getElementById(containerId);
+  if (!wrap) return;
+  const items = getTrainingGearPresets(tag);
+  wrap.innerHTML = '';
+  if (!items.length) {
+    wrap.innerHTML = '<p style="font-size:0.9rem;color:var(--ink-light)">No preset gear for this sport yet.</p>';
+    return;
+  }
+  if (!stateObj.gearState) stateObj.gearState = {};
+  items.forEach((label, idx)=>{
+    const key = `gear-${tag}-${idx}`;
+    const row = document.createElement('div');
+    row.className = 'checklist-item' + (stateObj.gearState[key] ? ' checked' : '');
+    row.innerHTML = `<div class="checklist-check">${stateObj.gearState[key]?'✓':''}</div><span class="checklist-text">${label}</span>`;
+    row.onclick = ()=>{
+      stateObj.gearState[key] = !stateObj.gearState[key];
+      renderTrainingGearChecklist(containerId, stateObj, tag);
+    };
+    wrap.appendChild(row);
+  });
 }
 
 function countChecklistTotal(block, act) {
@@ -4108,7 +4201,7 @@ function handleCanvasTap(e, zMinStart) {
   pendingStartMin = absMin;
 
   if (selectedActivity.isTraining) {
-    ts = { durationMin: selectedActivity.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays:[], travelBuffer:false };
+    ts = { durationMin: selectedActivity.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, gearState:{} };
     openTrainingSheet();
   } else {
     as_ = { durationMin: selectedActivity.durationMin||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false };
@@ -4127,6 +4220,8 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
     tag: opts.tag||null,
     parentPinned: isParent() ? true : false,
     travelBuffer: !!opts.travelBuffer,
+    getReadyBuffer: !!opts.getReadyBuffer,
+    gearState: opts.gearState ? { ...opts.gearState } : {},
     checklistState: {},
     confirmed: false, // Parent confirms before progress counts toward level-up
   };
@@ -4434,6 +4529,9 @@ function renderTrainingSheet() {
   // Travel buffer toggle
   const tbToggle = document.getElementById('trainingTravelToggle');
   tbToggle.classList.toggle('on', ts.travelBuffer);
+  const rbToggle = document.getElementById('trainingReadyToggle');
+  rbToggle.classList.toggle('on', !!ts.getReadyBuffer);
+  renderTrainingGearChecklist('trainingGearList', ts, ts.tag);
 
   // Repeat + day picker
   const rt = document.getElementById('trainingRepeat');
@@ -4445,7 +4543,7 @@ function renderTrainingSheet() {
 
   document.getElementById('trainingNote').value = ts.note;
 
-  renderSheetTimeSummary('trainingTimeSummary', pendingStartMin, ts.durationMin, ts.travelBuffer, 15);
+  renderSheetTimeSummary('trainingTimeSummary', pendingStartMin, ts.durationMin, ts.travelBuffer, 15, !!ts.getReadyBuffer, 15);
 }
 
 function confirmTraining() {
@@ -4456,6 +4554,8 @@ function confirmTraining() {
     tag: ts.tag,
     repeatDays: ts.repeat?ts.repeatDays:[],
     travelBuffer: ts.travelBuffer,
+    getReadyBuffer: !!ts.getReadyBuffer,
+    gearState: ts.gearState || {},
     repeatDateStart: dateStart || null,
     repeatDateEnd:   dateEnd   || null,
   });
@@ -4631,6 +4731,15 @@ function toggleTravelBuffer(which) {
   if (which==='training') { ts.travelBuffer = !ts.travelBuffer; renderTrainingSheet(); }
   else { as_.travelBuffer = !as_.travelBuffer; renderActivitySheet(); }
 }
+function toggleGetReadyBuffer(which) {
+  if (which==='training') { ts.getReadyBuffer = !ts.getReadyBuffer; renderTrainingSheet(); }
+}
+function toggleEditGetReadyBuffer() {
+  editState.getReadyBuffer = !editState.getReadyBuffer;
+  const tg = document.getElementById('editReadyToggle');
+  if (tg) tg.classList.toggle('on', !!editState.getReadyBuffer);
+  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, 15, !!editState.getReadyBuffer, 15);
+}
 
 /* Multi-day picker */
 function renderDayPicker(containerId, selectedDays, onChange) {
@@ -4666,7 +4775,7 @@ function pickPreset(which, preset) {
    EDIT BLOCK SHEET
 ════════════════════════════════════════════════════════════════ */
 let editState = {
-  startMin: null, durationMin: null, travelBuffer: false, repeat: false, repeatDays: [],
+  startMin: null, durationMin: null, travelBuffer: false, getReadyBuffer: false, repeat: false, repeatDays: [],
   completed: false,
   stopwatchEnabled: false,
   stopwatch: { goalSec: null, elapsedSec: 0, running: false, startedAt: null },
@@ -4794,6 +4903,8 @@ function openEditSheet(blockId) {
   editState.startMin    = block.startMin;
   editState.durationMin = block.durationMin;
   editState.travelBuffer = !!block.travelBuffer;
+  editState.getReadyBuffer = !!block.getReadyBuffer;
+  editState.gearState = { ...(block.gearState||{}) }
   editState.repeat = false;
   editState.repeatDays = [];
   // Reset edit-repeat UI to "off"
@@ -4862,10 +4973,21 @@ function openEditSheet(blockId) {
     bmWrap.appendChild(el);
   });
 
-  // Travel buffer
+  // Travel + get-ready buffer
   document.getElementById('editTravelToggle').classList.toggle('on', editState.travelBuffer);
+  const editReady = document.getElementById('editReadyToggle');
+  const editGearWrap = document.getElementById('editTrainingGearWrap');
+  if (act.isTraining) {
+    editReady.style.display = 'flex';
+    editReady.classList.toggle('on', !!editState.getReadyBuffer);
+    editGearWrap.style.display = 'block';
+    renderTrainingGearChecklist('editTrainingGearList', editState, block.tag || 'skating');
+  } else {
+    editReady.style.display = 'none';
+    editGearWrap.style.display = 'none';
+  }
 
-  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, 15);
+  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, 15, !!editState.getReadyBuffer, 15);
   syncEditStopwatchUI();
 
   // Parent pin toggle
@@ -5130,6 +5252,8 @@ function saveEditChanges() {
   const newStart = Math.max(START_MIN, Math.min(END_MIN-15, editState.startMin));
   const newDur   = Math.max(5, Math.min(DAY_MIN_SPAN, editState.durationMin));
   const newTravel = !!editState.travelBuffer;
+  const newGetReady = !!editState.getReadyBuffer;
+  const newGearState = editState.gearState ? { ...editState.gearState } : {};
   const newNote  = document.getElementById('editNoteInput').value;
   const newCompleted = !!editState.completed;
 
@@ -5148,6 +5272,8 @@ function saveEditChanges() {
     blk.startMin !== newStart ||
     blk.durationMin !== newDur ||
     blk.travelBuffer !== newTravel ||
+    !!blk.getReadyBuffer !== newGetReady ||
+    JSON.stringify(blk.gearState||{}) !== JSON.stringify(newGearState||{}) ||
     (blk.note||'') !== newNote ||
     !!blk.completed !== newCompleted ||
     JSON.stringify(blk.stopwatch||null) !== JSON.stringify(newStopwatch)
@@ -5166,6 +5292,8 @@ function saveEditChanges() {
   blk.startMin    = newStart;
   blk.durationMin = newDur;
   blk.travelBuffer = newTravel;
+  blk.getReadyBuffer = newGetReady;
+  blk.gearState = newGearState;
   blk.note = newNote;
   blk.completed = newCompleted;
   if (newStopwatch) blk.stopwatch = newStopwatch;
@@ -5175,7 +5303,7 @@ function saveEditChanges() {
   // Optionally apply same edits to siblings
   if (applyToSeries && blk.seriesId) {
     const seriesPatch = {
-      startMin: newStart, durationMin: newDur, travelBuffer: newTravel, note: newNote,
+      startMin: newStart, durationMin: newDur, travelBuffer: newTravel, getReadyBuffer: newGetReady, gearState: { ...newGearState }, note: newNote,
       completed: newCompleted,
     };
     if (newStopwatch) seriesPatch.stopwatch = { ...newStopwatch };
@@ -5615,7 +5743,14 @@ function renderSync() {
 }
 
 function sendInvite(block, to) {
+  const sisterName = to==='jenn'?'Jenn':'Jess';
+  const act = getAllActivities(profile).find(a=>a.id===block.actId) || getAllActivities().find(a=>a.id===block.actId);
+  const activityLabel = act ? `${act.icon} ${act.name}` : 'this activity';
   const day = currentDayKey || getDayKeys(weekOffset)[syncDayIdx];
+  const dayDate = formatDayKey(day);
+  const dayIdx = (dayDate.getDay()+6)%7;
+  const ok = confirm(`Share ${activityLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(block.startMin)} with ${sisterName}?`);
+  if (!ok) return;
   const inv = {
     id: 'inv-'+Date.now().toString(36),
     from: profile,
@@ -6311,6 +6446,7 @@ function getCurrentWeekKey() {
 function ensureGtFields(p) {
   if (!p.goals) p.goals = [];
   if (!p.todos) p.todos = [];
+  if (!p.achievements) p.achievements = [];
 }
 
 function renderGoalsTodos() {
@@ -6337,6 +6473,15 @@ function renderGoalsTodos() {
     todosList.innerHTML = '<div class="gt-empty">Nothing yet. Tap ＋ to add a to-do.</div>';
   } else {
     weekTodos.forEach(t => todosList.appendChild(buildTodoRow(t)));
+  }
+
+  const achList = document.getElementById('achievementsList');
+  if (!achList) return;
+  achList.innerHTML = '';
+  if (!p.achievements.length) {
+    achList.innerHTML = '<div class="gt-empty">No achievements yet. Tap ＋ to add one.</div>';
+  } else {
+    p.achievements.forEach(a => achList.appendChild(buildAchievementRow(a)));
   }
 }
 
@@ -6462,6 +6607,117 @@ function addGoal() {
     const inputs = document.querySelectorAll('#goalsList .gt-text-input');
     if (inputs.length) inputs[inputs.length-1].focus();
   }, 0);
+}
+
+
+function progressForAchievement(a) {
+  const keys = getDayKeys(weekOffset);
+  const blocks = keys.flatMap(k=>getDayBlocks(k));
+  const linked = blocks.filter(b=>b.actId===a.activityId && b.completed);
+  if (a.mode==='duration') {
+    const value = linked.reduce((sum,b)=>sum+(b.durationMin||0),0);
+    return { value, label: formatDuration(value) };
+  }
+  const value = linked.length;
+  return { value, label: String(value) };
+}
+
+function buildAchievementRow(a) {
+  const row = document.createElement('div');
+  row.className = 'gt-item gt-achievement-row';
+  const acts = getAllActivities();
+  const act = acts.find(x=>x.id===a.activityId);
+  const prog = progressForAchievement(a);
+  const targetVal = Math.max(1, a.target||1);
+  const done = prog.value >= targetVal;
+  const targetLabel = a.mode==='duration' ? formatDuration(targetVal) : String(targetVal);
+  row.innerHTML = `<div class=\"gt-text\"><b>${act ? act.icon+' '+escapeHtml(act.name) : 'Pick activity'}</b> · ${a.mode==='duration'?'minutes':'count'} target ${targetLabel}<br><span class="gt-achievement-meta">${prog.label}/${targetLabel} · ${done?'Completed ✅':(prog.value>0?'In progress ⏳':'Not started')}</span></div>`;
+  const controls = document.createElement('div');
+  controls.className = 'gt-achievement-controls';
+
+  const modeBtn = document.createElement('button');
+  modeBtn.className='pill-btn';
+  modeBtn.textContent = a.mode==='duration' ? 'Mode: Duration' : 'Mode: Count';
+  modeBtn.onclick = ()=>setAchievementMode(a.id, a.mode==='duration'?'count':'duration');
+  controls.appendChild(modeBtn);
+
+  const pick = document.createElement('button');
+  pick.className='pill-btn';
+  pick.textContent='Link activity';
+  pick.onclick = ()=>{
+    const names = acts.map((x,i)=>`${i+1}. ${x.icon} ${x.name}`).join('\n');
+    const idx = parseInt(prompt('Activity number:\n'+names, '1')||'',10)-1;
+    if (Number.isNaN(idx) || idx<0 || idx>=acts.length) return;
+    setAchievementActivity(a.id, acts[idx].id);
+  };
+  controls.appendChild(pick);
+
+  const targetBtn = document.createElement('button');
+  targetBtn.className = 'pill-btn';
+  targetBtn.textContent = `Target: ${targetLabel}`;
+  targetBtn.onclick = ()=>{
+    const next = parseInt(prompt(`Set target (${a.mode==='duration'?'minutes':'count'})`, String(targetVal))||'', 10);
+    if (!Number.isInteger(next) || next < 1) return;
+    setAchievementTarget(a.id, next);
+  };
+  controls.appendChild(targetBtn);
+
+  const del = document.createElement('button');
+  del.className='gt-del';
+  del.textContent='×';
+  del.onclick = ()=>{
+    const p = getProfData();
+    p.achievements = p.achievements.filter(x=>x.id!==a.id);
+    saveAll();
+    renderGoalsTodos();
+  };
+  controls.appendChild(del);
+  row.appendChild(controls);
+  return row;
+}
+
+function addAchievement() {
+  const p = getProfData();
+  ensureGtFields(p);
+  const acts = getAllActivities();
+  const first = acts[0];
+  p.achievements.push({
+    id: 'a-'+Date.now().toString(36),
+    activityId: first ? first.id : null,
+    mode: 'count',
+    target: 1,
+    createdAt: Date.now(),
+  });
+  saveAll();
+  renderGoalsTodos();
+}
+
+function setAchievementMode(id, mode) {
+  const p = getProfData();
+  const a = (p.achievements||[]).find(x=>x.id===id);
+  if (!a) return;
+  a.mode = mode;
+  if (a.target == null || a.target < 1) a.target = 1;
+  saveAll();
+  renderGoalsTodos();
+}
+
+function setAchievementActivity(id, activityId) {
+  const p = getProfData();
+  const a = (p.achievements||[]).find(x=>x.id===id);
+  if (!a) return;
+  a.activityId = activityId;
+  saveAll();
+  renderGoalsTodos();
+}
+
+function setAchievementTarget(id, target) {
+  const p = getProfData();
+  const a = (p.achievements||[]).find(x=>x.id===id);
+  if (!a) return;
+  a.target = Math.max(1, target|0);
+  saveAll();
+  renderGoalsTodos();
 }
 
 function addTodo() {
@@ -6956,6 +7212,13 @@ function inviteSisterFromEdit() {
   const me = activeProfile();
   if (me !== 'jenn' && me !== 'jess') return;
   const sister = me === 'jenn' ? 'jess' : 'jenn';
+  const sisterName = sister==='jenn'?'Jenn':'Jess';
+  const act = getAllActivities(me).find(a=>a.id===blk.actId) || getAllActivities().find(a=>a.id===blk.actId);
+  const activityLabel = act ? `${act.icon} ${act.name}` : 'this activity';
+  const dayDate = formatDayKey(currentDayKey);
+  const dayIdx = (dayDate.getDay()+6)%7;
+  const ok = confirm(`Share ${activityLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(blk.startMin)} with ${sisterName}?`);
+  if (!ok) return;
   // Reuse existing sendInvite, but it expects currentDayKey/syncDayIdx context.
   // Inline here for clarity:
   const inv = {
