@@ -1211,7 +1211,8 @@
     overflow-y: auto;
   }
   #activityOverlay .sheet,
-  #trainingOverlay .sheet {
+  #trainingOverlay .sheet,
+  #editOverlay .sheet {
     width: 70%;
     max-width: 720px;
     margin-left: auto;
@@ -1221,7 +1222,8 @@
   }
   @media (max-width: 520px) {
     #activityOverlay .sheet,
-    #trainingOverlay .sheet {
+    #trainingOverlay .sheet,
+    #editOverlay .sheet {
       width: 92%;
       max-width: none;
     }
@@ -1264,6 +1266,44 @@
   .sheet h4 { font-family:'Gochi Hand', cursive; font-size: 1.38rem; margin: 0.8rem 0 0.4rem; color: #5a4d41; }
 
   .sheet-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+  .sheet-time-grid-row {
+    display: grid;
+    grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+    gap: 0.55rem;
+    align-items: start;
+    margin-bottom: 0.45rem;
+  }
+  .sheet-time-grid-row h4 { margin-top: 0.1rem; }
+  .sheet-toggle-row { margin-top: 0.45rem; margin-bottom: 0.45rem; }
+  .block-stopwatch-btn {
+    margin-top: 0.25rem;
+    width: 100%;
+    border: 2px dashed var(--ink);
+    background: rgba(255,255,255,0.35);
+    border-radius: 10px;
+    padding: 0.2rem 0.4rem;
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .block-stopwatch-btn:hover { background: rgba(255,255,255,0.55); }
+  .block-focus-pulse {
+    animation: blockFocusPulse 1.1s ease-in-out 2;
+  }
+  @keyframes blockFocusPulse {
+    0% { transform: scale(1); box-shadow: 3px 3px 0 var(--ink); }
+    50% { transform: scale(1.03); box-shadow: 0 0 0 4px rgba(255,123,84,0.4), 3px 3px 0 var(--ink); }
+    100% { transform: scale(1); box-shadow: 3px 3px 0 var(--ink); }
+  }
+  @media (max-width: 560px) {
+    .sheet-time-grid-row { grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+    .sheet h4 { font-size: 1.16rem; margin: 0.5rem 0 0.28rem; }
+    .repeat-toggle, .buffer-toggle { padding: 0.45rem 0.6rem; margin-bottom: 0.35rem; }
+    .toggle-label { font-size: 0.96rem; }
+    #inviteSisterBtn { display: none !important; }
+  }
 
   .pill-btn {
     background: var(--paper); border: 2px solid var(--ink);
@@ -2211,11 +2251,17 @@
   <div class="sheet">
     <div class="sheet-handle"></div>
     <h3 id="activitySheetTitle"></h3>
-    <h4>START TIME</h4>
-    <div id="activityStartPicker"></div>
-    <h4>DURATION</h4>
-    <div class="sheet-row" id="activityDurBtns"></div>
-    <div id="activityCustomDur"></div>
+    <div class="sheet-time-grid-row">
+      <div>
+        <h4>START TIME</h4>
+        <div id="activityStartPicker"></div>
+      </div>
+      <div>
+        <h4>DURATION</h4>
+        <div class="sheet-row" id="activityDurBtns"></div>
+        <div id="activityCustomDur"></div>
+      </div>
+    </div>
     <div id="activityTimeSummary"></div>
     <h4>COLOUR</h4>
     <div class="colour-picker" id="activityColourPicker"></div>
@@ -2263,12 +2309,17 @@
       <div class="checklist-wrap" id="editChecklistList"></div>
     </div>
 
-    <h4>START TIME</h4>
-    <div id="editStartPicker"></div>
-
-    <h4>DURATION</h4>
-    <div class="sheet-row" id="editDurBtns"></div>
-    <div id="editCustomDur"></div>
+    <div class="sheet-time-grid-row">
+      <div>
+        <h4>START TIME</h4>
+        <div id="editStartPicker"></div>
+      </div>
+      <div>
+        <h4>DURATION</h4>
+        <div class="sheet-row" id="editDurBtns"></div>
+        <div id="editCustomDur"></div>
+      </div>
+    </div>
     <div id="editTimeSummary"></div>
 
     <div id="editObjectivesWrap" style="display:none">
@@ -2279,11 +2330,11 @@
     <h4>NOTE</h4>
     <textarea class="note-input" id="editNoteInput" rows="2" placeholder="Add a note…"></textarea>
 
-    <div class="buffer-toggle" id="editTravelToggle" onclick="toggleEditTravelBuffer()">
+    <div class="buffer-toggle sheet-toggle-row" id="editTravelToggle" onclick="toggleEditTravelBuffer()">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
       <span class="toggle-label">🚗 Needs travel time</span>
     </div>
-    <div class="buffer-toggle" id="editReadyToggle" onclick="toggleEditGetReadyBuffer()" style="display:none">
+    <div class="buffer-toggle sheet-toggle-row" id="editReadyToggle" onclick="toggleEditGetReadyBuffer()" style="display:none">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
       <span class="toggle-label">👕 Needs get ready time</span>
     </div>
@@ -2292,7 +2343,7 @@
       <div class="checklist-wrap" id="editTrainingGearList"></div>
     </div>
 
-    <div class="repeat-toggle" id="editCompleteToggle" onclick="toggleEditComplete()">
+    <div class="repeat-toggle sheet-toggle-row" id="editCompleteToggle" onclick="toggleEditComplete()">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
       <span class="toggle-label">✅ Mark this activity done</span>
     </div>
@@ -2311,7 +2362,7 @@
     </div>
 
     <!-- Repeat to other days of this week -->
-    <div class="repeat-toggle" id="editRepeat" onclick="toggleRepeat('editRepeat')">
+    <div class="repeat-toggle sheet-toggle-row" id="editRepeat" onclick="toggleRepeat('editRepeat')">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
       <span class="toggle-label">🔁 Repeat on other days…</span>
     </div>
@@ -2917,6 +2968,9 @@ let weekView = 'full';
 let currentZone = 'all';
 let currentTrayFilter = 'all';
 let activeTimers = {}; // itemKey -> {remaining, interval}
+let pendingFocusBlockId = null;
+let pendingFocusAttempts = 0;
+let activeStopwatchTick = null;
 
 let ts  = { durationMin:120, colour: CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays: [], travelBuffer:false, getReadyBuffer:false, gearState:{} };
 let as_ = { durationMin:60,  colour: COLOURS[0], note:'', repeat:false, repeatDays: [], travelBuffer:false };
@@ -3123,6 +3177,12 @@ function getAllActivities(p=activeProfile()) {
     }
     return act;
   });
+}
+
+function getSisterVisibilityState() {
+  const mode = (state.shared && state.shared.sisterVisibilityMode) || 'public';
+  const hideDetails = mode === 'busy-only';
+  return { mode, hideDetails };
 }
 
 /* Week utils */
@@ -3444,7 +3504,7 @@ function renderTimeGrid(keys) {
             if (!isLightColour(colour)) seg.style.color = '#fff';
           }
           seg.title = act ? `${act.name} (${formatTimeFromMin(hit.startMin)}, ${formatDuration(hit.durationMin)})` : '';
-          seg.onclick = (e)=>{ e.stopPropagation(); openDay(key, dayIdx); };
+          seg.onclick = (e)=>{ e.stopPropagation(); openDay(key, dayIdx, hit.id); };
           stack.appendChild(seg);
         });
         cell.appendChild(stack);
@@ -3753,7 +3813,7 @@ function renderFullWeek(keys) {
             <div class="wf-card-dur">${formatDuration(b.durationMin)}</div>
           `;
           card.title = `${act.icon} ${act.name} — ${formatDuration(b.durationMin)}`;
-          card.onclick = (e)=>{ e.stopPropagation(); openDay(key, ci); };
+          card.onclick = (e)=>{ e.stopPropagation(); openDay(key, ci, b.id); };
           cell.appendChild(card);
         });
       }
@@ -3766,7 +3826,7 @@ function renderFullWeek(keys) {
 /* ════════════════════════════════════════════════════════════════
    DAY EDITOR
 ════════════════════════════════════════════════════════════════ */
-function openDay(key, dayIdx) {
+function openDay(key, dayIdx, focusBlockId=null) {
   currentDayKey = key;
   selectedActivity = null;
   currentZone = 'all';
@@ -3788,6 +3848,11 @@ function openDay(key, dayIdx) {
   buildTimeline();
   buildTray();
   renderVibe();
+  if (focusBlockId) {
+    pendingFocusBlockId = focusBlockId;
+    pendingFocusAttempts = 0;
+    focusBlockOnTimeline(focusBlockId);
+  }
 
   // Gentle reflect prompt if evening and day has blocks and no mood set
   const now = new Date();
@@ -3795,6 +3860,41 @@ function openDay(key, dayIdx) {
     const m = getProfData().dayMoods?.[key];
     if (!m) showToast('💫 Tap 🌙 to reflect on today');
   }
+}
+
+function focusBlockOnTimeline(blockId) {
+  if (!blockId) return;
+  const wrap = document.querySelector('.timeline-wrap');
+  const el = document.getElementById('block-'+blockId);
+  if (!wrap || !el) {
+    if (pendingFocusAttempts < 6) {
+      pendingFocusAttempts += 1;
+      setTimeout(()=>focusBlockOnTimeline(blockId), 80);
+    }
+    return;
+  }
+  const targetTop = el.offsetTop - (wrap.clientHeight / 2) + (el.clientHeight / 2);
+  wrap.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+  el.classList.add('block-focus-pulse');
+  setTimeout(()=>el.classList.remove('block-focus-pulse'), 2300);
+  pendingFocusBlockId = null;
+}
+
+function tickActiveStopwatch() {
+  const wrap = document.querySelector('.timeline-wrap');
+  if (!wrap) return;
+  const blocks = getDayBlocks(currentDayKey);
+  let changed = false;
+  blocks.forEach(b=>{
+    if (!b?.stopwatch?.running || !b.stopwatch.startedAt) return;
+    const elapsedNow = stopwatchDisplayElapsed(b.stopwatch);
+    if (elapsedNow <= 0) return;
+    b.stopwatch.elapsedSec = elapsedNow;
+    b.stopwatch.running = false;
+    b.stopwatch.startedAt = null;
+    changed = true;
+  });
+  if (changed) setDayBlocks(currentDayKey, blocks);
 }
 
 /* Navigate to previous/next day (cross-week aware) */
@@ -3855,6 +3955,7 @@ function setDayMood(m) {
 }
 
 function buildTimeline() {
+  if (activeStopwatchTick) { clearInterval(activeStopwatchTick); activeStopwatchTick = null; }
   const tl = document.getElementById('timeline');
   tl.innerHTML = '';
   const blocks = getDayBlocks(currentDayKey);
@@ -3942,6 +4043,17 @@ function buildTimeline() {
   tl.appendChild(sideband);
   tl.appendChild(gutter);
   tl.appendChild(canvas);
+  const hasRunning = blocks.some(b => !!(b.stopwatch && b.stopwatch.enabled && b.stopwatch.running));
+  if (hasRunning) {
+    activeStopwatchTick = setInterval(()=>{
+      if (document.querySelector('.screen.active')?.id !== 'screen-day') {
+        clearInterval(activeStopwatchTick);
+        activeStopwatchTick = null;
+        return;
+      }
+      buildTimeline();
+    }, 1000);
+  }
 }
 
 function renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd) {
@@ -4242,6 +4354,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
   blockEl.innerHTML = `
     ${nameHtml}
     <div class="block-meta">${durStr}${badges?' '+badges:''}</div>
+    ${b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="block-stopwatch-btn" onclick="event.stopPropagation(); startBlockStopwatch('${b.id}')">⏱ Start stopwatch</button>` : ''}
     ${noteHtml}
   `;
   blockEl.onclick = (e)=>{ e.stopPropagation(); openEditSheet(b.id); };
@@ -5519,6 +5632,7 @@ function saveEditChanges() {
   closeSheet('editOverlay');
   buildTimeline();
   showToast(applyToSeries ? 'Series updated ✅' : 'Saved ✅');
+  renderGoalsTodos();
 }
 
 /* Count how many blocks share a seriesId across all weeks of this profile. */
@@ -5906,6 +6020,17 @@ function renderSync() {
 
   // Side-by-side
   const grid = document.getElementById('syncGrid');
+  const showAll = sisterDetailsVisibleGlobal();
+  const toggleWrap = document.createElement('div');
+  toggleWrap.className = 'repeat-toggle';
+  toggleWrap.classList.toggle('on', showAll);
+  toggleWrap.style.marginBottom = '0.55rem';
+  toggleWrap.innerHTML = `
+    <div class="toggle-track"><div class="toggle-knob"></div></div>
+    <span class="toggle-label">${showAll ? '👯 Sister details: Showing all activities' : '🙈 Sister details: Busy slots only'}</span>
+  `;
+  toggleWrap.onclick = ()=>setSisterDetailsVisibleGlobal(!showAll);
+  overlapWrap.appendChild(toggleWrap);
   grid.innerHTML = '';
   [['jenn','🐥 Jenn',jB], ['jess','🦊 Jess',sB]].forEach(([p, lbl, blocks])=>{
     const col = document.createElement('div');
@@ -5921,7 +6046,7 @@ function renderSync() {
       const mini = document.createElement('div');
       mini.className = 'sync-block-mini';
       // Sister's private blocks: show time+"Busy" only. Public blocks show details.
-      const showDetails = isMe || !!b.public;
+      const showDetails = isMe || (showAll && !!b.public);
       if (showDetails) {
         mini.style.background = b.colour||CAT_HEX[act.cat];
         mini.style.color = '#fff';
@@ -5975,6 +6100,42 @@ function sendInvite(block, to) {
   }
   saveAll();
   showToast(`Invite sent to ${to==='jenn'?'Jenn':'Jess'} 💌`);
+}
+
+function startBlockStopwatch(blockId) {
+  if (!blockId) return;
+  const blocks = getDayBlocks(currentDayKey);
+  const blk = blocks.find(b=>b.id===blockId);
+  if (!blk) return;
+  if (!blk.stopwatch || !blk.stopwatch.enabled) {
+    showToast('Enable stopwatch in Edit first ⏱');
+    return;
+  }
+  if (blk.stopwatch.running) {
+    showToast('Stopwatch already running ⏱');
+    return;
+  }
+  blk.stopwatch.running = true;
+  blk.stopwatch.startedAt = Date.now();
+  blk.stopwatch.elapsedSec = Math.max(0, blk.stopwatch.elapsedSec|0);
+  if (blk.stopwatch.goalSec == null) blk.stopwatch.goalSec = Math.max(60, (blk.durationMin|0) * 60);
+  setDayBlocks(currentDayKey, blocks);
+  buildTimeline();
+  openEditSheet(blockId);
+  showToast('Stopwatch started ⏱');
+}
+function stopActiveStopwatchTick() {
+  if (activeStopwatchTick) {
+    clearInterval(activeStopwatchTick);
+    activeStopwatchTick = null;
+  }
+}
+function ensureActiveStopwatchTick() {
+  stopActiveStopwatchTick();
+  const blocks = getDayBlocks(currentDayKey);
+  const hasRunning = blocks.some(b => b.stopwatch && b.stopwatch.enabled && b.stopwatch.running);
+  if (!hasRunning) return;
+  activeStopwatchTick = setInterval(()=>buildTimeline(), 1000);
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -6642,6 +6803,28 @@ const GT_COLOURS = ['#ff7b54','#ffd166','#95d5b2','#6fb1fc','#c3aed6','#ff9eb5',
 function getCurrentWeekKey() {
   return dateToLocalKey(getWeekStart(weekOffset));
 }
+function getWeekBlockStatsByActId(actId) {
+  const keys = getDayKeys(weekOffset);
+  const weekBlocks = keys.flatMap(k=>getDayBlocks(k));
+  const matches = weekBlocks.filter(b=>b.actId===actId);
+  const completed = matches.filter(b=>!!b.completed).length;
+  return { total: matches.length, completed };
+}
+function getTodoLinkStats(todo) {
+  if (!todo) return null;
+  if (todo.linkType === 'block' && todo.linkBlockId) {
+    const keys = getDayKeys(weekOffset);
+    const weekBlocks = keys.flatMap(k=>getDayBlocks(k));
+    const blk = weekBlocks.find(b=>b.id===todo.linkBlockId);
+    if (!blk) return null;
+    return { total: 1, completed: blk.completed ? 1 : 0, actId: blk.actId };
+  }
+  if (todo.linkActId) {
+    const s = getWeekBlockStatsByActId(todo.linkActId);
+    return { ...s, actId: todo.linkActId };
+  }
+  return null;
+}
 
 function ensureGtFields(p) {
   if (!p.goals) p.goals = [];
@@ -6730,12 +6913,18 @@ function buildGoalRow(g) {
 
 function buildTodoRow(t) {
   const row = document.createElement('div');
-  row.className = 'gt-item' + (t.done ? ' done' : '');
+  const linkStats = getTodoLinkStats(t);
+  const effectiveDone = linkStats ? (linkStats.total > 0 && linkStats.completed >= linkStats.total) : !!t.done;
+  row.className = 'gt-item' + (effectiveDone ? ' done' : '');
 
   const check = document.createElement('div');
   check.className = 'gt-check';
-  check.textContent = t.done ? '✓' : '';
+  check.textContent = effectiveDone ? '✓' : '';
   check.onclick = ()=>{
+    if (linkStats) {
+      showToast('Linked to activities: complete blocks in Day view ✅');
+      return;
+    }
     t.done = !t.done;
     t.doneAt = t.done ? Date.now() : null;
     saveAll();
@@ -6764,10 +6953,19 @@ function buildTodoRow(t) {
   row.appendChild(inp);
 
   const tag = document.createElement('span');
-  tag.className = 'gt-day-tag' + (t.assignedDay==null ? ' unset' : '');
-  tag.textContent = t.assignedDay==null ? '— day' : DAY_SHORT[t.assignedDay];
-  tag.title = 'Tap to assign a day';
+  const acts = getAllActivities();
+  const linkedAct = linkStats?.actId ? acts.find(a=>a.id===linkStats.actId) : null;
+  if (linkStats) {
+    tag.className = 'gt-day-tag';
+    tag.textContent = linkedAct ? `${linkedAct.icon} ${linkStats.completed}/${linkStats.total}` : `${linkStats.completed}/${linkStats.total}`;
+    tag.title = 'Linked weekly progress';
+  } else {
+    tag.className = 'gt-day-tag' + (t.assignedDay==null ? ' unset' : '');
+    tag.textContent = t.assignedDay==null ? '— day' : DAY_SHORT[t.assignedDay];
+    tag.title = 'Tap to assign a day';
+  }
   tag.onclick = ()=>{
+    if (linkStats) return;
     // Cycle: unassigned → Mon → Tue → … → Sun → unassigned
     const cur = t.assignedDay;
     t.assignedDay = (cur == null) ? 0 : (cur >= 6 ? null : cur + 1);
@@ -6923,6 +7121,18 @@ function setAchievementTarget(id, target) {
 function addTodo() {
   const p = getProfData();
   ensureGtFields(p);
+  const acts = getAllActivities();
+  const entries = acts.map((x,i)=>`${i+1}. ${x.icon} ${x.name}`).join('\n');
+  const pick = prompt(`Link this weekly to-do to an activity series?\nEnter activity number (or leave blank for manual to-do):\n${entries}`, '');
+  let linkActId = null;
+  if (pick && pick.trim()) {
+    const idx = parseInt(pick.trim(), 10) - 1;
+    if (Number.isInteger(idx) && idx >= 0 && idx < acts.length) {
+      linkActId = acts[idx].id;
+    } else {
+      showToast('Invalid activity number. Created regular to-do.');
+    }
+  }
   p.todos.push({
     id: 't-'+Date.now().toString(36),
     text: '',
@@ -6930,6 +7140,9 @@ function addTodo() {
     weekKey: getCurrentWeekKey(),
     assignedDay: null,
     done: false,
+    linkType: linkActId ? 'activity' : null,
+    linkActId: linkActId || null,
+    linkBlockId: null,
     createdAt: Date.now(),
   });
   saveAll();
@@ -7403,6 +7616,16 @@ function togglePublic() {
   blk.public = !blk.public;
   setDayBlocks(currentDayKey, blocks);
   document.getElementById('publicToggle').classList.toggle('on', !!blk.public);
+}
+function sisterDetailsVisibleGlobal() {
+  const vis = getSisterVisibilityState();
+  return !vis.hideDetails;
+}
+function setSisterDetailsVisibleGlobal(next) {
+  if (!state.shared) state.shared = {};
+  state.shared.sisterVisibilityMode = next ? 'public' : 'busy-only';
+  saveAll();
+  if (document.querySelector('#screen-sync.active')) renderSync();
 }
 function inviteSisterFromEdit() {
   if (!editingBlockId) return;
