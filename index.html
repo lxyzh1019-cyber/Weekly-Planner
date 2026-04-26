@@ -347,11 +347,11 @@
   /* ── INVERTED MODE (default) ──
      Free cells = bright profile color (saturated, celebratory).
      Scheduled cells = neutral grey with small icon. */
-  .tg-wrap.inverted .tg-cell.tg-free-jenn {
+  .tg-wrap.inverted .tg-free-jenn {
     background: #ffd166;
     background-image: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 50%);
   }
-  .tg-wrap.inverted .tg-cell.tg-free-jess {
+  .tg-wrap.inverted .tg-free-jess {
     background: #6fb1fc;
     background-image: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 50%);
   }
@@ -3101,17 +3101,24 @@ function mergeWeeks(localWeeks, remoteWeeks) {
   });
   return merged;
 }
+function mergeProfileState(localProfile, remoteProfile) {
+  const lp = localProfile || {};
+  const rp = remoteProfile || {};
+  const merged = { ...lp, ...rp };
+  merged.weeks = mergeWeeks(lp.weeks, rp.weeks);
+  merged.customActivities = mergeArrayById(lp.customActivities, rp.customActivities);
+  merged.goals = mergeArrayById(lp.goals, rp.goals);
+  merged.todos = mergeArrayById(lp.todos, rp.todos);
+  merged.achievements = mergeArrayById(lp.achievements, rp.achievements);
+  return merged;
+}
 function mergeRemoteState(remote) {
   if (!remote) return;
   if (remote.profiles) {
     ['jenn','jess'].forEach(p => {
       const lp = state.profiles[p] || {};
       const rp = remote.profiles[p] || {};
-      state.profiles[p] = {
-        ...lp,
-        ...rp,
-        weeks: mergeWeeks(lp.weeks, rp.weeks),
-      };
+      state.profiles[p] = mergeProfileState(lp, rp);
     });
   }
   if (remote.shared) {
@@ -3486,6 +3493,7 @@ function renderTimeGrid(keys) {
         stack.appendChild(qd);
       }
       if (hits.length) {
+        if (inverted) stack.querySelectorAll('.tg-quarter').forEach(q=>q.classList.remove('tg-hour-free', freeCellCls));
         hits.forEach(hit=>{
           const act = acts.find(a=>a.id===hit.actId);
           const bucket = categorizeBlock(hit, act);
@@ -3873,7 +3881,9 @@ function focusBlockOnTimeline(blockId) {
     }
     return;
   }
-  const targetTop = el.offsetTop - (wrap.clientHeight / 2) + (el.clientHeight / 2);
+  const wrapRect = wrap.getBoundingClientRect();
+  const elRect = el.getBoundingClientRect();
+  const targetTop = wrap.scrollTop + (elRect.top - wrapRect.top) - (wrap.clientHeight / 2) + (elRect.height / 2);
   wrap.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
   el.classList.add('block-focus-pulse');
   setTimeout(()=>el.classList.remove('block-focus-pulse'), 2300);
@@ -3881,20 +3891,7 @@ function focusBlockOnTimeline(blockId) {
 }
 
 function tickActiveStopwatch() {
-  const wrap = document.querySelector('.timeline-wrap');
-  if (!wrap) return;
-  const blocks = getDayBlocks(currentDayKey);
-  let changed = false;
-  blocks.forEach(b=>{
-    if (!b?.stopwatch?.running || !b.stopwatch.startedAt) return;
-    const elapsedNow = stopwatchDisplayElapsed(b.stopwatch);
-    if (elapsedNow <= 0) return;
-    b.stopwatch.elapsedSec = elapsedNow;
-    b.stopwatch.running = false;
-    b.stopwatch.startedAt = null;
-    changed = true;
-  });
-  if (changed) setDayBlocks(currentDayKey, blocks);
+  buildTimeline();
 }
 
 /* Navigate to previous/next day (cross-week aware) */
@@ -5141,7 +5138,7 @@ function editStopwatchStartTick() {
 function syncEditStopwatchUI() {
   const wrap = document.getElementById('editStopwatchWrap');
   const tg = document.getElementById('editStopwatchToggle');
-  if (wrap) wrap.style.display = editState.stopwatchEnabled ? 'block' : 'none';
+  if (wrap) wrap.style.display = 'block';
   if (tg) tg.classList.toggle('on', editState.stopwatchEnabled);
   renderEditStopwatchStats();
   const sw = editState.stopwatch;
@@ -6124,20 +6121,6 @@ function startBlockStopwatch(blockId) {
   openEditSheet(blockId);
   showToast('Stopwatch started ⏱');
 }
-function stopActiveStopwatchTick() {
-  if (activeStopwatchTick) {
-    clearInterval(activeStopwatchTick);
-    activeStopwatchTick = null;
-  }
-}
-function ensureActiveStopwatchTick() {
-  stopActiveStopwatchTick();
-  const blocks = getDayBlocks(currentDayKey);
-  const hasRunning = blocks.some(b => b.stopwatch && b.stopwatch.enabled && b.stopwatch.running);
-  if (!hasRunning) return;
-  activeStopwatchTick = setInterval(()=>buildTimeline(), 1000);
-}
-
 /* ════════════════════════════════════════════════════════════════
    CHALLENGES
 ════════════════════════════════════════════════════════════════ */
