@@ -3113,6 +3113,11 @@ function saveAll() {
   renderPendingSyncMessage();
   pushToFirebase();
 }
+function markItemUpdated(item) {
+  if (!item) return item;
+  item.updatedAt = Date.now();
+  return item;
+}
 function mergeArrayById(localArr, remoteArr) {
   const map = new Map();
   (localArr || []).forEach(item => {
@@ -3128,7 +3133,7 @@ function mergeArrayById(localArr, remoteArr) {
     }
     const prevTs = prev.updatedAt || prev.createdAt || 0;
     const nextTs = item.updatedAt || item.createdAt || 0;
-    map.set(item.id, nextTs >= prevTs ? item : prev);
+    map.set(item.id, nextTs > prevTs ? item : prev);
   });
   return Array.from(map.values());
 }
@@ -6106,6 +6111,11 @@ function renderSync() {
 function sendInvite(block, to) {
   const sisterName = to==='jenn'?'Jenn':'Jess';
   const act = getAllActivities(profile).find(a=>a.id===block.actId) || getAllActivities().find(a=>a.id===block.actId);
+  const receiverAct = getAllActivities(to).find(a=>a.id===block.actId);
+  if (!receiverAct) {
+    showToast(`${sisterName} cannot receive this activity yet.`);
+    return;
+  }
   const activityLabel = act ? `${act.icon} ${act.name}` : 'this activity';
   const day = currentDayKey || getDayKeys(weekOffset)[syncDayIdx];
   const dayDate = formatDayKey(day);
@@ -6267,7 +6277,17 @@ function deleteChallenge(id) {
 function acceptInvite(id) {
   const inv = (state.shared.invites||[]).find(i=>i.id===id);
   if (!inv) return;
+  const receiverAct = getAllActivities(profile).find(a=>a.id===inv.actId);
+  if (!receiverAct) {
+    inv.status = 'declined';
+    markItemUpdated(inv);
+    saveAll();
+    renderChallenges();
+    showToast('Invite unavailable: activity is not in your tray.');
+    return;
+  }
   inv.status = 'accepted';
+  markItemUpdated(inv);
   // Place a matching block in this profile's schedule
   const blocks = getDayBlocks(inv.day, profile);
   blocks.push({
@@ -6277,7 +6297,6 @@ function acceptInvite(id) {
     checklistState: {}, travelBuffer: false,
   });
   setDayBlocks(inv.day, blocks, profile);
-  saveAll();
   renderChallenges();
   showToast('Added to your plan! 💕');
 }
@@ -6285,6 +6304,7 @@ function declineInvite(id) {
   const inv = (state.shared.invites||[]).find(i=>i.id===id);
   if (!inv) return;
   inv.status = 'declined';
+  markItemUpdated(inv);
   saveAll();
   renderChallenges();
 }
@@ -6401,6 +6421,7 @@ function confirmParentActivity() {
     const existing = findParentActivity(oldOwner, id);
     if (!existing) { showToast('Not found'); return; }
     existing.name = name; existing.icon = icon; existing.cat = cat; existing.durationMin = durationMin;
+    markItemUpdated(existing);
     // Visibility moved? Migrate the activity object to the new collection (preserving its id so placed blocks still resolve).
     const newOwner = vis;
     if (newOwner !== oldOwner) {
@@ -6901,6 +6922,7 @@ function buildGoalRow(g) {
   swatch.onclick = ()=>{
     const idx = GT_COLOURS.indexOf(g.color);
     g.color = GT_COLOURS[(idx + 1) % GT_COLOURS.length];
+    markItemUpdated(g);
     saveAll();
     renderGoalsTodos();
   };
@@ -6912,6 +6934,7 @@ function buildGoalRow(g) {
   inp.placeholder = 'New goal…';
   inp.onchange = ()=>{
     g.text = inp.value.trim();
+    markItemUpdated(g);
     saveAll();
   };
   inp.onblur = inp.onchange;
@@ -6949,6 +6972,7 @@ function buildTodoRow(t) {
     }
     t.done = !t.done;
     t.doneAt = t.done ? Date.now() : null;
+    markItemUpdated(t);
     saveAll();
     renderGoalsTodos();
   };
@@ -6961,6 +6985,7 @@ function buildTodoRow(t) {
   swatch.onclick = ()=>{
     const idx = GT_COLOURS.indexOf(t.color);
     t.color = GT_COLOURS[(idx + 1) % GT_COLOURS.length];
+    markItemUpdated(t);
     saveAll();
     renderGoalsTodos();
   };
@@ -6970,7 +6995,7 @@ function buildTodoRow(t) {
   inp.className = 'gt-text-input';
   inp.value = t.text;
   inp.placeholder = 'New to-do…';
-  inp.onchange = ()=>{ t.text = inp.value.trim(); saveAll(); };
+  inp.onchange = ()=>{ t.text = inp.value.trim(); markItemUpdated(t); saveAll(); };
   inp.onblur = inp.onchange;
   row.appendChild(inp);
 
@@ -6991,6 +7016,7 @@ function buildTodoRow(t) {
     // Cycle: unassigned → Mon → Tue → … → Sun → unassigned
     const cur = t.assignedDay;
     t.assignedDay = (cur == null) ? 0 : (cur >= 6 ? null : cur + 1);
+    markItemUpdated(t);
     saveAll();
     renderGoalsTodos();
   };
@@ -7118,6 +7144,7 @@ function setAchievementMode(id, mode) {
   if (!a) return;
   a.mode = mode;
   if (a.target == null || a.target < 1) a.target = 1;
+  markItemUpdated(a);
   saveAll();
   renderGoalsTodos();
 }
@@ -7127,6 +7154,7 @@ function setAchievementActivity(id, activityId) {
   const a = (p.achievements||[]).find(x=>x.id===id);
   if (!a) return;
   a.activityId = activityId;
+  markItemUpdated(a);
   saveAll();
   renderGoalsTodos();
 }
@@ -7136,6 +7164,7 @@ function setAchievementTarget(id, target) {
   const a = (p.achievements||[]).find(x=>x.id===id);
   if (!a) return;
   a.target = Math.max(1, target|0);
+  markItemUpdated(a);
   saveAll();
   renderGoalsTodos();
 }
