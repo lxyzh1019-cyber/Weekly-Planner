@@ -184,6 +184,51 @@
     align-self: flex-end;
   }
 
+  .day-next-up-banner {
+    margin: 0 0.8rem 0.5rem;
+    padding: 0.55rem 0.85rem;
+    background: linear-gradient(135deg, #e8f4ff 0%, #fff8e6 100%);
+    border: 2px solid var(--ink);
+    border-radius: 14px;
+    box-shadow: 2px 2px 0 var(--ink);
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 1.08rem;
+    font-weight: 700;
+    color: var(--ink);
+    text-align: center;
+    line-height: 1.35;
+  }
+  .day-next-up-banner .next-up-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #5a4d41;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 0.15rem;
+  }
+  .day-kid-quick-row {
+    display: flex;
+    justify-content: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    margin: 0 0.8rem 0.55rem;
+  }
+  .day-kid-quick-row .btn-break-quick {
+    background: var(--accent-yellow);
+    border: 2px solid var(--ink);
+    border-radius: 16px;
+    padding: 0.45rem 1rem;
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 1.02rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 2px 2px 0 var(--ink);
+  }
+  .day-kid-quick-row .btn-break-quick:hover {
+    transform: translate(-1px,-1px);
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+
   .profile-badge {
     display: flex; align-items: center; gap: 0.4rem;
     background: var(--bg); border-radius: 20px;
@@ -2203,6 +2248,12 @@
     </div>
   </div>
 
+  <div id="dayNextUpBanner" class="day-next-up-banner" style="display:none"></div>
+  <div id="dayKidQuickRow" class="day-kid-quick-row" style="display:none">
+    <button type="button" class="btn-break-quick" onclick="addQuickBreak(15)">☕ I need a break (15 min)</button>
+    <button type="button" class="btn-break-quick" onclick="addQuickBreak(10)">🫧 Short break (10 min)</button>
+  </div>
+
   <!-- Today's Vibe (replaces balance) -->
   <div class="vibe-card">
     <div>
@@ -3092,6 +3143,7 @@ const DEFAULT_ACTIVITIES = [
   { id:'math',       name:'Math Adventure',    icon:'🦘', cat:'school',   durationMin:60, suitableTime:['after-school','weekend','evening'] },
   { id:'training',   name:'Training',          icon:'🏋️', cat:'training', durationMin:120, isTraining:true, suitableTime:['after-school','weekend'] },
   { id:'relax',      name:'Muscle Relaxation', icon:'🧘', cat:'active',   durationMin:60, suitableTime:['after-school','evening','weekend'] },
+  { id:'break_quick', name:'Quick Break',     icon:'☕', cat:'free',     durationMin:15, suitableTime:['before-school','school','after-school','evening','weekend'], quickBreak:true },
   { id:'piano',      name:'Piano Practice',    icon:'🎹', cat:'school',   durationMin:60, suitableTime:['after-school','evening','weekend'] },
   { id:'chores',     name:'House Chore',       icon:'🧹', cat:'daily',    durationMin:60, suitableTime:['after-school','evening','weekend'] },
   { id:'family',     name:'Family Time',       icon:'👨‍👩‍👧‍👦', cat:'free', durationMin:120, suitableTime:['evening','weekend'], social:true },
@@ -3456,6 +3508,112 @@ function getAllActivities(p=activeProfile()) {
       return { ...act, name: rule.name||act.name, icon: rule.newIcon||act.icon, _levelled:true };
     }
     return act;
+  });
+}
+
+/* Track celebration toasts so we do not spam on every re-render */
+const routineCompleteToasted = new Set();
+const stopwatchGoalToasted = new Set();
+
+function blocksOverlap(aStart, aDur, bStart, bDur) {
+  const aEnd = aStart + aDur;
+  const bEnd = bStart + bDur;
+  return aStart < bEnd && bStart < aEnd;
+}
+
+/** Next gap of at least minGap minutes inside [START_MIN, END_MIN), or null */
+function findNextGapForBreak(dayKey, minGap, fromMinAbs) {
+  const blocks = getDayBlocks(dayKey).filter(b => b && b.startMin != null && b.durationMin != null);
+  const startSearch = Math.max(START_MIN, Math.min(END_MIN - minGap, fromMinAbs));
+  for (let t = startSearch; t <= END_MIN - minGap; t += 5) {
+    const ok = !blocks.some(b => blocksOverlap(t, minGap, b.startMin, b.durationMin));
+    if (ok) return t;
+  }
+  return null;
+}
+
+function addQuickBreak(durationMin) {
+  if (isParent()) {
+    showToast('Switch to your profile to add a break 👤');
+    return;
+  }
+  const now = new Date();
+  const nowAbs = now.getHours() * 60 + now.getMinutes();
+  let start = findNextGapForBreak(currentDayKey, durationMin, nowAbs);
+  if (start == null) {
+    start = findNextGapForBreak(currentDayKey, durationMin, START_MIN);
+  }
+  if (start == null) {
+    showToast('No empty slot big enough — try editing the day 📋');
+    return;
+  }
+  const act = getAllActivities().find(a => a.id === 'break_quick');
+  const colour = act ? (CAT_HEX[act.cat] || '#95d5b2') : '#95d5b2';
+  placeBlock('break_quick', start, durationMin, colour, [], 'Quick break', { travelBuffer: false });
+  showToast(`Break added at ${formatTimeFromMin(start)} ✨`);
+}
+
+function renderDayNextUpBanner() {
+  const el = document.getElementById('dayNextUpBanner');
+  const row = document.getElementById('dayKidQuickRow');
+  if (!el || !row) return;
+  if (isParent()) {
+    el.style.display = 'none';
+    row.style.display = 'none';
+    return;
+  }
+  row.style.display = 'flex';
+  const blocks = getDayBlocks(currentDayKey);
+  const acts = getAllActivities();
+  const now = new Date();
+  const nowAbs = now.getHours() * 60 + now.getMinutes();
+  const isToday = currentDayKey === todayKey();
+
+  let candidates = blocks.map(b => {
+    const act = acts.find(a => a.id === b.actId);
+    if (!act || act.quickBreak) return null;
+    const end = b.startMin + b.durationMin;
+    if (isToday) {
+      if (end <= nowAbs) return null;
+    }
+    return { b, act, end };
+  }).filter(Boolean);
+
+  candidates.sort((a, b) => a.b.startMin - b.b.startMin);
+
+  let next = null;
+  if (isToday) {
+    next = candidates.find(c => c.b.startMin > nowAbs) || candidates[0] || null;
+  } else {
+    next = candidates[0] || null;
+  }
+
+  if (!next) {
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = 'block';
+  const timeStr = formatTimeFromMin(next.b.startMin);
+  el.innerHTML = `<div class="next-up-label">Next up</div><div>${next.act.icon} <b>${escapeHtml(next.act.name)}</b> · ${timeStr}</div>`;
+}
+
+function updateStopwatchGoalToasts(blocks) {
+  blocks.forEach(b => {
+    const sw = b.stopwatch;
+    if (!sw || !sw.enabled || !sw.running) {
+      stopwatchGoalToasted.delete(b.id);
+      return;
+    }
+    const goal = sw.goalSec != null ? sw.goalSec : Math.max(60, (b.durationMin | 0) * 60);
+    const used = stopwatchDisplayElapsed(sw);
+    if (used >= goal) {
+      if (!stopwatchGoalToasted.has(b.id)) {
+        stopwatchGoalToasted.add(b.id);
+        showToast('🎉 You hit your stopwatch goal — amazing!');
+      }
+    } else {
+      stopwatchGoalToasted.delete(b.id);
+    }
   });
 }
 
@@ -4343,6 +4501,9 @@ function buildTimeline() {
       buildTimeline();
     }, 1000);
   }
+
+  updateStopwatchGoalToasts(blocks);
+  renderDayNextUpBanner();
 }
 
 function renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd) {
@@ -5639,6 +5800,7 @@ function editStopwatchReset() {
   sw.running = false;
   sw.startedAt = null;
   sw.goalSec = Math.max(60, (editState.durationMin|0) * 60);
+  if (editingBlockId) stopwatchGoalToasted.delete(editingBlockId);
   syncEditStopwatchUI();
 }
 
@@ -5905,6 +6067,18 @@ function buildChecklistRow(block, act, item, isKidItem, listContainerId) {
     setDayBlocks(currentDayKey, blocks);
     renderChecklist(b, act, cid);
     buildTimeline();
+    if (act.isRoutine) {
+      const total = countChecklistTotal(b, act);
+      const done = countChecklistDone(b, act);
+      if (total > 0 && done >= total) {
+        if (!routineCompleteToasted.has(b.id)) {
+          routineCompleteToasted.add(b.id);
+          showToast('🌟 Routine complete — you did it!');
+        }
+      } else {
+        routineCompleteToasted.delete(b.id);
+      }
+    }
   };
   row.appendChild(box);
 
