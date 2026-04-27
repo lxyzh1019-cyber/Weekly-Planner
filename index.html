@@ -708,6 +708,73 @@
     .gt-panel { grid-template-columns: 1fr; }
   }
 
+  /* ═══════════ CHORE TAB (merged from Chore-Tracker) ═══════════ */
+  .chore-wrap {
+    padding: 0.8rem;
+    display: grid;
+    gap: 0.8rem;
+  }
+  .chore-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.8rem;
+  }
+  .chore-card {
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    border-radius: 12px;
+    padding: 0.7rem;
+    box-shadow: 2px 2px 0 var(--ink);
+  }
+  .chore-card h3 { margin: 0 0 0.5rem 0; font-size: 1.2rem; }
+  .ct-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    border: 1.5px solid var(--ink);
+    border-radius: 9px;
+    background: var(--bg);
+    padding: 0.35rem 0.5rem;
+    margin-bottom: 0.35rem;
+    font-size: 1rem;
+  }
+  .ct-item:last-child { margin-bottom: 0; }
+  .ct-item.done { opacity: 0.65; text-decoration: line-through; }
+  .ct-item-left { display:flex; align-items:center; gap:0.45rem; min-width:0; }
+  .ct-check {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid var(--ink);
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .ct-check.on { background: var(--accent); color: #fff; }
+  .ct-badge {
+    font-size: 0.78rem;
+    font-weight: 700;
+    border: 1.5px solid var(--ink);
+    border-radius: 7px;
+    padding: 1px 6px;
+    background: var(--accent-yellow);
+    white-space: nowrap;
+  }
+  .ct-meta { font-size: 0.88rem; color: #5a4d41; }
+  .ct-score-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+  }
+  @media (max-width: 900px) {
+    .chore-grid { grid-template-columns: 1fr; }
+  }
+
   /* ═══════════ FULL WEEKLY VIEW — zones as rows, days as columns ═══════════ */
   .weekly-full-wrap { padding: 0.5rem; overflow-x: auto; flex: 1; padding-bottom: 0.5rem; }
   .weekly-full {
@@ -1913,6 +1980,7 @@
       <h2>My Week</h2>
     </div>
     <div style="display:flex;gap:0.4rem">
+      <button class="btn-icon" title="Weekly Chore" onclick="openChoreTab()">🧹</button>
       <button class="btn-icon" title="Challenges" onclick="openChallenges()">🎯</button>
       <button class="btn-icon" title="Sister Sync" onclick="openSisterSync()">👯</button>
       <button class="btn-icon" title="Print" onclick="openPrint()">🖨</button>
@@ -2004,6 +2072,20 @@
       <div id="achievementsList"></div>
     </div>
   </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN: CHORE TAB
+════════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-chore">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="btn-icon" onclick="goWeek()">◀</button>
+      <h2>Weekly Chore 🧹</h2>
+    </div>
+    <div class="profile-badge" id="choreProfileBadge"></div>
+  </div>
+  <div class="chore-wrap" id="choreWrap"></div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
@@ -3182,6 +3264,7 @@ function refreshCurrentScreen() {
   if (!active) return;
   if (active.id === 'screen-week') renderWeek();
   else if (active.id === 'screen-day') { buildTimeline(); buildTray(); renderVibe(); }
+  else if (active.id === 'screen-chore') renderChoreTab();
   else if (active.id === 'screen-sync') renderSync();
   else if (active.id === 'screen-challenges') renderChallenges();
   else if (active.id === 'screen-parent') renderParentHome();
@@ -3308,6 +3391,7 @@ function goProfile() {
   profile=null; selectedActivity=null; showScreen('profile');
 }
 function goWeek()    { selectedActivity=null; showScreen('week'); renderWeek(); }
+function openChoreTab() { selectedActivity=null; showScreen('chore'); renderChoreTab(); }
 
 /* ════════════════════════════════════════════════════════════════
    WEEK VIEW
@@ -7173,6 +7257,126 @@ function addTodo() {
     const inputs = document.querySelectorAll('#todosList .gt-text-input');
     if (inputs.length) inputs[inputs.length-1].focus();
   }, 0);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CHORE TAB (MERGED FROM CHORE TRACKER)
+════════════════════════════════════════════════════════════════ */
+const CT_DEFAULT_ITEMS = [
+  { id:'ct-mop', text:'Mop', activityId:'chores', requiredCount:1 },
+  { id:'ct-vacuum', text:'Vacuum', activityId:'chores', requiredCount:1 },
+  { id:'ct-dish', text:'Dish Clean & Dishwasher', activityId:'chores', requiredCount:1 },
+  { id:'ct-laundry', text:'Laundry', activityId:'chores', requiredCount:1 },
+  { id:'ct-sort', text:'Sorting Clothes', activityId:'chores', requiredCount:1 },
+  { id:'ct-exercise', text:'Extra Exercise', activityId:'training', requiredCount:1 },
+  { id:'ct-other', text:'Other', activityId:null, requiredCount:1, isManual:true },
+];
+
+function ensureChoreFields(p) {
+  if (!p.choreItems || !Array.isArray(p.choreItems) || !p.choreItems.length) {
+    p.choreItems = CT_DEFAULT_ITEMS.map(item => ({
+      ...item,
+      manualDone: false,
+      createdAt: Date.now(),
+    }));
+  }
+}
+
+function getChoreProgress(item) {
+  if (!item || item.isManual || !item.activityId) {
+    return { done: !!item?.manualDone, completed: item?.manualDone ? 1 : 0, required: Math.max(1, item?.requiredCount||1), isLinked: false };
+  }
+  const stats = getWeekBlockStatsByActId(item.activityId);
+  const required = Math.max(1, item.requiredCount||1);
+  return { done: stats.completed >= required, completed: stats.completed, required, isLinked: true };
+}
+
+function buildChoreItemRow(item) {
+  const row = document.createElement('div');
+  const progress = getChoreProgress(item);
+  row.className = 'ct-item' + (progress.done ? ' done' : '');
+
+  const left = document.createElement('div');
+  left.className = 'ct-item-left';
+  const check = document.createElement('div');
+  check.className = 'ct-check' + (progress.done ? ' on' : '');
+  check.textContent = progress.done ? '✓' : '';
+  check.onclick = ()=>{
+    if (progress.isLinked) {
+      showToast('Linked chore: complete planner blocks in Day view ✅');
+      return;
+    }
+    item.manualDone = !item.manualDone;
+    saveAll();
+    renderChoreTab();
+  };
+  left.appendChild(check);
+
+  const label = document.createElement('span');
+  label.textContent = item.text || 'Chore';
+  left.appendChild(label);
+  row.appendChild(left);
+
+  const badge = document.createElement('span');
+  badge.className = 'ct-badge';
+  if (progress.isLinked) {
+    badge.textContent = `${progress.completed}/${progress.required}`;
+    badge.title = 'Auto-completed from Weekly Planner blocks';
+  } else {
+    badge.textContent = progress.done ? 'manual done' : 'manual';
+    badge.title = 'Manual chore';
+  }
+  row.appendChild(badge);
+  return row;
+}
+
+function getChoreSummary(items) {
+  const summary = items.reduce((acc, item)=>{
+    const progress = getChoreProgress(item);
+    acc.total += 1;
+    if (progress.done) acc.done += 1;
+    return acc;
+  }, { total:0, done:0 });
+  return summary;
+}
+
+function renderChoreKidCard(kid) {
+  const p = getProfData(kid);
+  ensureChoreFields(p);
+  const card = document.createElement('section');
+  card.className = 'chore-card';
+  const icon = kid==='jenn' ? '🐥' : '🦊';
+  const name = kid==='jenn' ? 'Jenn' : 'Jess';
+  const summary = getChoreSummary(p.choreItems);
+  card.innerHTML = `<h3>${icon} ${name}</h3><div class="ct-meta">Completed ${summary.done}/${summary.total} this week</div>`;
+  p.choreItems.forEach(item=>card.appendChild(buildChoreItemRow(item)));
+  return card;
+}
+
+function renderChoreTab() {
+  const wrap = document.getElementById('choreWrap');
+  if (!wrap) return;
+  const badge = document.getElementById('choreProfileBadge');
+  if (badge) {
+    if (isParent()) badge.textContent = `👨‍👩‍👧‍👦 Parent (${parentViewing==='jenn'?'Jenn':'Jess'})`;
+    else badge.textContent = activeProfile()==='jenn' ? '🐥 Jenn' : '🦊 Jess';
+  }
+  const weekKey = getCurrentWeekKey();
+  wrap.innerHTML = '';
+  const info = document.createElement('div');
+  info.className = 'chore-card';
+  info.innerHTML = `<h3>Auto-complete rules</h3><div class="ct-meta">Linked chores are computed from completed planner blocks for week ${weekKey}. Manual chores can be checked directly.</div>`;
+  wrap.appendChild(info);
+
+  const grid = document.createElement('div');
+  grid.className = 'chore-grid';
+  if (isParent()) {
+    grid.appendChild(renderChoreKidCard('jenn'));
+    grid.appendChild(renderChoreKidCard('jess'));
+  } else {
+    grid.appendChild(renderChoreKidCard(activeProfile()));
+  }
+  wrap.appendChild(grid);
 }
 
 /* ════════════════════════════════════════════════════════════════
