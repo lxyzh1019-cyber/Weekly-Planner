@@ -1467,7 +1467,7 @@
   .sheet-time-main .sheet-row { margin-bottom: 0; }
   /* Aligns duration column custom-min row with start column (same vertical rhythm) */
   .sheet-time-col--duration .duration-custom-slot {
-    min-height: 2.85rem;
+    min-height: 0;
     display: flex;
     align-items: flex-end;
     margin-bottom: 0.35rem;
@@ -2695,6 +2695,7 @@
     <h3 id="kidTrainingTitle"></h3>
     <p style="font-size:0.92rem;color:var(--ink-light);margin:0 0 0.5rem">Your plan for this session:</p>
     <div id="kidTrainingObjectives"></div>
+    <div class="kid-run-stopwatch" id="kidTrainingStopwatch" style="display:none"></div>
     <h4 style="margin-top:0.75rem">GEAR</h4>
     <div class="checklist-wrap" id="kidTrainingGear"></div>
     <button type="button" class="pill-btn" style="width:100%;margin-top:0.5rem" onclick="kidTrainingOpenEdit()">✏️ Edit (objectives, times, travel…)</button>
@@ -3269,6 +3270,7 @@ let pendingFocusAttempts = 0;
 let activeStopwatchTick = null;
 let kidQuickBlockId = null;
 let kidRoutineStopwatchTick = null;
+let kidTrainingStopwatchTick = null;
 
 let ts  = { durationMin:120, colour: CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays: [], travelBuffer:false, getReadyBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15 };
 let as_ = { durationMin:60,  colour: COLOURS[0], note:'', repeat:false, repeatDays: [], travelBuffer:false, travelBufMin:15 };
@@ -4917,7 +4919,11 @@ function syncDurationColumnSpacers(mode) {
   if (!s || !slot) return;
   const sh = s.offsetHeight;
   const dh = d ? d.offsetHeight : 0;
-  slot.style.minHeight = Math.max(0, sh - dh) + 'px';
+  const startCustom = s.querySelector('.custom-time-row');
+  const ch = startCustom
+    ? startCustom.offsetHeight + parseFloat(getComputedStyle(startCustom).marginTop || '0')
+    : 0;
+  slot.style.minHeight = Math.max(0, sh - dh - ch) + 'px';
 }
 
 function getTrainingGearPresets(tag) {
@@ -5001,6 +5007,13 @@ function kidRoutineStopwatchClearTick() {
   }
 }
 
+function kidTrainingStopwatchClearTick() {
+  if (kidTrainingStopwatchTick) {
+    clearInterval(kidTrainingStopwatchTick);
+    kidTrainingStopwatchTick = null;
+  }
+}
+
 function openKidRoutineQuick(blockId) {
   kidQuickBlockId = blockId;
   const blocks = getDayBlocks(currentDayKey);
@@ -5056,6 +5069,31 @@ function openKidTrainingQuick(blockId) {
     ? b.objectives.map(o => `<div class="checklist-item" style="cursor:default;border-color:var(--accent)"><span class="checklist-text">🎯 ${escapeHtml(o)}</span></div>`).join('')
     : '<p style="font-size:0.95rem;color:var(--ink-light)">No objectives listed yet — tap Edit to add some.</p>';
   objEl.innerHTML = lines;
+  const swEl = document.getElementById('kidTrainingStopwatch');
+  if (b.stopwatch && b.stopwatch.enabled) {
+    swEl.style.display = 'block';
+    kidTrainingStopwatchClearTick();
+    const tick = ()=>{
+      const arr = getDayBlocks(currentDayKey);
+      const blk = arr.find(x => x.id === blockId);
+      if (!blk || !blk.stopwatch) return;
+      const goal = blk.stopwatch.goalSec != null ? blk.stopwatch.goalSec : Math.max(60, (blk.durationMin|0) * 60);
+      const used = stopwatchDisplayElapsed(blk.stopwatch);
+      swEl.textContent = `⏱ Goal ${formatTimerSec(goal)} · Used ${formatTimerSec(used)}`;
+    };
+    tick();
+    if (!b.stopwatch.running) {
+      b.stopwatch.running = true;
+      b.stopwatch.startedAt = Date.now();
+      b.stopwatch.elapsedSec = Math.max(0, b.stopwatch.elapsedSec|0);
+      if (b.stopwatch.goalSec == null) b.stopwatch.goalSec = Math.max(60, (b.durationMin|0) * 60);
+      setDayBlocks(currentDayKey, blocks);
+      buildTimeline();
+    }
+    kidTrainingStopwatchTick = setInterval(tick, 500);
+  } else {
+    swEl.style.display = 'none';
+  }
   renderTrainingGearChecklist('kidTrainingGear', b, b.tag || 'skating', true);
   openSheet('kidTrainingOverlay');
 }
@@ -8524,6 +8562,7 @@ function openSheet(id) { document.getElementById(id).classList.add('open'); }
 function closeSheet(id) {
   if (id === 'editOverlay') editStopwatchClearTick();
   if (id === 'kidRoutineOverlay') kidRoutineStopwatchClearTick();
+  if (id === 'kidTrainingOverlay') kidTrainingStopwatchClearTick();
   document.getElementById(id).classList.remove('open');
 }
 function overlayClick(e, id) { if (e.target.classList.contains('overlay')) closeSheet(id); }
