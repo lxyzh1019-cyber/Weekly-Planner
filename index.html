@@ -183,6 +183,31 @@
   #screen-day .day-topbar__row2 .btn-template.danger {
     align-self: flex-end;
   }
+  .day-layout-three {
+    display: contents;
+  }
+  .day-reward-prompt {
+    margin: 0 0.8rem 0.5rem;
+    padding: 0.55rem 0.8rem;
+    border: 2px dashed var(--accent);
+    background: #fff9e9;
+    border-radius: 12px;
+    font-family: 'Patrick Hand', sans-serif;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .day-reward-actions { display:flex; gap:0.35rem; flex-wrap:wrap; }
+  .reward-pill {
+    border: 2px solid var(--ink);
+    border-radius: 16px;
+    padding: 0.25rem 0.65rem;
+    background: #fff;
+    cursor: pointer;
+    font-family: 'Patrick Hand', sans-serif;
+    font-weight: 700;
+  }
 
   .day-next-up-banner {
     margin: 0 0.8rem 0.5rem;
@@ -227,6 +252,75 @@
   .day-kid-quick-row .btn-break-quick:hover {
     transform: translate(-1px,-1px);
     box-shadow: 3px 3px 0 var(--ink);
+  }
+  .tutorial-overlay-note {
+    font-size: 0.95rem;
+    color: var(--ink-light);
+    margin-bottom: 0.6rem;
+  }
+  .tutorial-choice-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+  .tutorial-choice-btn {
+    width: 100%;
+    text-align: left;
+  }
+  .tutorial-overlay-note {
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 1rem;
+    color: #5a4d41;
+    margin-bottom: 0.55rem;
+  }
+  .tutorial-choice-btn {
+    width: 100%;
+    text-align: left;
+    margin-bottom: 0.4rem;
+  }
+
+  @media (min-width: 980px) and (orientation: landscape) {
+    #screen-day {
+      display: grid;
+      grid-template-columns: 240px minmax(460px, 620px) 300px;
+      grid-auto-rows: auto;
+      column-gap: 0.7rem;
+      align-content: start;
+    }
+    #screen-day .day-topbar {
+      grid-column: 1 / 4;
+    }
+    #screen-day #dayNextUpBanner,
+    #screen-day #dayKidQuickRow,
+    #screen-day .vibe-card,
+    #screen-day #dayRewardPrompt {
+      grid-column: 1 / 2;
+      margin-right: 0;
+    }
+    #screen-day .timeline-wrap {
+      grid-column: 2 / 3;
+      padding: 0;
+      margin: 0;
+      min-height: calc(100vh - 220px);
+    }
+    #screen-day .activity-tray {
+      grid-column: 3 / 4;
+      position: sticky;
+      top: 170px;
+      bottom: auto;
+      left: auto; right: auto;
+      border: 2px solid var(--ink);
+      border-radius: 14px;
+      border-top: 2px solid var(--ink);
+      box-shadow: 2px 2px 0 var(--ink);
+      padding-bottom: 0.6rem;
+      max-height: calc(100vh - 190px);
+      overflow-y: auto;
+    }
+    #screen-day .timeline {
+      max-width: 620px;
+      margin: 0 auto;
+    }
   }
 
   .profile-badge {
@@ -2253,6 +2347,13 @@
     <button type="button" class="btn-break-quick" onclick="addQuickBreak(15)">☕ I need a break (15 min)</button>
     <button type="button" class="btn-break-quick" onclick="addQuickBreak(10)">🫧 Short break (10 min)</button>
   </div>
+  <div id="dayRewardPrompt" class="day-reward-prompt">
+    <div id="dayRewardText"></div>
+    <div class="day-reward-actions">
+      <button type="button" class="reward-pill" onclick="acceptRewardPrompt()">Add today</button>
+      <button type="button" class="reward-pill" onclick="skipRewardPrompt()">Not today</button>
+    </div>
+  </div>
 
   <!-- Today's Vibe (replaces balance) -->
   <div class="vibe-card">
@@ -2263,18 +2364,20 @@
     <div class="vibe-moods" id="vibeMoods"></div>
   </div>
 
-  <div class="timeline-wrap">
-    <div class="timeline" id="timeline"></div>
-  </div>
-
-  <!-- Activity tray -->
-  <div class="activity-tray">
-    <div class="tray-header">
-      <span class="tray-title">Activities</span>
-      <span class="tray-hint" id="trayHint">Tap one to pick</span>
+  <div class="day-layout-three">
+    <div class="timeline-wrap">
+      <div class="timeline" id="timeline"></div>
     </div>
-    <div class="tray-filter" id="trayFilter"></div>
-    <div class="tray-scroll" id="trayScroll"></div>
+
+    <!-- Activity tray -->
+    <div class="activity-tray">
+      <div class="tray-header">
+        <span class="tray-title">Activities</span>
+        <span class="tray-hint" id="trayHint">Tap one to pick</span>
+      </div>
+      <div class="tray-filter" id="trayFilter"></div>
+      <div class="tray-scroll" id="trayScroll"></div>
+    </div>
   </div>
 </div>
 
@@ -2700,6 +2803,16 @@
     <div class="checklist-wrap" id="kidTrainingGear"></div>
     <button type="button" class="pill-btn" style="width:100%;margin-top:0.5rem" onclick="kidTrainingOpenEdit()">✏️ Edit (objectives, times, travel…)</button>
     <button type="button" class="btn-confirm" style="margin-top:0.45rem" onclick="closeSheet('kidTrainingOverlay')">Done ✨</button>
+  </div>
+</div>
+
+<div class="overlay" id="tutorialOverlay" onclick="overlayClick(event,'tutorialOverlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3>Build your first Family Hero task</h3>
+    <p class="tutorial-overlay-note">Choose one Family Responsibility activity to create now. More options unlock as rewards.</p>
+    <div id="tutorialChoices"></div>
+    <button type="button" class="pill-btn" style="width:100%;margin-top:0.5rem" onclick="skipTutorial()">Skip for now</button>
   </div>
 </div>
 
@@ -3130,6 +3243,37 @@ const OBJECTIVES_BY_TAG = {
   general: GENERAL_OBJECTIVES,
 };
 
+const REWARD_POOLS = {
+  family: [
+    { id:'family_set_table', name:'Family Hero: Set the Table', icon:'🍽', cat:'daily', durationMin:20, suitableTime:['evening','weekend'] },
+    { id:'family_prep_bag', name:'Family Hero: Prep School Bag', icon:'🎒', cat:'daily', durationMin:15, suitableTime:['evening'] },
+    { id:'family_laundry_fold', name:'Home Champion: Fold Laundry', icon:'🧺', cat:'daily', durationMin:20, suitableTime:['weekend','evening'] },
+    { id:'family_kitchen_helper', name:'Kitchen Helper Quest', icon:'🥕', cat:'daily', durationMin:20, suitableTime:['evening','weekend'] },
+  ],
+  academic: [
+    { id:'acad_focus_sprint', name:'Focus Sprint', icon:'📘', cat:'school', durationMin:25, suitableTime:['after-school','evening'] },
+    { id:'acad_preview_power', name:'Preview Power', icon:'🧠', cat:'school', durationMin:20, suitableTime:['evening','weekend'] },
+    { id:'acad_reading_star', name:'Reading Star', icon:'📚', cat:'school', durationMin:30, suitableTime:['after-school','evening','weekend'] },
+  ],
+  health: [
+    { id:'health_recovery_fuel', name:'Recovery Fuel', icon:'🍎', cat:'daily', durationMin:15, suitableTime:['after-school','evening'] },
+    { id:'health_stretch_reset', name:'Stretch Reset', icon:'🤸', cat:'active', durationMin:15, suitableTime:['after-school','evening'] },
+    { id:'health_pack_tomorrow', name:'Tomorrow Ready', icon:'👜', cat:'daily', durationMin:15, suitableTime:['evening'] },
+  ],
+  culture: [
+    { id:'culture_story_circle', name:'Culture Explorer Story', icon:'🏮', cat:'free', durationMin:25, suitableTime:['evening','weekend'] },
+    { id:'culture_festival_prep', name:'Festival Prep Mission', icon:'🥮', cat:'free', durationMin:30, suitableTime:['weekend','evening'] },
+    { id:'culture_calligraphy_play', name:'Brush Art Play', icon:'🖌️', cat:'free', durationMin:30, suitableTime:['weekend'] },
+  ],
+};
+const TUTORIAL_STARTER_CHOICES = REWARD_POOLS.family.slice(0, 3);
+const AFTERSCHOOL_CHECKLIST_REWARDS = [
+  { id:'ar1', text:'Champion Prep: 10-minute reading star mission' },
+  { id:'ar2', text:'Family Hero Bonus: organize tomorrow clothes' },
+  { id:'ar3', text:'Calm Finish Bonus: 5-minute stretch reset' },
+];
+const MORNING_LOCKED_REWARD = { id:'mw1', text:'Warm water with breakfast' };
+
 /* Built-in activities — durationMin is default duration in minutes */
 /* suitableTime values: 'before-school' | 'school' | 'after-school' | 'evening' | 'weekend'
    Used by mascot recommendations.
@@ -3148,6 +3292,7 @@ const DEFAULT_ACTIVITIES = [
   { id:'piano',      name:'Piano Practice',    icon:'🎹', cat:'school',   durationMin:60, suitableTime:['after-school','evening','weekend'] },
   { id:'chores',     name:'House Chore',       icon:'🧹', cat:'daily',    durationMin:60, suitableTime:['after-school','evening','weekend'] },
   { id:'family',     name:'Family Time',       icon:'👨‍👩‍👧‍👦', cat:'free', durationMin:120, suitableTime:['evening','weekend'], social:true },
+  ...Object.values(REWARD_POOLS).flat().map(a => ({ ...a, rewardLocked: true })),
   // Routines
   { id:'routine_morning',   name:'Morning Routine',      icon:'🌅', cat:'routine', durationMin:30, isRoutine:true, routineId:'morning',     suitableTime:['before-school','weekend'] },
   { id:'routine_afterschool', name:'After-School Routine', icon:'🎒', cat:'routine', durationMin:30, isRoutine:true, routineId:'afterschool', suitableTime:['after-school'] },
@@ -3178,6 +3323,9 @@ const ROUTINE_PRESETS = {
       { id:'a4', text:'Empty school bag / lunchbox in sink / finish water bottle' },
       { id:'a5', text:'Finish school/home work (ask for help if needed)' },
       { id:'a6', text:'Prep for training / get ready for today & tomorrow' },
+      { id:'a7', text:'Family Hero Task: set table or wash veggies' },
+      { id:'a8', text:'Focus Sprint: 25 min homework + 5 min break' },
+      { id:'a9', text:'Recovery Fuel: water + healthy snack' },
     ]
   },
   evening: {
@@ -3189,6 +3337,9 @@ const ROUTINE_PRESETS = {
       { id:'e3', text:'Brush teeth', timerSec: 120 },
       { id:'e4', text:'Wash face / skincare / hair / clean bathroom' },
       { id:'e5', text:'Turn off lights in empty rooms' },
+      { id:'e6', text:'Champion Prep: pack school bag for tomorrow' },
+      { id:'e7', text:'Culture Explorer: story, poem, or festival learning' },
+      { id:'e8', text:'Calm Finish: 3-minute reflection and gratitude' },
     ]
   }
 };
@@ -3271,6 +3422,12 @@ let activeStopwatchTick = null;
 let kidQuickBlockId = null;
 let kidRoutineStopwatchTick = null;
 let kidTrainingStopwatchTick = null;
+const MORNING_UNLOCK_ITEM = { id:'m_unlock_warm_water', text:'Warm water before breakfast' };
+const AFTERSCHOOL_REWARD_ITEMS = [
+  { id:'a_unlock_helper', text:'Reward pick: Family Hero helper task (your choice)' },
+  { id:'a_unlock_focus', text:'Reward pick: Focus Sprint bonus (15 min)' },
+  { id:'a_unlock_culture', text:'Reward pick: Culture Explorer mini time' },
+];
 
 let ts  = { durationMin:120, colour: CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays: [], travelBuffer:false, getReadyBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15 };
 let as_ = { durationMin:60,  colour: COLOURS[0], note:'', repeat:false, repeatDays: [], travelBuffer:false, travelBufMin:15 };
@@ -3395,6 +3552,7 @@ function saveAll() {
   renderPendingSyncMessage();
   pushToFirebase();
 }
+window._skipRewardPrompt = false;
 function markItemUpdated(item) {
   if (!item) return item;
   item.updatedAt = Date.now();
@@ -3480,6 +3638,35 @@ function refreshCurrentScreen() {
 ════════════════════════════════════════════════════════════════ */
 function getProfData(p=activeProfile()) {
   if (!state.profiles[p]) state.profiles[p] = { weeks:{}, customActivities:[], dayMoods:{}, blockMoods:{}, activityCounts:{}, activityHours:{} };
+  const prof = state.profiles[p];
+  if (!prof.progress) {
+    prof.progress = {
+      tutorialDone: false,
+      tutorialStarterActId: null,
+      unlockedActs: [],
+      pendingRewards: [],
+      streaks: {},
+      manualPlacedCount: 0,
+      streakFreezeTokens: 1,
+      streakFreezeWeek: dateToLocalKey(getWeekStart(weekOffset)),
+      unlockedThisWeek: {},
+    };
+  }
+  if (!Array.isArray(prof.progress.unlockedActs)) prof.progress.unlockedActs = [];
+  if (!Array.isArray(prof.progress.pendingRewards)) prof.progress.pendingRewards = [];
+  if (!prof.progress.unlockedChecklistItems) prof.progress.unlockedChecklistItems = {};
+  if (!prof.progress.streaks) prof.progress.streaks = {};
+  if (!prof.progress.unlockedThisWeek) prof.progress.unlockedThisWeek = {};
+  if (!prof.progress.unlockedChecklistItems) prof.progress.unlockedChecklistItems = {};
+  if (prof.progress.manualPlacedCount == null) prof.progress.manualPlacedCount = 0;
+  if (prof.progress.streakFreezeTokens == null) prof.progress.streakFreezeTokens = 1;
+  if (!prof.progress.streakFreezeWeek) prof.progress.streakFreezeWeek = dateToLocalKey(getWeekStart(weekOffset));
+  const wk = dateToLocalKey(getWeekStart(weekOffset));
+  if (prof.progress.streakFreezeWeek !== wk) {
+    prof.progress.streakFreezeWeek = wk;
+    prof.progress.streakFreezeTokens = 1;
+    prof.progress.unlockedThisWeek = {};
+  }
   return state.profiles[p];
 }
 function getDayBlocks(key, p=activeProfile()) { return getProfData(p).weeks[key] || []; }
@@ -3502,7 +3689,14 @@ function getAllActivities(p=activeProfile()) {
   // apply level-ups
   const rules = state.shared.levelRules || [];
   const profd = getProfData(p);
+  const progress = getProfData(p).progress || {};
+  const unlockedSet = new Set(progress.unlockedActs || []);
+  const starter = progress.tutorialStarterActId;
   return base.map(act => {
+    if (act.rewardLocked) {
+      const unlocked = unlockedSet.has(act.id) || (starter && starter === act.id);
+      act = { ...act, _rewardLocked: !unlocked, _locked: !unlocked };
+    }
     const rule = rules.find(r => r.activityId===act.id);
     if (!rule) return act;
     const cur = rule.type==='count' ? (profd.activityCounts?.[act.id]||0) : (profd.activityHours?.[act.id]||0);
@@ -3511,6 +3705,241 @@ function getAllActivities(p=activeProfile()) {
     }
     return act;
   });
+}
+
+function getUnlockedRoutineRewards(routineId, p=activeProfile()) {
+  const pr = getProfData(p).progress || {};
+  const map = pr.unlockedChecklistItems || {};
+  return map[routineId] || [];
+}
+
+function queueReward(actId, reason) {
+  const p = getProfData();
+  const pr = p.progress;
+  if (!actId) return;
+  const existsPending = (pr.pendingRewards || []).some(r=>r.actId===actId);
+  if (existsPending || (pr.unlockedActs||[]).includes(actId)) return;
+  pr.pendingRewards.push({ id:'rw-'+Date.now().toString(36)+Math.random().toString(36).slice(2,4), actId, reason: reason||'progress' });
+}
+
+function queueChecklistReward(routineId, item, reason) {
+  const p = getProfData();
+  const pr = p.progress;
+  if (!routineId || !item || !item.id) return;
+  const key = `${routineId}:${item.id}`;
+  const hasPending = (pr.pendingRewards || []).some(r => r.type==='checklist' && `${r.routineId}:${r.item?.id}` === key);
+  const unlocked = ((pr.unlockedChecklistItems[routineId] || []).some(x=>x.id===item.id));
+  if (hasPending || unlocked) return;
+  pr.pendingRewards.push({
+    id:'rw-'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),
+    type:'checklist',
+    routineId,
+    item: { ...item },
+    reason: reason || 'progress',
+  });
+}
+
+function unlockRewardAct(actId) {
+  const p = getProfData();
+  const pr = p.progress;
+  if (!actId) return false;
+  if (!pr.unlockedActs.includes(actId)) {
+    pr.unlockedActs.push(actId);
+    return true;
+  }
+  return false;
+}
+
+function pickLockedReward(poolKey, excludeIds=[]) {
+  const p = getProfData();
+  const pr = p.progress;
+  const unlocked = new Set(pr.unlockedActs || []);
+  const exclude = new Set(excludeIds || []);
+  const pool = REWARD_POOLS[poolKey] || [];
+  const act = pool.find(a => !unlocked.has(a.id) && !exclude.has(a.id));
+  return act ? act.id : null;
+}
+
+function enqueueMilestoneRewards() {
+  const p = getProfData();
+  const pr = p.progress;
+  const n = pr.manualPlacedCount || 0;
+  const milestones = [10,15,20];
+  milestones.forEach(m=>{
+    const key = `manual-${m}`;
+    if (n >= m && !pr.unlockedThisWeek[key]) {
+      const cycle = m===10 ? ['family','academic'] : (m===15 ? ['health'] : ['culture']);
+      let queued = false;
+      cycle.forEach(k=>{
+        const id = pickLockedReward(k);
+        if (id && !queued) {
+          queueReward(id, `Placed ${m} blocks`);
+          queued = true;
+        }
+      });
+      if (queued) pr.unlockedThisWeek[key] = true;
+    }
+  });
+}
+
+function maybeShowRewardPrompt() {
+  if (isParent()) return;
+  const p = getProfData();
+  const pr = p.progress;
+  const box = document.getElementById('dayRewardPrompt');
+  const txt = document.getElementById('dayRewardText');
+  if (!box || !txt) return;
+  if (!pr.pendingRewards.length) {
+    box.style.display = 'none';
+    window._currentRewardPrompt = null;
+    return;
+  }
+  const first = pr.pendingRewards[0];
+  window._currentRewardPrompt = first;
+  if (first.type === 'checklist') {
+    txt.textContent = `Reward unlocked: ${first.item.text} (${first.reason})`;
+  } else {
+    const act = DEFAULT_ACTIVITIES.find(a=>a.id===first.actId) || Object.values(REWARD_POOLS).flat().find(a=>a.id===first.actId);
+    if (!act) {
+      pr.pendingRewards.shift();
+      saveAll();
+      maybeShowRewardPrompt();
+      return;
+    }
+    txt.textContent = `Reward unlocked: ${act.icon} ${act.name} (${first.reason})`;
+  }
+  box.style.display = 'flex';
+}
+
+function acceptRewardPrompt() {
+  const p = getProfData();
+  const pr = p.progress;
+  const rw = window._currentRewardPrompt;
+  if (!rw) return;
+  if (rw.type === 'checklist') {
+    if (!pr.unlockedChecklistItems[rw.routineId]) pr.unlockedChecklistItems[rw.routineId] = [];
+    if (!pr.unlockedChecklistItems[rw.routineId].some(x=>x.id===rw.item.id)) {
+      pr.unlockedChecklistItems[rw.routineId].push({ ...rw.item });
+      showToast(`Unlocked checklist reward ✨`);
+    }
+  } else if (rw.actId) {
+    const changed = unlockRewardAct(rw.actId);
+    if (changed) {
+      const act = DEFAULT_ACTIVITIES.find(a=>a.id===rw.actId) || Object.values(REWARD_POOLS).flat().find(a=>a.id===rw.actId);
+      showToast(`Unlocked: ${act?.name || 'New reward'} ✨`);
+    }
+  }
+  pr.pendingRewards = pr.pendingRewards.filter(x=>x.id!==rw.id);
+  saveAll();
+  buildTray();
+  maybeShowRewardPrompt();
+}
+
+function skipRewardPrompt() {
+  const p = getProfData();
+  const pr = p.progress;
+  const rw = window._currentRewardPrompt;
+  if (!rw) return;
+  pr.pendingRewards = pr.pendingRewards.filter(x=>x.id!==rw.id);
+  pr.pendingRewards.push(rw);
+  saveAll();
+  showToast('No problem — you can choose it later 💫');
+  maybeShowRewardPrompt();
+}
+
+function openTutorial() {
+  const wrap = document.getElementById('tutorialChoices');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  const p = getProfData();
+  const progress = p.progress;
+  TUTORIAL_STARTER_CHOICES.forEach(act=>{
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'pill-btn tutorial-choice-btn';
+    btn.textContent = `${act.icon} ${act.name} (${formatDuration(act.durationMin)})`;
+    btn.onclick = ()=>chooseTutorialStarter(act.id);
+    wrap.appendChild(btn);
+  });
+  if (progress.tutorialStarterActId) {
+    const note = document.createElement('p');
+    note.className = 'tutorial-overlay-note';
+    note.textContent = 'You already picked a starter. You can keep building your Family Hero streak!';
+    wrap.appendChild(note);
+  }
+  openSheet('tutorialOverlay');
+}
+
+function chooseTutorialStarter(actId) {
+  const p = getProfData();
+  const pr = p.progress;
+  pr.tutorialDone = true;
+  pr.tutorialStarterActId = actId;
+  unlockRewardAct(actId);
+  closeSheet('tutorialOverlay');
+  saveAll();
+  buildTray();
+  const act = getAllActivities().find(a=>a.id===actId);
+  if (act) {
+    selectActivity(act);
+    showToast(`Starter unlocked: ${act.name} — tap timeline to place it ✅`);
+  }
+}
+
+function skipTutorial() {
+  closeSheet('tutorialOverlay');
+  showToast('Tutorial skipped — you can open it later from day view');
+}
+
+function offerTutorialIfNeeded() {
+  if (isParent()) return;
+  const p = getProfData();
+  if (!p.progress.tutorialDone) openTutorial();
+}
+
+function markRoutineProgressOnChecklistToggle(block, act, prevDone, nextDone, total) {
+  if (!act?.isRoutine || !total) return;
+  if (prevDone >= total || nextDone < total) return;
+  const p = getProfData();
+  const pr = p.progress;
+  const rid = act.routineId;
+  if (!rid) return;
+  if (!pr.streaks[rid]) pr.streaks[rid] = { count: 0, lastDay: null };
+  const st = pr.streaks[rid];
+  const today = currentDayKey;
+  if (st.lastDay === today) return;
+  if (!st.lastDay) st.count = 1;
+  else {
+    const gapDays = Math.round((formatDayKey(today) - formatDayKey(st.lastDay)) / (24*60*60*1000));
+    if (gapDays === 1) st.count += 1;
+    else if (gapDays > 1 && pr.streakFreezeTokens > 0) {
+      pr.streakFreezeTokens -= 1;
+      st.count += 1;
+      showToast('Streak freeze used — nice recovery ⭐');
+    } else st.count = 1;
+  }
+  st.lastDay = today;
+  if (rid === 'morning' && st.count >= 5) {
+    queueChecklistReward('morning', MORNING_LOCKED_REWARD, '5-day morning streak');
+  }
+  if (rid === 'afterschool' && st.count >= 10) {
+    const unlocked = p.progress.unlockedChecklistItems.afterschool || [];
+    const pendingIds = (p.progress.pendingRewards || [])
+      .filter(r=>r.type==='checklist' && r.routineId==='afterschool')
+      .map(r=>r.item?.id);
+    const next = AFTERSCHOOL_CHECKLIST_REWARDS.find(it => !unlocked.some(u=>u.id===it.id) && !pendingIds.includes(it.id));
+    if (next) queueChecklistReward('afterschool', next, '10-day after-school streak');
+  }
+  saveAll();
+  maybeShowRewardPrompt();
+}
+
+function getRoutineChecklistWithUnlocks(routineId) {
+  const tmpl = getRoutineTemplate(routineId);
+  const base = (tmpl?.items || []).slice();
+  const p = getProfData();
+  const unlocked = (p.progress && p.progress.unlockedChecklistItems && p.progress.unlockedChecklistItems[routineId]) || [];
+  return [...base, ...unlocked];
 }
 
 /* Track celebration toasts so we do not spam on every re-render */
@@ -3672,6 +4101,10 @@ function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-'+id).classList.add('active');
   if (typeof refreshMascotButton === 'function') refreshMascotButton();
+  if (id === 'day') {
+    maybeShowRewardPrompt();
+    offerTutorialIfNeeded();
+  }
 }
 
 const PARENT_PIN = '1234';
@@ -3694,6 +4127,10 @@ function selectProfile(p) {
   } else {
     showScreen('week');
     renderWeek();
+    const pp = getProfData(p);
+    if (pp?.progress && !pp.progress.tutorialDone) {
+      setTimeout(()=>openTutorial(), 350);
+    }
   }
 }
 function goProfile() {
@@ -4308,6 +4745,8 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   buildTimeline();
   buildTray();
   renderVibe();
+  maybeShowRewardPrompt();
+  offerTutorialIfNeeded();
   if (focusBlockId) {
     pendingFocusBlockId = focusBlockId;
     pendingFocusAttempts = 0;
@@ -4964,7 +5403,8 @@ function countChecklistTotal(block, act) {
   const tmpl = getRoutineTemplate(act.routineId);
   const tmplCount = tmpl?.items?.length || 0;
   const extraCount = getKidExtras(act.routineId).length;
-  return tmplCount + extraCount;
+  const rewardCount = getUnlockedRoutineRewards(act.routineId).length;
+  return tmplCount + extraCount + rewardCount;
 }
 function countChecklistDone(block, act) {
   const state = block.checklistState || {};
@@ -4998,6 +5438,18 @@ function onTimelineBlockTap(blockId) {
     return;
   }
   openEditSheet(blockId);
+}
+
+function isActivitySelectable(act) {
+  if (!act) return false;
+  if (act._locked || act._rewardLocked) return false;
+  return true;
+}
+
+function getUnlockedRoutineRewards(routineId) {
+  const p = getProfData();
+  const map = (p.progress && p.progress.unlockedChecklistItems) || {};
+  return map[routineId] || [];
 }
 
 function kidRoutineStopwatchClearTick() {
@@ -5108,6 +5560,7 @@ function kidTrainingOpenEdit() {
 function handleCanvasTap(e, zMinStart) {
   if (!selectedActivity) { showToast('Tap an activity first 👇'); return; }
   if (selectedActivity._locked) { showToast(`🔒 Unlocks in ${selectedActivity.season}!`); return; }
+  if (selectedActivity._rewardLocked) { showToast('Keep going — this reward unlocks soon ✨'); return; }
 
   const rect = e.currentTarget.getBoundingClientRect();
   const y = e.clientY - rect.top;
@@ -5152,6 +5605,12 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
   const blocks = getDayBlocks(currentDayKey);
   blocks.push(block);
   setDayBlocks(currentDayKey, blocks);
+  if (!isParent()) {
+    const p = getProfData();
+    p.progress.manualPlacedCount = (p.progress.manualPlacedCount || 0) + 1;
+    enqueueMilestoneRewards();
+    maybeShowRewardPrompt();
+  }
 
   // Counts are recomputed from confirmed blocks elsewhere — no manual increment here.
   const profd = getProfData();
@@ -5322,7 +5781,7 @@ function buildTray() {
 
   filtered.forEach(act=>{
     const chip = document.createElement('div');
-    chip.className = 'activity-chip'+(act._locked?' locked':'');
+    chip.className = 'activity-chip'+((act._locked || act._rewardLocked)?' locked':'');
     chip.id = 'chip-'+act.id;
     chip.style.borderColor = 'var(--ink)';
     const durStr = formatDuration(act.durationMin || 60);
@@ -5335,7 +5794,7 @@ function buildTray() {
       if (cur >= rule.target) levelBadge = `<div class="chip-level-badge">★</div>`;
     }
     let lockBadge = '';
-    if (act._locked) lockBadge = `<div class="chip-lock-badge">🔒</div>`;
+    if (act._locked || act._rewardLocked) lockBadge = `<div class="chip-lock-badge">🔒</div>`;
 
     chip.innerHTML = `
       ${levelBadge}${lockBadge}
@@ -5356,6 +5815,7 @@ function buildTray() {
 
 function selectActivity(act) {
   if (act._locked) { showToast(`🔒 Unlocks in ${act.season}!`); return; }
+  if (act._rewardLocked) { showToast('Keep going — unlock this reward soon ✨'); return; }
   selectedActivity = act;
   document.querySelectorAll('.activity-chip').forEach(c=>c.classList.remove('selected'));
   const el = document.getElementById('chip-'+act.id);
@@ -5912,7 +6372,7 @@ function openEditSheet(blockId) {
   const clWrap = document.getElementById('editChecklistWrap');
   if (act.isRoutine) {
     clWrap.style.display = 'block';
-    renderChecklist(block, act);
+    renderChecklist(block, act, 'editChecklistList');
   } else {
     clWrap.style.display = 'none';
   }
@@ -6044,7 +6504,7 @@ function renderChecklist(block, act, listContainerId, options) {
   const listWrap = document.getElementById(listContainerId || 'editChecklistList');
   const skipAdd = !!(options && options.skipAdd);
   listWrap.innerHTML = '';
-  if (!tmpl?.items?.length && !getKidExtras(act.routineId).length) {
+  if (!tmpl?.items?.length && !getKidExtras(act.routineId).length && !getUnlockedRoutineRewards(act.routineId).length) {
     listWrap.innerHTML = '<p style="font-size:0.9rem;color:var(--ink-light)">No items in this routine</p>';
     return;
   }
@@ -6061,6 +6521,10 @@ function renderChecklist(block, act, listContainerId, options) {
   const extras = getKidExtras(act.routineId);
   extras.forEach(item=>{
     listWrap.appendChild(buildChecklistRow(block, act, item, true, cid));
+  });
+  const rewardItems = getUnlockedRoutineRewards(act.routineId);
+  rewardItems.forEach(item=>{
+    listWrap.appendChild(buildChecklistRow(block, act, item, false, cid));
   });
 
   // "+ Add my own item" row — only when a child is using their own profile (not parent mode)
@@ -6108,6 +6572,8 @@ function buildChecklistRow(block, act, item, isKidItem, listContainerId) {
     if (act.isRoutine) {
       const total = countChecklistTotal(b, act);
       const done = countChecklistDone(b, act);
+      const prevDone = b.checklistState[item.id] ? Math.max(0, done - 1) : Math.min(total, done + 1);
+      markRoutineProgressOnChecklistToggle(b, act, prevDone, done, total);
       if (total > 0 && done >= total) {
         if (!routineCompleteToasted.has(b.id)) {
           routineCompleteToasted.add(b.id);
@@ -8821,6 +9287,7 @@ loadLocal();
 initFirebase();
 ctSetupLegacyReadCompatibility();
 showScreen('profile');
+window._currentRewardPrompt = null;
 
 /* Desktop: convert vertical wheel scroll to horizontal on the tray + filter */
 function enableHorizontalWheelScroll() {
