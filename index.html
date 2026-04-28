@@ -184,6 +184,51 @@
     align-self: flex-end;
   }
 
+  .day-next-up-banner {
+    margin: 0 0.8rem 0.5rem;
+    padding: 0.55rem 0.85rem;
+    background: linear-gradient(135deg, #e8f4ff 0%, #fff8e6 100%);
+    border: 2px solid var(--ink);
+    border-radius: 14px;
+    box-shadow: 2px 2px 0 var(--ink);
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 1.08rem;
+    font-weight: 700;
+    color: var(--ink);
+    text-align: center;
+    line-height: 1.35;
+  }
+  .day-next-up-banner .next-up-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #5a4d41;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 0.15rem;
+  }
+  .day-kid-quick-row {
+    display: flex;
+    justify-content: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    margin: 0 0.8rem 0.55rem;
+  }
+  .day-kid-quick-row .btn-break-quick {
+    background: var(--accent-yellow);
+    border: 2px solid var(--ink);
+    border-radius: 16px;
+    padding: 0.45rem 1rem;
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 1.02rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 2px 2px 0 var(--ink);
+  }
+  .day-kid-quick-row .btn-break-quick:hover {
+    transform: translate(-1px,-1px);
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+
   .profile-badge {
     display: flex; align-items: center; gap: 0.4rem;
     background: var(--bg); border-radius: 20px;
@@ -1028,17 +1073,18 @@
   }
   .tl-now-line {
     position: absolute;
-    left: -4px; right: 0;
+    left: -6px; right: 0;
     height: 0;
-    border-top: 2px solid var(--accent);
+    border-top: 4px solid var(--accent);
     z-index: 20;
     pointer-events: none;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.85);
   }
   .tl-now-line::before {
     content: '';
     position: absolute;
-    left: -6px; top: -5px;
-    width: 10px; height: 10px;
+    left: -8px; top: -7px;
+    width: 14px; height: 14px;
     background: var(--accent);
     border-radius: 50%;
     border: 2px solid #fff;
@@ -1091,8 +1137,14 @@
     border: 2px solid var(--ink); background: var(--paper); cursor: pointer;
     font-family: 'Patrick Hand', sans-serif;
   }
-  .placed-block .block-name { font-size: 1.04rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-  .placed-block .block-meta { font-size: 0.81rem; opacity: 0.98; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+  .placed-block .block-name { font-size: 1.04rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; line-height: 1.15; }
+  .placed-block .block-meta { font-size: 0.81rem; opacity: 0.98; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; line-height: 1.15; }
+  /* Taller blocks: slightly larger type; very short blocks stay compact */
+  .placed-block.block-font-md .block-name { font-size: 1.12rem; }
+  .placed-block.block-font-md .block-meta { font-size: 0.88rem; }
+  .placed-block.block-font-lg .block-name { font-size: 1.22rem; }
+  .placed-block.block-font-lg .block-meta { font-size: 0.95rem; }
+  .placed-block.block-font-lg .block-note { font-size: 0.82rem; }
   .placed-block .block-note {
     font-size: 0.75rem;
     font-weight: 600;
@@ -1166,6 +1218,10 @@
     cursor: default;
     border-style: dotted;
     box-shadow: none;
+  }
+  .placed-block.travel-buf.travel-buf-ready {
+    z-index: 6;
+    opacity: 0.42;
   }
   .placed-block.travel-buf:hover { transform: none; box-shadow: none; }
   .block-badges { display:flex; gap: 3px; }
@@ -1309,6 +1365,62 @@
     border-radius: 10px;
   }
   .sheet-time-summary + .sheet-time-summary { margin-top: 0.15rem; }
+  .sheet-time-summary-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0.25rem 0 0.5rem;
+  }
+  .sheet-time-summary-row .sheet-time-summary {
+    flex: 1 1 200px;
+    margin: 0;
+    min-width: 0;
+  }
+  .buffer-dur-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0.35rem 0 0.5rem;
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: #5a4d41;
+  }
+  .buffer-dur-row label { margin: 0; }
+  .buffer-dur-row input {
+    width: 64px;
+    border: 2px solid var(--ink);
+    border-radius: 8px;
+    padding: 0.25rem 0.35rem;
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 1rem;
+    text-align: center;
+    background: #fff;
+  }
+  .kid-block-overlay .sheet { max-width: 520px; margin-left: auto; margin-right: auto; border-radius: 24px 24px 0 0; border-left: none; }
+  .kid-block-overlay .kid-run-stopwatch {
+    font-family: 'Gochi Hand', cursive;
+    font-size: 1.35rem;
+    text-align: center;
+    margin: 0.5rem 0;
+    padding: 0.5rem;
+    background: var(--bg2);
+    border: 2px solid var(--ink);
+    border-radius: 12px;
+  }
+  .kid-coach-tip {
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: #5a4d41;
+    margin: 0.5rem 0;
+    padding: 0.55rem 0.7rem;
+    background: linear-gradient(135deg, #fff9e6 0%, #e8f7ff 100%);
+    border: 2px dashed var(--accent);
+    border-radius: 12px;
+    line-height: 1.35;
+  }
 
   .edit-stopwatch-wrap {
     margin: 0.6rem 0 0.8rem;
@@ -1345,7 +1457,7 @@
     flex-direction: column;
     min-width: 0;
   }
-  .sheet-time-grid-row h4 { margin-top: 0.1rem; min-height: 1.55rem; }
+  .sheet-time-grid-row h4 { margin-top: 0.1rem; margin-bottom: 0.35rem; min-height: 1.55rem; }
   .sheet-time-main {
     min-height: 168px;
     display: flex;
@@ -1353,6 +1465,13 @@
     justify-content: flex-start;
   }
   .sheet-time-main .sheet-row { margin-bottom: 0; }
+  /* Aligns duration column custom-min row with start column (same vertical rhythm) */
+  .sheet-time-col--duration .duration-custom-slot {
+    min-height: 2.85rem;
+    display: flex;
+    align-items: flex-end;
+    margin-bottom: 0.35rem;
+  }
   .duration-align-spacer {
     height: 74px;
     margin-bottom: 0.35rem;
@@ -1998,6 +2117,7 @@
     <button class="view-tab active" id="viewTabFull" onclick="setWeekView('full')">📋 Full</button>
     <button class="view-tab" id="viewTabTimeGrid" onclick="setWeekView('timegrid')">🕐 Time-Grid</button>
   </div>
+  <p class="kid-coach-tip" id="weekCoachTip" style="display:none;margin:0.35rem 0.75rem 0"></p>
 
   <!-- Compact view kept in DOM but hidden (no longer used) -->
   <div id="weekCompact" style="display:none">
@@ -2126,6 +2246,12 @@
       </div>
       <button class="btn-template danger" onclick="clearDay()">🗑 Clear</button>
     </div>
+  </div>
+
+  <div id="dayNextUpBanner" class="day-next-up-banner" style="display:none"></div>
+  <div id="dayKidQuickRow" class="day-kid-quick-row" style="display:none">
+    <button type="button" class="btn-break-quick" onclick="addQuickBreak(15)">☕ I need a break (15 min)</button>
+    <button type="button" class="btn-break-quick" onclick="addQuickBreak(10)">🫧 Short break (10 min)</button>
   </div>
 
   <!-- Today's Vibe (replaces balance) -->
@@ -2325,13 +2451,21 @@
     <h4>NOTE</h4>
     <textarea class="note-input" id="trainingNote" rows="2" placeholder="e.g. Terwillegar, bring skates…"></textarea>
 
-    <div class="buffer-toggle" id="trainingTravelToggle" onclick="toggleTravelBuffer('training')">
-      <div class="toggle-track"><div class="toggle-knob"></div></div>
-      <span class="toggle-label">🚗 Needs travel time (adds 15 min before & after)</span>
-    </div>
     <div class="buffer-toggle" id="trainingReadyToggle" onclick="toggleGetReadyBuffer('training')">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
-      <span class="toggle-label">👕 Needs get ready time (adds 15 min before & after)</span>
+      <span class="toggle-label">👕 Needs get ready time (default 15 min before & after — adjust below)</span>
+    </div>
+    <div class="buffer-dur-row" id="trainingReadyDurRow" style="display:none">
+      <label for="trainingReadyBufMin">Get-ready minutes (each way)</label>
+      <input type="number" id="trainingReadyBufMin" min="5" max="120" step="5" value="15" onchange="onTrainingBufferMinInput()">
+    </div>
+    <div class="buffer-toggle" id="trainingTravelToggle" onclick="toggleTravelBuffer('training')">
+      <div class="toggle-track"><div class="toggle-knob"></div></div>
+      <span class="toggle-label">🚗 Needs travel time (default 15 min before & after — adjust below)</span>
+    </div>
+    <div class="buffer-dur-row" id="trainingTravelDurRow" style="display:none">
+      <label for="trainingTravelBufMin">Travel minutes (each way)</label>
+      <input type="number" id="trainingTravelBufMin" min="5" max="180" step="5" value="15" onchange="onTrainingBufferMinInput()">
     </div>
     <div id="trainingGearWrap">
       <h4>GEAR LIST</h4>
@@ -2371,12 +2505,11 @@
     <div class="sheet-time-grid-row">
       <div class="sheet-time-col">
         <h4>START TIME</h4>
-        <div class="sheet-time-spacer" aria-hidden="true"></div>
         <div id="activityStartPicker"></div>
       </div>
-      <div class="sheet-time-col">
+      <div class="sheet-time-col sheet-time-col--duration">
         <h4>DURATION</h4>
-        <div class="sheet-time-spacer" aria-hidden="true"></div>
+        <div class="duration-custom-slot" id="activityDurationTopSpacer" aria-hidden="true"></div>
         <div class="sheet-row" id="activityDurBtns"></div>
         <div id="activityCustomDur"></div>
       </div>
@@ -2388,7 +2521,11 @@
     <textarea class="note-input" id="activityNote" rows="2" placeholder="Add a note…"></textarea>
     <div class="buffer-toggle" id="activityTravelToggle" onclick="toggleTravelBuffer('activity')">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
-      <span class="toggle-label">🚗 Needs travel time (adds 15 min before & after)</span>
+      <span class="toggle-label">🚗 Needs travel time (default 15 min each way — adjust below)</span>
+    </div>
+    <div class="buffer-dur-row" id="activityTravelDurRow" style="display:none">
+      <label for="activityTravelBufMin">Travel minutes (each way)</label>
+      <input type="number" id="activityTravelBufMin" min="5" max="180" step="5" value="15" onchange="onActivityTravelBufMinInput()">
     </div>
     <div class="repeat-toggle" id="activityRepeat" onclick="toggleRepeat('activityRepeat')">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
@@ -2431,12 +2568,11 @@
     <div class="sheet-time-grid-row">
       <div class="sheet-time-col">
         <h4>START TIME</h4>
-        <div class="sheet-time-spacer" aria-hidden="true"></div>
         <div id="editStartPicker"></div>
       </div>
-      <div class="sheet-time-col">
+      <div class="sheet-time-col sheet-time-col--duration">
         <h4>DURATION</h4>
-        <div class="sheet-time-spacer" aria-hidden="true"></div>
+        <div class="duration-custom-slot" id="editDurationTopSpacer" aria-hidden="true"></div>
         <div class="sheet-row" id="editDurBtns"></div>
         <div id="editCustomDur"></div>
       </div>
@@ -2446,18 +2582,30 @@
     <div id="editObjectivesWrap" style="display:none">
       <h4>OBJECTIVES</h4>
       <div id="editObjectivesView" style="margin-bottom:0.8rem"></div>
+      <div id="editObjectivesEditWrap" style="display:none">
+        <label style="font-size:0.95rem;font-weight:700;color:#5a4d41">Edit your goals (one per line)</label>
+        <textarea class="note-input" id="editObjectivesInput" rows="4" placeholder="e.g. 10 good jumps&#10;2 run-throughs"></textarea>
+      </div>
     </div>
 
     <h4>NOTE</h4>
     <textarea class="note-input" id="editNoteInput" rows="2" placeholder="Add a note…"></textarea>
 
+    <div class="buffer-toggle sheet-toggle-row" id="editReadyToggle" onclick="toggleEditGetReadyBuffer()" style="display:none">
+      <div class="toggle-track"><div class="toggle-knob"></div></div>
+      <span class="toggle-label">👕 Needs get ready time</span>
+    </div>
+    <div class="buffer-dur-row" id="editReadyDurRow" style="display:none">
+      <label for="editReadyBufMin">Get-ready minutes (each way)</label>
+      <input type="number" id="editReadyBufMin" min="5" max="120" step="5" value="15" onchange="onEditBufferMinInput()">
+    </div>
     <div class="buffer-toggle sheet-toggle-row" id="editTravelToggle" onclick="toggleEditTravelBuffer()">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
       <span class="toggle-label">🚗 Needs travel time</span>
     </div>
-    <div class="buffer-toggle sheet-toggle-row" id="editReadyToggle" onclick="toggleEditGetReadyBuffer()" style="display:none">
-      <div class="toggle-track"><div class="toggle-knob"></div></div>
-      <span class="toggle-label">👕 Needs get ready time</span>
+    <div class="buffer-dur-row" id="editTravelDurRow" style="display:none">
+      <label for="editTravelBufMin">Travel minutes (each way)</label>
+      <input type="number" id="editTravelBufMin" min="5" max="180" step="5" value="15" onchange="onEditBufferMinInput()">
     </div>
     <div id="editTrainingGearWrap" style="display:none">
       <h4>GEAR LIST</h4>
@@ -2525,6 +2673,32 @@
 
     <button class="btn-danger" onclick="removeBlock()">🗑 Remove this block</button>
     <button class="btn-confirm" style="margin-top:0.4rem" onclick="saveEditChanges()">Save Changes ✅</button>
+  </div>
+</div>
+
+<!-- Kid quick view: routine checklist + auto stopwatch -->
+<div class="overlay kid-block-overlay" id="kidRoutineOverlay" onclick="overlayClick(event,'kidRoutineOverlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3 id="kidRoutineTitle"></h3>
+    <div class="checklist-wrap" id="kidRoutineChecklist"></div>
+    <div class="kid-run-stopwatch" id="kidRoutineStopwatch" style="display:none"></div>
+    <button type="button" class="pill-btn" style="width:100%;margin-top:0.5rem" onclick="kidRoutineOpenEdit()">✏️ Edit (times, notes, stopwatch…)</button>
+    <button type="button" class="btn-confirm" style="margin-top:0.45rem" onclick="closeSheet('kidRoutineOverlay')">Done ✨</button>
+  </div>
+</div>
+
+<!-- Kid quick view: training objectives + gear -->
+<div class="overlay kid-block-overlay" id="kidTrainingOverlay" onclick="overlayClick(event,'kidTrainingOverlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3 id="kidTrainingTitle"></h3>
+    <p style="font-size:0.92rem;color:var(--ink-light);margin:0 0 0.5rem">Your plan for this session:</p>
+    <div id="kidTrainingObjectives"></div>
+    <h4 style="margin-top:0.75rem">GEAR</h4>
+    <div class="checklist-wrap" id="kidTrainingGear"></div>
+    <button type="button" class="pill-btn" style="width:100%;margin-top:0.5rem" onclick="kidTrainingOpenEdit()">✏️ Edit (objectives, times, travel…)</button>
+    <button type="button" class="btn-confirm" style="margin-top:0.45rem" onclick="closeSheet('kidTrainingOverlay')">Done ✨</button>
   </div>
 </div>
 
@@ -2969,6 +3143,7 @@ const DEFAULT_ACTIVITIES = [
   { id:'math',       name:'Math Adventure',    icon:'🦘', cat:'school',   durationMin:60, suitableTime:['after-school','weekend','evening'] },
   { id:'training',   name:'Training',          icon:'🏋️', cat:'training', durationMin:120, isTraining:true, suitableTime:['after-school','weekend'] },
   { id:'relax',      name:'Muscle Relaxation', icon:'🧘', cat:'active',   durationMin:60, suitableTime:['after-school','evening','weekend'] },
+  { id:'break_quick', name:'Quick Break',     icon:'☕', cat:'free',     durationMin:15, suitableTime:['before-school','school','after-school','evening','weekend'], quickBreak:true },
   { id:'piano',      name:'Piano Practice',    icon:'🎹', cat:'school',   durationMin:60, suitableTime:['after-school','evening','weekend'] },
   { id:'chores',     name:'House Chore',       icon:'🧹', cat:'daily',    durationMin:60, suitableTime:['after-school','evening','weekend'] },
   { id:'family',     name:'Family Time',       icon:'👨‍👩‍👧‍👦', cat:'free', durationMin:120, suitableTime:['evening','weekend'], social:true },
@@ -3092,9 +3267,11 @@ let activeTimers = {}; // itemKey -> {remaining, interval}
 let pendingFocusBlockId = null;
 let pendingFocusAttempts = 0;
 let activeStopwatchTick = null;
+let kidQuickBlockId = null;
+let kidRoutineStopwatchTick = null;
 
-let ts  = { durationMin:120, colour: CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays: [], travelBuffer:false, getReadyBuffer:false, gearState:{} };
-let as_ = { durationMin:60,  colour: COLOURS[0], note:'', repeat:false, repeatDays: [], travelBuffer:false };
+let ts  = { durationMin:120, colour: CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays: [], travelBuffer:false, getReadyBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15 };
+let as_ = { durationMin:60,  colour: COLOURS[0], note:'', repeat:false, repeatDays: [], travelBuffer:false, travelBufMin:15 };
 
 function isParent() { return profile === 'parent'; }
 function activeProfile() { return isParent() ? parentViewing : profile; }
@@ -3154,10 +3331,31 @@ function migrateBlocks() {
         if (next?.id == null) {
           next = { ...next, id: ensureBlockId(key, next, idx) };
         }
+        if (next.travelBuffer && (next.travelBufMin == null || next.travelBufMin < 5)) {
+          next = { ...next, travelBufMin: 15 };
+        }
+        if (next.getReadyBuffer && (next.getReadyBufMin == null || next.getReadyBufMin < 5)) {
+          next = { ...next, getReadyBufMin: 15 };
+        }
         return next;
       });
     });
   });
+}
+
+const DEFAULT_BUFFER_MIN = 15;
+function clampBufferMin(n) {
+  const v = parseInt(n, 10);
+  if (Number.isNaN(v)) return DEFAULT_BUFFER_MIN;
+  return Math.max(5, Math.min(180, v));
+}
+function getTravelBufMin(block) {
+  if (!block || !block.travelBuffer) return 0;
+  return clampBufferMin(block.travelBufMin != null ? block.travelBufMin : DEFAULT_BUFFER_MIN);
+}
+function getGetReadyBufMin(block) {
+  if (!block || !block.getReadyBuffer) return 0;
+  return clampBufferMin(block.getReadyBufMin != null ? block.getReadyBufMin : DEFAULT_BUFFER_MIN);
 }
 function saveLocal() {
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e){}
@@ -3313,6 +3511,112 @@ function getAllActivities(p=activeProfile()) {
   });
 }
 
+/* Track celebration toasts so we do not spam on every re-render */
+const routineCompleteToasted = new Set();
+const stopwatchGoalToasted = new Set();
+
+function blocksOverlap(aStart, aDur, bStart, bDur) {
+  const aEnd = aStart + aDur;
+  const bEnd = bStart + bDur;
+  return aStart < bEnd && bStart < aEnd;
+}
+
+/** Next gap of at least minGap minutes inside [START_MIN, END_MIN), or null */
+function findNextGapForBreak(dayKey, minGap, fromMinAbs) {
+  const blocks = getDayBlocks(dayKey).filter(b => b && b.startMin != null && b.durationMin != null);
+  const startSearch = Math.max(START_MIN, Math.min(END_MIN - minGap, fromMinAbs));
+  for (let t = startSearch; t <= END_MIN - minGap; t += 5) {
+    const ok = !blocks.some(b => blocksOverlap(t, minGap, b.startMin, b.durationMin));
+    if (ok) return t;
+  }
+  return null;
+}
+
+function addQuickBreak(durationMin) {
+  if (isParent()) {
+    showToast('Switch to your profile to add a break 👤');
+    return;
+  }
+  const now = new Date();
+  const nowAbs = now.getHours() * 60 + now.getMinutes();
+  let start = findNextGapForBreak(currentDayKey, durationMin, nowAbs);
+  if (start == null) {
+    start = findNextGapForBreak(currentDayKey, durationMin, START_MIN);
+  }
+  if (start == null) {
+    showToast('No empty slot big enough — try editing the day 📋');
+    return;
+  }
+  const act = getAllActivities().find(a => a.id === 'break_quick');
+  const colour = act ? (CAT_HEX[act.cat] || '#95d5b2') : '#95d5b2';
+  placeBlock('break_quick', start, durationMin, colour, [], 'Quick break', { travelBuffer: false });
+  showToast(`Break added at ${formatTimeFromMin(start)} ✨`);
+}
+
+function renderDayNextUpBanner() {
+  const el = document.getElementById('dayNextUpBanner');
+  const row = document.getElementById('dayKidQuickRow');
+  if (!el || !row) return;
+  if (isParent()) {
+    el.style.display = 'none';
+    row.style.display = 'none';
+    return;
+  }
+  row.style.display = 'flex';
+  const blocks = getDayBlocks(currentDayKey);
+  const acts = getAllActivities();
+  const now = new Date();
+  const nowAbs = now.getHours() * 60 + now.getMinutes();
+  const isToday = currentDayKey === todayKey();
+
+  let candidates = blocks.map(b => {
+    const act = acts.find(a => a.id === b.actId);
+    if (!act || act.quickBreak) return null;
+    const end = b.startMin + b.durationMin;
+    if (isToday) {
+      if (end <= nowAbs) return null;
+    }
+    return { b, act, end };
+  }).filter(Boolean);
+
+  candidates.sort((a, b) => a.b.startMin - b.b.startMin);
+
+  let next = null;
+  if (isToday) {
+    next = candidates.find(c => c.b.startMin > nowAbs) || candidates[0] || null;
+  } else {
+    next = candidates[0] || null;
+  }
+
+  if (!next) {
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = 'block';
+  const timeStr = formatTimeFromMin(next.b.startMin);
+  el.innerHTML = `<div class="next-up-label">Next up</div><div>${next.act.icon} <b>${escapeHtml(next.act.name)}</b> · ${timeStr}</div>`;
+}
+
+function updateStopwatchGoalToasts(blocks) {
+  blocks.forEach(b => {
+    const sw = b.stopwatch;
+    if (!sw || !sw.enabled || !sw.running) {
+      stopwatchGoalToasted.delete(b.id);
+      return;
+    }
+    const goal = sw.goalSec != null ? sw.goalSec : Math.max(60, (b.durationMin | 0) * 60);
+    const used = stopwatchDisplayElapsed(sw);
+    if (used >= goal) {
+      if (!stopwatchGoalToasted.has(b.id)) {
+        stopwatchGoalToasted.add(b.id);
+        showToast('🎉 You hit your stopwatch goal — amazing!');
+      }
+    } else {
+      stopwatchGoalToasted.delete(b.id);
+    }
+  });
+}
+
 function getSisterVisibilityState() {
   const mode = (state.shared && state.shared.sisterVisibilityMode) || 'public';
   const hideDetails = mode === 'busy-only';
@@ -3450,6 +3754,12 @@ function renderWeek() {
   if (legend) legend.style.display = isParent() ? 'flex' : 'none';
 
   renderGoalsTodos();
+
+  const coachEl = document.getElementById('weekCoachTip');
+  if (coachEl && !isParent()) {
+    coachEl.style.display = 'block';
+    coachEl.textContent = '🌟 Tip: Tap a day card to see your timeline. Check off routines as you go — each tick is a small win. Use “My free time” in Time-Grid to spot when you can choose rest or a goal.';
+  } else if (coachEl) coachEl.style.display = 'none';
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -3955,7 +4265,7 @@ function renderFullWeek(keys) {
             <div class="wf-card-dur">${formatDuration(b.durationMin)}</div>
           `;
           card.title = `${act.icon} ${act.name} — ${formatDuration(b.durationMin)}`;
-          card.onclick = (e)=>{ e.stopPropagation(); openDay(key, ci, b.id); };
+          card.onclick = (e)=>{ e.stopPropagation(); openDayFromWeekCard(key, ci, b.id); };
           cell.appendChild(card);
         });
       }
@@ -3968,7 +4278,13 @@ function renderFullWeek(keys) {
 /* ════════════════════════════════════════════════════════════════
    DAY EDITOR
 ════════════════════════════════════════════════════════════════ */
-function openDay(key, dayIdx, focusBlockId=null) {
+function openDayFromWeekCard(dayKey, dayIdx, focusBlockId=null) {
+  const wk = computeWeekOffsetForDayKey(dayKey);
+  openDay(dayKey, dayIdx, focusBlockId, wk);
+}
+
+function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
+  if (weekOffsetOverride != null) weekOffset = weekOffsetOverride;
   currentDayKey = key;
   selectedActivity = null;
   currentZone = 'all';
@@ -4185,6 +4501,9 @@ function buildTimeline() {
       buildTimeline();
     }, 1000);
   }
+
+  updateStopwatchGoalToasts(blocks);
+  renderDayNextUpBanner();
 }
 
 function renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd) {
@@ -4445,7 +4764,12 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
 
   const blockEl = document.createElement('div');
   const isCompact = height < 45;
-  blockEl.className = 'placed-block'+(b.parentPinned?' parent-pinned':'')+(b.completed?' placed-block--completed':'')+(isCompact?' compact':'');
+  let fontTier = '';
+  if (!isCompact) {
+    if (height >= 110) fontTier = ' block-font-lg';
+    else if (height >= 72) fontTier = ' block-font-md';
+  }
+  blockEl.className = 'placed-block'+(b.parentPinned?' parent-pinned':'')+(b.completed?' placed-block--completed':'')+(isCompact?' compact':'')+fontTier;
   blockEl.id = 'block-'+b.id;
   blockEl.style.background = b.colour || CAT_HEX[act.cat] || '#888';
   blockEl.style.top = top + 'px';
@@ -4488,7 +4812,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
     ${b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="block-stopwatch-btn" onclick="event.stopPropagation(); startBlockStopwatch('${b.id}')">⏱ Start stopwatch</button>` : ''}
     ${noteHtml}
   `;
-  blockEl.onclick = (e)=>{ e.stopPropagation(); openEditSheet(b.id); };
+  blockEl.onclick = (e)=>{ e.stopPropagation(); onTimelineBlockTap(b.id); };
   canvas.appendChild(blockEl);
 
   // Decorative doodle (seasonal, stable per block per month)
@@ -4496,21 +4820,22 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
 }
 
 function renderTravelBuffers(canvas, b, zMinStart, zMinEnd) {
+  const travelBuf = getTravelBufMin(b);
+  const readyBuf = getGetReadyBufMin(b);
   const entries = [];
-  if (b.travelBuffer) {
+  if (b.getReadyBuffer && readyBuf > 0) {
     entries.push(
-      { startMin: b.startMin - 15, label: '🚗 ➡ travel' },
-      { startMin: b.startMin + b.durationMin, label: '🚗 ⬅ travel' },
+      { startMin: b.startMin - readyBuf, label: '👕 ➡ get ready', bufDur: readyBuf, cls: 'travel-buf-ready' },
+      { startMin: b.startMin + b.durationMin, label: '👕 ⬅ get ready', bufDur: readyBuf, cls: 'travel-buf-ready' },
     );
   }
-  if (b.getReadyBuffer) {
+  if (b.travelBuffer && travelBuf > 0) {
     entries.push(
-      { startMin: b.startMin - 15, label: '👕 ➡ ready' },
-      { startMin: b.startMin + b.durationMin, label: '👕 ⬅ ready' },
+      { startMin: b.startMin - travelBuf, label: '🚗 ➡ travel', bufDur: travelBuf, cls: '' },
+      { startMin: b.startMin + b.durationMin, label: '🚗 ⬅ travel', bufDur: travelBuf, cls: '' },
     );
   }
-  entries.forEach(({startMin, label})=>{
-    const bufDur = 15;
+  entries.forEach(({startMin, label, bufDur, cls})=>{
     const endMin = startMin + bufDur;
     const bStart = startMin - START_MIN;
     const bEnd   = endMin - START_MIN;
@@ -4522,7 +4847,7 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd) {
     const height = Math.max(18, bufDur * PX_PER_MIN - 2);
 
     const el = document.createElement('div');
-    el.className = 'placed-block travel-buf';
+    el.className = 'placed-block travel-buf' + (cls ? ' '+cls : '');
     el.style.background = b.colour || CAT_HEX[act?.cat] || '#888';
     el.style.top = top + 'px';
     el.style.height = height + 'px';
@@ -4557,24 +4882,42 @@ function escapeHtml(str) {
   return d.innerHTML;
 }
 
-function renderSheetTimeSummary(elId, startMin, durationMin, travelOn, bufMin, readyOn=false, readyBufMin=15) {
+function renderSheetTimeSummary(elId, startMin, durationMin, travelOn, travelBufMin, readyOn=false, readyBufMin=15) {
   const el = document.getElementById(elId);
   if (!el) return;
   const dur = Math.max(0, durationMin|0);
   const start = startMin|0;
   const endMin = start + dur;
-  let html = `<div class="sheet-time-summary">Ends about ${formatTimeFromMin(endMin)}</div>`;
-  if (travelOn) {
-    const b = Math.max(0, bufMin|0);
-    const homeMin = endMin + b;
-    html += `<div class="sheet-time-summary">Home about ${formatTimeFromMin(homeMin)} (after ${b}m travel)</div>`;
+  const tBuf = Math.max(0, travelBufMin|0);
+  const rBuf = Math.max(0, readyBufMin|0);
+  const homeMin = travelOn ? endMin + tBuf : null;
+  const prepMin = readyOn ? start - rBuf : null;
+  let html = '';
+  if (travelOn && homeMin != null) {
+    html += `<div class="sheet-time-summary-row">`;
+    html += `<div class="sheet-time-summary">Ends about ${formatTimeFromMin(endMin)}</div>`;
+    html += `<div class="sheet-time-summary">Home about ${formatTimeFromMin(homeMin)} (after ${tBuf}m travel)</div>`;
+    html += `</div>`;
+  } else {
+    html += `<div class="sheet-time-summary">Ends about ${formatTimeFromMin(endMin)}</div>`;
   }
-  if (readyOn) {
-    const b = Math.max(0, readyBufMin|0);
-    const prepMin = start - b;
-    html += `<div class="sheet-time-summary">Start getting ready by ${formatTimeFromMin(prepMin)} (adds ${b}m before + ${b}m after)</div>`;
+  if (readyOn && prepMin != null) {
+    html += `<div class="sheet-time-summary">Start getting ready by ${formatTimeFromMin(prepMin)} (${rBuf}m before + ${rBuf}m after)</div>`;
   }
   el.innerHTML = html;
+}
+
+function syncDurationColumnSpacers(mode) {
+  const startId = mode === 'activity' ? 'activityStartPicker' : 'editStartPicker';
+  const durRowId = mode === 'activity' ? 'activityDurBtns' : 'editDurBtns';
+  const slotId = mode === 'activity' ? 'activityDurationTopSpacer' : 'editDurationTopSpacer';
+  const s = document.getElementById(startId);
+  const d = document.getElementById(durRowId);
+  const slot = document.getElementById(slotId);
+  if (!s || !slot) return;
+  const sh = s.offsetHeight;
+  const dh = d ? d.offsetHeight : 0;
+  slot.style.minHeight = Math.max(0, sh - dh) + 'px';
 }
 
 function getTrainingGearPresets(tag) {
@@ -4587,7 +4930,7 @@ function getTrainingGearPresets(tag) {
   return [];
 }
 
-function renderTrainingGearChecklist(containerId, stateObj, tag) {
+function renderTrainingGearChecklist(containerId, stateObj, tag, persist) {
   const wrap = document.getElementById(containerId);
   if (!wrap) return;
   const items = getTrainingGearPresets(tag);
@@ -4604,7 +4947,8 @@ function renderTrainingGearChecklist(containerId, stateObj, tag) {
     row.innerHTML = `<div class="checklist-check">${stateObj.gearState[key]?'✓':''}</div><span class="checklist-text">${label}</span>`;
     row.onclick = ()=>{
       stateObj.gearState[key] = !stateObj.gearState[key];
-      renderTrainingGearChecklist(containerId, stateObj, tag);
+      if (persist) saveAll();
+      renderTrainingGearChecklist(containerId, stateObj, tag, persist);
     };
     wrap.appendChild(row);
   });
@@ -4630,6 +4974,98 @@ function getRoutineTemplate(routineId) {
 }
 function isBuiltInRoutine(routineId) { return !!ROUTINE_PRESETS[routineId]; }
 
+function onTimelineBlockTap(blockId) {
+  if (isParent()) {
+    openEditSheet(blockId);
+    return;
+  }
+  const blocks = getDayBlocks(currentDayKey);
+  const b = blocks.find(x => x.id === blockId);
+  const act = b && getAllActivities().find(a => a.id === b.actId);
+  if (!b || !act) return;
+  if (act.isRoutine) {
+    openKidRoutineQuick(blockId);
+    return;
+  }
+  if (act.isTraining) {
+    openKidTrainingQuick(blockId);
+    return;
+  }
+  openEditSheet(blockId);
+}
+
+function kidRoutineStopwatchClearTick() {
+  if (kidRoutineStopwatchTick) {
+    clearInterval(kidRoutineStopwatchTick);
+    kidRoutineStopwatchTick = null;
+  }
+}
+
+function openKidRoutineQuick(blockId) {
+  kidQuickBlockId = blockId;
+  const blocks = getDayBlocks(currentDayKey);
+  const b = blocks.find(x => x.id === blockId);
+  const act = b && getAllActivities().find(a => a.id === b.actId);
+  if (!b || !act || !act.isRoutine) return;
+  document.getElementById('kidRoutineTitle').textContent = `${act.icon} ${act.name}`;
+  renderChecklist(b, act, 'kidRoutineChecklist', { skipAdd: true });
+  const swEl = document.getElementById('kidRoutineStopwatch');
+  if (b.stopwatch && b.stopwatch.enabled) {
+    swEl.style.display = 'block';
+    kidRoutineStopwatchClearTick();
+    const tick = ()=>{
+      const arr = getDayBlocks(currentDayKey);
+      const blk = arr.find(x => x.id === blockId);
+      if (!blk || !blk.stopwatch) return;
+      const goal = blk.stopwatch.goalSec != null ? blk.stopwatch.goalSec : Math.max(60, (blk.durationMin|0) * 60);
+      const used = stopwatchDisplayElapsed(blk.stopwatch);
+      swEl.textContent = `⏱ Goal ${formatTimerSec(goal)} · Used ${formatTimerSec(used)}`;
+    };
+    tick();
+    if (!b.stopwatch.running) {
+      b.stopwatch.running = true;
+      b.stopwatch.startedAt = Date.now();
+      b.stopwatch.elapsedSec = Math.max(0, b.stopwatch.elapsedSec|0);
+      if (b.stopwatch.goalSec == null) b.stopwatch.goalSec = Math.max(60, (b.durationMin|0) * 60);
+      setDayBlocks(currentDayKey, blocks);
+      buildTimeline();
+    }
+    kidRoutineStopwatchTick = setInterval(tick, 500);
+  } else {
+    swEl.style.display = 'none';
+  }
+  openSheet('kidRoutineOverlay');
+}
+
+function kidRoutineOpenEdit() {
+  kidRoutineStopwatchClearTick();
+  const id = kidQuickBlockId;
+  closeSheet('kidRoutineOverlay');
+  if (id) openEditSheet(id);
+}
+
+function openKidTrainingQuick(blockId) {
+  kidQuickBlockId = blockId;
+  const blocks = getDayBlocks(currentDayKey);
+  const b = blocks.find(x => x.id === blockId);
+  const act = b && getAllActivities().find(a => a.id === b.actId);
+  if (!b || !act || !act.isTraining) return;
+  document.getElementById('kidTrainingTitle').textContent = `${act.icon} ${act.name}`;
+  const objEl = document.getElementById('kidTrainingObjectives');
+  const lines = (b.objectives && b.objectives.length)
+    ? b.objectives.map(o => `<div class="checklist-item" style="cursor:default;border-color:var(--accent)"><span class="checklist-text">🎯 ${escapeHtml(o)}</span></div>`).join('')
+    : '<p style="font-size:0.95rem;color:var(--ink-light)">No objectives listed yet — tap Edit to add some.</p>';
+  objEl.innerHTML = lines;
+  renderTrainingGearChecklist('kidTrainingGear', b, b.tag || 'skating', true);
+  openSheet('kidTrainingOverlay');
+}
+
+function kidTrainingOpenEdit() {
+  const id = kidQuickBlockId;
+  closeSheet('kidTrainingOverlay');
+  if (id) openEditSheet(id);
+}
+
 /* Canvas tap → place new block at that pixel y */
 function handleCanvasTap(e, zMinStart) {
   if (!selectedActivity) { showToast('Tap an activity first 👇'); return; }
@@ -4645,10 +5081,10 @@ function handleCanvasTap(e, zMinStart) {
   pendingStartMin = absMin;
 
   if (selectedActivity.isTraining) {
-    ts = { durationMin: selectedActivity.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, gearState:{} };
+    ts = { durationMin: selectedActivity.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15 };
     openTrainingSheet();
   } else {
-    as_ = { durationMin: selectedActivity.durationMin||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false };
+    as_ = { durationMin: selectedActivity.durationMin||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15 };
     openActivitySheet();
   }
 }
@@ -4669,6 +5105,12 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
     checklistState: {},
     confirmed: false, // Parent confirms before progress counts toward level-up
   };
+  if (block.travelBuffer) {
+    block.travelBufMin = clampBufferMin(opts.travelBufMin != null ? opts.travelBufMin : DEFAULT_BUFFER_MIN);
+  }
+  if (block.getReadyBuffer) {
+    block.getReadyBufMin = clampBufferMin(opts.getReadyBufMin != null ? opts.getReadyBufMin : DEFAULT_BUFFER_MIN);
+  }
   const blocks = getDayBlocks(currentDayKey);
   blocks.push(block);
   setDayBlocks(currentDayKey, blocks);
@@ -4970,11 +5412,18 @@ function renderTrainingSheet() {
     });
   }
 
-  // Travel buffer toggle
+  if (ts.travelBufMin == null || ts.travelBufMin < 5) ts.travelBufMin = DEFAULT_BUFFER_MIN;
+  if (ts.getReadyBufMin == null || ts.getReadyBufMin < 5) ts.getReadyBufMin = DEFAULT_BUFFER_MIN;
   const tbToggle = document.getElementById('trainingTravelToggle');
   tbToggle.classList.toggle('on', ts.travelBuffer);
   const rbToggle = document.getElementById('trainingReadyToggle');
   rbToggle.classList.toggle('on', !!ts.getReadyBuffer);
+  document.getElementById('trainingTravelDurRow').style.display = ts.travelBuffer ? 'flex' : 'none';
+  document.getElementById('trainingReadyDurRow').style.display = ts.getReadyBuffer ? 'flex' : 'none';
+  const tIn = document.getElementById('trainingTravelBufMin');
+  const rIn = document.getElementById('trainingReadyBufMin');
+  if (tIn) tIn.value = String(ts.travelBufMin);
+  if (rIn) rIn.value = String(ts.getReadyBufMin);
   renderTrainingGearChecklist('trainingGearList', ts, ts.tag);
 
   // Repeat + day picker
@@ -4987,7 +5436,15 @@ function renderTrainingSheet() {
 
   document.getElementById('trainingNote').value = ts.note;
 
-  renderSheetTimeSummary('trainingTimeSummary', pendingStartMin, ts.durationMin, ts.travelBuffer, 15, !!ts.getReadyBuffer, 15);
+  renderSheetTimeSummary('trainingTimeSummary', pendingStartMin, ts.durationMin, ts.travelBuffer, ts.travelBufMin, !!ts.getReadyBuffer, ts.getReadyBufMin);
+}
+
+function onTrainingBufferMinInput() {
+  const tIn = document.getElementById('trainingTravelBufMin');
+  const rIn = document.getElementById('trainingReadyBufMin');
+  if (tIn) ts.travelBufMin = clampBufferMin(tIn.value);
+  if (rIn) ts.getReadyBufMin = clampBufferMin(rIn.value);
+  renderTrainingSheet();
 }
 
 function confirmTraining() {
@@ -5000,6 +5457,8 @@ function confirmTraining() {
     travelBuffer: ts.travelBuffer,
     getReadyBuffer: !!ts.getReadyBuffer,
     gearState: ts.gearState || {},
+    travelBufMin: ts.travelBufMin,
+    getReadyBufMin: ts.getReadyBufMin,
     repeatDateStart: dateStart || null,
     repeatDateEnd:   dateEnd   || null,
   });
@@ -5014,8 +5473,9 @@ function openActivitySheet() { renderActivitySheet(); openSheet('activityOverlay
 function renderActivitySheet() {
   const act = selectedActivity;
   document.getElementById('activitySheetTitle').textContent = `${act.icon} ${act.name}`;
+  if (as_.travelBufMin == null || as_.travelBufMin < 5) as_.travelBufMin = DEFAULT_BUFFER_MIN;
 
-  renderStartTimePicker('activityStartPicker', pendingStartMin, (m)=>{ pendingStartMin = m; renderActivitySheet(); });
+  renderStartTimePicker('activityStartPicker', pendingStartMin, (m)=>{ pendingStartMin = m; renderActivitySheet(); }, ()=>syncDurationColumnSpacers('activity'));
 
   const durWrap = document.getElementById('activityDurBtns');
   durWrap.innerHTML = '';
@@ -5029,7 +5489,7 @@ function renderActivitySheet() {
   // Custom duration input
   renderCustomDuration('activityCustomDur', as_.durationMin, (m)=>{
     as_.durationMin = m; renderActivitySheet();
-  });
+  }, ()=>syncDurationColumnSpacers('activity'));
 
   const cp = document.getElementById('activityColourPicker');
   cp.innerHTML = '';
@@ -5043,6 +5503,10 @@ function renderActivitySheet() {
 
   const tbToggle = document.getElementById('activityTravelToggle');
   tbToggle.classList.toggle('on', as_.travelBuffer);
+  const atRow = document.getElementById('activityTravelDurRow');
+  if (atRow) atRow.style.display = as_.travelBuffer ? 'flex' : 'none';
+  const atIn = document.getElementById('activityTravelBufMin');
+  if (atIn) atIn.value = String(as_.travelBufMin);
 
   const rt = document.getElementById('activityRepeat');
   rt.classList.toggle('on', as_.repeat);
@@ -5054,7 +5518,8 @@ function renderActivitySheet() {
 
   document.getElementById('activityNote').value = as_.note;
 
-  renderSheetTimeSummary('activityTimeSummary', pendingStartMin, as_.durationMin, as_.travelBuffer, 15);
+  renderSheetTimeSummary('activityTimeSummary', pendingStartMin, as_.durationMin, as_.travelBuffer, as_.travelBufMin);
+  requestAnimationFrame(()=>syncDurationColumnSpacers('activity'));
 }
 function confirmActivity() {
   as_.note = document.getElementById('activityNote').value;
@@ -5064,6 +5529,7 @@ function confirmActivity() {
   placeBlock(selectedActivity.id, pendingStartMin, as_.durationMin, as_.colour, [], as_.note, {
     repeatDays: as_.repeat?as_.repeatDays:[],
     travelBuffer: as_.travelBuffer,
+    travelBufMin: as_.travelBufMin,
     repeatDateStart: dateStart || null,
     repeatDateEnd:   dateEnd   || null,
   });
@@ -5097,7 +5563,7 @@ function renderStartTimePicker(containerId, curMin, onChange, onAfterRender) {
   prevH.onclick = ()=>{
     const newMin = Math.max(START_MIN, curMin - 60);
     onChange(newMin);
-    renderStartTimePicker(containerId, newMin, onChange);
+    renderStartTimePicker(containerId, newMin, onChange, onAfterRender);
   };
   hourRow.appendChild(prevH);
 
@@ -5113,7 +5579,7 @@ function renderStartTimePicker(containerId, curMin, onChange, onAfterRender) {
   nextH.onclick = ()=>{
     const newMin = Math.min(END_MIN - 15, curMin + 60);
     onChange(newMin);
-    renderStartTimePicker(containerId, newMin, onChange);
+    renderStartTimePicker(containerId, newMin, onChange, onAfterRender);
   };
   hourRow.appendChild(nextH);
   wrap.appendChild(hourRow);
@@ -5128,7 +5594,7 @@ function renderStartTimePicker(containerId, curMin, onChange, onAfterRender) {
     b.onclick = ()=>{
       const newMin = curH*60 + m;
       onChange(newMin);
-      renderStartTimePicker(containerId, newMin, onChange);
+      renderStartTimePicker(containerId, newMin, onChange, onAfterRender);
     };
     minRow.appendChild(b);
   });
@@ -5145,11 +5611,11 @@ function renderStartTimePicker(containerId, curMin, onChange, onAfterRender) {
     const m = Math.max(0, Math.min(55, Math.round(parseInt(input.value||0)/5)*5));
     const newMin = curH*60 + m;
     onChange(newMin);
-    renderStartTimePicker(containerId, newMin, onChange);
+    renderStartTimePicker(containerId, newMin, onChange, onAfterRender);
   };
   customRow.appendChild(input);
   wrap.appendChild(customRow);
-  if (typeof onAfterRender === 'function') onAfterRender(curMin);
+  requestAnimationFrame(()=>{ if (typeof onAfterRender === 'function') onAfterRender(curMin); });
 }
 
 function renderCustomDuration(containerId, curMin, onChange, onAfterChange) {
@@ -5172,8 +5638,15 @@ function renderCustomDuration(containerId, curMin, onChange, onAfterChange) {
 }
 
 function toggleTravelBuffer(which) {
-  if (which==='training') { ts.travelBuffer = !ts.travelBuffer; renderTrainingSheet(); }
-  else { as_.travelBuffer = !as_.travelBuffer; renderActivitySheet(); }
+  if (which==='training') {
+    ts.travelBuffer = !ts.travelBuffer;
+    if (ts.travelBuffer && (ts.travelBufMin == null || ts.travelBufMin < 5)) ts.travelBufMin = DEFAULT_BUFFER_MIN;
+    renderTrainingSheet();
+  } else {
+    as_.travelBuffer = !as_.travelBuffer;
+    if (as_.travelBuffer && (as_.travelBufMin == null || as_.travelBufMin < 5)) as_.travelBufMin = DEFAULT_BUFFER_MIN;
+    renderActivitySheet();
+  }
 }
 function toggleGetReadyBuffer(which) {
   if (which==='training') { ts.getReadyBuffer = !ts.getReadyBuffer; renderTrainingSheet(); }
@@ -5182,7 +5655,9 @@ function toggleEditGetReadyBuffer() {
   editState.getReadyBuffer = !editState.getReadyBuffer;
   const tg = document.getElementById('editReadyToggle');
   if (tg) tg.classList.toggle('on', !!editState.getReadyBuffer);
-  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, 15, !!editState.getReadyBuffer, 15);
+  const row = document.getElementById('editReadyDurRow');
+  if (row) row.style.display = editState.getReadyBuffer ? 'flex' : 'none';
+  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin);
 }
 
 /* Multi-day picker */
@@ -5219,7 +5694,8 @@ function pickPreset(which, preset) {
    EDIT BLOCK SHEET
 ════════════════════════════════════════════════════════════════ */
 let editState = {
-  startMin: null, durationMin: null, travelBuffer: false, getReadyBuffer: false, repeat: false, repeatDays: [],
+  startMin: null, durationMin: null, travelBuffer: false, getReadyBuffer: false, travelBufMin: 15, getReadyBufMin: 15,
+  repeat: false, repeatDays: [],
   completed: false,
   stopwatchEnabled: false,
   stopwatch: { goalSec: null, elapsedSec: 0, running: false, startedAt: null },
@@ -5324,17 +5800,32 @@ function editStopwatchReset() {
   sw.running = false;
   sw.startedAt = null;
   sw.goalSec = Math.max(60, (editState.durationMin|0) * 60);
+  if (editingBlockId) stopwatchGoalToasted.delete(editingBlockId);
   syncEditStopwatchUI();
 }
 
 function onEditStartMinChange(m) {
   editState.startMin = m;
-  renderStartTimePicker('editStartPicker', editState.startMin, onEditStartMinChange);
-  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, 15);
+  renderStartTimePicker('editStartPicker', editState.startMin, onEditStartMinChange, ()=>syncDurationColumnSpacers('edit'));
+  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin);
   if (editState.stopwatch && editState.stopwatchEnabled) {
     editState.stopwatch.goalSec = Math.max(60, (editState.durationMin|0) * 60);
     renderEditStopwatchStats();
   }
+}
+
+function onEditBufferMinInput() {
+  const tIn = document.getElementById('editTravelBufMin');
+  const rIn = document.getElementById('editReadyBufMin');
+  if (tIn) editState.travelBufMin = clampBufferMin(tIn.value);
+  if (rIn) editState.getReadyBufMin = clampBufferMin(rIn.value);
+  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin);
+}
+
+function onActivityTravelBufMinInput() {
+  const tIn = document.getElementById('activityTravelBufMin');
+  if (tIn) as_.travelBufMin = clampBufferMin(tIn.value);
+  renderActivitySheet();
 }
 
 function openEditSheet(blockId) {
@@ -5348,6 +5839,8 @@ function openEditSheet(blockId) {
   editState.durationMin = block.durationMin;
   editState.travelBuffer = !!block.travelBuffer;
   editState.getReadyBuffer = !!block.getReadyBuffer;
+  editState.travelBufMin = getTravelBufMin(block) || DEFAULT_BUFFER_MIN;
+  editState.getReadyBufMin = getGetReadyBufMin(block) || DEFAULT_BUFFER_MIN;
   editState.gearState = { ...(block.gearState||{}) }
   editState.repeat = false;
   editState.repeatDays = [];
@@ -5374,7 +5867,7 @@ function openEditSheet(blockId) {
     editState.stopwatch.startedAt = null;
   }
 
-  renderStartTimePicker('editStartPicker', editState.startMin, onEditStartMinChange);
+  renderStartTimePicker('editStartPicker', editState.startMin, onEditStartMinChange, ()=>syncDurationColumnSpacers('edit'));
   renderEditDurationPicker(act);
 
   // Checklist (only if routine)
@@ -5388,12 +5881,22 @@ function openEditSheet(blockId) {
 
   // Objectives (training)
   const objWrap = document.getElementById('editObjectivesWrap');
-  if (block.objectives?.length) {
+  const objEditWrap = document.getElementById('editObjectivesEditWrap');
+  const objInput = document.getElementById('editObjectivesInput');
+  if (act.isTraining) {
     objWrap.style.display = 'block';
-    document.getElementById('editObjectivesView').innerHTML = block.objectives.map(o=>
-      `<div style="font-size:0.9rem;padding:0.3rem 0;border-bottom:1px dashed var(--paper-line)">🎯 ${o}</div>`
-    ).join('');
-  } else objWrap.style.display = 'none';
+    const list = Array.isArray(block.objectives) ? block.objectives : [];
+    document.getElementById('editObjectivesView').innerHTML = list.length
+      ? list.map(o=>`<div style="font-size:0.9rem;padding:0.3rem 0;border-bottom:1px dashed var(--paper-line)">🎯 ${escapeHtml(o)}</div>`).join('')
+      : '<p style="font-size:0.9rem;color:var(--ink-light)">No objectives yet — add some below.</p>';
+    objInput.value = list.join('\n');
+    if (isParent()) objEditWrap.style.display = 'block';
+    else if (block.parentPinned) objEditWrap.style.display = 'none';
+    else objEditWrap.style.display = 'block';
+  } else {
+    objWrap.style.display = 'none';
+    objEditWrap.style.display = 'none';
+  }
 
   document.getElementById('editNoteInput').value = block.note || '';
 
@@ -5421,17 +5924,31 @@ function openEditSheet(blockId) {
   document.getElementById('editTravelToggle').classList.toggle('on', editState.travelBuffer);
   const editReady = document.getElementById('editReadyToggle');
   const editGearWrap = document.getElementById('editTrainingGearWrap');
+  const editTrRow = document.getElementById('editTravelDurRow');
+  const editRdRow = document.getElementById('editReadyDurRow');
   if (act.isTraining) {
     editReady.style.display = 'flex';
     editReady.classList.toggle('on', !!editState.getReadyBuffer);
     editGearWrap.style.display = 'block';
     renderTrainingGearChecklist('editTrainingGearList', editState, block.tag || 'skating');
+    editTrRow.style.display = editState.travelBuffer ? 'flex' : 'none';
+    editRdRow.style.display = editState.getReadyBuffer ? 'flex' : 'none';
+    const etIn = document.getElementById('editTravelBufMin');
+    const erIn = document.getElementById('editReadyBufMin');
+    if (etIn) etIn.value = String(editState.travelBufMin);
+    if (erIn) erIn.value = String(editState.getReadyBufMin);
   } else {
     editReady.style.display = 'none';
     editGearWrap.style.display = 'none';
+    editTrRow.style.display = editState.travelBuffer ? 'flex' : 'none';
+    editRdRow.style.display = 'none';
+    if (editTrRow.style.display === 'flex') {
+      const etIn = document.getElementById('editTravelBufMin');
+      if (etIn) etIn.value = String(editState.travelBufMin);
+    }
   }
 
-  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, 15, !!editState.getReadyBuffer, 15);
+  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin);
   syncEditStopwatchUI();
 
   // Parent pin toggle
@@ -5475,17 +5992,19 @@ function renderEditDurationPicker(act) {
   });
   renderCustomDuration('editCustomDur', editState.durationMin, (m)=>{
     editState.durationMin = m; renderEditDurationPicker(act);
-  });
-  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, 15);
+  }, ()=>syncDurationColumnSpacers('edit'));
+  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin);
   if (editState.stopwatch) {
     editState.stopwatch.goalSec = Math.max(60, (editState.durationMin|0) * 60);
     renderEditStopwatchStats();
   }
+  requestAnimationFrame(()=>syncDurationColumnSpacers('edit'));
 }
 
-function renderChecklist(block, act) {
+function renderChecklist(block, act, listContainerId, options) {
   const tmpl = getRoutineTemplate(act.routineId);
-  const listWrap = document.getElementById('editChecklistList');
+  const listWrap = document.getElementById(listContainerId || 'editChecklistList');
+  const skipAdd = !!(options && options.skipAdd);
   listWrap.innerHTML = '';
   if (!tmpl?.items?.length && !getKidExtras(act.routineId).length) {
     listWrap.innerHTML = '<p style="font-size:0.9rem;color:var(--ink-light)">No items in this routine</p>';
@@ -5494,18 +6013,20 @@ function renderChecklist(block, act) {
   if (!block.checklistState) block.checklistState = {};
 
   // Render parent/template items first (kids cannot rename/delete)
+  const cid = listContainerId || 'editChecklistList';
+
   (tmpl?.items || []).forEach(item=>{
-    listWrap.appendChild(buildChecklistRow(block, act, item, false));
+    listWrap.appendChild(buildChecklistRow(block, act, item, false, cid));
   });
 
   // Render kid-added items (only for child profiles, not parent — parent shouldn't see another kid's extras)
   const extras = getKidExtras(act.routineId);
   extras.forEach(item=>{
-    listWrap.appendChild(buildChecklistRow(block, act, item, true));
+    listWrap.appendChild(buildChecklistRow(block, act, item, true, cid));
   });
 
   // "+ Add my own item" row — only when a child is using their own profile (not parent mode)
-  if (!isParent()) {
+  if (!isParent() && !skipAdd) {
     const addRow = document.createElement('div');
     addRow.className = 'checklist-add-row';
     addRow.innerHTML = `
@@ -5519,7 +6040,7 @@ function renderChecklist(block, act) {
       if (!txt) return;
       addKidExtra(act.routineId, txt);
       inp.value = '';
-      renderChecklist(block, act);
+      renderChecklist(block, act, cid);
     };
     btn.onclick = submit;
     inp.onkeydown = (e)=>{ if (e.key==='Enter') { e.preventDefault(); submit(); } };
@@ -5528,7 +6049,8 @@ function renderChecklist(block, act) {
 }
 
 /* Build one checklist row. isKidItem=true means the row gets a delete (×) button. */
-function buildChecklistRow(block, act, item, isKidItem) {
+function buildChecklistRow(block, act, item, isKidItem, listContainerId) {
+  const cid = listContainerId || 'editChecklistList';
   const checked = !!block.checklistState[item.id];
   const row = document.createElement('div');
   row.className = 'checklist-item'+(checked?' checked':'')+(isKidItem?' kid-item':'');
@@ -5543,8 +6065,20 @@ function buildChecklistRow(block, act, item, isKidItem) {
     if (!b.checklistState) b.checklistState = {};
     b.checklistState[item.id] = !b.checklistState[item.id];
     setDayBlocks(currentDayKey, blocks);
-    renderChecklist(b, act);
+    renderChecklist(b, act, cid);
     buildTimeline();
+    if (act.isRoutine) {
+      const total = countChecklistTotal(b, act);
+      const done = countChecklistDone(b, act);
+      if (total > 0 && done >= total) {
+        if (!routineCompleteToasted.has(b.id)) {
+          routineCompleteToasted.add(b.id);
+          showToast('🌟 Routine complete — you did it!');
+        }
+      } else {
+        routineCompleteToasted.delete(b.id);
+      }
+    }
   };
   row.appendChild(box);
 
@@ -5575,7 +6109,7 @@ function buildChecklistRow(block, act, item, isKidItem) {
     delBtn.onclick = (e)=>{
       e.stopPropagation();
       removeKidExtra(act.routineId, item.id);
-      renderChecklist(block, act);
+      renderChecklist(block, act, cid);
     };
     row.appendChild(delBtn);
   }
@@ -5679,7 +6213,9 @@ function playBell() {
 function toggleEditTravelBuffer() {
   editState.travelBuffer = !editState.travelBuffer;
   document.getElementById('editTravelToggle').classList.toggle('on', editState.travelBuffer);
-  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, 15);
+  const row = document.getElementById('editTravelDurRow');
+  if (row) row.style.display = editState.travelBuffer ? 'flex' : 'none';
+  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin);
 }
 
 function saveEditChanges() {
@@ -5692,14 +6228,23 @@ function saveEditChanges() {
     showToast('📌 Parent-pinned — ask a grown-up');
     return;
   }
+  const act = getAllActivities().find(a=>a.id===blk.actId);
 
   const newStart = Math.max(START_MIN, Math.min(END_MIN-15, editState.startMin));
   const newDur   = Math.max(5, Math.min(DAY_MIN_SPAN, editState.durationMin));
   const newTravel = !!editState.travelBuffer;
   const newGetReady = !!editState.getReadyBuffer;
+  const newTravelBuf = newTravel ? clampBufferMin(editState.travelBufMin) : null;
+  const newReadyBuf = newGetReady ? clampBufferMin(editState.getReadyBufMin) : null;
   const newGearState = editState.gearState ? { ...editState.gearState } : {};
   const newNote  = document.getElementById('editNoteInput').value;
   const newCompleted = !!editState.completed;
+  let newObjectives = Array.isArray(blk.objectives) ? [...blk.objectives] : [];
+  if (act && act.isTraining && (isParent() || !blk.parentPinned)) {
+    const raw = (document.getElementById('editObjectivesInput')?.value || '').split('\n')
+      .map(s => s.trim()).filter(Boolean);
+    newObjectives = raw;
+  }
 
   let newStopwatch = null;
   if (editState.stopwatchEnabled && editState.stopwatch) {
@@ -5717,9 +6262,12 @@ function saveEditChanges() {
     blk.durationMin !== newDur ||
     blk.travelBuffer !== newTravel ||
     !!blk.getReadyBuffer !== newGetReady ||
+    getTravelBufMin(blk) !== (newTravelBuf || 0) ||
+    getGetReadyBufMin(blk) !== (newReadyBuf || 0) ||
     JSON.stringify(blk.gearState||{}) !== JSON.stringify(newGearState||{}) ||
     (blk.note||'') !== newNote ||
     !!blk.completed !== newCompleted ||
+    JSON.stringify(blk.objectives||[]) !== JSON.stringify(newObjectives) ||
     JSON.stringify(blk.stopwatch||null) !== JSON.stringify(newStopwatch)
   );
 
@@ -5737,9 +6285,14 @@ function saveEditChanges() {
   blk.durationMin = newDur;
   blk.travelBuffer = newTravel;
   blk.getReadyBuffer = newGetReady;
+  if (newTravel) blk.travelBufMin = newTravelBuf;
+  else delete blk.travelBufMin;
+  if (newGetReady) blk.getReadyBufMin = newReadyBuf;
+  else delete blk.getReadyBufMin;
   blk.gearState = newGearState;
   blk.note = newNote;
   blk.completed = newCompleted;
+  if (act && act.isTraining) blk.objectives = newObjectives;
   if (newStopwatch) blk.stopwatch = newStopwatch;
   else delete blk.stopwatch;
   setDayBlocks(currentDayKey, blocks);
@@ -5750,6 +6303,11 @@ function saveEditChanges() {
       startMin: newStart, durationMin: newDur, travelBuffer: newTravel, getReadyBuffer: newGetReady, gearState: { ...newGearState }, note: newNote,
       completed: newCompleted,
     };
+    if (newTravel) seriesPatch.travelBufMin = newTravelBuf;
+    else seriesPatch.travelBufMin = null;
+    if (newGetReady) seriesPatch.getReadyBufMin = newReadyBuf;
+    else seriesPatch.getReadyBufMin = null;
+    if (act && act.isTraining) seriesPatch.objectives = [...newObjectives];
     if (newStopwatch) seriesPatch.stopwatch = { ...newStopwatch };
     else seriesPatch.stopwatch = null;
     applySeriesEdit(blk.seriesId, editingBlockId, seriesPatch);
@@ -5790,6 +6348,8 @@ function applySeriesEdit(seriesId, sourceBlockId, fields) {
       if (Object.prototype.hasOwnProperty.call(fields, 'stopwatch') && fields.stopwatch == null) {
         delete b.stopwatch;
       }
+      if (fields.travelBufMin == null && Object.prototype.hasOwnProperty.call(fields, 'travelBufMin')) delete b.travelBufMin;
+      if (fields.getReadyBufMin == null && Object.prototype.hasOwnProperty.call(fields, 'getReadyBufMin')) delete b.getReadyBufMin;
       changed = true;
     });
     if (changed) setDayBlocks(dayKey, arr);
@@ -7801,6 +8361,10 @@ function getDayBlocksForProfile(key, profId) {
 }
 
 /* Given a date, compute the weekOffset relative to today's week */
+function computeWeekOffsetForDayKey(dayKey) {
+  return computeWeekOffsetFor(formatDayKey(dayKey));
+}
+
 function computeWeekOffsetFor(date) {
   const today = new Date();
   const todayMon = getWeekStart(0);
@@ -7959,6 +8523,7 @@ function renderPrintSheet() {
 function openSheet(id) { document.getElementById(id).classList.add('open'); }
 function closeSheet(id) {
   if (id === 'editOverlay') editStopwatchClearTick();
+  if (id === 'kidRoutineOverlay') kidRoutineStopwatchClearTick();
   document.getElementById(id).classList.remove('open');
 }
 function overlayClick(e, id) { if (e.target.classList.contains('overlay')) closeSheet(id); }
