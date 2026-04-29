@@ -184,8 +184,9 @@
     align-self: flex-end;
   }
 
-  /* Day body: portrait = stacked; landscape = three-column grid (see media query) */
-  #screen-day {
+  /* Day body: portrait = stacked; landscape = three-column grid (see media query).
+     Must chain .screen.active so #screen-day does not override .screen { display:none }. */
+  #screen-day.screen.active {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
@@ -317,7 +318,7 @@
   }
 
   @media (min-width: 980px) and (orientation: landscape) {
-    #screen-day {
+    #screen-day.screen.active {
       overflow: hidden;
     }
     .day-workspace {
