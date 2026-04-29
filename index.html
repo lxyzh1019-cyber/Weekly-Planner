@@ -686,6 +686,26 @@
   }
   .btn-icon:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
   .btn-icon:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 var(--ink); }
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  .zone-tab:focus-visible,
+  .view-tab:focus-visible,
+  .filter-chip:focus-visible,
+  .pill-btn:focus-visible,
+  .profile-card:focus-visible {
+    outline: 3px solid var(--accent-blue);
+    outline-offset: 2px;
+  }
+  .btn-icon:focus-visible,
+  .zone-tab:focus-visible,
+  .view-tab:focus-visible,
+  .filter-chip:focus-visible,
+  .pill-btn:focus-visible,
+  .profile-badge:focus-visible,
+  .btn-template:focus-visible {
+    outline: 3px solid var(--accent-blue);
+    outline-offset: 2px;
+  }
 
   /* ═══════════ STATUS DOT (sync) ═══════════ */
   .sync-dot {
