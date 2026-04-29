@@ -184,6 +184,37 @@
     align-self: flex-end;
   }
 
+  /* Section labels (sticky inside each scroll column on day view) */
+  .day-panel-label {
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #5a4d41;
+    padding: 0.32rem 0.45rem 0.28rem;
+    margin: 0 0 0.25rem;
+    background: rgba(255, 253, 245, 0.92);
+    border-bottom: 2px dashed var(--paper-line);
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    flex-shrink: 0;
+    box-shadow: 0 1px 0 rgba(42, 35, 32, 0.06);
+  }
+  .day-panel-label--landscape-only {
+    display: none;
+  }
+  .tray-bridge-hint {
+    display: none;
+    margin: 0.15rem 0 0;
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #c95f3d;
+    line-height: 1.25;
+  }
+
   /* Day body: portrait = stacked; landscape = three-column grid (see media query).
      Must chain .screen.active so #screen-day does not override .screen { display:none }. */
   #screen-day.screen.active {
@@ -320,34 +351,116 @@
   @media (min-width: 980px) and (orientation: landscape) {
     #screen-day.screen.active {
       overflow: hidden;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    #screen-day > .parent-banner.sticky {
+      padding-left: max(0.8rem, env(safe-area-inset-left, 0px));
+      padding-right: max(0.8rem, env(safe-area-inset-right, 0px));
+    }
+    #screen-day .topbar.day-topbar {
+      padding-left: max(1rem, env(safe-area-inset-left, 0px));
+      padding-right: max(1rem, env(safe-area-inset-right, 0px));
+      padding-top: max(0.55rem, env(safe-area-inset-top, 0px));
+    }
+    /* One compact strip: day nav + scrollable zone tabs + Clear */
+    #screen-day .day-topbar__row2 {
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: 0.4rem;
+      padding-top: 0.35rem;
+    }
+    #screen-day .day-topbar__row2 .day-controls {
+      flex: 0 1 auto;
+      min-width: 0;
+      justify-content: flex-start;
+    }
+    #screen-day .day-topbar__row2 .day-nav-center {
+      gap: 0.45rem;
+    }
+    #screen-day .day-topbar__row2 .day-nav-center h3 {
+      min-width: 0;
+      font-size: 1.42rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #screen-day .day-topbar__row2 .zone-tabs {
+      flex: 1 1 0;
+      min-width: 0;
+      justify-content: flex-start;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 0.2rem 0;
+      gap: 0.3rem;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+    #screen-day .day-topbar__row2 .zone-tabs::-webkit-scrollbar {
+      height: 4px;
+    }
+    #screen-day .day-topbar__row2 .zone-tabs::-webkit-scrollbar-thumb {
+      background: var(--paper-line);
+      border-radius: 3px;
+    }
+    #screen-day .day-topbar__row2 .zone-tab {
+      flex-shrink: 0;
+      padding: 0.26rem 0.65rem;
+      font-size: 0.92rem;
+    }
+    #screen-day .day-topbar__row2 .btn-template.danger {
+      align-self: center;
+      flex: 0 0 auto;
+      padding: 0.3rem 0.55rem;
+      font-size: 0.82rem;
     }
     .day-workspace {
       display: grid;
       grid-template-columns: minmax(220px, 0.95fr) minmax(420px, 1.45fr) minmax(260px, 1fr);
       gap: 0.65rem;
       align-items: stretch;
-      padding: 0 0.65rem 0.55rem;
+      padding-top: 0;
+      padding-bottom: max(0.55rem, env(safe-area-inset-bottom, 0px));
+      padding-left: max(0.65rem, env(safe-area-inset-left, 0px));
+      padding-right: max(0.65rem, env(safe-area-inset-right, 0px));
       flex: 1 1 auto;
       min-height: 0;
     }
     .day-left-rail {
-      max-height: calc(100dvh - 168px);
+      max-height: calc(100dvh - 168px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
       overflow-y: auto;
+      padding: 0.35rem 0.4rem 0.35rem 0.35rem;
       padding-right: 0.35rem;
+      background: rgba(255, 249, 239, 0.65);
+      border: 2px dashed rgba(42, 35, 32, 0.12);
+      border-radius: 14px;
+      scroll-padding-top: 2rem;
     }
     .day-center-lane {
-      max-height: calc(100dvh - 168px);
+      max-height: calc(100dvh - 168px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
       min-height: 0;
+      background: var(--paper);
+      border: 2px solid var(--ink);
+      border-radius: 16px;
+      box-shadow: 3px 4px 0 rgba(42, 35, 32, 0.1);
+      overflow: hidden;
     }
     .day-center-lane .timeline-wrap {
       padding-bottom: 0;
       max-height: 100%;
       overflow-y: auto;
+      scroll-padding-top: 2rem;
     }
     .day-right-rail {
-      max-height: calc(100dvh - 168px);
+      max-height: calc(100dvh - 168px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
       overflow-y: auto;
       padding-bottom: 0;
+      background: rgba(255, 253, 245, 0.75);
+      border: 2px dashed rgba(42, 35, 32, 0.14);
+      border-radius: 14px;
+      padding: 0.35rem;
+      scroll-padding-top: 2rem;
     }
     #screen-day .activity-tray {
       position: static;
@@ -381,8 +494,20 @@
       width: 100%;
     }
     #screen-day .timeline {
-      max-width: 640px;
+      max-width: min(920px, 100%);
+      width: 100%;
       margin: 0 auto;
+    }
+    #screen-day .tray-bridge-hint {
+      display: block;
+    }
+    #screen-day .tray-header {
+      border-left: 3px solid var(--accent);
+      padding-left: 0.45rem;
+      margin-left: -0.15rem;
+    }
+    #screen-day .day-panel-label--landscape-only {
+      display: block;
     }
   }
 
@@ -2407,6 +2532,7 @@
 
   <div class="day-workspace">
     <div class="day-left-rail">
+      <div class="day-panel-label day-panel-label--landscape-only">Today</div>
       <div id="dayNextUpBanner" class="day-next-up-banner" style="display:none"></div>
       <div id="dayKidQuickRow" class="day-kid-quick-row" style="display:none">
         <button type="button" class="btn-break-quick" onclick="addQuickBreak(15)">☕ I need a break (15 min)</button>
@@ -2431,17 +2557,20 @@
 
     <div class="day-center-lane">
       <div class="timeline-wrap">
+        <div class="day-panel-label day-panel-label--landscape-only">Schedule</div>
         <div class="timeline" id="timeline"></div>
       </div>
     </div>
 
     <div class="day-right-rail">
+      <div class="day-panel-label day-panel-label--landscape-only">Activities</div>
       <!-- Activity tray -->
       <div class="activity-tray">
         <div class="tray-header">
           <span class="tray-title">Activities</span>
           <span class="tray-hint" id="trayHint">Tap one to pick</span>
         </div>
+        <p class="tray-bridge-hint" aria-hidden="true">Then tap the schedule to place it →</p>
         <div class="tray-filter" id="trayFilter"></div>
         <div class="tray-scroll" id="trayScroll"></div>
       </div>
