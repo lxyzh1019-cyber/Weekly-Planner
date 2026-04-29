@@ -504,14 +504,14 @@
     }
     #screen-day .day-topbar__row2 .zone-tab {
       flex-shrink: 0;
-      padding: 0.26rem 0.65rem;
-      font-size: 0.92rem;
+      padding: 0.32rem 0.75rem;
+      font-size: 0.98rem;
     }
     #screen-day .day-topbar__row2 .btn-template.danger {
       align-self: center;
       flex: 0 0 auto;
-      padding: 0.3rem 0.55rem;
-      font-size: 0.82rem;
+      padding: 0.36rem 0.72rem;
+      font-size: 0.9rem;
     }
     .day-workspace {
       display: grid;
@@ -649,7 +649,7 @@
     }
     #screen-week .week-nav--inline h3 {
       min-width: 0;
-      font-size: 1.44rem;
+      font-size: 1.52rem;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -658,6 +658,11 @@
       flex: 0 0 auto;
       justify-content: flex-end;
       flex-wrap: nowrap;
+    }
+    #screen-week .view-tab {
+      min-height: 40px;
+      padding: 0.36rem 0.88rem;
+      font-size: 0.96rem;
     }
   }
 
@@ -672,10 +677,12 @@
   }
   .btn-icon {
     background: var(--paper); border: 2px solid var(--ink);
-    border-radius: 12px; padding: 0.36rem 0.7rem;
+    border-radius: 12px; padding: 0.42rem 0.78rem;
     cursor: pointer; font-size: 1.3rem;
     transition: all 0.15s;
     box-shadow: 2px 2px 0 var(--ink);
+    min-height: 40px;
+    min-width: 40px;
   }
   .btn-icon:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
   .btn-icon:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 var(--ink); }
@@ -757,6 +764,8 @@
   .day-topbar-actions .btn-icon {
     padding: 0.34rem 0.62rem;
     font-size: 1.16rem;
+    min-height: 38px;
+    min-width: 38px;
   }
 
   /* Weekly view toggle */
@@ -770,6 +779,7 @@
     cursor: pointer; font-size: 0.9rem; font-weight: 600;
     font-family: 'Patrick Hand', sans-serif;
     box-shadow: 2px 2px 0 var(--ink);
+    min-height: 38px;
   }
   .view-tab.active { background: var(--accent); color: #fff; }
 
@@ -1413,6 +1423,9 @@
     font-family: 'Patrick Hand', sans-serif;
     box-shadow: 2px 2px 0 var(--ink);
     transition: all 0.15s;
+    min-height: 38px;
+    display: inline-flex;
+    align-items: center;
   }
   .zone-tab.active { background: var(--accent-yellow); }
   .zone-tab:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
@@ -1794,6 +1807,7 @@
   }
   .tray-title { font-family: 'Gochi Hand', cursive; font-size: 1.27rem; }
   .tray-hint { font-size: 0.98rem; color: #c95f3d; font-weight: 700; }
+  .tray-hint { color: #b3472b; }
 
   .tray-filter {
     display: flex; gap: 0.3rem; padding-bottom: 0.3rem;
@@ -1804,6 +1818,9 @@
     border-radius: 16px; padding: 0.23rem 0.8rem;
     cursor: pointer; font-size: 0.92rem; font-weight: 700;
     font-family: 'Patrick Hand', sans-serif;
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
   }
   .filter-chip.active { background: var(--accent); color: #fff; }
 
@@ -2093,6 +2110,7 @@
     font-family: 'Patrick Hand', sans-serif;
     box-shadow: 2px 2px 0 var(--ink);
     transition: all 0.15s;
+    min-height: 38px;
   }
   .pill-btn:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
   .pill-btn.active { background: var(--accent); color: #fff; }
