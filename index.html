@@ -188,7 +188,7 @@
   /* Section labels (sticky inside each scroll column on day view) */
   .day-panel-label {
     font-family: 'Patrick Hand', sans-serif;
-    font-size: 0.72rem;
+    font-size: 0.95rem;
     font-weight: 800;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -205,6 +205,36 @@
   }
   .day-panel-label--landscape-only {
     display: none;
+  }
+  .day-goals-todos {
+    margin: 0.35rem 0.1rem 0.5rem;
+    background: rgba(255,255,255,0.6);
+    border: 2px solid var(--ink);
+    border-radius: 14px;
+    box-shadow: 2px 2px 0 rgba(42,35,32,0.1);
+    padding: 0.45rem 0.5rem 0.55rem;
+  }
+  .day-goals-todos__section + .day-goals-todos__section {
+    margin-top: 0.55rem;
+    padding-top: 0.45rem;
+    border-top: 2px dashed var(--paper-line);
+  }
+  .day-goals-todos .gt-col-header {
+    margin-bottom: 0.2rem;
+  }
+  .day-goals-todos .gt-col-header h3 {
+    font-size: 1.08rem;
+  }
+  .day-goals-todos .gt-col-header .btn-icon.gt-add-btn {
+    padding: 0.18rem 0.45rem;
+    font-size: 1rem;
+  }
+  .day-goals-todos .gt-hint {
+    margin-bottom: 0.35rem;
+    font-size: 0.84rem;
+  }
+  .day-goals-todos .gt-item {
+    margin-bottom: 0.32rem;
   }
   .tray-bridge-hint {
     display: none;
@@ -358,6 +388,44 @@
     transform: translate(-1px,-1px);
     box-shadow: 3px 3px 0 var(--ink);
   }
+  .day-mini-panel {
+    margin: 0 0 0.5rem;
+    border: 2px solid var(--ink);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.78);
+    box-shadow: 2px 2px 0 rgba(42,35,32,0.12);
+    overflow: hidden;
+  }
+  .day-mini-panel__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    padding: 0.35rem 0.45rem;
+    border-bottom: 2px dashed var(--paper-line);
+    background: rgba(255, 248, 230, 0.85);
+  }
+  .day-mini-panel__header h4 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: #5a4d41;
+    font-family: 'Gochi Hand', cursive;
+  }
+  .day-mini-list {
+    padding: 0.35rem;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  .day-mini-list .gt-item {
+    margin-bottom: 0.35rem;
+  }
+  .day-mini-list .gt-text-input {
+    min-width: 0;
+  }
+  .day-mini-list .gt-empty {
+    margin: 0;
+    font-size: 0.9rem;
+  }
   .tutorial-overlay-note {
     font-family: 'Patrick Hand', sans-serif;
     font-size: 1rem;
@@ -389,7 +457,7 @@
       padding-right: max(1rem, env(safe-area-inset-right, 0px));
       padding-top: max(0.55rem, env(safe-area-inset-top, 0px));
     }
-    /* One compact strip: day nav + scrollable zone tabs + Clear */
+    /* Day row2: day nav + zone tabs + Clear (second line) */
     #screen-day .day-topbar__row2 {
       flex-direction: row;
       flex-wrap: nowrap;
@@ -444,7 +512,7 @@
     }
     .day-workspace {
       display: grid;
-      grid-template-columns: minmax(220px, 0.95fr) minmax(420px, 1.45fr) minmax(260px, 1fr);
+      grid-template-columns: minmax(240px, 0.9fr) minmax(500px, 1.75fr) minmax(250px, 0.95fr);
       gap: 0.65rem;
       align-items: stretch;
       padding-top: 0;
@@ -554,6 +622,40 @@
     #screen-day.focus-right .day-center-lane * {
       pointer-events: none;
     }
+    #screen-week > .parent-banner.sticky {
+      padding-left: max(0.8rem, env(safe-area-inset-left, 0px));
+      padding-right: max(0.8rem, env(safe-area-inset-right, 0px));
+    }
+    #screen-week .topbar.week-topbar {
+      padding-left: max(1rem, env(safe-area-inset-left, 0px));
+      padding-right: max(1rem, env(safe-area-inset-right, 0px));
+      padding-top: max(0.55rem, env(safe-area-inset-top, 0px));
+    }
+    #screen-week .week-topbar__row1 {
+      gap: 0.45rem;
+      flex-wrap: nowrap;
+    }
+    #screen-week .week-topbar__row1 .topbar-left {
+      flex: 0 1 auto;
+      min-width: 0;
+    }
+    #screen-week .week-nav--inline {
+      flex: 1 1 auto;
+      justify-content: center;
+      min-width: 0;
+    }
+    #screen-week .week-nav--inline h3 {
+      min-width: 0;
+      font-size: 1.44rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #screen-week .week-actions {
+      flex: 0 0 auto;
+      justify-content: flex-end;
+      flex-wrap: nowrap;
+    }
   }
 
   .profile-badge {
@@ -599,11 +701,56 @@
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
   /* ═══════════ WEEK VIEW ═══════════ */
+  .week-topbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+    padding-bottom: 0.45rem;
+  }
+  .week-topbar__row1 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .week-topbar__row2 {
+    padding-top: 0.2rem;
+    border-top: 2px dashed var(--paper-line);
+  }
+  .week-nav--inline {
+    padding: 0;
+    gap: 0.45rem;
+    flex-wrap: nowrap;
+  }
+  .week-nav--inline h3 {
+    font-size: 1.66rem;
+    min-width: 11.5rem;
+    text-align: center;
+    margin: 0;
+  }
+  #screen-week .view-tabs {
+    padding: 0;
+    justify-content: center;
+  }
+  #screen-week .week-actions {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
   .week-nav {
     display: flex; align-items: center; justify-content: center;
     gap: 1rem; padding: 0.8rem;
   }
   .week-nav h3 { font-size: 1.4rem; transform: rotate(-1deg); }
+  .day-topbar-actions {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
 
   /* Weekly view toggle */
   .view-tabs {
@@ -1521,6 +1668,14 @@
   }
   .placed-block .block-name { font-size: 1.04rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; line-height: 1.15; }
   .placed-block .block-meta { font-size: 0.81rem; opacity: 0.98; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; line-height: 1.15; }
+  .placed-block.travel-buf .block-meta {
+    text-align: center;
+    width: 100%;
+    letter-spacing: 0.01em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
   /* Taller blocks: slightly larger type; very short blocks stay compact */
   .placed-block.block-font-md .block-name { font-size: 1.12rem; }
   .placed-block.block-font-md .block-meta { font-size: 0.88rem; }
@@ -1579,6 +1734,13 @@
     text-overflow: ellipsis;
   }
   .placed-block.compact .block-meta { font-size: 0.81rem; flex-shrink: 0; }
+  .placed-block.compact .block-stopwatch-btn {
+    width: auto;
+    padding: 0.12rem 0.42rem;
+    margin-top: 0;
+    font-size: 0.74rem;
+    line-height: 1.1;
+  }
   /* Doodle decorations scattered around blocks */
   .tl-doodle {
     position: absolute;
@@ -1831,17 +1993,18 @@
     display: grid;
     grid-template-columns: minmax(0,1fr) minmax(0,1fr);
     gap: 0.55rem;
-    align-items: start;
+    align-items: stretch;
     margin-bottom: 0.45rem;
   }
   .sheet-time-col {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    height: 100%;
   }
   .sheet-time-grid-row h4 { margin-top: 0.1rem; margin-bottom: 0.35rem; min-height: 1.55rem; }
   .sheet-time-main {
-    min-height: 168px;
+    min-height: 172px;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
@@ -1855,7 +2018,7 @@
     margin-bottom: 0.35rem;
   }
   .duration-align-spacer {
-    height: 74px;
+    height: 80px;
     margin-bottom: 0.35rem;
   }
   .sheet-time-custom-row {
@@ -1906,7 +2069,7 @@
     100% { transform: scale(1); box-shadow: 3px 3px 0 var(--ink); }
   }
   @media (max-width: 560px) {
-    .sheet-time-grid-row { grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+    .sheet-time-grid-row { grid-template-columns: 1fr 1fr; gap: 0.4rem; align-items: stretch; }
     .sheet-time-main { min-height: 162px; }
     .duration-align-spacer { height: 70px; }
     .sheet h4 { font-size: 1.16rem; margin: 0.5rem 0 0.28rem; }
@@ -2483,29 +2646,31 @@
     <button class="btn-icon no-print" style="padding:2px 8px;margin-left:8px" onclick="parentSwitchView()">Switch</button>
   </div>
 
-  <div class="topbar">
-    <div class="topbar-left">
-      <div class="profile-badge" onclick="goProfile()" id="weekProfileBadge"></div>
-      <h2>My Week</h2>
+  <div class="topbar week-topbar">
+    <div class="week-topbar__row1">
+      <div class="topbar-left">
+        <div class="profile-badge" onclick="goProfile()" id="weekProfileBadge"></div>
+        <h2>My Week</h2>
+      </div>
+      <div class="week-nav week-nav--inline">
+        <button class="btn-icon" onclick="changeWeek(-1)">◀</button>
+        <h3 id="weekRangeLabel"></h3>
+        <button class="btn-icon" onclick="changeWeek(1)">▶</button>
+      </div>
+      <div class="week-actions">
+        <button class="btn-icon" title="Weekly Chore" onclick="openChoreTab()">🧹</button>
+        <button class="btn-icon" title="Challenges" onclick="openChallenges()">🎯</button>
+        <button class="btn-icon" title="Sister Sync" onclick="openSisterSync()">👯</button>
+        <button class="btn-icon" title="Print" onclick="openPrint()">🖨</button>
+      </div>
     </div>
-    <div style="display:flex;gap:0.4rem">
-      <button class="btn-icon" title="Weekly Chore" onclick="openChoreTab()">🧹</button>
-      <button class="btn-icon" title="Challenges" onclick="openChallenges()">🎯</button>
-      <button class="btn-icon" title="Sister Sync" onclick="openSisterSync()">👯</button>
-      <button class="btn-icon" title="Print" onclick="openPrint()">🖨</button>
+    <div class="week-topbar__row2">
+      <!-- View switcher: Full (cards) / Time-Grid (hours) -->
+      <div class="view-tabs">
+        <button class="view-tab active" id="viewTabFull" onclick="setWeekView('full')">📋 Full</button>
+        <button class="view-tab" id="viewTabTimeGrid" onclick="setWeekView('timegrid')">🕐 Time-Grid</button>
+      </div>
     </div>
-  </div>
-
-  <div class="week-nav">
-    <button class="btn-icon" onclick="changeWeek(-1)">◀</button>
-    <h3 id="weekRangeLabel"></h3>
-    <button class="btn-icon" onclick="changeWeek(1)">▶</button>
-  </div>
-
-  <!-- View switcher: Full (cards) / Time-Grid (hours) -->
-  <div class="view-tabs">
-    <button class="view-tab active" id="viewTabFull" onclick="setWeekView('full')">📋 Full</button>
-    <button class="view-tab" id="viewTabTimeGrid" onclick="setWeekView('timegrid')">🕐 Time-Grid</button>
   </div>
   <p class="kid-coach-tip" id="weekCoachTip" style="display:none;margin:0.35rem 0.75rem 0"></p>
 
@@ -2614,13 +2779,6 @@
         <button class="btn-icon" onclick="goWeek()">◀</button>
         <h2 id="dayTitle"></h2>
       </div>
-      <div style="display:flex;gap:0.4rem;align-items:center">
-        <button class="btn-icon" onclick="openTemplateSheet()" title="Template">📋</button>
-        <button class="btn-icon" onclick="openReflectSheet()" title="Reflect">🌙</button>
-        <div class="profile-badge" onclick="goProfile()" id="dayProfileBadge"></div>
-      </div>
-    </div>
-    <div class="day-topbar__row2">
       <div class="day-controls">
         <div class="day-nav-center">
           <button class="btn-icon day-nav-arrow" onclick="navDay(-1)" title="Previous day">◀</button>
@@ -2628,6 +2786,13 @@
           <button class="btn-icon day-nav-arrow" onclick="navDay(1)" title="Next day">▶</button>
         </div>
       </div>
+      <div style="display:flex;gap:0.4rem;align-items:center" class="day-topbar-actions">
+        <button class="btn-icon" onclick="openTemplateSheet()" title="Template">📋</button>
+        <button class="btn-icon" onclick="openReflectSheet()" title="Reflect">🌙</button>
+        <div class="profile-badge" onclick="goProfile()" id="dayProfileBadge"></div>
+      </div>
+    </div>
+    <div class="day-topbar__row2">
       <div class="zone-tabs">
         <div class="zone-tab active" data-zone="all" onclick="setZone('all')">☀️ All Day</div>
         <div class="zone-tab" data-zone="morning" onclick="setZone('morning')">🌅 Morning</div>
@@ -2661,6 +2826,20 @@
         </div>
         <div class="vibe-moods" id="vibeMoods"></div>
       </div>
+      <div class="day-mini-panel">
+        <div class="day-mini-panel__header">
+          <h4>✅ To-do</h4>
+          <button class="btn-icon gt-add-btn" onclick="addTodo()" title="Add todo">＋</button>
+        </div>
+        <div id="dayTodosList" class="day-mini-list"></div>
+      </div>
+      <div class="day-mini-panel">
+        <div class="day-mini-panel__header">
+          <h4>🎯 Goals</h4>
+          <button class="btn-icon gt-add-btn" onclick="addGoal()" title="Add goal">＋</button>
+        </div>
+        <div id="dayGoalsList" class="day-mini-list"></div>
+      </div>
     </div>
 
     <div class="day-center-lane">
@@ -2675,7 +2854,7 @@
       <!-- Activity tray -->
       <div class="activity-tray">
         <div class="tray-header">
-          <span class="tray-title">Activities</span>
+          <span class="tray-title">Pick one</span>
           <span class="tray-hint" id="trayHint">Tap one to pick</span>
         </div>
         <p class="tray-bridge-hint" aria-hidden="true">Then tap the schedule to place it →</p>
@@ -2901,7 +3080,10 @@
       </div>
     </div>
 
-    <button class="btn-confirm" onclick="confirmTraining()">Place Training ✅</button>
+    <div class="sheet-action-row">
+      <button class="btn-template alt" type="button" onclick="cancelCreatePlacement('trainingOverlay')">Cancel</button>
+      <button class="btn-confirm" onclick="confirmTraining()">Place Training ✅</button>
+    </div>
   </div>
 </div>
 
@@ -2955,7 +3137,10 @@
         <p class="hint">Leave empty to repeat only this week.</p>
       </div>
     </div>
-    <button class="btn-confirm" onclick="confirmActivity()">Place Block ✅</button>
+    <div class="sheet-action-row">
+      <button class="btn-template alt" type="button" onclick="cancelCreatePlacement('activityOverlay')">Cancel</button>
+      <button class="btn-confirm" onclick="confirmActivity()">Place Block ✅</button>
+    </div>
   </div>
 </div>
 
@@ -3007,9 +3192,15 @@
       <label for="editReadyBufMin">Get-ready minutes (each way)</label>
       <input type="number" id="editReadyBufMin" min="5" max="120" step="5" value="15" onchange="onEditBufferMinInput()">
     </div>
-    <div class="buffer-toggle sheet-toggle-row" id="editTravelToggle" onclick="toggleEditTravelBuffer()">
-      <div class="toggle-track"><div class="toggle-knob"></div></div>
-      <span class="toggle-label">🚗 Needs travel time</span>
+    <div class="edit-primary-toggle-row">
+      <div class="buffer-toggle sheet-toggle-row" id="editTravelToggle" onclick="toggleEditTravelBuffer()">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">🚗 Needs travel time</span>
+      </div>
+      <div class="repeat-toggle sheet-toggle-row" id="editCompleteToggle" onclick="toggleEditComplete()">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">✅ Mark this activity done</span>
+      </div>
     </div>
     <div class="buffer-dur-row" id="editTravelDurRow" style="display:none">
       <label for="editTravelBufMin">Travel minutes (each way)</label>
@@ -3018,11 +3209,6 @@
     <div id="editTrainingGearWrap" style="display:none">
       <h4>GEAR LIST</h4>
       <div class="checklist-wrap" id="editTrainingGearList"></div>
-    </div>
-
-    <div class="repeat-toggle sheet-toggle-row" id="editCompleteToggle" onclick="toggleEditComplete()">
-      <div class="toggle-track"><div class="toggle-knob"></div></div>
-      <span class="toggle-label">✅ Mark this activity done</span>
     </div>
 
     <div class="edit-stopwatch-wrap" id="editStopwatchWrap">
@@ -3628,9 +3814,6 @@ const ROUTINE_PRESETS = {
       { id:'a4', text:'Empty school bag / lunchbox in sink / finish water bottle' },
       { id:'a5', text:'Finish school/home work (ask for help if needed)' },
       { id:'a6', text:'Prep for training / get ready for today & tomorrow' },
-      { id:'a7', text:'Family Hero Task: set table or wash veggies' },
-      { id:'a8', text:'Focus Sprint: 25 min homework + 5 min break' },
-      { id:'a9', text:'Recovery Fuel: water + healthy snack' },
     ]
   },
   evening: {
@@ -3642,9 +3825,6 @@ const ROUTINE_PRESETS = {
       { id:'e3', text:'Brush teeth', timerSec: 120 },
       { id:'e4', text:'Wash face / skincare / hair / clean bathroom' },
       { id:'e5', text:'Turn off lights in empty rooms' },
-      { id:'e6', text:'Champion Prep: pack school bag for tomorrow' },
-      { id:'e7', text:'Culture Explorer: story, poem, or festival learning' },
-      { id:'e8', text:'Calm Finish: 3-minute reflection and gratitude' },
     ]
   }
 };
@@ -5056,6 +5236,7 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   buildTimeline();
   buildTray();
   renderVibe();
+  renderDayGoalsTodos();
   maybeShowRewardPrompt();
   offerTutorialIfNeeded();
   if (focusBlockId) {
@@ -5069,6 +5250,35 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   if (now.getHours() >= 20 && currentDayKey === todayKey() && getDayBlocks(key).length > 0) {
     const m = getProfData().dayMoods?.[key];
     if (!m) showToast('💫 Tap 🌙 to reflect on today');
+  }
+}
+
+function renderDayGoalsTodos() {
+  const p = getProfData();
+  if (!p) return;
+  ensureGtFields(p);
+  const dayGoalsList = document.getElementById('dayGoalsList');
+  const dayTodosList = document.getElementById('dayTodosList');
+  if (!dayGoalsList || !dayTodosList) return;
+
+  dayGoalsList.innerHTML = '';
+  if (!p.goals.length) {
+    dayGoalsList.innerHTML = '<div class="gt-empty">No goals yet.</div>';
+  } else {
+    p.goals.forEach(g => dayGoalsList.appendChild(buildGoalRow(g)));
+  }
+
+  const wk = getCurrentWeekKey();
+  const dayDate = formatDayKey(currentDayKey || todayKey());
+  const dayIdx = (dayDate.getDay()+6)%7;
+  const weekTodos = p.todos.filter(t => t.weekKey === wk);
+  const filtered = weekTodos.filter(t => t.assignedDay == null || t.assignedDay === dayIdx);
+
+  dayTodosList.innerHTML = '';
+  if (!filtered.length) {
+    dayTodosList.innerHTML = '<div class="gt-empty">No to-dos for today.</div>';
+  } else {
+    filtered.forEach(t => dayTodosList.appendChild(buildTodoRow(t)));
   }
 }
 
@@ -5620,7 +5830,7 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd) {
     const height = Math.max(18, bufDur * PX_PER_MIN - 2);
 
     const el = document.createElement('div');
-    el.className = 'placed-block travel-buf' + (cls ? ' '+cls : '');
+    el.className = 'placed-block travel-buf travel-buf--centered' + (cls ? ' '+cls : '');
     el.style.background = b.colour || CAT_HEX[act?.cat] || '#888';
     el.style.top = top + 'px';
     el.style.height = height + 'px';
@@ -5681,9 +5891,9 @@ function renderSheetTimeSummary(elId, startMin, durationMin, travelOn, travelBuf
 }
 
 function syncDurationColumnSpacers(mode) {
-  const startId = mode === 'activity' ? 'activityStartPicker' : 'editStartPicker';
-  const durRowId = mode === 'activity' ? 'activityDurBtns' : 'editDurBtns';
-  const slotId = mode === 'activity' ? 'activityDurationTopSpacer' : 'editDurationTopSpacer';
+  const startId = mode === 'training' ? 'trainingStartPicker' : (mode === 'activity' ? 'activityStartPicker' : 'editStartPicker');
+  const durRowId = mode === 'training' ? 'trainingDurBtns' : (mode === 'activity' ? 'activityDurBtns' : 'editDurBtns');
+  const slotId = mode === 'training' ? 'trainingDurationTopSpacer' : (mode === 'activity' ? 'activityDurationTopSpacer' : 'editDurationTopSpacer');
   const s = document.getElementById(startId);
   const d = document.getElementById(durRowId);
   const slot = document.getElementById(slotId);
@@ -5807,30 +6017,28 @@ function openKidRoutineQuick(blockId) {
   document.getElementById('kidRoutineTitle').textContent = `${act.icon} ${act.name}`;
   renderChecklist(b, act, 'kidRoutineChecklist', { skipAdd: true });
   const swEl = document.getElementById('kidRoutineStopwatch');
-  if (b.stopwatch && b.stopwatch.enabled) {
-    swEl.style.display = 'block';
-    kidRoutineStopwatchClearTick();
-    const tick = ()=>{
-      const arr = getDayBlocks(currentDayKey);
-      const blk = arr.find(x => x.id === blockId);
-      if (!blk || !blk.stopwatch) return;
-      const goal = blk.stopwatch.goalSec != null ? blk.stopwatch.goalSec : Math.max(60, (blk.durationMin|0) * 60);
-      const used = stopwatchDisplayElapsed(blk.stopwatch);
-      swEl.textContent = `⏱ Goal ${formatTimerSec(goal)} · Used ${formatTimerSec(used)}`;
-    };
-    tick();
-    if (!b.stopwatch.running) {
-      b.stopwatch.running = true;
-      b.stopwatch.startedAt = Date.now();
-      b.stopwatch.elapsedSec = Math.max(0, b.stopwatch.elapsedSec|0);
-      if (b.stopwatch.goalSec == null) b.stopwatch.goalSec = Math.max(60, (b.durationMin|0) * 60);
-      setDayBlocks(currentDayKey, blocks);
-      buildTimeline();
-    }
-    kidRoutineStopwatchTick = setInterval(tick, 500);
-  } else {
-    swEl.style.display = 'none';
+  swEl.style.display = 'block';
+  if (!b.stopwatch) b.stopwatch = {};
+  b.stopwatch.enabled = true;
+  if (b.stopwatch.goalSec == null) b.stopwatch.goalSec = Math.max(60, (b.durationMin|0) * 60);
+  if (b.stopwatch.elapsedSec == null) b.stopwatch.elapsedSec = 0;
+  if (!b.stopwatch.running) {
+    b.stopwatch.running = true;
+    b.stopwatch.startedAt = Date.now();
   }
+  setDayBlocks(currentDayKey, blocks);
+  buildTimeline();
+  kidRoutineStopwatchClearTick();
+  const tick = ()=>{
+    const arr = getDayBlocks(currentDayKey);
+    const blk = arr.find(x => x.id === blockId);
+    if (!blk || !blk.stopwatch) return;
+    const goal = blk.stopwatch.goalSec != null ? blk.stopwatch.goalSec : Math.max(60, (blk.durationMin|0) * 60);
+    const used = stopwatchDisplayElapsed(blk.stopwatch);
+    swEl.textContent = `⏱ Goal ${formatTimerSec(goal)} · Used ${formatTimerSec(used)}`;
+  };
+  tick();
+  kidRoutineStopwatchTick = setInterval(tick, 500);
   openSheet('kidRoutineOverlay');
 }
 
@@ -5948,6 +6156,7 @@ function setDayFocusPane(pane) {
   dayScreen.classList.toggle('focus-center', dayLandscapeFocusPane === 'center');
   dayScreen.classList.toggle('focus-right', dayLandscapeFocusPane === 'right');
 }
+
 function applyDayLandscapeFocusState() {
   setDayFocusPane(dayLandscapeFocusPane);
 }
@@ -6349,6 +6558,18 @@ function onTrainingBufferMinInput() {
   if (tIn) ts.travelBufMin = clampBufferMin(tIn.value);
   if (rIn) ts.getReadyBufMin = clampBufferMin(rIn.value);
   renderTrainingSheet();
+}
+
+function cancelCreatePlacement(overlayId, skipClose=false) {
+  pendingStartMin = null;
+  selectedActivity = null;
+  currentTimelineGuideY = null;
+  setDayFocusPane(null);
+  clearPlacementGuide();
+  if (!skipClose && overlayId) closeSheet(overlayId);
+  const hint = document.getElementById('trayHint');
+  if (hint) hint.textContent = 'Tap an activity to pick';
+  document.querySelectorAll('.activity-chip').forEach(c=>c.classList.remove('selected'));
 }
 
 function confirmTraining() {
@@ -8469,6 +8690,8 @@ function renderGoalsTodos() {
   } else {
     p.achievements.forEach(a => achList.appendChild(buildAchievementRow(a)));
   }
+
+  renderDayGoalsTodos();
 }
 
 function buildGoalRow(g) {
@@ -9435,6 +9658,7 @@ function closeSheet(id) {
   if (id === 'editOverlay') editStopwatchClearTick();
   if (id === 'kidRoutineOverlay') kidRoutineStopwatchClearTick();
   if (id === 'kidTrainingOverlay') kidTrainingStopwatchClearTick();
+  if (id === 'activityOverlay' || id === 'trainingOverlay') cancelCreatePlacement(null, true);
   document.getElementById(id).classList.remove('open');
 }
 function overlayClick(e, id) { if (e.target.classList.contains('overlay')) closeSheet(id); }
