@@ -183,9 +183,55 @@
   #screen-day .day-topbar__row2 .btn-template.danger {
     align-self: flex-end;
   }
-  .day-layout-three {
-    display: contents;
+
+  /* Day body: portrait = stacked; landscape = three-column grid (see media query) */
+  #screen-day {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;
   }
+  .day-workspace {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .day-left-rail,
+  .day-center-lane,
+  .day-right-rail {
+    min-width: 0;
+  }
+  .day-left-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0 0.55rem;
+  }
+  .day-left-rail .day-next-up-banner,
+  .day-left-rail .day-kid-quick-row,
+  .day-left-rail #dayRewardPrompt,
+  .day-left-rail .vibe-card {
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .day-left-rail #dayRewardPrompt {
+    margin-top: 0;
+  }
+  .day-center-lane {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .day-center-lane .timeline-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .day-right-rail {
+    flex-shrink: 0;
+  }
+
   .day-reward-prompt {
     margin: 0 0.8rem 0.5rem;
     padding: 0.55rem 0.8rem;
@@ -254,9 +300,10 @@
     box-shadow: 3px 3px 0 var(--ink);
   }
   .tutorial-overlay-note {
-    font-size: 0.95rem;
-    color: var(--ink-light);
-    margin-bottom: 0.6rem;
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 1rem;
+    color: #5a4d41;
+    margin-bottom: 0.55rem;
   }
   .tutorial-choice-list {
     display: flex;
@@ -266,59 +313,74 @@
   .tutorial-choice-btn {
     width: 100%;
     text-align: left;
-  }
-  .tutorial-overlay-note {
-    font-family: 'Patrick Hand', sans-serif;
-    font-size: 1rem;
-    color: #5a4d41;
-    margin-bottom: 0.55rem;
-  }
-  .tutorial-choice-btn {
-    width: 100%;
-    text-align: left;
     margin-bottom: 0.4rem;
   }
 
   @media (min-width: 980px) and (orientation: landscape) {
     #screen-day {
+      overflow: hidden;
+    }
+    .day-workspace {
       display: grid;
-      grid-template-columns: 240px minmax(460px, 620px) 300px;
-      grid-auto-rows: auto;
-      column-gap: 0.7rem;
-      align-content: start;
+      grid-template-columns: minmax(220px, 0.95fr) minmax(420px, 1.45fr) minmax(260px, 1fr);
+      gap: 0.65rem;
+      align-items: stretch;
+      padding: 0 0.65rem 0.55rem;
+      flex: 1 1 auto;
+      min-height: 0;
     }
-    #screen-day .day-topbar {
-      grid-column: 1 / 4;
+    .day-left-rail {
+      max-height: calc(100dvh - 168px);
+      overflow-y: auto;
+      padding-right: 0.35rem;
     }
-    #screen-day #dayNextUpBanner,
-    #screen-day #dayKidQuickRow,
-    #screen-day .vibe-card,
-    #screen-day #dayRewardPrompt {
-      grid-column: 1 / 2;
-      margin-right: 0;
+    .day-center-lane {
+      max-height: calc(100dvh - 168px);
+      min-height: 0;
     }
-    #screen-day .timeline-wrap {
-      grid-column: 2 / 3;
-      padding: 0;
-      margin: 0;
-      min-height: calc(100vh - 220px);
+    .day-center-lane .timeline-wrap {
+      padding-bottom: 0;
+      max-height: 100%;
+      overflow-y: auto;
+    }
+    .day-right-rail {
+      max-height: calc(100dvh - 168px);
+      overflow-y: auto;
+      padding-bottom: 0;
     }
     #screen-day .activity-tray {
-      grid-column: 3 / 4;
-      position: sticky;
-      top: 170px;
+      position: static;
+      inset: auto;
+      left: auto;
+      right: auto;
       bottom: auto;
-      left: auto; right: auto;
+      width: auto;
+      z-index: 1;
       border: 2px solid var(--ink);
       border-radius: 14px;
       border-top: 2px solid var(--ink);
       box-shadow: 2px 2px 0 var(--ink);
-      padding-bottom: 0.6rem;
-      max-height: calc(100vh - 190px);
-      overflow-y: auto;
+      padding: 0.55rem 0.65rem 0.75rem;
+    }
+    #screen-day .tray-scroll {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.45rem;
+      overflow-x: visible;
+      overflow-y: visible;
+      padding: 0.35rem 0.15rem;
+    }
+    #screen-day .tray-scroll::-webkit-scrollbar {
+      width: 5px;
+      height: auto;
+    }
+    #screen-day .activity-chip,
+    #screen-day .chip-add {
+      min-width: 0;
+      width: 100%;
     }
     #screen-day .timeline {
-      max-width: 620px;
+      max-width: 640px;
       margin: 0 auto;
     }
   }
@@ -2342,41 +2404,46 @@
     </div>
   </div>
 
-  <div id="dayNextUpBanner" class="day-next-up-banner" style="display:none"></div>
-  <div id="dayKidQuickRow" class="day-kid-quick-row" style="display:none">
-    <button type="button" class="btn-break-quick" onclick="addQuickBreak(15)">☕ I need a break (15 min)</button>
-    <button type="button" class="btn-break-quick" onclick="addQuickBreak(10)">🫧 Short break (10 min)</button>
-  </div>
-  <div id="dayRewardPrompt" class="day-reward-prompt">
-    <div id="dayRewardText"></div>
-    <div class="day-reward-actions">
-      <button type="button" class="reward-pill" onclick="acceptRewardPrompt()">Add today</button>
-      <button type="button" class="reward-pill" onclick="skipRewardPrompt()">Not today</button>
-    </div>
-  </div>
-
-  <!-- Today's Vibe (replaces balance) -->
-  <div class="vibe-card">
-    <div>
-      <div class="vibe-title">Today's Vibe</div>
-      <div style="font-size:0.92rem;color:#5a4d41" id="vibeSubtext">Set when the day's done</div>
-    </div>
-    <div class="vibe-moods" id="vibeMoods"></div>
-  </div>
-
-  <div class="day-layout-three">
-    <div class="timeline-wrap">
-      <div class="timeline" id="timeline"></div>
-    </div>
-
-    <!-- Activity tray -->
-    <div class="activity-tray">
-      <div class="tray-header">
-        <span class="tray-title">Activities</span>
-        <span class="tray-hint" id="trayHint">Tap one to pick</span>
+  <div class="day-workspace">
+    <div class="day-left-rail">
+      <div id="dayNextUpBanner" class="day-next-up-banner" style="display:none"></div>
+      <div id="dayKidQuickRow" class="day-kid-quick-row" style="display:none">
+        <button type="button" class="btn-break-quick" onclick="addQuickBreak(15)">☕ I need a break (15 min)</button>
+        <button type="button" class="btn-break-quick" onclick="addQuickBreak(10)">🫧 Short break (10 min)</button>
       </div>
-      <div class="tray-filter" id="trayFilter"></div>
-      <div class="tray-scroll" id="trayScroll"></div>
+      <div id="dayRewardPrompt" class="day-reward-prompt">
+        <div id="dayRewardText"></div>
+        <div class="day-reward-actions">
+          <button type="button" class="reward-pill" onclick="acceptRewardPrompt()">Add today</button>
+          <button type="button" class="reward-pill" onclick="skipRewardPrompt()">Not today</button>
+        </div>
+      </div>
+      <!-- Today's Vibe (replaces balance) -->
+      <div class="vibe-card">
+        <div>
+          <div class="vibe-title">Today's Vibe</div>
+          <div style="font-size:0.92rem;color:#5a4d41" id="vibeSubtext">Set when the day's done</div>
+        </div>
+        <div class="vibe-moods" id="vibeMoods"></div>
+      </div>
+    </div>
+
+    <div class="day-center-lane">
+      <div class="timeline-wrap">
+        <div class="timeline" id="timeline"></div>
+      </div>
+    </div>
+
+    <div class="day-right-rail">
+      <!-- Activity tray -->
+      <div class="activity-tray">
+        <div class="tray-header">
+          <span class="tray-title">Activities</span>
+          <span class="tray-hint" id="trayHint">Tap one to pick</span>
+        </div>
+        <div class="tray-filter" id="trayFilter"></div>
+        <div class="tray-scroll" id="trayScroll"></div>
+      </div>
     </div>
   </div>
 </div>
