@@ -471,7 +471,7 @@
     #screen-day .day-topbar__row2 .day-controls {
       flex: 0 1 auto;
       min-width: 0;
-      justify-content: flex-start;
+      justify-content: center;
     }
     #screen-day .day-topbar__row2 .day-nav-center {
       gap: 0.45rem;
@@ -486,7 +486,7 @@
     #screen-day .day-topbar__row2 .zone-tabs {
       flex: 1 1 0;
       min-width: 0;
-      justify-content: flex-start;
+      justify-content: center;
       flex-wrap: nowrap;
       overflow-x: auto;
       overflow-y: hidden;
@@ -512,6 +512,55 @@
       flex: 0 0 auto;
       padding: 0.36rem 0.72rem;
       font-size: 0.9rem;
+    }
+    #screen-day .topbar.day-topbar.day-topbar--compact {
+      gap: 0.16rem;
+      padding-top: max(0.28rem, env(safe-area-inset-top, 0px));
+      padding-bottom: 0.22rem;
+    }
+    #screen-day .topbar.day-topbar.day-topbar--compact .day-topbar__row1 {
+      gap: 0.38rem;
+    }
+    #screen-day .topbar.day-topbar.day-topbar--compact .topbar-left h2 {
+      font-size: 1.3rem;
+    }
+    #screen-day .topbar.day-topbar.day-topbar--compact .day-topbar-actions .btn-icon,
+    #screen-day .topbar.day-topbar.day-topbar--compact .day-topbar-actions .profile-badge {
+      min-height: 34px;
+      min-width: 34px;
+      font-size: 0.9rem;
+    }
+    #screen-day .topbar.day-topbar.day-topbar--compact .day-topbar__row2 {
+      gap: 0.28rem;
+      padding-top: 0.16rem;
+      border-top-width: 1px;
+    }
+    #screen-day .topbar.day-topbar.day-topbar--compact .day-nav-center {
+      gap: 0.3rem;
+    }
+    #screen-day .topbar.day-topbar.day-topbar--compact .day-nav-center h3 {
+      font-size: 1.12rem;
+    }
+    #screen-day .topbar.day-topbar.day-topbar--compact .day-nav-arrow {
+      min-height: 30px;
+      min-width: 30px;
+      padding: 0.16rem 0.44rem;
+      font-size: 0.94rem;
+    }
+    #screen-day .topbar.day-topbar.day-topbar--compact .zone-tabs {
+      gap: 0.2rem;
+      padding: 0.06rem 0;
+    }
+    #screen-day .topbar.day-topbar.day-topbar--compact .zone-tab {
+      min-height: 30px;
+      padding: 0.16rem 0.5rem;
+      font-size: 0.78rem;
+      border-width: 1px;
+    }
+    #screen-day .topbar.day-topbar.day-topbar--compact .btn-template.danger {
+      padding: 0.2rem 0.5rem;
+      font-size: 0.75rem;
+      min-height: 30px;
     }
     .day-workspace {
       display: grid;
@@ -1478,6 +1527,9 @@
     align-items: center; justify-content: center;
   }
   .day-controls h3 { font-size: 1.5rem; }
+  #screen-day .day-topbar__row1 .topbar-left h2 {
+    display: none;
+  }
   .day-nav-center {
     display: flex; align-items: center; gap: 0.75rem;
     flex: 1 1 auto; justify-content: center;
@@ -1715,6 +1767,18 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 0.28rem;
+  }
+  .placed-block.travel-buf .travel-meta-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  .placed-block.travel-buf .travel-meta-text {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
   }
   /* Taller blocks: slightly larger type; very short blocks stay compact */
   .placed-block.block-font-md .block-name { font-size: 1.12rem; }
@@ -1780,6 +1844,28 @@
     margin-top: 0;
     font-size: 0.74rem;
     line-height: 1.1;
+  }
+  .block-close-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    border: 1.5px solid var(--ink);
+    background: rgba(255,255,255,0.7);
+    color: var(--ink);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.82rem;
+    font-weight: 900;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 14;
+  }
+  .block-close-btn:hover {
+    background: rgba(255,255,255,0.9);
   }
   /* Doodle decorations scattered around blocks */
   .tl-doodle {
@@ -1920,6 +2006,25 @@
     animation: slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);
     max-height: 88vh;
     overflow-y: auto;
+  }
+  .sheet-close-x {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--ink);
+    border-radius: 999px;
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 1.05rem;
+    font-weight: 900;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 2px 2px 0 var(--ink);
+    z-index: 2;
   }
   #activityOverlay .sheet,
   #trainingOverlay .sheet,
@@ -3126,7 +3231,7 @@
     </div>
 
     <div class="sheet-action-row">
-      <button class="btn-template alt" type="button" onclick="cancelCreatePlacement('trainingOverlay')">Cancel</button>
+      <button class="sheet-close-x" type="button" aria-label="Close training sheet" onclick="cancelCreatePlacement('trainingOverlay')">×</button>
       <button class="btn-confirm" onclick="confirmTraining()">Place Training ✅</button>
     </div>
   </div>
@@ -3183,7 +3288,7 @@
       </div>
     </div>
     <div class="sheet-action-row">
-      <button class="btn-template alt" type="button" onclick="cancelCreatePlacement('activityOverlay')">Cancel</button>
+      <button class="sheet-close-x" type="button" aria-label="Close activity sheet" onclick="cancelCreatePlacement('activityOverlay')">×</button>
       <button class="btn-confirm" onclick="confirmActivity()">Place Block ✅</button>
     </div>
   </div>
@@ -3956,6 +4061,7 @@ let kidRoutineStopwatchTick = null;
 let kidTrainingStopwatchTick = null;
 let dayLandscapeFocusPane = null;
 let currentTimelineGuideY = null;
+let dayTopbarCompactBound = false;
 const MORNING_UNLOCK_ITEM = { id:'m_unlock_warm_water', text:'Warm water before breakfast' };
 const AFTERSCHOOL_REWARD_ITEMS = [
   { id:'a_unlock_helper', text:'Reward pick: Family Hero helper task (your choice)' },
@@ -5231,9 +5337,12 @@ function renderFullWeek(keys) {
           const bg = b.colour || CAT_HEX[act.cat] || '#888';
           const card = document.createElement('div');
           card.className = 'wf-card' + (isLightColour(bg) ? ' light-bg' : '');
-          const zoneDur = Math.max(1, z.end - z.start);
-          const ratio = Math.max(0.22, Math.min(1, (b.durationMin||0) / zoneDur));
-          card.style.minHeight = Math.round(26 + ratio * 140) + 'px';
+          const dur = Math.max(5, b.durationMin || 0);
+          // Hybrid scaling: keep duration signal clearer while capping long blocks
+          // so school-day does not consume disproportionate vertical space.
+          const normalized = Math.log1p(dur) / Math.log1p(420);
+          const maxByZone = z.id === 'school' ? 114 : 132;
+          card.style.minHeight = Math.round(24 + Math.min(1, normalized) * maxByZone) + 'px';
           card.style.background = bg;
           card.innerHTML = `
             <div class="wf-card-time">${timeStr}</div>
@@ -5275,12 +5384,13 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   document.getElementById('dayProfileBadge').textContent =
     isParent() ? (parentViewing==='jenn'?'🐥 (P)':'🦊 (P)') :
     (profile==='jenn'?'🐥 Jenn':'🦊 Jess');
-  document.getElementById('dayTitle').textContent = DAY_SHORT[dayIdx];
+  document.getElementById('dayTitle').textContent = '';
   const d = formatDayKey(key);
   document.getElementById('daySubtitle').textContent = `${DAY_LONG[dayIdx]}, ${MONTH_SHORT[d.getMonth()]} ${d.getDate()}`;
 
   showScreen('day');
   buildTimeline();
+  bindDayTimelineCompactOnScroll();
   buildTray();
   renderVibe();
   renderDayGoalsTodos();
@@ -5413,7 +5523,9 @@ function setDayMood(m) {
 function buildTimeline() {
   if (activeStopwatchTick) { clearInterval(activeStopwatchTick); activeStopwatchTick = null; }
   const tl = document.getElementById('timeline');
+  const topbar = document.querySelector('#screen-day .day-topbar');
   tl.innerHTML = '';
+  if (topbar) topbar.classList.remove('day-topbar--compact');
   const blocks = getDayBlocks(currentDayKey);
 
   // Zone = range in minutes from 6AM
@@ -5792,6 +5904,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
   const widthPct = 100 / colCount;
   const leftPct  = colIdx * widthPct;
 
+  const isBuffer = !!b._isBuffer;
   const blockEl = document.createElement('div');
   const isCompact = height < 45;
   let fontTier = '';
@@ -5799,7 +5912,11 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
     if (height >= 110) fontTier = ' block-font-lg';
     else if (height >= 72) fontTier = ' block-font-md';
   }
-  blockEl.className = 'placed-block'+(b.parentPinned?' parent-pinned':'')+(b.completed?' placed-block--completed':'')+(isCompact?' compact':'')+fontTier;
+  blockEl.className = 'placed-block'
+    +(isBuffer ? ` travel-buf travel-buf--centered${b._bufferCls ? ' '+b._bufferCls : ''}` : '')
+    +(b.parentPinned?' parent-pinned':'')
+    +(b.completed?' placed-block--completed':'')
+    +(isCompact?' compact':'')+fontTier;
   blockEl.id = 'block-'+b.id;
   blockEl.style.background = b.colour || CAT_HEX[act.cat] || '#888';
   blockEl.style.top = top + 'px';
@@ -5816,7 +5933,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
   if (b.objectives?.length) badges += '<span class="badge">🎯</span>';
   if (b.note) badges += '<span class="badge">📝</span>';
   if (b.parentPinned) badges += '<span class="badge">📌</span>';
-  if (b.travelBuffer) badges += '<span class="badge">🚗</span>';
+  if (!isBuffer && b.travelBuffer) badges += '<span class="badge">🚗</span>';
   if (b.public) badges += '<span class="badge">👯</span>';
   if (Array.isArray(b.invitedTo) && b.invitedTo.length) badges += '<span class="badge">💌</span>';
   if (b.seriesId) badges += '<span class="badge">🔁</span>';
@@ -5832,21 +5949,30 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
   const noteHtml = (!isCompact && noteTrim)
     ? `<div class="block-note">${escapeHtml(noteTrim)}</div>`
     : '';
-  const nameHtml = (isCompact && noteTrim)
+  const nameHtml = isBuffer
+    ? ''
+    : (isCompact && noteTrim)
     ? `<div class="block-name block-name--inline">${act.icon} <span class="block-title">${escapeHtml(act.name)}</span><span class="block-note-inline" title="${escapeHtml(noteTrim).replace(/"/g,'&quot;')}"> · ${escapeHtml(noteTrim)}</span></div>`
     : `<div class="block-name">${act.icon} ${escapeHtml(act.name)}</div>`;
+  const metaHtml = isBuffer
+    ? `<div class="block-meta"><span class="travel-buf-label">${escapeHtml(b._bufferLabel || '')}</span></div>`
+    : `<div class="block-meta">${durStr}${badges?' '+badges:''}</div>`;
+  const closeHtml = !isBuffer
+    ? `<button type="button" class="block-close-btn" aria-label="Clear selected activity" onclick="event.stopPropagation(); cancelCreatePlacement(null, true)">×</button>`
+    : '';
 
   blockEl.innerHTML = `
+    ${closeHtml}
     ${nameHtml}
-    <div class="block-meta">${durStr}${badges?' '+badges:''}</div>
-    ${b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="block-stopwatch-btn" onclick="event.stopPropagation(); startBlockStopwatch('${b.id}')">⏱ Start stopwatch</button>` : ''}
+    ${metaHtml}
+    ${!isBuffer && b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="block-stopwatch-btn" onclick="event.stopPropagation(); startBlockStopwatch('${b.id}')">⏱ Start stopwatch</button>` : ''}
     ${noteHtml}
   `;
-  blockEl.onclick = (e)=>{ e.stopPropagation(); onTimelineBlockTap(b.id); };
+  if (!isBuffer) blockEl.onclick = (e)=>{ e.stopPropagation(); onTimelineBlockTap(b.id); };
   canvas.appendChild(blockEl);
 
   // Decorative doodle (seasonal, stable per block per month)
-  renderDoodle(canvas, b.id, top, height, leftPct, widthPct);
+  if (!isBuffer) renderDoodle(canvas, b.id, top, height, leftPct, widthPct);
 }
 
 function renderTravelBuffers(canvas, b, zMinStart, zMinEnd) {
@@ -5865,28 +5991,39 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd) {
       { startMin: b.startMin + b.durationMin, label: '🚗 ⬅ travel', bufDur: travelBuf, cls: '' },
     );
   }
-  entries.forEach(({startMin, label, bufDur, cls})=>{
-    const endMin = startMin + bufDur;
-    const bStart = startMin - START_MIN;
-    const bEnd   = endMin - START_MIN;
-    if (bEnd <= zMinStart || bStart >= zMinEnd) return;
-
-    const act = getAllActivities().find(a=>a.id===b.actId);
-    const relStart = bStart - zMinStart;
-    const top = Math.max(0, relStart * PX_PER_MIN);
-    const height = Math.max(18, bufDur * PX_PER_MIN - 2);
-
-    const el = document.createElement('div');
-    el.className = 'placed-block travel-buf travel-buf--centered' + (cls ? ' '+cls : '');
-    el.style.background = b.colour || CAT_HEX[act?.cat] || '#888';
-    el.style.top = top + 'px';
-    el.style.height = height + 'px';
-    el.style.left = '2px';
-    el.style.right = '2px';
-    el.style.width = 'calc(100% - 4px)';
-    el.innerHTML = `<div class="block-meta">${label}</div>`;
-    canvas.appendChild(el);
+  const sourceAct = getAllActivities().find(a=>a.id===b.actId);
+  const overlayBlocks = entries.map(({ startMin, label, bufDur, cls }) => ({
+    id: `${b.id}-${startMin}-${bufDur}-${cls || 'travel'}`,
+    actId: b.actId,
+    startMin,
+    durationMin: bufDur,
+    colour: b.colour || CAT_HEX[sourceAct?.cat] || '#888',
+    _isBuffer: true,
+    _bufferCls: cls || '',
+    _bufferLabel: label,
+  })).filter(buf => {
+    const bufStart = buf.startMin - START_MIN;
+    const bufEnd = bufStart + buf.durationMin;
+    return bufEnd > zMinStart && bufStart < zMinEnd;
   });
+  if (!overlayBlocks.length) return;
+  renderBlocksWithCollision(canvas, overlayBlocks, zMinStart);
+}
+
+function bindDayTimelineCompactOnScroll() {
+  if (dayTopbarCompactBound) return;
+  const screen = document.getElementById('screen-day');
+  const topbar = screen ? screen.querySelector('.day-topbar') : null;
+  if (!screen || !topbar) return;
+  const threshold = 36;
+  screen.addEventListener('scroll', () => {
+    if (!window.matchMedia('(min-width: 980px) and (orientation: landscape)').matches) {
+      topbar.classList.remove('day-topbar--compact');
+      return;
+    }
+    topbar.classList.toggle('day-topbar--compact', screen.scrollTop > threshold);
+  }, { passive: true });
+  dayTopbarCompactBound = true;
 }
 
 function formatDuration(min) {
