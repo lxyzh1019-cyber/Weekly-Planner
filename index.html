@@ -4633,7 +4633,9 @@ const MOODS = ['😄','🙂','😐','😕','😴'];
 ════════════════════════════════════════════════════════════════ */
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('screen-'+id).classList.add('active');
+  const targetScreen = document.getElementById('screen-'+id);
+  targetScreen.classList.add('active');
+  enhanceAccessibility(targetScreen);
   if (typeof refreshMascotButton === 'function') refreshMascotButton();
   if (id === 'day') {
     updateDayLandscapeChromeHeight();
@@ -6470,6 +6472,7 @@ function buildTray() {
   addChip.innerHTML = '<div style="font-size:1.6rem">＋</div><div>Custom</div>';
   addChip.onclick = ()=>openSheet('customOverlay');
   tray.appendChild(addChip);
+  enhanceAccessibility(document.getElementById('screen-day'));
 }
 
 function selectActivity(act) {
@@ -9977,7 +9980,88 @@ function enableHorizontalWheelScroll() {
     }, { passive:false });
   });
 }
+
+function enhanceNonButtonClickables(root = document) {
+  const clickableSelectors = [
+    '.profile-card[onclick]',
+    '.profile-badge[onclick]',
+    '.zone-tab[onclick]',
+    '.buffer-toggle[onclick]',
+    '.repeat-toggle[onclick]',
+    '.mascot-close[onclick]',
+  ];
+  root.querySelectorAll(clickableSelectors.join(',')).forEach(el => {
+    const tag = (el.tagName || '').toLowerCase();
+    if (tag === 'button' || tag === 'a' || tag === 'input' || tag === 'select' || tag === 'textarea') return;
+    if (!el.hasAttribute('role')) el.setAttribute('role', 'button');
+    if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
+    if (!el.dataset.a11yKeybound) {
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          el.click();
+        }
+      });
+      el.dataset.a11yKeybound = '1';
+    }
+  });
+}
+
+function applyIconButtonAriaLabels(root = document) {
+  root.querySelectorAll('button').forEach(btn => {
+    if (btn.getAttribute('aria-label')) return;
+    const title = (btn.getAttribute('title') || '').trim();
+    if (title) {
+      btn.setAttribute('aria-label', title);
+      return;
+    }
+    const text = (btn.textContent || '').replace(/\s+/g, ' ').trim();
+    const hasLetters = /[A-Za-z]/.test(text);
+    if (hasLetters) return;
+    const iconTextMap = {
+      '◀': 'Back',
+      '▶': 'Next',
+      '＋': 'Add',
+      '🧹': 'Open Weekly Chore',
+      '🎯': 'Open Challenges',
+      '👯': 'Open Sister Sync',
+      '🖨': 'Print',
+      '📋': 'Open Templates',
+      '🌙': 'Open Reflection',
+      '✏️': 'Edit',
+      '🗑': 'Delete',
+      '↩️': 'Reset',
+      '🔗': 'Share',
+      '✅': 'Accept',
+      '❌': 'Decline',
+      'Exit': 'Exit',
+    };
+    const mapped = iconTextMap[text];
+    if (mapped) btn.setAttribute('aria-label', mapped);
+  });
+}
+
+function enhanceAccessibility(root = document) {
+  enhanceNonButtonClickables(root);
+  applyIconButtonAriaLabels(root);
+  root.querySelectorAll('.profile-badge').forEach((badge) => {
+    if (!badge.getAttribute('aria-label')) badge.setAttribute('aria-label', 'Open profile selector');
+  });
+  root.querySelectorAll('.mascot-close').forEach((closeBtn) => {
+    if (!closeBtn.getAttribute('aria-label')) closeBtn.setAttribute('aria-label', 'Close owl helper');
+  });
+}
+
+function initA11yEnhancements() {
+  const run = () => {
+    enhanceAccessibility(document);
+  };
+  run();
+  const observer = new MutationObserver(() => run());
+  observer.observe(document.body, { childList: true, subtree: true });
+}
 enableHorizontalWheelScroll();
+initA11yEnhancements();
 
 // Small onboarding mascot after profile pick (if day is empty)
 const _origBuildTimeline = buildTimeline;
