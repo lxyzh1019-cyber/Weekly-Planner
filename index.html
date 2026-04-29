@@ -44,6 +44,7 @@
     --jenn: #ff9eb5;
     --jess: #6fb1fc;
     --parent: #7d5ba6;
+    --day-landscape-chrome: 168px;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -260,6 +261,32 @@
     flex: 1 1 auto;
     min-height: 0;
   }
+  .day-center-lane .timeline-empty-state {
+    position: absolute;
+    left: 50%;
+    top: 34%;
+    transform: translate(-50%, -50%);
+    width: min(440px, calc(100% - 1.2rem));
+    padding: 0.8rem 0.95rem;
+    border: 2px dashed var(--ink);
+    border-radius: 14px;
+    text-align: center;
+    background: linear-gradient(135deg, rgba(255,250,235,0.95) 0%, rgba(231,243,255,0.92) 100%);
+    box-shadow: 2px 2px 0 rgba(42,35,32,0.14);
+    pointer-events: none;
+    z-index: 4;
+  }
+  .timeline-empty-state .title {
+    font-size: 1.08rem;
+    font-weight: 800;
+    color: var(--ink);
+    margin-bottom: 0.2rem;
+  }
+  .timeline-empty-state .hint {
+    font-size: 0.92rem;
+    color: #5f5041;
+    line-height: 1.3;
+  }
   .day-right-rail {
     flex-shrink: 0;
   }
@@ -428,7 +455,7 @@
       min-height: 0;
     }
     .day-left-rail {
-      max-height: calc(100dvh - 168px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+      max-height: calc(100dvh - var(--day-landscape-chrome, 168px) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
       overflow-y: auto;
       padding: 0.35rem 0.4rem 0.35rem 0.35rem;
       padding-right: 0.35rem;
@@ -438,7 +465,7 @@
       scroll-padding-top: 2rem;
     }
     .day-center-lane {
-      max-height: calc(100dvh - 168px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+      max-height: calc(100dvh - var(--day-landscape-chrome, 168px) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
       min-height: 0;
       background: var(--paper);
       border: 2px solid var(--ink);
@@ -453,7 +480,7 @@
       scroll-padding-top: 2rem;
     }
     .day-right-rail {
-      max-height: calc(100dvh - 168px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+      max-height: calc(100dvh - var(--day-landscape-chrome, 168px) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
       overflow-y: auto;
       padding-bottom: 0;
       background: rgba(255, 253, 245, 0.75);
@@ -508,6 +535,24 @@
     }
     #screen-day .day-panel-label--landscape-only {
       display: block;
+    }
+    #screen-day.focus-center .day-left-rail,
+    #screen-day.focus-center .day-right-rail {
+      opacity: 0.42;
+      filter: saturate(0.82);
+      transition: opacity 0.18s ease, filter 0.18s ease;
+    }
+    #screen-day.focus-center .day-left-rail *,
+    #screen-day.focus-center .day-right-rail * {
+      pointer-events: none;
+    }
+    #screen-day.focus-right .day-center-lane {
+      opacity: 0.55;
+      filter: saturate(0.86);
+      transition: opacity 0.18s ease, filter 0.18s ease;
+    }
+    #screen-day.focus-right .day-center-lane * {
+      pointer-events: none;
     }
   }
 
@@ -1340,6 +1385,61 @@
     border-left: 2px solid var(--paper-line);
     cursor: pointer;
   }
+  .tl-canvas.place-target::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: var(--place-guide-y, 0px);
+    border-top: 2px dashed rgba(255, 123, 84, 0.9);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.7);
+    pointer-events: none;
+    z-index: 18;
+  }
+  .tl-canvas.place-target::after {
+    content: attr(data-guide-label);
+    position: absolute;
+    top: calc(var(--place-guide-y, 0px) - 14px);
+    right: 8px;
+    background: rgba(255, 251, 240, 0.95);
+    border: 1.5px solid var(--ink);
+    border-radius: 8px;
+    padding: 0.05rem 0.35rem;
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: #6b4a3b;
+    pointer-events: none;
+    z-index: 19;
+  }
+  .tl-placement-guide {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 2px dashed rgba(255, 123, 84, 0.85);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.12s ease-in-out;
+    z-index: 18;
+  }
+  .tl-placement-guide::before {
+    content: attr(data-time);
+    position: absolute;
+    top: -15px;
+    left: 6px;
+    padding: 1px 8px;
+    border-radius: 12px;
+    border: 2px solid var(--ink);
+    background: #fff8e6;
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 800;
+    color: var(--ink);
+    line-height: 1.2;
+    box-shadow: 1px 1px 0 var(--ink);
+  }
+  .tl-canvas.placing .tl-placement-guide {
+    opacity: 1;
+  }
   .tl-hour-line {
     position: absolute;
     left: 0; right: 0;
@@ -1791,6 +1891,14 @@
   .block-stopwatch-btn:hover { background: rgba(255,255,255,0.55); }
   .block-focus-pulse {
     animation: blockFocusPulse 1.1s ease-in-out 2;
+  }
+  .block-place-pulse {
+    animation: blockPlacePulse 0.75s ease-out 1;
+  }
+  @keyframes blockPlacePulse {
+    0% { box-shadow: 3px 3px 0 var(--ink); transform: scale(1); }
+    35% { box-shadow: 0 0 0 5px rgba(149,213,178,0.42), 3px 3px 0 var(--ink); transform: scale(1.02); }
+    100% { box-shadow: 3px 3px 0 var(--ink); transform: scale(1); }
   }
   @keyframes blockFocusPulse {
     0% { transform: scale(1); box-shadow: 3px 3px 0 var(--ink); }
@@ -3606,6 +3714,8 @@ let parentViewing = 'jenn';
 let weekOffset = 0;
 let currentDayKey = null;
 let selectedActivity = null;
+let timelinePlacementGuideEl = null;
+let dayLandscapeChromeRaf = 0;
 let pendingStartMin = null;
 let editingBlockId = null;
 let syncDayIdx = 0;
@@ -3619,6 +3729,8 @@ let activeStopwatchTick = null;
 let kidQuickBlockId = null;
 let kidRoutineStopwatchTick = null;
 let kidTrainingStopwatchTick = null;
+let dayLandscapeFocusPane = null;
+let currentTimelineGuideY = null;
 const MORNING_UNLOCK_ITEM = { id:'m_unlock_warm_water', text:'Warm water before breakfast' };
 const AFTERSCHOOL_REWARD_ITEMS = [
   { id:'a_unlock_helper', text:'Reward pick: Family Hero helper task (your choice)' },
@@ -4299,6 +4411,8 @@ function showScreen(id) {
   document.getElementById('screen-'+id).classList.add('active');
   if (typeof refreshMascotButton === 'function') refreshMascotButton();
   if (id === 'day') {
+    updateDayLandscapeChromeHeight();
+    applyDayLandscapeFocusState();
     maybeShowRewardPrompt();
     offerTutorialIfNeeded();
   }
@@ -5061,6 +5175,17 @@ function buildTimeline() {
   canvas.style.height = canvasHeight + 'px';
   canvas.dataset.zmin = zMinStart;
   canvas.onclick = (e)=>handleCanvasTap(e, zMinStart);
+  canvas.onmousemove = (e)=>updatePlacementGuideFromPointer(e, zMinStart);
+  canvas.onmouseleave = ()=>clearPlacementGuide();
+  canvas.classList.toggle('placing', !!selectedActivity);
+
+  timelinePlacementGuideEl = document.createElement('div');
+  timelinePlacementGuideEl.className = 'tl-placement-guide';
+  timelinePlacementGuideEl.dataset.time = '';
+  if (currentTimelineGuideY != null) {
+    timelinePlacementGuideEl.style.top = `${currentTimelineGuideY}px`;
+  }
+  canvas.appendChild(timelinePlacementGuideEl);
 
   // Hour lines + labels
   const firstHour = Math.ceil((zMinStart + START_MIN) / 60);
@@ -5114,6 +5239,16 @@ function buildTimeline() {
     return bEnd > zMinStart && bStart < zMinEnd;
   });
   renderBlocksWithCollision(canvas, visibleBlocks, zMinStart);
+
+  if (!blocks.length) {
+    const emptyState = document.createElement('div');
+    emptyState.className = 'timeline-empty-state';
+    emptyState.innerHTML = `
+      <div class="title">Ready to plan this day?</div>
+      <div class="hint">Pick an activity, then tap a time in the schedule.</div>
+    `;
+    canvas.appendChild(emptyState);
+  }
 
   // Travel buffers (rendered underneath, not counted for collision)
   blocks.forEach(b => {
@@ -5777,6 +5912,77 @@ function handleCanvasTap(e, zMinStart) {
   }
 }
 
+function updatePlacementGuideFromPointer(ev, zMinStart) {
+  const canvas = ev?.currentTarget;
+  if (!canvas || !selectedActivity) return;
+  const rect = canvas.getBoundingClientRect();
+  const rawY = ev.clientY - rect.top;
+  const clampedY = Math.max(0, Math.min(rect.height, rawY));
+  const relMin = Math.round(clampedY / PX_PER_MIN);
+  const snapped = Math.round(relMin / 15) * 15;
+  const snappedY = Math.max(0, Math.min(rect.height, snapped * PX_PER_MIN));
+  const absMin = START_MIN + zMinStart + snapped;
+  currentTimelineGuideY = snappedY;
+  canvas.style.setProperty('--place-guide-y', `${snappedY}px`);
+  canvas.dataset.guideLabel = formatTimeFromMin(absMin);
+  if (timelinePlacementGuideEl) {
+    timelinePlacementGuideEl.style.top = `${snappedY}px`;
+    timelinePlacementGuideEl.dataset.time = formatTimeFromMin(absMin);
+  }
+}
+
+function clearPlacementGuide() {
+  currentTimelineGuideY = null;
+  const canvas = document.querySelector('#timeline .tl-canvas');
+  if (!canvas) return;
+  canvas.classList.remove('placing');
+  canvas.style.removeProperty('--place-guide-y');
+  canvas.dataset.guideLabel = '';
+}
+
+function setDayFocusPane(pane) {
+  dayLandscapeFocusPane = pane || null;
+  const dayScreen = document.getElementById('screen-day');
+  if (!dayScreen) return;
+  dayScreen.classList.toggle('focus-left', dayLandscapeFocusPane === 'left');
+  dayScreen.classList.toggle('focus-center', dayLandscapeFocusPane === 'center');
+  dayScreen.classList.toggle('focus-right', dayLandscapeFocusPane === 'right');
+}
+function applyDayLandscapeFocusState() {
+  setDayFocusPane(dayLandscapeFocusPane);
+}
+
+function updateDayLandscapeChromeHeight() {
+  if (dayLandscapeChromeRaf) cancelAnimationFrame(dayLandscapeChromeRaf);
+  dayLandscapeChromeRaf = requestAnimationFrame(()=>{
+    dayLandscapeChromeRaf = 0;
+    const dayScreen = document.getElementById('screen-day');
+    if (!dayScreen) return;
+    const isLandscape = window.matchMedia('(min-width: 980px) and (orientation: landscape)').matches;
+    if (!isLandscape) {
+      dayScreen.style.removeProperty('--day-landscape-chrome');
+      return;
+    }
+    const parentBanner = dayScreen.querySelector(':scope > #parentBannerDay');
+    const topbar = dayScreen.querySelector(':scope > .day-topbar');
+    const pb = parentBanner && parentBanner.style.display !== 'none' ? parentBanner.offsetHeight : 0;
+    const tb = topbar ? topbar.offsetHeight : 0;
+    const chromePx = Math.max(112, Math.ceil(pb + tb + 10));
+    dayScreen.style.setProperty('--day-landscape-chrome', `${chromePx}px`);
+  });
+}
+window.addEventListener('resize', updateDayLandscapeChromeHeight);
+window.addEventListener('orientationchange', updateDayLandscapeChromeHeight);
+
+function placementFeedback() {
+  try {
+    if (navigator.vibrate) navigator.vibrate(20);
+  } catch(e) {}
+  try {
+    playBell();
+  } catch(e) {}
+}
+
 /* Place a new block */
 function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts={}) {
   const id = Date.now().toString(36)+Math.random().toString(36).slice(2,5);
@@ -5814,6 +6020,7 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
   if (!profd.activityCounts) profd.activityCounts = {};
   if (!profd.activityHours)  profd.activityHours  = {};
   saveAll();
+  placementFeedback();
 
   if (opts.repeatDays?.length) {
     // Stamp series on the original block first
@@ -5863,6 +6070,7 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
   buildTimeline();
   buildTray();
   selectedActivity = null;
+  setDayFocusPane(null);
   document.getElementById('trayHint').textContent = 'Tap an activity to pick';
 }
 
@@ -6014,6 +6222,7 @@ function selectActivity(act) {
   if (act._locked) { showToast(`🔒 Unlocks in ${act.season}!`); return; }
   if (act._rewardLocked) { showToast('Keep going — unlock this reward soon ✨'); return; }
   selectedActivity = act;
+  setDayFocusPane('center');
   document.querySelectorAll('.activity-chip').forEach(c=>c.classList.remove('selected'));
   const el = document.getElementById('chip-'+act.id);
   if (el) el.classList.add('selected');
