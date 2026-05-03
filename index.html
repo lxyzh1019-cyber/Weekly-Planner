@@ -3257,6 +3257,10 @@
     <div id="activityTimeSummary"></div>
     <h4>COLOUR</h4>
     <div class="colour-picker" id="activityColourPicker"></div>
+    <div id="choreTypeRow" style="display:none">
+      <h4>CHORE TYPE</h4>
+      <div class="sheet-row" id="choreTypePicker"></div>
+    </div>
     <h4>NOTE</h4>
     <textarea class="note-input" id="activityNote" rows="2" placeholder="Add a note…"></textarea>
     <div class="buffer-toggle" id="activityTravelToggle" onclick="toggleTravelBuffer('activity')">
@@ -4070,7 +4074,7 @@ const AFTERSCHOOL_REWARD_ITEMS = [
 ];
 
 let ts  = { durationMin:120, colour: CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays: [], travelBuffer:false, getReadyBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15 };
-let as_ = { durationMin:60,  colour: COLOURS[0], note:'', repeat:false, repeatDays: [], travelBuffer:false, travelBufMin:15 };
+let as_ = { durationMin:60,  colour: COLOURS[0], note:'', repeat:false, repeatDays: [], travelBuffer:false, travelBufMin:15, choreTag: null };
 
 function isParent() { return profile === 'parent'; }
 function activeProfile() { return isParent() ? parentViewing : profile; }
@@ -4570,8 +4574,30 @@ function markRoutineProgressOnChecklistToggle(block, act, prevDone, nextDone, to
     const next = AFTERSCHOOL_CHECKLIST_REWARDS.find(it => !unlocked.some(u=>u.id===it.id) && !pendingIds.includes(it.id));
     if (next) queueChecklistReward('afterschool', next, '10-day after-school streak');
   }
+  // Award chore point from routine completion
+  ctAwardMandatoryFromRoutine(rid, activeProfile(), today);
   saveAll();
   maybeShowRewardPrompt();
+}
+
+const CT_ROUTINE_SESSION_MAP = { morning: 'Morning', afterschool: 'Afternoon', evening: 'Evening' };
+
+function ctAwardMandatoryFromRoutine(routineId, kid, dayKey) {
+  const session = CT_ROUTINE_SESSION_MAP[routineId];
+  if (!session) return;
+  const wk = ctWeekKeyForDate(dayKey);
+  const mon = formatDayKey(wk);
+  const day = formatDayKey(dayKey);
+  const dayIdx = Math.round((day - mon) / (24*60*60*1000));
+  if (dayIdx < 0 || dayIdx > 6) return;
+  const p = getProfData(kid);
+  ctEnsureProfile(p);
+  // Sticky: once earned, don't unset even if routine is later unchecked
+  if (ctGetMandatory(wk, dayIdx, session, kid)) return;
+  ctSetMandatory(wk, dayIdx, session, kid, true);
+  ctSetMandatoryAuto(wk, dayIdx, session, kid);
+  ctMaybeFireGoalBonus(wk, kid);
+  showToast(`✨ +1 ${session} chore point earned!`);
 }
 
 function getRoutineChecklistWithUnlocks(routineId) {
@@ -4785,7 +4811,12 @@ function goProfile() {
 function goWeek()    { selectedActivity=null; showScreen('week'); renderWeek(); }
 function openChoreTab() {
   selectedActivity = null;
-  ctSetCurrentWeekFromPlanner();
+  ctSetCurrentWeekFromPlanner();  // Sync with current weekOffset
+  // Default day to today's day of week (within the current week view)
+  const todayDate = formatDayKey(todayKey());
+  const monDate = getWeekStart(weekOffset);
+  const diff = Math.round((todayDate - monDate) / (24*60*60*1000));
+  ctDay = Math.max(0, Math.min(6, diff));
   ctSetupLegacyReadCompatibility();
   showScreen('chore');
   renderChoreTab();
@@ -6299,7 +6330,7 @@ function handleCanvasTap(e, zMinStart) {
     ts = { durationMin: selectedActivity.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15 };
     openTrainingSheet();
   } else {
-    as_ = { durationMin: selectedActivity.durationMin||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15 };
+    as_ = { durationMin: selectedActivity.durationMin||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15, choreTag: null };
     openActivitySheet();
   }
 }
@@ -6385,6 +6416,7 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
     objectives: objectives||[],
     note: note||'',
     tag: opts.tag||null,
+    choreTag: opts.choreTag||null,
     parentPinned: isParent() ? true : false,
     travelBuffer: !!opts.travelBuffer,
     getReadyBuffer: !!opts.getReadyBuffer,
@@ -6828,6 +6860,26 @@ function renderActivitySheet() {
 
   document.getElementById('activityNote').value = as_.note;
 
+  // Chore type picker — only shown when placing a House Chore block
+  const choreRow = document.getElementById('choreTypeRow');
+  const isChoreBlock = selectedActivity && selectedActivity.id === 'chores';
+  if (choreRow) {
+    choreRow.style.display = isChoreBlock ? 'block' : 'none';
+    if (isChoreBlock) {
+      const picker = document.getElementById('choreTypePicker');
+      if (picker) {
+        picker.innerHTML = '';
+        ['General', ...CT_CHORES].forEach(tag => {
+          const b = document.createElement('button');
+          b.className = 'pill-btn' + (as_.choreTag === tag ? ' active' : '');
+          b.textContent = tag;
+          b.onclick = () => { as_.choreTag = tag; renderActivitySheet(); };
+          picker.appendChild(b);
+        });
+      }
+    }
+  }
+
   renderSheetTimeSummary('activityTimeSummary', pendingStartMin, as_.durationMin, as_.travelBuffer, as_.travelBufMin);
   requestAnimationFrame(()=>syncDurationColumnSpacers('activity'));
 }
@@ -6836,12 +6888,14 @@ function confirmActivity() {
   const allowRange = isParent() && selectedActivity && selectedActivity.cat === 'school';
   const dateStart = allowRange ? document.getElementById('activityDateStart').value : '';
   const dateEnd   = allowRange ? document.getElementById('activityDateEnd').value   : '';
+  const isChoreBlock = selectedActivity && selectedActivity.id === 'chores';
   placeBlock(selectedActivity.id, pendingStartMin, as_.durationMin, as_.colour, [], as_.note, {
     repeatDays: as_.repeat?as_.repeatDays:[],
     travelBuffer: as_.travelBuffer,
     travelBufMin: as_.travelBufMin,
     repeatDateStart: dateStart || null,
     repeatDateEnd:   dateEnd   || null,
+    choreTag: isChoreBlock ? (as_.choreTag || 'General') : null,
   });
   closeSheet('activityOverlay');
   showToast('Block placed ✅');
@@ -7737,6 +7791,21 @@ function togglePin() {
   buildTimeline();
 }
 
+function ctAutoCheckOptionalFromBlock(blk, dayKey) {
+  const choreName = blk.choreTag;
+  if (!choreName || choreName === 'General' || !CT_CHORES.includes(choreName)) return;
+  const kid = isParent() ? parentViewing : activeProfile();
+  const wk = ctWeekKeyForDate(dayKey);
+  const mon = formatDayKey(wk);
+  const day = formatDayKey(dayKey);
+  const dayIdx = Math.round((day - mon) / (24*60*60*1000));
+  if (dayIdx < 0 || dayIdx > 6) return;
+  if (ctGetOptional(wk, dayIdx, kid, choreName)) return;
+  ctSetOptional(wk, dayIdx, kid, choreName, true);
+  ctMaybeFireGoalBonus(wk, kid);
+  showToast(`✨ ${choreName} optional chore checked!`);
+}
+
 function toggleConfirm() {
   if (!isParent()) { showToast('Only parents can confirm 🔒'); return; }
   const blocks = getDayBlocks(currentDayKey);
@@ -7746,7 +7815,10 @@ function toggleConfirm() {
   setDayBlocks(currentDayKey, blocks);
   document.getElementById('confirmToggle').classList.toggle('on', !!blk.confirmed);
   recountActivityProgress();
-  if (blk.confirmed) checkLevelUp(blk.actId);
+  if (blk.confirmed) {
+    checkLevelUp(blk.actId);
+    if (blk.actId === 'chores') ctAutoCheckOptionalFromBlock(blk, currentDayKey);
+  }
   saveAll();
   buildTimeline();
 }
@@ -7764,9 +7836,10 @@ function confirmAllToday() {
   unconfirmed.forEach(b => { b.confirmed = true; });
   setDayBlocks(currentDayKey, blocks);
   recountActivityProgress();
-  // Check level-up for each unique actId touched
+  // Check level-up and auto-chore for each unique actId touched
   const seen = new Set();
   unconfirmed.forEach(b => {
+    if (b.actId === 'chores') ctAutoCheckOptionalFromBlock(b, currentDayKey);
     if (seen.has(b.actId)) return;
     seen.add(b.actId);
     checkLevelUp(b.actId);
@@ -9180,11 +9253,11 @@ const CT_SESSIONS = ['Morning','Afternoon','Evening'];
 const CT_CHORES = ['Mop','Vacuum','Dish Clean & Dishwasher','Laundry','Sorting Clothes','Extra Exercise','Other'];
 const CT_MONEY_CAP = 6;
 const CT_MONEY_BASE = 2;
-const CT_WEEKS = 8;
+const CT_SUMMARY_WEEKS = 8;  // Rolling window for summary table
 const CT_LEGACY_COLLECTION = 'chore-tracker';
 const CT_LEGACY_DOC = 'family-data';
 const CT_PROFILE_ICON = { jenn:'🐥', jess:'🦊' };
-let ctWeek = 1;
+let ctWeekKey = null;  // "YYYY-MM-DD" Monday of current chore week (synced with weekOffset)
 let ctDay = 0;
 let ctOptKid = 'jenn';
 let ctParentKid = 'jenn';
@@ -9216,158 +9289,180 @@ function ctEnsureProfile(p) {
   if (!p.chore) p.chore = {};
   if (!p.chore.mandatoryByWeek) p.chore.mandatoryByWeek = {};
   if (!p.chore.optionalByWeek) p.chore.optionalByWeek = {};
+  if (!p.chore.mandatoryAutoByWeek) p.chore.mandatoryAutoByWeek = {};
 }
-function ctWeekInfo(weekNum) {
-  ctEnsureShared();
-  const start = formatDayKey(state.shared.chore.programStartDate || ctDateToKey(ctMondayOf(new Date())));
-  const mon = new Date(start);
-  mon.setDate(start.getDate() + (weekNum - 1) * 7);
+function ctWeekInfo() {
+  const mon = formatDayKey(ctWeekKey || ctDateToKey(ctMondayOf(new Date())));
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
   const keys = [];
   for (let i = 0; i < 7; i++) {
-    const d = new Date(mon);
-    d.setDate(mon.getDate() + i);
+    const d = new Date(mon); d.setDate(mon.getDate() + i);
     keys.push(ctDateToKey(d));
   }
-  return { keys, mon, sun: formatDayKey(keys[6]) };
+  return { keys, mon, sun };
 }
-function ctGetWeekGoals(weekNum) {
+function ctGetWeekGoals(weekKey) {
   ctEnsureShared();
-  const g = state.shared.chore.goalsByWeek[String(weekNum)] || {};
+  const g = state.shared.chore.goalsByWeek[weekKey] || {};
   return { jenn: g.jenn || null, jess: g.jess || null };
 }
-function ctSetWeekGoals(weekNum, jGoal, kGoal) {
+function ctSetWeekGoals(weekKey, jGoal, kGoal) {
   ctEnsureShared();
-  state.shared.chore.goalsByWeek[String(weekNum)] = { jenn: jGoal || null, jess: kGoal || null };
-  const bonus = state.shared.chore.goalBonusByWeek[String(weekNum)] || { jenn:false, jess:false };
+  state.shared.chore.goalsByWeek[weekKey] = { jenn: jGoal || null, jess: kGoal || null };
+  const bonus = state.shared.chore.goalBonusByWeek[weekKey] || { jenn:false, jess:false };
   if (jGoal == null) bonus.jenn = false;
   if (kGoal == null) bonus.jess = false;
-  state.shared.chore.goalBonusByWeek[String(weekNum)] = bonus;
+  state.shared.chore.goalBonusByWeek[weekKey] = bonus;
 }
-function ctGetGoalBonus(weekNum, kid) {
+function ctGetGoalBonus(weekKey, kid) {
   ctEnsureShared();
-  return !!(state.shared.chore.goalBonusByWeek[String(weekNum)] || {})[kid];
+  return !!(state.shared.chore.goalBonusByWeek[weekKey] || {})[kid];
 }
-function ctSetGoalBonus(weekNum, kid, val) {
+function ctSetGoalBonus(weekKey, kid, val) {
   ctEnsureShared();
-  if (!state.shared.chore.goalBonusByWeek[String(weekNum)]) state.shared.chore.goalBonusByWeek[String(weekNum)] = { jenn:false, jess:false };
-  state.shared.chore.goalBonusByWeek[String(weekNum)][kid] = !!val;
+  if (!state.shared.chore.goalBonusByWeek[weekKey]) state.shared.chore.goalBonusByWeek[weekKey] = { jenn:false, jess:false };
+  state.shared.chore.goalBonusByWeek[weekKey][kid] = !!val;
 }
-function ctGetMandatory(weekNum, dayIdx, session, kid) {
+function ctGetMandatory(weekKey, dayIdx, session, kid) {
   const p = getProfData(kid);
   ctEnsureProfile(p);
-  return !!(((p.chore.mandatoryByWeek[String(weekNum)] || {})[String(dayIdx)] || {})[session]);
+  return !!(((p.chore.mandatoryByWeek[weekKey] || {})[String(dayIdx)] || {})[session]);
 }
-function ctSetMandatory(weekNum, dayIdx, session, kid, value) {
+function ctSetMandatory(weekKey, dayIdx, session, kid, value) {
   const p = getProfData(kid);
   ctEnsureProfile(p);
-  if (!p.chore.mandatoryByWeek[String(weekNum)]) p.chore.mandatoryByWeek[String(weekNum)] = {};
-  if (!p.chore.mandatoryByWeek[String(weekNum)][String(dayIdx)]) p.chore.mandatoryByWeek[String(weekNum)][String(dayIdx)] = {};
-  p.chore.mandatoryByWeek[String(weekNum)][String(dayIdx)][session] = !!value;
+  if (!p.chore.mandatoryByWeek[weekKey]) p.chore.mandatoryByWeek[weekKey] = {};
+  if (!p.chore.mandatoryByWeek[weekKey][String(dayIdx)]) p.chore.mandatoryByWeek[weekKey][String(dayIdx)] = {};
+  p.chore.mandatoryByWeek[weekKey][String(dayIdx)][session] = !!value;
 }
-function ctGetOptional(weekNum, dayIdx, kid, choreName) {
+function ctGetOptional(weekKey, dayIdx, kid, choreName) {
   const p = getProfData(kid);
   ctEnsureProfile(p);
-  return !!((((p.chore.optionalByWeek[String(weekNum)] || {})[String(dayIdx)] || {})[choreName]));
+  return !!(((p.chore.optionalByWeek[weekKey] || {})[String(dayIdx)] || {})[choreName]);
 }
-function ctSetOptional(weekNum, dayIdx, kid, choreName, value) {
+function ctSetOptional(weekKey, dayIdx, kid, choreName, value) {
   const p = getProfData(kid);
   ctEnsureProfile(p);
-  if (!p.chore.optionalByWeek[String(weekNum)]) p.chore.optionalByWeek[String(weekNum)] = {};
-  if (!p.chore.optionalByWeek[String(weekNum)][String(dayIdx)]) p.chore.optionalByWeek[String(weekNum)][String(dayIdx)] = {};
-  p.chore.optionalByWeek[String(weekNum)][String(dayIdx)][choreName] = !!value;
+  if (!p.chore.optionalByWeek[weekKey]) p.chore.optionalByWeek[weekKey] = {};
+  if (!p.chore.optionalByWeek[weekKey][String(dayIdx)]) p.chore.optionalByWeek[weekKey][String(dayIdx)] = {};
+  p.chore.optionalByWeek[weekKey][String(dayIdx)][choreName] = !!value;
 }
-function ctMandatoryPoints(weekNum, kid) {
+function ctGetMandatoryAuto(weekKey, dayIdx, session, kid) {
+  const p = getProfData(kid);
+  ctEnsureProfile(p);
+  return !!((((p.chore.mandatoryAutoByWeek || {})[weekKey] || {})[String(dayIdx)] || {})[session]);
+}
+function ctSetMandatoryAuto(weekKey, dayIdx, session, kid) {
+  const p = getProfData(kid);
+  ctEnsureProfile(p);
+  if (!p.chore.mandatoryAutoByWeek[weekKey]) p.chore.mandatoryAutoByWeek[weekKey] = {};
+  if (!p.chore.mandatoryAutoByWeek[weekKey][String(dayIdx)]) p.chore.mandatoryAutoByWeek[weekKey][String(dayIdx)] = {};
+  p.chore.mandatoryAutoByWeek[weekKey][String(dayIdx)][session] = true;
+}
+function ctMandatoryPoints(weekKey, kid) {
   let n = 0;
-  for (let d = 0; d < 7; d++) for (const s of CT_SESSIONS) if (ctGetMandatory(weekNum, d, s, kid)) n++;
+  for (let d = 0; d < 7; d++) for (const s of CT_SESSIONS) if (ctGetMandatory(weekKey, d, s, kid)) n++;
   return n;
 }
-function ctOptionalPoints(weekNum, kid) {
+function ctOptionalPoints(weekKey, kid) {
   let n = 0;
-  for (let d = 0; d < 7; d++) for (const c of CT_CHORES) if (ctGetOptional(weekNum, d, kid, c)) n++;
+  for (let d = 0; d < 7; d++) for (const c of CT_CHORES) if (ctGetOptional(weekKey, d, kid, c)) n++;
   return n;
 }
-function ctBonusDays(weekNum, kid) {
+function ctBonusDays(weekKey, kid) {
   let n = 0;
   for (let d = 0; d < 7; d++) {
-    if (CT_CHORES.some(c=>ctGetOptional(weekNum, d, kid, c))) n++;
+    if (CT_CHORES.some(c=>ctGetOptional(weekKey, d, kid, c))) n++;
   }
   return n;
 }
-function ctWeekHasData(weekNum, kid) {
+function ctWeekHasData(weekKey, kid) {
   for (let d = 0; d < 7; d++) {
-    if (CT_SESSIONS.some(s=>ctGetMandatory(weekNum, d, s, kid))) return true;
-    if (CT_CHORES.some(c=>ctGetOptional(weekNum, d, kid, c))) return true;
+    if (CT_SESSIONS.some(s=>ctGetMandatory(weekKey, d, s, kid))) return true;
+    if (CT_CHORES.some(c=>ctGetOptional(weekKey, d, kid, c))) return true;
   }
   return false;
 }
-function ctWeekMoney(weekNum, kid) {
-  if (!ctWeekHasData(weekNum, kid)) return 0;
-  const bonus = ctBonusDays(weekNum, kid);
-  const goalBonus = ctGetGoalBonus(weekNum, kid) ? 1 : 0;
+function ctWeekMoney(weekKey, kid) {
+  if (!ctWeekHasData(weekKey, kid)) return 0;
+  const bonus = ctBonusDays(weekKey, kid);
+  const goalBonus = ctGetGoalBonus(weekKey, kid) ? 1 : 0;
   return Math.min(CT_MONEY_CAP, CT_MONEY_BASE + bonus + goalBonus);
 }
-function ctMaybeFireGoalBonus(weekNum, kid) {
-  const goals = ctGetWeekGoals(weekNum);
+function ctMaybeFireGoalBonus(weekKey, kid) {
+  const goals = ctGetWeekGoals(weekKey);
   const goal = goals[kid];
   if (!goal) return;
-  if (ctGetGoalBonus(weekNum, kid)) return;
-  const points = ctMandatoryPoints(weekNum, kid) + ctOptionalPoints(weekNum, kid);
-  if (points >= goal) ctSetGoalBonus(weekNum, kid, true);
+  if (ctGetGoalBonus(weekKey, kid)) return;
+  const points = ctMandatoryPoints(weekKey, kid) + ctOptionalPoints(weekKey, kid);
+  if (points >= goal) ctSetGoalBonus(weekKey, kid, true);
 }
 function ctSetCurrentWeekFromPlanner() {
-  ctEnsureShared();
-  const start = formatDayKey(state.shared.chore.programStartDate);
-  const now = new Date();
-  const cur = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const diff = Math.floor((cur - start) / 86400000);
-  if (diff < 0) ctWeek = 1;
-  else if (diff >= CT_WEEKS * 7) ctWeek = CT_WEEKS;
-  else ctWeek = Math.floor(diff / 7) + 1;
+  ctWeekKey = dateToLocalKey(getWeekStart(weekOffset));
+}
+function ctDayIndexForDate(dayKey) {
+  const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
+  const mon = formatDayKey(wk);
+  const day = formatDayKey(dayKey);
+  return Math.round((day - mon) / (24*60*60*1000));
+}
+function ctWeekKeyForDate(dayKey) {
+  return ctDateToKey(ctMondayOf(formatDayKey(dayKey)));
 }
 function ctToggleMandatory(session, kid) {
-  const prev = ctGetMandatory(ctWeek, ctDay, session, kid);
-  ctSetMandatory(ctWeek, ctDay, session, kid, !prev);
-  ctMaybeFireGoalBonus(ctWeek, kid);
+  const isAuto = ctGetMandatoryAuto(ctWeekKey, ctDay, session, kid);
+  if (isAuto && !isParent()) return;
+  const prev = ctGetMandatory(ctWeekKey, ctDay, session, kid);
+  ctSetMandatory(ctWeekKey, ctDay, session, kid, !prev);
+  ctMaybeFireGoalBonus(ctWeekKey, kid);
   saveAll();
   renderChoreTab();
 }
 function ctToggleOptional(choreName, kid) {
-  const prev = ctGetOptional(ctWeek, ctDay, kid, choreName);
-  ctSetOptional(ctWeek, ctDay, kid, choreName, !prev);
-  ctMaybeFireGoalBonus(ctWeek, kid);
+  const prev = ctGetOptional(ctWeekKey, ctDay, kid, choreName);
+  ctSetOptional(ctWeekKey, ctDay, kid, choreName, !prev);
+  ctMaybeFireGoalBonus(ctWeekKey, kid);
   saveAll();
   renderChoreTab();
 }
 function ctClearWeek() {
-  if (!confirm(`Reset all chore data for Week ${ctWeek}?`)) return;
+  const info = ctWeekInfo();
+  if (!confirm(`Reset all chore data for week of ${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()}?`)) return;
   ['jenn','jess'].forEach(kid=>{
     const p = getProfData(kid);
     ctEnsureProfile(p);
-    delete p.chore.mandatoryByWeek[String(ctWeek)];
-    delete p.chore.optionalByWeek[String(ctWeek)];
+    delete p.chore.mandatoryByWeek[ctWeekKey];
+    delete p.chore.optionalByWeek[ctWeekKey];
+    delete p.chore.mandatoryAutoByWeek[ctWeekKey];
   });
-  ctSetGoalBonus(ctWeek, 'jenn', false);
-  ctSetGoalBonus(ctWeek, 'jess', false);
+  ctSetGoalBonus(ctWeekKey, 'jenn', false);
+  ctSetGoalBonus(ctWeekKey, 'jess', false);
   saveAll();
   renderChoreTab();
 }
 function ctWeekSummaryRows() {
+  // Show last CT_SUMMARY_WEEKS weeks ending with current ctWeekKey
   let rows = '';
-  for (let w = 1; w <= CT_WEEKS; w++) {
-    const jm = ctMandatoryPoints(w, 'jenn');
-    const jo = ctOptionalPoints(w, 'jenn');
-    const km = ctMandatoryPoints(w, 'jess');
-    const ko = ctOptionalPoints(w, 'jess');
-    rows += `<tr><td>Wk ${w}</td><td>${jm}/21</td><td>+${jo}</td><td>${jm+jo}</td><td>${km}/21</td><td>+${ko}</td><td>${km+ko}</td></tr>`;
+  const cur = formatDayKey(ctWeekKey || ctDateToKey(ctMondayOf(new Date())));
+  for (let i = CT_SUMMARY_WEEKS - 1; i >= 0; i--) {
+    const mon = new Date(cur); mon.setDate(cur.getDate() - i * 7);
+    const wk = ctDateToKey(mon);
+    const label = `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()}`;
+    const jm = ctMandatoryPoints(wk, 'jenn');
+    const jo = ctOptionalPoints(wk, 'jenn');
+    const km = ctMandatoryPoints(wk, 'jess');
+    const ko = ctOptionalPoints(wk, 'jess');
+    const isCurrent = wk === ctWeekKey;
+    rows += `<tr${isCurrent?' style="font-weight:600"':''}><td>${label}</td><td>${jm}/21</td><td>+${jo}</td><td>${jm+jo}</td><td>${km}/21</td><td>+${ko}</td><td>${km+ko}</td></tr>`;
   }
   return rows;
 }
 function ctExportBackup() {
   ctEnsureShared();
   const payload = {
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
-    week: ctWeek,
+    weekKey: ctWeekKey,
     day: ctDay,
     migration: state.shared.chore.migration,
     goalsByWeek: state.shared.chore.goalsByWeek,
@@ -9377,8 +9472,8 @@ function ctExportBackup() {
       jess: getProfData('jess').chore || {},
     },
     summary: {
-      jenn: { mandatory: ctMandatoryPoints(ctWeek,'jenn'), optional: ctOptionalPoints(ctWeek,'jenn'), money: ctWeekMoney(ctWeek,'jenn') },
-      jess: { mandatory: ctMandatoryPoints(ctWeek,'jess'), optional: ctOptionalPoints(ctWeek,'jess'), money: ctWeekMoney(ctWeek,'jess') },
+      jenn: { mandatory: ctMandatoryPoints(ctWeekKey,'jenn'), optional: ctOptionalPoints(ctWeekKey,'jenn'), money: ctWeekMoney(ctWeekKey,'jenn') },
+      jess: { mandatory: ctMandatoryPoints(ctWeekKey,'jess'), optional: ctOptionalPoints(ctWeekKey,'jess'), money: ctWeekMoney(ctWeekKey,'jess') },
     },
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -9392,21 +9487,24 @@ function ctExportBackup() {
 function ctRenderKidSection(kid) {
   const icon = CT_PROFILE_ICON[kid];
   const name = kid === 'jenn' ? 'Jenn' : 'Jess';
-  const mandatory = ctMandatoryPoints(ctWeek, kid);
-  const optional = ctOptionalPoints(ctWeek, kid);
+  const mandatory = ctMandatoryPoints(ctWeekKey, kid);
+  const optional = ctOptionalPoints(ctWeekKey, kid);
   const total = mandatory + optional;
-  const money = ctWeekMoney(ctWeek, kid);
-  const goal = ctGetWeekGoals(ctWeek)[kid];
-  const goalReached = ctGetGoalBonus(ctWeek, kid);
+  const money = ctWeekMoney(ctWeekKey, kid);
+  const goal = ctGetWeekGoals(ctWeekKey)[kid];
+  const goalReached = ctGetGoalBonus(ctWeekKey, kid);
 
   let html = `<div class="chore-card"><h3>${icon} ${name}</h3><div class="ct-meta">Mandatory: ${mandatory}/21 · Bonus: +${optional} · Total ${total}</div>`;
   if (goal) html += `<div class="ct-meta">Goal ${total}/${goal}${goalReached ? ' · reached +$1' : ''}</div>`;
 
   for (const s of CT_SESSIONS) {
-    const checked = ctGetMandatory(ctWeek, ctDay, s, kid);
+    const checked = ctGetMandatory(ctWeekKey, ctDay, s, kid);
+    const isAuto = ctGetMandatoryAuto(ctWeekKey, ctDay, s, kid);
+    const canToggle = isParent() || !isAuto;
+    const clickAttr = canToggle ? `onclick="ctToggleMandatory('${s}','${kid}')"` : '';
     html += `<div class="ct-item ${checked ? 'done' : ''}">
-      <div class="ct-item-left"><div class="ct-check ${checked ? 'on' : ''}" onclick="ctToggleMandatory('${s}','${kid}')">${checked ? '✓' : ''}</div><span>${s}</span></div>
-      <span class="ct-badge">mandatory</span>
+      <div class="ct-item-left"><div class="ct-check ${checked ? 'on' : ''}" ${clickAttr} style="${!canToggle ? 'cursor:default;opacity:0.8' : ''}">${checked ? '✓' : ''}</div><span>${s}</span></div>
+      <span class="ct-badge">${isAuto ? '✨ auto' : 'mandatory'}</span>
     </div>`;
   }
   html += `<div class="ct-meta" style="margin-top:0.3rem">Pocket Money (week): $${money.toFixed(2)}</div></div>`;
@@ -9416,7 +9514,7 @@ function ctRenderOptionalGrid() {
   const kid = isParent() ? ctParentKid : activeProfile();
   let html = `<div class="chore-card"><h3>Optional chores (${kid==='jenn'?'Jenn':'Jess'})</h3><div class="ct-meta">+1 point each, contributes to weekly money bonus days.</div>`;
   for (const c of CT_CHORES) {
-    const checked = ctGetOptional(ctWeek, ctDay, kid, c);
+    const checked = ctGetOptional(ctWeekKey, ctDay, kid, c);
     html += `<div class="ct-item ${checked ? 'done' : ''}">
       <div class="ct-item-left"><div class="ct-check ${checked ? 'on' : ''}" onclick="ctToggleOptional('${c.replace(/'/g,"\\'")}','${kid}')">${checked ? '✓' : ''}</div><span>${escapeHtml(c)}</span></div>
       <span class="ct-badge">optional</span>
@@ -9426,15 +9524,20 @@ function ctRenderOptionalGrid() {
   return html;
 }
 function ctRenderWeekControls() {
-  const info = ctWeekInfo(ctWeek);
-  const g = ctGetWeekGoals(ctWeek);
+  const info = ctWeekInfo();
+  const g = ctGetWeekGoals(ctWeekKey);
+  const goalRowJenn = isParent()
+    ? `<input id="ctGoalJenn" class="input" type="number" min="1" max="60" value="${g.jenn || ''}" placeholder="Jenn goal"/>`
+    : (g.jenn ? `<div class="ct-meta">Jenn goal: ${g.jenn}</div>` : '');
+  const goalRowJess = isParent()
+    ? `<input id="ctGoalJess" class="input" type="number" min="1" max="60" value="${g.jess || ''}" placeholder="Jess goal"/>`
+    : (g.jess ? `<div class="ct-meta">Jess goal: ${g.jess}</div>` : '');
   const parentControls = isParent() ? `
     <div class="chore-card">
       <h3>Parent controls</h3>
       <div class="ct-meta">Week goals and validation controls.</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-top:0.4rem">
-        <input id="ctGoalJenn" class="input" type="number" min="1" max="60" value="${g.jenn || ''}" placeholder="Jenn goal"/>
-        <input id="ctGoalJess" class="input" type="number" min="1" max="60" value="${g.jess || ''}" placeholder="Jess goal"/>
+        ${goalRowJenn}${goalRowJess}
       </div>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem">
         <button class="pill-btn" onclick="ctSaveGoalsFromUi()">Save goals</button>
@@ -9447,13 +9550,14 @@ function ctRenderWeekControls() {
       </div>
     </div>` : `
     <div class="chore-card">
-      <h3>Actions</h3>
-      <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+      <h3>Goals</h3>
+      ${goalRowJenn}${goalRowJess}
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem">
         <button class="pill-btn" onclick="ctExportBackup()">Export backup</button>
       </div>
     </div>`;
   return `<div class="chore-card">
-    <h3>Week ${ctWeek} · ${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()} — ${MONTH_SHORT[info.sun.getMonth()]} ${info.sun.getDate()}</h3>
+    <h3>Week of ${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()} — ${MONTH_SHORT[info.sun.getMonth()]} ${info.sun.getDate()}</h3>
     <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.4rem">
       <button class="pill-btn" onclick="ctChangeWeek(-1)">◀ Prev week</button>
       <button class="pill-btn" onclick="ctChangeWeek(1)">Next week ▶</button>
@@ -9464,7 +9568,9 @@ function ctRenderWeekControls() {
   </div>${parentControls}`;
 }
 function ctChangeWeek(delta) {
-  ctWeek = Math.max(1, Math.min(CT_WEEKS, ctWeek + delta));
+  const mon = formatDayKey(ctWeekKey || ctDateToKey(ctMondayOf(new Date())));
+  mon.setDate(mon.getDate() + delta * 7);
+  ctWeekKey = ctDateToKey(mon);
   ctDay = 0;
   renderChoreTab();
 }
@@ -9475,9 +9581,9 @@ function ctSelectDay(dayIdx) {
 function ctSaveGoalsFromUi() {
   const j = parseInt(document.getElementById('ctGoalJenn')?.value || '', 10);
   const k = parseInt(document.getElementById('ctGoalJess')?.value || '', 10);
-  ctSetWeekGoals(ctWeek, Number.isInteger(j)?j:null, Number.isInteger(k)?k:null);
-  ctSetGoalBonus(ctWeek, 'jenn', false);
-  ctSetGoalBonus(ctWeek, 'jess', false);
+  ctSetWeekGoals(ctWeekKey, Number.isInteger(j)?j:null, Number.isInteger(k)?k:null);
+  ctSetGoalBonus(ctWeekKey, 'jenn', false);
+  ctSetGoalBonus(ctWeekKey, 'jess', false);
   saveAll();
   renderChoreTab();
 }
@@ -9488,34 +9594,75 @@ function ctRenderSummaryTable() {
 }
 function ctApplyLegacyPayloadToState(parsed) {
   if (!parsed) return false;
-  const { dataObj, optObj, goalsObj, bonusObj, updatedAt } = parsed;
+  const { dataObj, optObj, goalsObj, bonusObj, startDate, updatedAt } = parsed;
   if (!dataObj || !optObj) return false;
+  ctEnsureShared();
   ['jenn','jess'].forEach(kid=>{
     const p = getProfData(kid);
     ctEnsureProfile(p);
   });
-  for (let w = 1; w <= CT_WEEKS; w++) {
+  // Use startDate from legacy payload, or fall back to programStartDate
+  const anchor = startDate || state.shared.chore.programStartDate || ctDateToKey(ctMondayOf(new Date()));
+  const anchorDate = formatDayKey(anchor);
+  for (let w = 1; w <= 8; w++) {
+    const weekMon = new Date(anchorDate); weekMon.setDate(anchorDate.getDate() + (w-1)*7);
+    const wk = ctDateToKey(weekMon);
     for (let d = 0; d < 7; d++) {
       for (const s of CT_SESSIONS) {
         const src = (((dataObj[String(w)]||{})[String(d)]||{})[s]||{});
-        ctSetMandatory(w, d, s, 'jenn', !!src.jenn);
-        ctSetMandatory(w, d, s, 'jess', !!src.jess);
+        ctSetMandatory(wk, d, s, 'jenn', !!src.jenn);
+        ctSetMandatory(wk, d, s, 'jess', !!src.jess);
       }
       for (const c of CT_CHORES) {
         const o = ((optObj[String(w)]||{})[String(d)]||{});
-        ctSetOptional(w, d, 'jenn', c, !!((o.jenn||{})[c]));
-        ctSetOptional(w, d, 'jess', c, !!((o.jess||{})[c]));
+        ctSetOptional(wk, d, 'jenn', c, !!((o.jenn||{})[c]));
+        ctSetOptional(wk, d, 'jess', c, !!((o.jess||{})[c]));
       }
     }
     const g = goalsObj?.[String(w)] || {};
-    ctSetWeekGoals(w, g.jenn || null, g.jess || null);
+    ctSetWeekGoals(wk, g.jenn || null, g.jess || null);
     const b = bonusObj?.[String(w)] || {};
-    ctSetGoalBonus(w, 'jenn', !!b.jenn);
-    ctSetGoalBonus(w, 'jess', !!b.jess);
+    ctSetGoalBonus(wk, 'jenn', !!b.jenn);
+    ctSetGoalBonus(wk, 'jess', !!b.jess);
   }
-  ctEnsureShared();
   state.shared.chore.migration = { done: true, migratedAt: Date.now(), sourceUpdatedAt: updatedAt || 0 };
   return true;
+}
+// One-time migration of any existing numbered-key data to date keys
+function ctMigrateNumberedKeys() {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  if (c.dateKeyMigration?.done) return;
+  const anchor = c.programStartDate;
+  if (!anchor) { c.dateKeyMigration = { done: true }; return; }
+  const anchorDate = formatDayKey(anchor);
+  let didMigrate = false;
+  ['jenn','jess'].forEach(kid=>{
+    const p = getProfData(kid);
+    ctEnsureProfile(p);
+    const newMandatory = {}, newOptional = {};
+    for (let w = 1; w <= 8; w++) {
+      if (!p.chore.mandatoryByWeek[String(w)] && !p.chore.optionalByWeek[String(w)]) continue;
+      const weekMon = new Date(anchorDate); weekMon.setDate(anchorDate.getDate() + (w-1)*7);
+      const wk = ctDateToKey(weekMon);
+      if (p.chore.mandatoryByWeek[String(w)]) { newMandatory[wk] = p.chore.mandatoryByWeek[String(w)]; delete p.chore.mandatoryByWeek[String(w)]; didMigrate = true; }
+      if (p.chore.optionalByWeek[String(w)])  { newOptional[wk]  = p.chore.optionalByWeek[String(w)];  delete p.chore.optionalByWeek[String(w)];  didMigrate = true; }
+    }
+    Object.assign(p.chore.mandatoryByWeek, newMandatory);
+    Object.assign(p.chore.optionalByWeek,  newOptional);
+  });
+  const newGoals = {}, newBonus = {};
+  for (let w = 1; w <= 8; w++) {
+    if (!c.goalsByWeek[String(w)] && !c.goalBonusByWeek[String(w)]) continue;
+    const weekMon = new Date(anchorDate); weekMon.setDate(anchorDate.getDate() + (w-1)*7);
+    const wk = ctDateToKey(weekMon);
+    if (c.goalsByWeek[String(w)])    { newGoals[wk] = c.goalsByWeek[String(w)];    delete c.goalsByWeek[String(w)];    didMigrate = true; }
+    if (c.goalBonusByWeek[String(w)]){ newBonus[wk] = c.goalBonusByWeek[String(w)]; delete c.goalBonusByWeek[String(w)]; didMigrate = true; }
+  }
+  Object.assign(c.goalsByWeek, newGoals);
+  Object.assign(c.goalBonusByWeek, newBonus);
+  c.dateKeyMigration = { done: true, migratedAt: Date.now() };
+  if (didMigrate) saveAll();
 }
 function ctTryMigrateLegacy() {
   ctEnsureShared();
@@ -9555,16 +9702,18 @@ function renderChoreTab() {
   ctEnsureShared();
   ctEnsureProfile(getProfData('jenn'));
   ctEnsureProfile(getProfData('jess'));
-  ctSetCurrentWeekFromPlanner();
+  // ctWeekKey is set once in openChoreTab and preserved across renders (navigation)
+  if (!ctWeekKey) ctSetCurrentWeekFromPlanner();
   ctSetupLegacyReadCompatibility();
   ctTryMigrateLegacy();
+  ctMigrateNumberedKeys();
   const wrap = document.getElementById('choreWrap');
   if (!wrap) return;
   const badge = document.getElementById('choreProfileBadge');
   if (badge) badge.textContent = isParent() ? `👨‍👩‍👧‍👦 Parent (${ctParentKid==='jenn'?'Jenn':'Jess'})` : (activeProfile()==='jenn' ? '🐥 Jenn' : '🦊 Jess');
   const kid = isParent() ? ctParentKid : activeProfile();
-  ctMaybeFireGoalBonus(ctWeek, 'jenn');
-  ctMaybeFireGoalBonus(ctWeek, 'jess');
+  ctMaybeFireGoalBonus(ctWeekKey, 'jenn');
+  ctMaybeFireGoalBonus(ctWeekKey, 'jess');
 
   wrap.innerHTML = `
     <div class="chore-grid">
@@ -9572,7 +9721,6 @@ function renderChoreTab() {
       ${ctRenderKidSection(kid)}
       ${ctRenderOptionalGrid()}
       ${ctRenderSummaryTable()}
-      <div class="chore-card"><h3>Legacy compatibility</h3><div class="ct-meta">Read-only compatibility with chore-tracker/family-data is ${state.shared.chore.readLegacyCompatibility ? 'enabled' : 'disabled'}. Migration status: ${state.shared.chore.migration?.done ? 'done' : 'pending'}.</div></div>
     </div>
   `;
 }
