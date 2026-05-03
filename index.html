@@ -9,9 +9,9 @@
 <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png">
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Gochi+Hand&family=Nunito:wght@400;600;700;800&family=Patrick+Hand&display=swap" rel="stylesheet">
 
-<!-- Firebase (compat builds for simplicity) -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<!-- Firebase (compat builds for simplicity) — defer so they don't block HTML parsing -->
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
 <style>
   :root {
@@ -45,6 +45,41 @@
     --jess: #6fb1fc;
     --parent: #7d5ba6;
     --day-landscape-chrome: 168px;
+
+    /* ── Design tokens (audit: spacing, type, radius, shadow scales) ── */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+
+    --text-xs:   0.75rem;
+    --text-sm:   0.875rem;
+    --text-base: 1rem;
+    --text-lg:   1.25rem;
+    --text-xl:   1.5rem;
+    --text-2xl:  2rem;
+
+    --radius-sm:   8px;
+    --radius-md:   14px;
+    --radius-lg:   18px;
+    --radius-full: 999px;
+
+    --shadow-sm: 2px 2px 0 rgba(42,35,32,0.12);
+    --shadow-md: 3px 3px 0 rgba(42,35,32,0.15);
+    --shadow-lg: 0 4px 16px rgba(42,35,32,0.10);
+
+    /* Semantic text color for date-range labels (was hardcoded #5a4d41) */
+    --ink-muted: #5a4d41;
+
+    /* Z-index scale */
+    --z-base:     1;
+    --z-sticky:   100;
+    --z-dropdown: 200;
+    --z-modal:    300;
+    --z-overlay:  400;
+    --z-toast:    999;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -192,7 +227,7 @@
     font-weight: 800;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #5a4d41;
+    color: var(--ink-muted);
     padding: 0.32rem 0.45rem 0.28rem;
     margin: 0 0 0.25rem;
     background: rgba(255, 253, 245, 0.92);
@@ -361,7 +396,7 @@
   .day-next-up-banner .next-up-label {
     font-size: 0.82rem;
     font-weight: 700;
-    color: #5a4d41;
+    color: var(--ink-muted);
     letter-spacing: 0.04em;
     text-transform: uppercase;
     margin-bottom: 0.15rem;
@@ -408,7 +443,7 @@
   .day-mini-panel__header h4 {
     margin: 0;
     font-size: 1.05rem;
-    color: #5a4d41;
+    color: var(--ink-muted);
     font-family: 'Gochi Hand', cursive;
   }
   .day-mini-list {
@@ -432,7 +467,7 @@
   .tutorial-overlay-note {
     font-family: 'Patrick Hand', sans-serif;
     font-size: 1rem;
-    color: #5a4d41;
+    color: var(--ink-muted);
     margin-bottom: 0.55rem;
   }
   .tutorial-choice-list {
@@ -492,7 +527,6 @@
       overflow-y: hidden;
       padding: 0.2rem 0;
       gap: 0.3rem;
-      -webkit-overflow-scrolling: touch;
       scrollbar-width: thin;
     }
     #screen-day .day-topbar__row2 .zone-tabs::-webkit-scrollbar {
@@ -1253,7 +1287,7 @@
   .gt-col-header h3 { font-size: 1.38rem; margin: 0; }
   .gt-add-btn { padding: 2px 10px; font-size: 1.27rem; }
   .gt-hint {
-    font-size: 0.95rem; color: #5a4d41;
+    font-size: 0.95rem; color: var(--ink-muted);
     margin: 0 0 0.5rem 0;
   }
   .gt-item {
@@ -1295,18 +1329,18 @@
     background: var(--accent-yellow); flex-shrink: 0;
     cursor: pointer;
   }
-  .gt-day-tag.unset { background: transparent; color: #5a4d41; }
+  .gt-day-tag.unset { background: transparent; color: var(--ink-muted); }
   .gt-del {
-    background: transparent; border: none; color: #5a4d41;
+    background: transparent; border: none; color: var(--ink-muted);
     font-size: 1.38rem; cursor: pointer; padding: 0 0.2rem; flex-shrink: 0;
   }
   .gt-del:hover { color: #c00; }
   .gt-empty {
-    font-size: 1.01rem; color: #5a4d41;
+    font-size: 1.01rem; color: var(--ink-muted);
     text-align: center; padding: 1rem 0;
   }
   .gt-achievement-row { align-items: flex-start; }
-  .gt-achievement-meta { font-size: 0.92rem; color: #5a4d41; }
+  .gt-achievement-meta { font-size: 0.92rem; color: var(--ink-muted); }
   .gt-achievement-controls { display:flex; flex-direction:column; gap:0.25rem; margin-left:auto; }
   .gt-achievement-controls .pill-btn { font-size:0.85rem; padding:0.2rem 0.45rem; }
   @media (max-width: 720px) {
@@ -1370,7 +1404,7 @@
     background: var(--accent-yellow);
     white-space: nowrap;
   }
-  .ct-meta { font-size: 0.88rem; color: #5a4d41; }
+  .ct-meta { font-size: 0.88rem; color: var(--ink-muted); }
   .ct-score-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1584,7 +1618,7 @@
     right: 8px;
     font-size: 0.92rem;
     font-weight: 600;
-    color: #5a4d41;
+    color: var(--ink-muted);
     font-family: 'Patrick Hand', sans-serif;
     transform: translateY(-50%);
   }
@@ -1954,7 +1988,7 @@
   .activity-chip.selected { transform: translate(-1px,-4px) rotate(-2deg) scale(1.05); box-shadow: 5px 6px 0 var(--accent); background: var(--bg2); }
   .activity-chip .chip-icon { font-size: 1.84rem; }
   .activity-chip .chip-name { font-size: 0.9rem; font-weight: 700; margin-top: 2px; line-height: 1.15; font-family: 'Patrick Hand', sans-serif; }
-  .activity-chip .chip-dur { font-size: 0.81rem; color: #5a4d41; font-weight: 700; }
+  .activity-chip .chip-dur { font-size: 0.81rem; color: var(--ink-muted); font-weight: 700; }
   .activity-chip.locked { opacity: 0.45; cursor: not-allowed; }
   .activity-chip.locked .chip-icon { filter: grayscale(0.7); }
   .chip-level-badge {
@@ -1979,7 +2013,7 @@
     min-width: 88px;
     text-align: center;
     transition: all 0.15s;
-    color: #5a4d41;
+    color: var(--ink-muted);
     font-size: 0.98rem; font-weight: 700;
     font-family: 'Patrick Hand', sans-serif;
   }
@@ -2050,7 +2084,7 @@
     font-family: 'Patrick Hand', sans-serif;
     font-size: 1.02rem;
     font-weight: 700;
-    color: #5a4d41;
+    color: var(--ink-muted);
     margin: 0.25rem 0 0.5rem;
     padding: 0.45rem 0.65rem;
     background: var(--bg);
@@ -2078,7 +2112,7 @@
     font-family: 'Patrick Hand', sans-serif;
     font-size: 0.98rem;
     font-weight: 700;
-    color: #5a4d41;
+    color: var(--ink-muted);
   }
   .buffer-dur-row label { margin: 0; }
   .buffer-dur-row input {
@@ -2106,7 +2140,7 @@
     font-family: 'Patrick Hand', sans-serif;
     font-size: 1.02rem;
     font-weight: 700;
-    color: #5a4d41;
+    color: var(--ink-muted);
     margin: 0.5rem 0;
     padding: 0.55rem 0.7rem;
     background: linear-gradient(135deg, #fff9e6 0%, #e8f7ff 100%);
@@ -2135,7 +2169,7 @@
 
   .sheet-handle { width: 50px; height: 5px; background: var(--paper-line); border-radius: 3px; margin: 0 auto 1rem; }
   .sheet h3 { font-family:'Gochi Hand', cursive; font-size: 1.6rem; margin-bottom: 0.8rem; }
-  .sheet h4 { font-family:'Gochi Hand', cursive; font-size: 1.38rem; margin: 0.8rem 0 0.4rem; color: #5a4d41; }
+  .sheet h4 { font-family:'Gochi Hand', cursive; font-size: 1.38rem; margin: 0.8rem 0 0.4rem; color: var(--ink-muted); }
 
   .sheet-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
   .sheet-time-grid-row {
@@ -2594,7 +2628,7 @@
     padding: 0.3rem 0.4rem; font-family: 'Patrick Hand', sans-serif;
     font-size: 1rem; text-align: center; background: #fff;
   }
-  .custom-time-row label { font-size: 1.04rem; font-weight: 700; color: #5a4d41; }
+  .custom-time-row label { font-size: 1.04rem; font-weight: 700; color: var(--ink-muted); }
 
   /* Checklist in edit sheet */
   .checklist-wrap { margin: 0.5rem 0 0.8rem; }
@@ -2643,7 +2677,7 @@
     background: var(--accent-green);
   }
   .checklist-del-btn {
-    background: transparent; border: none; color: #5a4d41;
+    background: transparent; border: none; color: var(--ink-muted);
     font-size: 1.5rem; line-height: 1; cursor: pointer; padding: 0 0.3rem;
     flex-shrink: 0;
   }
@@ -2705,16 +2739,85 @@
     margin-top: 0.6rem; padding: 0.5rem 0.7rem;
     background: var(--bg); border: 2px dashed var(--ink); border-radius: 12px;
   }
-  .date-range-wrap label { display:block; margin-top:0.3rem; font-size:0.98rem; color: #5a4d41; }
+  .date-range-wrap label { display:block; margin-top:0.3rem; font-size:0.98rem; color: var(--ink-muted); }
   .date-range-wrap input[type="date"] {
     width:100%; padding:0.35rem; margin-top:0.2rem;
     border:2px solid var(--ink); border-radius:8px; font-family:inherit;
   }
-  .date-range-wrap .hint { font-size:0.86rem; color:#5a4d41; margin-top:0.4rem; }
+  .date-range-wrap .hint { font-size:0.86rem; color:var(--ink-muted); margin-top:0.4rem; }
 
   @media(max-width:400px) {
     .week-grid { gap: 0.25rem; padding: 0.3rem 0.4rem; }
     .day-card { padding: 0.3rem 0.2rem; min-height: 110px; }
+  }
+
+  /* ── Audit fix: larger chore checkbox tap targets (was 20×20px, now 28px visible + 48px hit area) ── */
+  .ct-check {
+    width: 28px;
+    height: 28px;
+    position: relative;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+  .ct-check::before {
+    content: '';
+    position: absolute;
+    inset: -10px;
+  }
+
+  /* ── Audit fix: mood selection pop animation for ritual reflection screen ── */
+  @keyframes moodPop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.45) rotate(12deg); }
+    70%  { transform: scale(0.9) rotate(-5deg); }
+    100% { transform: scale(1.1) rotate(0deg); }
+  }
+  .mood-btn.selected {
+    animation: moodPop 0.4s ease-out forwards;
+  }
+
+  /* ── Audit fix: iPad portrait (820px) explicit base layout ── */
+  @media (max-width: 819px) {
+    /* Below iPad portrait width — single-column fallback */
+    .tray-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+  /* iPad portrait (820–979px): explicit single-column + bottom-tray optimised layout */
+  @media (min-width: 820px) and (max-width: 979px) {
+    #screen-day { grid-template-columns: 1fr; }
+    .profile-cards {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: var(--space-4);
+    }
+    .profile-card {
+      width: auto;
+      min-width: 150px;
+      flex: 1 1 170px;
+      max-width: 220px;
+    }
+  }
+
+  /* ── Audit fix: screen-reader-only utility (visually hidden but announced by AT) ── */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* ── Audit fix: prefers-reduced-motion — stops all ambient animations for WCAG 2.3.3 ── */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 </style>
 </head>
@@ -2724,11 +2827,11 @@
 <div class="toast" id="toast"></div>
 
 <!-- ═══════════ MASCOT ═══════════ -->
-<button class="mascot-btn" id="mascotBtn" onclick="onMascotClick()" title="Your owl">
+<button class="mascot-btn" id="mascotBtn" onclick="onMascotClick()" aria-label="Owl mascot — tap for tips">
   🦉<span class="deco" id="mascotDeco"></span>
 </button>
-<div class="mascot-bubble" id="mascot">
-  <span class="mascot-close" onclick="hideMascot()">×</span>
+<div class="mascot-bubble" id="mascot" role="dialog" aria-label="Mascot message">
+  <button class="mascot-close" onclick="hideMascot()" aria-label="Close mascot message">×</button>
   <div id="mascotMsg"></div>
   <div class="mascot-suggestions" id="mascotSuggestions"></div>
 </div>
@@ -2753,20 +2856,20 @@
     <h1>My Weekly Planner</h1>
     <p>Who's here today? <span class="sync-dot" id="syncDot"></span></p>
   </div>
-  <div class="profile-cards">
-    <div class="profile-card jenn" onclick="selectProfile('jenn')">
-      <span class="avatar">🐥</span>
+  <nav class="profile-cards" aria-label="Who's here today?">
+    <button class="profile-card jenn" onclick="selectProfile('jenn')" aria-label="Select Jenn's profile">
+      <span class="avatar" aria-hidden="true">🐥</span>
       <h2>Jenn</h2>
-    </div>
-    <div class="profile-card jess" onclick="selectProfile('jess')">
-      <span class="avatar">🦊</span>
+    </button>
+    <button class="profile-card jess" onclick="selectProfile('jess')" aria-label="Select Jess's profile">
+      <span class="avatar" aria-hidden="true">🦊</span>
       <h2>Jess</h2>
-    </div>
-    <div class="profile-card parent" onclick="selectProfile('parent')">
-      <span class="avatar">👨‍👩‍👧‍👦</span>
+    </button>
+    <button class="profile-card parent" onclick="selectProfile('parent')" aria-label="Enter parent mode">
+      <span class="avatar" aria-hidden="true">👨‍👩‍👧‍👦</span>
       <h2>Parent</h2>
-    </div>
-  </div>
+    </button>
+  </nav>
   <div class="profile-motto">
     <p>✨ Plan what matters — the rest of the time is yours ✨</p>
     <div class="profile-message">
@@ -2799,19 +2902,19 @@
   <div class="topbar week-topbar">
     <div class="week-topbar__row1">
       <div class="topbar-left">
-        <div class="profile-badge" onclick="goProfile()" id="weekProfileBadge"></div>
+        <button class="profile-badge" onclick="goProfile()" id="weekProfileBadge" aria-label="Switch profile"></button>
         <h2>My Week</h2>
       </div>
       <div class="week-nav week-nav--inline">
-        <button class="btn-icon" onclick="changeWeek(-1)">◀</button>
+        <button class="btn-icon" onclick="changeWeek(-1)" aria-label="Previous week">◀</button>
         <h3 id="weekRangeLabel"></h3>
-        <button class="btn-icon" onclick="changeWeek(1)">▶</button>
+        <button class="btn-icon" onclick="changeWeek(1)" aria-label="Next week">▶</button>
       </div>
       <div class="week-actions">
-        <button class="btn-icon" title="Weekly Chore" onclick="openChoreTab()">🧹</button>
-        <button class="btn-icon" title="Challenges" onclick="openChallenges()">🎯</button>
-        <button class="btn-icon" title="Sister Sync" onclick="openSisterSync()">👯</button>
-        <button class="btn-icon" title="Print" onclick="openPrint()">🖨</button>
+        <button class="btn-icon" aria-label="Weekly Chore" onclick="openChoreTab()">🧹</button>
+        <button class="btn-icon" aria-label="Challenges" onclick="openChallenges()">🎯</button>
+        <button class="btn-icon" aria-label="Sister Sync" onclick="openSisterSync()">👯</button>
+        <button class="btn-icon" aria-label="Print week" onclick="openPrint()">🖨</button>
       </div>
     </div>
     <div class="week-topbar__row2">
@@ -2827,14 +2930,14 @@
   <!-- Compact view kept in DOM but hidden (no longer used) -->
   <div id="weekCompact" style="display:none">
     <div class="week-grid" id="weekGrid"></div>
-    <div class="week-legend" id="weekLegend" style="display:none">
-      <div class="legend-item"><div class="legend-dot" style="background:var(--cat-sleep)"></div>Rest</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--cat-school)"></div>Learning</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--cat-active)"></div>Active</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--cat-free)"></div>Free</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--cat-daily)"></div>Daily</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--cat-routine)"></div>Routine</div>
-    </div>
+    <ul class="week-legend" id="weekLegend" style="display:none" aria-label="Activity category legend">
+      <li class="legend-item"><span class="legend-dot" style="background:var(--cat-sleep)" aria-hidden="true"></span>Rest</li>
+      <li class="legend-item"><span class="legend-dot" style="background:var(--cat-school)" aria-hidden="true"></span>Learning</li>
+      <li class="legend-item"><span class="legend-dot" style="background:var(--cat-active)" aria-hidden="true"></span>Active</li>
+      <li class="legend-item"><span class="legend-dot" style="background:var(--cat-free)" aria-hidden="true"></span>Free</li>
+      <li class="legend-item"><span class="legend-dot" style="background:var(--cat-daily)" aria-hidden="true"></span>Daily</li>
+      <li class="legend-item"><span class="legend-dot" style="background:var(--cat-routine)" aria-hidden="true"></span>Routine</li>
+    </ul>
   </div>
 
   <!-- Full week view (default) -->
@@ -2871,6 +2974,7 @@
   </div>
 
   <!-- Goals + Todos panel (side-by-side, below Full Week grid) -->
+  <h2 class="sr-only">Week Tools</h2>
   <div class="gt-panel" id="gtPanel">
     <div class="gt-col">
       <div class="gt-col-header">
@@ -2926,28 +3030,28 @@
   <div class="topbar day-topbar">
     <div class="day-topbar__row1">
       <div class="topbar-left">
-        <button class="btn-icon" onclick="goWeek()">◀</button>
+        <button class="btn-icon" onclick="goWeek()" aria-label="Back to week view">◀</button>
         <h2 id="dayTitle"></h2>
       </div>
       <div class="day-controls">
         <div class="day-nav-center">
-          <button class="btn-icon day-nav-arrow" onclick="navDay(-1)" title="Previous day">◀</button>
+          <button class="btn-icon day-nav-arrow" onclick="navDay(-1)" aria-label="Previous day">◀</button>
           <h3 id="daySubtitle"></h3>
-          <button class="btn-icon day-nav-arrow" onclick="navDay(1)" title="Next day">▶</button>
+          <button class="btn-icon day-nav-arrow" onclick="navDay(1)" aria-label="Next day">▶</button>
         </div>
       </div>
       <div style="display:flex;gap:0.4rem;align-items:center" class="day-topbar-actions">
-        <button class="btn-icon" onclick="openTemplateSheet()" title="Template">📋</button>
-        <button class="btn-icon" onclick="openReflectSheet()" title="Reflect">🌙</button>
-        <div class="profile-badge" onclick="goProfile()" id="dayProfileBadge"></div>
+        <button class="btn-icon" onclick="openTemplateSheet()" aria-label="Apply template">📋</button>
+        <button class="btn-icon" onclick="openReflectSheet()" aria-label="Reflect on today">🌙</button>
+        <button class="profile-badge" onclick="goProfile()" id="dayProfileBadge" aria-label="Switch profile"></button>
       </div>
     </div>
     <div class="day-topbar__row2">
-      <div class="zone-tabs">
-        <div class="zone-tab active" data-zone="all" onclick="setZone('all')">☀️ All Day</div>
-        <div class="zone-tab" data-zone="morning" onclick="setZone('morning')">🌅 Morning</div>
-        <div class="zone-tab" data-zone="afternoon" onclick="setZone('afternoon')">☀️ Afternoon</div>
-        <div class="zone-tab" data-zone="evening" onclick="setZone('evening')">🌙 Evening</div>
+      <div class="zone-tabs" role="tablist" aria-label="Day zone filter">
+        <button class="zone-tab active" role="tab" aria-selected="true" data-zone="all" onclick="setZone('all')">☀️ All Day</button>
+        <button class="zone-tab" role="tab" aria-selected="false" data-zone="morning" onclick="setZone('morning')">🌅 Morning</button>
+        <button class="zone-tab" role="tab" aria-selected="false" data-zone="afternoon" onclick="setZone('afternoon')">☀️ Afternoon</button>
+        <button class="zone-tab" role="tab" aria-selected="false" data-zone="evening" onclick="setZone('evening')">🌙 Evening</button>
       </div>
       <button class="btn-template danger" onclick="clearDay()">🗑 Clear</button>
     </div>
@@ -3223,9 +3327,9 @@
       <div class="day-picker" id="trainingDayPicker"></div>
       <div id="trainingDateRange" class="date-range-wrap" style="display:none">
         <label>Repeat from</label>
-        <input type="date" id="trainingDateStart">
+        <input type="date" id="trainingDateStart" aria-label="Repeat start date">
         <label>through</label>
-        <input type="date" id="trainingDateEnd">
+        <input type="date" id="trainingDateEnd" aria-label="Repeat end date">
         <p class="hint">Leave empty to repeat only this week.</p>
       </div>
     </div>
@@ -3285,9 +3389,9 @@
       <div class="day-picker" id="activityDayPicker"></div>
       <div id="activityDateRange" class="date-range-wrap" style="display:none">
         <label>Repeat from</label>
-        <input type="date" id="activityDateStart">
+        <input type="date" id="activityDateStart" aria-label="Repeat start date">
         <label>through</label>
-        <input type="date" id="activityDateEnd">
+        <input type="date" id="activityDateEnd" aria-label="Repeat end date">
         <p class="hint">Leave empty to repeat only this week.</p>
       </div>
     </div>
@@ -3479,11 +3583,11 @@
     <h3>✨ Create Activity</h3>
     <div class="custom-builder">
       <label>Activity Name</label>
-      <input type="text" id="customName" placeholder="e.g. Guitar, Swimming…" maxlength="30">
+      <input type="text" id="customName" placeholder="e.g. Guitar, Swimming…" maxlength="30" aria-label="Activity name">
       <div class="row">
         <div>
           <label>Icon (emoji)</label>
-          <input type="text" id="customIcon" placeholder="🎸" maxlength="2">
+          <input type="text" id="customIcon" placeholder="🎸" maxlength="2" aria-label="Activity icon (emoji)">
         </div>
         <div>
           <label>Default Duration</label>
@@ -3516,7 +3620,7 @@
     <h3 id="parentActivityHeading">✨ Add Activity</h3>
     <div class="custom-builder">
       <label>Activity Name</label>
-      <input type="text" id="paName" placeholder="e.g. Tennis, Drama…" maxlength="30">
+      <input type="text" id="paName" placeholder="e.g. Tennis, Drama…" maxlength="30" aria-label="Activity name">
       <div class="row">
         <div>
           <label>Icon (emoji)</label>
@@ -3561,7 +3665,7 @@
     <p style="font-size:0.88rem;color:var(--ink-light);margin-bottom:0.5rem">Saved to your library for reuse.</p>
     <div class="custom-builder">
       <label>Task name (e.g. Backstroke drill)</label>
-      <input type="text" id="taskName" placeholder="e.g. 50m Freestyle">
+      <input type="text" id="taskName" placeholder="e.g. 50m Freestyle" aria-label="Training task name">
       <div class="row">
         <div>
           <label>Sport</label>
@@ -3574,7 +3678,7 @@
         </div>
         <div>
           <label>Reps / Count</label>
-          <input type="text" id="taskReps" placeholder="e.g. x4 or 6 mins">
+          <input type="text" id="taskReps" placeholder="e.g. x4 or 6 mins" aria-label="Reps or duration">
         </div>
       </div>
       <label>Notes (optional)</label>
@@ -3604,13 +3708,13 @@
     <h3>🎯 New Weekly Challenge</h3>
     <div class="custom-builder">
       <label>Challenge title</label>
-      <input type="text" id="chTitle" placeholder="e.g. Practice piano 5x this week">
+      <input type="text" id="chTitle" placeholder="e.g. Practice piano 5x this week" aria-label="Challenge title">
       <label>Activity</label>
       <select id="chActivity"></select>
       <div class="row">
         <div>
           <label>Target count</label>
-          <input type="number" id="chTarget" min="1" value="5">
+          <input type="number" id="chTarget" min="1" value="5" aria-label="Challenge target count">
         </div>
         <div>
           <label>For</label>
@@ -3640,11 +3744,11 @@
         <option value="hours">Time (accumulate X hours)</option>
       </select>
       <label>Target amount</label>
-      <input type="number" id="ruleTarget" min="1" value="10">
-      <label>Level-up name (e.g. "Piano Master")</label>
-      <input type="text" id="ruleName" placeholder="e.g. Math Wizard">
-      <label>New icon (optional)</label>
-      <input type="text" id="ruleNewIcon" placeholder="🎯" maxlength="2">
+      <input type="number" id="ruleTarget" min="1" value="10" aria-label="Level-up target count">
+      <label for="ruleName">Level-up name (e.g. "Piano Master")</label>
+      <input type="text" id="ruleName" placeholder="e.g. Math Wizard" aria-label="Level-up title">
+      <label for="ruleNewIcon">New icon (optional)</label>
+      <input type="text" id="ruleNewIcon" placeholder="🎯" maxlength="2" aria-label="Level-up icon (emoji)">
     </div>
     <button class="btn-confirm" onclick="confirmNewRule()">Save Rule ✨</button>
   </div>
@@ -3659,12 +3763,12 @@
     <div class="custom-builder">
       <div class="row">
         <div style="flex:3">
-          <label>Routine name</label>
-          <input type="text" id="rbTitle" placeholder="e.g. Saturday Clean-up">
+          <label for="rbTitle">Routine name</label>
+          <input type="text" id="rbTitle" placeholder="e.g. Saturday Clean-up" aria-label="Routine name">
         </div>
         <div style="flex:1">
-          <label>Icon</label>
-          <input type="text" id="rbIcon" placeholder="📋" maxlength="2">
+          <label for="rbIcon">Icon</label>
+          <input type="text" id="rbIcon" placeholder="📋" maxlength="2" aria-label="Routine icon (emoji)">
         </div>
       </div>
       <label>Checklist items (timer in minutes, optional)</label>
@@ -9527,10 +9631,10 @@ function ctRenderWeekControls() {
   const info = ctWeekInfo();
   const g = ctGetWeekGoals(ctWeekKey);
   const goalRowJenn = isParent()
-    ? `<input id="ctGoalJenn" class="input" type="number" min="1" max="60" value="${g.jenn || ''}" placeholder="Jenn goal"/>`
+    ? `<input id="ctGoalJenn" class="input" type="number" min="1" max="60" value="${g.jenn || ''}" placeholder="Jenn goal" aria-label="Jenn weekly point goal"/>`
     : (g.jenn ? `<div class="ct-meta">Jenn goal: ${g.jenn}</div>` : '');
   const goalRowJess = isParent()
-    ? `<input id="ctGoalJess" class="input" type="number" min="1" max="60" value="${g.jess || ''}" placeholder="Jess goal"/>`
+    ? `<input id="ctGoalJess" class="input" type="number" min="1" max="60" value="${g.jess || ''}" placeholder="Jess goal" aria-label="Jess weekly point goal"/>`
     : (g.jess ? `<div class="ct-meta">Jess goal: ${g.jess}</div>` : '');
   const parentControls = isParent() ? `
     <div class="chore-card">
@@ -10267,25 +10371,72 @@ function enableHorizontalWheelScroll() {
 }
 
 function enhanceNonButtonClickables(root = document) {
-  const clickableSelectors = [
+  // Generic clickable divs → role="button" + keyboard access
+  const buttonSelectors = [
     '.profile-card[onclick]',
     '.profile-badge[onclick]',
-    '.zone-tab[onclick]',
-    '.buffer-toggle[onclick]',
-    '.repeat-toggle[onclick]',
     '.mascot-close[onclick]',
   ];
-  root.querySelectorAll(clickableSelectors.join(',')).forEach(el => {
+  root.querySelectorAll(buttonSelectors.join(',')).forEach(el => {
     const tag = (el.tagName || '').toLowerCase();
     if (tag === 'button' || tag === 'a' || tag === 'input' || tag === 'select' || tag === 'textarea') return;
     if (!el.hasAttribute('role')) el.setAttribute('role', 'button');
     if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
     if (!el.dataset.a11yKeybound) {
       el.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          el.click();
-        }
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
+      });
+      el.dataset.a11yKeybound = '1';
+    }
+  });
+
+  // Toggle switches → role="switch" + aria-checked (reflects .on class)
+  const switchSelectors = ['.buffer-toggle[onclick]', '.repeat-toggle[onclick]'];
+  root.querySelectorAll(switchSelectors.join(',')).forEach(el => {
+    const tag = (el.tagName || '').toLowerCase();
+    if (tag === 'button' || tag === 'a') return;
+    if (!el.hasAttribute('role')) el.setAttribute('role', 'switch');
+    if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
+    el.setAttribute('aria-checked', el.classList.contains('on') ? 'true' : 'false');
+    if (!el.dataset.a11yKeybound) {
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
+      });
+      el.dataset.a11yKeybound = '1';
+    }
+    // Keep aria-checked in sync when .on class changes via MutationObserver
+    if (!el.dataset.a11yObserved) {
+      new MutationObserver(() => {
+        el.setAttribute('aria-checked', el.classList.contains('on') ? 'true' : 'false');
+      }).observe(el, { attributeFilter: ['class'] });
+      el.dataset.a11yObserved = '1';
+    }
+  });
+
+  // Zone tabs → already converted to <button role="tab"> in HTML; keep aria-selected in sync
+  root.querySelectorAll('.zone-tab[onclick]').forEach(el => {
+    const tag = (el.tagName || '').toLowerCase();
+    if (tag === 'button') return; // already a button — handled by JS setZone()
+    if (!el.hasAttribute('role')) el.setAttribute('role', 'tab');
+    if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
+    if (!el.dataset.a11yKeybound) {
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
+      });
+      el.dataset.a11yKeybound = '1';
+    }
+  });
+
+  // Chore checkboxes (.ct-check) rendered via innerHTML → add role + aria-checked
+  root.querySelectorAll('.ct-check').forEach(el => {
+    const tag = (el.tagName || '').toLowerCase();
+    if (tag === 'button' || tag === 'input') return;
+    if (!el.hasAttribute('role')) el.setAttribute('role', 'checkbox');
+    if (!el.hasAttribute('tabindex') && el.getAttribute('onclick')) el.setAttribute('tabindex', '0');
+    el.setAttribute('aria-checked', el.classList.contains('on') ? 'true' : 'false');
+    if (!el.dataset.a11yKeybound && el.getAttribute('onclick')) {
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
       });
       el.dataset.a11yKeybound = '1';
     }
