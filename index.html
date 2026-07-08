@@ -1395,6 +1395,9 @@
     flex-shrink: 0;
   }
   .ct-check.on { background: var(--accent); color: #fff; }
+  button.ct-check { padding: 0; font: inherit; line-height: 1; }
+  button.ct-check:disabled { cursor: default; opacity: 0.8; }
+  button.ct-check:focus-visible { outline: 3px solid var(--accent-blue); outline-offset: 2px; }
   .ct-badge {
     font-size: 0.78rem;
     font-weight: 700;
@@ -1403,6 +1406,19 @@
     padding: 1px 6px;
     background: var(--accent-yellow);
     white-space: nowrap;
+  }
+  /* Money identity = amber; paid = green (color law) */
+  .ct-money-badge { background: var(--accent-yellow); }
+  .ct-badge-week { background: var(--accent-green); font-weight: 600; }
+  .chore-card.paid { background: color-mix(in srgb, var(--accent-green) 22%, var(--paper)); border-color: var(--accent-green); }
+  .ct-money-total { font-family: 'Gochi Hand', cursive; font-size: 2rem; font-weight: 800; color: var(--ink); margin: 0.1rem 0 0.4rem; }
+  .ct-money-cap { font-family: 'Nunito', sans-serif; font-size: 0.85rem; font-weight: 700; color: var(--ink-muted); }
+  .ct-cap-note { color: var(--accent); font-weight: 700; }
+  /* override .custom-builder label/input defaults for the in-editor chore checklist */
+  .custom-builder label.cg-chore-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; margin-bottom: 0; font-family: 'Nunito', sans-serif; font-size: 0.95rem; color: var(--ink); cursor: pointer; }
+  .custom-builder #cgChoreList input[type="checkbox"] {
+    width: 20px; height: 20px; flex: 0 0 auto; margin: 0; padding: 0;
+    border-radius: 5px; box-shadow: none; accent-color: var(--accent-green);
   }
   .ct-meta { font-size: 0.88rem; color: var(--ink-muted); }
   .ct-score-row {
@@ -2989,6 +3005,19 @@
   }
   .mission-clear-btn:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 var(--ink); }
 
+  /* Quest Board pocket-money strip */
+  .quest-money-strip {
+    display: flex; align-items: center; gap: 0.5rem; width: 100%;
+    border: 1.5px solid var(--ink); border-radius: 12px; background: var(--bg);
+    padding: 0.45rem 0.7rem; margin: 0.6rem 0 0.2rem; font: inherit; cursor: pointer; text-align: left;
+  }
+  .quest-money-strip:focus-visible { outline: 3px solid var(--accent-blue); outline-offset: 2px; }
+  .qms-amount { font-weight: 800; background: var(--accent-yellow); border-radius: 8px; padding: 2px 8px; white-space: nowrap; }
+  .qms-chips { display: flex; gap: 0.3rem; flex-wrap: wrap; min-width: 0; }
+  .qms-chip { font-size: 0.8rem; border: 1.5px solid var(--ink); border-radius: 7px; padding: 1px 6px; background: var(--bg); white-space: nowrap; }
+  .qms-chip.paid { background: var(--accent-green); }
+  .qms-go { margin-left: auto; font-weight: 800; font-size: 1.2rem; }
+
   /* Sparkles */
   .quest-spark {
     position: absolute; font-size: 1.4rem; pointer-events: none;
@@ -3097,6 +3126,8 @@
       <div class="quest-xp-label" id="questXpLabel">0 / 100 XP</div>
     </div>
   </div>
+
+  <button type="button" class="quest-money-strip" id="questMoneyStrip" hidden onclick="openChoreTab()" aria-label="Open chores and pocket money"></button>
 
   <div class="quest-board-header">
     <h2>🗺️ Today's Quests</h2>
@@ -3985,6 +4016,40 @@
       <input type="text" id="ruleNewIcon" placeholder="🎯" maxlength="2" aria-label="Level-up icon (emoji)">
     </div>
     <button class="btn-confirm" onclick="confirmNewRule()">Save Rule ✨</button>
+  </div>
+</div>
+
+<!-- New / Edit Money Group -->
+<div class="overlay" id="choreGroupOverlay" onclick="overlayClick(event,'choreGroupOverlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3 id="cgTitle">💰 New Money Group</h3>
+    <div class="custom-builder">
+      <label for="cgName">Group name</label>
+      <input type="text" id="cgName" maxlength="40" placeholder="e.g. Clean Home Crew" aria-label="Group name">
+      <label for="cgIcon">Icon (emoji)</label>
+      <input type="text" id="cgIcon" maxlength="2" placeholder="🧹" aria-label="Group icon (emoji)">
+      <label for="cgKid">Who</label>
+      <select id="cgKid">
+        <option value="both">Both</option>
+        <option value="jenn">Jenn</option>
+        <option value="jess">Jess</option>
+      </select>
+      <label for="cgCadence">Pays</label>
+      <select id="cgCadence">
+        <option value="weekly">Weekly — all chores done sometime this week</option>
+        <option value="daily">Daily — all chores done the same day</option>
+      </select>
+      <label for="cgValue">Value ($)</label>
+      <input type="number" id="cgValue" min="0.25" max="6" step="0.25" value="1" aria-label="Group value in dollars">
+      <label>Chores in this group</label>
+      <div id="cgChoreList"></div>
+      <div style="display:flex;gap:0.4rem;margin-top:0.3rem">
+        <input type="text" id="cgNewChore" placeholder="Add custom chore" maxlength="30" aria-label="Add a custom chore">
+        <button type="button" class="pill-btn" onclick="ctAddCustomChoreToEditor()">Add</button>
+      </div>
+    </div>
+    <button class="btn-confirm" onclick="ctConfirmGroupFromUi()">Save Group ✨</button>
   </div>
 </div>
 
@@ -4930,12 +4995,14 @@ function ctAwardMandatoryFromRoutine(routineId, kid, dayKey) {
   if (dayIdx < 0 || dayIdx > 6) return;
   const p = getProfData(kid);
   ctEnsureProfile(p);
-  // Sticky: once earned, don't unset even if routine is later unchecked
+  // Sticky: once tracked, don't unset even if routine is later unchecked.
+  // Routines are mandatory + tracked (heatmap/streaks/goal points) but pay NO money —
+  // money now comes only from completing priced chore groups.
   if (ctGetMandatory(wk, dayIdx, session, kid)) return;
   ctSetMandatory(wk, dayIdx, session, kid, true);
   ctSetMandatoryAuto(wk, dayIdx, session, kid);
   ctMaybeFireGoalBonus(wk, kid);
-  showToast(`✨ +1 ${session} chore point earned!`);
+  showToast(`✅ ${session} routine complete`);
 }
 
 function getRoutineChecklistWithUnlocks(routineId) {
@@ -5224,6 +5291,8 @@ function renderQuestBoard() {
   const dateStr = today.toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' });
   document.getElementById('questBoardDate').textContent = dateStr;
 
+  renderQuestMoneyStrip(p);
+
   // Today's quests = today's blocks
   const key = todayKey();
   const blocks = (getDayBlocks(key) || []).filter(b => b && b.startMin != null);
@@ -5267,6 +5336,35 @@ function renderQuestBoard() {
       </div>
     `;
   }).join('');
+}
+
+// Read-only pocket-money summary on the Quest Board (kids never open the chore tab otherwise).
+function renderQuestMoneyStrip(kid) {
+  const el = document.getElementById('questMoneyStrip');
+  if (!el) return;
+  if (kid !== 'jenn' && kid !== 'jess') { el.hidden = true; return; }
+  ctEnsureShared();
+  ctMigrateToGroups();
+  const wk = ctDateToKey(ctMondayOf(new Date()));   // real current week, independent of chore-tab nav
+  const today = formatDayKey(todayKey());
+  const dayIdx = Math.max(0, Math.min(6, Math.round((today - formatDayKey(wk)) / (24*60*60*1000))));
+  const chips = ctGroupsForKid(kid).map(g => {
+    const ids = g.choreIds || [];
+    const m = ids.length;
+    let n, paid;
+    if (g.cadence === 'daily') {
+      n = ids.filter(c => ctGetOptional(wk, dayIdx, kid, c)).length;
+      paid = ctGroupFiredDaily(wk, g.id, kid, dayIdx);
+    } else {
+      n = ids.filter(c => [0,1,2,3,4,5,6].some(d => ctGetOptional(wk, d, kid, c))).length;
+      paid = ctGroupFiredWeekly(wk, g.id, kid);
+    }
+    return `<span class="qms-chip ${paid ? 'paid' : ''}">${g.icon || '🧺'} ${paid ? '✓' : `${n}/${m}`}</span>`;
+  }).join('');
+  el.innerHTML = `<span class="qms-amount">💰 $${ctWeekMoney(wk, kid).toFixed(2)}</span>`
+    + `<span class="qms-chips">${chips || '<span class="qms-chip">No groups yet</span>'}</span>`
+    + `<span class="qms-go">›</span>`;
+  el.hidden = false;
 }
 
 function formatQuestTime(min) {
@@ -5329,9 +5427,9 @@ function showQuestCompletePopup(act, result) {
   }, 1400);
 }
 
-function spawnQuestSparkles() {
+function spawnQuestSparkles(hostId = 'screen-quest') {
   const sparkles = ['✨','⭐','💫','🌟'];
-  const host = document.getElementById('screen-quest');
+  const host = document.getElementById(hostId) || document.getElementById('screen-quest');
   if (!host) return;
   for (let i=0; i<6; i++) {
     const el = document.createElement('div');
@@ -5370,7 +5468,6 @@ function openChoreTab() {
   const monDate = getWeekStart(weekOffset);
   const diff = Math.round((todayDate - monDate) / (24*60*60*1000));
   ctDay = Math.max(0, Math.min(6, diff));
-  ctSetupLegacyReadCompatibility();
   showScreen('chore');
   renderChoreTab();
 }
@@ -6631,6 +6728,10 @@ function escapeHtml(str) {
   const d = document.createElement('div');
   d.textContent = String(str);
   return d.innerHTML;
+}
+// Escape a value for use inside a double-quoted HTML attribute (escapeHtml leaves quotes).
+function escapeAttr(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 function renderSheetTimeSummary(elId, startMin, durationMin, travelOn, travelBufMin, readyOn=false, readyBufMin=15) {
@@ -8346,7 +8447,7 @@ function togglePin() {
 
 function ctAutoCheckOptionalFromBlock(blk, dayKey) {
   const choreName = blk.choreTag;
-  if (!choreName || choreName === 'General' || !CT_CHORES.includes(choreName)) return;
+  if (!choreName || choreName === 'General' || !ctAllChoreNames().includes(choreName)) return;
   const kid = isParent() ? parentViewing : activeProfile();
   const wk = ctWeekKeyForDate(dayKey);
   const mon = formatDayKey(wk);
@@ -8355,8 +8456,11 @@ function ctAutoCheckOptionalFromBlock(blk, dayKey) {
   if (dayIdx < 0 || dayIdx > 6) return;
   if (ctGetOptional(wk, dayIdx, kid, choreName)) return;
   ctSetOptional(wk, dayIdx, kid, choreName, true);
+  const fired = ctCheckGroupPayouts(wk, dayIdx, kid);
   ctMaybeFireGoalBonus(wk, kid);
-  showToast(`✨ ${choreName} optional chore checked!`);
+  // Caller performs saveAll().
+  if (fired.length) ctCelebrateGroupPayouts(fired, 'screen-chore');
+  else showToast(`✨ ${choreName} optional chore checked!`);
 }
 
 function toggleConfirm() {
@@ -9805,16 +9909,12 @@ const CT_DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const CT_SESSIONS = ['Morning','Afternoon','Evening'];
 const CT_CHORES = ['Mop','Vacuum','Dish Clean & Dishwasher','Laundry','Sorting Clothes','Extra Exercise','Other'];
 const CT_MONEY_CAP = 6;
-const CT_MONEY_BASE = 2;
 const CT_SUMMARY_WEEKS = 8;  // Rolling window for summary table
-const CT_LEGACY_COLLECTION = 'chore-tracker';
-const CT_LEGACY_DOC = 'family-data';
 const CT_PROFILE_ICON = { jenn:'🐥', jess:'🦊' };
 let ctWeekKey = null;  // "YYYY-MM-DD" Monday of current chore week (synced with weekOffset)
 let ctDay = 0;
-let ctOptKid = 'jenn';
 let ctParentKid = 'jenn';
-let ctLegacyListenOff = null;
+let ctEditingGroupId = null;  // group id being edited in the money-group sheet, null = creating new
 
 function ctMondayOf(date) {
   const d = new Date(date);
@@ -9836,7 +9936,12 @@ function ctEnsureShared() {
   if (!c.locked) c.locked = { enabled: false, pin: '1234' };
   if (!c.migration) c.migration = { done: false, migratedAt: null, sourceUpdatedAt: 0 };
   if (!c.legacy) c.legacy = { payload: null, updatedAt: 0 };
-  if (c.readLegacyCompatibility == null) c.readLegacyCompatibility = true;
+  if (c.readLegacyCompatibility == null) c.readLegacyCompatibility = false;
+  // ── Chore groups (priced pocket-money model) ──
+  if (!c.groups) c.groups = [];                    // [{id,name,icon,kid,choreIds:[names],valueDollars,cadence}]
+  if (!c.groupPayoutsFired) c.groupPayoutsFired = {}; // {[weekKey]:{[groupId]:{[kid]:{weekly:true,total}|{days:{dayIdx:true},total}}}}
+  if (!c.moneySnapshots) c.moneySnapshots = {};    // {[weekKey]:{jenn:$,jess:$}} — historical weeks frozen at migration
+  if (!c.groupsMigration) c.groupsMigration = { done: false };
 }
 function ctEnsureProfile(p) {
   if (!p.chore) p.chore = {};
@@ -9875,6 +9980,54 @@ function ctSetGoalBonus(weekKey, kid, val) {
   ctEnsureShared();
   if (!state.shared.chore.goalBonusByWeek[weekKey]) state.shared.chore.goalBonusByWeek[weekKey] = { jenn:false, jess:false };
   state.shared.chore.goalBonusByWeek[weekKey][kid] = !!val;
+}
+/* ── Chore-group helpers (priced pocket-money model) ── */
+function ctGroups() { ctEnsureShared(); return state.shared.chore.groups; }
+function ctGroupsForKid(kid) { return ctGroups().filter(g => g.kid === kid || g.kid === 'both'); }
+function ctGroupById(gid) { return ctGroups().find(g => g.id === gid) || null; }
+function ctAllChoreNames() {
+  // CT_CHORES first (stable order), then any custom names introduced by groups
+  const set = new Set(CT_CHORES);
+  for (const g of ctGroups()) for (const c of (g.choreIds || [])) set.add(c);
+  return [...set];
+}
+function ctGetGroupFiredEntry(weekKey, gid, kid) {
+  ctEnsureShared();
+  return (((state.shared.chore.groupPayoutsFired[weekKey] || {})[gid] || {})[kid]) || null;
+}
+function ctGroupFiredWeekly(weekKey, gid, kid) {
+  const e = ctGetGroupFiredEntry(weekKey, gid, kid);
+  return e === true || !!(e && e.weekly);        // bare `true` = legacy weekly fire
+}
+function ctGroupFiredDaily(weekKey, gid, kid, dayIdx) {
+  const e = ctGetGroupFiredEntry(weekKey, gid, kid);
+  return !!(e && e.days && e.days[String(dayIdx)]);
+}
+function ctSetGroupFired(weekKey, gid, kid, { cadence, dayIdx, amount }) {
+  ctEnsureShared();
+  const f = state.shared.chore.groupPayoutsFired;
+  if (!f[weekKey]) f[weekKey] = {};
+  if (!f[weekKey][gid]) f[weekKey][gid] = {};
+  let e = f[weekKey][gid][kid];
+  if (!e || e === true) e = f[weekKey][gid][kid] = (e === true ? { weekly:true, total:0 } : { total:0 });
+  if (cadence === 'weekly') {
+    if (e.weekly) return;                          // idempotent
+    e.weekly = true; e.total = (Number(e.total)||0) + amount;
+  } else {
+    if (!e.days) e.days = {};
+    if (e.days[String(dayIdx)]) return;            // idempotent per day
+    e.days[String(dayIdx)] = true; e.total = (Number(e.total)||0) + amount;
+  }
+}
+function ctGroupCompleteDaily(weekKey, dayIdx, kid, g) {
+  return (g.choreIds || []).every(c => ctGetOptional(weekKey, dayIdx, kid, c));
+}
+function ctGroupCompleteWeekly(weekKey, kid, g) {
+  // each member chore checked on at least one day this week
+  return (g.choreIds || []).every(c => {
+    for (let d = 0; d < 7; d++) if (ctGetOptional(weekKey, d, kid, c)) return true;
+    return false;
+  });
 }
 function ctGetMandatory(weekKey, dayIdx, session, kid) {
   const p = getProfData(kid);
@@ -9919,10 +10072,11 @@ function ctMandatoryPoints(weekKey, kid) {
 }
 function ctOptionalPoints(weekKey, kid) {
   let n = 0;
-  for (let d = 0; d < 7; d++) for (const c of CT_CHORES) if (ctGetOptional(weekKey, d, kid, c)) n++;
+  for (let d = 0; d < 7; d++) for (const c of ctAllChoreNames()) if (ctGetOptional(weekKey, d, kid, c)) n++;
   return n;
 }
-function ctBonusDays(weekKey, kid) {
+// Legacy money formula input — kept only for the one-time migration snapshot.
+function ctBonusDaysLegacy(weekKey, kid) {
   let n = 0;
   for (let d = 0; d < 7; d++) {
     if (CT_CHORES.some(c=>ctGetOptional(weekKey, d, kid, c))) n++;
@@ -9932,15 +10086,29 @@ function ctBonusDays(weekKey, kid) {
 function ctWeekHasData(weekKey, kid) {
   for (let d = 0; d < 7; d++) {
     if (CT_SESSIONS.some(s=>ctGetMandatory(weekKey, d, s, kid))) return true;
-    if (CT_CHORES.some(c=>ctGetOptional(weekKey, d, kid, c))) return true;
+    if (ctAllChoreNames().some(c=>ctGetOptional(weekKey, d, kid, c))) return true;
   }
   return false;
 }
+// Uncapped sum of fired group payouts (dollar amount frozen at fire time).
+function ctGroupEarned(weekKey, kid) {
+  ctEnsureShared();
+  const wk = state.shared.chore.groupPayoutsFired[weekKey] || {};
+  let sum = 0;
+  for (const gid of Object.keys(wk)) {
+    const e = wk[gid][kid];
+    if (!e) continue;
+    if (e === true) { const g = ctGroupById(gid); sum += g ? (Number(g.valueDollars) || 0) : 0; }
+    else sum += Number(e.total) || 0;
+  }
+  return sum;
+}
 function ctWeekMoney(weekKey, kid) {
-  if (!ctWeekHasData(weekKey, kid)) return 0;
-  const bonus = ctBonusDays(weekKey, kid);
+  ctEnsureShared();
+  const snap = state.shared.chore.moneySnapshots[weekKey];
+  if (snap && snap[kid] != null) return snap[kid];   // historical week frozen at migration
   const goalBonus = ctGetGoalBonus(weekKey, kid) ? 1 : 0;
-  return Math.min(CT_MONEY_CAP, CT_MONEY_BASE + bonus + goalBonus);
+  return Math.min(CT_MONEY_CAP, ctGroupEarned(weekKey, kid) + goalBonus);
 }
 function ctMaybeFireGoalBonus(weekKey, kid) {
   const goals = ctGetWeekGoals(weekKey);
@@ -9949,6 +10117,47 @@ function ctMaybeFireGoalBonus(weekKey, kid) {
   if (ctGetGoalBonus(weekKey, kid)) return;
   const points = ctMandatoryPoints(weekKey, kid) + ctOptionalPoints(weekKey, kid);
   if (points >= goal) ctSetGoalBonus(weekKey, kid, true);
+}
+// Fire any newly-completed group payouts for `kid` in `weekKey`.
+// `dayIdx` is the day just mutated (required for daily cadence; pass null to skip daily groups).
+// Sticky by construction — it only ADDS fired entries; unchecking never removes them.
+// Returns the array of groups that fired on this call. Caller must saveAll() + re-render.
+function ctCheckGroupPayouts(weekKey, dayIdx, kid) {
+  ctEnsureShared();
+  const snap = state.shared.chore.moneySnapshots[weekKey];
+  if (snap && snap[kid] != null) return [];   // frozen historical week: never fire
+  const fired = [];
+  for (const g of ctGroupsForKid(kid)) {
+    const amount = Number(g.valueDollars);
+    if (!Array.isArray(g.choreIds) || !g.choreIds.length || !(amount > 0)) continue;
+    if (g.cadence === 'daily') {
+      if (dayIdx == null) continue;
+      if (ctGroupFiredDaily(weekKey, g.id, kid, dayIdx)) continue;
+      if (!ctGroupCompleteDaily(weekKey, dayIdx, kid, g)) continue;
+      ctSetGroupFired(weekKey, g.id, kid, { cadence:'daily', dayIdx, amount });
+      fired.push(g);
+    } else {
+      if (ctGroupFiredWeekly(weekKey, g.id, kid)) continue;
+      if (!ctGroupCompleteWeekly(weekKey, kid, g)) continue;
+      ctSetGroupFired(weekKey, g.id, kid, { cadence:'weekly', amount });
+      fired.push(g);
+    }
+  }
+  return fired;
+}
+// Silent reconciliation sweep across all 7 days + weekly groups (no toasts).
+function ctSweepGroupPayouts(weekKey, kid) {
+  let any = [];
+  for (let d = 0; d < 7; d++) any = any.concat(ctCheckGroupPayouts(weekKey, d, kid));
+  return any;
+}
+// Shared toast + celebration for freshly-fired group payouts.
+function ctCelebrateGroupPayouts(fired, hostId) {
+  if (!fired || !fired.length) return;
+  const total = fired.reduce((s,g)=>s + (Number(g.valueDollars)||0), 0);
+  const label = fired.length === 1 ? `${fired[0].icon || ''} ${fired[0].name}`.trim() : `${fired.length} groups`;
+  showToast(`💰 ${label} complete! +$${total.toFixed(2)}`);
+  if (typeof spawnQuestSparkles === 'function') spawnQuestSparkles(hostId || 'screen-chore');
 }
 function ctSetCurrentWeekFromPlanner() {
   ctWeekKey = dateToLocalKey(getWeekStart(weekOffset));
@@ -9974,13 +10183,15 @@ function ctToggleMandatory(session, kid) {
 function ctToggleOptional(choreName, kid) {
   const prev = ctGetOptional(ctWeekKey, ctDay, kid, choreName);
   ctSetOptional(ctWeekKey, ctDay, kid, choreName, !prev);
+  const fired = !prev ? ctCheckGroupPayouts(ctWeekKey, ctDay, kid) : [];
   ctMaybeFireGoalBonus(ctWeekKey, kid);
   saveAll();
   renderChoreTab();
+  ctCelebrateGroupPayouts(fired, 'screen-chore');
 }
 function ctClearWeek() {
   const info = ctWeekInfo();
-  if (!confirm(`Reset all chore data for week of ${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()}?`)) return;
+  if (!confirm(`Reset all chore data (and pocket money) for week of ${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()}?`)) return;
   ['jenn','jess'].forEach(kid=>{
     const p = getProfData(kid);
     ctEnsureProfile(p);
@@ -9990,6 +10201,9 @@ function ctClearWeek() {
   });
   ctSetGoalBonus(ctWeekKey, 'jenn', false);
   ctSetGoalBonus(ctWeekKey, 'jess', false);
+  ctEnsureShared();
+  delete state.shared.chore.groupPayoutsFired[ctWeekKey];  // explicit parent reset beats stickiness
+  delete state.shared.chore.moneySnapshots[ctWeekKey];
   saveAll();
   renderChoreTab();
 }
@@ -10005,21 +10219,27 @@ function ctWeekSummaryRows() {
     const jo = ctOptionalPoints(wk, 'jenn');
     const km = ctMandatoryPoints(wk, 'jess');
     const ko = ctOptionalPoints(wk, 'jess');
+    const j$ = ctWeekMoney(wk, 'jenn');
+    const k$ = ctWeekMoney(wk, 'jess');
     const isCurrent = wk === ctWeekKey;
-    rows += `<tr${isCurrent?' style="font-weight:600"':''}><td>${label}</td><td>${jm}/21</td><td>+${jo}</td><td>${jm+jo}</td><td>${km}/21</td><td>+${ko}</td><td>${km+ko}</td></tr>`;
+    rows += `<tr${isCurrent?' style="font-weight:600"':''}><td>${label}</td><td>${jm}/21</td><td>+${jo}</td><td>$${j$.toFixed(2)}</td><td>${km}/21</td><td>+${ko}</td><td>$${k$.toFixed(2)}</td></tr>`;
   }
   return rows;
 }
 function ctExportBackup() {
   ctEnsureShared();
   const payload = {
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     weekKey: ctWeekKey,
     day: ctDay,
     migration: state.shared.chore.migration,
     goalsByWeek: state.shared.chore.goalsByWeek,
     goalBonusByWeek: state.shared.chore.goalBonusByWeek,
+    groups: state.shared.chore.groups,
+    groupPayoutsFired: state.shared.chore.groupPayoutsFired,
+    moneySnapshots: state.shared.chore.moneySnapshots,
+    groupsMigration: state.shared.chore.groupsMigration,
     profiles: {
       jenn: getProfData('jenn').chore || {},
       jess: getProfData('jess').chore || {},
@@ -10037,44 +10257,152 @@ function ctExportBackup() {
   URL.revokeObjectURL(link.href);
   showToast('Chore backup exported ✅');
 }
+// Delegated click handler for the chore tab (#choreWrap). Names travel only via
+// data-attributes, so no user text is ever interpolated into inline handlers.
+function ctHandleWrapClick(e) {
+  const el = e.target.closest('[data-ct-action]');
+  if (!el || el.disabled) return;
+  const a = el.dataset.ctAction;
+  if (a === 'toggle-mandatory') ctToggleMandatory(el.dataset.session, el.dataset.kid);
+  else if (a === 'toggle-optional') ctToggleOptional(el.dataset.chore, el.dataset.kid);
+  else if (a === 'edit-group') ctOpenGroupEditor(el.dataset.groupId);
+  else if (a === 'delete-group') ctDeleteGroup(el.dataset.groupId);
+  else if (a === 'new-group') ctOpenGroupEditor(null);
+}
+// One optional-chore check row (keyboard-accessible button, role=checkbox).
+function ctOptCheckRow(kid, choreName, extra = '', badge = '') {
+  const checked = ctGetOptional(ctWeekKey, ctDay, kid, choreName);
+  return `<div class="ct-item ${checked ? 'done' : ''}">
+    <div class="ct-item-left">
+      <button type="button" class="ct-check ${checked ? 'on' : ''}" data-ct-action="toggle-optional" data-chore="${escapeAttr(choreName)}" data-kid="${kid}" role="checkbox" aria-checked="${checked}" aria-label="${escapeAttr(choreName)}">${checked ? '✓' : ''}</button>
+      <span>${escapeHtml(choreName)}</span>${extra}
+    </div>${badge}
+  </div>`;
+}
 function ctRenderKidSection(kid) {
   const icon = CT_PROFILE_ICON[kid];
   const name = kid === 'jenn' ? 'Jenn' : 'Jess';
   const mandatory = ctMandatoryPoints(ctWeekKey, kid);
   const optional = ctOptionalPoints(ctWeekKey, kid);
   const total = mandatory + optional;
-  const money = ctWeekMoney(ctWeekKey, kid);
   const goal = ctGetWeekGoals(ctWeekKey)[kid];
   const goalReached = ctGetGoalBonus(ctWeekKey, kid);
 
-  let html = `<div class="chore-card"><h3>${icon} ${name}</h3><div class="ct-meta">Mandatory: ${mandatory}/21 · Bonus: +${optional} · Total ${total}</div>`;
+  let html = `<div class="chore-card"><h3>${icon} ${name} — routines</h3><div class="ct-meta">Mandatory: ${mandatory}/21 · Points: ${total}</div>`;
   if (goal) html += `<div class="ct-meta">Goal ${total}/${goal}${goalReached ? ' · reached +$1' : ''}</div>`;
 
   for (const s of CT_SESSIONS) {
     const checked = ctGetMandatory(ctWeekKey, ctDay, s, kid);
     const isAuto = ctGetMandatoryAuto(ctWeekKey, ctDay, s, kid);
     const canToggle = isParent() || !isAuto;
-    const clickAttr = canToggle ? `onclick="ctToggleMandatory('${s}','${kid}')"` : '';
     html += `<div class="ct-item ${checked ? 'done' : ''}">
-      <div class="ct-item-left"><div class="ct-check ${checked ? 'on' : ''}" ${clickAttr} style="${!canToggle ? 'cursor:default;opacity:0.8' : ''}">${checked ? '✓' : ''}</div><span>${s}</span></div>
+      <div class="ct-item-left"><button type="button" class="ct-check ${checked ? 'on' : ''}" data-ct-action="toggle-mandatory" data-session="${s}" data-kid="${kid}" role="checkbox" aria-checked="${checked}" aria-label="${s} routine" ${!canToggle ? 'disabled' : ''}>${checked ? '✓' : ''}</button><span>${s}</span></div>
       <span class="ct-badge">${isAuto ? '✨ auto' : 'mandatory'}</span>
     </div>`;
   }
-  html += `<div class="ct-meta" style="margin-top:0.3rem">Pocket Money (week): $${money.toFixed(2)}</div></div>`;
+  html += `<div class="ct-meta" style="margin-top:0.3rem">Routines are tracked but pay no money.</div></div>`;
   return html;
 }
-function ctRenderOptionalGrid() {
-  const kid = isParent() ? ctParentKid : activeProfile();
-  let html = `<div class="chore-card"><h3>Optional chores (${kid==='jenn'?'Jenn':'Jess'})</h3><div class="ct-meta">+1 point each, contributes to weekly money bonus days.</div>`;
-  for (const c of CT_CHORES) {
-    const checked = ctGetOptional(ctWeekKey, ctDay, kid, c);
-    html += `<div class="ct-item ${checked ? 'done' : ''}">
-      <div class="ct-item-left"><div class="ct-check ${checked ? 'on' : ''}" onclick="ctToggleOptional('${c.replace(/'/g,"\\'")}','${kid}')">${checked ? '✓' : ''}</div><span>${escapeHtml(c)}</span></div>
-      <span class="ct-badge">optional</span>
-    </div>`;
+function ctRenderMoneyCard(kid) {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  const name = kid === 'jenn' ? 'Jenn' : 'Jess';
+  const money = ctWeekMoney(ctWeekKey, kid);
+  const snap = c.moneySnapshots[ctWeekKey];
+  let body;
+  if (snap && snap[kid] != null) {
+    body = `<div class="ct-meta">Earned before the new money system.</div>`;
+  } else {
+    const wk = c.groupPayoutsFired[ctWeekKey] || {};
+    const lines = [];
+    let uncapped = 0;
+    for (const gid of Object.keys(wk)) {
+      const e = wk[gid][kid];
+      if (!e) continue;
+      const g = ctGroupById(gid);
+      const gname = g ? `${g.icon || ''} ${g.name}`.trim() : 'Group';
+      if (e === true) {
+        const amt = g ? (Number(g.valueDollars) || 0) : 0; uncapped += amt;
+        lines.push(`<div class="ct-meta">✅ ${escapeHtml(gname)} +$${amt.toFixed(2)}</div>`);
+      } else {
+        const amt = Number(e.total) || 0; uncapped += amt;
+        const dayCount = e.days ? Object.keys(e.days).length : 0;
+        const suffix = dayCount ? ` ×${dayCount} day${dayCount > 1 ? 's' : ''}` : '';
+        lines.push(`<div class="ct-meta">✅ ${escapeHtml(gname)}${suffix} +$${amt.toFixed(2)}</div>`);
+      }
+    }
+    if (ctGetGoalBonus(ctWeekKey, kid)) { uncapped += 1; lines.push(`<div class="ct-meta">⭐ Weekly goal bonus +$1.00</div>`); }
+    if (!lines.length) lines.push(`<div class="ct-meta">Finish a chore group to earn pocket money.</div>`);
+    if (uncapped > CT_MONEY_CAP) lines.push(`<div class="ct-meta ct-cap-note">Capped at $${CT_MONEY_CAP} this week.</div>`);
+    body = lines.join('');
   }
-  html += `</div>`;
-  return html;
+  return `<div class="chore-card"><h3>💰 ${name}'s pocket money</h3>
+    <div class="ct-money-total">$${money.toFixed(2)} <span class="ct-money-cap">/ $${CT_MONEY_CAP} max</span></div>
+    ${body}</div>`;
+}
+function ctRenderGroupCards(kid) {
+  const groups = ctGroupsForKid(kid);
+  if (!groups.length) return '';
+  return groups.map(g => {
+    const ids = g.choreIds || [];
+    const m = ids.length;
+    const val = Number(g.valueDollars) || 0;
+    const cadenceLabel = g.cadence === 'daily' ? 'day' : 'week';
+    let paid, meta;
+    const rows = ids.map(cn => {
+      let extra = '';
+      if (g.cadence === 'weekly') {
+        const wkDone = [0,1,2,3,4,5,6].some(d => ctGetOptional(ctWeekKey, d, kid, cn));
+        if (wkDone) extra = ` <span class="ct-badge ct-badge-week">done this week</span>`;
+      }
+      return ctOptCheckRow(kid, cn, extra);
+    }).join('');
+    if (g.cadence === 'daily') {
+      const n = ids.filter(cn => ctGetOptional(ctWeekKey, ctDay, kid, cn)).length;
+      paid = ctGroupFiredDaily(ctWeekKey, g.id, kid, ctDay);
+      const entry = ctGetGroupFiredEntry(ctWeekKey, g.id, kid);
+      const daysPaid = entry && entry.days ? Object.keys(entry.days).length : 0;
+      meta = `<div class="ct-meta">Today: ${n}/${m}${paid ? ` · ✅ Paid $${val.toFixed(2)} today` : ''}</div>`
+        + (daysPaid ? `<div class="ct-meta">Paid ${daysPaid} day${daysPaid > 1 ? 's' : ''} this week</div>` : '');
+    } else {
+      const n = ids.filter(cn => [0,1,2,3,4,5,6].some(d => ctGetOptional(ctWeekKey, d, kid, cn))).length;
+      paid = ctGroupFiredWeekly(ctWeekKey, g.id, kid);
+      meta = `<div class="ct-meta">${n}/${m} chores done this week${paid ? ` · ✅ Paid $${val.toFixed(2)}` : ''}</div>`;
+    }
+    return `<div class="chore-card ${paid ? 'paid' : ''}">
+      <h3>${g.icon || '🧺'} ${escapeHtml(g.name)} <span class="ct-badge ct-money-badge">$${val.toFixed(2)} / ${cadenceLabel}</span></h3>
+      ${meta}
+      ${rows}
+    </div>`;
+  }).join('');
+}
+function ctRenderExtraChoresCard(kid) {
+  const inGroups = new Set();
+  ctGroupsForKid(kid).forEach(g => (g.choreIds || []).forEach(cn => inGroups.add(cn)));
+  const extras = ctAllChoreNames().filter(cn => !inGroups.has(cn));
+  if (!extras.length) return '';
+  const rows = extras.map(cn => ctOptCheckRow(kid, cn, '', `<span class="ct-badge">extra</span>`)).join('');
+  return `<div class="chore-card"><h3>Extra chores</h3>
+    <div class="ct-meta">Counts toward the weekly goal — no money.</div>${rows}</div>`;
+}
+function ctRenderGroupManagerCard() {
+  if (!isParent()) return '';
+  const rows = ctGroups().map(g => {
+    const kidLabel = g.kid === 'both' ? 'Both' : (g.kid === 'jenn' ? 'Jenn' : 'Jess');
+    return `<div class="ct-item">
+      <div class="ct-item-left"><span>${g.icon || '🧺'} ${escapeHtml(g.name)}</span></div>
+      <span class="ct-meta" style="margin:0">$${(Number(g.valueDollars) || 0).toFixed(2)}/${g.cadence === 'daily' ? 'day' : 'wk'} · ${kidLabel}</span>
+      <span style="display:flex;gap:0.3rem">
+        <button type="button" class="btn-icon" data-ct-action="edit-group" data-group-id="${escapeAttr(g.id)}" aria-label="Edit ${escapeAttr(g.name)}">✏️</button>
+        <button type="button" class="btn-icon" data-ct-action="delete-group" data-group-id="${escapeAttr(g.id)}" aria-label="Delete ${escapeAttr(g.name)}">🗑</button>
+      </span>
+    </div>`;
+  }).join('') || `<div class="ct-meta">No money groups yet.</div>`;
+  return `<div class="chore-card"><h3>⚙️ Money groups</h3>
+    <div class="ct-meta">Kids earn a group's value when they finish all its chores within the cadence window.</div>
+    ${rows}
+    <div style="margin-top:0.5rem"><button type="button" class="pill-btn" data-ct-action="new-group">+ New group</button></div>
+  </div>`;
 }
 function ctRenderWeekControls() {
   const info = ctWeekInfo();
@@ -10101,14 +10429,12 @@ function ctRenderWeekControls() {
         <button class="pill-btn ${ctParentKid==='jenn'?'active':''}" onclick="ctParentKid='jenn';renderChoreTab()">Jenn view</button>
         <button class="pill-btn ${ctParentKid==='jess'?'active':''}" onclick="ctParentKid='jess';renderChoreTab()">Jess view</button>
       </div>
-    </div>` : `
+    </div>` : (
+    (goalRowJenn || goalRowJess) ? `
     <div class="chore-card">
       <h3>Goals</h3>
       ${goalRowJenn}${goalRowJess}
-      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem">
-        <button class="pill-btn" onclick="ctExportBackup()">Export backup</button>
-      </div>
-    </div>`;
+    </div>` : '');
   return `<div class="chore-card">
     <h3>Week of ${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()} — ${MONTH_SHORT[info.sun.getMonth()]} ${info.sun.getDate()}</h3>
     <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.4rem">
@@ -10134,15 +10460,88 @@ function ctSelectDay(dayIdx) {
 function ctSaveGoalsFromUi() {
   const j = parseInt(document.getElementById('ctGoalJenn')?.value || '', 10);
   const k = parseInt(document.getElementById('ctGoalJess')?.value || '', 10);
+  // ctSetWeekGoals already clears a bonus when its goal is removed. Do NOT blanket-reset
+  // both bonuses — that would strip a bonus a kid already banked when a goal is re-saved.
   ctSetWeekGoals(ctWeekKey, Number.isInteger(j)?j:null, Number.isInteger(k)?k:null);
-  ctSetGoalBonus(ctWeekKey, 'jenn', false);
-  ctSetGoalBonus(ctWeekKey, 'jess', false);
+  ctMaybeFireGoalBonus(ctWeekKey, 'jenn');   // a lowered goal may already be met
+  ctMaybeFireGoalBonus(ctWeekKey, 'jess');
+  saveAll();
+  renderChoreTab();
+}
+/* ── Parent money-group editor (reuses the .sheet overlay pattern) ── */
+function ctRenderChoreEditorList(selectedIds) {
+  const sel = new Set(selectedIds || []);
+  const names = [...new Set([...ctAllChoreNames(), ...sel])];  // include any names already on the group
+  const host = document.getElementById('cgChoreList');
+  if (!host) return;
+  host.innerHTML = names.map(n => `
+    <label class="cg-chore-row">
+      <input type="checkbox" data-chore="${escapeAttr(n)}" ${sel.has(n) ? 'checked' : ''}>
+      <span>${escapeHtml(n)}</span>
+    </label>`).join('');
+}
+function ctOpenGroupEditor(groupId) {
+  if (!isParent()) { showToast('Only parents can edit money groups 🔒'); return; }
+  ctEnsureShared();
+  ctEditingGroupId = groupId || null;
+  const g = groupId ? ctGroupById(groupId) : null;
+  document.getElementById('cgTitle').textContent = g ? '💰 Edit Money Group' : '💰 New Money Group';
+  document.getElementById('cgName').value = g ? g.name : '';
+  document.getElementById('cgIcon').value = g ? (g.icon || '') : '';
+  document.getElementById('cgKid').value = g ? g.kid : 'both';
+  document.getElementById('cgCadence').value = g ? g.cadence : 'weekly';
+  document.getElementById('cgValue').value = g ? g.valueDollars : 1;
+  document.getElementById('cgNewChore').value = '';
+  ctRenderChoreEditorList(g ? g.choreIds : []);
+  openSheet('choreGroupOverlay');
+}
+function ctAddCustomChoreToEditor() {
+  const input = document.getElementById('cgNewChore');
+  const name = (input.value || '').trim();
+  if (!name) return;
+  const existing = [...document.querySelectorAll('#cgChoreList input[data-chore]')].map(el => el.dataset.chore);
+  if (existing.includes(name)) { showToast('That chore is already listed'); input.value = ''; return; }
+  // preserve current checkbox selections, then append the new (checked) chore
+  const selected = existing.filter((_, i) => document.querySelectorAll('#cgChoreList input[data-chore]')[i].checked);
+  ctRenderChoreEditorList([...selected, name]);
+  input.value = '';
+}
+function ctConfirmGroupFromUi() {
+  if (!isParent()) return;
+  const name = (document.getElementById('cgName').value || '').trim();
+  const icon = (document.getElementById('cgIcon').value || '').trim();
+  const kid = document.getElementById('cgKid').value;
+  const cadence = document.getElementById('cgCadence').value === 'daily' ? 'daily' : 'weekly';
+  const valueDollars = parseFloat(document.getElementById('cgValue').value);
+  const choreIds = [...document.querySelectorAll('#cgChoreList input[data-chore]:checked')].map(el => el.dataset.chore);
+  if (!name) { showToast('Give the group a name'); return; }
+  if (!(valueDollars > 0)) { showToast('Set a dollar value above 0'); return; }
+  if (!choreIds.length) { showToast('Pick at least one chore'); return; }
+  ctEnsureShared();
+  if (ctEditingGroupId) {
+    const g = ctGroupById(ctEditingGroupId);
+    if (g) { g.name = name; g.icon = icon; g.kid = kid; g.cadence = cadence; g.valueDollars = valueDollars; g.choreIds = choreIds; }
+  } else {
+    state.shared.chore.groups.push({ id:'grp-'+Date.now().toString(36), name, icon, kid, choreIds, valueDollars, cadence });
+  }
+  ctEditingGroupId = null;
+  saveAll();
+  closeSheet('choreGroupOverlay');
+  renderChoreTab();   // render sweep fires any payout the edit newly satisfies
+  showToast('Group saved 💰');
+}
+function ctDeleteGroup(groupId) {
+  if (!isParent()) return;
+  const g = ctGroupById(groupId);
+  if (!g) return;
+  if (!confirm(`Delete "${g.name}"? Money already earned from it stays.`)) return;
+  state.shared.chore.groups = ctGroups().filter(x => x.id !== groupId);
   saveAll();
   renderChoreTab();
 }
 function ctRenderSummaryTable() {
   return `<div class="chore-card"><h3>8-week summary</h3>
-    <div style="overflow:auto"><table class="wf-analytics-table"><thead><tr><th>Week</th><th>Jenn Mand</th><th>Jenn Opt</th><th>Jenn Total</th><th>Jess Mand</th><th>Jess Opt</th><th>Jess Total</th></tr></thead><tbody>${ctWeekSummaryRows()}</tbody></table></div>
+    <div style="overflow:auto"><table class="wf-analytics-table"><thead><tr><th>Week</th><th>Jenn Mand</th><th>Jenn Opt</th><th>Jenn $</th><th>Jess Mand</th><th>Jess Opt</th><th>Jess $</th></tr></thead><tbody>${ctWeekSummaryRows()}</tbody></table></div>
   </div>`;
 }
 function ctApplyLegacyPayloadToState(parsed) {
@@ -10217,6 +10616,44 @@ function ctMigrateNumberedKeys() {
   c.dateKeyMigration = { done: true, migratedAt: Date.now() };
   if (didMigrate) saveAll();
 }
+// One-time migration to the priced chore-group model:
+// (1) freeze every historical week's money at its OLD-formula value, and
+// (2) seed one starter group so the new UI isn't empty.
+function ctMigrateToGroups() {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  if (c.groupsMigration?.done) return;
+  // Ensure legacy numbered-key weeks are date-keyed BEFORE we snapshot history — this can be
+  // reached from the Quest Board (kids' default landing) before renderChoreTab runs it. Idempotent.
+  ctMigrateNumberedKeys();
+  const migrationWeek = ctDateToKey(ctMondayOf(new Date()));
+
+  // (1) Freeze history — every stored week strictly before the current week.
+  const weeks = new Set([...Object.keys(c.goalsByWeek), ...Object.keys(c.goalBonusByWeek)]);
+  ['jenn','jess'].forEach(kid=>{
+    const p = getProfData(kid); ctEnsureProfile(p);
+    Object.keys(p.chore.mandatoryByWeek).forEach(w=>weeks.add(w));
+    Object.keys(p.chore.optionalByWeek).forEach(w=>weeks.add(w));
+  });
+  for (const wk of weeks) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(wk) || wk >= migrationWeek) continue;  // ISO compare valid for zero-padded dates
+    ['jenn','jess'].forEach(kid=>{
+      if (!ctWeekHasData(wk, kid)) return;
+      // Old formula: min(cap, base 2 + bonusDays + goalBonus). `2` = retired CT_MONEY_BASE.
+      const old = Math.min(CT_MONEY_CAP, 2 + ctBonusDaysLegacy(wk, kid) + (ctGetGoalBonus(wk, kid) ? 1 : 0));
+      if (!c.moneySnapshots[wk]) c.moneySnapshots[wk] = {};
+      c.moneySnapshots[wk][kid] = old;
+    });
+  }
+
+  // (2) Seed a starter group so parents have something to edit.
+  if (!c.groups.length) {
+    c.groups.push({ id:'grp-starter', name:'Clean Home Crew', icon:'🧹', kid:'both',
+      choreIds:['Mop','Vacuum','Dish Clean & Dishwasher'], valueDollars:3, cadence:'weekly' });
+  }
+  c.groupsMigration = { done:true, migratedAt:Date.now(), migrationWeek };
+  saveAll();
+}
 function ctTryMigrateLegacy() {
   ctEnsureShared();
   if (state.shared.chore.migration?.done) return;
@@ -10224,42 +10661,18 @@ function ctTryMigrateLegacy() {
   if (!payload) return;
   if (ctApplyLegacyPayloadToState(payload)) saveAll();
 }
-function ctSetupLegacyReadCompatibility() {
-  ctEnsureShared();
-  if (!fbStore) return;
-  if (!state.shared.chore.readLegacyCompatibility) return;
-  if (ctLegacyListenOff) return;
-  ctLegacyListenOff = fbStore.collection(CT_LEGACY_COLLECTION).doc(CT_LEGACY_DOC).onSnapshot(snap=>{
-    if (!snap.exists) return;
-    const d = snap.data() || {};
-    let parsed = null;
-    try {
-      parsed = {
-        dataObj: d.data ? JSON.parse(d.data) : {},
-        optObj: d.opt ? JSON.parse(d.opt) : {},
-        goalsObj: d.goals ? JSON.parse(d.goals) : {},
-        bonusObj: d.goalBonusFired ? JSON.parse(d.goalBonusFired) : {},
-        startDate: d.startDate || null,
-        updatedAt: Number(d.updatedAt) || 0,
-      };
-    } catch (e) {
-      console.warn('Legacy chore parse failed', e);
-      return;
-    }
-    state.shared.chore.legacy = { payload: parsed, updatedAt: parsed.updatedAt || Date.now() };
-    ctTryMigrateLegacy();
-    if (document.querySelector('#screen-chore.active')) renderChoreTab();
-  }, err => console.warn('Legacy chore read-only listener failed', err));
-}
+// Legacy standalone Chore-Tracker (chore-tracker/family-data) has been retired.
+// Any previously-imported data remains in state.shared.chore; ctTryMigrateLegacy still
+// applies a stored payload once, and ctMigrateNumberedKeys still runs on local data.
 function renderChoreTab() {
   ctEnsureShared();
   ctEnsureProfile(getProfData('jenn'));
   ctEnsureProfile(getProfData('jess'));
   // ctWeekKey is set once in openChoreTab and preserved across renders (navigation)
   if (!ctWeekKey) ctSetCurrentWeekFromPlanner();
-  ctSetupLegacyReadCompatibility();
   ctTryMigrateLegacy();
   ctMigrateNumberedKeys();
+  ctMigrateToGroups();
   const wrap = document.getElementById('choreWrap');
   if (!wrap) return;
   const badge = document.getElementById('choreProfileBadge');
@@ -10267,12 +10680,19 @@ function renderChoreTab() {
   const kid = isParent() ? ctParentKid : activeProfile();
   ctMaybeFireGoalBonus(ctWeekKey, 'jenn');
   ctMaybeFireGoalBonus(ctWeekKey, 'jess');
+  // Silent self-heal: fire payouts satisfied by remote-synced checks or by a group
+  // created/edited after its chores were already ticked.
+  const swept = ctSweepGroupPayouts(ctWeekKey, 'jenn').length + ctSweepGroupPayouts(ctWeekKey, 'jess').length;
+  if (swept) saveAll();
 
   wrap.innerHTML = `
     <div class="chore-grid">
       ${ctRenderWeekControls()}
+      ${ctRenderMoneyCard(kid)}
       ${ctRenderKidSection(kid)}
-      ${ctRenderOptionalGrid()}
+      ${ctRenderGroupCards(kid)}
+      ${ctRenderExtraChoresCard(kid)}
+      ${ctRenderGroupManagerCard()}
       ${ctRenderSummaryTable()}
     </div>
   `;
@@ -10801,9 +11221,13 @@ function inviteSisterFromEdit() {
 ════════════════════════════════════════════════════════════════ */
 loadLocal();
 initFirebase();
-ctSetupLegacyReadCompatibility();
 showScreen('profile');
 window._currentRewardPrompt = null;
+// Chore tab uses event delegation on #choreWrap (survives innerHTML re-renders).
+(function(){
+  const wrap = document.getElementById('choreWrap');
+  if (wrap) wrap.addEventListener('click', ctHandleWrapClick);
+})();
 
 /* Desktop: convert vertical wheel scroll to horizontal on the tray + filter */
 function enableHorizontalWheelScroll() {
