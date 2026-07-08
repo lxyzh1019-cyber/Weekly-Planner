@@ -2819,6 +2819,195 @@
       transition-duration: 0.01ms !important;
     }
   }
+
+  /* ══════════════════════════════════════════════════════════
+     QUEST BOARD (Hero Mode) — simplified gamified planner view
+  ══════════════════════════════════════════════════════════ */
+  #screen-quest {
+    background: linear-gradient(160deg, #fff4db 0%, #ffe1c4 60%, #ffd0d8 100%);
+    min-height: 100vh;
+    padding: 1rem 1rem 6rem;
+  }
+  .quest-topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  .quest-back-btn {
+    background: #fff; border: 3px solid var(--ink); border-radius: 14px;
+    box-shadow: 3px 3px 0 var(--ink);
+    padding: 0.4rem 0.9rem; font-weight: 700; cursor: pointer;
+    font-size: 0.9rem; color: var(--ink);
+  }
+  .quest-back-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+  .quest-hero-card {
+    background: #fff; border: 4px solid var(--ink); border-radius: 20px;
+    box-shadow: 5px 5px 0 var(--ink);
+    padding: 1rem 1.1rem; display: flex; align-items: center; gap: 1rem;
+    margin-bottom: 1.2rem;
+  }
+  .quest-hero-avatar {
+    font-size: 3.2rem; line-height: 1;
+    background: var(--accent-yellow);
+    border: 3px solid var(--ink); border-radius: 50%;
+    width: 76px; height: 76px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 3px 3px 0 var(--ink); flex-shrink: 0;
+    animation: heroBob 2.4s ease-in-out infinite;
+  }
+  @keyframes heroBob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+  .quest-hero-info { flex: 1; min-width: 0; }
+  .quest-hero-title { font-weight: 800; font-size: 1.05rem; color: var(--ink); }
+  .quest-hero-name { font-size: 0.85rem; color: var(--ink-light); margin-bottom: 0.4rem; }
+  .quest-xp-bar {
+    background: #f5ecdc; border: 2px solid var(--ink); border-radius: 999px;
+    height: 16px; overflow: hidden; position: relative;
+  }
+  .quest-xp-fill {
+    background: linear-gradient(90deg, var(--accent-green) 0%, var(--accent-yellow) 100%);
+    height: 100%; border-radius: 999px;
+    transition: width 0.6s cubic-bezier(.4,1.4,.6,1);
+  }
+  .quest-xp-label {
+    font-size: 0.72rem; color: var(--ink-light); margin-top: 0.25rem; font-weight: 600;
+  }
+  .quest-board-header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 0.7rem;
+  }
+  .quest-board-header h2 {
+    font-size: 1.4rem; font-weight: 800; color: var(--ink);
+    margin: 0;
+  }
+  .quest-board-date { font-size: 0.85rem; color: var(--ink-light); font-weight: 600; }
+
+  .quest-list { display: flex; flex-direction: column; gap: 0.75rem; }
+  .quest-card {
+    background: #fff; border: 3px solid var(--ink); border-radius: 18px;
+    box-shadow: 4px 4px 0 var(--ink);
+    padding: 0.9rem 1rem; display: flex; align-items: center; gap: 0.85rem;
+    transition: transform 0.15s;
+    cursor: pointer;
+  }
+  .quest-card:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 var(--ink); }
+  .quest-card.quest-done {
+    background: #e8f5e9; opacity: 0.78;
+  }
+  .quest-card.quest-done .quest-card-name { text-decoration: line-through; }
+  .quest-card-icon {
+    font-size: 2rem; width: 52px; height: 52px;
+    background: var(--bg2); border: 2px solid var(--ink); border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 2px 2px 0 var(--ink); flex-shrink: 0;
+  }
+  .quest-card-body { flex: 1; min-width: 0; }
+  .quest-card-name {
+    font-weight: 700; font-size: 1rem; color: var(--ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .quest-card-meta {
+    font-size: 0.8rem; color: var(--ink-light); margin-top: 0.15rem;
+    display: flex; gap: 0.7rem; flex-wrap: wrap;
+  }
+  .quest-card-meta .quest-xp-tag {
+    background: var(--accent-yellow); border: 1.5px solid var(--ink); border-radius: 999px;
+    padding: 0 0.45rem; font-weight: 700; font-size: 0.72rem; color: var(--ink);
+  }
+  .quest-complete-btn {
+    background: var(--accent-green); border: 2.5px solid var(--ink); border-radius: 12px;
+    box-shadow: 2px 2px 0 var(--ink);
+    padding: 0.5rem 0.8rem; font-weight: 700; cursor: pointer;
+    font-size: 1.2rem; color: var(--ink); flex-shrink: 0;
+  }
+  .quest-complete-btn:active { transform: translate(2px,2px); box-shadow: 0 0 0 var(--ink); }
+  .quest-done-badge {
+    font-size: 1.6rem; color: #2e7d32; flex-shrink: 0;
+    animation: questPopIn 0.4s ease-out;
+  }
+  @keyframes questPopIn {
+    0% { transform: scale(0) rotate(-20deg); opacity: 0; }
+    70% { transform: scale(1.25) rotate(8deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0); }
+  }
+
+  .quest-empty {
+    text-align: center; padding: 2rem 1rem;
+    background: #fff; border: 3px dashed var(--ink); border-radius: 18px;
+    color: var(--ink-light);
+  }
+  .quest-empty-emoji { font-size: 3rem; margin-bottom: 0.4rem; }
+  .quest-empty-cta { margin-top: 0.8rem; }
+
+  /* Quest Complete floating popup */
+  .quest-popup {
+    position: fixed; top: 30%; left: 50%; transform: translate(-50%, -50%) scale(0.6);
+    background: #fff; border: 4px solid var(--ink); border-radius: 22px;
+    box-shadow: 6px 6px 0 var(--ink);
+    padding: 1.2rem 1.6rem; z-index: 9999;
+    text-align: center; min-width: 260px;
+    opacity: 0; pointer-events: none;
+    transition: transform 0.35s cubic-bezier(.4,1.6,.6,1), opacity 0.25s;
+  }
+  .quest-popup.show {
+    opacity: 1; transform: translate(-50%, -50%) scale(1);
+  }
+  .quest-popup-icon { font-size: 3.2rem; margin-bottom: 0.3rem; }
+  .quest-popup-title {
+    font-size: 1.35rem; font-weight: 800; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .quest-popup-xp {
+    margin-top: 0.4rem; font-size: 1.1rem; font-weight: 700; color: var(--ink);
+  }
+  .quest-popup-sub { font-size: 0.85rem; color: var(--ink-light); margin-top: 0.2rem; }
+
+  /* Mission Clear full screen */
+  .mission-clear {
+    position: fixed; inset: 0; z-index: 9998;
+    background: radial-gradient(circle at 50% 40%, #fff4db 0%, #ffd166 50%, #ff7b54 100%);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 2rem;
+  }
+  .mission-clear.show { display: flex; animation: missionFadeIn 0.4s ease-out; }
+  @keyframes missionFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .mission-clear-emoji { font-size: 6rem; animation: missionBounce 0.8s ease-out; }
+  @keyframes missionBounce {
+    0% { transform: scale(0) rotate(-180deg); }
+    60% { transform: scale(1.3) rotate(20deg); }
+    100% { transform: scale(1) rotate(0); }
+  }
+  .mission-clear-title {
+    font-size: 2.4rem; font-weight: 900; color: #fff;
+    text-shadow: 3px 3px 0 var(--ink);
+    letter-spacing: 2px; margin: 0.5rem 0;
+  }
+  .mission-clear-sub { font-size: 1.1rem; color: var(--ink); font-weight: 600; margin-bottom: 1.4rem; }
+  .mission-clear-btn {
+    background: #fff; border: 4px solid var(--ink); border-radius: 16px;
+    box-shadow: 4px 4px 0 var(--ink);
+    padding: 0.7rem 1.4rem; font-weight: 800; cursor: pointer;
+    font-size: 1.05rem; color: var(--ink);
+  }
+  .mission-clear-btn:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 var(--ink); }
+
+  /* Sparkles */
+  .quest-spark {
+    position: absolute; font-size: 1.4rem; pointer-events: none;
+    animation: sparkleFly 0.9s ease-out forwards;
+  }
+  @keyframes sparkleFly {
+    0% { transform: translate(0,0) scale(0.6); opacity: 1; }
+    100% { transform: translate(var(--dx, 0), var(--dy, -40px)) scale(1.2); opacity: 0; }
+  }
+
+  /* Hero Mode toggle on profile screen */
+  .hero-mode-toggle {
+    position: absolute; top: 0.8rem; right: 0.8rem;
+    background: #fff; border: 2.5px solid var(--ink); border-radius: 999px;
+    box-shadow: 2px 2px 0 var(--ink);
+    padding: 0.35rem 0.8rem; font-size: 0.78rem; font-weight: 700; cursor: pointer;
+    color: var(--ink);
+  }
+  .hero-mode-toggle.on { background: var(--accent-yellow); }
 </style>
 </head>
 <body>
@@ -2852,6 +3041,7 @@
      SCREEN: PROFILE SELECT
 ════════════════════════════════════════════════════════ -->
 <div class="screen active" id="screen-profile">
+  <button class="hero-mode-toggle" id="heroModeToggle" onclick="toggleHeroMode()" aria-label="Toggle Hero Mode">🎮 Hero Mode: ON</button>
   <div class="profile-header">
     <h1>My Weekly Planner</h1>
     <p>Who's here today? <span class="sync-dot" id="syncDot"></span></p>
@@ -2890,6 +3080,49 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
+     SCREEN: QUEST BOARD (Hero Mode)
+════════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-quest">
+  <div class="quest-topbar">
+    <button class="quest-back-btn" onclick="goProfile()" aria-label="Back to profile">◀ Switch hero</button>
+    <button class="quest-back-btn" onclick="goWeek()" aria-label="Open full planner">📋 Full planner</button>
+  </div>
+
+  <div class="quest-hero-card">
+    <div class="quest-hero-avatar" id="questHeroAvatar">🐣</div>
+    <div class="quest-hero-info">
+      <div class="quest-hero-title" id="questHeroTitle">Newbie Hero</div>
+      <div class="quest-hero-name" id="questHeroName"></div>
+      <div class="quest-xp-bar"><div class="quest-xp-fill" id="questXpFill" style="width:0%"></div></div>
+      <div class="quest-xp-label" id="questXpLabel">0 / 100 XP</div>
+    </div>
+  </div>
+
+  <div class="quest-board-header">
+    <h2>🗺️ Today's Quests</h2>
+    <span class="quest-board-date" id="questBoardDate"></span>
+  </div>
+
+  <div class="quest-list" id="questList"></div>
+</div>
+
+<!-- Quest Complete popup -->
+<div class="quest-popup" id="questPopup" aria-hidden="true">
+  <div class="quest-popup-icon" id="questPopupIcon">⭐</div>
+  <div class="quest-popup-title">Quest Complete!</div>
+  <div class="quest-popup-xp" id="questPopupXp">+20 XP</div>
+  <div class="quest-popup-sub" id="questPopupSub"></div>
+</div>
+
+<!-- Mission Clear celebration -->
+<div class="mission-clear" id="missionClear" aria-hidden="true">
+  <div class="mission-clear-emoji">🏆</div>
+  <div class="mission-clear-title">MISSION CLEAR!</div>
+  <div class="mission-clear-sub" id="missionClearSub">All today's quests done — go enjoy your day!</div>
+  <button class="mission-clear-btn" onclick="closeMissionClear()">Close 👋</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
      SCREEN: WEEK VIEW
 ════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-week">
@@ -2911,6 +3144,7 @@
         <button class="btn-icon" onclick="changeWeek(1)" aria-label="Next week">▶</button>
       </div>
       <div class="week-actions">
+        <button class="btn-icon" aria-label="Quest Board" onclick="goQuestBoard()" title="Quest Board">🎮</button>
         <button class="btn-icon" aria-label="Weekly Chore" onclick="openChoreTab()">🧹</button>
         <button class="btn-icon" aria-label="Challenges" onclick="openChallenges()">🎯</button>
         <button class="btn-icon" aria-label="Sister Sync" onclick="openSisterSync()">👯</button>
@@ -4884,6 +5118,26 @@ function showScreen(id) {
 const PARENT_PIN = '1234';
 let parentUnlockedThisSession = false;
 
+/* ── Hero Mode (Quest Board) — simplified gamified landing for kids ── */
+const HERO_MODE_LS_KEY = 'wp_hero_mode';
+function isHeroMode() {
+  const v = localStorage.getItem(HERO_MODE_LS_KEY);
+  return v === null ? true : v === '1'; // default ON
+}
+function toggleHeroMode() {
+  const next = !isHeroMode();
+  localStorage.setItem(HERO_MODE_LS_KEY, next ? '1' : '0');
+  refreshHeroModeToggle();
+  showToast(next ? '🎮 Hero Mode ON' : 'Hero Mode OFF');
+}
+function refreshHeroModeToggle() {
+  const btn = document.getElementById('heroModeToggle');
+  if (!btn) return;
+  const on = isHeroMode();
+  btn.textContent = on ? '🎮 Hero Mode: ON' : '🎮 Hero Mode: OFF';
+  btn.classList.toggle('on', on);
+}
+
 function selectProfile(p) {
   if (p === 'parent' && !parentUnlockedThisSession) {
     const pin = (prompt('Enter parent PIN 🔒') || '').trim();
@@ -4898,6 +5152,8 @@ function selectProfile(p) {
     parentViewing = 'jenn';
     showScreen('parent');
     renderParentHome();
+  } else if (isHeroMode()) {
+    goQuestBoard();
   } else {
     showScreen('week');
     renderWeek();
@@ -4906,6 +5162,199 @@ function selectProfile(p) {
       setTimeout(()=>openTutorial(), 350);
     }
   }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   QUEST BOARD — gamified daily plan view
+════════════════════════════════════════════════════════════════ */
+const QUEST_XP_PER_TASK = 20;
+const QUEST_XP_PER_LEVEL = 100;
+const HERO_TIERS = [
+  { lv: 1, name: 'Newbie Hero',   emoji: '🐣' },
+  { lv: 2, name: 'Junior Hero',   emoji: '🐤' },
+  { lv: 3, name: 'Brave Hero',    emoji: '🦊' },
+  { lv: 4, name: 'Mighty Hero',   emoji: '🦁' },
+  { lv: 5, name: 'Legendary Hero',emoji: '🦄' },
+  { lv: 6, name: '✨ Star Hero ✨', emoji: '🌟' },
+];
+function heroTierForLevel(lv) {
+  return HERO_TIERS[Math.min(lv-1, HERO_TIERS.length-1)] || HERO_TIERS[0];
+}
+function getQuestXP(p=activeProfile()) {
+  const prog = getProfData(p)?.progress || {};
+  return prog.questXP || 0;
+}
+function addQuestXP(amount, p=activeProfile()) {
+  const profd = getProfData(p);
+  if (!profd) return { leveledUp:false };
+  if (!profd.progress) profd.progress = {};
+  const before = profd.progress.questXP || 0;
+  const after = before + amount;
+  profd.progress.questXP = after;
+  const lvBefore = Math.floor(before / QUEST_XP_PER_LEVEL) + 1;
+  const lvAfter  = Math.floor(after  / QUEST_XP_PER_LEVEL) + 1;
+  saveAll();
+  return { leveledUp: lvAfter > lvBefore, newLevel: lvAfter };
+}
+
+function goQuestBoard() {
+  showScreen('quest');
+  renderQuestBoard();
+}
+
+function renderQuestBoard() {
+  const p = activeProfile();
+  if (!p) return;
+  const profName = p.charAt(0).toUpperCase() + p.slice(1);
+
+  // Hero header
+  const xp = getQuestXP(p);
+  const level = Math.floor(xp / QUEST_XP_PER_LEVEL) + 1;
+  const tier = heroTierForLevel(level);
+  const xpIntoLevel = xp % QUEST_XP_PER_LEVEL;
+  const pct = Math.round((xpIntoLevel / QUEST_XP_PER_LEVEL) * 100);
+  document.getElementById('questHeroAvatar').textContent = tier.emoji;
+  document.getElementById('questHeroTitle').textContent = `Lv ${level} — ${tier.name}`;
+  document.getElementById('questHeroName').textContent = profName + "'s adventure";
+  document.getElementById('questXpFill').style.width = pct + '%';
+  document.getElementById('questXpLabel').textContent = `${xpIntoLevel} / ${QUEST_XP_PER_LEVEL} XP  •  Total ${xp}`;
+
+  // Date
+  const today = new Date();
+  const dateStr = today.toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' });
+  document.getElementById('questBoardDate').textContent = dateStr;
+
+  // Today's quests = today's blocks
+  const key = todayKey();
+  const blocks = (getDayBlocks(key) || []).filter(b => b && b.startMin != null);
+  blocks.sort((a,b)=> (a.startMin||0) - (b.startMin||0));
+  const acts = getAllActivities(p);
+  const actById = id => acts.find(a => a.id === id);
+
+  const list = document.getElementById('questList');
+  if (!blocks.length) {
+    list.innerHTML = `
+      <div class="quest-empty">
+        <div class="quest-empty-emoji">📜</div>
+        <div><strong>No quests for today!</strong></div>
+        <div style="margin-top:0.4rem;font-size:0.9rem">Add tasks in the full planner to start your adventure.</div>
+        <div class="quest-empty-cta">
+          <button class="quest-back-btn" onclick="goWeek()">📋 Open full planner</button>
+        </div>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = blocks.map(b => {
+    const act = actById(b.actId) || { name:'Quest', icon:'⭐' };
+    const time = formatQuestTime(b.startMin);
+    const dur = b.durationMin ? `${b.durationMin} min` : '';
+    const done = !!b.completed;
+    const right = done
+      ? `<div class="quest-done-badge">✓</div>`
+      : `<button class="quest-complete-btn" onclick="event.stopPropagation();completeQuest('${b.id}')" aria-label="Complete quest">✓</button>`;
+    return `
+      <div class="quest-card ${done?'quest-done':''}" onclick="openQuestDetail('${b.id}')">
+        <div class="quest-card-icon">${act.icon || '⭐'}</div>
+        <div class="quest-card-body">
+          <div class="quest-card-name">${escapeHtml(act.name || 'Quest')}</div>
+          <div class="quest-card-meta">
+            <span>🕐 ${time}${dur?' · '+dur:''}</span>
+            <span class="quest-xp-tag">+${QUEST_XP_PER_TASK} XP</span>
+          </div>
+        </div>
+        ${right}
+      </div>
+    `;
+  }).join('');
+}
+
+function formatQuestTime(min) {
+  if (min == null) return '';
+  const h = Math.floor(min/60), m = min%60;
+  const hh = ((h+11)%12)+1;
+  const ap = h<12 ? 'am' : 'pm';
+  return `${hh}:${String(m).padStart(2,'0')}${ap}`;
+}
+
+function openQuestDetail(blockId) {
+  // Reuse existing edit sheet so kids can see/edit details if they tap the card body
+  if (typeof openEditSheet === 'function') openEditSheet(blockId);
+}
+
+function completeQuest(blockId) {
+  const key = todayKey();
+  const blocks = getDayBlocks(key) || [];
+  const blk = blocks.find(b => b.id === blockId);
+  if (!blk) return;
+  if (blk.completed) return;
+
+  blk.completed = true;
+  setDayBlocks(key, blocks);
+
+  const acts = getAllActivities();
+  const act = acts.find(a => a.id === blk.actId) || { name:'Quest', icon:'⭐' };
+  const result = addQuestXP(QUEST_XP_PER_TASK);
+
+  showQuestCompletePopup(act, result);
+  spawnQuestSparkles();
+  renderQuestBoard();
+
+  // Check Mission Clear after popup
+  setTimeout(()=>{
+    const remaining = (getDayBlocks(key)||[]).filter(b => b && b.startMin!=null && !b.completed);
+    if (remaining.length === 0) {
+      showMissionClear();
+    }
+  }, 1100);
+}
+
+function showQuestCompletePopup(act, result) {
+  const pop = document.getElementById('questPopup');
+  document.getElementById('questPopupIcon').textContent = act.icon || '⭐';
+  document.getElementById('questPopupXp').textContent = `+${QUEST_XP_PER_TASK} XP`;
+  const sub = document.getElementById('questPopupSub');
+  if (result?.leveledUp) {
+    const tier = heroTierForLevel(result.newLevel);
+    sub.innerHTML = `🎉 LEVEL UP! You are now <strong>Lv ${result.newLevel} ${tier.name}</strong> ${tier.emoji}`;
+  } else {
+    sub.textContent = escapeHtml(act.name || '');
+  }
+  pop.classList.add('show');
+  pop.setAttribute('aria-hidden', 'false');
+  clearTimeout(window._questPopupT);
+  window._questPopupT = setTimeout(()=>{
+    pop.classList.remove('show');
+    pop.setAttribute('aria-hidden', 'true');
+  }, 1400);
+}
+
+function spawnQuestSparkles() {
+  const sparkles = ['✨','⭐','💫','🌟'];
+  const host = document.getElementById('screen-quest');
+  if (!host) return;
+  for (let i=0; i<6; i++) {
+    const el = document.createElement('div');
+    el.className = 'quest-spark';
+    el.textContent = sparkles[i % sparkles.length];
+    el.style.left = (40 + Math.random()*20) + '%';
+    el.style.top  = (25 + Math.random()*20) + '%';
+    el.style.setProperty('--dx', (Math.random()*180 - 90) + 'px');
+    el.style.setProperty('--dy', (-60 - Math.random()*60) + 'px');
+    host.appendChild(el);
+    setTimeout(()=>el.remove(), 950);
+  }
+}
+
+function showMissionClear() {
+  const m = document.getElementById('missionClear');
+  m.classList.add('show');
+  m.setAttribute('aria-hidden', 'false');
+}
+function closeMissionClear() {
+  const m = document.getElementById('missionClear');
+  m.classList.remove('show');
+  m.setAttribute('aria-hidden', 'true');
 }
 function goProfile() {
   // Lock parent mode again when leaving the profile picker
@@ -10498,6 +10947,7 @@ function initA11yEnhancements() {
 }
 enableHorizontalWheelScroll();
 initA11yEnhancements();
+refreshHeroModeToggle();
 
 // Small onboarding mascot after profile pick (if day is empty)
 const _origBuildTimeline = buildTimeline;
