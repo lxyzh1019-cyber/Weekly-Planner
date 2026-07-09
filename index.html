@@ -1495,30 +1495,33 @@
     letter-spacing: 0.5px;
   }
   .wf-zone-row-label:last-of-type { border-bottom: none; }
+  /* Each zone cell is a time-proportional lane: cards are absolutely
+     positioned by their start time on a shared px-per-minute scale, so the
+     same clock time lands at the same height across all 7 day columns. */
   .wf-zone-cell {
     background: var(--paper);
     border-bottom: 1.5px dashed var(--paper-line);
     border-right: 1px dashed var(--paper-line);
-    padding: 0.25rem;
-    min-height: 70px;
+    padding: 0;
     cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
+    position: relative;
+    overflow: hidden;
   }
   .wf-zone-cell:nth-last-child(-n+7) { border-bottom: none; } /* last row of cells */
   .wf-zone-cell.today { background: #fff4db; }
   .wf-zone-cell:hover:not(:has(.wf-card:hover)) { background: #fff9e6; }
-  .wf-zone-before { min-height: 84px; }
-  .wf-zone-school { min-height: 190px; }
-  .wf-zone-after { min-height: 116px; }
-  .wf-zone-evening { min-height: 92px; }
+  /* Faint hour gridlines reinforce the time alignment */
+  .wf-hour-line {
+    position: absolute; left: 0; right: 0; height: 0;
+    border-top: 1px dotted var(--paper-line); opacity: 0.6;
+    pointer-events: none;
+  }
   .wf-cell-empty {
-    flex: 1;
-    min-height: 44px;
+    position: absolute; inset: 0;
   }
   .wf-card {
-    padding: 0.4rem 0.55rem;
+    position: absolute;
+    padding: 0.28rem 0.45rem;
     border-radius: 9px;
     border: 2px solid var(--ink);
     color: #fff;
@@ -1529,16 +1532,23 @@
     align-items: center;
     gap: 6px;
     font-size: 0.82rem;
-    line-height: 1.25;
+    line-height: 1.2;
     transition: transform 0.1s;
     text-shadow: 0 1px 1px rgba(0,0,0,0.25);
+    overflow: hidden;
+    box-sizing: border-box;
   }
-  .wf-card:hover { transform: translate(-1px,-1px); box-shadow: 2.5px 2.5px 0 var(--ink); }
+  .wf-card:hover { transform: translate(-1px,-1px); box-shadow: 2.5px 2.5px 0 var(--ink); z-index: 3; }
   .wf-card-time { font-weight: 800; font-size: 0.72rem; }
   .wf-card-icon { font-size: 1.1rem; text-shadow: none; }
   .wf-card-name { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   .wf-card-dur { font-size: 0.7rem; font-weight: 700; }
   .wf-card.light-bg { color: var(--ink); text-shadow: none; }
+  /* Short blocks: drop the duration/time chips so the name + icon still fit */
+  .wf-card.wf-card--slim { padding: 0.1rem 0.4rem; align-items: center; }
+  .wf-card.wf-card--slim .wf-card-dur { display: none; }
+  .wf-card.wf-card--xslim .wf-card-time { display: none; }
+  .wf-card.wf-card--xslim { grid-template-columns: auto 1fr; font-size: 0.74rem; }
 
   /* ═══════════ LEGEND ═══════════ */
   .week-legend {
@@ -6025,8 +6035,15 @@ function renderFullWeek(keys) {
     grid.appendChild(header);
   });
 
+  // Consistent time scale so any clock time maps to the same pixel offset
+  // across every day column — cards align to the time grid, not to order.
+  const PX_PER_MIN = 0.9;
+
   // For each zone row: zone label + 7 day cells
   ZONES.forEach(z => {
+    const zoneSpan = z.end - z.start;               // minutes covered by this zone
+    const cellH = Math.round(zoneSpan * PX_PER_MIN); // shared height for all 7 day cells
+
     const zoneLabel = document.createElement('div');
     zoneLabel.classList.add('wf-zone-'+z.id);
     zoneLabel.className = 'wf-zone-row-label';
@@ -6036,12 +6053,29 @@ function renderFullWeek(keys) {
     keys.forEach((key, ci) => {
       const cell = document.createElement('div');
       cell.className = 'wf-zone-cell wf-zone-'+z.id + (key===todayKey() ? ' today' : '');
+      cell.style.height = cellH + 'px';
       cell.onclick = (e)=>{
         // Only open day if clicked on empty area, not on a card
-        if (e.target === cell || e.target.classList.contains('wf-cell-empty')) {
+        if (e.target === cell || e.target.classList.contains('wf-cell-empty') || e.target.classList.contains('wf-hour-line')) {
           openDay(key, ci);
         }
       };
+
+      // Empty backdrop makes the whole lane tappable to open the day
+      const emp = document.createElement('div');
+      emp.className = 'wf-cell-empty';
+      cell.appendChild(emp);
+
+      // Hour gridlines within the zone to anchor the eye to the time grid
+      const firstHour = Math.ceil((START_MIN + z.start) / 60) * 60; // absolute minutes
+      for (let hm = firstHour; hm < START_MIN + z.end; hm += 60) {
+        const rel = (hm - START_MIN) - z.start;
+        if (rel <= 0) continue;
+        const line = document.createElement('div');
+        line.className = 'wf-hour-line';
+        line.style.top = (rel / zoneSpan * 100) + '%';
+        cell.appendChild(line);
+      }
 
       const blocks = (getDayBlocks(key) || [])
         .slice().sort((a,b)=>a.startMin - b.startMin)
@@ -6052,44 +6086,92 @@ function renderFullWeek(keys) {
           return picked.id === z.id;
         });
 
-      if (!blocks.length) {
-        const emp = document.createElement('div');
-        emp.className = 'wf-cell-empty';
-        cell.appendChild(emp);
-      } else {
-        blocks.forEach(b=>{
-          const act = acts.find(a=>a.id===b.actId);
-          if (!act) return;
-          const startMinOfDay = b.startMin;
-          const hr = Math.floor(startMinOfDay/60);
-          const min = startMinOfDay % 60;
-          const timeStr = `${hr>12?hr-12:hr}:${String(min).padStart(2,'0')}${hr>=12?'p':'a'}`;
+      // Split blocks that overlap in time into side-by-side columns so
+      // vertical position always reflects the real start time.
+      const cols = wfAssignColumns(blocks);
 
-          const bg = b.colour || CAT_HEX[act.cat] || '#888';
-          const card = document.createElement('div');
-          card.className = 'wf-card' + (isLightColour(bg) ? ' light-bg' : '');
-          const dur = Math.max(5, b.durationMin || 0);
-          // Hybrid scaling: keep duration signal clearer while capping long blocks
-          // so school-day does not consume disproportionate vertical space.
-          const normalized = Math.log1p(dur) / Math.log1p(420);
-          const maxByZone = z.id === 'school' ? 114 : 132;
-          card.style.minHeight = Math.round(24 + Math.min(1, normalized) * maxByZone) + 'px';
-          card.style.background = bg;
-          card.innerHTML = `
-            <div class="wf-card-time">${timeStr}</div>
-            <div class="wf-card-icon">${act.icon}</div>
-            <div class="wf-card-name">${act.name}</div>
-            <div class="wf-card-dur">${formatDuration(b.durationMin)}</div>
-          `;
-          card.title = `${act.icon} ${act.name} — ${formatDuration(b.durationMin)}`;
-          card.onclick = (e)=>{ e.stopPropagation(); openDayFromWeekCard(key, ci, b.id); };
-          cell.appendChild(card);
-        });
-      }
+      blocks.forEach(b=>{
+        const act = acts.find(a=>a.id===b.actId);
+        if (!act) return;
+        const startMinOfDay = b.startMin;
+        const hr = Math.floor(startMinOfDay/60);
+        const min = startMinOfDay % 60;
+        const timeStr = `${hr>12?hr-12:hr}:${String(min).padStart(2,'0')}${hr>=12?'p':'a'}`;
+
+        // Position by time within the zone (clamped to the zone's span)
+        const relStart = b.startMin - START_MIN;
+        const dur = Math.max(5, b.durationMin || 0);
+        const segStart = Math.max(relStart, z.start);
+        const segEnd   = Math.min(relStart + dur, z.end);
+        const topPct = (segStart - z.start) / zoneSpan * 100;
+        const heightPct = Math.max(segEnd - segStart, 0) / zoneSpan * 100;
+        const pxHeight = heightPct / 100 * cellH;
+
+        const bg = b.colour || CAT_HEX[act.cat] || '#888';
+        const card = document.createElement('div');
+        let cls = 'wf-card' + (isLightColour(bg) ? ' light-bg' : '');
+        if (pxHeight < 34) cls += ' wf-card--slim';
+        if (pxHeight < 22) cls += ' wf-card--xslim';
+        card.className = cls;
+
+        const slot = cols.get(b.id) || { col: 0, count: 1 };
+        const colCount = slot.count;
+        const gap = 3; // px between overlapping columns
+        card.style.top = topPct + '%';
+        card.style.height = 'calc(' + heightPct + '% - 2px)';
+        card.style.left  = 'calc(' + (slot.col * 100 / colCount) + '% + 1px)';
+        card.style.width = 'calc(' + (100 / colCount) + '% - ' + (gap + 2) + 'px)';
+        card.style.background = bg;
+        card.innerHTML = `
+          <div class="wf-card-time">${timeStr}</div>
+          <div class="wf-card-icon">${act.icon}</div>
+          <div class="wf-card-name">${act.name}</div>
+          <div class="wf-card-dur">${formatDuration(b.durationMin)}</div>
+        `;
+        card.title = `${act.icon} ${act.name} — ${timeStr}, ${formatDuration(b.durationMin)}`;
+        card.onclick = (e)=>{ e.stopPropagation(); openDayFromWeekCard(key, ci, b.id); };
+        cell.appendChild(card);
+      });
 
       grid.appendChild(cell);
     });
   });
+}
+
+/* Assign overlapping blocks to columns (greedy) so time-positioned cards
+   never sit on top of each other. Returns a Map of id -> {col, count} where
+   count is the column count of that block's own overlap group. */
+function wfAssignColumns(blocks) {
+  const map = new Map();
+  const sorted = blocks.slice().sort((a,b)=> (a.startMin - b.startMin) || (a.durationMin - b.durationMin));
+  // Group runs of mutually-overlapping blocks, then column-pack each group.
+  let group = [];
+  let groupEnd = -Infinity;
+  const flush = ()=>{
+    if (!group.length) return;
+    const colEnds = []; // running end time per column
+    group.forEach(b=>{
+      const bStart = b.startMin;
+      const bEnd = b.startMin + (b.durationMin || 0);
+      let colIdx = colEnds.findIndex(end => end <= bStart);
+      if (colIdx === -1) { colIdx = colEnds.length; colEnds.push(bEnd); }
+      else { colEnds[colIdx] = bEnd; }
+      map.set(b.id, { col: colIdx });
+    });
+    const count = colEnds.length;
+    group.forEach(b=> { map.get(b.id).count = count; });
+    group = [];
+    groupEnd = -Infinity;
+  };
+  sorted.forEach(b=>{
+    const bStart = b.startMin;
+    const bEnd = b.startMin + (b.durationMin || 0);
+    if (bStart >= groupEnd && group.length) flush();
+    group.push(b);
+    groupEnd = Math.max(groupEnd, bEnd);
+  });
+  flush();
+  return map;
 }
 
 /* ════════════════════════════════════════════════════════════════
