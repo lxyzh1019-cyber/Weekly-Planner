@@ -1544,6 +1544,20 @@
   .wf-card-name { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   .wf-card-dur { font-size: 0.7rem; font-weight: 700; }
   .wf-card.light-bg { color: var(--ink); text-shadow: none; }
+  /* Quick-complete tick in the card corner — check off without opening detail */
+  .wf-card-check {
+    position: absolute; top: 3px; right: 3px;
+    width: 17px; height: 17px; border-radius: 5px;
+    border: 1.5px solid var(--ink); background: rgba(255,255,255,0.9);
+    color: var(--ink); font-size: 0.72rem; font-weight: 900; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; padding: 0; text-shadow: none; z-index: 2;
+  }
+  .wf-card-check:hover { background: #fff; transform: scale(1.1); }
+  .wf-card--done { opacity: 0.6; }
+  .wf-card--done .wf-card-name { text-decoration: line-through; }
+  .wf-card--done .wf-card-check { background: var(--accent-green); color: var(--ink); }
+  .wf-card--xslim .wf-card-check { display: none; } /* too short to tap reliably */
   /* Short blocks: drop the duration/time chips so the name + icon still fit */
   .wf-card.wf-card--slim { padding: 0.1rem 0.4rem; align-items: center; }
   .wf-card.wf-card--slim .wf-card-dur { display: none; }
@@ -2629,7 +2643,13 @@
   }
   /* Slot rows: fixed short height so all 15 hours fit one page. */
   .print-cell, .print-time-cell { height: var(--print-slot); }
-  .print-time-cell { overflow: hidden; }
+  /* Centre the hour label in its cell (both axes) so it prints cleanly on the
+     hour line instead of floating right-aligned against the border. */
+  .print-time-cell {
+    overflow: visible;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+  }
   /* Day cells must let a multi-slot block overflow downward over the
      rows it spans — the previous overflow:hidden clipped every block
      to a single 15-min sliver. */
@@ -2639,7 +2659,7 @@
     font-family: 'Gochi Hand', cursive; font-size: 10pt;
     min-height: 18px; overflow: hidden;
   }
-  .print-time-cell { font-size: 7pt; color: #666; text-align: right; font-weight: 600; }
+  .print-time-cell { font-size: 7.5pt; color: #444; text-align: center; font-weight: 700; }
   .print-block {
     position: absolute; left: 1px; right: 1px; top: 0; z-index: 1;
     border-radius: 4px; padding: 1px 4px;
@@ -5467,6 +5487,24 @@ function completeQuest(blockId) {
   }, 1100);
 }
 
+/* Quick-complete: flip a block's done state straight from the week/day view
+   without opening the detail sheet. Mirrors the edit sheet's "Mark done"
+   toggle (no XP accounting, so it's freely reversible). */
+function toggleBlockDone(dayKey, blockId, ev) {
+  if (ev) ev.stopPropagation();
+  const blocks = getDayBlocks(dayKey) || [];
+  const blk = blocks.find(b => b.id === blockId);
+  if (!blk) return;
+  blk.completed = !blk.completed;
+  setDayBlocks(dayKey, blocks);
+  const nowDone = blk.completed;
+  const active = document.querySelector('.screen.active');
+  if (active && active.id === 'screen-week') renderWeek();
+  else if (active && active.id === 'screen-day') buildTimeline();
+  else if (active && active.id === 'screen-quest') renderQuestBoard();
+  showToast(nowDone ? 'Done! ✓' : 'Marked not done');
+}
+
 function showQuestCompletePopup(act, result) {
   const pop = document.getElementById('questPopup');
   document.getElementById('questPopupIcon').textContent = act.icon || '⭐';
@@ -6112,6 +6150,7 @@ function renderFullWeek(keys) {
         let cls = 'wf-card' + (isLightColour(bg) ? ' light-bg' : '');
         if (pxHeight < 34) cls += ' wf-card--slim';
         if (pxHeight < 22) cls += ' wf-card--xslim';
+        if (b.completed) cls += ' wf-card--done';
         card.className = cls;
 
         const slot = cols.get(b.id) || { col: 0, count: 1 };
@@ -6127,6 +6166,8 @@ function renderFullWeek(keys) {
           <div class="wf-card-icon">${act.icon}</div>
           <div class="wf-card-name">${act.name}</div>
           <div class="wf-card-dur">${formatDuration(b.durationMin)}</div>
+          <button type="button" class="wf-card-check" aria-label="${b.completed?'Mark not done':'Mark done'}"
+            onclick="toggleBlockDone('${key}','${b.id}',event)">${b.completed?'✓':''}</button>
         `;
         card.title = `${act.icon} ${act.name} — ${timeStr}, ${formatDuration(b.durationMin)}`;
         card.onclick = (e)=>{ e.stopPropagation(); openDayFromWeekCard(key, ci, b.id); };
