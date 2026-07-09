@@ -1960,6 +1960,31 @@
   .block-close-btn:hover {
     background: rgba(255,255,255,0.9);
   }
+  /* Quick-complete tick, sits just left of the × */
+  .block-done-btn {
+    position: absolute;
+    top: 4px;
+    right: 30px;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    border: 1.5px solid var(--ink);
+    background: rgba(255,255,255,0.75);
+    color: var(--ink);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.82rem;
+    font-weight: 900;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 14;
+  }
+  .block-done-btn:hover { background: rgba(255,255,255,0.95); transform: scale(1.08); }
+  .block-done-btn.done { background: var(--accent-green); color: var(--ink); }
+  /* On short/compact blocks there isn't room for both buttons — hide the
+     tick there (the block can still be checked from the week view or detail). */
+  .placed-block.compact .block-done-btn { display: none; }
   /* Doodle decorations scattered around blocks */
   .tl-doodle {
     position: absolute;
@@ -2427,6 +2452,21 @@
   .custom-builder label { font-family:'Gochi Hand', cursive; font-size: 1rem; color: var(--ink-light); margin-bottom: 0.2rem; display: block; }
   .custom-builder .row { display:flex; gap: 0.5rem; }
   .custom-builder .row > * { flex: 1; }
+  /* Tap-to-pick emoji grid */
+  .emoji-grid {
+    display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px;
+    margin-bottom: 0.6rem; max-height: 148px; overflow-y: auto;
+    padding: 4px; background: var(--bg); border: 2px dashed var(--paper-line);
+    border-radius: 12px;
+  }
+  .emoji-cell {
+    aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    font-size: 1.15rem; line-height: 1; padding: 0; cursor: pointer;
+    background: #fff; border: 2px solid transparent; border-radius: 9px;
+  }
+  .emoji-cell:hover { border-color: var(--paper-line); transform: scale(1.08); }
+  .emoji-cell.selected { border-color: var(--ink); background: var(--accent-yellow); box-shadow: 1.5px 1.5px 0 var(--ink); }
+  @media (max-width: 420px) { .emoji-grid { grid-template-columns: repeat(6, 1fr); } }
 
   /* ═══════════ TOAST ═══════════ */
   .toast {
@@ -2695,6 +2735,13 @@
        per block (see printTextColor / printBlockFontPt). */
     display: flex; align-items: center; justify-content: center;
     text-align: center;
+  }
+  /* Printable empty tick box in the block's top-right corner */
+  .print-check {
+    position: absolute; top: 2px; right: 2px;
+    width: 9px; height: 9px; border-radius: 2px;
+    border: 1px solid currentColor; background: rgba(255,255,255,0.55);
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
 
   /* Scrollbar polish */
@@ -3963,7 +4010,7 @@
       <div class="row">
         <div>
           <label>Icon (emoji)</label>
-          <input type="text" id="customIcon" placeholder="🎸" maxlength="2" aria-label="Activity icon (emoji)">
+          <input type="text" id="customIcon" placeholder="🎸" maxlength="2" aria-label="Activity icon (emoji)" oninput="syncEmojiGrid('customEmojiGrid', this.value)">
         </div>
         <div>
           <label>Default Duration</label>
@@ -3976,6 +4023,8 @@
           </select>
         </div>
       </div>
+      <label>Or tap an icon</label>
+      <div class="emoji-grid" id="customEmojiGrid"></div>
       <label>Category</label>
       <select id="customCat">
         <option value="sleep">😴 Rest</option>
@@ -4000,7 +4049,7 @@
       <div class="row">
         <div>
           <label>Icon (emoji)</label>
-          <input type="text" id="paIcon" placeholder="🎾" maxlength="2">
+          <input type="text" id="paIcon" placeholder="🎾" maxlength="2" oninput="syncEmojiGrid('paEmojiGrid', this.value)">
         </div>
         <div>
           <label>Default Duration</label>
@@ -4013,6 +4062,8 @@
           </select>
         </div>
       </div>
+      <label>Or tap an icon</label>
+      <div class="emoji-grid" id="paEmojiGrid"></div>
       <label>Category</label>
       <select id="paCat">
         <option value="sleep">😴 Rest</option>
@@ -6850,9 +6901,14 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
   const closeHtml = !isBuffer
     ? `<button type="button" class="block-close-btn" aria-label="Clear selected activity" onclick="event.stopPropagation(); cancelCreatePlacement(null, true)">×</button>`
     : '';
+  // Quick-complete tick — mark this block done straight from the timeline.
+  const doneHtml = !isBuffer
+    ? `<button type="button" class="block-done-btn${b.completed?' done':''}" aria-label="${b.completed?'Mark not done':'Mark done'}" onclick="event.stopPropagation(); toggleBlockDone(currentDayKey,'${b.id}',event)">${b.completed?'✓':''}</button>`
+    : '';
 
   blockEl.innerHTML = `
     ${closeHtml}
+    ${doneHtml}
     ${nameHtml}
     ${metaHtml}
     ${!isBuffer && b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="block-stopwatch-btn" onclick="event.stopPropagation(); startBlockStopwatch('${b.id}')">⏱ Start stopwatch</button>` : ''}
@@ -7502,7 +7558,7 @@ function buildTray() {
   const addChip = document.createElement('div');
   addChip.className = 'chip-add';
   addChip.innerHTML = '<div style="font-size:1.6rem">＋</div><div>Custom</div>';
-  addChip.onclick = ()=>openSheet('customOverlay');
+  addChip.onclick = ()=>openCustomActivity();
   tray.appendChild(addChip);
   enhanceAccessibility(document.getElementById('screen-day'));
 }
@@ -8761,6 +8817,49 @@ function clearDay() {
 /* ════════════════════════════════════════════════════════════════
    CUSTOM ACTIVITY & TASK
 ════════════════════════════════════════════════════════════════ */
+
+/* Tap-to-pick emoji grid for activity icons (easier than typing an emoji,
+   especially on desktop). */
+const EMOJI_PICKER = [
+  '⚽','🏀','🎾','🏐','🏊','🚴','🏃','⛸️','🤸','🥋','🧗','🏋️','🛹','⛹️','🥅',
+  '🎸','🎹','🎺','🎻','🥁','🎨','🖌️','🎭','🎤','🩰','🎬',
+  '📚','📖','✏️','🔬','🧪','🧮','🌍','💻','📝','🗣️','🎓',
+  '🍽️','🥣','🍳','🛁','🪥','🧹','🧺','🛏️','👕','🐶','🌳',
+  '🎮','🧩','♟️','🎲','🪁','🎈','⭐','🎯','💤','🧸'
+];
+
+function renderEmojiGrid(gridId, inputId, current) {
+  const grid = document.getElementById(gridId);
+  if (!grid) return;
+  grid.innerHTML = '';
+  EMOJI_PICKER.forEach(e => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'emoji-cell' + (e === current ? ' selected' : '');
+    btn.textContent = e;
+    btn.setAttribute('aria-label', 'Use ' + e);
+    btn.onclick = () => {
+      const input = document.getElementById(inputId);
+      if (input) input.value = e;
+      syncEmojiGrid(gridId, e);
+    };
+    grid.appendChild(btn);
+  });
+}
+
+/* Highlight the cell that matches the typed value (keeps grid + input in sync). */
+function syncEmojiGrid(gridId, current) {
+  const grid = document.getElementById(gridId);
+  if (!grid) return;
+  [...grid.children].forEach(c => c.classList.toggle('selected', c.textContent === current));
+}
+
+function openCustomActivity() {
+  openSheet('customOverlay');
+  const cur = (document.getElementById('customIcon').value || '').trim();
+  renderEmojiGrid('customEmojiGrid', 'customIcon', cur);
+}
+
 function confirmCustomActivity() {
   const name = document.getElementById('customName').value.trim();
   const icon = document.getElementById('customIcon').value.trim() || '⭐';
@@ -9289,6 +9388,7 @@ function openParentActivityEditor(owner, id) {
     document.getElementById('paDur').value = '60';
     document.getElementById('paCat').value = 'free';
     document.getElementById('paVisibility').value = 'shared';
+    renderEmojiGrid('paEmojiGrid', 'paIcon', '');
     openSheet('parentActivityOverlay');
     return;
   }
@@ -9302,6 +9402,7 @@ function openParentActivityEditor(owner, id) {
   document.getElementById('paDur').value = String(act.durationMin || 60);
   document.getElementById('paCat').value = act.cat || 'free';
   document.getElementById('paVisibility').value = owner==='shared' ? 'shared' : owner;
+  renderEmojiGrid('paEmojiGrid', 'paIcon', act.icon || '');
   openSheet('parentActivityOverlay');
 }
 
@@ -11245,7 +11346,9 @@ function renderPrintSheet() {
         const slotSpan = Math.max(1, Math.round((segEnd - segStart)/15));
         const bh = slotSpan*slotPx - 1;
         const bg = b.colour || CAT_HEX[act.cat] || '#888';
-        blockHtml += `<div class="print-block" style="background:${bg};color:${printTextColor(bg)};font-size:${printBlockFontPt(bh)}pt;height:${bh}px">${act.icon} ${act.name}</div>`;
+        // Empty tick box so it can be checked off on the printed page.
+        const checkbox = bh >= 15 ? `<span class="print-check" style="border-color:${printTextColor(bg)}"></span>` : '';
+        blockHtml += `<div class="print-block" style="background:${bg};color:${printTextColor(bg)};font-size:${printBlockFontPt(bh)}pt;height:${bh}px">${checkbox}${act.icon} ${act.name}</div>`;
       });
       html += `<div class="print-cell">${blockHtml}</div>`;
     });
