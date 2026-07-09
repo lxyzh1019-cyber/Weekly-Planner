@@ -4661,7 +4661,7 @@ const AFTERSCHOOL_REWARD_ITEMS = [
 ];
 
 let ts  = { durationMin:120, colour: CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays: [], travelBuffer:false, getReadyBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15 };
-let as_ = { durationMin:60,  colour: COLOURS[0], note:'', repeat:false, repeatDays: [], travelBuffer:false, travelBufMin:15, choreTag: null };
+let as_ = { durationMin:60,  colour: COLOURS[0], note:'', repeat:false, repeatDays: [], travelBuffer:false, travelBufMin:15, choreTags: [] };
 
 function isParent() { return profile === 'parent'; }
 function activeProfile() { return isParent() ? parentViewing : profile; }
@@ -7001,11 +7001,15 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
   const noteHtml = (!isCompact && noteTrim)
     ? `<div class="block-note">${escapeHtml(noteTrim)}</div>`
     : '';
+  // For a multi-chore House-Chore block, show the tagged chores in the name.
+  const choreList = (b.actId === 'chores' && Array.isArray(b.choreTags) && b.choreTags.length)
+    ? b.choreTags.join(', ') : '';
+  const displayName = choreList ? `${act.name}: ${choreList}` : act.name;
   const nameHtml = isBuffer
     ? ''
     : (isCompact && noteTrim)
     ? `<div class="block-name block-name--inline">${act.icon} <span class="block-title">${escapeHtml(act.name)}</span><span class="block-note-inline" title="${escapeHtml(noteTrim).replace(/"/g,'&quot;')}"> · ${escapeHtml(noteTrim)}</span></div>`
-    : `<div class="block-name">${act.icon} ${escapeHtml(act.name)}</div>`;
+    : `<div class="block-name">${act.icon} ${escapeHtml(displayName)}</div>`;
   const metaHtml = isBuffer
     ? `<div class="block-meta"><span class="travel-buf-label">${escapeHtml(b._bufferLabel || '')}</span></div>`
     : `<div class="block-meta">${durStr}${badges?' '+badges:''}</div>`;
@@ -7360,7 +7364,7 @@ function handleCanvasTap(e, zMinStart) {
     ts = { durationMin: selectedActivity.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15 };
     openTrainingSheet();
   } else {
-    as_ = { durationMin: selectedActivity.durationMin||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15, choreTag: null };
+    as_ = { durationMin: selectedActivity.durationMin||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15, choreTags: [] };
     openActivitySheet();
   }
 }
@@ -7446,7 +7450,8 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
     objectives: objectives||[],
     note: note||'',
     tag: opts.tag||null,
-    choreTag: opts.choreTag||null,
+    choreTags: opts.choreTags || (opts.choreTag ? [opts.choreTag] : null),
+    choreTag: opts.choreTag || (opts.choreTags && opts.choreTags[0]) || null,
     parentPinned: isParent() ? true : false,
     travelBuffer: !!opts.travelBuffer,
     getReadyBuffer: !!opts.getReadyBuffer,
@@ -7906,11 +7911,18 @@ function renderActivitySheet() {
       const picker = document.getElementById('choreTypePicker');
       if (picker) {
         picker.innerHTML = '';
-        ['General', ...CT_CHORES].forEach(tag => {
+        if (!Array.isArray(as_.choreTags)) as_.choreTags = [];
+        // Multi-select: tag several chores on one House-Chore block. All the
+        // selected chores sync to the chore tab when the block is completed.
+        ctPickableChoreNames().forEach(tag => {
           const b = document.createElement('button');
-          b.className = 'pill-btn' + (as_.choreTag === tag ? ' active' : '');
-          b.textContent = tag;
-          b.onclick = () => { as_.choreTag = tag; renderActivitySheet(); };
+          const on = as_.choreTags.includes(tag);
+          b.className = 'pill-btn' + (on ? ' active' : '');
+          b.textContent = (on ? '✓ ' : '') + tag;
+          b.onclick = () => {
+            as_.choreTags = on ? as_.choreTags.filter(t => t !== tag) : [...as_.choreTags, tag];
+            renderActivitySheet();
+          };
           picker.appendChild(b);
         });
       }
@@ -7932,7 +7944,7 @@ function confirmActivity() {
     travelBufMin: as_.travelBufMin,
     repeatDateStart: dateStart || null,
     repeatDateEnd:   dateEnd   || null,
-    choreTag: isChoreBlock ? (as_.choreTag || 'General') : null,
+    choreTags: isChoreBlock ? (as_.choreTags || []).slice() : null,
   });
   closeSheet('activityOverlay');
   showToast('Block placed ✅');
@@ -8832,21 +8844,30 @@ function togglePin() {
 }
 
 function ctAutoCheckOptionalFromBlock(blk, dayKey) {
-  const choreName = blk.choreTag;
-  if (!choreName || choreName === 'General' || !ctAllChoreNames().includes(choreName)) return;
+  // A House-Chore block can tag several chores; sync each one to the chore tab.
+  const tags = (Array.isArray(blk.choreTags) && blk.choreTags.length)
+    ? blk.choreTags
+    : (blk.choreTag ? [blk.choreTag] : []);
+  const valid = tags.filter(t => t && t !== 'General' && ctAllChoreNames().includes(t));
+  if (!valid.length) return;
   const kid = isParent() ? parentViewing : activeProfile();
   const wk = ctWeekKeyForDate(dayKey);
   const mon = formatDayKey(wk);
   const day = formatDayKey(dayKey);
   const dayIdx = Math.round((day - mon) / (24*60*60*1000));
   if (dayIdx < 0 || dayIdx > 6) return;
-  if (ctGetOptional(wk, dayIdx, kid, choreName)) return;
-  ctSetOptional(wk, dayIdx, kid, choreName, true);
+  const newlyChecked = [];
+  valid.forEach(name => {
+    if (ctGetOptional(wk, dayIdx, kid, name)) return;
+    ctSetOptional(wk, dayIdx, kid, name, true);
+    newlyChecked.push(name);
+  });
+  if (!newlyChecked.length) return;
   const fired = ctCheckGroupPayouts(wk, dayIdx, kid);
   ctMaybeFireGoalBonus(wk, kid);
   // Caller performs saveAll().
   if (fired.length) ctCelebrateGroupPayouts(fired, 'screen-chore');
-  else showToast(`✨ ${choreName} optional chore checked!`);
+  else showToast(`✨ ${newlyChecked.length === 1 ? newlyChecked[0] + ' chore' : newlyChecked.length + ' chores'} checked!`);
 }
 
 function toggleConfirm() {
@@ -10373,6 +10394,58 @@ function ctEnsureShared() {
   if (!c.groupPayoutsFired) c.groupPayoutsFired = {}; // {[weekKey]:{[groupId]:{[kid]:{weekly:true,total}|{days:{dayIdx:true},total}}}}
   if (!c.moneySnapshots) c.moneySnapshots = {};    // {[weekKey]:{jenn:$,jess:$}} — historical weeks frozen at migration
   if (!c.groupsMigration) c.groupsMigration = { done: false };
+  if (!c.customChores) c.customChores = [];        // parent-added chore names
+  if (!c.hiddenChores) c.hiddenChores = [];        // base/custom names hidden from the pickable list
+}
+/* Chore names a parent can pick/assign right now: base defaults + custom,
+   minus any they've hidden. (ctAllChoreNames keeps the full union incl.
+   hidden + group-referenced, for validating existing tagged blocks.) */
+function ctPickableChoreNames() {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  const hidden = new Set(c.hiddenChores || []);
+  const set = new Set([...CT_CHORES, ...(c.customChores || [])]);
+  return [...set].filter(n => !hidden.has(n));
+}
+function ctAddChore(name) {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  const trimmed = (name || '').trim();
+  if (!trimmed) return false;
+  // un-hide if it was hidden; add to custom if genuinely new
+  c.hiddenChores = (c.hiddenChores || []).filter(n => n !== trimmed);
+  const known = new Set([...CT_CHORES, ...(c.customChores || [])]);
+  if (!known.has(trimmed)) c.customChores.push(trimmed);
+  saveAll();
+  return true;
+}
+function ctRemoveChore(name) {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  // Custom names are removed outright; base names are hidden (data keyed by
+  // name in past weeks/groups stays intact).
+  if ((c.customChores || []).includes(name)) {
+    c.customChores = c.customChores.filter(n => n !== name);
+  }
+  if (CT_CHORES.includes(name) && !(c.hiddenChores || []).includes(name)) {
+    c.hiddenChores.push(name);
+  }
+  saveAll();
+}
+function ctRenameChore(oldName, newName) {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  const nn = (newName || '').trim();
+  if (!nn || nn === oldName) return;
+  // Only custom chores can be renamed in place; base names are added-as-new.
+  if ((c.customChores || []).includes(oldName)) {
+    c.customChores = c.customChores.map(n => n === oldName ? nn : n);
+    // repoint any group references
+    (c.groups || []).forEach(g => { g.choreIds = (g.choreIds || []).map(id => id === oldName ? nn : id); });
+  } else {
+    ctAddChore(nn);
+  }
+  saveAll();
 }
 function ctEnsureProfile(p) {
   if (!p.chore) p.chore = {};
@@ -10417,8 +10490,10 @@ function ctGroups() { ctEnsureShared(); return state.shared.chore.groups; }
 function ctGroupsForKid(kid) { return ctGroups().filter(g => g.kid === kid || g.kid === 'both'); }
 function ctGroupById(gid) { return ctGroups().find(g => g.id === gid) || null; }
 function ctAllChoreNames() {
-  // CT_CHORES first (stable order), then any custom names introduced by groups
-  const set = new Set(CT_CHORES);
+  // Full union for validation: base + parent-custom + any names introduced by
+  // groups (includes hidden names so existing tagged blocks still resolve).
+  ctEnsureShared();
+  const set = new Set([...CT_CHORES, ...(state.shared.chore.customChores || [])]);
   for (const g of ctGroups()) for (const c of (g.choreIds || [])) set.add(c);
   return [...set];
 }
@@ -10699,6 +10774,48 @@ function ctHandleWrapClick(e) {
   else if (a === 'edit-group') ctOpenGroupEditor(el.dataset.groupId);
   else if (a === 'delete-group') ctDeleteGroup(el.dataset.groupId);
   else if (a === 'new-group') ctOpenGroupEditor(null);
+  else if (a === 'add-chore') ctPromptAddChore();
+  else if (a === 'rename-chore') ctPromptRenameChore(el.dataset.chore);
+  else if (a === 'remove-chore') ctPromptRemoveChore(el.dataset.chore);
+}
+function ctPromptAddChore() {
+  const name = (prompt('New chore name:', '') || '').trim();
+  if (!name) return;
+  if (ctAddChore(name)) { showToast(`Added "${name}" 🧽`); renderChoreTab(); }
+}
+function ctPromptRenameChore(oldName) {
+  const nn = (prompt('Rename chore:', oldName) || '').trim();
+  if (!nn || nn === oldName) return;
+  const isCustom = (state.shared.chore.customChores || []).includes(oldName);
+  ctRenameChore(oldName, nn);
+  showToast(isCustom ? `Renamed to "${nn}"` : `Added "${nn}" (base chores keep their name)`);
+  renderChoreTab();
+}
+function ctPromptRemoveChore(name) {
+  const isCustom = (state.shared.chore.customChores || []).includes(name);
+  if (!confirm(isCustom ? `Remove "${name}"?` : `Hide "${name}" from the pickable list? (Past weeks keep their data.)`)) return;
+  ctRemoveChore(name);
+  showToast(isCustom ? `Removed "${name}"` : `Hid "${name}"`);
+  renderChoreTab();
+}
+// Parent-only manager to add / rename / hide the base chore names.
+function ctRenderChoreNamesCard() {
+  if (!isParent()) return '';
+  const rows = ctPickableChoreNames().map(cn => {
+    const isCustom = (state.shared.chore.customChores || []).includes(cn);
+    return `<div class="ct-item">
+      <div class="ct-item-left"><span>🧽 ${escapeHtml(cn)}</span>${isCustom ? '<span class="ct-badge">custom</span>' : ''}</div>
+      <span style="display:flex;gap:0.3rem">
+        <button type="button" class="btn-icon" data-ct-action="rename-chore" data-chore="${escapeAttr(cn)}" aria-label="Rename ${escapeAttr(cn)}">✏️</button>
+        <button type="button" class="btn-icon" data-ct-action="remove-chore" data-chore="${escapeAttr(cn)}" aria-label="Remove ${escapeAttr(cn)}">🗑</button>
+      </span>
+    </div>`;
+  }).join('');
+  return `<div class="chore-card"><h3>🧽 Chore names</h3>
+    <div class="ct-meta">The chores kids can tag on a House-Chore block and check off. Base chores hide (data kept); custom chores rename/remove.</div>
+    ${rows}
+    <div style="margin-top:0.5rem"><button type="button" class="pill-btn" data-ct-action="add-chore">+ New chore</button></div>
+  </div>`;
 }
 // One optional-chore check row (keyboard-accessible button, role=checkbox).
 function ctOptCheckRow(kid, choreName, extra = '', badge = '') {
@@ -10810,7 +10927,7 @@ function ctRenderGroupCards(kid) {
 function ctRenderExtraChoresCard(kid) {
   const inGroups = new Set();
   ctGroupsForKid(kid).forEach(g => (g.choreIds || []).forEach(cn => inGroups.add(cn)));
-  const extras = ctAllChoreNames().filter(cn => !inGroups.has(cn));
+  const extras = ctPickableChoreNames().filter(cn => !inGroups.has(cn));
   if (!extras.length) return '';
   const rows = extras.map(cn => ctOptCheckRow(kid, cn, '', `<span class="ct-badge">extra</span>`)).join('');
   return `<div class="chore-card"><h3>Extra chores</h3>
@@ -11124,6 +11241,7 @@ function renderChoreTab() {
       ${ctRenderGroupCards(kid)}
       ${ctRenderExtraChoresCard(kid)}
       ${ctRenderGroupManagerCard()}
+      ${ctRenderChoreNamesCard()}
       ${ctRenderSummaryTable()}
     </div>
   `;
