@@ -2247,6 +2247,22 @@
     cursor: pointer; display: flex; align-items: center; justify-content: center;
   }
   .tip-dismiss:hover { background: #fff; }
+  .wins-btn { border: 1.5px solid var(--ink); background: var(--accent-yellow); border-radius: 999px; padding: 0.1rem 0.5rem; font-weight: 800; font-size: 0.8rem; cursor: pointer; font-family: 'Patrick Hand', sans-serif; }
+  .wins-btn:hover { background: #ffe08a; }
+  /* Weekly wins recap modal */
+  .wins-hero { text-align: center; font-family: 'Gochi Hand', cursive; font-size: 1.3rem; color: var(--accent); margin-bottom: 0.6rem; }
+  .wins-stat-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+  .wins-stat { flex: 1; text-align: center; border: 2px solid var(--ink); border-radius: 12px; padding: 0.5rem 0.25rem; background: var(--bg2); }
+  .wins-num { font-family: 'Gochi Hand', cursive; font-size: 1.5rem; font-weight: 800; color: var(--ink); }
+  .wins-lbl { font-size: 0.72rem; font-weight: 700; color: var(--ink-light); }
+  .wins-cats { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; margin-top: 0.4rem; }
+  .wins-chip { font-size: 0.82rem; background: #fff; border: 1.5px solid var(--ink); border-radius: 999px; padding: 0.1rem 0.55rem; }
+  /* Parent proud-stamp picker (#5) */
+  .parent-stamp-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; padding: 0.4rem 0; }
+  .parent-stamp-picker { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+  .stamp-cell { width: 34px; height: 34px; border: 2px solid var(--ink); border-radius: 9px; background: #fff; font-size: 1.15rem; line-height: 1; cursor: pointer; padding: 0; }
+  .stamp-cell.selected { background: var(--accent-yellow); box-shadow: 1.5px 1.5px 0 var(--ink); }
+  .badge-stamp { background: #ffe3ef; }
   /* Evening wind-down reminder inside the day Next-Up banner */
   .bedtime-tip {
     margin-top: 0.4rem; padding-top: 0.35rem;
@@ -3065,6 +3081,17 @@
   .quest-board-date { font-size: 0.85rem; color: var(--ink-light); font-weight: 600; }
 
   .quest-list { display: flex; flex-direction: column; gap: 0.75rem; }
+  /* Sticker collection (#8) */
+  .sticker-collection { margin-top: 1rem; }
+  .sticker-head { font-family: 'Gochi Hand', cursive; font-size: 1.15rem; font-weight: 700; color: var(--ink); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
+  .sticker-count { font-family: 'Patrick Hand', sans-serif; font-size: 0.9rem; background: var(--accent-yellow); border: 2px solid var(--ink); border-radius: 999px; padding: 0.05rem 0.55rem; }
+  .sticker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+  .sticker-cell { border: 2px solid var(--ink); border-radius: 14px; padding: 0.5rem 0.25rem; text-align: center; background: #fff; }
+  .sticker-cell.locked { opacity: 0.55; background: var(--bg2); border-style: dashed; }
+  .sticker-cell.got { background: linear-gradient(135deg,#fff6d6,#ffe3ef); box-shadow: 2px 2px 0 var(--ink); }
+  .sticker-emoji { font-size: 1.7rem; line-height: 1.1; }
+  .sticker-name { font-size: 0.66rem; font-weight: 700; color: var(--ink); margin-top: 0.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 380px) { .sticker-grid { grid-template-columns: repeat(3, 1fr); } }
   .quest-card {
     background: #fff; border: 3px solid var(--ink); border-radius: 18px;
     box-shadow: 4px 4px 0 var(--ink);
@@ -3304,6 +3331,7 @@
 
   <button type="button" class="quest-add-btn" onclick="goPlanToday()">＋ Add a quest for today</button>
   <div class="quest-list" id="questList"></div>
+  <div class="sticker-collection" id="questStickers"></div>
 </div>
 
 <!-- Quest Complete popup -->
@@ -3904,6 +3932,10 @@
         <div class="toggle-track"><div class="toggle-knob"></div></div>
         <span class="toggle-label">✅ Mark this activity done</span>
       </div>
+      <div id="editParentStampRow" class="parent-stamp-row" style="display:none">
+        <span class="toggle-label">💖 Proud stamp</span>
+        <div class="parent-stamp-picker" id="editParentStampPicker"></div>
+      </div>
     </div>
     <div class="buffer-dur-row" id="editTravelDurRow" style="display:none">
       <label for="editTravelBufMin">Travel minutes (each way)</label>
@@ -4018,6 +4050,16 @@
     <p style="font-size:0.9rem;color:var(--ink-light);margin-bottom:0.8rem">This replaces your current plan for this day.</p>
     <button class="pill-btn" style="width:100%;margin-bottom:0.5rem;font-size:1rem" onclick="applyTemplate('school')">🏫 School Day</button>
     <button class="pill-btn" style="width:100%;font-size:1rem" onclick="applyTemplate('weekend')">🌈 Weekend</button>
+  </div>
+</div>
+
+<!-- Weekly Wins recap (#6) -->
+<div class="overlay" id="weeklyWinsOverlay" onclick="overlayClick(event,'weeklyWinsOverlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3>🎉 This week's wins</h3>
+    <div id="weeklyWinsBody"></div>
+    <button class="btn-confirm" onclick="closeSheet('weeklyWinsOverlay')">Awesome! 🙌</button>
   </div>
 </div>
 
@@ -4890,6 +4932,9 @@ function getProfData(p=activeProfile()) {
   if (!prof.progress.unlockedThisWeek) prof.progress.unlockedThisWeek = {};
   if (!prof.progress.unlockedChecklistItems) prof.progress.unlockedChecklistItems = {};
   if (prof.progress.manualPlacedCount == null) prof.progress.manualPlacedCount = 0;
+  if (!Array.isArray(prof.progress.stickers)) prof.progress.stickers = [];      // unlocked collectible ids
+  if (prof.progress.tasksCompleted == null) prof.progress.tasksCompleted = 0;   // lifetime completions
+  if (!prof.progress.completedByCat) prof.progress.completedByCat = {};         // per-category completions
   if (prof.progress.streakFreezeTokens == null) prof.progress.streakFreezeTokens = 1;
   if (!prof.progress.streakFreezeWeek) prof.progress.streakFreezeWeek = dateToLocalKey(getWeekStart(weekOffset));
   const wk = dateToLocalKey(getWeekStart(weekOffset));
@@ -5143,7 +5188,13 @@ function markRoutineProgressOnChecklistToggle(block, act, prevDone, nextDone, to
   else {
     const gapDays = Math.round((formatDayKey(today) - formatDayKey(st.lastDay)) / (24*60*60*1000));
     if (gapDays === 1) st.count += 1;
-    else if (gapDays > 1 && pr.streakFreezeTokens > 0) {
+    else if (gapDays === 2) {
+      // Forgiving streak: one missed day is always forgiven, so a single
+      // off-day never wipes out the child's progress.
+      st.count += 1;
+      showToast('Grace day — your streak is safe 💛');
+    }
+    else if (gapDays > 2 && pr.streakFreezeTokens > 0) {
       pr.streakFreezeTokens -= 1;
       st.count += 1;
       showToast('Streak freeze used — nice recovery ⭐');
@@ -5483,6 +5534,7 @@ function renderQuestBoard() {
   document.getElementById('questBoardDate').textContent = dateStr;
 
   renderQuestMoneyStrip(p);
+  renderStickerCollection(p);
 
   // Today's quests = today's blocks
   const key = todayKey();
@@ -5527,6 +5579,24 @@ function renderQuestBoard() {
       </div>
     `;
   }).join('');
+}
+
+// Sticker collection on the Quest Board — earned by real habits (#8).
+function renderStickerCollection(kid) {
+  const el = document.getElementById('questStickers');
+  if (!el) return;
+  const pd = getProfData(kid);
+  const have = new Set((pd && pd.progress && pd.progress.stickers) || []);
+  const earned = STICKER_DEFS.filter(d => have.has(d.id)).length;
+  const cells = STICKER_DEFS.map(d => {
+    const got = have.has(d.id);
+    return `<div class="sticker-cell ${got ? 'got' : 'locked'}" title="${escapeHtml(got ? d.name : d.hint)}">
+      <div class="sticker-emoji">${got ? d.emoji : '🔒'}</div>
+      <div class="sticker-name">${escapeHtml(got ? d.name : '???')}</div>
+    </div>`;
+  }).join('');
+  el.innerHTML = `<div class="sticker-head">🎖️ Sticker collection <span class="sticker-count">${earned}/${STICKER_DEFS.length}</span></div>
+    <div class="sticker-grid">${cells}</div>`;
 }
 
 // Read-only pocket-money summary on the Quest Board (kids never open the chore tab otherwise).
@@ -5616,17 +5686,90 @@ function completeQuest(blockId) {
    the toast. */
 function awardBlockLinks(blk, dayKey) {
   let msg = '';
+  const kid = isParent() ? parentViewing : activeProfile();
+  const act = getAllActivities().find(a => a.id === blk.actId);
   if (!blk.xpAwarded) {
     blk.xpAwarded = true;
     const r = addQuestXP(QUEST_XP_PER_TASK);
     msg = ` +${QUEST_XP_PER_TASK} XP`;
     if (r && r.leveledUp) msg += ' • LEVEL UP! 🎉';
+    // Count the completion toward the collectible-sticker milestones (#8).
+    const pd = getProfData(kid);
+    if (pd && pd.progress) {
+      pd.progress.tasksCompleted = (pd.progress.tasksCompleted || 0) + 1;
+      if (act) {
+        pd.progress.completedByCat = pd.progress.completedByCat || {};
+        pd.progress.completedByCat[act.cat] = (pd.progress.completedByCat[act.cat] || 0) + 1;
+      }
+      const newStickers = checkStickerUnlocks(kid);
+      if (newStickers.length) msg += ` • New sticker ${newStickers[0].emoji}!`;
+    }
   }
-  const kid = isParent() ? parentViewing : activeProfile();
-  const act = getAllActivities().find(a => a.id === blk.actId);
   if (act && act.isRoutine && act.routineId) ctAwardMandatoryFromRoutine(act.routineId, kid, dayKey);
   if (blk.actId === 'chores') ctAutoCheckOptionalFromBlock(blk, dayKey);
   return msg;
+}
+
+/* ── #5 Parent "proud of you" stamp: a warm mark a parent drops on a block ── */
+const PARENT_STAMPS = ['⭐','🏆','💖','👏','🌟','🔥','💪','🦄'];
+function renderParentStampPicker(block) {
+  const row = document.getElementById('editParentStampRow');
+  const picker = document.getElementById('editParentStampPicker');
+  if (!row || !picker) return;
+  // Only parents can award a stamp; kids just see it on the block.
+  if (!isParent()) { row.style.display = 'none'; return; }
+  row.style.display = 'flex';
+  const cur = block.parentStamp && block.parentStamp.emoji;
+  picker.innerHTML = '';
+  PARENT_STAMPS.forEach(em => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'stamp-cell' + (cur === em ? ' selected' : '');
+    b.textContent = em;
+    b.onclick = () => setParentStamp(block.id, cur === em ? null : em);
+    picker.appendChild(b);
+  });
+}
+function setParentStamp(blockId, emoji) {
+  const blocks = getDayBlocks(currentDayKey);
+  const blk = blocks.find(b => b.id === blockId);
+  if (!blk) return;
+  if (emoji) blk.parentStamp = { emoji, by: parentViewing || 'parent', at: Date.now() };
+  else delete blk.parentStamp;
+  setDayBlocks(currentDayKey, blocks);
+  renderParentStampPicker(blk);
+  buildTimeline();
+  showToast(emoji ? `${emoji} Proud stamp added!` : 'Stamp removed');
+}
+
+/* ── #8 Collectible stickers: unlocked by real habits, not app-opening ── */
+const STICKER_DEFS = [
+  { id: 'first',   emoji: '🌱', name: 'First Step',    cond: { type: 'total', n: 1 },   hint: 'Finish your first task' },
+  { id: 'ten',     emoji: '⭐', name: 'Rising Star',    cond: { type: 'total', n: 10 },  hint: 'Finish 10 tasks' },
+  { id: 'fifty',   emoji: '🏅', name: 'Go-Getter',      cond: { type: 'total', n: 50 },  hint: 'Finish 50 tasks' },
+  { id: 'hundred', emoji: '🏆', name: 'Century Club',   cond: { type: 'total', n: 100 }, hint: 'Finish 100 tasks' },
+  { id: 'reader',  emoji: '📚', name: 'Bookworm',       cond: { type: 'cat', cat: 'school', n: 15 }, hint: '15 learning tasks' },
+  { id: 'athlete', emoji: '🏃', name: 'Athlete',        cond: { type: 'cat', cat: 'active', n: 15 }, hint: '15 active tasks' },
+  { id: 'helper',  emoji: '🧹', name: 'Home Helper',    cond: { type: 'cat', cat: 'daily',  n: 15 }, hint: '15 daily/chore tasks' },
+  { id: 'zen',     emoji: '🌙', name: 'Wind-Down Pro',  cond: { type: 'cat', cat: 'routine', n: 20 }, hint: '20 routines done' },
+];
+function stickerEarned(prog, def) {
+  if (def.cond.type === 'total') return (prog.tasksCompleted || 0) >= def.cond.n;
+  return ((prog.completedByCat || {})[def.cond.cat] || 0) >= def.cond.n;
+}
+function checkStickerUnlocks(kid = activeProfile()) {
+  const pd = getProfData(kid);
+  if (!pd || !pd.progress) return [];
+  const have = new Set(pd.progress.stickers || []);
+  const fresh = [];
+  STICKER_DEFS.forEach(def => {
+    if (!have.has(def.id) && stickerEarned(pd.progress, def)) {
+      pd.progress.stickers.push(def.id);
+      fresh.push(def);
+    }
+  });
+  if (fresh.length) saveAll();
+  return fresh;
 }
 
 /* Quick-complete: flip a block's done state straight from the week/day view
@@ -5773,7 +5916,7 @@ function renderWeek() {
       const free = fmtHrsMin(t.free);
       coachEl.classList.add('week-review-tip');
       coachEl.style.display = 'block';
-      coachEl.innerHTML = `🗓️ <b>Sunday review</b> — this week: 📚 ${learn} learning · 🏃 ${active} active · 🌤 ${free} free. Look back together, celebrate one win 🎉, then tweak one thing for next week. <button class="tip-dismiss" aria-label="Dismiss" onclick="dismissWeekReview()">✕</button>`;
+      coachEl.innerHTML = `🗓️ <b>Sunday review</b> — this week: 📚 ${learn} learning · 🏃 ${active} active · 🌤 ${free} free. Look back together, then tweak one thing for next week. <button class="wins-btn" onclick="openWeeklyWins()">🎉 See wins</button> <button class="tip-dismiss" aria-label="Dismiss" onclick="dismissWeekReview()">✕</button>`;
     } else if (!isParent()) {
       coachEl.classList.remove('week-review-tip');
       coachEl.style.display = 'block';
@@ -5803,6 +5946,57 @@ function computeWeekTotals(keys) {
     });
   });
   return { catMin, planned, free: Math.max(0, DAY_MIN_SPAN * 7 - planned) };
+}
+
+// #6 Weekly wins recap — a celebratory look at what actually got done.
+function computeWeekWins(keys) {
+  const acts = getAllActivities();
+  let done = 0, total = 0;
+  const byCat = {};
+  keys.forEach(k => {
+    (getDayBlocks(k) || []).forEach(b => {
+      if (b.startMin == null) return;
+      total++;
+      if (b.completed) {
+        done++;
+        const act = acts.find(a => a.id === b.actId);
+        const cat = act ? act.cat : 'custom';
+        byCat[cat] = (byCat[cat] || 0) + 1;
+      }
+    });
+  });
+  const kid = isParent() ? parentViewing : activeProfile();
+  const pd = getProfData(kid);
+  const topStreak = Math.max(0, ...Object.values((pd && pd.progress && pd.progress.streaks) || {}).map(s => s.count || 0));
+  const stickers = ((pd && pd.progress && pd.progress.stickers) || []).length;
+  const money = (kid === 'jenn' || kid === 'jess') ? ctWeekMoney(ctWeekKeyForDate(keys[0]), kid) : 0;
+  return { done, total, byCat, topStreak, stickers, money };
+}
+function openWeeklyWins() {
+  const keys = getDayKeys(weekOffset);
+  const w = computeWeekWins(keys);
+  const CAT_LABELS = { school:'📚 Learning', active:'🏃 Active', free:'🎮 Free', daily:'🍽 Daily', routine:'📋 Routines', training:'🏋️ Training', sleep:'😴 Rest', custom:'✨ Other' };
+  const pct = w.total ? Math.round(w.done / w.total * 100) : 0;
+  const cheer = pct >= 80 ? 'Incredible week! 🌟' : pct >= 50 ? 'Great effort this week! 💪' : w.done > 0 ? 'Every finished task counts 💛' : 'A fresh week ahead — you’ve got this!';
+  const catLines = Object.keys(w.byCat).sort((a,b)=>w.byCat[b]-w.byCat[a])
+    .map(c => `<span class="wins-chip">${CAT_LABELS[c]||c}: <b>${w.byCat[c]}</b></span>`).join('');
+  const body = document.getElementById('weeklyWinsBody');
+  if (body) {
+    body.innerHTML = `
+      <div class="wins-hero">${cheer}</div>
+      <div class="wins-stat-row">
+        <div class="wins-stat"><div class="wins-num">${w.done}</div><div class="wins-lbl">tasks done</div></div>
+        <div class="wins-stat"><div class="wins-num">${pct}%</div><div class="wins-lbl">of planned</div></div>
+        <div class="wins-stat"><div class="wins-num">${w.topStreak}</div><div class="wins-lbl">day streak</div></div>
+      </div>
+      <div class="wins-stat-row">
+        ${(activeProfile()==='jenn'||activeProfile()==='jess'||isParent()) ? `<div class="wins-stat"><div class="wins-num">$${(w.money||0).toFixed(2)}</div><div class="wins-lbl">earned</div></div>` : ''}
+        <div class="wins-stat"><div class="wins-num">${w.stickers}</div><div class="wins-lbl">stickers</div></div>
+      </div>
+      ${catLines ? `<div class="wins-cats">${catLines}</div>` : ''}
+    `;
+  }
+  openSheet('weeklyWinsOverlay');
 }
 
 let weekReviewDismissed = false;
@@ -6362,7 +6556,7 @@ function renderFullWeek(keys) {
         card.innerHTML = `
           <div class="wf-card-time">${timeStr}</div>
           <div class="wf-card-icon">${act.icon}</div>
-          <div class="wf-card-name">${act.name}</div>
+          <div class="wf-card-name">${b.parentStamp && b.parentStamp.emoji ? b.parentStamp.emoji + ' ' : ''}${act.name}</div>
           <div class="wf-card-dur">${formatDuration(b.durationMin)}</div>
           <button type="button" class="wf-card-check" aria-label="${b.completed?'Mark not done':'Mark done'}"
             onclick="toggleBlockDone('${key}','${b.id}',event)">${b.completed?'✓':''}</button>
@@ -6996,6 +7190,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
     if (total > 0) badges += `<span class="badge">✓ ${done}/${total}</span>`;
   }
   if (mood) badges += `<span class="badge">${mood}</span>`;
+  if (b.parentStamp && b.parentStamp.emoji) badges += `<span class="badge badge-stamp" title="Proud stamp from a parent">${b.parentStamp.emoji}</span>`;
 
   const noteTrim = (b.note && String(b.note).trim()) ? String(b.note).trim() : '';
   const noteHtml = (!isCompact && noteTrim)
@@ -8271,6 +8466,7 @@ function openEditSheet(blockId) {
 
   editState.completed = !!block.completed;
   document.getElementById('editCompleteToggle').classList.toggle('on', editState.completed);
+  renderParentStampPicker(block);
 
   editState.stopwatch = cloneStopwatch(block.stopwatch);
   editState.stopwatchEnabled = !!(block.stopwatch && (block.stopwatch.enabled || block.stopwatch.running));
