@@ -2629,6 +2629,31 @@
     border-bottom: 3px double var(--ink); padding-bottom: 0.3rem;
   }
   .print-header h1 { font-family:'Gochi Hand', cursive; font-size: 1.5rem; }
+  .print-subhead { font-size: 9pt; color: #555; font-weight: 700; margin-top: 2px; }
+  /* On-screen controls (never printed) */
+  .print-controls {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem 1.2rem;
+    padding: 0.7rem 1rem; margin-bottom: 0.6rem;
+    background: var(--bg2); border: 2px solid var(--ink); border-radius: 12px;
+    box-shadow: 2px 2px 0 var(--ink); font-family: 'Patrick Hand', sans-serif;
+  }
+  .print-ctrl { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 700; color: var(--ink); }
+  .print-ctrl select, .print-ctrl input {
+    border: 2px solid var(--ink); border-radius: 8px; padding: 0.25rem 0.5rem;
+    font-family: 'Patrick Hand', sans-serif; font-size: 1rem; background: #fff;
+  }
+  .print-ctrl input { width: 60px; text-align: center; }
+  .print-ctrl-hint { font-size: 0.85rem; color: var(--ink-light); }
+  /* Printed summary */
+  .print-summary { margin-top: 0.7rem; padding-top: 0.4rem; border-top: 2px solid var(--ink); }
+  .print-summary-title { font-family: 'Gochi Hand', cursive; font-size: 12pt; font-weight: 700; margin-bottom: 0.3rem; }
+  .print-summary-window { font-family: 'Patrick Hand', sans-serif; font-size: 9pt; color: #666; font-weight: 600; }
+  .print-cat-chips { display: flex; flex-wrap: wrap; gap: 0.35rem 0.7rem; font-size: 9.5pt; }
+  .print-cat-chip { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+  .print-cat-dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+  .print-sleep { margin-top: 0.45rem; font-size: 9.5pt; padding: 0.3rem 0.5rem; background: #f3eefb; border-radius: 8px; }
+  .print-sleep--muted { background: #f5f5f5; color: #777; }
+  @media print { .print-sleep { background: #f3eefb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   .print-week-grid {
     display: grid;
     grid-template-columns: 44px repeat(7, 1fr);
@@ -3598,6 +3623,17 @@
       <h2>Print Week</h2>
     </div>
     <button class="btn-template" onclick="window.print()">🖨 Print</button>
+  </div>
+  <div class="print-controls no-print">
+    <label class="print-ctrl">🕐 Show
+      <select id="printStartHour" onchange="onPrintWindowChange()"></select>
+      to
+      <select id="printEndHour" onchange="onPrintWindowChange()"></select>
+    </label>
+    <label class="print-ctrl">🎂 Child's age
+      <input type="number" id="printAge" min="1" max="18" placeholder="—" onchange="onPrintAgeChange()">
+    </label>
+    <span class="print-ctrl-hint">Totals &amp; free time are calculated over this window.</span>
   </div>
   <div class="print-sheet" id="printSheet"></div>
 </div>
@@ -11063,8 +11099,70 @@ function deleteLevelRule(id) {
 /* ════════════════════════════════════════════════════════════════
    PRINT VIEW
 ════════════════════════════════════════════════════════════════ */
+// Print display window — the start/end the parent chooses for what the
+// printout shows and totals over. Defaults to the app's 6am–9pm.
+let printWindow = { startHour: START_HOUR, endHour: END_HOUR };
+
+// AAP/NSF sleep guidance by age → the printout shows this as a required
+// nightly amount so a week can be planned around it.
+function recommendedSleep(age) {
+  if (age == null || isNaN(age)) return null;
+  if (age <= 2)  return { min: 11, max: 14, group: 'toddler' };
+  if (age <= 5)  return { min: 10, max: 13, group: 'preschool' };
+  if (age <= 12) return { min: 9,  max: 12, group: 'school-age' };
+  if (age <= 18) return { min: 8,  max: 10, group: 'teen' };
+  return { min: 7, max: 9, group: 'adult' };
+}
+
+function fmtHrsMin(totalMin) {
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  if (h && m) return `${h}h ${m}m`;
+  if (h) return `${h}h`;
+  return `${m}m`;
+}
+
+// Fill the start/end/age controls and reflect the current state.
+function renderPrintControls() {
+  const startSel = document.getElementById('printStartHour');
+  const endSel = document.getElementById('printEndHour');
+  const ageInput = document.getElementById('printAge');
+  if (!startSel || !endSel || !ageInput) return;
+  const hourLabel = (h) => {
+    const hr12 = ((h + 11) % 12) + 1;
+    return `${hr12}${h < 12 ? 'am' : (h === 24 ? 'am' : 'pm')}`;
+  };
+  const opts = (lo, hi, sel) => {
+    let s = '';
+    for (let h = lo; h <= hi; h++) s += `<option value="${h}"${h===sel?' selected':''}>${hourLabel(h)}</option>`;
+    return s;
+  };
+  startSel.innerHTML = opts(4, 12, printWindow.startHour);
+  endSel.innerHTML = opts(15, 23, printWindow.endHour);
+  const age = getProfData()?.age;
+  ageInput.value = (age != null && !isNaN(age)) ? age : '';
+}
+
+function onPrintWindowChange() {
+  const start = parseInt(document.getElementById('printStartHour').value, 10);
+  const end = parseInt(document.getElementById('printEndHour').value, 10);
+  if (!isNaN(start)) printWindow.startHour = start;
+  if (!isNaN(end)) printWindow.endHour = end;
+  if (printWindow.endHour <= printWindow.startHour) printWindow.endHour = printWindow.startHour + 1;
+  renderPrintControls();
+  renderPrintSheet();
+}
+
+function onPrintAgeChange() {
+  const v = document.getElementById('printAge').value.trim();
+  const age = v === '' ? null : Math.max(1, Math.min(18, parseInt(v, 10) || 0));
+  const pd = getProfData();
+  if (pd) { pd.age = age; saveAll(); }
+  renderPrintSheet();
+}
+
 function openPrint() {
   showScreen('print');
+  renderPrintControls();
   renderPrintSheet();
 }
 
@@ -11098,15 +11196,24 @@ function renderPrintSheet() {
   const p = activeProfile();
   const nameStr = p==='jenn'?'🐥 Jenn':'🦊 Jess';
 
+  // Chosen display window (defaults to 6am–9pm).
+  const winStartMin = printWindow.startHour * 60;
+  const winEndMin   = printWindow.endHour * 60;
+  const winSlots    = Math.round((winEndMin - winStartMin) / 15);
+  const winStartHr  = printWindow.startHour;
+
+  const fmtHr = (h) => `${((h+11)%12)+1}${h>=12 && h<24 ? 'pm' : 'am'}`;
   let html = `
     <div class="print-header">
       <h1>${nameStr}'s Week — ${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} to ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()}</h1>
+      <div class="print-subhead">${fmtHr(winStartHr)}–${fmtHr(printWindow.endHour)}</div>
     </div>
   `;
 
-  // Grid. Row height comes from the --print-slot CSS var so the
-  // block heights below line up exactly with the printed rows.
-  const slotPx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--print-slot')) || 11;
+  // Row height scales so the chosen window still fits one landscape page.
+  const slotPx = Math.max(7, Math.min(11, Math.floor(660 / winSlots)));
+  document.documentElement.style.setProperty('--print-slot', slotPx + 'px');
+
   html += `<div class="print-week-grid">`;
   // header row
   html += `<div class="print-header-cell"></div>`;
@@ -11116,20 +11223,26 @@ function renderPrintSheet() {
   });
   // rows
   const acts = getAllActivities();
-  for (let s=0;s<TOTAL_SLOTS;s++) {
+  for (let s=0;s<winSlots;s++) {
     const totalMin=s*15;
-    const hour = START_HOUR + Math.floor(totalMin/60);
+    const hour = winStartHr + Math.floor(totalMin/60);
     const min  = totalMin%60;
     html += `<div class="print-time-cell">${min===0 ? (hour>12?hour-12:hour)+(hour>=12?'pm':'am') : ''}</div>`;
     keys.forEach(k=>{
       const bks = getDayBlocks(k);
       let blockHtml = '';
       bks.forEach(b=>{
-        const startSlot = Math.round((b.startMin - START_MIN)/15);
+        // Clip each block to the window so blocks that start earlier/run later
+        // still render (trimmed) instead of vanishing.
+        const dur = b.durationMin || 0;
+        const segStart = Math.max(b.startMin, winStartMin);
+        const segEnd   = Math.min(b.startMin + dur, winEndMin);
+        if (segEnd <= segStart) return;
+        const startSlot = Math.round((segStart - winStartMin)/15);
         if (startSlot!==s) return;
         const act = acts.find(a=>a.id===b.actId);
         if (!act) return;
-        const slotSpan = Math.max(1, Math.round(b.durationMin/15));
+        const slotSpan = Math.max(1, Math.round((segEnd - segStart)/15));
         const bh = slotSpan*slotPx - 1;
         const bg = b.colour || CAT_HEX[act.cat] || '#888';
         blockHtml += `<div class="print-block" style="background:${bg};color:${printTextColor(bg)};font-size:${printBlockFontPt(bh)}pt;height:${bh}px">${act.icon} ${act.name}</div>`;
@@ -11138,6 +11251,9 @@ function renderPrintSheet() {
     });
   }
   html += `</div>`;
+
+  // ── Category time summary (within the chosen window) + free time + sleep ──
+  html += buildPrintSummary(keys, acts, winStartMin, winEndMin);
 
   // Notes footer
   const notes = [];
@@ -11161,6 +11277,60 @@ function renderPrintSheet() {
   }
 
   document.getElementById('printSheet').innerHTML = html;
+}
+
+// Weekly time-per-category totals over the chosen window, plus unscheduled
+// (free) time and an age-based sleep recommendation.
+function buildPrintSummary(keys, acts, winStartMin, winEndMin) {
+  const CAT_LABELS = {
+    sleep:'😴 Rest', school:'📚 Learning', active:'🏃 Active',
+    free:'🎮 Free', daily:'🍽 Daily', training:'🏋️ Training',
+    routine:'📋 Routine', custom:'✨ Custom'
+  };
+  const catMin = {};
+  let planned = 0;
+  keys.forEach(k=>{
+    (getDayBlocks(k) || []).forEach(b=>{
+      const segStart = Math.max(b.startMin, winStartMin);
+      const segEnd   = Math.min(b.startMin + (b.durationMin||0), winEndMin);
+      const mins = segEnd - segStart;
+      if (mins <= 0) return;
+      const act = acts.find(a=>a.id===b.actId);
+      const cat = act ? act.cat : 'custom';
+      catMin[cat] = (catMin[cat]||0) + mins;
+      planned += mins;
+    });
+  });
+  const windowWeekMin = (winEndMin - winStartMin) * 7;
+  const free = Math.max(0, windowWeekMin - planned);
+
+  // Ordered chips: each scheduled category with time, then unscheduled time.
+  const order = ['school','active','training','routine','daily','free','sleep','custom'];
+  let chips = '';
+  order.forEach(cat=>{
+    if (!catMin[cat]) return;
+    chips += `<span class="print-cat-chip"><span class="print-cat-dot" style="background:${CAT_HEX[cat]||'#999'}"></span>${CAT_LABELS[cat]||cat}: <b>${fmtHrsMin(catMin[cat])}</b></span>`;
+  });
+  chips += `<span class="print-cat-chip"><span class="print-cat-dot" style="background:#fff;border:1px solid #999"></span>🌤 Unscheduled: <b>${fmtHrsMin(free)}</b></span>`;
+
+  // Sleep recommendation from age.
+  const age = getProfData()?.age;
+  const sleep = recommendedSleep(age);
+  let sleepHtml = '';
+  if (sleep) {
+    const perWeek = sleep.min * 7;
+    sleepHtml = `<div class="print-sleep">💤 <b>Recommended sleep (age ${age}, ${sleep.group}):</b> ${sleep.min}–${sleep.max}h per night · aim for ~${perWeek}h across the week</div>`;
+  } else {
+    sleepHtml = `<div class="print-sleep print-sleep--muted">💤 Set the child's age to see the recommended sleep for their age group.</div>`;
+  }
+
+  return `
+    <div class="print-summary">
+      <div class="print-summary-title">This week at a glance <span class="print-summary-window">(${fmtHrsMin(winEndMin-winStartMin)}/day window)</span></div>
+      <div class="print-cat-chips">${chips}</div>
+      ${sleepHtml}
+    </div>
+  `;
 }
 
 /* ════════════════════════════════════════════════════════════════
