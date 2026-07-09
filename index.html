@@ -2632,10 +2632,14 @@
   .print-time-cell { font-size: 7pt; color: #666; text-align: right; font-weight: 600; }
   .print-block {
     position: absolute; left: 1px; right: 1px; top: 0; z-index: 1;
-    border-radius: 4px; padding: 1px 3px;
-    font-size: 7pt; font-weight: 700;
-    color: #fff; border: 1px solid #000;
+    border-radius: 4px; padding: 1px 4px;
+    font-weight: 700; border: 1px solid #000;
     overflow: hidden; line-height: 1.05;
+    /* Title centered in the block (both axes) so a tall block's label sits
+       in the middle instead of tiny in a corner. Colour + size are set
+       per block (see printTextColor / printBlockFontPt). */
+    display: flex; align-items: center; justify-content: center;
+    text-align: center;
   }
 
   /* Scrollbar polish */
@@ -10941,6 +10945,29 @@ function openPrint() {
   renderPrintSheet();
 }
 
+// Auto-contrast: choose ink vs white by the fill's luminance so titles stay
+// readable on every colour — and on a black & white printer, where each
+// colour prints as its matching shade of grey, the same choice still holds.
+function printTextColor(hex) {
+  if (!hex || hex[0] !== '#') return '#1a1a1a';
+  let h = hex.slice(1);
+  if (h.length === 3) h = h.split('').map(c=>c+c).join('');
+  const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+  const L = (0.299*r + 0.587*g + 0.114*b) / 255;
+  return L > 0.6 ? '#1a1a1a' : '#fff';
+}
+
+// Proportional title size: taller blocks (which have the room) get larger
+// text; short blocks stay small so the label still fits.
+function printBlockFontPt(heightPx) {
+  if (heightPx >= 240) return 12;    // ~5h+ (e.g. a full school day)
+  if (heightPx >= 120) return 10.5;  // ~3h+
+  if (heightPx >= 60)  return 9.5;   // ~1h30+
+  if (heightPx >= 36)  return 8.5;   // ~1h
+  if (heightPx >= 18)  return 7.5;   // ~30m
+  return 6.5;                        // ~15m sliver
+}
+
 function renderPrintSheet() {
   const keys = getDayKeys(weekOffset);
   const mon = formatDayKey(keys[0]);
@@ -10980,7 +11007,9 @@ function renderPrintSheet() {
         const act = acts.find(a=>a.id===b.actId);
         if (!act) return;
         const slotSpan = Math.max(1, Math.round(b.durationMin/15));
-        blockHtml += `<div class="print-block" style="background:${b.colour||CAT_HEX[act.cat]};height:${slotSpan*slotPx-1}px">${act.icon} ${act.name}</div>`;
+        const bh = slotSpan*slotPx - 1;
+        const bg = b.colour || CAT_HEX[act.cat] || '#888';
+        blockHtml += `<div class="print-block" style="background:${bg};color:${printTextColor(bg)};font-size:${printBlockFontPt(bh)}pt;height:${bh}px">${act.icon} ${act.name}</div>`;
       });
       html += `<div class="print-cell">${blockHtml}</div>`;
     });
