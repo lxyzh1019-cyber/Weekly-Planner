@@ -5588,11 +5588,13 @@ function completeQuest(blockId) {
   if (blk.completed) return;
 
   blk.completed = true;
-  setDayBlocks(key, blocks);
-
+  blk.xpAwarded = true; // mark so a later quick-check elsewhere won't re-award
   const acts = getAllActivities();
   const act = acts.find(a => a.id === blk.actId) || { name:'Quest', icon:'⭐' };
   const result = addQuestXP(QUEST_XP_PER_TASK);
+  // Fire the same routine/chore links the week & day views now use.
+  awardBlockLinks(blk, key);
+  setDayBlocks(key, blocks);
 
   showQuestCompletePopup(act, result);
   spawnQuestSparkles();
@@ -5607,22 +5609,44 @@ function completeQuest(blockId) {
   }, 1100);
 }
 
+/* Unified completion rewards: award XP once per block (sticky, never removed
+   or double-counted) and fire the routine → mandatory and House-Chore → money
+   links. Called from every completion path (quick-check, quest board, edit
+   sheet) so a tick anywhere counts the same. Returns a short XP suffix for
+   the toast. */
+function awardBlockLinks(blk, dayKey) {
+  let msg = '';
+  if (!blk.xpAwarded) {
+    blk.xpAwarded = true;
+    const r = addQuestXP(QUEST_XP_PER_TASK);
+    msg = ` +${QUEST_XP_PER_TASK} XP`;
+    if (r && r.leveledUp) msg += ' • LEVEL UP! 🎉';
+  }
+  const kid = isParent() ? parentViewing : activeProfile();
+  const act = getAllActivities().find(a => a.id === blk.actId);
+  if (act && act.isRoutine && act.routineId) ctAwardMandatoryFromRoutine(act.routineId, kid, dayKey);
+  if (blk.actId === 'chores') ctAutoCheckOptionalFromBlock(blk, dayKey);
+  return msg;
+}
+
 /* Quick-complete: flip a block's done state straight from the week/day view
-   without opening the detail sheet. Mirrors the edit sheet's "Mark done"
-   toggle (no XP accounting, so it's freely reversible). */
+   without opening the detail sheet. Now awards XP + fires routine/chore links
+   on completion (unified with the quest board). */
 function toggleBlockDone(dayKey, blockId, ev) {
   if (ev) ev.stopPropagation();
   const blocks = getDayBlocks(dayKey) || [];
   const blk = blocks.find(b => b.id === blockId);
   if (!blk) return;
   blk.completed = !blk.completed;
-  setDayBlocks(dayKey, blocks);
   const nowDone = blk.completed;
+  let extra = '';
+  if (nowDone) extra = awardBlockLinks(blk, dayKey);
+  setDayBlocks(dayKey, blocks);
   const active = document.querySelector('.screen.active');
   if (active && active.id === 'screen-week') renderWeek();
   else if (active && active.id === 'screen-day') buildTimeline();
   else if (active && active.id === 'screen-quest') renderQuestBoard();
-  showToast(nowDone ? 'Done! ✓' : 'Marked not done');
+  showToast(nowDone ? ('Done! ✓' + extra) : 'Marked not done');
 }
 
 function showQuestCompletePopup(act, result) {
@@ -8674,7 +8698,10 @@ function saveEditChanges() {
   else delete blk.getReadyBufMin;
   blk.gearState = newGearState;
   blk.note = newNote;
+  const wasCompleted = !!blk.completed;
   blk.completed = newCompleted;
+  // Unify rewards: marking done in the edit sheet now earns XP + fires links.
+  if (!wasCompleted && newCompleted) awardBlockLinks(blk, currentDayKey);
   if (act && act.isTraining) blk.objectives = newObjectives;
   if (newStopwatch) blk.stopwatch = newStopwatch;
   else delete blk.stopwatch;
