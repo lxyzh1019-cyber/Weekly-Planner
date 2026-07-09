@@ -1544,6 +1544,20 @@
   .wf-card-name { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   .wf-card-dur { font-size: 0.7rem; font-weight: 700; }
   .wf-card.light-bg { color: var(--ink); text-shadow: none; }
+  /* Quick-complete tick in the card corner — check off without opening detail */
+  .wf-card-check {
+    position: absolute; top: 3px; right: 3px;
+    width: 17px; height: 17px; border-radius: 5px;
+    border: 1.5px solid var(--ink); background: rgba(255,255,255,0.9);
+    color: var(--ink); font-size: 0.72rem; font-weight: 900; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; padding: 0; text-shadow: none; z-index: 2;
+  }
+  .wf-card-check:hover { background: #fff; transform: scale(1.1); }
+  .wf-card--done { opacity: 0.6; }
+  .wf-card--done .wf-card-name { text-decoration: line-through; }
+  .wf-card--done .wf-card-check { background: var(--accent-green); color: var(--ink); }
+  .wf-card--xslim .wf-card-check { display: none; } /* too short to tap reliably */
   /* Short blocks: drop the duration/time chips so the name + icon still fit */
   .wf-card.wf-card--slim { padding: 0.1rem 0.4rem; align-items: center; }
   .wf-card.wf-card--slim .wf-card-dur { display: none; }
@@ -1946,6 +1960,31 @@
   .block-close-btn:hover {
     background: rgba(255,255,255,0.9);
   }
+  /* Quick-complete tick, sits just left of the × */
+  .block-done-btn {
+    position: absolute;
+    top: 4px;
+    right: 30px;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    border: 1.5px solid var(--ink);
+    background: rgba(255,255,255,0.75);
+    color: var(--ink);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.82rem;
+    font-weight: 900;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 14;
+  }
+  .block-done-btn:hover { background: rgba(255,255,255,0.95); transform: scale(1.08); }
+  .block-done-btn.done { background: var(--accent-green); color: var(--ink); }
+  /* On short/compact blocks there isn't room for both buttons — hide the
+     tick there (the block can still be checked from the week view or detail). */
+  .placed-block.compact .block-done-btn { display: none; }
   /* Doodle decorations scattered around blocks */
   .tl-doodle {
     position: absolute;
@@ -2413,6 +2452,21 @@
   .custom-builder label { font-family:'Gochi Hand', cursive; font-size: 1rem; color: var(--ink-light); margin-bottom: 0.2rem; display: block; }
   .custom-builder .row { display:flex; gap: 0.5rem; }
   .custom-builder .row > * { flex: 1; }
+  /* Tap-to-pick emoji grid */
+  .emoji-grid {
+    display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px;
+    margin-bottom: 0.6rem; max-height: 148px; overflow-y: auto;
+    padding: 4px; background: var(--bg); border: 2px dashed var(--paper-line);
+    border-radius: 12px;
+  }
+  .emoji-cell {
+    aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    font-size: 1.15rem; line-height: 1; padding: 0; cursor: pointer;
+    background: #fff; border: 2px solid transparent; border-radius: 9px;
+  }
+  .emoji-cell:hover { border-color: var(--paper-line); transform: scale(1.08); }
+  .emoji-cell.selected { border-color: var(--ink); background: var(--accent-yellow); box-shadow: 1.5px 1.5px 0 var(--ink); }
+  @media (max-width: 420px) { .emoji-grid { grid-template-columns: repeat(6, 1fr); } }
 
   /* ═══════════ TOAST ═══════════ */
   .toast {
@@ -2615,6 +2669,31 @@
     border-bottom: 3px double var(--ink); padding-bottom: 0.3rem;
   }
   .print-header h1 { font-family:'Gochi Hand', cursive; font-size: 1.5rem; }
+  .print-subhead { font-size: 9pt; color: #555; font-weight: 700; margin-top: 2px; }
+  /* On-screen controls (never printed) */
+  .print-controls {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem 1.2rem;
+    padding: 0.7rem 1rem; margin-bottom: 0.6rem;
+    background: var(--bg2); border: 2px solid var(--ink); border-radius: 12px;
+    box-shadow: 2px 2px 0 var(--ink); font-family: 'Patrick Hand', sans-serif;
+  }
+  .print-ctrl { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 700; color: var(--ink); }
+  .print-ctrl select, .print-ctrl input {
+    border: 2px solid var(--ink); border-radius: 8px; padding: 0.25rem 0.5rem;
+    font-family: 'Patrick Hand', sans-serif; font-size: 1rem; background: #fff;
+  }
+  .print-ctrl input { width: 60px; text-align: center; }
+  .print-ctrl-hint { font-size: 0.85rem; color: var(--ink-light); }
+  /* Printed summary */
+  .print-summary { margin-top: 0.7rem; padding-top: 0.4rem; border-top: 2px solid var(--ink); }
+  .print-summary-title { font-family: 'Gochi Hand', cursive; font-size: 12pt; font-weight: 700; margin-bottom: 0.3rem; }
+  .print-summary-window { font-family: 'Patrick Hand', sans-serif; font-size: 9pt; color: #666; font-weight: 600; }
+  .print-cat-chips { display: flex; flex-wrap: wrap; gap: 0.35rem 0.7rem; font-size: 9.5pt; }
+  .print-cat-chip { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+  .print-cat-dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+  .print-sleep { margin-top: 0.45rem; font-size: 9.5pt; padding: 0.3rem 0.5rem; background: #f3eefb; border-radius: 8px; }
+  .print-sleep--muted { background: #f5f5f5; color: #777; }
+  @media print { .print-sleep { background: #f3eefb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   .print-week-grid {
     display: grid;
     grid-template-columns: 44px repeat(7, 1fr);
@@ -2629,7 +2708,13 @@
   }
   /* Slot rows: fixed short height so all 15 hours fit one page. */
   .print-cell, .print-time-cell { height: var(--print-slot); }
-  .print-time-cell { overflow: hidden; }
+  /* Centre the hour label in its cell (both axes) so it prints cleanly on the
+     hour line instead of floating right-aligned against the border. */
+  .print-time-cell {
+    overflow: visible;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+  }
   /* Day cells must let a multi-slot block overflow downward over the
      rows it spans — the previous overflow:hidden clipped every block
      to a single 15-min sliver. */
@@ -2639,7 +2724,7 @@
     font-family: 'Gochi Hand', cursive; font-size: 10pt;
     min-height: 18px; overflow: hidden;
   }
-  .print-time-cell { font-size: 7pt; color: #666; text-align: right; font-weight: 600; }
+  .print-time-cell { font-size: 7.5pt; color: #444; text-align: center; font-weight: 700; }
   .print-block {
     position: absolute; left: 1px; right: 1px; top: 0; z-index: 1;
     border-radius: 4px; padding: 1px 4px;
@@ -2650,6 +2735,13 @@
        per block (see printTextColor / printBlockFontPt). */
     display: flex; align-items: center; justify-content: center;
     text-align: center;
+  }
+  /* Printable empty tick box in the block's top-right corner */
+  .print-check {
+    position: absolute; top: 2px; right: 2px;
+    width: 9px; height: 9px; border-radius: 2px;
+    border: 1px solid currentColor; background: rgba(255,255,255,0.55);
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
 
   /* Scrollbar polish */
@@ -3579,6 +3671,17 @@
     </div>
     <button class="btn-template" onclick="window.print()">🖨 Print</button>
   </div>
+  <div class="print-controls no-print">
+    <label class="print-ctrl">🕐 Show
+      <select id="printStartHour" onchange="onPrintWindowChange()"></select>
+      to
+      <select id="printEndHour" onchange="onPrintWindowChange()"></select>
+    </label>
+    <label class="print-ctrl">🎂 Child's age
+      <input type="number" id="printAge" min="1" max="18" placeholder="—" onchange="onPrintAgeChange()">
+    </label>
+    <span class="print-ctrl-hint">Totals &amp; free time are calculated over this window.</span>
+  </div>
   <div class="print-sheet" id="printSheet"></div>
 </div>
 
@@ -3907,7 +4010,7 @@
       <div class="row">
         <div>
           <label>Icon (emoji)</label>
-          <input type="text" id="customIcon" placeholder="🎸" maxlength="2" aria-label="Activity icon (emoji)">
+          <input type="text" id="customIcon" placeholder="🎸" maxlength="2" aria-label="Activity icon (emoji)" oninput="syncEmojiGrid('customEmojiGrid', this.value)">
         </div>
         <div>
           <label>Default Duration</label>
@@ -3920,6 +4023,8 @@
           </select>
         </div>
       </div>
+      <label>Or tap an icon</label>
+      <div class="emoji-grid" id="customEmojiGrid"></div>
       <label>Category</label>
       <select id="customCat">
         <option value="sleep">😴 Rest</option>
@@ -3944,7 +4049,7 @@
       <div class="row">
         <div>
           <label>Icon (emoji)</label>
-          <input type="text" id="paIcon" placeholder="🎾" maxlength="2">
+          <input type="text" id="paIcon" placeholder="🎾" maxlength="2" oninput="syncEmojiGrid('paEmojiGrid', this.value)">
         </div>
         <div>
           <label>Default Duration</label>
@@ -3957,6 +4062,8 @@
           </select>
         </div>
       </div>
+      <label>Or tap an icon</label>
+      <div class="emoji-grid" id="paEmojiGrid"></div>
       <label>Category</label>
       <select id="paCat">
         <option value="sleep">😴 Rest</option>
@@ -5467,6 +5574,24 @@ function completeQuest(blockId) {
   }, 1100);
 }
 
+/* Quick-complete: flip a block's done state straight from the week/day view
+   without opening the detail sheet. Mirrors the edit sheet's "Mark done"
+   toggle (no XP accounting, so it's freely reversible). */
+function toggleBlockDone(dayKey, blockId, ev) {
+  if (ev) ev.stopPropagation();
+  const blocks = getDayBlocks(dayKey) || [];
+  const blk = blocks.find(b => b.id === blockId);
+  if (!blk) return;
+  blk.completed = !blk.completed;
+  setDayBlocks(dayKey, blocks);
+  const nowDone = blk.completed;
+  const active = document.querySelector('.screen.active');
+  if (active && active.id === 'screen-week') renderWeek();
+  else if (active && active.id === 'screen-day') buildTimeline();
+  else if (active && active.id === 'screen-quest') renderQuestBoard();
+  showToast(nowDone ? 'Done! ✓' : 'Marked not done');
+}
+
 function showQuestCompletePopup(act, result) {
   const pop = document.getElementById('questPopup');
   document.getElementById('questPopupIcon').textContent = act.icon || '⭐';
@@ -6112,6 +6237,7 @@ function renderFullWeek(keys) {
         let cls = 'wf-card' + (isLightColour(bg) ? ' light-bg' : '');
         if (pxHeight < 34) cls += ' wf-card--slim';
         if (pxHeight < 22) cls += ' wf-card--xslim';
+        if (b.completed) cls += ' wf-card--done';
         card.className = cls;
 
         const slot = cols.get(b.id) || { col: 0, count: 1 };
@@ -6127,6 +6253,8 @@ function renderFullWeek(keys) {
           <div class="wf-card-icon">${act.icon}</div>
           <div class="wf-card-name">${act.name}</div>
           <div class="wf-card-dur">${formatDuration(b.durationMin)}</div>
+          <button type="button" class="wf-card-check" aria-label="${b.completed?'Mark not done':'Mark done'}"
+            onclick="toggleBlockDone('${key}','${b.id}',event)">${b.completed?'✓':''}</button>
         `;
         card.title = `${act.icon} ${act.name} — ${timeStr}, ${formatDuration(b.durationMin)}`;
         card.onclick = (e)=>{ e.stopPropagation(); openDayFromWeekCard(key, ci, b.id); };
@@ -6773,9 +6901,14 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
   const closeHtml = !isBuffer
     ? `<button type="button" class="block-close-btn" aria-label="Clear selected activity" onclick="event.stopPropagation(); cancelCreatePlacement(null, true)">×</button>`
     : '';
+  // Quick-complete tick — mark this block done straight from the timeline.
+  const doneHtml = !isBuffer
+    ? `<button type="button" class="block-done-btn${b.completed?' done':''}" aria-label="${b.completed?'Mark not done':'Mark done'}" onclick="event.stopPropagation(); toggleBlockDone(currentDayKey,'${b.id}',event)">${b.completed?'✓':''}</button>`
+    : '';
 
   blockEl.innerHTML = `
     ${closeHtml}
+    ${doneHtml}
     ${nameHtml}
     ${metaHtml}
     ${!isBuffer && b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="block-stopwatch-btn" onclick="event.stopPropagation(); startBlockStopwatch('${b.id}')">⏱ Start stopwatch</button>` : ''}
@@ -7425,7 +7558,7 @@ function buildTray() {
   const addChip = document.createElement('div');
   addChip.className = 'chip-add';
   addChip.innerHTML = '<div style="font-size:1.6rem">＋</div><div>Custom</div>';
-  addChip.onclick = ()=>openSheet('customOverlay');
+  addChip.onclick = ()=>openCustomActivity();
   tray.appendChild(addChip);
   enhanceAccessibility(document.getElementById('screen-day'));
 }
@@ -8684,6 +8817,49 @@ function clearDay() {
 /* ════════════════════════════════════════════════════════════════
    CUSTOM ACTIVITY & TASK
 ════════════════════════════════════════════════════════════════ */
+
+/* Tap-to-pick emoji grid for activity icons (easier than typing an emoji,
+   especially on desktop). */
+const EMOJI_PICKER = [
+  '⚽','🏀','🎾','🏐','🏊','🚴','🏃','⛸️','🤸','🥋','🧗','🏋️','🛹','⛹️','🥅',
+  '🎸','🎹','🎺','🎻','🥁','🎨','🖌️','🎭','🎤','🩰','🎬',
+  '📚','📖','✏️','🔬','🧪','🧮','🌍','💻','📝','🗣️','🎓',
+  '🍽️','🥣','🍳','🛁','🪥','🧹','🧺','🛏️','👕','🐶','🌳',
+  '🎮','🧩','♟️','🎲','🪁','🎈','⭐','🎯','💤','🧸'
+];
+
+function renderEmojiGrid(gridId, inputId, current) {
+  const grid = document.getElementById(gridId);
+  if (!grid) return;
+  grid.innerHTML = '';
+  EMOJI_PICKER.forEach(e => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'emoji-cell' + (e === current ? ' selected' : '');
+    btn.textContent = e;
+    btn.setAttribute('aria-label', 'Use ' + e);
+    btn.onclick = () => {
+      const input = document.getElementById(inputId);
+      if (input) input.value = e;
+      syncEmojiGrid(gridId, e);
+    };
+    grid.appendChild(btn);
+  });
+}
+
+/* Highlight the cell that matches the typed value (keeps grid + input in sync). */
+function syncEmojiGrid(gridId, current) {
+  const grid = document.getElementById(gridId);
+  if (!grid) return;
+  [...grid.children].forEach(c => c.classList.toggle('selected', c.textContent === current));
+}
+
+function openCustomActivity() {
+  openSheet('customOverlay');
+  const cur = (document.getElementById('customIcon').value || '').trim();
+  renderEmojiGrid('customEmojiGrid', 'customIcon', cur);
+}
+
 function confirmCustomActivity() {
   const name = document.getElementById('customName').value.trim();
   const icon = document.getElementById('customIcon').value.trim() || '⭐';
@@ -9212,6 +9388,7 @@ function openParentActivityEditor(owner, id) {
     document.getElementById('paDur').value = '60';
     document.getElementById('paCat').value = 'free';
     document.getElementById('paVisibility').value = 'shared';
+    renderEmojiGrid('paEmojiGrid', 'paIcon', '');
     openSheet('parentActivityOverlay');
     return;
   }
@@ -9225,6 +9402,7 @@ function openParentActivityEditor(owner, id) {
   document.getElementById('paDur').value = String(act.durationMin || 60);
   document.getElementById('paCat').value = act.cat || 'free';
   document.getElementById('paVisibility').value = owner==='shared' ? 'shared' : owner;
+  renderEmojiGrid('paEmojiGrid', 'paIcon', act.icon || '');
   openSheet('parentActivityOverlay');
 }
 
@@ -11022,8 +11200,70 @@ function deleteLevelRule(id) {
 /* ════════════════════════════════════════════════════════════════
    PRINT VIEW
 ════════════════════════════════════════════════════════════════ */
+// Print display window — the start/end the parent chooses for what the
+// printout shows and totals over. Defaults to the app's 6am–9pm.
+let printWindow = { startHour: START_HOUR, endHour: END_HOUR };
+
+// AAP/NSF sleep guidance by age → the printout shows this as a required
+// nightly amount so a week can be planned around it.
+function recommendedSleep(age) {
+  if (age == null || isNaN(age)) return null;
+  if (age <= 2)  return { min: 11, max: 14, group: 'toddler' };
+  if (age <= 5)  return { min: 10, max: 13, group: 'preschool' };
+  if (age <= 12) return { min: 9,  max: 12, group: 'school-age' };
+  if (age <= 18) return { min: 8,  max: 10, group: 'teen' };
+  return { min: 7, max: 9, group: 'adult' };
+}
+
+function fmtHrsMin(totalMin) {
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  if (h && m) return `${h}h ${m}m`;
+  if (h) return `${h}h`;
+  return `${m}m`;
+}
+
+// Fill the start/end/age controls and reflect the current state.
+function renderPrintControls() {
+  const startSel = document.getElementById('printStartHour');
+  const endSel = document.getElementById('printEndHour');
+  const ageInput = document.getElementById('printAge');
+  if (!startSel || !endSel || !ageInput) return;
+  const hourLabel = (h) => {
+    const hr12 = ((h + 11) % 12) + 1;
+    return `${hr12}${h < 12 ? 'am' : (h === 24 ? 'am' : 'pm')}`;
+  };
+  const opts = (lo, hi, sel) => {
+    let s = '';
+    for (let h = lo; h <= hi; h++) s += `<option value="${h}"${h===sel?' selected':''}>${hourLabel(h)}</option>`;
+    return s;
+  };
+  startSel.innerHTML = opts(4, 12, printWindow.startHour);
+  endSel.innerHTML = opts(15, 23, printWindow.endHour);
+  const age = getProfData()?.age;
+  ageInput.value = (age != null && !isNaN(age)) ? age : '';
+}
+
+function onPrintWindowChange() {
+  const start = parseInt(document.getElementById('printStartHour').value, 10);
+  const end = parseInt(document.getElementById('printEndHour').value, 10);
+  if (!isNaN(start)) printWindow.startHour = start;
+  if (!isNaN(end)) printWindow.endHour = end;
+  if (printWindow.endHour <= printWindow.startHour) printWindow.endHour = printWindow.startHour + 1;
+  renderPrintControls();
+  renderPrintSheet();
+}
+
+function onPrintAgeChange() {
+  const v = document.getElementById('printAge').value.trim();
+  const age = v === '' ? null : Math.max(1, Math.min(18, parseInt(v, 10) || 0));
+  const pd = getProfData();
+  if (pd) { pd.age = age; saveAll(); }
+  renderPrintSheet();
+}
+
 function openPrint() {
   showScreen('print');
+  renderPrintControls();
   renderPrintSheet();
 }
 
@@ -11057,15 +11297,24 @@ function renderPrintSheet() {
   const p = activeProfile();
   const nameStr = p==='jenn'?'🐥 Jenn':'🦊 Jess';
 
+  // Chosen display window (defaults to 6am–9pm).
+  const winStartMin = printWindow.startHour * 60;
+  const winEndMin   = printWindow.endHour * 60;
+  const winSlots    = Math.round((winEndMin - winStartMin) / 15);
+  const winStartHr  = printWindow.startHour;
+
+  const fmtHr = (h) => `${((h+11)%12)+1}${h>=12 && h<24 ? 'pm' : 'am'}`;
   let html = `
     <div class="print-header">
       <h1>${nameStr}'s Week — ${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} to ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()}</h1>
+      <div class="print-subhead">${fmtHr(winStartHr)}–${fmtHr(printWindow.endHour)}</div>
     </div>
   `;
 
-  // Grid. Row height comes from the --print-slot CSS var so the
-  // block heights below line up exactly with the printed rows.
-  const slotPx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--print-slot')) || 11;
+  // Row height scales so the chosen window still fits one landscape page.
+  const slotPx = Math.max(7, Math.min(11, Math.floor(660 / winSlots)));
+  document.documentElement.style.setProperty('--print-slot', slotPx + 'px');
+
   html += `<div class="print-week-grid">`;
   // header row
   html += `<div class="print-header-cell"></div>`;
@@ -11075,28 +11324,39 @@ function renderPrintSheet() {
   });
   // rows
   const acts = getAllActivities();
-  for (let s=0;s<TOTAL_SLOTS;s++) {
+  for (let s=0;s<winSlots;s++) {
     const totalMin=s*15;
-    const hour = START_HOUR + Math.floor(totalMin/60);
+    const hour = winStartHr + Math.floor(totalMin/60);
     const min  = totalMin%60;
     html += `<div class="print-time-cell">${min===0 ? (hour>12?hour-12:hour)+(hour>=12?'pm':'am') : ''}</div>`;
     keys.forEach(k=>{
       const bks = getDayBlocks(k);
       let blockHtml = '';
       bks.forEach(b=>{
-        const startSlot = Math.round((b.startMin - START_MIN)/15);
+        // Clip each block to the window so blocks that start earlier/run later
+        // still render (trimmed) instead of vanishing.
+        const dur = b.durationMin || 0;
+        const segStart = Math.max(b.startMin, winStartMin);
+        const segEnd   = Math.min(b.startMin + dur, winEndMin);
+        if (segEnd <= segStart) return;
+        const startSlot = Math.round((segStart - winStartMin)/15);
         if (startSlot!==s) return;
         const act = acts.find(a=>a.id===b.actId);
         if (!act) return;
-        const slotSpan = Math.max(1, Math.round(b.durationMin/15));
+        const slotSpan = Math.max(1, Math.round((segEnd - segStart)/15));
         const bh = slotSpan*slotPx - 1;
         const bg = b.colour || CAT_HEX[act.cat] || '#888';
-        blockHtml += `<div class="print-block" style="background:${bg};color:${printTextColor(bg)};font-size:${printBlockFontPt(bh)}pt;height:${bh}px">${act.icon} ${act.name}</div>`;
+        // Empty tick box so it can be checked off on the printed page.
+        const checkbox = bh >= 15 ? `<span class="print-check" style="border-color:${printTextColor(bg)}"></span>` : '';
+        blockHtml += `<div class="print-block" style="background:${bg};color:${printTextColor(bg)};font-size:${printBlockFontPt(bh)}pt;height:${bh}px">${checkbox}${act.icon} ${act.name}</div>`;
       });
       html += `<div class="print-cell">${blockHtml}</div>`;
     });
   }
   html += `</div>`;
+
+  // ── Category time summary (within the chosen window) + free time + sleep ──
+  html += buildPrintSummary(keys, acts, winStartMin, winEndMin);
 
   // Notes footer
   const notes = [];
@@ -11120,6 +11380,60 @@ function renderPrintSheet() {
   }
 
   document.getElementById('printSheet').innerHTML = html;
+}
+
+// Weekly time-per-category totals over the chosen window, plus unscheduled
+// (free) time and an age-based sleep recommendation.
+function buildPrintSummary(keys, acts, winStartMin, winEndMin) {
+  const CAT_LABELS = {
+    sleep:'😴 Rest', school:'📚 Learning', active:'🏃 Active',
+    free:'🎮 Free', daily:'🍽 Daily', training:'🏋️ Training',
+    routine:'📋 Routine', custom:'✨ Custom'
+  };
+  const catMin = {};
+  let planned = 0;
+  keys.forEach(k=>{
+    (getDayBlocks(k) || []).forEach(b=>{
+      const segStart = Math.max(b.startMin, winStartMin);
+      const segEnd   = Math.min(b.startMin + (b.durationMin||0), winEndMin);
+      const mins = segEnd - segStart;
+      if (mins <= 0) return;
+      const act = acts.find(a=>a.id===b.actId);
+      const cat = act ? act.cat : 'custom';
+      catMin[cat] = (catMin[cat]||0) + mins;
+      planned += mins;
+    });
+  });
+  const windowWeekMin = (winEndMin - winStartMin) * 7;
+  const free = Math.max(0, windowWeekMin - planned);
+
+  // Ordered chips: each scheduled category with time, then unscheduled time.
+  const order = ['school','active','training','routine','daily','free','sleep','custom'];
+  let chips = '';
+  order.forEach(cat=>{
+    if (!catMin[cat]) return;
+    chips += `<span class="print-cat-chip"><span class="print-cat-dot" style="background:${CAT_HEX[cat]||'#999'}"></span>${CAT_LABELS[cat]||cat}: <b>${fmtHrsMin(catMin[cat])}</b></span>`;
+  });
+  chips += `<span class="print-cat-chip"><span class="print-cat-dot" style="background:#fff;border:1px solid #999"></span>🌤 Unscheduled: <b>${fmtHrsMin(free)}</b></span>`;
+
+  // Sleep recommendation from age.
+  const age = getProfData()?.age;
+  const sleep = recommendedSleep(age);
+  let sleepHtml = '';
+  if (sleep) {
+    const perWeek = sleep.min * 7;
+    sleepHtml = `<div class="print-sleep">💤 <b>Recommended sleep (age ${age}, ${sleep.group}):</b> ${sleep.min}–${sleep.max}h per night · aim for ~${perWeek}h across the week</div>`;
+  } else {
+    sleepHtml = `<div class="print-sleep print-sleep--muted">💤 Set the child's age to see the recommended sleep for their age group.</div>`;
+  }
+
+  return `
+    <div class="print-summary">
+      <div class="print-summary-title">This week at a glance <span class="print-summary-window">(${fmtHrsMin(winEndMin-winStartMin)}/day window)</span></div>
+      <div class="print-cat-chips">${chips}</div>
+      ${sleepHtml}
+    </div>
+  `;
 }
 
 /* ════════════════════════════════════════════════════════════════
