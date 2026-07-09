@@ -1427,6 +1427,13 @@
   .chore-card.paid { background: color-mix(in srgb, var(--accent-green) 22%, var(--paper)); border-color: var(--accent-green); }
   .ct-money-total { font-family: 'Gochi Hand', cursive; font-size: 2rem; font-weight: 800; color: var(--ink); margin: 0.1rem 0 0.4rem; }
   .ct-money-cap { font-family: 'Nunito', sans-serif; font-size: 0.85rem; font-weight: 700; color: var(--ink-muted); }
+  /* Money / Bank screen */
+  .money-hero { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem;
+    background: linear-gradient(135deg,#e7f7e6,#e8f0ff); border: 2px solid var(--ink); border-radius: 14px;
+    padding: 0.7rem 0.9rem; box-shadow: 3px 3px 0 var(--ink); font-family: 'Patrick Hand', sans-serif; }
+  .money-hero b { font-family: 'Gochi Hand', cursive; font-size: 1.6rem; }
+  .money-market { background: var(--accent-yellow); border: 2px solid var(--ink); border-radius: 999px; padding: 0.2rem 0.6rem; font-weight: 800; font-size: 0.85rem; }
+  .money-btn-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.4rem; }
   .ct-cap-note { color: var(--accent); font-weight: 700; }
   /* override .custom-builder label/input defaults for the in-editor chore checklist */
   .custom-builder label.cg-chore-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; margin-bottom: 0; font-family: 'Nunito', sans-serif; font-size: 0.95rem; color: var(--ink); cursor: pointer; }
@@ -3477,6 +3484,27 @@
     <div class="profile-badge" id="choreProfileBadge"></div>
   </div>
   <div class="chore-wrap" id="choreWrap"></div>
+</div>
+
+<!-- ═══════════════════ MONEY: Bank & Invest ═══════════════════ -->
+<div class="screen" id="screen-money">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="btn-icon" onclick="openChoreTab()">◀</button>
+      <h2>Bank &amp; Invest 🏦</h2>
+    </div>
+    <div class="profile-badge" id="moneyProfileBadge"></div>
+  </div>
+  <div class="chore-wrap" id="moneyWrap"></div>
+</div>
+
+<!-- Weekly family meeting overlay -->
+<div class="overlay" id="familyMeetingOverlay" onclick="overlayClick(event,'familyMeetingOverlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3>🧑‍🧑‍🧒 Weekly family meeting</h3>
+    <div id="familyMeetingBody"></div>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
@@ -10593,6 +10621,276 @@ function ctEnsureShared() {
   if (!c.customChores) c.customChores = [];        // parent-added chore names
   if (!c.hiddenChores) c.hiddenChores = [];        // base/custom names hidden from the pickable list
 }
+
+/* ════════════════════════════════════════════════════════════════
+   MONEY: Bank (savings + GIC) & Investing (stocks) — a kids' money sim.
+
+   Simulated clock: one weekly family meeting = one "month". Each meeting
+   advances the stock market one month through real 2023 data, credits one
+   month of savings interest, and matures any GICs that have reached term.
+   All amounts display in CAD (Suncor is CAD-listed; USD names converted at
+   ~1.35 so everything is one currency for the kids).
+   ════════════════════════════════════════════════════════════════ */
+const MONEY_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+// Real 2023 monthly closes, normalized to CAD (USD names × ~1.35, rounded).
+const STOCKS_2023 = {
+  SU:   { name: 'Suncor', emoji: '🛢️', prices: [45,44,41,43,40,41,46,47,50,45,42,43] },
+  TSLA: { name: 'Tesla',  emoji: '🚗', prices: [234,277,279,221,274,352,360,348,338,270,324,335] },
+  AAPL: { name: 'Apple',  emoji: '🍎', prices: [194,198,223,230,239,262,265,254,231,231,255,259] },
+  COST: { name: 'Costco', emoji: '🛒', prices: [675,655,675,678,682,726,752,755,761,745,799,891] },
+};
+const MONEY_TICKERS = ['SU','TSLA','AAPL','COST'];
+const BANK_DEFAULTS = { savingsRate: 0.015, gicRates: { 3: 0.030, 6: 0.035, 12: 0.040 } };
+
+function money2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+function bankConfig() {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  if (!c.bank) c.bank = { savingsRate: BANK_DEFAULTS.savingsRate, gicRates: { ...BANK_DEFAULTS.gicRates }, marketMonth: 0 };
+  if (c.bank.marketMonth == null) c.bank.marketMonth = 0;
+  if (c.bank.savingsRate == null) c.bank.savingsRate = BANK_DEFAULTS.savingsRate;
+  if (!c.bank.gicRates) c.bank.gicRates = { ...BANK_DEFAULTS.gicRates };
+  return c.bank;
+}
+function ensureWallet(kid) {
+  const p = getProfData(kid);
+  if (!p.wallet) p.wallet = { cash: 0, savings: 0, gics: [], holdings: {}, lastMeetingWeek: null };
+  if (!Array.isArray(p.wallet.gics)) p.wallet.gics = [];
+  if (!p.wallet.holdings) p.wallet.holdings = {};
+  return p.wallet;
+}
+function stockPrice(ticker, monthOverride) {
+  const m = ((monthOverride != null ? monthOverride : bankConfig().marketMonth) % 12 + 12) % 12;
+  return STOCKS_2023[ticker].prices[m];
+}
+function marketMonthLabel() { return MONEY_MONTHS[bankConfig().marketMonth % 12] + ' 2023'; }
+function portfolioValue(kid) {
+  const w = ensureWallet(kid);
+  return money2(Object.keys(w.holdings).reduce((s, t) => s + (w.holdings[t] || 0) * stockPrice(t), 0));
+}
+function gicTotal(kid) { return money2(ensureWallet(kid).gics.reduce((s, g) => s + (g.amount || 0), 0)); }
+function netWorth(kid) {
+  const w = ensureWallet(kid);
+  return money2(w.cash + w.savings + gicTotal(kid) + portfolioValue(kid));
+}
+
+/* ── Transactions (each guards against overdraw; returns true on success) ── */
+function moneyDeposit(kid, amount) {          // cash → savings
+  const w = ensureWallet(kid); amount = money2(Math.min(amount, w.cash));
+  if (amount <= 0) return false;
+  w.cash = money2(w.cash - amount); w.savings = money2(w.savings + amount); saveAll(); return true;
+}
+function moneyWithdraw(kid, amount) {         // savings → cash (two-way)
+  const w = ensureWallet(kid); amount = money2(Math.min(amount, w.savings));
+  if (amount <= 0) return false;
+  w.savings = money2(w.savings - amount); w.cash = money2(w.cash + amount); saveAll(); return true;
+}
+function moneyOpenGIC(kid, amount, termMonths) {   // cash → locked GIC
+  const w = ensureWallet(kid); amount = money2(Math.min(amount, w.cash));
+  if (amount <= 0 || ![3, 6, 12].includes(termMonths)) return false;
+  const cfg = bankConfig();
+  const rate = cfg.gicRates[termMonths] || 0.03;
+  w.cash = money2(w.cash - amount);
+  w.gics.push({ id: 'gic-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+    amount, termMonths, rate, openedMonth: cfg.marketMonth, matureMonth: cfg.marketMonth + termMonths });
+  saveAll(); return true;
+}
+function moneyBuyStock(kid, ticker, dollars) {     // cash → fractional shares
+  const w = ensureWallet(kid); dollars = money2(Math.min(dollars, w.cash));
+  if (dollars <= 0 || !STOCKS_2023[ticker]) return false;
+  const shares = dollars / stockPrice(ticker);
+  w.cash = money2(w.cash - dollars);
+  w.holdings[ticker] = (w.holdings[ticker] || 0) + shares; saveAll(); return true;
+}
+function moneySellStock(kid, ticker, shares) {     // shares → cash
+  const w = ensureWallet(kid); const have = w.holdings[ticker] || 0;
+  shares = Math.min(shares, have);
+  if (shares <= 1e-9 || !STOCKS_2023[ticker]) return false;
+  w.holdings[ticker] = have - shares;
+  if (w.holdings[ticker] < 1e-9) delete w.holdings[ticker];
+  w.cash = money2(w.cash + shares * stockPrice(ticker)); saveAll(); return true;
+}
+
+/* Advance the money world by one "month": credit savings interest, mature any
+   due GICs (principal + simple interest for the term), and step the market.
+   Returns a summary for the meeting recap. Called once per weekly meeting. */
+function moneyAdvanceMonth(kid) {
+  const w = ensureWallet(kid); const cfg = bankConfig();
+  const interest = money2(w.savings * (cfg.savingsRate / 12));
+  w.savings = money2(w.savings + interest);
+  const maturedList = [];
+  const nextMonth = cfg.marketMonth + 1;
+  w.gics = w.gics.filter(g => {
+    if (nextMonth >= g.matureMonth) {
+      const payout = money2(g.amount * (1 + g.rate * (g.termMonths / 12)));
+      w.cash = money2(w.cash + payout);
+      maturedList.push({ amount: g.amount, payout, termMonths: g.termMonths });
+      return false;
+    }
+    return true;
+  });
+  return { interest, matured: maturedList };
+}
+
+/* ── Money UI ── */
+let moneyKid = 'jess';
+function openMoneyScreen(kid) {
+  moneyKid = (kid === 'jenn' || kid === 'jess') ? kid : (isParent() ? ctParentKid : activeProfile());
+  showScreen('money');
+  renderMoneyScreen();
+}
+function renderMoneyScreen() {
+  const kid = moneyKid;
+  const badge = document.getElementById('moneyProfileBadge');
+  if (badge) badge.textContent = kid === 'jenn' ? '🐥 Jenn' : '🦊 Jess';
+  const w = ensureWallet(kid); const cfg = bankConfig();
+  const wrap = document.getElementById('moneyWrap');
+  if (!wrap) return;
+  let html = `<div class="chore-grid">`;
+  html += `<div class="money-hero">
+      <div>Net worth<br><b>$${netWorth(kid).toFixed(2)}</b></div>
+      <div class="money-market">📅 ${marketMonthLabel()}</div>
+    </div>`;
+  html += `<div class="chore-card"><h3>💵 Cash — $${w.cash.toFixed(2)}</h3>
+    <div class="money-btn-row">
+      <button class="pill-btn" onclick="moneyAction('deposit')">→ 🏦 Save</button>
+      <button class="pill-btn" onclick="moneyOpenGICPrompt()">→ 🔒 GIC</button>
+      <button class="pill-btn" onclick="moneyAction('buy')">→ 📈 Invest</button>
+    </div></div>`;
+  html += `<div class="chore-card"><h3>🏦 Savings — $${w.savings.toFixed(2)}</h3>
+    <div class="ct-meta">Earns ${(cfg.savingsRate * 100).toFixed(2)}%/yr, credited each family meeting. Money moves both ways.</div>
+    <div class="money-btn-row"><button class="pill-btn" onclick="moneyAction('withdraw')">→ 💵 To cash</button></div></div>`;
+  const gicRows = w.gics.length ? w.gics.map(g => {
+    const left = Math.max(0, g.matureMonth - cfg.marketMonth);
+    const payout = money2(g.amount * (1 + g.rate * (g.termMonths / 12)));
+    return `<div class="ct-item"><div class="ct-item-left"><span>🔒 $${g.amount.toFixed(2)} · ${g.termMonths}mo @ ${(g.rate * 100).toFixed(1)}%</span></div><span class="ct-meta">${left === 0 ? 'matures next meeting' : left + ' mo left'} → $${payout.toFixed(2)}</span></div>`;
+  }).join('') : `<div class="ct-meta">No GICs yet. Locking cash for a term earns a higher, guaranteed rate.</div>`;
+  html += `<div class="chore-card"><h3>🔒 GIC — locked savings</h3>${gicRows}
+    <div class="ct-meta">Rates: 3mo ${(cfg.gicRates[3] * 100).toFixed(1)}% · 6mo ${(cfg.gicRates[6] * 100).toFixed(1)}% · 12mo ${(cfg.gicRates[12] * 100).toFixed(1)}%</div>
+    <div class="money-btn-row"><button class="pill-btn" onclick="moneyOpenGICPrompt()">+ Open a GIC</button></div></div>`;
+  const stockRows = MONEY_TICKERS.map(t => {
+    const price = stockPrice(t); const sh = w.holdings[t] || 0; const val = sh * price;
+    return `<div class="ct-item"><div class="ct-item-left"><span>${STOCKS_2023[t].emoji} <b>${t}</b> $${price}</span></div>
+      <span class="ct-meta">${sh > 0 ? sh.toFixed(3) + ' sh · $' + val.toFixed(2) : '—'}</span>
+      <span style="display:flex;gap:0.3rem"><button class="btn-icon" aria-label="Buy ${t}" onclick="moneyBuyPrompt('${t}')">＋</button>${sh > 0 ? `<button class="btn-icon" aria-label="Sell ${t}" onclick="moneySellPrompt('${t}')">－</button>` : ''}</span></div>`;
+  }).join('');
+  html += `<div class="chore-card"><h3>📈 Stocks — ${marketMonthLabel()}</h3>
+    <div class="ct-meta">Real 2023 prices — they go up AND down. Invest any dollar amount (fractional shares).</div>
+    ${stockRows}
+    <div class="ct-meta" style="margin-top:0.3rem">Portfolio value: <b>$${portfolioValue(kid).toFixed(2)}</b></div></div>`;
+  if (isParent()) {
+    html += `<div class="chore-card"><h3>⚙️ Rates (parent)</h3>
+      <div class="money-btn-row">
+        <button class="pill-btn" onclick="moneySetRate('savings')">Savings ${(cfg.savingsRate * 100).toFixed(2)}%</button>
+        <button class="pill-btn" onclick="moneySetRate('3')">GIC 3mo ${(cfg.gicRates[3] * 100).toFixed(1)}%</button>
+        <button class="pill-btn" onclick="moneySetRate('6')">GIC 6mo ${(cfg.gicRates[6] * 100).toFixed(1)}%</button>
+        <button class="pill-btn" onclick="moneySetRate('12')">GIC 12mo ${(cfg.gicRates[12] * 100).toFixed(1)}%</button>
+      </div>
+      <div class="ct-meta">Rates reference CIBC savings/GIC. One family meeting = one month of interest.</div></div>`;
+  }
+  html += `</div>`;
+  wrap.innerHTML = html;
+}
+function moneyPromptAmount(label, max) {
+  const v = prompt(`${label}\nHow much? (max $${max.toFixed(2)})`, '');
+  if (v == null) return null;
+  const a = money2(parseFloat(v));
+  if (!a || a <= 0) return null;
+  return Math.min(a, max);
+}
+function moneyAction(kind) {
+  const kid = moneyKid; const w = ensureWallet(kid);
+  if (kind === 'deposit') { const a = moneyPromptAmount('Move Cash → Savings', w.cash); if (a) { moneyDeposit(kid, a); renderMoneyScreen(); } }
+  else if (kind === 'withdraw') { const a = moneyPromptAmount('Move Savings → Cash', w.savings); if (a) { moneyWithdraw(kid, a); renderMoneyScreen(); } }
+  else if (kind === 'buy') { const t = (prompt('Which stock? SU, TSLA, AAPL, COST', 'AAPL') || '').toUpperCase().trim(); if (STOCKS_2023[t]) moneyBuyPrompt(t); }
+}
+function moneyBuyPrompt(t) {
+  const kid = moneyKid; const w = ensureWallet(kid);
+  const a = moneyPromptAmount(`Invest in ${t} @ $${stockPrice(t)}/share`, w.cash);
+  if (a) { moneyBuyStock(kid, t, a); renderMoneyScreen(); showToast(`Bought $${a.toFixed(2)} of ${t} 📈`); }
+}
+function moneySellPrompt(t) {
+  const kid = moneyKid; const w = ensureWallet(kid); const sh = w.holdings[t] || 0;
+  const v = prompt(`Sell ${t} (you have ${sh.toFixed(3)} shares @ $${stockPrice(t)})\nHow many shares?`, sh.toFixed(3));
+  if (v == null) return;
+  const n = parseFloat(v);
+  if (n > 0) { moneySellStock(kid, t, n); renderMoneyScreen(); showToast(`Sold ${t} 💵`); }
+}
+function moneyOpenGICPrompt() {
+  const kid = moneyKid; const w = ensureWallet(kid);
+  const term = prompt('GIC term — 3, 6, or 12 months?', '12');
+  const tm = parseInt(term, 10);
+  if (![3, 6, 12].includes(tm)) { if (term != null) showToast('Pick 3, 6, or 12'); return; }
+  const a = moneyPromptAmount(`Open a ${tm}-month GIC`, w.cash);
+  if (a) { moneyOpenGIC(kid, a, tm); renderMoneyScreen(); showToast(`🔒 ${tm}-month GIC opened`); }
+}
+function moneySetRate(which) {
+  const cfg = bankConfig();
+  const cur = which === 'savings' ? cfg.savingsRate : cfg.gicRates[parseInt(which, 10)];
+  const v = prompt(`Annual rate (%) for ${which === 'savings' ? 'Savings' : 'GIC ' + which + 'mo'}:`, (cur * 100).toFixed(2));
+  if (v == null) return;
+  const r = parseFloat(v) / 100;
+  if (isNaN(r) || r < 0 || r > 1) { showToast('Enter a rate like 1.5'); return; }
+  if (which === 'savings') cfg.savingsRate = r; else cfg.gicRates[parseInt(which, 10)] = r;
+  saveAll(); renderMoneyScreen();
+}
+
+/* ── Weekly family meeting: day-by-day review, then finalize + advance month ── */
+function openFamilyMeeting() {
+  if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
+  ctEnsureShared();
+  const c = state.shared.chore;
+  const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
+  const held = !!(c.meetingsHeld && c.meetingsHeld[wk]);
+  let html = `<div class="ct-meta">Review the week day by day, then pay out. This advances the money world one month — interest is credited, due GICs mature, and the stock market moves.</div>`;
+  ['jenn', 'jess'].forEach(kid => {
+    const prelim = ctWeekMoney(wk, kid);
+    let days = '';
+    for (let d = 0; d < 7; d++) {
+      const chores = ctAllChoreNames().filter(cn => ctGetOptional(wk, d, kid, cn));
+      const mand = CT_SESSIONS.filter(s => ctGetMandatory(wk, d, s, kid));
+      if (chores.length || mand.length) {
+        days += `<div class="ct-meta">${CT_DAYS[d]}: ${mand.length ? '✅ ' + mand.length + ' routines ' : ''}${chores.length ? '🧹 ' + chores.map(escapeHtml).join(', ') : ''}</div>`;
+      }
+    }
+    if (!days) days = `<div class="ct-meta">No chores checked this week.</div>`;
+    html += `<div class="chore-card"><h3>${kid === 'jenn' ? '🐥 Jenn' : '🦊 Jess'} — $${prelim.toFixed(2)}</h3>${days}</div>`;
+  });
+  html += held
+    ? `<div class="ct-meta" style="margin-top:0.5rem">✅ This week's meeting is already done. Come back next week.</div>
+       <button class="pill-btn" style="width:100%;margin-top:0.4rem" onclick="closeSheet('familyMeetingOverlay')">Close</button>`
+    : `<button class="btn-confirm" onclick="finalizeFamilyMeeting()">✅ Pay out &amp; advance the month</button>
+       <button class="pill-btn" style="width:100%;margin-top:0.4rem" onclick="closeSheet('familyMeetingOverlay')">Not yet</button>`;
+  document.getElementById('familyMeetingBody').innerHTML = html;
+  openSheet('familyMeetingOverlay');
+}
+function finalizeFamilyMeeting() {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
+  if (c.meetingsHeld && c.meetingsHeld[wk]) { showToast('Already held this week'); return; }
+  if (!c.finalizedWeeks) c.finalizedWeeks = {};
+  if (!c.finalizedWeeks[wk]) c.finalizedWeeks[wk] = {};
+  if (!c.meetingsHeld) c.meetingsHeld = {};
+  const parts = [];
+  ['jenn', 'jess'].forEach(kid => {
+    const w = ensureWallet(kid);
+    if (c.finalizedWeeks[wk][kid] == null) {
+      const prelim = ctWeekMoney(wk, kid);
+      w.cash = money2(w.cash + prelim);
+      c.finalizedWeeks[wk][kid] = prelim;
+      if (prelim > 0) parts.push(`${kid === 'jenn' ? 'Jenn' : 'Jess'} +$${prelim.toFixed(2)}`);
+    }
+    const adv = moneyAdvanceMonth(kid);
+    adv.matured.forEach(m => parts.push(`${kid === 'jenn' ? 'Jenn' : 'Jess'} GIC +$${m.payout.toFixed(2)}`));
+  });
+  bankConfig().marketMonth += 1;   // one shared market step per meeting
+  c.meetingsHeld[wk] = true;
+  saveAll();
+  closeSheet('familyMeetingOverlay');
+  renderChoreTab();
+  showToast(`💰 ${parts.length ? parts.join(' · ') + ' · ' : ''}market now ${marketMonthLabel()}`);
+}
 /* Chore names a parent can pick/assign right now: base defaults + custom,
    minus any they've hidden. (ctAllChoreNames keeps the full union incl.
    hidden + group-referenced, for validating existing tagged blocks.) */
@@ -11080,9 +11378,17 @@ function ctRenderMoneyCard(kid) {
     if (uncapped > CT_MONEY_CAP) lines.push(`<div class="ct-meta ct-cap-note">Capped at $${CT_MONEY_CAP} this week.</div>`);
     body = lines.join('');
   }
+  const nw = netWorth(kid);
+  const finalized = !!(c.finalizedWeeks && c.finalizedWeeks[ctWeekKey] && c.finalizedWeeks[ctWeekKey][kid] != null);
   return `<div class="chore-card"><h3>💰 ${name}'s pocket money</h3>
     <div class="ct-money-total">$${money.toFixed(2)} <span class="ct-money-cap">/ $${CT_MONEY_CAP} max</span></div>
-    ${body}</div>`;
+    <div class="ct-meta">${finalized ? '✅ Paid out at the family meeting' : 'Preliminary — confirmed at the weekly family meeting'}</div>
+    ${body}
+    <div class="ct-meta" style="margin-top:0.4rem">🏦 Net worth: <b>$${nw.toFixed(2)}</b></div>
+    <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.5rem">
+      <button type="button" class="pill-btn" onclick="openMoneyScreen('${kid}')">🏦 Bank &amp; invest</button>
+      ${isParent() ? `<button type="button" class="pill-btn" onclick="openFamilyMeeting()">🧑‍🧑‍🧒 Family meeting</button>` : ''}
+    </div></div>`;
 }
 function ctRenderGroupCards(kid) {
   const groups = ctGroupsForKid(kid);
