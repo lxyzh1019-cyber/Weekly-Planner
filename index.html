@@ -15,6 +15,10 @@
 
 <style>
   :root {
+    /* Print grid slot height (per 15-min slot). Sized so the full
+       6am–9pm week fits one A4/Letter landscape page. JS reads this
+       same value via getComputedStyle so the two never drift. */
+    --print-slot: 11px;
     /* Paper / sticker aesthetic */
     --bg: #fef9ef;
     --bg2: #fff4db;
@@ -769,6 +773,16 @@
   }
   .btn-icon:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
   .btn-icon:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 var(--ink); }
+  /* Toolbar icons with a visible caption so kids know what each does,
+     not just an emoji to guess at. */
+  .btn-icon--labeled {
+    display: inline-flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 1px; line-height: 1;
+    padding: 0.28rem 0.5rem; font-size: 1.15rem;
+  }
+  .btn-icon--labeled .btn-icon__label {
+    font-size: 0.58rem; font-weight: 700; letter-spacing: 0.2px;
+  }
   button:focus-visible,
   [role="button"]:focus-visible,
   .zone-tab:focus-visible,
@@ -1432,11 +1446,16 @@
 
   /* ═══════════ FULL WEEKLY VIEW — zones as rows, days as columns ═══════════ */
   .weekly-full-wrap { padding: 0.5rem; overflow-x: auto; flex: 1; padding-bottom: 0.5rem; }
+  /* On phones the 7 columns would be too thin to read, so give them a
+     floor and let this one view scroll instead of squishing. */
+  @media (max-width: 600px) { .weekly-full { min-width: 560px; } }
   .weekly-full {
     display: grid;
-    grid-template-columns: 110px repeat(7, minmax(140px, 1fr));
+    /* All 7 days share the width so the whole week is visible at once —
+       no horizontal scroll hiding Sunday on tablets/laptops. */
+    grid-template-columns: 96px repeat(7, minmax(0, 1fr));
     gap: 0;
-    min-width: 1100px;
+    min-width: 0;
     background: var(--paper);
     border: 2px solid var(--ink);
     border-radius: 14px;
@@ -2564,6 +2583,10 @@
     .screen:not(#screen-print) { display: none !important; }
     #screen-print { display: block !important; }
     .no-print { display: none !important; }
+    /* @page already supplies the page margin — drop the on-screen
+       padding so the grid gets the full landscape height (keeps the
+       whole week on one A4/Letter page). */
+    #screen-print { padding: 0 !important; }
     @page { size: landscape; margin: 0.3in; }
   }
   #screen-print {
@@ -2578,34 +2601,41 @@
     font-family: 'Patrick Hand', sans-serif;
   }
   .print-header {
-    text-align: center; margin-bottom: 0.8rem;
-    border-bottom: 3px double var(--ink); padding-bottom: 0.5rem;
+    text-align: center; margin-bottom: 0.35rem;
+    border-bottom: 3px double var(--ink); padding-bottom: 0.3rem;
   }
-  .print-header h1 { font-family:'Gochi Hand', cursive; font-size: 2.2rem; }
+  .print-header h1 { font-family:'Gochi Hand', cursive; font-size: 1.5rem; }
   .print-week-grid {
     display: grid;
-    grid-template-columns: 50px repeat(7, 1fr);
+    grid-template-columns: 44px repeat(7, 1fr);
     border: 2px solid var(--ink);
     font-size: 9pt;
+    break-inside: avoid;
   }
   .print-cell, .print-header-cell, .print-time-cell {
     border: 1px solid var(--paper-line);
-    padding: 2px 4px;
-    min-height: 14px;
+    padding: 0 4px;
     position: relative;
-    overflow: hidden;
   }
+  /* Slot rows: fixed short height so all 15 hours fit one page. */
+  .print-cell, .print-time-cell { height: var(--print-slot); }
+  .print-time-cell { overflow: hidden; }
+  /* Day cells must let a multi-slot block overflow downward over the
+     rows it spans — the previous overflow:hidden clipped every block
+     to a single 15-min sliver. */
+  .print-cell { overflow: visible; padding: 0 2px; }
   .print-header-cell {
     background: #f5f5f5; font-weight: 700; text-align: center;
-    font-family: 'Gochi Hand', cursive; font-size: 11pt;
+    font-family: 'Gochi Hand', cursive; font-size: 10pt;
+    min-height: 18px; overflow: hidden;
   }
-  .print-time-cell { font-size: 8pt; color: #666; text-align: right; font-weight: 600; }
+  .print-time-cell { font-size: 7pt; color: #666; text-align: right; font-weight: 600; }
   .print-block {
-    position: absolute; left: 1px; right: 1px;
+    position: absolute; left: 1px; right: 1px; top: 0; z-index: 1;
     border-radius: 4px; padding: 1px 3px;
-    font-size: 7.5pt; font-weight: 700;
+    font-size: 7pt; font-weight: 700;
     color: #fff; border: 1px solid #000;
-    overflow: hidden; line-height: 1.1;
+    overflow: hidden; line-height: 1.05;
   }
 
   /* Scrollbar polish */
@@ -2855,6 +2885,16 @@
     font-size: 0.9rem; color: var(--ink);
   }
   .quest-back-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+  /* Plan-from-home: add a quest without leaving the Quest Board. */
+  .quest-add-btn {
+    display: block; width: 100%; margin: 0.1rem 0 0.7rem;
+    background: var(--accent); color: #fff;
+    border: 3px solid var(--ink); border-radius: 14px;
+    box-shadow: 3px 3px 0 var(--ink);
+    padding: 0.6rem 0.9rem; font-weight: 800; cursor: pointer;
+    font-size: 1.02rem; font-family: inherit;
+  }
+  .quest-add-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
   .quest-hero-card {
     background: #fff; border: 4px solid var(--ink); border-radius: 20px;
     box-shadow: 5px 5px 0 var(--ink);
@@ -3134,6 +3174,7 @@
     <span class="quest-board-date" id="questBoardDate"></span>
   </div>
 
+  <button type="button" class="quest-add-btn" onclick="goPlanToday()">＋ Add a quest for today</button>
   <div class="quest-list" id="questList"></div>
 </div>
 
@@ -3175,11 +3216,11 @@
         <button class="btn-icon" onclick="changeWeek(1)" aria-label="Next week">▶</button>
       </div>
       <div class="week-actions">
-        <button class="btn-icon" aria-label="Quest Board" onclick="goQuestBoard()" title="Quest Board">🎮</button>
-        <button class="btn-icon" aria-label="Weekly Chore" onclick="openChoreTab()">🧹</button>
-        <button class="btn-icon" aria-label="Challenges" onclick="openChallenges()">🎯</button>
-        <button class="btn-icon" aria-label="Sister Sync" onclick="openSisterSync()">👯</button>
-        <button class="btn-icon" aria-label="Print week" onclick="openPrint()">🖨</button>
+        <button class="btn-icon btn-icon--labeled" aria-label="Quest Board" onclick="goQuestBoard()" title="Quest Board"><span aria-hidden="true">🎮</span><span class="btn-icon__label">Quests</span></button>
+        <button class="btn-icon btn-icon--labeled" aria-label="Weekly Chore" onclick="openChoreTab()" title="Weekly Chore"><span aria-hidden="true">🧹</span><span class="btn-icon__label">Chores</span></button>
+        <button class="btn-icon btn-icon--labeled" aria-label="Challenges" onclick="openChallenges()" title="Challenges"><span aria-hidden="true">🎯</span><span class="btn-icon__label">Challenge</span></button>
+        <button class="btn-icon btn-icon--labeled" aria-label="Sister Sync" onclick="openSisterSync()" title="Sister Sync"><span aria-hidden="true">👯</span><span class="btn-icon__label">Sisters</span></button>
+        <button class="btn-icon btn-icon--labeled" aria-label="Print week" onclick="openPrint()" title="Print week"><span aria-hidden="true">🖨</span><span class="btn-icon__label">Print</span></button>
       </div>
     </div>
     <div class="week-topbar__row2">
@@ -4939,9 +4980,9 @@ function skipTutorial() {
 }
 
 function offerTutorialIfNeeded() {
-  if (isParent()) return;
-  const p = getProfData();
-  if (!p.progress.tutorialDone) openTutorial();
+  // Family Hero onboarding is opt-in. Kids reach the starter chooser by
+  // tapping a locked Family Hero chip in the tray (see selectActivity),
+  // not via a pop-up that blocks the first day they try to plan.
 }
 
 function markRoutineProgressOnChecklistToggle(block, act, prevDone, nextDone, total) {
@@ -5224,10 +5265,6 @@ function selectProfile(p) {
   } else {
     showScreen('week');
     renderWeek();
-    const pp = getProfData(p);
-    if (pp?.progress && !pp.progress.tutorialDone) {
-      setTimeout(()=>openTutorial(), 350);
-    }
   }
 }
 
@@ -5306,9 +5343,9 @@ function renderQuestBoard() {
       <div class="quest-empty">
         <div class="quest-empty-emoji">📜</div>
         <div><strong>No quests for today!</strong></div>
-        <div style="margin-top:0.4rem;font-size:0.9rem">Add tasks in the full planner to start your adventure.</div>
+        <div style="margin-top:0.4rem;font-size:0.9rem">Tap <strong>＋ Add a quest</strong> above to start your adventure.</div>
         <div class="quest-empty-cta">
-          <button class="quest-back-btn" onclick="goWeek()">📋 Open full planner</button>
+          <button class="quest-back-btn" onclick="goWeek()">📋 Plan the whole week</button>
         </div>
       </div>`;
     return;
@@ -5373,6 +5410,15 @@ function formatQuestTime(min) {
   const hh = ((h+11)%12)+1;
   const ap = h<12 ? 'am' : 'pm';
   return `${hh}:${String(m).padStart(2,'0')}${ap}`;
+}
+
+// Plan-from-home: jump straight into today's day view, ready to add a
+// block, instead of routing through the week grid first.
+function goPlanToday() {
+  const key = todayKey();
+  const d = formatDayKey(key);
+  const dayIdx = (d.getDay() + 6) % 7; // Monday = 0, matching the week grid
+  openDayFromWeekCard(key, dayIdx);
 }
 
 function openQuestDetail(blockId) {
@@ -7299,6 +7345,13 @@ function buildTray() {
 }
 
 function selectActivity(act) {
+  // Opt-in Family Hero onboarding: tapping a starter chore before it's
+  // been set up opens the chooser here, instead of forcing that sheet on
+  // the first day-view load (and instead of a dead "locked" toast).
+  const _pr = getProfData()?.progress;
+  if (_pr && !_pr.tutorialDone && TUTORIAL_STARTER_CHOICES.some(c=>c.id===act.id)) {
+    openTutorial(); return;
+  }
   if (act._locked) { showToast(`🔒 Unlocks in ${act.season}!`); return; }
   if (act._rewardLocked) { showToast('Keep going — unlock this reward soon ✨'); return; }
   selectedActivity = act;
@@ -10901,7 +10954,9 @@ function renderPrintSheet() {
     </div>
   `;
 
-  // Grid
+  // Grid. Row height comes from the --print-slot CSS var so the
+  // block heights below line up exactly with the printed rows.
+  const slotPx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--print-slot')) || 11;
   html += `<div class="print-week-grid">`;
   // header row
   html += `<div class="print-header-cell"></div>`;
@@ -10924,8 +10979,8 @@ function renderPrintSheet() {
         if (startSlot!==s) return;
         const act = acts.find(a=>a.id===b.actId);
         if (!act) return;
-        const slotSpan = Math.round(b.durationMin/15);
-        blockHtml += `<div class="print-block" style="background:${b.colour||CAT_HEX[act.cat]};height:${slotSpan*14-1}px">${act.icon} ${act.name}</div>`;
+        const slotSpan = Math.max(1, Math.round(b.durationMin/15));
+        blockHtml += `<div class="print-block" style="background:${b.colour||CAT_HEX[act.cat]};height:${slotSpan*slotPx-1}px">${act.icon} ${act.name}</div>`;
       });
       html += `<div class="print-cell">${blockHtml}</div>`;
     });
