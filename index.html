@@ -2232,6 +2232,28 @@
     border-radius: 12px;
     line-height: 1.35;
   }
+  /* Sunday weekly-review variant of the coach tip */
+  .kid-coach-tip.week-review-tip {
+    position: relative;
+    background: linear-gradient(135deg, #fff2d6 0%, #ffe3ef 100%);
+    border-color: var(--accent-green);
+    padding-right: 2rem;
+  }
+  .tip-dismiss {
+    position: absolute; top: 4px; right: 6px;
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 1.5px solid var(--ink); background: rgba(255,255,255,0.8);
+    color: var(--ink); font-weight: 900; font-size: 0.85rem; line-height: 1;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .tip-dismiss:hover { background: #fff; }
+  /* Evening wind-down reminder inside the day Next-Up banner */
+  .bedtime-tip {
+    margin-top: 0.4rem; padding-top: 0.35rem;
+    border-top: 1px dashed var(--paper-line);
+    font-size: 0.92rem; font-weight: 700; color: #6a5acd;
+    line-height: 1.3;
+  }
 
   .edit-stopwatch-wrap {
     margin: 0.6rem 0 0.8rem;
@@ -5252,13 +5274,24 @@ function renderDayNextUpBanner() {
     next = candidates[0] || null;
   }
 
-  if (!next) {
+  // Evening wind-down nudge (once age is set) — shown alongside or in place
+  // of the Next-Up card when it's getting late today.
+  const evening = isToday && now.getHours() >= 18;
+  const age = getProfData()?.age;
+  const bedtime = (evening && age != null) ? bedtimeReminderText(age) : null;
+
+  if (!next && !bedtime) {
     el.style.display = 'none';
     return;
   }
   el.style.display = 'block';
-  const timeStr = formatTimeFromMin(next.b.startMin);
-  el.innerHTML = `<div class="next-up-label">Next up</div><div>${next.act.icon} <b>${escapeHtml(next.act.name)}</b> · ${timeStr}</div>`;
+  let inner = '';
+  if (next) {
+    const timeStr = formatTimeFromMin(next.b.startMin);
+    inner += `<div class="next-up-label">Next up</div><div>${next.act.icon} <b>${escapeHtml(next.act.name)}</b> · ${timeStr}</div>`;
+  }
+  if (bedtime) inner += `<div class="bedtime-tip">${bedtime}</div>`;
+  el.innerHTML = inner;
 }
 
 function updateStopwatchGoalToasts(blocks) {
@@ -5705,10 +5738,64 @@ function renderWeek() {
   renderGoalsTodos();
 
   const coachEl = document.getElementById('weekCoachTip');
-  if (coachEl && !isParent()) {
-    coachEl.style.display = 'block';
-    coachEl.textContent = '🌟 Tip: Tap a day card to see your timeline. Check off routines as you go — each tick is a small win. Use “My free time” in Time-Grid to spot when you can choose rest or a goal.';
-  } else if (coachEl) coachEl.style.display = 'none';
+  if (coachEl) {
+    const isSunday = new Date().getDay() === 0;
+    if (isSunday && weekOffset === 0 && !weekReviewDismissed) {
+      // Sunday weekly-review nudge: a gentle look-back with a mini summary,
+      // shown to parent and child alike so they can reflect together.
+      const t = computeWeekTotals(keys);
+      const learn = fmtHrsMin(t.catMin.school || 0);
+      const active = fmtHrsMin((t.catMin.active || 0) + (t.catMin.training || 0));
+      const free = fmtHrsMin(t.free);
+      coachEl.classList.add('week-review-tip');
+      coachEl.style.display = 'block';
+      coachEl.innerHTML = `🗓️ <b>Sunday review</b> — this week: 📚 ${learn} learning · 🏃 ${active} active · 🌤 ${free} free. Look back together, celebrate one win 🎉, then tweak one thing for next week. <button class="tip-dismiss" aria-label="Dismiss" onclick="dismissWeekReview()">✕</button>`;
+    } else if (!isParent()) {
+      coachEl.classList.remove('week-review-tip');
+      coachEl.style.display = 'block';
+      coachEl.textContent = '🌟 Tip: Tap a day card to see your timeline. Check off routines as you go — each tick is a small win. Use “My free time” in Time-Grid to spot when you can choose rest or a goal.';
+    } else {
+      coachEl.style.display = 'none';
+    }
+  }
+}
+
+// Weekly time-per-category totals over the app's 6am–9pm window (shared by
+// the Sunday review nudge). Free = window minutes not scheduled.
+function computeWeekTotals(keys) {
+  const acts = getAllActivities();
+  const catMin = {};
+  let planned = 0;
+  keys.forEach(k => {
+    (getDayBlocks(k) || []).forEach(b => {
+      const s = Math.max(b.startMin, START_MIN);
+      const e = Math.min(b.startMin + (b.durationMin || 0), END_MIN);
+      const m = e - s;
+      if (m <= 0) return;
+      const act = acts.find(a => a.id === b.actId);
+      const cat = act ? act.cat : 'custom';
+      catMin[cat] = (catMin[cat] || 0) + m;
+      planned += m;
+    });
+  });
+  return { catMin, planned, free: Math.max(0, DAY_MIN_SPAN * 7 - planned) };
+}
+
+let weekReviewDismissed = false;
+function dismissWeekReview() {
+  weekReviewDismissed = true;
+  const el = document.getElementById('weekCoachTip');
+  if (el) el.style.display = 'none';
+}
+
+// Evening wind-down reminder derived from the child's age (default 7am wake).
+function bedtimeReminderText(age) {
+  const s = recommendedSleep(age);
+  if (!s) return null;
+  const targetH = Math.round((s.min + s.max) / 2);
+  let bed = 7 * 60 - targetH * 60;
+  if (bed < 0) bed += 24 * 60;
+  return `💤 Wind-down soon — age ${age} does best with ~${targetH}h sleep (lights-out around ${formatTimeFromMin(bed)} for a 7 am wake).`;
 }
 
 /* ════════════════════════════════════════════════════════════════
