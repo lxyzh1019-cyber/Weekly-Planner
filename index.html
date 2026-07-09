@@ -10593,6 +10593,116 @@ function ctEnsureShared() {
   if (!c.customChores) c.customChores = [];        // parent-added chore names
   if (!c.hiddenChores) c.hiddenChores = [];        // base/custom names hidden from the pickable list
 }
+
+/* ════════════════════════════════════════════════════════════════
+   MONEY: Bank (savings + GIC) & Investing (stocks) — a kids' money sim.
+
+   Simulated clock: one weekly family meeting = one "month". Each meeting
+   advances the stock market one month through real 2023 data, credits one
+   month of savings interest, and matures any GICs that have reached term.
+   All amounts display in CAD (Suncor is CAD-listed; USD names converted at
+   ~1.35 so everything is one currency for the kids).
+   ════════════════════════════════════════════════════════════════ */
+const MONEY_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+// Real 2023 monthly closes, normalized to CAD (USD names × ~1.35, rounded).
+const STOCKS_2023 = {
+  SU:   { name: 'Suncor', emoji: '🛢️', prices: [45,44,41,43,40,41,46,47,50,45,42,43] },
+  TSLA: { name: 'Tesla',  emoji: '🚗', prices: [234,277,279,221,274,352,360,348,338,270,324,335] },
+  AAPL: { name: 'Apple',  emoji: '🍎', prices: [194,198,223,230,239,262,265,254,231,231,255,259] },
+  COST: { name: 'Costco', emoji: '🛒', prices: [675,655,675,678,682,726,752,755,761,745,799,891] },
+};
+const MONEY_TICKERS = ['SU','TSLA','AAPL','COST'];
+const BANK_DEFAULTS = { savingsRate: 0.015, gicRates: { 3: 0.030, 6: 0.035, 12: 0.040 } };
+
+function money2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+function bankConfig() {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  if (!c.bank) c.bank = { savingsRate: BANK_DEFAULTS.savingsRate, gicRates: { ...BANK_DEFAULTS.gicRates }, marketMonth: 0 };
+  if (c.bank.marketMonth == null) c.bank.marketMonth = 0;
+  if (c.bank.savingsRate == null) c.bank.savingsRate = BANK_DEFAULTS.savingsRate;
+  if (!c.bank.gicRates) c.bank.gicRates = { ...BANK_DEFAULTS.gicRates };
+  return c.bank;
+}
+function ensureWallet(kid) {
+  const p = getProfData(kid);
+  if (!p.wallet) p.wallet = { cash: 0, savings: 0, gics: [], holdings: {}, lastMeetingWeek: null };
+  if (!Array.isArray(p.wallet.gics)) p.wallet.gics = [];
+  if (!p.wallet.holdings) p.wallet.holdings = {};
+  return p.wallet;
+}
+function stockPrice(ticker, monthOverride) {
+  const m = ((monthOverride != null ? monthOverride : bankConfig().marketMonth) % 12 + 12) % 12;
+  return STOCKS_2023[ticker].prices[m];
+}
+function marketMonthLabel() { return MONEY_MONTHS[bankConfig().marketMonth % 12] + ' 2023'; }
+function portfolioValue(kid) {
+  const w = ensureWallet(kid);
+  return money2(Object.keys(w.holdings).reduce((s, t) => s + (w.holdings[t] || 0) * stockPrice(t), 0));
+}
+function gicTotal(kid) { return money2(ensureWallet(kid).gics.reduce((s, g) => s + (g.amount || 0), 0)); }
+function netWorth(kid) {
+  const w = ensureWallet(kid);
+  return money2(w.cash + w.savings + gicTotal(kid) + portfolioValue(kid));
+}
+
+/* ── Transactions (each guards against overdraw; returns true on success) ── */
+function moneyDeposit(kid, amount) {          // cash → savings
+  const w = ensureWallet(kid); amount = money2(Math.min(amount, w.cash));
+  if (amount <= 0) return false;
+  w.cash = money2(w.cash - amount); w.savings = money2(w.savings + amount); saveAll(); return true;
+}
+function moneyWithdraw(kid, amount) {         // savings → cash (two-way)
+  const w = ensureWallet(kid); amount = money2(Math.min(amount, w.savings));
+  if (amount <= 0) return false;
+  w.savings = money2(w.savings - amount); w.cash = money2(w.cash + amount); saveAll(); return true;
+}
+function moneyOpenGIC(kid, amount, termMonths) {   // cash → locked GIC
+  const w = ensureWallet(kid); amount = money2(Math.min(amount, w.cash));
+  if (amount <= 0 || ![3, 6, 12].includes(termMonths)) return false;
+  const cfg = bankConfig();
+  const rate = cfg.gicRates[termMonths] || 0.03;
+  w.cash = money2(w.cash - amount);
+  w.gics.push({ id: 'gic-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+    amount, termMonths, rate, openedMonth: cfg.marketMonth, matureMonth: cfg.marketMonth + termMonths });
+  saveAll(); return true;
+}
+function moneyBuyStock(kid, ticker, dollars) {     // cash → fractional shares
+  const w = ensureWallet(kid); dollars = money2(Math.min(dollars, w.cash));
+  if (dollars <= 0 || !STOCKS_2023[ticker]) return false;
+  const shares = dollars / stockPrice(ticker);
+  w.cash = money2(w.cash - dollars);
+  w.holdings[ticker] = (w.holdings[ticker] || 0) + shares; saveAll(); return true;
+}
+function moneySellStock(kid, ticker, shares) {     // shares → cash
+  const w = ensureWallet(kid); const have = w.holdings[ticker] || 0;
+  shares = Math.min(shares, have);
+  if (shares <= 1e-9 || !STOCKS_2023[ticker]) return false;
+  w.holdings[ticker] = have - shares;
+  if (w.holdings[ticker] < 1e-9) delete w.holdings[ticker];
+  w.cash = money2(w.cash + shares * stockPrice(ticker)); saveAll(); return true;
+}
+
+/* Advance the money world by one "month": credit savings interest, mature any
+   due GICs (principal + simple interest for the term), and step the market.
+   Returns a summary for the meeting recap. Called once per weekly meeting. */
+function moneyAdvanceMonth(kid) {
+  const w = ensureWallet(kid); const cfg = bankConfig();
+  const interest = money2(w.savings * (cfg.savingsRate / 12));
+  w.savings = money2(w.savings + interest);
+  const maturedList = [];
+  const nextMonth = cfg.marketMonth + 1;
+  w.gics = w.gics.filter(g => {
+    if (nextMonth >= g.matureMonth) {
+      const payout = money2(g.amount * (1 + g.rate * (g.termMonths / 12)));
+      w.cash = money2(w.cash + payout);
+      maturedList.push({ amount: g.amount, payout, termMonths: g.termMonths });
+      return false;
+    }
+    return true;
+  });
+  return { interest, matured: maturedList };
+}
 /* Chore names a parent can pick/assign right now: base defaults + custom,
    minus any they've hidden. (ctAllChoreNames keeps the full union incl.
    hidden + group-referenced, for validating existing tagged blocks.) */
