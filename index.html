@@ -3178,6 +3178,7 @@
   .sticker-name { font-size: 0.66rem; font-weight: 700; color: var(--ink); margin-top: 0.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   @media (max-width: 380px) { .sticker-grid { grid-template-columns: repeat(3, 1fr); } }
   .quest-card {
+    position: relative;
     background: #fff; border: 3px solid var(--ink); border-radius: 18px;
     box-shadow: 4px 4px 0 var(--ink);
     padding: 0.9rem 1rem; display: flex; align-items: center; gap: 0.85rem;
@@ -3362,6 +3363,21 @@
   @keyframes sparkleFly {
     0% { transform: translate(0,0) scale(0.6); opacity: 1; }
     100% { transform: translate(var(--dx, 0), var(--dy, -40px)) scale(1.2); opacity: 0; }
+  }
+  /* Arcade blast-to-complete on the quest card */
+  .quest-projectile {
+    position: absolute; font-size: 1.4rem; pointer-events: none; z-index: 5;
+    transition: transform 0.3s cubic-bezier(.2,.8,.3,1), opacity 0.3s ease-out;
+  }
+  .quest-card.quest-blasting { pointer-events: none; }
+  .quest-card.quest-burst {
+    animation: questHit 0.32s ease-out;
+  }
+  @keyframes questHit {
+    0% { transform: none; }
+    30% { transform: translateX(-3px) scale(1.04) rotate(-1deg); box-shadow: 0 0 0 4px rgba(255,209,102,0.7), 4px 4px 0 var(--ink); }
+    60% { transform: translateX(3px) scale(0.99) rotate(1deg); }
+    100% { transform: none; }
   }
 
   /* Hero Mode toggle on profile screen */
@@ -5764,7 +5780,7 @@ function renderQuestBoard() {
     const done = !!b.completed;
     const right = done
       ? `<div class="quest-done-badge">✓</div>`
-      : `<button class="quest-complete-btn" onclick="event.stopPropagation();completeQuest('${b.id}')" aria-label="Complete quest">✓</button>`;
+      : `<button class="quest-complete-btn" onclick="event.stopPropagation();blastQuest('${b.id}', this)" aria-label="Blast this quest complete" title="Blast it! 🎯">🎯</button>`;
     return `
       <div class="quest-card ${done?'quest-done':''}" onclick="openQuestDetail('${b.id}')">
         <div class="quest-time-col">
@@ -5878,6 +5894,57 @@ function goPlanToday() {
 function openQuestDetail(blockId) {
   // Reuse existing edit sheet so kids can see/edit details if they tap the card body
   if (typeof openEditSheet === 'function') openEditSheet(blockId);
+}
+
+/* Arcade "blast to complete": tapping the 🎯 fires a shot at the quest card,
+   which bursts before the quest is marked done — completion feels like a
+   shooting game rather than a plain checkbox (item 4). */
+function blastQuest(blockId, btn) {
+  const card = btn && btn.closest ? btn.closest('.quest-card') : null;
+  if (!card || card.classList.contains('quest-blasting')) {
+    if (card && card.classList.contains('quest-blasting')) return;
+    completeQuest(blockId); return;
+  }
+  card.classList.add('quest-blasting');
+  const rect = card.getBoundingClientRect();
+  const bRect = btn.getBoundingClientRect();
+
+  const proj = document.createElement('div');
+  proj.className = 'quest-projectile';
+  proj.textContent = '💥';
+  proj.style.left = (bRect.left - rect.left + bRect.width / 2 - 10) + 'px';
+  proj.style.top  = (bRect.top - rect.top + bRect.height / 2 - 10) + 'px';
+  card.appendChild(proj);
+  // Fly from the blaster toward the quest icon on the far side of the card.
+  requestAnimationFrame(() => {
+    proj.style.transform = `translateX(-${Math.max(60, rect.width * 0.66)}px) scale(1.7)`;
+    proj.style.opacity = '0.15';
+  });
+
+  setTimeout(() => {
+    proj.remove();
+    card.classList.add('quest-burst');
+    spawnQuestBurst(card);
+    setTimeout(() => completeQuest(blockId), 240);
+  }, 300);
+}
+
+// Particle burst radiating from a quest card when it's blasted.
+function spawnQuestBurst(card) {
+  const bits = ['⭐','✨','💫','🌟','🎉'];
+  const rect = card.getBoundingClientRect();
+  for (let i = 0; i < 9; i++) {
+    const el = document.createElement('div');
+    el.className = 'quest-spark';
+    el.textContent = bits[i % bits.length];
+    el.style.left = '30%';
+    el.style.top = '50%';
+    const ang = (Math.PI * 2 * i) / 9;
+    el.style.setProperty('--dx', Math.cos(ang) * (70 + Math.random() * 50) + 'px');
+    el.style.setProperty('--dy', Math.sin(ang) * (55 + Math.random() * 45) + 'px');
+    card.appendChild(el);
+    setTimeout(() => el.remove(), 900);
+  }
 }
 
 function completeQuest(blockId) {
