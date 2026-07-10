@@ -1289,6 +1289,41 @@
   }
 
   /* ═══════════ GOALS + TODOS PANEL ═══════════ */
+  /* This week at a glance */
+  .week-glance {
+    margin: 0.3rem 0.8rem 0;
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    border-radius: 14px;
+    box-shadow: 2px 2px 0 var(--ink);
+    padding: 0.7rem 0.9rem;
+  }
+  .week-glance-header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.4rem;
+  }
+  .week-glance-header h3 { font-size: 1.25rem; margin: 0; }
+  .week-glance-age {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    font-weight: 700; font-size: 0.92rem; color: var(--ink);
+  }
+  .week-glance-age input {
+    width: 56px; text-align: center; border: 2px solid var(--ink);
+    border-radius: 8px; padding: 0.2rem 0.35rem; background: #fff;
+    font-family: 'Patrick Hand', sans-serif; font-size: 0.95rem;
+  }
+  .glance-window { font-size: 0.82rem; color: var(--ink-light); margin-bottom: 0.4rem; }
+  .glance-chips { display: flex; flex-wrap: wrap; gap: 0.35rem 0.7rem; font-size: 0.92rem; }
+  .glance-chip { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+  .glance-dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
+  .glance-sleep {
+    margin-top: 0.5rem; font-size: 0.9rem; padding: 0.4rem 0.55rem;
+    background: #f3eefb; border-radius: 8px;
+  }
+  .glance-sleep--muted { background: #f5f5f5; color: #777; }
+  .glance-notes { margin-top: 0.5rem; padding-top: 0.45rem; border-top: 1.5px dashed var(--paper-line); }
+  .glance-notes-title { font-weight: 800; font-size: 0.95rem; margin-bottom: 0.25rem; }
+  .glance-note { font-size: 0.85rem; color: var(--ink); margin-bottom: 0.15rem; }
   .gt-panel {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -1554,6 +1589,9 @@
     text-shadow: 0 1px 1px rgba(0,0,0,0.25);
     overflow: hidden;
     box-sizing: border-box;
+    /* Floor so blocks under ~30 min stay tall enough to read the name. */
+    min-height: 17px;
+    z-index: 2;
   }
   .wf-card:hover { transform: translate(-1px,-1px); box-shadow: 2.5px 2.5px 0 var(--ink); z-index: 3; }
   .wf-card-time { font-weight: 800; font-size: 0.72rem; }
@@ -3476,6 +3514,17 @@
       <div class="tg-mytime-bricks" id="tgMyTimeBricks"></div>
       <div class="tg-mytime-breakdown" id="tgMyTimeBreakdown"></div>
     </div>
+  </div>
+
+  <!-- This week at a glance: category/free-time totals, sleep, notes -->
+  <div class="week-glance" id="weekGlance">
+    <div class="week-glance-header">
+      <h3>📊 This week at a glance</h3>
+      <label class="week-glance-age">🎂 Age
+        <input type="number" id="weekAge" min="1" max="18" placeholder="—" onchange="onWeekAgeChange()">
+      </label>
+    </div>
+    <div class="week-glance-body" id="weekGlanceBody"></div>
   </div>
 
   <!-- Goals + Todos panel (side-by-side, below Full Week grid) -->
@@ -5973,6 +6022,7 @@ function renderWeek() {
   if (legend) legend.style.display = isParent() ? 'flex' : 'none';
 
   renderGoalsTodos();
+  renderWeekGlance(keys);
 
   const coachEl = document.getElementById('weekCoachTip');
   if (coachEl) {
@@ -6016,6 +6066,71 @@ function computeWeekTotals(keys) {
     });
   });
   return { catMin, planned, free: Math.max(0, DAY_MIN_SPAN * 7 - planned) };
+}
+
+// "This week at a glance" panel on the week view: category/free-time totals,
+// an age-based sleep recommendation, and the week's notes & objectives.
+function onWeekAgeChange() {
+  const v = (document.getElementById('weekAge')?.value || '').trim();
+  const age = v === '' ? null : Math.max(1, Math.min(18, parseInt(v, 10) || 0));
+  const pd = getProfData();
+  if (pd) { pd.age = age; saveAll(); }
+  renderWeekGlance(getDayKeys(weekOffset));
+}
+
+function renderWeekGlance(keys) {
+  const body = document.getElementById('weekGlanceBody');
+  if (!body) return;
+  const ageInput = document.getElementById('weekAge');
+  const age = getProfData()?.age;
+  if (ageInput && document.activeElement !== ageInput) {
+    ageInput.value = (age != null && !isNaN(age)) ? age : '';
+  }
+
+  const acts = getAllActivities();
+  const CAT_LABELS = {
+    sleep:'😴 Rest', school:'📚 Learning', active:'🏃 Active',
+    free:'🎮 Free', daily:'🍽 Daily', training:'🏋️ Training',
+    routine:'📋 Routine', custom:'✨ Custom'
+  };
+  const t = computeWeekTotals(keys);
+
+  const order = ['school','active','training','routine','daily','free','sleep','custom'];
+  let chips = '';
+  order.forEach(cat => {
+    if (!t.catMin[cat]) return;
+    chips += `<span class="glance-chip"><span class="glance-dot" style="background:${CAT_HEX[cat]||'#999'}"></span>${CAT_LABELS[cat]||cat}: <b>${fmtHrsMin(t.catMin[cat])}</b></span>`;
+  });
+  chips += `<span class="glance-chip"><span class="glance-dot" style="background:#fff;border:1px solid #999"></span>🌤 Unscheduled: <b>${fmtHrsMin(t.free)}</b></span>`;
+
+  const sleep = recommendedSleep(age);
+  let sleepHtml;
+  if (sleep) {
+    const perWeek = sleep.min * 7;
+    sleepHtml = `<div class="glance-sleep">💤 <b>Recommended sleep (age ${age}, ${sleep.group}):</b> ${sleep.min}–${sleep.max}h per night · aim for ~${perWeek}h across the week</div>`;
+  } else {
+    sleepHtml = `<div class="glance-sleep glance-sleep--muted">💤 Set the age above to see the recommended sleep for this age group.</div>`;
+  }
+
+  // Notes & objectives across the week.
+  const notes = [];
+  keys.forEach((k, i) => {
+    (getDayBlocks(k) || []).forEach(b => {
+      const act = acts.find(a => a.id === b.actId);
+      if (b.note) notes.push(`<b>${DAY_SHORT[i]}</b> · ${act?.icon||''} ${escapeHtml(act?.name||'')}: ${escapeHtml(b.note)}`);
+      if (b.objectives?.length) notes.push(`<b>${DAY_SHORT[i]}</b> · ${act?.icon||''} ${escapeHtml(act?.name||'')}: 🎯 ${escapeHtml(b.objectives.join(', '))}`);
+    });
+  });
+  const notesHtml = notes.length
+    ? `<div class="glance-notes"><div class="glance-notes-title">📝 Notes &amp; objectives</div>${notes.map(n=>`<div class="glance-note">${n}</div>`).join('')}</div>`
+    : '';
+
+  body.innerHTML = `
+    <div class="glance-window">Totals over the 6am–9pm window (${fmtHrsMin(DAY_MIN_SPAN)}/day).</div>
+    <div class="glance-chips">${chips}</div>
+    ${sleepHtml}
+    ${notesHtml}
+  `;
 }
 
 // #6 Weekly wins recap — a celebratory look at what actually got done.
@@ -6621,24 +6736,11 @@ function renderFullWeek(keys) {
         const leftCss  = 'calc(' + (slot.col * 100 / colCount) + '% + 1px)';
         const widthCss = 'calc(' + (100 / colCount) + '% - ' + (gap + 2) + 'px)';
 
-        // Travel / get-ready buffers, shown as hatched strips hugging the card
-        // so travel time is visible on the week at a glance (readability item).
+        // Inline travel/get-ready tag on the card (the strips themselves are
+        // drawn in a separate pass below so both sides always show).
         const travelMin = b.travelBuffer ? getTravelBufMin(b) : 0;
         const readyMin  = b.getReadyBuffer ? getGetReadyBufMin(b) : 0;
         const bufBefore = travelMin + readyMin;
-        if (bufBefore > 0) {
-          const bufIcon = travelMin ? '🚗' : '👕';
-          const cardTopPx = topPct / 100 * cellH;
-          // Before-strip: ends where the card starts.
-          const beforePx = bufBefore * PX_PER_MIN;
-          const beforeTop = Math.max(0, cardTopPx - beforePx);
-          const beforeH = cardTopPx - beforeTop;
-          if (beforeH >= 3) cell.appendChild(wfTravelStrip(beforeTop, beforeH, leftCss, widthCss, bufIcon, bufBefore));
-          // After-strip: starts where the card ends.
-          const cardBotPx = cardTopPx + heightPct / 100 * cellH;
-          const afterH = Math.min(beforePx, cellH - cardBotPx);
-          if (afterH >= 3) cell.appendChild(wfTravelStrip(cardBotPx, afterH, leftCss, widthCss, bufIcon, bufBefore));
-        }
 
         card.style.top = topPct + '%';
         card.style.height = 'calc(' + heightPct + '% - 2px)';
@@ -6658,6 +6760,32 @@ function renderFullWeek(keys) {
           + (bufBefore > 0 ? ` · ${travelMin ? '🚗 travel' : '👕 get-ready'} ${bufBefore} min each way` : '');
         card.onclick = (e)=>{ e.stopPropagation(); openDayFromWeekCard(key, ci, b.id); };
         cell.appendChild(card);
+      });
+
+      // Travel / get-ready strips for ALL of the day's blocks, drawn in
+      // whichever zone they fall into. This guarantees BOTH the before and
+      // after strip render even when a buffer crosses a zone boundary
+      // (previously a boundary-crossing block showed only one side).
+      (getDayBlocks(key) || []).forEach(b => {
+        const travelMin = b.travelBuffer ? getTravelBufMin(b) : 0;
+        const readyMin  = b.getReadyBuffer ? getGetReadyBufMin(b) : 0;
+        const buf = travelMin + readyMin;
+        if (buf <= 0) return;
+        const icon = travelMin ? '🚗' : '👕';
+        const relStart = b.startMin - START_MIN;
+        const dur = Math.max(5, b.durationMin || 0);
+        const entries = [
+          { s: relStart - buf, e: relStart },              // before
+          { s: relStart + dur, e: relStart + dur + buf },  // after
+        ];
+        entries.forEach(en => {
+          const segS = Math.max(en.s, z.start);
+          const segE = Math.min(en.e, z.end);
+          if (segE - segS < 2) return; // no visible overlap with this zone
+          const topPx = (segS - z.start) / zoneSpan * cellH;
+          const hPx = (segE - segS) / zoneSpan * cellH;
+          cell.appendChild(wfTravelStrip(topPx, hPx, '2px', 'calc(100% - 4px)', icon, buf));
+        });
       });
 
       grid.appendChild(cell);
