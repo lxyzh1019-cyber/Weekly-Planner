@@ -9993,31 +9993,46 @@ function renderSync() {
   const jB = getDayBlocks(key, 'jenn');
   const sB = getDayBlocks(key, 'jess');
 
-  // Overlaps — use minute-based granularity (count 15-min slots of free-time overlap)
+  // Overlaps — genuine "you're both free" time: any 15-min slot in the
+  // 6am–9pm window that is either unscheduled or a Free-category block for
+  // BOTH girls. (Previously it only counted explicit Free blocks, so two
+  // kids who simply left time open never saw an overlap.)
   const overlapWrap = document.getElementById('syncOverlapWrap');
   overlapWrap.innerHTML = '';
-  const jSlots = new Set();
-  jB.forEach(b=>{
-    const a = getAllActivities().find(x=>x.id===b.actId);
-    if(a?.cat!=='free') return;
-    const startSlot = Math.floor((b.startMin - START_MIN)/15);
-    const endSlot = Math.ceil((b.startMin - START_MIN + b.durationMin)/15);
-    for(let s=startSlot;s<endSlot;s++) jSlots.add(s);
-  });
-  const shared = [];
-  sB.forEach(b=>{
-    const a = getAllActivities().find(x=>x.id===b.actId);
-    if(a?.cat!=='free') return;
-    const startSlot = Math.floor((b.startMin - START_MIN)/15);
-    const endSlot = Math.ceil((b.startMin - START_MIN + b.durationMin)/15);
-    for(let s=startSlot;s<endSlot;s++) if(jSlots.has(s)) shared.push(s);
-  });
-  const sharedSet = [...new Set(shared)];
-  if (sharedSet.length) {
-    const count = sharedSet.length * 15;
+  const acts = getAllActivities();
+  const TOTAL = Math.round(DAY_MIN_SPAN / 15);
+  const busySlots = (blocks) => {
+    const busy = new Set();
+    blocks.forEach(b => {
+      const a = acts.find(x => x.id === b.actId);
+      if (a && a.cat === 'free') return;      // free time = still available to hang out
+      const s = Math.floor((b.startMin - START_MIN) / 15);
+      const e = Math.ceil((b.startMin - START_MIN + (b.durationMin || 0)) / 15);
+      for (let i = Math.max(0, s); i < Math.min(TOTAL, e); i++) busy.add(i);
+    });
+    return busy;
+  };
+  const jBusy = busySlots(jB), sBusy = busySlots(sB);
+  const freeSlots = [];
+  for (let i = 0; i < TOTAL; i++) if (!jBusy.has(i) && !sBusy.has(i)) freeSlots.push(i);
+  if (freeSlots.length) {
+    // Collapse contiguous slots into readable time ranges (show the first few).
+    const ranges = [];
+    let runStart = freeSlots[0], prev = freeSlots[0];
+    for (let k = 1; k <= freeSlots.length; k++) {
+      if (k < freeSlots.length && freeSlots[k] === prev + 1) { prev = freeSlots[k]; continue; }
+      ranges.push([runStart, prev + 1]);
+      if (k < freeSlots.length) { runStart = freeSlots[k]; prev = freeSlots[k]; }
+    }
+    // Only surface reasonably-sized windows (≥30 min) as hang-out suggestions.
+    const windows = ranges.filter(([a, b]) => (b - a) * 15 >= 30)
+      .map(([a, b]) => `${formatTimeFromMin(START_MIN + a*15)}–${formatTimeFromMin(START_MIN + b*15)}`);
+    const totalMin = freeSlots.length * 15;
     const overlap = document.createElement('div');
     overlap.className = 'sync-overlap';
-    overlap.innerHTML = `🎉 You both have about <b>${count} mins</b> of free time overlap today! Why not hang out?`;
+    overlap.innerHTML = windows.length
+      ? `🎉 You're both free for about <b>${fmtHrsMin(totalMin)}</b> today — e.g. <b>${windows.slice(0, 3).join(', ')}</b>. Why not hang out?`
+      : `🎉 You both have about <b>${fmtHrsMin(totalMin)}</b> of free time overlapping today!`;
     overlapWrap.appendChild(overlap);
   }
 
