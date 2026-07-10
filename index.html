@@ -3783,6 +3783,11 @@
 
   <div id="syncOverlapWrap"></div>
   <div class="sync-grid" id="syncGrid"></div>
+
+  <div style="padding: 0 0.8rem 1rem">
+    <h3 style="font-size:1.3rem;margin:1rem 0 0.5rem">💌 Invites</h3>
+    <div id="invitesList"></div>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
@@ -3798,11 +3803,9 @@
   </div>
 
   <div style="padding: 0.8rem">
+    <p style="color:var(--ink-light);font-size:0.9rem;margin:-0.2rem 0 0.7rem">Friendly weekly goals you both race on. Activity-sharing invites now live in <b>Sister Sync 👯</b>.</p>
     <h3 style="font-size:1.3rem;margin-bottom:0.5rem">📋 Weekly Goals</h3>
     <div id="challengesList"></div>
-
-    <h3 style="font-size:1.3rem;margin:1rem 0 0.5rem">💌 Invites</h3>
-    <div id="invitesList"></div>
   </div>
 </div>
 
@@ -9881,6 +9884,8 @@ function renderSync() {
     });
     grid.appendChild(col);
   });
+
+  renderInvites();
 }
 
 function sendInvite(block, to) {
@@ -9986,32 +9991,35 @@ function renderChallenges() {
       list.appendChild(card);
     });
   }
+}
 
-  // Invites
+// Activity-sharing invites — task sharing, so they live under Sister Sync.
+function renderInvites() {
   const inviteList = document.getElementById('invitesList');
+  if (!inviteList) return;
   inviteList.innerHTML = '';
   const myInvites = (state.shared.invites||[]).filter(i=>i.to===profile && i.status==='pending');
   if (!myInvites.length) {
-    inviteList.innerHTML = '<p style="color:var(--ink-light);font-size:0.95rem">No invites right now</p>';
-  } else {
-    const acts = getAllActivities();
-    myInvites.forEach(inv=>{
-      const act = acts.find(a=>a.id===inv.actId);
-      const d = formatDayKey(inv.day);
-      const tStr = formatTimeFromMin(inv.startMin);
-      const el = document.createElement('div');
-      el.className = 'invite-item';
-      el.innerHTML = `
-        <div>💌 <b>${inv.from==='jenn'?'Jenn':'Jess'}</b> invited you to<br>
-        <b>${act?.icon} ${act?.name}</b> on ${DAY_SHORT[(d.getDay()+6)%7]} at ${tStr}</div>
-        <div class="invite-actions">
-          <button class="pill-btn" onclick="acceptInvite('${inv.id}')">✅ Accept</button>
-          <button class="pill-btn" onclick="declineInvite('${inv.id}')">❌ Decline</button>
-        </div>
-      `;
-      inviteList.appendChild(el);
-    });
+    inviteList.innerHTML = '<p style="color:var(--ink-light);font-size:0.95rem">No invites right now. Tap one of your own activities above to invite your sister.</p>';
+    return;
   }
+  const acts = getAllActivities();
+  myInvites.forEach(inv=>{
+    const act = acts.find(a=>a.id===inv.actId);
+    const d = formatDayKey(inv.day);
+    const tStr = formatTimeFromMin(inv.startMin);
+    const el = document.createElement('div');
+    el.className = 'invite-item';
+    el.innerHTML = `
+      <div>💌 <b>${inv.from==='jenn'?'Jenn':'Jess'}</b> invited you to<br>
+      <b>${act?.icon} ${act?.name}</b> on ${DAY_SHORT[(d.getDay()+6)%7]} at ${tStr}</div>
+      <div class="invite-actions">
+        <button class="pill-btn" onclick="acceptInvite('${inv.id}')">✅ Accept</button>
+        <button class="pill-btn" onclick="declineInvite('${inv.id}')">❌ Decline</button>
+      </div>
+    `;
+    inviteList.appendChild(el);
+  });
 }
 
 function openNewChallenge() {
@@ -10057,7 +10065,7 @@ function acceptInvite(id) {
     inv.status = 'declined';
     markItemUpdated(inv);
     saveAll();
-    renderChallenges();
+    refreshInvitesUI();
     showToast('Invite unavailable: activity is not in your tray.');
     return;
   }
@@ -10072,7 +10080,7 @@ function acceptInvite(id) {
     checklistState: {}, travelBuffer: false,
   });
   setDayBlocks(inv.day, blocks, profile);
-  renderChallenges();
+  refreshInvitesUI();
   showToast('Added to your plan! 💕');
 }
 function declineInvite(id) {
@@ -10081,7 +10089,13 @@ function declineInvite(id) {
   inv.status = 'declined';
   markItemUpdated(inv);
   saveAll();
-  renderChallenges();
+  refreshInvitesUI();
+}
+// Invites now live in Sister Sync — refresh whichever surface is showing them.
+function refreshInvitesUI() {
+  const sync = document.getElementById('screen-sync');
+  if (sync && sync.classList.contains('active')) renderSync();
+  else renderInvites();
 }
 
 /* ════════════════════════════════════════════════════════════════
