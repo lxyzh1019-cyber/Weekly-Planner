@@ -304,6 +304,19 @@
   .day-right-rail {
     min-width: 0;
   }
+  /* "Panel" collapse toggle — only meaningful in the landscape 3-column
+     layout, so it stays hidden elsewhere (overridden in that media query). */
+  .day-left-toggle { display: none; }
+  .day-schedule-label {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  }
+  .day-left-toggle {
+    align-items: center; gap: 0.2rem;
+    background: var(--paper); border: 1.5px solid var(--ink); border-radius: 9px;
+    padding: 0.1rem 0.5rem; font-family: 'Patrick Hand', sans-serif;
+    font-size: 0.82rem; font-weight: 800; color: var(--ink); cursor: pointer;
+  }
+  .day-left-toggle:hover { background: var(--accent-yellow); }
   .day-left-rail {
     display: flex;
     flex-direction: column;
@@ -722,6 +735,13 @@
     #screen-day.focus-right .day-center-lane * {
       pointer-events: none;
     }
+    /* Auto-hide the left "Today" pane to free up room while editing the
+       schedule (and via the manual Panel toggle). */
+    #screen-day.left-collapsed .day-workspace {
+      grid-template-columns: minmax(500px, 2.6fr) minmax(250px, 0.95fr);
+    }
+    #screen-day.left-collapsed .day-left-rail { display: none; }
+    #screen-day .day-left-toggle { display: inline-flex; }
     #screen-week > .parent-banner.sticky {
       padding-left: max(0.8rem, env(safe-area-inset-left, 0px));
       padding-right: max(0.8rem, env(safe-area-inset-right, 0px));
@@ -1289,6 +1309,41 @@
   }
 
   /* ═══════════ GOALS + TODOS PANEL ═══════════ */
+  /* This week at a glance */
+  .week-glance {
+    margin: 0.3rem 0.8rem 0;
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    border-radius: 14px;
+    box-shadow: 2px 2px 0 var(--ink);
+    padding: 0.7rem 0.9rem;
+  }
+  .week-glance-header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.4rem;
+  }
+  .week-glance-header h3 { font-size: 1.25rem; margin: 0; }
+  .week-glance-age {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    font-weight: 700; font-size: 0.92rem; color: var(--ink);
+  }
+  .week-glance-age input {
+    width: 56px; text-align: center; border: 2px solid var(--ink);
+    border-radius: 8px; padding: 0.2rem 0.35rem; background: #fff;
+    font-family: 'Patrick Hand', sans-serif; font-size: 0.95rem;
+  }
+  .glance-window { font-size: 0.82rem; color: var(--ink-light); margin-bottom: 0.4rem; }
+  .glance-chips { display: flex; flex-wrap: wrap; gap: 0.35rem 0.7rem; font-size: 0.92rem; }
+  .glance-chip { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+  .glance-dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
+  .glance-sleep {
+    margin-top: 0.5rem; font-size: 0.9rem; padding: 0.4rem 0.55rem;
+    background: #f3eefb; border-radius: 8px;
+  }
+  .glance-sleep--muted { background: #f5f5f5; color: #777; }
+  .glance-notes { margin-top: 0.5rem; padding-top: 0.45rem; border-top: 1.5px dashed var(--paper-line); }
+  .glance-notes-title { font-weight: 800; font-size: 0.95rem; margin-bottom: 0.25rem; }
+  .glance-note { font-size: 0.85rem; color: var(--ink); margin-bottom: 0.15rem; }
   .gt-panel {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -1554,6 +1609,9 @@
     text-shadow: 0 1px 1px rgba(0,0,0,0.25);
     overflow: hidden;
     box-sizing: border-box;
+    /* Floor so blocks under ~30 min stay tall enough to read the name. */
+    min-height: 17px;
+    z-index: 2;
   }
   .wf-card:hover { transform: translate(-1px,-1px); box-shadow: 2.5px 2.5px 0 var(--ink); z-index: 3; }
   .wf-card-time { font-weight: 800; font-size: 0.72rem; }
@@ -2651,6 +2709,49 @@
   }
   .parent-banner.sticky { position: sticky; top: 0; z-index: 99; }
 
+  /* Parent portal: tabbed sections */
+  .parent-tabs {
+    display: flex; gap: 0.4rem; flex-wrap: wrap;
+    border-bottom: 2px solid var(--ink); padding-bottom: 0.5rem;
+  }
+  .parent-tab {
+    background: var(--paper); border: 2px solid var(--ink); border-radius: 12px 12px 0 0;
+    padding: 0.4rem 0.75rem; font-family: 'Patrick Hand', sans-serif;
+    font-size: 0.98rem; font-weight: 800; cursor: pointer; color: var(--ink);
+  }
+  .parent-tab.active { background: var(--accent-yellow); box-shadow: 2px -2px 0 var(--ink); }
+  .parent-tab:hover { background: var(--accent-yellow); }
+  .parent-panel { padding: 0.8rem 1rem 2.5rem; }
+  .parent-panel[hidden] { display: none; }
+  .parent-h3 { font-size: 1.25rem; margin: 1rem 0 0.4rem; }
+  .parent-panel > .parent-h3:first-child { margin-top: 0.4rem; }
+  .parent-hint { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 0.55rem; }
+  /* Per-day confirm row in the weekly review */
+  .review-day-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .review-day {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    border: 2px solid var(--ink); border-radius: 12px; background: var(--paper);
+    padding: 0.4rem 0.35rem; min-width: 68px; cursor: pointer;
+    font-family: 'Patrick Hand', sans-serif; box-shadow: 2px 2px 0 var(--ink);
+  }
+  .review-day:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
+  .review-day.confirmed { background: var(--accent-green); }
+  .review-day.today { outline: 3px solid var(--accent-yellow); outline-offset: 1px; }
+  .review-day-dow { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; }
+  .review-day-date { font-size: 1.2rem; font-weight: 800; font-family: 'Gochi Hand', cursive; line-height: 1; }
+  .review-day-state { font-size: 0.72rem; font-weight: 700; }
+  .review-day-count { font-size: 0.68rem; color: var(--ink-light); }
+  /* Kid feedback list */
+  .feedback-item {
+    border: 1.5px solid var(--ink); border-radius: 10px; background: var(--paper);
+    padding: 0.45rem 0.6rem; margin-bottom: 0.4rem; font-size: 0.92rem;
+  }
+  .feedback-week-note {
+    border: 2px dashed var(--ink); border-radius: 10px; background: #fffbe9;
+    padding: 0.55rem 0.7rem; margin-bottom: 0.5rem; font-size: 0.95rem;
+  }
+  .feedback-empty { color: var(--ink-light); font-size: 0.92rem; }
+
   /* Sister Sync */
   .sync-grid {
     display: grid; grid-template-columns: repeat(2, 1fr);
@@ -3120,6 +3221,7 @@
   .sticker-name { font-size: 0.66rem; font-weight: 700; color: var(--ink); margin-top: 0.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   @media (max-width: 380px) { .sticker-grid { grid-template-columns: repeat(3, 1fr); } }
   .quest-card {
+    position: relative;
     background: #fff; border: 3px solid var(--ink); border-radius: 18px;
     box-shadow: 4px 4px 0 var(--ink);
     padding: 0.9rem 1rem; display: flex; align-items: center; gap: 0.85rem;
@@ -3243,18 +3345,58 @@
   }
   .mission-clear-btn:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 var(--ink); }
 
-  /* Quest Board pocket-money strip */
-  .quest-money-strip {
-    display: flex; align-items: center; gap: 0.5rem; width: 100%;
+  /* Quest Board pocket-money — hidden behind a toggle, off by default */
+  .quest-money-wrap { margin: 0.6rem 0 0.2rem; }
+  .quest-money-toggle {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%;
     border: 1.5px solid var(--ink); border-radius: 12px; background: var(--bg);
-    padding: 0.45rem 0.7rem; margin: 0.6rem 0 0.2rem; font: inherit; cursor: pointer; text-align: left;
+    padding: 0.5rem 0.75rem; font: inherit; font-weight: 800; cursor: pointer; text-align: left;
   }
-  .quest-money-strip:focus-visible { outline: 3px solid var(--accent-blue); outline-offset: 2px; }
-  .qms-amount { font-weight: 800; background: var(--accent-yellow); border-radius: 8px; padding: 2px 8px; white-space: nowrap; }
-  .qms-chips { display: flex; gap: 0.3rem; flex-wrap: wrap; min-width: 0; }
+  .quest-money-toggle:focus-visible { outline: 3px solid var(--accent-blue); outline-offset: 2px; }
+  .qmt-caret { font-size: 0.82rem; font-weight: 700; color: var(--ink-light); white-space: nowrap; }
+  .quest-money-panel {
+    border: 1.5px solid var(--ink); border-top: none;
+    border-radius: 0 0 12px 12px; background: #fff;
+    padding: 0.6rem 0.75rem; margin-top: -6px;
+  }
+  .qmp-total { font-weight: 800; font-size: 1.15rem; margin-bottom: 0.5rem; }
+  .qmp-total b { background: var(--accent-yellow); border-radius: 8px; padding: 2px 8px; }
+  .qmp-breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-bottom: 0.55rem; }
+  .qmp-tile {
+    border: 1.5px solid var(--ink); border-radius: 10px; padding: 0.4rem 0.55rem;
+    display: flex; flex-direction: column; gap: 1px; background: var(--bg);
+  }
+  .qmp-tile-label { font-size: 0.76rem; font-weight: 700; color: var(--ink-light); }
+  .qmp-tile-value { font-size: 1.02rem; font-weight: 800; }
+  .qms-week { font-size: 0.85rem; font-weight: 700; margin-bottom: 0.4rem; }
+  .qms-chips { display: flex; gap: 0.3rem; flex-wrap: wrap; min-width: 0; margin-bottom: 0.5rem; }
   .qms-chip { font-size: 0.8rem; border: 1.5px solid var(--ink); border-radius: 7px; padding: 1px 6px; background: var(--bg); white-space: nowrap; }
   .qms-chip.paid { background: var(--accent-green); }
-  .qms-go { margin-left: auto; font-weight: 800; font-size: 1.2rem; }
+  .qmp-open {
+    width: 100%; border: 2px solid var(--ink); border-radius: 10px; background: var(--accent-green);
+    box-shadow: 2px 2px 0 var(--ink); padding: 0.45rem; font-weight: 800; cursor: pointer;
+  }
+
+  /* Quick slot-picker sheet (tap an empty slot to add an activity) */
+  .slot-picker-hint { color: var(--ink-light); font-size: 0.92rem; margin: 0.1rem 0 0.5rem; }
+  .slot-picker-filter { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+  .slot-picker-list {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 0.5rem; max-height: 52vh; overflow-y: auto; padding: 0.15rem;
+  }
+  .slot-pick-chip {
+    display: flex; align-items: center; gap: 0.45rem;
+    border: 2px solid var(--ink); border-radius: 12px; background: #fff;
+    box-shadow: 2px 2px 0 var(--ink); padding: 0.5rem 0.6rem;
+    font: inherit; text-align: left; cursor: pointer;
+  }
+  .slot-pick-chip:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
+  .slot-pick-chip:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 var(--ink); }
+  .slot-pick-chip.locked { opacity: 0.55; }
+  .slot-pick-add { background: var(--bg2); border-style: dashed; }
+  .spc-icon { font-size: 1.4rem; flex-shrink: 0; }
+  .spc-name { font-weight: 800; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .spc-dur { font-size: 0.78rem; font-weight: 700; color: var(--ink-light); flex-shrink: 0; }
 
   /* Sparkles */
   .quest-spark {
@@ -3264,6 +3406,32 @@
   @keyframes sparkleFly {
     0% { transform: translate(0,0) scale(0.6); opacity: 1; }
     100% { transform: translate(var(--dx, 0), var(--dy, -40px)) scale(1.2); opacity: 0; }
+  }
+  /* Kid weekly feedback box on the Quest Board */
+  .kid-feedback-box {
+    margin-top: 0.8rem; background: #fff; border: 2.5px solid var(--ink);
+    border-radius: 16px; box-shadow: 3px 3px 0 var(--ink); padding: 0.7rem 0.85rem;
+  }
+  .kid-feedback-box label { display: block; font-weight: 800; margin-bottom: 0.35rem; }
+  .kid-feedback-box textarea {
+    width: 100%; box-sizing: border-box; border: 2px solid var(--ink); border-radius: 10px;
+    padding: 0.45rem 0.55rem; font-family: 'Patrick Hand', sans-serif; font-size: 0.98rem;
+    resize: vertical; background: var(--bg);
+  }
+  /* Arcade blast-to-complete on the quest card */
+  .quest-projectile {
+    position: absolute; font-size: 1.4rem; pointer-events: none; z-index: 5;
+    transition: transform 0.3s cubic-bezier(.2,.8,.3,1), opacity 0.3s ease-out;
+  }
+  .quest-card.quest-blasting { pointer-events: none; }
+  .quest-card.quest-burst {
+    animation: questHit 0.32s ease-out;
+  }
+  @keyframes questHit {
+    0% { transform: none; }
+    30% { transform: translateX(-3px) scale(1.04) rotate(-1deg); box-shadow: 0 0 0 4px rgba(255,209,102,0.7), 4px 4px 0 var(--ink); }
+    60% { transform: translateX(3px) scale(0.99) rotate(1deg); }
+    100% { transform: none; }
   }
 
   /* Hero Mode toggle on profile screen */
@@ -3365,7 +3533,13 @@
     </div>
   </div>
 
-  <button type="button" class="quest-money-strip" id="questMoneyStrip" hidden onclick="openChoreTab()" aria-label="Open chores and pocket money"></button>
+  <div class="quest-money-wrap" id="questMoneyWrap" hidden>
+    <button type="button" class="quest-money-toggle" id="questMoneyToggle" onclick="togglePocketMoney()" aria-expanded="false" aria-controls="questMoneyPanel">
+      <span>💰 My pocket money</span>
+      <span class="qmt-caret" id="qmtCaret">Show ▸</span>
+    </button>
+    <div class="quest-money-panel" id="questMoneyPanel" hidden></div>
+  </div>
 
   <div class="quest-board-header">
     <h2>🗺️ Today's Quests</h2>
@@ -3375,6 +3549,11 @@
   <button type="button" class="quest-add-btn" onclick="goPlanToday()">＋ Add a quest for today</button>
   <div class="quest-list" id="questList"></div>
   <div class="sticker-collection" id="questStickers"></div>
+
+  <div class="kid-feedback-box">
+    <label for="kidWeekFeedback">💬 Tell your grown-ups how your week is going</label>
+    <textarea id="kidWeekFeedback" rows="2" placeholder="What was fun? What was tricky?" onchange="saveKidWeekFeedback()"></textarea>
+  </div>
 </div>
 
 <!-- Quest Complete popup -->
@@ -3476,6 +3655,17 @@
       <div class="tg-mytime-bricks" id="tgMyTimeBricks"></div>
       <div class="tg-mytime-breakdown" id="tgMyTimeBreakdown"></div>
     </div>
+  </div>
+
+  <!-- This week at a glance: category/free-time totals, sleep, notes -->
+  <div class="week-glance" id="weekGlance">
+    <div class="week-glance-header">
+      <h3>📊 This week at a glance</h3>
+      <label class="week-glance-age">🎂 Age
+        <input type="number" id="weekAge" min="1" max="18" placeholder="—" onchange="onWeekAgeChange()">
+      </label>
+    </div>
+    <div class="week-glance-body" id="weekGlanceBody"></div>
   </div>
 
   <!-- Goals + Todos panel (side-by-side, below Full Week grid) -->
@@ -3624,7 +3814,10 @@
 
     <div class="day-center-lane">
       <div class="timeline-wrap">
-        <div class="day-panel-label day-panel-label--landscape-only">Schedule</div>
+        <div class="day-panel-label day-panel-label--landscape-only day-schedule-label">
+          <button type="button" class="day-left-toggle" id="dayLeftToggle" onclick="toggleLeftPane()" title="Hide/show the side panel" aria-label="Hide or show the side panel"><span id="dayLeftToggleCaret">◀</span> Panel</button>
+          <span>Schedule</span>
+        </div>
         <div class="timeline" id="timeline"></div>
       </div>
     </div>
@@ -3665,6 +3858,11 @@
 
   <div id="syncOverlapWrap"></div>
   <div class="sync-grid" id="syncGrid"></div>
+
+  <div style="padding: 0 0.8rem 1rem">
+    <h3 style="font-size:1.3rem;margin:1rem 0 0.5rem">💌 Invites</h3>
+    <div id="invitesList"></div>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
@@ -3680,11 +3878,9 @@
   </div>
 
   <div style="padding: 0.8rem">
+    <p style="color:var(--ink-light);font-size:0.9rem;margin:-0.2rem 0 0.7rem">Friendly weekly goals you both race on. Activity-sharing invites now live in <b>Sister Sync 👯</b>.</p>
     <h3 style="font-size:1.3rem;margin-bottom:0.5rem">📋 Weekly Goals</h3>
     <div id="challengesList"></div>
-
-    <h3 style="font-size:1.3rem;margin:1rem 0 0.5rem">💌 Invites</h3>
-    <div id="invitesList"></div>
   </div>
 </div>
 
@@ -3700,34 +3896,70 @@
     <button class="btn-icon" onclick="goProfile()">Exit</button>
   </div>
 
-  <div style="padding:1rem">
-    <h3 style="font-size:1.3rem;margin-bottom:0.6rem">👀 View a Child's Week</h3>
-    <div style="display:flex;gap:0.6rem;margin-bottom:1rem" id="parentWeekKidPills">
-      <button class="pill-btn active" onclick="parentView('jenn')">🐥 Jenn</button>
-      <button class="pill-btn" onclick="parentView('jess')">🦊 Jess</button>
+  <div style="padding:0.8rem 1rem 0">
+    <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.7rem">
+      <span style="font-weight:800">Viewing:</span>
+      <div style="display:flex;gap:0.5rem" id="parentWeekKidPills">
+        <button class="pill-btn active" onclick="setParentKid('jenn')">🐥 Jenn</button>
+        <button class="pill-btn" onclick="setParentKid('jess')">🦊 Jess</button>
+      </div>
+      <button class="pill-btn" style="margin-left:auto" onclick="parentView(parentViewing)">📋 Open full week ›</button>
     </div>
+    <div class="parent-tabs" role="tablist" aria-label="Parent sections">
+      <button class="parent-tab active" role="tab" data-ptab="review" onclick="setParentTab('review')">🗓️ Weekly Review</button>
+      <button class="parent-tab" role="tab" data-ptab="routines" onclick="setParentTab('routines')">🌅 Routines</button>
+      <button class="parent-tab" role="tab" data-ptab="tasks" onclick="setParentTab('tasks')">✅ Tasks</button>
+      <button class="parent-tab" role="tab" data-ptab="rules" onclick="setParentTab('rules')">⚙️ Level-Up</button>
+    </div>
+  </div>
 
-    <h3 style="font-size:1.3rem;margin-bottom:0.6rem">📅 Monthly Overview</h3>
-    <div style="display:flex;gap:0.6rem;margin-bottom:1rem">
+  <!-- TAB: Weekly Review -->
+  <div class="parent-panel active" id="ptab-review" role="tabpanel">
+    <h3 class="parent-h3">🗓️ Confirm the week — <span id="reviewKidName">Jenn</span></h3>
+    <p class="parent-hint">Review each day together, then tap to confirm it. Progress is saved.</p>
+    <div id="reviewDayConfirm" class="review-day-row"></div>
+
+    <h3 class="parent-h3">🧹 Chore review</h3>
+    <p class="parent-hint">This week's chore progress and pocket money.</p>
+    <div id="reviewChores"></div>
+    <button class="btn-confirm" style="margin-top:0.5rem" onclick="parentOpenChoreReview()">Open full chore tab ›</button>
+
+    <h3 class="parent-h3">💬 Feedback from your kid</h3>
+    <div id="reviewFeedback"></div>
+
+    <h3 class="parent-h3">📊 Weekly analytics</h3>
+    <div id="analyticsCards"></div>
+
+    <h3 class="parent-h3">📅 Monthly overview</h3>
+    <div style="display:flex;gap:0.6rem;flex-wrap:wrap">
       <button class="pill-btn" onclick="openParentMonthly('jenn')">🐥 Jenn's Month</button>
       <button class="pill-btn" onclick="openParentMonthly('jess')">🦊 Jess's Month</button>
     </div>
+  </div>
 
-    <h3 style="font-size:1.3rem;margin-bottom:0.6rem">📊 Weekly Analytics</h3>
-    <div id="analyticsCards"></div>
-
-    <h3 style="font-size:1.3rem;margin:1rem 0 0.6rem">🌅 Routines</h3>
-    <p style="font-size:0.9rem;color:var(--ink-light);margin-bottom:0.6rem">Built-in (Morning / After-School / Evening) and custom routines. All shared with both girls.</p>
+  <!-- TAB: Routines -->
+  <div class="parent-panel" id="ptab-routines" role="tabpanel" hidden>
+    <h3 class="parent-h3">🌅 Routines</h3>
+    <p class="parent-hint">Built-in (Morning / After-School / Evening) and custom routines. All shared with both girls.</p>
     <div id="routinesList"></div>
     <button class="btn-confirm" style="margin-top:0.6rem" onclick="openNewRoutine()">＋ Add Routine</button>
+  </div>
 
-    <h3 style="font-size:1.3rem;margin:1rem 0 0.6rem">🎨 Activities</h3>
-    <p style="font-size:0.9rem;color:var(--ink-light);margin-bottom:0.6rem">All custom activities — yours and the girls'. Tap 🔗 to share with both, or 🔗 again to make it private to one child.</p>
+  <!-- TAB: Tasks -->
+  <div class="parent-panel" id="ptab-tasks" role="tabpanel" hidden>
+    <h3 class="parent-h3">🕓 Pending approval</h3>
+    <p class="parent-hint">New activities the girls added themselves. Approve, edit, or remove.</p>
+    <div id="pendingApprovalList"></div>
+    <h3 class="parent-h3">🎨 All activities</h3>
+    <p class="parent-hint">All custom activities — yours and the girls'. Tap 🔗 to share with both, or 🔗 again to make it private to one child.</p>
     <div id="parentActivitiesList"></div>
     <button class="btn-confirm" style="margin-top:0.6rem" onclick="openParentActivityEditor()">＋ Add Activity</button>
+  </div>
 
-    <h3 style="font-size:1.3rem;margin:1rem 0 0.6rem">⚙️ Level-Up Rules</h3>
-    <p style="font-size:0.9rem;color:var(--ink-light);margin-bottom:0.6rem">Shared between both girls.</p>
+  <!-- TAB: Level-Up Rules -->
+  <div class="parent-panel" id="ptab-rules" role="tabpanel" hidden>
+    <h3 class="parent-h3">⚙️ Level-Up Rules</h3>
+    <p class="parent-hint">Earn a ★ on an activity after enough sessions/hours. Shared between both girls.</p>
     <div id="levelRulesList"></div>
     <button class="btn-confirm" style="margin-top:0.6rem" onclick="openNewLevelRule()">＋ Add Rule</button>
   </div>
@@ -3876,6 +4108,18 @@
 </div>
 
 <!-- Generic Activity Sheet -->
+<!-- Quick activity picker: opens when a kid taps an empty time slot without
+     having selected an activity first (item 6). -->
+<div class="overlay" id="slotPickerOverlay" onclick="overlayClick(event,'slotPickerOverlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3 id="slotPickerTitle">Add an activity</h3>
+    <p class="slot-picker-hint" id="slotPickerHint">Pick what goes here.</p>
+    <div class="slot-picker-filter" id="slotPickerFilter"></div>
+    <div class="slot-picker-list" id="slotPickerList"></div>
+  </div>
+</div>
+
 <div class="overlay" id="activityOverlay" onclick="overlayClick(event,'activityOverlay')">
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -5602,6 +5846,7 @@ function renderQuestBoard() {
 
   renderQuestMoneyStrip(p);
   renderStickerCollection(p);
+  loadKidWeekFeedback(p);
 
   // Today's quests = today's blocks
   const key = todayKey();
@@ -5631,7 +5876,7 @@ function renderQuestBoard() {
     const done = !!b.completed;
     const right = done
       ? `<div class="quest-done-badge">✓</div>`
-      : `<button class="quest-complete-btn" onclick="event.stopPropagation();completeQuest('${b.id}')" aria-label="Complete quest">✓</button>`;
+      : `<button class="quest-complete-btn" onclick="event.stopPropagation();blastQuest('${b.id}', this)" aria-label="Blast this quest complete" title="Blast it! 🎯">🎯</button>`;
     return `
       <div class="quest-card ${done?'quest-done':''}" onclick="openQuestDetail('${b.id}')">
         <div class="quest-time-col">
@@ -5669,11 +5914,27 @@ function renderStickerCollection(kid) {
     <div class="sticker-grid">${cells}</div>`;
 }
 
-// Read-only pocket-money summary on the Quest Board (kids never open the chore tab otherwise).
+// Pocket money on the Quest Board is private by default — kids tap the toggle
+// to reveal the full breakdown (cash / savings / investments / GIC).
+let showPocketMoney = false;
+function togglePocketMoney() {
+  showPocketMoney = !showPocketMoney;
+  renderQuestMoneyStrip(activeProfile());
+}
+
 function renderQuestMoneyStrip(kid) {
-  const el = document.getElementById('questMoneyStrip');
-  if (!el) return;
-  if (kid !== 'jenn' && kid !== 'jess') { el.hidden = true; return; }
+  const wrap = document.getElementById('questMoneyWrap');
+  if (!wrap) return;
+  if (kid !== 'jenn' && kid !== 'jess') { wrap.hidden = true; return; }
+  wrap.hidden = false;
+
+  const toggle = document.getElementById('questMoneyToggle');
+  const caret = document.getElementById('qmtCaret');
+  const panel = document.getElementById('questMoneyPanel');
+  if (toggle) toggle.setAttribute('aria-expanded', showPocketMoney ? 'true' : 'false');
+  if (caret) caret.textContent = showPocketMoney ? 'Hide ▾' : 'Show ▸';
+  if (!showPocketMoney) { panel.hidden = true; panel.innerHTML = ''; return; }
+
   ctEnsureShared();
   ctMigrateToGroups();
   const wk = ctDateToKey(ctMondayOf(new Date()));   // real current week, independent of chore-tab nav
@@ -5692,10 +5953,40 @@ function renderQuestMoneyStrip(kid) {
     }
     return `<span class="qms-chip ${paid ? 'paid' : ''}">${g.icon || '🧺'} ${paid ? '✓' : `${n}/${m}`}</span>`;
   }).join('');
-  el.innerHTML = `<span class="qms-amount">💰 $${ctWeekMoney(wk, kid).toFixed(2)}</span>`
-    + `<span class="qms-chips">${chips || '<span class="qms-chip">No groups yet</span>'}</span>`
-    + `<span class="qms-go">›</span>`;
-  el.hidden = false;
+
+  const w = ensureWallet(kid);
+  const tile = (label, val) => `<div class="qmp-tile"><span class="qmp-tile-label">${label}</span><span class="qmp-tile-value">$${money2(val).toFixed(2)}</span></div>`;
+  panel.hidden = false;
+  panel.innerHTML =
+      `<div class="qmp-total">Total money: <b>$${netWorth(kid).toFixed(2)}</b></div>`
+    + `<div class="qmp-breakdown">`
+    +   tile('💵 Cash', w.cash)
+    +   tile('🏦 Savings', w.savings)
+    +   tile('📈 Investments', portfolioValue(kid))
+    +   tile('🔒 GIC', gicTotal(kid))
+    + `</div>`
+    + `<div class="qms-week">🧹 Earned this week: <b>$${ctWeekMoney(wk, kid).toFixed(2)}</b></div>`
+    + `<div class="qms-chips">${chips || '<span class="qms-chip">No chore groups yet</span>'}</div>`
+    + `<button type="button" class="qmp-open" onclick="openMoneyScreen('${kid}')">Open Bank &amp; Invest ›</button>`;
+}
+
+// Kid's free-text weekly note to grown-ups — surfaced in the parent review.
+function weekFeedbackKey() { return getDayKeys(weekOffset)[0]; }
+function loadKidWeekFeedback(kid) {
+  const ta = document.getElementById('kidWeekFeedback');
+  if (!ta) return;
+  const pd = getProfData(kid);
+  ta.value = (pd && pd.weekFeedback && pd.weekFeedback[weekFeedbackKey()]) || '';
+}
+function saveKidWeekFeedback() {
+  const ta = document.getElementById('kidWeekFeedback');
+  if (!ta) return;
+  const pd = getProfData(activeProfile());
+  if (!pd) return;
+  if (!pd.weekFeedback) pd.weekFeedback = {};
+  pd.weekFeedback[weekFeedbackKey()] = ta.value;
+  saveAll();
+  showToast('Shared with your grown-ups 💬');
 }
 
 function formatQuestTime(min) {
@@ -5718,6 +6009,57 @@ function goPlanToday() {
 function openQuestDetail(blockId) {
   // Reuse existing edit sheet so kids can see/edit details if they tap the card body
   if (typeof openEditSheet === 'function') openEditSheet(blockId);
+}
+
+/* Arcade "blast to complete": tapping the 🎯 fires a shot at the quest card,
+   which bursts before the quest is marked done — completion feels like a
+   shooting game rather than a plain checkbox (item 4). */
+function blastQuest(blockId, btn) {
+  const card = btn && btn.closest ? btn.closest('.quest-card') : null;
+  if (!card || card.classList.contains('quest-blasting')) {
+    if (card && card.classList.contains('quest-blasting')) return;
+    completeQuest(blockId); return;
+  }
+  card.classList.add('quest-blasting');
+  const rect = card.getBoundingClientRect();
+  const bRect = btn.getBoundingClientRect();
+
+  const proj = document.createElement('div');
+  proj.className = 'quest-projectile';
+  proj.textContent = '💥';
+  proj.style.left = (bRect.left - rect.left + bRect.width / 2 - 10) + 'px';
+  proj.style.top  = (bRect.top - rect.top + bRect.height / 2 - 10) + 'px';
+  card.appendChild(proj);
+  // Fly from the blaster toward the quest icon on the far side of the card.
+  requestAnimationFrame(() => {
+    proj.style.transform = `translateX(-${Math.max(60, rect.width * 0.66)}px) scale(1.7)`;
+    proj.style.opacity = '0.15';
+  });
+
+  setTimeout(() => {
+    proj.remove();
+    card.classList.add('quest-burst');
+    spawnQuestBurst(card);
+    setTimeout(() => completeQuest(blockId), 240);
+  }, 300);
+}
+
+// Particle burst radiating from a quest card when it's blasted.
+function spawnQuestBurst(card) {
+  const bits = ['⭐','✨','💫','🌟','🎉'];
+  const rect = card.getBoundingClientRect();
+  for (let i = 0; i < 9; i++) {
+    const el = document.createElement('div');
+    el.className = 'quest-spark';
+    el.textContent = bits[i % bits.length];
+    el.style.left = '30%';
+    el.style.top = '50%';
+    const ang = (Math.PI * 2 * i) / 9;
+    el.style.setProperty('--dx', Math.cos(ang) * (70 + Math.random() * 50) + 'px');
+    el.style.setProperty('--dy', Math.sin(ang) * (55 + Math.random() * 45) + 'px');
+    card.appendChild(el);
+    setTimeout(() => el.remove(), 900);
+  }
 }
 
 function completeQuest(blockId) {
@@ -5973,6 +6315,7 @@ function renderWeek() {
   if (legend) legend.style.display = isParent() ? 'flex' : 'none';
 
   renderGoalsTodos();
+  renderWeekGlance(keys);
 
   const coachEl = document.getElementById('weekCoachTip');
   if (coachEl) {
@@ -6016,6 +6359,71 @@ function computeWeekTotals(keys) {
     });
   });
   return { catMin, planned, free: Math.max(0, DAY_MIN_SPAN * 7 - planned) };
+}
+
+// "This week at a glance" panel on the week view: category/free-time totals,
+// an age-based sleep recommendation, and the week's notes & objectives.
+function onWeekAgeChange() {
+  const v = (document.getElementById('weekAge')?.value || '').trim();
+  const age = v === '' ? null : Math.max(1, Math.min(18, parseInt(v, 10) || 0));
+  const pd = getProfData();
+  if (pd) { pd.age = age; saveAll(); }
+  renderWeekGlance(getDayKeys(weekOffset));
+}
+
+function renderWeekGlance(keys) {
+  const body = document.getElementById('weekGlanceBody');
+  if (!body) return;
+  const ageInput = document.getElementById('weekAge');
+  const age = getProfData()?.age;
+  if (ageInput && document.activeElement !== ageInput) {
+    ageInput.value = (age != null && !isNaN(age)) ? age : '';
+  }
+
+  const acts = getAllActivities();
+  const CAT_LABELS = {
+    sleep:'😴 Rest', school:'📚 Learning', active:'🏃 Active',
+    free:'🎮 Free', daily:'🍽 Daily', training:'🏋️ Training',
+    routine:'📋 Routine', custom:'✨ Custom'
+  };
+  const t = computeWeekTotals(keys);
+
+  const order = ['school','active','training','routine','daily','free','sleep','custom'];
+  let chips = '';
+  order.forEach(cat => {
+    if (!t.catMin[cat]) return;
+    chips += `<span class="glance-chip"><span class="glance-dot" style="background:${CAT_HEX[cat]||'#999'}"></span>${CAT_LABELS[cat]||cat}: <b>${fmtHrsMin(t.catMin[cat])}</b></span>`;
+  });
+  chips += `<span class="glance-chip"><span class="glance-dot" style="background:#fff;border:1px solid #999"></span>🌤 Unscheduled: <b>${fmtHrsMin(t.free)}</b></span>`;
+
+  const sleep = recommendedSleep(age);
+  let sleepHtml;
+  if (sleep) {
+    const perWeek = sleep.min * 7;
+    sleepHtml = `<div class="glance-sleep">💤 <b>Recommended sleep (age ${age}, ${sleep.group}):</b> ${sleep.min}–${sleep.max}h per night · aim for ~${perWeek}h across the week</div>`;
+  } else {
+    sleepHtml = `<div class="glance-sleep glance-sleep--muted">💤 Set the age above to see the recommended sleep for this age group.</div>`;
+  }
+
+  // Notes & objectives across the week.
+  const notes = [];
+  keys.forEach((k, i) => {
+    (getDayBlocks(k) || []).forEach(b => {
+      const act = acts.find(a => a.id === b.actId);
+      if (b.note) notes.push(`<b>${DAY_SHORT[i]}</b> · ${act?.icon||''} ${escapeHtml(act?.name||'')}: ${escapeHtml(b.note)}`);
+      if (b.objectives?.length) notes.push(`<b>${DAY_SHORT[i]}</b> · ${act?.icon||''} ${escapeHtml(act?.name||'')}: 🎯 ${escapeHtml(b.objectives.join(', '))}`);
+    });
+  });
+  const notesHtml = notes.length
+    ? `<div class="glance-notes"><div class="glance-notes-title">📝 Notes &amp; objectives</div>${notes.map(n=>`<div class="glance-note">${n}</div>`).join('')}</div>`
+    : '';
+
+  body.innerHTML = `
+    <div class="glance-window">Totals over the 6am–9pm window (${fmtHrsMin(DAY_MIN_SPAN)}/day).</div>
+    <div class="glance-chips">${chips}</div>
+    ${sleepHtml}
+    ${notesHtml}
+  `;
 }
 
 // #6 Weekly wins recap — a celebratory look at what actually got done.
@@ -6621,24 +7029,11 @@ function renderFullWeek(keys) {
         const leftCss  = 'calc(' + (slot.col * 100 / colCount) + '% + 1px)';
         const widthCss = 'calc(' + (100 / colCount) + '% - ' + (gap + 2) + 'px)';
 
-        // Travel / get-ready buffers, shown as hatched strips hugging the card
-        // so travel time is visible on the week at a glance (readability item).
+        // Inline travel/get-ready tag on the card (the strips themselves are
+        // drawn in a separate pass below so both sides always show).
         const travelMin = b.travelBuffer ? getTravelBufMin(b) : 0;
         const readyMin  = b.getReadyBuffer ? getGetReadyBufMin(b) : 0;
         const bufBefore = travelMin + readyMin;
-        if (bufBefore > 0) {
-          const bufIcon = travelMin ? '🚗' : '👕';
-          const cardTopPx = topPct / 100 * cellH;
-          // Before-strip: ends where the card starts.
-          const beforePx = bufBefore * PX_PER_MIN;
-          const beforeTop = Math.max(0, cardTopPx - beforePx);
-          const beforeH = cardTopPx - beforeTop;
-          if (beforeH >= 3) cell.appendChild(wfTravelStrip(beforeTop, beforeH, leftCss, widthCss, bufIcon, bufBefore));
-          // After-strip: starts where the card ends.
-          const cardBotPx = cardTopPx + heightPct / 100 * cellH;
-          const afterH = Math.min(beforePx, cellH - cardBotPx);
-          if (afterH >= 3) cell.appendChild(wfTravelStrip(cardBotPx, afterH, leftCss, widthCss, bufIcon, bufBefore));
-        }
 
         card.style.top = topPct + '%';
         card.style.height = 'calc(' + heightPct + '% - 2px)';
@@ -6658,6 +7053,32 @@ function renderFullWeek(keys) {
           + (bufBefore > 0 ? ` · ${travelMin ? '🚗 travel' : '👕 get-ready'} ${bufBefore} min each way` : '');
         card.onclick = (e)=>{ e.stopPropagation(); openDayFromWeekCard(key, ci, b.id); };
         cell.appendChild(card);
+      });
+
+      // Travel / get-ready strips for ALL of the day's blocks, drawn in
+      // whichever zone they fall into. This guarantees BOTH the before and
+      // after strip render even when a buffer crosses a zone boundary
+      // (previously a boundary-crossing block showed only one side).
+      (getDayBlocks(key) || []).forEach(b => {
+        const travelMin = b.travelBuffer ? getTravelBufMin(b) : 0;
+        const readyMin  = b.getReadyBuffer ? getGetReadyBufMin(b) : 0;
+        const buf = travelMin + readyMin;
+        if (buf <= 0) return;
+        const icon = travelMin ? '🚗' : '👕';
+        const relStart = b.startMin - START_MIN;
+        const dur = Math.max(5, b.durationMin || 0);
+        const entries = [
+          { s: relStart - buf, e: relStart },              // before
+          { s: relStart + dur, e: relStart + dur + buf },  // after
+        ];
+        entries.forEach(en => {
+          const segS = Math.max(en.s, z.start);
+          const segE = Math.min(en.e, z.end);
+          if (segE - segS < 2) return; // no visible overlap with this zone
+          const topPx = (segS - z.start) / zoneSpan * cellH;
+          const hPx = (segE - segS) / zoneSpan * cellH;
+          cell.appendChild(wfTravelStrip(topPx, hPx, '2px', 'calc(100% - 4px)', icon, buf));
+        });
       });
 
       grid.appendChild(cell);
@@ -6729,6 +7150,7 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   currentDayKey = key;
   selectedActivity = null;
   currentZone = 'all';
+  leftPaneManualCollapsed = false;
 
   document.querySelectorAll('.zone-tab').forEach(t=>t.classList.toggle('active', t.dataset.zone==='all'));
 
@@ -7642,16 +8064,18 @@ function kidTrainingOpenEdit() {
 
 /* Canvas tap → place new block at that pixel y */
 function handleCanvasTap(e, zMinStart) {
-  if (!selectedActivity) { showToast('Tap an activity first 👇'); return; }
-  if (selectedActivity._locked) { showToast(`🔒 Unlocks in ${selectedActivity.season}!`); return; }
-  if (selectedActivity._rewardLocked) { showToast('Keep going — this reward unlocks soon ✨'); return; }
-
   const rect = e.currentTarget.getBoundingClientRect();
   const y = e.clientY - rect.top;
   const relMin = Math.round(y / PX_PER_MIN);
   // Snap to 15 min
   const snapped = Math.round(relMin / 15) * 15;
   const absMin = START_MIN + zMinStart + snapped;
+
+  // No activity picked yet → offer the picker right at the tapped time so the
+  // kid doesn't have to select from the tray first.
+  if (!selectedActivity) { openSlotPicker(absMin); return; }
+  if (selectedActivity._locked) { showToast(`🔒 Unlocks in ${selectedActivity.season}!`); return; }
+  if (selectedActivity._rewardLocked) { showToast('Keep going — this reward unlocks soon ✨'); return; }
 
   pendingStartMin = absMin;
 
@@ -7660,6 +8084,80 @@ function handleCanvasTap(e, zMinStart) {
     openTrainingSheet();
   } else {
     as_ = { durationMin: selectedActivity.durationMin||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15, choreTags: [] };
+    openActivitySheet();
+  }
+}
+
+/* Quick activity picker shown when an empty slot is tapped with nothing
+   selected. Keeps pendingStartMin from the tap, then routes into the normal
+   placement sheet once an activity is chosen. */
+let slotPickerFilter = 'all';
+function openSlotPicker(absMin) {
+  pendingStartMin = absMin;
+  slotPickerFilter = 'all';
+  const title = document.getElementById('slotPickerTitle');
+  const hint = document.getElementById('slotPickerHint');
+  if (title) title.textContent = `Add at ${formatTimeFromMin(absMin)}`;
+  if (hint) hint.textContent = 'Pick what goes in this time slot.';
+  renderSlotPicker();
+  openSheet('slotPickerOverlay');
+}
+function renderSlotPicker() {
+  const filterWrap = document.getElementById('slotPickerFilter');
+  const list = document.getElementById('slotPickerList');
+  if (!filterWrap || !list) return;
+  const filters = [
+    {id:'all', label:'All'}, {id:'daily', label:'🍽 Daily'}, {id:'routine', label:'🌅 Routines'},
+    {id:'school', label:'📚 Learning'}, {id:'active', label:'🏃 Active'},
+    {id:'training', label:'🏋️ Training'}, {id:'free', label:'🎮 Free'},
+  ];
+  filterWrap.innerHTML = '';
+  filters.forEach(f => {
+    const c = document.createElement('button');
+    c.type = 'button';
+    c.className = 'filter-chip' + (slotPickerFilter === f.id ? ' active' : '');
+    c.textContent = f.label;
+    c.onclick = () => { slotPickerFilter = f.id; renderSlotPicker(); };
+    filterWrap.appendChild(c);
+  });
+  const acts = getAllActivities().filter(a => {
+    if (slotPickerFilter === 'all') return true;
+    if (slotPickerFilter === 'training') return a.isTraining;
+    return a.cat === slotPickerFilter;
+  });
+  list.innerHTML = '';
+  acts.forEach(act => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'slot-pick-chip' + ((act._locked || act._rewardLocked) ? ' locked' : '');
+    chip.innerHTML = `<span class="spc-icon">${act.icon}</span><span class="spc-name">${escapeHtml(act.name)}</span><span class="spc-dur">${formatDuration(act.durationMin || 60)}</span>`;
+    chip.onclick = () => pickFromSlot(act.id);
+    list.appendChild(chip);
+  });
+  const addC = document.createElement('button');
+  addC.type = 'button';
+  addC.className = 'slot-pick-chip slot-pick-add';
+  addC.innerHTML = '<span class="spc-icon">＋</span><span class="spc-name">Custom activity</span>';
+  addC.onclick = () => { closeSheet('slotPickerOverlay'); openCustomActivity(); };
+  list.appendChild(addC);
+}
+function pickFromSlot(actId) {
+  const act = getAllActivities().find(a => a.id === actId);
+  if (!act) return;
+  if (act._locked) { showToast(`🔒 Unlocks in ${act.season}!`); return; }
+  if (act._rewardLocked) { showToast('Keep going — unlock this reward soon ✨'); return; }
+  const _pr = getProfData()?.progress;
+  if (_pr && !_pr.tutorialDone && TUTORIAL_STARTER_CHOICES.some(c => c.id === act.id)) {
+    closeSheet('slotPickerOverlay'); openTutorial(); return;
+  }
+  selectedActivity = act;
+  closeSheet('slotPickerOverlay');
+  // pendingStartMin was set by openSlotPicker.
+  if (act.isTraining) {
+    ts = { durationMin: act.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15 };
+    openTrainingSheet();
+  } else {
+    as_ = { durationMin: act.durationMin||60, colour: CAT_HEX[act.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15, choreTags: [] };
     openActivitySheet();
   }
 }
@@ -7699,6 +8197,26 @@ function setDayFocusPane(pane) {
   dayScreen.classList.toggle('focus-left', dayLandscapeFocusPane === 'left');
   dayScreen.classList.toggle('focus-center', dayLandscapeFocusPane === 'center');
   dayScreen.classList.toggle('focus-right', dayLandscapeFocusPane === 'right');
+  applyLeftPaneState();
+}
+
+// Left "Today" pane auto-hides while editing (an activity is picked, i.e.
+// focus-center) to free up room for the schedule; the Panel button also
+// toggles it manually.
+let leftPaneManualCollapsed = false;
+function applyLeftPaneState() {
+  const s = document.getElementById('screen-day');
+  if (!s) return;
+  const editing = s.classList.contains('focus-center');
+  const collapsed = leftPaneManualCollapsed || editing;
+  s.classList.toggle('left-collapsed', collapsed);
+  const caret = document.getElementById('dayLeftToggleCaret');
+  if (caret) caret.textContent = collapsed ? '▸' : '◀';
+}
+function toggleLeftPane() {
+  const s = document.getElementById('screen-day');
+  leftPaneManualCollapsed = !(s && s.classList.contains('left-collapsed'));
+  applyLeftPaneState();
 }
 
 function applyDayLandscapeFocusState() {
@@ -9297,12 +9815,14 @@ function confirmCustomActivity() {
   const cat  = document.getElementById('customCat').value;
   const durationMin = parseInt(document.getElementById('customDur').value);
   if (!name) { showToast('Enter a name!'); return; }
-  const act = { id:'custom-'+Date.now().toString(36), name, icon, cat, durationMin, custom:true };
+  const act = { id:'custom-'+Date.now().toString(36), name, icon, cat, durationMin, custom:true,
+    addedBy: isParent() ? 'parent' : activeProfile(),
+    pendingApproval: !isParent() };  // a kid's new activity waits for a parent's OK
   getProfData().customActivities = [...getCustomActivities(), act];
   saveAll();
   closeSheet('customOverlay');
   buildTray();
-  showToast(`"${name}" added ✨`);
+  showToast(isParent() ? `"${name}" added ✨` : `"${name}" added — a grown-up will approve it ✨`);
   document.getElementById('customName').value='';
   document.getElementById('customIcon').value='';
 }
@@ -9473,31 +9993,46 @@ function renderSync() {
   const jB = getDayBlocks(key, 'jenn');
   const sB = getDayBlocks(key, 'jess');
 
-  // Overlaps — use minute-based granularity (count 15-min slots of free-time overlap)
+  // Overlaps — genuine "you're both free" time: any 15-min slot in the
+  // 6am–9pm window that is either unscheduled or a Free-category block for
+  // BOTH girls. (Previously it only counted explicit Free blocks, so two
+  // kids who simply left time open never saw an overlap.)
   const overlapWrap = document.getElementById('syncOverlapWrap');
   overlapWrap.innerHTML = '';
-  const jSlots = new Set();
-  jB.forEach(b=>{
-    const a = getAllActivities().find(x=>x.id===b.actId);
-    if(a?.cat!=='free') return;
-    const startSlot = Math.floor((b.startMin - START_MIN)/15);
-    const endSlot = Math.ceil((b.startMin - START_MIN + b.durationMin)/15);
-    for(let s=startSlot;s<endSlot;s++) jSlots.add(s);
-  });
-  const shared = [];
-  sB.forEach(b=>{
-    const a = getAllActivities().find(x=>x.id===b.actId);
-    if(a?.cat!=='free') return;
-    const startSlot = Math.floor((b.startMin - START_MIN)/15);
-    const endSlot = Math.ceil((b.startMin - START_MIN + b.durationMin)/15);
-    for(let s=startSlot;s<endSlot;s++) if(jSlots.has(s)) shared.push(s);
-  });
-  const sharedSet = [...new Set(shared)];
-  if (sharedSet.length) {
-    const count = sharedSet.length * 15;
+  const acts = getAllActivities();
+  const TOTAL = Math.round(DAY_MIN_SPAN / 15);
+  const busySlots = (blocks) => {
+    const busy = new Set();
+    blocks.forEach(b => {
+      const a = acts.find(x => x.id === b.actId);
+      if (a && a.cat === 'free') return;      // free time = still available to hang out
+      const s = Math.floor((b.startMin - START_MIN) / 15);
+      const e = Math.ceil((b.startMin - START_MIN + (b.durationMin || 0)) / 15);
+      for (let i = Math.max(0, s); i < Math.min(TOTAL, e); i++) busy.add(i);
+    });
+    return busy;
+  };
+  const jBusy = busySlots(jB), sBusy = busySlots(sB);
+  const freeSlots = [];
+  for (let i = 0; i < TOTAL; i++) if (!jBusy.has(i) && !sBusy.has(i)) freeSlots.push(i);
+  if (freeSlots.length) {
+    // Collapse contiguous slots into readable time ranges (show the first few).
+    const ranges = [];
+    let runStart = freeSlots[0], prev = freeSlots[0];
+    for (let k = 1; k <= freeSlots.length; k++) {
+      if (k < freeSlots.length && freeSlots[k] === prev + 1) { prev = freeSlots[k]; continue; }
+      ranges.push([runStart, prev + 1]);
+      if (k < freeSlots.length) { runStart = freeSlots[k]; prev = freeSlots[k]; }
+    }
+    // Only surface reasonably-sized windows (≥30 min) as hang-out suggestions.
+    const windows = ranges.filter(([a, b]) => (b - a) * 15 >= 30)
+      .map(([a, b]) => `${formatTimeFromMin(START_MIN + a*15)}–${formatTimeFromMin(START_MIN + b*15)}`);
+    const totalMin = freeSlots.length * 15;
     const overlap = document.createElement('div');
     overlap.className = 'sync-overlap';
-    overlap.innerHTML = `🎉 You both have about <b>${count} mins</b> of free time overlap today! Why not hang out?`;
+    overlap.innerHTML = windows.length
+      ? `🎉 You're both free for about <b>${fmtHrsMin(totalMin)}</b> today — e.g. <b>${windows.slice(0, 3).join(', ')}</b>. Why not hang out?`
+      : `🎉 You both have about <b>${fmtHrsMin(totalMin)}</b> of free time overlapping today!`;
     overlapWrap.appendChild(overlap);
   }
 
@@ -9548,6 +10083,8 @@ function renderSync() {
     });
     grid.appendChild(col);
   });
+
+  renderInvites();
 }
 
 function sendInvite(block, to) {
@@ -9653,32 +10190,35 @@ function renderChallenges() {
       list.appendChild(card);
     });
   }
+}
 
-  // Invites
+// Activity-sharing invites — task sharing, so they live under Sister Sync.
+function renderInvites() {
   const inviteList = document.getElementById('invitesList');
+  if (!inviteList) return;
   inviteList.innerHTML = '';
   const myInvites = (state.shared.invites||[]).filter(i=>i.to===profile && i.status==='pending');
   if (!myInvites.length) {
-    inviteList.innerHTML = '<p style="color:var(--ink-light);font-size:0.95rem">No invites right now</p>';
-  } else {
-    const acts = getAllActivities();
-    myInvites.forEach(inv=>{
-      const act = acts.find(a=>a.id===inv.actId);
-      const d = formatDayKey(inv.day);
-      const tStr = formatTimeFromMin(inv.startMin);
-      const el = document.createElement('div');
-      el.className = 'invite-item';
-      el.innerHTML = `
-        <div>💌 <b>${inv.from==='jenn'?'Jenn':'Jess'}</b> invited you to<br>
-        <b>${act?.icon} ${act?.name}</b> on ${DAY_SHORT[(d.getDay()+6)%7]} at ${tStr}</div>
-        <div class="invite-actions">
-          <button class="pill-btn" onclick="acceptInvite('${inv.id}')">✅ Accept</button>
-          <button class="pill-btn" onclick="declineInvite('${inv.id}')">❌ Decline</button>
-        </div>
-      `;
-      inviteList.appendChild(el);
-    });
+    inviteList.innerHTML = '<p style="color:var(--ink-light);font-size:0.95rem">No invites right now. Tap one of your own activities above to invite your sister.</p>';
+    return;
   }
+  const acts = getAllActivities();
+  myInvites.forEach(inv=>{
+    const act = acts.find(a=>a.id===inv.actId);
+    const d = formatDayKey(inv.day);
+    const tStr = formatTimeFromMin(inv.startMin);
+    const el = document.createElement('div');
+    el.className = 'invite-item';
+    el.innerHTML = `
+      <div>💌 <b>${inv.from==='jenn'?'Jenn':'Jess'}</b> invited you to<br>
+      <b>${act?.icon} ${act?.name}</b> on ${DAY_SHORT[(d.getDay()+6)%7]} at ${tStr}</div>
+      <div class="invite-actions">
+        <button class="pill-btn" onclick="acceptInvite('${inv.id}')">✅ Accept</button>
+        <button class="pill-btn" onclick="declineInvite('${inv.id}')">❌ Decline</button>
+      </div>
+    `;
+    inviteList.appendChild(el);
+  });
 }
 
 function openNewChallenge() {
@@ -9724,7 +10264,7 @@ function acceptInvite(id) {
     inv.status = 'declined';
     markItemUpdated(inv);
     saveAll();
-    renderChallenges();
+    refreshInvitesUI();
     showToast('Invite unavailable: activity is not in your tray.');
     return;
   }
@@ -9739,7 +10279,7 @@ function acceptInvite(id) {
     checklistState: {}, travelBuffer: false,
   });
   setDayBlocks(inv.day, blocks, profile);
-  renderChallenges();
+  refreshInvitesUI();
   showToast('Added to your plan! 💕');
 }
 function declineInvite(id) {
@@ -9748,17 +10288,186 @@ function declineInvite(id) {
   inv.status = 'declined';
   markItemUpdated(inv);
   saveAll();
-  renderChallenges();
+  refreshInvitesUI();
+}
+// Invites now live in Sister Sync — refresh whichever surface is showing them.
+function refreshInvitesUI() {
+  const sync = document.getElementById('screen-sync');
+  if (sync && sync.classList.contains('active')) renderSync();
+  else renderInvites();
 }
 
 /* ════════════════════════════════════════════════════════════════
    PARENT MODE
 ════════════════════════════════════════════════════════════════ */
+let parentTab = 'review';
 function renderParentHome() {
+  setParentTab(parentTab);
+  document.getElementById('reviewKidName').textContent = parentViewing==='jenn' ? '🐥 Jenn' : '🦊 Jess';
+  document.querySelectorAll('#parentWeekKidPills .pill-btn').forEach(b =>
+    b.classList.toggle('active', b.textContent.includes(parentViewing==='jenn'?'Jenn':'Jess')));
   renderAnalytics();
   renderRoutinesList();
   renderParentActivities();
+  renderPendingApproval();
   renderLevelRules();
+  renderReviewDays();
+  renderReviewChores();
+  renderReviewFeedback();
+}
+
+function setParentTab(tab) {
+  parentTab = tab;
+  document.querySelectorAll('#screen-parent .parent-tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.ptab === tab));
+  document.querySelectorAll('#screen-parent .parent-panel').forEach(p =>
+    p.hidden = (p.id !== 'ptab-' + tab));
+}
+
+// Switch which child the parent is reviewing without leaving the dashboard.
+function setParentKid(kid) {
+  parentViewing = kid;
+  renderParentHome();
+}
+
+/* Weekly Review — per-day confirm buttons. A confirmation is stored per
+   child per day so a parent can tick off each day as they review it. */
+function parentDayConfirmStore() {
+  if (!state.shared.parentDayConfirm) state.shared.parentDayConfirm = {};
+  if (!state.shared.parentDayConfirm[parentViewing]) state.shared.parentDayConfirm[parentViewing] = {};
+  return state.shared.parentDayConfirm[parentViewing];
+}
+function parentToggleDayConfirm(dayKey) {
+  const store = parentDayConfirmStore();
+  store[dayKey] = !store[dayKey];
+  saveAll();
+  renderReviewDays();
+}
+function renderReviewDays() {
+  const wrap = document.getElementById('reviewDayConfirm');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  const keys = getDayKeys(weekOffset);
+  const store = parentDayConfirmStore();
+  keys.forEach((k, i) => {
+    const d = formatDayKey(k);
+    const blocks = getDayBlocks(k, parentViewing) || [];
+    const done = blocks.filter(b => b.completed).length;
+    const confirmed = !!store[k];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'review-day' + (confirmed ? ' confirmed' : '') + (k === todayKey() ? ' today' : '');
+    btn.onclick = () => parentToggleDayConfirm(k);
+    btn.innerHTML =
+        `<span class="review-day-dow">${DAY_SHORT[i]}</span>`
+      + `<span class="review-day-date">${d.getDate()}</span>`
+      + `<span class="review-day-count">${done}/${blocks.length} done</span>`
+      + `<span class="review-day-state">${confirmed ? '✓ Confirmed' : 'Tap to confirm'}</span>`;
+    wrap.appendChild(btn);
+  });
+}
+
+// Chore review summary for the reviewed child (this real week).
+function renderReviewChores() {
+  const wrap = document.getElementById('reviewChores');
+  if (!wrap) return;
+  const kid = parentViewing;
+  if (kid !== 'jenn' && kid !== 'jess') { wrap.innerHTML = '<p class="feedback-empty">No chores for this profile.</p>'; return; }
+  ctEnsureShared(); ctMigrateToGroups();
+  const wk = ctDateToKey(ctMondayOf(new Date()));
+  const groups = ctGroupsForKid(kid);
+  if (!groups.length) { wrap.innerHTML = '<p class="feedback-empty">No chore groups set up yet.</p>'; return; }
+  const chips = groups.map(g => {
+    const ids = g.choreIds || [];
+    const paid = g.cadence === 'daily'
+      ? [0,1,2,3,4,5,6].some(dd => ctGroupFiredDaily(wk, g.id, kid, dd))
+      : ctGroupFiredWeekly(wk, g.id, kid);
+    return `<span class="qms-chip ${paid ? 'paid' : ''}">${g.icon || '🧺'} ${escapeHtml(g.name || 'Chores')} ${paid ? '✓' : ''}</span>`;
+  }).join(' ');
+  wrap.innerHTML = `<div style="font-weight:800;margin-bottom:0.35rem">💰 Earned this week: $${ctWeekMoney(wk, kid).toFixed(2)}</div>`
+    + `<div class="qms-chips">${chips}</div>`;
+}
+function parentOpenChoreReview() {
+  profile = 'parent';
+  openChoreTab();
+}
+
+/* Feedback from the kid: the moods/vibes they logged each day this week,
+   plus their free-text weekly note (written from the Quest Board). */
+function renderReviewFeedback() {
+  const wrap = document.getElementById('reviewFeedback');
+  if (!wrap) return;
+  const kid = parentViewing;
+  const pd = getProfData(kid);
+  const keys = getDayKeys(weekOffset);
+  const wkKey = keys[0];
+  let html = '';
+  const note = pd && pd.weekFeedback && pd.weekFeedback[wkKey];
+  if (note && note.trim()) {
+    html += `<div class="feedback-week-note">💬 <b>Their note this week:</b><br>${escapeHtml(note.trim())}</div>`;
+  }
+  const moods = keys.map((k, i) => {
+    const m = pd && pd.dayMoods && pd.dayMoods[k];
+    return m ? `<span title="${DAY_SHORT[i]}">${DAY_SHORT[i]} ${m}</span>` : null;
+  }).filter(Boolean);
+  if (moods.length) {
+    html += `<div class="feedback-item">🌈 <b>Daily vibes:</b> ${moods.join(' · ')}</div>`;
+  }
+  if (!html) html = '<p class="feedback-empty">No feedback yet — vibes and notes your kid logs this week will show here.</p>';
+  wrap.innerHTML = html;
+}
+
+/* Task approval: activities a kid added themselves wait for a parent's OK. */
+function pendingApprovalActs() {
+  const out = [];
+  ['jenn','jess'].forEach(p => {
+    ((state.profiles[p] && state.profiles[p].customActivities) || []).forEach(a => {
+      if (a.pendingApproval) out.push({ act: a, owner: p });
+    });
+  });
+  return out;
+}
+function renderPendingApproval() {
+  const wrap = document.getElementById('pendingApprovalList');
+  if (!wrap) return;
+  const pending = pendingApprovalActs();
+  if (!pending.length) { wrap.innerHTML = '<p class="feedback-empty">Nothing waiting — new activities the girls add will appear here.</p>'; return; }
+  wrap.innerHTML = '';
+  pending.forEach(({ act, owner }) => {
+    const card = document.createElement('div');
+    card.className = 'challenge-card';
+    card.innerHTML = `
+      <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· ${owner==='jenn'?'🐥 Jenn':'🦊 Jess'} added</span></div>
+      <div style="font-size:0.85rem;color:var(--ink-light)">${(act.durationMin||60)} min · ${act.cat||'free'}</div>
+      <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
+        <button class="btn-icon" style="padding:2px 8px;background:var(--accent-green)" onclick="approveKidActivity('${owner}','${act.id}')">✅ Approve</button>
+        <button class="btn-icon" style="padding:2px 8px" onclick="openParentActivityEditor('${owner}','${act.id}')">✏️ Modify</button>
+        <button class="btn-icon" style="padding:2px 8px" onclick="rejectKidActivity('${owner}','${act.id}')">🗑 Reject</button>
+      </div>`;
+    wrap.appendChild(card);
+  });
+}
+function approveKidActivity(owner, id) {
+  const acts = (state.profiles[owner] && state.profiles[owner].customActivities) || [];
+  const a = acts.find(x => x.id === id);
+  if (!a) return;
+  delete a.pendingApproval;
+  markItemUpdated && markItemUpdated(a);
+  saveAll();
+  renderPendingApproval();
+  renderParentActivities();
+  showToast('Approved ✅');
+}
+function rejectKidActivity(owner, id) {
+  if (!confirm('Remove this activity the child added?')) return;
+  const arr = (state.profiles[owner] && state.profiles[owner].customActivities) || [];
+  const idx = arr.findIndex(x => x.id === id);
+  if (idx < 0) return;
+  arr.splice(idx, 1);
+  saveAll();
+  renderPendingApproval();
+  renderParentActivities();
+  showToast('Removed');
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -9781,6 +10490,8 @@ function renderParentActivities() {
     acts.forEach(a => {
       // Skip routine-shadow activities (they're managed via the Routines section)
       if (a.isRoutine) return;
+      // Pending kid-added activities show in the approval section above.
+      if (a.pendingApproval) return;
       wrap.appendChild(parentActivityCard(a, p));
     });
   });
