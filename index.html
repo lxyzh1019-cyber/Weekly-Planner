@@ -3281,18 +3281,37 @@
   }
   .mission-clear-btn:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 var(--ink); }
 
-  /* Quest Board pocket-money strip */
-  .quest-money-strip {
-    display: flex; align-items: center; gap: 0.5rem; width: 100%;
+  /* Quest Board pocket-money — hidden behind a toggle, off by default */
+  .quest-money-wrap { margin: 0.6rem 0 0.2rem; }
+  .quest-money-toggle {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%;
     border: 1.5px solid var(--ink); border-radius: 12px; background: var(--bg);
-    padding: 0.45rem 0.7rem; margin: 0.6rem 0 0.2rem; font: inherit; cursor: pointer; text-align: left;
+    padding: 0.5rem 0.75rem; font: inherit; font-weight: 800; cursor: pointer; text-align: left;
   }
-  .quest-money-strip:focus-visible { outline: 3px solid var(--accent-blue); outline-offset: 2px; }
-  .qms-amount { font-weight: 800; background: var(--accent-yellow); border-radius: 8px; padding: 2px 8px; white-space: nowrap; }
-  .qms-chips { display: flex; gap: 0.3rem; flex-wrap: wrap; min-width: 0; }
+  .quest-money-toggle:focus-visible { outline: 3px solid var(--accent-blue); outline-offset: 2px; }
+  .qmt-caret { font-size: 0.82rem; font-weight: 700; color: var(--ink-light); white-space: nowrap; }
+  .quest-money-panel {
+    border: 1.5px solid var(--ink); border-top: none;
+    border-radius: 0 0 12px 12px; background: #fff;
+    padding: 0.6rem 0.75rem; margin-top: -6px;
+  }
+  .qmp-total { font-weight: 800; font-size: 1.15rem; margin-bottom: 0.5rem; }
+  .qmp-total b { background: var(--accent-yellow); border-radius: 8px; padding: 2px 8px; }
+  .qmp-breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-bottom: 0.55rem; }
+  .qmp-tile {
+    border: 1.5px solid var(--ink); border-radius: 10px; padding: 0.4rem 0.55rem;
+    display: flex; flex-direction: column; gap: 1px; background: var(--bg);
+  }
+  .qmp-tile-label { font-size: 0.76rem; font-weight: 700; color: var(--ink-light); }
+  .qmp-tile-value { font-size: 1.02rem; font-weight: 800; }
+  .qms-week { font-size: 0.85rem; font-weight: 700; margin-bottom: 0.4rem; }
+  .qms-chips { display: flex; gap: 0.3rem; flex-wrap: wrap; min-width: 0; margin-bottom: 0.5rem; }
   .qms-chip { font-size: 0.8rem; border: 1.5px solid var(--ink); border-radius: 7px; padding: 1px 6px; background: var(--bg); white-space: nowrap; }
   .qms-chip.paid { background: var(--accent-green); }
-  .qms-go { margin-left: auto; font-weight: 800; font-size: 1.2rem; }
+  .qmp-open {
+    width: 100%; border: 2px solid var(--ink); border-radius: 10px; background: var(--accent-green);
+    box-shadow: 2px 2px 0 var(--ink); padding: 0.45rem; font-weight: 800; cursor: pointer;
+  }
 
   /* Sparkles */
   .quest-spark {
@@ -3403,7 +3422,13 @@
     </div>
   </div>
 
-  <button type="button" class="quest-money-strip" id="questMoneyStrip" hidden onclick="openChoreTab()" aria-label="Open chores and pocket money"></button>
+  <div class="quest-money-wrap" id="questMoneyWrap" hidden>
+    <button type="button" class="quest-money-toggle" id="questMoneyToggle" onclick="togglePocketMoney()" aria-expanded="false" aria-controls="questMoneyPanel">
+      <span>💰 My pocket money</span>
+      <span class="qmt-caret" id="qmtCaret">Show ▸</span>
+    </button>
+    <div class="quest-money-panel" id="questMoneyPanel" hidden></div>
+  </div>
 
   <div class="quest-board-header">
     <h2>🗺️ Today's Quests</h2>
@@ -5718,11 +5743,27 @@ function renderStickerCollection(kid) {
     <div class="sticker-grid">${cells}</div>`;
 }
 
-// Read-only pocket-money summary on the Quest Board (kids never open the chore tab otherwise).
+// Pocket money on the Quest Board is private by default — kids tap the toggle
+// to reveal the full breakdown (cash / savings / investments / GIC).
+let showPocketMoney = false;
+function togglePocketMoney() {
+  showPocketMoney = !showPocketMoney;
+  renderQuestMoneyStrip(activeProfile());
+}
+
 function renderQuestMoneyStrip(kid) {
-  const el = document.getElementById('questMoneyStrip');
-  if (!el) return;
-  if (kid !== 'jenn' && kid !== 'jess') { el.hidden = true; return; }
+  const wrap = document.getElementById('questMoneyWrap');
+  if (!wrap) return;
+  if (kid !== 'jenn' && kid !== 'jess') { wrap.hidden = true; return; }
+  wrap.hidden = false;
+
+  const toggle = document.getElementById('questMoneyToggle');
+  const caret = document.getElementById('qmtCaret');
+  const panel = document.getElementById('questMoneyPanel');
+  if (toggle) toggle.setAttribute('aria-expanded', showPocketMoney ? 'true' : 'false');
+  if (caret) caret.textContent = showPocketMoney ? 'Hide ▾' : 'Show ▸';
+  if (!showPocketMoney) { panel.hidden = true; panel.innerHTML = ''; return; }
+
   ctEnsureShared();
   ctMigrateToGroups();
   const wk = ctDateToKey(ctMondayOf(new Date()));   // real current week, independent of chore-tab nav
@@ -5741,10 +5782,21 @@ function renderQuestMoneyStrip(kid) {
     }
     return `<span class="qms-chip ${paid ? 'paid' : ''}">${g.icon || '🧺'} ${paid ? '✓' : `${n}/${m}`}</span>`;
   }).join('');
-  el.innerHTML = `<span class="qms-amount">💰 $${ctWeekMoney(wk, kid).toFixed(2)}</span>`
-    + `<span class="qms-chips">${chips || '<span class="qms-chip">No groups yet</span>'}</span>`
-    + `<span class="qms-go">›</span>`;
-  el.hidden = false;
+
+  const w = ensureWallet(kid);
+  const tile = (label, val) => `<div class="qmp-tile"><span class="qmp-tile-label">${label}</span><span class="qmp-tile-value">$${money2(val).toFixed(2)}</span></div>`;
+  panel.hidden = false;
+  panel.innerHTML =
+      `<div class="qmp-total">Total money: <b>$${netWorth(kid).toFixed(2)}</b></div>`
+    + `<div class="qmp-breakdown">`
+    +   tile('💵 Cash', w.cash)
+    +   tile('🏦 Savings', w.savings)
+    +   tile('📈 Investments', portfolioValue(kid))
+    +   tile('🔒 GIC', gicTotal(kid))
+    + `</div>`
+    + `<div class="qms-week">🧹 Earned this week: <b>$${ctWeekMoney(wk, kid).toFixed(2)}</b></div>`
+    + `<div class="qms-chips">${chips || '<span class="qms-chip">No chore groups yet</span>'}</div>`
+    + `<button type="button" class="qmp-open" onclick="openMoneyScreen('${kid}')">Open Bank &amp; Invest ›</button>`;
 }
 
 function formatQuestTime(min) {
