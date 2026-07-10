@@ -2709,6 +2709,49 @@
   }
   .parent-banner.sticky { position: sticky; top: 0; z-index: 99; }
 
+  /* Parent portal: tabbed sections */
+  .parent-tabs {
+    display: flex; gap: 0.4rem; flex-wrap: wrap;
+    border-bottom: 2px solid var(--ink); padding-bottom: 0.5rem;
+  }
+  .parent-tab {
+    background: var(--paper); border: 2px solid var(--ink); border-radius: 12px 12px 0 0;
+    padding: 0.4rem 0.75rem; font-family: 'Patrick Hand', sans-serif;
+    font-size: 0.98rem; font-weight: 800; cursor: pointer; color: var(--ink);
+  }
+  .parent-tab.active { background: var(--accent-yellow); box-shadow: 2px -2px 0 var(--ink); }
+  .parent-tab:hover { background: var(--accent-yellow); }
+  .parent-panel { padding: 0.8rem 1rem 2.5rem; }
+  .parent-panel[hidden] { display: none; }
+  .parent-h3 { font-size: 1.25rem; margin: 1rem 0 0.4rem; }
+  .parent-panel > .parent-h3:first-child { margin-top: 0.4rem; }
+  .parent-hint { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 0.55rem; }
+  /* Per-day confirm row in the weekly review */
+  .review-day-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .review-day {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    border: 2px solid var(--ink); border-radius: 12px; background: var(--paper);
+    padding: 0.4rem 0.35rem; min-width: 68px; cursor: pointer;
+    font-family: 'Patrick Hand', sans-serif; box-shadow: 2px 2px 0 var(--ink);
+  }
+  .review-day:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
+  .review-day.confirmed { background: var(--accent-green); }
+  .review-day.today { outline: 3px solid var(--accent-yellow); outline-offset: 1px; }
+  .review-day-dow { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; }
+  .review-day-date { font-size: 1.2rem; font-weight: 800; font-family: 'Gochi Hand', cursive; line-height: 1; }
+  .review-day-state { font-size: 0.72rem; font-weight: 700; }
+  .review-day-count { font-size: 0.68rem; color: var(--ink-light); }
+  /* Kid feedback list */
+  .feedback-item {
+    border: 1.5px solid var(--ink); border-radius: 10px; background: var(--paper);
+    padding: 0.45rem 0.6rem; margin-bottom: 0.4rem; font-size: 0.92rem;
+  }
+  .feedback-week-note {
+    border: 2px dashed var(--ink); border-radius: 10px; background: #fffbe9;
+    padding: 0.55rem 0.7rem; margin-bottom: 0.5rem; font-size: 0.95rem;
+  }
+  .feedback-empty { color: var(--ink-light); font-size: 0.92rem; }
+
   /* Sister Sync */
   .sync-grid {
     display: grid; grid-template-columns: repeat(2, 1fr);
@@ -3364,6 +3407,17 @@
     0% { transform: translate(0,0) scale(0.6); opacity: 1; }
     100% { transform: translate(var(--dx, 0), var(--dy, -40px)) scale(1.2); opacity: 0; }
   }
+  /* Kid weekly feedback box on the Quest Board */
+  .kid-feedback-box {
+    margin-top: 0.8rem; background: #fff; border: 2.5px solid var(--ink);
+    border-radius: 16px; box-shadow: 3px 3px 0 var(--ink); padding: 0.7rem 0.85rem;
+  }
+  .kid-feedback-box label { display: block; font-weight: 800; margin-bottom: 0.35rem; }
+  .kid-feedback-box textarea {
+    width: 100%; box-sizing: border-box; border: 2px solid var(--ink); border-radius: 10px;
+    padding: 0.45rem 0.55rem; font-family: 'Patrick Hand', sans-serif; font-size: 0.98rem;
+    resize: vertical; background: var(--bg);
+  }
   /* Arcade blast-to-complete on the quest card */
   .quest-projectile {
     position: absolute; font-size: 1.4rem; pointer-events: none; z-index: 5;
@@ -3495,6 +3549,11 @@
   <button type="button" class="quest-add-btn" onclick="goPlanToday()">＋ Add a quest for today</button>
   <div class="quest-list" id="questList"></div>
   <div class="sticker-collection" id="questStickers"></div>
+
+  <div class="kid-feedback-box">
+    <label for="kidWeekFeedback">💬 Tell your grown-ups how your week is going</label>
+    <textarea id="kidWeekFeedback" rows="2" placeholder="What was fun? What was tricky?" onchange="saveKidWeekFeedback()"></textarea>
+  </div>
 </div>
 
 <!-- Quest Complete popup -->
@@ -3837,34 +3896,70 @@
     <button class="btn-icon" onclick="goProfile()">Exit</button>
   </div>
 
-  <div style="padding:1rem">
-    <h3 style="font-size:1.3rem;margin-bottom:0.6rem">👀 View a Child's Week</h3>
-    <div style="display:flex;gap:0.6rem;margin-bottom:1rem" id="parentWeekKidPills">
-      <button class="pill-btn active" onclick="parentView('jenn')">🐥 Jenn</button>
-      <button class="pill-btn" onclick="parentView('jess')">🦊 Jess</button>
+  <div style="padding:0.8rem 1rem 0">
+    <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.7rem">
+      <span style="font-weight:800">Viewing:</span>
+      <div style="display:flex;gap:0.5rem" id="parentWeekKidPills">
+        <button class="pill-btn active" onclick="setParentKid('jenn')">🐥 Jenn</button>
+        <button class="pill-btn" onclick="setParentKid('jess')">🦊 Jess</button>
+      </div>
+      <button class="pill-btn" style="margin-left:auto" onclick="parentView(parentViewing)">📋 Open full week ›</button>
     </div>
+    <div class="parent-tabs" role="tablist" aria-label="Parent sections">
+      <button class="parent-tab active" role="tab" data-ptab="review" onclick="setParentTab('review')">🗓️ Weekly Review</button>
+      <button class="parent-tab" role="tab" data-ptab="routines" onclick="setParentTab('routines')">🌅 Routines</button>
+      <button class="parent-tab" role="tab" data-ptab="tasks" onclick="setParentTab('tasks')">✅ Tasks</button>
+      <button class="parent-tab" role="tab" data-ptab="rules" onclick="setParentTab('rules')">⚙️ Level-Up</button>
+    </div>
+  </div>
 
-    <h3 style="font-size:1.3rem;margin-bottom:0.6rem">📅 Monthly Overview</h3>
-    <div style="display:flex;gap:0.6rem;margin-bottom:1rem">
+  <!-- TAB: Weekly Review -->
+  <div class="parent-panel active" id="ptab-review" role="tabpanel">
+    <h3 class="parent-h3">🗓️ Confirm the week — <span id="reviewKidName">Jenn</span></h3>
+    <p class="parent-hint">Review each day together, then tap to confirm it. Progress is saved.</p>
+    <div id="reviewDayConfirm" class="review-day-row"></div>
+
+    <h3 class="parent-h3">🧹 Chore review</h3>
+    <p class="parent-hint">This week's chore progress and pocket money.</p>
+    <div id="reviewChores"></div>
+    <button class="btn-confirm" style="margin-top:0.5rem" onclick="parentOpenChoreReview()">Open full chore tab ›</button>
+
+    <h3 class="parent-h3">💬 Feedback from your kid</h3>
+    <div id="reviewFeedback"></div>
+
+    <h3 class="parent-h3">📊 Weekly analytics</h3>
+    <div id="analyticsCards"></div>
+
+    <h3 class="parent-h3">📅 Monthly overview</h3>
+    <div style="display:flex;gap:0.6rem;flex-wrap:wrap">
       <button class="pill-btn" onclick="openParentMonthly('jenn')">🐥 Jenn's Month</button>
       <button class="pill-btn" onclick="openParentMonthly('jess')">🦊 Jess's Month</button>
     </div>
+  </div>
 
-    <h3 style="font-size:1.3rem;margin-bottom:0.6rem">📊 Weekly Analytics</h3>
-    <div id="analyticsCards"></div>
-
-    <h3 style="font-size:1.3rem;margin:1rem 0 0.6rem">🌅 Routines</h3>
-    <p style="font-size:0.9rem;color:var(--ink-light);margin-bottom:0.6rem">Built-in (Morning / After-School / Evening) and custom routines. All shared with both girls.</p>
+  <!-- TAB: Routines -->
+  <div class="parent-panel" id="ptab-routines" role="tabpanel" hidden>
+    <h3 class="parent-h3">🌅 Routines</h3>
+    <p class="parent-hint">Built-in (Morning / After-School / Evening) and custom routines. All shared with both girls.</p>
     <div id="routinesList"></div>
     <button class="btn-confirm" style="margin-top:0.6rem" onclick="openNewRoutine()">＋ Add Routine</button>
+  </div>
 
-    <h3 style="font-size:1.3rem;margin:1rem 0 0.6rem">🎨 Activities</h3>
-    <p style="font-size:0.9rem;color:var(--ink-light);margin-bottom:0.6rem">All custom activities — yours and the girls'. Tap 🔗 to share with both, or 🔗 again to make it private to one child.</p>
+  <!-- TAB: Tasks -->
+  <div class="parent-panel" id="ptab-tasks" role="tabpanel" hidden>
+    <h3 class="parent-h3">🕓 Pending approval</h3>
+    <p class="parent-hint">New activities the girls added themselves. Approve, edit, or remove.</p>
+    <div id="pendingApprovalList"></div>
+    <h3 class="parent-h3">🎨 All activities</h3>
+    <p class="parent-hint">All custom activities — yours and the girls'. Tap 🔗 to share with both, or 🔗 again to make it private to one child.</p>
     <div id="parentActivitiesList"></div>
     <button class="btn-confirm" style="margin-top:0.6rem" onclick="openParentActivityEditor()">＋ Add Activity</button>
+  </div>
 
-    <h3 style="font-size:1.3rem;margin:1rem 0 0.6rem">⚙️ Level-Up Rules</h3>
-    <p style="font-size:0.9rem;color:var(--ink-light);margin-bottom:0.6rem">Shared between both girls.</p>
+  <!-- TAB: Level-Up Rules -->
+  <div class="parent-panel" id="ptab-rules" role="tabpanel" hidden>
+    <h3 class="parent-h3">⚙️ Level-Up Rules</h3>
+    <p class="parent-hint">Earn a ★ on an activity after enough sessions/hours. Shared between both girls.</p>
     <div id="levelRulesList"></div>
     <button class="btn-confirm" style="margin-top:0.6rem" onclick="openNewLevelRule()">＋ Add Rule</button>
   </div>
@@ -5751,6 +5846,7 @@ function renderQuestBoard() {
 
   renderQuestMoneyStrip(p);
   renderStickerCollection(p);
+  loadKidWeekFeedback(p);
 
   // Today's quests = today's blocks
   const key = todayKey();
@@ -5872,6 +5968,25 @@ function renderQuestMoneyStrip(kid) {
     + `<div class="qms-week">🧹 Earned this week: <b>$${ctWeekMoney(wk, kid).toFixed(2)}</b></div>`
     + `<div class="qms-chips">${chips || '<span class="qms-chip">No chore groups yet</span>'}</div>`
     + `<button type="button" class="qmp-open" onclick="openMoneyScreen('${kid}')">Open Bank &amp; Invest ›</button>`;
+}
+
+// Kid's free-text weekly note to grown-ups — surfaced in the parent review.
+function weekFeedbackKey() { return getDayKeys(weekOffset)[0]; }
+function loadKidWeekFeedback(kid) {
+  const ta = document.getElementById('kidWeekFeedback');
+  if (!ta) return;
+  const pd = getProfData(kid);
+  ta.value = (pd && pd.weekFeedback && pd.weekFeedback[weekFeedbackKey()]) || '';
+}
+function saveKidWeekFeedback() {
+  const ta = document.getElementById('kidWeekFeedback');
+  if (!ta) return;
+  const pd = getProfData(activeProfile());
+  if (!pd) return;
+  if (!pd.weekFeedback) pd.weekFeedback = {};
+  pd.weekFeedback[weekFeedbackKey()] = ta.value;
+  saveAll();
+  showToast('Shared with your grown-ups 💬');
 }
 
 function formatQuestTime(min) {
@@ -9700,12 +9815,14 @@ function confirmCustomActivity() {
   const cat  = document.getElementById('customCat').value;
   const durationMin = parseInt(document.getElementById('customDur').value);
   if (!name) { showToast('Enter a name!'); return; }
-  const act = { id:'custom-'+Date.now().toString(36), name, icon, cat, durationMin, custom:true };
+  const act = { id:'custom-'+Date.now().toString(36), name, icon, cat, durationMin, custom:true,
+    addedBy: isParent() ? 'parent' : activeProfile(),
+    pendingApproval: !isParent() };  // a kid's new activity waits for a parent's OK
   getProfData().customActivities = [...getCustomActivities(), act];
   saveAll();
   closeSheet('customOverlay');
   buildTray();
-  showToast(`"${name}" added ✨`);
+  showToast(isParent() ? `"${name}" added ✨` : `"${name}" added — a grown-up will approve it ✨`);
   document.getElementById('customName').value='';
   document.getElementById('customIcon').value='';
 }
@@ -10168,11 +10285,174 @@ function refreshInvitesUI() {
 /* ════════════════════════════════════════════════════════════════
    PARENT MODE
 ════════════════════════════════════════════════════════════════ */
+let parentTab = 'review';
 function renderParentHome() {
+  setParentTab(parentTab);
+  document.getElementById('reviewKidName').textContent = parentViewing==='jenn' ? '🐥 Jenn' : '🦊 Jess';
+  document.querySelectorAll('#parentWeekKidPills .pill-btn').forEach(b =>
+    b.classList.toggle('active', b.textContent.includes(parentViewing==='jenn'?'Jenn':'Jess')));
   renderAnalytics();
   renderRoutinesList();
   renderParentActivities();
+  renderPendingApproval();
   renderLevelRules();
+  renderReviewDays();
+  renderReviewChores();
+  renderReviewFeedback();
+}
+
+function setParentTab(tab) {
+  parentTab = tab;
+  document.querySelectorAll('#screen-parent .parent-tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.ptab === tab));
+  document.querySelectorAll('#screen-parent .parent-panel').forEach(p =>
+    p.hidden = (p.id !== 'ptab-' + tab));
+}
+
+// Switch which child the parent is reviewing without leaving the dashboard.
+function setParentKid(kid) {
+  parentViewing = kid;
+  renderParentHome();
+}
+
+/* Weekly Review — per-day confirm buttons. A confirmation is stored per
+   child per day so a parent can tick off each day as they review it. */
+function parentDayConfirmStore() {
+  if (!state.shared.parentDayConfirm) state.shared.parentDayConfirm = {};
+  if (!state.shared.parentDayConfirm[parentViewing]) state.shared.parentDayConfirm[parentViewing] = {};
+  return state.shared.parentDayConfirm[parentViewing];
+}
+function parentToggleDayConfirm(dayKey) {
+  const store = parentDayConfirmStore();
+  store[dayKey] = !store[dayKey];
+  saveAll();
+  renderReviewDays();
+}
+function renderReviewDays() {
+  const wrap = document.getElementById('reviewDayConfirm');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  const keys = getDayKeys(weekOffset);
+  const store = parentDayConfirmStore();
+  keys.forEach((k, i) => {
+    const d = formatDayKey(k);
+    const blocks = getDayBlocks(k, parentViewing) || [];
+    const done = blocks.filter(b => b.completed).length;
+    const confirmed = !!store[k];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'review-day' + (confirmed ? ' confirmed' : '') + (k === todayKey() ? ' today' : '');
+    btn.onclick = () => parentToggleDayConfirm(k);
+    btn.innerHTML =
+        `<span class="review-day-dow">${DAY_SHORT[i]}</span>`
+      + `<span class="review-day-date">${d.getDate()}</span>`
+      + `<span class="review-day-count">${done}/${blocks.length} done</span>`
+      + `<span class="review-day-state">${confirmed ? '✓ Confirmed' : 'Tap to confirm'}</span>`;
+    wrap.appendChild(btn);
+  });
+}
+
+// Chore review summary for the reviewed child (this real week).
+function renderReviewChores() {
+  const wrap = document.getElementById('reviewChores');
+  if (!wrap) return;
+  const kid = parentViewing;
+  if (kid !== 'jenn' && kid !== 'jess') { wrap.innerHTML = '<p class="feedback-empty">No chores for this profile.</p>'; return; }
+  ctEnsureShared(); ctMigrateToGroups();
+  const wk = ctDateToKey(ctMondayOf(new Date()));
+  const groups = ctGroupsForKid(kid);
+  if (!groups.length) { wrap.innerHTML = '<p class="feedback-empty">No chore groups set up yet.</p>'; return; }
+  const chips = groups.map(g => {
+    const ids = g.choreIds || [];
+    const paid = g.cadence === 'daily'
+      ? [0,1,2,3,4,5,6].some(dd => ctGroupFiredDaily(wk, g.id, kid, dd))
+      : ctGroupFiredWeekly(wk, g.id, kid);
+    return `<span class="qms-chip ${paid ? 'paid' : ''}">${g.icon || '🧺'} ${escapeHtml(g.name || 'Chores')} ${paid ? '✓' : ''}</span>`;
+  }).join(' ');
+  wrap.innerHTML = `<div style="font-weight:800;margin-bottom:0.35rem">💰 Earned this week: $${ctWeekMoney(wk, kid).toFixed(2)}</div>`
+    + `<div class="qms-chips">${chips}</div>`;
+}
+function parentOpenChoreReview() {
+  profile = 'parent';
+  openChoreTab();
+}
+
+/* Feedback from the kid: the moods/vibes they logged each day this week,
+   plus their free-text weekly note (written from the Quest Board). */
+function renderReviewFeedback() {
+  const wrap = document.getElementById('reviewFeedback');
+  if (!wrap) return;
+  const kid = parentViewing;
+  const pd = getProfData(kid);
+  const keys = getDayKeys(weekOffset);
+  const wkKey = keys[0];
+  let html = '';
+  const note = pd && pd.weekFeedback && pd.weekFeedback[wkKey];
+  if (note && note.trim()) {
+    html += `<div class="feedback-week-note">💬 <b>Their note this week:</b><br>${escapeHtml(note.trim())}</div>`;
+  }
+  const moods = keys.map((k, i) => {
+    const m = pd && pd.dayMoods && pd.dayMoods[k];
+    return m ? `<span title="${DAY_SHORT[i]}">${DAY_SHORT[i]} ${m}</span>` : null;
+  }).filter(Boolean);
+  if (moods.length) {
+    html += `<div class="feedback-item">🌈 <b>Daily vibes:</b> ${moods.join(' · ')}</div>`;
+  }
+  if (!html) html = '<p class="feedback-empty">No feedback yet — vibes and notes your kid logs this week will show here.</p>';
+  wrap.innerHTML = html;
+}
+
+/* Task approval: activities a kid added themselves wait for a parent's OK. */
+function pendingApprovalActs() {
+  const out = [];
+  ['jenn','jess'].forEach(p => {
+    ((state.profiles[p] && state.profiles[p].customActivities) || []).forEach(a => {
+      if (a.pendingApproval) out.push({ act: a, owner: p });
+    });
+  });
+  return out;
+}
+function renderPendingApproval() {
+  const wrap = document.getElementById('pendingApprovalList');
+  if (!wrap) return;
+  const pending = pendingApprovalActs();
+  if (!pending.length) { wrap.innerHTML = '<p class="feedback-empty">Nothing waiting — new activities the girls add will appear here.</p>'; return; }
+  wrap.innerHTML = '';
+  pending.forEach(({ act, owner }) => {
+    const card = document.createElement('div');
+    card.className = 'challenge-card';
+    card.innerHTML = `
+      <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· ${owner==='jenn'?'🐥 Jenn':'🦊 Jess'} added</span></div>
+      <div style="font-size:0.85rem;color:var(--ink-light)">${(act.durationMin||60)} min · ${act.cat||'free'}</div>
+      <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
+        <button class="btn-icon" style="padding:2px 8px;background:var(--accent-green)" onclick="approveKidActivity('${owner}','${act.id}')">✅ Approve</button>
+        <button class="btn-icon" style="padding:2px 8px" onclick="openParentActivityEditor('${owner}','${act.id}')">✏️ Modify</button>
+        <button class="btn-icon" style="padding:2px 8px" onclick="rejectKidActivity('${owner}','${act.id}')">🗑 Reject</button>
+      </div>`;
+    wrap.appendChild(card);
+  });
+}
+function approveKidActivity(owner, id) {
+  const acts = (state.profiles[owner] && state.profiles[owner].customActivities) || [];
+  const a = acts.find(x => x.id === id);
+  if (!a) return;
+  delete a.pendingApproval;
+  markItemUpdated && markItemUpdated(a);
+  saveAll();
+  renderPendingApproval();
+  renderParentActivities();
+  showToast('Approved ✅');
+}
+function rejectKidActivity(owner, id) {
+  if (!confirm('Remove this activity the child added?')) return;
+  const arr = (state.profiles[owner] && state.profiles[owner].customActivities) || [];
+  const idx = arr.findIndex(x => x.id === id);
+  if (idx < 0) return;
+  arr.splice(idx, 1);
+  saveAll();
+  renderPendingApproval();
+  renderParentActivities();
+  showToast('Removed');
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -10195,6 +10475,8 @@ function renderParentActivities() {
     acts.forEach(a => {
       // Skip routine-shadow activities (they're managed via the Routines section)
       if (a.isRoutine) return;
+      // Pending kid-added activities show in the approval section above.
+      if (a.pendingApproval) return;
       wrap.appendChild(parentActivityCard(a, p));
     });
   });
