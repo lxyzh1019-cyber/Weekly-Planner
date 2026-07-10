@@ -304,6 +304,19 @@
   .day-right-rail {
     min-width: 0;
   }
+  /* "Panel" collapse toggle — only meaningful in the landscape 3-column
+     layout, so it stays hidden elsewhere (overridden in that media query). */
+  .day-left-toggle { display: none; }
+  .day-schedule-label {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  }
+  .day-left-toggle {
+    align-items: center; gap: 0.2rem;
+    background: var(--paper); border: 1.5px solid var(--ink); border-radius: 9px;
+    padding: 0.1rem 0.5rem; font-family: 'Patrick Hand', sans-serif;
+    font-size: 0.82rem; font-weight: 800; color: var(--ink); cursor: pointer;
+  }
+  .day-left-toggle:hover { background: var(--accent-yellow); }
   .day-left-rail {
     display: flex;
     flex-direction: column;
@@ -722,6 +735,13 @@
     #screen-day.focus-right .day-center-lane * {
       pointer-events: none;
     }
+    /* Auto-hide the left "Today" pane to free up room while editing the
+       schedule (and via the manual Panel toggle). */
+    #screen-day.left-collapsed .day-workspace {
+      grid-template-columns: minmax(500px, 2.6fr) minmax(250px, 0.95fr);
+    }
+    #screen-day.left-collapsed .day-left-rail { display: none; }
+    #screen-day .day-left-toggle { display: inline-flex; }
     #screen-week > .parent-banner.sticky {
       padding-left: max(0.8rem, env(safe-area-inset-left, 0px));
       padding-right: max(0.8rem, env(safe-area-inset-right, 0px));
@@ -3313,6 +3333,27 @@
     box-shadow: 2px 2px 0 var(--ink); padding: 0.45rem; font-weight: 800; cursor: pointer;
   }
 
+  /* Quick slot-picker sheet (tap an empty slot to add an activity) */
+  .slot-picker-hint { color: var(--ink-light); font-size: 0.92rem; margin: 0.1rem 0 0.5rem; }
+  .slot-picker-filter { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+  .slot-picker-list {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 0.5rem; max-height: 52vh; overflow-y: auto; padding: 0.15rem;
+  }
+  .slot-pick-chip {
+    display: flex; align-items: center; gap: 0.45rem;
+    border: 2px solid var(--ink); border-radius: 12px; background: #fff;
+    box-shadow: 2px 2px 0 var(--ink); padding: 0.5rem 0.6rem;
+    font: inherit; text-align: left; cursor: pointer;
+  }
+  .slot-pick-chip:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
+  .slot-pick-chip:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 var(--ink); }
+  .slot-pick-chip.locked { opacity: 0.55; }
+  .slot-pick-add { background: var(--bg2); border-style: dashed; }
+  .spc-icon { font-size: 1.4rem; flex-shrink: 0; }
+  .spc-name { font-weight: 800; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .spc-dur { font-size: 0.78rem; font-weight: 700; color: var(--ink-light); flex-shrink: 0; }
+
   /* Sparkles */
   .quest-spark {
     position: absolute; font-size: 1.4rem; pointer-events: none;
@@ -3698,7 +3739,10 @@
 
     <div class="day-center-lane">
       <div class="timeline-wrap">
-        <div class="day-panel-label day-panel-label--landscape-only">Schedule</div>
+        <div class="day-panel-label day-panel-label--landscape-only day-schedule-label">
+          <button type="button" class="day-left-toggle" id="dayLeftToggle" onclick="toggleLeftPane()" title="Hide/show the side panel" aria-label="Hide or show the side panel"><span id="dayLeftToggleCaret">◀</span> Panel</button>
+          <span>Schedule</span>
+        </div>
         <div class="timeline" id="timeline"></div>
       </div>
     </div>
@@ -3950,6 +3994,18 @@
 </div>
 
 <!-- Generic Activity Sheet -->
+<!-- Quick activity picker: opens when a kid taps an empty time slot without
+     having selected an activity first (item 6). -->
+<div class="overlay" id="slotPickerOverlay" onclick="overlayClick(event,'slotPickerOverlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3 id="slotPickerTitle">Add an activity</h3>
+    <p class="slot-picker-hint" id="slotPickerHint">Pick what goes here.</p>
+    <div class="slot-picker-filter" id="slotPickerFilter"></div>
+    <div class="slot-picker-list" id="slotPickerList"></div>
+  </div>
+</div>
+
 <div class="overlay" id="activityOverlay" onclick="overlayClick(event,'activityOverlay')">
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -6909,6 +6965,7 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   currentDayKey = key;
   selectedActivity = null;
   currentZone = 'all';
+  leftPaneManualCollapsed = false;
 
   document.querySelectorAll('.zone-tab').forEach(t=>t.classList.toggle('active', t.dataset.zone==='all'));
 
@@ -7822,16 +7879,18 @@ function kidTrainingOpenEdit() {
 
 /* Canvas tap → place new block at that pixel y */
 function handleCanvasTap(e, zMinStart) {
-  if (!selectedActivity) { showToast('Tap an activity first 👇'); return; }
-  if (selectedActivity._locked) { showToast(`🔒 Unlocks in ${selectedActivity.season}!`); return; }
-  if (selectedActivity._rewardLocked) { showToast('Keep going — this reward unlocks soon ✨'); return; }
-
   const rect = e.currentTarget.getBoundingClientRect();
   const y = e.clientY - rect.top;
   const relMin = Math.round(y / PX_PER_MIN);
   // Snap to 15 min
   const snapped = Math.round(relMin / 15) * 15;
   const absMin = START_MIN + zMinStart + snapped;
+
+  // No activity picked yet → offer the picker right at the tapped time so the
+  // kid doesn't have to select from the tray first.
+  if (!selectedActivity) { openSlotPicker(absMin); return; }
+  if (selectedActivity._locked) { showToast(`🔒 Unlocks in ${selectedActivity.season}!`); return; }
+  if (selectedActivity._rewardLocked) { showToast('Keep going — this reward unlocks soon ✨'); return; }
 
   pendingStartMin = absMin;
 
@@ -7840,6 +7899,80 @@ function handleCanvasTap(e, zMinStart) {
     openTrainingSheet();
   } else {
     as_ = { durationMin: selectedActivity.durationMin||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15, choreTags: [] };
+    openActivitySheet();
+  }
+}
+
+/* Quick activity picker shown when an empty slot is tapped with nothing
+   selected. Keeps pendingStartMin from the tap, then routes into the normal
+   placement sheet once an activity is chosen. */
+let slotPickerFilter = 'all';
+function openSlotPicker(absMin) {
+  pendingStartMin = absMin;
+  slotPickerFilter = 'all';
+  const title = document.getElementById('slotPickerTitle');
+  const hint = document.getElementById('slotPickerHint');
+  if (title) title.textContent = `Add at ${formatTimeFromMin(absMin)}`;
+  if (hint) hint.textContent = 'Pick what goes in this time slot.';
+  renderSlotPicker();
+  openSheet('slotPickerOverlay');
+}
+function renderSlotPicker() {
+  const filterWrap = document.getElementById('slotPickerFilter');
+  const list = document.getElementById('slotPickerList');
+  if (!filterWrap || !list) return;
+  const filters = [
+    {id:'all', label:'All'}, {id:'daily', label:'🍽 Daily'}, {id:'routine', label:'🌅 Routines'},
+    {id:'school', label:'📚 Learning'}, {id:'active', label:'🏃 Active'},
+    {id:'training', label:'🏋️ Training'}, {id:'free', label:'🎮 Free'},
+  ];
+  filterWrap.innerHTML = '';
+  filters.forEach(f => {
+    const c = document.createElement('button');
+    c.type = 'button';
+    c.className = 'filter-chip' + (slotPickerFilter === f.id ? ' active' : '');
+    c.textContent = f.label;
+    c.onclick = () => { slotPickerFilter = f.id; renderSlotPicker(); };
+    filterWrap.appendChild(c);
+  });
+  const acts = getAllActivities().filter(a => {
+    if (slotPickerFilter === 'all') return true;
+    if (slotPickerFilter === 'training') return a.isTraining;
+    return a.cat === slotPickerFilter;
+  });
+  list.innerHTML = '';
+  acts.forEach(act => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'slot-pick-chip' + ((act._locked || act._rewardLocked) ? ' locked' : '');
+    chip.innerHTML = `<span class="spc-icon">${act.icon}</span><span class="spc-name">${escapeHtml(act.name)}</span><span class="spc-dur">${formatDuration(act.durationMin || 60)}</span>`;
+    chip.onclick = () => pickFromSlot(act.id);
+    list.appendChild(chip);
+  });
+  const addC = document.createElement('button');
+  addC.type = 'button';
+  addC.className = 'slot-pick-chip slot-pick-add';
+  addC.innerHTML = '<span class="spc-icon">＋</span><span class="spc-name">Custom activity</span>';
+  addC.onclick = () => { closeSheet('slotPickerOverlay'); openCustomActivity(); };
+  list.appendChild(addC);
+}
+function pickFromSlot(actId) {
+  const act = getAllActivities().find(a => a.id === actId);
+  if (!act) return;
+  if (act._locked) { showToast(`🔒 Unlocks in ${act.season}!`); return; }
+  if (act._rewardLocked) { showToast('Keep going — unlock this reward soon ✨'); return; }
+  const _pr = getProfData()?.progress;
+  if (_pr && !_pr.tutorialDone && TUTORIAL_STARTER_CHOICES.some(c => c.id === act.id)) {
+    closeSheet('slotPickerOverlay'); openTutorial(); return;
+  }
+  selectedActivity = act;
+  closeSheet('slotPickerOverlay');
+  // pendingStartMin was set by openSlotPicker.
+  if (act.isTraining) {
+    ts = { durationMin: act.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15 };
+    openTrainingSheet();
+  } else {
+    as_ = { durationMin: act.durationMin||60, colour: CAT_HEX[act.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15, choreTags: [] };
     openActivitySheet();
   }
 }
@@ -7879,6 +8012,26 @@ function setDayFocusPane(pane) {
   dayScreen.classList.toggle('focus-left', dayLandscapeFocusPane === 'left');
   dayScreen.classList.toggle('focus-center', dayLandscapeFocusPane === 'center');
   dayScreen.classList.toggle('focus-right', dayLandscapeFocusPane === 'right');
+  applyLeftPaneState();
+}
+
+// Left "Today" pane auto-hides while editing (an activity is picked, i.e.
+// focus-center) to free up room for the schedule; the Panel button also
+// toggles it manually.
+let leftPaneManualCollapsed = false;
+function applyLeftPaneState() {
+  const s = document.getElementById('screen-day');
+  if (!s) return;
+  const editing = s.classList.contains('focus-center');
+  const collapsed = leftPaneManualCollapsed || editing;
+  s.classList.toggle('left-collapsed', collapsed);
+  const caret = document.getElementById('dayLeftToggleCaret');
+  if (caret) caret.textContent = collapsed ? '▸' : '◀';
+}
+function toggleLeftPane() {
+  const s = document.getElementById('screen-day');
+  leftPaneManualCollapsed = !(s && s.classList.contains('left-collapsed'));
+  applyLeftPaneState();
 }
 
 function applyDayLandscapeFocusState() {
