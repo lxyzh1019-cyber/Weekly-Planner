@@ -1565,8 +1565,25 @@
     display: flex;
     align-items: center;
     letter-spacing: 0.5px;
+    position: relative;
   }
   .wf-zone-row-label:last-of-type { border-bottom: none; }
+  /* Hour ticks down the right edge of the zone label so a card sitting
+     near a zone's top/bottom border can still be read against a real
+     clock time, not just guessed from its position in the lane. */
+  .wf-zone-tick {
+    position: absolute;
+    right: 4px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: var(--ink-light, #8a8275);
+    opacity: 0.85;
+    pointer-events: none;
+    background: var(--bg2);
+    padding: 0 2px;
+  }
+  .wf-zone-tick--top { top: 2px; }
+  .wf-zone-tick--bottom { bottom: 2px; }
   /* Each zone cell is a time-proportional lane: cards are absolutely
      positioned by their start time on a shared px-per-minute scale, so the
      same clock time lands at the same height across all 7 day columns. */
@@ -1936,6 +1953,8 @@
   }
   .placed-block:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--ink); }
   .placed-block.parent-pinned { border-style: dashed; border-width: 3px; }
+  /* Pale block colours (e.g. Routine's mint) need dark text to stay readable. */
+  .placed-block.light-bg { color: var(--ink); }
   /* Pending invitation from sister (not yet accepted) */
   .placed-block.invitation {
     border-style: dashed;
@@ -1995,6 +2014,19 @@
     word-break: break-word;
     white-space: normal;
   }
+  .placed-block .block-gear {
+    font-size: 0.72rem;
+    font-weight: 600;
+    opacity: 0.95;
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+    white-space: normal;
+  }
+  .placed-block.block-font-lg .block-gear { font-size: 0.8rem; }
   .placed-block.placed-block--completed {
     filter: brightness(0.9) saturate(0.6);
     border-style: solid;
@@ -2891,6 +2923,17 @@
     min-height: 18px; overflow: hidden;
   }
   .print-time-cell { font-size: 7.5pt; color: #444; text-align: center; font-weight: 700; }
+  /* Hour boundaries get a heavier top border + darker, bigger label so the
+     grid reads at a glance instead of requiring the tiny 15-min tick text
+     to be parsed row by row. */
+  .print-cell.print-hour-start, .print-time-cell.print-hour-start {
+    border-top: 1.5px solid var(--ink);
+  }
+  .print-time-cell.print-hour-start {
+    font-size: 8.5pt;
+    color: #000;
+    font-weight: 800;
+  }
   .print-block {
     position: absolute; left: 1px; right: 1px; top: 0; z-index: 1;
     border-radius: 4px; padding: 1px 4px;
@@ -4401,6 +4444,7 @@
         <option value="active">🏃 Active</option>
         <option value="free" selected>🎮 Free Time</option>
         <option value="daily">🍽 Daily</option>
+        <option value="training">🏋️ Training</option>
       </select>
     </div>
     <button class="btn-confirm" onclick="confirmCustomActivity()">Add Activity ✅</button>
@@ -6956,6 +7000,20 @@ function renderFullWeek(keys) {
     zoneLabel.classList.add('wf-zone-'+z.id);
     zoneLabel.className = 'wf-zone-row-label';
     zoneLabel.textContent = z.label;
+
+    // Clock-time ticks at the zone's own top/bottom edge so a card sitting
+    // near a zone boundary (like a 5:30 swim block right before 6pm) reads
+    // against a real hour instead of just "close to the next section".
+    const zoneStartAbs = START_MIN + z.start;
+    const zoneEndAbs = START_MIN + z.end;
+    [zoneStartAbs, zoneEndAbs].forEach(hm => {
+      const isTop = hm === zoneStartAbs;
+      const tick = document.createElement('span');
+      tick.className = 'wf-zone-tick' + (isTop ? ' wf-zone-tick--top' : ' wf-zone-tick--bottom');
+      const h = Math.floor(hm / 60) % 24;
+      tick.textContent = `${((h+11)%12)+1}${h>=12?'p':'a'}`;
+      zoneLabel.appendChild(tick);
+    });
     grid.appendChild(zoneLabel);
 
     keys.forEach((key, ci) => {
@@ -7684,13 +7742,15 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
     if (height >= 110) fontTier = ' block-font-lg';
     else if (height >= 72) fontTier = ' block-font-md';
   }
+  const blockBg = b.colour || CAT_HEX[act.cat] || '#888';
   blockEl.className = 'placed-block'
     +(isBuffer ? ` travel-buf travel-buf--centered${b._bufferCls ? ' '+b._bufferCls : ''}` : '')
     +(b.parentPinned?' parent-pinned':'')
     +(b.completed?' placed-block--completed':'')
+    +(isLightColour(blockBg)?' light-bg':'')
     +(isCompact?' compact':'')+fontTier;
   blockEl.id = 'block-'+b.id;
-  blockEl.style.background = b.colour || CAT_HEX[act.cat] || '#888';
+  blockEl.style.background = blockBg;
   blockEl.style.top = top + 'px';
   blockEl.style.height = height + 'px';
   blockEl.style.left = `calc(${leftPct}% + 2px)`;
@@ -7722,6 +7782,19 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
   const noteHtml = (!isCompact && noteTrim)
     ? `<div class="block-note">${escapeHtml(noteTrim)}</div>`
     : '';
+  // Training blocks: remind the kid what gear to bring, right on the block,
+  // whenever there's room — no need to open the sheet just to check.
+  let gearHtml = '';
+  if (!isBuffer && !isCompact && act.isTraining && b.tag) {
+    const gearItems = getTrainingGearPresets(b.tag);
+    const unchecked = gearItems.filter((_, idx) => !(b.gearState || {})['gear-'+b.tag+'-'+idx]);
+    if (unchecked.length) {
+      const maxItems = fontTier === ' block-font-lg' ? 6 : fontTier === ' block-font-md' ? 3 : 2;
+      const shown = unchecked.slice(0, maxItems);
+      const more = unchecked.length - shown.length;
+      gearHtml = `<div class="block-gear">🎒 ${escapeHtml(shown.join(', '))}${more > 0 ? ` +${more} more` : ''}</div>`;
+    }
+  }
   // For a multi-chore House-Chore block, show the tagged chores in the name.
   const choreList = (b.actId === 'chores' && Array.isArray(b.choreTags) && b.choreTags.length)
     ? b.choreTags.join(', ') : '';
@@ -7745,6 +7818,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
     ${metaHtml}
     ${!isBuffer && b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="block-stopwatch-btn" onclick="event.stopPropagation(); startBlockStopwatch('${b.id}')">⏱ Start stopwatch</button>` : ''}
     ${noteHtml}
+    ${gearHtml}
   `;
   if (!isBuffer) blockEl.onclick = (e)=>{ e.stopPropagation(); onTimelineBlockTap(b.id); };
   canvas.appendChild(blockEl);
@@ -12841,7 +12915,8 @@ function renderPrintSheet() {
     const totalMin=s*15;
     const hour = winStartHr + Math.floor(totalMin/60);
     const min  = totalMin%60;
-    html += `<div class="print-time-cell">${min===0 ? (hour>12?hour-12:hour)+(hour>=12?'pm':'am') : ''}</div>`;
+    const isHourStart = min===0;
+    html += `<div class="print-time-cell${isHourStart?' print-hour-start':''}">${isHourStart ? (hour>12?hour-12:hour)+(hour>=12?'pm':'am') : ''}</div>`;
     keys.forEach(k=>{
       const bks = getDayBlocks(k);
       let blockHtml = '';
@@ -12863,7 +12938,7 @@ function renderPrintSheet() {
         const checkbox = bh >= 15 ? `<span class="print-check" style="border-color:${printTextColor(bg)}"></span>` : '';
         blockHtml += `<div class="print-block" style="background:${bg};color:${printTextColor(bg)};font-size:${printBlockFontPt(bh)}pt;height:${bh}px">${checkbox}${act.icon} ${act.name}</div>`;
       });
-      html += `<div class="print-cell">${blockHtml}</div>`;
+      html += `<div class="print-cell${isHourStart?' print-hour-start':''}">${blockHtml}</div>`;
     });
   }
   html += `</div>`;
