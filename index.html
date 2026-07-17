@@ -2250,6 +2250,28 @@
     max-height: 88vh;
     overflow-y: auto;
   }
+  /* Styled confirm/prompt dialog (promise-based, replaces native dialogs) */
+  #appDialogOverlay { align-items: center; justify-content: center; z-index: 500; }
+  .app-dialog-sheet {
+    width: min(420px, 92vw);
+    border-radius: 22px;
+    border: 3px solid var(--ink);
+    box-shadow: 6px 6px 0 var(--ink);
+    text-align: center;
+  }
+  .app-dialog-msg {
+    font-size: 1.1rem; font-weight: 700; margin: 0.4rem 0 0.9rem;
+    white-space: pre-line; line-height: 1.35;
+  }
+  .app-dialog-input {
+    width: 100%; padding: 0.7rem 0.9rem; font-size: 1.1rem;
+    font-family: 'Patrick Hand', sans-serif;
+    border: 2px solid var(--ink); border-radius: 12px;
+    background: #fff; color: var(--ink); margin-bottom: 0.9rem;
+  }
+  .app-dialog-input:focus { outline: 3px solid var(--accent-strong); outline-offset: 1px; }
+  .app-dialog-btns { display: flex; gap: 0.6rem; align-items: center; }
+  .app-dialog-cancel { flex: 0 0 auto; }
   .sheet-close-x {
     position: absolute;
     top: 10px;
@@ -5873,12 +5895,12 @@ function setParentPin(newPin) {
   saveAll();
 }
 // Parent-hub control: change the family PIN (verifies the current one first).
-function changeParentPin() {
-  const cur = (prompt('Enter your current PIN 🔒') || '').trim();
+async function changeParentPin() {
+  const cur = ((await showPrompt('Enter your current PIN 🔒', { type:'password' })) || '').trim();
   if (cur !== getParentPin()) { showToast('Incorrect PIN'); return; }
-  const next = (prompt('New PIN (numbers work best):') || '').trim();
+  const next = ((await showPrompt('New PIN (numbers work best):', { type:'password' })) || '').trim();
   if (!next) { showToast('PIN unchanged'); return; }
-  const confirm2 = (prompt('Re-enter the new PIN:') || '').trim();
+  const confirm2 = ((await showPrompt('Re-enter the new PIN:', { type:'password' })) || '').trim();
   if (next !== confirm2) { showToast('PINs didn\'t match — unchanged'); return; }
   setParentPin(next);
   showToast('✅ Parent PIN updated');
@@ -5905,9 +5927,9 @@ function refreshHeroModeToggle() {
   btn.classList.toggle('on', on);
 }
 
-function selectProfile(p) {
+async function selectProfile(p) {
   if (p === 'parent' && !parentUnlockedThisSession) {
-    const pin = (prompt('Enter parent PIN 🔒') || '').trim();
+    const pin = ((await showPrompt('Enter parent PIN 🔒', { type:'password' })) || '').trim();
     if (pin !== getParentPin()) {
       showToast('Incorrect PIN');
       return;
@@ -9894,7 +9916,7 @@ function toggleConfirm() {
 }
 
 /* Parent: confirm every block on the current day in one tap. */
-function confirmAllToday() {
+async function confirmAllToday() {
   if (!isParent()) return;
   const blocks = getDayBlocks(currentDayKey);
   const unconfirmed = blocks.filter(b => !b.confirmed);
@@ -9902,7 +9924,7 @@ function confirmAllToday() {
     showToast('Already all confirmed ✅');
     return;
   }
-  if (!confirm(`Confirm all ${unconfirmed.length} block${unconfirmed.length===1?'':'s'} for this day?`)) return;
+  if (!(await showConfirm(`Confirm all ${unconfirmed.length} block${unconfirmed.length===1?'':'s'} for this day?`))) return;
   unconfirmed.forEach(b => { b.confirmed = true; });
   setDayBlocks(currentDayKey, blocks);
   recountActivityProgress();
@@ -9948,8 +9970,8 @@ function applyTemplate(type) {
   showToast(`${type==='school'?'🏫 School':'🌈 Weekend'} template applied!`);
 }
 
-function clearDay() {
-  if (!confirm('Clear all blocks for this day?')) return;
+async function clearDay() {
+  if (!(await showConfirm('Clear all blocks for this day?', { danger:true, okLabel:'Clear' }))) return;
   setDayBlocks(currentDayKey, []);
   buildTimeline();
   showToast('Day cleared 🗑');
@@ -11297,8 +11319,8 @@ function buildGoalRow(g) {
   del.className = 'gt-del';
   del.textContent = '×';
   del.title = 'Remove';
-  del.onclick = ()=>{
-    if (!confirm('Remove this goal?')) return;
+  del.onclick = async ()=>{
+    if (!(await showConfirm('Remove this goal?', { danger:true, okLabel:'Remove' }))) return;
     const p = getProfData();
     p.goals = p.goals.filter(x=>x.id!==g.id);
     saveAll();
@@ -13131,6 +13153,74 @@ function buildPrintSummary(keys, acts, winStartMin, winEndMin) {
 /* ════════════════════════════════════════════════════════════════
    MISC
 ════════════════════════════════════════════════════════════════ */
+/* ── Styled dialogs — promise-based replacements for native confirm()/prompt()
+   so destructive confirms and PIN/text entry stay inside the app's sheet
+   aesthetic instead of the browser's gray boxes. Reuses the .overlay/.sheet
+   styling. showConfirm → Promise<boolean>; showPrompt → Promise<string|null>
+   (null on cancel, matching native prompt). ── */
+let _appDialogResolve = null;
+function _closeAppDialog(result) {
+  const ov = document.getElementById('appDialogOverlay');
+  if (ov) ov.classList.remove('open');
+  const resolve = _appDialogResolve;
+  _appDialogResolve = null;
+  document.removeEventListener('keydown', _appDialogKey, true);
+  if (resolve) resolve(result);
+}
+function _appDialogKey(e) {
+  if (e.key === 'Escape') { e.preventDefault(); _appDialogCancel(); }
+  else if (e.key === 'Enter') {
+    const inp = document.getElementById('appDialogInput');
+    if (!inp || document.activeElement === inp) { e.preventDefault(); _appDialogOk(); }
+  }
+}
+function _appDialogOk() {
+  const inp = document.getElementById('appDialogInput');
+  _closeAppDialog(inp ? inp.value : true);
+}
+function _appDialogCancel() {
+  const inp = document.getElementById('appDialogInput');
+  _closeAppDialog(inp ? null : false);
+}
+function _appDialog({ message, kind, value = '', inputType = 'text', okLabel = 'OK', cancelLabel = 'Cancel', danger = false }) {
+  // Resolve any dialog already open (shouldn't normally happen) before opening.
+  if (_appDialogResolve) _closeAppDialog(kind === 'prompt' ? null : false);
+  let ov = document.getElementById('appDialogOverlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.className = 'overlay';
+    ov.id = 'appDialogOverlay';
+    ov.addEventListener('click', e => { if (e.target === ov) _appDialogCancel(); });
+    document.body.appendChild(ov);
+  }
+  const inputHtml = kind === 'prompt'
+    ? `<input id="appDialogInput" type="${inputType}" class="app-dialog-input" value="${escapeAttr(String(value))}">`
+    : '';
+  ov.innerHTML =
+    `<div class="sheet app-dialog-sheet" role="dialog" aria-modal="true">
+      <div class="sheet-handle"></div>
+      <p class="app-dialog-msg">${escapeHtml(message)}</p>
+      ${inputHtml}
+      <div class="app-dialog-btns">
+        <button type="button" class="pill-btn app-dialog-cancel" onclick="_appDialogCancel()">${escapeHtml(cancelLabel)}</button>
+        <button type="button" class="btn-confirm${danger ? ' danger' : ''}" style="width:auto;flex:1" onclick="_appDialogOk()">${escapeHtml(okLabel)}</button>
+      </div>
+    </div>`;
+  return new Promise(resolve => {
+    _appDialogResolve = resolve;
+    ov.classList.add('open');
+    document.addEventListener('keydown', _appDialogKey, true);
+    const inp = document.getElementById('appDialogInput');
+    if (inp) { inp.focus(); inp.select(); }
+  });
+}
+function showConfirm(message, opts = {}) {
+  return _appDialog({ message, kind: 'confirm', okLabel: opts.okLabel || 'OK', cancelLabel: opts.cancelLabel || 'Cancel', danger: !!opts.danger });
+}
+function showPrompt(message, opts = {}) {
+  return _appDialog({ message, kind: 'prompt', value: opts.value || '', inputType: opts.type || 'text', okLabel: opts.okLabel || 'OK', cancelLabel: opts.cancelLabel || 'Cancel' });
+}
+
 function openSheet(id) { document.getElementById(id).classList.add('open'); }
 function closeSheet(id) {
   if (id === 'editOverlay') editStopwatchClearTick();
@@ -13192,13 +13282,13 @@ function refreshMascotButton() {
 }
 
 /* First tap -> name prompt; subsequent taps -> recommendation based on day. */
-function onMascotClick() {
+async function onMascotClick() {
   const p = getProfData();
   ensureMascotFields(p);
   if (!p.mascotName) {
     hideMascot();
     const defaultName = activeProfile() === 'jenn' ? 'Hedwig' : 'My Owl';
-    const name = (prompt("What should I call your owl? 🦉", defaultName) || '').trim();
+    const name = ((await showPrompt("What should I call your owl? 🦉", { value: defaultName })) || '').trim();
     if (!name) return;
     p.mascotName = name.slice(0, 20);
     p.mascotIntroShown = true;
