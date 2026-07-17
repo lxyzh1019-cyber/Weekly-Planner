@@ -27,6 +27,11 @@
     --ink: #2a2320;
     --ink-light: #6b5d4f;
     --accent: #ff7b54;
+    /* Darker accent for text/UI that must meet WCAG AA: white-on-it = 4.9:1,
+       and it-as-text on cream paper = 4.8:1. Use for selected controls (white
+       label) and informational accent text; keep light --accent for decorative
+       fills and category identity. */
+    --accent-strong: #c14a24;
     --accent-pink: #ff9eb5;
     --accent-blue: #6fb1fc;
     --accent-yellow: #ffd166;
@@ -34,7 +39,7 @@
     --accent-purple: #c3aed6;
 
     --radius: 18px;
-    --radius-sm: 10px;
+    /* --radius-sm defined once in the design-token scale below (8px). */
 
     --cat-sleep:   #c3aed6;
     --cat-school:  #6fb1fc;
@@ -122,7 +127,7 @@
   .profile-header { text-align: center; margin-bottom: 2rem; }
   .profile-header h1 {
     font-family: 'Gochi Hand', cursive;
-    font-size: 3.4rem; color: var(--accent);
+    font-size: 3.4rem; color: var(--accent-strong);
     transform: rotate(-2deg);
     text-shadow: 3px 3px 0 rgba(0,0,0,0.06);
   }
@@ -914,6 +919,12 @@
     min-height: 38px;
     min-width: 38px;
   }
+  #restDayBtn { font-size: 0.9rem; }
+  #restDayBtn.on {
+    background: var(--cat-sleep);
+    border-color: var(--ink);
+    font-weight: 700;
+  }
 
   /* Weekly view toggle */
   .view-tabs {
@@ -928,7 +939,7 @@
     box-shadow: 2px 2px 0 var(--ink);
     min-height: 38px;
   }
-  .view-tab.active { background: var(--accent); color: #fff; }
+  .view-tab.active { background: var(--accent-strong); color: #fff; }
 
   /* Time-Grid weekly view: 7-column × hour-row grid that visualizes free time */
   .tg-wrap { padding: 0 0.5rem 0.5rem; overflow-x: auto; }
@@ -1188,7 +1199,7 @@
   .tg-mytime-value {
     font-family: 'Gochi Hand', cursive;
     font-size: 1.8rem;
-    color: var(--accent);
+    color: var(--accent-strong);
     font-weight: 700;
   }
   .tg-mytime-bricks {
@@ -1247,7 +1258,7 @@
   .day-card.today::after {
     content:'today'; position:absolute; top: -8px; right: -4px;
     font-family: 'Caveat', cursive; font-size: 0.9rem;
-    background: var(--accent); color:#fff; padding: 1px 8px;
+    background: var(--accent-strong); color:#fff; padding: 1px 8px;
     border-radius: 10px; transform: rotate(5deg);
     border: 1.5px solid var(--ink);
   }
@@ -1401,7 +1412,7 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 1.04rem; flex-shrink: 0; cursor: pointer;
   }
-  .gt-item.done .gt-check { background: var(--accent); color: #fff; }
+  .gt-item.done .gt-check { background: var(--accent-strong); color: #fff; }
   .gt-day-tag {
     font-size: 0.83rem; font-weight: 800;
     padding: 1px 6px; border: 1.5px solid var(--ink); border-radius: 8px;
@@ -1473,7 +1484,7 @@
     cursor: pointer;
     flex-shrink: 0;
   }
-  .ct-check.on { background: var(--accent); color: #fff; }
+  .ct-check.on { background: var(--accent-strong); color: #fff; }
   button.ct-check { padding: 0; font: inherit; line-height: 1; }
   button.ct-check:disabled { cursor: default; opacity: 0.8; }
   button.ct-check:focus-visible { outline: 3px solid var(--accent-blue); outline-offset: 2px; }
@@ -1499,7 +1510,7 @@
   .money-hero b { font-family: 'Gochi Hand', cursive; font-size: 1.6rem; }
   .money-market { background: var(--accent-yellow); border: 2px solid var(--ink); border-radius: 999px; padding: 0.2rem 0.6rem; font-weight: 800; font-size: 0.85rem; }
   .money-btn-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.4rem; }
-  .ct-cap-note { color: var(--accent); font-weight: 700; }
+  .ct-cap-note { color: var(--accent-strong); font-weight: 700; }
   /* override .custom-builder label/input defaults for the in-editor chore checklist */
   .custom-builder label.cg-chore-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; margin-bottom: 0; font-family: 'Nunito', sans-serif; font-size: 0.95rem; color: var(--ink); cursor: pointer; }
   .custom-builder #cgChoreList input[type="checkbox"] {
@@ -1756,7 +1767,7 @@
     font-size: 1.27rem; padding: 0.35rem 0.78rem;
   }
   .btn-template {
-    background: var(--accent); color: #fff;
+    background: var(--accent-strong); color: #fff;
     border: 2px solid var(--ink);
     border-radius: 12px; padding: 0.35rem 0.8rem;
     cursor: pointer; font-size: 0.9rem; font-weight: 700;
@@ -1778,7 +1789,7 @@
     text-align: center;
     font-family: 'Gochi Hand', cursive;
     font-size: 1.2rem;
-    color: var(--accent);
+    color: var(--accent-strong);
     letter-spacing: 1px;
   }
 
@@ -1929,8 +1940,8 @@
     left: 4px;
     font-family: 'Gochi Hand', cursive;
     font-size: 0.9rem;
-    color: var(--accent);
-    opacity: 0.6;
+    color: var(--accent-strong);
+    opacity: 0.9;
     pointer-events: none;
     z-index: 1;
   }
@@ -2160,7 +2171,7 @@
     display: inline-flex;
     align-items: center;
   }
-  .filter-chip.active { background: var(--accent); color: #fff; }
+  .filter-chip.active { background: var(--accent-strong); color: #fff; }
 
   .tray-scroll {
     display: flex; gap: 0.5rem;
@@ -2215,7 +2226,7 @@
     font-size: 0.98rem; font-weight: 700;
     font-family: 'Patrick Hand', sans-serif;
   }
-  .chip-add:hover { border-color: var(--accent); color: var(--accent); }
+  .chip-add:hover { border-color: var(--accent-strong); color: var(--accent-strong); }
 
   /* ═══════════ OVERLAYS / SHEETS ═══════════ */
   .overlay {
@@ -2239,6 +2250,28 @@
     max-height: 88vh;
     overflow-y: auto;
   }
+  /* Styled confirm/prompt dialog (promise-based, replaces native dialogs) */
+  #appDialogOverlay { align-items: center; justify-content: center; z-index: 500; }
+  .app-dialog-sheet {
+    width: min(420px, 92vw);
+    border-radius: 22px;
+    border: 3px solid var(--ink);
+    box-shadow: 6px 6px 0 var(--ink);
+    text-align: center;
+  }
+  .app-dialog-msg {
+    font-size: 1.1rem; font-weight: 700; margin: 0.4rem 0 0.9rem;
+    white-space: pre-line; line-height: 1.35;
+  }
+  .app-dialog-input {
+    width: 100%; padding: 0.7rem 0.9rem; font-size: 1.1rem;
+    font-family: 'Patrick Hand', sans-serif;
+    border: 2px solid var(--ink); border-radius: 12px;
+    background: #fff; color: var(--ink); margin-bottom: 0.9rem;
+  }
+  .app-dialog-input:focus { outline: 3px solid var(--accent-strong); outline-offset: 1px; }
+  .app-dialog-btns { display: flex; gap: 0.6rem; align-items: center; }
+  .app-dialog-cancel { flex: 0 0 auto; }
   .sheet-close-x {
     position: absolute;
     top: 10px;
@@ -2364,7 +2397,7 @@
   .wins-btn { border: 1.5px solid var(--ink); background: var(--accent-yellow); border-radius: 999px; padding: 0.1rem 0.5rem; font-weight: 800; font-size: 0.8rem; cursor: pointer; font-family: 'Patrick Hand', sans-serif; }
   .wins-btn:hover { background: #ffe08a; }
   /* Weekly wins recap modal */
-  .wins-hero { text-align: center; font-family: 'Gochi Hand', cursive; font-size: 1.3rem; color: var(--accent); margin-bottom: 0.6rem; }
+  .wins-hero { text-align: center; font-family: 'Gochi Hand', cursive; font-size: 1.3rem; color: var(--accent-strong); margin-bottom: 0.6rem; }
   .wins-stat-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
   .wins-stat { flex: 1; text-align: center; border: 2px solid var(--ink); border-radius: 12px; padding: 0.5rem 0.25rem; background: var(--bg2); }
   .wins-num { font-family: 'Gochi Hand', cursive; font-size: 1.5rem; font-weight: 800; color: var(--ink); }
@@ -2508,7 +2541,7 @@
     min-height: 38px;
   }
   .pill-btn:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
-  .pill-btn.active { background: var(--accent); color: #fff; }
+  .pill-btn.active { background: var(--accent-strong); color: #fff; }
 
   .objectives-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.8rem; }
   .obj-item {
@@ -2520,7 +2553,7 @@
   }
   .obj-item.checked { background: var(--accent-yellow); }
   .obj-check { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--ink); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; background:#fff; }
-  .obj-item.checked .obj-check { background: var(--accent); color: #fff; }
+  .obj-item.checked .obj-check { background: var(--accent-strong); color: #fff; }
   .obj-item .obj-meta { margin-left: auto; font-size: 0.75rem; color: var(--ink-light); }
   .obj-item .obj-delete { margin-left: 0.4rem; color: #ef476f; font-weight: 800; padding: 0 4px; }
 
@@ -2575,11 +2608,11 @@
     font-family: 'Patrick Hand', sans-serif;
     box-shadow: 2px 2px 0 var(--ink);
   }
-  .day-pick.active { background: var(--accent); color: #fff; }
+  .day-pick.active { background: var(--accent-strong); color: #fff; }
   .day-pick-presets { display:flex; gap: 0.3rem; margin-bottom: 0.4rem; flex-wrap:wrap; }
 
   .btn-confirm {
-    width: 100%; background: var(--accent); color: #fff;
+    width: 100%; background: var(--accent-strong); color: #fff;
     border: 2px solid var(--ink); border-radius: 14px; padding: 0.85rem;
     font-size: 1.1rem; font-weight: 700; font-family: 'Gochi Hand', cursive;
     cursor: pointer; box-shadow: 3px 3px 0 var(--ink);
@@ -2661,7 +2694,7 @@
   }
   @keyframes floatIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
   .ritual-screen button {
-    margin-top: 1rem; background: #fff; color: var(--accent);
+    margin-top: 1rem; background: #fff; color: var(--accent-strong);
     border: 2px solid var(--ink); border-radius: 20px;
     padding: 0.7rem 1.8rem; font-size: 1.1rem; font-weight: 700;
     cursor: pointer; font-family: 'Gochi Hand', cursive;
@@ -2968,7 +3001,7 @@
   .time-display {
     font-family: 'Gochi Hand', cursive;
     font-size: 1.5rem;
-    color: var(--accent);
+    color: var(--accent-strong);
     padding: 0.3rem 0.7rem;
     background: var(--bg2);
     border: 2px solid var(--ink);
@@ -3012,7 +3045,7 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 1rem; flex-shrink: 0; cursor: pointer;
   }
-  .checklist-item.checked .checklist-check { background: var(--accent); color: #fff; }
+  .checklist-item.checked .checklist-check { background: var(--accent-strong); color: #fff; }
   .checklist-text { flex: 1; font-size: 1.09rem; }
   .checklist-timer-btn {
     background: var(--accent-yellow); border: 2px solid var(--ink);
@@ -3023,7 +3056,7 @@
     flex-shrink: 0;
   }
   .checklist-timer-btn.running {
-    background: var(--accent); color: #fff; animation: pulse 1s infinite;
+    background: var(--accent-strong); color: #fff; animation: pulse 1s infinite;
   }
   .checklist-item input.timer-input {
     width: 56px; border: 1.5px solid var(--ink); border-radius: 6px;
@@ -3203,7 +3236,7 @@
   /* Plan-from-home: add a quest without leaving the Quest Board. */
   .quest-add-btn {
     display: block; width: 100%; margin: 0.1rem 0 0.7rem;
-    background: var(--accent); color: #fff;
+    background: var(--accent-strong); color: #fff;
     border: 3px solid var(--ink); border-radius: 14px;
     box-shadow: 3px 3px 0 var(--ink);
     padding: 0.6rem 0.9rem; font-weight: 800; cursor: pointer;
@@ -3351,7 +3384,7 @@
   }
   .quest-popup-icon { font-size: 3.2rem; margin-bottom: 0.3rem; }
   .quest-popup-title {
-    font-size: 1.35rem; font-weight: 800; color: var(--accent);
+    font-size: 1.35rem; font-weight: 800; color: var(--accent-strong);
     text-transform: uppercase; letter-spacing: 1px;
   }
   .quest-popup-xp {
@@ -3541,13 +3574,13 @@
   <div class="profile-motto">
     <p>✨ Plan what matters — the rest of the time is yours ✨</p>
     <div class="profile-message">
-      This planner is not a set of "rules" to follow, nor is it a clock meant to rush you. Think of it as your Blueprint for Freedom.<br><br>
-      In the world of elite performance, the greatest athletes are not just those who train the hardest, but those who own their day. When you master your schedule, you transition from being "busy" to being intentional.<br><br>
-      By using this tool, you are choosing to:<br>
-      Design Your Success: Carve out the time needed to sharpen your skills.<br>
-      Protect Your Joy: Ensure there is always space for rest, play, and the things that make you smile.<br>
-      Lead Yourself: Develop the discipline that separates the good from the great.<br><br>
-      Remember: Do not let the clock run you; you run the clock. You are the conductor of your own symphony. Let's make every week a masterpiece of progress and resilience.
+      This planner is yours. It's not a list of rules to follow, and it's not a clock telling you to hurry. Think of it as a way to make room for the things you care about.<br><br>
+      Pick a few things that matter to you this week — then the rest of the time is yours to rest, play, and explore. You don't have to fill every minute. Some weeks are busy and some are slow, and both are okay.<br><br>
+      Here's the idea:<br>
+      Make Space: Set aside time for the things you want to get better at.<br>
+      Protect Your Joy: Always keep room for rest, play, and the things that make you smile.<br>
+      Lead Yourself: It's your day — you get to choose how it goes.<br><br>
+      Remember: you're in charge of your own day. Be kind to yourself, try things, and enjoy the week.
     </div>
   </div>
   <p style="position:absolute;bottom:1rem;color:var(--ink-light);font-size:0.8rem">
@@ -3800,6 +3833,7 @@
         </div>
       </div>
       <div style="display:flex;gap:0.4rem;align-items:center" class="day-topbar-actions">
+        <button class="btn-icon" id="restDayBtn" onclick="toggleRestDay(currentDayKey)" aria-label="Mark rest day" title="Mark today a rest day">😌 Rest</button>
         <button class="btn-icon" onclick="openTemplateSheet()" aria-label="Apply template">📋</button>
         <button class="btn-icon" onclick="openReflectSheet()" aria-label="Reflect on today">🌙</button>
         <button class="profile-badge" onclick="goProfile()" id="dayProfileBadge" aria-label="Switch profile"></button>
@@ -3936,7 +3970,10 @@
     <div class="topbar-left">
       <h2>Parent Dashboard</h2>
     </div>
-    <button class="btn-icon" onclick="goProfile()">Exit</button>
+    <div style="display:flex;gap:0.4rem;align-items:center">
+      <button class="btn-icon" onclick="changeParentPin()" title="Change parent PIN">🔒 PIN</button>
+      <button class="btn-icon" onclick="goProfile()">Exit</button>
+    </div>
   </div>
 
   <div style="padding:0.8rem 1rem 0">
@@ -4031,7 +4068,7 @@
   </div>
 
   <div style="padding:0 0.8rem 0.4rem;font-size:0.85rem;color:var(--ink-light)">
-    Color shows planning density per day. Tap a day to open it.
+    Color shows how much each day is <b>planned</b> — not how much was completed. Tap a day to open it.
   </div>
 
   <div class="pm-grid-wrap">
@@ -4963,7 +5000,7 @@ const ROUTINE_PRESETS = {
 
 /* Seasonal/rare activities — unlock by season */
 function getCurrentSeason() {
-  const m = new Date().getMonth(); // 0..11
+  const m = formatDayKey(toDayKeyInZone(new Date())).getMonth(); // 0..11, app timezone
   if ([2,3,4].includes(m)) return 'spring';
   if ([5,6,7].includes(m)) return 'summer';
   if ([8,9,10].includes(m)) return 'autumn';
@@ -5018,6 +5055,7 @@ let state = {
     customTasks: [],
     invites: [],
     routineTemplates: [],  // custom routines: {id, title, icon, items:[{id,text,timerSec}]}
+    parentPin: '1234',     // soft child-lock, parent-configurable (NOT a security boundary)
   }
 };
 
@@ -5138,8 +5176,24 @@ function getGetReadyBufMin(block) {
   if (!block || !block.getReadyBuffer) return 0;
   return clampBufferMin(block.getReadyBufMin != null ? block.getReadyBufMin : DEFAULT_BUFFER_MIN);
 }
+let localSaveFailed = false;
 function saveLocal() {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e){}
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+    // Recovered: a previously-failed write now succeeds.
+    if (localSaveFailed) {
+      localSaveFailed = false;
+      if (typeof showToast === 'function') showToast('✅ Saving works again on this device');
+    }
+  } catch(e) {
+    // Quota exceeded, private mode, or storage blocked. Warn once per transition
+    // (not on every keystroke) so the child/parent knows data isn't persisting.
+    console.error('localStorage save failed', e);
+    if (!localSaveFailed) {
+      localSaveFailed = true;
+      if (typeof showToast === 'function') showToast('⚠️ Couldn\'t save on this device — storage may be full');
+    }
+  }
 }
 function pushToFirebase() {
   if (!fbDocRef || !fbConnected) {
@@ -5285,6 +5339,7 @@ function getProfData(p=activeProfile()) {
   if (prof.progress.tasksCompleted == null) prof.progress.tasksCompleted = 0;   // lifetime completions
   if (!prof.progress.completedByCat) prof.progress.completedByCat = {};         // per-category completions
   if (prof.progress.streakFreezeTokens == null) prof.progress.streakFreezeTokens = 1;
+  if (!prof.progress.restDays) prof.progress.restDays = {};                     // {[dayKey]:true} — kid-marked days off
   if (!prof.progress.streakFreezeWeek) prof.progress.streakFreezeWeek = dateToLocalKey(getWeekStart(weekOffset));
   const wk = dateToLocalKey(getWeekStart(weekOffset));
   if (prof.progress.streakFreezeWeek !== wk) {
@@ -5522,6 +5577,46 @@ function offerTutorialIfNeeded() {
   // not via a pop-up that blocks the first day they try to plan.
 }
 
+/* ── Rest days: a kid can mark a day as "off". Rest days are celebrated (rest is
+   part of the plan) and never count against a streak — the gap logic below
+   subtracts them so a planned day off doesn't break the streak. ── */
+function isRestDay(dayKey, kid = activeProfile()) {
+  const pd = getProfData(kid);
+  return !!(pd && pd.progress && pd.progress.restDays && pd.progress.restDays[dayKey]);
+}
+function toggleRestDay(dayKey) {
+  const pd = getProfData();
+  if (!pd.progress.restDays) pd.progress.restDays = {};
+  const on = !pd.progress.restDays[dayKey];
+  if (on) pd.progress.restDays[dayKey] = true;
+  else delete pd.progress.restDays[dayKey];
+  saveAll();
+  showToast(on ? 'Rest day set — rest is part of the plan 💛' : 'Rest day removed');
+  if (typeof buildTimeline === 'function') buildTimeline();
+  refreshRestDayButton();
+}
+// Reflect the current day's rest state on the day-view toggle button.
+function refreshRestDayButton() {
+  const btn = document.getElementById('restDayBtn');
+  if (!btn || !currentDayKey) return;
+  const on = isRestDay(currentDayKey);
+  btn.classList.toggle('on', on);
+  btn.textContent = on ? '😌 Resting' : '😌 Rest';
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+}
+// Count kid-marked rest days strictly between two day keys (exclusive both ends).
+function countRestDaysBetween(fromKey, toKey, kid = activeProfile()) {
+  let n = 0;
+  const d = formatDayKey(fromKey);
+  const end = formatDayKey(toKey);
+  d.setDate(d.getDate() + 1);
+  while (d < end) {
+    if (isRestDay(dateToLocalKey(d), kid)) n++;
+    d.setDate(d.getDate() + 1);
+  }
+  return n;
+}
+
 function markRoutineProgressOnChecklistToggle(block, act, prevDone, nextDone, total) {
   if (!act?.isRoutine || !total) return;
   if (prevDone >= total || nextDone < total) return;
@@ -5535,8 +5630,11 @@ function markRoutineProgressOnChecklistToggle(block, act, prevDone, nextDone, to
   if (st.lastDay === today) return;
   if (!st.lastDay) st.count = 1;
   else {
-    const gapDays = Math.round((formatDayKey(today) - formatDayKey(st.lastDay)) / (24*60*60*1000));
-    if (gapDays === 1) st.count += 1;
+    const rawGap = Math.round((formatDayKey(today) - formatDayKey(st.lastDay)) / (24*60*60*1000));
+    // Planned rest days between the two active days don't count against the
+    // streak, so a kid who marks a day off keeps their progress.
+    const gapDays = rawGap - countRestDaysBetween(st.lastDay, today);
+    if (gapDays <= 1) st.count += 1;
     else if (gapDays === 2) {
       // Forgiving streak: one missed day is always forgiven, so a single
       // off-day never wipes out the child's progress.
@@ -5783,7 +5881,30 @@ function showScreen(id) {
   }
 }
 
-const PARENT_PIN = '1234';
+/* Parent PIN — a *soft* child-lock, not real security (anyone reading the
+   source or the synced state can see it). Stored per-family in shared state so a
+   parent can change it; defaults to '1234'. A real gate needs Firebase Auth +
+   scoped Firestore rules (see SECURITY_TODO.md). */
+function getParentPin() {
+  const pin = state.shared && state.shared.parentPin;
+  return (pin != null && String(pin).length) ? String(pin) : '1234';
+}
+function setParentPin(newPin) {
+  if (!state.shared) state.shared = {};
+  state.shared.parentPin = String(newPin);
+  saveAll();
+}
+// Parent-hub control: change the family PIN (verifies the current one first).
+async function changeParentPin() {
+  const cur = ((await showPrompt('Enter your current PIN 🔒', { type:'password' })) || '').trim();
+  if (cur !== getParentPin()) { showToast('Incorrect PIN'); return; }
+  const next = ((await showPrompt('New PIN (numbers work best):', { type:'password' })) || '').trim();
+  if (!next) { showToast('PIN unchanged'); return; }
+  const confirm2 = ((await showPrompt('Re-enter the new PIN:', { type:'password' })) || '').trim();
+  if (next !== confirm2) { showToast('PINs didn\'t match — unchanged'); return; }
+  setParentPin(next);
+  showToast('✅ Parent PIN updated');
+}
 let parentUnlockedThisSession = false;
 
 /* ── Hero Mode (Quest Board) — simplified gamified landing for kids ── */
@@ -5806,10 +5927,10 @@ function refreshHeroModeToggle() {
   btn.classList.toggle('on', on);
 }
 
-function selectProfile(p) {
+async function selectProfile(p) {
   if (p === 'parent' && !parentUnlockedThisSession) {
-    const pin = (prompt('Enter parent PIN 🔒') || '').trim();
-    if (pin !== PARENT_PIN) {
+    const pin = ((await showPrompt('Enter parent PIN 🔒', { type:'password' })) || '').trim();
+    if (pin !== getParentPin()) {
       showToast('Incorrect PIN');
       return;
     }
@@ -6114,24 +6235,30 @@ function completeQuest(blockId) {
   if (blk.completed) return;
 
   blk.completed = true;
-  blk.xpAwarded = true; // mark so a later quick-check elsewhere won't re-award
   markItemUpdated(blk); // stamp so the completion wins cross-device merges
   const acts = getAllActivities();
   const act = acts.find(a => a.id === blk.actId) || { name:'Quest', icon:'⭐' };
-  const result = addQuestXP(QUEST_XP_PER_TASK);
-  // Fire the same routine/chore links the week & day views now use.
-  awardBlockLinks(blk, key);
+  // awardBlockLinks is the single source of truth: it awards XP, counts the
+  // completion toward sticker milestones, and fires routine/chore links. Do NOT
+  // pre-set xpAwarded here — that would skip the sticker counting (bug: quest
+  // board taps never advanced the sticker shelf shown right on this screen).
+  const result = awardBlockLinks(blk, key);
   setDayBlocks(key, blocks);
 
   showQuestCompletePopup(act, result);
   spawnQuestSparkles();
   renderQuestBoard();
 
-  // Check Mission Clear after popup
+  // After the popup: full clear → Mission Clear; partial progress → a warm,
+  // low-pressure nudge (never nothing, so off days don't feel like failure).
   setTimeout(()=>{
-    const remaining = (getDayBlocks(key)||[]).filter(b => b && b.startMin!=null && !b.completed);
+    const scheduled = (getDayBlocks(key)||[]).filter(b => b && b.startMin!=null);
+    const remaining = scheduled.filter(b => !b.completed);
     if (remaining.length === 0) {
       showMissionClear();
+    } else {
+      const done = scheduled.length - remaining.length;
+      showToast(`${done} of ${scheduled.length} done — nice work! 🌟 The rest can wait.`);
     }
   }, 1100);
 }
@@ -6139,17 +6266,23 @@ function completeQuest(blockId) {
 /* Unified completion rewards: award XP once per block (sticky, never removed
    or double-counted) and fire the routine → mandatory and House-Chore → money
    links. Called from every completion path (quick-check, quest board, edit
-   sheet) so a tick anywhere counts the same. Returns a short XP suffix for
-   the toast. */
+   sheet) so a tick anywhere counts the same. This is the SINGLE source of truth
+   for XP + sticker/task counting — callers must NOT award XP or set xpAwarded
+   themselves (doing so silently skips the sticker counting below). Returns
+   { msg, leveledUp, newLevel } — msg is a short toast suffix; the level fields
+   feed the quest-complete popup. */
 function awardBlockLinks(blk, dayKey) {
   let msg = '';
+  let leveledUp = false, newLevel = null;
   const kid = isParent() ? parentViewing : activeProfile();
   const act = getAllActivities().find(a => a.id === blk.actId);
   if (!blk.xpAwarded) {
     blk.xpAwarded = true;
     const r = addQuestXP(QUEST_XP_PER_TASK);
+    leveledUp = !!(r && r.leveledUp);
+    newLevel = r && r.newLevel;
     msg = ` +${QUEST_XP_PER_TASK} XP`;
-    if (r && r.leveledUp) msg += ' • LEVEL UP! 🎉';
+    if (leveledUp) msg += ' • LEVEL UP! 🎉';
     // Count the completion toward the collectible-sticker milestones (#8).
     const pd = getProfData(kid);
     if (pd && pd.progress) {
@@ -6164,7 +6297,7 @@ function awardBlockLinks(blk, dayKey) {
   }
   if (act && act.isRoutine && act.routineId) ctAwardMandatoryFromRoutine(act.routineId, kid, dayKey);
   if (blk.actId === 'chores') ctAutoCheckOptionalFromBlock(blk, dayKey);
-  return msg;
+  return { msg, leveledUp, newLevel };
 }
 
 /* ── #5 Parent "proud of you" stamp: a warm mark a parent drops on a block ── */
@@ -6241,7 +6374,7 @@ function toggleBlockDone(dayKey, blockId, ev) {
   markItemUpdated(blk); // stamp so the completion wins cross-device merges
   const nowDone = blk.completed;
   let extra = '';
-  if (nowDone) extra = awardBlockLinks(blk, dayKey);
+  if (nowDone) extra = awardBlockLinks(blk, dayKey).msg;
   setDayBlocks(dayKey, blocks);
   const active = document.querySelector('.screen.active');
   if (active && active.id === 'screen-week') renderWeek();
@@ -6365,7 +6498,9 @@ function renderWeek() {
 
   const coachEl = document.getElementById('weekCoachTip');
   if (coachEl) {
-    const isSunday = new Date().getDay() === 0;
+    // Use the app's timezone (America/Edmonton) rather than the device clock so
+    // the Sunday nudge lands on the same day boundary as all the week/day keys.
+    const isSunday = formatDayKey(toDayKeyInZone(new Date())).getDay() === 0;
     if (isSunday && weekOffset === 0 && !weekReviewDismissed) {
       // Sunday weekly-review nudge: a gentle look-back with a mini summary,
       // shown to parent and child alike so they can reflect together.
@@ -7359,6 +7494,7 @@ function setDayMood(m) {
 
 function buildTimeline() {
   if (activeStopwatchTick) { clearInterval(activeStopwatchTick); activeStopwatchTick = null; }
+  refreshRestDayButton();
   const tl = document.getElementById('timeline');
   const topbar = document.querySelector('#screen-day .day-topbar');
   tl.innerHTML = '';
@@ -8424,7 +8560,7 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
   document.getElementById('trayHint').textContent = 'Tap an activity to pick';
 }
 
-function removeBlock() {
+async function removeBlock() {
   if (!editingBlockId) return;
   const blocks = getDayBlocks(currentDayKey);
   const blk = blocks.find(b=>b.id===editingBlockId);
@@ -8436,7 +8572,7 @@ function removeBlock() {
   if (blk?.seriesId) {
     const siblings = countSeriesBlocks(blk.seriesId);
     if (siblings > 1) {
-      const all = confirm(`This block is part of a series of ${siblings}.\n\nOK = remove ALL in series\nCancel = remove only this one`);
+      const all = await showConfirm(`This block is part of a series of ${siblings}.\n\nOK = remove ALL in series\nCancel = remove only this one`, { okLabel:'Remove all', cancelLabel:'Only this' });
       if (all) {
         deleteSeriesBlocks(blk.seriesId);
         closeSheet('editOverlay');
@@ -9528,7 +9664,7 @@ function toggleEditTravelBuffer() {
   renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin);
 }
 
-function saveEditChanges() {
+async function saveEditChanges() {
   if (!editingBlockId) return;
   editStopwatchPause();
   const blocks = getDayBlocks(currentDayKey);
@@ -9586,7 +9722,7 @@ function saveEditChanges() {
   if (blk.seriesId && fieldsChanged) {
     const siblings = countSeriesBlocks(blk.seriesId);
     if (siblings > 1) {
-      applyToSeries = confirm(`This block is part of a series of ${siblings}.\n\nOK = update ALL in series\nCancel = update only this one`);
+      applyToSeries = await showConfirm(`This block is part of a series of ${siblings}.\n\nOK = update ALL in series\nCancel = update only this one`, { okLabel:'Update all', cancelLabel:'Only this' });
     }
   }
 
@@ -9780,7 +9916,7 @@ function toggleConfirm() {
 }
 
 /* Parent: confirm every block on the current day in one tap. */
-function confirmAllToday() {
+async function confirmAllToday() {
   if (!isParent()) return;
   const blocks = getDayBlocks(currentDayKey);
   const unconfirmed = blocks.filter(b => !b.confirmed);
@@ -9788,7 +9924,7 @@ function confirmAllToday() {
     showToast('Already all confirmed ✅');
     return;
   }
-  if (!confirm(`Confirm all ${unconfirmed.length} block${unconfirmed.length===1?'':'s'} for this day?`)) return;
+  if (!(await showConfirm(`Confirm all ${unconfirmed.length} block${unconfirmed.length===1?'':'s'} for this day?`))) return;
   unconfirmed.forEach(b => { b.confirmed = true; });
   setDayBlocks(currentDayKey, blocks);
   recountActivityProgress();
@@ -9834,8 +9970,8 @@ function applyTemplate(type) {
   showToast(`${type==='school'?'🏫 School':'🌈 Weekend'} template applied!`);
 }
 
-function clearDay() {
-  if (!confirm('Clear all blocks for this day?')) return;
+async function clearDay() {
+  if (!(await showConfirm('Clear all blocks for this day?', { danger:true, okLabel:'Clear' }))) return;
   setDayBlocks(currentDayKey, []);
   buildTimeline();
   showToast('Day cleared 🗑');
@@ -10165,7 +10301,7 @@ function renderSync() {
   renderInvites();
 }
 
-function sendInvite(block, to) {
+async function sendInvite(block, to) {
   const sisterName = to==='jenn'?'Jenn':'Jess';
   const act = getAllActivities(profile).find(a=>a.id===block.actId) || getAllActivities().find(a=>a.id===block.actId);
   const receiverAct = getAllActivities(to).find(a=>a.id===block.actId);
@@ -10177,7 +10313,7 @@ function sendInvite(block, to) {
   const day = currentDayKey || getDayKeys(weekOffset)[syncDayIdx];
   const dayDate = formatDayKey(day);
   const dayIdx = (dayDate.getDay()+6)%7;
-  const ok = confirm(`Share ${activityLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(block.startMin)} with ${sisterName}?`);
+  const ok = await showConfirm(`Share ${activityLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(block.startMin)} with ${sisterName}?`, { okLabel:'Share' });
   if (!ok) return;
   const inv = {
     id: 'inv-'+Date.now().toString(36),
@@ -10258,8 +10394,12 @@ function renderChallenges() {
             <span>${count}/${c.target}</span>
           </div>`;
       }).join('');
+      const teamNote = c.who==='both'
+        ? `<div class="ct-meta" style="font-style:italic;margin-bottom:0.2rem">You're a team on this one — cheer each other on! 🤝</div>`
+        : '';
       card.innerHTML = `
         <div class="challenge-title">${c.title}</div>
+        ${teamNote}
         ${rows}
         <div style="display:flex;justify-content:flex-end;margin-top:0.4rem">
           <button class="btn-icon" onclick="deleteChallenge('${c.id}')" style="padding:2px 8px">🗑</button>
@@ -10536,8 +10676,8 @@ function approveKidActivity(owner, id) {
   renderParentActivities();
   showToast('Approved ✅');
 }
-function rejectKidActivity(owner, id) {
-  if (!confirm('Remove this activity the child added?')) return;
+async function rejectKidActivity(owner, id) {
+  if (!(await showConfirm('Remove this activity the child added?', { danger:true, okLabel:'Remove' }))) return;
   const arr = (state.profiles[owner] && state.profiles[owner].customActivities) || [];
   const idx = arr.findIndex(x => x.id === id);
   if (idx < 0) return;
@@ -10688,7 +10828,7 @@ function confirmParentActivity() {
   showToast('Activity added ✅');
 }
 
-function deleteParentActivity(owner, id) {
+async function deleteParentActivity(owner, id) {
   // Count how many placed blocks reference this activity across both kids' weeks
   const refs = countBlocksUsingActivity(id);
   let msg;
@@ -10697,7 +10837,7 @@ function deleteParentActivity(owner, id) {
   } else {
     msg = `⚠️ This activity is used in ${refs} placed block${refs===1?'':'s'}.\n\nOK = delete the activity AND all ${refs} block${refs===1?'':'s'}\nCancel = keep everything`;
   }
-  if (!confirm(msg)) return;
+  if (!(await showConfirm(msg, { danger:true, okLabel:'Delete' }))) return;
   // Remove the activity definition
   removeParentActivity(owner, id);
   // Cascade-delete every referencing block from both kids
@@ -10732,10 +10872,10 @@ function countBlocksUsingActivity(actId) {
 }
 
 /* Promote a child-only activity to shared, or demote a shared back to a single child. */
-function toggleShareActivity(owner, id) {
+async function toggleShareActivity(owner, id) {
   if (owner === 'shared') {
     // Demote: ask which child to give it to
-    const which = prompt('Move this activity to which child?\n\nType "jenn" or "jess":', 'jenn');
+    const which = await showPrompt('Move this activity to which child?\n\nType "jenn" or "jess":', { value:'jenn' });
     if (!which) return;
     const target = which.trim().toLowerCase();
     if (target !== 'jenn' && target !== 'jess') { showToast('Type jenn or jess'); return; }
@@ -10887,8 +11027,8 @@ function openEditBuiltInRoutine(id) {
   openSheet('newRoutineOverlay');
 }
 
-function resetBuiltInRoutine(id) {
-  if (!confirm('Reset this routine to the built-in default? Your edits will be lost.')) return;
+async function resetBuiltInRoutine(id) {
+  if (!(await showConfirm('Reset this routine to the built-in default? Your edits will be lost.', { danger:true, okLabel:'Reset' }))) return;
   if (state.shared.builtInRoutineOverrides) delete state.shared.builtInRoutineOverrides[id];
   saveAll();
   renderRoutinesList();
@@ -11050,8 +11190,8 @@ function confirmRoutine() {
   showToast('Routine created ✨');
 }
 
-function deleteRoutine(id) {
-  if (!confirm('Delete this routine?')) return;
+async function deleteRoutine(id) {
+  if (!(await showConfirm('Delete this routine?', { danger:true, okLabel:'Delete' }))) return;
   state.shared.routineTemplates = (state.shared.routineTemplates||[]).filter(r=>r.id!==id);
   // Remove matching activity from both kids
   ['jenn','jess'].forEach(p=>{
@@ -11179,8 +11319,8 @@ function buildGoalRow(g) {
   del.className = 'gt-del';
   del.textContent = '×';
   del.title = 'Remove';
-  del.onclick = ()=>{
-    if (!confirm('Remove this goal?')) return;
+  del.onclick = async ()=>{
+    if (!(await showConfirm('Remove this goal?', { danger:true, okLabel:'Remove' }))) return;
     const p = getProfData();
     p.goals = p.goals.filter(x=>x.id!==g.id);
     saveAll();
@@ -11325,9 +11465,9 @@ function buildAchievementRow(a) {
   const pick = document.createElement('button');
   pick.className='pill-btn';
   pick.textContent='Link activity';
-  pick.onclick = ()=>{
+  pick.onclick = async ()=>{
     const names = acts.map((x,i)=>`${i+1}. ${x.icon} ${x.name}`).join('\n');
-    const idx = parseInt(prompt('Activity number:\n'+names, '1')||'',10)-1;
+    const idx = parseInt((await showPrompt('Activity number:\n'+names, { value:'1', type:'number' }))||'',10)-1;
     if (Number.isNaN(idx) || idx<0 || idx>=acts.length) return;
     setAchievementActivity(a.id, acts[idx].id);
   };
@@ -11336,8 +11476,8 @@ function buildAchievementRow(a) {
   const targetBtn = document.createElement('button');
   targetBtn.className = 'pill-btn';
   targetBtn.textContent = `Target: ${targetLabel}`;
-  targetBtn.onclick = ()=>{
-    const next = parseInt(prompt(`Set target (${a.mode==='duration'?'minutes':'count'})`, String(targetVal))||'', 10);
+  targetBtn.onclick = async ()=>{
+    const next = parseInt((await showPrompt(`Set target (${a.mode==='duration'?'minutes':'count'})`, { value:String(targetVal), type:'number' }))||'', 10);
     if (!Number.isInteger(next) || next < 1) return;
     setAchievementTarget(a.id, next);
   };
@@ -11404,12 +11544,12 @@ function setAchievementTarget(id, target) {
   renderGoalsTodos();
 }
 
-function addTodo() {
+async function addTodo() {
   const p = getProfData();
   ensureGtFields(p);
   const acts = getAllActivities();
   const entries = acts.map((x,i)=>`${i+1}. ${x.icon} ${x.name}`).join('\n');
-  const pick = prompt(`Link this weekly to-do to an activity series?\nEnter activity number (or leave blank for manual to-do):\n${entries}`, '');
+  const pick = await showPrompt(`Link this weekly to-do to an activity series?\nEnter activity number (or leave blank for manual to-do):\n${entries}`, { value:'' });
   let linkActId = null;
   if (pick && pick.trim()) {
     const idx = parseInt(pick.trim(), 10) - 1;
@@ -11652,43 +11792,43 @@ function renderMoneyScreen() {
   html += `</div>`;
   wrap.innerHTML = html;
 }
-function moneyPromptAmount(label, max) {
-  const v = prompt(`${label}\nHow much? (max $${max.toFixed(2)})`, '');
+async function moneyPromptAmount(label, max) {
+  const v = await showPrompt(`${label}\nHow much? (max $${max.toFixed(2)})`, { value:'', type:'number' });
   if (v == null) return null;
   const a = money2(parseFloat(v));
   if (!a || a <= 0) return null;
   return Math.min(a, max);
 }
-function moneyAction(kind) {
+async function moneyAction(kind) {
   const kid = moneyKid; const w = ensureWallet(kid);
-  if (kind === 'deposit') { const a = moneyPromptAmount('Move Cash → Savings', w.cash); if (a) { moneyDeposit(kid, a); renderMoneyScreen(); } }
-  else if (kind === 'withdraw') { const a = moneyPromptAmount('Move Savings → Cash', w.savings); if (a) { moneyWithdraw(kid, a); renderMoneyScreen(); } }
-  else if (kind === 'buy') { const t = (prompt('Which stock? SU, TSLA, AAPL, COST', 'AAPL') || '').toUpperCase().trim(); if (STOCKS_2023[t]) moneyBuyPrompt(t); }
+  if (kind === 'deposit') { const a = await moneyPromptAmount('Move Cash → Savings', w.cash); if (a) { moneyDeposit(kid, a); renderMoneyScreen(); } }
+  else if (kind === 'withdraw') { const a = await moneyPromptAmount('Move Savings → Cash', w.savings); if (a) { moneyWithdraw(kid, a); renderMoneyScreen(); } }
+  else if (kind === 'buy') { const t = ((await showPrompt('Which stock? SU, TSLA, AAPL, COST', { value:'AAPL' })) || '').toUpperCase().trim(); if (STOCKS_2023[t]) moneyBuyPrompt(t); }
 }
-function moneyBuyPrompt(t) {
+async function moneyBuyPrompt(t) {
   const kid = moneyKid; const w = ensureWallet(kid);
-  const a = moneyPromptAmount(`Invest in ${t} @ $${stockPrice(t)}/share`, w.cash);
+  const a = await moneyPromptAmount(`Invest in ${t} @ $${stockPrice(t)}/share`, w.cash);
   if (a) { moneyBuyStock(kid, t, a); renderMoneyScreen(); showToast(`Bought $${a.toFixed(2)} of ${t} 📈`); }
 }
-function moneySellPrompt(t) {
+async function moneySellPrompt(t) {
   const kid = moneyKid; const w = ensureWallet(kid); const sh = w.holdings[t] || 0;
-  const v = prompt(`Sell ${t} (you have ${sh.toFixed(3)} shares @ $${stockPrice(t)})\nHow many shares?`, sh.toFixed(3));
+  const v = await showPrompt(`Sell ${t} (you have ${sh.toFixed(3)} shares @ $${stockPrice(t)})\nHow many shares?`, { value:sh.toFixed(3), type:'number' });
   if (v == null) return;
   const n = parseFloat(v);
   if (n > 0) { moneySellStock(kid, t, n); renderMoneyScreen(); showToast(`Sold ${t} 💵`); }
 }
-function moneyOpenGICPrompt() {
+async function moneyOpenGICPrompt() {
   const kid = moneyKid; const w = ensureWallet(kid);
-  const term = prompt('GIC term — 3, 6, or 12 months?', '12');
+  const term = await showPrompt('GIC term — 3, 6, or 12 months?', { value:'12', type:'number' });
   const tm = parseInt(term, 10);
   if (![3, 6, 12].includes(tm)) { if (term != null) showToast('Pick 3, 6, or 12'); return; }
-  const a = moneyPromptAmount(`Open a ${tm}-month GIC`, w.cash);
+  const a = await moneyPromptAmount(`Open a ${tm}-month GIC`, w.cash);
   if (a) { moneyOpenGIC(kid, a, tm); renderMoneyScreen(); showToast(`🔒 ${tm}-month GIC opened`); }
 }
-function moneySetRate(which) {
+async function moneySetRate(which) {
   const cfg = bankConfig();
   const cur = which === 'savings' ? cfg.savingsRate : cfg.gicRates[parseInt(which, 10)];
-  const v = prompt(`Annual rate (%) for ${which === 'savings' ? 'Savings' : 'GIC ' + which + 'mo'}:`, (cur * 100).toFixed(2));
+  const v = await showPrompt(`Annual rate (%) for ${which === 'savings' ? 'Savings' : 'GIC ' + which + 'mo'}:`, { value:(cur * 100).toFixed(2), type:'number' });
   if (v == null) return;
   const r = parseFloat(v) / 100;
   if (isNaN(r) || r < 0 || r > 1) { showToast('Enter a rate like 1.5'); return; }
@@ -11750,7 +11890,7 @@ function finalizeFamilyMeeting() {
   saveAll();
   closeSheet('familyMeetingOverlay');
   renderChoreTab();
-  showToast(`💰 ${parts.length ? parts.join(' · ') + ' · ' : ''}market now ${marketMonthLabel()}`);
+  showToast(`💛 Thanks for helping the family! ${parts.length ? parts.join(' · ') + ' · ' : ''}market now ${marketMonthLabel()}`);
 }
 /* Chore names a parent can pick/assign right now: base defaults + custom,
    minus any they've hidden. (ctAllChoreNames keeps the full union incl.
@@ -12050,9 +12190,9 @@ function ctToggleOptional(choreName, kid) {
   renderChoreTab();
   ctCelebrateGroupPayouts(fired, 'screen-chore');
 }
-function ctClearWeek() {
+async function ctClearWeek() {
   const info = ctWeekInfo();
-  if (!confirm(`Reset all chore data (and pocket money) for week of ${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()}?`)) return;
+  if (!(await showConfirm(`Reset all chore data (and pocket money) for week of ${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()}?`, { danger:true, okLabel:'Reset' }))) return;
   ['jenn','jess'].forEach(kid=>{
     const p = getProfData(kid);
     ctEnsureProfile(p);
@@ -12133,22 +12273,22 @@ function ctHandleWrapClick(e) {
   else if (a === 'rename-chore') ctPromptRenameChore(el.dataset.chore);
   else if (a === 'remove-chore') ctPromptRemoveChore(el.dataset.chore);
 }
-function ctPromptAddChore() {
-  const name = (prompt('New chore name:', '') || '').trim();
+async function ctPromptAddChore() {
+  const name = ((await showPrompt('New chore name:', { value:'' })) || '').trim();
   if (!name) return;
   if (ctAddChore(name)) { showToast(`Added "${name}" 🧽`); renderChoreTab(); }
 }
-function ctPromptRenameChore(oldName) {
-  const nn = (prompt('Rename chore:', oldName) || '').trim();
+async function ctPromptRenameChore(oldName) {
+  const nn = ((await showPrompt('Rename chore:', { value:oldName })) || '').trim();
   if (!nn || nn === oldName) return;
   const isCustom = (state.shared.chore.customChores || []).includes(oldName);
   ctRenameChore(oldName, nn);
   showToast(isCustom ? `Renamed to "${nn}"` : `Added "${nn}" (base chores keep their name)`);
   renderChoreTab();
 }
-function ctPromptRemoveChore(name) {
+async function ctPromptRemoveChore(name) {
   const isCustom = (state.shared.chore.customChores || []).includes(name);
-  if (!confirm(isCustom ? `Remove "${name}"?` : `Hide "${name}" from the pickable list? (Past weeks keep their data.)`)) return;
+  if (!(await showConfirm(isCustom ? `Remove "${name}"?` : `Hide "${name}" from the pickable list? (Past weeks keep their data.)`, { danger:true, okLabel:isCustom?'Remove':'Hide' }))) return;
   ctRemoveChore(name);
   showToast(isCustom ? `Removed "${name}"` : `Hid "${name}"`);
   renderChoreTab();
@@ -12243,6 +12383,7 @@ function ctRenderMoneyCard(kid) {
   const finalized = !!(c.finalizedWeeks && c.finalizedWeeks[ctWeekKey] && c.finalizedWeeks[ctWeekKey][kid] != null);
   return `<div class="chore-card"><h3>💰 ${name}'s pocket money</h3>
     <div class="ct-money-total">$${money.toFixed(2)} <span class="ct-money-cap">/ $${CT_MONEY_CAP} max</span></div>
+    <div class="ct-meta" style="font-style:italic">Chores are how you help the family 💛 — the pocket money is a bonus for practising with real money.</div>
     <div class="ct-meta">${finalized ? '✅ Paid out at the family meeting' : 'Preliminary — confirmed at the weekly family meeting'}</div>
     ${body}
     <div class="ct-meta" style="margin-top:0.4rem">🏦 Net worth: <b>$${nw.toFixed(2)}</b></div>
@@ -12441,11 +12582,11 @@ function ctConfirmGroupFromUi() {
   renderChoreTab();   // render sweep fires any payout the edit newly satisfies
   showToast('Group saved 💰');
 }
-function ctDeleteGroup(groupId) {
+async function ctDeleteGroup(groupId) {
   if (!isParent()) return;
   const g = ctGroupById(groupId);
   if (!g) return;
-  if (!confirm(`Delete "${g.name}"? Money already earned from it stays.`)) return;
+  if (!(await showConfirm(`Delete "${g.name}"? Money already earned from it stays.`, { danger:true, okLabel:'Delete' }))) return;
   state.shared.chore.groups = ctGroups().filter(x => x.id !== groupId);
   saveAll();
   renderChoreTab();
@@ -12638,8 +12779,9 @@ function renderParentMonthly() {
   document.getElementById('pmKidJenn').classList.toggle('active', parentMonthlyKid==='jenn');
   document.getElementById('pmKidJess').classList.toggle('active', parentMonthlyKid==='jess');
 
-  // Compute month
-  const now = new Date();
+  // Compute month — anchor "current month" to the app timezone (America/Edmonton)
+  // so it matches the day keys, not the device clock, near month boundaries.
+  const now = formatDayKey(toDayKeyInZone(new Date()));
   const monthStart = new Date(now.getFullYear(), now.getMonth() + parentMonthOffset, 1);
   const year = monthStart.getFullYear();
   const month = monthStart.getMonth();
@@ -13011,6 +13153,74 @@ function buildPrintSummary(keys, acts, winStartMin, winEndMin) {
 /* ════════════════════════════════════════════════════════════════
    MISC
 ════════════════════════════════════════════════════════════════ */
+/* ── Styled dialogs — promise-based replacements for native confirm()/prompt()
+   so destructive confirms and PIN/text entry stay inside the app's sheet
+   aesthetic instead of the browser's gray boxes. Reuses the .overlay/.sheet
+   styling. showConfirm → Promise<boolean>; showPrompt → Promise<string|null>
+   (null on cancel, matching native prompt). ── */
+let _appDialogResolve = null;
+function _closeAppDialog(result) {
+  const ov = document.getElementById('appDialogOverlay');
+  if (ov) ov.classList.remove('open');
+  const resolve = _appDialogResolve;
+  _appDialogResolve = null;
+  document.removeEventListener('keydown', _appDialogKey, true);
+  if (resolve) resolve(result);
+}
+function _appDialogKey(e) {
+  if (e.key === 'Escape') { e.preventDefault(); _appDialogCancel(); }
+  else if (e.key === 'Enter') {
+    const inp = document.getElementById('appDialogInput');
+    if (!inp || document.activeElement === inp) { e.preventDefault(); _appDialogOk(); }
+  }
+}
+function _appDialogOk() {
+  const inp = document.getElementById('appDialogInput');
+  _closeAppDialog(inp ? inp.value : true);
+}
+function _appDialogCancel() {
+  const inp = document.getElementById('appDialogInput');
+  _closeAppDialog(inp ? null : false);
+}
+function _appDialog({ message, kind, value = '', inputType = 'text', okLabel = 'OK', cancelLabel = 'Cancel', danger = false }) {
+  // Resolve any dialog already open (shouldn't normally happen) before opening.
+  if (_appDialogResolve) _closeAppDialog(kind === 'prompt' ? null : false);
+  let ov = document.getElementById('appDialogOverlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.className = 'overlay';
+    ov.id = 'appDialogOverlay';
+    ov.addEventListener('click', e => { if (e.target === ov) _appDialogCancel(); });
+    document.body.appendChild(ov);
+  }
+  const inputHtml = kind === 'prompt'
+    ? `<input id="appDialogInput" type="${inputType}" class="app-dialog-input" value="${escapeAttr(String(value))}">`
+    : '';
+  ov.innerHTML =
+    `<div class="sheet app-dialog-sheet" role="dialog" aria-modal="true">
+      <div class="sheet-handle"></div>
+      <p class="app-dialog-msg">${escapeHtml(message)}</p>
+      ${inputHtml}
+      <div class="app-dialog-btns">
+        <button type="button" class="pill-btn app-dialog-cancel" onclick="_appDialogCancel()">${escapeHtml(cancelLabel)}</button>
+        <button type="button" class="btn-confirm${danger ? ' danger' : ''}" style="width:auto;flex:1" onclick="_appDialogOk()">${escapeHtml(okLabel)}</button>
+      </div>
+    </div>`;
+  return new Promise(resolve => {
+    _appDialogResolve = resolve;
+    ov.classList.add('open');
+    document.addEventListener('keydown', _appDialogKey, true);
+    const inp = document.getElementById('appDialogInput');
+    if (inp) { inp.focus(); inp.select(); }
+  });
+}
+function showConfirm(message, opts = {}) {
+  return _appDialog({ message, kind: 'confirm', okLabel: opts.okLabel || 'OK', cancelLabel: opts.cancelLabel || 'Cancel', danger: !!opts.danger });
+}
+function showPrompt(message, opts = {}) {
+  return _appDialog({ message, kind: 'prompt', value: opts.value || '', inputType: opts.type || 'text', okLabel: opts.okLabel || 'OK', cancelLabel: opts.cancelLabel || 'Cancel' });
+}
+
 function openSheet(id) { document.getElementById(id).classList.add('open'); }
 function closeSheet(id) {
   if (id === 'editOverlay') editStopwatchClearTick();
@@ -13072,13 +13282,13 @@ function refreshMascotButton() {
 }
 
 /* First tap -> name prompt; subsequent taps -> recommendation based on day. */
-function onMascotClick() {
+async function onMascotClick() {
   const p = getProfData();
   ensureMascotFields(p);
   if (!p.mascotName) {
     hideMascot();
     const defaultName = activeProfile() === 'jenn' ? 'Hedwig' : 'My Owl';
-    const name = (prompt("What should I call your owl? 🦉", defaultName) || '').trim();
+    const name = ((await showPrompt("What should I call your owl? 🦉", { value: defaultName })) || '').trim();
     if (!name) return;
     p.mascotName = name.slice(0, 20);
     p.mascotIntroShown = true;
@@ -13231,7 +13441,7 @@ function setSisterDetailsVisibleGlobal(next) {
   saveAll();
   if (document.querySelector('#screen-sync.active')) renderSync();
 }
-function inviteSisterFromEdit() {
+async function inviteSisterFromEdit() {
   if (!editingBlockId) return;
   const blocks = getDayBlocks(currentDayKey);
   const blk = blocks.find(b=>b.id===editingBlockId);
@@ -13244,7 +13454,7 @@ function inviteSisterFromEdit() {
   const activityLabel = act ? `${act.icon} ${act.name}` : 'this activity';
   const dayDate = formatDayKey(currentDayKey);
   const dayIdx = (dayDate.getDay()+6)%7;
-  const ok = confirm(`Share ${activityLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(blk.startMin)} with ${sisterName}?`);
+  const ok = await showConfirm(`Share ${activityLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(blk.startMin)} with ${sisterName}?`, { okLabel:'Share' });
   if (!ok) return;
   // Reuse existing sendInvite, but it expects currentDayKey/syncDayIdx context.
   // Inline here for clarity:
