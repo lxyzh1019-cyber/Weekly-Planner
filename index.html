@@ -6115,6 +6115,7 @@ function completeQuest(blockId) {
 
   blk.completed = true;
   blk.xpAwarded = true; // mark so a later quick-check elsewhere won't re-award
+  markItemUpdated(blk); // stamp so the completion wins cross-device merges
   const acts = getAllActivities();
   const act = acts.find(a => a.id === blk.actId) || { name:'Quest', icon:'⭐' };
   const result = addQuestXP(QUEST_XP_PER_TASK);
@@ -6237,6 +6238,7 @@ function toggleBlockDone(dayKey, blockId, ev) {
   const blk = blocks.find(b => b.id === blockId);
   if (!blk) return;
   blk.completed = !blk.completed;
+  markItemUpdated(blk); // stamp so the completion wins cross-device merges
   const nowDone = blk.completed;
   let extra = '';
   if (nowDone) extra = awardBlockLinks(blk, dayKey);
@@ -8333,6 +8335,7 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
   const id = Date.now().toString(36)+Math.random().toString(36).slice(2,5);
   const block = {
     id, actId, startMin, durationMin,
+    createdAt: Date.now(), updatedAt: Date.now(), // so cross-device merges order correctly
     colour,
     objectives: objectives||[],
     note: note||'',
@@ -9605,6 +9608,7 @@ function saveEditChanges() {
   if (act && act.isTraining) blk.objectives = newObjectives;
   if (newStopwatch) blk.stopwatch = newStopwatch;
   else delete blk.stopwatch;
+  markItemUpdated(blk); // stamp so edits win cross-device merges
   setDayBlocks(currentDayKey, blocks);
 
   // Optionally apply same edits to siblings
