@@ -8560,7 +8560,7 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
   document.getElementById('trayHint').textContent = 'Tap an activity to pick';
 }
 
-function removeBlock() {
+async function removeBlock() {
   if (!editingBlockId) return;
   const blocks = getDayBlocks(currentDayKey);
   const blk = blocks.find(b=>b.id===editingBlockId);
@@ -8572,7 +8572,7 @@ function removeBlock() {
   if (blk?.seriesId) {
     const siblings = countSeriesBlocks(blk.seriesId);
     if (siblings > 1) {
-      const all = confirm(`This block is part of a series of ${siblings}.\n\nOK = remove ALL in series\nCancel = remove only this one`);
+      const all = await showConfirm(`This block is part of a series of ${siblings}.\n\nOK = remove ALL in series\nCancel = remove only this one`, { okLabel:'Remove all', cancelLabel:'Only this' });
       if (all) {
         deleteSeriesBlocks(blk.seriesId);
         closeSheet('editOverlay');
@@ -9664,7 +9664,7 @@ function toggleEditTravelBuffer() {
   renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin);
 }
 
-function saveEditChanges() {
+async function saveEditChanges() {
   if (!editingBlockId) return;
   editStopwatchPause();
   const blocks = getDayBlocks(currentDayKey);
@@ -9722,7 +9722,7 @@ function saveEditChanges() {
   if (blk.seriesId && fieldsChanged) {
     const siblings = countSeriesBlocks(blk.seriesId);
     if (siblings > 1) {
-      applyToSeries = confirm(`This block is part of a series of ${siblings}.\n\nOK = update ALL in series\nCancel = update only this one`);
+      applyToSeries = await showConfirm(`This block is part of a series of ${siblings}.\n\nOK = update ALL in series\nCancel = update only this one`, { okLabel:'Update all', cancelLabel:'Only this' });
     }
   }
 
@@ -10301,7 +10301,7 @@ function renderSync() {
   renderInvites();
 }
 
-function sendInvite(block, to) {
+async function sendInvite(block, to) {
   const sisterName = to==='jenn'?'Jenn':'Jess';
   const act = getAllActivities(profile).find(a=>a.id===block.actId) || getAllActivities().find(a=>a.id===block.actId);
   const receiverAct = getAllActivities(to).find(a=>a.id===block.actId);
@@ -10313,7 +10313,7 @@ function sendInvite(block, to) {
   const day = currentDayKey || getDayKeys(weekOffset)[syncDayIdx];
   const dayDate = formatDayKey(day);
   const dayIdx = (dayDate.getDay()+6)%7;
-  const ok = confirm(`Share ${activityLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(block.startMin)} with ${sisterName}?`);
+  const ok = await showConfirm(`Share ${activityLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(block.startMin)} with ${sisterName}?`, { okLabel:'Share' });
   if (!ok) return;
   const inv = {
     id: 'inv-'+Date.now().toString(36),
@@ -10676,8 +10676,8 @@ function approveKidActivity(owner, id) {
   renderParentActivities();
   showToast('Approved ✅');
 }
-function rejectKidActivity(owner, id) {
-  if (!confirm('Remove this activity the child added?')) return;
+async function rejectKidActivity(owner, id) {
+  if (!(await showConfirm('Remove this activity the child added?', { danger:true, okLabel:'Remove' }))) return;
   const arr = (state.profiles[owner] && state.profiles[owner].customActivities) || [];
   const idx = arr.findIndex(x => x.id === id);
   if (idx < 0) return;
@@ -10828,7 +10828,7 @@ function confirmParentActivity() {
   showToast('Activity added ✅');
 }
 
-function deleteParentActivity(owner, id) {
+async function deleteParentActivity(owner, id) {
   // Count how many placed blocks reference this activity across both kids' weeks
   const refs = countBlocksUsingActivity(id);
   let msg;
@@ -10837,7 +10837,7 @@ function deleteParentActivity(owner, id) {
   } else {
     msg = `⚠️ This activity is used in ${refs} placed block${refs===1?'':'s'}.\n\nOK = delete the activity AND all ${refs} block${refs===1?'':'s'}\nCancel = keep everything`;
   }
-  if (!confirm(msg)) return;
+  if (!(await showConfirm(msg, { danger:true, okLabel:'Delete' }))) return;
   // Remove the activity definition
   removeParentActivity(owner, id);
   // Cascade-delete every referencing block from both kids
@@ -10872,10 +10872,10 @@ function countBlocksUsingActivity(actId) {
 }
 
 /* Promote a child-only activity to shared, or demote a shared back to a single child. */
-function toggleShareActivity(owner, id) {
+async function toggleShareActivity(owner, id) {
   if (owner === 'shared') {
     // Demote: ask which child to give it to
-    const which = prompt('Move this activity to which child?\n\nType "jenn" or "jess":', 'jenn');
+    const which = await showPrompt('Move this activity to which child?\n\nType "jenn" or "jess":', { value:'jenn' });
     if (!which) return;
     const target = which.trim().toLowerCase();
     if (target !== 'jenn' && target !== 'jess') { showToast('Type jenn or jess'); return; }
@@ -11027,8 +11027,8 @@ function openEditBuiltInRoutine(id) {
   openSheet('newRoutineOverlay');
 }
 
-function resetBuiltInRoutine(id) {
-  if (!confirm('Reset this routine to the built-in default? Your edits will be lost.')) return;
+async function resetBuiltInRoutine(id) {
+  if (!(await showConfirm('Reset this routine to the built-in default? Your edits will be lost.', { danger:true, okLabel:'Reset' }))) return;
   if (state.shared.builtInRoutineOverrides) delete state.shared.builtInRoutineOverrides[id];
   saveAll();
   renderRoutinesList();
@@ -11190,8 +11190,8 @@ function confirmRoutine() {
   showToast('Routine created ✨');
 }
 
-function deleteRoutine(id) {
-  if (!confirm('Delete this routine?')) return;
+async function deleteRoutine(id) {
+  if (!(await showConfirm('Delete this routine?', { danger:true, okLabel:'Delete' }))) return;
   state.shared.routineTemplates = (state.shared.routineTemplates||[]).filter(r=>r.id!==id);
   // Remove matching activity from both kids
   ['jenn','jess'].forEach(p=>{
@@ -11465,9 +11465,9 @@ function buildAchievementRow(a) {
   const pick = document.createElement('button');
   pick.className='pill-btn';
   pick.textContent='Link activity';
-  pick.onclick = ()=>{
+  pick.onclick = async ()=>{
     const names = acts.map((x,i)=>`${i+1}. ${x.icon} ${x.name}`).join('\n');
-    const idx = parseInt(prompt('Activity number:\n'+names, '1')||'',10)-1;
+    const idx = parseInt((await showPrompt('Activity number:\n'+names, { value:'1', type:'number' }))||'',10)-1;
     if (Number.isNaN(idx) || idx<0 || idx>=acts.length) return;
     setAchievementActivity(a.id, acts[idx].id);
   };
@@ -11476,8 +11476,8 @@ function buildAchievementRow(a) {
   const targetBtn = document.createElement('button');
   targetBtn.className = 'pill-btn';
   targetBtn.textContent = `Target: ${targetLabel}`;
-  targetBtn.onclick = ()=>{
-    const next = parseInt(prompt(`Set target (${a.mode==='duration'?'minutes':'count'})`, String(targetVal))||'', 10);
+  targetBtn.onclick = async ()=>{
+    const next = parseInt((await showPrompt(`Set target (${a.mode==='duration'?'minutes':'count'})`, { value:String(targetVal), type:'number' }))||'', 10);
     if (!Number.isInteger(next) || next < 1) return;
     setAchievementTarget(a.id, next);
   };
@@ -11544,12 +11544,12 @@ function setAchievementTarget(id, target) {
   renderGoalsTodos();
 }
 
-function addTodo() {
+async function addTodo() {
   const p = getProfData();
   ensureGtFields(p);
   const acts = getAllActivities();
   const entries = acts.map((x,i)=>`${i+1}. ${x.icon} ${x.name}`).join('\n');
-  const pick = prompt(`Link this weekly to-do to an activity series?\nEnter activity number (or leave blank for manual to-do):\n${entries}`, '');
+  const pick = await showPrompt(`Link this weekly to-do to an activity series?\nEnter activity number (or leave blank for manual to-do):\n${entries}`, { value:'' });
   let linkActId = null;
   if (pick && pick.trim()) {
     const idx = parseInt(pick.trim(), 10) - 1;
@@ -11792,43 +11792,43 @@ function renderMoneyScreen() {
   html += `</div>`;
   wrap.innerHTML = html;
 }
-function moneyPromptAmount(label, max) {
-  const v = prompt(`${label}\nHow much? (max $${max.toFixed(2)})`, '');
+async function moneyPromptAmount(label, max) {
+  const v = await showPrompt(`${label}\nHow much? (max $${max.toFixed(2)})`, { value:'', type:'number' });
   if (v == null) return null;
   const a = money2(parseFloat(v));
   if (!a || a <= 0) return null;
   return Math.min(a, max);
 }
-function moneyAction(kind) {
+async function moneyAction(kind) {
   const kid = moneyKid; const w = ensureWallet(kid);
-  if (kind === 'deposit') { const a = moneyPromptAmount('Move Cash → Savings', w.cash); if (a) { moneyDeposit(kid, a); renderMoneyScreen(); } }
-  else if (kind === 'withdraw') { const a = moneyPromptAmount('Move Savings → Cash', w.savings); if (a) { moneyWithdraw(kid, a); renderMoneyScreen(); } }
-  else if (kind === 'buy') { const t = (prompt('Which stock? SU, TSLA, AAPL, COST', 'AAPL') || '').toUpperCase().trim(); if (STOCKS_2023[t]) moneyBuyPrompt(t); }
+  if (kind === 'deposit') { const a = await moneyPromptAmount('Move Cash → Savings', w.cash); if (a) { moneyDeposit(kid, a); renderMoneyScreen(); } }
+  else if (kind === 'withdraw') { const a = await moneyPromptAmount('Move Savings → Cash', w.savings); if (a) { moneyWithdraw(kid, a); renderMoneyScreen(); } }
+  else if (kind === 'buy') { const t = ((await showPrompt('Which stock? SU, TSLA, AAPL, COST', { value:'AAPL' })) || '').toUpperCase().trim(); if (STOCKS_2023[t]) moneyBuyPrompt(t); }
 }
-function moneyBuyPrompt(t) {
+async function moneyBuyPrompt(t) {
   const kid = moneyKid; const w = ensureWallet(kid);
-  const a = moneyPromptAmount(`Invest in ${t} @ $${stockPrice(t)}/share`, w.cash);
+  const a = await moneyPromptAmount(`Invest in ${t} @ $${stockPrice(t)}/share`, w.cash);
   if (a) { moneyBuyStock(kid, t, a); renderMoneyScreen(); showToast(`Bought $${a.toFixed(2)} of ${t} 📈`); }
 }
-function moneySellPrompt(t) {
+async function moneySellPrompt(t) {
   const kid = moneyKid; const w = ensureWallet(kid); const sh = w.holdings[t] || 0;
-  const v = prompt(`Sell ${t} (you have ${sh.toFixed(3)} shares @ $${stockPrice(t)})\nHow many shares?`, sh.toFixed(3));
+  const v = await showPrompt(`Sell ${t} (you have ${sh.toFixed(3)} shares @ $${stockPrice(t)})\nHow many shares?`, { value:sh.toFixed(3), type:'number' });
   if (v == null) return;
   const n = parseFloat(v);
   if (n > 0) { moneySellStock(kid, t, n); renderMoneyScreen(); showToast(`Sold ${t} 💵`); }
 }
-function moneyOpenGICPrompt() {
+async function moneyOpenGICPrompt() {
   const kid = moneyKid; const w = ensureWallet(kid);
-  const term = prompt('GIC term — 3, 6, or 12 months?', '12');
+  const term = await showPrompt('GIC term — 3, 6, or 12 months?', { value:'12', type:'number' });
   const tm = parseInt(term, 10);
   if (![3, 6, 12].includes(tm)) { if (term != null) showToast('Pick 3, 6, or 12'); return; }
-  const a = moneyPromptAmount(`Open a ${tm}-month GIC`, w.cash);
+  const a = await moneyPromptAmount(`Open a ${tm}-month GIC`, w.cash);
   if (a) { moneyOpenGIC(kid, a, tm); renderMoneyScreen(); showToast(`🔒 ${tm}-month GIC opened`); }
 }
-function moneySetRate(which) {
+async function moneySetRate(which) {
   const cfg = bankConfig();
   const cur = which === 'savings' ? cfg.savingsRate : cfg.gicRates[parseInt(which, 10)];
-  const v = prompt(`Annual rate (%) for ${which === 'savings' ? 'Savings' : 'GIC ' + which + 'mo'}:`, (cur * 100).toFixed(2));
+  const v = await showPrompt(`Annual rate (%) for ${which === 'savings' ? 'Savings' : 'GIC ' + which + 'mo'}:`, { value:(cur * 100).toFixed(2), type:'number' });
   if (v == null) return;
   const r = parseFloat(v) / 100;
   if (isNaN(r) || r < 0 || r > 1) { showToast('Enter a rate like 1.5'); return; }
@@ -12190,9 +12190,9 @@ function ctToggleOptional(choreName, kid) {
   renderChoreTab();
   ctCelebrateGroupPayouts(fired, 'screen-chore');
 }
-function ctClearWeek() {
+async function ctClearWeek() {
   const info = ctWeekInfo();
-  if (!confirm(`Reset all chore data (and pocket money) for week of ${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()}?`)) return;
+  if (!(await showConfirm(`Reset all chore data (and pocket money) for week of ${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()}?`, { danger:true, okLabel:'Reset' }))) return;
   ['jenn','jess'].forEach(kid=>{
     const p = getProfData(kid);
     ctEnsureProfile(p);
@@ -12273,22 +12273,22 @@ function ctHandleWrapClick(e) {
   else if (a === 'rename-chore') ctPromptRenameChore(el.dataset.chore);
   else if (a === 'remove-chore') ctPromptRemoveChore(el.dataset.chore);
 }
-function ctPromptAddChore() {
-  const name = (prompt('New chore name:', '') || '').trim();
+async function ctPromptAddChore() {
+  const name = ((await showPrompt('New chore name:', { value:'' })) || '').trim();
   if (!name) return;
   if (ctAddChore(name)) { showToast(`Added "${name}" 🧽`); renderChoreTab(); }
 }
-function ctPromptRenameChore(oldName) {
-  const nn = (prompt('Rename chore:', oldName) || '').trim();
+async function ctPromptRenameChore(oldName) {
+  const nn = ((await showPrompt('Rename chore:', { value:oldName })) || '').trim();
   if (!nn || nn === oldName) return;
   const isCustom = (state.shared.chore.customChores || []).includes(oldName);
   ctRenameChore(oldName, nn);
   showToast(isCustom ? `Renamed to "${nn}"` : `Added "${nn}" (base chores keep their name)`);
   renderChoreTab();
 }
-function ctPromptRemoveChore(name) {
+async function ctPromptRemoveChore(name) {
   const isCustom = (state.shared.chore.customChores || []).includes(name);
-  if (!confirm(isCustom ? `Remove "${name}"?` : `Hide "${name}" from the pickable list? (Past weeks keep their data.)`)) return;
+  if (!(await showConfirm(isCustom ? `Remove "${name}"?` : `Hide "${name}" from the pickable list? (Past weeks keep their data.)`, { danger:true, okLabel:isCustom?'Remove':'Hide' }))) return;
   ctRemoveChore(name);
   showToast(isCustom ? `Removed "${name}"` : `Hid "${name}"`);
   renderChoreTab();
@@ -12582,11 +12582,11 @@ function ctConfirmGroupFromUi() {
   renderChoreTab();   // render sweep fires any payout the edit newly satisfies
   showToast('Group saved 💰');
 }
-function ctDeleteGroup(groupId) {
+async function ctDeleteGroup(groupId) {
   if (!isParent()) return;
   const g = ctGroupById(groupId);
   if (!g) return;
-  if (!confirm(`Delete "${g.name}"? Money already earned from it stays.`)) return;
+  if (!(await showConfirm(`Delete "${g.name}"? Money already earned from it stays.`, { danger:true, okLabel:'Delete' }))) return;
   state.shared.chore.groups = ctGroups().filter(x => x.id !== groupId);
   saveAll();
   renderChoreTab();
@@ -13441,7 +13441,7 @@ function setSisterDetailsVisibleGlobal(next) {
   saveAll();
   if (document.querySelector('#screen-sync.active')) renderSync();
 }
-function inviteSisterFromEdit() {
+async function inviteSisterFromEdit() {
   if (!editingBlockId) return;
   const blocks = getDayBlocks(currentDayKey);
   const blk = blocks.find(b=>b.id===editingBlockId);
@@ -13454,7 +13454,7 @@ function inviteSisterFromEdit() {
   const activityLabel = act ? `${act.icon} ${act.name}` : 'this activity';
   const dayDate = formatDayKey(currentDayKey);
   const dayIdx = (dayDate.getDay()+6)%7;
-  const ok = confirm(`Share ${activityLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(blk.startMin)} with ${sisterName}?`);
+  const ok = await showConfirm(`Share ${activityLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(blk.startMin)} with ${sisterName}?`, { okLabel:'Share' });
   if (!ok) return;
   // Reuse existing sendInvite, but it expects currentDayKey/syncDayIdx context.
   // Inline here for clarity:
