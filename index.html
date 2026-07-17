@@ -919,6 +919,12 @@
     min-height: 38px;
     min-width: 38px;
   }
+  #restDayBtn { font-size: 0.9rem; }
+  #restDayBtn.on {
+    background: var(--cat-sleep);
+    border-color: var(--ink);
+    font-weight: 700;
+  }
 
   /* Weekly view toggle */
   .view-tabs {
@@ -3805,6 +3811,7 @@
         </div>
       </div>
       <div style="display:flex;gap:0.4rem;align-items:center" class="day-topbar-actions">
+        <button class="btn-icon" id="restDayBtn" onclick="toggleRestDay(currentDayKey)" aria-label="Mark rest day" title="Mark today a rest day">😌 Rest</button>
         <button class="btn-icon" onclick="openTemplateSheet()" aria-label="Apply template">📋</button>
         <button class="btn-icon" onclick="openReflectSheet()" aria-label="Reflect on today">🌙</button>
         <button class="profile-badge" onclick="goProfile()" id="dayProfileBadge" aria-label="Switch profile"></button>
@@ -5310,6 +5317,7 @@ function getProfData(p=activeProfile()) {
   if (prof.progress.tasksCompleted == null) prof.progress.tasksCompleted = 0;   // lifetime completions
   if (!prof.progress.completedByCat) prof.progress.completedByCat = {};         // per-category completions
   if (prof.progress.streakFreezeTokens == null) prof.progress.streakFreezeTokens = 1;
+  if (!prof.progress.restDays) prof.progress.restDays = {};                     // {[dayKey]:true} — kid-marked days off
   if (!prof.progress.streakFreezeWeek) prof.progress.streakFreezeWeek = dateToLocalKey(getWeekStart(weekOffset));
   const wk = dateToLocalKey(getWeekStart(weekOffset));
   if (prof.progress.streakFreezeWeek !== wk) {
@@ -5547,6 +5555,46 @@ function offerTutorialIfNeeded() {
   // not via a pop-up that blocks the first day they try to plan.
 }
 
+/* ── Rest days: a kid can mark a day as "off". Rest days are celebrated (rest is
+   part of the plan) and never count against a streak — the gap logic below
+   subtracts them so a planned day off doesn't break the streak. ── */
+function isRestDay(dayKey, kid = activeProfile()) {
+  const pd = getProfData(kid);
+  return !!(pd && pd.progress && pd.progress.restDays && pd.progress.restDays[dayKey]);
+}
+function toggleRestDay(dayKey) {
+  const pd = getProfData();
+  if (!pd.progress.restDays) pd.progress.restDays = {};
+  const on = !pd.progress.restDays[dayKey];
+  if (on) pd.progress.restDays[dayKey] = true;
+  else delete pd.progress.restDays[dayKey];
+  saveAll();
+  showToast(on ? 'Rest day set — rest is part of the plan 💛' : 'Rest day removed');
+  if (typeof buildTimeline === 'function') buildTimeline();
+  refreshRestDayButton();
+}
+// Reflect the current day's rest state on the day-view toggle button.
+function refreshRestDayButton() {
+  const btn = document.getElementById('restDayBtn');
+  if (!btn || !currentDayKey) return;
+  const on = isRestDay(currentDayKey);
+  btn.classList.toggle('on', on);
+  btn.textContent = on ? '😌 Resting' : '😌 Rest';
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+}
+// Count kid-marked rest days strictly between two day keys (exclusive both ends).
+function countRestDaysBetween(fromKey, toKey, kid = activeProfile()) {
+  let n = 0;
+  const d = formatDayKey(fromKey);
+  const end = formatDayKey(toKey);
+  d.setDate(d.getDate() + 1);
+  while (d < end) {
+    if (isRestDay(dateToLocalKey(d), kid)) n++;
+    d.setDate(d.getDate() + 1);
+  }
+  return n;
+}
+
 function markRoutineProgressOnChecklistToggle(block, act, prevDone, nextDone, total) {
   if (!act?.isRoutine || !total) return;
   if (prevDone >= total || nextDone < total) return;
@@ -5560,8 +5608,11 @@ function markRoutineProgressOnChecklistToggle(block, act, prevDone, nextDone, to
   if (st.lastDay === today) return;
   if (!st.lastDay) st.count = 1;
   else {
-    const gapDays = Math.round((formatDayKey(today) - formatDayKey(st.lastDay)) / (24*60*60*1000));
-    if (gapDays === 1) st.count += 1;
+    const rawGap = Math.round((formatDayKey(today) - formatDayKey(st.lastDay)) / (24*60*60*1000));
+    // Planned rest days between the two active days don't count against the
+    // streak, so a kid who marks a day off keeps their progress.
+    const gapDays = rawGap - countRestDaysBetween(st.lastDay, today);
+    if (gapDays <= 1) st.count += 1;
     else if (gapDays === 2) {
       // Forgiving streak: one missed day is always forgiven, so a single
       // off-day never wipes out the child's progress.
@@ -6176,11 +6227,16 @@ function completeQuest(blockId) {
   spawnQuestSparkles();
   renderQuestBoard();
 
-  // Check Mission Clear after popup
+  // After the popup: full clear → Mission Clear; partial progress → a warm,
+  // low-pressure nudge (never nothing, so off days don't feel like failure).
   setTimeout(()=>{
-    const remaining = (getDayBlocks(key)||[]).filter(b => b && b.startMin!=null && !b.completed);
+    const scheduled = (getDayBlocks(key)||[]).filter(b => b && b.startMin!=null);
+    const remaining = scheduled.filter(b => !b.completed);
     if (remaining.length === 0) {
       showMissionClear();
+    } else {
+      const done = scheduled.length - remaining.length;
+      showToast(`${done} of ${scheduled.length} done — nice work! 🌟 The rest can wait.`);
     }
   }, 1100);
 }
@@ -7416,6 +7472,7 @@ function setDayMood(m) {
 
 function buildTimeline() {
   if (activeStopwatchTick) { clearInterval(activeStopwatchTick); activeStopwatchTick = null; }
+  refreshRestDayButton();
   const tl = document.getElementById('timeline');
   const topbar = document.querySelector('#screen-day .day-topbar');
   tl.innerHTML = '';
