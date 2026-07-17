@@ -3546,13 +3546,13 @@
   <div class="profile-motto">
     <p>✨ Plan what matters — the rest of the time is yours ✨</p>
     <div class="profile-message">
-      This planner is not a set of "rules" to follow, nor is it a clock meant to rush you. Think of it as your Blueprint for Freedom.<br><br>
-      In the world of elite performance, the greatest athletes are not just those who train the hardest, but those who own their day. When you master your schedule, you transition from being "busy" to being intentional.<br><br>
-      By using this tool, you are choosing to:<br>
-      Design Your Success: Carve out the time needed to sharpen your skills.<br>
-      Protect Your Joy: Ensure there is always space for rest, play, and the things that make you smile.<br>
-      Lead Yourself: Develop the discipline that separates the good from the great.<br><br>
-      Remember: Do not let the clock run you; you run the clock. You are the conductor of your own symphony. Let's make every week a masterpiece of progress and resilience.
+      This planner is yours. It's not a list of rules to follow, and it's not a clock telling you to hurry. Think of it as a way to make room for the things you care about.<br><br>
+      Pick a few things that matter to you this week — then the rest of the time is yours to rest, play, and explore. You don't have to fill every minute. Some weeks are busy and some are slow, and both are okay.<br><br>
+      Here's the idea:<br>
+      Make Space: Set aside time for the things you want to get better at.<br>
+      Protect Your Joy: Always keep room for rest, play, and the things that make you smile.<br>
+      Lead Yourself: It's your day — you get to choose how it goes.<br><br>
+      Remember: you're in charge of your own day. Be kind to yourself, try things, and enjoy the week.
     </div>
   </div>
   <p style="position:absolute;bottom:1rem;color:var(--ink-light);font-size:0.8rem">
@@ -10315,8 +10315,12 @@ function renderChallenges() {
             <span>${count}/${c.target}</span>
           </div>`;
       }).join('');
+      const teamNote = c.who==='both'
+        ? `<div class="ct-meta" style="font-style:italic;margin-bottom:0.2rem">You're a team on this one — cheer each other on! 🤝</div>`
+        : '';
       card.innerHTML = `
         <div class="challenge-title">${c.title}</div>
+        ${teamNote}
         ${rows}
         <div style="display:flex;justify-content:flex-end;margin-top:0.4rem">
           <button class="btn-icon" onclick="deleteChallenge('${c.id}')" style="padding:2px 8px">🗑</button>
@@ -11807,7 +11811,7 @@ function finalizeFamilyMeeting() {
   saveAll();
   closeSheet('familyMeetingOverlay');
   renderChoreTab();
-  showToast(`💰 ${parts.length ? parts.join(' · ') + ' · ' : ''}market now ${marketMonthLabel()}`);
+  showToast(`💛 Thanks for helping the family! ${parts.length ? parts.join(' · ') + ' · ' : ''}market now ${marketMonthLabel()}`);
 }
 /* Chore names a parent can pick/assign right now: base defaults + custom,
    minus any they've hidden. (ctAllChoreNames keeps the full union incl.
@@ -12300,6 +12304,7 @@ function ctRenderMoneyCard(kid) {
   const finalized = !!(c.finalizedWeeks && c.finalizedWeeks[ctWeekKey] && c.finalizedWeeks[ctWeekKey][kid] != null);
   return `<div class="chore-card"><h3>💰 ${name}'s pocket money</h3>
     <div class="ct-money-total">$${money.toFixed(2)} <span class="ct-money-cap">/ $${CT_MONEY_CAP} max</span></div>
+    <div class="ct-meta" style="font-style:italic">Chores are how you help the family 💛 — the pocket money is a bonus for practising with real money.</div>
     <div class="ct-meta">${finalized ? '✅ Paid out at the family meeting' : 'Preliminary — confirmed at the weekly family meeting'}</div>
     ${body}
     <div class="ct-meta" style="margin-top:0.4rem">🏦 Net worth: <b>$${nw.toFixed(2)}</b></div>
