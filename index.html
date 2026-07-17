@@ -27,6 +27,11 @@
     --ink: #2a2320;
     --ink-light: #6b5d4f;
     --accent: #ff7b54;
+    /* Darker accent for text/UI that must meet WCAG AA: white-on-it = 4.9:1,
+       and it-as-text on cream paper = 4.8:1. Use for selected controls (white
+       label) and informational accent text; keep light --accent for decorative
+       fills and category identity. */
+    --accent-strong: #c14a24;
     --accent-pink: #ff9eb5;
     --accent-blue: #6fb1fc;
     --accent-yellow: #ffd166;
@@ -34,7 +39,7 @@
     --accent-purple: #c3aed6;
 
     --radius: 18px;
-    --radius-sm: 10px;
+    /* --radius-sm defined once in the design-token scale below (8px). */
 
     --cat-sleep:   #c3aed6;
     --cat-school:  #6fb1fc;
@@ -122,7 +127,7 @@
   .profile-header { text-align: center; margin-bottom: 2rem; }
   .profile-header h1 {
     font-family: 'Gochi Hand', cursive;
-    font-size: 3.4rem; color: var(--accent);
+    font-size: 3.4rem; color: var(--accent-strong);
     transform: rotate(-2deg);
     text-shadow: 3px 3px 0 rgba(0,0,0,0.06);
   }
@@ -928,7 +933,7 @@
     box-shadow: 2px 2px 0 var(--ink);
     min-height: 38px;
   }
-  .view-tab.active { background: var(--accent); color: #fff; }
+  .view-tab.active { background: var(--accent-strong); color: #fff; }
 
   /* Time-Grid weekly view: 7-column × hour-row grid that visualizes free time */
   .tg-wrap { padding: 0 0.5rem 0.5rem; overflow-x: auto; }
@@ -1188,7 +1193,7 @@
   .tg-mytime-value {
     font-family: 'Gochi Hand', cursive;
     font-size: 1.8rem;
-    color: var(--accent);
+    color: var(--accent-strong);
     font-weight: 700;
   }
   .tg-mytime-bricks {
@@ -1247,7 +1252,7 @@
   .day-card.today::after {
     content:'today'; position:absolute; top: -8px; right: -4px;
     font-family: 'Caveat', cursive; font-size: 0.9rem;
-    background: var(--accent); color:#fff; padding: 1px 8px;
+    background: var(--accent-strong); color:#fff; padding: 1px 8px;
     border-radius: 10px; transform: rotate(5deg);
     border: 1.5px solid var(--ink);
   }
@@ -1401,7 +1406,7 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 1.04rem; flex-shrink: 0; cursor: pointer;
   }
-  .gt-item.done .gt-check { background: var(--accent); color: #fff; }
+  .gt-item.done .gt-check { background: var(--accent-strong); color: #fff; }
   .gt-day-tag {
     font-size: 0.83rem; font-weight: 800;
     padding: 1px 6px; border: 1.5px solid var(--ink); border-radius: 8px;
@@ -1473,7 +1478,7 @@
     cursor: pointer;
     flex-shrink: 0;
   }
-  .ct-check.on { background: var(--accent); color: #fff; }
+  .ct-check.on { background: var(--accent-strong); color: #fff; }
   button.ct-check { padding: 0; font: inherit; line-height: 1; }
   button.ct-check:disabled { cursor: default; opacity: 0.8; }
   button.ct-check:focus-visible { outline: 3px solid var(--accent-blue); outline-offset: 2px; }
@@ -1499,7 +1504,7 @@
   .money-hero b { font-family: 'Gochi Hand', cursive; font-size: 1.6rem; }
   .money-market { background: var(--accent-yellow); border: 2px solid var(--ink); border-radius: 999px; padding: 0.2rem 0.6rem; font-weight: 800; font-size: 0.85rem; }
   .money-btn-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.4rem; }
-  .ct-cap-note { color: var(--accent); font-weight: 700; }
+  .ct-cap-note { color: var(--accent-strong); font-weight: 700; }
   /* override .custom-builder label/input defaults for the in-editor chore checklist */
   .custom-builder label.cg-chore-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; margin-bottom: 0; font-family: 'Nunito', sans-serif; font-size: 0.95rem; color: var(--ink); cursor: pointer; }
   .custom-builder #cgChoreList input[type="checkbox"] {
@@ -1756,7 +1761,7 @@
     font-size: 1.27rem; padding: 0.35rem 0.78rem;
   }
   .btn-template {
-    background: var(--accent); color: #fff;
+    background: var(--accent-strong); color: #fff;
     border: 2px solid var(--ink);
     border-radius: 12px; padding: 0.35rem 0.8rem;
     cursor: pointer; font-size: 0.9rem; font-weight: 700;
@@ -1778,7 +1783,7 @@
     text-align: center;
     font-family: 'Gochi Hand', cursive;
     font-size: 1.2rem;
-    color: var(--accent);
+    color: var(--accent-strong);
     letter-spacing: 1px;
   }
 
@@ -1929,8 +1934,8 @@
     left: 4px;
     font-family: 'Gochi Hand', cursive;
     font-size: 0.9rem;
-    color: var(--accent);
-    opacity: 0.6;
+    color: var(--accent-strong);
+    opacity: 0.9;
     pointer-events: none;
     z-index: 1;
   }
@@ -2160,7 +2165,7 @@
     display: inline-flex;
     align-items: center;
   }
-  .filter-chip.active { background: var(--accent); color: #fff; }
+  .filter-chip.active { background: var(--accent-strong); color: #fff; }
 
   .tray-scroll {
     display: flex; gap: 0.5rem;
@@ -2215,7 +2220,7 @@
     font-size: 0.98rem; font-weight: 700;
     font-family: 'Patrick Hand', sans-serif;
   }
-  .chip-add:hover { border-color: var(--accent); color: var(--accent); }
+  .chip-add:hover { border-color: var(--accent-strong); color: var(--accent-strong); }
 
   /* ═══════════ OVERLAYS / SHEETS ═══════════ */
   .overlay {
@@ -2364,7 +2369,7 @@
   .wins-btn { border: 1.5px solid var(--ink); background: var(--accent-yellow); border-radius: 999px; padding: 0.1rem 0.5rem; font-weight: 800; font-size: 0.8rem; cursor: pointer; font-family: 'Patrick Hand', sans-serif; }
   .wins-btn:hover { background: #ffe08a; }
   /* Weekly wins recap modal */
-  .wins-hero { text-align: center; font-family: 'Gochi Hand', cursive; font-size: 1.3rem; color: var(--accent); margin-bottom: 0.6rem; }
+  .wins-hero { text-align: center; font-family: 'Gochi Hand', cursive; font-size: 1.3rem; color: var(--accent-strong); margin-bottom: 0.6rem; }
   .wins-stat-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
   .wins-stat { flex: 1; text-align: center; border: 2px solid var(--ink); border-radius: 12px; padding: 0.5rem 0.25rem; background: var(--bg2); }
   .wins-num { font-family: 'Gochi Hand', cursive; font-size: 1.5rem; font-weight: 800; color: var(--ink); }
@@ -2508,7 +2513,7 @@
     min-height: 38px;
   }
   .pill-btn:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
-  .pill-btn.active { background: var(--accent); color: #fff; }
+  .pill-btn.active { background: var(--accent-strong); color: #fff; }
 
   .objectives-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.8rem; }
   .obj-item {
@@ -2520,7 +2525,7 @@
   }
   .obj-item.checked { background: var(--accent-yellow); }
   .obj-check { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--ink); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; background:#fff; }
-  .obj-item.checked .obj-check { background: var(--accent); color: #fff; }
+  .obj-item.checked .obj-check { background: var(--accent-strong); color: #fff; }
   .obj-item .obj-meta { margin-left: auto; font-size: 0.75rem; color: var(--ink-light); }
   .obj-item .obj-delete { margin-left: 0.4rem; color: #ef476f; font-weight: 800; padding: 0 4px; }
 
@@ -2575,11 +2580,11 @@
     font-family: 'Patrick Hand', sans-serif;
     box-shadow: 2px 2px 0 var(--ink);
   }
-  .day-pick.active { background: var(--accent); color: #fff; }
+  .day-pick.active { background: var(--accent-strong); color: #fff; }
   .day-pick-presets { display:flex; gap: 0.3rem; margin-bottom: 0.4rem; flex-wrap:wrap; }
 
   .btn-confirm {
-    width: 100%; background: var(--accent); color: #fff;
+    width: 100%; background: var(--accent-strong); color: #fff;
     border: 2px solid var(--ink); border-radius: 14px; padding: 0.85rem;
     font-size: 1.1rem; font-weight: 700; font-family: 'Gochi Hand', cursive;
     cursor: pointer; box-shadow: 3px 3px 0 var(--ink);
@@ -2661,7 +2666,7 @@
   }
   @keyframes floatIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
   .ritual-screen button {
-    margin-top: 1rem; background: #fff; color: var(--accent);
+    margin-top: 1rem; background: #fff; color: var(--accent-strong);
     border: 2px solid var(--ink); border-radius: 20px;
     padding: 0.7rem 1.8rem; font-size: 1.1rem; font-weight: 700;
     cursor: pointer; font-family: 'Gochi Hand', cursive;
@@ -2968,7 +2973,7 @@
   .time-display {
     font-family: 'Gochi Hand', cursive;
     font-size: 1.5rem;
-    color: var(--accent);
+    color: var(--accent-strong);
     padding: 0.3rem 0.7rem;
     background: var(--bg2);
     border: 2px solid var(--ink);
@@ -3012,7 +3017,7 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 1rem; flex-shrink: 0; cursor: pointer;
   }
-  .checklist-item.checked .checklist-check { background: var(--accent); color: #fff; }
+  .checklist-item.checked .checklist-check { background: var(--accent-strong); color: #fff; }
   .checklist-text { flex: 1; font-size: 1.09rem; }
   .checklist-timer-btn {
     background: var(--accent-yellow); border: 2px solid var(--ink);
@@ -3023,7 +3028,7 @@
     flex-shrink: 0;
   }
   .checklist-timer-btn.running {
-    background: var(--accent); color: #fff; animation: pulse 1s infinite;
+    background: var(--accent-strong); color: #fff; animation: pulse 1s infinite;
   }
   .checklist-item input.timer-input {
     width: 56px; border: 1.5px solid var(--ink); border-radius: 6px;
@@ -3203,7 +3208,7 @@
   /* Plan-from-home: add a quest without leaving the Quest Board. */
   .quest-add-btn {
     display: block; width: 100%; margin: 0.1rem 0 0.7rem;
-    background: var(--accent); color: #fff;
+    background: var(--accent-strong); color: #fff;
     border: 3px solid var(--ink); border-radius: 14px;
     box-shadow: 3px 3px 0 var(--ink);
     padding: 0.6rem 0.9rem; font-weight: 800; cursor: pointer;
@@ -3351,7 +3356,7 @@
   }
   .quest-popup-icon { font-size: 3.2rem; margin-bottom: 0.3rem; }
   .quest-popup-title {
-    font-size: 1.35rem; font-weight: 800; color: var(--accent);
+    font-size: 1.35rem; font-weight: 800; color: var(--accent-strong);
     text-transform: uppercase; letter-spacing: 1px;
   }
   .quest-popup-xp {
