@@ -3941,7 +3941,10 @@
     <div class="topbar-left">
       <h2>Parent Dashboard</h2>
     </div>
-    <button class="btn-icon" onclick="goProfile()">Exit</button>
+    <div style="display:flex;gap:0.4rem;align-items:center">
+      <button class="btn-icon" onclick="changeParentPin()" title="Change parent PIN">🔒 PIN</button>
+      <button class="btn-icon" onclick="goProfile()">Exit</button>
+    </div>
   </div>
 
   <div style="padding:0.8rem 1rem 0">
@@ -4036,7 +4039,7 @@
   </div>
 
   <div style="padding:0 0.8rem 0.4rem;font-size:0.85rem;color:var(--ink-light)">
-    Color shows planning density per day. Tap a day to open it.
+    Color shows how much each day is <b>planned</b> — not how much was completed. Tap a day to open it.
   </div>
 
   <div class="pm-grid-wrap">
@@ -5023,6 +5026,7 @@ let state = {
     customTasks: [],
     invites: [],
     routineTemplates: [],  // custom routines: {id, title, icon, items:[{id,text,timerSec}]}
+    parentPin: '1234',     // soft child-lock, parent-configurable (NOT a security boundary)
   }
 };
 
@@ -5143,8 +5147,24 @@ function getGetReadyBufMin(block) {
   if (!block || !block.getReadyBuffer) return 0;
   return clampBufferMin(block.getReadyBufMin != null ? block.getReadyBufMin : DEFAULT_BUFFER_MIN);
 }
+let localSaveFailed = false;
 function saveLocal() {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e){}
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+    // Recovered: a previously-failed write now succeeds.
+    if (localSaveFailed) {
+      localSaveFailed = false;
+      if (typeof showToast === 'function') showToast('✅ Saving works again on this device');
+    }
+  } catch(e) {
+    // Quota exceeded, private mode, or storage blocked. Warn once per transition
+    // (not on every keystroke) so the child/parent knows data isn't persisting.
+    console.error('localStorage save failed', e);
+    if (!localSaveFailed) {
+      localSaveFailed = true;
+      if (typeof showToast === 'function') showToast('⚠️ Couldn\'t save on this device — storage may be full');
+    }
+  }
 }
 function pushToFirebase() {
   if (!fbDocRef || !fbConnected) {
@@ -5788,7 +5808,30 @@ function showScreen(id) {
   }
 }
 
-const PARENT_PIN = '1234';
+/* Parent PIN — a *soft* child-lock, not real security (anyone reading the
+   source or the synced state can see it). Stored per-family in shared state so a
+   parent can change it; defaults to '1234'. A real gate needs Firebase Auth +
+   scoped Firestore rules (see SECURITY_TODO.md). */
+function getParentPin() {
+  const pin = state.shared && state.shared.parentPin;
+  return (pin != null && String(pin).length) ? String(pin) : '1234';
+}
+function setParentPin(newPin) {
+  if (!state.shared) state.shared = {};
+  state.shared.parentPin = String(newPin);
+  saveAll();
+}
+// Parent-hub control: change the family PIN (verifies the current one first).
+function changeParentPin() {
+  const cur = (prompt('Enter your current PIN 🔒') || '').trim();
+  if (cur !== getParentPin()) { showToast('Incorrect PIN'); return; }
+  const next = (prompt('New PIN (numbers work best):') || '').trim();
+  if (!next) { showToast('PIN unchanged'); return; }
+  const confirm2 = (prompt('Re-enter the new PIN:') || '').trim();
+  if (next !== confirm2) { showToast('PINs didn\'t match — unchanged'); return; }
+  setParentPin(next);
+  showToast('✅ Parent PIN updated');
+}
 let parentUnlockedThisSession = false;
 
 /* ── Hero Mode (Quest Board) — simplified gamified landing for kids ── */
@@ -5814,7 +5857,7 @@ function refreshHeroModeToggle() {
 function selectProfile(p) {
   if (p === 'parent' && !parentUnlockedThisSession) {
     const pin = (prompt('Enter parent PIN 🔒') || '').trim();
-    if (pin !== PARENT_PIN) {
+    if (pin !== getParentPin()) {
       showToast('Incorrect PIN');
       return;
     }
