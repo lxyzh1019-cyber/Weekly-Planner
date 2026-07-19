@@ -1637,8 +1637,8 @@
     text-shadow: 0 1px 1px rgba(0,0,0,0.25);
     overflow: hidden;
     box-sizing: border-box;
-    /* Floor so blocks under ~30 min stay tall enough to read the name. */
-    min-height: 17px;
+    /* Floor so even a 15-min block stays tall enough to tap & read (W2). */
+    min-height: 18px;
     z-index: 2;
   }
   .wf-card:hover { transform: translate(-1px,-1px); box-shadow: 2.5px 2.5px 0 var(--ink); z-index: 3; }
@@ -1679,12 +1679,26 @@
   .wf-card--done { opacity: 0.6; }
   .wf-card--done .wf-card-name { text-decoration: line-through; }
   .wf-card--done .wf-card-check { background: var(--accent-green); color: var(--ink); }
-  .wf-card--xslim .wf-card-check { display: none; } /* too short to tap reliably */
+  /* W4: even the shortest block keeps a tappable tick, just smaller — never
+     leave a rendered block with no way to check it off. */
+  .wf-card--xslim .wf-card-check { width: 14px; height: 14px; font-size: 0.62rem; top: 2px; right: 2px; border-radius: 4px; }
   /* Short blocks: drop the duration/time chips so the name + icon still fit */
   .wf-card.wf-card--slim { padding: 0.1rem 0.4rem; align-items: center; }
   .wf-card.wf-card--slim .wf-card-dur { display: none; }
   .wf-card.wf-card--xslim .wf-card-time { display: none; }
-  .wf-card.wf-card--xslim { grid-template-columns: auto 1fr; font-size: 0.74rem; }
+  .wf-card.wf-card--xslim { grid-template-columns: auto 1fr auto; font-size: 0.74rem; }
+  /* W2: too short even for a name → show the icon only, keep the title tooltip
+     and (on the first segment) the check button. */
+  .wf-card--icononly { grid-template-columns: 1fr auto; padding: 0 0.2rem; justify-items: center; }
+  .wf-card--icononly .wf-card-name,
+  .wf-card--icononly .wf-card-time,
+  .wf-card--icononly .wf-card-dur { display: none; }
+  .wf-card--icononly .wf-card-icon { font-size: 0.95rem; }
+  /* W1: continuation segment of a block that crosses a zone boundary. Dashed
+     top edge + ⤵ marker, no time/check (those live on the first segment). */
+  .wf-card--cont { border-top: 2px dashed var(--ink); box-shadow: 1.5px 1.5px 0 rgba(42,35,32,0.35); }
+  .wf-card--cont .wf-card-name { opacity: 0.9; }
+  .wf-card-cont-marker { font-weight: 900; font-size: 0.8rem; line-height: 1; }
 
   /* ═══════════ LEGEND ═══════════ */
   .week-legend {
@@ -1784,6 +1798,68 @@
     padding: 0 0.8rem;
     padding-bottom: 260px;
   }
+  /* ═══════ 3b: Day "Checklist" mode — collapse free time ═══════ */
+  .day-mode-toggle { display: inline-flex; gap: 4px; margin-left: auto; }
+  .day-mode-btn {
+    font-family: 'Patrick Hand', sans-serif; font-size: 0.82rem; font-weight: 700;
+    border: 2px solid var(--ink); background: var(--paper-card, #fffdf5); color: var(--ink);
+    border-radius: 9px; padding: 2px 9px; cursor: pointer; box-shadow: 1.5px 1.5px 0 var(--ink);
+  }
+  .day-mode-btn.active { background: var(--accent-strong, #c14a24); color: #fffdf5; }
+  .day-checklist { display: flex; flex-direction: column; gap: 7px; padding: 6px 0 40px; }
+  .dc-head {
+    display: flex; align-items: center; gap: 8px; font-family: 'Gochi Hand', cursive;
+    font-size: 1.15rem; color: var(--ink); margin: 2px 0 6px;
+  }
+  .dc-head .dc-free-chip {
+    margin-left: auto; font-family: 'Patrick Hand', sans-serif; font-size: 0.9rem; font-weight: 700;
+    background: #fff4db; border: 2px dashed #e8dfc3; border-radius: 10px; padding: 3px 10px;
+  }
+  .dc-row {
+    display: grid; grid-template-columns: 76px 1fr 26px; align-items: center; gap: 8px;
+    border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px;
+    background: var(--paper-card, #fffdf5); box-shadow: 2px 2px 0 var(--ink); cursor: pointer;
+  }
+  .dc-row.tint-routine  { background: #fff4db; }
+  .dc-row.tint-training { background: #ffe3ea; }
+  .dc-row.tint-chores   { background: #eaf6ef; }
+  .dc-row.tint-meals    { background: #fff9e9; }
+  .dc-row.tint-learning { background: #eef3fb; }
+  .dc-row.tint-active   { background: #f1ecfa; }
+  .dc-row.dc-done { opacity: 0.62; }
+  .dc-row.dc-done .dc-name { text-decoration: line-through; }
+  .dc-time { font-weight: 800; font-size: 0.86rem; line-height: 1.15; color: var(--ink); }
+  .dc-time small { display: block; font-weight: 700; font-size: 0.74rem; opacity: 0.75; }
+  .dc-content { min-width: 0; }
+  .dc-name { font-weight: 800; font-size: 1.02rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dc-meta { font-size: 0.8rem; opacity: 0.85; }
+  .dc-check {
+    width: 26px; height: 26px; border-radius: 7px; border: 2px solid var(--ink);
+    background: rgba(255,255,255,0.9); color: var(--ink); font-size: 0.95rem; font-weight: 900;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
+  }
+  .dc-check.done { background: #95d5b2; }
+  .dc-gap { display: flex; flex-direction: column; gap: 4px; }
+  .dc-gap-pill {
+    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+    border: 2px dashed #c9bda6; border-radius: 12px; background: var(--paper-card, #fffdf5);
+    padding: 7px 12px; font-family: 'Patrick Hand', sans-serif; font-size: 0.95rem; color: #6b5d4f;
+    cursor: pointer;
+  }
+  .dc-gap-pill:hover { border-color: var(--ink); color: var(--ink); }
+  .dc-gap-pill .dc-gap-chev { font-weight: 900; }
+  .dc-gap-pill .dc-gap-hint { margin-left: auto; font-size: 0.82rem; opacity: 0.85; }
+  .dc-slots { display: flex; flex-direction: column; gap: 3px; padding-left: 26px; }
+  .dc-slot {
+    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+    border: 2px dashed #e8dfc3; border-radius: 10px; background: rgba(255,255,255,0.6);
+    padding: 5px 10px; font-family: 'Patrick Hand', sans-serif; font-size: 0.9rem; color: #6b5d4f;
+    cursor: pointer;
+  }
+  .dc-slot:hover { border-color: var(--accent-strong, #c14a24); color: var(--accent-strong, #c14a24); }
+  .dc-empty { text-align: center; color: #6b5d4f; padding: 24px 0; }
+  /* Zone filter is timeline-only; the checklist always shows the whole day. */
+  #screen-day.dc-mode .day-topbar__row2 .zone-tabs { display: none; }
   .timeline-zone-label {
     margin: 0.8rem 0 0.3rem;
     text-align: center;
@@ -1797,7 +1873,7 @@
   .timeline {
     position: relative;
     display: flex;
-    min-height: 1260px; /* DAY_MIN_SPAN * PX_PER_MIN, see JS */
+    min-height: 1344px; /* DAY_MIN_SPAN(960) * PX_PER_MIN(1.4), see JS */
   }
   .tl-gutter {
     width: 50px;
@@ -1964,6 +2040,17 @@
   }
   .placed-block:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--ink); }
   .placed-block.parent-pinned { border-style: dashed; border-width: 3px; }
+  /* W7: a block spilling past the selected zone's edge shows a "continues"
+     marker at that edge instead of being silently cut off. */
+  .block-clip-marker {
+    position: absolute; left: 0; right: 0;
+    text-align: center; font-size: 0.6rem; font-weight: 900;
+    letter-spacing: 0.5px; line-height: 1; padding: 1px 0;
+    background: rgba(42,35,32,0.72); color: #fffdf5;
+    pointer-events: none; z-index: 11;
+  }
+  .block-clip-marker--top { top: 0; border-radius: 10px 10px 0 0; }
+  .block-clip-marker--bottom { bottom: 0; border-radius: 0 0 10px 10px; }
   /* Pale block colours (e.g. Routine's mint) need dark text to stay readable. */
   .placed-block.light-bg { color: var(--ink); }
   /* Pending invitation from sister (not yet accepted) */
@@ -3452,6 +3539,33 @@
     width: 100%; border: 2px solid var(--ink); border-radius: 10px; background: var(--accent-green);
     box-shadow: 2px 2px 0 var(--ink); padding: 0.45rem; font-weight: 800; cursor: pointer;
   }
+  /* ═══════ 3a: "How I earn" — one money page ═══════ */
+  .hm-earn { border: 2px solid var(--ink); border-radius: 12px; background: #fff9e9; padding: 8px 12px; margin-bottom: 8px; }
+  .hm-earn-top { display: flex; align-items: baseline; gap: 8px; }
+  .hm-earn-label { font-family: 'Gochi Hand', cursive; font-size: 1.15rem; }
+  .hm-earn-amt { margin-left: auto; font-family: 'Gochi Hand', cursive; font-size: 1.35rem; color: var(--accent-strong, #c14a24); }
+  .hm-bar { position: relative; height: 16px; border: 2px solid var(--ink); border-radius: 9px; overflow: hidden; background: var(--paper-card, #fffdf5); margin: 6px 0 5px; }
+  .hm-bar-fill { position: absolute; inset: 0; background: var(--accent-yellow, #ffd166); border-radius: 0; }
+  .hm-bar-tick { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #c9bda6; }
+  .hm-earn-note { font-size: 0.8rem; color: var(--ink-light, #5a4d41); }
+  .hm-rules { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .hm-rule { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center; border: 2px solid var(--ink); border-radius: 11px; padding: 6px 9px; background: rgba(255,255,255,0.7); }
+  .hm-rule-icon { font-size: 1.15rem; text-align: center; }
+  .hm-rule-text { font-size: 0.86rem; line-height: 1.25; min-width: 0; }
+  .hm-rule-text i { font-style: italic; opacity: 0.85; }
+  .hm-rule-chip { font-size: 0.78rem; font-weight: 800; border: 2px solid var(--ink); border-radius: 9px; padding: 1px 8px; white-space: nowrap; }
+  .hm-rule-chip.chip-green { background: #95d5b2; }
+  .hm-rule-chip.chip-yellow { background: var(--accent-yellow, #ffd166); }
+  .hm-rule-chip.chip-plain { background: var(--paper-card, #fffdf5); }
+  .hm-wallet { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px; }
+  .hm-wtile { border: 2px solid var(--ink); border-radius: 11px; padding: 6px 4px; text-align: center; }
+  .hm-wtile.w-cash { background: #fff9e9; }
+  .hm-wtile.w-savings { background: #eaf6ef; }
+  .hm-wtile.w-gic { background: #eef3fb; }
+  .hm-wtile.w-stocks { background: #f6effa; }
+  .hm-wtile-label { font-size: 0.76rem; color: var(--ink-light, #5a4d41); }
+  .hm-wtile-amt { font-family: 'Gochi Hand', cursive; font-size: 1.1rem; }
+  .hm-wtile-note { font-size: 0.66rem; color: #6b5d4f; line-height: 1.1; }
 
   /* Quick slot-picker sheet (tap an empty slot to add an activity) */
   .slot-picker-hint { color: var(--ink-light); font-size: 0.92rem; margin: 0.1rem 0 0.5rem; }
@@ -3894,8 +4008,13 @@
         <div class="day-panel-label day-panel-label--landscape-only day-schedule-label">
           <button type="button" class="day-left-toggle" id="dayLeftToggle" onclick="toggleLeftPane()" title="Hide/show the side panel" aria-label="Hide or show the side panel"><span id="dayLeftToggleCaret">◀</span> Panel</button>
           <span>Schedule</span>
+          <div class="day-mode-toggle" role="tablist" aria-label="Schedule view mode">
+            <button type="button" class="day-mode-btn active" id="dayModeTimeline" role="tab" aria-selected="true" onclick="setDayViewMode('timeline')">🕐 Timeline</button>
+            <button type="button" class="day-mode-btn" id="dayModeChecklist" role="tab" aria-selected="false" onclick="setDayViewMode('checklist')">✅ Checklist</button>
+          </div>
         </div>
         <div class="timeline" id="timeline"></div>
+        <div class="day-checklist" id="dayChecklist" style="display:none"></div>
       </div>
     </div>
 
@@ -4831,10 +4950,10 @@ function renderSyncDebugMessage() {
 const LS_KEY = 'weeklyplanner-v3';
 const TOTAL_SLOTS = 60;           // 6AM → 9PM = 15 hrs × 4 (legacy, used for some %s)
 const START_HOUR  = 6;
-const END_HOUR    = 21;
+const END_HOUR    = 22;
 const START_MIN   = START_HOUR * 60;      // 360
-const END_MIN     = END_HOUR * 60;        // 1260
-const DAY_MIN_SPAN = END_MIN - START_MIN; // 900 min
+const END_MIN     = END_HOUR * 60;        // 1320
+const DAY_MIN_SPAN = END_MIN - START_MIN; // 960 min
 const PX_PER_MIN  = 1.4;                  // 1 min = 1.4px → 1 hr = 84px
 
 const COLOURS = ['#ff7b54','#ff9eb5','#ffd166','#95d5b2','#6fb1fc','#c3aed6','#ef476f','#8ecae6','#ffb4a2','#b5ead7'];
@@ -5064,6 +5183,8 @@ let parentViewing = 'jenn';
 let weekOffset = 0;
 let currentDayKey = null;
 let selectedActivity = null;
+let dayViewMode = 'timeline';        // 3b: 'timeline' | 'checklist'
+let dcOpenGaps = new Set();          // 3b: which free-gaps are expanded (by start-min)
 let timelinePlacementGuideEl = null;
 let dayLandscapeChromeRaf = 0;
 let pendingStartMin = null;
@@ -6119,19 +6240,79 @@ function renderQuestMoneyStrip(kid) {
     return `<span class="qms-chip ${paid ? 'paid' : ''}">${g.icon || '🧺'} ${paid ? '✓' : `${n}/${m}`}</span>`;
   }).join('');
 
-  const w = ensureWallet(kid);
-  const tile = (label, val) => `<div class="qmp-tile"><span class="qmp-tile-label">${label}</span><span class="qmp-tile-value">$${money2(val).toFixed(2)}</span></div>`;
   panel.hidden = false;
-  panel.innerHTML =
-      `<div class="qmp-total">Total money: <b>$${netWorth(kid).toFixed(2)}</b></div>`
-    + `<div class="qmp-breakdown">`
-    +   tile('💵 Cash', w.cash)
-    +   tile('🏦 Savings', w.savings)
-    +   tile('📈 Investments', portfolioValue(kid))
-    +   tile('🔒 GIC', gicTotal(kid))
-    + `</div>`
-    + `<div class="qms-week">🧹 Earned this week: <b>$${ctWeekMoney(wk, kid).toFixed(2)}</b></div>`
-    + `<div class="qms-chips">${chips || '<span class="qms-chip">No chore groups yet</span>'}</div>`
+  panel.innerHTML = buildHowIEarnCard(kid, wk);
+}
+
+/* 3a — "How I earn": one kid-readable card that gathers every money rule and
+   the wallet in one place (was split across the chore tab, money screen and
+   meeting sheet). Display-only — reads existing chore/money state. */
+function buildHowIEarnCard(kid, wk) {
+  const cap = CT_MONEY_CAP;
+  const earned = ctGroupEarned(wk, kid);                    // fired chore money (sticky)
+  const goalBonusEarned = ctGetGoalBonus(wk, kid) ? 1 : 0;
+  const weekMoney = ctWeekMoney(wk, kid);                   // min(cap, earned + bonus)
+  const goals = ctGetWeekGoals(wk);
+  const goal = goals[kid];                                  // points target or null
+  const pts = ctMandatoryPoints(wk, kid) + ctOptionalPoints(wk, kid);
+  const goalPending = !!goal && !goalBonusEarned;
+  const fillPct = Math.max(0, Math.min(100, weekMoney / cap * 100));
+  const tickPct = Math.max(0, Math.min(100, (Math.min(cap, earned + goalBonusEarned + (goalPending ? 1 : 0))) / cap * 100));
+
+  // Top earnings card + progress bar to the weekly cap.
+  const capNote = [];
+  if (earned > 0) capNote.push(`$${earned.toFixed(2)} chores ✓`);
+  if (goalBonusEarned) capNote.push(`+$1.00 goal ✓`);
+  else if (goalPending) capNote.push(`goal bonus +$1.00 still open${goal ? ` (${pts}/${goal} pts)` : ''}`);
+  const earnCard =
+      `<div class="hm-earn">`
+    +   `<div class="hm-earn-top"><span class="hm-earn-label">This week so far</span><span class="hm-earn-amt">$${weekMoney.toFixed(2)}</span></div>`
+    +   `<div class="hm-bar"><div class="hm-bar-fill" style="width:${fillPct}%"></div><div class="hm-bar-tick" style="left:${tickPct}%"></div></div>`
+    +   `<div class="hm-earn-note">of $${cap.toFixed(2)} max${capNote.length ? ' · ' + capNote.join(' · ') : ''}</div>`
+    + `</div>`;
+
+  // Rule cards — one per weekly chore group, then goal / sticky / meeting.
+  const rule = (icon, name, text, chip, chipCls) =>
+      `<div class="hm-rule"><span class="hm-rule-icon">${icon}</span>`
+    +   `<span class="hm-rule-text"><b>${escapeHtml(name)}</b> — ${text}</span>`
+    +   `<span class="hm-rule-chip ${chipCls||''}">${chip}</span></div>`;
+
+  let rules = '';
+  ctGroupsForKid(kid).filter(g => g.cadence !== 'daily').forEach(g => {
+    const ids = g.choreIds || [];
+    const m = ids.length;
+    const n = ids.filter(c => [0,1,2,3,4,5,6].some(d => ctGetOptional(wk, d, kid, c))).length;
+    const fired = ctGroupFiredWeekly(wk, g.id, kid);
+    const val = (Number(g.valueDollars) || 0).toFixed(2);
+    rules += rule(g.icon || '🧹', g.name || 'Chore crew',
+      `all ${m} done sometime this week → $${val} <i>all or nothing</i>`,
+      fired ? `${m}/${m} ✓ $${val}` : `${n}/${m}`,
+      fired ? 'chip-green' : '');
+  });
+  rules += rule('🎯', 'Week goal',
+    `routine + chore points reach your goal → $1.00 bonus`,
+    goalBonusEarned ? '✓ $1.00' : (goal ? `${pts}/${goal} pts` : 'set a goal'),
+    goalBonusEarned ? 'chip-green' : 'chip-yellow');
+  rules += rule('🔒', 'Once earned, yours',
+    `unchecking never takes money back`, 'sticky', 'chip-plain');
+  rules += rule('🤝', 'Family meeting',
+    `confirms the week (max $${cap.toFixed(2)}) & moves the money world one month`, 'Sunday', 'chip-plain');
+
+  // Wallet strip.
+  const w = ensureWallet(kid);
+  const wtile = (label, val, note, cls) =>
+      `<div class="hm-wtile ${cls}"><div class="hm-wtile-label">${label}</div>`
+    +   `<div class="hm-wtile-amt">$${money2(val).toFixed(2)}</div>`
+    +   `<div class="hm-wtile-note">${note}</div></div>`;
+  const wallet =
+      `<div class="hm-wallet">`
+    +   wtile('Cash', w.cash, 'spend or save', 'w-cash')
+    +   wtile('Savings', w.savings, 'earns interest', 'w-savings')
+    +   wtile('GIC', gicTotal(kid), 'locked, grows more', 'w-gic')
+    +   wtile('Stocks', portfolioValue(kid), 'goes up & down', 'w-stocks')
+    + `</div>`;
+
+  return earnCard + `<div class="hm-rules">${rules}</div>` + wallet
     + `<button type="button" class="qmp-open" onclick="openMoneyScreen('${kid}')">Open Bank &amp; Invest ›</button>`;
 }
 
@@ -6521,8 +6702,9 @@ function renderWeek() {
   }
 }
 
-// Weekly time-per-category totals over the app's 6am–9pm window (shared by
-// the Sunday review nudge). Free = window minutes not scheduled.
+// Weekly time-per-category totals over the app's 6am–10pm window (shared by
+// the Sunday review nudge). Free = window minutes not scheduled. Counts the
+// full entered duration up to END_MIN so charts reflect what was planned (W6).
 function computeWeekTotals(keys) {
   const acts = getAllActivities();
   const catMin = {};
@@ -6600,7 +6782,7 @@ function renderWeekGlance(keys) {
     : '';
 
   body.innerHTML = `
-    <div class="glance-window">Totals over the 6am–9pm window (${fmtHrsMin(DAY_MIN_SPAN)}/day).</div>
+    <div class="glance-window">Totals over the 6am–10pm window (${fmtHrsMin(DAY_MIN_SPAN)}/day).</div>
     <div class="glance-chips">${chips}</div>
     ${sleepHtml}
     ${notesHtml}
@@ -6684,7 +6866,10 @@ function bedtimeReminderText(age) {
    ════════════════════════════════════════════════════════════════ */
 
 /* Time-grid color mode: 'inverted' (default, free=bright) or 'classic' (cat colors) */
-let tgColorMode = 'inverted';
+// 2a: default to quiet-free — planned blocks carry their saturated category
+// colour, free time stays plain paper so an empty week reads as empty. The
+// toggle still flips to the older "free-time bright" (inverted) mode.
+let tgColorMode = 'classic';
 
 /* Activity IDs that count as Learning/Training (per locked plan) */
 const TG_LEARNING_IDS = ['school_day', 'french', 'chinese', 'math', 'piano', 'training'];
@@ -7098,17 +7283,36 @@ function wfPickZone(relStart, durMin, zones) {
   return bestOv > 0 ? best : zones[zones.length - 1];
 }
 
+/* Split a block into one render segment per zone it overlaps so a block that
+   crosses a zone boundary shows in EVERY zone instead of being clamped into a
+   single one (W1/W7). relStart/dur are minutes from START_MIN. Zones must be
+   contiguous and sorted by start. Returns segments in time order, each flagged
+   isFirst (earliest, keeps the time label + check button) / isLast. */
+function splitBlockIntoZoneSegments(relStart, dur, zones) {
+  const blockEnd = relStart + dur;
+  const segs = [];
+  zones.forEach(z => {
+    const segStart = Math.max(relStart, z.start);
+    const segEnd   = Math.min(blockEnd, z.end);
+    if (segEnd - segStart <= 0) return;
+    segs.push({ zoneId: z.id, zone: z, segStart, segEnd });
+  });
+  segs.sort((a,b)=> a.segStart - b.segStart);
+  segs.forEach((s,i)=>{ s.isFirst = (i===0); s.isLast = (i===segs.length-1); });
+  return segs;
+}
+
 function renderFullWeek(keys) {
   const grid = document.getElementById('weeklyFullGrid');
   grid.innerHTML = '';
   const acts = getAllActivities();
 
-  /* Minutes from START_MIN (6am): before 6-8am, school 8am-3pm, after 3-6pm, evening 6pm-9pm */
+  /* Minutes from START_MIN (6am): before 6-8am, school 8am-3pm, after 3-6pm, evening 6pm-10pm */
   const ZONES = [
     { id:'before',  label: '🌅 Before school · Morning (6–8 am)', start: 0,   end: 120 },
     { id:'school',  label: '🏫 School · Daytime (8 am–3 pm)',    start: 120, end: 540 },
     { id:'after',   label: '🎒 After school · Afternoon (3–6 pm)', start: 540, end: 720 },
-    { id:'evening', label: '🌙 Evening (6–9 pm)',                 start: 720, end: DAY_MIN_SPAN },
+    { id:'evening', label: '🌙 Evening (6–10 pm)',                start: 720, end: DAY_MIN_SPAN },
   ];
 
   // Day headers row
@@ -7184,9 +7388,12 @@ function renderFullWeek(keys) {
         .slice().sort((a,b)=>a.startMin - b.startMin)
         .filter(b=>{
           const relStart = b.startMin - START_MIN;
-          const dur = b.durationMin || 0;
-          const picked = wfPickZone(relStart, dur, ZONES);
-          return picked.id === z.id;
+          const dur = Math.max(5, b.durationMin || 0);
+          // Include the block in EVERY zone it overlaps (not just its "best"
+          // zone) so a boundary-crossing block renders a segment in each — the
+          // segment is clamped to this zone's edges below (W1). Mirrors the
+          // travel-strip pass further down.
+          return wfZoneOverlap(relStart, dur, z) > 0;
         });
 
       // Split blocks that overlap in time into side-by-side columns so
@@ -7201,11 +7408,14 @@ function renderFullWeek(keys) {
         const min = startMinOfDay % 60;
         const timeStr = `${hr>12?hr-12:hr}:${String(min).padStart(2,'0')}${hr>=12?'p':'a'}`;
 
-        // Position by time within the zone (clamped to the zone's span)
+        // Position by time within the zone (clamped to the zone's span). A
+        // block spanning several zones renders one segment per zone; only the
+        // segment in the zone the block actually starts in is the "first" one.
         const relStart = b.startMin - START_MIN;
         const dur = Math.max(5, b.durationMin || 0);
         const segStart = Math.max(relStart, z.start);
         const segEnd   = Math.min(relStart + dur, z.end);
+        const isFirst  = relStart >= z.start; // zones are contiguous → true only where it starts
         const topPct = (segStart - z.start) / zoneSpan * 100;
         const heightPct = Math.max(segEnd - segStart, 0) / zoneSpan * 100;
         const pxHeight = heightPct / 100 * cellH;
@@ -7215,7 +7425,9 @@ function renderFullWeek(keys) {
         let cls = 'wf-card' + (isLightColour(bg) ? ' light-bg' : '');
         if (pxHeight < 34) cls += ' wf-card--slim';
         if (pxHeight < 22) cls += ' wf-card--xslim';
+        if (pxHeight < 16) cls += ' wf-card--icononly'; // W2: too short for a name → icon only
         if (b.completed) cls += ' wf-card--done';
+        if (!isFirst)   cls += ' wf-card--cont';         // W1: continuation segment
         card.className = cls;
 
         const slot = cols.get(b.id) || { col: 0, count: 1 };
@@ -7236,15 +7448,27 @@ function renderFullWeek(keys) {
         card.style.width = widthCss;
         card.style.background = bg;
         const travelTag = bufBefore > 0 ? `<span class="wf-card-travel">${travelMin ? '🚗' : '👕'}${bufBefore}m</span>` : '';
-        card.innerHTML = `
-          <div class="wf-card-time">${timeStr}</div>
-          <div class="wf-card-icon">${act.icon}</div>
-          <div class="wf-card-name">${b.parentStamp && b.parentStamp.emoji ? b.parentStamp.emoji + ' ' : ''}${act.name}${travelTag}</div>
-          <div class="wf-card-dur">${formatDuration(b.durationMin)}</div>
-          <button type="button" class="wf-card-check" aria-label="${b.completed?'Mark not done':'Mark done'}"
-            onclick="toggleBlockDone('${key}','${b.id}',event)">${b.completed?'✓':''}</button>
-        `;
+        const stampEmoji = b.parentStamp && b.parentStamp.emoji ? b.parentStamp.emoji + ' ' : '';
+        if (isFirst) {
+          card.innerHTML = `
+            <div class="wf-card-time">${timeStr}</div>
+            <div class="wf-card-icon">${act.icon}</div>
+            <div class="wf-card-name">${stampEmoji}${act.name}${travelTag}</div>
+            <div class="wf-card-dur">${formatDuration(b.durationMin)}</div>
+            <button type="button" class="wf-card-check" aria-label="${b.completed?'Mark not done':'Mark done'}"
+              onclick="toggleBlockDone('${key}','${b.id}',event)">${b.completed?'✓':''}</button>
+          `;
+        } else {
+          // Continuation segment: no time, no check, a ⤵ marker to signal the
+          // block began in an earlier zone. Same tooltip + click-through below.
+          card.innerHTML = `
+            <div class="wf-card-cont-marker" aria-hidden="true">⤵</div>
+            <div class="wf-card-icon">${act.icon}</div>
+            <div class="wf-card-name">${stampEmoji}${act.name}</div>
+          `;
+        }
         card.title = `${act.icon} ${act.name} — ${timeStr}, ${formatDuration(b.durationMin)}`
+          + (isFirst ? '' : ' · continues from the previous section')
           + (bufBefore > 0 ? ` · ${travelMin ? '🚗 travel' : '👕 get-ready'} ${bufBefore} min each way` : '');
         card.onclick = (e)=>{ e.stopPropagation(); openDayFromWeekCard(key, ci, b.id); };
         cell.appendChild(card);
@@ -7346,6 +7570,7 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   selectedActivity = null;
   currentZone = 'all';
   leftPaneManualCollapsed = false;
+  dcOpenGaps.clear(); // 3b: forget expanded free-slots from the previous day
 
   document.querySelectorAll('.zone-tab').forEach(t=>t.classList.toggle('active', t.dataset.zone==='all'));
 
@@ -7492,10 +7717,151 @@ function setDayMood(m) {
   showToast('Mood saved '+m);
 }
 
+/* ════════════════════════════════════════════════════════════════
+   3b — DAY "CHECKLIST" MODE: collapse free time into tappable pills
+════════════════════════════════════════════════════════════════ */
+function setDayViewMode(mode) {
+  dayViewMode = (mode === 'checklist') ? 'checklist' : 'timeline';
+  const tb = document.getElementById('dayModeTimeline');
+  const cb = document.getElementById('dayModeChecklist');
+  if (tb) { tb.classList.toggle('active', dayViewMode==='timeline'); tb.setAttribute('aria-selected', dayViewMode==='timeline'); }
+  if (cb) { cb.classList.toggle('active', dayViewMode==='checklist'); cb.setAttribute('aria-selected', dayViewMode==='checklist'); }
+  const scr = document.getElementById('screen-day');
+  if (scr) scr.classList.toggle('dc-mode', dayViewMode==='checklist');
+  buildTimeline();
+}
+
+/* Soft category tint for a checklist row, per the 3b palette. */
+function dcTintClass(act) {
+  if (!act) return '';
+  if (act.isTraining || act.cat==='training') return 'tint-training';
+  if (act.isRoutine  || act.cat==='routine')  return 'tint-routine';
+  if (act.id==='chores') return 'tint-chores';
+  if (['breakfast','lunch','dinner'].includes(act.id)) return 'tint-meals';
+  if (act.cat==='school') return 'tint-learning';
+  if (act.cat==='active') return 'tint-active';
+  return '';
+}
+
+function dcToggleGap(startMin) {
+  if (dcOpenGaps.has(startMin)) dcOpenGaps.delete(startMin); else dcOpenGaps.add(startMin);
+  buildDayChecklist();
+}
+
+function buildDayChecklistBlockRow(b, acts) {
+  const act = acts.find(a=>a.id===b.actId);
+  const row = document.createElement('div');
+  row.className = ('dc-row ' + dcTintClass(act) + (b.completed?' dc-done':'')).trim();
+  const startAbs = b.startMin, endAbs = b.startMin + (b.durationMin||0);
+  const icon = act ? act.icon : '❓';
+  const name = act ? act.name : 'Activity';
+  const choreList = (b.actId==='chores' && Array.isArray(b.choreTags) && b.choreTags.length) ? ': '+b.choreTags.join(', ') : '';
+  const noteTrim = (b.note && String(b.note).trim()) ? String(b.note).trim() : '';
+  row.innerHTML = `
+    <div class="dc-time">${formatTimeFromMin(startAbs)}<small>${formatTimeFromMin(endAbs)}</small></div>
+    <div class="dc-content">
+      <div class="dc-name">${icon} ${escapeHtml(name)}${escapeHtml(choreList)}</div>
+      <div class="dc-meta">${formatDuration(b.durationMin||0)}${noteTrim? ' · '+escapeHtml(noteTrim) : ''}</div>
+    </div>
+    <button type="button" class="dc-check${b.completed?' done':''}" aria-label="${b.completed?'Mark not done':'Mark done'}" onclick="event.stopPropagation(); toggleBlockDone(currentDayKey,'${b.id}',event)">${b.completed?'✓':''}</button>
+  `;
+  row.onclick = (e)=>{ e.stopPropagation(); onTimelineBlockTap(b.id); };
+  return row;
+}
+
+function buildDayChecklistGapPill(gapStart, gapEnd) {
+  const wrap = document.createElement('div');
+  wrap.className = 'dc-gap';
+  const open = dcOpenGaps.has(gapStart);
+  const dur = gapEnd - gapStart;
+  const pill = document.createElement('button');
+  pill.type = 'button';
+  pill.className = 'dc-gap-pill';
+  pill.innerHTML = `<span class="dc-gap-chev">${open?'▾':'▸'}</span><span>✨ Free · ${fmtHrsMin(dur)}</span><span class="dc-gap-hint">${open?'pick a start time':'tap to add here'}</span>`;
+  pill.onclick = ()=> dcToggleGap(gapStart);
+  wrap.appendChild(pill);
+  if (open) {
+    const slots = document.createElement('div');
+    slots.className = 'dc-slots';
+    // 30-min slots aligned to clock half-hours, clipped to the gap.
+    for (let t = Math.floor(gapStart/30)*30; t < gapEnd; t += 30) {
+      const slotStart = Math.max(t, gapStart);
+      const slotEnd = Math.min(t+30, gapEnd);
+      if (slotEnd - slotStart < 5) continue;
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'dc-slot';
+      btn.textContent = `${formatTimeFromMin(slotStart)} – ${formatTimeFromMin(slotEnd)} · tap to add ＋`;
+      btn.onclick = ()=> addActivityAtMin(slotStart);
+      slots.appendChild(btn);
+    }
+    wrap.appendChild(slots);
+  }
+  return wrap;
+}
+
+function buildDayChecklist() {
+  const host = document.getElementById('dayChecklist');
+  if (!host) return;
+  host.innerHTML = '';
+  const acts = getAllActivities();
+  const blocks = getDayBlocks(currentDayKey).slice()
+    .filter(b => (b.durationMin||0) > 0)
+    .sort((a,b)=> (a.startMin - b.startMin) || (a.durationMin - b.durationMin));
+
+  // Total free time = day window minus the union of occupied intervals.
+  const iv = blocks
+    .map(b => [Math.max(b.startMin, START_MIN), Math.min(b.startMin+(b.durationMin||0), END_MIN)])
+    .filter(([s,e]) => e > s)
+    .sort((a,b)=> a[0]-b[0]);
+  let occ = 0, curS = null, curE = null;
+  iv.forEach(([s,e]) => {
+    if (curE === null) { curS = s; curE = e; }
+    else if (s <= curE) { curE = Math.max(curE, e); }
+    else { occ += curE - curS; curS = s; curE = e; }
+  });
+  if (curE !== null) occ += curE - curS;
+  const freeMin = Math.max(0, (END_MIN - START_MIN) - occ);
+
+  const head = document.createElement('div');
+  head.className = 'dc-head';
+  head.innerHTML = `<span>📋 Today's checklist</span><span class="dc-free-chip">🌤 ${fmtHrsMin(freeMin)} free today</span>`;
+  host.appendChild(head);
+
+  // Walk the day: emit a free-gap pill before each block, then the block row.
+  let cursor = START_MIN;
+  const emitGap = (gs, ge) => { if (ge - gs >= 5) host.appendChild(buildDayChecklistGapPill(gs, ge)); };
+  blocks.forEach(b => {
+    const bStart = b.startMin, bEnd = b.startMin + (b.durationMin||0);
+    if (bStart > cursor) emitGap(cursor, bStart);
+    host.appendChild(buildDayChecklistBlockRow(b, acts));
+    cursor = Math.max(cursor, bEnd);
+  });
+  if (cursor < END_MIN) emitGap(cursor, END_MIN);
+
+  if (!blocks.length) {
+    const empty = document.createElement('div');
+    empty.className = 'dc-empty';
+    empty.textContent = 'Nothing planned yet — tap a free stretch above to add your first activity.';
+    host.appendChild(empty);
+  }
+}
+
 function buildTimeline() {
   if (activeStopwatchTick) { clearInterval(activeStopwatchTick); activeStopwatchTick = null; }
   refreshRestDayButton();
   const tl = document.getElementById('timeline');
+  const cl = document.getElementById('dayChecklist');
+  // 3b: in checklist mode, render the collapsed-free-time list instead of the
+  // pixel timeline.
+  if (dayViewMode === 'checklist') {
+    if (tl) tl.style.display = 'none';
+    if (cl) cl.style.display = '';
+    buildDayChecklist();
+    renderDayNextUpBanner();
+    return;
+  }
+  if (tl) tl.style.display = '';
+  if (cl) cl.style.display = 'none';
   const topbar = document.querySelector('#screen-day .day-topbar');
   tl.innerHTML = '';
   if (topbar) topbar.classList.remove('day-topbar--compact');
@@ -7865,9 +8231,20 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
   const act = getAllActivities().find(a=>a.id===b.actId);
   if (!act) return;
 
+  // Clip the block to the visible zone and flag any edge it crosses, so a
+  // block spilling past a selected zone's top/bottom shows a "continues"
+  // marker instead of being silently cut (W7). In the default "all" view the
+  // zone spans the whole day, so nothing is clipped.
+  const [, zEndOffset] = zoneRangeMin(currentZone);
+  const zoneSpan = zEndOffset - zMinStart;
   const relStart = (b.startMin - START_MIN) - zMinStart;
-  const top = Math.max(0, relStart * PX_PER_MIN);
-  const height = Math.max(22, b.durationMin * PX_PER_MIN - 2);
+  const relEnd   = relStart + (b.durationMin || 0);
+  const clippedTop    = relStart < 0;
+  const clippedBottom = relEnd > zoneSpan;
+  const visStartMin = Math.max(0, relStart);
+  const visEndMin   = Math.min(zoneSpan, relEnd);
+  const top = visStartMin * PX_PER_MIN;
+  const height = Math.max(22, (visEndMin - visStartMin) * PX_PER_MIN - 2);
 
   const widthPct = 100 / colCount;
   const leftPct  = colIdx * widthPct;
@@ -7958,6 +8335,20 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
     ${noteHtml}
     ${gearHtml}
   `;
+  if (!isBuffer && clippedTop) {
+    const m = document.createElement('div');
+    m.className = 'block-clip-marker block-clip-marker--top';
+    m.textContent = '⌃ continues';
+    blockEl.appendChild(m);
+    blockEl.title = `${act.name} started earlier — switch to “All” to see the whole block`;
+  }
+  if (!isBuffer && clippedBottom) {
+    const m = document.createElement('div');
+    m.className = 'block-clip-marker block-clip-marker--bottom';
+    m.textContent = 'continues ⌄';
+    blockEl.appendChild(m);
+    blockEl.title = `${act.name} continues past this section — switch to “All” to see the whole block`;
+  }
   if (!isBuffer) blockEl.onclick = (e)=>{ e.stopPropagation(); onTimelineBlockTap(b.id); };
   canvas.appendChild(blockEl);
 
@@ -8283,6 +8674,13 @@ function handleCanvasTap(e, zMinStart) {
   const snapped = Math.round(relMin / 15) * 15;
   const absMin = START_MIN + zMinStart + snapped;
 
+  addActivityAtMin(absMin);
+}
+
+/* Shared placement entry point used by both the timeline canvas tap and the
+   3b checklist free-slot buttons: with nothing selected, offer the slot
+   picker; otherwise route the selected activity into its placement sheet. */
+function addActivityAtMin(absMin) {
   // No activity picked yet → offer the picker right at the tapped time so the
   // kid doesn't have to select from the tray first.
   if (!selectedActivity) { openSlotPicker(absMin); return; }
@@ -8469,6 +8867,12 @@ function placementFeedback() {
 /* Place a new block */
 function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts={}) {
   const id = Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  // W5: keep the block inside the day — trim its duration to the room left from
+  // its start so what's saved always renders in full.
+  const reqDur = Math.max(5, durationMin || 0);
+  const fitDur = Math.min(reqDur, END_MIN - startMin);
+  if (fitDur < reqDur) showToast('✂️ Trimmed to fit the day');
+  durationMin = fitDur;
   const block = {
     id, actId, startMin, durationMin,
     createdAt: Date.now(), updatedAt: Date.now(), // so cross-device merges order correctly
@@ -9677,7 +10081,12 @@ async function saveEditChanges() {
   const act = getAllActivities().find(a=>a.id===blk.actId);
 
   const newStart = Math.max(START_MIN, Math.min(END_MIN-15, editState.startMin));
-  const newDur   = Math.max(5, Math.min(DAY_MIN_SPAN, editState.durationMin));
+  // W5: never let a block run past the end of the day — clamp its duration to
+  // the room left from its start, so what's saved is what renders. Toast if we
+  // had to shorten it.
+  const requestedDur = Math.max(5, Math.min(DAY_MIN_SPAN, editState.durationMin));
+  const newDur = Math.min(requestedDur, END_MIN - newStart);
+  if (newDur < requestedDur) showToast('✂️ Trimmed to fit the day');
   const newTravel = !!editState.travelBuffer;
   const newGetReady = !!editState.getReadyBuffer;
   const newTravelBuf = newTravel ? clampBufferMin(editState.travelBufMin) : null;
