@@ -3539,6 +3539,33 @@
     width: 100%; border: 2px solid var(--ink); border-radius: 10px; background: var(--accent-green);
     box-shadow: 2px 2px 0 var(--ink); padding: 0.45rem; font-weight: 800; cursor: pointer;
   }
+  /* ═══════ 3a: "How I earn" — one money page ═══════ */
+  .hm-earn { border: 2px solid var(--ink); border-radius: 12px; background: #fff9e9; padding: 8px 12px; margin-bottom: 8px; }
+  .hm-earn-top { display: flex; align-items: baseline; gap: 8px; }
+  .hm-earn-label { font-family: 'Gochi Hand', cursive; font-size: 1.15rem; }
+  .hm-earn-amt { margin-left: auto; font-family: 'Gochi Hand', cursive; font-size: 1.35rem; color: var(--accent-strong, #c14a24); }
+  .hm-bar { position: relative; height: 16px; border: 2px solid var(--ink); border-radius: 9px; overflow: hidden; background: var(--paper-card, #fffdf5); margin: 6px 0 5px; }
+  .hm-bar-fill { position: absolute; inset: 0; background: var(--accent-yellow, #ffd166); border-radius: 0; }
+  .hm-bar-tick { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #c9bda6; }
+  .hm-earn-note { font-size: 0.8rem; color: var(--ink-light, #5a4d41); }
+  .hm-rules { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .hm-rule { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center; border: 2px solid var(--ink); border-radius: 11px; padding: 6px 9px; background: rgba(255,255,255,0.7); }
+  .hm-rule-icon { font-size: 1.15rem; text-align: center; }
+  .hm-rule-text { font-size: 0.86rem; line-height: 1.25; min-width: 0; }
+  .hm-rule-text i { font-style: italic; opacity: 0.85; }
+  .hm-rule-chip { font-size: 0.78rem; font-weight: 800; border: 2px solid var(--ink); border-radius: 9px; padding: 1px 8px; white-space: nowrap; }
+  .hm-rule-chip.chip-green { background: #95d5b2; }
+  .hm-rule-chip.chip-yellow { background: var(--accent-yellow, #ffd166); }
+  .hm-rule-chip.chip-plain { background: var(--paper-card, #fffdf5); }
+  .hm-wallet { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px; }
+  .hm-wtile { border: 2px solid var(--ink); border-radius: 11px; padding: 6px 4px; text-align: center; }
+  .hm-wtile.w-cash { background: #fff9e9; }
+  .hm-wtile.w-savings { background: #eaf6ef; }
+  .hm-wtile.w-gic { background: #eef3fb; }
+  .hm-wtile.w-stocks { background: #f6effa; }
+  .hm-wtile-label { font-size: 0.76rem; color: var(--ink-light, #5a4d41); }
+  .hm-wtile-amt { font-family: 'Gochi Hand', cursive; font-size: 1.1rem; }
+  .hm-wtile-note { font-size: 0.66rem; color: #6b5d4f; line-height: 1.1; }
 
   /* Quick slot-picker sheet (tap an empty slot to add an activity) */
   .slot-picker-hint { color: var(--ink-light); font-size: 0.92rem; margin: 0.1rem 0 0.5rem; }
@@ -6213,19 +6240,79 @@ function renderQuestMoneyStrip(kid) {
     return `<span class="qms-chip ${paid ? 'paid' : ''}">${g.icon || '🧺'} ${paid ? '✓' : `${n}/${m}`}</span>`;
   }).join('');
 
-  const w = ensureWallet(kid);
-  const tile = (label, val) => `<div class="qmp-tile"><span class="qmp-tile-label">${label}</span><span class="qmp-tile-value">$${money2(val).toFixed(2)}</span></div>`;
   panel.hidden = false;
-  panel.innerHTML =
-      `<div class="qmp-total">Total money: <b>$${netWorth(kid).toFixed(2)}</b></div>`
-    + `<div class="qmp-breakdown">`
-    +   tile('💵 Cash', w.cash)
-    +   tile('🏦 Savings', w.savings)
-    +   tile('📈 Investments', portfolioValue(kid))
-    +   tile('🔒 GIC', gicTotal(kid))
-    + `</div>`
-    + `<div class="qms-week">🧹 Earned this week: <b>$${ctWeekMoney(wk, kid).toFixed(2)}</b></div>`
-    + `<div class="qms-chips">${chips || '<span class="qms-chip">No chore groups yet</span>'}</div>`
+  panel.innerHTML = buildHowIEarnCard(kid, wk);
+}
+
+/* 3a — "How I earn": one kid-readable card that gathers every money rule and
+   the wallet in one place (was split across the chore tab, money screen and
+   meeting sheet). Display-only — reads existing chore/money state. */
+function buildHowIEarnCard(kid, wk) {
+  const cap = CT_MONEY_CAP;
+  const earned = ctGroupEarned(wk, kid);                    // fired chore money (sticky)
+  const goalBonusEarned = ctGetGoalBonus(wk, kid) ? 1 : 0;
+  const weekMoney = ctWeekMoney(wk, kid);                   // min(cap, earned + bonus)
+  const goals = ctGetWeekGoals(wk);
+  const goal = goals[kid];                                  // points target or null
+  const pts = ctMandatoryPoints(wk, kid) + ctOptionalPoints(wk, kid);
+  const goalPending = !!goal && !goalBonusEarned;
+  const fillPct = Math.max(0, Math.min(100, weekMoney / cap * 100));
+  const tickPct = Math.max(0, Math.min(100, (Math.min(cap, earned + goalBonusEarned + (goalPending ? 1 : 0))) / cap * 100));
+
+  // Top earnings card + progress bar to the weekly cap.
+  const capNote = [];
+  if (earned > 0) capNote.push(`$${earned.toFixed(2)} chores ✓`);
+  if (goalBonusEarned) capNote.push(`+$1.00 goal ✓`);
+  else if (goalPending) capNote.push(`goal bonus +$1.00 still open${goal ? ` (${pts}/${goal} pts)` : ''}`);
+  const earnCard =
+      `<div class="hm-earn">`
+    +   `<div class="hm-earn-top"><span class="hm-earn-label">This week so far</span><span class="hm-earn-amt">$${weekMoney.toFixed(2)}</span></div>`
+    +   `<div class="hm-bar"><div class="hm-bar-fill" style="width:${fillPct}%"></div><div class="hm-bar-tick" style="left:${tickPct}%"></div></div>`
+    +   `<div class="hm-earn-note">of $${cap.toFixed(2)} max${capNote.length ? ' · ' + capNote.join(' · ') : ''}</div>`
+    + `</div>`;
+
+  // Rule cards — one per weekly chore group, then goal / sticky / meeting.
+  const rule = (icon, name, text, chip, chipCls) =>
+      `<div class="hm-rule"><span class="hm-rule-icon">${icon}</span>`
+    +   `<span class="hm-rule-text"><b>${escapeHtml(name)}</b> — ${text}</span>`
+    +   `<span class="hm-rule-chip ${chipCls||''}">${chip}</span></div>`;
+
+  let rules = '';
+  ctGroupsForKid(kid).filter(g => g.cadence !== 'daily').forEach(g => {
+    const ids = g.choreIds || [];
+    const m = ids.length;
+    const n = ids.filter(c => [0,1,2,3,4,5,6].some(d => ctGetOptional(wk, d, kid, c))).length;
+    const fired = ctGroupFiredWeekly(wk, g.id, kid);
+    const val = (Number(g.valueDollars) || 0).toFixed(2);
+    rules += rule(g.icon || '🧹', g.name || 'Chore crew',
+      `all ${m} done sometime this week → $${val} <i>all or nothing</i>`,
+      fired ? `${m}/${m} ✓ $${val}` : `${n}/${m}`,
+      fired ? 'chip-green' : '');
+  });
+  rules += rule('🎯', 'Week goal',
+    `routine + chore points reach your goal → $1.00 bonus`,
+    goalBonusEarned ? '✓ $1.00' : (goal ? `${pts}/${goal} pts` : 'set a goal'),
+    goalBonusEarned ? 'chip-green' : 'chip-yellow');
+  rules += rule('🔒', 'Once earned, yours',
+    `unchecking never takes money back`, 'sticky', 'chip-plain');
+  rules += rule('🤝', 'Family meeting',
+    `confirms the week (max $${cap.toFixed(2)}) & moves the money world one month`, 'Sunday', 'chip-plain');
+
+  // Wallet strip.
+  const w = ensureWallet(kid);
+  const wtile = (label, val, note, cls) =>
+      `<div class="hm-wtile ${cls}"><div class="hm-wtile-label">${label}</div>`
+    +   `<div class="hm-wtile-amt">$${money2(val).toFixed(2)}</div>`
+    +   `<div class="hm-wtile-note">${note}</div></div>`;
+  const wallet =
+      `<div class="hm-wallet">`
+    +   wtile('Cash', w.cash, 'spend or save', 'w-cash')
+    +   wtile('Savings', w.savings, 'earns interest', 'w-savings')
+    +   wtile('GIC', gicTotal(kid), 'locked, grows more', 'w-gic')
+    +   wtile('Stocks', portfolioValue(kid), 'goes up & down', 'w-stocks')
+    + `</div>`;
+
+  return earnCard + `<div class="hm-rules">${rules}</div>` + wallet
     + `<button type="button" class="qmp-open" onclick="openMoneyScreen('${kid}')">Open Bank &amp; Invest ›</button>`;
 }
 
