@@ -1512,6 +1512,61 @@
   .cm-spark { display: flex; align-items: flex-end; gap: 3px; height: 26px; margin-left: auto; }
   .cm-spark-bar { width: 12px; background: #ffd166; border: 1.5px solid var(--ink); border-radius: 3px 3px 0 0; min-height: 4px; }
   .cm-spark-bar.cm-spark-now { background: #ff7b54; }
+  /* ═══════ 2c/1b/2b: Meeting Mode ═══════ */
+  .mm-stepper { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+  .mm-step {
+    font-family: 'Patrick Hand', sans-serif; font-weight: 800; font-size: 0.82rem;
+    border: 2px solid var(--ink); border-radius: 999px; padding: 3px 10px; cursor: pointer;
+    background: var(--paper-card, #fffdf5); color: var(--ink);
+  }
+  .mm-step-cur { background: #c14a24; color: #fffdf5; }
+  .mm-step-done { background: #95d5b2; }
+  .mm-h { font-family: 'Gochi Hand', cursive; font-size: 1.25rem; margin: 2px 0 8px; }
+  .mm-h-sub { font-size: 1.05rem; margin-top: 12px; }
+  .mm-hint, .mm-cap { font-size: 0.8rem; color: #6b5d4f; margin: 6px 0; }
+  .mm-legend { display: flex; gap: 12px; align-items: center; font-size: 0.8rem; margin-bottom: 6px; flex-wrap: wrap; }
+  .mm-legend .mm-sw { display: inline-block; width: 12px; height: 12px; border: 1.5px solid var(--ink); border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+  .mm-legend-note { color: #6b5d4f; }
+  .mm-bar-j { background: #ffd166; }
+  .mm-bar-s { background: #ff7b54; }
+  .mm-chart {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; align-items: end;
+    height: 150px; padding: 6px; border: 2px solid var(--ink); border-radius: 12px; background: var(--paper-card, #fffdf5);
+  }
+  .mm-daygrp { display: flex; flex-direction: column; align-items: center; gap: 3px; height: 100%; border: 0; background: transparent; cursor: pointer; padding: 0; }
+  .mm-daygrp-sel { background: #fff4db; border-radius: 8px; }
+  .mm-bars { display: flex; align-items: flex-end; gap: 3px; height: 110px; width: 100%; justify-content: center; }
+  .mm-bar { width: 40%; max-width: 18px; min-height: 2px; border: 2px solid var(--ink); border-bottom: 0; border-radius: 5px 5px 0 0; }
+  .mm-daylabel { font-size: 0.72rem; font-weight: 800; }
+  .mm-daylabel-sel { background: #2a2320; color: #fffdf5; border-radius: 6px; padding: 0 5px; }
+  .mm-detail { border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px; margin: 8px 0; background: var(--paper-card, #fffdf5); }
+  .mm-detail-cols { display: grid; grid-template-columns: 1fr 2px 1fr; gap: 8px; }
+  .mm-detail-div { background: repeating-linear-gradient(#c9bda6, #c9bda6 3px, transparent 3px, transparent 6px); }
+  .mm-detail-kid { font-weight: 800; font-size: 0.86rem; margin-bottom: 4px; }
+  .mm-detail-kid small { font-weight: 700; opacity: 0.7; }
+  .mm-item { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; padding: 1px 0; }
+  .mm-item-box { width: 16px; height: 16px; border: 2px solid var(--ink); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 900; flex-shrink: 0; }
+  .mm-item.on .mm-item-box { background: #95d5b2; }
+  .mm-confirm-day { width: 100%; margin-top: 8px; border: 2px solid var(--ink); border-radius: 10px; background: var(--paper-card, #fffdf5); box-shadow: 2px 2px 0 var(--ink); padding: 6px; font-weight: 800; cursor: pointer; }
+  .mm-confirm-day.confirmed { background: #95d5b2; }
+  .mm-ready { margin-top: 8px; font-size: 0.82rem; font-weight: 700; background: #fff4db; border: 2px dashed #e8dfc3; border-radius: 10px; padding: 6px 10px; }
+  .mm-wins { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .mm-win { border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px; background: var(--paper-card, #fffdf5); }
+  .mm-win-kid { font-weight: 800; margin-bottom: 4px; }
+  .mm-win-item { font-size: 0.82rem; padding: 1px 0; }
+  .mm-2b { display: flex; flex-direction: column; gap: 10px; }
+  .mm-2b-kid { border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px; background: var(--paper-card, #fffdf5); }
+  .mm-2b-row { display: grid; grid-template-columns: 90px 1fr auto; gap: 8px; align-items: center; margin-top: 5px; }
+  .mm-2b-label { font-size: 0.78rem; font-weight: 700; }
+  .mm-2b-track { position: relative; height: 18px; border: 2px dashed #c9bda6; border-radius: 7px; }
+  .mm-2b-plan { position: absolute; inset: 0; width: 0; background: repeating-linear-gradient(-45deg, rgba(90,77,65,0.10) 0 4px, transparent 4px 8px); border-radius: 5px; }
+  .mm-2b-done { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 5px; border: 2px solid var(--ink); }
+  .mm-2b-num { font-size: 0.74rem; font-weight: 800; white-space: nowrap; }
+  .mm-pay { border: 2px solid var(--ink); border-radius: 12px; background: #fff9e9; padding: 8px 10px; margin: 8px 0; }
+  .mm-pay-row { display: flex; justify-content: space-between; font-size: 0.95rem; padding: 2px 0; }
+  .mm-recorded { font-size: 0.86rem; font-weight: 700; background: #95d5b2; border: 2px solid var(--ink); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; }
+  .mm-nav { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; }
+  .mm-nav .btn-confirm { flex: 1; }
   .chore-card h3 { margin: 0 0 0.5rem 0; font-size: 1.2rem; }
   .ct-item {
     display: flex;
@@ -4160,6 +4215,7 @@
         <button class="pill-btn" onclick="setParentKid('jess')">🦊 Jess</button>
       </div>
       <button class="pill-btn" style="margin-left:auto" onclick="parentView(parentViewing)">📋 Open full week ›</button>
+      <button class="btn-confirm" style="padding:0.35rem 0.8rem" onclick="openFamilyMeeting()">🧑‍🧑‍🧒 Run family meeting</button>
     </div>
     <div class="parent-tabs" role="tablist" aria-label="Parent sections">
       <button class="parent-tab active" role="tab" data-ptab="review" onclick="setParentTab('review')">🗓️ Weekly Review</button>
@@ -12302,40 +12358,236 @@ async function moneySetRate(which) {
   saveAll(); renderMoneyScreen();
 }
 
-/* ── Weekly family meeting: day-by-day review, then finalize + advance month ── */
+/* ════════════════════════════════════════════════════════════════
+   2c / 1b / 2b — MEETING MODE: a guided 4-step weekly family meeting
+   (Review → Celebrate → Confirm → Plan next week). Reuses the existing
+   money commit (commitFamilyMeeting) and adds an undo window.
+════════════════════════════════════════════════════════════════ */
+const MM_STEPS = ['Review', 'Celebrate', 'Confirm', 'Plan next'];
+let mmStep = 1;
+let mmSelectedDay = null;
+let mmConfirmedDays = new Set();
+let mmUndo = null;
+
 function openFamilyMeeting() {
   if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
   ctEnsureShared();
-  const c = state.shared.chore;
-  const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
-  const held = !!(c.meetingsHeld && c.meetingsHeld[wk]);
-  let html = `<div class="ct-meta">Review the week day by day, then pay out. This advances the money world one month — interest is credited, due GICs mature, and the stock market moves.</div>`;
-  ['jenn', 'jess'].forEach(kid => {
-    const prelim = ctWeekMoney(wk, kid);
-    let days = '';
-    for (let d = 0; d < 7; d++) {
-      const chores = ctAllChoreNames().filter(cn => ctGetOptional(wk, d, kid, cn));
-      const mand = CT_SESSIONS.filter(s => ctGetMandatory(wk, d, s, kid));
-      if (chores.length || mand.length) {
-        days += `<div class="ct-meta">${CT_DAYS[d]}: ${mand.length ? '✅ ' + mand.length + ' routines ' : ''}${chores.length ? '🧹 ' + chores.map(escapeHtml).join(', ') : ''}</div>`;
-      }
-    }
-    if (!days) days = `<div class="ct-meta">No chores checked this week.</div>`;
-    html += `<div class="chore-card"><h3>${kid === 'jenn' ? '🐥 Jenn' : '🦊 Jess'} — $${prelim.toFixed(2)}</h3>${days}</div>`;
-  });
-  html += held
-    ? `<div class="ct-meta" style="margin-top:0.5rem">✅ This week's meeting is already done. Come back next week.</div>
-       <button class="pill-btn" style="width:100%;margin-top:0.4rem" onclick="closeSheet('familyMeetingOverlay')">Close</button>`
-    : `<button class="btn-confirm" onclick="finalizeFamilyMeeting()">✅ Pay out &amp; advance the month</button>
-       <button class="pill-btn" style="width:100%;margin-top:0.4rem" onclick="closeSheet('familyMeetingOverlay')">Not yet</button>`;
-  document.getElementById('familyMeetingBody').innerHTML = html;
+  mmStep = 1; mmSelectedDay = null; mmConfirmedDays = new Set(); mmUndo = null;
+  renderMeetingMode();
   openSheet('familyMeetingOverlay');
 }
-function finalizeFamilyMeeting() {
-  ctEnsureShared();
+function mmGoStep(n) { mmStep = Math.max(1, Math.min(4, n)); if (mmStep !== 1) mmSelectedDay = mmSelectedDay; renderMeetingMode(); }
+
+// % of a kid's tracked items (routines + all chores) done on a given day.
+function mmDayPct(kid, dayIdx) {
+  const rows = ctMatrixRows(kid);
+  if (!rows.length) return 0;
+  const done = rows.reduce((s, row) => s + (ctMatrixCellChecked(kid, dayIdx, row) ? 1 : 0), 0);
+  return Math.round(done / rows.length * 100);
+}
+function mmWeekPct(kid) { let s = 0; for (let d = 0; d < 7; d++) s += mmDayPct(kid, d); return Math.round(s / 7); }
+
+function renderMeetingMode() {
+  const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
+  const held = !!(state.shared.chore.meetingsHeld && state.shared.chore.meetingsHeld[wk]);
+  const stepper = MM_STEPS.map((label, i) => {
+    const n = i + 1;
+    const cls = n === mmStep ? 'mm-step-cur' : (n < mmStep ? 'mm-step-done' : 'mm-step-up');
+    return `<button type="button" class="mm-step ${cls}" onclick="mmGoStep(${n})">${n}·${label}</button>`;
+  }).join('');
+
+  let body;
+  if (mmStep === 1) body = mmRenderReview(wk);
+  else if (mmStep === 2) body = mmRenderCelebrate(wk);
+  else if (mmStep === 3) body = mmRenderConfirm(wk, held);
+  else body = mmRenderPlan(wk);
+
+  const back = mmStep > 1 ? `<button type="button" class="pill-btn" onclick="mmGoStep(${mmStep - 1})">◀ Back</button>` : `<span></span>`;
+  const next = mmStep < 4
+    ? `<button type="button" class="btn-confirm" onclick="mmGoStep(${mmStep + 1})">Next ▶</button>`
+    : `<button type="button" class="btn-confirm" onclick="closeSheet('familyMeetingOverlay')">🎉 Finish meeting</button>`;
+
+  document.getElementById('familyMeetingBody').innerHTML =
+    `<div class="mm-stepper">${stepper}</div><div class="mm-body">${body}</div><div class="mm-nav">${back}${next}</div>`;
+}
+
+/* Step 1 — Review: 1b grouped bar chart + day drill-in + meeting readiness. */
+function mmRenderReview(wk) {
+  const info = ctWeekInfo();
+  const todayD = formatDayKey(todayKey());
+  let bars = '';
+  for (let d = 0; d < 7; d++) {
+    const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
+    const isToday = Math.round((date - todayD) / 864e5) === 0;
+    const jp = mmDayPct('jenn', d), sp = mmDayPct('jess', d);
+    const sel = mmSelectedDay === d ? ' mm-daygrp-sel' : '';
+    bars += `<button type="button" class="mm-daygrp${sel}" onclick="mmSelectDay(${d})">
+        <div class="mm-bars">
+          <div class="mm-bar mm-bar-j" style="height:${jp}%"></div>
+          <div class="mm-bar mm-bar-s" style="height:${sp}%"></div>
+        </div>
+        <div class="mm-daylabel${mmSelectedDay === d ? ' mm-daylabel-sel' : ''}">${DAY_SHORT[d]}${isToday ? ' ★' : ''}</div>
+      </button>`;
+  }
+  const detail = mmSelectedDay != null ? mmRenderDayDetail(wk, mmSelectedDay) : `<div class="mm-hint">Tap a day to review each kid's items and confirm it.</div>`;
+  const footer = `<div class="mm-ready">Meeting-ready: ${mmConfirmedDays.size}/7 days confirmed · 🐥 Jenn ${mmWeekPct('jenn')}% · 🦊 Jess ${mmWeekPct('jess')}% of week done</div>`;
+  return `<div class="mm-h">Review the week</div>
+    <div class="mm-legend"><span><i class="mm-sw mm-bar-j"></i>Jenn</span><span><i class="mm-sw mm-bar-s"></i>Jess</span><span class="mm-legend-note">bars = % of that day's items done</span></div>
+    <div class="mm-chart">${bars}</div>${detail}${footer}`;
+}
+function mmSelectDay(d) { mmSelectedDay = (mmSelectedDay === d ? null : d); renderMeetingMode(); }
+function mmRenderDayDetail(wk, d) {
+  const col = (kid) => {
+    const rows = ctMatrixRows(kid);
+    const items = rows.map(row => {
+      const on = ctMatrixCellChecked(kid, d, row);
+      return `<div class="mm-item ${on ? 'on' : ''}"><span class="mm-item-box">${on ? '✓' : ''}</span>${escapeHtml(row.label)}</div>`;
+    }).join('');
+    const done = rows.filter(row => ctMatrixCellChecked(kid, d, row)).length;
+    return `<div class="mm-detail-col"><div class="mm-detail-kid">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'} <small>${done}/${rows.length} done</small></div>${items}</div>`;
+  };
+  const confirmed = mmConfirmedDays.has(d);
+  return `<div class="mm-detail">
+      <div class="mm-detail-cols">${col('jenn')}<div class="mm-detail-div"></div>${col('jess')}</div>
+      <button type="button" class="mm-confirm-day ${confirmed ? 'confirmed' : ''}" onclick="mmToggleConfirmDay(${d})">${confirmed ? '✓ Confirmed' : 'Confirm this day'}</button>
+    </div>`;
+}
+function mmToggleConfirmDay(d) { if (mmConfirmedDays.has(d)) mmConfirmedDays.delete(d); else mmConfirmedDays.add(d); renderMeetingMode(); }
+
+/* Step 2 — Celebrate: auto-collected wins + 2b planned-vs-done analytics. */
+function mmRenderCelebrate(wk) {
+  const info = ctWeekInfo();
+  const wins = (kid) => {
+    const mand = ctMandatoryPoints(wk, kid);
+    const chores = [];
+    ctGroupsForKid(kid).forEach(g => (g.choreIds || []).forEach(cn => { if ([0,1,2,3,4,5,6].some(d => ctGetOptional(wk, d, kid, cn))) chores.push(cn); }));
+    const money = ctWeekMoney(wk, kid);
+    const goal = ctGetGoalBonus(wk, kid);
+    const w = [`✅ ${mand}/21 routines kept`];
+    if (chores.length) w.push(`🧹 ${chores.length} chore${chores.length > 1 ? 's' : ''} done`);
+    if (goal) w.push(`🎯 Weekly goal reached (+$1)`);
+    if (money > 0) w.push(`💰 $${money.toFixed(2)} pocket money`);
+    const moods = (getProfData(kid).dayMoods) || {};
+    const moodList = info.keys.map(k => moods[k]).filter(Boolean);
+    if (moodList.length) w.push(`💫 Vibe: ${moodList.join(' ')}`);
+    return `<div class="mm-win"><div class="mm-win-kid">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'}</div>${w.map(x => `<div class="mm-win-item">${x}</div>`).join('')}</div>`;
+  };
+  return `<div class="mm-h">Celebrate the wins</div>
+    <div class="mm-wins">${wins('jenn')}${wins('jess')}</div>
+    <div class="mm-h mm-h-sub">Planned vs done</div>
+    <div class="mm-2b">${mm2b('jenn')}${mm2b('jess')}</div>
+    <div class="mm-cap">Solid = done · dashed = planned.</div>`;
+}
+function mm2b(kid) {
+  const info = ctWeekInfo();
+  const CATS = [['school','📘 Learning'],['training','🏋️ Training'],['routine','📋 Routine'],['daily','🧹 Chores'],['free','🎮 Family/Free'],['active','🏃 Active']];
+  const planned = {}, done = {};
+  const acts = getAllActivities(kid);
+  info.keys.forEach(key => {
+    (getDayBlocksForProfile(key, kid) || []).forEach(b => {
+      const act = acts.find(a => a.id === b.actId);
+      const cat = act ? act.cat : 'custom';
+      const m = b.durationMin || 0;
+      planned[cat] = (planned[cat] || 0) + m;
+      if (b.completed) done[cat] = (done[cat] || 0) + m;
+    });
+  });
+  let totalP = 0, totalD = 0;
+  Object.values(planned).forEach(v => totalP += v); Object.values(done).forEach(v => totalD += v);
+  const maxMin = Math.max(60, ...CATS.map(([c]) => planned[c] || 0));
+  const rows = CATS.filter(([c]) => (planned[c] || 0) > 0).map(([c, label]) => {
+    const p = planned[c] || 0, dn = done[c] || 0;
+    const pPct = Math.round(p / maxMin * 100), dPct = Math.round(dn / maxMin * 100);
+    return `<div class="mm-2b-row"><span class="mm-2b-label">${label}</span>
+        <span class="mm-2b-track"><span class="mm-2b-plan" style="width:${pPct}%"></span><span class="mm-2b-done" style="width:${dPct}%;background:${CAT_HEX[c] || '#888'}"></span></span>
+        <span class="mm-2b-num">${fmtHrsMin(dn)} / ${fmtHrsMin(p)}</span></div>`;
+  }).join('') || `<div class="ct-meta">No scheduled blocks this week.</div>`;
+  return `<div class="mm-2b-kid"><div class="mm-win-kid">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'} — ${fmtHrsMin(totalP)} planned · ${fmtHrsMin(totalD)} done</div>${rows}</div>`;
+}
+
+/* Step 3 — Confirm & record (reuses commitFamilyMeeting; offers an undo). */
+function mmRenderConfirm(wk, held) {
+  const rows = ['jenn','jess'].map(kid => {
+    const prelim = ctWeekMoney(wk, kid);
+    return `<div class="mm-pay-row"><span>${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'}</span><b>$${prelim.toFixed(2)}</b></div>`;
+  }).join('');
+  const alreadyHeld = held || !!(state.shared.chore.meetingsHeld && state.shared.chore.meetingsHeld[wk]);
+  let action;
+  if (mmUndo) {
+    action = `<div class="mm-recorded">✅ Recorded — money credited &amp; market advanced to ${marketMonthLabel()}.</div>
+      <button type="button" class="pill-btn danger" onclick="mmUndoRecord()">↩️ Undo (nothing is frozen yet)</button>`;
+  } else if (alreadyHeld) {
+    action = `<div class="mm-recorded">✅ This week was already recorded. Market is at ${marketMonthLabel()}.</div>`;
+  } else {
+    action = `<button type="button" class="btn-confirm" onclick="mmConfirmAndRecord()">✅ Confirm &amp; record the week</button>`;
+  }
+  return `<div class="mm-h">Confirm &amp; record</div>
+    <div class="ct-meta">This <b>confirms</b> the week — it doesn't "pay". Group chore money already fired sticky as chores were done; recording credits each kid's total (max $${CT_MONEY_CAP}) to cash, adds a month of interest, matures due GICs and moves the market one month.</div>
+    <div class="mm-pay">${rows}</div>${action}`;
+}
+function mmConfirmAndRecord() {
   const c = state.shared.chore;
   const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
-  if (c.meetingsHeld && c.meetingsHeld[wk]) { showToast('Already held this week'); return; }
+  if (c.meetingsHeld && c.meetingsHeld[wk]) { showToast('Already recorded this week'); return; }
+  // Snapshot everything the commit mutates so the undo can fully reverse it.
+  mmUndo = {
+    wk,
+    jenn: JSON.parse(JSON.stringify(ensureWallet('jenn'))),
+    jess: JSON.parse(JSON.stringify(ensureWallet('jess'))),
+    marketMonth: bankConfig().marketMonth,
+    finalized: (c.finalizedWeeks && c.finalizedWeeks[wk]) ? JSON.parse(JSON.stringify(c.finalizedWeeks[wk])) : null,
+  };
+  const parts = commitFamilyMeeting(wk);
+  renderMeetingMode();
+  showToast(`💛 Recorded${parts.length ? ' · ' + parts.join(' · ') : ''} · market ${marketMonthLabel()}`);
+}
+function mmUndoRecord() {
+  if (!mmUndo) return;
+  const c = state.shared.chore; const wk = mmUndo.wk;
+  getProfData('jenn').wallet = mmUndo.jenn;
+  getProfData('jess').wallet = mmUndo.jess;
+  bankConfig().marketMonth = mmUndo.marketMonth;
+  if (mmUndo.finalized) c.finalizedWeeks[wk] = mmUndo.finalized; else if (c.finalizedWeeks) delete c.finalizedWeeks[wk];
+  if (c.meetingsHeld) delete c.meetingsHeld[wk];
+  mmUndo = null;
+  saveAll();
+  renderMeetingMode();
+  showToast('↩️ Undone — nothing was recorded');
+}
+
+/* Step 4 — Plan next week: copy this week into next week as a template. */
+function mmRenderPlan(wk) {
+  return `<div class="mm-h">Plan next week</div>
+    <div class="ct-meta">Copy this week's schedule into next week for both kids as a starting template, then jump there to tweak. Days that already have plans next week are left untouched.</div>
+    <button type="button" class="btn-confirm" onclick="mmPlanNextWeek()">📋 Copy this week → next week</button>`;
+}
+function mmPlanNextWeek() {
+  const info = ctWeekInfo();
+  let copied = 0;
+  ['jenn','jess'].forEach(kid => {
+    info.keys.forEach(key => {
+      const src = getDayBlocksForProfile(key, kid) || [];
+      if (!src.length) return;
+      const date = formatDayKey(key); const next = new Date(date); next.setDate(date.getDate() + 7);
+      const nextKey = dateToLocalKey(next);
+      if ((getDayBlocksForProfile(nextKey, kid) || []).length) return; // don't clobber existing plans
+      const clone = src.map(b => ({ ...b, id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), completed: false, confirmed: false, createdAt: Date.now(), updatedAt: Date.now() }));
+      setDayBlocks(nextKey, clone, kid);
+      copied += clone.length;
+    });
+  });
+  saveAll();
+  closeSheet('familyMeetingOverlay');
+  weekOffset += 1;
+  showScreen('week'); renderWeek();
+  showToast(copied ? `📋 Copied ${copied} blocks into next week` : 'Next week already had plans — nothing copied');
+}
+// Core money commit for the weekly meeting (no UI): credit each kid's prelim
+// pocket money to cash, advance the money world one month (interest + GIC
+// maturities), step the market, and mark the week held. Returns summary parts.
+function commitFamilyMeeting(wk) {
+  ctEnsureShared();
+  const c = state.shared.chore;
   if (!c.finalizedWeeks) c.finalizedWeeks = {};
   if (!c.finalizedWeeks[wk]) c.finalizedWeeks[wk] = {};
   if (!c.meetingsHeld) c.meetingsHeld = {};
@@ -12354,6 +12606,14 @@ function finalizeFamilyMeeting() {
   bankConfig().marketMonth += 1;   // one shared market step per meeting
   c.meetingsHeld[wk] = true;
   saveAll();
+  return parts;
+}
+function finalizeFamilyMeeting() {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
+  if (c.meetingsHeld && c.meetingsHeld[wk]) { showToast('Already held this week'); return; }
+  const parts = commitFamilyMeeting(wk);
   closeSheet('familyMeetingOverlay');
   renderChoreTab();
   showToast(`💛 Thanks for helping the family! ${parts.length ? parts.join(' · ') + ' · ' : ''}market now ${marketMonthLabel()}`);
