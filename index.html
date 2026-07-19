@@ -1204,7 +1204,7 @@
   }
   .tg-mytime-bricks {
     display: grid;
-    grid-template-columns: repeat(30, 1fr);
+    grid-template-columns: repeat(32, 1fr); /* full 6am–10pm window; set precisely in JS */
     gap: 2px;
     margin: 0.5rem 0;
   }
@@ -7005,15 +7005,17 @@ function categorizeBlock(block, act) {
 }
 
 /**
- * Returns 30 bricks for a given day key. Each brick = 30 minutes.
- * 30 bricks × 30 min = 15 waking hours (6 AM–9 PM), per the plan: 2 bricks per hour.
+ * Returns one brick per 30 minutes across the whole waking window. With the
+ * day now running 6 AM–10 PM (DAY_MIN_SPAN = 960) that's 32 bricks, so the
+ * late-evening hour is no longer dropped (W8).
  * Brick categories: 'sleep-meal' | 'learning' | 'free' (gap counts as free per plan).
  */
+const BRICK_COUNT = Math.round(DAY_MIN_SPAN / 30);
 function getBrickStrip(key) {
   const blocks = getDayBlocks(key);
   const acts = getAllActivities(activeProfile());
   const bricks = [];
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < BRICK_COUNT; i++) {
     const slotStart = START_MIN + i * 30;
     const slotEnd   = slotStart + 30;
     // Find the block that occupies this slot. If multiple overlap, pick the
@@ -7289,9 +7291,10 @@ function renderTimeGridMyTime(keys) {
   document.querySelector('#tgMyTime .tg-mytime-label').innerHTML = `🌟 MY FREE TIME<br><span style="font-size:0.95rem;font-family:'Patrick Hand',sans-serif;font-weight:700">${dayLabel}</span>`;
   document.getElementById('tgMyTimeValue').textContent = valueStr;
 
-  // Mini brick strip showing today's 30 bricks
+  // Mini brick strip showing today's bricks across the full 6am–10pm window
   const bricksEl = document.getElementById('tgMyTimeBricks');
   bricksEl.innerHTML = '';
+  bricksEl.style.gridTemplateColumns = `repeat(${bricks.length}, 1fr)`;
   const freeCls = tgFreeBrickClass();
   bricks.forEach(b => {
     const brk = document.createElement('div');
@@ -12366,15 +12369,35 @@ async function moneySetRate(which) {
 const MM_STEPS = ['Review', 'Celebrate', 'Confirm', 'Plan next'];
 let mmStep = 1;
 let mmSelectedDay = null;
-let mmConfirmedDays = new Set();
 let mmUndo = null;
 
 function openFamilyMeeting() {
   if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
   ctEnsureShared();
-  mmStep = 1; mmSelectedDay = null; mmConfirmedDays = new Set(); mmUndo = null;
+  mmStep = 1; mmSelectedDay = null; mmUndo = null;
   renderMeetingMode();
   openSheet('familyMeetingOverlay');
+}
+
+// Day-confirm in the meeting persists to the real parent day-confirm store
+// (state.shared.parentDayConfirm), shared with the Weekly Review tab. A meeting
+// day is "confirmed" when it's confirmed for BOTH kids.
+function mmDayKey(d) { return ctWeekInfo().keys[d]; }
+function mmIsDayConfirmed(d) {
+  const k = mmDayKey(d);
+  const store = state.shared.parentDayConfirm || {};
+  return !!((store.jenn || {})[k]) && !!((store.jess || {})[k]);
+}
+function mmToggleConfirmDay(d) {
+  const k = mmDayKey(d);
+  const next = !mmIsDayConfirmed(d);
+  if (!state.shared.parentDayConfirm) state.shared.parentDayConfirm = {};
+  ['jenn', 'jess'].forEach(kid => {
+    if (!state.shared.parentDayConfirm[kid]) state.shared.parentDayConfirm[kid] = {};
+    state.shared.parentDayConfirm[kid][k] = next;
+  });
+  saveAll();
+  renderMeetingMode();
 }
 function mmGoStep(n) { mmStep = Math.max(1, Math.min(4, n)); if (mmStep !== 1) mmSelectedDay = mmSelectedDay; renderMeetingMode(); }
 
@@ -12430,7 +12453,8 @@ function mmRenderReview(wk) {
       </button>`;
   }
   const detail = mmSelectedDay != null ? mmRenderDayDetail(wk, mmSelectedDay) : `<div class="mm-hint">Tap a day to review each kid's items and confirm it.</div>`;
-  const footer = `<div class="mm-ready">Meeting-ready: ${mmConfirmedDays.size}/7 days confirmed · 🐥 Jenn ${mmWeekPct('jenn')}% · 🦊 Jess ${mmWeekPct('jess')}% of week done</div>`;
+  const nConfirmed = [0,1,2,3,4,5,6].filter(mmIsDayConfirmed).length;
+  const footer = `<div class="mm-ready">Meeting-ready: ${nConfirmed}/7 days confirmed · 🐥 Jenn ${mmWeekPct('jenn')}% · 🦊 Jess ${mmWeekPct('jess')}% of week done</div>`;
   return `<div class="mm-h">Review the week</div>
     <div class="mm-legend"><span><i class="mm-sw mm-bar-j"></i>Jenn</span><span><i class="mm-sw mm-bar-s"></i>Jess</span><span class="mm-legend-note">bars = % of that day's items done</span></div>
     <div class="mm-chart">${bars}</div>${detail}${footer}`;
@@ -12446,13 +12470,12 @@ function mmRenderDayDetail(wk, d) {
     const done = rows.filter(row => ctMatrixCellChecked(kid, d, row)).length;
     return `<div class="mm-detail-col"><div class="mm-detail-kid">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'} <small>${done}/${rows.length} done</small></div>${items}</div>`;
   };
-  const confirmed = mmConfirmedDays.has(d);
+  const confirmed = mmIsDayConfirmed(d);
   return `<div class="mm-detail">
       <div class="mm-detail-cols">${col('jenn')}<div class="mm-detail-div"></div>${col('jess')}</div>
-      <button type="button" class="mm-confirm-day ${confirmed ? 'confirmed' : ''}" onclick="mmToggleConfirmDay(${d})">${confirmed ? '✓ Confirmed' : 'Confirm this day'}</button>
+      <button type="button" class="mm-confirm-day ${confirmed ? 'confirmed' : ''}" onclick="mmToggleConfirmDay(${d})">${confirmed ? '✓ Confirmed (both kids)' : 'Confirm this day'}</button>
     </div>`;
 }
-function mmToggleConfirmDay(d) { if (mmConfirmedDays.has(d)) mmConfirmedDays.delete(d); else mmConfirmedDays.add(d); renderMeetingMode(); }
 
 /* Step 2 — Celebrate: auto-collected wins + 2b planned-vs-done analytics. */
 function mmRenderCelebrate(wk) {
