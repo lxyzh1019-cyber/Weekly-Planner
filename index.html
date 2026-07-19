@@ -1550,6 +1550,12 @@
   .mm-item-box { width: 16px; height: 16px; border: 2px solid var(--ink); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 900; flex-shrink: 0; }
   .mm-item.on .mm-item-box { background: #95d5b2; }
   .mm-detail-editnote { font-size: 0.72rem; opacity: 0.7; font-style: italic; margin-top: 6px; }
+  .ct-history > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .ct-history > summary::-webkit-details-marker { display: none; }
+  .ct-history > summary::before { content: '▸'; font-weight: 900; transition: transform 0.15s; }
+  .ct-history[open] > summary::before { transform: rotate(90deg); }
+  .ct-history > summary h3 { margin: 0; }
+  .ct-history .ct-hist-total td { font-weight: 800; border-top: 2px solid var(--ink); }
   .mm-confirm-day { width: 100%; margin-top: 8px; border: 2px solid var(--ink); border-radius: 10px; background: var(--paper-card, #fffdf5); box-shadow: 2px 2px 0 var(--ink); padding: 6px; font-weight: 800; cursor: pointer; }
   .mm-confirm-day.confirmed { background: #95d5b2; }
   .mm-ready { margin-top: 8px; font-size: 0.82rem; font-weight: 700; background: #fff4db; border: 2px dashed #e8dfc3; border-radius: 10px; padding: 6px 10px; }
@@ -13540,6 +13546,41 @@ function ctRenderSummaryTable() {
     <div style="overflow:auto"><table class="wf-analytics-table"><thead><tr><th>Week</th><th>Jenn Mand</th><th>Jenn Opt</th><th>Jenn $</th><th>Jess Mand</th><th>Jess Opt</th><th>Jess $</th></tr></thead><tbody>${ctWeekSummaryRows()}</tbody></table></div>
   </div>`;
 }
+// Full pocket-money history: every week ever recorded at a family meeting, drawn
+// from finalizedWeeks (the authoritative "paid" ledger — unbounded, unlike the
+// rolling 8-week summary), with per-kid running cumulative totals.
+function ctRenderMoneyHistory() {
+  ctEnsureShared();
+  const fw = state.shared.chore.finalizedWeeks || {};
+  const keys = Object.keys(fw).sort();   // YYYY-MM-DD keys sort chronologically
+  if (!keys.length) {
+    return `<div class="chore-card"><details class="ct-history"><summary><h3>💰 Full pocket-money history</h3></summary>
+      <div class="ct-meta" style="margin-top:0.3rem">No weeks recorded yet. A week appears here once you tap “Confirm &amp; record” for it in the family meeting.</div>
+    </details></div>`;
+  }
+  let jRun = 0, kRun = 0, rows = '';
+  keys.forEach(wk => {
+    const entry = fw[wk] || {};
+    const jHas = entry.jenn != null, kHas = entry.jess != null;
+    const j = Number(entry.jenn) || 0, k = Number(entry.jess) || 0;
+    if (jHas) jRun = money2(jRun + j);
+    if (kHas) kRun = money2(kRun + k);
+    const d = formatDayKey(wk);
+    const label = `${MONTH_SHORT[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+    rows += `<tr><td>${label}</td>`
+      + `<td>${jHas ? '$' + j.toFixed(2) : '—'}</td><td>$${jRun.toFixed(2)}</td>`
+      + `<td>${kHas ? '$' + k.toFixed(2) : '—'}</td><td>$${kRun.toFixed(2)}</td></tr>`;
+  });
+  rows += `<tr class="ct-hist-total"><td>Total · ${keys.length} wk</td><td>$${jRun.toFixed(2)}</td><td></td><td>$${kRun.toFixed(2)}</td><td></td></tr>`;
+  const ji = CT_PROFILE_ICON['jenn'], ki = CT_PROFILE_ICON['jess'];
+  return `<div class="chore-card"><details class="ct-history">
+      <summary><h3>💰 Full pocket-money history</h3><span class="ct-meta">${keys.length} recorded week${keys.length > 1 ? 's' : ''}</span></summary>
+      <div class="ct-meta" style="margin:0.3rem 0">Every week recorded at a family meeting, oldest first, with running totals. “—” means no amount was recorded for that kid that week.</div>
+      <div style="overflow:auto"><table class="wf-analytics-table">
+        <thead><tr><th>Week</th><th>${ji} Jenn $</th><th>Jenn total</th><th>${ki} Jess $</th><th>Jess total</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>
+    </details></div>`;
+}
 function ctApplyLegacyPayloadToState(parsed) {
   if (!parsed) return false;
   const { dataObj, optObj, goalsObj, bonusObj, startDate, updatedAt } = parsed;
@@ -13694,6 +13735,7 @@ function renderChoreTab() {
       ${ctRenderGroupManagerCard()}
       ${ctRenderChoreNamesCard()}
       ${ctRenderSummaryTable()}
+      ${ctRenderMoneyHistory()}
     </div>
   `
     : `
