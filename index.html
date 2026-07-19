@@ -1455,6 +1455,63 @@
     padding: 0.7rem;
     box-shadow: 2px 2px 0 var(--ink);
   }
+  /* ═══════ 1a: kid week chore matrix ═══════ */
+  .cm-card { grid-column: 1 / -1; }
+  .cm-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .cm-pills { display: flex; gap: 6px; }
+  .cm-pill {
+    font-family: 'Patrick Hand', sans-serif; font-weight: 700; font-size: 0.9rem;
+    border: 2px solid var(--ink); border-radius: 999px; padding: 3px 12px; cursor: pointer;
+    background: var(--paper-card, #fffdf5); color: var(--ink);
+  }
+  .cm-pill.active { background: #c14a24; color: #fffdf5; }
+  .cm-pill:disabled { opacity: 0.5; cursor: default; }
+  .cm-money-chip {
+    margin-left: auto; font-size: 0.82rem; font-weight: 700; color: var(--ink);
+    background: #fff4db; border: 2px solid var(--ink); border-radius: 10px; padding: 3px 10px;
+  }
+  .cm-grid {
+    display: grid; grid-template-columns: 150px repeat(7, minmax(30px, 1fr)) 52px;
+    gap: 3px; align-items: stretch; overflow-x: auto;
+  }
+  .cm-corner { }
+  .cm-dayhead, .cm-wkhead {
+    text-align: center; font-weight: 800; font-size: 0.72rem; line-height: 1.05;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px 0;
+  }
+  .cm-dayhead small { font-weight: 700; opacity: 0.7; }
+  .cm-dayhead.cm-today { background: #ffd166; border: 2px solid var(--ink); border-radius: 8px; }
+  .cm-section {
+    grid-column: 1 / -1; font-weight: 800; font-size: 0.82rem; color: var(--ink);
+    border-bottom: 2px dashed #c9bda6; padding: 8px 0 2px; margin-top: 2px;
+  }
+  .cm-rowlabel {
+    font-size: 0.82rem; font-weight: 700; display: flex; align-items: center;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 4px;
+  }
+  .cm-cell {
+    height: 36px; min-width: 30px; border: 2px solid var(--ink); border-radius: 9px;
+    background: var(--paper-card, #fffdf5); color: var(--ink); font-size: 1rem; font-weight: 900;
+    cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center;
+  }
+  .cm-cell.cm-future { background: #f6f0e1; color: transparent; }
+  .cm-cell.cm-on { background: #95d5b2; }
+  .cm-cell.cm-disabled { opacity: 0.55; cursor: default; }
+  .cm-cell:not(.cm-on):not(.cm-future) { color: #b9ac95; }
+  .cm-rowtotal, .cm-wkhead { font-size: 0.74rem; font-weight: 800; text-align: center; display: flex; align-items: center; justify-content: center; }
+  .cm-bar {
+    position: relative; height: 34px; border: 2px solid var(--ink); border-radius: 7px;
+    background: var(--paper-card, #fffdf5); overflow: hidden; display: flex; align-items: flex-end; justify-content: center;
+  }
+  .cm-bar-fill { position: absolute; left: 0; right: 0; bottom: 0; background: #95d5b2; }
+  .cm-bar-pct { position: relative; font-size: 0.6rem; font-weight: 800; z-index: 1; padding-bottom: 1px; }
+  .cm-bar-future { color: #c9bda6; font-weight: 800; }
+  .cm-progress-label { font-size: 0.74rem; opacity: 0.8; }
+  .cm-footer { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+  .cm-footer-summary { font-size: 0.86rem; font-weight: 700; }
+  .cm-spark { display: flex; align-items: flex-end; gap: 3px; height: 26px; margin-left: auto; }
+  .cm-spark-bar { width: 12px; background: #ffd166; border: 1.5px solid var(--ink); border-radius: 3px 3px 0 0; min-height: 4px; }
+  .cm-spark-bar.cm-spark-now { background: #ff7b54; }
   .chore-card h3 { margin: 0 0 0.5rem 0; font-size: 1.2rem; }
   .ct-item {
     display: flex;
@@ -12675,6 +12732,8 @@ function ctHandleWrapClick(e) {
   const a = el.dataset.ctAction;
   if (a === 'toggle-mandatory') ctToggleMandatory(el.dataset.session, el.dataset.kid);
   else if (a === 'toggle-optional') ctToggleOptional(el.dataset.chore, el.dataset.kid);
+  else if (a === 'matrix-mandatory') ctMatrixToggleMandatory(+el.dataset.day, el.dataset.session, el.dataset.kid);
+  else if (a === 'matrix-optional') ctMatrixToggleOptional(+el.dataset.day, el.dataset.chore, el.dataset.kid);
   else if (a === 'edit-group') ctOpenGroupEditor(el.dataset.groupId);
   else if (a === 'delete-group') ctDeleteGroup(el.dataset.groupId);
   else if (a === 'new-group') ctOpenGroupEditor(null);
@@ -12731,6 +12790,170 @@ function ctOptCheckRow(kid, choreName, extra = '', badge = '') {
     </div>${badge}
   </div>`;
 }
+/* ════════════════════════════════════════════════════════════════
+   1a — KID WEEK MATRIX: one tap-to-toggle grid for the whole week
+════════════════════════════════════════════════════════════════ */
+// Toggle a matrix cell on an explicit day (the per-day handlers above use the
+// selected ctDay; the matrix needs any day).
+function ctMatrixToggleMandatory(dayIdx, session, kid) {
+  if (ctGetMandatoryAuto(ctWeekKey, dayIdx, session, kid) && !isParent()) return;
+  const prev = ctGetMandatory(ctWeekKey, dayIdx, session, kid);
+  ctSetMandatory(ctWeekKey, dayIdx, session, kid, !prev);
+  ctMaybeFireGoalBonus(ctWeekKey, kid);
+  saveAll();
+  renderChoreTab();
+}
+function ctMatrixToggleOptional(dayIdx, choreName, kid) {
+  const prev = ctGetOptional(ctWeekKey, dayIdx, kid, choreName);
+  ctSetOptional(ctWeekKey, dayIdx, kid, choreName, !prev);
+  const fired = !prev ? ctCheckGroupPayouts(ctWeekKey, dayIdx, kid) : [];
+  ctMaybeFireGoalBonus(ctWeekKey, kid);
+  saveAll();
+  renderChoreTab();
+  ctCelebrateGroupPayouts(fired, 'screen-chore');
+}
+
+// The ordered set of matrix rows for a kid: routines, then each chore group,
+// then extras. Each row carries how to read/write its cell.
+function ctMatrixRows(kid) {
+  const rows = [];
+  CT_SESSIONS.forEach(s => rows.push({ section:'Routines · tracked, no money', label:s, kind:'mandatory', key:s }));
+  const groups = ctGroupsForKid(kid);
+  const inGroups = new Set();
+  groups.forEach(g => {
+    const val = (Number(g.valueDollars)||0).toFixed(2);
+    const cad = g.cadence === 'daily' ? 'day' : 'week';
+    const section = `${g.icon||'🧺'} ${g.name} · $${val} / ${cad}`;
+    (g.choreIds||[]).forEach(cn => { inGroups.add(cn); rows.push({ section, label:cn, kind:'optional', key:cn }); });
+  });
+  ctPickableChoreNames().filter(cn => !inGroups.has(cn)).forEach(cn =>
+    rows.push({ section:'Extra · counts toward the goal', label:cn, kind:'optional', key:cn }));
+  return rows;
+}
+function ctMatrixCellChecked(kid, dayIdx, row) {
+  return row.kind === 'mandatory'
+    ? ctGetMandatory(ctWeekKey, dayIdx, row.key, kid)
+    : ctGetOptional(ctWeekKey, dayIdx, kid, row.key);
+}
+function ctMatrixCellAuto(kid, dayIdx, row) {
+  return row.kind === 'mandatory' && ctGetMandatoryAuto(ctWeekKey, dayIdx, row.key, kid);
+}
+
+function ctRenderWeekMatrix(kid) {
+  const rows = ctMatrixRows(kid);
+  const info = ctWeekInfo();
+  const todayD = formatDayKey(todayKey());
+  // Day status per column: 'past' | 'today' | 'future'
+  const dayStatus = [];
+  let todayCol = -1;
+  for (let d = 0; d < 7; d++) {
+    const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
+    const cmp = Math.round((date - todayD) / (24*60*60*1000));
+    if (cmp < 0) dayStatus.push('past');
+    else if (cmp === 0) { dayStatus.push('today'); todayCol = d; }
+    else dayStatus.push('future');
+  }
+
+  const icon = CT_PROFILE_ICON[kid];
+  const name = kid === 'jenn' ? 'Jenn' : 'Jess';
+
+  // Kid pills (parent may switch which kid they're viewing; a kid sees their own).
+  const pill = (k) => {
+    const active = k === kid;
+    const canSwitch = isParent();
+    const attrs = canSwitch ? `onclick="ctParentKid='${k}';renderChoreTab()"` : (active ? '' : 'disabled');
+    return `<button type="button" class="cm-pill ${active?'active':''}" ${attrs}>${CT_PROFILE_ICON[k]} ${k==='jenn'?'Jenn':'Jess'}</button>`;
+  };
+
+  // Money status chip from the primary chore group.
+  const groups = ctGroupsForKid(kid).filter(g => g.cadence !== 'daily');
+  let chip = '';
+  if (groups.length) {
+    const g = groups[0];
+    const ids = g.choreIds || []; const m = ids.length;
+    const n = ids.filter(cn => [0,1,2,3,4,5,6].some(d => ctGetOptional(ctWeekKey, d, kid, cn))).length;
+    const fired = ctGroupFiredWeekly(ctWeekKey, g.id, kid);
+    const val = (Number(g.valueDollars)||0).toFixed(2);
+    chip = fired ? `$${val} earned · confirm at meeting` : `${n}/${m} chores → $${val} when all done`;
+  } else {
+    chip = 'No chore groups yet';
+  }
+
+  // Header row.
+  let cells = '';
+  cells += `<div class="cm-corner"></div>`;
+  for (let d = 0; d < 7; d++) {
+    const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
+    cells += `<div class="cm-dayhead ${dayStatus[d]==='today'?'cm-today':''}">${DAY_SHORT[d]}<small>${date.getDate()}</small></div>`;
+  }
+  cells += `<div class="cm-wkhead">wk</div>`;
+
+  // Section + data rows.
+  let lastSection = null;
+  rows.forEach(row => {
+    if (row.section !== lastSection) {
+      cells += `<div class="cm-section">${escapeHtml(row.section)}</div>`;
+      lastSection = row.section;
+    }
+    cells += `<div class="cm-rowlabel" title="${escapeAttr(row.label)}">${escapeHtml(row.label)}</div>`;
+    let weekN = 0;
+    for (let d = 0; d < 7; d++) {
+      const on = ctMatrixCellChecked(kid, d, row);
+      if (on) weekN++;
+      const auto = ctMatrixCellAuto(kid, d, row);
+      const disabled = auto && !isParent();
+      const st = dayStatus[d];
+      const glyph = on ? '✓' : (st === 'future' ? '' : '·');
+      const dataAttrs = row.kind === 'mandatory'
+        ? `data-ct-action="matrix-mandatory" data-session="${escapeAttr(row.key)}"`
+        : `data-ct-action="matrix-optional" data-chore="${escapeAttr(row.key)}"`;
+      cells += `<button type="button" class="cm-cell ${on?'on':''} cm-${st}${disabled?' cm-disabled':''}"`
+        + ` role="checkbox" aria-checked="${on}" aria-label="${escapeAttr(row.label)} ${DAY_SHORT[d]}"`
+        + ` ${dataAttrs} data-day="${d}" data-kid="${kid}"${disabled ? ' disabled' : ''}>${glyph}</button>`;
+    }
+    cells += `<div class="cm-rowtotal">${weekN}/7</div>`;
+  });
+
+  // Bottom row: per-day mini progress bars (% of that day's items done).
+  const totalRows = rows.length || 1;
+  cells += `<div class="cm-rowlabel cm-progress-label">Progress</div>`;
+  for (let d = 0; d < 7; d++) {
+    if (dayStatus[d] === 'future') { cells += `<div class="cm-bar cm-bar-future">–</div>`; continue; }
+    const done = rows.reduce((s,row)=> s + (ctMatrixCellChecked(kid, d, row) ? 1 : 0), 0);
+    const pct = Math.round(done / totalRows * 100);
+    cells += `<div class="cm-bar"><div class="cm-bar-fill" style="height:${pct}%"></div><span class="cm-bar-pct">${pct}%</span></div>`;
+  }
+  cells += `<div class="cm-corner"></div>`;
+
+  // Footer: summary + 8-week sparkline of weekly money.
+  const mandatory = ctMandatoryPoints(ctWeekKey, kid);
+  const allGroupChores = [];
+  ctGroupsForKid(kid).forEach(g => (g.choreIds||[]).forEach(cn => allGroupChores.push(cn)));
+  const choresDone = allGroupChores.filter(cn => [0,1,2,3,4,5,6].some(d => ctGetOptional(ctWeekKey, d, kid, cn))).length;
+
+  const mon0 = ctMondayOf(formatDayKey(ctWeekKey));
+  let spark = '';
+  for (let i = 7; i >= 0; i--) {
+    const d = new Date(mon0); d.setDate(d.getDate() - i*7);
+    const wkKey = ctDateToKey(d);
+    const money = ctWeekMoney(wkKey, kid);
+    const h = Math.max(6, Math.round(money / CT_MONEY_CAP * 100));
+    spark += `<span class="cm-spark-bar ${i===0?'cm-spark-now':''}" style="height:${h}%" title="Week of ${MONTH_SHORT[d.getMonth()]} ${d.getDate()}: $${money.toFixed(2)}"></span>`;
+  }
+
+  return `<div class="chore-card cm-card">
+    <div class="cm-head">
+      <div class="cm-pills">${pill('jenn')}${pill('jess')}</div>
+      <span class="cm-money-chip">${chip}</span>
+    </div>
+    <div class="cm-grid">${cells}</div>
+    <div class="cm-footer">
+      <span class="cm-footer-summary">${icon} ${name} this week: ${mandatory}/21 routines · ${choresDone}/${allGroupChores.length||0} chores</span>
+      <span class="cm-spark" aria-label="Last 8 weeks of pocket money">${spark}</span>
+    </div>
+  </div>`;
+}
+
 function ctRenderKidSection(kid) {
   const icon = CT_PROFILE_ICON[kid];
   const name = kid === 'jenn' ? 'Jenn' : 'Jess';
@@ -13146,7 +13369,10 @@ function renderChoreTab() {
   const swept = ctSweepGroupPayouts(ctWeekKey, 'jenn').length + ctSweepGroupPayouts(ctWeekKey, 'jess').length;
   if (swept) saveAll();
 
-  wrap.innerHTML = `
+  // 1a: kids get the one-tap week matrix; parents keep the day-by-day
+  // management view (groups, chore names, summary, etc.).
+  wrap.innerHTML = isParent()
+    ? `
     <div class="chore-grid">
       ${ctRenderWeekControls()}
       ${ctRenderMoneyCard(kid)}
@@ -13156,6 +13382,13 @@ function renderChoreTab() {
       ${ctRenderGroupManagerCard()}
       ${ctRenderChoreNamesCard()}
       ${ctRenderSummaryTable()}
+    </div>
+  `
+    : `
+    <div class="chore-grid">
+      ${ctRenderWeekControls()}
+      ${ctRenderWeekMatrix(kid)}
+      ${ctRenderMoneyCard(kid)}
     </div>
   `;
 }
