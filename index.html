@@ -12215,6 +12215,11 @@ function moneyDeposit(kid, amount) {          // cash → savings
   if (amount <= 0) return false;
   w.cash = money2(w.cash - amount); w.savings = money2(w.savings + amount); saveAll(); return true;
 }
+function moneyAddCash(kid, amount) {          // extra cash from outside chores → wallet cash
+  const w = ensureWallet(kid); amount = money2(amount);
+  if (!(amount > 0)) return false;
+  w.cash = money2(w.cash + amount); saveAll(); return true;
+}
 function moneyWithdraw(kid, amount) {         // savings → cash (two-way)
   const w = ensureWallet(kid); amount = money2(Math.min(amount, w.savings));
   if (amount <= 0) return false;
@@ -12288,10 +12293,11 @@ function renderMoneyScreen() {
     </div>`;
   html += `<div class="chore-card"><h3>💵 Cash — $${w.cash.toFixed(2)}</h3>
     <div class="money-btn-row">
+      ${isParent() ? `<button class="pill-btn" onclick="moneyAddCashPrompt()">➕ Add cash</button>` : ''}
       <button class="pill-btn" onclick="moneyAction('deposit')">→ 🏦 Save</button>
       <button class="pill-btn" onclick="moneyOpenGICPrompt()">→ 🔒 GIC</button>
       <button class="pill-btn" onclick="moneyAction('buy')">→ 📈 Invest</button>
-    </div></div>`;
+    </div>${isParent() ? `<div class="ct-meta" style="margin-top:0.3rem">➕ Add cash logs extra money from outside chores (a gift, allowance, birthday) so it can be saved or invested too.</div>` : ''}</div>`;
   html += `<div class="chore-card"><h3>🏦 Savings — $${w.savings.toFixed(2)}</h3>
     <div class="ct-meta">Earns ${(cfg.savingsRate * 100).toFixed(2)}%/yr, credited each family meeting. Money moves both ways.</div>
     <div class="money-btn-row"><button class="pill-btn" onclick="moneyAction('withdraw')">→ 💵 To cash</button></div></div>`;
@@ -12338,6 +12344,17 @@ async function moneyAction(kind) {
   if (kind === 'deposit') { const a = await moneyPromptAmount('Move Cash → Savings', w.cash); if (a) { moneyDeposit(kid, a); renderMoneyScreen(); } }
   else if (kind === 'withdraw') { const a = await moneyPromptAmount('Move Savings → Cash', w.savings); if (a) { moneyWithdraw(kid, a); renderMoneyScreen(); } }
   else if (kind === 'buy') { const t = ((await showPrompt('Which stock? SU, TSLA, AAPL, COST', { value:'AAPL' })) || '').toUpperCase().trim(); if (STOCKS_2023[t]) moneyBuyPrompt(t); }
+}
+async function moneyAddCashPrompt() {
+  if (!isParent()) { showToast('Parents add extra cash 🔒'); return; }
+  const kid = moneyKid;
+  const v = await showPrompt('Add extra cash 💵\nMoney from outside chores — a gift, allowance, or birthday. How much?', { value:'', type:'number' });
+  if (v == null) return;
+  const a = money2(parseFloat(v));
+  if (!a || a <= 0) { if (v !== '') showToast('Enter an amount like 5'); return; }
+  moneyAddCash(kid, a);
+  renderMoneyScreen();
+  showToast(`➕ Added $${a.toFixed(2)} to ${kid === 'jenn' ? 'Jenn' : 'Jess'}’s cash — save or invest it below 🏦`);
 }
 async function moneyBuyPrompt(t) {
   const kid = moneyKid; const w = ensureWallet(kid);
