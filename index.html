@@ -1544,9 +1544,12 @@
   .mm-detail-div { background: repeating-linear-gradient(#c9bda6, #c9bda6 3px, transparent 3px, transparent 6px); }
   .mm-detail-kid { font-weight: 800; font-size: 0.86rem; margin-bottom: 4px; }
   .mm-detail-kid small { font-weight: 700; opacity: 0.7; }
-  .mm-item { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; padding: 1px 0; }
+  .mm-item { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; padding: 2px 4px; width: 100%; text-align: left; background: transparent; border: 1.5px solid transparent; border-radius: 8px; color: inherit; font-family: inherit; cursor: pointer; }
+  .mm-item:hover { border-color: #d9cfb4; background: rgba(0,0,0,0.03); }
+  .mm-item:active { transform: translateY(1px); }
   .mm-item-box { width: 16px; height: 16px; border: 2px solid var(--ink); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 900; flex-shrink: 0; }
   .mm-item.on .mm-item-box { background: #95d5b2; }
+  .mm-detail-editnote { font-size: 0.72rem; opacity: 0.7; font-style: italic; margin-top: 6px; }
   .mm-confirm-day { width: 100%; margin-top: 8px; border: 2px solid var(--ink); border-radius: 10px; background: var(--paper-card, #fffdf5); box-shadow: 2px 2px 0 var(--ink); padding: 6px; font-weight: 800; cursor: pointer; }
   .mm-confirm-day.confirmed { background: #95d5b2; }
   .mm-ready { margin-top: 8px; font-size: 0.82rem; font-weight: 700; background: #fff4db; border: 2px dashed #e8dfc3; border-radius: 10px; padding: 6px 10px; }
@@ -12463,9 +12466,12 @@ function mmSelectDay(d) { mmSelectedDay = (mmSelectedDay === d ? null : d); rend
 function mmRenderDayDetail(wk, d) {
   const col = (kid) => {
     const rows = ctMatrixRows(kid);
-    const items = rows.map(row => {
+    // Items are tappable so a parent can correct a kid's selection right here in
+    // the meeting (parent-only overlay) instead of going to each kid's weekly view.
+    const items = rows.map((row, i) => {
       const on = ctMatrixCellChecked(kid, d, row);
-      return `<div class="mm-item ${on ? 'on' : ''}"><span class="mm-item-box">${on ? '✓' : ''}</span>${escapeHtml(row.label)}</div>`;
+      return `<button type="button" class="mm-item ${on ? 'on' : ''}" onclick="mmToggleItem('${kid}',${d},${i})"
+          role="checkbox" aria-checked="${on}" aria-label="${escapeAttr(row.label)} ${DAY_SHORT[d]}, ${kid === 'jenn' ? 'Jenn' : 'Jess'}"><span class="mm-item-box">${on ? '✓' : ''}</span>${escapeHtml(row.label)}</button>`;
     }).join('');
     const done = rows.filter(row => ctMatrixCellChecked(kid, d, row)).length;
     return `<div class="mm-detail-col"><div class="mm-detail-kid">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'} <small>${done}/${rows.length} done</small></div>${items}</div>`;
@@ -12473,8 +12479,31 @@ function mmRenderDayDetail(wk, d) {
   const confirmed = mmIsDayConfirmed(d);
   return `<div class="mm-detail">
       <div class="mm-detail-cols">${col('jenn')}<div class="mm-detail-div"></div>${col('jess')}</div>
+      <div class="mm-detail-editnote">Tap any item to check or uncheck it for that kid — chore money and goal bonuses update live.</div>
       <button type="button" class="mm-confirm-day ${confirmed ? 'confirmed' : ''}" onclick="mmToggleConfirmDay(${d})">${confirmed ? '✓ Confirmed (both kids)' : 'Confirm this day'}</button>
     </div>`;
+}
+// Parent taps a kid's routine/chore in the meeting review — mirrors the kid-view
+// toggles (ctToggleMandatory/ctToggleOptional) but targets an explicit day `d`
+// instead of the globally selected ctDay, then re-renders the meeting in place.
+function mmToggleItem(kid, d, idx) {
+  const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
+  const row = ctMatrixRows(kid)[idx];
+  if (!row) return;
+  if (row.kind === 'mandatory') {
+    ctSetMandatory(wk, d, row.key, kid, !ctGetMandatory(wk, d, row.key, kid));
+    ctMaybeFireGoalBonus(wk, kid);
+    saveAll();
+    renderMeetingMode();
+  } else {
+    const prev = ctGetOptional(wk, d, kid, row.key);
+    ctSetOptional(wk, d, kid, row.key, !prev);
+    const fired = !prev ? ctCheckGroupPayouts(wk, d, kid) : [];
+    ctMaybeFireGoalBonus(wk, kid);
+    saveAll();
+    renderMeetingMode();
+    ctCelebrateGroupPayouts(fired, 'familyMeetingOverlay');
+  }
 }
 
 /* Step 2 — Celebrate: auto-collected wins + 2b planned-vs-done analytics. */
