@@ -1637,8 +1637,8 @@
     text-shadow: 0 1px 1px rgba(0,0,0,0.25);
     overflow: hidden;
     box-sizing: border-box;
-    /* Floor so blocks under ~30 min stay tall enough to read the name. */
-    min-height: 17px;
+    /* Floor so even a 15-min block stays tall enough to tap & read (W2). */
+    min-height: 18px;
     z-index: 2;
   }
   .wf-card:hover { transform: translate(-1px,-1px); box-shadow: 2.5px 2.5px 0 var(--ink); z-index: 3; }
@@ -1679,12 +1679,26 @@
   .wf-card--done { opacity: 0.6; }
   .wf-card--done .wf-card-name { text-decoration: line-through; }
   .wf-card--done .wf-card-check { background: var(--accent-green); color: var(--ink); }
-  .wf-card--xslim .wf-card-check { display: none; } /* too short to tap reliably */
+  /* W4: even the shortest block keeps a tappable tick, just smaller — never
+     leave a rendered block with no way to check it off. */
+  .wf-card--xslim .wf-card-check { width: 14px; height: 14px; font-size: 0.62rem; top: 2px; right: 2px; border-radius: 4px; }
   /* Short blocks: drop the duration/time chips so the name + icon still fit */
   .wf-card.wf-card--slim { padding: 0.1rem 0.4rem; align-items: center; }
   .wf-card.wf-card--slim .wf-card-dur { display: none; }
   .wf-card.wf-card--xslim .wf-card-time { display: none; }
-  .wf-card.wf-card--xslim { grid-template-columns: auto 1fr; font-size: 0.74rem; }
+  .wf-card.wf-card--xslim { grid-template-columns: auto 1fr auto; font-size: 0.74rem; }
+  /* W2: too short even for a name → show the icon only, keep the title tooltip
+     and (on the first segment) the check button. */
+  .wf-card--icononly { grid-template-columns: 1fr auto; padding: 0 0.2rem; justify-items: center; }
+  .wf-card--icononly .wf-card-name,
+  .wf-card--icononly .wf-card-time,
+  .wf-card--icononly .wf-card-dur { display: none; }
+  .wf-card--icononly .wf-card-icon { font-size: 0.95rem; }
+  /* W1: continuation segment of a block that crosses a zone boundary. Dashed
+     top edge + ⤵ marker, no time/check (those live on the first segment). */
+  .wf-card--cont { border-top: 2px dashed var(--ink); box-shadow: 1.5px 1.5px 0 rgba(42,35,32,0.35); }
+  .wf-card--cont .wf-card-name { opacity: 0.9; }
+  .wf-card-cont-marker { font-weight: 900; font-size: 0.8rem; line-height: 1; }
 
   /* ═══════════ LEGEND ═══════════ */
   .week-legend {
@@ -1797,7 +1811,7 @@
   .timeline {
     position: relative;
     display: flex;
-    min-height: 1260px; /* DAY_MIN_SPAN * PX_PER_MIN, see JS */
+    min-height: 1344px; /* DAY_MIN_SPAN(960) * PX_PER_MIN(1.4), see JS */
   }
   .tl-gutter {
     width: 50px;
@@ -1964,6 +1978,17 @@
   }
   .placed-block:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--ink); }
   .placed-block.parent-pinned { border-style: dashed; border-width: 3px; }
+  /* W7: a block spilling past the selected zone's edge shows a "continues"
+     marker at that edge instead of being silently cut off. */
+  .block-clip-marker {
+    position: absolute; left: 0; right: 0;
+    text-align: center; font-size: 0.6rem; font-weight: 900;
+    letter-spacing: 0.5px; line-height: 1; padding: 1px 0;
+    background: rgba(42,35,32,0.72); color: #fffdf5;
+    pointer-events: none; z-index: 11;
+  }
+  .block-clip-marker--top { top: 0; border-radius: 10px 10px 0 0; }
+  .block-clip-marker--bottom { bottom: 0; border-radius: 0 0 10px 10px; }
   /* Pale block colours (e.g. Routine's mint) need dark text to stay readable. */
   .placed-block.light-bg { color: var(--ink); }
   /* Pending invitation from sister (not yet accepted) */
@@ -4831,10 +4856,10 @@ function renderSyncDebugMessage() {
 const LS_KEY = 'weeklyplanner-v3';
 const TOTAL_SLOTS = 60;           // 6AM → 9PM = 15 hrs × 4 (legacy, used for some %s)
 const START_HOUR  = 6;
-const END_HOUR    = 21;
+const END_HOUR    = 22;
 const START_MIN   = START_HOUR * 60;      // 360
-const END_MIN     = END_HOUR * 60;        // 1260
-const DAY_MIN_SPAN = END_MIN - START_MIN; // 900 min
+const END_MIN     = END_HOUR * 60;        // 1320
+const DAY_MIN_SPAN = END_MIN - START_MIN; // 960 min
 const PX_PER_MIN  = 1.4;                  // 1 min = 1.4px → 1 hr = 84px
 
 const COLOURS = ['#ff7b54','#ff9eb5','#ffd166','#95d5b2','#6fb1fc','#c3aed6','#ef476f','#8ecae6','#ffb4a2','#b5ead7'];
@@ -6521,8 +6546,9 @@ function renderWeek() {
   }
 }
 
-// Weekly time-per-category totals over the app's 6am–9pm window (shared by
-// the Sunday review nudge). Free = window minutes not scheduled.
+// Weekly time-per-category totals over the app's 6am–10pm window (shared by
+// the Sunday review nudge). Free = window minutes not scheduled. Counts the
+// full entered duration up to END_MIN so charts reflect what was planned (W6).
 function computeWeekTotals(keys) {
   const acts = getAllActivities();
   const catMin = {};
@@ -6600,7 +6626,7 @@ function renderWeekGlance(keys) {
     : '';
 
   body.innerHTML = `
-    <div class="glance-window">Totals over the 6am–9pm window (${fmtHrsMin(DAY_MIN_SPAN)}/day).</div>
+    <div class="glance-window">Totals over the 6am–10pm window (${fmtHrsMin(DAY_MIN_SPAN)}/day).</div>
     <div class="glance-chips">${chips}</div>
     ${sleepHtml}
     ${notesHtml}
@@ -6684,7 +6710,10 @@ function bedtimeReminderText(age) {
    ════════════════════════════════════════════════════════════════ */
 
 /* Time-grid color mode: 'inverted' (default, free=bright) or 'classic' (cat colors) */
-let tgColorMode = 'inverted';
+// 2a: default to quiet-free — planned blocks carry their saturated category
+// colour, free time stays plain paper so an empty week reads as empty. The
+// toggle still flips to the older "free-time bright" (inverted) mode.
+let tgColorMode = 'classic';
 
 /* Activity IDs that count as Learning/Training (per locked plan) */
 const TG_LEARNING_IDS = ['school_day', 'french', 'chinese', 'math', 'piano', 'training'];
@@ -7098,17 +7127,36 @@ function wfPickZone(relStart, durMin, zones) {
   return bestOv > 0 ? best : zones[zones.length - 1];
 }
 
+/* Split a block into one render segment per zone it overlaps so a block that
+   crosses a zone boundary shows in EVERY zone instead of being clamped into a
+   single one (W1/W7). relStart/dur are minutes from START_MIN. Zones must be
+   contiguous and sorted by start. Returns segments in time order, each flagged
+   isFirst (earliest, keeps the time label + check button) / isLast. */
+function splitBlockIntoZoneSegments(relStart, dur, zones) {
+  const blockEnd = relStart + dur;
+  const segs = [];
+  zones.forEach(z => {
+    const segStart = Math.max(relStart, z.start);
+    const segEnd   = Math.min(blockEnd, z.end);
+    if (segEnd - segStart <= 0) return;
+    segs.push({ zoneId: z.id, zone: z, segStart, segEnd });
+  });
+  segs.sort((a,b)=> a.segStart - b.segStart);
+  segs.forEach((s,i)=>{ s.isFirst = (i===0); s.isLast = (i===segs.length-1); });
+  return segs;
+}
+
 function renderFullWeek(keys) {
   const grid = document.getElementById('weeklyFullGrid');
   grid.innerHTML = '';
   const acts = getAllActivities();
 
-  /* Minutes from START_MIN (6am): before 6-8am, school 8am-3pm, after 3-6pm, evening 6pm-9pm */
+  /* Minutes from START_MIN (6am): before 6-8am, school 8am-3pm, after 3-6pm, evening 6pm-10pm */
   const ZONES = [
     { id:'before',  label: '🌅 Before school · Morning (6–8 am)', start: 0,   end: 120 },
     { id:'school',  label: '🏫 School · Daytime (8 am–3 pm)',    start: 120, end: 540 },
     { id:'after',   label: '🎒 After school · Afternoon (3–6 pm)', start: 540, end: 720 },
-    { id:'evening', label: '🌙 Evening (6–9 pm)',                 start: 720, end: DAY_MIN_SPAN },
+    { id:'evening', label: '🌙 Evening (6–10 pm)',                start: 720, end: DAY_MIN_SPAN },
   ];
 
   // Day headers row
@@ -7184,9 +7232,12 @@ function renderFullWeek(keys) {
         .slice().sort((a,b)=>a.startMin - b.startMin)
         .filter(b=>{
           const relStart = b.startMin - START_MIN;
-          const dur = b.durationMin || 0;
-          const picked = wfPickZone(relStart, dur, ZONES);
-          return picked.id === z.id;
+          const dur = Math.max(5, b.durationMin || 0);
+          // Include the block in EVERY zone it overlaps (not just its "best"
+          // zone) so a boundary-crossing block renders a segment in each — the
+          // segment is clamped to this zone's edges below (W1). Mirrors the
+          // travel-strip pass further down.
+          return wfZoneOverlap(relStart, dur, z) > 0;
         });
 
       // Split blocks that overlap in time into side-by-side columns so
@@ -7201,11 +7252,14 @@ function renderFullWeek(keys) {
         const min = startMinOfDay % 60;
         const timeStr = `${hr>12?hr-12:hr}:${String(min).padStart(2,'0')}${hr>=12?'p':'a'}`;
 
-        // Position by time within the zone (clamped to the zone's span)
+        // Position by time within the zone (clamped to the zone's span). A
+        // block spanning several zones renders one segment per zone; only the
+        // segment in the zone the block actually starts in is the "first" one.
         const relStart = b.startMin - START_MIN;
         const dur = Math.max(5, b.durationMin || 0);
         const segStart = Math.max(relStart, z.start);
         const segEnd   = Math.min(relStart + dur, z.end);
+        const isFirst  = relStart >= z.start; // zones are contiguous → true only where it starts
         const topPct = (segStart - z.start) / zoneSpan * 100;
         const heightPct = Math.max(segEnd - segStart, 0) / zoneSpan * 100;
         const pxHeight = heightPct / 100 * cellH;
@@ -7215,7 +7269,9 @@ function renderFullWeek(keys) {
         let cls = 'wf-card' + (isLightColour(bg) ? ' light-bg' : '');
         if (pxHeight < 34) cls += ' wf-card--slim';
         if (pxHeight < 22) cls += ' wf-card--xslim';
+        if (pxHeight < 16) cls += ' wf-card--icononly'; // W2: too short for a name → icon only
         if (b.completed) cls += ' wf-card--done';
+        if (!isFirst)   cls += ' wf-card--cont';         // W1: continuation segment
         card.className = cls;
 
         const slot = cols.get(b.id) || { col: 0, count: 1 };
@@ -7236,15 +7292,27 @@ function renderFullWeek(keys) {
         card.style.width = widthCss;
         card.style.background = bg;
         const travelTag = bufBefore > 0 ? `<span class="wf-card-travel">${travelMin ? '🚗' : '👕'}${bufBefore}m</span>` : '';
-        card.innerHTML = `
-          <div class="wf-card-time">${timeStr}</div>
-          <div class="wf-card-icon">${act.icon}</div>
-          <div class="wf-card-name">${b.parentStamp && b.parentStamp.emoji ? b.parentStamp.emoji + ' ' : ''}${act.name}${travelTag}</div>
-          <div class="wf-card-dur">${formatDuration(b.durationMin)}</div>
-          <button type="button" class="wf-card-check" aria-label="${b.completed?'Mark not done':'Mark done'}"
-            onclick="toggleBlockDone('${key}','${b.id}',event)">${b.completed?'✓':''}</button>
-        `;
+        const stampEmoji = b.parentStamp && b.parentStamp.emoji ? b.parentStamp.emoji + ' ' : '';
+        if (isFirst) {
+          card.innerHTML = `
+            <div class="wf-card-time">${timeStr}</div>
+            <div class="wf-card-icon">${act.icon}</div>
+            <div class="wf-card-name">${stampEmoji}${act.name}${travelTag}</div>
+            <div class="wf-card-dur">${formatDuration(b.durationMin)}</div>
+            <button type="button" class="wf-card-check" aria-label="${b.completed?'Mark not done':'Mark done'}"
+              onclick="toggleBlockDone('${key}','${b.id}',event)">${b.completed?'✓':''}</button>
+          `;
+        } else {
+          // Continuation segment: no time, no check, a ⤵ marker to signal the
+          // block began in an earlier zone. Same tooltip + click-through below.
+          card.innerHTML = `
+            <div class="wf-card-cont-marker" aria-hidden="true">⤵</div>
+            <div class="wf-card-icon">${act.icon}</div>
+            <div class="wf-card-name">${stampEmoji}${act.name}</div>
+          `;
+        }
         card.title = `${act.icon} ${act.name} — ${timeStr}, ${formatDuration(b.durationMin)}`
+          + (isFirst ? '' : ' · continues from the previous section')
           + (bufBefore > 0 ? ` · ${travelMin ? '🚗 travel' : '👕 get-ready'} ${bufBefore} min each way` : '');
         card.onclick = (e)=>{ e.stopPropagation(); openDayFromWeekCard(key, ci, b.id); };
         cell.appendChild(card);
@@ -7865,9 +7933,20 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
   const act = getAllActivities().find(a=>a.id===b.actId);
   if (!act) return;
 
+  // Clip the block to the visible zone and flag any edge it crosses, so a
+  // block spilling past a selected zone's top/bottom shows a "continues"
+  // marker instead of being silently cut (W7). In the default "all" view the
+  // zone spans the whole day, so nothing is clipped.
+  const [, zEndOffset] = zoneRangeMin(currentZone);
+  const zoneSpan = zEndOffset - zMinStart;
   const relStart = (b.startMin - START_MIN) - zMinStart;
-  const top = Math.max(0, relStart * PX_PER_MIN);
-  const height = Math.max(22, b.durationMin * PX_PER_MIN - 2);
+  const relEnd   = relStart + (b.durationMin || 0);
+  const clippedTop    = relStart < 0;
+  const clippedBottom = relEnd > zoneSpan;
+  const visStartMin = Math.max(0, relStart);
+  const visEndMin   = Math.min(zoneSpan, relEnd);
+  const top = visStartMin * PX_PER_MIN;
+  const height = Math.max(22, (visEndMin - visStartMin) * PX_PER_MIN - 2);
 
   const widthPct = 100 / colCount;
   const leftPct  = colIdx * widthPct;
@@ -7958,6 +8037,20 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
     ${noteHtml}
     ${gearHtml}
   `;
+  if (!isBuffer && clippedTop) {
+    const m = document.createElement('div');
+    m.className = 'block-clip-marker block-clip-marker--top';
+    m.textContent = '⌃ continues';
+    blockEl.appendChild(m);
+    blockEl.title = `${act.name} started earlier — switch to “All” to see the whole block`;
+  }
+  if (!isBuffer && clippedBottom) {
+    const m = document.createElement('div');
+    m.className = 'block-clip-marker block-clip-marker--bottom';
+    m.textContent = 'continues ⌄';
+    blockEl.appendChild(m);
+    blockEl.title = `${act.name} continues past this section — switch to “All” to see the whole block`;
+  }
   if (!isBuffer) blockEl.onclick = (e)=>{ e.stopPropagation(); onTimelineBlockTap(b.id); };
   canvas.appendChild(blockEl);
 
@@ -8469,6 +8562,12 @@ function placementFeedback() {
 /* Place a new block */
 function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts={}) {
   const id = Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  // W5: keep the block inside the day — trim its duration to the room left from
+  // its start so what's saved always renders in full.
+  const reqDur = Math.max(5, durationMin || 0);
+  const fitDur = Math.min(reqDur, END_MIN - startMin);
+  if (fitDur < reqDur) showToast('✂️ Trimmed to fit the day');
+  durationMin = fitDur;
   const block = {
     id, actId, startMin, durationMin,
     createdAt: Date.now(), updatedAt: Date.now(), // so cross-device merges order correctly
@@ -9677,7 +9776,12 @@ async function saveEditChanges() {
   const act = getAllActivities().find(a=>a.id===blk.actId);
 
   const newStart = Math.max(START_MIN, Math.min(END_MIN-15, editState.startMin));
-  const newDur   = Math.max(5, Math.min(DAY_MIN_SPAN, editState.durationMin));
+  // W5: never let a block run past the end of the day — clamp its duration to
+  // the room left from its start, so what's saved is what renders. Toast if we
+  // had to shorten it.
+  const requestedDur = Math.max(5, Math.min(DAY_MIN_SPAN, editState.durationMin));
+  const newDur = Math.min(requestedDur, END_MIN - newStart);
+  if (newDur < requestedDur) showToast('✂️ Trimmed to fit the day');
   const newTravel = !!editState.travelBuffer;
   const newGetReady = !!editState.getReadyBuffer;
   const newTravelBuf = newTravel ? clampBufferMin(editState.travelBufMin) : null;
