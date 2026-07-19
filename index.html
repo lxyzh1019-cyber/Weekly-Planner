@@ -4964,6 +4964,20 @@ function initFirebase() {
       setSyncStatus('offline','Local only (no Firebase config)');
       return;
     }
+    // The Firebase SDK <script> tags are deferred, so they haven't executed yet
+    // when this inline script calls initFirebase() at parse time — `firebase`
+    // would be undefined and init would throw straight to "Local only". If the
+    // SDK isn't ready, wait for DOMContentLoaded (deferred scripts run before it)
+    // and retry once. Only report "Local only" if it's truly still missing.
+    if (typeof firebase === 'undefined' || typeof firebase.initializeApp !== 'function') {
+      if (document.readyState === 'loading') {
+        setSyncStatus('syncing', 'Connecting…');
+        window.addEventListener('DOMContentLoaded', initFirebase, { once: true });
+        return;
+      }
+      setSyncStatus('offline', 'Local only (Firebase SDK unavailable)');
+      return;
+    }
     fbApp = firebase.initializeApp(FIREBASE_CONFIG);
     fbStore = firebase.firestore();
     fbDocRef = fbStore.collection(FS_COLLECTION).doc(FS_DOC_ID);
