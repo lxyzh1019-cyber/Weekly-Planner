@@ -2606,6 +2606,17 @@
     max-height: 88vh;
     overflow-y: auto;
   }
+  /* Keep the primary action(s) reachable without scrolling to the very
+     bottom of a long sheet — pins to the visible edge of the sheet's own
+     scroll area regardless of how much content sits above it. */
+  .sheet-actions-sticky {
+    position: sticky;
+    bottom: -1.2rem;
+    margin: 0.6rem -1.2rem -1.2rem;
+    padding: 0.6rem 1.2rem calc(1.2rem + env(safe-area-inset-bottom, 0px));
+    background: var(--paper);
+    border-top: 2px solid var(--paper-line);
+  }
   /* Styled confirm/prompt dialog (promise-based, replaces native dialogs) */
   #appDialogOverlay { align-items: center; justify-content: center; z-index: 500; }
   .app-dialog-sheet {
@@ -4867,8 +4878,10 @@
       </div>
     </div>
 
-    <button class="btn-danger" onclick="removeBlock()">🗑 Remove this block</button>
-    <button class="btn-confirm" style="margin-top:0.4rem" onclick="saveEditChanges()">Save Changes ✅</button>
+    <div class="sheet-actions-sticky">
+      <button class="btn-danger" onclick="removeBlock()">🗑 Remove this block</button>
+      <button class="btn-confirm" style="margin-top:0.4rem" onclick="saveEditChanges()">Save Changes ✅</button>
+    </div>
   </div>
 </div>
 
