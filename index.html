@@ -1407,10 +1407,10 @@
     font-size: 1.09rem; outline: none; padding: 0; min-width: 0;
   }
   .gt-check {
-    width: 22px; height: 22px; border-radius: 50%;
+    width: 32px; height: 32px; border-radius: 50%;
     border: 2px solid var(--ink); background: #fff;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.04rem; flex-shrink: 0; cursor: pointer;
+    font-size: 1.4rem; flex-shrink: 0; cursor: pointer;
   }
   .gt-item.done .gt-check { background: var(--accent-strong); color: #fff; }
   .gt-day-tag {
@@ -1547,7 +1547,7 @@
   .mm-item { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; padding: 2px 4px; width: 100%; text-align: left; background: transparent; border: 1.5px solid transparent; border-radius: 8px; color: inherit; font-family: inherit; cursor: pointer; }
   .mm-item:hover { border-color: #d9cfb4; background: rgba(0,0,0,0.03); }
   .mm-item:active { transform: translateY(1px); }
-  .mm-item-box { width: 16px; height: 16px; border: 2px solid var(--ink); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 900; flex-shrink: 0; }
+  .mm-item-box { width: 26px; height: 26px; border: 2px solid var(--ink); border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: 900; flex-shrink: 0; }
   .mm-item.on .mm-item-box { background: #95d5b2; }
   .mm-detail-editnote { font-size: 0.72rem; opacity: 0.7; font-style: italic; margin-top: 6px; }
   .ct-history > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
@@ -1787,9 +1787,9 @@
   /* Quick-complete tick in the card corner — check off without opening detail */
   .wf-card-check {
     position: absolute; top: 3px; right: 3px;
-    width: 17px; height: 17px; border-radius: 5px;
-    border: 1.5px solid var(--ink); background: rgba(255,255,255,0.9);
-    color: var(--ink); font-size: 0.72rem; font-weight: 900; line-height: 1;
+    width: 24px; height: 24px; border-radius: 6px;
+    border: 2px solid var(--ink); background: rgba(255,255,255,0.9);
+    color: var(--ink); font-size: 1rem; font-weight: 900; line-height: 1;
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; padding: 0; text-shadow: none; z-index: 2;
   }
@@ -1799,7 +1799,7 @@
   .wf-card--done .wf-card-check { background: var(--accent-green); color: var(--ink); }
   /* W4: even the shortest block keeps a tappable tick, just smaller — never
      leave a rendered block with no way to check it off. */
-  .wf-card--xslim .wf-card-check { width: 14px; height: 14px; font-size: 0.62rem; top: 2px; right: 2px; border-radius: 4px; }
+  .wf-card--xslim .wf-card-check { width: 19px; height: 19px; font-size: 0.78rem; top: 2px; right: 2px; border-radius: 5px; }
   /* Short blocks: drop the duration/time chips so the name + icon still fit */
   .wf-card.wf-card--slim { padding: 0.1rem 0.4rem; align-items: center; }
   .wf-card.wf-card--slim .wf-card-dur { display: none; }
@@ -1935,7 +1935,7 @@
     background: #fff4db; border: 2px dashed #e8dfc3; border-radius: 10px; padding: 3px 10px;
   }
   .dc-row {
-    display: grid; grid-template-columns: 76px 1fr 26px; align-items: center; gap: 8px;
+    display: grid; grid-template-columns: 76px 1fr 36px; align-items: center; gap: 8px;
     border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px;
     background: var(--paper-card, #fffdf5); box-shadow: 2px 2px 0 var(--ink); cursor: pointer;
   }
@@ -1953,8 +1953,8 @@
   .dc-name { font-weight: 800; font-size: 1.02rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .dc-meta { font-size: 0.8rem; opacity: 0.85; }
   .dc-check {
-    width: 26px; height: 26px; border-radius: 7px; border: 2px solid var(--ink);
-    background: rgba(255,255,255,0.9); color: var(--ink); font-size: 0.95rem; font-weight: 900;
+    width: 36px; height: 36px; border-radius: 9px; border: 2px solid var(--ink);
+    background: rgba(255,255,255,0.9); color: var(--ink); font-size: 1.35rem; font-weight: 900;
     display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
   }
   .dc-check.done { background: #95d5b2; }
@@ -2231,19 +2231,47 @@
     word-break: break-word;
     white-space: normal;
   }
-  .placed-block .block-gear {
-    font-size: 0.72rem;
-    font-weight: 600;
-    opacity: 0.95;
-    line-height: 1.2;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    word-break: break-word;
-    white-space: normal;
+  /* Tappable get-ready gear checklist on a training block. */
+  .placed-block .block-gear-list {
+    margin-top: 3px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
   }
-  .placed-block.block-font-lg .block-gear { font-size: 0.8rem; }
+  .placed-block .block-gear-head {
+    font-size: 0.74rem; font-weight: 800; opacity: 0.95;
+    line-height: 1.1;
+  }
+  .placed-block .block-gear-item {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.22);
+    border: 1.5px solid rgba(255,255,255,0.65);
+    border-radius: 8px;
+    padding: 2px 6px;
+    font-family: inherit;
+    font-size: 0.8rem; font-weight: 700;
+    color: inherit; text-align: left;
+    cursor: pointer; min-width: 0; width: 100%;
+    box-shadow: none;
+  }
+  .placed-block.light-bg .block-gear-item { border-color: rgba(42,35,32,0.35); background: rgba(255,255,255,0.4); }
+  .placed-block .block-gear-item .block-gear-box {
+    flex-shrink: 0;
+    width: 26px; height: 26px;
+    border-radius: 7px;
+    border: 2px solid currentColor;
+    background: rgba(255,255,255,0.85);
+    color: var(--ink);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.15rem; font-weight: 900; line-height: 1;
+  }
+  .placed-block .block-gear-item.checked .block-gear-box { background: var(--accent-green, #7ac74f); }
+  .placed-block .block-gear-item .block-gear-label {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .placed-block .block-gear-item.checked .block-gear-label { text-decoration: line-through; opacity: 0.8; }
+  .placed-block.block-font-lg .block-gear-head { font-size: 0.82rem; }
   .placed-block.placed-block--completed {
     filter: brightness(0.9) saturate(0.6);
     border-style: solid;
@@ -2294,18 +2322,18 @@
   /* Quick-complete tick in the block corner */
   .block-done-btn {
     position: absolute;
-    top: 4px;
-    right: 30px;
-    width: 20px;
-    height: 20px;
-    border-radius: 6px;
-    border: 1.5px solid var(--ink);
-    background: rgba(255,255,255,0.75);
+    top: 5px;
+    right: 6px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 2px solid var(--ink);
+    background: rgba(255,255,255,0.85);
     color: var(--ink);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.82rem;
+    font-size: 1.25rem;
     font-weight: 900;
     line-height: 1;
     cursor: pointer;
@@ -3246,10 +3274,10 @@
     opacity: 0.7;
   }
   .checklist-check {
-    width: 24px; height: 24px; border-radius: 6px;
+    width: 34px; height: 34px; border-radius: 8px;
     border: 2px solid var(--ink); background: #fff;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1rem; flex-shrink: 0; cursor: pointer;
+    font-size: 1.4rem; flex-shrink: 0; cursor: pointer;
   }
   .checklist-item.checked .checklist-check { background: var(--accent-strong); color: #fff; }
   .checklist-text { flex: 1; font-size: 1.09rem; }
@@ -3353,10 +3381,10 @@
 
   /* ── Audit fix: larger chore checkbox tap targets (was 20×20px, now 28px visible + 48px hit area) ── */
   .ct-check {
-    width: 28px;
-    height: 28px;
+    width: 38px;
+    height: 38px;
     position: relative;
-    font-size: 1.1rem;
+    font-size: 1.45rem;
     flex-shrink: 0;
   }
   .ct-check::before {
@@ -8409,19 +8437,11 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
   const noteHtml = (!isCompact && noteTrim)
     ? `<div class="block-note">${escapeHtml(noteTrim)}</div>`
     : '';
-  // Training blocks: remind the kid what gear to bring, right on the block,
-  // whenever there's room — no need to open the sheet just to check.
-  let gearHtml = '';
-  if (!isBuffer && !isCompact && act.isTraining && b.tag) {
-    const gearItems = getTrainingGearPresets(b.tag);
-    const unchecked = gearItems.filter((_, idx) => !(b.gearState || {})['gear-'+b.tag+'-'+idx]);
-    if (unchecked.length) {
-      const maxItems = fontTier === ' block-font-lg' ? 6 : fontTier === ' block-font-md' ? 3 : 2;
-      const shown = unchecked.slice(0, maxItems);
-      const more = unchecked.length - shown.length;
-      gearHtml = `<div class="block-gear">🎒 ${escapeHtml(shown.join(', '))}${more > 0 ? ` +${more} more` : ''}</div>`;
-    }
-  }
+  // Training blocks show the get-ready gear as a tappable checklist right on
+  // the block (built as DOM below), so the kid can pack without opening the
+  // sheet. This is separate from the block's own "done" checkbox.
+  const showGearChecklist = !isBuffer && !isCompact && act.isTraining && b.tag
+    && getTrainingGearPresets(b.tag).length > 0;
   // For a multi-chore House-Chore block, show the tagged chores in the name.
   const choreList = (b.actId === 'chores' && Array.isArray(b.choreTags) && b.choreTags.length)
     ? b.choreTags.join(', ') : '';
@@ -8445,8 +8465,8 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
     ${metaHtml}
     ${!isBuffer && b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="block-stopwatch-btn" onclick="event.stopPropagation(); startBlockStopwatch('${b.id}')">⏱ Start stopwatch</button>` : ''}
     ${noteHtml}
-    ${gearHtml}
   `;
+  if (showGearChecklist) blockEl.appendChild(buildBlockGearChecklist(b, b.tag));
   if (!isBuffer && clippedTop) {
     const m = document.createElement('div');
     m.className = 'block-clip-marker block-clip-marker--top';
@@ -8625,6 +8645,44 @@ function renderTrainingGearChecklist(containerId, stateObj, tag, persist) {
     };
     wrap.appendChild(row);
   });
+}
+
+/* Tappable get-ready gear checklist rendered directly on a training block in
+   the timeline. Each item toggles the block's gearState and persists it. This
+   is deliberately separate from the block's own completion checkbox. */
+function buildBlockGearChecklist(b, tag) {
+  const items = getTrainingGearPresets(tag);
+  const wrap = document.createElement('div');
+  wrap.className = 'block-gear-list';
+  if (!items.length) return wrap;
+  if (!b.gearState) b.gearState = {};
+  const doneCount = items.filter((_, idx) => b.gearState[`gear-${tag}-${idx}`]).length;
+  const head = document.createElement('div');
+  head.className = 'block-gear-head';
+  head.textContent = `🎒 Get ready ${doneCount}/${items.length}`;
+  wrap.appendChild(head);
+  items.forEach((label, idx) => {
+    const key = `gear-${tag}-${idx}`;
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'block-gear-item' + (b.gearState[key] ? ' checked' : '');
+    row.innerHTML = `<span class="block-gear-box">${b.gearState[key] ? '✓' : ''}</span><span class="block-gear-label">${escapeHtml(label)}</span>`;
+    row.onclick = (e) => {
+      e.stopPropagation();
+      b.gearState[key] = !b.gearState[key];
+      markItemUpdated(b);
+      saveAll();
+      row.classList.toggle('checked', !!b.gearState[key]);
+      row.querySelector('.block-gear-box').textContent = b.gearState[key] ? '✓' : '';
+      const done = items.filter((_, i) => b.gearState[`gear-${tag}-${i}`]).length;
+      head.textContent = `🎒 Get ready ${done}/${items.length}`;
+    };
+    // The gear rows are real taps, not scroll gestures — let them through the
+    // block-level tap guard.
+    row.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+    wrap.appendChild(row);
+  });
+  return wrap;
 }
 
 function countChecklistTotal(block, act) {
