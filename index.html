@@ -2084,6 +2084,7 @@
   }
   .dc-row.tint-routine  { background: #fff4db; }
   .dc-row.tint-training { background: #ffe3ea; }
+  .dc-row.tint-competition { background: #fdecd3; }
   .dc-row.tint-chores   { background: #eaf6ef; }
   .dc-row.tint-meals    { background: #fff9e9; }
   .dc-row.tint-learning { background: #eef3fb; }
@@ -2512,6 +2513,12 @@
   .placed-block.travel-buf.travel-buf-ready {
     z-index: 6;
     opacity: 0.42;
+  }
+  .placed-block.travel-buf.travel-buf-warmup {
+    z-index: 7;
+    opacity: 0.48;
+    background: repeating-linear-gradient(-45deg,
+      rgba(244,163,64,0.5) 0 5px, rgba(244,163,64,0.2) 5px 10px) !important;
   }
   .placed-block.travel-buf:hover { transform: none; box-shadow: none; }
   /* Buffer overlaps an adjacent activity — not enough real time to travel or
@@ -4643,7 +4650,7 @@
 <div class="overlay" id="trainingOverlay" onclick="overlayClick(event,'trainingOverlay')">
   <div class="sheet">
     <div class="sheet-handle"></div>
-    <h3>🏋️ Training Session</h3>
+    <h3 id="trainingSheetTitle">🏋️ Practice Session</h3>
 
     <h4>START TIME</h4>
     <div id="trainingStartPicker"></div>
@@ -4665,6 +4672,14 @@
     <h4>NOTE</h4>
     <textarea class="note-input" id="trainingNote" rows="2" placeholder="e.g. Terwillegar, bring skates…"></textarea>
 
+    <div class="buffer-toggle" id="trainingWarmupToggle" onclick="toggleWarmupBuffer('training')">
+      <div class="toggle-track"><div class="toggle-knob"></div></div>
+      <span class="toggle-label">🔥 Needs warm-up time (default 20 min right before — adjust below)</span>
+    </div>
+    <div class="buffer-dur-row" id="trainingWarmupDurRow" style="display:none">
+      <label for="trainingWarmupBufMin">Warm-up minutes (before only)</label>
+      <input type="number" id="trainingWarmupBufMin" min="5" max="120" step="5" value="20" onchange="onTrainingBufferMinInput()">
+    </div>
     <div class="buffer-toggle" id="trainingReadyToggle" onclick="toggleGetReadyBuffer('training')">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
       <span class="toggle-label">👕 Needs get ready time (default 15 min before & after — adjust below)</span>
@@ -4827,6 +4842,14 @@
     <h4>NOTE</h4>
     <textarea class="note-input" id="editNoteInput" rows="2" placeholder="Add a note…"></textarea>
 
+    <div class="buffer-toggle sheet-toggle-row" id="editWarmupToggle" onclick="toggleEditWarmupBuffer()" style="display:none">
+      <div class="toggle-track"><div class="toggle-knob"></div></div>
+      <span class="toggle-label">🔥 Needs warm-up time</span>
+    </div>
+    <div class="buffer-dur-row" id="editWarmupDurRow" style="display:none">
+      <label for="editWarmupBufMin">Warm-up minutes (before only)</label>
+      <input type="number" id="editWarmupBufMin" min="5" max="120" step="5" value="20" onchange="onEditBufferMinInput()">
+    </div>
     <div class="buffer-toggle sheet-toggle-row" id="editReadyToggle" onclick="toggleEditGetReadyBuffer()" style="display:none">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
       <span class="toggle-label">👕 Needs get ready time</span>
@@ -5022,7 +5045,8 @@
         <option value="active">🏃 Active</option>
         <option value="free" selected>🎮 Free Time</option>
         <option value="daily">🍽 Daily</option>
-        <option value="training">🏋️ Training</option>
+        <option value="training">🏋️ Practice</option>
+        <option value="competition">🏆 Competition</option>
       </select>
     </div>
     <button class="btn-confirm" onclick="confirmCustomActivity()">Add Activity ✅</button>
@@ -5062,7 +5086,8 @@
         <option value="active">🏃 Active</option>
         <option value="free" selected>🎮 Free Time</option>
         <option value="daily">🍽 Daily</option>
-        <option value="training">🏋️ Training</option>
+        <option value="training">🏋️ Practice</option>
+        <option value="competition">🏆 Competition</option>
       </select>
       <label>Visibility</label>
       <select id="paVisibility">
@@ -5402,7 +5427,7 @@ const CAT_COLOUR = {
 const CAT_HEX = {
   sleep:'#c3aed6', school:'#6fb1fc', active:'#ff7b54',
   free:'#95d5b2', daily:'#ffd166', custom:'#ff9eb5', training:'#ef476f',
-  routine:'#80cbc4'
+  routine:'#80cbc4', competition:'#f4a340'
 };
 
 /* Training tags + sport-specific starter objectives. Each topic carries its
@@ -5412,7 +5437,7 @@ const TRAINING_TAGS = [
   { id:'skating',  label:'⛸ Skating',  name:'Skating',  icon:'⛸', colour:'#8a6fd0' },
   { id:'swimming', label:'🏊 Swimming', name:'Swimming', icon:'🏊', colour:'#2f9fd0' },
   { id:'dryland',  label:'💪 Dryland', name:'Dryland',  icon:'💪', colour:'#e08a3a' },
-  { id:'general',  label:'🏃 General', name:'Training', icon:'🏃', colour:'#ef476f' },
+  { id:'general',  label:'🏃 General', name:'Practice', icon:'🏃', colour:'#ef476f' },
 ];
 function getTrainingTopic(tag) {
   return TRAINING_TAGS.find(t => t.id === tag) || TRAINING_TAGS[3];
@@ -5512,7 +5537,8 @@ const DEFAULT_ACTIVITIES = [
   { id:'french',     name:'French Adventure',  icon:'🇫🇷', cat:'school',   durationMin:60, suitableTime:['after-school','weekend','evening'] },
   { id:'chinese',    name:'Chinese Adventure', icon:'🇨🇳', cat:'school',   durationMin:60, suitableTime:['after-school','weekend','evening'] },
   { id:'math',       name:'Math Adventure',    icon:'🦘', cat:'school',   durationMin:60, suitableTime:['after-school','weekend','evening'] },
-  { id:'training',   name:'Training',          icon:'🏋️', cat:'training', durationMin:120, isTraining:true, suitableTime:['after-school','weekend'] },
+  { id:'training',   name:'Practice',          icon:'🏋️', cat:'training', durationMin:120, isTraining:true, suitableTime:['after-school','weekend'] },
+  { id:'competition', name:'Competition',      icon:'🏆', cat:'competition', durationMin:480, isTraining:true, isCompetition:true, suitableTime:['weekend'] },
   { id:'relax',      name:'Muscle Relaxation', icon:'🧘', cat:'active',   durationMin:60, suitableTime:['after-school','evening','weekend'] },
   { id:'break_quick', name:'Quick Break',     icon:'☕', cat:'free',     durationMin:15, suitableTime:['before-school','school','after-school','evening','weekend'], quickBreak:true },
   { id:'piano',      name:'Piano Practice',    icon:'🎹', cat:'school',   durationMin:60, suitableTime:['after-school','evening','weekend'] },
@@ -5658,7 +5684,7 @@ const AFTERSCHOOL_REWARD_ITEMS = [
   { id:'a_unlock_culture', text:'Reward pick: Culture Explorer mini time' },
 ];
 
-let ts  = { durationMin:120, colour: CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays: [], travelBuffer:false, getReadyBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15 };
+let ts  = { durationMin:120, colour: CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays: [], travelBuffer:false, getReadyBuffer:false, warmupBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15, warmupBufMin:20 };
 let as_ = { durationMin:60,  colour: COLOURS[0], note:'', repeat:false, repeatDays: [], travelBuffer:false, travelBufMin:15, choreTags: [] };
 
 function isParent() { return profile === 'parent'; }
@@ -5745,6 +5771,13 @@ function getGetReadyBufMin(block) {
   if (!block || !block.getReadyBuffer) return 0;
   return clampBufferMin(block.getReadyBufMin != null ? block.getReadyBufMin : DEFAULT_BUFFER_MIN);
 }
+const DEFAULT_WARMUP_MIN = 20;
+/* Warm-up is one-sided — you warm up right before competing/training, never
+   after — unlike travel/get-ready which mirror before and after. */
+function getWarmupBufMin(block) {
+  if (!block || !block.warmupBuffer) return 0;
+  return clampBufferMin(block.warmupBufMin != null ? block.warmupBufMin : DEFAULT_WARMUP_MIN);
+}
 /* A block's travel/get-ready buffer needs real, unoccupied time right before
    and after the activity. If that buffer window overlaps another block's own
    time, the plan isn't actually workable (e.g. "leave by 5:30" but the next
@@ -5755,10 +5788,12 @@ function computeBufferConflicts(blocks) {
   const perBlock = new Map();
   const affected = new Set();
   (blocks || []).forEach(b => {
-    const buf = getTravelBufMin(b) + getGetReadyBufMin(b);
-    if (buf <= 0) return;
-    const preStart = b.startMin - buf, preEnd = b.startMin;
-    const postStart = b.startMin + (b.durationMin || 0), postEnd = postStart + buf;
+    const sideBuf = getTravelBufMin(b) + getGetReadyBufMin(b);
+    const preBuf = sideBuf + getWarmupBufMin(b); // warm-up only ever sits before
+    const postBuf = sideBuf;
+    if (preBuf <= 0 && postBuf <= 0) return;
+    const preStart = b.startMin - preBuf, preEnd = b.startMin;
+    const postStart = b.startMin + (b.durationMin || 0), postEnd = postStart + postBuf;
     let pre = false, post = false;
     (blocks || []).forEach(o => {
       if (o.id === b.id) return;
@@ -7454,12 +7489,12 @@ function renderWeekGlance(keys) {
   const acts = getAllActivities();
   const CAT_LABELS = {
     sleep:'😴 Rest', school:'📚 Learning', active:'🏃 Active',
-    free:'🎮 Free', daily:'🍽 Daily', training:'🏋️ Training',
-    routine:'📋 Routine', custom:'✨ Custom'
+    free:'🎮 Free', daily:'🍽 Daily', training:'🏋️ Practice',
+    competition:'🏆 Competition', routine:'📋 Routine', custom:'✨ Custom'
   };
   const t = computeWeekTotals(keys);
 
-  const order = ['school','active','training','routine','daily','free','sleep','custom'];
+  const order = ['school','active','training','competition','routine','daily','free','sleep','custom'];
   let chips = '';
   order.forEach(cat => {
     if (!t.catMin[cat]) return;
@@ -7524,7 +7559,7 @@ function computeWeekWins(keys) {
 function openWeeklyWins() {
   const keys = getDayKeys(weekOffset);
   const w = computeWeekWins(keys);
-  const CAT_LABELS = { school:'📚 Learning', active:'🏃 Active', free:'🎮 Free', daily:'🍽 Daily', routine:'📋 Routines', training:'🏋️ Training', sleep:'😴 Rest', custom:'✨ Other' };
+  const CAT_LABELS = { school:'📚 Learning', active:'🏃 Active', free:'🎮 Free', daily:'🍽 Daily', routine:'📋 Routines', training:'🏋️ Practice', competition:'🏆 Competition', sleep:'😴 Rest', custom:'✨ Other' };
   const pct = w.total ? Math.round(w.done / w.total * 100) : 0;
   const cheer = pct >= 80 ? 'Incredible week! 🌟' : pct >= 50 ? 'Great effort this week! 💪' : w.done > 0 ? 'Every finished task counts 💛' : 'A fresh week ahead — you’ve got this!';
   const catLines = Object.keys(w.byCat).sort((a,b)=>w.byCat[b]-w.byCat[a])
@@ -7580,7 +7615,7 @@ function bedtimeReminderText(age) {
 let tgColorMode = 'classic';
 
 /* Activity IDs that count as Learning/Training (per locked plan) */
-const TG_LEARNING_IDS = ['school_day', 'french', 'chinese', 'math', 'piano', 'training'];
+const TG_LEARNING_IDS = ['school_day', 'french', 'chinese', 'math', 'piano', 'training', 'competition'];
 /* Daily meals that count as Sleep/Meal */
 const TG_MEAL_IDS = ['breakfast', 'lunch', 'dinner'];
 
@@ -7794,7 +7829,7 @@ function renderTimeGrid(keys) {
     } else {
       legend.style.display = 'flex';
       legend.innerHTML = [
-        ['school', '📚 Learning'], ['training', '🏋️ Training'],
+        ['school', '📚 Learning'], ['training', '🏋️ Practice'], ['competition', '🏆 Competition'],
         ['routine', '📋 Routine'], ['active', '🏃 Active'], ['daily', '🍽 Daily'],
       ].map(([cat, label]) =>
         `<span class="tg-legend-chip"><span class="tg-legend-dot" style="background:${CAT_HEX[cat] || '#999'}"></span>${label}</span>`
@@ -7994,22 +8029,25 @@ function renderDayBar(key, blocks) {
   }
 }
 
-/* Buffer segments for a block, stacked so get-ready and travel never occupy the
-   same minutes: before the block you get ready FIRST, then travel (drive), then
-   the activity; after it you travel home, then put the gear away. Returns
-   segments with startRel (minutes from START_MIN), dur, icon, min — time order.
-   Getting skate boots ready can't happen while driving, so the two buffers are
-   laid end-to-end, not stacked on the same slot. */
+/* Buffer segments for a block, stacked so get-ready/travel/warm-up never occupy
+   the same minutes: before the block you get ready FIRST, then travel (drive),
+   then warm up right at the venue, then the activity; after it you travel home,
+   then put the gear away. Warm-up is one-sided — you don't warm up on the way
+   home. Returns segments with startRel (minutes from START_MIN), dur, icon,
+   min — time order. Getting skate boots ready can't happen while driving, so
+   the buffers are laid end-to-end, not stacked on the same slot. */
 function wfBufferSegments(b) {
   const travelMin = getTravelBufMin(b);
   const readyMin  = getGetReadyBufMin(b);
+  const warmupMin = getWarmupBufMin(b);
   const relStart = b.startMin - START_MIN;
   const dur = Math.max(5, b.durationMin || 0);
   const relEnd = relStart + dur;
   const segs = [];
-  // Before: [get-ready][travel][ACTIVITY]
-  if (travelMin > 0) segs.push({ startRel: relStart - travelMin, dur: travelMin, icon: '🚗', min: travelMin, kind: 'travel', side: 'pre' });
-  if (readyMin  > 0) segs.push({ startRel: relStart - travelMin - readyMin, dur: readyMin, icon: '👕', min: readyMin, kind: 'ready', side: 'pre' });
+  // Before: [get-ready][travel][warm-up][ACTIVITY]
+  if (warmupMin > 0) segs.push({ startRel: relStart - warmupMin, dur: warmupMin, icon: '🔥', min: warmupMin, kind: 'warmup', side: 'pre' });
+  if (travelMin > 0) segs.push({ startRel: relStart - warmupMin - travelMin, dur: travelMin, icon: '🚗', min: travelMin, kind: 'travel', side: 'pre' });
+  if (readyMin  > 0) segs.push({ startRel: relStart - warmupMin - travelMin - readyMin, dur: readyMin, icon: '👕', min: readyMin, kind: 'ready', side: 'pre' });
   // After: [ACTIVITY][travel][get-ready]
   if (travelMin > 0) segs.push({ startRel: relEnd, dur: travelMin, icon: '🚗', min: travelMin, kind: 'travel', side: 'post' });
   if (readyMin  > 0) segs.push({ startRel: relEnd + travelMin, dur: readyMin, icon: '👕', min: readyMin, kind: 'ready', side: 'post' });
@@ -8204,7 +8242,9 @@ function renderFullWeek(keys) {
       const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
       const bg = topic ? trainingBlockColour(b) : (b.colour || CAT_HEX[act.cat] || '#888');
       const dispIcon = topic ? topic.icon : act.icon;
-      const dispName = topic ? topic.name : act.name;
+      // Competition shares the sport topic's icon/colour/name with Practice,
+      // so a 🏆 prefix keeps it visually distinct at a glance.
+      const dispName = (topic ? topic.name : act.name) + (act.isCompetition ? ' 🏆' : '');
       const card = document.createElement('div');
       let cls = 'wf-card' + (isLightColour(bg) ? ' light-bg' : '');
       if (pxHeight >= 60) cls += ' wf-card--tall'; // room to stack time/icon/name centered
@@ -8483,6 +8523,7 @@ function setDayViewMode(mode) {
 /* Soft category tint for a checklist row, per the 3b palette. */
 function dcTintClass(act) {
   if (!act) return '';
+  if (act.isCompetition || act.cat==='competition') return 'tint-competition';
   if (act.isTraining || act.cat==='training') return 'tint-training';
   if (act.isRoutine  || act.cat==='routine')  return 'tint-routine';
   if (act.id==='chores') return 'tint-chores';
@@ -8712,7 +8753,7 @@ function buildTimeline() {
 
   // Travel buffers (rendered underneath, not counted for collision)
   blocks.forEach(b => {
-    if (!b.travelBuffer && !b.getReadyBuffer) return;
+    if (!b.travelBuffer && !b.getReadyBuffer && !b.warmupBuffer) return;
     renderTravelBuffers(canvas, b, zMinStart, zMinEnd, bufferConflicts.perBlock.get(b.id));
   });
 
@@ -9036,6 +9077,9 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
 
   let badges = '';
   // (Training sport is shown by the block's own icon now, so no separate badge.)
+  // Competition shares the sport's topic icon/colour/name with Practice, so it
+  // needs its own badge to stay visually distinct at a glance.
+  if (!isBuffer && act.isCompetition) badges += '<span class="badge" title="Competition">🏆</span>';
   if (b.objectives?.length) badges += '<span class="badge">🎯</span>';
   if (b.note) badges += '<span class="badge">📝</span>';
   if (b.parentPinned) badges += '<span class="badge">📌</span>';
@@ -9112,21 +9156,29 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
 function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict) {
   const travelBuf = getTravelBufMin(b);
   const readyBuf = getGetReadyBufMin(b);
+  const warmupBuf = getWarmupBufMin(b);
   const endMin = b.startMin + b.durationMin;
   const entries = [];
-  // Stack the buffers end-to-end so get-ready and driving never share the same
-  // minutes — you can't get skate boots ready while the car is moving. Before
-  // the block: [get ready][travel][ACTIVITY]; after: [ACTIVITY][travel][get ready].
+  // Stack the buffers end-to-end so get-ready/driving/warm-up never share the
+  // same minutes — you can't get skate boots ready while the car is moving.
+  // Before the block: [get ready][travel][warm-up][ACTIVITY]; after: [ACTIVITY]
+  // [travel][get ready] — warm-up never happens on the way home.
+  if (b.warmupBuffer && warmupBuf > 0) {
+    entries.push(
+      { startMin: b.startMin - warmupBuf, label: '🔥 warm-up', bufDur: warmupBuf, cls: 'travel-buf-warmup', side: 'pre' },
+    );
+  }
+  const preWarmup = (b.warmupBuffer ? warmupBuf : 0);
   if (b.travelBuffer && travelBuf > 0) {
     entries.push(
-      { startMin: b.startMin - travelBuf, label: '🚗 ➡ travel', bufDur: travelBuf, cls: '', side: 'pre' },
+      { startMin: b.startMin - preWarmup - travelBuf, label: '🚗 ➡ travel', bufDur: travelBuf, cls: '', side: 'pre' },
       { startMin: endMin, label: '🚗 ⬅ travel', bufDur: travelBuf, cls: '', side: 'post' },
     );
   }
   if (b.getReadyBuffer && readyBuf > 0) {
     const preTravel = (b.travelBuffer ? travelBuf : 0);
     entries.push(
-      { startMin: b.startMin - preTravel - readyBuf, label: '👕 ➡ get ready', bufDur: readyBuf, cls: 'travel-buf-ready', side: 'pre' },
+      { startMin: b.startMin - preWarmup - preTravel - readyBuf, label: '👕 ➡ get ready', bufDur: readyBuf, cls: 'travel-buf-ready', side: 'pre' },
       { startMin: endMin + preTravel, label: '👕 ⬅ get ready', bufDur: readyBuf, cls: 'travel-buf-ready', side: 'post' },
     );
   }
@@ -9196,7 +9248,7 @@ function escapeAttr(str) {
   return String(str ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-function renderSheetTimeSummary(elId, startMin, durationMin, travelOn, travelBufMin, readyOn=false, readyBufMin=15) {
+function renderSheetTimeSummary(elId, startMin, durationMin, travelOn, travelBufMin, readyOn=false, readyBufMin=15, warmupOn=false, warmupBufMin=20) {
   const el = document.getElementById(elId);
   if (!el) return;
   const dur = Math.max(0, durationMin|0);
@@ -9204,8 +9256,10 @@ function renderSheetTimeSummary(elId, startMin, durationMin, travelOn, travelBuf
   const endMin = start + dur;
   const tBuf = Math.max(0, travelBufMin|0);
   const rBuf = Math.max(0, readyBufMin|0);
+  const wBuf = Math.max(0, warmupBufMin|0);
   const homeMin = travelOn ? endMin + tBuf : null;
   const prepMin = readyOn ? start - rBuf : null;
+  const warmupStartMin = warmupOn ? start - wBuf : null;
   let html = '';
   if (travelOn && homeMin != null) {
     html += `<div class="sheet-time-summary-row">`;
@@ -9214,6 +9268,9 @@ function renderSheetTimeSummary(elId, startMin, durationMin, travelOn, travelBuf
     html += `</div>`;
   } else {
     html += `<div class="sheet-time-summary">Ends about ${formatTimeFromMin(endMin)}</div>`;
+  }
+  if (warmupOn && warmupStartMin != null) {
+    html += `<div class="sheet-time-summary">🔥 Warm up by ${formatTimeFromMin(warmupStartMin)} (${wBuf}m before)</div>`;
   }
   if (readyOn && prepMin != null) {
     html += `<div class="sheet-time-summary">Start getting ready by ${formatTimeFromMin(prepMin)} (${rBuf}m before + ${rBuf}m after)</div>`;
@@ -9490,7 +9547,7 @@ function addActivityAtMin(absMin) {
   pendingStartMin = absMin;
 
   if (selectedActivity.isTraining) {
-    ts = { durationMin: selectedActivity.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15 };
+    ts = { durationMin: selectedActivity.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, warmupBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15, warmupBufMin:20 };
     openTrainingSheet();
   } else {
     as_ = { durationMin: selectedActivity.durationMin||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15, choreTags: [] };
@@ -9519,7 +9576,7 @@ function renderSlotPicker() {
   const filters = [
     {id:'all', label:'All'}, {id:'daily', label:'🍽 Daily'}, {id:'routine', label:'🌅 Routines'},
     {id:'school', label:'📚 Learning'}, {id:'active', label:'🏃 Active'},
-    {id:'training', label:'🏋️ Training'}, {id:'free', label:'🎮 Free'},
+    {id:'training', label:'🏋️ Practice'}, {id:'competition', label:'🏆 Competition'}, {id:'free', label:'🎮 Free'},
   ];
   filterWrap.innerHTML = '';
   filters.forEach(f => {
@@ -9532,7 +9589,6 @@ function renderSlotPicker() {
   });
   const acts = getAllActivities().filter(a => {
     if (slotPickerFilter === 'all') return true;
-    if (slotPickerFilter === 'training') return a.isTraining;
     return a.cat === slotPickerFilter;
   });
   list.innerHTML = '';
@@ -9564,7 +9620,7 @@ function pickFromSlot(actId) {
   closeSheet('slotPickerOverlay');
   // pendingStartMin was set by openSlotPicker.
   if (act.isTraining) {
-    ts = { durationMin: act.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15 };
+    ts = { durationMin: act.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, warmupBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15, warmupBufMin:20 };
     openTrainingSheet();
   } else {
     as_ = { durationMin: act.durationMin||60, colour: CAT_HEX[act.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15, choreTags: [] };
@@ -9685,6 +9741,7 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
     parentPinned: isParent() ? true : false,
     travelBuffer: !!opts.travelBuffer,
     getReadyBuffer: !!opts.getReadyBuffer,
+    warmupBuffer: !!opts.warmupBuffer,
     gearState: opts.gearState ? { ...opts.gearState } : {},
     checklistState: {},
     confirmed: false, // Parent confirms before progress counts toward level-up
@@ -9694,6 +9751,9 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
   }
   if (block.getReadyBuffer) {
     block.getReadyBufMin = clampBufferMin(opts.getReadyBufMin != null ? opts.getReadyBufMin : DEFAULT_BUFFER_MIN);
+  }
+  if (block.warmupBuffer) {
+    block.warmupBufMin = clampBufferMin(opts.warmupBufMin != null ? opts.warmupBufMin : DEFAULT_WARMUP_MIN);
   }
   const blocks = getDayBlocks(currentDayKey);
   blocks.push(block);
@@ -9853,7 +9913,8 @@ function buildTray() {
     {id:'routine', label:'🌅 Routines'},
     {id:'school', label:'📚 Learning'},
     {id:'active', label:'🏃 Active'},
-    {id:'training', label:'🏋️ Training'},
+    {id:'training', label:'🏋️ Practice'},
+    {id:'competition', label:'🏆 Competition'},
     {id:'free', label:'🎮 Free'},
     {id:'seasonal', label:'🌟 Seasonal'},
   ];
@@ -9871,7 +9932,8 @@ function buildTray() {
   const filtered = acts.filter(a=>{
     if (currentTrayFilter==='all') return true;
     if (currentTrayFilter==='seasonal') return a._seasonal;
-    if (currentTrayFilter==='training') return a.isTraining || a.cat==='training';
+    // Category is the source of truth — isTraining is a shared UI mechanism
+    // (objectives/gear/tags) between Practice and Competition, not a category.
     return a.cat===currentTrayFilter;
   });
 
@@ -9935,6 +9997,10 @@ function selectActivity(act) {
 function openTrainingSheet() { renderTrainingSheet(); openSheet('trainingOverlay'); }
 
 function renderTrainingSheet() {
+  const isCompetition = !!(selectedActivity && selectedActivity.isCompetition);
+  const titleEl = document.getElementById('trainingSheetTitle');
+  if (titleEl) titleEl.textContent = isCompetition ? '🏆 Competition' : '🏋️ Practice Session';
+
   // Start time picker
   renderStartTimePicker('trainingStartPicker', pendingStartMin, (m)=>{ pendingStartMin = m; renderTrainingSheet(); });
 
@@ -9953,10 +10019,12 @@ function renderTrainingSheet() {
     tagWrap.appendChild(b);
   });
 
-  // Duration (in minutes)
+  // Duration (in minutes) — a competition (meet/event) runs much longer than
+  // a practice session, so it gets its own, larger set of preset lengths.
   const durWrap = document.getElementById('trainingDurBtns');
   durWrap.innerHTML = '';
-  [30,60,90,120,150,180].forEach(min=>{
+  const durOptions = isCompetition ? [120,180,240,300,360,420,480,540,600] : [30,60,90,120,150,180];
+  durOptions.forEach(min=>{
     const b = document.createElement('button');
     b.className='pill-btn'+(ts.durationMin===min?' active':'');
     b.textContent = formatDuration(min);
@@ -10022,16 +10090,22 @@ function renderTrainingSheet() {
 
   if (ts.travelBufMin == null || ts.travelBufMin < 5) ts.travelBufMin = DEFAULT_BUFFER_MIN;
   if (ts.getReadyBufMin == null || ts.getReadyBufMin < 5) ts.getReadyBufMin = DEFAULT_BUFFER_MIN;
+  if (ts.warmupBufMin == null || ts.warmupBufMin < 5) ts.warmupBufMin = DEFAULT_WARMUP_MIN;
   const tbToggle = document.getElementById('trainingTravelToggle');
   tbToggle.classList.toggle('on', ts.travelBuffer);
   const rbToggle = document.getElementById('trainingReadyToggle');
   rbToggle.classList.toggle('on', !!ts.getReadyBuffer);
+  const wbToggle = document.getElementById('trainingWarmupToggle');
+  wbToggle.classList.toggle('on', !!ts.warmupBuffer);
   document.getElementById('trainingTravelDurRow').style.display = ts.travelBuffer ? 'flex' : 'none';
   document.getElementById('trainingReadyDurRow').style.display = ts.getReadyBuffer ? 'flex' : 'none';
+  document.getElementById('trainingWarmupDurRow').style.display = ts.warmupBuffer ? 'flex' : 'none';
   const tIn = document.getElementById('trainingTravelBufMin');
   const rIn = document.getElementById('trainingReadyBufMin');
+  const wIn = document.getElementById('trainingWarmupBufMin');
   if (tIn) tIn.value = String(ts.travelBufMin);
   if (rIn) rIn.value = String(ts.getReadyBufMin);
+  if (wIn) wIn.value = String(ts.warmupBufMin);
   renderTrainingGearChecklist('trainingGearList', ts, ts.tag);
 
   // Repeat + day picker
@@ -10044,14 +10118,16 @@ function renderTrainingSheet() {
 
   document.getElementById('trainingNote').value = ts.note;
 
-  renderSheetTimeSummary('trainingTimeSummary', pendingStartMin, ts.durationMin, ts.travelBuffer, ts.travelBufMin, !!ts.getReadyBuffer, ts.getReadyBufMin);
+  renderSheetTimeSummary('trainingTimeSummary', pendingStartMin, ts.durationMin, ts.travelBuffer, ts.travelBufMin, !!ts.getReadyBuffer, ts.getReadyBufMin, !!ts.warmupBuffer, ts.warmupBufMin);
 }
 
 function onTrainingBufferMinInput() {
   const tIn = document.getElementById('trainingTravelBufMin');
   const rIn = document.getElementById('trainingReadyBufMin');
+  const wIn = document.getElementById('trainingWarmupBufMin');
   if (tIn) ts.travelBufMin = clampBufferMin(tIn.value);
   if (rIn) ts.getReadyBufMin = clampBufferMin(rIn.value);
+  if (wIn) ts.warmupBufMin = clampBufferMin(wIn.value);
   renderTrainingSheet();
 }
 
@@ -10071,19 +10147,22 @@ function confirmTraining() {
   ts.note = document.getElementById('trainingNote').value;
   const dateStart = isParent() ? document.getElementById('trainingDateStart').value : '';
   const dateEnd   = isParent() ? document.getElementById('trainingDateEnd').value : '';
-  placeBlock('training', pendingStartMin, ts.durationMin, ts.colour, ts.objectives, ts.note, {
+  const actId = (selectedActivity && selectedActivity.id) || 'training';
+  placeBlock(actId, pendingStartMin, ts.durationMin, ts.colour, ts.objectives, ts.note, {
     tag: ts.tag,
     repeatDays: ts.repeat?ts.repeatDays:[],
     travelBuffer: ts.travelBuffer,
     getReadyBuffer: !!ts.getReadyBuffer,
+    warmupBuffer: !!ts.warmupBuffer,
     gearState: ts.gearState || {},
     travelBufMin: ts.travelBufMin,
     getReadyBufMin: ts.getReadyBufMin,
+    warmupBufMin: ts.warmupBufMin,
     repeatDateStart: dateStart || null,
     repeatDateEnd:   dateEnd   || null,
   });
   closeSheet('trainingOverlay');
-  showToast('Training placed 🏋️');
+  showToast(selectedActivity && selectedActivity.isCompetition ? 'Competition placed 🏆' : 'Practice placed 🏋️');
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -10300,13 +10379,24 @@ function toggleTravelBuffer(which) {
 function toggleGetReadyBuffer(which) {
   if (which==='training') { ts.getReadyBuffer = !ts.getReadyBuffer; renderTrainingSheet(); }
 }
+function toggleWarmupBuffer(which) {
+  if (which==='training') { ts.warmupBuffer = !ts.warmupBuffer; renderTrainingSheet(); }
+}
 function toggleEditGetReadyBuffer() {
   editState.getReadyBuffer = !editState.getReadyBuffer;
   const tg = document.getElementById('editReadyToggle');
   if (tg) tg.classList.toggle('on', !!editState.getReadyBuffer);
   const row = document.getElementById('editReadyDurRow');
   if (row) row.style.display = editState.getReadyBuffer ? 'flex' : 'none';
-  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin);
+  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin, !!editState.warmupBuffer, editState.warmupBufMin);
+}
+function toggleEditWarmupBuffer() {
+  editState.warmupBuffer = !editState.warmupBuffer;
+  const tg = document.getElementById('editWarmupToggle');
+  if (tg) tg.classList.toggle('on', !!editState.warmupBuffer);
+  const row = document.getElementById('editWarmupDurRow');
+  if (row) row.style.display = editState.warmupBuffer ? 'flex' : 'none';
+  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin, !!editState.warmupBuffer, editState.warmupBufMin);
 }
 
 /* Multi-day picker */
@@ -10344,6 +10434,7 @@ function pickPreset(which, preset) {
 ════════════════════════════════════════════════════════════════ */
 let editState = {
   startMin: null, durationMin: null, travelBuffer: false, getReadyBuffer: false, travelBufMin: 15, getReadyBufMin: 15,
+  warmupBuffer: false, warmupBufMin: 20,
   repeat: false, repeatDays: [],
   completed: false,
   stopwatchEnabled: false,
@@ -10456,7 +10547,7 @@ function editStopwatchReset() {
 function onEditStartMinChange(m) {
   editState.startMin = m;
   renderStartTimePicker('editStartPicker', editState.startMin, onEditStartMinChange, ()=>syncDurationColumnSpacers('edit'));
-  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin);
+  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin, !!editState.warmupBuffer, editState.warmupBufMin);
   if (editState.stopwatch && editState.stopwatchEnabled) {
     editState.stopwatch.goalSec = Math.max(60, (editState.durationMin|0) * 60);
     renderEditStopwatchStats();
@@ -10466,9 +10557,11 @@ function onEditStartMinChange(m) {
 function onEditBufferMinInput() {
   const tIn = document.getElementById('editTravelBufMin');
   const rIn = document.getElementById('editReadyBufMin');
+  const wIn = document.getElementById('editWarmupBufMin');
   if (tIn) editState.travelBufMin = clampBufferMin(tIn.value);
   if (rIn) editState.getReadyBufMin = clampBufferMin(rIn.value);
-  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin);
+  if (wIn) editState.warmupBufMin = clampBufferMin(wIn.value);
+  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin, !!editState.warmupBuffer, editState.warmupBufMin);
 }
 
 function onActivityTravelBufMinInput() {
@@ -10488,8 +10581,10 @@ function openEditSheet(blockId) {
   editState.durationMin = block.durationMin;
   editState.travelBuffer = !!block.travelBuffer;
   editState.getReadyBuffer = !!block.getReadyBuffer;
+  editState.warmupBuffer = !!block.warmupBuffer;
   editState.travelBufMin = getTravelBufMin(block) || DEFAULT_BUFFER_MIN;
   editState.getReadyBufMin = getGetReadyBufMin(block) || DEFAULT_BUFFER_MIN;
+  editState.warmupBufMin = getWarmupBufMin(block) || DEFAULT_WARMUP_MIN;
   editState.gearState = { ...(block.gearState||{}) }
   editState.repeat = false;
   editState.repeatDays = [];
@@ -10570,35 +10665,44 @@ function openEditSheet(blockId) {
     bmWrap.appendChild(el);
   });
 
-  // Travel + get-ready buffer
+  // Travel + get-ready + warm-up buffer
   document.getElementById('editTravelToggle').classList.toggle('on', editState.travelBuffer);
   const editReady = document.getElementById('editReadyToggle');
+  const editWarmup = document.getElementById('editWarmupToggle');
   const editGearWrap = document.getElementById('editTrainingGearWrap');
   const editTrRow = document.getElementById('editTravelDurRow');
   const editRdRow = document.getElementById('editReadyDurRow');
+  const editWuRow = document.getElementById('editWarmupDurRow');
   if (act.isTraining) {
     editReady.style.display = 'flex';
     editReady.classList.toggle('on', !!editState.getReadyBuffer);
+    editWarmup.style.display = 'flex';
+    editWarmup.classList.toggle('on', !!editState.warmupBuffer);
     editGearWrap.style.display = 'block';
     renderTrainingGearChecklist('editTrainingGearList', editState, block.tag || 'skating');
     editTrRow.style.display = editState.travelBuffer ? 'flex' : 'none';
     editRdRow.style.display = editState.getReadyBuffer ? 'flex' : 'none';
+    editWuRow.style.display = editState.warmupBuffer ? 'flex' : 'none';
     const etIn = document.getElementById('editTravelBufMin');
     const erIn = document.getElementById('editReadyBufMin');
+    const ewIn = document.getElementById('editWarmupBufMin');
     if (etIn) etIn.value = String(editState.travelBufMin);
     if (erIn) erIn.value = String(editState.getReadyBufMin);
+    if (ewIn) ewIn.value = String(editState.warmupBufMin);
   } else {
     editReady.style.display = 'none';
+    editWarmup.style.display = 'none';
     editGearWrap.style.display = 'none';
     editTrRow.style.display = editState.travelBuffer ? 'flex' : 'none';
     editRdRow.style.display = 'none';
+    editWuRow.style.display = 'none';
     if (editTrRow.style.display === 'flex') {
       const etIn = document.getElementById('editTravelBufMin');
       if (etIn) etIn.value = String(editState.travelBufMin);
     }
   }
 
-  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin);
+  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin, !!editState.warmupBuffer, editState.warmupBufMin);
   syncEditStopwatchUI();
 
   // Parent pin toggle
@@ -10632,7 +10736,8 @@ function openEditSheet(blockId) {
 function renderEditDurationPicker(act) {
   const durWrap = document.getElementById('editDurBtns');
   durWrap.innerHTML = '';
-  const options = act.isTraining ? [30,60,90,120,150,180] : [15,30,45,60,90,120,180,240];
+  const options = act.isCompetition ? [120,180,240,300,360,420,480,540,600]
+    : act.isTraining ? [30,60,90,120,150,180] : [15,30,45,60,90,120,180,240];
   options.forEach(min=>{
     const b = document.createElement('button');
     b.className='pill-btn'+(editState.durationMin===min?' active':'');
@@ -10643,7 +10748,7 @@ function renderEditDurationPicker(act) {
   renderCustomDuration('editCustomDur', editState.durationMin, (m)=>{
     editState.durationMin = m; renderEditDurationPicker(act);
   }, ()=>syncDurationColumnSpacers('edit'));
-  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin);
+  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin, !!editState.warmupBuffer, editState.warmupBufMin);
   if (editState.stopwatch) {
     editState.stopwatch.goalSec = Math.max(60, (editState.durationMin|0) * 60);
     renderEditStopwatchStats();
@@ -10871,7 +10976,7 @@ function toggleEditTravelBuffer() {
   document.getElementById('editTravelToggle').classList.toggle('on', editState.travelBuffer);
   const row = document.getElementById('editTravelDurRow');
   if (row) row.style.display = editState.travelBuffer ? 'flex' : 'none';
-  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin);
+  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin, !!editState.warmupBuffer, editState.warmupBufMin);
 }
 
 async function saveEditChanges() {
@@ -10895,8 +11000,10 @@ async function saveEditChanges() {
   if (newDur < requestedDur) showToast('✂️ Trimmed to fit the day');
   const newTravel = !!editState.travelBuffer;
   const newGetReady = !!editState.getReadyBuffer;
+  const newWarmup = !!editState.warmupBuffer;
   const newTravelBuf = newTravel ? clampBufferMin(editState.travelBufMin) : null;
   const newReadyBuf = newGetReady ? clampBufferMin(editState.getReadyBufMin) : null;
+  const newWarmupBuf = newWarmup ? clampBufferMin(editState.warmupBufMin) : null;
   const newGearState = editState.gearState ? { ...editState.gearState } : {};
   const newNote  = document.getElementById('editNoteInput').value;
   const newCompleted = !!editState.completed;
@@ -10923,8 +11030,10 @@ async function saveEditChanges() {
     blk.durationMin !== newDur ||
     blk.travelBuffer !== newTravel ||
     !!blk.getReadyBuffer !== newGetReady ||
+    !!blk.warmupBuffer !== newWarmup ||
     getTravelBufMin(blk) !== (newTravelBuf || 0) ||
     getGetReadyBufMin(blk) !== (newReadyBuf || 0) ||
+    getWarmupBufMin(blk) !== (newWarmupBuf || 0) ||
     JSON.stringify(blk.gearState||{}) !== JSON.stringify(newGearState||{}) ||
     (blk.note||'') !== newNote ||
     !!blk.completed !== newCompleted ||
@@ -10946,10 +11055,13 @@ async function saveEditChanges() {
   blk.durationMin = newDur;
   blk.travelBuffer = newTravel;
   blk.getReadyBuffer = newGetReady;
+  blk.warmupBuffer = newWarmup;
   if (newTravel) blk.travelBufMin = newTravelBuf;
   else delete blk.travelBufMin;
   if (newGetReady) blk.getReadyBufMin = newReadyBuf;
   else delete blk.getReadyBufMin;
+  if (newWarmup) blk.warmupBufMin = newWarmupBuf;
+  else delete blk.warmupBufMin;
   blk.gearState = newGearState;
   blk.note = newNote;
   const wasCompleted = !!blk.completed;
@@ -10965,13 +11077,15 @@ async function saveEditChanges() {
   // Optionally apply same edits to siblings
   if (applyToSeries && blk.seriesId) {
     const seriesPatch = {
-      startMin: newStart, durationMin: newDur, travelBuffer: newTravel, getReadyBuffer: newGetReady, gearState: { ...newGearState }, note: newNote,
+      startMin: newStart, durationMin: newDur, travelBuffer: newTravel, getReadyBuffer: newGetReady, warmupBuffer: newWarmup, gearState: { ...newGearState }, note: newNote,
       completed: newCompleted,
     };
     if (newTravel) seriesPatch.travelBufMin = newTravelBuf;
     else seriesPatch.travelBufMin = null;
     if (newGetReady) seriesPatch.getReadyBufMin = newReadyBuf;
     else seriesPatch.getReadyBufMin = null;
+    if (newWarmup) seriesPatch.warmupBufMin = newWarmupBuf;
+    else seriesPatch.warmupBufMin = null;
     if (act && act.isTraining) seriesPatch.objectives = [...newObjectives];
     if (newStopwatch) seriesPatch.stopwatch = { ...newStopwatch };
     else seriesPatch.stopwatch = null;
@@ -11015,6 +11129,7 @@ function applySeriesEdit(seriesId, sourceBlockId, fields) {
       }
       if (fields.travelBufMin == null && Object.prototype.hasOwnProperty.call(fields, 'travelBufMin')) delete b.travelBufMin;
       if (fields.getReadyBufMin == null && Object.prototype.hasOwnProperty.call(fields, 'getReadyBufMin')) delete b.getReadyBufMin;
+      if (fields.warmupBufMin == null && Object.prototype.hasOwnProperty.call(fields, 'warmupBufMin')) delete b.warmupBufMin;
       changed = true;
     });
     if (changed) setDayBlocks(dayKey, arr);
@@ -12201,7 +12316,7 @@ function renderPerfDetail() {
   const monKey = perfMondayKey(perfWeekOffset);
   const mon = formatDayKey(monKey);
   const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-  const CATS = [['school','📘 Learning'],['training','🏋️ Training'],['routine','📋 Routine'],['daily','🧹 Chores'],['free','🎮 Family/Free'],['active','🏃 Active'],['sleep','😴 Rest'],['custom','⭐ Custom']];
+  const CATS = [['school','📘 Learning'],['training','🏋️ Practice'],['competition','🏆 Competition'],['routine','📋 Routine'],['daily','🧹 Chores'],['free','🎮 Family/Free'],['active','🏃 Active'],['sleep','😴 Rest'],['custom','⭐ Custom']];
   const kidCard = (kid) => {
     const st = perfWeekStats(monKey, kid);
     const maxMin = Math.max(60, ...Object.values(st.byCat).map(v => v.planned));
@@ -13332,7 +13447,7 @@ function mmRenderCelebrate(wk) {
 }
 function mm2b(kid) {
   const info = ctWeekInfo();
-  const CATS = [['school','📘 Learning'],['training','🏋️ Training'],['routine','📋 Routine'],['daily','🧹 Chores'],['free','🎮 Family/Free'],['active','🏃 Active']];
+  const CATS = [['school','📘 Learning'],['training','🏋️ Practice'],['competition','🏆 Competition'],['routine','📋 Routine'],['daily','🧹 Chores'],['free','🎮 Family/Free'],['active','🏃 Active']];
   const planned = {}, done = {};
   const acts = getAllActivities(kid);
   info.keys.forEach(key => {
@@ -14907,7 +15022,8 @@ function renderPrintSheet() {
           const slotSpan = Math.max(1, Math.round((segEnd - segStart)/15));
           const bh = slotSpan*slotPx - 1;
           const label = bh >= 9 ? `${seg.icon} ${seg.min}m` : '';
-          blockHtml += `<div class="print-buffer" style="height:${bh}px" title="${seg.kind==='travel'?'Travel':'Get ready'} — ${seg.min} min">${label}</div>`;
+          const kindLabel = seg.kind==='travel' ? 'Travel' : seg.kind==='warmup' ? 'Warm-up' : 'Get ready';
+          blockHtml += `<div class="print-buffer" style="height:${bh}px" title="${kindLabel} — ${seg.min} min">${label}</div>`;
         });
         // Clip each block to the window so blocks that start earlier/run later
         // still render (trimmed) instead of vanishing.
@@ -14957,8 +15073,8 @@ function renderPrintSheet() {
 function buildPrintSummary(keys, acts, winStartMin, winEndMin) {
   const CAT_LABELS = {
     sleep:'😴 Rest', school:'📚 Learning', active:'🏃 Active',
-    free:'🎮 Free', daily:'🍽 Daily', training:'🏋️ Training',
-    routine:'📋 Routine', custom:'✨ Custom'
+    free:'🎮 Free', daily:'🍽 Daily', training:'🏋️ Practice',
+    competition:'🏆 Competition', routine:'📋 Routine', custom:'✨ Custom'
   };
   const catMin = {};
   let planned = 0;
