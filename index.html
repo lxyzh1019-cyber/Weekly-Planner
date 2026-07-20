@@ -5131,13 +5131,24 @@ const CAT_HEX = {
   routine:'#80cbc4'
 };
 
-/* Training tags + sport-specific starter objectives */
+/* Training tags + sport-specific starter objectives. Each topic carries its
+   own icon and background colour so a Skating block reads differently from a
+   Swimming or Dryland one at a glance, not just by its text label. */
 const TRAINING_TAGS = [
-  { id:'skating',  label:'⛸ Skating',  icon:'⛸' },
-  { id:'swimming', label:'🏊 Swimming', icon:'🏊' },
-  { id:'dryland',  label:'💪 Dryland', icon:'💪' },
-  { id:'general',  label:'🏃 General', icon:'🏃' },
+  { id:'skating',  label:'⛸ Skating',  name:'Skating',  icon:'⛸', colour:'#8a6fd0' },
+  { id:'swimming', label:'🏊 Swimming', name:'Swimming', icon:'🏊', colour:'#2f9fd0' },
+  { id:'dryland',  label:'💪 Dryland', name:'Dryland',  icon:'💪', colour:'#e08a3a' },
+  { id:'general',  label:'🏃 General', name:'Training', icon:'🏃', colour:'#ef476f' },
 ];
+function getTrainingTopic(tag) {
+  return TRAINING_TAGS.find(t => t.id === tag) || TRAINING_TAGS[3];
+}
+/* The background a training block should use: an explicit non-default custom
+   colour wins; otherwise the topic colour (falls back to the training pink). */
+function trainingBlockColour(b) {
+  if (b.colour && b.colour !== CAT_HEX.training) return b.colour;
+  return getTrainingTopic(b.tag).colour;
+}
 
 /* Figure skating: landing doubles, targeting double axel */
 const SKATING_OBJECTIVES = [
@@ -7601,7 +7612,11 @@ function renderFullWeek(keys) {
       const topPx = relStart * PX_PER_MIN;
       const pxHeight = Math.max(dur * PX_PER_MIN, 16);
 
-      const bg = b.colour || CAT_HEX[act.cat] || '#888';
+      // Training topics carry their own icon + colour (skating/swimming/dryland).
+      const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
+      const bg = topic ? trainingBlockColour(b) : (b.colour || CAT_HEX[act.cat] || '#888');
+      const dispIcon = topic ? topic.icon : act.icon;
+      const dispName = topic ? topic.name : act.name;
       const card = document.createElement('div');
       let cls = 'wf-card' + (isLightColour(bg) ? ' light-bg' : '');
       if (pxHeight < 34) cls += ' wf-card--slim';
@@ -7629,13 +7644,13 @@ function renderFullWeek(keys) {
       const stampEmoji = b.parentStamp && b.parentStamp.emoji ? b.parentStamp.emoji + ' ' : '';
       card.innerHTML = `
         <div class="wf-card-time">${timeStr}</div>
-        <div class="wf-card-icon">${act.icon}</div>
-        <div class="wf-card-name">${stampEmoji}${act.name}${travelTag}</div>
+        <div class="wf-card-icon">${dispIcon}</div>
+        <div class="wf-card-name">${stampEmoji}${dispName}${travelTag}</div>
         <div class="wf-card-dur">${formatDuration(b.durationMin)}</div>
         <button type="button" class="wf-card-check" aria-label="${b.completed?'Mark not done':'Mark done'}"
           onclick="toggleBlockDone('${key}','${b.id}',event)">${b.completed?'✓':''}</button>
       `;
-      card.title = `${act.icon} ${act.name} — ${timeStr}, ${formatDuration(b.durationMin)}`
+      card.title = `${dispIcon} ${dispName} — ${timeStr}, ${formatDuration(b.durationMin)}`
         + (bufBefore > 0 ? ` · ${travelMin ? '🚗 travel' : '👕 get-ready'} ${bufBefore} min each way` : '');
       attachTapGuard(card, ()=> openDayFromWeekCard(key, ci, b.id));
       cell.appendChild(card);
@@ -8397,7 +8412,11 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
     if (height >= 110) fontTier = ' block-font-lg';
     else if (height >= 72) fontTier = ' block-font-md';
   }
-  const blockBg = b.colour || CAT_HEX[act.cat] || '#888';
+  // Training topics (skating/swimming/dryland) each get their own icon + colour
+  // so they read differently at a glance, not just by the text label.
+  const topic = (act.isTraining) ? getTrainingTopic(b.tag) : null;
+  const blockBg = topic ? trainingBlockColour(b) : (b.colour || CAT_HEX[act.cat] || '#888');
+  const dispIcon = topic ? topic.icon : act.icon;
   blockEl.className = 'placed-block'
     +(isBuffer ? ` travel-buf travel-buf--centered${b._bufferCls ? ' '+b._bufferCls : ''}` : '')
     +(b.parentPinned?' parent-pinned':'')
@@ -8412,11 +8431,10 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
   blockEl.style.width = `calc(${widthPct}% - 4px)`;
 
   const durStr = formatDuration(b.durationMin);
-  const tagBadge = b.tag ? {skating:'⛸',swimming:'🏊',dryland:'💪',general:'🏃'}[b.tag] || '' : '';
   const mood = getProfData().blockMoods?.[b.id] || '';
 
   let badges = '';
-  if (tagBadge) badges += `<span class="badge">${tagBadge}</span>`;
+  // (Training sport is shown by the block's own icon now, so no separate badge.)
   if (b.objectives?.length) badges += '<span class="badge">🎯</span>';
   if (b.note) badges += '<span class="badge">📝</span>';
   if (b.parentPinned) badges += '<span class="badge">📌</span>';
@@ -8445,12 +8463,13 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
   // For a multi-chore House-Chore block, show the tagged chores in the name.
   const choreList = (b.actId === 'chores' && Array.isArray(b.choreTags) && b.choreTags.length)
     ? b.choreTags.join(', ') : '';
-  const displayName = choreList ? `${act.name}: ${choreList}` : act.name;
+  const baseName = topic ? topic.name : act.name;
+  const displayName = choreList ? `${act.name}: ${choreList}` : baseName;
   const nameHtml = isBuffer
     ? ''
     : (isCompact && noteTrim)
-    ? `<div class="block-name block-name--inline">${act.icon} <span class="block-title">${escapeHtml(act.name)}</span><span class="block-note-inline" title="${escapeHtml(noteTrim).replace(/"/g,'&quot;')}"> · ${escapeHtml(noteTrim)}</span></div>`
-    : `<div class="block-name">${act.icon} ${escapeHtml(displayName)}</div>`;
+    ? `<div class="block-name block-name--inline">${dispIcon} <span class="block-title">${escapeHtml(baseName)}</span><span class="block-note-inline" title="${escapeHtml(noteTrim).replace(/"/g,'&quot;')}"> · ${escapeHtml(noteTrim)}</span></div>`
+    : `<div class="block-name">${dispIcon} ${escapeHtml(displayName)}</div>`;
   const metaHtml = isBuffer
     ? `<div class="block-meta"><span class="travel-buf-label">${escapeHtml(b._bufferLabel || '')}</span></div>`
     : `<div class="block-meta">${durStr}${badges?' '+badges:''}</div>`;
@@ -9319,7 +9338,11 @@ function renderTrainingSheet() {
     const b = document.createElement('button');
     b.className = 'pill-btn'+(ts.tag===t.id?' active':'');
     b.textContent = t.label;
-    b.onclick = ()=>{ ts.tag=t.id; ts.objectives=[]; renderTrainingSheet(); };
+    b.onclick = ()=>{
+      // Adopt the topic colour unless the user had picked a non-default custom one.
+      if (!ts.colour || ts.colour === CAT_HEX.training || TRAINING_TAGS.some(x=>x.colour===ts.colour)) ts.colour = t.colour;
+      ts.tag=t.id; ts.objectives=[]; renderTrainingSheet();
+    };
     tagWrap.appendChild(b);
   });
 
