@@ -1689,9 +1689,10 @@
   @media (max-width: 600px) { .weekly-full { min-width: 560px; } }
   .weekly-full {
     display: grid;
-    /* All 7 days share the width so the whole week is visible at once —
-       no horizontal scroll hiding Sunday on tablets/laptops. */
-    grid-template-columns: 40px repeat(7, minmax(0, 1fr));
+    /* Leading 18px column = time-of-day sideband (Before School / School /
+       After School / Evening), same as the day view's left band. All 7 days
+       share the remaining width so the whole week is visible at once. */
+    grid-template-columns: 18px 40px repeat(7, minmax(0, 1fr));
     gap: 0;
     min-width: 0;
     background: var(--paper);
@@ -1743,6 +1744,31 @@
   }
   .wf-day-col:last-child { border-right: none; }
   .wf-day-col.today { box-shadow: inset 0 0 0 2px #ffb865; }
+  /* Left sideband: the day view's Before School / School / After School /
+     Evening axis, rendered once for the whole week. */
+  .wf-sideband {
+    position: relative;
+    background: var(--bg2);
+  }
+  .wf-sideband-seg {
+    position: absolute;
+    left: 1px; right: 1px;
+    border-radius: 6px;
+    border: 1.5px solid var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.8px;
+    overflow: hidden;
+    padding: 3px 0;
+    box-sizing: border-box;
+  }
   /* Time-of-day tint bands — decorative background, not structural rows. */
   .wf-band {
     position: absolute; left: 0; right: 0;
@@ -3276,10 +3302,31 @@
   @media print { .print-sleep { background: #f3eefb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   .print-week-grid {
     display: grid;
-    grid-template-columns: 44px repeat(7, 1fr);
+    /* Leading 14px column = time-of-day sideband (Before School / School /
+       After School / Evening), mirroring the day view's left axis. */
+    grid-template-columns: 14px 44px repeat(7, 1fr);
     border: 2px solid var(--ink);
     font-size: 9pt;
     break-inside: avoid;
+  }
+  /* Time-of-day sideband cells + vertical label on each band's first slot */
+  .print-band-cell {
+    position: relative;
+    border-right: 1px solid var(--paper-line);
+    overflow: visible;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .print-band-before { background: #fff4db; }
+  .print-band-school { background: #d7eafe; }
+  .print-band-after  { background: #ffe1d0; }
+  .print-band-evening{ background: #e8dcf2; }
+  .print-band-label {
+    position: absolute; left: 0; top: 0; width: 100%;
+    display: flex; align-items: center; justify-content: center;
+    writing-mode: vertical-rl; text-orientation: mixed;
+    font-size: 6.5pt; font-weight: 800; letter-spacing: 0.5px;
+    color: #3a332c; white-space: nowrap; overflow: hidden;
+    z-index: 1;
   }
   .print-cell, .print-header-cell, .print-time-cell {
     border: 1px solid var(--paper-line);
@@ -5709,7 +5756,10 @@ function markItemUpdated(item) {
   item.updatedAt = Date.now();
   return item;
 }
-function mergeArrayById(localArr, remoteArr) {
+/* Union two id-keyed arrays, newest copy of each id wins. `tombScope` names
+   the collection ('sa:', 'ca:jenn:', 'task:'…) so deletions recorded as
+   scoped tombstones stick instead of resurrecting via the union. */
+function mergeArrayById(localArr, remoteArr, tombScope) {
   const map = new Map();
   (localArr || []).forEach(item => {
     if (!item || item.id == null) return;
@@ -5726,7 +5776,13 @@ function mergeArrayById(localArr, remoteArr) {
     const nextTs = item.updatedAt || item.createdAt || 0;
     map.set(item.id, nextTs > prevTs ? item : prev);
   });
-  return Array.from(map.values());
+  let out = Array.from(map.values());
+  if (tombScope != null) {
+    const t = state.shared && state.shared.tombstones;
+    if (t) out = out.filter(item =>
+      !(t[tombScope + item.id] && t[tombScope + item.id] >= (item.updatedAt || item.createdAt || 0)));
+  }
+  return out;
 }
 
 /* ── Deletion tombstones ──
@@ -5747,6 +5803,11 @@ function tombstoneBlockIds(ids) {
   // longer than any device realistically stays offline holding stale blocks.
   const cutoff = now - 30 * 24 * 60 * 60 * 1000;
   Object.keys(t).forEach(id => { if (t[id] < cutoff) delete t[id]; });
+}
+/* Tombstone ids in a named collection (scope must match the mergeArrayById
+   call for that collection, e.g. 'sa:' for sharedActivities). */
+function tombstoneIds(scope, ids) {
+  tombstoneBlockIds((ids || []).map(id => scope + id));
 }
 function blockTombstoned(b) {
   const bTs = b.updatedAt || b.createdAt || 0;
@@ -5822,12 +5883,12 @@ function mergeWeeks(localWeeks, remoteWeeks) {
   });
   return merged;
 }
-function mergeProfileState(localProfile, remoteProfile) {
+function mergeProfileState(localProfile, remoteProfile, profName) {
   const lp = localProfile || {};
   const rp = remoteProfile || {};
   const merged = { ...lp, ...rp };
   merged.weeks = mergeWeeks(lp.weeks, rp.weeks);
-  merged.customActivities = mergeArrayById(lp.customActivities, rp.customActivities);
+  merged.customActivities = mergeArrayById(lp.customActivities, rp.customActivities, profName ? 'ca:' + profName + ':' : null);
   merged.goals = mergeArrayById(lp.goals, rp.goals);
   merged.todos = mergeArrayById(lp.todos, rp.todos);
   merged.achievements = mergeArrayById(lp.achievements, rp.achievements);
@@ -5849,7 +5910,7 @@ function mergeRemoteState(remote) {
     ['jenn','jess'].forEach(p => {
       const lp = state.profiles[p] || {};
       const rp = remote.profiles[p] || {};
-      state.profiles[p] = mergeProfileState(lp, rp);
+      state.profiles[p] = mergeProfileState(lp, rp, p);
       // activityCounts/activityHours are derived from confirmed blocks —
       // recompute from the merged weeks instead of trusting either side's copy.
       recountActivityProgress(p);
@@ -5863,8 +5924,13 @@ function mergeRemoteState(remote) {
       ...rs,
       invites: mergeArrayById(ls.invites, rs.invites),
       challenges: mergeArrayById(ls.challenges, rs.challenges),
-      customTasks: mergeArrayById(ls.customTasks, rs.customTasks),
-      routineTemplates: mergeArrayById(ls.routineTemplates, rs.routineTemplates),
+      customTasks: mergeArrayById(ls.customTasks, rs.customTasks, 'task:'),
+      routineTemplates: mergeArrayById(ls.routineTemplates, rs.routineTemplates, 'rt:'),
+      // Shared activities & level rules were previously replaced wholesale by
+      // the remote copy — which made share/unshare/edit only stick when this
+      // device pushed last. Merge them by id like everything else.
+      sharedActivities: mergeArrayById(ls.sharedActivities, rs.sharedActivities, 'sa:'),
+      levelRules: mergeArrayById(ls.levelRules, rs.levelRules, 'lr:'),
       // Chore config/payouts (groups, goals, fired payouts, bank) is a nested
       // tree — deep-merge so two devices' edits both survive.
       chore: deepMergeObj(ls.chore, rs.chore),
@@ -7909,16 +7975,20 @@ function renderFullWeek(keys) {
   const totalH = Math.round(DAY_MIN_SPAN * PX_PER_MIN);
 
   // Time-of-day tint bands + slot labels. Boundaries match the day view's
-  // sideband (buildSideband): 6–9am / 9am–3pm / 3–6pm / 6pm–end.
+  // sideband (buildSideband): 6–9am / 9am–3pm / 3–6pm / 6pm–end. `side` is the
+  // compact label used on the left axis band.
   const WEEKDAY_BANDS = [
-    { start: 0,   end: 180,          cls: 'wf-band-before',  label: '🌅 Before School' },
-    { start: 180, end: 540,          cls: 'wf-band-school',  label: '🏫 School'        },
-    { start: 540, end: 720,          cls: 'wf-band-after',   label: '🎒 After School'  },
-    { start: 720, end: DAY_MIN_SPAN, cls: 'wf-band-evening', label: '🌙 Evening'       },
+    { start: 0,   end: 180,          cls: 'wf-band-before',  label: '🌅 Before School', side: '🌅 Before' },
+    { start: 180, end: 540,          cls: 'wf-band-school',  label: '🏫 School',        side: '🏫 School' },
+    { start: 540, end: 720,          cls: 'wf-band-after',   label: '🎒 After School',  side: '🎒 After'  },
+    { start: 720, end: DAY_MIN_SPAN, cls: 'wf-band-evening', label: '🌙 Evening',       side: '🌙 Evening' },
   ];
   const WEEKEND_BANDS = [ { start: 0, end: DAY_MIN_SPAN, cls: 'wf-band-free', label: '🎉 Free Time' } ];
 
-  // ── Header row: corner + 7 day headers ──
+  // ── Header row: sideband corner + gutter corner + 7 day headers ──
+  const bandCorner = document.createElement('div');
+  bandCorner.className = 'wf-corner';
+  grid.appendChild(bandCorner);
   const corner = document.createElement('div');
   corner.className = 'wf-corner';
   grid.appendChild(corner);
@@ -7933,6 +8003,21 @@ function renderFullWeek(keys) {
 
   const firstHour = Math.ceil(START_MIN / 60);
   const lastHour  = Math.floor((START_MIN + DAY_MIN_SPAN) / 60);
+
+  // ── Left sideband: the day view's time-of-day axis for the whole week ──
+  const sideband = document.createElement('div');
+  sideband.className = 'wf-sideband';
+  sideband.style.height = totalH + 'px';
+  WEEKDAY_BANDS.forEach(bd => {
+    const seg = document.createElement('div');
+    seg.className = 'wf-sideband-seg ' + bd.cls;
+    seg.style.top = (bd.start * PX_PER_MIN + 1) + 'px';
+    seg.style.height = ((bd.end - bd.start) * PX_PER_MIN - 3) + 'px';
+    seg.textContent = bd.side;
+    seg.title = bd.label;
+    sideband.appendChild(seg);
+  });
+  grid.appendChild(sideband);
 
   // ── Slim gutter with hour labels down the side ──
   const gutter = document.createElement('div');
@@ -7964,14 +8049,17 @@ function renderFullWeek(keys) {
       }
     };
 
-    // Zone tint bands behind everything, each with its slot label at the top.
+    // Zone tint bands behind everything. Weekday band names live on the left
+    // sideband axis; weekend columns keep their own "Free Time" label since
+    // the axis shows the school-day rhythm.
+    const isWeekendCol = (dow === 0 || dow === 6);
     bands.forEach(bd => {
       const seg = document.createElement('div');
       seg.className = 'wf-band ' + bd.cls;
       seg.style.top = (bd.start * PX_PER_MIN) + 'px';
       seg.style.height = ((bd.end - bd.start) * PX_PER_MIN) + 'px';
       cell.appendChild(seg);
-      if (bd.label && (bd.end - bd.start) * PX_PER_MIN >= 24) {
+      if (isWeekendCol && bd.label && (bd.end - bd.start) * PX_PER_MIN >= 24) {
         const lbl = document.createElement('div');
         lbl.className = 'wf-band-label';
         lbl.style.top = (bd.start * PX_PER_MIN + 2) + 'px';
@@ -9822,6 +9910,7 @@ function renderTrainingSheet() {
       item.onclick = (e)=>{
         if (e.target.classList.contains('obj-delete')) {
           state.shared.customTasks = state.shared.customTasks.filter(x=>x.id!==t.id);
+          tombstoneIds('task:', [t.id]);
           ts.objectives = ts.objectives.filter(o=>o!==label);
           saveAll(); renderTrainingSheet();
           return;
@@ -11708,6 +11797,7 @@ async function rejectKidActivity(owner, id) {
   const idx = arr.findIndex(x => x.id === id);
   if (idx < 0) return;
   arr.splice(idx, 1);
+  tombstoneIds('ca:' + owner + ':', [id]);
   saveAll();
   renderPendingApproval();
   renderParentActivities();
@@ -11798,10 +11888,14 @@ function findParentActivity(owner, id) {
 }
 
 function removeParentActivity(owner, id) {
+  // Tombstone the removal so the sync merge can't restore it from another
+  // device (a move records the removal in the OLD collection only).
   if (owner === 'shared') {
     state.shared.sharedActivities = (state.shared.sharedActivities||[]).filter(a=>a.id!==id);
+    tombstoneIds('sa:', [id]);
   } else {
     state.profiles[owner].customActivities = (state.profiles[owner].customActivities||[]).filter(a=>a.id!==id);
+    tombstoneIds('ca:' + owner + ':', [id]);
   }
 }
 
@@ -11866,16 +11960,23 @@ async function deleteParentActivity(owner, id) {
   if (!(await showConfirm(msg, { danger:true, okLabel:'Delete' }))) return;
   // Remove the activity definition
   removeParentActivity(owner, id);
-  // Cascade-delete every referencing block from both kids
+  // Cascade-delete every referencing block from both kids (tombstoned so the
+  // sync merge can't bring them back)
   if (refs > 0) {
+    const removedBlockIds = [];
     ['jenn','jess'].forEach(p => {
       const weeks = (state.profiles[p] && state.profiles[p].weeks) || {};
       Object.keys(weeks).forEach(dayKey => {
         const arr = weeks[dayKey] || [];
-        const kept = arr.filter(b => b.actId !== id);
+        const kept = arr.filter(b => {
+          if (b.actId !== id) return true;
+          removedBlockIds.push(b.id);
+          return false;
+        });
         if (kept.length !== arr.length) state.profiles[p].weeks[dayKey] = kept;
       });
     });
+    tombstoneBlockIds(removedBlockIds);
     // Recompute progress for both kids since their counts may have changed
     recountActivityProgress('jenn');
     recountActivityProgress('jess');
@@ -11907,14 +12008,18 @@ async function toggleShareActivity(owner, id) {
     if (target !== 'jenn' && target !== 'jess') { showToast('Type jenn or jess'); return; }
     const act = (state.shared.sharedActivities||[]).find(a=>a.id===id);
     if (!act) return;
-    state.shared.sharedActivities = state.shared.sharedActivities.filter(a=>a.id!==id);
+    // Stamp the moved copy first, then tombstone the old home — the fresh
+    // timestamp is what lets the move survive a merge with a stale device.
+    markItemUpdated(act);
+    removeParentActivity('shared', id);
     state.profiles[target].customActivities = [...((state.profiles[target]||{}).customActivities||[]), act];
   } else {
     // Promote to shared
     const list = (state.profiles[owner]||{}).customActivities || [];
     const act = list.find(a=>a.id===id);
     if (!act) return;
-    state.profiles[owner].customActivities = list.filter(a=>a.id!==id);
+    markItemUpdated(act);
+    removeParentActivity(owner, id);
     state.shared.sharedActivities = [...(state.shared.sharedActivities||[]), act];
   }
   saveAll();
@@ -12276,9 +12381,12 @@ function confirmRoutine() {
 async function deleteRoutine(id) {
   if (!(await showConfirm('Delete this routine?', { danger:true, okLabel:'Delete' }))) return;
   state.shared.routineTemplates = (state.shared.routineTemplates||[]).filter(r=>r.id!==id);
-  // Remove matching activity from both kids
+  tombstoneIds('rt:', [id]);
+  // Remove matching activity from both kids (tombstoned so sync can't revive them)
   ['jenn','jess'].forEach(p=>{
+    const removed = (state.profiles[p].customActivities||[]).filter(a=>a.routineId===id).map(a=>a.id);
     state.profiles[p].customActivities = (state.profiles[p].customActivities||[]).filter(a=>a.routineId!==id);
+    tombstoneIds('ca:' + p + ':', removed);
   });
   saveAll();
   renderRoutinesList();
@@ -14531,6 +14639,7 @@ function confirmNewRule() {
 }
 function deleteLevelRule(id) {
   state.shared.levelRules = (state.shared.levelRules||[]).filter(r=>r.id!==id);
+  tombstoneIds('lr:', [id]);
   saveAll();
   renderLevelRules();
 }
@@ -14650,12 +14759,21 @@ function renderPrintSheet() {
   document.documentElement.style.setProperty('--print-slot', slotPx + 'px');
 
   html += `<div class="print-week-grid">`;
-  // header row
-  html += `<div class="print-header-cell"></div>`;
+  // header row (band-axis corner + time corner + 7 days)
+  html += `<div class="print-header-cell"></div><div class="print-header-cell"></div>`;
   keys.forEach((k,i)=>{
     const d = formatDayKey(k);
     html += `<div class="print-header-cell">${DAY_SHORT[i]} ${d.getDate()}</div>`;
   });
+  // Time-of-day sideband segments (absolute minutes), matching the day view's
+  // axis: 6–9am / 9am–3pm / 3–6pm / 6pm onward.
+  const PRINT_BANDS = [
+    { start: 360,  end: 540,  cls: 'print-band-before',  label: '🌅 Before' },
+    { start: 540,  end: 900,  cls: 'print-band-school',  label: '🏫 School' },
+    { start: 900,  end: 1080, cls: 'print-band-after',   label: '🎒 After'  },
+    { start: 1080, end: 1440, cls: 'print-band-evening', label: '🌙 Evening' },
+  ];
+  const bandForSlot = (absMin) => PRINT_BANDS.find(b => absMin >= b.start && absMin < b.end);
   // rows
   const acts = getAllActivities();
   for (let s=0;s<winSlots;s++) {
@@ -14663,6 +14781,19 @@ function renderPrintSheet() {
     const hour = winStartHr + Math.floor(totalMin/60);
     const min  = totalMin%60;
     const isHourStart = min===0;
+    // Sideband cell: tinted per band; the band's first visible slot carries a
+    // vertical label spanning the band's full (clipped) height.
+    const absMin = winStartMin + totalMin;
+    const band = bandForSlot(absMin);
+    let bandHtml = '';
+    if (band) {
+      const bandVisStart = Math.max(band.start, winStartMin);
+      if (absMin === bandVisStart) {
+        const visSlots = Math.round((Math.min(band.end, winEndMin) - bandVisStart) / 15);
+        bandHtml = `<span class="print-band-label" style="height:${visSlots * slotPx - 1}px">${band.label}</span>`;
+      }
+    }
+    html += `<div class="print-band-cell${band ? ' ' + band.cls : ''}">${bandHtml}</div>`;
     html += `<div class="print-time-cell${isHourStart?' print-hour-start':''}">${isHourStart ? (hour>12?hour-12:hour)+(hour>=12?'pm':'am') : ''}</div>`;
     keys.forEach(k=>{
       const bks = getDayBlocks(k);
