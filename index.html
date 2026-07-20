@@ -1846,6 +1846,35 @@
   .legend-item { display: flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; font-weight: 600; }
   .legend-dot { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--ink); }
 
+  /* ═══════════ WEEKLY SIGNATURE (kid sign-off) ═══════════ */
+  .week-signature {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.8rem;
+    flex-wrap: wrap;
+    margin: 0.6rem 0.2rem 0.2rem;
+    padding: 0.6rem 0.9rem;
+    background: var(--paper-card, #fffdf5);
+    border: 2px dashed var(--ink); border-radius: 14px;
+  }
+  .wk-sig-line { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; min-width: 0; }
+  .wk-sig-label { font-family: 'Patrick Hand', sans-serif; font-weight: 800; font-size: 1rem; color: var(--ink); }
+  .wk-sig-name {
+    font-family: 'Gochi Hand', cursive; font-size: 1.8rem; line-height: 1;
+    color: var(--accent-strong, #c14a24);
+    border-bottom: 2px solid var(--ink); padding: 0 0.5rem;
+  }
+  .wk-sig-date { font-size: 0.85rem; color: var(--ink-light); font-weight: 700; }
+  .wk-sig-line--empty .wk-sig-blank {
+    display: inline-block; min-width: 160px; border-bottom: 2px solid var(--ink); height: 1.4rem;
+  }
+  .wk-sig-btn {
+    font-family: 'Patrick Hand', sans-serif; font-weight: 800; font-size: 0.95rem;
+    background: var(--accent-yellow); color: var(--ink);
+    border: 2px solid var(--ink); border-radius: 10px; padding: 0.35rem 0.8rem;
+    cursor: pointer; box-shadow: 2px 2px 0 var(--ink); flex-shrink: 0;
+  }
+  .wk-sig-btn:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
+  .wk-sig-btn--clear { background: transparent; box-shadow: none; font-size: 0.82rem; font-weight: 700; color: var(--ink-light); border-style: dashed; }
+
   /* ═══════════ DAY EDITOR ═══════════ */
   /* Labeled "back to week" button in the day topbar */
   .btn-back-week {
@@ -3239,6 +3268,19 @@
     border: 1px solid currentColor; background: rgba(255,255,255,0.55);
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
+  /* Signature footer on the printed weekly plan */
+  .print-signature {
+    display: flex; gap: 22px; align-items: flex-end;
+    margin-top: 10px; padding: 0 4px;
+  }
+  .print-sig-block { display: flex; align-items: flex-end; gap: 6px; flex: 1; }
+  .print-sig-block--date { flex: 0 0 150px; }
+  .print-sig-caption { font-size: 8pt; font-weight: 700; color: #333; white-space: nowrap; }
+  .print-sig-line { flex: 1; border-bottom: 1px solid #000; min-height: 16px; position: relative; }
+  .print-sig-name {
+    font-family: 'Gochi Hand', cursive; font-size: 15pt; line-height: 1;
+    position: absolute; left: 6px; bottom: 1px;
+  }
 
   /* Scrollbar polish */
   ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -3986,6 +4028,7 @@
   <div id="weekFull" style="display:flex">
     <div class="weekly-full-wrap">
       <div class="weekly-full" id="weeklyFullGrid"></div>
+      <div class="week-signature" id="weekSignatureBar"></div>
     </div>
   </div>
 
@@ -6876,6 +6919,60 @@ function setWeekView(v) {
 }
 function changeWeek(d) { weekOffset += d; renderWeek(); }
 
+/* ── Kid's weekly signature: a commitment "I'll follow my plan" sign-off,
+   shown on the weekly view and carried onto the printed sheet. Stored per
+   week per profile so each kid signs their own plan. ── */
+function weekSignatureKey(keys) { return keys && keys[0] ? keys[0] : getDayKeys(weekOffset)[0]; }
+function getWeekSignature(keys, p=activeProfile()) {
+  const sigs = getProfData(p)?.weekSignatures;
+  return (sigs && sigs[weekSignatureKey(keys)]) || null;
+}
+function renderWeekSignature(keys) {
+  const bar = document.getElementById('weekSignatureBar');
+  if (!bar) return;
+  const p = activeProfile();
+  const name = p==='jenn' ? 'Jenn' : 'Jess';
+  const sig = getWeekSignature(keys, p);
+  if (sig) {
+    const when = new Date(sig.signedAt);
+    const dateStr = `${MONTH_SHORT[when.getMonth()]} ${when.getDate()}`;
+    bar.innerHTML = `
+      <div class="wk-sig-line">
+        <span class="wk-sig-label">✍️ Signed by</span>
+        <span class="wk-sig-name">${escapeHtml(sig.name || name)}</span>
+        <span class="wk-sig-date">on ${dateStr}</span>
+      </div>
+      <button type="button" class="wk-sig-btn wk-sig-btn--clear" onclick="clearWeekSignature()">Unsign</button>`;
+  } else {
+    bar.innerHTML = `
+      <div class="wk-sig-line wk-sig-line--empty">
+        <span class="wk-sig-label">✍️ ${name}, sign your week</span>
+        <span class="wk-sig-blank"></span>
+      </div>
+      <button type="button" class="wk-sig-btn" onclick="signWeek()">Sign this week ✍️</button>`;
+  }
+}
+async function signWeek() {
+  const keys = getDayKeys(weekOffset);
+  const p = activeProfile();
+  const defName = p==='jenn' ? 'Jenn' : 'Jess';
+  const entered = await showPrompt('Sign your week ✍️ — write your name:', { value: defName });
+  if (entered == null) return;                 // cancelled
+  const name = String(entered).trim() || defName;
+  const pd = getProfData(p);
+  if (!pd.weekSignatures) pd.weekSignatures = {};
+  pd.weekSignatures[weekSignatureKey(keys)] = { name, signedAt: Date.now() };
+  saveAll();
+  renderWeekSignature(keys);
+  showToast(`✍️ ${name} signed this week!`);
+}
+function clearWeekSignature() {
+  const keys = getDayKeys(weekOffset);
+  const pd = getProfData(activeProfile());
+  if (pd.weekSignatures) { delete pd.weekSignatures[weekSignatureKey(keys)]; saveAll(); }
+  renderWeekSignature(keys);
+}
+
 function renderWeek() {
   // parent banner
   const parentBanner = document.getElementById('parentBannerWeek');
@@ -6907,6 +7004,7 @@ function renderWeek() {
 
   renderGoalsTodos();
   renderWeekGlance(keys);
+  renderWeekSignature(keys);
 
   const coachEl = document.getElementById('weekCoachTip');
   if (coachEl) {
@@ -14243,10 +14341,13 @@ function renderPrintSheet() {
         if (!act) return;
         const slotSpan = Math.max(1, Math.round((segEnd - segStart)/15));
         const bh = slotSpan*slotPx - 1;
-        const bg = b.colour || CAT_HEX[act.cat] || '#888';
+        const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
+        const bg = topic ? trainingBlockColour(b) : (b.colour || CAT_HEX[act.cat] || '#888');
+        const pIcon = topic ? topic.icon : act.icon;
+        const pName = topic ? topic.name : act.name;
         // Empty tick box so it can be checked off on the printed page.
         const checkbox = bh >= 15 ? `<span class="print-check" style="border-color:${printTextColor(bg)}"></span>` : '';
-        blockHtml += `<div class="print-block" style="background:${bg};color:${printTextColor(bg)};font-size:${printBlockFontPt(bh)}pt;height:${bh}px">${checkbox}${act.icon} ${act.name}</div>`;
+        blockHtml += `<div class="print-block" style="background:${bg};color:${printTextColor(bg)};font-size:${printBlockFontPt(bh)}pt;height:${bh}px">${checkbox}${pIcon} ${pName}</div>`;
       });
       html += `<div class="print-cell${isHourStart?' print-hour-start':''}">${blockHtml}</div>`;
     });
@@ -14256,6 +14357,17 @@ function renderPrintSheet() {
   // The print is the planning grid only — A4 landscape, one page. Summaries,
   // free-time totals, sleep recommendations and notes are intentionally left
   // off so the printed sheet stays a single-page plan (per request).
+
+  // Signature footer: the kid commits to the plan (carried over from the weekly
+  // view if already signed), with blank lines for a parent co-sign and the date.
+  const kidName = p==='jenn' ? 'Jenn' : 'Jess';
+  const sig = getWeekSignature(keys, p);
+  const sigName = sig ? escapeHtml(sig.name || kidName) : '';
+  html += `<div class="print-signature">
+      <div class="print-sig-block"><span class="print-sig-caption">${kidName} signs</span><span class="print-sig-line">${sigName ? `<span class="print-sig-name">${sigName}</span>` : ''}</span></div>
+      <div class="print-sig-block"><span class="print-sig-caption">Parent</span><span class="print-sig-line"></span></div>
+      <div class="print-sig-block print-sig-block--date"><span class="print-sig-caption">Date</span><span class="print-sig-line"></span></div>
+    </div>`;
 
   document.getElementById('printSheet').innerHTML = html;
 }
