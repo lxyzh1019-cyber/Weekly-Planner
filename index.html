@@ -2999,7 +2999,7 @@
   .parent-h3 { font-size: 1.25rem; margin: 1rem 0 0.4rem; }
   .parent-panel > .parent-h3:first-child { margin-top: 0.4rem; }
   .parent-hint { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 0.55rem; }
-  /* Per-day confirm row in the weekly review */
+  /* Day-status strip in the weekly-review hub (read-only; taps open the meeting) */
   .review-day-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
   .review-day {
     display: flex; flex-direction: column; align-items: center; gap: 2px;
@@ -3014,6 +3014,25 @@
   .review-day-date { font-size: 1.2rem; font-weight: 800; font-family: 'Gochi Hand', cursive; line-height: 1; }
   .review-day-state { font-size: 0.72rem; font-weight: 700; }
   .review-day-count { font-size: 0.68rem; color: var(--ink-light); }
+  /* Weekly-review hub */
+  .hub-week { font-weight: 800; margin-bottom: 0.4rem; }
+  .hub-status { margin-top: 0.55rem; font-size: 0.88rem; font-weight: 700; background: #fff4db; border: 2px dashed #e8dfc3; border-radius: 10px; padding: 6px 10px; }
+  .hub-status-done { background: var(--accent-green); border-style: solid; border-color: var(--ink); }
+  /* Performance tab */
+  .perf-table { display: flex; flex-direction: column; gap: 4px; margin-top: 0.4rem; }
+  .perf-row {
+    display: grid; grid-template-columns: 72px 1fr auto 1fr auto auto; gap: 6px; align-items: center;
+    border: 2px solid var(--ink); border-radius: 10px; background: var(--paper);
+    padding: 5px 8px; cursor: pointer; font-family: 'Patrick Hand', sans-serif; text-align: left;
+  }
+  .perf-row.sel { background: #fff4db; box-shadow: 2px 2px 0 var(--ink); }
+  .perf-week { font-weight: 800; font-size: 0.82rem; white-space: nowrap; }
+  .perf-track { height: 12px; border: 1.5px solid var(--ink); border-radius: 6px; overflow: hidden; background: #f3ecdc; min-width: 36px; }
+  .perf-fill { height: 100%; }
+  .perf-num { font-size: 0.72rem; font-weight: 800; min-width: 28px; }
+  .perf-money { font-size: 0.76rem; font-weight: 800; white-space: nowrap; }
+  .perf-facts { margin-top: 6px; font-size: 0.8rem; font-weight: 700; }
+  .perf-detail-nav { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; }
   /* Kid feedback list */
   .feedback-item {
     border: 1.5px solid var(--ink); border-radius: 10px; background: var(--paper);
@@ -4224,34 +4243,45 @@
         <button class="pill-btn" onclick="setParentKid('jess')">🦊 Jess</button>
       </div>
       <button class="pill-btn" style="margin-left:auto" onclick="parentView(parentViewing)">📋 Open full week ›</button>
-      <button class="btn-confirm" style="padding:0.35rem 0.8rem" onclick="openFamilyMeeting()">🧑‍🧑‍🧒 Run family meeting</button>
     </div>
     <div class="parent-tabs" role="tablist" aria-label="Parent sections">
       <button class="parent-tab active" role="tab" data-ptab="review" onclick="setParentTab('review')">🗓️ Weekly Review</button>
+      <button class="parent-tab" role="tab" data-ptab="analysis" onclick="setParentTab('analysis')">📊 Performance</button>
       <button class="parent-tab" role="tab" data-ptab="routines" onclick="setParentTab('routines')">🌅 Routines</button>
       <button class="parent-tab" role="tab" data-ptab="tasks" onclick="setParentTab('tasks')">✅ Tasks</button>
       <button class="parent-tab" role="tab" data-ptab="rules" onclick="setParentTab('rules')">⚙️ Level-Up</button>
     </div>
   </div>
 
-  <!-- TAB: Weekly Review -->
+  <!-- TAB: Weekly Review — Function 1: review & confirm THIS week.
+       All reviewing/confirming happens inside the family meeting; this tab
+       is a read-only hub that shows status and launches the meeting. -->
   <div class="parent-panel active" id="ptab-review" role="tabpanel">
-    <h3 class="parent-h3">🗓️ Confirm the week — <span id="reviewKidName">Jenn</span></h3>
-    <p class="parent-hint">Review each day together, then tap to confirm it. Progress is saved.</p>
-    <div id="reviewDayConfirm" class="review-day-row"></div>
+    <h3 class="parent-h3">🗓️ This week — review &amp; confirm</h3>
+    <p class="parent-hint">The whole weekly review happens in the <b>family meeting</b>: check each day together, celebrate wins, confirm &amp; record pocket money, then plan next week. Tap a day below to jump straight to it in the meeting.</p>
+    <div id="meetingHub"></div>
 
-    <h3 class="parent-h3">🧹 Chore review</h3>
-    <p class="parent-hint">This week's chore progress and pocket money.</p>
-    <div id="reviewChores"></div>
-    <button class="btn-confirm" style="margin-top:0.5rem" onclick="parentOpenChoreReview()">Open full chore tab ›</button>
-
-    <h3 class="parent-h3">💬 Feedback from your kid</h3>
+    <h3 class="parent-h3">💬 Feedback from <span id="reviewKidName">Jenn</span></h3>
+    <p class="parent-hint">What your kid logged this week — worth a look before the meeting.</p>
     <div id="reviewFeedback"></div>
 
-    <h3 class="parent-h3">📊 Weekly analytics</h3>
-    <div id="analyticsCards"></div>
+    <h3 class="parent-h3">🧰 Setup &amp; management</h3>
+    <p class="parent-hint">Not part of the review — chore groups, amounts, custom chores and the full money history live in the chore tab.</p>
+    <button class="pill-btn" onclick="parentOpenChoreReview()">🧹 Manage chores &amp; money ›</button>
+  </div>
+
+  <!-- TAB: Performance — Function 2: analyse PAST weeks. Read-only:
+       nothing here confirms or records; that stays in the meeting. -->
+  <div class="parent-panel" id="ptab-analysis" role="tabpanel" hidden>
+    <h3 class="parent-h3">📊 Past weeks at a glance</h3>
+    <p class="parent-hint">How the last 8 weeks actually went — % of planned time completed, routines kept, and the pocket money recorded at each meeting.</p>
+    <div id="perfTrend"></div>
+
+    <h3 class="parent-h3">🔍 One week in detail</h3>
+    <div id="perfDetail"></div>
 
     <h3 class="parent-h3">📅 Monthly overview</h3>
+    <p class="parent-hint">Planned-density heatmap by month. Tap a day to open it.</p>
     <div style="display:flex;gap:0.6rem;flex-wrap:wrap">
       <button class="pill-btn" onclick="openParentMonthly('jenn')">🐥 Jenn's Month</button>
       <button class="pill-btn" onclick="openParentMonthly('jess')">🦊 Jess's Month</button>
@@ -11058,14 +11088,13 @@ function renderParentHome() {
   document.getElementById('reviewKidName').textContent = parentViewing==='jenn' ? '🐥 Jenn' : '🦊 Jess';
   document.querySelectorAll('#parentWeekKidPills .pill-btn').forEach(b =>
     b.classList.toggle('active', b.textContent.includes(parentViewing==='jenn'?'Jenn':'Jess')));
-  renderAnalytics();
+  renderMeetingHub();
+  renderReviewFeedback();
+  renderPerformance();
   renderRoutinesList();
   renderParentActivities();
   renderPendingApproval();
   renderLevelRules();
-  renderReviewDays();
-  renderReviewChores();
-  renderReviewFeedback();
 }
 
 function setParentTab(tab) {
@@ -11082,62 +11111,50 @@ function setParentKid(kid) {
   renderParentHome();
 }
 
-/* Weekly Review — per-day confirm buttons. A confirmation is stored per
-   child per day so a parent can tick off each day as they review it. */
-function parentDayConfirmStore() {
-  if (!state.shared.parentDayConfirm) state.shared.parentDayConfirm = {};
-  if (!state.shared.parentDayConfirm[parentViewing]) state.shared.parentDayConfirm[parentViewing] = {};
-  return state.shared.parentDayConfirm[parentViewing];
-}
-function parentToggleDayConfirm(dayKey) {
-  const store = parentDayConfirmStore();
-  store[dayKey] = !store[dayKey];
-  saveAll();
-  renderReviewDays();
-}
-function renderReviewDays() {
-  const wrap = document.getElementById('reviewDayConfirm');
+/* Weekly Review hub — Function 1 (review & confirm) lives in ONE place:
+   the family meeting. This hub is read-only status for the meeting's week:
+   the 7-day strip mirrors the meeting's day-confirms (both kids), and every
+   tap opens the meeting itself rather than confirming in a second surface. */
+function renderMeetingHub() {
+  const wrap = document.getElementById('meetingHub');
   if (!wrap) return;
-  wrap.innerHTML = '';
-  const keys = getDayKeys(weekOffset);
-  const store = parentDayConfirmStore();
-  keys.forEach((k, i) => {
-    const d = formatDayKey(k);
-    const blocks = getDayBlocks(k, parentViewing) || [];
-    const done = blocks.filter(b => b.completed).length;
-    const confirmed = !!store[k];
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'review-day' + (confirmed ? ' confirmed' : '') + (k === todayKey() ? ' today' : '');
-    btn.onclick = () => parentToggleDayConfirm(k);
-    btn.innerHTML =
-        `<span class="review-day-dow">${DAY_SHORT[i]}</span>`
-      + `<span class="review-day-date">${d.getDate()}</span>`
-      + `<span class="review-day-count">${done}/${blocks.length} done</span>`
-      + `<span class="review-day-state">${confirmed ? '✓ Confirmed' : 'Tap to confirm'}</span>`;
-    wrap.appendChild(btn);
-  });
-}
-
-// Chore review summary for the reviewed child (this real week).
-function renderReviewChores() {
-  const wrap = document.getElementById('reviewChores');
-  if (!wrap) return;
-  const kid = parentViewing;
-  if (kid !== 'jenn' && kid !== 'jess') { wrap.innerHTML = '<p class="feedback-empty">No chores for this profile.</p>'; return; }
   ctEnsureShared(); ctMigrateToGroups();
-  const wk = ctDateToKey(ctMondayOf(new Date()));
-  const groups = ctGroupsForKid(kid);
-  if (!groups.length) { wrap.innerHTML = '<p class="feedback-empty">No chore groups set up yet.</p>'; return; }
-  const chips = groups.map(g => {
-    const ids = g.choreIds || [];
-    const paid = g.cadence === 'daily'
-      ? [0,1,2,3,4,5,6].some(dd => ctGroupFiredDaily(wk, g.id, kid, dd))
-      : ctGroupFiredWeekly(wk, g.id, kid);
-    return `<span class="qms-chip ${paid ? 'paid' : ''}">${g.icon || '🧺'} ${escapeHtml(g.name || 'Chores')} ${paid ? '✓' : ''}</span>`;
-  }).join(' ');
-  wrap.innerHTML = `<div style="font-weight:800;margin-bottom:0.35rem">💰 Earned this week: $${ctWeekMoney(wk, kid).toFixed(2)}</div>`
-    + `<div class="qms-chips">${chips}</div>`;
+  const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
+  const info = ctWeekInfo();
+  const held = !!(state.shared.chore.meetingsHeld && state.shared.chore.meetingsHeld[wk]);
+  const nConfirmed = [0,1,2,3,4,5,6].filter(mmIsDayConfirmed).length;
+  let days = '';
+  for (let d = 0; d < 7; d++) {
+    const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
+    const k = ctDateToKey(date);
+    const confirmed = mmIsDayConfirmed(d);
+    days += `<button type="button" class="review-day${confirmed ? ' confirmed' : ''}${k === todayKey() ? ' today' : ''}" onclick="openFamilyMeetingAt(1,${d})">
+        <span class="review-day-dow">${DAY_SHORT[d]}</span>
+        <span class="review-day-date">${date.getDate()}</span>
+        <span class="review-day-count">🐥${mmDayPct('jenn', d)}% 🦊${mmDayPct('jess', d)}%</span>
+        <span class="review-day-state">${confirmed ? '✓ Confirmed' : 'Review ›'}</span>
+      </button>`;
+  }
+  const weekLabel = `${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()} – ${MONTH_SHORT[info.sun.getMonth()]} ${info.sun.getDate()}`;
+  const money = ['jenn', 'jess'].map(kid => `${CT_PROFILE_ICON[kid]} $${ctWeekMoney(wk, kid).toFixed(2)}`).join(' · ');
+  const status = held
+    ? `<div class="hub-status hub-status-done">✅ This week is recorded — pocket money was credited at the meeting.</div>`
+    : `<div class="hub-status">${nConfirmed}/7 days confirmed · pocket money so far: ${money}</div>`;
+  const cta = held
+    ? `<button type="button" class="pill-btn" onclick="openFamilyMeeting()">🧑‍🧑‍🧒 Re-open the meeting</button>`
+    : `<button type="button" class="btn-confirm" onclick="openFamilyMeeting()">🧑‍🧑‍🧒 ${nConfirmed > 0 ? 'Continue the' : 'Run'} family meeting</button>`;
+  wrap.innerHTML = `<div class="hub-week">Week of ${weekLabel}</div>
+    <div class="review-day-row">${days}</div>${status}
+    <div style="margin-top:0.6rem">${cta}</div>`;
+}
+// Deep-link into the meeting: used by the hub's day strip to open the exact
+// day a parent wants to review, inside the one-and-only confirm surface.
+function openFamilyMeetingAt(step, day) {
+  if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
+  openFamilyMeeting();
+  mmStep = step;
+  mmSelectedDay = day == null ? null : day;
+  renderMeetingMode();
 }
 function parentOpenChoreReview() {
   profile = 'parent';
@@ -11430,52 +11447,109 @@ async function toggleShareActivity(owner, id) {
   showToast('Updated 🔗');
 }
 
-function renderAnalytics() {
-  const wrap = document.getElementById('analyticsCards');
-  if (!wrap) return;
-  wrap.innerHTML = '';
-  const keys = getDayKeys(weekOffset);
-  const CAT_LABELS = {
-    sleep:'Rest', school:'Learning', active:'Active',
-    free:'Free', daily:'Daily', training:'Training',
-    routine:'Routine', custom:'Custom'
-  };
+/* ── Performance tab — Function 2: analyse PAST weeks ──────────────
+   Read-only analytics over what actually happened: % of planned time
+   completed, routines kept, and money recorded at meetings (from the
+   finalizedWeeks ledger). Nothing here confirms or records a week —
+   that stays in the family meeting. */
+let perfWeekOffset = 0;   // 0 = current week, -1 = last week, …
 
-  ['jenn','jess'].forEach(p=>{
-    const catMin = {};
-    let totalMin = 0;
-    const acts = getAllActivities(p);
-    keys.forEach(k=>{
-      (state.profiles[p]?.weeks?.[k]||[]).forEach(b=>{
-        const act = acts.find(a=>a.id===b.actId);
-        if (!act) return;
-        catMin[act.cat] = (catMin[act.cat]||0) + b.durationMin;
-        totalMin += b.durationMin;
-      });
+function perfMondayKey(offset) {
+  const mon = ctMondayOf(new Date());
+  mon.setDate(mon.getDate() + offset * 7);
+  return ctDateToKey(mon);
+}
+// One kid's numbers for the week starting at monKey.
+function perfWeekStats(monKey, kid) {
+  const mon = formatDayKey(monKey);
+  const acts = getAllActivities(kid);
+  let planned = 0, done = 0;
+  const byCat = {};
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(mon); d.setDate(mon.getDate() + i);
+    (getDayBlocksForProfile(ctDateToKey(d), kid) || []).forEach(b => {
+      const act = acts.find(a => a.id === b.actId);
+      const cat = act ? act.cat : 'custom';
+      const m = b.durationMin || 0;
+      if (!byCat[cat]) byCat[cat] = { planned: 0, done: 0 };
+      byCat[cat].planned += m; planned += m;
+      if (b.completed) { byCat[cat].done += m; done += m; }
     });
+  }
+  const fw = (state.shared.chore.finalizedWeeks || {})[monKey] || {};
+  return { planned, done, byCat, routines: ctMandatoryPoints(monKey, kid), money: fw[kid] };
+}
 
-    const card = document.createElement('div');
-    card.className = 'challenge-card';
-    let rows = '';
-    if (totalMin === 0) {
-      rows = '<p style="color:var(--ink-light);font-size:0.9rem">Nothing planned this week</p>';
-    } else {
-      Object.entries(catMin).sort((a,b)=>b[1]-a[1]).forEach(([cat, min])=>{
-        const pct = Math.round(min/totalMin*100);
-        rows += `
-          <div class="challenge-progress">
-            <span style="min-width:80px;font-size:0.85rem">${CAT_LABELS[cat]||cat}</span>
-            <div class="challenge-bar"><div class="challenge-fill" style="width:${pct}%;background:${CAT_HEX[cat]||'#999'}"></div></div>
-            <span style="font-size:0.85rem">${Math.round(min/60*10)/10}h · ${pct}%</span>
-          </div>`;
-      });
-    }
-    card.innerHTML = `
-      <div class="challenge-title">${p==='jenn'?'🐥 Jenn':'🦊 Jess'} — ${Math.round(totalMin/60*10)/10}h planned</div>
-      ${rows}
-    `;
-    wrap.appendChild(card);
-  });
+function renderPerformance() {
+  ctEnsureShared();
+  renderPerfTrend();
+  renderPerfDetail();
+}
+
+function renderPerfTrend() {
+  const wrap = document.getElementById('perfTrend');
+  if (!wrap) return;
+  const heldMap = state.shared.chore.meetingsHeld || {};
+  let rows = '';
+  for (let off = 0; off > -8; off--) {
+    const monKey = perfMondayKey(off);
+    const mon = formatDayKey(monKey);
+    const j = perfWeekStats(monKey, 'jenn'), s = perfWeekStats(monKey, 'jess');
+    // Hide untouched history weeks, but always show the current one.
+    if (off !== 0 && !j.planned && !s.planned && j.money == null && s.money == null && !j.routines && !s.routines) continue;
+    const bar = (st, cls) => {
+      const pct = st.planned ? Math.round(st.done / st.planned * 100) : 0;
+      return `<span class="perf-track"><span class="perf-fill ${cls}" style="display:block;width:${pct}%"></span></span><span class="perf-num">${st.planned ? pct + '%' : '—'}</span>`;
+    };
+    const money = (st) => st.money != null ? `$${st.money.toFixed(2)}` : '—';
+    rows += `<button type="button" class="perf-row${off === perfWeekOffset ? ' sel' : ''}" onclick="perfSelectWeek(${off})">
+        <span class="perf-week">${off === 0 ? 'This wk' : MONTH_SHORT[mon.getMonth()] + ' ' + mon.getDate()}${heldMap[monKey] ? ' ✅' : ''}</span>
+        ${bar(j, 'mm-bar-j')}${bar(s, 'mm-bar-s')}
+        <span class="perf-money">${money(j)} · ${money(s)}</span>
+      </button>`;
+  }
+  wrap.innerHTML = `<div class="mm-legend"><span><i class="mm-sw mm-bar-j"></i>Jenn</span><span><i class="mm-sw mm-bar-s"></i>Jess</span><span class="mm-legend-note">bars = % of planned time done · ✅ = recorded at a meeting · $ = money recorded (Jenn · Jess)</span></div>
+    <div class="perf-table">${rows}</div>
+    <div class="ct-meta" style="margin-top:0.4rem">Tap a week to see its detail below.</div>`;
+}
+function perfSelectWeek(off) {
+  perfWeekOffset = Math.min(0, off);
+  renderPerfTrend();
+  renderPerfDetail();
+}
+
+function renderPerfDetail() {
+  const wrap = document.getElementById('perfDetail');
+  if (!wrap) return;
+  const monKey = perfMondayKey(perfWeekOffset);
+  const mon = formatDayKey(monKey);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  const CATS = [['school','📘 Learning'],['training','🏋️ Training'],['routine','📋 Routine'],['daily','🧹 Chores'],['free','🎮 Family/Free'],['active','🏃 Active'],['sleep','😴 Rest'],['custom','⭐ Custom']];
+  const kidCard = (kid) => {
+    const st = perfWeekStats(monKey, kid);
+    const maxMin = Math.max(60, ...Object.values(st.byCat).map(v => v.planned));
+    const rows = CATS.filter(([c]) => st.byCat[c] && st.byCat[c].planned > 0).map(([c, label]) => {
+      const p = st.byCat[c].planned, dn = st.byCat[c].done;
+      return `<div class="mm-2b-row"><span class="mm-2b-label">${label}</span>
+          <span class="mm-2b-track"><span class="mm-2b-plan" style="width:${Math.round(p / maxMin * 100)}%"></span><span class="mm-2b-done" style="width:${Math.round(dn / maxMin * 100)}%;background:${CAT_HEX[c] || '#888'}"></span></span>
+          <span class="mm-2b-num">${fmtHrsMin(dn)} / ${fmtHrsMin(p)}</span></div>`;
+    }).join('') || `<div class="ct-meta">Nothing was planned this week.</div>`;
+    const money = st.money != null
+      ? `$${st.money.toFixed(2)} recorded`
+      : (perfWeekOffset === 0 ? `$${ctWeekMoney(monKey, kid).toFixed(2)} preliminary — recorded at the meeting` : 'not recorded');
+    return `<div class="mm-2b-kid">
+        <div class="mm-win-kid">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'} — ${fmtHrsMin(st.done)} / ${fmtHrsMin(st.planned)} done</div>${rows}
+        <div class="perf-facts">✅ ${st.routines}/21 routines kept · 💰 ${money}</div>
+      </div>`;
+  };
+  const label = `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} – ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()}`;
+  wrap.innerHTML = `<div class="perf-detail-nav">
+      <button type="button" class="btn-icon" onclick="perfSelectWeek(${perfWeekOffset - 1})">◀</button>
+      <b>${perfWeekOffset === 0 ? 'This week' : 'Week of ' + label}</b>
+      <button type="button" class="btn-icon" ${perfWeekOffset >= 0 ? 'disabled' : ''} onclick="perfSelectWeek(${perfWeekOffset + 1})">▶</button>
+    </div>
+    <div class="mm-2b">${kidCard('jenn')}${kidCard('jess')}</div>
+    <div class="mm-cap">Solid = done · dashed = planned.</div>`;
 }
 
 function renderRoutinesList() {
@@ -12682,16 +12756,6 @@ function commitFamilyMeeting(wk) {
   c.meetingsHeld[wk] = true;
   saveAll();
   return parts;
-}
-function finalizeFamilyMeeting() {
-  ctEnsureShared();
-  const c = state.shared.chore;
-  const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
-  if (c.meetingsHeld && c.meetingsHeld[wk]) { showToast('Already held this week'); return; }
-  const parts = commitFamilyMeeting(wk);
-  closeSheet('familyMeetingOverlay');
-  renderChoreTab();
-  showToast(`💛 Thanks for helping the family! ${parts.length ? parts.join(' · ') + ' · ' : ''}market now ${marketMonthLabel()}`);
 }
 /* Chore names a parent can pick/assign right now: base defaults + custom,
    minus any they've hidden. (ctAllChoreNames keeps the full union incl.
@@ -14241,6 +14305,12 @@ function closeSheet(id) {
   if (id === 'kidTrainingOverlay') kidTrainingStopwatchClearTick();
   if (id === 'activityOverlay' || id === 'trainingOverlay') cancelCreatePlacement(null, true);
   document.getElementById(id).classList.remove('open');
+  // The meeting is the only surface that confirms days / records the week, so
+  // refresh the parent dashboard's read-only hub whenever the meeting closes.
+  if (id === 'familyMeetingOverlay') {
+    const sp = document.getElementById('screen-parent');
+    if (sp && sp.classList.contains('active')) renderParentHome();
+  }
 }
 function overlayClick(e, id) { if (e.target.classList.contains('overlay')) closeSheet(id); }
 function toggleRepeat(id) {
