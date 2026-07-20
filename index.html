@@ -9871,7 +9871,7 @@ function buildTray() {
   const filtered = acts.filter(a=>{
     if (currentTrayFilter==='all') return true;
     if (currentTrayFilter==='seasonal') return a._seasonal;
-    if (currentTrayFilter==='training') return a.isTraining;
+    if (currentTrayFilter==='training') return a.isTraining || a.cat==='training';
     return a.cat===currentTrayFilter;
   });
 
