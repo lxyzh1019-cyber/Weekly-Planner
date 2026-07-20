@@ -3933,6 +3933,7 @@
       <div class="week-actions">
         <button class="btn-icon btn-icon--labeled" aria-label="Quest Board" onclick="goQuestBoard()" title="Quest Board"><span aria-hidden="true">🎮</span><span class="btn-icon__label">Quests</span></button>
         <button class="btn-icon btn-icon--labeled" aria-label="Weekly Chore" onclick="openChoreTab()" title="Weekly Chore"><span aria-hidden="true">🧹</span><span class="btn-icon__label">Chores</span></button>
+        <button class="btn-icon btn-icon--labeled" aria-label="Bank &amp; Invest" onclick="openMoneyScreen()" title="Bank &amp; Invest"><span aria-hidden="true">🏦</span><span class="btn-icon__label">Bank</span></button>
         <button class="btn-icon btn-icon--labeled" aria-label="Challenges" onclick="openChallenges()" title="Challenges"><span aria-hidden="true">🎯</span><span class="btn-icon__label">Challenge</span></button>
         <button class="btn-icon btn-icon--labeled" aria-label="Sister Sync" onclick="openSisterSync()" title="Sister Sync"><span aria-hidden="true">👯</span><span class="btn-icon__label">Sisters</span></button>
         <button class="btn-icon btn-icon--labeled" aria-label="Print week" onclick="openPrint()" title="Print week"><span aria-hidden="true">🖨</span><span class="btn-icon__label">Print</span></button>
@@ -4053,7 +4054,7 @@
 <div class="screen" id="screen-money">
   <div class="topbar">
     <div class="topbar-left">
-      <button class="btn-icon" onclick="openChoreTab()">◀</button>
+      <button class="btn-icon" onclick="goWeek()">◀</button>
       <h2>Bank &amp; Invest 🏦</h2>
     </div>
     <div class="profile-badge" id="moneyProfileBadge"></div>
@@ -12258,7 +12259,20 @@ function bankConfig() {
   if (c.bank.marketMonth == null) c.bank.marketMonth = 0;
   if (c.bank.savingsRate == null) c.bank.savingsRate = BANK_DEFAULTS.savingsRate;
   if (!c.bank.gicRates) c.bank.gicRates = { ...BANK_DEFAULTS.gicRates };
+  // Anchor the sim clock to the real calendar the first time it runs, so the
+  // date starts at "this month, this year" and advances with each meeting —
+  // instead of being permanently stuck at "Jan 2023".
+  if (c.bank.startYear == null || c.bank.startMonth == null) {
+    const now = new Date();
+    c.bank.startYear = now.getFullYear();
+    c.bank.startMonth = now.getMonth();
+  }
   return c.bank;
+}
+/* Which of the 12 historical price columns the current sim month maps to. */
+function marketMonthIndex() {
+  const cfg = bankConfig();
+  return ((cfg.startMonth + cfg.marketMonth) % 12 + 12) % 12;
 }
 function ensureWallet(kid) {
   const p = getProfData(kid);
@@ -12268,10 +12282,17 @@ function ensureWallet(kid) {
   return p.wallet;
 }
 function stockPrice(ticker, monthOverride) {
-  const m = ((monthOverride != null ? monthOverride : bankConfig().marketMonth) % 12 + 12) % 12;
+  const cfg = bankConfig();
+  const simMonth = (monthOverride != null ? monthOverride : cfg.marketMonth);
+  const m = ((cfg.startMonth + simMonth) % 12 + 12) % 12;
   return STOCKS_2023[ticker].prices[m];
 }
-function marketMonthLabel() { return MONEY_MONTHS[bankConfig().marketMonth % 12] + ' 2023'; }
+function marketMonthLabel() {
+  const cfg = bankConfig();
+  const total = cfg.startMonth + cfg.marketMonth;
+  const year = cfg.startYear + Math.floor(total / 12);
+  return MONEY_MONTHS[((total % 12) + 12) % 12] + ' ' + year;
+}
 function portfolioValue(kid) {
   const w = ensureWallet(kid);
   return money2(Object.keys(w.holdings).reduce((s, t) => s + (w.holdings[t] || 0) * stockPrice(t), 0));
@@ -12389,7 +12410,7 @@ function renderMoneyScreen() {
       <span style="display:flex;gap:0.3rem"><button class="btn-icon" aria-label="Buy ${t}" onclick="moneyBuyPrompt('${t}')">＋</button>${sh > 0 ? `<button class="btn-icon" aria-label="Sell ${t}" onclick="moneySellPrompt('${t}')">－</button>` : ''}</span></div>`;
   }).join('');
   html += `<div class="chore-card"><h3>📈 Stocks — ${marketMonthLabel()}</h3>
-    <div class="ct-meta">Real 2023 prices — they go up AND down. Invest any dollar amount (fractional shares).</div>
+    <div class="ct-meta">Real historical prices — they go up AND down. Invest any dollar amount (fractional shares).</div>
     ${stockRows}
     <div class="ct-meta" style="margin-top:0.3rem">Portfolio value: <b>$${portfolioValue(kid).toFixed(2)}</b></div></div>`;
   if (isParent()) {
