@@ -839,6 +839,26 @@
     outline-offset: 2px;
   }
 
+  /* ═══════════ QUICK PROFILE SWITCHER ═══════════ */
+  .profile-switch-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.3rem; }
+  .profile-switch-opt {
+    display: flex; align-items: center; gap: 0.7rem;
+    width: 100%; text-align: left;
+    background: var(--paper-card, #fffdf5);
+    border: 2px solid var(--ink); border-radius: 14px;
+    padding: 0.7rem 0.9rem; cursor: pointer;
+    font-family: 'Patrick Hand', sans-serif; font-weight: 800;
+    color: var(--ink); box-shadow: 2px 2px 0 var(--ink);
+    transition: transform 0.12s, box-shadow 0.12s;
+  }
+  .profile-switch-opt:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); background: var(--accent-yellow); }
+  .profile-switch-opt.current { background: var(--accent-yellow); }
+  .profile-switch-opt .ps-emoji { font-size: 1.7rem; line-height: 1; flex-shrink: 0; }
+  .profile-switch-opt .ps-name { font-size: 1.2rem; flex: 1; }
+  .profile-switch-opt .ps-check { font-size: 1.3rem; font-weight: 900; color: var(--accent-strong, #c14a24); }
+  .profile-switch-opt.ps-more { background: transparent; box-shadow: none; border-style: dashed; font-weight: 700; }
+  .profile-switch-opt.ps-more .ps-name { font-size: 1rem; color: var(--ink-light); }
+
   /* ═══════════ STATUS DOT (sync) ═══════════ */
   .sync-dot {
     width: 8px; height: 8px; border-radius: 50%;
@@ -3922,7 +3942,7 @@
   <div class="topbar week-topbar">
     <div class="week-topbar__row1">
       <div class="topbar-left">
-        <button class="profile-badge" onclick="goProfile()" id="weekProfileBadge" aria-label="Switch profile"></button>
+        <button class="profile-badge" onclick="openProfileSwitcher()" id="weekProfileBadge" aria-label="Switch profile"></button>
         <h2>My Week</h2>
       </div>
       <div class="week-nav week-nav--inline">
@@ -4071,6 +4091,15 @@
   </div>
 </div>
 
+<!-- Quick profile switcher (tap the profile icon) -->
+<div class="overlay" id="profileSwitchOverlay" onclick="overlayClick(event,'profileSwitchOverlay')">
+  <div class="sheet sheet--compact">
+    <div class="sheet-handle"></div>
+    <h3>Switch profile 👤</h3>
+    <div class="profile-switch-list" id="profileSwitchBody"></div>
+  </div>
+</div>
+
 <!-- ═══════════════════════════════════════════════════════
      SCREEN: DAY EDITOR
 ════════════════════════════════════════════════════════ -->
@@ -4098,7 +4127,7 @@
         <button class="btn-icon" id="restDayBtn" onclick="toggleRestDay(currentDayKey)" aria-label="Mark rest day" title="Mark today a rest day">😌 Rest</button>
         <button class="btn-icon" onclick="openTemplateSheet()" aria-label="Apply template">📋</button>
         <button class="btn-icon" onclick="openReflectSheet()" aria-label="Reflect on today">🌙</button>
-        <button class="profile-badge" onclick="goProfile()" id="dayProfileBadge" aria-label="Switch profile"></button>
+        <button class="profile-badge" onclick="openProfileSwitcher()" id="dayProfileBadge" aria-label="Switch profile"></button>
       </div>
     </div>
     <div class="day-topbar__row2">
@@ -6789,6 +6818,34 @@ function goProfile() {
   // Lock parent mode again when leaving the profile picker
   parentUnlockedThisSession = false;
   profile=null; selectedActivity=null; showScreen('profile');
+}
+
+/* Quick profile switcher popup — tapping the profile icon pops up a small
+   window to hop between Jenn, Jess and Parent Mode without leaving the current
+   view for the full profile screen. */
+function openProfileSwitcher() {
+  const cur = activeProfile();
+  const parentNow = isParent();
+  const opt = (p, emoji, name) => {
+    const on = !parentNow && cur === p;
+    return `<button type="button" class="profile-switch-opt${on ? ' current' : ''}" onclick="pickProfileFromSwitcher('${p}')">`
+      + `<span class="ps-emoji">${emoji}</span><span class="ps-name">${name}</span>`
+      + `${on ? '<span class="ps-check">✓</span>' : ''}</button>`;
+  };
+  const body = document.getElementById('profileSwitchBody');
+  body.innerHTML =
+    opt('jenn', '🐥', 'Jenn') +
+    opt('jess', '🦊', 'Jess') +
+    `<button type="button" class="profile-switch-opt${parentNow ? ' current' : ''}" onclick="pickProfileFromSwitcher('parent')">`
+      + `<span class="ps-emoji">🧑‍🧑‍🧒</span><span class="ps-name">Parent Mode</span>`
+      + `${parentNow ? '<span class="ps-check">✓</span>' : ''}</button>` +
+    `<button type="button" class="profile-switch-opt ps-more" onclick="closeSheet('profileSwitchOverlay'); goProfile();">`
+      + `<span class="ps-emoji">👤</span><span class="ps-name">Full profile screen…</span></button>`;
+  openSheet('profileSwitchOverlay');
+}
+async function pickProfileFromSwitcher(p) {
+  closeSheet('profileSwitchOverlay');
+  await selectProfile(p);
 }
 function goWeek()    { selectedActivity=null; showScreen('week'); renderWeek(); }
 function openChoreTab() {
