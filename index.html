@@ -4650,7 +4650,7 @@
 <div class="overlay" id="trainingOverlay" onclick="overlayClick(event,'trainingOverlay')">
   <div class="sheet">
     <div class="sheet-handle"></div>
-    <h3 id="trainingSheetTitle">🏋️ Practice Session</h3>
+    <h3 id="trainingSheetTitle">🏋️ Competitive Sports Session</h3>
 
     <h4>START TIME</h4>
     <div id="trainingStartPicker"></div>
@@ -5045,7 +5045,7 @@
         <option value="active">🏃 Active</option>
         <option value="free" selected>🎮 Free Time</option>
         <option value="daily">🍽 Daily</option>
-        <option value="training">🏋️ Practice</option>
+        <option value="training">🏋️ Competitive Sports</option>
         <option value="competition">🏆 Competition</option>
       </select>
     </div>
@@ -5086,7 +5086,7 @@
         <option value="active">🏃 Active</option>
         <option value="free" selected>🎮 Free Time</option>
         <option value="daily">🍽 Daily</option>
-        <option value="training">🏋️ Practice</option>
+        <option value="training">🏋️ Competitive Sports</option>
         <option value="competition">🏆 Competition</option>
       </select>
       <label>Visibility</label>
@@ -5437,7 +5437,7 @@ const TRAINING_TAGS = [
   { id:'skating',  label:'⛸ Skating',  name:'Skating',  icon:'⛸', colour:'#8a6fd0' },
   { id:'swimming', label:'🏊 Swimming', name:'Swimming', icon:'🏊', colour:'#2f9fd0' },
   { id:'dryland',  label:'💪 Dryland', name:'Dryland',  icon:'💪', colour:'#e08a3a' },
-  { id:'general',  label:'🏃 General', name:'Practice', icon:'🏃', colour:'#ef476f' },
+  { id:'general',  label:'🏃 General', name:'Competitive Sports', icon:'🏃', colour:'#ef476f' },
 ];
 function getTrainingTopic(tag) {
   return TRAINING_TAGS.find(t => t.id === tag) || TRAINING_TAGS[3];
@@ -5537,7 +5537,7 @@ const DEFAULT_ACTIVITIES = [
   { id:'french',     name:'French Adventure',  icon:'🇫🇷', cat:'school',   durationMin:60, suitableTime:['after-school','weekend','evening'] },
   { id:'chinese',    name:'Chinese Adventure', icon:'🇨🇳', cat:'school',   durationMin:60, suitableTime:['after-school','weekend','evening'] },
   { id:'math',       name:'Math Adventure',    icon:'🦘', cat:'school',   durationMin:60, suitableTime:['after-school','weekend','evening'] },
-  { id:'training',   name:'Practice',          icon:'🏋️', cat:'training', durationMin:120, isTraining:true, suitableTime:['after-school','weekend'] },
+  { id:'training',   name:'Competitive Sports', icon:'🏋️', cat:'training', durationMin:120, isTraining:true, suitableTime:['after-school','weekend'] },
   { id:'competition', name:'Competition',      icon:'🏆', cat:'competition', durationMin:480, isTraining:true, isCompetition:true, suitableTime:['weekend'] },
   { id:'relax',      name:'Muscle Relaxation', icon:'🧘', cat:'active',   durationMin:60, suitableTime:['after-school','evening','weekend'] },
   { id:'break_quick', name:'Quick Break',     icon:'☕', cat:'free',     durationMin:15, suitableTime:['before-school','school','after-school','evening','weekend'], quickBreak:true },
@@ -7489,7 +7489,7 @@ function renderWeekGlance(keys) {
   const acts = getAllActivities();
   const CAT_LABELS = {
     sleep:'😴 Rest', school:'📚 Learning', active:'🏃 Active',
-    free:'🎮 Free', daily:'🍽 Daily', training:'🏋️ Practice',
+    free:'🎮 Free', daily:'🍽 Daily', training:'🏋️ Competitive Sports',
     competition:'🏆 Competition', routine:'📋 Routine', custom:'✨ Custom'
   };
   const t = computeWeekTotals(keys);
@@ -7559,7 +7559,7 @@ function computeWeekWins(keys) {
 function openWeeklyWins() {
   const keys = getDayKeys(weekOffset);
   const w = computeWeekWins(keys);
-  const CAT_LABELS = { school:'📚 Learning', active:'🏃 Active', free:'🎮 Free', daily:'🍽 Daily', routine:'📋 Routines', training:'🏋️ Practice', competition:'🏆 Competition', sleep:'😴 Rest', custom:'✨ Other' };
+  const CAT_LABELS = { school:'📚 Learning', active:'🏃 Active', free:'🎮 Free', daily:'🍽 Daily', routine:'📋 Routines', training:'🏋️ Competitive Sports', competition:'🏆 Competition', sleep:'😴 Rest', custom:'✨ Other' };
   const pct = w.total ? Math.round(w.done / w.total * 100) : 0;
   const cheer = pct >= 80 ? 'Incredible week! 🌟' : pct >= 50 ? 'Great effort this week! 💪' : w.done > 0 ? 'Every finished task counts 💛' : 'A fresh week ahead — you’ve got this!';
   const catLines = Object.keys(w.byCat).sort((a,b)=>w.byCat[b]-w.byCat[a])
@@ -7829,7 +7829,7 @@ function renderTimeGrid(keys) {
     } else {
       legend.style.display = 'flex';
       legend.innerHTML = [
-        ['school', '📚 Learning'], ['training', '🏋️ Practice'], ['competition', '🏆 Competition'],
+        ['school', '📚 Learning'], ['training', '🏋️ Competitive Sports'], ['competition', '🏆 Competition'],
         ['routine', '📋 Routine'], ['active', '🏃 Active'], ['daily', '🍽 Daily'],
       ].map(([cat, label]) =>
         `<span class="tg-legend-chip"><span class="tg-legend-dot" style="background:${CAT_HEX[cat] || '#999'}"></span>${label}</span>`
@@ -8242,7 +8242,7 @@ function renderFullWeek(keys) {
       const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
       const bg = topic ? trainingBlockColour(b) : (b.colour || CAT_HEX[act.cat] || '#888');
       const dispIcon = topic ? topic.icon : act.icon;
-      // Competition shares the sport topic's icon/colour/name with Practice,
+      // Competition shares the sport topic's icon/colour/name with Competitive Sports,
       // so a 🏆 prefix keeps it visually distinct at a glance.
       const dispName = (topic ? topic.name : act.name) + (act.isCompetition ? ' 🏆' : '');
       const card = document.createElement('div');
@@ -9077,7 +9077,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
 
   let badges = '';
   // (Training sport is shown by the block's own icon now, so no separate badge.)
-  // Competition shares the sport's topic icon/colour/name with Practice, so it
+  // Competition shares the sport's topic icon/colour/name with Competitive Sports, so it
   // needs its own badge to stay visually distinct at a glance.
   if (!isBuffer && act.isCompetition) badges += '<span class="badge" title="Competition">🏆</span>';
   if (b.objectives?.length) badges += '<span class="badge">🎯</span>';
@@ -9576,7 +9576,7 @@ function renderSlotPicker() {
   const filters = [
     {id:'all', label:'All'}, {id:'daily', label:'🍽 Daily'}, {id:'routine', label:'🌅 Routines'},
     {id:'school', label:'📚 Learning'}, {id:'active', label:'🏃 Active'},
-    {id:'training', label:'🏋️ Practice'}, {id:'competition', label:'🏆 Competition'}, {id:'free', label:'🎮 Free'},
+    {id:'training', label:'🏋️ Competitive Sports'}, {id:'competition', label:'🏆 Competition'}, {id:'free', label:'🎮 Free'},
   ];
   filterWrap.innerHTML = '';
   filters.forEach(f => {
@@ -9913,7 +9913,7 @@ function buildTray() {
     {id:'routine', label:'🌅 Routines'},
     {id:'school', label:'📚 Learning'},
     {id:'active', label:'🏃 Active'},
-    {id:'training', label:'🏋️ Practice'},
+    {id:'training', label:'🏋️ Competitive Sports'},
     {id:'competition', label:'🏆 Competition'},
     {id:'free', label:'🎮 Free'},
     {id:'seasonal', label:'🌟 Seasonal'},
@@ -9933,7 +9933,7 @@ function buildTray() {
     if (currentTrayFilter==='all') return true;
     if (currentTrayFilter==='seasonal') return a._seasonal;
     // Category is the source of truth — isTraining is a shared UI mechanism
-    // (objectives/gear/tags) between Practice and Competition, not a category.
+    // (objectives/gear/tags) between Competitive Sports and Competition, not a category.
     return a.cat===currentTrayFilter;
   });
 
@@ -9999,7 +9999,7 @@ function openTrainingSheet() { renderTrainingSheet(); openSheet('trainingOverlay
 function renderTrainingSheet() {
   const isCompetition = !!(selectedActivity && selectedActivity.isCompetition);
   const titleEl = document.getElementById('trainingSheetTitle');
-  if (titleEl) titleEl.textContent = isCompetition ? '🏆 Competition' : '🏋️ Practice Session';
+  if (titleEl) titleEl.textContent = isCompetition ? '🏆 Competition' : '🏋️ Competitive Sports Session';
 
   // Start time picker
   renderStartTimePicker('trainingStartPicker', pendingStartMin, (m)=>{ pendingStartMin = m; renderTrainingSheet(); });
@@ -10162,7 +10162,7 @@ function confirmTraining() {
     repeatDateEnd:   dateEnd   || null,
   });
   closeSheet('trainingOverlay');
-  showToast(selectedActivity && selectedActivity.isCompetition ? 'Competition placed 🏆' : 'Practice placed 🏋️');
+  showToast(selectedActivity && selectedActivity.isCompetition ? 'Competition placed 🏆' : 'Competitive Sports placed 🏋️');
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -12316,7 +12316,7 @@ function renderPerfDetail() {
   const monKey = perfMondayKey(perfWeekOffset);
   const mon = formatDayKey(monKey);
   const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-  const CATS = [['school','📘 Learning'],['training','🏋️ Practice'],['competition','🏆 Competition'],['routine','📋 Routine'],['daily','🧹 Chores'],['free','🎮 Family/Free'],['active','🏃 Active'],['sleep','😴 Rest'],['custom','⭐ Custom']];
+  const CATS = [['school','📘 Learning'],['training','🏋️ Competitive Sports'],['competition','🏆 Competition'],['routine','📋 Routine'],['daily','🧹 Chores'],['free','🎮 Family/Free'],['active','🏃 Active'],['sleep','😴 Rest'],['custom','⭐ Custom']];
   const kidCard = (kid) => {
     const st = perfWeekStats(monKey, kid);
     const maxMin = Math.max(60, ...Object.values(st.byCat).map(v => v.planned));
@@ -13447,7 +13447,7 @@ function mmRenderCelebrate(wk) {
 }
 function mm2b(kid) {
   const info = ctWeekInfo();
-  const CATS = [['school','📘 Learning'],['training','🏋️ Practice'],['competition','🏆 Competition'],['routine','📋 Routine'],['daily','🧹 Chores'],['free','🎮 Family/Free'],['active','🏃 Active']];
+  const CATS = [['school','📘 Learning'],['training','🏋️ Competitive Sports'],['competition','🏆 Competition'],['routine','📋 Routine'],['daily','🧹 Chores'],['free','🎮 Family/Free'],['active','🏃 Active']];
   const planned = {}, done = {};
   const acts = getAllActivities(kid);
   info.keys.forEach(key => {
@@ -15073,7 +15073,7 @@ function renderPrintSheet() {
 function buildPrintSummary(keys, acts, winStartMin, winEndMin) {
   const CAT_LABELS = {
     sleep:'😴 Rest', school:'📚 Learning', active:'🏃 Active',
-    free:'🎮 Free', daily:'🍽 Daily', training:'🏋️ Practice',
+    free:'🎮 Free', daily:'🍽 Daily', training:'🏋️ Competitive Sports',
     competition:'🏆 Competition', routine:'📋 Routine', custom:'✨ Custom'
   };
   const catMin = {};
