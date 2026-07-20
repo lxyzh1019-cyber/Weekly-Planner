@@ -1862,18 +1862,39 @@
     opacity: 0.9; white-space: nowrap;
   }
   .wf-card--slim .wf-card-travel, .wf-card--xslim .wf-card-travel { display: none; }
-  /* Hatched travel/get-ready strips hugging a card in the week lane */
+  /* Buffer/conflict warning badge inline on the card name */
+  .wf-card-conflict-badge { margin-left: 3px; font-size: 0.68rem; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); }
+  .wf-card--slim .wf-card-conflict-badge, .wf-card--xslim .wf-card-conflict-badge { display: none; }
+  .wf-card--conflict { outline: 2px solid #d6453a; outline-offset: 1px; }
+  /* Hatched travel/get-ready strips hugging a card in the week lane — tinted
+     to the activity's own colour so it reads as "part of that block" rather
+     than a generic grey stripe. */
   .wf-travel {
+    --wf-travel-colour: #5a4d41;
     position: absolute;
     box-sizing: border-box;
     border-radius: 5px;
     background: repeating-linear-gradient(-45deg,
-      rgba(90,77,65,0.16) 0 4px, rgba(90,77,65,0.04) 4px 8px);
-    border: 1px dashed rgba(42,35,32,0.4);
-    color: #5a4d41;
+      color-mix(in srgb, var(--wf-travel-colour) 45%, transparent) 0 4px,
+      color-mix(in srgb, var(--wf-travel-colour) 15%, transparent) 4px 8px);
+    border: 1px dashed color-mix(in srgb, var(--wf-travel-colour) 75%, black 15%);
+    color: color-mix(in srgb, var(--wf-travel-colour) 80%, black 25%);
     font-size: 0.58rem; font-weight: 800; line-height: 1;
     display: flex; align-items: center; justify-content: center;
     overflow: hidden; pointer-events: none; z-index: 1;
+  }
+  /* Buffer overlaps another activity — there isn't actually enough time */
+  .wf-travel--conflict {
+    background: repeating-linear-gradient(-45deg,
+      rgba(214,69,58,0.55) 0 4px, rgba(214,69,58,0.22) 4px 8px);
+    border: 1.5px dashed #d6453a;
+    color: #7a1f18;
+    z-index: 2;
+    animation: wf-conflict-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes wf-conflict-pulse {
+    0%, 100% { box-shadow: 0 0 0 rgba(214,69,58,0); }
+    50% { box-shadow: 0 0 0 3px rgba(214,69,58,0.35); }
   }
   /* Quick-complete tick in the card corner — check off without opening detail */
   .wf-card-check {
@@ -2493,6 +2514,19 @@
     opacity: 0.42;
   }
   .placed-block.travel-buf:hover { transform: none; box-shadow: none; }
+  /* Buffer overlaps an adjacent activity — not enough real time to travel or
+     get ready. Full opacity + red dashed border so it can't be missed. */
+  .placed-block.travel-buf.travel-buf--conflict {
+    opacity: 0.85;
+    background: repeating-linear-gradient(-45deg,
+      rgba(214,69,58,0.55) 0 5px, rgba(214,69,58,0.22) 5px 10px) !important;
+    border-color: #d6453a;
+    border-width: 2px;
+    color: #7a1f18;
+    animation: wf-conflict-pulse 1.6s ease-in-out infinite;
+  }
+  /* Activity itself touched by a conflicting buffer (its own or a neighbour's) */
+  .placed-block.placed-block--conflict { outline: 2px solid #d6453a; outline-offset: -1px; }
   .block-badges { display:flex; gap: 3px; }
   .badge { font-size: 0.75rem; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2)); }
 
@@ -5711,6 +5745,31 @@ function getGetReadyBufMin(block) {
   if (!block || !block.getReadyBuffer) return 0;
   return clampBufferMin(block.getReadyBufMin != null ? block.getReadyBufMin : DEFAULT_BUFFER_MIN);
 }
+/* A block's travel/get-ready buffer needs real, unoccupied time right before
+   and after the activity. If that buffer window overlaps another block's own
+   time, the plan isn't actually workable (e.g. "leave by 5:30" but the next
+   activity already starts at 5:30) — surface it instead of letting it be
+   discovered by showing up late. Returns { perBlock: Map(id -> {pre,post}),
+   affected: Set(ids of every block touched by a conflict, either side) }. */
+function computeBufferConflicts(blocks) {
+  const perBlock = new Map();
+  const affected = new Set();
+  (blocks || []).forEach(b => {
+    const buf = getTravelBufMin(b) + getGetReadyBufMin(b);
+    if (buf <= 0) return;
+    const preStart = b.startMin - buf, preEnd = b.startMin;
+    const postStart = b.startMin + (b.durationMin || 0), postEnd = postStart + buf;
+    let pre = false, post = false;
+    (blocks || []).forEach(o => {
+      if (o.id === b.id) return;
+      const oStart = o.startMin, oEnd = o.startMin + (o.durationMin || 0);
+      if (preStart < oEnd && preEnd > oStart) { pre = true; affected.add(o.id); }
+      if (postStart < oEnd && postEnd > oStart) { post = true; affected.add(o.id); }
+    });
+    if (pre || post) { perBlock.set(b.id, { pre, post }); affected.add(b.id); }
+  });
+  return { perBlock, affected };
+}
 let localSaveFailed = false;
 function saveLocal() {
   try {
@@ -7949,11 +8008,11 @@ function wfBufferSegments(b) {
   const relEnd = relStart + dur;
   const segs = [];
   // Before: [get-ready][travel][ACTIVITY]
-  if (travelMin > 0) segs.push({ startRel: relStart - travelMin, dur: travelMin, icon: '🚗', min: travelMin, kind: 'travel' });
-  if (readyMin  > 0) segs.push({ startRel: relStart - travelMin - readyMin, dur: readyMin, icon: '👕', min: readyMin, kind: 'ready' });
+  if (travelMin > 0) segs.push({ startRel: relStart - travelMin, dur: travelMin, icon: '🚗', min: travelMin, kind: 'travel', side: 'pre' });
+  if (readyMin  > 0) segs.push({ startRel: relStart - travelMin - readyMin, dur: readyMin, icon: '👕', min: readyMin, kind: 'ready', side: 'pre' });
   // After: [ACTIVITY][travel][get-ready]
-  if (travelMin > 0) segs.push({ startRel: relEnd, dur: travelMin, icon: '🚗', min: travelMin, kind: 'travel' });
-  if (readyMin  > 0) segs.push({ startRel: relEnd + travelMin, dur: readyMin, icon: '👕', min: readyMin, kind: 'ready' });
+  if (travelMin > 0) segs.push({ startRel: relEnd, dur: travelMin, icon: '🚗', min: travelMin, kind: 'travel', side: 'post' });
+  if (readyMin  > 0) segs.push({ startRel: relEnd + travelMin, dur: readyMin, icon: '👕', min: readyMin, kind: 'ready', side: 'post' });
   return segs;
 }
 
@@ -8105,17 +8164,25 @@ function renderFullWeek(keys) {
 
     const blocks = (getDayBlocks(key) || []).slice().sort((a,b)=>a.startMin - b.startMin);
     const cols = wfAssignColumns(blocks);
+    const bufferConflicts = computeBufferConflicts(blocks);
 
     // Travel / get-ready strips (underneath cards), stacked so getting ready and
-    // driving never share the same minutes.
+    // driving never share the same minutes. Coloured to match the activity
+    // they belong to, and flagged red when they'd overlap another activity —
+    // i.e. there isn't actually enough time to travel/get ready.
     blocks.forEach(b => {
+      const act = acts.find(a=>a.id===b.actId);
+      const topic = act && act.isTraining ? getTrainingTopic(b.tag) : null;
+      const segColour = topic ? trainingBlockColour(b) : (b.colour || (act && CAT_HEX[act.cat]) || '#888');
+      const bc = bufferConflicts.perBlock.get(b.id);
       wfBufferSegments(b).forEach(seg => {
         const segS = Math.max(seg.startRel, 0);
         const segE = Math.min(seg.startRel + seg.dur, DAY_MIN_SPAN);
         if (segE - segS < 2) return;
         const topPx = segS * PX_PER_MIN;
         const hPx = (segE - segS) * PX_PER_MIN;
-        cell.appendChild(wfTravelStrip(topPx, hPx, '2px', 'calc(100% - 4px)', seg.icon, seg.min));
+        const segConflict = !!bc && (seg.side === 'pre' ? bc.pre : bc.post);
+        cell.appendChild(wfTravelStrip(topPx, hPx, '2px', 'calc(100% - 4px)', seg.icon, seg.min, segColour, segConflict));
       });
     });
 
@@ -8145,6 +8212,8 @@ function renderFullWeek(keys) {
       if (pxHeight < 22) cls += ' wf-card--xslim';
       if (pxHeight < 16) cls += ' wf-card--icononly'; // too short for a name → icon only
       if (b.completed) cls += ' wf-card--done';
+      const hasConflict = bufferConflicts.affected.has(b.id);
+      if (hasConflict) cls += ' wf-card--conflict';
       card.className = cls;
 
       const slot = cols.get(b.id) || { col: 0, count: 1 };
@@ -8164,16 +8233,18 @@ function renderFullWeek(keys) {
       card.style.background = bg;
       const travelTag = bufBefore > 0 ? `<span class="wf-card-travel">${travelMin ? '🚗' : '👕'}${bufBefore}m</span>` : '';
       const stampEmoji = b.parentStamp && b.parentStamp.emoji ? b.parentStamp.emoji + ' ' : '';
+      const conflictTag = hasConflict ? `<span class="wf-card-conflict-badge" title="Not enough travel/get-ready time — overlaps another activity">⚠️</span>` : '';
       card.innerHTML = `
         <div class="wf-card-time">${timeStr}</div>
         <div class="wf-card-icon">${dispIcon}</div>
-        <div class="wf-card-name">${stampEmoji}${dispName}${travelTag}</div>
+        <div class="wf-card-name">${stampEmoji}${dispName}${travelTag}${conflictTag}</div>
         <div class="wf-card-dur">${formatDuration(b.durationMin)}</div>
         <button type="button" class="wf-card-check" aria-label="${b.completed?'Mark not done':'Mark done'}"
           onclick="toggleBlockDone('${key}','${b.id}',event)">${b.completed?'✓':''}</button>
       `;
       card.title = `${dispIcon} ${dispName} — ${timeStr}, ${formatDuration(b.durationMin)}`
-        + (bufBefore > 0 ? ` · ${travelMin ? '🚗 travel' : '👕 get-ready'} ${bufBefore} min each way` : '');
+        + (bufBefore > 0 ? ` · ${travelMin ? '🚗 travel' : '👕 get-ready'} ${bufBefore} min each way` : '')
+        + (hasConflict ? ' · ⚠️ overlaps another activity — not enough time' : '');
       attachTapGuard(card, ()=> openDayFromWeekCard(key, ci, b.id));
       cell.appendChild(card);
     });
@@ -8185,15 +8256,16 @@ function renderFullWeek(keys) {
 /* Build one travel/get-ready buffer strip for the weekly view. Positioned in
    px within the zone cell, hugging the card it belongs to. Non-interactive so
    taps fall through to the card/cell underneath. */
-function wfTravelStrip(topPx, hPx, leftCss, widthCss, icon, min) {
+function wfTravelStrip(topPx, hPx, leftCss, widthCss, icon, min, colour, conflict) {
   const s = document.createElement('div');
-  s.className = 'wf-travel' + (hPx >= 14 ? ' wf-travel--label' : '');
+  s.className = 'wf-travel' + (hPx >= 14 ? ' wf-travel--label' : '') + (conflict ? ' wf-travel--conflict' : '');
   s.style.top = topPx + 'px';
   s.style.height = hPx + 'px';
   s.style.left = leftCss;
   s.style.width = widthCss;
-  if (hPx >= 14) s.textContent = `${icon}${min}m`;
-  s.title = `Travel / get-ready — ${min} min`;
+  if (colour && !conflict) s.style.setProperty('--wf-travel-colour', colour);
+  if (hPx >= 14) s.textContent = `${conflict ? '⚠️' : icon}${min}m`;
+  s.title = (conflict ? '⚠️ Overlaps another activity — not enough time. ' : '') + `Travel / get-ready — ${min} min`;
   return s;
 }
 
@@ -8623,7 +8695,10 @@ function buildTimeline() {
     const bEnd   = bStart + b.durationMin;
     return bEnd > zMinStart && bStart < zMinEnd;
   });
-  renderBlocksWithCollision(canvas, visibleBlocks, zMinStart);
+  // A block's travel/get-ready buffer can overlap an adjacent activity — flag
+  // both the buffer strip and the activity it collides with.
+  const bufferConflicts = computeBufferConflicts(blocks);
+  renderBlocksWithCollision(canvas, visibleBlocks, zMinStart, bufferConflicts.affected);
 
   if (!blocks.length) {
     const emptyState = document.createElement('div');
@@ -8638,7 +8713,7 @@ function buildTimeline() {
   // Travel buffers (rendered underneath, not counted for collision)
   blocks.forEach(b => {
     if (!b.travelBuffer && !b.getReadyBuffer) return;
-    renderTravelBuffers(canvas, b, zMinStart, zMinEnd);
+    renderTravelBuffers(canvas, b, zMinStart, zMinEnd, bufferConflicts.perBlock.get(b.id));
   });
 
   // Pending invitations from sister — render as dashed-border blocks
@@ -8858,8 +8933,10 @@ function zoneRangeMin(z) {
   return [0, DAY_MIN_SPAN];
 }
 
-/* Greedy column-packing collision: blocks that overlap get assigned to columns */
-function renderBlocksWithCollision(canvas, blocks, zMinStart) {
+/* Greedy column-packing collision: blocks that overlap get assigned to columns.
+   conflictAffectedIds (optional Set) flags blocks whose buffer overlaps a
+   neighbour, or that a neighbour's buffer overlaps — surfaced as a badge. */
+function renderBlocksWithCollision(canvas, blocks, zMinStart, conflictAffectedIds) {
   if (!blocks.length) return;
 
   // Build overlap groups
@@ -8899,12 +8976,12 @@ function renderBlocksWithCollision(canvas, blocks, zMinStart) {
 
     g.blocks.forEach(b=>{
       const colIdx = assignments.get(b.id);
-      renderBlockPixel(canvas, b, zMinStart, colIdx, colCount);
+      renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffectedIds);
     });
   });
 }
 
-function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
+function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffectedIds) {
   const act = getAllActivities().find(a=>a.id===b.actId);
   if (!act) return;
 
@@ -8939,11 +9016,13 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
   const topic = (act.isTraining) ? getTrainingTopic(b.tag) : null;
   const blockBg = topic ? trainingBlockColour(b) : (b.colour || CAT_HEX[act.cat] || '#888');
   const dispIcon = topic ? topic.icon : act.icon;
+  const hasConflict = !isBuffer && !!(conflictAffectedIds && conflictAffectedIds.has(b.id));
   blockEl.className = 'placed-block'
-    +(isBuffer ? ` travel-buf travel-buf--centered${b._bufferCls ? ' '+b._bufferCls : ''}` : '')
+    +(isBuffer ? ` travel-buf travel-buf--centered${b._bufferCls ? ' '+b._bufferCls : ''}${b._bufferConflict ? ' travel-buf--conflict' : ''}` : '')
     +(b.parentPinned?' parent-pinned':'')
     +(b.completed?' placed-block--completed':'')
     +(isLightColour(blockBg)?' light-bg':'')
+    +(hasConflict ? ' placed-block--conflict' : '')
     +(isCompact?' compact':'')+fontTier;
   blockEl.id = 'block-'+b.id;
   blockEl.style.background = blockBg;
@@ -8961,6 +9040,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
   if (b.note) badges += '<span class="badge">📝</span>';
   if (b.parentPinned) badges += '<span class="badge">📌</span>';
   if (!isBuffer && b.travelBuffer) badges += '<span class="badge">🚗</span>';
+  if (hasConflict) badges += '<span class="badge" title="Not enough travel/get-ready time — overlaps another activity">⚠️</span>';
   if (b.public) badges += '<span class="badge">👯</span>';
   if (Array.isArray(b.invitedTo) && b.invitedTo.length) badges += '<span class="badge">💌</span>';
   if (b.seriesId) badges += '<span class="badge">🔁</span>';
@@ -9029,7 +9109,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
   if (!isBuffer) renderDoodle(canvas, b.id, top, height, leftPct, widthPct);
 }
 
-function renderTravelBuffers(canvas, b, zMinStart, zMinEnd) {
+function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict) {
   const travelBuf = getTravelBufMin(b);
   const readyBuf = getGetReadyBufMin(b);
   const endMin = b.startMin + b.durationMin;
@@ -9039,28 +9119,32 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd) {
   // the block: [get ready][travel][ACTIVITY]; after: [ACTIVITY][travel][get ready].
   if (b.travelBuffer && travelBuf > 0) {
     entries.push(
-      { startMin: b.startMin - travelBuf, label: '🚗 ➡ travel', bufDur: travelBuf, cls: '' },
-      { startMin: endMin, label: '🚗 ⬅ travel', bufDur: travelBuf, cls: '' },
+      { startMin: b.startMin - travelBuf, label: '🚗 ➡ travel', bufDur: travelBuf, cls: '', side: 'pre' },
+      { startMin: endMin, label: '🚗 ⬅ travel', bufDur: travelBuf, cls: '', side: 'post' },
     );
   }
   if (b.getReadyBuffer && readyBuf > 0) {
     const preTravel = (b.travelBuffer ? travelBuf : 0);
     entries.push(
-      { startMin: b.startMin - preTravel - readyBuf, label: '👕 ➡ get ready', bufDur: readyBuf, cls: 'travel-buf-ready' },
-      { startMin: endMin + preTravel, label: '👕 ⬅ get ready', bufDur: readyBuf, cls: 'travel-buf-ready' },
+      { startMin: b.startMin - preTravel - readyBuf, label: '👕 ➡ get ready', bufDur: readyBuf, cls: 'travel-buf-ready', side: 'pre' },
+      { startMin: endMin + preTravel, label: '👕 ⬅ get ready', bufDur: readyBuf, cls: 'travel-buf-ready', side: 'post' },
     );
   }
   const sourceAct = getAllActivities().find(a=>a.id===b.actId);
-  const overlayBlocks = entries.map(({ startMin, label, bufDur, cls }) => ({
-    id: `${b.id}-${startMin}-${bufDur}-${cls || 'travel'}`,
-    actId: b.actId,
-    startMin,
-    durationMin: bufDur,
-    colour: b.colour || CAT_HEX[sourceAct?.cat] || '#888',
-    _isBuffer: true,
-    _bufferCls: cls || '',
-    _bufferLabel: label,
-  })).filter(buf => {
+  const overlayBlocks = entries.map(({ startMin, label, bufDur, cls, side }) => {
+    const segConflict = !!conflict && (side === 'pre' ? conflict.pre : conflict.post);
+    return {
+      id: `${b.id}-${startMin}-${bufDur}-${cls || 'travel'}`,
+      actId: b.actId,
+      startMin,
+      durationMin: bufDur,
+      colour: b.colour || CAT_HEX[sourceAct?.cat] || '#888',
+      _isBuffer: true,
+      _bufferCls: cls || '',
+      _bufferLabel: (segConflict ? '⚠️ ' : '') + label,
+      _bufferConflict: segConflict,
+    };
+  }).filter(buf => {
     const bufStart = buf.startMin - START_MIN;
     const bufEnd = bufStart + buf.durationMin;
     return bufEnd > zMinStart && bufStart < zMinEnd;
