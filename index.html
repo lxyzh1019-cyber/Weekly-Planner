@@ -939,7 +939,7 @@
     min-height: 38px;
     min-width: 38px;
   }
-  #restDayBtn { font-size: 0.9rem; }
+  /* Rest-day toggle now lives inside the Template sheet */
   #restDayBtn.on {
     background: var(--cat-sleep);
     border-color: var(--ink);
@@ -1052,6 +1052,18 @@
   }
   .tg-block.partial { font-style: italic; opacity: 0.85; }
   .tg-hint { text-align: center; color: var(--ink-light); margin-top: 0.5rem; font-style: italic; font-size: 0.85rem; }
+  /* 2a category legend under the Time-Grid */
+  .tg-legend {
+    display: flex; flex-wrap: wrap; justify-content: center;
+    gap: 0.35rem 0.9rem; margin-top: 0.35rem;
+    font-size: 0.82rem; font-weight: 700; color: var(--ink);
+  }
+  .tg-legend-chip { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+  .tg-legend-dot {
+    width: 12px; height: 12px; border-radius: 4px; display: inline-block;
+    border: 1.5px solid var(--ink);
+  }
+  .tg-legend-dot--free { background: var(--paper); border-style: dashed; }
   .tg-day-link {
     display: block;
     text-decoration: underline dotted;
@@ -1502,13 +1514,15 @@
   .cm-dayhead small { font-weight: 700; opacity: 0.7; }
   .cm-dayhead.cm-today { background: #ffd166; border: 2px solid var(--ink); border-radius: 8px; }
   .cm-section {
-    grid-column: 1 / -1; font-weight: 800; font-size: 0.82rem; color: var(--ink);
+    grid-column: 1 / -1; font-weight: 800; font-size: 0.72rem; color: var(--accent-strong, #c14a24);
+    text-transform: uppercase; letter-spacing: 0.6px;
     border-bottom: 2px dashed #c9bda6; padding: 8px 0 2px; margin-top: 2px;
   }
   .cm-rowlabel {
-    font-size: 0.82rem; font-weight: 700; display: flex; align-items: center;
+    font-size: 0.82rem; font-weight: 700; display: flex; align-items: center; gap: 4px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 4px;
   }
+  .cm-rowicon { flex-shrink: 0; }
   .cm-cell {
     height: 36px; min-width: 30px; border: 2px solid var(--ink); border-radius: 9px;
     background: var(--paper-card, #fffdf5); color: var(--ink); font-size: 1rem; font-weight: 900;
@@ -1675,9 +1689,10 @@
   @media (max-width: 600px) { .weekly-full { min-width: 560px; } }
   .weekly-full {
     display: grid;
-    /* All 7 days share the width so the whole week is visible at once —
-       no horizontal scroll hiding Sunday on tablets/laptops. */
-    grid-template-columns: 40px repeat(7, minmax(0, 1fr));
+    /* Leading 18px column = time-of-day sideband (Before School / School /
+       After School / Evening), same as the day view's left band. All 7 days
+       share the remaining width so the whole week is visible at once. */
+    grid-template-columns: 18px 40px repeat(7, minmax(0, 1fr));
     gap: 0;
     min-width: 0;
     background: var(--paper);
@@ -1729,6 +1744,31 @@
   }
   .wf-day-col:last-child { border-right: none; }
   .wf-day-col.today { box-shadow: inset 0 0 0 2px #ffb865; }
+  /* Left sideband: the day view's Before School / School / After School /
+     Evening axis, rendered once for the whole week. */
+  .wf-sideband {
+    position: relative;
+    background: var(--bg2);
+  }
+  .wf-sideband-seg {
+    position: absolute;
+    left: 1px; right: 1px;
+    border-radius: 6px;
+    border: 1.5px solid var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.8px;
+    overflow: hidden;
+    padding: 3px 0;
+    box-sizing: border-box;
+  }
   /* Time-of-day tint bands — decorative background, not structural rows. */
   .wf-band {
     position: absolute; left: 0; right: 0;
@@ -1739,6 +1779,17 @@
   .wf-band-after  { background: #ffe1d0; }
   .wf-band-evening{ background: #e8dcf2; }
   .wf-band-free   { background: #d8f0e1; }
+  /* Time-of-day slot label at the top of each tint band, so the week shows the
+     same Before School / School / After School / Evening rhythm as the day and
+     print views. Behind the cards (z-index 1) so activities always win. */
+  .wf-band-label {
+    position: absolute; left: 0; right: 0;
+    text-align: center; z-index: 1; pointer-events: none;
+    font-size: 0.56rem; font-weight: 800; letter-spacing: 0.2px;
+    text-transform: uppercase; line-height: 1;
+    color: var(--ink); opacity: 0.55; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; padding: 1px 2px 0;
+  }
   /* "Now" marker on today's column */
   .wf-now-line {
     position: absolute; left: 0; right: 0; height: 0;
@@ -1748,18 +1799,19 @@
     content: ''; position: absolute; left: 0; top: -3px;
     width: 5px; height: 5px; border-radius: 50%; background: #e5484d;
   }
-  /* Faint hour gridlines reinforce the time alignment */
+  /* Hour gridlines — solid like the print view so each hour reads as its own
+     row. Above the tint bands, below the activity cards. */
   .wf-hour-line {
     position: absolute; left: 0; right: 0; height: 0;
-    border-top: 1px dotted var(--paper-line); opacity: 0.6;
-    pointer-events: none; z-index: 0;
+    border-top: 1px solid var(--paper-line); opacity: 0.9;
+    pointer-events: none; z-index: 1;
   }
   .wf-cell-empty {
     position: absolute; inset: 0;
   }
   .wf-card {
     position: absolute;
-    padding: 0.28rem 0.45rem;
+    padding: 0.12rem 0.45rem;
     border-radius: 9px;
     border: 2px solid var(--ink);
     color: #fff;
@@ -1767,10 +1819,13 @@
     box-shadow: 1.5px 1.5px 0 var(--ink);
     display: grid;
     grid-template-columns: auto auto 1fr auto;
+    /* Centre the single content row on both axes (like the print blocks) so
+       text/icon sit in the middle instead of clipping at the bottom edge. */
     align-items: center;
+    align-content: center;
     gap: 6px;
     font-size: 0.82rem;
-    line-height: 1.2;
+    line-height: 1.1;
     transition: transform 0.1s;
     text-shadow: 0 1px 1px rgba(0,0,0,0.25);
     overflow: hidden;
@@ -1780,10 +1835,26 @@
     z-index: 2;
   }
   .wf-card:hover { transform: translate(-1px,-1px); box-shadow: 2.5px 2.5px 0 var(--ink); z-index: 3; }
-  .wf-card-time { font-weight: 800; font-size: 0.72rem; }
-  .wf-card-icon { font-size: 1.1rem; text-shadow: none; }
-  .wf-card-name { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-  .wf-card-dur { font-size: 0.7rem; font-weight: 700; }
+  .wf-card-time { font-weight: 800; font-size: 0.72rem; line-height: 1; }
+  .wf-card-icon { font-size: 1rem; line-height: 1; text-shadow: none; }
+  .wf-card-name { font-weight: 800; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .wf-card-dur { font-size: 0.7rem; font-weight: 700; line-height: 1; }
+  /* Columns are narrow: below the tall threshold the time/duration chips are
+     dropped so the NAME gets the room (start time still reads off the grid
+     position + tooltip). Tall cards stack everything centered, like a printed
+     block, instead of one cramped row pinned to the top. */
+  .wf-card:not(.wf-card--tall) { grid-template-columns: auto 1fr auto; }
+  .wf-card:not(.wf-card--tall) .wf-card-time,
+  .wf-card:not(.wf-card--tall) .wf-card-dur { display: none; }
+  .wf-card--tall {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    align-content: center;
+    gap: 2px;
+    text-align: center;
+  }
+  .wf-card--tall .wf-card-icon { font-size: 1.25rem; }
+  .wf-card--tall .wf-card-name { white-space: normal; max-height: 2.3em; }
   .wf-card.light-bg { color: var(--ink); text-shadow: none; }
   /* Inline travel/get-ready tag on the card name (compact fallback) */
   .wf-card-travel {
@@ -1821,17 +1892,19 @@
      leave a rendered block with no way to check it off. */
   .wf-card--xslim .wf-card-check { width: 19px; height: 19px; font-size: 0.78rem; top: 2px; right: 2px; border-radius: 5px; }
   /* Short blocks: drop the duration/time chips so the name + icon still fit */
-  .wf-card.wf-card--slim { padding: 0.1rem 0.4rem; align-items: center; }
+  .wf-card.wf-card--slim { padding: 0 0.4rem; align-items: center; }
   .wf-card.wf-card--slim .wf-card-dur { display: none; }
+  .wf-card.wf-card--slim .wf-card-icon { font-size: 0.9rem; }
   .wf-card.wf-card--xslim .wf-card-time { display: none; }
-  .wf-card.wf-card--xslim { grid-template-columns: auto 1fr auto; font-size: 0.74rem; }
+  .wf-card.wf-card--xslim { grid-template-columns: auto 1fr auto; font-size: 0.74rem; padding: 0 0.3rem; }
+  .wf-card.wf-card--xslim .wf-card-icon { font-size: 0.8rem; }
   /* W2: too short even for a name → show the icon only, keep the title tooltip
      and (on the first segment) the check button. */
   .wf-card--icononly { grid-template-columns: 1fr auto; padding: 0 0.2rem; justify-items: center; }
   .wf-card--icononly .wf-card-name,
   .wf-card--icononly .wf-card-time,
   .wf-card--icononly .wf-card-dur { display: none; }
-  .wf-card--icononly .wf-card-icon { font-size: 0.95rem; }
+  .wf-card--icononly .wf-card-icon { font-size: 0.78rem; }
   /* W1: continuation segment of a block that crosses a zone boundary. Dashed
      top edge + ⤵ marker, no time/check (those live on the first segment). */
   .wf-card--cont { border-top: 2px dashed var(--ink); box-shadow: 1.5px 1.5px 0 rgba(42,35,32,0.35); }
@@ -3229,10 +3302,31 @@
   @media print { .print-sleep { background: #f3eefb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   .print-week-grid {
     display: grid;
-    grid-template-columns: 44px repeat(7, 1fr);
+    /* Leading 14px column = time-of-day sideband (Before School / School /
+       After School / Evening), mirroring the day view's left axis. */
+    grid-template-columns: 14px 44px repeat(7, 1fr);
     border: 2px solid var(--ink);
     font-size: 9pt;
     break-inside: avoid;
+  }
+  /* Time-of-day sideband cells + vertical label on each band's first slot */
+  .print-band-cell {
+    position: relative;
+    border-right: 1px solid var(--paper-line);
+    overflow: visible;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .print-band-before { background: #fff4db; }
+  .print-band-school { background: #d7eafe; }
+  .print-band-after  { background: #ffe1d0; }
+  .print-band-evening{ background: #e8dcf2; }
+  .print-band-label {
+    position: absolute; left: 0; top: 0; width: 100%;
+    display: flex; align-items: center; justify-content: center;
+    writing-mode: vertical-rl; text-orientation: mixed;
+    font-size: 6.5pt; font-weight: 800; letter-spacing: 0.5px;
+    color: #3a332c; white-space: nowrap; overflow: hidden;
+    z-index: 1;
   }
   .print-cell, .print-header-cell, .print-time-cell {
     border: 1px solid var(--paper-line);
@@ -3279,6 +3373,20 @@
        per block (see printTextColor / printBlockFontPt). */
     display: flex; align-items: center; justify-content: center;
     text-align: center;
+  }
+  /* Travel / get-ready buffer strip around a block (🚗 drive, 👕 gear up) so
+     kids can see the real leave-the-house time on the printed page. */
+  .print-buffer {
+    position: absolute; left: 1px; right: 1px; top: 0; z-index: 1;
+    border-radius: 3px;
+    border: 1px dashed #6b5d4f;
+    background: repeating-linear-gradient(-45deg,
+      rgba(90,77,65,0.18) 0 3px, rgba(90,77,65,0.05) 3px 6px);
+    color: #4a3f35;
+    font-size: 6.5pt; font-weight: 700; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; box-sizing: border-box;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
   /* Printable empty tick box in the block's top-right corner */
   .print-check {
@@ -4014,7 +4122,7 @@
       <div class="week-actions">
         <button class="btn-icon btn-icon--labeled" aria-label="Quest Board" onclick="goQuestBoard()" title="Quest Board"><span aria-hidden="true">🎮</span><span class="btn-icon__label">Quests</span></button>
         <button class="btn-icon btn-icon--labeled" aria-label="Weekly Chore" onclick="openChoreTab()" title="Weekly Chore"><span aria-hidden="true">🧹</span><span class="btn-icon__label">Chores</span></button>
-        <button class="btn-icon btn-icon--labeled" aria-label="Bank &amp; Invest" onclick="openMoneyScreen()" title="Bank &amp; Invest"><span aria-hidden="true">🏦</span><span class="btn-icon__label">Bank</span></button>
+        <button class="btn-icon btn-icon--labeled" id="weekMoneyBtn" aria-label="Bank &amp; Invest" onclick="openWeekMoney()" title="Bank &amp; Invest"><span aria-hidden="true">🏦</span><span class="btn-icon__label">Bank</span></button>
         <button class="btn-icon btn-icon--labeled" aria-label="Challenges" onclick="openChallenges()" title="Challenges"><span aria-hidden="true">🎯</span><span class="btn-icon__label">Challenge</span></button>
         <button class="btn-icon btn-icon--labeled" aria-label="Sister Sync" onclick="openSisterSync()" title="Sister Sync"><span aria-hidden="true">👯</span><span class="btn-icon__label">Sisters</span></button>
         <button class="btn-icon btn-icon--labeled" aria-label="Print week" onclick="openPrint()" title="Print week"><span aria-hidden="true">🖨</span><span class="btn-icon__label">Print</span></button>
@@ -4064,6 +4172,9 @@
     <div class="tg-wrap">
       <div class="tg-grid" id="tgGrid"></div>
       <p class="tg-hint" id="tgHint">Bright cells = your free time ✨</p>
+      <!-- 2a: kid-readable category legend — planned blocks carry color, free
+           time stays plain paper -->
+      <div class="tg-legend" id="tgLegend"></div>
     </div>
 
     <!-- Today's MY TIME summary (kid view) -->
@@ -4186,7 +4297,6 @@
         </div>
       </div>
       <div style="display:flex;gap:0.4rem;align-items:center" class="day-topbar-actions">
-        <button class="btn-icon" id="restDayBtn" onclick="toggleRestDay(currentDayKey)" aria-label="Mark rest day" title="Mark today a rest day">😌 Rest</button>
         <button class="btn-icon" onclick="openTemplateSheet()" aria-label="Apply template">📋</button>
         <button class="btn-icon" onclick="openReflectSheet()" aria-label="Reflect on today">🌙</button>
         <button class="profile-badge" onclick="openProfileSwitcher()" id="dayProfileBadge" aria-label="Switch profile"></button>
@@ -4198,6 +4308,12 @@
         <button class="zone-tab" role="tab" aria-selected="false" data-zone="morning" onclick="setZone('morning')">🌅 Morning</button>
         <button class="zone-tab" role="tab" aria-selected="false" data-zone="afternoon" onclick="setZone('afternoon')">☀️ Afternoon</button>
         <button class="zone-tab" role="tab" aria-selected="false" data-zone="evening" onclick="setZone('evening')">🌙 Evening</button>
+      </div>
+      <!-- 3b Timeline/Checklist switch lives in the topbar so it's reachable in
+           portrait too (the landscape "Schedule" label bar is hidden there). -->
+      <div class="day-mode-toggle" role="tablist" aria-label="Schedule view mode">
+        <button type="button" class="day-mode-btn active" id="dayModeTimeline" role="tab" aria-selected="true" onclick="setDayViewMode('timeline')">🕐 Timeline</button>
+        <button type="button" class="day-mode-btn" id="dayModeChecklist" role="tab" aria-selected="false" onclick="setDayViewMode('checklist')">✅ Checklist</button>
       </div>
       <button class="btn-template danger" onclick="clearDay()">🗑 Clear</button>
     </div>
@@ -4247,10 +4363,6 @@
         <div class="day-panel-label day-panel-label--landscape-only day-schedule-label">
           <button type="button" class="day-left-toggle" id="dayLeftToggle" onclick="toggleLeftPane()" title="Hide/show the side panel" aria-label="Hide or show the side panel"><span id="dayLeftToggleCaret">◀</span> Panel</button>
           <span>Schedule</span>
-          <div class="day-mode-toggle" role="tablist" aria-label="Schedule view mode">
-            <button type="button" class="day-mode-btn active" id="dayModeTimeline" role="tab" aria-selected="true" onclick="setDayViewMode('timeline')">🕐 Timeline</button>
-            <button type="button" class="day-mode-btn" id="dayModeChecklist" role="tab" aria-selected="false" onclick="setDayViewMode('checklist')">✅ Checklist</button>
-          </div>
         </div>
         <div class="timeline" id="timeline"></div>
         <div class="day-checklist" id="dayChecklist" style="display:none"></div>
@@ -4335,14 +4447,6 @@
   </div>
 
   <div style="padding:0.8rem 1rem 0">
-    <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.7rem">
-      <span style="font-weight:800">Viewing:</span>
-      <div style="display:flex;gap:0.5rem" id="parentWeekKidPills">
-        <button class="pill-btn active" onclick="setParentKid('jenn')">🐥 Jenn</button>
-        <button class="pill-btn" onclick="setParentKid('jess')">🦊 Jess</button>
-      </div>
-      <button class="pill-btn" style="margin-left:auto" onclick="parentView(parentViewing)">📋 Open full week ›</button>
-    </div>
     <div class="parent-tabs" role="tablist" aria-label="Parent sections">
       <button class="parent-tab active" role="tab" data-ptab="review" onclick="setParentTab('review')">🗓️ Weekly Review</button>
       <button class="parent-tab" role="tab" data-ptab="analysis" onclick="setParentTab('analysis')">📊 Performance</button>
@@ -4356,6 +4460,14 @@
        All reviewing/confirming happens inside the family meeting; this tab
        is a read-only hub that shows status and launches the meeting. -->
   <div class="parent-panel active" id="ptab-review" role="tabpanel">
+    <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.7rem">
+      <span style="font-weight:800">Viewing:</span>
+      <div style="display:flex;gap:0.5rem" id="parentWeekKidPills">
+        <button class="pill-btn active" onclick="setParentKid('jenn')">🐥 Jenn</button>
+        <button class="pill-btn" onclick="setParentKid('jess')">🦊 Jess</button>
+      </div>
+      <button class="pill-btn" style="margin-left:auto" onclick="parentView(parentViewing)">📋 Open full week ›</button>
+    </div>
     <h3 class="parent-h3">🗓️ This week — review &amp; confirm</h3>
     <p class="parent-hint">The whole weekly review happens in the <b>family meeting</b>: check each day together, celebrate wins, confirm &amp; record pocket money, then plan next week. Tap a day below to jump straight to it in the meeting.</p>
     <div id="meetingHub"></div>
@@ -4805,6 +4917,8 @@
     <p style="font-size:0.9rem;color:var(--ink-light);margin-bottom:0.8rem">This replaces your current plan for this day.</p>
     <button class="pill-btn" style="width:100%;margin-bottom:0.5rem;font-size:1rem" onclick="applyTemplate('school')">🏫 School Day</button>
     <button class="pill-btn" style="width:100%;font-size:1rem" onclick="applyTemplate('weekend')">🌈 Weekend</button>
+    <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">Taking today off? Rest days keep your streak safe.</p>
+    <button class="pill-btn" style="width:100%;font-size:1rem" id="restDayBtn" onclick="toggleRestDay(currentDayKey)" aria-label="Mark rest day" title="Mark today a rest day">😌 Rest</button>
   </div>
 </div>
 
@@ -4815,6 +4929,16 @@
     <h3>🎉 This week's wins</h3>
     <div id="weeklyWinsBody"></div>
     <button class="btn-confirm" onclick="closeSheet('weeklyWinsOverlay')">Awesome! 🙌</button>
+  </div>
+</div>
+
+<!-- 3a "How I earn" — kid-facing money rules + wallet, opened from the week topbar -->
+<div class="overlay" id="howIEarnOverlay" onclick="overlayClick(event,'howIEarnOverlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3>💰 How I earn pocket money</h3>
+    <div id="howIEarnBody"></div>
+    <button class="btn-confirm" onclick="closeSheet('howIEarnOverlay')">Got it! 👍</button>
   </div>
 </div>
 
@@ -5451,6 +5575,7 @@ let state = {
     invites: [],
     routineTemplates: [],  // custom routines: {id, title, icon, items:[{id,text,timerSec}]}
     parentPin: '1234',     // soft child-lock, parent-configurable (NOT a security boundary)
+    tombstones: {},        // {[blockId]: deletedAtMs} — keeps deletions from resurrecting on merge
   }
 };
 
@@ -5631,7 +5756,10 @@ function markItemUpdated(item) {
   item.updatedAt = Date.now();
   return item;
 }
-function mergeArrayById(localArr, remoteArr) {
+/* Union two id-keyed arrays, newest copy of each id wins. `tombScope` names
+   the collection ('sa:', 'ca:jenn:', 'task:'…) so deletions recorded as
+   scoped tombstones stick instead of resurrecting via the union. */
+function mergeArrayById(localArr, remoteArr, tombScope) {
   const map = new Map();
   (localArr || []).forEach(item => {
     if (!item || item.id == null) return;
@@ -5648,34 +5776,144 @@ function mergeArrayById(localArr, remoteArr) {
     const nextTs = item.updatedAt || item.createdAt || 0;
     map.set(item.id, nextTs > prevTs ? item : prev);
   });
-  return Array.from(map.values());
+  let out = Array.from(map.values());
+  if (tombScope != null) {
+    const t = state.shared && state.shared.tombstones;
+    if (t) out = out.filter(item =>
+      !(t[tombScope + item.id] && t[tombScope + item.id] >= (item.updatedAt || item.createdAt || 0)));
+  }
+  return out;
 }
+
+/* ── Deletion tombstones ──
+   mergeArrayById is a union: without a record of the delete, a removed block
+   comes straight back from any device still holding it (this is what broke
+   "remove series"). Deletes record a tombstone in shared state; the merge
+   drops any incoming copy older than the tombstone. */
+function ensureTombstones() {
+  if (!state.shared) state.shared = {};
+  if (!state.shared.tombstones) state.shared.tombstones = {};
+  return state.shared.tombstones;
+}
+function tombstoneBlockIds(ids) {
+  const t = ensureTombstones();
+  const now = Date.now();
+  (ids || []).forEach(id => { if (id != null) t[id] = now; });
+  // Prune ancient tombstones so the map doesn't grow forever. 30 days is far
+  // longer than any device realistically stays offline holding stale blocks.
+  const cutoff = now - 30 * 24 * 60 * 60 * 1000;
+  Object.keys(t).forEach(id => { if (t[id] < cutoff) delete t[id]; });
+}
+/* Tombstone ids in a named collection (scope must match the mergeArrayById
+   call for that collection, e.g. 'sa:' for sharedActivities). */
+function tombstoneIds(scope, ids) {
+  tombstoneBlockIds((ids || []).map(id => scope + id));
+}
+function blockTombstoned(b) {
+  const bTs = b.updatedAt || b.createdAt || 0;
+  const t = state.shared && state.shared.tombstones;
+  // A copy edited AFTER the delete wins (someone deliberately revived it).
+  if (t && t[b.id] && t[b.id] >= bTs) return true;
+  // "Remove ALL in series" also tombstones the seriesId itself (prefixed key),
+  // so members this device never saw can't sneak back in from another device.
+  if (b.seriesId && t && t['sr:' + b.seriesId] && t['sr:' + b.seriesId] >= bTs) return true;
+  return false;
+}
+function mergeTombstones(remoteTombs) {
+  const t = ensureTombstones();
+  Object.entries(remoteTombs || {}).forEach(([id, ts]) => {
+    if (!t[id] || ts > t[id]) t[id] = ts;
+  });
+}
+
+/* ── Deep merge for nested plain objects ──
+   The old `{...lp, ...rp}` replaced nested trees (progress, chore checkmarks,
+   wallet, moods) wholesale with the remote copy, clobbering local edits. This
+   merges key-by-key and only lets remote win at scalar/array leaves. */
+function isPlainObject(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+function deepMergeObj(local, remote) {
+  if (remote === undefined) return local;
+  if (!isPlainObject(local) || !isPlainObject(remote)) return remote;
+  const out = { ...local };
+  Object.keys(remote).forEach(k => {
+    out[k] = (isPlainObject(local[k]) && isPlainObject(remote[k]))
+      ? deepMergeObj(local[k], remote[k])
+      : (remote[k] === undefined ? local[k] : remote[k]);
+  });
+  return out;
+}
+
+/* Per-kid chore checkmarks: deep-merge unions checks from both sides, but a
+   deliberate UNcheck must also be able to win. Chore edits stamp a per-week
+   updatedAtByWeek; the strictly-newer side takes that week's whole tree. */
+function mergeChoreState(localChore, remoteChore) {
+  const lc = localChore || {};
+  const rc = remoteChore || {};
+  const out = deepMergeObj(lc, rc);
+  const lts = lc.updatedAtByWeek || {};
+  const rts = rc.updatedAtByWeek || {};
+  out.updatedAtByWeek = {};
+  new Set([...Object.keys(lts), ...Object.keys(rts)]).forEach(wk => {
+    const l = lts[wk] || 0, r = rts[wk] || 0;
+    out.updatedAtByWeek[wk] = Math.max(l, r);
+    const src = r > l ? rc : (l > r ? lc : null);
+    if (!src) return; // tie / no stamps → keep the deep-merged union
+    ['mandatoryByWeek', 'optionalByWeek', 'mandatoryAutoByWeek'].forEach(f => {
+      if (src[f] && src[f][wk] !== undefined) {
+        if (!out[f]) out[f] = {};
+        out[f][wk] = src[f][wk];
+      }
+    });
+  });
+  return out;
+}
+
 function mergeWeeks(localWeeks, remoteWeeks) {
   const merged = { ...(localWeeks || {}) };
   Object.entries(remoteWeeks || {}).forEach(([dayKey, remoteBlocks]) => {
     const localBlocks = merged[dayKey] || [];
     merged[dayKey] = mergeArrayById(localBlocks, remoteBlocks);
   });
+  // Drop tombstoned blocks everywhere — including local-only days, so a delete
+  // made on another device lands here too.
+  Object.keys(merged).forEach(dayKey => {
+    const arr = merged[dayKey] || [];
+    const kept = arr.filter(b => !b || !blockTombstoned(b));
+    if (kept.length !== arr.length) merged[dayKey] = kept;
+  });
   return merged;
 }
-function mergeProfileState(localProfile, remoteProfile) {
+function mergeProfileState(localProfile, remoteProfile, profName) {
   const lp = localProfile || {};
   const rp = remoteProfile || {};
   const merged = { ...lp, ...rp };
   merged.weeks = mergeWeeks(lp.weeks, rp.weeks);
-  merged.customActivities = mergeArrayById(lp.customActivities, rp.customActivities);
+  merged.customActivities = mergeArrayById(lp.customActivities, rp.customActivities, profName ? 'ca:' + profName + ':' : null);
   merged.goals = mergeArrayById(lp.goals, rp.goals);
   merged.todos = mergeArrayById(lp.todos, rp.todos);
   merged.achievements = mergeArrayById(lp.achievements, rp.achievements);
+  // Nested trees: merge key-by-key instead of letting remote replace them.
+  merged.progress = deepMergeObj(lp.progress, rp.progress);
+  merged.chore = mergeChoreState(lp.chore, rp.chore);
+  merged.wallet = deepMergeObj(lp.wallet, rp.wallet);
+  merged.dayMoods = deepMergeObj(lp.dayMoods, rp.dayMoods);
+  merged.blockMoods = deepMergeObj(lp.blockMoods, rp.blockMoods);
+  merged.weekFeedback = deepMergeObj(lp.weekFeedback, rp.weekFeedback);
   return merged;
 }
 function mergeRemoteState(remote) {
   if (!remote) return;
+  // Tombstones first, so the week merges below already know about deletes
+  // recorded on other devices.
+  if (remote.shared) mergeTombstones(remote.shared.tombstones);
   if (remote.profiles) {
     ['jenn','jess'].forEach(p => {
       const lp = state.profiles[p] || {};
       const rp = remote.profiles[p] || {};
-      state.profiles[p] = mergeProfileState(lp, rp);
+      state.profiles[p] = mergeProfileState(lp, rp, p);
+      // activityCounts/activityHours are derived from confirmed blocks —
+      // recompute from the merged weeks instead of trusting either side's copy.
+      recountActivityProgress(p);
     });
   }
   if (remote.shared) {
@@ -5686,8 +5924,17 @@ function mergeRemoteState(remote) {
       ...rs,
       invites: mergeArrayById(ls.invites, rs.invites),
       challenges: mergeArrayById(ls.challenges, rs.challenges),
-      customTasks: mergeArrayById(ls.customTasks, rs.customTasks),
-      routineTemplates: mergeArrayById(ls.routineTemplates, rs.routineTemplates),
+      customTasks: mergeArrayById(ls.customTasks, rs.customTasks, 'task:'),
+      routineTemplates: mergeArrayById(ls.routineTemplates, rs.routineTemplates, 'rt:'),
+      // Shared activities & level rules were previously replaced wholesale by
+      // the remote copy — which made share/unshare/edit only stick when this
+      // device pushed last. Merge them by id like everything else.
+      sharedActivities: mergeArrayById(ls.sharedActivities, rs.sharedActivities, 'sa:'),
+      levelRules: mergeArrayById(ls.levelRules, rs.levelRules, 'lr:'),
+      // Chore config/payouts (groups, goals, fired payouts, bank) is a nested
+      // tree — deep-merge so two devices' edits both survive.
+      chore: deepMergeObj(ls.chore, rs.chore),
+      tombstones: ensureTombstones(),
     };
   }
   migrateBlocks();
@@ -5998,7 +6245,7 @@ function refreshRestDayButton() {
   if (!btn || !currentDayKey) return;
   const on = isRestDay(currentDayKey);
   btn.classList.toggle('on', on);
-  btn.textContent = on ? '😌 Resting' : '😌 Rest';
+  btn.textContent = on ? '😌 Today is a rest day — tap to undo' : '😌 Mark today a rest day';
   btn.setAttribute('aria-pressed', on ? 'true' : 'false');
 }
 // Count kid-marked rest days strictly between two day keys (exclusive both ends).
@@ -6497,8 +6744,7 @@ function renderQuestMoneyStrip(kid) {
   if (caret) caret.textContent = showPocketMoney ? 'Hide ▾' : 'Show ▸';
   if (!showPocketMoney) { panel.hidden = true; panel.innerHTML = ''; return; }
 
-  ctEnsureShared();
-  ctMigrateToGroups();
+  ctPrepareRead();
   const wk = ctDateToKey(ctMondayOf(new Date()));   // real current week, independent of chore-tab nav
   const today = formatDayKey(todayKey());
   const dayIdx = Math.max(0, Math.min(6, Math.round((today - formatDayKey(wk)) / (24*60*60*1000))));
@@ -6588,8 +6834,28 @@ function buildHowIEarnCard(kid, wk) {
     +   wtile('Stocks', portfolioValue(kid), 'goes up & down', 'w-stocks')
     + `</div>`;
 
-  return earnCard + `<div class="hm-rules">${rules}</div>` + wallet
-    + `<button type="button" class="qmp-open" onclick="openMoneyScreen('${kid}')">Open Bank &amp; Invest ›</button>`;
+  // Bank & Invest is a parent surface — kids see their balances here but the
+  // bank screen itself only opens from parent mode.
+  const bankBtn = isParent()
+    ? `<button type="button" class="qmp-open" onclick="openMoneyScreen('${kid}')">Open Bank &amp; Invest ›</button>`
+    : '';
+  return earnCard + `<div class="hm-rules">${rules}</div>` + wallet + bankBtn;
+}
+
+/* Week-topbar money button: parents get the full Bank & Invest screen, kids get
+   the "How I earn" card (rules + wallet) in a sheet. */
+function openWeekMoney() {
+  if (isParent()) openMoneyScreen();
+  else openHowIEarn();
+}
+
+function openHowIEarn() {
+  const kid = activeProfile();
+  if (kid !== 'jenn' && kid !== 'jess') return;
+  ctPrepareRead();
+  const wk = ctDateToKey(ctMondayOf(new Date()));
+  document.getElementById('howIEarnBody').innerHTML = buildHowIEarnCard(kid, wk);
+  openSheet('howIEarnOverlay');
 }
 
 // Kid's free-text weekly note to grown-ups — surfaced in the parent review.
@@ -7032,6 +7298,17 @@ function renderWeek() {
   const legend = document.getElementById('weekLegend');
   if (legend) legend.style.display = isParent() ? 'flex' : 'none';
 
+  // Money button: parents open Bank & Invest, kids open "How I earn".
+  const moneyBtn = document.getElementById('weekMoneyBtn');
+  if (moneyBtn) {
+    const parent = isParent();
+    moneyBtn.innerHTML = parent
+      ? '<span aria-hidden="true">🏦</span><span class="btn-icon__label">Bank</span>'
+      : '<span aria-hidden="true">💰</span><span class="btn-icon__label">How I earn</span>';
+    moneyBtn.title = parent ? 'Bank & Invest' : 'How I earn pocket money';
+    moneyBtn.setAttribute('aria-label', moneyBtn.title);
+  }
+
   renderGoalsTodos();
   renderWeekGlance(keys);
   renderWeekSignature(keys);
@@ -7437,6 +7714,21 @@ function renderTimeGrid(keys) {
   if (hint) hint.textContent = inverted ? 'Bright cells = your free time ✨' : 'Each color = an activity type 🎨';
   const btn = document.getElementById('tgToggleBtn');
   if (btn) btn.textContent = inverted ? '🎨 Classic colors' : '✨ Free-time mode';
+  // 2a legend: which color means what — free time stays plain on purpose.
+  const legend = document.getElementById('tgLegend');
+  if (legend) {
+    if (inverted) {
+      legend.style.display = 'none';
+    } else {
+      legend.style.display = 'flex';
+      legend.innerHTML = [
+        ['school', '📚 Learning'], ['training', '🏋️ Training'],
+        ['routine', '📋 Routine'], ['active', '🏃 Active'], ['daily', '🍽 Daily'],
+      ].map(([cat, label]) =>
+        `<span class="tg-legend-chip"><span class="tg-legend-dot" style="background:${CAT_HEX[cat] || '#999'}"></span>${label}</span>`
+      ).join('') + `<span class="tg-legend-chip"><span class="tg-legend-dot tg-legend-dot--free"></span>Free — no color needed</span>`;
+    }
+  }
 }
 
 /* Toggle between inverted (free-bright) and classic (category colors) */
@@ -7682,16 +7974,21 @@ function renderFullWeek(keys) {
   const PX_PER_MIN = 0.72;
   const totalH = Math.round(DAY_MIN_SPAN * PX_PER_MIN);
 
-  // Time-of-day bands are decorative background tint now, not structural rows.
+  // Time-of-day tint bands + slot labels. Boundaries match the day view's
+  // sideband (buildSideband): 6–9am / 9am–3pm / 3–6pm / 6pm–end. `side` is the
+  // compact label used on the left axis band.
   const WEEKDAY_BANDS = [
-    { start: 0,   end: 120,          cls: 'wf-band-before'  },
-    { start: 120, end: 540,          cls: 'wf-band-school'  },
-    { start: 540, end: 720,          cls: 'wf-band-after'   },
-    { start: 720, end: DAY_MIN_SPAN, cls: 'wf-band-evening' },
+    { start: 0,   end: 180,          cls: 'wf-band-before',  label: '🌅 Before School', side: '🌅 Before' },
+    { start: 180, end: 540,          cls: 'wf-band-school',  label: '🏫 School',        side: '🏫 School' },
+    { start: 540, end: 720,          cls: 'wf-band-after',   label: '🎒 After School',  side: '🎒 After'  },
+    { start: 720, end: DAY_MIN_SPAN, cls: 'wf-band-evening', label: '🌙 Evening',       side: '🌙 Evening' },
   ];
-  const WEEKEND_BANDS = [ { start: 0, end: DAY_MIN_SPAN, cls: 'wf-band-free' } ];
+  const WEEKEND_BANDS = [ { start: 0, end: DAY_MIN_SPAN, cls: 'wf-band-free', label: '🎉 Free Time' } ];
 
-  // ── Header row: corner + 7 day headers ──
+  // ── Header row: sideband corner + gutter corner + 7 day headers ──
+  const bandCorner = document.createElement('div');
+  bandCorner.className = 'wf-corner';
+  grid.appendChild(bandCorner);
   const corner = document.createElement('div');
   corner.className = 'wf-corner';
   grid.appendChild(corner);
@@ -7706,6 +8003,21 @@ function renderFullWeek(keys) {
 
   const firstHour = Math.ceil(START_MIN / 60);
   const lastHour  = Math.floor((START_MIN + DAY_MIN_SPAN) / 60);
+
+  // ── Left sideband: the day view's time-of-day axis for the whole week ──
+  const sideband = document.createElement('div');
+  sideband.className = 'wf-sideband';
+  sideband.style.height = totalH + 'px';
+  WEEKDAY_BANDS.forEach(bd => {
+    const seg = document.createElement('div');
+    seg.className = 'wf-sideband-seg ' + bd.cls;
+    seg.style.top = (bd.start * PX_PER_MIN + 1) + 'px';
+    seg.style.height = ((bd.end - bd.start) * PX_PER_MIN - 3) + 'px';
+    seg.textContent = bd.side;
+    seg.title = bd.label;
+    sideband.appendChild(seg);
+  });
+  grid.appendChild(sideband);
 
   // ── Slim gutter with hour labels down the side ──
   const gutter = document.createElement('div');
@@ -7737,13 +8049,23 @@ function renderFullWeek(keys) {
       }
     };
 
-    // Zone tint bands behind everything.
+    // Zone tint bands behind everything. Weekday band names live on the left
+    // sideband axis; weekend columns keep their own "Free Time" label since
+    // the axis shows the school-day rhythm.
+    const isWeekendCol = (dow === 0 || dow === 6);
     bands.forEach(bd => {
       const seg = document.createElement('div');
       seg.className = 'wf-band ' + bd.cls;
       seg.style.top = (bd.start * PX_PER_MIN) + 'px';
       seg.style.height = ((bd.end - bd.start) * PX_PER_MIN) + 'px';
       cell.appendChild(seg);
+      if (isWeekendCol && bd.label && (bd.end - bd.start) * PX_PER_MIN >= 24) {
+        const lbl = document.createElement('div');
+        lbl.className = 'wf-band-label';
+        lbl.style.top = (bd.start * PX_PER_MIN + 2) + 'px';
+        lbl.textContent = bd.label;
+        cell.appendChild(lbl);
+      }
     });
 
     // Hour gridlines to anchor the eye to the time grid.
@@ -7805,6 +8127,7 @@ function renderFullWeek(keys) {
       const dispName = topic ? topic.name : act.name;
       const card = document.createElement('div');
       let cls = 'wf-card' + (isLightColour(bg) ? ' light-bg' : '');
+      if (pxHeight >= 60) cls += ' wf-card--tall'; // room to stack time/icon/name centered
       if (pxHeight < 34) cls += ' wf-card--slim';
       if (pxHeight < 22) cls += ' wf-card--xslim';
       if (pxHeight < 16) cls += ' wf-card--icononly'; // too short for a name → icon only
@@ -9366,6 +9689,7 @@ async function removeBlock() {
       }
     }
   }
+  tombstoneBlockIds([editingBlockId]);
   setDayBlocks(currentDayKey, blocks.filter(b=>b.id!==editingBlockId));
   closeSheet('editOverlay');
   buildTimeline();
@@ -9586,6 +9910,7 @@ function renderTrainingSheet() {
       item.onclick = (e)=>{
         if (e.target.classList.contains('obj-delete')) {
           state.shared.customTasks = state.shared.customTasks.filter(x=>x.id!==t.id);
+          tombstoneIds('task:', [t.id]);
           ts.objectives = ts.objectives.filter(o=>o!==label);
           saveAll(); renderTrainingSheet();
           return;
@@ -10604,16 +10929,22 @@ function deleteSeriesBlocks(seriesId, exceptBlockId=null) {
   if (!seriesId) return 0;
   const weeks = (getProfData().weeks)||{};
   let removed = 0;
+  const removedIds = [];
   Object.keys(weeks).forEach(dayKey=>{
     const arr = weeks[dayKey]||[];
     const kept = arr.filter(b => {
       if (b.seriesId !== seriesId) return true;
       if (b.id === exceptBlockId) return true;
       removed++;
+      removedIds.push(b.id);
       return false;
     });
     if (kept.length !== arr.length) setDayBlocks(dayKey, kept);
   });
+  // Tombstone every removed id AND the series itself so the sync merge can't
+  // resurrect any member — even one this device never saw.
+  tombstoneBlockIds(removedIds.concat(exceptBlockId ? [] : ['sr:' + seriesId]));
+  if (removedIds.length) saveAll();
   return removed;
 }
 
@@ -10737,7 +11068,7 @@ async function confirmAllToday() {
 /* ════════════════════════════════════════════════════════════════
    TEMPLATES / CLEAR
 ════════════════════════════════════════════════════════════════ */
-function openTemplateSheet() { openSheet('templateOverlay'); }
+function openTemplateSheet() { refreshRestDayButton(); openSheet('templateOverlay'); }
 
 function applyTemplate(type) {
   const tmpl = type==='school' ? SCHOOL_TEMPLATE : WEEKEND_TEMPLATE;
@@ -10757,6 +11088,9 @@ function applyTemplate(type) {
       travelBuffer: false,
     };
   });
+  // The template REPLACES the day — tombstone the old blocks so they don't
+  // come back from another device on the next sync merge.
+  tombstoneBlockIds((getDayBlocks(currentDayKey) || []).map(b => b.id));
   setDayBlocks(currentDayKey, blocks);
   closeSheet('templateOverlay');
   buildTimeline();
@@ -10765,6 +11099,7 @@ function applyTemplate(type) {
 
 async function clearDay() {
   if (!(await showConfirm('Clear all blocks for this day?', { danger:true, okLabel:'Clear' }))) return;
+  tombstoneBlockIds((getDayBlocks(currentDayKey) || []).map(b => b.id));
   setDayBlocks(currentDayKey, []);
   buildTimeline();
   showToast('Day cleared 🗑');
@@ -11347,7 +11682,7 @@ function setParentKid(kid) {
 function renderMeetingHub() {
   const wrap = document.getElementById('meetingHub');
   if (!wrap) return;
-  ctEnsureShared(); ctMigrateToGroups();
+  ctPrepareRead();
   const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
   const info = ctWeekInfo();
   const held = !!(state.shared.chore.meetingsHeld && state.shared.chore.meetingsHeld[wk]);
@@ -11462,6 +11797,7 @@ async function rejectKidActivity(owner, id) {
   const idx = arr.findIndex(x => x.id === id);
   if (idx < 0) return;
   arr.splice(idx, 1);
+  tombstoneIds('ca:' + owner + ':', [id]);
   saveAll();
   renderPendingApproval();
   renderParentActivities();
@@ -11552,10 +11888,14 @@ function findParentActivity(owner, id) {
 }
 
 function removeParentActivity(owner, id) {
+  // Tombstone the removal so the sync merge can't restore it from another
+  // device (a move records the removal in the OLD collection only).
   if (owner === 'shared') {
     state.shared.sharedActivities = (state.shared.sharedActivities||[]).filter(a=>a.id!==id);
+    tombstoneIds('sa:', [id]);
   } else {
     state.profiles[owner].customActivities = (state.profiles[owner].customActivities||[]).filter(a=>a.id!==id);
+    tombstoneIds('ca:' + owner + ':', [id]);
   }
 }
 
@@ -11620,16 +11960,23 @@ async function deleteParentActivity(owner, id) {
   if (!(await showConfirm(msg, { danger:true, okLabel:'Delete' }))) return;
   // Remove the activity definition
   removeParentActivity(owner, id);
-  // Cascade-delete every referencing block from both kids
+  // Cascade-delete every referencing block from both kids (tombstoned so the
+  // sync merge can't bring them back)
   if (refs > 0) {
+    const removedBlockIds = [];
     ['jenn','jess'].forEach(p => {
       const weeks = (state.profiles[p] && state.profiles[p].weeks) || {};
       Object.keys(weeks).forEach(dayKey => {
         const arr = weeks[dayKey] || [];
-        const kept = arr.filter(b => b.actId !== id);
+        const kept = arr.filter(b => {
+          if (b.actId !== id) return true;
+          removedBlockIds.push(b.id);
+          return false;
+        });
         if (kept.length !== arr.length) state.profiles[p].weeks[dayKey] = kept;
       });
     });
+    tombstoneBlockIds(removedBlockIds);
     // Recompute progress for both kids since their counts may have changed
     recountActivityProgress('jenn');
     recountActivityProgress('jess');
@@ -11661,14 +12008,18 @@ async function toggleShareActivity(owner, id) {
     if (target !== 'jenn' && target !== 'jess') { showToast('Type jenn or jess'); return; }
     const act = (state.shared.sharedActivities||[]).find(a=>a.id===id);
     if (!act) return;
-    state.shared.sharedActivities = state.shared.sharedActivities.filter(a=>a.id!==id);
+    // Stamp the moved copy first, then tombstone the old home — the fresh
+    // timestamp is what lets the move survive a merge with a stale device.
+    markItemUpdated(act);
+    removeParentActivity('shared', id);
     state.profiles[target].customActivities = [...((state.profiles[target]||{}).customActivities||[]), act];
   } else {
     // Promote to shared
     const list = (state.profiles[owner]||{}).customActivities || [];
     const act = list.find(a=>a.id===id);
     if (!act) return;
-    state.profiles[owner].customActivities = list.filter(a=>a.id!==id);
+    markItemUpdated(act);
+    removeParentActivity(owner, id);
     state.shared.sharedActivities = [...(state.shared.sharedActivities||[]), act];
   }
   saveAll();
@@ -12030,9 +12381,12 @@ function confirmRoutine() {
 async function deleteRoutine(id) {
   if (!(await showConfirm('Delete this routine?', { danger:true, okLabel:'Delete' }))) return;
   state.shared.routineTemplates = (state.shared.routineTemplates||[]).filter(r=>r.id!==id);
-  // Remove matching activity from both kids
+  tombstoneIds('rt:', [id]);
+  // Remove matching activity from both kids (tombstoned so sync can't revive them)
   ['jenn','jess'].forEach(p=>{
+    const removed = (state.profiles[p].customActivities||[]).filter(a=>a.routineId===id).map(a=>a.id);
     state.profiles[p].customActivities = (state.profiles[p].customActivities||[]).filter(a=>a.routineId!==id);
+    tombstoneIds('ca:' + p + ':', removed);
   });
   saveAll();
   renderRoutinesList();
@@ -12598,7 +12952,9 @@ function moneyAdvanceMonth(kid) {
 /* ── Money UI ── */
 let moneyKid = 'jess';
 function openMoneyScreen(kid) {
-  moneyKid = (kid === 'jenn' || kid === 'jess') ? kid : (isParent() ? ctParentKid : activeProfile());
+  // Bank & Invest is parent-only; kids get the "How I earn" sheet instead.
+  if (!isParent()) { openHowIEarn(); return; }
+  moneyKid = (kid === 'jenn' || kid === 'jess') ? kid : ctParentKid;
   showScreen('money');
   renderMoneyScreen();
 }
@@ -12760,6 +13116,7 @@ function mmDayPct(kid, dayIdx) {
 function mmWeekPct(kid) { let s = 0; for (let d = 0; d < 7; d++) s += mmDayPct(kid, d); return Math.round(s / 7); }
 
 function renderMeetingMode() {
+  ctPrepareRead();
   const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
   const held = !!(state.shared.chore.meetingsHeld && state.shared.chore.meetingsHeld[wk]);
   const stepper = MM_STEPS.map((label, i) => {
@@ -12817,7 +13174,7 @@ function mmRenderDayDetail(wk, d) {
     const items = rows.map((row, i) => {
       const on = ctMatrixCellChecked(kid, d, row);
       return `<button type="button" class="mm-item ${on ? 'on' : ''}" onclick="mmToggleItem('${kid}',${d},${i})"
-          role="checkbox" aria-checked="${on}" aria-label="${escapeAttr(row.label)} ${DAY_SHORT[d]}, ${kid === 'jenn' ? 'Jenn' : 'Jess'}"><span class="mm-item-box">${on ? '✓' : ''}</span>${escapeHtml(row.label)}</button>`;
+          role="checkbox" aria-checked="${on}" aria-label="${escapeAttr(row.label)} ${DAY_SHORT[d]}, ${kid === 'jenn' ? 'Jenn' : 'Jess'}"><span class="mm-item-box">${on ? '✓' : ''}</span>${row.icon ? row.icon + ' ' : ''}${escapeHtml(row.label)}</button>`;
     }).join('');
     const done = rows.filter(row => ctMatrixCellChecked(kid, d, row)).length;
     return `<div class="mm-detail-col"><div class="mm-detail-kid">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'} <small>${done}/${rows.length} done</small></div>${items}</div>`;
@@ -13061,6 +13418,24 @@ function ctEnsureProfile(p) {
   if (!p.chore.mandatoryByWeek) p.chore.mandatoryByWeek = {};
   if (!p.chore.optionalByWeek) p.chore.optionalByWeek = {};
   if (!p.chore.mandatoryAutoByWeek) p.chore.mandatoryAutoByWeek = {};
+  if (!p.chore.updatedAtByWeek) p.chore.updatedAtByWeek = {}; // {[weekKey]: ms} — newest edit wins that week in sync merges
+}
+/* Stamp a chore edit so cross-device merges know which side of a week is newer
+   (this is what lets an UNcheck beat a stale remote check). */
+function ctStampChoreWeek(p, weekKey) {
+  if (!p.chore.updatedAtByWeek) p.chore.updatedAtByWeek = {};
+  p.chore.updatedAtByWeek[weekKey] = Date.now();
+}
+/* One shared prepare step for EVERY chore-reading surface (chore tab, kid week
+   matrix, weekly-review hub, family meeting). All migrations run everywhere so
+   the three surfaces can never disagree about the same week's data. */
+function ctPrepareRead() {
+  ctEnsureShared();
+  ctEnsureProfile(getProfData('jenn'));
+  ctEnsureProfile(getProfData('jess'));
+  ctTryMigrateLegacy();
+  ctMigrateNumberedKeys();
+  ctMigrateToGroups();
 }
 function ctWeekInfo() {
   const mon = formatDayKey(ctWeekKey || ctDateToKey(ctMondayOf(new Date())));
@@ -13155,6 +13530,7 @@ function ctSetMandatory(weekKey, dayIdx, session, kid, value) {
   if (!p.chore.mandatoryByWeek[weekKey]) p.chore.mandatoryByWeek[weekKey] = {};
   if (!p.chore.mandatoryByWeek[weekKey][String(dayIdx)]) p.chore.mandatoryByWeek[weekKey][String(dayIdx)] = {};
   p.chore.mandatoryByWeek[weekKey][String(dayIdx)][session] = !!value;
+  ctStampChoreWeek(p, weekKey);
 }
 function ctGetOptional(weekKey, dayIdx, kid, choreName) {
   const p = getProfData(kid);
@@ -13167,6 +13543,7 @@ function ctSetOptional(weekKey, dayIdx, kid, choreName, value) {
   if (!p.chore.optionalByWeek[weekKey]) p.chore.optionalByWeek[weekKey] = {};
   if (!p.chore.optionalByWeek[weekKey][String(dayIdx)]) p.chore.optionalByWeek[weekKey][String(dayIdx)] = {};
   p.chore.optionalByWeek[weekKey][String(dayIdx)][choreName] = !!value;
+  ctStampChoreWeek(p, weekKey);
 }
 function ctGetMandatoryAuto(weekKey, dayIdx, session, kid) {
   const p = getProfData(kid);
@@ -13179,6 +13556,7 @@ function ctSetMandatoryAuto(weekKey, dayIdx, session, kid) {
   if (!p.chore.mandatoryAutoByWeek[weekKey]) p.chore.mandatoryAutoByWeek[weekKey] = {};
   if (!p.chore.mandatoryAutoByWeek[weekKey][String(dayIdx)]) p.chore.mandatoryAutoByWeek[weekKey][String(dayIdx)] = {};
   p.chore.mandatoryAutoByWeek[weekKey][String(dayIdx)][session] = true;
+  ctStampChoreWeek(p, weekKey);
 }
 function ctMandatoryPoints(weekKey, kid) {
   let n = 0;
@@ -13461,21 +13839,29 @@ function ctMatrixToggleOptional(dayIdx, choreName, kid) {
   ctCelebrateGroupPayouts(fired, 'screen-chore');
 }
 
+// Row icons so every routine/chore reads at a glance (1a/1b mock).
+const CT_SESSION_ICONS = { Morning:'🌅', Afternoon:'☀️', Evening:'🌙' };
+const CT_CHORE_ICONS = {
+  'Mop':'🧽', 'Vacuum':'🧹', 'Dish Clean & Dishwasher':'🍽️', 'Laundry':'🧺',
+  'Sorting Clothes':'👕', 'Extra Exercise':'🏃', 'Other':'✨',
+};
+function ctChoreIcon(name) { return CT_CHORE_ICONS[name] || '🧺'; }
+
 // The ordered set of matrix rows for a kid: routines, then each chore group,
 // then extras. Each row carries how to read/write its cell.
 function ctMatrixRows(kid) {
   const rows = [];
-  CT_SESSIONS.forEach(s => rows.push({ section:'Routines · tracked, no money', label:s, kind:'mandatory', key:s }));
+  CT_SESSIONS.forEach(s => rows.push({ section:'Routines · tracked, no money', label:s, kind:'mandatory', key:s, icon:CT_SESSION_ICONS[s]||'📋' }));
   const groups = ctGroupsForKid(kid);
   const inGroups = new Set();
   groups.forEach(g => {
     const val = (Number(g.valueDollars)||0).toFixed(2);
     const cad = g.cadence === 'daily' ? 'day' : 'week';
     const section = `${g.icon||'🧺'} ${g.name} · $${val} / ${cad}`;
-    (g.choreIds||[]).forEach(cn => { inGroups.add(cn); rows.push({ section, label:cn, kind:'optional', key:cn }); });
+    (g.choreIds||[]).forEach(cn => { inGroups.add(cn); rows.push({ section, label:cn, kind:'optional', key:cn, icon:ctChoreIcon(cn) }); });
   });
   ctPickableChoreNames().filter(cn => !inGroups.has(cn)).forEach(cn =>
-    rows.push({ section:'Extra · counts toward the goal', label:cn, kind:'optional', key:cn }));
+    rows.push({ section:'Extra · counts toward the goal', label:cn, kind:'optional', key:cn, icon:ctChoreIcon(cn) }));
   return rows;
 }
 function ctMatrixCellChecked(kid, dayIdx, row) {
@@ -13543,7 +13929,7 @@ function ctRenderWeekMatrix(kid) {
       cells += `<div class="cm-section">${escapeHtml(row.section)}</div>`;
       lastSection = row.section;
     }
-    cells += `<div class="cm-rowlabel" title="${escapeAttr(row.label)}">${escapeHtml(row.label)}</div>`;
+    cells += `<div class="cm-rowlabel" title="${escapeAttr(row.label)}"><span class="cm-rowicon">${row.icon||''}</span>${escapeHtml(row.label)}</div>`;
     let weekN = 0;
     for (let d = 0; d < 7; d++) {
       const on = ctMatrixCellChecked(kid, d, row);
@@ -13668,8 +14054,10 @@ function ctRenderMoneyCard(kid) {
     ${body}
     <div class="ct-meta" style="margin-top:0.4rem">🏦 Net worth: <b>$${nw.toFixed(2)}</b></div>
     <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.5rem">
-      <button type="button" class="pill-btn" onclick="openMoneyScreen('${kid}')">🏦 Bank &amp; invest</button>
-      ${isParent() ? `<button type="button" class="pill-btn" onclick="openFamilyMeeting()">🧑‍🧑‍🧒 Family meeting</button>` : ''}
+      ${isParent()
+        ? `<button type="button" class="pill-btn" onclick="openMoneyScreen('${kid}')">🏦 Bank &amp; invest</button>
+           <button type="button" class="pill-btn" onclick="openFamilyMeeting()">🧑‍🧑‍🧒 Family meeting</button>`
+        : `<button type="button" class="pill-btn" onclick="openHowIEarn()">💰 How I earn</button>`}
     </div></div>`;
 }
 function ctRenderGroupCards(kid) {
@@ -14032,14 +14420,9 @@ function ctTryMigrateLegacy() {
 // Any previously-imported data remains in state.shared.chore; ctTryMigrateLegacy still
 // applies a stored payload once, and ctMigrateNumberedKeys still runs on local data.
 function renderChoreTab() {
-  ctEnsureShared();
-  ctEnsureProfile(getProfData('jenn'));
-  ctEnsureProfile(getProfData('jess'));
+  ctPrepareRead();
   // ctWeekKey is set once in openChoreTab and preserved across renders (navigation)
   if (!ctWeekKey) ctSetCurrentWeekFromPlanner();
-  ctTryMigrateLegacy();
-  ctMigrateNumberedKeys();
-  ctMigrateToGroups();
   const wrap = document.getElementById('choreWrap');
   if (!wrap) return;
   const badge = document.getElementById('choreProfileBadge');
@@ -14256,6 +14639,7 @@ function confirmNewRule() {
 }
 function deleteLevelRule(id) {
   state.shared.levelRules = (state.shared.levelRules||[]).filter(r=>r.id!==id);
+  tombstoneIds('lr:', [id]);
   saveAll();
   renderLevelRules();
 }
@@ -14375,12 +14759,21 @@ function renderPrintSheet() {
   document.documentElement.style.setProperty('--print-slot', slotPx + 'px');
 
   html += `<div class="print-week-grid">`;
-  // header row
-  html += `<div class="print-header-cell"></div>`;
+  // header row (band-axis corner + time corner + 7 days)
+  html += `<div class="print-header-cell"></div><div class="print-header-cell"></div>`;
   keys.forEach((k,i)=>{
     const d = formatDayKey(k);
     html += `<div class="print-header-cell">${DAY_SHORT[i]} ${d.getDate()}</div>`;
   });
+  // Time-of-day sideband segments (absolute minutes), matching the day view's
+  // axis: 6–9am / 9am–3pm / 3–6pm / 6pm onward.
+  const PRINT_BANDS = [
+    { start: 360,  end: 540,  cls: 'print-band-before',  label: '🌅 Before' },
+    { start: 540,  end: 900,  cls: 'print-band-school',  label: '🏫 School' },
+    { start: 900,  end: 1080, cls: 'print-band-after',   label: '🎒 After'  },
+    { start: 1080, end: 1440, cls: 'print-band-evening', label: '🌙 Evening' },
+  ];
+  const bandForSlot = (absMin) => PRINT_BANDS.find(b => absMin >= b.start && absMin < b.end);
   // rows
   const acts = getAllActivities();
   for (let s=0;s<winSlots;s++) {
@@ -14388,11 +14781,37 @@ function renderPrintSheet() {
     const hour = winStartHr + Math.floor(totalMin/60);
     const min  = totalMin%60;
     const isHourStart = min===0;
+    // Sideband cell: tinted per band; the band's first visible slot carries a
+    // vertical label spanning the band's full (clipped) height.
+    const absMin = winStartMin + totalMin;
+    const band = bandForSlot(absMin);
+    let bandHtml = '';
+    if (band) {
+      const bandVisStart = Math.max(band.start, winStartMin);
+      if (absMin === bandVisStart) {
+        const visSlots = Math.round((Math.min(band.end, winEndMin) - bandVisStart) / 15);
+        bandHtml = `<span class="print-band-label" style="height:${visSlots * slotPx - 1}px">${band.label}</span>`;
+      }
+    }
+    html += `<div class="print-band-cell${band ? ' ' + band.cls : ''}">${bandHtml}</div>`;
     html += `<div class="print-time-cell${isHourStart?' print-hour-start':''}">${isHourStart ? (hour>12?hour-12:hour)+(hour>=12?'pm':'am') : ''}</div>`;
     keys.forEach(k=>{
       const bks = getDayBlocks(k);
       let blockHtml = '';
       bks.forEach(b=>{
+        // Travel / get-ready buffer strips around the block, so the printed
+        // sheet shows "leave at 5:00" for a 5:30 training just like the app.
+        wfBufferSegments(b).forEach(seg=>{
+          const absStart = seg.startRel + START_MIN;
+          const segStart = Math.max(absStart, winStartMin);
+          const segEnd   = Math.min(absStart + seg.dur, winEndMin);
+          if (segEnd <= segStart) return;
+          if (Math.round((segStart - winStartMin)/15) !== s) return;
+          const slotSpan = Math.max(1, Math.round((segEnd - segStart)/15));
+          const bh = slotSpan*slotPx - 1;
+          const label = bh >= 9 ? `${seg.icon} ${seg.min}m` : '';
+          blockHtml += `<div class="print-buffer" style="height:${bh}px" title="${seg.kind==='travel'?'Travel':'Get ready'} — ${seg.min} min">${label}</div>`;
+        });
         // Clip each block to the window so blocks that start earlier/run later
         // still render (trimmed) instead of vanishing.
         const dur = b.durationMin || 0;
