@@ -839,6 +839,26 @@
     outline-offset: 2px;
   }
 
+  /* ═══════════ QUICK PROFILE SWITCHER ═══════════ */
+  .profile-switch-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.3rem; }
+  .profile-switch-opt {
+    display: flex; align-items: center; gap: 0.7rem;
+    width: 100%; text-align: left;
+    background: var(--paper-card, #fffdf5);
+    border: 2px solid var(--ink); border-radius: 14px;
+    padding: 0.7rem 0.9rem; cursor: pointer;
+    font-family: 'Patrick Hand', sans-serif; font-weight: 800;
+    color: var(--ink); box-shadow: 2px 2px 0 var(--ink);
+    transition: transform 0.12s, box-shadow 0.12s;
+  }
+  .profile-switch-opt:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); background: var(--accent-yellow); }
+  .profile-switch-opt.current { background: var(--accent-yellow); }
+  .profile-switch-opt .ps-emoji { font-size: 1.7rem; line-height: 1; flex-shrink: 0; }
+  .profile-switch-opt .ps-name { font-size: 1.2rem; flex: 1; }
+  .profile-switch-opt .ps-check { font-size: 1.3rem; font-weight: 900; color: var(--accent-strong, #c14a24); }
+  .profile-switch-opt.ps-more { background: transparent; box-shadow: none; border-style: dashed; font-weight: 700; }
+  .profile-switch-opt.ps-more .ps-name { font-size: 1rem; color: var(--ink-light); }
+
   /* ═══════════ STATUS DOT (sync) ═══════════ */
   .sync-dot {
     width: 8px; height: 8px; border-radius: 50%;
@@ -1407,10 +1427,10 @@
     font-size: 1.09rem; outline: none; padding: 0; min-width: 0;
   }
   .gt-check {
-    width: 22px; height: 22px; border-radius: 50%;
+    width: 32px; height: 32px; border-radius: 50%;
     border: 2px solid var(--ink); background: #fff;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.04rem; flex-shrink: 0; cursor: pointer;
+    font-size: 1.4rem; flex-shrink: 0; cursor: pointer;
   }
   .gt-item.done .gt-check { background: var(--accent-strong); color: #fff; }
   .gt-day-tag {
@@ -1547,7 +1567,7 @@
   .mm-item { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; padding: 2px 4px; width: 100%; text-align: left; background: transparent; border: 1.5px solid transparent; border-radius: 8px; color: inherit; font-family: inherit; cursor: pointer; }
   .mm-item:hover { border-color: #d9cfb4; background: rgba(0,0,0,0.03); }
   .mm-item:active { transform: translateY(1px); }
-  .mm-item-box { width: 16px; height: 16px; border: 2px solid var(--ink); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 900; flex-shrink: 0; }
+  .mm-item-box { width: 26px; height: 26px; border: 2px solid var(--ink); border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: 900; flex-shrink: 0; }
   .mm-item.on .mm-item-box { background: #95d5b2; }
   .mm-detail-editnote { font-size: 0.72rem; opacity: 0.7; font-style: italic; margin-top: 6px; }
   .ct-history > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
@@ -1649,7 +1669,7 @@
   }
 
   /* ═══════════ FULL WEEKLY VIEW — zones as rows, days as columns ═══════════ */
-  .weekly-full-wrap { padding: 0.5rem; overflow-x: auto; flex: 1; padding-bottom: 0.5rem; }
+  .weekly-full-wrap { padding: 0.5rem; overflow: auto; overscroll-behavior: contain; flex: 1; padding-bottom: 0.5rem; }
   /* On phones the 7 columns would be too thin to read, so give them a
      floor and let this one view scroll instead of squishing. */
   @media (max-width: 600px) { .weekly-full { min-width: 560px; } }
@@ -1657,7 +1677,7 @@
     display: grid;
     /* All 7 days share the width so the whole week is visible at once —
        no horizontal scroll hiding Sunday on tablets/laptops. */
-    grid-template-columns: 96px repeat(7, minmax(0, 1fr));
+    grid-template-columns: 40px repeat(7, minmax(0, 1fr));
     gap: 0;
     min-width: 0;
     background: var(--paper);
@@ -1685,57 +1705,54 @@
   .wf-day-header.today { background: #ffd9a6; }
   .wf-col-dow { font-size: 0.8rem; font-weight: 800; text-transform: uppercase; color: var(--ink); letter-spacing: 1.2px; }
   .wf-col-date { font-size: 1.35rem; font-weight: 800; font-family: 'Gochi Hand', cursive; color: var(--ink); }
-  .wf-zone-row-label {
-    background: var(--bg2);
-    padding: 0.6rem 0.5rem;
-    font-family: 'Patrick Hand', sans-serif;
-    font-size: 0.9rem;
-    font-weight: 800;
-    color: var(--ink);
-    border-bottom: 1.5px dashed var(--paper-line);
-    border-right: 2px solid var(--ink);
-    display: flex;
-    align-items: center;
-    letter-spacing: 0.5px;
+  /* Continuous single-column-per-day timeline: hour labels live in a slim
+     gutter; each day is one tall lane where cards are absolutely positioned by
+     real start time, so an activity is never sliced at a band boundary. */
+  .wf-gutter {
     position: relative;
-  }
-  .wf-zone-row-label:last-of-type { border-bottom: none; }
-  /* Hour ticks down the right edge of the zone label so a card sitting
-     near a zone's top/bottom border can still be read against a real
-     clock time, not just guessed from its position in the lane. */
-  .wf-zone-tick {
-    position: absolute;
-    right: 4px;
-    font-size: 0.62rem;
-    font-weight: 700;
-    color: var(--ink-light, #8a8275);
-    opacity: 0.85;
-    pointer-events: none;
     background: var(--bg2);
-    padding: 0 2px;
+    border-right: 2px solid var(--ink);
   }
-  .wf-zone-tick--top { top: 2px; }
-  .wf-zone-tick--bottom { bottom: 2px; }
-  /* Each zone cell is a time-proportional lane: cards are absolutely
-     positioned by their start time on a shared px-per-minute scale, so the
-     same clock time lands at the same height across all 7 day columns. */
-  .wf-zone-cell {
+  .wf-gutter-hour {
+    position: absolute; right: 4px; transform: translateY(-50%);
+    font-size: 0.62rem; font-weight: 800;
+    color: var(--ink-light, #8a8275);
+    pointer-events: none; white-space: nowrap;
+  }
+  .wf-day-col {
     background: var(--paper);
-    border-bottom: 1.5px dashed var(--paper-line);
     border-right: 1px dashed var(--paper-line);
     padding: 0;
     cursor: pointer;
     position: relative;
     overflow: hidden;
   }
-  .wf-zone-cell:nth-last-child(-n+7) { border-bottom: none; } /* last row of cells */
-  .wf-zone-cell.today { background: #fff4db; }
-  .wf-zone-cell:hover:not(:has(.wf-card:hover)) { background: #fff9e6; }
+  .wf-day-col:last-child { border-right: none; }
+  .wf-day-col.today { box-shadow: inset 0 0 0 2px #ffb865; }
+  /* Time-of-day tint bands — decorative background, not structural rows. */
+  .wf-band {
+    position: absolute; left: 0; right: 0;
+    pointer-events: none; opacity: 0.55; z-index: 0;
+  }
+  .wf-band-before { background: #fff4db; }
+  .wf-band-school { background: #d7eafe; }
+  .wf-band-after  { background: #ffe1d0; }
+  .wf-band-evening{ background: #e8dcf2; }
+  .wf-band-free   { background: #d8f0e1; }
+  /* "Now" marker on today's column */
+  .wf-now-line {
+    position: absolute; left: 0; right: 0; height: 0;
+    border-top: 2px solid #e5484d; z-index: 3; pointer-events: none;
+  }
+  .wf-now-line::before {
+    content: ''; position: absolute; left: 0; top: -3px;
+    width: 5px; height: 5px; border-radius: 50%; background: #e5484d;
+  }
   /* Faint hour gridlines reinforce the time alignment */
   .wf-hour-line {
     position: absolute; left: 0; right: 0; height: 0;
     border-top: 1px dotted var(--paper-line); opacity: 0.6;
-    pointer-events: none;
+    pointer-events: none; z-index: 0;
   }
   .wf-cell-empty {
     position: absolute; inset: 0;
@@ -1790,9 +1807,9 @@
   /* Quick-complete tick in the card corner — check off without opening detail */
   .wf-card-check {
     position: absolute; top: 3px; right: 3px;
-    width: 17px; height: 17px; border-radius: 5px;
-    border: 1.5px solid var(--ink); background: rgba(255,255,255,0.9);
-    color: var(--ink); font-size: 0.72rem; font-weight: 900; line-height: 1;
+    width: 24px; height: 24px; border-radius: 6px;
+    border: 2px solid var(--ink); background: rgba(255,255,255,0.9);
+    color: var(--ink); font-size: 1rem; font-weight: 900; line-height: 1;
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; padding: 0; text-shadow: none; z-index: 2;
   }
@@ -1802,7 +1819,7 @@
   .wf-card--done .wf-card-check { background: var(--accent-green); color: var(--ink); }
   /* W4: even the shortest block keeps a tappable tick, just smaller — never
      leave a rendered block with no way to check it off. */
-  .wf-card--xslim .wf-card-check { width: 14px; height: 14px; font-size: 0.62rem; top: 2px; right: 2px; border-radius: 4px; }
+  .wf-card--xslim .wf-card-check { width: 19px; height: 19px; font-size: 0.78rem; top: 2px; right: 2px; border-radius: 5px; }
   /* Short blocks: drop the duration/time chips so the name + icon still fit */
   .wf-card.wf-card--slim { padding: 0.1rem 0.4rem; align-items: center; }
   .wf-card.wf-card--slim .wf-card-dur { display: none; }
@@ -1828,6 +1845,35 @@
   }
   .legend-item { display: flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; font-weight: 600; }
   .legend-dot { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--ink); }
+
+  /* ═══════════ WEEKLY SIGNATURE (kid sign-off) ═══════════ */
+  .week-signature {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.8rem;
+    flex-wrap: wrap;
+    margin: 0.6rem 0.2rem 0.2rem;
+    padding: 0.6rem 0.9rem;
+    background: var(--paper-card, #fffdf5);
+    border: 2px dashed var(--ink); border-radius: 14px;
+  }
+  .wk-sig-line { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; min-width: 0; }
+  .wk-sig-label { font-family: 'Patrick Hand', sans-serif; font-weight: 800; font-size: 1rem; color: var(--ink); }
+  .wk-sig-name {
+    font-family: 'Gochi Hand', cursive; font-size: 1.8rem; line-height: 1;
+    color: var(--accent-strong, #c14a24);
+    border-bottom: 2px solid var(--ink); padding: 0 0.5rem;
+  }
+  .wk-sig-date { font-size: 0.85rem; color: var(--ink-light); font-weight: 700; }
+  .wk-sig-line--empty .wk-sig-blank {
+    display: inline-block; min-width: 160px; border-bottom: 2px solid var(--ink); height: 1.4rem;
+  }
+  .wk-sig-btn {
+    font-family: 'Patrick Hand', sans-serif; font-weight: 800; font-size: 0.95rem;
+    background: var(--accent-yellow); color: var(--ink);
+    border: 2px solid var(--ink); border-radius: 10px; padding: 0.35rem 0.8rem;
+    cursor: pointer; box-shadow: 2px 2px 0 var(--ink); flex-shrink: 0;
+  }
+  .wk-sig-btn:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
+  .wk-sig-btn--clear { background: transparent; box-shadow: none; font-size: 0.82rem; font-weight: 700; color: var(--ink-light); border-style: dashed; }
 
   /* ═══════════ DAY EDITOR ═══════════ */
   /* Labeled "back to week" button in the day topbar */
@@ -1916,6 +1962,7 @@
   .timeline-wrap {
     flex: 1;
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 0 0.8rem;
     padding-bottom: 260px;
   }
@@ -1937,7 +1984,7 @@
     background: #fff4db; border: 2px dashed #e8dfc3; border-radius: 10px; padding: 3px 10px;
   }
   .dc-row {
-    display: grid; grid-template-columns: 76px 1fr 26px; align-items: center; gap: 8px;
+    display: grid; grid-template-columns: 76px 1fr 36px; align-items: center; gap: 8px;
     border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px;
     background: var(--paper-card, #fffdf5); box-shadow: 2px 2px 0 var(--ink); cursor: pointer;
   }
@@ -1955,8 +2002,8 @@
   .dc-name { font-weight: 800; font-size: 1.02rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .dc-meta { font-size: 0.8rem; opacity: 0.85; }
   .dc-check {
-    width: 26px; height: 26px; border-radius: 7px; border: 2px solid var(--ink);
-    background: rgba(255,255,255,0.9); color: var(--ink); font-size: 0.95rem; font-weight: 900;
+    width: 36px; height: 36px; border-radius: 9px; border: 2px solid var(--ink);
+    background: rgba(255,255,255,0.9); color: var(--ink); font-size: 1.35rem; font-weight: 900;
     display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
   }
   .dc-check.done { background: #95d5b2; }
@@ -2233,19 +2280,47 @@
     word-break: break-word;
     white-space: normal;
   }
-  .placed-block .block-gear {
-    font-size: 0.72rem;
-    font-weight: 600;
-    opacity: 0.95;
-    line-height: 1.2;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    word-break: break-word;
-    white-space: normal;
+  /* Tappable get-ready gear checklist on a training block. */
+  .placed-block .block-gear-list {
+    margin-top: 3px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
   }
-  .placed-block.block-font-lg .block-gear { font-size: 0.8rem; }
+  .placed-block .block-gear-head {
+    font-size: 0.74rem; font-weight: 800; opacity: 0.95;
+    line-height: 1.1;
+  }
+  .placed-block .block-gear-item {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.22);
+    border: 1.5px solid rgba(255,255,255,0.65);
+    border-radius: 8px;
+    padding: 2px 6px;
+    font-family: inherit;
+    font-size: 0.8rem; font-weight: 700;
+    color: inherit; text-align: left;
+    cursor: pointer; min-width: 0; width: 100%;
+    box-shadow: none;
+  }
+  .placed-block.light-bg .block-gear-item { border-color: rgba(42,35,32,0.35); background: rgba(255,255,255,0.4); }
+  .placed-block .block-gear-item .block-gear-box {
+    flex-shrink: 0;
+    width: 26px; height: 26px;
+    border-radius: 7px;
+    border: 2px solid currentColor;
+    background: rgba(255,255,255,0.85);
+    color: var(--ink);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.15rem; font-weight: 900; line-height: 1;
+  }
+  .placed-block .block-gear-item.checked .block-gear-box { background: var(--accent-green, #7ac74f); }
+  .placed-block .block-gear-item .block-gear-label {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .placed-block .block-gear-item.checked .block-gear-label { text-decoration: line-through; opacity: 0.8; }
+  .placed-block.block-font-lg .block-gear-head { font-size: 0.82rem; }
   .placed-block.placed-block--completed {
     filter: brightness(0.9) saturate(0.6);
     border-style: solid;
@@ -2296,18 +2371,18 @@
   /* Quick-complete tick in the block corner */
   .block-done-btn {
     position: absolute;
-    top: 4px;
-    right: 30px;
-    width: 20px;
-    height: 20px;
-    border-radius: 6px;
-    border: 1.5px solid var(--ink);
-    background: rgba(255,255,255,0.75);
+    top: 5px;
+    right: 6px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 2px solid var(--ink);
+    background: rgba(255,255,255,0.85);
     color: var(--ink);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.82rem;
+    font-size: 1.25rem;
     font-weight: 900;
     line-height: 1;
     cursor: pointer;
@@ -3212,6 +3287,19 @@
     border: 1px solid currentColor; background: rgba(255,255,255,0.55);
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
+  /* Signature footer on the printed weekly plan */
+  .print-signature {
+    display: flex; gap: 22px; align-items: flex-end;
+    margin-top: 10px; padding: 0 4px;
+  }
+  .print-sig-block { display: flex; align-items: flex-end; gap: 6px; flex: 1; }
+  .print-sig-block--date { flex: 0 0 150px; }
+  .print-sig-caption { font-size: 8pt; font-weight: 700; color: #333; white-space: nowrap; }
+  .print-sig-line { flex: 1; border-bottom: 1px solid #000; min-height: 16px; position: relative; }
+  .print-sig-name {
+    font-family: 'Gochi Hand', cursive; font-size: 15pt; line-height: 1;
+    position: absolute; left: 6px; bottom: 1px;
+  }
 
   /* Scrollbar polish */
   ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -3267,10 +3355,10 @@
     opacity: 0.7;
   }
   .checklist-check {
-    width: 24px; height: 24px; border-radius: 6px;
+    width: 34px; height: 34px; border-radius: 8px;
     border: 2px solid var(--ink); background: #fff;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1rem; flex-shrink: 0; cursor: pointer;
+    font-size: 1.4rem; flex-shrink: 0; cursor: pointer;
   }
   .checklist-item.checked .checklist-check { background: var(--accent-strong); color: #fff; }
   .checklist-text { flex: 1; font-size: 1.09rem; }
@@ -3374,10 +3462,10 @@
 
   /* ── Audit fix: larger chore checkbox tap targets (was 20×20px, now 28px visible + 48px hit area) ── */
   .ct-check {
-    width: 28px;
-    height: 28px;
+    width: 38px;
+    height: 38px;
     position: relative;
-    font-size: 1.1rem;
+    font-size: 1.45rem;
     flex-shrink: 0;
   }
   .ct-check::before {
@@ -3915,7 +4003,7 @@
   <div class="topbar week-topbar">
     <div class="week-topbar__row1">
       <div class="topbar-left">
-        <button class="profile-badge" onclick="goProfile()" id="weekProfileBadge" aria-label="Switch profile"></button>
+        <button class="profile-badge" onclick="openProfileSwitcher()" id="weekProfileBadge" aria-label="Switch profile"></button>
         <h2>My Week</h2>
       </div>
       <div class="week-nav week-nav--inline">
@@ -3926,6 +4014,7 @@
       <div class="week-actions">
         <button class="btn-icon btn-icon--labeled" aria-label="Quest Board" onclick="goQuestBoard()" title="Quest Board"><span aria-hidden="true">🎮</span><span class="btn-icon__label">Quests</span></button>
         <button class="btn-icon btn-icon--labeled" aria-label="Weekly Chore" onclick="openChoreTab()" title="Weekly Chore"><span aria-hidden="true">🧹</span><span class="btn-icon__label">Chores</span></button>
+        <button class="btn-icon btn-icon--labeled" aria-label="Bank &amp; Invest" onclick="openMoneyScreen()" title="Bank &amp; Invest"><span aria-hidden="true">🏦</span><span class="btn-icon__label">Bank</span></button>
         <button class="btn-icon btn-icon--labeled" aria-label="Challenges" onclick="openChallenges()" title="Challenges"><span aria-hidden="true">🎯</span><span class="btn-icon__label">Challenge</span></button>
         <button class="btn-icon btn-icon--labeled" aria-label="Sister Sync" onclick="openSisterSync()" title="Sister Sync"><span aria-hidden="true">👯</span><span class="btn-icon__label">Sisters</span></button>
         <button class="btn-icon btn-icon--labeled" aria-label="Print week" onclick="openPrint()" title="Print week"><span aria-hidden="true">🖨</span><span class="btn-icon__label">Print</span></button>
@@ -3958,6 +4047,7 @@
   <div id="weekFull" style="display:flex">
     <div class="weekly-full-wrap">
       <div class="weekly-full" id="weeklyFullGrid"></div>
+      <div class="week-signature" id="weekSignatureBar"></div>
     </div>
   </div>
 
@@ -4046,7 +4136,7 @@
 <div class="screen" id="screen-money">
   <div class="topbar">
     <div class="topbar-left">
-      <button class="btn-icon" onclick="openChoreTab()">◀</button>
+      <button class="btn-icon" onclick="goWeek()">◀</button>
       <h2>Bank &amp; Invest 🏦</h2>
     </div>
     <div class="profile-badge" id="moneyProfileBadge"></div>
@@ -4060,6 +4150,15 @@
     <div class="sheet-handle"></div>
     <h3>🧑‍🧑‍🧒 Weekly family meeting</h3>
     <div id="familyMeetingBody"></div>
+  </div>
+</div>
+
+<!-- Quick profile switcher (tap the profile icon) -->
+<div class="overlay" id="profileSwitchOverlay" onclick="overlayClick(event,'profileSwitchOverlay')">
+  <div class="sheet sheet--compact">
+    <div class="sheet-handle"></div>
+    <h3>Switch profile 👤</h3>
+    <div class="profile-switch-list" id="profileSwitchBody"></div>
   </div>
 </div>
 
@@ -4090,7 +4189,7 @@
         <button class="btn-icon" id="restDayBtn" onclick="toggleRestDay(currentDayKey)" aria-label="Mark rest day" title="Mark today a rest day">😌 Rest</button>
         <button class="btn-icon" onclick="openTemplateSheet()" aria-label="Apply template">📋</button>
         <button class="btn-icon" onclick="openReflectSheet()" aria-label="Reflect on today">🌙</button>
-        <button class="profile-badge" onclick="goProfile()" id="dayProfileBadge" aria-label="Switch profile"></button>
+        <button class="profile-badge" onclick="openProfileSwitcher()" id="dayProfileBadge" aria-label="Switch profile"></button>
       </div>
     </div>
     <div class="day-topbar__row2">
@@ -5135,13 +5234,24 @@ const CAT_HEX = {
   routine:'#80cbc4'
 };
 
-/* Training tags + sport-specific starter objectives */
+/* Training tags + sport-specific starter objectives. Each topic carries its
+   own icon and background colour so a Skating block reads differently from a
+   Swimming or Dryland one at a glance, not just by its text label. */
 const TRAINING_TAGS = [
-  { id:'skating',  label:'⛸ Skating',  icon:'⛸' },
-  { id:'swimming', label:'🏊 Swimming', icon:'🏊' },
-  { id:'dryland',  label:'💪 Dryland', icon:'💪' },
-  { id:'general',  label:'🏃 General', icon:'🏃' },
+  { id:'skating',  label:'⛸ Skating',  name:'Skating',  icon:'⛸', colour:'#8a6fd0' },
+  { id:'swimming', label:'🏊 Swimming', name:'Swimming', icon:'🏊', colour:'#2f9fd0' },
+  { id:'dryland',  label:'💪 Dryland', name:'Dryland',  icon:'💪', colour:'#e08a3a' },
+  { id:'general',  label:'🏃 General', name:'Training', icon:'🏃', colour:'#ef476f' },
 ];
+function getTrainingTopic(tag) {
+  return TRAINING_TAGS.find(t => t.id === tag) || TRAINING_TAGS[3];
+}
+/* The background a training block should use: an explicit non-default custom
+   colour wins; otherwise the topic colour (falls back to the training pink). */
+function trainingBlockColour(b) {
+  if (b.colour && b.colour !== CAT_HEX.training) return b.colour;
+  return getTrainingTopic(b.tag).colour;
+}
 
 /* Figure skating: landing doubles, targeting double axel */
 const SKATING_OBJECTIVES = [
@@ -6782,6 +6892,34 @@ function goProfile() {
   parentUnlockedThisSession = false;
   profile=null; selectedActivity=null; showScreen('profile');
 }
+
+/* Quick profile switcher popup — tapping the profile icon pops up a small
+   window to hop between Jenn, Jess and Parent Mode without leaving the current
+   view for the full profile screen. */
+function openProfileSwitcher() {
+  const cur = activeProfile();
+  const parentNow = isParent();
+  const opt = (p, emoji, name) => {
+    const on = !parentNow && cur === p;
+    return `<button type="button" class="profile-switch-opt${on ? ' current' : ''}" onclick="pickProfileFromSwitcher('${p}')">`
+      + `<span class="ps-emoji">${emoji}</span><span class="ps-name">${name}</span>`
+      + `${on ? '<span class="ps-check">✓</span>' : ''}</button>`;
+  };
+  const body = document.getElementById('profileSwitchBody');
+  body.innerHTML =
+    opt('jenn', '🐥', 'Jenn') +
+    opt('jess', '🦊', 'Jess') +
+    `<button type="button" class="profile-switch-opt${parentNow ? ' current' : ''}" onclick="pickProfileFromSwitcher('parent')">`
+      + `<span class="ps-emoji">🧑‍🧑‍🧒</span><span class="ps-name">Parent Mode</span>`
+      + `${parentNow ? '<span class="ps-check">✓</span>' : ''}</button>` +
+    `<button type="button" class="profile-switch-opt ps-more" onclick="closeSheet('profileSwitchOverlay'); goProfile();">`
+      + `<span class="ps-emoji">👤</span><span class="ps-name">Full profile screen…</span></button>`;
+  openSheet('profileSwitchOverlay');
+}
+async function pickProfileFromSwitcher(p) {
+  closeSheet('profileSwitchOverlay');
+  await selectProfile(p);
+}
 function goWeek()    { selectedActivity=null; showScreen('week'); renderWeek(); }
 function openChoreTab() {
   selectedActivity = null;
@@ -6810,6 +6948,60 @@ function setWeekView(v) {
   renderWeek();
 }
 function changeWeek(d) { weekOffset += d; renderWeek(); }
+
+/* ── Kid's weekly signature: a commitment "I'll follow my plan" sign-off,
+   shown on the weekly view and carried onto the printed sheet. Stored per
+   week per profile so each kid signs their own plan. ── */
+function weekSignatureKey(keys) { return keys && keys[0] ? keys[0] : getDayKeys(weekOffset)[0]; }
+function getWeekSignature(keys, p=activeProfile()) {
+  const sigs = getProfData(p)?.weekSignatures;
+  return (sigs && sigs[weekSignatureKey(keys)]) || null;
+}
+function renderWeekSignature(keys) {
+  const bar = document.getElementById('weekSignatureBar');
+  if (!bar) return;
+  const p = activeProfile();
+  const name = p==='jenn' ? 'Jenn' : 'Jess';
+  const sig = getWeekSignature(keys, p);
+  if (sig) {
+    const when = new Date(sig.signedAt);
+    const dateStr = `${MONTH_SHORT[when.getMonth()]} ${when.getDate()}`;
+    bar.innerHTML = `
+      <div class="wk-sig-line">
+        <span class="wk-sig-label">✍️ Signed by</span>
+        <span class="wk-sig-name">${escapeHtml(sig.name || name)}</span>
+        <span class="wk-sig-date">on ${dateStr}</span>
+      </div>
+      <button type="button" class="wk-sig-btn wk-sig-btn--clear" onclick="clearWeekSignature()">Unsign</button>`;
+  } else {
+    bar.innerHTML = `
+      <div class="wk-sig-line wk-sig-line--empty">
+        <span class="wk-sig-label">✍️ ${name}, sign your week</span>
+        <span class="wk-sig-blank"></span>
+      </div>
+      <button type="button" class="wk-sig-btn" onclick="signWeek()">Sign this week ✍️</button>`;
+  }
+}
+async function signWeek() {
+  const keys = getDayKeys(weekOffset);
+  const p = activeProfile();
+  const defName = p==='jenn' ? 'Jenn' : 'Jess';
+  const entered = await showPrompt('Sign your week ✍️ — write your name:', { value: defName });
+  if (entered == null) return;                 // cancelled
+  const name = String(entered).trim() || defName;
+  const pd = getProfData(p);
+  if (!pd.weekSignatures) pd.weekSignatures = {};
+  pd.weekSignatures[weekSignatureKey(keys)] = { name, signedAt: Date.now() };
+  saveAll();
+  renderWeekSignature(keys);
+  showToast(`✍️ ${name} signed this week!`);
+}
+function clearWeekSignature() {
+  const keys = getDayKeys(weekOffset);
+  const pd = getProfData(activeProfile());
+  if (pd.weekSignatures) { delete pd.weekSignatures[weekSignatureKey(keys)]; saveAll(); }
+  renderWeekSignature(keys);
+}
 
 function renderWeek() {
   // parent banner
@@ -6842,6 +7034,7 @@ function renderWeek() {
 
   renderGoalsTodos();
   renderWeekGlance(keys);
+  renderWeekSignature(keys);
 
   const coachEl = document.getElementById('weekCoachTip');
   if (coachEl) {
@@ -7437,38 +7630,45 @@ function renderDayBar(key, blocks) {
   }
 }
 
-function wfZoneOverlap(relStart, durMin, z) {
-  const blockEnd = relStart + durMin;
-  const ovStart = Math.max(relStart, z.start);
-  const ovEnd = Math.min(blockEnd, z.end);
-  return Math.max(0, ovEnd - ovStart);
-}
-function wfPickZone(relStart, durMin, zones) {
-  let best = zones[0], bestOv = -1;
-  zones.forEach(z=>{
-    const ov = wfZoneOverlap(relStart, durMin, z);
-    if (ov > bestOv) { bestOv = ov; best = z; }
-  });
-  return bestOv > 0 ? best : zones[zones.length - 1];
+/* Buffer segments for a block, stacked so get-ready and travel never occupy the
+   same minutes: before the block you get ready FIRST, then travel (drive), then
+   the activity; after it you travel home, then put the gear away. Returns
+   segments with startRel (minutes from START_MIN), dur, icon, min — time order.
+   Getting skate boots ready can't happen while driving, so the two buffers are
+   laid end-to-end, not stacked on the same slot. */
+function wfBufferSegments(b) {
+  const travelMin = getTravelBufMin(b);
+  const readyMin  = getGetReadyBufMin(b);
+  const relStart = b.startMin - START_MIN;
+  const dur = Math.max(5, b.durationMin || 0);
+  const relEnd = relStart + dur;
+  const segs = [];
+  // Before: [get-ready][travel][ACTIVITY]
+  if (travelMin > 0) segs.push({ startRel: relStart - travelMin, dur: travelMin, icon: '🚗', min: travelMin, kind: 'travel' });
+  if (readyMin  > 0) segs.push({ startRel: relStart - travelMin - readyMin, dur: readyMin, icon: '👕', min: readyMin, kind: 'ready' });
+  // After: [ACTIVITY][travel][get-ready]
+  if (travelMin > 0) segs.push({ startRel: relEnd, dur: travelMin, icon: '🚗', min: travelMin, kind: 'travel' });
+  if (readyMin  > 0) segs.push({ startRel: relEnd + travelMin, dur: readyMin, icon: '👕', min: readyMin, kind: 'ready' });
+  return segs;
 }
 
-/* Split a block into one render segment per zone it overlaps so a block that
-   crosses a zone boundary shows in EVERY zone instead of being clamped into a
-   single one (W1/W7). relStart/dur are minutes from START_MIN. Zones must be
-   contiguous and sorted by start. Returns segments in time order, each flagged
-   isFirst (earliest, keeps the time label + check button) / isLast. */
-function splitBlockIntoZoneSegments(relStart, dur, zones) {
-  const blockEnd = relStart + dur;
-  const segs = [];
-  zones.forEach(z => {
-    const segStart = Math.max(relStart, z.start);
-    const segEnd   = Math.min(blockEnd, z.end);
-    if (segEnd - segStart <= 0) return;
-    segs.push({ zoneId: z.id, zone: z, segStart, segEnd });
-  });
-  segs.sort((a,b)=> a.segStart - b.segStart);
-  segs.forEach((s,i)=>{ s.isFirst = (i===0); s.isLast = (i===segs.length-1); });
-  return segs;
+/* Distinguish a tap from a scroll/drag so a large block (like Training) that
+   fills the timeline doesn't open its editor every time the user tries to
+   scroll past it. If the pointer moves beyond a small threshold — or the
+   browser cancels the pointer to start scrolling — the following click is
+   treated as a scroll gesture and ignored. */
+function attachTapGuard(el, onTap) {
+  let sx = 0, sy = 0, moved = false;
+  el.addEventListener('pointerdown', (e) => { sx = e.clientX; sy = e.clientY; moved = false; }, { passive: true });
+  el.addEventListener('pointermove', (e) => {
+    if (Math.abs(e.clientX - sx) > 8 || Math.abs(e.clientY - sy) > 8) moved = true;
+  }, { passive: true });
+  el.addEventListener('pointercancel', () => { moved = true; }, { passive: true });
+  el.onclick = (e) => {
+    e.stopPropagation();
+    if (moved) { moved = false; return; }
+    onTap(e);
+  };
 }
 
 function renderFullWeek(keys) {
@@ -7476,15 +7676,22 @@ function renderFullWeek(keys) {
   grid.innerHTML = '';
   const acts = getAllActivities();
 
-  /* Minutes from START_MIN (6am): before 6-8am, school 8am-3pm, after 3-6pm, evening 6pm-10pm */
-  const ZONES = [
-    { id:'before',  label: '🌅 Before school · Morning (6–8 am)', start: 0,   end: 120 },
-    { id:'school',  label: '🏫 School · Daytime (8 am–3 pm)',    start: 120, end: 540 },
-    { id:'after',   label: '🎒 After school · Afternoon (3–6 pm)', start: 540, end: 720 },
-    { id:'evening', label: '🌙 Evening (6–10 pm)',                start: 720, end: DAY_MIN_SPAN },
-  ];
+  // Continuous single-column-per-day timeline (matches the Day view): each
+  // activity is ONE unbroken block positioned by its real start time on a
+  // shared px-per-minute scale, so nothing is ever sliced at a band boundary.
+  const PX_PER_MIN = 0.72;
+  const totalH = Math.round(DAY_MIN_SPAN * PX_PER_MIN);
 
-  // Day headers row
+  // Time-of-day bands are decorative background tint now, not structural rows.
+  const WEEKDAY_BANDS = [
+    { start: 0,   end: 120,          cls: 'wf-band-before'  },
+    { start: 120, end: 540,          cls: 'wf-band-school'  },
+    { start: 540, end: 720,          cls: 'wf-band-after'   },
+    { start: 720, end: DAY_MIN_SPAN, cls: 'wf-band-evening' },
+  ];
+  const WEEKEND_BANDS = [ { start: 0, end: DAY_MIN_SPAN, cls: 'wf-band-free' } ];
+
+  // ── Header row: corner + 7 day headers ──
   const corner = document.createElement('div');
   corner.className = 'wf-corner';
   grid.appendChild(corner);
@@ -7497,180 +7704,145 @@ function renderFullWeek(keys) {
     grid.appendChild(header);
   });
 
-  // Consistent time scale so any clock time maps to the same pixel offset
-  // across every day column — cards align to the time grid, not to order.
-  const PX_PER_MIN = 0.9;
+  const firstHour = Math.ceil(START_MIN / 60);
+  const lastHour  = Math.floor((START_MIN + DAY_MIN_SPAN) / 60);
 
-  // For each zone row: zone label + 7 day cells
-  ZONES.forEach(z => {
-    const zoneSpan = z.end - z.start;               // minutes covered by this zone
-    const cellH = Math.round(zoneSpan * PX_PER_MIN); // shared height for all 7 day cells
+  // ── Slim gutter with hour labels down the side ──
+  const gutter = document.createElement('div');
+  gutter.className = 'wf-gutter';
+  gutter.style.height = totalH + 'px';
+  for (let h = firstHour; h <= lastHour; h++) {
+    const rel = h*60 - START_MIN;
+    if (rel < 0 || rel > DAY_MIN_SPAN) continue;
+    const lbl = document.createElement('div');
+    lbl.className = 'wf-gutter-hour';
+    lbl.style.top = (rel * PX_PER_MIN) + 'px';
+    lbl.textContent = `${((h+11)%12)+1}${h>=12?'p':'a'}`;
+    gutter.appendChild(lbl);
+  }
+  grid.appendChild(gutter);
 
-    const zoneLabel = document.createElement('div');
-    zoneLabel.classList.add('wf-zone-'+z.id);
-    zoneLabel.className = 'wf-zone-row-label';
-    zoneLabel.textContent = z.label;
+  // ── One continuous lane per day ──
+  keys.forEach((key, ci) => {
+    const dow = formatDayKey(key).getDay();
+    const bands = (dow===0 || dow===6) ? WEEKEND_BANDS : WEEKDAY_BANDS;
 
-    // Clock-time ticks at the zone's own top/bottom edge so a card sitting
-    // near a zone boundary (like a 5:30 swim block right before 6pm) reads
-    // against a real hour instead of just "close to the next section".
-    const zoneStartAbs = START_MIN + z.start;
-    const zoneEndAbs = START_MIN + z.end;
-    [zoneStartAbs, zoneEndAbs].forEach(hm => {
-      const isTop = hm === zoneStartAbs;
-      const tick = document.createElement('span');
-      tick.className = 'wf-zone-tick' + (isTop ? ' wf-zone-tick--top' : ' wf-zone-tick--bottom');
-      const h = Math.floor(hm / 60) % 24;
-      tick.textContent = `${((h+11)%12)+1}${h>=12?'p':'a'}`;
-      zoneLabel.appendChild(tick);
-    });
-    grid.appendChild(zoneLabel);
-
-    keys.forEach((key, ci) => {
-      const cell = document.createElement('div');
-      cell.className = 'wf-zone-cell wf-zone-'+z.id + (key===todayKey() ? ' today' : '');
-      cell.style.height = cellH + 'px';
-      cell.onclick = (e)=>{
-        // Only open day if clicked on empty area, not on a card
-        if (e.target === cell || e.target.classList.contains('wf-cell-empty') || e.target.classList.contains('wf-hour-line')) {
-          openDay(key, ci);
-        }
-      };
-
-      // Empty backdrop makes the whole lane tappable to open the day
-      const emp = document.createElement('div');
-      emp.className = 'wf-cell-empty';
-      cell.appendChild(emp);
-
-      // Hour gridlines within the zone to anchor the eye to the time grid
-      const firstHour = Math.ceil((START_MIN + z.start) / 60) * 60; // absolute minutes
-      for (let hm = firstHour; hm < START_MIN + z.end; hm += 60) {
-        const rel = (hm - START_MIN) - z.start;
-        if (rel <= 0) continue;
-        const line = document.createElement('div');
-        line.className = 'wf-hour-line';
-        line.style.top = (rel / zoneSpan * 100) + '%';
-        cell.appendChild(line);
+    const cell = document.createElement('div');
+    cell.className = 'wf-day-col' + (key===todayKey() ? ' today' : '');
+    cell.style.height = totalH + 'px';
+    cell.onclick = (e)=>{
+      // Only open the day when the empty lane (not a card) is tapped.
+      if (e.target === cell || e.target.classList.contains('wf-band') || e.target.classList.contains('wf-hour-line')) {
+        openDay(key, ci);
       }
+    };
 
-      const blocks = (getDayBlocks(key) || [])
-        .slice().sort((a,b)=>a.startMin - b.startMin)
-        .filter(b=>{
-          const relStart = b.startMin - START_MIN;
-          const dur = Math.max(5, b.durationMin || 0);
-          // Include the block in EVERY zone it overlaps (not just its "best"
-          // zone) so a boundary-crossing block renders a segment in each — the
-          // segment is clamped to this zone's edges below (W1). Mirrors the
-          // travel-strip pass further down.
-          return wfZoneOverlap(relStart, dur, z) > 0;
-        });
-
-      // Split blocks that overlap in time into side-by-side columns so
-      // vertical position always reflects the real start time.
-      const cols = wfAssignColumns(blocks);
-
-      blocks.forEach(b=>{
-        const act = acts.find(a=>a.id===b.actId);
-        if (!act) return;
-        const startMinOfDay = b.startMin;
-        const hr = Math.floor(startMinOfDay/60);
-        const min = startMinOfDay % 60;
-        const timeStr = `${hr>12?hr-12:hr}:${String(min).padStart(2,'0')}${hr>=12?'p':'a'}`;
-
-        // Position by time within the zone (clamped to the zone's span). A
-        // block spanning several zones renders one segment per zone; only the
-        // segment in the zone the block actually starts in is the "first" one.
-        const relStart = b.startMin - START_MIN;
-        const dur = Math.max(5, b.durationMin || 0);
-        const segStart = Math.max(relStart, z.start);
-        const segEnd   = Math.min(relStart + dur, z.end);
-        const isFirst  = relStart >= z.start; // zones are contiguous → true only where it starts
-        const topPct = (segStart - z.start) / zoneSpan * 100;
-        const heightPct = Math.max(segEnd - segStart, 0) / zoneSpan * 100;
-        const pxHeight = heightPct / 100 * cellH;
-
-        const bg = b.colour || CAT_HEX[act.cat] || '#888';
-        const card = document.createElement('div');
-        let cls = 'wf-card' + (isLightColour(bg) ? ' light-bg' : '');
-        if (pxHeight < 34) cls += ' wf-card--slim';
-        if (pxHeight < 22) cls += ' wf-card--xslim';
-        if (pxHeight < 16) cls += ' wf-card--icononly'; // W2: too short for a name → icon only
-        if (b.completed) cls += ' wf-card--done';
-        if (!isFirst)   cls += ' wf-card--cont';         // W1: continuation segment
-        card.className = cls;
-
-        const slot = cols.get(b.id) || { col: 0, count: 1 };
-        const colCount = slot.count;
-        const gap = 3; // px between overlapping columns
-        const leftCss  = 'calc(' + (slot.col * 100 / colCount) + '% + 1px)';
-        const widthCss = 'calc(' + (100 / colCount) + '% - ' + (gap + 2) + 'px)';
-
-        // Inline travel/get-ready tag on the card (the strips themselves are
-        // drawn in a separate pass below so both sides always show).
-        const travelMin = b.travelBuffer ? getTravelBufMin(b) : 0;
-        const readyMin  = b.getReadyBuffer ? getGetReadyBufMin(b) : 0;
-        const bufBefore = travelMin + readyMin;
-
-        card.style.top = topPct + '%';
-        card.style.height = 'calc(' + heightPct + '% - 2px)';
-        card.style.left  = leftCss;
-        card.style.width = widthCss;
-        card.style.background = bg;
-        const travelTag = bufBefore > 0 ? `<span class="wf-card-travel">${travelMin ? '🚗' : '👕'}${bufBefore}m</span>` : '';
-        const stampEmoji = b.parentStamp && b.parentStamp.emoji ? b.parentStamp.emoji + ' ' : '';
-        if (isFirst) {
-          card.innerHTML = `
-            <div class="wf-card-time">${timeStr}</div>
-            <div class="wf-card-icon">${act.icon}</div>
-            <div class="wf-card-name">${stampEmoji}${act.name}${travelTag}</div>
-            <div class="wf-card-dur">${formatDuration(b.durationMin)}</div>
-            <button type="button" class="wf-card-check" aria-label="${b.completed?'Mark not done':'Mark done'}"
-              onclick="toggleBlockDone('${key}','${b.id}',event)">${b.completed?'✓':''}</button>
-          `;
-        } else {
-          // Continuation segment: no time, no check, a ⤵ marker to signal the
-          // block began in an earlier zone. Same tooltip + click-through below.
-          card.innerHTML = `
-            <div class="wf-card-cont-marker" aria-hidden="true">⤵</div>
-            <div class="wf-card-icon">${act.icon}</div>
-            <div class="wf-card-name">${stampEmoji}${act.name}</div>
-          `;
-        }
-        card.title = `${act.icon} ${act.name} — ${timeStr}, ${formatDuration(b.durationMin)}`
-          + (isFirst ? '' : ' · continues from the previous section')
-          + (bufBefore > 0 ? ` · ${travelMin ? '🚗 travel' : '👕 get-ready'} ${bufBefore} min each way` : '');
-        card.onclick = (e)=>{ e.stopPropagation(); openDayFromWeekCard(key, ci, b.id); };
-        cell.appendChild(card);
-      });
-
-      // Travel / get-ready strips for ALL of the day's blocks, drawn in
-      // whichever zone they fall into. This guarantees BOTH the before and
-      // after strip render even when a buffer crosses a zone boundary
-      // (previously a boundary-crossing block showed only one side).
-      (getDayBlocks(key) || []).forEach(b => {
-        const travelMin = b.travelBuffer ? getTravelBufMin(b) : 0;
-        const readyMin  = b.getReadyBuffer ? getGetReadyBufMin(b) : 0;
-        const buf = travelMin + readyMin;
-        if (buf <= 0) return;
-        const icon = travelMin ? '🚗' : '👕';
-        const relStart = b.startMin - START_MIN;
-        const dur = Math.max(5, b.durationMin || 0);
-        const entries = [
-          { s: relStart - buf, e: relStart },              // before
-          { s: relStart + dur, e: relStart + dur + buf },  // after
-        ];
-        entries.forEach(en => {
-          const segS = Math.max(en.s, z.start);
-          const segE = Math.min(en.e, z.end);
-          if (segE - segS < 2) return; // no visible overlap with this zone
-          const topPx = (segS - z.start) / zoneSpan * cellH;
-          const hPx = (segE - segS) / zoneSpan * cellH;
-          cell.appendChild(wfTravelStrip(topPx, hPx, '2px', 'calc(100% - 4px)', icon, buf));
-        });
-      });
-
-      grid.appendChild(cell);
+    // Zone tint bands behind everything.
+    bands.forEach(bd => {
+      const seg = document.createElement('div');
+      seg.className = 'wf-band ' + bd.cls;
+      seg.style.top = (bd.start * PX_PER_MIN) + 'px';
+      seg.style.height = ((bd.end - bd.start) * PX_PER_MIN) + 'px';
+      cell.appendChild(seg);
     });
+
+    // Hour gridlines to anchor the eye to the time grid.
+    for (let h = firstHour; h <= lastHour; h++) {
+      const rel = h*60 - START_MIN;
+      if (rel <= 0 || rel >= DAY_MIN_SPAN) continue;
+      const line = document.createElement('div');
+      line.className = 'wf-hour-line';
+      line.style.top = (rel * PX_PER_MIN) + 'px';
+      cell.appendChild(line);
+    }
+
+    // "Now" marker on today's column.
+    if (key === todayKey()) {
+      const now = new Date();
+      const nowMin = now.getHours()*60 + now.getMinutes() - START_MIN;
+      if (nowMin > 0 && nowMin < DAY_MIN_SPAN) {
+        const nl = document.createElement('div');
+        nl.className = 'wf-now-line';
+        nl.style.top = (nowMin * PX_PER_MIN) + 'px';
+        cell.appendChild(nl);
+      }
+    }
+
+    const blocks = (getDayBlocks(key) || []).slice().sort((a,b)=>a.startMin - b.startMin);
+    const cols = wfAssignColumns(blocks);
+
+    // Travel / get-ready strips (underneath cards), stacked so getting ready and
+    // driving never share the same minutes.
+    blocks.forEach(b => {
+      wfBufferSegments(b).forEach(seg => {
+        const segS = Math.max(seg.startRel, 0);
+        const segE = Math.min(seg.startRel + seg.dur, DAY_MIN_SPAN);
+        if (segE - segS < 2) return;
+        const topPx = segS * PX_PER_MIN;
+        const hPx = (segE - segS) * PX_PER_MIN;
+        cell.appendChild(wfTravelStrip(topPx, hPx, '2px', 'calc(100% - 4px)', seg.icon, seg.min));
+      });
+    });
+
+    // Activity cards — one unbroken block each.
+    blocks.forEach(b=>{
+      const act = acts.find(a=>a.id===b.actId);
+      if (!act) return;
+      const startMinOfDay = b.startMin;
+      const hr = Math.floor(startMinOfDay/60);
+      const min = startMinOfDay % 60;
+      const timeStr = `${hr>12?hr-12:hr}:${String(min).padStart(2,'0')}${hr>=12?'p':'a'}`;
+
+      const relStart = b.startMin - START_MIN;
+      const dur = Math.max(5, b.durationMin || 0);
+      const topPx = relStart * PX_PER_MIN;
+      const pxHeight = Math.max(dur * PX_PER_MIN, 16);
+
+      // Training topics carry their own icon + colour (skating/swimming/dryland).
+      const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
+      const bg = topic ? trainingBlockColour(b) : (b.colour || CAT_HEX[act.cat] || '#888');
+      const dispIcon = topic ? topic.icon : act.icon;
+      const dispName = topic ? topic.name : act.name;
+      const card = document.createElement('div');
+      let cls = 'wf-card' + (isLightColour(bg) ? ' light-bg' : '');
+      if (pxHeight < 34) cls += ' wf-card--slim';
+      if (pxHeight < 22) cls += ' wf-card--xslim';
+      if (pxHeight < 16) cls += ' wf-card--icononly'; // too short for a name → icon only
+      if (b.completed) cls += ' wf-card--done';
+      card.className = cls;
+
+      const slot = cols.get(b.id) || { col: 0, count: 1 };
+      const colCount = slot.count || 1;
+      const gap = 3; // px between overlapping columns
+      const leftCss  = 'calc(' + (slot.col * 100 / colCount) + '% + 1px)';
+      const widthCss = 'calc(' + (100 / colCount) + '% - ' + (gap + 2) + 'px)';
+
+      const travelMin = getTravelBufMin(b);
+      const readyMin  = getGetReadyBufMin(b);
+      const bufBefore = travelMin + readyMin;
+
+      card.style.top = topPx + 'px';
+      card.style.height = Math.max(pxHeight - 2, 12) + 'px';
+      card.style.left  = leftCss;
+      card.style.width = widthCss;
+      card.style.background = bg;
+      const travelTag = bufBefore > 0 ? `<span class="wf-card-travel">${travelMin ? '🚗' : '👕'}${bufBefore}m</span>` : '';
+      const stampEmoji = b.parentStamp && b.parentStamp.emoji ? b.parentStamp.emoji + ' ' : '';
+      card.innerHTML = `
+        <div class="wf-card-time">${timeStr}</div>
+        <div class="wf-card-icon">${dispIcon}</div>
+        <div class="wf-card-name">${stampEmoji}${dispName}${travelTag}</div>
+        <div class="wf-card-dur">${formatDuration(b.durationMin)}</div>
+        <button type="button" class="wf-card-check" aria-label="${b.completed?'Mark not done':'Mark done'}"
+          onclick="toggleBlockDone('${key}','${b.id}',event)">${b.completed?'✓':''}</button>
+      `;
+      card.title = `${dispIcon} ${dispName} — ${timeStr}, ${formatDuration(b.durationMin)}`
+        + (bufBefore > 0 ? ` · ${travelMin ? '🚗 travel' : '👕 get-ready'} ${bufBefore} min each way` : '');
+      attachTapGuard(card, ()=> openDayFromWeekCard(key, ci, b.id));
+      cell.appendChild(card);
+    });
+
+    grid.appendChild(cell);
   });
 }
 
@@ -8426,7 +8598,11 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
     if (height >= 110) fontTier = ' block-font-lg';
     else if (height >= 72) fontTier = ' block-font-md';
   }
-  const blockBg = b.colour || CAT_HEX[act.cat] || '#888';
+  // Training topics (skating/swimming/dryland) each get their own icon + colour
+  // so they read differently at a glance, not just by the text label.
+  const topic = (act.isTraining) ? getTrainingTopic(b.tag) : null;
+  const blockBg = topic ? trainingBlockColour(b) : (b.colour || CAT_HEX[act.cat] || '#888');
+  const dispIcon = topic ? topic.icon : act.icon;
   blockEl.className = 'placed-block'
     +(isBuffer ? ` travel-buf travel-buf--centered${b._bufferCls ? ' '+b._bufferCls : ''}` : '')
     +(b.parentPinned?' parent-pinned':'')
@@ -8441,11 +8617,10 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
   blockEl.style.width = `calc(${widthPct}% - 4px)`;
 
   const durStr = formatDuration(b.durationMin);
-  const tagBadge = b.tag ? {skating:'⛸',swimming:'🏊',dryland:'💪',general:'🏃'}[b.tag] || '' : '';
   const mood = getProfData().blockMoods?.[b.id] || '';
 
   let badges = '';
-  if (tagBadge) badges += `<span class="badge">${tagBadge}</span>`;
+  // (Training sport is shown by the block's own icon now, so no separate badge.)
   if (b.objectives?.length) badges += '<span class="badge">🎯</span>';
   if (b.note) badges += '<span class="badge">📝</span>';
   if (b.parentPinned) badges += '<span class="badge">📌</span>';
@@ -8466,28 +8641,21 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
   const noteHtml = (!isCompact && noteTrim)
     ? `<div class="block-note">${escapeHtml(noteTrim)}</div>`
     : '';
-  // Training blocks: remind the kid what gear to bring, right on the block,
-  // whenever there's room — no need to open the sheet just to check.
-  let gearHtml = '';
-  if (!isBuffer && !isCompact && act.isTraining && b.tag) {
-    const gearItems = getTrainingGearPresets(b.tag);
-    const unchecked = gearItems.filter((_, idx) => !(b.gearState || {})['gear-'+b.tag+'-'+idx]);
-    if (unchecked.length) {
-      const maxItems = fontTier === ' block-font-lg' ? 6 : fontTier === ' block-font-md' ? 3 : 2;
-      const shown = unchecked.slice(0, maxItems);
-      const more = unchecked.length - shown.length;
-      gearHtml = `<div class="block-gear">🎒 ${escapeHtml(shown.join(', '))}${more > 0 ? ` +${more} more` : ''}</div>`;
-    }
-  }
+  // Training blocks show the get-ready gear as a tappable checklist right on
+  // the block (built as DOM below), so the kid can pack without opening the
+  // sheet. This is separate from the block's own "done" checkbox.
+  const showGearChecklist = !isBuffer && !isCompact && act.isTraining && b.tag
+    && getTrainingGearPresets(b.tag).length > 0;
   // For a multi-chore House-Chore block, show the tagged chores in the name.
   const choreList = (b.actId === 'chores' && Array.isArray(b.choreTags) && b.choreTags.length)
     ? b.choreTags.join(', ') : '';
-  const displayName = choreList ? `${act.name}: ${choreList}` : act.name;
+  const baseName = topic ? topic.name : act.name;
+  const displayName = choreList ? `${act.name}: ${choreList}` : baseName;
   const nameHtml = isBuffer
     ? ''
     : (isCompact && noteTrim)
-    ? `<div class="block-name block-name--inline">${act.icon} <span class="block-title">${escapeHtml(act.name)}</span><span class="block-note-inline" title="${escapeHtml(noteTrim).replace(/"/g,'&quot;')}"> · ${escapeHtml(noteTrim)}</span></div>`
-    : `<div class="block-name">${act.icon} ${escapeHtml(displayName)}</div>`;
+    ? `<div class="block-name block-name--inline">${dispIcon} <span class="block-title">${escapeHtml(baseName)}</span><span class="block-note-inline" title="${escapeHtml(noteTrim).replace(/"/g,'&quot;')}"> · ${escapeHtml(noteTrim)}</span></div>`
+    : `<div class="block-name">${dispIcon} ${escapeHtml(displayName)}</div>`;
   const metaHtml = isBuffer
     ? `<div class="block-meta"><span class="travel-buf-label">${escapeHtml(b._bufferLabel || '')}</span></div>`
     : `<div class="block-meta">${durStr}${badges?' '+badges:''}</div>`;
@@ -8502,8 +8670,8 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
     ${metaHtml}
     ${!isBuffer && b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="block-stopwatch-btn" onclick="event.stopPropagation(); startBlockStopwatch('${b.id}')">⏱ Start stopwatch</button>` : ''}
     ${noteHtml}
-    ${gearHtml}
   `;
+  if (showGearChecklist) blockEl.appendChild(buildBlockGearChecklist(b, b.tag));
   if (!isBuffer && clippedTop) {
     const m = document.createElement('div');
     m.className = 'block-clip-marker block-clip-marker--top';
@@ -8518,7 +8686,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
     blockEl.appendChild(m);
     blockEl.title = `${act.name} continues past this section — switch to “All” to see the whole block`;
   }
-  if (!isBuffer) blockEl.onclick = (e)=>{ e.stopPropagation(); onTimelineBlockTap(b.id); };
+  if (!isBuffer) attachTapGuard(blockEl, ()=> onTimelineBlockTap(b.id));
   canvas.appendChild(blockEl);
 
   // Decorative doodle (seasonal, stable per block per month)
@@ -8528,17 +8696,22 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
 function renderTravelBuffers(canvas, b, zMinStart, zMinEnd) {
   const travelBuf = getTravelBufMin(b);
   const readyBuf = getGetReadyBufMin(b);
+  const endMin = b.startMin + b.durationMin;
   const entries = [];
-  if (b.getReadyBuffer && readyBuf > 0) {
-    entries.push(
-      { startMin: b.startMin - readyBuf, label: '👕 ➡ get ready', bufDur: readyBuf, cls: 'travel-buf-ready' },
-      { startMin: b.startMin + b.durationMin, label: '👕 ⬅ get ready', bufDur: readyBuf, cls: 'travel-buf-ready' },
-    );
-  }
+  // Stack the buffers end-to-end so get-ready and driving never share the same
+  // minutes — you can't get skate boots ready while the car is moving. Before
+  // the block: [get ready][travel][ACTIVITY]; after: [ACTIVITY][travel][get ready].
   if (b.travelBuffer && travelBuf > 0) {
     entries.push(
       { startMin: b.startMin - travelBuf, label: '🚗 ➡ travel', bufDur: travelBuf, cls: '' },
-      { startMin: b.startMin + b.durationMin, label: '🚗 ⬅ travel', bufDur: travelBuf, cls: '' },
+      { startMin: endMin, label: '🚗 ⬅ travel', bufDur: travelBuf, cls: '' },
+    );
+  }
+  if (b.getReadyBuffer && readyBuf > 0) {
+    const preTravel = (b.travelBuffer ? travelBuf : 0);
+    entries.push(
+      { startMin: b.startMin - preTravel - readyBuf, label: '👕 ➡ get ready', bufDur: readyBuf, cls: 'travel-buf-ready' },
+      { startMin: endMin + preTravel, label: '👕 ⬅ get ready', bufDur: readyBuf, cls: 'travel-buf-ready' },
     );
   }
   const sourceAct = getAllActivities().find(a=>a.id===b.actId);
@@ -8677,6 +8850,44 @@ function renderTrainingGearChecklist(containerId, stateObj, tag, persist) {
     };
     wrap.appendChild(row);
   });
+}
+
+/* Tappable get-ready gear checklist rendered directly on a training block in
+   the timeline. Each item toggles the block's gearState and persists it. This
+   is deliberately separate from the block's own completion checkbox. */
+function buildBlockGearChecklist(b, tag) {
+  const items = getTrainingGearPresets(tag);
+  const wrap = document.createElement('div');
+  wrap.className = 'block-gear-list';
+  if (!items.length) return wrap;
+  if (!b.gearState) b.gearState = {};
+  const doneCount = items.filter((_, idx) => b.gearState[`gear-${tag}-${idx}`]).length;
+  const head = document.createElement('div');
+  head.className = 'block-gear-head';
+  head.textContent = `🎒 Get ready ${doneCount}/${items.length}`;
+  wrap.appendChild(head);
+  items.forEach((label, idx) => {
+    const key = `gear-${tag}-${idx}`;
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'block-gear-item' + (b.gearState[key] ? ' checked' : '');
+    row.innerHTML = `<span class="block-gear-box">${b.gearState[key] ? '✓' : ''}</span><span class="block-gear-label">${escapeHtml(label)}</span>`;
+    row.onclick = (e) => {
+      e.stopPropagation();
+      b.gearState[key] = !b.gearState[key];
+      markItemUpdated(b);
+      saveAll();
+      row.classList.toggle('checked', !!b.gearState[key]);
+      row.querySelector('.block-gear-box').textContent = b.gearState[key] ? '✓' : '';
+      const done = items.filter((_, i) => b.gearState[`gear-${tag}-${i}`]).length;
+      head.textContent = `🎒 Get ready ${done}/${items.length}`;
+    };
+    // The gear rows are real taps, not scroll gestures — let them through the
+    // block-level tap guard.
+    row.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+    wrap.appendChild(row);
+  });
+  return wrap;
 }
 
 function countChecklistTotal(block, act) {
@@ -9313,7 +9524,11 @@ function renderTrainingSheet() {
     const b = document.createElement('button');
     b.className = 'pill-btn'+(ts.tag===t.id?' active':'');
     b.textContent = t.label;
-    b.onclick = ()=>{ ts.tag=t.id; ts.objectives=[]; renderTrainingSheet(); };
+    b.onclick = ()=>{
+      // Adopt the topic colour unless the user had picked a non-default custom one.
+      if (!ts.colour || ts.colour === CAT_HEX.training || TRAINING_TAGS.some(x=>x.colour===ts.colour)) ts.colour = t.colour;
+      ts.tag=t.id; ts.objectives=[]; renderTrainingSheet();
+    };
     tagWrap.appendChild(b);
   });
 
@@ -12273,7 +12488,20 @@ function bankConfig() {
   if (c.bank.marketMonth == null) c.bank.marketMonth = 0;
   if (c.bank.savingsRate == null) c.bank.savingsRate = BANK_DEFAULTS.savingsRate;
   if (!c.bank.gicRates) c.bank.gicRates = { ...BANK_DEFAULTS.gicRates };
+  // Anchor the sim clock to the real calendar the first time it runs, so the
+  // date starts at "this month, this year" and advances with each meeting —
+  // instead of being permanently stuck at "Jan 2023".
+  if (c.bank.startYear == null || c.bank.startMonth == null) {
+    const now = new Date();
+    c.bank.startYear = now.getFullYear();
+    c.bank.startMonth = now.getMonth();
+  }
   return c.bank;
+}
+/* Which of the 12 historical price columns the current sim month maps to. */
+function marketMonthIndex() {
+  const cfg = bankConfig();
+  return ((cfg.startMonth + cfg.marketMonth) % 12 + 12) % 12;
 }
 function ensureWallet(kid) {
   const p = getProfData(kid);
@@ -12283,10 +12511,17 @@ function ensureWallet(kid) {
   return p.wallet;
 }
 function stockPrice(ticker, monthOverride) {
-  const m = ((monthOverride != null ? monthOverride : bankConfig().marketMonth) % 12 + 12) % 12;
+  const cfg = bankConfig();
+  const simMonth = (monthOverride != null ? monthOverride : cfg.marketMonth);
+  const m = ((cfg.startMonth + simMonth) % 12 + 12) % 12;
   return STOCKS_2023[ticker].prices[m];
 }
-function marketMonthLabel() { return MONEY_MONTHS[bankConfig().marketMonth % 12] + ' 2023'; }
+function marketMonthLabel() {
+  const cfg = bankConfig();
+  const total = cfg.startMonth + cfg.marketMonth;
+  const year = cfg.startYear + Math.floor(total / 12);
+  return MONEY_MONTHS[((total % 12) + 12) % 12] + ' ' + year;
+}
 function portfolioValue(kid) {
   const w = ensureWallet(kid);
   return money2(Object.keys(w.holdings).reduce((s, t) => s + (w.holdings[t] || 0) * stockPrice(t), 0));
@@ -12404,7 +12639,7 @@ function renderMoneyScreen() {
       <span style="display:flex;gap:0.3rem"><button class="btn-icon" aria-label="Buy ${t}" onclick="moneyBuyPrompt('${t}')">＋</button>${sh > 0 ? `<button class="btn-icon" aria-label="Sell ${t}" onclick="moneySellPrompt('${t}')">－</button>` : ''}</span></div>`;
   }).join('');
   html += `<div class="chore-card"><h3>📈 Stocks — ${marketMonthLabel()}</h3>
-    <div class="ct-meta">Real 2023 prices — they go up AND down. Invest any dollar amount (fractional shares).</div>
+    <div class="ct-meta">Real historical prices — they go up AND down. Invest any dollar amount (fractional shares).</div>
     ${stockRows}
     <div class="ct-meta" style="margin-top:0.3rem">Portfolio value: <b>$${portfolioValue(kid).toFixed(2)}</b></div></div>`;
   if (isParent()) {
@@ -14170,10 +14405,13 @@ function renderPrintSheet() {
         if (!act) return;
         const slotSpan = Math.max(1, Math.round((segEnd - segStart)/15));
         const bh = slotSpan*slotPx - 1;
-        const bg = b.colour || CAT_HEX[act.cat] || '#888';
+        const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
+        const bg = topic ? trainingBlockColour(b) : (b.colour || CAT_HEX[act.cat] || '#888');
+        const pIcon = topic ? topic.icon : act.icon;
+        const pName = topic ? topic.name : act.name;
         // Empty tick box so it can be checked off on the printed page.
         const checkbox = bh >= 15 ? `<span class="print-check" style="border-color:${printTextColor(bg)}"></span>` : '';
-        blockHtml += `<div class="print-block" style="background:${bg};color:${printTextColor(bg)};font-size:${printBlockFontPt(bh)}pt;height:${bh}px">${checkbox}${act.icon} ${act.name}</div>`;
+        blockHtml += `<div class="print-block" style="background:${bg};color:${printTextColor(bg)};font-size:${printBlockFontPt(bh)}pt;height:${bh}px">${checkbox}${pIcon} ${pName}</div>`;
       });
       html += `<div class="print-cell${isHourStart?' print-hour-start':''}">${blockHtml}</div>`;
     });
@@ -14183,6 +14421,17 @@ function renderPrintSheet() {
   // The print is the planning grid only — A4 landscape, one page. Summaries,
   // free-time totals, sleep recommendations and notes are intentionally left
   // off so the printed sheet stays a single-page plan (per request).
+
+  // Signature footer: the kid commits to the plan (carried over from the weekly
+  // view if already signed), with blank lines for a parent co-sign and the date.
+  const kidName = p==='jenn' ? 'Jenn' : 'Jess';
+  const sig = getWeekSignature(keys, p);
+  const sigName = sig ? escapeHtml(sig.name || kidName) : '';
+  html += `<div class="print-signature">
+      <div class="print-sig-block"><span class="print-sig-caption">${kidName} signs</span><span class="print-sig-line">${sigName ? `<span class="print-sig-name">${sigName}</span>` : ''}</span></div>
+      <div class="print-sig-block"><span class="print-sig-caption">Parent</span><span class="print-sig-line"></span></div>
+      <div class="print-sig-block print-sig-block--date"><span class="print-sig-caption">Date</span><span class="print-sig-line"></span></div>
+    </div>`;
 
   document.getElementById('printSheet').innerHTML = html;
 }
