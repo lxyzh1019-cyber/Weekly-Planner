@@ -1649,7 +1649,7 @@
   }
 
   /* ═══════════ FULL WEEKLY VIEW — zones as rows, days as columns ═══════════ */
-  .weekly-full-wrap { padding: 0.5rem; overflow: auto; flex: 1; padding-bottom: 0.5rem; }
+  .weekly-full-wrap { padding: 0.5rem; overflow: auto; overscroll-behavior: contain; flex: 1; padding-bottom: 0.5rem; }
   /* On phones the 7 columns would be too thin to read, so give them a
      floor and let this one view scroll instead of squishing. */
   @media (max-width: 600px) { .weekly-full { min-width: 560px; } }
@@ -1913,6 +1913,7 @@
   .timeline-wrap {
     flex: 1;
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 0 0.8rem;
     padding-bottom: 260px;
   }
@@ -7426,6 +7427,25 @@ function wfBufferSegments(b) {
   return segs;
 }
 
+/* Distinguish a tap from a scroll/drag so a large block (like Training) that
+   fills the timeline doesn't open its editor every time the user tries to
+   scroll past it. If the pointer moves beyond a small threshold — or the
+   browser cancels the pointer to start scrolling — the following click is
+   treated as a scroll gesture and ignored. */
+function attachTapGuard(el, onTap) {
+  let sx = 0, sy = 0, moved = false;
+  el.addEventListener('pointerdown', (e) => { sx = e.clientX; sy = e.clientY; moved = false; }, { passive: true });
+  el.addEventListener('pointermove', (e) => {
+    if (Math.abs(e.clientX - sx) > 8 || Math.abs(e.clientY - sy) > 8) moved = true;
+  }, { passive: true });
+  el.addEventListener('pointercancel', () => { moved = true; }, { passive: true });
+  el.onclick = (e) => {
+    e.stopPropagation();
+    if (moved) { moved = false; return; }
+    onTap(e);
+  };
+}
+
 function renderFullWeek(keys) {
   const grid = document.getElementById('weeklyFullGrid');
   grid.innerHTML = '';
@@ -7589,7 +7609,7 @@ function renderFullWeek(keys) {
       `;
       card.title = `${act.icon} ${act.name} — ${timeStr}, ${formatDuration(b.durationMin)}`
         + (bufBefore > 0 ? ` · ${travelMin ? '🚗 travel' : '👕 get-ready'} ${bufBefore} min each way` : '');
-      card.onclick = (e)=>{ e.stopPropagation(); openDayFromWeekCard(key, ci, b.id); };
+      attachTapGuard(card, ()=> openDayFromWeekCard(key, ci, b.id));
       cell.appendChild(card);
     });
 
@@ -8441,7 +8461,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount) {
     blockEl.appendChild(m);
     blockEl.title = `${act.name} continues past this section — switch to “All” to see the whole block`;
   }
-  if (!isBuffer) blockEl.onclick = (e)=>{ e.stopPropagation(); onTimelineBlockTap(b.id); };
+  if (!isBuffer) attachTapGuard(blockEl, ()=> onTimelineBlockTap(b.id));
   canvas.appendChild(blockEl);
 
   // Decorative doodle (seasonal, stable per block per month)
