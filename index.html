@@ -8350,6 +8350,14 @@ function renderFullWeek(keys) {
       const topic = act && act.isTraining ? getTrainingTopic(b.tag) : null;
       const segColour = topic ? trainingBlockColour(b) : (b.colour || (act && CAT_HEX[act.cat]) || '#888');
       const bc = bufferConflicts.perBlock.get(b.id);
+      // Match the buffer strip to its own block's column, so a get-ready/drive
+      // strip sits directly under (and the same width as) the card it belongs to
+      // instead of spanning the whole day column.
+      const slot = cols.get(b.id) || { col: 0, count: 1 };
+      const colCount = slot.count || 1;
+      const gap = 3;
+      const leftCss  = 'calc(' + (slot.col * 100 / colCount) + '% + 1px)';
+      const widthCss = 'calc(' + (100 / colCount) + '% - ' + (gap + 2) + 'px)';
       wfBufferSegments(b).forEach(seg => {
         const segS = Math.max(seg.startRel, 0);
         const segE = Math.min(seg.startRel + seg.dur, DAY_MIN_SPAN);
@@ -8357,7 +8365,7 @@ function renderFullWeek(keys) {
         const topPx = segS * PX_PER_MIN;
         const hPx = (segE - segS) * PX_PER_MIN;
         const segConflict = !!bc && (seg.side === 'pre' ? bc.pre : bc.post);
-        cell.appendChild(wfTravelStrip(topPx, hPx, '2px', 'calc(100% - 4px)', seg.icon, seg.min, segColour, segConflict));
+        cell.appendChild(wfTravelStrip(topPx, hPx, leftCss, widthCss, seg.icon, seg.min, segColour, segConflict));
       });
     });
 
