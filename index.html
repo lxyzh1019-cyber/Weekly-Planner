@@ -6750,16 +6750,23 @@ const MOODS = ['😄','🙂','😐','😕','😴'];
    SCREENS / NAVIGATION
 ════════════════════════════════════════════════════════════════ */
 function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   const targetScreen = document.getElementById('screen-'+id);
+  // Never throw on an unknown/removed screen id — that would leave no screen
+  // active and, because every nav button routes through here, freeze the app.
+  if (!targetScreen) { console.error('showScreen: no screen for id', id); return; }
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   targetScreen.classList.add('active');
-  enhanceAccessibility(targetScreen);
-  if (typeof refreshMascotButton === 'function') refreshMascotButton();
+  // Auxiliary hooks are isolated so a failure in one can't stop the screen from
+  // actually showing (and can't lock navigation across the whole app).
+  try { enhanceAccessibility(targetScreen); } catch(e){ console.error('enhanceAccessibility failed', e); }
+  try { if (typeof refreshMascotButton === 'function') refreshMascotButton(); } catch(e){ console.error('refreshMascotButton failed', e); }
   if (id === 'day') {
-    updateDayLandscapeChromeHeight();
-    applyDayLandscapeFocusState();
-    maybeShowRewardPrompt();
-    offerTutorialIfNeeded();
+    try {
+      updateDayLandscapeChromeHeight();
+      applyDayLandscapeFocusState();
+      maybeShowRewardPrompt();
+      offerTutorialIfNeeded();
+    } catch(e){ console.error('day-screen init failed', e); }
   }
 }
 
@@ -10445,11 +10452,18 @@ function cancelCreatePlacement(overlayId, skipClose=false) {
 }
 
 function confirmTraining() {
+  // Guard against a rapid double-tap placing two blocks. The confirm button no
+  // longer hides itself after a tap, so we consume pendingStartMin immediately
+  // and bail if it's already been consumed (the second tap of a double-tap).
+  if (pendingStartMin == null) return;
+  const startMin = pendingStartMin;
+  pendingStartMin = null;
+  const isComp = !!(selectedActivity && selectedActivity.isCompetition);
   ts.note = document.getElementById('trainingNote').value;
   const dateStart = isParent() ? document.getElementById('trainingDateStart').value : '';
   const dateEnd   = isParent() ? document.getElementById('trainingDateEnd').value : '';
   const actId = (selectedActivity && selectedActivity.id) || 'training';
-  placeBlock(actId, pendingStartMin, ts.durationMin, ts.colour, ts.objectives, ts.note, {
+  placeBlock(actId, startMin, ts.durationMin, ts.colour, ts.objectives, ts.note, {
     tag: ts.tag,
     repeatDays: ts.repeat?ts.repeatDays:[],
     travelBuffer: ts.travelBuffer,
@@ -10463,7 +10477,7 @@ function confirmTraining() {
     repeatDateEnd:   dateEnd   || null,
   });
   closeSheet('trainingOverlay');
-  showToast(selectedActivity && selectedActivity.isCompetition ? 'Competition placed 🏆' : 'Competitive Sports placed 🏋️');
+  showToast(isComp ? 'Competition placed 🏆' : 'Training placed 🏋️');
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -10549,12 +10563,17 @@ function renderActivitySheet() {
   requestAnimationFrame(()=>syncDurationColumnSpacers('activity'));
 }
 function confirmActivity() {
+  // Guard against a rapid double-tap placing two blocks (and against a second
+  // tap running after selectedActivity was cleared, which used to throw).
+  if (pendingStartMin == null || !selectedActivity) return;
+  const startMin = pendingStartMin;
+  pendingStartMin = null;
   as_.note = document.getElementById('activityNote').value;
   const allowRange = isParent() && selectedActivity && selectedActivity.cat === 'school';
   const dateStart = allowRange ? document.getElementById('activityDateStart').value : '';
   const dateEnd   = allowRange ? document.getElementById('activityDateEnd').value   : '';
   const isChoreBlock = selectedActivity && selectedActivity.id === 'chores';
-  placeBlock(selectedActivity.id, pendingStartMin, as_.durationMin, as_.colour, [], as_.note, {
+  placeBlock(selectedActivity.id, startMin, as_.durationMin, as_.colour, [], as_.note, {
     repeatDays: as_.repeat?as_.repeatDays:[],
     travelBuffer: as_.travelBuffer,
     travelBufMin: as_.travelBufMin,
@@ -15783,6 +15802,29 @@ async function inviteSisterFromEdit() {
 /* ════════════════════════════════════════════════════════════════
    INIT
 ════════════════════════════════════════════════════════════════ */
+// Surface an otherwise-silent runtime error as a thin, dismissible banner so a
+// problem is diagnosable (and reportable) instead of looking like a dead app.
+window.addEventListener('error', (ev) => {
+  try {
+    if (document.getElementById('globalErrBar')) return; // only the first one
+    const bar = document.createElement('div');
+    bar.id = 'globalErrBar';
+    bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:2147483647;'
+      + 'background:#d6453a;color:#fff;font:600 12px system-ui,sans-serif;'
+      + 'padding:8px 40px 8px 12px;box-shadow:0 -2px 8px rgba(0,0,0,0.25);line-height:1.3;';
+    const msg = (ev && ev.message) ? ev.message : 'Script error';
+    const where = (ev && ev.lineno) ? ` (line ${ev.lineno})` : '';
+    bar.textContent = `⚠️ Something errored: ${msg}${where} — please screenshot this.`;
+    const x = document.createElement('button');
+    x.textContent = '✕';
+    x.setAttribute('aria-label', 'Dismiss');
+    x.style.cssText = 'position:absolute;top:4px;right:8px;background:transparent;border:0;color:#fff;font-size:16px;cursor:pointer;';
+    x.onclick = () => bar.remove();
+    bar.appendChild(x);
+    (document.body || document.documentElement).appendChild(bar);
+  } catch(_) {}
+});
+
 loadLocal();
 initFirebase();
 showScreen('profile');
