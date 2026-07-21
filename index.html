@@ -15536,7 +15536,38 @@ function showPrompt(message, opts = {}) {
   return _appDialog({ message, kind: 'prompt', value: opts.value || '', inputType: opts.type || 'text', okLabel: opts.okLabel || 'OK', cancelLabel: opts.cancelLabel || 'Cancel' });
 }
 
-function openSheet(id) { document.getElementById(id).classList.add('open'); }
+// ── App-wide double-tap / double-click guard for committing actions ──
+// Confirm / Save / Remove / Delete / Share buttons no longer hide themselves
+// after a tap, so a fast double-tap (or a mobile "ghost click") could fire the
+// handler twice — placing a duplicate block, sending a duplicate invite, etc.
+// We swallow a repeat activation of the SAME action button inside a short
+// window. Opening any sheet resets the guard so legitimately re-using the same
+// static button on a fresh sheet is never blocked.
+let _actGuardBtn = null, _actGuardAt = 0;
+function resetActionGuard() { _actGuardBtn = null; _actGuardAt = 0; }
+(function installActionDoubleTapGuard() {
+  const WINDOW_MS = 600;
+  const MUTATING = /(?:confirm|save|remove|delete|send|invite|create|place|blast|accept|decline|record)[A-Za-z]*\s*\(/i;
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest('button, [onclick], [role="button"]');
+    if (!btn) return;
+    const cls = typeof btn.className === 'string' ? btn.className : '';
+    const oc = (btn.getAttribute && btn.getAttribute('onclick')) || '';
+    const isAction = /\bbtn-confirm\b/.test(cls) || /\bbtn-danger\b/.test(cls) || MUTATING.test(oc);
+    if (!isAction) return;
+    const now = Date.now();
+    if (btn === _actGuardBtn && (now - _actGuardAt) < WINDOW_MS) {
+      // Duplicate activation — swallow it before the inline handler runs.
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      return;
+    }
+    _actGuardBtn = btn;
+    _actGuardAt = now;
+  }, true);
+})();
+
+function openSheet(id) { resetActionGuard(); document.getElementById(id).classList.add('open'); }
 function closeSheet(id) {
   if (id === 'editOverlay') editStopwatchClearTick();
   if (id === 'kidRoutineOverlay') kidRoutineStopwatchClearTick();
