@@ -5965,29 +5965,54 @@ function pushToFirebase() {
   }
   const writeAt = Date.now();
   lastLocalWriteAt = Math.max(lastLocalWriteAt, writeAt);
-  const payload = {
-    profiles: state.profiles,
-    shared: state.shared,
-    _meta: { updatedAt: writeAt },
-  };
+  // Firestore's set() validates the payload SYNCHRONOUSLY and throws on data
+  // it can't store (e.g. any field that is `undefined`). Every mutating button
+  // runs mutate → saveAll → pushToFirebase → close-sheet/re-render, so a throw
+  // here silently killed the UI-refresh half of every action while the data
+  // (already in memory and localStorage) survived. JSON round-tripping the
+  // payload uploads exactly what saveLocal persists — undefined fields drop
+  // out instead of throwing — and any remaining sync throw is downgraded to
+  // the same retry path as an async write failure.
+  let payload;
+  try {
+    payload = JSON.parse(JSON.stringify({ profiles: state.profiles, shared: state.shared }));
+  } catch (e) {
+    hasPendingSync = true;
+    lastSyncError = e?.message || 'payload serialize failed';
+    renderPendingSyncMessage();
+    console.error('Firestore payload serialization failed', e);
+    return;
+  }
+  payload._meta = { updatedAt: writeAt };
   lastSyncError = '';
   renderPendingSyncMessage();
   setSyncStatus('syncing', 'Uploading…');
-  fbDocRef.set(payload, { merge: true }).catch(e=>{
+  try {
+    fbDocRef.set(payload, { merge: true }).catch(e=>{
+      hasPendingSync = true;
+      lastSyncError = e?.code || e?.message || 'write failed';
+      renderPendingSyncMessage();
+      console.error('Firestore push failed', e);
+      setSyncStatus('online', 'Synced (connection only)');
+    }).then(() => {
+      if (!hasPendingSync) setSyncStatus('online', 'Synced');
+    });
+  } catch (e) {
     hasPendingSync = true;
     lastSyncError = e?.code || e?.message || 'write failed';
     renderPendingSyncMessage();
-    console.error('Firestore push failed', e);
+    console.error('Firestore push failed (sync validation)', e);
     setSyncStatus('online', 'Synced (connection only)');
-  }).then(() => {
-    if (!hasPendingSync) setSyncStatus('online', 'Synced');
-  });
+  }
 }
 function saveAll() {
   saveLocal();
   hasPendingSync = true;
-  renderPendingSyncMessage();
-  pushToFirebase();
+  // Persistence must never throw into the calling action handler — every
+  // Save/Delete/Share button refreshes its UI *after* calling saveAll, so an
+  // escaped error here leaves sheets stuck open with the data already saved.
+  try { renderPendingSyncMessage(); } catch (e) { console.error('renderPendingSyncMessage failed', e); }
+  try { pushToFirebase(); } catch (e) { console.error('pushToFirebase failed', e); }
 }
 window._skipRewardPrompt = false;
 function markItemUpdated(item) {
