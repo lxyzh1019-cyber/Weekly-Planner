@@ -1070,6 +1070,64 @@
     cursor: pointer;
   }
 
+  /* ── 2a "Day Blocks": plans pop, free stays quiet ── */
+  .tg2-wrap { padding: 0.2rem 0.6rem 0.4rem; }
+  .tg2-subtitle { text-align: center; color: var(--ink-light); font-size: 0.85rem; font-style: italic; margin: 0 0 0.5rem; }
+  .tg2-grid {
+    display: grid;
+    grid-template-columns: 26px repeat(7, 1fr);
+    gap: 3px;
+    align-items: start;
+  }
+  .tg2-corner { }
+  .tg2-head {
+    font-weight: 800; font-size: 0.78rem; text-align: center;
+    padding: 3px 1px; color: var(--ink);
+    border-bottom: 2px solid var(--ink);
+    cursor: pointer; border-radius: 6px 6px 0 0;
+  }
+  .tg2-head.today { background: #fff4db; }
+  .tg2-head small { display: block; font-size: 0.7rem; color: var(--ink-light); font-weight: 700; }
+  .tg2-gutter { position: relative; }
+  .tg2-gutter-hour {
+    position: absolute; right: 2px; transform: translateY(-50%);
+    font-size: 0.6rem; color: var(--ink-light); font-weight: 700; white-space: nowrap;
+  }
+  /* Free time = plain lined paper, so an empty day genuinely looks empty. */
+  .tg2-lane {
+    position: relative;
+    background: var(--paper, #fffdf5);
+    border: 1.5px solid rgba(42,35,32,0.18);
+    border-radius: 7px;
+    background-image: repeating-linear-gradient(180deg, transparent 0 23px, rgba(42,35,32,0.06) 23px 24px);
+    overflow: hidden;
+  }
+  .tg2-lane.today { border-color: #2f8f84; box-shadow: 0 0 0 1.5px rgba(47,143,132,0.35); }
+  .tg2-block {
+    position: absolute; left: 2px; right: 2px;
+    border-radius: 5px; border: 1.5px solid var(--ink);
+    color: #fff; font-size: 0.62rem; font-weight: 800; line-height: 1.05;
+    padding: 1px 3px; overflow: hidden; cursor: pointer;
+    display: flex; align-items: center; gap: 2px;
+    box-shadow: 1px 1px 0 rgba(42,35,32,0.25);
+    text-shadow: 0 1px 1px rgba(0,0,0,0.22);
+  }
+  .tg2-block.light-bg { color: var(--ink); text-shadow: none; }
+  .tg2-block--done { opacity: 0.55; }
+  .tg2-block--conflict { outline: 2.5px solid #d6453a; outline-offset: 1px; overflow: visible; z-index: 5; }
+  .tg2-block-flag {
+    position: absolute; top: -6px; left: -6px; z-index: 6;
+    width: 15px; height: 15px; border-radius: 50%;
+    background: #d6453a; color: #fff; font-size: 0.6rem; line-height: 15px; text-align: center;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.35);
+  }
+  .tg2-block-lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (max-width: 640px) {
+    .tg2-grid { grid-template-columns: 20px repeat(7, 1fr); gap: 2px; }
+    .tg2-block { font-size: 0.55rem; padding: 1px 2px; }
+    .tg2-head { font-size: 0.68rem; }
+  }
+
   /* ── INVERTED MODE (default) ──
      Free cells = bright profile color (saturated, celebratory).
      Scheduled cells = neutral grey with small icon. */
@@ -1487,6 +1545,13 @@
     padding: 0.7rem;
     box-shadow: 2px 2px 0 var(--ink);
   }
+  /* A full-width chore card (e.g. the pocket-money box) matches the main matrix
+     box width instead of sitting in a narrow half-column. */
+  .chore-card--full { grid-column: 1 / -1; }
+  /* Week selector: the range label lives between the prev/next arrows on one
+     row to save vertical space. */
+  .ct-weeknav { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+  .ct-weeknav-label { margin: 0; font-size: 1.05rem; text-align: center; flex: 1; }
   /* ═══════ 1a: kid week chore matrix ═══════ */
   .cm-card { grid-column: 1 / -1; }
   .cm-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
@@ -1529,9 +1594,16 @@
     cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center;
   }
   .cm-cell.cm-future { background: #f6f0e1; color: transparent; }
-  .cm-cell.cm-on { background: #95d5b2; }
+  /* Completed = the whole box turns green (not just the ✓), so a done routine is
+     obvious at a glance. Class is `on` to match how the matrix renders cells. */
+  .cm-cell.on {
+    background: #6fc292; color: #143024;
+    border-color: #2f7d55;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.4);
+  }
+  .cm-cell.cm-readonly { cursor: default; }
   .cm-cell.cm-disabled { opacity: 0.55; cursor: default; }
-  .cm-cell:not(.cm-on):not(.cm-future) { color: #b9ac95; }
+  .cm-cell:not(.on):not(.cm-future) { color: #b9ac95; }
   .cm-rowtotal, .cm-wkhead { font-size: 0.74rem; font-weight: 800; text-align: center; display: flex; align-items: center; justify-content: center; }
   .cm-bar {
     position: relative; height: 34px; border: 2px solid var(--ink); border-radius: 7px;
@@ -1864,8 +1936,37 @@
   .wf-card--slim .wf-card-travel, .wf-card--xslim .wf-card-travel { display: none; }
   /* Buffer/conflict warning badge inline on the card name */
   .wf-card-conflict-badge { margin-left: 3px; font-size: 0.68rem; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); }
-  .wf-card--slim .wf-card-conflict-badge, .wf-card--xslim .wf-card-conflict-badge { display: none; }
-  .wf-card--conflict { outline: 2px solid #d6453a; outline-offset: 1px; }
+  /* A conflict is a real scheduling problem, so it must read at a glance without
+     hovering: bold red frame, a soft red glow, and an always-visible corner
+     flag even on the slimmest cards. */
+  .wf-card--conflict {
+    outline: 3px solid #d6453a; outline-offset: 1px;
+    box-shadow: 0 0 0 2px rgba(214,69,58,0.25), 0 2px 8px rgba(214,69,58,0.35);
+    overflow: visible; /* let the corner flag sit just outside the card */
+    z-index: 3;
+  }
+  .wf-card-conflict-flag {
+    position: absolute; top: -7px; left: -7px; z-index: 4;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #d6453a; color: #fff;
+    font-size: 0.7rem; line-height: 18px; text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+    animation: wf-conflict-pulse 1.6s ease-in-out infinite;
+  }
+  /* Banner above the grid summarizing the week's clashes so they're impossible
+     to miss (the per-card flag then tells you which blocks). */
+  .week-conflict-banner {
+    display: flex; align-items: center; gap: 0.5rem;
+    background: #fdecea; border: 2px solid #d6453a; border-radius: 12px;
+    color: #7a1f18; font-weight: 700; font-size: 0.9rem;
+    padding: 0.55rem 0.8rem; margin: 0 0 0.6rem;
+    box-shadow: 2px 2px 0 rgba(214,69,58,0.25);
+  }
+  .week-conflict-banner .wcb-icon { font-size: 1.15rem; }
+  .week-conflict-banner .wcb-detail { font-weight: 600; opacity: 0.85; font-size: 0.82rem; }
+  @media (prefers-color-scheme: dark) {
+    .week-conflict-banner { background: #3a1512; color: #ffd7d2; border-color: #e5675c; }
+  }
   /* Hatched travel/get-ready strips hugging a card in the week lane — tinted
      to the activity's own colour so it reads as "part of that block" rather
      than a generic grey stripe. */
@@ -2121,6 +2222,21 @@
   }
   .dc-slot:hover { border-color: var(--accent-strong, #c14a24); color: var(--accent-strong, #c14a24); }
   .dc-empty { text-align: center; color: #6b5d4f; padding: 24px 0; }
+  /* Quest mode for the day view (reuses .quest-card styling) */
+  .day-quest { display: flex; flex-direction: column; gap: 10px; padding: 6px 0 40px; }
+  .dq-list { display: flex; flex-direction: column; gap: 0.6rem; }
+  .dq-hero {
+    display: flex; align-items: center; gap: 10px;
+    background: linear-gradient(135deg, #6a5acd, #8a7be0);
+    border: 2px solid var(--ink); border-radius: 12px;
+    padding: 8px 10px; box-shadow: 2px 2px 0 var(--ink); color: #fff;
+  }
+  .dq-hero-avatar { font-size: 1.8rem; }
+  .dq-hero-info { flex: 1; min-width: 0; }
+  .dq-hero-title { font-weight: 800; font-size: 0.95rem; }
+  .dq-hero-sub { font-size: 0.78rem; opacity: 0.92; margin-top: 2px; }
+  .dq-xp-bar { height: 8px; border-radius: 999px; background: rgba(0,0,0,0.25); overflow: hidden; margin: 3px 0; }
+  .dq-xp-fill { height: 100%; background: #ffd166; border-radius: 999px; transition: width 0.3s; }
   /* Zone filter is timeline-only; the checklist always shows the whole day. */
   #screen-day.dc-mode .day-topbar__row2 .zone-tabs { display: none; }
   .timeline-zone-label {
@@ -3426,6 +3542,8 @@
     display: flex; align-items: center; justify-content: center;
     text-align: center;
   }
+  /* A time clash prints with a heavy red frame so it survives black & white too. */
+  .print-block--conflict { outline: 2px solid #d6453a; outline-offset: -1px; box-shadow: inset 0 0 0 1px #d6453a; }
   /* Travel / get-ready buffer strip around a block (🚗 drive, 👕 gear up) so
      kids can see the real leave-the-house time on the printed page. */
   .print-buffer {
@@ -4175,8 +4293,7 @@
         <button class="btn-icon btn-icon--labeled" aria-label="Quest Board" onclick="goQuestBoard()" title="Quest Board"><span aria-hidden="true">🎮</span><span class="btn-icon__label">Quests</span></button>
         <button class="btn-icon btn-icon--labeled" aria-label="Weekly Chore" onclick="openChoreTab()" title="Weekly Chore"><span aria-hidden="true">🧹</span><span class="btn-icon__label">Chores</span></button>
         <button class="btn-icon btn-icon--labeled" id="weekMoneyBtn" aria-label="Bank &amp; Invest" onclick="openWeekMoney()" title="Bank &amp; Invest"><span aria-hidden="true">🏦</span><span class="btn-icon__label">Bank</span></button>
-        <button class="btn-icon btn-icon--labeled" aria-label="Challenges" onclick="openChallenges()" title="Challenges"><span aria-hidden="true">🎯</span><span class="btn-icon__label">Challenge</span></button>
-        <button class="btn-icon btn-icon--labeled" aria-label="Sister Sync" onclick="openSisterSync()" title="Sister Sync"><span aria-hidden="true">👯</span><span class="btn-icon__label">Sisters</span></button>
+        <button class="btn-icon btn-icon--labeled" aria-label="Sister Sync &amp; Challenges" onclick="openSisterSync()" title="Sister Sync &amp; Challenges"><span aria-hidden="true">👯</span><span class="btn-icon__label">Sisters</span></button>
         <button class="btn-icon btn-icon--labeled" aria-label="Print week" onclick="openPrint()" title="Print week"><span aria-hidden="true">🖨</span><span class="btn-icon__label">Print</span></button>
       </div>
     </div>
@@ -4184,7 +4301,7 @@
       <!-- View switcher: Full (cards) / Time-Grid (hours) -->
       <div class="view-tabs">
         <button class="view-tab active" id="viewTabFull" onclick="setWeekView('full')">📋 Full</button>
-        <button class="view-tab" id="viewTabTimeGrid" onclick="setWeekView('timegrid')">🕐 Time-Grid</button>
+        <button class="view-tab" id="viewTabTimeGrid" onclick="setWeekView('timegrid')">🧱 Day Blocks</button>
       </div>
     </div>
   </div>
@@ -4206,37 +4323,26 @@
   <!-- Full week view (default) -->
   <div id="weekFull" style="display:flex">
     <div class="weekly-full-wrap">
+      <div class="week-conflict-banner" id="weekConflictBanner" style="display:none"></div>
       <div class="weekly-full" id="weeklyFullGrid"></div>
       <div class="week-signature" id="weekSignatureBar"></div>
     </div>
   </div>
 
-  <!-- Time-Grid view: 7 columns × hour rows, with brick strips and summary -->
+  <!-- Day Blocks view (2a): "plans pop, free stays quiet" — one column per day,
+       planned activities carry colour + a short label, free time stays plain. -->
   <div id="weekTimeGrid" style="display:none">
     <div class="tg-controls">
       <div class="tg-streak" id="tgStreak"></div>
-      <button class="tg-toggle" id="tgToggleBtn" onclick="toggleTimeGridColors()">🎨 Classic colors</button>
     </div>
 
-    <!-- Weekly overview: 7 days × 30 bricks each, all-week glance -->
-    <div class="tg-week-overview" id="tgWeekOverview"></div>
-
-    <div class="tg-wrap">
-      <div class="tg-grid" id="tgGrid"></div>
-      <p class="tg-hint" id="tgHint">Bright cells = your free time ✨</p>
-      <!-- 2a: kid-readable category legend — planned blocks carry color, free
+    <div class="tg2-wrap">
+      <div class="week-conflict-banner" id="tgConflictBanner" style="display:none"></div>
+      <p class="tg2-subtitle">Plans pop, free stays quiet ✨ — tap any day to open it.</p>
+      <div class="tg2-grid" id="tgGrid"></div>
+      <!-- 2a: kid-readable category legend — planned blocks carry colour, free
            time stays plain paper -->
       <div class="tg-legend" id="tgLegend"></div>
-    </div>
-
-    <!-- Today's MY TIME summary (kid view) -->
-    <div class="tg-mytime" id="tgMyTime" style="display:none">
-      <div class="tg-mytime-row">
-        <div class="tg-mytime-label">🌟 MY FREE TIME TODAY</div>
-        <div class="tg-mytime-value" id="tgMyTimeValue">—</div>
-      </div>
-      <div class="tg-mytime-bricks" id="tgMyTimeBricks"></div>
-      <div class="tg-mytime-breakdown" id="tgMyTimeBreakdown"></div>
     </div>
   </div>
 
@@ -4366,6 +4472,7 @@
       <div class="day-mode-toggle" role="tablist" aria-label="Schedule view mode">
         <button type="button" class="day-mode-btn active" id="dayModeTimeline" role="tab" aria-selected="true" onclick="setDayViewMode('timeline')">🕐 Timeline</button>
         <button type="button" class="day-mode-btn" id="dayModeChecklist" role="tab" aria-selected="false" onclick="setDayViewMode('checklist')">✅ Checklist</button>
+        <button type="button" class="day-mode-btn" id="dayModeQuest" role="tab" aria-selected="false" onclick="setDayViewMode('quest')">🎮 Quest</button>
       </div>
       <button class="btn-template danger" onclick="clearDay()">🗑 Clear</button>
     </div>
@@ -4418,6 +4525,7 @@
         </div>
         <div class="timeline" id="timeline"></div>
         <div class="day-checklist" id="dayChecklist" style="display:none"></div>
+        <div class="day-quest" id="dayQuest" style="display:none"></div>
       </div>
     </div>
 
@@ -4458,28 +4566,19 @@
   <div id="syncOverlapWrap"></div>
   <div class="sync-grid" id="syncGrid"></div>
 
+  <!-- Challenges now live here under Sisters — friendly weekly goals you race on. -->
+  <div style="padding: 0 0.8rem 0.4rem">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:1rem 0 0.3rem">
+      <h3 style="font-size:1.3rem;margin:0">🎯 Our Challenges</h3>
+      <button class="btn-icon" onclick="openNewChallenge()" aria-label="Add challenge">＋</button>
+    </div>
+    <p style="color:var(--ink-light);font-size:0.85rem;margin:0 0 0.6rem">Friendly weekly goals you both race on.</p>
+    <div id="challengesList"></div>
+  </div>
+
   <div style="padding: 0 0.8rem 1rem">
     <h3 style="font-size:1.3rem;margin:1rem 0 0.5rem">💌 Invites</h3>
     <div id="invitesList"></div>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════
-     SCREEN: CHALLENGES
-════════════════════════════════════════════════════════ -->
-<div class="screen" id="screen-challenges">
-  <div class="topbar">
-    <div class="topbar-left">
-      <button class="btn-icon" onclick="goWeek()">◀</button>
-      <h2>Our Challenges 🎯</h2>
-    </div>
-    <button class="btn-icon" onclick="openNewChallenge()">＋</button>
-  </div>
-
-  <div style="padding: 0.8rem">
-    <p style="color:var(--ink-light);font-size:0.9rem;margin:-0.2rem 0 0.7rem">Friendly weekly goals you both race on. Activity-sharing invites now live in <b>Sister Sync 👯</b>.</p>
-    <h3 style="font-size:1.3rem;margin-bottom:0.5rem">📋 Weekly Goals</h3>
-    <div id="challengesList"></div>
   </div>
 </div>
 
@@ -5046,7 +5145,6 @@
         <option value="free" selected>🎮 Free Time</option>
         <option value="daily">🍽 Daily</option>
         <option value="training">🏋️ Competitive Sports</option>
-        <option value="competition">🏆 Competition</option>
       </select>
     </div>
     <button class="btn-confirm" onclick="confirmCustomActivity()">Add Activity ✅</button>
@@ -5087,7 +5185,6 @@
         <option value="free" selected>🎮 Free Time</option>
         <option value="daily">🍽 Daily</option>
         <option value="training">🏋️ Competitive Sports</option>
-        <option value="competition">🏆 Competition</option>
       </select>
       <label>Visibility</label>
       <select id="paVisibility">
@@ -5437,7 +5534,7 @@ const TRAINING_TAGS = [
   { id:'skating',  label:'⛸ Skating',  name:'Skating',  icon:'⛸', colour:'#8a6fd0' },
   { id:'swimming', label:'🏊 Swimming', name:'Swimming', icon:'🏊', colour:'#2f9fd0' },
   { id:'dryland',  label:'💪 Dryland', name:'Dryland',  icon:'💪', colour:'#e08a3a' },
-  { id:'general',  label:'🏃 General', name:'Competitive Sports', icon:'🏃', colour:'#ef476f' },
+  { id:'general',  label:'🏃 General', name:'Training', icon:'🏃', colour:'#ef476f' },
 ];
 function getTrainingTopic(tag) {
   return TRAINING_TAGS.find(t => t.id === tag) || TRAINING_TAGS[3];
@@ -5494,6 +5591,41 @@ const OBJECTIVES_BY_TAG = {
   general: GENERAL_OBJECTIVES,
 };
 
+/* Competition day is a different beast from a practice session — its checklist
+   is about performing and managing the meet, not drilling technique. Kept fully
+   separate from the training objectives so a Competition never just repeats the
+   Training list. */
+const COMPETITION_OBJECTIVES_BY_TAG = {
+  skating: [
+    'On-ice warm-up',
+    'Program run-through',
+    'Land my key jumps clean',
+    'Strong spins & footwork',
+    'Perform with confidence',
+    'Cool-down & stretch',
+  ],
+  swimming: [
+    'Pool warm-up',
+    'Race starts & turns',
+    'Swim my race plan / pace',
+    'Strong finishes',
+    'Stay hydrated & fuelled',
+    'Cool-down swim',
+  ],
+  dryland: [
+    'Dynamic warm-up',
+    'Activation drills',
+    'Give my best effort',
+    'Recovery & mobility',
+  ],
+  general: [
+    'Warm-up',
+    'Compete my best',
+    'Good sportsmanship',
+    'Cool-down & reflect',
+  ],
+};
+
 const REWARD_POOLS = {
   family: [
     { id:'family_set_table', name:'Family Hero: Set the Table', icon:'🍽', cat:'daily', durationMin:20, suitableTime:['evening','weekend'] },
@@ -5537,8 +5669,8 @@ const DEFAULT_ACTIVITIES = [
   { id:'french',     name:'French Adventure',  icon:'🇫🇷', cat:'school',   durationMin:60, suitableTime:['after-school','weekend','evening'] },
   { id:'chinese',    name:'Chinese Adventure', icon:'🇨🇳', cat:'school',   durationMin:60, suitableTime:['after-school','weekend','evening'] },
   { id:'math',       name:'Math Adventure',    icon:'🦘', cat:'school',   durationMin:60, suitableTime:['after-school','weekend','evening'] },
-  { id:'training',   name:'Competitive Sports', icon:'🏋️', cat:'training', durationMin:120, isTraining:true, suitableTime:['after-school','weekend'] },
-  { id:'competition', name:'Competition',      icon:'🏆', cat:'competition', durationMin:480, isTraining:true, isCompetition:true, suitableTime:['weekend'] },
+  { id:'training',   name:'Training',          icon:'🏋️', cat:'training', durationMin:120, isTraining:true, suitableTime:['after-school','weekend'] },
+  { id:'competition', name:'Competition',      icon:'🏆', cat:'training', durationMin:480, isTraining:true, isCompetition:true, suitableTime:['weekend'] },
   { id:'relax',      name:'Muscle Relaxation', icon:'🧘', cat:'active',   durationMin:60, suitableTime:['after-school','evening','weekend'] },
   { id:'break_quick', name:'Quick Break',     icon:'☕', cat:'free',     durationMin:15, suitableTime:['before-school','school','after-school','evening','weekend'], quickBreak:true },
   { id:'piano',      name:'Piano Practice',    icon:'🎹', cat:'school',   durationMin:60, suitableTime:['after-school','evening','weekend'] },
@@ -6056,7 +6188,6 @@ function refreshCurrentScreen() {
   else if (active.id === 'screen-day') { buildTimeline(); buildTray(); renderVibe(); }
   else if (active.id === 'screen-chore') renderChoreTab();
   else if (active.id === 'screen-sync') renderSync();
-  else if (active.id === 'screen-challenges') renderChallenges();
   else if (active.id === 'screen-parent') renderParentHome();
 }
 
@@ -7719,130 +7850,133 @@ function formatStretchLabel(stretch) {
 }
 
 /* Time-Grid: 7-column hour grid that visualizes free time. */
+/* Short label for the 2a Day-Blocks view — a Skating block reads "Skate", French
+   reads "FR", the morning routine reads "AM", etc. Kept compact so a block only a
+   few pixels tall still says something useful. */
+function tg2ShortLabel(act, b) {
+  if (!act) return '';
+  if (act.isRoutine) {
+    if (act.routineId === 'morning') return 'AM';
+    if (act.routineId === 'afterschool') return 'PM';
+    if (act.routineId === 'evening') return 'Eve';
+    return 'Routine';
+  }
+  if (act.isTraining) {
+    const t = getTrainingTopic(b.tag);
+    if (act.isCompetition) return t.id === 'general' ? 'Comp' : (t.name.slice(0, 4) + '🏆');
+    return ({ skating: 'Skate', swimming: 'Swim', dryland: 'Dry', general: 'Train' })[t.id] || 'Train';
+  }
+  const idMap = {
+    school_day: 'School', french: 'FR', chinese: 'CN', math: 'Math', piano: 'Piano',
+    chores: 'Chores', breakfast: '🍳', lunch: '🥗', dinner: '🍽', relax: 'Relax',
+    break_quick: 'Break', family: 'Family',
+  };
+  if (idMap[act.id]) return idMap[act.id];
+  const w = (act.name || '').split(/\s+/)[0];
+  return w.length > 7 ? w.slice(0, 7) : w;
+}
+
+/* 2a "Day Blocks": one column per day, planned activities carry colour + a short
+   label, free time is plain lined paper. Conflicts get the same red flag as the
+   Full week and the print sheet so the three views agree. */
 function renderTimeGrid(keys) {
   const grid = document.getElementById('tgGrid');
-  const wrap = document.querySelector('#weekTimeGrid .tg-wrap');
-  if (!grid || !wrap) return;
+  if (!grid) return;
   grid.innerHTML = '';
-
-  // Apply color mode to wrap
-  wrap.classList.toggle('inverted', tgColorMode === 'inverted');
-  const inverted = tgColorMode === 'inverted';
-  const freeCellCls = tgFreeCellClass();
-
-  // Header row: blank corner + 7 day labels
-  const corner = document.createElement('div');
-  corner.className = 'tg-cell tg-head';
-  corner.textContent = '';
-  grid.appendChild(corner);
+  const acts = getAllActivities(activeProfile());
   const today = todayKey();
-  keys.forEach((key, i)=>{
+
+  const PX_PER_MIN = 0.5;
+  const totalH = Math.round(DAY_MIN_SPAN * PX_PER_MIN);
+  const firstHour = Math.ceil(START_MIN / 60);
+  const lastHour  = Math.floor((START_MIN + DAY_MIN_SPAN) / 60);
+
+  // ── Header row: corner + 7 day headers ──
+  const corner = document.createElement('div');
+  corner.className = 'tg2-corner';
+  grid.appendChild(corner);
+  keys.forEach((key, i) => {
     const d = formatDayKey(key);
     const head = document.createElement('div');
-    head.className = 'tg-cell tg-head tg-day-link'+(key===today?' today tg-col-today-border':'');
-    head.textContent = `${DAY_SHORT[i]} ${d.getDate()}`;
-    head.onclick = ()=>openDay(key, i);
+    head.className = 'tg2-head' + (key === today ? ' today' : '');
+    head.innerHTML = `${DAY_SHORT[i]}<small>${d.getDate()}</small>`;
+    head.onclick = () => openDay(key, i);
     grid.appendChild(head);
   });
 
-  const startHour = Math.floor(START_MIN/60);             // 6
-  const endHour   = Math.floor((START_MIN+DAY_MIN_SPAN)/60); // 21
-
-  // Pre-fetch activities once per profile
-  const acts = getAllActivities(activeProfile());
-
-  for (let h = startHour; h < endHour; h++) {
-    // Time label cell
-    const tl = document.createElement('div');
-    tl.className = 'tg-cell tg-time';
-    const hr12 = ((h+11)%12)+1; const ampm = h<12 ? 'a' : 'p';
-    tl.textContent = `${hr12}${ampm}`;
-    grid.appendChild(tl);
-
-    keys.forEach((key, dayIdx) => {
-      const cell = document.createElement('div');
-      const isTodayCol = key === today;
-      const isLastHourRow = h === endHour - 1;
-      cell.className = 'tg-cell tg-hour-cell' + (isTodayCol ? ' tg-col-today-border' : '') + ((isTodayCol && isLastHourRow) ? ' tg-col-today-bottom' : '');
-
-      const blocks = getDayBlocks(key);
-      const hourStartAbs = h*60;
-      const hourEndAbs   = (h+1)*60;
-      const hits = blocks.filter(b => b.startMin < hourEndAbs && (b.startMin + b.durationMin) > hourStartAbs)
-        .sort((a,b)=>a.startMin-b.startMin);
-
-      const stack = document.createElement('div');
-      stack.className = 'tg-hour-stack';
-      for (let q = 0; q < 4; q++) {
-        const qd = document.createElement('div');
-        qd.className = 'tg-quarter';
-        if (inverted) qd.classList.add('tg-hour-free', freeCellCls);
-        stack.appendChild(qd);
-      }
-      if (hits.length) {
-        if (inverted) stack.querySelectorAll('.tg-quarter').forEach(q=>q.classList.remove('tg-hour-free', freeCellCls));
-        hits.forEach(hit=>{
-          const act = acts.find(a=>a.id===hit.actId);
-          const bucket = categorizeBlock(hit, act);
-          const seg = document.createElement('div');
-          seg.className = 'tg-seg-abs bucket-' + bucket;
-          const segStart = Math.max(hit.startMin, hourStartAbs);
-          const segEnd = Math.min(hit.startMin + hit.durationMin, hourEndAbs);
-          const topPct = ((segStart - hourStartAbs) / 60) * 100;
-          let hPct = ((segEnd - segStart) / 60) * 100;
-          if (hPct < 12) hPct = 12;
-          seg.style.top = topPct + '%';
-          seg.style.height = hPct + '%';
-          if (!inverted) {
-            const colour = hit.colour || (act && CAT_HEX[act.cat]) || '#888';
-            seg.style.background = colour;
-            if (!isLightColour(colour)) seg.style.color = '#fff';
-          }
-          seg.title = act ? `${act.name} (${formatTimeFromMin(hit.startMin)}, ${formatDuration(hit.durationMin)})` : '';
-          seg.onclick = (e)=>{ e.stopPropagation(); openDay(key, dayIdx, hit.id); };
-          stack.appendChild(seg);
-        });
-        cell.appendChild(stack);
-        cell.onclick = ()=>openDay(key, dayIdx);
-      } else {
-        cell.appendChild(stack);
-        cell.onclick = ()=>openDay(key, dayIdx);
-      }
-      grid.appendChild(cell);
-    });
+  // ── Body row: time gutter + 7 lanes ──
+  const gutter = document.createElement('div');
+  gutter.className = 'tg2-gutter';
+  gutter.style.height = totalH + 'px';
+  for (let h = firstHour; h <= lastHour; h++) {
+    const rel = h * 60 - START_MIN;
+    if (rel < 0 || rel > DAY_MIN_SPAN) continue;
+    const lbl = document.createElement('div');
+    lbl.className = 'tg2-gutter-hour';
+    lbl.style.top = (rel * PX_PER_MIN) + 'px';
+    lbl.textContent = `${((h + 11) % 12) + 1}${h >= 12 ? 'p' : 'a'}`;
+    gutter.appendChild(lbl);
   }
+  grid.appendChild(gutter);
 
-  // Render extras
+  keys.forEach((key, dayIdx) => {
+    const lane = document.createElement('div');
+    lane.className = 'tg2-lane' + (key === today ? ' today' : '');
+    lane.style.height = totalH + 'px';
+    lane.onclick = () => openDay(key, dayIdx);
+
+    const blocks = (getDayBlocks(key) || []).slice().sort((a, b) => a.startMin - b.startMin);
+    const conflicts = computeBufferConflicts(blocks);
+    const cols = wfAssignColumns(blocks);
+
+    blocks.forEach(b => {
+      const act = acts.find(a => a.id === b.actId);
+      if (!act) return;
+      const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
+      const bg = topic ? trainingBlockColour(b) : (b.colour || CAT_HEX[act.cat] || '#95d5b2');
+      const relStart = Math.max(0, b.startMin - START_MIN);
+      const relEnd = Math.min(DAY_MIN_SPAN, b.startMin - START_MIN + (b.durationMin || 0));
+      if (relEnd - relStart < 1) return;
+      const el = document.createElement('div');
+      const hasConflict = conflicts.affected.has(b.id);
+      el.className = 'tg2-block' + (isLightColour(bg) ? ' light-bg' : '')
+        + (b.completed ? ' tg2-block--done' : '') + (hasConflict ? ' tg2-block--conflict' : '');
+      el.style.top = (relStart * PX_PER_MIN) + 'px';
+      el.style.height = Math.max(11, (relEnd - relStart) * PX_PER_MIN - 1) + 'px';
+      el.style.background = bg;
+      // Column-pack overlapping blocks so they sit side-by-side, not stacked.
+      const slot = cols.get(b.id) || { col: 0, count: 1 };
+      const cc = slot.count || 1;
+      if (cc > 1) {
+        el.style.left = `calc(${(slot.col * 100 / cc)}% + 1px)`;
+        el.style.right = 'auto';
+        el.style.width = `calc(${100 / cc}% - 3px)`;
+      }
+      const icon = topic ? topic.icon : act.icon;
+      const flag = hasConflict ? `<div class="tg2-block-flag" title="Time clash — not enough travel/get-ready time">!</div>` : '';
+      el.innerHTML = `${flag}${icon}<span class="tg2-block-lbl">${escapeHtml(tg2ShortLabel(act, b))}</span>`;
+      el.title = `${icon} ${topic ? topic.name : act.name} — ${formatTimeFromMin(b.startMin)}, ${formatDuration(b.durationMin)}`
+        + (hasConflict ? ' · ⚠️ overlaps another activity' : '');
+      el.onclick = (e) => { e.stopPropagation(); openDay(key, dayIdx, b.id); };
+      lane.appendChild(el);
+    });
+
+    grid.appendChild(lane);
+  });
+
+  // Week-level clash banner (shared with the Full view), plus the streak + legend.
+  renderWeekConflictBanner(keys, 'tgConflictBanner');
   renderTimeGridStreak(keys);
-  renderTimeGridWeekOverview(keys);
-  renderTimeGridMyTime(keys);
-  // Update hint text based on mode
-  const hint = document.getElementById('tgHint');
-  if (hint) hint.textContent = inverted ? 'Bright cells = your free time ✨' : 'Each color = an activity type 🎨';
-  const btn = document.getElementById('tgToggleBtn');
-  if (btn) btn.textContent = inverted ? '🎨 Classic colors' : '✨ Free-time mode';
-  // 2a legend: which color means what — free time stays plain on purpose.
   const legend = document.getElementById('tgLegend');
   if (legend) {
-    if (inverted) {
-      legend.style.display = 'none';
-    } else {
-      legend.style.display = 'flex';
-      legend.innerHTML = [
-        ['school', '📚 Learning'], ['training', '🏋️ Competitive Sports'], ['competition', '🏆 Competition'],
-        ['routine', '📋 Routine'], ['active', '🏃 Active'], ['daily', '🍽 Daily'],
-      ].map(([cat, label]) =>
-        `<span class="tg-legend-chip"><span class="tg-legend-dot" style="background:${CAT_HEX[cat] || '#999'}"></span>${label}</span>`
-      ).join('') + `<span class="tg-legend-chip"><span class="tg-legend-dot tg-legend-dot--free"></span>Free — no color needed</span>`;
-    }
+    legend.style.display = 'flex';
+    legend.innerHTML = [
+      ['school', '📚 Learning'], ['training', '🏋️ Competitive Sports'],
+      ['routine', '📋 Routine'], ['active', '🏃 Active'], ['daily', '🍽 Daily'],
+    ].map(([cat, label]) =>
+      `<span class="tg-legend-chip"><span class="tg-legend-dot" style="background:${CAT_HEX[cat] || '#999'}"></span>${label}</span>`
+    ).join('') + `<span class="tg-legend-chip"><span class="tg-legend-dot tg-legend-dot--free"></span>Free — plain paper</span>`;
   }
-}
-
-/* Toggle between inverted (free-bright) and classic (category colors) */
-function toggleTimeGridColors() {
-  tgColorMode = (tgColorMode === 'inverted') ? 'classic' : 'inverted';
-  const keys = getDayKeys(weekOffset);
-  renderTimeGrid(keys);
 }
 
 /* Render the streak banner above the grid */
@@ -8078,6 +8212,9 @@ function renderFullWeek(keys) {
   grid.innerHTML = '';
   const acts = getAllActivities();
 
+  // ── Week-level conflict summary banner (shown above the grid) ──
+  renderWeekConflictBanner(keys);
+
   // Continuous single-column-per-day timeline (matches the Day view): each
   // activity is ONE unbroken block positioned by its real start time on a
   // shared px-per-minute scale, so nothing is ever sliced at a band boundary.
@@ -8213,6 +8350,14 @@ function renderFullWeek(keys) {
       const topic = act && act.isTraining ? getTrainingTopic(b.tag) : null;
       const segColour = topic ? trainingBlockColour(b) : (b.colour || (act && CAT_HEX[act.cat]) || '#888');
       const bc = bufferConflicts.perBlock.get(b.id);
+      // Match the buffer strip to its own block's column, so a get-ready/drive
+      // strip sits directly under (and the same width as) the card it belongs to
+      // instead of spanning the whole day column.
+      const slot = cols.get(b.id) || { col: 0, count: 1 };
+      const colCount = slot.count || 1;
+      const gap = 3;
+      const leftCss  = 'calc(' + (slot.col * 100 / colCount) + '% + 1px)';
+      const widthCss = 'calc(' + (100 / colCount) + '% - ' + (gap + 2) + 'px)';
       wfBufferSegments(b).forEach(seg => {
         const segS = Math.max(seg.startRel, 0);
         const segE = Math.min(seg.startRel + seg.dur, DAY_MIN_SPAN);
@@ -8220,7 +8365,7 @@ function renderFullWeek(keys) {
         const topPx = segS * PX_PER_MIN;
         const hPx = (segE - segS) * PX_PER_MIN;
         const segConflict = !!bc && (seg.side === 'pre' ? bc.pre : bc.post);
-        cell.appendChild(wfTravelStrip(topPx, hPx, '2px', 'calc(100% - 4px)', seg.icon, seg.min, segColour, segConflict));
+        cell.appendChild(wfTravelStrip(topPx, hPx, leftCss, widthCss, seg.icon, seg.min, segColour, segConflict));
       });
     });
 
@@ -8242,9 +8387,12 @@ function renderFullWeek(keys) {
       const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
       const bg = topic ? trainingBlockColour(b) : (b.colour || CAT_HEX[act.cat] || '#888');
       const dispIcon = topic ? topic.icon : act.icon;
-      // Competition shares the sport topic's icon/colour/name with Competitive Sports,
-      // so a 🏆 prefix keeps it visually distinct at a glance.
-      const dispName = (topic ? topic.name : act.name) + (act.isCompetition ? ' 🏆' : '');
+      // Competition shares the sport topic's icon/colour, but reads as its own
+      // task (a general competition says "Competition", a sport one says e.g.
+      // "Swimming 🏆") so it never looks like a plain Training block.
+      const dispName = topic
+        ? (act.isCompetition ? (topic.id === 'general' ? 'Competition 🏆' : topic.name + ' 🏆') : topic.name)
+        : act.name;
       const card = document.createElement('div');
       let cls = 'wf-card' + (isLightColour(bg) ? ' light-bg' : '');
       if (pxHeight >= 60) cls += ' wf-card--tall'; // room to stack time/icon/name centered
@@ -8274,7 +8422,11 @@ function renderFullWeek(keys) {
       const travelTag = bufBefore > 0 ? `<span class="wf-card-travel">${travelMin ? '🚗' : '👕'}${bufBefore}m</span>` : '';
       const stampEmoji = b.parentStamp && b.parentStamp.emoji ? b.parentStamp.emoji + ' ' : '';
       const conflictTag = hasConflict ? `<span class="wf-card-conflict-badge" title="Not enough travel/get-ready time — overlaps another activity">⚠️</span>` : '';
+      // Corner flag stays visible on every card size (the inline badge is hidden
+      // when a card is too slim for its name), so a clash never hides off-screen.
+      const conflictFlag = hasConflict ? `<div class="wf-card-conflict-flag" title="Time clash — not enough travel/get-ready time">!</div>` : '';
       card.innerHTML = `
+        ${conflictFlag}
         <div class="wf-card-time">${timeStr}</div>
         <div class="wf-card-icon">${dispIcon}</div>
         <div class="wf-card-name">${stampEmoji}${dispName}${travelTag}${conflictTag}</div>
@@ -8291,6 +8443,38 @@ function renderFullWeek(keys) {
 
     grid.appendChild(cell);
   });
+}
+
+/* Scan the whole week for buffer/time clashes and surface a plain-language
+   banner so a conflict is obvious the moment the week opens — no hovering, no
+   hunting for a red outline. Each day that clashes names the activities that
+   don't leave enough travel/get-ready time. */
+function renderWeekConflictBanner(keys, bannerId = 'weekConflictBanner') {
+  const banner = document.getElementById(bannerId);
+  if (!banner) return;
+  const acts = getAllActivities();
+  const dayLines = [];
+  keys.forEach((key, i) => {
+    const blocks = (getDayBlocks(key) || []).slice();
+    const conflicts = computeBufferConflicts(blocks);
+    if (!conflicts.affected.size) return;
+    const names = [];
+    blocks.forEach(b => {
+      if (!conflicts.affected.has(b.id)) return;
+      const act = acts.find(a => a.id === b.actId);
+      const topic = act && act.isTraining ? getTrainingTopic(b.tag) : null;
+      const nm = act ? (topic ? topic.name : act.name) : 'Activity';
+      if (!names.includes(nm)) names.push(nm);
+    });
+    dayLines.push(`${DAY_SHORT[i]}: ${names.join(' ⇆ ')}`);
+  });
+  if (!dayLines.length) { banner.style.display = 'none'; banner.innerHTML = ''; return; }
+  const n = dayLines.length;
+  banner.style.display = 'flex';
+  banner.innerHTML =
+    `<span class="wcb-icon">⚠️</span>`
+    + `<span>${n} time ${n === 1 ? 'clash' : 'clashes'} this week — not enough travel/get-ready time`
+    + `<span class="wcb-detail"><br>${dayLines.map(escapeHtml).join(' · ')}</span></span>`;
 }
 
 /* Build one travel/get-ready buffer strip for the weekly view. Positioned in
@@ -8510,11 +8694,13 @@ function setDayMood(m) {
    3b — DAY "CHECKLIST" MODE: collapse free time into tappable pills
 ════════════════════════════════════════════════════════════════ */
 function setDayViewMode(mode) {
-  dayViewMode = (mode === 'checklist') ? 'checklist' : 'timeline';
+  dayViewMode = (mode === 'checklist' || mode === 'quest') ? mode : 'timeline';
   const tb = document.getElementById('dayModeTimeline');
   const cb = document.getElementById('dayModeChecklist');
+  const qb = document.getElementById('dayModeQuest');
   if (tb) { tb.classList.toggle('active', dayViewMode==='timeline'); tb.setAttribute('aria-selected', dayViewMode==='timeline'); }
   if (cb) { cb.classList.toggle('active', dayViewMode==='checklist'); cb.setAttribute('aria-selected', dayViewMode==='checklist'); }
+  if (qb) { qb.classList.toggle('active', dayViewMode==='quest'); qb.setAttribute('aria-selected', dayViewMode==='quest'); }
   const scr = document.getElementById('screen-day');
   if (scr) scr.classList.toggle('dc-mode', dayViewMode==='checklist');
   buildTimeline();
@@ -8636,11 +8822,104 @@ function buildDayChecklist() {
   }
 }
 
+/* Quest mode for the day view: the viewed day's activities as gamified quest
+   cards. Completing a quest is instant — it marks the block done, awards XP, and
+   re-renders in place (no separate Quest Board screen needed). */
+function buildDayQuest() {
+  const host = document.getElementById('dayQuest');
+  if (!host) return;
+  host.innerHTML = '';
+  const p = activeProfile();
+  const acts = getAllActivities(p);
+  const blocks = (getDayBlocks(currentDayKey) || [])
+    .filter(b => b && b.startMin != null && (b.durationMin || 0) > 0)
+    .slice().sort((a, b) => (a.startMin || 0) - (b.startMin || 0));
+
+  // Compact hero / XP strip so the gamification travels with the view.
+  const xp = getQuestXP(p);
+  const level = Math.floor(xp / QUEST_XP_PER_LEVEL) + 1;
+  const tier = heroTierForLevel(level);
+  const into = xp % QUEST_XP_PER_LEVEL;
+  const pct = Math.round(into / QUEST_XP_PER_LEVEL * 100);
+  const doneCount = blocks.filter(b => b.completed).length;
+  const head = document.createElement('div');
+  head.className = 'dq-hero';
+  head.innerHTML = `
+    <div class="dq-hero-avatar">${tier.emoji}</div>
+    <div class="dq-hero-info">
+      <div class="dq-hero-title">Lv ${level} · ${escapeHtml(tier.name)}</div>
+      <div class="dq-xp-bar"><div class="dq-xp-fill" style="width:${pct}%"></div></div>
+      <div class="dq-hero-sub">${doneCount}/${blocks.length} quests done · ${into}/${QUEST_XP_PER_LEVEL} XP</div>
+    </div>`;
+  host.appendChild(head);
+
+  if (!blocks.length) {
+    const empty = document.createElement('div');
+    empty.className = 'dc-empty';
+    empty.textContent = 'No quests for this day yet — switch to Timeline to add some.';
+    host.appendChild(empty);
+    return;
+  }
+
+  const actById = id => acts.find(a => a.id === id);
+  const list = document.createElement('div');
+  list.className = 'dq-list';
+  blocks.forEach(b => {
+    const act = actById(b.actId) || { name: 'Quest', icon: '⭐' };
+    const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
+    const icon = topic ? topic.icon : (act.icon || '⭐');
+    const nm = topic
+      ? (act.isCompetition ? (topic.id === 'general' ? 'Competition' : topic.name + ' Comp.') : topic.name)
+      : (act.name || 'Quest');
+    const done = !!b.completed;
+    const card = document.createElement('div');
+    card.className = 'quest-card dq-card' + (done ? ' quest-done' : '');
+    card.innerHTML = `
+      <div class="quest-time-col">
+        <div class="quest-time">${formatQuestTime(b.startMin)}</div>
+        ${b.durationMin ? `<div class="quest-dur">${formatDuration(b.durationMin)}</div>` : ''}
+      </div>
+      <div class="quest-card-icon">${icon}</div>
+      <div class="quest-card-body">
+        <div class="quest-card-name">${escapeHtml(nm)}</div>
+        <div class="quest-card-meta"><span class="quest-xp-tag">+${QUEST_XP_PER_TASK} XP</span></div>
+      </div>`;
+    const right = document.createElement(done ? 'div' : 'button');
+    if (done) {
+      right.className = 'quest-done-badge';
+      right.textContent = '✓';
+    } else {
+      right.type = 'button';
+      right.className = 'quest-complete-btn';
+      right.setAttribute('aria-label', 'Complete quest');
+      right.title = 'Complete it! 🎯';
+      right.textContent = '🎯';
+      right.onclick = (e) => { e.stopPropagation(); toggleBlockDone(currentDayKey, b.id, e); };
+    }
+    card.appendChild(right);
+    card.onclick = () => onTimelineBlockTap(b.id);
+    list.appendChild(card);
+  });
+  host.appendChild(list);
+}
+
 function buildTimeline() {
   if (activeStopwatchTick) { clearInterval(activeStopwatchTick); activeStopwatchTick = null; }
   refreshRestDayButton();
   const tl = document.getElementById('timeline');
   const cl = document.getElementById('dayChecklist');
+  const ql = document.getElementById('dayQuest');
+  // Quest mode: the day's activities as gamified quest cards with instant
+  // blast-to-complete.
+  if (dayViewMode === 'quest') {
+    if (tl) tl.style.display = 'none';
+    if (cl) cl.style.display = 'none';
+    if (ql) ql.style.display = '';
+    buildDayQuest();
+    renderDayNextUpBanner();
+    return;
+  }
+  if (ql) ql.style.display = 'none';
   // 3b: in checklist mode, render the collapsed-free-time list instead of the
   // pixel timeline.
   if (dayViewMode === 'checklist') {
@@ -9105,11 +9384,13 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   // the block (built as DOM below), so the kid can pack without opening the
   // sheet. This is separate from the block's own "done" checkbox.
   const showGearChecklist = !isBuffer && !isCompact && act.isTraining && b.tag
-    && getTrainingGearPresets(b.tag).length > 0;
+    && getTrainingGearPresets(b.tag, act.isCompetition).length > 0;
   // For a multi-chore House-Chore block, show the tagged chores in the name.
   const choreList = (b.actId === 'chores' && Array.isArray(b.choreTags) && b.choreTags.length)
     ? b.choreTags.join(', ') : '';
-  const baseName = topic ? topic.name : act.name;
+  const baseName = topic
+    ? (act.isCompetition ? (topic.id === 'general' ? 'Competition' : topic.name + ' Comp.') : topic.name)
+    : act.name;
   const displayName = choreList ? `${act.name}: ${choreList}` : baseName;
   const nameHtml = isBuffer
     ? ''
@@ -9131,7 +9412,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
     ${!isBuffer && b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="block-stopwatch-btn" onclick="event.stopPropagation(); startBlockStopwatch('${b.id}')">⏱ Start stopwatch</button>` : ''}
     ${noteHtml}
   `;
-  if (showGearChecklist) blockEl.appendChild(buildBlockGearChecklist(b, b.tag));
+  if (showGearChecklist) blockEl.appendChild(buildBlockGearChecklist(b, b.tag, act.isCompetition));
   if (!isBuffer && clippedTop) {
     const m = document.createElement('div');
     m.className = 'block-clip-marker block-clip-marker--top';
@@ -9295,7 +9576,17 @@ function syncDurationColumnSpacers(mode) {
   slot.style.minHeight = Math.max(0, sh - dh - ch) + 'px';
 }
 
-function getTrainingGearPresets(tag) {
+function getTrainingGearPresets(tag, isComp) {
+  if (isComp) {
+    // Competition-day packing list — bring-everything, not the practice bag.
+    if (tag === 'swimming') {
+      return ['Competition suit','Goggles (spare too)','Swim cap (x2)','Towel (x2)','Warm clothes / parka','Snacks','Water bottle','Heat sheet / schedule','ID / registration'];
+    }
+    if (tag === 'skating') {
+      return ['Competition dress','Skates','Guards & soakers','Gloves','Music backup','Hair & makeup kit','Tissues','Snacks','Water bottle','Schedule'];
+    }
+    return ['Uniform / kit','Water bottle','Snacks','Schedule','ID / registration'];
+  }
   if (tag === 'swimming') {
     return ['Goggles','Swim cap','Swim suit','Towel','Training earphone','Mic','Hat','Board','Hand fins','Leg fins'];
   }
@@ -9305,25 +9596,34 @@ function getTrainingGearPresets(tag) {
   return [];
 }
 
-function renderTrainingGearChecklist(containerId, stateObj, tag, persist) {
+/* Does this placed block represent a Competition (vs a Training session)? */
+function blockIsCompetition(b) {
+  if (!b) return false;
+  if (b.actId === 'competition') return true;
+  const act = getAllActivities().find(a => a.id === b.actId);
+  return !!(act && act.isCompetition);
+}
+
+function renderTrainingGearChecklist(containerId, stateObj, tag, persist, isComp) {
   const wrap = document.getElementById(containerId);
   if (!wrap) return;
-  const items = getTrainingGearPresets(tag);
+  const items = getTrainingGearPresets(tag, isComp);
   wrap.innerHTML = '';
   if (!items.length) {
     wrap.innerHTML = '<p style="font-size:0.9rem;color:var(--ink-light)">No preset gear for this sport yet.</p>';
     return;
   }
   if (!stateObj.gearState) stateObj.gearState = {};
+  const prefix = isComp ? `gearC-${tag}` : `gear-${tag}`;
   items.forEach((label, idx)=>{
-    const key = `gear-${tag}-${idx}`;
+    const key = `${prefix}-${idx}`;
     const row = document.createElement('div');
     row.className = 'checklist-item' + (stateObj.gearState[key] ? ' checked' : '');
     row.innerHTML = `<div class="checklist-check">${stateObj.gearState[key]?'✓':''}</div><span class="checklist-text">${label}</span>`;
     row.onclick = ()=>{
       stateObj.gearState[key] = !stateObj.gearState[key];
       if (persist) saveAll();
-      renderTrainingGearChecklist(containerId, stateObj, tag, persist);
+      renderTrainingGearChecklist(containerId, stateObj, tag, persist, isComp);
     };
     wrap.appendChild(row);
   });
@@ -9332,19 +9632,20 @@ function renderTrainingGearChecklist(containerId, stateObj, tag, persist) {
 /* Tappable get-ready gear checklist rendered directly on a training block in
    the timeline. Each item toggles the block's gearState and persists it. This
    is deliberately separate from the block's own completion checkbox. */
-function buildBlockGearChecklist(b, tag) {
-  const items = getTrainingGearPresets(tag);
+function buildBlockGearChecklist(b, tag, isComp) {
+  const items = getTrainingGearPresets(tag, isComp);
   const wrap = document.createElement('div');
   wrap.className = 'block-gear-list';
   if (!items.length) return wrap;
   if (!b.gearState) b.gearState = {};
-  const doneCount = items.filter((_, idx) => b.gearState[`gear-${tag}-${idx}`]).length;
+  const prefix = isComp ? `gearC-${tag}` : `gear-${tag}`;
+  const doneCount = items.filter((_, idx) => b.gearState[`${prefix}-${idx}`]).length;
   const head = document.createElement('div');
   head.className = 'block-gear-head';
-  head.textContent = `🎒 Get ready ${doneCount}/${items.length}`;
+  head.textContent = `${isComp ? '🏆' : '🎒'} ${isComp ? 'Pack for comp' : 'Get ready'} ${doneCount}/${items.length}`;
   wrap.appendChild(head);
   items.forEach((label, idx) => {
-    const key = `gear-${tag}-${idx}`;
+    const key = `${prefix}-${idx}`;
     const row = document.createElement('button');
     row.type = 'button';
     row.className = 'block-gear-item' + (b.gearState[key] ? ' checked' : '');
@@ -9356,8 +9657,8 @@ function buildBlockGearChecklist(b, tag) {
       saveAll();
       row.classList.toggle('checked', !!b.gearState[key]);
       row.querySelector('.block-gear-box').textContent = b.gearState[key] ? '✓' : '';
-      const done = items.filter((_, i) => b.gearState[`gear-${tag}-${i}`]).length;
-      head.textContent = `🎒 Get ready ${done}/${items.length}`;
+      const done = items.filter((_, i) => b.gearState[`${prefix}-${i}`]).length;
+      head.textContent = `${isComp ? '🏆' : '🎒'} ${isComp ? 'Pack for comp' : 'Get ready'} ${done}/${items.length}`;
     };
     // The gear rows are real taps, not scroll gestures — let them through the
     // block-level tap guard.
@@ -9512,7 +9813,7 @@ function openKidTrainingQuick(blockId) {
   } else {
     swEl.style.display = 'none';
   }
-  renderTrainingGearChecklist('kidTrainingGear', b, b.tag || 'skating', true);
+  renderTrainingGearChecklist('kidTrainingGear', b, b.tag || 'skating', true, act.isCompetition);
   openSheet('kidTrainingOverlay');
 }
 
@@ -9576,7 +9877,7 @@ function renderSlotPicker() {
   const filters = [
     {id:'all', label:'All'}, {id:'daily', label:'🍽 Daily'}, {id:'routine', label:'🌅 Routines'},
     {id:'school', label:'📚 Learning'}, {id:'active', label:'🏃 Active'},
-    {id:'training', label:'🏋️ Competitive Sports'}, {id:'competition', label:'🏆 Competition'}, {id:'free', label:'🎮 Free'},
+    {id:'training', label:'🏋️ Competitive Sports'}, {id:'free', label:'🎮 Free'},
   ];
   filterWrap.innerHTML = '';
   filters.forEach(f => {
@@ -9914,7 +10215,6 @@ function buildTray() {
     {id:'school', label:'📚 Learning'},
     {id:'active', label:'🏃 Active'},
     {id:'training', label:'🏋️ Competitive Sports'},
-    {id:'competition', label:'🏆 Competition'},
     {id:'free', label:'🎮 Free'},
     {id:'seasonal', label:'🌟 Seasonal'},
   ];
@@ -9999,7 +10299,7 @@ function openTrainingSheet() { renderTrainingSheet(); openSheet('trainingOverlay
 function renderTrainingSheet() {
   const isCompetition = !!(selectedActivity && selectedActivity.isCompetition);
   const titleEl = document.getElementById('trainingSheetTitle');
-  if (titleEl) titleEl.textContent = isCompetition ? '🏆 Competition' : '🏋️ Competitive Sports Session';
+  if (titleEl) titleEl.textContent = isCompetition ? '🏆 Competition' : '🏋️ Training Session';
 
   // Start time picker
   renderStartTimePicker('trainingStartPicker', pendingStartMin, (m)=>{ pendingStartMin = m; renderTrainingSheet(); });
@@ -10043,10 +10343,11 @@ function renderTrainingSheet() {
     cp.appendChild(d);
   });
 
-  // Objectives — preset + custom tasks filtered by tag
+  // Objectives — preset + custom tasks filtered by tag. Competition day gets its
+  // own performance/meet checklist rather than the practice-drill objectives.
   const objWrap = document.getElementById('objectivesList');
   objWrap.innerHTML = '';
-  const presets = OBJECTIVES_BY_TAG[ts.tag] || [];
+  const presets = (isCompetition ? COMPETITION_OBJECTIVES_BY_TAG : OBJECTIVES_BY_TAG)[ts.tag] || [];
   presets.forEach(obj=>{
     const item = document.createElement('div');
     const checked = ts.objectives.includes(obj);
@@ -10106,7 +10407,7 @@ function renderTrainingSheet() {
   if (tIn) tIn.value = String(ts.travelBufMin);
   if (rIn) rIn.value = String(ts.getReadyBufMin);
   if (wIn) wIn.value = String(ts.warmupBufMin);
-  renderTrainingGearChecklist('trainingGearList', ts, ts.tag);
+  renderTrainingGearChecklist('trainingGearList', ts, ts.tag, false, isCompetition);
 
   // Repeat + day picker
   const rt = document.getElementById('trainingRepeat');
@@ -10679,7 +10980,7 @@ function openEditSheet(blockId) {
     editWarmup.style.display = 'flex';
     editWarmup.classList.toggle('on', !!editState.warmupBuffer);
     editGearWrap.style.display = 'block';
-    renderTrainingGearChecklist('editTrainingGearList', editState, block.tag || 'skating');
+    renderTrainingGearChecklist('editTrainingGearList', editState, block.tag || 'skating', false, act.isCompetition);
     editTrRow.style.display = editState.travelBuffer ? 'flex' : 'none';
     editRdRow.style.display = editState.getReadyBuffer ? 'flex' : 'none';
     editWuRow.style.display = editState.warmupBuffer ? 'flex' : 'none';
@@ -11638,6 +11939,7 @@ function renderSync() {
     grid.appendChild(col);
   });
 
+  renderChallenges();
   renderInvites();
 }
 
@@ -11706,9 +12008,10 @@ function startBlockStopwatch(blockId) {
 /* ════════════════════════════════════════════════════════════════
    CHALLENGES
 ════════════════════════════════════════════════════════════════ */
+// Challenges are now part of Sister Sync — keep this entry point as a redirect
+// for any lingering callers/deep links.
 function openChallenges() {
-  showScreen('challenges');
-  renderChallenges();
+  openSisterSync();
 }
 
 function renderChallenges() {
@@ -14147,13 +14450,16 @@ function ctRenderWeekMatrix(kid) {
       const on = ctMatrixCellChecked(kid, d, row);
       if (on) weekN++;
       const auto = ctMatrixCellAuto(kid, d, row);
-      const disabled = auto && !isParent();
+      // Read-only for kids: they can view here but tick completion in their Day /
+      // Week view (which syncs back). Only parents toggle cells directly.
+      const readOnly = !isParent();
+      const disabled = readOnly || (auto && !isParent());
       const st = dayStatus[d];
       const glyph = on ? '✓' : (st === 'future' ? '' : '·');
       const dataAttrs = row.kind === 'mandatory'
         ? `data-ct-action="matrix-mandatory" data-session="${escapeAttr(row.key)}"`
         : `data-ct-action="matrix-optional" data-chore="${escapeAttr(row.key)}"`;
-      cells += `<button type="button" class="cm-cell ${on?'on':''} cm-${st}${disabled?' cm-disabled':''}"`
+      cells += `<button type="button" class="cm-cell ${on?'on':''} cm-${st}${readOnly?' cm-readonly':(disabled?' cm-disabled':'')}"`
         + ` role="checkbox" aria-checked="${on}" aria-label="${escapeAttr(row.label)} ${DAY_SHORT[d]}"`
         + ` ${dataAttrs} data-day="${d}" data-kid="${kid}"${disabled ? ' disabled' : ''}>${glyph}</button>`;
     }
@@ -14259,7 +14565,7 @@ function ctRenderMoneyCard(kid) {
   }
   const nw = netWorth(kid);
   const finalized = !!(c.finalizedWeeks && c.finalizedWeeks[ctWeekKey] && c.finalizedWeeks[ctWeekKey][kid] != null);
-  return `<div class="chore-card"><h3>💰 ${name}'s pocket money</h3>
+  return `<div class="chore-card chore-card--full"><h3>💰 ${name}'s pocket money</h3>
     <div class="ct-money-total">$${money.toFixed(2)} <span class="ct-money-cap">/ $${CT_MONEY_CAP} max</span></div>
     <div class="ct-meta" style="font-style:italic">Chores are how you help the family 💛 — the pocket money is a bonus for practising with real money.</div>
     <div class="ct-meta">${finalized ? '✅ Paid out at the family meeting' : 'Preliminary — confirmed at the weekly family meeting'}</div>
@@ -14367,15 +14673,26 @@ function ctRenderWeekControls() {
       <h3>Goals</h3>
       ${goalRowJenn}${goalRowJess}
     </div>` : '');
+  const weekLabel = `${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()} — ${MONTH_SHORT[info.sun.getMonth()]} ${info.sun.getDate()}`;
+  // Day picker only matters for the parent day-by-day management view; the kid
+  // matrix already shows all 7 days, so the day pills are dropped there.
+  const dayPills = isParent()
+    ? `<div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.5rem">
+        ${CT_DAYS.map((d,i)=>`<button class="pill-btn ${i===ctDay?'active':''}" onclick="ctSelectDay(${i})">${d}</button>`).join('')}
+      </div>` : '';
+  // Kids can view their chores here but tick completion in their Day / Week view
+  // (which syncs back automatically) — this board is read-only for them.
+  const kidNote = !isParent()
+    ? `<div class="ct-meta" style="margin-top:0.5rem;font-style:italic">👀 View only — tick chores &amp; routines done in your <b>Day</b> or <b>Week</b> view and they'll fill in here.</div>`
+    : '';
   return `<div class="chore-card">
-    <h3>Week of ${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()} — ${MONTH_SHORT[info.sun.getMonth()]} ${info.sun.getDate()}</h3>
-    <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.4rem">
-      <button class="pill-btn" onclick="ctChangeWeek(-1)">◀ Prev week</button>
-      <button class="pill-btn" onclick="ctChangeWeek(1)">Next week ▶</button>
+    <div class="ct-weeknav">
+      <button class="btn-icon" onclick="ctChangeWeek(-1)" aria-label="Previous week">◀</button>
+      <h3 class="ct-weeknav-label">Week of ${weekLabel}</h3>
+      <button class="btn-icon" onclick="ctChangeWeek(1)" aria-label="Next week">▶</button>
     </div>
-    <div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.5rem">
-      ${CT_DAYS.map((d,i)=>`<button class="pill-btn ${i===ctDay?'active':''}" onclick="ctSelectDay(${i})">${d}</button>`).join('')}
-    </div>
+    ${dayPills}
+    ${kidNote}
   </div>${parentControls}`;
 }
 function ctChangeWeek(delta) {
@@ -14988,6 +15305,10 @@ function renderPrintSheet() {
   const bandForSlot = (absMin) => PRINT_BANDS.find(b => absMin >= b.start && absMin < b.end);
   // rows
   const acts = getAllActivities();
+  // Time clashes flagged the same way as the Full/Day-Blocks views so the three
+  // views agree on the printed sheet.
+  const printConflicts = {};
+  keys.forEach(k => { printConflicts[k] = computeBufferConflicts(getDayBlocks(k) || []).affected; });
   for (let s=0;s<winSlots;s++) {
     const totalMin=s*15;
     const hour = winStartHr + Math.floor(totalMin/60);
@@ -15040,10 +15361,13 @@ function renderPrintSheet() {
         const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
         const bg = topic ? trainingBlockColour(b) : (b.colour || CAT_HEX[act.cat] || '#888');
         const pIcon = topic ? topic.icon : act.icon;
-        const pName = topic ? topic.name : act.name;
+        const pName = topic
+          ? (act.isCompetition ? (topic.id === 'general' ? 'Competition 🏆' : topic.name + ' 🏆') : topic.name)
+          : act.name;
+        const hasConflict = printConflicts[k] && printConflicts[k].has(b.id);
         // Empty tick box so it can be checked off on the printed page.
         const checkbox = bh >= 15 ? `<span class="print-check" style="border-color:${printTextColor(bg)}"></span>` : '';
-        blockHtml += `<div class="print-block" style="background:${bg};color:${printTextColor(bg)};font-size:${printBlockFontPt(bh)}pt;height:${bh}px">${checkbox}${pIcon} ${pName}</div>`;
+        blockHtml += `<div class="print-block${hasConflict ? ' print-block--conflict' : ''}" style="background:${bg};color:${printTextColor(bg)};font-size:${printBlockFontPt(bh)}pt;height:${bh}px">${checkbox}${hasConflict ? '⚠️ ' : ''}${pIcon} ${pName}</div>`;
       });
       html += `<div class="print-cell${isHourStart?' print-hour-start':''}">${blockHtml}</div>`;
     });
