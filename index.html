@@ -10452,11 +10452,18 @@ function cancelCreatePlacement(overlayId, skipClose=false) {
 }
 
 function confirmTraining() {
+  // Guard against a rapid double-tap placing two blocks. The confirm button no
+  // longer hides itself after a tap, so we consume pendingStartMin immediately
+  // and bail if it's already been consumed (the second tap of a double-tap).
+  if (pendingStartMin == null) return;
+  const startMin = pendingStartMin;
+  pendingStartMin = null;
+  const isComp = !!(selectedActivity && selectedActivity.isCompetition);
   ts.note = document.getElementById('trainingNote').value;
   const dateStart = isParent() ? document.getElementById('trainingDateStart').value : '';
   const dateEnd   = isParent() ? document.getElementById('trainingDateEnd').value : '';
   const actId = (selectedActivity && selectedActivity.id) || 'training';
-  placeBlock(actId, pendingStartMin, ts.durationMin, ts.colour, ts.objectives, ts.note, {
+  placeBlock(actId, startMin, ts.durationMin, ts.colour, ts.objectives, ts.note, {
     tag: ts.tag,
     repeatDays: ts.repeat?ts.repeatDays:[],
     travelBuffer: ts.travelBuffer,
@@ -10470,7 +10477,7 @@ function confirmTraining() {
     repeatDateEnd:   dateEnd   || null,
   });
   closeSheet('trainingOverlay');
-  showToast(selectedActivity && selectedActivity.isCompetition ? 'Competition placed 🏆' : 'Competitive Sports placed 🏋️');
+  showToast(isComp ? 'Competition placed 🏆' : 'Training placed 🏋️');
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -10556,12 +10563,17 @@ function renderActivitySheet() {
   requestAnimationFrame(()=>syncDurationColumnSpacers('activity'));
 }
 function confirmActivity() {
+  // Guard against a rapid double-tap placing two blocks (and against a second
+  // tap running after selectedActivity was cleared, which used to throw).
+  if (pendingStartMin == null || !selectedActivity) return;
+  const startMin = pendingStartMin;
+  pendingStartMin = null;
   as_.note = document.getElementById('activityNote').value;
   const allowRange = isParent() && selectedActivity && selectedActivity.cat === 'school';
   const dateStart = allowRange ? document.getElementById('activityDateStart').value : '';
   const dateEnd   = allowRange ? document.getElementById('activityDateEnd').value   : '';
   const isChoreBlock = selectedActivity && selectedActivity.id === 'chores';
-  placeBlock(selectedActivity.id, pendingStartMin, as_.durationMin, as_.colour, [], as_.note, {
+  placeBlock(selectedActivity.id, startMin, as_.durationMin, as_.colour, [], as_.note, {
     repeatDays: as_.repeat?as_.repeatDays:[],
     travelBuffer: as_.travelBuffer,
     travelBufMin: as_.travelBufMin,
