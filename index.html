@@ -15833,29 +15833,6 @@ async function inviteSisterFromEdit() {
 /* ════════════════════════════════════════════════════════════════
    INIT
 ════════════════════════════════════════════════════════════════ */
-// Surface an otherwise-silent runtime error as a thin, dismissible banner so a
-// problem is diagnosable (and reportable) instead of looking like a dead app.
-window.addEventListener('error', (ev) => {
-  try {
-    if (document.getElementById('globalErrBar')) return; // only the first one
-    const bar = document.createElement('div');
-    bar.id = 'globalErrBar';
-    bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:2147483647;'
-      + 'background:#d6453a;color:#fff;font:600 12px system-ui,sans-serif;'
-      + 'padding:8px 40px 8px 12px;box-shadow:0 -2px 8px rgba(0,0,0,0.25);line-height:1.3;';
-    const msg = (ev && ev.message) ? ev.message : 'Script error';
-    const where = (ev && ev.lineno) ? ` (line ${ev.lineno})` : '';
-    bar.textContent = `⚠️ Something errored: ${msg}${where} — please screenshot this.`;
-    const x = document.createElement('button');
-    x.textContent = '✕';
-    x.setAttribute('aria-label', 'Dismiss');
-    x.style.cssText = 'position:absolute;top:4px;right:8px;background:transparent;border:0;color:#fff;font-size:16px;cursor:pointer;';
-    x.onclick = () => bar.remove();
-    bar.appendChild(x);
-    (document.body || document.documentElement).appendChild(bar);
-  } catch(_) {}
-});
-
 loadLocal();
 initFirebase();
 showScreen('profile');
