@@ -1,35 +1,11 @@
-// Unit checks for the cloud-sync merge layer in index.html.
+// Unit checks for the cloud-sync merge layer in js/04-merge.js.
 // Run: node tests/merge.test.js
-// They execute the REAL functions extracted from index.html, so they catch
-// regressions in deletion tombstones, deep merges, and chore-week conflicts.
-const fs = require('fs');
-const path = require('path');
-const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-const m = html.match(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/);
-if (!m) { console.error('no inline <script> found'); process.exit(1); }
-const src = m[1];
-
-function extract(name) {
-  const start = src.indexOf(`function ${name}(`);
-  if (start < 0) throw new Error('function not found in index.html: ' + name);
-  let i = src.indexOf('{', start), depth = 0;
-  for (; i < src.length; i++) {
-    if (src[i] === '{') depth++;
-    else if (src[i] === '}') { depth--; if (depth === 0) break; }
-  }
-  return src.slice(start, i + 1);
-}
-
-const names = ['mergeArrayById','ensureTombstones','tombstoneBlockIds','blockTombstoned','tombstoneIds',
-  'mergeTombstones','isPlainObject','deepMergeObj','mergeChoreState','mergeWeeks','mergeProfileState'];
-const code = names.map(extract).join('\n');
-
-const fn = new Function('state', code + `
-  return { mergeArrayById, tombstoneBlockIds, tombstoneIds, blockTombstoned, mergeTombstones,
-           deepMergeObj, mergeChoreState, mergeWeeks, mergeProfileState };
-`);
-const state = { shared: { tombstones: {} }, profiles: {} };
-const api = fn(state);
+// They execute the REAL functions the app ships, so they catch regressions
+// in deletion tombstones, deep merges, and chore-week conflicts.
+// The functions read the app's global `state`, so install a fake one first.
+global.state = { shared: { tombstones: {} }, profiles: {} };
+const state = global.state;
+const api = require('../js/04-merge.js');
 
 let pass = 0, fail = 0;
 function check(name, cond) {
