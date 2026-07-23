@@ -18,12 +18,8 @@ pre-installed); elsewhere set `SMOKE_CHROMIUM=/path/to/chrome`.
 Also worth running after any edit:
 
 ```bash
-# JS syntax check on the inline script
-node -e "
-const m = require('fs').readFileSync('index.html','utf8')
-  .match(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/);
-require('fs').writeFileSync('/tmp/wp.js', m[1]);
-" && node --check /tmp/wp.js && echo OK
+# JS syntax check on every app script
+for f in js/*.js; do node --check "$f" || break; done && echo OK
 ```
 
 When asking Claude (or anyone) to change this app, ask them to **run these

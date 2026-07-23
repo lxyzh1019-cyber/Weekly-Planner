@@ -1,9 +1,23 @@
 # Plan: splitting index.html into modules
 
-`index.html` is 15,627 lines: CSS on lines 16–4024, HTML body, and one inline
-`<script>` on lines 5259–15625 with ~530 functions. This plan splits it into
-one CSS file and ~14 JS files with **no behaviour change**, validated by the
-existing tests at every step.
+> **Status: executed (2nd application).** The split was first run against an
+> earlier `index.html`; only this planning doc reached `main` via PR #48,
+> while `main` kept growing on the monolith (competition activity + taxonomy,
+> week-view conflict banner and column-width travel strips, navigation
+> hardening, an app-wide double-tap/action guard). This branch re-applies the
+> split to the **current 16,026-line `main`**, so the module files include all
+> of those features. Final layout is **18 JS files** (the file's own section
+> banners drove the grouping, so filenames differ slightly from the 14-file
+> sketch below). `tests/merge.test.js` now `require()`s `js/04-merge.js`
+> directly; `tests/smoke.js` is unchanged. Both suites were green after every
+> extraction commit. New code routed automatically inside existing sections;
+> the one new top-level statement (the `installActionDoubleTapGuard` IIFE) is
+> self-contained and lives in `js/17-ui-misc.js`.
+
+`index.html` was 15,627 lines when first analysed (16,026 on current `main`):
+CSS at the top, HTML body, and one inline `<script>` with ~530 functions.
+This plan splits it into one CSS file and ~14–18 JS files with **no behaviour
+change**, validated by the existing tests at every step.
 
 ## Ground rules (what makes this low-risk)
 
