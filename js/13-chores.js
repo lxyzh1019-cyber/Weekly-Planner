@@ -30,6 +30,7 @@ function ctEnsureShared() {
   const c = state.shared.chore;
   if (!c.programStartDate) c.programStartDate = ctDateToKey(ctMondayOf(new Date()));
   if (!c.goalsByWeek) c.goalsByWeek = {};
+  if (!c.goalsUpdatedAtByWeek) c.goalsUpdatedAtByWeek = {}; // per-week goal edit ts → conflict-aware sync merge
   if (!c.goalBonusByWeek) c.goalBonusByWeek = {};
   if (!c.locked) c.locked = { enabled: false, pin: '1234' };
   if (!c.migration) c.migration = { done: false, migratedAt: null, sourceUpdatedAt: 0 };
@@ -136,6 +137,7 @@ function ctGetWeekGoals(weekKey) {
 function ctSetWeekGoals(weekKey, jGoal, kGoal) {
   ctEnsureShared();
   state.shared.chore.goalsByWeek[weekKey] = { jenn: jGoal || null, jess: kGoal || null };
+  state.shared.chore.goalsUpdatedAtByWeek[weekKey] = Date.now(); // stamp so a concurrent edit merges by recency
   const bonus = state.shared.chore.goalBonusByWeek[weekKey] || { jenn:false, jess:false };
   if (jGoal == null) bonus.jenn = false;
   if (kGoal == null) bonus.jess = false;
@@ -935,9 +937,10 @@ function ctConfirmGroupFromUi() {
   ctEnsureShared();
   if (ctEditingGroupId) {
     const g = ctGroupById(ctEditingGroupId);
-    if (g) { g.name = name; g.icon = icon; g.kid = kid; g.cadence = cadence; g.valueDollars = valueDollars; g.choreIds = choreIds; }
+    // updatedAt lets the sync merge keep the newer edit when two devices touch groups.
+    if (g) { g.name = name; g.icon = icon; g.kid = kid; g.cadence = cadence; g.valueDollars = valueDollars; g.choreIds = choreIds; g.updatedAt = Date.now(); }
   } else {
-    state.shared.chore.groups.push({ id:'grp-'+Date.now().toString(36), name, icon, kid, choreIds, valueDollars, cadence });
+    state.shared.chore.groups.push({ id:'grp-'+Date.now().toString(36), name, icon, kid, choreIds, valueDollars, cadence, updatedAt: Date.now() });
   }
   ctEditingGroupId = null;
   saveAll();
@@ -951,6 +954,7 @@ async function ctDeleteGroup(groupId) {
   if (!g) return;
   if (!(await showConfirm(`Delete "${g.name}"? Money already earned from it stays.`, { danger:true, okLabel:'Delete' }))) return;
   state.shared.chore.groups = ctGroups().filter(x => x.id !== groupId);
+  tombstoneIds('grp:', [groupId]); // record the delete so it can't resurrect from another device's copy
   saveAll();
   renderChoreTab();
 }

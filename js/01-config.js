@@ -20,7 +20,7 @@ const CAT_COLOUR = {
   training:'var(--cat-training)', routine:'var(--cat-routine)'
 };
 const CAT_HEX = {
-  sleep:'#c3aed6', school:'#6fb1fc', active:'#ff7b54',
+  sleep:'#c3aed6', school:'#6fb1fc', active:'#fb6f1c',
   free:'#95d5b2', daily:'#ffd166', custom:'#ff9eb5', training:'#ef476f',
   routine:'#80cbc4', competition:'#f4a340'
 };

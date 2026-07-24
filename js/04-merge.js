@@ -112,6 +112,37 @@ function mergeChoreState(localChore, remoteChore) {
   return out;
 }
 
+/* shared.chore mixes three kinds of data: set-only maps that only ever grow
+   (goalBonusByWeek, groupPayoutsFired, moneySnapshots, finalizedWeeks,
+   meetingsHeld — a union is correct), an id-keyed array (groups), and per-week
+   goals that can be *changed* on two devices. Merging the whole thing with
+   deepMergeObj let remote win at every leaf, silently dropping a group added on
+   the other device or a goal edit that hadn't synced yet. Keep the deep-merge
+   union as the base, but arbitrate groups by id (+ 'grp:' tombstones for
+   deletes) and goalsByWeek by a per-week timestamp, mirroring mergeChoreState. */
+function mergeSharedChore(localChore, remoteChore) {
+  const lc = localChore || {};
+  const rc = remoteChore || {};
+  const out = deepMergeObj(lc, rc);
+  // Groups: union by id so concurrent adds both survive; newest edit wins;
+  // a delete recorded as a 'grp:' tombstone stays deleted instead of resurrecting.
+  out.groups = mergeArrayById(lc.groups, rc.groups, 'grp:');
+  // Weekly goals: the strictly-newer side takes that whole week, so an edit that
+  // lowers or clears a goal wins over a stale copy (a plain union can't express
+  // a removal). A tie / unstamped week keeps the deep-merged union already in out.
+  const lts = lc.goalsUpdatedAtByWeek || {};
+  const rts = rc.goalsUpdatedAtByWeek || {};
+  out.goalsUpdatedAtByWeek = {};
+  if (!out.goalsByWeek) out.goalsByWeek = {};
+  new Set([...Object.keys(lts), ...Object.keys(rts)]).forEach(wk => {
+    const l = lts[wk] || 0, r = rts[wk] || 0;
+    out.goalsUpdatedAtByWeek[wk] = Math.max(l, r);
+    const src = r > l ? rc : (l > r ? lc : null);
+    if (src && src.goalsByWeek && src.goalsByWeek[wk] !== undefined) out.goalsByWeek[wk] = src.goalsByWeek[wk];
+  });
+  return out;
+}
+
 function mergeWeeks(localWeeks, remoteWeeks) {
   const merged = { ...(localWeeks || {}) };
   Object.entries(remoteWeeks || {}).forEach(([dayKey, remoteBlocks]) => {
@@ -150,5 +181,5 @@ function mergeProfileState(localProfile, remoteProfile, profName) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { mergeArrayById, ensureTombstones, tombstoneBlockIds, blockTombstoned,
     tombstoneIds, mergeTombstones, isPlainObject, deepMergeObj, mergeChoreState,
-    mergeWeeks, mergeProfileState };
+    mergeSharedChore, mergeWeeks, mergeProfileState };
 }

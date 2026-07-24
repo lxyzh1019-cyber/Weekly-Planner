@@ -379,12 +379,16 @@ function completeQuest(blockId) {
   spawnQuestSparkles();
   renderQuestBoard();
 
-  // After the popup: full clear → Mission Clear; partial progress → a warm,
-  // low-pressure nudge (never nothing, so off days don't feel like failure).
+  // After the popup: rest day → its own warm celebration (rest is a valid state,
+  // not a failed perfect day); full clear → Mission Clear; partial progress → a
+  // warm, low-pressure nudge (never nothing, so off days don't feel like failure).
+  const restKid = isParent() ? parentViewing : activeProfile();
   setTimeout(()=>{
     const scheduled = (getDayBlocks(key)||[]).filter(b => b && b.startMin!=null);
     const remaining = scheduled.filter(b => !b.completed);
-    if (remaining.length === 0) {
+    if (isRestDay(key, restKid)) {
+      showMissionClear({ emoji:'😌', title:'REST DAY', sub:'Resting is part of the plan — every bit you did still counts, and your streak stays safe. 💛' });
+    } else if (remaining.length === 0) {
       showMissionClear();
     } else {
       const done = scheduled.length - remaining.length;
@@ -550,8 +554,18 @@ function spawnQuestSparkles(hostId = 'screen-quest') {
   }
 }
 
-function showMissionClear() {
+/* opts lets a rest day reuse the same celebration with its own warm copy instead
+   of the perfect-day "MISSION CLEAR", so an off day is an explicit, celebrated
+   state — not a failed perfect day. No opts = the default all-done celebration. */
+function showMissionClear(opts) {
+  const o = opts || {};
   const m = document.getElementById('missionClear');
+  const emoji = document.getElementById('missionClearEmoji');
+  const title = document.getElementById('missionClearTitle');
+  const sub   = document.getElementById('missionClearSub');
+  if (emoji) emoji.textContent = o.emoji || '🏆';
+  if (title) title.textContent = o.title || 'MISSION CLEAR!';
+  if (sub)   sub.textContent   = o.sub   || "All today's quests done — go enjoy your day! Off days are OK too — your streak stays safe. 💛";
   m.classList.add('show');
   m.setAttribute('aria-hidden', 'false');
 }

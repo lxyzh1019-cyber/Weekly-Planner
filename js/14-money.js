@@ -144,6 +144,33 @@ function openMoneyScreen(kid) {
   showScreen('money');
   renderMoneyScreen();
 }
+/* The two extrinsic economies — Quest Board XP (effort) and pocket money
+   (reward) — live in separate systems and were never shown together, so a
+   parent couldn't see effort→reward at a glance. This read-only card bridges
+   the visibility (it does NOT merge the systems): each kid's level/XP/quests
+   beside this week's money and net worth. */
+function buildEffortRewardCard() {
+  const wk = (typeof ctWeekKey !== 'undefined' && ctWeekKey) ? ctWeekKey : ctDateToKey(ctMondayOf(new Date()));
+  const col = (kid) => {
+    const xp = getQuestXP(kid);
+    const level = Math.floor(xp / QUEST_XP_PER_LEVEL) + 1;
+    const tier = heroTierForLevel(level);
+    const quests = (getProfData(kid)?.progress?.tasksCompleted) || 0;
+    const money = ctWeekMoney(wk, kid);
+    const worth = netWorth(kid);
+    return `<div style="flex:1;min-width:0;text-align:center">
+        <div style="font-weight:700;margin-bottom:0.2rem">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'}</div>
+        <div>${tier.emoji} Lv ${level} · ${xp} XP</div>
+        <div class="ct-meta">${quests} quest${quests === 1 ? '' : 's'} done</div>
+        <div style="margin:0.3rem 0;font-size:1.1rem" aria-hidden="true">↓</div>
+        <div>💰 $${money.toFixed(2)} <span class="ct-meta">this week</span></div>
+        <div class="ct-meta">net worth $${worth.toFixed(2)}</div>
+      </div>`;
+  };
+  return `<div class="chore-card"><h3>🎯 Effort → Reward</h3>
+    <div class="ct-meta">Effort earns XP &amp; hero levels on the Quest Board; kept routines and chores earn pocket money. Two systems — one glance.</div>
+    <div style="display:flex;gap:0.75rem;margin-top:0.4rem">${col('jenn')}${col('jess')}</div></div>`;
+}
 function renderMoneyScreen() {
   const kid = moneyKid;
   const badge = document.getElementById('moneyProfileBadge');
@@ -156,6 +183,7 @@ function renderMoneyScreen() {
       <div>Net worth<br><b>$${netWorth(kid).toFixed(2)}</b></div>
       <div class="money-market">📅 ${marketMonthLabel()}</div>
     </div>`;
+  html += buildEffortRewardCard();
   html += `<div class="chore-card"><h3>💵 Cash — $${w.cash.toFixed(2)}</h3>
     <div class="money-btn-row">
       ${isParent() ? `<button class="pill-btn" onclick="moneyAddCashPrompt()">➕ Add cash</button>` : ''}

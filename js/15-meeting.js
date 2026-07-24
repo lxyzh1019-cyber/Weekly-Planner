@@ -47,7 +47,23 @@ function mmDayPct(kid, dayIdx) {
   const done = rows.reduce((s, row) => s + (ctMatrixCellChecked(kid, dayIdx, row) ? 1 : 0), 0);
   return Math.round(done / rows.length * 100);
 }
-function mmWeekPct(kid) { let s = 0; for (let d = 0; d < 7; d++) s += mmDayPct(kid, d); return Math.round(s / 7); }
+// Days of the viewed week that have already happened (Mon..today inclusive).
+// A past week counts all 7; a future/other week counts 7 too (its numerator is
+// 0 anyway, so this just avoids divide-by-zero).
+function mmElapsedDays() {
+  const info = ctWeekInfo();
+  const idx = Math.round((formatDayKey(todayKey()) - info.mon) / 864e5);
+  if (idx < 0 || idx > 6) return 7;
+  return idx + 1;
+}
+// Average % of items done per elapsed day. Was a fixed /7, which let an
+// untouched, not-yet-happened weekend drag a strong Mon–Fri down; dividing by
+// elapsed days instead measures the days actually in play.
+function mmWeekPct(kid) {
+  const days = mmElapsedDays();
+  let s = 0; for (let d = 0; d < days; d++) s += mmDayPct(kid, d);
+  return Math.round(s / days);
+}
 
 function renderMeetingMode() {
   ctPrepareRead();
@@ -94,9 +110,13 @@ function mmRenderReview(wk) {
   }
   const detail = mmSelectedDay != null ? mmRenderDayDetail(wk, mmSelectedDay) : `<div class="mm-hint">Tap a day to review each kid's items and confirm it.</div>`;
   const nConfirmed = [0,1,2,3,4,5,6].filter(mmIsDayConfirmed).length;
-  const footer = `<div class="mm-ready">Meeting-ready: ${nConfirmed}/7 days confirmed · 🐥 Jenn ${mmWeekPct('jenn')}% · 🦊 Jess ${mmWeekPct('jess')}% of week done</div>`;
+  // Framed as a team total, not a head-to-head scoreboard: lead with how the two
+  // did together, with each kid's number kept small for transparency.
+  const jp = mmWeekPct('jenn'), sp = mmWeekPct('jess');
+  const together = Math.round((jp + sp) / 2);
+  const footer = `<div class="mm-ready">Meeting-ready: ${nConfirmed}/7 days confirmed · 💪 Together you kept ${together}% of the days so far <small>(🐥 ${jp}% · 🦊 ${sp}%)</small></div>`;
   return `<div class="mm-h">Review the week</div>
-    <div class="mm-legend"><span><i class="mm-sw mm-bar-j"></i>Jenn</span><span><i class="mm-sw mm-bar-s"></i>Jess</span><span class="mm-legend-note">bars = % of that day's items done</span></div>
+    <div class="mm-legend"><span><i class="mm-sw mm-bar-j"></i>Jenn</span><span><i class="mm-sw mm-bar-s"></i>Jess</span><span class="mm-legend-note">how the team's doing each day — cheer each other on</span></div>
     <div class="mm-chart">${bars}</div>${detail}${footer}`;
 }
 function mmSelectDay(d) { mmSelectedDay = (mmSelectedDay === d ? null : d); renderMeetingMode(); }
