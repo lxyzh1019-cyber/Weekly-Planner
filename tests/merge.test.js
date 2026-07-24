@@ -73,5 +73,40 @@ check('newer shared-activity edit wins', outEdit.find(a=>a.id==='a1').name === '
 state.shared.tombstones['task:t-1'] = 7000;
 check('deleted task stays deleted', api.mergeArrayById([], [ { id:'t-1' } ], 'task:').length === 0);
 
+// (h) shared.chore: concurrent group adds on two devices both survive
+state.shared.tombstones = {};
+const scAdd = api.mergeSharedChore(
+  { groups: [ { id:'g1', name:'Kitchen', updatedAt: 100 } ] },
+  { groups: [ { id:'g2', name:'Yard', updatedAt: 100 } ] });
+check('shared.chore concurrent group adds both survive',
+  scAdd.groups.length === 2 && scAdd.groups.some(g=>g.id==='g1') && scAdd.groups.some(g=>g.id==='g2'));
+
+// (h2) newer group edit wins over stale copy
+const scEdit = api.mergeSharedChore(
+  { groups: [ { id:'g1', valueDollars: 5, updatedAt: 9000 } ] },
+  { groups: [ { id:'g1', valueDollars: 1, updatedAt: 100 } ] });
+check('shared.chore newer group edit wins', scEdit.groups.find(g=>g.id==='g1').valueDollars === 5);
+
+// (h3) deleted group stays deleted via 'grp:' tombstone
+state.shared.tombstones = {}; api.tombstoneIds('grp:', ['g9']);
+const scDel = api.mergeSharedChore({ groups: [] }, { groups: [ { id:'g9', name:'gone' } ] });
+check('shared.chore deleted group stays deleted', scDel.groups.length === 0);
+
+// (h4) newer weekly goal wins (both directions); older edit doesn't clobber
+state.shared.tombstones = {};
+const gl = { goalsByWeek:{ w1:{ jenn:15, jess:null } }, goalsUpdatedAtByWeek:{ w1: 2000 } };
+const gr = { goalsByWeek:{ w1:{ jenn:20, jess:null } }, goalsUpdatedAtByWeek:{ w1: 1000 } };
+check('shared.chore newer goal wins (local newer)',
+  api.mergeSharedChore(gl, gr).goalsByWeek.w1.jenn === 15);
+check('shared.chore newer goal wins (remote newer)',
+  api.mergeSharedChore(gr, gl).goalsByWeek.w1.jenn === 15);
+
+// (h5) additive maps (goalBonusByWeek) still union across devices
+const scBonus = api.mergeSharedChore(
+  { goalBonusByWeek:{ w1:{ jenn:true } } },
+  { goalBonusByWeek:{ w1:{ jess:true } } });
+check('shared.chore goalBonusByWeek union',
+  scBonus.goalBonusByWeek.w1.jenn === true && scBonus.goalBonusByWeek.w1.jess === true);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

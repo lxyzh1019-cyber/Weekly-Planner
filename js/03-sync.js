@@ -377,8 +377,9 @@ function mergeRemoteState(remote) {
       sharedActivities: mergeArrayById(ls.sharedActivities, rs.sharedActivities, 'sa:'),
       levelRules: mergeArrayById(ls.levelRules, rs.levelRules, 'lr:'),
       // Chore config/payouts (groups, goals, fired payouts, bank) is a nested
-      // tree — deep-merge so two devices' edits both survive.
-      chore: deepMergeObj(ls.chore, rs.chore),
+      // tree — conflict-aware merge so two devices' edits both survive: additive
+      // maps union, groups arbitrate by id (+ tombstones), goals by per-week ts.
+      chore: mergeSharedChore(ls.chore, rs.chore),
       tombstones: ensureTombstones(),
     };
   }
