@@ -48,8 +48,8 @@ Maximum **$3 per day.** Anything past that earns **XP instead of money** *(Part 
 | Task | Requirement | Pay |
 |---|---|---|
 | Math homework | 3 pages of +/−/×/÷ — neat, correct | **$2** |
-| Chinese / handwriting | 5 pages of characters, letters, or numbers | **$2** |
-| Vocabulary | 10 new words or characters you actually know | **$1** |
+| Handwriting | 5 pages of characters, letters, or numbers | **$2** |
+| Chinese | 10 new words or characters you actually know | **$1** |
 | Learning game / app | Clear a level | **XP only** *(Part 6)* |
 
 **It has to be new material** — work you didn't already know how to do. Not to standard? Redo it, then it pays.

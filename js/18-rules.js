@@ -60,9 +60,9 @@ const MR_DEFAULT_RULES = {
 
   learning: {
     items: [
-      { id: 'math',    label: 'Math homework',        unit: 'pages', perUnit: 3,  amount: 2 },
-      { id: 'chinese', label: 'Chinese / handwriting', unit: 'pages', perUnit: 5, amount: 2 },
-      { id: 'vocab',   label: 'Vocabulary',           unit: 'words', perUnit: 10, amount: 1 },
+      { id: 'math',        label: 'Math homework', unit: 'pages', perUnit: 3,  amount: 2 },
+      { id: 'handwriting', label: 'Handwriting',   unit: 'pages', perUnit: 5,  amount: 2 },
+      { id: 'chinese',     label: 'Chinese',       unit: 'words', perUnit: 10, amount: 1 },
       // The learning app is XP-only: it is the one channel whose units are
       // trivially farmable, so it never pays dollars.
       { id: 'app',     label: 'Learning game level',  unit: 'levels', perUnit: 1, amount: 0, xpOnly: true },
