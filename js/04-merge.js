@@ -140,6 +140,17 @@ function mergeSharedChore(localChore, remoteChore) {
     const src = r > l ? rc : (l > r ? lc : null);
     if (src && src.goalsByWeek && src.goalsByWeek[wk] !== undefined) out.goalsByWeek[wk] = src.goalsByWeek[wk];
   });
+  // Money rules: `versions` is an id-keyed array, so two parents editing on
+  // different devices both keep their version (newest updatedAt wins per id,
+  // 'mrv:' tombstones make a delete stick). The audit `log` is grow-only —
+  // deepMergeObj's union is already the correct merge for it, and a lost entry
+  // would be a lost record of a change, so it must never be arbitrated away.
+  if (lc.moneyRules || rc.moneyRules) {
+    const lm = lc.moneyRules || {}, rm = rc.moneyRules || {};
+    if (!out.moneyRules) out.moneyRules = {};
+    out.moneyRules.versions = mergeArrayById(lm.versions, rm.versions, 'mrv:');
+    out.moneyRules.log = deepMergeObj(lm.log || {}, rm.log || {});
+  }
   return out;
 }
 

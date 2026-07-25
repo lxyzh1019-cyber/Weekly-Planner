@@ -108,5 +108,45 @@ const scBonus = api.mergeSharedChore(
 check('shared.chore goalBonusByWeek union',
   scBonus.goalBonusByWeek.w1.jenn === true && scBonus.goalBonusByWeek.w1.jess === true);
 
+// ── (i) money rules: effective-dated versions + grow-only audit log ──
+state.shared.tombstones = {};
+
+// (i1) two parents each add a rule version on their own device — both survive.
+// A lost version here would silently revert a rule change.
+const mrAdd = api.mergeSharedChore(
+  { moneyRules: { versions: [ { id:'mrv1', effectiveFrom:'2026-07-27', updatedAt: 100 } ], log: {} } },
+  { moneyRules: { versions: [ { id:'mrv2', effectiveFrom:'2026-09-04', updatedAt: 100 } ], log: {} } });
+check('moneyRules concurrent version adds both survive',
+  mrAdd.moneyRules.versions.length === 2
+  && mrAdd.moneyRules.versions.some(v=>v.id==='mrv1')
+  && mrAdd.moneyRules.versions.some(v=>v.id==='mrv2'));
+
+// (i2) same version edited on both devices — newest updatedAt wins
+const mrEdit = api.mergeSharedChore(
+  { moneyRules: { versions: [ { id:'mrv1', rules:{ chores:{ dailyCap: 4 } }, updatedAt: 9000 } ] } },
+  { moneyRules: { versions: [ { id:'mrv1', rules:{ chores:{ dailyCap: 3 } }, updatedAt: 100 } ] } });
+check('moneyRules newer version edit wins',
+  mrEdit.moneyRules.versions.find(v=>v.id==='mrv1').rules.chores.dailyCap === 4);
+
+// (i3) the audit log is grow-only: entries written on either device must ALL
+// survive, because a dropped entry is a lost record of a rule change.
+const mrLog = api.mergeSharedChore(
+  { moneyRules: { versions: [], log: { a:{ id:'a', path:'chores.dailyCap', to:4 } } } },
+  { moneyRules: { versions: [], log: { b:{ id:'b', path:'loan.arrearsRatePct', to:5 } } } });
+check('moneyRules audit log unions both entries',
+  mrLog.moneyRules.log.a && mrLog.moneyRules.log.b);
+
+// (i4) a deleted version stays deleted via its 'mrv:' tombstone
+api.tombstoneIds('mrv:', ['mrv9']);
+const mrDel = api.mergeSharedChore(
+  { moneyRules: { versions: [], log: {} } },
+  { moneyRules: { versions: [ { id:'mrv9', effectiveFrom:'2026-01-01' } ], log: {} } });
+check('moneyRules deleted version stays deleted', mrDel.moneyRules.versions.length === 0);
+
+// (i5) untouched state must not sprout an empty moneyRules bucket
+state.shared.tombstones = {};
+check('moneyRules absent when neither side has it',
+  api.mergeSharedChore({ groups: [] }, { groups: [] }).moneyRules === undefined);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
