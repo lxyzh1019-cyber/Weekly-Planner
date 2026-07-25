@@ -137,12 +137,11 @@ function moneyAdvanceMonth(kid) {
 
 /* ── Money UI ── */
 let moneyKid = 'jess';
+/* Bank & Invest is now a sub-tab of the Pocket Money screen. Kids may LOOK at
+   their savings, GICs and stocks — every button that moves money is gated on
+   isParent() below — so this routes both roles to the same place. */
 function openMoneyScreen(kid) {
-  // Bank & Invest is parent-only; kids get the "How I earn" sheet instead.
-  if (!isParent()) { openHowIEarn(); return; }
-  moneyKid = (kid === 'jenn' || kid === 'jess') ? kid : ctParentKid;
-  showScreen('money');
-  renderMoneyScreen();
+  openPocketMoney((kid === 'jenn' || kid === 'jess') ? kid : ctParentKid, 'bank');
 }
 /* The two extrinsic economies — Quest Board XP (effort) and pocket money
    (reward) — live in separate systems and were never shown together, so a
@@ -172,8 +171,11 @@ function buildEffortRewardCard() {
     <div style="display:flex;gap:0.75rem;margin-top:0.4rem">${col('jenn')}${col('jess')}</div></div>`;
 }
 function renderMoneyScreen() {
-  const kid = moneyKid;
-  const badge = document.getElementById('moneyProfileBadge');
+  // Follows the Pocket Money screen's kid selection so the bank tab can never
+  // show a different child than the balance tab beside it.
+  const kid = (typeof pocketViewKid === 'function') ? pocketViewKid() : moneyKid;
+  moneyKid = kid;
+  const badge = document.getElementById('pocketProfileBadge');
   if (badge) badge.textContent = kid === 'jenn' ? '🐥 Jenn' : '🦊 Jess';
   const w = ensureWallet(kid); const cfg = bankConfig();
   const wrap = document.getElementById('moneyWrap');
@@ -184,16 +186,22 @@ function renderMoneyScreen() {
       <div class="money-market">📅 ${marketMonthLabel()}</div>
     </div>`;
   html += buildEffortRewardCard();
+  // Kids can see every balance here but move nothing — money decisions happen
+  // out loud at Sunday, not tapped through mid-week.
+  const canTransact = isParent();
+  const readOnlyNote = canTransact ? '' :
+    `<div class="ct-meta" style="margin-top:0.3rem">👀 You can see everything here. Moving money happens together on Sunday.</div>`;
   html += `<div class="chore-card"><h3>💵 Cash — $${w.cash.toFixed(2)}</h3>
-    <div class="money-btn-row">
-      ${isParent() ? `<button class="pill-btn" onclick="moneyAddCashPrompt()">➕ Add cash</button>` : ''}
+    ${canTransact ? `<div class="money-btn-row">
+      <button class="pill-btn" onclick="moneyAddCashPrompt()">➕ Add cash</button>
       <button class="pill-btn" onclick="moneyAction('deposit')">→ 🏦 Save</button>
       <button class="pill-btn" onclick="moneyOpenGICPrompt()">→ 🔒 GIC</button>
       <button class="pill-btn" onclick="moneyAction('buy')">→ 📈 Invest</button>
-    </div>${isParent() ? `<div class="ct-meta" style="margin-top:0.3rem">➕ Add cash logs extra money from outside chores (a gift, allowance, birthday) so it can be saved or invested too.</div>` : ''}</div>`;
+    </div>
+    <div class="ct-meta" style="margin-top:0.3rem">➕ Add cash logs extra money from outside chores (a gift, allowance, birthday) so it can be saved or invested too.</div>` : readOnlyNote}</div>`;
   html += `<div class="chore-card"><h3>🏦 Savings — $${w.savings.toFixed(2)}</h3>
     <div class="ct-meta">Earns ${(cfg.savingsRate * 100).toFixed(2)}%/yr, credited each family meeting. Money moves both ways.</div>
-    <div class="money-btn-row"><button class="pill-btn" onclick="moneyAction('withdraw')">→ 💵 To cash</button></div></div>`;
+    ${canTransact ? `<div class="money-btn-row"><button class="pill-btn" onclick="moneyAction('withdraw')">→ 💵 To cash</button></div>` : ''}</div>`;
   const gicRows = w.gics.length ? w.gics.map(g => {
     const left = Math.max(0, g.matureMonth - cfg.marketMonth);
     const payout = money2(g.amount * (1 + g.rate * (g.termMonths / 12)));
@@ -201,12 +209,12 @@ function renderMoneyScreen() {
   }).join('') : `<div class="ct-meta">No GICs yet. Locking cash for a term earns a higher, guaranteed rate.</div>`;
   html += `<div class="chore-card"><h3>🔒 GIC — locked savings</h3>${gicRows}
     <div class="ct-meta">Rates: 3mo ${(cfg.gicRates[3] * 100).toFixed(1)}% · 6mo ${(cfg.gicRates[6] * 100).toFixed(1)}% · 12mo ${(cfg.gicRates[12] * 100).toFixed(1)}%</div>
-    <div class="money-btn-row"><button class="pill-btn" onclick="moneyOpenGICPrompt()">+ Open a GIC</button></div></div>`;
+    ${canTransact ? `<div class="money-btn-row"><button class="pill-btn" onclick="moneyOpenGICPrompt()">+ Open a GIC</button></div>` : ''}</div>`;
   const stockRows = MONEY_TICKERS.map(t => {
     const price = stockPrice(t); const sh = w.holdings[t] || 0; const val = sh * price;
     return `<div class="ct-item"><div class="ct-item-left"><span>${STOCKS_2023[t].emoji} <b>${t}</b> $${price}</span></div>
       <span class="ct-meta">${sh > 0 ? sh.toFixed(3) + ' sh · $' + val.toFixed(2) : '—'}</span>
-      <span style="display:flex;gap:0.3rem"><button class="btn-icon" aria-label="Buy ${t}" onclick="moneyBuyPrompt('${t}')">＋</button>${sh > 0 ? `<button class="btn-icon" aria-label="Sell ${t}" onclick="moneySellPrompt('${t}')">－</button>` : ''}</span></div>`;
+      ${canTransact ? `<span style="display:flex;gap:0.3rem"><button class="btn-icon" aria-label="Buy ${t}" onclick="moneyBuyPrompt('${t}')">＋</button>${sh > 0 ? `<button class="btn-icon" aria-label="Sell ${t}" onclick="moneySellPrompt('${t}')">－</button>` : ''}</span>` : ''}</div>`;
   }).join('');
   html += `<div class="chore-card"><h3>📈 Stocks — ${marketMonthLabel()}</h3>
     <div class="ct-meta">Real historical prices — they go up AND down. Invest any dollar amount (fractional shares).</div>
@@ -232,7 +240,15 @@ async function moneyPromptAmount(label, max) {
   if (!a || a <= 0) return null;
   return Math.min(a, max);
 }
+/* Hiding a button is presentation, not a rule. Every function that moves money
+   checks the role itself, so a kid can't reach one through a stale handler. */
+function moneyCanTransact() {
+  if (isParent()) return true;
+  showToast('Moving money happens together on Sunday 🔒');
+  return false;
+}
 async function moneyAction(kind) {
+  if (!moneyCanTransact()) return;
   const kid = moneyKid; const w = ensureWallet(kid);
   if (kind === 'deposit') { const a = await moneyPromptAmount('Move Cash → Savings', w.cash); if (a) { moneyDeposit(kid, a); renderMoneyScreen(); } }
   else if (kind === 'withdraw') { const a = await moneyPromptAmount('Move Savings → Cash', w.savings); if (a) { moneyWithdraw(kid, a); renderMoneyScreen(); } }
@@ -250,11 +266,13 @@ async function moneyAddCashPrompt() {
   showToast(`➕ Added $${a.toFixed(2)} to ${kid === 'jenn' ? 'Jenn' : 'Jess'}’s cash — save or invest it below 🏦`);
 }
 async function moneyBuyPrompt(t) {
+  if (!moneyCanTransact()) return;
   const kid = moneyKid; const w = ensureWallet(kid);
   const a = await moneyPromptAmount(`Invest in ${t} @ $${stockPrice(t)}/share`, w.cash);
   if (a) { moneyBuyStock(kid, t, a); renderMoneyScreen(); showToast(`Bought $${a.toFixed(2)} of ${t} 📈`); }
 }
 async function moneySellPrompt(t) {
+  if (!moneyCanTransact()) return;
   const kid = moneyKid; const w = ensureWallet(kid); const sh = w.holdings[t] || 0;
   const v = await showPrompt(`Sell ${t} (you have ${sh.toFixed(3)} shares @ $${stockPrice(t)})\nHow many shares?`, { value:sh.toFixed(3), type:'number' });
   if (v == null) return;
@@ -262,6 +280,7 @@ async function moneySellPrompt(t) {
   if (n > 0) { moneySellStock(kid, t, n); renderMoneyScreen(); showToast(`Sold ${t} 💵`); }
 }
 async function moneyOpenGICPrompt() {
+  if (!moneyCanTransact()) return;
   const kid = moneyKid; const w = ensureWallet(kid);
   const term = await showPrompt('GIC term — 3, 6, or 12 months?', { value:'12', type:'number' });
   const tm = parseInt(term, 10);

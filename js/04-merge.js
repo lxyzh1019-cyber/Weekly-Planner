@@ -112,6 +112,25 @@ function mergeChoreState(localChore, remoteChore) {
   return out;
 }
 
+/* Graded chores / personal chores / sick days, keyed by week. Same hazard as
+   mergeChoreState: a deep-merge union can express "graded" but not a REGRADE
+   downward (3 → 1) or an erased grade, because the union keeps the higher
+   remote leaf. Each edit stamps earningsUpdatedAtByWeek, and the strictly-newer
+   side takes that whole week. */
+function mergeEarnings(localEarn, remoteEarn, localStamps, remoteStamps) {
+  const le = localEarn || {}, re = remoteEarn || {};
+  const out = deepMergeObj(le, re);
+  const lts = localStamps || {}, rts = remoteStamps || {};
+  const stamps = {};
+  new Set([...Object.keys(lts), ...Object.keys(rts)]).forEach(wk => {
+    const l = lts[wk] || 0, r = rts[wk] || 0;
+    stamps[wk] = Math.max(l, r);
+    const src = r > l ? re : (l > r ? le : null);
+    if (src && src[wk] !== undefined) out[wk] = src[wk];   // tie keeps the union
+  });
+  return { earnings: out, stamps };
+}
+
 /* shared.chore mixes three kinds of data: set-only maps that only ever grow
    (goalBonusByWeek, groupPayoutsFired, moneySnapshots, finalizedWeeks,
    meetingsHeld — a union is correct), an id-keyed array (groups), and per-week
@@ -140,6 +159,17 @@ function mergeSharedChore(localChore, remoteChore) {
     const src = r > l ? rc : (l > r ? lc : null);
     if (src && src.goalsByWeek && src.goalsByWeek[wk] !== undefined) out.goalsByWeek[wk] = src.goalsByWeek[wk];
   });
+  // Money rules: `versions` is an id-keyed array, so two parents editing on
+  // different devices both keep their version (newest updatedAt wins per id,
+  // 'mrv:' tombstones make a delete stick). The audit `log` is grow-only —
+  // deepMergeObj's union is already the correct merge for it, and a lost entry
+  // would be a lost record of a change, so it must never be arbitrated away.
+  if (lc.moneyRules || rc.moneyRules) {
+    const lm = lc.moneyRules || {}, rm = rc.moneyRules || {};
+    if (!out.moneyRules) out.moneyRules = {};
+    out.moneyRules.versions = mergeArrayById(lm.versions, rm.versions, 'mrv:');
+    out.moneyRules.log = deepMergeObj(lm.log || {}, rm.log || {});
+  }
   return out;
 }
 
@@ -170,6 +200,21 @@ function mergeProfileState(localProfile, remoteProfile, profName) {
   // Nested trees: merge key-by-key instead of letting remote replace them.
   merged.progress = deepMergeObj(lp.progress, rp.progress);
   merged.chore = mergeChoreState(lp.chore, rp.chore);
+  const me = mergeEarnings(lp.earnings, rp.earnings, lp.earningsUpdatedAtByWeek, rp.earningsUpdatedAtByWeek);
+  merged.earnings = me.earnings;
+  merged.earningsUpdatedAtByWeek = me.stamps;
+  // Append-only records: id-union with their own tombstone scopes so a delete
+  // made on one device sticks instead of resurrecting from the other.
+  merged.competitions = mergeArrayById(lp.competitions, rp.competitions, 'comp:');
+  merged.fines        = mergeArrayById(lp.fines,        rp.fines,        'fine:');
+  merged.boxItems     = mergeArrayById(lp.boxItems,     rp.boxItems,     'box:');
+  merged.honesty      = mergeArrayById(lp.honesty,      rp.honesty,      'hon:');
+  // Loan: scalars deep-merge, but `payments` is the ledger -- a lost payment is
+  // money the kid paid and didn't get credit for, so it unions by id.
+  merged.loan = deepMergeObj(lp.loan, rp.loan);
+  if (lp.loan || rp.loan) {
+    merged.loan.payments = mergeArrayById((lp.loan||{}).payments, (rp.loan||{}).payments, 'lp:');
+  }
   merged.wallet = deepMergeObj(lp.wallet, rp.wallet);
   merged.dayMoods = deepMergeObj(lp.dayMoods, rp.dayMoods);
   merged.blockMoods = deepMergeObj(lp.blockMoods, rp.blockMoods);
@@ -181,5 +226,5 @@ function mergeProfileState(localProfile, remoteProfile, profName) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { mergeArrayById, ensureTombstones, tombstoneBlockIds, blockTombstoned,
     tombstoneIds, mergeTombstones, isPlainObject, deepMergeObj, mergeChoreState,
-    mergeSharedChore, mergeWeeks, mergeProfileState };
+    mergeEarnings, mergeSharedChore, mergeWeeks, mergeProfileState };
 }

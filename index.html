@@ -275,16 +275,26 @@
   <div class="chore-wrap" id="choreWrap"></div>
 </div>
 
-<!-- ═══════════════════ MONEY: Bank & Invest ═══════════════════ -->
-<div class="screen" id="screen-money">
+<!-- ═══════════════════ POCKET MONEY ═══════════════════
+     Three sub-tabs: what you have and what each task pays (kids + parent),
+     the bank (kids read-only, parent transacts), and the rules editor
+     (parent only — the tab itself is hidden for kids). -->
+<div class="screen" id="screen-pocket">
   <div class="topbar">
     <div class="topbar-left">
       <button class="btn-icon" onclick="goWeek()">◀</button>
-      <h2>Bank &amp; Invest 🏦</h2>
+      <h2>Pocket Money 💰</h2>
     </div>
-    <div class="profile-badge" id="moneyProfileBadge"></div>
+    <div class="profile-badge" id="pocketProfileBadge"></div>
   </div>
-  <div class="chore-wrap" id="moneyWrap"></div>
+  <div class="parent-tabs" role="tablist" aria-label="Pocket money sections">
+    <button class="parent-tab active" role="tab" data-pmtab="balance" onclick="setPocketTab('balance')">💰 Balance &amp; Prices</button>
+    <button class="parent-tab" role="tab" data-pmtab="bank" onclick="setPocketTab('bank')">🏦 Bank &amp; Invest</button>
+    <button class="parent-tab" role="tab" data-pmtab="setup" id="pocketSetupTab" onclick="setPocketTab('setup')">⚙️ Rules &amp; Prices</button>
+  </div>
+  <div class="parent-panel active" id="pmtab-balance" role="tabpanel"><div class="chore-wrap" id="pmBalanceWrap"></div></div>
+  <div class="parent-panel" id="pmtab-bank" role="tabpanel" hidden><div class="chore-wrap" id="moneyWrap"></div></div>
+  <div class="parent-panel" id="pmtab-setup" role="tabpanel" hidden><div class="chore-wrap" id="pmSetupWrap"></div></div>
 </div>
 
 <!-- Weekly family meeting overlay -->
@@ -1244,6 +1254,9 @@
 <script src="js/15-meeting.js"></script>
 <script src="js/16-print.js"></script>
 <script src="js/17-ui-misc.js"></script>
+<script src="js/18-rules.js"></script>
+<script src="js/19-pocket.js"></script>
+<script src="js/20-loan.js"></script>
 <script src="js/99-main.js"></script>
 </body>
 </html>
