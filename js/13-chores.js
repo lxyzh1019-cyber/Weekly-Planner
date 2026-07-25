@@ -279,10 +279,21 @@ function ctGroupEarned(weekKey, kid) {
   }
   return sum;
 }
+/* The single computation every money surface reads. Weeks are resolved against
+   the model that was live when they were earned:
+
+   - Before mrModelStartWeek: the legacy formula (chore groups pay, $6 cap).
+     Those weeks are history and must not move just because the family switched
+     to graded chores.
+   - From mrModelStartWeek on: the rulebook model — routines are unpaid, graded
+     household chores are the paid channel, and there is no weekly total cap. */
 function ctWeekMoney(weekKey, kid) {
   ctEnsureShared();
   const snap = state.shared.chore.moneySnapshots[weekKey];
   if (snap && snap[kid] != null) return snap[kid];   // historical week frozen at migration
+  if (typeof mrUsesNewModel === 'function' && mrUsesNewModel(weekKey)) {
+    return mrWeekMoney(weekKey, kid);
+  }
   const goalBonus = ctGetGoalBonus(weekKey, kid) ? 1 : 0;
   return Math.min(CT_MONEY_CAP, ctGroupEarned(weekKey, kid) + goalBonus);
 }
@@ -435,6 +446,18 @@ function ctExportBackup() {
 }
 // Delegated click handler for the chore tab (#choreWrap). Names travel only via
 // data-attributes, so no user text is ever interpolated into inline handlers.
+/* Grade a household chore for the day being viewed, then re-render so the
+   day/week totals and the free-chore counter update together. */
+function ctGradeChore(choreId, grade) {
+  const kid = isParent() ? ctParentKid : activeProfile();
+  if (mrSetChoreGrade(kid, ctWeekKey, ctDay, choreId, grade)) renderChoreTab();
+}
+function ctCyclePersonalChore(choreId) {
+  const kid = isParent() ? ctParentKid : activeProfile();
+  const next = mrCyclePersonal(kid, ctWeekKey, ctDay, choreId);
+  renderChoreTab();
+  if (next === 'unasked') showToast('⭐ Done without being asked — that earns XP');
+}
 function ctHandleWrapClick(e) {
   const el = e.target.closest('[data-ct-action]');
   if (!el || el.disabled) return;
@@ -449,6 +472,8 @@ function ctHandleWrapClick(e) {
   else if (a === 'add-chore') ctPromptAddChore();
   else if (a === 'rename-chore') ctPromptRenameChore(el.dataset.chore);
   else if (a === 'remove-chore') ctPromptRemoveChore(el.dataset.chore);
+  else if (a === 'grade-chore') ctGradeChore(el.dataset.choreId, +el.dataset.grade);
+  else if (a === 'cycle-personal') ctCyclePersonalChore(el.dataset.choreId);
 }
 async function ctPromptAddChore() {
   const name = ((await showPrompt('New chore name:', { value:'' })) || '').trim();
@@ -698,6 +723,78 @@ function ctRenderKidSection(kid) {
   html += `<div class="ct-meta" style="margin-top:0.3rem">Routines are tracked but pay no money.</div></div>`;
   return html;
 }
+/* ── Household chores: the paid channel ──
+   One row per chore in the pool, each showing its own deadline (there is no
+   single household "on time"), with a 0/1/2/3 grade selector for the day being
+   viewed. Kids see their grades; only a parent can set one. */
+function ctRenderHouseholdChores(kid) {
+  const r = mrRulesForWeek(ctWeekKey);
+  const pool = r.chorePool || [];
+  if (!pool.length) return '';
+  const pay = (r.chores || {}).grade || {};
+  const wk = mrChoreWeek(ctWeekKey, kid);
+  const day = wk.days[ctDay] || { paid: 0 };
+  const freeIds = new Set(wk.freeUsed.filter(f => f.dayIdx === ctDay).map(f => f.choreId));
+
+  const GRADES = [
+    { g: 3, label: 'On time & to standard' },
+    { g: 2, label: 'To standard, late' },
+    { g: 1, label: 'Redone, then to standard' },
+    { g: 0, label: 'Not done' },
+  ];
+  const rows = pool.map(c => {
+    const g = mrGetChoreGrade(kid, ctWeekKey, ctDay, c.id);
+    const isFree = freeIds.has(c.id);
+    const amount = isFree ? 'free' : (g > 0 ? '$' + Number(pay[g] || 0).toFixed(2) : '—');
+    const pills = isParent()
+      ? GRADES.map(x => `<button type="button" class="ct-check ${g === x.g ? 'on' : ''}"
+            data-ct-action="grade-chore" data-chore-id="${escapeAttr(c.id)}" data-grade="${x.g}"
+            title="${escapeAttr(x.label)}" aria-label="${escapeAttr(c.label + ': ' + x.label)}">${x.g}</button>`).join('')
+      : `<span class="ct-badge">${g > 0 ? g + '/3' : 'not yet'}</span>`;
+    return `<div class="ct-item ${g > 0 ? 'done' : ''}">
+      <div class="ct-item-left"><span>${escapeHtml(c.label)}<br><span class="ct-meta">due ${escapeHtml(c.deadline || '—')}</span></span></div>
+      <span class="ct-meta">${amount}</span>
+      <span style="display:flex;gap:0.25rem">${pills}</span>
+    </div>`;
+  }).join('');
+
+  const cap = (r.chores || {}).dailyCap;
+  const freeLine = wk.freeLeft > 0
+    ? `<div class="ct-meta">${wk.freeLeft} free chore${wk.freeLeft === 1 ? '' : 's'} left this week — those belong to the family.</div>`
+    : `<div class="ct-meta">Your ${(r.chores || {}).freeChoresPerWeek} free chores are done — everything else this week pays.</div>`;
+  const overflow = wk.overflowChores > 0
+    ? `<div class="ct-meta">⭐ ${wk.overflowChores} chore${wk.overflowChores === 1 ? '' : 's'} past the daily max — those earn XP instead of money.</div>` : '';
+
+  return `<div class="chore-card chore-card--full"><h3>🧹 Household chores — ${CT_DAYS[ctDay]}</h3>
+    <div class="ct-meta">Paid. "On time" is different for every chore — check the chore, not the clock.</div>
+    ${rows}
+    <div class="ct-meta" style="margin-top:0.4rem">${CT_DAYS[ctDay]}: <b>$${Number(day.paid).toFixed(2)}</b>${cap != null ? ` / $${Number(cap).toFixed(2)} max` : ''} · week so far <b>$${wk.paid.toFixed(2)}</b></div>
+    ${freeLine}${overflow}</div>`;
+}
+
+/* ── Personal chores: mandatory, never paid ──
+   Tap cycles none → done → done unasked. Only "unasked" earns XP. */
+function ctRenderPersonalChores(kid) {
+  const r = mrRulesForWeek(ctWeekKey);
+  const list = r.personalChores || [];
+  if (!list.length) return '';
+  const rows = list.map(c => {
+    const st = mrGetPersonal(kid, ctWeekKey, ctDay, c.id);
+    const mark = st === 'unasked' ? '⭐' : (st === 'done' ? '✓' : '');
+    return `<div class="ct-item ${st ? 'done' : ''}">
+      <div class="ct-item-left"><button type="button" class="ct-check ${st ? 'on' : ''}"
+          data-ct-action="cycle-personal" data-chore-id="${escapeAttr(c.id)}"
+          aria-label="${escapeAttr(c.label)}">${mark}</button><span>${escapeHtml(c.label)}</span></div>
+      <span class="ct-badge">${st === 'unasked' ? 'unasked ⭐ XP' : (st === 'done' ? 'done' : 'yours')}</span>
+    </div>`;
+  }).join('');
+  const unasked = mrPersonalUnaskedCount(ctWeekKey, kid);
+  return `<div class="chore-card"><h3>🪥 Personal chores — ${CT_DAYS[ctDay]}</h3>
+    <div class="ct-meta">These are yours. They are never paid. Tap once for done, twice if you did it without being asked.</div>
+    ${rows}
+    <div class="ct-meta" style="margin-top:0.3rem">${unasked} done unasked this week — that's XP.</div></div>`;
+}
+
 function ctRenderMoneyCard(kid) {
   ctEnsureShared();
   const c = state.shared.chore;
@@ -804,8 +901,11 @@ function ctRenderGroupManagerCard() {
       </span>
     </div>`;
   }).join('') || `<div class="ct-meta">No money groups yet.</div>`;
-  return `<div class="chore-card"><h3>⚙️ Money groups</h3>
-    <div class="ct-meta">Kids earn a group's value when they finish all its chores within the cadence window.</div>
+  const legacy = !mrUsesNewModel(ctWeekKey);
+  return `<div class="chore-card"><h3>⚙️ Routines</h3>
+    <div class="ct-meta">${legacy
+      ? "Kids earn a routine's value when they finish all its chores within the cadence window."
+      : 'Routines are tracked but pay no money — that is how the house runs. Money comes from household chores.'}</div>
     ${rows}
     <div style="margin-top:0.5rem"><button type="button" class="pill-btn" data-ct-action="new-group">+ New group</button></div>
   </div>`;
@@ -1136,11 +1236,19 @@ function renderChoreTab() {
 
   // 1a: kids get the one-tap week matrix; parents keep the day-by-day
   // management view (groups, chore names, summary, etc.).
+  // The three chore kinds render as three cards, in the order the rulebook
+  // names them: what pays, what's yours, what's just how we live.
+  const newModel = mrUsesNewModel(ctWeekKey);
+  const household = newModel ? ctRenderHouseholdChores(kid) : '';
+  const personal  = newModel ? ctRenderPersonalChores(kid) : '';
+
   wrap.innerHTML = isParent()
     ? `
     <div class="chore-grid">
       ${ctRenderWeekControls()}
       ${ctRenderMoneyCard(kid)}
+      ${household}
+      ${personal}
       ${ctRenderKidSection(kid)}
       ${ctRenderGroupCards(kid)}
       ${ctRenderExtraChoresCard(kid)}
@@ -1153,6 +1261,8 @@ function renderChoreTab() {
     : `
     <div class="chore-grid">
       ${ctRenderWeekControls()}
+      ${household}
+      ${personal}
       ${ctRenderWeekMatrix(kid)}
       ${ctRenderMoneyCard(kid)}
     </div>

@@ -112,6 +112,25 @@ function mergeChoreState(localChore, remoteChore) {
   return out;
 }
 
+/* Graded chores / personal chores / sick days, keyed by week. Same hazard as
+   mergeChoreState: a deep-merge union can express "graded" but not a REGRADE
+   downward (3 → 1) or an erased grade, because the union keeps the higher
+   remote leaf. Each edit stamps earningsUpdatedAtByWeek, and the strictly-newer
+   side takes that whole week. */
+function mergeEarnings(localEarn, remoteEarn, localStamps, remoteStamps) {
+  const le = localEarn || {}, re = remoteEarn || {};
+  const out = deepMergeObj(le, re);
+  const lts = localStamps || {}, rts = remoteStamps || {};
+  const stamps = {};
+  new Set([...Object.keys(lts), ...Object.keys(rts)]).forEach(wk => {
+    const l = lts[wk] || 0, r = rts[wk] || 0;
+    stamps[wk] = Math.max(l, r);
+    const src = r > l ? re : (l > r ? le : null);
+    if (src && src[wk] !== undefined) out[wk] = src[wk];   // tie keeps the union
+  });
+  return { earnings: out, stamps };
+}
+
 /* shared.chore mixes three kinds of data: set-only maps that only ever grow
    (goalBonusByWeek, groupPayoutsFired, moneySnapshots, finalizedWeeks,
    meetingsHeld — a union is correct), an id-keyed array (groups), and per-week
@@ -181,6 +200,9 @@ function mergeProfileState(localProfile, remoteProfile, profName) {
   // Nested trees: merge key-by-key instead of letting remote replace them.
   merged.progress = deepMergeObj(lp.progress, rp.progress);
   merged.chore = mergeChoreState(lp.chore, rp.chore);
+  const me = mergeEarnings(lp.earnings, rp.earnings, lp.earningsUpdatedAtByWeek, rp.earningsUpdatedAtByWeek);
+  merged.earnings = me.earnings;
+  merged.earningsUpdatedAtByWeek = me.stamps;
   merged.wallet = deepMergeObj(lp.wallet, rp.wallet);
   merged.dayMoods = deepMergeObj(lp.dayMoods, rp.dayMoods);
   merged.blockMoods = deepMergeObj(lp.blockMoods, rp.blockMoods);
@@ -192,5 +214,5 @@ function mergeProfileState(localProfile, remoteProfile, profName) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { mergeArrayById, ensureTombstones, tombstoneBlockIds, blockTombstoned,
     tombstoneIds, mergeTombstones, isPlainObject, deepMergeObj, mergeChoreState,
-    mergeSharedChore, mergeWeeks, mergeProfileState };
+    mergeEarnings, mergeSharedChore, mergeWeeks, mergeProfileState };
 }

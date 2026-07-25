@@ -148,5 +148,49 @@ state.shared.tombstones = {};
 check('moneyRules absent when neither side has it',
   api.mergeSharedChore({ groups: [] }, { groups: [] }).moneyRules === undefined);
 
+// ── (j) graded chores: a regrade DOWN must beat a stale remote copy ──
+// This is the hazard a plain union cannot express — the union keeps the higher
+// remote grade, so Mom lowering 3 → 1 on her phone would silently revert.
+const eLocalNewer = api.mergeEarnings(
+  { w1: { chores: { '0': { dishes: 1 } } } },
+  { w1: { chores: { '0': { dishes: 3 } } } },
+  { w1: 2000 }, { w1: 1000 });
+check('earnings regrade down wins when local is newer',
+  eLocalNewer.earnings.w1.chores['0'].dishes === 1);
+
+const eRemoteNewer = api.mergeEarnings(
+  { w1: { chores: { '0': { dishes: 3 } } } },
+  { w1: { chores: { '0': { dishes: 1 } } } },
+  { w1: 1000 }, { w1: 2000 });
+check('earnings regrade down wins when remote is newer',
+  eRemoteNewer.earnings.w1.chores['0'].dishes === 1);
+
+// An erased grade must also survive — deleting a key is invisible to a union.
+const eErase = api.mergeEarnings(
+  { w1: { chores: { '0': {} } } },
+  { w1: { chores: { '0': { dishes: 3 } } } },
+  { w1: 5000 }, { w1: 100 });
+check('earnings erased grade stays erased',
+  eErase.earnings.w1.chores['0'].dishes === undefined);
+
+// Untouched weeks on either device must not be disturbed by another week's edit.
+const eOther = api.mergeEarnings(
+  { w1: { chores: { '0': { mop: 2 } } } },
+  { w2: { chores: { '0': { bins: 3 } } } },
+  { w1: 2000 }, { w2: 2000 });
+check('earnings separate weeks both survive',
+  eOther.earnings.w1.chores['0'].mop === 2 && eOther.earnings.w2.chores['0'].bins === 3);
+
+// A tie keeps the union rather than arbitrarily picking a side.
+const eTie = api.mergeEarnings(
+  { w1: { personal: { '0': { bed: 'done' } } } },
+  { w1: { personal: { '0': { room: 'unasked' } } } },
+  { w1: 1000 }, { w1: 1000 });
+check('earnings tie keeps the union',
+  eTie.earnings.w1.personal['0'].bed === 'done' && eTie.earnings.w1.personal['0'].room === 'unasked');
+
+// Stamps must merge to the newer of the two, or the next merge misjudges.
+check('earnings stamps take the max', eLocalNewer.stamps.w1 === 2000);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

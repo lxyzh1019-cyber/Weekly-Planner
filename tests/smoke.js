@@ -100,6 +100,14 @@ function findChromium() {
     const res = mrApplyEdits([{ path: 'chores.dailyCap', value: 99 }], { reason: 'family_meeting' });
     return res === null && mrVersions().length === before && mrRules().chores.dailyCap !== 99;
   });
+  // A kid must not be able to grade her own chores.
+  checks.kidCannotGradeChores = await page.evaluate(() => {
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = activeProfile();
+    const before = mrGetChoreGrade(kid, ctWeekKey, 0, 'dishes');
+    const ok = mrSetChoreGrade(kid, ctWeekKey, 0, 'dishes', 3);
+    return ok === false && mrGetChoreGrade(kid, ctWeekKey, 0, 'dishes') === before;
+  });
   await page.evaluate(() => { setPocketTab('balance'); goWeek(); });
 
   // Day view: Timeline/Checklist toggle reachable in portrait

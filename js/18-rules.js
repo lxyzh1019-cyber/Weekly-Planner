@@ -318,6 +318,157 @@ function mrApplyCap(amount, cap) {
   return isFinite(c) ? Math.min(a, c) : a;
 }
 
+/* ════════════════════════════════════════════════════════════════
+   EARNINGS — the new chore model
+
+   Three kinds of chore, per the rulebook:
+     ROUTINE          — state.shared.chore.groups. Tracked, pays nothing.
+     HOUSEHOLD chore  — graded 3/2/1/0, paid, own deadline, $3/day cap.
+     PERSONAL chore   — mandatory, unpaid; XP only when done unasked.
+   ════════════════════════════════════════════════════════════════ */
+
+/* The week the new model takes over. Weeks before it keep the old
+   group-payout formula, so switching the family to graded chores can't
+   restate money that was already earned under the old rules. Set once, to the
+   Monday of whichever week the app first runs the new code. */
+function mrModelStartWeek() {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  if (!c.moneyModelStartWeek) c.moneyModelStartWeek = ctDateToKey(ctMondayOf(new Date()));
+  return c.moneyModelStartWeek;
+}
+function mrUsesNewModel(weekKey) {
+  return String(weekKey || '') >= mrModelStartWeek();   // 'YYYY-MM-DD' compares chronologically
+}
+
+function mrEnsureEarnings(kid, weekKey) {
+  const p = getProfData(kid);
+  if (!p.earnings) p.earnings = {};
+  if (!p.earnings[weekKey]) p.earnings[weekKey] = {};
+  const e = p.earnings[weekKey];
+  if (!e.chores) e.chores = {};       // {[dayIdx]: {[choreId]: grade 1..3}}
+  if (!e.personal) e.personal = {};   // {[dayIdx]: {[choreId]: 'done'|'unasked'}}
+  if (!e.learning) e.learning = {};   // filled in by a later step
+  if (!e.sick) e.sick = {};           // {[dayIdx]: true} — pauses everything
+  if (!p.earningsUpdatedAtByWeek) p.earningsUpdatedAtByWeek = {};
+  return e;
+}
+/* Stamp the week so a cross-device merge knows which side is newer — this is
+   what lets a REGRADE (3 → 1) beat a stale remote copy, exactly as
+   ctStampChoreWeek does for the old checkbox model. */
+function mrStampEarnings(kid, weekKey) {
+  const p = getProfData(kid);
+  if (!p.earningsUpdatedAtByWeek) p.earningsUpdatedAtByWeek = {};
+  p.earningsUpdatedAtByWeek[weekKey] = Date.now();
+}
+
+function mrGetChoreGrade(kid, weekKey, dayIdx, choreId) {
+  const e = mrEnsureEarnings(kid, weekKey);
+  return Number((e.chores[String(dayIdx)] || {})[choreId]) || 0;
+}
+function mrSetChoreGrade(kid, weekKey, dayIdx, choreId, grade) {
+  if (!isParent()) { showToast('Mom grades the chores 🔒'); return false; }
+  const e = mrEnsureEarnings(kid, weekKey);
+  const d = String(dayIdx);
+  if (!e.chores[d]) e.chores[d] = {};
+  const g = Math.max(0, Math.min(3, Number(grade) || 0));
+  if (g === 0) delete e.chores[d][choreId]; else e.chores[d][choreId] = g;
+  mrStampEarnings(kid, weekKey);
+  saveAll();
+  return true;
+}
+function mrGetPersonal(kid, weekKey, dayIdx, choreId) {
+  const e = mrEnsureEarnings(kid, weekKey);
+  return (e.personal[String(dayIdx)] || {})[choreId] || null;
+}
+/* Personal chores cycle none → done → done-unasked. Only the last earns XP;
+   none of the three ever earns money. */
+function mrCyclePersonal(kid, weekKey, dayIdx, choreId) {
+  const e = mrEnsureEarnings(kid, weekKey);
+  const d = String(dayIdx);
+  if (!e.personal[d]) e.personal[d] = {};
+  const cur = e.personal[d][choreId] || null;
+  const next = cur === null ? 'done' : (cur === 'done' ? 'unasked' : null);
+  if (next === null) delete e.personal[d][choreId]; else e.personal[d][choreId] = next;
+  mrStampEarnings(kid, weekKey);
+  saveAll();
+  return next;
+}
+function mrIsSick(kid, weekKey, dayIdx) {
+  return !!mrEnsureEarnings(kid, weekKey).sick[String(dayIdx)];
+}
+function mrToggleSick(kid, weekKey, dayIdx) {
+  if (!isParent()) { showToast('A grown-up marks sick days 🔒'); return; }
+  const e = mrEnsureEarnings(kid, weekKey);
+  const d = String(dayIdx);
+  if (e.sick[d]) delete e.sick[d]; else e.sick[d] = true;
+  mrStampEarnings(kid, weekKey);
+  saveAll();
+}
+
+/* Household chore money for a week.
+
+   Order matters and is the subtle part: the free chores are deducted BEFORE
+   the daily cap, not after. Deducting after would mean a kid who does three
+   chores on Monday takes her free two out of already-capped money and earns
+   less than one who did the same work spread across the week.
+
+   The first `freeChoresPerWeek` graded chores of the week are the free ones.
+   Because every chore in the pool is meant to be equivalent effort, taking
+   them chronologically is the same as letting her choose — she picks by
+   deciding what to do first, and no ordering earns her more.
+
+   Returns the paid total plus the per-day breakdown and the count of chores
+   that fell entirely past the cap (those earn XP instead — credited at the
+   family meeting, so a re-render can never double-award). */
+function mrChoreWeek(weekKey, kid) {
+  const r = mrRulesForWeek(weekKey);
+  const cfg = r.chores || {};
+  const pay = cfg.grade || {};
+  const dailyCap = cfg.dailyCap;
+  let freeLeft = Number(cfg.freeChoresPerWeek) || 0;
+
+  const days = [];
+  let total = 0, overflowChores = 0, freeUsed = [];
+  for (let d = 0; d < 7; d++) {
+    const graded = mrEnsureEarnings(kid, weekKey).chores[String(d)] || {};
+    let dayPaid = 0, dayRaw = 0;
+    // Stable order so the same week always resolves identically.
+    Object.keys(graded).sort().forEach(choreId => {
+      const g = Number(graded[choreId]) || 0;
+      if (g <= 0) return;
+      if (freeLeft > 0) { freeLeft--; freeUsed.push({ dayIdx: d, choreId }); return; }
+      const value = Number(pay[g]) || 0;
+      dayRaw += value;
+      const room = (dailyCap == null) ? value : Math.max(0, dailyCap - dayPaid);
+      if (room <= 0) { overflowChores++; return; }   // nothing left today → XP
+      dayPaid += Math.min(value, room);
+    });
+    dayPaid = money2(dayPaid);
+    total += dayPaid;
+    days.push({ dayIdx: d, raw: money2(dayRaw), paid: dayPaid });
+  }
+  return { paid: money2(total), days, overflowChores, freeUsed, freeLeft };
+}
+
+/* Personal chores done unasked, for the XP award. Never money. */
+function mrPersonalUnaskedCount(weekKey, kid) {
+  const e = mrEnsureEarnings(kid, weekKey);
+  let n = 0;
+  for (let d = 0; d < 7; d++) {
+    const day = e.personal[String(d)] || {};
+    Object.keys(day).forEach(id => { if (day[id] === 'unasked') n++; });
+  }
+  return n;
+}
+
+/* The week's money under the new model. Channels land here as they're built;
+   right now household chores are the only paid one, which is correct —
+   routines and personal chores pay nothing by design. */
+function mrWeekMoney(weekKey, kid) {
+  return money2(mrChoreWeek(weekKey, kid).paid);
+}
+
 /* Inert in the browser; lets tests/rules.test.js exercise the pure helpers. */
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { MR_DEFAULT_RULES, MR_REASONS, MR_DEFAULT_REASON,
