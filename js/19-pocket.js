@@ -1,0 +1,259 @@
+// Weekly-Planner — Pocket Money screen: balance & prices, bank, rules editor.
+// Classic script, global scope — declarations only (see MODULARIZATION_PLAN.md).
+/* ════════════════════════════════════════════════════════════════
+   POCKET MONEY SCREEN
+
+   One home for the money system, in three sub-tabs:
+
+     balance — what you have and what every task pays. Kids and parents.
+     bank    — savings / GIC / stocks. Kids can LOOK, only parents transact.
+     setup   — the rules editor. Parent only; the tab is hidden for kids.
+
+   The prices shown on the balance tab and the prices edited on the setup tab
+   are the same data (js/18-rules.js), so the two can never drift.
+   ════════════════════════════════════════════════════════════════ */
+let pocketTab = 'balance';
+let pocketKid = 'jess';
+
+/* Kids look at their own money; a parent looks at whichever kid is selected. */
+function pocketViewKid() {
+  return isParent() ? (pocketKid === 'jenn' ? 'jenn' : 'jess') : activeProfile();
+}
+
+function openPocketMoney(kid, tab) {
+  ctPrepareRead();
+  if (isParent() && (kid === 'jenn' || kid === 'jess')) pocketKid = kid;
+  // Kids can never land on the parent-only editor, even via a stale deep link.
+  const wanted = tab || pocketTab;
+  pocketTab = (wanted === 'setup' && !isParent()) ? 'balance' : wanted;
+  showScreen('pocket');
+  renderPocketScreen();
+}
+
+function setPocketTab(tab) {
+  if (tab === 'setup' && !isParent()) { showToast('Only parents can change the rules 🔒'); return; }
+  pocketTab = tab;
+  document.querySelectorAll('#screen-pocket .parent-tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.pmtab === tab));
+  document.querySelectorAll('#screen-pocket .parent-panel').forEach(p =>
+    p.hidden = (p.id !== 'pmtab-' + tab));
+  renderPocketScreen();
+}
+
+function renderPocketScreen() {
+  const kid = pocketViewKid();
+  const badge = document.getElementById('pocketProfileBadge');
+  if (badge) badge.textContent = `${CT_PROFILE_ICON[kid] || ''} ${kid === 'jenn' ? 'Jenn' : 'Jess'}`;
+  // The editor tab simply doesn't exist for a kid.
+  const setupTab = document.getElementById('pocketSetupTab');
+  if (setupTab) setupTab.hidden = !isParent();
+
+  if (pocketTab === 'bank') { renderMoneyScreen(); return; }
+  if (pocketTab === 'setup') { pmRenderSetup(); return; }
+  pmRenderBalance(kid);
+}
+
+/* ── Sub-tab 1: Balance & Prices ──────────────────────────────────
+   The kid-facing answer to "what do I have, and what is each thing worth?"
+   Every price is read from the active rule version rather than written here,
+   so editing a price on the setup tab changes this card immediately. */
+function pmRenderBalance(kid) {
+  const wrap = document.getElementById('pmBalanceWrap');
+  if (!wrap) return;
+  const r = mrRules();
+  const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
+  const w = ensureWallet(kid);
+  const name = kid === 'jenn' ? 'Jenn' : 'Jess';
+
+  const kidPills = isParent()
+    ? `<div style="display:flex;gap:0.5rem;margin-bottom:0.6rem">
+         <button class="pill-btn ${kid === 'jenn' ? 'active' : ''}" onclick="pmSetKid('jenn')">🐥 Jenn</button>
+         <button class="pill-btn ${kid === 'jess' ? 'active' : ''}" onclick="pmSetKid('jess')">🦊 Jess</button>
+       </div>` : '';
+
+  let html = `<div class="chore-grid">${kidPills}`;
+
+  // ── What you have ──
+  html += `<div class="money-hero">
+      <div>Net worth<br><b>$${netWorth(kid).toFixed(2)}</b></div>
+      <div class="money-market">💵 $${w.cash.toFixed(2)} cash</div>
+    </div>`;
+
+  html += `<div class="chore-card"><h3>💰 ${name}'s money right now</h3>
+    <div class="ct-item"><div class="ct-item-left"><span>💵 Cash</span></div><span class="ct-meta">$${w.cash.toFixed(2)}</span></div>
+    <div class="ct-item"><div class="ct-item-left"><span>🏦 Savings</span></div><span class="ct-meta">$${w.savings.toFixed(2)}</span></div>
+    <div class="ct-item"><div class="ct-item-left"><span>🔒 GIC</span></div><span class="ct-meta">$${gicTotal(kid).toFixed(2)}</span></div>
+    <div class="ct-item"><div class="ct-item-left"><span>📈 Stocks</span></div><span class="ct-meta">$${portfolioValue(kid).toFixed(2)}</span></div>
+    <div class="ct-meta" style="margin-top:0.4rem">Earned this week so far: <b>$${ctWeekMoney(wk, kid).toFixed(2)}</b> — confirmed Sunday.</div>
+  </div>`;
+
+  // ── The loan ──
+  const loan = r.loan || {};
+  const principal = Number((loan.principal || {})[kid]) || 0;
+  if (principal > 0) {
+    const paid = Number((getProfData(kid).loan || {}).paid) || 0;
+    const left = Math.max(0, money2(principal - paid));
+    const pct = Math.max(0, Math.min(100, (paid / principal) * 100));
+    html += `<div class="chore-card"><h3>🎿 Your sports loan</h3>
+      <div class="hm-bar"><div class="hm-bar-fill" style="width:${pct}%"></div></div>
+      <div class="ct-meta">Paid $${paid.toFixed(2)} of $${principal.toFixed(2)} · <b>$${left.toFixed(2)} to go</b></div>
+      <div class="ct-item"><div class="ct-item-left"><span>Down payment (${loan.downPaymentDue || ''})</span></div><span class="ct-meta">$${Number((loan.downPayment||{})[kid]||0).toFixed(2)}</span></div>
+      <div class="ct-item"><div class="ct-item-left"><span>Each month after</span></div><span class="ct-meta">$${Number((loan.monthly||{})[kid]||0).toFixed(2)} × ${loan.months || 0}</span></div>
+      <div class="ct-meta" style="margin-top:0.4rem">On schedule: <b>no interest, ever</b>. Behind: ${loan.arrearsRatePct}% a month${loan.simpleInterest ? ' simple' : ''} on what's overdue.</div>
+      <div class="ct-meta">Pay early — any amount — and <b>${loan.earlyPaymentBonusPct}% comes off</b>. Put in $100, clear $${(100 * (1 + (Number(loan.earlyPaymentBonusPct)||0) / 100)).toFixed(0)}.</div>
+    </div>`;
+  }
+
+  // ── What each task pays ──
+  html += pmPriceCards(r);
+  html += `</div>`;
+  wrap.innerHTML = html;
+}
+
+function pmSetKid(kid) { pocketKid = kid; renderPocketScreen(); }
+
+/* The price list, rendered straight from the rules so it is always the truth.
+   Shared by the balance tab (read-only) and the setup tab (with edit buttons). */
+function pmPriceCards(r, editable) {
+  const row = (label, value, path) => {
+    const btn = (editable && path)
+      ? `<button type="button" class="btn-icon" data-pm-action="edit" data-pm-path="${escapeAttr(path)}" aria-label="Edit ${escapeAttr(label)}">✏️</button>`
+      : '';
+    return `<div class="ct-item"><div class="ct-item-left"><span>${label}</span></div>
+      <span class="ct-meta">${value}</span>${btn}</div>`;
+  };
+  const g = (r.chores && r.chores.grade) || {};
+  let html = '';
+
+  html += `<div class="chore-card"><h3>🧹 Household chores</h3>
+    <div class="ct-meta">Your first ${(r.chores || {}).freeChoresPerWeek} each week are free — you pick them. Every chore after that pays.</div>
+    ${row('On time <b>and</b> to standard', '$' + Number(g[3] || 0).toFixed(2), 'chores.grade.3')}
+    ${row('To standard, but late', '$' + Number(g[2] || 0).toFixed(2), 'chores.grade.2')}
+    ${row('Redone, then to standard', '$' + Number(g[1] || 0).toFixed(2), 'chores.grade.1')}
+    ${row('Not done, or fails the redo', '$0.00', null)}
+    ${row('Most you can earn in a day', '$' + Number((r.chores || {}).dailyCap || 0).toFixed(2), 'chores.dailyCap')}
+    <div class="ct-meta">Past your daily max, extra chores earn <b>XP</b> instead of money.</div>
+  </div>`;
+
+  const pool = r.chorePool || [];
+  if (pool.length) {
+    html += `<div class="chore-card"><h3>⏰ When each chore is due</h3>
+      <div class="ct-meta">"On time" is different for every chore — check the chore, not the clock.</div>
+      ${pool.map(c => row(escapeHtml(c.label), escapeHtml(c.deadline || '—'), null)).join('')}
+    </div>`;
+  }
+
+  const li = (r.learning && r.learning.items) || [];
+  html += `<div class="chore-card"><h3>📘 Learning</h3>
+    ${li.map(it => row(
+        escapeHtml(it.label) + ` <span class="ct-meta">(${it.perUnit} ${escapeHtml(it.unit)})</span>`,
+        it.xpOnly ? 'XP only' : '$' + Number(it.amount || 0).toFixed(2),
+        it.xpOnly ? null : 'learning.items')).join('')}
+    <div class="ct-meta">It has to be new material. Every Sunday ${(r.learning || {}).sundayCheckCount} get picked at random — can't answer, it's unpaid and you do it again.</div>
+  </div>`;
+
+  const tiers = ((r.streak || {}).tiers) || [];
+  html += `<div class="chore-card"><h3>🔥 Routine streak</h3>
+    ${tiers.map(t => row(t.days + ' days in a row', '+$' + Number(t.bonus || 0).toFixed(2), null)).join('')}
+    <div class="ct-meta"><b>Highest one only</b> — they don't add up. Miss a day and it goes to zero. Resets Sunday.</div>
+  </div>`;
+
+  const cp = r.competition || {};
+  html += `<div class="chore-card"><h3>🏆 Competition days</h3>
+    ${row('Swim — per point', '$' + Number((cp.swim || {}).perPoint || 0).toFixed(2), 'competition.swim.perPoint')}
+    ${row('Qualify for Provincials', '+$' + Number((cp.swim || {}).qualifyBonus || 0).toFixed(2), 'competition.swim.qualifyBonus')}
+    ${row('Provincials — per point', '$' + Number((cp.swim || {}).provincialPerPoint || 0).toFixed(2), 'competition.swim.provincialPerPoint')}
+    ${row('Skating — per point', '$' + Number((cp.skate || {}).perPoint || 0).toFixed(2), 'competition.skate.perPoint')}
+    ${row('Skating placement — group / overall (1st)', '$' + Number((((cp.skate||{}).placement||{}).group||{})[1] || 0).toFixed(2) + ' each', null)}
+    ${row('Dance — Silver / Gold per item', '$' + Number((cp.dance || {}).silverPerItem || 0).toFixed(2) + ' / $' + Number((cp.dance || {}).goldPerItem || 0).toFixed(2), null)}
+    ${row('Dance — all Gold', '+$' + Number((cp.dance || {}).allGoldBonus || 0).toFixed(2) + ' (test max $' + Number((cp.dance || {}).testCap || 0).toFixed(0) + ')', 'competition.dance.testCap')}
+    <div class="ct-meta">Both skating placements stack. <b>No cap on points.</b> The official results sheet decides — not Mom, not Dad, not you.</div>
+  </div>`;
+
+  const fi = (r.fines && r.fines.items) || [];
+  html += `<div class="chore-card"><h3>📦 Saturday Box &amp; fines</h3>
+    <div class="ct-meta">Leave something out and it's boxed until Saturday. <b>Box first, fine on repeat</b> — the second time that week, it's boxed <i>and</i> it costs.</div>
+    ${fi.map(f => row(escapeHtml(f.label), '−$' + Number(f.amount || 0).toFixed(2), null)).join('')}
+    <div class="ct-meta">A day never goes below $0. Fines can take what you earned that day — they can't put you in debt.</div>
+  </div>`;
+
+  const xp = (r.xp && r.xp.awards) || [];
+  html += `<div class="chore-card"><h3>⭐ XP</h3>
+    <div class="ct-meta">XP isn't money — it's the record of everything money doesn't capture. ${(r.xp || {}).perLevel} XP = one level.</div>
+    ${xp.map(a => row(escapeHtml(a.label), a.xp + ' XP', null)).join('')}
+  </div>`;
+
+  return html;
+}
+
+/* ── Sub-tab 3: Rules & Prices (parent only) ──────────────────────
+   Every save goes through mrApplyEdits, so it is effective-dated and logged.
+   Nothing here writes a rule directly. */
+function pmRenderSetup() {
+  const wrap = document.getElementById('pmSetupWrap');
+  if (!wrap) return;
+  if (!isParent()) { wrap.innerHTML = `<div class="chore-card"><div class="ct-meta">Parents only 🔒</div></div>`; return; }
+  const r = mrRules();
+  const v = mrLatestVersion();
+
+  let html = `<div class="chore-grid">`;
+  html += `<div class="chore-card"><h3>⚙️ How editing works</h3>
+    <div class="ct-meta">Every change is dated and recorded. Past weeks keep the prices that were live when the work was done — changing a price today never rewrites what they already earned.</div>
+    <div class="ct-meta" style="margin-top:0.3rem">In effect since <b>${escapeHtml((v && v.effectiveFrom) || '—')}</b> · reason: ${escapeHtml(mrReasonLabel(v && v.reason))}</div>
+  </div>`;
+
+  html += pmPriceCards(r, true);
+
+  // Loan terms
+  const loan = r.loan || {};
+  html += `<div class="chore-card"><h3>🎿 Loan terms</h3>
+    <div class="ct-item"><div class="ct-item-left"><span>Jenn / Jess principal</span></div><span class="ct-meta">$${Number((loan.principal||{}).jenn||0).toFixed(0)} / $${Number((loan.principal||{}).jess||0).toFixed(0)}</span></div>
+    <div class="ct-item"><div class="ct-item-left"><span>Interest while on schedule</span></div><span class="ct-meta">${loan.onScheduleRatePct}%</span>
+      <button type="button" class="btn-icon" data-pm-action="edit" data-pm-path="loan.onScheduleRatePct" aria-label="Edit on-schedule rate">✏️</button></div>
+    <div class="ct-item"><div class="ct-item-left"><span>Overdue rate (per month, simple)</span></div><span class="ct-meta">${loan.arrearsRatePct}%</span>
+      <button type="button" class="btn-icon" data-pm-action="edit" data-pm-path="loan.arrearsRatePct" aria-label="Edit arrears rate">✏️</button></div>
+    <div class="ct-item"><div class="ct-item-left"><span>Early-payment bonus</span></div><span class="ct-meta">${loan.earlyPaymentBonusPct}%</span>
+      <button type="button" class="btn-icon" data-pm-action="edit" data-pm-path="loan.earlyPaymentBonusPct" aria-label="Edit early payment bonus">✏️</button></div>
+  </div>`;
+
+  // Audit log
+  const entries = mrLogEntries().slice(0, 25);
+  html += `<div class="chore-card"><h3>📋 Change history</h3>
+    ${entries.length ? entries.map(e => `<div class="ct-item">
+        <div class="ct-item-left"><span>${escapeHtml(e.path)}</span></div>
+        <span class="ct-meta">${escapeHtml(String(e.from))} → <b>${escapeHtml(String(e.to))}</b> · ${escapeHtml(mrReasonLabel(e.reason))} · ${new Date(e.at).toLocaleDateString()}</span>
+      </div>`).join('') : `<div class="ct-meta">No changes yet — the starting template is still in effect.</div>`}
+  </div>`;
+
+  html += `</div>`;
+  wrap.innerHTML = html;
+}
+
+/* Delegated clicks: rule paths are data, never interpolated into an inline
+   handler (same reason the chore tab uses data-ct-action). */
+function pmHandleWrapClick(e) {
+  const btn = e.target.closest('[data-pm-action]');
+  if (!btn) return;
+  if (btn.dataset.pmAction === 'edit') pmPromptEdit(btn.dataset.pmPath);
+}
+
+async function pmPromptEdit(path) {
+  if (!isParent()) { showToast('Only parents can change the rules 🔒'); return; }
+  if (!path) return;
+  const cur = mrGetPath(mrRules(), path);
+  if (cur != null && typeof cur === 'object') { showToast('Edit this one on the rulebook for now'); return; }
+  const val = await showPrompt(`New value for ${path}:`, { value: String(cur ?? ''), type: 'number' });
+  if (val == null || val === '') return;
+  const num = Number(val);
+  if (!isFinite(num) || num < 0) { showToast('Enter a number like 3'); return; }
+
+  const reasonList = MR_REASONS.map((x, i) => `${i + 1}. ${x.label}`).join('\n');
+  const pick = await showPrompt(`Why is this changing?\n${reasonList}`, { value: '1', type: 'number' });
+  if (pick == null) return;
+  const reason = (MR_REASONS[(parseInt(pick, 10) || 1) - 1] || MR_REASONS[0]).id;
+
+  const version = mrApplyEdits([{ path, value: num }], { reason });
+  if (!version) { showToast('No change — that was already the value'); return; }
+  renderPocketScreen();
+  showToast(`✅ ${path} → ${num} · recorded`);
+}

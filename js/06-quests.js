@@ -252,8 +252,9 @@ function buildHowIEarnCard(kid, wk) {
 /* Week-topbar money button: parents get the full Bank & Invest screen, kids get
    the "How I earn" card (rules + wallet) in a sheet. */
 function openWeekMoney() {
-  if (isParent()) openMoneyScreen();
-  else openHowIEarn();
+  // Both roles land on the same Pocket Money screen now — kids open on Balance
+  // & Prices, which replaced the old "How I earn" sheet with a live one.
+  openPocketMoney(isParent() ? ctParentKid : activeProfile(), 'balance');
 }
 
 function openHowIEarn() {

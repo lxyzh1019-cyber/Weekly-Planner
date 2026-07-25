@@ -13,6 +13,14 @@ window._currentRewardPrompt = null;
   const wrap = document.getElementById('choreWrap');
   if (wrap) wrap.addEventListener('click', ctHandleWrapClick);
 })();
+// Pocket Money tabs delegate the same way — rule paths ride on data attributes
+// rather than inline handlers, so nothing user-entered is interpolated into HTML.
+(function(){
+  ['pmSetupWrap','pmBalanceWrap'].forEach(id => {
+    const wrap = document.getElementById(id);
+    if (wrap) wrap.addEventListener('click', pmHandleWrapClick);
+  });
+})();
 
 /* Desktop: convert vertical wheel scroll to horizontal on the tray + filter */
 function enableHorizontalWheelScroll() {

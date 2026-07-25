@@ -63,14 +63,44 @@ function findChromium() {
   checks.weekHourLines = await page.evaluate(() =>
     document.querySelectorAll('.wf-hour-line').length > 0);
 
-  // Kid money surface: How I earn (no Bank screen for kids)
+  // Kid money surface: kids reach Pocket Money and may LOOK at the bank, but
+  // every function that moves money refuses them.
   checks.kidMoneyLabel = await page.evaluate(() =>
-    document.getElementById('weekMoneyBtn').textContent.includes('How I earn'));
-  checks.kidCannotOpenBank = await page.evaluate(() => {
-    openMoneyScreen();
-    return !document.getElementById('screen-money').classList.contains('active');
+    document.getElementById('weekMoneyBtn').textContent.includes('Pocket money'));
+  checks.kidCanOpenPocket = await page.evaluate(() => {
+    openWeekMoney();
+    return document.getElementById('screen-pocket').classList.contains('active');
   });
-  await page.evaluate(() => closeSheet('howIEarnOverlay'));
+  // The rules editor must not even be offered to a kid.
+  checks.kidHasNoRulesTab = await page.evaluate(() =>
+    document.getElementById('pocketSetupTab').hidden === true);
+  checks.kidCannotReachSetup = await page.evaluate(() => {
+    setPocketTab('setup');
+    return document.getElementById('pmtab-setup').hidden === true;
+  });
+  // Bank tab is visible to a kid...
+  checks.kidCanSeeBank = await page.evaluate(() => {
+    setPocketTab('bank');
+    return document.getElementById('moneyWrap').textContent.includes('Savings');
+  });
+  // ...but the balances must not move when a kid tries to transact.
+  checks.kidCannotTransact = await page.evaluate(async () => {
+    const before = JSON.stringify(ensureWallet(activeProfile()));
+    moneyAddCash(activeProfile(), 10);          // seed cash so a deposit COULD succeed
+    const seeded = ensureWallet(activeProfile()).cash;
+    await moneyAction('deposit');
+    const after = ensureWallet(activeProfile());
+    const ok = after.cash === seeded && after.savings === 0;
+    ensureWallet(activeProfile()).cash = JSON.parse(before).cash;   // restore
+    return ok;
+  });
+  // A kid editing a rule must be refused, leaving no new version or log entry.
+  checks.kidCannotEditRules = await page.evaluate(() => {
+    const before = mrVersions().length;
+    const res = mrApplyEdits([{ path: 'chores.dailyCap', value: 99 }], { reason: 'family_meeting' });
+    return res === null && mrVersions().length === before && mrRules().chores.dailyCap !== 99;
+  });
+  await page.evaluate(() => { setPocketTab('balance'); goWeek(); });
 
   // Day view: Timeline/Checklist toggle reachable in portrait
   await page.evaluate(() => openDay(getDayKeys(0)[5], 5));

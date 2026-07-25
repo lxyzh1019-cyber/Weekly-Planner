@@ -99,14 +99,12 @@ function renderWeek() {
   const legend = document.getElementById('weekLegend');
   if (legend) legend.style.display = isParent() ? 'flex' : 'none';
 
-  // Money button: parents open Bank & Invest, kids open "How I earn".
+  // Money button: both roles open the Pocket Money screen — kids land on
+  // Balance & Prices, parents keep the bank and rules tabs beside it.
   const moneyBtn = document.getElementById('weekMoneyBtn');
   if (moneyBtn) {
-    const parent = isParent();
-    moneyBtn.innerHTML = parent
-      ? '<span aria-hidden="true">🏦</span><span class="btn-icon__label">Bank</span>'
-      : '<span aria-hidden="true">💰</span><span class="btn-icon__label">How I earn</span>';
-    moneyBtn.title = parent ? 'Bank & Invest' : 'How I earn pocket money';
+    moneyBtn.innerHTML = '<span aria-hidden="true">💰</span><span class="btn-icon__label">Pocket money</span>';
+    moneyBtn.title = 'Pocket money';
     moneyBtn.setAttribute('aria-label', moneyBtn.title);
   }
 
