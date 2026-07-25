@@ -89,18 +89,31 @@ function pmRenderBalance(kid) {
 
   // ── The loan ──
   const loan = r.loan || {};
-  const principal = Number((loan.principal || {})[kid]) || 0;
+  const principal = loanPrincipal(kid);
   if (principal > 0) {
-    const paid = Number((getProfData(kid).loan || {}).paid) || 0;
-    const left = Math.max(0, money2(principal - paid));
-    const pct = Math.max(0, Math.min(100, (paid / principal) * 100));
+    const l = loanState(kid);
+    const left = loanBalance(kid);
+    const pct = Math.max(0, Math.min(100, (l.paid / principal) * 100));
+    const pace = loanPacing(kid);
+    const paceLine = pace
+      ? (pace.status === 'on-pace'
+          ? `<div class="ct-meta">✅ On pace — $${pace.paid.toFixed(2)} paid against $${pace.expected.toFixed(2)} due by now.</div>`
+          : `<div class="ct-meta">⚠️ Behind by <b>$${pace.behindBy.toFixed(2)}</b> — $${pace.paid.toFixed(2)} paid against $${pace.expected.toFixed(2)} due by now.</div>`)
+      : '';
+    const arrearsLine = (l.arrears > 0 || l.arrearsInterest > 0)
+      ? `<div class="ct-meta">Overdue: $${money2(l.arrears).toFixed(2)}${l.arrearsInterest > 0 ? ` · interest charged $${money2(l.arrearsInterest).toFixed(2)}` : ''}</div>` : '';
     html += `<div class="chore-card"><h3>🎿 Your sports loan</h3>
       <div class="hm-bar"><div class="hm-bar-fill" style="width:${pct}%"></div></div>
-      <div class="ct-meta">Paid $${paid.toFixed(2)} of $${principal.toFixed(2)} · <b>$${left.toFixed(2)} to go</b></div>
-      <div class="ct-item"><div class="ct-item-left"><span>Down payment (${loan.downPaymentDue || ''})</span></div><span class="ct-meta">$${Number((loan.downPayment||{})[kid]||0).toFixed(2)}</span></div>
-      <div class="ct-item"><div class="ct-item-left"><span>Each month after</span></div><span class="ct-meta">$${Number((loan.monthly||{})[kid]||0).toFixed(2)} × ${loan.months || 0}</span></div>
+      <div class="ct-meta">Paid $${money2(l.paid).toFixed(2)} of $${principal.toFixed(2)} · <b>$${left.toFixed(2)} to go</b></div>
+      ${paceLine}${arrearsLine}
+      <div class="ct-item"><div class="ct-item-left"><span>Down payment (${escapeHtml(loan.downPaymentDue || '')})</span></div><span class="ct-meta">$${loanDownPayment(kid).toFixed(2)}</span></div>
+      <div class="ct-item"><div class="ct-item-left"><span>Each month after</span></div><span class="ct-meta">$${loanMonthly(kid).toFixed(2)} × ${loan.months || 0}</span></div>
       <div class="ct-meta" style="margin-top:0.4rem">On schedule: <b>no interest, ever</b>. Behind: ${loan.arrearsRatePct}% a month${loan.simpleInterest ? ' simple' : ''} on what's overdue.</div>
-      <div class="ct-meta">Pay early — any amount — and <b>${loan.earlyPaymentBonusPct}% comes off</b>. Put in $100, clear $${(100 * (1 + (Number(loan.earlyPaymentBonusPct)||0) / 100)).toFixed(0)}.</div>
+      <div class="ct-meta">Pay early — any amount — and <b>${loan.earlyPaymentBonusPct}% comes off</b>. Put in $100, clear $${(100 * (1 + (Number(loan.earlyPaymentBonusPct) || 0) / 100)).toFixed(0)}.</div>
+      ${left > 0 ? `<div class="money-btn-row" style="margin-top:0.5rem">
+        <button class="pill-btn" onclick="loanPayExtraPrompt('${kid}')">🎿 Pay extra (earns ${loan.earlyPaymentBonusPct}%)</button>
+        ${isParent() ? `<button class="pill-btn" onclick="pmSundayTransfer('${kid}')">📅 Run Sunday transfer</button>` : ''}
+      </div>` : `<div class="ct-meta">🎉 Loan cleared.</div>`}
     </div>`;
   }
 
@@ -111,6 +124,37 @@ function pmRenderBalance(kid) {
 }
 
 function pmSetKid(kid) { pocketKid = kid; renderPocketScreen(); }
+
+/* The Sunday transfer. When the wallet covers the minimum it just moves; when
+   it doesn't, SHE picks which of the three prices to pay. That choice is the
+   whole lesson, so it's asked out loud rather than resolved silently. */
+async function pmSundayTransfer(kid) {
+  if (!isParent()) { showToast('This happens together on Sunday 🔒'); return; }
+  const due = loanMonthly(kid);
+  const w = ensureWallet(kid);
+  let choice = 'pay_available';
+  if (w.cash < due) {
+    const pick = await showPrompt(
+      `${kid === 'jenn' ? 'Jenn' : 'Jess'} owes $${due.toFixed(2)} and has $${w.cash.toFixed(2)}.\n` +
+      `1. Pay what she's got — the rest goes overdue at ${loanRules().arrearsRatePct}%\n` +
+      `2. Pay nothing this month — all of it goes overdue, costs more\n` +
+      `3. Cover it from savings — no interest, but gives up what that money was earning`,
+      { value: '1', type: 'number' });
+    if (pick == null) return;
+    choice = ['pay_available', 'pay_nothing', 'cover_from_savings'][(parseInt(pick, 10) || 1) - 1] || 'pay_available';
+  }
+  const res = loanSundayTransfer(kid, choice);
+  renderPocketScreen();
+  const msg = {
+    paid: `📅 Paid $${res.paid.toFixed(2)} — on schedule, no interest`,
+    'covered-from-savings': `📅 Paid $${res.paid.toFixed(2)}, $${(res.fromSavings || 0).toFixed(2)} from savings — no interest`,
+    partial: `📅 Paid $${res.paid.toFixed(2)} · $${res.shortfall.toFixed(2)} now overdue`,
+    deferred: `📅 Deferred — $${res.shortfall.toFixed(2)} now overdue`,
+    cleared: '🎉 Loan already cleared',
+    'nothing-due': 'Nothing due',
+  }[res.status] || 'Done';
+  showToast(msg);
+}
 
 /* The price list, rendered straight from the rules so it is always the truth.
    Shared by the balance tab (read-only) and the setup tab (with edit buttons). */

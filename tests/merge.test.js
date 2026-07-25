@@ -192,5 +192,44 @@ check('earnings tie keeps the union',
 // Stamps must merge to the newer of the two, or the next merge misjudges.
 check('earnings stamps take the max', eLocalNewer.stamps.w1 === 2000);
 
+// ── (k) append-only per-kid ledgers ──
+state.shared.tombstones = {};
+
+// Results recorded on two devices must both survive; losing one loses money.
+const compMerge = api.mergeProfileState(
+  { competitions: [{ id:'c1', sport:'swim',  awarded: 22, updatedAt: 100 }] },
+  { competitions: [{ id:'c2', sport:'skate', awarded: 57, updatedAt: 100 }] }, 'jess');
+check('competitions from both devices survive',
+  compMerge.competitions.length === 2
+  && compMerge.competitions.reduce((s,c)=>s+c.awarded,0) === 79);
+
+// A deleted result must stay deleted rather than resurrect from the other side.
+api.tombstoneIds('comp:', ['c9']);
+const compDel = api.mergeProfileState(
+  { competitions: [] },
+  { competitions: [{ id:'c9', sport:'swim', awarded: 99 }] }, 'jess');
+check('deleted competition stays deleted', compDel.competitions.length === 0);
+
+// Fines and box items are separate ledgers and must not bleed into each other.
+state.shared.tombstones = {};
+const fineMerge = api.mergeProfileState(
+  { fines: [{ id:'f1', itemId:'tone' }],   boxItems: [{ id:'b1', label:'skates' }] },
+  { fines: [{ id:'f2', itemId:'screens' }], boxItems: [{ id:'b2', label:'books' }] }, 'jess');
+check('fines and box items both union independently',
+  fineMerge.fines.length === 2 && fineMerge.boxItems.length === 2);
+
+// The honesty ladder derives its step from the count, so a dropped strike would
+// silently walk the escalation backwards.
+const honMerge = api.mergeProfileState(
+  { honesty: [{ id:'h1', step:1 }] },
+  { honesty: [{ id:'h2', step:2 }] }, 'jess');
+check('honesty strikes union so the ladder cannot regress', honMerge.honesty.length === 2);
+
+// A lost loan payment is money the kid paid and didn't get credit for.
+const loanMerge = api.mergeProfileState(
+  { loan: { paid: 110, payments: [{ id:'p1', amount:100, credited:110 }] } },
+  { loan: { paid: 56,  payments: [{ id:'p2', amount:56,  credited:56  }] } }, 'jess');
+check('loan payments union across devices', loanMerge.loan.payments.length === 2);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

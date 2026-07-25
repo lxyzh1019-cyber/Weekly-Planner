@@ -108,6 +108,16 @@ function findChromium() {
     const ok = mrSetChoreGrade(kid, ctWeekKey, 0, 'dishes', 3);
     return ok === false && mrGetChoreGrade(kid, ctWeekKey, 0, 'dishes') === before;
   });
+  // Kids must not be able to record their own results, fines or honesty strikes.
+  checks.kidCannotSelfReport = await page.evaluate(() => {
+    const kid = activeProfile();
+    const comps = mrCompetitions(kid).length, fines = mrFines(kid).length;
+    mrAddCompetition(kid, { sport:'swim', points: 99 });
+    mrAddFine(kid, 'tone');
+    mrRecordHonesty(kid, 'chores');
+    return mrCompetitions(kid).length === comps && mrFines(kid).length === fines
+        && mrHonestyStrikes(kid).length === 0;
+  });
   await page.evaluate(() => { setPocketTab('balance'); goWeek(); });
 
   // Day view: Timeline/Checklist toggle reachable in portrait

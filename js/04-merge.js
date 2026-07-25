@@ -203,6 +203,18 @@ function mergeProfileState(localProfile, remoteProfile, profName) {
   const me = mergeEarnings(lp.earnings, rp.earnings, lp.earningsUpdatedAtByWeek, rp.earningsUpdatedAtByWeek);
   merged.earnings = me.earnings;
   merged.earningsUpdatedAtByWeek = me.stamps;
+  // Append-only records: id-union with their own tombstone scopes so a delete
+  // made on one device sticks instead of resurrecting from the other.
+  merged.competitions = mergeArrayById(lp.competitions, rp.competitions, 'comp:');
+  merged.fines        = mergeArrayById(lp.fines,        rp.fines,        'fine:');
+  merged.boxItems     = mergeArrayById(lp.boxItems,     rp.boxItems,     'box:');
+  merged.honesty      = mergeArrayById(lp.honesty,      rp.honesty,      'hon:');
+  // Loan: scalars deep-merge, but `payments` is the ledger -- a lost payment is
+  // money the kid paid and didn't get credit for, so it unions by id.
+  merged.loan = deepMergeObj(lp.loan, rp.loan);
+  if (lp.loan || rp.loan) {
+    merged.loan.payments = mergeArrayById((lp.loan||{}).payments, (rp.loan||{}).payments, 'lp:');
+  }
   merged.wallet = deepMergeObj(lp.wallet, rp.wallet);
   merged.dayMoods = deepMergeObj(lp.dayMoods, rp.dayMoods);
   merged.blockMoods = deepMergeObj(lp.blockMoods, rp.blockMoods);
