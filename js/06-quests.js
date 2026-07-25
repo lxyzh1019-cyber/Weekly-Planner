@@ -5,6 +5,9 @@
 ════════════════════════════════════════════════════════════════ */
 const QUEST_XP_PER_TASK = 20;
 const QUEST_XP_PER_LEVEL = 100;
+/* Tiers run to 10. Six topped out at 500 XP, which the chore-overflow and
+   personal-best awards clear well inside a single season — a kid who stays at
+   the top tier from October onward has nothing left to climb. */
 const HERO_TIERS = [
   { lv: 1, name: 'Newbie Hero',   emoji: '🐣' },
   { lv: 2, name: 'Junior Hero',   emoji: '🐤' },
@@ -12,6 +15,10 @@ const HERO_TIERS = [
   { lv: 4, name: 'Mighty Hero',   emoji: '🦁' },
   { lv: 5, name: 'Legendary Hero',emoji: '🦄' },
   { lv: 6, name: '✨ Star Hero ✨', emoji: '🌟' },
+  { lv: 7, name: 'Comet Hero',    emoji: '☄️' },
+  { lv: 8, name: 'Galaxy Hero',   emoji: '🌌' },
+  { lv: 9, name: 'Champion Hero', emoji: '🏅' },
+  { lv: 10, name: '👑 Legend 👑',  emoji: '👑' },
 ];
 function heroTierForLevel(lv) {
   return HERO_TIERS[Math.min(lv-1, HERO_TIERS.length-1)] || HERO_TIERS[0];

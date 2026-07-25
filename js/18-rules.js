@@ -751,6 +751,101 @@ function mrWeekMoney(weekKey, kid) {
   return mrWeekBreakdown(weekKey, kid).net;
 }
 
+/* ── XP ────────────────────────────────────────────────────────────
+   XP is the record of everything money doesn't capture — and it's what stops
+   the daily cap reading as a hard stop. Work past the cap still counts, it just
+   counts as something other than dollars.
+
+   Computed for a week, credited once at the family meeting. Crediting on every
+   render would multiply the award by however many times the screen redrew. */
+function mrXpAward(rules, id) {
+  const a = ((rules.xp || {}).awards || []).find(x => x.id === id);
+  return a ? (Number(a.xp) || 0) : 0;
+}
+function mrXpForWeek(weekKey, kid) {
+  const r = mrRulesForWeek(weekKey);
+  const chores = mrChoreWeek(weekKey, kid);
+  const learning = mrLearningWeek(weekKey, kid);
+  const streak = mrStreakWeek(weekKey, kid);
+  const comp = mrCompetitionWeek(weekKey, kid);
+
+  const lines = [];
+  const add = (id, count) => {
+    if (!count) return;
+    const each = mrXpAward(r, id);
+    if (!each) return;
+    const award = ((r.xp || {}).awards || []).find(x => x.id === id);
+    lines.push({ id, label: award ? award.label : id, count, each, xp: count * each });
+  };
+  add('chore_overflow',   chores.overflowChores);
+  add('personal_unasked', mrPersonalUnaskedCount(weekKey, kid));
+  add('app_level',        learning.xpLevels);
+  add('streak_7',         streak.days >= 7 ? 1 : 0);
+  add('personal_best',    comp.personalBests);
+  return { lines, total: lines.reduce((s, l) => s + l.xp, 0) };
+}
+/* Idempotent per week — a second call for the same week is a no-op, so
+   re-recording a meeting can't double-award. */
+function mrCreditWeekXp(weekKey, kid) {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  if (!c.xpAwardedWeeks) c.xpAwardedWeeks = {};
+  if (!c.xpAwardedWeeks[weekKey]) c.xpAwardedWeeks[weekKey] = {};
+  if (c.xpAwardedWeeks[weekKey][kid] != null) return 0;      // already credited
+  const { total } = mrXpForWeek(weekKey, kid);
+  c.xpAwardedWeeks[weekKey][kid] = total;
+  if (total > 0) addQuestXP(total, kid);
+  return total;
+}
+
+/* ── QUARTERLY REVIEW ──────────────────────────────────────────────
+   The rulebook promises the numbers get revisited every three months. This
+   turns that promise into something the app actually raises, with the real
+   earning data beside it so the re-tune isn't guesswork. */
+function mrQuarterOf(dayKey) {
+  const d = formatDayKey(dayKey || todayKey());
+  return d.getFullYear() + '-Q' + (Math.floor(d.getMonth() / 3) + 1);
+}
+function mrLastReviewedQuarter() {
+  ctEnsureShared();
+  return state.shared.chore.lastReviewedQuarter || null;
+}
+function mrQuarterlyDue() {
+  return mrLastReviewedQuarter() !== mrQuarterOf(todayKey());
+}
+function mrMarkQuarterReviewed() {
+  if (!isParent()) return;
+  ctEnsureShared();
+  state.shared.chore.lastReviewedQuarter = mrQuarterOf(todayKey());
+  mrLogAppend({ path: 'review.quarter', from: mrLastReviewedQuarter(), to: mrQuarterOf(todayKey()),
+                reason: 'quarterly_review', note: 'Quarterly review marked done' });
+  saveAll();
+}
+/* Actual earnings per channel across the finalized weeks, against the annual
+   target — the numbers the quarterly re-tune should be argued from. */
+function mrYearToDate(kid) {
+  ctEnsureShared();
+  const fin = state.shared.chore.finalizedWeeks || {};
+  const weeks = Object.keys(fin).filter(wk => fin[wk] && fin[wk][kid] != null).sort();
+  let paidTotal = 0;
+  const channels = { chores: 0, learning: 0, streak: 0, competition: 0, fines: 0 };
+  weeks.forEach(wk => {
+    paidTotal += Number(fin[wk][kid]) || 0;
+    if (!mrUsesNewModel(wk)) return;                 // legacy weeks have no channel split
+    const b = mrWeekBreakdown(wk, kid);
+    channels.chores      += b.chorePaid;
+    channels.learning    += b.learnPaid;
+    channels.streak      += b.streak.bonus;
+    channels.competition += b.compPaid;
+    channels.fines       += b.fines.total;
+  });
+  const target = mrTargetFor(kid);
+  const weeksCounted = weeks.length || 1;
+  const projected = money2((paidTotal / weeksCounted) * 52);
+  return { weeks: weeks.length, paidTotal: money2(paidTotal), channels, target, projected,
+           pctOfTarget: target ? Math.round((projected / target) * 100) : 0 };
+}
+
 /* Inert in the browser; lets tests/rules.test.js exercise the pure helpers. */
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { MR_DEFAULT_RULES, MR_REASONS, MR_DEFAULT_REASON,

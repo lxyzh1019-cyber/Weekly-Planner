@@ -174,6 +174,35 @@ function findChromium() {
     return countSeriesBlocks(sid) === 0;
   });
 
+  // Parent: the meeting commit moves wallet, XP and the loan together, so undo
+  // has to reverse all three. A partial reverse would leave credited XP or a
+  // loan payment standing against a week that was un-recorded.
+  checks.meetingUndoIsComplete = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey, kid = 'jess';
+    mrSetChoreGrade(kid, wk, 0, 'dishes', 3);
+    mrSetChoreGrade(kid, wk, 0, 'mop', 3);
+    mrSetChoreGrade(kid, wk, 0, 'vacuum', 3);
+    ensureWallet(kid).cash = 200;
+    const before = { cash: ensureWallet(kid).cash,
+                     xp: (getProfData(kid).progress || {}).questXP || 0,
+                     loan: loanState(kid).paid, market: bankConfig().marketMonth };
+    mmConfirmAndRecord();
+    const moved = ensureWallet(kid).cash !== before.cash
+               || loanState(kid).paid !== before.loan
+               || bankConfig().marketMonth !== before.market;
+    mmUndoRecord();
+    const back = ensureWallet(kid).cash === before.cash
+              && ((getProfData(kid).progress || {}).questXP || 0) === before.xp
+              && loanState(kid).paid === before.loan
+              && bankConfig().marketMonth === before.market;
+    return moved && back;
+  });
+  // Hero tiers must outlast a season; six topped out at 500 XP.
+  checks.heroTiersReachTen = await page.evaluate(() =>
+    HERO_TIERS.length >= 10 && heroTierForLevel(10).name.length > 0);
+
   checks.noConsoleErrors = errors.length === 0;
 
   const failed = Object.entries(checks).filter(([,v]) => !v).map(([k]) => k);

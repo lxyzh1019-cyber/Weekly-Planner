@@ -230,21 +230,82 @@ function mmRenderConfirm(wk, held) {
   } else {
     action = `<button type="button" class="btn-confirm" onclick="mmConfirmAndRecord()">✅ Confirm &amp; record the week</button>`;
   }
+  const newModel = (typeof mrUsesNewModel === 'function') && mrUsesNewModel(wk);
+  // Show what recording is about to do, per kid, BEFORE it happens — the loan
+  // transfer and XP credit are irreversible-feeling to a kid, so they should
+  // never be a surprise that only shows up in a toast afterwards.
+  const preview = newModel ? ['jenn','jess'].map(kid => {
+    const b = mrWeekBreakdown(wk, kid);
+    const xp = mrXpForWeek(wk, kid).total;
+    const due = loanMonthly(kid);
+    const bits = [];
+    if (b.chorePaid) bits.push(`chores $${b.chorePaid.toFixed(2)}`);
+    if (b.learnPaid) bits.push(`learning $${b.learnPaid.toFixed(2)}`);
+    if (b.streak.bonus) bits.push(`streak $${b.streak.bonus.toFixed(2)}`);
+    if (b.compPaid) bits.push(`competition $${b.compPaid.toFixed(2)}`);
+    if (b.fines.total) bits.push(`fines −$${b.fines.total.toFixed(2)}`);
+    return `<div class="ct-meta">${CT_PROFILE_ICON[kid]} ${bits.join(' · ') || 'nothing earned'}${xp ? ` · +${xp} XP` : ''}${due ? ` · loan −$${due.toFixed(2)}` : ''}</div>`;
+  }).join('') : '';
+  const explain = newModel
+    ? `This <b>confirms</b> the week. Recording credits each kid's total to cash, credits XP, charges any overdue interest, moves the monthly loan payment, adds a month of savings interest, matures due GICs and steps the market.`
+    : `This <b>confirms</b> the week — it doesn't "pay". Group chore money already fired sticky as chores were done; recording credits each kid's total (max $${CT_MONEY_CAP}) to cash, adds a month of interest, matures due GICs and moves the market one month.`;
   return `<div class="mm-h">Confirm &amp; record</div>
-    <div class="ct-meta">This <b>confirms</b> the week — it doesn't "pay". Group chore money already fired sticky as chores were done; recording credits each kid's total (max $${CT_MONEY_CAP}) to cash, adds a month of interest, matures due GICs and moves the market one month.</div>
-    <div class="mm-pay">${rows}</div>${action}`;
+    <div class="ct-meta">${explain}</div>
+    <div class="mm-pay">${rows}</div>${preview}${mmRenderQuarterly()}${action}`;
 }
+/* Quarterly review. The rulebook promises the numbers get revisited every three
+   months; this raises it at the meeting with the actual earning data beside it,
+   so the re-tune is argued from what happened rather than from a hunch. */
+function mmRenderQuarterly() {
+  if (typeof mrQuarterlyDue !== 'function' || !mrQuarterlyDue()) return '';
+  const rows = ['jenn','jess'].map(kid => {
+    const y = mrYearToDate(kid);
+    const ch = y.channels;
+    const name = kid === 'jenn' ? 'Jenn' : 'Jess';
+    if (!y.weeks) return `<div class="ct-meta">${CT_PROFILE_ICON[kid]} ${name} — no recorded weeks yet.</div>`;
+    return `<div class="ct-meta" style="margin-top:0.3rem">${CT_PROFILE_ICON[kid]} <b>${name}</b> — $${y.paidTotal.toFixed(2)} over ${y.weeks} week${y.weeks === 1 ? '' : 's'}
+        · on this pace <b>$${y.projected.toFixed(2)}/yr</b> against a $${y.target.toFixed(0)} target (<b>${y.pctOfTarget}%</b>)</div>
+      <div class="ct-meta">chores $${ch.chores.toFixed(2)} · learning $${ch.learning.toFixed(2)} · streak $${ch.streak.toFixed(2)} · competition $${ch.competition.toFixed(2)} · fines −$${ch.fines.toFixed(2)}</div>`;
+  }).join('');
+  return `<div class="mm-recorded" style="margin-top:0.6rem">
+      <div><b>📅 Quarterly review — ${mrQuarterOf(todayKey())}</b></div>
+      <div class="ct-meta">The rulebook says these numbers get looked at every three months. Here's what actually happened.</div>
+      ${rows}
+      <div style="margin-top:0.4rem"><button type="button" class="pill-btn" onclick="mmDoQuarterlyReview()">Open the rules editor</button>
+        <button type="button" class="pill-btn" onclick="mmSkipQuarterlyReview()">Reviewed — no change</button></div>
+    </div>`;
+}
+function mmDoQuarterlyReview() {
+  mrMarkQuarterReviewed();
+  closeSheet('familyMeetingOverlay');
+  openPocketMoney(ctParentKid, 'setup');
+}
+function mmSkipQuarterlyReview() {
+  mrMarkQuarterReviewed();
+  renderMeetingMode();
+  showToast('📅 Quarterly review recorded — rates unchanged');
+}
+
 function mmConfirmAndRecord() {
   const c = state.shared.chore;
   const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
   if (c.meetingsHeld && c.meetingsHeld[wk]) { showToast('Already recorded this week'); return; }
   // Snapshot everything the commit mutates so the undo can fully reverse it.
+  // The commit now moves XP and the loan as well as the wallet, so the undo has
+  // to carry all of it — a partial reverse would leave credited XP or a loan
+  // payment standing against a week that was un-recorded.
+  const snap = kid => JSON.parse(JSON.stringify({
+    wallet: ensureWallet(kid),
+    loan: (typeof loanState === 'function') ? loanState(kid) : null,
+    xp: (getProfData(kid).progress || {}).questXP || 0,
+  }));
   mmUndo = {
     wk,
-    jenn: JSON.parse(JSON.stringify(ensureWallet('jenn'))),
-    jess: JSON.parse(JSON.stringify(ensureWallet('jess'))),
+    jenn: snap('jenn'),
+    jess: snap('jess'),
     marketMonth: bankConfig().marketMonth,
     finalized: (c.finalizedWeeks && c.finalizedWeeks[wk]) ? JSON.parse(JSON.stringify(c.finalizedWeeks[wk])) : null,
+    xpAwarded: (c.xpAwardedWeeks && c.xpAwardedWeeks[wk]) ? JSON.parse(JSON.stringify(c.xpAwardedWeeks[wk])) : null,
   };
   const parts = commitFamilyMeeting(wk);
   renderMeetingMode();
@@ -253,10 +314,21 @@ function mmConfirmAndRecord() {
 function mmUndoRecord() {
   if (!mmUndo) return;
   const c = state.shared.chore; const wk = mmUndo.wk;
-  getProfData('jenn').wallet = mmUndo.jenn;
-  getProfData('jess').wallet = mmUndo.jess;
+  ['jenn', 'jess'].forEach(kid => {
+    const s = mmUndo[kid];
+    const pd = getProfData(kid);
+    pd.wallet = s.wallet;
+    if (s.loan) pd.loan = s.loan;
+    if (!pd.progress) pd.progress = {};
+    pd.progress.questXP = s.xp;
+  });
   bankConfig().marketMonth = mmUndo.marketMonth;
   if (mmUndo.finalized) c.finalizedWeeks[wk] = mmUndo.finalized; else if (c.finalizedWeeks) delete c.finalizedWeeks[wk];
+  // Clearing the XP ledger for the week is what lets a re-record award again;
+  // without it the reversed XP could never be re-credited.
+  if (c.xpAwardedWeeks) {
+    if (mmUndo.xpAwarded) c.xpAwardedWeeks[wk] = mmUndo.xpAwarded; else delete c.xpAwardedWeeks[wk];
+  }
   if (c.meetingsHeld) delete c.meetingsHeld[wk];
   mmUndo = null;
   saveAll();
@@ -301,16 +373,33 @@ function commitFamilyMeeting(wk) {
   if (!c.finalizedWeeks[wk]) c.finalizedWeeks[wk] = {};
   if (!c.meetingsHeld) c.meetingsHeld = {};
   const parts = [];
+  const newModel = (typeof mrUsesNewModel === 'function') && mrUsesNewModel(wk);
   ['jenn', 'jess'].forEach(kid => {
     const w = ensureWallet(kid);
+    const name = kid === 'jenn' ? 'Jenn' : 'Jess';
     if (c.finalizedWeeks[wk][kid] == null) {
       const prelim = ctWeekMoney(wk, kid);
       w.cash = money2(w.cash + prelim);
       c.finalizedWeeks[wk][kid] = prelim;
-      if (prelim > 0) parts.push(`${kid === 'jenn' ? 'Jenn' : 'Jess'} +$${prelim.toFixed(2)}`);
+      if (prelim > 0) parts.push(`${name} +$${prelim.toFixed(2)}`);
+    }
+    // XP is computed all week but only credited here — awarding it on render
+    // would multiply it by however many times the screen redrew. Idempotent
+    // per week, so re-recording can't double-award.
+    if (newModel) {
+      const xp = mrCreditWeekXp(wk, kid);
+      if (xp > 0) parts.push(`${name} +${xp} XP`);
+      // A month of overdue interest, then the scheduled transfer. Interest is
+      // charged BEFORE the payment so a kid who pays late still meets the cost
+      // of having been late, rather than escaping it by paying on the day.
+      const interest = loanAccrueArrears(kid);
+      if (interest > 0) parts.push(`${name} interest −$${interest.toFixed(2)}`);
+      const t = loanSundayTransfer(kid, 'pay_available');
+      if (t.paid > 0) parts.push(`${name} loan −$${t.paid.toFixed(2)}`);
+      if (t.shortfall > 0) parts.push(`${name} overdue $${t.shortfall.toFixed(2)}`);
     }
     const adv = moneyAdvanceMonth(kid);
-    adv.matured.forEach(m => parts.push(`${kid === 'jenn' ? 'Jenn' : 'Jess'} GIC +$${m.payout.toFixed(2)}`));
+    adv.matured.forEach(m => parts.push(`${name} GIC +$${m.payout.toFixed(2)}`));
   });
   bankConfig().marketMonth += 1;   // one shared market step per meeting
   c.meetingsHeld[wk] = true;
