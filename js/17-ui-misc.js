@@ -25,14 +25,24 @@ function _appDialogKey(e) {
   }
 }
 function _appDialogOk() {
+  // A gated dialog can't be confirmed until its checkbox is ticked — Enter must
+  // respect that too, not just the disabled button.
+  const chk = document.getElementById('appDialogCheck');
+  if (chk && !chk.checked) return;
   const inp = document.getElementById('appDialogInput');
   _closeAppDialog(inp ? inp.value : true);
+}
+/* Enable the OK button only once the box is ticked. */
+function _appDialogCheckToggle() {
+  const chk = document.getElementById('appDialogCheck');
+  const ok = document.getElementById('appDialogOkBtn');
+  if (chk && ok) ok.disabled = !chk.checked;
 }
 function _appDialogCancel() {
   const inp = document.getElementById('appDialogInput');
   _closeAppDialog(inp ? null : false);
 }
-function _appDialog({ message, kind, value = '', inputType = 'text', okLabel = 'OK', cancelLabel = 'Cancel', danger = false }) {
+function _appDialog({ message, kind, value = '', inputType = 'text', okLabel = 'OK', cancelLabel = 'Cancel', danger = false, checkLabel = '' }) {
   // Resolve any dialog already open (shouldn't normally happen) before opening.
   if (_appDialogResolve) _closeAppDialog(kind === 'prompt' ? null : false);
   let ov = document.getElementById('appDialogOverlay');
@@ -46,14 +56,20 @@ function _appDialog({ message, kind, value = '', inputType = 'text', okLabel = '
   const inputHtml = kind === 'prompt'
     ? `<input id="appDialogInput" type="${inputType}" class="app-dialog-input" value="${escapeAttr(String(value))}">`
     : '';
+  // A checkbox turns "are you sure?" into "confirm this specific thing
+  // happened" — the parent has to actively state the job was done, rather than
+  // tapping OK out of habit.
+  const checkHtml = checkLabel
+    ? `<label class="app-dialog-check"><input type="checkbox" id="appDialogCheck" onchange="_appDialogCheckToggle()"> <span>${escapeHtml(checkLabel)}</span></label>`
+    : '';
   ov.innerHTML =
     `<div class="sheet app-dialog-sheet" role="dialog" aria-modal="true">
       <div class="sheet-handle"></div>
       <p class="app-dialog-msg">${escapeHtml(message)}</p>
-      ${inputHtml}
+      ${inputHtml}${checkHtml}
       <div class="app-dialog-btns">
         <button type="button" class="pill-btn app-dialog-cancel" onclick="_appDialogCancel()">${escapeHtml(cancelLabel)}</button>
-        <button type="button" class="btn-confirm${danger ? ' danger' : ''}" style="width:auto;flex:1" onclick="_appDialogOk()">${escapeHtml(okLabel)}</button>
+        <button type="button" id="appDialogOkBtn" class="btn-confirm${danger ? ' danger' : ''}" style="width:auto;flex:1"${checkLabel ? ' disabled' : ''} onclick="_appDialogOk()">${escapeHtml(okLabel)}</button>
       </div>
     </div>`;
   return new Promise(resolve => {
@@ -66,6 +82,12 @@ function _appDialog({ message, kind, value = '', inputType = 'text', okLabel = '
 }
 function showConfirm(message, opts = {}) {
   return _appDialog({ message, kind: 'confirm', okLabel: opts.okLabel || 'OK', cancelLabel: opts.cancelLabel || 'Cancel', danger: !!opts.danger });
+}
+/* A confirm whose OK stays disabled until the checkbox is ticked. Use it where
+   the tap is a factual assertion ("the job was done"), not just consent. */
+function showCheckConfirm(message, checkLabel, opts = {}) {
+  return _appDialog({ message, kind: 'confirm', checkLabel,
+    okLabel: opts.okLabel || 'OK', cancelLabel: opts.cancelLabel || 'Cancel', danger: !!opts.danger });
 }
 function showPrompt(message, opts = {}) {
   return _appDialog({ message, kind: 'prompt', value: opts.value || '', inputType: opts.type || 'text', okLabel: opts.okLabel || 'OK', cancelLabel: opts.cancelLabel || 'Cancel' });

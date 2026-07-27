@@ -93,6 +93,8 @@ function pmRenderBalance(kid) {
   if (principal > 0) {
     const l = loanState(kid);
     const left = loanBalance(kid);
+    // Honesty step 3 withdraws the loan-surplus choice for the week.
+    const choicesGone = (typeof mrLosesChoices === 'function') && mrLosesChoices(kid);
     const pct = Math.max(0, Math.min(100, (l.paid / principal) * 100));
     const pace = loanPacing(kid);
     const paceLine = pace
@@ -106,21 +108,67 @@ function pmRenderBalance(kid) {
       <div class="hm-bar"><div class="hm-bar-fill" style="width:${pct}%"></div></div>
       <div class="ct-meta">Paid $${money2(l.paid).toFixed(2)} of $${principal.toFixed(2)} · <b>$${left.toFixed(2)} to go</b></div>
       ${paceLine}${arrearsLine}
-      <div class="ct-item"><div class="ct-item-left"><span>Down payment (${escapeHtml(loan.downPaymentDue || '')})</span></div><span class="ct-meta">$${loanDownPayment(kid).toFixed(2)}</span></div>
-      <div class="ct-item"><div class="ct-item-left"><span>Each month after</span></div><span class="ct-meta">$${loanMonthly(kid).toFixed(2)} × ${loan.months || 0}</span></div>
+      <div class="ct-item"><div class="ct-item-left"><span>Each month after the deposit</span></div><span class="ct-meta">$${loanMonthly(kid).toFixed(2)} × ${loan.months || 0}</span></div>
       <div class="ct-meta" style="margin-top:0.4rem">On schedule: <b>no interest, ever</b>. Behind: ${loan.arrearsRatePct}% a month${loan.simpleInterest ? ' simple' : ''} on what's overdue.</div>
       <div class="ct-meta">Pay early — any amount — and <b>${loan.earlyPaymentBonusPct}% comes off</b>. Put in $100, clear $${(100 * (1 + (Number(loan.earlyPaymentBonusPct) || 0) / 100)).toFixed(0)}.</div>
       ${left > 0 ? `<div class="money-btn-row" style="margin-top:0.5rem">
-        <button class="pill-btn" onclick="loanPayExtraPrompt('${kid}')">🎿 Pay extra (earns ${loan.earlyPaymentBonusPct}%)</button>
-        ${isParent() ? `<button class="pill-btn" onclick="pmSundayTransfer('${kid}')">📅 Run Sunday transfer</button>` : ''}
+        ${choicesGone
+          ? `<div class="ct-meta">⚖️ Paying extra is paused this week — that choice comes back next week.</div>`
+          : `<button class="pill-btn" onclick="loanPayExtraPrompt('${kid}')">🎿 Pay extra (earns ${loan.earlyPaymentBonusPct}%)</button>`}
+        ${isParent() ? `<button class="pill-btn" onclick="pmSundayTransfer('${kid}')">📅 Run the monthly transfer</button>` : ''}
       </div>` : `<div class="ct-meta">🎉 Loan cleared.</div>`}
     </div>`;
+
+    html += pmDownPaymentCard(kid, loan);
   }
 
   // ── What each task pays ──
   html += pmPriceCards(r);
   html += `</div>`;
   wrap.innerHTML = html;
+}
+
+/* ── The down payment ─────────────────────────────────────────────
+   The deposit is its own thing, not a line item on the loan card. It is a
+   single dated obligation that has to be met before the monthly schedule
+   starts, and until it is paid it is the only number that matters — so it
+   gets a card that says plainly what is owed, by when, and how far along
+   she is. */
+function pmDownPaymentCard(kid, loan) {
+  const total = loanDownPayment(kid);
+  if (!(total > 0)) return '';
+  const l = loanState(kid);
+  const paid = money2(Math.min(total, l.downPaid));
+  const owing = loanDownOutstanding(kid);
+  const dueDate = (loan || {}).downPaymentDue || '';
+  const today = todayKey();
+  const settled = owing <= 0;
+  const isDue = !!dueDate && today >= dueDate;
+  const pct = Math.max(0, Math.min(100, total ? (paid / total) * 100 : 0));
+
+  let status;
+  if (settled) {
+    status = `<div class="ct-meta">✅ Paid in full — the monthly payments run from here.</div>`;
+  } else if (isDue) {
+    const days = Math.max(0, Math.round((formatDayKey(today) - formatDayKey(dueDate)) / 86400000));
+    status = `<div class="ct-meta">⚠️ <b>Due now</b> — $${owing.toFixed(2)} still to pay${days > 0 ? `, ${days} day${days === 1 ? '' : 's'} past ${escapeHtml(dueDate)}` : ''}. Until it's paid, the monthly payments haven't started.</div>`;
+  } else {
+    const days = Math.max(0, Math.round((formatDayKey(dueDate) - formatDayKey(today)) / 86400000));
+    const perWeek = days > 0 ? money2(owing / Math.max(1, days / 7)) : owing;
+    status = `<div class="ct-meta">📅 Due <b>${escapeHtml(dueDate)}</b> — ${days} day${days === 1 ? '' : 's'} away. That's about <b>$${perWeek.toFixed(2)} a week</b> from now to get there.</div>`;
+  }
+
+  const w = ensureWallet(kid);
+  return `<div class="chore-card"><h3>🏦 Down payment</h3>
+    <div class="hm-bar"><div class="hm-bar-fill" style="width:${pct}%"></div></div>
+    <div class="ct-meta">Paid $${paid.toFixed(2)} of $${total.toFixed(2)}${owing > 0 ? ` · <b>$${owing.toFixed(2)} to go</b>` : ''}</div>
+    ${status}
+    <div class="ct-item"><div class="ct-item-left"><span>You have in cash</span></div><span class="ct-meta">$${w.cash.toFixed(2)}</span></div>
+    ${owing > 0 ? `<div class="money-btn-row" style="margin-top:0.5rem">
+      <button class="pill-btn" onclick="loanPayDownPaymentPrompt('${kid}')">🏦 Pay the down payment</button>
+    </div>
+    <div class="ct-meta" style="margin-top:0.4rem">You can pay it in pieces — anything you put in now is that much less to find on ${escapeHtml(dueDate)}.</div>` : ''}
+  </div>`;
 }
 
 function pmSetKid(kid) { pocketKid = kid; renderPocketScreen(); }
@@ -130,12 +178,25 @@ function pmSetKid(kid) { pocketKid = kid; renderPocketScreen(); }
    whole lesson, so it's asked out loud rather than resolved silently. */
 async function pmSundayTransfer(kid) {
   if (!isParent()) { showToast('This happens together on Sunday 🔒'); return; }
-  const due = loanMonthly(kid);
+  const duty = loanDueNow(kid);
+  if (duty.reason === 'cleared')     { showToast('🎉 Loan already cleared'); return; }
+  if (duty.reason === 'not-started') { showToast(`Nothing due yet — the deposit is due ${loanRules().downPaymentDue}`); return; }
+  if (loanState(kid).lastPaymentMonth === loanMonthKey()) {
+    showToast('Already paid this month ✅ — the schedule is monthly, not weekly');
+    return;
+  }
+  const due = duty.amount;
   const w = ensureWallet(kid);
   let choice = 'pay_available';
-  if (w.cash < due) {
+  // Step 3 withdraws the choice: a grown-up decides, and it defaults to
+  // paying what's there rather than to the cheapest option.
+  const choicesGone = (typeof mrLosesChoices === 'function') && mrLosesChoices(kid);
+  if (w.cash < due && choicesGone) {
+    showToast('⚖️ Choices are withdrawn this week — paying what she has');
+  } else if (w.cash < due) {
     const pick = await showPrompt(
-      `${kid === 'jenn' ? 'Jenn' : 'Jess'} owes $${due.toFixed(2)} and has $${w.cash.toFixed(2)}.\n` +
+      `${kid === 'jenn' ? 'Jenn' : 'Jess'} owes $${due.toFixed(2)} ` +
+      `(${duty.kind === 'down' ? 'down payment' : 'this month'}) and has $${w.cash.toFixed(2)}.\n` +
       `1. Pay what she's got — the rest goes overdue at ${loanRules().arrearsRatePct}%\n` +
       `2. Pay nothing this month — all of it goes overdue, costs more\n` +
       `3. Cover it from savings — no interest, but gives up what that money was earning`,
@@ -152,6 +213,8 @@ async function pmSundayTransfer(kid) {
     deferred: `📅 Deferred — $${res.shortfall.toFixed(2)} now overdue`,
     cleared: '🎉 Loan already cleared',
     'nothing-due': 'Nothing due',
+    'not-started': 'Nothing due yet',
+    'already-this-month': 'Already paid this month ✅',
   }[res.status] || 'Done';
   showToast(msg);
 }
@@ -170,7 +233,7 @@ function pmPriceCards(r, editable) {
   let html = '';
 
   html += `<div class="chore-card"><h3>🧹 Household chores</h3>
-    <div class="ct-meta">Your first ${(r.chores || {}).freeChoresPerWeek} each week are free — you pick them. Every chore after that pays.</div>
+    <div class="ct-meta">${(r.chores || {}).freeChoresPerWeek} each week are free — every chore after that pays. The free ones are always your <b>lowest-paying</b> chores, so doing your best work first never costs you.</div>
     ${row('On time <b>and</b> to standard', '$' + Number(g[3] || 0).toFixed(2), 'chores.grade.3')}
     ${row('To standard, but late', '$' + Number(g[2] || 0).toFixed(2), 'chores.grade.2')}
     ${row('Redone, then to standard', '$' + Number(g[1] || 0).toFixed(2), 'chores.grade.1')}
@@ -199,7 +262,7 @@ function pmPriceCards(r, editable) {
   const tiers = ((r.streak || {}).tiers) || [];
   html += `<div class="chore-card"><h3>🔥 Routine streak</h3>
     ${tiers.map(t => row(t.days + ' days in a row', '+$' + Number(t.bonus || 0).toFixed(2), null)).join('')}
-    <div class="ct-meta"><b>Highest one only</b> — they don't add up. Miss a day and it goes to zero. Resets Sunday.</div>
+    <div class="ct-meta"><b>Highest one only</b> — they don't add up. Miss a day and the run starts over, but <b>your best run of the week</b> is what pays. Resets Sunday.</div>
   </div>`;
 
   const cp = r.competition || {};
@@ -215,8 +278,8 @@ function pmPriceCards(r, editable) {
   </div>`;
 
   const fi = (r.fines && r.fines.items) || [];
-  html += `<div class="chore-card"><h3>📦 Saturday Box &amp; fines</h3>
-    <div class="ct-meta">Leave something out and it's boxed until Saturday. <b>Box first, fine on repeat</b> — the second time that week, it's boxed <i>and</i> it costs.</div>
+  html += `<div class="chore-card"><h3>📦 Sunday Box &amp; fines</h3>
+    <div class="ct-meta">Leave something out and it's boxed until Sunday — it comes back at the family meeting. <b>Box first, fine on repeat</b> — the second time that week, it's boxed <i>and</i> it costs.</div>
     ${fi.map(f => row(escapeHtml(f.label), '−$' + Number(f.amount || 0).toFixed(2), null)).join('')}
     <div class="ct-meta">A day never goes below $0. Fines can take what you earned that day — they can't put you in debt.</div>
   </div>`;
@@ -252,6 +315,9 @@ function pmRenderSetup() {
   const loan = r.loan || {};
   html += `<div class="chore-card"><h3>🎿 Loan terms</h3>
     <div class="ct-item"><div class="ct-item-left"><span>Jenn / Jess principal</span></div><span class="ct-meta">$${Number((loan.principal||{}).jenn||0).toFixed(0)} / $${Number((loan.principal||{}).jess||0).toFixed(0)}</span></div>
+    <div class="ct-item"><div class="ct-item-left"><span>Down payment — due ${escapeHtml(loan.downPaymentDue || '—')}</span></div><span class="ct-meta">$${Number((loan.downPayment||{}).jenn||0).toFixed(0)} / $${Number((loan.downPayment||{}).jess||0).toFixed(0)}</span></div>
+    <div class="ct-item"><div class="ct-item-left"><span>Collected so far</span></div><span class="ct-meta">$${money2(loanState('jenn').downPaid).toFixed(2)} / $${money2(loanState('jess').downPaid).toFixed(2)}</span></div>
+    <div class="ct-item"><div class="ct-item-left"><span>Monthly after the deposit</span></div><span class="ct-meta">$${Number((loan.monthly||{}).jenn||0).toFixed(0)} / $${Number((loan.monthly||{}).jess||0).toFixed(0)} × ${loan.months || 0}</span></div>
     <div class="ct-item"><div class="ct-item-left"><span>Interest while on schedule</span></div><span class="ct-meta">${loan.onScheduleRatePct}%</span>
       <button type="button" class="btn-icon" data-pm-action="edit" data-pm-path="loan.onScheduleRatePct" aria-label="Edit on-schedule rate">✏️</button></div>
     <div class="ct-item"><div class="ct-item-left"><span>Overdue rate (per month, simple)</span></div><span class="ct-meta">${loan.arrearsRatePct}%</span>

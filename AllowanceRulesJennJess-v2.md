@@ -18,7 +18,7 @@
 
 **Routines. Personal chores. Two household chores.** That's the floor. None of it earns money, and none of it is optional.
 
-**Miss a routine and your streak goes to zero.** That's the cost. Nothing else happens.
+**Miss a routine and your streak starts over.** That's the cost. Nothing else happens.
 
 **Genuinely sick — actually in bed, not at school — pauses everything.** Streaks hold, chores aren't expected, nothing counts against you. Being unwell is not a discipline problem.
 
@@ -64,7 +64,9 @@ Maximum **$3 per day.** Anything past that earns **XP instead of money** *(Part 
 |---|---|---|
 | **+$1** | **+$2** | **+$3** |
 
-Counted **by day**. **Highest one only** — they don't add together. Miss a day and it goes to zero. Resets every Sunday.
+Counted **by day**. **Highest one only** — they don't add together.
+
+Miss a day and the run starts over, but **your best run of the week is the one that pays.** Four clean days, a miss, then two more still pays the 3-day tier — one bad Wednesday doesn't wipe out the week. Resets every Sunday.
 
 **Who decides: your own card, checked Sunday.**
 
@@ -116,7 +118,9 @@ Your sport costs a lot. You borrow 10% of it from Dad — and you pay it back.
 
 ### The Sunday Transfer
 
-Your monthly payment moves **automatically** every Sunday.
+Your payment moves **automatically**, at the first Sunday meeting of each month. It is a **monthly** payment — the other Sundays don't charge you again.
+
+**The down payment comes first.** Until the deposit is paid, the monthly payments haven't started. You can pay the deposit down in pieces any time before it's due — whatever you put in early is that much less to find on the day.
 
 **If you don't have enough that week, you choose:**
 
@@ -136,9 +140,11 @@ Recalculated every season.
 
 ## PART 5 — When Things Go Wrong
 
-### The Saturday Box
+### The Sunday Box
 
-**Leave something out and it goes in the Saturday Box.** You get it back Saturday morning. Want it sooner? One unpaid job, chosen by Mom — and **that job does not count** toward your two free chores.
+**Leave something out and it goes in the Sunday Box.** You get it back at the Sunday family meeting — the same sit-down where we settle the week. Want it sooner? One unpaid job, chosen by Mom — and **that job does not count** toward your two free chores.
+
+The job gets **written down and ticked off** when you get the thing back, so "I'll do it later" isn't a way to get it out of the box.
 
 *School books, homework and sports gear are never boxed — they go on Mom's shelf and you ask for them.*
 
@@ -170,7 +176,9 @@ Almost everything here runs on your word. You tell Mom the chore was done to sta
 |---|---|
 | **First time** | Claim is void. Recorded, and we talk about it Sunday. Nothing else. |
 | **Second time** | Claim is void, and **that whole channel pays nothing for the week** — chores or competition, whichever you claimed on. |
-| **Third time** | Claim is void, and **you lose your choices** — picking your own free chores, deciding your own loan surplus — until you've earned them back. |
+| **Third time** | Claim is void, and **you lose your choices** for that week — your two free chores land on your **highest**-paying work instead of your lowest, and you can't put extra money against the loan. |
+
+**The ladder resets every Sunday.** Three strikes in one week takes you to the third step; a clean week starts you back at the first. The strikes stay on the record and we still talk about them — but you are never permanently at step three, and your choices always come back.
 
 Tell me you didn't do it and nothing happens beyond the ordinary miss. **Owning it always costs less than hiding it.** That is the entire lesson and it is the one I care about most.
 
@@ -201,7 +209,9 @@ Money runs out when the loan is paid. **XP is the part that's just yours.**
 
 Bring your card. We add it up, pay it out, move the loan payment, and set the week.
 
-You pick your two free chores. You choose what happens with anything above your minimum. If you think something was graded wrong, **say so here** — I'll listen properly, and if I got it wrong I'll say so and fix it.
+Your two free chores are always your **lowest-paying** ones, worked out at the end of the week — doing your best work first never costs you money. You choose what happens with anything above your minimum. If you think something was graded wrong, **say so here** — I'll listen properly, and if I got it wrong I'll say so and fix it.
+
+**Anything still in the Sunday Box comes back at this meeting.**
 
 **Everything is discussed Sunday. Nothing is argued about on Tuesday.**
 

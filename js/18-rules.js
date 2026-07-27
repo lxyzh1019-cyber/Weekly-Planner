@@ -84,8 +84,10 @@ const MR_DEFAULT_RULES = {
 
   // Objects left out are boxed, not fined — the fine only lands on a REPEAT of
   // the same item in the same week. One event, one penalty, until it's a choice.
-  saturdayBox: {
-    releaseDay: 'saturday',
+  // Released at the Sunday family meeting, so getting your things back is part
+  // of the same sit-down that settles the week.
+  sundayBox: {
+    releaseDay: 'sunday',
     redemptionJob: true,
     redemptionCountsToFree: false,   // the redemption job is NOT one of the free two
     exempt: ['school books', 'homework', 'sports gear'],
@@ -413,10 +415,18 @@ function mrToggleSick(kid, weekKey, dayIdx) {
    chores on Monday takes her free two out of already-capped money and earns
    less than one who did the same work spread across the week.
 
-   The first `freeChoresPerWeek` graded chores of the week are the free ones.
-   Because every chore in the pool is meant to be equivalent effort, taking
-   them chronologically is the same as letting her choose — she picks by
-   deciding what to do first, and no ordering earns her more.
+   Which chores are free is NOT chronological. Grades pay differently ($3 / $2
+   / $1), so taking the first two of the week would mean a kid who does two
+   sloppy grade-1 chores on Monday keeps her grade-3 work and earns more than
+   one who did her best work first. That is exactly backwards.
+
+   "You pick them" is therefore resolved as the arrangement she would pick:
+   the free slots land on her LOWEST-paying graded chores, so she keeps the
+   most money and there is no reward for starting the week badly.
+
+   At honesty step 3 the pick is withdrawn (see mrHonestyEffect). The free
+   slots then land on her highest-paying chores instead — the privilege is the
+   choice, and losing it has a price.
 
    Returns the paid total plus the per-day breakdown and the count of chores
    that fell entirely past the cap (those earn XP instead — credited at the
@@ -426,29 +436,47 @@ function mrChoreWeek(weekKey, kid) {
   const cfg = r.chores || {};
   const pay = cfg.grade || {};
   const dailyCap = cfg.dailyCap;
-  let freeLeft = Number(cfg.freeChoresPerWeek) || 0;
+  const freeCount = Number(cfg.freeChoresPerWeek) || 0;
+  const pickWithdrawn = !!mrHonestyEffect(kid, weekKey).losesChoices;
 
-  const days = [];
-  let total = 0, overflowChores = 0, freeUsed = [];
+  // Every graded chore of the week, with what it would pay.
+  const all = [];
   for (let d = 0; d < 7; d++) {
     const graded = mrEnsureEarnings(kid, weekKey).chores[String(d)] || {};
-    let dayPaid = 0, dayRaw = 0;
-    // Stable order so the same week always resolves identically.
     Object.keys(graded).sort().forEach(choreId => {
       const g = Number(graded[choreId]) || 0;
       if (g <= 0) return;
-      if (freeLeft > 0) { freeLeft--; freeUsed.push({ dayIdx: d, choreId }); return; }
-      const value = Number(pay[g]) || 0;
-      dayRaw += value;
-      const room = (dailyCap == null) ? value : Math.max(0, dailyCap - dayPaid);
+      all.push({ dayIdx: d, choreId, grade: g, value: Number(pay[g]) || 0 });
+    });
+  }
+
+  // Cheapest-first is her best arrangement; step 3 flips it to dearest-first.
+  // Day and id break ties so the same week always resolves identically.
+  const ranked = all.slice().sort((a, b) =>
+    (pickWithdrawn ? b.value - a.value : a.value - b.value)
+    || a.dayIdx - b.dayIdx
+    || (a.choreId < b.choreId ? -1 : a.choreId > b.choreId ? 1 : 0));
+  const freeUsed = ranked.slice(0, freeCount);
+  const isFree = {};
+  freeUsed.forEach(f => { isFree[f.dayIdx + '|' + f.choreId] = true; });
+
+  const days = [];
+  let total = 0, overflowChores = 0;
+  for (let d = 0; d < 7; d++) {
+    let dayPaid = 0, dayRaw = 0;
+    all.filter(c => c.dayIdx === d).forEach(c => {
+      if (isFree[c.dayIdx + '|' + c.choreId]) return;
+      dayRaw += c.value;
+      const room = (dailyCap == null) ? c.value : Math.max(0, dailyCap - dayPaid);
       if (room <= 0) { overflowChores++; return; }   // nothing left today → XP
-      dayPaid += Math.min(value, room);
+      dayPaid += Math.min(c.value, room);
     });
     dayPaid = money2(dayPaid);
     total += dayPaid;
     days.push({ dayIdx: d, raw: money2(dayRaw), paid: dayPaid });
   }
-  return { paid: money2(total), days, overflowChores, freeUsed, freeLeft };
+  return { paid: money2(total), days, overflowChores, freeUsed,
+           freeLeft: Math.max(0, freeCount - freeUsed.length), pickWithdrawn };
 }
 
 /* Personal chores done unasked, for the XP award. Never money. */
@@ -585,6 +613,9 @@ function mrAddCompetition(kid, entry) {
   if (!isParent()) { showToast('A grown-up records results 🔒'); return null; }
   const e = {
     id: mrNewId('comp-'), dayKey: entry.dayKey || todayKey(), sport: entry.sport,
+    // The meet's own name and date: "3 pts, skate" is not something anyone can
+    // check against a results sheet six months later.
+    name: String(entry.name || '').trim(),
     points: Number(entry.points) || 0, placement: entry.placement || {},
     qualified: !!entry.qualified, provincial: !!entry.provincial,
     danceItems: entry.danceItems || {}, personalBest: !!entry.personalBest,
@@ -614,7 +645,15 @@ function mrCompetitionWeek(weekKey, kid) {
   };
 }
 
-/* ── FINES, SATURDAY BOX, HONESTY ──────────────────────────────────
+/* The box config. Rule versions saved before the box moved to Sunday still
+   carry the old `saturdayBox` key, and past versions are immutable by design,
+   so both names are read. */
+function mrBoxCfg(r) {
+  const rules = r || mrRules();
+  return rules.sundayBox || rules.saturdayBox || {};
+}
+
+/* ── FINES, SUNDAY BOX, HONESTY ────────────────────────────────────
    Box first, fine on repeat: leaving something out is boxed, and only a SECOND
    offence for the same item that week also costs money. Once is a mistake,
    twice is a choice — and it keeps one event from carrying two penalties. */
@@ -656,14 +695,32 @@ function mrBoxItem(kid, label, weekKey) {
                   dayKey: todayKey(), boxedAt: Date.now(), releasedAt: null,
                   repeat: priorThisWeek > 0 };
   mrBoxItems(kid).push(entry);
-  if (entry.repeat) mrAddFine(kid, (r.saturdayBox || {}).repeatFineId || 'box_repeat', entry.dayKey);
+  if (entry.repeat) mrAddFine(kid, mrBoxCfg(r).repeatFineId || 'box_repeat', entry.dayKey);
   saveAll();
   return entry;
 }
-function mrReleaseBoxItem(kid, id) {
+/* Early release. The rulebook price for getting something back before Sunday is
+   one unpaid job chosen by Mom, so the release records WHY it happened —
+   otherwise an early release is indistinguishable from the Sunday one and the
+   job quietly becomes optional. */
+function mrReleaseBoxItem(kid, id, opts) {
   if (!isParent()) { showToast('A grown-up opens the box 🔒'); return; }
+  const o = opts || {};
   const b = mrBoxItems(kid).find(x => x.id === id);
-  if (b) { b.releasedAt = Date.now(); saveAll(); }
+  if (!b) return;
+  b.releasedAt = Date.now();
+  b.releasedEarly = true;
+  b.redemptionJob = o.job ? String(o.job).trim() : '';
+  saveAll();
+}
+/* The Sunday release: everything still in the box comes out when the family
+   meeting is recorded. Returns how many items were handed back so the meeting
+   recap can say so. Caller saves. */
+function mrReleaseBoxForMeeting(kid) {
+  const now = Date.now();
+  let n = 0;
+  mrBoxItems(kid).forEach(b => { if (!b.releasedAt) { b.releasedAt = now; n++; } });
+  return n;
 }
 
 /* Fines for the week, floored so a day can never go negative: a fine can take
@@ -692,18 +749,41 @@ function mrFinesWeek(weekKey, kid, dayEarnings) {
 
 /* Honesty ladder: warning → that channel's week → choice privileges. The step
    is derived from how many strikes are already on record, so it escalates on
-   its own rather than needing anyone to remember where they were. */
+   its own rather than needing anyone to remember where they were.
+
+   The ladder is counted PER WEEK and resets on Sunday. Counting it over a
+   lifetime meant that after three strikes ever, every later strike was step 3
+   forever — the rulebook's "until you've earned them back" would have had no
+   way to happen. A week is the unit everything else here settles in, so it is
+   the unit the ladder resets in too. The strikes themselves are kept forever;
+   it is only the escalation that starts again. */
 function mrHonestyStrikes(kid) {
   const p = getProfData(kid);
   if (!Array.isArray(p.honesty)) p.honesty = [];
   return p.honesty;
 }
+/* The Monday-to-Sunday keys of a week — the window the ladder counts in. */
+function mrWeekDayKeys(weekKey) {
+  const mon = formatDayKey(weekKey);
+  const keys = [];
+  for (let i = 0; i < 7; i++) { const d = new Date(mon); d.setDate(mon.getDate() + i); keys.push(ctDateToKey(d)); }
+  return keys;
+}
+function mrHonestyStrikesInWeek(kid, weekKey) {
+  const keys = mrWeekDayKeys(weekKey);
+  return mrHonestyStrikes(kid).filter(h => keys.includes(ctDateToKey(new Date(h.at))));
+}
 function mrRecordHonesty(kid, channel, note) {
   if (!isParent()) { showToast('A grown-up records this 🔒'); return null; }
   const r = mrRules();
   const steps = (r.honesty || {}).steps || [];
-  const step = Math.min(mrHonestyStrikes(kid).length + 1, steps.length || 3);
-  const entry = { id: mrNewId('hon-'), at: Date.now(), channel: channel || 'chores',
+  // The strike's own timestamp decides which week it belongs to, so the step
+  // has to be counted in that same week — not in whichever week the chore tab
+  // happens to be showing.
+  const at = Date.now();
+  const wk = ctDateToKey(ctMondayOf(new Date(at)));
+  const step = Math.min(mrHonestyStrikesInWeek(kid, wk).length + 1, steps.length || 3);
+  const entry = { id: mrNewId('hon-'), at, channel: channel || 'chores',
                   step, note: note || '' };
   mrHonestyStrikes(kid).push(entry);
   saveAll();
@@ -711,17 +791,27 @@ function mrRecordHonesty(kid, channel, note) {
 }
 /* Step 2 voids a channel for the week; step 3 also withdraws the kid's choices. */
 function mrHonestyEffect(kid, weekKey) {
-  const mon = formatDayKey(weekKey);
-  const keys = [];
-  for (let i = 0; i < 7; i++) { const d = new Date(mon); d.setDate(mon.getDate() + i); keys.push(ctDateToKey(d)); }
-  const thisWeek = mrHonestyStrikes(kid).filter(h => keys.includes(ctDateToKey(new Date(h.at))));
+  const thisWeek = mrHonestyStrikesInWeek(kid, weekKey);
   const voided = {};
   let losesChoices = false;
   thisWeek.forEach(h => {
     if (h.step >= 2) voided[h.channel] = true;
     if (h.step >= 3) losesChoices = true;
   });
-  return { voidedChannels: voided, losesChoices, strikes: mrHonestyStrikes(kid).length };
+  // `strikes` is the count that drives the ladder, so it is the weekly one.
+  // The lifetime total is kept alongside it for the Sunday conversation.
+  return { voidedChannels: voided, losesChoices,
+           strikes: thisWeek.length, strikesAllTime: mrHonestyStrikes(kid).length };
+}
+
+/* Has this kid lost her choices this week? Defaults to the live week so the
+   surfaces that gate on it (the loan-surplus button, the free-chore pick)
+   don't each have to work out which week they're in. */
+function mrLosesChoices(kid, weekKey) {
+  const wk = weekKey || (typeof ctWeekKey !== 'undefined' && ctWeekKey)
+             || ctDateToKey(ctMondayOf(new Date()));
+  if (!mrUsesNewModel(wk)) return false;
+  return !!mrHonestyEffect(kid, wk).losesChoices;
 }
 
 /* ── THE WEEK ──────────────────────────────────────────────────────
@@ -749,6 +839,41 @@ function mrWeekBreakdown(weekKey, kid) {
 }
 function mrWeekMoney(weekKey, kid) {
   return mrWeekBreakdown(weekKey, kid).net;
+}
+
+/* A frozen copy of a week's breakdown, taken at the family meeting.
+
+   Everything in mrWeekBreakdown is derived — from the rules live today, the
+   grades recorded today, the honesty strikes on file today. That is right for
+   the current week and wrong for a past one: edit a price in March and every
+   week back to January would restate itself. Freezing the numbers at the
+   moment they are agreed makes the history an actual ledger, and means the
+   Sunday conversation can always be reconstructed exactly as it happened.
+
+   The loan and XP fields are filled in by the meeting once those have run. */
+function mrFreezeWeekLedger(weekKey, kid) {
+  const b = mrWeekBreakdown(weekKey, kid);
+  const v = mrVersionForDate(weekKey) || {};
+  return {
+    at: Date.now(),
+    rulesVersion: v.id || null,
+    rulesEffectiveFrom: v.effectiveFrom || null,
+    chores: money2(b.chorePaid),
+    choresRaw: money2(b.chores.paid),
+    freeChores: (b.chores.freeUsed || []).length,
+    overflowChores: b.chores.overflowChores || 0,
+    pickWithdrawn: !!b.chores.pickWithdrawn,
+    learning: money2(b.learnPaid),
+    streakDays: b.streak.days || 0,
+    streak: money2(b.streak.bonus),
+    competition: money2(b.compPaid),
+    fines: money2(b.fines.total),
+    voided: Object.keys(b.honesty.voidedChannels || {}),
+    honestyStrikes: b.honesty.strikes || 0,
+    gross: money2(b.gross),
+    net: money2(b.net),
+    xp: 0, boxReleased: 0, loan: null,
+  };
 }
 
 /* ── XP ────────────────────────────────────────────────────────────
