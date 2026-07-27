@@ -199,6 +199,98 @@ function findChromium() {
               && bankConfig().marketMonth === before.market;
     return moved && back;
   });
+  // The loan schedule is MONTHLY but the family meeting is WEEKLY. A second
+  // run in the same calendar month must not charge the payment again.
+  checks.loanChargesOncePerMonth = await page.evaluate(() => {
+    profile = 'parent';
+    const kid = 'jenn';
+    const l = loanState(kid);
+    l.paid = 0; l.downPaid = 0; l.arrears = 0; l.arrearsInterest = 0;
+    l.lastPaymentMonth = null; l.lastInterestMonth = null; l.payments = [];
+    ensureWallet(kid).cash = 1000;
+    const first  = loanSundayTransfer(kid, 'pay_available', { dayKey: '2026-10-04' });
+    const second = loanSundayTransfer(kid, 'pay_available', { dayKey: '2026-10-11' });
+    return first.paid > 0 && second.status === 'already-this-month' && second.paid === 0;
+  });
+
+  // Overdue interest is a MONTHLY rate; charging it at every meeting would be
+  // four to five months of interest a month.
+  checks.arrearsInterestOncePerMonth = await page.evaluate(() => {
+    const kid = 'jenn';
+    const l = loanState(kid);
+    l.arrears = 100; l.arrearsInterest = 0; l.lastInterestMonth = null;
+    const a = loanAccrueArrears(kid, { dayKey: '2026-12-06' });
+    const b = loanAccrueArrears(kid, { dayKey: '2026-12-13' });
+    const c = loanAccrueArrears(kid, { dayKey: '2027-01-03' });
+    return a > 0 && b === 0 && c > 0;
+  });
+
+  // The deposit is what the schedule asks for first; the monthly payments only
+  // start once it is settled.
+  checks.downPaymentComesFirst = await page.evaluate(() => {
+    const kid = 'jenn';
+    const l = loanState(kid);
+    l.paid = 0; l.downPaid = 0; l.arrears = 0; l.arrearsInterest = 0;
+    l.lastPaymentMonth = null; l.payments = [];
+    const before = loanDueNow(kid, '2026-10-04');
+    ensureWallet(kid).cash = 1000;
+    loanSundayTransfer(kid, 'pay_available', { dayKey: '2026-10-04' });
+    const after = loanDueNow(kid, '2026-11-01');
+    return before.kind === 'down'
+        && before.amount === loanDownPayment(kid)
+        && loanDownOutstanding(kid) === 0
+        && after.kind === 'scheduled';
+  });
+
+  // Nothing is owed before the deposit falls due — the pacing readout must not
+  // report a kid as behind on a loan that hasn't started.
+  checks.nothingDueBeforeStart = await page.evaluate(() =>
+    loanDueNow('jess', '2026-08-02').reason === 'not-started');
+
+  // Free chores land on the LOWEST-paying work. Chronological order would mean
+  // two sloppy chores on Monday earn more than two good ones.
+  checks.freeChoresTakeLowestPaying = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey, kid = 'jess';
+    getProfData(kid).honesty = [];
+    mrSetChoreGrade(kid, wk, 0, 'dishes', 3);   // $3
+    mrSetChoreGrade(kid, wk, 0, 'mop', 3);      // $3
+    mrSetChoreGrade(kid, wk, 0, 'vacuum', 1);   // $1
+    const w = mrChoreWeek(wk, kid);
+    // The two free slots take the $1 and one $3, leaving a $3 chore to pay.
+    return w.paid === 3 && !w.pickWithdrawn;
+  });
+
+  // Honesty step 3 withdraws the pick: the free slots flip to her highest-paying
+  // chores, so losing the choice actually costs something.
+  checks.honestyStep3WithdrawsFreePick = await page.evaluate(() => {
+    const wk = ctWeekKey, kid = 'jess';
+    getProfData(kid).honesty = [];
+    mrRecordHonesty(kid, 'chores'); mrRecordHonesty(kid, 'chores'); mrRecordHonesty(kid, 'chores');
+    const w = mrChoreWeek(wk, kid);
+    const gone = mrLosesChoices(kid, wk);
+    getProfData(kid).honesty = [];
+    // Both $3 chores are now free, leaving only the $1 one to pay.
+    return gone && w.pickWithdrawn && w.paid === 1;
+  });
+
+  // The box opens at the Sunday meeting, and the undo has to put it back.
+  checks.sundayBoxOpensAtMeeting = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey, kid = 'jess';
+    if (state.shared.chore.meetingsHeld) delete state.shared.chore.meetingsHeld[wk];
+    getProfData(kid).boxItems = [];
+    mrBoxItem(kid, 'skates', wk);
+    const before = mrBoxItems(kid).filter(b => !b.releasedAt).length;
+    mmConfirmAndRecord();
+    const after = mrBoxItems(kid).filter(b => !b.releasedAt).length;
+    mmUndoRecord();
+    const restored = mrBoxItems(kid).filter(b => !b.releasedAt).length;
+    return before === 1 && after === 0 && restored === 1;
+  });
+
   // Hero tiers must outlast a season; six topped out at 500 XP.
   checks.heroTiersReachTen = await page.evaluate(() =>
     HERO_TIERS.length >= 10 && heroTierForLevel(10).name.length > 0);

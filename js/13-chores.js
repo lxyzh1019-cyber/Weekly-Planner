@@ -561,7 +561,7 @@ async function ctPromptBoxItem() {
   if (!label || !label.trim()) return;
   const e = mrBoxItem(ctActiveKid(), label, ctWeekKey);
   renderChoreTab();
-  if (e) showToast(e.repeat ? `📦 Boxed again this week — that's also −$1` : '📦 Boxed until Saturday');
+  if (e) showToast(e.repeat ? `📦 Boxed again this week — that's also −$1` : '📦 Boxed until Sunday');
 }
 function ctReleaseBox(id) { mrReleaseBoxItem(ctActiveKid(), id); renderChoreTab(); }
 
@@ -877,9 +877,15 @@ function ctRenderHouseholdChores(kid) {
   }).join('');
 
   const cap = (r.chores || {}).dailyCap;
+  // Which chores are free is settled at the end of the week, not as you go —
+  // they land on the lowest-paying ones so doing your best work first is never
+  // punished. Step 3 flips that, and says so.
+  const freeNote = wk.pickWithdrawn
+    ? ` <b>Choices withdrawn this week</b> — they land on your highest-paying chores instead.`
+    : ` They land on your <b>lowest-paying</b> chores, so your best work is the work that pays.`;
   const freeLine = wk.freeLeft > 0
-    ? `<div class="ct-meta">${wk.freeLeft} free chore${wk.freeLeft === 1 ? '' : 's'} left this week — those belong to the family.</div>`
-    : `<div class="ct-meta">Your ${(r.chores || {}).freeChoresPerWeek} free chores are done — everything else this week pays.</div>`;
+    ? `<div class="ct-meta">${wk.freeLeft} free chore${wk.freeLeft === 1 ? '' : 's'} left this week — those belong to the family.${freeNote}</div>`
+    : `<div class="ct-meta">Your ${(r.chores || {}).freeChoresPerWeek} free chores are used up — everything else this week pays.${freeNote}</div>`;
   const overflow = wk.overflowChores > 0
     ? `<div class="ct-meta">⭐ ${wk.overflowChores} chore${wk.overflowChores === 1 ? '' : 's'} past the daily max — those earn XP instead of money.</div>` : '';
 
@@ -981,7 +987,7 @@ function ctRenderCompetitionCard(kid) {
     ${isParent() ? `<div style="margin-top:0.5rem"><button type="button" class="pill-btn" data-ct-action="add-comp">+ Record a result</button></div>` : ''}</div>`;
 }
 
-/* ── Saturday Box & fines ── */
+/* ── Sunday Box & fines ── */
 function ctRenderBoxFinesCard(kid) {
   const r = mrRulesForWeek(ctWeekKey);
   const chores = mrChoreWeek(ctWeekKey, kid);
@@ -997,9 +1003,17 @@ function ctRenderBoxFinesCard(kid) {
     `<div class="ct-item"><div class="ct-item-left"><span>${escapeHtml(fineNames[f.itemId] || f.itemId)}<br><span class="ct-meta">${escapeHtml(f.dayKey)}</span></span></div>
       <span class="ct-meta">−$1.00</span>
       ${isParent() ? `<button type="button" class="btn-icon" data-ct-action="del-fine" data-fine-id="${escapeAttr(f.id)}" aria-label="Remove fine">🗑</button>` : ''}</div>`).join('');
-  return `<div class="chore-card"><h3>📦 Saturday Box &amp; fines</h3>
-    <div class="ct-meta">Box first, fine on repeat. A day never goes below $0 — fines this week: <b>−$${fw.total.toFixed(2)}</b></div>
-    ${boxRows}${fineRows}
+  // Step 3 of the honesty ladder is a withdrawal of discretion, so it has to be
+  // visible where the strike was recorded — not just felt on the loan card.
+  const eff = mrHonestyEffect(kid, ctWeekKey);
+  const honestyNote = eff.losesChoices
+    ? `<div class="ct-meta">⚖️ <b>Choices withdrawn this week</b> — the free chores land on her highest-paying work instead of her lowest, and paying extra off the loan is paused.</div>`
+    : (Object.keys(eff.voidedChannels || {}).length
+        ? `<div class="ct-meta">⚖️ Voided this week: <b>${escapeHtml(Object.keys(eff.voidedChannels).join(', '))}</b></div>`
+        : '');
+  return `<div class="chore-card"><h3>📦 Sunday Box &amp; fines</h3>
+    <div class="ct-meta">Box first, fine on repeat. Everything in the box comes back at the Sunday family meeting. A day never goes below $0 — fines this week: <b>−$${fw.total.toFixed(2)}</b></div>
+    ${honestyNote}${boxRows}${fineRows}
     ${isParent() ? `<div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.5rem">
       <button type="button" class="pill-btn" data-ct-action="box-item">📦 Box something</button>
       <button type="button" class="pill-btn" data-ct-action="add-fine">− Add a fine</button>
@@ -1013,9 +1027,26 @@ function ctRenderMoneyCard(kid) {
   const name = kid === 'jenn' ? 'Jenn' : 'Jess';
   const money = ctWeekMoney(ctWeekKey, kid);
   const snap = c.moneySnapshots[ctWeekKey];
+  const newModel = mrUsesNewModel(ctWeekKey);
   let body;
   if (snap && snap[kid] != null) {
     body = `<div class="ct-meta">Earned before the new money system.</div>`;
+  } else if (newModel) {
+    // Under the rulebook model the money comes from graded chores, learning,
+    // the streak and competitions — not from group payouts, and there is no
+    // weekly total cap.
+    const b = mrWeekBreakdown(ctWeekKey, kid);
+    const lines = [];
+    if (b.chorePaid) lines.push(`<div class="ct-meta">🧹 Household chores +$${b.chorePaid.toFixed(2)}</div>`);
+    if (b.learnPaid) lines.push(`<div class="ct-meta">📘 Learning +$${b.learnPaid.toFixed(2)}</div>`);
+    if (b.streak.bonus) lines.push(`<div class="ct-meta">🔥 Streak (${b.streak.days} days) +$${b.streak.bonus.toFixed(2)}</div>`);
+    if (b.compPaid) lines.push(`<div class="ct-meta">🏆 Competition +$${b.compPaid.toFixed(2)}</div>`);
+    if (b.fines.total) lines.push(`<div class="ct-meta">📦 Fines −$${b.fines.total.toFixed(2)}</div>`);
+    Object.keys(b.honesty.voidedChannels || {}).forEach(ch =>
+      lines.push(`<div class="ct-meta">⚖️ ${escapeHtml(ch)} voided this week — honesty</div>`));
+    if (b.chores.overflowChores) lines.push(`<div class="ct-meta">⭐ ${b.chores.overflowChores} chore${b.chores.overflowChores > 1 ? 's' : ''} past the daily max — earns XP</div>`);
+    if (!lines.length) lines.push(`<div class="ct-meta">Do a household chore to start earning.</div>`);
+    body = lines.join('');
   } else {
     const wk = c.groupPayoutsFired[ctWeekKey] || {};
     const lines = [];
@@ -1043,7 +1074,9 @@ function ctRenderMoneyCard(kid) {
   const nw = netWorth(kid);
   const finalized = !!(c.finalizedWeeks && c.finalizedWeeks[ctWeekKey] && c.finalizedWeeks[ctWeekKey][kid] != null);
   return `<div class="chore-card chore-card--full"><h3>💰 ${name}'s pocket money</h3>
-    <div class="ct-money-total">$${money.toFixed(2)} <span class="ct-money-cap">/ $${CT_MONEY_CAP} max</span></div>
+    <div class="ct-money-total">$${money.toFixed(2)}${newModel
+      ? ` <span class="ct-money-cap">this week</span>`
+      : ` <span class="ct-money-cap">/ $${CT_MONEY_CAP} max</span>`}</div>
     <div class="ct-meta" style="font-style:italic">Chores are how you help the family 💛 — the pocket money is a bonus for practising with real money.</div>
     <div class="ct-meta">${finalized ? '✅ Paid out at the family meeting' : 'Preliminary — confirmed at the weekly family meeting'}</div>
     ${body}
@@ -1052,7 +1085,7 @@ function ctRenderMoneyCard(kid) {
       ${isParent()
         ? `<button type="button" class="pill-btn" onclick="openMoneyScreen('${kid}')">🏦 Bank &amp; invest</button>
            <button type="button" class="pill-btn" onclick="openFamilyMeeting()">🧑‍🧑‍🧒 Family meeting</button>`
-        : `<button type="button" class="pill-btn" onclick="openHowIEarn()">💰 How I earn</button>`}
+        : `<button type="button" class="pill-btn" onclick="openPocketMoney('${kid}','balance')">💰 How I earn</button>`}
     </div></div>`;
 }
 function ctRenderGroupCards(kid) {

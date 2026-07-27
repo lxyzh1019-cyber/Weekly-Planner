@@ -237,17 +237,23 @@ function mmRenderConfirm(wk, held) {
   const preview = newModel ? ['jenn','jess'].map(kid => {
     const b = mrWeekBreakdown(wk, kid);
     const xp = mrXpForWeek(wk, kid).total;
-    const due = loanMonthly(kid);
+    // What the schedule actually asks for today — the deposit before the
+    // monthlies, and nothing at all on the Sundays that aren't payment day.
+    const l = loanState(kid);
+    const duty = loanDueNow(kid);
+    const paidThisMonth = l.lastPaymentMonth === loanMonthKey();
+    const due = paidThisMonth ? 0 : duty.amount;
+    const dueLabel = duty.kind === 'down' ? 'down payment' : 'loan';
     const bits = [];
     if (b.chorePaid) bits.push(`chores $${b.chorePaid.toFixed(2)}`);
     if (b.learnPaid) bits.push(`learning $${b.learnPaid.toFixed(2)}`);
     if (b.streak.bonus) bits.push(`streak $${b.streak.bonus.toFixed(2)}`);
     if (b.compPaid) bits.push(`competition $${b.compPaid.toFixed(2)}`);
     if (b.fines.total) bits.push(`fines −$${b.fines.total.toFixed(2)}`);
-    return `<div class="ct-meta">${CT_PROFILE_ICON[kid]} ${bits.join(' · ') || 'nothing earned'}${xp ? ` · +${xp} XP` : ''}${due ? ` · loan −$${due.toFixed(2)}` : ''}</div>`;
+    return `<div class="ct-meta">${CT_PROFILE_ICON[kid]} ${bits.join(' · ') || 'nothing earned'}${xp ? ` · +${xp} XP` : ''}${due ? ` · ${dueLabel} −$${due.toFixed(2)}` : ''}</div>`;
   }).join('') : '';
   const explain = newModel
-    ? `This <b>confirms</b> the week. Recording credits each kid's total to cash, credits XP, charges any overdue interest, moves the monthly loan payment, adds a month of savings interest, matures due GICs and steps the market.`
+    ? `This <b>confirms</b> the week. Recording credits each kid's total to cash, credits XP, opens the Sunday Box, adds a month of savings interest, matures due GICs and steps the market. The loan payment and any overdue interest move <b>once a month</b>, not every Sunday.`
     : `This <b>confirms</b> the week — it doesn't "pay". Group chore money already fired sticky as chores were done; recording credits each kid's total (max $${CT_MONEY_CAP}) to cash, adds a month of interest, matures due GICs and moves the market one month.`;
   return `<div class="mm-h">Confirm &amp; record</div>
     <div class="ct-meta">${explain}</div>
@@ -298,6 +304,8 @@ function mmConfirmAndRecord() {
     wallet: ensureWallet(kid),
     loan: (typeof loanState === 'function') ? loanState(kid) : null,
     xp: (getProfData(kid).progress || {}).questXP || 0,
+    // The meeting also empties the box, so undo has to put it back.
+    boxItems: (typeof mrBoxItems === 'function') ? mrBoxItems(kid) : null,
   }));
   mmUndo = {
     wk,
@@ -319,6 +327,7 @@ function mmUndoRecord() {
     const pd = getProfData(kid);
     pd.wallet = s.wallet;
     if (s.loan) pd.loan = s.loan;
+    if (s.boxItems) pd.boxItems = s.boxItems;
     if (!pd.progress) pd.progress = {};
     pd.progress.questXP = s.xp;
   });
@@ -394,9 +403,16 @@ function commitFamilyMeeting(wk) {
       // of having been late, rather than escaping it by paying on the day.
       const interest = loanAccrueArrears(kid);
       if (interest > 0) parts.push(`${name} interest −$${interest.toFixed(2)}`);
+      // Both of these are stamped by calendar month inside the loan module —
+      // the meeting is weekly, the schedule is monthly, so most Sundays this
+      // correctly does nothing.
       const t = loanSundayTransfer(kid, 'pay_available');
-      if (t.paid > 0) parts.push(`${name} loan −$${t.paid.toFixed(2)}`);
+      const what = t.kind === 'down' ? 'down payment' : 'loan';
+      if (t.paid > 0) parts.push(`${name} ${what} −$${t.paid.toFixed(2)}`);
       if (t.shortfall > 0) parts.push(`${name} overdue $${t.shortfall.toFixed(2)}`);
+      // The box opens at the meeting, not on a calendar day.
+      const released = mrReleaseBoxForMeeting(kid);
+      if (released > 0) parts.push(`${name} box opened (${released})`);
     }
     const adv = moneyAdvanceMonth(kid);
     adv.matured.forEach(m => parts.push(`${name} GIC +$${m.payout.toFixed(2)}`));

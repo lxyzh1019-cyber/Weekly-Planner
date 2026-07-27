@@ -30,13 +30,44 @@ function loanState(kid) {
   if (!Array.isArray(l.payments)) l.payments = [];
   if (l.arrears == null) l.arrears = 0;        // overdue principal
   if (l.arrearsInterest == null) l.arrearsInterest = 0;  // never itself earns interest
-  if (l.lastTransferWeek == null) l.lastTransferWeek = null;
+  if (l.downPaid == null) l.downPaid = 0;      // how much of the deposit is settled
+  // The schedule is MONTHLY but the meeting is WEEKLY, so both the payment and
+  // the interest are stamped with the calendar month they belong to. Without
+  // this the monthly payment fires again at every Sunday meeting.
+  if (l.lastPaymentMonth == null) l.lastPaymentMonth = null;    // 'YYYY-MM'
+  if (l.lastInterestMonth == null) l.lastInterestMonth = null;  // 'YYYY-MM'
   return l;
 }
 
 function loanPrincipal(kid) { return Number((loanRules().principal || {})[kid]) || 0; }
 function loanMonthly(kid)   { return Number((loanRules().monthly   || {})[kid]) || 0; }
 function loanDownPayment(kid) { return Number((loanRules().downPayment || {})[kid]) || 0; }
+
+/* The calendar month a date belongs to. 'YYYY-MM-DD' slices chronologically. */
+function loanMonthKey(dayKey) { return String(dayKey || todayKey()).slice(0, 7); }
+
+/* How much of the deposit is still owed. */
+function loanDownOutstanding(kid) {
+  return money2(Math.max(0, loanDownPayment(kid) - loanState(kid).downPaid));
+}
+function loanDownIsDue(kid, dayKey) {
+  const due = loanRules().downPaymentDue;
+  return !!due && String(dayKey || todayKey()) >= due && loanDownOutstanding(kid) > 0;
+}
+
+/* What the schedule asks for right now, and which kind of payment it is.
+
+   The deposit comes first: until it is settled there are no monthly payments,
+   which is what "down payment, then ten months" actually means. */
+function loanDueNow(kid, dayKey) {
+  const today = dayKey || todayKey();
+  const dueDate = loanRules().downPaymentDue;
+  if (loanIsCleared(kid)) return { kind: null, amount: 0, reason: 'cleared' };
+  if (!dueDate || today < dueDate) return { kind: null, amount: 0, reason: 'not-started' };
+  const down = loanDownOutstanding(kid);
+  if (down > 0) return { kind: 'down', amount: down, reason: 'down-payment' };
+  return { kind: 'scheduled', amount: loanMonthly(kid), reason: 'monthly' };
+}
 
 /* What's still owed: principal not yet cleared, plus any interest charged. */
 function loanBalance(kid) {
@@ -48,6 +79,9 @@ function loanIsCleared(kid) { return loanBalance(kid) <= 0; }
 /* Record a payment.
 
    kind 'scheduled' — the monthly minimum. Clears exactly what's paid.
+   kind 'down'      — the deposit. Clears exactly what's paid, and also counts
+                      against the deposit so the schedule can move on to the
+                      monthly payments.
    kind 'early'     — anything above the minimum. Earns the bonus, so $100 paid
                       clears $110 of principal.
 
@@ -71,6 +105,11 @@ function loanRecordPayment(kid, amount, kind) {
   const applied = Math.min(credited, owed);        // never overpay the loan
   l.paid = money2(l.paid + applied);
   if (l.arrears > 0) l.arrears = money2(Math.max(0, l.arrears - applied));
+  // The deposit is tracked on its own so the schedule knows when the monthly
+  // payments start — settled against what actually landed on principal.
+  if (kind === 'down') {
+    l.downPaid = money2(Math.min(loanDownPayment(kid), l.downPaid + applied));
+  }
 
   const rec = { id: mrNewId('lp-'), at: Date.now(), amount: money2(amount), kind: kind || 'scheduled',
                 bonusPct, credited: applied, toInterest: money2(toInterest) };
@@ -79,11 +118,43 @@ function loanRecordPayment(kid, amount, kind) {
   return rec;
 }
 
+/* Pay the deposit — hers to make early, in whatever pieces she can manage.
+   Anything paid here counts against the deposit rather than earning the
+   early-payment bonus: the deposit is the schedule, not ahead of it. */
+async function loanPayDownPaymentPrompt(kid) {
+  const w = ensureWallet(kid);
+  const owing = loanDownOutstanding(kid);
+  if (!(owing > 0)) { showToast('Down payment is already settled ✅'); return; }
+  const v = await showPrompt(
+    `Down payment 🎿\n$${owing.toFixed(2)} still to pay of the $${loanDownPayment(kid).toFixed(2)} deposit.\nHow much? (you have $${w.cash.toFixed(2)})`,
+    { value: '', type: 'number' });
+  if (v == null || v === '') return;
+  const amt = money2(Math.min(parseFloat(v) || 0, w.cash, owing));
+  if (!(amt > 0)) { showToast('Enter an amount like 20'); return; }
+  w.cash = money2(w.cash - amt);
+  loanRecordPayment(kid, amt, 'down');
+  const left = loanDownOutstanding(kid);
+  showToast(left > 0
+    ? `🎿 Paid $${amt.toFixed(2)} — $${left.toFixed(2)} of the deposit to go`
+    : `🎿 Deposit settled — monthly payments start now`);
+  if (typeof renderPocketScreen === 'function') renderPocketScreen();
+}
+
 /* One month of simple interest on the overdue principal. Charged against a
-   separate bucket so it never compounds. */
-function loanAccrueArrears(kid) {
+   separate bucket so it never compounds.
+
+   Stamped with the calendar month: the family meeting runs every Sunday, and
+   charging "one month" of interest at each of them would be four to five
+   months of interest a month. The month is stamped even when nothing is
+   overdue, so arrears raised later in the same month aren't charged interest
+   for a month that had already begun. */
+function loanAccrueArrears(kid, opts) {
+  const o = opts || {};
   const l = loanState(kid);
-  if (!(l.arrears > 0)) return 0;
+  const mk = loanMonthKey(o.dayKey);
+  if (l.lastInterestMonth === mk && !o.force) return 0;
+  l.lastInterestMonth = mk;
+  if (!(l.arrears > 0)) { saveAll(); return 0; }
   const rate = (Number(loanRules().arrearsRatePct) || 0) / 100;
   const interest = money2(l.arrears * rate);
   l.arrearsInterest = money2(l.arrearsInterest + interest);
@@ -99,18 +170,34 @@ function loanAccrueArrears(kid) {
      cover_from_savings top up from savings so nothing goes overdue, giving up
                         whatever that money was earning
 
+   The schedule is monthly and the meeting is weekly, so the month is stamped
+   once a payment is settled either way — paid, part-paid or deferred all use
+   up that month's turn. Otherwise every Sunday would charge the month again.
+
    Returns a description of what happened for the meeting recap. */
-function loanSundayTransfer(kid, choice) {
+function loanSundayTransfer(kid, choice, opts) {
+  const o = opts || {};
   const l = loanState(kid);
-  const due = loanMonthly(kid);
-  if (loanIsCleared(kid)) return { status: 'cleared', paid: 0, shortfall: 0 };
+  const today = o.dayKey || todayKey();
+  const mk = loanMonthKey(today);
+  const duty = loanDueNow(kid, today);
+
+  if (duty.reason === 'cleared') return { status: 'cleared', paid: 0, shortfall: 0 };
+  if (duty.reason === 'not-started') return { status: 'not-started', paid: 0, shortfall: 0 };
+  if (l.lastPaymentMonth === mk && !o.force) {
+    return { status: 'already-this-month', paid: 0, shortfall: 0, kind: duty.kind };
+  }
+  const due = money2(duty.amount);
+  const kind = duty.kind;
   if (!(due > 0)) return { status: 'nothing-due', paid: 0, shortfall: 0 };
 
+  const settle = (res) => { l.lastPaymentMonth = mk; saveAll(); return Object.assign({ kind }, res); };
   const w = ensureWallet(kid);
+
   if (w.cash >= due) {
     w.cash = money2(w.cash - due);
-    loanRecordPayment(kid, due, 'scheduled');
-    return { status: 'paid', paid: due, shortfall: 0 };
+    loanRecordPayment(kid, due, kind);
+    return settle({ status: 'paid', paid: due, shortfall: 0 });
   }
 
   const available = money2(w.cash);
@@ -124,28 +211,33 @@ function loanSundayTransfer(kid, choice) {
       w.savings = money2(w.savings - fromSavings);
       w.cash = money2(w.cash + fromSavings);
       w.cash = money2(w.cash - due);
-      loanRecordPayment(kid, due, 'scheduled');
-      return { status: 'covered-from-savings', paid: due, shortfall: 0, fromSavings };
+      loanRecordPayment(kid, due, kind);
+      return settle({ status: 'covered-from-savings', paid: due, shortfall: 0, fromSavings });
     }
   }
 
   if (choice === 'pay_nothing') {
     l.arrears = money2(l.arrears + due);
-    saveAll();
-    return { status: 'deferred', paid: 0, shortfall: due };
+    return settle({ status: 'deferred', paid: 0, shortfall: due });
   }
 
   // pay_available (also the fallback)
   w.cash = money2(w.cash - available);
-  if (available > 0) loanRecordPayment(kid, available, 'scheduled');
+  if (available > 0) loanRecordPayment(kid, available, kind);
   const shortfall = money2(due - available);
   l.arrears = money2(l.arrears + shortfall);
-  saveAll();
-  return { status: 'partial', paid: available, shortfall };
+  return settle({ status: 'partial', paid: available, shortfall });
 }
 
-/* Pay extra, any amount — this is the one that earns the 10%. */
+/* Pay extra, any amount — this is the one that earns the 10%.
+
+   This is also the "loan-surplus choice" the honesty ladder withdraws at step
+   3, so a strike on record this week closes it. */
 async function loanPayExtraPrompt(kid) {
+  if (typeof mrLosesChoices === 'function' && mrLosesChoices(kid)) {
+    showToast('Loan choices are paused this week ⚖️ — decided together on Sunday');
+    return;
+  }
   const w = ensureWallet(kid);
   const bonus = Number(loanRules().earlyPaymentBonusPct) || 0;
   const v = await showPrompt(
