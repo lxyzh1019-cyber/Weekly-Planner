@@ -343,7 +343,12 @@ function ctCelebrateGroupPayouts(fired, hostId) {
   if (!fired || !fired.length) return;
   const total = fired.reduce((s,g)=>s + (Number(g.valueDollars)||0), 0);
   const label = fired.length === 1 ? `${fired[0].icon || ''} ${fired[0].name}`.trim() : `${fired.length} groups`;
-  showToast(`💰 ${label} complete! +$${total.toFixed(2)}`);
+  // Under the rulebook model routines are tracked but pay nothing, so the
+  // group value must not be announced as money — ctWeekMoney ignores it, and
+  // promising a kid $2 she never receives is worse than saying nothing.
+  showToast(mrUsesNewModel(ctWeekKey)
+    ? `✅ ${label} complete!`
+    : `💰 ${label} complete! +$${total.toFixed(2)}`);
   if (typeof spawnQuestSparkles === 'function') spawnQuestSparkles(hostId || 'screen-chore');
 }
 function ctSetCurrentWeekFromPlanner() {
