@@ -46,66 +46,82 @@ function setDayBlocks(key, blocks, p=activeProfile()) {
   getProfData(p).weeks[key] = blocks;
   saveAll();
 }
-/* Compact "what is this block actually about" summary — the main categories a
-   block carries (objectives, gear, routine checklist, chores, note) boiled down
-   to one short line each. Shared by the print sheet, the weekly cards and any
-   other view too small to show the real lists: each row names the first item and
-   counts the rest ("🎯 Backward crossovers +2"), so a glance still tells you the
-   session's target and whether the bag is packed.
-   Returns { rows: [{icon, text, full}], counts: '🎯3 · 🎒3/4 · 📝' }. */
-function blockSummaryRows(b, act) {
-  const rows = [];
-  const countBits = [];
-  const first = (list) => {
-    const n = list.length;
-    return n > 1 ? `${list[0]} +${n - 1}` : list[0];
-  };
+/* What this block is actually about, as a flat ordered list of individual
+   items — one line each, not folded into "+N" — so a view with room to spare
+   (a tall print/week block) can just list as much of it as fits. Priority
+   order: gear first (packing is the "get ready" checklist and effectively
+   mandatory for a training block), then objectives/goals, then chores, then
+   the routine checklist tally and note. A view with only a little room slices
+   this list down to what it can hold (sliceDetailLines) or, with almost none,
+   folds it to a one-line count (blockCountsSummary) instead.
+   Returns [{icon, text, group}]. */
+function blockDetailLines(b, act) {
+  const lines = [];
 
-  const objectives = Array.isArray(b.objectives) ? b.objectives.filter(Boolean) : [];
-  if (objectives.length) {
-    rows.push({ icon: '🎯', text: first(objectives), full: objectives.join(', ') });
-    countBits.push(`🎯${objectives.length}`);
-  }
-
-  // Gear only exists for training/competition blocks, and what matters at a
-  // glance is how much of it is already packed.
+  // Gear only exists for training/competition blocks — shown first and, space
+  // permitting, in full, since packing is the mandatory "get ready" list.
   const gear = (typeof getTrainingGearPresets === 'function' && act && act.isTraining && b.tag)
     ? getTrainingGearPresets(b.tag, blockIsCompetition(b))
     : [];
   if (gear.length) {
     const prefix = blockIsCompetition(b) ? `gearC-${b.tag}` : `gear-${b.tag}`;
     const gs = b.gearState || {};
-    const packed = gear.filter((_, i) => gs[`${prefix}-${i}`]).length;
-    rows.push({
-      icon: '🎒',
-      text: `${first(gear)} (${packed}/${gear.length})`,
-      full: `${gear.join(', ')} — ${packed}/${gear.length} packed`,
+    gear.forEach((label, i) => {
+      const packed = !!gs[`${prefix}-${i}`];
+      lines.push({ icon: packed ? '✅' : '⬜', text: label, group: 'gear' });
     });
-    countBits.push(`🎒${packed}/${gear.length}`);
   }
+
+  (Array.isArray(b.objectives) ? b.objectives.filter(Boolean) : []).forEach(o => {
+    lines.push({ icon: '🎯', text: o, group: 'objective' });
+  });
+
+  (Array.isArray(b.choreTags) ? b.choreTags.filter(Boolean) : []).forEach(c => {
+    lines.push({ icon: '🧹', text: c, group: 'chore' });
+  });
 
   if (act && act.isRoutine) {
     const total = countChecklistTotal(b, act);
     if (total > 0) {
       const done = countChecklistDone(b, act);
-      rows.push({ icon: '✓', text: `${done}/${total} done`, full: `Checklist ${done}/${total} done` });
-      countBits.push(`✓${done}/${total}`);
+      lines.push({ icon: '✓', text: `${done}/${total} done`, group: 'checklist' });
     }
   }
 
-  const chores = Array.isArray(b.choreTags) ? b.choreTags.filter(Boolean) : [];
-  if (chores.length) {
-    rows.push({ icon: '🧹', text: first(chores), full: chores.join(', ') });
-    countBits.push(`🧹${chores.length}`);
-  }
-
   const note = (b.note && String(b.note).trim()) || '';
-  if (note) {
-    rows.push({ icon: '📝', text: note, full: note });
-    countBits.push('📝');
-  }
+  if (note) lines.push({ icon: '📝', text: note, group: 'note' });
 
-  return { rows, counts: countBits.join(' · ') };
+  return lines;
+}
+
+/* Slice a detail-line list down to what maxRows can hold, appending a
+   "+N more" tail line instead of silently dropping the overflow when it
+   doesn't all fit. maxRows <= 0 returns nothing (caller should fall back to
+   blockCountsSummary instead). */
+function sliceDetailLines(lines, maxRows) {
+  if (maxRows <= 0 || !lines.length) return [];
+  if (lines.length <= maxRows) return lines;
+  // With only one row to spare, a "+N more" tail would show zero real content
+  // (all budget spent on the tail itself) — show the one real item instead
+  // and drop the count rather than reserve a slot for it.
+  if (maxRows === 1) return [lines[0]];
+  const shown = lines.slice(0, maxRows - 1);
+  const hidden = lines.length - shown.length;
+  return [...shown, { icon: '➕', text: `${hidden} more`, group: 'more' }];
+}
+
+/* One-line fold of a detail-line list for a block too short to list anything
+   individually — e.g. "🎒4 · 🎯3 · 📝" — same idea as the old blockSummaryRows
+   counts string. */
+function blockCountsSummary(lines) {
+  const counts = {};
+  lines.forEach(l => { counts[l.group] = (counts[l.group] || 0) + 1; });
+  const order = [
+    ['gear', '🎒'], ['objective', '🎯'], ['chore', '🧹'], ['checklist', '✓'], ['note', '📝'],
+  ];
+  return order.filter(([g]) => counts[g])
+    .map(([g, icon]) => g === 'note' ? icon : `${icon}${counts[g]}`)
+    .join(' · ');
 }
 
 function getCustomActivities(p=activeProfile()) { return getProfData(p).customActivities || []; }

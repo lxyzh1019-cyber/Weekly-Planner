@@ -893,11 +893,26 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   const doneHtml = !isBuffer
     ? `<button type="button" class="block-done-btn${b.completed?' done':''}" aria-label="${b.completed?'Mark not done':'Mark done'}" onclick="event.stopPropagation(); toggleBlockDone(currentDayKey,'${b.id}',event)">${b.completed?'✓':''}</button>`
     : '';
+  // List as many objectives/goals as the block's own height can hold — same
+  // "show what this block is about" idea as print/week, and the day view has
+  // the most room, so a Piano block gets its whole goal list, not just the
+  // 🎯 badge. Gear already gets its own tappable checklist below, so it isn't
+  // duplicated here.
+  const objList = (!isBuffer && Array.isArray(b.objectives)) ? b.objectives.filter(Boolean) : [];
+  let objHtml = '';
+  if (!isCompact && objList.length) {
+    const maxObjRows = Math.max(0, Math.floor((height - 62) / 17));
+    if (maxObjRows > 0) {
+      const shown = sliceDetailLines(objList.map(o => ({ icon: '🎯', text: o })), maxObjRows);
+      objHtml = `<div class="block-objectives">${shown.map(r => `<div class="block-objective-row">${r.icon} ${escapeHtml(r.text)}</div>`).join('')}</div>`;
+    }
+  }
 
   blockEl.innerHTML = `
     ${doneHtml}
     ${nameHtml}
     ${metaHtml}
+    ${objHtml}
     ${!isBuffer && b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="block-stopwatch-btn" onclick="event.stopPropagation(); startBlockStopwatch('${b.id}')">⏱ Start stopwatch</button>` : ''}
     ${noteHtml}
   `;

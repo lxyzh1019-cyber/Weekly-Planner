@@ -2507,6 +2507,24 @@
     word-break: break-word;
     white-space: normal;
   }
+  /* Goal/objective list on a block, sized to fit however many lines the
+     block's own height allows — plain text (not tappable, unlike the gear
+     checklist just below), one goal per line. */
+  .placed-block .block-objectives {
+    margin-top: 2px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .placed-block .block-objective-row {
+    font-size: 0.74rem;
+    font-weight: 700;
+    line-height: 1.2;
+    opacity: 0.95;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   /* Tappable get-ready gear checklist on a training block. */
   .placed-block .block-gear-list {
     margin-top: 3px;
@@ -3438,6 +3456,11 @@
        padding so the grid gets the full landscape height (keeps the
        whole week on one A4 page). */
     #screen-print { padding: 0 !important; }
+    /* .screen carries `min-height: 100vh` for the on-screen layout. In print,
+       100vh resolves to a full page — taller than the sheet's actual content —
+       so the box itself overflows onto a second, otherwise-empty page. Drop it
+       so the printed box is exactly as tall as its content. */
+    #screen-print { min-height: 0 !important; }
     @page { size: A4 landscape; margin: 0.3in; }
     /* Planning grid is the whole print — keep it on a single page. */
     .print-sheet { break-inside: avoid; }

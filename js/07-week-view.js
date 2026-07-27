@@ -1014,18 +1014,25 @@ function renderFullWeek(keys) {
       // Corner flag stays visible on every card size (the inline badge is hidden
       // when a card is too slim for its name), so a clash never hides off-screen.
       const conflictFlag = hasConflict ? `<div class="wf-card-conflict-flag" title="Time clash — not enough travel/get-ready time">!</div>` : '';
-      // Main-category summary (objectives, gear, note…) — only on cards tall
-      // enough to hold it; shorter ones fold it into a compact counts string
-      // tacked onto the duration line instead.
-      const summary = blockSummaryRows(b, act);
+      // List as much of "what this block is about" (gear/objectives/note) as
+      // the card's own height can hold — gear first since packing is
+      // effectively mandatory for a training block, then as many objectives as
+      // fit — degrading to a one-line count on cards too short for a list.
+      const detailLines = blockDetailLines(b, act);
       let sumHtml = '';
-      if (cls.includes('wf-card--tall') && summary.rows.length) {
-        const maxRows = pxHeight >= 98 ? 3 : pxHeight >= 78 ? 2 : 1;
-        sumHtml = summary.rows.slice(0, maxRows)
-          .map(r => `<div class="wf-card-sum" title="${escapeHtml(r.full)}">${r.icon} ${escapeHtml(r.text)}</div>`)
+      if (cls.includes('wf-card--tall') && detailLines.length) {
+        // Matches the old fixed 1/2/3-row tiers at 60/78/98px, then keeps
+        // scaling continuously so a tall card (a long training session) gets
+        // room for its whole gear + objective list instead of a hard cap.
+        const maxRows = Math.max(0, Math.floor((pxHeight - 58) / 20) + 1);
+        sumHtml = sliceDetailLines(detailLines, maxRows)
+          .map(r => `<div class="wf-card-sum" title="${escapeHtml(r.text)}">${r.icon} ${escapeHtml(r.text)}</div>`)
           .join('');
       }
-      const durHtml = `${formatDuration(b.durationMin)}${(!sumHtml && summary.counts) ? ' · ' + summary.counts : ''}`;
+      const durHtml = `${formatDuration(b.durationMin)}${(!sumHtml && detailLines.length) ? ' · ' + blockCountsSummary(detailLines) : ''}`;
+      // Done-tick sized to the card's own height, same idea as the print
+      // checkboxes, so a slim card doesn't carry an oversized tap target.
+      const checkPx = Math.max(14, Math.min(24, Math.round(10 + pxHeight / 4)));
       card.innerHTML = `
         ${conflictFlag}
         <div class="wf-card-time">${timeStr}</div>
@@ -1033,7 +1040,7 @@ function renderFullWeek(keys) {
         <div class="wf-card-name">${stampEmoji}${dispName}${travelTag}${conflictTag}</div>
         ${sumHtml}
         <div class="wf-card-dur">${durHtml}</div>
-        <button type="button" class="wf-card-check" aria-label="${b.completed?'Mark not done':'Mark done'}"
+        <button type="button" class="wf-card-check" style="width:${checkPx}px;height:${checkPx}px;font-size:${Math.round(checkPx*0.58)}px" aria-label="${b.completed?'Mark not done':'Mark done'}"
           onclick="toggleBlockDone('${key}','${b.id}',event)">${b.completed?'✓':''}</button>
       `;
       card.title = `${dispIcon} ${dispName} — ${timeStr}, ${formatDuration(b.durationMin)}`

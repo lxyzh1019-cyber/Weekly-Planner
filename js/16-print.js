@@ -90,6 +90,25 @@ function printBlockFontPt(heightPx) {
   return 6.5;                        // ~15m sliver
 }
 
+// How many detail lines (gear/objective/etc.) fit under the title in a block
+// of this height, given the title's own font size — continuous, so a big
+// competition block naturally gets room for its whole gear + objective list
+// instead of a fixed 1/2/3-row cap regardless of how tall the block actually is.
+function printDetailCapacity(heightPx, titleFpt) {
+  const pxPerPt = 1.333;
+  const titleLinePx = titleFpt * pxPerPt * 1.15 + 2;
+  const rowFpt = titleFpt * 0.78;
+  const rowLinePx = rowFpt * pxPerPt * 1.15 + 1;
+  return Math.max(0, Math.floor((heightPx - titleLinePx - 2) / rowLinePx));
+}
+
+// Tick-box side length scaled to the block/strip's own height, so a 15-min
+// sliver gets a small box and an hours-long block gets a comfortably tappable
+// one, instead of one fixed size for every time slot.
+function printCheckboxPx(heightPx, { min = 6, max = 12, base = 5, divisor = 20 } = {}) {
+  return Math.max(min, Math.min(max, Math.round(base + heightPx / divisor)));
+}
+
 function renderPrintSheet() {
   const keys = getDayKeys(weekOffset);
   const mon = formatDayKey(keys[0]);
@@ -181,7 +200,8 @@ function renderPrintSheet() {
           const label = bh >= 6 ? bufferSegLabels(seg, tier) : '';
           const kindLabel = seg.kind==='travel' ? 'Travel' : seg.kind==='warmup' ? 'Warm-up' : 'Get ready';
           const kindCls = seg.kind === 'ready' ? ' print-buffer--ready' : seg.kind === 'warmup' ? ' print-buffer--warmup' : ' print-buffer--travel';
-          const checkbox = bh >= 9 ? `<span class="print-check" style="border-color:${printTextColor(bg)}"></span>` : '';
+          const bufCheckPx = printCheckboxPx(bh, { min: 5, max: 9, base: 4, divisor: 8 });
+          const checkbox = bh >= 9 ? `<span class="print-check" style="border-color:${printTextColor(bg)};width:${bufCheckPx}px;height:${bufCheckPx}px"></span>` : '';
           blockHtml += `<div class="print-buffer${kindCls}" style="height:${bh}px;--print-buf-colour:${bg}" title="${kindLabel} — ${seg.min} min">${checkbox}${label}</div>`;
         });
         // Clip each block to the window so blocks that start earlier/run later
@@ -199,23 +219,30 @@ function renderPrintSheet() {
           ? (act.isCompetition ? (topic.id === 'general' ? 'Competition 🏆' : topic.name + ' 🏆') : topic.name)
           : act.name;
         const hasConflict = printConflicts[k] && printConflicts[k].has(b.id);
-        // Empty tick box so it can be checked off on the printed page.
-        const checkbox = bh >= 15 ? `<span class="print-check" style="border-color:${printTextColor(bg)}"></span>` : '';
-        // Main-category summary (objective/gear/note) so the printed page
-        // carries the same "what's this block about" info as the app —
-        // degrading to icon+name only on slivers too short to hold more.
-        const summary = blockSummaryRows(b, act);
+        const titleFpt = printBlockFontPt(bh);
+        // Empty tick box so it can be checked off on the printed page — sized
+        // to the block's own height so a 15-min sliver and an hours-long
+        // session don't share one fixed box size.
+        const checkPx = printCheckboxPx(bh);
+        const checkbox = bh >= 15 ? `<span class="print-check" style="border-color:${printTextColor(bg)};width:${checkPx}px;height:${checkPx}px"></span>` : '';
+        // List as much of "what this block is about" (gear/objectives/note)
+        // as the block's own height can hold — gear first since packing is
+        // effectively mandatory for a training block — degrading to a one-line
+        // count, then to icon+name only, on slivers too short for more.
+        const detailLines = blockDetailLines(b, act);
         let sumHtml = '';
-        if (bh >= 34 && summary.rows.length) {
-          const maxRows = bh >= 62 ? 3 : bh >= 48 ? 2 : 1;
-          sumHtml = summary.rows.slice(0, maxRows)
-            .map(r => `<div class="print-block-sum">${r.icon} ${escapeHtml(r.text)}</div>`)
-            .join('');
-        } else if (bh >= 26 && summary.counts) {
-          sumHtml = `<div class="print-block-sum">${summary.counts}</div>`;
+        if (detailLines.length) {
+          const maxRows = printDetailCapacity(bh, titleFpt);
+          if (maxRows > 0) {
+            sumHtml = sliceDetailLines(detailLines, maxRows)
+              .map(r => `<div class="print-block-sum">${r.icon} ${escapeHtml(r.text)}</div>`)
+              .join('');
+          } else if (bh >= 26) {
+            sumHtml = `<div class="print-block-sum">${blockCountsSummary(detailLines)}</div>`;
+          }
         }
         const titleCls = sumHtml ? '' : ' print-block--titleonly';
-        blockHtml += `<div class="print-block${titleCls}${hasConflict ? ' print-block--conflict' : ''}" style="background:${bg};color:${printTextColor(bg)};font-size:${printBlockFontPt(bh)}pt;height:${bh}px">${checkbox}<div class="print-block-title">${hasConflict ? '⚠️ ' : ''}${pIcon} ${escapeHtml(pName)}</div>${sumHtml}</div>`;
+        blockHtml += `<div class="print-block${titleCls}${hasConflict ? ' print-block--conflict' : ''}" style="background:${bg};color:${printTextColor(bg)};font-size:${titleFpt}pt;height:${bh}px">${checkbox}<div class="print-block-title">${hasConflict ? '⚠️ ' : ''}${pIcon} ${escapeHtml(pName)}</div>${sumHtml}</div>`;
       });
       html += `<div class="print-cell${isHourStart?' print-hour-start':''}">${blockHtml}</div>`;
     });
