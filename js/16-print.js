@@ -159,8 +159,16 @@ function renderPrintSheet() {
       const bks = getDayBlocks(k);
       let blockHtml = '';
       bks.forEach(b=>{
+        const act = acts.find(a=>a.id===b.actId);
+        if (!act) return;
+        const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
+        // Computed once so the buffer strips can be tinted to match, the same
+        // way the week view's strips hug their own activity's colour.
+        const bg = topic ? trainingBlockColour(b) : (b.colour || CAT_HEX[act.cat] || '#888');
+
         // Travel / get-ready buffer strips around the block, so the printed
-        // sheet shows "leave at 5:00" for a 5:30 training just like the app.
+        // sheet shows "leave at 5:00" for a 5:30 training just like the app —
+        // each with its own tick box and a real deadline, not just "🚗15m".
         wfBufferSegments(b).forEach(seg=>{
           const absStart = seg.startRel + START_MIN;
           const segStart = Math.max(absStart, winStartMin);
@@ -169,9 +177,12 @@ function renderPrintSheet() {
           if (Math.round((segStart - winStartMin)/15) !== s) return;
           const slotSpan = Math.max(1, Math.round((segEnd - segStart)/15));
           const bh = slotSpan*slotPx - 1;
-          const label = bh >= 9 ? `${seg.icon} ${seg.min}m` : '';
+          const tier = bh >= 12 ? 'long' : bh >= 9 ? 'short' : 'tiny';
+          const label = bh >= 6 ? bufferSegLabels(seg, tier) : '';
           const kindLabel = seg.kind==='travel' ? 'Travel' : seg.kind==='warmup' ? 'Warm-up' : 'Get ready';
-          blockHtml += `<div class="print-buffer" style="height:${bh}px" title="${kindLabel} — ${seg.min} min">${label}</div>`;
+          const kindCls = seg.kind === 'ready' ? ' print-buffer--ready' : seg.kind === 'warmup' ? ' print-buffer--warmup' : ' print-buffer--travel';
+          const checkbox = bh >= 9 ? `<span class="print-check" style="border-color:${printTextColor(bg)}"></span>` : '';
+          blockHtml += `<div class="print-buffer${kindCls}" style="height:${bh}px;--print-buf-colour:${bg}" title="${kindLabel} — ${seg.min} min">${checkbox}${label}</div>`;
         });
         // Clip each block to the window so blocks that start earlier/run later
         // still render (trimmed) instead of vanishing.
@@ -181,12 +192,8 @@ function renderPrintSheet() {
         if (segEnd <= segStart) return;
         const startSlot = Math.round((segStart - winStartMin)/15);
         if (startSlot!==s) return;
-        const act = acts.find(a=>a.id===b.actId);
-        if (!act) return;
         const slotSpan = Math.max(1, Math.round((segEnd - segStart)/15));
         const bh = slotSpan*slotPx - 1;
-        const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
-        const bg = topic ? trainingBlockColour(b) : (b.colour || CAT_HEX[act.cat] || '#888');
         const pIcon = topic ? topic.icon : act.icon;
         const pName = topic
           ? (act.isCompetition ? (topic.id === 'general' ? 'Competition 🏆' : topic.name + ' 🏆') : topic.name)
@@ -194,7 +201,21 @@ function renderPrintSheet() {
         const hasConflict = printConflicts[k] && printConflicts[k].has(b.id);
         // Empty tick box so it can be checked off on the printed page.
         const checkbox = bh >= 15 ? `<span class="print-check" style="border-color:${printTextColor(bg)}"></span>` : '';
-        blockHtml += `<div class="print-block${hasConflict ? ' print-block--conflict' : ''}" style="background:${bg};color:${printTextColor(bg)};font-size:${printBlockFontPt(bh)}pt;height:${bh}px">${checkbox}${hasConflict ? '⚠️ ' : ''}${pIcon} ${pName}</div>`;
+        // Main-category summary (objective/gear/note) so the printed page
+        // carries the same "what's this block about" info as the app —
+        // degrading to icon+name only on slivers too short to hold more.
+        const summary = blockSummaryRows(b, act);
+        let sumHtml = '';
+        if (bh >= 34 && summary.rows.length) {
+          const maxRows = bh >= 62 ? 3 : bh >= 48 ? 2 : 1;
+          sumHtml = summary.rows.slice(0, maxRows)
+            .map(r => `<div class="print-block-sum">${r.icon} ${escapeHtml(r.text)}</div>`)
+            .join('');
+        } else if (bh >= 26 && summary.counts) {
+          sumHtml = `<div class="print-block-sum">${summary.counts}</div>`;
+        }
+        const titleCls = sumHtml ? '' : ' print-block--titleonly';
+        blockHtml += `<div class="print-block${titleCls}${hasConflict ? ' print-block--conflict' : ''}" style="background:${bg};color:${printTextColor(bg)};font-size:${printBlockFontPt(bh)}pt;height:${bh}px">${checkbox}<div class="print-block-title">${hasConflict ? '⚠️ ' : ''}${pIcon} ${escapeHtml(pName)}</div>${sumHtml}</div>`;
       });
       html += `<div class="print-cell${isHourStart?' print-hour-start':''}">${blockHtml}</div>`;
     });

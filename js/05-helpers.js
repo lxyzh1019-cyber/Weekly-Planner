@@ -46,6 +46,68 @@ function setDayBlocks(key, blocks, p=activeProfile()) {
   getProfData(p).weeks[key] = blocks;
   saveAll();
 }
+/* Compact "what is this block actually about" summary — the main categories a
+   block carries (objectives, gear, routine checklist, chores, note) boiled down
+   to one short line each. Shared by the print sheet, the weekly cards and any
+   other view too small to show the real lists: each row names the first item and
+   counts the rest ("🎯 Backward crossovers +2"), so a glance still tells you the
+   session's target and whether the bag is packed.
+   Returns { rows: [{icon, text, full}], counts: '🎯3 · 🎒3/4 · 📝' }. */
+function blockSummaryRows(b, act) {
+  const rows = [];
+  const countBits = [];
+  const first = (list) => {
+    const n = list.length;
+    return n > 1 ? `${list[0]} +${n - 1}` : list[0];
+  };
+
+  const objectives = Array.isArray(b.objectives) ? b.objectives.filter(Boolean) : [];
+  if (objectives.length) {
+    rows.push({ icon: '🎯', text: first(objectives), full: objectives.join(', ') });
+    countBits.push(`🎯${objectives.length}`);
+  }
+
+  // Gear only exists for training/competition blocks, and what matters at a
+  // glance is how much of it is already packed.
+  const gear = (typeof getTrainingGearPresets === 'function' && act && act.isTraining && b.tag)
+    ? getTrainingGearPresets(b.tag, blockIsCompetition(b))
+    : [];
+  if (gear.length) {
+    const prefix = blockIsCompetition(b) ? `gearC-${b.tag}` : `gear-${b.tag}`;
+    const gs = b.gearState || {};
+    const packed = gear.filter((_, i) => gs[`${prefix}-${i}`]).length;
+    rows.push({
+      icon: '🎒',
+      text: `${first(gear)} (${packed}/${gear.length})`,
+      full: `${gear.join(', ')} — ${packed}/${gear.length} packed`,
+    });
+    countBits.push(`🎒${packed}/${gear.length}`);
+  }
+
+  if (act && act.isRoutine) {
+    const total = countChecklistTotal(b, act);
+    if (total > 0) {
+      const done = countChecklistDone(b, act);
+      rows.push({ icon: '✓', text: `${done}/${total} done`, full: `Checklist ${done}/${total} done` });
+      countBits.push(`✓${done}/${total}`);
+    }
+  }
+
+  const chores = Array.isArray(b.choreTags) ? b.choreTags.filter(Boolean) : [];
+  if (chores.length) {
+    rows.push({ icon: '🧹', text: first(chores), full: chores.join(', ') });
+    countBits.push(`🧹${chores.length}`);
+  }
+
+  const note = (b.note && String(b.note).trim()) || '';
+  if (note) {
+    rows.push({ icon: '📝', text: note, full: note });
+    countBits.push('📝');
+  }
+
+  return { rows, counts: countBits.join(' · ') };
+}
+
 function getCustomActivities(p=activeProfile()) { return getProfData(p).customActivities || []; }
 function getSharedActivities() { return (state.shared && state.shared.sharedActivities) || []; }
 

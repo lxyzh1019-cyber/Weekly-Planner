@@ -489,7 +489,7 @@ function buildTimeline() {
   // A block's travel/get-ready buffer can overlap an adjacent activity — flag
   // both the buffer strip and the activity it collides with.
   const bufferConflicts = computeBufferConflicts(blocks);
-  renderBlocksWithCollision(canvas, visibleBlocks, zMinStart, bufferConflicts.affected);
+  const colAssignments = renderBlocksWithCollision(canvas, visibleBlocks, zMinStart, bufferConflicts.affected);
 
   if (!blocks.length) {
     const emptyState = document.createElement('div');
@@ -501,10 +501,13 @@ function buildTimeline() {
     canvas.appendChild(emptyState);
   }
 
-  // Travel buffers (rendered underneath, not counted for collision)
+  // Travel buffers (rendered underneath, not counted for collision). Each
+  // buffer strip inherits its own activity's column/width, so it hugs the
+  // card it belongs to instead of sprawling across a neighbouring column.
   blocks.forEach(b => {
     if (!b.travelBuffer && !b.getReadyBuffer && !b.warmupBuffer) return;
-    renderTravelBuffers(canvas, b, zMinStart, zMinEnd, bufferConflicts.perBlock.get(b.id));
+    const slot = colAssignments.get(b.id) || { col: 0, count: 1 };
+    renderTravelBuffers(canvas, b, zMinStart, zMinEnd, bufferConflicts.perBlock.get(b.id), slot.col, slot.count || 1);
   });
 
   // Pending invitations from sister — render as dashed-border blocks
@@ -726,9 +729,14 @@ function zoneRangeMin(z) {
 
 /* Greedy column-packing collision: blocks that overlap get assigned to columns.
    conflictAffectedIds (optional Set) flags blocks whose buffer overlaps a
-   neighbour, or that a neighbour's buffer overlaps — surfaced as a badge. */
+   neighbour, or that a neighbour's buffer overlaps — surfaced as a badge.
+   Returns a Map of id -> {col, count} so the buffer pass below can reuse the
+   same column/width as the activity a buffer belongs to, instead of each
+   buffer strip claiming the full lane width and sprawling under a
+   side-by-side neighbour. */
 function renderBlocksWithCollision(canvas, blocks, zMinStart, conflictAffectedIds) {
-  if (!blocks.length) return;
+  const assignments = new Map();
+  if (!blocks.length) return assignments;
 
   // Build overlap groups
   const sorted = blocks.slice().sort((a,b)=> (a.startMin - b.startMin) || (a.durationMin - b.durationMin));
@@ -750,7 +758,6 @@ function renderBlocksWithCollision(canvas, blocks, zMinStart, conflictAffectedId
   groups.forEach(g=>{
     // Within a group, assign each block to the lowest-indexed column that's free
     const cols = []; // each col = {endMin}
-    const assignments = new Map();
     g.blocks.forEach(b=>{
       const bStart = b.startMin;
       const bEnd = b.startMin + b.durationMin;
@@ -761,15 +768,17 @@ function renderBlocksWithCollision(canvas, blocks, zMinStart, conflictAffectedId
       } else {
         cols[colIdx].endMin = bEnd;
       }
-      assignments.set(b.id, colIdx);
+      assignments.set(b.id, { col: colIdx });
     });
     const colCount = cols.length;
 
     g.blocks.forEach(b=>{
-      const colIdx = assignments.get(b.id);
+      const colIdx = assignments.get(b.id).col;
+      assignments.get(b.id).count = colCount;
       renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffectedIds);
     });
   });
+  return assignments;
 }
 
 function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffectedIds) {
@@ -788,8 +797,17 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   const clippedBottom = relEnd > zoneSpan;
   const visStartMin = Math.max(0, relStart);
   const visEndMin   = Math.min(zoneSpan, relEnd);
-  const top = visStartMin * PX_PER_MIN;
   const height = Math.max(22, (visEndMin - visStartMin) * PX_PER_MIN - 2);
+  // A short buffer (e.g. a 5-15 min get-ready) is floored up to the 22px
+  // minimum, taller than its real duration. Anchored from the top that
+  // overshoot bleeds forward — for a pre-side buffer, straight into the next
+  // buffer and then the activity itself. A post-side buffer already grows
+  // into empty time after the block, which is why "after" always looked
+  // right; anchoring pre-side buffers from the BOTTOM instead makes their
+  // overshoot bleed backward into empty time too, matching "after".
+  const top = (b._isBuffer && b._bufferSide === 'pre')
+    ? Math.max(0, visEndMin * PX_PER_MIN - height)
+    : visStartMin * PX_PER_MIN;
 
   const widthPct = 100 / colCount;
   const leftPct  = colIdx * widthPct;
@@ -905,7 +923,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   if (!isBuffer) renderDoodle(canvas, b.id, top, height, leftPct, widthPct);
 }
 
-function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict) {
+function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0, colCount = 1) {
   const travelBuf = getTravelBufMin(b);
   const readyBuf = getGetReadyBufMin(b);
   const warmupBuf = getWarmupBufMin(b);
@@ -947,6 +965,7 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict) {
       _bufferCls: cls || '',
       _bufferLabel: (segConflict ? '⚠️ ' : '') + label,
       _bufferConflict: segConflict,
+      _bufferSide: side,
     };
   }).filter(buf => {
     const bufStart = buf.startMin - START_MIN;
@@ -954,7 +973,11 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict) {
     return bufEnd > zMinStart && bufStart < zMinEnd;
   });
   if (!overlayBlocks.length) return;
-  renderBlocksWithCollision(canvas, overlayBlocks, zMinStart);
+  // A block's own buffers never overlap each other in time (they're stacked
+  // end-to-end), so they don't need their own column-packing pass — each one
+  // just inherits the activity's column/width, so it hugs the card it
+  // belongs to instead of spanning the whole lane under a neighbour.
+  overlayBlocks.forEach(buf => renderBlockPixel(canvas, buf, zMinStart, colIdx, colCount));
 }
 
 function bindDayTimelineCompactOnScroll() {
@@ -1322,7 +1345,7 @@ function addActivityAtMin(absMin) {
     ts = { durationMin: selectedActivity.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, warmupBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15, warmupBufMin:20 };
     openTrainingSheet();
   } else {
-    as_ = { durationMin: selectedActivity.durationMin||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15, choreTags: [] };
+    as_ = { durationMin: selectedActivity.durationMin||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15, choreTags: [], objectives: [] };
     openActivitySheet();
   }
 }
@@ -1395,7 +1418,7 @@ function pickFromSlot(actId) {
     ts = { durationMin: act.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, warmupBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15, warmupBufMin:20 };
     openTrainingSheet();
   } else {
-    as_ = { durationMin: act.durationMin||60, colour: CAT_HEX[act.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15, choreTags: [] };
+    as_ = { durationMin: act.durationMin||60, colour: CAT_HEX[act.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15, choreTags: [], objectives: [] };
     openActivitySheet();
   }
 }
