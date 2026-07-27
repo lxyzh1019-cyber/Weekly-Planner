@@ -291,6 +291,93 @@ function findChromium() {
     return before === 1 && after === 0 && restored === 1;
   });
 
+  // The honesty ladder resets weekly. Counted over a lifetime, a kid who had
+  // three strikes ever was permanently at step 3 and could never earn her
+  // choices back.
+  checks.honestyLadderResetsWeekly = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess';
+    getProfData(kid).honesty = [];
+    const steps = [1, 2, 3].map(() => mrRecordHonesty(kid, 'chores').step);
+    // A strike carrying last week's timestamp must not escalate this week.
+    const lastWeek = Date.now() - 8 * 24 * 60 * 60 * 1000;
+    getProfData(kid).honesty = [
+      { id: 'h1', at: lastWeek, channel: 'chores', step: 1 },
+      { id: 'h2', at: lastWeek, channel: 'chores', step: 2 },
+      { id: 'h3', at: lastWeek, channel: 'chores', step: 3 },
+    ];
+    const freshStep = mrRecordHonesty(kid, 'chores').step;
+    const eff = mrHonestyEffect(kid, ctWeekKey);
+    getProfData(kid).honesty = [];
+    return steps.join(',') === '1,2,3' && freshStep === 1
+        && eff.strikes === 1 && eff.strikesAllTime === 4 && !eff.losesChoices;
+  });
+
+  // The meeting freezes the breakdown, so a later price change cannot restate
+  // what a past week paid.
+  checks.ledgerFreezesTheWeek = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const c = state.shared.chore, wk = ctWeekKey, kid = 'jess';
+    if (c.meetingsHeld) delete c.meetingsHeld[wk];
+    if (c.finalizedWeeks) delete c.finalizedWeeks[wk];
+    if (c.moneyLedger) delete c.moneyLedger[wk];
+    getProfData(kid).honesty = [];
+    mrSetChoreGrade(kid, wk, 0, 'dishes', 3);
+    mrSetChoreGrade(kid, wk, 0, 'mop', 3);
+    mrSetChoreGrade(kid, wk, 0, 'vacuum', 3);
+    mmConfirmAndRecord();
+    const frozen = ((c.moneyLedger || {})[wk] || {})[kid];
+    if (!frozen) return false;
+    const was = frozen.chores;
+    // Regrade after the fact: the ledger must not move.
+    mrSetChoreGrade(kid, wk, 0, 'mop', 1);
+    const still = ((c.moneyLedger || {})[wk] || {})[kid].chores;
+    const hasShape = frozen.net != null && frozen.gross != null && frozen.rulesVersion !== undefined;
+    mmUndoRecord();
+    const goneAfterUndo = !((c.moneyLedger || {})[wk] || {})[kid];
+    return was === still && hasShape && goneAfterUndo;
+  });
+
+  // A competition carries the meet's own name and date, and is priced against
+  // the rules live on that date rather than the day the tab was showing.
+  checks.competitionCarriesNameAndDate = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    const kid = 'jess';
+    getProfData(kid).competitions = [];
+    const saved = mrAddCompetition(kid, {
+      sport: 'swim', name: 'Winter Invitational', dayKey: '2026-07-21', points: 4 });
+    getProfData(kid).competitions = [];
+    return !!saved && saved.name === 'Winter Invitational'
+        && saved.dayKey === '2026-07-21' && saved.awarded > 0;
+  });
+
+  // The gated confirm cannot be accepted until the box is ticked.
+  checks.checkConfirmIsGated = await page.evaluate(async () => {
+    const p = showCheckConfirm('Give it back?', 'The job was done');
+    await new Promise(r => setTimeout(r, 60));
+    const ok = document.getElementById('appDialogOkBtn');
+    const chk = document.getElementById('appDialogCheck');
+    if (!ok || !chk || !ok.disabled) { _appDialogCancel(); await p; return false; }
+    _appDialogOk();                     // must be refused while unticked
+    await new Promise(r => setTimeout(r, 30));
+    const stillOpen = !!document.getElementById('appDialogCheck');
+    chk.checked = true; _appDialogCheckToggle();
+    const enabled = !ok.disabled;
+    _appDialogOk();
+    const result = await p;
+    return stillOpen && enabled && result === true;
+  });
+
+  // School books and homework are never boxed — the exempt list is enforced,
+  // not just declared.
+  checks.boxExemptListIsRead = await page.evaluate(() => {
+    const cfg = mrBoxCfg(mrRules());
+    return Array.isArray(cfg.exempt) && cfg.exempt.length > 0
+        && cfg.releaseDay === 'sunday' && cfg.redemptionJob === true;
+  });
+
   // Hero tiers must outlast a season; six topped out at 500 XP.
   checks.heroTiersReachTen = await page.evaluate(() =>
     HERO_TIERS.length >= 10 && heroTierForLevel(10).name.length > 0);

@@ -133,7 +133,9 @@ function mergeEarnings(localEarn, remoteEarn, localStamps, remoteStamps) {
 
 /* shared.chore mixes three kinds of data: set-only maps that only ever grow
    (goalBonusByWeek, groupPayoutsFired, moneySnapshots, finalizedWeeks,
-   meetingsHeld — a union is correct), an id-keyed array (groups), and per-week
+   moneyLedger, meetingsHeld — a union is correct; a ledger entry is written
+   once when the week is recorded and never edited, so two devices can only
+   ever agree), an id-keyed array (groups), and per-week
    goals that can be *changed* on two devices. Merging the whole thing with
    deepMergeObj let remote win at every leaf, silently dropping a group added on
    the other device or a goal edit that hadn't synced yet. Keep the deep-merge

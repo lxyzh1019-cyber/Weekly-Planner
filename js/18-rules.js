@@ -613,6 +613,9 @@ function mrAddCompetition(kid, entry) {
   if (!isParent()) { showToast('A grown-up records results 🔒'); return null; }
   const e = {
     id: mrNewId('comp-'), dayKey: entry.dayKey || todayKey(), sport: entry.sport,
+    // The meet's own name and date: "3 pts, skate" is not something anyone can
+    // check against a results sheet six months later.
+    name: String(entry.name || '').trim(),
     points: Number(entry.points) || 0, placement: entry.placement || {},
     qualified: !!entry.qualified, provincial: !!entry.provincial,
     danceItems: entry.danceItems || {}, personalBest: !!entry.personalBest,
@@ -696,10 +699,19 @@ function mrBoxItem(kid, label, weekKey) {
   saveAll();
   return entry;
 }
-function mrReleaseBoxItem(kid, id) {
+/* Early release. The rulebook price for getting something back before Sunday is
+   one unpaid job chosen by Mom, so the release records WHY it happened —
+   otherwise an early release is indistinguishable from the Sunday one and the
+   job quietly becomes optional. */
+function mrReleaseBoxItem(kid, id, opts) {
   if (!isParent()) { showToast('A grown-up opens the box 🔒'); return; }
+  const o = opts || {};
   const b = mrBoxItems(kid).find(x => x.id === id);
-  if (b) { b.releasedAt = Date.now(); saveAll(); }
+  if (!b) return;
+  b.releasedAt = Date.now();
+  b.releasedEarly = true;
+  b.redemptionJob = o.job ? String(o.job).trim() : '';
+  saveAll();
 }
 /* The Sunday release: everything still in the box comes out when the family
    meeting is recorded. Returns how many items were handed back so the meeting
@@ -737,18 +749,41 @@ function mrFinesWeek(weekKey, kid, dayEarnings) {
 
 /* Honesty ladder: warning → that channel's week → choice privileges. The step
    is derived from how many strikes are already on record, so it escalates on
-   its own rather than needing anyone to remember where they were. */
+   its own rather than needing anyone to remember where they were.
+
+   The ladder is counted PER WEEK and resets on Sunday. Counting it over a
+   lifetime meant that after three strikes ever, every later strike was step 3
+   forever — the rulebook's "until you've earned them back" would have had no
+   way to happen. A week is the unit everything else here settles in, so it is
+   the unit the ladder resets in too. The strikes themselves are kept forever;
+   it is only the escalation that starts again. */
 function mrHonestyStrikes(kid) {
   const p = getProfData(kid);
   if (!Array.isArray(p.honesty)) p.honesty = [];
   return p.honesty;
 }
+/* The Monday-to-Sunday keys of a week — the window the ladder counts in. */
+function mrWeekDayKeys(weekKey) {
+  const mon = formatDayKey(weekKey);
+  const keys = [];
+  for (let i = 0; i < 7; i++) { const d = new Date(mon); d.setDate(mon.getDate() + i); keys.push(ctDateToKey(d)); }
+  return keys;
+}
+function mrHonestyStrikesInWeek(kid, weekKey) {
+  const keys = mrWeekDayKeys(weekKey);
+  return mrHonestyStrikes(kid).filter(h => keys.includes(ctDateToKey(new Date(h.at))));
+}
 function mrRecordHonesty(kid, channel, note) {
   if (!isParent()) { showToast('A grown-up records this 🔒'); return null; }
   const r = mrRules();
   const steps = (r.honesty || {}).steps || [];
-  const step = Math.min(mrHonestyStrikes(kid).length + 1, steps.length || 3);
-  const entry = { id: mrNewId('hon-'), at: Date.now(), channel: channel || 'chores',
+  // The strike's own timestamp decides which week it belongs to, so the step
+  // has to be counted in that same week — not in whichever week the chore tab
+  // happens to be showing.
+  const at = Date.now();
+  const wk = ctDateToKey(ctMondayOf(new Date(at)));
+  const step = Math.min(mrHonestyStrikesInWeek(kid, wk).length + 1, steps.length || 3);
+  const entry = { id: mrNewId('hon-'), at, channel: channel || 'chores',
                   step, note: note || '' };
   mrHonestyStrikes(kid).push(entry);
   saveAll();
@@ -756,17 +791,17 @@ function mrRecordHonesty(kid, channel, note) {
 }
 /* Step 2 voids a channel for the week; step 3 also withdraws the kid's choices. */
 function mrHonestyEffect(kid, weekKey) {
-  const mon = formatDayKey(weekKey);
-  const keys = [];
-  for (let i = 0; i < 7; i++) { const d = new Date(mon); d.setDate(mon.getDate() + i); keys.push(ctDateToKey(d)); }
-  const thisWeek = mrHonestyStrikes(kid).filter(h => keys.includes(ctDateToKey(new Date(h.at))));
+  const thisWeek = mrHonestyStrikesInWeek(kid, weekKey);
   const voided = {};
   let losesChoices = false;
   thisWeek.forEach(h => {
     if (h.step >= 2) voided[h.channel] = true;
     if (h.step >= 3) losesChoices = true;
   });
-  return { voidedChannels: voided, losesChoices, strikes: mrHonestyStrikes(kid).length };
+  // `strikes` is the count that drives the ladder, so it is the weekly one.
+  // The lifetime total is kept alongside it for the Sunday conversation.
+  return { voidedChannels: voided, losesChoices,
+           strikes: thisWeek.length, strikesAllTime: mrHonestyStrikes(kid).length };
 }
 
 /* Has this kid lost her choices this week? Defaults to the live week so the
@@ -804,6 +839,41 @@ function mrWeekBreakdown(weekKey, kid) {
 }
 function mrWeekMoney(weekKey, kid) {
   return mrWeekBreakdown(weekKey, kid).net;
+}
+
+/* A frozen copy of a week's breakdown, taken at the family meeting.
+
+   Everything in mrWeekBreakdown is derived — from the rules live today, the
+   grades recorded today, the honesty strikes on file today. That is right for
+   the current week and wrong for a past one: edit a price in March and every
+   week back to January would restate itself. Freezing the numbers at the
+   moment they are agreed makes the history an actual ledger, and means the
+   Sunday conversation can always be reconstructed exactly as it happened.
+
+   The loan and XP fields are filled in by the meeting once those have run. */
+function mrFreezeWeekLedger(weekKey, kid) {
+  const b = mrWeekBreakdown(weekKey, kid);
+  const v = mrVersionForDate(weekKey) || {};
+  return {
+    at: Date.now(),
+    rulesVersion: v.id || null,
+    rulesEffectiveFrom: v.effectiveFrom || null,
+    chores: money2(b.chorePaid),
+    choresRaw: money2(b.chores.paid),
+    freeChores: (b.chores.freeUsed || []).length,
+    overflowChores: b.chores.overflowChores || 0,
+    pickWithdrawn: !!b.chores.pickWithdrawn,
+    learning: money2(b.learnPaid),
+    streakDays: b.streak.days || 0,
+    streak: money2(b.streak.bonus),
+    competition: money2(b.compPaid),
+    fines: money2(b.fines.total),
+    voided: Object.keys(b.honesty.voidedChannels || {}),
+    honestyStrikes: b.honesty.strikes || 0,
+    gross: money2(b.gross),
+    net: money2(b.net),
+    xp: 0, boxReleased: 0, loan: null,
+  };
 }
 
 /* ── XP ────────────────────────────────────────────────────────────

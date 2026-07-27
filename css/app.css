@@ -2780,6 +2780,19 @@
   .app-dialog-input:focus { outline: 3px solid var(--accent-strong); outline-offset: 1px; }
   .app-dialog-btns { display: flex; gap: 0.6rem; align-items: center; }
   .app-dialog-cancel { flex: 0 0 auto; }
+  /* Gated confirm: the tick is an assertion, so give it a real target size and
+     make the still-disabled OK obviously inert rather than merely unresponsive. */
+  .app-dialog-check {
+    display: flex; align-items: flex-start; gap: 0.6rem; text-align: left;
+    padding: 0.7rem 0.8rem; margin-bottom: 0.9rem;
+    border: 2px dashed var(--ink); border-radius: 12px;
+    font-size: 1rem; line-height: 1.3; cursor: pointer;
+  }
+  .app-dialog-check input { width: 22px; height: 22px; flex: 0 0 auto; margin-top: 1px; }
+  /* Frozen per-week breakdown under each history row. */
+  .ct-hist-detail td { padding: 0.15rem 0.4rem 0.45rem; border-top: none; }
+  .ct-hist-kid { display: block; font-size: 0.82rem; opacity: 0.85; line-height: 1.35; }
+  .app-dialog-btns .btn-confirm:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
   .sheet-close-x {
     position: absolute;
     top: 10px;

@@ -144,6 +144,8 @@ Recalculated every season.
 
 **Leave something out and it goes in the Sunday Box.** You get it back at the Sunday family meeting — the same sit-down where we settle the week. Want it sooner? One unpaid job, chosen by Mom — and **that job does not count** toward your two free chores.
 
+The job gets **written down and ticked off** when you get the thing back, so "I'll do it later" isn't a way to get it out of the box.
+
 *School books, homework and sports gear are never boxed — they go on Mom's shelf and you ask for them.*
 
 **Box first. Fine on repeat.** The first time something goes in the box that week, that's the whole consequence. **If the same thing happens again in the same week, it's boxed *and* it costs −$1.** Once is a mistake. Twice is a choice.
@@ -174,7 +176,9 @@ Almost everything here runs on your word. You tell Mom the chore was done to sta
 |---|---|
 | **First time** | Claim is void. Recorded, and we talk about it Sunday. Nothing else. |
 | **Second time** | Claim is void, and **that whole channel pays nothing for the week** — chores or competition, whichever you claimed on. |
-| **Third time** | Claim is void, and **you lose your choices** for that week — your two free chores land on your **highest**-paying work instead of your lowest, and you can't put extra money against the loan. Both come back the following week. |
+| **Third time** | Claim is void, and **you lose your choices** for that week — your two free chores land on your **highest**-paying work instead of your lowest, and you can't put extra money against the loan. |
+
+**The ladder resets every Sunday.** Three strikes in one week takes you to the third step; a clean week starts you back at the first. The strikes stay on the record and we still talk about them — but you are never permanently at step three, and your choices always come back.
 
 Tell me you didn't do it and nothing happens beyond the ordinary miss. **Owning it always costs less than hiding it.** That is the entire lesson and it is the one I care about most.
 

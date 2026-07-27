@@ -314,6 +314,7 @@ function mmConfirmAndRecord() {
     marketMonth: bankConfig().marketMonth,
     finalized: (c.finalizedWeeks && c.finalizedWeeks[wk]) ? JSON.parse(JSON.stringify(c.finalizedWeeks[wk])) : null,
     xpAwarded: (c.xpAwardedWeeks && c.xpAwardedWeeks[wk]) ? JSON.parse(JSON.stringify(c.xpAwardedWeeks[wk])) : null,
+    ledger: (c.moneyLedger && c.moneyLedger[wk]) ? JSON.parse(JSON.stringify(c.moneyLedger[wk])) : null,
   };
   const parts = commitFamilyMeeting(wk);
   renderMeetingMode();
@@ -337,6 +338,11 @@ function mmUndoRecord() {
   // without it the reversed XP could never be re-credited.
   if (c.xpAwardedWeeks) {
     if (mmUndo.xpAwarded) c.xpAwardedWeeks[wk] = mmUndo.xpAwarded; else delete c.xpAwardedWeeks[wk];
+  }
+  // The frozen ledger has to go back too, or an un-recorded week keeps a
+  // history entry claiming it was settled.
+  if (c.moneyLedger) {
+    if (mmUndo.ledger) c.moneyLedger[wk] = mmUndo.ledger; else delete c.moneyLedger[wk];
   }
   if (c.meetingsHeld) delete c.meetingsHeld[wk];
   mmUndo = null;
@@ -381,11 +387,19 @@ function commitFamilyMeeting(wk) {
   if (!c.finalizedWeeks) c.finalizedWeeks = {};
   if (!c.finalizedWeeks[wk]) c.finalizedWeeks[wk] = {};
   if (!c.meetingsHeld) c.meetingsHeld = {};
+  if (!c.moneyLedger) c.moneyLedger = {};
+  if (!c.moneyLedger[wk]) c.moneyLedger[wk] = {};
   const parts = [];
   const newModel = (typeof mrUsesNewModel === 'function') && mrUsesNewModel(wk);
   ['jenn', 'jess'].forEach(kid => {
     const w = ensureWallet(kid);
     const name = kid === 'jenn' ? 'Jenn' : 'Jess';
+    // The breakdown is frozen HERE, before anything moves. Recomputing it later
+    // would read today's rules and today's grades, so a price edit or a late
+    // regrade would silently rewrite what a past week said it paid. History has
+    // to be a record, not a recomputation.
+    const ledger = (newModel && c.moneyLedger[wk][kid] == null)
+      ? mrFreezeWeekLedger(wk, kid) : null;
     if (c.finalizedWeeks[wk][kid] == null) {
       const prelim = ctWeekMoney(wk, kid);
       w.cash = money2(w.cash + prelim);
@@ -413,6 +427,14 @@ function commitFamilyMeeting(wk) {
       // The box opens at the meeting, not on a calendar day.
       const released = mrReleaseBoxForMeeting(kid);
       if (released > 0) parts.push(`${name} box opened (${released})`);
+      // Fill in what only became known as the meeting ran.
+      if (ledger) {
+        ledger.xp = xp;
+        ledger.boxReleased = released;
+        ledger.loan = { kind: t.kind || null, paid: money2(t.paid || 0),
+                        shortfall: money2(t.shortfall || 0), interest: money2(interest || 0) };
+        c.moneyLedger[wk][kid] = ledger;
+      }
     }
     const adv = moneyAdvanceMonth(kid);
     adv.matured.forEach(m => parts.push(`${name} GIC +$${m.payout.toFixed(2)}`));
