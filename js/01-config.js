@@ -124,6 +124,36 @@ const COMPETITION_OBJECTIVES_BY_TAG = {
   ],
 };
 
+/* Goal/objective presets for ordinary (non-training) activities — same shape
+   and UI as the training objectives, so any block can carry a target, not
+   just Competitive Sports/Competition. Looked up by activity id first (a
+   specific activity like Piano gets its own goals), falling back to its
+   category. */
+const ACTIVITY_OBJECTIVES_BY_ID = {
+  piano: ['Scales / technique', 'New piece — learn notes', 'Polish a piece', 'Sight-reading'],
+  french: ['Vocabulary', 'Listening practice', 'Conversation practice', 'Reading'],
+  chinese: ['Vocabulary / characters', 'Listening practice', 'Conversation practice', 'Reading'],
+  math: ['Times tables / facts', 'Word problems', 'Homework review', 'New concept'],
+  chores: ['Finish assigned chore(s)', 'Do it without being asked twice', 'Clean up after'],
+  relax: ['Deep breathing', 'Stretch', 'Quiet time — no screens'],
+};
+const ACTIVITY_OBJECTIVES_BY_CAT = {
+  school: ['Homework', 'Reading', 'Review for a test'],
+  active: ['Get moving', 'Stretch / cool-down'],
+  free: ['Pick something new to try'],
+  daily: ['Get it done before the next thing'],
+  routine: [],
+  custom: [],
+};
+/* Single entry point for "what goals can this block have" — training tags use
+   the sport-specific lists (competition vs practice), everything else falls
+   back to its own activity id, then its category. */
+function getObjectivePresets(act, tag, isCompetition) {
+  if (!act) return [];
+  if (act.isTraining) return (isCompetition ? COMPETITION_OBJECTIVES_BY_TAG : OBJECTIVES_BY_TAG)[tag] || [];
+  return ACTIVITY_OBJECTIVES_BY_ID[act.id] || ACTIVITY_OBJECTIVES_BY_CAT[act.cat] || [];
+}
+
 const REWARD_POOLS = {
   family: [
     { id:'family_set_table', name:'Family Hero: Set the Table', icon:'🍽', cat:'daily', durationMin:20, suitableTime:['evening','weekend'] },

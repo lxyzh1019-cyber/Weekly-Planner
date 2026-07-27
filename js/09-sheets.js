@@ -90,6 +90,57 @@ function selectActivity(act) {
   hideMascot();
 }
 
+/* Renders a tickable objectives/goals checklist — preset items plus any
+   matching saved custom tasks — into containerId, toggling entries in
+   stateObj.objectives and re-rendering via rerenderFn. Shared by the training
+   sheet and the plain activity sheet so every block type gets the same goal
+   UI instead of objectives being a training-only concept. */
+function renderObjectivesList(containerId, stateObj, presets, myTasks, rerenderFn) {
+  const objWrap = document.getElementById(containerId);
+  if (!objWrap) return;
+  objWrap.innerHTML = '';
+  if (!Array.isArray(stateObj.objectives)) stateObj.objectives = [];
+  presets.forEach(obj=>{
+    const item = document.createElement('div');
+    const checked = stateObj.objectives.includes(obj);
+    item.className = 'obj-item'+(checked?' checked':'');
+    item.innerHTML = `<div class="obj-check">${checked?'✓':''}</div><span>${obj}</span>`;
+    item.onclick = ()=>{
+      if (stateObj.objectives.includes(obj)) stateObj.objectives = stateObj.objectives.filter(o=>o!==obj);
+      else stateObj.objectives.push(obj);
+      rerenderFn();
+    };
+    objWrap.appendChild(item);
+  });
+
+  if (myTasks.length) {
+    const hdr = document.createElement('div');
+    hdr.style.cssText='font-family:Gochi Hand;font-size:1rem;color:var(--ink-light);margin-top:0.4rem';
+    hdr.textContent = 'From your library:';
+    objWrap.appendChild(hdr);
+    myTasks.forEach(t=>{
+      const label = `${t.name}${t.reps?` (${t.reps})`:''}`;
+      const checked = stateObj.objectives.includes(label);
+      const item = document.createElement('div');
+      item.className = 'obj-item'+(checked?' checked':'');
+      item.innerHTML = `<div class="obj-check">${checked?'✓':''}</div><span>${label}</span><span class="obj-meta">saved</span><span class="obj-delete" title="delete">×</span>`;
+      item.onclick = (e)=>{
+        if (e.target.classList.contains('obj-delete')) {
+          state.shared.customTasks = state.shared.customTasks.filter(x=>x.id!==t.id);
+          tombstoneIds('task:', [t.id]);
+          stateObj.objectives = stateObj.objectives.filter(o=>o!==label);
+          saveAll(); rerenderFn();
+          return;
+        }
+        if (stateObj.objectives.includes(label)) stateObj.objectives = stateObj.objectives.filter(o=>o!==label);
+        else stateObj.objectives.push(label);
+        rerenderFn();
+      };
+      objWrap.appendChild(item);
+    });
+  }
+}
+
 /* ════════════════════════════════════════════════════════════════
    TRAINING SHEET
 ════════════════════════════════════════════════════════════════ */
@@ -144,49 +195,9 @@ function renderTrainingSheet() {
 
   // Objectives — preset + custom tasks filtered by tag. Competition day gets its
   // own performance/meet checklist rather than the practice-drill objectives.
-  const objWrap = document.getElementById('objectivesList');
-  objWrap.innerHTML = '';
-  const presets = (isCompetition ? COMPETITION_OBJECTIVES_BY_TAG : OBJECTIVES_BY_TAG)[ts.tag] || [];
-  presets.forEach(obj=>{
-    const item = document.createElement('div');
-    const checked = ts.objectives.includes(obj);
-    item.className = 'obj-item'+(checked?' checked':'');
-    item.innerHTML = `<div class="obj-check">${checked?'✓':''}</div><span>${obj}</span>`;
-    item.onclick = ()=>{
-      if (ts.objectives.includes(obj)) ts.objectives = ts.objectives.filter(o=>o!==obj);
-      else ts.objectives.push(obj);
-      renderTrainingSheet();
-    };
-    objWrap.appendChild(item);
-  });
-
+  const presets = getObjectivePresets(selectedActivity, ts.tag, isCompetition);
   const myTasks = (state.shared.customTasks||[]).filter(t=>t.sport===ts.tag || t.sport==='general');
-  if (myTasks.length) {
-    const hdr = document.createElement('div');
-    hdr.style.cssText='font-family:Gochi Hand;font-size:1rem;color:var(--ink-light);margin-top:0.4rem';
-    hdr.textContent = 'From your library:';
-    objWrap.appendChild(hdr);
-    myTasks.forEach(t=>{
-      const label = `${t.name}${t.reps?` (${t.reps})`:''}`;
-      const checked = ts.objectives.includes(label);
-      const item = document.createElement('div');
-      item.className = 'obj-item'+(checked?' checked':'');
-      item.innerHTML = `<div class="obj-check">${checked?'✓':''}</div><span>${label}</span><span class="obj-meta">saved</span><span class="obj-delete" title="delete">×</span>`;
-      item.onclick = (e)=>{
-        if (e.target.classList.contains('obj-delete')) {
-          state.shared.customTasks = state.shared.customTasks.filter(x=>x.id!==t.id);
-          tombstoneIds('task:', [t.id]);
-          ts.objectives = ts.objectives.filter(o=>o!==label);
-          saveAll(); renderTrainingSheet();
-          return;
-        }
-        if (ts.objectives.includes(label)) ts.objectives = ts.objectives.filter(o=>o!==label);
-        else ts.objectives.push(label);
-        renderTrainingSheet();
-      };
-      objWrap.appendChild(item);
-    });
-  }
+  renderObjectivesList('objectivesList', ts, presets, myTasks, renderTrainingSheet);
 
   if (ts.travelBufMin == null || ts.travelBufMin < 5) ts.travelBufMin = DEFAULT_BUFFER_MIN;
   if (ts.getReadyBufMin == null || ts.getReadyBufMin < 5) ts.getReadyBufMin = DEFAULT_BUFFER_MIN;
@@ -307,6 +318,12 @@ function renderActivitySheet() {
     cp.appendChild(d);
   });
 
+  // Goals/objectives — same tickable-list UI as training, scoped to this
+  // activity's own presets (or its category's) plus any saved custom goals.
+  const objPresets = getObjectivePresets(act);
+  const objMyTasks = (state.shared.customTasks||[]).filter(t=>t.activityId===act.id);
+  renderObjectivesList('activityObjectivesList', as_, objPresets, objMyTasks, renderActivitySheet);
+
   const tbToggle = document.getElementById('activityTravelToggle');
   tbToggle.classList.toggle('on', as_.travelBuffer);
   const atRow = document.getElementById('activityTravelDurRow');
@@ -365,7 +382,7 @@ function confirmActivity() {
   const dateStart = allowRange ? document.getElementById('activityDateStart').value : '';
   const dateEnd   = allowRange ? document.getElementById('activityDateEnd').value   : '';
   const isChoreBlock = selectedActivity && selectedActivity.id === 'chores';
-  placeBlock(selectedActivity.id, startMin, as_.durationMin, as_.colour, [], as_.note, {
+  placeBlock(selectedActivity.id, startMin, as_.durationMin, as_.colour, as_.objectives || [], as_.note, {
     repeatDays: as_.repeat?as_.repeatDays:[],
     travelBuffer: as_.travelBuffer,
     travelBufMin: as_.travelBufMin,
@@ -736,24 +753,19 @@ function openEditSheet(blockId) {
     clWrap.style.display = 'none';
   }
 
-  // Objectives (training)
+  // Objectives/goals — every block can carry a target, not just training.
   const objWrap = document.getElementById('editObjectivesWrap');
   const objEditWrap = document.getElementById('editObjectivesEditWrap');
   const objInput = document.getElementById('editObjectivesInput');
-  if (act.isTraining) {
-    objWrap.style.display = 'block';
-    const list = Array.isArray(block.objectives) ? block.objectives : [];
-    document.getElementById('editObjectivesView').innerHTML = list.length
-      ? list.map(o=>`<div style="font-size:0.9rem;padding:0.3rem 0;border-bottom:1px dashed var(--paper-line)">🎯 ${escapeHtml(o)}</div>`).join('')
-      : '<p style="font-size:0.9rem;color:var(--ink-light)">No objectives yet — add some below.</p>';
-    objInput.value = list.join('\n');
-    if (isParent()) objEditWrap.style.display = 'block';
-    else if (block.parentPinned) objEditWrap.style.display = 'none';
-    else objEditWrap.style.display = 'block';
-  } else {
-    objWrap.style.display = 'none';
-    objEditWrap.style.display = 'none';
-  }
+  objWrap.style.display = 'block';
+  const list = Array.isArray(block.objectives) ? block.objectives : [];
+  document.getElementById('editObjectivesView').innerHTML = list.length
+    ? list.map(o=>`<div style="font-size:0.9rem;padding:0.3rem 0;border-bottom:1px dashed var(--paper-line)">🎯 ${escapeHtml(o)}</div>`).join('')
+    : '<p style="font-size:0.9rem;color:var(--ink-light)">No objectives yet — add some below.</p>';
+  objInput.value = list.join('\n');
+  if (isParent()) objEditWrap.style.display = 'block';
+  else if (block.parentPinned) objEditWrap.style.display = 'none';
+  else objEditWrap.style.display = 'block';
 
   document.getElementById('editNoteInput').value = block.note || '';
 
@@ -1120,7 +1132,7 @@ async function saveEditChanges() {
   const newNote  = document.getElementById('editNoteInput').value;
   const newCompleted = !!editState.completed;
   let newObjectives = Array.isArray(blk.objectives) ? [...blk.objectives] : [];
-  if (act && act.isTraining && (isParent() || !blk.parentPinned)) {
+  if (isParent() || !blk.parentPinned) {
     const raw = (document.getElementById('editObjectivesInput')?.value || '').split('\n')
       .map(s => s.trim()).filter(Boolean);
     newObjectives = raw;
@@ -1180,7 +1192,7 @@ async function saveEditChanges() {
   blk.completed = newCompleted;
   // Unify rewards: marking done in the edit sheet now earns XP + fires links.
   if (!wasCompleted && newCompleted) awardBlockLinks(blk, currentDayKey);
-  if (act && act.isTraining) blk.objectives = newObjectives;
+  blk.objectives = newObjectives;
   if (newStopwatch) blk.stopwatch = newStopwatch;
   else delete blk.stopwatch;
   markItemUpdated(blk); // stamp so edits win cross-device merges
@@ -1198,7 +1210,7 @@ async function saveEditChanges() {
     else seriesPatch.getReadyBufMin = null;
     if (newWarmup) seriesPatch.warmupBufMin = newWarmupBuf;
     else seriesPatch.warmupBufMin = null;
-    if (act && act.isTraining) seriesPatch.objectives = [...newObjectives];
+    seriesPatch.objectives = [...newObjectives];
     if (newStopwatch) seriesPatch.stopwatch = { ...newStopwatch };
     else seriesPatch.stopwatch = null;
     applySeriesEdit(blk.seriesId, editingBlockId, seriesPatch);
@@ -1493,18 +1505,30 @@ function confirmCustomActivity() {
   document.getElementById('customIcon').value='';
 }
 
-function openCustomTask() { openSheet('customTaskOverlay'); }
+function openCustomTask(context='training') {
+  customTaskContext = context;
+  // The Sport picker only makes sense for a training task; a plain-activity
+  // goal is tagged to that activity instead (see confirmCustomTask).
+  const sportRow = document.getElementById('taskSportRow');
+  if (sportRow) sportRow.style.display = context === 'training' ? '' : 'none';
+  const titleEl = document.getElementById('customTaskSheetTitle');
+  if (titleEl) titleEl.textContent = context === 'training' ? '➕ Custom Training Task' : '➕ Custom Goal';
+  openSheet('customTaskOverlay');
+}
 function confirmCustomTask() {
   const name = document.getElementById('taskName').value.trim();
   const sport = document.getElementById('taskSport').value;
   const reps = document.getElementById('taskReps').value.trim();
   const notes = document.getElementById('taskNotes').value.trim();
   if (!name) { showToast('Enter a name!'); return; }
-  const task = { id:'t-'+Date.now().toString(36), name, sport, reps, notes };
+  const task = customTaskContext === 'activity'
+    ? { id:'t-'+Date.now().toString(36), name, sport:'general', activityId: selectedActivity?.id || null, reps, notes }
+    : { id:'t-'+Date.now().toString(36), name, sport, reps, notes };
   state.shared.customTasks = [...(state.shared.customTasks||[]), task];
   saveAll();
   closeSheet('customTaskOverlay');
-  renderTrainingSheet();
+  if (customTaskContext === 'activity') renderActivitySheet();
+  else renderTrainingSheet();
   showToast('Task saved to library ✨');
   document.getElementById('taskName').value='';
   document.getElementById('taskReps').value='';

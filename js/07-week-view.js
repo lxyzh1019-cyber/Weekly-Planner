@@ -746,7 +746,29 @@ function wfBufferSegments(b) {
   // After: [ACTIVITY][travel][get-ready]
   if (travelMin > 0) segs.push({ startRel: relEnd, dur: travelMin, icon: '🚗', min: travelMin, kind: 'travel', side: 'post' });
   if (readyMin  > 0) segs.push({ startRel: relEnd + travelMin, dur: readyMin, icon: '👕', min: readyMin, kind: 'ready', side: 'post' });
+  segs.forEach(s => { s.endRel = s.startRel + s.dur; });
   return segs;
+}
+
+/* Human label for one buffer segment, at three widths, so a strip reads as a
+   real instruction ("leave by 5:30p") rather than a bare "🚗15m" wherever
+   there's room for it — the print sheet and the weekly cards both need this,
+   not just the day view. `tier` is 'long' | 'short' | 'tiny'. */
+function bufferSegLabels(seg, tier) {
+  const startAbs = seg.startRel + START_MIN;
+  const endAbs = seg.endRel + START_MIN;
+  if (tier === 'tiny') return `${seg.icon}${seg.min}m`;
+  if (tier === 'short') {
+    const kindLabel = seg.kind === 'travel' ? 'Travel' : seg.kind === 'warmup' ? 'Warm up' : 'Get ready';
+    return `${seg.icon} ${kindLabel} ${seg.min}m`;
+  }
+  // long
+  if (seg.kind === 'ready' && seg.side === 'pre')  return `${seg.icon} Get ready ${seg.min}m — done by ${formatTimeFromMin(endAbs)}`;
+  if (seg.kind === 'travel' && seg.side === 'pre') return `${seg.icon} Leave by ${formatTimeFromMin(startAbs)} (${seg.min}m)`;
+  if (seg.kind === 'warmup')                       return `${seg.icon} Warm up by ${formatTimeFromMin(startAbs)} (${seg.min}m)`;
+  if (seg.kind === 'travel' && seg.side === 'post') return `${seg.icon} Home about ${formatTimeFromMin(endAbs)} (${seg.min}m)`;
+  if (seg.kind === 'ready' && seg.side === 'post')  return `${seg.icon} Put gear away ${seg.min}m`;
+  return `${seg.icon} ${seg.min}m`;
 }
 
 /* Distinguish a tap from a scroll/drag so a large block (like Training) that
@@ -926,7 +948,7 @@ function renderFullWeek(keys) {
         const topPx = segS * PX_PER_MIN;
         const hPx = (segE - segS) * PX_PER_MIN;
         const segConflict = !!bc && (seg.side === 'pre' ? bc.pre : bc.post);
-        cell.appendChild(wfTravelStrip(topPx, hPx, leftCss, widthCss, seg.icon, seg.min, segColour, segConflict));
+        cell.appendChild(wfTravelStrip(topPx, hPx, leftCss, widthCss, seg, segColour, segConflict));
       });
     });
 
@@ -973,30 +995,56 @@ function renderFullWeek(keys) {
 
       const travelMin = getTravelBufMin(b);
       const readyMin  = getGetReadyBufMin(b);
-      const bufBefore = travelMin + readyMin;
+      const warmupMin = getWarmupBufMin(b);
+      // Name every buffer kind the block actually carries, instead of
+      // collapsing travel + get-ready into a single icon+number.
+      const bufKinds = [];
+      if (readyMin  > 0) bufKinds.push(`👕${readyMin}m`);
+      if (travelMin > 0) bufKinds.push(`🚗${travelMin}m`);
+      if (warmupMin > 0) bufKinds.push(`🔥${warmupMin}m`);
 
       card.style.top = topPx + 'px';
       card.style.height = Math.max(pxHeight - 2, 12) + 'px';
       card.style.left  = leftCss;
       card.style.width = widthCss;
       card.style.background = bg;
-      const travelTag = bufBefore > 0 ? `<span class="wf-card-travel">${travelMin ? '🚗' : '👕'}${bufBefore}m</span>` : '';
+      const travelTag = bufKinds.length ? `<span class="wf-card-travel">${bufKinds.join(' ')}</span>` : '';
       const stampEmoji = b.parentStamp && b.parentStamp.emoji ? b.parentStamp.emoji + ' ' : '';
       const conflictTag = hasConflict ? `<span class="wf-card-conflict-badge" title="Not enough travel/get-ready time — overlaps another activity">⚠️</span>` : '';
       // Corner flag stays visible on every card size (the inline badge is hidden
       // when a card is too slim for its name), so a clash never hides off-screen.
       const conflictFlag = hasConflict ? `<div class="wf-card-conflict-flag" title="Time clash — not enough travel/get-ready time">!</div>` : '';
+      // List as much of "what this block is about" (gear/objectives/note) as
+      // the card's own height can hold — gear first since packing is
+      // effectively mandatory for a training block, then as many objectives as
+      // fit — degrading to a one-line count on cards too short for a list.
+      const detailLines = blockDetailLines(b, act);
+      let sumHtml = '';
+      if (cls.includes('wf-card--tall') && detailLines.length) {
+        // Matches the old fixed 1/2/3-row tiers at 60/78/98px, then keeps
+        // scaling continuously so a tall card (a long training session) gets
+        // room for its whole gear + objective list instead of a hard cap.
+        const maxRows = Math.max(0, Math.floor((pxHeight - 58) / 20) + 1);
+        sumHtml = sliceDetailLines(detailLines, maxRows)
+          .map(r => `<div class="wf-card-sum" title="${escapeHtml(r.text)}">${r.icon} ${escapeHtml(r.text)}</div>`)
+          .join('');
+      }
+      const durHtml = `${formatDuration(b.durationMin)}${(!sumHtml && detailLines.length) ? ' · ' + blockCountsSummary(detailLines) : ''}`;
+      // Done-tick sized to the card's own height, same idea as the print
+      // checkboxes, so a slim card doesn't carry an oversized tap target.
+      const checkPx = Math.max(14, Math.min(24, Math.round(10 + pxHeight / 4)));
       card.innerHTML = `
         ${conflictFlag}
         <div class="wf-card-time">${timeStr}</div>
         <div class="wf-card-icon">${dispIcon}</div>
         <div class="wf-card-name">${stampEmoji}${dispName}${travelTag}${conflictTag}</div>
-        <div class="wf-card-dur">${formatDuration(b.durationMin)}</div>
-        <button type="button" class="wf-card-check" aria-label="${b.completed?'Mark not done':'Mark done'}"
+        ${sumHtml}
+        <div class="wf-card-dur">${durHtml}</div>
+        <button type="button" class="wf-card-check" style="width:${checkPx}px;height:${checkPx}px;font-size:${Math.round(checkPx*0.58)}px" aria-label="${b.completed?'Mark not done':'Mark done'}"
           onclick="toggleBlockDone('${key}','${b.id}',event)">${b.completed?'✓':''}</button>
       `;
       card.title = `${dispIcon} ${dispName} — ${timeStr}, ${formatDuration(b.durationMin)}`
-        + (bufBefore > 0 ? ` · ${travelMin ? '🚗 travel' : '👕 get-ready'} ${bufBefore} min each way` : '')
+        + (bufKinds.length ? ` · ${bufKinds.join(', ')} each way` : '')
         + (hasConflict ? ' · ⚠️ overlaps another activity — not enough time' : '');
       attachTapGuard(card, ()=> openDayFromWeekCard(key, ci, b.id));
       cell.appendChild(card);
@@ -1041,16 +1089,21 @@ function renderWeekConflictBanner(keys, bannerId = 'weekConflictBanner') {
 /* Build one travel/get-ready buffer strip for the weekly view. Positioned in
    px within the zone cell, hugging the card it belongs to. Non-interactive so
    taps fall through to the card/cell underneath. */
-function wfTravelStrip(topPx, hPx, leftCss, widthCss, icon, min, colour, conflict) {
+function wfTravelStrip(topPx, hPx, leftCss, widthCss, seg, colour, conflict) {
   const s = document.createElement('div');
-  s.className = 'wf-travel' + (hPx >= 14 ? ' wf-travel--label' : '') + (conflict ? ' wf-travel--conflict' : '');
+  // Per-kind class (ready/travel/warmup) so adjacent strips read as three
+  // distinct things even before you can make out the text.
+  const kindCls = seg.kind === 'ready' ? ' wf-travel--ready' : seg.kind === 'warmup' ? ' wf-travel--warmup' : ' wf-travel--travel';
+  const tier = hPx >= 13 ? 'long' : hPx >= 8 ? 'short' : 'tiny';
+  s.className = 'wf-travel' + kindCls + ` wf-travel--tier-${tier}` + (tier !== 'tiny' ? ' wf-travel--label' : '') + (conflict ? ' wf-travel--conflict' : '');
   s.style.top = topPx + 'px';
   s.style.height = hPx + 'px';
   s.style.left = leftCss;
   s.style.width = widthCss;
   if (colour && !conflict) s.style.setProperty('--wf-travel-colour', colour);
-  if (hPx >= 14) s.textContent = `${conflict ? '⚠️' : icon}${min}m`;
-  s.title = (conflict ? '⚠️ Overlaps another activity — not enough time. ' : '') + `Travel / get-ready — ${min} min`;
+  const kindLabel = seg.kind === 'travel' ? 'Travel' : seg.kind === 'warmup' ? 'Warm-up' : 'Get ready';
+  s.textContent = conflict ? `⚠️${seg.min}m` : bufferSegLabels(seg, tier);
+  s.title = (conflict ? '⚠️ Overlaps another activity — not enough time. ' : '') + `${kindLabel} — ${seg.min} min`;
   return s;
 }
 

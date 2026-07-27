@@ -748,6 +748,9 @@
       <h4>CHORE TYPE</h4>
       <div class="sheet-row" id="choreTypePicker"></div>
     </div>
+    <h4 id="activityObjectivesHeader">GOAL / OBJECTIVES <span style="font-weight:400;font-size:0.85rem;color:var(--ink-light)">(optional)</span></h4>
+    <div class="objectives-list" id="activityObjectivesList"></div>
+    <button class="pill-btn" style="margin-bottom:0.8rem" onclick="openCustomTask('activity')">＋ Add custom goal</button>
     <h4>NOTE</h4>
     <textarea class="note-input" id="activityNote" rows="2" placeholder="Add a note…"></textarea>
     <div class="buffer-toggle" id="activityTravelToggle" onclick="toggleTravelBuffer('activity')">
@@ -1079,13 +1082,13 @@
 <div class="overlay" id="customTaskOverlay" onclick="overlayClick(event,'customTaskOverlay')">
   <div class="sheet">
     <div class="sheet-handle"></div>
-    <h3>➕ Custom Training Task</h3>
+    <h3 id="customTaskSheetTitle">➕ Custom Training Task</h3>
     <p style="font-size:0.88rem;color:var(--ink-light);margin-bottom:0.5rem">Saved to your library for reuse.</p>
     <div class="custom-builder">
       <label>Task name (e.g. Backstroke drill)</label>
       <input type="text" id="taskName" placeholder="e.g. 50m Freestyle" aria-label="Training task name">
       <div class="row">
-        <div>
+        <div id="taskSportRow">
           <label>Sport</label>
           <select id="taskSport">
             <option value="skating">⛸ Skating</option>
