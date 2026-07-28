@@ -297,13 +297,23 @@ function mnyLinksCard(kid) {
    this morning is right here this afternoon. Collapsed by default: this is
    reference, not news. */
 function mnyPricesCard(wk) {
-  const r = mrRulesForWeek(wk);
+  /* TODAY's prices, not the week's. This is the list she checks before deciding
+     whether to go and do the bins — it has to answer "what will I get for this
+     if I do it now". The week's earnings are still computed against the rules
+     that were live when each day happened (mrRulesForWeek), so a price raised
+     mid-week shows up here immediately without restating what she already
+     earned; the note says so when the two differ. */
+  const r = mrRules();
+  const weekRules = mrRulesForWeek(wk);
+  const changedMidWeek = JSON.stringify(r) !== JSON.stringify(weekRules);
   const open = !!mnyOpenPrices.all;
   return `<div class="mny-card">
       <button type="button" class="mny-acc" data-mny-action="prices" aria-expanded="${open}">
         <span class="mny-label">💷 What things pay</span><span>${open ? 'Hide ▾' : 'Show ▸'}</span>
       </button>
-      ${open ? `<div class="mny-prices">${pmPriceCards(r, false)}</div>` : ''}
+      ${open ? `${changedMidWeek
+          ? `<div class="mny-note">Something changed price this week. These are the new prices, from now on — what you already did this week still pays what it was worth then.</div>` : ''}
+        <div class="mny-prices">${pmPriceCards(r, false)}</div>` : ''}
     </div>`;
 }
 

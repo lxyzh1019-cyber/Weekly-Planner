@@ -279,24 +279,6 @@
      Three sub-tabs: what you have and what each task pays (kids + parent),
      the bank (kids read-only, parent transacts), and the rules editor
      (parent only — the tab itself is hidden for kids). -->
-<div class="screen" id="screen-pocket">
-  <div class="topbar">
-    <div class="topbar-left">
-      <button class="btn-icon" onclick="goWeek()">◀</button>
-      <h2>Pocket Money 💰</h2>
-    </div>
-    <div class="profile-badge" id="pocketProfileBadge"></div>
-  </div>
-  <div class="parent-tabs" role="tablist" aria-label="Pocket money sections">
-    <button class="parent-tab active" role="tab" data-pmtab="balance" onclick="setPocketTab('balance')">💰 Balance &amp; Prices</button>
-    <button class="parent-tab" role="tab" data-pmtab="bank" onclick="setPocketTab('bank')">🏦 Bank &amp; Invest</button>
-    <button class="parent-tab" role="tab" data-pmtab="setup" id="pocketSetupTab" onclick="setPocketTab('setup')">⚙️ Rules &amp; Prices</button>
-  </div>
-  <div class="parent-panel active" id="pmtab-balance" role="tabpanel"><div class="chore-wrap" id="pmBalanceWrap"></div></div>
-  <div class="parent-panel" id="pmtab-bank" role="tabpanel" hidden><div class="chore-wrap" id="moneyWrap"></div></div>
-  <div class="parent-panel" id="pmtab-setup" role="tabpanel" hidden><div class="chore-wrap" id="pmSetupWrap"></div></div>
-</div>
-
 <!-- 1 💰 My money — the kid's own money page -->
 <div class="screen" id="screen-mymoney">
   <div class="topbar">

@@ -229,10 +229,10 @@ function mmRenderConfirm(wk, held) {
   const alreadyHeld = held || !!(state.shared.chore.meetingsHeld && state.shared.chore.meetingsHeld[wk]);
   let action;
   if (mmUndo) {
-    action = `<div class="mm-recorded">✅ Recorded — money credited &amp; market advanced to ${marketMonthLabel()}.</div>
+    action = `<div class="mm-recorded">✅ Recorded — money credited.</div>
       <button type="button" class="pill-btn danger" onclick="mmUndoRecord()">↩️ Undo (nothing is frozen yet)</button>`;
   } else if (alreadyHeld) {
-    action = `<div class="mm-recorded">✅ This week was already recorded. Market is at ${marketMonthLabel()}.</div>`;
+    action = `<div class="mm-recorded">✅ This week was already recorded.</div>`;
   } else {
     action = `<button type="button" class="btn-confirm" onclick="mmConfirmAndRecord()">✅ Confirm &amp; record the week</button>`;
   }
@@ -259,8 +259,8 @@ function mmRenderConfirm(wk, held) {
     return `<div class="ct-meta">${CT_PROFILE_ICON[kid]} ${bits.join(' · ') || 'nothing earned'}${xp ? ` · +${xp} XP` : ''}${due ? ` · ${dueLabel} −$${due.toFixed(2)}` : ''}</div>`;
   }).join('') : '';
   const explain = newModel
-    ? `This <b>confirms</b> the week. Recording credits each kid's total to cash, credits XP, opens the Sunday Box, adds a month of savings interest, matures due GICs and steps the market. The loan payment and any overdue interest move <b>once a month</b>, not every Sunday.`
-    : `This <b>confirms</b> the week — it doesn't "pay". Group chore money already fired sticky as chores were done; recording credits each kid's total (max $${CT_MONEY_CAP}) to cash, adds a month of interest, matures due GICs and moves the market one month.`;
+    ? `This <b>confirms</b> the week. Recording credits each kid's total to cash, credits XP, opens the Sunday Box, adds a month of interest and pays out anything locked away that has reached its date. The loan payment and any overdue interest move <b>once a month</b>, not every Sunday.`
+    : `This <b>confirms</b> the week — it doesn't "pay". Group chore money already fired sticky as chores were done; recording credits each kid's total (max $${CT_MONEY_CAP}) to cash, adds a month of interest and pays out anything locked away that has reached its date.`;
   return `<div class="mm-h">Confirm &amp; record</div>
     <div class="ct-meta">${explain}</div>
     <div class="mm-pay">${rows}</div>${preview}${mmRenderQuarterly()}${action}`;

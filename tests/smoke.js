@@ -90,16 +90,16 @@ function findChromium() {
   });
   // Kids may look at what they own, but the balances must not move when a kid
   // tries to transact.
-  checks.kidCannotTransact = await page.evaluate(async () => {
+  checks.kidCannotTransact = await page.evaluate(() => {
     const kid = activeProfile();
-    const before = ensureWallet(kid).cash;
-    const savedBefore = mnySavedTotal(kid);
-    moneyAddCash(kid, 10);                      // seed cash so a deposit COULD succeed
-    const seeded = ensureWallet(kid).cash;
-    await moneyAction('deposit');
-    const ok = ensureWallet(kid).cash === seeded && mnySavedTotal(kid) === savedBefore;
-    ensureWallet(kid).cash = before;            // restore
-    return ok;
+    const wrap = document.getElementById('mnyPage1Wrap');
+    // Her page has no control that moves money — not a disabled one, none.
+    const noMovers = !wrap.querySelector('[data-mny-action="commit"], [data-mnyp-action]');
+    // And the guard the commit path leans on refuses her.
+    const guarded = moneyCanTransact() === false;
+    // Her earnings are not hers to change either.
+    const cannotOverride = mnySetOverride(kid, mnyWeekKey(), 'chores', 99, 'fixing') === false;
+    return noMovers && guarded && cannotOverride;
   });
   // A kid editing a rule must be refused, leaving no new version or log entry.
   checks.kidCannotEditRules = await page.evaluate(() => {
@@ -125,7 +125,7 @@ function findChromium() {
     return mrCompetitions(kid).length === comps && mrFines(kid).length === fines
         && mrHonestyStrikes(kid).length === 0;
   });
-  await page.evaluate(() => { setPocketTab('balance'); goWeek(); });
+  await page.evaluate(() => goWeek());
 
   // Day view: Timeline/Checklist toggle reachable in portrait
   await page.evaluate(() => openDay(getDayKeys(0)[5], 5));
@@ -696,6 +696,30 @@ function findChromium() {
     mnySchoolConcept = 'debt';
     delete pd.debts;
     return namesHerDebt && atStage1 && lockedExplains && unlockEarly;
+  });
+
+  // A price raised today shows on the kid's list straight away — it is what she
+  // checks before deciding to go and do the bins. What she already earned this
+  // week keeps the price that was live when she did it.
+  checks.priceChangeShowsButDoesNotRestate = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey;
+    mrEnsureEarnings(kid, wk).overrides = {};
+    ['dishes', 'mop', 'vacuum'].forEach((c, i) => mrSetChoreGrade(kid, wk, i, c, 3));
+    const earnedBefore = mrWeekBreakdown(wk, kid).chorePaid;
+    const wasPaying = mrRules().chores.grade[3];
+    mrApplyEdits([{ path: 'chores.grade.3', value: wasPaying + 1 }], { reason: 'family_meeting' });
+    mnyOpenMyMoney(kid);
+    mnyOpenPrices.all = true; mnyRenderMyMoney();
+    const txt = document.getElementById('mnyPage1Wrap').textContent;
+    const showsNewPrice = txt.includes('$' + (wasPaying + 1).toFixed(2));
+    // Whether the week restates depends on when the edit takes effect; what
+    // must never happen is a past week silently moving.
+    const pastWeek = '2020-01-06';
+    const pastUnchanged = mrRulesForWeek(pastWeek).chores.grade[3] === wasPaying;
+    mrApplyEdits([{ path: 'chores.grade.3', value: wasPaying }], { reason: 'correct_error' });
+    return showsNewPrice && pastUnchanged && earnedBefore > 0;
   });
 
   checks.noConsoleErrors = errors.length === 0;

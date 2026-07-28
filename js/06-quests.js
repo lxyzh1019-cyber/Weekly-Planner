@@ -214,82 +214,6 @@ function buildHowIEarnCard(kid, wk) {
   return buildHowIEarnCardLegacy(kid, wk);
 }
 
-/* The live version: what she has actually earned this week, by channel, with
-   the rule beside each number. Every figure comes from mrWeekBreakdown, which
-   is the same computation the family meeting settles on. */
-function buildHowIEarnCardLive(kid, wk) {
-  const r = mrRulesForWeek(wk);
-  const b = mrWeekBreakdown(wk, kid);
-  const xp = mrXpForWeek(wk, kid);
-  const cfg = r.chores || {};
-
-  const earnCard =
-      `<div class="hm-earn">`
-    +   `<div class="hm-earn-top"><span class="hm-earn-label">This week so far</span><span class="hm-earn-amt">$${b.net.toFixed(2)}</span></div>`
-    +   `<div class="hm-earn-note">confirmed at the family meeting${xp.total ? ` · +${xp.total} XP waiting` : ''}</div>`
-    + `</div>`;
-
-  const rule = (icon, name, text, chip, chipCls) =>
-      `<div class="hm-rule"><span class="hm-rule-icon">${icon}</span>`
-    +   `<span class="hm-rule-text"><b>${escapeHtml(name)}</b> — ${text}</span>`
-    +   `<span class="hm-rule-chip ${chipCls||''}">${chip}</span></div>`;
-
-  const g = cfg.grade || {};
-  let rules = '';
-  rules += rule('🧹', 'Household chores',
-    `on time and to standard $${Number(g[3]||0).toFixed(2)} · late $${Number(g[2]||0).toFixed(2)} · redone $${Number(g[1]||0).toFixed(2)}`,
-    b.chorePaid ? `$${b.chorePaid.toFixed(2)}` : '$0.00',
-    b.chorePaid ? 'chip-green' : '');
-  rules += rule('🎁', 'Free chores',
-    `${cfg.freeChoresPerWeek} a week are free — your lowest-paying ones`,
-    `${(b.chores.freeUsed || []).length}/${cfg.freeChoresPerWeek} used`, 'chip-plain');
-  rules += rule('📅', 'Most in a day',
-    `past $${Number(cfg.dailyCap||0).toFixed(2)} in a day, extra chores earn XP instead`,
-    b.chores.overflowChores ? `${b.chores.overflowChores} → XP` : `$${Number(cfg.dailyCap||0).toFixed(2)}`,
-    b.chores.overflowChores ? 'chip-yellow' : 'chip-plain');
-  rules += rule('📘', 'Learning',
-    `paid per finished bundle — has to be new material`,
-    b.learnPaid ? `$${b.learnPaid.toFixed(2)}` : '$0.00',
-    b.learnPaid ? 'chip-green' : '');
-  rules += rule('🔥', 'Routine streak',
-    `your best run of the week pays — highest tier only`,
-    b.streak.days ? `${b.streak.days} days · $${b.streak.bonus.toFixed(2)}` : 'no run yet',
-    b.streak.bonus ? 'chip-green' : '');
-  rules += rule('🏆', 'Competition',
-    `the official results sheet decides · no cap on points`,
-    b.compPaid ? `$${b.compPaid.toFixed(2)}` : '—',
-    b.compPaid ? 'chip-green' : 'chip-plain');
-  if (b.fines.total > 0) {
-    rules += rule('📦', 'Fines', `a day never goes below $0`,
-      `−$${b.fines.total.toFixed(2)}`, 'chip-yellow');
-  }
-  const voided = Object.keys(b.honesty.voidedChannels || {});
-  if (voided.length || b.honesty.losesChoices) {
-    rules += rule('⚖️', 'Honesty',
-      voided.length ? `${escapeHtml(voided.join(', '))} pays nothing this week` : `choices withdrawn this week`,
-      `step ${Math.min(3, b.honesty.strikes)}`, 'chip-yellow');
-  }
-
-  const w = ensureWallet(kid);
-  const wtile = (label, val, note, cls) =>
-      `<div class="hm-wtile ${cls}"><div class="hm-wtile-label">${label}</div>`
-    +   `<div class="hm-wtile-amt">$${money2(val).toFixed(2)}</div>`
-    +   `<div class="hm-wtile-note">${note}</div></div>`;
-  const wallet =
-      `<div class="hm-wallet">`
-    +   wtile('Cash', w.cash, 'spend or save', 'w-cash')
-    +   wtile('Savings', w.savings, 'earns interest', 'w-savings')
-    +   wtile('GIC', gicTotal(kid), 'locked, grows more', 'w-gic')
-    +   wtile('Stocks', portfolioValue(kid), 'goes up & down', 'w-stocks')
-    + `</div>`;
-
-  // The full price list lives in one place — this links there rather than
-  // keeping a second copy that can drift.
-  const btn = `<button type="button" class="qmp-open" onclick="openPocketMoney('${kid}','balance')">See every price &amp; your loan ›</button>`;
-  return earnCard + `<div class="hm-rules">${rules}</div>` + wallet + btn;
-}
-
-/* Pre-rulebook weeks: the group-payout model with the $6 weekly cap. */
 function buildHowIEarnCardLegacy(kid, wk) {
   const cap = CT_MONEY_CAP;
   const earned = ctGroupEarned(wk, kid);                    // fired chore money (sticky)
@@ -358,7 +282,7 @@ function buildHowIEarnCardLegacy(kid, wk) {
   // Bank & Invest is a parent surface — kids see their balances here but the
   // bank screen itself only opens from parent mode.
   const bankBtn = isParent()
-    ? `<button type="button" class="qmp-open" onclick="openMoneyScreen('${kid}')">Open Bank &amp; Invest ›</button>`
+    ? `<button type="button" class="qmp-open" onclick="mnyOpenMyMoney('${kid}')">Open My money ›</button>`
     : '';
   return earnCard + `<div class="hm-rules">${rules}</div>` + wallet + bankBtn;
 }
