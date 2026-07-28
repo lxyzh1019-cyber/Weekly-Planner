@@ -134,34 +134,14 @@ function moneySellStock(kid, ticker, shares) {     // a bit of a company → cas
   w.cash = money2(w.cash + proceeds); saveAll(); return true;
 }
 
-/* One month on. Interest lands on what is kept ready, and anything locked away
-   that has reached its date pays out. There is no market simulation any more:
-   a share is worth what the Money rules page says it is worth, which is both
-   simpler and closer to how it really works.
-   Returns a summary for the meeting recap. Called once per weekly meeting. */
+/* Bring the world up to today. The simulation runs on real calendar time
+   (js/21-money-data.js) — interest for the days that actually passed, locked
+   money maturing on its real date, share prices moving with the month — so
+   this is just the meeting's name for "catch up before you settle anything".
+   Kept under the old name because the meeting recap still calls it. */
 function moneyAdvanceMonth(kid) {
-  const w = ensureWallet(kid);
-  let interest = 0;
-  mnyHoldingsOfKind(kid, 'savings').forEach(h => {
-    const add = money2(mnyHoldingValue(h) * ((Number(h.rateAnnual) || 0) / 12));
-    if (!(add > 0)) return;
-    h.units = 1;
-    h.priceNow = money2(mnyHoldingValue(h) + add);
-    h.updatedAt = Date.now();
-    interest = money2(interest + add);
-  });
-  const maturedList = [];
-  const today = todayKey();
-  mnyHoldingsOfKind(kid, 'gic').slice().forEach(h => {
-    if (!h.maturesOn || String(h.maturesOn) > String(today)) return;
-    const value = mnyHoldingValue(h);
-    const payout = money2(value * (1 + (Number(h.rateAnnual) || 0)));
-    w.cash = money2(w.cash + payout);
-    maturedList.push({ amount: value, payout, termMonths: h.termMonths || 12 });
-    mnyRemoveHolding(kid, h.id);
-  });
-  saveAll();
-  return { interest, matured: maturedList };
+  const r = mnySimCatchUp(kid);
+  return { interest: r.interest, matured: r.matured };
 }
 
 /* Kids may look at what they own on 💰 My money; every function that moves it

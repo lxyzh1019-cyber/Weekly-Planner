@@ -180,6 +180,10 @@ const MNY_HOLDING_KINDS = [
   { id: 'stock',   icon: '📈', label: 'A bit of a company' },
 ];
 
+/* What the blended funds earn a year when nobody is picking companies. Real
+   long-run-ish numbers, kept as defaults a parent can edit per holding. */
+const MNY_FUND_RATES = { index: 0.07, bond: 0.03 };
+
 function mnyNormalizeHolding(h) {
   if (!h || typeof h !== 'object') return null;
   if (!h.id) h.id = mrNewId('hold-');
@@ -191,8 +195,111 @@ function mnyNormalizeHolding(h) {
   if (h.rateAnnual == null) h.rateAnnual = 0;      // 0.015 = 1.5% a year
   if (!h.openedOn) h.openedOn = todayKey();
   if (h.maturesOn == null) h.maturesOn = '';
+  // The last day this holding's growth was worked out, and what it was worth at
+  // the last settled Sunday. Both drive the simulation below.
+  if (!h.lastAccruedOn) h.lastAccruedOn = h.openedOn || todayKey();
+  if (h.valueAtLastMeeting == null) h.valueAtLastMeeting = money2(h.units * h.priceNow);
   if (!h.createdAt) h.createdAt = Date.now();
   return h;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   THE SIMULATION — on real calendar time
+
+   Money does not wait for a family meeting. Interest accrues on the days that
+   actually passed, a locked deposit matures on its real date, and a share is
+   worth whatever the market says this month. Tying any of that to "one meeting
+   = one month" made the world move only when a grown-up remembered to open a
+   screen, which is exactly the wrong lesson.
+
+   `mnySimCatchUp` is lazy and idempotent: every money surface calls it on
+   render and the commit calls it before it settles anything, and running it
+   twice in one day does nothing the second time. That is what lets the app be
+   closed for three weeks and still be right when it opens.
+   ════════════════════════════════════════════════════════════════ */
+
+/* Whole days between two dayKeys, never negative. */
+function mnyDaysBetween(fromKey, toKey) {
+  const a = formatDayKey(fromKey), b = formatDayKey(toKey);
+  return Math.max(0, Math.round((b - a) / 86400000));
+}
+/* Which column of a 12-month price series a real calendar month lands on.
+   The data is one real year; after twelve months it cycles, which is honest
+   enough for a teaching model and never leaves a price undefined. */
+function mnyPriceForMonth(ticker, dayKey) {
+  const series = (STOCKS_2023[ticker] || {}).prices;
+  if (!series) return null;
+  const d = formatDayKey(dayKey || todayKey());
+  return series[((d.getMonth() % series.length) + series.length) % series.length];
+}
+
+function mnySimCatchUp(kid, opts) {
+  const o = opts || {};
+  const today = o.dayKey || todayKey();
+  const w = ensureWallet(kid);
+  let interest = 0, moved = false;
+  const matured = [];
+
+  mnyEnsureHoldings(kid).slice().forEach(h => {
+    const days = mnyDaysBetween(h.lastAccruedOn, today);
+
+    // Anything locked away pays out on its date — principal plus the interest
+    // it was promised for the term. It is the one holding that ends by itself.
+    if (h.kind === 'gic' && h.maturesOn && String(h.maturesOn) <= String(today)) {
+      const value = mnyHoldingValue(h);
+      const term = (Number(h.termMonths) || 12) / 12;
+      const payout = money2(value * (1 + (Number(h.rateAnnual) || 0) * term));
+      w.cash = money2(w.cash + payout);
+      matured.push({ id: h.id, name: h.name, amount: value, payout });
+      mnyRemoveHolding(kid, h.id);
+      moved = true;
+      return;
+    }
+    if (!days) return;
+
+    if (h.kind === 'savings' || (h.kind === 'stock' && !h.ticker)) {
+      // Kept-ready money and the blended funds grow smoothly: simple interest
+      // for the days that actually passed. No compounding — it is both gentler
+      // and easier to explain than interest on interest.
+      const rate = (h.rateAnnual != null) ? Number(h.rateAnnual)
+                 : (MNY_FUND_RATES[h.fundId] || 0);
+      const add = money2(mnyHoldingValue(h) * rate * (days / 365));
+      if (add > 0) {
+        h.units = 1;
+        h.priceNow = money2(mnyHoldingValue(h) + add);
+        interest = money2(interest + add);
+        moved = true;
+      }
+    } else if (h.kind === 'stock' && h.ticker) {
+      // A real company's price for this calendar month. It goes down as often
+      // as it goes up, which is the entire point of holding one.
+      const price = mnyPriceForMonth(h.ticker, today);
+      if (price != null && money2(price) !== money2(h.priceNow)) {
+        h.priceNow = money2(price);
+        moved = true;
+      }
+    }
+    h.lastAccruedOn = today;
+    h.updatedAt = Date.now();
+  });
+
+  if (moved) saveAll();
+  return { interest, matured };
+}
+
+/* What her money made on its own since the last settled Sunday — interest
+   credited plus any change in what her companies are worth. This is real
+   income, it just was not earned by working, and a week's bar that leaves it
+   out does not add up. */
+function mnyPassiveSinceLastMeeting(kid) {
+  mnySimCatchUp(kid);
+  return money2(mnyEnsureHoldings(kid)
+    .reduce((s, h) => s + (mnyHoldingValue(h) - money2(h.valueAtLastMeeting)), 0));
+}
+/* Called once the week is settled: this Sunday becomes the new baseline. */
+function mnyStampPassiveBaseline(kid) {
+  mnyEnsureHoldings(kid).forEach(h => { h.valueAtLastMeeting = mnyHoldingValue(h); });
+  saveAll();
 }
 
 /* Lazy-init + one-time migration off the old wallet, mirroring bankConfig().
@@ -717,17 +824,25 @@ function mnySegments(list) {
    that happened this week, and dropping it into a weekly bar would make the
    segments add up to more than the week did. That number has its own home —
    the returns statement on page 2, where it is the whole point. */
+/* Everything that came in this week, including what her money made on its own.
+   Passive income belongs here: it is income, it happened this week, and a bar
+   that omits it does not add up to what she is worth now. It is deliberately
+   the last segment and a muted grey — she did not work for it, and the whole
+   lesson is that it arrived anyway. */
 function mnyIncomeSegments(weekKey, kid) {
   const pool = mnyPool(weekKey, kid);
   const b = pool.breakdown;
+  const passive = mnyPassiveSinceLastMeeting(kid);
   const out = mnySegments([
-    { label: 'Jobs',         value: b.chorePaid,    color: '#95d5b2' },
-    { label: 'Learning',     value: b.learnPaid,    color: '#6fb1fc' },
-    { label: 'Clean days',   value: b.streakBonus,  color: '#ffd166' },
-    { label: 'Competitions', value: b.compPaid,     color: '#ff9eb5' },
-    { label: 'From outside', value: pool.deposits,  color: '#c9a6e8' },
+    { label: 'Jobs',           value: b.chorePaid,    color: '#95d5b2' },
+    { label: 'Learning',       value: b.learnPaid,    color: '#6fb1fc' },
+    { label: 'Clean days',     value: b.streakBonus,  color: '#ffd166' },
+    { label: 'Competitions',   value: b.compPaid,     color: '#ff9eb5' },
+    { label: 'From outside',   value: pool.deposits,  color: '#c9a6e8' },
+    { label: 'Made on its own', value: Math.max(0, passive), color: '#b8b0a2' },
   ]);
   out.fines = money2(b.fines.total);
+  out.passive = passive;
   return out;
 }
 function mnyOutflowSegments(weekKey, kid, split) {

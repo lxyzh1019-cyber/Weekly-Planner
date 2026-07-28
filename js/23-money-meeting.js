@@ -78,6 +78,7 @@ function mnyStrip(wk, kid, liveIdx) {
 function mnyRenderEarned(wk) {
   const kid = mnyMeetingKid();
   if (!mrUsesNewModel(wk)) return mmRenderConfirm(wk, false);
+  mnySimCatchUp(kid);          // the world moves whether or not we met last week
 
   const confirmed = mnyIsConfirmed(wk, kid);
   return `<div class="mm-h">💪 What ${kid === 'jenn' ? 'Jenn' : 'Jess'} earned</div>
@@ -379,6 +380,7 @@ function mnyReturnsCard(kid) {
    ════════════════════════════════════════════════════════════════ */
 function mnyRenderDecide(wk) {
   const kid = mnyMeetingKid();
+  mnySimCatchUp(kid);
   if (!mrUsesNewModel(wk)) {
     return `<div class="mm-h">🤝 What I do with it</div>
       <div class="ct-meta">This week was earned under the old group model, which paid as the chores were done. There is nothing to decide.</div>`;
@@ -768,6 +770,11 @@ function mnyDoCommit() {
   if (!d || !mnyIsConfirmed(wk, kid) || mnyIsCommitted(wk, kid)) return;
   if (!isParent()) { showToast('A grown-up moves the money 🔒'); return; }
 
+  // Catch the world up first: interest earned and prices moved since the last
+  // meeting are part of this week, and the ledger has to record them.
+  mnySimCatchUp(kid);
+  const passive = mnyPassiveSinceLastMeeting(kid);
+
   mmTakeUndoSnapshot(wk);
 
   // 1 · money from outside joins the pool FIRST. It carries no destination —
@@ -824,8 +831,11 @@ function mnyDoCommit() {
     ledger.gic = money2(split.gic);
     ledger.stock = money2(split.stock);
     ledger.reflect = d.reflect;
+    ledger.passive = passive;
     ledger.debtBalanceAfter = mnyTotalOwing(kid);
   }
+  // This Sunday becomes the new baseline for "made on its own".
+  mnyStampPassiveBaseline(kid);
 
   // 5 · the shared half of the meeting, once BOTH kids are settled.
   if (['jenn', 'jess'].every(k => mnyIsCommitted(wk, k))) commitMeetingShared(wk);
@@ -854,8 +864,11 @@ function mnyBuyChosenFund(kid, dollars) {
     held.costBasis = money2(money2(held.costBasis) + amt);
     held.updatedAt = Date.now();
   } else {
+    // A blended fund has no share price to look up, so it grows at a rate like
+    // a savings account does — just a much better one, with the risk to match.
     mnyAddHolding(kid, { kind: 'stock', name: fund.label, fundId: fund.id,
-                         units: 1, priceNow: amt, costBasis: amt });
+                         units: 1, priceNow: amt, costBasis: amt,
+                         rateAnnual: MNY_FUND_RATES[fund.id] || 0 });
   }
   saveAll();
 }

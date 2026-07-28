@@ -91,6 +91,9 @@ function mnyRenderMyMoney() {
   if (!wrap) return;
   const kid = mnyViewKid();
   const wk = mnyWeekKey();
+  // Bring the world up to today before drawing it. The app can be shut for
+  // three weeks; the interest still happened.
+  mnySimCatchUp(kid);
 
   const badge = document.getElementById('mnyProfileBadge');
   if (badge) badge.textContent = `${CT_PROFILE_ICON[kid] || ''} ${mnyKidName(kid)}`;
@@ -172,14 +175,15 @@ function mnyWalletCard(kid) {
    the number and the picture can never tell two different stories. */
 function mnyIncomeCard(kid, wk) {
   const data = mnyIncomeSegments(wk, kid);
-  const made = mnyReturns(kid).gain;
   return `<div class="mny-card">
       <div class="mny-label">Money that came in this week</div>
       <div class="mny-total sm">${mnyMoney(data.total)}</div>
       ${mnyBarHtml(data, { empty: 'Nothing yet — the week has just started' })}
-      ${made > 0
-        ? `<div class="mny-note">Separately, what you already own has made <b>${mnyMoney(made)}</b> since you got it — without you doing anything. ${mnyAskBtn('save')}</div>`
-        : ''}
+      ${data.passive > 0
+        ? `<div class="mny-note">${mnyMoney(data.passive)} of that you did nothing for — it is what your money made by itself. ${mnyAskBtn('save')}</div>`
+        : (data.passive < 0
+          ? `<div class="mny-note warn">Your companies are worth ${mnyMoney(-data.passive)} less than last Sunday. That happens — it can go back up. ${mnyAskBtn('stock')}</div>`
+          : '')}
     </div>`;
 }
 

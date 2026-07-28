@@ -754,6 +754,90 @@ function findChromium() {
     return showsNewPrice && pastUnchanged && earnedBefore > 0;
   });
 
+  /* ── The simulation runs on real calendar time ── */
+
+  // Interest is for the days that actually passed, not for "one meeting". The
+  // app can be shut for a month and still be right when it opens — and running
+  // the catch-up twice in one day must not pay twice.
+  checks.interestAccruesOnRealDays = await page.evaluate(() => {
+    const kid = 'jenn', pd = getProfData(kid);
+    delete pd.holdings;
+    pd.wallet = { cash: 0, savings: 0, gics: [], holdings: {}, lastMeetingWeek: null };
+    const h = mnyAddHolding(kid, { kind: 'savings', name: 'Money kept ready', units: 1,
+                                   priceNow: 1000, costBasis: 1000, rateAnnual: 0.05 });
+    h.lastAccruedOn = '2026-01-01';
+    mnySimCatchUp(kid, { dayKey: '2026-01-31' });        // 30 days at 5%/yr on $1000
+    const after30 = mnySavedTotal(kid);
+    const expected = money2(1000 + 1000 * 0.05 * (30 / 365));   // ≈ $1004.11
+    mnySimCatchUp(kid, { dayKey: '2026-01-31' });        // same day again → no-op
+    const idempotent = mnySavedTotal(kid) === after30;
+    delete pd.holdings;
+    return Math.abs(after30 - expected) < 0.02 && idempotent;
+  });
+
+  // Locked money ends by itself, on its real date — nobody has to remember.
+  checks.lockedMoneyMaturesOnItsDate = await page.evaluate(() => {
+    const kid = 'jenn', pd = getProfData(kid);
+    delete pd.holdings;
+    ensureWallet(kid).cash = 0;
+    mnyAddHolding(kid, { kind: 'gic', name: 'Locked away for a year', units: 1,
+                         priceNow: 100, costBasis: 100, rateAnnual: 0.04,
+                         termMonths: 12, maturesOn: '2026-06-01' });
+    mnySimCatchUp(kid, { dayKey: '2026-05-31' });        // the day before
+    const stillLocked = mnyLockedTotal(kid) === 100 && ensureWallet(kid).cash === 0;
+    const r = mnySimCatchUp(kid, { dayKey: '2026-06-01' });   // the day itself
+    const paidOut = mnyLockedTotal(kid) === 0
+                 && ensureWallet(kid).cash === 104            // $100 + a year at 4%
+                 && r.matured.length === 1;
+    delete pd.holdings;
+    ensureWallet(kid).cash = 0;
+    return stillLocked && paidOut;
+  });
+
+  // A real company's price moves with the calendar, and it goes down as often
+  // as it goes up — which is the whole reason for holding one.
+  checks.sharePriceFollowsTheCalendar = await page.evaluate(() => {
+    const kid = 'jenn', pd = getProfData(kid);
+    delete pd.holdings;
+    const h = mnyAddHolding(kid, { kind: 'stock', name: 'Tesla', ticker: 'TSLA',
+                                   units: 1, priceNow: 0, costBasis: 300 });
+    h.lastAccruedOn = '2026-01-01';
+    mnySimCatchUp(kid, { dayKey: '2026-04-15' });
+    const april = mnyHoldings(kid)[0].priceNow;
+    mnyHoldings(kid)[0].lastAccruedOn = '2026-04-15';
+    mnySimCatchUp(kid, { dayKey: '2026-06-15' });
+    const june = mnyHoldings(kid)[0].priceNow;
+    const followsMonth = april === STOCKS_2023.TSLA.prices[3]     // April column
+                      && june === STOCKS_2023.TSLA.prices[5];     // June column
+    const canFall = STOCKS_2023.TSLA.prices[3] < STOCKS_2023.TSLA.prices[2];
+    delete pd.holdings;
+    return followsMonth && canFall;
+  });
+
+  // Money made on its own is income: it belongs in the week's bar, and in the
+  // ledger, or the bar does not add up to what she is worth now.
+  checks.passiveIncomeIsCountedAndBaselined = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey, pd = getProfData(kid);
+    delete pd.holdings;
+    const h = mnyAddHolding(kid, { kind: 'savings', name: 'Money kept ready', units: 1,
+                                   priceNow: 500, costBasis: 500, rateAnnual: 0.05 });
+    h.lastAccruedOn = '2026-01-01';
+    h.valueAtLastMeeting = 500;
+    mnySimCatchUp(kid, { dayKey: '2026-03-01' });
+    const passive = mnyPassiveSinceLastMeeting(kid);
+    const inBar = mnyIncomeSegments(wk, kid);
+    const counted = passive > 0
+      && inBar.passive === passive
+      && inBar.segs.some(s => s.label === 'Made on its own');
+    // Once the week is settled, this Sunday becomes the new baseline.
+    mnyStampPassiveBaseline(kid);
+    const rebaselined = mnyPassiveSinceLastMeeting(kid) === 0;
+    delete pd.holdings;
+    return counted && rebaselined;
+  });
+
   checks.noConsoleErrors = errors.length === 0;
 
   const failed = Object.entries(checks).filter(([,v]) => !v).map(([k]) => k);

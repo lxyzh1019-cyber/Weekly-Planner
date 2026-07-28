@@ -236,8 +236,11 @@ function mergeProfileState(localProfile, remoteProfile, profName) {
   merged.honesty      = mergeArrayById(lp.honesty,      rp.honesty,      'hon:');
   // Money from outside — birthday money, a gift. Append-only, like the others.
   merged.deposits = mergeArrayById(lp.deposits, rp.deposits, 'dep:');
-  // What she owns. Each holding is edited in place by a parent, so newest copy
-  // of each id wins and a removed one stays removed.
+  // What she owns. Each holding is edited in place — by a parent, and by the
+  // simulation catching up on interest and prices — so newest copy of each id
+  // wins and a removed one stays removed. Two devices catching up the same day
+  // compute the same figures from the same dates, so newest-wins is safe here:
+  // the loser is not a lost edit, it is an identical one.
   merged.holdings = mergeArrayById(lp.holdings, rp.holdings, 'hold:');
   // Debts: an id-keyed array now that a kid can owe for more than one thing.
   // Each record carries its own `payments` ledger -- a lost payment is money

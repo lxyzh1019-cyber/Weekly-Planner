@@ -321,12 +321,15 @@ function mnyHoldingsEditor(kid) {
         <label class="mny-field"><span>What she calls it</span>
           <input type="text" value="${escapeAttr(h.name)}" data-mnyp-action="holdname" data-mnyp-id="${escapeAttr(h.id)}"></label>
         <div class="mny-rows">
-          ${h.kind === 'stock' ? bump('How many', 'units', 1) : ''}
-          ${bump(h.kind === 'stock' ? 'Worth each, today' : 'Worth today', 'priceNow', 5)}
+          ${h.ticker ? bump('How many', 'units', 1) : ''}
+          ${bump(h.ticker ? 'Worth each, today' : 'Worth today', 'priceNow', 5)}
           ${bump('What it cost', 'costBasis', 5)}
-          ${h.kind !== 'stock' ? bump('Interest a year', 'rateAnnual', 0.005) : ''}
+          ${h.ticker ? '' : bump('Growth a year', 'rateAnnual', 0.005)}
           <div class="mny-row total"><span>Worth now</span><b>${mnyMoney(mnyHoldingValue(h))}</b></div>
         </div>
+        ${h.ticker
+          ? `<div class="mny-note">${escapeHtml(h.ticker)}'s price follows the calendar month on its own. Setting it here holds until the month turns.</div>`
+          : `<div class="mny-note">This grows by itself, a bit every day, at the rate above.</div>`}
         ${h.kind === 'gic' ? `<label class="mny-field"><span>Unlocks on</span>
           <input type="date" value="${escapeAttr(h.maturesOn || '')}" data-mnyp-action="holddate" data-mnyp-id="${escapeAttr(h.id)}"></label>` : ''}
       </div>`;
@@ -344,7 +347,7 @@ function mnyHoldingsEditor(kid) {
         <div class="mny-row"><span>In companies</span><b>${mnyMoney(mnyInvestedTotal(kid))}</b></div>
         <div class="mny-row total"><span>Everything</span><b>${mnyMoney(mnyEverything(kid))}</b></div>
       </div>
-      <div class="mny-note">Made so far: <b>${mnySigned(r.gain)}</b>. On this rate, another <b>${mnySigned(r.yearAhead)}</b> over a year. There is no market here — you set what a share is worth, which is the honest version.</div>
+      <div class="mny-note">Made so far: <b>${mnySigned(r.gain)}</b>. On this rate, another <b>${mnySigned(r.yearAhead)}</b> over a year. All of it moves on its own: interest for the days that pass, share prices with the calendar month, and locked money paying out on its date.</div>
     </div>
     ${cards}
     <div class="mny-card">
