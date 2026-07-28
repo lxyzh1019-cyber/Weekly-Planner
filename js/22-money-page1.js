@@ -427,8 +427,16 @@ function mnyHandleClick(ev) {
   if (a === 'kid')    { mnySetKid(el.getAttribute('data-mny-kid')); return; }
   if (a === 'story')  { mnyOpenStory(); return; }
   if (a === 'school') { if (typeof mnyOpenSchool === 'function') mnyOpenSchool(mnyViewKid()); return; }
-  if (a === 'prices') { mnyOpenPrices.all = !mnyOpenPrices.all; mnyRenderMyMoney(); return; }
-  if (a === 'ask')    { mnyShowConcept(el.getAttribute('data-mny-concept')); return; }
+  if (a === 'prices') {
+    // From Money school this is a link to the price list rather than a toggle
+    // on a card that is not on screen.
+    if (!document.getElementById('screen-mymoney').classList.contains('active')) {
+      mnyOpenPrices.all = true; mnyOpenMyMoney(mnyViewKid()); return;
+    }
+    mnyOpenPrices.all = !mnyOpenPrices.all; mnyRenderMyMoney(); return;
+  }
+  if (a === 'ask')     { mnyShowConcept(el.getAttribute('data-mny-concept')); return; }
+  if (a === 'concept') { mnySchoolConcept = el.getAttribute('data-mny-concept'); mnyRenderSchool(); return; }
   if (a === 'cal') {
     const month = mnyCalMonth || String(todayKey()).slice(0, 7);
     const [y, m] = month.split('-').map(Number);
@@ -458,12 +466,14 @@ function mnyShowConcept(id) {
        <div class="mny-sub">${escapeHtml(c.whyLabel)}</div><p>${escapeHtml(c.why)}</p>
        <div class="mny-sub">${escapeHtml(c.riskLabel)}</div><p>${escapeHtml(c.risk)}</p>`
     : `<p>🔒 ${escapeHtml(mnyNeedLabel(c.need))}.</p>`;
-  showToastCard(`${c.icon} ${c.title}`, body);
+  // Every `?` in the system can hand off to the page that teaches the idea
+  // properly, so a question asked anywhere lands somewhere that answers it.
+  showToastCard(`${c.icon} ${c.title}`, body, c.id);
 }
 
 /* A plain dismissible card. Uses the app's sheet chrome if it is available and
    falls back to a toast, so a `?` always answers something. */
-function showToastCard(title, bodyHtml) {
+function showToastCard(title, bodyHtml, conceptId) {
   const existing = document.getElementById('mnyConceptCard');
   if (existing) existing.remove();
   const el = document.createElement('div');
@@ -472,10 +482,19 @@ function showToastCard(title, bodyHtml) {
   el.innerHTML = `<div class="mny-concept" role="dialog" aria-modal="true" aria-label="${escapeAttr(title)}">
       <div class="mny-concept-title">${escapeHtml(title)}</div>
       <div class="mny-concept-body">${bodyHtml}</div>
+      ${conceptId ? `<button type="button" class="mny-btn wide" id="mnyConceptMore">🎓 Take me to Money school</button>` : ''}
       <button type="button" class="mny-btn wide" id="mnyConceptClose">Got it</button>
     </div>`;
   document.body.appendChild(el);
   const close = () => el.remove();
   el.addEventListener('click', e => { if (e.target === el) close(); });
   el.querySelector('#mnyConceptClose').addEventListener('click', close);
+  const more = el.querySelector('#mnyConceptMore');
+  if (more) more.addEventListener('click', () => {
+    close();
+    // The meeting runs in an overlay; leaving it open over the school page
+    // would strand her behind a scrim she cannot see past.
+    if (typeof closeSheet === 'function') closeSheet('familyMeetingOverlay');
+    mnyOpenSchool(mnyViewKid(), conceptId);
+  });
 }

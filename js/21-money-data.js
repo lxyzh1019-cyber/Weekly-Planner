@@ -129,18 +129,20 @@ const MNY_PAID = [
 /* The eight ideas Money school teaches, in the order they open. `need` is the
    stage; the debt card names the real debt at render time. */
 const MNY_CONCEPTS = [
+  /* {debt} is filled in with the real name from her debt record, so this reads
+     as being about her week rather than about money in general. */
   { id: 'debt', icon: '🎿', title: 'Owing money', need: 0,
-    what: 'Someone paid for something now, and you pay them back a bit at a time.',
-    why: 'You get the thing straight away instead of waiting years to save for it.',
-    risk: 'Until it is paid off, part of every week is already spoken for.' },
+    what: 'We paid for {debt} up front, and you pay us back a bit at a time.',
+    why: 'You got it straight away instead of waiting years to save up for it.',
+    risk: 'Until {debt} is paid off, part of every week is already spoken for.' },
   { id: 'cash', icon: '💵', title: 'Cash', need: 0,
     what: 'Money you can use today, sitting in your wallet.',
     why: 'It is ready the moment you need it.',
     risk: 'It does not grow at all while it sits there.' },
   { id: 'extra', icon: '⚡', title: 'Paying early', need: 0,
-    what: 'Paying more than you have to, before it is due.',
-    why: 'You earn a bonus for it, and the loan ends sooner.',
-    risk: 'That money is gone into the loan — you cannot get it back out.',
+    what: 'Paying more off {debt} than you have to, before it is due.',
+    why: 'You earn a bonus for it, and {debt} is gone sooner.',
+    risk: 'That money has gone into {debt} — you cannot get it back out.',
     whyLabel: 'The good side', riskLabel: 'The other side' },
   { id: 'ready', icon: '🏦', title: 'Keeping money ready', need: 30,
     what: 'Money set aside that you can still get back whenever you want.',

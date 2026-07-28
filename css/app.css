@@ -4481,3 +4481,10 @@
   .mny-card.mny-pending { background: var(--bg2); border-width: 3px; }
   .mny-row.changed b { background: var(--accent-yellow, #ffd166); border-radius: 5px; padding: 0 0.2rem; }
   #mnyRulesWrap .mny-card { margin-bottom: 0.7rem; }
+  /* A stage she has not reached is dimmed rather than hidden: seeing what is
+     coming is part of what makes paying the loan down feel like progress. */
+  .mny-row.dim { opacity: 0.5; }
+  /* A locked lesson stays tappable — pressing it explains what opens it, which
+     beats a dead button with no explanation. */
+  .mny-chip.locked { background: #f2ece0; color: var(--ink-light); }
+  .mny-chip.locked.on { background: var(--ink-light); color: var(--paper); }

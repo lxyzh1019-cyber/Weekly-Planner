@@ -667,6 +667,37 @@ function findChromium() {
     return stayedFrozen && editable && removable;
   });
 
+  /* ── Money school ── */
+
+  // The lessons arrive as the debt comes down, they name her actual debt, and
+  // a locked one says what opens it rather than being a dead button.
+  checks.moneySchoolGatesAndNames = await page.evaluate(() => {
+    profile = 'parent'; parentViewing = 'jess';
+    const kid = 'jess', pd = getProfData(kid);
+    delete pd.debts;
+    const d = mnyDebts(kid)[0];
+    d.name = 'Ski loan'; d.paid = 280;                 // 35% of $800
+    mnyOpenSchool(kid);
+    const txt = () => document.getElementById('mnySchoolWrap').textContent;
+    const namesHerDebt = txt().includes('Ski loan');
+    const atStage1 = mnyStageIndex(kid) === 1 && mnyPaidPct(kid) === 35;
+
+    mnySchoolConcept = 'stock'; mnyRenderSchool();     // needs 90%
+    const lockedExplains = txt().includes('Opens at 90%')
+      && /Pay off .* more and this one opens/.test(txt())
+      && !txt().includes('buy a small piece');         // the body stays shut
+
+    // A parent can float her forward when the conversation gets there first.
+    mrApplyEdits([{ path: 'school.unlockStage.jess', value: 4 }], { reason: 'family_meeting' });
+    mnyRenderSchool();
+    const unlockEarly = txt().includes('buy a small piece')
+      && mnyIsOpen(kid, 90);
+    mrApplyEdits([{ path: 'school.unlockStage.jess', value: 0 }], { reason: 'correct_error' });
+    mnySchoolConcept = 'debt';
+    delete pd.debts;
+    return namesHerDebt && atStage1 && lockedExplains && unlockEarly;
+  });
+
   checks.noConsoleErrors = errors.length === 0;
 
   const failed = Object.entries(checks).filter(([,v]) => !v).map(([k]) => k);
