@@ -783,10 +783,15 @@ function mnyPctOf(rate, dollars) {
   const txt = (Math.round(pct * 10) / 10) + '%';
   return dollars == null ? txt : txt + ' — ' + mnyMoney(dollars);
 }
+/* "Jul 28" is fine for something that happened this year. For a debt-free date
+   three years out it is worse than useless — it reads as next week. The year
+   appears whenever it is not the current one. */
 function mnyShortDate(dayKey) {
   if (!dayKey) return '—';
   const d = formatDayKey(dayKey);
-  return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()] + ' ' + d.getDate();
+  const txt = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()] + ' ' + d.getDate();
+  const thisYear = formatDayKey(todayKey()).getFullYear();
+  return d.getFullYear() === thisYear ? txt : (txt + ' ' + d.getFullYear());
 }
 /* The week the money pages are looking at — the planner's current week. */
 function mnyWeekKey() {

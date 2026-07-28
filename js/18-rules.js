@@ -281,7 +281,10 @@ function mrApplyEdits(changes, { reason, note, effectiveFrom } = {}) {
     const before = mrGetPath(rules, ch.path);
     if (JSON.stringify(before) === JSON.stringify(ch.value)) return;   // no-ops make no version
     mrSetPath(rules, ch.path, ch.value);
-    applied.push({ path: ch.path, from: before, to: ch.value });
+    // `label` is what the editor called this field on screen. A history that
+    // reads "chores.grade.3" is a history nobody checks; "On time and to
+    // standard" is one a parent can actually scan six months later.
+    applied.push({ path: ch.path, from: before, to: ch.value, label: ch.label || null });
   });
   if (!applied.length) return null;
 
@@ -306,7 +309,7 @@ function mrApplyEdits(changes, { reason, note, effectiveFrom } = {}) {
   applied.forEach(a => mrLogAppend({
     versionId: version.id, effectiveFrom: from,
     path: a.path, from: a.from, to: a.to,
-    reason: reason || MR_DEFAULT_REASON, note: note || '',
+    reason: reason || MR_DEFAULT_REASON, note: a.label || note || '',
   }));
   saveAll();
   return version;

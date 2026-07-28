@@ -4473,3 +4473,11 @@
 
   .mny-spark { width: 100%; height: 60px; margin-top: 0.4rem; }
   .mny-note.warn, .warn { color: var(--mny-fine); }
+
+  /* ── Money rules (parent) ── */
+  /* A queued edit is visibly different from a saved one: nothing on this page
+     takes effect until the pending bar is confirmed, and a stepper that looked
+     saved would be a lie about what the kid's page is showing. */
+  .mny-card.mny-pending { background: var(--bg2); border-width: 3px; }
+  .mny-row.changed b { background: var(--accent-yellow, #ffd166); border-radius: 5px; padding: 0 0.2rem; }
+  #mnyRulesWrap .mny-card { margin-bottom: 0.7rem; }

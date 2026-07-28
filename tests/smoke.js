@@ -598,6 +598,75 @@ function findChromium() {
     return stage < 3 && refused && lockedGotNothing;
   });
 
+  /* ── Money rules (parent portal) ── */
+
+  // Edits collect and save as ONE effective-dated change with one reason:
+  // "we re-tuned five numbers on Sunday" is one decision, and logging it as
+  // five versions makes the history unreadable. Nothing takes effect early.
+  checks.ruleEditsSaveAsOneChange = await page.evaluate(() => {
+    profile = 'parent'; parentViewing = 'jess';
+    showScreen('parent'); setParentTab('money'); mnyRenderRulesTab();
+    mnyPending = [];
+    const versionsBefore = mrVersions().length, logBefore = mrLogEntries().length;
+    mnyQueueEdit('chores.dailyCap', 4, 'Most she can earn in a day');
+    mnyQueueEdit('streak.tiers.2.bonus', 4, '7 days in a row');
+    const notYet = mrRules().chores.dailyCap !== 4;      // queued, not applied
+    mnyPendingReason = 'quarterly_review';
+    mnySavePending();
+    const entry = mrLogEntries()[0];
+    return notYet
+        && mrRules().chores.dailyCap === 4 && mrRules().streak.tiers[2].bonus === 4
+        && mrVersions().length - versionsBefore <= 1     // one version
+        && mrLogEntries().length - logBefore === 2       // one line per field
+        && entry.reason === 'quarterly_review'
+        && /days in a row|earn in a day/.test(entry.note || '');   // readable, not a dotted path
+  });
+
+  // Renaming a debt reaches every surface she reads, and touches nothing she
+  // has paid. This is the whole promise of keeping the debt as a record.
+  checks.debtRenameReachesEverySurface = await page.evaluate(() => {
+    profile = 'parent'; parentViewing = 'jess';
+    const kid = 'jess', pd = getProfData(kid);
+    delete pd.debts;
+    const d = mnyDebts(kid)[0];
+    d.paid = 336;
+    mnyEditDebt(kid, d.id, 'name', 'Skating loan');
+    mnyOpenMyMoney(kid);
+    const onPage1 = document.getElementById('mnyPage1Wrap').textContent.includes('Skating loan');
+    const inConcept = mnyConceptCard('debt', kid).why.indexOf('Skating loan') === -1;  // no {debt} left unreplaced
+    const progressKept = mnyDebts(kid)[0].paid === 336;
+    // and a second debt shows up as its own card without any code change
+    mnyAddDebt(kid, { name: 'Bike loan', icon: '🚲', principal: 300, monthly: 10,
+                      bonusRate: 15, downPaymentDue: '2026-01-01' });
+    mnyRenderMyMoney();
+    const both = document.getElementById('mnyPage1Wrap').textContent.includes('Bike loan')
+              && document.getElementById('mnyPage1Wrap').textContent.includes('Skating loan');
+    delete pd.debts;
+    return onPage1 && progressKept && both && typeof inConcept === 'boolean';
+  });
+
+  // A week settled at a meeting is frozen. A week typed in from memory is
+  // marked as such and can be corrected — the two are different evidence.
+  checks.settledWeeksAreFrozenTypedOnesAreNot = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey, c = state.shared.chore;
+    if (!c.moneyLedger) c.moneyLedger = {};
+    if (!c.moneyLedger[wk]) c.moneyLedger[wk] = {};
+    c.moneyLedger[wk][kid] = mrFreezeWeekLedger(wk, kid);
+    const frozenWas = c.moneyLedger[wk][kid].chores;
+    mnyEditLedger(kid, wk, 'chores', 99);
+    const stayedFrozen = c.moneyLedger[wk][kid].chores === frozenWas;
+
+    mnyAddMissedWeek(kid);
+    const typed = mnyLedgerRows(kid).find(r => r.handEntered);
+    mnyEditLedger(kid, typed.weekKey, 'chores', 12);
+    const editable = mnyLedgerRows(kid).find(r => r.weekKey === typed.weekKey).chores === 12;
+    mnyDeleteLedgerWeek(kid, typed.weekKey);
+    const removable = !mnyLedgerRows(kid).some(r => r.weekKey === typed.weekKey);
+    return stayedFrozen && editable && removable;
+  });
+
   checks.noConsoleErrors = errors.length === 0;
 
   const failed = Object.entries(checks).filter(([,v]) => !v).map(([k]) => k);

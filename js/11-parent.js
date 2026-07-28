@@ -16,6 +16,7 @@ function renderParentHome() {
   renderParentActivities();
   renderPendingApproval();
   renderLevelRules();
+  mnyRenderRulesTab();
 }
 
 function setParentTab(tab) {

@@ -522,6 +522,7 @@
       <button class="parent-tab" role="tab" data-ptab="analysis" onclick="setParentTab('analysis')">📊 Performance</button>
       <button class="parent-tab" role="tab" data-ptab="routines" onclick="setParentTab('routines')">🌅 Routines</button>
       <button class="parent-tab" role="tab" data-ptab="tasks" onclick="setParentTab('tasks')">✅ Tasks</button>
+      <button class="parent-tab" role="tab" data-ptab="money" onclick="setParentTab('money')">💰 Money rules</button>
       <button class="parent-tab" role="tab" data-ptab="rules" onclick="setParentTab('rules')">⚙️ Level-Up</button>
     </div>
   </div>
@@ -589,6 +590,12 @@
   </div>
 
   <!-- TAB: Level-Up Rules -->
+  <!-- TAB: Money rules — everything a grown-up can change about the money
+       system, in one place. Every save is effective-dated and logged. -->
+  <div class="parent-panel" id="ptab-money" role="tabpanel" hidden>
+    <div class="chore-wrap" id="mnyRulesWrap"></div>
+  </div>
+
   <div class="parent-panel" id="ptab-rules" role="tabpanel" hidden>
     <h3 class="parent-h3">⚙️ Level-Up Rules</h3>
     <p class="parent-hint">Earn a ★ on an activity after enough sessions/hours. Shared between both girls.</p>
@@ -1292,6 +1299,7 @@
 <script src="js/21-money-data.js"></script>
 <script src="js/22-money-page1.js"></script>
 <script src="js/23-money-meeting.js"></script>
+<script src="js/24-money-parent.js"></script>
 <script src="js/99-main.js"></script>
 </body>
 </html>
