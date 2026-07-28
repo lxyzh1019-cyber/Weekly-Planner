@@ -466,6 +466,7 @@ function mnyPoolCard(wk, kid, pool) {
         ${due.map(d => `<div class="mny-row"><span>🔒 ${escapeHtml(d.debt.icon + ' ' + d.debt.name)} — ${d.kind === 'down' ? 'deposit' : 'this month'}, already spoken for</span><b>−${mnyMoney(d.amount).slice(1)}</b></div>`).join('')}
         <div class="mny-row total"><span>Mine to choose</span><b>${mnyMoney(pool.mine)}</b></div>
       </div>
+      ${mnyBuysNote(pool.mine)}
       <div class="mny-note">Corrections happen on the step before this one.</div>
       ${short ? `<div class="mny-note warn">There is not enough to cover the payment. ${MNY_SHORTFALL.map(s =>
         `<button type="button" class="mny-chip" onclick="mnyPickShortfall('${s.id}')">${escapeHtml(s.label)}</button>`).join(' ')}</div>` : ''}
@@ -508,6 +509,12 @@ function mnyBucketRows(kid, split) {
       rows.push(`<div class="mny-row"><span>${escapeHtml(d.icon + ' Pay off ' + d.name)} ${mnyAskBtn('extra')}</span><b>${mnyMoney(v)}</b></div>`);
     }
   });
+  mnyGoals(kid).forEach(g => {
+    const v = money2(split['goal:' + g.id]);
+    if (v > 0 || split['goal:' + g.id] != null) {
+      rows.push(`<div class="mny-row"><span>${escapeHtml(g.icon + ' Toward ' + g.name)}</span><b>${mnyMoney(v)}</b></div>`);
+    }
+  });
   [['ready', '💵 Keep it ready', 'ready'], ['gic', '🔒 Lock it away for a year', 'gic'],
    ['stock', '📈 Buy a bit of a company', 'stock']].forEach(([k, label, ask]) => {
     rows.push(`<div class="mny-row"><span>${label} ${mnyAskBtn(ask)}</span><b>${mnyMoney(split[k])}</b></div>`);
@@ -529,6 +536,12 @@ function mnyChangePlanCards(wk, kid, draft, pool) {
 
   const steppers = mnyDebtsByPriority(kid).map(d =>
     `<div class="mny-row"><span>${escapeHtml(d.icon + ' ' + d.name)}</span>${mnyBucketStepper('loan:' + d.id, draft.split['loan:' + d.id])}</div>`).join('')
+    + mnyGoals(kid).map(g => {
+      const pace = mnyGoalPace(kid, g);
+      return `<div class="mny-row"><span>${escapeHtml(g.icon + ' ' + g.name)}
+        ${pace.neededPerWeek != null ? `<small class="mny-sub-row">${mnyMoney(pace.neededPerWeek)} a week keeps it on track</small>` : ''}</span>
+        ${mnyBucketStepper('goal:' + g.id, draft.split['goal:' + g.id])}</div>`;
+    }).join('')
     + MNY_BUCKETS.filter(b => b.key !== 'loan').map(b => {
       const open = mnyIsOpen(kid, b.need);
       return `<div class="mny-row"><span>${b.icon} ${escapeHtml(b.label)}${open ? '' : ' 🔒 ' + mnyNeedLabel(b.need)}</span>
@@ -809,6 +822,20 @@ function mnyDoCommit() {
     toLoan = money2(toLoan + pay);
     if (rec) parts.push(`${debt.name} −$${pay.toFixed(2)} (cleared $${rec.credited.toFixed(2)})`);
   });
+  // Goal money is real kept-ready money with a name on it — it moves into
+  // savings like anything else, and the goal records that this much of it is
+  // spoken for. Keeping goals as a separate pot would have meant a kid could
+  // not change her mind, which is not a thing savings should do.
+  const toGoals = {};
+  mnyGoals(kid).forEach(g => {
+    const amt = money2(split['goal:' + g.id]);
+    if (!(amt > 0)) return;
+    if (!moneyDeposit(kid, amt)) return;
+    g.saved = money2(money2(g.saved) + amt);
+    g.updatedAt = Date.now();
+    toGoals[g.id] = amt;
+    parts.push(`${g.icon} ${g.name} +$${amt.toFixed(2)}`);
+  });
   if (money2(split.gic) > 0) moneyOpenGIC(kid, money2(split.gic), 12);
   if (money2(split.stock) > 0) mnyBuyChosenFund(kid, money2(split.stock));
   if (money2(split.ready) > 0) moneyDeposit(kid, money2(split.ready));
@@ -832,6 +859,7 @@ function mnyDoCommit() {
     ledger.stock = money2(split.stock);
     ledger.reflect = d.reflect;
     ledger.passive = passive;
+    ledger.goals = toGoals;
     ledger.debtBalanceAfter = mnyTotalOwing(kid);
   }
   // This Sunday becomes the new baseline for "made on its own".

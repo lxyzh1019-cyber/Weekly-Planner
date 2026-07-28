@@ -188,6 +188,15 @@ function mnyRulePrices() {
       ${num('Jess', 'targets.jess.annual', ((r.targets || {}).jess || {}).annual, 50)}
     </div>`);
 
+  /* What money buys. These are the anchors every big number on a kid page is
+     translated into, so they have to be things she has watched you buy — keep
+     them current, and keep them yours. */
+  const buys = (r.buys || {}).items || [];
+  cards.push(`<div class="mny-card"><div class="mny-label">🛒 What money buys</div>
+      ${buys.map((b, i) => num(b.label, 'buys.items.' + i + '.amount', b.amount, 1)).join('')}
+      <div class="mny-note">Every big number she sees gets turned into these — "$80" is a word, "dinner out for all of us" is a quantity. Keep them things she has actually watched us buy.</div>
+    </div>`);
+
   return `<div class="mny-card">
       <label class="mny-field"><span>Find a price</span>
         <input type="search" value="${escapeAttr(mnyRuleSearch)}" placeholder="streak, dance, cap…" data-mnyp-action="search"></label>

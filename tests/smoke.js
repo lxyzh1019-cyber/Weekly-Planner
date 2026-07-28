@@ -838,6 +838,89 @@ function findChromium() {
     return counted && rebaselined;
   });
 
+  /* ── Saving goals ── */
+
+  // A goal is the one thing in this system a kid makes herself, and the money
+  // that goes toward it is real kept-ready money with a name on it — she can
+  // still change her mind, which is what savings are for.
+  checks.savingGoalEndToEnd = await page.evaluate(() => {
+    profile = 'jess'; parentViewing = 'jess';
+    const kid = 'jess', pd = getProfData(kid);
+    pd.savingGoals = [];
+    // She creates it herself — no parent gate on this one.
+    const g = mnyAddGoal(kid, { name: 'A new bike', icon: '🚲', target: 100,
+                                targetDate: '2026-12-25' });
+    const kidCanCreate = !!g && mnyGoals(kid).length === 1;
+
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey, c = state.shared.chore;
+    ['meetingsHeld', 'finalizedWeeks', 'moneyLedger', 'weekConfirms', 'weekPlans', 'xpAwardedWeeks']
+      .forEach(m => { if (c[m]) delete c[m][wk]; });
+    delete pd.debts; pd.deposits = []; pd.competitions = []; pd.honesty = [];
+    delete pd.holdings;
+    mrEnsureEarnings(kid, wk).overrides = {};
+    ensureWallet(kid).cash = 0;
+    const debt = mnyDebts(kid)[0];
+    debt.paid = debt.principal;                       // nothing owing, so nothing is due
+    ['dishes', 'mop', 'vacuum'].forEach((ch, i) => mrSetChoreGrade(kid, wk, i, ch, 3));
+
+    // The plan offers a row for it, and it is never stage-locked.
+    const split = mnySplitFor(wk, kid, 'own');
+    const hasBucket = split['goal:' + g.id] !== undefined;
+
+    openFamilyMeeting(); mnySetMeetKid(kid);
+    mmGoStep(3); mnyDoConfirm();
+    mmGoStep(4);
+    const draft = mnyEnsureDraft(wk, kid);
+    const pool = mnyPool(wk, kid);
+    Object.keys(draft.split).forEach(k => { draft.split[k] = 0; });
+    draft.split['goal:' + g.id] = pool.mine;          // all of it toward the bike
+    draft.planId = 'own';
+    mnyPickReflect('saving');
+    const savedBefore = mnySavedTotal(kid);
+    mnyDoCommit();
+
+    const goal = mnyGoalById(kid, g.id);
+    const led = ((c.moneyLedger || {})[wk] || {})[kid] || {};
+    const moved = goal.saved === pool.mine
+               && mnySavedTotal(kid) === money2(savedBefore + pool.mine)   // real savings
+               && led.goals && led.goals[g.id] === pool.mine;
+
+    mmUndoRecord();
+    const reversed = mnyGoalById(kid, g.id).saved === 0
+                  && mnySavedTotal(kid) === savedBefore;
+
+    // And the pace answer is in dollars a week, which is the only actionable form.
+    const pace = mnyGoalPace(kid, mnyGoalById(kid, g.id));
+    const paceUsable = pace.weeksLeft > 0 && pace.neededPerWeek > 0
+                    && Math.abs(pace.neededPerWeek * pace.weeksLeft - 100) < 1;
+
+    closeSheet('familyMeetingOverlay');
+    pd.savingGoals = [];
+    return kidCanCreate && hasBucket && moved && reversed && paceUsable;
+  });
+
+  /* ── What money buys ── */
+
+  // "$80" is a word; "dinner out for all of us" is a quantity. The anchor has
+  // to read naturally, stay silent when it cannot, and follow the parent's list.
+  checks.buysLineReadsNaturally = await page.evaluate(() => {
+    profile = 'parent';
+    const forty = mnyBuysLine(45);
+    const tiny = mnyBuysLine(2);                       // under the cheapest thing
+    const one = mnyBuysLine(8);                        // exactly a jar of milk
+    const natural = /\b(pizza|burger|book|plush)/.test(forty)
+                 && tiny === ''
+                 && /price of/.test(one)
+                 && !/\d+\s+a\s/.test(forty);          // never "3 a burger meal"
+    // A parent editing the list changes what she is told.
+    mrApplyEdits([{ path: 'buys.items.1.amount', value: 16 }], { reason: 'family_meeting' });
+    const afterEdit = mnyBuysItems().find(i => i.id === 'milk').amount === 16;
+    mrApplyEdits([{ path: 'buys.items.1.amount', value: 8 }], { reason: 'correct_error' });
+    return natural && afterEdit;
+  });
+
   checks.noConsoleErrors = errors.length === 0;
 
   const failed = Object.entries(checks).filter(([,v]) => !v).map(([k]) => k);

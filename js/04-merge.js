@@ -236,6 +236,9 @@ function mergeProfileState(localProfile, remoteProfile, profName) {
   merged.honesty      = mergeArrayById(lp.honesty,      rp.honesty,      'hon:');
   // Money from outside — birthday money, a gift. Append-only, like the others.
   merged.deposits = mergeArrayById(lp.deposits, rp.deposits, 'dep:');
+  // What she is saving for. A kid can add one on either device, so these union
+  // by id; a goal she deleted stays deleted via its 'sgoal:' tombstone.
+  merged.savingGoals = mergeArrayById(lp.savingGoals, rp.savingGoals, 'sgoal:');
   // What she owns. Each holding is edited in place — by a parent, and by the
   // simulation catching up on interest and prices — so newest copy of each id
   // wins and a removed one stays removed. Two devices catching up the same day

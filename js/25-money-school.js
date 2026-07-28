@@ -47,7 +47,7 @@ function mnyRenderSchool() {
       `<div class="mny-cols">
          <div class="mny-col">${mnyLadderCard(kid, pct, idx)}</div>
          <div class="mny-col">${mnyConceptPanel(kid)}</div>
-         <div class="mny-col">${mnyWorkListsCard()}</div>
+         <div class="mny-col">${mnyWorkListsCard()}${mnyBuysCard()}</div>
        </div>`;
   if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
 }
@@ -114,6 +114,19 @@ function mnyConceptPanel(kid) {
       <div class="mny-concept-body">${body}</div>
     </div>
     ${mnySchoolConcept === 'stock' ? mnyStockChart() : ''}`;
+}
+
+/* What money actually buys. The list exists so a number can be weighed against
+   something real — "$40" is a word, "a pizza night" is a quantity. */
+function mnyBuysCard() {
+  const items = mnyBuysItems();
+  if (!items.length) return '';
+  return `<div class="mny-card">
+      <div class="mny-label">🛒 What money buys</div>
+      <div class="mny-rows">${items.map(i =>
+        `<div class="mny-row"><span>${escapeHtml(i.label)}</span><b>${mnyMoney(i.amount)}</b></div>`).join('')}</div>
+      <div class="mny-note">Real prices, from things we actually buy. It is how you tell whether something is worth saving for.</div>
+    </div>`;
 }
 
 /* The line the whole rulebook rests on: some things are paid for and most

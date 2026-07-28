@@ -29,6 +29,8 @@ let mnyCalMonth = null;       // 'YYYY-MM' for the competition calendar
 let mnyOpenPrices = {};       // which "what things pay" cards are expanded
 let mnyStoryMode = 'week';    // the money story: 'week' | 'month'
 let mnyStoryMonth = null;     // 'YYYY-MM'
+let mnyGoalFormOpen = false;  // the new-goal form on My money
+let mnyGoalDraft = { name: '', icon: '🎯', target: 50, targetDate: '' };
 
 /* Kids see their own money. A parent sees whichever kid is selected. */
 function mnyViewKid() {
@@ -109,6 +111,7 @@ function mnyRenderMyMoney() {
          <div class="mny-col">
            ${mnyTodayCard(kid, wk)}
            ${mnyWalletCard(kid)}
+           ${mnySavingGoalsCard(kid)}
            ${mnyIncomeCard(kid, wk)}
            ${mnyGoalCard(kid)}
          </div>
@@ -162,12 +165,87 @@ function mnyWalletCard(kid) {
   return `<div class="mny-card">
       <div class="mny-label">Everything I have</div>
       <div class="mny-total">${mnyMoney(mnyEverything(kid))}</div>
+      ${mnyBuysNote(mnyEverything(kid))}
       <div class="mny-tiles">
         ${tiles.map(t => `<div class="mny-tile">
             <div class="mny-tile-top">${t.icon} ${escapeHtml(t.label)} ${mnyAskBtn(t.ask)}</div>
             <div class="mny-tile-val">${mnyMoney(t.value)}</div>
           </div>`).join('')}
       </div>
+    </div>`;
+}
+
+/* ── What she is saving for ──
+   The one card on this page she fills in herself. A goal is earmarked
+   kept-ready money, so the dollars are really hers and she could change her
+   mind; what the goal adds is a name, a date, and a straight answer to "am I
+   going to make it?" — in dollars per week, because that is the only form of
+   the answer anyone can act on. */
+function mnySavingGoalsCard(kid) {
+  const goals = mnyGoals(kid);
+  const rows = goals.map(g => {
+    const pace = mnyGoalPace(kid, g);
+    const pct = money2(g.target) > 0
+      ? Math.max(0, Math.min(100, Math.round((money2(g.saved) / money2(g.target)) * 100))) : 0;
+    let line;
+    if (pace.reached) {
+      line = isParent()
+        ? `<button type="button" class="mny-btn wide primary" data-mny-action="goaldone" data-mny-goal="${escapeAttr(g.id)}">🎉 She got it — take it out</button>`
+        : `<div class="mny-note"><b>You made it!</b> Tell a grown-up.</div>`;
+    } else if (pace.late) {
+      line = `<div class="mny-note">The day has passed and there is ${mnyMoney(pace.left)} to go. Move the date, or keep going.</div>`;
+    } else if (pace.neededPerWeek != null) {
+      // A goal made this morning has no history to be behind on. Telling a kid
+      // she is already failing at something she just decided to want is the
+      // fastest way to make her stop setting goals.
+      line = `<div class="mny-note">${(pace.onPace || !pace.hasHistory)
+        ? `Put away <b>${mnyMoney(pace.neededPerWeek)}</b> a week and you make it.`
+        : `You need <b>${mnyMoney(pace.neededPerWeek)}</b> a week now. Lately you have been putting away ${mnyMoney(pace.recent)}.`}</div>`;
+    } else {
+      line = `<div class="mny-note">${mnyMoney(pace.left)} to go. Give it a day and I can tell you how much a week.</div>`;
+    }
+    return `<div class="mny-goalrow">
+        <div class="mny-week-head">
+          <span>${escapeHtml(g.icon)} <b>${escapeHtml(g.name)}</b></span>
+          <button type="button" class="mny-step" data-mny-action="goaldel" data-mny-goal="${escapeAttr(g.id)}" aria-label="Remove this goal">✕</button>
+        </div>
+        <div class="mny-progress"><div class="mny-progress-fill" style="width:${pct}%"></div></div>
+        <div class="mny-goal-row">${mnyMoney(g.saved)} of ${mnyMoney(g.target)}${g.targetDate ? ' · by ' + mnyShortDate(g.targetDate) : ''}</div>
+        ${mnyBuysNote(g.target)}
+        ${line}
+      </div>`;
+  }).join('');
+
+  const form = mnyGoalFormOpen ? mnyGoalForm() : '';
+  return `<div class="mny-card">
+      <div class="mny-week-head">
+        <span class="mny-label">🎯 What I'm saving for</span>
+        <button type="button" class="mny-chip ${mnyGoalFormOpen ? 'on' : ''}" data-mny-action="goalform">${mnyGoalFormOpen ? 'Cancel' : '＋ New goal'}</button>
+      </div>
+      ${form}
+      ${goals.length ? rows : (mnyGoalFormOpen ? '' : `<div class="mny-note">Nothing yet. Pick something you want and I will work out how much a week it takes.</div>`)}
+    </div>`;
+}
+
+function mnyGoalForm() {
+  const d = mnyGoalDraft;
+  return `<div class="mny-goalform">
+      <label class="mny-field"><span>What is it?</span>
+        <input type="text" value="${escapeAttr(d.name)}" data-mny-action="goalname" placeholder="A new bike"></label>
+      <div class="mny-chiprow">${MNY_GOAL_ICONS.map(ic =>
+        `<button type="button" class="mny-chip ${d.icon === ic ? 'on' : ''}" data-mny-action="goalicon" data-mny-icon="${escapeAttr(ic)}">${ic}</button>`).join('')}</div>
+      <div class="mny-row"><span>How much does it cost?</span>
+        <span class="mny-stepgrp">
+          <button type="button" class="mny-step" data-mny-action="goalamt" data-mny-d="-5" aria-label="Less">−</button>
+          <b>${mnyMoney(d.target)}</b>
+          <button type="button" class="mny-step" data-mny-action="goalamt" data-mny-d="5" aria-label="More">+</button>
+        </span></div>
+      <div class="mny-chiprow">${MNY_GOAL_CHIPS.map(v =>
+        `<button type="button" class="mny-chip ${d.target === v ? 'on' : ''}" data-mny-action="goalamtset" data-mny-v="${v}">$${v}</button>`).join('')}</div>
+      ${mnyBuysNote(d.target)}
+      <label class="mny-field"><span>When do you want it by?</span>
+        <input type="date" value="${escapeAttr(d.targetDate)}" data-mny-action="goaldate"></label>
+      <button type="button" class="mny-btn wide primary" data-mny-action="goalsave">Save my goal</button>
     </div>`;
 }
 
@@ -459,6 +537,34 @@ function mnyHandleClick(ev) {
     mnyRenderMyMoney();
     return;
   }
+  // ── Saving goals: hers to create, hers to drop ──
+  if (a === 'goalform') {
+    mnyGoalFormOpen = !mnyGoalFormOpen;
+    if (mnyGoalFormOpen) mnyGoalDraft = { name: '', icon: '🎯', target: 50, targetDate: '' };
+    mnyRenderMyMoney();
+    return;
+  }
+  if (a === 'goalicon')   { mnyGoalDraft.icon = el.getAttribute('data-mny-icon'); mnyRenderMyMoney(); return; }
+  if (a === 'goalamt')    { mnyGoalDraft.target = Math.max(1, money2(mnyGoalDraft.target + Number(el.getAttribute('data-mny-d')))); mnyRenderMyMoney(); return; }
+  if (a === 'goalamtset') { mnyGoalDraft.target = Number(el.getAttribute('data-mny-v')); mnyRenderMyMoney(); return; }
+  if (a === 'goalsave') {
+    const d = mnyGoalDraft;
+    const g = mnyAddGoal(mnyViewKid(), {
+      name: String(d.name || '').trim() || 'Something I want',
+      icon: d.icon, target: d.target, targetDate: d.targetDate,
+    });
+    if (!g) { showToast('Put in how much it costs first'); return; }
+    mnyGoalFormOpen = false;
+    showToast(`${g.icon} Saved — ${mnyMoney(g.target)} to go`);
+    mnyRenderMyMoney();
+    return;
+  }
+  if (a === 'goaldel')  { mnyRemoveGoal(mnyViewKid(), el.getAttribute('data-mny-goal')); mnyRenderMyMoney(); return; }
+  if (a === 'goaldone') {
+    if (mnyCompleteGoal(mnyViewKid(), el.getAttribute('data-mny-goal'))) showToast('🎉 Got it!');
+    mnyRenderMyMoney();
+    return;
+  }
   if (a === 'storymode')  { mnyStoryMode = el.getAttribute('data-mny-mode'); mnyRenderStory(); return; }
   if (a === 'storymonth') {
     const [y, m] = String(mnyStoryMonth).split('-').map(Number);
@@ -467,6 +573,16 @@ function mnyHandleClick(ev) {
     mnyRenderStory();
     return;
   }
+}
+
+/* Typed fields in the goal form. Kept out of mnyHandleClick and off re-render:
+   redrawing the card on every keystroke would take the caret with it. */
+function mnyHandleInput(ev) {
+  const el = ev.target.closest('[data-mny-action]');
+  if (!el) return;
+  const a = el.getAttribute('data-mny-action');
+  if (a === 'goalname') { mnyGoalDraft.name = el.value; return; }
+  if (a === 'goaldate') { mnyGoalDraft.targetDate = el.value; mnyRenderMyMoney(); return; }
 }
 
 /* The concept card. Locked ideas show what opens them rather than the body —

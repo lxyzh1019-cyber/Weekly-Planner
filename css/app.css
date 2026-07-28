@@ -4491,3 +4491,9 @@
   /* A sub-line inside the pool summary: a breakdown of the row above it, not a
      movement of its own. */
   .mny-sub-row { color: var(--ink-light); font-size: 0.78rem; padding-left: 0.6rem; }
+  /* The what-it-buys anchor under a total. Quiet — it explains the number
+     above it rather than competing with it. */
+  .mny-buys { font-size: 0.78rem; color: var(--ink-light); margin-top: 0.2rem; }
+  .mny-goalrow { border-top: 1px dashed var(--paper-line); padding-top: 0.5rem; margin-top: 0.5rem; }
+  .mny-goalrow:first-of-type { border-top: 0; }
+  .mny-goalform { border: 2px dashed var(--paper-line); border-radius: 10px; padding: 0.5rem; margin-top: 0.4rem; }

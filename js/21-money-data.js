@@ -444,6 +444,124 @@ function mnyReturns(kid) {
 }
 
 /* ════════════════════════════════════════════════════════════════
+   SAVING GOALS
+
+   A number in a savings account is not a reason to save. A bike is.
+
+   Goals are the one thing in this whole system a kid creates herself — she
+   names it, sets what it costs and when she wants it by, and the app works out
+   what that means per week. Everything else here is decided by a grown-up or
+   by a rule, and a system where a kid has no say in anything is a system she
+   participates in rather than owns.
+
+   A goal is earmarked kept-ready money, not a separate pot: the dollars are
+   really in her savings and she could change her mind. What the goal adds is a
+   name, a date, and an honest answer to "am I going to make it?".
+   ════════════════════════════════════════════════════════════════ */
+const MNY_GOAL_ICONS = ['🎯', '🚲', '🎮', '📱', '🎸', '🛼', '📚', '🧩', '🎧', '🐶', '✈️', '🎁'];
+const MNY_GOAL_CHIPS = [25, 50, 100, 200];
+
+function mnyEnsureGoals(kid) {
+  const p = getProfData(kid);
+  if (!Array.isArray(p.savingGoals)) p.savingGoals = [];
+  return p.savingGoals;
+}
+function mnyGoals(kid, includeDone) {
+  return mnyEnsureGoals(kid).filter(g => includeDone || !g.done);
+}
+function mnyGoalById(kid, id) { return mnyEnsureGoals(kid).find(g => g.id === id) || null; }
+
+/* Kid-editable on purpose — no isParent() gate. Naming what you are saving for
+   is the part that makes saving mean anything. */
+function mnyAddGoal(kid, fields) {
+  const g = Object.assign({
+    id: mrNewId('goal-'), name: 'Something I want', icon: '🎯',
+    target: 50, targetDate: '', saved: 0, done: false,
+    createdAt: Date.now(), updatedAt: Date.now(),
+  }, fields || {});
+  g.target = money2(g.target);
+  g.saved = money2(g.saved);
+  if (!(g.target > 0)) return null;
+  mnyEnsureGoals(kid).push(g);
+  saveAll();
+  return g;
+}
+function mnyEditGoal(kid, id, field, value) {
+  const g = mnyGoalById(kid, id);
+  if (!g) return false;
+  g[field] = (field === 'target' || field === 'saved') ? Math.max(0, money2(value)) : value;
+  g.updatedAt = Date.now();
+  saveAll();
+  return true;
+}
+function mnyRemoveGoal(kid, id) {
+  const list = mnyEnsureGoals(kid);
+  const i = list.findIndex(g => g.id === id);
+  if (i < 0) return false;
+  const [gone] = list.splice(i, 1);
+  ensureTombstones()['sgoal:' + gone.id] = Date.now();
+  saveAll();
+  return true;
+}
+/* Reaching a goal is a parent moment: it is the point where the money leaves
+   savings and becomes the thing. */
+function mnyCompleteGoal(kid, id) {
+  if (!isParent()) { showToast('Tell a grown-up — they will mark it 🎉'); return false; }
+  const g = mnyGoalById(kid, id);
+  if (!g || g.done) return false;
+  mnyTakeFromSaved(kid, Math.min(money2(g.saved), mnySavedTotal(kid)));
+  g.done = true;
+  g.doneAt = Date.now();
+  g.updatedAt = Date.now();
+  saveAll();
+  return true;
+}
+
+/* Am I going to make it? Answered in dollars per week, because "you need 34%
+   more" is not something anyone can act on. */
+function mnyGoalPace(kid, goal) {
+  const left = money2(Math.max(0, money2(goal.target) - money2(goal.saved)));
+  if (left <= 0) return { left: 0, weeksLeft: 0, neededPerWeek: 0, onPace: true, reached: true };
+  let weeksLeft = null;
+  if (goal.targetDate) {
+    const days = mnyDaysBetween(todayKey(), goal.targetDate);
+    weeksLeft = Math.max(0, Math.ceil(days / 7));
+  }
+  const neededPerWeek = weeksLeft ? money2(left / weeksLeft) : null;
+  // What she has actually been putting aside, from the weeks already settled.
+  const recent = mnyRecentSavingRate(kid);
+  const hasHistory = mnySettledWeekCount(kid) > 0;
+  return {
+    left, weeksLeft, neededPerWeek, recent, hasHistory, reached: false,
+    onPace: (neededPerWeek == null) || (recent >= neededPerWeek),
+    // A date already past with money still to go is its own answer.
+    late: weeksLeft === 0 && left > 0,
+  };
+}
+/* How many Sundays have actually been settled. Without one, there is no pace
+   to be behind — only a plan. */
+function mnySettledWeekCount(kid) {
+  ctEnsureShared();
+  const plans = state.shared.chore.weekPlans || {};
+  return Object.keys(plans).filter(wk => plans[wk] && plans[wk][kid] && plans[wk][kid].committedAt).length;
+}
+/* Average put aside per settled week, over the last few. */
+function mnyRecentSavingRate(kid) {
+  ctEnsureShared();
+  const plans = state.shared.chore.weekPlans || {};
+  const weeks = Object.keys(plans).filter(wk => plans[wk] && plans[wk][kid] && plans[wk][kid].committedAt)
+    .sort().slice(-6);
+  if (!weeks.length) return 0;
+  const total = weeks.reduce((s, wk) => {
+    const sp = plans[wk][kid].split || {};
+    const goals = Object.keys(sp).filter(k => k.indexOf('goal:') === 0)
+      .reduce((t, k) => t + money2(sp[k]), 0);
+    return s + money2(sp.ready) + goals;
+  }, 0);
+  return money2(total / weeks.length);
+}
+
+/* ════════════════════════════════════════════════════════════════
    MONEY FROM OUTSIDE
 
    Birthday money, a gift, something sold. Entered at the meeting with her in
@@ -685,6 +803,10 @@ function mnySplitFor(weekKey, kid, planId, own) {
   const debts = mnyDebtsByPriority(kid).filter(d => loanBalance(kid, d.id) > 0);
   const out = { ready: 0, gic: 0, stock: 0 };
   debts.forEach(d => { out['loan:' + d.id] = 0; });
+  // A row per goal she is still saving for. Goals are never stage-locked —
+  // they are the reason to save, so gating them behind a lesson about saving
+  // would be backwards.
+  mnyGoals(kid).forEach(g => { out['goal:' + g.id] = 0; });
 
   if (planId === 'own') return Object.assign(out, own || {});
   if (planId === 'last') {
@@ -695,8 +817,14 @@ function mnySplitFor(weekKey, kid, planId, own) {
       const prevTotal = Object.keys(prev.split).reduce((s, k) => s + money2(prev.split[k]), 0);
       if (prevTotal > 0) {
         Object.keys(prev.split).forEach(k => {
-          if (out[k] === undefined && k.indexOf('loan:') === 0) return;   // a debt since cleared
-          out[k] = money2(pool.mine * (money2(prev.split[k]) / prevTotal));
+          const dollars = money2(pool.mine * (money2(prev.split[k]) / prevTotal));
+          // A debt cleared or a goal reached since last week: its share falls
+          // back to being kept ready rather than vanishing from the split.
+          if (out[k] === undefined && (k.indexOf('loan:') === 0 || k.indexOf('goal:') === 0)) {
+            out.ready = money2(out.ready + dollars);
+            return;
+          }
+          out[k] = dollars;
         });
         return out;
       }
@@ -852,6 +980,10 @@ function mnyOutflowSegments(weekKey, kid, split) {
   mnyDebtsByPriority(kid).forEach(d => {
     rows.push({ label: 'Extra off ' + d.name, value: money2(s['loan:' + d.id]), color: '#95d5b2' });
   });
+  mnyGoals(kid, true).forEach(g => {
+    const v = money2(s['goal:' + g.id]);
+    if (v > 0) rows.push({ label: 'Toward ' + g.name, value: v, color: '#ffb4a2' });
+  });
   rows.push({ label: 'Kept ready',   value: money2(s.ready), color: '#ffd166' });
   rows.push({ label: 'Locked away',  value: money2(s.gic),   color: '#6fb1fc' });
   rows.push({ label: 'Bit of a company', value: money2(s.stock), color: '#c9a6e8' });
@@ -892,6 +1024,67 @@ function mnyConceptCard(id, kid) {
     what: swap(c.what), why: swap(c.why), risk: swap(c.risk),
     whyLabel: c.whyLabel || 'Why it helps', riskLabel: c.riskLabel || 'What to watch',
   };
+}
+
+/* ════════════════════════════════════════════════════════════════
+   WHAT MONEY BUYS
+
+   "$80" is not a quantity to a nine-year-old, it is a word. "Dinner out for
+   all of us" is a quantity. They are the same fact, and only one of them can
+   be weighed against wanting something else.
+
+   So every big number on a kid page gets an anchor beside it, drawn from a
+   list of things she has actually watched the family buy — parent-editable,
+   because the whole point is that the prices are hers, not a stock photo of a
+   generic economy.
+   ════════════════════════════════════════════════════════════════ */
+function mnyBuysItems() {
+  const items = ((mrRules().buys || {}).items || []).filter(i => money2(i.amount) > 0);
+  return items.slice().sort((a, b) => money2(a.amount) - money2(b.amount));
+}
+/* Pick the comparison that reads most naturally for this amount: a count
+   between one and nine, halves allowed, nothing below the cheapest thing on
+   the list — "about 0.4 of an ice cream" helps nobody. */
+function mnyBuysLine(amount) {
+  const amt = money2(amount);
+  const items = mnyBuysItems();
+  if (!items.length || amt < money2(items[0].amount)) return '';
+
+  let best = null;
+  items.forEach(it => {
+    const price = money2(it.amount);
+    const raw = amt / price;
+    if (raw < 0.9) return;                       // cannot afford one of these
+    const n = Math.round(raw * 2) / 2;           // to the nearest half
+    if (n > 9.5) return;                         // too many to picture
+    // Prefer whole numbers, then small counts, then the closest fit.
+    const score = (Math.abs(n - Math.round(n)) < 0.01 ? 0 : 1) * 10
+                + Math.abs(n - 3)                 // three of something reads best
+                + Math.abs(raw - n) * 2;          // and honest is better than tidy
+    if (!best || score < best.score) best = { it, n, raw, score };
+  });
+  if (!best) {
+    // Bigger than nine of everything: use the dearest thing and say "over".
+    const top = items[items.length - 1];
+    const n = Math.floor(amt / money2(top.amount));
+    return n >= 1 ? `more than ${n} ${mnyBuysPlural(top)}` : '';
+  }
+  const { it, n } = best;
+  if (Math.abs(n - 1) < 0.01) return `about the price of ${it.label}`;
+  const count = (Math.abs(n - Math.round(n)) < 0.01) ? String(Math.round(n)) : n.toFixed(1);
+  return `about ${count} ${mnyBuysPlural(it)}`;
+}
+/* The plural comes from the item, never from a rule — English does not have
+   one. Falls back to the label with its article stripped, which is at least
+   never nonsense even if a parent leaves the field empty. */
+function mnyBuysPlural(item) {
+  return item.plural || String(item.label || '').replace(/^an? /, '');
+}
+/* The same line, ready to drop under a total. Empty when there is nothing
+   useful to say, so it never leaves a dangling dash. */
+function mnyBuysNote(amount) {
+  const line = mnyBuysLine(amount);
+  return line ? `<div class="mny-buys">🛒 ${escapeHtml(line)}</div>` : '';
 }
 
 /* ── Formatting ── */

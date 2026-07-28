@@ -326,6 +326,8 @@ function mmTakeUndoSnapshot(wk) {
     debts: (typeof mnyDebts === 'function') ? mnyDebts(kid) : null,
     holdings: (typeof mnyHoldings === 'function') ? mnyHoldings(kid) : null,
     deposits: (typeof mnyEnsureDeposits === 'function') ? mnyEnsureDeposits(kid) : null,
+    // Goal progress moves with the money, so it has to come back with it.
+    savingGoals: (typeof mnyEnsureGoals === 'function') ? mnyEnsureGoals(kid) : null,
     xp: (getProfData(kid).progress || {}).questXP || 0,
     // The meeting also empties the box, so undo has to put it back.
     boxItems: (typeof mrBoxItems === 'function') ? mrBoxItems(kid) : null,
@@ -355,6 +357,7 @@ function mmUndoRecord() {
     if (s.debts) pd.debts = s.debts;
     if (s.holdings) pd.holdings = s.holdings;
     if (s.deposits) pd.deposits = s.deposits;
+    if (s.savingGoals) pd.savingGoals = s.savingGoals;
     if (s.boxItems) pd.boxItems = s.boxItems;
     if (!pd.progress) pd.progress = {};
     pd.progress.questXP = s.xp;

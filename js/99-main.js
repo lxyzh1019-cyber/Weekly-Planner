@@ -19,7 +19,11 @@ window._currentRewardPrompt = null;
 (function(){
   ['mnyPage1Wrap','mnyStoryWrap','mnySchoolWrap'].forEach(id => {
     const wrap = document.getElementById(id);
-    if (wrap) wrap.addEventListener('click', mnyHandleClick);
+    if (!wrap) return;
+    wrap.addEventListener('click', mnyHandleClick);
+    // The saving-goal form types into it, so it needs input/change too.
+    wrap.addEventListener('input', mnyHandleInput);
+    wrap.addEventListener('change', mnyHandleInput);
   });
   // The parent Money rules tab has its own handler: rule paths and holding ids
   // ride on data attributes rather than being interpolated into inline

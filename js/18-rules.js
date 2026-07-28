@@ -144,6 +144,32 @@ const MR_DEFAULT_RULES = {
      company by name is the lesson, and a search field is a casino. */
   investing: { fund: 'index' },
 
+  /* What money buys.
+
+     "$80" means nothing to a nine-year-old. "Dinner out for all of us" means
+     something, and the two are the same fact. Every big number on a kid page
+     gets translated into these, so saving up for something has a size she can
+     picture rather than a figure she is told to care about.
+
+     Prices are deliberately family-specific and parent-editable — the point is
+     that they are things SHE has seen the family buy. */
+  buys: {
+    // `plural` is carried explicitly because English will not be guessed at:
+    // "3 dinner out for all of uses" is what naive pluralisation produces.
+    items: [
+      { id: 'icecream', label: 'an ice-cream cone',        plural: 'ice-cream cones',   amount: 6 },
+      { id: 'milk',     label: 'a jar of milk',            plural: 'jars of milk',      amount: 8 },
+      { id: 'sharpen',  label: 'a skate sharpening',       plural: 'skate sharpenings', amount: 12 },
+      { id: 'movie',    label: 'a movie ticket',           plural: 'movie tickets',     amount: 14 },
+      { id: 'burger',   label: 'a burger meal',            plural: 'burger meals',      amount: 15 },
+      { id: 'book',     label: 'a new book',               plural: 'new books',         amount: 20 },
+      { id: 'plush',    label: 'a big plush toy',          plural: 'big plush toys',    amount: 35 },
+      { id: 'pizza',    label: 'a pizza night at home',    plural: 'pizza nights',      amount: 40 },
+      { id: 'dinner',   label: 'dinner out for all of us', plural: 'dinners out',       amount: 80 },
+      { id: 'game',     label: 'a new video game',         plural: 'new video games',   amount: 90 },
+    ],
+  },
+
   /* Money school opens as the debt comes down. A parent can float a kid to a
      later stage when the conversation gets there before the loan does. */
   school: { unlockStage: { jenn: 0, jess: 0 } },
