@@ -287,19 +287,14 @@ function mnyDepositForm(wk, kid) {
           <button type="button" class="mny-chip" onclick="mnyToggleDep()">${saved.length ? 'Add another' : 'Add some'}</button>
         </div>
         ${saved.length
-          ? saved.map(s => `<div class="mny-row"><span>🎁 ${escapeHtml(s.from)} · ${escapeHtml(mnyDestLabel(s.dest))}</span>
+          ? saved.map(s => `<div class="mny-row"><span>🎁 ${escapeHtml(s.from)}</span>
               <b>${mnyMoney(s.amount)}</b>
               <button type="button" class="mny-step" onclick="mnyDeleteDep('${escapeAttr(s.id)}')" aria-label="Remove">✕</button></div>`).join('')
           : `<div class="mny-note">Nothing from outside this week.</div>`}
         ${saved.length ? `<div class="mny-note">One-offs stay one-offs — this does not change what any week pays.</div>` : ''}
       </div>`;
   }
-  const d = mnyDepDraft || (mnyDepDraft = { amount: 20, from: MNY_FROM[0], dest: 'ready' });
-  const dests = MNY_DEST.map(x => {
-    const open = mnyIsOpen(kid, x.need);
-    return `<button type="button" class="mny-chip ${d.dest === x.id ? 'on' : ''}" ${open ? '' : 'disabled'}
-      onclick="mnyDepSet('dest','${x.id}')">${x.icon} ${escapeHtml(x.label)}${open ? '' : ' 🔒 ' + mnyNeedLabel(x.need)}</button>`;
-  }).join('');
+  const d = mnyDepDraft || (mnyDepDraft = { amount: 20, from: MNY_FROM[0] });
   return `<div class="mny-card">
       <div class="mny-label">🎁 Money from outside</div>
       <div class="mny-row"><span>How much</span>${mnyStepper('amount', d.amount, 'dep', 5)}</div>
@@ -308,32 +303,12 @@ function mnyDepositForm(wk, kid) {
       <div class="mny-label">Where it came from</div>
       <div class="mny-chiprow">${MNY_FROM.map(f =>
         `<button type="button" class="mny-chip ${d.from === f ? 'on' : ''}" onclick="mnyDepSet('from','${escapeAttr(f)}')">${escapeHtml(f)}</button>`).join('')}</div>
-      <div class="mny-label">Where it should go</div>
-      <div class="mny-chiprow">${dests}</div>
-      <div class="mny-note">${escapeHtml(mnyDepEffect(kid, d))}</div>
+      <div class="mny-note">This goes into the same pile as everything else you earned. You decide where all of it goes on the next step.</div>
       <div class="mny-chiprow">
         <button type="button" class="mny-btn primary" onclick="mnySaveDep()">Save it</button>
         <button type="button" class="mny-btn" onclick="mnyToggleDep()">Cancel</button>
       </div>
     </div>`;
-}
-function mnyDestLabel(id) { const d = MNY_DEST.find(x => x.id === id); return d ? d.label : id; }
-/* What this choice actually does, in dollars, before it is made. */
-function mnyDepEffect(kid, d) {
-  const amt = money2(d.amount);
-  if (!(amt > 0)) return '';
-  if (d.dest === 'loan') {
-    const debt = mnyDebtsByPriority(kid)[0];
-    if (!debt) return 'Nothing left to pay off.';
-    const bonus = (Number(debt.bonusRate) || 0) / 100;
-    return `Paying ${debt.name} clears ${mnyMoney(amt * (1 + bonus))} of it — ${mnyMoney(amt * bonus)} more than you put in.`;
-  }
-  if (d.dest === 'gic') {
-    const rate = Number((bankConfig().gicRates || {})[12]) || 0.04;
-    return `Locked away for a year it becomes ${mnyMoney(amt * (1 + rate))}. You cannot touch it until then.`;
-  }
-  const rate = Number(bankConfig().savingsRate) || 0.015;
-  return `Kept ready it becomes ${mnyMoney(amt * (1 + rate))} in a year, and you can have it back any day.`;
 }
 
 /* The confirm bar. Total on the left, what is in the way in the middle, the
@@ -485,8 +460,8 @@ function mnyPoolCard(wk, kid, pool) {
       <div class="mny-label">Where this week's money stands</div>
       <div class="mny-rows">
         <div class="mny-row"><span>Money that came in</span><b>${mnyMoney(pool.cameIn)}</b></div>
+        ${pool.deposits > 0 ? `<div class="mny-row"><span class="mny-sub-row">…including 🎁 ${mnyMoney(pool.deposits)} from outside</span></div>` : ''}
         ${due.map(d => `<div class="mny-row"><span>🔒 ${escapeHtml(d.debt.icon + ' ' + d.debt.name)} — ${d.kind === 'down' ? 'deposit' : 'this month'}, already spoken for</span><b>−${mnyMoney(d.amount).slice(1)}</b></div>`).join('')}
-        ${pool.deposits > 0 ? `<div class="mny-row"><span>🎁 Money from outside — you already said where this goes</span><b>−${mnyMoney(pool.deposits).slice(1)}</b></div>` : ''}
         <div class="mny-row total"><span>Mine to choose</span><b>${mnyMoney(pool.mine)}</b></div>
       </div>
       <div class="mny-note">Corrections happen on the step before this one.</div>
@@ -795,29 +770,22 @@ function mnyDoCommit() {
 
   mmTakeUndoSnapshot(wk);
 
-  // 1 · the week itself: freeze the ledger, credit cash and XP, run the
-  //     scheduled loan payment, open the box.
-  const res = commitKidWeek(wk, kid, { shortfall: mnyShortfallChoice });
-  const parts = res.parts;
-
-  // 2 · money from outside, to wherever it was aimed when it was entered. It
-  //     lands in cash first and then moves on, so every destination goes
-  //     through the same guarded transaction the rest of the app uses.
+  // 1 · money from outside joins the pool FIRST. It carries no destination —
+  //     the plan below decides where every dollar goes, whichever door it came
+  //     in through — and it has to be in the wallet before the schedule runs.
+  //     Crediting it afterwards would send a week to arrears for want of money
+  //     that was sitting on the table the whole time.
   mnyDepositsForWeek(kid, wk).forEach(dep => {
     if (dep.appliedAt) return;
     moneyAddCash(kid, dep.amount);
-    if (dep.dest === 'loan') {
-      // Spread pays what the debts can still take — which may be less than the
-      // gift if they are nearly cleared. Only that much leaves the wallet.
-      const spread = mnySpreadEarlyPayment(kid, dep.amount);
-      const used = money2(spread.reduce((s, x) => s + x.paid, 0));
-      const w = ensureWallet(kid);
-      w.cash = money2(w.cash - used);
-    } else if (dep.dest === 'gic') moneyOpenGIC(kid, dep.amount, 12);
-    else moneyDeposit(kid, dep.amount);
     dep.appliedAt = Date.now();
     dep.updatedAt = Date.now();
   });
+
+  // 2 · the week itself: freeze the ledger, credit what she earned, credit XP,
+  //     run the scheduled loan payment against the whole pool, open the box.
+  const res = commitKidWeek(wk, kid, { shortfall: mnyShortfallChoice });
+  const parts = res.parts;
 
   // 3 · the plan. Cash is already in the wallet from step 1, so each bucket
   //     just moves it on.

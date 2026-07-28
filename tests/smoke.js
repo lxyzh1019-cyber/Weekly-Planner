@@ -529,8 +529,9 @@ function findChromium() {
     mnySetMeetKid(kid);
     const fiveSteps = MM_STEPS.length === 5;
 
-    // Money from outside is entered at the meeting, with her in the room.
-    mnyAddDeposit(kid, wk, { amount: 50, from: 'Birthday money', dest: 'ready' });
+    // Money from outside is entered at the meeting, with her in the room. It
+    // carries no destination — it joins the pool like every other dollar.
+    mnyAddDeposit(kid, wk, { amount: 50, from: 'Birthday money' });
 
     // Step 4 is locked, whole-page, until the week is agreed.
     mmGoStep(4);
@@ -540,16 +541,14 @@ function findChromium() {
     mnyDoConfirm();
     const confirmed = mnyIsConfirmed(wk, kid);
 
-    // A gift is money that came in, but it is NOT hers to choose about again —
-    // she aimed it when she entered it. Counting it twice would let the plan
-    // commit more than exists.
+    // ONE POOL. Every inflow lands in the same place, the schedule draws on the
+    // whole of it, and everything left over is hers to decide about — whichever
+    // door each dollar came in through.
     const pool = mnyPool(wk, kid);
     const poolIsHonest = pool.deposits === 50
       && pool.cameIn === money2(pool.breakdown.net + 50)
-      // what is hers to choose is what her WORK left after the loan — the gift
-      // is already aimed, and the loan is a claim on the week she worked
-      && pool.mine === money2(Math.max(0, pool.breakdown.net - pool.mustPay))
-      && pool.mustPay <= pool.breakdown.net;
+      && pool.mine === money2(pool.cameIn - pool.mustPay)
+      && pool.mine > pool.breakdown.net;      // the gift really is choosable
 
     mmGoStep(4);
     const draft = mnyEnsureDraft(wk, kid);
@@ -565,9 +564,14 @@ function findChromium() {
     const after = { cash: ensureWallet(kid).cash, paid: mnyDebts(kid)[0].paid, saved: mnySavedTotal(kid) };
     const led = ((c.moneyLedger || {})[wk] || {})[kid] || {};
     const moved = mnyIsCommitted(wk, kid)
-      && after.paid > before.paid                       // the loan came down
-      && after.saved === money2(before.saved + 50)      // the gift landed where aimed
-      && after.cash === 0                               // and every dollar had a job
+      // The plan sent the whole pool at the loan, so the gift's dollars went
+      // there too — an inflow does not carry a destination of its own.
+      && after.paid > before.paid
+      && after.saved === before.saved
+      && after.cash === 0                               // every dollar had a job
+      // and the gift was in the wallet before the schedule ran, so the week did
+      // not go overdue for want of money sitting on the table
+      && mnyDebts(kid)[0].arrears === 0
       && led.reflect === 'sooner' && led.outside === 50;
     // One kid settled is not the meeting settled — her sister has not decided.
     const notHeldYet = !((c.meetingsHeld || {})[wk]);
@@ -581,6 +585,34 @@ function findChromium() {
     closeSheet('familyMeetingOverlay');
     return fiveSteps && gated && confirmed && poolIsHonest && allToLoan
         && blockedNoAnswer && moved && notHeldYet && reversed;
+  });
+
+  // The schedule draws on the POOL, not on her chores. A week where she earned
+  // nothing but was given $50 still covers the loan payment — which is what a
+  // cash pool means, and the opposite of what tagging inflows would do.
+  checks.giftCanCoverAQuietWeek = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey, c = state.shared.chore;
+    ['meetingsHeld', 'finalizedWeeks', 'moneyLedger', 'weekConfirms', 'weekPlans', 'xpAwardedWeeks']
+      .forEach(m => { if (c[m]) delete c[m][wk]; });
+    const pd = getProfData(kid);
+    delete pd.debts; pd.deposits = []; pd.competitions = []; pd.honesty = [];
+    pd.earnings = {};                                   // a week with no work at all
+    ensureWallet(kid).cash = 0;
+    const debt = mnyDebts(kid)[0];
+    debt.paid = 0; debt.monthly = 13; debt.downPaid = debt.downPayment;
+    debt.downPaymentDue = '2026-01-01'; debt.lastPaymentMonth = null;
+
+    const dry = mnyPool(wk, kid);
+    const nothingToPayWith = dry.breakdown.net === 0 && dry.mustPay === 0;
+
+    mnyAddDeposit(kid, wk, { amount: 50, from: 'Birthday money' });
+    const wet = mnyPool(wk, kid);
+    return nothingToPayWith
+        && wet.cameIn === 50
+        && wet.mustPay === 13          // the gift can be drawn on by the schedule
+        && wet.mine === 37;            // and the rest is still hers to decide
   });
 
   // A lesson that can be skipped by a stale click is not a lesson: a plan or a

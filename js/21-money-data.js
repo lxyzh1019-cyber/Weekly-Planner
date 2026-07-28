@@ -68,13 +68,9 @@ const MNY_FUNDS = [
   { id: 'TSLA',   label: 'One company you pick — Tesla',      ticker: 'TSLA' },
 ];
 
-/* Money that arrives from outside the week's work. Destinations are gated by
-   the same stages as the buckets, so a birthday cheque cannot skip a lesson. */
-const MNY_DEST = [
-  { id: 'loan',  icon: '🎿', label: 'Pay off my loan',        need: 0 },
-  { id: 'ready', icon: '💵', label: 'Keep it ready',          need: 30 },
-  { id: 'gic',   icon: '🔒', label: 'Lock it away for a year', need: 60 },
-];
+/* Where money from outside came FROM. Not where it goes — a gift carries no
+   destination. It joins the pool like every other dollar and gets decided on
+   page 3 with the rest. */
 const MNY_FROM = ['Birthday money', 'A gift', 'Grandma & Grandpa', 'Sold something', 'Found a job'];
 const MNY_DEPOSIT_CHIPS = [20, 50, 100, 200];
 
@@ -346,6 +342,9 @@ function mnyReturns(kid) {
    Birthday money, a gift, something sold. Entered at the meeting with her in
    the room — never on a parent-only screen — and applied when the week is
    committed, so it can be corrected right up to the moment it moves.
+
+   It records how much and where from. It does NOT record where it goes: that
+   is decided on page 3 along with everything else in the pool.
    ════════════════════════════════════════════════════════════════ */
 function mnyEnsureDeposits(kid) {
   const p = getProfData(kid);
@@ -357,7 +356,7 @@ function mnyDepositsForWeek(kid, weekKey) {
 }
 function mnyAddDeposit(kid, weekKey, fields) {
   const d = Object.assign({
-    id: mrNewId('dep-'), weekKey, amount: 0, from: MNY_FROM[0], dest: 'ready',
+    id: mrNewId('dep-'), weekKey, amount: 0, from: MNY_FROM[0],
     dayKey: todayKey(), appliedAt: null, createdAt: Date.now(), updatedAt: Date.now(),
   }, fields || {});
   d.amount = money2(d.amount);
@@ -542,21 +541,26 @@ function mnyPreviousPlan(weekKey, kid) {
 /* ── What the week is made of ──
    One number for each thing that came in, one for each thing that has to go
    out, and what is left for her to decide. */
+/* ── ONE POOL ──
+   Jobs, learning, clean days, competitions and a birthday cheque are all the
+   same thing once they land: money in. Paying off a loan, keeping some ready,
+   locking it away, buying a bit of a company and putting some toward a goal
+   are all the same thing on the way out: money out. Which door a dollar came
+   in through has no bearing on which door it leaves by.
+
+   That is not a simplification for a nine-year-old — it is how a cash pool
+   actually works, and it is the reason there is exactly one place where
+   outflows get decided (page 3) rather than a destination attached to every
+   inflow. Tagging gifts with a destination at entry looked tidier and was
+   wrong twice over: it let the same fifty dollars be spent in two places, and
+   it made the loan payment look like a claim on her chores specifically. */
 function mnyPool(weekKey, kid) {
   const b = mrWeekBreakdown(weekKey, kid);
   const deposits = mnyDepositTotal(kid, weekKey);
   const cameIn = money2(b.net + deposits);
-  /* The loan payment comes out of what she EARNED, not out of a birthday
-     cheque: the schedule is a claim on her week's work, and letting a gift
-     absorb it would quietly make the loan look easier than it is. */
-  const mustPay = money2(Math.min(mnyDueNowTotal(kid), b.net));
-  /* Money from outside is money that came in, but it is NOT hers to choose
-     about tonight: she already aimed it when she entered it, one destination
-     per gift. Counting it in both places would let the same fifty dollars be
-     kept ready AND paid off the loan — the plan would commit more than exists,
-     and the shortfall would only surface as an odd number after the commit.
-     So what is hers to choose is simply what her work left after the loan. */
-  const mine = money2(Math.max(0, b.net - mustPay));
+  // The schedule draws on the whole pool, like any real payment does.
+  const mustPay = money2(Math.min(mnyDueNowTotal(kid), cameIn));
+  const mine = money2(Math.max(0, cameIn - mustPay));
   return {
     breakdown: b, deposits, cameIn, mustPay, mine,
     // Investing is capped at a fifth of the week: a bad month should sting,

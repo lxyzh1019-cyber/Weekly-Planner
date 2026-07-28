@@ -4488,3 +4488,6 @@
      beats a dead button with no explanation. */
   .mny-chip.locked { background: #f2ece0; color: var(--ink-light); }
   .mny-chip.locked.on { background: var(--ink-light); color: var(--paper); }
+  /* A sub-line inside the pool summary: a breakdown of the row above it, not a
+     movement of its own. */
+  .mny-sub-row { color: var(--ink-light); font-size: 0.78rem; padding-left: 0.6rem; }
