@@ -231,5 +231,69 @@ const loanMerge = api.mergeProfileState(
   { loan: { paid: 56,  payments: [{ id:'p2', amount:56,  credited:56  }] } }, 'jess');
 check('loan payments union across devices', loanMerge.loan.payments.length === 2);
 
+/* ── The pocket-money system ── */
+
+// A kid can owe for more than one thing. Each debt carries its own payment
+// ledger, so a debt added on one device and a payment made on the other both
+// have to survive.
+state.shared.tombstones = {};
+const debtMerge = api.mergeProfileState(
+  { debts: [{ id:'loan', name:'Ski loan', paid: 110, updatedAt: 5,
+              payments: [{ id:'p1', amount:100 }] }] },
+  { debts: [{ id:'loan', name:'Ski loan', paid: 110, updatedAt: 5,
+              payments: [{ id:'p2', amount:56 }] },
+            { id:'bike', name:'Bike loan', paid: 0 }] }, 'jess');
+check('debts union and per-debt payments survive',
+  debtMerge.debts.length === 2 &&
+  debtMerge.debts.find(d => d.id === 'loan').payments.length === 2);
+
+// Removing a debt on one device must stick, not resurrect from the other.
+state.shared.tombstones = { 'debt:bike': Date.now() };
+check('removed debt stays removed',
+  api.mergeProfileState({ debts: [] }, { debts: [{ id:'bike', name:'Bike loan' }] }, 'jess')
+     .debts.length === 0);
+
+// Money from outside is append-only; a deleted one carries a 'dep:' tombstone.
+state.shared.tombstones = {};
+const depMerge = api.mergeProfileState(
+  { deposits: [{ id:'d1', amount: 50 }] },
+  { deposits: [{ id:'d2', amount: 20 }] }, 'jess');
+check('deposits union across devices', depMerge.deposits.length === 2);
+state.shared.tombstones = { 'dep:d2': Date.now() };
+check('deleted deposit stays deleted',
+  api.mergeProfileState({ deposits: [] }, { deposits: [{ id:'d2', amount: 20 }] }, 'jess')
+     .deposits.length === 0);
+
+// Holdings are edited in place by a parent, so the newest copy of each wins.
+state.shared.tombstones = {};
+const holdMerge = api.mergeProfileState(
+  { holdings: [{ id:'h1', priceNow: 180, updatedAt: 10 }] },
+  { holdings: [{ id:'h1', priceNow: 200, updatedAt: 20 }, { id:'h2', priceNow: 100 }] }, 'jess');
+check('newest holding edit wins, new holdings union',
+  holdMerge.holdings.length === 2 &&
+  holdMerge.holdings.find(h => h.id === 'h1').priceNow === 200);
+
+// THE ONE THAT MATTERS: confirming a week, then reopening it after an edit.
+// A plain union would keep the stale confirm alive over the reopen that came
+// after it, and the kid's decision page would unlock on a week nobody agreed.
+const confirmMerge = api.mergeSharedChore(
+  { weekConfirms: { '2026-07-26': { jess: { by:'Mom', at: 100, reopenedAt: 300 } } } },
+  { weekConfirms: { '2026-07-26': { jess: { by:'Mom', at: 100, reopenedAt: null } } } });
+check('reopening a week beats a stale confirm',
+  confirmMerge.weekConfirms['2026-07-26'].jess.reopenedAt === 300);
+
+// Two kids confirmed on two devices in the same week — both have to land.
+const twoKids = api.mergeSharedChore(
+  { weekConfirms: { w1: { jenn: { at: 10 } } } },
+  { weekConfirms: { w1: { jess: { at: 20 } } } });
+check('both kids\' confirms survive the same week',
+  twoKids.weekConfirms.w1.jenn && twoKids.weekConfirms.w1.jess);
+
+// What she decided to do with the money: newest decision wins per week per kid.
+const planMerge = api.mergeSharedChore(
+  { weekPlans: { w1: { jess: { planId:'ready', committedAt: 500 } } } },
+  { weekPlans: { w1: { jess: { planId:'debt',  committedAt: 900 } } } });
+check('newest week plan wins', planMerge.weekPlans.w1.jess.planId === 'debt');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

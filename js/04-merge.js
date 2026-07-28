@@ -161,6 +161,29 @@ function mergeSharedChore(localChore, remoteChore) {
     const src = r > l ? rc : (l > r ? lc : null);
     if (src && src.goalsByWeek && src.goalsByWeek[wk] !== undefined) out.goalsByWeek[wk] = src.goalsByWeek[wk];
   });
+  // The Sunday meeting writes two per-week, per-kid records that can both be
+  // *changed* on either device, so a union is the wrong merge for them:
+  //   weekConfirms — confirming, then reopening after an edit. A union would
+  //     keep a stale confirm alive over the reopen that came after it, and the
+  //     kid's decision page would unlock on a week that is no longer agreed.
+  //   weekPlans    — what she decided to do with the money.
+  // Newest write wins per week, per kid, mirroring goalsByWeek above.
+  ['weekConfirms', 'weekPlans'].forEach(field => {
+    const lf = lc[field] || {}, rf = rc[field] || {};
+    if (!lc[field] && !rc[field]) return;
+    const stampOf = (rec) => (rec && (rec.reopenedAt || rec.committedAt || rec.updatedAt || rec.at)) || 0;
+    out[field] = {};
+    new Set([...Object.keys(lf), ...Object.keys(rf)]).forEach(wk => {
+      const lw = lf[wk] || {}, rw = rf[wk] || {};
+      out[field][wk] = {};
+      new Set([...Object.keys(lw), ...Object.keys(rw)]).forEach(kid => {
+        const l = lw[kid], r = rw[kid];
+        if (l == null) { out[field][wk][kid] = r; return; }
+        if (r == null) { out[field][wk][kid] = l; return; }
+        out[field][wk][kid] = stampOf(r) > stampOf(l) ? r : l;
+      });
+    });
+  });
   // Money rules: `versions` is an id-keyed array, so two parents editing on
   // different devices both keep their version (newest updatedAt wins per id,
   // 'mrv:' tombstones make a delete stick). The audit `log` is grow-only —
@@ -211,8 +234,23 @@ function mergeProfileState(localProfile, remoteProfile, profName) {
   merged.fines        = mergeArrayById(lp.fines,        rp.fines,        'fine:');
   merged.boxItems     = mergeArrayById(lp.boxItems,     rp.boxItems,     'box:');
   merged.honesty      = mergeArrayById(lp.honesty,      rp.honesty,      'hon:');
-  // Loan: scalars deep-merge, but `payments` is the ledger -- a lost payment is
-  // money the kid paid and didn't get credit for, so it unions by id.
+  // Money from outside — birthday money, a gift. Append-only, like the others.
+  merged.deposits = mergeArrayById(lp.deposits, rp.deposits, 'dep:');
+  // What she owns. Each holding is edited in place by a parent, so newest copy
+  // of each id wins and a removed one stays removed.
+  merged.holdings = mergeArrayById(lp.holdings, rp.holdings, 'hold:');
+  // Debts: an id-keyed array now that a kid can owe for more than one thing.
+  // Each record carries its own `payments` ledger -- a lost payment is money
+  // the kid paid and didn't get credit for, so those union by id too, inside
+  // the newest copy of the debt.
+  merged.debts = mergeArrayById(lp.debts, rp.debts, 'debt:');
+  merged.debts.forEach(d => {
+    const l = (lp.debts || []).find(x => x && x.id === d.id);
+    const r = (rp.debts || []).find(x => x && x.id === d.id);
+    if (l && r) d.payments = mergeArrayById(l.payments, r.payments, 'lp:');
+  });
+  // Legacy single loan, kept for state saved before debts existed; the first
+  // read after upgrading migrates it into debts[0] (js/20-loan.js).
   merged.loan = deepMergeObj(lp.loan, rp.loan);
   if (lp.loan || rp.loan) {
     merged.loan.payments = mergeArrayById((lp.loan||{}).payments, (rp.loan||{}).payments, 'lp:');

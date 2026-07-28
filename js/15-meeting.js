@@ -302,7 +302,12 @@ function mmConfirmAndRecord() {
   // payment standing against a week that was un-recorded.
   const snap = kid => JSON.parse(JSON.stringify({
     wallet: ensureWallet(kid),
-    loan: (typeof loanState === 'function') ? loanState(kid) : null,
+    // Every debt, every holding and every deposit the commit can touch. A kid
+    // can owe for more than one thing, so snapshotting only the first debt
+    // would leave the others paid down against a week that was un-recorded.
+    debts: (typeof mnyDebts === 'function') ? mnyDebts(kid) : null,
+    holdings: (typeof mnyHoldings === 'function') ? mnyHoldings(kid) : null,
+    deposits: (typeof mnyEnsureDeposits === 'function') ? mnyEnsureDeposits(kid) : null,
     xp: (getProfData(kid).progress || {}).questXP || 0,
     // The meeting also empties the box, so undo has to put it back.
     boxItems: (typeof mrBoxItems === 'function') ? mrBoxItems(kid) : null,
@@ -327,7 +332,9 @@ function mmUndoRecord() {
     const s = mmUndo[kid];
     const pd = getProfData(kid);
     pd.wallet = s.wallet;
-    if (s.loan) pd.loan = s.loan;
+    if (s.debts) pd.debts = s.debts;
+    if (s.holdings) pd.holdings = s.holdings;
+    if (s.deposits) pd.deposits = s.deposits;
     if (s.boxItems) pd.boxItems = s.boxItems;
     if (!pd.progress) pd.progress = {};
     pd.progress.questXP = s.xp;
@@ -415,15 +422,18 @@ function commitFamilyMeeting(wk) {
       // A month of overdue interest, then the scheduled transfer. Interest is
       // charged BEFORE the payment so a kid who pays late still meets the cost
       // of having been late, rather than escaping it by paying on the day.
-      const interest = loanAccrueArrears(kid);
+      const interest = mnyAccrueArrearsAll(kid);
       if (interest > 0) parts.push(`${name} interest −$${interest.toFixed(2)}`);
       // Both of these are stamped by calendar month inside the loan module —
       // the meeting is weekly, the schedule is monthly, so most Sundays this
-      // correctly does nothing.
-      const t = loanSundayTransfer(kid, 'pay_available');
-      const what = t.kind === 'down' ? 'down payment' : 'loan';
-      if (t.paid > 0) parts.push(`${name} ${what} −$${t.paid.toFixed(2)}`);
-      if (t.shortfall > 0) parts.push(`${name} overdue $${t.shortfall.toFixed(2)}`);
+      // correctly does nothing. Every debt is paid, highest bonus rate first.
+      const transfers = mnySundayTransferAll(kid, 'pay_available');
+      const t = transfers[0] || { paid: 0, shortfall: 0, kind: null };
+      transfers.forEach(r => {
+        const what = r.kind === 'down' ? 'down payment' : r.name;
+        if (r.paid > 0) parts.push(`${name} ${what} −$${r.paid.toFixed(2)}`);
+        if (r.shortfall > 0) parts.push(`${name} ${r.name} overdue $${r.shortfall.toFixed(2)}`);
+      });
       // The box opens at the meeting, not on a calendar day.
       const released = mrReleaseBoxForMeeting(kid);
       if (released > 0) parts.push(`${name} box opened (${released})`);
@@ -431,8 +441,15 @@ function commitFamilyMeeting(wk) {
       if (ledger) {
         ledger.xp = xp;
         ledger.boxReleased = released;
-        ledger.loan = { kind: t.kind || null, paid: money2(t.paid || 0),
-                        shortfall: money2(t.shortfall || 0), interest: money2(interest || 0) };
+        ledger.loan = {
+          kind: t.kind || null,
+          paid: money2(transfers.reduce((s, r) => s + (r.paid || 0), 0)),
+          shortfall: money2(transfers.reduce((s, r) => s + (r.shortfall || 0), 0)),
+          interest: money2(interest || 0),
+          // Per debt, so a week with two loans can still be read back.
+          each: transfers.map(r => ({ debtId: r.debtId, name: r.name,
+                                      paid: money2(r.paid || 0), shortfall: money2(r.shortfall || 0) })),
+        };
         c.moneyLedger[wk][kid] = ledger;
       }
     }

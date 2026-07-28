@@ -62,76 +62,106 @@ function marketMonthLabel() {
   const year = cfg.startYear + Math.floor(total / 12);
   return MONEY_MONTHS[((total % 12) + 12) % 12] + ' ' + year;
 }
-function portfolioValue(kid) {
-  const w = ensureWallet(kid);
-  return money2(Object.keys(w.holdings).reduce((s, t) => s + (w.holdings[t] || 0) * stockPrice(t), 0));
-}
-function gicTotal(kid) { return money2(ensureWallet(kid).gics.reduce((s, g) => s + (g.amount || 0), 0)); }
-function netWorth(kid) {
-  const w = ensureWallet(kid);
-  return money2(w.cash + w.savings + gicTotal(kid) + portfolioValue(kid));
-}
+/* What she owns now lives in one record per holding (js/21-money-data.js), so
+   a parent can keep it truthful by hand instead of a simulation deciding for
+   them. These four keep their old names because half the app calls them. */
+function portfolioValue(kid) { return mnyInvestedTotal(kid); }
+function gicTotal(kid) { return mnyLockedTotal(kid); }
+function savingsTotal(kid) { return mnySavedTotal(kid); }
+function netWorth(kid) { return mnyEverything(kid); }
 
 /* ── Transactions (each guards against overdraw; returns true on success) ── */
-function moneyDeposit(kid, amount) {          // cash → savings
+function moneyDeposit(kid, amount) {          // cash → kept ready
   const w = ensureWallet(kid); amount = money2(Math.min(amount, w.cash));
   if (amount <= 0) return false;
-  w.cash = money2(w.cash - amount); w.savings = money2(w.savings + amount); saveAll(); return true;
+  w.cash = money2(w.cash - amount); mnyAddToSaved(kid, amount); saveAll(); return true;
 }
 function moneyAddCash(kid, amount) {          // extra cash from outside chores → wallet cash
   const w = ensureWallet(kid); amount = money2(amount);
   if (!(amount > 0)) return false;
   w.cash = money2(w.cash + amount); saveAll(); return true;
 }
-function moneyWithdraw(kid, amount) {         // savings → cash (two-way)
-  const w = ensureWallet(kid); amount = money2(Math.min(amount, w.savings));
+function moneyWithdraw(kid, amount) {         // kept ready → cash (two-way)
+  const w = ensureWallet(kid); amount = money2(Math.min(amount, mnySavedTotal(kid)));
   if (amount <= 0) return false;
-  w.savings = money2(w.savings - amount); w.cash = money2(w.cash + amount); saveAll(); return true;
+  const took = mnyTakeFromSaved(kid, amount);
+  w.cash = money2(w.cash + took); saveAll(); return true;
 }
-function moneyOpenGIC(kid, amount, termMonths) {   // cash → locked GIC
+function moneyOpenGIC(kid, amount, termMonths) {   // cash → locked away
   const w = ensureWallet(kid); amount = money2(Math.min(amount, w.cash));
-  if (amount <= 0 || ![3, 6, 12].includes(termMonths)) return false;
+  const term = termMonths || 12;
+  if (amount <= 0 || ![3, 6, 12].includes(term)) return false;
   const cfg = bankConfig();
-  const rate = cfg.gicRates[termMonths] || 0.03;
+  const rate = cfg.gicRates[term] || 0.03;
   w.cash = money2(w.cash - amount);
-  w.gics.push({ id: 'gic-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-    amount, termMonths, rate, openedMonth: cfg.marketMonth, matureMonth: cfg.marketMonth + termMonths });
+  const matures = formatDayKey(todayKey());
+  matures.setMonth(matures.getMonth() + term);
+  mnyAddHolding(kid, { kind: 'gic', name: 'Locked away for a year', units: 1,
+                       priceNow: amount, costBasis: amount, rateAnnual: rate,
+                       termMonths: term, maturesOn: ctDateToKey(matures) });
   saveAll(); return true;
 }
-function moneyBuyStock(kid, ticker, dollars) {     // cash → fractional shares
+function moneyBuyStock(kid, ticker, dollars) {     // cash → a bit of a company
   const w = ensureWallet(kid); dollars = money2(Math.min(dollars, w.cash));
   if (dollars <= 0 || !STOCKS_2023[ticker]) return false;
-  const shares = dollars / stockPrice(ticker);
+  const price = stockPrice(ticker);
   w.cash = money2(w.cash - dollars);
-  w.holdings[ticker] = (w.holdings[ticker] || 0) + shares; saveAll(); return true;
+  const held = mnyHoldingsOfKind(kid, 'stock').find(h => h.ticker === ticker);
+  if (held) {
+    held.units = (Number(held.units) || 0) + dollars / price;
+    held.priceNow = money2(price);
+    held.costBasis = money2(money2(held.costBasis) + dollars);
+    held.updatedAt = Date.now();
+  } else {
+    mnyAddHolding(kid, { kind: 'stock', name: STOCKS_2023[ticker].name, ticker,
+                         units: dollars / price, priceNow: money2(price), costBasis: dollars });
+  }
+  saveAll(); return true;
 }
-function moneySellStock(kid, ticker, shares) {     // shares → cash
-  const w = ensureWallet(kid); const have = w.holdings[ticker] || 0;
+function moneySellStock(kid, ticker, shares) {     // a bit of a company → cash
+  const w = ensureWallet(kid);
+  const held = mnyHoldingsOfKind(kid, 'stock').find(h => h.ticker === ticker);
+  if (!held) return false;
+  const have = Number(held.units) || 0;
   shares = Math.min(shares, have);
-  if (shares <= 1e-9 || !STOCKS_2023[ticker]) return false;
-  w.holdings[ticker] = have - shares;
-  if (w.holdings[ticker] < 1e-9) delete w.holdings[ticker];
-  w.cash = money2(w.cash + shares * stockPrice(ticker)); saveAll(); return true;
+  if (shares <= 1e-9) return false;
+  const price = money2(held.priceNow) || stockPrice(ticker);
+  const proceeds = money2(shares * price);
+  // Cost comes off in proportion, so what is left still knows what it cost.
+  held.costBasis = money2(money2(held.costBasis) * (1 - shares / have));
+  held.units = have - shares;
+  held.updatedAt = Date.now();
+  if (held.units < 1e-9) mnyRemoveHolding(kid, held.id);
+  w.cash = money2(w.cash + proceeds); saveAll(); return true;
 }
 
-/* Advance the money world by one "month": credit savings interest, mature any
-   due GICs (principal + simple interest for the term), and step the market.
+/* One month on. Interest lands on what is kept ready, and anything locked away
+   that has reached its date pays out. There is no market simulation any more:
+   a share is worth what the Money rules page says it is worth, which is both
+   simpler and closer to how it really works.
    Returns a summary for the meeting recap. Called once per weekly meeting. */
 function moneyAdvanceMonth(kid) {
-  const w = ensureWallet(kid); const cfg = bankConfig();
-  const interest = money2(w.savings * (cfg.savingsRate / 12));
-  w.savings = money2(w.savings + interest);
-  const maturedList = [];
-  const nextMonth = cfg.marketMonth + 1;
-  w.gics = w.gics.filter(g => {
-    if (nextMonth >= g.matureMonth) {
-      const payout = money2(g.amount * (1 + g.rate * (g.termMonths / 12)));
-      w.cash = money2(w.cash + payout);
-      maturedList.push({ amount: g.amount, payout, termMonths: g.termMonths });
-      return false;
-    }
-    return true;
+  const w = ensureWallet(kid);
+  let interest = 0;
+  mnyHoldingsOfKind(kid, 'savings').forEach(h => {
+    const add = money2(mnyHoldingValue(h) * ((Number(h.rateAnnual) || 0) / 12));
+    if (!(add > 0)) return;
+    h.units = 1;
+    h.priceNow = money2(mnyHoldingValue(h) + add);
+    h.updatedAt = Date.now();
+    interest = money2(interest + add);
   });
+  const maturedList = [];
+  const today = todayKey();
+  mnyHoldingsOfKind(kid, 'gic').slice().forEach(h => {
+    if (!h.maturesOn || String(h.maturesOn) > String(today)) return;
+    const value = mnyHoldingValue(h);
+    const payout = money2(value * (1 + (Number(h.rateAnnual) || 0)));
+    w.cash = money2(w.cash + payout);
+    maturedList.push({ amount: value, payout, termMonths: h.termMonths || 12 });
+    mnyRemoveHolding(kid, h.id);
+  });
+  saveAll();
   return { interest, matured: maturedList };
 }
 

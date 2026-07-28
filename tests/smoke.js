@@ -382,6 +382,122 @@ function findChromium() {
   checks.heroTiersReachTen = await page.evaluate(() =>
     HERO_TIERS.length >= 10 && heroTierForLevel(10).name.length > 0);
 
+  /* ── The pocket-money system ── */
+
+  // The single sports loan becomes debts[0] with every field carried across.
+  // A migration that dropped `payments` would erase money the kid really paid.
+  checks.loanMigratesToDebtsIntact = await page.evaluate(() => {
+    const kid = 'jenn';
+    const pd = getProfData(kid);
+    delete pd.debts;
+    pd.loan = { paid: 110, arrears: 20, arrearsInterest: 1,
+                payments: [{ id: 'p1', amount: 100, credited: 110 }] };
+    const debts = mnyDebts(kid);
+    return debts.length === 1 && debts[0].id === 'loan'
+        && debts[0].paid === 110 && debts[0].payments.length === 1
+        && debts[0].principal === 1000            // seeded from the rulebook
+        && loanState(kid).id === 'loan';          // old callers still work
+  });
+
+  // Extra money goes to the debt where a dollar clears the most, not the one
+  // that happens to be first in the list.
+  checks.extraPaysHighestBonusFirst = await page.evaluate(() => {
+    profile = 'parent';
+    const kid = 'jess';
+    const pd = getProfData(kid);
+    delete pd.debts;
+    mnyDebts(kid);                                 // migrate, then add a second
+    mnyAddDebt(kid, { id: 'bike', name: 'Bike loan', icon: '🚲',
+                      principal: 300, monthly: 25, bonusRate: 15,
+                      downPaymentDue: '2026-01-01' });
+    const first = mnyDebtsByPriority(kid)[0];
+    const spread = mnySpreadEarlyPayment(kid, 100);
+    const ok = first.id === 'bike'                 // 15% beats the loan's 10%
+            && spread.length === 1 && spread[0].debtId === 'bike'
+            && spread[0].cleared === 115;          // $100 clears $115
+    delete pd.debts;
+    return ok;
+  });
+
+  // Renaming a debt must never reset progress — the whole point of the record.
+  checks.renamingADebtKeepsProgress = await page.evaluate(() => {
+    profile = 'parent';
+    const kid = 'jess';
+    const pd = getProfData(kid);
+    delete pd.debts;
+    const d = mnyDebts(kid)[0];
+    d.paid = 200;
+    mnyEditDebt(kid, d.id, 'name', 'Ski loan');
+    const after = mnyDebts(kid)[0];
+    const logged = mrLogEntries().some(e => String(e.path).indexOf('debts.jess') === 0);
+    delete pd.debts;
+    return after.name === 'Ski loan' && after.paid === 200 && logged;
+  });
+
+  // A number changed at the meeting replaces the planner's figure everywhere,
+  // keeps the original beside it, and reopens a week that was already agreed.
+  checks.overrideReopensTheWeek = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey, kid = 'jess';
+    const c = state.shared.chore;
+    if (c.weekConfirms) delete c.weekConfirms[wk];
+    if (c.weekPlans) delete c.weekPlans[wk];
+    mrEnsureEarnings(kid, wk).overrides = {};
+    mrSetChoreGrade(kid, wk, 0, 'dishes', 3);
+    const planner = mrWeekBreakdown(wk, kid).chorePaid;
+    mnyConfirmWeek(wk, kid, 'Mom');
+    const wasConfirmed = mnyIsConfirmed(wk, kid);
+    mnySetOverride(kid, wk, 'chores', 15, 'graded_wrong');
+    const b = mrWeekBreakdown(wk, kid);
+    const ok = wasConfirmed
+            && b.chorePaid === 15                  // the override is what counts
+            && b.original.chores === planner       // the planner's number is kept
+            && mnyWeekReason(kid, wk) === 'graded_wrong'
+            && !mnyIsConfirmed(wk, kid)            // the week reopened
+            && mnyConfirmStamp(wk, kid).indexOf('confirm again') > -1
+            // and it reaches the frozen ledger, not just the screen
+            && mrFreezeWeekLedger(wk, kid).chores === 15;
+    mrEnsureEarnings(kid, wk).overrides = {};
+    if (c.weekConfirms) delete c.weekConfirms[wk];
+    return ok;
+  });
+
+  // A plan can never commit more than exists, and investing is capped at a
+  // fifth of the week — a bad month should sting, not wipe out the year.
+  checks.planNeverOverspendsThePool = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey, kid = 'jess';
+    mrEnsureEarnings(kid, wk).overrides = {};
+    mnySetOverride(kid, wk, 'chores', 40, 'agreed');
+    const pool = mnyPool(wk, kid);
+    const split = mnySplitFor(wk, kid, 'balanced');
+    const spent = mnySplitTotal(split);
+    const ok = pool.mine > 0
+            && Math.abs(spent - pool.mine) < 0.05
+            && Math.abs(pool.stockCap - pool.mine * 0.2) < 0.01
+            && mnyPricePlan(kid, split).bonus > 0;   // paying early earns the bonus
+    mrEnsureEarnings(kid, wk).overrides = {};
+    return ok;
+  });
+
+  // What she owns comes off one record per holding, so the four tiles on the
+  // kid's page and the wallet can never disagree about the same dollar.
+  checks.holdingsAreOneSourceOfTruth = await page.evaluate(() => {
+    const kid = 'jenn';
+    const pd = getProfData(kid);
+    delete pd.holdings;
+    pd.wallet = { cash: 42.20, savings: 180, gics: [], holdings: {}, lastMeetingWeek: null };
+    const migrated = mnySavedTotal(kid) === 180 && pd.wallet.savings === 0;
+    moneyDeposit(kid, 20);                          // cash → kept ready
+    const moved = mnySavedTotal(kid) === 200 && ensureWallet(kid).cash === 22.20;
+    moneyWithdraw(kid, 50);
+    const back = mnySavedTotal(kid) === 150 && ensureWallet(kid).cash === 72.20;
+    return migrated && moved && back
+        && mnyEverything(kid) === 222.20;
+  });
+
   checks.noConsoleErrors = errors.length === 0;
 
   const failed = Object.entries(checks).filter(([,v]) => !v).map(([k]) => k);
