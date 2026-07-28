@@ -21,6 +21,15 @@ window._currentRewardPrompt = null;
     if (wrap) wrap.addEventListener('click', pmHandleWrapClick);
   });
 })();
+// The pocket-money pages delegate the same way, for the same reason: every
+// render replaces the whole wrap, so a listener bound to a card would be gone
+// the first time a number changed.
+(function(){
+  ['mnyPage1Wrap','mnyStoryWrap','mnySchoolWrap'].forEach(id => {
+    const wrap = document.getElementById(id);
+    if (wrap) wrap.addEventListener('click', mnyHandleClick);
+  });
+})();
 
 /* Desktop: convert vertical wheel scroll to horizontal on the tray + filter */
 function enableHorizontalWheelScroll() {

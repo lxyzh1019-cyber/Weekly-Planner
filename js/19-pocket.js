@@ -20,14 +20,22 @@ function pocketViewKid() {
   return isParent() ? (pocketKid === 'jenn' ? 'jenn' : 'jess') : activeProfile();
 }
 
+/* The three sub-tabs have all moved:
+     balance → 💰 My money      (js/22-money-page1.js)
+     setup   → the Money rules tab of the parent portal
+     bank    → gone; what she owns is now one record per holding, edited on
+               the Money rules tab, with no market simulation behind it.
+   This stays as the redirect so older call sites and any saved deep link keep
+   landing somewhere sensible instead of a blank screen. */
 function openPocketMoney(kid, tab) {
   ctPrepareRead();
   if (isParent() && (kid === 'jenn' || kid === 'jess')) pocketKid = kid;
-  // Kids can never land on the parent-only editor, even via a stale deep link.
-  const wanted = tab || pocketTab;
-  pocketTab = (wanted === 'setup' && !isParent()) ? 'balance' : wanted;
-  showScreen('pocket');
-  renderPocketScreen();
+  if (tab === 'setup' && isParent()) {
+    showScreen('parent');
+    if (typeof setParentTab === 'function') setParentTab('money');
+    return;
+  }
+  mnyOpenMyMoney(kid || pocketViewKid());
 }
 
 function setPocketTab(tab) {

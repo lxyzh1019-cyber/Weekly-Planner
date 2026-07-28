@@ -180,6 +180,26 @@ function renderQuestMoneyStrip(kid) {
   panel.innerHTML = buildHowIEarnCard(kid, wk);
 }
 
+/* The Quest Board keeps a three-line answer to "how am I doing?" and hands the
+   rest to 💰 My money (js/22-money-page1.js). This used to be the whole money
+   card; a board about today's quests is the wrong place for a wallet, a debt
+   and a year's pacing, and duplicating them here meant two screens that could
+   disagree about the same dollar. */
+function mnyQuestSummary(kid, wk) {
+  const b = mrWeekBreakdown(wk, kid);
+  const owing = mnyTotalOwing(kid);
+  const pct = mnyPaidPct(kid);
+  return `<div class="mny-card">
+      <div class="mny-row"><span>Earned this week so far</span><b>${mnyMoney(b.net)}</b></div>
+      <div class="mny-row"><span>Everything I have</span><b>${mnyMoney(mnyEverything(kid))}</b></div>
+      ${owing > 0
+        ? `<div class="mny-row"><span>Still to pay off</span><b>${mnyMoney(owing)}</b></div>
+           <div class="mny-progress"><div class="mny-progress-fill green" style="width:${pct}%"></div></div>`
+        : ''}
+      <button type="button" class="mny-btn wide primary" onclick="mnyOpenMyMoney('${kid}')">💰 Open My money ›</button>
+    </div>`;
+}
+
 /* 3a — "How I earn": one kid-readable card that gathers every money rule and
    the wallet in one place. Display-only — reads existing chore/money state.
 
@@ -189,7 +209,7 @@ function renderQuestMoneyStrip(kid) {
    those weeks really were earned under the $6-cap group model. */
 function buildHowIEarnCard(kid, wk) {
   if (typeof mrUsesNewModel === 'function' && mrUsesNewModel(wk)) {
-    return buildHowIEarnCardLive(kid, wk);
+    return mnyQuestSummary(kid, wk);
   }
   return buildHowIEarnCardLegacy(kid, wk);
 }
@@ -343,12 +363,11 @@ function buildHowIEarnCardLegacy(kid, wk) {
   return earnCard + `<div class="hm-rules">${rules}</div>` + wallet + bankBtn;
 }
 
-/* Week-topbar money button: parents get the full Bank & Invest screen, kids get
-   the "How I earn" card (rules + wallet) in a sheet. */
+/* Week-topbar money button. Both roles land on 💰 My money — a parent looking
+   at a kid's money should see exactly what the kid sees, and everything a
+   parent can CHANGE lives on the Money rules tab of the portal instead. */
 function openWeekMoney() {
-  // Both roles land on the same Pocket Money screen now — kids open on Balance
-  // & Prices, which replaced the old "How I earn" sheet with a live one.
-  openPocketMoney(isParent() ? ctParentKid : activeProfile(), 'balance');
+  mnyOpenMyMoney(isParent() ? ctParentKid : activeProfile());
 }
 
 // Kid's free-text weekly note to grown-ups — surfaced in the parent review.

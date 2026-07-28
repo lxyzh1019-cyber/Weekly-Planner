@@ -66,32 +66,39 @@ function findChromium() {
   // Kid money surface: kids reach Pocket Money and may LOOK at the bank, but
   // every function that moves money refuses them.
   checks.kidMoneyLabel = await page.evaluate(() =>
-    document.getElementById('weekMoneyBtn').textContent.includes('Pocket money'));
-  checks.kidCanOpenPocket = await page.evaluate(() => {
+    document.getElementById('weekMoneyBtn').textContent.includes('My money'));
+  // The money button lands a kid on her own page, and that page shows the four
+  // things she owns and what she still owes.
+  checks.kidCanOpenMyMoney = await page.evaluate(() => {
     openWeekMoney();
-    return document.getElementById('screen-pocket').classList.contains('active');
+    const txt = document.getElementById('mnyPage1Wrap').textContent;
+    return document.getElementById('screen-mymoney').classList.contains('active')
+        && txt.includes('Everything I have')
+        && txt.includes('Cash') && txt.includes('Locked away');
   });
-  // The rules editor must not even be offered to a kid.
-  checks.kidHasNoRulesTab = await page.evaluate(() =>
-    document.getElementById('pocketSetupTab').hidden === true);
-  checks.kidCannotReachSetup = await page.evaluate(() => {
-    setPocketTab('setup');
-    return document.getElementById('pmtab-setup').hidden === true;
+  // The rules editor is not on a kid's page at all — there is nothing to hide.
+  checks.kidHasNoRulesOnHerPage = await page.evaluate(() => {
+    const txt = document.getElementById('mnyPage1Wrap').textContent;
+    return !document.getElementById('mnyPage1Wrap').querySelector('[data-pm-action="edit"]')
+        && !txt.includes('Rules &');
   });
-  // Bank tab is visible to a kid...
-  checks.kidCanSeeBank = await page.evaluate(() => {
-    setPocketTab('bank');
-    return document.getElementById('moneyWrap').textContent.includes('Savings');
+  // A kid can walk to her own history and back without a grown-up.
+  checks.kidCanReadHerStory = await page.evaluate(() => {
+    mnyOpenStory();
+    return document.getElementById('screen-moneystory').classList.contains('active')
+        && document.getElementById('mnyStoryWrap').textContent.includes('My money story');
   });
-  // ...but the balances must not move when a kid tries to transact.
+  // Kids may look at what they own, but the balances must not move when a kid
+  // tries to transact.
   checks.kidCannotTransact = await page.evaluate(async () => {
-    const before = JSON.stringify(ensureWallet(activeProfile()));
-    moneyAddCash(activeProfile(), 10);          // seed cash so a deposit COULD succeed
-    const seeded = ensureWallet(activeProfile()).cash;
+    const kid = activeProfile();
+    const before = ensureWallet(kid).cash;
+    const savedBefore = mnySavedTotal(kid);
+    moneyAddCash(kid, 10);                      // seed cash so a deposit COULD succeed
+    const seeded = ensureWallet(kid).cash;
     await moneyAction('deposit');
-    const after = ensureWallet(activeProfile());
-    const ok = after.cash === seeded && after.savings === 0;
-    ensureWallet(activeProfile()).cash = JSON.parse(before).cash;   // restore
+    const ok = ensureWallet(kid).cash === seeded && mnySavedTotal(kid) === savedBefore;
+    ensureWallet(kid).cash = before;            // restore
     return ok;
   });
   // A kid editing a rule must be refused, leaving no new version or log entry.

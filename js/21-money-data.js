@@ -685,17 +685,20 @@ function mnySegments(list) {
     })),
   };
 }
+/* What came in THIS WEEK. Deliberately no "made on its own" segment: what her
+   holdings have gained is a running total since she bought them, not a thing
+   that happened this week, and dropping it into a weekly bar would make the
+   segments add up to more than the week did. That number has its own home —
+   the returns statement on page 2, where it is the whole point. */
 function mnyIncomeSegments(weekKey, kid) {
   const pool = mnyPool(weekKey, kid);
   const b = pool.breakdown;
-  const made = mnyReturns(kid).gain;
   const out = mnySegments([
-    { label: 'Jobs',          value: b.chorePaid,     color: '#95d5b2' },
-    { label: 'Learning',      value: b.learnPaid,     color: '#6fb1fc' },
-    { label: 'Clean days',    value: b.streak.bonus,  color: '#ffd166' },
-    { label: 'Competitions',  value: b.compPaid,      color: '#ff9eb5' },
-    { label: 'From outside',  value: pool.deposits,   color: '#c9a6e8' },
-    { label: 'Made on its own', value: Math.max(0, made), color: '#b8b0a2' },
+    { label: 'Jobs',         value: b.chorePaid,    color: '#95d5b2' },
+    { label: 'Learning',     value: b.learnPaid,    color: '#6fb1fc' },
+    { label: 'Clean days',   value: b.streakBonus,  color: '#ffd166' },
+    { label: 'Competitions', value: b.compPaid,     color: '#ff9eb5' },
+    { label: 'From outside', value: pool.deposits,  color: '#c9a6e8' },
   ]);
   out.fines = money2(b.fines.total);
   return out;

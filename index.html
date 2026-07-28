@@ -297,6 +297,41 @@
   <div class="parent-panel" id="pmtab-setup" role="tabpanel" hidden><div class="chore-wrap" id="pmSetupWrap"></div></div>
 </div>
 
+<!-- 1 💰 My money — the kid's own money page -->
+<div class="screen" id="screen-mymoney">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="btn-icon" onclick="goWeek()">◀</button>
+      <h2>My money 💰</h2>
+    </div>
+    <div class="mny-kid-switch" id="mnyKidSwitch" hidden></div>
+    <div class="profile-badge" id="mnyProfileBadge"></div>
+  </div>
+  <div class="chore-wrap" id="mnyPage1Wrap"></div>
+</div>
+
+<!-- 📖 My money story — every week that was settled -->
+<div class="screen" id="screen-moneystory">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="btn-icon" onclick="mnyOpenMyMoney(mnyViewKid())">◀</button>
+      <h2>My money story 📖</h2>
+    </div>
+  </div>
+  <div class="chore-wrap" id="mnyStoryWrap"></div>
+</div>
+
+<!-- 5 🎓 Money school -->
+<div class="screen" id="screen-moneyschool">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="btn-icon" onclick="mnyOpenMyMoney(mnyViewKid())">◀</button>
+      <h2>Money school 🎓</h2>
+    </div>
+  </div>
+  <div class="chore-wrap" id="mnySchoolWrap"></div>
+</div>
+
 <!-- Weekly family meeting overlay -->
 <div class="overlay" id="familyMeetingOverlay" onclick="overlayClick(event,'familyMeetingOverlay')">
   <div class="sheet">
@@ -1255,6 +1290,7 @@
 <script src="js/19-pocket.js"></script>
 <script src="js/20-loan.js"></script>
 <script src="js/21-money-data.js"></script>
+<script src="js/22-money-page1.js"></script>
 <script src="js/99-main.js"></script>
 </body>
 </html>
