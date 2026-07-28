@@ -544,8 +544,17 @@ function mnyPool(weekKey, kid) {
   const b = mrWeekBreakdown(weekKey, kid);
   const deposits = mnyDepositTotal(kid, weekKey);
   const cameIn = money2(b.net + deposits);
-  const mustPay = money2(Math.min(mnyDueNowTotal(kid), cameIn));
-  const mine = money2(Math.max(0, cameIn - mustPay));
+  /* The loan payment comes out of what she EARNED, not out of a birthday
+     cheque: the schedule is a claim on her week's work, and letting a gift
+     absorb it would quietly make the loan look easier than it is. */
+  const mustPay = money2(Math.min(mnyDueNowTotal(kid), b.net));
+  /* Money from outside is money that came in, but it is NOT hers to choose
+     about tonight: she already aimed it when she entered it, one destination
+     per gift. Counting it in both places would let the same fifty dollars be
+     kept ready AND paid off the loan — the plan would commit more than exists,
+     and the shortfall would only surface as an odd number after the commit.
+     So what is hers to choose is simply what her work left after the loan. */
+  const mine = money2(Math.max(0, b.net - mustPay));
   return {
     breakdown: b, deposits, cameIn, mustPay, mine,
     // Investing is capped at a fifth of the week: a bad month should sting,
@@ -584,8 +593,20 @@ function mnySplitFor(weekKey, kid, planId, own) {
   const plan = MNY_PLANS.find(p => p.id === planId) || MNY_PLANS[0];
   const shape = plan.split || { loan: 1 };
   Object.keys(shape).forEach(k => {
-    const dollars = money2(pool.mine * shape[k]);
-    if (k !== 'loan') { out[k] = dollars; return; }
+    let dollars = money2(pool.mine * shape[k]);
+    if (k !== 'loan') {
+      // A bucket she has not reached yet takes nothing, whatever the plan says.
+      // Its share falls back to paying the debt down, which is always open.
+      const bucket = MNY_BUCKETS.find(b => b.key === k);
+      if (bucket && !mnyIsOpen(kid, bucket.need)) {
+        const first = debts[0];
+        if (first) out['loan:' + first.id] = money2(out['loan:' + first.id] + dollars);
+        else out.ready = money2(out.ready + dollars);
+        return;
+      }
+      out[k] = dollars;
+      return;
+    }
     // The loan share spreads across debts, highest bonus first — that is where
     // a dollar clears the most.
     let left = dollars;

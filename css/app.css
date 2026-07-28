@@ -4375,3 +4375,101 @@
   }
   .mny-concept-title { font-size: 1.15rem; font-weight: 800; margin-bottom: 0.4rem; }
   .mny-concept-body p { margin: 0.25rem 0 0.5rem; font-size: 0.9rem; line-height: 1.5; }
+
+  /* ── The meeting's two money steps (pages 2 and 3) ── */
+  .mny-cols.two { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 820px) { .mny-cols.two { grid-template-columns: 1fr; } }
+
+  /* Money in → what must go out → what is hers. */
+  .mny-strip { display: flex; align-items: stretch; gap: 0.35rem; margin: 0.5rem 0; }
+  .mny-strip-cell {
+    flex: 1; border: 2.5px solid var(--ink); border-radius: 12px; background: var(--paper);
+    padding: 0.4rem 0.55rem; min-width: 0;
+  }
+  .mny-strip-cell.on { background: var(--bg2); box-shadow: 2px 3px 0 rgba(42, 35, 32, 0.12); }
+  .mny-strip-val { font-size: 1.15rem; font-weight: 800; color: var(--accent-strong); }
+  .mny-strip-arrow { align-self: center; color: var(--ink-light); font-weight: 800; }
+
+  /* An earnings row: what it is, where the number came from, what it is worth. */
+  .mny-erow { border-bottom: 1px dashed var(--paper-line); padding: 0.35rem 0; }
+  .mny-erow:last-of-type { border-bottom: 0; }
+  .mny-erow-label {
+    background: none; border: 0; padding: 0; font: inherit; color: var(--ink);
+    cursor: pointer; text-align: left; min-height: 32px;
+  }
+  .mny-mag { opacity: 0.45; font-size: 0.8em; }
+  .mny-erow-right { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.15rem; }
+  .mny-erow-right b { color: var(--accent-strong); }
+  .mny-was { color: var(--ink-light); font-weight: 400; }
+  /* Where a number came from. "From the planner" and "Changed by a grown-up"
+     are different claims, and a kid is entitled to know which she is looking at. */
+  .mny-src {
+    font-size: 0.68rem; letter-spacing: 0.03em; text-transform: uppercase; font-weight: 700;
+    border: 1.5px solid var(--ink); border-radius: 6px; padding: 0.08rem 0.3rem; color: var(--ink-light);
+    background: var(--bg);
+  }
+  .mny-src.edited { background: var(--accent-yellow, #ffd166); color: var(--ink); }
+  .mny-src.amber { background: #ffe0a3; color: #7a4b00; border-color: #7a4b00; }
+  .mny-stepgrp { display: inline-flex; align-items: center; gap: 0.25rem; }
+  .mny-stepgrp .mny-step { min-width: 30px; min-height: 30px; }
+  .mny-stepgrp .mny-step.on { background: #ffe0a3; }
+  .mny-working {
+    margin-top: 0.35rem; padding: 0.4rem 0.5rem; background: var(--bg);
+    border: 2px dashed var(--paper-line); border-radius: 9px;
+  }
+
+  .mny-field { display: block; margin-top: 0.4rem; font-size: 0.8rem; color: var(--ink-light); }
+  .mny-field span { display: block; margin-bottom: 0.15rem; }
+  .mny-field input {
+    width: 100%; min-height: 40px; border: 2px solid var(--ink); border-radius: 9px;
+    background: var(--paper); color: var(--ink); font: inherit; padding: 0.3rem 0.5rem;
+  }
+
+  /* The confirm / commit bar: total, what is in the way, the button. The button
+     says what is missing rather than just refusing. */
+  .mny-confirmbar {
+    display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; justify-content: space-between;
+    border: 2.5px solid var(--ink); border-radius: 12px; background: var(--bg2);
+    padding: 0.5rem 0.7rem; margin-top: 0.6rem;
+    box-shadow: 2px 3px 0 rgba(42, 35, 32, 0.12);
+  }
+  .mny-confirmbar b { color: var(--accent-strong); font-size: 1.1rem; }
+  .mny-card.locked { background: #f7f2e6; }
+
+  .mny-checks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.3rem; margin-top: 0.4rem; }
+  @media (max-width: 620px) { .mny-checks { grid-template-columns: 1fr; } }
+  .mny-checks .mny-chip { text-align: left; }
+
+  .mny-plans { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; margin-top: 0.45rem; }
+  @media (max-width: 620px) { .mny-plans { grid-template-columns: 1fr; } }
+  .mny-plan {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem;
+    min-height: 60px; border: 2.5px solid var(--ink); border-radius: 11px; background: var(--paper);
+    color: var(--ink); font: inherit; font-size: 0.82rem; text-align: left; padding: 0.45rem 0.55rem;
+    cursor: pointer;
+  }
+  .mny-plan.on { background: var(--accent-strong); color: #fff; }
+  .mny-plan[disabled] { background: #f2ece0; color: var(--ink-light); cursor: not-allowed; }
+  .mny-plan small { font-size: 0.68rem; opacity: 0.85; }
+  .mny-plan-icon { font-size: 1.1rem; }
+
+  /* The five doors, as signed bars around a zero line: paying late is the only
+     one that goes the other way, and it has to LOOK like it. */
+  .mny-doors { margin-top: 0.45rem; }
+  .mny-door { display: grid; grid-template-columns: 1fr 90px auto; gap: 0.4rem; align-items: center; padding: 0.2rem 0; }
+  .mny-door-label { font-size: 0.8rem; }
+  .mny-door-track {
+    position: relative; height: 12px; border: 2px solid var(--ink); border-radius: 6px;
+    background: var(--bg); overflow: hidden; display: block;
+  }
+  .mny-door-track::before {
+    content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: var(--ink); opacity: 0.5;
+  }
+  .mny-door-track i { position: absolute; top: 0; bottom: 0; display: block; }
+  .mny-door-track i.pos { left: 50%; background: var(--mny-chores); }
+  .mny-door-track i.neg { right: 50%; background: var(--mny-fine); }
+  .mny-door b { font-size: 0.82rem; color: var(--accent-strong); white-space: nowrap; }
+  .mny-door b.neg { color: var(--mny-fine); }
+
+  .mny-spark { width: 100%; height: 60px; margin-top: 0.4rem; }
+  .mny-note.warn, .warn { color: var(--mny-fine); }

@@ -505,6 +505,99 @@ function findChromium() {
         && mnyEverything(kid) === 222.20;
   });
 
+  /* ── The Sunday meeting's two money steps ── */
+
+  // The whole flow: agree the week, decide where it goes, watch it move, undo.
+  // This is the one path that actually moves money, so it is checked end to end
+  // rather than a piece at a time.
+  checks.meetingMoneyFlowEndToEnd = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey, c = state.shared.chore;
+    ['meetingsHeld', 'finalizedWeeks', 'moneyLedger', 'weekConfirms', 'weekPlans', 'xpAwardedWeeks']
+      .forEach(m => { if (c[m]) delete c[m][wk]; });
+    const pd = getProfData(kid);
+    delete pd.debts; pd.deposits = []; pd.competitions = []; pd.honesty = [];
+    mrEnsureEarnings(kid, wk).overrides = {};
+    ensureWallet(kid).cash = 0;
+    const debt = mnyDebts(kid)[0];
+    debt.paid = 336; debt.monthly = 13; debt.downPaid = debt.downPayment;
+    debt.downPaymentDue = '2026-01-01'; debt.lastPaymentMonth = null;
+    ['dishes', 'mop', 'vacuum'].forEach((ch, i) => mrSetChoreGrade(kid, wk, i, ch, 3));
+
+    openFamilyMeeting();
+    mnySetMeetKid(kid);
+    const fiveSteps = MM_STEPS.length === 5;
+
+    // Money from outside is entered at the meeting, with her in the room.
+    mnyAddDeposit(kid, wk, { amount: 50, from: 'Birthday money', dest: 'ready' });
+
+    // Step 4 is locked, whole-page, until the week is agreed.
+    mmGoStep(4);
+    const gated = document.getElementById('familyMeetingBody').textContent.includes('Agree the week');
+
+    mmGoStep(3);
+    mnyDoConfirm();
+    const confirmed = mnyIsConfirmed(wk, kid);
+
+    // A gift is money that came in, but it is NOT hers to choose about again —
+    // she aimed it when she entered it. Counting it twice would let the plan
+    // commit more than exists.
+    const pool = mnyPool(wk, kid);
+    const poolIsHonest = pool.deposits === 50
+      && pool.cameIn === money2(pool.breakdown.net + 50)
+      // what is hers to choose is what her WORK left after the loan — the gift
+      // is already aimed, and the loan is a claim on the week she worked
+      && pool.mine === money2(Math.max(0, pool.breakdown.net - pool.mustPay))
+      && pool.mustPay <= pool.breakdown.net;
+
+    mmGoStep(4);
+    const draft = mnyEnsureDraft(wk, kid);
+    mnyPickPlan('debt');
+    const allToLoan = money2(mnySplitToLoan(draft.split)) === pool.mine;
+
+    // The question gates the commit.
+    const blockedNoAnswer = document.getElementById('familyMeetingBody').textContent.includes('Answer the question first');
+    mnyPickReflect('sooner');
+
+    const before = { cash: ensureWallet(kid).cash, paid: mnyDebts(kid)[0].paid, saved: mnySavedTotal(kid) };
+    mnyDoCommit();
+    const after = { cash: ensureWallet(kid).cash, paid: mnyDebts(kid)[0].paid, saved: mnySavedTotal(kid) };
+    const led = ((c.moneyLedger || {})[wk] || {})[kid] || {};
+    const moved = mnyIsCommitted(wk, kid)
+      && after.paid > before.paid                       // the loan came down
+      && after.saved === money2(before.saved + 50)      // the gift landed where aimed
+      && after.cash === 0                               // and every dollar had a job
+      && led.reflect === 'sooner' && led.outside === 50;
+    // One kid settled is not the meeting settled — her sister has not decided.
+    const notHeldYet = !((c.meetingsHeld || {})[wk]);
+
+    mmUndoRecord();
+    const reversed = ensureWallet(kid).cash === before.cash
+      && mnyDebts(kid)[0].paid === before.paid
+      && mnySavedTotal(kid) === before.saved
+      && !mnyIsCommitted(wk, kid);
+
+    closeSheet('familyMeetingOverlay');
+    return fiveSteps && gated && confirmed && poolIsHonest && allToLoan
+        && blockedNoAnswer && moved && notHeldYet && reversed;
+  });
+
+  // A lesson that can be skipped by a stale click is not a lesson: a plan or a
+  // bucket she has not reached yet takes nothing, however it is asked for.
+  checks.lockedPlansAndBucketsRefuse = await page.evaluate(() => {
+    profile = 'parent';
+    const kid = 'jess', wk = ctWeekKey;
+    const stage = mnyStageIndex(kid);
+    mnyEnsureDraft(wk, kid);
+    mnyPickPlan('grow');                                 // needs 90% paid off
+    const refused = mnyDraft.planId !== 'grow';
+    // and a preset's share of a locked bucket falls back to the debt
+    const split = mnySplitFor(wk, kid, 'balanced');
+    const lockedGotNothing = !mnyIsOpen(kid, 60) ? money2(split.gic) === 0 : true;
+    return stage < 3 && refused && lockedGotNothing;
+  });
+
   checks.noConsoleErrors = errors.length === 0;
 
   const failed = Object.entries(checks).filter(([,v]) => !v).map(([k]) => k);
