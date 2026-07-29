@@ -26,7 +26,9 @@
 
 let mnyKid = 'jess';          // which kid a parent is looking at
 let mnyCalMonth = null;       // 'YYYY-MM' for the competition calendar
-let mnyOpenPrices = {};       // which "what things pay" cards are expanded
+/* Open by default: on page 1 the price list IS the middle column, and a
+   column holding one collapsed button is a column holding nothing. */
+let mnyOpenPrices = { all: true };
 let mnyStoryMode = 'week';    // the money story: 'week' | 'month'
 let mnyStoryMonth = null;     // 'YYYY-MM'
 let mnyGoalFormOpen = false;  // the new-goal form on My money
@@ -85,6 +87,58 @@ function mnyAskBtn(conceptId) {
   return `<button type="button" class="mny-ask" data-mny-action="ask" data-mny-concept="${escapeAttr(conceptId)}" aria-label="What does this mean?">?</button>`;
 }
 
+/* ── The walkthrough ──
+   A card at a time, with a dot pager. Opened from the ? in a page header and
+   never shown unasked: a tour that appears by itself is a thing to dismiss,
+   not a thing to read. */
+let mnyTourWho = null;      // 'kid' | 'parent' | null
+let mnyTourStep = 0;
+function mnyOpenTour(who) { mnyTourWho = who; mnyTourStep = 0; mnyDrawTour(); }
+function mnyCloseTour() {
+  mnyTourWho = null;
+  const el = document.getElementById('mnyTour');
+  if (el) el.remove();
+}
+function mnyTourGo(d) {
+  const steps = MNY_TOURS[mnyTourWho] || [];
+  const next = mnyTourStep + d;
+  if (next < 0 || next >= steps.length) { mnyCloseTour(); return; }
+  mnyTourStep = next;
+  mnyDrawTour();
+}
+function mnyDrawTour() {
+  const steps = MNY_TOURS[mnyTourWho] || [];
+  const s = steps[mnyTourStep];
+  if (!s) return mnyCloseTour();
+  let el = document.getElementById('mnyTour');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'mnyTour';
+    el.className = 'mny-tour-scrim';
+    document.body.appendChild(el);
+    el.addEventListener('click', ev => {
+      if (ev.target === el) { mnyCloseTour(); return; }
+      const b = ev.target.closest('[data-tour]');
+      if (!b) return;
+      const a = b.getAttribute('data-tour');
+      if (a === 'close') mnyCloseTour();
+      else if (a === 'dot') { mnyTourStep = Number(b.getAttribute('data-i')); mnyDrawTour(); }
+      else mnyTourGo(Number(a));
+    });
+  }
+  el.innerHTML = `<div class="mny-tour" role="dialog" aria-modal="true" aria-label="${escapeAttr(s.title)}">
+      <div class="mny-tour-where">${escapeHtml(s.where)}</div>
+      <div class="mny-tour-title">${escapeHtml(s.icon + ' ' + s.title)}</div>
+      <p>${escapeHtml(s.body)}</p>
+      <div class="mny-tour-foot">
+        <button type="button" class="mny-btn" data-tour="-1">${mnyTourStep ? '◀ Back' : 'Close'}</button>
+        <div class="mny-dots">${steps.map((_, i) =>
+          `<button type="button" class="mny-dot${i === mnyTourStep ? ' on' : ''}" data-tour="dot" data-i="${i}" aria-label="Step ${i + 1}"></button>`).join('')}</div>
+        <button type="button" class="mny-btn primary" data-tour="1">${mnyTourStep === steps.length - 1 ? 'Done' : 'Next ▶'}</button>
+      </div>
+    </div>`;
+}
+
 /* ════════════════════════════════════════════════════════════════
    THE PAGE
    ════════════════════════════════════════════════════════════════ */
@@ -97,34 +151,59 @@ function mnyRenderMyMoney() {
   // three weeks; the interest still happened.
   mnySimCatchUp(kid);
 
-  const badge = document.getElementById('mnyProfileBadge');
-  if (badge) badge.textContent = `${CT_PROFILE_ICON[kid] || ''} ${mnyKidName(kid)}`;
-  const switcher = document.getElementById('mnyKidSwitch');
-  if (switcher) {
-    switcher.hidden = !isParent();
-    switcher.innerHTML = ['jenn', 'jess'].map(k =>
-      `<button type="button" class="mny-chip ${k === kid ? 'on' : ''}" data-mny-action="kid" data-mny-kid="${k}">${CT_PROFILE_ICON[k]} ${mnyKidName(k)}</button>`).join('');
-  }
-
   wrap.innerHTML =
-      `<div class="mny-cols">
+      `${mnyPageHead('💰 My money', mnyTodayLine(), [
+          { action: 'story',    label: '📖 My money story' },
+          { action: 'tourkid',  label: '? How this page works' },
+        ], { kidSwitch: true })}
+       ${mnyTabBar('money')}
+       <div class="mny-cols page1">
          <div class="mny-col">
            ${mnyTodayCard(kid, wk)}
            ${mnyWalletCard(kid)}
-           ${mnySavingGoalsCard(kid)}
            ${mnyIncomeCard(kid, wk)}
+           ${mnySavingGoalsCard(kid)}
            ${mnyGoalCard(kid)}
+         </div>
+         <div class="mny-col">
+           ${mnyPricesCard(wk)}
          </div>
          <div class="mny-col">
            ${mnyDebtCards(kid)}
            ${mnyCompetitionCard(kid)}
-         </div>
-         <div class="mny-col">
            ${mnyLinksCard(kid)}
-           ${mnyPricesCard(wk)}
          </div>
        </div>`;
   if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
+}
+
+/* The strap under a page title. Names the day, because this page is read on a
+   Saturday morning as often as at a Sunday meeting and the two are different
+   moods. */
+function mnyTodayLine() {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return days[formatDayKey(todayKey()).getDay()] + ' · this is the only page that is mine';
+}
+
+/* Every money page wears the same head: a way back, the title, a line of
+   context, and the buttons that belong to this page rather than to the system.
+   It replaces the app's topbar on these screens rather than sitting under it —
+   two bars repeating the same title, plus the tab bar, is three rows of chrome
+   before any money appears. */
+function mnyPageHead(title, strap, buttons, opts) {
+  const o = opts || {};
+  const kidSwitch = (o.kidSwitch && isParent())
+    ? `<span class="mny-head-kids">${['jenn', 'jess'].map(k =>
+        `<button type="button" class="mny-chip ${k === mnyViewKid() ? 'on' : ''}" data-mny-action="kid" data-mny-kid="${k}">${CT_PROFILE_ICON[k]} ${mnyKidName(k)}</button>`).join('')}</span>`
+    : '';
+  return `<div class="mny-head">
+      ${o.back === false ? '' : `<button type="button" class="mny-back" data-mny-action="${escapeAttr(o.back || 'backplanner')}" aria-label="Back">◀</button>`}
+      <h2 class="mny-head-title">${escapeHtml(title)}</h2>
+      ${strap ? `<span class="mny-head-strap">${escapeHtml(strap)}</span>` : ''}
+      ${kidSwitch}
+      <span class="mny-head-btns">${(buttons || []).map(b =>
+        `<button type="button" class="mny-btn" data-mny-action="${escapeAttr(b.action)}">${escapeHtml(b.label)}</button>`).join('')}</span>
+    </div>`;
 }
 
 /* What is still on the table today. The daily cap is a real number to a kid —
@@ -423,7 +502,9 @@ function mnyRenderStory() {
   const all = mnyLedgerRows(kid);
 
   if (!all.length) {
-    wrap.innerHTML = `<div class="mny-card"><div class="mny-label">📖 My money story</div>
+    wrap.innerHTML = `${mnyPageHead('📖 My money story', '', [], { back: 'backmoney' })}
+      ${mnyTabBar('money')}
+      <div class="mny-card"><div class="mny-label">📖 My money story</div>
       <div class="mny-note">Nothing here yet. Every Sunday you settle a week, it gets written down here — what came in, where it went, and how much of your loan was left.</div></div>`;
     return;
   }
@@ -448,7 +529,9 @@ function mnyRenderStory() {
   const inTotal = money2(sum('chores') + sum('learning') + sum('streak') + sum('competition'));
 
   wrap.innerHTML =
-      `<div class="mny-card">
+      `${mnyPageHead('📖 My money story', 'Every week you have settled', [], { back: 'backmoney' })}
+       ${mnyTabBar('money')}
+       <div class="mny-card">
          <div class="mny-label">📖 My money story</div>
          <div class="mny-chiprow">${modeBtns}</div>
          ${monthNav}
@@ -516,9 +599,14 @@ function mnyHandleClick(ev) {
   if (!el) return;
   const a = el.getAttribute('data-mny-action');
 
-  if (a === 'kid')    { mnySetKid(el.getAttribute('data-mny-kid')); return; }
-  if (a === 'story')  { mnyOpenStory(); return; }
-  if (a === 'school') { if (typeof mnyOpenSchool === 'function') mnyOpenSchool(mnyViewKid()); return; }
+  if (a === 'kid')     { mnySetKid(el.getAttribute('data-mny-kid')); return; }
+  if (a === 'story')   { mnyOpenStory(); return; }
+  if (a === 'school')  { if (typeof mnyOpenSchool === 'function') mnyOpenSchool(mnyViewKid()); return; }
+  if (a === 'tab')     { mnyGoTab(el.getAttribute('data-mny-tab')); return; }
+  if (a === 'tourkid') { mnyOpenTour('kid'); return; }
+  if (a === 'backmoney')   { mnyOpenMyMoney(mnyViewKid()); return; }
+  if (a === 'backplanner') { goWeek(); return; }
+  if (a === 'tourpar') { mnyOpenTour('parent'); return; }
   if (a === 'prices') {
     // From Money school this is a link to the price list rather than a toggle
     // on a card that is not on screen.

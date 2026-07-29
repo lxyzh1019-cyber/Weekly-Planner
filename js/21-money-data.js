@@ -1087,6 +1087,96 @@ function mnyBuysNote(amount) {
   return line ? `<div class="mny-buys">🛒 ${escapeHtml(line)}</div>` : '';
 }
 
+/* ════════════════════════════════════════════════════════════════
+   THE FIVE PAGES, AS A SET
+
+   Every money surface carries the same numbered tab bar. That is not
+   decoration: the five pages are one system, and a kid who can see all five
+   from any of them understands that "what I earned" and "what I do with it"
+   are two halves of one Sunday rather than two unrelated screens.
+
+   The tag under each label says WHO the page is for. A kid tapping page 4 is
+   not being refused — she is being told it is a grown-up's page, which is a
+   different and much better message.
+   ════════════════════════════════════════════════════════════════ */
+const MNY_TABS = [
+  { id: 'money',  icon: '💰', label: 'My money',          who: 'kid' },
+  { id: 'grow',   icon: '💪', label: 'What I earned',     who: 'meeting' },
+  { id: 'where',  icon: '🤝', label: 'What I do with it', who: 'meeting' },
+  { id: 'rules',  icon: '⚙️', label: 'Money rules',       who: 'parent' },
+  { id: 'school', icon: '🎓', label: 'Money school',      who: 'optional' },
+];
+
+/* Where each tab goes. The two meeting pages open the meeting itself for a
+   grown-up; for a kid they explain that this happens on Sunday, together,
+   rather than opening a screen she cannot use alone. */
+function mnyGoTab(id) {
+  const kid = (typeof mnyViewKid === 'function') ? mnyViewKid() : 'jess';
+  if (id === 'money')  { mnyOpenMyMoney(kid); return; }
+  if (id === 'school') { mnyOpenSchool(kid); return; }
+  if (id === 'rules') {
+    if (!isParent()) { showToast('⚙️ Money rules is a grown-up page'); return; }
+    showScreen('parent');
+    if (typeof setParentTab === 'function') setParentTab('money');
+    if (typeof mnyRenderRulesTab === 'function') mnyRenderRulesTab();
+    return;
+  }
+  // grow / where — the two halves of the Sunday meeting.
+  if (!isParent()) {
+    showToast(id === 'grow'
+      ? '💪 You go through this together on Sunday'
+      : '🤝 You decide this together on Sunday');
+    return;
+  }
+  if (typeof openFamilyMeeting !== 'function') return;
+  const already = document.getElementById('familyMeetingOverlay');
+  if (!already || !already.classList.contains('open')) openFamilyMeeting();
+  mmGoStep(id === 'grow' ? 3 : 4);
+}
+
+/* The bar itself. `cur` is the tab that is showing, and it is not a link. */
+function mnyTabBar(cur) {
+  return `<nav class="mny-tabs" aria-label="The five money pages">${MNY_TABS.map((t, i) => {
+    const sel = t.id === cur;
+    return `<button type="button" class="mny-tab${sel ? ' on' : ''}"${sel ? ' aria-current="page"' : ''}
+        data-mny-action="tab" data-mny-tab="${t.id}">
+        <span>${i + 1} ${t.icon} ${escapeHtml(t.label)}</span>
+        <span class="mny-tab-tag">${escapeHtml(t.who)}</span>
+      </button>`;
+  }).join('')}</nav>`;
+}
+
+/* ── The walkthroughs ──
+   Two of them, because the two audiences need opposite things explained: a kid
+   needs to know nothing here can hurt her, a parent needs to know this is the
+   only place a number can be changed. */
+const MNY_TOURS = {
+  kid: [
+    { icon: '💰', title: 'This page is yours', where: 'The whole screen',
+      body: 'Everything here is yours to look at any time, without asking. Nothing on this page can take money away from you — a number only changes at the Sunday meeting, with a grown-up sitting next to you.' },
+    { icon: '🧹', title: 'What you can still earn today', where: 'Top left',
+      body: 'The first card is today only. It says how much of today is still open, and how many of your free jobs are left.' },
+    { icon: '🏦', title: 'The four places your money sits', where: 'Left column',
+      body: 'Cash you can spend, money kept ready, money locked away for a year, and money in companies. Add the four together and that is everything you have.' },
+    { icon: '🎯', title: 'What you are saving for', where: 'Left column',
+      body: 'Make a goal for something you want. Put in what it costs and when you want it by, and I will tell you how much a week that takes.' },
+    { icon: '📖', title: 'Every week you have ever done', where: 'Top right button',
+      body: 'My money story opens your past weeks — one at a time or a whole month, and how much of your loan was left at the end of each.' },
+  ],
+  parent: [
+    { icon: '⚙️', title: 'The only page that changes a number', where: 'The whole screen',
+      body: 'Prices, caps, targets, the loans, what she owns and past weeks all live here. Pages 1 to 3 only read from this page — nothing on them can be edited by a kid.' },
+    { icon: '🎿', title: 'The loans', where: 'Loans section',
+      body: 'Each debt carries its own amount, schedule, early-payment bonus and late cost. Renaming or re-rating one is written to the change history with a date, and never touches what has been paid.' },
+    { icon: '📈', title: 'What she actually holds', where: 'What she owns',
+      body: 'One record per holding. Page 1’s tiles and page 2’s returns are computed from it, so no number is typed in twice. Interest, share prices and maturity all move on real calendar time by themselves.' },
+    { icon: '🗓', title: 'Weeks arrive two ways', where: 'Week history',
+      body: 'Confirming a week at the meeting writes its row by itself and freezes it. For a week that happened before the app, "Add a week" steps back one week per tap so you can type it in.' },
+    { icon: '💾', title: 'Nothing saves until you say so', where: 'The bar at the top',
+      body: 'Edits collect and save as one dated change with one reason. Discard throws them away — no version was ever created, so there is nothing to roll back.' },
+  ],
+};
+
 /* ── Formatting ── */
 function mnyMoney(n) { return '$' + money2(n).toFixed(2); }
 function mnySigned(n) { const v = money2(n); return (v < 0 ? '−$' : '+$') + Math.abs(v).toFixed(2); }

@@ -44,7 +44,9 @@ function mnyRenderSchool() {
   if (!mnyConceptById(mnySchoolConcept)) mnySchoolConcept = 'debt';
 
   wrap.innerHTML =
-      `<div class="mny-cols">
+      `${mnyPageHead('🎓 Money school', 'Why any of it works this way', [], { back: 'backmoney' })}
+       ${mnyTabBar('school')}
+       <div class="mny-cols school">
          <div class="mny-col">${mnyLadderCard(kid, pct, idx)}</div>
          <div class="mny-col">${mnyConceptPanel(kid)}</div>
          <div class="mny-col">${mnyWorkListsCard()}${mnyBuysCard()}</div>

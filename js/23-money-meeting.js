@@ -81,7 +81,8 @@ function mnyRenderEarned(wk) {
   mnySimCatchUp(kid);          // the world moves whether or not we met last week
 
   const confirmed = mnyIsConfirmed(wk, kid);
-  return `<div class="mm-h">💪 What ${kid === 'jenn' ? 'Jenn' : 'Jess'} earned</div>
+  return `${mnyPageHead('💪 What I earned', 'Agree the week before anything moves', [], { back: false })}
+    ${mnyTabBar('grow')}
     ${mnyKidTabs()}
     ${mnyStrip(wk, kid, 0)}
     ${mmRenderQuarterly()}
@@ -385,7 +386,8 @@ function mnyRenderDecide(wk) {
     return `<div class="mm-h">🤝 What I do with it</div>
       <div class="ct-meta">This week was earned under the old group model, which paid as the chores were done. There is nothing to decide.</div>`;
   }
-  const head = `<div class="mm-h">🤝 What ${kid === 'jenn' ? 'Jenn' : 'Jess'} does with it</div>${mnyKidTabs()}`;
+  const head = `${mnyPageHead('🤝 What I do with it', 'Decide once, for every dollar', [], { back: false })}
+    ${mnyTabBar('where')}${mnyKidTabs()}`;
 
   // The gate covers the WHOLE step, not one column: deciding what to do with a
   // number nobody has agreed to is not a decision, it is a guess.
@@ -498,9 +500,26 @@ function mnyPlanCard(wk, kid, draft, pool) {
       ${priced.bonus > 0 ? `<div class="mny-note">Paying early earns you <b>${mnyMoney(priced.bonus)}</b> on top${priced.monthsSaved > 0 ? `, and finishes ${priced.monthsSaved} month${priced.monthsSaved > 1 ? 's' : ''} sooner` : ''}.</div>` : ''}
       <div class="mny-sub">Where it all goes</div>
       ${mnyBarHtml(out, { empty: 'Nothing to move' })}
+      ${mnyGhostBar(wk, kid)}
       <button type="button" class="mny-btn wide" onclick="mnyTogglePlan()">${mnyPlanOpen ? 'Done changing ▾' : '✏️ Change the plan ▸'}</button>
     </div>`;
 }
+/* Last week's shape, ghosted under this week's. Two bars side by side would be
+   a comparison; one under the other, faded, is the same shape asked about
+   again — which is the actual question at the meeting. Absent on the first
+   week, because a ghost of nothing is just a puzzle. */
+function mnyGhostBar(wk, kid) {
+  const prev = mnyPreviousPlan(wk, kid);
+  if (!prev || !prev.split) return '';
+  const ghost = mnyOutflowSegments(wk, kid, prev.split);
+  if (!ghost.segs.length) return '';
+  return `<div class="mny-ghost">
+      <div class="mny-ghost-label">Last week</div>
+      <div class="mny-bar ghost" role="img" aria-label="Last week's plan for comparison">${ghost.segs.map(g =>
+        `<div class="mny-seg" style="width:${g.w};background:${g.color}"></div>`).join('')}</div>
+    </div>`;
+}
+
 function mnyBucketRows(kid, split) {
   const rows = [];
   mnyDebtsByPriority(kid).forEach(d => {

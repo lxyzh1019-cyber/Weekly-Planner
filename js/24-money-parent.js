@@ -66,9 +66,13 @@ function mnyRenderRulesTab() {
   else body = mnyHistoryEditor(kid);
 
   wrap.innerHTML =
-      `<div class="mny-card">
+      `${mnyPageHead('⚙️ Money rules', 'The only page that changes a number', [
+          { action: 'tourpar', label: '? How this page works' },
+        ], { back: false })}
+       ${mnyTabBar('rules')}
+       <div class="mny-card">
          <div class="mny-week-head">
-           <span class="mny-label">⚙️ Money rules — ${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'}</span>
+           <span class="mny-label">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'}</span>
            <span class="mny-chiprow">${['jenn', 'jess'].map(k =>
              `<button type="button" class="mny-chip ${k === kid ? 'on' : ''}" data-mnyp-action="kid" data-mnyp-id="${k}">${CT_PROFILE_ICON[k]} ${k === 'jenn' ? 'Jenn' : 'Jess'}</button>`).join('')}</span>
          </div>
@@ -482,6 +486,7 @@ function mnyParentClick(ev) {
   const kid = mnyParentKid();
 
   if (a === 'section') { mnySetParentSection(id); return; }
+  if (a === 'tab')     { mnyGoTab(el.getAttribute('data-mny-tab')); return; }
   if (a === 'kid')     { setParentKid(id); mnyRenderRulesTab(); return; }
   if (a === 'hist')    { mnyHistoryOpen = !mnyHistoryOpen; mnyRenderRulesTab(); return; }
   if (a === 'reason')  { mnyPendingReason = id; mnyRenderRulesTab(); return; }

@@ -921,6 +921,93 @@ function findChromium() {
     return natural && afterEdit;
   });
 
+  /* ── The five pages are one system ── */
+
+  // The same numbered tab bar on every money surface. Five pages that look
+  // like five separate pages are five separate apps.
+  checks.tabBarOnEveryMoneySurface = await page.evaluate(() => {
+    profile = 'parent'; parentViewing = 'jess'; ctParentKid = 'jess';
+    const bar = (id) => {
+      const el = document.getElementById(id);
+      if (!el) return null;
+      const tabs = el.querySelectorAll('.mny-tab');
+      return tabs.length === 5 && el.querySelector('.mny-tab.on') ? tabs : null;
+    };
+    mnyOpenMyMoney('jess');
+    const onMoney = !!bar('mnyPage1Wrap');
+    mnyOpenStory();
+    const onStory = !!bar('mnyStoryWrap');
+    mnyOpenSchool('jess');
+    const onSchool = !!bar('mnySchoolWrap');
+    showScreen('parent'); setParentTab('money'); mnyRenderRulesTab();
+    const onRules = !!bar('mnyRulesWrap');
+    openFamilyMeeting(); mnySetMeetKid('jess'); mmGoStep(3);
+    const body = document.getElementById('familyMeetingBody');
+    const onEarned = body.querySelectorAll('.mny-tab').length === 5;
+    mmGoStep(4);
+    const onDecide = body.querySelectorAll('.mny-tab').length === 5;
+    closeSheet('familyMeetingOverlay');
+
+    // And it navigates: tapping 5 from page 1 lands on Money school.
+    mnyOpenMyMoney('jess');
+    mnyGoTab('school');
+    const navigates = document.getElementById('screen-moneyschool').classList.contains('active');
+    return onMoney && onStory && onSchool && onRules && onEarned && onDecide && navigates;
+  });
+
+  // A kid tapping a grown-up's page is told what it is, not silently refused —
+  // and is never dropped into a screen she cannot use.
+  checks.kidTabsExplainRatherThanRefuse = await page.evaluate(() => {
+    profile = 'jess';
+    mnyOpenMyMoney('jess');
+    mnyGoTab('rules');
+    const stayedPut = !document.getElementById('screen-parent').classList.contains('active');
+    mnyGoTab('grow');
+    const noMeeting = !document.getElementById('familyMeetingOverlay').classList.contains('open');
+    return stayedPut && noMeeting;
+  });
+
+  // Last week's plan, ghosted under this week's — but only once there IS a last
+  // week. A ghost of nothing is a puzzle, not a comparison.
+  checks.ghostBarOnlyWithHistory = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey, c = state.shared.chore;
+    if (c.weekPlans) delete c.weekPlans[wk];
+    const prevD = formatDayKey(wk); prevD.setDate(prevD.getDate() - 7);
+    const prev = ctDateToKey(prevD);
+    if (c.weekPlans && c.weekPlans[prev]) delete c.weekPlans[prev];
+    const none = mnyGhostBar(wk, kid) === '';
+    if (!c.weekPlans) c.weekPlans = {};
+    c.weekPlans[prev] = { [kid]: { planId: 'ready', split: { ready: 8, gic: 0, stock: 0 },
+                                   committedAt: Date.now() - 6e8 } };
+    const drawn = mnyGhostBar(wk, kid).indexOf('Last week') > -1;
+    delete c.weekPlans[prev];
+    return none && drawn;
+  });
+
+  // The walkthrough opens from a ?, pages through, and closes — and is never
+  // shown unasked.
+  checks.tourOpensPagesAndCloses = await page.evaluate(() => {
+    profile = 'parent';
+    mnyOpenMyMoney('jess');
+    const unasked = !document.getElementById('mnyTour');
+    mnyOpenTour('kid');
+    const opened = !!document.getElementById('mnyTour')
+      && document.querySelectorAll('#mnyTour .mny-dot').length === MNY_TOURS.kid.length;
+    mnyTourGo(1); mnyTourGo(1);
+    const paged = mnyTourStep === 2
+      && document.querySelector('#mnyTour .mny-dot.on')
+      && [...document.querySelectorAll('#mnyTour .mny-dot')].indexOf(
+           document.querySelector('#mnyTour .mny-dot.on')) === 2;
+    mnyCloseTour();
+    const closed = !document.getElementById('mnyTour');
+    // And the parent has a different one, because they need opposite things.
+    const twoTours = MNY_TOURS.parent.length >= 5 && MNY_TOURS.kid.length >= 5
+      && MNY_TOURS.parent[0].title !== MNY_TOURS.kid[0].title;
+    return unasked && opened && paged && closed && twoTours;
+  });
+
   checks.noConsoleErrors = errors.length === 0;
 
   const failed = Object.entries(checks).filter(([,v]) => !v).map(([k]) => k);

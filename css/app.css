@@ -4497,3 +4497,88 @@
   .mny-goalrow { border-top: 1px dashed var(--paper-line); padding-top: 0.5rem; margin-top: 0.5rem; }
   .mny-goalrow:first-of-type { border-top: 0; }
   .mny-goalform { border: 2px dashed var(--paper-line); border-radius: 10px; padding: 0.5rem; margin-top: 0.4rem; }
+
+  /* ══════════════════════════════════════════════════════════════
+     POCKET MONEY — page chrome (the five pages as one system)
+
+     Every money surface wears the same head and the same numbered tab bar.
+     That is the point: five pages that look like five separate pages are five
+     separate apps, and the whole idea is that "what I earned" and "what I do
+     with it" are two halves of one Sunday.
+     ══════════════════════════════════════════════════════════════ */
+  .mny-head {
+    display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+    padding: 0.5rem 0.2rem 0.6rem; border-bottom: 3px solid var(--ink);
+  }
+  .mny-head-title { margin: 0; font-size: 1.4rem; font-weight: 800; }
+  .mny-head-strap { font-size: 0.85rem; color: var(--ink-light); }
+  .mny-head-btns { margin-left: auto; display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .mny-head-btns .mny-btn { min-height: 40px; padding: 0.25rem 0.7rem; font-size: 0.85rem; }
+
+  .mny-tabs {
+    display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;
+    padding: 0.5rem 0.2rem; border-bottom: 3px solid var(--ink); margin-bottom: 0.7rem;
+  }
+  .mny-tab {
+    display: flex; align-items: center; gap: 0.4rem; min-height: 40px;
+    border: 2.5px solid var(--ink); border-radius: 11px; background: var(--paper);
+    color: var(--ink); font: inherit; font-size: 0.85rem; padding: 0.2rem 0.7rem; cursor: pointer;
+  }
+  .mny-tab:hover { filter: brightness(1.05); }
+  .mny-tab.on { background: var(--accent-strong); color: #fff; cursor: default; }
+  /* Who a page is for. A kid tapping the parent tab is not refused, she is
+     told — a different and much better message. */
+  .mny-tab-tag { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.09em; opacity: 0.65; }
+  @media (max-width: 720px) {
+    .mny-tab { font-size: 0.78rem; padding: 0.2rem 0.5rem; }
+    .mny-tab-tag { display: none; }
+  }
+
+  /* The design's column widths, kept where there is room and collapsed only
+     where there is not. */
+  .mny-cols.page1  { grid-template-columns: 340px minmax(0, 1fr) 348px; }
+  .mny-cols.school { grid-template-columns: 340px minmax(0, 1fr) 320px; }
+  @media (max-width: 1100px) {
+    .mny-cols.page1, .mny-cols.school { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 720px) {
+    .mny-cols.page1, .mny-cols.school { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  /* Last week's plan, ghosted under this week's — the same shape asked about
+     again, rather than a second chart to compare against. */
+  .mny-ghost { margin-top: 0.4rem; opacity: 0.45; }
+  .mny-ghost-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-light); }
+  .mny-bar.ghost { height: 12px; border-width: 2px; margin-top: 0.15rem; }
+
+  /* The walkthrough. Opened from a ? and never shown unasked: a tour that
+     appears by itself is a thing to dismiss, not a thing to read. */
+  .mny-tour-scrim {
+    position: fixed; inset: 0; background: rgba(42, 35, 32, 0.58);
+    display: flex; align-items: center; justify-content: center; padding: 1rem;
+    z-index: var(--z-modal, 900);
+  }
+  .mny-tour {
+    background: var(--paper); border: 3px solid var(--ink); border-radius: 16px;
+    box-shadow: 5px 7px 0 rgba(42, 35, 32, 0.22);
+    padding: 1rem; max-width: 640px; width: 100%;
+  }
+  .mny-tour-where {
+    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--ink-light); font-weight: 700;
+  }
+  .mny-tour-title { font-size: 1.2rem; font-weight: 800; margin: 0.1rem 0 0.4rem; }
+  .mny-tour p { margin: 0 0 0.8rem; font-size: 0.92rem; line-height: 1.55; }
+  .mny-tour-foot { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+  .mny-dots { display: flex; gap: 0.35rem; }
+  .mny-dot {
+    width: 11px; height: 11px; padding: 0; border: 2px solid var(--ink); border-radius: 50%;
+    background: var(--paper); cursor: pointer;
+  }
+  .mny-dot.on { background: var(--accent-strong); }
+  .mny-back {
+    min-width: 40px; min-height: 40px; border: 2.5px solid var(--ink); border-radius: 11px;
+    background: var(--paper); color: var(--ink); font: inherit; font-weight: 800; cursor: pointer;
+  }
+  .mny-back:hover { background: var(--bg2); }
+  .mny-head-kids { display: flex; gap: 0.3rem; }
