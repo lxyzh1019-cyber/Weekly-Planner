@@ -140,6 +140,40 @@ const MR_DEFAULT_RULES = {
     shortfallChoices: ['pay_available', 'pay_nothing', 'cover_from_savings'],
   },
 
+  /* What she can put money into. A fixed menu, never a text box: choosing a
+     company by name is the lesson, and a search field is a casino. */
+  investing: { fund: 'index' },
+
+  /* What money buys.
+
+     "$80" means nothing to a nine-year-old. "Dinner out for all of us" means
+     something, and the two are the same fact. Every big number on a kid page
+     gets translated into these, so saving up for something has a size she can
+     picture rather than a figure she is told to care about.
+
+     Prices are deliberately family-specific and parent-editable — the point is
+     that they are things SHE has seen the family buy. */
+  buys: {
+    // `plural` is carried explicitly because English will not be guessed at:
+    // "3 dinner out for all of uses" is what naive pluralisation produces.
+    items: [
+      { id: 'icecream', label: 'an ice-cream cone',        plural: 'ice-cream cones',   amount: 6 },
+      { id: 'milk',     label: 'a jar of milk',            plural: 'jars of milk',      amount: 8 },
+      { id: 'sharpen',  label: 'a skate sharpening',       plural: 'skate sharpenings', amount: 12 },
+      { id: 'movie',    label: 'a movie ticket',           plural: 'movie tickets',     amount: 14 },
+      { id: 'burger',   label: 'a burger meal',            plural: 'burger meals',      amount: 15 },
+      { id: 'book',     label: 'a new book',               plural: 'new books',         amount: 20 },
+      { id: 'plush',    label: 'a big plush toy',          plural: 'big plush toys',    amount: 35 },
+      { id: 'pizza',    label: 'a pizza night at home',    plural: 'pizza nights',      amount: 40 },
+      { id: 'dinner',   label: 'dinner out for all of us', plural: 'dinners out',       amount: 80 },
+      { id: 'game',     label: 'a new video game',         plural: 'new video games',   amount: 90 },
+    ],
+  },
+
+  /* Money school opens as the debt comes down. A parent can float a kid to a
+     later stage when the conversation gets there before the loan does. */
+  school: { unlockStage: { jenn: 0, jess: 0 } },
+
   sickPausesEverything: true,
   reviewCadence: 'quarterly',
 };
@@ -273,7 +307,10 @@ function mrApplyEdits(changes, { reason, note, effectiveFrom } = {}) {
     const before = mrGetPath(rules, ch.path);
     if (JSON.stringify(before) === JSON.stringify(ch.value)) return;   // no-ops make no version
     mrSetPath(rules, ch.path, ch.value);
-    applied.push({ path: ch.path, from: before, to: ch.value });
+    // `label` is what the editor called this field on screen. A history that
+    // reads "chores.grade.3" is a history nobody checks; "On time and to
+    // standard" is one a parent can actually scan six months later.
+    applied.push({ path: ch.path, from: before, to: ch.value, label: ch.label || null });
   });
   if (!applied.length) return null;
 
@@ -298,7 +335,7 @@ function mrApplyEdits(changes, { reason, note, effectiveFrom } = {}) {
   applied.forEach(a => mrLogAppend({
     versionId: version.id, effectiveFrom: from,
     path: a.path, from: a.from, to: a.to,
-    reason: reason || MR_DEFAULT_REASON, note: note || '',
+    reason: reason || MR_DEFAULT_REASON, note: a.label || note || '',
   }));
   saveAll();
   return version;
@@ -352,6 +389,8 @@ function mrEnsureEarnings(kid, weekKey) {
   if (!e.personal) e.personal = {};   // {[dayIdx]: {[choreId]: 'done'|'unasked'}}
   if (!e.learning) e.learning = {};   // filled in by a later step
   if (!e.sick) e.sick = {};           // {[dayIdx]: true} — pauses everything
+  if (!e.overrides) e.overrides = {}; // {[channel]: {value, reason, at}} — set at the meeting
+  if (!Array.isArray(e.missing)) e.missing = [];   // channels the planner has nothing for
   if (!p.earningsUpdatedAtByWeek) p.earningsUpdatedAtByWeek = {};
   return e;
 }
@@ -824,18 +863,40 @@ function mrWeekBreakdown(weekKey, kid) {
   const honesty = mrHonestyEffect(kid, weekKey);
 
   // A step-2 honesty strike zeroes the channel it was claimed on.
-  const chorePaid = honesty.voidedChannels.chores ? 0 : chores.paid;
-  const learnPaid = honesty.voidedChannels.learning ? 0 : learning.paid;
-  const compPaid  = honesty.voidedChannels.competition ? 0 : comp.paid;
+  let chorePaid = honesty.voidedChannels.chores ? 0 : chores.paid;
+  let learnPaid = honesty.voidedChannels.learning ? 0 : learning.paid;
+  let compPaid  = honesty.voidedChannels.competition ? 0 : comp.paid;
 
   // Fines are floored against what was actually earned that day.
   const dayEarnings = chores.days.map(d => d.paid);
   const fines = mrFinesWeek(weekKey, kid, dayEarnings);
 
-  const gross = money2(chorePaid + learnPaid + streak.bonus + compPaid);
-  const net = money2(Math.max(0, gross - fines.total));
-  return { chores, learning, streak, comp, fines, honesty, gross, net,
-           chorePaid, learnPaid, compPaid };
+  /* ── What a grown-up changed at the meeting ──
+     The planner's number is where the conversation starts, not where it ends:
+     a chore graded from the wrong room, a page counted twice, an agreed
+     exception. An override replaces the channel's figure but keeps the
+     original beside it, and it is applied HERE — the one place every surface
+     reads from — so the quest strip, the frozen ledger and the year-to-date
+     all follow without a second code path. */
+  const e = mrEnsureEarnings(kid, weekKey);
+  const ov = e.overrides || {};
+  const original = { chores: money2(chorePaid), learning: money2(learnPaid),
+                     streak: money2(streak.bonus), comp: money2(compPaid),
+                     fines: money2(fines.total) };
+  let streakBonus = streak.bonus;
+  let finesTotal = fines.total;
+  if (ov.chores)   chorePaid  = money2(ov.chores.value);
+  if (ov.learning) learnPaid  = money2(ov.learning.value);
+  if (ov.streak)   streakBonus = money2(ov.streak.value);
+  if (ov.comp)     compPaid   = money2(ov.comp.value);
+  if (ov.fines)    finesTotal = money2(ov.fines.value);
+
+  const gross = money2(chorePaid + learnPaid + streakBonus + compPaid);
+  const net = money2(Math.max(0, gross - finesTotal));
+  return { chores, learning, streak, comp, honesty, gross, net,
+           chorePaid, learnPaid, compPaid,
+           streakBonus, overrides: ov, original,
+           fines: Object.assign({}, fines, { total: money2(finesTotal) }) };
 }
 function mrWeekMoney(weekKey, kid) {
   return mrWeekBreakdown(weekKey, kid).net;
@@ -865,11 +926,17 @@ function mrFreezeWeekLedger(weekKey, kid) {
     pickWithdrawn: !!b.chores.pickWithdrawn,
     learning: money2(b.learnPaid),
     streakDays: b.streak.days || 0,
-    streak: money2(b.streak.bonus),
+    streak: money2(b.streakBonus),
     competition: money2(b.compPaid),
     fines: money2(b.fines.total),
     voided: Object.keys(b.honesty.voidedChannels || {}),
     honestyStrikes: b.honesty.strikes || 0,
+    // What a grown-up changed, and why — frozen alongside the numbers so the
+    // Sunday conversation can be read back exactly as it happened.
+    edited: Object.keys(b.overrides || {}),
+    editReason: (Object.keys(b.overrides || {}).map(k => b.overrides[k])
+                  .filter(o => o && o.reason)
+                  .sort((x, y) => (x.at || 0) - (y.at || 0))[0] || {}).reason || null,
     gross: money2(b.gross),
     net: money2(b.net),
     xp: 0, boxReleased: 0, loan: null,
@@ -960,7 +1027,7 @@ function mrYearToDate(kid) {
     const b = mrWeekBreakdown(wk, kid);
     channels.chores      += b.chorePaid;
     channels.learning    += b.learnPaid;
-    channels.streak      += b.streak.bonus;
+    channels.streak      += b.streakBonus;
     channels.competition += b.compPaid;
     channels.fines       += b.fines.total;
   });

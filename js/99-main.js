@@ -13,13 +13,27 @@ window._currentRewardPrompt = null;
   const wrap = document.getElementById('choreWrap');
   if (wrap) wrap.addEventListener('click', ctHandleWrapClick);
 })();
-// Pocket Money tabs delegate the same way — rule paths ride on data attributes
-// rather than inline handlers, so nothing user-entered is interpolated into HTML.
+// The pocket-money pages delegate the same way, for the same reason: every
+// render replaces the whole wrap, so a listener bound to a card would be gone
+// the first time a number changed.
 (function(){
-  ['pmSetupWrap','pmBalanceWrap'].forEach(id => {
+  ['mnyPage1Wrap','mnyStoryWrap','mnySchoolWrap'].forEach(id => {
     const wrap = document.getElementById(id);
-    if (wrap) wrap.addEventListener('click', pmHandleWrapClick);
+    if (!wrap) return;
+    wrap.addEventListener('click', mnyHandleClick);
+    // The saving-goal form types into it, so it needs input/change too.
+    wrap.addEventListener('input', mnyHandleInput);
+    wrap.addEventListener('change', mnyHandleInput);
   });
+  // The parent Money rules tab has its own handler: rule paths and holding ids
+  // ride on data attributes rather than being interpolated into inline
+  // handlers, and its typed fields need input/change as well as click.
+  const rules = document.getElementById('mnyRulesWrap');
+  if (rules) {
+    rules.addEventListener('click', mnyParentClick);
+    rules.addEventListener('input', mnyParentInput);
+    rules.addEventListener('change', mnyParentInput);
+  }
 })();
 
 /* Desktop: convert vertical wheel scroll to horizontal on the tray + filter */

@@ -5,7 +5,12 @@
    (Review → Celebrate → Confirm → Plan next week). Reuses the existing
    money commit (commitFamilyMeeting) and adds an undo window.
 ════════════════════════════════════════════════════════════════ */
-const MM_STEPS = ['Review', 'Celebrate', 'Confirm', 'Plan next'];
+/* Five steps since the money system was redesigned. The old single "Confirm"
+   step did two different jobs badly: it agreed the week AND moved the money in
+   one press, which meant a correction after the fact had to be unwound. Steps
+   3 and 4 (js/23-money-meeting.js) separate them — 3 agrees the numbers, 4
+   decides where they go and is the only thing that moves money. */
+const MM_STEPS = ['Review', 'Celebrate', 'What I earned', 'What I do with it', 'Plan next'];
 let mmStep = 1;
 let mmSelectedDay = null;
 let mmUndo = null;
@@ -38,7 +43,7 @@ function mmToggleConfirmDay(d) {
   saveAll();
   renderMeetingMode();
 }
-function mmGoStep(n) { mmStep = Math.max(1, Math.min(4, n)); if (mmStep !== 1) mmSelectedDay = mmSelectedDay; renderMeetingMode(); }
+function mmGoStep(n) { mmStep = Math.max(1, Math.min(MM_STEPS.length, n)); renderMeetingMode(); }
 
 // % of a kid's tracked items (routines + all chores) done on a given day.
 function mmDayPct(kid, dayIdx) {
@@ -78,11 +83,12 @@ function renderMeetingMode() {
   let body;
   if (mmStep === 1) body = mmRenderReview(wk);
   else if (mmStep === 2) body = mmRenderCelebrate(wk);
-  else if (mmStep === 3) body = mmRenderConfirm(wk, held);
+  else if (mmStep === 3) body = mnyRenderEarned(wk);
+  else if (mmStep === 4) body = mnyRenderDecide(wk);
   else body = mmRenderPlan(wk);
 
   const back = mmStep > 1 ? `<button type="button" class="pill-btn" onclick="mmGoStep(${mmStep - 1})">◀ Back</button>` : `<span></span>`;
-  const next = mmStep < 4
+  const next = mmStep < MM_STEPS.length
     ? `<button type="button" class="btn-confirm" onclick="mmGoStep(${mmStep + 1})">Next ▶</button>`
     : `<button type="button" class="btn-confirm" onclick="closeSheet('familyMeetingOverlay')">🎉 Finish meeting</button>`;
 
@@ -223,10 +229,10 @@ function mmRenderConfirm(wk, held) {
   const alreadyHeld = held || !!(state.shared.chore.meetingsHeld && state.shared.chore.meetingsHeld[wk]);
   let action;
   if (mmUndo) {
-    action = `<div class="mm-recorded">✅ Recorded — money credited &amp; market advanced to ${marketMonthLabel()}.</div>
+    action = `<div class="mm-recorded">✅ Recorded — money credited.</div>
       <button type="button" class="pill-btn danger" onclick="mmUndoRecord()">↩️ Undo (nothing is frozen yet)</button>`;
   } else if (alreadyHeld) {
-    action = `<div class="mm-recorded">✅ This week was already recorded. Market is at ${marketMonthLabel()}.</div>`;
+    action = `<div class="mm-recorded">✅ This week was already recorded.</div>`;
   } else {
     action = `<button type="button" class="btn-confirm" onclick="mmConfirmAndRecord()">✅ Confirm &amp; record the week</button>`;
   }
@@ -253,8 +259,8 @@ function mmRenderConfirm(wk, held) {
     return `<div class="ct-meta">${CT_PROFILE_ICON[kid]} ${bits.join(' · ') || 'nothing earned'}${xp ? ` · +${xp} XP` : ''}${due ? ` · ${dueLabel} −$${due.toFixed(2)}` : ''}</div>`;
   }).join('') : '';
   const explain = newModel
-    ? `This <b>confirms</b> the week. Recording credits each kid's total to cash, credits XP, opens the Sunday Box, adds a month of savings interest, matures due GICs and steps the market. The loan payment and any overdue interest move <b>once a month</b>, not every Sunday.`
-    : `This <b>confirms</b> the week — it doesn't "pay". Group chore money already fired sticky as chores were done; recording credits each kid's total (max $${CT_MONEY_CAP}) to cash, adds a month of interest, matures due GICs and moves the market one month.`;
+    ? `This <b>confirms</b> the week. Recording credits each kid's total to cash, credits XP, opens the Sunday Box, adds a month of interest and pays out anything locked away that has reached its date. The loan payment and any overdue interest move <b>once a month</b>, not every Sunday.`
+    : `This <b>confirms</b> the week — it doesn't "pay". Group chore money already fired sticky as chores were done; recording credits each kid's total (max $${CT_MONEY_CAP}) to cash, adds a month of interest and pays out anything locked away that has reached its date.`;
   return `<div class="mm-h">Confirm &amp; record</div>
     <div class="ct-meta">${explain}</div>
     <div class="mm-pay">${rows}</div>${preview}${mmRenderQuarterly()}${action}`;
@@ -296,13 +302,32 @@ function mmConfirmAndRecord() {
   const c = state.shared.chore;
   const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
   if (c.meetingsHeld && c.meetingsHeld[wk]) { showToast('Already recorded this week'); return; }
+  mmTakeUndoSnapshot(wk);
+  const parts = commitFamilyMeeting(wk);
+  renderMeetingMode();
+  showToast(`💛 Recorded${parts.length ? ' · ' + parts.join(' · ') : ''}`);
+}
+
+/* Snapshot everything a commit mutates, so the undo can fully reverse it. Taken
+   before either kid is settled — step 4 settles them one at a time, and an undo
+   that only reversed the second would leave the first standing against a week
+   that was un-recorded. */
+function mmTakeUndoSnapshot(wk) {
+  const c = state.shared.chore;
   // Snapshot everything the commit mutates so the undo can fully reverse it.
   // The commit now moves XP and the loan as well as the wallet, so the undo has
   // to carry all of it — a partial reverse would leave credited XP or a loan
   // payment standing against a week that was un-recorded.
   const snap = kid => JSON.parse(JSON.stringify({
     wallet: ensureWallet(kid),
-    loan: (typeof loanState === 'function') ? loanState(kid) : null,
+    // Every debt, every holding and every deposit the commit can touch. A kid
+    // can owe for more than one thing, so snapshotting only the first debt
+    // would leave the others paid down against a week that was un-recorded.
+    debts: (typeof mnyDebts === 'function') ? mnyDebts(kid) : null,
+    holdings: (typeof mnyHoldings === 'function') ? mnyHoldings(kid) : null,
+    deposits: (typeof mnyEnsureDeposits === 'function') ? mnyEnsureDeposits(kid) : null,
+    // Goal progress moves with the money, so it has to come back with it.
+    savingGoals: (typeof mnyEnsureGoals === 'function') ? mnyEnsureGoals(kid) : null,
     xp: (getProfData(kid).progress || {}).questXP || 0,
     // The meeting also empties the box, so undo has to put it back.
     boxItems: (typeof mrBoxItems === 'function') ? mrBoxItems(kid) : null,
@@ -315,10 +340,12 @@ function mmConfirmAndRecord() {
     finalized: (c.finalizedWeeks && c.finalizedWeeks[wk]) ? JSON.parse(JSON.stringify(c.finalizedWeeks[wk])) : null,
     xpAwarded: (c.xpAwardedWeeks && c.xpAwardedWeeks[wk]) ? JSON.parse(JSON.stringify(c.xpAwardedWeeks[wk])) : null,
     ledger: (c.moneyLedger && c.moneyLedger[wk]) ? JSON.parse(JSON.stringify(c.moneyLedger[wk])) : null,
+    // What each kid decided, and whether she had agreed her week — an undo that
+    // left the plan behind would show money moved against a week with no
+    // decision recorded.
+    plans: (c.weekPlans && c.weekPlans[wk]) ? JSON.parse(JSON.stringify(c.weekPlans[wk])) : null,
+    confirms: (c.weekConfirms && c.weekConfirms[wk]) ? JSON.parse(JSON.stringify(c.weekConfirms[wk])) : null,
   };
-  const parts = commitFamilyMeeting(wk);
-  renderMeetingMode();
-  showToast(`💛 Recorded${parts.length ? ' · ' + parts.join(' · ') : ''} · market ${marketMonthLabel()}`);
 }
 function mmUndoRecord() {
   if (!mmUndo) return;
@@ -327,7 +354,10 @@ function mmUndoRecord() {
     const s = mmUndo[kid];
     const pd = getProfData(kid);
     pd.wallet = s.wallet;
-    if (s.loan) pd.loan = s.loan;
+    if (s.debts) pd.debts = s.debts;
+    if (s.holdings) pd.holdings = s.holdings;
+    if (s.deposits) pd.deposits = s.deposits;
+    if (s.savingGoals) pd.savingGoals = s.savingGoals;
     if (s.boxItems) pd.boxItems = s.boxItems;
     if (!pd.progress) pd.progress = {};
     pd.progress.questXP = s.xp;
@@ -344,6 +374,11 @@ function mmUndoRecord() {
   if (c.moneyLedger) {
     if (mmUndo.ledger) c.moneyLedger[wk] = mmUndo.ledger; else delete c.moneyLedger[wk];
   }
+  // The decision and the agreement go back with the money. Leaving the plan
+  // behind would leave the week showing as settled with nothing to settle.
+  if (c.weekPlans) { if (mmUndo.plans) c.weekPlans[wk] = mmUndo.plans; else delete c.weekPlans[wk]; }
+  if (c.weekConfirms) { if (mmUndo.confirms) c.weekConfirms[wk] = mmUndo.confirms; else delete c.weekConfirms[wk]; }
+  if (typeof mnyDraft !== 'undefined') mnyDraft = null;
   if (c.meetingsHeld) delete c.meetingsHeld[wk];
   mmUndo = null;
   saveAll();
@@ -381,7 +416,12 @@ function mmPlanNextWeek() {
 // Core money commit for the weekly meeting (no UI): credit each kid's prelim
 // pocket money to cash, advance the money world one month (interest + GIC
 // maturities), step the market, and mark the week held. Returns summary parts.
-function commitFamilyMeeting(wk) {
+/* The per-kid half. Split out of commitFamilyMeeting so the redesigned meeting
+   can settle one kid at a time — she decides what happens to her own money on
+   step 4, and her sister's week is a separate conversation that may not even
+   happen on the same evening. */
+function commitKidWeek(wk, kid, opts) {
+  const o = opts || {};
   ctEnsureShared();
   const c = state.shared.chore;
   if (!c.finalizedWeeks) c.finalizedWeeks = {};
@@ -391,7 +431,7 @@ function commitFamilyMeeting(wk) {
   if (!c.moneyLedger[wk]) c.moneyLedger[wk] = {};
   const parts = [];
   const newModel = (typeof mrUsesNewModel === 'function') && mrUsesNewModel(wk);
-  ['jenn', 'jess'].forEach(kid => {
+  {
     const w = ensureWallet(kid);
     const name = kid === 'jenn' ? 'Jenn' : 'Jess';
     // The breakdown is frozen HERE, before anything moves. Recomputing it later
@@ -415,15 +455,18 @@ function commitFamilyMeeting(wk) {
       // A month of overdue interest, then the scheduled transfer. Interest is
       // charged BEFORE the payment so a kid who pays late still meets the cost
       // of having been late, rather than escaping it by paying on the day.
-      const interest = loanAccrueArrears(kid);
+      const interest = mnyAccrueArrearsAll(kid);
       if (interest > 0) parts.push(`${name} interest −$${interest.toFixed(2)}`);
       // Both of these are stamped by calendar month inside the loan module —
       // the meeting is weekly, the schedule is monthly, so most Sundays this
-      // correctly does nothing.
-      const t = loanSundayTransfer(kid, 'pay_available');
-      const what = t.kind === 'down' ? 'down payment' : 'loan';
-      if (t.paid > 0) parts.push(`${name} ${what} −$${t.paid.toFixed(2)}`);
-      if (t.shortfall > 0) parts.push(`${name} overdue $${t.shortfall.toFixed(2)}`);
+      // correctly does nothing. Every debt is paid, highest bonus rate first.
+      const transfers = mnySundayTransferAll(kid, o.shortfall || 'pay_available');
+      const t = transfers[0] || { paid: 0, shortfall: 0, kind: null };
+      transfers.forEach(r => {
+        const what = r.kind === 'down' ? 'down payment' : r.name;
+        if (r.paid > 0) parts.push(`${name} ${what} −$${r.paid.toFixed(2)}`);
+        if (r.shortfall > 0) parts.push(`${name} ${r.name} overdue $${r.shortfall.toFixed(2)}`);
+      });
       // The box opens at the meeting, not on a calendar day.
       const released = mrReleaseBoxForMeeting(kid);
       if (released > 0) parts.push(`${name} box opened (${released})`);
@@ -431,16 +474,43 @@ function commitFamilyMeeting(wk) {
       if (ledger) {
         ledger.xp = xp;
         ledger.boxReleased = released;
-        ledger.loan = { kind: t.kind || null, paid: money2(t.paid || 0),
-                        shortfall: money2(t.shortfall || 0), interest: money2(interest || 0) };
+        ledger.loan = {
+          kind: t.kind || null,
+          paid: money2(transfers.reduce((s, r) => s + (r.paid || 0), 0)),
+          shortfall: money2(transfers.reduce((s, r) => s + (r.shortfall || 0), 0)),
+          interest: money2(interest || 0),
+          // Per debt, so a week with two loans can still be read back.
+          each: transfers.map(r => ({ debtId: r.debtId, name: r.name,
+                                      paid: money2(r.paid || 0), shortfall: money2(r.shortfall || 0) })),
+        };
         c.moneyLedger[wk][kid] = ledger;
       }
     }
     const adv = moneyAdvanceMonth(kid);
-    adv.matured.forEach(m => parts.push(`${name} GIC +$${m.payout.toFixed(2)}`));
-  });
-  bankConfig().marketMonth += 1;   // one shared market step per meeting
+    adv.matured.forEach(m => parts.push(`${name} unlocked +$${m.payout.toFixed(2)}`));
+  }
+  saveAll();
+  return { parts, ledger: (c.moneyLedger[wk] || {})[kid] || null };
+}
+
+/* The half that belongs to the family rather than to one kid. Runs once, when
+   both weeks are settled — marking the meeting held before the second kid has
+   decided anything would lock her out of her own step 4. */
+function commitMeetingShared(wk) {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  if (!c.meetingsHeld) c.meetingsHeld = {};
+  bankConfig().marketMonth += 1;   // one shared clock step per meeting
   c.meetingsHeld[wk] = true;
   saveAll();
+}
+
+/* Both kids in one press. The redesigned meeting settles them one at a time on
+   step 4; this stays for the legacy path and for anything that just wants the
+   week recorded. */
+function commitFamilyMeeting(wk) {
+  const parts = [];
+  ['jenn', 'jess'].forEach(kid => { parts.push(...commitKidWeek(wk, kid).parts); });
+  commitMeetingShared(wk);
   return parts;
 }

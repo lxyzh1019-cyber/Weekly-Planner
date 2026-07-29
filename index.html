@@ -279,22 +279,19 @@
      Three sub-tabs: what you have and what each task pays (kids + parent),
      the bank (kids read-only, parent transacts), and the rules editor
      (parent only — the tab itself is hidden for kids). -->
-<div class="screen" id="screen-pocket">
-  <div class="topbar">
-    <div class="topbar-left">
-      <button class="btn-icon" onclick="goWeek()">◀</button>
-      <h2>Pocket Money 💰</h2>
-    </div>
-    <div class="profile-badge" id="pocketProfileBadge"></div>
-  </div>
-  <div class="parent-tabs" role="tablist" aria-label="Pocket money sections">
-    <button class="parent-tab active" role="tab" data-pmtab="balance" onclick="setPocketTab('balance')">💰 Balance &amp; Prices</button>
-    <button class="parent-tab" role="tab" data-pmtab="bank" onclick="setPocketTab('bank')">🏦 Bank &amp; Invest</button>
-    <button class="parent-tab" role="tab" data-pmtab="setup" id="pocketSetupTab" onclick="setPocketTab('setup')">⚙️ Rules &amp; Prices</button>
-  </div>
-  <div class="parent-panel active" id="pmtab-balance" role="tabpanel"><div class="chore-wrap" id="pmBalanceWrap"></div></div>
-  <div class="parent-panel" id="pmtab-bank" role="tabpanel" hidden><div class="chore-wrap" id="moneyWrap"></div></div>
-  <div class="parent-panel" id="pmtab-setup" role="tabpanel" hidden><div class="chore-wrap" id="pmSetupWrap"></div></div>
+<!-- 1 💰 My money — the kid's own money page -->
+<div class="screen" id="screen-mymoney">
+  <div class="chore-wrap" id="mnyPage1Wrap"></div>
+</div>
+
+<!-- 📖 My money story — every week that was settled -->
+<div class="screen" id="screen-moneystory">
+  <div class="chore-wrap" id="mnyStoryWrap"></div>
+</div>
+
+<!-- 5 🎓 Money school -->
+<div class="screen" id="screen-moneyschool">
+  <div class="chore-wrap" id="mnySchoolWrap"></div>
 </div>
 
 <!-- Weekly family meeting overlay -->
@@ -487,6 +484,7 @@
       <button class="parent-tab" role="tab" data-ptab="analysis" onclick="setParentTab('analysis')">📊 Performance</button>
       <button class="parent-tab" role="tab" data-ptab="routines" onclick="setParentTab('routines')">🌅 Routines</button>
       <button class="parent-tab" role="tab" data-ptab="tasks" onclick="setParentTab('tasks')">✅ Tasks</button>
+      <button class="parent-tab" role="tab" data-ptab="money" onclick="setParentTab('money')">💰 Money rules</button>
       <button class="parent-tab" role="tab" data-ptab="rules" onclick="setParentTab('rules')">⚙️ Level-Up</button>
     </div>
   </div>
@@ -554,6 +552,12 @@
   </div>
 
   <!-- TAB: Level-Up Rules -->
+  <!-- TAB: Money rules — everything a grown-up can change about the money
+       system, in one place. Every save is effective-dated and logged. -->
+  <div class="parent-panel" id="ptab-money" role="tabpanel" hidden>
+    <div class="chore-wrap" id="mnyRulesWrap"></div>
+  </div>
+
   <div class="parent-panel" id="ptab-rules" role="tabpanel" hidden>
     <h3 class="parent-h3">⚙️ Level-Up Rules</h3>
     <p class="parent-hint">Earn a ★ on an activity after enough sessions/hours. Shared between both girls.</p>
@@ -1254,6 +1258,11 @@
 <script src="js/18-rules.js"></script>
 <script src="js/19-pocket.js"></script>
 <script src="js/20-loan.js"></script>
+<script src="js/21-money-data.js"></script>
+<script src="js/22-money-page1.js"></script>
+<script src="js/23-money-meeting.js"></script>
+<script src="js/24-money-parent.js"></script>
+<script src="js/25-money-school.js"></script>
 <script src="js/99-main.js"></script>
 </body>
 </html>

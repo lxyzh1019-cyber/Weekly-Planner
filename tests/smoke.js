@@ -66,33 +66,40 @@ function findChromium() {
   // Kid money surface: kids reach Pocket Money and may LOOK at the bank, but
   // every function that moves money refuses them.
   checks.kidMoneyLabel = await page.evaluate(() =>
-    document.getElementById('weekMoneyBtn').textContent.includes('Pocket money'));
-  checks.kidCanOpenPocket = await page.evaluate(() => {
+    document.getElementById('weekMoneyBtn').textContent.includes('My money'));
+  // The money button lands a kid on her own page, and that page shows the four
+  // things she owns and what she still owes.
+  checks.kidCanOpenMyMoney = await page.evaluate(() => {
     openWeekMoney();
-    return document.getElementById('screen-pocket').classList.contains('active');
+    const txt = document.getElementById('mnyPage1Wrap').textContent;
+    return document.getElementById('screen-mymoney').classList.contains('active')
+        && txt.includes('Everything I have')
+        && txt.includes('Cash') && txt.includes('Locked away');
   });
-  // The rules editor must not even be offered to a kid.
-  checks.kidHasNoRulesTab = await page.evaluate(() =>
-    document.getElementById('pocketSetupTab').hidden === true);
-  checks.kidCannotReachSetup = await page.evaluate(() => {
-    setPocketTab('setup');
-    return document.getElementById('pmtab-setup').hidden === true;
+  // The rules editor is not on a kid's page at all — there is nothing to hide.
+  checks.kidHasNoRulesOnHerPage = await page.evaluate(() => {
+    const txt = document.getElementById('mnyPage1Wrap').textContent;
+    return !document.getElementById('mnyPage1Wrap').querySelector('[data-pm-action="edit"]')
+        && !txt.includes('Rules &');
   });
-  // Bank tab is visible to a kid...
-  checks.kidCanSeeBank = await page.evaluate(() => {
-    setPocketTab('bank');
-    return document.getElementById('moneyWrap').textContent.includes('Savings');
+  // A kid can walk to her own history and back without a grown-up.
+  checks.kidCanReadHerStory = await page.evaluate(() => {
+    mnyOpenStory();
+    return document.getElementById('screen-moneystory').classList.contains('active')
+        && document.getElementById('mnyStoryWrap').textContent.includes('My money story');
   });
-  // ...but the balances must not move when a kid tries to transact.
-  checks.kidCannotTransact = await page.evaluate(async () => {
-    const before = JSON.stringify(ensureWallet(activeProfile()));
-    moneyAddCash(activeProfile(), 10);          // seed cash so a deposit COULD succeed
-    const seeded = ensureWallet(activeProfile()).cash;
-    await moneyAction('deposit');
-    const after = ensureWallet(activeProfile());
-    const ok = after.cash === seeded && after.savings === 0;
-    ensureWallet(activeProfile()).cash = JSON.parse(before).cash;   // restore
-    return ok;
+  // Kids may look at what they own, but the balances must not move when a kid
+  // tries to transact.
+  checks.kidCannotTransact = await page.evaluate(() => {
+    const kid = activeProfile();
+    const wrap = document.getElementById('mnyPage1Wrap');
+    // Her page has no control that moves money — not a disabled one, none.
+    const noMovers = !wrap.querySelector('[data-mny-action="commit"], [data-mnyp-action]');
+    // And the guard the commit path leans on refuses her.
+    const guarded = moneyCanTransact() === false;
+    // Her earnings are not hers to change either.
+    const cannotOverride = mnySetOverride(kid, mnyWeekKey(), 'chores', 99, 'fixing') === false;
+    return noMovers && guarded && cannotOverride;
   });
   // A kid editing a rule must be refused, leaving no new version or log entry.
   checks.kidCannotEditRules = await page.evaluate(() => {
@@ -118,7 +125,7 @@ function findChromium() {
     return mrCompetitions(kid).length === comps && mrFines(kid).length === fines
         && mrHonestyStrikes(kid).length === 0;
   });
-  await page.evaluate(() => { setPocketTab('balance'); goWeek(); });
+  await page.evaluate(() => goWeek());
 
   // Day view: Timeline/Checklist toggle reachable in portrait
   await page.evaluate(() => openDay(getDayKeys(0)[5], 5));
@@ -381,6 +388,625 @@ function findChromium() {
   // Hero tiers must outlast a season; six topped out at 500 XP.
   checks.heroTiersReachTen = await page.evaluate(() =>
     HERO_TIERS.length >= 10 && heroTierForLevel(10).name.length > 0);
+
+  /* ── The pocket-money system ── */
+
+  // The single sports loan becomes debts[0] with every field carried across.
+  // A migration that dropped `payments` would erase money the kid really paid.
+  checks.loanMigratesToDebtsIntact = await page.evaluate(() => {
+    const kid = 'jenn';
+    const pd = getProfData(kid);
+    delete pd.debts;
+    pd.loan = { paid: 110, arrears: 20, arrearsInterest: 1,
+                payments: [{ id: 'p1', amount: 100, credited: 110 }] };
+    const debts = mnyDebts(kid);
+    return debts.length === 1 && debts[0].id === 'loan'
+        && debts[0].paid === 110 && debts[0].payments.length === 1
+        && debts[0].principal === 1000            // seeded from the rulebook
+        && loanState(kid).id === 'loan';          // old callers still work
+  });
+
+  // Extra money goes to the debt where a dollar clears the most, not the one
+  // that happens to be first in the list.
+  checks.extraPaysHighestBonusFirst = await page.evaluate(() => {
+    profile = 'parent';
+    const kid = 'jess';
+    const pd = getProfData(kid);
+    delete pd.debts;
+    mnyDebts(kid);                                 // migrate, then add a second
+    mnyAddDebt(kid, { id: 'bike', name: 'Bike loan', icon: '🚲',
+                      principal: 300, monthly: 25, bonusRate: 15,
+                      downPaymentDue: '2026-01-01' });
+    const first = mnyDebtsByPriority(kid)[0];
+    const spread = mnySpreadEarlyPayment(kid, 100);
+    const ok = first.id === 'bike'                 // 15% beats the loan's 10%
+            && spread.length === 1 && spread[0].debtId === 'bike'
+            && spread[0].cleared === 115;          // $100 clears $115
+    delete pd.debts;
+    return ok;
+  });
+
+  // Renaming a debt must never reset progress — the whole point of the record.
+  checks.renamingADebtKeepsProgress = await page.evaluate(() => {
+    profile = 'parent';
+    const kid = 'jess';
+    const pd = getProfData(kid);
+    delete pd.debts;
+    const d = mnyDebts(kid)[0];
+    d.paid = 200;
+    mnyEditDebt(kid, d.id, 'name', 'Ski loan');
+    const after = mnyDebts(kid)[0];
+    const logged = mrLogEntries().some(e => String(e.path).indexOf('debts.jess') === 0);
+    delete pd.debts;
+    return after.name === 'Ski loan' && after.paid === 200 && logged;
+  });
+
+  // A number changed at the meeting replaces the planner's figure everywhere,
+  // keeps the original beside it, and reopens a week that was already agreed.
+  checks.overrideReopensTheWeek = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey, kid = 'jess';
+    const c = state.shared.chore;
+    if (c.weekConfirms) delete c.weekConfirms[wk];
+    if (c.weekPlans) delete c.weekPlans[wk];
+    mrEnsureEarnings(kid, wk).overrides = {};
+    mrSetChoreGrade(kid, wk, 0, 'dishes', 3);
+    const planner = mrWeekBreakdown(wk, kid).chorePaid;
+    mnyConfirmWeek(wk, kid, 'Mom');
+    const wasConfirmed = mnyIsConfirmed(wk, kid);
+    mnySetOverride(kid, wk, 'chores', 15, 'graded_wrong');
+    const b = mrWeekBreakdown(wk, kid);
+    const ok = wasConfirmed
+            && b.chorePaid === 15                  // the override is what counts
+            && b.original.chores === planner       // the planner's number is kept
+            && mnyWeekReason(kid, wk) === 'graded_wrong'
+            && !mnyIsConfirmed(wk, kid)            // the week reopened
+            && mnyConfirmStamp(wk, kid).indexOf('confirm again') > -1
+            // and it reaches the frozen ledger, not just the screen
+            && mrFreezeWeekLedger(wk, kid).chores === 15;
+    mrEnsureEarnings(kid, wk).overrides = {};
+    if (c.weekConfirms) delete c.weekConfirms[wk];
+    return ok;
+  });
+
+  // A plan can never commit more than exists, and investing is capped at a
+  // fifth of the week — a bad month should sting, not wipe out the year.
+  checks.planNeverOverspendsThePool = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey, kid = 'jess';
+    mrEnsureEarnings(kid, wk).overrides = {};
+    mnySetOverride(kid, wk, 'chores', 40, 'agreed');
+    const pool = mnyPool(wk, kid);
+    const split = mnySplitFor(wk, kid, 'balanced');
+    const spent = mnySplitTotal(split);
+    const ok = pool.mine > 0
+            && Math.abs(spent - pool.mine) < 0.05
+            && Math.abs(pool.stockCap - pool.mine * 0.2) < 0.01
+            && mnyPricePlan(kid, split).bonus > 0;   // paying early earns the bonus
+    mrEnsureEarnings(kid, wk).overrides = {};
+    return ok;
+  });
+
+  // What she owns comes off one record per holding, so the four tiles on the
+  // kid's page and the wallet can never disagree about the same dollar.
+  checks.holdingsAreOneSourceOfTruth = await page.evaluate(() => {
+    const kid = 'jenn';
+    const pd = getProfData(kid);
+    delete pd.holdings;
+    pd.wallet = { cash: 42.20, savings: 180, gics: [], holdings: {}, lastMeetingWeek: null };
+    const migrated = mnySavedTotal(kid) === 180 && pd.wallet.savings === 0;
+    moneyDeposit(kid, 20);                          // cash → kept ready
+    const moved = mnySavedTotal(kid) === 200 && ensureWallet(kid).cash === 22.20;
+    moneyWithdraw(kid, 50);
+    const back = mnySavedTotal(kid) === 150 && ensureWallet(kid).cash === 72.20;
+    return migrated && moved && back
+        && mnyEverything(kid) === 222.20;
+  });
+
+  /* ── The Sunday meeting's two money steps ── */
+
+  // The whole flow: agree the week, decide where it goes, watch it move, undo.
+  // This is the one path that actually moves money, so it is checked end to end
+  // rather than a piece at a time.
+  checks.meetingMoneyFlowEndToEnd = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey, c = state.shared.chore;
+    ['meetingsHeld', 'finalizedWeeks', 'moneyLedger', 'weekConfirms', 'weekPlans', 'xpAwardedWeeks']
+      .forEach(m => { if (c[m]) delete c[m][wk]; });
+    const pd = getProfData(kid);
+    delete pd.debts; pd.deposits = []; pd.competitions = []; pd.honesty = [];
+    mrEnsureEarnings(kid, wk).overrides = {};
+    ensureWallet(kid).cash = 0;
+    const debt = mnyDebts(kid)[0];
+    debt.paid = 336; debt.monthly = 13; debt.downPaid = debt.downPayment;
+    debt.downPaymentDue = '2026-01-01'; debt.lastPaymentMonth = null;
+    ['dishes', 'mop', 'vacuum'].forEach((ch, i) => mrSetChoreGrade(kid, wk, i, ch, 3));
+
+    openFamilyMeeting();
+    mnySetMeetKid(kid);
+    const fiveSteps = MM_STEPS.length === 5;
+
+    // Money from outside is entered at the meeting, with her in the room. It
+    // carries no destination — it joins the pool like every other dollar.
+    mnyAddDeposit(kid, wk, { amount: 50, from: 'Birthday money' });
+
+    // Step 4 is locked, whole-page, until the week is agreed.
+    mmGoStep(4);
+    const gated = document.getElementById('familyMeetingBody').textContent.includes('Agree the week');
+
+    mmGoStep(3);
+    mnyDoConfirm();
+    const confirmed = mnyIsConfirmed(wk, kid);
+
+    // ONE POOL. Every inflow lands in the same place, the schedule draws on the
+    // whole of it, and everything left over is hers to decide about — whichever
+    // door each dollar came in through.
+    const pool = mnyPool(wk, kid);
+    const poolIsHonest = pool.deposits === 50
+      && pool.cameIn === money2(pool.breakdown.net + 50)
+      && pool.mine === money2(pool.cameIn - pool.mustPay)
+      && pool.mine > pool.breakdown.net;      // the gift really is choosable
+
+    mmGoStep(4);
+    const draft = mnyEnsureDraft(wk, kid);
+    mnyPickPlan('debt');
+    const allToLoan = money2(mnySplitToLoan(draft.split)) === pool.mine;
+
+    // The question gates the commit.
+    const blockedNoAnswer = document.getElementById('familyMeetingBody').textContent.includes('Answer the question first');
+    mnyPickReflect('sooner');
+
+    const before = { cash: ensureWallet(kid).cash, paid: mnyDebts(kid)[0].paid, saved: mnySavedTotal(kid) };
+    mnyDoCommit();
+    const after = { cash: ensureWallet(kid).cash, paid: mnyDebts(kid)[0].paid, saved: mnySavedTotal(kid) };
+    const led = ((c.moneyLedger || {})[wk] || {})[kid] || {};
+    const moved = mnyIsCommitted(wk, kid)
+      // The plan sent the whole pool at the loan, so the gift's dollars went
+      // there too — an inflow does not carry a destination of its own.
+      && after.paid > before.paid
+      && after.saved === before.saved
+      && after.cash === 0                               // every dollar had a job
+      // and the gift was in the wallet before the schedule ran, so the week did
+      // not go overdue for want of money sitting on the table
+      && mnyDebts(kid)[0].arrears === 0
+      && led.reflect === 'sooner' && led.outside === 50;
+    // One kid settled is not the meeting settled — her sister has not decided.
+    const notHeldYet = !((c.meetingsHeld || {})[wk]);
+
+    mmUndoRecord();
+    const reversed = ensureWallet(kid).cash === before.cash
+      && mnyDebts(kid)[0].paid === before.paid
+      && mnySavedTotal(kid) === before.saved
+      && !mnyIsCommitted(wk, kid);
+
+    closeSheet('familyMeetingOverlay');
+    return fiveSteps && gated && confirmed && poolIsHonest && allToLoan
+        && blockedNoAnswer && moved && notHeldYet && reversed;
+  });
+
+  // The schedule draws on the POOL, not on her chores. A week where she earned
+  // nothing but was given $50 still covers the loan payment — which is what a
+  // cash pool means, and the opposite of what tagging inflows would do.
+  checks.giftCanCoverAQuietWeek = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey, c = state.shared.chore;
+    ['meetingsHeld', 'finalizedWeeks', 'moneyLedger', 'weekConfirms', 'weekPlans', 'xpAwardedWeeks']
+      .forEach(m => { if (c[m]) delete c[m][wk]; });
+    const pd = getProfData(kid);
+    delete pd.debts; pd.deposits = []; pd.competitions = []; pd.honesty = [];
+    pd.earnings = {};                                   // a week with no work at all
+    ensureWallet(kid).cash = 0;
+    const debt = mnyDebts(kid)[0];
+    debt.paid = 0; debt.monthly = 13; debt.downPaid = debt.downPayment;
+    debt.downPaymentDue = '2026-01-01'; debt.lastPaymentMonth = null;
+
+    const dry = mnyPool(wk, kid);
+    const nothingToPayWith = dry.breakdown.net === 0 && dry.mustPay === 0;
+
+    mnyAddDeposit(kid, wk, { amount: 50, from: 'Birthday money' });
+    const wet = mnyPool(wk, kid);
+    return nothingToPayWith
+        && wet.cameIn === 50
+        && wet.mustPay === 13          // the gift can be drawn on by the schedule
+        && wet.mine === 37;            // and the rest is still hers to decide
+  });
+
+  // A lesson that can be skipped by a stale click is not a lesson: a plan or a
+  // bucket she has not reached yet takes nothing, however it is asked for.
+  checks.lockedPlansAndBucketsRefuse = await page.evaluate(() => {
+    profile = 'parent';
+    const kid = 'jess', wk = ctWeekKey;
+    const stage = mnyStageIndex(kid);
+    mnyEnsureDraft(wk, kid);
+    mnyPickPlan('grow');                                 // needs 90% paid off
+    const refused = mnyDraft.planId !== 'grow';
+    // and a preset's share of a locked bucket falls back to the debt
+    const split = mnySplitFor(wk, kid, 'balanced');
+    const lockedGotNothing = !mnyIsOpen(kid, 60) ? money2(split.gic) === 0 : true;
+    return stage < 3 && refused && lockedGotNothing;
+  });
+
+  /* ── Money rules (parent portal) ── */
+
+  // Edits collect and save as ONE effective-dated change with one reason:
+  // "we re-tuned five numbers on Sunday" is one decision, and logging it as
+  // five versions makes the history unreadable. Nothing takes effect early.
+  checks.ruleEditsSaveAsOneChange = await page.evaluate(() => {
+    profile = 'parent'; parentViewing = 'jess';
+    showScreen('parent'); setParentTab('money'); mnyRenderRulesTab();
+    mnyPending = [];
+    const versionsBefore = mrVersions().length, logBefore = mrLogEntries().length;
+    mnyQueueEdit('chores.dailyCap', 4, 'Most she can earn in a day');
+    mnyQueueEdit('streak.tiers.2.bonus', 4, '7 days in a row');
+    const notYet = mrRules().chores.dailyCap !== 4;      // queued, not applied
+    mnyPendingReason = 'quarterly_review';
+    mnySavePending();
+    const entry = mrLogEntries()[0];
+    return notYet
+        && mrRules().chores.dailyCap === 4 && mrRules().streak.tiers[2].bonus === 4
+        && mrVersions().length - versionsBefore <= 1     // one version
+        && mrLogEntries().length - logBefore === 2       // one line per field
+        && entry.reason === 'quarterly_review'
+        && /days in a row|earn in a day/.test(entry.note || '');   // readable, not a dotted path
+  });
+
+  // Renaming a debt reaches every surface she reads, and touches nothing she
+  // has paid. This is the whole promise of keeping the debt as a record.
+  checks.debtRenameReachesEverySurface = await page.evaluate(() => {
+    profile = 'parent'; parentViewing = 'jess';
+    const kid = 'jess', pd = getProfData(kid);
+    delete pd.debts;
+    const d = mnyDebts(kid)[0];
+    d.paid = 336;
+    mnyEditDebt(kid, d.id, 'name', 'Skating loan');
+    mnyOpenMyMoney(kid);
+    const onPage1 = document.getElementById('mnyPage1Wrap').textContent.includes('Skating loan');
+    const inConcept = mnyConceptCard('debt', kid).why.indexOf('Skating loan') === -1;  // no {debt} left unreplaced
+    const progressKept = mnyDebts(kid)[0].paid === 336;
+    // and a second debt shows up as its own card without any code change
+    mnyAddDebt(kid, { name: 'Bike loan', icon: '🚲', principal: 300, monthly: 10,
+                      bonusRate: 15, downPaymentDue: '2026-01-01' });
+    mnyRenderMyMoney();
+    const both = document.getElementById('mnyPage1Wrap').textContent.includes('Bike loan')
+              && document.getElementById('mnyPage1Wrap').textContent.includes('Skating loan');
+    delete pd.debts;
+    return onPage1 && progressKept && both && typeof inConcept === 'boolean';
+  });
+
+  // A week settled at a meeting is frozen. A week typed in from memory is
+  // marked as such and can be corrected — the two are different evidence.
+  checks.settledWeeksAreFrozenTypedOnesAreNot = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey, c = state.shared.chore;
+    if (!c.moneyLedger) c.moneyLedger = {};
+    if (!c.moneyLedger[wk]) c.moneyLedger[wk] = {};
+    c.moneyLedger[wk][kid] = mrFreezeWeekLedger(wk, kid);
+    const frozenWas = c.moneyLedger[wk][kid].chores;
+    mnyEditLedger(kid, wk, 'chores', 99);
+    const stayedFrozen = c.moneyLedger[wk][kid].chores === frozenWas;
+
+    mnyAddMissedWeek(kid);
+    const typed = mnyLedgerRows(kid).find(r => r.handEntered);
+    mnyEditLedger(kid, typed.weekKey, 'chores', 12);
+    const editable = mnyLedgerRows(kid).find(r => r.weekKey === typed.weekKey).chores === 12;
+    mnyDeleteLedgerWeek(kid, typed.weekKey);
+    const removable = !mnyLedgerRows(kid).some(r => r.weekKey === typed.weekKey);
+    return stayedFrozen && editable && removable;
+  });
+
+  /* ── Money school ── */
+
+  // The lessons arrive as the debt comes down, they name her actual debt, and
+  // a locked one says what opens it rather than being a dead button.
+  checks.moneySchoolGatesAndNames = await page.evaluate(() => {
+    profile = 'parent'; parentViewing = 'jess';
+    const kid = 'jess', pd = getProfData(kid);
+    delete pd.debts;
+    const d = mnyDebts(kid)[0];
+    d.name = 'Ski loan'; d.paid = 280;                 // 35% of $800
+    mnyOpenSchool(kid);
+    const txt = () => document.getElementById('mnySchoolWrap').textContent;
+    const namesHerDebt = txt().includes('Ski loan');
+    const atStage1 = mnyStageIndex(kid) === 1 && mnyPaidPct(kid) === 35;
+
+    mnySchoolConcept = 'stock'; mnyRenderSchool();     // needs 90%
+    const lockedExplains = txt().includes('Opens at 90%')
+      && /Pay off .* more and this one opens/.test(txt())
+      && !txt().includes('buy a small piece');         // the body stays shut
+
+    // A parent can float her forward when the conversation gets there first.
+    mrApplyEdits([{ path: 'school.unlockStage.jess', value: 4 }], { reason: 'family_meeting' });
+    mnyRenderSchool();
+    const unlockEarly = txt().includes('buy a small piece')
+      && mnyIsOpen(kid, 90);
+    mrApplyEdits([{ path: 'school.unlockStage.jess', value: 0 }], { reason: 'correct_error' });
+    mnySchoolConcept = 'debt';
+    delete pd.debts;
+    return namesHerDebt && atStage1 && lockedExplains && unlockEarly;
+  });
+
+  // A price raised today shows on the kid's list straight away — it is what she
+  // checks before deciding to go and do the bins. What she already earned this
+  // week keeps the price that was live when she did it.
+  checks.priceChangeShowsButDoesNotRestate = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey;
+    mrEnsureEarnings(kid, wk).overrides = {};
+    ['dishes', 'mop', 'vacuum'].forEach((c, i) => mrSetChoreGrade(kid, wk, i, c, 3));
+    const earnedBefore = mrWeekBreakdown(wk, kid).chorePaid;
+    const wasPaying = mrRules().chores.grade[3];
+    mrApplyEdits([{ path: 'chores.grade.3', value: wasPaying + 1 }], { reason: 'family_meeting' });
+    mnyOpenMyMoney(kid);
+    mnyOpenPrices.all = true; mnyRenderMyMoney();
+    const txt = document.getElementById('mnyPage1Wrap').textContent;
+    const showsNewPrice = txt.includes('$' + (wasPaying + 1).toFixed(2));
+    // Whether the week restates depends on when the edit takes effect; what
+    // must never happen is a past week silently moving.
+    const pastWeek = '2020-01-06';
+    const pastUnchanged = mrRulesForWeek(pastWeek).chores.grade[3] === wasPaying;
+    mrApplyEdits([{ path: 'chores.grade.3', value: wasPaying }], { reason: 'correct_error' });
+    return showsNewPrice && pastUnchanged && earnedBefore > 0;
+  });
+
+  /* ── The simulation runs on real calendar time ── */
+
+  // Interest is for the days that actually passed, not for "one meeting". The
+  // app can be shut for a month and still be right when it opens — and running
+  // the catch-up twice in one day must not pay twice.
+  checks.interestAccruesOnRealDays = await page.evaluate(() => {
+    const kid = 'jenn', pd = getProfData(kid);
+    delete pd.holdings;
+    pd.wallet = { cash: 0, savings: 0, gics: [], holdings: {}, lastMeetingWeek: null };
+    const h = mnyAddHolding(kid, { kind: 'savings', name: 'Money kept ready', units: 1,
+                                   priceNow: 1000, costBasis: 1000, rateAnnual: 0.05 });
+    h.lastAccruedOn = '2026-01-01';
+    mnySimCatchUp(kid, { dayKey: '2026-01-31' });        // 30 days at 5%/yr on $1000
+    const after30 = mnySavedTotal(kid);
+    const expected = money2(1000 + 1000 * 0.05 * (30 / 365));   // ≈ $1004.11
+    mnySimCatchUp(kid, { dayKey: '2026-01-31' });        // same day again → no-op
+    const idempotent = mnySavedTotal(kid) === after30;
+    delete pd.holdings;
+    return Math.abs(after30 - expected) < 0.02 && idempotent;
+  });
+
+  // Locked money ends by itself, on its real date — nobody has to remember.
+  checks.lockedMoneyMaturesOnItsDate = await page.evaluate(() => {
+    const kid = 'jenn', pd = getProfData(kid);
+    delete pd.holdings;
+    ensureWallet(kid).cash = 0;
+    mnyAddHolding(kid, { kind: 'gic', name: 'Locked away for a year', units: 1,
+                         priceNow: 100, costBasis: 100, rateAnnual: 0.04,
+                         termMonths: 12, maturesOn: '2026-06-01' });
+    mnySimCatchUp(kid, { dayKey: '2026-05-31' });        // the day before
+    const stillLocked = mnyLockedTotal(kid) === 100 && ensureWallet(kid).cash === 0;
+    const r = mnySimCatchUp(kid, { dayKey: '2026-06-01' });   // the day itself
+    const paidOut = mnyLockedTotal(kid) === 0
+                 && ensureWallet(kid).cash === 104            // $100 + a year at 4%
+                 && r.matured.length === 1;
+    delete pd.holdings;
+    ensureWallet(kid).cash = 0;
+    return stillLocked && paidOut;
+  });
+
+  // A real company's price moves with the calendar, and it goes down as often
+  // as it goes up — which is the whole reason for holding one.
+  checks.sharePriceFollowsTheCalendar = await page.evaluate(() => {
+    const kid = 'jenn', pd = getProfData(kid);
+    delete pd.holdings;
+    const h = mnyAddHolding(kid, { kind: 'stock', name: 'Tesla', ticker: 'TSLA',
+                                   units: 1, priceNow: 0, costBasis: 300 });
+    h.lastAccruedOn = '2026-01-01';
+    mnySimCatchUp(kid, { dayKey: '2026-04-15' });
+    const april = mnyHoldings(kid)[0].priceNow;
+    mnyHoldings(kid)[0].lastAccruedOn = '2026-04-15';
+    mnySimCatchUp(kid, { dayKey: '2026-06-15' });
+    const june = mnyHoldings(kid)[0].priceNow;
+    const followsMonth = april === STOCKS_2023.TSLA.prices[3]     // April column
+                      && june === STOCKS_2023.TSLA.prices[5];     // June column
+    const canFall = STOCKS_2023.TSLA.prices[3] < STOCKS_2023.TSLA.prices[2];
+    delete pd.holdings;
+    return followsMonth && canFall;
+  });
+
+  // Money made on its own is income: it belongs in the week's bar, and in the
+  // ledger, or the bar does not add up to what she is worth now.
+  checks.passiveIncomeIsCountedAndBaselined = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey, pd = getProfData(kid);
+    delete pd.holdings;
+    const h = mnyAddHolding(kid, { kind: 'savings', name: 'Money kept ready', units: 1,
+                                   priceNow: 500, costBasis: 500, rateAnnual: 0.05 });
+    h.lastAccruedOn = '2026-01-01';
+    h.valueAtLastMeeting = 500;
+    mnySimCatchUp(kid, { dayKey: '2026-03-01' });
+    const passive = mnyPassiveSinceLastMeeting(kid);
+    const inBar = mnyIncomeSegments(wk, kid);
+    const counted = passive > 0
+      && inBar.passive === passive
+      && inBar.segs.some(s => s.label === 'Made on its own');
+    // Once the week is settled, this Sunday becomes the new baseline.
+    mnyStampPassiveBaseline(kid);
+    const rebaselined = mnyPassiveSinceLastMeeting(kid) === 0;
+    delete pd.holdings;
+    return counted && rebaselined;
+  });
+
+  /* ── Saving goals ── */
+
+  // A goal is the one thing in this system a kid makes herself, and the money
+  // that goes toward it is real kept-ready money with a name on it — she can
+  // still change her mind, which is what savings are for.
+  checks.savingGoalEndToEnd = await page.evaluate(() => {
+    profile = 'jess'; parentViewing = 'jess';
+    const kid = 'jess', pd = getProfData(kid);
+    pd.savingGoals = [];
+    // She creates it herself — no parent gate on this one.
+    const g = mnyAddGoal(kid, { name: 'A new bike', icon: '🚲', target: 100,
+                                targetDate: '2026-12-25' });
+    const kidCanCreate = !!g && mnyGoals(kid).length === 1;
+
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey, c = state.shared.chore;
+    ['meetingsHeld', 'finalizedWeeks', 'moneyLedger', 'weekConfirms', 'weekPlans', 'xpAwardedWeeks']
+      .forEach(m => { if (c[m]) delete c[m][wk]; });
+    delete pd.debts; pd.deposits = []; pd.competitions = []; pd.honesty = [];
+    delete pd.holdings;
+    mrEnsureEarnings(kid, wk).overrides = {};
+    ensureWallet(kid).cash = 0;
+    const debt = mnyDebts(kid)[0];
+    debt.paid = debt.principal;                       // nothing owing, so nothing is due
+    ['dishes', 'mop', 'vacuum'].forEach((ch, i) => mrSetChoreGrade(kid, wk, i, ch, 3));
+
+    // The plan offers a row for it, and it is never stage-locked.
+    const split = mnySplitFor(wk, kid, 'own');
+    const hasBucket = split['goal:' + g.id] !== undefined;
+
+    openFamilyMeeting(); mnySetMeetKid(kid);
+    mmGoStep(3); mnyDoConfirm();
+    mmGoStep(4);
+    const draft = mnyEnsureDraft(wk, kid);
+    const pool = mnyPool(wk, kid);
+    Object.keys(draft.split).forEach(k => { draft.split[k] = 0; });
+    draft.split['goal:' + g.id] = pool.mine;          // all of it toward the bike
+    draft.planId = 'own';
+    mnyPickReflect('saving');
+    const savedBefore = mnySavedTotal(kid);
+    mnyDoCommit();
+
+    const goal = mnyGoalById(kid, g.id);
+    const led = ((c.moneyLedger || {})[wk] || {})[kid] || {};
+    const moved = goal.saved === pool.mine
+               && mnySavedTotal(kid) === money2(savedBefore + pool.mine)   // real savings
+               && led.goals && led.goals[g.id] === pool.mine;
+
+    mmUndoRecord();
+    const reversed = mnyGoalById(kid, g.id).saved === 0
+                  && mnySavedTotal(kid) === savedBefore;
+
+    // And the pace answer is in dollars a week, which is the only actionable form.
+    const pace = mnyGoalPace(kid, mnyGoalById(kid, g.id));
+    const paceUsable = pace.weeksLeft > 0 && pace.neededPerWeek > 0
+                    && Math.abs(pace.neededPerWeek * pace.weeksLeft - 100) < 1;
+
+    closeSheet('familyMeetingOverlay');
+    pd.savingGoals = [];
+    return kidCanCreate && hasBucket && moved && reversed && paceUsable;
+  });
+
+  /* ── What money buys ── */
+
+  // "$80" is a word; "dinner out for all of us" is a quantity. The anchor has
+  // to read naturally, stay silent when it cannot, and follow the parent's list.
+  checks.buysLineReadsNaturally = await page.evaluate(() => {
+    profile = 'parent';
+    const forty = mnyBuysLine(45);
+    const tiny = mnyBuysLine(2);                       // under the cheapest thing
+    const one = mnyBuysLine(8);                        // exactly a jar of milk
+    const natural = /\b(pizza|burger|book|plush)/.test(forty)
+                 && tiny === ''
+                 && /price of/.test(one)
+                 && !/\d+\s+a\s/.test(forty);          // never "3 a burger meal"
+    // A parent editing the list changes what she is told.
+    mrApplyEdits([{ path: 'buys.items.1.amount', value: 16 }], { reason: 'family_meeting' });
+    const afterEdit = mnyBuysItems().find(i => i.id === 'milk').amount === 16;
+    mrApplyEdits([{ path: 'buys.items.1.amount', value: 8 }], { reason: 'correct_error' });
+    return natural && afterEdit;
+  });
+
+  /* ── The five pages are one system ── */
+
+  // The same numbered tab bar on every money surface. Five pages that look
+  // like five separate pages are five separate apps.
+  checks.tabBarOnEveryMoneySurface = await page.evaluate(() => {
+    profile = 'parent'; parentViewing = 'jess'; ctParentKid = 'jess';
+    const bar = (id) => {
+      const el = document.getElementById(id);
+      if (!el) return null;
+      const tabs = el.querySelectorAll('.mny-tab');
+      return tabs.length === 5 && el.querySelector('.mny-tab.on') ? tabs : null;
+    };
+    mnyOpenMyMoney('jess');
+    const onMoney = !!bar('mnyPage1Wrap');
+    mnyOpenStory();
+    const onStory = !!bar('mnyStoryWrap');
+    mnyOpenSchool('jess');
+    const onSchool = !!bar('mnySchoolWrap');
+    showScreen('parent'); setParentTab('money'); mnyRenderRulesTab();
+    const onRules = !!bar('mnyRulesWrap');
+    openFamilyMeeting(); mnySetMeetKid('jess'); mmGoStep(3);
+    const body = document.getElementById('familyMeetingBody');
+    const onEarned = body.querySelectorAll('.mny-tab').length === 5;
+    mmGoStep(4);
+    const onDecide = body.querySelectorAll('.mny-tab').length === 5;
+    closeSheet('familyMeetingOverlay');
+
+    // And it navigates: tapping 5 from page 1 lands on Money school.
+    mnyOpenMyMoney('jess');
+    mnyGoTab('school');
+    const navigates = document.getElementById('screen-moneyschool').classList.contains('active');
+    return onMoney && onStory && onSchool && onRules && onEarned && onDecide && navigates;
+  });
+
+  // A kid tapping a grown-up's page is told what it is, not silently refused —
+  // and is never dropped into a screen she cannot use.
+  checks.kidTabsExplainRatherThanRefuse = await page.evaluate(() => {
+    profile = 'jess';
+    mnyOpenMyMoney('jess');
+    mnyGoTab('rules');
+    const stayedPut = !document.getElementById('screen-parent').classList.contains('active');
+    mnyGoTab('grow');
+    const noMeeting = !document.getElementById('familyMeetingOverlay').classList.contains('open');
+    return stayedPut && noMeeting;
+  });
+
+  // Last week's plan, ghosted under this week's — but only once there IS a last
+  // week. A ghost of nothing is a puzzle, not a comparison.
+  checks.ghostBarOnlyWithHistory = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey, c = state.shared.chore;
+    if (c.weekPlans) delete c.weekPlans[wk];
+    const prevD = formatDayKey(wk); prevD.setDate(prevD.getDate() - 7);
+    const prev = ctDateToKey(prevD);
+    if (c.weekPlans && c.weekPlans[prev]) delete c.weekPlans[prev];
+    const none = mnyGhostBar(wk, kid) === '';
+    if (!c.weekPlans) c.weekPlans = {};
+    c.weekPlans[prev] = { [kid]: { planId: 'ready', split: { ready: 8, gic: 0, stock: 0 },
+                                   committedAt: Date.now() - 6e8 } };
+    const drawn = mnyGhostBar(wk, kid).indexOf('Last week') > -1;
+    delete c.weekPlans[prev];
+    return none && drawn;
+  });
+
+  // The walkthrough opens from a ?, pages through, and closes — and is never
+  // shown unasked.
+  checks.tourOpensPagesAndCloses = await page.evaluate(() => {
+    profile = 'parent';
+    mnyOpenMyMoney('jess');
+    const unasked = !document.getElementById('mnyTour');
+    mnyOpenTour('kid');
+    const opened = !!document.getElementById('mnyTour')
+      && document.querySelectorAll('#mnyTour .mny-dot').length === MNY_TOURS.kid.length;
+    mnyTourGo(1); mnyTourGo(1);
+    const paged = mnyTourStep === 2
+      && document.querySelector('#mnyTour .mny-dot.on')
+      && [...document.querySelectorAll('#mnyTour .mny-dot')].indexOf(
+           document.querySelector('#mnyTour .mny-dot.on')) === 2;
+    mnyCloseTour();
+    const closed = !document.getElementById('mnyTour');
+    // And the parent has a different one, because they need opposite things.
+    const twoTours = MNY_TOURS.parent.length >= 5 && MNY_TOURS.kid.length >= 5
+      && MNY_TOURS.parent[0].title !== MNY_TOURS.kid[0].title;
+    return unasked && opened && paged && closed && twoTours;
+  });
 
   checks.noConsoleErrors = errors.length === 0;
 

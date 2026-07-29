@@ -99,12 +99,13 @@ function renderWeek() {
   const legend = document.getElementById('weekLegend');
   if (legend) legend.style.display = isParent() ? 'flex' : 'none';
 
-  // Money button: both roles open the Pocket Money screen — kids land on
-  // Balance & Prices, parents keep the bank and rules tabs beside it.
+  // Money button: both roles open 💰 My money. A parent looking at a kid's
+  // money should see exactly what the kid sees; everything a parent can change
+  // lives on the Money rules tab of the portal instead.
   const moneyBtn = document.getElementById('weekMoneyBtn');
   if (moneyBtn) {
-    moneyBtn.innerHTML = '<span aria-hidden="true">💰</span><span class="btn-icon__label">Pocket money</span>';
-    moneyBtn.title = 'Pocket money';
+    moneyBtn.innerHTML = '<span aria-hidden="true">💰</span><span class="btn-icon__label">My money</span>';
+    moneyBtn.title = 'My money';
     moneyBtn.setAttribute('aria-label', moneyBtn.title);
   }
 

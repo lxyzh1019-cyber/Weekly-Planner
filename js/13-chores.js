@@ -1149,9 +1149,9 @@ function ctRenderMoneyCard(kid) {
     <div class="ct-meta" style="margin-top:0.4rem">🏦 Net worth: <b>$${nw.toFixed(2)}</b></div>
     <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.5rem">
       ${isParent()
-        ? `<button type="button" class="pill-btn" onclick="openMoneyScreen('${kid}')">🏦 Bank &amp; invest</button>
+        ? `<button type="button" class="pill-btn" onclick="mnyOpenMyMoney('${kid}')">💰 My money</button>
            <button type="button" class="pill-btn" onclick="openFamilyMeeting()">🧑‍🧑‍🧒 Family meeting</button>`
-        : `<button type="button" class="pill-btn" onclick="openPocketMoney('${kid}','balance')">💰 How I earn</button>`}
+        : `<button type="button" class="pill-btn" onclick="mnyOpenMyMoney('${kid}')">💰 My money</button>`}
     </div></div>`;
 }
 function ctRenderGroupCards(kid) {
