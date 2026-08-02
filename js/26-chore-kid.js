@@ -268,11 +268,11 @@ function ckOwnLanes(kid) {
   const day = mrChoresForDay(kid, ctWeekKey, ctDay);
   const r = mrRulesForWeek(ctWeekKey);
   const own = [
-    ...(r.personalChores || []).map(c => ({ id: c.id, label: c.label, due: '' })),
-    ...day.rows.filter(x => x.row.lane === 'own').map(x => ({ id: x.row.id, label: x.row.label, due: mrDueLabel(x.row) })),
+    ...(r.personalChores || []).map(c => ({ id: c.id, icon: c.icon || '⭐', label: c.label, due: '' })),
+    ...day.rows.filter(x => x.row.lane === 'own').map(x => ({ id: x.row.id, icon: x.row.icon, label: x.row.label, due: mrDueLabel(x.row) })),
   ];
   const helping = day.rows.filter(x => x.row.lane === 'helping')
-    .map(x => ({ id: x.row.id, label: x.row.label, due: mrDueLabel(x.row) }));
+    .map(x => ({ id: x.row.id, icon: x.row.icon, label: x.row.label, due: mrDueLabel(x.row) }));
 
   const lane = (label, note, items) => {
     if (!items.length) return '';
@@ -283,6 +283,7 @@ function ckOwnLanes(kid) {
       return `<button type="button" class="ck-item ${st ? 'on' : ''}"
         data-ct-action="cycle-personal" data-chore-id="${escapeAttr(i.id)}" aria-label="${escapeAttr(i.label)}">
         <span class="ck-check ${st ? 'on' : ''}">${mark}</span>
+        <span class="ck-item-icon">${i.icon || '⭐'}</span>
         <span class="ck-item-name">${escapeHtml(i.label)}${i.due ? `<span class="ck-item-due">by ${escapeHtml(i.due)}</span>` : ''}</span>
         <span class="ck-item-note">${st === 'unasked' ? 'nobody asked ⭐' : (st === 'done' ? 'done' : '')}</span></button>`;
     }).join('');
@@ -358,6 +359,7 @@ function ckChores(kid) {
     return `<div class="ck-chore ck-chore-${state} ${open ? 'open' : ''}">
       <button type="button" class="ck-chore-row" data-ct-action="ck-chore-row" data-chore-id="${escapeAttr(row.id)}">
         <span class="ck-check ${state !== 'todo' ? 'on' : ''} ${state === 'claimed' ? 'ring' : ''}">${mark}</span>
+        <span class="ck-chore-icon">${row.icon}</span>
         <span class="ck-chore-name">${escapeHtml(row.label)}
           <span class="ck-chore-status">${status}</span></span>
         <span class="ck-chore-pay ${payCls}">${pay}</span>
@@ -384,6 +386,7 @@ function ckLearning(kid) {
     const units = mrGetLearning(kid, ctWeekKey, ctDay, it.id);
     const worth = it.xpOnly ? 'XP only' : `${ckMoney(it.amount)} / ${it.perUnit} ${it.unit}`;
     return `<div class="ck-learn ${units > 0 ? 'on' : ''}">
+      <span class="ck-item-icon">${it.xpOnly ? '🎮' : '📘'}</span>
       <span class="ck-learn-name">${escapeHtml(it.label)}<span class="ck-item-due">${escapeHtml(worth)}</span></span>
       <span class="ck-learn-count">${units} ${escapeHtml(it.unit)}</span>
       <span class="ck-learn-btns">
@@ -427,6 +430,7 @@ function ckLoops(kid) {
   const boxed = mrBoxItems(kid).filter(b => !b.releasedAt);
   if (!boxed.length) return '';
   const rows = boxed.map(b => `<div class="ck-loop">
+    <span class="ck-item-icon">📦</span>
     <span class="ck-loop-name">${escapeHtml(b.label)}<span class="ck-item-due">back Sunday, or sooner for one unpaid job</span></span>
     <span class="ck-pill ${b.repeat ? 'ck-pill-red' : ''}">${b.repeat ? 'again this week · −$1' : 'in the box'}</span></div>`).join('');
   return `<div class="ck-sect"><div class="ck-h2">Open loops</div>
@@ -460,7 +464,7 @@ function ckWeekGrid(kid) {
       + rows.map(row => {
         let cells = '', wk = 0;
         for (let d = 0; d < 7; d++) cells += row.cell(d, () => wk++);
-        return `<div class="ck-grid-row"><div class="ck-grid-label">${escapeHtml(row.name)}</div>${cells}<div class="ck-grid-total">${row.total()}</div></div>`;
+        return `<div class="ck-grid-row"><div class="ck-grid-label"><span class="ck-grid-icon">${row.icon || ''}</span>${escapeHtml(row.name)}</div>${cells}<div class="ck-grid-total">${row.total()}</div></div>`;
       }).join('') + '</div>';
   };
 
@@ -469,6 +473,7 @@ function ckWeekGrid(kid) {
     for (let d = 0; d < 7; d++) if (ctGetMandatory(ctWeekKey, d, s, kid)) n++;
     return {
       name: s,
+      icon: CT_SESSION_ICONS[s] || '📋',
       cell: (d) => {
         const on = ctGetMandatory(ctWeekKey, d, s, kid);
         return `<div class="ck-cell ${on ? 'done' : ''}">${on ? '✓' : '·'}</div>`;
@@ -486,6 +491,7 @@ function ckWeekGrid(kid) {
     }
     return {
       name: p.label,
+      icon: p.icon,
       cell: (d) => {
         const here = scheduled[d][p.id];
         if (!here) return `<div class="ck-cell ck-cell-off" title="not on the plan that day"></div>`;

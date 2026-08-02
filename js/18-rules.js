@@ -34,13 +34,13 @@
    lets the week grid grey out a day and mean it — a chore can't be judged on a
    day it was never planned for. */
 const MR_HOUSEHOLD_CHORES = [
-  { id: 'dishes',   label: 'Dishes & dishwasher',   deadline: 'before you leave the kitchen', due: '19:30', who: 'both', lane: 'chores' },
-  { id: 'mop',      label: 'Mop',                   deadline: 'before dinner',                due: '17:30', who: 'both', lane: 'chores' },
-  { id: 'vacuum',   label: 'Vacuum',                deadline: 'before dinner',                due: '17:30', who: 'both', lane: 'chores' },
-  { id: 'laundry',  label: 'Laundry',               deadline: 'before bed',                   due: '20:00', who: 'both', lane: 'chores' },
-  { id: 'sorting',  label: 'Sorting clothes',       deadline: 'before bed',                   due: '20:00', who: 'both', lane: 'chores' },
-  { id: 'bins',     label: 'Bins out',              deadline: 'before dinner',                due: '17:30', who: 'both', lane: 'chores' },
-  { id: 'table',    label: 'Set & clear the table', deadline: 'before dinner',                due: '17:30', who: 'both', lane: 'chores' },
+  { id: 'dishes',   icon: '🍴', label: 'Dishes & dishwasher',   deadline: 'before you leave the kitchen', due: '19:30', who: 'both', lane: 'chores' },
+  { id: 'mop',      icon: '🧽', label: 'Mop',                   deadline: 'before dinner',                due: '17:30', who: 'both', lane: 'chores' },
+  { id: 'vacuum',   icon: '🌀', label: 'Vacuum',                deadline: 'before dinner',                due: '17:30', who: 'both', lane: 'chores' },
+  { id: 'laundry',  icon: '🧺', label: 'Laundry',               deadline: 'before bed',                   due: '20:00', who: 'both', lane: 'chores' },
+  { id: 'sorting',  icon: '👕', label: 'Sorting clothes',       deadline: 'before bed',                   due: '20:00', who: 'both', lane: 'chores' },
+  { id: 'bins',     icon: '🗑️', label: 'Bins out',              deadline: 'before dinner',                due: '17:30', who: 'both', lane: 'chores' },
+  { id: 'table',    icon: '🍽️', label: 'Set & clear the table', deadline: 'before dinner',                due: '17:30', who: 'both', lane: 'chores' },
 ];
 /* Only `chores` is checked and paid. The other two are day-scoped standing
    responsibilities that earn XP — they need no planner block to appear. */
@@ -51,10 +51,10 @@ const MR_LANES = [
 ];
 const MR_BEDTIME_MIN = 20 * 60 + 30;   // 8:30pm — nothing can be due after it
 const MR_PERSONAL_CHORES = [
-  { id: 'bed',      label: 'Make your bed' },
-  { id: 'room',     label: 'Tidy your room' },
-  { id: 'schoolbag',label: 'Pack your school bag' },
-  { id: 'gear',     label: 'Pack your sports gear' },
+  { id: 'bed',      icon: '🛏️', label: 'Make your bed' },
+  { id: 'room',     icon: '🧸', label: 'Tidy your room' },
+  { id: 'schoolbag',icon: '🎒', label: 'Pack your school bag' },
+  { id: 'gear',     icon: '🥋', label: 'Pack your sports gear' },
 ];
 
 /* The seed template. Every value is a starting point reviewed each quarter —
@@ -484,6 +484,7 @@ function mrNormalizePoolRow(row) {
   const lane = MR_LANES.some(l => l.id === row.lane) ? row.lane : 'chores';
   const who = (row.who === 'jenn' || row.who === 'jess') ? row.who : 'both';
   return { id: row.id, label: row.label || row.id, lane, who,
+           icon: row.icon || (lane === 'chores' ? '🧺' : '⭐'),
            due: row.due || null, deadline: row.deadline || '' };
 }
 function mrPoolRows(weekKey) {

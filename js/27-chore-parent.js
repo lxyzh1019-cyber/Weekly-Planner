@@ -128,6 +128,7 @@ function cpQueue() {
     const name = q.row ? q.row.label : q.choreId;
     const due = q.row ? mrDueLabel(q.row) : '—';
     return `<div class="cp-qrow">
+      <span class="cp-qicon">${q.row ? q.row.icon : '🧺'}</span>
       <div class="cp-qtext">
         <div class="cp-qname">${escapeHtml(name)}</div>
         <div class="ck-sub">${CT_DAYS[q.dayIdx]} · due ${escapeHtml(due)}</div>
@@ -159,6 +160,7 @@ function cpGraded() {
       ? (claim === g ? 'you agreed with her' : `she said ${ckMoney(ckGradePay(r, claim))}`)
       : 'she never claimed it';
     return `<div class="cp-qrow cp-qrow-done">
+      <span class="cp-qicon">${row ? row.icon : '🧺'}</span>
       <div class="cp-qtext">
         <div class="cp-qname">${escapeHtml(row ? row.label : id)}</div>
         <div class="ck-sub">${escapeHtml((CP_GRADES.find(x => x.g === g) || {}).label || '')} · ${escapeHtml(agree)}</div>
@@ -184,6 +186,7 @@ function cpPlanner() {
   const pool = mrPoolRows(ctWeekKey)
     .filter(p => p.lane === 'chores' && (p.who === 'both' || p.who === kid));
   const rows = pool.map(p => `<div class="cp-plan ${on.has(p.id) ? 'on' : ''}">
+      <span class="cp-qicon">${p.icon}</span>
       <span class="cp-plan-name">${escapeHtml(p.label)}<span class="ck-item-due">due ${escapeHtml(mrDueLabel(p))}</span></span>
       <button type="button" class="ck-btn ${on.has(p.id) ? 'on' : ''}"
         data-cp-action="${on.has(p.id) ? 'unschedule' : 'schedule'}" data-chore-id="${escapeAttr(p.id)}">
@@ -281,7 +284,7 @@ function cpDualGrid() {
       for (let d = 0; d < 7; d++) { const g = mrGetChoreGrade(k, ctWeekKey, d, p.id); if (g > 0) m += ckGradePay(r, g); }
       return m;
     };
-    return `<div class="cp-grid-row"><div class="ck-grid-label">${escapeHtml(p.label)}</div>${cells}
+    return `<div class="cp-grid-row"><div class="ck-grid-label"><span class="ck-grid-icon">${p.icon}</span>${escapeHtml(p.label)}</div>${cells}
       <div class="cp-grid-tot"><span>${ckMoney(tot('jenn'))}</span><span>${ckMoney(tot('jess'))}</span></div></div>`;
   }).join('');
   return `<div class="cp-sect"><div class="cp-cap">Both kids, same week</div>

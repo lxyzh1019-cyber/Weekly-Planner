@@ -691,6 +691,77 @@ function findChromium() {
     return failed.length === 0 || failed;
   });
 
+  // ── In a hand ──
+  // The chore system has to work on a phone, not merely not crash on one.
+  // Two failures are silent and permanent once shipped: content pushed off the
+  // side (a grid item's default min-width:auto does this), and controls too
+  // small to hit. Both are measured here at two real iPhone widths.
+  const phoneAudit = async (w, h, label) => {
+    await page.setViewportSize({ width: w, height: h });
+    await page.waitForTimeout(350);
+    return page.evaluate(({ w, label }) => {
+      const bad = { label, overflow: [], small: [] };
+      const seen = new Set();
+      // Nothing may extend past the viewport, and the page must not scroll
+      // sideways. 1px of tolerance for sub-pixel rounding.
+      if (document.body.scrollWidth > w + 1) bad.overflow.push('body:' + document.body.scrollWidth);
+      document.querySelectorAll('.ck-tab *, .cp-tab *, .ctr-tab *').forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        // A box that scrolls its own overflow is allowed to be wider inside.
+        if (el.closest('.ck-gridwrap')) return;
+        if (r.right > w + 1 && !seen.has(el.className)) {
+          seen.add(el.className);
+          bad.overflow.push(String(el.className).slice(0, 40) + '@' + Math.round(r.right));
+        }
+      });
+      // Primary controls need a 44px target. Icon-sized steppers inside a
+      // scrolling table are exempt; the ones a thumb actually aims at are not.
+      document.querySelectorAll(
+        '.ck-chore-row, .ck-qbtn, .ck-day, .ck-segbtn, .ck-item, .ck-rate, .cp-gbtn, .cp-kid, .co-lane, .co-who'
+      ).forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        if (r.height < 44 && !seen.has('h:' + el.className)) {
+          seen.add('h:' + el.className);
+          bad.small.push(String(el.className).slice(0, 30) + '@' + Math.round(r.height));
+        }
+      });
+      return bad;
+    }, { w, label });
+  };
+
+  // Kid tab, both phone widths.
+  await page.evaluate(() => {
+    profile = 'jenn'; selectProfile('jenn');
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const keys = mrWeekDayKeys(ctWeekKey);
+    setDayBlocks(keys[2], [{ id:'ph1', actId:'chores', startMin: 17*60, durationMin: 30,
+      choreTags:['dishes','vacuum'], checklistState:{} }], 'jenn');
+    openChoreTab(); ckSelectDay(2);
+  });
+  const kid393 = await phoneAudit(393, 852, 'kid@393');
+  await page.screenshot({ path: shot('phone_kid') });
+  const kid375 = await phoneAudit(375, 667, 'kid@375');
+  checks.kidTabFitsAPhone =
+    (kid393.overflow.length + kid393.small.length + kid375.overflow.length + kid375.small.length) === 0
+    || [kid393, kid375];
+
+  // The portal's three tabs, on the smaller phone.
+  await page.evaluate(() => {
+    profile = 'parent'; showScreen('parent'); renderParentHome();
+  });
+  const portal = [];
+  for (const tab of ['chores', 'trends', 'options']) {
+    await page.evaluate(t => setParentTab(t), tab);
+    const a = await phoneAudit(390, 844, 'portal-' + tab);
+    if (a.overflow.length || a.small.length) portal.push(a);
+    if (tab === 'chores') await page.screenshot({ path: shot('phone_parent') });
+  }
+  checks.portalFitsAPhone = portal.length === 0 || portal;
+  await page.setViewportSize({ width: 900, height: 1100 });
+  await page.waitForTimeout(200);
+
   // Parent: the meeting commit moves wallet, XP and the loan together, so undo
   // has to reverse all three. A partial reverse would leave credited XP or a
   // loan payment standing against a week that was un-recorded.

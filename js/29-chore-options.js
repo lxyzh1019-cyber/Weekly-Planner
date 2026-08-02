@@ -10,7 +10,7 @@
 // up in the rule log with a reason beside it. Changing what a chore is worth in
 // March must not restate what January paid.
 
-let coDraft = { label: '', due: '17:30', who: 'both', lane: 'chores' };
+let coDraft = { icon: '🧺', label: '', due: '17:30', who: 'both', lane: 'chores' };
 
 function coApply(pool, label) {
   // Dated from the week on screen, not from today: a rule edited on Wednesday
@@ -32,6 +32,8 @@ function coPoolCard() {
       `<button type="button" class="co-who ${p.who === w ? 'on' : ''}"
         data-co-action="who" data-id="${escapeAttr(p.id)}" data-who="${w}">${lbl}</button>`).join('');
     return `<div class="co-row">
+      <input class="co-icon" value="${escapeAttr(p.icon)}" data-co-action="icon" data-id="${escapeAttr(p.id)}"
+        title="One emoji" aria-label="Icon for ${escapeAttr(p.label)}">
       <input class="co-name" value="${escapeAttr(p.label)}" data-co-action="rename" data-id="${escapeAttr(p.id)}"
         aria-label="Name of ${escapeAttr(p.label)}">
       <input class="co-due" value="${escapeAttr(mrDueMinutes(p) != null ? mrFormatClock(mrDueMinutes(p)) : (p.due || ''))}" placeholder="7:30pm"
@@ -50,6 +52,8 @@ function coPoolCard() {
     <div class="ck-sub">Pay comes from the grade you give, not from the chore, so there is no per-chore price to argue about. <b>8:30pm is bedtime and nothing can be due after it.</b> Only the <b>Chores</b> lane is checked and paid.</div>
     ${rows}
     <div class="co-row co-draft">
+      <input class="co-icon" value="${escapeAttr(coDraft.icon)}" data-co-action="draft-icon"
+        title="One emoji" aria-label="New chore icon">
       <input class="co-name" value="${escapeAttr(coDraft.label)}" placeholder="New chore — what is it?"
         data-co-action="draft-label" aria-label="New chore name">
       <input class="co-due" value="${escapeAttr(coDraft.due)}" placeholder="7:30pm"
@@ -199,6 +203,8 @@ function coHandleChange(e) {
   if (!el) return;
   const a = el.dataset.coAction;
   if (a === 'rename') coSetField(el.dataset.id, 'label', el.value);
+  else if (a === 'icon') coSetField(el.dataset.id, 'icon', el.value);
+  else if (a === 'draft-icon') coDraft.icon = el.value;
   else if (a === 'due') coSetDue(el.dataset.id, el.value);
   else if (a === 'draft-label') coDraft.label = el.value;
   else if (a === 'draft-due') coDraft.due = el.value;
@@ -251,10 +257,11 @@ function coAdd() {
   if (pool.some(p => mrFoldName(p.label) === mrFoldName(label))) {
     showToast('That chore is already in the pool'); return;
   }
-  pool.push({ id: coNewId(label, pool), label, lane: coDraft.lane, who: coDraft.who,
+  pool.push({ id: coNewId(label, pool), icon: coDraft.icon || '🧺', label,
+              lane: coDraft.lane, who: coDraft.who,
               due: coDraft.due ? mrFormatClock(mrParseClock(coDraft.due)) : null });
   coApply(pool, `added ${label}`);
-  coDraft = { label: '', due: '17:30', who: 'both', lane: 'chores' };
+  coDraft = { icon: '🧺', label: '', due: '17:30', who: 'both', lane: 'chores' };
   coRenderOptions();
   cpRenderChoreTab();
   showToast(`"${label}" is in the pool 🧽`);
@@ -263,7 +270,7 @@ function coAdd() {
    so the blocks already carrying it resolve immediately. */
 function coAdopt(tag) {
   const pool = coPool();
-  pool.push({ id: tag, label: tag, lane: 'chores', who: 'both', due: null });
+  pool.push({ id: tag, icon: '🧺', label: tag, lane: 'chores', who: 'both', due: null });
   coApply(pool, `added ${tag} from the planner`);
   coRenderOptions();
   cpRenderChoreTab();
