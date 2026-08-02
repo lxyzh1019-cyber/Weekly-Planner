@@ -629,6 +629,68 @@ function findChromium() {
   await page.waitForTimeout(200);
   await page.screenshot({ path: shot('parent_options') });
 
+  // ── The whole redesign, as one journey ──
+  // Each phase is checked in isolation above; this is the only check that the
+  // pieces actually join up: plan it, claim it, grade it, see it, settle it.
+  checks.redesignEndToEnd = await page.evaluate(() => {
+    const kid = 'jenn', wk = ctWeekKey, day = 3, chore = 'vacuum';
+    const step = {};
+    profile = 'parent'; parentViewing = kid; cpDay = day; cpView = 'day';
+
+    // 1. A parent puts the chore on Thursday from the portal.
+    setParentTab('chores'); cpRenderChoreTab();
+    document.querySelector(`[data-cp-action="schedule"][data-chore-id="${chore}"]`).click();
+    step.scheduled = mrChoresForDay(kid, wk, day).rows.some(r => r.row.id === chore);
+
+    // 2. The kid opens her tab on that day and sees it — and nothing else did.
+    profile = kid; ctDay = day; ckView = 'day'; openChoreTab(); ckSelectDay(day);
+    const row = document.querySelector(`[data-ct-action="ck-chore-row"][data-chore-id="${chore}"]`);
+    step.sheSeesIt = !!row;
+
+    // 3. She says how it went. That is a claim, and it pays nothing.
+    const moneyBefore = mrWeekMoney(wk, kid);
+    row.click();
+    document.querySelector(`[data-ct-action="ck-claim"][data-chore-id="${chore}"][data-quality="3"]`).click();
+    step.claimedNotPaid = mrGetClaim(kid, wk, day, chore) === 3
+      && mrWeekMoney(wk, kid) === moneyBefore;
+
+    // 4. It is waiting on the parent, who grades it.
+    profile = 'parent';
+    setParentTab('chores'); cpDay = day; cpRenderChoreTab();
+    step.inTheQueue = mrClaimQueue(wk, kid).some(q => q.choreId === chore && q.dayIdx === day);
+    document.querySelector(`[data-cp-action="grade"][data-chore-id="${chore}"][data-day="${day}"][data-grade="3"]`).click();
+    step.graded = mrGetChoreGrade(kid, wk, day, chore) === 3;
+    step.queueCleared = !mrClaimQueue(wk, kid).some(q => q.choreId === chore && q.dayIdx === day);
+
+    // 5. Her week grid fills that one cell and greys the days nobody planned.
+    profile = kid; openChoreTab(); ckSetView('week');
+    const grid = document.querySelector('.ck-grid');
+    step.gridFilled = grid.querySelectorAll('.ck-cell.done').length > 0
+      && grid.querySelectorAll('.ck-cell-off').length > 0;
+    ckSetView('day');
+
+    // 6. Trends counts the week, and the meeting is still the only settler.
+    profile = 'parent';
+    setParentTab('trends'); ctrOffset = 0; ctrRenderTrends();
+    step.inTrends = ctrRow(wk, kid).total >= 0 && !!document.querySelector('#ptab-trends .ctr-svg');
+    const finalBefore = JSON.stringify(state.shared.chore.finalizedWeeks || {});
+    setParentTab('chores'); cpRenderChoreTab();
+    document.querySelector('[data-cp-action="settle"]').click();
+    step.meetingOpens = document.getElementById('familyMeetingOverlay').classList.contains('open');
+    step.nothingSettledYet = JSON.stringify(state.shared.chore.finalizedWeeks || {}) === finalBefore;
+    closeSheet('familyMeetingOverlay');
+
+    // Leave the week as we found it.
+    mrSetChoreGrade(kid, wk, day, chore, 0);
+    mrSetClaim(kid, wk, day, chore, 0);
+    setParentTab('chores'); cpRenderChoreTab();
+    const off = document.querySelector(`[data-cp-action="unschedule"][data-chore-id="${chore}"]`);
+    if (off) off.click();
+
+    const failed = Object.keys(step).filter(k => !step[k]);
+    return failed.length === 0 || failed;
+  });
+
   // Parent: the meeting commit moves wallet, XP and the loan together, so undo
   // has to reverse all three. A partial reverse would leave credited XP or a
   // loan payment standing against a week that was un-recorded.
