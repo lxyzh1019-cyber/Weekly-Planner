@@ -273,13 +273,92 @@ function findChromium() {
   });
   await page.evaluate(() => setWeekView('full'));
 
-  // Chore matrix row icons
-  await page.evaluate(() => openChoreTab());
+  // ── Redesign phase 2: the kid's chore tab ──
+  // Put a chore on the day the tab will open on, so there is something to answer for.
+  await page.evaluate(() => {
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = activeProfile();
+    const dayKey = mrWeekDayKeys(ctWeekKey)[2];
+    setDayBlocks(dayKey, [...(getDayBlocks(dayKey, kid) || []),
+      { id:'ckchore', actId:'chores', startMin: 17*60, durationMin: 30,
+        choreTags:['Dishes & dishwasher'], checklistState:{} }], kid);
+  });
+  await page.evaluate(() => { openChoreTab(); ckSelectDay(2); });
   await page.waitForTimeout(400);
-  checks.matrixRowIcons = await page.evaluate(() =>
-    !!document.querySelector('.cm-rowicon') &&
-    document.querySelector('.cm-rowicon').textContent.trim().length > 0);
-  await page.screenshot({ path: shot('chore_matrix') });
+
+  // The four frames of the redesign are all on screen.
+  checks.kidTabRenders = await page.evaluate(() =>
+    !!document.querySelector('.ck-tab') && !!document.querySelector('.ck-rail')
+    && document.querySelectorAll('.ck-day').length === 7
+    && !!document.querySelector('.ck-bar'));
+  // A kid's tab carries no grading control anywhere on it.
+  checks.kidTabHasNoGrading = await page.evaluate(() =>
+    !document.querySelector('[data-ct-action="grade-chore"]'));
+  // Layout C: the row is the tap target, and only the tapped row opens.
+  checks.tapOpensOneChoreOnly = await page.evaluate(() => {
+    const row = document.querySelector('[data-ct-action="ck-chore-row"]');
+    if (!row) return false;
+    row.click();
+    return document.querySelectorAll('.ck-chore.open').length === 1
+        && document.querySelectorAll('[data-ct-action="ck-claim"]').length === 3;
+  });
+  await page.screenshot({ path: shot('kid_chore_day') });
+  // Picking a word writes a claim, collapses the row, and moves no money.
+  checks.claimFromTheRow = await page.evaluate(() => {
+    const kid = activeProfile(), wk = ctWeekKey;
+    const before = mrWeekMoney(wk, kid);
+    const btn = document.querySelector('[data-ct-action="ck-claim"][data-quality="3"]');
+    if (!btn) return false;
+    btn.click();
+    return mrGetClaim(kid, wk, 2, 'dishes') === 3
+        && mrWeekMoney(wk, kid) === before
+        && document.querySelectorAll('.ck-chore.open').length === 0
+        && !!document.querySelector('.ck-chore-claimed');
+  });
+  // A graded chore is Mom's answer; the kid's row refuses to reopen it.
+  checks.gradedRowIsClosedToHer = await page.evaluate(() => {
+    const kid = activeProfile(), wk = ctWeekKey;
+    const wasProfile = profile;
+    profile = 'parent'; mrSetChoreGrade(kid, wk, 2, 'dishes', 2); profile = wasProfile;
+    renderChoreTab();
+    document.querySelector('[data-ct-action="ck-chore-row"]').click();
+    const stillShut = document.querySelectorAll('.ck-chore.open').length === 0;
+    profile = 'parent'; mrSetChoreGrade(kid, wk, 2, 'dishes', 0); profile = wasProfile;
+    mrSetClaim(kid, wk, 2, 'dishes', 0);
+    renderChoreTab();
+    return stillShut;
+  });
+  // The week grid is an input, and a day the planner skipped is inert.
+  checks.weekGridClaimsAndGreys = await page.evaluate(() => {
+    ckSetView('week');
+    const cells = document.querySelectorAll('[data-ct-action="ck-week-cell"]');
+    const off = document.querySelectorAll('.ck-cell-off').length;
+    if (!cells.length) return false;
+    cells[0].click();
+    const claimed = mrGetClaim(activeProfile(), ctWeekKey, 2, 'dishes') === 3;
+    mrSetClaim(activeProfile(), ctWeekKey, 2, 'dishes', 0);
+    return claimed && off > 0;
+  });
+  await page.screenshot({ path: shot('kid_chore_week') });
+  // At iPad landscape the earn board sits beside the work, not under it.
+  await page.setViewportSize({ width: 1194, height: 834 });
+  await page.evaluate(() => { ckSetView('day'); });
+  await page.waitForTimeout(300);
+  checks.railSitsBesideAtIpad = await page.evaluate(() => {
+    const main = document.querySelector('.ck-main').getBoundingClientRect();
+    const rail = document.querySelector('.ck-rail').getBoundingClientRect();
+    return rail.left >= main.right - 2 && rail.width > 200;
+  });
+  await page.screenshot({ path: shot('kid_chore_ipad') });
+  await page.setViewportSize({ width: 900, height: 1100 });
+  await page.waitForTimeout(200);
+  // A day with nothing planned says so rather than showing an empty box.
+  checks.emptyDaySaysSo = await page.evaluate(() => {
+    ckSelectDay(4);
+    const txt = document.querySelector('.ck-main').textContent;
+    ckSelectDay(2);
+    return /Nothing on today's plan/.test(txt);
+  });
 
   // Print view: travel/get-ready buffers + time-of-day sideband
   await page.evaluate(() => { goWeek(); openPrint(); });

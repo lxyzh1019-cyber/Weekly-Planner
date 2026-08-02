@@ -534,6 +534,18 @@ function ctHandleWrapClick(e) {
   else if (a === 'add-fine') ctPromptFine();
   else if (a === 'del-fine') ctRemoveFineById(el.dataset.fineId);
   else if (a === 'honesty') ctPromptHonesty();
+  // ── kid tab (js/26-chore-kid.js) ──
+  else if (a === 'ck-view') ckSetView(el.dataset.view);
+  else if (a === 'ck-day') ckSelectDay(+el.dataset.day);
+  else if (a === 'ck-week') ctChangeWeek(+el.dataset.delta);
+  else if (a === 'ck-history') ckToggleHistory();
+  else if (a === 'ck-history-pick') ckPickWeek(el.dataset.week);
+  else if (a === 'ck-chore-row') ckTapChoreRow(el.dataset.choreId);
+  else if (a === 'ck-claim') ckClaim(el.dataset.choreId, +el.dataset.quality);
+  else if (a === 'ck-week-cell') ckCycleWeekClaim(el.dataset.choreId, +el.dataset.day);
+  else if (a === 'ck-routine-item') ckToggleRoutineItem(el.dataset.blockId, el.dataset.itemId);
+  else if (a === 'ck-routine-all') ckCloseRoutine(el.dataset.blockId);
+  else if (a === 'ck-attitude') ckRateSelf(+el.dataset.day, +el.dataset.n);
 }
 
 function ctActiveKid() { return isParent() ? ctParentKid : activeProfile(); }
@@ -1668,18 +1680,15 @@ function renderChoreTab() {
       ${ctRenderMoneyHistory()}
     </div>
   `
-    : `
+    // A kid gets the redesigned tab: one job, and every control on it writes a
+    // claim rather than a payment. Weeks earned under the retired group model
+    // have no chore pool to read, so those fall back to the old board.
+    : (newModel ? ckRenderKidTab(kid) : `
     <div class="chore-grid">
       ${ctRenderWeekControls()}
-      ${household}
-      ${personal}
-      ${learning}
-      ${streak}
-      ${comp}
-      ${boxFines}
       ${ctRenderWeekMatrix(kid)}
       ${ctRenderMoneyCard(kid)}
     </div>
-  `;
+  `);
 }
 
