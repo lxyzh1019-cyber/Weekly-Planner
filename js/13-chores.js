@@ -129,10 +129,42 @@ function ctWeekInfo() {
   }
   return { keys, mon, sun };
 }
+/* A goal used to be one number: total points for the week. The redesign splits
+   it into a routine goal and a money goal, and meeting BOTH is what the +$1 is
+   for. Weeks written before that stay a points goal and keep firing on the old
+   rule — a bonus already banked must not un-bank itself because the shape of a
+   goal changed. */
+function ctNormalizeGoal(g) {
+  if (g == null || g === '') return null;
+  if (typeof g === 'number') return { points: g };
+  if (typeof g === 'object') {
+    if (g.points != null) return { points: Number(g.points) || 0 };
+    const routineDays = g.routineDays == null ? null : Number(g.routineDays) || 0;
+    const money = g.money == null ? null : Number(g.money) || 0;
+    if (routineDays == null && money == null) return null;
+    return { routineDays, money };
+  }
+  const n = Number(g);
+  return Number.isFinite(n) ? { points: n } : null;
+}
+/* One line describing a goal, whichever shape it is. */
+function ctGoalLabel(goal) {
+  const g = ctNormalizeGoal(goal);
+  if (!g) return '';
+  if (g.points != null) return `${g.points} points`;
+  const bits = [];
+  if (g.routineDays != null) bits.push(`${g.routineDays} clean day${g.routineDays === 1 ? '' : 's'}`);
+  if (g.money != null) bits.push(`$${Number(g.money).toFixed(2)}`);
+  return bits.join(' · ');
+}
+function ctGoalPoints(goal) {
+  const g = ctNormalizeGoal(goal);
+  return g && g.points != null ? g.points : null;
+}
 function ctGetWeekGoals(weekKey) {
   ctEnsureShared();
   const g = state.shared.chore.goalsByWeek[weekKey] || {};
-  return { jenn: g.jenn || null, jess: g.jess || null };
+  return { jenn: ctNormalizeGoal(g.jenn), jess: ctNormalizeGoal(g.jess) };
 }
 function ctSetWeekGoals(weekKey, jGoal, kGoal) {
   ctEnsureShared();
@@ -297,13 +329,25 @@ function ctWeekMoney(weekKey, kid) {
   const goalBonus = ctGetGoalBonus(weekKey, kid) ? 1 : 0;
   return Math.min(CT_MONEY_CAP, ctGroupEarned(weekKey, kid) + goalBonus);
 }
+/* Clean routine days this week — the routine half of a goal. */
+function ctRoutineDaysDone(weekKey, kid) {
+  let n = 0;
+  for (let d = 0; d < 7; d++) if (mrStreakDayDone(weekKey, kid, d)) n++;
+  return n;
+}
 function ctMaybeFireGoalBonus(weekKey, kid) {
-  const goals = ctGetWeekGoals(weekKey);
-  const goal = goals[kid];
+  const goal = ctGetWeekGoals(weekKey)[kid];
   if (!goal) return;
   if (ctGetGoalBonus(weekKey, kid)) return;
-  const points = ctMandatoryPoints(weekKey, kid) + ctOptionalPoints(weekKey, kid);
-  if (points >= goal) ctSetGoalBonus(weekKey, kid, true);
+  if (goal.points != null) {   // legacy single-number goal, unchanged
+    const points = ctMandatoryPoints(weekKey, kid) + ctOptionalPoints(weekKey, kid);
+    if (points >= goal.points) ctSetGoalBonus(weekKey, kid, true);
+    return;
+  }
+  // Both halves must land. A half that was never set can't hold the bonus back.
+  const routineOk = goal.routineDays == null || ctRoutineDaysDone(weekKey, kid) >= goal.routineDays;
+  const moneyOk   = goal.money == null || ctWeekMoney(weekKey, kid) >= goal.money;
+  if (routineOk && moneyOk) ctSetGoalBonus(weekKey, kid, true);
 }
 // Fire any newly-completed group payouts for `kid` in `weekKey`.
 // `dayIdx` is the day just mutated (required for daily cadence; pass null to skip daily groups).
@@ -885,7 +929,10 @@ function ctRenderKidSection(kid) {
   const goalReached = ctGetGoalBonus(ctWeekKey, kid);
 
   let html = `<div class="chore-card"><h3>${icon} ${name} — routines</h3><div class="ct-meta">Mandatory: ${mandatory}/21 · Points: ${total}</div>`;
-  if (goal) html += `<div class="ct-meta">Goal ${total}/${goal}${goalReached ? ' · reached +$1' : ''}</div>`;
+  if (goal) {
+    const pts = ctGoalPoints(goal);
+    html += `<div class="ct-meta">Goal ${pts != null ? `${total}/${pts}` : ctGoalLabel(goal)}${goalReached ? ' · reached +$1' : ''}</div>`;
+  }
 
   for (const s of CT_SESSIONS) {
     const checked = ctGetMandatory(ctWeekKey, ctDay, s, kid);
@@ -1224,12 +1271,18 @@ function ctRenderGroupManagerCard() {
 function ctRenderWeekControls() {
   const info = ctWeekInfo();
   const g = ctGetWeekGoals(ctWeekKey);
-  const goalRowJenn = isParent()
-    ? `<input id="ctGoalJenn" class="input" type="number" min="1" max="60" value="${g.jenn || ''}" placeholder="Jenn goal" aria-label="Jenn weekly point goal"/>`
-    : (g.jenn ? `<div class="ct-meta">Jenn goal: ${g.jenn}</div>` : '');
-  const goalRowJess = isParent()
-    ? `<input id="ctGoalJess" class="input" type="number" min="1" max="60" value="${g.jess || ''}" placeholder="Jess goal" aria-label="Jess weekly point goal"/>`
-    : (g.jess ? `<div class="ct-meta">Jess goal: ${g.jess}</div>` : '');
+  // Interim control: it edits the legacy points goal only. A routine/money goal
+  // set elsewhere shows read-only here and is preserved when this box is left
+  // blank (see ctSaveGoalsFromUi) — the full two-part editor lands with the
+  // parent setup screen.
+  const goalRow = (kid, id, label) => {
+    const pts = ctGoalPoints(g[kid]);
+    if (!isParent()) return g[kid] ? `<div class="ct-meta">${label} goal: ${ctGoalLabel(g[kid])}</div>` : '';
+    if (g[kid] && pts == null) return `<div class="ct-meta">${label} goal: ${ctGoalLabel(g[kid])}</div>`;
+    return `<input id="${id}" class="input" type="number" min="1" max="60" value="${pts != null ? pts : ''}" placeholder="${label} goal" aria-label="${label} weekly point goal"/>`;
+  };
+  const goalRowJenn = goalRow('jenn', 'ctGoalJenn', 'Jenn');
+  const goalRowJess = goalRow('jess', 'ctGoalJess', 'Jess');
   const parentControls = isParent() ? `
     <div class="chore-card">
       <h3>Parent controls</h3>
@@ -1286,11 +1339,20 @@ function ctSelectDay(dayIdx) {
   renderChoreTab();
 }
 function ctSaveGoalsFromUi() {
-  const j = parseInt(document.getElementById('ctGoalJenn')?.value || '', 10);
-  const k = parseInt(document.getElementById('ctGoalJess')?.value || '', 10);
+  const cur = ctGetWeekGoals(ctWeekKey);
+  // A missing input means "not editing this kid" — a routine/money goal renders
+  // as text, so blanking it here must not delete a goal this box cannot express.
+  const read = (id, kid) => {
+    const el = document.getElementById(id);
+    if (!el) return cur[kid];
+    const n = parseInt(el.value || '', 10);
+    return Number.isInteger(n) ? n : null;
+  };
+  const j = read('ctGoalJenn', 'jenn');
+  const k = read('ctGoalJess', 'jess');
   // ctSetWeekGoals already clears a bonus when its goal is removed. Do NOT blanket-reset
   // both bonuses — that would strip a bonus a kid already banked when a goal is re-saved.
-  ctSetWeekGoals(ctWeekKey, Number.isInteger(j)?j:null, Number.isInteger(k)?k:null);
+  ctSetWeekGoals(ctWeekKey, j, k);
   ctMaybeFireGoalBonus(ctWeekKey, 'jenn');   // a lowered goal may already be met
   ctMaybeFireGoalBonus(ctWeekKey, 'jess');
   saveAll();

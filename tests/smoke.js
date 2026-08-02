@@ -115,6 +115,128 @@ function findChromium() {
     const ok = mrSetChoreGrade(kid, ctWeekKey, 0, 'dishes', 3);
     return ok === false && mrGetChoreGrade(kid, ctWeekKey, 0, 'dishes') === before;
   });
+  // ── Redesign phase 1: claims, the pool↔planner seam, goal shapes ──
+  // A kid CAN say how a chore went, and saying so moves no money.
+  checks.claimIsNotPayment = await page.evaluate(() => {
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = activeProfile(), wk = ctWeekKey;
+    const before = mrWeekMoney(wk, kid);
+    const ok = mrSetClaim(kid, wk, 0, 'dishes', 3);
+    return ok === true
+        && mrGetClaim(kid, wk, 0, 'dishes') === 3
+        && mrGetChoreGrade(kid, wk, 0, 'dishes') === 0   // still ungraded
+        && mrWeekMoney(wk, kid) === before;              // and still unpaid
+  });
+  // A claim with no grade is what the parent queue is made of; grading clears it.
+  checks.gradingClearsTheQueue = await page.evaluate(() => {
+    const kid = activeProfile(), wk = ctWeekKey;
+    const queued = mrClaimQueue(wk, kid).some(q => q.choreId === 'dishes' && q.dayIdx === 0);
+    const wasParent = profile;
+    profile = 'parent';
+    mrSetChoreGrade(kid, wk, 0, 'dishes', 3);
+    const gone = !mrClaimQueue(wk, kid).some(q => q.choreId === 'dishes' && q.dayIdx === 0);
+    mrSetChoreGrade(kid, wk, 0, 'dishes', 0);            // put it back
+    profile = wasParent;
+    return queued && gone;
+  });
+  // A kid must not answer for her sister's week.
+  checks.kidCannotClaimForSister = await page.evaluate(() => {
+    const other = activeProfile() === 'jenn' ? 'jess' : 'jenn';
+    const before = mrGetClaim(other, ctWeekKey, 0, 'dishes');
+    const ok = mrSetClaim(other, ctWeekKey, 0, 'dishes', 3);
+    return ok === false && mrGetClaim(other, ctWeekKey, 0, 'dishes') === before;
+  });
+  // The planner owns the schedule: a chore is on a day only if a block tags it.
+  checks.plannerOwnsTheSchedule = await page.evaluate(() => {
+    const kid = activeProfile(), wk = ctWeekKey;
+    const keys = mrWeekDayKeys(wk);
+    const has = (d) => mrChoresForDay(kid, wk, d).rows.some(r => r.row.id === 'dishes');
+    const before = getDayBlocks(keys[2], kid).slice();
+    const emptyBefore = !has(2);
+    setDayBlocks(keys[2], [...before,
+      { id:'ct1', actId:'chores', startMin: 17*60, durationMin: 30, choreTags:['Dishes & dishwasher'], checklistState:{} }]);
+    const onWed = has(2), notThu = !has(3);
+    setDayBlocks(keys[2], before);                       // and it leaves with the block
+    return emptyBefore && onWed && notThu && !has(2);
+  });
+  // Legacy name tags still find their pool row; an unknown tag is reported, not dropped.
+  checks.legacyTagsStillResolve = await page.evaluate(() => {
+    const wk = ctWeekKey;
+    const byName = mrPoolRowForTag('Mop', wk);
+    const byId = mrPoolRowForTag('mop', wk);
+    const messy = mrPoolRowForTag('dishes & DISHWASHER', wk);
+    const unknown = mrPoolRowForTag('Polish the cat', wk);
+    return byName && byName.id === 'mop' && byId && byId.id === 'mop'
+        && messy && messy.id === 'dishes' && unknown === null;
+  });
+  checks.unknownTagIsSurfaced = await page.evaluate(() => {
+    const kid = activeProfile(), wk = ctWeekKey;
+    const keys = mrWeekDayKeys(wk);
+    const before = getDayBlocks(keys[1], kid).slice();
+    setDayBlocks(keys[1], [...before,
+      { id:'ct2', actId:'chores', startMin: 17*60, durationMin: 30, choreTags:['Polish the cat'], checklistState:{} }]);
+    const day = mrChoresForDay(kid, wk, 1);
+    const listed = mrUnresolvedTags(wk).some(u => u.tag === 'Polish the cat');
+    setDayBlocks(keys[1], before);
+    return day.unresolved.includes('Polish the cat') && listed;
+  });
+  // Edit the pool as a parent, effective from the week under test (a rule edit
+  // dated today would land AFTER this week's Monday and not apply to it), then
+  // put the pool back so later checks see the seeded rules.
+  const withPool = async (fn) => page.evaluate(({ fnSrc }) => {
+    const wk = ctWeekKey;
+    const original = mrDeepCopy(mrRulesForWeek(wk).chorePool);
+    const wasProfile = profile;
+    const edit = (pool) => {
+      profile = 'parent';
+      mrApplyEdits([{ path: 'chorePool', value: pool }],
+        { reason: 'family_meeting', effectiveFrom: wk });
+      profile = wasProfile;
+    };
+    try { return (0, eval)('(' + fnSrc + ')')({ wk, original, edit, mrDeepCopy }); }
+    finally { edit(original); }
+  }, { fnSrc: fn.toString() });
+
+  // A `who`-scoped row belongs to one kid even on a block they both see.
+  checks.whoScopesAPoolRow = await withPool(({ wk, original, edit, mrDeepCopy }) => {
+    const keys = mrWeekDayKeys(wk);
+    const jb = getDayBlocks(keys[4], 'jenn').slice(), kb = getDayBlocks(keys[4], 'jess').slice();
+    const block = { id:'ct3', actId:'chores', startMin: 17*60, durationMin: 30, choreTags:['bins'], checklistState:{} };
+    setDayBlocks(keys[4], [...jb, block], 'jenn');
+    setDayBlocks(keys[4], [...kb, { ...block, id:'ct4' }], 'jess');
+    edit(mrDeepCopy(original).map(r => r.id === 'bins' ? { ...r, who: 'jenn' } : r));
+    const j = mrChoresForDay('jenn', wk, 4).rows.some(r => r.row.id === 'bins');
+    const k = mrChoresForDay('jess', wk, 4).rows.some(r => r.row.id === 'bins');
+    setDayBlocks(keys[4], jb, 'jenn'); setDayBlocks(keys[4], kb, 'jess');
+    return j === true && k === false;
+  });
+  // Standing responsibilities need no block at all.
+  checks.standingLanesNeedNoBlock = await withPool(({ wk, original, edit, mrDeepCopy }) => {
+    edit([...mrDeepCopy(original),
+      { id:'water', label:'Water the plants', lane:'helping', who:'both', due:'18:00' }]);
+    const row = mrChoresForDay('jenn', wk, 6).rows.find(r => r.row.id === 'water');
+    return !!row && row.scheduled === false && row.row.lane === 'helping';
+  });
+  // A goal written as a bare number still fires the +$1 on the old rule.
+  checks.legacyGoalStillFires = await page.evaluate(() => {
+    const kid = activeProfile(), wk = ctWeekKey;
+    ctSetWeekGoals(wk, 1, null);                          // 1 point is reachable
+    const g = ctGetWeekGoals(wk).jenn || ctGetWeekGoals(wk)[kid];
+    const shape = !!g && g.points === 1;
+    ctSetMandatory(wk, 0, 'Morning', kid, true);
+    ctMaybeFireGoalBonus(wk, kid);
+    const fired = ctGetGoalBonus(wk, kid);
+    ctSetMandatory(wk, 0, 'Morning', kid, false);
+    ctSetGoalBonus(wk, kid, false);
+    ctSetWeekGoals(wk, null, null);
+    return shape && fired === true;
+  });
+  // Due times are real clock times, and bedtime is a wall.
+  checks.dueTimesRespectBedtime = await page.evaluate(() =>
+    mrDueIsValid('19:30') && mrDueIsValid('7:30pm') && mrDueIsValid('20:30')
+    && !mrDueIsValid('21:00') && !mrDueIsValid('9:00pm') && !mrDueIsValid('teatime')
+    && mrFormatClock(mrParseClock('19:30')) === '7:30pm');
+
   // Kids must not be able to record their own results, fines or honesty strikes.
   checks.kidCannotSelfReport = await page.evaluate(() => {
     const kid = activeProfile();
