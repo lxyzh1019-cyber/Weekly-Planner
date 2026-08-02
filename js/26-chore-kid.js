@@ -25,7 +25,14 @@ const CK_QUALITY = [
 function ckGradePay(rules, g) {
   return Number(((rules.chores || {}).grade || {})[g]) || 0;
 }
-function ckMoney(n) { return '$' + Number(n || 0).toFixed(Number(n) % 1 ? 2 : 0); }
+/* Whole dollars read as "$3", parts as "$2.50". Non-finite input is floored to
+   zero rather than rendered: "$NaN" on a kid's earnings is worse than a wrong
+   zero, and it is always a bug upstream that this must not hide behind. */
+function ckMoney(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return '$0';
+  return '$' + v.toFixed(v % 1 ? 2 : 0);
+}
 
 /* The activity behind a block. The day view resolves this with a local closure
    over getAllActivities(); this is the same lookup, reachable from here. */

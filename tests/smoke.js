@@ -463,6 +463,92 @@ function findChromium() {
     showScreen('parent');
   });
 
+  // ── Redesign phase 4: the eight-week read ──
+  // Seed earlier weeks so the chart is drawn against real bars and lines. An
+  // empty chart proves only that nothing threw.
+  await page.evaluate(() => {
+    const cur = ctMondayOf(formatDayKey(ctWeekKey));
+    // Weeks before moneyModelStartWeek resolve through the RETIRED model and
+    // correctly show nothing here. Walk the start back so this window is all
+    // new-model weeks — i.e. a family two months into the current rules.
+    const back = new Date(cur); back.setDate(cur.getDate() - 8 * 7);
+    ctEnsureShared();
+    state.shared.chore.moneyModelStartWeek = ctDateToKey(back);
+    for (let i = 1; i < 8; i++) {
+      const d = new Date(cur); d.setDate(cur.getDate() - i * 7);
+      const wk = ctDateToKey(d);
+      ['jenn', 'jess'].forEach((kid, ki) => {
+        const n = 2 + ((i + ki) % 4);
+        for (let j = 0; j < n; j++) {
+          mrSetChoreGrade(kid, wk, j % 7, ['dishes','mop','vacuum','laundry'][j % 4], 3 - (j % 3));
+        }
+        mrSetLearning(kid, wk, 1, 'math', 3 + (i % 3));
+      });
+    }
+  });
+  await page.evaluate(() => { setParentTab('trends'); ctrRenderTrends(); });
+  await page.waitForTimeout(300);
+  checks.trendsRenders = await page.evaluate(() => {
+    const p = document.getElementById('ptab-trends');
+    return !!p && p.hidden === false && document.querySelectorAll('.ctr-svg').length === 2
+        && document.querySelectorAll('.ctr-card').length === 2
+        && !!document.querySelector('.ctr-heat-cell');
+  });
+  // Two panels, two scales — never one plot with two y-axes.
+  checks.noDualAxis = await page.evaluate(() => {
+    const svgs = [...document.querySelectorAll('.ctr-svg')];
+    const bars = svgs[0].querySelectorAll('rect').length;
+    const lines = svgs[1].querySelectorAll('polyline').length;
+    // The bar panel carries no polylines and the line panel carries no bars.
+    return svgs[0].querySelectorAll('polyline').length === 0
+        && svgs[1].querySelectorAll('rect').length === 0
+        && lines === 2 && bars >= 0;
+  });
+  // Identity is never colour-alone: a legend is present and cells carry numbers.
+  checks.trendsIdentityNotColourAlone = await page.evaluate(() =>
+    document.querySelectorAll('.ctr-legend-item').length === 2
+    && [...document.querySelectorAll('.ctr-heat-cell')].every(c => c.textContent.trim().length > 0));
+  // The window pages back, and cannot page past now.
+  checks.trendsPagingIsBounded = await page.evaluate(() => {
+    const title = () => document.querySelector('#ptab-trends .cp-title').textContent;
+    const first = title();
+    document.querySelector('[data-ctr-action="page"][data-delta="1"]').click();
+    const moved = title() !== first;
+    document.querySelector('[data-ctr-action="page"][data-delta="-1"]').click();
+    const back = title() === first;
+    const atNow = document.querySelector('[data-ctr-action="page"][data-delta="-1"]').disabled;
+    return moved && back && atNow;
+  });
+  // A settled week is read from its frozen ledger, not recomputed.
+  checks.trendsPrefersTheFrozenLedger = await page.evaluate(() => {
+    ctEnsureShared();
+    const wk = ctrWeeks()[0].key;
+    const led = state.shared.chore.moneyLedger || (state.shared.chore.moneyLedger = {});
+    led[wk] = Object.assign({}, led[wk], { jenn: { net: 42, chores: 40, fines: 0, xp: 7 } });
+    const r = ctrRow(wk, 'jenn');
+    delete led[wk].jenn;
+    return r.frozen === true && r.total === 42 && r.xp === 7;
+  });
+  // No surface in the portal may print NaN, Infinity or [object Object] — those
+  // are always a bug upstream, and money is the worst place to discover one.
+  checks.portalPrintsNoBrokenNumbers = await page.evaluate(() => {
+    const bad = [];
+    ['chores', 'trends'].forEach(tab => {
+      setParentTab(tab);
+      if (tab === 'chores') cpRenderChoreTab(); else ctrRenderTrends();
+      const t = document.getElementById('ptab-' + tab).textContent;
+      if (/NaN|Infinity|\[object /.test(t)) bad.push(tab);
+    });
+    setParentTab('trends'); ctrRenderTrends();
+    return bad.length === 0 || bad;
+  });
+  // The read must not call a week still being lived a downturn.
+  checks.readIgnoresTheUnfinishedWeek = await page.evaluate(() => {
+    const t = document.querySelector('#ptab-trends .cp-sect:last-child').textContent;
+    return /still being lived/.test(t) && !/^\s*$/.test(t);
+  });
+  await page.screenshot({ path: shot('parent_trends') });
+
   // Parent: the meeting commit moves wallet, XP and the loan together, so undo
   // has to reverse all three. A partial reverse would leave credited XP or a
   // loan payment standing against a week that was un-recorded.

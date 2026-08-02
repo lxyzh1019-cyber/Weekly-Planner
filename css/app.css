@@ -5020,3 +5020,48 @@
     background: var(--paper); font-size: 0.68rem; font-weight: 900;
     display: flex; align-items: center; justify-content: center;
   }
+
+  /* ═══════════════════════════════════════════════════════════════
+     TRENDS TAB (redesign 2a — "Trends" frame, js/28-chore-trends.js)
+     Series colours live in JS (they are data, not decoration) and were
+     validated with the dataviz palette checker. Chrome is recessive: solid
+     hairline grid one shade off the paper, thin marks, no dashed rules.
+  ═══════════════════════════════════════════════════════════════ */
+  .ctr-tab { display: flex; flex-direction: column; gap: 0.7rem; }
+  .ctr-head {
+    display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+    background: var(--bg2); border: 2px solid var(--ink); border-radius: 16px; padding: 0.6rem 0.75rem;
+  }
+  .ctr-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+  @media (max-width: 820px) { .ctr-cards { grid-template-columns: 1fr; } }
+  .ctr-card { border: 2px solid var(--ink); border-radius: 15px; background: var(--paper); overflow: hidden; }
+  .ctr-card-head { display: flex; align-items: center; gap: 0.45rem; padding: 0.45rem 0.65rem; border-bottom: 2px solid var(--ink); }
+  .ctr-card-icon { font-size: 1.1rem; }
+  .ctr-card-name { font-family: 'Patrick Hand', sans-serif; font-size: 1.05rem; font-weight: 700; }
+  .ctr-card-xp { font-size: 0.72rem; font-weight: 800; }
+  .ctr-card-body { padding: 0.55rem 0.65rem 0.7rem; }
+  .ctr-tiles { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+  .ctr-tile { flex: 1; min-width: 68px; border: 1.5px solid #d9cfb4; border-radius: 10px; background: #fff9ee; padding: 0.3rem 0.45rem; }
+  .ctr-tile-cap { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; color: #8a7f6d; }
+  .ctr-tile-v { font-size: 0.9rem; font-weight: 800; }
+  .ctr-goalbar { height: 13px; border: 2px solid var(--ink); border-radius: 99px; overflow: hidden; background: #f0e8d5; }
+  .ctr-goalfill { height: 100%; background: #48a271; }
+
+  .ctr-svg { display: block; width: 100%; height: auto; margin-top: 0.3rem; }
+  .ctr-tick, .ctr-xlab, .ctr-xlab2 { font-family: 'Nunito', sans-serif; font-size: 10px; font-weight: 700; fill: var(--ink-light); }
+  .ctr-endlab { font-family: 'Nunito', sans-serif; font-size: 11px; font-weight: 800; fill: var(--ink); }
+  .ctr-legend { display: flex; gap: 0.9rem; flex-wrap: wrap; }
+  .ctr-legend-item { display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; font-weight: 700; color: var(--ink-light); }
+  .ctr-swatch { width: 12px; height: 12px; border: 1.5px solid var(--ink); border-radius: 3px; }
+
+  .ctr-heat { min-width: 620px; display: flex; flex-direction: column; gap: 3px; }
+  .ctr-heat-row { display: grid; grid-template-columns: 150px repeat(8, minmax(40px, 1fr)); gap: 3px; align-items: center; }
+  .ctr-heat-head { margin-bottom: 0.15rem; }
+  .ctr-heat-label { font-size: 0.75rem; font-weight: 800; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .ctr-heat-cell {
+    height: 28px; display: flex; align-items: center; justify-content: center;
+    border: 1.5px solid var(--ink); border-radius: 6px; font-size: 0.7rem; font-weight: 800;
+  }
+  .ctr-xlab2 { text-align: center; font-size: 0.62rem; font-weight: 800; color: var(--ink-light); }
+  .ctr-read-line { font-size: 0.85rem; font-weight: 700; line-height: 1.55; }
+  .ctr-read-line + .ctr-read-line { margin-top: 0.3rem; }

@@ -482,6 +482,7 @@
     <div class="parent-tabs" role="tablist" aria-label="Parent sections">
       <button class="parent-tab active" role="tab" data-ptab="review" onclick="setParentTab('review')">🗓️ Weekly Review</button>
       <button class="parent-tab" role="tab" data-ptab="chores" onclick="setParentTab('chores')">🧹 Chores</button>
+      <button class="parent-tab" role="tab" data-ptab="trends" onclick="setParentTab('trends')">📈 Trends</button>
       <button class="parent-tab" role="tab" data-ptab="analysis" onclick="setParentTab('analysis')">📊 Performance</button>
       <button class="parent-tab" role="tab" data-ptab="routines" onclick="setParentTab('routines')">🌅 Routines</button>
       <button class="parent-tab" role="tab" data-ptab="tasks" onclick="setParentTab('tasks')">✅ Tasks</button>
@@ -519,6 +520,11 @@
        it, put work on a day. It settles nothing: the meeting does that. -->
   <div class="parent-panel" id="ptab-chores" role="tabpanel" hidden>
     <div class="chore-wrap" id="cpWrap" onclick="cpHandleClick(event);cpHandleCtClick(event)"></div>
+  </div>
+
+  <!-- TAB: Trends — the eight-week read of what the chore system actually paid. -->
+  <div class="parent-panel" id="ptab-trends" role="tabpanel" hidden>
+    <div class="chore-wrap" id="ctrWrap" onclick="ctrHandleClick(event)"></div>
   </div>
 
   <!-- TAB: Performance — Function 2: analyse PAST weeks. Read-only:
@@ -1272,6 +1278,7 @@
 <script src="js/25-money-school.js"></script>
 <script src="js/26-chore-kid.js"></script>
 <script src="js/27-chore-parent.js"></script>
+<script src="js/28-chore-trends.js"></script>
 <script src="js/99-main.js"></script>
 </body>
 </html>

@@ -18,6 +18,7 @@ function renderParentHome() {
   renderLevelRules();
   mnyRenderRulesTab();
   cpRenderChoreTab();
+  ctrRenderTrends();
 }
 
 function setParentTab(tab) {
