@@ -17,6 +17,7 @@ function renderParentHome() {
   renderPendingApproval();
   renderLevelRules();
   mnyRenderRulesTab();
+  cpRenderChoreTab();
 }
 
 function setParentTab(tab) {
@@ -78,9 +79,10 @@ function openFamilyMeetingAt(step, day) {
   mmSelectedDay = day == null ? null : day;
   renderMeetingMode();
 }
+/* The chore setup a parent used to reach through the kid-shaped chore tab now
+   lives in the portal, next to the queue that needs it. */
 function parentOpenChoreReview() {
-  profile = 'parent';
-  openChoreTab();
+  setParentTab('chores');
 }
 
 /* Feedback from the kid: the moods/vibes they logged each day this week,

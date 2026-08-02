@@ -127,6 +127,8 @@ function findChromium() {
         && mrGetChoreGrade(kid, wk, 0, 'dishes') === 0   // still ungraded
         && mrWeekMoney(wk, kid) === before;              // and still unpaid
   });
+  // Every check from here leaves the week as it found it, so a later one can
+  // assert on the queue being empty and mean it.
   // A claim with no grade is what the parent queue is made of; grading clears it.
   checks.gradingClearsTheQueue = await page.evaluate(() => {
     const kid = activeProfile(), wk = ctWeekKey;
@@ -137,6 +139,7 @@ function findChromium() {
     const gone = !mrClaimQueue(wk, kid).some(q => q.choreId === 'dishes' && q.dayIdx === 0);
     mrSetChoreGrade(kid, wk, 0, 'dishes', 0);            // put it back
     profile = wasParent;
+    mrSetClaim(kid, wk, 0, 'dishes', 0);                 // and clear the claim
     return queued && gone;
   });
   // A kid must not answer for her sister's week.
@@ -380,6 +383,84 @@ function findChromium() {
     mergeRemoteState({ profiles: { jenn: { weeks: {
       [keys[1]]: [{ id:'ghost', actId:'piano', startMin:960, durationMin:60, seriesId:sid }] } } } });
     return countSeriesBlocks(sid) === 0;
+  });
+
+  // ── Redesign phase 3: the parent's chore tab, in the portal ──
+  await page.evaluate(() => {
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    // Something claimed and ungraded, so the queue has work in it.
+    mrSetClaim('jenn', ctWeekKey, 2, 'dishes', 3);
+    showScreen('parent'); renderParentHome(); setParentTab('chores');
+    cpDay = 2; cpRenderChoreTab();
+  });
+  await page.waitForTimeout(300);
+  checks.parentChoreTabRenders = await page.evaluate(() => {
+    const panel = document.getElementById('ptab-chores');
+    return !!panel && panel.hidden === false && !!document.querySelector('.cp-tab')
+        && !!document.querySelector('[data-cp-action="settle"]');
+  });
+  // The queue shows her claim, ringed on the grade the claim matches.
+  checks.queueShowsTheClaim = await page.evaluate(() => {
+    const ringed = document.querySelector('.cp-gbtn.agrees');
+    return !!ringed && /waiting on you/i.test(document.querySelector('.cp-tab').textContent);
+  });
+  await page.screenshot({ path: shot('parent_chore_day') });
+  // Grading from the queue records the grade and clears the row out of it.
+  // It does NOT necessarily pay: her first two chores of the week are free, so
+  // asserting money moved on chore one would be asserting the wrong rule.
+  checks.gradeFromQueueClearsIt = await page.evaluate(() => {
+    const btn = document.querySelector('[data-cp-action="grade"][data-chore-id="dishes"][data-day="2"][data-grade="3"]');
+    if (!btn) return false;
+    btn.click();
+    return mrGetChoreGrade('jenn', ctWeekKey, 2, 'dishes') === 3
+        && !mrClaimQueue(ctWeekKey, 'jenn').some(q => q.choreId === 'dishes' && q.dayIdx === 2);
+  });
+  // Past the free two, a grade does move the week's money.
+  checks.gradingPastTheFreeTwoPays = await page.evaluate(() => {
+    const wk = ctWeekKey;
+    mrSetChoreGrade('jenn', wk, 0, 'mop', 3);
+    mrSetChoreGrade('jenn', wk, 0, 'vacuum', 3);
+    const before = mrWeekMoney(wk, 'jenn');
+    mrSetChoreGrade('jenn', wk, 1, 'laundry', 3);
+    const after = mrWeekMoney(wk, 'jenn');
+    ['mop', 'vacuum'].forEach(id => mrSetChoreGrade('jenn', wk, 0, id, 0));
+    mrSetChoreGrade('jenn', wk, 1, 'laundry', 0);
+    return after > before;
+  });
+  // Settle opens the meeting rather than recording anything here.
+  checks.settleOnlyOpensTheMeeting = await page.evaluate(() => {
+    const before = JSON.stringify(state.shared.chore.finalizedWeeks || {});
+    document.querySelector('[data-cp-action="settle"]').click();
+    const opened = document.getElementById('familyMeetingOverlay').classList.contains('open');
+    closeSheet('familyMeetingOverlay');
+    return opened && JSON.stringify(state.shared.chore.finalizedWeeks || {}) === before;
+  });
+  // The planner panel schedules a chore onto the day, and takes it off again.
+  checks.parentSchedulesFromTheTab = await page.evaluate(() => {
+    setParentTab('chores'); cpDay = 3; cpRenderChoreTab();
+    const has = () => mrChoresForDay('jenn', ctWeekKey, 3).rows.some(r => r.row.id === 'mop');
+    const wasOff = !has();
+    document.querySelector('[data-cp-action="schedule"][data-chore-id="mop"]').click();
+    const nowOn = has();
+    document.querySelector('[data-cp-action="unschedule"][data-chore-id="mop"]').click();
+    return wasOff && nowOn && !has();
+  });
+  // The dual grid shows both girls on one row, and greys days nobody planned.
+  checks.dualGridStripesBothKids = await page.evaluate(() => {
+    cpView = 'week'; cpRenderChoreTab();
+    const pairs = document.querySelectorAll('.cp-cellpair');
+    const off = document.querySelectorAll('.cp-stripe.off').length;
+    const ok = pairs.length > 0 && pairs[0].children.length === 2 && off > 0
+      && !!document.querySelector('.cp-payout');
+    cpView = 'day'; cpRenderChoreTab();
+    return ok;
+  });
+  await page.evaluate(() => { cpView = 'week'; cpRenderChoreTab(); });
+  await page.screenshot({ path: shot('parent_chore_week') });
+  await page.evaluate(() => {
+    cpView = 'day'; mrSetChoreGrade('jenn', ctWeekKey, 2, 'dishes', 0);
+    showScreen('parent');
   });
 
   // Parent: the meeting commit moves wallet, XP and the loan together, so undo
