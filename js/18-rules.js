@@ -27,20 +27,34 @@
      PERSONAL chore   — mandatory, unpaid; XP only when done unasked.
    Every household chore is meant to be roughly equivalent effort, so the kid
    picking her two free ones each week has no clever move available. */
+/* A pool row says what a chore IS — its name, which lane it belongs to, when in
+   the day it's due, and who it's for. It deliberately does NOT say which day it
+   happens: that is the weekly planner's job, and a chore reaches a kid's day
+   only because a House-Chore block there tags it. Keeping the two apart is what
+   lets the week grid grey out a day and mean it — a chore can't be judged on a
+   day it was never planned for. */
 const MR_HOUSEHOLD_CHORES = [
-  { id: 'dishes',   label: 'Dishes & dishwasher',   deadline: 'before you leave the kitchen' },
-  { id: 'mop',      label: 'Mop',                   deadline: 'before dinner' },
-  { id: 'vacuum',   label: 'Vacuum',                deadline: 'before dinner' },
-  { id: 'laundry',  label: 'Laundry',               deadline: 'before bed' },
-  { id: 'sorting',  label: 'Sorting clothes',       deadline: 'before bed' },
-  { id: 'bins',     label: 'Bins out',              deadline: 'before dinner' },
-  { id: 'table',    label: 'Set & clear the table', deadline: 'before dinner' },
+  { id: 'dishes',   icon: '🍴', label: 'Dishes & dishwasher',   deadline: 'before you leave the kitchen', due: '19:30', who: 'both', lane: 'chores' },
+  { id: 'mop',      icon: '🧽', label: 'Mop',                   deadline: 'before dinner',                due: '17:30', who: 'both', lane: 'chores' },
+  { id: 'vacuum',   icon: '🌀', label: 'Vacuum',                deadline: 'before dinner',                due: '17:30', who: 'both', lane: 'chores' },
+  { id: 'laundry',  icon: '🧺', label: 'Laundry',               deadline: 'before bed',                   due: '20:00', who: 'both', lane: 'chores' },
+  { id: 'sorting',  icon: '👕', label: 'Sorting clothes',       deadline: 'before bed',                   due: '20:00', who: 'both', lane: 'chores' },
+  { id: 'bins',     icon: '🗑️', label: 'Bins out',              deadline: 'before dinner',                due: '17:30', who: 'both', lane: 'chores' },
+  { id: 'table',    icon: '🍽️', label: 'Set & clear the table', deadline: 'before dinner',                due: '17:30', who: 'both', lane: 'chores' },
 ];
+/* Only `chores` is checked and paid. The other two are day-scoped standing
+   responsibilities that earn XP — they need no planner block to appear. */
+const MR_LANES = [
+  { id: 'chores',  label: 'Chores',          paid: true,  needsBlock: true  },
+  { id: 'own',     label: 'Your own things', paid: false, needsBlock: false },
+  { id: 'helping', label: 'Helping out',     paid: false, needsBlock: false },
+];
+const MR_BEDTIME_MIN = 20 * 60 + 30;   // 8:30pm — nothing can be due after it
 const MR_PERSONAL_CHORES = [
-  { id: 'bed',      label: 'Make your bed' },
-  { id: 'room',     label: 'Tidy your room' },
-  { id: 'schoolbag',label: 'Pack your school bag' },
-  { id: 'gear',     label: 'Pack your sports gear' },
+  { id: 'bed',      icon: '🛏️', label: 'Make your bed' },
+  { id: 'room',     icon: '🧸', label: 'Tidy your room' },
+  { id: 'schoolbag',icon: '🎒', label: 'Pack your school bag' },
+  { id: 'gear',     icon: '🥋', label: 'Pack your sports gear' },
 ];
 
 /* The seed template. Every value is a starting point reviewed each quarter —
@@ -124,6 +138,27 @@ const MR_DEFAULT_RULES = {
       { id: 'helped_sister',  label: "Helping with something that isn't yours", xp: 15 },
       { id: 'streak_7',       label: 'Full 7-day routine streak', xp: 50 },
       { id: 'personal_best',  label: 'Personal best at a competition', xp: 50 },
+      // Attitude at training is XP only, never money — how you turn up isn't
+      // something to be paid for, but it is something worth counting.
+      { id: 'training_attitude', label: 'Turning up well at training', xp: 10 },
+    ],
+    /* A name for where she is, so a level number means something out loud.
+       Highest tier whose `level` she has reached. */
+    tiers: [
+      { level: 1,  name: 'Starter' },
+      { level: 3,  name: 'Steady' },
+      { level: 5,  name: 'Reliable' },
+      { level: 8,  name: 'Trusted' },
+      { level: 12, name: 'Captain' },
+    ],
+    /* What XP buys. Deliberately never money — these are things a grown-up
+       grants, which is the whole point of a second currency. */
+    privileges: [
+      { id: 'bedtime',  label: 'Pick Friday bedtime — half an hour later', levelReq: 2 },
+      { id: 'music',    label: 'Choose the music in the car',              levelReq: 3 },
+      { id: 'seat',     label: 'Front seat for a week',                    levelReq: 5 },
+      { id: 'friend',   label: 'A friend over on a school night',          levelReq: 8 },
+      { id: 'dayout',   label: 'Pick where we go on a Saturday',           levelReq: 12 },
     ],
   },
 
@@ -386,6 +421,12 @@ function mrEnsureEarnings(kid, weekKey) {
   if (!p.earnings[weekKey]) p.earnings[weekKey] = {};
   const e = p.earnings[weekKey];
   if (!e.chores) e.chores = {};       // {[dayIdx]: {[choreId]: grade 1..3}}
+  /* What SHE says happened, kept strictly apart from what Mom graded. A claim
+     never touches money — mrChoreWeek reads `chores` and nothing else. The two
+     living in separate maps is what lets one week cell carry both answers
+     without either being mistaken for the other. */
+  if (!e.claims) e.claims = {};       // {[dayIdx]: {[choreId]: quality 1..3}}
+  if (!e.attitude) e.attitude = {};   // {[dayIdx]: {self:1..5, parent:1..5}} — XP only
   if (!e.personal) e.personal = {};   // {[dayIdx]: {[choreId]: 'done'|'unasked'}}
   if (!e.learning) e.learning = {};   // filled in by a later step
   if (!e.sick) e.sick = {};           // {[dayIdx]: true} — pauses everything
@@ -435,6 +476,222 @@ function mrCyclePersonal(kid, weekKey, dayIdx, choreId) {
   saveAll();
   return next;
 }
+/* ── THE CHORE POOL: what a chore is ───────────────────────────────
+   Rows are read through mrNormalizePoolRow so a row stored before the lane /
+   due / who fields existed still resolves. Nothing here knows about days. */
+function mrNormalizePoolRow(row) {
+  if (!row) return null;
+  const lane = MR_LANES.some(l => l.id === row.lane) ? row.lane : 'chores';
+  const who = (row.who === 'jenn' || row.who === 'jess') ? row.who : 'both';
+  return { id: row.id, label: row.label || row.id, lane, who,
+           icon: row.icon || (lane === 'chores' ? '🧺' : '⭐'),
+           due: row.due || null, deadline: row.deadline || '' };
+}
+function mrPoolRows(weekKey) {
+  return ((mrRulesForWeek(weekKey) || {}).chorePool || []).map(mrNormalizePoolRow).filter(Boolean);
+}
+function mrPoolRow(id, weekKey) {
+  return mrPoolRows(weekKey).find(r => r.id === id) || null;
+}
+function mrLane(id) { return MR_LANES.find(l => l.id === id) || MR_LANES[0]; }
+function mrLanePays(id) { return !!mrLane(id).paid; }
+
+/* ── Clock times ──
+   A due time is a real time of day, and bedtime is a wall the rules put there:
+   nothing can be due after 8:30pm, because a chore due after bedtime is a chore
+   she is set up to fail. */
+function mrParseClock(s) {
+  const t = String(s == null ? '' : s).trim().toLowerCase();
+  if (!t) return null;
+  const m = t.match(/^(\d{1,2})[:.]?(\d{2})?\s*(am|pm)?$/);
+  if (!m) return null;
+  let h = parseInt(m[1], 10);
+  const min = m[2] ? parseInt(m[2], 10) : 0;
+  if (!(h >= 0 && h <= 23) || !(min >= 0 && min <= 59)) return null;
+  if (m[3] === 'pm' && h < 12) h += 12;
+  if (m[3] === 'am' && h === 12) h = 0;
+  if (h > 23) return null;
+  return h * 60 + min;
+}
+function mrFormatClock(mins) {
+  if (mins == null) return '';
+  const h24 = Math.floor(mins / 60), m = mins % 60;
+  const ap = h24 >= 12 ? 'pm' : 'am';
+  const h = h24 % 12 === 0 ? 12 : h24 % 12;
+  return m ? `${h}:${String(m).padStart(2, '0')}${ap}` : `${h}${ap}`;
+}
+function mrDueMinutes(row) { return row ? mrParseClock(row.due) : null; }
+/* What to print. A real clock time wins; the prose deadline is the fallback so
+   rows written before due times existed still read as something. */
+function mrDueLabel(row) {
+  const mins = mrDueMinutes(row);
+  if (mins != null) return mrFormatClock(mins);
+  return (row && row.deadline) || '—';
+}
+function mrDueIsValid(s) {
+  const mins = mrParseClock(s);
+  return mins != null && mins <= MR_BEDTIME_MIN;
+}
+
+/* ── THE PLANNER SEAM: which day a chore is on ─────────────────────
+   Planner blocks tag chores by NAME (`choreTags: ['Mop']`) while the pool is
+   keyed by id ('mop') — two vocabularies for one thing, harmless until the
+   planner became the only way a chore reaches a day. Resolve by id first, then
+   by folded label, so every tag written before this still lands on its row. */
+function mrFoldName(s) {
+  return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+function mrPoolRowForTag(tag, weekKey) {
+  const rows = mrPoolRows(weekKey);
+  const raw = String(tag == null ? '' : tag).trim();
+  if (!raw) return null;
+  const byId = rows.find(r => r.id === raw);
+  if (byId) return byId;
+  const folded = mrFoldName(raw);
+  return rows.find(r => mrFoldName(r.id) === folded)
+      || rows.find(r => mrFoldName(r.label) === folded)
+      || null;
+}
+/* Every chore tag the planner put on this kid's day, in block order. */
+function mrChoreTagsForDay(kid, weekKey, dayIdx) {
+  const keys = (typeof mrWeekDayKeys === 'function') ? mrWeekDayKeys(weekKey) : [];
+  const dayKey = keys[dayIdx];
+  if (!dayKey) return [];
+  const out = [];
+  (getDayBlocks(dayKey, kid) || []).forEach(b => {
+    if (b.actId !== 'chores') return;
+    const tags = (Array.isArray(b.choreTags) && b.choreTags.length)
+      ? b.choreTags
+      : (b.choreTag ? [b.choreTag] : []);
+    tags.filter(Boolean).forEach(t => out.push({ tag: t, blockId: b.id }));
+  });
+  return out;
+}
+/* THE reader every chore surface uses.
+
+   `chores`-lane rows appear only where the planner scheduled them. `own` and
+   `helping` rows are standing responsibilities — they need no block and show
+   every day, which is how personal chores have always behaved.
+
+   Unresolvable tags are returned rather than dropped: a tag pointing at no pool
+   row is a real setup mistake, and silently hiding it would leave a kid doing
+   work the app never counts. */
+function mrChoresForDay(kid, weekKey, dayIdx) {
+  const forKid = r => r.who === 'both' || r.who === kid;
+  const rows = [], unresolved = [], seen = new Set();
+  mrChoreTagsForDay(kid, weekKey, dayIdx).forEach(({ tag, blockId }) => {
+    const row = mrPoolRowForTag(tag, weekKey);
+    if (!row) { if (!unresolved.includes(tag)) unresolved.push(tag); return; }
+    if (!forKid(row) || seen.has(row.id)) return;
+    seen.add(row.id);
+    rows.push({ row, tag, blockId, scheduled: true });
+  });
+  mrPoolRows(weekKey).forEach(row => {
+    if (mrLane(row.lane).needsBlock || seen.has(row.id) || !forKid(row)) return;
+    seen.add(row.id);
+    rows.push({ row, tag: row.id, blockId: null, scheduled: false });
+  });
+  rows.sort((a, b) => {
+    const da = mrDueMinutes(a.row), db = mrDueMinutes(b.row);
+    if (da != null && db != null && da !== db) return da - db;
+    if ((da == null) !== (db == null)) return da == null ? 1 : -1;
+    return a.row.label < b.row.label ? -1 : a.row.label > b.row.label ? 1 : 0;
+  });
+  return { rows, unresolved };
+}
+/* Every planner tag this week that lands on no pool row — surfaced in the
+   parent's setup screen so it can be fixed rather than quietly costing money. */
+function mrUnresolvedTags(weekKey) {
+  const out = [];
+  ['jenn', 'jess'].forEach(kid => {
+    for (let d = 0; d < 7; d++) {
+      mrChoresForDay(kid, weekKey, d).unresolved.forEach(t => {
+        if (!out.some(x => x.tag === t && x.kid === kid)) out.push({ tag: t, kid, dayIdx: d });
+      });
+    }
+  });
+  return out;
+}
+
+/* ── CLAIMS: what she says happened ────────────────────────────────
+   A claim is an answer, not a payment. It rings the cell; only a grade fills
+   it. Mom can agree, change it, or leave it — and until she does, the chore
+   sits in her queue. */
+function mrGetClaim(kid, weekKey, dayIdx, choreId) {
+  const e = mrEnsureEarnings(kid, weekKey);
+  return Number((e.claims[String(dayIdx)] || {})[choreId]) || 0;
+}
+function mrSetClaim(kid, weekKey, dayIdx, choreId, quality) {
+  // A kid may only ever answer for her own week. Parents claim on her behalf
+  // (she told them at the door), which is why this isn't parent-only.
+  if (!isParent() && kid !== activeProfile()) {
+    showToast('That’s not your week 🔒');
+    return false;
+  }
+  const e = mrEnsureEarnings(kid, weekKey);
+  const d = String(dayIdx);
+  if (!e.claims[d]) e.claims[d] = {};
+  const q = Math.max(0, Math.min(3, Number(quality) || 0));
+  if (q === 0) delete e.claims[d][choreId]; else e.claims[d][choreId] = q;
+  mrStampEarnings(kid, weekKey);
+  saveAll();
+  return true;
+}
+/* Claimed but not yet graded — the parent's "waiting on you" list. Ordered by
+   day then due time so the oldest thing owed an answer is first. */
+function mrClaimQueue(weekKey, kid) {
+  const e = mrEnsureEarnings(kid, weekKey);
+  const out = [];
+  for (let d = 0; d < 7; d++) {
+    const claims = e.claims[String(d)] || {};
+    Object.keys(claims).forEach(choreId => {
+      if (mrGetChoreGrade(kid, weekKey, d, choreId) > 0) return;   // already answered
+      const row = mrPoolRow(choreId, weekKey);
+      out.push({ kid, dayIdx: d, choreId, claim: Number(claims[choreId]) || 0, row });
+    });
+  }
+  return out.sort((a, b) => a.dayIdx - b.dayIdx
+    || ((mrDueMinutes(a.row) ?? 9999) - (mrDueMinutes(b.row) ?? 9999)));
+}
+
+/* ── TRAINING ATTITUDE: XP only, never money ───────────────────────
+   She rates herself, Mom rates her, and the gap between the two is the part
+   worth talking about. Both are 1..5; the average earns XP per rated session. */
+function mrGetAttitude(kid, weekKey, dayIdx) {
+  const a = mrEnsureEarnings(kid, weekKey).attitude[String(dayIdx)] || {};
+  return { self: Number(a.self) || 0, parent: Number(a.parent) || 0 };
+}
+function mrSetAttitude(kid, weekKey, dayIdx, who, n) {
+  if (who === 'parent' && !isParent()) { showToast('Mom sets that one 🔒'); return false; }
+  if (who === 'self' && !isParent() && kid !== activeProfile()) return false;
+  const e = mrEnsureEarnings(kid, weekKey);
+  const d = String(dayIdx);
+  if (!e.attitude[d]) e.attitude[d] = {};
+  const v = Math.max(0, Math.min(5, Number(n) || 0));
+  if (v === 0) delete e.attitude[d][who]; else e.attitude[d][who] = v;
+  if (!Object.keys(e.attitude[d]).length) delete e.attitude[d];
+  mrStampEarnings(kid, weekKey);
+  saveAll();
+  return true;
+}
+/* A session counts once both people have answered — one rating on its own is
+   half a conversation, and paying XP for it would reward self-rating alone. */
+function mrAttitudeWeek(weekKey, kid) {
+  const days = [];
+  for (let d = 0; d < 7; d++) {
+    const a = mrGetAttitude(kid, weekKey, d);
+    if (!a.self && !a.parent) continue;
+    const rated = a.self > 0 && a.parent > 0;
+    days.push({ dayIdx: d, self: a.self, parent: a.parent, rated,
+                avg: rated ? Math.round((a.self + a.parent) / 2 * 10) / 10 : 0,
+                gap: rated ? a.self - a.parent : 0 });
+  }
+  const scored = days.filter(d => d.rated);
+  const avg = scored.length
+    ? Math.round(scored.reduce((s, d) => s + d.avg, 0) / scored.length * 10) / 10 : 0;
+  return { days, sessions: scored.length, avg };
+}
+
 function mrIsSick(kid, weekKey, dayIdx) {
   return !!mrEnsureEarnings(kid, weekKey).sick[String(dayIdx)];
 }
@@ -974,7 +1231,33 @@ function mrXpForWeek(weekKey, kid) {
   add('app_level',        learning.xpLevels);
   add('streak_7',         streak.days >= 7 ? 1 : 0);
   add('personal_best',    comp.personalBests);
+  // Only sessions BOTH people rated count — see mrAttitudeWeek.
+  add('training_attitude', mrAttitudeWeek(weekKey, kid).sessions);
   return { lines, total: lines.reduce((s, l) => s + l.xp, 0) };
+}
+
+/* ── XP levels, tiers and what they buy ────────────────────────────
+   Levels come from the quest XP already banked in progress.questXP — this puts
+   a name and a set of privileges on top of it rather than starting a second,
+   competing XP system. */
+function mrXpLevelInfo(kid, weekKey) {
+  const r = mrRulesForWeek(weekKey || todayKey());
+  const perLevel = Number((r.xp || {}).perLevel) || 100;
+  const xp = Number((getProfData(kid).progress || {}).questXP) || 0;
+  const level = Math.floor(xp / perLevel) + 1;
+  const into = xp % perLevel;
+  const tiers = ((r.xp || {}).tiers || []).slice().sort((a, b) => a.level - b.level);
+  const tier = tiers.filter(t => level >= t.level).pop() || tiers[0] || null;
+  return { xp, perLevel, level, into, pct: Math.round(into / perLevel * 100),
+           tier: tier ? tier.name : '', toNext: perLevel - into };
+}
+function mrPrivileges(kid, weekKey) {
+  const info = mrXpLevelInfo(kid, weekKey);
+  const r = mrRulesForWeek(weekKey || todayKey());
+  return ((r.xp || {}).privileges || []).map(p => ({
+    id: p.id, label: p.label, levelReq: Number(p.levelReq) || 1,
+    unlocked: info.level >= (Number(p.levelReq) || 1),
+  }));
 }
 /* Idempotent per week — a second call for the same week is a no-op, so
    re-recording a meeting can't double-award. */

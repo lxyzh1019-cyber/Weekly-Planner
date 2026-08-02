@@ -230,7 +230,10 @@ function buildHowIEarnCardLegacy(kid, wk) {
   const capNote = [];
   if (earned > 0) capNote.push(`$${earned.toFixed(2)} chores ✓`);
   if (goalBonusEarned) capNote.push(`+$1.00 goal ✓`);
-  else if (goalPending) capNote.push(`goal bonus +$1.00 still open${goal ? ` (${pts}/${goal} pts)` : ''}`);
+  else if (goalPending) {
+    const target = ctGoalPoints(goal);
+    capNote.push(`goal bonus +$1.00 still open${target != null ? ` (${pts}/${target} pts)` : (goal ? ` (${ctGoalLabel(goal)})` : '')}`);
+  }
   const earnCard =
       `<div class="hm-earn">`
     +   `<div class="hm-earn-top"><span class="hm-earn-label">This week so far</span><span class="hm-earn-amt">$${weekMoney.toFixed(2)}</span></div>`
@@ -258,7 +261,8 @@ function buildHowIEarnCardLegacy(kid, wk) {
   });
   rules += rule('🎯', 'Week goal',
     `routine + chore points reach your goal → $1.00 bonus`,
-    goalBonusEarned ? '✓ $1.00' : (goal ? `${pts}/${goal} pts` : 'set a goal'),
+    goalBonusEarned ? '✓ $1.00'
+      : (goal ? (ctGoalPoints(goal) != null ? `${pts}/${ctGoalPoints(goal)} pts` : ctGoalLabel(goal)) : 'set a goal'),
     goalBonusEarned ? 'chip-green' : 'chip-yellow');
   rules += rule('🔒', 'Once earned, yours',
     `unchecking never takes money back`, 'sticky', 'chip-plain');
