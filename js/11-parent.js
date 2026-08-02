@@ -593,7 +593,10 @@ function renderRoutineBuilder() {
   routineBuilder.items.forEach((it, idx)=>{
     const row = document.createElement('div');
     row.className = 'builder-item-row';
+    // The icon box shows what the item WILL get if left alone — the guess from
+    // its text — so a blank field never means a blank icon.
     row.innerHTML = `
+      <input type="text" class="builder-item-icon" placeholder="${routineItemIcon(it)}" value="${(it.icon||'').replace(/"/g,'&quot;')}" data-idx="${idx}" data-field="icon" title="Icon — leave blank to pick one from the words" aria-label="Icon">
       <input type="text" placeholder="Task description" value="${(it.text||'').replace(/"/g,'&quot;')}" data-idx="${idx}" data-field="text">
       <input type="number" placeholder="min" min="0" max="60" value="${it.timerSec?Math.round(it.timerSec/60):''}" data-idx="${idx}" data-field="timerMin" title="Timer (minutes)">
       <button class="del-btn" data-idx="${idx}">×</button>
@@ -605,7 +608,13 @@ function renderRoutineBuilder() {
     inp.oninput = (e)=>{
       const i = parseInt(e.target.dataset.idx);
       const f = e.target.dataset.field;
-      if (f==='text') routineBuilder.items[i].text = e.target.value;
+      if (f==='text') {
+        routineBuilder.items[i].text = e.target.value;
+        // Re-guess the placeholder as the words change, while the field is empty.
+        const iconField = list.querySelector(`input[data-idx="${i}"][data-field="icon"]`);
+        if (iconField && !iconField.value) iconField.placeholder = routineItemIcon(routineBuilder.items[i]);
+      }
+      if (f==='icon') routineBuilder.items[i].icon = e.target.value.trim() || null;
       if (f==='timerMin') {
         const min = parseInt(e.target.value);
         routineBuilder.items[i].timerSec = (min && min>0) ? min*60 : null;

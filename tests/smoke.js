@@ -691,6 +691,36 @@ function findChromium() {
     return failed.length === 0 || failed;
   });
 
+  // Every routine checklist item shows an icon, wherever it is ticked — from
+  // the preset, from a parent's own, or guessed from the words when neither
+  // exists. A blank where an icon belongs is the failure being guarded.
+  checks.routineItemsAlwaysHaveAnIcon = await page.evaluate(() => {
+    const guessed = routineItemIcon({ text: 'Feed the dog' }) === '🐾'
+                 && routineItemIcon({ text: 'Brush teeth' }) === '🪥'
+                 && routineItemIcon({ text: 'Wash hands' }) === '🧼'
+                 && routineItemIcon({ icon: '🦄', text: 'Brush teeth' }) === '🦄';   // explicit wins
+    // Nothing renders empty, even for words the map has never seen.
+    const neverBlank = routineItemIcon({ text: 'qqzz' }).length > 0
+                    && routineItemIcon({}).length > 0;
+    // And the presets carry their own rather than leaning on the guess.
+    const presets = Object.values(ROUTINE_PRESETS)
+      .every(r => r.items.every(i => !!i.icon));
+    return guessed && neverBlank && presets;
+  });
+  checks.kidTabShowsRoutineIcons = await page.evaluate(() => {
+    profile = 'jenn'; selectProfile('jenn');
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const keys = mrWeekDayKeys(ctWeekKey);
+    setDayBlocks(keys[2], [{ id:'ri1', actId:'routine_morning', startMin: 7*60,
+      durationMin: 30, checklistState:{} }], 'jenn');
+    openChoreTab(); ckSelectDay(2);
+    // .ck-block, not .ck-block-body: the own/helping lanes reuse the body class.
+    const icons = [...document.querySelectorAll('.ck-block .ck-item-icon')];
+    const want = ROUTINE_PRESETS.morning.items;
+    return icons.length === want.length
+        && icons.every((el, i) => el.textContent.trim() === want[i].icon);
+  });
+
   // ── In a hand ──
   // The chore system has to work on a phone, not merely not crash on one.
   // Two failures are silent and permanent once shipped: content pushed off the

@@ -217,35 +217,35 @@ const ROUTINE_PRESETS = {
     title: 'Morning Routine',
     icon: '🌅',
     items: [
-      { id:'m1', text:'Morning exercise' },
-      { id:'m2', text:'Healthy breakfast (carb/protein/fat) + vitamin' },
-      { id:'m3', text:'Brush teeth', timerSec: 120 },
-      { id:'m4', text:'Wash face / skincare / hair / clean bathroom' },
-      { id:'m5', text:'Make bed / clean bedroom / take out garbage / lights off' },
-      { id:'m6', text:'Put on clothes for the weather' },
+      { id:'m1', icon:'🏃', text:'Morning exercise' },
+      { id:'m2', icon:'🥣', text:'Healthy breakfast (carb/protein/fat) + vitamin' },
+      { id:'m3', icon:'🪥', text:'Brush teeth', timerSec: 120 },
+      { id:'m4', icon:'🧼', text:'Wash face / skincare / hair / clean bathroom' },
+      { id:'m5', icon:'🛏️', text:'Make bed / clean bedroom / take out garbage / lights off' },
+      { id:'m6', icon:'👕', text:'Put on clothes for the weather' },
     ]
   },
   afterschool: {
     title: 'After-School Routine',
     icon: '🎒',
     items: [
-      { id:'a1', text:'Bring back all gear & clean the car seat' },
-      { id:'a2', text:'Wash hands (and face if needed)' },
-      { id:'a3', text:'Put everything back in its correct spot' },
-      { id:'a4', text:'Empty school bag / lunchbox in sink / finish water bottle' },
-      { id:'a5', text:'Finish school/home work (ask for help if needed)' },
-      { id:'a6', text:'Prep for training / get ready for today & tomorrow' },
+      { id:'a1', icon:'🎒', text:'Bring back all gear & clean the car seat' },
+      { id:'a2', icon:'🧼', text:'Wash hands (and face if needed)' },
+      { id:'a3', icon:'📦', text:'Put everything back in its correct spot' },
+      { id:'a4', icon:'🍱', text:'Empty school bag / lunchbox in sink / finish water bottle' },
+      { id:'a5', icon:'✏️', text:'Finish school/home work (ask for help if needed)' },
+      { id:'a6', icon:'🏋️', text:'Prep for training / get ready for today & tomorrow' },
     ]
   },
   evening: {
     title: 'Evening Routine',
     icon: '🌙',
     items: [
-      { id:'e1', text:'Sports training prep (gear / battery levels)' },
-      { id:'e2', text:'Put away toys & books / clean the table' },
-      { id:'e3', text:'Brush teeth', timerSec: 120 },
-      { id:'e4', text:'Wash face / skincare / hair / clean bathroom' },
-      { id:'e5', text:'Turn off lights in empty rooms' },
+      { id:'e1', icon:'🏋️', text:'Sports training prep (gear / battery levels)' },
+      { id:'e2', icon:'🧸', text:'Put away toys & books / clean the table' },
+      { id:'e3', icon:'🪥', text:'Brush teeth', timerSec: 120 },
+      { id:'e4', icon:'🧼', text:'Wash face / skincare / hair / clean bathroom' },
+      { id:'e5', icon:'💡', text:'Turn off lights in empty rooms' },
     ]
   }
 };

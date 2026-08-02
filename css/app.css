@@ -5220,3 +5220,14 @@
     .ctr-head { flex-wrap: wrap; }
     .ctr-tile { min-width: 60px; }
   }
+
+  /* Routine checklist item icons — the day view's list and the builder row. */
+  .checklist-icon { font-size: 1.05rem; flex: none; line-height: 1; }
+  /* Outranks `.builder-item-row input[type=text] { flex: 1 }`, which would
+     otherwise stretch the icon box across the row. */
+  .builder-item-row input.builder-item-icon {
+    width: 46px; flex: none; text-align: center; font-size: 1.05rem;
+  }
+  @media (max-width: 700px) {
+    .builder-item-row input.builder-item-icon { width: 42px; }
+  }

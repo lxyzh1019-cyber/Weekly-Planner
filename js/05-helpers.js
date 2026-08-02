@@ -456,6 +456,50 @@ function ctAwardMandatoryFromRoutine(routineId, kid, dayKey) {
   showToast(`✅ ${session} routine complete`);
 }
 
+/* ── An icon for a routine checklist item ──────────────────────────
+   The presets carry their own. Everything else has to be guessed at, and
+   there is a lot of "everything else": a parent who overrode a built-in
+   routine before icons existed has a stored copy without them, custom
+   routines are whatever a parent typed, and kid-added extras are whatever a
+   nine-year-old typed. A blank where an icon belongs is worse than an
+   approximate one, so the text picks the icon when the item doesn't carry it.
+
+   Order matters — the first match wins, so the specific patterns sit above
+   the general ones ("wash hands" must beat "wash", "bottle" must beat
+   "water"). */
+const ROUTINE_ITEM_ICONS = [
+  [/\bteeth|toothbrush|brush(ing)? your teeth\b/i, '🪥'],
+  [/\bhands?\b/i,                                  '🧼'],
+  [/\bface|skincare|shower|bath(e|ing)?\b/i,       '🧼'],
+  [/\bhair\b/i,                                    '💇'],
+  [/\bbed\b/i,                                     '🛏️'],
+  [/\bbedroom|tidy|room\b/i,                       '🧸'],
+  [/\bgarbage|rubbish|bin\b/i,                     '🗑️'],
+  [/\blight/i,                                      '💡'],
+  [/\bclothes|dress|uniform|weather\b/i,           '👕'],
+  [/\bbreakfast|vitamin|eat|snack\b/i,             '🥣'],
+  [/\blunchbox|lunch\b/i,                          '🍱'],
+  [/\bbottle|drink\b/i,                            '🚰'],
+  [/\bschool ?bag|backpack|bag\b/i,                '🎒'],
+  [/\bhome ?work|school ?work|reading|read\b/i,    '✏️'],
+  [/\bpractice|piano|music|instrument\b/i,         '🎹'],
+  [/\btraining|gear|sport|exercise|stretch\b/i,    '🏋️'],
+  [/\bcar seat|car\b/i,                            '🚗'],
+  [/\bwater\b/i,                                   '🚰'],
+  [/\btoys?|books?\b/i,                            '🧸'],
+  [/\btable|dish|kitchen|sink\b/i,                 '🍽️'],
+  [/\bpack|put (everything )?(back|away)|tidy|spot\b/i, '📦'],
+  [/\bcharge|battery\b/i,                          '🔋'],
+  [/\bpet|dog|cat|fish\b/i,                        '🐾'],
+  [/\bwash|clean|wipe\b/i,                         '🧽'],
+];
+function routineItemIcon(item) {
+  if (item && item.icon) return item.icon;
+  const text = String((item && item.text) || '');
+  for (const [re, icon] of ROUTINE_ITEM_ICONS) if (re.test(text)) return icon;
+  return '•';
+}
+
 function getRoutineChecklistWithUnlocks(routineId) {
   const tmpl = getRoutineTemplate(routineId);
   const base = (tmpl?.items || []).slice();

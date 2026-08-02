@@ -987,6 +987,13 @@ function buildChecklistRow(block, act, item, isKidItem, listContainerId) {
   };
   row.appendChild(box);
 
+  // The same icon the chore tab shows, so one item does not read as two
+  // different things depending on which screen ticked it.
+  const ico = document.createElement('span');
+  ico.className = 'checklist-icon';
+  ico.textContent = routineItemIcon(item);
+  row.appendChild(ico);
+
   const txt = document.createElement('span');
   txt.className = 'checklist-text';
   txt.textContent = item.text;

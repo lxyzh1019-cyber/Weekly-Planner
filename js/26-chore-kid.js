@@ -239,6 +239,7 @@ function ckRoutines(kid) {
         data-ct-action="ck-routine-item" data-block-id="${escapeAttr(block.id)}" data-item-id="${escapeAttr(i.id)}"
         role="checkbox" aria-checked="${on}">
         <span class="ck-check ${on ? 'on' : ''}">${on ? '✓' : ''}</span>
+        <span class="ck-item-icon">${routineItemIcon(i)}</span>
         <span class="ck-item-name">${escapeHtml(i.text || '')}</span></button>`;
     }).join('');
     return `<div class="ck-block">
