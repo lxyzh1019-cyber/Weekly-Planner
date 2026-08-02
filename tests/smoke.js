@@ -490,13 +490,13 @@ function findChromium() {
   await page.waitForTimeout(300);
   checks.trendsRenders = await page.evaluate(() => {
     const p = document.getElementById('ptab-trends');
-    return !!p && p.hidden === false && document.querySelectorAll('.ctr-svg').length === 2
-        && document.querySelectorAll('.ctr-card').length === 2
-        && !!document.querySelector('.ctr-heat-cell');
+    return !!p && p.hidden === false && p.querySelectorAll('.ctr-svg').length === 2
+        && p.querySelectorAll('.ctr-card').length === 2
+        && !!p.querySelector('.ctr-heat-cell');
   });
   // Two panels, two scales — never one plot with two y-axes.
   checks.noDualAxis = await page.evaluate(() => {
-    const svgs = [...document.querySelectorAll('.ctr-svg')];
+    const svgs = [...document.querySelectorAll('#ptab-trends .ctr-svg')];
     const bars = svgs[0].querySelectorAll('rect').length;
     const lines = svgs[1].querySelectorAll('polyline').length;
     // The bar panel carries no polylines and the line panel carries no bars.
@@ -506,8 +506,8 @@ function findChromium() {
   });
   // Identity is never colour-alone: a legend is present and cells carry numbers.
   checks.trendsIdentityNotColourAlone = await page.evaluate(() =>
-    document.querySelectorAll('.ctr-legend-item').length === 2
-    && [...document.querySelectorAll('.ctr-heat-cell')].every(c => c.textContent.trim().length > 0));
+    document.querySelectorAll('#ptab-trends .ctr-legend-item').length === 2
+    && [...document.querySelectorAll('#ptab-trends .ctr-heat-cell')].every(c => c.textContent.trim().length > 0));
   // The window pages back, and cannot page past now.
   checks.trendsPagingIsBounded = await page.evaluate(() => {
     const title = () => document.querySelector('#ptab-trends .cp-title').textContent;
@@ -548,6 +548,86 @@ function findChromium() {
     return /still being lived/.test(t) && !/^\s*$/.test(t);
   });
   await page.screenshot({ path: shot('parent_trends') });
+
+  // ── Redesign phase 5: chore setup ──
+  await page.evaluate(() => { setParentTab('options'); coRenderOptions(); });
+  await page.waitForTimeout(300);
+  checks.optionsRenders = await page.evaluate(() => {
+    const p = document.getElementById('ptab-options');
+    return !!p && p.hidden === false && document.querySelectorAll('.co-row').length > 1
+        && !!document.querySelector('[data-co-action="add"]');
+  });
+  // Adding a chore writes an effective-dated rule version, and it shows up in
+  // the pool for the week on screen.
+  checks.addingAChoreIsAnAuditedRuleEdit = await page.evaluate(() => {
+    const before = mrVersions().length, logBefore = mrLogEntries().length;
+    coDraft = { label: 'Water the plants', due: '6:00pm', who: 'jess', lane: 'helping' };
+    coRenderOptions();
+    document.querySelector('[data-co-action="add"]').click();
+    const row = mrPoolRows(ctWeekKey).find(p => p.label === 'Water the plants');
+    return !!row && row.lane === 'helping' && row.who === 'jess' && row.due === '6pm'
+        && mrLogEntries().length > logBefore && mrVersions().length >= before;
+  });
+  // Bedtime is a wall: a due time after it is refused, and the pool is unchanged.
+  checks.bedtimeIsAWall = await page.evaluate(() => {
+    const row = mrPoolRows(ctWeekKey).find(p => p.label === 'Water the plants');
+    coSetDue(row.id, '9:30pm');
+    const after = mrPoolRows(ctWeekKey).find(p => p.id === row.id);
+    return after.due === '6pm';
+  });
+  // A planner tag matching no pool row is surfaced here, and can be adopted.
+  checks.orphanTagsAreOfferedAFix = await page.evaluate(() => {
+    const kid = 'jenn', dayKey = mrWeekDayKeys(ctWeekKey)[5];
+    const before = (getDayBlocks(dayKey, kid) || []).slice();
+    setDayBlocks(dayKey, [...before, { id:'orph', actId:'chores', startMin: 17*60,
+      durationMin: 30, choreTags:['Polish the cat'], checklistState:{} }], kid);
+    coRenderOptions();
+    const listed = !!document.querySelector('[data-co-action="adopt"]');
+    document.querySelector('[data-co-action="adopt"]').click();
+    const resolves = !!mrPoolRowForTag('Polish the cat', ctWeekKey);
+    setDayBlocks(dayKey, before, kid);
+    coApply(mrDeepCopy(mrRulesForWeek(ctWeekKey).chorePool)
+      .filter(p => p.label !== 'Polish the cat' && p.label !== 'Water the plants'), 'test cleanup');
+    coRenderOptions();
+    return listed && resolves;
+  });
+  // The two-part goal needs BOTH halves before the +$1 fires.
+  checks.bothGoalHalvesMustLand = await page.evaluate(() => {
+    const wk = ctWeekKey, kid = 'jess';
+    ctSetGoalBonus(wk, kid, false);
+    ctSetWeekGoals(wk, null, { routineDays: 7, money: 0 });
+    ctMaybeFireGoalBonus(wk, kid);
+    // The money half is trivially met, so only the unmet routine half can be
+    // holding the bonus back — which is exactly what "both" has to mean.
+    const heldBack = ctGetGoalBonus(wk, kid) === false;
+    ctSetWeekGoals(wk, null, { routineDays: 0, money: 0 });
+    ctMaybeFireGoalBonus(wk, kid);
+    const fired = ctGetGoalBonus(wk, kid);
+    ctSetWeekGoals(wk, null, null); ctSetGoalBonus(wk, kid, false);
+    return heldBack && fired === true;
+  });
+  // The planner's tag picker offers pool rows and writes their ids, so it can
+  // no longer manufacture a tag that matches nothing.
+  checks.tagPickerWritesPoolIds = await page.evaluate(() => {
+    profile = 'jenn'; selectProfile('jenn');
+    currentDayKey = mrWeekDayKeys(ctWeekKey)[0];
+    selectedActivity = getAllActivities('jenn').find(a => a.id === 'chores');
+    as_ = { durationMin: 30, colour: COLOURS[0], note: '', repeat: false, repeatDays: [],
+             travelBuffer: false, travelBufMin: 15, choreTags: [], objectives: [] };
+    renderActivitySheet();
+    const btns = [...document.querySelectorAll('#choreTypePicker button')];
+    const labels = mrPoolRows(ctWeekKey).filter(p => p.lane === 'chores').map(p => p.label);
+    const shown = btns.every(b => labels.includes(b.textContent.replace(/^✓ /, '')));
+    btns[0].click();
+    const wrote = as_.choreTags.length === 1 && !!mrPoolRow(as_.choreTags[0], ctWeekKey);
+    as_ = { durationMin: 30, colour: COLOURS[0], note: '', repeat: false, repeatDays: [],
+             travelBuffer: false, travelBufMin: 15, choreTags: [], objectives: [] };
+    selectedActivity = null; profile = 'parent';
+    return btns.length === labels.length && shown && wrote;
+  });
+  await page.evaluate(() => { profile = 'parent'; showScreen('parent'); renderParentHome(); setParentTab('options'); });
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: shot('parent_options') });
 
   // Parent: the meeting commit moves wallet, XP and the loan together, so undo
   // has to reverse all three. A partial reverse would leave credited XP or a

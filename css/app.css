@@ -5065,3 +5065,33 @@
   .ctr-xlab2 { text-align: center; font-size: 0.62rem; font-weight: 800; color: var(--ink-light); }
   .ctr-read-line { font-size: 0.85rem; font-weight: 700; line-height: 1.55; }
   .ctr-read-line + .ctr-read-line { margin-top: 0.3rem; }
+
+  /* ── Chore setup (js/29-chore-options.js) ── */
+  .co-row {
+    display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
+    border: 2px solid var(--ink); border-radius: 12px; background: var(--paper);
+    padding: 0.35rem 0.5rem; margin-top: 0.35rem;
+  }
+  .co-draft { border-style: dashed; border-color: #c9bda6; }
+  .co-name, .co-due {
+    border: 1.5px solid #d9cfb4; border-radius: 7px; padding: 0.25rem 0.45rem;
+    font: inherit; font-weight: 800; color: var(--ink); background: var(--paper);
+  }
+  .co-name { flex: 1; min-width: 130px; font-size: 0.8rem; }
+  .co-due { width: 76px; font-size: 0.75rem; font-weight: 700; color: var(--ink-light); }
+  .co-lanes, .co-whos { display: flex; }
+  .co-lane, .co-who {
+    border: 1.5px solid var(--ink); background: var(--paper); color: var(--ink);
+    font: inherit; font-size: 0.68rem; font-weight: 800; padding: 0.25rem 0.5rem; cursor: pointer;
+  }
+  .co-lane:first-child, .co-who:first-child { border-radius: 7px 0 0 7px; }
+  .co-lane:last-child, .co-who:last-child { border-radius: 0 7px 7px 0; }
+  .co-lane + .co-lane, .co-who + .co-who { border-left-width: 0; }
+  .co-lane.on { background: var(--accent-yellow); }
+  .co-who.on { background: var(--accent-blue); color: #10243d; }
+  .co-goalrow { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.45rem; }
+  .co-goallab { font-size: 0.72rem; font-weight: 800; color: var(--ink-light); }
+  .co-num { display: flex; align-items: center; gap: 0.4rem; border: 2px solid var(--ink); border-radius: 12px; background: var(--paper); padding: 0.35rem 0.55rem; margin-top: 0.3rem; }
+  .co-numv { min-width: 44px; text-align: center; font-size: 0.85rem; font-weight: 800; }
+  .co-danger { background: #fdeeea; }
+  .co-danger:hover { background: #f8d9d1; }

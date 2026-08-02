@@ -351,19 +351,39 @@ function renderActivitySheet() {
       if (picker) {
         picker.innerHTML = '';
         if (!Array.isArray(as_.choreTags)) as_.choreTags = [];
-        // Multi-select: tag several chores on one House-Chore block. All the
-        // selected chores sync to the chore tab when the block is completed.
-        ctPickableChoreNames().forEach(tag => {
+        /* Multi-select: tag several chores on one House-Chore block. This block
+           is what puts a chore on a day — the pool says what a chore is, the
+           planner says when — so the picker offers POOL ROWS and writes their
+           ids. Writing a display name here is what produced tags matching no
+           pool row, which can never be claimed, graded or paid.
+
+           Pre-pool weeks keep the old name list, since they have no pool to
+           pick from. */
+        const wk = ctWeekKeyForDate(currentDayKey || todayKey());
+        const options = mrUsesNewModel(wk)
+          ? mrPoolRows(wk).filter(p => p.lane === 'chores').map(p => ({ id: p.id, label: p.label }))
+          : ctPickableChoreNames().map(n => ({ id: n, label: n }));
+        options.forEach(({ id, label }) => {
           const b = document.createElement('button');
-          const on = as_.choreTags.includes(tag);
+          const on = as_.choreTags.some(t => t === id
+            || (mrUsesNewModel(wk) && (mrPoolRowForTag(t, wk) || {}).id === id));
           b.className = 'pill-btn' + (on ? ' active' : '');
-          b.textContent = (on ? '✓ ' : '') + tag;
+          b.textContent = (on ? '✓ ' : '') + label;
           b.onclick = () => {
-            as_.choreTags = on ? as_.choreTags.filter(t => t !== tag) : [...as_.choreTags, tag];
+            as_.choreTags = on
+              ? as_.choreTags.filter(t => t !== id
+                  && (!mrUsesNewModel(wk) || (mrPoolRowForTag(t, wk) || {}).id !== id))
+              : [...as_.choreTags, id];
             renderActivitySheet();
           };
           picker.appendChild(b);
         });
+        if (!options.length) {
+          const note = document.createElement('div');
+          note.className = 'ct-meta';
+          note.textContent = 'No chores in the pool yet — a grown-up adds them in Chore setup.';
+          picker.appendChild(note);
+        }
       }
     }
   }

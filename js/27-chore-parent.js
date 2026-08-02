@@ -320,6 +320,62 @@ function cpPayout() {
     </div></div>`;
 }
 
+/* ── Competition results ──
+   A parent-recorded channel, and the only one whose money comes from a sheet
+   of paper rather than from anything the app watched happen. It lives beside
+   the payout because that is where its money shows up. */
+function cpCompetition() {
+  const kid = cpKid();
+  const cw = mrCompetitionWeek(ctWeekKey, kid);
+  const rows = cw.entries.length ? cw.entries.map(c => {
+    const bits = [];
+    if (c.points) bits.push(`${c.points} pts`);
+    if ((c.placement || {}).group) bits.push(`${c.placement.group} in group`);
+    if ((c.placement || {}).overall) bits.push(`${c.placement.overall} overall`);
+    if (c.qualified) bits.push('qualified');
+    if (c.personalBest) bits.push('PB ⭐');
+    const d = formatDayKey(c.dayKey);
+    return `<div class="cp-applied">
+      <span class="cp-plan-name">${escapeHtml(c.name || c.sport)}<span class="ck-item-due">${escapeHtml(c.sport)} · ${MONTH_SHORT[d.getMonth()]} ${d.getDate()} · ${escapeHtml(bits.join(' · ') || '—')}</span></span>
+      <span class="ck-green">${ckMoney(c.awarded || 0)}</span>
+      <button type="button" class="ck-navbtn" data-ct-action="del-comp" data-comp-id="${escapeAttr(c.id)}" aria-label="Remove result">×</button>
+    </div>`;
+  }).join('') : '<div class="ck-sub">No results this week.</div>';
+  return `<div class="cp-sect"><div class="cp-cap">Competition — week: ${ckMoney(cw.paid)}</div>
+    <div class="ck-sub">The official results sheet decides, and a result pays in the week it happened — one dated outside this week won't show here.</div>
+    ${rows}
+    <button type="button" class="ck-btn" data-ct-action="add-comp">🏆 Record a result</button></div>`;
+}
+
+/* ── Every week ever recorded ──
+   The authoritative paid ledger, unbounded, with running totals. Frozen when
+   it was agreed, so changing a price today never rewrites what a week paid. */
+function cpMoneyHistory() {
+  ctEnsureShared();
+  const fw = state.shared.chore.finalizedWeeks || {};
+  const keys = Object.keys(fw).sort();
+  if (!keys.length) {
+    return `<div class="cp-sect"><div class="cp-cap">Recorded weeks</div>
+      <div class="ck-sub">Nothing recorded yet. A week lands here once you tap “Confirm &amp; record” for it in the family meeting.</div></div>`;
+  }
+  let jRun = 0, kRun = 0, rows = '';
+  keys.forEach(wk => {
+    const e = fw[wk] || {};
+    const j = Number(e.jenn) || 0, k = Number(e.jess) || 0;
+    if (e.jenn != null) jRun = money2(jRun + j);
+    if (e.jess != null) kRun = money2(kRun + k);
+    const d = formatDayKey(wk);
+    rows += `<tr><td>${MONTH_SHORT[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}</td>
+      <td>${e.jenn != null ? ckMoney(j) : '—'}</td><td>${ckMoney(jRun)}</td>
+      <td>${e.jess != null ? ckMoney(k) : '—'}</td><td>${ckMoney(kRun)}</td></tr>`;
+  });
+  return `<div class="cp-sect"><div class="cp-cap">Recorded weeks · ${keys.length}</div>
+    <div class="ck-sub">Every week recorded at a family meeting, oldest first, with running totals. Each week's breakdown is frozen when it was agreed.</div>
+    <div class="ck-gridwrap"><table class="wf-analytics-table">
+      <thead><tr><th>Week</th><th>${CT_PROFILE_ICON.jenn} Jenn</th><th>total</th><th>${CT_PROFILE_ICON.jess} Jess</th><th>total</th></tr></thead>
+      <tbody>${rows}</tbody></table></div></div>`;
+}
+
 /* ── Spot-check, honesty, box ── */
 function cpSundayTools() {
   const kid = cpKid();
@@ -363,7 +419,7 @@ function cpRenderChoreTab() {
         <div>${cpQueue()}${cpGraded()}${cpFines()}</div>
         <div>${cpPlanner()}${cpAttitudeSick()}</div>
       </div>`
-    : `${cpDualGrid()}${cpPayout()}${cpSundayTools()}`;
+    : `${cpDualGrid()}${cpPayout()}${cpCompetition()}${cpSundayTools()}${cpMoneyHistory()}`;
   wrap.innerHTML = `<div class="cp-tab">${cpHeader()}${cpSettleCard()}${body}</div>`;
 }
 

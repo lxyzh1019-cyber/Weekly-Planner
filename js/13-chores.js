@@ -443,25 +443,6 @@ async function ctClearWeek() {
   saveAll();
   renderChoreTab();
 }
-function ctWeekSummaryRows() {
-  // Show last CT_SUMMARY_WEEKS weeks ending with current ctWeekKey
-  let rows = '';
-  const cur = formatDayKey(ctWeekKey || ctDateToKey(ctMondayOf(new Date())));
-  for (let i = CT_SUMMARY_WEEKS - 1; i >= 0; i--) {
-    const mon = new Date(cur); mon.setDate(cur.getDate() - i * 7);
-    const wk = ctDateToKey(mon);
-    const label = `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()}`;
-    const jm = ctMandatoryPoints(wk, 'jenn');
-    const jo = ctOptionalPoints(wk, 'jenn');
-    const km = ctMandatoryPoints(wk, 'jess');
-    const ko = ctOptionalPoints(wk, 'jess');
-    const j$ = ctWeekMoney(wk, 'jenn');
-    const k$ = ctWeekMoney(wk, 'jess');
-    const isCurrent = wk === ctWeekKey;
-    rows += `<tr${isCurrent?' style="font-weight:600"':''}><td>${label}</td><td>${jm}/21</td><td>+${jo}</td><td>$${j$.toFixed(2)}</td><td>${km}/21</td><td>+${ko}</td><td>$${k$.toFixed(2)}</td></tr>`;
-  }
-  return rows;
-}
 function ctExportBackup() {
   ctEnsureShared();
   const payload = {
@@ -727,35 +708,6 @@ async function ctPromptRemoveChore(name) {
   showToast(isCustom ? `Removed "${name}"` : `Hid "${name}"`);
   renderChoreTab();
 }
-// Parent-only manager to add / rename / hide the base chore names.
-function ctRenderChoreNamesCard() {
-  if (!isParent()) return '';
-  const rows = ctPickableChoreNames().map(cn => {
-    const isCustom = (state.shared.chore.customChores || []).includes(cn);
-    return `<div class="ct-item">
-      <div class="ct-item-left"><span>🧽 ${escapeHtml(cn)}</span>${isCustom ? '<span class="ct-badge">custom</span>' : ''}</div>
-      <span style="display:flex;gap:0.3rem">
-        <button type="button" class="btn-icon" data-ct-action="rename-chore" data-chore="${escapeAttr(cn)}" aria-label="Rename ${escapeAttr(cn)}">✏️</button>
-        <button type="button" class="btn-icon" data-ct-action="remove-chore" data-chore="${escapeAttr(cn)}" aria-label="Remove ${escapeAttr(cn)}">🗑</button>
-      </span>
-    </div>`;
-  }).join('');
-  return `<div class="chore-card"><h3>🧽 Chore names</h3>
-    <div class="ct-meta">The chores kids can tag on a House-Chore block and check off. Base chores hide (data kept); custom chores rename/remove.</div>
-    ${rows}
-    <div style="margin-top:0.5rem"><button type="button" class="pill-btn" data-ct-action="add-chore">+ New chore</button></div>
-  </div>`;
-}
-// One optional-chore check row (keyboard-accessible button, role=checkbox).
-function ctOptCheckRow(kid, choreName, extra = '', badge = '') {
-  const checked = ctGetOptional(ctWeekKey, ctDay, kid, choreName);
-  return `<div class="ct-item ${checked ? 'done' : ''}">
-    <div class="ct-item-left">
-      <button type="button" class="ct-check ${checked ? 'on' : ''}" data-ct-action="toggle-optional" data-chore="${escapeAttr(choreName)}" data-kid="${kid}" role="checkbox" aria-checked="${checked}" aria-label="${escapeAttr(choreName)}">${checked ? '✓' : ''}</button>
-      <span>${escapeHtml(choreName)}</span>${extra}
-    </div>${badge}
-  </div>`;
-}
 /* ════════════════════════════════════════════════════════════════
    1a — KID WEEK MATRIX: one tap-to-toggle grid for the whole week
 ════════════════════════════════════════════════════════════════ */
@@ -931,220 +883,11 @@ function ctRenderWeekMatrix(kid) {
   </div>`;
 }
 
-function ctRenderKidSection(kid) {
-  const icon = CT_PROFILE_ICON[kid];
-  const name = kid === 'jenn' ? 'Jenn' : 'Jess';
-  const mandatory = ctMandatoryPoints(ctWeekKey, kid);
-  const optional = ctOptionalPoints(ctWeekKey, kid);
-  const total = mandatory + optional;
-  const goal = ctGetWeekGoals(ctWeekKey)[kid];
-  const goalReached = ctGetGoalBonus(ctWeekKey, kid);
 
-  let html = `<div class="chore-card"><h3>${icon} ${name} — routines</h3><div class="ct-meta">Mandatory: ${mandatory}/21 · Points: ${total}</div>`;
-  if (goal) {
-    const pts = ctGoalPoints(goal);
-    html += `<div class="ct-meta">Goal ${pts != null ? `${total}/${pts}` : ctGoalLabel(goal)}${goalReached ? ' · reached +$1' : ''}</div>`;
-  }
 
-  for (const s of CT_SESSIONS) {
-    const checked = ctGetMandatory(ctWeekKey, ctDay, s, kid);
-    const isAuto = ctGetMandatoryAuto(ctWeekKey, ctDay, s, kid);
-    const canToggle = isParent() || !isAuto;
-    html += `<div class="ct-item ${checked ? 'done' : ''}">
-      <div class="ct-item-left"><button type="button" class="ct-check ${checked ? 'on' : ''}" data-ct-action="toggle-mandatory" data-session="${s}" data-kid="${kid}" role="checkbox" aria-checked="${checked}" aria-label="${s} routine" ${!canToggle ? 'disabled' : ''}>${checked ? '✓' : ''}</button><span>${s}</span></div>
-      <span class="ct-badge">${isAuto ? '✨ auto' : 'mandatory'}</span>
-    </div>`;
-  }
-  html += `<div class="ct-meta" style="margin-top:0.3rem">Routines are tracked but pay no money.</div></div>`;
-  return html;
-}
-/* ── Household chores: the paid channel ──
-   One row per chore in the pool, each showing its own deadline (there is no
-   single household "on time"), with a 0/1/2/3 grade selector for the day being
-   viewed. Kids see their grades; only a parent can set one. */
-function ctRenderHouseholdChores(kid) {
-  const r = mrRulesForWeek(ctWeekKey);
-  const pool = r.chorePool || [];
-  if (!pool.length) return '';
-  const pay = (r.chores || {}).grade || {};
-  const wk = mrChoreWeek(ctWeekKey, kid);
-  const day = wk.days[ctDay] || { paid: 0 };
-  const freeIds = new Set(wk.freeUsed.filter(f => f.dayIdx === ctDay).map(f => f.choreId));
 
-  const GRADES = [
-    { g: 3, label: 'On time & to standard' },
-    { g: 2, label: 'To standard, late' },
-    { g: 1, label: 'Redone, then to standard' },
-    { g: 0, label: 'Not done' },
-  ];
-  const rows = pool.map(c => {
-    const g = mrGetChoreGrade(kid, ctWeekKey, ctDay, c.id);
-    const isFree = freeIds.has(c.id);
-    const amount = isFree ? 'free' : (g > 0 ? '$' + Number(pay[g] || 0).toFixed(2) : '—');
-    const pills = isParent()
-      ? GRADES.map(x => `<button type="button" class="ct-check ${g === x.g ? 'on' : ''}"
-            data-ct-action="grade-chore" data-chore-id="${escapeAttr(c.id)}" data-grade="${x.g}"
-            title="${escapeAttr(x.label)}" aria-label="${escapeAttr(c.label + ': ' + x.label)}">${x.g}</button>`).join('')
-      : `<span class="ct-badge">${g > 0 ? g + '/3' : 'not yet'}</span>`;
-    return `<div class="ct-item ${g > 0 ? 'done' : ''}">
-      <div class="ct-item-left"><span>${escapeHtml(c.label)}<br><span class="ct-meta">due ${escapeHtml(c.deadline || '—')}</span></span></div>
-      <span class="ct-meta">${amount}</span>
-      <span style="display:flex;gap:0.25rem">${pills}</span>
-    </div>`;
-  }).join('');
 
-  const cap = (r.chores || {}).dailyCap;
-  // Which chores are free is settled at the end of the week, not as you go —
-  // they land on the lowest-paying ones so doing your best work first is never
-  // punished. Step 3 flips that, and says so.
-  const freeNote = wk.pickWithdrawn
-    ? ` <b>Choices withdrawn this week</b> — they land on your highest-paying chores instead.`
-    : ` They land on your <b>lowest-paying</b> chores, so your best work is the work that pays.`;
-  const freeLine = wk.freeLeft > 0
-    ? `<div class="ct-meta">${wk.freeLeft} free chore${wk.freeLeft === 1 ? '' : 's'} left this week — those belong to the family.${freeNote}</div>`
-    : `<div class="ct-meta">Your ${(r.chores || {}).freeChoresPerWeek} free chores are used up — everything else this week pays.${freeNote}</div>`;
-  const overflow = wk.overflowChores > 0
-    ? `<div class="ct-meta">⭐ ${wk.overflowChores} chore${wk.overflowChores === 1 ? '' : 's'} past the daily max — those earn XP instead of money.</div>` : '';
 
-  return `<div class="chore-card chore-card--full"><h3>🧹 Household chores — ${CT_DAYS[ctDay]}</h3>
-    <div class="ct-meta">Paid. "On time" is different for every chore — check the chore, not the clock.</div>
-    ${rows}
-    <div class="ct-meta" style="margin-top:0.4rem">${CT_DAYS[ctDay]}: <b>$${Number(day.paid).toFixed(2)}</b>${cap != null ? ` / $${Number(cap).toFixed(2)} max` : ''} · week so far <b>$${wk.paid.toFixed(2)}</b></div>
-    ${freeLine}${overflow}</div>`;
-}
-
-/* ── Personal chores: mandatory, never paid ──
-   Tap cycles none → done → done unasked. Only "unasked" earns XP. */
-function ctRenderPersonalChores(kid) {
-  const r = mrRulesForWeek(ctWeekKey);
-  const list = r.personalChores || [];
-  if (!list.length) return '';
-  const rows = list.map(c => {
-    const st = mrGetPersonal(kid, ctWeekKey, ctDay, c.id);
-    const mark = st === 'unasked' ? '⭐' : (st === 'done' ? '✓' : '');
-    return `<div class="ct-item ${st ? 'done' : ''}">
-      <div class="ct-item-left"><button type="button" class="ct-check ${st ? 'on' : ''}"
-          data-ct-action="cycle-personal" data-chore-id="${escapeAttr(c.id)}"
-          aria-label="${escapeAttr(c.label)}">${mark}</button><span>${escapeHtml(c.label)}</span></div>
-      <span class="ct-badge">${st === 'unasked' ? 'unasked ⭐ XP' : (st === 'done' ? 'done' : 'yours')}</span>
-    </div>`;
-  }).join('');
-  const unasked = mrPersonalUnaskedCount(ctWeekKey, kid);
-  return `<div class="chore-card"><h3>🪥 Personal chores — ${CT_DAYS[ctDay]}</h3>
-    <div class="ct-meta">These are yours. They are never paid. Tap once for done, twice if you did it without being asked.</div>
-    ${rows}
-    <div class="ct-meta" style="margin-top:0.3rem">${unasked} done unasked this week — that's XP.</div></div>`;
-}
-
-/* ── Learning: bundle-rated, with the Sunday check ── */
-function ctRenderLearningCard(kid) {
-  const r = mrRulesForWeek(ctWeekKey);
-  const items = (r.learning || {}).items || [];
-  if (!items.length) return '';
-  const wk = mrLearningWeek(ctWeekKey, kid);
-  const rows = items.map(it => {
-    const units = mrGetLearning(kid, ctWeekKey, ctDay, it.id);
-    const voided = mrGetLearningVoid(kid, ctWeekKey, ctDay, it.id);
-    const line = wk.lines.find(l => l.id === it.id) || {};
-    const worth = it.xpOnly ? 'XP only' : `$${Number(it.amount).toFixed(2)} / ${it.perUnit} ${it.unit}`;
-    const controls = isParent()
-      ? `<button type="button" class="btn-icon" data-ct-action="learn-minus" data-item-id="${escapeAttr(it.id)}" aria-label="Less ${escapeAttr(it.label)}">−</button>
-         <button type="button" class="btn-icon" data-ct-action="learn-plus" data-item-id="${escapeAttr(it.id)}" aria-label="More ${escapeAttr(it.label)}">＋</button>`
-      : '';
-    return `<div class="ct-item ${units > 0 ? 'done' : ''}">
-      <div class="ct-item-left"><span>${escapeHtml(it.label)}<br><span class="ct-meta">${worth}</span></span></div>
-      <span class="ct-meta">${units} ${escapeHtml(it.unit)}${voided ? ` · ${voided} voided` : ''}${line.amount ? ` · $${Number(line.amount).toFixed(2)} wk` : ''}</span>
-      <span style="display:flex;gap:0.25rem">${controls}</span></div>`;
-  }).join('');
-  return `<div class="chore-card"><h3>📘 Learning — ${CT_DAYS[ctDay]}</h3>
-    <div class="ct-meta">Paid per finished bundle, and it has to be new material. Week so far: <b>$${wk.paid.toFixed(2)}</b></div>
-    ${rows}
-    ${isParent() ? `<div style="margin-top:0.5rem"><button type="button" class="pill-btn" data-ct-action="sunday-check">🔍 Sunday check (${(r.learning||{}).sundayCheckCount})</button></div>` : ''}
-    <div class="ct-meta">Every Sunday ${(r.learning || {}).sundayCheckCount} get picked at random — can't answer, it's unpaid and you do it again.</div></div>`;
-}
-
-/* ── Streak, sick days ── */
-function ctRenderStreakCard(kid) {
-  const st = mrStreakWeek(ctWeekKey, kid);
-  const r = mrRulesForWeek(ctWeekKey);
-  const tiers = ((r.streak || {}).tiers || []).map(t =>
-    `<span class="ct-badge">${t.days}d +$${Number(t.bonus).toFixed(0)}</span>`).join(' ');
-  const dots = CT_DAYS.map((d, i) => {
-    const sick = mrIsSick(kid, ctWeekKey, i);
-    const done = mrStreakDayDone(ctWeekKey, kid, i);
-    const mark = sick ? '🤒' : (done ? '✓' : '·');
-    return `<button type="button" class="ct-check ${done && !sick ? 'on' : ''}"
-      data-ct-action="toggle-sick" data-day="${i}" title="${d}${sick ? ' — sick' : ''}"
-      aria-label="${d}${sick ? ' sick day' : ''}">${mark}</button>`;
-  }).join('');
-  return `<div class="chore-card"><h3>🔥 Routine streak</h3>
-    <div class="ct-meta">Highest tier only — they don't add up. ${tiers}</div>
-    <div style="display:flex;gap:0.3rem;margin:0.4rem 0">${dots}</div>
-    <div class="ct-meta">Best run this week: <b>${st.days} day${st.days === 1 ? '' : 's'}</b>${st.bonus ? ` → +$${st.bonus.toFixed(2)}` : ' — no bonus yet'}</div>
-    ${isParent() ? `<div class="ct-meta">Tap a day to mark it sick — sick days pause the streak instead of breaking it.</div>` : ''}</div>`;
-}
-
-/* ── Competition results ── */
-function ctRenderCompetitionCard(kid) {
-  const cw = mrCompetitionWeek(ctWeekKey, kid);
-  const rows = cw.entries.length ? cw.entries.map(c => {
-    const bits = [];
-    if (c.points) bits.push(`${c.points} pts`);
-    if ((c.placement || {}).group) bits.push(`${c.placement.group} in group`);
-    if ((c.placement || {}).overall) bits.push(`${c.placement.overall} overall`);
-    if (c.qualified) bits.push('qualified');
-    if (c.personalBest) bits.push('PB ⭐');
-    const d = formatDayKey(c.dayKey);
-    const when = `${MONTH_SHORT[d.getMonth()]} ${d.getDate()}`;
-    const title = c.name ? escapeHtml(c.name) : escapeHtml(c.sport);
-    return `<div class="ct-item"><div class="ct-item-left"><span>${title}<br><span class="ct-meta">${escapeHtml(c.sport)} · ${when} · ${escapeHtml(bits.join(' · ') || '—')}</span></span></div>
-      <span class="ct-meta">$${Number(c.awarded || 0).toFixed(2)}</span>
-      ${isParent() ? `<button type="button" class="btn-icon" data-ct-action="del-comp" data-comp-id="${escapeAttr(c.id)}" aria-label="Remove result">🗑</button>` : ''}</div>`;
-  }).join('') : `<div class="ct-meta">No results this week.</div>`;
-  return `<div class="chore-card"><h3>🏆 Competition</h3>
-    <div class="ct-meta">The official results sheet decides. No cap on points. Week: <b>$${cw.paid.toFixed(2)}</b></div>
-    ${rows}
-    ${isParent() ? `<div style="margin-top:0.5rem"><button type="button" class="pill-btn" data-ct-action="add-comp">+ Record a result</button></div>` : ''}</div>`;
-}
-
-/* ── Sunday Box & fines ── */
-function ctRenderBoxFinesCard(kid) {
-  const r = mrRulesForWeek(ctWeekKey);
-  const chores = mrChoreWeek(ctWeekKey, kid);
-  const fw = mrFinesWeek(ctWeekKey, kid, chores.days.map(d => d.paid));
-  const boxed = mrBoxItems(kid).filter(b => !b.releasedAt);
-  const boxRows = boxed.length ? boxed.map(b =>
-    `<div class="ct-item"><div class="ct-item-left"><span>📦 ${escapeHtml(b.label)}${b.repeat ? ' <span class="ct-badge">repeat −$1</span>' : ''}<br><span class="ct-meta">back Sunday, or sooner for one unpaid job</span></span></div>
-      ${isParent() ? `<button type="button" class="pill-btn" data-ct-action="release-box" data-box-id="${escapeAttr(b.id)}">Release early</button>` : ''}</div>`
-  ).join('') : `<div class="ct-meta">Box is empty.</div>`;
-  // Early releases are worth showing: they are the ones that cost a job, and
-  // seeing the job named is what keeps the price real.
-  const earlyRows = mrBoxItems(kid).filter(b => b.releasedAt && b.releasedEarly && b.redemptionJob)
-    .slice(-3).reverse().map(b =>
-      `<div class="ct-item"><div class="ct-item-left"><span>✅ ${escapeHtml(b.label)}<br><span class="ct-meta">earned back — ${escapeHtml(b.redemptionJob)}</span></span></div></div>`).join('');
-  const fineNames = {};
-  ((r.fines || {}).items || []).forEach(i => { fineNames[i.id] = i.label; });
-  const fineRows = mrFines(kid).slice(-6).reverse().map(f =>
-    `<div class="ct-item"><div class="ct-item-left"><span>${escapeHtml(fineNames[f.itemId] || f.itemId)}<br><span class="ct-meta">${escapeHtml(f.dayKey)}</span></span></div>
-      <span class="ct-meta">−$1.00</span>
-      ${isParent() ? `<button type="button" class="btn-icon" data-ct-action="del-fine" data-fine-id="${escapeAttr(f.id)}" aria-label="Remove fine">🗑</button>` : ''}</div>`).join('');
-  // Step 3 of the honesty ladder is a withdrawal of discretion, so it has to be
-  // visible where the strike was recorded — not just felt on the loan card.
-  const eff = mrHonestyEffect(kid, ctWeekKey);
-  const honestyNote = eff.losesChoices
-    ? `<div class="ct-meta">⚖️ <b>Choices withdrawn this week</b> — the free chores land on her highest-paying work instead of her lowest, and paying extra off the loan is paused.</div>`
-    : (Object.keys(eff.voidedChannels || {}).length
-        ? `<div class="ct-meta">⚖️ Voided this week: <b>${escapeHtml(Object.keys(eff.voidedChannels).join(', '))}</b></div>`
-        : '');
-  return `<div class="chore-card"><h3>📦 Sunday Box &amp; fines</h3>
-    <div class="ct-meta">Box first, fine on repeat. Everything in the box comes back at the Sunday family meeting. A day never goes below $0 — fines this week: <b>−$${fw.total.toFixed(2)}</b></div>
-    ${honestyNote}${boxRows}${earlyRows}${fineRows}
-    ${isParent() ? `<div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.5rem">
-      <button type="button" class="pill-btn" data-ct-action="box-item">📦 Box something</button>
-      <button type="button" class="pill-btn" data-ct-action="add-fine">− Add a fine</button>
-      <button type="button" class="pill-btn" data-ct-action="honesty">⚖️ Honesty</button>
-    </div>` : ''}</div>`;
-}
 
 function ctRenderMoneyCard(kid) {
   ctEnsureShared();
@@ -1212,73 +955,6 @@ function ctRenderMoneyCard(kid) {
            <button type="button" class="pill-btn" onclick="openFamilyMeeting()">🧑‍🧑‍🧒 Family meeting</button>`
         : `<button type="button" class="pill-btn" onclick="mnyOpenMyMoney('${kid}')">💰 My money</button>`}
     </div></div>`;
-}
-function ctRenderGroupCards(kid) {
-  const groups = ctGroupsForKid(kid);
-  if (!groups.length) return '';
-  return groups.map(g => {
-    const ids = g.choreIds || [];
-    const m = ids.length;
-    const val = Number(g.valueDollars) || 0;
-    const cadenceLabel = g.cadence === 'daily' ? 'day' : 'week';
-    let paid, meta;
-    const rows = ids.map(cn => {
-      let extra = '';
-      if (g.cadence === 'weekly') {
-        const wkDone = [0,1,2,3,4,5,6].some(d => ctGetOptional(ctWeekKey, d, kid, cn));
-        if (wkDone) extra = ` <span class="ct-badge ct-badge-week">done this week</span>`;
-      }
-      return ctOptCheckRow(kid, cn, extra);
-    }).join('');
-    if (g.cadence === 'daily') {
-      const n = ids.filter(cn => ctGetOptional(ctWeekKey, ctDay, kid, cn)).length;
-      paid = ctGroupFiredDaily(ctWeekKey, g.id, kid, ctDay);
-      const entry = ctGetGroupFiredEntry(ctWeekKey, g.id, kid);
-      const daysPaid = entry && entry.days ? Object.keys(entry.days).length : 0;
-      meta = `<div class="ct-meta">Today: ${n}/${m}${paid ? ` · ✅ Paid $${val.toFixed(2)} today` : ''}</div>`
-        + (daysPaid ? `<div class="ct-meta">Paid ${daysPaid} day${daysPaid > 1 ? 's' : ''} this week</div>` : '');
-    } else {
-      const n = ids.filter(cn => [0,1,2,3,4,5,6].some(d => ctGetOptional(ctWeekKey, d, kid, cn))).length;
-      paid = ctGroupFiredWeekly(ctWeekKey, g.id, kid);
-      meta = `<div class="ct-meta">${n}/${m} chores done this week${paid ? ` · ✅ Paid $${val.toFixed(2)}` : ''}</div>`;
-    }
-    return `<div class="chore-card ${paid ? 'paid' : ''}">
-      <h3>${g.icon || '🧺'} ${escapeHtml(g.name)} <span class="ct-badge ct-money-badge">$${val.toFixed(2)} / ${cadenceLabel}</span></h3>
-      ${meta}
-      ${rows}
-    </div>`;
-  }).join('');
-}
-function ctRenderExtraChoresCard(kid) {
-  const inGroups = new Set();
-  ctGroupsForKid(kid).forEach(g => (g.choreIds || []).forEach(cn => inGroups.add(cn)));
-  const extras = ctPickableChoreNames().filter(cn => !inGroups.has(cn));
-  if (!extras.length) return '';
-  const rows = extras.map(cn => ctOptCheckRow(kid, cn, '', `<span class="ct-badge">extra</span>`)).join('');
-  return `<div class="chore-card"><h3>Extra chores</h3>
-    <div class="ct-meta">Counts toward the weekly goal — no money.</div>${rows}</div>`;
-}
-function ctRenderGroupManagerCard() {
-  if (!isParent()) return '';
-  const rows = ctGroups().map(g => {
-    const kidLabel = g.kid === 'both' ? 'Both' : (g.kid === 'jenn' ? 'Jenn' : 'Jess');
-    return `<div class="ct-item">
-      <div class="ct-item-left"><span>${g.icon || '🧺'} ${escapeHtml(g.name)}</span></div>
-      <span class="ct-meta" style="margin:0">$${(Number(g.valueDollars) || 0).toFixed(2)}/${g.cadence === 'daily' ? 'day' : 'wk'} · ${kidLabel}</span>
-      <span style="display:flex;gap:0.3rem">
-        <button type="button" class="btn-icon" data-ct-action="edit-group" data-group-id="${escapeAttr(g.id)}" aria-label="Edit ${escapeAttr(g.name)}">✏️</button>
-        <button type="button" class="btn-icon" data-ct-action="delete-group" data-group-id="${escapeAttr(g.id)}" aria-label="Delete ${escapeAttr(g.name)}">🗑</button>
-      </span>
-    </div>`;
-  }).join('') || `<div class="ct-meta">No money groups yet.</div>`;
-  const legacy = !mrUsesNewModel(ctWeekKey);
-  return `<div class="chore-card"><h3>⚙️ Routines</h3>
-    <div class="ct-meta">${legacy
-      ? "Kids earn a routine's value when they finish all its chores within the cadence window."
-      : 'Routines are tracked but pay no money — that is how the house runs. Money comes from household chores.'}</div>
-    ${rows}
-    <div style="margin-top:0.5rem"><button type="button" class="pill-btn" data-ct-action="new-group">+ New group</button></div>
-  </div>`;
 }
 function ctRenderWeekControls() {
   const info = ctWeekInfo();
@@ -1443,75 +1119,10 @@ async function ctDeleteGroup(groupId) {
   saveAll();
   renderChoreTab();
 }
-function ctRenderSummaryTable() {
-  return `<div class="chore-card"><h3>8-week summary</h3>
-    <div style="overflow:auto"><table class="wf-analytics-table"><thead><tr><th>Week</th><th>Jenn Mand</th><th>Jenn Opt</th><th>Jenn $</th><th>Jess Mand</th><th>Jess Opt</th><th>Jess $</th></tr></thead><tbody>${ctWeekSummaryRows()}</tbody></table></div>
-  </div>`;
-}
 // Full pocket-money history: every week ever recorded at a family meeting, drawn
 // from finalizedWeeks (the authoritative "paid" ledger — unbounded, unlike the
 // rolling 8-week summary), with per-kid running cumulative totals.
-/* One frozen week, read back as a sentence. Only the parts that actually
-   happened are shown — a row of zeroes is noise, not a record. */
-function ctLedgerLine(L) {
-  const bits = [];
-  if (L.chores)      bits.push(`🧹 $${Number(L.chores).toFixed(2)}`);
-  if (L.learning)    bits.push(`📘 $${Number(L.learning).toFixed(2)}`);
-  if (L.streak)      bits.push(`🔥 ${L.streakDays}d $${Number(L.streak).toFixed(2)}`);
-  if (L.competition) bits.push(`🏆 $${Number(L.competition).toFixed(2)}`);
-  if (L.fines)       bits.push(`📦 −$${Number(L.fines).toFixed(2)}`);
-  if (L.xp)          bits.push(`⭐ ${L.xp} XP`);
-  if (L.loan && L.loan.paid)      bits.push(`🎿 ${L.loan.kind === 'down' ? 'deposit' : 'loan'} −$${Number(L.loan.paid).toFixed(2)}`);
-  if (L.loan && L.loan.interest)  bits.push(`interest −$${Number(L.loan.interest).toFixed(2)}`);
-  if (L.loan && L.loan.shortfall) bits.push(`overdue $${Number(L.loan.shortfall).toFixed(2)}`);
-  if ((L.voided || []).length)    bits.push(`⚖️ ${escapeHtml(L.voided.join(', '))} voided`);
-  if (L.pickWithdrawn)            bits.push(`⚖️ pick withdrawn`);
-  if (L.overflowChores)           bits.push(`${L.overflowChores} past the cap`);
-  return bits.length ? bits.join(' · ') : 'nothing earned';
-}
 
-function ctRenderMoneyHistory() {
-  ctEnsureShared();
-  const fw = state.shared.chore.finalizedWeeks || {};
-  const keys = Object.keys(fw).sort();   // YYYY-MM-DD keys sort chronologically
-  if (!keys.length) {
-    return `<div class="chore-card"><details class="ct-history"><summary><h3>💰 Full pocket-money history</h3></summary>
-      <div class="ct-meta" style="margin-top:0.3rem">No weeks recorded yet. A week appears here once you tap “Confirm &amp; record” for it in the family meeting.</div>
-    </details></div>`;
-  }
-  const ledger = state.shared.chore.moneyLedger || {};
-  let jRun = 0, kRun = 0, rows = '';
-  keys.forEach(wk => {
-    const entry = fw[wk] || {};
-    const jHas = entry.jenn != null, kHas = entry.jess != null;
-    const j = Number(entry.jenn) || 0, k = Number(entry.jess) || 0;
-    if (jHas) jRun = money2(jRun + j);
-    if (kHas) kRun = money2(kRun + k);
-    const d = formatDayKey(wk);
-    const label = `${MONTH_SHORT[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
-    rows += `<tr><td>${label}</td>`
-      + `<td>${jHas ? '$' + j.toFixed(2) : '—'}</td><td>$${jRun.toFixed(2)}</td>`
-      + `<td>${kHas ? '$' + k.toFixed(2) : '—'}</td><td>$${kRun.toFixed(2)}</td></tr>`;
-    // Where a frozen breakdown exists, show what the total was actually made
-    // of — a bare number a month later answers nothing on its own.
-    const lw = ledger[wk] || {};
-    const detail = ['jenn', 'jess'].map(kid => {
-      const L = lw[kid];
-      if (!L) return '';
-      return `<span class="ct-hist-kid">${CT_PROFILE_ICON[kid]} ${ctLedgerLine(L)}</span>`;
-    }).filter(Boolean).join('');
-    if (detail) rows += `<tr class="ct-hist-detail"><td colspan="5">${detail}</td></tr>`;
-  });
-  rows += `<tr class="ct-hist-total"><td>Total · ${keys.length} wk</td><td>$${jRun.toFixed(2)}</td><td></td><td>$${kRun.toFixed(2)}</td><td></td></tr>`;
-  const ji = CT_PROFILE_ICON['jenn'], ki = CT_PROFILE_ICON['jess'];
-  return `<div class="chore-card"><details class="ct-history">
-      <summary><h3>💰 Full pocket-money history</h3><span class="ct-meta">${keys.length} recorded week${keys.length > 1 ? 's' : ''}</span></summary>
-      <div class="ct-meta" style="margin:0.3rem 0">Every week recorded at a family meeting, oldest first, with running totals. “—” means no amount was recorded for that kid that week. Each week's breakdown is <b>frozen when it was agreed</b> — changing a price today never rewrites what a past week paid.</div>
-      <div style="overflow:auto"><table class="wf-analytics-table">
-        <thead><tr><th>Week</th><th>${ji} Jenn $</th><th>Jenn total</th><th>${ki} Jess $</th><th>Jess total</th></tr></thead>
-        <tbody>${rows}</tbody></table></div>
-    </details></div>`;
-}
 function ctApplyLegacyPayloadToState(parsed) {
   if (!parsed) return false;
   const { dataObj, optObj, goalsObj, bonusObj, startDate, updatedAt } = parsed;
@@ -1648,47 +1259,18 @@ function renderChoreTab() {
   const swept = ctSweepGroupPayouts(ctWeekKey, 'jenn').length + ctSweepGroupPayouts(ctWeekKey, 'jess').length;
   if (swept) saveAll();
 
-  // 1a: kids get the one-tap week matrix; parents keep the day-by-day
-  // management view (groups, chore names, summary, etc.).
-  // The three chore kinds render as three cards, in the order the rulebook
-  // names them: what pays, what's yours, what's just how we live.
-  const newModel = mrUsesNewModel(ctWeekKey);
-  const household = newModel ? ctRenderHouseholdChores(kid) : '';
-  const personal  = newModel ? ctRenderPersonalChores(kid) : '';
-  const learning  = newModel ? ctRenderLearningCard(kid) : '';
-  const streak    = newModel ? ctRenderStreakCard(kid) : '';
-  const comp      = newModel ? ctRenderCompetitionCard(kid) : '';
-  const boxFines  = newModel ? ctRenderBoxFinesCard(kid) : '';
-
-  wrap.innerHTML = isParent()
-    ? `
-    <div class="chore-grid">
-      ${ctRenderWeekControls()}
-      ${ctRenderMoneyCard(kid)}
-      ${household}
-      ${personal}
-      ${learning}
-      ${streak}
-      ${comp}
-      ${boxFines}
-      ${ctRenderKidSection(kid)}
-      ${ctRenderGroupCards(kid)}
-      ${ctRenderExtraChoresCard(kid)}
-      ${ctRenderGroupManagerCard()}
-      ${ctRenderChoreNamesCard()}
-      ${ctRenderSummaryTable()}
-      ${ctRenderMoneyHistory()}
-    </div>
-  `
-    // A kid gets the redesigned tab: one job, and every control on it writes a
-    // claim rather than a payment. Weeks earned under the retired group model
-    // have no chore pool to read, so those fall back to the old board.
-    : (newModel ? ckRenderKidTab(kid) : `
+  // One screen, one job. The parent's half of the week moved to the portal
+  // (js/27-chore-parent.js), so this is the kid frame for everyone — a parent
+  // opening it is asking "what does she see", which is worth being able to do.
+  //
+  // Weeks earned under the retired group model have no chore pool to read, so
+  // they keep the old board rather than rendering an empty redesign.
+  wrap.innerHTML = mrUsesNewModel(ctWeekKey) ? ckRenderKidTab(kid) : `
     <div class="chore-grid">
       ${ctRenderWeekControls()}
       ${ctRenderWeekMatrix(kid)}
       ${ctRenderMoneyCard(kid)}
     </div>
-  `);
+  `;
 }
 
