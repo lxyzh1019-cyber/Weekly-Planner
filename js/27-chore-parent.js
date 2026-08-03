@@ -172,7 +172,10 @@ function cpGraded() {
           title="${escapeAttr(x.label)}">${ckMoney(ckGradePay(r, x.g))}</button>`).join('')}</div>
     </div>`;
   }).join('');
-  return `<div class="cp-sect"><div class="cp-cap">Already graded</div>${body}</div>`;
+  // Same notice the meeting's step 1 carries, from the same reader, so the two
+  // can never end up disagreeing about whether these grades still count.
+  const banner = mnyOverrideBanner(kid, ctWeekKey, 'chores');
+  return `<div class="cp-sect"><div class="cp-cap">Already graded</div>${banner}${body}</div>`;
 }
 
 /* ── This day's planner ──
@@ -183,11 +186,15 @@ function cpPlanner() {
   const kid = cpKid();
   const day = mrChoresForDay(kid, ctWeekKey, cpDay);
   const on = new Set(day.rows.filter(x => x.scheduled).map(x => x.row.id));
+  // Chores she claimed that were never put on the day. Worth naming here
+  // rather than in the queue alone: if she keeps adding the same one, it
+  // belongs on next week's plan.
+  const added = new Set(day.rows.filter(x => x.unplanned).map(x => x.row.id));
   const pool = mrPoolRows(ctWeekKey)
     .filter(p => p.lane === 'chores' && (p.who === 'both' || p.who === kid));
   const rows = pool.map(p => `<div class="cp-plan ${on.has(p.id) ? 'on' : ''}">
       <span class="cp-qicon">${p.icon}</span>
-      <span class="cp-plan-name">${escapeHtml(p.label)}<span class="ck-item-due">due ${escapeHtml(mrDueLabel(p))}</span></span>
+      <span class="cp-plan-name">${escapeHtml(p.label)}${added.has(p.id) ? ' <span class="ck-added">she added this</span>' : ''}<span class="ck-item-due">due ${escapeHtml(mrDueLabel(p))}</span></span>
       <button type="button" class="ck-btn ${on.has(p.id) ? 'on' : ''}"
         data-cp-action="${on.has(p.id) ? 'unschedule' : 'schedule'}" data-chore-id="${escapeAttr(p.id)}">
         ${on.has(p.id) ? 'On the day' : 'Put on the day'}</button>

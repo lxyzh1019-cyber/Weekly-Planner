@@ -12,6 +12,7 @@
 let ckView = 'day';        // 'day' | 'week'
 let ckOpenChore = null;    // the one chore showing its quality words
 let ckHistoryOpen = false;
+let ckElseOpen = false;    // the "I did something else today" picker
 
 /* The three answers, and what each is worth. She judges the work; the dollar
    follows. $0 is deliberately absent — "I didn't do it" isn't a claim, it's the
@@ -147,6 +148,7 @@ function ckHeader(kid) {
         </div>
       </div>
     </div>
+    ${ckLoopChips(kid)}
     <div class="ck-chip">
       <span class="ck-chip-icon">🔥</span>
       <div><div class="ck-chip-big">${st.days}</div><div class="ck-chip-cap">day streak</div></div>
@@ -159,6 +161,45 @@ function ckHeader(kid) {
       </div>
     </div>
   </div>`;
+}
+
+/* ── Her half of the loop ──
+   She used to claim into silence: no count of what was still with Mom, and no
+   sign when an answer came back — she had to re-open the tab and re-read every
+   row to find out. Both numbers already existed; neither was ever shown.
+
+   Only on the live week, because "2 waiting" on a week from March is history,
+   not something to act on. */
+function ckLoopChips(kid) {
+  if (ctWeekKey !== ctThisWeekKey()) return '';
+  const waiting = mrWaitingCount(kid, ctWeekKey);
+  const fresh = mrNewlyGraded(kid, ctWeekKey);
+  let out = '';
+  if (waiting > 0) {
+    out += `<button type="button" class="ck-chip ck-chip-btn" data-ct-action="ck-waiting"
+        title="Go to the first one Mom hasn't answered yet">
+        <span class="ck-chip-icon">⏳</span>
+        <div><div class="ck-chip-big">${waiting}</div><div class="ck-chip-cap">waiting for Mom</div></div>
+      </button>`;
+  }
+  if (fresh.length) {
+    out += `<button type="button" class="ck-chip ck-chip-btn ck-chip-fresh" data-ct-action="ck-fresh"
+        title="Go to what Mom answered since you last looked">
+        <span class="ck-chip-icon">✨</span>
+        <div><div class="ck-chip-big">${fresh.length}</div><div class="ck-chip-cap">newly answered</div></div>
+      </button>`;
+  }
+  return out;
+}
+function ckGoWaiting() {
+  const d = mrFirstWaitingDay(ctActiveKid(), ctWeekKey);
+  if (d == null) { showToast('Nothing waiting — you are all caught up ✓'); return; }
+  ckSelectDay(d);
+}
+function ckGoFresh() {
+  const fresh = mrNewlyGraded(ctActiveKid(), ctWeekKey);
+  if (!fresh.length) return;
+  ckSelectDay(fresh.sort((a, b) => a.dayIdx - b.dayIdx)[0].dayIdx);
 }
 
 /* ── Control strip: which day, and the four dots that summarise it ── */
@@ -319,12 +360,16 @@ function ckChores(kid) {
 
   if (!rows.length) {
     return `<div class="ck-sect">${head}
-      <div class="ck-empty">Nothing on today's plan. A chore only turns up here once it's been put on the day in the weekly planner — so today there is nothing to answer for.</div>
+      <div class="ck-empty">Nothing on today's plan — so there is nothing here to answer for yet.</div>
+      ${ckSomethingElse(kid)}
       ${day.unresolved.length ? `<div class="ck-warn">The planner asked for ${escapeHtml(day.unresolved.join(', '))}, which isn't in the chore list — tell a grown-up so it can count.</div>` : ''}
     </div>`;
   }
 
-  const body = rows.map(({ row }) => {
+  // Captured before the render marks them seen, so "new since you last looked"
+  // survives the very render that clears it.
+  const seenBefore = mrLastGradeSeen(kid);
+  const body = rows.map(({ row, unplanned }) => {
     const grade = mrGetChoreGrade(kid, ctWeekKey, ctDay, row.id);
     const claim = mrGetClaim(kid, ctWeekKey, ctDay, row.id);
     const free = freeIds.has(row.id);
@@ -332,10 +377,11 @@ function ckChores(kid) {
     const due = mrDueLabel(row);
 
     let state = 'todo', mark = '', status = `by ${escapeHtml(due)}`, pay = '', payCls = '';
+    const isFresh = mrGradedAt(kid, ctWeekKey, ctDay, row.id) > seenBefore;
     if (grade > 0) {
       state = 'graded'; mark = '✓';
       const word = (CK_QUALITY.find(q => q.g === grade) || {}).word || '';
-      status = `${escapeHtml(word.toLowerCase())} · Mom agreed`;
+      status = `${escapeHtml(word.toLowerCase())} · Mom agreed${isFresh ? ' · new ✨' : ''}`;
       pay = free ? 'free' : ckMoney(ckGradePay(r, grade));
       payCls = 'ck-green';
     } else if (claim > 0) {
@@ -357,11 +403,11 @@ function ckChores(kid) {
           <span class="ck-qpay">${ckMoney(ckGradePay(r, q.g))}</span></button>`).join('')}
       </div></div>` : '';
 
-    return `<div class="ck-chore ck-chore-${state} ${open ? 'open' : ''}">
+    return `<div class="ck-chore ck-chore-${state} ${open ? 'open' : ''} ${isFresh && grade > 0 ? 'ck-chore-fresh' : ''}">
       <button type="button" class="ck-chore-row" data-ct-action="ck-chore-row" data-chore-id="${escapeAttr(row.id)}">
         <span class="ck-check ${state !== 'todo' ? 'on' : ''} ${state === 'claimed' ? 'ring' : ''}">${mark}</span>
         <span class="ck-chore-icon">${row.icon}</span>
-        <span class="ck-chore-name">${escapeHtml(row.label)}
+        <span class="ck-chore-name">${escapeHtml(row.label)}${unplanned ? ' <span class="ck-added">you added this</span>' : ''}
           <span class="ck-chore-status">${status}</span></span>
         <span class="ck-chore-pay ${payCls}">${pay}</span>
       </button>${quality}</div>`;
@@ -373,9 +419,54 @@ function ckChores(kid) {
   return `<div class="ck-sect">${head}
     <div class="ck-sub">Tap the row, then say how it went. Mom checks it after.</div>
     ${body}
+    ${ckSomethingElse(kid)}
     <div class="ck-note">${free}</div>
     ${day.unresolved.length ? `<div class="ck-warn">The planner also asked for ${escapeHtml(day.unresolved.join(', '))}, which isn't in the chore list — tell a grown-up so it can count.</div>` : ''}
   </div>`;
+}
+
+/* ── "I did something else" ──
+   The planner is where a chore is meant to be arranged, and that is a good
+   rule for what the app expects. It is a bad rule for what actually happens:
+   she vacuums without being asked, and until now there was nowhere to put it —
+   the work was uncountable and unpayable, and the only fix was a grown-up
+   scheduling it retroactively from the portal.
+
+   This is the kid-side door, and it does not weaken the gate: it files a
+   CLAIM, exactly like every other chore on this screen, and a parent still
+   grades it before a cent moves. */
+function ckUnlistedChores(kid) {
+  const onToday = new Set(mrChoresForDay(kid, ctWeekKey, ctDay).rows.map(x => x.row.id));
+  return mrPoolRows(ctWeekKey).filter(row =>
+    row.lane === 'chores' && !onToday.has(row.id) && (row.who === 'both' || row.who === kid));
+}
+function ckSomethingElse(kid) {
+  const left = ckUnlistedChores(kid);
+  if (!left.length) return '';
+  if (!ckElseOpen) {
+    return `<button type="button" class="ck-else-btn" data-ct-action="ck-else">
+      ＋ I did something else today</button>`;
+  }
+  const rows = left.map(row => `<button type="button" class="ck-else-row"
+      data-ct-action="ck-else-pick" data-chore-id="${escapeAttr(row.id)}">
+      <span class="ck-chore-icon">${row.icon}</span>
+      <span class="ck-chore-name">${escapeHtml(row.label)}</span>
+      <span class="ck-chore-pay">${ckMoney(ckGradePay(mrRulesForWeek(ctWeekKey), 3))}</span>
+    </button>`).join('');
+  return `<div class="ck-else">
+      <div class="ck-else-cap">Which one did you do?</div>
+      <div class="ck-sub">It goes to Mom the same way — she still decides what it was worth.</div>
+      ${rows}
+      <button type="button" class="ck-else-btn" data-ct-action="ck-else">Never mind ▾</button>
+    </div>`;
+}
+function ckToggleElse() { ckElseOpen = !ckElseOpen; renderChoreTab(); }
+function ckPickElse(choreId) {
+  const kid = ctActiveKid();
+  const row = mrPoolRow(choreId, ctWeekKey);
+  if (!row) return;
+  ckElseOpen = false;
+  openChoreClaimPrompt(kid, ctWeekKey, ctDay, choreId, row.label).then(() => renderChoreTab());
 }
 
 /* ── Learning ── */
@@ -592,6 +683,14 @@ function ckRail(kid) {
 
 /* ── The tab ── */
 function ckRenderKidTab(kid) {
+  const html = ckBuildKidTab(kid);
+  // After building, not before: the rows above read lastGradeSeen to decide
+  // what to flag, so stamping first would clear the markers on the render that
+  // was meant to show them. A parent viewing her tab never consumes them.
+  mrMarkGradesSeen(kid);
+  return html;
+}
+function ckBuildKidTab(kid) {
   const main = ckView === 'day'
     ? `${ckRoutines(kid)}${ckOwnLanes(kid)}${ckChores(kid)}${ckLearning(kid)}${ckAttitude(kid)}${ckLoops(kid)}`
     : ckWeekGrid(kid);
@@ -608,8 +707,8 @@ function ckRenderKidTab(kid) {
 
 /* ── Actions ──
    Every one of these writes a claim or a tick, never a grade. */
-function ckSetView(v) { ckView = v === 'week' ? 'week' : 'day'; ckOpenChore = null; renderChoreTab(); }
-function ckSelectDay(d) { ctDay = Math.max(0, Math.min(6, d)); ckOpenChore = null; renderChoreTab(); }
+function ckSetView(v) { ckView = v === 'week' ? 'week' : 'day'; ckOpenChore = null; ckElseOpen = false; renderChoreTab(); }
+function ckSelectDay(d) { ctDay = Math.max(0, Math.min(6, d)); ckOpenChore = null; ckElseOpen = false; renderChoreTab(); }
 function ckToggleHistory() { ckHistoryOpen = !ckHistoryOpen; renderChoreTab(); }
 function ckPickWeek(wk) { ctWeekKey = wk; ctDay = 0; ckHistoryOpen = false; ckOpenChore = null; renderChoreTab(); }
 

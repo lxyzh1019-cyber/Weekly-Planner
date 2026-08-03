@@ -455,9 +455,52 @@ function mrSetChoreGrade(kid, weekKey, dayIdx, choreId, grade) {
   if (!e.chores[d]) e.chores[d] = {};
   const g = Math.max(0, Math.min(3, Number(grade) || 0));
   if (g === 0) delete e.chores[d][choreId]; else e.chores[d][choreId] = g;
+  // When it was answered, so the kid's tab can show her what is new since she
+  // last looked. Without this she claims into silence: she has to re-open the
+  // tab and re-read every row to find out whether anything was decided.
+  if (!e.gradedAt) e.gradedAt = {};
+  if (!e.gradedAt[d]) e.gradedAt[d] = {};
+  if (g === 0) delete e.gradedAt[d][choreId]; else e.gradedAt[d][choreId] = Date.now();
   mrStampEarnings(kid, weekKey);
   saveAll();
   return true;
+}
+function mrGradedAt(kid, weekKey, dayIdx, choreId) {
+  const e = mrEnsureEarnings(kid, weekKey);
+  return Number(((e.gradedAt || {})[String(dayIdx)] || {})[choreId]) || 0;
+}
+/* ── What she hasn't seen yet ──
+   Two halves of the same loop: what is still with Mom, and what came back
+   while she wasn't looking. Both read from records that already exist. */
+function mrWaitingCount(kid, weekKey) {
+  return mrClaimQueue(weekKey, kid).length;
+}
+function mrFirstWaitingDay(kid, weekKey) {
+  const q = mrClaimQueue(weekKey, kid);
+  return q.length ? q[0].dayIdx : null;
+}
+function mrLastGradeSeen(kid) {
+  const pr = getProfData(kid).progress || {};
+  return Number(pr.lastGradeSeen) || 0;
+}
+function mrNewlyGraded(kid, weekKey) {
+  const since = mrLastGradeSeen(kid);
+  const e = mrEnsureEarnings(kid, weekKey);
+  const out = [];
+  Object.keys(e.gradedAt || {}).forEach(d => {
+    Object.keys(e.gradedAt[d] || {}).forEach(id => {
+      if (e.gradedAt[d][id] > since) out.push({ dayIdx: Number(d), choreId: id });
+    });
+  });
+  return out;
+}
+/* Stamped when the kid's own tab renders — a parent looking at her screen must
+   not consume her "new" markers, or she never sees them. */
+function mrMarkGradesSeen(kid) {
+  if (isParent()) return;
+  const pd = getProfData(kid);
+  if (!pd.progress) pd.progress = {};
+  pd.progress.lastGradeSeen = Date.now();
 }
 function mrGetPersonal(kid, weekKey, dayIdx, choreId) {
   const e = mrEnsureEarnings(kid, weekKey);
@@ -590,6 +633,21 @@ function mrChoresForDay(kid, weekKey, dayIdx) {
     if (mrLane(row.lane).needsBlock || seen.has(row.id) || !forKid(row)) return;
     seen.add(row.id);
     rows.push({ row, tag: row.id, blockId: null, scheduled: false });
+  });
+  // A chore that was DONE but never planned. The pool/planner rule ("the pool
+  // says what a chore is; the planner says when") is right about what the app
+  // expects and wrong about what happens — she mops without being asked, and
+  // this reader had no way to represent that, so the work was uncountable and
+  // unpayable. A claim or a grade on the day is evidence enough that it
+  // happened; nothing is paid until a grown-up grades it either way.
+  const e = mrEnsureEarnings(kid, weekKey);
+  const d = String(dayIdx);
+  new Set([...Object.keys(e.claims[d] || {}), ...Object.keys(e.chores[d] || {})]).forEach(id => {
+    if (seen.has(id)) return;
+    const row = mrPoolRow(id, weekKey);
+    if (!row || !forKid(row)) return;
+    seen.add(id);
+    rows.push({ row, tag: id, blockId: null, scheduled: false, unplanned: true });
   });
   rows.sort((a, b) => {
     const da = mrDueMinutes(a.row), db = mrDueMinutes(b.row);

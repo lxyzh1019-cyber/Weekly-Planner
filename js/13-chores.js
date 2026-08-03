@@ -541,6 +541,10 @@ function ctHandleWrapClick(e) {
   else if (a === 'ck-routine-item') ckToggleRoutineItem(el.dataset.blockId, el.dataset.itemId);
   else if (a === 'ck-routine-all') ckCloseRoutine(el.dataset.blockId);
   else if (a === 'ck-attitude') ckRateSelf(+el.dataset.day, +el.dataset.n);
+  else if (a === 'ck-waiting') ckGoWaiting();
+  else if (a === 'ck-fresh') ckGoFresh();
+  else if (a === 'ck-else') ckToggleElse();
+  else if (a === 'ck-else-pick') ckPickElse(el.dataset.choreId);
 }
 
 function ctActiveKid() { return isParent() ? ctParentKid : activeProfile(); }
