@@ -917,6 +917,9 @@
     align-items: center;
     flex-wrap: wrap;
   }
+  /* Right-hand group of a plain .topbar (the chore screen), so a screen can
+     carry an action next to its profile badge. */
+  .topbar-actions { display: flex; gap: 0.5rem; align-items: center; }
   .day-topbar-actions .btn-icon {
     padding: 0.34rem 0.62rem;
     font-size: 1.16rem;

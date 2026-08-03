@@ -383,17 +383,37 @@ function loanSundayTransfer(kid, choice, opts) {
   if (l.lastPaymentMonth === mk && !o.force) {
     return { status: 'already-this-month', paid: 0, shortfall: 0, kind: duty.kind };
   }
-  const due = money2(duty.amount);
+  // The family can agree at the meeting to pay less than the schedule this
+  // month (opts.cap). The rest is NOT forgiven — it lands in arrears below,
+  // exactly as an unaffordable month would, so the cost is the same whether
+  // she couldn't pay or chose not to.
+  const scheduled = money2(duty.amount);
+  const due = (o.cap == null) ? scheduled : money2(Math.max(0, Math.min(o.cap, scheduled)));
   const kind = duty.kind;
-  if (!(due > 0)) return { status: 'nothing-due', paid: 0, shortfall: 0 };
+  if (!(scheduled > 0)) return { status: 'nothing-due', paid: 0, shortfall: 0 };
+  if (!(due > 0)) {
+    l.arrears = money2(l.arrears + scheduled);
+    l.lastPaymentMonth = mk;
+    saveAll();
+    return { status: 'deferred', paid: 0, shortfall: scheduled, kind, debtId: l.id, name: l.name, icon: l.icon };
+  }
 
-  const settle = (res) => { l.lastPaymentMonth = mk; saveAll(); return Object.assign({ kind, debtId: l.id, name: l.name, icon: l.icon }, res); };
+  // Whatever the agreed payment leaves unpaid of the scheduled amount still
+  // has to be owed, on every path out of here.
+  const agreedShort = money2(scheduled - due);
+  const settle = (res) => {
+    if (agreedShort > 0) l.arrears = money2(l.arrears + agreedShort);
+    l.lastPaymentMonth = mk;
+    saveAll();
+    return Object.assign({ kind, debtId: l.id, name: l.name, icon: l.icon }, res,
+      { shortfall: money2((res.shortfall || 0) + agreedShort) });
+  };
   const w = ensureWallet(kid);
 
   if (w.cash >= due) {
     w.cash = money2(w.cash - due);
     loanRecordPayment(kid, due, kind, l.id);
-    return settle({ status: 'paid', paid: due, shortfall: 0 });
+    return settle({ status: agreedShort > 0 ? 'partial' : 'paid', paid: due, shortfall: 0 });
   }
 
   const available = money2(w.cash);
@@ -429,8 +449,15 @@ function loanSundayTransfer(kid, choice, opts) {
 /* Every debt's scheduled payment, highest bonus first — what the meeting runs.
    Returns one result per debt so the recap can name each. */
 function mnySundayTransferAll(kid, choice, opts) {
+  const o = opts || {};
   return mnyDebtsByPriority(kid)
-    .map(d => loanSundayTransfer(kid, choice, Object.assign({}, opts, { debtId: d.id })))
+    .map(d => {
+      // A payment the family agreed down at the meeting caps this debt's
+      // transfer; without a week to read overrides from, the schedule stands.
+      const cap = (o.weekKey && typeof mnyGetPaymentOverride === 'function')
+        ? mnyGetPaymentOverride(kid, o.weekKey, d.id) : null;
+      return loanSundayTransfer(kid, choice, Object.assign({}, o, { debtId: d.id, cap }));
+    })
     .filter(r => r && r.status !== 'cleared' && r.status !== 'not-started' && r.status !== 'nothing-due');
 }
 

@@ -563,7 +563,7 @@ function commitKidWeek(wk, kid, opts) {
       // Both of these are stamped by calendar month inside the loan module —
       // the meeting is weekly, the schedule is monthly, so most Sundays this
       // correctly does nothing. Every debt is paid, highest bonus rate first.
-      const transfers = mnySundayTransferAll(kid, o.shortfall || 'pay_available');
+      const transfers = mnySundayTransferAll(kid, o.shortfall || 'pay_available', { weekKey: wk });
       const t = transfers[0] || { paid: 0, shortfall: 0, kind: null };
       transfers.forEach(r => {
         const what = r.kind === 'down' ? 'down payment' : r.name;

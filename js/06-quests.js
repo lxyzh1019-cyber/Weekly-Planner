@@ -160,22 +160,9 @@ function renderQuestMoneyStrip(kid) {
 
   ctPrepareRead();
   const wk = ctThisWeekKey();   // real current week, independent of chore-tab nav
-  const today = formatDayKey(todayKey());
-  const dayIdx = Math.max(0, Math.min(6, Math.round((today - formatDayKey(wk)) / (24*60*60*1000))));
-  const chips = ctGroupsForKid(kid).map(g => {
-    const ids = g.choreIds || [];
-    const m = ids.length;
-    let n, paid;
-    if (g.cadence === 'daily') {
-      n = ids.filter(c => ctGetOptional(wk, dayIdx, kid, c)).length;
-      paid = ctGroupFiredDaily(wk, g.id, kid, dayIdx);
-    } else {
-      n = ids.filter(c => [0,1,2,3,4,5,6].some(d => ctGetOptional(wk, d, kid, c))).length;
-      paid = ctGroupFiredWeekly(wk, g.id, kid);
-    }
-    return `<span class="qms-chip ${paid ? 'paid' : ''}">${g.icon || '🧺'} ${paid ? '✓' : `${n}/${m}`}</span>`;
-  }).join('');
-
+  // (A per-group chip row was built here and never rendered — it read the
+  // retired chore-group store, so it would have shown 0/0 on every current
+  // week anyway. buildHowIEarnCard is the whole panel.)
   panel.hidden = false;
   panel.innerHTML = buildHowIEarnCard(kid, wk);
 }

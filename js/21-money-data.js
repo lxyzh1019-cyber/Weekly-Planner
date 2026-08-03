@@ -42,6 +42,11 @@ const MNY_STAGES = [
    `loan` is special: there is one row per debt, built at render time. */
 const MNY_BUCKETS = [
   { key: 'loan',  icon: '🎿', label: 'Pay off',        need: 0,  tint: '#eaf6ef' },
+  // Spending is a real answer to "what do I do with it", and a system that
+  // only ever offers ways to defer teaches deferring, not choosing. Open from
+  // the first week — but capped at a fifth, so a whole week can never vanish
+  // into one afternoon.
+  { key: 'spend', icon: '🛍️', label: 'Spend it',       need: 0,  tint: '#fff0f0' },
   { key: 'ready', icon: '💵', label: 'Keep it ready',  need: 30, tint: '#fff9e9' },
   { key: 'gic',   icon: '🔒', label: 'Lock it away for a year', need: 60, tint: '#eef3fb' },
   { key: 'stock', icon: '📈', label: 'Buy a bit of a company',  need: 90, tint: '#f6effa' },
@@ -54,7 +59,7 @@ const MNY_PLANS = [
   { id: 'balanced', icon: '⚖️', label: 'A bit of everything',   need: 60,  split: { loan: 0.4, ready: 0.3, gic: 0.3 } },
   { id: 'grow',     icon: '📈', label: 'Grow it more',          need: 90,  split: { loan: 0.3, ready: 0.1, gic: 0.2, stock: 0.4 } },
   { id: 'last',     icon: '🔁', label: 'Same as last week',     need: 0,   split: null },
-  { id: 'own',      icon: '🧩', label: "I'll choose every number myself", need: 100, split: null, own: true },
+  { id: 'own',      icon: '🧩', label: "I'll choose every number myself", need: 30, split: null, own: true },
 ];
 
 /* Investing is a fixed menu — no typing in a ticker. A nine-year-old picking a
@@ -88,12 +93,18 @@ function mnyReasonLabel(id) {
 }
 
 /* One question, every week. Three answers, so it gets answered. */
+/* Each answer names a plan, so picking one visibly re-shapes the split rather
+   than just unlocking the commit button. `effect` says what it did, in the
+   same words as the answer, so the connection is not a guess. */
 const MNY_REFLECT = {
   question: 'What is this money for?',
   chips: [
-    { id: 'sooner',  label: 'Getting my loan gone sooner' },
-    { id: 'saving',  label: 'Saving for something big' },
-    { id: 'growing', label: 'Learning how money grows' },
+    { id: 'sooner',  label: 'Getting my loan gone sooner', planId: 'debt',
+      effect: 'Then most of it goes onto the loan.' },
+    { id: 'saving',  label: 'Saving for something big', planId: 'ready',
+      effect: 'Then more of it stays where you can reach it.' },
+    { id: 'growing', label: 'Learning how money grows', planId: 'balanced',
+      effect: 'Then it gets spread across a few places, so you can watch what each one does.' },
   ],
 };
 
@@ -101,7 +112,7 @@ const MNY_REFLECT = {
 const MNY_CHECKS = [
   { id: 'c1', label: 'Chores graded for all six days' },
   { id: 'c2', label: 'Learning pages counted' },
-  { id: 'c3', label: 'Streak days agreed' },
+  { id: 'c3', label: 'Routine days agreed (morning / afternoon / evening)' },
   { id: 'c4', label: 'Anything boxed this week talked about' },
   { id: 'c5', label: 'Competition results sheet in hand' },
   { id: 'c6', label: 'Money from outside written down' },
@@ -135,6 +146,11 @@ const MNY_CONCEPTS = [
     what: 'Money you can use today, sitting in your wallet.',
     why: 'It is ready the moment you need it.',
     risk: 'It does not grow at all while it sits there.' },
+  { id: 'spend', icon: '🛍️', title: 'Spending some of it', need: 0,
+    what: 'Money you decide to actually use, on something you want.',
+    why: 'Money is for something. Choosing what, and living with the choice, is the whole skill.',
+    risk: 'It is gone once it is spent, and it never comes back as more. That is why only a fifth of a week can go here.',
+    whyLabel: 'The good side', riskLabel: 'The other side' },
   { id: 'extra', icon: '⚡', title: 'Paying early', need: 0,
     what: 'Paying more off {debt} than you have to, before it is due.',
     why: 'You earn a bonus for it, and {debt} is gone sooner.',
@@ -617,7 +633,7 @@ function mnyDepositTotal(kid, weekKey) {
 const MNY_CHANNELS = [
   { key: 'chores',   icon: '🧹', label: 'Jobs around the house' },
   { key: 'learning', icon: '📚', label: 'Learning' },
-  { key: 'streak',   icon: '🔥', label: 'Clean days in a row' },
+  { key: 'streak',   icon: '🔥', label: 'Routines kept — morning, afternoon, evening' },
   { key: 'comp',     icon: '🏆', label: 'Competition days' },
   { key: 'fines',    icon: '⚖️', label: 'Taken off' },
 ];
@@ -779,18 +795,65 @@ function mnyPreviousPlan(weekKey, kid) {
    inflow. Tagging gifts with a destination at entry looked tidier and was
    wrong twice over: it let the same fifty dollars be spent in two places, and
    it made the loan payment look like a claim on her chores specifically. */
+/* ── Paying less than the schedule asks ──
+   The scheduled payment is what the loan agreement says. It is not a law of
+   physics: a family sitting at the table can decide to pay less this month,
+   and the whole point of the meeting is to see what that costs before saying
+   yes. An override is per-week and per-debt, parent-set, and never silently
+   forgiven — the shortfall still runs through the arrears the rules define.
+
+   Stored beside the earnings overrides so it freezes into the week's ledger
+   with everything else that was decided that Sunday. */
+function mnyPaymentOverrides(kid, weekKey) {
+  const e = mrEnsureEarnings(kid, weekKey);
+  if (!e.paymentOverrides) e.paymentOverrides = {};
+  return e.paymentOverrides;
+}
+function mnyGetPaymentOverride(kid, weekKey, debtId) {
+  const v = mnyPaymentOverrides(kid, weekKey)[debtId];
+  return v == null ? null : money2(v);
+}
+function mnySetPaymentOverride(kid, weekKey, debtId, amount) {
+  if (!isParent()) { showToast('A grown-up changes the payment 🔒'); return false; }
+  const ov = mnyPaymentOverrides(kid, weekKey);
+  if (amount == null) delete ov[debtId];
+  else ov[debtId] = money2(Math.max(0, amount));
+  mrStampEarnings(kid, weekKey);
+  saveAll();
+  return true;
+}
+/* What each debt is actually being paid this week: the schedule, or the
+   agreed-down figure. One reader, so the pool, the card and the commit can't
+   disagree about the number. */
+function mnyDueThisWeek(kid, weekKey) {
+  return mnyDueNowAll(kid).map(d => {
+    const ov = mnyGetPaymentOverride(kid, weekKey, d.debt.id);
+    const amount = ov == null ? money2(d.amount) : money2(Math.min(ov, d.amount));
+    return Object.assign({}, d, { scheduled: money2(d.amount), amount, reduced: ov != null && amount < money2(d.amount) });
+  });
+}
+
 function mnyPool(weekKey, kid) {
   const b = mrWeekBreakdown(weekKey, kid);
   const deposits = mnyDepositTotal(kid, weekKey);
   const cameIn = money2(b.net + deposits);
   // The schedule draws on the whole pool, like any real payment does.
-  const mustPay = money2(Math.min(mnyDueNowTotal(kid), cameIn));
+  const due = mnyDueThisWeek(kid, weekKey);
+  const dueTotal = money2(due.reduce((s, d) => s + money2(d.amount), 0));
+  const scheduledTotal = money2(due.reduce((s, d) => s + money2(d.scheduled), 0));
+  const mustPay = money2(Math.min(dueTotal, cameIn));
   const mine = money2(Math.max(0, cameIn - mustPay));
   return {
-    breakdown: b, deposits, cameIn, mustPay, mine,
+    breakdown: b, deposits, cameIn, mustPay, mine, due,
+    scheduledPay: scheduledTotal,
+    // What the family agreed NOT to pay this month. It does not vanish — the
+    // debt still carries it, and arrears still apply.
+    unpaid: money2(Math.max(0, scheduledTotal - dueTotal)),
     // Investing is capped at a fifth of the week: a bad month should sting,
     // not wipe out everything she earned.
     stockCap: money2(mine * 0.2),
+    // Spending is capped the same way — see MNY_BUCKETS 'spend'.
+    spendCap: money2(mine * 0.2),
   };
 }
 
@@ -801,7 +864,7 @@ function mnyPool(weekKey, kid) {
 function mnySplitFor(weekKey, kid, planId, own) {
   const pool = mnyPool(weekKey, kid);
   const debts = mnyDebtsByPriority(kid).filter(d => loanBalance(kid, d.id) > 0);
-  const out = { ready: 0, gic: 0, stock: 0 };
+  const out = { ready: 0, gic: 0, stock: 0, spend: 0 };
   debts.forEach(d => { out['loan:' + d.id] = 0; });
   // A row per goal she is still saving for. Goals are never stage-locked —
   // they are the reason to save, so gating them behind a lesson about saving
@@ -964,7 +1027,7 @@ function mnyIncomeSegments(weekKey, kid) {
   const out = mnySegments([
     { label: 'Jobs',           value: b.chorePaid,    color: '#95d5b2' },
     { label: 'Learning',       value: b.learnPaid,    color: '#6fb1fc' },
-    { label: 'Clean days',     value: b.streakBonus,  color: '#ffd166' },
+    { label: 'Routines kept',  value: b.streakBonus,  color: '#ffd166' },
     { label: 'Competitions',   value: b.compPaid,     color: '#ff9eb5' },
     { label: 'From outside',   value: pool.deposits,  color: '#c9a6e8' },
     { label: 'Made on its own', value: Math.max(0, passive), color: '#b8b0a2' },
@@ -984,6 +1047,7 @@ function mnyOutflowSegments(weekKey, kid, split) {
     const v = money2(s['goal:' + g.id]);
     if (v > 0) rows.push({ label: 'Toward ' + g.name, value: v, color: '#ffb4a2' });
   });
+  rows.push({ label: 'Spent',        value: money2(s.spend), color: '#ff9eb5' });
   rows.push({ label: 'Kept ready',   value: money2(s.ready), color: '#ffd166' });
   rows.push({ label: 'Locked away',  value: money2(s.gic),   color: '#6fb1fc' });
   rows.push({ label: 'Bit of a company', value: money2(s.stock), color: '#c9a6e8' });

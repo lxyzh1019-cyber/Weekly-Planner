@@ -439,7 +439,7 @@ function mnyHistoryEditor(kid) {
             <b>${mnyMoney(r.net)}</b>
           </div>
           ${r.handEntered ? `<div class="mny-rows">
-              ${f('Jobs', 'chores', 1)}${f('Learning', 'learning', 1)}${f('Clean days', 'streak', 1)}
+              ${f('Jobs', 'chores', 1)}${f('Learning', 'learning', 1)}${f('Routines', 'streak', 1)}
               ${f('Competitions', 'competition', 5)}${f('From outside', 'outside', 5)}${f('Taken off', 'fines', 1)}
               ${f('Kept ready', 'ready', 1)}${f('Locked away', 'gic', 5)}${f('Into companies', 'stock', 1)}
               ${f('Paid off early', 'debtExtra', 1)}
@@ -450,7 +450,7 @@ function mnyHistoryEditor(kid) {
           : `<div class="mny-rows">
               <div class="mny-row"><span>Jobs</span><b>${mnyMoney(r.chores)}</b></div>
               <div class="mny-row"><span>Learning</span><b>${mnyMoney(r.learning)}</b></div>
-              <div class="mny-row"><span>Clean days</span><b>${mnyMoney(r.streak)}</b></div>
+              <div class="mny-row"><span>Routines kept</span><b>${mnyMoney(r.streak)}</b></div>
               <div class="mny-row"><span>Competitions</span><b>${mnyMoney(r.competition)}</b></div>
               <div class="mny-row"><span>Taken off</span><b>${mnyMoney(r.fines)}</b></div>
               ${r.editReason ? `<div class="mny-row"><span>Changed at the meeting</span><b>${escapeHtml(mnyReasonLabel(r.editReason))}</b></div>` : ''}
