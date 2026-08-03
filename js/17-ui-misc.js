@@ -15,6 +15,7 @@ function _closeAppDialog(result) {
   const resolve = _appDialogResolve;
   _appDialogResolve = null;
   document.removeEventListener('keydown', _appDialogKey, true);
+  document.removeEventListener('keydown', _appChoiceKey, true);
   if (resolve) resolve(result);
 }
 function _appDialogKey(e) {
@@ -91,6 +92,53 @@ function showCheckConfirm(message, checkLabel, opts = {}) {
 }
 function showPrompt(message, opts = {}) {
   return _appDialog({ message, kind: 'prompt', value: opts.value || '', inputType: opts.type || 'text', okLabel: opts.okLabel || 'OK', cancelLabel: opts.cancelLabel || 'Cancel' });
+}
+/* One question, N answers, each its own button — for "how did it go?", where
+   OK/Cancel can't express the answer. Resolves the chosen option's `id`, or
+   null if it was dismissed. `options` is [{ id, label, sub }]. */
+function showChoice(message, options, opts = {}) {
+  if (_appDialogResolve) _closeAppDialog(null);
+  let ov = document.getElementById('appDialogOverlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.className = 'overlay';
+    ov.id = 'appDialogOverlay';
+    ov.addEventListener('click', e => { if (e.target === ov) _appDialogCancel(); });
+    document.body.appendChild(ov);
+  }
+  const btns = (options || []).map((o, i) =>
+    `<button type="button" class="app-dialog-choice" data-choice="${i}">
+       <span class="app-dialog-choice-label">${escapeHtml(o.label)}</span>
+       ${o.sub ? `<span class="app-dialog-choice-sub">${escapeHtml(o.sub)}</span>` : ''}
+     </button>`).join('');
+  ov.innerHTML =
+    `<div class="sheet app-dialog-sheet" role="dialog" aria-modal="true">
+      <div class="sheet-handle"></div>
+      <p class="app-dialog-msg">${escapeHtml(message)}</p>
+      <div class="app-dialog-choices">${btns}</div>
+      <div class="app-dialog-btns">
+        <button type="button" class="pill-btn app-dialog-cancel" onclick="_closeAppDialog(null)">${escapeHtml(opts.cancelLabel || 'Not yet')}</button>
+      </div>
+    </div>`;
+  ov.querySelectorAll('[data-choice]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const o = options[Number(btn.getAttribute('data-choice'))];
+      _closeAppDialog(o ? o.id : null);
+    });
+  });
+  return new Promise(resolve => {
+    _appDialogResolve = resolve;
+    ov.classList.add('open');
+    // Escape dismisses; Enter must NOT, because there is no single default
+    // answer here — _appDialogKey's Enter branch would resolve `true`, which is
+    // not one of the ids the caller is waiting for.
+    document.addEventListener('keydown', _appChoiceKey, true);
+    const first = ov.querySelector('[data-choice]');
+    if (first) first.focus();
+  });
+}
+function _appChoiceKey(e) {
+  if (e.key === 'Escape') { e.preventDefault(); _closeAppDialog(null); }
 }
 
 // ── App-wide double-tap / double-click guard for committing actions ──

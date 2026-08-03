@@ -388,7 +388,20 @@ function mergeRemoteState(remote) {
   refreshCurrentScreen();
 }
 
+/* Redraw whatever is on screen after a remote snapshot lands.
+
+   The kid-facing money pages and the quest board were missing from this list,
+   which is why a parent's edit showed up in the portal immediately but a kid
+   staring at her own money page saw a stale number until she navigated away
+   and back. The meeting overlay is not a `.screen` at all, so it needs its own
+   check — and it redraws through renderMeetingMode, which preserves scroll and
+   focus, so an incoming sync can't yank a parent's cursor out of a field
+   mid-meeting. */
 function refreshCurrentScreen() {
+  const meeting = document.getElementById('familyMeetingOverlay');
+  if (meeting && meeting.classList.contains('open') && typeof renderMeetingMode === 'function') {
+    renderMeetingMode();
+  }
   const active = document.querySelector('.screen.active');
   if (!active) return;
   if (active.id === 'screen-week') renderWeek();
@@ -396,5 +409,9 @@ function refreshCurrentScreen() {
   else if (active.id === 'screen-chore') renderChoreTab();
   else if (active.id === 'screen-sync') renderSync();
   else if (active.id === 'screen-parent') renderParentHome();
+  else if (active.id === 'screen-mymoney' && typeof mnyRenderMyMoney === 'function') mnyRenderMyMoney();
+  else if (active.id === 'screen-moneystory' && typeof mnyRenderStory === 'function') mnyRenderStory();
+  else if (active.id === 'screen-moneyschool' && typeof mnyRenderSchool === 'function') mnyRenderSchool();
+  else if (active.id === 'screen-quest' && typeof renderQuestBoard === 'function') renderQuestBoard();
 }
 

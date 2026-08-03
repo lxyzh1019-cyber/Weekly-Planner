@@ -133,7 +133,7 @@ function ckHeader(kid) {
   const lv = mrXpLevelInfo(kid, ctWeekKey);
   const st = mrStreakWeek(ctWeekKey, kid);
   const label = `${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()} – ${MONTH_SHORT[info.sun.getMonth()]} ${info.sun.getDate()}`;
-  const isThisWeek = ctWeekKey === ctDateToKey(ctMondayOf(new Date()));
+  const isThisWeek = ctWeekKey === ctThisWeekKey();
   return `<div class="ck-head">
     <div class="ck-head-who">
       <span class="ck-head-icon">${CT_PROFILE_ICON[kid]}</span>
@@ -215,7 +215,7 @@ function ckHistory(kid) {
     const st = mrStreakWeek(wk, kid);
     rows += `<button type="button" class="ck-hist-row" data-ct-action="ck-history-pick" data-week="${escapeAttr(wk)}">
       <span class="ck-hist-label">${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()}</span>
-      <span class="ck-hist-detail">${st.days} clean day${st.days === 1 ? '' : 's'}</span>
+      <span class="ck-hist-detail">${st.days} day${st.days === 1 ? '' : 's'} all routines kept</span>
       <span class="ck-hist-total">${ckMoney(money)}</span></button>`;
   }
   return `<div class="ck-card ck-history">
@@ -258,7 +258,7 @@ function ckRoutines(kid) {
   }).join('');
   return `<div class="ck-sect">
     <div class="ck-h2">Your three routines</div>
-    <div class="ck-sub">Tap when it's done · all three closed = a clean day for the streak</div>
+    <div class="ck-sub">Tap when it's done · all three closed counts the day toward the routine bonus</div>
     ${body}</div>`;
 }
 
@@ -532,7 +532,7 @@ function ckRail(kid) {
   const ledger = [];
   if (b.chorePaid)      ledger.push({ name: 'Household chores', detail: `${CT_DAYS[ctDay]} and the rest of the week`, amount: ckMoney(b.chorePaid), fg: 'ck-green' });
   if (b.learnPaid)      ledger.push({ name: 'Learning', detail: 'whole bundles only', amount: ckMoney(b.learnPaid), fg: 'ck-green' });
-  if (b.streakBonus)    ledger.push({ name: 'Streak', detail: `${b.streak.days} clean days`, amount: ckMoney(b.streakBonus), fg: 'ck-green' });
+  if (b.streakBonus)    ledger.push({ name: 'Routines kept', detail: `${b.streak.days} days with all three closed`, amount: ckMoney(b.streakBonus), fg: 'ck-green' });
   if (b.compPaid)       ledger.push({ name: 'Competition', detail: 'from the results sheet', amount: ckMoney(b.compPaid), fg: 'ck-green' });
   if (b.fines.total)    ledger.push({ name: 'Fines', detail: 'taken before anything is banked', amount: '−' + ckMoney(b.fines.total), fg: 'ck-red' });
   if (!ledger.length)   ledger.push({ name: 'Nothing yet', detail: 'do a household chore to start', amount: ckMoney(0), fg: '' });
@@ -624,6 +624,33 @@ function ckTapChoreRow(choreId) {
   ckOpenChore = ckOpenChore === choreId ? null : choreId;
   renderChoreTab();
 }
+/* ── The claim prompt, shared ──
+   A chore can be finished in three places: the chore tab, the day timeline and
+   the week planner. All three have to ask the same question and write the same
+   record, or a chore ticked in one place never reaches Mom's queue from the
+   others — which is exactly what used to happen when the planner wrote to the
+   retired `optionalByWeek` store instead.
+
+   Resolves the grade she claimed, or null if she backed out. */
+function openChoreClaimPrompt(kid, weekKey, dayIdx, choreId, label) {
+  const r = mrRulesForWeek(weekKey);
+  const options = CK_QUALITY.map(q => ({
+    id: String(q.g),
+    label: q.word,
+    sub: `${mnyMoney(ckGradePay(r, q.g))} · Mom checks it after`,
+  }));
+  return showChoice(`How did ${label || 'it'} go?`, options, { cancelLabel: 'Not done yet' })
+    .then(id => {
+      if (id == null) return null;
+      const g = Number(id) || 0;
+      if (!g) return null;
+      mrSetClaim(kid, weekKey, dayIdx, choreId, g);
+      saveAll();
+      showToast('Said and sent — Mom checks it after ✓');
+      return g;
+    });
+}
+
 function ckClaim(choreId, quality) {
   const kid = ctActiveKid();
   const cur = mrGetClaim(kid, ctWeekKey, ctDay, choreId);

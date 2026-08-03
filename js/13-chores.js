@@ -24,11 +24,25 @@ function ctMondayOf(date) {
 function ctDateToKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 }
+/* THE current week, for everything chore- and money-shaped.
+
+   `ctMondayOf(new Date())` reads the device's raw clock; the planner derives
+   its week from getWeekStart(), which goes through the app's timezone
+   (APP_TIMEZONE). On a device whose clock sits in a different zone the two
+   disagree for part of every day — and at a week boundary they name *different
+   Mondays*. That is not cosmetic: mrUsesNewModel compares the planner's week
+   against a start week recorded by the raw-clock path, so on a Sunday evening
+   the chore tab decided the current week predated the money model and silently
+   fell back to the retired group board — no chore rows, nothing to claim.
+
+   One derivation, shared by both, so they cannot drift. */
+function ctThisMonday() { return getWeekStart(0); }
+function ctThisWeekKey() { return dateToLocalKey(getWeekStart(0)); }
 function ctEnsureShared() {
   if (!state.shared) state.shared = {};
   if (!state.shared.chore) state.shared.chore = {};
   const c = state.shared.chore;
-  if (!c.programStartDate) c.programStartDate = ctDateToKey(ctMondayOf(new Date()));
+  if (!c.programStartDate) c.programStartDate = ctThisWeekKey();
   if (!c.goalsByWeek) c.goalsByWeek = {};
   if (!c.goalsUpdatedAtByWeek) c.goalsUpdatedAtByWeek = {}; // per-week goal edit ts → conflict-aware sync merge
   if (!c.goalBonusByWeek) c.goalBonusByWeek = {};
@@ -120,7 +134,7 @@ function ctPrepareRead() {
   ctMigrateToGroups();
 }
 function ctWeekInfo() {
-  const mon = formatDayKey(ctWeekKey || ctDateToKey(ctMondayOf(new Date())));
+  const mon = formatDayKey(ctWeekKey || ctThisWeekKey());
   const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
   const keys = [];
   for (let i = 0; i < 7; i++) {
@@ -399,7 +413,7 @@ function ctSetCurrentWeekFromPlanner() {
   ctWeekKey = dateToLocalKey(getWeekStart(weekOffset));
 }
 function ctDayIndexForDate(dayKey) {
-  const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
+  const wk = ctWeekKey || ctThisWeekKey();
   const mon = formatDayKey(wk);
   const day = formatDayKey(dayKey);
   return Math.round((day - mon) / (24*60*60*1000));
@@ -1016,7 +1030,7 @@ function ctRenderWeekControls() {
   </div>${parentControls}`;
 }
 function ctChangeWeek(delta) {
-  const mon = formatDayKey(ctWeekKey || ctDateToKey(ctMondayOf(new Date())));
+  const mon = formatDayKey(ctWeekKey || ctThisWeekKey());
   mon.setDate(mon.getDate() + delta * 7);
   ctWeekKey = ctDateToKey(mon);
   ctDay = 0;
@@ -1133,7 +1147,7 @@ function ctApplyLegacyPayloadToState(parsed) {
     ctEnsureProfile(p);
   });
   // Use startDate from legacy payload, or fall back to programStartDate
-  const anchor = startDate || state.shared.chore.programStartDate || ctDateToKey(ctMondayOf(new Date()));
+  const anchor = startDate || state.shared.chore.programStartDate || ctThisWeekKey();
   const anchorDate = formatDayKey(anchor);
   for (let w = 1; w <= 8; w++) {
     const weekMon = new Date(anchorDate); weekMon.setDate(anchorDate.getDate() + (w-1)*7);
@@ -1205,7 +1219,7 @@ function ctMigrateToGroups() {
   // Ensure legacy numbered-key weeks are date-keyed BEFORE we snapshot history — this can be
   // reached from the Quest Board (kids' default landing) before renderChoreTab runs it. Idempotent.
   ctMigrateNumberedKeys();
-  const migrationWeek = ctDateToKey(ctMondayOf(new Date()));
+  const migrationWeek = ctThisWeekKey();
 
   // (1) Freeze history — every stored week strictly before the current week.
   const weeks = new Set([...Object.keys(c.goalsByWeek), ...Object.keys(c.goalBonusByWeek)]);

@@ -1358,32 +1358,13 @@ function togglePin() {
   buildTimeline();
 }
 
-function ctAutoCheckOptionalFromBlock(blk, dayKey) {
-  // A House-Chore block can tag several chores; sync each one to the chore tab.
-  const tags = (Array.isArray(blk.choreTags) && blk.choreTags.length)
-    ? blk.choreTags
-    : (blk.choreTag ? [blk.choreTag] : []);
-  const valid = tags.filter(t => t && t !== 'General' && ctAllChoreNames().includes(t));
-  if (!valid.length) return;
-  const kid = isParent() ? parentViewing : activeProfile();
-  const wk = ctWeekKeyForDate(dayKey);
-  const mon = formatDayKey(wk);
-  const day = formatDayKey(dayKey);
-  const dayIdx = Math.round((day - mon) / (24*60*60*1000));
-  if (dayIdx < 0 || dayIdx > 6) return;
-  const newlyChecked = [];
-  valid.forEach(name => {
-    if (ctGetOptional(wk, dayIdx, kid, name)) return;
-    ctSetOptional(wk, dayIdx, kid, name, true);
-    newlyChecked.push(name);
-  });
-  if (!newlyChecked.length) return;
-  const fired = ctCheckGroupPayouts(wk, dayIdx, kid);
-  ctMaybeFireGoalBonus(wk, kid);
-  // Caller performs saveAll().
-  if (fired.length) ctCelebrateGroupPayouts(fired, 'screen-chore');
-  else showToast(`✨ ${newlyChecked.length === 1 ? newlyChecked[0] + ' chore' : newlyChecked.length + ' chores'} checked!`);
-}
+/* ctAutoCheckOptionalFromBlock lived here: it synced a completed chore block
+   into `optionalByWeek`, the retired chore-GROUP store. Nothing downstream
+   reads that store any more — not the kid tab, not the parent portal, not
+   mrWeekBreakdown — so its only remaining effect was to make a chore look
+   handled while it never reached anyone. Completions now route through
+   claimChoresFromBlock / gradeChoresFromBlock (js/06-quests.js), which write
+   claims and grades against the chore pool. */
 
 function toggleConfirm() {
   if (!isParent()) { showToast('Only parents can confirm 🔒'); return; }
@@ -1396,7 +1377,8 @@ function toggleConfirm() {
   recountActivityProgress();
   if (blk.confirmed) {
     checkLevelUp(blk.actId);
-    if (blk.actId === 'chores') ctAutoCheckOptionalFromBlock(blk, currentDayKey);
+    // A parent confirming the block is the grading act — see gradeChoresFromBlock.
+    if (blk.actId === 'chores') gradeChoresFromBlock(blk, currentDayKey, isParent() ? parentViewing : activeProfile());
   }
   saveAll();
   buildTimeline();
@@ -1418,7 +1400,7 @@ async function confirmAllToday() {
   // Check level-up and auto-chore for each unique actId touched
   const seen = new Set();
   unconfirmed.forEach(b => {
-    if (b.actId === 'chores') ctAutoCheckOptionalFromBlock(b, currentDayKey);
+    if (b.actId === 'chores') gradeChoresFromBlock(b, currentDayKey, isParent() ? parentViewing : activeProfile());
     if (seen.has(b.actId)) return;
     seen.add(b.actId);
     checkLevelUp(b.actId);

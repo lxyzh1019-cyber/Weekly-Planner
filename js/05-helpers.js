@@ -46,31 +46,67 @@ function setDayBlocks(key, blocks, p=activeProfile()) {
   getProfData(p).weeks[key] = blocks;
   saveAll();
 }
+/* ── ONE rule for how much a block says ──
+   A block's height is decided by its duration, not by how much there is to
+   say about it, so every view has to answer "what fits?" — and each of them
+   used to answer it differently, with its own thresholds. A 7am routine could
+   be legible in the week and a scramble in the day.
+
+   Five tiers, shared by the day timeline, the week cards and the print sheet:
+
+     icon    too short for a word at all
+     name    icon + a short name
+     meta    + the time and duration, and at most two badges
+     detail  + as many goal lines as fit
+     full    + the four training checks
+
+   Anything past two badges folds into a "+N" chip: a strip of eight emoji is
+   not information, it is texture. */
+const BLOCK_TIERS = [
+  { id: 'icon',   min: 0 },
+  { id: 'name',   min: 20 },
+  { id: 'meta',   min: 34 },
+  { id: 'detail', min: 64 },
+  { id: 'full',   min: 130 },   // measured: name + duration + the 2×2 checks
+];
+function blockContentTier(pxHeight) {
+  const h = Number(pxHeight) || 0;
+  let id = 'icon';
+  BLOCK_TIERS.forEach(t => { if (h >= t.min) id = t.id; });
+  return id;
+}
+function blockTierAtLeast(tier, min) {
+  const order = BLOCK_TIERS.map(t => t.id);
+  return order.indexOf(tier) >= order.indexOf(min);
+}
+/* At most `max` badges, with the overflow folded into one chip. */
+function foldBadges(badges, max = 2) {
+  const list = (badges || []).filter(Boolean);
+  if (list.length <= max) return list.join('');
+  return list.slice(0, max).join('') + `<span class="badge badge-more">+${list.length - max}</span>`;
+}
+
+/* The four training checks for a block, as detail lines. */
+function trainingCheckLines(b) {
+  const st = (b && b.trainingCheck) || {};
+  return TRAINING_CHECKS.map(c => ({
+    icon: st[c.id] ? '✅' : '⬜', text: c.label, group: 'check',
+  }));
+}
+
 /* What this block is actually about, as a flat ordered list of individual
    items — one line each, not folded into "+N" — so a view with room to spare
-   (a tall print/week block) can just list as much of it as fits. Priority
-   order: gear first (packing is the "get ready" checklist and effectively
-   mandatory for a training block), then objectives/goals, then chores, then
-   the routine checklist tally and note. A view with only a little room slices
-   this list down to what it can hold (sliceDetailLines) or, with almost none,
-   folds it to a one-line count (blockCountsSummary) instead.
+   can list as much of it as fits. Order: the training checks first (they are
+   the review), then objectives/goals, then chores, then the routine checklist
+   tally and the note. A view with only a little room slices this down with
+   sliceDetailLines, or folds it to a one-line count with blockCountsSummary.
    Returns [{icon, text, group}]. */
 function blockDetailLines(b, act) {
   const lines = [];
 
-  // Gear only exists for training/competition blocks — shown first and, space
-  // permitting, in full, since packing is the mandatory "get ready" list.
-  const gear = (typeof getTrainingGearPresets === 'function' && act && act.isTraining && b.tag)
-    ? getTrainingGearPresets(b.tag, blockIsCompetition(b))
-    : [];
-  if (gear.length) {
-    const prefix = blockIsCompetition(b) ? `gearC-${b.tag}` : `gear-${b.tag}`;
-    const gs = b.gearState || {};
-    gear.forEach((label, i) => {
-      const packed = !!gs[`${prefix}-${i}`];
-      lines.push({ icon: packed ? '✅' : '⬜', text: label, group: 'gear' });
-    });
-  }
+  // Training blocks carry the same four checks everywhere, in place of the
+  // packing list they used to spill onto every surface (see TRAINING_CHECKS).
+  if (act && act.isTraining) trainingCheckLines(b).forEach(l => lines.push(l));
 
   (Array.isArray(b.objectives) ? b.objectives.filter(Boolean) : []).forEach(o => {
     lines.push({ icon: '🎯', text: o, group: 'objective' });
@@ -117,7 +153,7 @@ function blockCountsSummary(lines) {
   const counts = {};
   lines.forEach(l => { counts[l.group] = (counts[l.group] || 0) + 1; });
   const order = [
-    ['gear', '🎒'], ['objective', '🎯'], ['chore', '🧹'], ['checklist', '✓'], ['note', '📝'],
+    ['check', '🏋️'], ['objective', '🎯'], ['chore', '🧹'], ['checklist', '✓'], ['note', '📝'],
   ];
   return order.filter(([g]) => counts[g])
     .map(([g, icon]) => g === 'note' ? icon : `${icon}${counts[g]}`)

@@ -45,11 +45,49 @@ function mmToggleConfirmDay(d) {
 }
 function mmGoStep(n) { mmStep = Math.max(1, Math.min(MM_STEPS.length, n)); renderMeetingMode(); }
 
-// % of a kid's tracked items (routines + all chores) done on a given day.
+/* ── What Step 1 reviews ───────────────────────────────────────────
+   The two halves of a day are stored in two different places, on purpose:
+
+     ROUTINES (Morning / Afternoon / Evening) are the parent's call and pay no
+     money. They live in the legacy per-session store (ctGetMandatory), which
+     is also exactly what mrStreakDayDone reads for the clean-day streak — so
+     ticking one here is what moves the streak channel.
+
+     CHORES come from the chore pool via the planner (mrChoresForDay) and are
+     what the money engine totals. A parent tapping one in the meeting IS the
+     grading act, so a tap writes a GRADE (mrSetChoreGrade), the same value
+     cpQueue writes from the portal.
+
+   Before this, Step 1 rendered the retired chore *groups* and wrote to
+   ctSetOptional — a store nothing downstream reads any more. That is why a
+   week reviewed at the table still showed $0 of "Jobs around the house" on
+   Step 3. */
+function mmReviewRows(kid, dayIdx) {
+  const wk = mmWeekKey();
+  const rows = CT_SESSIONS.map(s => ({
+    kind: 'routine', key: s, label: s, icon: CT_SESSION_ICONS[s] || '📋',
+    on: !!ctGetMandatory(wk, dayIdx, s, kid),
+    claim: 0, pays: false,
+  }));
+  const r = mrRulesForWeek(wk);
+  mrChoresForDay(kid, wk, dayIdx).rows.forEach(({ row }) => {
+    if (!mrLanePays(row.lane)) return;   // 'own'/'helping' never pay — not money to agree
+    const grade = mrGetChoreGrade(kid, wk, dayIdx, row.id);
+    rows.push({
+      kind: 'chore', key: row.id, label: row.label, icon: row.icon || '🧺',
+      on: grade > 0, grade, claim: mrGetClaim(kid, wk, dayIdx, row.id),
+      pays: true, pay: ckGradePay(r, grade || 3),
+    });
+  });
+  return rows;
+}
+function mmWeekKey() { return ctWeekKey || ctThisWeekKey(); }
+
+// % of a kid's tracked items (routines + priced chores) settled on a given day.
 function mmDayPct(kid, dayIdx) {
-  const rows = ctMatrixRows(kid);
+  const rows = mmReviewRows(kid, dayIdx);
   if (!rows.length) return 0;
-  const done = rows.reduce((s, row) => s + (ctMatrixCellChecked(kid, dayIdx, row) ? 1 : 0), 0);
+  const done = rows.reduce((s, row) => s + (row.on ? 1 : 0), 0);
   return Math.round(done / rows.length * 100);
 }
 // Days of the viewed week that have already happened (Mon..today inclusive).
@@ -72,7 +110,7 @@ function mmWeekPct(kid) {
 
 function renderMeetingMode() {
   ctPrepareRead();
-  const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
+  const wk = ctWeekKey || ctThisWeekKey();
   const held = !!(state.shared.chore.meetingsHeld && state.shared.chore.meetingsHeld[wk]);
   const stepper = MM_STEPS.map((label, i) => {
     const n = i + 1;
@@ -92,8 +130,48 @@ function renderMeetingMode() {
     ? `<button type="button" class="btn-confirm" onclick="mmGoStep(${mmStep + 1})">Next ▶</button>`
     : `<button type="button" class="btn-confirm" onclick="closeSheet('familyMeetingOverlay')">🎉 Finish meeting</button>`;
 
-  document.getElementById('familyMeetingBody').innerHTML =
+  const host = document.getElementById('familyMeetingBody');
+  const restore = mmCaptureUiState(host);
+  host.innerHTML =
     `<div class="mm-stepper">${stepper}</div><div class="mm-body">${body}</div><div class="mm-nav">${back}${next}</div>`;
+  restore();
+}
+
+/* ── Keeping the meeting usable across a re-render ──
+   Every tap in steps 3 and 4 rebuilds #familyMeetingBody wholesale. That threw
+   away two things the family notices immediately: the sheet's scroll position
+   (so a button pressed halfway down the page appeared to "do nothing" — the
+   view had jumped back to the top), and keyboard focus (so typing a
+   competition name lost the caret after the first letter, because the input
+   the letter went into no longer existed).
+
+   Captures both before the swap and puts them back after. Fields are matched by
+   `data-mm-field` rather than DOM position, so a re-render that changes the
+   surrounding markup still finds the right input. */
+function mmCaptureUiState(host) {
+  const sheet = document.querySelector('#familyMeetingOverlay .sheet');
+  const scrollTop = sheet ? sheet.scrollTop : 0;
+  const active = document.activeElement;
+  let field = null, selStart = null, selEnd = null;
+  if (active && host && host.contains(active)) {
+    field = active.getAttribute('data-mm-field');
+    // Only text-like inputs carry a caret worth restoring.
+    try {
+      if (field && active.selectionStart != null) {
+        selStart = active.selectionStart;
+        selEnd = active.selectionEnd;
+      }
+    } catch (e) { /* number/date inputs throw on selectionStart — ignore */ }
+  }
+  return function restore() {
+    if (sheet) sheet.scrollTop = scrollTop;
+    if (!field || !host) return;
+    const next = host.querySelector(`[data-mm-field="${CSS.escape(field)}"]`);
+    if (!next) return;
+    next.focus();
+    if (selStart == null) return;
+    try { next.setSelectionRange(selStart, selEnd); } catch (e) { /* not text-like */ }
+  };
 }
 
 /* Step 1 — Review: 1b grouped bar chart + day drill-in + meeting readiness. */
@@ -128,45 +206,70 @@ function mmRenderReview(wk) {
 function mmSelectDay(d) { mmSelectedDay = (mmSelectedDay === d ? null : d); renderMeetingMode(); }
 function mmRenderDayDetail(wk, d) {
   const col = (kid) => {
-    const rows = ctMatrixRows(kid);
-    // Items are tappable so a parent can correct a kid's selection right here in
-    // the meeting (parent-only overlay) instead of going to each kid's weekly view.
-    const items = rows.map((row, i) => {
-      const on = ctMatrixCellChecked(kid, d, row);
-      return `<button type="button" class="mm-item ${on ? 'on' : ''}" onclick="mmToggleItem('${kid}',${d},${i})"
-          role="checkbox" aria-checked="${on}" aria-label="${escapeAttr(row.label)} ${DAY_SHORT[d]}, ${kid === 'jenn' ? 'Jenn' : 'Jess'}"><span class="mm-item-box">${on ? '✓' : ''}</span>${row.icon ? row.icon + ' ' : ''}${escapeHtml(row.label)}</button>`;
-    }).join('');
-    const done = rows.filter(row => ctMatrixCellChecked(kid, d, row)).length;
-    return `<div class="mm-detail-col"><div class="mm-detail-kid">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'} <small>${done}/${rows.length} done</small></div>${items}</div>`;
+    const rows = mmReviewRows(kid, d);
+    const name = kid === 'jenn' ? 'Jenn' : 'Jess';
+    const section = (title, note, kind) => {
+      const mine = rows.map((row, i) => ({ row, i })).filter(x => x.row.kind === kind);
+      if (!mine.length) {
+        return `<div class="mm-detail-sect"><div class="mm-detail-cap">${title}</div>
+          <div class="mm-detail-empty">${kind === 'chore'
+            ? 'No chores on the plan for this day.'
+            : 'No routines tracked for this day.'}</div></div>`;
+      }
+      const items = mine.map(({ row, i }) => {
+        // What she said, before a grown-up agreed — so the parent is confirming
+        // her answer rather than guessing at it.
+        const said = row.claim > 0
+          ? (CK_QUALITY.find(q => q.g === row.claim) || {}).word || ''
+          : '';
+        const tag = row.kind === 'chore'
+          ? (row.on ? `<span class="mm-item-pay">${mnyMoney(row.pay)}</span>`
+             : said ? `<span class="mm-item-said">she said: ${escapeHtml(said.toLowerCase())}</span>`
+             : `<span class="mm-item-said">not answered</span>`)
+          : '';
+        return `<button type="button" class="mm-item ${row.on ? 'on' : ''}" onclick="mmToggleItem('${kid}',${d},${i})"
+            role="checkbox" aria-checked="${row.on}" aria-label="${escapeAttr(row.label)} ${DAY_SHORT[d]}, ${name}"><span class="mm-item-box">${row.on ? '✓' : ''}</span>${row.icon ? row.icon + ' ' : ''}${escapeHtml(row.label)}${tag}</button>`;
+      }).join('');
+      const done = mine.filter(x => x.row.on).length;
+      return `<div class="mm-detail-sect">
+        <div class="mm-detail-cap">${title} <small>${done}/${mine.length}</small></div>
+        <div class="mm-detail-note">${note}</div>${items}</div>`;
+    };
+    const done = rows.filter(r => r.on).length;
+    return `<div class="mm-detail-col">
+      <div class="mm-detail-kid">${CT_PROFILE_ICON[kid]} ${name} <small>${done}/${rows.length} done</small></div>
+      ${section('Routines', 'You mark these. They pay no money — they build the clean-day streak.', 'routine')}
+      ${section('Chores', 'Tapping one agrees her answer and pays it.', 'chore')}
+    </div>`;
   };
   const confirmed = mmIsDayConfirmed(d);
   return `<div class="mm-detail">
       <div class="mm-detail-cols">${col('jenn')}<div class="mm-detail-div"></div>${col('jess')}</div>
-      <div class="mm-detail-editnote">Tap any item to check or uncheck it for that kid — chore money and goal bonuses update live.</div>
+      <div class="mm-detail-editnote">Tap any item to change it for that kid — this is the same record the chore tab and "What I earned" read, so the money updates live.</div>
       <button type="button" class="mm-confirm-day ${confirmed ? 'confirmed' : ''}" onclick="mmToggleConfirmDay(${d})">${confirmed ? '✓ Confirmed (both kids)' : 'Confirm this day'}</button>
     </div>`;
 }
-// Parent taps a kid's routine/chore in the meeting review — mirrors the kid-view
-// toggles (ctToggleMandatory/ctToggleOptional) but targets an explicit day `d`
-// instead of the globally selected ctDay, then re-renders the meeting in place.
+/* Parent taps an item in the meeting review.
+
+   A routine toggles the tracked session (no money, feeds the streak). A chore
+   writes a GRADE — agreeing the kid's claim at the quality she said, or a
+   plain "on time" when she never answered. Tapping a graded chore ungrades it.
+   Either way it is the same store the portal and the money engine read, so
+   Step 3 recomputes from it the moment this returns. */
 function mmToggleItem(kid, d, idx) {
-  const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
-  const row = ctMatrixRows(kid)[idx];
+  const wk = mmWeekKey();
+  const row = mmReviewRows(kid, d)[idx];
   if (!row) return;
-  if (row.kind === 'mandatory') {
-    ctSetMandatory(wk, d, row.key, kid, !ctGetMandatory(wk, d, row.key, kid));
+  if (row.kind === 'routine') {
+    ctSetMandatory(wk, d, row.key, kid, !row.on);
     ctMaybeFireGoalBonus(wk, kid);
-    saveAll();
-    renderMeetingMode();
   } else {
-    const prev = ctGetOptional(wk, d, kid, row.key);
-    ctSetOptional(wk, d, kid, row.key, !prev);
-    const fired = !prev ? ctCheckGroupPayouts(wk, d, kid) : [];
-    ctMaybeFireGoalBonus(wk, kid);
-    saveAll();
-    renderMeetingMode();
-    ctCelebrateGroupPayouts(fired, 'familyMeetingOverlay');
+    // Agree at what she claimed; if she never claimed, agree at "on time".
+    const next = row.on ? 0 : (row.claim > 0 ? row.claim : 3);
+    mrSetChoreGrade(kid, wk, d, row.key, next);
   }
+  saveAll();
+  renderMeetingMode();
 }
 
 /* Step 2 — Celebrate: auto-collected wins + 2b planned-vs-done analytics. */
@@ -300,7 +403,7 @@ function mmSkipQuarterlyReview() {
 
 function mmConfirmAndRecord() {
   const c = state.shared.chore;
-  const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
+  const wk = ctWeekKey || ctThisWeekKey();
   if (c.meetingsHeld && c.meetingsHeld[wk]) { showToast('Already recorded this week'); return; }
   mmTakeUndoSnapshot(wk);
   const parts = commitFamilyMeeting(wk);
@@ -460,7 +563,7 @@ function commitKidWeek(wk, kid, opts) {
       // Both of these are stamped by calendar month inside the loan module —
       // the meeting is weekly, the schedule is monthly, so most Sundays this
       // correctly does nothing. Every debt is paid, highest bonus rate first.
-      const transfers = mnySundayTransferAll(kid, o.shortfall || 'pay_available');
+      const transfers = mnySundayTransferAll(kid, o.shortfall || 'pay_available', { weekKey: wk });
       const t = transfers[0] || { paid: 0, shortfall: 0, kind: null };
       transfers.forEach(r => {
         const what = r.kind === 'down' ? 'down payment' : r.name;

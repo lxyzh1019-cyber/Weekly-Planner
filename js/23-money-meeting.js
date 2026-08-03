@@ -184,9 +184,9 @@ function mnyWorking(wk, kid, channel, b) {
       || `<div class="mny-note">Nothing counted this week.</div>`;
   }
   if (channel === 'streak') {
-    return line('Longest run of clean days', b.streak.days + ' days')
+    return line('Longest run of days with all three routines kept', b.streak.days + ' days')
       + (b.streak.tier ? line('That pays the ' + b.streak.tier + '-day step', mnyMoney(b.streak.bonus))
-                       : `<div class="mny-note">Three clean days in a row is the first step.</div>`);
+                       : `<div class="mny-note">Three days in a row with morning, afternoon and evening all closed is the first step.</div>`);
   }
   if (channel === 'comp') {
     const entries = mrCompetitions(kid).filter(c => String(c.dayKey) >= wk && String(c.dayKey) <= mnyWeekEnd(wk));
@@ -262,9 +262,11 @@ function mnyCompetitionForm(wk, kid) {
       <div class="mny-label">🏆 Competition day</div>
       <div class="mny-chiprow">${sportChips}</div>
       <label class="mny-field"><span>What it was called</span>
-        <input type="text" value="${escapeAttr(d.name)}" oninput="mnyCompSet('name', this.value)" placeholder="Winter Invitational"></label>
+        <input type="text" data-mm-field="comp-name" value="${escapeAttr(d.name)}"
+          oninput="mnyCompSetQuiet('name', this.value)" placeholder="Winter Invitational"></label>
       <label class="mny-field"><span>Which day</span>
-        <input type="date" value="${escapeAttr(d.dayKey)}" onchange="mnyCompSet('dayKey', this.value)"></label>
+        <input type="date" data-mm-field="comp-day" value="${escapeAttr(d.dayKey)}"
+          onchange="mnyCompSet('dayKey', this.value)"></label>
       ${d.sport !== 'dance' ? `<div class="mny-row"><span>Points</span>${mnyStepper('points', d.points, 'comp')}</div>` : ''}
       ${detail}
       <div class="mny-row total"><span>That comes to</span><b>${mnyMoney(preview)}</b></div>
@@ -457,23 +459,57 @@ function mnyChecklist(wk, kid) {
    it is not a choice, and giving it its own card made it look like one. */
 function mnyPoolCard(wk, kid, pool) {
   const b = pool.breakdown;
-  const due = mnyDueNowAll(kid);
+  const due = pool.due;
   const w = ensureWallet(kid);
   const short = pool.mustPay > 0 && money2(w.cash + b.net) < pool.mustPay;
+  // The payment can be argued with, at the table, with the consequence on
+  // screen while you argue. Parent-only: it is a change to the agreement.
+  const payRow = (d) => {
+    const stepper = isParent()
+      ? `<span class="mny-stepgrp">
+           <button type="button" class="mny-step" onclick="mnyBumpPayment('${escapeAttr(d.debt.id)}',-1)" aria-label="Pay less">−</button>
+           <button type="button" class="mny-step" onclick="mnyBumpPayment('${escapeAttr(d.debt.id)}',1)" aria-label="Pay more">+</button>
+           ${d.reduced ? `<button type="button" class="mny-step" onclick="mnyResetPayment('${escapeAttr(d.debt.id)}')" aria-label="Back to the scheduled payment">↺</button>` : ''}
+         </span>`
+      : '';
+    const was = d.reduced ? `<s class="mny-was">${mnyMoney(d.scheduled)}</s> ` : '';
+    return `<div class="mny-row">
+        <span>🔒 ${escapeHtml(d.debt.icon + ' ' + d.debt.name)} — ${d.kind === 'down' ? 'deposit' : 'this month'}</span>
+        <b>${was}−${mnyMoney(d.amount).slice(1)}</b>${stepper}
+      </div>`;
+  };
   return `<div class="mny-card">
       <div class="mny-label">Where this week's money stands</div>
       <div class="mny-rows">
         <div class="mny-row"><span>Money that came in</span><b>${mnyMoney(pool.cameIn)}</b></div>
         ${pool.deposits > 0 ? `<div class="mny-row"><span class="mny-sub-row">…including 🎁 ${mnyMoney(pool.deposits)} from outside</span></div>` : ''}
-        ${due.map(d => `<div class="mny-row"><span>🔒 ${escapeHtml(d.debt.icon + ' ' + d.debt.name)} — ${d.kind === 'down' ? 'deposit' : 'this month'}, already spoken for</span><b>−${mnyMoney(d.amount).slice(1)}</b></div>`).join('')}
+        ${due.map(payRow).join('')}
         <div class="mny-row total"><span>Mine to choose</span><b>${mnyMoney(pool.mine)}</b></div>
       </div>
+      ${mnyPaymentImpact(wk, kid, pool)}
       ${mnyBuysNote(pool.mine)}
-      <div class="mny-note">Corrections happen on the step before this one.</div>
+      <div class="mny-note">Corrections to what she earned happen on the step before this one.</div>
       ${short ? `<div class="mny-note warn">There is not enough to cover the payment. ${MNY_SHORTFALL.map(s =>
         `<button type="button" class="mny-chip" onclick="mnyPickShortfall('${s.id}')">${escapeHtml(s.label)}</button>`).join(' ')}</div>` : ''}
     </div>`;
 }
+/* What paying less actually costs, in the two units that mean something to a
+   nine-year-old: dollars added by arrears, and months added to the date she is
+   free of it. Silent when the family is paying the schedule, because then
+   there is nothing to weigh up. */
+function mnyPaymentImpact(wk, kid, pool) {
+  if (!(pool.unpaid > 0)) return '';
+  const primary = mnyDebtsByPriority(kid).find(d => loanBalance(kid, d.id) > 0);
+  const rate = primary ? (Number(primary.arrearsRatePct) || 0) / 100 : 0;
+  const cost = money2(pool.unpaid * rate);
+  const freed = money2(pool.unpaid);
+  return `<div class="mny-note warn">
+      Paying ${mnyMoney(pool.unpaid)} less than the schedule frees ${mnyMoney(freed)} to choose with now,
+      and costs ${mnyMoney(cost)} a month in late fees until it is caught up. It is not forgiven — the
+      loan still carries it.
+    </div>`;
+}
+
 /* The three ways a short week can be settled. All three have a price, and the
    price is the lesson. */
 const MNY_SHORTFALL = [
@@ -483,6 +519,23 @@ const MNY_SHORTFALL = [
 ];
 let mnyShortfallChoice = 'pay_available';
 function mnyPickShortfall(id) { mnyShortfallChoice = id; renderMeetingMode(); }
+
+/* Nudge a debt's payment for this week. Never above the schedule (paying extra
+   is a choice made below, out of what's hers) and never below zero. */
+function mnyBumpPayment(debtId, dir) {
+  const wk = mnyWeekKeyMeeting(), kid = mnyMeetingKid();
+  const row = mnyDueThisWeek(kid, wk).find(d => d.debt.id === debtId);
+  if (!row) return;
+  const next = money2(Math.max(0, Math.min(row.scheduled, row.amount + dir)));
+  mnySetPaymentOverride(kid, wk, debtId, next >= row.scheduled ? null : next);
+  mnyDraft = null;   // the pool changed, so the draft split has to be re-priced
+  renderMeetingMode();
+}
+function mnyResetPayment(debtId) {
+  mnySetPaymentOverride(mnyMeetingKid(), mnyWeekKeyMeeting(), debtId, null);
+  mnyDraft = null;
+  renderMeetingMode();
+}
 
 /* The plan, already applied and priced. On a normal week this is the whole of
    step 4: read it, answer the question, done. */
@@ -501,7 +554,8 @@ function mnyPlanCard(wk, kid, draft, pool) {
       <div class="mny-sub">Where it all goes</div>
       ${mnyBarHtml(out, { empty: 'Nothing to move' })}
       ${mnyGhostBar(wk, kid)}
-      <button type="button" class="mny-btn wide" onclick="mnyTogglePlan()">${mnyPlanOpen ? 'Done changing ▾' : '✏️ Change the plan ▸'}</button>
+      <button type="button" class="mny-btn wide${mnyPlanOpen ? '' : ' primary'}" onclick="mnyTogglePlan()">${
+        mnyPlanOpen ? 'Done changing ▾' : '✏️ Change the plan — pick a different one, or set your own amounts ▸'}</button>
     </div>`;
 }
 /* Last week's shape, ghosted under this week's. Two bars side by side would be
@@ -534,7 +588,8 @@ function mnyBucketRows(kid, split) {
       rows.push(`<div class="mny-row"><span>${escapeHtml(g.icon + ' Toward ' + g.name)}</span><b>${mnyMoney(v)}</b></div>`);
     }
   });
-  [['ready', '💵 Keep it ready', 'ready'], ['gic', '🔒 Lock it away for a year', 'gic'],
+  [['spend', '🛍️ Spend it', 'spend'], ['ready', '💵 Keep it ready', 'ready'],
+   ['gic', '🔒 Lock it away for a year', 'gic'],
    ['stock', '📈 Buy a bit of a company', 'stock']].forEach(([k, label, ask]) => {
     rows.push(`<div class="mny-row"><span>${label} ${mnyAskBtn(ask)}</span><b>${mnyMoney(split[k])}</b></div>`);
   });
@@ -570,8 +625,11 @@ function mnyChangePlanCards(wk, kid, draft, pool) {
   const spent = mnySplitTotal(draft.split);
   const left = money2(pool.mine - spent);
   const overStock = money2(draft.split.stock) > pool.stockCap;
+  const overSpend = money2(draft.split.spend) > pool.spendCap;
   const msg = overStock
     ? `<span class="warn">A bit of a company is capped at ${mnyMoney(pool.stockCap)} — a fifth of the week.</span>`
+    : overSpend
+    ? `<span class="warn">Spending is capped at ${mnyMoney(pool.spendCap)} — a fifth of the week.</span>`
     : (Math.abs(left) < 0.005 ? 'Every dollar has a job ✓'
        : (left > 0 ? `${mnyMoney(left)} still has no job.` : `That is ${mnyMoney(-left)} more than you have.`));
 
@@ -605,7 +663,7 @@ function mnyChangePlanCards(wk, kid, draft, pool) {
       }).join('')}</div>
       <div class="mny-note">${escapeHtml(doors.map(d => d.note)[3])}</div>
     </div>
-    ${mnyStockChart()}`;
+    ${mnyIsOpen(kid, 90) ? mnyStockChart() : ''}`;
 }
 function mnyBucketStepper(key, value) {
   return `<span class="mny-stepgrp">
@@ -635,11 +693,15 @@ function mnyStockChart() {
 /* One question, and it gates the commit. Not because the answer is checked,
    but because a decision she cannot say a reason for is not hers yet. */
 function mnyReflectCard(draft) {
+  const chosen = MNY_REFLECT.chips.find(c => c.id === draft.reflect);
   return `<div class="mny-card">
       <div class="mny-label">One question</div>
       <div class="mny-today-big">${escapeHtml(MNY_REFLECT.question)}</div>
       <div class="mny-chiprow">${MNY_REFLECT.chips.map(c =>
         `<button type="button" class="mny-chip ${draft.reflect === c.id ? 'on' : ''}" onclick="mnyPickReflect('${c.id}')">${escapeHtml(c.label)}</button>`).join('')}</div>
+      ${chosen
+        ? `<div class="mny-note">${escapeHtml(chosen.effect)} The plan above has moved to match — change any number if you disagree with it.</div>`
+        : `<div class="mny-note">Pick one. Your answer shapes the plan above, and it goes into the record of this week.</div>`}
     </div>`;
 }
 
@@ -647,11 +709,13 @@ function mnyCommitBar(wk, kid, draft, pool) {
   const spent = mnySplitTotal(draft.split);
   const left = money2(pool.mine - spent);
   const overStock = money2(draft.split.stock) > pool.stockCap;
+  const overSpend = money2(draft.split.spend) > pool.spendCap;
   let blocked = '';
   if (!draft.reflect) blocked = 'Answer the question first';
   else if (left < -0.005) blocked = 'That is more than you have';
   else if (left > 0.005) blocked = `${mnyMoney(left)} still has no job`;
   else if (overStock) blocked = 'Too much into one company';
+  else if (overSpend) blocked = `Spending is capped at ${mnyMoney(pool.spendCap)}`;
   return `<div class="mny-confirmbar">
       <span><b>${mnyMoney(spent)}</b> to move</span>
       ${blocked
@@ -684,7 +748,7 @@ function mnyToggleDep() { mnyDepOpen = !mnyDepOpen; if (!mnyDepOpen) mnyDepDraft
 function mnyToggleChecks() { mnyChecksOpen = !mnyChecksOpen; renderMeetingMode(); }
 function mnyTogglePlan() { mnyPlanOpen = !mnyPlanOpen; renderMeetingMode(); }
 function mnyTickCheck(id) { mnyToggleCheck(mnyWeekKeyMeeting(), mnyMeetingKid(), id); renderMeetingMode(); }
-function mnyWeekKeyMeeting() { return ctWeekKey || ctDateToKey(ctMondayOf(new Date())); }
+function mnyWeekKeyMeeting() { return ctWeekKey || ctThisWeekKey(); }
 
 function mnyBumpChannel(channel, delta) {
   const wk = mnyWeekKeyMeeting(), kid = mnyMeetingKid();
@@ -720,6 +784,13 @@ function mnyStepper(field, value, which, step) {
       <button type="button" class="mny-step" onclick="${fn}('${field}',${s})" aria-label="More">+</button>
     </span>`;
 }
+/* Typed fields mutate the draft WITHOUT redrawing. A chip or a stepper changes
+   what the rest of the card says (the score preview, which detail rows apply),
+   so those still re-render; a name being typed changes nothing else on screen,
+   and redrawing on each letter is what threw the caret out of the box. The
+   value is already in the draft, so the next real render picks it up. */
+function mnyCompSetQuiet(field, value) { if (mnyCompDraft) mnyCompDraft[field] = value; }
+function mnyDepSetQuiet(field, value) { if (mnyDepDraft) mnyDepDraft[field] = value; }
 function mnyCompSet(field, value) { if (!mnyCompDraft) return; mnyCompDraft[field] = value; renderMeetingMode(); }
 function mnyCompBump(field, delta) { if (!mnyCompDraft) return; mnyCompDraft[field] = Math.max(0, (Number(mnyCompDraft[field]) || 0) + delta); renderMeetingMode(); }
 function mnyDepSet(field, value) { if (!mnyDepDraft) return; mnyDepDraft[field] = value; renderMeetingMode(); }
@@ -775,7 +846,29 @@ function mnyPickPlan(id) {
   d.split = mnySplitFor(d.wk, d.kid, id, d.own);
   renderMeetingMode();
 }
-function mnyPickReflect(id) { if (mnyDraft) mnyDraft.reflect = id; renderMeetingMode(); }
+/* Answering the question is not a formality — it re-shapes the plan toward
+   what she just said the money is for. Three identical-feeling buttons that
+   only unlocked a commit taught that the question was a toll booth; a plan
+   that visibly moves teaches that the answer is a decision. Every number is
+   still hers to override afterwards. */
+function mnyPickReflect(id) {
+  const d = mnyDraft;
+  if (!d) return;
+  d.reflect = id;
+  // ...except once she has set the numbers by hand. At that point the split is
+  // an answer in its own right, and overwriting it because she then named a
+  // reason would throw away the more considered of the two.
+  if (d.planId === 'own') { renderMeetingMode(); return; }
+  const chip = MNY_REFLECT.chips.find(c => c.id === id);
+  if (chip && chip.planId) {
+    const open = mnyIsOpen(d.kid, (MNY_PLANS.find(p => p.id === chip.planId) || {}).need || 0);
+    if (open) {
+      d.planId = chip.planId;
+      d.split = mnySplitFor(d.wk, d.kid, chip.planId, d.own);
+    }
+  }
+  renderMeetingMode();
+}
 function mnySetDoor(v) { mnyDoorAmt = v; renderMeetingMode(); }
 /* Touching any stepper turns the plan into a hand-built one, seeded from
    wherever it already was — so nudging one number never silently discards the
@@ -785,6 +878,7 @@ function mnyTuneBucket(key, dir) {
   const pool = mnyPool(d.wk, d.kid);
   const next = Math.max(0, money2(money2(d.split[key]) + dir));
   if (key === 'stock' && next > pool.stockCap) { showToast(`A fifth of the week is the most — ${mnyMoney(pool.stockCap)}`); return; }
+  if (key === 'spend' && next > pool.spendCap) { showToast(`A fifth of the week is the most to spend — ${mnyMoney(pool.spendCap)}`); return; }
   const others = money2(mnySplitTotal(d.split) - money2(d.split[key]));
   if (money2(others + next) > pool.mine + 0.005) { showToast('That is more than you have'); return; }
   d.split[key] = next;
@@ -855,6 +949,9 @@ function mnyDoCommit() {
     toGoals[g.id] = amt;
     parts.push(`${g.icon} ${g.name} +$${amt.toFixed(2)}`);
   });
+  // Spending leaves it exactly where it is: cash in the wallet is money she can
+  // spend. The record of the decision is the plan and the ledger line below.
+  if (money2(split.spend) > 0) parts.push(`🛍️ to spend $${money2(split.spend).toFixed(2)}`);
   if (money2(split.gic) > 0) moneyOpenGIC(kid, money2(split.gic), 12);
   if (money2(split.stock) > 0) mnyBuyChosenFund(kid, money2(split.stock));
   if (money2(split.ready) > 0) moneyDeposit(kid, money2(split.ready));
@@ -873,6 +970,7 @@ function mnyDoCommit() {
     ledger.plan = { id: d.planId, label: plan.label };
     ledger.outside = mnyDepositTotal(kid, wk);
     ledger.debtExtra = toLoan;
+    ledger.spend = money2(split.spend);
     ledger.ready = money2(split.ready);
     ledger.gic = money2(split.gic);
     ledger.stock = money2(split.stock);

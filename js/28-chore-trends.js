@@ -23,7 +23,7 @@ const CTR_HEAT = ['#71c295', '#48a271', '#2b8054', '#185235'];
 
 /* The eight weeks in the window, oldest first. */
 function ctrWeeks() {
-  const cur = ctMondayOf(formatDayKey(ctWeekKey || ctDateToKey(ctMondayOf(new Date()))));
+  const cur = ctMondayOf(formatDayKey(ctWeekKey || ctThisWeekKey()));
   const out = [];
   for (let i = CT_SUMMARY_WEEKS - 1; i >= 0; i--) {
     const d = new Date(cur);
@@ -247,7 +247,7 @@ function ctrRead(d) {
     // Compare weeks that actually finished. The last column is usually the week
     // being lived right now, and reading a half-finished week as a downturn is
     // the easiest way for a chart to say something untrue.
-    const running = rs[rs.length - 1].week.key === ctDateToKey(ctMondayOf(new Date()));
+    const running = rs[rs.length - 1].week.key === ctThisWeekKey();
     const settledRuns = live.filter(r => !(running && r === rs[rs.length - 1]));
     const first = settledRuns[0], lastDone = settledRuns[settledRuns.length - 1];
     const dir = !lastDone || settledRuns.length < 2 ? 'just starting out'
