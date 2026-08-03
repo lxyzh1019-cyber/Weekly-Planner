@@ -246,7 +246,7 @@ function mrEnsure() {
     const now = Date.now();
     mr.versions.push({
       id: mrNewId('mrv-'),
-      effectiveFrom: c.programStartDate || ctDateToKey(ctMondayOf(new Date())),
+      effectiveFrom: c.programStartDate || ctThisWeekKey(),
       createdAt: now, updatedAt: now, createdBy: 'parent',
       reason: MR_DEFAULT_REASON,
       note: 'Rulebook v2 — starting template.',
@@ -408,7 +408,7 @@ function mrApplyCap(amount, cap) {
 function mrModelStartWeek() {
   ctEnsureShared();
   const c = state.shared.chore;
-  if (!c.moneyModelStartWeek) c.moneyModelStartWeek = ctDateToKey(ctMondayOf(new Date()));
+  if (!c.moneyModelStartWeek) c.moneyModelStartWeek = ctThisWeekKey();
   return c.moneyModelStartWeek;
 }
 function mrUsesNewModel(weekKey) {
@@ -1065,9 +1065,15 @@ function mrWeekDayKeys(weekKey) {
   for (let i = 0; i < 7; i++) { const d = new Date(mon); d.setDate(mon.getDate() + i); keys.push(ctDateToKey(d)); }
   return keys;
 }
+/* Which day a strike falls on has to be read in the app's timezone, the same
+   way mrWeekDayKeys builds the keys it is matched against. Reading the device
+   clock instead put a strike on the wrong calendar day for part of every day —
+   and outside the week entirely at a week boundary, which silently emptied the
+   ladder: three strikes in one evening all counted as step 1 and nothing was
+   ever voided. */
 function mrHonestyStrikesInWeek(kid, weekKey) {
   const keys = mrWeekDayKeys(weekKey);
-  return mrHonestyStrikes(kid).filter(h => keys.includes(ctDateToKey(new Date(h.at))));
+  return mrHonestyStrikes(kid).filter(h => keys.includes(toDayKeyInZone(new Date(h.at))));
 }
 function mrRecordHonesty(kid, channel, note) {
   if (!isParent()) { showToast('A grown-up records this 🔒'); return null; }
@@ -1077,7 +1083,7 @@ function mrRecordHonesty(kid, channel, note) {
   // has to be counted in that same week — not in whichever week the chore tab
   // happens to be showing.
   const at = Date.now();
-  const wk = ctDateToKey(ctMondayOf(new Date(at)));
+  const wk = ctThisWeekKey();
   const step = Math.min(mrHonestyStrikesInWeek(kid, wk).length + 1, steps.length || 3);
   const entry = { id: mrNewId('hon-'), at, channel: channel || 'chores',
                   step, note: note || '' };
@@ -1105,7 +1111,7 @@ function mrHonestyEffect(kid, weekKey) {
    don't each have to work out which week they're in. */
 function mrLosesChoices(kid, weekKey) {
   const wk = weekKey || (typeof ctWeekKey !== 'undefined' && ctWeekKey)
-             || ctDateToKey(ctMondayOf(new Date()));
+             || ctThisWeekKey();
   if (!mrUsesNewModel(wk)) return false;
   return !!mrHonestyEffect(kid, wk).losesChoices;
 }

@@ -1200,7 +1200,7 @@ function mnyShortDate(dayKey) {
 /* The week the money pages are looking at — the planner's current week. */
 function mnyWeekKey() {
   if (typeof ctWeekKey !== 'undefined' && ctWeekKey) return ctWeekKey;
-  return ctDateToKey(ctMondayOf(new Date()));
+  return ctThisWeekKey();
 }
 
 // Inert in the browser; lets tests run these helpers in Node.

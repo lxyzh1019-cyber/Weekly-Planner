@@ -133,7 +133,7 @@ function ckHeader(kid) {
   const lv = mrXpLevelInfo(kid, ctWeekKey);
   const st = mrStreakWeek(ctWeekKey, kid);
   const label = `${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()} – ${MONTH_SHORT[info.sun.getMonth()]} ${info.sun.getDate()}`;
-  const isThisWeek = ctWeekKey === ctDateToKey(ctMondayOf(new Date()));
+  const isThisWeek = ctWeekKey === ctThisWeekKey();
   return `<div class="ck-head">
     <div class="ck-head-who">
       <span class="ck-head-icon">${CT_PROFILE_ICON[kid]}</span>
@@ -624,6 +624,33 @@ function ckTapChoreRow(choreId) {
   ckOpenChore = ckOpenChore === choreId ? null : choreId;
   renderChoreTab();
 }
+/* ── The claim prompt, shared ──
+   A chore can be finished in three places: the chore tab, the day timeline and
+   the week planner. All three have to ask the same question and write the same
+   record, or a chore ticked in one place never reaches Mom's queue from the
+   others — which is exactly what used to happen when the planner wrote to the
+   retired `optionalByWeek` store instead.
+
+   Resolves the grade she claimed, or null if she backed out. */
+function openChoreClaimPrompt(kid, weekKey, dayIdx, choreId, label) {
+  const r = mrRulesForWeek(weekKey);
+  const options = CK_QUALITY.map(q => ({
+    id: String(q.g),
+    label: q.word,
+    sub: `${mnyMoney(ckGradePay(r, q.g))} · Mom checks it after`,
+  }));
+  return showChoice(`How did ${label || 'it'} go?`, options, { cancelLabel: 'Not done yet' })
+    .then(id => {
+      if (id == null) return null;
+      const g = Number(id) || 0;
+      if (!g) return null;
+      mrSetClaim(kid, weekKey, dayIdx, choreId, g);
+      saveAll();
+      showToast('Said and sent — Mom checks it after ✓');
+      return g;
+    });
+}
+
 function ckClaim(choreId, quality) {
   const kid = ctActiveKid();
   const cur = mrGetClaim(kid, ctWeekKey, ctDay, choreId);

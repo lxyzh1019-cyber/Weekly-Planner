@@ -457,7 +457,7 @@ function cpHandleCtClick(e) {
   ctHandleWrapClick(e);
 }
 function ctChangeWeekParent(delta) {
-  const mon = formatDayKey(ctWeekKey || ctDateToKey(ctMondayOf(new Date())));
+  const mon = formatDayKey(ctWeekKey || ctThisWeekKey());
   mon.setDate(mon.getDate() + delta * 7);
   ctWeekKey = ctDateToKey(mon);
   cpDay = 0;

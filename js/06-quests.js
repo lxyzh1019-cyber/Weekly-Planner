@@ -159,7 +159,7 @@ function renderQuestMoneyStrip(kid) {
   if (!showPocketMoney) { panel.hidden = true; panel.innerHTML = ''; return; }
 
   ctPrepareRead();
-  const wk = ctDateToKey(ctMondayOf(new Date()));   // real current week, independent of chore-tab nav
+  const wk = ctThisWeekKey();   // real current week, independent of chore-tab nav
   const today = formatDayKey(todayKey());
   const dayIdx = Math.max(0, Math.min(6, Math.round((today - formatDayKey(wk)) / (24*60*60*1000))));
   const chips = ctGroupsForKid(kid).map(g => {
@@ -463,8 +463,80 @@ function awardBlockLinks(blk, dayKey) {
     }
   }
   if (act && act.isRoutine && act.routineId) ctAwardMandatoryFromRoutine(act.routineId, kid, dayKey);
-  if (blk.actId === 'chores') ctAutoCheckOptionalFromBlock(blk, dayKey);
+  // A finished chore block has to land in the parent's grading queue. It used
+  // to write to ctSetOptional — the retired group store, which no surface reads
+  // any more — so a chore ticked in the planner simply never appeared in the
+  // portal. Now it asks how it went and files that as a claim, exactly as the
+  // chore tab does.
+  if (blk.actId === 'chores') claimChoresFromBlock(blk, dayKey, kid);
   return { msg, leveledUp, newLevel };
+}
+
+/* Every pool chore this block is tagged with, resolved for a given day.
+   Returns [{ choreId, label }] — tags that match no pool row are dropped here
+   and surfaced separately by mrUnresolvedTags, which is where a parent can
+   actually fix them. */
+function blockChoreTargets(blk, dayKey, kid) {
+  const wk = ctWeekKeyForDate(dayKey);
+  const dayIdx = Math.round((formatDayKey(dayKey) - formatDayKey(wk)) / 864e5);
+  if (dayIdx < 0 || dayIdx > 6) return { wk, dayIdx: -1, targets: [] };
+  const tags = (Array.isArray(blk.choreTags) && blk.choreTags.length)
+    ? blk.choreTags
+    : (blk.choreTag ? [blk.choreTag] : []);
+  const seen = new Set();
+  const targets = [];
+  tags.filter(t => t && t !== 'General').forEach(t => {
+    const row = mrPoolRowForTag(t, wk);
+    if (!row || seen.has(row.id)) return;
+    if (!mrLanePays(row.lane)) return;         // 'own'/'helping' are never claimed for money
+    if (row.who !== 'both' && row.who !== kid) return;
+    seen.add(row.id);
+    targets.push({ choreId: row.id, label: row.label });
+  });
+  return { wk, dayIdx, targets };
+}
+
+/* Marking the block done → one claim prompt per tagged chore, in sequence.
+   Already-graded chores are skipped: a grade is Mom's answer and the planner
+   does not get to overwrite it. */
+function claimChoresFromBlock(blk, dayKey, kid) {
+  const { wk, dayIdx, targets } = blockChoreTargets(blk, dayKey, kid);
+  if (dayIdx < 0 || !targets.length) return;
+  const pending = targets.filter(t => !(mrGetChoreGrade(kid, wk, dayIdx, t.choreId) > 0));
+  if (!pending.length) return;
+  // Sequential rather than all at once — three overlapping dialogs is not a
+  // question, it's a pile-up.
+  pending.reduce(
+    (chain, t) => chain.then(() => openChoreClaimPrompt(kid, wk, dayIdx, t.choreId, t.label)),
+    Promise.resolve()
+  ).then(() => {
+    const active = document.querySelector('.screen.active');
+    if (active && active.id === 'screen-chore') renderChoreTab();
+  });
+}
+
+/* A PARENT confirming a chore block is the grading act, not a claim — she is
+   the one who decides. Agrees at what the kid claimed, or "on time" if the kid
+   never answered, matching how a tap in the meeting's Step 1 behaves. */
+function gradeChoresFromBlock(blk, dayKey, kid) {
+  const { wk, dayIdx, targets } = blockChoreTargets(blk, dayKey, kid);
+  if (dayIdx < 0) return;
+  targets.forEach(t => {
+    if (mrGetChoreGrade(kid, wk, dayIdx, t.choreId) > 0) return;
+    const claim = mrGetClaim(kid, wk, dayIdx, t.choreId);
+    mrSetChoreGrade(kid, wk, dayIdx, t.choreId, claim > 0 ? claim : 3);
+  });
+}
+
+/* Un-ticking the block takes the claim back — but never an answer Mom has
+   already given. */
+function unclaimChoresFromBlock(blk, dayKey, kid) {
+  const { wk, dayIdx, targets } = blockChoreTargets(blk, dayKey, kid);
+  if (dayIdx < 0) return;
+  targets.forEach(t => {
+    if (mrGetChoreGrade(kid, wk, dayIdx, t.choreId) > 0) return;
+    if (mrGetClaim(kid, wk, dayIdx, t.choreId) > 0) mrSetClaim(kid, wk, dayIdx, t.choreId, 0);
+  });
 }
 
 /* ── #5 Parent "proud of you" stamp: a warm mark a parent drops on a block ── */
@@ -542,6 +614,9 @@ function toggleBlockDone(dayKey, blockId, ev) {
   const nowDone = blk.completed;
   let extra = '';
   if (nowDone) extra = awardBlockLinks(blk, dayKey).msg;
+  else if (blk.actId === 'chores') {
+    unclaimChoresFromBlock(blk, dayKey, isParent() ? parentViewing : activeProfile());
+  }
   setDayBlocks(dayKey, blocks);
   const active = document.querySelector('.screen.active');
   if (active && active.id === 'screen-week') renderWeek();

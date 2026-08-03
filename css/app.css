@@ -1645,6 +1645,17 @@
   .mm-item-box { width: 26px; height: 26px; border: 2px solid var(--ink); border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: 900; flex-shrink: 0; }
   .mm-item.on .mm-item-box { background: #95d5b2; }
   .mm-detail-editnote { font-size: 0.72rem; opacity: 0.7; font-style: italic; margin-top: 6px; }
+  /* Step 1 splits each kid's day into the two things it actually is: routines
+     the parent marks (no money, feeds the streak) and priced chores, where a
+     tap is the grading act. They read differently because they ARE different. */
+  .mm-detail-sect { margin-top: 6px; }
+  .mm-detail-sect + .mm-detail-sect { border-top: 1.5px dashed var(--paper-line); padding-top: 6px; }
+  .mm-detail-cap { font-weight: 800; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.03em; opacity: 0.75; }
+  .mm-detail-cap small { font-weight: 700; text-transform: none; letter-spacing: 0; }
+  .mm-detail-note { font-size: 0.7rem; opacity: 0.65; margin-bottom: 3px; }
+  .mm-detail-empty { font-size: 0.72rem; opacity: 0.6; font-style: italic; padding: 2px 4px; }
+  .mm-item-pay { margin-left: auto; font-weight: 800; font-size: 0.74rem; color: #2f7d55; white-space: nowrap; }
+  .mm-item-said { margin-left: auto; font-size: 0.68rem; opacity: 0.7; font-style: italic; white-space: nowrap; }
   .ct-history > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
   .ct-history > summary::-webkit-details-marker { display: none; }
   .ct-history > summary::before { content: '▸'; font-weight: 900; transition: transform 0.15s; }
@@ -2833,6 +2844,18 @@
     background: #fff; color: var(--ink); margin-bottom: 0.9rem;
   }
   .app-dialog-input:focus { outline: 3px solid var(--accent-strong); outline-offset: 1px; }
+  /* showChoice: one button per answer, stacked, each big enough for a thumb. */
+  .app-dialog-choices { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.6rem 0 0.9rem; }
+  .app-dialog-choice {
+    display: flex; flex-direction: column; gap: 0.15rem; align-items: flex-start;
+    width: 100%; text-align: left; padding: 0.65rem 0.8rem;
+    background: var(--paper); color: inherit; font-family: inherit;
+    border: 2px solid var(--ink); border-radius: 12px; cursor: pointer;
+  }
+  .app-dialog-choice:hover, .app-dialog-choice:focus-visible { background: var(--bg2); }
+  .app-dialog-choice:active { transform: translateY(1px); }
+  .app-dialog-choice-label { font-weight: 800; font-size: 1rem; }
+  .app-dialog-choice-sub { font-size: 0.8rem; opacity: 0.75; }
   .app-dialog-btns { display: flex; gap: 0.6rem; align-items: center; }
   .app-dialog-cancel { flex: 0 0 auto; }
   /* Gated confirm: the tick is an assertion, so give it a real target size and

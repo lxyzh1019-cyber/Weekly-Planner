@@ -44,7 +44,7 @@ function renderMeetingHub() {
   const wrap = document.getElementById('meetingHub');
   if (!wrap) return;
   ctPrepareRead();
-  const wk = ctWeekKey || ctDateToKey(ctMondayOf(new Date()));
+  const wk = ctWeekKey || ctThisWeekKey();
   const info = ctWeekInfo();
   const held = !!(state.shared.chore.meetingsHeld && state.shared.chore.meetingsHeld[wk]);
   const nConfirmed = [0,1,2,3,4,5,6].filter(mmIsDayConfirmed).length;
@@ -397,7 +397,7 @@ async function toggleShareActivity(owner, id) {
 let perfWeekOffset = 0;   // 0 = current week, -1 = last week, …
 
 function perfMondayKey(offset) {
-  const mon = ctMondayOf(new Date());
+  const mon = ctThisMonday();
   mon.setDate(mon.getDate() + offset * 7);
   return ctDateToKey(mon);
 }

@@ -262,9 +262,11 @@ function mnyCompetitionForm(wk, kid) {
       <div class="mny-label">🏆 Competition day</div>
       <div class="mny-chiprow">${sportChips}</div>
       <label class="mny-field"><span>What it was called</span>
-        <input type="text" value="${escapeAttr(d.name)}" oninput="mnyCompSet('name', this.value)" placeholder="Winter Invitational"></label>
+        <input type="text" data-mm-field="comp-name" value="${escapeAttr(d.name)}"
+          oninput="mnyCompSetQuiet('name', this.value)" placeholder="Winter Invitational"></label>
       <label class="mny-field"><span>Which day</span>
-        <input type="date" value="${escapeAttr(d.dayKey)}" onchange="mnyCompSet('dayKey', this.value)"></label>
+        <input type="date" data-mm-field="comp-day" value="${escapeAttr(d.dayKey)}"
+          onchange="mnyCompSet('dayKey', this.value)"></label>
       ${d.sport !== 'dance' ? `<div class="mny-row"><span>Points</span>${mnyStepper('points', d.points, 'comp')}</div>` : ''}
       ${detail}
       <div class="mny-row total"><span>That comes to</span><b>${mnyMoney(preview)}</b></div>
@@ -684,7 +686,7 @@ function mnyToggleDep() { mnyDepOpen = !mnyDepOpen; if (!mnyDepOpen) mnyDepDraft
 function mnyToggleChecks() { mnyChecksOpen = !mnyChecksOpen; renderMeetingMode(); }
 function mnyTogglePlan() { mnyPlanOpen = !mnyPlanOpen; renderMeetingMode(); }
 function mnyTickCheck(id) { mnyToggleCheck(mnyWeekKeyMeeting(), mnyMeetingKid(), id); renderMeetingMode(); }
-function mnyWeekKeyMeeting() { return ctWeekKey || ctDateToKey(ctMondayOf(new Date())); }
+function mnyWeekKeyMeeting() { return ctWeekKey || ctThisWeekKey(); }
 
 function mnyBumpChannel(channel, delta) {
   const wk = mnyWeekKeyMeeting(), kid = mnyMeetingKid();
@@ -720,6 +722,13 @@ function mnyStepper(field, value, which, step) {
       <button type="button" class="mny-step" onclick="${fn}('${field}',${s})" aria-label="More">+</button>
     </span>`;
 }
+/* Typed fields mutate the draft WITHOUT redrawing. A chip or a stepper changes
+   what the rest of the card says (the score preview, which detail rows apply),
+   so those still re-render; a name being typed changes nothing else on screen,
+   and redrawing on each letter is what threw the caret out of the box. The
+   value is already in the draft, so the next real render picks it up. */
+function mnyCompSetQuiet(field, value) { if (mnyCompDraft) mnyCompDraft[field] = value; }
+function mnyDepSetQuiet(field, value) { if (mnyDepDraft) mnyDepDraft[field] = value; }
 function mnyCompSet(field, value) { if (!mnyCompDraft) return; mnyCompDraft[field] = value; renderMeetingMode(); }
 function mnyCompBump(field, delta) { if (!mnyCompDraft) return; mnyCompDraft[field] = Math.max(0, (Number(mnyCompDraft[field]) || 0) + delta); renderMeetingMode(); }
 function mnyDepSet(field, value) { if (!mnyDepDraft) return; mnyDepDraft[field] = value; renderMeetingMode(); }
