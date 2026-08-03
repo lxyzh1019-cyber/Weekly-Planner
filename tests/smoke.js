@@ -1786,8 +1786,10 @@ function findChromium() {
     const pool = mnyPool(wk, kid);
     const capped = pool.spendCap === money2(pool.mine * 0.2);
     const explained = !!mnyConceptById('spend');
-    // And "choose every number myself" is reachable before the debt is gone.
-    const ownReachable = MNY_PLANS.find(p => p.id === 'own').need === 30;
+    // "Choose every number myself" is manual entry, not a stage-gated idea: the
+    // steppers that do the same job sit unlocked directly beneath it.
+    const ownReachable = MNY_PLANS.find(p => p.id === 'own').need === 0
+      && mnyIsOpen(kid, MNY_PLANS.find(p => p.id === 'own').need);
     return openFromTheStart && inTheSplit && capped && explained && ownReachable;
   });
 

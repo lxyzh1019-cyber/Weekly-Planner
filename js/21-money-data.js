@@ -59,7 +59,11 @@ const MNY_PLANS = [
   { id: 'balanced', icon: '⚖️', label: 'A bit of everything',   need: 60,  split: { loan: 0.4, ready: 0.3, gic: 0.3 } },
   { id: 'grow',     icon: '📈', label: 'Grow it more',          need: 90,  split: { loan: 0.3, ready: 0.1, gic: 0.2, stock: 0.4 } },
   { id: 'last',     icon: '🔁', label: 'Same as last week',     need: 0,   split: null },
-  { id: 'own',      icon: '🧩', label: "I'll choose every number myself", need: 30, split: null, own: true },
+  /* Not a stage-gated idea — it is manual entry, and the "or set every number
+     yourself" steppers directly below this card are open at every stage. A
+     locked card sitting above the unlocked control that does the same thing is
+     just a lie about what the screen can do. */
+  { id: 'own',      icon: '🧩', label: "I'll choose every number myself", need: 0, split: null, own: true },
 ];
 
 /* Investing is a fixed menu — no typing in a ticker. A nine-year-old picking a
