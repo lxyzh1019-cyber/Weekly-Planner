@@ -199,7 +199,10 @@ function mmRenderReview(wk) {
   const jp = mmWeekPct('jenn'), sp = mmWeekPct('jess');
   const together = Math.round((jp + sp) / 2);
   const footer = `<div class="mm-ready">Meeting-ready: ${nConfirmed}/7 days confirmed · 💪 Together you kept ${together}% of the days so far <small>(🐥 ${jp}% · 🦊 ${sp}%)</small></div>`;
-  return `<div class="mm-h">Review the week</div>
+  // The readiness list belongs before anything is agreed, not after (it lived
+   // in step 4 until now). Per-kid state, so it follows whoever step 3/4 is on.
+  return `${mnyChecklist(wk, mnyMeetingKid())}
+    <div class="mm-h">Review the week</div>
     <div class="mm-legend"><span><i class="mm-sw mm-bar-j"></i>Jenn</span><span><i class="mm-sw mm-bar-s"></i>Jess</span><span class="mm-legend-note">how the team's doing each day — cheer each other on</span></div>
     <div class="mm-chart">${bars}</div>${detail}${footer}`;
 }

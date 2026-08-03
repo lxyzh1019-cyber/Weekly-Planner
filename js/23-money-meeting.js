@@ -407,7 +407,6 @@ function mnyRenderDecide(wk) {
   const pool = mnyPool(wk, kid);
   return `${head}
     ${mnyStrip(wk, kid, 2)}
-    ${mnyChecklist(wk, kid)}
     <div class="mny-cols two">
       <div class="mny-col">
         ${mnyPoolCard(wk, kid, pool)}
@@ -438,7 +437,11 @@ function mnyEnsureDraft(wk, kid) {
 }
 
 /* The parent's before-we-start list. Collapsed, because on a good week it is
-   seven ticks and nobody needs to read it. */
+   seven ticks and nobody needs to read it.
+
+   It used to render inside step 4 — after step 3 had already agreed the week —
+   which made a list called "before we start" into a post-mortem. It belongs at
+   the top of step 1, and that is where mmRenderReview now calls it. */
 function mnyChecklist(wk, kid) {
   const checks = mnyChecks(wk, kid);
   const done = MNY_CHECKS.filter(c => checks[c.id]).length;
@@ -502,11 +505,24 @@ function mnyPaymentImpact(wk, kid, pool) {
   const primary = mnyDebtsByPriority(kid).find(d => loanBalance(kid, d.id) > 0);
   const rate = primary ? (Number(primary.arrearsRatePct) || 0) / 100 : 0;
   const cost = money2(pool.unpaid * rate);
-  const freed = money2(pool.unpaid);
+  // The months are the half a nine-year-old can actually feel. loanFreeDate
+  // already answers "when am I free of this at the current rate", so asking it
+  // twice — once as if the shortfall had been paid — gives the delta without a
+  // second formula to keep in step with the first.
+  let later = '';
+  if (primary) {
+    const now = loanFreeDate(kid, primary.id, 0);
+    const ifPaid = loanFreeDate(kid, primary.id, pool.unpaid);
+    if (now.months != null && ifPaid.months != null) {
+      const slip = now.months - ifPaid.months;
+      if (slip > 0) later = ` It also pushes being free of ${escapeHtml(primary.name)} out by about `
+        + `${slip} month${slip === 1 ? '' : 's'}.`;
+    }
+  }
   return `<div class="mny-note warn">
-      Paying ${mnyMoney(pool.unpaid)} less than the schedule frees ${mnyMoney(freed)} to choose with now,
-      and costs ${mnyMoney(cost)} a month in late fees until it is caught up. It is not forgiven — the
-      loan still carries it.
+      Paying ${mnyMoney(pool.unpaid)} less than the schedule frees ${mnyMoney(pool.unpaid)} to choose with now,
+      and costs ${mnyMoney(cost)} a month in late fees until it is caught up.${later}
+      It is not forgiven — the loan still carries it.
     </div>`;
 }
 

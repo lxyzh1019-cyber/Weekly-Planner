@@ -1804,6 +1804,205 @@ function findChromium() {
         && mrUsesNewModel(planner);
   });
 
+  /* ══════════════════════════════════════════════════════════════
+     ROUND 2 — the places the flow was leaking. Each of these fails
+     silently in the app: every screen still renders, the record just
+     stops being true.
+     ══════════════════════════════════════════════════════════════ */
+
+  // The week is only recorded when BOTH kids are settled, so the last step has
+  // to say when one isn't rather than offering a celebration.
+  checks.meetingWontCelebrateHalfDone = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey, c = state.shared.chore;
+    ['meetingsHeld', 'finalizedWeeks', 'moneyLedger', 'weekConfirms', 'weekPlans', 'xpAwardedWeeks']
+      .forEach(m => { if (c[m]) delete c[m][wk]; });
+    ['jenn', 'jess'].forEach(k => {
+      const pd = getProfData(k);
+      delete pd.debts; pd.deposits = []; pd.competitions = []; pd.honesty = [];
+      const e = mrEnsureEarnings(k, wk);
+      e.overrides = {}; e.paymentOverrides = {}; e.chores = {}; e.claims = {};
+      ensureWallet(k).cash = 0;
+      const d = mnyDebts(k)[0]; d.paid = d.principal;      // nothing due
+      ['dishes', 'mop', 'vacuum'].forEach((ch, i) => mrSetChoreGrade(k, wk, i, ch, 3));
+    });
+
+    openFamilyMeeting(); mmGoStep(5);
+    const body = () => document.getElementById('familyMeetingBody').textContent;
+    const neitherDone = body().includes('Neither week is decided');
+
+    // Settle Jess only.
+    mnySetMeetKid('jess'); mmGoStep(3); mnyDoConfirm(); mmGoStep(4);
+    const d = mnyEnsureDraft(wk, 'jess');
+    Object.keys(d.split).forEach(k => { d.split[k] = 0; });
+    d.split.spend = mnyPool(wk, 'jess').spendCap;
+    d.split.ready = money2(mnyPool(wk, 'jess').mine - d.split.spend);
+    d.planId = 'own'; d.reflect = 'saving';
+    mnyDoCommit();
+
+    mmGoStep(5);
+    const namesJenn = body().includes("Jenn's week isn't decided");
+    const jessTicks = document.querySelectorAll('.mm-settle-cell.on').length === 2;
+    // Half-done must not be recorded, and must not read as finished.
+    const notHeld = !(c.meetingsHeld && c.meetingsHeld[wk]);
+    const noCelebration = !body().includes('🎉 Finish meeting');
+    closeSheet('familyMeetingOverlay');
+    return neitherDone && namesJenn && jessTicks && notHeld && noCelebration;
+  });
+
+  // An override wins, but the grades behind it must stop claiming to decide
+  // anything — on BOTH surfaces that still show them.
+  checks.overrideIsFlaggedWhereverGradesShow = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey;
+    const e = mrEnsureEarnings(kid, wk);
+    e.chores = {}; e.claims = {}; e.overrides = {};
+    const dk = mrWeekDayKeys(wk)[2];
+    setDayBlocks(dk, [{ id: 'ovb', actId: 'chores', startMin: 17 * 60,
+                        durationMin: 30, choreTags: ['Vacuum'] }], kid);
+    mrSetChoreGrade(kid, wk, 2, 'vacuum', 3);
+    const gradeBefore = mrGetChoreGrade(kid, wk, 2, 'vacuum');
+
+    const quiet = !mnyOverrideNotice(kid, wk, 'chores');
+    mnySetOverride(kid, wk, 'chores', 99, 'graded_wrong');
+
+    openFamilyMeeting(); mmGoStep(1); mmSelectDay(2);
+    const inMeeting = document.getElementById('familyMeetingBody').textContent
+      .includes('no longer decide it');
+    closeSheet('familyMeetingOverlay');
+
+    // The portal, not openChoreTab — that renders the KID frame for everyone
+    // (round 1 moved the parent's half of the week into js/27-chore-parent.js).
+    // setParentTab only toggles panels — the render has to be asked for.
+    cpDay = 2; cpView = 'day';
+    showScreen('parent'); setParentTab('chores'); cpRenderChoreTab();
+    const cp = document.getElementById('cpWrap').textContent;
+    const inPortal = cp.includes('Already graded') && cp.includes('no longer decide it');
+    // The override is a display fact, not a rewrite of what she was marked.
+    const gradeUntouched = mrGetChoreGrade(kid, wk, 2, 'vacuum') === gradeBefore;
+
+    e.overrides = {}; setDayBlocks(dk, [], kid);
+    return quiet && inMeeting && inPortal && gradeUntouched;
+  });
+
+  // Work she did that nobody planned has to be claimable — and still gated.
+  checks.unplannedChoreIsClaimable = await page.evaluate(async () => {
+    profile = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey;
+    const e = mrEnsureEarnings(kid, wk);
+    e.claims = {}; e.chores = {}; e.gradedAt = {};
+    mrWeekDayKeys(wk).forEach(k => setDayBlocks(k, [], kid));
+
+    openChoreTab(); ckSelectDay(3);
+    const nothingPlanned = document.querySelectorAll('[data-ct-action="ck-chore-row"]').length === 0;
+    const doorExists = !!document.querySelector('[data-ct-action="ck-else"]');
+    document.querySelector('[data-ct-action="ck-else"]').click();
+    const offered = document.querySelectorAll('[data-ct-action="ck-else-pick"]').length > 0;
+    document.querySelectorAll('[data-ct-action="ck-else-pick"]')[0].click();
+    await new Promise(r => setTimeout(r, 30));
+    document.querySelectorAll('.app-dialog-choice')[0].click();
+    await new Promise(r => setTimeout(r, 30));
+
+    const inQueue = mrClaimQueue(wk, kid).length === 1;
+    const onHerTab = document.querySelectorAll('[data-ct-action="ck-chore-row"]').length === 1;
+    const markedAdded = !!document.querySelector('.ck-added');
+    const paysNothingYet = mrChoreWeek(wk, kid).paid === 0;   // a parent still decides
+    return nothingPlanned && doorExists && offered && inQueue
+        && onHerTab && markedAdded && paysNothingYet;
+  });
+
+  // Her half of the loop: what is with Mom, and what came back while she
+  // wasn't looking — and the marker must survive the render that shows it.
+  checks.kidSeesWaitingAndAnswered = await page.evaluate(() => {
+    profile = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey, pd = getProfData(kid);
+    const e = mrEnsureEarnings(kid, wk);
+    e.claims = {}; e.chores = {}; e.gradedAt = {};
+    pd.progress.lastGradeSeen = 0;
+    mrSetClaim(kid, wk, 1, 'dishes', 3);
+    mrSetClaim(kid, wk, 3, 'mop', 2);
+
+    openChoreTab(); ckSelectDay(0);
+    const waiting = mrWaitingCount(kid, wk) === 2
+      && document.getElementById('choreWrap').textContent.includes('waiting for Mom');
+
+    const was = profile;
+    profile = 'parent'; ctParentKid = kid;
+    mrSetChoreGrade(kid, wk, 1, 'dishes', 3);
+    // A parent looking at her tab must NOT consume her "new" markers.
+    renderChoreTab();
+    const survivedParentLook = mrNewlyGraded(kid, wk).length === 1;
+    profile = was;
+
+    renderChoreTab();
+    const showedHer = document.getElementById('choreWrap').textContent.includes('newly answered');
+    renderChoreTab();                                  // she has now seen it
+    const cleared = mrNewlyGraded(kid, wk).length === 0;
+    const nowWaitingOne = mrWaitingCount(kid, wk) === 1;
+    return waiting && survivedParentLook && showedHer && cleared && nowWaitingOne;
+  });
+
+  // A 60-minute session is too short for the 2x2 grid but not too short to
+  // review — it gets one line instead of none.
+  checks.trainingChecksScaleWithTheBlock = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    const k = getDayKeys(0)[1];
+    setDayBlocks(k, [
+      { id: 'tc60', actId: 'training', startMin: 9 * 60, durationMin: 60, tag: 'skating', trainingCheck: {} },
+      { id: 'tc120', actId: 'training', startMin: 14 * 60, durationMin: 120, tag: 'swimming', trainingCheck: {} },
+    ], 'jenn');
+    openDay(k, 1);
+    const fits = el => el.scrollHeight <= el.getBoundingClientRect().height + 1;
+    const short = document.getElementById('block-tc60');
+    const tall = document.getElementById('block-tc120');
+    const ok = !!short.querySelector('.block-train-chip')
+      && short.querySelectorAll('.block-gear-item').length === 0 && fits(short)
+      && !tall.querySelector('.block-train-chip')
+      && tall.querySelectorAll('.block-gear-item').length === TRAINING_CHECKS.length && fits(tall);
+    setDayBlocks(k, [], 'jenn');
+    return ok;
+  });
+
+  // One quest list, one completion path. The board is a door to it, not a
+  // second copy of it.
+  checks.questBoardDoesNotDuplicateTheList = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    const key = todayKey();
+    setDayBlocks(key, [
+      { id: 'qb1', actId: 'breakfast', startMin: 7 * 60, durationMin: 30 },
+      { id: 'qb2', actId: 'piano', startMin: 16 * 60, durationMin: 60 },
+    ], 'jenn');
+    goQuestBoard();
+    const noOwnList = document.querySelectorAll('#questList .quest-card').length === 0;
+    const hasDoor = !!document.querySelector('.quest-today-card');
+    document.querySelector('.quest-today-card').click();
+    const landed = document.querySelector('.screen.active').id === 'screen-day'
+      && dayViewMode === 'quest'
+      && document.querySelectorAll('#dayQuest .quest-card').length === 2;
+    setDayBlocks(key, [], 'jenn');
+    setDayViewMode('timeline');
+    return noOwnList && hasDoor && landed;
+  });
+
+  // "Before we start" is a pre-flight list; it used to render after the week
+  // had already been agreed.
+  checks.readinessListComesBeforeTheReview = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead();
+    openFamilyMeeting(); mmGoStep(1);
+    const onStep1 = document.getElementById('familyMeetingBody').textContent
+      .includes('Before we start');
+    mmGoStep(4);
+    const offStep4 = !document.getElementById('familyMeetingBody').textContent
+      .includes('Before we start');
+    closeSheet('familyMeetingOverlay');
+    return onStep1 && offStep4;
+  });
+
   checks.noConsoleErrors = errors.length === 0;
 
   const failed = Object.entries(checks).filter(([,v]) => !v).map(([k]) => k);

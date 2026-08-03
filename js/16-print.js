@@ -90,10 +90,15 @@ function printBlockFontPt(heightPx) {
   return 6.5;                        // ~15m sliver
 }
 
-// How many detail lines (gear/objective/etc.) fit under the title in a block
+// How many detail lines (checks/objective/etc.) fit under the title in a block
 // of this height, given the title's own font size — continuous, so a big
-// competition block naturally gets room for its whole gear + objective list
-// instead of a fixed 1/2/3-row cap regardless of how tall the block actually is.
+// competition block naturally gets room for its whole list instead of a fixed
+// 1/2/3-row cap regardless of how tall the block actually is.
+//
+// Deliberately NOT blockContentTier (js/05-helpers.js), which the day and week
+// views share: this measures against real font metrics at the block's own point
+// size, and print px are not screen px — the sheet has its own --print-slot
+// scale, so those five pixel thresholds would mean nothing here.
 function printDetailCapacity(heightPx, titleFpt) {
   const pxPerPt = 1.333;
   const titleLinePx = titleFpt * pxPerPt * 1.15 + 2;
@@ -225,10 +230,11 @@ function renderPrintSheet() {
         // session don't share one fixed box size.
         const checkPx = printCheckboxPx(bh);
         const checkbox = bh >= 15 ? `<span class="print-check" style="border-color:${printTextColor(bg)};width:${checkPx}px;height:${checkPx}px"></span>` : '';
-        // List as much of "what this block is about" (gear/objectives/note)
-        // as the block's own height can hold — gear first since packing is
-        // effectively mandatory for a training block — degrading to a one-line
-        // count, then to icon+name only, on slivers too short for more.
+        // List as much of "what this block is about" as the block's own height
+        // can hold, degrading to a one-line count and then to icon+name only on
+        // slivers too short for more. A training block leads with its four
+        // checks (TRAINING_CHECKS), which print as ⬜ boxes — on paper they are
+        // the point, since a printed sheet is something you tick with a pen.
         const detailLines = blockDetailLines(b, act);
         let sumHtml = '';
         if (detailLines.length) {
