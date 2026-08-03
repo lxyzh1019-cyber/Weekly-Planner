@@ -1632,6 +1632,176 @@ function findChromium() {
     return unasked && opened && paged && closed && twoTours;
   });
 
+  /* ══════════════════════════════════════════════════════════════
+     THE CHORE → MONEY HAND-OFF
+     The app carried two chore stores for a while and only one of them was
+     wired to the money. These check the join, because a break here is silent:
+     everything still renders, the numbers are just wrong.
+     ══════════════════════════════════════════════════════════════ */
+
+  // The planner is where a chore gets finished. Finishing it has to reach the
+  // parent's queue, or the work is invisible to everyone who pays for it.
+  checks.plannerChoreReachesTheQueue = await page.evaluate(async () => {
+    profile = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey;
+    const e = mrEnsureEarnings(kid, wk);
+    e.claims = {}; e.chores = {};
+    const dayKey = mrWeekDayKeys(wk)[3];
+    setDayBlocks(dayKey, [{ id: 'pblk', actId: 'chores', startMin: 17 * 60,
+                            durationMin: 30, choreTags: ['Mop'] }], kid);
+
+    // Marking it done asks how it went; answering files the claim.
+    toggleBlockDone(dayKey, 'pblk');
+    // The prompt chain starts on a microtask, so let it open first.
+    await new Promise(r => setTimeout(r, 30));
+    const asked = !!document.querySelector('.app-dialog-choice');
+    if (!asked) return false;
+    document.querySelectorAll('.app-dialog-choice')[0].click();   // "On time"
+    await new Promise(r => setTimeout(r, 30));
+
+    const claimed = mrGetClaim(kid, wk, 3, 'mop') === 3;
+    const inQueue = mrClaimQueue(wk, kid).some(q => q.choreId === 'mop' && q.dayIdx === 3);
+    // A claim is an answer, not a payment: nothing has moved yet.
+    const unpaid = mrChoreWeek(wk, kid).paid === 0;
+
+    // Un-ticking withdraws it again.
+    toggleBlockDone(dayKey, 'pblk');
+    const withdrawn = mrGetClaim(kid, wk, 3, 'mop') === 0;
+
+    setDayBlocks(dayKey, [], kid);
+    return asked && claimed && inQueue && unpaid && withdrawn;
+  });
+
+  // A parent's grade is what turns the claim into money — and the meeting's
+  // step 1 and step 3 have to be reading the same record, which is exactly
+  // what was broken.
+  checks.step1GradeReachesStep3 = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey;
+    const e = mrEnsureEarnings(kid, wk);
+    e.claims = {}; e.chores = {}; e.overrides = {};
+    const dayKey = mrWeekDayKeys(wk)[2];
+    setDayBlocks(dayKey, [{ id: 'mblk', actId: 'chores', startMin: 17 * 60,
+                            durationMin: 30, choreTags: ['Vacuum'] }], kid);
+    // The week's first free chores are unpaid by design, so use them up first —
+    // otherwise the chore graded below would correctly pay nothing and this
+    // would be testing the free-chore rule rather than the hand-off.
+    const freeCount = Number((mrRulesForWeek(wk).chores || {}).freeChoresPerWeek) || 0;
+    ['dishes', 'mop', 'laundry'].slice(0, freeCount)
+      .forEach((ch, i) => mrSetChoreGrade(kid, wk, i, ch, 3));
+
+    openFamilyMeeting();
+    mmGoStep(1); mmSelectDay(2);
+    const rows = mmReviewRows(kid, 2);
+    // Routines are the parent's to mark; chores come from the planner.
+    const bothKinds = rows.filter(r => r.kind === 'routine').length === 3
+                   && rows.some(r => r.kind === 'chore' && r.key === 'vacuum');
+    const idx = rows.findIndex(r => r.key === 'vacuum');
+
+    const before = mrWeekBreakdown(wk, kid).chorePaid;
+    mmToggleItem(kid, 2, idx);                       // the tap IS the grading
+    const graded = mrGetChoreGrade(kid, wk, 2, 'vacuum') === 3;
+    const after = mrWeekBreakdown(wk, kid).chorePaid;
+
+    // Step 3 must show the same figure the grade just produced.
+    mnySetMeetKid(kid); mmGoStep(3);
+    const shown = document.getElementById('familyMeetingBody').textContent
+      .includes(mnyMoney(after));
+
+    mmToggleItem(kid, 2, idx);                       // and it is reversible
+    const ungraded = mrGetChoreGrade(kid, wk, 2, 'vacuum') === 0;
+
+    closeSheet('familyMeetingOverlay');
+    setDayBlocks(dayKey, [], kid);
+    return bothKinds && graded && after > before && shown && ungraded;
+  });
+
+  // Typing into the meeting must not throw the caret away on every letter.
+  checks.meetingKeepsFocusAndScroll = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    openFamilyMeeting(); mnySetMeetKid('jess'); mmGoStep(3);
+    if (!mnyCompOpen) mnyToggleComp();
+    const input = document.querySelector('[data-mm-field="comp-name"]');
+    if (!input) return false;
+    input.focus();
+    input.value = 'Winter Invit';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const keptWhileTyping = document.activeElement
+      && document.activeElement.getAttribute('data-mm-field') === 'comp-name';
+    // And a render triggered by something else puts the caret back.
+    input.setSelectionRange(3, 3);
+    renderMeetingMode();
+    const restored = document.activeElement
+      && document.activeElement.getAttribute('data-mm-field') === 'comp-name'
+      && document.activeElement.selectionStart === 3;
+    const draftKept = mnyCompDraft.name === 'Winter Invit';
+    mnyToggleComp();
+    closeSheet('familyMeetingOverlay');
+    return keptWhileTyping && restored && draftKept;
+  });
+
+  // Tabs 4 and 5 were dead inside the meeting: the delegated handler was only
+  // bound to the standalone money pages.
+  checks.moneyTabsWorkInsideTheMeeting = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); openFamilyMeeting(); mmGoStep(3);
+    const tab = document.querySelector('#familyMeetingBody [data-mny-action="tab"][data-mny-tab="school"]');
+    if (!tab) return false;
+    tab.click();
+    const landed = document.getElementById('screen-moneyschool').classList.contains('active');
+    closeSheet('familyMeetingOverlay');
+    return landed;
+  });
+
+  // Paying less than the schedule frees money now and costs arrears later. It
+  // must never quietly forgive the difference.
+  checks.loanPaymentIsArguableNotForgiven = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey;
+    mnyPaymentOverrides(kid, wk);
+    const due = mnyDueThisWeek(kid, wk);
+    if (!due.length) return true;                    // nothing scheduled — nothing to argue
+    const d = due[0], id = d.debt.id;
+    const mineBefore = mnyPool(wk, kid).mine;
+    mnySetPaymentOverride(kid, wk, id, money2(d.scheduled - 1));
+    const pool = mnyPool(wk, kid);
+    const freed = pool.mine > mineBefore && pool.unpaid === 1;
+    // Never above the schedule, and the reset puts it back.
+    mnySetPaymentOverride(kid, wk, id, d.scheduled + 99);
+    const capped = mnyDueThisWeek(kid, wk)[0].amount === d.scheduled;
+    mnySetPaymentOverride(kid, wk, id, null);
+    const reset = mnyPool(wk, kid).unpaid === 0;
+    return freed && capped && reset;
+  });
+
+  // Spending is a real answer, open from week one, capped at a fifth.
+  checks.spendingIsAnOptionAndCapped = await page.evaluate(() => {
+    const kid = 'jess', wk = ctWeekKey;
+    const openFromTheStart = MNY_BUCKETS.find(b => b.key === 'spend').need === 0;
+    const inTheSplit = mnySplitFor(wk, kid, 'own').spend !== undefined;
+    const pool = mnyPool(wk, kid);
+    const capped = pool.spendCap === money2(pool.mine * 0.2);
+    const explained = !!mnyConceptById('spend');
+    // And "choose every number myself" is reachable before the debt is gone.
+    const ownReachable = MNY_PLANS.find(p => p.id === 'own').need === 30;
+    return openFromTheStart && inTheSplit && capped && explained && ownReachable;
+  });
+
+  /* One derivation of "this week". Two disagreed for part of every day, and at
+     a week boundary named different Mondays — which made the chore tab decide
+     the current week predated the money model and fall back to a board with no
+     rows on it. */
+  checks.oneCurrentWeekEverywhere = await page.evaluate(() => {
+    const planner = dateToLocalKey(getWeekStart(0));
+    return ctThisWeekKey() === planner
+        && mnyWeekKey() === (ctWeekKey || planner)
+        && mrUsesNewModel(planner);
+  });
+
   checks.noConsoleErrors = errors.length === 0;
 
   const failed = Object.entries(checks).filter(([,v]) => !v).map(([k]) => k);

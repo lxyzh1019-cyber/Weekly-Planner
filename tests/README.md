@@ -11,6 +11,13 @@ npm install playwright-core   # once
 node tests/smoke.js           # screenshots land in tests/out/
 ```
 
+`smoke.js` covers, among much else, the chore -> money hand-off: a chore
+finished in the planner reaching the parent's grading queue, and a grade given
+in the meeting's step 1 showing up as the same figure on step 3. Those two are
+worth keeping green -- when that join broke, every screen still rendered and
+only the numbers were wrong, which is the kind of failure nobody notices until
+a Sunday goes badly.
+
 `smoke.js` needs a Chromium binary. It auto-detects the Playwright browsers
 under `/opt/pw-browsers` (Claude Code cloud environments have this
 pre-installed); elsewhere set `SMOKE_CHROMIUM=/path/to/chrome`.
