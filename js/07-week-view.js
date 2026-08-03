@@ -11,7 +11,9 @@ function setWeekView(v) {
   // Containers
   document.getElementById('weekCompact').style.display  = v==='compact' ? 'block' : 'none';
   document.getElementById('weekFull').style.display     = v==='full' ? 'flex' : 'none';
-  document.getElementById('weekTimeGrid').style.display = v==='timegrid' ? 'block' : 'none';
+  // flex, not block, so .tg2-wrap's `flex:1; min-height:0` gives it a bounded
+  // height and it becomes a real scroll container (same as #weekFull).
+  document.getElementById('weekTimeGrid').style.display = v==='timegrid' ? 'flex' : 'none';
   renderWeek();
 }
 function changeWeek(d) { weekOffset += d; renderWeek(); }
@@ -789,6 +791,51 @@ function attachTapGuard(el, onTap) {
     if (moved) { moved = false; return; }
     onTap(e);
   };
+}
+
+/* ── Middle-button panning ──
+   The week grid is covered edge to edge in cards, each with its own pointer
+   handlers, and the browser's own middle-click autoscroll is easy to lose:
+   it needs an unobstructed scroll container under the cursor and a mousedown
+   nobody cancelled. Rather than depend on that, drive it ourselves — press the
+   middle button anywhere in the view and drag to pan, in both axes.
+
+   Idempotent: every render rebuilds the contents but the wrap element itself
+   survives, so the flag stops listeners from stacking up. */
+function attachMiddleDragPan(el) {
+  if (!el || el.dataset.midPanBound) return;
+  el.dataset.midPanBound = '1';
+  let panning = false, sx = 0, sy = 0, sl = 0, st = 0;
+  el.addEventListener('pointerdown', (e) => {
+    if (e.button !== 1) return;                 // middle button only
+    panning = true;
+    sx = e.clientX; sy = e.clientY;
+    sl = el.scrollLeft; st = el.scrollTop;
+    el.setPointerCapture(e.pointerId);
+    el.classList.add('is-mid-panning');
+    e.preventDefault();                         // suppress the browser's own autoscroll
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!panning) return;
+    el.scrollLeft = sl - (e.clientX - sx);
+    el.scrollTop  = st - (e.clientY - sy);
+    e.preventDefault();
+  });
+  const end = (e) => {
+    if (!panning) return;
+    panning = false;
+    el.classList.remove('is-mid-panning');
+    try { el.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+  // Middle-click on a link/card would otherwise still fire after the drag.
+  el.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
+}
+/* Every scroll surface a plan is read on. */
+function bindMiddleDragPan() {
+  ['.weekly-full-wrap', '.tg2-wrap', '#screen-day .timeline-wrap']
+    .forEach(sel => document.querySelectorAll(sel).forEach(attachMiddleDragPan));
 }
 
 function renderFullWeek(keys) {

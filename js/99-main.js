@@ -96,19 +96,8 @@ function enhanceNonButtonClickables(root = document) {
     }
   });
 
-  // Zone tabs → already converted to <button role="tab"> in HTML; keep aria-selected in sync
-  root.querySelectorAll('.zone-tab[onclick]').forEach(el => {
-    const tag = (el.tagName || '').toLowerCase();
-    if (tag === 'button') return; // already a button — handled by JS setZone()
-    if (!el.hasAttribute('role')) el.setAttribute('role', 'tab');
-    if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
-    if (!el.dataset.a11yKeybound) {
-      el.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
-      });
-      el.dataset.a11yKeybound = '1';
-    }
-  });
+  // (A zone-tab a11y pass lived here. The morning/afternoon/evening filters
+  // were removed from the day topbar, so there is nothing left to enhance.)
 
   // Chore checkboxes (.ct-check) rendered via innerHTML → add role + aria-checked
   root.querySelectorAll('.ct-check').forEach(el => {
@@ -180,6 +169,7 @@ function initA11yEnhancements() {
   observer.observe(document.body, { childList: true, subtree: true });
 }
 enableHorizontalWheelScroll();
+bindMiddleDragPan();
 initA11yEnhancements();
 refreshHeroModeToggle();
 

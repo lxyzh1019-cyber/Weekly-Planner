@@ -25,7 +25,6 @@ let weekOffset = 0;
 let currentDayKey = null;
 let selectedActivity = null;
 let dayViewMode = 'timeline';        // 3b: 'timeline' | 'checklist'
-let dcOpenGaps = new Set();          // 3b: which free-gaps are expanded (by start-min)
 let timelinePlacementGuideEl = null;
 let dayLandscapeChromeRaf = 0;
 let pendingStartMin = null;

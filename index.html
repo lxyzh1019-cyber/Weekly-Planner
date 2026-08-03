@@ -346,17 +346,15 @@
       </div>
     </div>
     <div class="day-topbar__row2">
-      <div class="zone-tabs" role="tablist" aria-label="Day zone filter">
-        <button class="zone-tab active" role="tab" aria-selected="true" data-zone="all" onclick="setZone('all')">☀️ All Day</button>
-        <button class="zone-tab" role="tab" aria-selected="false" data-zone="morning" onclick="setZone('morning')">🌅 Morning</button>
-        <button class="zone-tab" role="tab" aria-selected="false" data-zone="afternoon" onclick="setZone('afternoon')">☀️ Afternoon</button>
-        <button class="zone-tab" role="tab" aria-selected="false" data-zone="evening" onclick="setZone('evening')">🌙 Evening</button>
-      </div>
-      <!-- 3b Timeline/Checklist switch lives in the topbar so it's reachable in
-           portrait too (the landscape "Schedule" label bar is hidden there). -->
+      <!-- The morning/afternoon/evening zone filters used to sit here. They
+           split a day that is already one screen tall, and the left sideband
+           already labels those stretches, so "All Day" is the only mode left
+           and the timeline no longer needs a filter above it. -->
+      <!-- Timeline/Quest switch lives in the topbar so it's reachable in
+           portrait too (the landscape "Schedule" label bar is hidden there).
+           Checklist mode was a third copy of the same day and is gone. -->
       <div class="day-mode-toggle" role="tablist" aria-label="Schedule view mode">
         <button type="button" class="day-mode-btn active" id="dayModeTimeline" role="tab" aria-selected="true" onclick="setDayViewMode('timeline')">🕐 Timeline</button>
-        <button type="button" class="day-mode-btn" id="dayModeChecklist" role="tab" aria-selected="false" onclick="setDayViewMode('checklist')">✅ Checklist</button>
         <button type="button" class="day-mode-btn" id="dayModeQuest" role="tab" aria-selected="false" onclick="setDayViewMode('quest')">🎮 Quest</button>
       </div>
       <button class="btn-template danger" onclick="clearDay()">🗑 Clear</button>
@@ -409,7 +407,6 @@
           <span>Schedule</span>
         </div>
         <div class="timeline" id="timeline"></div>
-        <div class="day-checklist" id="dayChecklist" style="display:none"></div>
         <div class="day-quest" id="dayQuest" style="display:none"></div>
       </div>
     </div>

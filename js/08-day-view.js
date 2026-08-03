@@ -14,7 +14,6 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   selectedActivity = null;
   currentZone = 'all';
   leftPaneManualCollapsed = false;
-  dcOpenGaps.clear(); // 3b: forget expanded free-slots from the previous day
 
   document.querySelectorAll('.zone-tab').forEach(t=>t.classList.toggle('active', t.dataset.zone==='all'));
 
@@ -123,10 +122,12 @@ function navDay(delta) {
   }
 }
 
-/* Event-zone tabs */
+/* The day is always shown whole now — the morning/afternoon/evening filters
+   are gone from the topbar. Kept as a no-op-ish entry point because the zone
+   plumbing (zoneRangeMin, clipping markers) still runs underneath, and a saved
+   deep link or a template could still ask for a zone. */
 function setZone(z) {
-  currentZone = z;
-  document.querySelectorAll('.zone-tab').forEach(t=>t.classList.toggle('active', t.dataset.zone===z));
+  currentZone = 'all';
   buildTimeline();
 }
 function zoneRange(z) {
@@ -164,134 +165,30 @@ function setDayMood(m) {
 /* ════════════════════════════════════════════════════════════════
    3b — DAY "CHECKLIST" MODE: collapse free time into tappable pills
 ════════════════════════════════════════════════════════════════ */
+/* Two modes: the timeline (plan it) and quests (confirm it). Checklist mode
+   was a third rendering of the same day and duplicated what quests already do,
+   so 'checklist' now lands on the timeline rather than a blank pane.
+
+   Quest mode is where completion gets confirmed, so it gets the whole width —
+   the Today rail and the activity tray are both about *planning*, and neither
+   is any use while ticking things off. */
 function setDayViewMode(mode) {
-  dayViewMode = (mode === 'checklist' || mode === 'quest') ? mode : 'timeline';
+  dayViewMode = (mode === 'quest') ? 'quest' : 'timeline';
   const tb = document.getElementById('dayModeTimeline');
-  const cb = document.getElementById('dayModeChecklist');
   const qb = document.getElementById('dayModeQuest');
   if (tb) { tb.classList.toggle('active', dayViewMode==='timeline'); tb.setAttribute('aria-selected', dayViewMode==='timeline'); }
-  if (cb) { cb.classList.toggle('active', dayViewMode==='checklist'); cb.setAttribute('aria-selected', dayViewMode==='checklist'); }
   if (qb) { qb.classList.toggle('active', dayViewMode==='quest'); qb.setAttribute('aria-selected', dayViewMode==='quest'); }
   const scr = document.getElementById('screen-day');
-  if (scr) scr.classList.toggle('dc-mode', dayViewMode==='checklist');
+  if (scr) scr.classList.toggle('quest-focus', dayViewMode==='quest');
   buildTimeline();
 }
 
-/* Soft category tint for a checklist row, per the 3b palette. */
-function dcTintClass(act) {
-  if (!act) return '';
-  if (act.isCompetition || act.cat==='competition') return 'tint-competition';
-  if (act.isTraining || act.cat==='training') return 'tint-training';
-  if (act.isRoutine  || act.cat==='routine')  return 'tint-routine';
-  if (act.id==='chores') return 'tint-chores';
-  if (['breakfast','lunch','dinner'].includes(act.id)) return 'tint-meals';
-  if (act.cat==='school') return 'tint-learning';
-  if (act.cat==='active') return 'tint-active';
-  return '';
-}
-
-function dcToggleGap(startMin) {
-  if (dcOpenGaps.has(startMin)) dcOpenGaps.delete(startMin); else dcOpenGaps.add(startMin);
-  buildDayChecklist();
-}
-
-function buildDayChecklistBlockRow(b, acts) {
-  const act = acts.find(a=>a.id===b.actId);
-  const row = document.createElement('div');
-  row.className = ('dc-row ' + dcTintClass(act) + (b.completed?' dc-done':'')).trim();
-  const startAbs = b.startMin, endAbs = b.startMin + (b.durationMin||0);
-  const icon = act ? act.icon : '❓';
-  const name = act ? act.name : 'Activity';
-  const choreList = (b.actId==='chores' && Array.isArray(b.choreTags) && b.choreTags.length) ? ': '+b.choreTags.join(', ') : '';
-  const noteTrim = (b.note && String(b.note).trim()) ? String(b.note).trim() : '';
-  row.innerHTML = `
-    <div class="dc-time">${formatTimeFromMin(startAbs)}<small>${formatTimeFromMin(endAbs)}</small></div>
-    <div class="dc-content">
-      <div class="dc-name">${icon} ${escapeHtml(name)}${escapeHtml(choreList)}</div>
-      <div class="dc-meta">${formatDuration(b.durationMin||0)}${noteTrim? ' · '+escapeHtml(noteTrim) : ''}</div>
-    </div>
-    <button type="button" class="dc-check${b.completed?' done':''}" aria-label="${b.completed?'Mark not done':'Mark done'}" onclick="event.stopPropagation(); toggleBlockDone(currentDayKey,'${b.id}',event)">${b.completed?'✓':''}</button>
-  `;
-  row.onclick = (e)=>{ e.stopPropagation(); onTimelineBlockTap(b.id); };
-  return row;
-}
-
-function buildDayChecklistGapPill(gapStart, gapEnd) {
-  const wrap = document.createElement('div');
-  wrap.className = 'dc-gap';
-  const open = dcOpenGaps.has(gapStart);
-  const dur = gapEnd - gapStart;
-  const pill = document.createElement('button');
-  pill.type = 'button';
-  pill.className = 'dc-gap-pill';
-  pill.innerHTML = `<span class="dc-gap-chev">${open?'▾':'▸'}</span><span>✨ Free · ${fmtHrsMin(dur)}</span><span class="dc-gap-hint">${open?'pick a start time':'tap to add here'}</span>`;
-  pill.onclick = ()=> dcToggleGap(gapStart);
-  wrap.appendChild(pill);
-  if (open) {
-    const slots = document.createElement('div');
-    slots.className = 'dc-slots';
-    // 30-min slots aligned to clock half-hours, clipped to the gap.
-    for (let t = Math.floor(gapStart/30)*30; t < gapEnd; t += 30) {
-      const slotStart = Math.max(t, gapStart);
-      const slotEnd = Math.min(t+30, gapEnd);
-      if (slotEnd - slotStart < 5) continue;
-      const btn = document.createElement('button');
-      btn.type = 'button'; btn.className = 'dc-slot';
-      btn.textContent = `${formatTimeFromMin(slotStart)} – ${formatTimeFromMin(slotEnd)} · tap to add ＋`;
-      btn.onclick = ()=> addActivityAtMin(slotStart);
-      slots.appendChild(btn);
-    }
-    wrap.appendChild(slots);
-  }
-  return wrap;
-}
-
-function buildDayChecklist() {
-  const host = document.getElementById('dayChecklist');
-  if (!host) return;
-  host.innerHTML = '';
-  const acts = getAllActivities();
-  const blocks = getDayBlocks(currentDayKey).slice()
-    .filter(b => (b.durationMin||0) > 0)
-    .sort((a,b)=> (a.startMin - b.startMin) || (a.durationMin - b.durationMin));
-
-  // Total free time = day window minus the union of occupied intervals.
-  const iv = blocks
-    .map(b => [Math.max(b.startMin, START_MIN), Math.min(b.startMin+(b.durationMin||0), END_MIN)])
-    .filter(([s,e]) => e > s)
-    .sort((a,b)=> a[0]-b[0]);
-  let occ = 0, curS = null, curE = null;
-  iv.forEach(([s,e]) => {
-    if (curE === null) { curS = s; curE = e; }
-    else if (s <= curE) { curE = Math.max(curE, e); }
-    else { occ += curE - curS; curS = s; curE = e; }
-  });
-  if (curE !== null) occ += curE - curS;
-  const freeMin = Math.max(0, (END_MIN - START_MIN) - occ);
-
-  const head = document.createElement('div');
-  head.className = 'dc-head';
-  head.innerHTML = `<span>📋 Today's checklist</span><span class="dc-free-chip">🌤 ${fmtHrsMin(freeMin)} free today</span>`;
-  host.appendChild(head);
-
-  // Walk the day: emit a free-gap pill before each block, then the block row.
-  let cursor = START_MIN;
-  const emitGap = (gs, ge) => { if (ge - gs >= 5) host.appendChild(buildDayChecklistGapPill(gs, ge)); };
-  blocks.forEach(b => {
-    const bStart = b.startMin, bEnd = b.startMin + (b.durationMin||0);
-    if (bStart > cursor) emitGap(cursor, bStart);
-    host.appendChild(buildDayChecklistBlockRow(b, acts));
-    cursor = Math.max(cursor, bEnd);
-  });
-  if (cursor < END_MIN) emitGap(cursor, END_MIN);
-
-  if (!blocks.length) {
-    const empty = document.createElement('div');
-    empty.className = 'dc-empty';
-    empty.textContent = 'Nothing planned yet — tap a free stretch above to add your first activity.';
-    host.appendChild(empty);
-  }
-}
+/* Day "Checklist" mode lived here — dcTintClass / dcToggleGap /
+   buildDayChecklistBlockRow / buildDayChecklistGapPill / buildDayChecklist.
+   It was a third rendering of the same day, and it overlapped Quest mode,
+   which already lists the day's activities with a tick beside each. Two
+   screens for confirming the same completions is one screen too many, so the
+   day now offers Timeline (plan it) and Quest (confirm it). */
 
 /* Quest mode for the day view: the viewed day's activities as gamified quest
    cards. Completing a quest is instant — it marks the block done, awards XP, and
@@ -378,30 +275,18 @@ function buildTimeline() {
   if (activeStopwatchTick) { clearInterval(activeStopwatchTick); activeStopwatchTick = null; }
   refreshRestDayButton();
   const tl = document.getElementById('timeline');
-  const cl = document.getElementById('dayChecklist');
   const ql = document.getElementById('dayQuest');
   // Quest mode: the day's activities as gamified quest cards with instant
   // blast-to-complete.
   if (dayViewMode === 'quest') {
     if (tl) tl.style.display = 'none';
-    if (cl) cl.style.display = 'none';
     if (ql) ql.style.display = '';
     buildDayQuest();
     renderDayNextUpBanner();
     return;
   }
   if (ql) ql.style.display = 'none';
-  // 3b: in checklist mode, render the collapsed-free-time list instead of the
-  // pixel timeline.
-  if (dayViewMode === 'checklist') {
-    if (tl) tl.style.display = 'none';
-    if (cl) cl.style.display = '';
-    buildDayChecklist();
-    renderDayNextUpBanner();
-    return;
-  }
   if (tl) tl.style.display = '';
-  if (cl) cl.style.display = 'none';
   const topbar = document.querySelector('#screen-day .day-topbar');
   tl.innerHTML = '';
   if (topbar) topbar.classList.remove('day-topbar--compact');

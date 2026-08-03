@@ -252,12 +252,25 @@ function findChromium() {
   });
   await page.evaluate(() => goWeek());
 
-  // Day view: Timeline/Checklist toggle reachable in portrait
+  // Day view: Timeline/Quest toggle reachable in portrait, and the retired
+  // Checklist mode is gone from the topbar entirely.
   await page.evaluate(() => openDay(getDayKeys(0)[5], 5));
   await page.waitForTimeout(400);
   checks.dayModeToggleVisible = await page.evaluate(() => {
-    const r = document.getElementById('dayModeChecklist').getBoundingClientRect();
-    return r.width > 0 && r.height > 0;
+    const r = document.getElementById('dayModeQuest').getBoundingClientRect();
+    return r.width > 0 && r.height > 0
+        && !document.getElementById('dayModeChecklist')
+        && !document.querySelector('.zone-tabs');
+  });
+  // Quest mode hands the whole workspace to the day's quests.
+  checks.questModeHidesBothRails = await page.evaluate(() => {
+    setDayViewMode('quest');
+    const hidden = el => !el || getComputedStyle(el).display === 'none';
+    const ok = hidden(document.querySelector('.day-left-rail'))
+            && hidden(document.querySelector('.day-right-rail'))
+            && !!document.getElementById('dayQuest');
+    setDayViewMode('timeline');
+    return ok;
   });
   // Rest toggle lives in the Template sheet
   await page.evaluate(() => openTemplateSheet());

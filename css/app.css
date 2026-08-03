@@ -205,10 +205,6 @@
   #screen-day .day-topbar__row2 .day-controls {
     justify-content: center;
   }
-  #screen-day .day-topbar__row2 .zone-tabs {
-    padding: 0;
-    justify-content: center;
-  }
   #screen-day .day-topbar__row2 .btn-template.danger {
     align-self: flex-end;
   }
@@ -534,29 +530,6 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    #screen-day .day-topbar__row2 .zone-tabs {
-      flex: 1 1 0;
-      min-width: 0;
-      justify-content: center;
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      overflow-y: hidden;
-      padding: 0.2rem 0;
-      gap: 0.3rem;
-      scrollbar-width: thin;
-    }
-    #screen-day .day-topbar__row2 .zone-tabs::-webkit-scrollbar {
-      height: 4px;
-    }
-    #screen-day .day-topbar__row2 .zone-tabs::-webkit-scrollbar-thumb {
-      background: var(--paper-line);
-      border-radius: 3px;
-    }
-    #screen-day .day-topbar__row2 .zone-tab {
-      flex-shrink: 0;
-      padding: 0.32rem 0.75rem;
-      font-size: 0.98rem;
-    }
     #screen-day .day-topbar__row2 .btn-template.danger {
       align-self: center;
       flex: 0 0 auto;
@@ -596,16 +569,6 @@
       min-width: 30px;
       padding: 0.16rem 0.44rem;
       font-size: 0.94rem;
-    }
-    #screen-day .topbar.day-topbar.day-topbar--compact .zone-tabs {
-      gap: 0.2rem;
-      padding: 0.06rem 0;
-    }
-    #screen-day .topbar.day-topbar.day-topbar--compact .zone-tab {
-      min-height: 30px;
-      padding: 0.16rem 0.5rem;
-      font-size: 0.78rem;
-      border-width: 1px;
     }
     #screen-day .topbar.day-topbar.day-topbar--compact .btn-template.danger {
       padding: 0.2rem 0.5rem;
@@ -804,7 +767,6 @@
   }
   button:focus-visible,
   [role="button"]:focus-visible,
-  .zone-tab:focus-visible,
   .view-tab:focus-visible,
   .filter-chip:focus-visible,
   .pill-btn:focus-visible,
@@ -813,7 +775,6 @@
     outline-offset: 2px;
   }
   .btn-icon:focus-visible,
-  .zone-tab:focus-visible,
   .view-tab:focus-visible,
   .filter-chip:focus-visible,
   .pill-btn:focus-visible,
@@ -1058,7 +1019,12 @@
   }
 
   /* ── 2a "Day Blocks": plans pop, free stays quiet ── */
-  .tg2-wrap { padding: 0.2rem 0.6rem 0.4rem; }
+  /* Column flex so .tg2-wrap can own the scrolling, matching #weekFull. */
+  #weekTimeGrid { flex-direction: column; min-height: 0; flex: 1; }
+  /* While middle-dragging, the grab cursor and a text-selection block, so a
+     pan across a week of cards doesn't leave everything highlighted. */
+  .is-mid-panning { cursor: grabbing; user-select: none; }
+  .tg2-wrap { padding: 0.2rem 0.6rem 0.4rem; overflow: auto; overscroll-behavior: contain; flex: 1; min-height: 0; }
   .tg2-subtitle { text-align: center; color: var(--ink-light); font-size: 0.85rem; font-style: italic; margin: 0 0 0.5rem; }
   .tg2-grid {
     display: grid;
@@ -1758,7 +1724,11 @@
   }
 
   /* ═══════════ FULL WEEKLY VIEW — zones as rows, days as columns ═══════════ */
-  .weekly-full-wrap { padding: 0.5rem; overflow: auto; overscroll-behavior: contain; flex: 1; padding-bottom: 0.5rem; }
+  /* min-height:0 is what makes this a scroller at all. A flex item defaults to
+     min-height:auto, so `flex:1; overflow:auto` grew to fit its content instead
+     of scrolling — the whole document scrolled instead, and the middle-button
+     autoscroll had no scroll container under the cursor to grab. */
+  .weekly-full-wrap { padding: 0.5rem; overflow: auto; overscroll-behavior: contain; flex: 1; min-height: 0; padding-bottom: 0.5rem; }
   /* On phones the 7 columns would be too thin to read, so give them a
      floor and let this one view scroll instead of squishing. */
   @media (max-width: 600px) { .weekly-full { min-width: 560px; } }
@@ -2116,24 +2086,6 @@
   }
   /* Event-zone chips — secondary jump-to filter, kept small so the schedule
      stays the focus (All Day is the default). */
-  .zone-tabs {
-    display:flex; gap: 0.25rem; padding: 0.2rem 0;
-    justify-content:center; flex-wrap: wrap;
-  }
-  .zone-tab {
-    background: transparent; border: 1.5px solid var(--paper-line);
-    border-radius: 14px; padding: 0.12rem 0.5rem;
-    cursor: pointer; font-size: 0.8rem; font-weight: 700;
-    font-family: 'Patrick Hand', sans-serif;
-    color: var(--ink-light);
-    box-shadow: none;
-    transition: all 0.15s;
-    min-height: 26px;
-    display: inline-flex;
-    align-items: center;
-  }
-  .zone-tab.active { background: var(--accent-yellow); border-color: var(--ink); color: var(--ink); }
-  .zone-tab:hover { border-color: var(--ink); color: var(--ink); }
 
   /* Vibe card (replaces Day Balance) */
   .vibe-card {
@@ -2191,6 +2143,7 @@
 
   .timeline-wrap {
     flex: 1;
+    min-height: 0;          /* see .weekly-full-wrap — without it this never scrolls */
     overflow-y: auto;
     overscroll-behavior: contain;
     padding: 0 0.8rem;
@@ -2204,59 +2157,8 @@
     border-radius: 9px; padding: 2px 9px; cursor: pointer; box-shadow: 1.5px 1.5px 0 var(--ink);
   }
   .day-mode-btn.active { background: var(--accent-strong, #c14a24); color: #fffdf5; }
-  .day-checklist { display: flex; flex-direction: column; gap: 7px; padding: 6px 0 40px; }
-  .dc-head {
-    display: flex; align-items: center; gap: 8px; font-family: 'Gochi Hand', cursive;
-    font-size: 1.15rem; color: var(--ink); margin: 2px 0 6px;
-  }
-  .dc-head .dc-free-chip {
-    margin-left: auto; font-family: 'Patrick Hand', sans-serif; font-size: 0.9rem; font-weight: 700;
-    background: #fff4db; border: 2px dashed #e8dfc3; border-radius: 10px; padding: 3px 10px;
-  }
-  .dc-row {
-    display: grid; grid-template-columns: 76px 1fr 36px; align-items: center; gap: 8px;
-    border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px;
-    background: var(--paper-card, #fffdf5); box-shadow: 2px 2px 0 var(--ink); cursor: pointer;
-  }
-  .dc-row.tint-routine  { background: #fff4db; }
-  .dc-row.tint-training { background: #ffe3ea; }
-  .dc-row.tint-competition { background: #fdecd3; }
-  .dc-row.tint-chores   { background: #eaf6ef; }
-  .dc-row.tint-meals    { background: #fff9e9; }
-  .dc-row.tint-learning { background: #eef3fb; }
-  .dc-row.tint-active   { background: #f1ecfa; }
-  .dc-row.dc-done { opacity: 0.62; }
-  .dc-row.dc-done .dc-name { text-decoration: line-through; }
-  .dc-time { font-weight: 800; font-size: 0.86rem; line-height: 1.15; color: var(--ink); }
-  .dc-time small { display: block; font-weight: 700; font-size: 0.74rem; opacity: 0.75; }
-  .dc-content { min-width: 0; }
-  .dc-name { font-weight: 800; font-size: 1.02rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .dc-meta { font-size: 0.8rem; opacity: 0.85; }
-  .dc-check {
-    width: 36px; height: 36px; border-radius: 9px; border: 2px solid var(--ink);
-    background: rgba(255,255,255,0.9); color: var(--ink); font-size: 1.35rem; font-weight: 900;
-    display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
-  }
-  .dc-check.done { background: #95d5b2; }
-  .dc-gap { display: flex; flex-direction: column; gap: 4px; }
-  .dc-gap-pill {
-    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
-    border: 2px dashed #c9bda6; border-radius: 12px; background: var(--paper-card, #fffdf5);
-    padding: 7px 12px; font-family: 'Patrick Hand', sans-serif; font-size: 0.95rem; color: #6b5d4f;
-    cursor: pointer;
-  }
-  .dc-gap-pill:hover { border-color: var(--ink); color: var(--ink); }
-  .dc-gap-pill .dc-gap-chev { font-weight: 900; }
-  .dc-gap-pill .dc-gap-hint { margin-left: auto; font-size: 0.82rem; opacity: 0.85; }
-  .dc-slots { display: flex; flex-direction: column; gap: 3px; padding-left: 26px; }
-  .dc-slot {
-    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
-    border: 2px dashed #e8dfc3; border-radius: 10px; background: rgba(255,255,255,0.6);
-    padding: 5px 10px; font-family: 'Patrick Hand', sans-serif; font-size: 0.9rem; color: #6b5d4f;
-    cursor: pointer;
-  }
-  .dc-slot:hover { border-color: var(--accent-strong, #c14a24); color: var(--accent-strong, #c14a24); }
-  .dc-empty { text-align: center; color: #6b5d4f; padding: 24px 0; }
+  /* The 3b day-checklist styles lived here; the mode itself is gone (see
+     setDayViewMode) and nothing renders a .dc-* node any more. */
   /* Quest mode for the day view (reuses .quest-card styling) */
   .day-quest { display: flex; flex-direction: column; gap: 10px; padding: 6px 0 40px; }
   .dq-list { display: flex; flex-direction: column; gap: 0.6rem; }
@@ -2272,8 +2174,13 @@
   .dq-hero-sub { font-size: 0.78rem; opacity: 0.92; margin-top: 2px; }
   .dq-xp-bar { height: 8px; border-radius: 999px; background: rgba(0,0,0,0.25); overflow: hidden; margin: 3px 0; }
   .dq-xp-fill { height: 100%; background: #ffd166; border-radius: 999px; transition: width 0.3s; }
-  /* Zone filter is timeline-only; the checklist always shows the whole day. */
-  #screen-day.dc-mode .day-topbar__row2 .zone-tabs { display: none; }
+  /* Quest mode is where completion gets confirmed, so it takes the whole
+     workspace: the Today rail and the activity tray are both about planning,
+     and neither is any help while ticking things off. */
+  #screen-day.quest-focus .day-left-rail,
+  #screen-day.quest-focus .day-right-rail { display: none; }
+  #screen-day.quest-focus .day-center-lane { flex: 1 1 100%; max-width: none; }
+  #screen-day.quest-focus .day-schedule-label { display: none; }
   .timeline-zone-label {
     margin: 0.8rem 0 0.3rem;
     text-align: center;
