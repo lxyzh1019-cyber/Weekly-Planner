@@ -493,6 +493,29 @@ function renderTimeGrid(keys) {
     const conflicts = computeBufferConflicts(blocks);
     const cols = wfAssignColumns(blocks);
 
+    // The strips that make a training block possible — get ready, drive, warm
+    // up — belong on this view too. Without them a 5pm skate looks like it
+    // starts at 5pm, when the day really starts at 4:15. Drawn first so the
+    // activity cards sit on top, same as the Full week.
+    blocks.forEach(b => {
+      const act = acts.find(a => a.id === b.actId);
+      const topic = act && act.isTraining ? getTrainingTopic(b.tag) : null;
+      const segColour = topic ? trainingBlockColour(b) : (b.colour || (act && CAT_HEX[act.cat]) || '#888');
+      const bc = conflicts.perBlock.get(b.id);
+      const slot = cols.get(b.id) || { col: 0, count: 1 };
+      const cc = slot.count || 1;
+      const leftCss  = `calc(${(slot.col * 100 / cc)}% + 1px)`;
+      const widthCss = `calc(${100 / cc}% - 3px)`;
+      wfBufferSegments(b).forEach(seg => {
+        const segS = Math.max(seg.startRel, 0);
+        const segE = Math.min(seg.startRel + seg.dur, DAY_MIN_SPAN);
+        if (segE - segS < 2) return;
+        const segConflict = !!bc && (seg.side === 'pre' ? bc.pre : bc.post);
+        lane.appendChild(wfTravelStrip(segS * PX_PER_MIN, (segE - segS) * PX_PER_MIN,
+          leftCss, widthCss, seg, segColour, segConflict));
+      });
+    });
+
     blocks.forEach(b => {
       const act = acts.find(a => a.id === b.actId);
       if (!act) return;
@@ -1025,11 +1048,15 @@ function renderFullWeek(keys) {
         ? (act.isCompetition ? (topic.id === 'general' ? 'Competition 🏆' : topic.name + ' 🏆') : topic.name)
         : act.name;
       const card = document.createElement('div');
+      // Same ladder the day timeline and the print sheet use — see
+      // blockContentTier (js/05-helpers.js). The class names are the ones the
+      // stylesheet already knows; what changed is that one function decides
+      // them, so a block does not read differently in two views.
+      const tier = blockContentTier(pxHeight);
       let cls = 'wf-card' + (isLightColour(bg) ? ' light-bg' : '');
-      if (pxHeight >= 60) cls += ' wf-card--tall'; // room to stack time/icon/name centered
-      if (pxHeight < 34) cls += ' wf-card--slim';
-      if (pxHeight < 22) cls += ' wf-card--xslim';
-      if (pxHeight < 16) cls += ' wf-card--icononly'; // too short for a name → icon only
+      if (blockTierAtLeast(tier, 'detail')) cls += ' wf-card--tall'; // room to stack time/icon/name centered
+      if (!blockTierAtLeast(tier, 'meta')) cls += ' wf-card--slim';
+      if (!blockTierAtLeast(tier, 'name')) cls += ' wf-card--xslim wf-card--icononly';
       if (b.completed) cls += ' wf-card--done';
       const hasConflict = bufferConflicts.affected.has(b.id);
       if (hasConflict) cls += ' wf-card--conflict';
@@ -1056,7 +1083,12 @@ function renderFullWeek(keys) {
       card.style.left  = leftCss;
       card.style.width = widthCss;
       card.style.background = bg;
-      const travelTag = bufKinds.length ? `<span class="wf-card-travel">${bufKinds.join(' ')}</span>` : '';
+      // The buffers already have their own labelled strips beside the card
+      // ("Leave by 3:50pm"), so repeating them inside the name is noise — and
+      // on a tall card it is noise that pushes the name into the rows below.
+      // Keep the inline tag only where the strips are too short to read.
+      const travelTag = (bufKinds.length && !blockTierAtLeast(tier, 'detail'))
+        ? `<span class="wf-card-travel">${bufKinds.join(' ')}</span>` : '';
       const stampEmoji = b.parentStamp && b.parentStamp.emoji ? b.parentStamp.emoji + ' ' : '';
       const conflictTag = hasConflict ? `<span class="wf-card-conflict-badge" title="Not enough travel/get-ready time — overlaps another activity">⚠️</span>` : '';
       // Corner flag stays visible on every card size (the inline badge is hidden
@@ -1068,10 +1100,10 @@ function renderFullWeek(keys) {
       // fit — degrading to a one-line count on cards too short for a list.
       const detailLines = blockDetailLines(b, act);
       let sumHtml = '';
-      if (cls.includes('wf-card--tall') && detailLines.length) {
-        // Matches the old fixed 1/2/3-row tiers at 60/78/98px, then keeps
-        // scaling continuously so a tall card (a long training session) gets
-        // room for its whole gear + objective list instead of a hard cap.
+      if (blockTierAtLeast(tier, 'detail') && detailLines.length) {
+        // Scales continuously above the 'detail' floor, so a long training
+        // session gets room for its four checks plus its goals rather than
+        // being cut at a fixed row count.
         const maxRows = Math.max(0, Math.floor((pxHeight - 58) / 20) + 1);
         sumHtml = sliceDetailLines(detailLines, maxRows)
           .map(r => `<div class="wf-card-sum" title="${escapeHtml(r.text)}">${r.icon} ${escapeHtml(r.text)}</div>`)

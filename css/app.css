@@ -1057,6 +1057,9 @@
   }
   .tg2-lane.today { border-color: #2f8f84; box-shadow: 0 0 0 1.5px rgba(47,143,132,0.35); }
   .tg2-block {
+    /* Above the travel/get-ready strips (.wf-travel is z-index 1), which are
+       drawn first and are context for the block, not a peer of it. */
+    z-index: 2;
     position: absolute; left: 2px; right: 2px;
     border-radius: 5px; border: 1.5px solid var(--ink);
     color: #fff; font-size: 0.62rem; font-weight: 800; line-height: 1.05;
@@ -1899,7 +1902,10 @@
     text-align: center;
   }
   .wf-card--tall .wf-card-icon { font-size: 1.25rem; }
-  .wf-card--tall .wf-card-name { white-space: normal; max-height: 2.3em; }
+  /* overflow:hidden matters as much as the max-height: without it a name that
+     wraps past two lines spilled over the summary row underneath instead of
+     being clipped, which is what made a training card read as overlapping text. */
+  .wf-card--tall .wf-card-name { white-space: normal; max-height: 2.3em; overflow: hidden; }
   /* Main-category summary rows (objective/gear/note) on tall cards only —
      shorter cards fold the same info into the duration line as a count string. */
   .wf-card-sum {
@@ -2452,13 +2458,18 @@
     white-space: nowrap;
   }
   /* Tappable get-ready gear checklist on a training block. */
+  /* The four training checks (TRAINING_CHECKS) sit 2×2 rather than in a
+     column: four short labels stacked need ~165px of block height, which a
+     two-hour session does not have once the name and duration are on it. Two
+     rows of two fit, and four peers read better as a grid than as a list. */
   .placed-block .block-gear-list {
     margin-top: 3px;
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 3px;
     min-width: 0;
   }
+  .placed-block .block-gear-head { grid-column: 1 / -1; }
   .placed-block .block-gear-head {
     font-size: 0.74rem; font-weight: 800; opacity: 0.95;
     line-height: 1.1;
@@ -2468,9 +2479,9 @@
     background: rgba(255,255,255,0.22);
     border: 1.5px solid rgba(255,255,255,0.65);
     border-radius: 8px;
-    padding: 2px 6px;
+    padding: 2px 5px;
     font-family: inherit;
-    font-size: 0.8rem; font-weight: 700;
+    font-size: 0.74rem; font-weight: 700;
     color: inherit; text-align: left;
     cursor: pointer; min-width: 0; width: 100%;
     box-shadow: none;
@@ -2478,8 +2489,8 @@
   .placed-block.light-bg .block-gear-item { border-color: rgba(42,35,32,0.35); background: rgba(255,255,255,0.4); }
   .placed-block .block-gear-item .block-gear-box {
     flex-shrink: 0;
-    width: 26px; height: 26px;
-    border-radius: 7px;
+    width: 22px; height: 22px;
+    border-radius: 6px;
     border: 2px solid currentColor;
     background: rgba(255,255,255,0.85);
     color: var(--ink);

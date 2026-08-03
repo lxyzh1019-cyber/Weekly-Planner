@@ -682,14 +682,22 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   const clippedBottom = relEnd > zoneSpan;
   const visStartMin = Math.max(0, relStart);
   const visEndMin   = Math.min(zoneSpan, relEnd);
-  const height = Math.max(22, (visEndMin - visStartMin) * PX_PER_MIN - 2);
-  // A short buffer (e.g. a 5-15 min get-ready) is floored up to the 22px
-  // minimum, taller than its real duration. Anchored from the top that
-  // overshoot bleeds forward — for a pre-side buffer, straight into the next
-  // buffer and then the activity itself. A post-side buffer already grows
-  // into empty time after the block, which is why "after" always looked
-  // right; anchoring pre-side buffers from the BOTTOM instead makes their
-  // overshoot bleed backward into empty time too, matching "after".
+  // A buffer is a thin strip, not a block, and it needs its own floor: at
+  // 1.4px per minute a 15-minute get-ready is 21px, and forcing that up to the
+  // 22px block minimum made every stacked buffer overlap its neighbour by a
+  // pixel or two. Get-ready, travel and warm-up sit end to end before a
+  // training block, so three of them compounded into the visible mess of
+  // overlapping strips. 11px is legible and still smaller than the shortest
+  // buffer the editor allows. clampBufferMin's floor is 5 minutes = 7px at
+  // 1.4px/min, so a 6px minimum is never actually reached and NO buffer is
+  // ever inflated — which makes the overlap impossible by construction rather
+  // than merely unlikely.
+  const minH = b._isBuffer ? 6 : 22;
+  const height = Math.max(minH, (visEndMin - visStartMin) * PX_PER_MIN - 2);
+  // Anchoring: a pre-side buffer grows from its BOTTOM edge, so any overshoot
+  // from the floor above bleeds backward into empty time rather than forward
+  // into the activity it precedes. Post-side buffers already grow into empty
+  // time, which is why "after" always looked right.
   const top = (b._isBuffer && b._bufferSide === 'pre')
     ? Math.max(0, visEndMin * PX_PER_MIN - height)
     : visStartMin * PX_PER_MIN;
@@ -699,11 +707,15 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
 
   const isBuffer = !!b._isBuffer;
   const blockEl = document.createElement('div');
-  const isCompact = height < 45;
+  // One shared rule for how much a block says at a given height — see
+  // blockContentTier (js/05-helpers.js). The week cards and the print sheet
+  // read the same ladder, so a block is legible the same way in all three.
+  const tier = blockContentTier(height);
+  const isCompact = !blockTierAtLeast(tier, 'meta');
   let fontTier = '';
   if (!isCompact) {
-    if (height >= 110) fontTier = ' block-font-lg';
-    else if (height >= 72) fontTier = ' block-font-md';
+    if (blockTierAtLeast(tier, 'full')) fontTier = ' block-font-lg';
+    else if (blockTierAtLeast(tier, 'detail')) fontTier = ' block-font-md';
   }
   // Training topics (skating/swimming/dryland) each get their own icon + colour
   // so they read differently at a glance, not just by the text label.
@@ -728,27 +740,35 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   const durStr = formatDuration(b.durationMin);
   const mood = getProfData().blockMoods?.[b.id] || '';
 
-  let badges = '';
+  // Badges are ordered by how much they change what you'd DO about the block:
+  // a clash first, then what it is, then decoration. Only the first two show —
+  // eight emoji in a row is texture, not information — and the rest fold into
+  // a single "+N" chip (foldBadges).
+  const badgeList = [];
+  if (hasConflict) badgeList.push('<span class="badge" title="Not enough travel/get-ready time — overlaps another activity">⚠️</span>');
   // (Training sport is shown by the block's own icon now, so no separate badge.)
   // Competition shares the sport's topic icon/colour/name with Competitive Sports, so it
   // needs its own badge to stay visually distinct at a glance.
-  if (!isBuffer && act.isCompetition) badges += '<span class="badge" title="Competition">🏆</span>';
-  if (b.objectives?.length) badges += '<span class="badge">🎯</span>';
-  if (b.note) badges += '<span class="badge">📝</span>';
-  if (b.parentPinned) badges += '<span class="badge">📌</span>';
-  if (!isBuffer && b.travelBuffer) badges += '<span class="badge">🚗</span>';
-  if (hasConflict) badges += '<span class="badge" title="Not enough travel/get-ready time — overlaps another activity">⚠️</span>';
-  if (b.public) badges += '<span class="badge">👯</span>';
-  if (Array.isArray(b.invitedTo) && b.invitedTo.length) badges += '<span class="badge">💌</span>';
-  if (b.seriesId) badges += '<span class="badge">🔁</span>';
-  if (b.confirmed) badges += '<span class="badge">✅</span>';
+  if (!isBuffer && act.isCompetition) badgeList.push('<span class="badge" title="Competition">🏆</span>');
   if (act.isRoutine) {
     const done = countChecklistDone(b, act);
     const total = countChecklistTotal(b, act);
-    if (total > 0) badges += `<span class="badge">✓ ${done}/${total}</span>`;
+    if (total > 0) badgeList.push(`<span class="badge">✓ ${done}/${total}</span>`);
   }
-  if (mood) badges += `<span class="badge">${mood}</span>`;
-  if (b.parentStamp && b.parentStamp.emoji) badges += `<span class="badge badge-stamp" title="Proud stamp from a parent">${b.parentStamp.emoji}</span>`;
+  if (b.parentPinned) badgeList.push('<span class="badge">📌</span>');
+  if (b.confirmed) badgeList.push('<span class="badge">✅</span>');
+  if (b.parentStamp && b.parentStamp.emoji) badgeList.push(`<span class="badge badge-stamp" title="Proud stamp from a parent">${b.parentStamp.emoji}</span>`);
+  // Below this line: things the block already says elsewhere (goals get their
+  // own rows, the note its own line, buffers their own strips), so they only
+  // appear when there is badge room to spare.
+  if (b.objectives?.length) badgeList.push('<span class="badge">🎯</span>');
+  if (b.note) badgeList.push('<span class="badge">📝</span>');
+  if (!isBuffer && b.travelBuffer) badgeList.push('<span class="badge">🚗</span>');
+  if (b.public) badgeList.push('<span class="badge">👯</span>');
+  if (Array.isArray(b.invitedTo) && b.invitedTo.length) badgeList.push('<span class="badge">💌</span>');
+  if (b.seriesId) badgeList.push('<span class="badge">🔁</span>');
+  if (mood) badgeList.push(`<span class="badge">${mood}</span>`);
+  const badges = foldBadges(badgeList, blockTierAtLeast(tier, 'detail') ? 3 : 2);
 
   const noteTrim = (b.note && String(b.note).trim()) ? String(b.note).trim() : '';
   const noteHtml = (!isCompact && noteTrim)
@@ -757,8 +777,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   // Training blocks show the get-ready gear as a tappable checklist right on
   // the block (built as DOM below), so the kid can pack without opening the
   // sheet. This is separate from the block's own "done" checkbox.
-  const showGearChecklist = !isBuffer && !isCompact && act.isTraining && b.tag
-    && getTrainingGearPresets(b.tag, act.isCompetition).length > 0;
+  const showTrainingChecks = !isBuffer && act.isTraining && blockTierAtLeast(tier, 'full');
   // For a multi-chore House-Chore block, show the tagged chores in the name.
   const choreList = (b.actId === 'chores' && Array.isArray(b.choreTags) && b.choreTags.length)
     ? b.choreTags.join(', ') : '';
@@ -781,12 +800,15 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   // List as many objectives/goals as the block's own height can hold — same
   // "show what this block is about" idea as print/week, and the day view has
   // the most room, so a Piano block gets its whole goal list, not just the
-  // 🎯 badge. Gear already gets its own tappable checklist below, so it isn't
-  // duplicated here.
+  // 🎯 badge. The four training checks get their own tappable rows below, so
+  // they aren't duplicated here.
   const objList = (!isBuffer && Array.isArray(b.objectives)) ? b.objectives.filter(Boolean) : [];
   let objHtml = '';
-  if (!isCompact && objList.length) {
-    const maxObjRows = Math.max(0, Math.floor((height - 62) / 17));
+  if (blockTierAtLeast(tier, 'detail') && objList.length) {
+    // Reserve the space the training checks are about to take, so the two
+    // never fight over the same pixels.
+    const reserved = showTrainingChecks ? 20 + Math.ceil(TRAINING_CHECKS.length / 2) * 30 : 0;
+    const maxObjRows = Math.max(0, Math.floor((height - 62 - reserved) / 17));
     if (maxObjRows > 0) {
       const shown = sliceDetailLines(objList.map(o => ({ icon: '🎯', text: o })), maxObjRows);
       objHtml = `<div class="block-objectives">${shown.map(r => `<div class="block-objective-row">${r.icon} ${escapeHtml(r.text)}</div>`).join('')}</div>`;
@@ -801,7 +823,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
     ${!isBuffer && b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="block-stopwatch-btn" onclick="event.stopPropagation(); startBlockStopwatch('${b.id}')">⏱ Start stopwatch</button>` : ''}
     ${noteHtml}
   `;
-  if (showGearChecklist) blockEl.appendChild(buildBlockGearChecklist(b, b.tag, act.isCompetition));
+  if (showTrainingChecks) blockEl.appendChild(buildBlockTrainingChecks(b));
   if (!isBuffer && clippedTop) {
     const m = document.createElement('div');
     m.className = 'block-clip-marker block-clip-marker--top';
@@ -998,6 +1020,31 @@ function blockIsCompetition(b) {
   return !!(act && act.isCompetition);
 }
 
+/* The four training checks in a sheet's checklist styling (the block gets its
+   own compact rendering — buildBlockTrainingChecks). */
+function renderTrainingChecks(containerId, block) {
+  const wrap = document.getElementById(containerId);
+  if (!wrap) return;
+  if (!block.trainingCheck) block.trainingCheck = {};
+  wrap.innerHTML = '';
+  TRAINING_CHECKS.forEach(c => {
+    const on = !!block.trainingCheck[c.id];
+    const row = document.createElement('div');
+    row.className = 'checklist-item' + (on ? ' checked' : '');
+    row.title = c.full;
+    row.innerHTML = `<div class="checklist-check">${on ? '✓' : ''}</div>`
+      + `<span class="checklist-text">${c.icon} ${escapeHtml(c.label)}<small style="display:block;opacity:0.75">${escapeHtml(c.full)}</small></span>`;
+    row.onclick = () => {
+      block.trainingCheck[c.id] = !block.trainingCheck[c.id];
+      markItemUpdated(block);
+      saveAll();
+      renderTrainingChecks(containerId, block);
+      buildTimeline();
+    };
+    wrap.appendChild(row);
+  });
+}
+
 function renderTrainingGearChecklist(containerId, stateObj, tag, persist, isComp) {
   const wrap = document.getElementById(containerId);
   if (!wrap) return;
@@ -1023,39 +1070,44 @@ function renderTrainingGearChecklist(containerId, stateObj, tag, persist, isComp
   });
 }
 
-/* Tappable get-ready gear checklist rendered directly on a training block in
-   the timeline. Each item toggles the block's gearState and persists it. This
-   is deliberately separate from the block's own completion checkbox. */
-function buildBlockGearChecklist(b, tag, isComp) {
-  const items = getTrainingGearPresets(tag, isComp);
+/* The four training checks, rendered on the block itself.
+
+   This replaced a tappable copy of the whole packing list — ten rows on a
+   skating block, ten on swimming — which at any realistic block height was a
+   wall of squares stacked under the name. These four are the review a parent
+   and a kid actually do after a session, they are the same four for every
+   sport, and they fit. The packing list still lives in the training sheet.
+
+   Each toggle persists to the block's own trainingCheck map, separate from the
+   block's "done" tick: turning up prepared and finishing the session are two
+   different claims. */
+function buildBlockTrainingChecks(b) {
   const wrap = document.createElement('div');
   wrap.className = 'block-gear-list';
-  if (!items.length) return wrap;
-  if (!b.gearState) b.gearState = {};
-  const prefix = isComp ? `gearC-${tag}` : `gear-${tag}`;
-  const doneCount = items.filter((_, idx) => b.gearState[`${prefix}-${idx}`]).length;
+  if (!b.trainingCheck) b.trainingCheck = {};
+  const doneCount = TRAINING_CHECKS.filter(c => b.trainingCheck[c.id]).length;
   const head = document.createElement('div');
   head.className = 'block-gear-head';
-  head.textContent = `${isComp ? '🏆' : '🎒'} ${isComp ? 'Pack for comp' : 'Get ready'} ${doneCount}/${items.length}`;
+  head.textContent = `${blockIsCompetition(b) ? '🏆 Competition' : '🏋️ Session'} ${doneCount}/${TRAINING_CHECKS.length}`;
   wrap.appendChild(head);
-  items.forEach((label, idx) => {
-    const key = `${prefix}-${idx}`;
+  TRAINING_CHECKS.forEach(c => {
     const row = document.createElement('button');
     row.type = 'button';
-    row.className = 'block-gear-item' + (b.gearState[key] ? ' checked' : '');
-    row.innerHTML = `<span class="block-gear-box">${b.gearState[key] ? '✓' : ''}</span><span class="block-gear-label">${escapeHtml(label)}</span>`;
+    row.className = 'block-gear-item' + (b.trainingCheck[c.id] ? ' checked' : '');
+    row.title = c.full;
+    row.innerHTML = `<span class="block-gear-box">${b.trainingCheck[c.id] ? '✓' : ''}</span>`
+      + `<span class="block-gear-label">${c.icon} ${escapeHtml(c.label)}</span>`;
     row.onclick = (e) => {
       e.stopPropagation();
-      b.gearState[key] = !b.gearState[key];
+      b.trainingCheck[c.id] = !b.trainingCheck[c.id];
       markItemUpdated(b);
       saveAll();
-      row.classList.toggle('checked', !!b.gearState[key]);
-      row.querySelector('.block-gear-box').textContent = b.gearState[key] ? '✓' : '';
-      const done = items.filter((_, i) => b.gearState[`${prefix}-${i}`]).length;
-      head.textContent = `${isComp ? '🏆' : '🎒'} ${isComp ? 'Pack for comp' : 'Get ready'} ${done}/${items.length}`;
+      row.classList.toggle('checked', !!b.trainingCheck[c.id]);
+      row.querySelector('.block-gear-box').textContent = b.trainingCheck[c.id] ? '✓' : '';
+      head.textContent = `${blockIsCompetition(b) ? '🏆 Competition' : '🏋️ Session'} `
+        + `${TRAINING_CHECKS.filter(x => b.trainingCheck[x.id]).length}/${TRAINING_CHECKS.length}`;
     };
-    // The gear rows are real taps, not scroll gestures — let them through the
-    // block-level tap guard.
+    // Real taps, not scroll gestures — let them through the block tap guard.
     row.addEventListener('pointerdown', (ev) => ev.stopPropagation());
     wrap.appendChild(row);
   });
@@ -1207,6 +1259,10 @@ function openKidTrainingQuick(blockId) {
   } else {
     swEl.style.display = 'none';
   }
+  // The four checks are the review; the packing list is the preparation. Both
+  // belong on this sheet — it is the one surface with room for both, which is
+  // why the block itself only carries the four.
+  renderTrainingChecks('kidTrainingChecks', b);
   renderTrainingGearChecklist('kidTrainingGear', b, b.tag || 'skating', true, act.isCompetition);
   openSheet('kidTrainingOverlay');
 }

@@ -185,6 +185,23 @@ const AFTERSCHOOL_CHECKLIST_REWARDS = [
 ];
 const MORNING_LOCKED_REWARD = { id:'mw1', text:'Warm water with breakfast' };
 
+/* ── What a training block asks, on the block itself ──
+   A training block used to render its whole packing list — ten mini
+   checkboxes on skating, ten on swimming — on top of an icon, a name, a
+   duration, a badge strip and a goal list. At the sizes a two-hour block
+   actually gets, that is a wall of squares nobody reads.
+
+   These four are what a parent and a kid actually review after a session, and
+   they are the same four for every sport, so the block reads identically
+   whatever is on it. The full packing list still exists; it lives in the
+   training sheet, where there is room to tick ten things off. */
+const TRAINING_CHECKS = [
+  { id: 'ready',    icon: '🎒', label: 'Ready to go',   full: 'Kit packed and there on time' },
+  { id: 'goal',     icon: '🎯', label: "Today's goal",  full: "Knew what today's session was for" },
+  { id: 'attitude', icon: '💪', label: 'Attitude',      full: 'Gave it my best effort' },
+  { id: 'cleanup',  icon: '🧽', label: 'Cleared up',    full: 'Packed up and cleared away after' },
+];
+
 /* Built-in activities — durationMin is default duration in minutes */
 /* suitableTime values: 'before-school' | 'school' | 'after-school' | 'evening' | 'weekend'
    Used by mascot recommendations.
