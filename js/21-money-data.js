@@ -647,6 +647,51 @@ function mnyOverrides(kid, weekKey) {
   if (!e.overrides) e.overrides = {};
   return e.overrides;
 }
+/* ── When a grade no longer decides the money ──
+   An override replaces a channel's figure AFTER mrWeekBreakdown has summed the
+   thing it came from. That is deliberate — a grown-up gets the last word — but
+   it leaves two surfaces still showing the working: the parent portal's graded
+   list and the meeting's step 1. Both used to present those grades as live
+   when they no longer added up to anything anyone would be paid.
+
+   This is the one reader they share, so the notice can't drift between them.
+   Returns null when the channel is untouched. */
+function mnyOverrideNotice(kid, weekKey, channel) {
+  const ov = mnyOverrides(kid, weekKey)[channel];
+  if (!ov) return null;
+  const label = (MNY_CHANNELS.find(c => c.key === channel) || {}).label || channel;
+  return {
+    channel, label,
+    value: money2(ov.value),
+    reason: ov.reason ? mnyReasonLabel(ov.reason) : '',
+    text: `This week's ${label.toLowerCase()} total was changed at the meeting to `
+        + `${mnyMoney(ov.value)} — the marks below no longer decide it.`
+        + (ov.reason ? ` Reason: ${mnyReasonLabel(ov.reason)}.` : ''),
+  };
+}
+/* The notice as a banner, with a way through to where the change was made
+   (step 3, chores row expanded) rather than just a warning to live with. */
+function mnyOverrideBanner(kid, weekKey, channel) {
+  const n = mnyOverrideNotice(kid, weekKey, channel);
+  if (!n) return '';
+  return `<div class="mny-override-note">
+      <span>✏️ ${escapeHtml(n.text)}</span>
+      <button type="button" class="mny-chip"
+        onclick="mnyShowTheChange('${kid}','${escapeAttr(channel)}')">See the change</button>
+    </div>`;
+}
+/* Open the meeting on step 3 with that channel's working expanded — the one
+   place the override, its original figure and its reason all sit together. */
+function mnyShowTheChange(kid, channel) {
+  if (typeof mnySetMeetKid === 'function') mnySetMeetKid(kid);
+  mnyExpandRow = channel;
+  const overlay = document.getElementById('familyMeetingOverlay');
+  if (!overlay || !overlay.classList.contains('open')) {
+    if (typeof openFamilyMeeting === 'function') openFamilyMeeting();
+  }
+  if (typeof mmGoStep === 'function') mmGoStep(3);
+}
+
 function mnySetOverride(kid, weekKey, channel, value, reason) {
   if (!isParent()) { showToast('A grown-up changes the numbers 🔒'); return false; }
   const ov = mnyOverrides(kid, weekKey);

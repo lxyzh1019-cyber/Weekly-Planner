@@ -224,6 +224,17 @@ function mergeProfileState(localProfile, remoteProfile, profName) {
   merged.achievements = mergeArrayById(lp.achievements, rp.achievements);
   // Nested trees: merge key-by-key instead of letting remote replace them.
   merged.progress = deepMergeObj(lp.progress, rp.progress);
+  // `lastGradeSeen` is a high-water mark, not a value — it records the moment
+  // the kid last looked at her own chore tab, and drives the "newly answered"
+  // markers. deepMergeObj lets remote win at a scalar leaf, so a phone that
+  // synced an older stamp would drag it BACKWARDS and resurface markers she had
+  // already read. A watermark only ever moves forward.
+  const seenL = Number((lp.progress || {}).lastGradeSeen) || 0;
+  const seenR = Number((rp.progress || {}).lastGradeSeen) || 0;
+  if (seenL || seenR) {
+    if (!merged.progress) merged.progress = {};
+    merged.progress.lastGradeSeen = Math.max(seenL, seenR);
+  }
   merged.chore = mergeChoreState(lp.chore, rp.chore);
   const me = mergeEarnings(lp.earnings, rp.earnings, lp.earningsUpdatedAtByWeek, rp.earningsUpdatedAtByWeek);
   merged.earnings = me.earnings;

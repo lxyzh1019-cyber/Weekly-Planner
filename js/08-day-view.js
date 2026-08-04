@@ -262,7 +262,10 @@ function buildDayQuest() {
       right.setAttribute('aria-label', 'Complete quest');
       right.title = 'Complete it! 🎯';
       right.textContent = '🎯';
-      right.onclick = (e) => { e.stopPropagation(); toggleBlockDone(currentDayKey, b.id, e); };
+      // The arcade blast (js/06-quests.js) — the same completion the Quest
+      // Board used to own. Now that the board hands its list to this view,
+      // this is where that animation lives.
+      right.onclick = (e) => { e.stopPropagation(); blastQuest(b.id, right, currentDayKey); };
     }
     card.appendChild(right);
     card.onclick = () => onTimelineBlockTap(b.id);
@@ -777,7 +780,13 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   // Training blocks show the get-ready gear as a tappable checklist right on
   // the block (built as DOM below), so the kid can pack without opening the
   // sheet. This is separate from the block's own "done" checkbox.
-  const showTrainingChecks = !isBuffer && act.isTraining && blockTierAtLeast(tier, 'full');
+  // A 130px block is a 93-minute session, but weekday training is routinely 60
+  // (84px). Rather than lower the threshold and bring back the overflow, a
+  // shorter block gets one tappable line instead of five — same store, opens
+  // the sheet where all four have room.
+  const isTrainingBlock = !isBuffer && act.isTraining;
+  const showTrainingChecks = isTrainingBlock && blockTierAtLeast(tier, 'full');
+  const showTrainingChip = isTrainingBlock && !showTrainingChecks && blockTierAtLeast(tier, 'detail');
   // For a multi-chore House-Chore block, show the tagged chores in the name.
   const choreList = (b.actId === 'chores' && Array.isArray(b.choreTags) && b.choreTags.length)
     ? b.choreTags.join(', ') : '';
@@ -807,7 +816,8 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   if (blockTierAtLeast(tier, 'detail') && objList.length) {
     // Reserve the space the training checks are about to take, so the two
     // never fight over the same pixels.
-    const reserved = showTrainingChecks ? 20 + Math.ceil(TRAINING_CHECKS.length / 2) * 30 : 0;
+    const reserved = showTrainingChecks ? 20 + Math.ceil(TRAINING_CHECKS.length / 2) * 30
+                   : showTrainingChip ? 24 : 0;
     const maxObjRows = Math.max(0, Math.floor((height - 62 - reserved) / 17));
     if (maxObjRows > 0) {
       const shown = sliceDetailLines(objList.map(o => ({ icon: '🎯', text: o })), maxObjRows);
@@ -824,6 +834,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
     ${noteHtml}
   `;
   if (showTrainingChecks) blockEl.appendChild(buildBlockTrainingChecks(b));
+  else if (showTrainingChip) blockEl.appendChild(buildBlockTrainingChip(b));
   if (!isBuffer && clippedTop) {
     const m = document.createElement('div');
     m.className = 'block-clip-marker block-clip-marker--top';
@@ -1112,6 +1123,23 @@ function buildBlockTrainingChecks(b) {
     wrap.appendChild(row);
   });
   return wrap;
+}
+
+/* The four checks folded to one line, for a block with room for a row but not
+   for a grid. Tapping opens the training sheet rather than toggling anything —
+   four states behind one control would be a guess about which one you meant. */
+function buildBlockTrainingChip(b) {
+  const st = b.trainingCheck || {};
+  const done = TRAINING_CHECKS.filter(c => st[c.id]).length;
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'block-train-chip' + (done === TRAINING_CHECKS.length ? ' complete' : '');
+  el.title = TRAINING_CHECKS.map(c => `${st[c.id] ? '✅' : '⬜'} ${c.full}`).join('\n');
+  el.innerHTML = `<span>${blockIsCompetition(b) ? '🏆' : '🏋️'} ${done}/${TRAINING_CHECKS.length}</span>`
+    + `<span class="block-train-chip-go">check off ›</span>`;
+  el.onclick = (e) => { e.stopPropagation(); openKidTrainingQuick(b.id); };
+  el.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+  return el;
 }
 
 function countChecklistTotal(block, act) {

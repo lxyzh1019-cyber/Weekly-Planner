@@ -295,5 +295,60 @@ const planMerge = api.mergeSharedChore(
   { weekPlans: { w1: { jess: { planId:'debt',  committedAt: 900 } } } });
 check('newest week plan wins', planMerge.weekPlans.w1.jess.planId === 'debt');
 
+/* ── State added by the viewer/flow work ──
+   Four new stores crossed the wire without a check between them. None of them
+   is exotic; the point is that a merge bug here is invisible until two devices
+   disagree about a week that has already been paid. */
+
+// The four training checks live on the block, so they ride the block's own
+// newest-wins arbitration — the same path gearState used.
+const trainMerge = api.mergeWeeks(
+  { d1: [ { id:'t1', trainingCheck: { ready: true }, updatedAt: 10 } ] },
+  { d1: [ { id:'t1', trainingCheck: { ready: true, attitude: true }, updatedAt: 20 } ] });
+check('newest training-check state wins on a block',
+  trainMerge.d1[0].trainingCheck.attitude === true);
+
+// gradedAt and paymentOverrides live inside earnings[week], which unions by
+// default and hands a whole week to the strictly-newer side when stamped.
+const gradeStamps = api.mergeEarnings(
+  { w1: { chores: { '0': { mop: 3 } }, gradedAt: { '0': { mop: 100 } } } },
+  { w1: { chores: { '1': { dishes: 2 } }, gradedAt: { '1': { dishes: 200 } } } },
+  {}, {});
+check('grades and their stamps union across devices',
+  gradeStamps.earnings.w1.gradedAt['0'].mop === 100 &&
+  gradeStamps.earnings.w1.gradedAt['1'].dishes === 200);
+
+// A payment agreed down at the meeting must not be lost to the other device's
+// copy of the same week.
+const payOv = api.mergeEarnings(
+  { w1: { paymentOverrides: { 'debt-1': 8 } } },
+  { w1: { overrides: { chores: { value: 12 } } } },
+  {}, {});
+check('a reduced loan payment survives a merge',
+  payOv.earnings.w1.paymentOverrides['debt-1'] === 8 &&
+  payOv.earnings.w1.overrides.chores.value === 12);
+
+// ...and the newer device still takes the whole week when both stamped it.
+const payOvNewer = api.mergeEarnings(
+  { w1: { paymentOverrides: { 'debt-1': 8 } } },
+  { w1: { paymentOverrides: { 'debt-1': 5 } } },
+  { w1: 100 }, { w1: 200 });
+check('newest side wins a stamped week outright',
+  payOvNewer.earnings.w1.paymentOverrides['debt-1'] === 5);
+
+// THE WATERMARK. lastGradeSeen records when the kid last read her tab. A plain
+// deep-merge lets remote win at a scalar, so an older stamp arriving from a
+// second device would drag it backwards and resurface markers she had read.
+const seenBack = api.mergeProfileState(
+  { progress: { lastGradeSeen: 900 } },
+  { progress: { lastGradeSeen: 100 } }, 'jess');
+check('the "seen" watermark never moves backwards',
+  seenBack.progress.lastGradeSeen === 900);
+const seenFwd = api.mergeProfileState(
+  { progress: { lastGradeSeen: 100 } },
+  { progress: { lastGradeSeen: 900 } }, 'jess');
+check('the "seen" watermark does move forwards',
+  seenFwd.progress.lastGradeSeen === 900);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

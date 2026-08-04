@@ -74,10 +74,20 @@ function renderQuestBoard() {
   // Today's quests = today's blocks
   const key = todayKey();
   const blocks = (getDayBlocks(key) || []).filter(b => b && b.startMin != null);
-  blocks.sort((a,b)=> (a.startMin||0) - (b.startMin||0));
   const acts = getAllActivities(p);
   const actById = id => acts.find(a => a.id === id);
+  const done = blocks.filter(b => b.completed).length;
 
+  /* ── One list, in one place ──
+     This used to render today's blocks as quest cards with their own complete
+     buttons — which is exactly what the day view's Quest mode does. Two
+     renderings of the same list means two sets of completion handlers and two
+     places a tick can go wrong, and it is the same duplication that got
+     Checklist mode removed.
+
+     The Quest Board keeps what only it has: the hero, the stickers, the money
+     panel and the weekly note. The list itself now lives in one place, and
+     this is the door to it. */
   const list = document.getElementById('questList');
   if (!blocks.length) {
     list.innerHTML = `
@@ -92,31 +102,30 @@ function renderQuestBoard() {
     return;
   }
 
-  list.innerHTML = blocks.map(b => {
-    const act = actById(b.actId) || { name:'Quest', icon:'⭐' };
-    const time = formatQuestTime(b.startMin);
-    const dur = b.durationMin ? `${b.durationMin} min` : '';
-    const done = !!b.completed;
-    const right = done
-      ? `<div class="quest-done-badge">✓</div>`
-      : `<button class="quest-complete-btn" onclick="event.stopPropagation();blastQuest('${b.id}', this)" aria-label="Blast this quest complete" title="Blast it! 🎯">🎯</button>`;
-    return `
-      <div class="quest-card ${done?'quest-done':''}" onclick="openQuestDetail('${b.id}')">
-        <div class="quest-time-col">
-          <div class="quest-time">${time}</div>
-          ${dur?`<div class="quest-dur">${dur}</div>`:''}
-        </div>
-        <div class="quest-card-icon">${act.icon || '⭐'}</div>
-        <div class="quest-card-body">
-          <div class="quest-card-name">${escapeHtml(act.name || 'Quest')}</div>
-          <div class="quest-card-meta">
-            <span class="quest-xp-tag">+${QUEST_XP_PER_TASK} XP</span>
-          </div>
-        </div>
-        ${right}
+  const left = blocks.length - done;
+  const donePct = Math.round(done / blocks.length * 100);   // `pct` above is the XP bar
+  const next = blocks.filter(b => !b.completed).sort((a, b) => a.startMin - b.startMin)[0];
+  const nextAct = next ? actById(next.actId) : null;
+  list.innerHTML = `
+    <button type="button" class="quest-today-card" onclick="goQuestsToday()">
+      <div class="quest-today-head">
+        <span class="quest-today-title">${left ? `${left} quest${left === 1 ? '' : 's'} to go` : 'Every quest done 🎉'}</span>
+        <span class="quest-today-count">${done}/${blocks.length}</span>
       </div>
-    `;
-  }).join('');
+      <div class="quest-today-bar"><span style="width:${donePct}%"></span></div>
+      ${next ? `<div class="quest-today-next">Next up — ${nextAct ? nextAct.icon : '⭐'} ${escapeHtml(nextAct ? nextAct.name : 'Quest')} at ${formatQuestTime(next.startMin)}</div>` : ''}
+      <span class="quest-today-go">Open today's quests ›</span>
+    </button>`;
+}
+
+/* The Quest Board's door into the one quest list — today's day view, in Quest
+   mode. Same blocks, same ticks, same XP, one implementation. */
+function goQuestsToday() {
+  const keys = getDayKeys(0);
+  const idx = keys.indexOf(todayKey());
+  dayViewMode = 'quest';
+  openDay(idx >= 0 ? keys[idx] : keys[0], idx >= 0 ? idx : 0, null, 0);
+  if (typeof setDayViewMode === 'function') setDayViewMode('quest');
 }
 
 // Sticker collection on the Quest Board — earned by real habits (#8).
@@ -321,19 +330,21 @@ function goPlanToday() {
   openDayFromWeekCard(key, dayIdx);
 }
 
-function openQuestDetail(blockId) {
-  // Reuse existing edit sheet so kids can see/edit details if they tap the card body
-  if (typeof openEditSheet === 'function') openEditSheet(blockId);
-}
+/* openQuestDetail lived here: it opened the edit sheet when a kid tapped a
+   quest card's body on the Quest Board. The board no longer renders that list —
+   the day view's Quest mode does, and its cards already route a body tap
+   through onTimelineBlockTap, which knows about routines and training blocks
+   as well. */
 
 /* Arcade "blast to complete": tapping the 🎯 fires a shot at the quest card,
    which bursts before the quest is marked done — completion feels like a
    shooting game rather than a plain checkbox (item 4). */
-function blastQuest(blockId, btn) {
+function blastQuest(blockId, btn, dayKey) {
+  const key = dayKey || todayKey();
   const card = btn && btn.closest ? btn.closest('.quest-card') : null;
   if (!card || card.classList.contains('quest-blasting')) {
     if (card && card.classList.contains('quest-blasting')) return;
-    completeQuest(blockId); return;
+    completeQuest(blockId, key); return;
   }
   card.classList.add('quest-blasting');
   const rect = card.getBoundingClientRect();
@@ -355,7 +366,7 @@ function blastQuest(blockId, btn) {
     proj.remove();
     card.classList.add('quest-burst');
     spawnQuestBurst(card);
-    setTimeout(() => completeQuest(blockId), 240);
+    setTimeout(() => completeQuest(blockId, key), 240);
   }, 300);
 }
 
@@ -377,8 +388,11 @@ function spawnQuestBurst(card) {
   }
 }
 
-function completeQuest(blockId) {
-  const key = todayKey();
+/* The one completion path with the arcade blast behind it. `dayKey` defaults
+   to today because the Quest Board only ever shows today; the day view passes
+   its own day, which is why this can no longer assume one. */
+function completeQuest(blockId, dayKey) {
+  const key = dayKey || todayKey();
   const blocks = getDayBlocks(key) || [];
   const blk = blocks.find(b => b.id === blockId);
   if (!blk) return;
@@ -397,7 +411,11 @@ function completeQuest(blockId) {
 
   showQuestCompletePopup(act, result);
   spawnQuestSparkles();
-  renderQuestBoard();
+  // Redraw whichever screen the tick came from — the board and the day view
+  // now share this path, so it can't assume the board.
+  const active = document.querySelector('.screen.active');
+  if (active && active.id === 'screen-day') buildTimeline();
+  else renderQuestBoard();
 
   // After the popup: rest day → its own warm celebration (rest is a valid state,
   // not a failed perfect day); full clear → Mission Clear; partial progress → a

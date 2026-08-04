@@ -128,7 +128,7 @@ function renderMeetingMode() {
   const back = mmStep > 1 ? `<button type="button" class="pill-btn" onclick="mmGoStep(${mmStep - 1})">◀ Back</button>` : `<span></span>`;
   const next = mmStep < MM_STEPS.length
     ? `<button type="button" class="btn-confirm" onclick="mmGoStep(${mmStep + 1})">Next ▶</button>`
-    : `<button type="button" class="btn-confirm" onclick="closeSheet('familyMeetingOverlay')">🎉 Finish meeting</button>`;
+    : mmFinishButtons(wk);
 
   const host = document.getElementById('familyMeetingBody');
   const restore = mmCaptureUiState(host);
@@ -199,7 +199,10 @@ function mmRenderReview(wk) {
   const jp = mmWeekPct('jenn'), sp = mmWeekPct('jess');
   const together = Math.round((jp + sp) / 2);
   const footer = `<div class="mm-ready">Meeting-ready: ${nConfirmed}/7 days confirmed · 💪 Together you kept ${together}% of the days so far <small>(🐥 ${jp}% · 🦊 ${sp}%)</small></div>`;
-  return `<div class="mm-h">Review the week</div>
+  // The readiness list belongs before anything is agreed, not after (it lived
+   // in step 4 until now). Per-kid state, so it follows whoever step 3/4 is on.
+  return `${mnyChecklist(wk, mnyMeetingKid())}
+    <div class="mm-h">Review the week</div>
     <div class="mm-legend"><span><i class="mm-sw mm-bar-j"></i>Jenn</span><span><i class="mm-sw mm-bar-s"></i>Jess</span><span class="mm-legend-note">how the team's doing each day — cheer each other on</span></div>
     <div class="mm-chart">${bars}</div>${detail}${footer}`;
 }
@@ -231,9 +234,13 @@ function mmRenderDayDetail(wk, d) {
             role="checkbox" aria-checked="${row.on}" aria-label="${escapeAttr(row.label)} ${DAY_SHORT[d]}, ${name}"><span class="mm-item-box">${row.on ? '✓' : ''}</span>${row.icon ? row.icon + ' ' : ''}${escapeHtml(row.label)}${tag}</button>`;
       }).join('');
       const done = mine.filter(x => x.row.on).length;
+      // A chores total overridden at step 3 no longer follows from these marks,
+      // so say so here rather than letting the ticks imply a number they don't
+      // produce any more.
+      const banner = kind === 'chore' ? mnyOverrideBanner(kid, mmWeekKey(), 'chores') : '';
       return `<div class="mm-detail-sect">
         <div class="mm-detail-cap">${title} <small>${done}/${mine.length}</small></div>
-        <div class="mm-detail-note">${note}</div>${items}</div>`;
+        <div class="mm-detail-note">${note}</div>${banner}${items}</div>`;
     };
     const done = rows.filter(r => r.on).length;
     return `<div class="mm-detail-col">
@@ -491,9 +498,67 @@ function mmUndoRecord() {
 
 /* Step 4 — Plan next week: copy this week into next week as a template. */
 function mmRenderPlan(wk) {
-  return `<div class="mm-h">Plan next week</div>
+  return `${mmSettledStrip(wk)}
+    <div class="mm-h">Plan next week</div>
     <div class="ct-meta">Copy this week's schedule into next week for both kids as a starting template, then jump there to tweak. Days that already have plans next week are left untouched.</div>
     <button type="button" class="btn-confirm" onclick="mmPlanNextWeek()">📋 Copy this week → next week</button>`;
+}
+
+/* ── Is this meeting actually finished? ──
+   The week is only recorded once BOTH kids are settled — commitMeetingShared
+   fires from step 4 on the condition that jenn and jess are each committed. So
+   a parent who worked through Jess and closed on "🎉 Finish meeting" left
+   Jenn's week un-agreed, un-decided and unrecorded, with nothing on screen
+   saying so. This strip is the missing readout: two rows, two states each,
+   every one of them a tap to the step that fixes it. */
+function mmKidSettled(wk, kid) {
+  return {
+    kid,
+    name: kid === 'jenn' ? 'Jenn' : 'Jess',
+    // A week earned under the retired group model has nothing to agree or
+    // decide, so it counts as settled rather than blocking the meeting forever.
+    old: !mrUsesNewModel(wk),
+    agreed: !mrUsesNewModel(wk) || mnyIsConfirmed(wk, kid),
+    decided: !mrUsesNewModel(wk) || mnyIsCommitted(wk, kid),
+  };
+}
+function mmAllSettled(wk) {
+  return ['jenn', 'jess'].every(k => mmKidSettled(wk, k).decided);
+}
+function mmSettledStrip(wk) {
+  const rows = ['jenn', 'jess'].map(k => {
+    const s = mmKidSettled(wk, k);
+    const cell = (on, label, step) =>
+      `<button type="button" class="mm-settle-cell ${on ? 'on' : ''}"
+         onclick="mnySetMeetKid('${k}');mmGoStep(${step})">${on ? '✓' : '○'} ${label}</button>`;
+    return `<div class="mm-settle-row">
+        <span class="mm-settle-who">${CT_PROFILE_ICON[k]} ${s.name}</span>
+        ${cell(s.agreed, 'Agreed', 3)}${cell(s.decided, 'Decided', 4)}
+      </div>`;
+  }).join('');
+  const done = mmAllSettled(wk);
+  return `<div class="mm-settle ${done ? 'done' : ''}">
+      <div class="mm-settle-cap">${done
+        ? '✅ Both weeks are settled — the money has moved and the week is recorded.'
+        : 'Before you finish — tap anything unticked to go and do it.'}</div>
+      ${rows}
+    </div>`;
+}
+/* What the last button should say. A family genuinely might stop halfway and
+   come back, so this names the gap rather than refusing — and keeps a way out. */
+function mmFinishButtons(wk) {
+  if (mmAllSettled(wk)) {
+    return `<button type="button" class="btn-confirm" onclick="closeSheet('familyMeetingOverlay')">🎉 Finish meeting</button>`;
+  }
+  const unsettled = ['jenn', 'jess'].map(k => mmKidSettled(wk, k)).filter(s => !s.decided);
+  const gap = unsettled.length === 2
+    ? "Neither week is decided yet"
+    : `${unsettled[0].name}'s week isn't decided yet`;
+  const goTo = unsettled[0];
+  return `<span class="mm-finish-gap">
+      <button type="button" class="pill-btn" onclick="closeSheet('familyMeetingOverlay')">Close anyway</button>
+      <button type="button" class="btn-confirm" onclick="mnySetMeetKid('${goTo.kid}');mmGoStep(${goTo.agreed ? 4 : 3})">${escapeHtml(gap)} ▶</button>
+    </span>`;
 }
 function mmPlanNextWeek() {
   const info = ctWeekInfo();
