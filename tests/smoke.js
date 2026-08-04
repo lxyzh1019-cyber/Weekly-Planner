@@ -1658,6 +1658,12 @@ function findChromium() {
     const asked = !!document.querySelector('.app-dialog-choice');
     if (!asked) return false;
     document.querySelectorAll('.app-dialog-choice')[0].click();   // "On time"
+    // Wait for it to be gone, not for a guessed interval — see the note on
+    // unplannedChoreIsClaimable below.
+    for (let i = 0; i < 50; i++) {
+      await new Promise(r => setTimeout(r, 20));
+      if (!document.querySelector('#appDialogOverlay.open')) break;
+    }
     await new Promise(r => setTimeout(r, 30));
 
     const claimed = mrGetClaim(kid, wk, 3, 'mop') === 3;
@@ -1889,6 +1895,18 @@ function findChromium() {
 
   // Work she did that nobody planned has to be claimable — and still gated.
   checks.unplannedChoreIsClaimable = await page.evaluate(async () => {
+    // openChoreClaimPrompt resolves a promise whose .then re-renders the chore
+    // tab. A fixed delay that expires early lets that render land in the MIDDLE
+    // of the next check — where it silently consumes the "newly answered"
+    // marker that check is about to assert on. Wait for the dialog to actually
+    // be gone instead of guessing.
+    const settled = async () => {
+      for (let i = 0; i < 50; i++) {
+        await new Promise(r => setTimeout(r, 20));
+        if (!document.querySelector('#appDialogOverlay.open')) return true;
+      }
+      return false;
+    };
     profile = 'jess'; parentViewing = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey;
@@ -1904,7 +1922,8 @@ function findChromium() {
     document.querySelectorAll('[data-ct-action="ck-else-pick"]')[0].click();
     await new Promise(r => setTimeout(r, 30));
     document.querySelectorAll('.app-dialog-choice')[0].click();
-    await new Promise(r => setTimeout(r, 30));
+    if (!await settled()) return false;
+    await new Promise(r => setTimeout(r, 30));   // let the .then re-render land
 
     const inQueue = mrClaimQueue(wk, kid).length === 1;
     const onHerTab = document.querySelectorAll('[data-ct-action="ck-chore-row"]').length === 1;

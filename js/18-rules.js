@@ -354,7 +354,22 @@ function mrApplyEdits(changes, { reason, note, effectiveFrom } = {}) {
   // a second same-day version — otherwise nudging one number three times leaves
   // three versions all effective today, and the tie-break decides the winner.
   let version;
-  if (base && base.effectiveFrom === from) {
+  // ...except the EARLIEST version, which is never replaced in place.
+  //
+  // mrVersionForDate falls back to vs[0] for any date before the first version
+  // exists, so vs[0] is what every pre-programme week reads. Rewriting it turns
+  // a price change into a retroactive one — the exact thing this whole
+  // versioning scheme exists to prevent ("edit a price in March and every week
+  // back to January would restate itself"). It only bites when a parent edits a
+  // price on the day the programme starts, because that is the one day the seed
+  // version is also "effective today" — which made this a bug that appeared on
+  // Mondays and vanished by Tuesday.
+  //
+  // Cost of the exception: several edits on day one leave several versions
+  // rather than one. The later one still wins (mrVersionForDate takes the last
+  // match), and a history that records each change is not the worse outcome.
+  const isSeed = base && mrVersions()[0] === base;
+  if (base && base.effectiveFrom === from && !isSeed) {
     base.rules = rules;
     base.updatedAt = now;
     base.reason = reason || MR_DEFAULT_REASON;
