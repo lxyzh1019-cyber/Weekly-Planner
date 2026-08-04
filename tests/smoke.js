@@ -1781,7 +1781,28 @@ function findChromium() {
     const capped = mnyDueThisWeek(kid, wk)[0].amount === d.scheduled;
     mnySetPaymentOverride(kid, wk, id, null);
     const reset = mnyPool(wk, kid).unpaid === 0;
-    return freed && capped && reset;
+
+    // The consequence has to be on screen while the family argues about it —
+    // in both units: dollars of arrears, and months added to being free of it.
+    // The months half must stay silent rather than claim a shift it can't show.
+    const pd = getProfData(kid);
+    const debt = mnyDebts(kid)[0];
+    debt.paid = Math.max(0, debt.principal - 40);   // small balance → a real shift
+    debt.monthly = 13; debt.lastPaymentMonth = null;
+    debt.downPaid = debt.downPayment; debt.downPaymentDue = '2026-01-01';
+    const big = mnyDueThisWeek(kid, wk)[0];
+    let saysBoth = true, silentWhenNoShift = true;
+    if (big) {
+      mnySetPaymentOverride(kid, wk, id, 0);         // skip the whole payment
+      const txt = mnyPaymentImpact(wk, kid, mnyPool(wk, kid));
+      saysBoth = /a month in late fees/.test(txt)
+              && /pushes being free of .* out by about \d+ month/.test(txt);
+      mnySetPaymentOverride(kid, wk, id, null);
+    }
+    // Paying the schedule in full says nothing at all.
+    silentWhenNoShift = mnyPaymentImpact(wk, kid, mnyPool(wk, kid)) === '';
+    delete pd.debts;
+    return freed && capped && reset && saysBoth && silentWhenNoShift;
   });
 
   // Spending is a real answer, open from week one, capped at a fifth.
@@ -2020,6 +2041,86 @@ function findChromium() {
       .includes('Before we start');
     closeSheet('familyMeetingOverlay');
     return onStep1 && offStep4;
+  });
+
+  /* The seed-version rule, tested on purpose rather than by luck.
+
+     priceChangeShowsButDoesNotRestate only reaches this code path when
+     programStartDate happens to equal today — i.e. on the day the programme
+     starts, which in a fresh smoke run means Mondays. That is how the bug it
+     guards survived: six days a week the test agreed with a broken build. This
+     one builds the precondition explicitly, so it fails every day or none. */
+  checks.earliestRuleVersionIsNeverRewritten = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead();
+    const mr = mrEnsure();
+    const today = todayKey();
+
+    // Precondition: exactly one version, effective today — the shape the
+    // programme has on its first day.
+    mr.versions = [mr.versions[0]];
+    mr.versions[0].effectiveFrom = today;
+    const seed = mr.versions[0];
+    const seedPrice = seed.rules.chores.grade[3];
+
+    mrApplyEdits([{ path: 'chores.grade.3', value: seedPrice + 1 }], { reason: 'family_meeting' });
+
+    // The seed must be untouched, and a second version must carry the change.
+    const seedIntact = mr.versions[0] === seed
+      && seed.rules.chores.grade[3] === seedPrice;
+    const stacked = mr.versions.length === 2;
+    const newestWins = mrRulesFor(today).chores.grade[3] === seedPrice + 1;
+    // Anything before the programme still reads the untouched seed.
+    const pastIntact = mrRulesForWeek('2020-01-06').chores.grade[3] === seedPrice;
+
+    // ...and the "don't stack a version per nudge" rule still holds for every
+    // version that ISN'T the seed: editing today's again replaces it.
+    mrApplyEdits([{ path: 'chores.grade.3', value: seedPrice + 2 }], { reason: 'family_meeting' });
+    const stillTwo = mr.versions.length === 2
+      && mrRulesFor(today).chores.grade[3] === seedPrice + 2;
+
+    // Leave the rules as they were found.
+    mr.versions = [seed];
+    return seedIntact && stacked && newestWins && pastIntact && stillTwo;
+  });
+
+  // The one-line wirings behind the new affordances — each is a place a tap
+  // can silently stop going anywhere.
+  checks.newAffordancesActuallyNavigate = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey;
+    const e = mrEnsureEarnings(kid, wk);
+    e.chores = {}; e.claims = {}; e.overrides = {};
+
+    // "See the change" on the override notice → step 3, that row expanded.
+    mrSetChoreGrade(kid, wk, 2, 'vacuum', 3);
+    mnySetOverride(kid, wk, 'chores', 99, 'graded_wrong');
+    mnyShowTheChange(kid, 'chores');
+    const toTheChange = mmStep === 3 && mnyExpandRow === 'chores';
+    closeSheet('familyMeetingOverlay');
+    e.overrides = {};
+
+    // Her "waiting for Mom" chip → the first day something is waiting on.
+    profile = 'jess';
+    e.chores = {}; e.claims = {};
+    mrSetClaim(kid, wk, 4, 'mop', 3);
+    openChoreTab(); ckSelectDay(0);
+    ckGoWaiting();
+    const toWaiting = ctDay === 4;
+
+    // The short-block training chip → the sheet with all four checks on it.
+    profile = 'jenn'; parentViewing = 'jenn';
+    const dk = getDayKeys(0)[1];
+    setDayBlocks(dk, [{ id: 'nav60', actId: 'training', startMin: 9 * 60,
+                        durationMin: 60, tag: 'skating', trainingCheck: {} }], 'jenn');
+    openDay(dk, 1);
+    document.querySelector('#block-nav60 .block-train-chip').click();
+    const toSheet = document.getElementById('kidTrainingOverlay').classList.contains('open')
+      && document.querySelectorAll('#kidTrainingChecks .checklist-item').length === TRAINING_CHECKS.length;
+    closeSheet('kidTrainingOverlay');
+    setDayBlocks(dk, [], 'jenn');
+    return toTheChange && toWaiting && toSheet;
   });
 
   checks.noConsoleErrors = errors.length === 0;
