@@ -26,6 +26,8 @@ window.addEventListener('pagehide', flushPush);
 (function(){
   const wrap = document.getElementById('tdWrap');
   if (wrap) wrap.addEventListener('click', tdHandleClick);
+  const nav = document.getElementById('kidNav');
+  if (nav) nav.addEventListener('click', tdHandleNavClick);
 })();
 // The pocket-money pages delegate the same way, for the same reason: every
 // render replaces the whole wrap, so a listener bound to a card would be gone

@@ -1336,6 +1336,11 @@
 <script src="js/27-chore-parent.js"></script>
 <script src="js/28-chore-trends.js"></script>
 <script src="js/29-chore-options.js"></script>
+<!-- The kid nav: one fixed element outside the screens, filled by tdRenderNav
+     (js/31-today.js). Six screens each carrying their own copy is six places for
+     it to drift, which is what happened to the topbar row it will replace. -->
+<nav id="kidNav" class="kid-nav" aria-label="Where to go" hidden></nav>
+
 <script src="js/30-backup.js"></script>
 <script src="js/31-today.js"></script>
 <script src="js/99-main.js"></script>

@@ -2644,6 +2644,96 @@ function findChromium() {
   await page.setViewportSize({ width: 900, height: 1100 });
   await page.waitForTimeout(150);
 
+  // ── Today as the front door (Branch 5) ───────────────────────────────────
+  checks.todayIsTheFrontDoor = await page.evaluate(async () => {
+    // Hero Mode used to decide the landing and was the only thing it decided, so
+    // both states must now land on Today — otherwise it is still the front door
+    // for only half the family.
+    const results = [];
+    for (const hero of ['1', '0']) {
+      localStorage.setItem('wp_hero_mode', hero);
+      profile = null;
+      await selectProfile('jenn');
+      results.push(document.getElementById('screen-today').classList.contains('active'));
+    }
+    localStorage.setItem('wp_hero_mode', '1');
+    // A parent still lands in the portal.
+    parentUnlockedThisSession = true;
+    await selectProfile('parent');
+    const parentToPortal = document.getElementById('screen-parent').classList.contains('active');
+    profile = 'jenn'; parentViewing = 'jenn';
+    return results.every(Boolean) && parentToPortal;
+  });
+
+  // The nav lives outside every #screen-*, so the kid-standards sweep cannot see
+  // it. Checked here instead: it is a kid surface and the same rules apply.
+  checks.kidNavIsUsableAndScoped = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    goToday();
+    const nav = document.getElementById('kidNav');
+    if (!nav || nav.hidden) return 'nav hidden on Today';
+    const btns = [...nav.querySelectorAll('.kid-nav-btn')];
+    if (btns.length !== 4) return `expected 4 destinations, got ${btns.length}`;
+    const bigEnough = btns.every(b => {
+      const r = b.getBoundingClientRect();
+      return r.height >= 44 && r.width >= 44;
+    });
+    const fontOk = btns.every(b => {
+      const l = b.querySelector('.kid-nav-label');
+      return l && parseFloat(getComputedStyle(l).fontSize) >= 13;
+    });
+    // The current place has to be stated, not only tinted.
+    const marksCurrent = !!nav.querySelector('.kid-nav-btn.on[aria-current="page"]');
+    // Content must not sit underneath it.
+    const padded = parseFloat(getComputedStyle(document.body).paddingBottom) >= 50;
+
+    // Hidden where it does not belong: a parent in the portal, and the picker.
+    profile = 'parent'; showScreen('parent'); renderParentHome();
+    const hiddenForParent = document.getElementById('kidNav').hidden;
+    profile = 'jenn'; showScreen('profile');
+    const hiddenOnPicker = document.getElementById('kidNav').hidden;
+    goToday();
+    return bigEnough && fontOk && marksCurrent && padded && hiddenForParent && hiddenOnPicker;
+  });
+
+  // Every destination goes somewhere, and every route the app had before still
+  // works — this stage adds a way to move around, it retires nothing.
+  checks.navReachesEverythingAndOldRoutesStillWork = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    const click = (sel) => { const el = document.querySelector(sel); if (el) el.click(); };
+    const activeId = () => (document.querySelector('.screen.active') || {}).id;
+
+    goToday();
+    click('#kidNav [data-td-nav="week"]');
+    const toWeek = activeId() === 'screen-week';
+    click('#kidNav [data-td-nav="money"]');
+    const toMoney = activeId() === 'screen-mymoney';
+    click('#kidNav [data-td-nav="today"]');
+    const backToToday = activeId() === 'screen-today';
+
+    // More opens a sheet, and a row in it navigates.
+    click('#kidNav [data-td-nav="more"]');
+    const sheetOpen = document.getElementById('tdMoreOverlay').classList.contains('open');
+    click('#tdMoreOverlay [data-td-more="chores"]');
+    const toChores = activeId() === 'screen-chore';
+    const sheetClosed = !document.getElementById('tdMoreOverlay').classList.contains('open');
+
+    // The pre-existing globals the rest of the suite drives the app with.
+    goWeek();              const oldWeek   = activeId() === 'screen-week';
+    goQuestBoard();        const oldQuest  = activeId() === 'screen-quest';
+    openChoreTab();        const oldChore  = activeId() === 'screen-chore';
+    mnyOpenMyMoney('jenn'); const oldMoney = activeId() === 'screen-mymoney';
+    openSisterSync();      const oldSync   = activeId() === 'screen-sync';
+    goToday();
+    return toWeek && toMoney && backToToday && sheetOpen && toChores && sheetClosed
+        && oldWeek && oldQuest && oldChore && oldMoney && oldSync;
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => { profile = 'jenn'; goToday(); });
+  await page.screenshot({ path: shot('phone_today_nav') });
+  await page.setViewportSize({ width: 900, height: 1100 });
+  await page.waitForTimeout(150);
+
   checks.noConsoleErrors = errors.length === 0;
 
   // A check passes only by being exactly true.

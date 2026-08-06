@@ -792,6 +792,10 @@ function showScreen(id) {
   // actually showing (and can't lock navigation across the whole app).
   try { enhanceAccessibility(targetScreen); } catch(e){ console.error('enhanceAccessibility failed', e); }
   try { if (typeof refreshMascotButton === 'function') refreshMascotButton(); } catch(e){ console.error('refreshMascotButton failed', e); }
+  // The kid nav follows whatever screen is now active, and hides itself outside
+  // a child's screens. Isolated like the hooks above: a nav that throws must not
+  // be able to stop a screen from showing.
+  try { if (typeof tdRenderNav === 'function') tdRenderNav(); } catch(e){ console.error('tdRenderNav failed', e); }
   if (id === 'day') {
     try {
       updateDayLandscapeChromeHeight();
@@ -862,6 +866,17 @@ async function selectProfile(p) {
     parentViewing = 'jenn';
     showScreen('parent');
     renderParentHome();
+  } else if (typeof goToday === 'function') {
+    /* Today is the front door. A child opening this app was landing on either the
+       Quest Board or the week grid, and both answer "what is my week" rather than
+       "what now" — see js/31-today.js.
+
+       Hero Mode used to be exactly this choice (quest board vs week) and nothing
+       else, so making Today the landing would have quietly left it a switch that
+       does nothing. It now decides whether Quests is offered as a way out of
+       Today, which keeps its intent — game framing to the fore, or not — and
+       Branch 6 decides where the toggle finally lives. */
+    goToday();
   } else if (isHeroMode()) {
     goQuestBoard();
   } else {

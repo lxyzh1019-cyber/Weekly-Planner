@@ -199,6 +199,8 @@ function tdRenderToday() {
       <div class="td-cap">Jobs I can do</div>${choreHtml}</div>
     <div class="td-say">${escapeHtml(tdEncouragement(kid))}</div>
     <div class="td-more">
+      ${(typeof isHeroMode === 'function' && isHeroMode())
+        ? `<button type="button" class="td-morebtn" data-td-action="quests">🎮 Quests</button>` : ''}
       <button type="button" class="td-morebtn" data-td-action="week">📋 The whole week</button>
       <button type="button" class="td-morebtn" data-td-action="money">💰 My money</button>
     </div>`;
@@ -223,4 +225,105 @@ function tdHandleClick(e) {
 function goToday() {
   showScreen('today');
   tdRenderToday();
+}
+
+/* ── The four-destination nav ─────────────────────────────────────────────────
+   Today · Week · Money · More.
+
+   One fixed element outside the screens rather than a copy of the same markup in
+   each: six kid screens each carrying their own nav row is six places for the
+   nav to drift, and the old topbar row proved it — the same five buttons were
+   pasted into three screens with slightly different labels.
+
+   Every existing route still works and every old button still exists. This adds a
+   way to move between the four places that matter without retiring anything;
+   Branch 6 is where the duplicates go. */
+const TD_NAV = [
+  { id: 'today', icon: '☀️', label: 'Today', screen: 'screen-today' },
+  { id: 'week',  icon: '📋', label: 'Week',  screen: 'screen-week' },
+  { id: 'money', icon: '💰', label: 'Money', screen: 'screen-mymoney' },
+  { id: 'more',  icon: '⋯',  label: 'More',  screen: null },
+];
+/* Screens that belong to a child. The nav is hidden everywhere else — a parent
+   in the portal does not need a child's bottom bar, and the profile picker is
+   where you go to stop being a child. */
+const TD_NAV_SCREENS = ['screen-today', 'screen-week', 'screen-mymoney', 'screen-chore',
+                        'screen-quest', 'screen-day', 'screen-sync', 'screen-moneystory',
+                        'screen-moneyschool'];
+
+function tdRenderNav() {
+  const nav = document.getElementById('kidNav');
+  if (!nav) return;
+  const active = document.querySelector('.screen.active');
+  const kid = activeProfile();
+  const show = !!active && TD_NAV_SCREENS.includes(active.id) &&
+               (kid === 'jenn' || kid === 'jess') && !isParent();
+  nav.hidden = !show;
+  if (!show) { document.body.classList.remove('has-kid-nav'); return; }
+  document.body.classList.add('has-kid-nav');
+  nav.innerHTML = TD_NAV.map(d => {
+    const on = d.screen === active.id;
+    return `<button type="button" class="kid-nav-btn${on ? ' on' : ''}"
+        data-td-nav="${d.id}"${on ? ' aria-current="page"' : ''}>
+        <span class="kid-nav-icon" aria-hidden="true">${d.icon}</span>
+        <span class="kid-nav-label">${escapeHtml(d.label)}</span>
+      </button>`;
+  }).join('');
+}
+
+/* "More" is everything that is not one of the three. A sheet rather than a
+   screen: it is a menu, and a menu you can dismiss beats a place you have to
+   navigate back out of. */
+function tdOpenMore() {
+  const items = [
+    { icon: '🎮', label: 'Quests',       go: 'quests' },
+    { icon: '🧹', label: 'Chores',       go: 'chores' },
+    { icon: '👯', label: 'Sisters',      go: 'sisters' },
+    { icon: '📖', label: 'Money story',  go: 'story' },
+    { icon: '🎓', label: 'Money school', go: 'school' },
+    { icon: '🖨', label: 'Print my week', go: 'print' },
+    { icon: '◀',  label: 'Switch who I am', go: 'profile' },
+  ];
+  let ov = document.getElementById('tdMoreOverlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.className = 'overlay';
+    ov.id = 'tdMoreOverlay';
+    ov.addEventListener('click', ev => {
+      if (ev.target === ov) { ov.classList.remove('open'); return; }
+      const b = ev.target.closest('[data-td-more]');
+      if (!b) return;
+      ov.classList.remove('open');
+      tdGoMore(b.getAttribute('data-td-more'));
+    });
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = `<div class="sheet td-more-sheet" role="dialog" aria-modal="true" aria-label="More places to go">
+      <div class="sheet-handle"></div>
+      <div class="td-cap">More</div>
+      ${items.map(i => `<button type="button" class="td-row" data-td-more="${i.go}">
+          <span class="td-row-icon">${i.icon}</span>
+          <span class="td-row-name">${escapeHtml(i.label)}</span>
+          <span class="td-row-go">›</span>
+        </button>`).join('')}
+    </div>`;
+  ov.classList.add('open');
+}
+function tdGoMore(where) {
+  if (where === 'quests')  { goQuestBoard(); return; }
+  if (where === 'chores')  { openChoreTab(); return; }
+  if (where === 'sisters') { openSisterSync(); return; }
+  if (where === 'story')   { mnyOpenStory(); return; }
+  if (where === 'school')  { if (typeof mnyOpenSchool === 'function') mnyOpenSchool(); return; }
+  if (where === 'print')   { openPrint(); return; }
+  if (where === 'profile') { goProfile(); return; }
+}
+function tdHandleNavClick(e) {
+  const el = e.target.closest('[data-td-nav]');
+  if (!el) return;
+  const d = el.getAttribute('data-td-nav');
+  if (d === 'today') { goToday(); return; }
+  if (d === 'week')  { goWeek(); return; }
+  if (d === 'money') { mnyOpenMyMoney(activeProfile()); return; }
+  if (d === 'more')  { tdOpenMore(); return; }
 }
