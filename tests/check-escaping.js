@@ -16,7 +16,10 @@
 //    live arbitrary-code execution on tap, not a theoretical one.
 //
 // Opt out on a line with a trailing `/* safe: why */` comment. Use it when the
-// value is a constant from a data table, and say which one.
+// value is a constant from a data table, and say which one. Note that a line
+// INSIDE a multi-line template literal cannot carry that comment — it would
+// render as visible text — so there, either escape (harmless on a constant) or
+// name the value with an `Html` suffix to say it is already escaped.
 //
 // This is a lint, not a proof: it reads lines, not scopes. tests/smoke.js has
 // the runtime assertions (hostileNamesCannotBecomeCode).
@@ -38,10 +41,19 @@ const OPT_OUT = /\/\*\s*safe:/;
    an inline pattern missed `act?.name` — optional chaining has no literal dot
    before the property, and that gap hid a real unescaped sink. */
 const TEXTY_MEMBER = /(?:\?\.|\.)\s*(?:name|label|title|text|note)\s*$/;
+/* A bare local that carries user text. This exists because a real XSS hid behind
+   one: js/07-week-view.js built `const dispName = topic ? topic.name : act.name`
+   and interpolated `${dispName}` straight into a card, so the member-expression
+   rule above never saw a `.name` at the interpolation site and the hole rendered
+   an <img> from a custom activity's name. Naming is the only signal available
+   without a real parser, so anything named like display text is treated as
+   display text. */
+const TEXTY_LOCAL = /^(?:disp[A-Z]\w*|\w*(?:Name|Label|Title|Text|Note))$/;
 function isTexty(expr) {
   // Ignore a trailing `|| 'fallback'`; the fallback is a literal either way.
   const head = expr.replace(/\|\|[^|]*$/, '').trim();
   if (/mascotName\s*$/.test(head)) return true;
+  if (TEXTY_LOCAL.test(head)) return true;
   return TEXTY_MEMBER.test(head);
 }
 

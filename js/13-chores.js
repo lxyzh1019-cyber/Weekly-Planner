@@ -1027,7 +1027,7 @@ function ctRenderWeekControls() {
   return `<div class="chore-card">
     <div class="ct-weeknav">
       <button class="btn-icon" onclick="ctChangeWeek(-1)" aria-label="Previous week">◀</button>
-      <h3 class="ct-weeknav-label">Week of ${weekLabel}</h3>
+      <h3 class="ct-weeknav-label">Week of ${escapeHtml(weekLabel)}</h3>
       <button class="btn-icon" onclick="ctChangeWeek(1)" aria-label="Next week">▶</button>
     </div>
     ${dayPills}

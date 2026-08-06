@@ -207,7 +207,7 @@ function renderPrintSheet() {
           const kindCls = seg.kind === 'ready' ? ' print-buffer--ready' : seg.kind === 'warmup' ? ' print-buffer--warmup' : ' print-buffer--travel';
           const bufCheckPx = printCheckboxPx(bh, { min: 5, max: 9, base: 4, divisor: 8 });
           const checkbox = bh >= 9 ? `<span class="print-check" style="border-color:${printTextColor(bg)};width:${bufCheckPx}px;height:${bufCheckPx}px"></span>` : '';
-          blockHtml += `<div class="print-buffer${kindCls}" style="height:${bh}px;--print-buf-colour:${bg}" title="${kindLabel} — ${seg.min} min">${checkbox}${label}</div>`;
+          blockHtml += `<div class="print-buffer${kindCls}" style="height:${bh}px;--print-buf-colour:${bg}" title="${escapeAttr(kindLabel)} — ${seg.min} min">${checkbox}${label}</div>`;
         });
         // Clip each block to the window so blocks that start earlier/run later
         // still render (trimmed) instead of vanishing.
@@ -263,9 +263,11 @@ function renderPrintSheet() {
   // view if already signed), with blank lines for a parent co-sign and the date.
   const kidName = p==='jenn' ? 'Jenn' : 'Jess';
   const sig = getWeekSignature(keys, p);
-  const sigName = sig ? escapeHtml(sig.name || kidName) : '';
+  // Named *Html because it is already escaped — the suffix is what stops it
+  // being escaped a second time, and stops the lint asking.
+  const sigNameHtml = sig ? escapeHtml(sig.name || kidName) : '';
   html += `<div class="print-signature">
-      <div class="print-sig-block"><span class="print-sig-caption">${kidName} signs</span><span class="print-sig-line">${sigName ? `<span class="print-sig-name">${sigName}</span>` : ''}</span></div>
+      <div class="print-sig-block"><span class="print-sig-caption">${escapeHtml(kidName)} signs</span><span class="print-sig-line">${sigNameHtml ? `<span class="print-sig-name">${sigNameHtml}</span>` : ''}</span></div>
       <div class="print-sig-block"><span class="print-sig-caption">Parent</span><span class="print-sig-line"></span></div>
       <div class="print-sig-block print-sig-block--date"><span class="print-sig-caption">Date</span><span class="print-sig-line"></span></div>
     </div>`;

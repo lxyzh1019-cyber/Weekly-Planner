@@ -447,7 +447,7 @@ function renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd) {
     const fromName = inv.from === 'jenn' ? 'Jenn' : 'Jess';
     el.innerHTML = `
       <div class="block-name">💌 ${act.icon} ${escapeHtml(act.name)}</div>
-      <div class="block-meta">From ${fromName} · ${formatTimeFromMin(inv.startMin)}</div>
+      <div class="block-meta">From ${escapeHtml(fromName)} · ${formatTimeFromMin(inv.startMin)}</div>
       <div class="invitation-actions">
         <button onclick="event.stopPropagation();acceptInviteFromTimeline('${escapeJsAttr(inv.id)}')">✅ Accept</button>
         <button onclick="event.stopPropagation();declineInviteFromTimeline('${escapeJsAttr(inv.id)}')">❌ Ignore</button>
@@ -797,8 +797,8 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   const nameHtml = isBuffer
     ? ''
     : (isCompact && noteTrim)
-    ? `<div class="block-name block-name--inline">${dispIcon} <span class="block-title">${escapeHtml(baseName)}</span><span class="block-note-inline" title="${escapeAttr(noteTrim)}"> · ${escapeHtml(noteTrim)}</span></div>`
-    : `<div class="block-name">${dispIcon} ${escapeHtml(displayName)}</div>`;
+    ? `<div class="block-name block-name--inline">${escapeHtml(dispIcon)} <span class="block-title">${escapeHtml(baseName)}</span><span class="block-note-inline" title="${escapeAttr(noteTrim)}"> · ${escapeHtml(noteTrim)}</span></div>`
+    : `<div class="block-name">${escapeHtml(dispIcon)} ${escapeHtml(displayName)}</div>`;
   const metaHtml = isBuffer
     ? `<div class="block-meta"><span class="travel-buf-label">${escapeHtml(b._bufferLabel || '')}</span></div>`
     : `<div class="block-meta">${durStr}${badges?' '+badges:''}</div>`;

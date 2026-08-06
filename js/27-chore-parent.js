@@ -45,7 +45,7 @@ function cpHeader() {
     </span>` : '';
   return `<div class="cp-head">
     <div class="cp-head-top">
-      <span class="cp-title">${cpName(kid)}'s week — ${weekLabel}</span>
+      <span class="cp-title">${cpName(kid)}'s week — ${escapeHtml(weekLabel)}</span>
       <span class="ck-spacer"></span>
       <button type="button" class="ck-navbtn" data-cp-action="week-step" data-delta="-1" aria-label="Previous week">‹</button>
       <button type="button" class="ck-navbtn" data-cp-action="week-step" data-delta="1" aria-label="Next week">›</button>

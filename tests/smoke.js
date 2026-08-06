@@ -2339,24 +2339,121 @@ function findChromium() {
 
   // A restore has to put back what a lost device had, through the same
   // normalisation a page load uses.
-  checks.restoreBringsBackWhatWasLost = await page.evaluate(() => {
-    const dk = getDayKeys(0)[2];
-    const json = JSON.stringify(bkBuildFullBackup());
+  //
+  // The real thing: a lost device. Two genuine page loads, the file going out to
+  // disk and coming back through the same File/FileReader path the parent's
+  // Restore button uses, and a structural comparison of the whole tree rather
+  // than three spot-checks. An in-page test of this proves the merge functions
+  // work; it does not prove a family gets their year back, because it never
+  // exercises loadLocal() on a cold start with an empty localStorage.
+  {
+    const APP_URL = 'file://' + path.join(__dirname, '..', 'index.html');
+    const backupPath = path.join(outDir, 'roundtrip-backup.json');
+    const problems = [];
 
-    // Simulate the lost device: everything for Jenn gone.
-    state.profiles.jenn = { weeks: {}, customActivities: [], goals: [], todos: [] };
-    const goneFirst = Object.keys(getProfData('jenn').weeks || {}).length === 0;
+    // Snapshot what a real device holds, and write the backup out as a file.
+    const exported = await page.evaluate(() => {
+      profile = 'jenn'; parentViewing = 'jenn';
+      const dk = getDayKeys(0)[3];
+      setDayBlocks(dk, [{ id: 'rt-blk', actId: 'piano', startMin: 9 * 60,
+                          durationMin: 45, note: 'round trip' }], 'jenn');
+      const p = getProfData('jenn');
+      p.goals = [{ id: 'rt-goal', name: 'Round trip goal', done: false }];
+      p.todos = [{ id: 'rt-todo', text: 'survive a reload', done: false }];
+      p.progress.unlockedChecklistItems = { morning: [{ id: 'rt-unlock' }] };
+      saveAll();
+      return { file: bkBuildFullBackup(), snapshot: { profiles: state.profiles, shared: state.shared }, dk };
+    });
+    // A real backup can be old, and an old backup holds pre-migration blocks in
+    // the {start, slots} shape. Injected into the FILE only, not the snapshot,
+    // because a correct restore normalises it — so it is asserted separately
+    // below rather than compared. Without this the restore path could skip
+    // migrateBlocks entirely and every check here would still pass.
+    const legacyKey = '2019-09-02';
+    exported.file.profiles.jenn.weeks[legacyKey] = [
+      { actId: 'piano', start: 8, slots: 4, note: 'from an old backup' }
+    ];
+    fs.writeFileSync(backupPath, JSON.stringify(exported.file, null, 2));
 
-    bkApplyBackup(JSON.parse(json), 'replace');
-    const back = getProfData('jenn');
-    const restored = getDayBlocks(dk, 'jenn').some(b => b.id === 'bk-blk')
-      && (back.goals || []).some(g => g.id === 'g-bk')
-      && !!(back.progress && back.progress.unlockedChecklistItems);
+    // The device is lost: cold start, storage wiped, cold start again so
+    // loadLocal() runs against nothing.
+    await page.goto(APP_URL);
+    await page.waitForFunction(() => typeof selectProfile === 'function');
+    await page.evaluate(() => localStorage.clear());
+    await page.goto(APP_URL);
+    await page.waitForFunction(() => typeof selectProfile === 'function');
+    const wiped = await page.evaluate(() => {
+      profile = 'jenn'; parentViewing = 'jenn';
+      return Object.keys(getProfData('jenn').weeks || {}).length === 0
+          && (getProfData('jenn').goals || []).length === 0;
+    });
+    if (!wiped) problems.push('the wipe did not actually empty the profile');
 
-    setDayBlocks(dk, [], 'jenn');
-    back.goals = [];
-    return goneFirst && restored;
-  });
+    // Restore the way a parent does: a real File through the real entry point.
+    const fileText = fs.readFileSync(backupPath, 'utf8');
+    const restored = await page.evaluate(async (text) => {
+      profile = 'parent';                       // restore is parent-gated
+      const file = new File([text], 'backup.json', { type: 'application/json' });
+      // showChoice/showCheckConfirm would block on a dialog, so answer them the
+      // way a parent would: Replace, confirmed.
+      const realChoice = window.showChoice, realCheck = window.showCheckConfirm;
+      window.showChoice = async () => 'replace';
+      window.showCheckConfirm = async () => true;
+      try { await bkHandleImportFile(file); }
+      finally { window.showChoice = realChoice; window.showCheckConfirm = realCheck; }
+      profile = 'jenn'; parentViewing = 'jenn';
+      return { profiles: state.profiles, shared: state.shared };
+    }, fileText);
+
+    // Structural equality, not spot-checks. A few keys legitimately recompute on
+    // load — the streak-freeze week is rewritten by getProfData for the current
+    // week — so they are excluded by name rather than by loosening the compare.
+    const RECOMPUTED = new Set(['streakFreezeWeek', 'streakFreezeTokens', 'unlockedThisWeek']);
+    const diff = [];
+    (function walk(a, b, at) {
+      if (diff.length > 6) return;
+      const ak = a && typeof a === 'object' ? Object.keys(a) : null;
+      const bk = b && typeof b === 'object' ? Object.keys(b) : null;
+      if (!ak || !bk) { if (JSON.stringify(a) !== JSON.stringify(b)) diff.push(`${at}: ${JSON.stringify(a)} vs ${JSON.stringify(b)}`); return; }
+      for (const k of new Set([...ak, ...bk])) {
+        if (RECOMPUTED.has(k)) continue;
+        walk(a[k], b[k], at ? at + '.' + k : k);
+      }
+    })(exported.snapshot, restored, '');
+    // The legacy week is expected to differ — it was only in the file — so it is
+    // excluded from the comparison and checked on its own terms below.
+    const realDiff = diff.filter(d => !d.startsWith('profiles.jenn.weeks.' + legacyKey));
+    if (realDiff.length) problems.push('tree differs after restore: ' + realDiff.slice(0, 4).join(' | '));
+
+    // A restore has to normalise what it loads, exactly as a page load does.
+    const migrated = await page.evaluate((k) => {
+      const b = (getProfData('jenn').weeks || {})[k];
+      return !!b && !!b[0] && typeof b[0].startMin === 'number' && typeof b[0].durationMin === 'number'
+          && b[0].id != null;
+    }, legacyKey);
+    if (!migrated) problems.push('a legacy {start, slots} block was restored unnormalised');
+
+    // And the things a child would actually notice.
+    const visible = await page.evaluate((dk) => {
+      const p = getProfData('jenn');
+      return getDayBlocks(dk, 'jenn').some(b => b.id === 'rt-blk')
+          && (p.goals || []).some(g => g.id === 'rt-goal')
+          && (p.todos || []).some(t => t.id === 'rt-todo')
+          && !!(p.progress && p.progress.unlockedChecklistItems.morning);
+    }, exported.dk);
+    if (!visible) problems.push('the week, goal, todo or progress did not come back');
+
+    // Leave the app as the rest of the suite expects to find it.
+    await page.evaluate((dk) => {
+      setDayBlocks(dk, [], 'jenn');
+      delete getProfData('jenn').weeks['2019-09-02'];
+      const p = getProfData('jenn'); p.goals = []; p.todos = [];
+      profile = 'jenn'; parentViewing = 'jenn';
+      ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    }, exported.dk);
+
+    checks.restoreBringsBackWhatWasLost = problems.length === 0 || problems;
+  }
 
   // ctExportBackup also writes a .json with a top-level `profiles` key, but
   // each profile there holds only the chore slice. Importing one as a full
@@ -2381,20 +2478,41 @@ function findChromium() {
 
   // Every mutation used to fire a full-document upload. A loop of them fired
   // one per step. This asserts the burst collapses to a single write.
+  //
+  // Driven against a REAL write, not a proxy counter. The suite boots offline, so
+  // pushToFirebase returns at its `if (!fbDocRef || !fbConnected)` guard and the
+  // whole body below it — payload build, size measurement, set() — never runs.
+  // fbDocRef is a plain mutable global, so a test double reaches the real path
+  // with no refactor. Everything is restored afterwards.
   checks.rapidEditsCoalesceIntoOneWrite = await page.evaluate(async () => {
-    const before = syncPushAttempts;
-    for (let i = 0; i < 20; i++) saveAll();
-    // Nothing may have gone out yet: the whole point is that it waits.
-    const noneYet = syncPushAttempts === before;
-    await new Promise(r => setTimeout(r, SYNC_DEBOUNCE_MS + 400));
-    const exactlyOne = syncPushAttempts === before + 1;
+    const realRef = fbDocRef, realConn = fbConnected;
+    const writes = [];
+    fbDocRef = { set: (payload) => { writes.push(payload); return Promise.resolve(); } };
+    fbConnected = true;
+    try {
+      for (let i = 0; i < 20; i++) saveAll();
+      // Nothing may have gone out yet: the whole point is that it waits.
+      const noneYet = writes.length === 0;
+      await new Promise(r => setTimeout(r, SYNC_DEBOUNCE_MS + 400));
+      const exactlyOne = writes.length === 1;
+      // ...and what went out is the whole tree, stamped.
+      const wroteRealPayload = !!writes[0] && !!writes[0].profiles && !!writes[0].shared
+        && !!writes[0]._meta && typeof writes[0]._meta.updatedAt === 'number';
 
-    // ...and a tab going away must not sit on a pending write.
-    const beforeFlush = syncPushAttempts;
-    saveAll();
-    flushPush();
-    const flushedNow = syncPushAttempts === beforeFlush + 1;
-    return noneYet && exactlyOne && flushedNow;
+      // A tab going away must not sit on a pending write.
+      saveAll();
+      flushPush();
+      const flushedNow = writes.length === 2;
+
+      // And an idle app must not write at all — a debounce that fires on a timer
+      // rather than on an edit would be a slow leak of full-document uploads.
+      await new Promise(r => setTimeout(r, SYNC_DEBOUNCE_MS + 400));
+      const quietWhenIdle = writes.length === 2;
+
+      return noneYet && exactlyOne && wroteRealPayload && flushedNow && quietWhenIdle;
+    } finally {
+      fbDocRef = realRef; fbConnected = realConn;
+    }
   });
 
   // The 1 MiB ceiling is reached by growth, not by a bug, so the warning has to
@@ -2409,6 +2527,76 @@ function findChromium() {
     const utf8 = byteLength('déjà') === 6 && byteLength('🎯') === 4;
     const live = bkCloudSizeInfo();
     return ordered && pctSane && utf8 && live.bytes > 0 && typeof live.level === 'string';
+  });
+
+  // The thresholds above are a pure function. This is the path that actually has
+  // to work: a real state, grown the way a family grows one, pushed through the
+  // real pushToFirebase, warning a parent before the document stops saving.
+  checks.aBigStateActuallyTripsTheWarning = await page.evaluate(async () => {
+    const realRef = fbDocRef, realConn = fbConnected;
+    const realProfiles = JSON.parse(JSON.stringify(state.profiles));
+    const realLevel = payloadWarnLevel, realBytes = lastPayloadBytes;
+    const toasts = [];
+    const realToast = window.showToast;
+    window.showToast = (m) => { toasts.push(String(m)); };
+    let lastWrite = null;
+    fbDocRef = { set: (p) => { lastWrite = p; return Promise.resolve(); } };
+    fbConnected = true;
+    payloadWarnLevel = 'ok';
+    try {
+      // 60 weeks x 2 kids x 7 days x 6 blocks, with the field count a real block
+      // carries (placeBlock writes ~20) so the bytes are honest rather than a
+      // string padded to length.
+      ['jenn', 'jess'].forEach(kid => {
+        const weeks = {};
+        for (let w = 0; w < 60; w++) {
+          for (let d = 0; d < 7; d++) {
+            const key = `2025-${String((w % 12) + 1).padStart(2, '0')}-${String((d % 28) + 1).padStart(2, '0')}-w${w}`;
+            weeks[key] = Array.from({ length: 6 }, (_, i) => ({
+              id: `blk-${w}-${d}-${i}`, actId: 'training', startMin: 480 + i * 90,
+              durationMin: 60, tag: 'skating', note: 'a note of the sort she actually writes',
+              colour: '#ef476f', completed: i % 2 === 0, confirmed: false,
+              objectives: ['edges', 'spins'], choreTags: ['dishes'],
+              trainingCheck: { warm: true, gear: true, focus: false, cool: false },
+              checklistState: {}, travelBuffer: true, travelBufMin: 15,
+              getReadyBuffer: true, getReadyBufMin: 15, warmupBuffer: true,
+              warmupBufMin: 20, public: true, createdAt: 1, updatedAt: 2,
+            }));
+          }
+        }
+        state.profiles[kid].weeks = weeks;
+      });
+
+      flushPush();
+      await new Promise(r => setTimeout(r, 50));
+
+      // The number reported must BE the number uploaded, not a parallel sum.
+      const uploaded = byteLength(JSON.stringify({ profiles: lastWrite.profiles, shared: lastWrite.shared }));
+      const measuredMatchesUploaded = Math.abs(lastPayloadBytes - uploaded) < 2;
+      const isBig = lastPayloadBytes > SYNC_WARN_BYTES;
+      const levelRose = payloadWarnLevel === 'warn' || payloadWarnLevel === 'critical';
+      const toldSomeone = toasts.some(t => /size limit/i.test(t));
+
+      // Once per transition, not once per write — a parent settling a meeting
+      // must not get the same warning forty times.
+      const after = toasts.length;
+      flushPush();
+      await new Promise(r => setTimeout(r, 50));
+      const didNotNag = toasts.length === after;
+
+      // And the parent panel states it in words.
+      bkRenderPanel();
+      const panel = document.getElementById('bkWrap').textContent;
+      const panelSaysSo = /of 1 MB/.test(panel) && /(close to the cloud limit|keeping an eye)/i.test(panel);
+
+      return measuredMatchesUploaded && isBig && levelRose && toldSomeone && didNotNag && panelSaysSo;
+    } finally {
+      state.profiles = realProfiles;
+      fbDocRef = realRef; fbConnected = realConn;
+      payloadWarnLevel = realLevel; lastPayloadBytes = realBytes;
+      window.showToast = realToast;
+      saveLocal();
+    }
   });
 
   // The panel is the only route to a backup, so it has to actually render and
@@ -2450,6 +2638,114 @@ function findChromium() {
                    "it's", '<>&"\'', 'a\nb', '  spaced  ', '&amp;', '&lt;script&gt;',
                    '🎯 emoji', '中文字符', 'a<b>c&d', null, undefined, 0, 42, false];
     return cases.every(c => escapeHtml(c) === reference(c));
+  });
+
+  // Escaping has to hold on every surface that renders user text, not just the
+  // one it was fixed on. Hostile strings are planted in the three places a family
+  // actually types — an activity name, a block note, a chore label — and then each
+  // screen is visited in turn.
+  //
+  // Two assertions per surface, because either alone is satisfiable by a bug:
+  // "no injected element" also passes if the string silently vanished, and
+  // "the text is there" also passes if it rendered as markup beside its own text.
+  {
+    const PAYLOAD = '<img src=x onerror="window.__xss5=1">&"';
+    const problems = [];
+    await page.evaluate((payload) => {
+      window.__xss5 = false;
+      profile = 'jenn'; parentViewing = 'jenn';
+      ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+      const dk = getDayKeys(0)[1];
+      const acts = getProfData('jenn').customActivities || [];
+      acts.push({ id: 'xss5-act', name: payload, icon: '⭐', cat: 'free', durationMin: 30 });
+      getProfData('jenn').customActivities = acts;
+      setDayBlocks(dk, [{ id: 'xss5-blk', actId: 'xss5-act', startMin: 9 * 60,
+                          durationMin: 60, note: payload }], 'jenn');
+      // A shared challenge renders on the sisters screen.
+      state.shared.challenges = [{ id: 'xss5-ch', title: payload, target: 3, unit: 'times' }];
+    }, PAYLOAD);
+
+    const SURFACES = [
+      ['week',  () => { goWeek(); renderWeek(); }],
+      ['day',   () => { openDay(getDayKeys(0)[1], 1); }],
+      ['sheet', () => { openDay(getDayKeys(0)[1], 1); openEditSheet('xss5-blk'); }],
+      ['sync',  () => { openSisterSync(); }],
+      ['chore', () => { openChoreTab(); ckSelectDay(1); }],
+    ];
+    for (const [name, nav] of SURFACES) {
+      const r = await page.evaluate(async ({ src, payload }) => {
+        try { eval('(' + src + ')()'); } catch (e) { return { err: String(e).slice(0, 80) }; }
+        await new Promise(r => setTimeout(r, 60));
+        return {
+          injected: !!document.querySelector('img[src="x"]'),
+          // The raw string must appear as text somewhere — proof it rendered
+          // rather than being dropped or swallowed into an attribute.
+          literal: document.body.innerText.includes(payload),
+          fired: window.__xss5 === true,
+        };
+      }, { src: nav.toString(), payload: PAYLOAD });
+      if (r.err) { problems.push(`${name}: navigation threw — ${r.err}`); continue; }
+      if (r.injected) problems.push(`${name}: an <img> was created from user text`);
+      if (r.fired) problems.push(`${name}: onerror executed`);
+      if (!r.literal) problems.push(`${name}: the hostile string never rendered as text (test proves nothing)`);
+    }
+
+    await page.evaluate(() => {
+      const dk = getDayKeys(0)[1];
+      setDayBlocks(dk, [], 'jenn');
+      getProfData('jenn').customActivities =
+        (getProfData('jenn').customActivities || []).filter(a => a.id !== 'xss5-act');
+      state.shared.challenges = [];
+      closeSheet('editOverlay');
+      goWeek();
+    });
+    checks.escapingHoldsOnEverySurface = problems.length === 0 || problems;
+  }
+
+  // Reference material is allowed to be long only because it starts collapsed —
+  // which is a promise that it is still one tap away, and that the choice sticks.
+  // The word budget alone would be satisfied by content that is simply unreachable.
+  checks.collapsedReferenceIsOneTapAway = await page.evaluate(async () => {
+    const problems = [];
+    const words = (id) => {
+      const scr = document.getElementById(id);
+      return (scr.innerText || '').split(/\s+/).filter(w => /[A-Za-z]/.test(w)).length;
+    };
+    const cases = [
+      ['screen-mymoney', () => mnyOpenMyMoney('jenn'), '[data-mny-action="prices"]'],
+      ['screen-chore',   () => { openChoreTab(); ckSelectDay(2); }, '[data-ct-action="ck-privs"]'],
+      ['screen-week',    () => { goWeek(); renderWeek(); }, '#weekGlance .week-glance-toggle'],
+    ];
+    for (const [id, nav, sel] of cases) {
+      nav();
+      await new Promise(r => setTimeout(r, 80));
+      const closed = words(id);
+      const btn = document.querySelector('#' + id + ' ' + sel) || document.querySelector(sel);
+      if (!btn) { problems.push(`${id}: no disclosure control (${sel})`); continue; }
+      const box = btn.getBoundingClientRect();
+      if (box.height < 44) problems.push(`${id}: disclosure control is ${Math.round(box.height)}px tall`);
+      const wasExpanded = btn.getAttribute('aria-expanded');
+
+      btn.click();
+      await new Promise(r => setTimeout(r, 120));
+      const open = words(id);
+      if (open <= closed) problems.push(`${id}: one tap revealed nothing (${closed} -> ${open} words)`);
+      const nowBtn = document.querySelector('#' + id + ' ' + sel) || document.querySelector(sel);
+      if (wasExpanded !== null && nowBtn && nowBtn.getAttribute('aria-expanded') === wasExpanded) {
+        problems.push(`${id}: aria-expanded did not change`);
+      }
+
+      // The choice has to survive a re-render, or "remembered" is a lie.
+      nav();
+      await new Promise(r => setTimeout(r, 80));
+      if (words(id) < open) problems.push(`${id}: the open state did not survive a re-render`);
+
+      // Put it back closed for whatever runs next.
+      const closeBtn = document.querySelector('#' + id + ' ' + sel) || document.querySelector(sel);
+      if (closeBtn) closeBtn.click();
+      await new Promise(r => setTimeout(r, 80));
+    }
+    return problems.length === 0 || problems;
   });
 
   // A block note used to be spliced into the block id, and block ids are

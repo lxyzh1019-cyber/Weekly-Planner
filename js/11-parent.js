@@ -69,7 +69,7 @@ function renderMeetingHub() {
   const cta = held
     ? `<button type="button" class="pill-btn" onclick="openFamilyMeeting()">🧑‍🧑‍🧒 Re-open the meeting</button>`
     : `<button type="button" class="btn-confirm" onclick="openFamilyMeeting()">🧑‍🧑‍🧒 ${nConfirmed > 0 ? 'Continue the' : 'Run'} family meeting</button>`;
-  wrap.innerHTML = `<div class="hub-week">Week of ${weekLabel}</div>
+  wrap.innerHTML = `<div class="hub-week">Week of ${escapeHtml(weekLabel)}</div>
     <div class="review-day-row">${days}</div>${status}
     <div style="margin-top:0.6rem">${cta}</div>`;
 }
@@ -205,7 +205,7 @@ function parentActivityCard(act, owner) {
                     : owner==='jenn'   ? '🐥 Jenn only'
                     : '🦊 Jess only';
   card.innerHTML = `
-    <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· ${ownerLabel}</span></div>
+    <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· ${escapeHtml(ownerLabel)}</span></div>
     <div style="font-size:0.85rem;color:var(--ink-light)">${(act.durationMin||60)} min · ${act.cat||'free'}</div>
     <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
       <button class="btn-icon" onclick="toggleShareActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')" style="padding:2px 8px" title="${owner==='shared'?'Move to single child':'Promote to shared'}">${owner==='shared'?'↩️ Unshare':'🔗 Share'}</button>

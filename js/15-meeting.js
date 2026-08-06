@@ -366,7 +366,7 @@ function mmRenderConfirm(wk, held) {
     if (b.streak.bonus) bits.push(`streak $${b.streak.bonus.toFixed(2)}`);
     if (b.compPaid) bits.push(`competition $${b.compPaid.toFixed(2)}`);
     if (b.fines.total) bits.push(`fines −$${b.fines.total.toFixed(2)}`);
-    return `<div class="ct-meta">${CT_PROFILE_ICON[kid]} ${bits.join(' · ') || 'nothing earned'}${xp ? ` · +${xp} XP` : ''}${due ? ` · ${dueLabel} −$${due.toFixed(2)}` : ''}</div>`;
+    return `<div class="ct-meta">${CT_PROFILE_ICON[kid]} ${bits.join(' · ') || 'nothing earned'}${xp ? ` · +${xp} XP` : ''}${due ? ` · ${escapeHtml(dueLabel)} −$${due.toFixed(2)}` : ''}</div>`;
   }).join('') : '';
   const explain = newModel
     ? `This <b>confirms</b> the week. Recording credits each kid's total to cash, credits XP, opens the Sunday Box, adds a month of interest and pays out anything locked away that has reached its date. The loan payment and any overdue interest move <b>once a month</b>, not every Sunday.`

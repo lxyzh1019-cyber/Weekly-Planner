@@ -241,7 +241,7 @@ function buildAchievementRow(a) {
   const targetVal = Math.max(1, a.target||1);
   const done = prog.value >= targetVal;
   const targetLabel = a.mode==='duration' ? formatDuration(targetVal) : String(targetVal);
-  row.innerHTML = `<div class=\"gt-text\"><b>${act ? act.icon+' '+escapeHtml(act.name) : 'Pick activity'}</b> · ${a.mode==='duration'?'minutes':'count'} target ${targetLabel}<br><span class="gt-achievement-meta">${escapeHtml(prog.label)}/${targetLabel} · ${done?'Completed ✅':(prog.value>0?'In progress ⏳':'Not started')}</span></div>`;
+  row.innerHTML = `<div class=\"gt-text\"><b>${act ? act.icon+' '+escapeHtml(act.name) : 'Pick activity'}</b> · ${a.mode==='duration'?'minutes':'count'} target ${escapeHtml(targetLabel)}<br><span class="gt-achievement-meta">${escapeHtml(prog.label)}/${escapeHtml(targetLabel)} · ${done?'Completed ✅':(prog.value>0?'In progress ⏳':'Not started')}</span></div>`;
   const controls = document.createElement('div');
   controls.className = 'gt-achievement-controls';
 
@@ -264,7 +264,7 @@ function buildAchievementRow(a) {
 
   const targetBtn = document.createElement('button');
   targetBtn.className = 'pill-btn';
-  targetBtn.textContent = `Target: ${targetLabel}`;
+  targetBtn.textContent = `Target: ${escapeHtml(targetLabel)}`;
   targetBtn.onclick = async ()=>{
     const next = parseInt((await showPrompt(`Set target (${a.mode==='duration'?'minutes':'count'})`, { value:String(targetVal), type:'number' }))||'', 10);
     if (!Number.isInteger(next) || next < 1) return;
