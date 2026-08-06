@@ -426,49 +426,33 @@ Add `.github/workflows/ci.yml` running `check` + `test:merge` on every PR
 to `REVIEW.md` and `MULTI_ROLE_REVIEW.md` marking them historical and pointing
 to this file.
 
-## P3-3 · unreferenced CSS — verified list, deliberately not swept
+## P3-3 · unreferenced CSS — done
 
-Re-measured 2026-08-06 after the Today-first stages landed: **42 class selectors
-in `css/app.css` appear nowhere in `index.html`, `js/` or `tests/`**, so they
-cannot be applied. (The audit's "67" counted names that are assembled at runtime
-from a prefix, e.g. `'ck-' + lane`; those are excluded here.)
+**Closed 2026-08-06.** All 42 verified-unreferenced class selectors are gone;
+`css/app.css` went 5589 → 5371 lines and now defines 1102 classes, every one of
+them referenced. `tests/check-dead-css.js` runs in `npm run check` so the
+stylesheet cannot silently accumulate more.
 
-  `tg-*` (9): `tg-col-today`, `tg-col-today-border`, `tg-col-today-bottom`, `tg-day-link`, `tg-hour-cell`, `tg-hour-free`, `tg-hour-stack`, `tg-seg-abs`, `tg-week-overview`
-  `wf-*` (6): `wf-card--cont`, `wf-card-cont-marker`, `wf-cell-empty`, `wf-travel--tier-long`, `wf-travel--tier-short`, `wf-travel--tier-tiny`
-  `ct-*` (5): `ct-badge-week`, `ct-hist-detail`, `ct-hist-kid`, `ct-hist-total`, `ct-score-row`
-  `money-*` (3): `money-btn-row`, `money-hero`, `money-market`
-  `qms-*` (3): `qms-chip`, `qms-chips`, `qms-week`
-  `day-*` (2): `day-goals-todos`, `day-goals-todos__section`
-  `qmp-*` (2): `qmp-tile-label`, `qmp-tile-value`
-  `travel-*` (2): `travel-meta-icon`, `travel-meta-text`
-  `block-*` (1): `block-place-pulse`
-  `btn-*` (1): `btn-icon--labeled`
-  `bucket-*` (1): `bucket-sleep-meal`
-  `duration-*` (1): `duration-align-spacer`
-  `mny-*` (1): `mny-kid-switch`
-  `place-*` (1): `place-target`
-  `sheet-*` (1): `sheet-time-custom-row`
-  `timeline-*` (1): `timeline-zone-label`
-  `timer-*` (1): `timer-input`
-  `tutorial-*` (1): `tutorial-choice-list`
+The method matters more than the result, because the first attempt broke the
+file. A hand-written brace-walking parser swallowed the closing brace of every
+`@media` block and left it 43 braces short — caught by a balance check and
+reverted with no damage. The second attempt used **the browser's own CSSOM**
+(`document.styleSheets`, recursing through `CSSMediaRule`), which already knows
+where every rule begins and ends. That needed the page served over http: on a
+`file://` origin Chrome treats the stylesheet as cross-origin and reading
+`cssRules` throws, which is why the first CSSOM run reported zero rules.
 
-**Not removed, on purpose.** An automated sweep of these was attempted and broke
-the stylesheet: a rule-level parser swallowed the closing brace of `@media`
-blocks, leaving the file 43 braces short. It was caught by a brace-balance check
-and reverted, but the lesson stands — most of these sit in compound selectors
-mixing live and dead classes (`.tg-cell.tg-hour-cell`, `.tg-head.tg-col-today-border`),
-so removal is per-rule surgery, not a sweep.
+It removed 51 of 57 automatically. The remaining six sat behind comments the
+locator mis-parsed and were removed by hand, which is the honest shape of this
+job — most dead classes live in compound selectors mixing live and dead names
+(`.tg-wrap.inverted .tg-block.bucket-sleep-meal`), so it is surgery, not a sweep.
 
-These classes are inert: a few hundred bytes, no runtime cost. A silently broken
-layout on a child's iPad costs considerably more. Do this one deliberately, in
-its own change, with before/after screenshots of the week grid at 390px, 768px
-and 1024px — the `tg-*` and `wf-*` groups are the dense grid where a missing rule
-is least obvious and most damaging.
-
-The two classes this session *made* dead (`.btn-icon--labeled`,
-`.btn-icon__label` — the captioned toolbar icons in the shortcut rows the
-persistent nav replaced) were removed with their last use, which is the right
-time to do it.
+**Gated on a pixel comparison, not on judgement.** 28 screenshots — seven screens
+at 390, 768, 1024 and 1440 — captured before and after: all 28 byte-identical.
+Establishing that gate took its own work, because 11 of the 28 were
+nondeterministic run to run. Disabling animations fixed ten; the last was
+`.wf-now-line`, the red current-time marker, which moves with the clock. Without
+that step a diff would have compared noise and proved nothing.
 
 ## P3-3 (original finding) · 67 unreferenced CSS classes
 

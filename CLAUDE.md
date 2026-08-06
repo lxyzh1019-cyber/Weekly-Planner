@@ -66,7 +66,8 @@ npm run test:merge
 npm run test:smoke          # screenshots land in tests/out/
 ```
 
-`npm run check` runs `tests/check-syntax.js` and `tests/check-globals.js`. **Do
+`npm run check` runs `tests/check-syntax.js`, `tests/check-globals.js`,
+`tests/check-escaping.js` and `tests/check-dead-css.js`. **Do
 not go back to the old shell loop** —
 
 ```bash

@@ -4,7 +4,7 @@
   "private": true,
   "description": "Family weekly planner — static site, classic scripts, no build step.",
   "scripts": {
-    "check": "node tests/check-syntax.js && node tests/check-globals.js && node tests/check-escaping.js",
+    "check": "node tests/check-syntax.js && node tests/check-globals.js && node tests/check-escaping.js && node tests/check-dead-css.js",
     "test:merge": "node tests/merge.test.js",
     "test:smoke": "node tests/smoke.js",
     "test": "npm run check && npm run test:merge && npm run test:smoke"

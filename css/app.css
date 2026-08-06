@@ -242,36 +242,6 @@
   .day-panel-label--landscape-only {
     display: none;
   }
-  .day-goals-todos {
-    margin: 0.35rem 0.1rem 0.5rem;
-    background: rgba(255,255,255,0.6);
-    border: 2px solid var(--ink);
-    border-radius: 14px;
-    box-shadow: 2px 2px 0 rgba(42,35,32,0.1);
-    padding: 0.45rem 0.5rem 0.55rem;
-  }
-  .day-goals-todos__section + .day-goals-todos__section {
-    margin-top: 0.55rem;
-    padding-top: 0.45rem;
-    border-top: 2px dashed var(--paper-line);
-  }
-  .day-goals-todos .gt-col-header {
-    margin-bottom: 0.2rem;
-  }
-  .day-goals-todos .gt-col-header h3 {
-    font-size: 1.08rem;
-  }
-  .day-goals-todos .gt-col-header .btn-icon.gt-add-btn {
-    padding: 0.18rem 0.45rem;
-    font-size: 1rem;
-  }
-  .day-goals-todos .gt-hint {
-    margin-bottom: 0.35rem;
-    font-size: calc(0.84rem * var(--fs-scale, 1));
-  }
-  .day-goals-todos .gt-item {
-    margin-bottom: 0.32rem;
-  }
   .tray-bridge-hint {
     display: none;
     margin: 0.15rem 0 0;
@@ -493,11 +463,6 @@
     font-size: 1rem;
     color: var(--ink-muted);
     margin-bottom: 0.55rem;
-  }
-  .tutorial-choice-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.45rem;
   }
   .tutorial-choice-btn {
     width: 100%;
@@ -767,10 +732,11 @@
   }
   .btn-icon:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
   .btn-icon:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 var(--ink); }
-  /* .btn-icon--labeled / .btn-icon__label were the captioned toolbar icons in the
-     shortcut rows that the persistent nav replaced. Removed with their last use
-     rather than left behind: the nav's own .kid-nav-btn carries the same idea
-     (icon over caption, so a child is not guessing at an emoji). */
+  /* The captioned toolbar icons (btn-icon--labeled / btn-icon__label) lived in
+     the shortcut rows the persistent nav replaced, and went with them. Named
+     without a leading dot here so the dead-class scan does not read a comment as
+     a rule. The nav's own .kid-nav-btn carries the same idea: icon over caption,
+     so a child is not guessing at an emoji. */
   button:focus-visible,
   [role="button"]:focus-visible,
   .view-tab:focus-visible,
@@ -939,19 +905,6 @@
     white-space: nowrap;
     text-overflow: ellipsis;
   }
-  .tg-cell.tg-hour-cell {
-    min-height: 44px;
-    padding: 0;
-    position: relative;
-    overflow: visible;
-  }
-  .tg-hour-stack {
-    position: relative;
-    height: 100%;
-    min-height: 44px;
-    display: flex;
-    flex-direction: column;
-  }
   .tg-quarter {
     flex: 1 1 0;
     min-height: 6px;
@@ -959,39 +912,6 @@
     box-sizing: border-box;
   }
   .tg-quarter:last-child { border-bottom: none; }
-  .tg-seg-abs {
-    position: absolute;
-    left: 2px;
-    right: 2px;
-    border-radius: 4px;
-    cursor: pointer;
-    z-index: 2;
-    border: 1px solid rgba(42,35,32,0.35);
-    box-sizing: border-box;
-  }
-  .tg-hour-cell.tg-col-today {
-    background-image: linear-gradient(180deg, rgba(255,244,219,0.2) 0%, transparent 100%);
-  }
-  .tg-hour-cell.tg-col-today-border {
-    border-left: 3px solid #2f8f84;
-    border-right: 3px solid #2f8f84;
-    box-shadow: none;
-  }
-  .tg-head.tg-col-today-border {
-    border-top: 3px solid #2f8f84;
-  }
-  .tg-hour-cell.tg-col-today-border.tg-col-today-bottom {
-    border-bottom: 3px solid #2f8f84;
-  }
-  .tg-hour-free {
-    border-radius: 0;
-    z-index: 1;
-    pointer-events: none;
-    opacity: 0.95;
-  }
-  .tg-wrap.inverted .tg-seg-abs {
-    border-color: rgba(107,93,79,0.35);
-  }
   .tg-head { font-weight: 700; background: var(--bg); color: var(--ink); padding: 4px 2px; font-size: calc(0.8rem * var(--fs-scale, 1)); }
   .tg-time { background: var(--bg); color: var(--ink-light); font-size: calc(0.7rem * var(--fs-scale, 1)); padding: 2px; line-height: 22px; }
   .tg-block {
@@ -1018,12 +938,6 @@
     border: 1.5px solid var(--ink);
   }
   .tg-legend-dot--free { background: var(--paper); border-style: dashed; }
-  .tg-day-link {
-    display: block;
-    text-decoration: underline dotted;
-    cursor: pointer;
-  }
-
   /* ── 2a "Day Blocks": plans pop, free stays quiet ── */
   /* Column flex so .tg2-wrap can own the scrolling, matching #weekFull. */
   #weekTimeGrid { flex-direction: column; min-height: 0; flex: 1; }
@@ -1107,20 +1021,6 @@
     border-radius: 3px;
     font-size: calc(0.7rem * var(--fs-scale, 1));
   }
-  /* Sleep/meal blocks in inverted mode get a calmer treatment */
-  .tg-wrap.inverted .tg-block.bucket-sleep-meal {
-    background: #c8bfa8 !important;
-    opacity: 0.85;
-  }
-  .tg-wrap.inverted .tg-seg-abs {
-    background: #d4ccb8 !important;
-    color: #6b5d4f;
-  }
-  .tg-wrap.inverted .tg-seg-abs.bucket-sleep-meal {
-    background: #c8bfa8 !important;
-    opacity: 0.9;
-  }
-
   /* ── TIME-GRID CONTROLS (toggle + streak banner) ── */
   .tg-controls {
     display: flex;
@@ -1158,21 +1058,6 @@
   }
   .tg-toggle:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 rgba(42,35,32,0.15); }
 
-  /* ── WEEKLY OVERVIEW: 7 days × 30 bricks each ── */
-  .tg-week-overview {
-    display: grid;
-    grid-template-columns: 44px repeat(7, minmax(40px, 1fr));
-    gap: 1px;
-    padding: 0.4rem 0.5rem 0.6rem;
-    background: transparent;
-  }
-  .tg-week-overview .tg-wo-label {
-    font-size: calc(0.7rem * var(--fs-scale, 1));
-    color: var(--ink-light);
-    text-align: right;
-    padding-right: 4px;
-    align-self: center;
-  }
   .tg-wo-day {
     display: flex;
     flex-direction: column;
@@ -1724,7 +1609,6 @@
   .ct-history > summary::before { content: '▸'; font-weight: 900; transition: transform 0.15s; }
   .ct-history[open] > summary::before { transform: rotate(90deg); }
   .ct-history > summary h3 { margin: 0; }
-  .ct-history .ct-hist-total td { font-weight: 800; border-top: 2px solid var(--ink); }
   .mm-confirm-day { width: 100%; margin-top: 8px; border: 2px solid var(--ink); border-radius: 10px; background: var(--paper-card, #fffdf5); box-shadow: 2px 2px 0 var(--ink); padding: 6px; font-weight: 800; cursor: pointer; }
   .mm-confirm-day.confirmed { background: #95d5b2; }
   .mm-ready { margin-top: 8px; font-size: calc(0.82rem * var(--fs-scale, 1)); font-weight: 700; background: #fff4db; border: 2px dashed #e8dfc3; border-radius: 10px; padding: 6px 10px; }
@@ -1789,17 +1673,9 @@
   }
   /* Money identity = amber; paid = green (color law) */
   .ct-money-badge { background: var(--accent-yellow); }
-  .ct-badge-week { background: var(--accent-green); font-weight: 600; }
   .chore-card.paid { background: color-mix(in srgb, var(--accent-green) 22%, var(--paper)); border-color: var(--accent-green); }
   .ct-money-total { font-family: 'Gochi Hand', cursive; font-size: 2rem; font-weight: 800; color: var(--ink); margin: 0.1rem 0 0.4rem; }
   .ct-money-cap { font-family: 'Nunito', sans-serif; font-size: calc(0.85rem * var(--fs-scale, 1)); font-weight: 700; color: var(--ink-muted); }
-  /* Money / Bank screen */
-  .money-hero { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem;
-    background: linear-gradient(135deg,#e7f7e6,#e8f0ff); border: 2px solid var(--ink); border-radius: 14px;
-    padding: 0.7rem 0.9rem; box-shadow: 3px 3px 0 var(--ink); font-family: 'Patrick Hand', sans-serif; }
-  .money-hero b { font-family: 'Gochi Hand', cursive; font-size: 1.6rem; }
-  .money-market { background: var(--accent-yellow); border: 2px solid var(--ink); border-radius: 999px; padding: 0.2rem 0.6rem; font-weight: 800; font-size: calc(0.85rem * var(--fs-scale, 1)); }
-  .money-btn-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.4rem; }
   .ct-cap-note { color: var(--accent-strong); font-weight: 700; }
   /* override .custom-builder label/input defaults for the in-editor chore checklist */
   .custom-builder label.cg-chore-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; margin-bottom: 0; font-family: 'Nunito', sans-serif; font-size: calc(0.95rem * var(--fs-scale, 1)); color: var(--ink); cursor: pointer; }
@@ -1807,13 +1683,7 @@
     width: 20px; height: 20px; flex: 0 0 auto; margin: 0; padding: 0;
     border-radius: 5px; box-shadow: none; accent-color: var(--accent-green);
   }
-  .ct-meta { font-size: calc(0.88rem * var(--fs-scale, 1)); color: var(--ink-muted); }
-  .ct-score-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.6rem;
-  }
-  @media (max-width: 900px) {
+  .ct-meta { font-size: calc(0.88rem * var(--fs-scale, 1)); color: var(--ink-muted); }  @media (max-width: 900px) {
     .chore-grid { grid-template-columns: 1fr; }
   }
 
@@ -1945,9 +1815,6 @@
     border-top: 1px solid var(--paper-line); opacity: 0.9;
     pointer-events: none; z-index: 1;
   }
-  .wf-cell-empty {
-    position: absolute; inset: 0;
-  }
   .wf-card {
     position: absolute;
     padding: 0.12rem 0.45rem;
@@ -2066,9 +1933,6 @@
      the label shrinks in steps instead of vanishing outright — "long" spells
      out the whole instruction ("Leave by 5:30p"), "short" keeps just the kind
      + minutes, "tiny" is icon+minutes only (set as plain text, no class font). */
-  .wf-travel--tier-long { font-size: calc(0.56rem * var(--fs-scale, 1)); }
-  .wf-travel--tier-short { font-size: calc(0.5rem * var(--fs-scale, 1)); letter-spacing: -0.01em; }
-  .wf-travel--tier-tiny { font-size: calc(0.46rem * var(--fs-scale, 1)); }
   /* Per-kind hatch angle so get-ready/travel/warm-up read as three different
      things at a glance, even before the (often tiny) text is legible. */
   .wf-travel--ready {
@@ -2131,10 +1995,6 @@
   .wf-card--icononly .wf-card-icon { font-size: calc(0.78rem * var(--fs-scale, 1)); }
   /* W1: continuation segment of a block that crosses a zone boundary. Dashed
      top edge + ⤵ marker, no time/check (those live on the first segment). */
-  .wf-card--cont { border-top: 2px dashed var(--ink); box-shadow: 1.5px 1.5px 0 rgba(42,35,32,0.35); }
-  .wf-card--cont .wf-card-name { opacity: 0.9; }
-  .wf-card-cont-marker { font-weight: 900; font-size: calc(0.8rem * var(--fs-scale, 1)); line-height: 1; }
-
   /* ═══════════ LEGEND ═══════════ */
   .week-legend {
     display: flex; gap: 0.6rem; flex-wrap: wrap;
@@ -2278,15 +2138,6 @@
   #screen-day.quest-focus .day-right-rail { display: none; }
   #screen-day.quest-focus .day-center-lane { flex: 1 1 100%; max-width: none; }
   #screen-day.quest-focus .day-schedule-label { display: none; }
-  .timeline-zone-label {
-    margin: 0.8rem 0 0.3rem;
-    text-align: center;
-    font-family: 'Gochi Hand', cursive;
-    font-size: 1.2rem;
-    color: var(--accent-strong);
-    letter-spacing: 1px;
-  }
-
   /* Pixel-canvas timeline */
   .timeline {
     position: relative;
@@ -2342,32 +2193,6 @@
     position: relative;
     border-left: 2px solid var(--paper-line);
     cursor: pointer;
-  }
-  .tl-canvas.place-target::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: var(--place-guide-y, 0px);
-    border-top: 2px dashed rgba(255, 123, 84, 0.9);
-    box-shadow: 0 0 0 1px rgba(255,255,255,0.7);
-    pointer-events: none;
-    z-index: 18;
-  }
-  .tl-canvas.place-target::after {
-    content: attr(data-guide-label);
-    position: absolute;
-    top: calc(var(--place-guide-y, 0px) - 14px);
-    right: 8px;
-    background: rgba(255, 251, 240, 0.95);
-    border: 1.5px solid var(--ink);
-    border-radius: 8px;
-    padding: 0.05rem 0.35rem;
-    font-size: calc(0.76rem * var(--fs-scale, 1));
-    font-weight: 700;
-    color: #6b4a3b;
-    pointer-events: none;
-    z-index: 19;
   }
   .tl-placement-guide {
     position: absolute;
@@ -2500,19 +2325,7 @@
     align-items: center;
     justify-content: center;
     gap: 0.28rem;
-  }
-  .placed-block.travel-buf .travel-meta-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
-  }
-  .placed-block.travel-buf .travel-meta-text {
-    display: inline-flex;
-    align-items: center;
-    line-height: 1;
-  }
-  /* Taller blocks: slightly larger type; very short blocks stay compact */
+  }  /* Taller blocks: slightly larger type; very short blocks stay compact */
   .placed-block.block-font-md .block-name { font-size: 1.12rem; }
   .placed-block.block-font-md .block-meta { font-size: calc(0.88rem * var(--fs-scale, 1)); }
   .placed-block.block-font-lg .block-name { font-size: 1.22rem; }
@@ -2879,9 +2692,6 @@
     font-size: 1rem; line-height: 1.3; cursor: pointer;
   }
   .app-dialog-check input { width: 22px; height: 22px; flex: 0 0 auto; margin-top: 1px; }
-  /* Frozen per-week breakdown under each history row. */
-  .ct-hist-detail td { padding: 0.15rem 0.4rem 0.45rem; border-top: none; }
-  .ct-hist-kid { display: block; font-size: calc(0.82rem * var(--fs-scale, 1)); opacity: 0.85; line-height: 1.35; }
   .app-dialog-btns .btn-confirm:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
   .sheet-close-x {
     position: absolute;
@@ -3080,16 +2890,6 @@
     align-items: flex-end;
     margin-bottom: 0.35rem;
   }
-  .duration-align-spacer {
-    height: 80px;
-    margin-bottom: 0.35rem;
-  }
-  .sheet-time-custom-row {
-    min-height: 54px;
-    display: flex;
-    align-items: flex-start;
-  }
-  .sheet-time-custom-row > * { width: 100%; }
   .sheet-toggle-row { margin-top: 0.45rem; margin-bottom: 0.45rem; }
   .edit-primary-toggle-row {
     display: grid;
@@ -3117,11 +2917,7 @@
   .block-stopwatch-btn:hover { background: rgba(255,255,255,0.55); }
   .block-focus-pulse {
     animation: blockFocusPulse 1.1s ease-in-out 2;
-  }
-  .block-place-pulse {
-    animation: blockPlacePulse 0.75s ease-out 1;
-  }
-  @keyframes blockPlacePulse {
+  }  @keyframes blockPlacePulse {
     0% { box-shadow: 3px 3px 0 var(--ink); transform: scale(1); }
     35% { box-shadow: 0 0 0 5px rgba(149,213,178,0.42), 3px 3px 0 var(--ink); transform: scale(1.02); }
     100% { box-shadow: 3px 3px 0 var(--ink); transform: scale(1); }
@@ -3134,8 +2930,7 @@
   @media (max-width: 560px) {
     .sheet-time-grid-row { grid-template-columns: 1fr 1fr; gap: 0.4rem; align-items: stretch; }
     .sheet-time-main { min-height: 162px; }
-    .duration-align-spacer { height: 70px; }
-    .sheet h4 { font-size: 1.16rem; margin: 0.5rem 0 0.28rem; }
+  .sheet h4 { font-size: 1.16rem; margin: 0.5rem 0 0.28rem; }
     .repeat-toggle, .buffer-toggle { padding: 0.45rem 0.6rem; margin-bottom: 0.35rem; }
     .toggle-label { font-size: calc(0.96rem * var(--fs-scale, 1)); }
     #inviteSisterBtn { display: none !important; }
@@ -3771,11 +3566,6 @@
   .checklist-timer-btn.running {
     background: var(--accent-strong); color: #fff; animation: pulse 1s infinite;
   }
-  .checklist-item input.timer-input {
-    width: 56px; border: 1.5px solid var(--ink); border-radius: 6px;
-    padding: 2px 4px; font-size: calc(0.92rem * var(--fs-scale, 1)); text-align: center;
-    font-family: 'Patrick Hand', sans-serif; background: #fff;
-  }
   .checklist-item.kid-item {
     border-style: dashed;
     background: #fffbe6;
@@ -4155,12 +3945,6 @@
     border: 1.5px solid var(--ink); border-radius: 10px; padding: 0.4rem 0.55rem;
     display: flex; flex-direction: column; gap: 1px; background: var(--bg);
   }
-  .qmp-tile-label { font-size: calc(0.76rem * var(--fs-scale, 1)); font-weight: 700; color: var(--ink-light); }
-  .qmp-tile-value { font-size: 1.02rem; font-weight: 800; }
-  .qms-week { font-size: calc(0.85rem * var(--fs-scale, 1)); font-weight: 700; margin-bottom: 0.4rem; }
-  .qms-chips { display: flex; gap: 0.3rem; flex-wrap: wrap; min-width: 0; margin-bottom: 0.5rem; }
-  .qms-chip { font-size: calc(0.8rem * var(--fs-scale, 1)); border: 1.5px solid var(--ink); border-radius: 7px; padding: 1px 6px; background: var(--bg); white-space: nowrap; }
-  .qms-chip.paid { background: var(--accent-green); }
   .qmp-open {
     width: 100%; border: 2px solid var(--ink); border-radius: 10px; background: var(--accent-green);
     box-shadow: 2px 2px 0 var(--ink); padding: 0.45rem; font-weight: 800; cursor: pointer;
@@ -4367,8 +4151,6 @@
   }
   .mny-chip.on { background: var(--accent-strong); color: #fff; }
   .mny-chip[disabled] { background: #f2ece0; color: var(--ink-light); cursor: not-allowed; }
-  .mny-kid-switch { display: flex; gap: 0.3rem; }
-
   .mny-ask {
     width: 22px; height: 22px; min-height: 22px; flex: 0 0 auto; padding: 0; line-height: 1;
     border: 2px solid var(--ink); border-radius: 50%; background: var(--paper);
