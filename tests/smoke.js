@@ -6,7 +6,35 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const http = require('http');
 const { chromium } = require('playwright-core');
+
+/* A throwaway static server for the handful of checks that need a real origin.
+   The suite runs over file:// on purpose — CLAUDE.md, and it is what keeps ES
+   modules impossible — but file:// blocks fetch() outright, so a manifest check
+   run there reports a broken manifest whether or not it is broken. Rather than
+   move everything to http and lose the file:// guarantee, one short pass at the
+   end serves the repo and checks the things only an origin can answer.
+   No dependency: node's own http, ~30 lines. */
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
+               '.json': 'application/manifest+json', '.png': 'image/png',
+               '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+function serveRepo() {
+  const root = path.join(__dirname, '..');
+  return new Promise(resolve => {
+    const server = http.createServer((req, res) => {
+      const rel = decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '') || 'index.html';
+      const file = path.join(root, rel);
+      // Never serve outside the repo.
+      if (!file.startsWith(root) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+        res.writeHead(404); res.end('not found'); return;
+      }
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
+      res.end(fs.readFileSync(file));
+    });
+    server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port }));
+  });
+}
 
 function findChromium() {
   if (process.env.SMOKE_CHROMIUM) return process.env.SMOKE_CHROMIUM;
@@ -869,6 +897,12 @@ function findChromium() {
       return !!hit && (hit === el || el.contains(hit));
     };
     const reaches44 = (el) => {
+      // Bring it on screen first. The nav is fixed to the bottom, so a control
+      // that happens to sit under it at the current scroll position is not
+      // unreachable — a child scrolls. Measuring wherever the page happened to be
+      // reported the last `?` on My money as too small at 768 purely because the
+      // nav was over it at that moment.
+      el.scrollIntoView({ block: 'center', inline: 'center' });
       const r = el.getBoundingClientRect();
       const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
       const half = 21;   // 22px each way ≈ a 44px target, 1px inside the edge
@@ -932,8 +966,12 @@ function findChromium() {
     ['screen-chore',   () => { openChoreTab(); ckSelectDay(2); }],
     ['screen-mymoney', () => { mnyOpenMyMoney('jenn'); }],
   ];
+  // Four real devices, not two. The plan asked for these and the branch that
+  // changed nearly every layout only ever checked a phone and a desktop-ish
+  // window, so iPad portrait and landscape — the sizes this app actually lives
+  // on — went unmeasured through the whole rebuild.
   const kidFindings = [];
-  for (const [w, h] of [[390, 844], [900, 1100]]) {
+  for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1440, 900], [900, 1100]]) {
     await page.setViewportSize({ width: w, height: h });
     for (const [id, nav] of KID_SCREENS) {
       await page.evaluate(`(${nav.toString()})()`);
@@ -942,6 +980,20 @@ function findChromium() {
       const budget = WORD_BUDGET[id] || 200;
       const problems = [];
       if (r.error) problems.push(r.error);
+      // Sideways scroll is the failure a screenshot needs a human to notice and
+      // an assertion catches by itself: content pushed off the edge of a tablet
+      // is simply unreachable, and nothing else here would report it.
+      const overflow = await page.evaluate((sid) => {
+        const scr = document.getElementById(sid);
+        const worst = [...scr.querySelectorAll('*')].reduce((acc, el) => {
+          if (el.closest('[style*="overflow"], .ck-gridwrap, .weekly-full-wrap, .tg-wrap')) return acc;
+          const r = el.getBoundingClientRect();
+          return (r.width && r.right > acc.right) ? { right: r.right, cls: String(el.className).slice(0, 24) } : acc;
+        }, { right: 0, cls: '' });
+        return { body: document.body.scrollWidth, worst };
+      }, id);
+      if (overflow.body > w + 1) problems.push(`page scrolls sideways (${overflow.body} > ${w})`);
+      if (overflow.worst.right > w + 1) problems.push(`.${overflow.worst.cls} runs to ${Math.round(overflow.worst.right)} (past ${w})`);
       if (r.words > budget) problems.push(`${r.words} words (max ${budget}${budget !== 200 ? ', ratchet — target is 200' : ''})`);
       if (r.small && r.small.length) problems.push(`${r.small.length} target(s) under 44px: ${r.small.slice(0, 6).join(', ')}`);
       if (r.minFont < 13) problems.push(`font ${r.minFont}px on .${r.minWhere} (min 13)`);
@@ -949,6 +1001,19 @@ function findChromium() {
     }
   }
   checks.kidScreensMeetTheHouseRules = kidFindings.length === 0 || kidFindings;
+
+  // Artifacts at the sizes this app is actually used at — phone, iPad both ways,
+  // laptop. The assertions above are the gate; these are for a human deciding
+  // whether it also looks right.
+  for (const [w, h, label] of [[768, 1024, 'ipad_portrait'], [1024, 768, 'ipad_landscape'], [1440, 900, 'laptop']]) {
+    await page.setViewportSize({ width: w, height: h });
+    for (const [id, nav] of [['today', () => goToday()], ['week', () => { goWeek(); renderWeek(); }],
+                             ['mymoney', () => mnyOpenMyMoney('jenn')]]) {
+      await page.evaluate(`(${nav.toString()})()`);
+      await page.waitForTimeout(150);
+      await page.screenshot({ path: shot(`${label}_${id}`) });
+    }
+  }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => { mnyOpenMyMoney('jenn'); });
   await page.screenshot({ path: shot('phone_mymoney') });
@@ -2823,44 +2888,73 @@ function findChromium() {
     return ok;
   });
 
-  // Installable, because this app lives on an iPad's home screen. The icons were
-  // already in the repo at the right sizes; only the manifest was missing.
+  // Installability, checked over a real origin.
   //
-  // The manifest is read from disk rather than fetched in the page: the suite runs
-  // over file://, where fetch() is blocked outright, so an in-page fetch reports a
-  // broken manifest whether or not the manifest is broken.
+  // Not Lighthouse — that is a heavy dependency and most of what it would report
+  // here is a handful of preconditions this can check directly. What it CANNOT
+  // do is claim Lighthouse passed, so it does not: this verifies the manifest
+  // fetches and parses the way a browser fetches it, that start_url resolves,
+  // and that every icon is a real image at the pixel size it claims. An icon
+  // entry saying 512x512 while pointing at a 192px file is the classic way an
+  // install prompt silently never appears, and a disk read cannot catch it
+  // because the bytes are there either way.
   {
-    const domSide = await page.evaluate(() => {
-      const link = document.querySelector('link[rel="manifest"]');
-      return {
-        href: link ? link.getAttribute('href') : null,
-        theme: !!document.querySelector('meta[name="theme-color"]'),
-        appleCapable: !!document.querySelector('meta[name="apple-mobile-web-app-capable"]')
-      };
-    });
+    const { server, port } = await serveRepo();
     const problems = [];
-    if (!domSide.href) problems.push('no <link rel="manifest">');
-    if (!domSide.theme) problems.push('no theme-color meta');
-    if (!domSide.appleCapable) problems.push('no apple-mobile-web-app-capable meta');
-    if (domSide.href) {
-      const mPath = path.join(__dirname, '..', domSide.href);
-      if (!fs.existsSync(mPath)) problems.push(`manifest missing at ${domSide.href}`);
-      else {
-        let m = null;
-        try { m = JSON.parse(fs.readFileSync(mPath, 'utf8')); }
-        catch (e) { problems.push('manifest is not valid JSON'); }
-        if (m) {
-          const sizes = (m.icons || []).map(i => i.sizes);
-          if (!m.name || !m.short_name) problems.push('manifest needs name and short_name');
-          if (!m.start_url) problems.push('manifest needs start_url');
-          if (m.display !== 'standalone') problems.push(`display is ${m.display}, want standalone`);
-          if (!sizes.includes('192x192') || !sizes.includes('512x512')) problems.push('needs 192 and 512 icons');
-          if (!(m.icons || []).some(i => (i.purpose || '').includes('maskable'))) problems.push('needs a maskable icon');
-          for (const icon of (m.icons || [])) {
-            if (!fs.existsSync(path.join(__dirname, '..', icon.src))) problems.push(`icon missing: ${icon.src}`);
+    try {
+      const httpPage = await browser.newPage();
+      const res = await httpPage.goto(`http://127.0.0.1:${port}/index.html`);
+      if (!res || !res.ok()) problems.push('index.html did not load over http');
+      const r = await httpPage.evaluate(async () => {
+        const out = { theme: !!document.querySelector('meta[name="theme-color"]'),
+                      apple: !!document.querySelector('meta[name="apple-mobile-web-app-capable"]') };
+        const link = document.querySelector('link[rel="manifest"]');
+        if (!link) return Object.assign(out, { err: 'no <link rel="manifest">' });
+        const resp = await fetch(link.href);
+        out.status = resp.status;
+        out.type = (resp.headers.get('content-type') || '').split(';')[0];
+        try { out.m = await resp.json(); } catch (e) { out.err = 'manifest is not valid JSON'; }
+        if (out.m) {
+          const startRes = await fetch(new URL(out.m.start_url, link.href).href, { method: 'GET' });
+          out.startOk = startRes.ok;
+          // Decode each icon and read its REAL dimensions.
+          out.icons = [];
+          for (const icon of (out.m.icons || [])) {
+            const url = new URL(icon.src, link.href).href;
+            const dims = await new Promise(done => {
+              const img = new Image();
+              img.onload = () => done({ w: img.naturalWidth, h: img.naturalHeight });
+              img.onerror = () => done(null);
+              img.src = url;
+            });
+            out.icons.push({ src: icon.src, declared: icon.sizes, purpose: icon.purpose || '', dims });
+          }
+        }
+        return out;
+      });
+
+      if (r.err) problems.push(r.err);
+      if (!r.theme) problems.push('no theme-color meta');
+      if (!r.apple) problems.push('no apple-mobile-web-app-capable meta');
+      if (r.status && r.status !== 200) problems.push(`manifest returned ${r.status}`);
+      if (r.m) {
+        if (!r.m.name || !r.m.short_name) problems.push('manifest needs name and short_name');
+        if (r.m.display !== 'standalone') problems.push(`display is ${r.m.display}, want standalone`);
+        if (!r.startOk) problems.push(`start_url ${r.m.start_url} did not resolve`);
+        const declared = (r.m.icons || []).map(i => i.sizes);
+        if (!declared.includes('192x192') || !declared.includes('512x512')) problems.push('needs 192 and 512 icons');
+        if (!(r.m.icons || []).some(i => (i.purpose || '').includes('maskable'))) problems.push('needs a maskable icon');
+        for (const icon of (r.icons || [])) {
+          if (!icon.dims) { problems.push(`icon did not load: ${icon.src}`); continue; }
+          const [w, h] = String(icon.declared).split('x').map(Number);
+          if (icon.dims.w !== w || icon.dims.h !== h) {
+            problems.push(`icon ${icon.src} claims ${icon.declared} but is ${icon.dims.w}x${icon.dims.h}`);
           }
         }
       }
+      await httpPage.close();
+    } finally {
+      server.close();
     }
     checks.installsToTheHomeScreen = problems.length === 0 || problems;
   }

@@ -33,17 +33,19 @@ let mnyCalMonth = null;       // 'YYYY-MM' for the competition calendar
    policy standing between a nine-year-old and the number she opened the page to
    see — most of the screen's whole word budget, spent on reference.
 
-   So: honour the column argument where there is a column, collapse it where
-   there isn't, and remember whatever she chooses after that. Stored in
-   localStorage rather than synced state — it is a per-device view preference,
-   and every state write is a full-document upload. Same idiom as
+   First attempt kept it open on wide screens, on the reasoning that the column
+   argument still holds there. Running the word-budget sweep at tablet-landscape
+   and desktop killed that: it put this page at 564 words on exactly the iPad a
+   child uses, which is the thing the budget exists to prevent. The budget is
+   about how much there is to read, and a wider screen does not make 564 words
+   less to read. Closed by default everywhere; her choice is remembered.
+
+   Stored in localStorage rather than synced state — it is a per-device view
+   preference, and every state write is a full-document upload. Same idiom as
    HERO_MODE_LS_KEY in js/05-helpers.js. */
 const MNY_PRICES_LS_KEY = 'wp_mny_prices_open';
-const MNY_WIDE_QUERY = '(min-width: 980px)';
 function mnyPricesOpen() {
-  const stored = localStorage.getItem(MNY_PRICES_LS_KEY);
-  if (stored !== null) return stored === '1';
-  return !!(window.matchMedia && window.matchMedia(MNY_WIDE_QUERY).matches);
+  return localStorage.getItem(MNY_PRICES_LS_KEY) === '1';
 }
 function mnySetPricesOpen(open) {
   try { localStorage.setItem(MNY_PRICES_LS_KEY, open ? '1' : '0'); } catch (e) {}

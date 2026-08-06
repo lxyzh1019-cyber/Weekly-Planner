@@ -5411,6 +5411,14 @@
      a bare class can reach. Matching the selector rather than reaching for
      !important keeps the cascade readable. */
   .mny-head-btns .mny-btn { min-height: 44px; }
+  /* Same problem, found only once the sweep ran at tablet-landscape and desktop:
+     `#screen-week .view-tab` inside the >=980px landscape query is an id plus a
+     class, so a bare `.view-tab` never reached it and the view switcher stayed
+     40px on exactly the screens this app is used on. The 44px floor is not a
+     small-screen rule. */
+  @media (min-width: 980px) and (orientation: landscape) {
+    #screen-week .view-tab { min-height: 44px; }
+  }
   /* An input needs the height but must keep its own width — a number field
      sized for two digits should not stretch to 44px wide. */
   #screen-chore input:not([type=hidden]),
