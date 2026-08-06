@@ -18,13 +18,19 @@ const BK_KIND = 'weekly-planner-full-backup';
    whether this build can read it. Mirrors exactly what saveLocal writes and
    pushToFirebase uploads: { profiles, shared }. */
 function bkBuildFullBackup() {
+  // A snapshot, not a view. This used to hand back live references into `state`,
+  // which is correct for the one caller that serialises immediately and a trap
+  // for every other one: hold the result, change anything, and the "backup" you
+  // are holding changes with it. Cheap to copy — an export is a rare, deliberate
+  // parent action, and JSON is the format it is about to become anyway.
+  const snapshot = JSON.parse(JSON.stringify({ profiles: state.profiles, shared: state.shared }));
   return {
     kind: BK_KIND,
     schemaVersion: BK_SCHEMA_VERSION,
     exportedAt: new Date().toISOString(),
     storageKey: LS_KEY,
-    profiles: state.profiles,
-    shared: state.shared
+    profiles: snapshot.profiles,
+    shared: snapshot.shared
   };
 }
 

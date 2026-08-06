@@ -2385,6 +2385,16 @@ function findChromium() {
     p.progress.unlockedChecklistItems = { morning: [{ id: 'unlocked-bk' }] };
 
     const b = bkBuildFullBackup();
+    // It must be a snapshot: holding it and then changing state must not change
+    // it. Returning live references made a "backup" that emptied when the thing
+    // it was backing up emptied.
+    const before = JSON.stringify(b.profiles.jenn.weeks);
+    const stash = state.profiles.jenn.weeks;
+    state.profiles.jenn.weeks = {};
+    const survived = JSON.stringify(b.profiles.jenn.weeks) === before;
+    state.profiles.jenn.weeks = stash;
+    if (!survived) return 'bkBuildFullBackup returned live references, not a snapshot';
+
     const jenn = b.profiles.jenn || {};
     const carries = Object.keys(jenn.weeks || {}).length > 0
       && (jenn.goals || []).some(g => g.id === 'g-bk')
