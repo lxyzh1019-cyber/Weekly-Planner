@@ -2148,6 +2148,137 @@ function findChromium() {
     return toTheChange && toWaiting && toSheet;
   });
 
+  // ── Durability (Branch 1) ────────────────────────────────────────────────
+  // The old export copied only the chore slices, so a "backup" silently left
+  // out every week, goal and progress record — the whole planner. These checks
+  // exist because that failure is invisible: the file downloads, it is valid
+  // JSON, and it looks like a backup right up until someone needs it.
+  checks.fullBackupCarriesTheWholePlanner = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    const dk = getDayKeys(0)[2];
+    setDayBlocks(dk, [{ id: 'bk-blk', actId: 'training', startMin: 600,
+                        durationMin: 60, tag: 'skating' }], 'jenn');
+    const p = getProfData('jenn');
+    p.goals = [{ id: 'g-bk', name: 'Backup goal', done: false }];
+    p.progress = p.progress || {};
+    p.progress.unlockedChecklistItems = { morning: [{ id: 'unlocked-bk' }] };
+
+    const b = bkBuildFullBackup();
+    const jenn = b.profiles.jenn || {};
+    const carries = Object.keys(jenn.weeks || {}).length > 0
+      && (jenn.goals || []).some(g => g.id === 'g-bk')
+      && !!(jenn.progress && jenn.progress.unlockedChecklistItems)
+      && !!b.shared
+      && b.schemaVersion === BK_SCHEMA_VERSION
+      && b.kind === 'weekly-planner-full-backup';
+
+    // Contrast: the same three things are absent from the chore-only shape.
+    const choreShape = { profiles: { jenn: getProfData('jenn').chore || {} } };
+    const choreOmits = !choreShape.profiles.jenn.weeks
+      && !choreShape.profiles.jenn.goals
+      && !choreShape.profiles.jenn.progress;
+
+    return carries && choreOmits;
+  });
+
+  // A restore has to put back what a lost device had, through the same
+  // normalisation a page load uses.
+  checks.restoreBringsBackWhatWasLost = await page.evaluate(() => {
+    const dk = getDayKeys(0)[2];
+    const json = JSON.stringify(bkBuildFullBackup());
+
+    // Simulate the lost device: everything for Jenn gone.
+    state.profiles.jenn = { weeks: {}, customActivities: [], goals: [], todos: [] };
+    const goneFirst = Object.keys(getProfData('jenn').weeks || {}).length === 0;
+
+    bkApplyBackup(JSON.parse(json), 'replace');
+    const back = getProfData('jenn');
+    const restored = getDayBlocks(dk, 'jenn').some(b => b.id === 'bk-blk')
+      && (back.goals || []).some(g => g.id === 'g-bk')
+      && !!(back.progress && back.progress.unlockedChecklistItems);
+
+    setDayBlocks(dk, [], 'jenn');
+    back.goals = [];
+    return goneFirst && restored;
+  });
+
+  // ctExportBackup also writes a .json with a top-level `profiles` key, but
+  // each profile there holds only the chore slice. Importing one as a full
+  // restore would swap real planner profiles for chore fragments, so it has to
+  // be named and refused rather than half-applied.
+  checks.choreOnlyFileIsRefusedNotHalfApplied = await page.evaluate(() => {
+    const choreFile = { version: 3, exportedAt: new Date().toISOString(),
+                        goalsByWeek: {}, groups: [], moneySnapshots: {},
+                        profiles: { jenn: {}, jess: {} } };
+    const verdict = bkValidateBackup(choreFile);
+    const named = !verdict.ok && /chore-only/i.test(verdict.error);
+
+    const newer = bkValidateBackup({ kind: 'weekly-planner-full-backup',
+                                     schemaVersion: BK_SCHEMA_VERSION + 1,
+                                     profiles: { jenn: {} }, shared: {} });
+    const refusesNewer = !newer.ok && /newer version/i.test(newer.error);
+
+    const noVersion = bkValidateBackup({ profiles: { jenn: {} }, shared: {} });
+    const good = bkValidateBackup(bkBuildFullBackup());
+    return named && refusesNewer && !noVersion.ok && good.ok;
+  });
+
+  // Every mutation used to fire a full-document upload. A loop of them fired
+  // one per step. This asserts the burst collapses to a single write.
+  checks.rapidEditsCoalesceIntoOneWrite = await page.evaluate(async () => {
+    const before = syncPushAttempts;
+    for (let i = 0; i < 20; i++) saveAll();
+    // Nothing may have gone out yet: the whole point is that it waits.
+    const noneYet = syncPushAttempts === before;
+    await new Promise(r => setTimeout(r, SYNC_DEBOUNCE_MS + 400));
+    const exactlyOne = syncPushAttempts === before + 1;
+
+    // ...and a tab going away must not sit on a pending write.
+    const beforeFlush = syncPushAttempts;
+    saveAll();
+    flushPush();
+    const flushedNow = syncPushAttempts === beforeFlush + 1;
+    return noneYet && exactlyOne && flushedNow;
+  });
+
+  // The 1 MiB ceiling is reached by growth, not by a bug, so the warning has to
+  // arrive while there is still room to act.
+  checks.cloudSizeWarnsBeforeTheCeiling = await page.evaluate(() => {
+    const ok = payloadHealth(200 * 1024);
+    const warn = payloadHealth(750 * 1024);
+    const crit = payloadHealth(950 * 1024);
+    const ordered = ok.level === 'ok' && warn.level === 'warn' && crit.level === 'critical';
+    const pctSane = ok.pct < warn.pct && warn.pct < crit.pct && crit.pct <= 100;
+    // Multi-byte characters must not be under-counted: .length would say 3.
+    const utf8 = byteLength('déjà') === 6 && byteLength('🎯') === 4;
+    const live = bkCloudSizeInfo();
+    return ordered && pctSane && utf8 && live.bytes > 0 && typeof live.level === 'string';
+  });
+
+  // The panel is the only route to a backup, so it has to actually render and
+  // its controls have to be reachable — a working exportFullBackup behind a
+  // blank tab is no better than no backup at all.
+  await page.evaluate(() => {
+    profile = 'parent'; showScreen('parent'); renderParentHome(); setParentTab('backup');
+  });
+  checks.backupTabIsUsable = await page.evaluate(() => {
+    const wrap = document.getElementById('bkWrap');
+    const panel = document.getElementById('ptab-backup');
+    if (!wrap || !panel || panel.hidden) return false;
+    const btns = [...wrap.querySelectorAll('button')];
+    const hasBoth = btns.some(b => /export full backup/i.test(b.textContent))
+                 && btns.some(b => /restore from file/i.test(b.textContent));
+    // Parent-only surface, but the 44px floor is a house rule everywhere.
+    const bigEnough = btns.every(b => {
+      const r = b.getBoundingClientRect();
+      return r.height >= 44 && r.width >= 44;
+    });
+    const meterDrawn = !!wrap.querySelector('.bk-meter-fill');
+    const saysSize = /of 1 MB/.test(wrap.textContent);
+    return hasBoth && bigEnough && meterDrawn && saysSize;
+  });
+  await page.screenshot({ path: shot('parent_backup') });
+
   checks.noConsoleErrors = errors.length === 0;
 
   const failed = Object.entries(checks).filter(([,v]) => !v).map(([k]) => k);

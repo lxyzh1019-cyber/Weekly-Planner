@@ -20,6 +20,7 @@ function renderParentHome() {
   cpRenderChoreTab();
   ctrRenderTrends();
   coRenderOptions();
+  bkRenderPanel();
 }
 
 function setParentTab(tab) {

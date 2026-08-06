@@ -43,6 +43,38 @@ service cloud.firestore {
 }
 ```
 
+## Runbook — the order this has to happen in
+
+`firestore.rules` in the repo root is the intended target. It is **committed but
+not deployed**, and deploying it out of order locks the app out of its own data,
+because every read and write the client makes today is unauthenticated.
+
+The rules and the client change are a single unit. Do not publish one without
+the other.
+
+1. **Export a full backup first.** Parent Dashboard → 🗄️ Backup → *Export full
+   backup*. Everything below is recoverable from that file and nothing below is
+   recoverable without it. Keep it off the device.
+2. **Read the current state before changing it.** Firebase console →
+   Firestore → Rules tab: record what is actually deployed today, and note the
+   current size of `weekly_planner/shared_state` from the Data tab. As of
+   2026-08-06 nobody has done this — see the note at the top of this file.
+3. **Add Firebase Auth** (§1 above) and get a uid in the client, without yet
+   changing where the document lives. Verify the app still works.
+4. **Move the document.** Copy `weekly_planner/shared_state` to
+   `weekly_planner/{uid}`. Leave the original in place until step 6 passes.
+5. **Point the client at the new path** — `FS_DOC_ID` becomes the uid rather
+   than the `'shared_state'` constant (`js/03-sync.js`), and `initFirebase`
+   waits for an auth state before subscribing.
+6. **Publish `firestore.rules`.** Then verify, in this order: the app still
+   reads and writes; a signed-out browser gets permission-denied; a second
+   family's uid cannot read the first's document.
+7. **Only then delete the old `shared_state` document,** and re-verify from a
+   fresh browser session.
+
+If step 6 fails, revert the rules first — the client can keep running against
+the open rules while the auth path is fixed.
+
 ## 4. Treat the PIN as UX only
 Even after the above, keep the parent PIN as a convenience lock for shared
 family devices — never as the thing that protects data. Money editing, backup

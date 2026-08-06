@@ -490,6 +490,7 @@
       <button class="parent-tab" role="tab" data-ptab="tasks" onclick="setParentTab('tasks')">✅ Tasks</button>
       <button class="parent-tab" role="tab" data-ptab="money" onclick="setParentTab('money')">💰 Money rules</button>
       <button class="parent-tab" role="tab" data-ptab="rules" onclick="setParentTab('rules')">⚙️ Level-Up</button>
+      <button class="parent-tab" role="tab" data-ptab="backup" onclick="setParentTab('backup')">🗄️ Backup</button>
     </div>
   </div>
 
@@ -585,6 +586,12 @@
     <p class="parent-hint">Earn a ★ on an activity after enough sessions/hours. Shared between both girls.</p>
     <div id="levelRulesList"></div>
     <button class="btn-confirm" style="margin-top:0.6rem" onclick="openNewLevelRule()">＋ Add Rule</button>
+  </div>
+
+  <!-- TAB: Backup — the only route back after a lost device, plus the cloud
+       size readout. Rendered by bkRenderPanel (js/30-backup.js). -->
+  <div class="parent-panel" id="ptab-backup" role="tabpanel" hidden>
+    <div id="bkWrap"></div>
   </div>
 </div>
 
@@ -1291,6 +1298,7 @@
 <script src="js/27-chore-parent.js"></script>
 <script src="js/28-chore-trends.js"></script>
 <script src="js/29-chore-options.js"></script>
+<script src="js/30-backup.js"></script>
 <script src="js/99-main.js"></script>
 </body>
 </html>

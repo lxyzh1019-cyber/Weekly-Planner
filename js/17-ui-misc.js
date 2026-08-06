@@ -43,7 +43,7 @@ function _appDialogCancel() {
   const inp = document.getElementById('appDialogInput');
   _closeAppDialog(inp ? null : false);
 }
-function _appDialog({ message, kind, value = '', inputType = 'text', okLabel = 'OK', cancelLabel = 'Cancel', danger = false, checkLabel = '' }) {
+function _appDialog({ message, kind, value = '', inputType = 'text', okLabel = 'OK', cancelLabel = 'Cancel', danger = false, checkLabel = '', hideCancel = false }) {
   // Resolve any dialog already open (shouldn't normally happen) before opening.
   if (_appDialogResolve) _closeAppDialog(kind === 'prompt' ? null : false);
   let ov = document.getElementById('appDialogOverlay');
@@ -69,7 +69,7 @@ function _appDialog({ message, kind, value = '', inputType = 'text', okLabel = '
       <p class="app-dialog-msg">${escapeHtml(message)}</p>
       ${inputHtml}${checkHtml}
       <div class="app-dialog-btns">
-        <button type="button" class="pill-btn app-dialog-cancel" onclick="_appDialogCancel()">${escapeHtml(cancelLabel)}</button>
+        ${hideCancel ? '' : `<button type="button" class="pill-btn app-dialog-cancel" onclick="_appDialogCancel()">${escapeHtml(cancelLabel)}</button>`}
         <button type="button" id="appDialogOkBtn" class="btn-confirm${danger ? ' danger' : ''}" style="width:auto;flex:1"${checkLabel ? ' disabled' : ''} onclick="_appDialogOk()">${escapeHtml(okLabel)}</button>
       </div>
     </div>`;
@@ -83,6 +83,12 @@ function _appDialog({ message, kind, value = '', inputType = 'text', okLabel = '
 }
 function showConfirm(message, opts = {}) {
   return _appDialog({ message, kind: 'confirm', okLabel: opts.okLabel || 'OK', cancelLabel: opts.cancelLabel || 'Cancel', danger: !!opts.danger });
+}
+/* Informational, one button. For a message too long or too important to be a
+   toast — a rejected file with a reason, say — where there is nothing to
+   confirm and no second choice to offer. Resolves when dismissed. */
+function showAlert(message, opts = {}) {
+  return _appDialog({ message, kind: 'alert', okLabel: opts.okLabel || 'OK', hideCancel: true });
 }
 /* A confirm whose OK stays disabled until the checkbox is ticked. Use it where
    the tap is a factual assertion ("the job was done"), not just consent. */

@@ -5296,3 +5296,22 @@
     min-height: auto;
     height: auto;
   }
+
+  /* ── Backup & restore (parent tab) ────────────────────────────────────────
+     Same construction as .mny-progress: a hard-bordered track with a coloured
+     fill, so the cloud-size readout reads like the rest of the app's meters.
+     Level colours are classes rather than inline styles; only the width is
+     inline, because only the width is data. */
+  .bk-meter {
+    height: 16px; border: 2.5px solid var(--ink); border-radius: 8px; overflow: hidden;
+    background: var(--bg); margin: 0.4rem 0 0.3rem;
+  }
+  .bk-meter-fill { height: 100%; transition: width 0.3s; background: var(--cat-free); }
+  .bk-meter-fill.warn { background: var(--accent-yellow); }
+  /* White text never sits on this, so the AA-safe strong accent is right here:
+     it has to read as "act soon" against the pastel fills above. */
+  .bk-meter-fill.critical { background: var(--accent-strong); }
+
+  /* Backup actions are rare, deliberate and parent-only — full-size targets,
+     never the cramped chips the kid screens use. */
+  .bk-btn { min-height: 44px; min-width: 44px; }
