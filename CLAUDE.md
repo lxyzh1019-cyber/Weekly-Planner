@@ -98,7 +98,7 @@ still rendered and only the numbers were wrong.
 
 `js/04-merge.js` implements conflict-aware sync: id-keyed unions, deletion
 tombstones (30-day pruning), deep object merge, per-week chore arbitration, and
-a forward-only `lastGradeSeen` watermark. It has 50 unit tests running the real
+a forward-only `lastGradeSeen` watermark. It has 52 unit tests running the real
 shipped functions.
 
 Do not refactor it for style. Change it only to fix a demonstrated sync bug, and
@@ -106,13 +106,36 @@ only with a failing test written first.
 
 ## Escaping
 
-Any user-supplied string interpolated into an `innerHTML` template **must** go
-through `escapeHtml()` (text context) or `escapeAttr()` (attribute context).
-Activity names, block notes, chore names, goal names, and kid feedback are all
-user-editable.
+All three helpers live in `js/05-helpers.js`. Pick by **context**, not by habit:
 
-This is currently inconsistent — see AUDIT item P1-2. When you touch a render
-function, fix its escaping as you pass through.
+| Context | Helper |
+|---|---|
+| Text inside markup — `` `<div>${x}</div>` `` | `escapeHtml(x)` |
+| A double-quoted attribute — `` `title="${x}"` `` | `escapeAttr(x)` |
+| A JS string inside an inline handler — `` `onclick="fn('${x}')"` `` | `escapeJsAttr(x)` |
+
+The third one is not interchangeable with the second, and this is the subtle
+part: **an inline handler is HTML-decoded before it is parsed as JavaScript**, so
+`escapeAttr`'s `&#39;` decodes straight back to an apostrophe and closes the
+string literal anyway. Only a backslash escape survives, which is what
+`escapeJsAttr` adds.
+
+That was a live hole, not a hypothetical one. `ensureBlockId` used to splice 24
+characters of the user's **note** into a block id, block ids get interpolated
+into `onclick` handlers, and ids also arrive straight off a world-writable
+Firestore document — so a note containing an apostrophe ran as JavaScript when
+the block was tapped. Fixed at both ends: ids are slugged at the source, and the
+~58 handler interpolations go through `escapeJsAttr`.
+
+Better than any of them: **don't interpolate into handlers at all.** Use data
+attributes plus a delegated listener, the way `js/13-chores.js` and the money
+pages already do. Prefer that for new code.
+
+`npm run check` runs `tests/check-escaping.js`, which fails the build on an
+unescaped user-text interpolation in markup and on `escapeAttr` used in a
+handler. Mark a genuine constant with a trailing `/* safe: from MNY_STAGES */`
+and say which table it came from. `tests/smoke.js` carries the runtime proof
+(`hostileNamesCannotBecomeCode`, `escapingMatchesTheDomReference`).
 
 ## Writing for children
 

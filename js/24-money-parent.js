@@ -55,7 +55,7 @@ function mnyRenderRulesTab() {
   const v = mrLatestVersion();
 
   const nav = MNY_PARENT_SECTIONS.map(s =>
-    `<button type="button" class="mny-chip ${mnyParentSection === s.id ? 'on' : ''}" data-mnyp-action="section" data-mnyp-id="${s.id}">${s.label}</button>`).join('');
+    `<button type="button" class="mny-chip ${mnyParentSection === s.id ? 'on' : ''}" data-mnyp-action="section" data-mnyp-id="${s.id}">${escapeHtml(s.label)}</button>`).join('');
 
   let body = '';
   if (mnyParentSection === 'prices') body = mnyRulePrices();
@@ -593,7 +593,7 @@ function mnyAddMissedWeek(kid) {
   if (!c.moneyLedger[wk]) c.moneyLedger[wk] = {};
   if (c.moneyLedger[wk][kid]) { showToast('That week is already on record'); return; }
   c.moneyLedger[wk][kid] = {
-    at: Date.now(), handEntered: true, updatedAt: Date.now(),
+    at: Date.now(), handEntered: true, updatedAt: syncNow(),
     chores: 0, learning: 0, streak: 0, competition: 0, fines: 0, outside: 0,
     ready: 0, gic: 0, stock: 0, debtExtra: 0, gross: 0, net: 0,
     xp: 0, boxReleased: 0, loan: null,
@@ -610,7 +610,7 @@ function mnyEditLedger(kid, wk, field, delta) {
   row[field] = Math.max(0, money2(money2(row[field]) + delta));
   row.gross = money2(money2(row.chores) + money2(row.learning) + money2(row.streak) + money2(row.competition));
   row.net = money2(Math.max(0, row.gross - money2(row.fines)));
-  row.updatedAt = Date.now();
+  row.updatedAt = syncNow();
   saveAll();
 }
 function mnyDeleteLedgerWeek(kid, wk) {

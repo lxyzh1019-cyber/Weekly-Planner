@@ -56,7 +56,7 @@ function buildTray() {
     chip.innerHTML = `
       ${levelBadge}${lockBadge}
       <div class="chip-icon">${act.icon}</div>
-      <div class="chip-name">${act.name}</div>
+      <div class="chip-name">${escapeHtml(act.name)}</div>
       <div class="chip-dur">${durStr}</div>
     `;
     chip.onclick = ()=>selectActivity(act);
@@ -1580,7 +1580,7 @@ function openReflectSheet() {
       const row = document.createElement('div');
       row.className = 'obj-item';
       row.style.justifyContent = 'space-between';
-      row.innerHTML = `<span>${act.icon} ${act.name}</span>`;
+      row.innerHTML = `<span>${act.icon} ${escapeHtml(act.name)}</span>`;
       const moodPicker = document.createElement('div');
       moodPicker.style.cssText='display:flex;gap:0.25rem';
       MOODS.forEach(m=>{

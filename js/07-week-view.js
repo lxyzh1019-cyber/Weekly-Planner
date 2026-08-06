@@ -1121,7 +1121,7 @@ function renderFullWeek(keys) {
         ${sumHtml}
         <div class="wf-card-dur">${durHtml}</div>
         <button type="button" class="wf-card-check" style="width:${checkPx}px;height:${checkPx}px;font-size:${Math.round(checkPx*0.58)}px" aria-label="${b.completed?'Mark not done':'Mark done'}"
-          onclick="toggleBlockDone('${key}','${b.id}',event)">${b.completed?'✓':''}</button>
+          onclick="toggleBlockDone('${escapeJsAttr(key)}','${escapeJsAttr(b.id)}',event)">${b.completed?'✓':''}</button>
       `;
       card.title = `${dispIcon} ${dispName} — ${timeStr}, ${formatDuration(b.durationMin)}`
         + (bufKinds.length ? ` · ${bufKinds.join(', ')} each way` : '')

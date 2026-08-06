@@ -969,9 +969,9 @@ function ctRenderMoneyCard(kid) {
     <div class="ct-meta" style="margin-top:0.4rem">🏦 Net worth: <b>$${nw.toFixed(2)}</b></div>
     <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.5rem">
       ${isParent()
-        ? `<button type="button" class="pill-btn" onclick="mnyOpenMyMoney('${kid}')">💰 My money</button>
+        ? `<button type="button" class="pill-btn" onclick="mnyOpenMyMoney('${escapeJsAttr(kid)}')">💰 My money</button>
            <button type="button" class="pill-btn" onclick="openFamilyMeeting()">🧑‍🧑‍🧒 Family meeting</button>`
-        : `<button type="button" class="pill-btn" onclick="mnyOpenMyMoney('${kid}')">💰 My money</button>`}
+        : `<button type="button" class="pill-btn" onclick="mnyOpenMyMoney('${escapeJsAttr(kid)}')">💰 My money</button>`}
     </div></div>`;
 }
 function ctRenderWeekControls() {
@@ -1117,9 +1117,9 @@ function ctConfirmGroupFromUi() {
   if (ctEditingGroupId) {
     const g = ctGroupById(ctEditingGroupId);
     // updatedAt lets the sync merge keep the newer edit when two devices touch groups.
-    if (g) { g.name = name; g.icon = icon; g.kid = kid; g.cadence = cadence; g.valueDollars = valueDollars; g.choreIds = choreIds; g.updatedAt = Date.now(); }
+    if (g) { g.name = name; g.icon = icon; g.kid = kid; g.cadence = cadence; g.valueDollars = valueDollars; g.choreIds = choreIds; g.updatedAt = syncNow(); }
   } else {
-    state.shared.chore.groups.push({ id:'grp-'+Date.now().toString(36), name, icon, kid, choreIds, valueDollars, cadence, updatedAt: Date.now() });
+    state.shared.chore.groups.push({ id:'grp-'+Date.now().toString(36), name, icon, kid, choreIds, valueDollars, cadence, updatedAt: syncNow() });
   }
   ctEditingGroupId = null;
   saveAll();

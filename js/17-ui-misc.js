@@ -430,7 +430,7 @@ async function inviteSisterFromEdit() {
     startMin: blk.startMin,
     durationMin: blk.durationMin,
     status: 'pending',
-    createdAt: Date.now(),
+    createdAt: syncNow(),
     sourceBlockId: blk.id,
   };
   state.shared.invites = [...(state.shared.invites||[]), inv];

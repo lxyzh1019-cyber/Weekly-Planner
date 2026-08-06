@@ -219,7 +219,7 @@ function mnyNormalizeHolding(h) {
   // the last settled Sunday. Both drive the simulation below.
   if (!h.lastAccruedOn) h.lastAccruedOn = h.openedOn || todayKey();
   if (h.valueAtLastMeeting == null) h.valueAtLastMeeting = money2(h.units * h.priceNow);
-  if (!h.createdAt) h.createdAt = Date.now();
+  if (!h.createdAt) h.createdAt = syncNow();
   return h;
 }
 
@@ -300,7 +300,7 @@ function mnySimCatchUp(kid, opts) {
       }
     }
     h.lastAccruedOn = today;
-    h.updatedAt = Date.now();
+    h.updatedAt = syncNow();
   });
 
   if (moved) saveAll();
@@ -387,7 +387,7 @@ function mnyEditHolding(kid, holdingId, field, value) {
   if (!h) return false;
   const num = ['units', 'priceNow', 'costBasis', 'rateAnnual'];
   h[field] = num.includes(field) ? Math.max(0, Number(value) || 0) : value;
-  h.updatedAt = Date.now();
+  h.updatedAt = syncNow();
   saveAll();
   return true;
 }
@@ -411,7 +411,7 @@ function mnyAddToSaved(kid, amount) {
     existing.units = 1;
     existing.priceNow = money2(mnyHoldingValue(existing) + amt);
     existing.costBasis = money2(money2(existing.costBasis) + amt);
-    existing.updatedAt = Date.now();
+    existing.updatedAt = syncNow();
   } else {
     const cfg = bankConfig();
     mnyAddHolding(kid, { id: 'save-' + kid, kind: 'savings', name: 'Money kept ready',
@@ -432,7 +432,7 @@ function mnyTakeFromSaved(kid, amount) {
     h.units = 1;
     h.priceNow = money2(have - take);
     h.costBasis = money2(Math.max(0, money2(h.costBasis) - take));
-    h.updatedAt = Date.now();
+    h.updatedAt = syncNow();
     left = money2(left - take);
     took = money2(took + take);
   });
@@ -497,7 +497,7 @@ function mnyAddGoal(kid, fields) {
   const g = Object.assign({
     id: mrNewId('goal-'), name: 'Something I want', icon: '🎯',
     target: 50, targetDate: '', saved: 0, done: false,
-    createdAt: Date.now(), updatedAt: Date.now(),
+    createdAt: syncNow(), updatedAt: syncNow(),
   }, fields || {});
   g.target = money2(g.target);
   g.saved = money2(g.saved);
@@ -510,7 +510,7 @@ function mnyEditGoal(kid, id, field, value) {
   const g = mnyGoalById(kid, id);
   if (!g) return false;
   g[field] = (field === 'target' || field === 'saved') ? Math.max(0, money2(value)) : value;
-  g.updatedAt = Date.now();
+  g.updatedAt = syncNow();
   saveAll();
   return true;
 }
@@ -532,7 +532,7 @@ function mnyCompleteGoal(kid, id) {
   mnyTakeFromSaved(kid, Math.min(money2(g.saved), mnySavedTotal(kid)));
   g.done = true;
   g.doneAt = Date.now();
-  g.updatedAt = Date.now();
+  g.updatedAt = syncNow();
   saveAll();
   return true;
 }
@@ -602,7 +602,7 @@ function mnyDepositsForWeek(kid, weekKey) {
 function mnyAddDeposit(kid, weekKey, fields) {
   const d = Object.assign({
     id: mrNewId('dep-'), weekKey, amount: 0, from: MNY_FROM[0],
-    dayKey: todayKey(), appliedAt: null, createdAt: Date.now(), updatedAt: Date.now(),
+    dayKey: todayKey(), appliedAt: null, createdAt: syncNow(), updatedAt: syncNow(),
   }, fields || {});
   d.amount = money2(d.amount);
   if (!(d.amount > 0)) return null;
@@ -677,7 +677,7 @@ function mnyOverrideBanner(kid, weekKey, channel) {
   return `<div class="mny-override-note">
       <span>✏️ ${escapeHtml(n.text)}</span>
       <button type="button" class="mny-chip"
-        onclick="mnyShowTheChange('${kid}','${escapeAttr(channel)}')">See the change</button>
+        onclick="mnyShowTheChange('${escapeJsAttr(kid)}','${escapeJsAttr(channel)}')">See the change</button>
     </div>`;
 }
 /* Open the meeting on step 3 with that channel's working expanded — the one
@@ -779,7 +779,7 @@ function mnyReopenWeek(kid, weekKey) {
   const s = (c.weekConfirms[weekKey] || {})[kid];
   if (!s || !s.at || s.reopenedAt) return false;
   if (mnyIsCommitted(weekKey, kid)) return false;
-  s.reopenedAt = Date.now();
+  s.reopenedAt = syncNow();
   saveAll();
   return true;
 }
@@ -815,7 +815,7 @@ function mnySavePlan(weekKey, kid, plan) {
   const c = mnyEnsureWeekMaps();
   if (!c.weekPlans[weekKey]) c.weekPlans[weekKey] = {};
   const prev = c.weekPlans[weekKey][kid] || {};
-  c.weekPlans[weekKey][kid] = Object.assign({}, prev, plan, { updatedAt: Date.now() });
+  c.weekPlans[weekKey][kid] = Object.assign({}, prev, plan, { updatedAt: syncNow() });
   saveAll();
   return c.weekPlans[weekKey][kid];
 }

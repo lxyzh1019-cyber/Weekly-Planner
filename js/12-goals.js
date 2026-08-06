@@ -208,7 +208,7 @@ function addGoal() {
     id: 'g-'+Date.now().toString(36),
     text: '',
     color: GT_COLOURS[p.goals.length % GT_COLOURS.length],
-    createdAt: Date.now(),
+    createdAt: syncNow(),
   });
   saveAll();
   renderGoalsTodos();
@@ -241,7 +241,7 @@ function buildAchievementRow(a) {
   const targetVal = Math.max(1, a.target||1);
   const done = prog.value >= targetVal;
   const targetLabel = a.mode==='duration' ? formatDuration(targetVal) : String(targetVal);
-  row.innerHTML = `<div class=\"gt-text\"><b>${act ? act.icon+' '+escapeHtml(act.name) : 'Pick activity'}</b> · ${a.mode==='duration'?'minutes':'count'} target ${targetLabel}<br><span class="gt-achievement-meta">${prog.label}/${targetLabel} · ${done?'Completed ✅':(prog.value>0?'In progress ⏳':'Not started')}</span></div>`;
+  row.innerHTML = `<div class=\"gt-text\"><b>${act ? act.icon+' '+escapeHtml(act.name) : 'Pick activity'}</b> · ${a.mode==='duration'?'minutes':'count'} target ${targetLabel}<br><span class="gt-achievement-meta">${escapeHtml(prog.label)}/${targetLabel} · ${done?'Completed ✅':(prog.value>0?'In progress ⏳':'Not started')}</span></div>`;
   const controls = document.createElement('div');
   controls.className = 'gt-achievement-controls';
 
@@ -296,7 +296,7 @@ function addAchievement() {
     activityId: first ? first.id : null,
     mode: 'count',
     target: 1,
-    createdAt: Date.now(),
+    createdAt: syncNow(),
   });
   saveAll();
   renderGoalsTodos();
@@ -358,7 +358,7 @@ async function addTodo() {
     linkType: linkActId ? 'activity' : null,
     linkActId: linkActId || null,
     linkBlockId: null,
-    createdAt: Date.now(),
+    createdAt: syncNow(),
   });
   saveAll();
   renderGoalsTodos();

@@ -988,7 +988,7 @@ function mrAddCompetition(kid, entry) {
     points: Number(entry.points) || 0, placement: entry.placement || {},
     qualified: !!entry.qualified, provincial: !!entry.provincial,
     danceItems: entry.danceItems || {}, personalBest: !!entry.personalBest,
-    updatedAt: Date.now(),
+    updatedAt: syncNow(),
   };
   e.awarded = mrScoreCompetition(e, mrRulesFor(e.dayKey));   // frozen at entry
   mrCompetitions(kid).push(e);

@@ -138,10 +138,10 @@ function ctrBars(d) {
       if (h > 0) {
         bars += `<rect x="${x}" y="${y(r.total)}" width="${bw}" height="${h}" rx="4"
           fill="${CTR_KID_COLOR[k]}" stroke="#2a2320" stroke-width="2">
-          <title>${k === 'jenn' ? 'Jenn' : 'Jess'} · week of ${w.label}: ${ckMoney(r.total)}${r.frozen ? ' (settled)' : ''}</title></rect>`;
+          <title>${k === 'jenn' ? 'Jenn' : 'Jess'} · week of ${escapeHtml(w.label)}: ${ckMoney(r.total)}${r.frozen ? ' (settled)' : ''}</title></rect>`;
       }
     });
-    labels += `<text x="${cx}" y="${H - 8}" text-anchor="middle" class="ctr-xlab">${w.label}</text>`;
+    labels += `<text x="${cx}" y="${H - 8}" text-anchor="middle" class="ctr-xlab">${escapeHtml(w.label)}</text>`;
   });
   return `<svg viewBox="0 0 ${W} ${H}" class="ctr-svg" role="img"
       aria-label="What each of the last ${CT_SUMMARY_WEEKS} weeks paid, Jenn and Jess side by side">
@@ -183,7 +183,7 @@ function ctrLines(d) {
       stroke-linejoin="round" stroke-linecap="round"/>`;
     d.rows[k].forEach((r, i) => {
       dots += `<circle cx="${padL + step * i}" cy="${y(r.cum)}" r="4" fill="${CTR_KID_COLOR[k]}"
-        stroke="#fffdf5" stroke-width="2"><title>${k === 'jenn' ? 'Jenn' : 'Jess'} by ${r.week.label}: ${ckMoney(r.cum)}</title></circle>`;
+        stroke="#fffdf5" stroke-width="2"><title>${k === 'jenn' ? 'Jenn' : 'Jess'} by ${escapeHtml(r.week.label)}: ${ckMoney(r.cum)}</title></circle>`;
     });
     // The label wears ink; a small mark beside it carries identity. Colouring
     // the text itself would make the value legible only to colour.
@@ -193,7 +193,7 @@ function ctrLines(d) {
   });
   let labels = '';
   d.weeks.forEach((w, i) => {
-    labels += `<text x="${padL + step * i}" y="${H - 8}" text-anchor="middle" class="ctr-xlab">${w.label}</text>`;
+    labels += `<text x="${padL + step * i}" y="${H - 8}" text-anchor="middle" class="ctr-xlab">${escapeHtml(w.label)}</text>`;
   });
   return `<svg viewBox="0 0 ${W} ${H}" class="ctr-svg" role="img"
       aria-label="The running total across the last ${CT_SUMMARY_WEEKS} weeks, Jenn and Jess">
@@ -229,9 +229,9 @@ function ctrHeat(d, kid) {
       const bg = v <= 0 ? 'var(--paper)' : CTR_HEAT[Math.min(CTR_HEAT.length - 1, Math.floor(v / peak * CTR_HEAT.length))];
       const fg = v <= 0 ? '#b9ac95' : (v / peak > 0.55 ? '#fffdf5' : '#1a2b20');
       return `<div class="ctr-heat-cell" style="background:${bg};color:${fg}"
-        title="${escapeAttr(c.label)} · week of ${r.week.label}: ${ckMoney(v)}">${v > 0 ? ckMoney(v) : '·'}</div>`;
+        title="${escapeAttr(c.label)} · week of ${escapeHtml(r.week.label)}: ${ckMoney(v)}">${v > 0 ? ckMoney(v) : '·'}</div>`;
     }).join('');
-    return `<div class="ctr-heat-row"><div class="ctr-heat-label">${c.label}</div>${cells}</div>`;
+    return `<div class="ctr-heat-row"><div class="ctr-heat-label">${escapeHtml(c.label)}</div>${cells}</div>`;
   }).join('');
   return `<div class="ck-gridwrap"><div class="ctr-heat">${head}${rows}</div></div>`;
 }

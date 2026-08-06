@@ -230,7 +230,7 @@ function mmRenderDayDetail(wk, d) {
              : said ? `<span class="mm-item-said">she said: ${escapeHtml(said.toLowerCase())}</span>`
              : `<span class="mm-item-said">not answered</span>`)
           : '';
-        return `<button type="button" class="mm-item ${row.on ? 'on' : ''}" onclick="mmToggleItem('${kid}',${d},${i})"
+        return `<button type="button" class="mm-item ${row.on ? 'on' : ''}" onclick="mmToggleItem('${escapeJsAttr(kid)}',${d},${i})"
             role="checkbox" aria-checked="${row.on}" aria-label="${escapeAttr(row.label)} ${DAY_SHORT[d]}, ${name}"><span class="mm-item-box">${row.on ? '✓' : ''}</span>${row.icon ? row.icon + ' ' : ''}${escapeHtml(row.label)}${tag}</button>`;
       }).join('');
       const done = mine.filter(x => x.row.on).length;
@@ -530,9 +530,9 @@ function mmSettledStrip(wk) {
     const s = mmKidSettled(wk, k);
     const cell = (on, label, step) =>
       `<button type="button" class="mm-settle-cell ${on ? 'on' : ''}"
-         onclick="mnySetMeetKid('${k}');mmGoStep(${step})">${on ? '✓' : '○'} ${label}</button>`;
+         onclick="mnySetMeetKid('${escapeJsAttr(k)}');mmGoStep(${step})">${on ? '✓' : '○'} ${label}</button>`;
     return `<div class="mm-settle-row">
-        <span class="mm-settle-who">${CT_PROFILE_ICON[k]} ${s.name}</span>
+        <span class="mm-settle-who">${CT_PROFILE_ICON[k]} ${escapeHtml(s.name)}</span>
         ${cell(s.agreed, 'Agreed', 3)}${cell(s.decided, 'Decided', 4)}
       </div>`;
   }).join('');
@@ -557,7 +557,7 @@ function mmFinishButtons(wk) {
   const goTo = unsettled[0];
   return `<span class="mm-finish-gap">
       <button type="button" class="pill-btn" onclick="closeSheet('familyMeetingOverlay')">Close anyway</button>
-      <button type="button" class="btn-confirm" onclick="mnySetMeetKid('${goTo.kid}');mmGoStep(${goTo.agreed ? 4 : 3})">${escapeHtml(gap)} ▶</button>
+      <button type="button" class="btn-confirm" onclick="mnySetMeetKid('${escapeJsAttr(goTo.kid)}');mmGoStep(${goTo.agreed ? 4 : 3})">${escapeHtml(gap)} ▶</button>
     </span>`;
 }
 function mmPlanNextWeek() {
@@ -570,7 +570,7 @@ function mmPlanNextWeek() {
       const date = formatDayKey(key); const next = new Date(date); next.setDate(date.getDate() + 7);
       const nextKey = dateToLocalKey(next);
       if ((getDayBlocksForProfile(nextKey, kid) || []).length) return; // don't clobber existing plans
-      const clone = src.map(b => ({ ...b, id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), completed: false, confirmed: false, createdAt: Date.now(), updatedAt: Date.now() }));
+      const clone = src.map(b => ({ ...b, id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), completed: false, confirmed: false, createdAt: syncNow(), updatedAt: syncNow() }));
       setDayBlocks(nextKey, clone, kid);
       copied += clone.length;
     });

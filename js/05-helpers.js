@@ -3,6 +3,71 @@
 /* ════════════════════════════════════════════════════════════════
    HELPERS
 ════════════════════════════════════════════════════════════════ */
+
+/* ── HTML escaping ─────────────────────────────────────────────────────────
+   Every user-supplied string interpolated into an innerHTML template must come
+   through one of these: escapeHtml for text position, escapeAttr inside a
+   double-quoted attribute. Activity names, block notes, chore names, goal
+   names and kid feedback are all user-editable.
+
+   These live here, not in a feature file, because js/05, js/06 and js/07 all
+   call them — they used to be declared in js/08-day-view.js, i.e. three files
+   depended on a primitive declared after them. It worked only because nothing
+   renders at load time.
+
+   escapeHtml used to build a throwaway <div> and read back its innerHTML. This
+   is the same transformation done directly: & < > become entities and quotes
+   are left alone, which is why attribute position needs escapeAttr instead.
+   A render can call this several hundred times, and this way it neither
+   allocates a DOM node per call nor needs a document at all. The equivalence
+   with the old implementation is asserted in tests/smoke.js
+   (escapingMatchesTheDomReference). */
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+// Escape a value for use inside a double-quoted HTML attribute (escapeHtml leaves quotes).
+function escapeAttr(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+/* For a value going inside a single-quoted JS string that is itself inside a
+   double-quoted inline handler — onclick="fn('HERE')".
+
+   escapeAttr is NOT enough there, and this is the subtle part: an inline handler
+   attribute is HTML-decoded *before* it is parsed as JavaScript, so escapeAttr's
+   &#39; decodes straight back to an apostrophe and closes the string literal
+   anyway. The quote has to be escaped for the JavaScript parser (backslash),
+   and only then escaped for the HTML parser.
+
+   This is not theoretical. Block ids reach these handlers, ensureBlockId used to
+   bake 24 characters of the user's note into an id, and ids also arrive straight
+   off a world-writable Firestore document — so a note or a synced id containing
+   an apostrophe ran as code on tap. Both ends are fixed: ids are slugged at the
+   source, and every id interpolated into a handler comes through here.
+
+   Better still is not to interpolate into handlers at all — data attributes plus
+   delegation, the way js/13-chores.js and the money pages already do it. Prefer
+   that for new code; this exists to make the ~40 handlers already written safe. */
+function escapeJsAttr(str) {
+  const js = String(str ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n');
+  return js
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 function getProfData(p=activeProfile()) {
   if (!state.profiles[p]) state.profiles[p] = { weeks:{}, customActivities:[], dayMoods:{}, blockMoods:{}, activityCounts:{}, activityHours:{} };
   const prof = state.profiles[p];

@@ -2279,6 +2279,98 @@ function findChromium() {
   });
   await page.screenshot({ path: shot('parent_backup') });
 
+  // ── Escaping (Branch 2) ──────────────────────────────────────────────────
+  // escapeHtml was rewritten from "build a <div>, set textContent, read back
+  // innerHTML" to a direct replace. That is a load-bearing security primitive,
+  // so equivalence is asserted rather than assumed.
+  checks.escapingMatchesTheDomReference = await page.evaluate(() => {
+    const reference = (str) => {                 // the old implementation
+      if (str == null) return '';
+      const d = document.createElement('div');
+      d.textContent = String(str);
+      return d.innerHTML;
+    };
+    const cases = ['', 'plain', 'a & b', '<script>alert(1)</script>', '"quoted"',
+                   "it's", '<>&"\'', 'a\nb', '  spaced  ', '&amp;', '&lt;script&gt;',
+                   '🎯 emoji', '中文字符', 'a<b>c&d', null, undefined, 0, 42, false];
+    return cases.every(c => escapeHtml(c) === reference(c));
+  });
+
+  // A block note used to be spliced into the block id, and block ids are
+  // interpolated into inline onclick handlers — so an apostrophe in a note closed
+  // the handler's string and the rest ran as JavaScript on tap. Both the id
+  // generator and the render sites are fixed; this asserts both.
+  checks.hostileNamesCannotBecomeCode = await page.evaluate(async () => {
+    window.__xssFired = false;
+    const payload = "',window.__xssFired=1,'";
+    profile = 'jenn'; parentViewing = 'jenn';
+    const dk = getDayKeys(0)[1];
+
+    // Path 1: a legacy id-less block whose note carries the payload.
+    state.profiles.jenn.weeks[dk] = [{ actId: 'piano', start: 8, slots: 4, note: payload }];
+    migrateBlocks();
+    const slugged = !/['"<>\\]/.test(state.profiles.jenn.weeks[dk][0].id);
+    openDay(dk, 1);
+    document.querySelectorAll('[onclick*="toggleBlockDone"]').forEach(el => el.click());
+
+    // Path 2: an id that arrives already-formed, as a writer to the shared
+    // Firestore document could supply. ensureBlockId never sees this one.
+    state.profiles.jenn.weeks[dk] = [{ id: "evil" + payload, actId: 'piano',
+                                       startMin: 480, durationMin: 60 }];
+    openDay(dk, 1);
+    document.querySelectorAll('[onclick*="toggleBlockDone"]').forEach(el => el.click());
+    await new Promise(r => setTimeout(r, 50));
+
+    // Path 3: a hostile activity name must render as text, not markup.
+    const acts = getProfData('jenn').customActivities || [];
+    acts.push({ id: 'xss-act', name: '<img src=x onerror="window.__xssFired=1">',
+                icon: '⭐', cat: 'free', durationMin: 30 });
+    getProfData('jenn').customActivities = acts;
+    if (typeof buildTray === 'function') buildTray();
+    const injected = !!document.querySelector('#screen-day img[src="x"], .tray img[src="x"]');
+
+    getProfData('jenn').customActivities = acts.filter(a => a.id !== 'xss-act');
+    setDayBlocks(dk, [], 'jenn');
+    return slugged && !injected && window.__xssFired === false;
+  });
+
+  // Stamps written into state must come from server-corrected time, or the merge
+  // layer arbitrates on whose clock is furthest ahead rather than who edited last.
+  checks.stampsUseServerCorrectedTime = await page.evaluate(() => {
+    const saved = serverTimeOffsetMs, savedKnown = serverTimeKnown, savedStamps = ownWriteStamps.slice();
+    let ok = true;
+
+    // Offline / before the first echo: syncNow is just the local clock.
+    serverTimeOffsetMs = 0; serverTimeKnown = false;
+    ok = ok && Math.abs(syncNow() - Date.now()) < 50;
+
+    // Learn an offset from the echo of one of our own writes.
+    const clientAt = Date.now();
+    ownWriteStamps = [clientAt];
+    noteServerTime({ clientAt, serverAt: { toMillis: () => clientAt - 600000 } });
+    ok = ok && serverTimeKnown === true;
+    ok = ok && Math.abs(serverTimeOffsetMs - (-600000)) < 50;
+    ok = ok && Math.abs(syncNow() - (Date.now() - 600000)) < 100;
+
+    // markItemUpdated must use the corrected clock, not Date.now().
+    const item = markItemUpdated({});
+    ok = ok && item.updatedAt < Date.now() - 500000;
+
+    // Another device's write teaches us nothing about our own clock.
+    const before = serverTimeOffsetMs;
+    noteServerTime({ clientAt: 12345, serverAt: { toMillis: () => 999999999 } });
+    ok = ok && serverTimeOffsetMs === before;
+
+    // An implausible offset is ignored rather than trusted.
+    const c2 = Date.now();
+    ownWriteStamps = [c2];
+    noteServerTime({ clientAt: c2, serverAt: { toMillis: () => c2 + 5 * 24 * 3600 * 1000 } });
+    ok = ok && serverTimeOffsetMs === before;
+
+    serverTimeOffsetMs = saved; serverTimeKnown = savedKnown; ownWriteStamps = savedStamps;
+    return ok;
+  });
+
   checks.noConsoleErrors = errors.length === 0;
 
   const failed = Object.entries(checks).filter(([,v]) => !v).map(([k]) => k);

@@ -136,9 +136,9 @@ function renderPendingApproval() {
       <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· ${owner==='jenn'?'🐥 Jenn':'🦊 Jess'} added</span></div>
       <div style="font-size:0.85rem;color:var(--ink-light)">${(act.durationMin||60)} min · ${act.cat||'free'}</div>
       <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
-        <button class="btn-icon" style="padding:2px 8px;background:var(--accent-green)" onclick="approveKidActivity('${owner}','${act.id}')">✅ Approve</button>
-        <button class="btn-icon" style="padding:2px 8px" onclick="openParentActivityEditor('${owner}','${act.id}')">✏️ Modify</button>
-        <button class="btn-icon" style="padding:2px 8px" onclick="rejectKidActivity('${owner}','${act.id}')">🗑 Reject</button>
+        <button class="btn-icon" style="padding:2px 8px;background:var(--accent-green)" onclick="approveKidActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✅ Approve</button>
+        <button class="btn-icon" style="padding:2px 8px" onclick="openParentActivityEditor('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✏️ Modify</button>
+        <button class="btn-icon" style="padding:2px 8px" onclick="rejectKidActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">🗑 Reject</button>
       </div>`;
     wrap.appendChild(card);
   });
@@ -205,12 +205,12 @@ function parentActivityCard(act, owner) {
                     : owner==='jenn'   ? '🐥 Jenn only'
                     : '🦊 Jess only';
   card.innerHTML = `
-    <div class="challenge-title">${act.icon||'⭐'} ${act.name} <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· ${ownerLabel}</span></div>
+    <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· ${ownerLabel}</span></div>
     <div style="font-size:0.85rem;color:var(--ink-light)">${(act.durationMin||60)} min · ${act.cat||'free'}</div>
     <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
-      <button class="btn-icon" onclick="toggleShareActivity('${owner}','${act.id}')" style="padding:2px 8px" title="${owner==='shared'?'Move to single child':'Promote to shared'}">${owner==='shared'?'↩️ Unshare':'🔗 Share'}</button>
-      <button class="btn-icon" onclick="openParentActivityEditor('${owner}','${act.id}')" style="padding:2px 8px">✏️ Edit</button>
-      <button class="btn-icon" onclick="deleteParentActivity('${owner}','${act.id}')" style="padding:2px 8px">🗑</button>
+      <button class="btn-icon" onclick="toggleShareActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')" style="padding:2px 8px" title="${owner==='shared'?'Move to single child':'Promote to shared'}">${owner==='shared'?'↩️ Unshare':'🔗 Share'}</button>
+      <button class="btn-icon" onclick="openParentActivityEditor('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')" style="padding:2px 8px">✏️ Edit</button>
+      <button class="btn-icon" onclick="deleteParentActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')" style="padding:2px 8px">🗑</button>
     </div>
   `;
   return card;
@@ -507,11 +507,11 @@ function renderRoutinesList() {
     const card = document.createElement('div');
     card.className = 'challenge-card';
     card.innerHTML = `
-      <div class="challenge-title">${tmpl.icon} ${tmpl.title} <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· built-in${isOverridden?' (edited)':''}</span></div>
+      <div class="challenge-title">${tmpl.icon} ${escapeHtml(tmpl.title)} <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· built-in${isOverridden?' (edited)':''}</span></div>
       <div style="font-size:0.85rem;color:var(--ink-light)">${tmpl.items.length} items</div>
       <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem">
-        <button class="btn-icon" onclick="openEditBuiltInRoutine('${id}')" style="padding:2px 8px">✏️ Edit</button>
-        ${isOverridden ? `<button class="btn-icon" onclick="resetBuiltInRoutine('${id}')" style="padding:2px 8px" title="Reset to default">↩️ Reset</button>` : ''}
+        <button class="btn-icon" onclick="openEditBuiltInRoutine('${escapeJsAttr(id)}')" style="padding:2px 8px">✏️ Edit</button>
+        ${isOverridden ? `<button class="btn-icon" onclick="resetBuiltInRoutine('${escapeJsAttr(id)}')" style="padding:2px 8px" title="Reset to default">↩️ Reset</button>` : ''}
       </div>
     `;
     wrap.appendChild(card);
@@ -522,11 +522,11 @@ function renderRoutinesList() {
     const card = document.createElement('div');
     card.className = 'challenge-card';
     card.innerHTML = `
-      <div class="challenge-title">${r.icon||'📋'} ${r.title}</div>
+      <div class="challenge-title">${r.icon||'📋'} ${escapeHtml(r.title)}</div>
       <div style="font-size:0.85rem;color:var(--ink-light)">${r.items.length} items</div>
       <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem">
-        <button class="btn-icon" onclick="openEditRoutine('${r.id}')" style="padding:2px 8px">✏️ Edit</button>
-        <button class="btn-icon" onclick="deleteRoutine('${r.id}')" style="padding:2px 8px">🗑</button>
+        <button class="btn-icon" onclick="openEditRoutine('${escapeJsAttr(r.id)}')" style="padding:2px 8px">✏️ Edit</button>
+        <button class="btn-icon" onclick="deleteRoutine('${escapeJsAttr(r.id)}')" style="padding:2px 8px">🗑</button>
       </div>
     `;
     wrap.appendChild(card);
@@ -597,8 +597,8 @@ function renderRoutineBuilder() {
     // The icon box shows what the item WILL get if left alone — the guess from
     // its text — so a blank field never means a blank icon.
     row.innerHTML = `
-      <input type="text" class="builder-item-icon" placeholder="${routineItemIcon(it)}" value="${(it.icon||'').replace(/"/g,'&quot;')}" data-idx="${idx}" data-field="icon" title="Icon — leave blank to pick one from the words" aria-label="Icon">
-      <input type="text" placeholder="Task description" value="${(it.text||'').replace(/"/g,'&quot;')}" data-idx="${idx}" data-field="text">
+      <input type="text" class="builder-item-icon" placeholder="${escapeAttr(routineItemIcon(it))}" value="${escapeAttr(it.icon)}" data-idx="${idx}" data-field="icon" title="Icon — leave blank to pick one from the words" aria-label="Icon">
+      <input type="text" placeholder="Task description" value="${escapeAttr(it.text)}" data-idx="${idx}" data-field="text">
       <input type="number" placeholder="min" min="0" max="60" value="${it.timerSec?Math.round(it.timerSec/60):''}" data-idx="${idx}" data-field="timerMin" title="Timer (minutes)">
       <button class="del-btn" data-idx="${idx}">×</button>
     `;
@@ -912,12 +912,12 @@ function renderLevelRules() {
     const card = document.createElement('div');
     card.className = 'challenge-card';
     card.innerHTML = `
-      <div class="challenge-title">${r.newIcon||act?.icon||''} ${r.name||'Level Up'}</div>
+      <div class="challenge-title">${r.newIcon||act?.icon||''} ${escapeHtml(r.name||'Level Up')}</div>
       <div style="font-size:0.88rem;color:var(--ink-light)">
-        ${act?.icon||''} ${act?.name||r.activityId} → level up after <b>${r.target} ${r.type==='count'?'times':'hours'}</b>
+        ${act?.icon||''} ${escapeHtml(act?.name||r.activityId)} → level up after <b>${r.target} ${r.type==='count'?'times':'hours'}</b>
       </div>
       <div style="display:flex;justify-content:flex-end;margin-top:0.4rem">
-        <button class="btn-icon" onclick="deleteLevelRule('${r.id}')" style="padding:2px 8px">🗑</button>
+        <button class="btn-icon" onclick="deleteLevelRule('${escapeJsAttr(r.id)}')" style="padding:2px 8px">🗑</button>
       </div>
     `;
     list.appendChild(card);

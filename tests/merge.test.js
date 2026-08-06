@@ -350,5 +350,32 @@ const seenFwd = api.mergeProfileState(
 check('the "seen" watermark does move forwards',
   seenFwd.progress.lastGradeSeen === 900);
 
+// ── Clock skew (P1-3) ──────────────────────────────────────────────────────
+// Arbitration here is purely "higher updatedAt wins". That is correct only if
+// the stamps are comparable across devices, and they were not: every device
+// stamped with its own Date.now(), so the winner was whichever clock was
+// furthest ahead. These two checks pin the mechanism the fix depends on — the
+// merge layer is unchanged, what changed is that js/03-sync.js now stamps with
+// syncNow() (server-corrected) instead of Date.now().
+const T = 1700000000000;
+const SKEW = 10 * 60 * 1000;   // one tablet is ten minutes fast
+
+// Jenn's device edits first, in real time, but its clock is ten minutes fast.
+// Jess's device edits a minute later with a correct clock. With raw local
+// clocks, the stale edit wins and the later one silently disappears.
+const skewed = api.mergeArrayById(
+  [{ id: 'blk', who: 'earlier-but-fast-clock', updatedAt: T + SKEW }],
+  [{ id: 'blk', who: 'later-real-edit',        updatedAt: T + 60000 }]);
+check('a fast clock would win an exchange it should lose (the bug)',
+  skewed.length === 1 && skewed[0].who === 'earlier-but-fast-clock');
+
+// Stamped with server-corrected time, the same two edits arbitrate on when they
+// actually happened, and the later edit survives.
+const corrected = api.mergeArrayById(
+  [{ id: 'blk', who: 'earlier-but-fast-clock', updatedAt: T }],
+  [{ id: 'blk', who: 'later-real-edit',        updatedAt: T + 60000 }]);
+check('server-corrected stamps let the later edit win (the fix)',
+  corrected.length === 1 && corrected[0].who === 'later-real-edit');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

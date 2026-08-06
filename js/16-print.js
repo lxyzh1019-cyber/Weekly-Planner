@@ -174,7 +174,7 @@ function renderPrintSheet() {
       const bandVisStart = Math.max(band.start, winStartMin);
       if (absMin === bandVisStart) {
         const visSlots = Math.round((Math.min(band.end, winEndMin) - bandVisStart) / 15);
-        bandHtml = `<span class="print-band-label" style="height:${visSlots * slotPx - 1}px">${band.label}</span>`;
+        bandHtml = `<span class="print-band-label" style="height:${visSlots * slotPx - 1}px">${escapeHtml(band.label)}</span>`;
       }
     }
     html += `<div class="print-band-cell${band ? ' ' + band.cls : ''}">${bandHtml}</div>`;

@@ -59,7 +59,7 @@ function mnyNormalizeDebt(d) {
   if (!Array.isArray(d.payments)) d.payments = [];
   if (d.lastPaymentMonth === undefined) d.lastPaymentMonth = null;   // 'YYYY-MM'
   if (d.lastInterestMonth === undefined) d.lastInterestMonth = null; // 'YYYY-MM'
-  if (!d.createdAt) d.createdAt = Date.now();
+  if (!d.createdAt) d.createdAt = syncNow();
   return d;
 }
 
@@ -164,7 +164,7 @@ function mnyEditDebt(kid, debtId, field, value, opts) {
   const num = ['principal', 'downPayment', 'monthly', 'months', 'arrearsRatePct', 'bonusRate', 'paid'];
   d[field] = num.includes(field) ? Math.max(0, Number(value) || 0) : value;
   if (JSON.stringify(before) === JSON.stringify(d[field])) return false;
-  d.updatedAt = Date.now();
+  d.updatedAt = syncNow();
   mrLogAppend({ path: 'debts.' + kid + '.' + d.id + '.' + field, from: before, to: d[field],
                 reason: (opts && opts.reason) || MR_DEFAULT_REASON,
                 note: (opts && opts.note) || (d.name + ' — ' + field) });

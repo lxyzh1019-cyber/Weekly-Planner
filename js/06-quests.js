@@ -192,7 +192,7 @@ function mnyQuestSummary(kid, wk) {
         ? `<div class="mny-row"><span>Still to pay off</span><b>${mnyMoney(owing)}</b></div>
            <div class="mny-progress"><div class="mny-progress-fill green" style="width:${pct}%"></div></div>`
         : ''}
-      <button type="button" class="mny-btn wide primary" onclick="mnyOpenMyMoney('${kid}')">💰 Open My money ›</button>
+      <button type="button" class="mny-btn wide primary" onclick="mnyOpenMyMoney('${escapeJsAttr(kid)}')">💰 Open My money ›</button>
     </div>`;
 }
 
@@ -282,7 +282,7 @@ function buildHowIEarnCardLegacy(kid, wk) {
   // Bank & Invest is a parent surface — kids see their balances here but the
   // bank screen itself only opens from parent mode.
   const bankBtn = isParent()
-    ? `<button type="button" class="qmp-open" onclick="mnyOpenMyMoney('${kid}')">Open My money ›</button>`
+    ? `<button type="button" class="qmp-open" onclick="mnyOpenMyMoney('${escapeJsAttr(kid)}')">Open My money ›</button>`
     : '';
   return earnCard + `<div class="hm-rules">${rules}</div>` + wallet + bankBtn;
 }
@@ -637,7 +637,7 @@ function showQuestCompletePopup(act, result) {
   const sub = document.getElementById('questPopupSub');
   if (result?.leveledUp) {
     const tier = heroTierForLevel(result.newLevel);
-    sub.innerHTML = `🎉 LEVEL UP! You are now <strong>Lv ${result.newLevel} ${tier.name}</strong> ${tier.emoji}`;
+    sub.innerHTML = `🎉 LEVEL UP! You are now <strong>Lv ${result.newLevel} ${escapeHtml(tier.name)}</strong> ${tier.emoji}`;
   } else {
     sub.textContent = escapeHtml(act.name || '');
   }
@@ -701,7 +701,7 @@ function openProfileSwitcher() {
   const parentNow = isParent();
   const opt = (p, emoji, name) => {
     const on = !parentNow && cur === p;
-    return `<button type="button" class="profile-switch-opt${on ? ' current' : ''}" onclick="pickProfileFromSwitcher('${p}')">`
+    return `<button type="button" class="profile-switch-opt${on ? ' current' : ''}" onclick="pickProfileFromSwitcher('${escapeJsAttr(p)}')">`
       + `<span class="ps-emoji">${emoji}</span><span class="ps-name">${name}</span>`
       + `${on ? '<span class="ps-check">✓</span>' : ''}</button>`;
   };
