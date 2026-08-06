@@ -767,16 +767,10 @@
   }
   .btn-icon:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
   .btn-icon:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 var(--ink); }
-  /* Toolbar icons with a visible caption so kids know what each does,
-     not just an emoji to guess at. */
-  .btn-icon--labeled {
-    display: inline-flex; flex-direction: column; align-items: center;
-    justify-content: center; gap: 1px; line-height: 1;
-    padding: 0.28rem 0.5rem; font-size: 1.15rem;
-  }
-  .btn-icon--labeled .btn-icon__label {
-    font-size: calc(0.58rem * var(--fs-scale, 1)); font-weight: 700; letter-spacing: 0.2px;
-  }
+  /* .btn-icon--labeled / .btn-icon__label were the captioned toolbar icons in the
+     shortcut rows that the persistent nav replaced. Removed with their last use
+     rather than left behind: the nav's own .kid-nav-btn carries the same idea
+     (icon over caption, so a child is not guessing at an emoji). */
   button:focus-visible,
   [role="button"]:focus-visible,
   .view-tab:focus-visible,
@@ -5366,8 +5360,7 @@
   #screen-mymoney .mny-cal-cell,
   #screen-chore .ck-legend,
   #screen-chore .ck-legend span,
-  #screen-chore .ck-weeklabel,
-  .btn-icon--labeled .btn-icon__label {
+  #screen-chore .ck-weeklabel {
     font-size: calc(0.82rem * var(--fs-scale, 1));   /* 13.1px */
   }
 

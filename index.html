@@ -134,7 +134,7 @@
 
   <div class="quest-money-wrap" id="questMoneyWrap" hidden>
     <button type="button" class="quest-money-toggle" id="questMoneyToggle" onclick="togglePocketMoney()" aria-expanded="false" aria-controls="questMoneyPanel">
-      <span>💰 My pocket money</span>
+      <span>💰 My money</span>
       <span class="qmt-caret" id="qmtCaret">Show ▸</span>
     </button>
     <div class="quest-money-panel" id="questMoneyPanel" hidden></div>
@@ -192,14 +192,10 @@
         <h3 id="weekRangeLabel"></h3>
         <button class="btn-icon" onclick="changeWeek(1)" aria-label="Next week">▶</button>
       </div>
-      <div class="week-actions">
-        <button class="btn-icon btn-icon--labeled" aria-label="Today" onclick="goToday()" title="Today"><span aria-hidden="true">☀️</span><span class="btn-icon__label">Today</span></button>
-        <button class="btn-icon btn-icon--labeled" aria-label="Quest Board" onclick="goQuestBoard()" title="Quest Board"><span aria-hidden="true">🎮</span><span class="btn-icon__label">Quests</span></button>
-        <button class="btn-icon btn-icon--labeled" aria-label="Weekly Chore" onclick="openChoreTab()" title="Weekly Chore"><span aria-hidden="true">🧹</span><span class="btn-icon__label">Chores</span></button>
-        <button class="btn-icon btn-icon--labeled" id="weekMoneyBtn" aria-label="My money" onclick="openWeekMoney()" title="My money"><span aria-hidden="true">💰</span><span class="btn-icon__label">My money</span></button>
-        <button class="btn-icon btn-icon--labeled" aria-label="Sister Sync &amp; Challenges" onclick="openSisterSync()" title="Sister Sync &amp; Challenges"><span aria-hidden="true">👯</span><span class="btn-icon__label">Sisters</span></button>
-        <button class="btn-icon btn-icon--labeled" aria-label="Print week" onclick="openPrint()" title="Print week"><span aria-hidden="true">🖨</span><span class="btn-icon__label">Print</span></button>
-      </div>
+      <!-- The six-button shortcut row that used to live here is gone: every one of
+           its destinations is in the persistent nav (Today, Money) or behind More
+           (Quests, Chores, Sisters, Print). Two rows of navigation on one screen
+           is how the labels drifted apart in the first place. -->
     </div>
     <div class="week-topbar__row2">
       <!-- View switcher: Full (cards) / Time-Grid (hours) -->
@@ -309,7 +305,6 @@
       <h2>Weekly Chore 🧹</h2>
     </div>
     <div class="topbar-actions">
-      <button class="btn-icon btn-icon--labeled" onclick="openWeekMoney()" title="My money" aria-label="My money"><span aria-hidden="true">💰</span><span class="btn-icon__label">My money</span></button>
       <div class="profile-badge" id="choreProfileBadge"></div>
     </div>
   </div>
@@ -377,7 +372,6 @@
         </div>
       </div>
       <div style="display:flex;gap:0.4rem;align-items:center" class="day-topbar-actions">
-        <button class="btn-icon" onclick="openWeekMoney()" aria-label="My money" title="My money">💰</button>
         <button class="btn-icon" onclick="openTemplateSheet()" aria-label="Apply template">📋</button>
         <button class="btn-icon" onclick="openReflectSheet()" aria-label="Reflect on today">🌙</button>
         <button class="profile-badge" onclick="openProfileSwitcher()" id="dayProfileBadge" aria-label="Switch profile"></button>

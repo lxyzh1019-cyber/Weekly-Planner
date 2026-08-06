@@ -426,7 +426,51 @@ Add `.github/workflows/ci.yml` running `check` + `test:merge` on every PR
 to `REVIEW.md` and `MULTI_ROLE_REVIEW.md` marking them historical and pointing
 to this file.
 
-## P3-3 · 67 unreferenced CSS classes
+## P3-3 · unreferenced CSS — verified list, deliberately not swept
+
+Re-measured 2026-08-06 after the Today-first stages landed: **42 class selectors
+in `css/app.css` appear nowhere in `index.html`, `js/` or `tests/`**, so they
+cannot be applied. (The audit's "67" counted names that are assembled at runtime
+from a prefix, e.g. `'ck-' + lane`; those are excluded here.)
+
+  `tg-*` (9): `tg-col-today`, `tg-col-today-border`, `tg-col-today-bottom`, `tg-day-link`, `tg-hour-cell`, `tg-hour-free`, `tg-hour-stack`, `tg-seg-abs`, `tg-week-overview`
+  `wf-*` (6): `wf-card--cont`, `wf-card-cont-marker`, `wf-cell-empty`, `wf-travel--tier-long`, `wf-travel--tier-short`, `wf-travel--tier-tiny`
+  `ct-*` (5): `ct-badge-week`, `ct-hist-detail`, `ct-hist-kid`, `ct-hist-total`, `ct-score-row`
+  `money-*` (3): `money-btn-row`, `money-hero`, `money-market`
+  `qms-*` (3): `qms-chip`, `qms-chips`, `qms-week`
+  `day-*` (2): `day-goals-todos`, `day-goals-todos__section`
+  `qmp-*` (2): `qmp-tile-label`, `qmp-tile-value`
+  `travel-*` (2): `travel-meta-icon`, `travel-meta-text`
+  `block-*` (1): `block-place-pulse`
+  `btn-*` (1): `btn-icon--labeled`
+  `bucket-*` (1): `bucket-sleep-meal`
+  `duration-*` (1): `duration-align-spacer`
+  `mny-*` (1): `mny-kid-switch`
+  `place-*` (1): `place-target`
+  `sheet-*` (1): `sheet-time-custom-row`
+  `timeline-*` (1): `timeline-zone-label`
+  `timer-*` (1): `timer-input`
+  `tutorial-*` (1): `tutorial-choice-list`
+
+**Not removed, on purpose.** An automated sweep of these was attempted and broke
+the stylesheet: a rule-level parser swallowed the closing brace of `@media`
+blocks, leaving the file 43 braces short. It was caught by a brace-balance check
+and reverted, but the lesson stands — most of these sit in compound selectors
+mixing live and dead classes (`.tg-cell.tg-hour-cell`, `.tg-head.tg-col-today-border`),
+so removal is per-rule surgery, not a sweep.
+
+These classes are inert: a few hundred bytes, no runtime cost. A silently broken
+layout on a child's iPad costs considerably more. Do this one deliberately, in
+its own change, with before/after screenshots of the week grid at 390px, 768px
+and 1024px — the `tg-*` and `wf-*` groups are the dense grid where a missing rule
+is least obvious and most damaging.
+
+The two classes this session *made* dead (`.btn-icon--labeled`,
+`.btn-icon__label` — the captioned toolbar icons in the shortcut rows the
+persistent nav replaced) were removed with their last use, which is the right
+time to do it.
+
+## P3-3 (original finding) · 67 unreferenced CSS classes
 
 Out of 1,118 in a 5,298-line stylesheet. Includes an orphaned `tg-*` family
 (~25 rules: `tg-grid`, `tg-hour-cell`, `tg-mytime-*`, `tg-week-overview`…) left

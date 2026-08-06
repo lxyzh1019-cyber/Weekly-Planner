@@ -90,8 +90,19 @@ function findChromium() {
 
   // Kid money surface: kids reach Pocket Money and may LOOK at the bank, but
   // every function that moves money refuses them.
-  checks.kidMoneyLabel = await page.evaluate(() =>
-    document.getElementById('weekMoneyBtn').textContent.includes('My money'));
+  // One label for one destination (audit P2-4). The Quest board used to call it
+  // "My pocket money" while three other entry points called it "My money"; the
+  // shortcut row those lived in is gone, so the surviving routes are checked.
+  checks.kidMoneyLabel = await page.evaluate(() => {
+    profile = 'jenn'; goToday();
+    const nav = document.querySelector('#kidNav [data-td-nav="money"]');
+    const navSays = !!nav && nav.textContent.includes('Money');
+    showScreen('quest'); renderQuestBoard();
+    const questText = document.getElementById('screen-quest').textContent;
+    const questSays = !/pocket money/i.test(questText);
+    goWeek();
+    return navSays && questSays;
+  });
   // The money button lands a kid on her own page, and that page shows the four
   // things she owns and what she still owes.
   checks.kidCanOpenMyMoney = await page.evaluate(() => {
@@ -906,9 +917,11 @@ function findChromium() {
 
      So this is a ratchet, not an exemption: the ceiling is what it currently
      measures, it fails the build if it grows, and the 200 target stays written
-     down as the thing the rebuild has to hit. */
+     down as the thing the rebuild has to hit. Tighten it whenever the real number
+     comes down — 346 at the audit, 280 after the disclosures, 276 once the
+     duplicate shortcut rows went. */
   const WORD_BUDGET = { 'screen-today': 200, 'screen-week': 200, 'screen-quest': 200,
-                        'screen-mymoney': 200, 'screen-chore': 280 };
+                        'screen-mymoney': 200, 'screen-chore': 276 };
   const KID_SCREENS = [
     // Today is held to the full 200 with no ratchet: it was built to these rules
     // rather than measured against them afterwards, which was the point of

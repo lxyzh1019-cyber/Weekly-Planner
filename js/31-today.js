@@ -17,7 +17,7 @@
 //
 // Invariants it must not break (see CLAUDE.md): a child may create or update a
 // claim, never grade or settle; nothing here moves money. Reached from the tab
-// bar; not yet the default landing — that is the next stage.
+// bar and from the persistent nav, and it is where a child now lands.
 //
 // Declarations only. Wiring is in js/99-main.js.
 
@@ -219,7 +219,7 @@ function tdHandleClick(e) {
   if (a === 'waiting') { openChoreTab(); ckGoWaiting(); return; }
   if (a === 'fresh')   { openChoreTab(); ckGoFresh(); return; }
   if (a === 'week')    { goWeek(); return; }
-  if (a === 'money')   { mnyOpenMyMoney(activeProfile()); return; }
+  if (a === 'money')   { openWeekMoney(); return; }
 }
 
 function goToday() {
@@ -324,6 +324,8 @@ function tdHandleNavClick(e) {
   const d = el.getAttribute('data-td-nav');
   if (d === 'today') { goToday(); return; }
   if (d === 'week')  { goWeek(); return; }
-  if (d === 'money') { mnyOpenMyMoney(activeProfile()); return; }
+  // openWeekMoney, not mnyOpenMyMoney directly: it resolves whose money page
+  // this is, which is not always the active profile.
+  if (d === 'money') { openWeekMoney(); return; }
   if (d === 'more')  { tdOpenMore(); return; }
 }

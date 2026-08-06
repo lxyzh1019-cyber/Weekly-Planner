@@ -181,8 +181,23 @@ Kid-facing copy is a product surface, not filler. The rules:
   is not banned, it starts collapsed — `mnyPricesOpen`, `ckPrivsOpen` and
   `weekGlanceOpen` are the pattern: closed by default, remembered in
   `localStorage` (never synced state — every state write is a full-document
-  upload). `screen-chore` is on a **ratchet** at 280 rather than the 200 target;
-  it must not grow, and the Today-first rebuild is what should bring it down.
+  upload). `screen-chore` is on a **ratchet** (276) rather than the 200 target: it
+  must not grow, tighten it whenever the real number drops, and the target stays
+  written down.
+
+## Navigation
+
+**Today is the front door** (`js/31-today.js`). A child lands there and moves
+through one nav — **Today · Week · Money · More** — which is a single fixed
+element outside the screens, filled by `tdRenderNav`. Do not add a second nav row
+to a screen: the six-button shortcut row that used to sit in three different
+topbars is exactly how their labels drifted apart, and it is gone.
+
+Today **owns no data and no rules.** Every number it shows is read through the
+accessors the owning screen uses, and every row hands off. A second place that
+grades a chore or moves money is a second place that can disagree with the first,
+and a child has no way to tell which one is lying. If you add something to Today,
+add a reader, not a writer.
 - Use the design tokens in `css/app.css` (`--space-*`, `--text-*`,
   `--shadow-*`, `--radius-*`). Avoid new inline `style="…"`.
 - `--accent` (`#ff7b54`) is decorative only. Anything with white text on it or
