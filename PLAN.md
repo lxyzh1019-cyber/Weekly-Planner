@@ -9,13 +9,25 @@
 > syntax check that could not fail and eight smoke checks that could not fail;
 > now 32 files / 52 merge / 132 smoke, all of which can.
 >
-> **Still open, deliberately:** the deployed Firestore rules are unverified (the
-> read-only check was blocked — see §0f); auth is deferred by decision, with
+> **Follow-up pass (`009d2f6`, `db09e70`, `c4c2e70`):** every acceptance
+> criterion the branches had approximated is now met, and each new check was
+> mutation-tested — the feature was broken deliberately and the check had to
+> catch it. That turned up four defects the original tests could not see: a
+> second XSS (`dispName`, a local holding `act.name`, rendered straight into a
+> week card), the 44px floor missing on the week view's tab switcher at
+> tablet-landscape and desktop, My money at 564 words on an iPad in landscape,
+> and a restore path that skipped `migrateBlocks` without any test noticing.
+>
+> **Still open:** the deployed Firestore rules are unverified (the read-only
+> check was blocked — see §0f); auth is deferred by decision, with
 > `firestore.rules` committed unapplied and a runbook in `SECURITY_TODO.md`;
-> `screen-chore` sits on a 276-word ratchet against a 200 target; the 42
-> verified-unreferenced CSS classes are catalogued in `AUDIT.md` but not swept.
-> Out of scope throughout: the parent Waiting-home consolidation and the
-> design-system pass.
+> `screen-chore` sits on a 276-word ratchet against a 200 target, which needs a
+> product decision about which instructional copy a nine-year-old can lose;
+> live two-device Firestore sync is untestable here without the emulator; and
+> P0-2 step 2 (week archival) stays deferred until the size numbers justify it.
+> CI has still never executed — pushing to a feature branch fires neither
+> trigger. Out of scope throughout: the parent Waiting-home consolidation and
+> the design-system pass.
 
 ## Context
 
