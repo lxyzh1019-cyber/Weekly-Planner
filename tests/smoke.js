@@ -783,21 +783,160 @@ function findChromium() {
           bad.overflow.push(String(el.className).slice(0, 40) + '@' + Math.round(r.right));
         }
       });
-      // Primary controls need a 44px target. Icon-sized steppers inside a
-      // scrolling table are exempt; the ones a thumb actually aims at are not.
+      // Primary controls need a 44px target in BOTH dimensions. This used to
+      // measure height only, which is how a 36x36 week arrow passed for months:
+      // tall enough was never the problem, wide enough was.
       document.querySelectorAll(
-        '.ck-chore-row, .ck-qbtn, .ck-day, .ck-segbtn, .ck-item, .ck-rate, .cp-gbtn, .cp-kid, .co-lane, .co-who'
+        '.ck-chore-row, .ck-qbtn, .ck-day, .ck-segbtn, .ck-item, .ck-rate, .ck-navbtn,' +
+        '.cp-gbtn, .cp-kid, .co-lane, .co-who, .ck-else-btn'
       ).forEach(el => {
         const r = el.getBoundingClientRect();
         if (!r.width || !r.height) return;
-        if (r.height < 44 && !seen.has('h:' + el.className)) {
-          seen.add('h:' + el.className);
-          bad.small.push(String(el.className).slice(0, 30) + '@' + Math.round(r.height));
+        const key = 'sz:' + el.className;
+        if ((r.height < 44 || r.width < 44) && !seen.has(key)) {
+          seen.add(key);
+          bad.small.push(String(el.className).slice(0, 30) + '@' +
+                         Math.round(r.width) + 'x' + Math.round(r.height));
         }
       });
       return bad;
     }, { w, label });
   };
+
+  // ── Kid-screen standards (Branch 3) ──────────────────────────────────────
+  // Three house rules from CLAUDE.md, asserted rather than hoped for. They exist
+  // to bind what comes next: a rebuilt Today screen has to be born inside this
+  // budget instead of inheriting the density it replaces.
+  //
+  //   ≤200 visible words per kid screen in its default state
+  //   every interactive target at least 44x44 — BOTH dimensions
+  //   nothing below 13px
+  //
+  // Reference material is not banned, it just starts collapsed. Words are counted
+  // in the default state, so a closed disclosure costs nothing and an open-by-
+  // default wall of policy costs everything.
+  const kidStandards = async (screenId) => page.evaluate((screenId) => {
+    const scr = document.getElementById(screenId);
+    if (!scr) return { screen: screenId, error: 'screen missing' };
+    const visible = (el) => {
+      const s = getComputedStyle(el);
+      if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) === 0) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    };
+
+    // A word has a letter in it. Bare numbers — a calendar's dates, a dollar
+    // figure, a tally — are what the screen is FOR, not text to wade through, and
+    // counting them would make a date grid look like a wall of prose.
+    let words = 0;
+    const walk = document.createTreeWalker(scr, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = walk.nextNode())) {
+      const p = n.parentElement;
+      if (!p || !visible(p) || p.closest('[hidden]')) continue;
+      const t = (n.textContent || '').trim();
+      if (t) words += t.split(/\s+/).filter(w => /[A-Za-z]/.test(w)).length;
+    }
+
+    // The week card's done-tick is sized inline per block height and sits at a
+    // card corner, so a 44px hit area there would swallow the tap that opens the
+    // day. Exempted deliberately, by name, with the reason in css/app.css — the
+    // Today-first rebuild is what actually relieves that grid.
+    const EXEMPT = ['wf-card-check'];
+
+    /* Measure the hit area, not the box. CLAUDE.md's own advice for a control
+       that must stay visually small is to keep its size and grow the target with
+       padding or an ::after overlay — and getBoundingClientRect cannot see an
+       overlay, so a box-size check would fail exactly the fix it recommends.
+       Probe instead: if the topmost element at a point is this control (or lives
+       inside it), the thumb lands on it there. */
+    const hittable = (el, x, y) => {
+      // A probe point outside the viewport proves nothing — a thumb cannot land
+      // there either, so a control at the screen edge is not failed for it.
+      if (x < 0 || y < 0 || x > window.innerWidth - 1 || y > window.innerHeight - 1) return true;
+      const hit = document.elementFromPoint(x, y);
+      return !!hit && (hit === el || el.contains(hit));
+    };
+    const reaches44 = (el) => {
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      const half = 21;   // 22px each way ≈ a 44px target, 1px inside the edge
+      // Horizontal and vertical extremes are what a 44px box actually requires.
+      return hittable(el, cx - half, cy) && hittable(el, cx + half, cy)
+          && hittable(el, cx, cy - half) && hittable(el, cx, cy + half);
+    };
+
+    const small = [];
+    scr.querySelectorAll('button, [onclick], [role="button"], a[href], input:not([type=hidden]), select, summary, .pill-btn, .btn-icon').forEach(el => {
+      if (!visible(el)) return;
+      if (EXEMPT.some(c => el.classList.contains(c))) return;
+      const r = el.getBoundingClientRect();
+      // Cheap path first; only probe the ones the box test would fail.
+      if (r.height >= 44 && r.width >= 44) return;
+      if (reaches44(el)) return;
+      small.push(`${(el.className || el.tagName).toString().trim().slice(0, 26)}@${Math.round(r.width)}x${Math.round(r.height)}`);
+    });
+
+    let minFont = 999, minWhere = '';
+    scr.querySelectorAll('*').forEach(el => {
+      if (!visible(el)) return;
+      if (![...el.childNodes].some(c => c.nodeType === 3 && c.textContent.trim())) return;
+      const f = parseFloat(getComputedStyle(el).fontSize);
+      if (f && f < minFont) {
+        minFont = f;
+        // Enough to actually find it: an unclassed <span> named only by tag is
+        // unfindable, and an inline font-size needs a different fix from a class.
+        const own = (el.className || '').toString().trim();
+        const parent = el.parentElement ? (el.parentElement.className || el.parentElement.tagName).toString().trim().slice(0, 24) : '';
+        const inline = /font-size/.test(el.getAttribute('style') || '') ? ' [inline]' : '';
+        minWhere = `${own || el.tagName}${own ? '' : ' in .' + parent}${inline}`.slice(0, 60);
+      }
+    });
+
+    return { screen: screenId, words, small, minFont: Math.round(minFont * 100) / 100, minWhere };
+  }, screenId);
+
+  /* Word budgets. Three screens meet the 200 the house rules ask for. The chore
+     screen does not, and the honest number is here rather than a quietly relaxed
+     rule: it came down from 346 (the audit's measurement) to ~275 by collapsing
+     the privilege ladder and the XP explainer, and the rest is instructional copy
+     a nine-year-old plausibly still needs — "tap twice if nobody had to ask",
+     "only whole bundles pay". Deciding which of those she can do without is a
+     product call and the Today-first rebuild's job, not a CSS pass.
+
+     So this is a ratchet, not an exemption: the ceiling is what it currently
+     measures, it fails the build if it grows, and the 200 target stays written
+     down as the thing the rebuild has to hit. */
+  const WORD_BUDGET = { 'screen-week': 200, 'screen-quest': 200, 'screen-mymoney': 200,
+                        'screen-chore': 280 };
+  const KID_SCREENS = [
+    ['screen-week',    () => { goWeek(); renderWeek(); }],
+    ['screen-quest',   () => { showScreen('quest'); renderQuestBoard(); }],
+    ['screen-chore',   () => { openChoreTab(); ckSelectDay(2); }],
+    ['screen-mymoney', () => { mnyOpenMyMoney('jenn'); }],
+  ];
+  const kidFindings = [];
+  for (const [w, h] of [[390, 844], [900, 1100]]) {
+    await page.setViewportSize({ width: w, height: h });
+    for (const [id, nav] of KID_SCREENS) {
+      await page.evaluate(`(${nav.toString()})()`);
+      await page.waitForTimeout(200);
+      const r = await kidStandards(id);
+      const budget = WORD_BUDGET[id] || 200;
+      const problems = [];
+      if (r.error) problems.push(r.error);
+      if (r.words > budget) problems.push(`${r.words} words (max ${budget}${budget !== 200 ? ', ratchet — target is 200' : ''})`);
+      if (r.small && r.small.length) problems.push(`${r.small.length} target(s) under 44px: ${r.small.slice(0, 6).join(', ')}`);
+      if (r.minFont < 13) problems.push(`font ${r.minFont}px on .${r.minWhere} (min 13)`);
+      if (problems.length) kidFindings.push(`${id}@${w}: ${problems.join(' | ')}`);
+    }
+  }
+  checks.kidScreensMeetTheHouseRules = kidFindings.length === 0 || kidFindings;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => { mnyOpenMyMoney('jenn'); });
+  await page.screenshot({ path: shot('phone_mymoney') });
+  await page.setViewportSize({ width: 900, height: 1100 });
+  await page.waitForTimeout(200);
 
   // Kid tab, both phone widths.
   await page.evaluate(() => {
@@ -1392,7 +1531,7 @@ function findChromium() {
     const wasPaying = mrRules().chores.grade[3];
     mrApplyEdits([{ path: 'chores.grade.3', value: wasPaying + 1 }], { reason: 'family_meeting' });
     mnyOpenMyMoney(kid);
-    mnyOpenPrices.all = true; mnyRenderMyMoney();
+    mnySetPricesOpen(true); mnyRenderMyMoney();
     const txt = document.getElementById('mnyPage1Wrap').textContent;
     const showsNewPrice = txt.includes('$' + (wasPaying + 1).toFixed(2));
     // Whether the week restates depends on when the edit takes effect; what
@@ -2371,9 +2510,62 @@ function findChromium() {
     return ok;
   });
 
+  // Installable, because this app lives on an iPad's home screen. The icons were
+  // already in the repo at the right sizes; only the manifest was missing.
+  //
+  // The manifest is read from disk rather than fetched in the page: the suite runs
+  // over file://, where fetch() is blocked outright, so an in-page fetch reports a
+  // broken manifest whether or not the manifest is broken.
+  {
+    const domSide = await page.evaluate(() => {
+      const link = document.querySelector('link[rel="manifest"]');
+      return {
+        href: link ? link.getAttribute('href') : null,
+        theme: !!document.querySelector('meta[name="theme-color"]'),
+        appleCapable: !!document.querySelector('meta[name="apple-mobile-web-app-capable"]')
+      };
+    });
+    const problems = [];
+    if (!domSide.href) problems.push('no <link rel="manifest">');
+    if (!domSide.theme) problems.push('no theme-color meta');
+    if (!domSide.appleCapable) problems.push('no apple-mobile-web-app-capable meta');
+    if (domSide.href) {
+      const mPath = path.join(__dirname, '..', domSide.href);
+      if (!fs.existsSync(mPath)) problems.push(`manifest missing at ${domSide.href}`);
+      else {
+        let m = null;
+        try { m = JSON.parse(fs.readFileSync(mPath, 'utf8')); }
+        catch (e) { problems.push('manifest is not valid JSON'); }
+        if (m) {
+          const sizes = (m.icons || []).map(i => i.sizes);
+          if (!m.name || !m.short_name) problems.push('manifest needs name and short_name');
+          if (!m.start_url) problems.push('manifest needs start_url');
+          if (m.display !== 'standalone') problems.push(`display is ${m.display}, want standalone`);
+          if (!sizes.includes('192x192') || !sizes.includes('512x512')) problems.push('needs 192 and 512 icons');
+          if (!(m.icons || []).some(i => (i.purpose || '').includes('maskable'))) problems.push('needs a maskable icon');
+          for (const icon of (m.icons || [])) {
+            if (!fs.existsSync(path.join(__dirname, '..', icon.src))) problems.push(`icon missing: ${icon.src}`);
+          }
+        }
+      }
+    }
+    checks.installsToTheHomeScreen = problems.length === 0 || problems;
+  }
+
   checks.noConsoleErrors = errors.length === 0;
 
-  const failed = Object.entries(checks).filter(([,v]) => !v).map(([k]) => k);
+  // A check passes only by being exactly true.
+  //
+  // This used to be `filter(([,v]) => !v)`, which meant every check written in the
+  // house idiom — `cond || [whatWentWrong]` — could never fail: on failure it
+  // assigns a non-empty array, and an array is truthy. Eight checks were built
+  // that way, including the 44px target audit. They printed their findings into
+  // the report and were then counted as passes, so the suite said ALL SMOKE
+  // CHECKS PASSED with the failures sitting in the output above it.
+  //
+  // Same shape as the `for f in js/*.js; do node --check "$f" || break; done`
+  // bug in the syntax check: a test that reports a problem and returns success.
+  const failed = Object.entries(checks).filter(([, v]) => v !== true).map(([k]) => k);
   console.log(JSON.stringify({ checks, errors }, null, 2));
   console.log(failed.length ? `FAILED: ${failed.join(', ')}` : 'ALL SMOKE CHECKS PASSED');
   await browser.close();

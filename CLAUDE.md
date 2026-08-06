@@ -78,6 +78,14 @@ fires, and the check reports success while the real error scrolls past on
 stderr. Under CI it is a check that can never fail. `tests/check-syntax.js`
 exists because of this.
 
+A check in `smoke.js` passes only by being exactly `true`. The house idiom
+`checks.x = cond || [whatWentWrong]` returns a **truthy array** on failure, so
+while the runner used `filter(([,v]) => !v)` all eight checks written that way —
+the 44px target audit among them — printed their findings and were then counted
+as passes. Same shape as the `|| break` bug above: a test that reports a problem
+and returns success. If you add a check, return `true` or the findings, never a
+bare truthy value.
+
 `tests/check-globals.js` enforces the one-declaration-per-name rule above,
 covering `function`, `async function` and top-level `let`/`const`/`var`
 (including the comma-separated form) — a duplicate `let` is a load-time
@@ -154,9 +162,27 @@ Kid-facing copy is a product surface, not filler. The rules:
 ## UI rules
 
 - **Touch targets ≥ 44×44px** on every interactive element, including week
-  arrows and small chips. The app currently fails this almost everywhere; don't
-  add new violations.
-- **Minimum font size 13px**; 15px for anything a child must read to act.
+  arrows and small chips. Enforced on the four kid screens by
+  `kidScreensMeetTheHouseRules` in `tests/smoke.js`, which probes the real hit
+  area with `elementFromPoint` rather than measuring the box — so the
+  keep-it-small-and-grow-the-target-with-an-`::after` technique passes, as it
+  should. One documented exemption: `.wf-card-check`, whose size is set inline per
+  block height and which sits at a card corner, where a 44px target would swallow
+  the tap that opens the day.
+  Scope target rules to the **component**, not the screen: `.ck-navbtn` is both a
+  kid's week arrow and the parent portal's, and screen-scoping it left the portal
+  copy at 36×36.
+- **Minimum font size 13px**; 15px for anything a child must read to act. Also
+  enforced by the same check. Roughly 147 declarations in `css/app.css` compute
+  below 13px, but most are print, dark-mode or parent surfaces where the kid floor
+  does not apply — the floor is a scoped block at the end of `css/app.css` listing
+  only what actually rendered too small.
+- **≤200 visible words per kid screen** in its default state. Reference material
+  is not banned, it starts collapsed — `mnyPricesOpen`, `ckPrivsOpen` and
+  `weekGlanceOpen` are the pattern: closed by default, remembered in
+  `localStorage` (never synced state — every state write is a full-document
+  upload). `screen-chore` is on a **ratchet** at 280 rather than the 200 target;
+  it must not grow, and the Today-first rebuild is what should bring it down.
 - Use the design tokens in `css/app.css` (`--space-*`, `--text-*`,
   `--shadow-*`, `--radius-*`). Avoid new inline `style="…"`.
 - `--accent` (`#ff7b54`) is decorative only. Anything with white text on it or

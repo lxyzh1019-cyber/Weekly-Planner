@@ -534,6 +534,7 @@ function ctHandleWrapClick(e) {
   else if (a === 'ck-day') ckSelectDay(+el.dataset.day);
   else if (a === 'ck-week') ctChangeWeek(+el.dataset.delta);
   else if (a === 'ck-history') ckToggleHistory();
+  else if (a === 'ck-privs') ckTogglePrivs();
   else if (a === 'ck-history-pick') ckPickWeek(el.dataset.week);
   else if (a === 'ck-chore-row') ckTapChoreRow(el.dataset.choreId);
   else if (a === 'ck-claim') ckClaim(el.dataset.choreId, +el.dataset.quality);

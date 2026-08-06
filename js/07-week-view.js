@@ -225,6 +225,28 @@ function renderWeekGlance(keys) {
     ${sleepHtml}
     ${notesHtml}
   `;
+  applyWeekGlanceOpen();
+}
+
+/* "This week at a glance" is reference, so it starts closed and remembers what
+   she chose. Per-device view state, so localStorage rather than the synced
+   document — same idiom as HERO_MODE_LS_KEY in js/05-helpers.js. */
+const WK_GLANCE_LS_KEY = 'wp_week_glance_open';
+function weekGlanceOpen() { return localStorage.getItem(WK_GLANCE_LS_KEY) === '1'; }
+function toggleWeekGlance() {
+  try { localStorage.setItem(WK_GLANCE_LS_KEY, weekGlanceOpen() ? '0' : '1'); } catch (e) {}
+  applyWeekGlanceOpen();
+}
+function applyWeekGlanceOpen() {
+  const open = weekGlanceOpen();
+  const body = document.getElementById('weekGlanceBody');
+  const age = document.getElementById('weekGlanceAge');
+  const caret = document.getElementById('weekGlanceCaret');
+  const btn = document.querySelector('#weekGlance .week-glance-toggle');
+  if (body) body.hidden = !open;
+  if (age) age.hidden = !open;
+  if (caret) caret.textContent = open ? 'Hide ▾' : 'Show ▸';
+  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
 
 // #6 Weekly wins recap — a celebratory look at what actually got done.

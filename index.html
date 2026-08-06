@@ -7,6 +7,15 @@
 <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png">
+<!-- Installable: this lives on an iPad and a phone, so it should open from the
+     home screen without browser chrome eating the top of a dense week grid.
+     The icons were already in the repo at the right sizes; only the manifest
+     was missing. --meta theme-color matches --bg so the status bar blends. -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#fef9ef">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Planner">
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Gochi+Hand&family=Nunito:wght@400;600;700;800&family=Patrick+Hand&display=swap" rel="stylesheet">
 
 <!-- Firebase (compat builds for simplicity) — defer so they don't block HTML parsing -->
@@ -220,15 +229,23 @@
     </div>
   </div>
 
-  <!-- This week at a glance: category/free-time totals, sleep, notes -->
+  <!-- This week at a glance: category/free-time totals, sleep, notes.
+       Collapsed by default — it is a reference panel, and open it cost about a
+       fifth of the screen's 200-word budget before the week itself was read.
+       The age field lives inside, because the only thing it changes is the sleep
+       line it sits above. -->
   <div class="week-glance" id="weekGlance">
     <div class="week-glance-header">
-      <h3>📊 This week at a glance</h3>
-      <label class="week-glance-age">🎂 Age
-        <input type="number" id="weekAge" min="1" max="18" placeholder="—" onchange="onWeekAgeChange()">
-      </label>
+      <button type="button" class="week-glance-toggle" onclick="toggleWeekGlance()"
+              aria-expanded="false" aria-controls="weekGlanceBody">
+        <h3>📊 This week at a glance</h3>
+        <span class="week-glance-caret" id="weekGlanceCaret">Show ▸</span>
+      </button>
     </div>
-    <div class="week-glance-body" id="weekGlanceBody"></div>
+    <label class="week-glance-age" id="weekGlanceAge" hidden>🎂 Age
+      <input type="number" id="weekAge" min="1" max="18" placeholder="—" onchange="onWeekAgeChange()">
+    </label>
+    <div class="week-glance-body" id="weekGlanceBody" hidden></div>
   </div>
 
   <!-- Goals + Todos panel (side-by-side, below Full Week grid) -->

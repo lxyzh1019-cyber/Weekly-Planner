@@ -641,10 +641,24 @@ function ckRail(kid) {
     `<span class="ck-spark ${w.now ? 'now' : ''}" style="height:${Math.max(4, Math.round(w.money / peak * 40))}px"
       title="Week of ${MONTH_SHORT[w.d.getMonth()]} ${w.d.getDate()}: ${ckMoney(w.money)}"></span>`).join('');
 
-  const privs = mrPrivileges(kid, ctWeekKey).map(p =>
+  /* The whole privilege ladder used to print every time — five rows of things
+     she cannot have yet, on a screen with a 200-word budget. What motivates is
+     what she has earned plus the one thing next; levels 5, 8 and 12 are a lookup
+     table, and a lookup table belongs behind a tap. */
+  const allPrivs = mrPrivileges(kid, ctWeekKey);
+  const nextLocked = allPrivs.find(p => !p.unlocked);
+  const shownPrivs = ckPrivsOpen()
+    ? allPrivs
+    : allPrivs.filter(p => p.unlocked || p === nextLocked);
+  const privsHidden = allPrivs.length - shownPrivs.length;
+  const privs = shownPrivs.map(p =>
     `<div class="ck-priv ${p.unlocked ? 'on' : ''}">
       <span class="ck-priv-name">${escapeHtml(p.label)}</span>
-      <span class="ck-priv-state">${p.unlocked ? 'yours' : `level ${p.levelReq}`}</span></div>`).join('');
+      <span class="ck-priv-state">${p.unlocked ? 'yours' : `level ${p.levelReq}`}</span></div>`).join('')
+    + (privsHidden > 0 || ckPrivsOpen()
+      ? `<button type="button" class="ck-privs-more" data-ct-action="ck-privs">${
+          ckPrivsOpen() ? 'Show less ▾' : `See all ${allPrivs.length} ▸`}</button>`
+      : '');
 
   return `<aside class="ck-rail">
     <div>
@@ -674,7 +688,7 @@ function ckRail(kid) {
       <div class="ck-xprow"><span class="ck-rail-total">${lv.xp}</span>
         <span class="ck-chip-cap">level ${lv.level} · ${escapeHtml(lv.tier)}</span></div>
       <div class="ck-sub ck-green">${xp.total} XP earned this week</div>
-      <div class="ck-sub">XP and dollars do not convert into each other. Money is what the work was worth; XP is what the habit was worth.</div>
+      ${ckPrivsOpen() ? `<div class="ck-sub">XP and dollars do not convert into each other. Money is what the work was worth; XP is what the habit was worth.</div>` : ''}
       <div class="ck-rail-cap ck-blue ck-privcap">What XP buys</div>
       ${privs}
     </div>
@@ -710,6 +724,15 @@ function ckBuildKidTab(kid) {
 function ckSetView(v) { ckView = v === 'week' ? 'week' : 'day'; ckOpenChore = null; ckElseOpen = false; renderChoreTab(); }
 function ckSelectDay(d) { ctDay = Math.max(0, Math.min(6, d)); ckOpenChore = null; ckElseOpen = false; renderChoreTab(); }
 function ckToggleHistory() { ckHistoryOpen = !ckHistoryOpen; renderChoreTab(); }
+/* The privilege ladder's open/closed state. localStorage rather than synced
+   state: it is a per-device view preference, and every state write here is a
+   full-document upload. Closed by default — see the note at the render site. */
+const CK_PRIVS_LS_KEY = 'wp_ck_privs_open';
+function ckPrivsOpen() { return localStorage.getItem(CK_PRIVS_LS_KEY) === '1'; }
+function ckTogglePrivs() {
+  try { localStorage.setItem(CK_PRIVS_LS_KEY, ckPrivsOpen() ? '0' : '1'); } catch (e) {}
+  renderChoreTab();
+}
 function ckPickWeek(wk) { ctWeekKey = wk; ctDay = 0; ckHistoryOpen = false; ckOpenChore = null; renderChoreTab(); }
 
 /* Tapping a settled row does nothing: a graded chore is Mom's answer, and this

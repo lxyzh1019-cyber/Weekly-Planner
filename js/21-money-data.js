@@ -1248,13 +1248,35 @@ function mnyGoTab(id) {
 }
 
 /* The bar itself. `cur` is the tab that is showing, and it is not a link. */
+/* Which of the five pages this viewer should be offered.
+
+   A kid was being shown all five, numbered, each wearing a badge telling her
+   whose page it was — three of them labelled MEETING or PARENT, i.e. three
+   things she is being shown and told she may not use. That reads as a locked
+   door on her own money page. She gets the two that are hers; a grown-up and the
+   meeting still get the whole rail, because for them it IS the map.
+
+   Filtering only. Same components, same routes, same numbering source — the
+   meeting pages still explain themselves if she arrives from elsewhere. */
+function mnyTabsFor() {
+  const parentish = (typeof isParent === 'function' && isParent()) ||
+                    (typeof mmStep !== 'undefined' && document.getElementById('familyMeetingOverlay') &&
+                     document.getElementById('familyMeetingOverlay').classList.contains('open'));
+  if (parentish) return MNY_TABS;
+  return MNY_TABS.filter(t => t.who === 'kid' || t.who === 'optional');
+}
 function mnyTabBar(cur) {
-  return `<nav class="mny-tabs" aria-label="The five money pages">${MNY_TABS.map((t, i) => {
+  const tabs = mnyTabsFor();
+  // Numbering comes from the full table, so "1" and "5" mean the same thing to a
+  // kid and a parent looking at the same system.
+  const label = tabs.length === MNY_TABS.length ? 'The five money pages' : 'Your money pages';
+  return `<nav class="mny-tabs" aria-label="${escapeAttr(label)}">${tabs.map((t) => {
     const sel = t.id === cur;
+    const n = MNY_TABS.indexOf(t) + 1;
     return `<button type="button" class="mny-tab${sel ? ' on' : ''}"${sel ? ' aria-current="page"' : ''}
         data-mny-action="tab" data-mny-tab="${t.id}">
-        <span>${i + 1} ${t.icon} ${escapeHtml(t.label)}</span>
-        <span class="mny-tab-tag">${escapeHtml(t.who)}</span>
+        <span>${n} ${t.icon} ${escapeHtml(t.label)}</span>
+        ${t.who === 'kid' || t.who === 'optional' ? '' : `<span class="mny-tab-tag">${escapeHtml(t.who)}</span>`}
       </button>`;
   }).join('')}</nav>`;
 }

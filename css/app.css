@@ -5315,3 +5315,168 @@
   /* Backup actions are rare, deliberate and parent-only — full-size targets,
      never the cramped chips the kid screens use. */
   .bk-btn { min-height: 44px; min-width: 44px; }
+
+  /* ── Kid-screen legibility floor ──────────────────────────────────────────
+     CLAUDE.md: nothing below 13px, and 15px for anything a child must read in
+     order to act. These are the classes that actually rendered below the floor
+     on the four kid screens — measured, not guessed. The floor is asserted in
+     tests/smoke.js (kidScreensMeetTheHouseRules), so this list cannot rot.
+
+     Written as its own block rather than by editing 147 scattered declarations,
+     because most of those live in print, dark-mode and parent surfaces where the
+     kid floor does not apply and a blanket bump would be wrong. */
+
+  /* Things she reads to decide or act — the 15px tier. */
+  #screen-chore .ck-item-due,
+  #screen-chore .ck-chore-status,
+  #screen-chore .ck-count,
+  #screen-chore .ck-note,
+  #screen-chore .ck-risk,
+  #screen-chore .ck-learn-count,
+  #screen-chore .ck-pill,
+  #screen-mymoney .mny-row,
+  #screen-quest .quest-xp-label {
+    font-size: calc(0.94rem * var(--fs-scale, 1));   /* 15px */
+  }
+
+  /* Labels, captions and keys — the 13px tier. */
+  #screen-chore .ck-ctl-cap,
+  #screen-chore .ck-key,
+  #screen-chore .ck-day-dow,
+  #screen-chore .ck-rail-cap,
+  #screen-chore .ck-priv-state,
+  #screen-chore .ck-priv-name,
+  #screen-chore .ck-chip-cap,
+  #screen-chore .ck-lane-note,
+  #screen-chore .ck-weeksub,
+  #screen-quest .sticker-name,
+  #screen-week .wf-col-dow,
+  #screen-week .wf-band-label,
+  #screen-week .wf-sideband-seg,
+  #screen-week .wf-travel,
+  #screen-week .wf-card-sum,
+  #screen-week .wf-card-dur,
+  #screen-week .wf-card-time,
+  #screen-chore .ck-allbtn span,
+  #screen-chore .ck-navbtn,
+  #screen-chore .ck-btn,
+  #screen-chore .ck-ledger-name span,
+  #screen-chore .ck-sub,
+  #screen-mymoney .mny-dow span,
+  #screen-mymoney .mny-cal-cell,
+  #screen-chore .ck-legend,
+  #screen-chore .ck-legend span,
+  #screen-chore .ck-weeklabel,
+  .btn-icon--labeled .btn-icon__label {
+    font-size: calc(0.82rem * var(--fs-scale, 1));   /* 13.1px */
+  }
+
+  /* The week grid's hour gutter is the one place a bigger label changes layout
+     rather than just type size, so widen the gutter to match instead of letting
+     the numbers collide. */
+  #screen-week .wf-gutter-hour {
+    font-size: calc(0.82rem * var(--fs-scale, 1));
+    white-space: nowrap;
+  }
+
+  /* ── Kid-screen touch targets ─────────────────────────────────────────────
+     CLAUDE.md: every interactive element at least 44x44, week arrows and small
+     chips included. These are the classes measured below that floor on the four
+     kid screens; the assertion in tests/smoke.js keeps the list honest.
+
+     Two techniques. Most controls simply grow — there was room all along. Where
+     the visual size carries meaning (a small round "?", a stepper beside a
+     number), the box stays its size and an invisible ::after centres a 44x44 hit
+     area over it, so the thumb target grows without the design changing. */
+
+  /* Grew outright. Deliberately NOT scoped to a screen id: these are shared
+     components, and the same .ck-navbtn that is a kid's week arrow is also the
+     parent portal's. Scoping the rule to #screen-chore left the portal copy at
+     36x36 — the reason the assertion checks the portal too. */
+  .ck-navbtn,                        /* the 36x36 week arrows — the worst offender */
+  .ck-else-btn,
+  .ck-allbtn,
+  .ck-segbtn,
+  .ck-btn,
+  .ck-day,
+  .cp-gbtn,
+  .mny-back,
+  .mny-tab,
+  .mny-btn,
+  .mny-chip,
+  .mny-acc,
+  .quest-back-btn,
+  .quest-money-toggle,
+  .wk-sig-btn,
+  .view-tab,
+  .btn-icon,
+  .profile-badge {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* Beats .mny-head-btns .mny-btn, which pins 40px at a higher specificity than
+     a bare class can reach. Matching the selector rather than reaching for
+     !important keeps the cascade readable. */
+  .mny-head-btns .mny-btn { min-height: 44px; }
+  /* An input needs the height but must keep its own width — a number field
+     sized for two digits should not stretch to 44px wide. */
+  #screen-chore input:not([type=hidden]),
+  #screen-mymoney input:not([type=hidden]),
+  #screen-week input:not([type=hidden]) {
+    min-height: 44px;
+  }
+
+  /* Kept their look, grew their reach. The overlay is centred and pointer-
+     transparent to nothing — it IS the button's own hit area, so it cannot steal
+     a sibling's tap, only extend this control's. */
+  #screen-mymoney .mny-ask,
+  #screen-mymoney .mny-step {
+    position: relative;
+  }
+  #screen-mymoney .mny-ask::after,
+  #screen-mymoney .mny-step::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+
+  /* The week card's done-tick is the one control this rule cannot reach yet, and
+     it is worth saying why rather than quietly exempting it. Its size is set
+     inline per block height (js/07-week-view.js) so the shortest block still gets
+     a tick, and it sits at the card's corner — a 44x44 overlay there would cover
+     most of a short card and swallow the tap that opens the day. So: raise the
+     floor from 15px to 28px, which is a real gain, and leave the rest to the
+     Today-first rebuild, whose whole point is that a child stops having to work
+     in this grid. tests/smoke.js records the exemption by name. */
+  #screen-week .wf-card-check {
+    min-width: 28px;
+    min-height: 28px;
+  }
+
+  /* Disclosure control for the privilege ladder — same shape as the app's other
+     "show the rest" affordances, and a full-size target because a child taps it. */
+  .ck-privs-more {
+    display: block; width: 100%; margin-top: 0.4rem;
+    min-height: 44px; padding: 0.4rem 0.6rem;
+    border: 2px dashed var(--ink); border-radius: var(--radius-sm, 10px);
+    background: transparent; color: var(--ink);
+    font: inherit; font-size: calc(0.82rem * var(--fs-scale, 1)); font-weight: 800;
+    cursor: pointer;
+  }
+  .ck-privs-more:hover { background: var(--bg2); }
+
+  /* The glance panel's header is now a disclosure control, so it needs to look
+     and behave like one: full-width target, the caret on the right, and the h3
+     keeping its type rather than inheriting button styling. */
+  .week-glance-toggle {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+    width: 100%; min-height: 44px; padding: 0.3rem 0.1rem;
+    background: none; border: 0; cursor: pointer;
+    font: inherit; color: var(--ink); text-align: left;
+  }
+  .week-glance-toggle h3 { margin: 0; }
+  .week-glance-caret { font-size: calc(0.82rem * var(--fs-scale, 1)); font-weight: 800; white-space: nowrap; }
