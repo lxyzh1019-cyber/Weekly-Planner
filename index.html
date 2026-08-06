@@ -96,6 +96,26 @@
 <!-- ═══════════════════════════════════════════════════════
      SCREEN: QUEST BOARD (Hero Mode)
 ════════════════════════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN: TODAY
+
+     Answers "what am I meant to be doing, and what needs me?" and then gets out
+     of the way. It owns no data and no rules: every number is read through the
+     accessors the other screens use, and every row hands off to the screen that
+     already owns the action. Rendered by js/31-today.js.
+
+     Reachable from the week's tab bar; not yet the default landing.
+════════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-today">
+  <div class="topbar">
+    <div class="topbar-left">
+      <h2>Today</h2>
+    </div>
+    <div class="profile-badge" id="todayProfileBadge"></div>
+  </div>
+  <div id="tdWrap" class="td-wrap"></div>
+</div>
+
 <div class="screen" id="screen-quest">
   <div class="quest-topbar">
     <button class="quest-back-btn" onclick="goProfile()" aria-label="Back to profile">◀ Switch hero</button>
@@ -173,6 +193,7 @@
         <button class="btn-icon" onclick="changeWeek(1)" aria-label="Next week">▶</button>
       </div>
       <div class="week-actions">
+        <button class="btn-icon btn-icon--labeled" aria-label="Today" onclick="goToday()" title="Today"><span aria-hidden="true">☀️</span><span class="btn-icon__label">Today</span></button>
         <button class="btn-icon btn-icon--labeled" aria-label="Quest Board" onclick="goQuestBoard()" title="Quest Board"><span aria-hidden="true">🎮</span><span class="btn-icon__label">Quests</span></button>
         <button class="btn-icon btn-icon--labeled" aria-label="Weekly Chore" onclick="openChoreTab()" title="Weekly Chore"><span aria-hidden="true">🧹</span><span class="btn-icon__label">Chores</span></button>
         <button class="btn-icon btn-icon--labeled" id="weekMoneyBtn" aria-label="My money" onclick="openWeekMoney()" title="My money"><span aria-hidden="true">💰</span><span class="btn-icon__label">My money</span></button>
@@ -1316,6 +1337,7 @@
 <script src="js/28-chore-trends.js"></script>
 <script src="js/29-chore-options.js"></script>
 <script src="js/30-backup.js"></script>
+<script src="js/31-today.js"></script>
 <script src="js/99-main.js"></script>
 </body>
 </html>

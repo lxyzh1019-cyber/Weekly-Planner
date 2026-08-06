@@ -5480,3 +5480,71 @@
   }
   .week-glance-toggle h3 { margin: 0; }
   .week-glance-caret { font-size: calc(0.82rem * var(--fs-scale, 1)); font-weight: 800; white-space: nowrap; }
+
+  /* ── Today ────────────────────────────────────────────────────────────────
+     One column, big rows, nothing to read twice. Built to the kid-screen rules
+     from the start: every target is 44px or more and no type is under 13px, so
+     the assertions in tests/smoke.js pass without a retrofit.
+
+     Uses the same tokens and hand-drawn borders as the rest of the app, because
+     a new front door that looks like a different app is a new app. */
+  .td-wrap { padding: 0.7rem 0.8rem 1.4rem; display: flex; flex-direction: column; gap: var(--space-3, 0.75rem); }
+
+  .td-card {
+    border: 2.5px solid var(--ink); border-radius: var(--radius, 18px);
+    background: var(--paper); padding: 0.7rem 0.8rem;
+    box-shadow: var(--shadow-sm, 2px 2px 0 rgba(0,0,0,0.12));
+  }
+  .td-cap {
+    font-size: calc(0.82rem * var(--fs-scale, 1)); font-weight: 800;
+    letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-light);
+    margin-bottom: 0.4rem;
+  }
+
+  /* The one thing the screen is for — deliberately the biggest object on it. */
+  .td-now { display: flex; align-items: center; gap: 0.8rem; background: var(--bg2); }
+  .td-now-icon { font-size: 2.2rem; line-height: 1; flex: 0 0 auto; }
+  .td-now-name { font-size: calc(1.25rem * var(--fs-scale, 1)); font-weight: 800; line-height: 1.15; }
+  .td-now-sub { font-size: calc(0.9rem * var(--fs-scale, 1)); color: var(--ink-light); }
+
+  .td-row {
+    display: flex; align-items: center; gap: 0.6rem; width: 100%;
+    min-height: 52px; padding: 0.45rem 0.5rem; margin-top: 0.3rem;
+    border: 2px solid var(--ink); border-radius: var(--radius-sm, 12px);
+    background: var(--bg); color: var(--ink); font: inherit; text-align: left;
+    cursor: pointer;
+  }
+  .td-row:hover { background: var(--bg2); }
+  .td-row-icon { font-size: 1.3rem; flex: 0 0 auto; }
+  .td-row-name { flex: 1 1 auto; font-size: calc(1rem * var(--fs-scale, 1)); font-weight: 700; }
+  .td-row-go {
+    flex: 0 0 auto; font-size: calc(0.85rem * var(--fs-scale, 1));
+    font-weight: 800; color: var(--accent-strong);
+  }
+
+  .td-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .td-chip {
+    display: flex; align-items: center; gap: 0.4rem;
+    min-height: 44px; padding: 0.4rem 0.8rem;
+    border: 2.5px solid var(--ink); border-radius: 999px;
+    background: var(--paper); color: var(--ink); font: inherit;
+    font-size: calc(0.94rem * var(--fs-scale, 1)); cursor: pointer;
+  }
+  .td-chip-fresh { background: var(--accent-yellow); }
+
+  .td-empty { font-size: calc(0.94rem * var(--fs-scale, 1)); color: var(--ink-light); padding: 0.2rem 0; }
+
+  /* One line, and it is about today. Never white on --accent (fails contrast). */
+  .td-say {
+    font-size: calc(1rem * var(--fs-scale, 1)); font-weight: 700;
+    color: var(--accent-strong); padding: 0.1rem 0.2rem;
+  }
+
+  .td-more { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .td-morebtn {
+    flex: 1 1 auto; min-height: 44px; min-width: 44px; padding: 0.5rem 0.7rem;
+    border: 2.5px solid var(--ink); border-radius: var(--radius-sm, 12px);
+    background: var(--paper); color: var(--ink); font: inherit;
+    font-size: calc(0.94rem * var(--fs-scale, 1)); font-weight: 800; cursor: pointer;
+  }
+  .td-morebtn:hover { background: var(--bg2); }

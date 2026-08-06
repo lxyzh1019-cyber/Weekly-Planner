@@ -22,6 +22,11 @@ window.addEventListener('pagehide', flushPush);
   const wrap = document.getElementById('choreWrap');
   if (wrap) wrap.addEventListener('click', ctHandleWrapClick);
 })();
+// Today delegates for the same reason: every render replaces the whole wrap.
+(function(){
+  const wrap = document.getElementById('tdWrap');
+  if (wrap) wrap.addEventListener('click', tdHandleClick);
+})();
 // The pocket-money pages delegate the same way, for the same reason: every
 // render replaces the whole wrap, so a listener bound to a card would be gone
 // the first time a number changed.

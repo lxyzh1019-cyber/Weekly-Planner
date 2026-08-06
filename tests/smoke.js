@@ -907,9 +907,13 @@ function findChromium() {
      So this is a ratchet, not an exemption: the ceiling is what it currently
      measures, it fails the build if it grows, and the 200 target stays written
      down as the thing the rebuild has to hit. */
-  const WORD_BUDGET = { 'screen-week': 200, 'screen-quest': 200, 'screen-mymoney': 200,
-                        'screen-chore': 280 };
+  const WORD_BUDGET = { 'screen-today': 200, 'screen-week': 200, 'screen-quest': 200,
+                        'screen-mymoney': 200, 'screen-chore': 280 };
   const KID_SCREENS = [
+    // Today is held to the full 200 with no ratchet: it was built to these rules
+    // rather than measured against them afterwards, which was the point of
+    // landing them first.
+    ['screen-today',   () => { goToday(); }],
     ['screen-week',    () => { goWeek(); renderWeek(); }],
     ['screen-quest',   () => { showScreen('quest'); renderQuestBoard(); }],
     ['screen-chore',   () => { openChoreTab(); ckSelectDay(2); }],
@@ -2551,6 +2555,94 @@ function findChromium() {
     }
     checks.installsToTheHomeScreen = problems.length === 0 || problems;
   }
+
+  // ── Today (Branch 4) ─────────────────────────────────────────────────────
+  // The whole claim of this screen is that a child can answer "what now?" and
+  // act on it without entering the planner. So: does it name the current thing,
+  // and does a tap reach the place that owns the action?
+  checks.todayAnswersWhatNow = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const dk = todayKey();
+    const now = new Date().getHours() * 60 + new Date().getMinutes();
+    // One block happening right now, one later.
+    setDayBlocks(dk, [
+      { id: 'td-now',  actId: 'piano',  startMin: Math.max(0, now - 15), durationMin: 60 },
+      { id: 'td-next', actId: 'piano',  startMin: Math.min(23 * 60, now + 120), durationMin: 30 },
+    ], 'jenn');
+    goToday();
+    const wrap = document.getElementById('tdWrap');
+    const txt = wrap.textContent;
+    const namesNow = /now · started/.test(txt);
+    const hasJobs = /Jobs I can do/.test(txt);
+    const says = !!wrap.querySelector('.td-say') && wrap.querySelector('.td-say').textContent.trim().length > 0;
+
+    // With nothing on today it must not read as a failure — off days are valid.
+    setDayBlocks(dk, [], 'jenn');
+    goToday();
+    const kind = /allowed|yours|quiet/i.test(document.getElementById('tdWrap').textContent);
+    return namesNow && hasJobs && says && kind;
+  });
+
+  // Handing off, not re-implementing: Today must never be a second place that
+  // grades a chore or moves money. It routes; the owning screen acts.
+  checks.todayHandsOffRatherThanActing = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey, d = tdTodayIndex();
+    if (d == null) return 'today is outside the current week';
+    const before = JSON.stringify(mrEnsureEarnings('jenn', wk));
+
+    goToday();
+    // Every row is a hand-off. Clicking one must change screen, not state.
+    const row = document.querySelector('#tdWrap [data-td-action="chore"]');
+    if (row) {
+      row.click();
+      const wentToChore = document.getElementById('screen-chore').classList.contains('active');
+      const after = JSON.stringify(mrEnsureEarnings('jenn', wk));
+      if (!wentToChore || after !== before) return 'a Today row changed state or did not navigate';
+    }
+    goToday();
+    document.querySelector('#tdWrap [data-td-action="week"]').click();
+    const toWeek = document.getElementById('screen-week').classList.contains('active');
+    goToday();
+    document.querySelector('#tdWrap [data-td-action="money"]').click();
+    const toMoney = document.getElementById('screen-mymoney').classList.contains('active');
+
+    const untouched = JSON.stringify(mrEnsureEarnings('jenn', wk)) === before;
+    return toWeek && toMoney && untouched;
+  });
+
+  // Today reads the same counts the chore screen does. If they can disagree, one
+  // of them is lying to a child about whether Mum has answered.
+  checks.todayAgreesWithTheChoreScreen = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey, d = tdTodayIndex();
+    if (d == null) return 'today is outside the current week';
+    const pool = mrPoolRows(wk).filter(r => r.who === 'both' || r.who === 'jenn');
+    if (!pool.length) return 'no pool rows to claim';
+    mrSetClaim('jenn', wk, d, pool[0].id, 3);
+
+    goToday();
+    const todayChip = document.querySelector('#tdWrap [data-td-action="waiting"]');
+    const todayCount = todayChip ? Number((todayChip.textContent.match(/\d+/) || [0])[0]) : 0;
+    const truth = mrWaitingCount('jenn', wk);
+
+    // ...and the claim must not appear in "jobs I can do" as well, or it reads as
+    // two separate jobs.
+    const claimedLabel = pool[0].label;
+    const stillOffered = [...document.querySelectorAll('#tdWrap [data-td-action="chore"]')]
+      .some(b => b.textContent.includes(claimedLabel));
+
+    mrEnsureEarnings('jenn', wk).claims = {};
+    return todayCount === truth && truth > 0 && !stillOffered;
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => { profile = 'jenn'; goToday(); });
+  await page.screenshot({ path: shot('phone_today') });
+  await page.setViewportSize({ width: 900, height: 1100 });
+  await page.waitForTimeout(150);
 
   checks.noConsoleErrors = errors.length === 0;
 

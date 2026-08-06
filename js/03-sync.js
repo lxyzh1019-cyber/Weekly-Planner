@@ -567,7 +567,8 @@ function refreshCurrentScreen() {
   }
   const active = document.querySelector('.screen.active');
   if (!active) return;
-  if (active.id === 'screen-week') renderWeek();
+  if (active.id === 'screen-today') { if (typeof tdRenderToday === 'function') tdRenderToday(); }
+  else if (active.id === 'screen-week') renderWeek();
   else if (active.id === 'screen-day') { buildTimeline(); buildTray(); renderVibe(); }
   else if (active.id === 'screen-chore') renderChoreTab();
   else if (active.id === 'screen-sync') renderSync();
