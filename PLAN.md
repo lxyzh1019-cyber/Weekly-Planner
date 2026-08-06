@@ -1,5 +1,22 @@
 # Weekly-Planner — reconciled plan from the GPT and Claude audits
 
+> **Status: all six branches landed** on `claude/audit-reports-plan-xb5l7u`
+> (2026-08-06). In order: `da65c2c` guardrails, `526faeb` durability, `0ad103a`
+> escaping + clock skew, `4a20ddc` kid standards, `6d9e543` Today, `433d580`
+> Today as the front door, `9d02e09` consolidation.
+>
+> Baseline then vs now — 30 files / 50 merge checks / 115 smoke checks, with a
+> syntax check that could not fail and eight smoke checks that could not fail;
+> now 32 files / 52 merge / 132 smoke, all of which can.
+>
+> **Still open, deliberately:** the deployed Firestore rules are unverified (the
+> read-only check was blocked — see §0f); auth is deferred by decision, with
+> `firestore.rules` committed unapplied and a runbook in `SECURITY_TODO.md`;
+> `screen-chore` sits on a 276-word ratchet against a 200 target; the 42
+> verified-unreferenced CSS classes are catalogued in `AUDIT.md` but not swept.
+> Out of scope throughout: the parent Waiting-home consolidation and the
+> design-system pass.
+
 ## Context
 
 Two independent audits of `main` @ `23e8bb4` arrived: a code-verified
