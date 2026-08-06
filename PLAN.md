@@ -237,10 +237,13 @@ globals, restyling the hand-drawn aesthetic, and refactoring `js/04-merge.js`.
 Every branch, before push — the three commands from `CLAUDE.md`:
 
 ```bash
-for f in js/*.js; do node --check "$f" || break; done && echo OK
-node tests/merge.test.js          # must stay 50/50, plus new cases
-node tests/smoke.js               # 115 checks today; screenshots in tests/out/
+npm test    # check + merge + smoke; see CLAUDE.md for the individual scripts
 ```
+
+Branch 0 replaced the old documented shell loop
+(`for f in js/*.js; do node --check "$f" || break; done && echo OK`) — `break`
+returns 0, so it printed `OK` and exited 0 even on a syntax error. The merge
+suite must stay at 50/50 plus new cases; smoke is 115 checks today.
 
 Notes from this session: `playwright-core` is gitignored and must be installed
 once (`npm install playwright-core`); Chromium lives at `/opt/pw-browsers` and

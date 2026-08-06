@@ -1,5 +1,11 @@
 # Weekly Planner — Front-End Review
 
+> **Historical — kept for the reasoning, not the references.** This review
+> predates the split of `index.html` into `js/01-*.js` … `js/99-main.js`, so any
+> `index.html` line numbers it cites no longer point at anything. Several items
+> marked ⚠️ Open here have since been fixed. For the current state see `AUDIT.md`
+> (implementation), `AUDIT-PRODUCT.md` (product/UX), and `PLAN.md`.
+
 Scope: full-app design / flow / accessibility / correctness pass accompanying the
 **Chore Groups with Direct Pricing** rebuild. Fixes marked ✅ **Fixed** were applied in
 this change; ⚠️ **Open** items are documented for follow-up.

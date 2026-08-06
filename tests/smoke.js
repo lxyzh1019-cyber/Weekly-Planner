@@ -1,20 +1,45 @@
 // Headless-browser smoke test for index.html.
-// Run: npm install playwright-core && node tests/smoke.js
+// Run: npm ci && npm run test:smoke
 // Boots the app offline (Firebase errors are ignored), seeds a test week, and
 // drives the main flows. Prints a JSON report; exits non-zero on any failure
 // or unexpected console error. Screenshots land in tests/out/.
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { chromium } = require('playwright-core');
 
 function findChromium() {
   if (process.env.SMOKE_CHROMIUM) return process.env.SMOKE_CHROMIUM;
-  const roots = ['/opt/pw-browsers'];
+  // Every known location, in preference order. These are additive on purpose:
+  // PLAYWRIGHT_BROWSERS_PATH must not replace the others, or an environment
+  // that sets it (this repo's cloud sandbox does, to /opt/pw-browsers) loses
+  // the fallbacks entirely.
+  const roots = [
+    // Explicit override, when the environment points at its own install.
+    process.env.PLAYWRIGHT_BROWSERS_PATH,
+    // Claude Code cloud environments pre-install browsers here.
+    '/opt/pw-browsers',
+    // Playwright's own default install root, used by
+    // `npx playwright install chromium` — this is what CI and a developer
+    // laptop resolve through. Without it, playwright-core (which ships no
+    // browsers and no installer) has nothing to fall back to.
+    path.join(os.homedir(), '.cache', 'ms-playwright'),
+    // macOS default for the same install.
+    path.join(os.homedir(), 'Library', 'Caches', 'ms-playwright')
+  ];
+  const binaries = [
+    ['chrome-linux', 'chrome'],
+    ['chrome-linux', 'headless_shell'],
+    ['chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium']
+  ];
   for (const root of roots) {
-    if (!fs.existsSync(root)) continue;
+    if (!root || !fs.existsSync(root)) continue;
     for (const d of fs.readdirSync(root)) {
-      const p = path.join(root, d, 'chrome-linux', 'chrome');
-      if (fs.existsSync(p)) return p;
+      if (!d.startsWith('chromium')) continue;
+      for (const parts of binaries) {
+        const p = path.join(root, d, ...parts);
+        if (fs.existsSync(p)) return p;
+      }
     }
   }
   return undefined; // fall back to playwright's own resolution

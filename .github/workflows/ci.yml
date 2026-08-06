@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # Nightly, 07:00 UTC — catches drift in the pinned browser and toolchain
+    # even on weeks when nothing is pushed.
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast gate: syntax + one-global-per-name + the merge-layer unit tests.
+  # No browser, runs in seconds.
+  checks:
+    name: Syntax, globals, merge tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # node --check on every js/*.js, plus the duplicate top-level
+      # declaration guard. All 30 scripts share one global scope, so a
+      # duplicate name is a real defect — see tests/check-globals.js.
+      - name: Syntax and global-scope checks
+        run: npm run check
+
+      # 50 assertions against the real shipped merge functions.
+      - name: Merge-layer unit tests
+        run: npm run test:merge
+
+  # Boots the app over file:// in headless Chromium and drives the main flows,
+  # including the chore -> money hand-off that is the most valuable join in the
+  # suite. Runs on pull requests too: it is the only check that would catch a
+  # broken screen, and it costs ~2 minutes.
+  smoke:
+    name: Headless smoke test
+    runs-on: ubuntu-latest
+    needs: checks
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # playwright-core ships no browsers and no installer, so fetch the
+      # browser with the matching playwright version. Cached between runs;
+      # tests/smoke.js finds it under ~/.cache/ms-playwright with no
+      # SMOKE_CHROMIUM needed.
+      - name: Read pinned playwright-core version
+        id: pw
+        run: echo "version=$(node -p "require('./package.json').devDependencies['playwright-core']")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Chromium
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-chromium-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      - name: Install Chromium
+        run: npx --yes playwright@${{ steps.pw.outputs.version }} install --with-deps chromium
+
+      - name: Smoke test
+        run: npm run test:smoke
+
+      # Screenshots make a layout regression visible in the run itself rather
+      # than only as a failed assertion.
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-screenshots
+          path: tests/out/
+          if-no-files-found: warn
+          retention-days: 14

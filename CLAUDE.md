@@ -49,19 +49,46 @@ top-level name, grep for it across `js/`.
 ## Verification — run all three before any push
 
 ```bash
-# 1. Syntax check every module
-for f in js/*.js; do node --check "$f" || break; done && echo OK
-
-# 2. Merge-layer unit tests (50 checks, must be 50/50)
-node tests/merge.test.js
-
-# 3. Headless smoke test — boots the app, drives the main flows
-npm install playwright-core     # once
-node tests/smoke.js             # screenshots land in tests/out/
+npm ci      # once
+npm test    # runs all three below, stops at the first failure
 ```
 
-`smoke.js` auto-detects Chromium under `/opt/pw-browsers`; elsewhere set
+Or individually:
+
+```bash
+# 1. Syntax check every module + the duplicate-name guard
+npm run check
+
+# 2. Merge-layer unit tests (50 checks, must be 50/50)
+npm run test:merge
+
+# 3. Headless smoke test — boots the app, drives the main flows
+npm run test:smoke          # screenshots land in tests/out/
+```
+
+`npm run check` runs `tests/check-syntax.js` and `tests/check-globals.js`. **Do
+not go back to the old shell loop** —
+
+```bash
+for f in js/*.js; do node --check "$f" || break; done && echo OK   # BROKEN
+```
+
+`break` returns 0, so the loop exits 0 even when a file fails, `&& echo OK`
+fires, and the check reports success while the real error scrolls past on
+stderr. Under CI it is a check that can never fail. `tests/check-syntax.js`
+exists because of this.
+
+`tests/check-globals.js` enforces the one-declaration-per-name rule above,
+covering `function`, `async function` and top-level `let`/`const`/`var`
+(including the comma-separated form) — a duplicate `let` is a load-time
+`SyntaxError` that per-file `node --check` cannot see.
+
+`smoke.js` auto-detects Chromium under `/opt/pw-browsers` or
+`~/.cache/ms-playwright` (`npx playwright install chromium`); elsewhere set
 `SMOKE_CHROMIUM=/path/to/chrome`.
+
+CI (`.github/workflows/ci.yml`) runs all three on every pull request and pushes
+to `main`, plus nightly, and uploads the smoke screenshots as an artifact.
 
 New features ship with a new check in `smoke.js`. The chore→money hand-off
 checks are the most valuable ones in there — when that join broke, every screen

@@ -57,8 +57,29 @@ at 21×21, My money `?` helpers at 22×22, "◀ Switch hero" at 131×35.
 4. **The font floor is worse than reported** — 8.96px on `screen-week` and 9.0px
    on `screen-chore`, not the 11.9px in P2-2.
 
+**One finding neither audit caught — the syntax check could not fail.** The
+command documented in `CLAUDE.md` and `tests/README.md`, and used to establish
+the "clean on all 30 files" baseline above, was:
+
+```bash
+for f in js/*.js; do node --check "$f" || break; done && echo OK   # BROKEN
+```
+
+`break` returns 0, so the `for` loop exits 0 even when `node --check` fails,
+`&& echo OK` fires, and the check prints `OK` while the parse error scrolls past
+on stderr. Verified empirically against a deliberately broken file: it printed
+`OK` and exited 0. Under CI it would have been a green check that can never go
+red. Branch 0 replaced it with `tests/check-syntax.js`, which reports each
+failing file and exits non-zero.
+
+The tree itself really is clean — re-checked with the corrected script, 30/30
+files pass — so the baseline result stands; only the method used to reach it was
+unsound. Note that P3-1's own proposed `package.json` used the correct
+`|| exit 1` form, as does `MODULARIZATION_PLAN.md:82`; the broken variant had
+spread to the two files people actually read.
+
 The measured word counts and touch-target failures are now enforced as smoke
-assertions rather than left as prose targets; see the plan for sequencing.
+assertions rather than left as prose targets; see `PLAN.md` for sequencing.
 
 ---
 

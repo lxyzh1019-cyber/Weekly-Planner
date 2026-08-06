@@ -1,0 +1,15 @@
+{
+  "name": "weekly-planner",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Family weekly planner — static site, classic scripts, no build step.",
+  "scripts": {
+    "check": "node tests/check-syntax.js && node tests/check-globals.js",
+    "test:merge": "node tests/merge.test.js",
+    "test:smoke": "node tests/smoke.js",
+    "test": "npm run check && npm run test:merge && npm run test:smoke"
+  },
+  "devDependencies": {
+    "playwright-core": "1.62.1"
+  }
+}

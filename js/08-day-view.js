@@ -1189,11 +1189,9 @@ function isActivitySelectable(act) {
   return true;
 }
 
-function getUnlockedRoutineRewards(routineId) {
-  const p = getProfData();
-  const map = (p.progress && p.progress.unlockedChecklistItems) || {};
-  return map[routineId] || [];
-}
+// getUnlockedRoutineRewards lives in js/05-helpers.js — that copy takes an
+// explicit profile, which this one dropped. Both files share one global scope,
+// so the duplicate here silently won and made the parameter dead.
 
 function kidRoutineStopwatchClearTick() {
   if (kidRoutineStopwatchTick) {
