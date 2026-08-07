@@ -167,10 +167,16 @@ function tdRenderToday() {
         </button>`).join('')
     : `<div class="td-empty">Nothing to claim today.</div>`;
 
+  /* Tapping one of today's own blocks opens the day where it can be *changed* —
+     the timeline, focused on the block she tapped. Today is the front door, and
+     the thing a child wants from the front door is to move the afternoon around,
+     not to tick it off; Quest mode is still one tap away on the day's own tab.
+     The block id rides in a data attribute rather than an inline handler, which
+     is the pattern the rest of this file already uses. */
   const questHtml = quests.length
     ? quests.map(b => {
         const l = tdBlockLine(b, kid);
-        return `<button type="button" class="td-row" data-td-action="quests">
+        return `<button type="button" class="td-row" data-td-action="plan" data-td-block="${escapeAttr(b.id)}">
           <span class="td-row-icon">${l.icon}</span>
           <span class="td-row-name">${escapeHtml(l.name)}</span>
           <span class="td-row-go">${escapeHtml(l.time)} ›</span>
@@ -199,6 +205,7 @@ function tdRenderToday() {
       <div class="td-cap">Jobs I can do</div>${choreHtml}</div>
     <div class="td-say">${escapeHtml(tdEncouragement(kid))}</div>
     <div class="td-more">
+      <button type="button" class="td-morebtn" data-td-action="plan">✏️ Plan my day</button>
       ${(typeof isHeroMode === 'function' && isHeroMode())
         ? `<button type="button" class="td-morebtn" data-td-action="quests">🎮 Quests</button>` : ''}
       <button type="button" class="td-morebtn" data-td-action="week">📋 The whole week</button>
@@ -215,6 +222,16 @@ function tdHandleClick(e) {
   const a = el.getAttribute('data-td-action');
   const d = tdTodayIndex();
   if (a === 'chore')   { openChoreTab(); if (d != null) ckSelectDay(d); return; }
+  /* Open today for planning. openDayFromWeekCard, not openDay: Today never
+     depends on weekOffset (it is today) but the day screen does, and the wrapper
+     is the one that resolves the offset for a given day key. The optional block
+     id feeds the existing focusBlockOnTimeline path, so a tap lands on the block
+     that was tapped rather than at the top of the day. */
+  if (a === 'plan')    {
+    if (d == null) { goWeek(); return; }
+    openDayFromWeekCard(todayKey(), d, el.getAttribute('data-td-block') || null);
+    return;
+  }
   if (a === 'quests')  { goQuestsToday(); return; }
   if (a === 'waiting') { openChoreTab(); ckGoWaiting(); return; }
   if (a === 'fresh')   { openChoreTab(); ckGoFresh(); return; }

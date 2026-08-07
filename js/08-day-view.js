@@ -29,7 +29,17 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   document.getElementById('daySubtitle').textContent = `${DAY_LONG[dayIdx]}, ${MONTH_SHORT[d.getMonth()]} ${d.getDate()}`;
 
   showScreen('day');
-  buildTimeline();
+  /* Land on the planning layout, always. dayViewMode used to survive every
+     navigation, so one trip in through Today's quest rows left Quest mode stuck
+     on: every day tapped in the week grid afterwards opened as tick-off cards
+     until someone noticed the Timeline tab. A mode the child never chose on this
+     screen is not a preference, it is a stale variable.
+
+     setDayViewMode rather than a bare assignment: it also syncs the tab buttons
+     and .quest-focus, and it ends in buildTimeline(), which is the render this
+     line used to do. goQuestsToday() still wins — it calls setDayViewMode('quest')
+     after openDay returns. */
+  setDayViewMode('timeline');
   bindDayTimelineCompactOnScroll();
   buildTray();
   renderVibe();

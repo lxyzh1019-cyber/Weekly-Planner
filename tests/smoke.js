@@ -3096,6 +3096,58 @@ function findChromium() {
     mrEnsureEarnings('jenn', wk).claims = {};
     return todayCount === truth && truth > 0 && !stillOffered;
   });
+
+  // Today is the door into *changing* a day, and the day view must not carry a
+  // mode across navigation. Both halves matter, and the second is the regression
+  // this check exists for: dayViewMode used to survive every openDay, so one trip
+  // through Today's rows left Quest mode stuck on and every day tapped in the
+  // week grid afterwards rendered as tick-off cards instead of the timeline.
+  checks.todayOpensTheDayForPlanning = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const d = tdTodayIndex();
+    if (d == null) return ['today is outside the current week'];
+    const dk = todayKey();
+    const bad = [];
+    setDayBlocks(dk, [{ id: 'td-plan', actId: 'piano', startMin: 9 * 60, durationMin: 30 }], 'jenn');
+
+    // 1. A block on Today opens the planning layout, focused on the block tapped.
+    goToday();
+    const row = document.querySelector('#tdWrap [data-td-action="plan"][data-td-block]');
+    if (!row) bad.push('Today offers no row that opens the day for planning');
+    else {
+      if (row.getAttribute('data-td-block') !== 'td-plan') bad.push('the row does not carry its block id');
+      row.click();
+      if (!document.getElementById('screen-day').classList.contains('active')) bad.push('a Today row did not open the day');
+      if (dayViewMode !== 'timeline') bad.push(`Today opened the day in ${dayViewMode}, not the planning layout`);
+      if (getComputedStyle(document.getElementById('timeline')).display === 'none') bad.push('the timeline is not the visible pane');
+    }
+
+    // 2. And there is still a door on a day with nothing on it yet — that is the
+    //    day most in need of planning, and it has no rows to tap.
+    setDayBlocks(dk, [], 'jenn');
+    goToday();
+    const door = document.querySelector('#tdWrap .td-more [data-td-action="plan"]');
+    if (!door) bad.push('no way to plan a day that is still empty');
+    else {
+      door.click();
+      if (!document.getElementById('screen-day').classList.contains('active') || dayViewMode !== 'timeline')
+        bad.push('the empty-day planning door did not reach the timeline');
+    }
+
+    // 3. Quest mode is still reachable, and still an explicit choice.
+    goQuestsToday();
+    if (dayViewMode !== 'quest') bad.push('Quest mode is no longer reachable');
+    if (!document.getElementById('screen-day').classList.contains('quest-focus')) bad.push('Quest mode did not take the full width');
+
+    // 4. ...and it does not leak into the next day opened from the week grid.
+    openDay(getDayKeys(0)[0], 0);
+    if (dayViewMode !== 'timeline') bad.push('the day view carried Quest mode across navigation');
+    if (document.getElementById('screen-day').classList.contains('quest-focus')) bad.push('quest-focus survived the mode reset');
+
+    setDayBlocks(dk, [], 'jenn');
+    return bad.length === 0 || bad;
+  });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => { profile = 'jenn'; goToday(); });
   await page.screenshot({ path: shot('phone_today') });
