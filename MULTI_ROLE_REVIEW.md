@@ -1,5 +1,11 @@
 # Weekly Planner — Multi-Role Review
 
+> **Historical — kept for the reasoning, not the references.** This review reads
+> the app as a single-file `index.html` of ~13.4k lines. That file has since been
+> split into 30 scripts under `js/`, so every line number below is meaningless
+> now and many findings are fixed. For the current state see `AUDIT.md`
+> (implementation), `AUDIT-PRODUCT.md` (product/UX), and `PLAN.md`.
+
 A five-lens review of the app (single-file `index.html`, ~13.4k lines) covering
 engineering correctness, visual/design quality, kid + parent flow, and the
 psychology of how the product motivates children. Every finding below cites the

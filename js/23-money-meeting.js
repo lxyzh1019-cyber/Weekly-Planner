@@ -52,7 +52,7 @@ function mnySetMeetKid(kid) {
 function mnyKidTabs() {
   const cur = mnyMeetingKid();
   return `<div class="mny-chiprow">${['jenn', 'jess'].map(k =>
-    `<button type="button" class="mny-chip ${k === cur ? 'on' : ''}" onclick="mnySetMeetKid('${k}')">${CT_PROFILE_ICON[k]} ${k === 'jenn' ? 'Jenn' : 'Jess'}</button>`).join('')}</div>`;
+    `<button type="button" class="mny-chip ${k === cur ? 'on' : ''}" onclick="mnySetMeetKid('${escapeJsAttr(k)}')">${CT_PROFILE_ICON[k]} ${k === 'jenn' ? 'Jenn' : 'Jess'}</button>`).join('')}</div>`;
 }
 
 /* Money in → what has to go out → what is hers. Three cells, and the one the
@@ -115,17 +115,17 @@ function mnyEarningsCard(wk, kid) {
       ? `<s class="mny-was">${mnyMoney(b.original[ch.key])}</s> ` : '';
     const steppers = mnyEditOn
       ? `<span class="mny-stepgrp">
-           <button type="button" class="mny-step" onclick="mnyBumpChannel('${ch.key}',-0.5)" aria-label="Less">−</button>
-           <button type="button" class="mny-step" onclick="mnyBumpChannel('${ch.key}',0.5)" aria-label="More">+</button>
-           ${ov ? `<button type="button" class="mny-step" onclick="mnyResetChannel('${ch.key}')" aria-label="Back to the planner's number">↺</button>` : ''}
-           <button type="button" class="mny-step${isMissing ? ' on' : ''}" onclick="mnyFlagMissing('${ch.key}')" aria-label="Nothing this week">∅</button>
+           <button type="button" class="mny-step" onclick="mnyBumpChannel('${escapeJsAttr(ch.key)}',-0.5)" aria-label="Less">−</button>
+           <button type="button" class="mny-step" onclick="mnyBumpChannel('${escapeJsAttr(ch.key)}',0.5)" aria-label="More">+</button>
+           ${ov ? `<button type="button" class="mny-step" onclick="mnyResetChannel('${escapeJsAttr(ch.key)}')" aria-label="Back to the planner's number">↺</button>` : ''}
+           <button type="button" class="mny-step${isMissing ? ' on' : ''}" onclick="mnyFlagMissing('${escapeJsAttr(ch.key)}')" aria-label="Nothing this week">∅</button>
          </span>` : '';
     // Only show a minus when something was actually taken off: "−$0.00" reads
     // as a penalty on a week that had none.
     const shown = (ch.key === 'fines' && value > 0)
       ? '−' + mnyMoney(value).slice(1) : mnyMoney(value);
     return `<div class="mny-erow">
-        <button type="button" class="mny-erow-label" onclick="mnyToggleRow('${ch.key}')" aria-expanded="${mnyExpandRow === ch.key}">
+        <button type="button" class="mny-erow-label" onclick="mnyToggleRow('${escapeJsAttr(ch.key)}')" aria-expanded="${mnyExpandRow === ch.key}">
           ${ch.icon} ${escapeHtml(ch.label)} <span class="mny-mag">🔍</span>
         </button>
         <div class="mny-erow-right">${chip}<b>${struck}${shown}</b>${steppers}</div>
@@ -136,7 +136,7 @@ function mnyEarningsCard(wk, kid) {
   const reason = mnyWeekReason(kid, wk);
   const reasonRow = mnyAnyEdited(kid, wk)
     ? `<div class="mny-note">Why: ${MNY_REASONS.map(r =>
-        `<button type="button" class="mny-chip ${reason === r.id ? 'on' : ''}" onclick="mnyPickReason('${r.id}')">${escapeHtml(r.label)}</button>`).join(' ')}</div>`
+        `<button type="button" class="mny-chip ${reason === r.id ? 'on' : ''}" onclick="mnyPickReason('${escapeJsAttr(r.id)}')">${escapeHtml(r.label)}</button>`).join(' ')}</div>`
     : '';
 
   return `<div class="mny-card">
@@ -223,7 +223,7 @@ function mnyCompetitionForm(wk, kid) {
         ${entries.length
           ? entries.map(c => `<div class="mny-row"><span>${mnySportIcon(c.sport)} ${escapeHtml(c.name || mnySportLabel(c.sport))} · ${mnyShortDate(c.dayKey)}</span>
               <b>${mnyMoney(c.awarded)}</b>
-              <button type="button" class="mny-step" onclick="mnyDeleteComp('${escapeAttr(c.id)}')" aria-label="Remove">✕</button></div>`).join('')
+              <button type="button" class="mny-step" onclick="mnyDeleteComp('${escapeJsAttr(c.id)}')" aria-label="Remove">✕</button></div>`).join('')
           : `<div class="mny-note">No competition this week.</div>`}
       </div>`;
   }
@@ -236,7 +236,7 @@ function mnyCompetitionForm(wk, kid) {
   }, mrRulesFor(d.dayKey));
 
   const sportChips = [['swim', '🏊 Swim'], ['skate', '⛸️ Skating'], ['dance', '💃 Dance']].map(([id, label]) =>
-    `<button type="button" class="mny-chip ${d.sport === id ? 'on' : ''}" onclick="mnyCompSet('sport','${id}')">${label}</button>`).join('');
+    `<button type="button" class="mny-chip ${d.sport === id ? 'on' : ''}" onclick="mnyCompSet('sport','${escapeJsAttr(id)}')">${label}</button>`).join('');
 
   let detail = '';
   if (d.sport === 'swim') {
@@ -293,7 +293,7 @@ function mnyDepositForm(wk, kid) {
         ${saved.length
           ? saved.map(s => `<div class="mny-row"><span>🎁 ${escapeHtml(s.from)}</span>
               <b>${mnyMoney(s.amount)}</b>
-              <button type="button" class="mny-step" onclick="mnyDeleteDep('${escapeAttr(s.id)}')" aria-label="Remove">✕</button></div>`).join('')
+              <button type="button" class="mny-step" onclick="mnyDeleteDep('${escapeJsAttr(s.id)}')" aria-label="Remove">✕</button></div>`).join('')
           : `<div class="mny-note">Nothing from outside this week.</div>`}
         ${saved.length ? `<div class="mny-note">One-offs stay one-offs — this does not change what any week pays.</div>` : ''}
       </div>`;
@@ -306,7 +306,7 @@ function mnyDepositForm(wk, kid) {
         `<button type="button" class="mny-chip ${d.amount === v ? 'on' : ''}" onclick="mnyDepSet('amount',${v})">$${v}</button>`).join('')}</div>
       <div class="mny-label">Where it came from</div>
       <div class="mny-chiprow">${MNY_FROM.map(f =>
-        `<button type="button" class="mny-chip ${d.from === f ? 'on' : ''}" onclick="mnyDepSet('from','${escapeAttr(f)}')">${escapeHtml(f)}</button>`).join('')}</div>
+        `<button type="button" class="mny-chip ${d.from === f ? 'on' : ''}" onclick="mnyDepSet('from','${escapeJsAttr(f)}')">${escapeHtml(f)}</button>`).join('')}</div>
       <div class="mny-note">This goes into the same pile as everything else you earned. You decide where all of it goes on the next step.</div>
       <div class="mny-chiprow">
         <button type="button" class="mny-btn primary" onclick="mnySaveDep()">Save it</button>
@@ -453,7 +453,7 @@ function mnyChecklist(wk, kid) {
       <div class="mny-week-head"><span class="mny-label">🧭 Before we start</span>
         <button type="button" class="mny-chip" onclick="mnyToggleChecks()">Hide ▾</button></div>
       <div class="mny-checks">${MNY_CHECKS.map(c =>
-        `<button type="button" class="mny-chip ${checks[c.id] ? 'on' : ''}" onclick="mnyTickCheck('${c.id}')">${checks[c.id] ? '✓' : '○'} ${escapeHtml(c.label)}</button>`).join('')}</div>
+        `<button type="button" class="mny-chip ${checks[c.id] ? 'on' : ''}" onclick="mnyTickCheck('${escapeJsAttr(c.id)}')">${checks[c.id] ? '✓' : '○'} ${escapeHtml(c.label)}</button>`).join('')}</div>
     </div>`;
 }
 
@@ -470,9 +470,9 @@ function mnyPoolCard(wk, kid, pool) {
   const payRow = (d) => {
     const stepper = isParent()
       ? `<span class="mny-stepgrp">
-           <button type="button" class="mny-step" onclick="mnyBumpPayment('${escapeAttr(d.debt.id)}',-1)" aria-label="Pay less">−</button>
-           <button type="button" class="mny-step" onclick="mnyBumpPayment('${escapeAttr(d.debt.id)}',1)" aria-label="Pay more">+</button>
-           ${d.reduced ? `<button type="button" class="mny-step" onclick="mnyResetPayment('${escapeAttr(d.debt.id)}')" aria-label="Back to the scheduled payment">↺</button>` : ''}
+           <button type="button" class="mny-step" onclick="mnyBumpPayment('${escapeJsAttr(d.debt.id)}',-1)" aria-label="Pay less">−</button>
+           <button type="button" class="mny-step" onclick="mnyBumpPayment('${escapeJsAttr(d.debt.id)}',1)" aria-label="Pay more">+</button>
+           ${d.reduced ? `<button type="button" class="mny-step" onclick="mnyResetPayment('${escapeJsAttr(d.debt.id)}')" aria-label="Back to the scheduled payment">↺</button>` : ''}
          </span>`
       : '';
     const was = d.reduced ? `<s class="mny-was">${mnyMoney(d.scheduled)}</s> ` : '';
@@ -493,7 +493,7 @@ function mnyPoolCard(wk, kid, pool) {
       ${mnyBuysNote(pool.mine)}
       <div class="mny-note">Corrections to what she earned happen on the step before this one.</div>
       ${short ? `<div class="mny-note warn">There is not enough to cover the payment. ${MNY_SHORTFALL.map(s =>
-        `<button type="button" class="mny-chip" onclick="mnyPickShortfall('${s.id}')">${escapeHtml(s.label)}</button>`).join(' ')}</div>` : ''}
+        `<button type="button" class="mny-chip" onclick="mnyPickShortfall('${escapeJsAttr(s.id)}')">${escapeHtml(s.label)}</button>`).join(' ')}</div>` : ''}
     </div>`;
 }
 /* What paying less actually costs, in the two units that mean something to a
@@ -617,7 +617,7 @@ function mnyChangePlanCards(wk, kid, draft, pool) {
   const cards = MNY_PLANS.map(p => {
     const open = mnyIsOpen(kid, p.need);
     return `<button type="button" class="mny-plan ${draft.planId === p.id ? 'on' : ''}" ${open ? '' : 'disabled'}
-      onclick="mnyPickPlan('${p.id}')">
+      onclick="mnyPickPlan('${escapeJsAttr(p.id)}')">
       <span class="mny-plan-icon">${p.icon}</span>
       <span>${escapeHtml(p.label)}</span>
       ${open ? '' : `<small>🔒 ${escapeHtml(mnyNeedLabel(p.need))}</small>`}
@@ -683,9 +683,9 @@ function mnyChangePlanCards(wk, kid, draft, pool) {
 }
 function mnyBucketStepper(key, value) {
   return `<span class="mny-stepgrp">
-      <button type="button" class="mny-step" onclick="mnyTuneBucket('${escapeAttr(key)}',-1)" aria-label="Less">−</button>
+      <button type="button" class="mny-step" onclick="mnyTuneBucket('${escapeJsAttr(key)}',-1)" aria-label="Less">−</button>
       <b>${mnyMoney(value)}</b>
-      <button type="button" class="mny-step" onclick="mnyTuneBucket('${escapeAttr(key)}',1)" aria-label="More">+</button>
+      <button type="button" class="mny-step" onclick="mnyTuneBucket('${escapeJsAttr(key)}',1)" aria-label="More">+</button>
     </span>`;
 }
 
@@ -714,7 +714,7 @@ function mnyReflectCard(draft) {
       <div class="mny-label">One question</div>
       <div class="mny-today-big">${escapeHtml(MNY_REFLECT.question)}</div>
       <div class="mny-chiprow">${MNY_REFLECT.chips.map(c =>
-        `<button type="button" class="mny-chip ${draft.reflect === c.id ? 'on' : ''}" onclick="mnyPickReflect('${c.id}')">${escapeHtml(c.label)}</button>`).join('')}</div>
+        `<button type="button" class="mny-chip ${draft.reflect === c.id ? 'on' : ''}" onclick="mnyPickReflect('${escapeJsAttr(c.id)}')">${escapeHtml(c.label)}</button>`).join('')}</div>
       ${chosen
         ? `<div class="mny-note">${escapeHtml(chosen.effect)} The plan above has moved to match — change any number if you disagree with it.</div>`
         : `<div class="mny-note">Pick one. Your answer shapes the plan above, and it goes into the record of this week.</div>`}
@@ -795,9 +795,9 @@ function mnyStepper(field, value, which, step) {
   const s = step || 1;
   const fn = which === 'comp' ? 'mnyCompBump' : 'mnyDepBump';
   return `<span class="mny-stepgrp">
-      <button type="button" class="mny-step" onclick="${fn}('${field}',${-s})" aria-label="Less">−</button>
+      <button type="button" class="mny-step" onclick="${fn}('${escapeJsAttr(field)}',${-s})" aria-label="Less">−</button>
       <b>${which === 'dep' ? mnyMoney(value) : value}</b>
-      <button type="button" class="mny-step" onclick="${fn}('${field}',${s})" aria-label="More">+</button>
+      <button type="button" class="mny-step" onclick="${fn}('${escapeJsAttr(field)}',${s})" aria-label="More">+</button>
     </span>`;
 }
 /* Typed fields mutate the draft WITHOUT redrawing. A chip or a stepper changes
@@ -928,7 +928,7 @@ function mnyDoCommit() {
     if (dep.appliedAt) return;
     moneyAddCash(kid, dep.amount);
     dep.appliedAt = Date.now();
-    dep.updatedAt = Date.now();
+    dep.updatedAt = syncNow();
   });
 
   // 2 · the week itself: freeze the ledger, credit what she earned, credit XP,
@@ -961,7 +961,7 @@ function mnyDoCommit() {
     if (!(amt > 0)) return;
     if (!moneyDeposit(kid, amt)) return;
     g.saved = money2(money2(g.saved) + amt);
-    g.updatedAt = Date.now();
+    g.updatedAt = syncNow();
     toGoals[g.id] = amt;
     parts.push(`${g.icon} ${g.name} +$${amt.toFixed(2)}`);
   });
@@ -976,7 +976,7 @@ function mnyDoCommit() {
   const plan = MNY_PLANS.find(p => p.id === d.planId) || MNY_PLANS[0];
   mnySavePlan(wk, kid, {
     planId: d.planId, label: plan.label, split, reflect: d.reflect,
-    committedAt: Date.now(),
+    committedAt: syncNow(),
   });
   const c = state.shared.chore;
   const ledger = ((c.moneyLedger || {})[wk] || {})[kid];
@@ -1023,7 +1023,7 @@ function mnyBuyChosenFund(kid, dollars) {
     held.units = 1;
     held.priceNow = money2(mnyHoldingValue(held) + amt);
     held.costBasis = money2(money2(held.costBasis) + amt);
-    held.updatedAt = Date.now();
+    held.updatedAt = syncNow();
   } else {
     // A blended fund has no share price to look up, so it grows at a rate like
     // a savings account does — just a much better one, with the risk to match.

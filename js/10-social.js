@@ -139,7 +139,7 @@ async function sendInvite(block, to) {
     startMin: block.startMin,
     durationMin: block.durationMin,
     status: 'pending',
-    createdAt: Date.now(),
+    createdAt: syncNow(),
     sourceBlockId: block.id,
   };
   state.shared.invites = [...(state.shared.invites||[]), inv];
@@ -214,11 +214,11 @@ function renderChallenges() {
         ? `<div class="ct-meta" style="font-style:italic;margin-bottom:0.2rem">You're a team on this one — cheer each other on! 🤝</div>`
         : '';
       card.innerHTML = `
-        <div class="challenge-title">${c.title}</div>
+        <div class="challenge-title">${escapeHtml(c.title)}</div>
         ${teamNote}
         ${rows}
         <div style="display:flex;justify-content:flex-end;margin-top:0.4rem">
-          <button class="btn-icon" onclick="deleteChallenge('${c.id}')" style="padding:2px 8px">🗑</button>
+          <button class="btn-icon" onclick="deleteChallenge('${escapeJsAttr(c.id)}')" style="padding:2px 8px">🗑</button>
         </div>
       `;
       list.appendChild(card);
@@ -245,10 +245,10 @@ function renderInvites() {
     el.className = 'invite-item';
     el.innerHTML = `
       <div>💌 <b>${inv.from==='jenn'?'Jenn':'Jess'}</b> invited you to<br>
-      <b>${act?.icon} ${act?.name}</b> on ${DAY_SHORT[(d.getDay()+6)%7]} at ${tStr}</div>
+      <b>${act?.icon} ${escapeHtml(act?.name)}</b> on ${DAY_SHORT[(d.getDay()+6)%7]} at ${tStr}</div>
       <div class="invite-actions">
-        <button class="pill-btn" onclick="acceptInvite('${inv.id}')">✅ Accept</button>
-        <button class="pill-btn" onclick="declineInvite('${inv.id}')">❌ Decline</button>
+        <button class="pill-btn" onclick="acceptInvite('${escapeJsAttr(inv.id)}')">✅ Accept</button>
+        <button class="pill-btn" onclick="declineInvite('${escapeJsAttr(inv.id)}')">❌ Decline</button>
       </div>
     `;
     inviteList.appendChild(el);
@@ -275,7 +275,7 @@ function confirmNewChallenge() {
     activityId: document.getElementById('chActivity').value,
     target: parseInt(document.getElementById('chTarget').value)||1,
     who: document.getElementById('chWho').value,
-    createdAt: Date.now(),
+    createdAt: syncNow(),
     weekStart: dateToLocalKey(getWeekStart(weekOffset)),
   };
   state.shared.challenges = [...(state.shared.challenges||[]), c];

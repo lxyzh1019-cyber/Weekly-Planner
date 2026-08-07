@@ -230,7 +230,7 @@ function mmRenderDayDetail(wk, d) {
              : said ? `<span class="mm-item-said">she said: ${escapeHtml(said.toLowerCase())}</span>`
              : `<span class="mm-item-said">not answered</span>`)
           : '';
-        return `<button type="button" class="mm-item ${row.on ? 'on' : ''}" onclick="mmToggleItem('${kid}',${d},${i})"
+        return `<button type="button" class="mm-item ${row.on ? 'on' : ''}" onclick="mmToggleItem('${escapeJsAttr(kid)}',${d},${i})"
             role="checkbox" aria-checked="${row.on}" aria-label="${escapeAttr(row.label)} ${DAY_SHORT[d]}, ${name}"><span class="mm-item-box">${row.on ? '✓' : ''}</span>${row.icon ? row.icon + ' ' : ''}${escapeHtml(row.label)}${tag}</button>`;
       }).join('');
       const done = mine.filter(x => x.row.on).length;
@@ -366,7 +366,7 @@ function mmRenderConfirm(wk, held) {
     if (b.streak.bonus) bits.push(`streak $${b.streak.bonus.toFixed(2)}`);
     if (b.compPaid) bits.push(`competition $${b.compPaid.toFixed(2)}`);
     if (b.fines.total) bits.push(`fines −$${b.fines.total.toFixed(2)}`);
-    return `<div class="ct-meta">${CT_PROFILE_ICON[kid]} ${bits.join(' · ') || 'nothing earned'}${xp ? ` · +${xp} XP` : ''}${due ? ` · ${dueLabel} −$${due.toFixed(2)}` : ''}</div>`;
+    return `<div class="ct-meta">${CT_PROFILE_ICON[kid]} ${bits.join(' · ') || 'nothing earned'}${xp ? ` · +${xp} XP` : ''}${due ? ` · ${escapeHtml(dueLabel)} −$${due.toFixed(2)}` : ''}</div>`;
   }).join('') : '';
   const explain = newModel
     ? `This <b>confirms</b> the week. Recording credits each kid's total to cash, credits XP, opens the Sunday Box, adds a month of interest and pays out anything locked away that has reached its date. The loan payment and any overdue interest move <b>once a month</b>, not every Sunday.`
@@ -530,9 +530,9 @@ function mmSettledStrip(wk) {
     const s = mmKidSettled(wk, k);
     const cell = (on, label, step) =>
       `<button type="button" class="mm-settle-cell ${on ? 'on' : ''}"
-         onclick="mnySetMeetKid('${k}');mmGoStep(${step})">${on ? '✓' : '○'} ${label}</button>`;
+         onclick="mnySetMeetKid('${escapeJsAttr(k)}');mmGoStep(${step})">${on ? '✓' : '○'} ${label}</button>`;
     return `<div class="mm-settle-row">
-        <span class="mm-settle-who">${CT_PROFILE_ICON[k]} ${s.name}</span>
+        <span class="mm-settle-who">${CT_PROFILE_ICON[k]} ${escapeHtml(s.name)}</span>
         ${cell(s.agreed, 'Agreed', 3)}${cell(s.decided, 'Decided', 4)}
       </div>`;
   }).join('');
@@ -557,7 +557,7 @@ function mmFinishButtons(wk) {
   const goTo = unsettled[0];
   return `<span class="mm-finish-gap">
       <button type="button" class="pill-btn" onclick="closeSheet('familyMeetingOverlay')">Close anyway</button>
-      <button type="button" class="btn-confirm" onclick="mnySetMeetKid('${goTo.kid}');mmGoStep(${goTo.agreed ? 4 : 3})">${escapeHtml(gap)} ▶</button>
+      <button type="button" class="btn-confirm" onclick="mnySetMeetKid('${escapeJsAttr(goTo.kid)}');mmGoStep(${goTo.agreed ? 4 : 3})">${escapeHtml(gap)} ▶</button>
     </span>`;
 }
 function mmPlanNextWeek() {
@@ -570,7 +570,7 @@ function mmPlanNextWeek() {
       const date = formatDayKey(key); const next = new Date(date); next.setDate(date.getDate() + 7);
       const nextKey = dateToLocalKey(next);
       if ((getDayBlocksForProfile(nextKey, kid) || []).length) return; // don't clobber existing plans
-      const clone = src.map(b => ({ ...b, id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), completed: false, confirmed: false, createdAt: Date.now(), updatedAt: Date.now() }));
+      const clone = src.map(b => ({ ...b, id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), completed: false, confirmed: false, createdAt: syncNow(), updatedAt: syncNow() }));
       setDayBlocks(nextKey, clone, kid);
       copied += clone.length;
     });

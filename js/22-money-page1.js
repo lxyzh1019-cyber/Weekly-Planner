@@ -26,9 +26,30 @@
 
 let mnyKid = 'jess';          // which kid a parent is looking at
 let mnyCalMonth = null;       // 'YYYY-MM' for the competition calendar
-/* Open by default: on page 1 the price list IS the middle column, and a
-   column holding one collapsed button is a column holding nothing. */
-let mnyOpenPrices = { all: true };
+/* The price list used to be open by default, on the reasoning that "on page 1
+   the price list IS the middle column, and a column holding one collapsed button
+   is a column holding nothing". That is true on a wide screen and false on a
+   phone: there is no middle column at 390px, so it became 428 words of pay
+   policy standing between a nine-year-old and the number she opened the page to
+   see — most of the screen's whole word budget, spent on reference.
+
+   First attempt kept it open on wide screens, on the reasoning that the column
+   argument still holds there. Running the word-budget sweep at tablet-landscape
+   and desktop killed that: it put this page at 564 words on exactly the iPad a
+   child uses, which is the thing the budget exists to prevent. The budget is
+   about how much there is to read, and a wider screen does not make 564 words
+   less to read. Closed by default everywhere; her choice is remembered.
+
+   Stored in localStorage rather than synced state — it is a per-device view
+   preference, and every state write is a full-document upload. Same idiom as
+   HERO_MODE_LS_KEY in js/05-helpers.js. */
+const MNY_PRICES_LS_KEY = 'wp_mny_prices_open';
+function mnyPricesOpen() {
+  return localStorage.getItem(MNY_PRICES_LS_KEY) === '1';
+}
+function mnySetPricesOpen(open) {
+  try { localStorage.setItem(MNY_PRICES_LS_KEY, open ? '1' : '0'); } catch (e) {}
+}
 let mnyStoryMode = 'week';    // the money story: 'week' | 'month'
 let mnyStoryMonth = null;     // 'YYYY-MM'
 let mnyGoalFormOpen = false;  // the new-goal form on My money
@@ -467,7 +488,7 @@ function mnyPricesCard(wk) {
   const r = mrRules();
   const weekRules = mrRulesForWeek(wk);
   const changedMidWeek = JSON.stringify(r) !== JSON.stringify(weekRules);
-  const open = !!mnyOpenPrices.all;
+  const open = mnyPricesOpen();
   return `<div class="mny-card">
       <button type="button" class="mny-acc" data-mny-action="prices" aria-expanded="${open}">
         <span class="mny-label">💷 What things pay</span><span>${open ? 'Hide ▾' : 'Show ▸'}</span>
@@ -611,9 +632,9 @@ function mnyHandleClick(ev) {
     // From Money school this is a link to the price list rather than a toggle
     // on a card that is not on screen.
     if (!document.getElementById('screen-mymoney').classList.contains('active')) {
-      mnyOpenPrices.all = true; mnyOpenMyMoney(mnyViewKid()); return;
+      mnySetPricesOpen(true); mnyOpenMyMoney(mnyViewKid()); return;
     }
-    mnyOpenPrices.all = !mnyOpenPrices.all; mnyRenderMyMoney(); return;
+    mnySetPricesOpen(!mnyPricesOpen()); mnyRenderMyMoney(); return;
   }
   if (a === 'ask')     { mnyShowConcept(el.getAttribute('data-mny-concept')); return; }
   if (a === 'concept') { mnySchoolConcept = el.getAttribute('data-mny-concept'); mnyRenderSchool(); return; }

@@ -3,6 +3,71 @@
 /* ════════════════════════════════════════════════════════════════
    HELPERS
 ════════════════════════════════════════════════════════════════ */
+
+/* ── HTML escaping ─────────────────────────────────────────────────────────
+   Every user-supplied string interpolated into an innerHTML template must come
+   through one of these: escapeHtml for text position, escapeAttr inside a
+   double-quoted attribute. Activity names, block notes, chore names, goal
+   names and kid feedback are all user-editable.
+
+   These live here, not in a feature file, because js/05, js/06 and js/07 all
+   call them — they used to be declared in js/08-day-view.js, i.e. three files
+   depended on a primitive declared after them. It worked only because nothing
+   renders at load time.
+
+   escapeHtml used to build a throwaway <div> and read back its innerHTML. This
+   is the same transformation done directly: & < > become entities and quotes
+   are left alone, which is why attribute position needs escapeAttr instead.
+   A render can call this several hundred times, and this way it neither
+   allocates a DOM node per call nor needs a document at all. The equivalence
+   with the old implementation is asserted in tests/smoke.js
+   (escapingMatchesTheDomReference). */
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+// Escape a value for use inside a double-quoted HTML attribute (escapeHtml leaves quotes).
+function escapeAttr(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+/* For a value going inside a single-quoted JS string that is itself inside a
+   double-quoted inline handler — onclick="fn('HERE')".
+
+   escapeAttr is NOT enough there, and this is the subtle part: an inline handler
+   attribute is HTML-decoded *before* it is parsed as JavaScript, so escapeAttr's
+   &#39; decodes straight back to an apostrophe and closes the string literal
+   anyway. The quote has to be escaped for the JavaScript parser (backslash),
+   and only then escaped for the HTML parser.
+
+   This is not theoretical. Block ids reach these handlers, ensureBlockId used to
+   bake 24 characters of the user's note into an id, and ids also arrive straight
+   off a world-writable Firestore document — so a note or a synced id containing
+   an apostrophe ran as code on tap. Both ends are fixed: ids are slugged at the
+   source, and every id interpolated into a handler comes through here.
+
+   Better still is not to interpolate into handlers at all — data attributes plus
+   delegation, the way js/13-chores.js and the money pages already do it. Prefer
+   that for new code; this exists to make the ~40 handlers already written safe. */
+function escapeJsAttr(str) {
+  const js = String(str ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n');
+  return js
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 function getProfData(p=activeProfile()) {
   if (!state.profiles[p]) state.profiles[p] = { weeks:{}, customActivities:[], dayMoods:{}, blockMoods:{}, activityCounts:{}, activityHours:{} };
   const prof = state.profiles[p];
@@ -727,6 +792,10 @@ function showScreen(id) {
   // actually showing (and can't lock navigation across the whole app).
   try { enhanceAccessibility(targetScreen); } catch(e){ console.error('enhanceAccessibility failed', e); }
   try { if (typeof refreshMascotButton === 'function') refreshMascotButton(); } catch(e){ console.error('refreshMascotButton failed', e); }
+  // The kid nav follows whatever screen is now active, and hides itself outside
+  // a child's screens. Isolated like the hooks above: a nav that throws must not
+  // be able to stop a screen from showing.
+  try { if (typeof tdRenderNav === 'function') tdRenderNav(); } catch(e){ console.error('tdRenderNav failed', e); }
   if (id === 'day') {
     try {
       updateDayLandscapeChromeHeight();
@@ -797,6 +866,17 @@ async function selectProfile(p) {
     parentViewing = 'jenn';
     showScreen('parent');
     renderParentHome();
+  } else if (typeof goToday === 'function') {
+    /* Today is the front door. A child opening this app was landing on either the
+       Quest Board or the week grid, and both answer "what is my week" rather than
+       "what now" — see js/31-today.js.
+
+       Hero Mode used to be exactly this choice (quest board vs week) and nothing
+       else, so making Today the landing would have quietly left it a switch that
+       does nothing. It now decides whether Quests is offered as a way out of
+       Today, which keeps its intent — game framing to the fore, or not — and
+       Branch 6 decides where the toggle finally lives. */
+    goToday();
   } else if (isHeroMode()) {
     goQuestBoard();
   } else {

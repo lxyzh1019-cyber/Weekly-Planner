@@ -446,11 +446,11 @@ function renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd) {
     el.style.width = 'calc(50% - 4px)';
     const fromName = inv.from === 'jenn' ? 'Jenn' : 'Jess';
     el.innerHTML = `
-      <div class="block-name">💌 ${act.icon} ${act.name}</div>
-      <div class="block-meta">From ${fromName} · ${formatTimeFromMin(inv.startMin)}</div>
+      <div class="block-name">💌 ${act.icon} ${escapeHtml(act.name)}</div>
+      <div class="block-meta">From ${escapeHtml(fromName)} · ${formatTimeFromMin(inv.startMin)}</div>
       <div class="invitation-actions">
-        <button onclick="event.stopPropagation();acceptInviteFromTimeline('${inv.id}')">✅ Accept</button>
-        <button onclick="event.stopPropagation();declineInviteFromTimeline('${inv.id}')">❌ Ignore</button>
+        <button onclick="event.stopPropagation();acceptInviteFromTimeline('${escapeJsAttr(inv.id)}')">✅ Accept</button>
+        <button onclick="event.stopPropagation();declineInviteFromTimeline('${escapeJsAttr(inv.id)}')">❌ Ignore</button>
       </div>
     `;
     canvas.appendChild(el);
@@ -797,14 +797,14 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   const nameHtml = isBuffer
     ? ''
     : (isCompact && noteTrim)
-    ? `<div class="block-name block-name--inline">${dispIcon} <span class="block-title">${escapeHtml(baseName)}</span><span class="block-note-inline" title="${escapeHtml(noteTrim).replace(/"/g,'&quot;')}"> · ${escapeHtml(noteTrim)}</span></div>`
-    : `<div class="block-name">${dispIcon} ${escapeHtml(displayName)}</div>`;
+    ? `<div class="block-name block-name--inline">${escapeHtml(dispIcon)} <span class="block-title">${escapeHtml(baseName)}</span><span class="block-note-inline" title="${escapeAttr(noteTrim)}"> · ${escapeHtml(noteTrim)}</span></div>`
+    : `<div class="block-name">${escapeHtml(dispIcon)} ${escapeHtml(displayName)}</div>`;
   const metaHtml = isBuffer
     ? `<div class="block-meta"><span class="travel-buf-label">${escapeHtml(b._bufferLabel || '')}</span></div>`
     : `<div class="block-meta">${durStr}${badges?' '+badges:''}</div>`;
   // Quick-complete tick — mark this block done straight from the timeline.
   const doneHtml = !isBuffer
-    ? `<button type="button" class="block-done-btn${b.completed?' done':''}" aria-label="${b.completed?'Mark not done':'Mark done'}" onclick="event.stopPropagation(); toggleBlockDone(currentDayKey,'${b.id}',event)">${b.completed?'✓':''}</button>`
+    ? `<button type="button" class="block-done-btn${b.completed?' done':''}" aria-label="${b.completed?'Mark not done':'Mark done'}" onclick="event.stopPropagation(); toggleBlockDone(currentDayKey,'${escapeJsAttr(b.id)}',event)">${b.completed?'✓':''}</button>`
     : '';
   // List as many objectives/goals as the block's own height can hold — same
   // "show what this block is about" idea as print/week, and the day view has
@@ -830,7 +830,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
     ${nameHtml}
     ${metaHtml}
     ${objHtml}
-    ${!isBuffer && b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="block-stopwatch-btn" onclick="event.stopPropagation(); startBlockStopwatch('${b.id}')">⏱ Start stopwatch</button>` : ''}
+    ${!isBuffer && b.stopwatch && b.stopwatch.enabled ? `<button type="button" class="block-stopwatch-btn" onclick="event.stopPropagation(); startBlockStopwatch('${escapeJsAttr(b.id)}')">⏱ Start stopwatch</button>` : ''}
     ${noteHtml}
   `;
   if (showTrainingChecks) blockEl.appendChild(buildBlockTrainingChecks(b));
@@ -945,16 +945,9 @@ function formatTimeFromMin(min) {
   return `${h12}:${m.toString().padStart(2,'0')}${ampm}`;
 }
 
-function escapeHtml(str) {
-  if (str == null) return '';
-  const d = document.createElement('div');
-  d.textContent = String(str);
-  return d.innerHTML;
-}
-// Escape a value for use inside a double-quoted HTML attribute (escapeHtml leaves quotes).
-function escapeAttr(str) {
-  return String(str ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+// escapeHtml and escapeAttr moved to js/05-helpers.js — js/05, js/06 and js/07
+// all call them, so a primitive declared here meant three earlier files
+// depended on a later one.
 
 function renderSheetTimeSummary(elId, startMin, durationMin, travelOn, travelBufMin, readyOn=false, readyBufMin=15, warmupOn=false, warmupBufMin=20) {
   const el = document.getElementById(elId);
@@ -1189,11 +1182,9 @@ function isActivitySelectable(act) {
   return true;
 }
 
-function getUnlockedRoutineRewards(routineId) {
-  const p = getProfData();
-  const map = (p.progress && p.progress.unlockedChecklistItems) || {};
-  return map[routineId] || [];
-}
+// getUnlockedRoutineRewards lives in js/05-helpers.js — that copy takes an
+// explicit profile, which this one dropped. Both files share one global scope,
+// so the duplicate here silently won and made the parameter dead.
 
 function kidRoutineStopwatchClearTick() {
   if (kidRoutineStopwatchTick) {
@@ -1510,7 +1501,7 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
   durationMin = fitDur;
   const block = {
     id, actId, startMin, durationMin,
-    createdAt: Date.now(), updatedAt: Date.now(), // so cross-device merges order correctly
+    createdAt: syncNow(), updatedAt: syncNow(), // so cross-device merges order correctly
     colour,
     objectives: objectives||[],
     note: note||'',

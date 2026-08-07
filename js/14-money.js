@@ -110,7 +110,7 @@ function moneyBuyStock(kid, ticker, dollars) {     // cash → a bit of a compan
     held.units = (Number(held.units) || 0) + dollars / price;
     held.priceNow = money2(price);
     held.costBasis = money2(money2(held.costBasis) + dollars);
-    held.updatedAt = Date.now();
+    held.updatedAt = syncNow();
   } else {
     mnyAddHolding(kid, { kind: 'stock', name: STOCKS_2023[ticker].name, ticker,
                          units: dollars / price, priceNow: money2(price), costBasis: dollars });
@@ -129,7 +129,7 @@ function moneySellStock(kid, ticker, shares) {     // a bit of a company → cas
   // Cost comes off in proportion, so what is left still knows what it cost.
   held.costBasis = money2(money2(held.costBasis) * (1 - shares / have));
   held.units = have - shares;
-  held.updatedAt = Date.now();
+  held.updatedAt = syncNow();
   if (held.units < 1e-9) mnyRemoveHolding(kid, held.id);
   w.cash = money2(w.cash + proceeds); saveAll(); return true;
 }

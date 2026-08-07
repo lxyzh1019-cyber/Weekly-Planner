@@ -8,10 +8,26 @@ loadLocal();
 initFirebase();
 showScreen('profile');
 window._currentRewardPrompt = null;
+// Cloud writes are debounced (SYNC_DEBOUNCE_MS, js/03-sync.js). A tab being
+// hidden or torn down is the one case where waiting out the window risks losing
+// the edit, so flush immediately. pagehide covers iOS Safari, where unload does
+// not reliably fire; visibilitychange covers app-switching on a tablet, which is
+// how this app is actually used.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushPush();
+});
+window.addEventListener('pagehide', flushPush);
 // Chore tab uses event delegation on #choreWrap (survives innerHTML re-renders).
 (function(){
   const wrap = document.getElementById('choreWrap');
   if (wrap) wrap.addEventListener('click', ctHandleWrapClick);
+})();
+// Today delegates for the same reason: every render replaces the whole wrap.
+(function(){
+  const wrap = document.getElementById('tdWrap');
+  if (wrap) wrap.addEventListener('click', tdHandleClick);
+  const nav = document.getElementById('kidNav');
+  if (nav) nav.addEventListener('click', tdHandleNavClick);
 })();
 // The pocket-money pages delegate the same way, for the same reason: every
 // render replaces the whole wrap, so a listener bound to a card would be gone

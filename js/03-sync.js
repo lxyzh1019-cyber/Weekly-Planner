@@ -26,6 +26,80 @@ let lastLocalWriteAt = 0;
 let lastRemoteSeenAt = 0;
 const SHOW_SYNC_DEBUG = false;
 
+/* ── Write coalescing ──────────────────────────────────────────────────────
+   Every mutation used to call saveAll → pushToFirebase, and each push writes
+   the ENTIRE state tree. Anything that mutates in a loop (a routine's items, a
+   week's blocks, a meeting settling both kids) therefore fired a full-document
+   upload per step. saveLocal stays immediate — localStorage is the crash-safety
+   net and must not lag behind the UI — but the network write is debounced.
+
+   Trailing edge, so a burst uploads once when it settles. Anything that ends
+   the session (tab hidden, page unloading) flushes first; those listeners are
+   registered in js/99-main.js, since this file may only declare. */
+const SYNC_DEBOUNCE_MS = 2000;
+let syncDebounceTimer = null;
+// Counts real push attempts, so tests can assert a burst coalesced. Also the
+// quickest way to see runaway writes from the console.
+let syncPushAttempts = 0;
+
+/* ── Payload size ──────────────────────────────────────────────────────────
+   Firestore's hard limit is 1 MiB per document. This app keeps every week
+   forever in one document and prunes nothing, so the limit is a real deadline
+   rather than a theoretical one — and the failure is silent: set() rejects, the
+   catch below logs, and the status line reads "Synced (connection only)" while
+   nothing has synced since. Measure every write and say so before that. */
+const SYNC_WARN_BYTES = 700 * 1024;
+const SYNC_HARD_WARN_BYTES = 900 * 1024;
+const SYNC_LIMIT_BYTES = 1024 * 1024;
+let lastPayloadBytes = 0;
+let lastPayloadAt = 0;
+let payloadWarnLevel = 'ok';   // 'ok' | 'warn' | 'critical' — last level announced
+
+/* ── Clock skew ────────────────────────────────────────────────────────────
+   js/04-merge.js arbitrates on `updatedAt`: the higher stamp wins an id, a week,
+   a holding. Those stamps came from each device's own Date.now(), so the
+   arbitration was really "whose clock is furthest ahead" rather than "who edited
+   last". A tablet an hour fast wins every exchange until it is corrected, and
+   silently — the losing edit just isn't there any more.
+
+   Fix: learn this device's offset from the server and stamp with the corrected
+   time. Every write carries both a client stamp and a serverTimestamp(); when
+   the write comes back on the snapshot, the difference is the offset. Only our
+   own echoes are used, because another device's clientAt says nothing about our
+   clock. The offset includes the commit latency, which is bounded by the network
+   (milliseconds) rather than by how wrong a clock can be (hours).
+
+   Offline, syncNow falls back to Date.now() — there is nothing better, and the
+   merge only matters once a connection exists anyway. */
+const SYNC_MAX_PLAUSIBLE_OFFSET_MS = 24 * 60 * 60 * 1000;
+let serverTimeOffsetMs = 0;
+let serverTimeKnown = false;
+let ownWriteStamps = [];   // client stamps we wrote, awaiting their echo
+
+/* The time to stamp edits with. Use this instead of Date.now() anywhere the
+   value is written into state and later compared across devices. */
+function syncNow() {
+  return Date.now() + serverTimeOffsetMs;
+}
+/* Learn the offset from the echo of one of our own writes. */
+function noteServerTime(meta) {
+  if (!meta) return;
+  const raw = meta.serverAt;
+  const serverAt = raw && typeof raw.toMillis === 'function' ? raw.toMillis()
+                 : (typeof raw === 'number' ? raw : 0);
+  const clientAt = Number(meta.clientAt) || 0;
+  if (!serverAt || !clientAt) return;
+  const i = ownWriteStamps.indexOf(clientAt);
+  if (i === -1) return;                      // another device's write
+  ownWriteStamps.splice(0, i + 1);
+  const offset = serverAt - clientAt;
+  // A wild value means something other than clock skew is going on; leave the
+  // offset alone rather than making arbitration worse than it already was.
+  if (Math.abs(offset) > SYNC_MAX_PLAUSIBLE_OFFSET_MS) return;
+  serverTimeOffsetMs = offset;
+  serverTimeKnown = true;
+}
+
 function initFirebase() {
   try {
     if (FIREBASE_CONFIG.apiKey.startsWith('REPLACE')) {
@@ -79,6 +153,10 @@ function initFirebase() {
       const remote = snap.data() || {};
       const remoteTs = remote?._meta?.updatedAt || 0;
       if (remoteTs) lastRemoteSeenAt = Math.max(lastRemoteSeenAt, remoteTs);
+      // Before merging: if this snapshot is the echo of our own write, it carries
+      // the server's view of when that write happened. That is the only source of
+      // truth this device has about its own clock.
+      try { noteServerTime(remote._meta); } catch (e) { console.error('noteServerTime failed', e); }
       mergeRemoteState(remote);
       if (hasPendingSync && remoteTs && remoteTs >= lastLocalWriteAt) {
         hasPendingSync = false;
@@ -112,6 +190,14 @@ function setSyncStatus(state, label) {
 function renderPendingSyncMessage() {
   const pending = document.getElementById('syncPendingMsg');
   if (!pending) {
+    renderSyncDebugMessage();
+    return;
+  }
+  // A write waiting out its debounce window is the normal case, not a problem.
+  // Without this it read "upload retrying…" for two seconds after every edit,
+  // which is alarming and untrue — nothing has failed yet.
+  if (hasPendingSync && fbConnected && syncDebounceTimer && !lastSyncError) {
+    pending.textContent = 'Saving…';
     renderSyncDebugMessage();
     return;
   }
@@ -176,7 +262,16 @@ function ensureBlockId(dayKey, block, idx) {
   const act = block?.actId || 'act';
   const start = block?.startMin ?? block?.start ?? 0;
   const dur = block?.durationMin ?? block?.slots ?? 0;
-  const note = (block?.note || '').slice(0, 24);
+  // The note used to be spliced into the id verbatim. Block ids get interpolated
+  // into inline onclick handlers, so a note containing an apostrophe closed the
+  // handler's string literal and the rest of the note ran as JavaScript on tap.
+  // Slug it: keep something human-readable, but only characters that cannot
+  // carry meaning in HTML or JS. escapeJsAttr at the render sites covers ids
+  // that arrive already-formed from a synced document.
+  const note = String(block?.note || '')
+    .replace(/[^A-Za-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 24);
   return `blk-${dayKey}-${idx}-${act}-${start}-${dur}-${note}`;
 }
 
@@ -282,7 +377,42 @@ function saveLocal() {
     }
   }
 }
+/* Byte length of a string as Firestore will store it — UTF-8, not UTF-16 code
+   units, so `.length` would under-count every non-ASCII character (the app is
+   full of emoji, and kid-entered notes may be Chinese). */
+function byteLength(str) {
+  if (typeof TextEncoder === 'function') return new TextEncoder().encode(str).length;
+  if (typeof Blob === 'function') return new Blob([str]).size;
+  return String(str).length;
+}
+/* Classify a payload against the Firestore ceiling. Pure, so it can be tested
+   without building a giant state. */
+function payloadHealth(bytes) {
+  const n = Number(bytes) || 0;
+  const level = n >= SYNC_HARD_WARN_BYTES ? 'critical' : n >= SYNC_WARN_BYTES ? 'warn' : 'ok';
+  return { bytes: n, level, pct: Math.min(100, Math.round((n / SYNC_LIMIT_BYTES) * 100)) };
+}
+/* Announce a threshold crossing once per transition rather than on every write,
+   and only ever upward — a parent shouldn't get the same warning 40 times while
+   settling a meeting. */
+function notePayloadSize(bytes) {
+  lastPayloadBytes = bytes;
+  lastPayloadAt = Date.now();
+  const { level, pct } = payloadHealth(bytes);
+  if (level !== payloadWarnLevel) {
+    const rising = (payloadWarnLevel === 'ok' && level !== 'ok') ||
+                   (payloadWarnLevel === 'warn' && level === 'critical');
+    payloadWarnLevel = level;
+    if (rising && typeof showToast === 'function') {
+      showToast(level === 'critical'
+        ? `⚠️ Cloud save is ${pct}% of its size limit — export a backup and ask for old weeks to be archived`
+        : `ℹ️ Cloud save is ${pct}% of its size limit — worth exporting a backup`);
+    }
+  }
+  if (typeof bkRenderPanel === 'function') { try { bkRenderPanel(); } catch (e) {} }
+}
 function pushToFirebase() {
+  syncPushAttempts++;
   if (!fbDocRef || !fbConnected) {
     hasPendingSync = true;
     lastSyncError = '';
@@ -301,7 +431,10 @@ function pushToFirebase() {
   // the same retry path as an async write failure.
   let payload;
   try {
-    payload = JSON.parse(JSON.stringify({ profiles: state.profiles, shared: state.shared }));
+    const json = JSON.stringify({ profiles: state.profiles, shared: state.shared });
+    // Measured on the exact string being uploaded, before _meta is attached.
+    notePayloadSize(byteLength(json));
+    payload = JSON.parse(json);
   } catch (e) {
     hasPendingSync = true;
     lastSyncError = e?.message || 'payload serialize failed';
@@ -309,7 +442,19 @@ function pushToFirebase() {
     console.error('Firestore payload serialization failed', e);
     return;
   }
-  payload._meta = { updatedAt: writeAt };
+  // updatedAt is the corrected stamp other devices arbitrate on. clientAt and
+  // serverAt exist only to measure this device's clock against the server's when
+  // this write echoes back — see noteServerTime.
+  payload._meta = { updatedAt: syncNow(), clientAt: writeAt };
+  try {
+    if (typeof firebase !== 'undefined' && firebase.firestore &&
+        firebase.firestore.FieldValue && firebase.firestore.FieldValue.serverTimestamp) {
+      payload._meta.serverAt = firebase.firestore.FieldValue.serverTimestamp();
+    }
+  } catch (e) { /* serverTimestamp unavailable — offset just stays unlearned */ }
+  ownWriteStamps.push(writeAt);
+  // Bound the list: only the newest few echoes are ever useful.
+  if (ownWriteStamps.length > 20) ownWriteStamps = ownWriteStamps.slice(-20);
   lastSyncError = '';
   renderPendingSyncMessage();
   setSyncStatus('syncing', 'Uploading…');
@@ -331,6 +476,22 @@ function pushToFirebase() {
     setSyncStatus('online', 'Synced (connection only)');
   }
 }
+/* Arm the trailing debounce. Repeated calls inside the window collapse into the
+   single upload that runs when it goes quiet. */
+function schedulePush() {
+  if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
+  syncDebounceTimer = setTimeout(() => {
+    syncDebounceTimer = null;
+    try { pushToFirebase(); } catch (e) { console.error('pushToFirebase failed', e); }
+  }, SYNC_DEBOUNCE_MS);
+}
+/* Upload now, cancelling any armed debounce. Called when waiting is no longer
+   safe: the tab is being hidden or the page is going away. */
+function flushPush() {
+  if (syncDebounceTimer) { clearTimeout(syncDebounceTimer); syncDebounceTimer = null; }
+  if (!hasPendingSync) return;
+  try { pushToFirebase(); } catch (e) { console.error('pushToFirebase failed', e); }
+}
 function saveAll() {
   saveLocal();
   hasPendingSync = true;
@@ -338,12 +499,14 @@ function saveAll() {
   // Save/Delete/Share button refreshes its UI *after* calling saveAll, so an
   // escaped error here leaves sheets stuck open with the data already saved.
   try { renderPendingSyncMessage(); } catch (e) { console.error('renderPendingSyncMessage failed', e); }
-  try { pushToFirebase(); } catch (e) { console.error('pushToFirebase failed', e); }
+  // Debounced rather than immediate: see SYNC_DEBOUNCE_MS above. The 5s retry
+  // interval in initFirebase is the backstop if this window is ever missed.
+  try { schedulePush(); } catch (e) { console.error('schedulePush failed', e); }
 }
 window._skipRewardPrompt = false;
 function markItemUpdated(item) {
   if (!item) return item;
-  item.updatedAt = Date.now();
+  item.updatedAt = syncNow();
   return item;
 }
 function mergeRemoteState(remote) {
@@ -404,7 +567,8 @@ function refreshCurrentScreen() {
   }
   const active = document.querySelector('.screen.active');
   if (!active) return;
-  if (active.id === 'screen-week') renderWeek();
+  if (active.id === 'screen-today') { if (typeof tdRenderToday === 'function') tdRenderToday(); }
+  else if (active.id === 'screen-week') renderWeek();
   else if (active.id === 'screen-day') { buildTimeline(); buildTray(); renderVibe(); }
   else if (active.id === 'screen-chore') renderChoreTab();
   else if (active.id === 'screen-sync') renderSync();

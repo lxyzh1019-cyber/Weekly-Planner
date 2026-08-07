@@ -225,6 +225,28 @@ function renderWeekGlance(keys) {
     ${sleepHtml}
     ${notesHtml}
   `;
+  applyWeekGlanceOpen();
+}
+
+/* "This week at a glance" is reference, so it starts closed and remembers what
+   she chose. Per-device view state, so localStorage rather than the synced
+   document — same idiom as HERO_MODE_LS_KEY in js/05-helpers.js. */
+const WK_GLANCE_LS_KEY = 'wp_week_glance_open';
+function weekGlanceOpen() { return localStorage.getItem(WK_GLANCE_LS_KEY) === '1'; }
+function toggleWeekGlance() {
+  try { localStorage.setItem(WK_GLANCE_LS_KEY, weekGlanceOpen() ? '0' : '1'); } catch (e) {}
+  applyWeekGlanceOpen();
+}
+function applyWeekGlanceOpen() {
+  const open = weekGlanceOpen();
+  const body = document.getElementById('weekGlanceBody');
+  const age = document.getElementById('weekGlanceAge');
+  const caret = document.getElementById('weekGlanceCaret');
+  const btn = document.querySelector('#weekGlance .week-glance-toggle');
+  if (body) body.hidden = !open;
+  if (age) age.hidden = !open;
+  if (caret) caret.textContent = open ? 'Hide ▾' : 'Show ▸';
+  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
 
 // #6 Weekly wins recap — a celebratory look at what actually got done.
@@ -654,7 +676,7 @@ function renderTimeGridMyTime(keys) {
   panel.style.display = 'block';
   panel.dataset.profile = activeProfile();
   panel.classList.toggle('tg-mytime--today', targetKey === today);
-  document.querySelector('#tgMyTime .tg-mytime-label').innerHTML = `🌟 MY FREE TIME<br><span style="font-size:0.95rem;font-family:'Patrick Hand',sans-serif;font-weight:700">${dayLabel}</span>`;
+  document.querySelector('#tgMyTime .tg-mytime-label').innerHTML = `🌟 MY FREE TIME<br><span style="font-size:0.95rem;font-family:'Patrick Hand',sans-serif;font-weight:700">${escapeHtml(dayLabel)}</span>`;
   document.getElementById('tgMyTimeValue').textContent = valueStr;
 
   // Mini brick strip showing today's bricks across the full 6am–10pm window
@@ -1116,12 +1138,12 @@ function renderFullWeek(keys) {
       card.innerHTML = `
         ${conflictFlag}
         <div class="wf-card-time">${timeStr}</div>
-        <div class="wf-card-icon">${dispIcon}</div>
-        <div class="wf-card-name">${stampEmoji}${dispName}${travelTag}${conflictTag}</div>
+        <div class="wf-card-icon">${escapeHtml(dispIcon)}</div>
+        <div class="wf-card-name">${stampEmoji}${escapeHtml(dispName)}${travelTag}${conflictTag}</div>
         ${sumHtml}
         <div class="wf-card-dur">${durHtml}</div>
         <button type="button" class="wf-card-check" style="width:${checkPx}px;height:${checkPx}px;font-size:${Math.round(checkPx*0.58)}px" aria-label="${b.completed?'Mark not done':'Mark done'}"
-          onclick="toggleBlockDone('${key}','${b.id}',event)">${b.completed?'✓':''}</button>
+          onclick="toggleBlockDone('${escapeJsAttr(key)}','${escapeJsAttr(b.id)}',event)">${b.completed?'✓':''}</button>
       `;
       card.title = `${dispIcon} ${dispName} — ${timeStr}, ${formatDuration(b.durationMin)}`
         + (bufKinds.length ? ` · ${bufKinds.join(', ')} each way` : '')

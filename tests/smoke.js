@@ -1,20 +1,73 @@
 // Headless-browser smoke test for index.html.
-// Run: npm install playwright-core && node tests/smoke.js
+// Run: npm ci && npm run test:smoke
 // Boots the app offline (Firebase errors are ignored), seeds a test week, and
 // drives the main flows. Prints a JSON report; exits non-zero on any failure
 // or unexpected console error. Screenshots land in tests/out/.
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const http = require('http');
 const { chromium } = require('playwright-core');
+
+/* A throwaway static server for the handful of checks that need a real origin.
+   The suite runs over file:// on purpose — CLAUDE.md, and it is what keeps ES
+   modules impossible — but file:// blocks fetch() outright, so a manifest check
+   run there reports a broken manifest whether or not it is broken. Rather than
+   move everything to http and lose the file:// guarantee, one short pass at the
+   end serves the repo and checks the things only an origin can answer.
+   No dependency: node's own http, ~30 lines. */
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
+               '.json': 'application/manifest+json', '.png': 'image/png',
+               '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+function serveRepo() {
+  const root = path.join(__dirname, '..');
+  return new Promise(resolve => {
+    const server = http.createServer((req, res) => {
+      const rel = decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '') || 'index.html';
+      const file = path.join(root, rel);
+      // Never serve outside the repo.
+      if (!file.startsWith(root) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+        res.writeHead(404); res.end('not found'); return;
+      }
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
+      res.end(fs.readFileSync(file));
+    });
+    server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port }));
+  });
+}
 
 function findChromium() {
   if (process.env.SMOKE_CHROMIUM) return process.env.SMOKE_CHROMIUM;
-  const roots = ['/opt/pw-browsers'];
+  // Every known location, in preference order. These are additive on purpose:
+  // PLAYWRIGHT_BROWSERS_PATH must not replace the others, or an environment
+  // that sets it (this repo's cloud sandbox does, to /opt/pw-browsers) loses
+  // the fallbacks entirely.
+  const roots = [
+    // Explicit override, when the environment points at its own install.
+    process.env.PLAYWRIGHT_BROWSERS_PATH,
+    // Claude Code cloud environments pre-install browsers here.
+    '/opt/pw-browsers',
+    // Playwright's own default install root, used by
+    // `npx playwright install chromium` — this is what CI and a developer
+    // laptop resolve through. Without it, playwright-core (which ships no
+    // browsers and no installer) has nothing to fall back to.
+    path.join(os.homedir(), '.cache', 'ms-playwright'),
+    // macOS default for the same install.
+    path.join(os.homedir(), 'Library', 'Caches', 'ms-playwright')
+  ];
+  const binaries = [
+    ['chrome-linux', 'chrome'],
+    ['chrome-linux', 'headless_shell'],
+    ['chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium']
+  ];
   for (const root of roots) {
-    if (!fs.existsSync(root)) continue;
+    if (!root || !fs.existsSync(root)) continue;
     for (const d of fs.readdirSync(root)) {
-      const p = path.join(root, d, 'chrome-linux', 'chrome');
-      if (fs.existsSync(p)) return p;
+      if (!d.startsWith('chromium')) continue;
+      for (const parts of binaries) {
+        const p = path.join(root, d, ...parts);
+        if (fs.existsSync(p)) return p;
+      }
     }
   }
   return undefined; // fall back to playwright's own resolution
@@ -33,8 +86,53 @@ function findChromium() {
     if (m.type() === 'error' && !/firestore|firebase|net::|CORS|fetch/i.test(m.text())) errors.push(m.text());
   });
 
+  /* ── Cut the app off from the real Firebase before it can reach it ──────────
+     THIS IS A SAFETY MEASURE, NOT A CONVENIENCE.
+
+     There is exactly one Firestore document — `weekly_planner/shared_state` —
+     and it holds the family's live planner. There is no test document. The app
+     connects on boot and every mutation goes saveAll → pushToFirebase → set().
+     This suite performs hundreds of mutations.
+
+     So on any machine with working network, running this test WRITES TEST DATA
+     INTO THE CHILDREN'S REAL PLANNER. It went unnoticed for a long time because
+     this sandbox's proxy blocks Firestore, so the app silently fell back to
+     "Local only" and the suite has only ever run isolated by accident. The first
+     CI run on a GitHub runner, which has open network, is what exposed it —
+     it failed on production data whose shape differs from the defaults.
+
+     Blocking at the network layer rather than in the app: the test must not
+     depend on the app remembering to be safe, and this also keeps the suite
+     deterministic — it exercises the shipped defaults instead of whatever
+     happens to be in the cloud that day.
+
+     Do not remove this without providing a separate test document first.
+
+     Scoped to Firebase hosts only — fonts.googleapis.com and fonts.gstatic.com
+     stay reachable, so the uploaded screenshots show the real typeface and the
+     font-size floor is measured against the fonts a child actually sees. */
+  for (const pattern of [
+    '**://firestore.googleapis.com/**',          // the database itself
+    '**://*.firebaseio.com/**',                  // realtime db, listed in the config
+    '**://www.gstatic.com/firebasejs/**',        // the SDK — without it, initFirebase bails
+    '**://identitytoolkit.googleapis.com/**',    // auth, for when it lands
+    '**://firebaseinstallations.googleapis.com/**',
+  ]) await page.route(pattern, r => r.abort());
+
   await page.goto('file://' + path.join(__dirname, '..', 'index.html'));
   await page.waitForTimeout(1200);
+
+  // Prove the isolation held rather than assuming it: if Firebase ever
+  // initialises here, every later check is running against live family data.
+  {
+    const live = await page.evaluate(() => ({ ref: !!fbDocRef, connected: !!fbConnected }));
+    if (live.ref) {
+      console.error('ABORTING: the app reached Firebase. This test would write to the ' +
+                    'family\'s real planner. Check the page.route blocks above.');
+      await browser.close();
+      process.exit(1);
+    }
+  }
 
   // ── Seed a kid week: school day, piano, Saturday training with buffers ──
   await page.evaluate(() => selectProfile('jenn'));
@@ -65,8 +163,19 @@ function findChromium() {
 
   // Kid money surface: kids reach Pocket Money and may LOOK at the bank, but
   // every function that moves money refuses them.
-  checks.kidMoneyLabel = await page.evaluate(() =>
-    document.getElementById('weekMoneyBtn').textContent.includes('My money'));
+  // One label for one destination (audit P2-4). The Quest board used to call it
+  // "My pocket money" while three other entry points called it "My money"; the
+  // shortcut row those lived in is gone, so the surviving routes are checked.
+  checks.kidMoneyLabel = await page.evaluate(() => {
+    profile = 'jenn'; goToday();
+    const nav = document.querySelector('#kidNav [data-td-nav="money"]');
+    const navSays = !!nav && nav.textContent.includes('Money');
+    showScreen('quest'); renderQuestBoard();
+    const questText = document.getElementById('screen-quest').textContent;
+    const questSays = !/pocket money/i.test(questText);
+    goWeek();
+    return navSays && questSays;
+  });
   // The money button lands a kid on her own page, and that page shows the four
   // things she owns and what she still owes.
   checks.kidCanOpenMyMoney = await page.evaluate(() => {
@@ -758,21 +867,203 @@ function findChromium() {
           bad.overflow.push(String(el.className).slice(0, 40) + '@' + Math.round(r.right));
         }
       });
-      // Primary controls need a 44px target. Icon-sized steppers inside a
-      // scrolling table are exempt; the ones a thumb actually aims at are not.
+      // Primary controls need a 44px target in BOTH dimensions. This used to
+      // measure height only, which is how a 36x36 week arrow passed for months:
+      // tall enough was never the problem, wide enough was.
       document.querySelectorAll(
-        '.ck-chore-row, .ck-qbtn, .ck-day, .ck-segbtn, .ck-item, .ck-rate, .cp-gbtn, .cp-kid, .co-lane, .co-who'
+        '.ck-chore-row, .ck-qbtn, .ck-day, .ck-segbtn, .ck-item, .ck-rate, .ck-navbtn,' +
+        '.cp-gbtn, .cp-kid, .co-lane, .co-who, .ck-else-btn'
       ).forEach(el => {
         const r = el.getBoundingClientRect();
         if (!r.width || !r.height) return;
-        if (r.height < 44 && !seen.has('h:' + el.className)) {
-          seen.add('h:' + el.className);
-          bad.small.push(String(el.className).slice(0, 30) + '@' + Math.round(r.height));
+        const key = 'sz:' + el.className;
+        if ((r.height < 44 || r.width < 44) && !seen.has(key)) {
+          seen.add(key);
+          bad.small.push(String(el.className).slice(0, 30) + '@' +
+                         Math.round(r.width) + 'x' + Math.round(r.height));
         }
       });
       return bad;
     }, { w, label });
   };
+
+  // ── Kid-screen standards (Branch 3) ──────────────────────────────────────
+  // Three house rules from CLAUDE.md, asserted rather than hoped for. They exist
+  // to bind what comes next: a rebuilt Today screen has to be born inside this
+  // budget instead of inheriting the density it replaces.
+  //
+  //   ≤200 visible words per kid screen in its default state
+  //   every interactive target at least 44x44 — BOTH dimensions
+  //   nothing below 13px
+  //
+  // Reference material is not banned, it just starts collapsed. Words are counted
+  // in the default state, so a closed disclosure costs nothing and an open-by-
+  // default wall of policy costs everything.
+  const kidStandards = async (screenId) => page.evaluate((screenId) => {
+    const scr = document.getElementById(screenId);
+    if (!scr) return { screen: screenId, error: 'screen missing' };
+    const visible = (el) => {
+      const s = getComputedStyle(el);
+      if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) === 0) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    };
+
+    // A word has a letter in it. Bare numbers — a calendar's dates, a dollar
+    // figure, a tally — are what the screen is FOR, not text to wade through, and
+    // counting them would make a date grid look like a wall of prose.
+    let words = 0;
+    const walk = document.createTreeWalker(scr, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = walk.nextNode())) {
+      const p = n.parentElement;
+      if (!p || !visible(p) || p.closest('[hidden]')) continue;
+      const t = (n.textContent || '').trim();
+      if (t) words += t.split(/\s+/).filter(w => /[A-Za-z]/.test(w)).length;
+    }
+
+    // The week card's done-tick is sized inline per block height and sits at a
+    // card corner, so a 44px hit area there would swallow the tap that opens the
+    // day. Exempted deliberately, by name, with the reason in css/app.css — the
+    // Today-first rebuild is what actually relieves that grid.
+    const EXEMPT = ['wf-card-check'];
+
+    /* Measure the hit area, not the box. CLAUDE.md's own advice for a control
+       that must stay visually small is to keep its size and grow the target with
+       padding or an ::after overlay — and getBoundingClientRect cannot see an
+       overlay, so a box-size check would fail exactly the fix it recommends.
+       Probe instead: if the topmost element at a point is this control (or lives
+       inside it), the thumb lands on it there. */
+    const hittable = (el, x, y) => {
+      // A probe point outside the viewport proves nothing — a thumb cannot land
+      // there either, so a control at the screen edge is not failed for it.
+      if (x < 0 || y < 0 || x > window.innerWidth - 1 || y > window.innerHeight - 1) return true;
+      const hit = document.elementFromPoint(x, y);
+      return !!hit && (hit === el || el.contains(hit));
+    };
+    const reaches44 = (el) => {
+      // Bring it on screen first. The nav is fixed to the bottom, so a control
+      // that happens to sit under it at the current scroll position is not
+      // unreachable — a child scrolls. Measuring wherever the page happened to be
+      // reported the last `?` on My money as too small at 768 purely because the
+      // nav was over it at that moment.
+      el.scrollIntoView({ block: 'center', inline: 'center' });
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      const half = 21;   // 22px each way ≈ a 44px target, 1px inside the edge
+      // Horizontal and vertical extremes are what a 44px box actually requires.
+      return hittable(el, cx - half, cy) && hittable(el, cx + half, cy)
+          && hittable(el, cx, cy - half) && hittable(el, cx, cy + half);
+    };
+
+    const small = [];
+    scr.querySelectorAll('button, [onclick], [role="button"], a[href], input:not([type=hidden]), select, summary, .pill-btn, .btn-icon').forEach(el => {
+      if (!visible(el)) return;
+      if (EXEMPT.some(c => el.classList.contains(c))) return;
+      const r = el.getBoundingClientRect();
+      // Cheap path first; only probe the ones the box test would fail.
+      if (r.height >= 44 && r.width >= 44) return;
+      if (reaches44(el)) return;
+      small.push(`${(el.className || el.tagName).toString().trim().slice(0, 26)}@${Math.round(r.width)}x${Math.round(r.height)}`);
+    });
+
+    let minFont = 999, minWhere = '';
+    scr.querySelectorAll('*').forEach(el => {
+      if (!visible(el)) return;
+      if (![...el.childNodes].some(c => c.nodeType === 3 && c.textContent.trim())) return;
+      const f = parseFloat(getComputedStyle(el).fontSize);
+      if (f && f < minFont) {
+        minFont = f;
+        // Enough to actually find it: an unclassed <span> named only by tag is
+        // unfindable, and an inline font-size needs a different fix from a class.
+        const own = (el.className || '').toString().trim();
+        const parent = el.parentElement ? (el.parentElement.className || el.parentElement.tagName).toString().trim().slice(0, 24) : '';
+        const inline = /font-size/.test(el.getAttribute('style') || '') ? ' [inline]' : '';
+        minWhere = `${own || el.tagName}${own ? '' : ' in .' + parent}${inline}`.slice(0, 60);
+      }
+    });
+
+    return { screen: screenId, words, small, minFont: Math.round(minFont * 100) / 100, minWhere };
+  }, screenId);
+
+  /* Word budgets. Three screens meet the 200 the house rules ask for. The chore
+     screen does not, and the honest number is here rather than a quietly relaxed
+     rule: it came down from 346 (the audit's measurement) to ~275 by collapsing
+     the privilege ladder and the XP explainer, and the rest is instructional copy
+     a nine-year-old plausibly still needs — "tap twice if nobody had to ask",
+     "only whole bundles pay". Deciding which of those she can do without is a
+     product call and the Today-first rebuild's job, not a CSS pass.
+
+     So this is a ratchet, not an exemption: the ceiling is what it currently
+     measures, it fails the build if it grows, and the 200 target stays written
+     down as the thing the rebuild has to hit. Tighten it whenever the real number
+     comes down — 346 at the audit, 280 after the disclosures, 276 once the
+     duplicate shortcut rows went. */
+  const WORD_BUDGET = { 'screen-today': 200, 'screen-week': 200, 'screen-quest': 200,
+                        'screen-mymoney': 200, 'screen-chore': 276 };
+  const KID_SCREENS = [
+    // Today is held to the full 200 with no ratchet: it was built to these rules
+    // rather than measured against them afterwards, which was the point of
+    // landing them first.
+    ['screen-today',   () => { goToday(); }],
+    ['screen-week',    () => { goWeek(); renderWeek(); }],
+    ['screen-quest',   () => { showScreen('quest'); renderQuestBoard(); }],
+    ['screen-chore',   () => { openChoreTab(); ckSelectDay(2); }],
+    ['screen-mymoney', () => { mnyOpenMyMoney('jenn'); }],
+  ];
+  // Four real devices, not two. The plan asked for these and the branch that
+  // changed nearly every layout only ever checked a phone and a desktop-ish
+  // window, so iPad portrait and landscape — the sizes this app actually lives
+  // on — went unmeasured through the whole rebuild.
+  const kidFindings = [];
+  for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1440, 900], [900, 1100]]) {
+    await page.setViewportSize({ width: w, height: h });
+    for (const [id, nav] of KID_SCREENS) {
+      await page.evaluate(`(${nav.toString()})()`);
+      await page.waitForTimeout(200);
+      const r = await kidStandards(id);
+      const budget = WORD_BUDGET[id] || 200;
+      const problems = [];
+      if (r.error) problems.push(r.error);
+      // Sideways scroll is the failure a screenshot needs a human to notice and
+      // an assertion catches by itself: content pushed off the edge of a tablet
+      // is simply unreachable, and nothing else here would report it.
+      const overflow = await page.evaluate((sid) => {
+        const scr = document.getElementById(sid);
+        const worst = [...scr.querySelectorAll('*')].reduce((acc, el) => {
+          if (el.closest('[style*="overflow"], .ck-gridwrap, .weekly-full-wrap, .tg-wrap')) return acc;
+          const r = el.getBoundingClientRect();
+          return (r.width && r.right > acc.right) ? { right: r.right, cls: String(el.className).slice(0, 24) } : acc;
+        }, { right: 0, cls: '' });
+        return { body: document.body.scrollWidth, worst };
+      }, id);
+      if (overflow.body > w + 1) problems.push(`page scrolls sideways (${overflow.body} > ${w})`);
+      if (overflow.worst.right > w + 1) problems.push(`.${overflow.worst.cls} runs to ${Math.round(overflow.worst.right)} (past ${w})`);
+      if (r.words > budget) problems.push(`${r.words} words (max ${budget}${budget !== 200 ? ', ratchet — target is 200' : ''})`);
+      if (r.small && r.small.length) problems.push(`${r.small.length} target(s) under 44px: ${r.small.slice(0, 6).join(', ')}`);
+      if (r.minFont < 13) problems.push(`font ${r.minFont}px on .${r.minWhere} (min 13)`);
+      if (problems.length) kidFindings.push(`${id}@${w}: ${problems.join(' | ')}`);
+    }
+  }
+  checks.kidScreensMeetTheHouseRules = kidFindings.length === 0 || kidFindings;
+
+  // Artifacts at the sizes this app is actually used at — phone, iPad both ways,
+  // laptop. The assertions above are the gate; these are for a human deciding
+  // whether it also looks right.
+  for (const [w, h, label] of [[768, 1024, 'ipad_portrait'], [1024, 768, 'ipad_landscape'], [1440, 900, 'laptop']]) {
+    await page.setViewportSize({ width: w, height: h });
+    for (const [id, nav] of [['today', () => goToday()], ['week', () => { goWeek(); renderWeek(); }],
+                             ['mymoney', () => mnyOpenMyMoney('jenn')]]) {
+      await page.evaluate(`(${nav.toString()})()`);
+      await page.waitForTimeout(150);
+      await page.screenshot({ path: shot(`${label}_${id}`) });
+    }
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => { mnyOpenMyMoney('jenn'); });
+  await page.screenshot({ path: shot('phone_mymoney') });
+  await page.setViewportSize({ width: 900, height: 1100 });
+  await page.waitForTimeout(200);
 
   // Kid tab, both phone widths.
   await page.evaluate(() => {
@@ -1367,7 +1658,7 @@ function findChromium() {
     const wasPaying = mrRules().chores.grade[3];
     mrApplyEdits([{ path: 'chores.grade.3', value: wasPaying + 1 }], { reason: 'family_meeting' });
     mnyOpenMyMoney(kid);
-    mnyOpenPrices.all = true; mnyRenderMyMoney();
+    mnySetPricesOpen(true); mnyRenderMyMoney();
     const txt = document.getElementById('mnyPage1Wrap').textContent;
     const showsNewPrice = txt.includes('$' + (wasPaying + 1).toFixed(2));
     // Whether the week restates depends on when the edit takes effect; what
@@ -2123,9 +2414,798 @@ function findChromium() {
     return toTheChange && toWaiting && toSheet;
   });
 
+  // ── Durability (Branch 1) ────────────────────────────────────────────────
+  // The old export copied only the chore slices, so a "backup" silently left
+  // out every week, goal and progress record — the whole planner. These checks
+  // exist because that failure is invisible: the file downloads, it is valid
+  // JSON, and it looks like a backup right up until someone needs it.
+  checks.fullBackupCarriesTheWholePlanner = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    const dk = getDayKeys(0)[2];
+    setDayBlocks(dk, [{ id: 'bk-blk', actId: 'training', startMin: 600,
+                        durationMin: 60, tag: 'skating' }], 'jenn');
+    const p = getProfData('jenn');
+    p.goals = [{ id: 'g-bk', name: 'Backup goal', done: false }];
+    p.progress = p.progress || {};
+    p.progress.unlockedChecklistItems = { morning: [{ id: 'unlocked-bk' }] };
+
+    const b = bkBuildFullBackup();
+    // It must be a snapshot: holding it and then changing state must not change
+    // it. Returning live references made a "backup" that emptied when the thing
+    // it was backing up emptied.
+    const before = JSON.stringify(b.profiles.jenn.weeks);
+    const stash = state.profiles.jenn.weeks;
+    state.profiles.jenn.weeks = {};
+    const survived = JSON.stringify(b.profiles.jenn.weeks) === before;
+    state.profiles.jenn.weeks = stash;
+    if (!survived) return 'bkBuildFullBackup returned live references, not a snapshot';
+
+    const jenn = b.profiles.jenn || {};
+    const carries = Object.keys(jenn.weeks || {}).length > 0
+      && (jenn.goals || []).some(g => g.id === 'g-bk')
+      && !!(jenn.progress && jenn.progress.unlockedChecklistItems)
+      && !!b.shared
+      && b.schemaVersion === BK_SCHEMA_VERSION
+      && b.kind === 'weekly-planner-full-backup';
+
+    // Contrast: the same three things are absent from the chore-only shape.
+    const choreShape = { profiles: { jenn: getProfData('jenn').chore || {} } };
+    const choreOmits = !choreShape.profiles.jenn.weeks
+      && !choreShape.profiles.jenn.goals
+      && !choreShape.profiles.jenn.progress;
+
+    return carries && choreOmits;
+  });
+
+  // A restore has to put back what a lost device had, through the same
+  // normalisation a page load uses.
+  //
+  // The real thing: a lost device. Two genuine page loads, the file going out to
+  // disk and coming back through the same File/FileReader path the parent's
+  // Restore button uses, and a structural comparison of the whole tree rather
+  // than three spot-checks. An in-page test of this proves the merge functions
+  // work; it does not prove a family gets their year back, because it never
+  // exercises loadLocal() on a cold start with an empty localStorage.
+  {
+    const APP_URL = 'file://' + path.join(__dirname, '..', 'index.html');
+    const backupPath = path.join(outDir, 'roundtrip-backup.json');
+    const problems = [];
+
+    // Snapshot what a real device holds, and write the backup out as a file.
+    const exported = await page.evaluate(() => {
+      profile = 'jenn'; parentViewing = 'jenn';
+      const dk = getDayKeys(0)[3];
+      setDayBlocks(dk, [{ id: 'rt-blk', actId: 'piano', startMin: 9 * 60,
+                          durationMin: 45, note: 'round trip' }], 'jenn');
+      const p = getProfData('jenn');
+      p.goals = [{ id: 'rt-goal', name: 'Round trip goal', done: false }];
+      p.todos = [{ id: 'rt-todo', text: 'survive a reload', done: false }];
+      p.progress.unlockedChecklistItems = { morning: [{ id: 'rt-unlock' }] };
+      saveAll();
+      return { file: bkBuildFullBackup(), snapshot: { profiles: state.profiles, shared: state.shared }, dk };
+    });
+    // A real backup can be old, and an old backup holds pre-migration blocks in
+    // the {start, slots} shape. Injected into the FILE only, not the snapshot,
+    // because a correct restore normalises it — so it is asserted separately
+    // below rather than compared. Without this the restore path could skip
+    // migrateBlocks entirely and every check here would still pass.
+    const legacyKey = '2019-09-02';
+    exported.file.profiles.jenn.weeks[legacyKey] = [
+      { actId: 'piano', start: 8, slots: 4, note: 'from an old backup' }
+    ];
+    fs.writeFileSync(backupPath, JSON.stringify(exported.file, null, 2));
+
+    // The device is lost: cold start, storage wiped, cold start again so
+    // loadLocal() runs against nothing.
+    await page.goto(APP_URL);
+    await page.waitForFunction(() => typeof selectProfile === 'function');
+    await page.evaluate(() => localStorage.clear());
+    await page.goto(APP_URL);
+    await page.waitForFunction(() => typeof selectProfile === 'function');
+    const wiped = await page.evaluate(() => {
+      profile = 'jenn'; parentViewing = 'jenn';
+      return Object.keys(getProfData('jenn').weeks || {}).length === 0
+          && (getProfData('jenn').goals || []).length === 0;
+    });
+    if (!wiped) problems.push('the wipe did not actually empty the profile');
+
+    // Restore the way a parent does: a real File through the real entry point.
+    const fileText = fs.readFileSync(backupPath, 'utf8');
+    const restored = await page.evaluate(async (text) => {
+      profile = 'parent';                       // restore is parent-gated
+      const file = new File([text], 'backup.json', { type: 'application/json' });
+      // showChoice/showCheckConfirm would block on a dialog, so answer them the
+      // way a parent would: Replace, confirmed.
+      const realChoice = window.showChoice, realCheck = window.showCheckConfirm;
+      window.showChoice = async () => 'replace';
+      window.showCheckConfirm = async () => true;
+      try { await bkHandleImportFile(file); }
+      finally { window.showChoice = realChoice; window.showCheckConfirm = realCheck; }
+      profile = 'jenn'; parentViewing = 'jenn';
+      return { profiles: state.profiles, shared: state.shared };
+    }, fileText);
+
+    // Structural equality, not spot-checks. A few keys legitimately recompute on
+    // load — the streak-freeze week is rewritten by getProfData for the current
+    // week — so they are excluded by name rather than by loosening the compare.
+    const RECOMPUTED = new Set(['streakFreezeWeek', 'streakFreezeTokens', 'unlockedThisWeek']);
+    const diff = [];
+    (function walk(a, b, at) {
+      if (diff.length > 6) return;
+      const ak = a && typeof a === 'object' ? Object.keys(a) : null;
+      const bk = b && typeof b === 'object' ? Object.keys(b) : null;
+      if (!ak || !bk) { if (JSON.stringify(a) !== JSON.stringify(b)) diff.push(`${at}: ${JSON.stringify(a)} vs ${JSON.stringify(b)}`); return; }
+      for (const k of new Set([...ak, ...bk])) {
+        if (RECOMPUTED.has(k)) continue;
+        walk(a[k], b[k], at ? at + '.' + k : k);
+      }
+    })(exported.snapshot, restored, '');
+    // The legacy week is expected to differ — it was only in the file — so it is
+    // excluded from the comparison and checked on its own terms below.
+    const realDiff = diff.filter(d => !d.startsWith('profiles.jenn.weeks.' + legacyKey));
+    if (realDiff.length) problems.push('tree differs after restore: ' + realDiff.slice(0, 4).join(' | '));
+
+    // A restore has to normalise what it loads, exactly as a page load does.
+    const migrated = await page.evaluate((k) => {
+      const b = (getProfData('jenn').weeks || {})[k];
+      return !!b && !!b[0] && typeof b[0].startMin === 'number' && typeof b[0].durationMin === 'number'
+          && b[0].id != null;
+    }, legacyKey);
+    if (!migrated) problems.push('a legacy {start, slots} block was restored unnormalised');
+
+    // And the things a child would actually notice.
+    const visible = await page.evaluate((dk) => {
+      const p = getProfData('jenn');
+      return getDayBlocks(dk, 'jenn').some(b => b.id === 'rt-blk')
+          && (p.goals || []).some(g => g.id === 'rt-goal')
+          && (p.todos || []).some(t => t.id === 'rt-todo')
+          && !!(p.progress && p.progress.unlockedChecklistItems.morning);
+    }, exported.dk);
+    if (!visible) problems.push('the week, goal, todo or progress did not come back');
+
+    // Leave the app as the rest of the suite expects to find it.
+    await page.evaluate((dk) => {
+      setDayBlocks(dk, [], 'jenn');
+      delete getProfData('jenn').weeks['2019-09-02'];
+      const p = getProfData('jenn'); p.goals = []; p.todos = [];
+      profile = 'jenn'; parentViewing = 'jenn';
+      ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    }, exported.dk);
+
+    checks.restoreBringsBackWhatWasLost = problems.length === 0 || problems;
+  }
+
+  // ctExportBackup also writes a .json with a top-level `profiles` key, but
+  // each profile there holds only the chore slice. Importing one as a full
+  // restore would swap real planner profiles for chore fragments, so it has to
+  // be named and refused rather than half-applied.
+  checks.choreOnlyFileIsRefusedNotHalfApplied = await page.evaluate(() => {
+    const choreFile = { version: 3, exportedAt: new Date().toISOString(),
+                        goalsByWeek: {}, groups: [], moneySnapshots: {},
+                        profiles: { jenn: {}, jess: {} } };
+    const verdict = bkValidateBackup(choreFile);
+    const named = !verdict.ok && /chore-only/i.test(verdict.error);
+
+    const newer = bkValidateBackup({ kind: 'weekly-planner-full-backup',
+                                     schemaVersion: BK_SCHEMA_VERSION + 1,
+                                     profiles: { jenn: {} }, shared: {} });
+    const refusesNewer = !newer.ok && /newer version/i.test(newer.error);
+
+    const noVersion = bkValidateBackup({ profiles: { jenn: {} }, shared: {} });
+    const good = bkValidateBackup(bkBuildFullBackup());
+    return named && refusesNewer && !noVersion.ok && good.ok;
+  });
+
+  // Every mutation used to fire a full-document upload. A loop of them fired
+  // one per step. This asserts the burst collapses to a single write.
+  //
+  // Driven against a REAL write, not a proxy counter. The suite boots offline, so
+  // pushToFirebase returns at its `if (!fbDocRef || !fbConnected)` guard and the
+  // whole body below it — payload build, size measurement, set() — never runs.
+  // fbDocRef is a plain mutable global, so a test double reaches the real path
+  // with no refactor. Everything is restored afterwards.
+  checks.rapidEditsCoalesceIntoOneWrite = await page.evaluate(async () => {
+    const realRef = fbDocRef, realConn = fbConnected;
+    const writes = [];
+    fbDocRef = { set: (payload) => { writes.push(payload); return Promise.resolve(); } };
+    fbConnected = true;
+    try {
+      for (let i = 0; i < 20; i++) saveAll();
+      // Nothing may have gone out yet: the whole point is that it waits.
+      const noneYet = writes.length === 0;
+      await new Promise(r => setTimeout(r, SYNC_DEBOUNCE_MS + 400));
+      const exactlyOne = writes.length === 1;
+      // ...and what went out is the whole tree, stamped.
+      const wroteRealPayload = !!writes[0] && !!writes[0].profiles && !!writes[0].shared
+        && !!writes[0]._meta && typeof writes[0]._meta.updatedAt === 'number';
+
+      // A tab going away must not sit on a pending write.
+      saveAll();
+      flushPush();
+      const flushedNow = writes.length === 2;
+
+      // And an idle app must not write at all — a debounce that fires on a timer
+      // rather than on an edit would be a slow leak of full-document uploads.
+      await new Promise(r => setTimeout(r, SYNC_DEBOUNCE_MS + 400));
+      const quietWhenIdle = writes.length === 2;
+
+      return noneYet && exactlyOne && wroteRealPayload && flushedNow && quietWhenIdle;
+    } finally {
+      fbDocRef = realRef; fbConnected = realConn;
+    }
+  });
+
+  // The 1 MiB ceiling is reached by growth, not by a bug, so the warning has to
+  // arrive while there is still room to act.
+  checks.cloudSizeWarnsBeforeTheCeiling = await page.evaluate(() => {
+    const ok = payloadHealth(200 * 1024);
+    const warn = payloadHealth(750 * 1024);
+    const crit = payloadHealth(950 * 1024);
+    const ordered = ok.level === 'ok' && warn.level === 'warn' && crit.level === 'critical';
+    const pctSane = ok.pct < warn.pct && warn.pct < crit.pct && crit.pct <= 100;
+    // Multi-byte characters must not be under-counted: .length would say 3.
+    const utf8 = byteLength('déjà') === 6 && byteLength('🎯') === 4;
+    const live = bkCloudSizeInfo();
+    return ordered && pctSane && utf8 && live.bytes > 0 && typeof live.level === 'string';
+  });
+
+  // The thresholds above are a pure function. This is the path that actually has
+  // to work: a real state, grown the way a family grows one, pushed through the
+  // real pushToFirebase, warning a parent before the document stops saving.
+  checks.aBigStateActuallyTripsTheWarning = await page.evaluate(async () => {
+    const realRef = fbDocRef, realConn = fbConnected;
+    const realProfiles = JSON.parse(JSON.stringify(state.profiles));
+    const realLevel = payloadWarnLevel, realBytes = lastPayloadBytes;
+    const toasts = [];
+    const realToast = window.showToast;
+    window.showToast = (m) => { toasts.push(String(m)); };
+    let lastWrite = null;
+    fbDocRef = { set: (p) => { lastWrite = p; return Promise.resolve(); } };
+    fbConnected = true;
+    payloadWarnLevel = 'ok';
+    try {
+      // 60 weeks x 2 kids x 7 days x 6 blocks, with the field count a real block
+      // carries (placeBlock writes ~20) so the bytes are honest rather than a
+      // string padded to length.
+      ['jenn', 'jess'].forEach(kid => {
+        const weeks = {};
+        for (let w = 0; w < 60; w++) {
+          for (let d = 0; d < 7; d++) {
+            const key = `2025-${String((w % 12) + 1).padStart(2, '0')}-${String((d % 28) + 1).padStart(2, '0')}-w${w}`;
+            weeks[key] = Array.from({ length: 6 }, (_, i) => ({
+              id: `blk-${w}-${d}-${i}`, actId: 'training', startMin: 480 + i * 90,
+              durationMin: 60, tag: 'skating', note: 'a note of the sort she actually writes',
+              colour: '#ef476f', completed: i % 2 === 0, confirmed: false,
+              objectives: ['edges', 'spins'], choreTags: ['dishes'],
+              trainingCheck: { warm: true, gear: true, focus: false, cool: false },
+              checklistState: {}, travelBuffer: true, travelBufMin: 15,
+              getReadyBuffer: true, getReadyBufMin: 15, warmupBuffer: true,
+              warmupBufMin: 20, public: true, createdAt: 1, updatedAt: 2,
+            }));
+          }
+        }
+        state.profiles[kid].weeks = weeks;
+      });
+
+      flushPush();
+      await new Promise(r => setTimeout(r, 50));
+
+      // The number reported must BE the number uploaded, not a parallel sum.
+      const uploaded = byteLength(JSON.stringify({ profiles: lastWrite.profiles, shared: lastWrite.shared }));
+      const measuredMatchesUploaded = Math.abs(lastPayloadBytes - uploaded) < 2;
+      const isBig = lastPayloadBytes > SYNC_WARN_BYTES;
+      const levelRose = payloadWarnLevel === 'warn' || payloadWarnLevel === 'critical';
+      const toldSomeone = toasts.some(t => /size limit/i.test(t));
+
+      // Once per transition, not once per write — a parent settling a meeting
+      // must not get the same warning forty times.
+      const after = toasts.length;
+      flushPush();
+      await new Promise(r => setTimeout(r, 50));
+      const didNotNag = toasts.length === after;
+
+      // And the parent panel states it in words.
+      bkRenderPanel();
+      const panel = document.getElementById('bkWrap').textContent;
+      const panelSaysSo = /of 1 MB/.test(panel) && /(close to the cloud limit|keeping an eye)/i.test(panel);
+
+      return measuredMatchesUploaded && isBig && levelRose && toldSomeone && didNotNag && panelSaysSo;
+    } finally {
+      state.profiles = realProfiles;
+      fbDocRef = realRef; fbConnected = realConn;
+      payloadWarnLevel = realLevel; lastPayloadBytes = realBytes;
+      window.showToast = realToast;
+      saveLocal();
+    }
+  });
+
+  // The panel is the only route to a backup, so it has to actually render and
+  // its controls have to be reachable — a working exportFullBackup behind a
+  // blank tab is no better than no backup at all.
+  await page.evaluate(() => {
+    profile = 'parent'; showScreen('parent'); renderParentHome(); setParentTab('backup');
+  });
+  checks.backupTabIsUsable = await page.evaluate(() => {
+    const wrap = document.getElementById('bkWrap');
+    const panel = document.getElementById('ptab-backup');
+    if (!wrap || !panel || panel.hidden) return false;
+    const btns = [...wrap.querySelectorAll('button')];
+    const hasBoth = btns.some(b => /export full backup/i.test(b.textContent))
+                 && btns.some(b => /restore from file/i.test(b.textContent));
+    // Parent-only surface, but the 44px floor is a house rule everywhere.
+    const bigEnough = btns.every(b => {
+      const r = b.getBoundingClientRect();
+      return r.height >= 44 && r.width >= 44;
+    });
+    const meterDrawn = !!wrap.querySelector('.bk-meter-fill');
+    const saysSize = /of 1 MB/.test(wrap.textContent);
+    return hasBoth && bigEnough && meterDrawn && saysSize;
+  });
+  await page.screenshot({ path: shot('parent_backup') });
+
+  // ── Escaping (Branch 2) ──────────────────────────────────────────────────
+  // escapeHtml was rewritten from "build a <div>, set textContent, read back
+  // innerHTML" to a direct replace. That is a load-bearing security primitive,
+  // so equivalence is asserted rather than assumed.
+  checks.escapingMatchesTheDomReference = await page.evaluate(() => {
+    const reference = (str) => {                 // the old implementation
+      if (str == null) return '';
+      const d = document.createElement('div');
+      d.textContent = String(str);
+      return d.innerHTML;
+    };
+    const cases = ['', 'plain', 'a & b', '<script>alert(1)</script>', '"quoted"',
+                   "it's", '<>&"\'', 'a\nb', '  spaced  ', '&amp;', '&lt;script&gt;',
+                   '🎯 emoji', '中文字符', 'a<b>c&d', null, undefined, 0, 42, false];
+    return cases.every(c => escapeHtml(c) === reference(c));
+  });
+
+  // Escaping has to hold on every surface that renders user text, not just the
+  // one it was fixed on. Hostile strings are planted in the three places a family
+  // actually types — an activity name, a block note, a chore label — and then each
+  // screen is visited in turn.
+  //
+  // Two assertions per surface, because either alone is satisfiable by a bug:
+  // "no injected element" also passes if the string silently vanished, and
+  // "the text is there" also passes if it rendered as markup beside its own text.
+  {
+    const PAYLOAD = '<img src=x onerror="window.__xss5=1">&"';
+    const problems = [];
+    await page.evaluate((payload) => {
+      window.__xss5 = false;
+      profile = 'jenn'; parentViewing = 'jenn';
+      ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+      const dk = getDayKeys(0)[1];
+      const acts = getProfData('jenn').customActivities || [];
+      acts.push({ id: 'xss5-act', name: payload, icon: '⭐', cat: 'free', durationMin: 30 });
+      getProfData('jenn').customActivities = acts;
+      setDayBlocks(dk, [{ id: 'xss5-blk', actId: 'xss5-act', startMin: 9 * 60,
+                          durationMin: 60, note: payload }], 'jenn');
+      // A shared challenge renders on the sisters screen.
+      state.shared.challenges = [{ id: 'xss5-ch', title: payload, target: 3, unit: 'times' }];
+    }, PAYLOAD);
+
+    const SURFACES = [
+      ['week',  () => { goWeek(); renderWeek(); }],
+      ['day',   () => { openDay(getDayKeys(0)[1], 1); }],
+      ['sheet', () => { openDay(getDayKeys(0)[1], 1); openEditSheet('xss5-blk'); }],
+      ['sync',  () => { openSisterSync(); }],
+      ['chore', () => { openChoreTab(); ckSelectDay(1); }],
+    ];
+    for (const [name, nav] of SURFACES) {
+      const r = await page.evaluate(async ({ src, payload }) => {
+        try { eval('(' + src + ')()'); } catch (e) { return { err: String(e).slice(0, 80) }; }
+        await new Promise(r => setTimeout(r, 60));
+        return {
+          injected: !!document.querySelector('img[src="x"]'),
+          // The raw string must appear as text somewhere — proof it rendered
+          // rather than being dropped or swallowed into an attribute.
+          literal: document.body.innerText.includes(payload),
+          fired: window.__xss5 === true,
+        };
+      }, { src: nav.toString(), payload: PAYLOAD });
+      if (r.err) { problems.push(`${name}: navigation threw — ${r.err}`); continue; }
+      if (r.injected) problems.push(`${name}: an <img> was created from user text`);
+      if (r.fired) problems.push(`${name}: onerror executed`);
+      if (!r.literal) problems.push(`${name}: the hostile string never rendered as text (test proves nothing)`);
+    }
+
+    await page.evaluate(() => {
+      const dk = getDayKeys(0)[1];
+      setDayBlocks(dk, [], 'jenn');
+      getProfData('jenn').customActivities =
+        (getProfData('jenn').customActivities || []).filter(a => a.id !== 'xss5-act');
+      state.shared.challenges = [];
+      closeSheet('editOverlay');
+      goWeek();
+    });
+    checks.escapingHoldsOnEverySurface = problems.length === 0 || problems;
+  }
+
+  // Reference material is allowed to be long only because it starts collapsed —
+  // which is a promise that it is still one tap away, and that the choice sticks.
+  // The word budget alone would be satisfied by content that is simply unreachable.
+  checks.collapsedReferenceIsOneTapAway = await page.evaluate(async () => {
+    const problems = [];
+    const words = (id) => {
+      const scr = document.getElementById(id);
+      return (scr.innerText || '').split(/\s+/).filter(w => /[A-Za-z]/.test(w)).length;
+    };
+    const cases = [
+      ['screen-mymoney', () => mnyOpenMyMoney('jenn'), '[data-mny-action="prices"]'],
+      ['screen-chore',   () => { openChoreTab(); ckSelectDay(2); }, '[data-ct-action="ck-privs"]'],
+      ['screen-week',    () => { goWeek(); renderWeek(); }, '#weekGlance .week-glance-toggle'],
+    ];
+    for (const [id, nav, sel] of cases) {
+      nav();
+      await new Promise(r => setTimeout(r, 80));
+      const closed = words(id);
+      const btn = document.querySelector('#' + id + ' ' + sel) || document.querySelector(sel);
+      if (!btn) { problems.push(`${id}: no disclosure control (${sel})`); continue; }
+      const box = btn.getBoundingClientRect();
+      if (box.height < 44) problems.push(`${id}: disclosure control is ${Math.round(box.height)}px tall`);
+      const wasExpanded = btn.getAttribute('aria-expanded');
+
+      btn.click();
+      await new Promise(r => setTimeout(r, 120));
+      const open = words(id);
+      if (open <= closed) problems.push(`${id}: one tap revealed nothing (${closed} -> ${open} words)`);
+      const nowBtn = document.querySelector('#' + id + ' ' + sel) || document.querySelector(sel);
+      if (wasExpanded !== null && nowBtn && nowBtn.getAttribute('aria-expanded') === wasExpanded) {
+        problems.push(`${id}: aria-expanded did not change`);
+      }
+
+      // The choice has to survive a re-render, or "remembered" is a lie.
+      nav();
+      await new Promise(r => setTimeout(r, 80));
+      if (words(id) < open) problems.push(`${id}: the open state did not survive a re-render`);
+
+      // Put it back closed for whatever runs next.
+      const closeBtn = document.querySelector('#' + id + ' ' + sel) || document.querySelector(sel);
+      if (closeBtn) closeBtn.click();
+      await new Promise(r => setTimeout(r, 80));
+    }
+    return problems.length === 0 || problems;
+  });
+
+  // A block note used to be spliced into the block id, and block ids are
+  // interpolated into inline onclick handlers — so an apostrophe in a note closed
+  // the handler's string and the rest ran as JavaScript on tap. Both the id
+  // generator and the render sites are fixed; this asserts both.
+  checks.hostileNamesCannotBecomeCode = await page.evaluate(async () => {
+    window.__xssFired = false;
+    const payload = "',window.__xssFired=1,'";
+    profile = 'jenn'; parentViewing = 'jenn';
+    const dk = getDayKeys(0)[1];
+
+    // Path 1: a legacy id-less block whose note carries the payload.
+    state.profiles.jenn.weeks[dk] = [{ actId: 'piano', start: 8, slots: 4, note: payload }];
+    migrateBlocks();
+    const slugged = !/['"<>\\]/.test(state.profiles.jenn.weeks[dk][0].id);
+    openDay(dk, 1);
+    document.querySelectorAll('[onclick*="toggleBlockDone"]').forEach(el => el.click());
+
+    // Path 2: an id that arrives already-formed, as a writer to the shared
+    // Firestore document could supply. ensureBlockId never sees this one.
+    state.profiles.jenn.weeks[dk] = [{ id: "evil" + payload, actId: 'piano',
+                                       startMin: 480, durationMin: 60 }];
+    openDay(dk, 1);
+    document.querySelectorAll('[onclick*="toggleBlockDone"]').forEach(el => el.click());
+    await new Promise(r => setTimeout(r, 50));
+
+    // Path 3: a hostile activity name must render as text, not markup.
+    const acts = getProfData('jenn').customActivities || [];
+    acts.push({ id: 'xss-act', name: '<img src=x onerror="window.__xssFired=1">',
+                icon: '⭐', cat: 'free', durationMin: 30 });
+    getProfData('jenn').customActivities = acts;
+    if (typeof buildTray === 'function') buildTray();
+    const injected = !!document.querySelector('#screen-day img[src="x"], .tray img[src="x"]');
+
+    getProfData('jenn').customActivities = acts.filter(a => a.id !== 'xss-act');
+    setDayBlocks(dk, [], 'jenn');
+    return slugged && !injected && window.__xssFired === false;
+  });
+
+  // Stamps written into state must come from server-corrected time, or the merge
+  // layer arbitrates on whose clock is furthest ahead rather than who edited last.
+  checks.stampsUseServerCorrectedTime = await page.evaluate(() => {
+    const saved = serverTimeOffsetMs, savedKnown = serverTimeKnown, savedStamps = ownWriteStamps.slice();
+    let ok = true;
+
+    // Offline / before the first echo: syncNow is just the local clock.
+    serverTimeOffsetMs = 0; serverTimeKnown = false;
+    ok = ok && Math.abs(syncNow() - Date.now()) < 50;
+
+    // Learn an offset from the echo of one of our own writes.
+    const clientAt = Date.now();
+    ownWriteStamps = [clientAt];
+    noteServerTime({ clientAt, serverAt: { toMillis: () => clientAt - 600000 } });
+    ok = ok && serverTimeKnown === true;
+    ok = ok && Math.abs(serverTimeOffsetMs - (-600000)) < 50;
+    ok = ok && Math.abs(syncNow() - (Date.now() - 600000)) < 100;
+
+    // markItemUpdated must use the corrected clock, not Date.now().
+    const item = markItemUpdated({});
+    ok = ok && item.updatedAt < Date.now() - 500000;
+
+    // Another device's write teaches us nothing about our own clock.
+    const before = serverTimeOffsetMs;
+    noteServerTime({ clientAt: 12345, serverAt: { toMillis: () => 999999999 } });
+    ok = ok && serverTimeOffsetMs === before;
+
+    // An implausible offset is ignored rather than trusted.
+    const c2 = Date.now();
+    ownWriteStamps = [c2];
+    noteServerTime({ clientAt: c2, serverAt: { toMillis: () => c2 + 5 * 24 * 3600 * 1000 } });
+    ok = ok && serverTimeOffsetMs === before;
+
+    serverTimeOffsetMs = saved; serverTimeKnown = savedKnown; ownWriteStamps = savedStamps;
+    return ok;
+  });
+
+  // Installability, checked over a real origin.
+  //
+  // Not Lighthouse — that is a heavy dependency and most of what it would report
+  // here is a handful of preconditions this can check directly. What it CANNOT
+  // do is claim Lighthouse passed, so it does not: this verifies the manifest
+  // fetches and parses the way a browser fetches it, that start_url resolves,
+  // and that every icon is a real image at the pixel size it claims. An icon
+  // entry saying 512x512 while pointing at a 192px file is the classic way an
+  // install prompt silently never appears, and a disk read cannot catch it
+  // because the bytes are there either way.
+  {
+    const { server, port } = await serveRepo();
+    const problems = [];
+    try {
+      const httpPage = await browser.newPage();
+      const res = await httpPage.goto(`http://127.0.0.1:${port}/index.html`);
+      if (!res || !res.ok()) problems.push('index.html did not load over http');
+      const r = await httpPage.evaluate(async () => {
+        const out = { theme: !!document.querySelector('meta[name="theme-color"]'),
+                      apple: !!document.querySelector('meta[name="apple-mobile-web-app-capable"]') };
+        const link = document.querySelector('link[rel="manifest"]');
+        if (!link) return Object.assign(out, { err: 'no <link rel="manifest">' });
+        const resp = await fetch(link.href);
+        out.status = resp.status;
+        out.type = (resp.headers.get('content-type') || '').split(';')[0];
+        try { out.m = await resp.json(); } catch (e) { out.err = 'manifest is not valid JSON'; }
+        if (out.m) {
+          const startRes = await fetch(new URL(out.m.start_url, link.href).href, { method: 'GET' });
+          out.startOk = startRes.ok;
+          // Decode each icon and read its REAL dimensions.
+          out.icons = [];
+          for (const icon of (out.m.icons || [])) {
+            const url = new URL(icon.src, link.href).href;
+            const dims = await new Promise(done => {
+              const img = new Image();
+              img.onload = () => done({ w: img.naturalWidth, h: img.naturalHeight });
+              img.onerror = () => done(null);
+              img.src = url;
+            });
+            out.icons.push({ src: icon.src, declared: icon.sizes, purpose: icon.purpose || '', dims });
+          }
+        }
+        return out;
+      });
+
+      if (r.err) problems.push(r.err);
+      if (!r.theme) problems.push('no theme-color meta');
+      if (!r.apple) problems.push('no apple-mobile-web-app-capable meta');
+      if (r.status && r.status !== 200) problems.push(`manifest returned ${r.status}`);
+      if (r.m) {
+        if (!r.m.name || !r.m.short_name) problems.push('manifest needs name and short_name');
+        if (r.m.display !== 'standalone') problems.push(`display is ${r.m.display}, want standalone`);
+        if (!r.startOk) problems.push(`start_url ${r.m.start_url} did not resolve`);
+        const declared = (r.m.icons || []).map(i => i.sizes);
+        if (!declared.includes('192x192') || !declared.includes('512x512')) problems.push('needs 192 and 512 icons');
+        if (!(r.m.icons || []).some(i => (i.purpose || '').includes('maskable'))) problems.push('needs a maskable icon');
+        for (const icon of (r.icons || [])) {
+          if (!icon.dims) { problems.push(`icon did not load: ${icon.src}`); continue; }
+          const [w, h] = String(icon.declared).split('x').map(Number);
+          if (icon.dims.w !== w || icon.dims.h !== h) {
+            problems.push(`icon ${icon.src} claims ${icon.declared} but is ${icon.dims.w}x${icon.dims.h}`);
+          }
+        }
+      }
+      await httpPage.close();
+    } finally {
+      server.close();
+    }
+    checks.installsToTheHomeScreen = problems.length === 0 || problems;
+  }
+
+  // ── Today (Branch 4) ─────────────────────────────────────────────────────
+  // The whole claim of this screen is that a child can answer "what now?" and
+  // act on it without entering the planner. So: does it name the current thing,
+  // and does a tap reach the place that owns the action?
+  checks.todayAnswersWhatNow = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const dk = todayKey();
+    const now = new Date().getHours() * 60 + new Date().getMinutes();
+    // One block happening right now, one later.
+    setDayBlocks(dk, [
+      { id: 'td-now',  actId: 'piano',  startMin: Math.max(0, now - 15), durationMin: 60 },
+      { id: 'td-next', actId: 'piano',  startMin: Math.min(23 * 60, now + 120), durationMin: 30 },
+    ], 'jenn');
+    goToday();
+    const wrap = document.getElementById('tdWrap');
+    const txt = wrap.textContent;
+    const namesNow = /now · started/.test(txt);
+    const hasJobs = /Jobs I can do/.test(txt);
+    const says = !!wrap.querySelector('.td-say') && wrap.querySelector('.td-say').textContent.trim().length > 0;
+
+    // With nothing on today it must not read as a failure — off days are valid.
+    setDayBlocks(dk, [], 'jenn');
+    goToday();
+    const kind = /allowed|yours|quiet/i.test(document.getElementById('tdWrap').textContent);
+    return namesNow && hasJobs && says && kind;
+  });
+
+  // Handing off, not re-implementing: Today must never be a second place that
+  // grades a chore or moves money. It routes; the owning screen acts.
+  checks.todayHandsOffRatherThanActing = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey, d = tdTodayIndex();
+    if (d == null) return 'today is outside the current week';
+    const before = JSON.stringify(mrEnsureEarnings('jenn', wk));
+
+    goToday();
+    // Every row is a hand-off. Clicking one must change screen, not state.
+    const row = document.querySelector('#tdWrap [data-td-action="chore"]');
+    if (row) {
+      row.click();
+      const wentToChore = document.getElementById('screen-chore').classList.contains('active');
+      const after = JSON.stringify(mrEnsureEarnings('jenn', wk));
+      if (!wentToChore || after !== before) return 'a Today row changed state or did not navigate';
+    }
+    goToday();
+    document.querySelector('#tdWrap [data-td-action="week"]').click();
+    const toWeek = document.getElementById('screen-week').classList.contains('active');
+    goToday();
+    document.querySelector('#tdWrap [data-td-action="money"]').click();
+    const toMoney = document.getElementById('screen-mymoney').classList.contains('active');
+
+    const untouched = JSON.stringify(mrEnsureEarnings('jenn', wk)) === before;
+    return toWeek && toMoney && untouched;
+  });
+
+  // Today reads the same counts the chore screen does. If they can disagree, one
+  // of them is lying to a child about whether Mum has answered.
+  checks.todayAgreesWithTheChoreScreen = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey, d = tdTodayIndex();
+    if (d == null) return 'today is outside the current week';
+    const pool = mrPoolRows(wk).filter(r => r.who === 'both' || r.who === 'jenn');
+    if (!pool.length) return 'no pool rows to claim';
+    mrSetClaim('jenn', wk, d, pool[0].id, 3);
+
+    goToday();
+    const todayChip = document.querySelector('#tdWrap [data-td-action="waiting"]');
+    const todayCount = todayChip ? Number((todayChip.textContent.match(/\d+/) || [0])[0]) : 0;
+    const truth = mrWaitingCount('jenn', wk);
+
+    // ...and the claim must not appear in "jobs I can do" as well, or it reads as
+    // two separate jobs.
+    const claimedLabel = pool[0].label;
+    const stillOffered = [...document.querySelectorAll('#tdWrap [data-td-action="chore"]')]
+      .some(b => b.textContent.includes(claimedLabel));
+
+    mrEnsureEarnings('jenn', wk).claims = {};
+    return todayCount === truth && truth > 0 && !stillOffered;
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => { profile = 'jenn'; goToday(); });
+  await page.screenshot({ path: shot('phone_today') });
+  await page.setViewportSize({ width: 900, height: 1100 });
+  await page.waitForTimeout(150);
+
+  // ── Today as the front door (Branch 5) ───────────────────────────────────
+  checks.todayIsTheFrontDoor = await page.evaluate(async () => {
+    // Hero Mode used to decide the landing and was the only thing it decided, so
+    // both states must now land on Today — otherwise it is still the front door
+    // for only half the family.
+    const results = [];
+    for (const hero of ['1', '0']) {
+      localStorage.setItem('wp_hero_mode', hero);
+      profile = null;
+      await selectProfile('jenn');
+      results.push(document.getElementById('screen-today').classList.contains('active'));
+    }
+    localStorage.setItem('wp_hero_mode', '1');
+    // A parent still lands in the portal.
+    parentUnlockedThisSession = true;
+    await selectProfile('parent');
+    const parentToPortal = document.getElementById('screen-parent').classList.contains('active');
+    profile = 'jenn'; parentViewing = 'jenn';
+    return results.every(Boolean) && parentToPortal;
+  });
+
+  // The nav lives outside every #screen-*, so the kid-standards sweep cannot see
+  // it. Checked here instead: it is a kid surface and the same rules apply.
+  checks.kidNavIsUsableAndScoped = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    goToday();
+    const nav = document.getElementById('kidNav');
+    if (!nav || nav.hidden) return 'nav hidden on Today';
+    const btns = [...nav.querySelectorAll('.kid-nav-btn')];
+    if (btns.length !== 4) return `expected 4 destinations, got ${btns.length}`;
+    const bigEnough = btns.every(b => {
+      const r = b.getBoundingClientRect();
+      return r.height >= 44 && r.width >= 44;
+    });
+    const fontOk = btns.every(b => {
+      const l = b.querySelector('.kid-nav-label');
+      return l && parseFloat(getComputedStyle(l).fontSize) >= 13;
+    });
+    // The current place has to be stated, not only tinted.
+    const marksCurrent = !!nav.querySelector('.kid-nav-btn.on[aria-current="page"]');
+    // Content must not sit underneath it.
+    const padded = parseFloat(getComputedStyle(document.body).paddingBottom) >= 50;
+
+    // Hidden where it does not belong: a parent in the portal, and the picker.
+    profile = 'parent'; showScreen('parent'); renderParentHome();
+    const hiddenForParent = document.getElementById('kidNav').hidden;
+    profile = 'jenn'; showScreen('profile');
+    const hiddenOnPicker = document.getElementById('kidNav').hidden;
+    goToday();
+    return bigEnough && fontOk && marksCurrent && padded && hiddenForParent && hiddenOnPicker;
+  });
+
+  // Every destination goes somewhere, and every route the app had before still
+  // works — this stage adds a way to move around, it retires nothing.
+  checks.navReachesEverythingAndOldRoutesStillWork = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    const click = (sel) => { const el = document.querySelector(sel); if (el) el.click(); };
+    const activeId = () => (document.querySelector('.screen.active') || {}).id;
+
+    goToday();
+    click('#kidNav [data-td-nav="week"]');
+    const toWeek = activeId() === 'screen-week';
+    click('#kidNav [data-td-nav="money"]');
+    const toMoney = activeId() === 'screen-mymoney';
+    click('#kidNav [data-td-nav="today"]');
+    const backToToday = activeId() === 'screen-today';
+
+    // More opens a sheet, and a row in it navigates.
+    click('#kidNav [data-td-nav="more"]');
+    const sheetOpen = document.getElementById('tdMoreOverlay').classList.contains('open');
+    click('#tdMoreOverlay [data-td-more="chores"]');
+    const toChores = activeId() === 'screen-chore';
+    const sheetClosed = !document.getElementById('tdMoreOverlay').classList.contains('open');
+
+    // The pre-existing globals the rest of the suite drives the app with.
+    goWeek();              const oldWeek   = activeId() === 'screen-week';
+    goQuestBoard();        const oldQuest  = activeId() === 'screen-quest';
+    openChoreTab();        const oldChore  = activeId() === 'screen-chore';
+    mnyOpenMyMoney('jenn'); const oldMoney = activeId() === 'screen-mymoney';
+    openSisterSync();      const oldSync   = activeId() === 'screen-sync';
+    goToday();
+    return toWeek && toMoney && backToToday && sheetOpen && toChores && sheetClosed
+        && oldWeek && oldQuest && oldChore && oldMoney && oldSync;
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => { profile = 'jenn'; goToday(); });
+  await page.screenshot({ path: shot('phone_today_nav') });
+  await page.setViewportSize({ width: 900, height: 1100 });
+  await page.waitForTimeout(150);
+
   checks.noConsoleErrors = errors.length === 0;
 
-  const failed = Object.entries(checks).filter(([,v]) => !v).map(([k]) => k);
+  // A check passes only by being exactly true.
+  //
+  // This used to be `filter(([,v]) => !v)`, which meant every check written in the
+  // house idiom — `cond || [whatWentWrong]` — could never fail: on failure it
+  // assigns a non-empty array, and an array is truthy. Eight checks were built
+  // that way, including the 44px target audit. They printed their findings into
+  // the report and were then counted as passes, so the suite said ALL SMOKE
+  // CHECKS PASSED with the failures sitting in the output above it.
+  //
+  // Same shape as the `for f in js/*.js; do node --check "$f" || break; done`
+  // bug in the syntax check: a test that reports a problem and returns success.
+  const failed = Object.entries(checks).filter(([, v]) => v !== true).map(([k]) => k);
   console.log(JSON.stringify({ checks, errors }, null, 2));
   console.log(failed.length ? `FAILED: ${failed.join(', ')}` : 'ALL SMOKE CHECKS PASSED');
   await browser.close();
