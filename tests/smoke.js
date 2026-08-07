@@ -86,8 +86,53 @@ function findChromium() {
     if (m.type() === 'error' && !/firestore|firebase|net::|CORS|fetch/i.test(m.text())) errors.push(m.text());
   });
 
+  /* ── Cut the app off from the real Firebase before it can reach it ──────────
+     THIS IS A SAFETY MEASURE, NOT A CONVENIENCE.
+
+     There is exactly one Firestore document — `weekly_planner/shared_state` —
+     and it holds the family's live planner. There is no test document. The app
+     connects on boot and every mutation goes saveAll → pushToFirebase → set().
+     This suite performs hundreds of mutations.
+
+     So on any machine with working network, running this test WRITES TEST DATA
+     INTO THE CHILDREN'S REAL PLANNER. It went unnoticed for a long time because
+     this sandbox's proxy blocks Firestore, so the app silently fell back to
+     "Local only" and the suite has only ever run isolated by accident. The first
+     CI run on a GitHub runner, which has open network, is what exposed it —
+     it failed on production data whose shape differs from the defaults.
+
+     Blocking at the network layer rather than in the app: the test must not
+     depend on the app remembering to be safe, and this also keeps the suite
+     deterministic — it exercises the shipped defaults instead of whatever
+     happens to be in the cloud that day.
+
+     Do not remove this without providing a separate test document first.
+
+     Scoped to Firebase hosts only — fonts.googleapis.com and fonts.gstatic.com
+     stay reachable, so the uploaded screenshots show the real typeface and the
+     font-size floor is measured against the fonts a child actually sees. */
+  for (const pattern of [
+    '**://firestore.googleapis.com/**',          // the database itself
+    '**://*.firebaseio.com/**',                  // realtime db, listed in the config
+    '**://www.gstatic.com/firebasejs/**',        // the SDK — without it, initFirebase bails
+    '**://identitytoolkit.googleapis.com/**',    // auth, for when it lands
+    '**://firebaseinstallations.googleapis.com/**',
+  ]) await page.route(pattern, r => r.abort());
+
   await page.goto('file://' + path.join(__dirname, '..', 'index.html'));
   await page.waitForTimeout(1200);
+
+  // Prove the isolation held rather than assuming it: if Firebase ever
+  // initialises here, every later check is running against live family data.
+  {
+    const live = await page.evaluate(() => ({ ref: !!fbDocRef, connected: !!fbConnected }));
+    if (live.ref) {
+      console.error('ABORTING: the app reached Firebase. This test would write to the ' +
+                    'family\'s real planner. Check the page.route blocks above.');
+      await browser.close();
+      process.exit(1);
+    }
+  }
 
   // ── Seed a kid week: school day, piano, Saturday training with buffers ──
   await page.evaluate(() => selectProfile('jenn'));
