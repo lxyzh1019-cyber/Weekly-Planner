@@ -232,8 +232,10 @@ const MUST_KEEP = ['blk-real-1', 'blk-real-2', 'custom-real', 'goal-real', 'save
     const { scan, applyRemovals } = window.__cleanup;
     const findings = scan(d);
     const chosen = findings.filter(f => f.certain);
-    const { next, done } = applyRemovals(d, chosen);
-    return { next, removed: done.length, before: d, stillFlagged: scan(next).filter(f => f.certain).length };
+    const { next, done, atRisk } = applyRemovals(d, chosen);
+    return { next, removed: done.length, before: d,
+             atRisk: atRisk.map(f => f.field),
+             stillFlagged: scan(next).filter(f => f.certain).length };
   }, doc);
 
   const n = out.next;
@@ -292,6 +294,60 @@ const MUST_KEEP = ['blk-real-1', 'blk-real-2', 'custom-real', 'goal-real', 'save
     const bad = missing.length ? ['missing tombstones: ' + missing.join(', ')] : [];
     // The suite's own tombstone must be gone, not re-added.
     if (t['t3']) bad.push('the fixture tombstone t3 was not removed');
+    return bad.length === 0 || bad;
+  })();
+
+  /* The whole point of the tool, and the one case a tombstone cannot cover.
+     "watertheplants" and "Polish the cat" sit INSIDE a rules version, and
+     mergeSharedChore arbitrates versions whole, by id, newest `updatedAt`
+     winning — there is no scope that would keep a single row out. So the
+     removal only sticks if the version we edited beats the copy an iPad has
+     been holding since 6 August.
+
+     Run the real shipped merge, in both directions, because which side is
+     "local" depends on which device syncs. Neither direction held before the
+     fix: both copies carried the same timestamp, `nextTs > prevTs` was false,
+     each side kept its own, and the fixtures rode back in. */
+  checks.nestedRowsStayGoneWhenAStaleDeviceSyncs = (() => {
+    const merge = require('../js/04-merge.js');
+    global.state = { shared: { tombstones: n.shared.tombstones || {} }, profiles: {} };
+    const stale = JSON.parse(JSON.stringify(doc.shared.chore));   // never cleaned
+    const clean = JSON.parse(JSON.stringify(n.shared.chore));
+    const bad = [];
+    const poolOf = (c) => (((c.moneyRules || {}).versions || [])
+      .find(v => v && v.id === doc.shared.chore.moneyRules.versions[0].id) || {})
+      .rules?.chorePool || [];
+    // Sanity: the stale copy really does still hold them, or this proves nothing.
+    if (!poolOf(stale).some(r => r.id === 'Polish the cat')) {
+      bad.push('the stale fixture is not in the test input — the check is vacuous');
+    }
+    for (const [label, l, r] of [['stale device local', stale, clean],
+                                 ['stale device remote', clean, stale]]) {
+      const pool = poolOf(merge.mergeSharedChore(l, r)).map(x => x && x.id);
+      for (const ghost of ['watertheplants', 'Polish the cat']) {
+        if (pool.includes(ghost)) bad.push(`${label}: "${ghost}" came back`);
+      }
+      if (!pool.includes('dishes')) bad.push(`${label}: the real chore pool was lost`);
+    }
+    return bad.length === 0 || bad;
+  })();
+
+  /* Removals nothing keeps deleted have to be NAMED, not counted as clean. The
+     handler used to compute this as `TOMB_SCOPE[f.field] === null`, and a row
+     nested in a rules version has a field name that is not in the table at all
+     — `undefined`, not `null` — so the one case this tool exists for was
+     reported as safely removed. */
+  checks.resurrectableRemovalsAreNamed = (() => {
+    const at = new Set(out.atRisk);
+    const bad = [];
+    // The audit log is a grow-only map with no tombstone support: any device
+    // still holding the entry re-adds it, and the parent must hear that.
+    if (!at.has('log')) bad.push('the money-rules audit log was not named as at risk');
+    // The chorePool rows ARE kept out now, by the version bump — so naming them
+    // would be crying wolf.
+    if (at.has('chorePool')) bad.push('chorePool named at risk though the version is stamped');
+    // Deleting a stale tombstone needs no tombstone of its own.
+    if (at.has('tombstones')) bad.push('removing a tombstone was named at risk');
     return bad.length === 0 || bad;
   })();
 

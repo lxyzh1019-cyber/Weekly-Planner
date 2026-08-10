@@ -37,7 +37,30 @@ scan reports a connection error, try the other one.
 
 Then: **Scan** (read-only) → review → **Download backup** (required) → type
 `REMOVE`. It writes once, at the end, so a failure part-way leaves the document
-untouched.
+untouched. If a device syncs while you are reading the findings, the write is
+refused rather than applied — the findings describe a document that no longer
+exists, and `set()` replaces the whole thing. Scan again and re-tick.
+
+### Making a removal stick
+
+Deleting the record is the easy half. Every list in this app merges as a union,
+so a device still holding the item puts it back on its next sync unless
+something outranks it. Three cases, because no one mechanism covers them all:
+
+1. **The collection has a tombstone scope** — record one, in the scope that
+   collection merges under (`js/03-sync.js:533-541`,
+   `js/04-merge.js:150,194,242-263`). A wrong scope is a tombstone that does
+   nothing.
+2. **The row sits inside a rules version** — the chores that landed in the
+   family's real pool. No scope reaches them: `mergeSharedChore` arbitrates
+   versions *whole*, by id, newest `updatedAt` winning. So the edited version is
+   stamped, and the cleaned copy beats the one a phone has been holding since
+   6 Aug. The cost, stated rather than hidden: that version is one object, so an
+   unsynced genuine edit to it on another device loses to this write. Open every
+   device first, as above.
+3. **Neither applies** — the grow-only audit log, and the collections that merge
+   with no tombstone support. Nothing keeps these deleted. They are **named in
+   the log** after the write instead of being counted as done.
 
 ### How it decides what to remove
 
@@ -75,5 +98,13 @@ shaped to look identical — same id prefixes, same names, differing only in the
 timestamps. It asserts that every fixture is removed, that no real record is
 touched, that tombstones land in the scope each collection merges under, and that
 a second scan finds nothing. It reaches no network.
+
+Two of those checks cover the "making a removal stick" cases above, and both run
+the **real** `js/04-merge.js` rather than a description of it:
+`nestedRowsStayGoneWhenAStaleDeviceSyncs` merges a stale copy of the chore state
+against the cleaned one in both directions and asserts the fixtures do not come
+back, and `resurrectableRemovalsAreNamed` asserts case 3 is reported. Both were
+mutation-tested — dropping the version stamp fails the first, restoring the
+`=== null` lookup fails the second.
 
 Delete this tool and its test once the cleanup is done.

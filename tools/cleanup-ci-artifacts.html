@@ -57,9 +57,23 @@
      holds them pushes them back. Do that BEFORE running this.
 
   It removes nothing until you have downloaded a backup and typed the
-  confirmation, and it writes once, at the end. Every removal also records a
-  tombstone in the scope that collection merges under, because without one the
-  union merge lets any device that still has the item put it straight back.
+  confirmation, and it writes once, at the end. It also re-reads the document
+  immediately before that write and refuses if it changed while you were
+  reading the findings, because `set()` replaces the document whole and would
+  otherwise undo whatever a device had just synced.
+
+  MAKING A REMOVAL STICK — three cases, because one mechanism does not cover all
+
+  1. Its collection has a tombstone scope: record one, or the union merge lets
+     any device still holding the item put it straight back.
+  2. It is a row INSIDE a rules version — "watertheplants" and "Polish the cat",
+     which landed in the family's own live chore pool. No scope can help:
+     mergeSharedChore arbitrates versions whole, by id, newest `updatedAt`
+     winning. So stamp the version that was edited, and the cleaned copy beats
+     the one a phone has held since the incident.
+  3. Neither applies — the grow-only audit log, and the collections that merge
+     without tombstone support. Nothing keeps these deleted, so they are NAMED
+     in the log after the write rather than counted as done.
   ═══════════════════════════════════════════════════════════════════════════
 -->
 <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -500,14 +514,31 @@ const gate = () => {
 };
 document.getElementById('confirmInput').addEventListener('input', gate);
 
+/* A finding inside a rules version sits at
+   ['shared','chore','moneyRules','versions', <index>, 'rules', …]. Returns that
+   index, or -1. Those rows have no tombstone scope of their own — the merge
+   arbitrates the whole version object — so the version is what has to win. */
+function versionIndexOf(at) {
+  return (at && at.length > 5 && at[0] === 'shared' && at[1] === 'chore'
+    && at[2] === 'moneyRules' && at[3] === 'versions' && typeof at[4] === 'number')
+    ? at[4] : -1;
+}
+
 /* Build the post-removal document. Pure, so the test can check it without a
-   network: takes the document and the chosen findings, returns the new one. */
+   network: takes the document and the chosen findings, returns the new one.
+
+   `atRisk` is the third return: removals that nothing keeps deleted, so the
+   caller can say so. It used to be recomputed in the click handler as
+   `TOMB_SCOPE[f.field] === null`, and strict equality is why the case this tool
+   exists for went unreported — a row nested in a rules version has a field name
+   (`chorePool`, `personalChores`) that is not in the table at all, so the lookup
+   is `undefined`, not `null`, and every one of them was counted as safe. */
 function applyRemovals(data, chosen) {
   const next = JSON.parse(JSON.stringify(data));
   next.shared = next.shared || {};
   next.shared.tombstones = next.shared.tombstones || {};
   const now = Date.now();
-  const done = [], skipped = [];
+  const done = [], skipped = [], atRisk = [];
 
   for (const f of chosen) {
     if (f.field === 'tombstones') {
@@ -541,14 +572,32 @@ function applyRemovals(data, chosen) {
     // A tombstone in the scope that collection merges under, or the union puts
     // it straight back from a device that still holds it.
     const scope = TOMB_SCOPE[f.field];
+    const vi = versionIndexOf(f.at);
     if (scope != null) {
       const key = (f.field === 'customActivities' ? 'ca:' + f.kid + ':' : scope) + f.id;
       next.shared.tombstones[key] = now;
+    } else if (vi >= 0) {
+      /* No scope exists for a row inside a version, because mergeArrayById
+         arbitrates versions whole, by id, newest `updatedAt` winning
+         (js/04-merge.js:19-21). Stamping the version we just edited is what
+         makes the removal stick: the cleaned copy beats the one a phone has
+         been holding since the incident. Without it both copies carry the same
+         timestamp, `nextTs > prevTs` is false, each side keeps its own — and
+         the fixtures ride back in on the first device to sync.
+
+         The cost, stated rather than hidden: this version is arbitrated as one
+         object, so a genuine edit made to it on another device and never synced
+         loses to this write. That is why the README says to open every device
+         before running this. */
+      const ver = (((next.shared.chore || {}).moneyRules || {}).versions || [])[vi];
+      if (ver) ver.updatedAt = now; else atRisk.push(f);
+    } else {
+      atRisk.push(f);
     }
     done.push(f);
   }
   next._meta = Object.assign({}, next._meta, { updatedAt: now });
-  return { next, done, skipped };
+  return { next, done, skipped, atRisk };
 }
 
 document.getElementById('removeBtn').onclick = async () => {
@@ -558,15 +607,31 @@ document.getElementById('removeBtn').onclick = async () => {
   const state = document.getElementById('removeState');
   state.textContent = 'working…';
   try {
-    const { next, done, skipped } = applyRemovals(DATA, chosen);
+    const { next, done, skipped, atRisk } = applyRemovals(DATA, chosen);
+
+    /* The findings were computed from the document as it was at scan time, and a
+       human has been reading them since. `set()` replaces the document whole, so
+       anything a kid's iPad synced in that gap would go with it. Refuse rather
+       than clobber: compare the stamp this write is built on against what is
+       there now, and make her scan again. */
+    const fresh = await docRef.get();
+    const liveTs = ((fresh.data() || {})._meta || {}).updatedAt || 0;
+    const scannedTs = ((DATA._meta || {}).updatedAt) || 0;
+    if (liveTs !== scannedTs) {
+      state.textContent = 'stopped — the planner changed.';
+      log(`\nSTOPPED, nothing written. The document changed since the scan ` +
+          `(${iso(scannedTs)} → ${iso(liveTs)}) — a device synced while this was open. ` +
+          `Writing now would undo whatever it just sent. Scan again and re-tick.`);
+      return;
+    }
+
     done.forEach(f => log('removed: ' + f.what));
     skipped.forEach(f => log('SKIPPED (could not locate): ' + f.what + ' @ ' + f.at.join('.')));
-    const noScope = done.filter(f => TOMB_SCOPE[f.field] === null);
     await docRef.set(next);
     state.textContent = `removed ${done.length}.`;
     log(`\nWrote the document. ${done.length} item(s) removed.`);
-    if (noScope.length) {
-      log(`Note: ${noScope.length} of them (${[...new Set(noScope.map(f => f.field))].join(', ')}) ` +
+    if (atRisk.length) {
+      log(`Note: ${atRisk.length} of them (${[...new Set(atRisk.map(f => f.field))].join(', ')}) ` +
           `merge without tombstone support, so a device still holding a copy can re-add them. ` +
           `Re-run the scan after every device has synced.`);
     }
@@ -582,7 +647,8 @@ document.getElementById('removeBtn').onclick = async () => {
 };
 
 // For tests/cleanup-tool.test.js — the detection and removal logic, no network.
-window.__cleanup = { scan, applyRemovals, timeFromId, timeOf, inWindow, cannotFix, CI_FROM, CI_TO };
+window.__cleanup = { scan, applyRemovals, timeFromId, timeOf, inWindow, cannotFix,
+                     versionIndexOf, TOMB_SCOPE, CI_FROM, CI_TO };
 </script>
 </body>
 </html>
