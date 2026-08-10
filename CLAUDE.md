@@ -34,9 +34,9 @@ event wiring, first render) lives in `js/99-main.js`, loaded last. Function
 hoisting means a declaration in `05` may freely *call* something declared in
 `22`; it just must not *run* at load time.
 
-Current permitted exceptions (do not add more): `js/03-sync.js:343`
-(`window._skipRewardPrompt = false`), `js/08-day-view.js:1490-1491` (two
-`window.addEventListener` calls that only register), `js/17-ui-misc.js:153`
+Current permitted exceptions (do not add more): `js/03-sync.js:506`
+(`window._skipRewardPrompt = false`), `js/08-day-view.js:1351-1352` (two
+`window.addEventListener` calls that only register), `js/17-ui-misc.js:159`
 (the self-contained `installActionDoubleTapGuard` IIFE), and the
 `module.exports` guards at the end of `04-merge.js`, `18-rules.js`,
 `21-money-data.js`.
@@ -194,11 +194,31 @@ element outside the screens, filled by `tdRenderNav`. Do not add a second nav ro
 to a screen: the six-button shortcut row that used to sit in three different
 topbars is exactly how their labels drifted apart, and it is gone.
 
-Today **owns no data and no rules.** Every number it shows is read through the
-accessors the owning screen uses, and every row hands off. A second place that
-grades a chore or moves money is a second place that can disagree with the first,
-and a child has no way to tell which one is lying. If you add something to Today,
-add a reader, not a writer.
+**Today is where a day gets done; the day screen is where one gets built.** That
+split is the whole design. Today carries the quest cards, the 🎯 completion, the
+XP strip, the breaks, the mood, the to-dos and the goals. `screen-day` is a
+planning tool — a schedule and an activity tray — with **one layout**. It has no
+mode toggle, and there is no `dayViewMode`: a mode that survives navigation is a
+mode a child never chose, which is what Quest mode became.
+
+Three renderings of one day have now been retired for the same reason — Checklist
+mode, the Quest Board's own list, and day-view Quest mode. If you find yourself
+adding a fourth place that lists today's blocks with ticks beside them, that is
+the mistake, and Today is the place that already does it.
+
+Today **owns no data and no rules — but it does invoke them.** Every number it
+shows is read through the accessors the owning screen uses, and every write goes
+through the function that already owned that write: `completeQuest` for a tick
+(XP and sticker counting come with it), `addQuickBreak` for a break, `setDayMood`
+for a mood. **Call an owner; never contain one.** A second place that *decides*
+how a chore is graded or how money moves is a second place that can disagree with
+the first, and a child has no way to tell which one is lying — so grading and
+settling still belong to the chore and money screens, and nothing on Today moves
+money.
+
+Today is also held to the **200-word budget with no ratchet**, which is why the
+vibe, to-do and goals panels ship collapsed behind one `localStorage` flag
+(`tdExtrasOpen`). Reference material starts closed.
 - Use the design tokens in `css/app.css` (`--space-*`, `--text-*`,
   `--shadow-*`, `--radius-*`). Avoid new inline `style="…"`.
 - `--accent` (`#ff7b54`) is decorative only. Anything with white text on it or
@@ -213,6 +233,31 @@ New user-created Claude skills for this ecosystem use the `HZ-` prefix
 (e.g. `HZ-web-app-audit`). Repo files, CSS classes and JS functions keep the
 existing conventions: `ct*` for chore-tracker functions, `mny*` for money,
 `tg2-*` for the current Day Blocks grid.
+
+## The school calendar expires every August
+
+`SCHOOL_HOURS`, `SCHOOL_TERM` and `NO_SCHOOL_DAYS` in `js/01-config.js` are the
+one source of truth for "is there school today, and when". Both consumers derive
+from them — `SCHOOL_TEMPLATE` and the day timeline's coloured bands — because
+when they were hardcoded separately they disagreed by an hour and nobody noticed.
+
+Read it through `isSchoolDay(dayKey)` / `schoolDayInfo(dayKey)`
+(`js/05-helpers.js`), never by checking the day of the week: a Tuesday in July is
+not a school day, and neither is a PD day.
+
+**Replace all three each August.** Past `SCHOOL_TERM.nextStart` the app stops
+claiming to know: bands fall back to weekday shape and `schoolCalendarIsStale()`
+puts a note on the week — *to a parent only*. A child is never told the app's
+data is out of date; she cannot act on it.
+
+`schoolCalendarIsRight` in `tests/smoke.js` counts the instructional days the
+calendar yields and asserts the published total (177 for K-8). A mistyped date
+moves that number, which is the point — it is the only check here that can catch
+a plausible-looking wrong date.
+
+This is deliberately shipped code, not synced state: it is identical on every
+device, and the repo is public, so it carries **dates only** — no school name, no
+district, no source document.
 
 ## Known trip hazards
 

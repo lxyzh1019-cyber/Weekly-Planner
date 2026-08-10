@@ -450,6 +450,31 @@ function offerTutorialIfNeeded() {
 /* ── Rest days: a kid can mark a day as "off". Rest days are celebrated (rest is
    part of the plan) and never count against a streak — the gap logic below
    subtracts them so a planned day off doesn't break the streak. ── */
+/* Is this a school day, and is the calendar still telling the truth?
+   Returns { school, reason } — reason is 'weekend' | 'holiday' | 'summer' |
+   'unknown' when school is false. 'unknown' means the date is past the school
+   year this build was told about: the honest answer is that we no longer know,
+   so callers fall back to weekday shape and the parent gets told to update it
+   rather than the app quietly inventing a calendar. */
+function schoolDayInfo(dayKey) {
+  const d = formatDayKey(dayKey);
+  const dow = d.getDay();
+  const isWeekday = SCHOOL_HOURS.days.includes(dow);
+  if (dayKey > SCHOOL_TERM.nextStart) {
+    return { school: isWeekday, reason: isWeekday ? null : 'weekend', stale: true };
+  }
+  if (!isWeekday) return { school: false, reason: 'weekend' };
+  if (dayKey < SCHOOL_TERM.start || dayKey > SCHOOL_TERM.end) {
+    return { school: false, reason: 'summer' };
+  }
+  if (NO_SCHOOL_DAYS.includes(dayKey)) return { school: false, reason: 'holiday' };
+  return { school: true, reason: null };
+}
+function isSchoolDay(dayKey) { return schoolDayInfo(dayKey).school; }
+/* True once the shipped calendar has run out — a parent-facing prompt, not a
+   kid-facing one. A child should never be told the app's data is old. */
+function schoolCalendarIsStale(dayKey) { return !!schoolDayInfo(dayKey).stale; }
+
 function isRestDay(dayKey, kid = activeProfile()) {
   const pd = getProfData(kid);
   return !!(pd && pd.progress && pd.progress.restDays && pd.progress.restDays[dayKey]);
@@ -651,66 +676,12 @@ function addQuickBreak(durationMin) {
   showToast(`Break added at ${formatTimeFromMin(start)} ✨`);
 }
 
-function renderDayNextUpBanner() {
-  const el = document.getElementById('dayNextUpBanner');
-  const row = document.getElementById('dayKidQuickRow');
-  if (!el || !row) return;
-  if (isParent()) {
-    el.style.display = 'none';
-    row.style.display = 'none';
-    return;
-  }
-  row.style.display = 'flex';
-  const blocks = getDayBlocks(currentDayKey);
-  const acts = getAllActivities();
-  const now = new Date();
-  const nowAbs = now.getHours() * 60 + now.getMinutes();
-  const isToday = currentDayKey === todayKey();
-
-  // "Current" and "Next up" are live, clock-relative concepts — they only
-  // make sense for today. On any other day the banner stays empty (item 5).
-  if (!isToday) {
-    el.style.display = 'none';
-    el.innerHTML = '';
-    return;
-  }
-
-  const scheduled = blocks.map(b => {
-    const act = acts.find(a => a.id === b.actId);
-    if (!act || act.quickBreak) return null;
-    return { b, act, end: b.startMin + b.durationMin };
-  }).filter(Boolean).sort((a, b) => a.b.startMin - b.b.startMin);
-
-  // Happening right now: started but not yet finished.
-  const current = scheduled.find(c => c.b.startMin <= nowAbs && c.end > nowAbs) || null;
-  // Up next: the first block that hasn't started yet.
-  const next = scheduled.find(c => c.b.startMin > nowAbs) || null;
-
-  // Evening wind-down nudge (once age is set).
-  const evening = now.getHours() >= 18;
-  const age = getProfData()?.age;
-  const bedtime = (evening && age != null) ? bedtimeReminderText(age) : null;
-
-  if (!current && !next && !bedtime) {
-    el.style.display = 'none';
-    el.innerHTML = '';
-    return;
-  }
-  el.style.display = 'block';
-  let inner = '';
-  if (current) {
-    const timeStr = formatTimeFromMin(current.b.startMin);
-    inner += `<div class="next-up-row next-up-row--now"><div class="next-up-label">Now</div>`
-      + `<div class="next-up-body">${current.act.icon} <b>${escapeHtml(current.act.name)}</b> · ${timeStr}</div></div>`;
-  }
-  if (next) {
-    const timeStr = formatTimeFromMin(next.b.startMin);
-    inner += `<div class="next-up-row"><div class="next-up-label">Next up</div>`
-      + `<div class="next-up-body">${next.act.icon} <b>${escapeHtml(next.act.name)}</b> · ${timeStr}</div></div>`;
-  }
-  if (bedtime) inner += `<div class="bedtime-tip">${bedtime}</div>`;
-  el.innerHTML = inner;
-}
+/* renderDayNextUpBanner lived here. It printed "Now" and "Next up" into the day
+   timeline's left rail — the same sentence Today's own card leads with, on a
+   screen you had just navigated away from Today to reach. The rail is gone and
+   this went with it; Today says it once. Its two side jobs moved rather than
+   died: the break row's visibility and the evening wind-down nudge are both in
+   tdRenderToday (js/31-today.js), which is where they are read now. */
 
 function updateStopwatchGoalToasts(blocks) {
   blocks.forEach(b => {
@@ -832,25 +803,12 @@ async function changeParentPin() {
 }
 let parentUnlockedThisSession = false;
 
-/* ── Hero Mode (Quest Board) — simplified gamified landing for kids ── */
-const HERO_MODE_LS_KEY = 'wp_hero_mode';
-function isHeroMode() {
-  const v = localStorage.getItem(HERO_MODE_LS_KEY);
-  return v === null ? true : v === '1'; // default ON
-}
-function toggleHeroMode() {
-  const next = !isHeroMode();
-  localStorage.setItem(HERO_MODE_LS_KEY, next ? '1' : '0');
-  refreshHeroModeToggle();
-  showToast(next ? '🎮 Hero Mode ON' : 'Hero Mode OFF');
-}
-function refreshHeroModeToggle() {
-  const btn = document.getElementById('heroModeToggle');
-  if (!btn) return;
-  const on = isHeroMode();
-  btn.textContent = on ? '🎮 Hero Mode: ON' : '🎮 Hero Mode: OFF';
-  btn.classList.toggle('on', on);
-}
+/* Hero Mode lived here. It began as the choice of landing screen — Quest Board
+   or week grid — and Today took that job. Its last remaining duty was gating a
+   "Quests" shortcut on Today, and Today became the quest list itself, so the
+   toggle ended up switching nothing at all. Removed, and the stored key is
+   cleared on boot (js/99-main.js) so it does not linger on the girls' devices.
+   HERO_TIERS and the XP ladder are a different feature and are untouched. */
 
 async function selectProfile(p) {
   if (p === 'parent' && !parentUnlockedThisSession) {
@@ -866,22 +824,12 @@ async function selectProfile(p) {
     parentViewing = 'jenn';
     showScreen('parent');
     renderParentHome();
-  } else if (typeof goToday === 'function') {
+  } else {
     /* Today is the front door. A child opening this app was landing on either the
        Quest Board or the week grid, and both answer "what is my week" rather than
-       "what now" — see js/31-today.js.
-
-       Hero Mode used to be exactly this choice (quest board vs week) and nothing
-       else, so making Today the landing would have quietly left it a switch that
-       does nothing. It now decides whether Quests is offered as a way out of
-       Today, which keeps its intent — game framing to the fore, or not — and
-       Branch 6 decides where the toggle finally lives. */
+       "what now" — see js/31-today.js. The Hero Mode fallbacks that used to sit
+       here were unreachable: goToday is always defined. */
     goToday();
-  } else if (isHeroMode()) {
-    goQuestBoard();
-  } else {
-    showScreen('week');
-    renderWeek();
   }
 }
 

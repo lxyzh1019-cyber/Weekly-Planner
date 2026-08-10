@@ -39,9 +39,19 @@ for (const dir of ['js', 'tests']) {
 }
 
 const classes = new Set([...cssRules.matchAll(/\.([a-zA-Z][a-zA-Z0-9_-]*)/g)].map(m => m[1]));
+
+/* Whole-token, not substring. `src.includes('week-grid')` is satisfied by
+   `print-week-grid`, and `includes('legend-dot')` by `tg-legend-dot` — so four
+   rules for a deleted week view sailed through this check as "referenced".
+   A dead-code check that cannot see dead code is the failure mode CLAUDE.md
+   warns about, so the boundary is explicit: a class name may not be flanked by
+   another name character. */
+const used = (name) =>
+  new RegExp(`(?<![A-Za-z0-9_-])${name.replace(/[-]/g, '\\-')}(?![A-Za-z0-9_-])`).test(src);
+
 const dead = [];
 for (const c of [...classes].sort()) {
-  if (src.includes(c)) continue;
+  if (used(c)) continue;
   const prefix = c.replace(/-[a-zA-Z0-9]+$/, '-');
   if (prefix !== c && [`'${prefix}`, `"${prefix}`, '`' + prefix, `${prefix}'`].some(p => src.includes(p))) {
     continue;   // plausibly built at runtime from this prefix
