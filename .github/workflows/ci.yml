@@ -76,6 +76,13 @@ jobs:
       - name: Install Chromium
         run: npx --yes playwright@${{ steps.pw.outputs.version }} install --with-deps chromium
 
+      # The cleanup tool is a page too, so it needs the browser this job just
+      # installed — which is why it sits here and not in `checks`. It reaches no
+      # network: every Firebase host is blocked and the test fails if the tool
+      # requests the database at all.
+      - name: Cleanup-tool tests
+        run: npm run test:cleanup
+
       - name: Smoke test
         run: npm run test:smoke
 

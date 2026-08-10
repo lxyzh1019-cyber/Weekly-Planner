@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clean up CI test artifacts — Weekly-Planner</title>
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+  WHY THIS EXISTS
+
+  GitHub Actions run #1 (31129824562, commit 619c1720) executed tests/smoke.js
+  with open network. The app has one Firestore document —
+  weekly_planner/shared_state — and no test document, so the suite loaded the
+  family's real planner and wrote its fixtures back into it.
+
+  Window, from the Actions API: 2026-08-06T23:07:03Z → 23:09:40Z.
+  Runs #2 and #3 ran commit 129432b, which blocks Firebase at the network
+  layer and aborts if it ever reaches it. Those two are clean.
+
+  HOW IT FINDS THINGS — and why it is not just a list of ids
+
+  A hand-written list of fixture ids does not work, because a third of what
+  the suite writes is randomly named: money-rules log entries (mrl-…), a rules
+  version (mrv-…), a boxed item (box-…). Those ids change every run.
+
+  What does work: every generated id in this app is
+      prefix + Date.now().toString(36) + random
+  (js/18-rules.js:231 and ~20 more sites), so the id itself encodes the
+  millisecond it was created. Combined with the updatedAt / createdAt / at /
+  boxedAt fields the records already carry, that gives every item a creation
+  time — and anything stamped inside the 2m37s incident window came from the
+  CI run.
+
+  So detection is:
+    A. timestamp inside the window   — catches the randomly-named items
+    B. a known fixture id            — t1, rt-goal, xss5-blk, …
+    C. a known fixture name          — "Polish the cat", the escaping probe, …
+
+  The catalogue in B and C was not guessed. It was derived by checking out
+  619c1720, running its smoke suite with Firebase blocked, recording every id
+  and name written to state across the whole run, and subtracting everything
+  that also appears in js/. See the header of scan() for the exact list.
+
+  WHAT IT CANNOT FIX — read this, it matters more than the removals
+
+  1. The starter chore group may have been reverted to factory settings.
+     On an empty profile the app seeds { id:'grp-starter', name:'Clean Home
+     Crew', choreIds:['Mop','Vacuum','Dish Clean & Dishwasher'], valueDollars:3 }
+     (js/13-chores.js:1249) with NO timestamp. mergeArrayById breaks a 0-vs-0
+     tie in favour of the local copy, so the CI browser's factory default won
+     over yours and was pushed up. If you had renamed that group, changed its
+     chores or its value, that edit is gone and this tool cannot know what it
+     was. Step 2 shows you the group so you can check it.
+
+  2. Emptied collections are not restored here, and do not need to be. Every
+     list merges as a union, so opening the planner on any device that still
+     holds them pushes them back. Do that BEFORE running this.
+
+  It removes nothing until you have downloaded a backup and typed the
+  confirmation, and it writes once, at the end. It also re-reads the document
+  immediately before that write and refuses if it changed while you were
+  reading the findings, because `set()` replaces the document whole and would
+  otherwise undo whatever a device had just synced.
+
+  MAKING A REMOVAL STICK — three cases, because one mechanism does not cover all
+
+  1. Its collection has a tombstone scope: record one, or the union merge lets
+     any device still holding the item put it straight back.
+  2. It is a row INSIDE a rules version — "watertheplants" and "Polish the cat",
+     which landed in the family's own live chore pool. No scope can help:
+     mergeSharedChore arbitrates versions whole, by id, newest `updatedAt`
+     winning. So stamp the version that was edited, and the cleaned copy beats
+     the one a phone has held since the incident.
+  3. Neither applies — the grow-only audit log, and the collections that merge
+     without tombstone support. Nothing keeps these deleted, so they are NAMED
+     in the log after the write rather than counted as done.
+  ═══════════════════════════════════════════════════════════════════════════
+-->
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --bg: #fef9ef; --paper: #fffdf5; --ink: #2a2320; --ink-light: #6b5d4f;
+    --accent-strong: #c14a24; --good: #2e7d5b; --line: #e8dfc3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0 auto; padding: 1.5rem 1rem 4rem; background: var(--bg); color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, sans-serif; max-width: 900px;
+  }
+  h1 { font-size: 1.5rem; margin: 0 0 .3rem; }
+  h2 { font-size: 1.1rem; margin: 1.6rem 0 .5rem; }
+  .sub { color: var(--ink-light); margin: 0 0 1.2rem; }
+  .card {
+    background: var(--paper); border: 2.5px solid var(--ink); border-radius: 14px;
+    padding: 1rem; margin-bottom: 1rem;
+  }
+  .step { display: flex; gap: .7rem; align-items: baseline; }
+  .step-n {
+    flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; background: var(--ink);
+    color: var(--paper); display: grid; place-items: center; font-weight: 700; font-size: .85rem;
+  }
+  button {
+    font: inherit; font-weight: 700; padding: .7rem 1.1rem; min-height: 44px;
+    border: 2.5px solid var(--ink); border-radius: 11px; background: var(--paper);
+    color: var(--ink); cursor: pointer;
+  }
+  button.primary { background: var(--accent-strong); color: #fff; }
+  button[disabled] { opacity: .4; cursor: not-allowed; }
+  .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+  code { background: #f3ecdc; padding: .1rem .35rem; border-radius: 5px; font-size: .9em; }
+  .finding { border-top: 1px solid var(--line); padding: .55rem 0; }
+  .finding:first-of-type { border-top: 0; }
+  .finding label { display: flex; gap: .6rem; align-items: flex-start; cursor: pointer; }
+  .finding .what { font-weight: 700; }
+  .finding .where { color: var(--ink-light); font-size: .88rem; }
+  .finding pre {
+    margin: .35rem 0 0; padding: .5rem .6rem; background: #f7f2e6; border-radius: 8px;
+    font-size: .8rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word;
+  }
+  .tag { font-size: .72rem; font-weight: 800; padding: .1rem .45rem; border-radius: 999px; border: 1.5px solid; white-space: nowrap; }
+  .tag.certain { color: var(--good); border-color: var(--good); }
+  .tag.check { color: var(--accent-strong); border-color: var(--accent-strong); }
+  .warn { border-color: var(--accent-strong); background: #fff4ef; }
+  #log { font: 13px/1.45 ui-monospace, monospace; white-space: pre-wrap; max-height: 320px; overflow-y: auto; }
+  input[type=text] { font: inherit; padding: .6rem; min-height: 44px; border: 2px solid var(--ink); border-radius: 9px; width: 260px; }
+  .muted { color: var(--ink-light); font-size: .9rem; }
+  ul { margin: .4rem 0; padding-left: 1.2rem; }
+</style>
+</head>
+<body>
+
+<h1>Clean up CI test artifacts</h1>
+<p class="sub">
+  One CI run on <b>6 Aug 2026, 23:07:03–23:09:40 UTC</b> wrote test data into the live planner.
+  This finds it and removes it. Nothing is written until you download a backup and confirm.
+</p>
+
+<div class="card warn">
+  <b>Do this first.</b> Open the planner on any device that has not synced since 6 Aug —
+  an iPad or phone that has been closed. Every list merges as a union, so anything the
+  test emptied is pushed back just by opening it. Then come back here.
+</div>
+
+<div class="card">
+  <div class="step"><div class="step-n">1</div><div style="flex:1">
+    <h2 style="margin-top:0">Connect and scan</h2>
+    <p class="muted">Reads the document. Changes nothing.</p>
+    <div class="row"><button id="scanBtn" class="primary">Scan the planner</button>
+      <span id="scanState" class="muted"></span></div>
+  </div></div>
+</div>
+
+<div class="card" id="findingsCard" hidden>
+  <div class="step"><div class="step-n">2</div><div style="flex:1">
+    <h2 style="margin-top:0">What it found</h2>
+    <p class="muted">
+      <span class="tag certain">test only</span> stamped inside the incident window, or a known
+      fixture — pre-ticked.
+      <span class="tag check">check this</span> it matched a fixture id but its own timestamp
+      says otherwise, so read it before ticking.
+    </p>
+    <div id="findings"></div>
+    <p class="muted" id="summary"></p>
+    <div id="cannotFix"></div>
+  </div></div>
+</div>
+
+<div class="card" id="backupCard" hidden>
+  <div class="step"><div class="step-n">3</div><div style="flex:1">
+    <h2 style="margin-top:0">Take a backup</h2>
+    <p class="muted">Required. Downloads the whole document exactly as it is now.</p>
+    <div class="row"><button id="backupBtn">Download backup</button>
+      <span id="backupState" class="muted"></span></div>
+  </div></div>
+</div>
+
+<div class="card" id="removeCard" hidden>
+  <div class="step"><div class="step-n">4</div><div style="flex:1">
+    <h2 style="margin-top:0">Remove the ticked items</h2>
+    <p class="muted">
+      Type <code>REMOVE</code> to enable. Written once, at the end — a failure part-way
+      leaves the document untouched.
+    </p>
+    <div class="row">
+      <input type="text" id="confirmInput" placeholder="type REMOVE" autocomplete="off">
+      <button id="removeBtn" class="primary" disabled>Remove selected</button>
+      <span id="removeState" class="muted"></span>
+    </div>
+  </div></div>
+</div>
+
+<div class="card"><h2 style="margin-top:0">Log</h2><div id="log">Ready.</div></div>
+
+<script>
+/* Same project the app uses — js/03-sync.js:8. */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBvasH4OqU76196ZmZSXX_e8-L2PYnvyaY",
+  authDomain: "chore-tracker-a461b.firebaseapp.com",
+  databaseURL: "https://chore-tracker-a461b-default-rtdb.firebaseio.com",
+  projectId: "chore-tracker-a461b",
+  storageBucket: "chore-tracker-a461b.firebasestorage.app",
+  messagingSenderId: "282740057913",
+  appId: "1:282740057913:web:72defcf2e53ae13237eae8"
+};
+const FS_COLLECTION = 'weekly_planner';
+const FS_DOC_ID = 'shared_state';
+
+/* The incident, from the GitHub Actions API for run 31129824562.
+   Padded by 30s each side: run_started_at is when the runner picked the job up,
+   and the pushes happen somewhere inside it. */
+const CI_FROM = Date.parse('2026-08-06T23:07:03Z') - 30000;
+const CI_TO   = Date.parse('2026-08-06T23:09:40Z') + 30000;
+
+/* B — fixture ids, from `id:` literals in tests/smoke.js at 619c1720, the commit
+   that actually ran. Anything also used by the app (dishes, mop, vacuum, laundry,
+   loan, grp-starter) is deliberately absent: those are real. */
+const FIXTURE_IDS = new Set(['t1','t2','t3','t4','ct1','ct2','ct3','ct4','tc60','tc120',
+  'h1','h2','h3','p1','pblk','qb1','qb2','ri1','nav60','ph1','mblk','ckchore','orph',
+  'ghost','ovb','bk-blk','rt-blk','rt-goal','rt-todo','rt-unlock','unlocked-bk','g-bk',
+  'td-now','td-next','xss-act','xss5-act','xss5-blk','xss5-ch','save-jess',
+  'watertheplants','Polish the cat']);
+
+/* Two ids the suite uses that the app also lets a parent create, so an id match
+   alone proves nothing — only the timestamp decides. */
+const AMBIGUOUS_IDS = {
+  bike:  'the suite adds a "bike" debt, but so would a real bike loan',
+  water: 'the suite adds a "water" chore, but so would a real "water the plants"'
+};
+
+/* C — names only the suite writes, verified absent from js/. */
+const FIXTURE_TEXTS = ['Polish the cat', 'Round trip goal', 'survive a reload'];
+const XSS_MARK = /<img\s+src=x/i;
+
+/* Where a removal has to record a tombstone, keyed by the collection's path.
+   Scopes copied from the mergeArrayById calls in js/03-sync.js:533-541 and
+   js/04-merge.js:150,194,242-263 — a wrong scope is a tombstone that does
+   nothing. `null` means that collection merges with no tombstone support. */
+const TOMB_SCOPE = {
+  'weeks': '',                    // blocks tombstone on the bare id
+  'customActivities': 'ca:',      // + kid, handled below
+  'savingGoals': 'sgoal:', 'debts': 'debt:', 'competitions': 'comp:',
+  'fines': 'fine:', 'boxItems': 'box:', 'honesty': 'hon:', 'deposits': 'dep:',
+  'holdings': 'hold:',
+  'goals': null, 'todos': null, 'achievements': null,
+  'invites': null, 'challenges': null,
+  'customTasks': 'task:', 'routineTemplates': 'rt:', 'sharedActivities': 'sa:',
+  'levelRules': 'lr:', 'groups': 'grp:', 'versions': 'mrv:'
+};
+
+let db, docRef, DATA = null, FINDINGS = [], backedUp = false;
+
+const log = (m) => { const el = document.getElementById('log');
+  el.textContent += '\n' + m; el.scrollTop = el.scrollHeight; };
+const esc = (s) => String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const iso = (t) => t ? new Date(t).toISOString().replace('T',' ').slice(0,19) + 'Z' : 'no timestamp';
+
+function connect() {
+  if (db) return;
+  firebase.initializeApp(FIREBASE_CONFIG);
+  db = firebase.firestore();
+  docRef = db.collection(FS_COLLECTION).doc(FS_DOC_ID);
+}
+
+/* Every generated id in this app is [prefix +] Date.now().toString(36) + random,
+   so the 8 base-36 characters after the prefix are the creation millisecond.
+   Returns null unless the decode lands on a plausible date, which keeps hand-
+   written ids like 'dishes' from being read as timestamps. */
+function timeFromId(id) {
+  if (typeof id !== 'string') return null;
+  const body = id.replace(/^[A-Za-z]+-/, '');
+  // Shape first. The generators are Date.now().toString(36) — 8 chars for this
+  // era — plus 0 to 4 random chars, so a real generated id has a body of 8 to 12
+  // [0-9a-z] characters and nothing else.
+  //
+  // This is deliberately strict, and the strictness is the whole point: an
+  // ordinary lowercase word is valid base 36. "watertheplants" starts
+  // "waterthe", which parses to a date in 2049 — plausible enough to pass a
+  // loose range check, at which point a fixture appears to carry a clock that
+  // clears it. The length bound rejects the word; the date bound below rejects
+  // the eight-letter ones that slip through it.
+  if (!/^[0-9a-z]{8,12}$/.test(body)) return null;
+  const t = parseInt(body.slice(0, 8), 36);
+  if (!Number.isFinite(t)) return null;
+  // No earlier than the app, no later than now. Nothing in this document was
+  // created before 2024 or in the future.
+  if (t < Date.parse('2024-01-01T00:00:00Z') || t > Date.now() + 86400000) return null;
+  return t;
+}
+
+/* The record's own idea of when it was written, preferring a real field. */
+const TIME_FIELDS = ['updatedAt','at','boxedAt','releasedAt','committedAt','createdAt'];
+function timeOf(o) {
+  for (const f of TIME_FIELDS) {
+    const v = o && o[f];
+    if (typeof v === 'number' && v > 1577836800000) return { t: v, src: f };
+  }
+  const t = timeFromId(o && o.id);
+  return t ? { t, src: 'id' } : { t: null, src: null };
+}
+
+const inWindow = (t) => t != null && t >= CI_FROM && t <= CI_TO;
+
+function textOf(o) {
+  return [o && o.name, o && o.label, o && o.title, o && o.text]
+    .filter(v => typeof v === 'string').join(' | ');
+}
+
+/* Walk the whole document rather than a hand-written list of paths, so
+   collections nobody thought about (fines, deposits, the money-rules audit log)
+   are covered too. Every object carrying an `id` is a candidate; the array or
+   map it sits in is recorded so removal never has to re-derive a path. */
+function scan(data) {
+  const out = [];
+
+  /* `at` is the key path from the document root to the ARRAY (or map) holding
+     this record, so removal navigates instead of re-deriving a location. */
+  const consider = (obj, at, key, path, kid) => {
+    if (!obj || typeof obj !== 'object' || obj.id == null) return;
+    const { t, src } = timeOf(obj);
+    const txt = textOf(obj);
+    const hitWindow  = inWindow(t);
+    const hitId      = FIXTURE_IDS.has(obj.id);
+    const hitAmbig   = Object.prototype.hasOwnProperty.call(AMBIGUOUS_IDS, obj.id);
+    const hitText    = FIXTURE_TEXTS.some(f => txt.includes(f)) || XSS_MARK.test(txt) || XSS_MARK.test(String(obj.id));
+    if (!hitWindow && !hitId && !hitAmbig && !hitText) return;
+
+    // Certain when the clock agrees, or when the id/name could only have come
+    // from the suite and the record carries no clock to contradict it.
+    const certain = hitWindow || ((hitId || hitText) && t == null);
+    const why = hitWindow
+      ? `written ${iso(t)} (${src}) — inside the CI run`
+      : hitAmbig
+      ? AMBIGUOUS_IDS[obj.id] + `; this one says ${iso(t)}`
+      : (hitId || hitText)
+      ? `matches a test fixture, but its own stamp says ${iso(t)}`
+      : '';
+
+    out.push({
+      what: `${key} · ${obj.id}${txt ? ' — ' + txt.slice(0, 60) : ''}`,
+      where: path, why, certain,
+      detail: JSON.stringify(obj),
+      at, key, id: obj.id, kid, field: key
+    });
+  };
+
+  const profiles = (data && data.profiles) || {};
+  for (const kid of Object.keys(profiles)) {
+    const p = profiles[kid] || {};
+    for (const field of Object.keys(p)) {
+      const v = p[field];
+      if (Array.isArray(v)) {
+        v.forEach(o => consider(o, ['profiles', kid, field], field, `${kid} · ${field}`, kid));
+      } else if (field === 'weeks' && v && typeof v === 'object') {
+        for (const day of Object.keys(v)) {
+          if (Array.isArray(v[day])) v[day].forEach(o => consider(o, ['profiles', kid, 'weeks', day], 'weeks', `${kid} · week ${day}`, kid));
+        }
+      } else if (field === 'progress' && v && v.unlockedChecklistItems) {
+        const u = v.unlockedChecklistItems;
+        for (const slot of Object.keys(u)) {
+          if (Array.isArray(u[slot])) u[slot].forEach(o => consider(o,
+            ['profiles', kid, 'progress', 'unlockedChecklistItems', slot], 'unlockedChecklistItems',
+            `${kid} · unlocked ${slot}`, kid));
+        }
+      }
+    }
+  }
+
+  const shared = (data && data.shared) || {};
+  for (const field of Object.keys(shared)) {
+    if (Array.isArray(shared[field])) {
+      shared[field].forEach(o => consider(o, ['shared', field], field, `shared · ${field}`, null));
+    }
+  }
+  const chore = shared.chore || {};
+  if (Array.isArray(chore.groups)) chore.groups.forEach(o =>
+    consider(o, ['shared', 'chore', 'groups'], 'groups', 'shared · chore groups', null));
+  const mr = chore.moneyRules || {};
+  if (Array.isArray(mr.versions)) mr.versions.forEach(o =>
+    consider(o, ['shared', 'chore', 'moneyRules', 'versions'], 'versions', 'shared · money-rules versions', null));
+  // The audit log is a map keyed by id, not an array.
+  if (mr.log && typeof mr.log === 'object') {
+    for (const k of Object.keys(mr.log)) consider(mr.log[k],
+      ['shared', 'chore', 'moneyRules', 'log'], 'log', 'shared · money-rules audit log', null);
+  }
+
+  /* Inside each rules version: the chore pool, personal chores, fines, buys,
+     privileges. This matters more than it looks. On the leaked run the CI
+     browser had already merged the family's real rules down, so mrEnsure found
+     an existing version and edited THAT — meaning the suite's "watertheplants"
+     and "Polish the cat" were appended to the family's own live chore list,
+     not to a throwaway version that could be deleted whole.
+
+     These rows carry no timestamps, so the clock cannot help: they are found by
+     fixture id and name only, which is why "water" stays ambiguous. */
+  (mr.versions || []).forEach((ver, vi) => {
+    const rules = ver && ver.rules;
+    if (!rules || typeof rules !== 'object') return;
+    const descend = (node, keys) => {
+      if (Array.isArray(node)) {
+        if (node.some(o => o && typeof o === 'object' && o.id != null)) {
+          node.forEach(o => consider(o,
+            ['shared', 'chore', 'moneyRules', 'versions', vi, ...keys], keys[keys.length - 1],
+            `rules ${ver.id || vi} · ${keys.join('.')}`, null));
+        }
+        return;
+      }
+      if (!node || typeof node !== 'object') return;
+      for (const k of Object.keys(node)) descend(node[k], [...keys, k]);
+    };
+    descend(rules, ['rules']);
+  });
+
+  // Tombstones the suite itself wrote. Harmless where the id is random, but a
+  // bare one like 't3' would suppress a real block of the same name.
+  const tombs = shared.tombstones || {};
+  for (const k of Object.keys(tombs)) {
+    const bare = k.replace(/^[a-z]+:/, '');
+    if (!inWindow(tombs[k]) && !FIXTURE_IDS.has(bare)) continue;
+    out.push({
+      what: `tombstone · ${k}`, where: 'shared · tombstones',
+      why: inWindow(tombs[k]) ? `recorded ${iso(tombs[k])} — inside the CI run`
+                              : 'a test fixture id',
+      certain: inWindow(tombs[k]), detail: JSON.stringify({ [k]: tombs[k] }),
+      container: tombs, key: 'tombstones', id: k, kid: null, field: 'tombstones'
+    });
+  }
+  return out;
+}
+
+/* Things the parent has to judge, that no removal can repair. */
+function cannotFix(data) {
+  const notes = [];
+  const groups = (((data || {}).shared || {}).chore || {}).groups || [];
+  const starter = groups.find(g => g && g.id === 'grp-starter');
+  if (starter && !timeOf(starter).t) {
+    const factory = starter.name === 'Clean Home Crew' && starter.valueDollars === 3 &&
+      Array.isArray(starter.choreIds) && starter.choreIds.join('|') === 'Mop|Vacuum|Dish Clean & Dishwasher';
+    notes.push(factory
+      ? `Your starter chore group is at <b>exactly the factory default</b> — "Clean Home Crew", $3, Mop/Vacuum/Dish Clean &amp; Dishwasher. That is what the CI browser seeded and pushed up, and because the group carries no timestamp the merge would have preferred it over yours. If you had customised it, re-enter your version. If you never changed it, nothing is wrong.`
+      : `Your starter chore group is <b>not</b> at the factory default (it reads "${esc(starter.name)}", $${starter.valueDollars}). Your edit survived — nothing to do.`);
+  }
+  notes.push('Anything the run <b>emptied</b> is not listed above and does not need to be: every list merges as a union, so opening the planner on a device that still holds it pushes it back.');
+  return notes;
+}
+
+function render() {
+  const box = document.getElementById('findings');
+  if (!FINDINGS.length) {
+    box.innerHTML = '<p><b>Nothing found.</b> Either the run wrote nothing that survived, or it has already been cleaned.</p>';
+    document.getElementById('summary').textContent = '';
+  } else {
+    box.innerHTML = FINDINGS.map((f, i) => `
+      <div class="finding">
+        <label>
+          <input type="checkbox" data-i="${i}" ${f.certain ? 'checked' : ''}>
+          <span>
+            <span class="what">${esc(f.what)}</span>
+            <span class="tag ${f.certain ? 'certain' : 'check'}">${f.certain ? 'test only' : 'check this'}</span>
+            <div class="where">${esc(f.where)} — ${esc(f.why)}</div>
+            <pre>${esc(f.detail.slice(0, 400))}</pre>
+          </span>
+        </label>
+      </div>`).join('');
+    const certain = FINDINGS.filter(f => f.certain).length;
+    document.getElementById('summary').textContent =
+      `${FINDINGS.length} found — ${certain} test-only, ${FINDINGS.length - certain} to check yourself.`;
+  }
+  const notes = cannotFix(DATA);
+  document.getElementById('cannotFix').innerHTML = notes.length
+    ? `<h2>What this cannot fix</h2><ul>${notes.map(n => `<li>${n}</li>`).join('')}</ul>` : '';
+}
+
+document.getElementById('scanBtn').onclick = async () => {
+  const state = document.getElementById('scanState');
+  try {
+    state.textContent = 'connecting…';
+    connect();
+    const snap = await docRef.get();
+    if (!snap.exists) { state.textContent = 'no document found.'; return; }
+    DATA = snap.data();
+    log('Read the document. _meta.updatedAt = ' + iso(((DATA._meta || {}).updatedAt) || 0));
+    FINDINGS = scan(DATA);
+    render();
+    document.getElementById('findingsCard').hidden = false;
+    document.getElementById('backupCard').hidden = false;
+    document.getElementById('removeCard').hidden = false;
+    state.textContent = `${FINDINGS.length} finding(s).`;
+    log(`Scan complete: ${FINDINGS.length} finding(s). Nothing has been changed.`);
+  } catch (e) {
+    state.textContent = 'failed — see log.';
+    log('ERROR during scan: ' + (e && e.message ? e.message : e));
+  }
+};
+
+document.getElementById('backupBtn').onclick = () => {
+  if (!DATA) return;
+  const blob = new Blob([JSON.stringify(DATA, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `weekly-planner-before-cleanup-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  backedUp = true;
+  document.getElementById('backupState').textContent = 'saved ✓';
+  log('Backup downloaded.');
+  gate();
+};
+
+const gate = () => {
+  document.getElementById('removeBtn').disabled =
+    !(backedUp && document.getElementById('confirmInput').value.trim().toUpperCase() === 'REMOVE');
+};
+document.getElementById('confirmInput').addEventListener('input', gate);
+
+/* A finding inside a rules version sits at
+   ['shared','chore','moneyRules','versions', <index>, 'rules', …]. Returns that
+   index, or -1. Those rows have no tombstone scope of their own — the merge
+   arbitrates the whole version object — so the version is what has to win. */
+function versionIndexOf(at) {
+  return (at && at.length > 5 && at[0] === 'shared' && at[1] === 'chore'
+    && at[2] === 'moneyRules' && at[3] === 'versions' && typeof at[4] === 'number')
+    ? at[4] : -1;
+}
+
+/* Build the post-removal document. Pure, so the test can check it without a
+   network: takes the document and the chosen findings, returns the new one.
+
+   `atRisk` is the third return: removals that nothing keeps deleted, so the
+   caller can say so. It used to be recomputed in the click handler as
+   `TOMB_SCOPE[f.field] === null`, and strict equality is why the case this tool
+   exists for went unreported — a row nested in a rules version has a field name
+   (`chorePool`, `personalChores`) that is not in the table at all, so the lookup
+   is `undefined`, not `null`, and every one of them was counted as safe. */
+function applyRemovals(data, chosen) {
+  const next = JSON.parse(JSON.stringify(data));
+  next.shared = next.shared || {};
+  next.shared.tombstones = next.shared.tombstones || {};
+  const now = Date.now();
+  const done = [], skipped = [], atRisk = [];
+
+  for (const f of chosen) {
+    if (f.field === 'tombstones') {
+      delete next.shared.tombstones[f.id];
+      done.push(f);
+      continue;
+    }
+
+    // Walk `f.at` to the array or map the record sits in. Nothing is guessed:
+    // the path was recorded during the scan of this same document.
+    let holder = next, ok = true;
+    for (const k of f.at) {
+      if (holder == null || typeof holder !== 'object') { ok = false; break; }
+      holder = holder[k];
+    }
+    if (!ok || holder == null) { skipped.push(f); continue; }
+
+    if (Array.isArray(holder)) {
+      // Reassign in place through the parent so the filtered array is the one
+      // that gets written.
+      const parent = f.at.slice(0, -1).reduce((o, k) => o[k], next);
+      const leaf = f.at[f.at.length - 1];
+      parent[leaf] = holder.filter(x => !x || x.id !== f.id);
+    } else if (typeof holder === 'object') {
+      delete holder[f.id];                      // the money-rules audit log
+    } else {
+      skipped.push(f);
+      continue;
+    }
+
+    // A tombstone in the scope that collection merges under, or the union puts
+    // it straight back from a device that still holds it.
+    const scope = TOMB_SCOPE[f.field];
+    const vi = versionIndexOf(f.at);
+    if (scope != null) {
+      const key = (f.field === 'customActivities' ? 'ca:' + f.kid + ':' : scope) + f.id;
+      next.shared.tombstones[key] = now;
+    } else if (vi >= 0) {
+      /* No scope exists for a row inside a version, because mergeArrayById
+         arbitrates versions whole, by id, newest `updatedAt` winning
+         (js/04-merge.js:19-21). Stamping the version we just edited is what
+         makes the removal stick: the cleaned copy beats the one a phone has
+         been holding since the incident. Without it both copies carry the same
+         timestamp, `nextTs > prevTs` is false, each side keeps its own — and
+         the fixtures ride back in on the first device to sync.
+
+         The cost, stated rather than hidden: this version is arbitrated as one
+         object, so a genuine edit made to it on another device and never synced
+         loses to this write. That is why the README says to open every device
+         before running this. */
+      const ver = (((next.shared.chore || {}).moneyRules || {}).versions || [])[vi];
+      if (ver) ver.updatedAt = now; else atRisk.push(f);
+    } else {
+      atRisk.push(f);
+    }
+    done.push(f);
+  }
+  next._meta = Object.assign({}, next._meta, { updatedAt: now });
+  return { next, done, skipped, atRisk };
+}
+
+document.getElementById('removeBtn').onclick = async () => {
+  const chosen = [...document.querySelectorAll('#findings input[type=checkbox]')]
+    .filter(c => c.checked).map(c => FINDINGS[Number(c.dataset.i)]);
+  if (!chosen.length) { log('Nothing ticked.'); return; }
+  const state = document.getElementById('removeState');
+  state.textContent = 'working…';
+  try {
+    const { next, done, skipped, atRisk } = applyRemovals(DATA, chosen);
+
+    /* The findings were computed from the document as it was at scan time, and a
+       human has been reading them since. `set()` replaces the document whole, so
+       anything a kid's iPad synced in that gap would go with it. Refuse rather
+       than clobber: compare the stamp this write is built on against what is
+       there now, and make her scan again. */
+    const fresh = await docRef.get();
+    const liveTs = ((fresh.data() || {})._meta || {}).updatedAt || 0;
+    const scannedTs = ((DATA._meta || {}).updatedAt) || 0;
+    if (liveTs !== scannedTs) {
+      state.textContent = 'stopped — the planner changed.';
+      log(`\nSTOPPED, nothing written. The document changed since the scan ` +
+          `(${iso(scannedTs)} → ${iso(liveTs)}) — a device synced while this was open. ` +
+          `Writing now would undo whatever it just sent. Scan again and re-tick.`);
+      return;
+    }
+
+    done.forEach(f => log('removed: ' + f.what));
+    skipped.forEach(f => log('SKIPPED (could not locate): ' + f.what + ' @ ' + f.at.join('.')));
+    await docRef.set(next);
+    state.textContent = `removed ${done.length}.`;
+    log(`\nWrote the document. ${done.length} item(s) removed.`);
+    if (atRisk.length) {
+      log(`Note: ${atRisk.length} of them (${[...new Set(atRisk.map(f => f.field))].join(', ')}) ` +
+          `merge without tombstone support, so a device still holding a copy can re-add them. ` +
+          `Re-run the scan after every device has synced.`);
+    }
+    log('Open the planner on each device to pull the change through.');
+    DATA = next;
+    FINDINGS = scan(DATA);
+    render();
+  } catch (e) {
+    state.textContent = 'failed — see log.';
+    log('ERROR during removal: ' + (e && e.message ? e.message : e) +
+        '\nNothing partial was written: the document is written once, at the end.');
+  }
+};
+
+// For tests/cleanup-tool.test.js — the detection and removal logic, no network.
+window.__cleanup = { scan, applyRemovals, timeFromId, timeOf, inWindow, cannotFix,
+                     versionIndexOf, TOMB_SCOPE, CI_FROM, CI_TO };
+</script>
+</body>
+</html>
