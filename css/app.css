@@ -5183,6 +5183,36 @@
     transform: translate(-50%, -50%);
   }
 
+  /* The Sunday review banner (js/07-week-view.js, the `isSunday` branch). It
+     renders one day in seven, so both its controls sat under the floor while
+     the assertion passed on the other six days — the nightly CI run on Sunday
+     2026-08-09 is what finally caught them, reported as
+     `wins-btn@76x22, tip-dismiss@22x22 | font 12.8px on .wins-btn`.
+
+     Both techniques, one banner. "See wins" is a labelled button with room to
+     grow, so it grows and joins the 13px tier. The dismiss X is a small round
+     control pinned to the banner's corner, where its size is the design, so it
+     keeps its 22px look and an invisible ::after centres a 44x44 hit area over
+     it. The ::after is absolutely positioned, so it is not a flex item and does
+     not shift the glyph its parent is centring.
+
+     .wins-btn also renders in the `nothingPlanned` branch, which is not day-
+     gated — so this fixes a second, quieter instance the suite never saw. */
+  .wins-btn {
+    min-height: 44px;
+    min-width: 44px;
+    font-size: calc(0.82rem * var(--fs-scale, 1));   /* 13.1px, was 12.8px */
+  }
+  .tip-dismiss::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+
   /* The week card's done-tick is the one control this rule cannot reach yet, and
      it is worth saying why rather than quietly exempting it. Its size is set
      inline per block height (js/07-week-view.js) so the shortest block still gets

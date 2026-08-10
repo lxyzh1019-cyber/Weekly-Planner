@@ -1111,6 +1111,43 @@ function findChromium() {
     // landing them first.
     ['screen-today',   () => { goToday(); }],
     ['screen-week',    () => { goWeek(); renderWeek(); }],
+    /* The same screen on a Sunday. The weekly-review banner renders one day in
+       seven (js/07-week-view.js, the `isSunday` branch) and it is the only place
+       .wins-btn and .tip-dismiss appear — so six days a week this audit walked
+       straight past them, and a 22x22 dismiss target with a 12.8px label lived
+       there until the Sunday-night CI run of 2026-08-09 happened to look.
+
+       A rule the suite can only check on one weekday is a rule that is unenforced
+       six days out of seven. Pin the clock to this week's Sunday for the length of
+       one render so the banner is audited on every run. The stand-in only answers
+       `new Date()` — every explicit form still builds the date it was given, so
+       the rest of the render is unaffected — and the real Date goes back in a
+       `finally`, because leaving a fake clock installed would quietly poison every
+       check after this one. */
+    ['screen-week',    () => {
+      goWeek();
+      const RealDate = Date;
+      const sunday = new RealDate();
+      sunday.setDate(sunday.getDate() - sunday.getDay());
+      sunday.setHours(10, 0, 0, 0);
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(sunday); };
+      Date.prototype = RealDate.prototype;
+      Date.now = RealDate.now; Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+      /* The empty-week invitation outranks the Sunday review, and by the time
+         this runs earlier checks have emptied the week — so without a block here
+         the audit renders the wrong branch and passes without ever seeing
+         .tip-dismiss. It measured `wins-btn@124x20` ("Start planning") instead of
+         `76x22` ("See wins"), which is how that was caught. Seed one block, then
+         put the day back exactly as it was. */
+      const kid = activeProfile();
+      const key = getDayKeys(0)[1];
+      const had = (getDayBlocks(key) || []).slice();
+      try {
+        setDayBlocks(key, [{ id: 'sun-audit', actId: 'piano', startMin: 16 * 60, durationMin: 60 }], kid);
+        weekOffset = 0; weekReviewDismissed = false;
+        renderWeek();
+      } finally { setDayBlocks(key, had, kid); Date = RealDate; }
+    }, 'screen-week/sunday'],
     ['screen-quest',   () => { showScreen('quest'); renderQuestBoard(); }],
     ['screen-chore',   () => { openChoreTab(); ckSelectDay(2); }],
     ['screen-mymoney', () => { mnyOpenMyMoney('jenn'); }],
@@ -1122,7 +1159,7 @@ function findChromium() {
   const kidFindings = [];
   for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1440, 900], [900, 1100]]) {
     await page.setViewportSize({ width: w, height: h });
-    for (const [id, nav] of KID_SCREENS) {
+    for (const [id, nav, label] of KID_SCREENS) {
       await page.evaluate(`(${nav.toString()})()`);
       await page.waitForTimeout(200);
       const r = await kidStandards(id);
@@ -1146,7 +1183,7 @@ function findChromium() {
       if (r.words > budget) problems.push(`${r.words} words (max ${budget}${budget !== 200 ? ', ratchet — target is 200' : ''})`);
       if (r.small && r.small.length) problems.push(`${r.small.length} target(s) under 44px: ${r.small.slice(0, 6).join(', ')}`);
       if (r.minFont < 13) problems.push(`font ${r.minFont}px on .${r.minWhere} (min 13)`);
-      if (problems.length) kidFindings.push(`${id}@${w}: ${problems.join(' | ')}`);
+      if (problems.length) kidFindings.push(`${label || id}@${w}: ${problems.join(' | ')}`);
     }
   }
   checks.kidScreensMeetTheHouseRules = kidFindings.length === 0 || kidFindings;
@@ -2352,33 +2389,49 @@ function findChromium() {
   // Her half of the loop: what is with Mom, and what came back while she
   // wasn't looking — and the marker must survive the render that shows it.
   checks.kidSeesWaitingAndAnswered = await page.evaluate(() => {
+    const bad = [];
     profile = 'jess'; parentViewing = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey, pd = getProfData(kid);
     const e = mrEnsureEarnings(kid, wk);
     e.claims = {}; e.chores = {}; e.gradedAt = {};
-    pd.progress.lastGradeSeen = 0;
     mrSetClaim(kid, wk, 1, 'dishes', 3);
     mrSetClaim(kid, wk, 3, 'mop', 2);
 
     openChoreTab(); ckSelectDay(0);
-    const waiting = mrWaitingCount(kid, wk) === 2
-      && document.getElementById('choreWrap').textContent.includes('waiting for Mom');
+    const wc = mrWaitingCount(kid, wk);
+    if (wc !== 2) bad.push(`waiting count is ${wc}, expected 2`);
+    if (!document.getElementById('choreWrap').textContent.includes('waiting for Mom'))
+      bad.push('her tab does not say "waiting for Mom"');
+
+    /* Say when she last looked, rather than inheriting it from the render above.
+       Rendering her tab stamps lastGradeSeen to now; grading below stamps
+       gradedAt from the same clock a few instructions later, and mrNewlyGraded
+       compares the two with a strict `>`. Both can land in the same millisecond,
+       and then a genuinely new grade reads as already-seen. That is what made
+       this check fail intermittently on CI while passing every time locally —
+       a millisecond boundary, not a regression. */
+    pd.progress.lastGradeSeen = syncNow() - 1000;
 
     const was = profile;
     profile = 'parent'; ctParentKid = kid;
     mrSetChoreGrade(kid, wk, 1, 'dishes', 3);
     // A parent looking at her tab must NOT consume her "new" markers.
     renderChoreTab();
-    const survivedParentLook = mrNewlyGraded(kid, wk).length === 1;
+    const afterParent = mrNewlyGraded(kid, wk).length;
+    if (afterParent !== 1) bad.push(`a parent's look left ${afterParent} new marker(s), expected 1`);
     profile = was;
 
     renderChoreTab();
-    const showedHer = document.getElementById('choreWrap').textContent.includes('newly answered');
+    if (!document.getElementById('choreWrap').textContent.includes('newly answered'))
+      bad.push('her tab does not say "newly answered"');
     renderChoreTab();                                  // she has now seen it
-    const cleared = mrNewlyGraded(kid, wk).length === 0;
-    const nowWaitingOne = mrWaitingCount(kid, wk) === 1;
-    return waiting && survivedParentLook && showedHer && cleared && nowWaitingOne;
+    const left = mrNewlyGraded(kid, wk).length;
+    if (left !== 0) bad.push(`${left} new marker(s) survived her own look, expected 0`);
+    const after = mrWaitingCount(kid, wk);
+    if (after !== 1) bad.push(`waiting count is ${after} after one grade, expected 1`);
+    // Findings, not a bare false — CLAUDE.md: return true or the findings.
+    return bad.length === 0 || bad;
   });
 
   // A 60-minute session is too short for the 2x2 grid but not too short to
