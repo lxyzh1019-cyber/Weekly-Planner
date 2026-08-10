@@ -662,7 +662,11 @@ function ckRail(kid) {
 
   return `<aside class="ck-rail">
     <div>
-      <div class="ck-rail-cap">Your week</div>
+      <!-- "Earned this week", not "Your week": this is b.net, so it excludes
+           money from outside. Labelled as the week's total it would disagree
+           with "Money that came in" on My money every time she is given
+           something, and she has no way to tell which screen is lying. -->
+      <div class="ck-rail-cap">Earned this week</div>
       <div class="ck-rail-total">${ckMoney(b.net)}</div>
       <div class="ck-sub">kept after fines · a day never goes below $0</div>
     </div>

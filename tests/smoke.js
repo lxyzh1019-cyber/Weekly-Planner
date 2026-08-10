@@ -998,9 +998,20 @@ function findChromium() {
      measures, it fails the build if it grows, and the 200 target stays written
      down as the thing the rebuild has to hit. Tighten it whenever the real number
      comes down — 346 at the audit, 280 after the disclosures, 276 once the
-     duplicate shortcut rows went. */
+     duplicate shortcut rows went.
+
+     ── 2026-08-10, 276 → 277, owner's call ──
+     The budget is a soft floor, not a hard one: where a word buys a number that
+     is not misleading, the word wins. This one did. The chore rail was capped
+     "Your week" over b.net, which excludes money from outside — labelled as the
+     week's total it disagreed with "Money that came in" on My money every time
+     one of them was given something. "Earned this week" costs one word and says
+     what the number actually is.
+
+     Raising it stays a recorded decision with a date and a reason, never a quiet
+     bump, and the check stays in place. The 200 target is unchanged. */
   const WORD_BUDGET = { 'screen-today': 200, 'screen-week': 200, 'screen-quest': 200,
-                        'screen-mymoney': 200, 'screen-chore': 276 };
+                        'screen-mymoney': 200, 'screen-chore': 277 };
   const KID_SCREENS = [
     // Today is held to the full 200 with no ratchet: it was built to these rules
     // rather than measured against them afterwards, which was the point of
@@ -3260,6 +3271,35 @@ function findChromium() {
     mnyRemoveDeposit(kid, (mnyDepositsForWeek(kid, wk)[0] || {}).id);
     return closes && carried && noRogueTotal
         && onKidPage === want && atMeeting === want && atPortal === want;
+  });
+
+  /* Anything labelled as the week's money is the pool's number.
+     The parent dashboard's "pocket money so far" read the earnings net, so a
+     gift already sitting in the week was invisible right up until the meeting.
+     Pinned against a week that HAS a gift in it, or it proves nothing. */
+  checks.pocketMoneySoFarIsThePoolsNumber = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey;
+    mrEnsureEarnings(kid, wk).overrides = {};
+    ['dishes', 'mop', 'vacuum'].forEach((c, i) => mrSetChoreGrade(kid, wk, i, c, 3));
+    mnyAddDeposit(kid, wk, { amount: 50, from: 'Birthday money' });
+
+    const pool = mnyPool(wk, kid);
+    // The gift must actually make the two differ, or this passes by accident.
+    const giftMatters = pool.cameIn !== mrWeekBreakdown(wk, kid).net;
+
+    showScreen('parent'); renderParentHome(); setParentTab('review');
+    const hub = document.querySelector('#screen-parent .hub-status');
+    const txt = hub ? hub.textContent : '';
+    // Scoped to Jess's own segment: the line carries both kids, and scanning
+    // the whole string reads the sister's total as if it were this one's.
+    const seg = (v) => CT_PROFILE_ICON[kid] + ' $' + v.toFixed(2);
+    const showsPool = txt.includes(seg(pool.cameIn));
+    const hidesNet = !txt.includes(seg(mrWeekBreakdown(wk, kid).net));
+
+    mnyRemoveDeposit(kid, (mnyDepositsForWeek(kid, wk)[0] || {}).id);
+    return giftMatters && showsPool && hidesNet;
   });
 
   /* The pool must not reserve a loan payment that has already been made.

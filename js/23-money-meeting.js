@@ -354,7 +354,10 @@ function mnyConfirmBar(wk, kid) {
     button = `<button type="button" class="mny-btn primary" onclick="mnyDoConfirm()">That's right — save it</button>`;
   }
   return `<div class="mny-confirmbar">
-      <span><b>${mnyMoney(b.net)}</b> for the week</span>
+      <!-- "earned for the week": b.net, no gifts. The strip at the top of this
+           step carries the pool's figure, and two numbers on one screen must
+           not both read as "the week". -->
+      <span><b>${mnyMoney(b.net)}</b> earned for the week</span>
       <span class="mny-note">${escapeHtml(blocked || stamp)}</span>
       ${button}
     </div>`;

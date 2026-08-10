@@ -62,7 +62,14 @@ function renderMeetingHub() {
       </button>`;
   }
   const weekLabel = `${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()} – ${MONTH_SHORT[info.sun.getMonth()]} ${info.sun.getDate()}`;
-  const money = ['jenn', 'jess'].map(kid => `${CT_PROFILE_ICON[kid]} $${ctWeekMoney(wk, kid).toFixed(2)}`).join(' · ');
+  /* pool.cameIn, not ctWeekMoney. This line says "pocket money so far" and it is
+     the parent's front door to the meeting, but it used to read the earnings
+     net — so a $50 birthday cheque already sitting in the week was invisible
+     here and then appeared out of nowhere at the table. Anything labelled as
+     the week's money is the pool's number; "earned for her work" is a
+     different figure and keeps its own label elsewhere. */
+  const money = ['jenn', 'jess'].map(kid =>
+    `${CT_PROFILE_ICON[kid]} $${mnyPool(wk, kid).cameIn.toFixed(2)}`).join(' · ');
   const status = held
     ? `<div class="hub-status hub-status-done">✅ This week is recorded — pocket money was credited at the meeting.</div>`
     : `<div class="hub-status">${nConfirmed}/7 days confirmed · pocket money so far: ${money}</div>`;
