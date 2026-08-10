@@ -31,8 +31,9 @@ let dayLandscapeChromeRaf = 0;
 let pendingStartMin = null;
 let editingBlockId = null;
 let syncDayIdx = 0;
-let weekView = 'full';
-let currentZone = 'all';
+let weekView = 'timegrid';   // Day Blocks is the front page of the week
+/* currentZone lived here, for the morning/afternoon/evening day filters.
+   Those are gone and the day is always shown whole — see js/08-day-view.js. */
 let currentTrayFilter = 'all';
 let activeTimers = {}; // itemKey -> {remaining, interval}
 let pendingFocusBlockId = null;

@@ -286,12 +286,62 @@ const SEASONAL_ACTIVITIES = [
   { id:'leaf_hike',     name:'Leaf Hike',        icon:'🍂', cat:'active', durationMin:90,  season:'autumn', suitableTime:['weekend'], social:true },
 ];
 
-/* School day / weekend templates (minute-based from 6AM) */
+/* ── The school year ──────────────────────────────────────────────────────────
+   One source of truth for "is there school today, and when". Before this, two
+   places each answered it and disagreed: SCHOOL_TEMPLATE placed the School Day
+   block at 8:00am while the day timeline's coloured band drew SCHOOL from 9am,
+   so a child who applied the template saw her school block start an hour before
+   the band that was supposed to mean school. Both now derive from here.
+
+   Minutes are offsets from 6AM (START_MIN), the unit every block uses.
+   Deliberately not synced state: this is a calendar, it is the same on every
+   device, and putting it in the shipped code costs nothing to set up.
+
+   Replace all three each August. Past SCHOOL_TERM.nextStart the app stops
+   claiming to know — it falls back to plain weekday rules rather than inventing
+   holidays for a year it has never been told about. */
+const SCHOOL_HOURS = { startMin: 120, endMin: 540, days: [1, 2, 3, 4, 5] };  // Mon–Fri, 8:00am–3:00pm
+
+const SCHOOL_TERM = { start: '2026-08-31', end: '2027-06-25', nextStart: '2027-08-30' };
+
+/* Weekdays inside the term with no school: statutory holidays, breaks, and
+   staff learning days. Weekends are not listed — SCHOOL_HOURS.days covers them,
+   and neither is the summer, which is the gap between `end` and `nextStart`. */
+const NO_SCHOOL_DAYS = [
+  '2026-09-07',                                            // Labour Day
+  '2026-09-18',                                            // staff learning day
+  '2026-09-30',                                            // Truth and Reconciliation
+  '2026-10-09',                                            // staff learning day
+  '2026-10-12',                                            // Thanksgiving
+  '2026-11-09', '2026-11-10',                              // fall break
+  '2026-11-11',                                            // Remembrance Day
+  '2026-11-26', '2026-11-27',                              // staff learning days
+  '2026-12-21', '2026-12-22', '2026-12-23', '2026-12-24',  // holiday break
+  '2026-12-25', '2026-12-28', '2026-12-29', '2026-12-30',
+  '2026-12-31', '2027-01-01',
+  '2027-01-15',                                            // staff learning day
+  '2027-02-15',                                            // Family Day
+  '2027-02-16',                                            // family break
+  '2027-02-17',                                            // teacher lieu day
+  '2027-02-18', '2027-02-19',                              // teachers' convention
+  '2027-03-11', '2027-03-12',                              // staff learning days
+  '2027-03-26',                                            // Good Friday
+  '2027-03-29',                                            // Easter Monday
+  '2027-03-30', '2027-03-31', '2027-04-01', '2027-04-02',  // spring break
+  '2027-04-23',                                            // staff learning day
+  '2027-05-21',                                            // staff learning day
+  '2027-05-24',                                            // Victoria Day
+  '2027-06-11',                                            // staff learning day
+];
+
+/* School day / weekend templates (minute-based from 6AM). The school block
+   derives from SCHOOL_HOURS so it can never drift from the coloured band. */
 const SCHOOL_TEMPLATE = [
   {actId:'routine_morning',   startMin: 60,  durationMin: 30},   // 7:00am
   {actId:'breakfast',         startMin: 90,  durationMin: 30},   // 7:30am
-  {actId:'school_day',        startMin: 120, durationMin: 420},  // 8:00am–3:00pm
-  {actId:'routine_afterschool',startMin:540, durationMin: 30},   // 3:00pm
+  {actId:'school_day',        startMin: SCHOOL_HOURS.startMin,
+                              durationMin: SCHOOL_HOURS.endMin - SCHOOL_HOURS.startMin},
+  {actId:'routine_afterschool',startMin: SCHOOL_HOURS.endMin, durationMin: 30},
   {actId:'piano',             startMin: 570, durationMin: 60},   // 3:30pm
   {actId:'dinner',            startMin: 690, durationMin: 60},   // 5:30pm
   {actId:'chores',            startMin: 750, durationMin: 30},   // 6:30pm

@@ -55,7 +55,6 @@
      SCREEN: PROFILE SELECT
 ════════════════════════════════════════════════════════ -->
 <div class="screen active" id="screen-profile">
-  <button class="hero-mode-toggle" id="heroModeToggle" onclick="toggleHeroMode()" aria-label="Toggle Hero Mode">🎮 Hero Mode: ON</button>
   <div class="profile-header">
     <h1>My Weekly Planner</h1>
     <p>Who's here today? <span class="sync-dot" id="syncDot"></span></p>
@@ -258,28 +257,22 @@
     <div class="week-topbar__row2">
       <!-- View switcher: Full (cards) / Time-Grid (hours) -->
       <div class="view-tabs">
-        <button class="view-tab active" id="viewTabFull" onclick="setWeekView('full')">📋 Full</button>
-        <button class="view-tab" id="viewTabTimeGrid" onclick="setWeekView('timegrid')">🧱 Day Blocks</button>
+        <button class="view-tab" id="viewTabFull" onclick="setWeekView('full')">📋 Full</button>
+        <button class="view-tab active" id="viewTabTimeGrid" onclick="setWeekView('timegrid')">🧱 Day Blocks</button>
       </div>
     </div>
   </div>
   <p class="kid-coach-tip" id="weekCoachTip" style="display:none;margin:0.35rem 0.75rem 0"></p>
 
-  <!-- Compact view kept in DOM but hidden (no longer used) -->
-  <div id="weekCompact" style="display:none">
-    <div class="week-grid" id="weekGrid"></div>
-    <ul class="week-legend" id="weekLegend" style="display:none" aria-label="Activity category legend">
-      <li class="legend-item"><span class="legend-dot" style="background:var(--cat-sleep)" aria-hidden="true"></span>Rest</li>
-      <li class="legend-item"><span class="legend-dot" style="background:var(--cat-school)" aria-hidden="true"></span>Learning</li>
-      <li class="legend-item"><span class="legend-dot" style="background:var(--cat-active)" aria-hidden="true"></span>Active</li>
-      <li class="legend-item"><span class="legend-dot" style="background:var(--cat-free)" aria-hidden="true"></span>Free</li>
-      <li class="legend-item"><span class="legend-dot" style="background:var(--cat-daily)" aria-hidden="true"></span>Daily</li>
-      <li class="legend-item"><span class="legend-dot" style="background:var(--cat-routine)" aria-hidden="true"></span>Routine</li>
-    </ul>
-  </div>
+  <!-- The compact week view lived here, with #weekGrid and #weekLegend. It was
+       the original third week layout and had been unreachable for a long time:
+       the tabs only ever set 'full' or 'timegrid'. #weekLegend went with it —
+       a parent-only, hardcoded copy of the category key that could never show,
+       because its container was permanently display:none. The Day Blocks view
+       builds a live one from CAT_HEX (#tgLegend) that everyone can see. -->
 
-  <!-- Full week view (default) -->
-  <div id="weekFull" style="display:flex">
+  <!-- Full week view (the alternate; Day Blocks is the default) -->
+  <div id="weekFull" style="display:none">
     <div class="weekly-full-wrap">
       <div class="week-conflict-banner" id="weekConflictBanner" style="display:none"></div>
       <div class="weekly-full" id="weeklyFullGrid"></div>
@@ -289,7 +282,7 @@
 
   <!-- Day Blocks view (2a): "plans pop, free stays quiet" — one column per day,
        planned activities carry colour + a short label, free time stays plain. -->
-  <div id="weekTimeGrid" style="display:none">
+  <div id="weekTimeGrid" style="display:flex">
     <div class="tg-controls">
       <div class="tg-streak" id="tgStreak"></div>
     </div>

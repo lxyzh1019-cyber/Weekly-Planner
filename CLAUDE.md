@@ -234,6 +234,31 @@ New user-created Claude skills for this ecosystem use the `HZ-` prefix
 existing conventions: `ct*` for chore-tracker functions, `mny*` for money,
 `tg2-*` for the current Day Blocks grid.
 
+## The school calendar expires every August
+
+`SCHOOL_HOURS`, `SCHOOL_TERM` and `NO_SCHOOL_DAYS` in `js/01-config.js` are the
+one source of truth for "is there school today, and when". Both consumers derive
+from them — `SCHOOL_TEMPLATE` and the day timeline's coloured bands — because
+when they were hardcoded separately they disagreed by an hour and nobody noticed.
+
+Read it through `isSchoolDay(dayKey)` / `schoolDayInfo(dayKey)`
+(`js/05-helpers.js`), never by checking the day of the week: a Tuesday in July is
+not a school day, and neither is a PD day.
+
+**Replace all three each August.** Past `SCHOOL_TERM.nextStart` the app stops
+claiming to know: bands fall back to weekday shape and `schoolCalendarIsStale()`
+puts a note on the week — *to a parent only*. A child is never told the app's
+data is out of date; she cannot act on it.
+
+`schoolCalendarIsRight` in `tests/smoke.js` counts the instructional days the
+calendar yields and asserts the published total (177 for K-8). A mistyped date
+moves that number, which is the point — it is the only check here that can catch
+a plausible-looking wrong date.
+
+This is deliberately shipped code, not synced state: it is identical on every
+device, and the repo is public, so it carries **dates only** — no school name, no
+district, no source document.
+
 ## Known trip hazards
 
 - Firebase config lives in **`js/03-sync.js:8`**, not `index.html`. Older docs

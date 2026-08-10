@@ -12,9 +12,6 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   if (weekOffsetOverride != null) weekOffset = weekOffsetOverride;
   currentDayKey = key;
   selectedActivity = null;
-  currentZone = 'all';
-
-  document.querySelectorAll('.zone-tab').forEach(t=>t.classList.toggle('active', t.dataset.zone==='all'));
 
   // Parent banner
   const banner = document.getElementById('parentBannerDay');
@@ -121,21 +118,14 @@ function navDay(delta) {
   }
 }
 
-/* The day is always shown whole now — the morning/afternoon/evening filters
-   are gone from the topbar. Kept as a no-op-ish entry point because the zone
-   plumbing (zoneRangeMin, clipping markers) still runs underneath, and a saved
-   deep link or a template could still ask for a zone. */
-function setZone(z) {
-  currentZone = 'all';
-  buildTimeline();
-}
-function zoneRange(z) {
-  if (z==='all') return [0, TOTAL_SLOTS];
-  if (z==='morning') return [0, 24];       // 6AM–12PM
-  if (z==='afternoon') return [24, 48];    // 12PM–6PM
-  if (z==='evening') return [48, TOTAL_SLOTS]; // 6PM–9PM
-  return [0, TOTAL_SLOTS];
-}
+/* setZone / zoneRange / zoneRangeMin and the currentZone variable lived here.
+   They powered morning/afternoon/evening filters in the day topbar, which were
+   removed long ago: the tabs went, setZone was left forcing 'all', and nothing
+   ever set currentZone to anything else — so every caller was computing the
+   whole day the long way round. The day is shown whole, full stop.
+
+   The Before School / School / After School / Evening bands are a different
+   thing entirely and are very much alive — see buildSideband. */
 
 /* Today's Vibe */
 function renderVibe() {
@@ -180,8 +170,7 @@ function buildTimeline() {
   if (topbar) topbar.classList.remove('day-topbar--compact');
   const blocks = getDayBlocks(currentDayKey);
 
-  // Zone = range in minutes from 6AM
-  const [zMinStart, zMinEnd] = zoneRangeMin(currentZone);
+  const zMinStart = 0, zMinEnd = DAY_MIN_SPAN;
   const spanMin = zMinEnd - zMinStart;
   const canvasHeight = spanMin * PX_PER_MIN;
 
@@ -454,21 +443,21 @@ function buildSideband(zMinStart, zMinEnd) {
   const canvasHeight = (zMinEnd - zMinStart) * PX_PER_MIN;
   band.style.height = canvasHeight + 'px';
 
-  const d = formatDayKey(currentDayKey);
-  const dow = d.getDay(); // 0=Sun, 6=Sat
-  const isWeekend = (dow===0 || dow===6);
-
-  // Segments defined as minutes-from-6am
-  let segs;
-  if (isWeekend) {
-    segs = [ { start: 0, end: DAY_MIN_SPAN, label: '🎉 FREE TIME', cls: 'tl-band-free' } ];
+  /* The bands read the real school calendar rather than the day of the week.
+     Before this they were hardcoded 9am–3pm Mon–Fri, which was both an hour out
+     against SCHOOL_TEMPLATE and wrong on every holiday, PD day and week of the
+     summer — a child opening a July Tuesday was told she was at school. */
+  const segs = [];
+  if (isSchoolDay(currentDayKey)) {
+    const s = SCHOOL_HOURS.startMin, e = SCHOOL_HOURS.endMin;
+    // 3h after the bell is "after school"; the rest of the night is evening.
+    const afterEnd = Math.min(e + 180, DAY_MIN_SPAN);
+    if (s > 0)              segs.push({ start: 0, end: s,  label: '🌅 BEFORE SCHOOL', short: '🌅 BEFORE', cls: 'tl-band-before' });
+                            segs.push({ start: s, end: e,  label: '🏫 SCHOOL',        short: '🏫',        cls: 'tl-band-school' });
+    if (afterEnd > e)       segs.push({ start: e, end: afterEnd, label: '🎒 AFTER SCHOOL', short: '🎒 AFTER', cls: 'tl-band-after' });
+    if (DAY_MIN_SPAN > afterEnd) segs.push({ start: afterEnd, end: DAY_MIN_SPAN, label: '🌙 EVENING', short: '🌙', cls: 'tl-band-evening' });
   } else {
-    segs = [
-      { start: 0,   end: 180,          label: '🌅 BEFORE SCHOOL', cls: 'tl-band-before'  }, // 6–9am
-      { start: 180, end: 540,          label: '🏫 SCHOOL',         cls: 'tl-band-school'  }, // 9am–3pm
-      { start: 540, end: 720,          label: '🎒 AFTER SCHOOL',   cls: 'tl-band-after'   }, // 3pm–6pm
-      { start: 720, end: DAY_MIN_SPAN, label: '🌙 EVENING',        cls: 'tl-band-evening' }, // 6pm–9pm
-    ];
+    segs.push({ start: 0, end: DAY_MIN_SPAN, label: '🎉 FREE TIME', short: '🎉', cls: 'tl-band-free' });
   }
 
   segs.forEach(s => {
@@ -483,20 +472,17 @@ function buildSideband(zMinStart, zMinEnd) {
     seg.className = 'tl-band-seg ' + s.cls;
     seg.style.top = top + 'px';
     seg.style.height = (height - 2) + 'px';
-    seg.textContent = s.label;
+    /* These labels are set sideways, so the band's height is their line length.
+       "BEFORE SCHOOL" needs about 165px and the before-school band is only as
+       tall as the gap between 6am and the first bell — at an 8am start that is a
+       2px margin, and a school starting earlier would cut the word in half.
+       Drop to the short form rather than render a clipped one. */
+    seg.textContent = (height < 180 && s.short) ? s.short : s.label;
+    seg.title = s.label;
     band.appendChild(seg);
   });
 
   return band;
-}
-
-function zoneRangeMin(z) {
-  // Return [startMinOffset, endMinOffset] from 6AM
-  if (z==='all') return [0, DAY_MIN_SPAN];
-  if (z==='morning') return [0, 360];       // 6AM-12PM
-  if (z==='afternoon') return [360, 720];   // 12PM-6PM
-  if (z==='evening') return [720, DAY_MIN_SPAN]; // 6PM-9PM
-  return [0, DAY_MIN_SPAN];
 }
 
 /* Greedy column-packing collision: blocks that overlap get assigned to columns.
@@ -557,12 +543,10 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   const act = getAllActivities().find(a=>a.id===b.actId);
   if (!act) return;
 
-  // Clip the block to the visible zone and flag any edge it crosses, so a
-  // block spilling past a selected zone's top/bottom shows a "continues"
-  // marker instead of being silently cut (W7). In the default "all" view the
-  // zone spans the whole day, so nothing is clipped.
-  const [, zEndOffset] = zoneRangeMin(currentZone);
-  const zoneSpan = zEndOffset - zMinStart;
+  // The day is always shown whole, so a block can only be clipped by running
+  // past the 6am-9pm canvas itself — the "continues" markers below still cover
+  // that. The zone filter that used to narrow this is gone.
+  const zoneSpan = DAY_MIN_SPAN - zMinStart;
   const relStart = (b.startMin - START_MIN) - zMinStart;
   const relEnd   = relStart + (b.durationMin || 0);
   const clippedTop    = relStart < 0;

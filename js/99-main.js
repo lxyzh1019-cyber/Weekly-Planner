@@ -190,7 +190,9 @@ function initA11yEnhancements() {
 enableHorizontalWheelScroll();
 bindMiddleDragPan();
 initA11yEnhancements();
-refreshHeroModeToggle();
+/* Hero Mode is gone (js/05-helpers.js). Drop its key so a switch nobody can see
+   is not still remembered on the girls' iPad. */
+try { localStorage.removeItem('wp_hero_mode'); } catch (e) {}
 
 // Small onboarding mascot after profile pick (if day is empty)
 const _origBuildTimeline = buildTimeline;

@@ -9,7 +9,6 @@ function setWeekView(v) {
   document.getElementById('viewTabFull').classList.toggle('active', v==='full');
   document.getElementById('viewTabTimeGrid').classList.toggle('active', v==='timegrid');
   // Containers
-  document.getElementById('weekCompact').style.display  = v==='compact' ? 'block' : 'none';
   document.getElementById('weekFull').style.display     = v==='full' ? 'flex' : 'none';
   // flex, not block, so .tg2-wrap's `flex:1; min-height:0` gives it a bounded
   // height and it becomes a real scroll container (same as #weekFull).
@@ -93,13 +92,13 @@ function renderWeek() {
   document.getElementById('weekRangeLabel').textContent =
     `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} — ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()}`;
 
-  if (weekView === 'compact')      renderCompactWeek(keys);
-  else if (weekView === 'timegrid') renderTimeGrid(keys);
-  else                              renderFullWeek(keys);
+  if (weekView === 'full') renderFullWeek(keys);
+  else                     renderTimeGrid(keys);
 
-  // Analytics (category legend) only visible to parents
-  const legend = document.getElementById('weekLegend');
-  if (legend) legend.style.display = isParent() ? 'flex' : 'none';
+  /* A parent-only category legend was toggled here. Its markup lived inside the
+     permanently hidden compact view, so it could never appear no matter what
+     this line set. The Day Blocks view renders a live one from CAT_HEX that
+     parent and child both see. */
 
   // Money button: both roles open 💰 My money. A parent looking at a kid's
   // money should see exactly what the kid sees; everything a parent can change
@@ -120,7 +119,29 @@ function renderWeek() {
     // Use the app's timezone (America/Edmonton) rather than the device clock so
     // the Sunday nudge lands on the same day boundary as all the week/day keys.
     const isSunday = formatDayKey(toDayKeyInZone(new Date())).getDay() === 0;
-    if (isSunday && weekOffset === 0 && !weekReviewDismissed) {
+    /* An empty week used to look exactly like a full one with the cards taken
+       out — seven blank columns and the same tip above them, saying nothing
+       about the fact that there is nothing here. It takes the highest priority
+       because on a blank week it is the only thing worth saying. Framed as an
+       invitation, not a scolding: a week with nothing in it yet is a normal
+       state, not a failure. */
+    const nothingPlanned = keys.every(k => !(getDayBlocks(k) || []).length);
+    /* The shipped school calendar has run out. Say so to a parent, once, where a
+       parent already looks — never to a child, who cannot act on it and should
+       not be told the app is out of date. Until it is replaced the day bands
+       fall back to plain weekday shape, which is wrong on holidays; that is a
+       visible, fixable wrong rather than a silent one. */
+    if (isParent() && keys.some(k => schoolCalendarIsStale(k))) {
+      coachEl.classList.remove('week-review-tip');
+      coachEl.style.display = 'block';
+      coachEl.textContent = '🗓️ The school calendar in this app ends after '
+        + SCHOOL_TERM.nextStart + '. Until it is updated, school days are guessed from the weekday only.';
+    } else if (nothingPlanned) {
+      coachEl.classList.remove('week-review-tip');
+      coachEl.style.display = 'block';
+      coachEl.innerHTML = `📝 <b>This week is empty.</b> Pick a day and put the first thing in — you can move it later. `
+        + `<button class="wins-btn" onclick="goPlanToday()">✏️ Start planning</button>`;
+    } else if (isSunday && weekOffset === 0 && !weekReviewDismissed) {
       // Sunday weekly-review nudge: a gentle look-back with a mini summary,
       // shown to parent and child alike so they can reflect together.
       const t = computeWeekTotals(keys);
@@ -133,7 +154,9 @@ function renderWeek() {
     } else if (!isParent()) {
       coachEl.classList.remove('week-review-tip');
       coachEl.style.display = 'block';
-      coachEl.textContent = '🌟 Tip: Tap a day card to see your timeline. Check off routines as you go — each tick is a small win. Use “My free time” in Time-Grid to spot when you can choose rest or a goal.';
+      // "Time-Grid" was a name for this view that no longer exists anywhere in
+      // the UI — the tab reads Day Blocks.
+      coachEl.textContent = '🌟 Tip: Tap a day to see your timeline. Check off routines as you go — each tick is a small win. Use “My free time” in Day Blocks to spot when you can choose rest or a goal.';
     } else {
       coachEl.style.display = 'none';
     }
@@ -702,28 +725,8 @@ function renderTimeGridMyTime(keys) {
   document.getElementById('tgMyTimeBreakdown').textContent = parts.length ? parts.join(' · ') + ' (30-min blocks)' : 'Nothing planned yet — your whole day is free!';
 }
 
-function renderCompactWeek(keys) {
-  const grid = document.getElementById('weekGrid');
-  grid.innerHTML = '';
-  const today = todayKey();
-
-  keys.forEach((key, i)=>{
-    const blocks = getDayBlocks(key);
-    const card = document.createElement('div');
-    card.className = 'day-card'+(key===today?' today':'');
-    card.onclick = ()=>openDay(key, i);
-    const d = formatDayKey(key);
-    card.innerHTML = `
-      <div class="day-label">${DAY_SHORT[i]}</div>
-      <div class="day-date">${d.getDate()}</div>
-      <div class="day-bar-wrap" id="daybar-${key}"></div>
-      <div class="day-mood" id="daymood-${key}"></div>
-      <div class="day-pct" id="daypct-${key}"></div>
-    `;
-    grid.appendChild(card);
-    renderDayBar(key, blocks);
-  });
-}
+/* renderCompactWeek lived here — one card per day listing that day's blocks as
+   text. It was unreachable: weekView is only ever 'full' or 'timegrid'. */
 
 function renderDayBar(key, blocks) {
   const wrap = document.getElementById('daybar-'+key);
