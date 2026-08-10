@@ -651,66 +651,12 @@ function addQuickBreak(durationMin) {
   showToast(`Break added at ${formatTimeFromMin(start)} ✨`);
 }
 
-function renderDayNextUpBanner() {
-  const el = document.getElementById('dayNextUpBanner');
-  const row = document.getElementById('dayKidQuickRow');
-  if (!el || !row) return;
-  if (isParent()) {
-    el.style.display = 'none';
-    row.style.display = 'none';
-    return;
-  }
-  row.style.display = 'flex';
-  const blocks = getDayBlocks(currentDayKey);
-  const acts = getAllActivities();
-  const now = new Date();
-  const nowAbs = now.getHours() * 60 + now.getMinutes();
-  const isToday = currentDayKey === todayKey();
-
-  // "Current" and "Next up" are live, clock-relative concepts — they only
-  // make sense for today. On any other day the banner stays empty (item 5).
-  if (!isToday) {
-    el.style.display = 'none';
-    el.innerHTML = '';
-    return;
-  }
-
-  const scheduled = blocks.map(b => {
-    const act = acts.find(a => a.id === b.actId);
-    if (!act || act.quickBreak) return null;
-    return { b, act, end: b.startMin + b.durationMin };
-  }).filter(Boolean).sort((a, b) => a.b.startMin - b.b.startMin);
-
-  // Happening right now: started but not yet finished.
-  const current = scheduled.find(c => c.b.startMin <= nowAbs && c.end > nowAbs) || null;
-  // Up next: the first block that hasn't started yet.
-  const next = scheduled.find(c => c.b.startMin > nowAbs) || null;
-
-  // Evening wind-down nudge (once age is set).
-  const evening = now.getHours() >= 18;
-  const age = getProfData()?.age;
-  const bedtime = (evening && age != null) ? bedtimeReminderText(age) : null;
-
-  if (!current && !next && !bedtime) {
-    el.style.display = 'none';
-    el.innerHTML = '';
-    return;
-  }
-  el.style.display = 'block';
-  let inner = '';
-  if (current) {
-    const timeStr = formatTimeFromMin(current.b.startMin);
-    inner += `<div class="next-up-row next-up-row--now"><div class="next-up-label">Now</div>`
-      + `<div class="next-up-body">${current.act.icon} <b>${escapeHtml(current.act.name)}</b> · ${timeStr}</div></div>`;
-  }
-  if (next) {
-    const timeStr = formatTimeFromMin(next.b.startMin);
-    inner += `<div class="next-up-row"><div class="next-up-label">Next up</div>`
-      + `<div class="next-up-body">${next.act.icon} <b>${escapeHtml(next.act.name)}</b> · ${timeStr}</div></div>`;
-  }
-  if (bedtime) inner += `<div class="bedtime-tip">${bedtime}</div>`;
-  el.innerHTML = inner;
-}
+/* renderDayNextUpBanner lived here. It printed "Now" and "Next up" into the day
+   timeline's left rail — the same sentence Today's own card leads with, on a
+   screen you had just navigated away from Today to reach. The rail is gone and
+   this went with it; Today says it once. Its two side jobs moved rather than
+   died: the break row's visibility and the evening wind-down nudge are both in
+   tdRenderToday (js/31-today.js), which is where they are read now. */
 
 function updateStopwatchGoalToasts(blocks) {
   blocks.forEach(b => {

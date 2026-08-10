@@ -13,7 +13,6 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   currentDayKey = key;
   selectedActivity = null;
   currentZone = 'all';
-  leftPaneManualCollapsed = false;
 
   document.querySelectorAll('.zone-tab').forEach(t=>t.classList.toggle('active', t.dataset.zone==='all'));
 
@@ -162,134 +161,20 @@ function setDayMood(m) {
   showToast('Mood saved '+m);
 }
 
-/* ════════════════════════════════════════════════════════════════
-   3b — DAY "CHECKLIST" MODE: collapse free time into tappable pills
-════════════════════════════════════════════════════════════════ */
-/* Two modes: the timeline (plan it) and quests (confirm it). Checklist mode
-   was a third rendering of the same day and duplicated what quests already do,
-   so 'checklist' now lands on the timeline rather than a blank pane.
+/* Quest mode lived here — setDayViewMode, buildDayQuest, and before them
+   Checklist mode. Three renderings of one day, each with its own completion
+   handlers, retired one at a time for the same reason: a tick that can happen in
+   two places is a tick that can disagree with itself.
 
-   Quest mode is where completion gets confirmed, so it gets the whole width —
-   the Today rail and the activity tray are both about *planning*, and neither
-   is any use while ticking things off. */
-function setDayViewMode(mode) {
-  dayViewMode = (mode === 'quest') ? 'quest' : 'timeline';
-  const tb = document.getElementById('dayModeTimeline');
-  const qb = document.getElementById('dayModeQuest');
-  if (tb) { tb.classList.toggle('active', dayViewMode==='timeline'); tb.setAttribute('aria-selected', dayViewMode==='timeline'); }
-  if (qb) { qb.classList.toggle('active', dayViewMode==='quest'); qb.setAttribute('aria-selected', dayViewMode==='quest'); }
-  const scr = document.getElementById('screen-day');
-  if (scr) scr.classList.toggle('quest-focus', dayViewMode==='quest');
-  buildTimeline();
-}
-
-/* Day "Checklist" mode lived here — dcTintClass / dcToggleGap /
-   buildDayChecklistBlockRow / buildDayChecklistGapPill / buildDayChecklist.
-   It was a third rendering of the same day, and it overlapped Quest mode,
-   which already lists the day's activities with a tick beside each. Two
-   screens for confirming the same completions is one screen too many, so the
-   day now offers Timeline (plan it) and Quest (confirm it). */
-
-/* Quest mode for the day view: the viewed day's activities as gamified quest
-   cards. Completing a quest is instant — it marks the block done, awards XP, and
-   re-renders in place (no separate Quest Board screen needed). */
-function buildDayQuest() {
-  const host = document.getElementById('dayQuest');
-  if (!host) return;
-  host.innerHTML = '';
-  const p = activeProfile();
-  const acts = getAllActivities(p);
-  const blocks = (getDayBlocks(currentDayKey) || [])
-    .filter(b => b && b.startMin != null && (b.durationMin || 0) > 0)
-    .slice().sort((a, b) => (a.startMin || 0) - (b.startMin || 0));
-
-  // Compact hero / XP strip so the gamification travels with the view.
-  const xp = getQuestXP(p);
-  const level = Math.floor(xp / QUEST_XP_PER_LEVEL) + 1;
-  const tier = heroTierForLevel(level);
-  const into = xp % QUEST_XP_PER_LEVEL;
-  const pct = Math.round(into / QUEST_XP_PER_LEVEL * 100);
-  const doneCount = blocks.filter(b => b.completed).length;
-  const head = document.createElement('div');
-  head.className = 'dq-hero';
-  head.innerHTML = `
-    <div class="dq-hero-avatar">${tier.emoji}</div>
-    <div class="dq-hero-info">
-      <div class="dq-hero-title">Lv ${level} · ${escapeHtml(tier.name)}</div>
-      <div class="dq-xp-bar"><div class="dq-xp-fill" style="width:${pct}%"></div></div>
-      <div class="dq-hero-sub">${doneCount}/${blocks.length} quests done · ${into}/${QUEST_XP_PER_LEVEL} XP</div>
-    </div>`;
-  host.appendChild(head);
-
-  if (!blocks.length) {
-    const empty = document.createElement('div');
-    empty.className = 'dc-empty';
-    empty.textContent = 'No quests for this day yet — switch to Timeline to add some.';
-    host.appendChild(empty);
-    return;
-  }
-
-  const actById = id => acts.find(a => a.id === id);
-  const list = document.createElement('div');
-  list.className = 'dq-list';
-  blocks.forEach(b => {
-    const act = actById(b.actId) || { name: 'Quest', icon: '⭐' };
-    const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
-    const icon = topic ? topic.icon : (act.icon || '⭐');
-    const nm = topic
-      ? (act.isCompetition ? (topic.id === 'general' ? 'Competition' : topic.name + ' Comp.') : topic.name)
-      : (act.name || 'Quest');
-    const done = !!b.completed;
-    const card = document.createElement('div');
-    card.className = 'quest-card dq-card' + (done ? ' quest-done' : '');
-    card.innerHTML = `
-      <div class="quest-time-col">
-        <div class="quest-time">${formatQuestTime(b.startMin)}</div>
-        ${b.durationMin ? `<div class="quest-dur">${formatDuration(b.durationMin)}</div>` : ''}
-      </div>
-      <div class="quest-card-icon">${icon}</div>
-      <div class="quest-card-body">
-        <div class="quest-card-name">${escapeHtml(nm)}</div>
-        <div class="quest-card-meta"><span class="quest-xp-tag">+${QUEST_XP_PER_TASK} XP</span></div>
-      </div>`;
-    const right = document.createElement(done ? 'div' : 'button');
-    if (done) {
-      right.className = 'quest-done-badge';
-      right.textContent = '✓';
-    } else {
-      right.type = 'button';
-      right.className = 'quest-complete-btn';
-      right.setAttribute('aria-label', 'Complete quest');
-      right.title = 'Complete it! 🎯';
-      right.textContent = '🎯';
-      // The arcade blast (js/06-quests.js) — the same completion the Quest
-      // Board used to own. Now that the board hands its list to this view,
-      // this is where that animation lives.
-      right.onclick = (e) => { e.stopPropagation(); blastQuest(b.id, right, currentDayKey); };
-    }
-    card.appendChild(right);
-    card.onclick = () => onTimelineBlockTap(b.id);
-    list.appendChild(card);
-  });
-  host.appendChild(list);
-}
+   The quest cards were not deleted, they moved. They are on Today now
+   (js/31-today.js), which is where a child goes to *do* a day; this screen is
+   where one gets built. That leaves the day screen a single layout, so there is
+   no dayViewMode left to go stale between visits. */
 
 function buildTimeline() {
   if (activeStopwatchTick) { clearInterval(activeStopwatchTick); activeStopwatchTick = null; }
   refreshRestDayButton();
   const tl = document.getElementById('timeline');
-  const ql = document.getElementById('dayQuest');
-  // Quest mode: the day's activities as gamified quest cards with instant
-  // blast-to-complete.
-  if (dayViewMode === 'quest') {
-    if (tl) tl.style.display = 'none';
-    if (ql) ql.style.display = '';
-    buildDayQuest();
-    renderDayNextUpBanner();
-    return;
-  }
-  if (ql) ql.style.display = 'none';
-  if (tl) tl.style.display = '';
   const topbar = document.querySelector('#screen-day .day-topbar');
   tl.innerHTML = '';
   if (topbar) topbar.classList.remove('day-topbar--compact');
@@ -418,7 +303,6 @@ function buildTimeline() {
   }
 
   updateStopwatchGoalToasts(blocks);
-  renderDayNextUpBanner();
 }
 
 function renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd) {
@@ -1433,27 +1317,13 @@ function setDayFocusPane(pane) {
   dayScreen.classList.toggle('focus-left', dayLandscapeFocusPane === 'left');
   dayScreen.classList.toggle('focus-center', dayLandscapeFocusPane === 'center');
   dayScreen.classList.toggle('focus-right', dayLandscapeFocusPane === 'right');
-  applyLeftPaneState();
 }
 
-// Left "Today" pane auto-hides while editing (an activity is picked, i.e.
-// focus-center) to free up room for the schedule; the Panel button also
-// toggles it manually.
-let leftPaneManualCollapsed = false;
-function applyLeftPaneState() {
-  const s = document.getElementById('screen-day');
-  if (!s) return;
-  const editing = s.classList.contains('focus-center');
-  const collapsed = leftPaneManualCollapsed || editing;
-  s.classList.toggle('left-collapsed', collapsed);
-  const caret = document.getElementById('dayLeftToggleCaret');
-  if (caret) caret.textContent = collapsed ? '▸' : '◀';
-}
-function toggleLeftPane() {
-  const s = document.getElementById('screen-day');
-  leftPaneManualCollapsed = !(s && s.classList.contains('left-collapsed'));
-  applyLeftPaneState();
-}
+/* leftPaneManualCollapsed / applyLeftPaneState / toggleLeftPane lived here, and
+   the ◀Panel button with them. All three existed to hide the left "Today" rail
+   to free up room for the schedule — and that rail is gone, so the schedule
+   already has the room. setDayFocusPane stays: focus-center still dims the
+   activity tray while a block is being placed, which is a different job. */
 
 function applyDayLandscapeFocusState() {
   setDayFocusPane(dayLandscapeFocusPane);

@@ -27,7 +27,9 @@
    is one encouragement line, and it is short. */
 
 const TD_MAX_CHORES = 4;      // beyond this it stops being "what now" and becomes a list
-const TD_MAX_QUESTS = 3;
+/* TD_MAX_QUESTS was here. It capped the old summary at three, which is right for
+   a teaser and wrong for the list itself — a capped list silently hides a quest
+   a child then never does. The whole day shows. */
 
 /* ── Reading the day ─────────────────────────────────────────────────────── */
 
@@ -76,15 +78,67 @@ function tdClaimableToday(kid) {
     !mrGetClaim(kid, wk, d, r.row.id) && !mrGetChoreGrade(kid, wk, d, r.row.id));
 }
 
-/* Today's quest-shaped blocks she hasn't finished. */
+/* Today's quest cards — every scheduled block, done ones included, because a
+   finished quest ticked green is the point of the list. Sorted by start so the
+   order matches the day. This is the one list of today: the day screen's Quest
+   mode used to render it too, and the Quest Board before that. */
 function tdQuestsToday(kid) {
   const key = todayKey();
+  return (getDayBlocks(key, kid) || [])
+    .filter(b => b && b.startMin != null && (b.durationMin || 0) > 0)
+    .slice()
+    .sort((a, b) => (a.startMin || 0) - (b.startMin || 0));
+}
+
+/* One quest card. Structure and classes are the ones Quest mode used, so the
+   card keeps its look; the difference is that both targets are data attributes
+   read by the delegated listener rather than inline handlers. */
+function tdQuestCard(b, kid) {
   const acts = getAllActivities(kid);
-  return (getDayBlocks(key, kid) || []).filter(b => {
-    if (b.completed) return false;
-    const act = acts.find(a => a.id === b.actId);
-    return !!act && !act.isRoutine;
-  });
+  const act = acts.find(a => a.id === b.actId) || { name: 'Quest', icon: '⭐' };
+  const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
+  const icon = topic ? topic.icon : (act.icon || '⭐');
+  const nm = topic
+    ? (act.isCompetition ? (topic.id === 'general' ? 'Competition' : topic.name + ' Comp.') : topic.name)
+    : (act.name || 'Quest');
+  const id = escapeAttr(b.id);
+  const done = !!b.completed;
+  return `<div class="quest-card${done ? ' quest-done' : ''}">
+      <button type="button" class="dq-open" data-td-action="plan" data-td-block="${id}">
+        <div class="quest-time-col">
+          <div class="quest-time">${escapeHtml(formatQuestTime(b.startMin))}</div>
+          ${b.durationMin ? `<div class="quest-dur">${escapeHtml(formatDuration(b.durationMin))}</div>` : ''}
+        </div>
+        <div class="quest-card-icon">${icon}</div>
+        <div class="quest-card-body">
+          <div class="quest-card-name">${escapeHtml(nm)}</div>
+          <div class="quest-card-meta"><span class="quest-xp-tag">+${QUEST_XP_PER_TASK} XP</span></div>
+        </div>
+      </button>
+      ${done
+        ? `<span class="quest-done-badge">✓</span>`
+        : `<button type="button" class="quest-complete-btn" data-td-action="blast"
+             data-td-block="${id}" aria-label="Complete ${escapeAttr(nm)}" title="Complete it! 🎯">🎯</button>`}
+    </div>`;
+}
+
+/* The hero strip that used to sit at the top of Quest mode. Numbers, not prose —
+   it costs almost nothing against the word budget. */
+function tdQuestHero(kid, blocks) {
+  const xp = getQuestXP(kid);
+  const level = Math.floor(xp / QUEST_XP_PER_LEVEL) + 1;
+  const tier = heroTierForLevel(level);
+  const into = xp % QUEST_XP_PER_LEVEL;
+  const pct = Math.round(into / QUEST_XP_PER_LEVEL * 100);
+  const done = blocks.filter(b => b.completed).length;
+  return `<div class="dq-hero">
+      <div class="dq-hero-avatar">${tier.emoji}</div>
+      <div class="dq-hero-info">
+        <div class="dq-hero-title">Lv ${level} · ${escapeHtml(tier.name)}</div>
+        <div class="dq-xp-bar"><div class="dq-xp-fill" style="width:${pct}%"></div></div>
+        <div class="dq-hero-sub">${done}/${blocks.length} done · ${into}/${QUEST_XP_PER_LEVEL} XP</div>
+      </div>
+    </div>`;
 }
 
 /* One line, chosen from what actually happened rather than at random — an
@@ -131,11 +185,17 @@ function tdRenderToday() {
     return;
   }
   ctPrepareRead();
+  /* The panels moved off the day timeline — vibe, to-dos, goals, breaks — all
+     read the global currentDayKey, which the day screen owns and sets in
+     openDay. On Today that day is today, by definition. Point it here so a mood
+     set from this screen lands on today rather than on whichever day happened to
+     be open last. Any entry to the day screen sets it again. */
+  currentDayKey = todayKey();
   const wk = ctThisWeekKey();
   const d = tdTodayIndex();
   const { current, next } = tdCurrentAndNext(kid);
   const claimable = tdClaimableToday(kid).slice(0, TD_MAX_CHORES);
-  const quests = tdQuestsToday(kid).slice(0, TD_MAX_QUESTS);
+  const quests = tdQuestsToday(kid);
   const waiting = d == null ? 0 : mrWaitingCount(kid, wk);
   const fresh = (d == null || typeof mrNewlyGraded !== 'function') ? [] : mrNewlyGraded(kid, wk);
 
@@ -168,15 +228,8 @@ function tdRenderToday() {
     : `<div class="td-empty">Nothing to claim today.</div>`;
 
   const questHtml = quests.length
-    ? quests.map(b => {
-        const l = tdBlockLine(b, kid);
-        return `<button type="button" class="td-row" data-td-action="quests">
-          <span class="td-row-icon">${l.icon}</span>
-          <span class="td-row-name">${escapeHtml(l.name)}</span>
-          <span class="td-row-go">${escapeHtml(l.time)} ›</span>
-        </button>`;
-      }).join('')
-    : '';
+    ? `<div class="dq-list">${quests.map(b => tdQuestCard(b, kid)).join('')}</div>`
+    : `<div class="td-empty">Nothing planned yet. Tap ✏️ Plan my day to build one.</div>`;
 
   // The loop back from a grown-up. Same counts the chore screen shows, so the two
   // can never disagree.
@@ -190,36 +243,82 @@ function tdRenderToday() {
       ⏳ <b>${waiting}</b> with Mum</button>`;
   }
 
+  /* The evening wind-down nudge, carried over from the day timeline's banner —
+     age-based, so it only appears once an age is set. */
+  const nowH = new Date().getHours();
+  const age = getProfData(kid)?.age;
+  const bedtime = (nowH >= 18 && age != null && typeof bedtimeReminderText === 'function')
+    ? bedtimeReminderText(age) : null;
+
   wrap.innerHTML = `
     <div class="td-card td-now">${nowHtml}</div>
     ${loopHtml ? `<div class="td-chips">${loopHtml}</div>` : ''}
-    ${questHtml ? `<div class="td-card">
-      <div class="td-cap">On today</div>${questHtml}</div>` : ''}
+    ${tdQuestHero(kid, quests)}
+    <div class="td-card">
+      <div class="td-cap">On today</div>${questHtml}</div>
     <div class="td-card">
       <div class="td-cap">Jobs I can do</div>${choreHtml}</div>
     <div class="td-say">${escapeHtml(tdEncouragement(kid))}</div>
-    <div class="td-more">
-      ${(typeof isHeroMode === 'function' && isHeroMode())
-        ? `<button type="button" class="td-morebtn" data-td-action="quests">🎮 Quests</button>` : ''}
-      <button type="button" class="td-morebtn" data-td-action="week">📋 The whole week</button>
-      <button type="button" class="td-morebtn" data-td-action="money">💰 My money</button>
-    </div>`;
+    ${bedtime ? `<div class="bedtime-tip">${escapeHtml(bedtime)}</div>` : ''}`;
+
+  /* The relocated panels are static siblings of the wrap, so they survive this
+     re-render and only need their own renderers run. Each is the function that
+     already owned that data on the day screen — called, not reimplemented. */
+  const quickRow = document.getElementById('dayKidQuickRow');
+  if (quickRow) quickRow.style.display = isParent() ? 'none' : 'flex';
+  tdApplyExtras();
+  if (typeof renderVibe === 'function') renderVibe();
+  if (typeof renderDayGoalsTodos === 'function') renderDayGoalsTodos();
+  if (typeof maybeShowRewardPrompt === 'function') maybeShowRewardPrompt();
 }
 
-/* Every row hands off; nothing here writes. One delegated listener, bound once
-   in js/99-main.js, so re-rendering cannot lose it and no user text is ever
-   interpolated into an inline handler. */
+/* Vibe, to-dos and goals sit behind one toggle: they are reference panels, and
+   Today's 200-word budget is for what a child needs at a glance. Closed by
+   default, remembered in localStorage — never synced state, because every state
+   write is a full-document upload. */
+const TD_EXTRAS_LS_KEY = 'wp_td_extras_open';
+function tdExtrasOpen() { return localStorage.getItem(TD_EXTRAS_LS_KEY) === '1'; }
+function tdToggleExtras() {
+  try { localStorage.setItem(TD_EXTRAS_LS_KEY, tdExtrasOpen() ? '0' : '1'); } catch (e) {}
+  tdApplyExtras();
+}
+function tdApplyExtras() {
+  const body = document.getElementById('tdExtrasBody');
+  const btn = document.getElementById('tdExtrasBtn');
+  if (!body || !btn) return;
+  const open = tdExtrasOpen();
+  body.style.display = open ? '' : 'none';
+  btn.textContent = open ? 'Vibe, to-dos and goals ▾' : 'Vibe, to-dos and goals ▸';
+}
+
+/* One delegated listener, bound once in js/99-main.js, so re-rendering cannot
+   lose it and no user text is ever interpolated into an inline handler.
+
+   Today is now the screen where a day gets done, so 'blast' does change state —
+   but through completeQuest, the one function that already owned completion, XP
+   and sticker counting. Invoking the owner is the rule; containing a second copy
+   of it is what CLAUDE.md forbids. Everything else here still just navigates. */
 function tdHandleClick(e) {
   const el = e.target.closest('[data-td-action]');
   if (!el || el.disabled) return;
   const a = el.getAttribute('data-td-action');
   const d = tdTodayIndex();
   if (a === 'chore')   { openChoreTab(); if (d != null) ckSelectDay(d); return; }
-  if (a === 'quests')  { goQuestsToday(); return; }
   if (a === 'waiting') { openChoreTab(); ckGoWaiting(); return; }
   if (a === 'fresh')   { openChoreTab(); ckGoFresh(); return; }
   if (a === 'week')    { goWeek(); return; }
   if (a === 'money')   { openWeekMoney(); return; }
+  // 🎯 — the arcade completion, unchanged, on today's block.
+  if (a === 'blast')   { blastQuest(el.getAttribute('data-td-block'), el, todayKey()); return; }
+  /* Open today for planning. openDayFromWeekCard, not openDay: Today never
+     depends on weekOffset (it is today) but the day screen does, and the wrapper
+     resolves the offset for a given day key. The optional block id feeds the
+     existing focusBlockOnTimeline path, so a card opens at the block tapped. */
+  if (a === 'plan') {
+    if (d == null) { goWeek(); return; }
+    openDayFromWeekCard(todayKey(), d, el.getAttribute('data-td-block') || null);
+    return;
+  }
 }
 
 function goToday() {

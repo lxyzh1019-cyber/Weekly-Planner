@@ -118,14 +118,12 @@ function renderQuestBoard() {
     </button>`;
 }
 
-/* The Quest Board's door into the one quest list — today's day view, in Quest
-   mode. Same blocks, same ticks, same XP, one implementation. */
+/* The Quest Board's door into the one quest list — which is Today. It used to
+   open the day view in Quest mode; that mode is gone and the cards live on the
+   Today screen, so this is now a one-liner to the same list. Same blocks, same
+   ticks, same XP, still one implementation. */
 function goQuestsToday() {
-  const keys = getDayKeys(0);
-  const idx = keys.indexOf(todayKey());
-  dayViewMode = 'quest';
-  openDay(idx >= 0 ? keys[idx] : keys[0], idx >= 0 ? idx : 0, null, 0);
-  if (typeof setDayViewMode === 'function') setDayViewMode('quest');
+  goToday();
 }
 
 // Sticker collection on the Quest Board — earned by real habits (#8).
@@ -411,10 +409,11 @@ function completeQuest(blockId, dayKey) {
 
   showQuestCompletePopup(act, result);
   spawnQuestSparkles();
-  // Redraw whichever screen the tick came from — the board and the day view
-  // now share this path, so it can't assume the board.
+  // Redraw whichever screen the tick came from — Today, the day timeline and the
+  // board all share this path, so it can't assume any one of them.
   const active = document.querySelector('.screen.active');
   if (active && active.id === 'screen-day') buildTimeline();
+  else if (active && active.id === 'screen-today') tdRenderToday();
   else renderQuestBoard();
 
   // After the popup: rest day → its own warm celebration (rest is a valid state,

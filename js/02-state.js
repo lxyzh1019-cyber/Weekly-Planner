@@ -24,7 +24,8 @@ let parentViewing = 'jenn';
 let weekOffset = 0;
 let currentDayKey = null;
 let selectedActivity = null;
-let dayViewMode = 'timeline';        // 3b: 'timeline' | 'checklist'
+/* dayViewMode was here. The day screen has one layout now — the timeline —
+   so there is no mode to hold, and nothing to carry between visits. */
 let timelinePlacementGuideEl = null;
 let dayLandscapeChromeRaf = 0;
 let pendingStartMin = null;

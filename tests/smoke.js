@@ -365,21 +365,22 @@ function findChromium() {
   // Checklist mode is gone from the topbar entirely.
   await page.evaluate(() => openDay(getDayKeys(0)[5], 5));
   await page.waitForTimeout(400);
-  checks.dayModeToggleVisible = await page.evaluate(() => {
-    const r = document.getElementById('dayModeQuest').getBoundingClientRect();
-    return r.width > 0 && r.height > 0
-        && !document.getElementById('dayModeChecklist')
-        && !document.querySelector('.zone-tabs');
-  });
-  // Quest mode hands the whole workspace to the day's quests.
-  checks.questModeHidesBothRails = await page.evaluate(() => {
-    setDayViewMode('quest');
-    const hidden = el => !el || getComputedStyle(el).display === 'none';
-    const ok = hidden(document.querySelector('.day-left-rail'))
-            && hidden(document.querySelector('.day-right-rail'))
-            && !!document.getElementById('dayQuest');
-    setDayViewMode('timeline');
-    return ok;
+  /* The day screen is a planning tool and nothing else: one layout, no mode
+     toggle to leave in the wrong state, and none of the "Today" rail that used
+     to duplicate the Today screen. What must remain is the schedule and the
+     activity tray — the two things you build a day with. */
+  checks.dayScreenIsPlanningOnly = await page.evaluate(() => {
+    const gone = ['dayModeQuest', 'dayModeTimeline', 'dayQuest', 'dayNextUpBanner',
+                  'dayLeftToggle'].filter(id => document.getElementById(id));
+    const bad = [];
+    if (gone.length) bad.push(`retired elements still present: ${gone.join(', ')}`);
+    if (document.querySelector('.day-left-rail')) bad.push('the left "Today" rail is still on the day screen');
+    if (document.querySelector('.zone-tabs')) bad.push('zone tabs are back');
+    if (typeof dayViewMode !== 'undefined') bad.push('dayViewMode still exists');
+    const vis = el => !!el && getComputedStyle(el).display !== 'none';
+    if (!vis(document.getElementById('timeline'))) bad.push('no schedule on the day screen');
+    if (!vis(document.querySelector('.day-right-rail'))) bad.push('no activity tray on the day screen');
+    return bad.length === 0 || bad;
   });
   // Rest toggle lives in the Template sheet
   await page.evaluate(() => openTemplateSheet());
@@ -2311,11 +2312,10 @@ function findChromium() {
     const noOwnList = document.querySelectorAll('#questList .quest-card').length === 0;
     const hasDoor = !!document.querySelector('.quest-today-card');
     document.querySelector('.quest-today-card').click();
-    const landed = document.querySelector('.screen.active').id === 'screen-day'
-      && dayViewMode === 'quest'
-      && document.querySelectorAll('#dayQuest .quest-card').length === 2;
+    // The one list is Today now. The board is still only a door to it.
+    const landed = document.querySelector('.screen.active').id === 'screen-today'
+      && document.querySelectorAll('#tdWrap .quest-card').length === 2;
     setDayBlocks(key, [], 'jenn');
-    setDayViewMode('timeline');
     return noOwnList && hasDoor && landed;
   });
 
@@ -3042,8 +3042,13 @@ function findChromium() {
     return namesNow && hasJobs && says && kind;
   });
 
-  // Handing off, not re-implementing: Today must never be a second place that
-  // grades a chore or moves money. It routes; the owning screen acts.
+  /* Handing off, not re-implementing. Today is now where a day gets *done*, so
+     it does write — but only by calling the function that already owned the
+     write (completeQuest for a tick, addQuickBreak for a break, setDayMood for a
+     mood). What it must still never do is grade a chore or move money: those
+     belong to the chore and money screens, and a second place that decides them
+     is a second place that can disagree. So the assertion narrows rather than
+     disappears — the navigation rows still change screen and not state. */
   checks.todayHandsOffRatherThanActing = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -3060,11 +3065,13 @@ function findChromium() {
       const after = JSON.stringify(mrEnsureEarnings('jenn', wk));
       if (!wentToChore || after !== before) return 'a Today row changed state or did not navigate';
     }
+    // The footer shortcuts are static markup now — siblings of #tdWrap, not
+    // inside it — so they are scoped to the screen.
     goToday();
-    document.querySelector('#tdWrap [data-td-action="week"]').click();
+    document.querySelector('#screen-today [data-td-action="week"]').click();
     const toWeek = document.getElementById('screen-week').classList.contains('active');
     goToday();
-    document.querySelector('#tdWrap [data-td-action="money"]').click();
+    document.querySelector('#screen-today [data-td-action="money"]').click();
     const toMoney = document.getElementById('screen-mymoney').classList.contains('active');
 
     const untouched = JSON.stringify(mrEnsureEarnings('jenn', wk)) === before;
@@ -3078,9 +3085,23 @@ function findChromium() {
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const wk = ctWeekKey, d = tdTodayIndex();
     if (d == null) return 'today is outside the current week';
-    const pool = mrPoolRows(wk).filter(r => r.who === 'both' || r.who === 'jenn');
-    if (!pool.length) return 'no pool rows to claim';
-    mrSetClaim('jenn', wk, d, pool[0].id, 3);
+    /* Pick a chore that is actually still open today. This took the first pool
+       row unconditionally, and by the time it ran an earlier check had already
+       graded `dishes` for this day — a graded chore is "answered", never
+       "waiting", so the claim landed and the waiting count stayed 0. The check
+       then returned a bare `false` and said nothing about why. */
+    /* Claim a chore that is genuinely still open today. This used to take the
+       first pool row unconditionally, and by the time it ran an earlier check
+       had already graded every chore due today — a graded chore is "answered",
+       never "waiting", so the claim landed and the waiting count stayed 0 while
+       the check reported a bare `false` that said nothing about why.
+       Clear this day's grades first so the precondition is real, not assumed. */
+    const dueRows = mrChoresForDay('jenn', wk, d).rows.map(r => r.row);
+    if (!dueRows.length) return 'no chores due today to claim';
+    const e = mrEnsureEarnings('jenn', wk);
+    if (e.chores) delete e.chores[String(d)];
+    const open = dueRows[0];
+    mrSetClaim('jenn', wk, d, open.id, 3);
 
     goToday();
     const todayChip = document.querySelector('#tdWrap [data-td-action="waiting"]');
@@ -3089,12 +3110,78 @@ function findChromium() {
 
     // ...and the claim must not appear in "jobs I can do" as well, or it reads as
     // two separate jobs.
-    const claimedLabel = pool[0].label;
+    const claimedLabel = open.label;
     const stillOffered = [...document.querySelectorAll('#tdWrap [data-td-action="chore"]')]
       .some(b => b.textContent.includes(claimedLabel));
 
     mrEnsureEarnings('jenn', wk).claims = {};
-    return todayCount === truth && truth > 0 && !stillOffered;
+    // Findings, not a bare false: this returned only `false` and said nothing
+    // about which half disagreed, which is the shape CLAUDE.md warns about.
+    const bad = [];
+    if (todayCount !== truth) bad.push(`Today says ${todayCount} waiting, the chore screen says ${truth}`);
+    if (!(truth > 0)) bad.push(`the claim on "${open.id}" did not register as waiting`);
+    if (stillOffered) bad.push(`"${claimedLabel}" is claimed and still offered as a job`);
+    return bad.length === 0 || bad;
+  });
+
+  /* Today is the doing surface: the quest list, the 🎯, and the panels that came
+     off the day timeline. The 🎯 must go through completeQuest — the single
+     owner of completion, XP and sticker counting — rather than a second copy of
+     it, which is the thing the Today rules actually forbid. */
+  checks.todayIsWhereTheDayGetsDone = await page.evaluate(async () => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const key = todayKey();
+    const bad = [];
+    setDayBlocks(key, [
+      { id: 'td-q1', actId: 'piano',      startMin: 15 * 60, durationMin: 60 },
+      { id: 'td-q2', actId: 'breakfast',  startMin: 7 * 60,  durationMin: 30 },
+    ], 'jenn');
+    goToday();
+
+    // The whole day is listed, in day order — not a capped teaser.
+    const cards = [...document.querySelectorAll('#tdWrap .quest-card')];
+    if (cards.length !== 2) bad.push(`expected 2 quest cards, got ${cards.length}`);
+    const times = [...document.querySelectorAll('#tdWrap .quest-time')].map(e => e.textContent.trim());
+    if (times[0] !== '7:00am') bad.push(`cards are not in day order: ${times.join(', ')}`);
+
+    // 🎯 completes through the owning path: block marked done AND XP moved.
+    const xpBefore = getQuestXP('jenn');
+    const blast = document.querySelector('#tdWrap [data-td-action="blast"][data-td-block="td-q2"]');
+    if (!blast) { bad.push('no 🎯 on a quest card'); }
+    else {
+      blast.click();
+      // The blast is an animation: projectile 300ms, burst 240ms, then the
+      // completion. Assert after it lands, not before.
+      await new Promise(r => setTimeout(r, 900));
+      const blk = (getDayBlocks(key, 'jenn') || []).find(b => b.id === 'td-q2');
+      if (!blk || !blk.completed) bad.push('🎯 did not complete the block');
+      if (getQuestXP('jenn') <= xpBefore) bad.push('🎯 completed without awarding XP');
+    }
+
+    // Tapping the card body is still a hand-off to the planner, not a write.
+    goToday();
+    const open = document.querySelector('#tdWrap [data-td-action="plan"][data-td-block="td-q1"]');
+    if (!open) bad.push('a quest card does not open the day for planning');
+    else {
+      open.click();
+      if (document.querySelector('.screen.active').id !== 'screen-day') bad.push('card body did not reach the day screen');
+    }
+
+    // The relocated panels are present, and the reference ones start collapsed
+    // so they cost nothing against the word budget.
+    goToday();
+    if (!document.getElementById('vibeMoods')) bad.push('the vibe picker did not come across');
+    if (!document.getElementById('dayTodosList') || !document.getElementById('dayGoalsList')) bad.push('to-dos/goals did not come across');
+    if (!document.querySelector('#screen-today .btn-break-quick')) bad.push('the break buttons did not come across');
+    const body = document.getElementById('tdExtrasBody');
+    if (!body || getComputedStyle(body).display !== 'none') bad.push('the extras panel is not collapsed by default');
+    tdToggleExtras();
+    if (getComputedStyle(document.getElementById('tdExtrasBody')).display === 'none') bad.push('the extras panel does not open');
+    tdToggleExtras();
+
+    setDayBlocks(key, [], 'jenn');
+    return bad.length === 0 || bad;
   });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => { profile = 'jenn'; goToday(); });
