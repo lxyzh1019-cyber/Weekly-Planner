@@ -3273,6 +3273,52 @@ function findChromium() {
         && onKidPage === want && atMeeting === want && atPortal === want;
   });
 
+  /* A competition has to make her total go up — everywhere.
+     competitionCarriesNameAndDate proves the record saves with a name, a date
+     and an award, then deletes it, so nothing covered the hand-off from a
+     result to the money. That is the join CLAUDE.md singles out: when it
+     breaks, every screen still renders and only the numbers are wrong.
+
+     Competition money is deliberately uncapped — the $3 daily chore cap must
+     not touch it, which is the whole reason a meet is worth more than a week
+     of bins. */
+  checks.competitionMoneyReachesThePool = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jenn', wk = ctWeekKey;
+    getProfData(kid).competitions = [];
+    mrEnsureEarnings(kid, wk).overrides = {};
+
+    const before = mnyPool(wk, kid).cameIn;
+    // Mid-week, so the day lands inside this week whatever day today is.
+    const dayKey = ctDateToKey(new Date(formatDayKey(wk).getTime() + 3 * 86400000));
+    const saved = mrAddCompetition(kid, {
+      sport: 'swim', name: 'Winter Invitational', dayKey, points: 6, qualified: true });
+    // 6 points x $1 + $20 qualifying bonus, under the seeded rates.
+    const scored = !!saved && saved.awarded === 26;
+
+    const b = mrWeekBreakdown(wk, kid);
+    const inChannel = b.compPaid === 26;
+    const after = mnyPool(wk, kid);
+    const inPool = money2(after.cameIn - before) === 26;
+    // Uncapped: the daily chore cap must not have clipped any of it.
+    const uncapped = after.cameIn >= 26;
+
+    // …and it must be visible, not merely counted.
+    const seg = mnyIncomeSegments(wk, kid).segs.find(s => s.label === 'Competitions');
+    const inBar = !!seg && seg.value === 26;
+    mnyOpenMyMoney(kid);
+    const onKidPage = document.getElementById('mnyPage1Wrap').textContent
+      .includes('Winter Invitational');
+    showScreen('parent'); renderParentHome(); setParentTab('review');
+    const hub = document.querySelector('#screen-parent .hub-status');
+    const onDashboard = !!hub
+      && hub.textContent.includes(CT_PROFILE_ICON[kid] + ' $' + after.cameIn.toFixed(2));
+
+    getProfData(kid).competitions = [];
+    return scored && inChannel && inPool && uncapped && inBar && onKidPage && onDashboard;
+  });
+
   /* Anything labelled as the week's money is the pool's number.
      The parent dashboard's "pocket money so far" read the earnings net, so a
      gift already sitting in the week was invisible right up until the meeting.
