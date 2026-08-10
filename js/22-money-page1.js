@@ -190,7 +190,7 @@ function mnyRenderMyMoney() {
            ${mnyPricesCard(wk)}
          </div>
          <div class="mny-col">
-           ${mnyDebtCards(kid)}
+           ${mnyDebtCards(kid, wk)}
            ${mnyCompetitionCard(kid)}
            ${mnyLinksCard(kid)}
          </div>
@@ -230,14 +230,9 @@ function mnyPageHead(title, strap, buttons, opts) {
 /* What is still on the table today. The daily cap is a real number to a kid —
    "I can still earn $2.00" is a reason to go and do the bins. */
 function mnyTodayCard(kid, wk) {
-  const r = mrRulesForWeek(wk);
-  const cap = (r.chores || {}).dailyCap;
-  const chores = mrChoreWeek(wk, kid);
-  const today = formatDayKey(todayKey());
-  const dayIdx = Math.max(0, Math.min(6, Math.round((today - formatDayKey(wk)) / (24 * 60 * 60 * 1000))));
-  const done = money2((chores.days[dayIdx] || {}).paid);
-  const left = (cap == null) ? null : money2(Math.max(0, cap - done));
-  const free = chores.freeLeft;
+  // One reader, shared with Today — see mnyEarnLeftToday in js/21-money-data.js.
+  const t = mnyEarnLeftToday(kid, wk);
+  const done = t.done, left = t.left, free = t.freeLeft;
 
   const line = (left == null)
     ? `You have earned ${mnyMoney(done)} today.`
@@ -349,19 +344,32 @@ function mnyGoalForm() {
     </div>`;
 }
 
-/* Where this week's money came from. The headline is the bar's own total, so
-   the number and the picture can never tell two different stories. */
+/* ── Where this week's money came from, and what of it is hers ──
+   This card used to headline the bar's own total under the label "Money that
+   came in this week" — the same phrase the meeting uses for pool.cameIn, which
+   is a different number: the bar counts fines separately and includes holding
+   growth, the pool takes fines off and excludes growth. Two screens, one
+   phrase, two figures, and a child finding out on Sunday which one was real.
+
+   The phrase now belongs to the pool, which is the one that means spendable
+   cash. There is no headline here at all: the bar's legend already prints every
+   segment in dollars, so removing it leaves nothing that COULD disagree with
+   the picture — which is what the old headline was for.
+
+   The strip underneath is the meeting's own component (mnyStrip), not a copy.
+   A second renderer of came-in → must-pay → mine is how the labels drifted
+   apart in the first place. */
 function mnyIncomeCard(kid, wk) {
   const data = mnyIncomeSegments(wk, kid);
   return `<div class="mny-card">
-      <div class="mny-label">Money that came in this week</div>
-      <div class="mny-total sm">${mnyMoney(data.total)}</div>
+      <div class="mny-label">Where this week's money came from</div>
       ${mnyBarHtml(data, { empty: 'Nothing yet — the week has just started' })}
       ${data.passive > 0
-        ? `<div class="mny-note">${mnyMoney(data.passive)} of that you did nothing for — it is what your money made by itself. ${mnyAskBtn('save')}</div>`
+        ? `<div class="mny-note">${mnyMoney(data.passive)} of that your money made by itself. It is not cash yet. ${mnyAskBtn('save')}</div>`
         : (data.passive < 0
           ? `<div class="mny-note warn">Your companies are worth ${mnyMoney(-data.passive)} less than last Sunday. That happens — it can go back up. ${mnyAskBtn('stock')}</div>`
           : '')}
+      ${mnyStrip(wk, kid, -1)}
     </div>`;
 }
 
@@ -390,10 +398,17 @@ function mnyGoalCard(kid) {
 
 /* One card per debt. The name and the icon are data a parent typed — every
    string that shows them interpolates, so nothing here says "ski". */
-function mnyDebtCards(kid) {
+function mnyDebtCards(kid, wk) {
   const debts = mnyDebts(kid);
   if (!debts.length) return '';
+  /* "Each month" is the agreement; it is not what this week is taking. Read the
+     week's real claim through the same function the pool uses, so the card and
+     the strip above it cannot disagree — and so a month already paid says so
+     rather than leaving a child to wonder why her loan payment reads $0.00. */
+  const dueById = {};
+  mnyDueThisWeek(kid, wk).forEach(x => { dueById[x.debt.id] = x; });
   return debts.map(d => {
+    const owedNow = dueById[d.id];
     const owing = loanBalance(kid, d.id);
     const principal = money2(d.principal);
     const pct = principal > 0 ? Math.max(0, Math.min(100, Math.round((money2(d.paid) / principal) * 100))) : 0;
@@ -412,6 +427,9 @@ function mnyDebtCards(kid) {
              <div class="mny-goal-row">${pct}% paid off · <b>${mnyMoney(owing)}</b> still to go</div>
              <div class="mny-rows">
                <div class="mny-row"><span>Each month</span><b>${mnyMoney(d.monthly)}</b></div>
+               ${owedNow
+                 ? `<div class="mny-row"><span>This month</span><b>−${mnyMoney(owedNow.amount).slice(1)}</b></div>`
+                 : `<div class="mny-row"><span>This month</span><b>Paid ✓</b></div>`}
                <div class="mny-row"><span>Paid off by</span><b>${free.date ? mnyShortDate(free.date) : '—'}</b></div>
                ${bonus > 0 ? `<div class="mny-row"><span>Extra I earned by paying early</span><b>${mnyMoney(bonus)}</b></div>` : ''}
                ${d.arrearsInterest > 0 ? `<div class="mny-row warn"><span>Costs added for paying late</span><b>${mnyMoney(d.arrearsInterest)}</b></div>` : ''}

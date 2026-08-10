@@ -222,11 +222,28 @@ function loanDueNow(kid, dayKey, debtId) {
   return { kind: 'scheduled', amount: money2(d.monthly), reason: 'monthly' };
 }
 
-/* What the schedule asks of this kid right now, across every debt. */
+/* ── What is still owed THIS MONTH, across every debt ──
+   The schedule is monthly and the meeting is weekly, so on three Sundays out of
+   four a debt that is fully paid up still has a monthly figure attached to it.
+   `loanDueNow` answers what the agreement asks and knows nothing about what has
+   been paid; this answers what is actually still owed, and it is the reader
+   every surface above it wants — the pool, the meeting's confirm preview, the
+   kid's debt cards.
+
+   Reading the unguarded number here is what made `mnyPool` reserve a payment
+   that `commitKidWeek` then correctly declined to make, understating "mine to
+   choose" for the rest of every month. `loanSundayTransfer` is the one caller
+   that must keep seeing the raw schedule: it does its own month check and has a
+   `force` escape hatch that a zeroed amount would silently turn into a no-op.
+
+   Already-paid debts are dropped rather than zeroed — the filter below already
+   drops empty rows, and every caller renders one line per entry, so keeping
+   them would print a −$0.00 payment on a month that had none. */
 function mnyDueNowAll(kid, dayKey) {
+  const monthKey = loanMonthKey(dayKey);
   return mnyDebtsByPriority(kid)
     .map(d => Object.assign({ debtId: d.id, debt: d }, loanDueNow(kid, dayKey, d.id)))
-    .filter(x => x.amount > 0);
+    .filter(x => x.amount > 0 && loanState(kid, x.debtId).lastPaymentMonth !== monthKey);
 }
 function mnyDueNowTotal(kid, dayKey) {
   return money2(mnyDueNowAll(kid, dayKey).reduce((s, x) => s + x.amount, 0));

@@ -848,6 +848,34 @@ function mrChoreWeek(weekKey, kid) {
            freeLeft: Math.max(0, freeCount - freeUsed.length), pickWithdrawn };
 }
 
+/* ── What one more chore would pay today ──
+   Chores are not priced individually — mrChoreWeek pays by GRADE, so anything
+   done on time and to standard is worth the same rules.chores.grade[3]. Two
+   things can still make that nothing: the free-chore rule takes the week's
+   cheapest few, and past the daily cap the overflow becomes XP.
+
+   So the honest answer is a ceiling, not a price: "up to $1.50", and once the
+   cap is spent, nothing but XP. A screen that promises $1.50 to a child who has
+   already capped out has lied to her, and she only finds out on Sunday.
+
+   Lives here beside mrChoreWeek because this module owns chore pricing. Today
+   reads it; it does not do this arithmetic itself. */
+function mrChoreWouldPay(kid, weekKey, dayIdx) {
+  const cfg = mrRulesForWeek(weekKey).chores || {};
+  const best = money2(Number((cfg.grade || {})[3]) || 0);
+  const week = mrChoreWeek(weekKey, kid);
+  const done = money2((week.days[dayIdx] || {}).paid);
+  const cap = (cfg.dailyCap == null) ? null : money2(cfg.dailyCap);
+  const room = (cap == null) ? best : money2(Math.max(0, cap - done));
+  return {
+    best,
+    room,
+    amount: money2(Math.min(best, room)),
+    capReached: cap != null && room <= 0,
+    freeLeft: week.freeLeft,
+  };
+}
+
 /* Personal chores done unasked, for the XP award. Never money. */
 function mrPersonalUnaskedCount(weekKey, kid) {
   const e = mrEnsureEarnings(kid, weekKey);

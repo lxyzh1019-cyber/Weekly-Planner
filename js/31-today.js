@@ -157,12 +157,38 @@ function tdRenderToday() {
         <div class="td-now-sub">the rest of today is yours</div></div>`;
   }
 
-  // Chores she can answer for. A tap opens the chore screen at today — the claim
-  // is made there, in the one place that owns it.
+  /* An empty day should offer to be filled. Until now the "nothing scheduled"
+     card was a dead end — there was no way from Today into planning a day, and
+     a child who wanted one had to already know where the day view lived.
+
+     Only when the day is genuinely empty. A day whose blocks are all finished
+     is a different state and tdEncouragement already says so; offering to plan
+     it would read as "that didn't count". An offer, never a nag — a quiet day
+     stays a valid way to spend a Saturday. */
+  const emptyDay = tdCurrentAndNext(kid).count === 0;
+  const planHtml = emptyDay
+    ? `<button type="button" class="td-row td-plan" data-td-action="plan">
+         <span class="td-row-icon">🗓️</span>
+         <span class="td-row-name">Want to plan today?</span>
+         <span class="td-row-go">Plan it ›</span>
+       </button>`
+    : '';
+
+  // Chores she can answer for, each with what it would be worth. A tap opens the
+  // chore screen at today — the claim is made there, in the one place that owns
+  // it. The price is read from mrChoreWouldPay (js/18-rules.js), which owns
+  // chore pricing; nothing here works out what a chore pays.
+  const pay = (d == null) ? null : mrChoreWouldPay(kid, wk, d);
+  const payTag = pay
+    ? (pay.capReached
+        ? `<span class="td-row-pay xp">+XP</span>`
+        : `<span class="td-row-pay">up to ${mnyMoney(pay.amount)}</span>`)
+    : '';
   const choreHtml = claimable.length
     ? claimable.map(c => `<button type="button" class="td-row" data-td-action="chore">
           <span class="td-row-icon">${(typeof ctChoreIcon === 'function' ? ctChoreIcon(c.row.id) : '🧹')}</span>
           <span class="td-row-name">${escapeHtml(c.row.label)}</span>
+          ${payTag}
           <span class="td-row-go">Do it ›</span>
         </button>`).join('')
     : `<div class="td-empty">Nothing to claim today.</div>`;
@@ -190,13 +216,42 @@ function tdRenderToday() {
       ⏳ <b>${waiting}</b> with Mum</button>`;
   }
 
+  /* ── Pocket money ──
+     Cash, what she owes, and what is still on the table today. It sits after
+     the jobs list because it answers "was that worth it?", which is the
+     question that follows the jobs rather than the one before them.
+
+     Three readers and nothing else: mnyCash and mnyTotalOwing are the same
+     accessors the money page uses, and mnyEarnLeftToday is the very function
+     mnyTodayCard reads — extracted precisely so this row could not become a
+     second answer to it. The whole row taps through to My money; nothing here
+     spends, claims or settles. */
+  const owing = mnyTotalOwing(kid);
+  const earn = mnyEarnLeftToday(kid, wk);
+  const moneyTiles = [
+    { label: 'Cash', value: mnyMoney(mnyCash(kid)) },
+    owing > 0 ? { label: 'I owe', value: mnyMoney(owing) } : null,
+    earn.left == null
+      ? { label: 'Earned today', value: mnyMoney(earn.done) }
+      : { label: 'Still to earn', value: mnyMoney(earn.left) },
+  ].filter(Boolean);
+  const moneyHtml = `<button type="button" class="td-money" data-td-action="money">
+      ${moneyTiles.map(t => `<span class="td-money-tile">
+          <span class="td-money-label">${escapeHtml(t.label)}</span>
+          <span class="td-money-val">${t.value}</span>
+        </span>`).join('')}
+    </button>`;
+
   wrap.innerHTML = `
     <div class="td-card td-now">${nowHtml}</div>
+    ${planHtml ? `<div class="td-card">${planHtml}</div>` : ''}
     ${loopHtml ? `<div class="td-chips">${loopHtml}</div>` : ''}
     ${questHtml ? `<div class="td-card">
       <div class="td-cap">On today</div>${questHtml}</div>` : ''}
     <div class="td-card">
       <div class="td-cap">Jobs I can do</div>${choreHtml}</div>
+    <div class="td-card">
+      <div class="td-cap">My money</div>${moneyHtml}</div>
     <div class="td-say">${escapeHtml(tdEncouragement(kid))}</div>
     <div class="td-more">
       ${(typeof isHeroMode === 'function' && isHeroMode())
@@ -220,6 +275,10 @@ function tdHandleClick(e) {
   if (a === 'fresh')   { openChoreTab(); ckGoFresh(); return; }
   if (a === 'week')    { goWeek(); return; }
   if (a === 'money')   { openWeekMoney(); return; }
+  // Hands off to the screen that owns planning, at today. openDayFromWeekCard
+  // resolves the week offset from the day key, so this works on the Sunday that
+  // straddles two weeks without Today having to know how weeks are numbered.
+  if (a === 'plan')    { if (d != null) openDayFromWeekCard(todayKey(), d); return; }
 }
 
 function goToday() {

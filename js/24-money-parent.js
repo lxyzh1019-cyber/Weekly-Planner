@@ -237,6 +237,16 @@ function mnyWeekResults(kid) {
       <div class="mny-note">Competition days and money from outside are entered <b>at the meeting, with her</b> — not here. That is the whole point of them.</div>
       <button type="button" class="mny-btn wide" data-mnyp-action="meeting">👨‍👩‍👧‍👦 Open the family meeting</button>
     </div>
+    ${/* The pool, read-only. "Earned for her work" above is b.net — gross less
+          fines, no gifts — which is a fourth number again. Without this the
+          parent is the one person who has to arbitrate when a child says the
+          screens disagree, and is reading a figure that matches neither of
+          them. A reader, not a writer: the payment steppers stay in
+          mnyPoolCard at the meeting, where the conversation happens. */''}
+    <div class="mny-card">
+      <div class="mny-label">Where this week's money stands</div>
+      ${mnyStrip(wk, kid, -1)}
+    </div>
     ${mnyLastAnswerCard(kid, wk)}`;
 }
 function mnyLastAnswerCard(kid, wk) {

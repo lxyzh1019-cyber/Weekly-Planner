@@ -3080,6 +3080,23 @@ function findChromium() {
     if (d == null) return 'today is outside the current week';
     const pool = mrPoolRows(wk).filter(r => r.who === 'both' || r.who === 'jenn');
     if (!pool.length) return 'no pool rows to claim';
+
+    /* Clear today's grades for jenn first. mrClaimQueue skips anything already
+       graded, so a leftover grade on the row this check claims makes the
+       waiting count 0 and the check fails — while proving nothing about Today.
+
+       That is not hypothetical: several earlier checks grade 'dishes' at day
+       index 0 and never clear it, so this failed whenever today happened to BE
+       day 0. It passed six days a week and went red every Monday, which is a
+       worse failure than a steady one because nobody believes it. */
+    const dayGrades = mrEnsureEarnings('jenn', wk).chores[String(d)] || {};
+    const restore = Object.assign({}, dayGrades);
+    // Grading is parent-only — as a kid these calls are refused silently, which
+    // is what made the first attempt at this reset do nothing at all.
+    profile = 'parent';
+    Object.keys(restore).forEach(id => mrSetChoreGrade('jenn', wk, d, id, 0));
+    profile = 'jenn';
+
     mrSetClaim('jenn', wk, d, pool[0].id, 3);
 
     goToday();
@@ -3094,6 +3111,9 @@ function findChromium() {
       .some(b => b.textContent.includes(claimedLabel));
 
     mrEnsureEarnings('jenn', wk).claims = {};
+    profile = 'parent';
+    Object.keys(restore).forEach(id => mrSetChoreGrade('jenn', wk, d, id, restore[id]));
+    profile = 'jenn';
     return todayCount === truth && truth > 0 && !stillOffered;
   });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -3189,6 +3209,284 @@ function findChromium() {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => { profile = 'jenn'; goToday(); });
   await page.screenshot({ path: shot('phone_today_nav') });
+  await page.setViewportSize({ width: 900, height: 1100 });
+  await page.waitForTimeout(150);
+
+  /* ── ONE POOL, ONE NUMBER ────────────────────────────────────────────────
+     The kid page, the meeting and the parent portal must print the same
+     "money that came in". They did not: the kid page headlined the income
+     bar's total (fines counted separately, holding growth included) under the
+     very phrase the meeting uses for pool.cameIn (fines taken off, growth
+     excluded). Two right answers to two different questions, wearing one label.
+
+     Comparing the FUNCTIONS would not have caught it — both were correct. So
+     this compares rendered text on all three surfaces. */
+  checks.onePoolReadsTheSameOnEveryScreen = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey;
+    const pd = getProfData(kid);
+    delete pd.debts;
+    mrEnsureEarnings(kid, wk).overrides = {};
+    ['dishes', 'mop', 'vacuum'].forEach((c, i) => mrSetChoreGrade(kid, wk, i, c, 3));
+    mnyAddDeposit(kid, wk, { amount: 50, from: 'Birthday money' });
+
+    const bar = mnyIncomeSegments(wk, kid);
+    const pool = mnyPool(wk, kid);
+    // The identity every surface relies on, stated once.
+    const closes = money2(bar.total - bar.fines - Math.max(0, bar.passive)) === pool.cameIn;
+    const carried = bar.cameIn === pool.cameIn;
+
+    const firstVal = (sel) => {
+      const el = document.querySelector(sel + ' .mny-strip .mny-strip-val');
+      return el ? el.textContent.trim() : null;
+    };
+    mnyOpenMyMoney(kid);
+    const onKidPage = firstVal('#screen-mymoney');
+    // The old headline must be gone: a second big number on that card is
+    // exactly what could drift away from the strip again.
+    const noRogueTotal = !document.querySelector('#mnyPage1Wrap .mny-total.sm');
+
+    openFamilyMeeting(); mnySetMeetKid(kid); mmGoStep(3);
+    const atMeeting = firstVal('#familyMeetingBody');
+    closeSheet('familyMeetingOverlay');
+
+    // The portal renders one section at a time; the strip lives in 'week'.
+    showScreen('parent'); renderParentHome(); mnySetParentSection('week');
+    const atPortal = firstVal('#screen-parent');
+    mnySetParentSection('prices');
+
+    const want = mnyMoney(pool.cameIn);
+    mnyRemoveDeposit(kid, (mnyDepositsForWeek(kid, wk)[0] || {}).id);
+    return closes && carried && noRogueTotal
+        && onKidPage === want && atMeeting === want && atPortal === want;
+  });
+
+  /* The pool must not reserve a loan payment that has already been made.
+     The schedule is monthly, the meeting weekly, so on three Sundays in four a
+     paid-up debt still has a monthly figure attached — and mnyPool was reading
+     it, understating "mine to choose" while the commit correctly moved nothing.
+
+     THIS IS THE ONE POOL CHECK THAT MUST NOT RESET lastPaymentMonth. Every
+     neighbour resets it at the top, which is precisely why the bug survived. */
+  checks.poolDoesNotReserveAPaymentAlreadyMade = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey;
+    const pd = getProfData(kid);
+    delete pd.debts;
+    const debt = mnyEnsureDebts(kid)[0];
+    debt.monthly = 13; debt.paid = 0;
+    debt.downPaymentDue = '2026-01-01';
+    debt.downPaid = debt.downPayment;
+    debt.lastPaymentMonth = loanMonthKey();          // this month is settled
+    // Guarantee income, so "mustPay came back" below cannot pass or fail by
+    // accident on a week where nothing was earned.
+    ['dishes', 'mop', 'vacuum'].forEach((c, i) => mrSetChoreGrade(kid, wk, i, c, 3));
+
+    const settled = mnyDueNowAll(kid).length === 0
+                 && mnyDueThisWeek(kid, wk).length === 0;
+    const pool = mnyPool(wk, kid);
+    const poolClear = pool.mustPay === 0 && pool.mine === pool.cameIn && pool.unpaid === 0;
+    // The agreement itself is untouched — only the week's claim is zero.
+    const scheduleIntact = loanDueNow(kid).amount === 13;
+    // ...and the write path already agreed; this is what the pool was ignoring.
+    const commitAgrees =
+      loanSundayTransfer(kid, 'pay_available', { debtId: debt.id }).status === 'already-this-month';
+
+    /* Not vacuous: clear the stamp and the payment must come back. Not "=== 13"
+       — mustPay is min(due, cameIn), so a thin week caps it at what came in.
+       What matters is that the debt reappears in the list and the pool starts
+       reserving again, which is exactly what the guard was suppressing. */
+    debt.lastPaymentMonth = null;
+    const back = mnyPool(wk, kid);
+    const returns = mnyDueNowAll(kid).length === 1
+                 && back.mustPay === money2(Math.min(13, back.cameIn))
+                 && back.mustPay > 0;
+
+    delete pd.debts;
+    return settled && poolClear && scheduleIntact && commitAgrees && returns;
+  });
+
+  /* What is actually hers reaches the kid, and the debt card agrees with it. */
+  checks.kidPageShowsWhatIsActuallyHers = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey;
+    const pd = getProfData(kid);
+    delete pd.debts;
+    const debt = mnyEnsureDebts(kid)[0];
+    debt.monthly = 3; debt.paid = 0;
+    debt.downPaymentDue = '2026-01-01';
+    debt.downPaid = debt.downPayment;
+    debt.lastPaymentMonth = null;
+    ['dishes', 'mop', 'vacuum'].forEach((c, i) => mrSetChoreGrade(kid, wk, i, c, 3));
+
+    mnyOpenMyMoney(kid);
+    const cells = [...document.querySelectorAll('#mnyPage1Wrap .mny-strip-cell')];
+    const threeCells = cells.length === 3;
+    const mineShown = cells[2] && cells[2].textContent.includes(mnyMoney(mnyPool(wk, kid).mine));
+    const dueNow = mnyDueThisWeek(kid, wk)[0];
+    const txt = () => document.getElementById('mnyPage1Wrap').textContent;
+    const cardSaysThisMonth = !!dueNow
+      && txt().includes('This month')
+      && txt().includes(mnyMoney(dueNow.amount).slice(1));
+
+    // Stamp the month: the strip's middle cell and the debt card must flip
+    // together, or one of them is telling her something the other denies.
+    debt.lastPaymentMonth = loanMonthKey();
+    mnyRenderMyMoney();
+    const cells2 = [...document.querySelectorAll('#mnyPage1Wrap .mny-strip-cell')];
+    const payZero = cells2[1] && cells2[1].textContent.includes(mnyMoney(0));
+    const cardSaysPaid = txt().includes('Paid ✓');
+
+    delete pd.debts;
+    return threeCells && mineShown && cardSaysThisMonth && payZero && cardSaysPaid;
+  });
+
+  /* The quest wallet strip must read the accessors, not the legacy wallet field
+     that mnyEnsureHoldings zeroes on migration — it showed Savings $0.00 while
+     the money page showed the real figure.
+
+     Driven directly rather than through renderQuestBoard: this strip lives in
+     buildHowIEarnCardLegacy, which only renders for weeks before the rulebook
+     model, so the board on a current week never reaches it. Calling the real
+     shipped function is the honest way to cover a legacy-only surface.
+
+     Asserting the number alone would pass on unmigrated data, so assert the old
+     field really is empty by then — that is what makes it a regression test. */
+  checks.questStripReadsTheRealSavings = await page.evaluate(() => {
+    profile = 'jess'; parentViewing = 'jess';
+    ctPrepareRead();
+    const kid = 'jess', wk = ctThisWeekKey();
+    const pd = getProfData(kid);
+    delete pd.holdings;
+    pd.wallet = { cash: 42.20, savings: 180, gics: [], holdings: {}, lastMeetingWeek: null };
+
+    const html = buildHowIEarnCardLegacy(kid, wk);
+    const legacyZeroed = money2(getProfData(kid).wallet.savings) === 0;
+    const migrated = mnySavedTotal(kid) === 180;
+    // The savings tile, and only it, must carry the real figure.
+    const tile = /class="hm-wtile w-savings">.*?hm-wtile-amt">([^<]+)</.exec(
+      html.replace(/\s+/g, ' '));
+    const shows = !!tile && tile[1].trim() === '$180.00';
+    return shows && legacyZeroed && migrated;
+  });
+
+  /* ── Today ───────────────────────────────────────────────────────────────
+     What a job is worth, in both states. A flat price would be a lie once the
+     daily cap is spent, so the check is only meaningful if it sees the flip. */
+  checks.todayShowsWhatAChoreWouldPay = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey, d = tdTodayIndex();
+    if (d == null) return 'today is outside the current week';
+    const dayGrades = mrEnsureEarnings('jenn', wk).chores[String(d)] || {};
+    const restore = Object.assign({}, dayGrades);
+    // Grading is parent-only; as a kid these are refused and the check would
+    // pass without ever having moved anything.
+    profile = 'parent';
+    Object.keys(restore).forEach(id => mrSetChoreGrade('jenn', wk, d, id, 0));
+    profile = 'jenn';
+
+    goToday();
+    const pay = mrChoreWouldPay('jenn', wk, d);
+    const rowText = () => {
+      const el = document.querySelector('#tdWrap .td-row-pay');
+      return el ? el.textContent.trim() : '';
+    };
+    const hasRows = !!document.querySelector('#tdWrap [data-td-action="chore"]');
+    const showsPrice = !hasRows || rowText() === 'up to ' + mnyMoney(pay.amount);
+
+    // Spend the daily cap and it must stop promising money.
+    const cap = (mrRulesForWeek(wk).chores || {}).dailyCap;
+    let flips = true;
+    let sawCapReached = false;
+    if (cap != null && hasRows) {
+      profile = 'parent';
+      ['dishes', 'mop', 'vacuum', 'laundry'].forEach(id => mrSetChoreGrade('jenn', wk, d, id, 3));
+      profile = 'jenn';
+      goToday();
+      sawCapReached = mrChoreWouldPay('jenn', wk, d).capReached;
+      flips = sawCapReached ? rowText() === '+XP' : true;
+    }
+
+    profile = 'parent';
+    Object.keys(mrEnsureEarnings('jenn', wk).chores[String(d)] || {})
+      .forEach(id => mrSetChoreGrade('jenn', wk, d, id, 0));
+    Object.keys(restore).forEach(id => mrSetChoreGrade('jenn', wk, d, id, restore[id]));
+    profile = 'jenn';
+    // The XP half must actually have been exercised, or this only ever proved
+    // that a price renders.
+    return showsPrice && flips && (!hasRows || cap == null || sawCapReached);
+  });
+
+  /* Today's money row is a reader. Every figure on it must equal the accessor
+     it came from, and the "still to earn" figure must equal the one My money
+     prints — that is the same class of agreement as the pool check above. */
+  checks.todayMoneyRowMatchesMyMoney = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jenn', wk = ctWeekKey;
+    goToday();
+    const row = document.querySelector('#tdWrap .td-money');
+    if (!row) return 'no money row on Today';
+    const txt = row.textContent;
+    const earn = mnyEarnLeftToday(kid, wk);
+    const showsCash = txt.includes(mnyMoney(mnyCash(kid)));
+    const owing = mnyTotalOwing(kid);
+    const showsOwing = owing > 0 ? txt.includes(mnyMoney(owing)) : !txt.includes('I owe');
+    const want = earn.left == null ? earn.done : earn.left;
+    const showsEarn = txt.includes(mnyMoney(want));
+    // …and My money must print the same figure from the same reader.
+    mnyOpenMyMoney(kid);
+    const onMoneyPage = document.getElementById('mnyPage1Wrap').textContent
+      .includes(mnyMoney(want));
+    goToday();
+    return showsCash && showsOwing && showsEarn && onMoneyPage;
+  });
+
+  /* An empty day offers to be planned; a day with blocks on it does not. Both
+     halves, or this only proves a button exists. */
+  checks.anEmptyDayOffersToBePlanned = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const key = todayKey();
+    const before = JSON.stringify(getDayBlocks(key, 'jenn') || []);
+    setDayBlocks(key, [], 'jenn');
+    goToday();
+    const offered = !!document.querySelector('#tdWrap [data-td-action="plan"]');
+    const reaches = (() => {
+      const b = document.querySelector('#tdWrap [data-td-action="plan"]');
+      if (!b) return false;
+      b.click();
+      const landed = document.getElementById('screen-day').classList.contains('active');
+      goToday();
+      return landed;
+    })();
+    setDayBlocks(key, JSON.parse(before), 'jenn');
+    goToday();
+    const hidden = (JSON.parse(before).length > 0)
+      ? !document.querySelector('#tdWrap [data-td-action="plan"]')
+      : true;
+    return offered && reaches && hidden;
+  });
+
+  /* No dead scroll under the kid nav. .screen was 100vh and the body added 64px
+     of padding to clear the bar, so every kid screen was 100vh + 64px however
+     little was on it — invisible on a phone, 64px of empty scroll on an iPad.
+     Today is the screen short enough to show it. */
+  await page.setViewportSize({ width: 1024, height: 768 });   // iPad landscape
+  await page.waitForTimeout(150);
+  checks.kidScreensDoNotScrollOnATablet = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead();
+    goToday();
+    const doc = document.documentElement;
+    const navShowing = !document.getElementById('kidNav').hidden;
+    return navShowing && doc.scrollHeight <= window.innerHeight + 1;
+  });
+  await page.screenshot({ path: shot('ipad_today') });
   await page.setViewportSize({ width: 900, height: 1100 });
   await page.waitForTimeout(150);
 

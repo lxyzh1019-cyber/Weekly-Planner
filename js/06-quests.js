@@ -274,7 +274,11 @@ function buildHowIEarnCardLegacy(kid, wk) {
   const wallet =
       `<div class="hm-wallet">`
     +   wtile('Cash', w.cash, 'spend or save', 'w-cash')
-    +   wtile('Savings', w.savings, 'earns interest', 'w-savings')
+    // savingsTotal, not w.savings: the legacy field is zeroed once holdings are
+    // migrated (mnyEnsureHoldings), so reading it showed $0.00 here while the
+    // money page showed the real figure. The other tiles already read through
+    // the accessors.
+    +   wtile('Savings', savingsTotal(kid), 'earns interest', 'w-savings')
     +   wtile('GIC', gicTotal(kid), 'locked, grows more', 'w-gic')
     +   wtile('Stocks', portfolioValue(kid), 'goes up & down', 'w-stocks')
     + `</div>`;

@@ -376,6 +376,29 @@ function mnyEverything(kid) {
   return money2(mnyCash(kid) + mnySavedTotal(kid) + mnyLockedTotal(kid) + mnyInvestedTotal(kid));
 }
 
+/* ── What is still on the table today ──
+   "I can still earn $2.00" is a reason to go and do the bins, which makes this
+   one of the few numbers a child acts on directly. It lived inline inside
+   mnyTodayCard until Today wanted it too; a second copy of this arithmetic is a
+   second answer to the same question, so it lives here and both screens read it.
+
+   `cap` null means the rules set no daily maximum, in which case there is no
+   "left" to speak of and the caller should say what she has earned instead. */
+function mnyEarnLeftToday(kid, weekKey) {
+  const wk = weekKey || mnyWeekKey();
+  const cap = (mrRulesForWeek(wk).chores || {}).dailyCap;
+  const chores = mrChoreWeek(wk, kid);
+  const today = formatDayKey(todayKey());
+  const dayIdx = Math.max(0, Math.min(6,
+    Math.round((today - formatDayKey(wk)) / (24 * 60 * 60 * 1000))));
+  const done = money2((chores.days[dayIdx] || {}).paid);
+  return {
+    dayIdx, done, cap: (cap == null) ? null : money2(cap),
+    left: (cap == null) ? null : money2(Math.max(0, cap - done)),
+    freeLeft: chores.freeLeft,
+  };
+}
+
 function mnyAddHolding(kid, fields) {
   const h = mnyNormalizeHolding(Object.assign({ kind: 'savings', units: 1 }, fields || {}));
   mnyEnsureHoldings(kid).push(h);
@@ -1059,11 +1082,6 @@ function mnySegments(list) {
     })),
   };
 }
-/* What came in THIS WEEK. Deliberately no "made on its own" segment: what her
-   holdings have gained is a running total since she bought them, not a thing
-   that happened this week, and dropping it into a weekly bar would make the
-   segments add up to more than the week did. That number has its own home —
-   the returns statement on page 2, where it is the whole point. */
 /* Everything that came in this week, including what her money made on its own.
    Passive income belongs here: it is income, it happened this week, and a bar
    that omits it does not add up to what she is worth now. It is deliberately
@@ -1083,6 +1101,19 @@ function mnyIncomeSegments(weekKey, kid) {
   ]);
   out.fines = money2(b.fines.total);
   out.passive = passive;
+  /* ── The bar's total is NOT the pool's "money that came in" ──
+     The bar adds up what landed: every positive channel, gifts, and what her
+     holdings gained. The pool counts spendable cash: fines already taken off,
+     and no holding growth, because unrealised value is not money a plan can
+     move. Both are right; they answer different questions.
+
+     They are carried side by side here so no screen has to work out the
+     difference for itself — that is exactly how the same phrase came to show
+     two different figures on the kid page and at the meeting. The identity
+     every surface can rely on:
+
+         total − fines − max(0, passive) === cameIn                          */
+  out.cameIn = pool.cameIn;
   return out;
 }
 function mnyOutflowSegments(weekKey, kid, split) {
