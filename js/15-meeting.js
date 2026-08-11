@@ -355,11 +355,15 @@ function mmRenderConfirm(wk, held) {
     const xp = mrXpForWeek(wk, kid).total;
     // What the schedule actually asks for today — the deposit before the
     // monthlies, and nothing at all on the Sundays that aren't payment day.
-    const l = loanState(kid);
-    const duty = loanDueNow(kid);
-    const paidThisMonth = l.lastPaymentMonth === loanMonthKey();
-    const due = paidThisMonth ? 0 : duty.amount;
-    const dueLabel = duty.kind === 'down' ? 'down payment' : 'loan';
+    // Read through mnyDueNowAll rather than loanDueNow: it already knows which
+    // months are settled, and it covers EVERY debt. This used to call
+    // loanState(kid) with no debtId, which returns list[0] in insertion order —
+    // so a kid with two loans saw one of them, and not necessarily the one the
+    // payment was about.
+    const owed = mnyDueNowAll(kid);
+    const due = money2(owed.reduce((s, x) => s + money2(x.amount), 0));
+    const dueLabel = owed.length > 1 ? 'loans'
+                   : (owed[0] && owed[0].kind === 'down') ? 'down payment' : 'loan';
     const bits = [];
     if (b.chorePaid) bits.push(`chores $${b.chorePaid.toFixed(2)}`);
     if (b.learnPaid) bits.push(`learning $${b.learnPaid.toFixed(2)}`);

@@ -217,19 +217,38 @@ function tdRenderToday() {
         <div class="td-now-sub">the rest of today is yours</div></div>`;
   }
 
-  // Chores she can answer for. A tap opens the chore screen at today — the claim
-  // is made there, in the one place that owns it.
+  // Chores she can answer for, each with what it would be worth. A tap opens the
+  // chore screen at today — the claim is made there, in the one place that owns
+  // it. The price is read from mrChoreWouldPay (js/18-rules.js), which owns
+  // chore pricing; nothing here works out what a chore pays.
+  const pay = (d == null) ? null : mrChoreWouldPay(kid, wk, d);
+  const payTag = pay
+    ? (pay.capReached
+        ? `<span class="td-row-pay xp">+XP</span>`
+        : `<span class="td-row-pay">up to ${mnyMoney(pay.amount)}</span>`)
+    : '';
   const choreHtml = claimable.length
     ? claimable.map(c => `<button type="button" class="td-row" data-td-action="chore">
           <span class="td-row-icon">${(typeof ctChoreIcon === 'function' ? ctChoreIcon(c.row.id) : '🧹')}</span>
           <span class="td-row-name">${escapeHtml(c.row.label)}</span>
+          ${payTag}
           <span class="td-row-go">Do it ›</span>
         </button>`).join('')
     : `<div class="td-empty">Nothing to claim today.</div>`;
 
+  /* An empty day offers to be filled, and the offer is the thing you tap.
+     This read "Tap ✏️ Plan my day to build one", pointing at a button in the
+     static row below — an instruction to go and find a control is a worse
+     affordance than the control, and it costs more words on a screen held to
+     200 with no ratchet. The permanent button stays for a day that already has
+     a plan; this is the door on the day that has none. */
   const questHtml = quests.length
     ? `<div class="dq-list">${quests.map(b => tdQuestCard(b, kid)).join('')}</div>`
-    : `<div class="td-empty">Nothing planned yet. Tap ✏️ Plan my day to build one.</div>`;
+    : `<button type="button" class="td-row td-plan" data-td-action="plan">
+         <span class="td-row-icon">✏️</span>
+         <span class="td-row-name">Nothing planned — build a day?</span>
+         <span class="td-row-go">Plan it ›</span>
+       </button>`;
 
   // The loop back from a grown-up. Same counts the chore screen shows, so the two
   // can never disagree.
@@ -242,6 +261,32 @@ function tdRenderToday() {
     loopHtml += `<button type="button" class="td-chip" data-td-action="waiting">
       ⏳ <b>${waiting}</b> with Mum</button>`;
   }
+
+  /* ── Pocket money ──
+     Cash, what she owes, and what is still on the table today. It sits after
+     the jobs list because it answers "was that worth it?", which is the
+     question that follows the jobs rather than the one before them.
+
+     Three readers and nothing else: mnyCash and mnyTotalOwing are the same
+     accessors the money page uses, and mnyEarnLeftToday is the very function
+     mnyTodayCard reads — extracted precisely so this row could not become a
+     second answer to it. The whole row taps through to My money; nothing here
+     spends, claims or settles. */
+  const owing = mnyTotalOwing(kid);
+  const earn = mnyEarnLeftToday(kid, wk);
+  const moneyTiles = [
+    { label: 'Cash', value: mnyMoney(mnyCash(kid)) },
+    owing > 0 ? { label: 'I owe', value: mnyMoney(owing) } : null,
+    earn.left == null
+      ? { label: 'Earned today', value: mnyMoney(earn.done) }
+      : { label: 'Still to earn', value: mnyMoney(earn.left) },
+  ].filter(Boolean);
+  const moneyHtml = `<button type="button" class="td-money" data-td-action="money">
+      ${moneyTiles.map(t => `<span class="td-money-tile">
+          <span class="td-money-label">${escapeHtml(t.label)}</span>
+          <span class="td-money-val">${t.value}</span>
+        </span>`).join('')}
+    </button>`;
 
   /* The evening wind-down nudge, carried over from the day timeline's banner —
      age-based, so it only appears once an age is set. */
@@ -258,6 +303,8 @@ function tdRenderToday() {
       <div class="td-cap">On today</div>${questHtml}</div>
     <div class="td-card">
       <div class="td-cap">Jobs I can do</div>${choreHtml}</div>
+    <div class="td-card">
+      <div class="td-cap">My money</div>${moneyHtml}</div>
     <div class="td-say">${escapeHtml(tdEncouragement(kid))}</div>
     ${bedtime ? `<div class="bedtime-tip">${escapeHtml(bedtime)}</div>` : ''}`;
 

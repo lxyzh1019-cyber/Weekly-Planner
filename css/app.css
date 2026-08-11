@@ -4167,6 +4167,28 @@
   .mny-strip-cell.on { background: var(--bg2); box-shadow: 2px 3px 0 rgba(42, 35, 32, 0.12); }
   .mny-strip-val { font-size: 1.15rem; font-weight: 800; color: var(--accent-strong); }
   .mny-strip-arrow { align-self: center; color: var(--ink-light); font-weight: 800; }
+  /* ── Stacked by default, three across only where there is room ──
+     Three cells across is a wide-CONTAINER shape, not a wide-screen one, and
+     the difference matters here: page 1 puts this strip in `.mny-cols.page1`'s
+     first column, which is a fixed 340px at every breakpoint. So each cell gets
+     about 100px and "Money that came in" wraps to three lines on a desktop just
+     as badly as on a phone — a viewport media query cannot see that.
+
+     Stacked is also the more honest reading for a child: it is a sum, and
+     came in → payment → mine reads top to bottom.
+
+     The two surfaces that give the strip a full-width card get the row back at
+     tablet width and up. That is a container-width fact about those two
+     layouts, not a rule about those screens — the sizing rules themselves
+     (targets, type) stay on the component, per the .ck-navbtn lesson. */
+  .mny-strip { flex-direction: column; }
+  .mny-strip-arrow { align-self: start; transform: rotate(90deg); margin-left: 0.9rem; }
+  @media (min-width: 760px) {
+    #familyMeetingBody .mny-strip,
+    #screen-parent .mny-strip { flex-direction: row; }
+    #familyMeetingBody .mny-strip-arrow,
+    #screen-parent .mny-strip-arrow { align-self: center; transform: none; margin-left: 0; }
+  }
 
   /* An earnings row: what it is, where the number came from, what it is worth. */
   .mny-erow { border-bottom: 1px dashed var(--paper-line); padding: 0.35rem 0; }
@@ -5291,6 +5313,44 @@
     font-weight: 800; color: var(--accent-strong);
   }
 
+  /* What a job is worth, on the row that offers it. A ceiling, not a promise —
+     see mrChoreWouldPay. The XP state is the same shape so the row does not
+     change size when the daily cap runs out. */
+  .td-row-pay {
+    flex: 0 0 auto; font-size: calc(0.85rem * var(--fs-scale, 1));
+    font-weight: 800; color: var(--ink-light); white-space: nowrap;
+  }
+  .td-row-pay.xp { color: var(--accent-strong); }
+
+  /* The offer to plan an empty day. Same row shape as everything else on Today,
+     tinted so it reads as an invitation rather than another job. */
+  .td-plan { background: var(--bg2); }
+
+  /* ── Pocket money ──
+     Two or three numbers she acts on, and a tap through to the money page. One
+     button, not a row of them: nothing here moves money, so there is nothing to
+     press but "show me more". */
+  .td-money {
+    display: flex; gap: 0.5rem; width: 100%; min-height: 52px;
+    padding: 0.45rem 0.5rem;
+    border: 2px solid var(--ink); border-radius: var(--radius-sm, 12px);
+    background: var(--bg); color: var(--ink); font: inherit; text-align: left;
+    cursor: pointer;
+  }
+  .td-money:hover { background: var(--bg2); }
+  .td-money-tile {
+    flex: 1 1 0; display: flex; flex-direction: column; gap: 1px; min-width: 0;
+  }
+  .td-money-label {
+    /* 0.85rem, not the 0.78rem this started at: Today carries no --fs-scale, so
+       0.78rem computes to 12.48px and lands under the 13px kid floor. */
+    font-size: calc(0.85rem * var(--fs-scale, 1)); font-weight: 700;
+    color: var(--ink-light);
+  }
+  .td-money-val {
+    font-size: calc(1.05rem * var(--fs-scale, 1)); font-weight: 800;
+  }
+
   .td-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; }
   .td-chip {
     display: flex; align-items: center; gap: 0.4rem;
@@ -5355,6 +5415,22 @@
   }
   .kid-nav[hidden] { display: none; }
   body.has-kid-nav { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0)); }
+
+  /* ── No dead scroll under the nav ──
+     .screen carries min-height: 100vh and the body adds 64px of bottom padding
+     to clear this bar, so every kid screen was 100vh + 64px tall no matter how
+     little was on it. On a phone that hides behind content that overflows
+     anyway; on an iPad, where Today fits on one screen, it was 64px of empty
+     scroll with nothing in it.
+
+     With the nav present the screen gets 100vh MINUS the bar, not plus it. dvh
+     because iOS Safari measures 100vh against the viewport with the toolbar
+     retracted, which is a second, separate source of phantom scroll; the vh
+     line stays first as the fallback for anything without dvh. */
+  body.has-kid-nav .screen {
+    min-height: calc(100vh - 64px - env(safe-area-inset-bottom, 0));
+    min-height: calc(100dvh - 64px - env(safe-area-inset-bottom, 0));
+  }
 
   .kid-nav-btn {
     flex: 1 1 0; min-height: 56px; min-width: 44px;

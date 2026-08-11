@@ -55,9 +55,18 @@ function mnyKidTabs() {
     `<button type="button" class="mny-chip ${k === cur ? 'on' : ''}" onclick="mnySetMeetKid('${escapeJsAttr(k)}')">${CT_PROFILE_ICON[k]} ${k === 'jenn' ? 'Jenn' : 'Jess'}</button>`).join('')}</div>`;
 }
 
-/* Money in → what has to go out → what is hers. Three cells, and the one the
-   current step is about is lit. Without it, "mine to choose" arrives as a
-   number with no arithmetic behind it. */
+/* ── Money in → what has to go out → what is hers ──
+   Three cells, and the one the current step is about is lit. Without it, "mine
+   to choose" arrives as a number with no arithmetic behind it.
+
+   FOUR callers now, deliberately one component: the kid's money page
+   (js/22-money-page1.js, mnyIncomeCard), meeting step 3, meeting step 4, and
+   the parent portal (js/24-money-parent.js, mnyWeekResults). A second thing
+   that draws these three numbers is a second thing that can drift, and drift
+   is the bug this was pulled in to fix.
+
+   `liveIdx` is meeting-only — it lights the cell the current step is about.
+   Pass -1 anywhere there is no "current step", and nothing lights. */
 function mnyStrip(wk, kid, liveIdx) {
   const pool = mnyPool(wk, kid);
   const cells = [
@@ -152,13 +161,19 @@ function mnyEarningsCard(wk, kid) {
 
 /* The bar lives in its own card rather than under the earnings rows, because it
    counts money from outside as well: sitting it directly beneath "earned for
-   her work" made two different totals look like one disagreeing with itself. */
+   her work" made two different totals look like one disagreeing with itself.
+
+   It carries no total of its own. Step 3 already shows mnyStrip directly above
+   it, and the strip's first cell is pool.cameIn — a different number from this
+   bar's sum, because the bar counts fines separately and includes holding
+   growth. Printing both, side by side, labelled as if they were the same thing,
+   is precisely the disagreement the comment above was written about. The
+   legend under the bar still names every segment in dollars. */
 function mnyIncomeBarCard(wk, kid) {
   const data = mnyIncomeSegments(wk, kid);
   return `<div class="mny-card">
       <div class="mny-week-head">
-        <span class="mny-label">Everything that came in</span>
-        <b>${mnyMoney(data.total)}</b>
+        <span class="mny-label">Where this week's money came from</span>
       </div>
       ${mnyBarHtml(data, { empty: 'Nothing counted yet' })}
     </div>`;
@@ -339,7 +354,10 @@ function mnyConfirmBar(wk, kid) {
     button = `<button type="button" class="mny-btn primary" onclick="mnyDoConfirm()">That's right — save it</button>`;
   }
   return `<div class="mny-confirmbar">
-      <span><b>${mnyMoney(b.net)}</b> for the week</span>
+      <!-- "earned for the week": b.net, no gifts. The strip at the top of this
+           step carries the pool's figure, and two numbers on one screen must
+           not both read as "the week". -->
+      <span><b>${mnyMoney(b.net)}</b> earned for the week</span>
       <span class="mny-note">${escapeHtml(blocked || stamp)}</span>
       ${button}
     </div>`;
