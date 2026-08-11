@@ -1443,8 +1443,16 @@ function applyTemplate(type) {
 }
 
 async function clearDay() {
-  if (!(await showConfirm('Clear all blocks for this day?', { danger:true, okLabel:'Clear' }))) return;
-  tombstoneBlockIds((getDayBlocks(currentDayKey) || []).map(b => b.id));
+  /* Name what goes, and how much of it. "Clear all blocks for this day?" asks a
+     child to agree to something abstract; a count and a weekday are what make
+     someone stop. There is no undo behind this, so the dialog is the whole
+     safety net and it has to say the true thing. */
+  const doomed = getDayBlocks(currentDayKey) || [];
+  if (!doomed.length) { showToast('Nothing to clear on this day'); return; }
+  const dayName = DAY_LONG[(formatDayKey(currentDayKey).getDay() + 6) % 7];
+  const msg = `This removes all ${doomed.length} thing${doomed.length === 1 ? '' : 's'} from ${dayName}.`;
+  if (!(await showConfirm(msg, { danger:true, okLabel:'Clear' }))) return;
+  tombstoneBlockIds(doomed.map(b => b.id));
   setDayBlocks(currentDayKey, []);
   buildTimeline();
   showToast('Day cleared 🗑');

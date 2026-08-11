@@ -475,7 +475,12 @@ function mrSetChoreGrade(kid, weekKey, dayIdx, choreId, grade) {
   // tab and re-read every row to find out whether anything was decided.
   if (!e.gradedAt) e.gradedAt = {};
   if (!e.gradedAt[d]) e.gradedAt[d] = {};
-  if (g === 0) delete e.gradedAt[d][choreId]; else e.gradedAt[d][choreId] = Date.now();
+  // syncNow, not Date.now: this stamp is written on the parent's device and read
+  // on the kid's, so the two clocks have to be compared on the same footing. A
+  // parent phone running a few seconds behind the iPad would stamp a grade that
+  // looks older than the kid's last visit, and mrNewlyGraded would never show it
+  // — the silence this field exists to prevent.
+  if (g === 0) delete e.gradedAt[d][choreId]; else e.gradedAt[d][choreId] = syncNow();
   mrStampEarnings(kid, weekKey);
   saveAll();
   return true;
@@ -515,7 +520,7 @@ function mrMarkGradesSeen(kid) {
   if (isParent()) return;
   const pd = getProfData(kid);
   if (!pd.progress) pd.progress = {};
-  pd.progress.lastGradeSeen = Date.now();
+  pd.progress.lastGradeSeen = syncNow();   // same clock as gradedAt, see mrSetChoreGrade
 }
 function mrGetPersonal(kid, weekKey, dayIdx, choreId) {
   const e = mrEnsureEarnings(kid, weekKey);

@@ -55,7 +55,6 @@
      SCREEN: PROFILE SELECT
 ════════════════════════════════════════════════════════ -->
 <div class="screen active" id="screen-profile">
-  <button class="hero-mode-toggle" id="heroModeToggle" onclick="toggleHeroMode()" aria-label="Toggle Hero Mode">🎮 Hero Mode: ON</button>
   <div class="profile-header">
     <h1>My Weekly Planner</h1>
     <p>Who's here today? <span class="sync-dot" id="syncDot"></span></p>
@@ -114,6 +113,64 @@
     <div class="profile-badge" id="todayProfileBadge"></div>
   </div>
   <div id="tdWrap" class="td-wrap"></div>
+
+  <!-- Moved here off the day timeline's left rail, which was headed "Today" and
+       printed the same "next up" sentence this screen already leads with. These
+       keep their original ids so renderVibe / renderDayGoalsTodos /
+       maybeShowRewardPrompt work untouched — every screen is in the DOM at once,
+       so those renderers find their elements wherever the markup lives.
+       The day screen is now only for building a day; this is where one gets done. -->
+  <div class="td-panels">
+    <div id="dayRewardPrompt" class="day-reward-prompt">
+      <div id="dayRewardText"></div>
+      <div class="day-reward-actions">
+        <button type="button" class="reward-pill" onclick="acceptRewardPrompt()">Add today</button>
+        <button type="button" class="reward-pill" onclick="skipRewardPrompt()">Not today</button>
+      </div>
+    </div>
+    <div id="dayKidQuickRow" class="day-kid-quick-row" style="display:none">
+      <button type="button" class="btn-break-quick" onclick="addQuickBreak(15)">☕ I need a break (15 min)</button>
+      <button type="button" class="btn-break-quick" onclick="addQuickBreak(10)">🫧 Short break (10 min)</button>
+    </div>
+
+    <!-- Collapsed by default and remembered in localStorage — the house
+         disclosure pattern (mnyPricesOpen / ckPrivsOpen / weekGlanceOpen). Never
+         synced state: every state write is a full-document upload. Three panels
+         under one toggle keeps this screen inside its 200-word budget. -->
+    <button type="button" class="td-fold-btn" id="tdExtrasBtn" onclick="tdToggleExtras()"></button>
+    <div class="td-fold-body" id="tdExtrasBody" style="display:none">
+      <div class="vibe-card">
+        <div>
+          <div class="vibe-title">Today's Vibe</div>
+          <div style="font-size:0.92rem;color:#5a4d41" id="vibeSubtext">Set when the day's done</div>
+        </div>
+        <div class="vibe-moods" id="vibeMoods"></div>
+      </div>
+      <div class="day-mini-panel">
+        <div class="day-mini-panel__header">
+          <h4>✅ To-do</h4>
+          <button class="btn-icon gt-add-btn" onclick="addTodo()" title="Add todo">＋</button>
+        </div>
+        <div id="dayTodosList" class="day-mini-list"></div>
+      </div>
+      <div class="day-mini-panel">
+        <div class="day-mini-panel__header">
+          <h4>🎯 Goals</h4>
+          <button class="btn-icon gt-add-btn" onclick="addGoal()" title="Add goal">＋</button>
+        </div>
+        <div id="dayGoalsList" class="day-mini-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Static: these three never vary, so they do not need re-rendering. The
+       "Quests" shortcut that used to sit here is gone — Today is the quest list
+       now, so it would have been a button to the screen you are on. -->
+  <div class="td-more">
+    <button type="button" class="td-morebtn" data-td-action="plan">✏️ Plan my day</button>
+    <button type="button" class="td-morebtn" data-td-action="week">📋 The whole week</button>
+    <button type="button" class="td-morebtn" data-td-action="money">💰 My money</button>
+  </div>
 </div>
 
 <div class="screen" id="screen-quest">
@@ -200,28 +257,22 @@
     <div class="week-topbar__row2">
       <!-- View switcher: Full (cards) / Time-Grid (hours) -->
       <div class="view-tabs">
-        <button class="view-tab active" id="viewTabFull" onclick="setWeekView('full')">📋 Full</button>
-        <button class="view-tab" id="viewTabTimeGrid" onclick="setWeekView('timegrid')">🧱 Day Blocks</button>
+        <button class="view-tab" id="viewTabFull" onclick="setWeekView('full')">📋 Full</button>
+        <button class="view-tab active" id="viewTabTimeGrid" onclick="setWeekView('timegrid')">🧱 Day Blocks</button>
       </div>
     </div>
   </div>
   <p class="kid-coach-tip" id="weekCoachTip" style="display:none;margin:0.35rem 0.75rem 0"></p>
 
-  <!-- Compact view kept in DOM but hidden (no longer used) -->
-  <div id="weekCompact" style="display:none">
-    <div class="week-grid" id="weekGrid"></div>
-    <ul class="week-legend" id="weekLegend" style="display:none" aria-label="Activity category legend">
-      <li class="legend-item"><span class="legend-dot" style="background:var(--cat-sleep)" aria-hidden="true"></span>Rest</li>
-      <li class="legend-item"><span class="legend-dot" style="background:var(--cat-school)" aria-hidden="true"></span>Learning</li>
-      <li class="legend-item"><span class="legend-dot" style="background:var(--cat-active)" aria-hidden="true"></span>Active</li>
-      <li class="legend-item"><span class="legend-dot" style="background:var(--cat-free)" aria-hidden="true"></span>Free</li>
-      <li class="legend-item"><span class="legend-dot" style="background:var(--cat-daily)" aria-hidden="true"></span>Daily</li>
-      <li class="legend-item"><span class="legend-dot" style="background:var(--cat-routine)" aria-hidden="true"></span>Routine</li>
-    </ul>
-  </div>
+  <!-- The compact week view lived here, with #weekGrid and #weekLegend. It was
+       the original third week layout and had been unreachable for a long time:
+       the tabs only ever set 'full' or 'timegrid'. #weekLegend went with it —
+       a parent-only, hardcoded copy of the category key that could never show,
+       because its container was permanently display:none. The Day Blocks view
+       builds a live one from CAT_HEX (#tgLegend) that everyone can see. -->
 
-  <!-- Full week view (default) -->
-  <div id="weekFull" style="display:flex">
+  <!-- Full week view (the alternate; Day Blocks is the default) -->
+  <div id="weekFull" style="display:none">
     <div class="weekly-full-wrap">
       <div class="week-conflict-banner" id="weekConflictBanner" style="display:none"></div>
       <div class="weekly-full" id="weeklyFullGrid"></div>
@@ -231,7 +282,7 @@
 
   <!-- Day Blocks view (2a): "plans pop, free stays quiet" — one column per day,
        planned activities carry colour + a short label, free time stays plain. -->
-  <div id="weekTimeGrid" style="display:none">
+  <div id="weekTimeGrid" style="display:flex">
     <div class="tg-controls">
       <div class="tg-streak" id="tgStreak"></div>
     </div>
@@ -382,64 +433,21 @@
            split a day that is already one screen tall, and the left sideband
            already labels those stretches, so "All Day" is the only mode left
            and the timeline no longer needs a filter above it. -->
-      <!-- Timeline/Quest switch lives in the topbar so it's reachable in
-           portrait too (the landscape "Schedule" label bar is hidden there).
-           Checklist mode was a third copy of the same day and is gone. -->
-      <div class="day-mode-toggle" role="tablist" aria-label="Schedule view mode">
-        <button type="button" class="day-mode-btn active" id="dayModeTimeline" role="tab" aria-selected="true" onclick="setDayViewMode('timeline')">🕐 Timeline</button>
-        <button type="button" class="day-mode-btn" id="dayModeQuest" role="tab" aria-selected="false" onclick="setDayViewMode('quest')">🎮 Quest</button>
-      </div>
+      <!-- The Timeline/Quest switch is gone with Quest mode: it was a second
+           rendering of a day this screen had just finished planning, and the
+           quest cards now live on Today, which is where a day gets done.
+           This screen builds a day; it has one layout and nothing to toggle. -->
       <button class="btn-template danger" onclick="clearDay()">🗑 Clear</button>
     </div>
   </div>
 
   <div class="day-workspace">
-    <div class="day-left-rail">
-      <div class="day-panel-label day-panel-label--landscape-only">Today</div>
-      <div id="dayNextUpBanner" class="day-next-up-banner" style="display:none"></div>
-      <div id="dayKidQuickRow" class="day-kid-quick-row" style="display:none">
-        <button type="button" class="btn-break-quick" onclick="addQuickBreak(15)">☕ I need a break (15 min)</button>
-        <button type="button" class="btn-break-quick" onclick="addQuickBreak(10)">🫧 Short break (10 min)</button>
-      </div>
-      <div id="dayRewardPrompt" class="day-reward-prompt">
-        <div id="dayRewardText"></div>
-        <div class="day-reward-actions">
-          <button type="button" class="reward-pill" onclick="acceptRewardPrompt()">Add today</button>
-          <button type="button" class="reward-pill" onclick="skipRewardPrompt()">Not today</button>
-        </div>
-      </div>
-      <!-- Today's Vibe (replaces balance) -->
-      <div class="vibe-card">
-        <div>
-          <div class="vibe-title">Today's Vibe</div>
-          <div style="font-size:0.92rem;color:#5a4d41" id="vibeSubtext">Set when the day's done</div>
-        </div>
-        <div class="vibe-moods" id="vibeMoods"></div>
-      </div>
-      <div class="day-mini-panel">
-        <div class="day-mini-panel__header">
-          <h4>✅ To-do</h4>
-          <button class="btn-icon gt-add-btn" onclick="addTodo()" title="Add todo">＋</button>
-        </div>
-        <div id="dayTodosList" class="day-mini-list"></div>
-      </div>
-      <div class="day-mini-panel">
-        <div class="day-mini-panel__header">
-          <h4>🎯 Goals</h4>
-          <button class="btn-icon gt-add-btn" onclick="addGoal()" title="Add goal">＋</button>
-        </div>
-        <div id="dayGoalsList" class="day-mini-list"></div>
-      </div>
-    </div>
-
     <div class="day-center-lane">
       <div class="timeline-wrap">
         <div class="day-panel-label day-panel-label--landscape-only day-schedule-label">
-          <button type="button" class="day-left-toggle" id="dayLeftToggle" onclick="toggleLeftPane()" title="Hide/show the side panel" aria-label="Hide or show the side panel"><span id="dayLeftToggleCaret">◀</span> Panel</button>
           <span>Schedule</span>
         </div>
         <div class="timeline" id="timeline"></div>
-        <div class="day-quest" id="dayQuest" style="display:none"></div>
       </div>
     </div>
 

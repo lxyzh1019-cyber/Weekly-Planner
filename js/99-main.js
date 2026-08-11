@@ -23,8 +23,11 @@ window.addEventListener('pagehide', flushPush);
   if (wrap) wrap.addEventListener('click', ctHandleWrapClick);
 })();
 // Today delegates for the same reason: every render replaces the whole wrap.
+// Bound to the screen rather than #tdWrap, because the panels moved off the day
+// timeline are static siblings of the wrap — one listener has to cover both, and
+// the screen element is the one thing here that is never replaced.
 (function(){
-  const wrap = document.getElementById('tdWrap');
+  const wrap = document.getElementById('screen-today');
   if (wrap) wrap.addEventListener('click', tdHandleClick);
   const nav = document.getElementById('kidNav');
   if (nav) nav.addEventListener('click', tdHandleNavClick);
@@ -187,7 +190,9 @@ function initA11yEnhancements() {
 enableHorizontalWheelScroll();
 bindMiddleDragPan();
 initA11yEnhancements();
-refreshHeroModeToggle();
+/* Hero Mode is gone (js/05-helpers.js). Drop its key so a switch nobody can see
+   is not still remembered on the girls' iPad. */
+try { localStorage.removeItem('wp_hero_mode'); } catch (e) {}
 
 // Small onboarding mascot after profile pick (if day is empty)
 const _origBuildTimeline = buildTimeline;

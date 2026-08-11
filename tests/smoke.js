@@ -155,11 +155,114 @@ function findChromium() {
 
   const checks = {};
 
-  // Weekly view: Y-axis sideband + hour lines + slot tint bands
-  checks.weekSideband = await page.evaluate(() =>
-    document.querySelectorAll('.wf-sideband-seg').length === 4);
+  /* The week's default layout, asserted before anything here navigates. Three
+     things have to agree and nothing enforces it at runtime: the initial value
+     of weekView, which container index.html leaves visible, and which tab it
+     marks active. renderWeek dispatches on weekView but never syncs the
+     containers — only setWeekView does — so if the state default and the markup
+     drift apart, the week boots showing one layout while rendering into another,
+     and nothing else in this suite would notice. */
+  checks.weekOpensOnDayBlocks = await page.evaluate(() => {
+    const bad = [];
+    if (weekView !== 'timegrid') bad.push(`default weekView is '${weekView}', expected 'timegrid'`);
+    if (getComputedStyle(document.getElementById('weekTimeGrid')).display === 'none')
+      bad.push('index.html hides #weekTimeGrid, which the default weekView selects');
+    if (getComputedStyle(document.getElementById('weekFull')).display !== 'none')
+      bad.push('index.html leaves #weekFull visible too');
+    if (!document.getElementById('viewTabTimeGrid').classList.contains('active'))
+      bad.push('the Day Blocks tab is not marked active in index.html');
+    if (document.getElementById('viewTabFull').classList.contains('active'))
+      bad.push('the Full tab is still marked active in index.html');
+    return bad.length === 0 || bad;
+  });
+
+  /* The school calendar. The band used to be hardcoded 9am–3pm Mon–Fri while
+     SCHOOL_TEMPLATE placed the school block at 8am, so the two contradicted each
+     other and both were wrong on every holiday and all summer. The arithmetic
+     assertion is the one that matters: the published calendar states 177
+     instructional days for K-8, so if a date was mistyped the count moves. */
+  checks.schoolCalendarIsRight = await page.evaluate(() => {
+    const bad = [];
+    const iso = (d) => d.toISOString().slice(0, 10);
+    // Template and band cannot disagree: both come from SCHOOL_HOURS.
+    const tpl = SCHOOL_TEMPLATE.find(b => b.actId === 'school_day');
+    if (!tpl || tpl.startMin !== SCHOOL_HOURS.startMin
+             || tpl.durationMin !== SCHOOL_HOURS.endMin - SCHOOL_HOURS.startMin)
+      bad.push('SCHOOL_TEMPLATE no longer derives from SCHOOL_HOURS');
+
+    // No weekend should ever appear in the holiday list — weekends are already
+    // covered by SCHOOL_HOURS.days, and one there means a mistyped date.
+    const weekendEntries = NO_SCHOOL_DAYS.filter(k => {
+      const dow = new Date(k + 'T12:00:00').getDay();
+      return dow === 0 || dow === 6;
+    });
+    if (weekendEntries.length) bad.push(`weekend dates in NO_SCHOOL_DAYS: ${weekendEntries.join(', ')}`);
+    if (new Set(NO_SCHOOL_DAYS).size !== NO_SCHOOL_DAYS.length) bad.push('NO_SCHOOL_DAYS has duplicates');
+
+    // Count the instructional days the calendar actually yields.
+    let taught = 0;
+    for (let d = new Date(SCHOOL_TERM.start + 'T12:00:00');
+         iso(d) <= SCHOOL_TERM.end; d.setDate(d.getDate() + 1)) {
+      if (isSchoolDay(iso(d))) taught++;
+    }
+    if (taught !== 177) bad.push(`${taught} instructional days, the published calendar says 177`);
+
+    // The three states that are not "school today".
+    if (isSchoolDay('2026-12-25')) bad.push('Christmas Day counted as school');
+    if (isSchoolDay('2027-07-14')) bad.push('a July weekday counted as school');   // summer
+    if (isSchoolDay('2026-09-05')) bad.push('a Saturday counted as school');
+    if (!isSchoolDay('2026-09-08')) bad.push('an ordinary term Tuesday was not school');
+    // Past the known year it stops pretending, and says so to a parent only.
+    if (!schoolCalendarIsStale('2028-10-03')) bad.push('a date past the shipped calendar is not flagged stale');
+    if (schoolCalendarIsStale('2026-10-05')) bad.push('an in-term date was flagged stale');
+    return bad.length === 0 || bad;
+  });
+
+  // The bands on the day itself follow that calendar rather than the weekday.
+  checks.dayBandsFollowTheCalendar = await page.evaluate(() => {
+    const bad = [];
+    const labels = () => [...document.querySelectorAll('#screen-day .tl-band-seg')].map(e => e.textContent);
+    profile = 'jenn'; parentViewing = 'jenn';
+    openDay('2026-09-08', 1);                       // an ordinary school Tuesday
+    const school = labels();
+    if (!school.some(l => /SCHOOL/.test(l))) bad.push(`no school band on a term Tuesday: ${school.join(' / ')}`);
+    openDay('2026-12-25', 4);                       // Christmas Day
+    const holiday = labels();
+    if (!holiday.some(l => /FREE TIME/.test(l))) bad.push(`Christmas Day did not read as free: ${holiday.join(' / ')}`);
+    openDay('2027-07-14', 2);                       // mid-summer
+    const summer = labels();
+    if (!summer.some(l => /FREE TIME/.test(l))) bad.push(`a July day did not read as free: ${summer.join(' / ')}`);
+
+    /* The labels are set sideways, so a band's height is the line length the
+       text has to fit into. The before-school band is only as tall as the gap
+       between 6am and the first bell, and "BEFORE SCHOOL" wants ~171px in the
+       166px an 8am start leaves — it clipped. Measure the text, not the box:
+       overflow:hidden means a clipped label still reports a tidy scrollHeight. */
+    openDay('2026-09-08', 1);
+    [...document.querySelectorAll('#screen-day .tl-band-seg')].forEach(el => {
+      const r = document.createRange(); r.selectNodeContents(el);
+      const text = r.getBoundingClientRect().height, box = el.getBoundingClientRect().height;
+      if (text > box + 1) bad.push(`band "${el.textContent}" needs ${Math.round(text)}px in ${Math.round(box)}px`);
+    });
+    return bad.length === 0 || bad;
+  });
+
+  /* Weekly view: Y-axis sideband + hour lines + slot tint bands. These belong to
+     the Full layout, which is no longer the one the week opens on — Day Blocks
+     is. So select it first rather than assuming: the alternate layout still has
+     to work, and an assertion that silently measured whichever view happened to
+     be default would stop testing anything the day the default moved. */
+  checks.weekSideband = await page.evaluate(() => {
+    setWeekView('full');
+    return document.querySelectorAll('.wf-sideband-seg').length === 4;
+  });
   checks.weekHourLines = await page.evaluate(() =>
     document.querySelectorAll('.wf-hour-line').length > 0);
+  // Day Blocks renders once selected.
+  checks.dayBlocksRenders = await page.evaluate(() => {
+    setWeekView('timegrid');
+    return document.querySelectorAll('.tg2-lane').length === 7 || ['no day lanes in Day Blocks'];
+  });
 
   // Kid money surface: kids reach Pocket Money and may LOOK at the bank, but
   // every function that moves money refuses them.
@@ -365,21 +468,22 @@ function findChromium() {
   // Checklist mode is gone from the topbar entirely.
   await page.evaluate(() => openDay(getDayKeys(0)[5], 5));
   await page.waitForTimeout(400);
-  checks.dayModeToggleVisible = await page.evaluate(() => {
-    const r = document.getElementById('dayModeQuest').getBoundingClientRect();
-    return r.width > 0 && r.height > 0
-        && !document.getElementById('dayModeChecklist')
-        && !document.querySelector('.zone-tabs');
-  });
-  // Quest mode hands the whole workspace to the day's quests.
-  checks.questModeHidesBothRails = await page.evaluate(() => {
-    setDayViewMode('quest');
-    const hidden = el => !el || getComputedStyle(el).display === 'none';
-    const ok = hidden(document.querySelector('.day-left-rail'))
-            && hidden(document.querySelector('.day-right-rail'))
-            && !!document.getElementById('dayQuest');
-    setDayViewMode('timeline');
-    return ok;
+  /* The day screen is a planning tool and nothing else: one layout, no mode
+     toggle to leave in the wrong state, and none of the "Today" rail that used
+     to duplicate the Today screen. What must remain is the schedule and the
+     activity tray — the two things you build a day with. */
+  checks.dayScreenIsPlanningOnly = await page.evaluate(() => {
+    const gone = ['dayModeQuest', 'dayModeTimeline', 'dayQuest', 'dayNextUpBanner',
+                  'dayLeftToggle'].filter(id => document.getElementById(id));
+    const bad = [];
+    if (gone.length) bad.push(`retired elements still present: ${gone.join(', ')}`);
+    if (document.querySelector('.day-left-rail')) bad.push('the left "Today" rail is still on the day screen');
+    if (document.querySelector('.zone-tabs')) bad.push('zone tabs are back');
+    if (typeof dayViewMode !== 'undefined') bad.push('dayViewMode still exists');
+    const vis = el => !!el && getComputedStyle(el).display !== 'none';
+    if (!vis(document.getElementById('timeline'))) bad.push('no schedule on the day screen');
+    if (!vis(document.querySelector('.day-right-rail'))) bad.push('no activity tray on the day screen');
+    return bad.length === 0 || bad;
   });
   // Rest toggle lives in the Template sheet
   await page.evaluate(() => openTemplateSheet());
@@ -1018,6 +1122,43 @@ function findChromium() {
     // landing them first.
     ['screen-today',   () => { goToday(); }],
     ['screen-week',    () => { goWeek(); renderWeek(); }],
+    /* The same screen on a Sunday. The weekly-review banner renders one day in
+       seven (js/07-week-view.js, the `isSunday` branch) and it is the only place
+       .wins-btn and .tip-dismiss appear — so six days a week this audit walked
+       straight past them, and a 22x22 dismiss target with a 12.8px label lived
+       there until the Sunday-night CI run of 2026-08-09 happened to look.
+
+       A rule the suite can only check on one weekday is a rule that is unenforced
+       six days out of seven. Pin the clock to this week's Sunday for the length of
+       one render so the banner is audited on every run. The stand-in only answers
+       `new Date()` — every explicit form still builds the date it was given, so
+       the rest of the render is unaffected — and the real Date goes back in a
+       `finally`, because leaving a fake clock installed would quietly poison every
+       check after this one. */
+    ['screen-week',    () => {
+      goWeek();
+      const RealDate = Date;
+      const sunday = new RealDate();
+      sunday.setDate(sunday.getDate() - sunday.getDay());
+      sunday.setHours(10, 0, 0, 0);
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(sunday); };
+      Date.prototype = RealDate.prototype;
+      Date.now = RealDate.now; Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+      /* The empty-week invitation outranks the Sunday review, and by the time
+         this runs earlier checks have emptied the week — so without a block here
+         the audit renders the wrong branch and passes without ever seeing
+         .tip-dismiss. It measured `wins-btn@124x20` ("Start planning") instead of
+         `76x22` ("See wins"), which is how that was caught. Seed one block, then
+         put the day back exactly as it was. */
+      const kid = activeProfile();
+      const key = getDayKeys(0)[1];
+      const had = (getDayBlocks(key) || []).slice();
+      try {
+        setDayBlocks(key, [{ id: 'sun-audit', actId: 'piano', startMin: 16 * 60, durationMin: 60 }], kid);
+        weekOffset = 0; weekReviewDismissed = false;
+        renderWeek();
+      } finally { setDayBlocks(key, had, kid); Date = RealDate; }
+    }, 'screen-week/sunday'],
     ['screen-quest',   () => { showScreen('quest'); renderQuestBoard(); }],
     ['screen-chore',   () => { openChoreTab(); ckSelectDay(2); }],
     ['screen-mymoney', () => { mnyOpenMyMoney('jenn'); }],
@@ -1029,7 +1170,7 @@ function findChromium() {
   const kidFindings = [];
   for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1440, 900], [900, 1100]]) {
     await page.setViewportSize({ width: w, height: h });
-    for (const [id, nav] of KID_SCREENS) {
+    for (const [id, nav, label] of KID_SCREENS) {
       await page.evaluate(`(${nav.toString()})()`);
       await page.waitForTimeout(200);
       const r = await kidStandards(id);
@@ -1053,7 +1194,7 @@ function findChromium() {
       if (r.words > budget) problems.push(`${r.words} words (max ${budget}${budget !== 200 ? ', ratchet — target is 200' : ''})`);
       if (r.small && r.small.length) problems.push(`${r.small.length} target(s) under 44px: ${r.small.slice(0, 6).join(', ')}`);
       if (r.minFont < 13) problems.push(`font ${r.minFont}px on .${r.minWhere} (min 13)`);
-      if (problems.length) kidFindings.push(`${id}@${w}: ${problems.join(' | ')}`);
+      if (problems.length) kidFindings.push(`${label || id}@${w}: ${problems.join(' | ')}`);
     }
   }
   checks.kidScreensMeetTheHouseRules = kidFindings.length === 0 || kidFindings;
@@ -2259,33 +2400,49 @@ function findChromium() {
   // Her half of the loop: what is with Mom, and what came back while she
   // wasn't looking — and the marker must survive the render that shows it.
   checks.kidSeesWaitingAndAnswered = await page.evaluate(() => {
+    const bad = [];
     profile = 'jess'; parentViewing = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey, pd = getProfData(kid);
     const e = mrEnsureEarnings(kid, wk);
     e.claims = {}; e.chores = {}; e.gradedAt = {};
-    pd.progress.lastGradeSeen = 0;
     mrSetClaim(kid, wk, 1, 'dishes', 3);
     mrSetClaim(kid, wk, 3, 'mop', 2);
 
     openChoreTab(); ckSelectDay(0);
-    const waiting = mrWaitingCount(kid, wk) === 2
-      && document.getElementById('choreWrap').textContent.includes('waiting for Mom');
+    const wc = mrWaitingCount(kid, wk);
+    if (wc !== 2) bad.push(`waiting count is ${wc}, expected 2`);
+    if (!document.getElementById('choreWrap').textContent.includes('waiting for Mom'))
+      bad.push('her tab does not say "waiting for Mom"');
+
+    /* Say when she last looked, rather than inheriting it from the render above.
+       Rendering her tab stamps lastGradeSeen to now; grading below stamps
+       gradedAt from the same clock a few instructions later, and mrNewlyGraded
+       compares the two with a strict `>`. Both can land in the same millisecond,
+       and then a genuinely new grade reads as already-seen. That is what made
+       this check fail intermittently on CI while passing every time locally —
+       a millisecond boundary, not a regression. */
+    pd.progress.lastGradeSeen = syncNow() - 1000;
 
     const was = profile;
     profile = 'parent'; ctParentKid = kid;
     mrSetChoreGrade(kid, wk, 1, 'dishes', 3);
     // A parent looking at her tab must NOT consume her "new" markers.
     renderChoreTab();
-    const survivedParentLook = mrNewlyGraded(kid, wk).length === 1;
+    const afterParent = mrNewlyGraded(kid, wk).length;
+    if (afterParent !== 1) bad.push(`a parent's look left ${afterParent} new marker(s), expected 1`);
     profile = was;
 
     renderChoreTab();
-    const showedHer = document.getElementById('choreWrap').textContent.includes('newly answered');
+    if (!document.getElementById('choreWrap').textContent.includes('newly answered'))
+      bad.push('her tab does not say "newly answered"');
     renderChoreTab();                                  // she has now seen it
-    const cleared = mrNewlyGraded(kid, wk).length === 0;
-    const nowWaitingOne = mrWaitingCount(kid, wk) === 1;
-    return waiting && survivedParentLook && showedHer && cleared && nowWaitingOne;
+    const left = mrNewlyGraded(kid, wk).length;
+    if (left !== 0) bad.push(`${left} new marker(s) survived her own look, expected 0`);
+    const after = mrWaitingCount(kid, wk);
+    if (after !== 1) bad.push(`waiting count is ${after} after one grade, expected 1`);
+    // Findings, not a bare false — CLAUDE.md: return true or the findings.
+    return bad.length === 0 || bad;
   });
 
   // A 60-minute session is too short for the 2x2 grid but not too short to
@@ -2322,11 +2479,10 @@ function findChromium() {
     const noOwnList = document.querySelectorAll('#questList .quest-card').length === 0;
     const hasDoor = !!document.querySelector('.quest-today-card');
     document.querySelector('.quest-today-card').click();
-    const landed = document.querySelector('.screen.active').id === 'screen-day'
-      && dayViewMode === 'quest'
-      && document.querySelectorAll('#dayQuest .quest-card').length === 2;
+    // The one list is Today now. The board is still only a door to it.
+    const landed = document.querySelector('.screen.active').id === 'screen-today'
+      && document.querySelectorAll('#tdWrap .quest-card').length === 2;
     setDayBlocks(key, [], 'jenn');
-    setDayViewMode('timeline');
     return noOwnList && hasDoor && landed;
   });
 
@@ -2796,14 +2952,22 @@ function findChromium() {
       state.shared.challenges = [{ id: 'xss5-ch', title: payload, target: 3, unit: 'times' }];
     }, PAYLOAD);
 
+    /* Both week layouts render user text and both must be proved, so neither is
+       left to whichever happens to be the default. They need different proofs:
+       the Full view prints the whole name, but Day Blocks passes it through
+       tg2ShortLabel, which shortens in JS — so demanding the entire payload
+       there would fail on a view that is behaving correctly. For that one the
+       proof of render is that a label element exists at all; the assertions
+       that matter — no <img> built, no onerror fired — are identical. */
     const SURFACES = [
-      ['week',  () => { goWeek(); renderWeek(); }],
-      ['day',   () => { openDay(getDayKeys(0)[1], 1); }],
-      ['sheet', () => { openDay(getDayKeys(0)[1], 1); openEditSheet('xss5-blk'); }],
-      ['sync',  () => { openSisterSync(); }],
-      ['chore', () => { openChoreTab(); ckSelectDay(1); }],
+      ['week',        () => { goWeek(); setWeekView('full'); }, true],
+      ['week-blocks', () => { goWeek(); setWeekView('timegrid'); }, false],
+      ['day',   () => { openDay(getDayKeys(0)[1], 1); }, true],
+      ['sheet', () => { openDay(getDayKeys(0)[1], 1); openEditSheet('xss5-blk'); }, true],
+      ['sync',  () => { openSisterSync(); }, true],
+      ['chore', () => { openChoreTab(); ckSelectDay(1); }, true],
     ];
-    for (const [name, nav] of SURFACES) {
+    for (const [name, nav, wantsLiteral] of SURFACES) {
       const r = await page.evaluate(async ({ src, payload }) => {
         try { eval('(' + src + ')()'); } catch (e) { return { err: String(e).slice(0, 80) }; }
         await new Promise(r => setTimeout(r, 60));
@@ -2812,13 +2976,17 @@ function findChromium() {
           // The raw string must appear as text somewhere — proof it rendered
           // rather than being dropped or swallowed into an attribute.
           literal: document.body.innerText.includes(payload),
+          // Day Blocks shortens every label deliberately; a rendered label is
+          // the proof that this surface drew the hostile block at all.
+          rendered: !!document.querySelector('.tg2-block-lbl'),
           fired: window.__xss5 === true,
         };
       }, { src: nav.toString(), payload: PAYLOAD });
       if (r.err) { problems.push(`${name}: navigation threw — ${r.err}`); continue; }
       if (r.injected) problems.push(`${name}: an <img> was created from user text`);
       if (r.fired) problems.push(`${name}: onerror executed`);
-      if (!r.literal) problems.push(`${name}: the hostile string never rendered as text (test proves nothing)`);
+      if (wantsLiteral && !r.literal) problems.push(`${name}: the hostile string never rendered as text (test proves nothing)`);
+      if (!wantsLiteral && !r.rendered) problems.push(`${name}: nothing rendered here (test proves nothing)`);
     }
 
     await page.evaluate(() => {
@@ -3053,8 +3221,13 @@ function findChromium() {
     return namesNow && hasJobs && says && kind;
   });
 
-  // Handing off, not re-implementing: Today must never be a second place that
-  // grades a chore or moves money. It routes; the owning screen acts.
+  /* Handing off, not re-implementing. Today is now where a day gets *done*, so
+     it does write — but only by calling the function that already owned the
+     write (completeQuest for a tick, addQuickBreak for a break, setDayMood for a
+     mood). What it must still never do is grade a chore or move money: those
+     belong to the chore and money screens, and a second place that decides them
+     is a second place that can disagree. So the assertion narrows rather than
+     disappears — the navigation rows still change screen and not state. */
   checks.todayHandsOffRatherThanActing = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -3071,11 +3244,13 @@ function findChromium() {
       const after = JSON.stringify(mrEnsureEarnings('jenn', wk));
       if (!wentToChore || after !== before) return 'a Today row changed state or did not navigate';
     }
+    // The footer shortcuts are static markup now — siblings of #tdWrap, not
+    // inside it — so they are scoped to the screen.
     goToday();
-    document.querySelector('#tdWrap [data-td-action="week"]').click();
+    document.querySelector('#screen-today [data-td-action="week"]').click();
     const toWeek = document.getElementById('screen-week').classList.contains('active');
     goToday();
-    document.querySelector('#tdWrap [data-td-action="money"]').click();
+    document.querySelector('#screen-today [data-td-action="money"]').click();
     const toMoney = document.getElementById('screen-mymoney').classList.contains('active');
 
     const untouched = JSON.stringify(mrEnsureEarnings('jenn', wk)) === before;
@@ -3089,26 +3264,23 @@ function findChromium() {
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const wk = ctWeekKey, d = tdTodayIndex();
     if (d == null) return 'today is outside the current week';
-    const pool = mrPoolRows(wk).filter(r => r.who === 'both' || r.who === 'jenn');
-    if (!pool.length) return 'no pool rows to claim';
-
-    /* Clear today's grades for jenn first. mrClaimQueue skips anything already
-       graded, so a leftover grade on the row this check claims makes the
-       waiting count 0 and the check fails — while proving nothing about Today.
-
-       That is not hypothetical: several earlier checks grade 'dishes' at day
-       index 0 and never clear it, so this failed whenever today happened to BE
-       day 0. It passed six days a week and went red every Monday, which is a
-       worse failure than a steady one because nobody believes it. */
-    const dayGrades = mrEnsureEarnings('jenn', wk).chores[String(d)] || {};
-    const restore = Object.assign({}, dayGrades);
-    // Grading is parent-only — as a kid these calls are refused silently, which
-    // is what made the first attempt at this reset do nothing at all.
-    profile = 'parent';
-    Object.keys(restore).forEach(id => mrSetChoreGrade('jenn', wk, d, id, 0));
-    profile = 'jenn';
-
-    mrSetClaim('jenn', wk, d, pool[0].id, 3);
+    /* Pick a chore that is actually still open today. This took the first pool
+       row unconditionally, and by the time it ran an earlier check had already
+       graded `dishes` for this day — a graded chore is "answered", never
+       "waiting", so the claim landed and the waiting count stayed 0. The check
+       then returned a bare `false` and said nothing about why. */
+    /* Claim a chore that is genuinely still open today. This used to take the
+       first pool row unconditionally, and by the time it ran an earlier check
+       had already graded every chore due today — a graded chore is "answered",
+       never "waiting", so the claim landed and the waiting count stayed 0 while
+       the check reported a bare `false` that said nothing about why.
+       Clear this day's grades first so the precondition is real, not assumed. */
+    const dueRows = mrChoresForDay('jenn', wk, d).rows.map(r => r.row);
+    if (!dueRows.length) return 'no chores due today to claim';
+    const e = mrEnsureEarnings('jenn', wk);
+    if (e.chores) delete e.chores[String(d)];
+    const open = dueRows[0];
+    mrSetClaim('jenn', wk, d, open.id, 3);
 
     goToday();
     const todayChip = document.querySelector('#tdWrap [data-td-action="waiting"]');
@@ -3117,15 +3289,78 @@ function findChromium() {
 
     // ...and the claim must not appear in "jobs I can do" as well, or it reads as
     // two separate jobs.
-    const claimedLabel = pool[0].label;
+    const claimedLabel = open.label;
     const stillOffered = [...document.querySelectorAll('#tdWrap [data-td-action="chore"]')]
       .some(b => b.textContent.includes(claimedLabel));
 
     mrEnsureEarnings('jenn', wk).claims = {};
-    profile = 'parent';
-    Object.keys(restore).forEach(id => mrSetChoreGrade('jenn', wk, d, id, restore[id]));
-    profile = 'jenn';
-    return todayCount === truth && truth > 0 && !stillOffered;
+    // Findings, not a bare false: this returned only `false` and said nothing
+    // about which half disagreed, which is the shape CLAUDE.md warns about.
+    const bad = [];
+    if (todayCount !== truth) bad.push(`Today says ${todayCount} waiting, the chore screen says ${truth}`);
+    if (!(truth > 0)) bad.push(`the claim on "${open.id}" did not register as waiting`);
+    if (stillOffered) bad.push(`"${claimedLabel}" is claimed and still offered as a job`);
+    return bad.length === 0 || bad;
+  });
+
+  /* Today is the doing surface: the quest list, the 🎯, and the panels that came
+     off the day timeline. The 🎯 must go through completeQuest — the single
+     owner of completion, XP and sticker counting — rather than a second copy of
+     it, which is the thing the Today rules actually forbid. */
+  checks.todayIsWhereTheDayGetsDone = await page.evaluate(async () => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const key = todayKey();
+    const bad = [];
+    setDayBlocks(key, [
+      { id: 'td-q1', actId: 'piano',      startMin: 15 * 60, durationMin: 60 },
+      { id: 'td-q2', actId: 'breakfast',  startMin: 7 * 60,  durationMin: 30 },
+    ], 'jenn');
+    goToday();
+
+    // The whole day is listed, in day order — not a capped teaser.
+    const cards = [...document.querySelectorAll('#tdWrap .quest-card')];
+    if (cards.length !== 2) bad.push(`expected 2 quest cards, got ${cards.length}`);
+    const times = [...document.querySelectorAll('#tdWrap .quest-time')].map(e => e.textContent.trim());
+    if (times[0] !== '7:00am') bad.push(`cards are not in day order: ${times.join(', ')}`);
+
+    // 🎯 completes through the owning path: block marked done AND XP moved.
+    const xpBefore = getQuestXP('jenn');
+    const blast = document.querySelector('#tdWrap [data-td-action="blast"][data-td-block="td-q2"]');
+    if (!blast) { bad.push('no 🎯 on a quest card'); }
+    else {
+      blast.click();
+      // The blast is an animation: projectile 300ms, burst 240ms, then the
+      // completion. Assert after it lands, not before.
+      await new Promise(r => setTimeout(r, 900));
+      const blk = (getDayBlocks(key, 'jenn') || []).find(b => b.id === 'td-q2');
+      if (!blk || !blk.completed) bad.push('🎯 did not complete the block');
+      if (getQuestXP('jenn') <= xpBefore) bad.push('🎯 completed without awarding XP');
+    }
+
+    // Tapping the card body is still a hand-off to the planner, not a write.
+    goToday();
+    const open = document.querySelector('#tdWrap [data-td-action="plan"][data-td-block="td-q1"]');
+    if (!open) bad.push('a quest card does not open the day for planning');
+    else {
+      open.click();
+      if (document.querySelector('.screen.active').id !== 'screen-day') bad.push('card body did not reach the day screen');
+    }
+
+    // The relocated panels are present, and the reference ones start collapsed
+    // so they cost nothing against the word budget.
+    goToday();
+    if (!document.getElementById('vibeMoods')) bad.push('the vibe picker did not come across');
+    if (!document.getElementById('dayTodosList') || !document.getElementById('dayGoalsList')) bad.push('to-dos/goals did not come across');
+    if (!document.querySelector('#screen-today .btn-break-quick')) bad.push('the break buttons did not come across');
+    const body = document.getElementById('tdExtrasBody');
+    if (!body || getComputedStyle(body).display !== 'none') bad.push('the extras panel is not collapsed by default');
+    tdToggleExtras();
+    if (getComputedStyle(document.getElementById('tdExtrasBody')).display === 'none') bad.push('the extras panel does not open');
+    tdToggleExtras();
+
+    setDayBlocks(key, [], 'jenn');
+    return bad.length === 0 || bad;
   });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => { profile = 'jenn'; goToday(); });
@@ -3135,17 +3370,16 @@ function findChromium() {
 
   // ── Today as the front door (Branch 5) ───────────────────────────────────
   checks.todayIsTheFrontDoor = await page.evaluate(async () => {
-    // Hero Mode used to decide the landing and was the only thing it decided, so
-    // both states must now land on Today — otherwise it is still the front door
-    // for only half the family.
+    /* Hero Mode used to decide the landing, and was eventually the only thing it
+       decided; it is gone. A child lands on Today unconditionally now, and the
+       key must not come back — a stale flag reviving an old landing screen is
+       exactly the failure this check exists to catch. */
     const results = [];
-    for (const hero of ['1', '0']) {
-      localStorage.setItem('wp_hero_mode', hero);
-      profile = null;
-      await selectProfile('jenn');
-      results.push(document.getElementById('screen-today').classList.contains('active'));
-    }
-    localStorage.setItem('wp_hero_mode', '1');
+    profile = null;
+    await selectProfile('jenn');
+    results.push(document.getElementById('screen-today').classList.contains('active'));
+    results.push(typeof isHeroMode === 'undefined');
+    results.push(localStorage.getItem('wp_hero_mode') === null);
     // A parent still lands in the portal.
     parentUnlockedThisSession = true;
     await selectProfile('parent');
@@ -3539,38 +3773,62 @@ function findChromium() {
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const key = todayKey();
     const before = JSON.stringify(getDayBlocks(key, 'jenn') || []);
+    /* .td-plan, not [data-td-action="plan"]: every quest card's body carries
+       that action too, so the bare attribute matches on a day that is full and
+       the "absent when planned" half below could never fail. */
+    const offer = () => document.querySelector('#tdWrap .td-plan');
     setDayBlocks(key, [], 'jenn');
     goToday();
-    const offered = !!document.querySelector('#tdWrap [data-td-action="plan"]');
+    const offered = !!offer();
     const reaches = (() => {
-      const b = document.querySelector('#tdWrap [data-td-action="plan"]');
+      const b = offer();
       if (!b) return false;
       b.click();
       const landed = document.getElementById('screen-day').classList.contains('active');
       goToday();
       return landed;
     })();
+    // A day with something on it gets the quest list instead — the offer is for
+    // the day that has none.
+    setDayBlocks(key, [{ id: 'td-plan-x', actId: 'piano', startMin: 15 * 60, durationMin: 60 }], 'jenn');
+    goToday();
+    const hidden = !offer();
     setDayBlocks(key, JSON.parse(before), 'jenn');
     goToday();
-    const hidden = (JSON.parse(before).length > 0)
-      ? !document.querySelector('#tdWrap [data-td-action="plan"]')
-      : true;
     return offered && reaches && hidden;
   });
 
-  /* No dead scroll under the kid nav. .screen was 100vh and the body added 64px
-     of padding to clear the bar, so every kid screen was 100vh + 64px however
-     little was on it — invisible on a phone, 64px of empty scroll on an iPad.
-     Today is the screen short enough to show it. */
+  /* No PHANTOM scroll under the kid nav. `.screen` carried min-height: 100vh
+     while the body added 64px of padding to clear the bar, so the page floor
+     was 100vh + 64px however little was on it — invisible on a phone, 64px of
+     empty scroll on an iPad with nothing in it.
+
+     Deliberately not "Today never scrolls": Today is the doing surface now and
+     has a real list on it, so on a short viewport it scrolls because there is
+     something to scroll to. That is not the bug. The invariant is that the
+     screen's own floor plus the body's clearance must fit the viewport — the
+     screen has to be 100vh MINUS the bar, not plus it. Content growth can never
+     break this check, and removing the fix always does. */
   await page.setViewportSize({ width: 1024, height: 768 });   // iPad landscape
   await page.waitForTimeout(150);
   checks.kidScreensDoNotScrollOnATablet = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead();
     goToday();
-    const doc = document.documentElement;
-    const navShowing = !document.getElementById('kidNav').hidden;
-    return navShowing && doc.scrollHeight <= window.innerHeight + 1;
+    const nav = document.getElementById('kidNav');
+    if (!nav || nav.hidden) return 'the kid nav is not showing';
+    const screen = document.querySelector('.screen.active');
+    const floor = parseFloat(getComputedStyle(screen).minHeight) || 0;
+    const clearance = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+    const navH = nav.getBoundingClientRect().height;
+    const bad = [];
+    if (floor > window.innerHeight - navH + 1) {
+      bad.push(`screen floor ${floor}px does not leave room for the ${navH}px nav in ${window.innerHeight}px`);
+    }
+    if (floor + clearance > window.innerHeight + 1) {
+      bad.push(`floor ${floor}px + clearance ${clearance}px = ${floor + clearance}px, taller than the ${window.innerHeight}px viewport`);
+    }
+    return bad.length === 0 || bad;
   });
   await page.screenshot({ path: shot('ipad_today') });
   await page.setViewportSize({ width: 900, height: 1100 });
