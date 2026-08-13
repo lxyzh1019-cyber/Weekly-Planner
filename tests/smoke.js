@@ -3275,8 +3275,26 @@ function findChromium() {
        never "waiting", so the claim landed and the waiting count stayed 0 while
        the check reported a bare `false` that said nothing about why.
        Clear this day's grades first so the precondition is real, not assumed. */
-    const dueRows = mrChoresForDay('jenn', wk, d).rows.map(r => r.row);
-    if (!dueRows.length) return 'no chores due today to claim';
+    /* And plant one if today has none, rather than reporting that as a failure.
+       Whether a chore is due today depends on which weekday the run lands on:
+       the pool rows that need a planned block only show up on the days the
+       seeded week puts one, so this check passed on Tuesday and Wednesday and
+       failed on Thursday against the identical commit, saying only "no chores
+       due today to claim". That is the check's own precondition, not a defect
+       in the app — and a check that can only run on some weekdays is not
+       checking the other ones. Tag the block with a pool row id so it resolves
+       for whoever the pool actually assigns the chore to. */
+    const dayKey = mrWeekDayKeys(wk)[d];
+    const hadBlocks = (getDayBlocks(dayKey) || []).slice();
+    let dueRows = mrChoresForDay('jenn', wk, d).rows.map(r => r.row);
+    if (!dueRows.length) {
+      const mine = mrPoolRows(wk).filter(r => r.who === 'both' || r.who === 'jenn');
+      if (!mine.length) return 'the chore pool has nothing for jenn';
+      setDayBlocks(dayKey, [{ id: 'td-agree', actId: 'chores', startMin: 17 * 60,
+                              durationMin: 30, choreTags: [mine[0].id] }], 'jenn');
+      dueRows = mrChoresForDay('jenn', wk, d).rows.map(r => r.row);
+      if (!dueRows.length) return `planted "${mine[0].id}" on today and it still reads as nothing due`;
+    }
     const e = mrEnsureEarnings('jenn', wk);
     if (e.chores) delete e.chores[String(d)];
     const open = dueRows[0];
@@ -3294,6 +3312,7 @@ function findChromium() {
       .some(b => b.textContent.includes(claimedLabel));
 
     mrEnsureEarnings('jenn', wk).claims = {};
+    setDayBlocks(dayKey, hadBlocks, 'jenn');   // put today back as it was found
     // Findings, not a bare false: this returned only `false` and said nothing
     // about which half disagreed, which is the shape CLAUDE.md warns about.
     const bad = [];
