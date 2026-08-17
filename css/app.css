@@ -1544,11 +1544,15 @@
      variant is a statement of fact, not a warning: a fortnight nobody wrote
      down is a normal outcome of a busy fortnight. */
   .mm-weekbar {
-    display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+    display: flex; flex-direction: column; gap: var(--space-1);
     margin-bottom: var(--space-2); padding: var(--space-2) var(--space-3);
     border: 1.5px solid var(--paper-line); border-radius: var(--radius-md);
     background: var(--paper-card, #fffdf5);
   }
+  .mm-weekbar-head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  /* Where the family left off. "Which week did we last do?" is the first
+     question at the table, and nothing on screen used to answer it. */
+  .mm-weekbar-last { font-size: calc(0.76rem * var(--fs-scale, 1)); opacity: 0.7; }
   .mm-weekbar-wk { font-weight: 800; font-size: calc(0.9rem * var(--fs-scale, 1)); }
   .mm-weekbar-now { font-size: calc(0.78rem * var(--fs-scale, 1)); opacity: 0.6; }
   .mm-weekbar.late { border-color: var(--accent-strong); border-style: dashed; background: #fff4db; }

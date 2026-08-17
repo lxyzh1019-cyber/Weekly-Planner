@@ -15,6 +15,7 @@ let mmStep = 1;
 let mmSelectedDay = null;
 let mmUndo = null;
 let mmAddChoreFor = null;   // "kid|dayIdx" whose add-a-chore picker is open
+let mmCatchUpAsked = false; // the catch-up question, asked once per page load
 
 function openFamilyMeeting() {
   if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
@@ -61,19 +62,82 @@ function mmWeekLabel(wk) {
   const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
   return `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} – ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()}`;
 }
-/* The week this meeting is about, always on screen. The sheet's own title is
-   the static "Weekly family meeting", which is true of every week and so
-   identifies none of them. */
+/* The last week that was actually recorded. A family that meets most Sundays
+   never needs this; a family sitting down after a busy fortnight needs it
+   before anything else, because "which week did we last do?" is the first
+   question at the table and nothing on screen answered it. */
+function mmLastReviewed() {
+  ctEnsureShared();
+  const held = state.shared.chore.meetingsHeld || {};
+  const wks = Object.keys(held).filter(k => held[k]).sort();
+  if (!wks.length) return null;
+  const wk = wks[wks.length - 1];
+  return { wk, weeksAgo: mrWeeksSince(wk) };
+}
+function mmWeeksAgoWord(n) {
+  return n === 0 ? 'this week' : n === 1 ? 'a week ago' : `${n} weeks ago`;
+}
+function mmLastReviewedLine() {
+  const last = mmLastReviewed();
+  const open = mmUnsettledWeeks(8).length;
+  if (!last) return `<div class="mm-weekbar-last">No week has been settled yet.</div>`;
+  const gap = open ? ` · ${open} earlier week${open === 1 ? '' : 's'} still open` : '';
+  // Dates and counts only — no user text on this line.
+  const text = `Last settled: ${mmWeekLabel(last.wk)} · ${mmWeeksAgoWord(last.weeksAgo)}${gap}`;
+  return `<div class="mm-weekbar-last">${escapeHtml(text)}</div>`;
+}
+/* The week this meeting is about, always on screen, with where the family left
+   off underneath it. The sheet's own title is the static "Weekly family
+   meeting", which is true of every week and so identifies none of them. */
 function mmWeekBar(wk) {
   const late = mrWeeksSince(wk);
   const label = `Week of ${mmWeekLabel(wk)}`;   // from date tables, no user text
-  if (!late) {
-    return `<div class="mm-weekbar"><span class="mm-weekbar-wk">${escapeHtml(label)}</span>
-        <span class="mm-weekbar-now">this week</span></div>`;
-  }
-  return `<div class="mm-weekbar late"><span class="mm-weekbar-wk">${escapeHtml(label)}</span>
-      <span class="mm-weekbar-late">⏪ catching up · ${late} week${late === 1 ? '' : 's'} ago</span>
-      <button type="button" class="mm-weekbar-btn" data-mm-action="thisweek">This week ▶</button></div>`;
+  const head = late
+    ? `<span class="mm-weekbar-wk">${escapeHtml(label)}</span>
+       <span class="mm-weekbar-late">⏪ catching up · ${late} week${late === 1 ? '' : 's'} ago</span>
+       <button type="button" class="mm-weekbar-btn" data-mm-action="thisweek">This week ▶</button>`
+    : `<span class="mm-weekbar-wk">${escapeHtml(label)}</span>
+       <span class="mm-weekbar-now">this week</span>`;
+  return `<div class="mm-weekbar${late ? ' late' : ''}">
+      <div class="mm-weekbar-head">${head}</div>${mmLastReviewedLine()}</div>`;
+}
+/* ── The question, when the meeting is opened to be run ──
+   Deliberately not part of openFamilyMeeting. Half of that function's callers
+   are deep links — a specific day from the hub's strip, step 3 to show an
+   override, the tab rail jumping to "What I earned" — and a question about a
+   different week on top of one of those is a question about something the
+   parent did not ask for. So this hangs off the three "run the meeting"
+   buttons, and openFamilyMeeting stays exactly as it was.
+
+   Asked once per page load: a parent who says not now has answered, the hub's
+   list is still sitting there, and next Sunday is a new load. */
+function mmMaybeAskCatchUp() {
+  if (mmCatchUpAsked || !isParent()) return;
+  if (mmWeekKey() !== ctThisWeekKey()) return;   // already looking at a past week
+  const missing = mmUnsettledWeeks(8);
+  if (!missing.length) return;
+  mmCatchUpAsked = true;
+  const last = mmLastReviewed();
+  const nearest = missing[0];
+  const where = last
+    ? `Last settled: week of ${mmWeekLabel(last.wk)} — ${mmWeeksAgoWord(last.weeksAgo)}.`
+    : 'No week has been settled yet.';
+  const msg = `${where} ${missing.length} earlier week${missing.length === 1 ? '' : 's'} `
+    + `${missing.length === 1 ? 'was' : 'were'} never settled, and `
+    + `${missing.length === 1 ? 'it is' : 'they are'} still open. Edit one now?`;
+  showChoice(msg, [
+    { id: 'nearest', label: `Catch up on ${mmWeekLabel(nearest.wk)}`,
+      sub: `${mmWeeksAgoWord(nearest.weeksLate)} — the most recent one still open` },
+    { id: 'now', label: 'Carry on with this week',
+      sub: 'The open weeks stay open, and stay editable' },
+  ], { cancelLabel: 'Not now' }).then(id => {
+    if (id === 'nearest') mmGoToWeek(nearest.wk);
+  });
+}
+/* What the "run the family meeting" buttons call. */
+function openFamilyMeetingAsk() {
+  openFamilyMeeting();
+  mmMaybeAskCatchUp();
 }
 /* Weeks behind us that were never recorded, most recent first. Stops at the
    money model's own start week: before that the meeting has nothing to agree or

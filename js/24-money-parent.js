@@ -503,7 +503,7 @@ function mnyParentClick(ev) {
   if (a === 'drop')    { mnyPending.splice(Number(el.getAttribute('data-mnyp-i')), 1); mnyRenderRulesTab(); return; }
   if (a === 'save')    { mnySavePending(); return; }
   if (a === 'discard') { mnyPending = []; mnyPendingFrom = null; mnyRenderRulesTab(); return; }
-  if (a === 'meeting') { showScreen('parent'); openFamilyMeeting(); return; }
+  if (a === 'meeting') { showScreen('parent'); openFamilyMeetingAsk(); return; }
 
   if (a === 'bump') {
     const path = el.getAttribute('data-mnyp-path');

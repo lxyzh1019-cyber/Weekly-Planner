@@ -659,6 +659,11 @@ function findChromium() {
     const before = JSON.stringify(state.shared.chore.finalizedWeeks || {});
     document.querySelector('[data-cp-action="settle"]').click();
     const opened = document.getElementById('familyMeetingOverlay').classList.contains('open');
+    // Settle is a run-the-meeting button, so it also asks about weeks nobody
+    // settled (mmMaybeAskCatchUp). Answer it — a live .overlay is fixed/inset-0
+    // at z-index 300, so leaving one up puts an invisible sheet of glass over
+    // every hit-test that follows, which is what broke the 44px kid audit.
+    _closeAppDialog(null);
     closeSheet('familyMeetingOverlay');
     return opened && JSON.stringify(state.shared.chore.finalizedWeeks || {}) === before;
   });
@@ -904,6 +909,7 @@ function findChromium() {
     document.querySelector('[data-cp-action="settle"]').click();
     step.meetingOpens = document.getElementById('familyMeetingOverlay').classList.contains('open');
     step.nothingSettledYet = JSON.stringify(state.shared.chore.finalizedWeeks || {}) === finalBefore;
+    _closeAppDialog(null);   // settle asks about unsettled weeks too — see above
     closeSheet('familyMeetingOverlay');
 
     // Leave the week as we found it.
@@ -3632,6 +3638,78 @@ function findChromium() {
     c.meetingsHeld = heldBefore; c.moneyModelStartWeek = startBefore;
     return (found && ordered && dropped && shown && wording && floored)
       || [{ found, ordered, dropped, shown, wording, floored }];
+  });
+
+  /* Opening the meeting has to answer "where did we leave off?" and then offer
+     the gap — the two things a family coming back after a busy fortnight needs
+     before anything else. The ask hangs off the run-the-meeting buttons, NOT
+     openFamilyMeeting: half that function's callers are deep links (a day from
+     the hub strip, step 3 to show an override, the tab rail), and a question
+     about another week on top of one of those is a question about something
+     nobody asked for. */
+  checks.meetingSaysWhereYouLeftOff = await page.evaluate(async () => {
+    profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const c = state.shared.chore;
+    const heldBefore = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
+    const startBefore = c.moneyModelStartWeek;
+    const askedBefore = mmCatchUpAsked;
+    const back = (n) => {
+      const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - n * 7);
+      return ctDateToKey(d);
+    };
+    c.moneyModelStartWeek = back(3);
+    // Settled three weeks ago and nothing since: two weeks open behind us.
+    c.meetingsHeld = {}; c.meetingsHeld[back(3)] = true;
+
+    const last = mmLastReviewed();
+    const lastIs = !!last && last.wk === back(3) && last.weeksAgo === 3;
+
+    // The readout is on screen whichever week the meeting is on.
+    mmCatchUpAsked = true;                  // suppress the ask for this part
+    openFamilyMeeting();
+    const body = document.getElementById('familyMeetingBody').textContent;
+    const shows = body.includes('Last settled') && body.includes('2 earlier weeks still open');
+    closeSheet('familyMeetingOverlay');
+
+    const dlgOpen = () => {
+      const ov = document.getElementById('appDialogOverlay');
+      return !!ov && ov.classList.contains('open');
+    };
+    // A programmatic open must stay silent.
+    mmCatchUpAsked = false;
+    openFamilyMeeting();
+    const quietOnDeepLink = !dlgOpen();
+    closeSheet('familyMeetingOverlay');
+
+    // The deliberate one asks, and taking the offer moves the meeting.
+    mmCatchUpAsked = false;
+    openFamilyMeetingAsk();
+    const asked = dlgOpen()
+      && document.getElementById('appDialogOverlay').textContent.includes('never settled');
+    const btn = document.querySelector('#appDialogOverlay [data-choice="0"]');
+    if (btn) btn.click();
+    await new Promise(r => setTimeout(r, 20));
+    const movedToGap = ctWeekKey === back(1);
+    // …and it is one ask per load, not one per open.
+    openFamilyMeetingAsk();
+    const askedOnce = !dlgOpen();
+    closeSheet('familyMeetingOverlay');
+
+    // Caught up → no question at all.
+    ctWeekKey = ctThisWeekKey();
+    mmUnsettledWeeks(8).forEach(x => { c.meetingsHeld[x.wk] = true; });
+    mmCatchUpAsked = false;
+    openFamilyMeetingAsk();
+    const quietWhenCaughtUp = !dlgOpen();
+    closeSheet('familyMeetingOverlay');
+
+    c.meetingsHeld = heldBefore; c.moneyModelStartWeek = startBefore;
+    mmCatchUpAsked = askedBefore;
+    ctSetCurrentWeekFromPlanner();
+    return (lastIs && shows && quietOnDeepLink && asked && movedToGap && askedOnce
+            && quietWhenCaughtUp) || [{ lastIs, shows, quietOnDeepLink, asked,
+              movedToGap, askedOnce, quietWhenCaughtUp }];
   });
 
   /* The market clock must not be a register of attendance. It was incremented

@@ -448,7 +448,7 @@ function cpHandleClick(e) {
     if (document.getElementById('ptab-options')) setParentTab('options');
     else showToast('Chore pool & goals — coming to its own tab');
   }
-  else if (a === 'settle') { openFamilyMeeting(); }
+  else if (a === 'settle') { openFamilyMeetingAsk(); }
   else if (a === 'grade') cpGrade(el.dataset.choreId, +el.dataset.day, +el.dataset.grade);
   else if (a === 'schedule') cpSchedule(el.dataset.choreId, true);
   else if (a === 'unschedule') cpSchedule(el.dataset.choreId, false);

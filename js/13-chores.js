@@ -971,7 +971,7 @@ function ctRenderMoneyCard(kid) {
     <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.5rem">
       ${isParent()
         ? `<button type="button" class="pill-btn" onclick="mnyOpenMyMoney('${escapeJsAttr(kid)}')">💰 My money</button>
-           <button type="button" class="pill-btn" onclick="openFamilyMeeting()">🧑‍🧑‍🧒 Family meeting</button>`
+           <button type="button" class="pill-btn" onclick="openFamilyMeetingAsk()">🧑‍🧑‍🧒 Family meeting</button>`
         : `<button type="button" class="pill-btn" onclick="mnyOpenMyMoney('${escapeJsAttr(kid)}')">💰 My money</button>`}
     </div></div>`;
 }
