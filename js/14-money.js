@@ -42,6 +42,28 @@ function bankConfig() {
   }
   return c.bank;
 }
+/* ── The market clock runs on the calendar, not on attendance ──
+   marketMonth used to be incremented once per meeting, which quietly made the
+   share prices a count of how many Sundays the family showed up. Two costs:
+   settling three missed weeks in one evening moved the market three months in
+   one evening, and a family that met every week saw a different year of prices
+   than a family that met fortnightly — for the same year.
+
+   Derived from the anchor instead, so the market moves with real time whether
+   or not anyone met. Monotonic on purpose: it never steps backwards, so a
+   device with a wrong clock cannot rewind a price a kid has already been
+   shown. */
+function bankMarketMonthForToday() {
+  const cfg = bankConfig();
+  const now = new Date();
+  return Math.max(0, (now.getFullYear() - cfg.startYear) * 12 + (now.getMonth() - cfg.startMonth));
+}
+function bankSyncMarketMonth() {
+  const cfg = bankConfig();
+  const next = bankMarketMonthForToday();
+  if (next > cfg.marketMonth) cfg.marketMonth = next;
+  return cfg.marketMonth;
+}
 function ensureWallet(kid) {
   const p = getProfData(kid);
   if (!p.wallet) p.wallet = { cash: 0, savings: 0, gics: [], holdings: {}, lastMeetingWeek: null };

@@ -445,7 +445,7 @@ function mnyHistoryEditor(kid) {
       const gap = money2(inTotal - money2(r.fines) - outTotal);
       return `<div class="mny-card">
           <div class="mny-week-head">
-            <span class="mny-label">Week of ${escapeHtml(mnyShortDate(r.weekKey))}${r.handEntered ? ' · typed in' : ''}</span>
+            <span class="mny-label">Week of ${escapeHtml(mnyShortDate(r.weekKey))}${r.handEntered ? ' · typed in' : (r.weeksLate ? ' · settled ' + r.weeksLate + 'wk late' : '')}</span>
             <b>${mnyMoney(r.net)}</b>
           </div>
           ${r.handEntered ? `<div class="mny-rows">
@@ -503,7 +503,7 @@ function mnyParentClick(ev) {
   if (a === 'drop')    { mnyPending.splice(Number(el.getAttribute('data-mnyp-i')), 1); mnyRenderRulesTab(); return; }
   if (a === 'save')    { mnySavePending(); return; }
   if (a === 'discard') { mnyPending = []; mnyPendingFrom = null; mnyRenderRulesTab(); return; }
-  if (a === 'meeting') { showScreen('parent'); openFamilyMeeting(); return; }
+  if (a === 'meeting') { showScreen('parent'); openFamilyMeetingAsk(); return; }
 
   if (a === 'bump') {
     const path = el.getAttribute('data-mnyp-path');

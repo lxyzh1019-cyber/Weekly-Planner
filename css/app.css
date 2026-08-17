@@ -1539,6 +1539,72 @@
     font-size: calc(0.78rem * var(--fs-scale, 1)); font-weight: 700;
   }
   .mm-detail-editnote { font-size: calc(0.72rem * var(--fs-scale, 1)); opacity: 0.7; font-style: italic; margin-top: 6px; }
+  /* ── Which week this meeting is about ──
+     Always on screen, because the sheet's title is true of every week. The late
+     variant is a statement of fact, not a warning: a fortnight nobody wrote
+     down is a normal outcome of a busy fortnight. */
+  .mm-weekbar {
+    display: flex; flex-direction: column; gap: var(--space-1);
+    margin-bottom: var(--space-2); padding: var(--space-2) var(--space-3);
+    border: 1.5px solid var(--paper-line); border-radius: var(--radius-md);
+    background: var(--paper-card, #fffdf5);
+  }
+  .mm-weekbar-head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  /* Where the family left off. "Which week did we last do?" is the first
+     question at the table, and nothing on screen used to answer it. */
+  .mm-weekbar-last { font-size: calc(0.76rem * var(--fs-scale, 1)); opacity: 0.7; }
+  .mm-weekbar-wk { font-weight: 800; font-size: calc(0.9rem * var(--fs-scale, 1)); }
+  .mm-weekbar-now { font-size: calc(0.78rem * var(--fs-scale, 1)); opacity: 0.6; }
+  .mm-weekbar.late { border-color: var(--accent-strong); border-style: dashed; background: #fff4db; }
+  .mm-weekbar-late {
+    font-size: calc(0.78rem * var(--fs-scale, 1)); font-weight: 800; color: var(--accent-strong);
+  }
+  .mm-weekbar-btn {
+    margin-left: auto; min-height: 44px; padding: 0 var(--space-3);
+    font-family: inherit; font-weight: 800; font-size: calc(0.82rem * var(--fs-scale, 1));
+    color: inherit; background: var(--paper); border: 1.5px solid var(--ink);
+    border-radius: var(--radius-sm); cursor: pointer;
+  }
+  /* ── Weeks nobody got to, on the parent hub ── */
+  .mm-catchup {
+    margin-top: var(--space-3); padding: var(--space-3);
+    border: 2px dashed var(--accent-strong); border-radius: var(--radius-md); background: #fff4db;
+  }
+  .mm-catchup-cap {
+    font-size: calc(0.82rem * var(--fs-scale, 1)); font-weight: 700; margin-bottom: var(--space-2);
+  }
+  .mm-catchup-row {
+    display: flex; align-items: center; gap: var(--space-2); width: 100%;
+    min-height: 44px; margin-top: var(--space-1); padding: var(--space-2) var(--space-3);
+    text-align: left; font-family: inherit; color: inherit; font-weight: 700;
+    font-size: calc(0.85rem * var(--fs-scale, 1));
+    background: var(--paper-card, #fffdf5); border: 1.5px solid var(--ink);
+    border-radius: var(--radius-sm); cursor: pointer;
+  }
+  .mm-catchup-row:hover { background: #fff; }
+  .mm-catchup-wk { flex: 1; min-width: 0; }
+  .mm-catchup-late { font-size: calc(0.75rem * var(--fs-scale, 1)); opacity: 0.65; white-space: nowrap; }
+  .mm-catchup-go { font-weight: 800; color: var(--accent-strong); white-space: nowrap; }
+  /* ── Making a blank day workable ──
+     Both footers sit under their section's items and are the only way a week
+     with no planner blocks in it gets anything to tick. */
+  .mm-routine-all, .mm-addchore {
+    width: 100%; min-height: 44px; margin-top: var(--space-2); padding: var(--space-2);
+    font-family: inherit; font-weight: 800; font-size: calc(0.8rem * var(--fs-scale, 1));
+    color: inherit; background: var(--paper); border: 1.5px dashed var(--ink);
+    border-radius: var(--radius-sm); cursor: pointer;
+  }
+  .mm-routine-all:hover, .mm-addchore:hover { background: #fff4db; }
+  .mm-addchore-list { display: flex; flex-direction: column; gap: var(--space-1); margin-top: var(--space-1); }
+  .mm-addchore-pick {
+    display: flex; align-items: center; gap: var(--space-2); width: 100%;
+    min-height: 44px; padding: var(--space-2) var(--space-3);
+    text-align: left; font-family: inherit; color: inherit; font-weight: 700;
+    font-size: calc(0.82rem * var(--fs-scale, 1));
+    background: var(--paper-card, #fffdf5); border: 1.5px solid var(--ink);
+    border-radius: var(--radius-sm); cursor: pointer;
+  }
+  .mm-addchore-pick:hover { background: #95d5b2; }
   /* Step 1 splits each kid's day into the two things it actually is: routines
      the parent marks (no money, feeds the streak) and priced chores, where a
      tap is the grading act. They read differently because they ARE different. */
@@ -1558,6 +1624,11 @@
   .mm-confirm-day { width: 100%; margin-top: 8px; border: 2px solid var(--ink); border-radius: 10px; background: var(--paper-card, #fffdf5); box-shadow: 2px 2px 0 var(--ink); padding: 6px; font-weight: 800; cursor: pointer; }
   .mm-confirm-day.confirmed { background: #95d5b2; }
   .mm-ready { margin-top: 8px; font-size: calc(0.82rem * var(--fs-scale, 1)); font-weight: 700; background: #fff4db; border: 2px dashed #e8dfc3; border-radius: 10px; padding: 6px 10px; }
+  /* Step 2's way through to the screen that owns the blocks. */
+  .mm-blocklink {
+    display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+    margin-top: var(--space-2);
+  }
   .mm-wins { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .mm-win { border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px; background: var(--paper-card, #fffdf5); }
   .mm-win-kid { font-weight: 800; margin-bottom: 4px; }

@@ -74,11 +74,11 @@ function renderMeetingHub() {
     ? `<div class="hub-status hub-status-done">✅ This week is recorded — pocket money was credited at the meeting.</div>`
     : `<div class="hub-status">${nConfirmed}/7 days confirmed · pocket money so far: ${money}</div>`;
   const cta = held
-    ? `<button type="button" class="pill-btn" onclick="openFamilyMeeting()">🧑‍🧑‍🧒 Re-open the meeting</button>`
-    : `<button type="button" class="btn-confirm" onclick="openFamilyMeeting()">🧑‍🧑‍🧒 ${nConfirmed > 0 ? 'Continue the' : 'Run'} family meeting</button>`;
+    ? `<button type="button" class="pill-btn" onclick="openFamilyMeetingAsk()">🧑‍🧑‍🧒 Re-open the meeting</button>`
+    : `<button type="button" class="btn-confirm" onclick="openFamilyMeetingAsk()">🧑‍🧑‍🧒 ${nConfirmed > 0 ? 'Continue the' : 'Run'} family meeting</button>`;
   wrap.innerHTML = `<div class="hub-week">Week of ${escapeHtml(weekLabel)}</div>
     <div class="review-day-row">${days}</div>${status}
-    <div style="margin-top:0.6rem">${cta}</div>`;
+    <div style="margin-top:0.6rem">${cta}</div>${mmCatchUpBanner()}`;
 }
 // Deep-link into the meeting: used by the hub's day strip to open the exact
 // day a parent wants to review, inside the one-and-only confirm surface.

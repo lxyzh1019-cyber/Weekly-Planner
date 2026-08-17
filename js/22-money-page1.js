@@ -616,6 +616,10 @@ function mnyStoryWeek(kid, r) {
         <b>${mnyMoney(r.net)}</b>
       </div>
       ${r.confirmedBy ? `<div class="mny-note">Agreed with ${escapeHtml(r.confirmedBy)}${plan.label ? ' · ' + escapeHtml(plan.label) : ''}</div>` : ''}
+      ${/* A week agreed weeks after it ended was put together from what everyone
+            remembered. She is entitled to know which of her weeks those are —
+            same honesty as the parent side marking a typed-in week. */''}
+      ${r.weeksLate ? `<div class="mny-note">🕰️ Agreed ${r.weeksLate} week${r.weeksLate > 1 ? 's' : ''} after this one finished, from what everyone remembered.</div>` : ''}
       ${edited ? `<div class="mny-note">${edited} thing${edited > 1 ? 's were' : ' was'} changed at the meeting${r.editReason ? ' — ' + escapeHtml(mnyReasonLabel(r.editReason)) : ''}.</div>` : ''}
       <div class="mny-sub">Came in</div>
       ${mnyBarHtml(inBar, { empty: 'Nothing came in' })}
