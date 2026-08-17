@@ -3526,6 +3526,168 @@ function findChromium() {
         && onKidPage === want && atMeeting === want && atPortal === want;
   });
 
+  /* ── Catching up on a week nobody wrote down ──
+     The meeting always ran on ctWeekKey, so settling a past week worked — but a
+     week with no planner blocks in it offered three routines a day and NOT ONE
+     priced chore, because the `chores` lane is needsBlock: true. The money
+     channel the meeting exists to agree was unreachable on exactly the weeks a
+     busy fortnight produces. This walks the real repair: a blank week, no chore
+     to tick, add what happened, and the pay follows.
+
+     The chore→money hand-off is the assertion that matters here (CLAUDE.md:
+     when that join broke, every screen still rendered and only the numbers were
+     wrong), so this checks mrWeekBreakdown, not just the row. */
+  checks.blankPastWeekCanBeMadeUp = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jenn', c = state.shared.chore;
+    const startBefore = c.moneyModelStartWeek;
+    const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - 14);
+    const past = ctDateToKey(mon);
+    // The model has to cover the week, or step 4 says "nothing to decide".
+    c.moneyModelStartWeek = past;
+    // Exactly what a fortnight nobody opened the app in leaves behind.
+    const e = mrEnsureEarnings(kid, past);
+    e.chores = {}; e.claims = {}; e.overrides = {};
+    mrWeekDayKeys(past).forEach(k => setDayBlocks(k, [], kid));
+
+    mmGoToWeek(past);
+    const body = () => document.getElementById('familyMeetingBody').textContent;
+    const onPastWeek = ctWeekKey === past;
+    // Three catch-ups in a row used to look identical while step 4 moved money.
+    const labelled = body().includes('catching up') && body().includes('2 weeks ago');
+
+    mmSelectDay(1);
+    const noChores = mmReviewRows(kid, 1).filter(r => r.kind === 'chore').length === 0;
+    const opts = mmAddChoreOptions(kid, 1);
+    const canAdd = opts.length > 0;
+    const picker = body().includes('Add a chore that happened');
+
+    const paidBefore = mrWeekBreakdown(past, kid).chorePaid;
+    /* Three chores, on three days. Two facts about a made-up week fall out of
+       the rules and both are easy to mistake for this feature being broken:
+       the week's cheapest two graded chores are unpaid by design
+       (rules.chores.freeChoresPerWeek = 2), and the daily cap fits one grade-3
+       chore. So a reconstructed week starts paying on the THIRD chore. Asserted
+       rather than worked around — it is the chore→money join, and the join is
+       what fails silently. */
+    const picks = opts.slice(0, 3).map(o => o.id);
+    picks.forEach((id, i) => mmAddChoreHappened(kid, i + 1, id));
+    // Surfaced by mrChoresForDay's unplanned branch, with no new store behind it.
+    const nowListed = picks.length === 3 && picks.every((id, i) =>
+      mmReviewRows(kid, i + 1).some(r => r.kind === 'chore' && r.key === id && r.on));
+    const paid = mrWeekBreakdown(past, kid).chorePaid > paidBefore;
+
+    // Routines are reconstructable too — and they must stay out of the chore
+    // channel, feeding the streak instead.
+    const choresAfterChore = mrWeekBreakdown(past, kid).chorePaid;
+    mmToggleAllRoutines(kid, 1);
+    const allThree = CT_SESSIONS.every(s => ctGetMandatory(past, 1, s, kid));
+    const routinesDontPayChores = mrWeekBreakdown(past, kid).chorePaid === choresAfterChore;
+
+    closeSheet('familyMeetingOverlay');
+    e.chores = {}; e.claims = {};
+    c.moneyModelStartWeek = startBefore;
+    ctSetCurrentWeekFromPlanner();
+    return (onPastWeek && labelled && noChores && canAdd && picker && nowListed
+            && paid && allThree && routinesDontPayChores) || [{ onPastWeek, labelled,
+              noChores, canAdd, picker, nowListed, paid, allThree, routinesDontPayChores }];
+  });
+
+  /* A skipped week has to be findable. Nothing read meetingsHeld looking for a
+     gap — every reader asked only "is THIS week held?" — so the one place a
+     missed week showed at all was as a row without a tick in the 8-week trend.
+     And mnyAddMissedWeek cannot reach a gap in the middle: it only ever steps
+     back from the earliest week on record. */
+  checks.unsettledWeeksAreOfferedNotHidden = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const c = state.shared.chore;
+    const heldBefore = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
+    const startBefore = c.moneyModelStartWeek;
+    const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - 21);
+    c.moneyModelStartWeek = ctDateToKey(mon);
+
+    c.meetingsHeld = {};
+    const found = mmUnsettledWeeks(8).length === 3;
+    const ordered = mmUnsettledWeeks(8)[0].weeksLate === 1;
+
+    // Settle the middle one: it drops out, and the gap either side stays
+    // reachable. This is the case the hand-entry path structurally cannot do.
+    const middle = mmUnsettledWeeks(8)[1].wk;
+    c.meetingsHeld[middle] = true;
+    const list = mmUnsettledWeeks(8);
+    const dropped = list.length === 2 && !list.some(x => x.wk === middle);
+
+    showScreen('parent'); renderParentHome();
+    const hub = document.getElementById('meetingHub');
+    const shown = !!hub.querySelector('.mm-catchup-row');
+    // A way in, not a telling-off: the copy must not scold a busy fortnight.
+    const wording = hub.textContent.includes('Nothing expires');
+
+    // Weeks before the money model began are a dead end — never offered.
+    c.moneyModelStartWeek = ctThisWeekKey();
+    const floored = mmUnsettledWeeks(8).length === 0;
+
+    c.meetingsHeld = heldBefore; c.moneyModelStartWeek = startBefore;
+    return (found && ordered && dropped && shown && wording && floored)
+      || [{ found, ordered, dropped, shown, wording, floored }];
+  });
+
+  /* The market clock must not be a register of attendance. It was incremented
+     once per meeting, so settling three missed weeks in one evening moved share
+     prices three months — and a family that met fortnightly saw a different
+     year of prices than one that met weekly, for the same year. */
+  checks.marketClockFollowsTheCalendar = await page.evaluate(() => {
+    ctPrepareRead();
+    const c = state.shared.chore;
+    const cfg = bankConfig();
+    const before = cfg.marketMonth;
+    const heldBefore = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
+    ['2020-01-06', '2020-01-13', '2020-01-20'].forEach(wk => commitMeetingShared(wk));
+    const after = cfg.marketMonth;
+    const steady = after === Math.max(before, bankMarketMonthForToday());
+    // …and it never rewinds a price a kid has already been shown.
+    cfg.marketMonth = 99;
+    bankSyncMarketMonth();
+    const monotonic = cfg.marketMonth === 99;
+    cfg.marketMonth = before;
+    c.meetingsHeld = heldBefore;
+    return (steady && monotonic) || [{ before, after, steady, monotonic }];
+  });
+
+  /* A week agreed three weeks after it ended was reconstructed from memory.
+     The parent side already marked a hand-typed week "typed in" for exactly
+     this reason; a late settlement is the same class of evidence, and both the
+     kid's story and the parent's history have to say so. */
+  checks.lateSettlementIsOnTheRecord = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', c = state.shared.chore;
+    const nowWk = ctThisWeekKey();
+    const mon = formatDayKey(nowWk); mon.setDate(mon.getDate() - 14);
+    const past = ctDateToKey(mon);
+
+    const counts = mrWeeksSince(past) === 2 && mrWeeksSince(nowWk) === 0;
+    const stamped = mrFreezeWeekLedger(past, kid).weeksLate === 2;
+    const onTimeIsClean = mrFreezeWeekLedger(nowWk, kid).weeksLate === 0;
+
+    // Both readers, called directly — each returns its own markup.
+    const row = Object.assign(mrFreezeWeekLedger(past, kid),
+                              { weekKey: past, net: 12, chores: 12 });
+    const hers = mnyStoryWeek(kid, row).includes('after this one finished');
+
+    if (!c.moneyLedger) c.moneyLedger = {};
+    if (!c.moneyLedger[past]) c.moneyLedger[past] = {};
+    const kept = c.moneyLedger[past][kid];
+    c.moneyLedger[past][kid] = row;
+    const theirs = mnyHistoryEditor(kid).includes('settled 2wk late');
+    if (kept == null) delete c.moneyLedger[past][kid]; else c.moneyLedger[past][kid] = kept;
+
+    return (counts && stamped && onTimeIsClean && hers && theirs)
+      || [{ counts, stamped, onTimeIsClean, hers, theirs }];
+  });
+
   /* A competition has to make her total go up — everywhere.
      competitionCarriesNameAndDate proves the record saves with a name, a date
      and an award, then deletes it, so nothing covered the hand-off from a

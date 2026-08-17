@@ -445,7 +445,7 @@ function mnyHistoryEditor(kid) {
       const gap = money2(inTotal - money2(r.fines) - outTotal);
       return `<div class="mny-card">
           <div class="mny-week-head">
-            <span class="mny-label">Week of ${escapeHtml(mnyShortDate(r.weekKey))}${r.handEntered ? ' · typed in' : ''}</span>
+            <span class="mny-label">Week of ${escapeHtml(mnyShortDate(r.weekKey))}${r.handEntered ? ' · typed in' : (r.weeksLate ? ' · settled ' + r.weeksLate + 'wk late' : '')}</span>
             <b>${mnyMoney(r.net)}</b>
           </div>
           ${r.handEntered ? `<div class="mny-rows">

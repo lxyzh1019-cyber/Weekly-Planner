@@ -429,6 +429,16 @@ function mrModelStartWeek() {
 function mrUsesNewModel(weekKey) {
   return String(weekKey || '') >= mrModelStartWeek();   // 'YYYY-MM-DD' compares chronologically
 }
+/* How many weeks back this week is — 0 for the current one.
+   Lives here rather than in the meeting because two different things need it
+   and neither owns it: the frozen ledger stamps how late a week was settled,
+   and the meeting offers up the weeks nobody got to. Rounded, not floored: a
+   DST boundary makes one of these spans an hour short of seven days. */
+function mrWeeksSince(weekKey) {
+  if (!weekKey) return 0;
+  const then = formatDayKey(weekKey), now = formatDayKey(ctThisWeekKey());
+  return Math.max(0, Math.round((now - then) / (7 * 864e5)));
+}
 
 function mrEnsureEarnings(kid, weekKey) {
   const p = getProfData(kid);
@@ -1306,6 +1316,11 @@ function mrFreezeWeekLedger(weekKey, kid) {
     editReason: (Object.keys(b.overrides || {}).map(k => b.overrides[k])
                   .filter(o => o && o.reason)
                   .sort((x, y) => (x.at || 0) - (y.at || 0))[0] || {}).reason || null,
+    // How long after the fact this was agreed. A week settled three weeks late
+    // was reconstructed from what everyone remembers, and the history says so
+    // rather than presenting it as something the app watched happen — the same
+    // reason a hand-typed week is marked `handEntered`.
+    weeksLate: mrWeeksSince(weekKey),
     gross: money2(b.gross),
     net: money2(b.net),
     xp: 0, boxReleased: 0, loan: null,

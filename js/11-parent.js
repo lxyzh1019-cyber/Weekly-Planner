@@ -78,7 +78,7 @@ function renderMeetingHub() {
     : `<button type="button" class="btn-confirm" onclick="openFamilyMeeting()">🧑‍🧑‍🧒 ${nConfirmed > 0 ? 'Continue the' : 'Run'} family meeting</button>`;
   wrap.innerHTML = `<div class="hub-week">Week of ${escapeHtml(weekLabel)}</div>
     <div class="review-day-row">${days}</div>${status}
-    <div style="margin-top:0.6rem">${cta}</div>`;
+    <div style="margin-top:0.6rem">${cta}</div>${mmCatchUpBanner()}`;
 }
 // Deep-link into the meeting: used by the hub's day strip to open the exact
 // day a parent wants to review, inside the one-and-only confirm surface.

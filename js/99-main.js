@@ -47,6 +47,10 @@ window.addEventListener('pagehide', flushPush);
     wrap.addEventListener('input', mnyHandleInput);
     wrap.addEventListener('change', mnyHandleInput);
   });
+  // The meeting's own controls (catch-up week bar, add-a-chore, all-routines)
+  // carry data-mm-action. Same reason as above — every step rebuilds the body.
+  const meeting = document.getElementById('familyMeetingBody');
+  if (meeting) meeting.addEventListener('click', mmHandleClick);
   // The parent Money rules tab has its own handler: rule paths and holding ids
   // ride on data attributes rather than being interpolated into inline
   // handlers, and its typed fields need input/change as well as click.
