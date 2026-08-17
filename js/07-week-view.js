@@ -17,6 +17,97 @@ function setWeekView(v) {
 }
 function changeWeek(d) { weekOffset += d; renderWeek(); }
 
+/* ── Putting back a week that was left blank ───────────────────────
+   The planner could only ever copy a week FORWARD (mmPlanNextWeek), which is
+   the wrong direction for the case that actually happens: a fortnight goes by,
+   nothing gets planned, and the family sits down to review two weeks with
+   nothing in them. Placing fourteen days one block at a time is the real reason
+   that review does not happen — so this offers the shape of a week she already
+   planned, to fix rather than to build from nothing.
+
+   Nothing is asserted on her behalf. Every copy arrives not-done and
+   unconfirmed: a copied week is a plan, not a claim about what happened. */
+function weekIsBlank(mondayKey, p) {
+  return mrWeekDayKeys(mondayKey).every(k => !(getDayBlocksForProfile(k, p) || []).length);
+}
+/* The nearest week that actually has a plan, searched outwards so a blank
+   fortnight can borrow from either side of itself. Equal distances go to the
+   LATER week: a plan from after the gap is a better guess at "a normal week"
+   than one from further back. */
+function nearestPlannedWeek(mondayKey, p, span) {
+  const mon = formatDayKey(mondayKey);
+  for (let d = 1; d <= (span || 8); d++) {
+    for (const dir of [1, -1]) {
+      const c = new Date(mon); c.setDate(mon.getDate() + dir * d * 7);
+      const key = ctDateToKey(c);
+      if (!weekIsBlank(key, p)) return key;
+    }
+  }
+  return null;
+}
+/* One clone rule, shared with mmPlanNextWeek. Everything that records what
+   HAPPENED is dropped, because a copy is a plan — and that includes xpAwarded,
+   which mmPlanNextWeek used to carry over: awardBlockLinks only awards when the
+   flag is unset, so a copied block could never pay XP however often it was
+   done. checklistState goes for the same reason — a pre-ticked checklist is a
+   claim nobody made. */
+function weekCloneBlock(b) {
+  return Object.assign({}, b, {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    completed: false, confirmed: false, xpAwarded: false, checklistState: {},
+    createdAt: syncNow(), updatedAt: syncNow(),
+  });
+}
+/* Days that already hold something are left alone — the same guard
+   mmPlanNextWeek uses. A copy must never overwrite a plan somebody made. */
+function copyWeekInto(sourceMondayKey, targetMondayKey, p) {
+  const src = mrWeekDayKeys(sourceMondayKey), dst = mrWeekDayKeys(targetMondayKey);
+  let copied = 0;
+  src.forEach((sk, i) => {
+    const from = getDayBlocksForProfile(sk, p) || [];
+    if (!from.length) return;
+    if ((getDayBlocksForProfile(dst[i], p) || []).length) return;
+    setDayBlocks(dst[i], from.map(b => weekCloneBlock(b)), p);
+    copied += from.length;
+  });
+  return copied;
+}
+function fillWeekFromNearest(mondayKey) {
+  const p = activeProfile();
+  if (!weekIsBlank(mondayKey, p)) { showToast('This week already has a plan'); return; }
+  const src = nearestPlannedWeek(mondayKey, p, 8);
+  if (!src) { showToast('No other week has a plan to copy yet'); return; }
+  const n = copyWeekInto(src, mondayKey, p);
+  renderWeek();
+  showToast(n ? `📋 Copied ${n} block${n === 1 ? '' : 's'} — now fix what's wrong` : 'Nothing to copy');
+}
+/* "Start planning" called goPlanToday, which opens TODAY — so a kid looking at
+   a blank week from a fortnight ago was teleported out of the week she was
+   looking at and into the current day, which is not what she pressed. Opens a
+   day in the week on screen instead, preferring today when today is in it. */
+function goPlanWeek(mondayKey) {
+  const keys = mrWeekDayKeys(mondayKey);
+  const i = Math.max(0, keys.indexOf(todayKey()));
+  openDayFromWeekCard(keys[i], i);
+}
+/* The empty-week tip. A past week says something different because the thing to
+   do is different: a week already gone is not "pick a day and put the first
+   thing in", it is "put back what actually happened" — and there may be a
+   week's shape next door to start from. One line either way; screen-week is on
+   the 200-word kid budget. */
+function weekEmptyOffer(keys) {
+  const p = activeProfile();
+  const plan = `<button class="wins-btn" onclick="goPlanWeek('${escapeJsAttr(keys[0])}')">✏️ Start planning</button>`;
+  if (keys[6] >= todayKey()) {
+    return `📝 <b>This week is empty.</b> Pick a day and put the first thing in — you can move it later. ${plan}`;
+  }
+  const src = nearestPlannedWeek(keys[0], p, 8);
+  const copy = src
+    ? ` <button class="wins-btn" onclick="fillWeekFromNearest('${escapeJsAttr(keys[0])}')">📋 Copy ${escapeHtml(mmWeekLabel(src))}</button>`
+    : '';
+  return `📝 <b>Nothing was planned this week.</b> Put back what you actually did, then review it together. ${plan}${copy}`;
+}
+
 /* ── Kid's weekly signature: a commitment "I'll follow my plan" sign-off,
    shown on the weekly view and carried onto the printed sheet. Stored per
    week per profile so each kid signs their own plan. ── */
@@ -139,8 +230,7 @@ function renderWeek() {
     } else if (nothingPlanned) {
       coachEl.classList.remove('week-review-tip');
       coachEl.style.display = 'block';
-      coachEl.innerHTML = `📝 <b>This week is empty.</b> Pick a day and put the first thing in — you can move it later. `
-        + `<button class="wins-btn" onclick="goPlanToday()">✏️ Start planning</button>`;
+      coachEl.innerHTML = weekEmptyOffer(keys);
     } else if (isSunday && weekOffset === 0 && !weekReviewDismissed) {
       // Sunday weekly-review nudge: a gentle look-back with a mini summary,
       // shown to parent and child alike so they can reflect together.

@@ -3640,6 +3640,97 @@ function findChromium() {
       || [{ found, ordered, dropped, shown, wording, floored }];
   });
 
+  /* ── A kid puts back a fortnight she never planned ──
+     The whole scenario, as the KID and not the parent: two weeks went by with
+     nothing in the planner, she goes back to them, fills them from a week she
+     did plan, and the family reviews them in the meeting.
+
+     The copy direction is the point. mmPlanNextWeek only ever went forward,
+     which is the wrong way round for the case that actually happens — and
+     placing fourteen days one block at a time is the real reason the review
+     never happens. */
+  checks.blankPastWeekCanBeFilledFromAnother = await page.evaluate(() => {
+    // As the kid. activeProfile() must resolve to her, not to a parent view.
+    profile = 'jenn'; parentViewing = 'jenn'; ctParentKid = 'jenn';
+    ctPrepareRead();
+    const asHer = !isParent() && activeProfile() === 'jenn';
+    const back = (n) => {
+      const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - n * 7);
+      return ctDateToKey(d);
+    };
+    const src = back(1), gap = back(2);
+    // A planned week to borrow from, and a blank one to fill. Two days in the
+    // source, one of them already done, so the clone rules get exercised.
+    const act = getAllActivities('jenn').find(a => a.cat === 'training');
+    mrWeekDayKeys(src).forEach(k => setDayBlocks(k, [], 'jenn'));
+    mrWeekDayKeys(gap).forEach(k => setDayBlocks(k, [], 'jenn'));
+    setDayBlocks(mrWeekDayKeys(src)[1], [{ id: 's1', actId: act.id, startMin: 16 * 60,
+      durationMin: 60, completed: true, confirmed: true, xpAwarded: true,
+      checklistState: { a: true } }], 'jenn');
+    setDayBlocks(mrWeekDayKeys(src)[3], [{ id: 's2', actId: act.id, startMin: 17 * 60,
+      durationMin: 30, completed: false }], 'jenn');
+
+    const blankSeen = weekIsBlank(gap, 'jenn') && !weekIsBlank(src, 'jenn');
+    // Equal distance either side goes to the later week; here only src has a plan.
+    const foundSource = nearestPlannedWeek(gap, 'jenn', 8) === src;
+
+    // She is on the blank week, and the offer is the past-week wording.
+    showScreen('week'); weekOffset = -2; renderWeek();
+    const coach = document.getElementById('screen-week').textContent;
+    const offered = coach.includes('Nothing was planned this week')
+                 && coach.includes('Copy ' + mmWeekLabel(src));
+
+    fillWeekFromNearest(gap);
+    const got = mrWeekDayKeys(gap).map(k => getDayBlocksForProfile(k, 'jenn'));
+    const copied = got[1].length === 1 && got[3].length === 1 && got[0].length === 0;
+    /* A copy is a plan, never a claim about what happened — and xpAwarded is the
+       one that bites silently: carried over, awardBlockLinks can never pay XP
+       for the block however often it is done. */
+    const b = got[1][0];
+    const arrivesAsAPlan = b.completed === false && b.confirmed === false
+      && b.xpAwarded === false && Object.keys(b.checklistState || {}).length === 0
+      && b.id !== 's1' && b.actId === act.id && b.durationMin === 60;
+    // A day that already has something is never overwritten.
+    setDayBlocks(mrWeekDayKeys(gap)[5], [{ id: 'keep', actId: act.id,
+      startMin: 9 * 60, durationMin: 15 }], 'jenn');
+    mrWeekDayKeys(gap).slice(0, 5).forEach(k => setDayBlocks(k, [], 'jenn'));
+    copyWeekInto(src, gap, 'jenn');
+    const keptMine = (getDayBlocksForProfile(mrWeekDayKeys(gap)[5], 'jenn')[0] || {}).id === 'keep';
+
+    // Start planning must stay inside the week on screen, not jump to today.
+    goPlanWeek(gap);
+    const stayedInTheWeek = mrWeekDayKeys(gap).indexOf(currentDayKey) >= 0;
+
+    // She ticks one, then the meeting reviews that week.
+    const mine = getDayBlocksForProfile(mrWeekDayKeys(gap)[1], 'jenn');
+    toggleBlockDone(mrWeekDayKeys(gap)[1], mine[0].id);
+    const sheTicked = !!getDayBlocksForProfile(mrWeekDayKeys(gap)[1], 'jenn')[0].completed;
+
+    profile = 'parent'; ctPrepareRead();
+    mmCatchUpAsked = true;                 // not what this check is about
+    mmGoToWeek(gap); mmGoStep(2);
+    const body = document.getElementById('familyMeetingBody').textContent.replace(/\s+/g, ' ');
+    /* Pinned, not fuzzy-matched. 60 + 30 copied in, plus the 15-minute block the
+       clobber guard above left standing = 1h 45m planned; one of them ticked =
+       1h done. The arithmetic is the whole point — a copy that silently arrived
+       already "done" would still render a chart, just a lying one. */
+    const meetingCounts = body.includes('1h 45m planned · 1h done')
+                       && body.includes('Competitive Sports 1h / 1h 45m');
+    // …and it hands off to the screen that owns the blocks rather than listing
+    // them a fourth time.
+    const handsOff = !!document.querySelector('#familyMeetingBody [data-mm-action="openweek"]')
+      && body.includes('not here');
+    closeSheet('familyMeetingOverlay');
+
+    mrWeekDayKeys(src).forEach(k => setDayBlocks(k, [], 'jenn'));
+    mrWeekDayKeys(gap).forEach(k => setDayBlocks(k, [], 'jenn'));
+    profile = 'parent'; weekOffset = 0; ctSetCurrentWeekFromPlanner();
+    return (asHer && blankSeen && foundSource && offered && copied && arrivesAsAPlan
+            && keptMine && stayedInTheWeek && sheTicked && meetingCounts && handsOff)
+      || [{ asHer, blankSeen, foundSource, offered, copied, arrivesAsAPlan, keptMine,
+            stayedInTheWeek, sheTicked, meetingCounts, handsOff, body: body.slice(0, 200) }];
+  });
+
   /* Opening the meeting has to answer "where did we leave off?" and then offer
      the gap — the two things a family coming back after a busy fortnight needs
      before anything else. The ask hangs off the run-the-meeting buttons, NOT

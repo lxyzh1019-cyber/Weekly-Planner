@@ -134,6 +134,19 @@ function mmMaybeAskCatchUp() {
     if (id === 'nearest') mmGoToWeek(nearest.wk);
   });
 }
+/* Step 2 charts the week's blocks and stops there, deliberately: the meeting is
+   not a fourth place that lists a day's blocks with ticks beside them —
+   CLAUDE.md names that as the mistake, and three such lists have already been
+   retired for it. So this is a way THROUGH to the screen that already owns
+   them, which is what was missing once a kid could put a blank fortnight back
+   in herself: the blocks still need confirming, and confirming is a day-view
+   act. Lands on the meeting's week, not on today. */
+function mmOpenWeekForBlocks(kid) {
+  const wk = mmWeekKey();
+  closeSheet('familyMeetingOverlay');
+  weekOffset = computeWeekOffsetForDayKey(wk);
+  parentView(kid);
+}
 /* What the "run the family meeting" buttons call. */
 function openFamilyMeetingAsk() {
   openFamilyMeeting();
@@ -200,6 +213,7 @@ function mmHandleClick(e) {
   const kid = el.getAttribute('data-kid') || '';
   const d = Number(el.getAttribute('data-day'));
   if (a === 'thisweek')       { mmGoToWeek(ctThisWeekKey()); return; }
+  if (a === 'openweek')       { mmOpenWeekForBlocks(kid); return; }
   if (a === 'allroutines')    { mmToggleAllRoutines(kid, d); return; }
   if (a === 'addchore-open')  { mmToggleAddChore(kid, d); return; }
   if (a === 'addchore-pick')  { mmAddChoreHappened(kid, d, el.getAttribute('data-chore')); return; }
@@ -535,7 +549,11 @@ function mmRenderCelebrate(wk) {
     <div class="mm-wins">${wins('jenn')}${wins('jess')}</div>
     <div class="mm-h mm-h-sub">Planned vs done</div>
     <div class="mm-2b">${mm2b('jenn')}${mm2b('jess')}</div>
-    <div class="mm-cap">Solid = done · dashed = planned.</div>`;
+    <div class="mm-cap">Solid = done · dashed = planned.</div>
+    <div class="mm-blocklink">${['jenn', 'jess'].map(k =>
+      `<button type="button" class="pill-btn" data-mm-action="openweek" data-kid="${escapeAttr(k)}"
+        >${CT_PROFILE_ICON[k]} Open ${escapeHtml(k === 'jenn' ? 'Jenn' : 'Jess')}'s week ›</button>`).join('')}
+      <span class="mm-cap">Ticking and confirming blocks happens there, not here.</span></div>`;
 }
 function mm2b(kid) {
   const info = ctWeekInfo();
@@ -808,7 +826,9 @@ function mmPlanNextWeek() {
       const date = formatDayKey(key); const next = new Date(date); next.setDate(date.getDate() + 7);
       const nextKey = dateToLocalKey(next);
       if ((getDayBlocksForProfile(nextKey, kid) || []).length) return; // don't clobber existing plans
-      const clone = src.map(b => ({ ...b, id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), completed: false, confirmed: false, createdAt: syncNow(), updatedAt: syncNow() }));
+      // Shared clone rule (js/07-week-view.js) — it also clears xpAwarded and
+      // checklistState, which this inline copy used to carry over.
+      const clone = src.map(b => weekCloneBlock(b));
       setDayBlocks(nextKey, clone, kid);
       copied += clone.length;
     });

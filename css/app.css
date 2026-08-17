@@ -1624,6 +1624,11 @@
   .mm-confirm-day { width: 100%; margin-top: 8px; border: 2px solid var(--ink); border-radius: 10px; background: var(--paper-card, #fffdf5); box-shadow: 2px 2px 0 var(--ink); padding: 6px; font-weight: 800; cursor: pointer; }
   .mm-confirm-day.confirmed { background: #95d5b2; }
   .mm-ready { margin-top: 8px; font-size: calc(0.82rem * var(--fs-scale, 1)); font-weight: 700; background: #fff4db; border: 2px dashed #e8dfc3; border-radius: 10px; padding: 6px 10px; }
+  /* Step 2's way through to the screen that owns the blocks. */
+  .mm-blocklink {
+    display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+    margin-top: var(--space-2);
+  }
   .mm-wins { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .mm-win { border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px; background: var(--paper-card, #fffdf5); }
   .mm-win-kid { font-weight: 800; margin-bottom: 4px; }
