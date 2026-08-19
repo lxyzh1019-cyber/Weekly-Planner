@@ -743,6 +743,7 @@ function renderTimeGrid(keys) {
 
   // Week-level clash banner (shared with the Full view), plus the streak + legend.
   renderWeekConflictBanner(keys, 'tgConflictBanner');
+  renderFamilyChoreBanner('tgFamilyBanner');
   renderTimeGridStreak(keys);
   const legend = document.getElementById('tgLegend');
   if (legend) {
@@ -1072,6 +1073,7 @@ function renderFullWeek(keys) {
 
   // ── Week-level conflict summary banner (shown above the grid) ──
   renderWeekConflictBanner(keys);
+  renderFamilyChoreBanner('weekFamilyBanner');
 
   // Continuous single-column-per-day timeline (matches the Day view): each
   // activity is ONE unbroken block positioned by its real start time on a
@@ -1368,6 +1370,35 @@ function renderWeekConflictBanner(keys, bannerId = 'weekConflictBanner') {
     `<span class="wcb-icon">⚠️</span>`
     + `<span>${n} time ${n === 1 ? 'clash' : 'clashes'} this week — not enough travel/get-ready time`
     + `<span class="wcb-detail"><br>${dayLines.map(escapeHtml).join(' · ')}</span></span>`;
+}
+
+/* ── The family's chores, on the week that can still fit them ──
+   The count and the rule both belong to js/18-rules.js (mrFamilyChoreStatus);
+   this only asks and words the answer.
+
+   Three deliberate limits. It is shown on THIS week only — a week that has
+   already gone by cannot be planned, and a banner about it is a reproach with
+   nothing to do about it. It hides completely once the floor is met, so it is a
+   to-do and never a scoreboard. And it is worded forwards: "still to find a day
+   for", not "you didn't do". That is the rule every kid-facing warning in this
+   app follows (js/26-chore-kid.js's ck-warn points at a setup mistake to report;
+   ck-risk describes exposure that has not happened yet), and it is the reason
+   this is its own amber .week-todo-banner rather than the red clash banner —
+   nothing here is wrong yet. */
+function renderFamilyChoreBanner(bannerId = 'weekFamilyBanner') {
+  const banner = document.getElementById(bannerId);
+  if (!banner) return;
+  const kid = activeProfile();
+  const hide = () => { banner.style.display = 'none'; banner.innerHTML = ''; };
+  if (weekOffset !== 0 || !kid || kid === 'parent' || typeof mrFamilyChoreStatus !== 'function') return hide();
+  ctPrepareRead();
+  const st = mrFamilyChoreStatus(kid, ctThisWeekKey());
+  if (!st.short) return hide();
+  banner.style.display = 'flex';
+  banner.innerHTML =
+    `<span class="wcb-icon">🧹</span>`
+    + `<span>${st.short} family ${st.short === 1 ? 'chore' : 'chores'} still to find a day for this week`
+    + `<span class="wcb-detail"><br>These are the ${st.needed} the family shares — tap a day to put ${st.short === 1 ? 'it' : 'them'} on the plan.</span></span>`;
 }
 
 /* Build one travel/get-ready buffer strip for the weekly view. Positioned in

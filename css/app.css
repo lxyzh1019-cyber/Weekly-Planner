@@ -1809,6 +1809,22 @@
   @media (prefers-color-scheme: dark) {
     .week-conflict-banner { background: #3a1512; color: #ffd7d2; border-color: #e5675c; }
   }
+  /* Something still to do, not something already wrong. Same shape as the clash
+     banner so the footer reads as one row of week-level notes, but amber rather
+     than red: a week that has not found a day for the family's chores yet is a
+     normal Tuesday, and red would make it a failure. */
+  .week-todo-banner {
+    display: flex; align-items: center; gap: 0.5rem;
+    background: #fff4db; border: 2px solid #c98a1e; border-radius: 12px;
+    color: #6b4708; font-weight: 700; font-size: max(13px, calc(0.9rem * var(--fs-scale, 1)));
+    padding: 0.55rem 0.8rem; margin: 0 0 0.6rem;
+    box-shadow: 2px 2px 0 rgba(201,138,30,0.25);
+  }
+  .week-todo-banner .wcb-icon { font-size: 1.15rem; }
+  .week-todo-banner .wcb-detail { font-weight: 600; opacity: 0.85; font-size: max(13px, calc(0.82rem * var(--fs-scale, 1))); }
+  @media (prefers-color-scheme: dark) {
+    .week-todo-banner { background: #33260c; color: #ffe6b0; border-color: #d9a33d; }
+  }
   /* Hatched travel/get-ready strips hugging a card in the week lane — tinted
      to the activity's own colour so it reads as "part of that block" rather
      than a generic grey stripe. */
@@ -3615,6 +3631,14 @@
   .quest-card.quest-done {
     background: #e8f5e9; opacity: 0.78;
   }
+  /* A stretch of nothing, drawn as an offer rather than a job: dashed, no drop
+     shadow, no 🎯. It is on the list because "you have an hour and a half" is an
+     answer to "what now" — but it is hers to spend, not a task to close. */
+  .quest-card--free {
+    background: var(--paper); border-style: dashed; box-shadow: none;
+  }
+  .quest-card--free:active { box-shadow: none; }
+  .quest-card--free .quest-card-icon { background: var(--paper); border-style: dashed; box-shadow: none; }
   .quest-card.quest-done .quest-card-name { text-decoration: line-through; }
   .quest-card-icon {
     font-size: 2rem; width: 52px; height: 52px;
@@ -3659,8 +3683,13 @@
     .quest-time { font-size: 1.25rem; }
     .quest-card-name { font-size: 1.05rem; }
   }
+  /* 12.8px until a free-time card put text directly in here. It had always been
+     under the floor; the sweep could not see it because every child of this box
+     was an element with its own size, and the audit only measures elements that
+     own a text node. A rule can be broken for a long time before anything is
+     looking at the place it is broken. */
   .quest-card-meta {
-    font-size: calc(0.8rem * var(--fs-scale, 1)); color: var(--ink-light); margin-top: 0.3rem;
+    font-size: max(13px, calc(0.82rem * var(--fs-scale, 1))); color: var(--ink-light); margin-top: 0.3rem;
     display: flex; gap: 0.7rem; flex-wrap: wrap;
   }
   /* 0.85rem for the same reason as .quest-dur: 0.72rem computed to 11.5px,
@@ -5211,7 +5240,20 @@
   .td-now { display: flex; align-items: center; gap: 0.8rem; background: var(--bg2); }
   .td-now-icon { font-size: 2.2rem; line-height: 1; flex: 0 0 auto; }
   .td-now-name { font-size: calc(1.25rem * var(--fs-scale, 1)); font-weight: 800; line-height: 1.15; }
-  .td-now-sub { font-size: calc(0.9rem * var(--fs-scale, 1)); color: var(--ink-light); }
+  .td-now-sub { font-size: max(13px, calc(0.9rem * var(--fs-scale, 1))); color: var(--ink-light); }
+  /* The one time she has to act on, then why. --accent-strong, never --accent:
+     this is informational accent text and --accent fails contrast. */
+  .td-now-move {
+    margin-top: 0.25rem;
+    font-size: max(15px, calc(0.96rem * var(--fs-scale, 1)));
+    font-weight: 800; color: var(--ink);
+  }
+  .td-now-move--now { color: var(--accent-strong); }
+  .td-now-steps {
+    display: flex; flex-direction: column; gap: 0.05rem;
+    font-size: max(13px, calc(0.82rem * var(--fs-scale, 1)));
+    font-weight: 700; color: var(--ink-light);
+  }
 
   .td-row {
     display: flex; align-items: center; gap: 0.6rem; width: 100%;
@@ -5302,7 +5344,7 @@
      answered. Still a row, because "it happened" is what the card is for. */
   .td-row--waiting, .td-row--done { opacity: 0.75; }
   .td-row--done .td-row-name { text-decoration: line-through; }
-  .td-earlier-btn { margin-top: 0.4rem; }
+  .td-earlier-btn, .td-later-btn { margin-top: 0.4rem; }
 
   .td-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; }
   .td-chip {
@@ -5313,6 +5355,9 @@
     font-size: calc(0.94rem * var(--fs-scale, 1)); cursor: pointer;
   }
   .td-chip-fresh { background: var(--accent-yellow); }
+  /* Amber, matching the week's .week-todo-banner: the same fact on two screens
+     should look like the same fact. Not red — nothing is wrong yet. */
+  .td-chip-family { background: #fff4db; border-color: #c98a1e; }
 
   .td-empty { font-size: calc(0.94rem * var(--fs-scale, 1)); color: var(--ink-light); padding: 0.2rem 0; }
 

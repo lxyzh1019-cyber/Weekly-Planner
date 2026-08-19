@@ -689,6 +689,36 @@ function findNextGapForBreak(dayKey, minGap, fromMinAbs) {
   return null;
 }
 
+/* Every unplanned stretch of a day, in time order.
+   A different question from findNextGapForBreak above, which answers "where can
+   I put a 20-minute break" and stops at the first slot that fits. This answers
+   "what is free today" — which is what a child is really asking when she looks
+   at an afternoon — so Today can name a gap as a thing on the list rather than
+   as the absence of things.
+
+   Absolute minutes from midnight, the unit blocks use, clipped to the app's
+   6am–10pm window. `fromMin` lets a caller ask about the rest of the day only.
+   Reads, never writes; overlapping blocks are merged, so two things booked on
+   top of each other do not conjure a gap between them. */
+function dayGaps(dayKey, kid = activeProfile(), minGapMin = 30, fromMin = START_MIN) {
+  const from = Math.max(START_MIN, fromMin);
+  const spans = (getDayBlocks(dayKey, kid) || [])
+    .filter(b => b && b.startMin != null && (b.durationMin || 0) > 0)
+    .map(b => [b.startMin, b.startMin + b.durationMin])
+    .sort((a, b) => a[0] - b[0]);
+  const gaps = [];
+  let cursor = from;
+  spans.forEach(([s, e]) => {
+    if (e <= cursor) return;              // already behind us, or fully covered
+    if (s > cursor) gaps.push([cursor, Math.min(s, END_MIN)]);
+    cursor = Math.max(cursor, e);
+  });
+  if (cursor < END_MIN) gaps.push([cursor, END_MIN]);
+  return gaps
+    .map(([s, e]) => ({ startMin: s, endMin: Math.min(e, END_MIN), durationMin: Math.min(e, END_MIN) - s }))
+    .filter(g => g.durationMin >= minGapMin && g.startMin < END_MIN);
+}
+
 function addQuickBreak(durationMin) {
   if (isParent()) {
     showToast('Switch to your profile to add a break 👤');

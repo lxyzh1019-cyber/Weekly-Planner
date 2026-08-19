@@ -2989,13 +2989,21 @@ function findChromium() {
     if (typeof goQuestBoard === 'function') bad.push('goQuestBoard is back');
     if (typeof renderQuestBoard === 'function') bad.push('renderQuestBoard is back');
     goToday();
-    // Both blocks are listed once, between the upcoming list and the earlier fold.
+    /* Both blocks are listed once, across the up-next list, the "later today"
+       fold and the "earlier today" fold — so both folds open before counting.
+       Blocks only: free-time cards share the .quest-card shell but describe the
+       gaps BETWEEN blocks, and counting them here would be counting holes as
+       things. The invariant is unchanged — every block of the day is in #tdWrap
+       and nowhere else in the document. */
     if (!tdEarlierOpen()) tdToggleEarlier();
-    const here = document.querySelectorAll('#tdWrap .quest-card').length;
+    if (!tdLaterOpen()) tdToggleLater();
+    const sel = '.quest-card:not(.quest-card--free)';
+    const here = document.querySelectorAll('#tdWrap ' + sel).length;
     if (here !== 2) bad.push(`Today lists ${here} of 2 blocks`);
-    const everywhere = document.querySelectorAll('.quest-card').length;
+    const everywhere = document.querySelectorAll(sel).length;
     if (everywhere !== here) bad.push(`quest cards render in ${everywhere - here} other place(s)`);
     tdToggleEarlier();
+    tdToggleLater();
     setDayBlocks(key, [], 'jenn');
     return bad.length === 0 || bad;
   });
@@ -3736,7 +3744,12 @@ function findChromium() {
 
   /* Next at the top. The list ran in plain time order, so from mid-morning
      onward the thing she was about to do sat below a breakfast she had already
-     eaten — the top of the screen was about the past. */
+     eaten — the top of the screen was about the past.
+
+     What this asserts is that THE PAST is not above the future, so it counts
+     block cards and ignores free-time ones. A free stretch between now and the
+     next block legitimately sits above it: "you have an hour, then piano" is the
+     order the afternoon actually happens in, and it is still not the past. */
   checks.todayLeadsWithWhatIsNext = await page.evaluate(() => {
     const bad = [];
     profile = 'jenn'; parentViewing = 'jenn';
@@ -3752,22 +3765,373 @@ function findChromium() {
     if (wasOpen) tdToggleEarlier();
     goToday();
     const wrap = document.getElementById('tdWrap');
-    const cards = [...wrap.querySelectorAll('.quest-card')];
-    if (cards.length !== 1) bad.push(`${cards.length} cards shown with the fold closed, expected just the upcoming one`);
-    if (cards[0] && !/Piano/.test(cards[0].textContent)) bad.push('the card at the top is not the next thing');
+    const blocks = () => [...document.querySelectorAll('#tdWrap .quest-card:not(.quest-card--free)')];
+    const cards = blocks();
+    if (cards.length !== 1) bad.push(`${cards.length} block cards shown with the fold closed, expected just the upcoming one`);
+    if (cards[0] && !/Piano/.test(cards[0].textContent)) bad.push('the block at the top is not the next thing');
+    // The breakfast is behind the fold, so nothing on the screen is in the past.
+    if (/Breakfast/.test(wrap.textContent)) bad.push('a finished block is showing with the fold closed');
     const fold = wrap.querySelector('[data-td-action="earlier"]');
     if (!fold) bad.push('finished blocks are not folded away');
     else {
       if (!/1/.test(fold.textContent)) bad.push('the fold does not say how many are behind it');
       fold.click();
-      const after = [...document.querySelectorAll('#tdWrap .quest-card')];
-      if (after.length !== 2) bad.push(`opening the fold showed ${after.length} cards, expected 2`);
+      const after = blocks();
+      if (after.length !== 2) bad.push(`opening the fold showed ${after.length} block cards, expected 2`);
       // Order: next first, earlier below.
       if (after[0] && !/Piano/.test(after[0].textContent)) bad.push('the earlier block came back above the next one');
       tdToggleEarlier();
     }
     if (wasOpen) tdToggleEarlier();
     setDayBlocks(dk, [], 'jenn');
+    return bad.length === 0 || bad;
+  });
+
+  /* THREE THINGS LOUD, THE REST ONE TAP AWAY.
+     A ten-block day put ten cards on the screen, which is a list, which is what
+     Today replaced. The distinction this check exists to hold is between a CAP
+     and a DISCLOSURE: a cap deleted the overflow and a child never saw it (see
+     TD_MAX_QUESTS, retired for exactly that); a disclosure defers it and one tap
+     brings it back. So it asserts both halves — few by default, all reachable.
+
+     The clock is pinned so the fixture is the same at 6am and at 6pm: an
+     unpinned "six blocks from now" drifts past END_MIN in the evening and the
+     check would test a different day depending on when CI ran. */
+  checks.todayShowsThreeThingsAndFoldsTheRest = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    const bad = [];
+    const key = todayKey();
+    const before = (getDayBlocks(key, 'jenn') || []).slice();
+    const wasLater = tdLaterOpen();
+    const RealDate = Date;
+    const pin = (h, m) => {
+      const when = new RealDate(); when.setHours(h, m, 0, 0);
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+      Date.prototype = RealDate.prototype;
+      Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    };
+    const cards = () => [...document.querySelectorAll('#tdWrap .quest-card')];
+    const blocks = () => [...document.querySelectorAll('#tdWrap .quest-card:not(.quest-card--free)')];
+    const fold = () => document.querySelector('#tdWrap [data-td-action="later"]');
+    try {
+      if (wasLater) tdToggleLater();
+      /* 9am sharp, and six back-to-back blocks from 9am: no gap before the first
+         and none between any of them, so nothing here is a free-time card and
+         the count is purely about the fold. Free time gets its own check. */
+      pin(9, 0);
+      setDayBlocks(key, [0, 1, 2, 3, 4, 5].map(i => ({
+        id: 'td-many-' + i, actId: 'piano', startMin: (9 + i) * 60, durationMin: 60,
+      })), 'jenn');
+      goToday();
+
+      if (blocks().length !== 3) bad.push(`${blocks().length} blocks loud, expected 1 + TD_UP_NEXT = 3`);
+      const f = fold();
+      if (!f) return ['the rest of the day is not folded away'];
+      if (!/3/.test(f.textContent)) bad.push(`the fold does not say how many are behind it: "${f.textContent.trim()}"`);
+      // Reachable — the half a cap could never satisfy.
+      f.click();
+      if (blocks().length !== 6) bad.push(`opening the fold showed ${blocks().length} of 6 blocks`);
+      const times = [...document.querySelectorAll('#tdWrap .quest-time')].map(e => e.textContent.trim());
+      if (!times.includes('9:00am') || !times.includes('2:00pm')) {
+        bad.push(`the whole day is not reachable: ${times.join(', ')}`);
+      }
+      tdToggleLater();
+
+      /* A fold over ONE card hides as much as it saves, so at one there is no
+         fold and the card simply shows. Four blocks: three loud, one over. */
+      setDayBlocks(key, [0, 1, 2, 3].map(i => ({
+        id: 'td-four-' + i, actId: 'piano', startMin: (9 + i) * 60, durationMin: 60,
+      })), 'jenn');
+      goToday();
+      if (fold()) bad.push('a fold was drawn over a single card');
+      if (blocks().length !== 4) bad.push(`${blocks().length} of 4 blocks showing when the fold is not worth drawing`);
+      if (cards().length !== blocks().length) bad.push('a free-time card appeared in a back-to-back day');
+    } finally {
+      Date = RealDate;
+      if (tdLaterOpen() !== wasLater) tdToggleLater();
+      setDayBlocks(key, before, 'jenn');
+      goToday();
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* FREE TIME IS A THING ON THE LIST. A list that names only blocks cannot
+     answer "what now" on an afternoon whose next block is two hours off — the
+     honest answer is "nothing until four, it is yours", and that is an item.
+     It is presentation only: no id, nothing written, and tdQuestsToday still
+     returns exactly the blocks the day contains. */
+  checks.todayNamesFreeTime = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    const bad = [];
+    const key = todayKey();
+    const before = (getDayBlocks(key, 'jenn') || []).slice();
+    const RealDate = Date;
+    const pin = (h, m) => {
+      const when = new RealDate(); when.setHours(h, m, 0, 0);
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+      Date.prototype = RealDate.prototype;
+      Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    };
+    const free = () => [...document.querySelectorAll('#tdWrap .quest-card--free')];
+    try {
+      pin(9, 0);
+      // 9–10 piano, then a 90-minute hole, then 11:30 dinner.
+      setDayBlocks(key, [
+        { id: 'td-g1', actId: 'piano',  startMin: 9 * 60,      durationMin: 60 },
+        { id: 'td-g2', actId: 'dinner', startMin: 11 * 60 + 30, durationMin: 60 },
+      ], 'jenn');
+      goToday();
+      const gaps = free();
+      if (gaps.length !== 1) bad.push(`${gaps.length} free-time cards, expected 1`);
+      else {
+        const t = gaps[0].textContent;
+        if (!/Free time/.test(t)) bad.push('the free card does not say what it is');
+        if (!/1h\s?30m/.test(t)) bad.push(`the free card does not say how long: "${t.replace(/\s+/g, ' ').trim()}"`);
+        if (!/10:00am/.test(t)) bad.push('the free card does not say when it starts');
+        if (!/11:30am/.test(t)) bad.push('the free card does not say when it ends');
+      }
+      // In time order, between the two blocks.
+      const all = [...document.querySelectorAll('#tdWrap .dq-list .quest-card')];
+      if (all.length !== 3 || !all[1].classList.contains('quest-card--free')) {
+        bad.push('the free stretch is not in time order between the blocks');
+      }
+      // It offers itself: tapping opens the day screen to fill it.
+      free()[0].querySelector('[data-td-action="plan"]').click();
+      if (document.querySelector('.screen.active').id !== 'screen-day') {
+        bad.push('a free-time card does not offer to be planned');
+      }
+      goToday();
+      // It owns nothing: the day still contains exactly the two real blocks.
+      if (tdQuestsToday('jenn').length !== 2) bad.push('a free-time card became a block');
+
+      /* FREE TIME ENDS WHEN GETTING READY STARTS. A 5pm skate with kit, car and
+         warm-up in front of it is not something she is free until 5 o'clock for.
+         Without this the card read "free until 5:00pm" directly under a NOW card
+         reading "be moving by 3:55pm" — the screen contradicting itself about
+         the only number on it that matters. */
+      setDayBlocks(key, [
+        { id: 'td-g1', actId: 'piano', startMin: 9 * 60, durationMin: 60 },
+        { id: 'td-g2', actId: 'training', tag: 'skating', startMin: 12 * 60, durationMin: 90,
+          getReadyBuffer: true, getReadyBufMin: 15, travelBuffer: true, travelBufMin: 30 },
+      ], 'jenn');
+      goToday();
+      const trimmed = free();
+      if (trimmed.length !== 1) bad.push(`${trimmed.length} free cards before a block with prep, expected 1`);
+      else {
+        const t = trimmed[0].textContent;
+        // 12:00 − 30 travel − 15 ready = 11:15, so 10:00–11:15 is 1h15m.
+        if (!/11:15am/.test(t)) bad.push(`free time runs past the get-ready time: "${t.replace(/\s+/g, ' ').trim()}"`);
+        if (/12:00pm/.test(t)) bad.push('free time claims the get-ready and travel time as hers');
+        if (!/1h\s?15m/.test(t)) bad.push(`the trimmed gap is the wrong length: "${t.replace(/\s+/g, ' ').trim()}"`);
+      }
+      // Trimming can take a gap under the threshold — then it was never free
+      // time, it was the run-up to the next thing.
+      setDayBlocks(key, [
+        { id: 'td-g1', actId: 'piano', startMin: 9 * 60, durationMin: 60 },
+        { id: 'td-g2', actId: 'training', tag: 'skating', startMin: 10 * 60 + 50, durationMin: 90,
+          getReadyBuffer: true, getReadyBufMin: 15, travelBuffer: true, travelBufMin: 30 },
+      ], 'jenn');
+      goToday();
+      if (free().length) bad.push('a 50-minute run-up was named as free time once prep was taken off it');
+
+      // Under TD_FREE_MIN is turnaround, not free time.
+      setDayBlocks(key, [
+        { id: 'td-g1', actId: 'piano',  startMin: 9 * 60,      durationMin: 60 },
+        { id: 'td-g2', actId: 'dinner', startMin: 10 * 60 + 20, durationMin: 60 },
+      ], 'jenn');
+      goToday();
+      if (free().length) bad.push('a 20-minute turnaround was named as free time');
+    } finally {
+      Date = RealDate;
+      setDayBlocks(key, before, 'jenn');
+      goToday();
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* WHEN TO START MOVING. A block can carry get-ready, travel and warm-up time,
+     and the app has always known how to word it — the week grid, the Full week
+     and the print sheet all read wfBufferSegments/bufferSegLabels. Today, the
+     screen a child actually looks at before leaving the house, never mentioned
+     it. This asserts the number, the wording and the silence: the wording has to
+     be the SAME STRINGS the week grid uses, because two screens that word "leave
+     by" differently will eventually disagree about the time too. */
+  checks.todayTellsHerWhenToStartMoving = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    const bad = [];
+    const key = todayKey();
+    const before = (getDayBlocks(key, 'jenn') || []).slice();
+    const RealDate = Date;
+    const pin = (h, m) => {
+      const when = new RealDate(); when.setHours(h, m, 0, 0);
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+      Date.prototype = RealDate.prototype;
+      Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    };
+    const block = {
+      id: 'td-prep', actId: 'training', tag: 'skating',
+      startMin: 17 * 60, durationMin: 90,
+      getReadyBuffer: true, getReadyBufMin: 15,
+      travelBuffer: true, travelBufMin: 30,
+      warmupBuffer: true, warmupBufMin: 20,
+    };
+    try {
+      setDayBlocks(key, [block], 'jenn');
+      // 17:00 − 20 warm-up − 30 travel − 15 get-ready = 15:55.
+      const expect = 17 * 60 - 20 - 30 - 15;
+      const prep = tdPrepFor(block);
+      if (!prep) return ['tdPrepFor found no preparation on a block that has all three'];
+      if (prep.moveByMin !== expect) bad.push(`move-by ${prep.moveByMin}, expected ${expect}`);
+
+      pin(15, 0);   // before the deadline
+      goToday();
+      const wrap = document.getElementById('tdWrap');
+      const move = wrap.querySelector('.td-now-move');
+      if (!move) return ['the NOW card says nothing about getting ready'];
+      if (!/3:55pm/.test(move.textContent)) bad.push(`the headline reads "${move.textContent.trim()}", expected 3:55pm`);
+      if (/Time to get moving/.test(move.textContent)) bad.push('it says the deadline has arrived two hours early');
+      // The steps are the week grid's own words, not a second wording of them.
+      const steps = [...wrap.querySelectorAll('.td-now-steps span')].map(e => e.textContent.trim());
+      const owned = wfBufferSegments(block).filter(s => s.side === 'pre')
+        .sort((a, b) => a.startRel - b.startRel).map(s => bufferSegLabels(s, 'long'));
+      if (steps.join('|') !== owned.join('|')) {
+        bad.push(`the steps are a second wording: ${steps.join(' / ')} vs ${owned.join(' / ')}`);
+      }
+
+      pin(16, 30);  // past it
+      goToday();
+      const late = document.querySelector('#tdWrap .td-now-move');
+      if (!late || !/Time to get moving/.test(late.textContent)) {
+        bad.push('past the deadline it still reads as if there were time');
+      }
+      if (!late.classList.contains('td-now-move--now')) bad.push('an arrived deadline does not look different');
+
+      // A block with no buffers says nothing — most blocks, and silence is right.
+      setDayBlocks(key, [{ id: 'td-plain', actId: 'piano', startMin: 17 * 60, durationMin: 60 }], 'jenn');
+      goToday();
+      if (document.querySelector('#tdWrap .td-now-move')) {
+        bad.push('a block with no travel or get-ready time invented some');
+      }
+      if (tdPrepFor({ id: 'x', actId: 'piano', startMin: 600, durationMin: 60 }) !== null) {
+        bad.push('tdPrepFor returns something for a block with no buffers');
+      }
+    } finally {
+      Date = RealDate;
+      setDayBlocks(key, before, 'jenn');
+      goToday();
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* THE FAMILY'S SHARE OF THE WEEK.
+     "2 free chores left this week — those belong to the family" is a PRICING
+     rule: mrChoreWeek takes that many graded chores and pays nothing for them.
+     Nothing checked that they get done, so a week with no chores planned at all
+     priced out perfectly and was silently fine. The same number is now also a
+     floor, and mrFamilyChoreStatus owns the counting. */
+  checks.familyChoreFloorIsFlaggedWhileItCanBeFixed = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const bad = [];
+    const kid = 'jenn', wk = ctWeekKey;
+    const keys = mrWeekDayKeys(wk);
+    const before = keys.map(k => (getDayBlocks(k, kid) || []).slice());
+    const e = mrEnsureEarnings(kid, wk);
+    const hadChores = JSON.stringify(e.chores), hadClaims = JSON.stringify(e.claims);
+    try {
+      keys.forEach(k => setDayBlocks(k, [], kid));
+      e.chores = {}; e.claims = {};
+
+      const st0 = mrFamilyChoreStatus(kid, wk);
+      if (st0.needed !== 2) bad.push(`the floor is ${st0.needed}, expected freeChoresPerWeek = 2`);
+      if (st0.short !== st0.needed) bad.push(`an empty week is ${st0.short} short, expected ${st0.needed}`);
+
+      // Both surfaces say so, and they say the same number.
+      goToday();
+      const chip = document.querySelector('#tdWrap [data-td-action="chore"].td-chip-family');
+      if (!chip) bad.push('Today does not mention the family chores');
+      else if (!/2/.test(chip.textContent)) bad.push(`the chip says "${chip.textContent.trim()}"`);
+      goWeek(); setWeekView('timegrid'); renderWeek();
+      const banner = document.getElementById('tgFamilyBanner');
+      if (!banner || banner.style.display === 'none') bad.push('the week does not mention the family chores');
+      else if (!/2 family chores/.test(banner.textContent)) bad.push(`the banner says "${banner.textContent.trim()}"`);
+
+      // Planning one counts.
+      setDayBlocks(keys[1], [{ id: 'fam-a', actId: 'chores', startMin: 17 * 60, durationMin: 30, choreTags: ['dishes'] }], kid);
+      if (mrFamilyChoreStatus(kid, wk).short !== 1) bad.push('planning a chore did not count toward the floor');
+
+      // Doing one without planning it counts too — the work, not the paperwork.
+      mrSetClaim(kid, wk, 3, 'mop', 3);
+      const st2 = mrFamilyChoreStatus(kid, wk);
+      if (st2.counted !== 2 || st2.short !== 0) {
+        bad.push(`an unplanned but claimed chore did not count (counted ${st2.counted})`);
+      }
+
+      // Met: both surfaces go quiet. It is a to-do, not a scoreboard.
+      goToday();
+      if (document.querySelector('#tdWrap .td-chip-family')) bad.push('the chip stayed after the floor was met');
+      goWeek(); renderWeek();
+      if (document.getElementById('tgFamilyBanner').style.display !== 'none') {
+        bad.push('the banner stayed after the floor was met');
+      }
+
+      /* Standing responsibilities do not count. `own` and `helping` need no
+         block and show every day, so counting them would satisfy the floor
+         without anyone lifting anything. */
+      keys.forEach(k => setDayBlocks(k, [], kid));
+      e.chores = {}; e.claims = {};
+      const st3 = mrFamilyChoreStatus(kid, wk);
+      if (st3.short !== 2) bad.push(`own/helping rows counted toward the floor (short ${st3.short})`);
+
+      // A week that has gone by cannot be planned, so nothing is said about it.
+      weekOffset = -1;
+      goWeek(); renderWeek();
+      if (document.getElementById('tgFamilyBanner').style.display !== 'none') {
+        bad.push('a past week is nagged about chores nobody can still plan');
+      }
+      weekOffset = 0;
+    } finally {
+      weekOffset = 0;
+      keys.forEach((k, i) => setDayBlocks(k, before[i], kid));
+      const en = mrEnsureEarnings(kid, wk);
+      en.chores = JSON.parse(hadChores); en.claims = JSON.parse(hadClaims);
+      goToday();
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* …AND IT IS A TO-DO, NOT BLAME.
+     Every kid-facing warning in this app is either a setup mistake to report
+     (ck-warn) or exposure that has not happened yet (ck-risk) — never "you
+     failed to do X". That is a house rule about a nine-year-old's screen, and a
+     rule kept only in a comment is a rule one edit away from being lost. */
+  checks.familyChoreFlagIsForwardLookingNotBlame = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const bad = [];
+    const kid = 'jenn', wk = ctWeekKey;
+    const keys = mrWeekDayKeys(wk);
+    const before = keys.map(k => (getDayBlocks(k, kid) || []).slice());
+    const e = mrEnsureEarnings(kid, wk);
+    const hadChores = JSON.stringify(e.chores), hadClaims = JSON.stringify(e.claims);
+    try {
+      keys.forEach(k => setDayBlocks(k, [], kid));
+      e.chores = {}; e.claims = {};
+      goWeek(); setWeekView('timegrid'); renderWeek();
+      goToday();
+      const chip = document.querySelector('#tdWrap .td-chip-family');
+      const banner = document.getElementById('tgFamilyBanner');
+      const copy = [chip ? chip.textContent : '', banner ? banner.textContent : ''].join(' ');
+      if (!/to plan|find a day/i.test(copy)) bad.push(`the copy is not forward-looking: "${copy.replace(/\s+/g, ' ').trim()}"`);
+      if (/didn'?t|failed|missed|should have|behind/i.test(copy)) {
+        bad.push(`the copy blames her: "${copy.replace(/\s+/g, ' ').trim()}"`);
+      }
+    } finally {
+      keys.forEach((k, i) => setDayBlocks(k, before[i], kid));
+      const en = mrEnsureEarnings(kid, wk);
+      en.chores = JSON.parse(hadChores); en.claims = JSON.parse(hadClaims);
+      goToday();
+    }
     return bad.length === 0 || bad;
   });
 
@@ -3983,14 +4347,23 @@ function findChromium() {
       { id: 'td-q2', actId: 'breakfast',  startMin: 7 * 60,  durationMin: 30 },
     ], 'jenn');
     /* The list leads with what is NEXT now, so a 7am breakfast is behind the
-       "earlier today" fold by mid-morning. Open it: the assertion is that the
-       whole day is still listed and reachable — not a capped teaser — which is
-       what it always was; only where the past sits has changed. */
-    const wasOpen = tdEarlierOpen();
+       "earlier today" fold by mid-morning, and anything past the third item is
+       behind "later today". Open both.
+
+       THE INVARIANT IS UNCHANGED and it is worth being exact about why, because
+       it looks like the capped teaser this check exists to forbid. A cap deletes:
+       the blocks past the limit were gone from Today and a child never saw them.
+       A disclosure defers: every block of the day is still on this screen, and
+       one tap reaches it. What the check holds is reachability, so it opens the
+       folds and then demands the whole day — which is exactly what it always
+       did. If a future change makes a block unreachable from here, this fails. */
+    const wasOpen = tdEarlierOpen(), wasLater = tdLaterOpen();
     if (!wasOpen) tdToggleEarlier();
+    if (!wasLater) tdToggleLater();
     goToday();
 
-    const cards = [...document.querySelectorAll('#tdWrap .quest-card')];
+    // Blocks only: free-time cards describe the gaps between them.
+    const cards = [...document.querySelectorAll('#tdWrap .quest-card:not(.quest-card--free)')];
     if (cards.length !== 2) bad.push(`expected 2 quest cards, got ${cards.length}`);
     // Within each group the order is still the day's own order.
     const times = [...document.querySelectorAll('#tdWrap .quest-time')].map(e => e.textContent.trim());
@@ -4037,6 +4410,7 @@ function findChromium() {
     tdToggleExtras();
 
     if (!wasOpen) tdToggleEarlier();
+    if (!wasLater) tdToggleLater();
     setDayBlocks(key, [], 'jenn');
     return bad.length === 0 || bad;
   });
