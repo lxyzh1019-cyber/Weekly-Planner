@@ -14,16 +14,67 @@ const PX_PER_MIN  = 1.4;                  // 1 min = 1.4px → 1 hr = 84px
 
 const COLOURS = ['#ff7b54','#ff9eb5','#ffd166','#95d5b2','#6fb1fc','#c3aed6','#ef476f','#8ecae6','#ffb4a2','#b5ead7'];
 
+/* When a day has stopped being a day. Minutes from midnight, so the window
+   wraps: 9pm to 7am. Today reads this to answer "what now" honestly at nine in
+   the evening — "the rest of today is yours" is not a useful thing to tell a
+   ten-year-old at 8:57pm. It is not a lock and it is not bedtime enforcement;
+   the age-based bedtime nudge (bedtimeReminderText) is a separate thing. */
+const QUIET_HOURS = { startMin: 21 * 60, endMin: 7 * 60 };
+
 const CAT_COLOUR = {
   sleep:'var(--cat-sleep)', school:'var(--cat-school)', active:'var(--cat-active)',
   free:'var(--cat-free)', daily:'var(--cat-daily)', custom:'var(--cat-custom)',
-  training:'var(--cat-training)', routine:'var(--cat-routine)'
+  training:'var(--cat-training)', routine:'var(--cat-routine)',
+  appointment:'var(--cat-appointment)'
 };
 const CAT_HEX = {
   sleep:'#c3aed6', school:'#6fb1fc', active:'#fb6f1c',
   free:'#95d5b2', daily:'#ffd166', custom:'#ff9eb5', training:'#ef476f',
-  routine:'#80cbc4', competition:'#f4a340'
+  routine:'#80cbc4',
+  // Appointments: the dentist, the orthodontist, a parent-teacher meeting. A
+  // fixed time somebody else set, which is what makes it its own category
+  // rather than an "active" or a "daily" — you cannot move it, and a week that
+  // has one is shaped around it. Muted on purpose: it is not a treat, and it is
+  // not a chore either.
+  appointment:'#8fa8b8',
+  // Not a category — Competition is cat:'training' with isCompetition set. The
+  // colour lives here so a competition block can be told apart at a glance.
+  competition:'#f4a340'
 };
+
+/* ── One filter table ──
+   The day screen's activity picker and the tray each carried their own copy of
+   this list, and they had drifted: the picker was missing Seasonal, and neither
+   offered Rest or a kid's own custom activities even though both are choosable
+   when you create one — anything filed there could only ever be found under
+   "All". Both read this now, so a category added here appears everywhere.
+
+   `seasonal` and `custom` match on a flag rather than a category, which is why
+   filtering goes through activityMatchesFilter instead of comparing a.cat. */
+const ACTIVITY_FILTERS = [
+  { id:'daily',       label:'🍽 Daily' },
+  { id:'routine',     label:'🌅 Routines' },
+  { id:'school',      label:'📚 Learning' },
+  { id:'active',      label:'🏃 Active' },
+  { id:'training',    label:'🏋️ Competitive Sports' },
+  { id:'appointment', label:'🩺 Appointments' },
+  { id:'free',        label:'🎮 Free' },
+  { id:'sleep',       label:'😴 Rest' },
+  { id:'custom',      label:'✨ Mine' },
+  { id:'seasonal',    label:'🌟 Seasonal' },
+];
+function activityMatchesFilter(act, filterId) {
+  if (!act) return false;
+  if (!filterId || filterId === 'all') return true;
+  if (filterId === 'seasonal') return !!act._seasonal;
+  // "Mine" means made by this family, wherever it was filed. A custom activity
+  // saved as, say, Free would otherwise be findable only under Free — and the
+  // point of the chip is to find the thing you made.
+  if (filterId === 'custom') return !!act.custom || act.cat === 'custom';
+  // Category is the source of truth — isTraining is a shared UI mechanism
+  // (objectives/gear/tags) between Competitive Sports and Competition, not a category.
+  return act.cat === filterId;
+}
 
 /* Training tags + sport-specific starter objectives. Each topic carries its
    own icon and background colour so a Skating block reads differently from a
@@ -34,8 +85,29 @@ const TRAINING_TAGS = [
   { id:'dryland',  label:'💪 Dryland', name:'Dryland',  icon:'💪', colour:'#e08a3a' },
   { id:'general',  label:'🏃 General', name:'Training', icon:'🏃', colour:'#ef476f' },
 ];
+/* This list used to be the whole of it, which meant a sport the family took up
+   — gymnastics — simply could not be entered: every training block had to be
+   one of four. A family adds sports; the app has to be able to.
+
+   Custom sports live in shared state so both girls and the parent see the same
+   set, and they are read through here rather than by anyone reaching into
+   state: getTrainingTopic is what every renderer already resolves a tag with,
+   so a sport added today makes last month's blocks render correctly too.
+   Archived rather than deleted, for exactly that reason. */
+function getCustomSports() {
+  const list = (typeof state !== 'undefined' && state.shared && state.shared.customSports) || [];
+  return list.filter(s => s && s.id && !s.archived);
+}
+function getTrainingTags() {
+  return TRAINING_TAGS.concat(getCustomSports());
+}
+/* Resolving a tag sees archived sports too — a block placed under a sport the
+   family has since dropped still says what it was. */
 function getTrainingTopic(tag) {
-  return TRAINING_TAGS.find(t => t.id === tag) || TRAINING_TAGS[3];
+  const all = (typeof state !== 'undefined' && state.shared && state.shared.customSports)
+    ? TRAINING_TAGS.concat(state.shared.customSports.filter(s => s && s.id))
+    : TRAINING_TAGS;
+  return all.find(t => t.id === tag) || TRAINING_TAGS[3];
 }
 /* The background a training block should use: an explicit non-default custom
    colour wins; otherwise the topic colour (falls back to the training pink). */
@@ -144,13 +216,29 @@ const ACTIVITY_OBJECTIVES_BY_CAT = {
   daily: ['Get it done before the next thing'],
   routine: [],
   custom: [],
+  // An appointment is somebody else's time slot, so the goals are about
+  // arriving ready for it and coming away knowing what happens next.
+  appointment: ['Bring what I need', 'Ask my own question', 'Know what happens next'],
+  // Rest is a state, not a task list — see CLAUDE.md: off days are valid, and
+  // giving rest a checklist would turn it into another thing to perform.
+  sleep: [],
+  // Training blocks resolve through OBJECTIVES_BY_TAG, but a block can lose its
+  // tag (a retired sport, an old import) and fall through to here.
+  training: ['Warm-up', 'Give my best effort', 'Cool-down'],
 };
 /* Single entry point for "what goals can this block have" — training tags use
    the sport-specific lists (competition vs practice), everything else falls
    back to its own activity id, then its category. */
 function getObjectivePresets(act, tag, isCompetition) {
   if (!act) return [];
-  if (act.isTraining) return (isCompetition ? COMPETITION_OBJECTIVES_BY_TAG : OBJECTIVES_BY_TAG)[tag] || [];
+  if (act.isTraining) {
+    const table = isCompetition ? COMPETITION_OBJECTIVES_BY_TAG : OBJECTIVES_BY_TAG;
+    // A sport the family added has no starter list of its own; the general set
+    // is a better opening than an empty sheet, and every one of these is
+    // editable. Custom tasks are already filtered per sport, so a new sport
+    // builds its own list from the first session onward.
+    return table[tag] || table.general || [];
+  }
   return ACTIVITY_OBJECTIVES_BY_ID[act.id] || ACTIVITY_OBJECTIVES_BY_CAT[act.cat] || [];
 }
 
@@ -216,7 +304,16 @@ const DEFAULT_ACTIVITIES = [
   { id:'math',       name:'Math Adventure',    icon:'🦘', cat:'school',   durationMin:60, suitableTime:['after-school','weekend','evening'] },
   { id:'training',   name:'Training',          icon:'🏋️', cat:'training', durationMin:120, isTraining:true, suitableTime:['after-school','weekend'] },
   { id:'competition', name:'Competition',      icon:'🏆', cat:'training', durationMin:480, isTraining:true, isCompetition:true, suitableTime:['weekend'] },
-  { id:'relax',      name:'Muscle Relaxation', icon:'🧘', cat:'active',   durationMin:60, suitableTime:['after-school','evening','weekend'] },
+  // Filed under Rest, not Active. It is the opposite of a workout, and Rest was
+  // a category with a colour, a chip and nothing in it.
+  { id:'relax',      name:'Muscle Relaxation', icon:'🧘', cat:'sleep',    durationMin:60, suitableTime:['after-school','evening','weekend'] },
+  // Appointments — a time somebody else set. Not moveable, and a week with one
+  // is shaped around it, which is why they are their own category rather than
+  // being filed under Daily.
+  { id:'appt_general',    name:'Appointment',      icon:'🗓', cat:'appointment', durationMin:60, suitableTime:['after-school','school','weekend'] },
+  { id:'appt_medical',    name:'Doctor / Dentist', icon:'🩺', cat:'appointment', durationMin:60, suitableTime:['after-school','school','weekend'] },
+  { id:'appt_haircut',    name:'Haircut',          icon:'✂️', cat:'appointment', durationMin:45, suitableTime:['after-school','weekend'] },
+  { id:'appt_school_meet', name:'School Meeting',  icon:'🧑‍🏫', cat:'appointment', durationMin:60, suitableTime:['after-school','school'] },
   { id:'break_quick', name:'Quick Break',     icon:'☕', cat:'free',     durationMin:15, suitableTime:['before-school','school','after-school','evening','weekend'], quickBreak:true },
   { id:'piano',      name:'Piano Practice',    icon:'🎹', cat:'school',   durationMin:60, suitableTime:['after-school','evening','weekend'] },
   { id:'chores',     name:'House Chore',       icon:'🧹', cat:'daily',    durationMin:60, suitableTime:['after-school','evening','weekend'] },

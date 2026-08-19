@@ -33,11 +33,16 @@
     --cat-custom:  #ff9eb5;
     --cat-training:#ef476f;
     --cat-routine: #80cbc4;
+    /* Appointments — muted slate-blue. Deliberately the quietest category:
+       an orthodontist visit is neither a treat nor a chore, and white text on
+       it fails contrast like every other pastel here, so blocks carry dark ink. */
+    --cat-appointment: #8fa8b8;
 
     --jenn: #ff9eb5;
     --jess: #6fb1fc;
     --parent: #7d5ba6;
-    --day-landscape-chrome: 168px;
+    /* --day-landscape-chrome lived here: the day screen's chrome height, which
+       its three rails each subtracted from the viewport. One scroller now. */
 
     /* ── Reading size ──
        Every font-size under 1rem in this file is written as
@@ -193,11 +198,11 @@
   .topbar-left { display: flex; align-items: center; gap: 0.6rem; }
   .topbar h2 { font-size: 1.84rem; }
 
-  /* Day view: merged top banner (row1 + row2 in one sticky bar) */
+  /* Day view: one sticky bar, one row inside it. */
   #screen-day .topbar.day-topbar {
     flex-direction: column;
     align-items: stretch;
-    gap: 0.35rem;
+    gap: 0;
     padding-bottom: 0.45rem;
   }
   #screen-day .day-topbar__row1 {
@@ -205,91 +210,67 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
+    flex-wrap: wrap;
   }
-  #screen-day .day-topbar__row2 {
+  /* Text that only a screen reader needs. #dayTitle is written by openDay and
+     read by the print heading, but says nothing the date line does not. */
+  .visually-hidden {
+    position: absolute;
+    width: 1px; height: 1px;
+    margin: -1px; padding: 0; border: 0;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  /* 1 / 2 / 3 days at once. */
+  .day-span-tabs {
     display: flex;
-    flex-direction: column;
-    /* Clear is the only thing left on this row now that the Timeline/Quest
-       tablist is gone, and it was the tablist's margin-left:auto keeping a
-       destructive button out of the top-left corner. Hold it right explicitly. */
-    align-items: flex-end;
-    gap: 0.35rem;
-    padding-top: 0.2rem;
-    border-top: 2px dashed var(--paper-line);
+    gap: 0.2rem;
+    border: 2px solid var(--ink);
+    border-radius: 12px;
+    padding: 2px;
+    background: var(--paper);
+    flex: 0 0 auto;
   }
-  #screen-day .day-topbar__row2 .day-controls {
-    justify-content: center;
-  }
-  #screen-day .day-topbar__row2 .btn-template.danger {
-    align-self: flex-end;
-  }
-
-  /* Section labels (sticky inside each scroll column on day view) */
-  .day-panel-label {
+  .day-span-tab {
+    min-width: 44px;
+    min-height: 44px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    cursor: pointer;
     font-family: 'Patrick Hand', sans-serif;
-    font-size: 1.02rem;
+    font-size: calc(1.05rem * var(--fs-scale, 1));
     font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--ink-muted);
-    padding: 0.32rem 0.45rem 0.28rem;
-    margin: 0 0 0.25rem;
-    background: rgba(255, 253, 245, 0.92);
-    border-bottom: 2px dashed var(--paper-line);
-    position: sticky;
-    top: 0;
-    z-index: 3;
-    flex-shrink: 0;
-    box-shadow: 0 1px 0 rgba(42, 35, 32, 0.06);
+    color: var(--ink);
   }
-  .day-panel-label--landscape-only {
-    display: none;
-  }
-  .tray-bridge-hint {
-    display: none;
-    margin: 0.15rem 0 0;
-    font-family: 'Patrick Hand', sans-serif;
-    font-size: calc(0.88rem * var(--fs-scale, 1));
-    font-weight: 700;
-    color: #c95f3d;
-    line-height: 1.25;
-  }
+  .day-span-tab.active { background: var(--accent-strong); color: #fff; }
+  /* Chosen, but the viewport can only carry fewer — say so rather than
+     silently disagreeing with the button that looks selected. */
+  .day-span-tab.unavailable { opacity: 0.4; }
+  /* The day topbar's second row lived here, along with the "Schedule" /
+     "Activities" panel labels and the tray's bridge hint. The topbar is one row
+     now and the panels it labelled are down to one, so a label naming it would
+     be naming the only thing on screen. */
 
-  /* Day body: portrait = stacked; landscape = three-column grid (see media query).
-     Must chain .screen.active so #screen-day does not override .screen { display:none }. */
+  /* Must chain .screen.active so #screen-day does not override .screen { display:none }. */
   #screen-day.screen.active {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
     min-height: 100dvh;
   }
+  /* The one scroll surface on this screen. Vertically it carries the whole
+     6am-10pm day; horizontally it carries however many day columns are on show,
+     which is why overflow is auto on both axes rather than hidden on one. */
   .day-workspace {
-    display: flex;
-    flex-direction: column;
     flex: 1 1 auto;
     min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
   }
-  .day-left-rail,
-  .day-center-lane,
-  .day-right-rail {
-    min-width: 0;
-  }
-  /* The ◀Panel toggle and the .day-left-rail rules lived here. Both existed for
-     a rail that has moved to the Today screen. */
-  .day-schedule-label {
-    display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
-  }
-  .day-center-lane {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-  }
-  .day-center-lane .timeline-wrap {
-    flex: 1 1 auto;
-    min-height: 0;
-  }
-  .day-center-lane .timeline-empty-state {
+  .timeline-empty-state {
     position: absolute;
     left: 50%;
     top: 34%;
@@ -315,10 +296,6 @@
     color: #5f5041;
     line-height: 1.3;
   }
-  .day-right-rail {
-    flex-shrink: 0;
-  }
-
   .day-reward-prompt {
     margin: 0 0.8rem 0.5rem;
     padding: 0.55rem 0.8rem;
@@ -344,31 +321,8 @@
 
   /* The .day-next-up-banner rules lived here — Today says "now" and "next up"
      once, on its own card. */
-  .day-kid-quick-row {
-    display: flex;
-    justify-content: center;
-    gap: 0.45rem;
-    flex-wrap: wrap;
-    margin: 0 0.8rem 0.55rem;
-  }
-  .day-kid-quick-row .btn-break-quick {
-    background: var(--accent-yellow);
-    border: 2px solid var(--ink);
-    border-radius: 16px;
-    padding: 0.45rem 1rem;
-    font-family: 'Patrick Hand', sans-serif;
-    font-size: 1.02rem;
-    font-weight: 800;
-    cursor: pointer;
-    box-shadow: 2px 2px 0 var(--ink);
-    /* 37px before. These lived on the day screen, which the kid-standards sweep
-       does not cover, so the house 44px floor was never applied to them. */
-    min-height: 44px;
-  }
-  .day-kid-quick-row .btn-break-quick:hover {
-    transform: translate(-1px,-1px);
-    box-shadow: 3px 3px 0 var(--ink);
-  }
+  /* The .day-kid-quick-row / .btn-break-quick rules lived here, styling the two
+     break buttons that sat permanently on Today. Both are gone. */
   .day-mini-panel {
     margin: 0 0 0.5rem;
     border: 2px solid var(--ink);
@@ -436,34 +390,12 @@
       padding-right: max(1rem, env(safe-area-inset-right, 0px));
       padding-top: max(0.55rem, env(safe-area-inset-top, 0px));
     }
-    /* Day row2: day nav + zone tabs + Clear (second line) */
-    #screen-day .day-topbar__row2 {
-      flex-direction: row;
-      flex-wrap: nowrap;
-      align-items: center;
-      gap: 0.4rem;
-      padding-top: 0.35rem;
-    }
-    #screen-day .day-topbar__row2 .day-controls {
-      flex: 0 1 auto;
-      min-width: 0;
-      justify-content: center;
-    }
-    #screen-day .day-topbar__row2 .day-nav-center {
-      gap: 0.45rem;
-    }
-    #screen-day .day-topbar__row2 .day-nav-center h3 {
+    #screen-day .day-nav-center h3 {
       min-width: 0;
       font-size: 1.42rem;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-    }
-    #screen-day .day-topbar__row2 .btn-template.danger {
-      align-self: center;
-      flex: 0 0 auto;
-      padding: 0.36rem 0.72rem;
-      font-size: calc(0.9rem * var(--fs-scale, 1));
     }
     #screen-day .topbar.day-topbar.day-topbar--compact {
       gap: 0.16rem;
@@ -473,19 +405,11 @@
     #screen-day .topbar.day-topbar.day-topbar--compact .day-topbar__row1 {
       gap: 0.38rem;
     }
-    #screen-day .topbar.day-topbar.day-topbar--compact .topbar-left h2 {
-      font-size: 1.3rem;
-    }
     #screen-day .topbar.day-topbar.day-topbar--compact .day-topbar-actions .btn-icon,
     #screen-day .topbar.day-topbar.day-topbar--compact .day-topbar-actions .profile-badge {
       min-height: 34px;
       min-width: 34px;
       font-size: calc(0.9rem * var(--fs-scale, 1));
-    }
-    #screen-day .topbar.day-topbar.day-topbar--compact .day-topbar__row2 {
-      gap: 0.28rem;
-      padding-top: 0.16rem;
-      border-top-width: 1px;
     }
     #screen-day .topbar.day-topbar.day-topbar--compact .day-nav-center {
       gap: 0.3rem;
@@ -499,130 +423,24 @@
       padding: 0.16rem 0.44rem;
       font-size: calc(0.94rem * var(--fs-scale, 1));
     }
-    #screen-day .topbar.day-topbar.day-topbar--compact .btn-template.danger {
-      padding: 0.2rem 0.5rem;
-      font-size: calc(0.75rem * var(--fs-scale, 1));
-      min-height: 30px;
-    }
+    /* Landscape: the day still scrolls as ONE surface. It used to be a
+       two-column grid whose lanes each had their own max-height and overflow,
+       so the schedule scrolled inside a box that scrolled inside the page and a
+       flick could move the wrong one. The columns on screen now are days, laid
+       out inside the timeline itself. */
     .day-workspace {
-      display: grid;
-      /* Two columns, not three: the left "Today" rail is gone. This must track
-         the markup — a stale third column would leave the schedule auto-placed
-         into a 240px slot with the rest of the row empty, which is exactly how
-         Quest mode used to render (it tried to widen a grid item with `flex`). */
-      grid-template-columns: minmax(500px, 2.6fr) minmax(250px, 0.95fr);
-      gap: 0.65rem;
-      align-items: stretch;
-      padding-top: 0;
       padding-bottom: max(0.55rem, env(safe-area-inset-bottom, 0px));
       padding-left: max(0.65rem, env(safe-area-inset-left, 0px));
       padding-right: max(0.65rem, env(safe-area-inset-right, 0px));
-      flex: 1 1 auto;
-      min-height: 0;
-    }
-    .day-left-rail {
-      max-height: calc(100dvh - var(--day-landscape-chrome, 168px) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-      overflow-y: auto;
-      padding: 0.35rem 0.4rem 0.35rem 0.35rem;
-      padding-right: 0.35rem;
-      background: rgba(255, 249, 239, 0.65);
-      border: 2px dashed rgba(42, 35, 32, 0.12);
-      border-radius: 14px;
-      scroll-padding-top: 2rem;
-    }
-    .day-center-lane {
-      max-height: calc(100dvh - var(--day-landscape-chrome, 168px) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-      min-height: 0;
-      background: var(--paper);
-      border: 2px solid var(--ink);
-      border-radius: 16px;
-      box-shadow: 3px 4px 0 rgba(42, 35, 32, 0.1);
-      overflow: hidden;
-    }
-    .day-center-lane .timeline-wrap {
-      padding-bottom: 0;
-      max-height: 100%;
-      overflow-y: auto;
-      scroll-padding-top: 2rem;
-    }
-    .day-right-rail {
-      max-height: calc(100dvh - var(--day-landscape-chrome, 168px) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-      overflow-y: auto;
-      padding-bottom: 0;
-      background: rgba(255, 253, 245, 0.75);
-      border: 2px dashed rgba(42, 35, 32, 0.14);
-      border-radius: 14px;
-      padding: 0.35rem;
-      scroll-padding-top: 2rem;
-    }
-    #screen-day .activity-tray {
-      position: static;
-      inset: auto;
-      left: auto;
-      right: auto;
-      bottom: auto;
-      width: auto;
-      z-index: 1;
-      border: 2px solid var(--ink);
-      border-radius: 14px;
-      border-top: 2px solid var(--ink);
-      box-shadow: 2px 2px 0 var(--ink);
-      padding: 0.55rem 0.65rem 0.75rem;
-    }
-    #screen-day .tray-scroll {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.45rem;
-      overflow-x: visible;
-      overflow-y: visible;
-      padding: 0.35rem 0.15rem;
-    }
-    #screen-day .tray-scroll::-webkit-scrollbar {
-      width: 5px;
-      height: auto;
-    }
-    #screen-day .activity-chip,
-    #screen-day .chip-add {
-      min-width: 0;
-      width: 100%;
     }
     #screen-day .timeline {
-      max-width: min(920px, 100%);
+      max-width: min(1180px, 100%);
       width: 100%;
       margin: 0 auto;
     }
-    #screen-day .tray-bridge-hint {
-      display: block;
+    #screen-day .timeline.timeline--multi {
+      max-width: 100%;
     }
-    #screen-day .tray-header {
-      border-left: 3px solid var(--accent);
-      padding-left: 0.45rem;
-      margin-left: -0.15rem;
-    }
-    #screen-day .day-panel-label--landscape-only {
-      display: block;
-    }
-    #screen-day.focus-center .day-left-rail,
-    #screen-day.focus-center .day-right-rail {
-      opacity: 0.42;
-      filter: saturate(0.82);
-      transition: opacity 0.18s ease, filter 0.18s ease;
-    }
-    #screen-day.focus-center .day-left-rail *,
-    #screen-day.focus-center .day-right-rail * {
-      pointer-events: none;
-    }
-    #screen-day.focus-right .day-center-lane {
-      opacity: 0.55;
-      filter: saturate(0.86);
-      transition: opacity 0.18s ease, filter 0.18s ease;
-    }
-    #screen-day.focus-right .day-center-lane * {
-      pointer-events: none;
-    }
-    /* The .left-collapsed rules lived here — they hid the left "Today" pane to
-       free up room for the schedule. The pane is gone, so its two-column layout
-       is simply the layout now, above. */
     #screen-week > .parent-banner.sticky {
       padding-left: max(0.8rem, env(safe-area-inset-left, 0px));
       padding-right: max(0.8rem, env(safe-area-inset-right, 0px));
@@ -768,6 +586,20 @@
   .week-topbar__row2 {
     padding-top: 0.2rem;
     border-top: 2px dashed var(--paper-line);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  /* Scoped to the component, not the screen: the day screen has a .btn-template
+     too, and screen-scoping a size rule is how the parent portal's copy of
+     .ck-navbtn was left at 36×36. */
+  .week-print-btn {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.35rem 0.9rem;
+    flex: 0 0 auto;
   }
   .week-nav--inline {
     padding: 0;
@@ -1472,21 +1304,8 @@
      displayed for a channel a grown-up overrode at the meeting. */
   /* The Quest Board's door into the day view's quest list — the board no longer
      renders its own copy of that list. */
-  .quest-today-card {
-    display: block; width: 100%; text-align: left; cursor: pointer;
-    font-family: inherit; color: var(--ink);
-    background: var(--paper); border: 2.5px solid var(--ink);
-    border-radius: 16px; padding: 0.9rem 1rem;
-    box-shadow: 3px 3px 0 var(--ink);
-  }
-  .quest-today-card:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
-  .quest-today-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; }
-  .quest-today-title { font-family: 'Gochi Hand', cursive; font-size: 1.5rem; }
-  .quest-today-count { font-weight: 800; font-size: calc(0.95rem * var(--fs-scale, 1)); opacity: 0.8; }
-  .quest-today-bar { height: 10px; border-radius: 999px; background: var(--paper-line); overflow: hidden; margin: 0.5rem 0; }
-  .quest-today-bar span { display: block; height: 100%; background: var(--accent-green); border-radius: 999px; transition: width 0.3s; }
-  .quest-today-next { font-size: calc(0.92rem * var(--fs-scale, 1)); font-weight: 700; }
-  .quest-today-go { display: inline-block; margin-top: 0.4rem; font-weight: 800; color: var(--accent-strong); }
+  /* .quest-today-card and its parts lived here — the Quest Board's summary of
+     today, and its door through to the real list. Today IS the list. */
 
   /* The four training checks folded to one line, for a block too short for the
      2x2 grid. Tapping opens the sheet. */
@@ -1581,10 +1400,22 @@
     background: var(--paper-card, #fffdf5); border: 1.5px solid var(--ink);
     border-radius: var(--radius-sm); cursor: pointer;
   }
+  .mm-catchup-row { flex-wrap: wrap; }
   .mm-catchup-row:hover { background: #fff; }
-  .mm-catchup-wk { flex: 1; min-width: 0; }
-  .mm-catchup-late { font-size: calc(0.75rem * var(--fs-scale, 1)); opacity: 0.65; white-space: nowrap; }
-  .mm-catchup-go { font-weight: 800; color: var(--accent-strong); white-space: nowrap; }
+  /* Met, money still waiting — a different situation from "nobody opened it",
+     and it should not read as a reprimand. */
+  .mm-catchup-row.met { border-style: dashed; background: #f4fbf6; }
+  .mm-catchup-wk { flex: 1 1 8rem; min-width: 0; }
+  .mm-catchup-late { font-size: max(13px, calc(0.8rem * var(--fs-scale, 1))); opacity: 0.7; }
+  .mm-catchup-go, .mm-catchup-did {
+    min-height: 44px; padding: 0 var(--space-2);
+    border: 1.5px solid var(--ink); border-radius: var(--radius-sm);
+    background: var(--paper); font-family: inherit; cursor: pointer;
+    font-size: max(13px, calc(0.85rem * var(--fs-scale, 1)));
+    font-weight: 800; white-space: nowrap; flex: 0 0 auto;
+  }
+  .mm-catchup-go { color: var(--accent-strong); }
+  .mm-catchup-did { border-style: dashed; color: var(--ink-muted); }
   /* ── Making a blank day workable ──
      Both footers sit under their section's items and are the only way a week
      with no planner blocks in it gets anything to tick. */
@@ -2085,16 +1916,13 @@
     align-items: center; justify-content: center;
   }
   .day-controls h3 { font-size: 1.5rem; }
-  #screen-day .day-topbar__row1 .topbar-left h2 {
-    display: none;
-  }
   .day-nav-center {
     display: flex; align-items: center; gap: 0.75rem;
     flex: 1 1 auto; justify-content: center;
   }
   .day-nav-center h3 {
-    font-size: 1.84rem; margin: 0;
-    text-align: center; min-width: 12rem;
+    font-size: 1.6rem; margin: 0;
+    text-align: center; min-width: 9rem;
   }
   .day-nav-arrow {
     font-size: 1.27rem; padding: 0.35rem 0.78rem;
@@ -2110,14 +1938,9 @@
   .btn-template:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
   .btn-template.danger { background: #ef476f; }
 
-  .timeline-wrap {
-    flex: 1;
-    min-height: 0;          /* see .weekly-full-wrap — without it this never scrolls */
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: 0 0.8rem;
-    padding-bottom: 260px;
-  }
+  /* .timeline-wrap lived here — the inner scroll box between .day-workspace and
+     .timeline. Its overflow was the middle of three nested scrollers; the day
+     scrolls as one surface now, and .day-workspace is it. */
   /* ═══════ 3b: Day "Checklist" mode — collapse free time ═══════ */
   /* .day-mode-toggle / .day-mode-btn / .day-quest lived here, for the
      Timeline/Quest switch. The day screen has one layout now. .dq-* stayed:
@@ -2135,23 +1958,24 @@
   .dq-hero-sub { font-size: calc(0.85rem * var(--fs-scale, 1)); opacity: 0.92; margin-top: 2px; }
   .dq-xp-bar { height: 8px; border-radius: 999px; background: rgba(0,0,0,0.25); overflow: hidden; margin: 3px 0; }
   .dq-xp-fill { height: 100%; background: #ffd166; border-radius: 999px; transition: width 0.3s; }
-  /* Quest mode is where completion gets confirmed, so it takes the whole
-     workspace: the Today rail and the activity tray are both about planning,
-     and neither is any help while ticking things off. */
-  #screen-day.quest-focus .day-left-rail,
-  #screen-day.quest-focus .day-right-rail { display: none; }
-  #screen-day.quest-focus .day-center-lane { flex: 1 1 100%; max-width: none; }
-  #screen-day.quest-focus .day-schedule-label { display: none; }
-  /* Pixel-canvas timeline */
+  /* Pixel-canvas timeline: one hour gutter, then one column per day on show. */
   .timeline {
     position: relative;
     display: flex;
+    align-items: flex-start;
     min-height: 1344px; /* DAY_MIN_SPAN(960) * PX_PER_MIN(1.4), see JS */
+    padding: 0 0.8rem 200px;
   }
   .tl-gutter {
     width: 50px;
     flex-shrink: 0;
     position: relative;
+    /* Sticks to the left as the columns pan sideways at 2 and 3 days, so the
+       hours stay readable without a copy of the ladder in every column. */
+    position: sticky;
+    left: 0;
+    z-index: 6;
+    background: var(--paper);
   }
   .tl-gutter .tl-hour-label {
     position: absolute;
@@ -2162,30 +1986,66 @@
     font-family: 'Patrick Hand', sans-serif;
     transform: translateY(-50%);
   }
-  /* Side band showing time-of-day context (Before School / School / etc) */
-  .tl-sideband {
-    width: 22px;
-    flex-shrink: 0;
-    position: relative;
-    margin-right: 4px;
+  .tl-cols {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(var(--day-cols, 1), minmax(0, 1fr));
+    gap: 0.5rem;
   }
+  .tl-col { position: relative; min-width: 0; }
+  /* The day the topbar's 📋 / 🌙 / 🗑 act on. Only marked when more than one day
+     is on screen — with one column there is nothing to distinguish it from. */
+  .timeline--multi .tl-col--current .tl-col-head {
+    background: var(--accent-yellow);
+  }
+  .timeline--multi .tl-col--current .tl-canvas {
+    box-shadow: 0 0 0 2px var(--accent-strong);
+    border-radius: 6px;
+  }
+  .tl-col-head {
+    position: sticky;
+    top: 0;
+    z-index: 7;
+    width: 100%;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0.35rem;
+    /* 44px: this is a real target — tapping it chooses which day the topbar acts on. */
+    min-height: 44px;
+    padding: 0.2rem 0.4rem;
+    border: 2px solid var(--ink);
+    border-radius: 10px 10px 0 0;
+    background: var(--paper);
+    font-family: 'Patrick Hand', sans-serif;
+    cursor: pointer;
+  }
+  .tl-col-head.is-today { border-bottom-width: 4px; }
+  .tl-col-day { font-size: calc(1rem * var(--fs-scale, 1)); font-weight: 800; }
+  .tl-col-date { font-size: calc(0.88rem * var(--fs-scale, 1)); color: var(--ink-muted); font-weight: 700; }
+
+  /* Before School / School / After School / Evening, painted as the day's
+     background. This used to be its own vertical strip beside the gutter with
+     the labels set sideways — one more vertical rule on a screen that already
+     had too many, and a band shorter than its own label rendered it clipped. */
   .tl-band-seg {
     position: absolute;
     left: 0; right: 0;
-    border-radius: 8px;
-    border: 1.5px solid var(--ink);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
-    font-family: 'Patrick Hand', sans-serif;
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: var(--ink);
-    letter-spacing: 1px;
+    z-index: 0;
+    pointer-events: none;
     overflow: hidden;
-    padding: 4px 0;
+  }
+  .tl-band-label {
+    display: block;
+    padding: 3px 7px;
+    font-family: 'Patrick Hand', sans-serif;
+    /* 13px floor: this is kid-facing text on a kid screen. */
+    font-size: max(13px, calc(0.86rem * var(--fs-scale, 1)));
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    opacity: 0.72;
   }
   .tl-band-before { background: #fff4db; }
   .tl-band-school { background: #d7eafe; }
@@ -2193,9 +2053,11 @@
   .tl-band-evening{ background: #e8dcf2; }
   .tl-band-free   { background: #d8f0e1; }
   .tl-canvas {
-    flex: 1;
     position: relative;
-    border-left: 2px solid var(--paper-line);
+    border: 2px solid var(--paper-line);
+    border-radius: 0 0 6px 6px;
+    background: var(--paper);
+    overflow: hidden;
     cursor: pointer;
   }
   .tl-placement-guide {
@@ -2451,6 +2313,20 @@
     text-overflow: ellipsis;
   }
   .placed-block.compact .block-meta { font-size: calc(0.81rem * var(--fs-scale, 1)); flex-shrink: 0; }
+  /* The shortest blocks the app allows. A 15-minute break is 22px tall, and
+     borders + padding take 8 of them — the ordinary compact line needs ~18px in
+     the 14 that leaves, so its one line overflowed. 13px is the house minimum
+     and this is the only place that reaches it: a quarter-hour block is a label
+     you glance at, not text you act on. */
+  .placed-block.compact.compact-tight {
+    padding: 0 6px;
+    gap: 4px;
+  }
+  .placed-block.compact.compact-tight .block-name,
+  .placed-block.compact.compact-tight .block-meta {
+    font-size: 13px;
+    line-height: 1.05;
+  }
   .placed-block.compact .block-stopwatch-btn {
     width: auto;
     padding: 0.12rem 0.42rem;
@@ -2532,28 +2408,10 @@
   .block-badges { display:flex; gap: 3px; }
   .badge { font-size: calc(0.75rem * var(--fs-scale, 1)); filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2)); }
 
-  /* ═══════════ ACTIVITY TRAY ═══════════ */
-  .activity-tray {
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    background: var(--paper);
-    border-top: 3px dashed var(--paper-line);
-    padding: 0.5rem 0.8rem 0.8rem;
-    z-index: 200;
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
-  }
-  .tray-header {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 0.4rem;
-  }
-  .tray-title { font-family: 'Gochi Hand', cursive; font-size: 1.27rem; }
-  .tray-hint { font-size: calc(0.98rem * var(--fs-scale, 1)); color: #c95f3d; font-weight: 700; }
-  .tray-hint { color: #b3472b; }
-
-  .tray-filter {
-    display: flex; gap: 0.3rem; padding-bottom: 0.3rem;
-    overflow-x: auto;
-  }
+  /* The ACTIVITY TRAY section lived here: the fixed bottom/side rail of
+     activity chips, its filters, its header and its level/lock badges. The
+     rail is gone — placement goes through the picker that opens where you
+     tap. .filter-chip survives because that picker uses it. */
   .filter-chip {
     flex-shrink: 0; background: var(--bg); border: 2px solid var(--ink);
     border-radius: 16px; padding: 0.3rem 0.9rem;
@@ -2567,60 +2425,6 @@
   }
   .filter-chip.active { background: var(--accent-strong); color: #fff; }
 
-  .tray-scroll {
-    display: flex; gap: 0.5rem;
-    overflow-x: auto; padding: 0.3rem 0;
-  }
-  .tray-scroll::-webkit-scrollbar { height: 4px; }
-  .tray-scroll::-webkit-scrollbar-thumb { background: var(--paper-line); border-radius: 3px; }
-
-  .activity-chip {
-    flex-shrink: 0;
-    background: var(--paper);
-    border: 2px solid var(--ink);
-    border-radius: 14px;
-    padding: 0.45rem 0.6rem;
-    cursor: pointer;
-    transition: all 0.15s;
-    text-align: center;
-    min-width: 88px;
-    box-shadow: 3px 3px 0 var(--ink);
-    position: relative;
-  }
-  .activity-chip:hover { transform: translate(-1px,-2px) rotate(-1deg); box-shadow: 4px 5px 0 var(--ink); }
-  .activity-chip.selected { transform: translate(-1px,-4px) rotate(-2deg) scale(1.05); box-shadow: 5px 6px 0 var(--accent); background: var(--bg2); }
-  .activity-chip .chip-icon { font-size: 1.84rem; }
-  .activity-chip .chip-name { font-size: calc(0.9rem * var(--fs-scale, 1)); font-weight: 700; margin-top: 2px; line-height: 1.15; font-family: 'Patrick Hand', sans-serif; }
-  .activity-chip .chip-dur { font-size: calc(0.81rem * var(--fs-scale, 1)); color: var(--ink-muted); font-weight: 700; }
-  .activity-chip.locked { opacity: 0.45; cursor: not-allowed; }
-  .activity-chip.locked .chip-icon { filter: grayscale(0.7); }
-  .chip-level-badge {
-    position: absolute; top: -6px; right: -6px;
-    background: var(--accent-yellow); border: 1.5px solid var(--ink);
-    border-radius: 50%; width: 25px; height: 25px;
-    display:flex; align-items:center; justify-content:center;
-    font-size: calc(0.81rem * var(--fs-scale, 1)); font-weight: 800;
-    font-family: 'Gochi Hand', cursive;
-  }
-  .chip-lock-badge {
-    position: absolute; top: -4px; right: -4px;
-    font-size: 1.15rem;
-  }
-  .chip-add {
-    flex-shrink: 0;
-    background: var(--paper);
-    border: 2px dashed var(--ink);
-    border-radius: 14px;
-    padding: 0.45rem 0.6rem;
-    cursor: pointer;
-    min-width: 88px;
-    text-align: center;
-    transition: all 0.15s;
-    color: var(--ink-muted);
-    font-size: calc(0.98rem * var(--fs-scale, 1)); font-weight: 700;
-    font-family: 'Patrick Hand', sans-serif;
-  }
-  .chip-add:hover { border-color: var(--accent-strong); color: var(--accent-strong); }
 
   /* ═══════════ OVERLAYS / SHEETS ═══════════ */
   .overlay {
@@ -2954,6 +2758,18 @@
   }
   .pill-btn:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
   .pill-btn.active { background: var(--accent-strong); color: #fff; }
+  /* "＋ Sport" beside the sport tags — dashed, so it reads as a way to add one
+     rather than as a fifth sport. */
+  .pill-btn--add { border-style: dashed; background: transparent; font-weight: 800; }
+
+  /* The sports a family added, listed inside the add-a-sport sheet so retiring
+     one happens where adding one does. */
+  .sport-existing { display: flex; flex-direction: column; gap: 0.35rem; margin: 0.5rem 0 0.8rem; }
+  .sport-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+    padding: 0.25rem 0;
+  }
+  .sport-row-name { font-family: 'Patrick Hand', sans-serif; font-size: 1.09rem; font-weight: 700; }
 
   .objectives-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.8rem; }
   .obj-item {
@@ -3680,8 +3496,7 @@
 
   /* ── Audit fix: iPad portrait (820px) explicit base layout ── */
   @media (max-width: 819px) {
-    /* Below iPad portrait width — single-column fallback */
-    .tray-grid { grid-template-columns: repeat(3, 1fr); }
+    /* .tray-grid lived here, for the activity rail that is gone. */
   }
   /* iPad portrait (820–979px): explicit single-column + bottom-tray optimised layout */
   @media (min-width: 820px) and (max-width: 979px) {
@@ -3722,77 +3537,12 @@
     }
   }
 
-  /* ══════════════════════════════════════════════════════════
-     QUEST BOARD (Hero Mode) — simplified gamified planner view
-  ══════════════════════════════════════════════════════════ */
-  #screen-quest {
-    background: linear-gradient(160deg, #fff4db 0%, #ffe1c4 60%, #ffd0d8 100%);
-    min-height: 100vh;
-    padding: 1rem 1rem 6rem;
-  }
-  .quest-topbar {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 1rem;
-  }
-  .quest-back-btn {
-    background: #fff; border: 3px solid var(--ink); border-radius: 14px;
-    box-shadow: 3px 3px 0 var(--ink);
-    padding: 0.4rem 0.9rem; font-weight: 700; cursor: pointer;
-    font-size: calc(0.9rem * var(--fs-scale, 1)); color: var(--ink);
-  }
-  .quest-back-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
-  /* Plan-from-home: add a quest without leaving the Quest Board. */
-  .quest-add-btn {
-    display: block; width: 100%; margin: 0.1rem 0 0.7rem;
-    background: var(--accent-strong); color: #fff;
-    border: 3px solid var(--ink); border-radius: 14px;
-    box-shadow: 3px 3px 0 var(--ink);
-    padding: 0.6rem 0.9rem; font-weight: 800; cursor: pointer;
-    font-size: 1.02rem; font-family: inherit;
-  }
-  .quest-add-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
-  .quest-hero-card {
-    background: #fff; border: 4px solid var(--ink); border-radius: 20px;
-    box-shadow: 5px 5px 0 var(--ink);
-    padding: 1rem 1.1rem; display: flex; align-items: center; gap: 1rem;
-    margin-bottom: 1.2rem;
-  }
-  .quest-hero-avatar {
-    font-size: 3.2rem; line-height: 1;
-    background: var(--accent-yellow);
-    border: 3px solid var(--ink); border-radius: 50%;
-    width: 76px; height: 76px;
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 3px 3px 0 var(--ink); flex-shrink: 0;
-    animation: heroBob 2.4s ease-in-out infinite;
-  }
-  @keyframes heroBob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
-  .quest-hero-info { flex: 1; min-width: 0; }
-  .quest-hero-title { font-weight: 800; font-size: 1.05rem; color: var(--ink); }
-  .quest-hero-name { font-size: calc(0.85rem * var(--fs-scale, 1)); color: var(--ink-light); margin-bottom: 0.4rem; }
-  .quest-xp-bar {
-    background: #f5ecdc; border: 2px solid var(--ink); border-radius: 999px;
-    height: 16px; overflow: hidden; position: relative;
-  }
-  .quest-xp-fill {
-    background: linear-gradient(90deg, var(--accent-green) 0%, var(--accent-yellow) 100%);
-    height: 100%; border-radius: 999px;
-    transition: width 0.6s cubic-bezier(.4,1.4,.6,1);
-  }
-  .quest-xp-label {
-    font-size: calc(0.72rem * var(--fs-scale, 1)); color: var(--ink-light); margin-top: 0.25rem; font-weight: 600;
-  }
-  .quest-board-header {
-    display: flex; align-items: baseline; justify-content: space-between;
-    margin-bottom: 0.7rem;
-  }
-  .quest-board-header h2 {
-    font-size: 1.4rem; font-weight: 800; color: var(--ink);
-    margin: 0;
-  }
-  .quest-board-date { font-size: calc(0.85rem * var(--fs-scale, 1)); color: var(--ink-light); font-weight: 600; }
+  /* The QUEST BOARD block lived here — #screen-quest's gradient, its topbar,
+     the hero card with its own Lv/XP bar, the board header and the quest list.
+     The screen is retired (index.html says why); Today carries the hero strip
+     it duplicated, as .dq-hero. The sticker collection below moved to Today
+     with its ids intact, so its rules stay exactly as they were. */
 
-  .quest-list { display: flex; flex-direction: column; gap: 0.75rem; }
   /* Sticker collection (#8) */
   .sticker-collection { margin-top: 1rem; }
   .sticker-head { font-family: 'Gochi Hand', cursive; font-size: 1.15rem; font-weight: 700; color: var(--ink); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
@@ -3887,14 +3637,6 @@
     100% { transform: scale(1) rotate(0); }
   }
 
-  .quest-empty {
-    text-align: center; padding: 2rem 1rem;
-    background: #fff; border: 3px dashed var(--ink); border-radius: 18px;
-    color: var(--ink-light);
-  }
-  .quest-empty-emoji { font-size: 3rem; margin-bottom: 0.4rem; }
-  .quest-empty-cta { margin-top: 0.8rem; }
-
   /* Quest Complete floating popup */
   .quest-popup {
     position: fixed; top: 30%; left: 50%; transform: translate(-50%, -50%) scale(0.6);
@@ -3947,20 +3689,8 @@
   }
   .mission-clear-btn:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 var(--ink); }
 
-  /* Quest Board pocket-money — hidden behind a toggle, off by default */
-  .quest-money-wrap { margin: 0.6rem 0 0.2rem; }
-  .quest-money-toggle {
-    display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%;
-    border: 1.5px solid var(--ink); border-radius: 12px; background: var(--bg);
-    padding: 0.5rem 0.75rem; font: inherit; font-weight: 800; cursor: pointer; text-align: left;
-  }
-  .quest-money-toggle:focus-visible { outline: 3px solid var(--accent-blue); outline-offset: 2px; }
-  .qmt-caret { font-size: calc(0.82rem * var(--fs-scale, 1)); font-weight: 700; color: var(--ink-light); white-space: nowrap; }
-  .quest-money-panel {
-    border: 1.5px solid var(--ink); border-top: none;
-    border-radius: 0 0 12px 12px; background: #fff;
-    padding: 0.6rem 0.75rem; margin-top: -6px;
-  }
+  /* The Quest Board's pocket-money disclosure lived here. Today's own money
+     card is the kid-facing summary now, and 💰 My money owns the detail. */
   .qmp-total { font-weight: 800; font-size: 1.15rem; margin-bottom: 0.5rem; }
   .qmp-total b { background: var(--accent-yellow); border-radius: 8px; padding: 2px 8px; }
   .qmp-breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-bottom: 0.55rem; }
@@ -3999,6 +3729,57 @@
   .hm-wtile-label { font-size: calc(0.76rem * var(--fs-scale, 1)); color: var(--ink-light, #5a4d41); }
   .hm-wtile-amt { font-family: 'Gochi Hand', cursive; font-size: 1.1rem; }
   .hm-wtile-note { font-size: calc(0.66rem * var(--fs-scale, 1)); color: #6b5d4f; line-height: 1.1; }
+
+  /* Money a week has earned that the meeting has not yet paid out. Not a
+     warning — it is hers, it is simply still on the table. */
+  .mny-unpaid {
+    display: flex; align-items: baseline; gap: 0.4rem; flex-wrap: wrap;
+    margin: 0.4rem 0 0.2rem; padding: 0.35rem 0.6rem;
+    border: 2px dashed var(--ink); border-radius: 10px;
+    background: #fff9e9;
+  }
+  .mny-unpaid-amt { font-weight: 800; font-size: max(15px, calc(1rem * var(--fs-scale, 1))); }
+
+  /* Activities taken off the list — a shelf, not part of the working list. */
+  .pa-retired { margin-top: 0.6rem; }
+  .pa-retired > summary {
+    cursor: pointer; min-height: 44px;
+    display: flex; align-items: center;
+    font-family: 'Patrick Hand', sans-serif; font-weight: 700;
+    font-size: max(13px, calc(0.94rem * var(--fs-scale, 1)));
+    color: var(--ink-muted);
+  }
+  .pa-retired-row {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.3rem 0; flex-wrap: wrap;
+  }
+  .pa-retired-name { font-family: 'Patrick Hand', sans-serif; font-weight: 700; flex: 1 1 auto; }
+  .pa-retired-meta { font-size: max(13px, calc(0.85rem * var(--fs-scale, 1))); color: var(--ink-muted); }
+
+  /* Copy-a-day rows in the template sheet */
+  .copy-day-list { display: flex; flex-direction: column; gap: 0.3rem; }
+  .copy-day-row {
+    display: flex; align-items: center; gap: 0.5rem;
+    width: 100%;
+    min-height: 44px;
+    padding: 0.3rem 0.7rem;
+    border: 2px solid var(--ink);
+    border-radius: 12px;
+    background: var(--paper);
+    box-shadow: 2px 2px 0 var(--ink);
+    cursor: pointer;
+    font-family: 'Patrick Hand', sans-serif;
+    text-align: left;
+  }
+  .copy-day-row.empty {
+    border-style: dashed;
+    box-shadow: none;
+    opacity: 0.55;
+    cursor: default;
+  }
+  .cdr-day { font-size: calc(1.02rem * var(--fs-scale, 1)); font-weight: 800; flex: 0 0 auto; }
+  .cdr-count { font-size: max(13px, calc(0.86rem * var(--fs-scale, 1))); color: var(--ink-muted); flex: 1 1 auto; }
+  .cdr-go { font-size: max(13px, calc(0.88rem * var(--fs-scale, 1))); font-weight: 800; color: var(--accent-strong); flex: 0 0 auto; }
 
   /* Quick slot-picker sheet (tap an empty slot to add an activity) */
   .slot-picker-hint { color: var(--ink-light); font-size: calc(0.92rem * var(--fs-scale, 1)); margin: 0.1rem 0 0.5rem; }
@@ -5159,8 +4940,7 @@
   #screen-chore .ck-risk,
   #screen-chore .ck-learn-count,
   #screen-chore .ck-pill,
-  #screen-mymoney .mny-row,
-  #screen-quest .quest-xp-label {
+  #screen-mymoney .mny-row {
     font-size: calc(0.94rem * var(--fs-scale, 1));   /* 15px */
   }
 
@@ -5229,8 +5009,6 @@
   .mny-btn,
   .mny-chip,
   .mny-acc,
-  .quest-back-btn,
-  .quest-money-toggle,
   .wk-sig-btn,
   .view-tab,
   .btn-icon,
@@ -5397,30 +5175,66 @@
      tinted so it reads as an invitation rather than another job. */
   .td-plan { background: var(--bg2); }
 
-  /* ── Pocket money ──
-     Two or three numbers she acts on, and a tap through to the money page. One
+  /* ── Pocket money, as a picture ──
+     This was three tiles of words and figures, which is a table — the slowest
+     way to answer "how am I doing". A bar shows where the money IS; the key
+     under it carries the same figures, so nothing is lost by drawing it. One
      button, not a row of them: nothing here moves money, so there is nothing to
      press but "show me more". */
   .td-money {
-    display: flex; gap: 0.5rem; width: 100%; min-height: 52px;
-    padding: 0.45rem 0.5rem;
+    display: flex; flex-direction: column; gap: 0.35rem;
+    width: 100%; min-height: 52px;
+    padding: 0.5rem;
     border: 2px solid var(--ink); border-radius: var(--radius-sm, 12px);
     background: var(--bg); color: var(--ink); font: inherit; text-align: left;
     cursor: pointer;
   }
   .td-money:hover { background: var(--bg2); }
-  .td-money-tile {
-    flex: 1 1 0; display: flex; flex-direction: column; gap: 1px; min-width: 0;
+  .td-money-total {
+    font-size: calc(1.25rem * var(--fs-scale, 1)); font-weight: 800;
   }
-  .td-money-label {
-    /* 0.85rem, not the 0.78rem this started at: Today carries no --fs-scale, so
-       0.78rem computes to 12.48px and lands under the 13px kid floor. */
-    font-size: calc(0.85rem * var(--fs-scale, 1)); font-weight: 700;
-    color: var(--ink-light);
+  .td-money-owing {
+    font-size: calc(0.88rem * var(--fs-scale, 1)); font-weight: 700;
+    /* --accent is decorative only; informational accent text uses the AA fix. */
+    color: var(--accent-strong);
   }
-  .td-money-val {
-    font-size: calc(1.05rem * var(--fs-scale, 1)); font-weight: 800;
+  .td-bar {
+    display: flex; width: 100%; height: 16px;
+    border: 2px solid var(--ink); border-radius: 999px;
+    overflow: hidden; background: var(--paper);
   }
+  .td-bar-seg { display: block; height: 100%; }
+  .td-bar--empty { opacity: 0.5; }
+  .td-keys { display: flex; flex-wrap: wrap; gap: 0.15rem 0.6rem; }
+  .td-key {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    /* 13px floor: these are the figures, so they are read to act on. */
+    font-size: max(13px, calc(0.88rem * var(--fs-scale, 1)));
+    font-weight: 700; color: var(--ink-light);
+  }
+  .td-key-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    border: 1.5px solid var(--ink); flex: 0 0 auto;
+  }
+  /* The one figure on this card she can act on today. */
+  .td-money-earn {
+    font-size: max(13px, calc(0.9rem * var(--fs-scale, 1)));
+    font-weight: 700; color: var(--accent-strong);
+  }
+  /* How the total has moved, once there are enough settled weeks for a line to
+     mean anything. Decorative — every figure it draws is already in the key. */
+  .td-spark { display: flex; align-items: center; gap: 0.4rem; }
+  .td-spark svg { width: 100%; height: 20px; display: block; flex: 1 1 auto; }
+  .td-spark-cap {
+    font-size: max(13px, calc(0.8rem * var(--fs-scale, 1)));
+    color: var(--ink-light); font-weight: 700; flex: 0 0 auto;
+  }
+
+  /* A job that is no longer hers to act on — waiting with a grown-up, or
+     answered. Still a row, because "it happened" is what the card is for. */
+  .td-row--waiting, .td-row--done { opacity: 0.75; }
+  .td-row--done .td-row-name { text-decoration: line-through; }
+  .td-earlier-btn { margin-top: 0.4rem; }
 
   .td-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; }
   .td-chip {
@@ -5522,6 +5336,31 @@
 
   /* The More sheet reuses the app's .sheet and Today's row styling. */
   .td-more-sheet { max-height: 80vh; overflow-y: auto; }
+  /* Tiles, not rows. Seven full-width rows filled most of a phone for a menu of
+     seven short words; three across says the same in a third of the height, and
+     each tile is still a 44px target in its own right. */
+  .td-more-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  .td-more-tile {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 0.2rem;
+    min-height: 76px;
+    padding: 0.5rem 0.3rem;
+    border: 2px solid var(--ink); border-radius: var(--radius-sm, 12px);
+    background: var(--paper); color: var(--ink); font: inherit;
+    box-shadow: 2px 2px 0 var(--ink);
+    cursor: pointer;
+  }
+  .td-more-tile:hover { background: var(--bg2); }
+  .td-more-icon { font-size: 1.5rem; line-height: 1; }
+  /* 13px floor: one word each, and the word is the whole affordance. */
+  .td-more-label {
+    font-size: max(13px, calc(0.9rem * var(--fs-scale, 1)));
+    font-weight: 700; text-align: center; line-height: 1.15;
+  }
 
   /* Print must never carry the nav. */
   @media print { .kid-nav { display: none !important; } body.has-kid-nav { padding-bottom: 0; } }

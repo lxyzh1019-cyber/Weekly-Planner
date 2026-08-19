@@ -27,7 +27,7 @@ function renderSync() {
   // kids who simply left time open never saw an overlap.)
   const overlapWrap = document.getElementById('syncOverlapWrap');
   overlapWrap.innerHTML = '';
-  const acts = getAllActivities();
+  const acts = getAllActivities(activeProfile(), { includeArchived: true });
   const TOTAL = Math.round(DAY_MIN_SPAN / 15);
   const busySlots = (blocks) => {
     const busy = new Set();
@@ -83,7 +83,7 @@ function renderSync() {
     col.className = 'sync-day-col';
     col.innerHTML = `<h4>${lbl}</h4>`;
     if (!blocks.length) col.innerHTML += '<p style="font-size:0.8rem;color:var(--ink-light)">Nothing planned</p>';
-    const acts = getAllActivities(p);
+    const acts = getAllActivities(p, { includeArchived: true });
     const isMe = (p === profile);
     blocks.slice().sort((a,b)=>a.startMin-b.startMin).forEach(b=>{
       const act = acts.find(a=>a.id===b.actId);
@@ -118,8 +118,8 @@ function renderSync() {
 
 async function sendInvite(block, to) {
   const sisterName = to==='jenn'?'Jenn':'Jess';
-  const act = getAllActivities(profile).find(a=>a.id===block.actId) || getAllActivities().find(a=>a.id===block.actId);
-  const receiverAct = getAllActivities(to).find(a=>a.id===block.actId);
+  const act = findActivity(block.actId, profile) || findActivity(block.actId);
+  const receiverAct = findActivity(block.actId, to);
   if (!receiverAct) {
     showToast(`${sisterName} cannot receive this activity yet.`);
     return;
@@ -236,7 +236,7 @@ function renderInvites() {
     inviteList.innerHTML = '<p style="color:var(--ink-light);font-size:0.95rem">No invites right now. Tap one of your own activities above to invite your sister.</p>';
     return;
   }
-  const acts = getAllActivities();
+  const acts = getAllActivities(activeProfile(), { includeArchived: true });
   myInvites.forEach(inv=>{
     const act = acts.find(a=>a.id===inv.actId);
     const d = formatDayKey(inv.day);
@@ -293,7 +293,7 @@ function deleteChallenge(id) {
 function acceptInvite(id) {
   const inv = (state.shared.invites||[]).find(i=>i.id===id);
   if (!inv) return;
-  const receiverAct = getAllActivities(profile).find(a=>a.id===inv.actId);
+  const receiverAct = findActivity(inv.actId, profile);
   if (!receiverAct) {
     inv.status = 'declined';
     markItemUpdated(inv);

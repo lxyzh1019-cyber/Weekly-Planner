@@ -51,6 +51,11 @@ window.addEventListener('pagehide', flushPush);
   // carry data-mm-action. Same reason as above — every step rebuilds the body.
   const meeting = document.getElementById('familyMeetingBody');
   if (meeting) meeting.addEventListener('click', mmHandleClick);
+  // The catch-up list lives on the parent hub rather than inside the meeting,
+  // and is rebuilt on every hub render, so it needs its own delegated listener
+  // on the container rather than handlers on the rows.
+  const hub = document.getElementById('meetingHub');
+  if (hub) hub.addEventListener('click', mmHandleCatchUpClick);
   // The parent Money rules tab has its own handler: rule paths and holding ids
   // ride on data attributes rather than being interpolated into inline
   // handlers, and its typed fields need input/change as well as click.

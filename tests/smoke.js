@@ -225,25 +225,34 @@ function findChromium() {
     profile = 'jenn'; parentViewing = 'jenn';
     openDay('2026-09-08', 1);                       // an ordinary school Tuesday
     const school = labels();
-    if (!school.some(l => /SCHOOL/.test(l))) bad.push(`no school band on a term Tuesday: ${school.join(' / ')}`);
+    if (!school.some(l => /School/i.test(l))) bad.push(`no school band on a term Tuesday: ${school.join(' / ')}`);
     openDay('2026-12-25', 4);                       // Christmas Day
     const holiday = labels();
-    if (!holiday.some(l => /FREE TIME/.test(l))) bad.push(`Christmas Day did not read as free: ${holiday.join(' / ')}`);
+    if (!holiday.some(l => /Free time/i.test(l))) bad.push(`Christmas Day did not read as free: ${holiday.join(' / ')}`);
+    if (holiday.some(l => /School/i.test(l))) bad.push(`Christmas Day claimed a school band: ${holiday.join(' / ')}`);
     openDay('2027-07-14', 2);                       // mid-summer
     const summer = labels();
-    if (!summer.some(l => /FREE TIME/.test(l))) bad.push(`a July day did not read as free: ${summer.join(' / ')}`);
+    if (!summer.some(l => /Free time/i.test(l))) bad.push(`a July day did not read as free: ${summer.join(' / ')}`);
 
-    /* The labels are set sideways, so a band's height is the line length the
-       text has to fit into. The before-school band is only as tall as the gap
-       between 6am and the first bell, and "BEFORE SCHOOL" wants ~171px in the
-       166px an 8am start leaves — it clipped. Measure the text, not the box:
-       overflow:hidden means a clipped label still reports a tidy scrollHeight. */
+    /* The labels used to be set sideways, so a band's height was the line
+       length its text had to fit into — and "BEFORE SCHOOL" wanted ~171px in
+       the 166px an 8am start leaves, so it clipped. They are painted as the
+       day's background now and read left to right, so the constraint is width,
+       not height. Measure the text against its box either way: overflow:hidden
+       means a clipped label still reports a tidy scrollHeight. */
     openDay('2026-09-08', 1);
     [...document.querySelectorAll('#screen-day .tl-band-seg')].forEach(el => {
-      const r = document.createRange(); r.selectNodeContents(el);
-      const text = r.getBoundingClientRect().height, box = el.getBoundingClientRect().height;
-      if (text > box + 1) bad.push(`band "${el.textContent}" needs ${Math.round(text)}px in ${Math.round(box)}px`);
+      const lab = el.querySelector('.tl-band-label');
+      if (!lab) return;                       // too short for a label at all — by design
+      const r = document.createRange(); r.selectNodeContents(lab);
+      const rect = r.getBoundingClientRect(), box = el.getBoundingClientRect();
+      if (rect.height > box.height + 1) bad.push(`band "${lab.textContent}" needs ${Math.round(rect.height)}px in ${Math.round(box.height)}px`);
+      if (rect.width > box.width + 1) bad.push(`band "${lab.textContent}" needs ${Math.round(rect.width)}px of width in ${Math.round(box.width)}px`);
     });
+    // The bands are the day's background: they must never eat a tap meant for
+    // the canvas underneath them.
+    const seg = document.querySelector('#screen-day .tl-band-seg');
+    if (seg && getComputedStyle(seg).pointerEvents !== 'none') bad.push('a zone band is intercepting taps');
     return bad.length === 0 || bad;
   });
 
@@ -266,18 +275,23 @@ function findChromium() {
 
   // Kid money surface: kids reach Pocket Money and may LOOK at the bank, but
   // every function that moves money refuses them.
-  // One label for one destination (audit P2-4). The Quest board used to call it
-  // "My pocket money" while three other entry points called it "My money"; the
-  // shortcut row those lived in is gone, so the surviving routes are checked.
+  /* One label for one destination (audit P2-4). The Quest Board used to call it
+     "My pocket money" while three other entry points called it "My money"; both
+     the shortcut row and the board are gone, so this now checks the two routes
+     that survive — the nav and Today's own money card — and that neither has
+     picked the old wording back up. */
   checks.kidMoneyLabel = await page.evaluate(() => {
+    const bad = [];
     profile = 'jenn'; goToday();
     const nav = document.querySelector('#kidNav [data-td-nav="money"]');
-    const navSays = !!nav && nav.textContent.includes('Money');
-    showScreen('quest'); renderQuestBoard();
-    const questText = document.getElementById('screen-quest').textContent;
-    const questSays = !/pocket money/i.test(questText);
+    if (!nav || !nav.textContent.includes('Money')) bad.push('the nav does not say Money');
+    const card = document.querySelector('#tdWrap [data-td-action="money"]');
+    if (!card) bad.push('Today has no money card');
+    if (/pocket money/i.test(document.getElementById('screen-today').textContent)) {
+      bad.push('"pocket money" wording is back on Today');
+    }
     goWeek();
-    return navSays && questSays;
+    return bad.length === 0 || bad;
   });
   // The money button lands a kid on her own page, and that page shows the four
   // things she owns and what she still owes.
@@ -482,9 +496,149 @@ function findChromium() {
     if (typeof dayViewMode !== 'undefined') bad.push('dayViewMode still exists');
     const vis = el => !!el && getComputedStyle(el).display !== 'none';
     if (!vis(document.getElementById('timeline'))) bad.push('no schedule on the day screen');
-    if (!vis(document.querySelector('.day-right-rail'))) bad.push('no activity tray on the day screen');
+    /* The activity rail used to be asserted here as a thing that must be
+       present. It is gone: placement goes through the picker that opens where
+       you tap, and the schedule has the width back. The assertion is now that
+       neither the rail nor the pick-then-tap machinery comes back. */
+    if (document.querySelector('.day-right-rail')) bad.push('the activity rail is back on the day screen');
+    if (document.querySelector('#screen-day .activity-tray')) bad.push('the activity tray is back');
+    if (typeof buildTray === 'function') bad.push('buildTray still exists');
+    if (typeof setDayFocusPane === 'function') bad.push('setDayFocusPane still exists');
+    if (document.querySelector('#screen-day .day-topbar__row2')) bad.push('the day topbar grew a second row again');
     return bad.length === 0 || bad;
   });
+
+  /* One scroll surface. It used to be three nested ones — .day-workspace, then
+     .day-center-lane, then .timeline-wrap — so on an iPad the schedule scrolled
+     inside a box inside a page and a flick could move the wrong one. */
+  checks.dayScreenScrollsAsOneSurface = await page.evaluate(() => {
+    const bad = [];
+    const scroller = el => {
+      const st = getComputedStyle(el);
+      return /(auto|scroll)/.test(st.overflowY) && el.scrollHeight > el.clientHeight + 4;
+    };
+    const inner = [...document.querySelectorAll('#screen-day *')].filter(scroller);
+    const notWorkspace = inner.filter(el => !el.classList.contains('day-workspace'));
+    if (notWorkspace.length) {
+      bad.push(`nested scrollers on the day screen: ${notWorkspace.map(e => e.className || e.tagName).join(' | ')}`);
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* The reported bug, as a check: a 30-minute block is 40px tall and used to
+     take the two-line layout, which needs ~46px — so "Breakfast" rendered with
+     its own title sliced in half. Measures the real box, at every length a
+     short block actually gets used at. */
+  checks.shortBlocksDoNotClipTheirName = await page.evaluate(() => {
+    const bad = [];
+    const key = getDayKeys(0)[4];
+    const before = getDayBlocks(key, 'jenn');
+    setDayBlocks(key, [15, 30, 45, 60].map((dur, i) => ({
+      id: 'clip-' + dur, actId: 'breakfast', startMin: 7 * 60 + i * 120,
+      durationMin: dur, objectives: [], note: '',
+    })), 'jenn');
+    openDay(key, 4);
+    [15, 30, 45, 60].forEach(dur => {
+      const el = document.getElementById('block-clip-' + dur);
+      if (!el) { bad.push(`no block rendered for ${dur} min`); return; }
+      if (el.scrollHeight > el.clientHeight + 1) {
+        bad.push(`${dur}-min block clips its own content (${el.scrollHeight}px into ${el.clientHeight}px)`);
+      }
+      const name = el.querySelector('.block-name');
+      if (name && name.scrollWidth > name.clientWidth + 1 && !name.textContent.trim()) {
+        bad.push(`${dur}-min block has no readable name`);
+      }
+    });
+    setDayBlocks(key, before, 'jenn');
+    openDay(key, 4);
+    return bad.length === 0 || bad;
+  });
+
+  /* Two and three days at once. The thing that must hold is that a tap in
+     column 2 places into column 2's day — reading currentDayKey instead would
+     drop every block onto whichever day the topbar happened to name, and a
+     child has no way to see that happen. */
+  // Wide enough for three columns to actually be offered — under ~1000px the
+  // day view deliberately serves fewer, whatever the stored preference says.
+  await page.setViewportSize({ width: 1400, height: 1000 });
+  await page.waitForTimeout(150);
+  checks.multiDayColumnsPlaceOnTheirOwnDay = await page.evaluate(() => {
+    const bad = [];
+    const keys = getDayKeys(0);
+    const spanBefore = dayViewSpan();
+    openDay(keys[0], 0);
+    setDayViewSpan(3);
+    const cols = [...document.querySelectorAll('#timeline .tl-col')];
+    if (cols.length !== 3) bad.push(`asked for 3 columns, rendered ${cols.length}`);
+    if (document.querySelectorAll('#timeline .tl-gutter').length !== 1) {
+      bad.push('the hour ladder is drawn once per column instead of once');
+    }
+    if (cols[1] && cols[1].dataset.dayKey !== keys[1]) bad.push('column 2 is not the next day');
+    // A tap in column 2 must target column 2's day.
+    const canvas2 = cols[1] && cols[1].querySelector('.tl-canvas');
+    if (!canvas2) bad.push('column 2 has no canvas');
+    else {
+      const r = canvas2.getBoundingClientRect();
+      canvas2.dispatchEvent(new MouseEvent('click', { clientY: r.top + 140, clientX: r.left + 10, bubbles: true }));
+      if (currentDayKey !== keys[1]) bad.push(`tapping column 2 left the edit target on ${currentDayKey}`);
+      const title = (document.getElementById('slotPickerTitle') || {}).textContent || '';
+      if (!/Tue/.test(title)) bad.push(`the picker does not name the day it will place on: "${title}"`);
+      closeSheet('slotPickerOverlay');
+    }
+    setDayViewSpan(spanBefore);
+    if (document.querySelectorAll('#timeline .tl-col').length !== 1) bad.push('going back to 1 day left extra columns');
+    return bad.length === 0 || bad;
+  });
+
+  /* Three columns on a phone is confetti, not a plan. The preference is kept —
+     a narrow viewport serves fewer without forgetting what was chosen. */
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(150);
+  checks.narrowScreensGetOneDay = await page.evaluate(() => {
+    const bad = [];
+    const spanBefore = dayViewSpan();
+    setDayViewSpan(3);
+    openDay(getDayKeys(0)[0], 0);
+    const n = document.querySelectorAll('#timeline .tl-col').length;
+    if (n !== 1) bad.push(`a 390px viewport rendered ${n} day columns`);
+    if (dayViewSpan() !== 3) bad.push('the stored preference was overwritten rather than overridden');
+    setDayViewSpan(spanBefore);
+    return bad.length === 0 || bad;
+  });
+  await page.setViewportSize({ width: 900, height: 1100 });
+  await page.waitForTimeout(150);
+
+  /* Copying a day is how a week actually gets built — a Tuesday and a Thursday
+     that look alike were two days built by hand. Clones must be fresh (no
+     inherited completion or XP) and a replaced day must be tombstoned, or a
+     merge from another device brings the old blocks straight back. */
+  checks.copyDayReplacesCleanly = await page.evaluate(() => {
+    const bad = [];
+    const keys = getDayKeys(0);
+    const [src, dst] = [keys[0], keys[2]];
+    const beforeSrc = getDayBlocks(src, 'jenn'), beforeDst = getDayBlocks(dst, 'jenn');
+    setDayBlocks(src, [{ id: 'cd-src', actId: 'piano', startMin: 600, durationMin: 60,
+                         completed: true, confirmed: true, xpAwarded: true, checklistState: { a: true } }], 'jenn');
+    setDayBlocks(dst, [{ id: 'cd-old', actId: 'breakfast', startMin: 480, durationMin: 30 }], 'jenn');
+    const n = copyDayInto(src, dst, 'jenn');
+    const got = getDayBlocks(dst, 'jenn');
+    if (n !== 1) bad.push(`copied ${n} blocks, expected 1`);
+    if (got.length !== 1) bad.push(`destination holds ${got.length} blocks, expected 1`);
+    else {
+      const b = got[0];
+      if (b.id === 'cd-src') bad.push('the copy reused the source id');
+      if (b.actId !== 'piano') bad.push('the copy is not the source activity');
+      if (b.completed || b.confirmed || b.xpAwarded) bad.push('the copy arrived pre-completed');
+      if (Object.keys(b.checklistState || {}).length) bad.push('the copy arrived pre-ticked');
+    }
+    if (!(state.shared.tombstones || {})['cd-old']) bad.push('the replaced block was not tombstoned — a merge will resurrect it');
+    // And the source is untouched.
+    if ((getDayBlocks(src, 'jenn')[0] || {}).id !== 'cd-src') bad.push('copying changed the source day');
+    setDayBlocks(src, beforeSrc, 'jenn'); setDayBlocks(dst, beforeDst, 'jenn');
+    return bad.length === 0 || bad;
+  });
+  await page.evaluate(() => openDay(getDayKeys(0)[5], 5));
+  await page.waitForTimeout(300);
   // Rest toggle lives in the Template sheet
   await page.evaluate(() => openTemplateSheet());
   checks.restInTemplateSheet = await page.evaluate(() => {
@@ -587,6 +741,202 @@ function findChromium() {
     const txt = document.querySelector('.ck-main').textContent;
     ckSelectDay(2);
     return /Nothing on today's plan/.test(txt);
+  });
+
+  /* Print is on the week it prints. It used to be reachable only from the More
+     sheet, which is a menu you have to know to open; the week is where you are
+     when you want a paper copy. Both doors call openPrint, so this asserts the
+     button exists on the week AND that it is the same call, not a second one. */
+  checks.printIsOnTheWeek = await page.evaluate(() => {
+    goWeek();
+    const bad = [];
+    const btn = document.querySelector('#screen-week .week-print-btn');
+    if (!btn) { bad.push('no print button on the week topbar'); return bad; }
+    const r = btn.getBoundingClientRect();
+    if (r.width < 44 || r.height < 44) bad.push(`print button is ${Math.round(r.width)}×${Math.round(r.height)}, under 44`);
+    if (!/openPrint\(\)/.test(btn.getAttribute('onclick') || '')) bad.push('the week print button does not call openPrint');
+    btn.click();
+    if (document.querySelector('.screen.active').id !== 'screen-print') bad.push('the week print button did not open the print screen');
+    goWeek();
+    return bad.length === 0 || bad;
+  });
+
+  /* A training session had no custom-length field at all — the presets were the
+     whole of it — and the two sheets that did have one clamped at 480 minutes,
+     below the app's own 600-minute competition preset. The ceiling is the day. */
+  checks.durationsGoAsLongAsTheDay = await page.evaluate(() => {
+    const bad = [];
+    const keys = getDayKeys(0);
+    currentDayKey = keys[1];
+    selectedActivity = getAllActivities('jenn').find(a => a.id === 'training');
+    pendingStartMin = 8 * 60;
+    ts = { durationMin: 120, colour: CAT_HEX.training, tag: 'skating', objectives: [], note: '',
+           repeat: false, repeatDays: [], travelBuffer: false, getReadyBuffer: false,
+           warmupBuffer: false, gearState: {}, travelBufMin: 15, getReadyBufMin: 15, warmupBufMin: 20 };
+    openTrainingSheet();
+    const inp = document.querySelector('#trainingCustomDur input');
+    if (!inp) bad.push('the training sheet still has no custom duration field');
+    else {
+      if (Number(inp.max) !== DAY_MIN_SPAN) bad.push(`training custom duration caps at ${inp.max}, not the day (${DAY_MIN_SPAN})`);
+      inp.value = '75';
+      inp.onchange();
+      if (ts.durationMin !== 75) bad.push('a typed training duration did not stick');
+    }
+    const actInp = document.querySelector('#activityCustomDur input');
+    if (actInp && Number(actInp.max) < 600) bad.push(`the activity sheet still caps below its own presets (${actInp.max})`);
+    closeSheet('trainingOverlay');
+    selectedActivity = null;
+    return bad.length === 0 || bad;
+  });
+
+  /* A family takes up a sport the four built-in tags do not cover. It has to be
+     addable, it has to render on a block, and retiring it must not rewrite the
+     blocks that already name it. */
+  checks.aCustomSportCanBeAdded = await page.evaluate(() => {
+    const bad = [];
+    const wasParent = profile;
+    profile = 'parent';
+    const before = (state.shared.customSports || []).length;
+    openCustomSport();
+    document.getElementById('sportName').value = 'Gymnastics';
+    document.getElementById('sportIcon').value = '🤸';
+    confirmCustomSport();
+    const mine = state.shared.customSports || [];
+    if (mine.length !== before + 1) bad.push('the sport was not added');
+    const s = mine[mine.length - 1];
+    if (getTrainingTags().every(t => t.id !== s.id)) bad.push('the new sport is not in the tag list');
+    if (getTrainingTopic(s.id).name !== 'Gymnastics') bad.push('a block cannot resolve the new sport');
+    // Retiring drops it from the picker but NOT from the resolver — a session
+    // already tagged with it still says what it was.
+    retireCustomSport(s.id);
+    if (getTrainingTags().some(t => t.id === s.id)) bad.push('a retired sport is still offered');
+    if (getTrainingTopic(s.id).name !== 'Gymnastics') bad.push('a retired sport stopped resolving — past blocks would lose their name');
+    state.shared.customSports = state.shared.customSports.filter(x => x.id !== s.id);
+    profile = wasParent;
+    return bad.length === 0 || bad;
+  });
+
+  /* Taking an activity off the list used to sweep BOTH kids' weeks with no date
+     filter — deleting every block that had ever named it, from last March as
+     readily as from next Tuesday, tombstoned so sync could not bring them back,
+     and then rebuilding the level-up counts from what was left. A piano teacher
+     stops and two years of piano goes with her. It archives now: the record
+     stays so history still renders, the list loses it, and only the plan ahead
+     is cleared. */
+  checks.retiringAnActivityKeepsItsHistory = await page.evaluate(async () => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'parent'; parentViewing = 'jenn';
+    // An activity of our own, with one block behind us and one ahead.
+    const act = { id: 'arch-test', name: 'Cello', icon: '🎻', cat: 'school', durationMin: 45, custom: true };
+    state.shared.sharedActivities = [...(state.shared.sharedActivities || []), act];
+    const past = new Date(); past.setDate(past.getDate() - 21);
+    const future = new Date(); future.setDate(future.getDate() + 3);
+    const pastKey = dateToLocalKey(past), futureKey = dateToLocalKey(future);
+    const hadPast = getDayBlocks(pastKey, 'jenn'), hadFuture = getDayBlocks(futureKey, 'jenn');
+    setDayBlocks(pastKey, [{ id: 'arch-old', actId: 'arch-test', startMin: 16 * 60, durationMin: 45, completed: true, confirmed: true }], 'jenn');
+    setDayBlocks(futureKey, [{ id: 'arch-new', actId: 'arch-test', startMin: 16 * 60, durationMin: 45 }], 'jenn');
+    const countsBefore = JSON.stringify(getProfData('jenn').activityCounts || {});
+
+    // Answer the confirm, then retire it.
+    const p = deleteParentActivity('shared', 'arch-test');
+    await new Promise(r => setTimeout(r, 30));
+    const ok = document.getElementById('appDialogOkBtn');
+    if (!ok) bad.push('no confirmation was asked before retiring');
+    else {
+      if (!/earlier/i.test(document.querySelector('.app-dialog-msg').textContent)) {
+        bad.push('the confirmation does not say the past is kept');
+      }
+      ok.click();
+    }
+    await p;
+
+    // The record survives, marked — and is NOT tombstoned, or a merge from
+    // another device would delete it for good.
+    const rec = (state.shared.sharedActivities || []).find(a => a.id === 'arch-test');
+    if (!rec) bad.push('the activity record was deleted, not archived');
+    else if (!rec.archived) bad.push('the activity was not marked archived');
+    if ((state.shared.tombstones || {})['sa:arch-test']) bad.push('the activity was tombstoned — sync will delete it for good');
+
+    // Gone from what you can pick…
+    profile = 'jenn'; parentViewing = 'jenn';
+    if (getAllActivities('jenn').some(a => a.id === 'arch-test')) bad.push('a retired activity is still offered in the picker');
+    // …but a block that names it still renders as what it was.
+    const resolved = findActivity('arch-test', 'jenn');
+    if (!resolved || resolved.name !== 'Cello') bad.push('a past block can no longer resolve its activity');
+    openDay(pastKey, (formatDayKey(pastKey).getDay() + 6) % 7);
+    const el = document.getElementById('block-arch-old');
+    if (!el) bad.push('the past block stopped rendering');
+    else if (!/Cello/.test(el.textContent)) bad.push(`the past block lost its name: "${el.textContent.slice(0, 40)}"`);
+
+    // History kept, plan ahead cleared, counts untouched.
+    if (!getDayBlocks(pastKey, 'jenn').some(b => b.id === 'arch-old')) bad.push('the past block was deleted');
+    if (getDayBlocks(futureKey, 'jenn').some(b => b.id === 'arch-new')) bad.push('the future block was left behind pointing at a retired activity');
+    if (JSON.stringify(getProfData('jenn').activityCounts || {}) !== countsBefore) bad.push('level-up counts were rewritten');
+
+    // And it can come back.
+    profile = 'parent';
+    unarchiveParentActivity('shared', 'arch-test');
+    if (!getAllActivities('jenn').some(a => a.id === 'arch-test')) bad.push('a retired activity cannot be put back');
+
+    state.shared.sharedActivities = (state.shared.sharedActivities || []).filter(a => a.id !== 'arch-test');
+    setDayBlocks(pastKey, hadPast, 'jenn'); setDayBlocks(futureKey, hadFuture, 'jenn');
+    profile = wasProfile;
+    return bad.length === 0 || bad;
+  });
+
+  /* Every category must be reachable from both ends. "Rest" and a kid's own
+     custom activities were offered when creating one but had no filter chip, so
+     anything filed there could only ever be found under "All"; "Routines" had a
+     chip but was in neither select. One table drives the chips now. */
+  checks.everyCategoryIsReachable = await page.evaluate(() => {
+    const bad = [];
+    profile = 'jenn';
+    /* A custom activity, because "Mine" is legitimately empty until the family
+       makes one — and it was the gap that started this: filed as Free Time, it
+       could be found under Free but never under a chip of its own, and filed as
+       "custom" it could not be found under any chip at all. */
+    const had = (getProfData('jenn').customActivities || []).slice();
+    getProfData('jenn').customActivities = [...had,
+      { id: 'cat-test', name: 'Cartwheels', icon: '🤸', cat: 'free', durationMin: 30, custom: true }];
+    const acts = getAllActivities('jenn');
+    ACTIVITY_FILTERS.forEach(f => {
+      if (!acts.some(a => activityMatchesFilter(a, f.id))) {
+        // Seasonal is the one that legitimately empties: out-of-season entries
+        // are still in the library, marked locked, so this only fires if the
+        // table itself has gone wrong.
+        bad.push(`filter "${f.label}" matches nothing in the library`);
+      }
+    });
+    if (!activityMatchesFilter(acts.find(a => a.id === 'cat-test'), 'custom')) {
+      bad.push('an activity the family made is not findable under "Mine"');
+    }
+    /* And the picker hides a chip with nothing behind it rather than offering a
+       dead end — which is what makes an always-populated table safe. */
+    currentDayKey = getDayKeys(0)[0];
+    openSlotPicker(9 * 60);
+    const chipLabels = [...document.querySelectorAll('#slotPickerFilter .filter-chip')].map(c => c.textContent);
+    ACTIVITY_FILTERS.forEach(f => {
+      const shown = chipLabels.includes(f.label);
+      const matches = acts.some(a => activityMatchesFilter(a, f.id));
+      if (shown !== matches) bad.push(`chip "${f.label}" is ${shown ? 'offered with nothing behind it' : 'hidden despite having matches'}`);
+    });
+    closeSheet('slotPickerOverlay');
+    getProfData('jenn').customActivities = had;
+    // Every category a parent or kid can file something under has a chip.
+    ['customCat', 'paCat'].forEach(id => {
+      const sel = document.getElementById(id);
+      if (!sel) { bad.push(`no #${id} select`); return; }
+      [...sel.options].forEach(o => {
+        if (!ACTIVITY_FILTERS.some(f => f.id === o.value)) {
+          bad.push(`#${id} offers "${o.value}" but nothing can filter to it`);
+        }
+      });
+    });
+    // Appointments arrived with something in them.
+    if (!acts.some(a => a.cat === 'appointment')) bad.push('the appointment category is empty');
+    if (!CAT_HEX.appointment) bad.push('appointments have no colour');
+    return bad.length === 0 || bad;
   });
 
   // Print view: travel/get-ready buffers + time-of-day sideband
@@ -1120,7 +1470,7 @@ function findChromium() {
 
      Raising it stays a recorded decision with a date and a reason, never a quiet
      bump, and the check stays in place. The 200 target is unchanged. */
-  const WORD_BUDGET = { 'screen-today': 200, 'screen-week': 200, 'screen-quest': 200,
+  const WORD_BUDGET = { 'screen-today': 200, 'screen-week': 200,
                         'screen-mymoney': 200, 'screen-chore': 277 };
   const KID_SCREENS = [
     // Today is held to the full 200 with no ratchet: it was built to these rules
@@ -1165,7 +1515,11 @@ function findChromium() {
         renderWeek();
       } finally { setDayBlocks(key, had, kid); Date = RealDate; }
     }, 'screen-week/sunday'],
-    ['screen-quest',   () => { showScreen('quest'); renderQuestBoard(); }],
+    /* screen-quest was audited here. The Quest Board is retired; its two unique
+       panels moved into Today's disclosure, which the screen-today row already
+       covers — with the disclosure opened, so the panels are actually measured
+       rather than skipped for being display:none. */
+    ['screen-today',   () => { goToday(); if (!tdExtrasOpen()) tdToggleExtras(); }, 'screen-today/extras'],
     ['screen-chore',   () => { openChoreTab(); ckSelectDay(2); }],
     ['screen-mymoney', () => { mnyOpenMyMoney('jenn'); }],
   ];
@@ -2474,22 +2828,31 @@ function findChromium() {
 
   // One quest list, one completion path. The board is a door to it, not a
   // second copy of it.
-  checks.questBoardDoesNotDuplicateTheList = await page.evaluate(() => {
+  /* The Quest Board was the fourth rendering of one day and is now retired.
+     What must hold is that it does not come back and that Today is still the
+     only place today's blocks are listed with ticks beside them — the invariant
+     the board's removal was for. */
+  checks.thereIsExactlyOneListOfToday = await page.evaluate(() => {
+    const bad = [];
     profile = 'jenn'; parentViewing = 'jenn';
     const key = todayKey();
     setDayBlocks(key, [
       { id: 'qb1', actId: 'breakfast', startMin: 7 * 60, durationMin: 30 },
       { id: 'qb2', actId: 'piano', startMin: 16 * 60, durationMin: 60 },
     ], 'jenn');
-    goQuestBoard();
-    const noOwnList = document.querySelectorAll('#questList .quest-card').length === 0;
-    const hasDoor = !!document.querySelector('.quest-today-card');
-    document.querySelector('.quest-today-card').click();
-    // The one list is Today now. The board is still only a door to it.
-    const landed = document.querySelector('.screen.active').id === 'screen-today'
-      && document.querySelectorAll('#tdWrap .quest-card').length === 2;
+    if (document.getElementById('screen-quest')) bad.push('the Quest Board screen is back');
+    if (typeof goQuestBoard === 'function') bad.push('goQuestBoard is back');
+    if (typeof renderQuestBoard === 'function') bad.push('renderQuestBoard is back');
+    goToday();
+    // Both blocks are listed once, between the upcoming list and the earlier fold.
+    if (!tdEarlierOpen()) tdToggleEarlier();
+    const here = document.querySelectorAll('#tdWrap .quest-card').length;
+    if (here !== 2) bad.push(`Today lists ${here} of 2 blocks`);
+    const everywhere = document.querySelectorAll('.quest-card').length;
+    if (everywhere !== here) bad.push(`quest cards render in ${everywhere - here} other place(s)`);
+    tdToggleEarlier();
     setDayBlocks(key, [], 'jenn');
-    return noOwnList && hasDoor && landed;
+    return bad.length === 0 || bad;
   });
 
   // "Before we start" is a pre-flight list; it used to render after the week
@@ -3083,7 +3446,6 @@ function findChromium() {
     acts.push({ id: 'xss-act', name: '<img src=x onerror="window.__xssFired=1">',
                 icon: '⭐', cat: 'free', durationMin: 30 });
     getProfData('jenn').customActivities = acts;
-    if (typeof buildTray === 'function') buildTray();
     const injected = !!document.querySelector('#screen-day img[src="x"], .tray img[src="x"]');
 
     getProfData('jenn').customActivities = acts.filter(a => a.id !== 'xss-act');
@@ -3223,8 +3585,138 @@ function findChromium() {
     // With nothing on today it must not read as a failure — off days are valid.
     setDayBlocks(dk, [], 'jenn');
     goToday();
-    const kind = /allowed|yours|quiet/i.test(document.getElementById('tdWrap').textContent);
+    const kind = /allowed|yours|quiet|rest/i.test(document.getElementById('tdWrap').textContent);
     return namesNow && hasJobs && says && kind;
+  });
+
+  /* Next at the top. The list ran in plain time order, so from mid-morning
+     onward the thing she was about to do sat below a breakfast she had already
+     eaten — the top of the screen was about the past. */
+  checks.todayLeadsWithWhatIsNext = await page.evaluate(() => {
+    const bad = [];
+    profile = 'jenn'; parentViewing = 'jenn';
+    const dk = todayKey();
+    const now = new Date().getHours() * 60 + new Date().getMinutes();
+    const past = Math.max(0, now - 180), soon = Math.min(23 * 60, now + 60);
+    if (past + 30 > now || soon <= now) return true;   // too close to midnight to test honestly
+    setDayBlocks(dk, [
+      { id: 'td-past', actId: 'breakfast', startMin: past, durationMin: 30 },
+      { id: 'td-soon', actId: 'piano', startMin: soon, durationMin: 30 },
+    ], 'jenn');
+    const wasOpen = tdEarlierOpen();
+    if (wasOpen) tdToggleEarlier();
+    goToday();
+    const wrap = document.getElementById('tdWrap');
+    const cards = [...wrap.querySelectorAll('.quest-card')];
+    if (cards.length !== 1) bad.push(`${cards.length} cards shown with the fold closed, expected just the upcoming one`);
+    if (cards[0] && !/Piano/.test(cards[0].textContent)) bad.push('the card at the top is not the next thing');
+    const fold = wrap.querySelector('[data-td-action="earlier"]');
+    if (!fold) bad.push('finished blocks are not folded away');
+    else {
+      if (!/1/.test(fold.textContent)) bad.push('the fold does not say how many are behind it');
+      fold.click();
+      const after = [...document.querySelectorAll('#tdWrap .quest-card')];
+      if (after.length !== 2) bad.push(`opening the fold showed ${after.length} cards, expected 2`);
+      // Order: next first, earlier below.
+      if (after[0] && !/Piano/.test(after[0].textContent)) bad.push('the earlier block came back above the next one');
+      tdToggleEarlier();
+    }
+    if (wasOpen) tdToggleEarlier();
+    setDayBlocks(dk, [], 'jenn');
+    return bad.length === 0 || bad;
+  });
+
+  /* At 8:57pm with nothing left, "the rest of today is yours" is true and
+     useless: the rest of that day is sleep. Drives the real render with the
+     clock pinned, then puts Date back — a fake clock left installed would
+     quietly poison every check after this one. */
+  checks.todayKnowsWhenTheDayIsOver = await page.evaluate(() => {
+    const bad = [];
+    profile = 'jenn'; parentViewing = 'jenn';
+    const dk = todayKey();
+    setDayBlocks(dk, [], 'jenn');
+    const RealDate = Date;
+    const at = h => {
+      const d = new RealDate(); d.setHours(h, 0, 0, 0);
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(d); };
+      Date.prototype = RealDate.prototype;
+      Date.now = RealDate.now; Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    };
+    try {
+      at(21);
+      goToday();
+      const night = document.getElementById('tdWrap').textContent;
+      if (/Nothing scheduled/.test(night)) bad.push('9pm still reads "Nothing scheduled"');
+      if (!/wind|rest/i.test(night)) bad.push(`9pm does not read as wind-down: "${night.slice(0, 90)}"`);
+      at(15);
+      goToday();
+      const afternoon = document.getElementById('tdWrap').textContent;
+      if (/[Ww]inding down/.test(afternoon)) bad.push('3pm reads as wind-down');
+    } finally { Date = RealDate; }
+    goToday();
+    return bad.length === 0 || bad;
+  });
+
+  /* "Jobs I can do" listed only what was still claimable, so on the day she
+     actually finished everything the card rendered nothing — the reward for
+     finishing was an empty box. It must always say which of the three
+     situations this is. */
+  checks.jobsCardIsNeverBlank = await page.evaluate(() => {
+    const bad = [];
+    profile = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead();
+    const wk = ctThisWeekKey(), d = tdTodayIndex();
+    if (d == null) return true;
+    const jobs = tdJobsToday('jenn');
+    goToday();
+    const card = [...document.querySelectorAll('#tdWrap .td-card')]
+      .find(c => /Jobs I can do/.test(c.textContent));
+    if (!card) { bad.push('no jobs card on Today'); return bad; }
+    const body = card.textContent.replace(/Jobs I can do/, '').trim();
+    if (!body) bad.push('the jobs card is blank');
+    if (!jobs.hasPool && !/No jobs set up/.test(body)) {
+      bad.push(`no pool this week, but the card says "${body.slice(0, 60)}"`);
+    }
+    // With a pool and nothing left to claim, it must celebrate rather than empty.
+    if (jobs.hasPool && jobs.rows.every(r => r.state !== 'todo') && !/done/i.test(body)) {
+      bad.push(`everything is done, but the card says "${body.slice(0, 60)}"`);
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* Money as a picture. The bar must be the accessors' own figures — a chart
+     that draws its own arithmetic is a second answer to "how much have I got".
+     The sparkline stays away until there are enough settled weeks to mean
+     something, so it is never a blank box. */
+  checks.todayMoneyChartMatchesTheAccessors = await page.evaluate(() => {
+    const bad = [];
+    profile = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead();
+    const kid = 'jenn';
+    const parts = tdMoneyParts(kid);
+    const total = money2(parts.cash + parts.saved + parts.locked + parts.stock);
+    goToday();
+    const card = document.querySelector('#tdWrap [data-td-action="money"]');
+    if (!card) { bad.push('no money card'); return bad; }
+    const shown = (card.querySelector('.td-money-total') || {}).textContent || '';
+    if (!shown.includes(mnyMoney(total))) bad.push(`card says "${shown}", accessors say ${mnyMoney(total)}`);
+    const segs = [...card.querySelectorAll('.td-bar-seg')];
+    if (total > 0) {
+      const widths = segs.map(s => parseFloat(s.style.width) || 0);
+      const sum = widths.reduce((a, b) => a + b, 0);
+      if (Math.abs(sum - 100) > 0.5) bad.push(`bar segments total ${sum.toFixed(1)}%, not 100%`);
+    }
+    const weeks = tdMoneyHistory(kid).length;
+    const hasSpark = !!card.querySelector('.td-spark');
+    if (weeks < TD_MONEY_SPARK_MIN_WEEKS && hasSpark) bad.push(`sparkline drawn from only ${weeks} settled weeks`);
+    if (weeks >= TD_MONEY_SPARK_MIN_WEEKS && !hasSpark) bad.push(`${weeks} settled weeks but no sparkline`);
+    // Nothing on Today moves money.
+    const before = mnyCash(kid);
+    card.click();
+    const after = mnyCash(kid);
+    if (before !== after) bad.push('tapping the money card moved money');
+    goToday();
+    return bad.length === 0 || bad;
   });
 
   /* Handing off, not re-implementing. Today is now where a day gets *done*, so
@@ -3341,13 +3833,21 @@ function findChromium() {
       { id: 'td-q1', actId: 'piano',      startMin: 15 * 60, durationMin: 60 },
       { id: 'td-q2', actId: 'breakfast',  startMin: 7 * 60,  durationMin: 30 },
     ], 'jenn');
+    /* The list leads with what is NEXT now, so a 7am breakfast is behind the
+       "earlier today" fold by mid-morning. Open it: the assertion is that the
+       whole day is still listed and reachable — not a capped teaser — which is
+       what it always was; only where the past sits has changed. */
+    const wasOpen = tdEarlierOpen();
+    if (!wasOpen) tdToggleEarlier();
     goToday();
 
-    // The whole day is listed, in day order — not a capped teaser.
     const cards = [...document.querySelectorAll('#tdWrap .quest-card')];
     if (cards.length !== 2) bad.push(`expected 2 quest cards, got ${cards.length}`);
+    // Within each group the order is still the day's own order.
     const times = [...document.querySelectorAll('#tdWrap .quest-time')].map(e => e.textContent.trim());
-    if (times[0] !== '7:00am') bad.push(`cards are not in day order: ${times.join(', ')}`);
+    if (!times.includes('7:00am') || !times.includes('3:00pm')) {
+      bad.push(`the day is not fully listed: ${times.join(', ')}`);
+    }
 
     // 🎯 completes through the owning path: block marked done AND XP moved.
     const xpBefore = getQuestXP('jenn');
@@ -3377,13 +3877,17 @@ function findChromium() {
     goToday();
     if (!document.getElementById('vibeMoods')) bad.push('the vibe picker did not come across');
     if (!document.getElementById('dayTodosList') || !document.getElementById('dayGoalsList')) bad.push('to-dos/goals did not come across');
-    if (!document.querySelector('#screen-today .btn-break-quick')) bad.push('the break buttons did not come across');
+    /* The two break buttons used to be asserted here. They are gone — a
+       permanent row for something asked for a handful of times — so the check is
+       now that they stay gone rather than that they arrived. */
+    if (document.querySelector('#screen-today .btn-break-quick')) bad.push('the break buttons came back');
     const body = document.getElementById('tdExtrasBody');
     if (!body || getComputedStyle(body).display !== 'none') bad.push('the extras panel is not collapsed by default');
     tdToggleExtras();
     if (getComputedStyle(document.getElementById('tdExtrasBody')).display === 'none') bad.push('the extras panel does not open');
     tdToggleExtras();
 
+    if (!wasOpen) tdToggleEarlier();
     setDayBlocks(key, [], 'jenn');
     return bad.length === 0 || bad;
   });
@@ -3468,7 +3972,8 @@ function findChromium() {
 
     // The pre-existing globals the rest of the suite drives the app with.
     goWeek();              const oldWeek   = activeId() === 'screen-week';
-    goQuestBoard();        const oldQuest  = activeId() === 'screen-quest';
+    // goQuestBoard was checked here; the Quest Board is retired.
+    const oldQuest = true;
     openChoreTab();        const oldChore  = activeId() === 'screen-chore';
     mnyOpenMyMoney('jenn'); const oldMoney = activeId() === 'screen-mymoney';
     openSisterSync();      const oldSync   = activeId() === 'screen-sync';
@@ -3606,38 +4111,124 @@ function findChromium() {
      And mnyAddMissedWeek cannot reach a gap in the middle: it only ever steps
      back from the earliest week on record. */
   checks.unsettledWeeksAreOfferedNotHidden = await page.evaluate(() => {
+    const bad = [];
     profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const c = state.shared.chore;
     const heldBefore = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
-    const startBefore = c.moneyModelStartWeek;
+    const metBefore = JSON.parse(JSON.stringify(c.meetingsMet || {}));
+    const startBefore = c.moneyModelStartWeek, progBefore = c.programStartDate;
     const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - 21);
+    // A family three weeks in. Both floors, because the look-back stops at
+    // whichever is later — a week before the family existed is not a week
+    // they missed.
     c.moneyModelStartWeek = ctDateToKey(mon);
+    c.programStartDate = ctDateToKey(mon);
 
-    c.meetingsHeld = {};
-    const found = mmUnsettledWeeks(8).length === 3;
-    const ordered = mmUnsettledWeeks(8)[0].weeksLate === 1;
+    c.meetingsHeld = {}; c.meetingsMet = {};
+    if (mmUnsettledWeeks(8).length !== 3) bad.push(`${mmUnsettledWeeks(8).length} open weeks, expected 3`);
+    if (mmUnsettledWeeks(8)[0].weeksLate !== 1) bad.push('the list does not start with the most recent');
 
     // Settle the middle one: it drops out, and the gap either side stays
     // reachable. This is the case the hand-entry path structurally cannot do.
     const middle = mmUnsettledWeeks(8)[1].wk;
     c.meetingsHeld[middle] = true;
     const list = mmUnsettledWeeks(8);
-    const dropped = list.length === 2 && !list.some(x => x.wk === middle);
+    if (list.length !== 2 || list.some(x => x.wk === middle)) bad.push('a settled week did not drop out of the list');
 
     showScreen('parent'); renderParentHome();
     const hub = document.getElementById('meetingHub');
-    const shown = !!hub.querySelector('.mm-catchup-row');
+    if (!hub.querySelector('.mm-catchup-row')) bad.push('the catch-up list is not on the hub');
     // A way in, not a telling-off: the copy must not scold a busy fortnight.
-    const wording = hub.textContent.includes('Nothing expires');
+    if (!hub.textContent.includes('Nothing expires')) bad.push('the copy scolds instead of offering');
 
     // Weeks before the money model began are a dead end — never offered.
     c.moneyModelStartWeek = ctThisWeekKey();
-    const floored = mmUnsettledWeeks(8).length === 0;
+    if (mmUnsettledWeeks(8).length !== 0) bad.push('weeks before the money model started are still offered');
 
-    c.meetingsHeld = heldBefore; c.moneyModelStartWeek = startBefore;
-    return (found && ordered && dropped && shown && wording && floored)
-      || [{ found, ordered, dropped, shown, wording, floored }];
+    c.meetingsHeld = heldBefore; c.meetingsMet = metBefore;
+    c.moneyModelStartWeek = startBefore; c.programStartDate = progBefore;
+    return bad.length === 0 || bad;
+  });
+
+  /* ── The "8 weeks never settled" bug ──
+     meetingsHeld is written only when BOTH kids finish step 4, so a family that
+     reviewed, celebrated and agreed the numbers recorded nothing — and the
+     catch-up list called every one of the last eight weeks never settled,
+     saturating at its own ceiling. That is where the number 8 came from. The
+     same press credits the money, which is why the wallet read $0.00 while the
+     meeting showed real figures: one bug, seen from two ends. */
+  checks.meetingMetIsNotMeetingSettled = await page.evaluate(() => {
+    const bad = [];
+    profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const c = state.shared.chore;
+    const heldBefore = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
+    const metBefore = JSON.parse(JSON.stringify(c.meetingsMet || {}));
+    const startBefore = c.moneyModelStartWeek, progBefore = c.programStartDate;
+    const back = n => { const m = formatDayKey(ctThisWeekKey()); m.setDate(m.getDate() - n * 7); return ctDateToKey(m); };
+    c.moneyModelStartWeek = back(3); c.programStartDate = back(3);
+    c.meetingsHeld = {}; c.meetingsMet = {};
+
+    // Two of the three were actually met. They must stop being nagged about…
+    mmMarkWeekMet(back(1));
+    mmMarkWeekMet(back(2));
+    const unopened = mmUnopenedWeeks(8);
+    if (unopened.length !== 1) bad.push(`${unopened.length} weeks still read as never opened, expected 1`);
+    // …without becoming settled, because the money genuinely has not moved.
+    if (mmIsSettled(back(1))) bad.push('marking a week met marked it settled');
+    if (mmUnsettledWeeks(8).length !== 3) bad.push('a met week dropped out of the unsettled list — its money is still waiting');
+    const met1 = mmUnsettledWeeks(8).find(x => x.wk === back(1));
+    if (!met1 || met1.status !== 'met') bad.push('a met week is not reported as met');
+
+    /* The hub says which is which, and offers the action that fits each — so it
+       has to be read while one week is still unopened and two are met. */
+    showScreen('parent'); renderParentHome();
+    const hub = document.getElementById('meetingHub');
+    if (!hub.querySelector('[data-mm-catch="settle"]')) bad.push('a met week is not offered a way to settle its money');
+    if (!hub.querySelector('[data-mm-catch="met"]')) bad.push('an unopened week cannot be ticked off as already done');
+    if (/never settled/.test(hub.textContent)) bad.push('the hub still calls a week the family met about "never settled"');
+
+    // And ticking one off moves no money.
+    const cashBefore = mnyCash('jenn');
+    mmMarkWeekMet(back(3));
+    if (mnyCash('jenn') !== cashBefore) bad.push('marking a week met moved money');
+    if (mmUnopenedWeeks(8).length !== 0) bad.push('ticking off the last unopened week did not take it off the list');
+
+    c.meetingsHeld = heldBefore; c.meetingsMet = metBefore;
+    c.moneyModelStartWeek = startBefore; c.programStartDate = progBefore;
+    renderParentHome();
+    return bad.length === 0 || bad;
+  });
+
+  /* The readout whose absence made $0.00 look like data loss: a week that has
+     been agreed but not paid out has to say so somewhere she will look. */
+  checks.agreedButUnpaidIsVisible = await page.evaluate(() => {
+    const bad = [];
+    profile = 'parent'; parentViewing = 'jenn'; mnyKid = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const c = state.shared.chore;
+    const finBefore = JSON.parse(JSON.stringify(c.finalizedWeeks || {}));
+    const lastWk = (() => { const m = formatDayKey(ctThisWeekKey()); m.setDate(m.getDate() - 7); return ctDateToKey(m); })();
+    const owed = money2(ctWeekMoney(lastWk, 'jenn'));
+    // Only meaningful if last week actually earned something.
+    if (owed <= 0) { c.finalizedWeeks = finBefore; return true; }
+    c.finalizedWeeks = JSON.parse(JSON.stringify(finBefore));
+    if (c.finalizedWeeks[lastWk]) delete c.finalizedWeeks[lastWk].jenn;
+    const rows = mnyUnpaidWeeks('jenn', 8);
+    if (!rows.some(r => r.wk === lastWk)) bad.push('an uncredited week is not counted as unpaid');
+    mnyOpenMyMoney('jenn');
+    const txt = document.getElementById('mnyPage1Wrap').textContent;
+    if (!/still to come/.test(txt)) bad.push('My money does not say the money is still waiting');
+    if (!txt.includes(mnyMoney(money2(rows.reduce((a, r) => a + r.amount, 0))))) {
+      bad.push('the unpaid figure on the page is not the accessors\' own');
+    }
+    // Once the week is credited the note goes away rather than double-counting.
+    if (!c.finalizedWeeks[lastWk]) c.finalizedWeeks[lastWk] = {};
+    c.finalizedWeeks[lastWk].jenn = owed;
+    if (mnyUnpaidWeeks('jenn', 8).some(r => r.wk === lastWk)) bad.push('a credited week is still counted as unpaid');
+    c.finalizedWeeks = finBefore;
+    return bad.length === 0 || bad;
   });
 
   /* ── A kid puts back a fortnight she never planned ──
@@ -3743,15 +4334,20 @@ function findChromium() {
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const c = state.shared.chore;
     const heldBefore = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
-    const startBefore = c.moneyModelStartWeek;
+    const metBefore = JSON.parse(JSON.stringify(c.meetingsMet || {}));
+    const startBefore = c.moneyModelStartWeek, progBefore = c.programStartDate;
     const askedBefore = mmCatchUpAsked;
     const back = (n) => {
       const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - n * 7);
       return ctDateToKey(d);
     };
+    // Both floors: the look-back stops at whichever is later, because a week
+    // before the family existed is not a week they missed.
     c.moneyModelStartWeek = back(3);
+    c.programStartDate = back(3);
     // Settled three weeks ago and nothing since: two weeks open behind us.
     c.meetingsHeld = {}; c.meetingsHeld[back(3)] = true;
+    c.meetingsMet = {};
 
     const last = mmLastReviewed();
     const lastIs = !!last && last.wk === back(3) && last.weeksAgo === 3;
@@ -3760,7 +4356,10 @@ function findChromium() {
     mmCatchUpAsked = true;                  // suppress the ask for this part
     openFamilyMeeting();
     const body = document.getElementById('familyMeetingBody').textContent;
-    const shows = body.includes('Last settled') && body.includes('2 earlier weeks still open');
+    /* The copy names WHICH kind of open each week is. It used to lump them
+       together as "still open", which is how a family that had met twice was
+       told it had missed eight weeks. */
+    const shows = body.includes('Last settled') && body.includes('2 earlier weeks not yet opened');
     closeSheet('familyMeetingOverlay');
 
     const dlgOpen = () => {
@@ -3777,7 +4376,7 @@ function findChromium() {
     mmCatchUpAsked = false;
     openFamilyMeetingAsk();
     const asked = dlgOpen()
-      && document.getElementById('appDialogOverlay').textContent.includes('never settled');
+      && document.getElementById('appDialogOverlay').textContent.includes('nobody has opened');
     const btn = document.querySelector('#appDialogOverlay [data-choice="0"]');
     if (btn) btn.click();
     await new Promise(r => setTimeout(r, 20));
@@ -3795,7 +4394,8 @@ function findChromium() {
     const quietWhenCaughtUp = !dlgOpen();
     closeSheet('familyMeetingOverlay');
 
-    c.meetingsHeld = heldBefore; c.moneyModelStartWeek = startBefore;
+    c.meetingsHeld = heldBefore; c.meetingsMet = metBefore;
+    c.moneyModelStartWeek = startBefore; c.programStartDate = progBefore;
     mmCatchUpAsked = askedBefore;
     ctSetCurrentWeekFromPlanner();
     return (lastIs && shows && quietOnDeepLink && asked && movedToGap && askedOnce
@@ -4095,25 +4695,33 @@ function findChromium() {
      it came from, and the "still to earn" figure must equal the one My money
      prints — that is the same class of agreement as the pool check above. */
   checks.todayMoneyRowMatchesMyMoney = await page.evaluate(() => {
+    const bad = [];
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jenn', wk = ctWeekKey;
     goToday();
     const row = document.querySelector('#tdWrap .td-money');
-    if (!row) return 'no money row on Today';
+    if (!row) { bad.push('no money row on Today'); return bad; }
     const txt = row.textContent;
-    const earn = mnyEarnLeftToday(kid, wk);
-    const showsCash = txt.includes(mnyMoney(mnyCash(kid)));
+    /* The three tiles this used to check became a stacked bar plus its key —
+       the same figures, drawn. Cash is now a key entry rather than a tile, and
+       the total is stated outright; both still have to be the accessors' own
+       numbers, which is what this asserts. */
+    if (!txt.includes(mnyMoney(mnyCash(kid)))) bad.push(`card does not show cash ${mnyMoney(mnyCash(kid))}`);
     const owing = mnyTotalOwing(kid);
-    const showsOwing = owing > 0 ? txt.includes(mnyMoney(owing)) : !txt.includes('I owe');
+    if (owing > 0 ? !txt.includes(mnyMoney(owing)) : /owes/.test(txt)) {
+      bad.push(`owing shown wrong (owes ${mnyMoney(owing)}): "${txt.slice(0, 80)}"`);
+    }
+    const earn = mnyEarnLeftToday(kid, wk);
     const want = earn.left == null ? earn.done : earn.left;
-    const showsEarn = txt.includes(mnyMoney(want));
+    if (!txt.includes(mnyMoney(want))) bad.push(`card does not show the earn figure ${mnyMoney(want)}`);
     // …and My money must print the same figure from the same reader.
     mnyOpenMyMoney(kid);
-    const onMoneyPage = document.getElementById('mnyPage1Wrap').textContent
-      .includes(mnyMoney(want));
+    if (!document.getElementById('mnyPage1Wrap').textContent.includes(mnyMoney(want))) {
+      bad.push('My money and Today disagree about what is still to earn');
+    }
     goToday();
-    return showsCash && showsOwing && showsEarn && onMoneyPage;
+    return bad.length === 0 || bad;
   });
 
   /* An empty day offers to be planned; a day with blocks on it does not. Both

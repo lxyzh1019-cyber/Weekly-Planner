@@ -8,9 +8,71 @@ function openDayFromWeekCard(dayKey, dayIdx, focusBlockId=null) {
   openDay(dayKey, dayIdx, focusBlockId, wk);
 }
 
+/* ── How many days the schedule shows at once ──
+   A column count, not a mode. What a block says, how it is placed and how it is
+   edited are identical at 1, 2 and 3 — the only difference is how many days are
+   on screen, which is the thing a parent laying out a week actually wants. It
+   lives in localStorage and never in synced state: every state write here is a
+   full-document upload, and this is a preference about one screen on one device.
+
+   Three columns on a phone is confetti rather than a plan, so a narrow viewport
+   is served one column whatever the stored preference says. */
+const DAY_SPAN_LS_KEY = 'wp_day_span';
+const DAY_SPAN_MIN_WIDTH_PER_COL = 300;  // below this a column stops being readable
+
+function dayViewSpan() {
+  const n = parseInt(localStorage.getItem(DAY_SPAN_LS_KEY) || '1', 10);
+  return (n === 2 || n === 3) ? n : 1;
+}
+/* What the viewport can actually carry, which is what buildTimeline renders. */
+function dayViewSpanEffective() {
+  const want = dayViewSpan();
+  const avail = Math.max(1, Math.floor((window.innerWidth - 64) / DAY_SPAN_MIN_WIDTH_PER_COL));
+  return Math.max(1, Math.min(want, avail));
+}
+function setDayViewSpan(n) {
+  try { localStorage.setItem(DAY_SPAN_LS_KEY, String(n)); } catch (e) {}
+  renderDaySpanTabs();
+  buildTimeline();
+}
+/* The day keys on screen, left to right, starting at the anchor. Runs past the
+   end of a week on purpose: three days from Saturday is Sat-Sun-Mon, which is
+   how a weekend is actually planned. */
+function dayViewKeys() {
+  const span = dayViewSpanEffective();
+  const start = formatDayKey(dayViewAnchorKey || currentDayKey);
+  const out = [];
+  for (let i = 0; i < span; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    out.push(dateToLocalKey(d));
+  }
+  return out;
+}
+function renderDaySpanTabs() {
+  const wrap = document.getElementById('daySpanTabs');
+  if (!wrap) return;
+  const cur = dayViewSpan();
+  const eff = dayViewSpanEffective();
+  wrap.innerHTML = '';
+  [1, 2, 3].forEach(n => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'day-span-tab' + (cur === n ? ' active' : '') + (n > eff ? ' unavailable' : '');
+    b.textContent = String(n);
+    b.setAttribute('aria-label', n === 1 ? 'Show one day' : `Show ${n} days side by side`);
+    b.setAttribute('aria-pressed', cur === n ? 'true' : 'false');
+    b.onclick = () => setDayViewSpan(n);
+    wrap.appendChild(b);
+  });
+}
+
 function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   if (weekOffsetOverride != null) weekOffset = weekOffsetOverride;
   currentDayKey = key;
+  // The anchor is the leftmost column; currentDayKey is the day being edited.
+  // They are the same until a tap lands in another column.
+  dayViewAnchorKey = key;
   selectedActivity = null;
 
   // Parent banner
@@ -21,13 +83,12 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
     isParent() ? (parentViewing==='jenn'?'🐥 (P)':'🦊 (P)') :
     (profile==='jenn'?'🐥 Jenn':'🦊 Jess');
   document.getElementById('dayTitle').textContent = '';
-  const d = formatDayKey(key);
-  document.getElementById('daySubtitle').textContent = `${DAY_LONG[dayIdx]}, ${MONTH_SHORT[d.getMonth()]} ${d.getDate()}`;
+  renderDayHeading();
 
   showScreen('day');
+  renderDaySpanTabs();
   buildTimeline();
   bindDayTimelineCompactOnScroll();
-  buildTray();
   renderVibe();
   renderDayGoalsTodos();
   maybeShowRewardPrompt();
@@ -44,6 +105,31 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
     const m = getProfData().dayMoods?.[key];
     if (!m) showToast('💫 Tap 🌙 to reflect on today');
   }
+}
+
+/* The date line in the topbar. Names one day, or the span it is showing — a
+   heading that said "Tuesday" over three columns would be lying about two of
+   them. */
+function renderDayHeading() {
+  const el = document.getElementById('daySubtitle');
+  if (!el) return;
+  const keys = dayViewKeys();
+  const first = formatDayKey(keys[0]);
+  if (keys.length === 1) {
+    el.textContent = `${DAY_LONG[dayIdxOfKey(keys[0])]}, ${MONTH_SHORT[first.getMonth()]} ${first.getDate()}`;
+    return;
+  }
+  const last = formatDayKey(keys[keys.length - 1]);
+  const lastPart = last.getMonth() === first.getMonth()
+    ? `${last.getDate()}` : `${MONTH_SHORT[last.getMonth()]} ${last.getDate()}`;
+  el.textContent = `${MONTH_SHORT[first.getMonth()]} ${first.getDate()} – ${lastPart}`;
+}
+/* Mon=0..Sun=6, the index DAY_LONG and getDayKeys both use. Derived from the
+   date rather than passed in, because a column three days along may not be in
+   the week the caller had in hand. */
+function dayIdxOfKey(key) {
+  const js = formatDayKey(key).getDay();
+  return js === 0 ? 6 : js - 1;
 }
 
 function renderDayGoalsTodos() {
@@ -77,7 +163,7 @@ function renderDayGoalsTodos() {
 
 function focusBlockOnTimeline(blockId) {
   if (!blockId) return;
-  const wrap = document.querySelector('.timeline-wrap');
+  const wrap = document.querySelector('#screen-day .day-workspace');
   const el = document.getElementById('block-'+blockId);
   if (!wrap || !el) {
     if (pendingFocusAttempts < 6) {
@@ -161,6 +247,10 @@ function setDayMood(m) {
    where one gets built. That leaves the day screen a single layout, so there is
    no dayViewMode left to go stale between visits. */
 
+/* One hour gutter, then one column per day on show. The gutter is shared
+   deliberately: three days each carrying their own 6am-10pm ladder is three
+   copies of the same information and two more vertical rules on a screen the
+   family already called too busy. */
 function buildTimeline() {
   if (activeStopwatchTick) { clearInterval(activeStopwatchTick); activeStopwatchTick = null; }
   refreshRestDayButton();
@@ -168,54 +258,116 @@ function buildTimeline() {
   const topbar = document.querySelector('#screen-day .day-topbar');
   tl.innerHTML = '';
   if (topbar) topbar.classList.remove('day-topbar--compact');
-  const blocks = getDayBlocks(currentDayKey);
 
-  const zMinStart = 0, zMinEnd = DAY_MIN_SPAN;
-  const spanMin = zMinEnd - zMinStart;
-  const canvasHeight = spanMin * PX_PER_MIN;
+  const keys = dayViewKeys();
+  tl.classList.toggle('timeline--multi', keys.length > 1);
+  tl.style.setProperty('--day-cols', String(keys.length));
 
-  // Gutter (time labels)
+  const canvasHeight = DAY_MIN_SPAN * PX_PER_MIN;
+  tl.appendChild(buildHourGutter(canvasHeight));
+
+  const cols = document.createElement('div');
+  cols.className = 'tl-cols';
+  let running = false;
+  const allBlocks = [];
+  keys.forEach(key => {
+    const built = buildDayColumn(key, canvasHeight, keys.length > 1);
+    cols.appendChild(built.el);
+    if (built.hasRunningStopwatch) running = true;
+    allBlocks.push(...built.blocks);
+  });
+  tl.appendChild(cols);
+
+  if (running) {
+    activeStopwatchTick = setInterval(()=>{
+      if (document.querySelector('.screen.active')?.id !== 'screen-day') {
+        clearInterval(activeStopwatchTick);
+        activeStopwatchTick = null;
+        return;
+      }
+      buildTimeline();
+    }, 1000);
+  }
+
+  enhanceAccessibility(tl);
+  updateStopwatchGoalToasts(allBlocks);
+}
+
+/* The 6am-10pm ladder, once. */
+function buildHourGutter(canvasHeight) {
   const gutter = document.createElement('div');
   gutter.className = 'tl-gutter';
   gutter.style.height = canvasHeight + 'px';
+  const firstHour = Math.ceil(START_MIN / 60);
+  const lastHour  = Math.floor(END_MIN / 60);
+  for (let h = firstHour; h <= lastHour; h++) {
+    const label = document.createElement('div');
+    label.className = 'tl-hour-label';
+    label.textContent = `${h>12?h-12:h}${h>=12?'pm':'am'}`;
+    label.style.top = ((h * 60) - START_MIN) * PX_PER_MIN + 'px';
+    gutter.appendChild(label);
+  }
+  return gutter;
+}
 
-  // Canvas (where blocks go)
+/* One day. Everything that used to be the body of buildTimeline, with the day
+   it belongs to passed in rather than read off the global — which is what makes
+   two and three columns possible at all. Each canvas carries its own dayKey, so
+   a tap knows which day it landed on without anything having to guess. */
+function buildDayColumn(dayKey, canvasHeight, withHeader) {
+  const zMinStart = 0, zMinEnd = DAY_MIN_SPAN;
+  const spanMin = zMinEnd - zMinStart;
+  const blocks = getDayBlocks(dayKey);
+
+  const col = document.createElement('div');
+  col.className = 'tl-col' + (dayKey === currentDayKey ? ' tl-col--current' : '');
+  col.dataset.dayKey = dayKey;
+
+  if (withHeader) {
+    const d = formatDayKey(dayKey);
+    const head = document.createElement('button');
+    head.type = 'button';
+    head.className = 'tl-col-head' + (dayKey === todayKey() ? ' is-today' : '');
+    head.innerHTML = `<span class="tl-col-day">${escapeHtml(DAY_SHORT[dayIdxOfKey(dayKey)])}</span>
+      <span class="tl-col-date">${d.getDate()}</span>`;
+    // Tapping the header makes that day the one the topbar's 📋 / 🌙 / 🗑 act on.
+    head.onclick = () => { focusDayColumn(dayKey); };
+    col.appendChild(head);
+  }
+
   const canvas = document.createElement('div');
   canvas.className = 'tl-canvas';
   canvas.style.height = canvasHeight + 'px';
   canvas.dataset.zmin = zMinStart;
+  canvas.dataset.dayKey = dayKey;
   canvas.onclick = (e)=>handleCanvasTap(e, zMinStart);
   canvas.onmousemove = (e)=>updatePlacementGuideFromPointer(e, zMinStart);
   canvas.onmouseleave = ()=>clearPlacementGuide();
   canvas.classList.toggle('placing', !!selectedActivity);
 
-  timelinePlacementGuideEl = document.createElement('div');
-  timelinePlacementGuideEl.className = 'tl-placement-guide';
-  timelinePlacementGuideEl.dataset.time = '';
-  if (currentTimelineGuideY != null) {
-    timelinePlacementGuideEl.style.top = `${currentTimelineGuideY}px`;
-  }
-  canvas.appendChild(timelinePlacementGuideEl);
+  /* The zone bands used to be a fourth vertical strip beside the gutter, with
+     their labels set sideways so a short band cut the word in half. They are
+     the background of the day now: same source (isSchoolDay / SCHOOL_HOURS),
+     one column fewer, and the label reads left to right. */
+  paintZoneBands(canvas, dayKey, zMinStart, zMinEnd);
 
-  // Hour lines + labels
+  const guide = document.createElement('div');
+  guide.className = 'tl-placement-guide';
+  guide.dataset.time = '';
+  if (currentTimelineGuideY != null) guide.style.top = `${currentTimelineGuideY}px`;
+  canvas.appendChild(guide);
+  if (dayKey === currentDayKey) timelinePlacementGuideEl = guide;
+
+  // Hour + half-hour rules
   const firstHour = Math.ceil((zMinStart + START_MIN) / 60);
   const lastHour  = Math.floor((zMinEnd + START_MIN) / 60);
   for (let h = firstHour; h <= lastHour; h++) {
     const minFromZoneStart = (h * 60) - START_MIN - zMinStart;
     const y = minFromZoneStart * PX_PER_MIN;
-
     const hourLine = document.createElement('div');
     hourLine.className = 'tl-hour-line';
     hourLine.style.top = y + 'px';
     canvas.appendChild(hourLine);
-
-    const label = document.createElement('div');
-    label.className = 'tl-hour-label';
-    label.textContent = `${h>12?h-12:h}${h>=12?'pm':'am'}`;
-    label.style.top = y + 'px';
-    gutter.appendChild(label);
-
-    // Half-hour line
     if (h < lastHour || minFromZoneStart + 30 < spanMin) {
       const halfY = y + 30 * PX_PER_MIN;
       if (halfY < canvasHeight) {
@@ -227,11 +379,8 @@ function buildTimeline() {
     }
   }
 
-  // Zone labels (only when viewing all) — now shown in side-band instead of canvas
-  // (Side-band is appended below alongside the gutter)
-
-  // "Now" line if today
-  if (currentDayKey === todayKey()) {
+  // "Now" line, on the column that is actually today
+  if (dayKey === todayKey()) {
     const now = new Date();
     const nowMin = now.getHours()*60 + now.getMinutes() - START_MIN;
     if (nowMin >= zMinStart && nowMin <= zMinEnd) {
@@ -242,7 +391,6 @@ function buildTimeline() {
     }
   }
 
-  // Render visible blocks with column collision
   const visibleBlocks = blocks.filter(b => {
     const bStart = b.startMin - START_MIN;
     const bEnd   = bStart + b.durationMin;
@@ -251,14 +399,14 @@ function buildTimeline() {
   // A block's travel/get-ready buffer can overlap an adjacent activity — flag
   // both the buffer strip and the activity it collides with.
   const bufferConflicts = computeBufferConflicts(blocks);
-  const colAssignments = renderBlocksWithCollision(canvas, visibleBlocks, zMinStart, bufferConflicts.affected);
+  const colAssignments = renderBlocksWithCollision(canvas, visibleBlocks, zMinStart, bufferConflicts.affected, dayKey);
 
   if (!blocks.length) {
     const emptyState = document.createElement('div');
     emptyState.className = 'timeline-empty-state';
     emptyState.innerHTML = `
       <div class="title">Ready to plan this day?</div>
-      <div class="hint">Pick an activity, then tap a time in the schedule.</div>
+      <div class="hint">Tap a time to add something.</div>
     `;
     canvas.appendChild(emptyState);
   }
@@ -273,36 +421,39 @@ function buildTimeline() {
   });
 
   // Pending invitations from sister — render as dashed-border blocks
-  renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd);
+  renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd, dayKey);
 
-  const sideband = buildSideband(zMinStart, zMinEnd);
-  tl.appendChild(sideband);
-  tl.appendChild(gutter);
-  tl.appendChild(canvas);
-  const hasRunning = blocks.some(b => !!(b.stopwatch && b.stopwatch.enabled && b.stopwatch.running));
-  if (hasRunning) {
-    activeStopwatchTick = setInterval(()=>{
-      if (document.querySelector('.screen.active')?.id !== 'screen-day') {
-        clearInterval(activeStopwatchTick);
-        activeStopwatchTick = null;
-        return;
-      }
-      buildTimeline();
-    }, 1000);
-  }
-
-  updateStopwatchGoalToasts(blocks);
+  col.appendChild(canvas);
+  return {
+    el: col,
+    blocks,
+    hasRunningStopwatch: blocks.some(b => !!(b.stopwatch && b.stopwatch.enabled && b.stopwatch.running)),
+  };
 }
 
-function renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd) {
+/* Make one column the day the topbar acts on. currentDayKey is what every
+   existing writer reads — placeBlock, setDayMood, clearDay, applyTemplate, the
+   edit sheet — so pointing it at the tapped column is the whole of what a
+   multi-day view needs, rather than threading a day key through all of them. */
+function focusDayColumn(dayKey) {
+  if (!dayKey || dayKey === currentDayKey) return;
+  currentDayKey = dayKey;
+  renderDayHeading();
+  document.querySelectorAll('#timeline .tl-col').forEach(c =>
+    c.classList.toggle('tl-col--current', c.dataset.dayKey === dayKey));
+  renderVibe();
+}
+
+function renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd, dayKey) {
+  const forDay = dayKey || currentDayKey;
   if (isParent()) return;
   const me = activeProfile();
   if (me !== 'jenn' && me !== 'jess') return;
   const invites = (state.shared.invites || []).filter(i =>
-    i.to === me && i.status === 'pending' && i.day === currentDayKey
+    i.to === me && i.status === 'pending' && i.day === forDay
   );
   if (!invites.length) return;
-  const acts = getAllActivities();
+  const acts = getAllActivities(activeProfile(), { includeArchived: true });
   invites.forEach(inv => {
     const act = acts.find(a => a.id === inv.actId);
     if (!act) return;
@@ -434,55 +585,54 @@ function renderDoodle(canvas, blockId, blockTop, blockHeight, leftPct, widthPct)
   canvas.appendChild(el);
 }
 
-/* Build the coloured side-band that shows Before School / School / etc.
-   Weekday: 4 segments. Weekend: single "Free Time" segment.
-   Returns a DOM element ready to insert before the gutter. */
-function buildSideband(zMinStart, zMinEnd) {
-  const band = document.createElement('div');
-  band.className = 'tl-sideband';
-  const canvasHeight = (zMinEnd - zMinStart) * PX_PER_MIN;
-  band.style.height = canvasHeight + 'px';
-
-  /* The bands read the real school calendar rather than the day of the week.
-     Before this they were hardcoded 9am–3pm Mon–Fri, which was both an hour out
-     against SCHOOL_TEMPLATE and wrong on every holiday, PD day and week of the
-     summer — a child opening a July Tuesday was told she was at school. */
-  const segs = [];
-  if (isSchoolDay(currentDayKey)) {
-    const s = SCHOOL_HOURS.startMin, e = SCHOOL_HOURS.endMin;
-    // 3h after the bell is "after school"; the rest of the night is evening.
-    const afterEnd = Math.min(e + 180, DAY_MIN_SPAN);
-    if (s > 0)              segs.push({ start: 0, end: s,  label: '🌅 BEFORE SCHOOL', short: '🌅 BEFORE', cls: 'tl-band-before' });
-                            segs.push({ start: s, end: e,  label: '🏫 SCHOOL',        short: '🏫',        cls: 'tl-band-school' });
-    if (afterEnd > e)       segs.push({ start: e, end: afterEnd, label: '🎒 AFTER SCHOOL', short: '🎒 AFTER', cls: 'tl-band-after' });
-    if (DAY_MIN_SPAN > afterEnd) segs.push({ start: afterEnd, end: DAY_MIN_SPAN, label: '🌙 EVENING', short: '🌙', cls: 'tl-band-evening' });
-  } else {
-    segs.push({ start: 0, end: DAY_MIN_SPAN, label: '🎉 FREE TIME', short: '🎉', cls: 'tl-band-free' });
+/* Which stretches of a day are Before School / School / After School / Evening,
+   or one Free Time band on a day with no school. Read from the real school
+   calendar rather than the day of the week: a Tuesday in July is not a school
+   day, and neither is a PD day (CLAUDE.md — isSchoolDay is the only way to ask). */
+function dayZoneSegments(dayKey) {
+  if (!isSchoolDay(dayKey)) {
+    return [{ start: 0, end: DAY_MIN_SPAN, label: '🎉 Free time', cls: 'tl-band-free' }];
   }
+  const s = SCHOOL_HOURS.startMin, e = SCHOOL_HOURS.endMin;
+  // 3h after the bell is "after school"; the rest of the night is evening.
+  const afterEnd = Math.min(e + 180, DAY_MIN_SPAN);
+  const segs = [];
+  if (s > 0)                   segs.push({ start: 0, end: s, label: '🌅 Before school', cls: 'tl-band-before' });
+                               segs.push({ start: s, end: e, label: '🏫 School', cls: 'tl-band-school' });
+  if (afterEnd > e)            segs.push({ start: e, end: afterEnd, label: '🎒 After school', cls: 'tl-band-after' });
+  if (DAY_MIN_SPAN > afterEnd) segs.push({ start: afterEnd, end: DAY_MIN_SPAN, label: '🌙 Evening', cls: 'tl-band-evening' });
+  return segs;
+}
 
-  segs.forEach(s => {
-    // Clip to visible zone
+/* The bands used to be their own vertical strip beside the gutter, with the
+   labels set sideways — which meant the band's height was the label's line
+   length, so a short before-school gap rendered "BEFORE SCHOOL" cut in half and
+   needed a whole fallback ladder of shorter strings. Painted as the day's
+   background instead: one vertical strip fewer, no sideways text, no fallback,
+   and the label reads the way words read. */
+function paintZoneBands(canvas, dayKey, zMinStart, zMinEnd) {
+  dayZoneSegments(dayKey).forEach(s => {
     const visStart = Math.max(s.start, zMinStart);
     const visEnd   = Math.min(s.end,   zMinEnd);
     if (visEnd <= visStart) return;
     const top    = (visStart - zMinStart) * PX_PER_MIN;
     const height = (visEnd - visStart) * PX_PER_MIN;
-    if (height < 20) return; // too small to be useful
     const seg = document.createElement('div');
     seg.className = 'tl-band-seg ' + s.cls;
     seg.style.top = top + 'px';
-    seg.style.height = (height - 2) + 'px';
-    /* These labels are set sideways, so the band's height is their line length.
-       "BEFORE SCHOOL" needs about 165px and the before-school band is only as
-       tall as the gap between 6am and the first bell — at an 8am start that is a
-       2px margin, and a school starting earlier would cut the word in half.
-       Drop to the short form rather than render a clipped one. */
-    seg.textContent = (height < 180 && s.short) ? s.short : s.label;
+    seg.style.height = height + 'px';
     seg.title = s.label;
-    band.appendChild(seg);
+    // Under ~34px there is no room for a line of text without it fighting the
+    // hour rule sitting in the same pixels; the colour still says which stretch
+    // it is, and the title carries the name.
+    if (height >= 34) {
+      const lab = document.createElement('span');
+      lab.className = 'tl-band-label';
+      lab.textContent = s.label;
+      seg.appendChild(lab);
+    }
+    canvas.appendChild(seg);
   });
-
-  return band;
 }
 
 /* Greedy column-packing collision: blocks that overlap get assigned to columns.
@@ -492,7 +642,7 @@ function buildSideband(zMinStart, zMinEnd) {
    same column/width as the activity a buffer belongs to, instead of each
    buffer strip claiming the full lane width and sprawling under a
    side-by-side neighbour. */
-function renderBlocksWithCollision(canvas, blocks, zMinStart, conflictAffectedIds) {
+function renderBlocksWithCollision(canvas, blocks, zMinStart, conflictAffectedIds, dayKey) {
   const assignments = new Map();
   if (!blocks.length) return assignments;
 
@@ -533,14 +683,18 @@ function renderBlocksWithCollision(canvas, blocks, zMinStart, conflictAffectedId
     g.blocks.forEach(b=>{
       const colIdx = assignments.get(b.id).col;
       assignments.get(b.id).count = colCount;
-      renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffectedIds);
+      renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffectedIds, dayKey);
     });
   });
   return assignments;
 }
 
-function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffectedIds) {
-  const act = getAllActivities().find(a=>a.id===b.actId);
+function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffectedIds, dayKey) {
+  // The day this block belongs to, not "whichever day the topbar names" — in a
+  // 2- or 3-day view those are different, and a tick that wrote to the wrong one
+  // would be a tick that silently completed another day's block.
+  const ownDayKey = dayKey || currentDayKey;
+  const act = findActivity(b.actId);
   if (!act) return;
 
   // The day is always shown whole, so a block can only be clipped by running
@@ -582,7 +736,16 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   // blockContentTier (js/05-helpers.js). The week cards and the print sheet
   // read the same ladder, so a block is legible the same way in all three.
   const tier = blockContentTier(height);
-  const isCompact = !blockTierAtLeast(tier, 'meta');
+  /* Whether the name and the duration go on two lines or one is a layout
+     question, not a "how much may it say" one, and using the ladder's `meta`
+     step for it stacked a 40px block into a 30px content box — the half-hour
+     Breakfast whose title came out sliced. See BLOCK_STACK_MIN. */
+  const isCompact = height < BLOCK_STACK_MIN;
+  /* And the shortest blocks the app allows — a 15-minute break is 22px, of
+     which borders and padding take 8 — need the tighter of the two one-line
+     settings, or the single line they do have overflows too. 13px is the house
+     floor and this is the one place that reaches it. */
+  const isTight = isCompact && height < 30;
   let fontTier = '';
   if (!isCompact) {
     if (blockTierAtLeast(tier, 'full')) fontTier = ' block-font-lg';
@@ -600,7 +763,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
     +(b.completed?' placed-block--completed':'')
     +(isLightColour(blockBg)?' light-bg':'')
     +(hasConflict ? ' placed-block--conflict' : '')
-    +(isCompact?' compact':'')+fontTier;
+    +(isCompact?' compact':'')+(isTight?' compact-tight':'')+fontTier;
   blockEl.id = 'block-'+b.id;
   blockEl.style.background = blockBg;
   blockEl.style.top = top + 'px';
@@ -672,7 +835,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
     : `<div class="block-meta">${durStr}${badges?' '+badges:''}</div>`;
   // Quick-complete tick — mark this block done straight from the timeline.
   const doneHtml = !isBuffer
-    ? `<button type="button" class="block-done-btn${b.completed?' done':''}" aria-label="${b.completed?'Mark not done':'Mark done'}" onclick="event.stopPropagation(); toggleBlockDone(currentDayKey,'${escapeJsAttr(b.id)}',event)">${b.completed?'✓':''}</button>`
+    ? `<button type="button" class="block-done-btn${b.completed?' done':''}" aria-label="${b.completed?'Mark not done':'Mark done'}" onclick="event.stopPropagation(); toggleBlockDone('${escapeJsAttr(ownDayKey)}','${escapeJsAttr(b.id)}',event)">${b.completed?'✓':''}</button>`
     : '';
   // List as many objectives/goals as the block's own height can hold — same
   // "show what this block is about" idea as print/week, and the day view has
@@ -717,7 +880,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
     blockEl.appendChild(m);
     blockEl.title = `${act.name} continues past this section — switch to “All” to see the whole block`;
   }
-  if (!isBuffer) attachTapGuard(blockEl, ()=> onTimelineBlockTap(b.id));
+  if (!isBuffer) attachTapGuard(blockEl, ()=> { focusDayColumn(ownDayKey); onTimelineBlockTap(b.id); });
   canvas.appendChild(blockEl);
 
   // Decorative doodle (seasonal, stable per block per month)
@@ -753,7 +916,7 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0
       { startMin: endMin + preTravel, label: '👕 ⬅ get ready', bufDur: readyBuf, cls: 'travel-buf-ready', side: 'post' },
     );
   }
-  const sourceAct = getAllActivities().find(a=>a.id===b.actId);
+  const sourceAct = findActivity(b.actId);
   const overlayBlocks = entries.map(({ startMin, label, bufDur, cls, side }) => {
     const segConflict = !!conflict && (side === 'pre' ? conflict.pre : conflict.post);
     return {
@@ -781,18 +944,23 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0
   overlayBlocks.forEach(buf => renderBlockPixel(canvas, buf, zMinStart, colIdx, colCount));
 }
 
+/* Bound to .day-workspace, which is the day screen's one scroller. It used to
+   listen on #screen-day itself — right while the screen was the scrolling
+   element, wrong now that the workspace inside it is. Scroll events do not
+   bubble, so listening on the wrong element is silent rather than noisy. */
 function bindDayTimelineCompactOnScroll() {
   if (dayTopbarCompactBound) return;
   const screen = document.getElementById('screen-day');
   const topbar = screen ? screen.querySelector('.day-topbar') : null;
-  if (!screen || !topbar) return;
+  const scroller = screen ? screen.querySelector('.day-workspace') : null;
+  if (!screen || !topbar || !scroller) return;
   const threshold = 36;
-  screen.addEventListener('scroll', () => {
+  scroller.addEventListener('scroll', () => {
     if (!window.matchMedia('(min-width: 980px) and (orientation: landscape)').matches) {
       topbar.classList.remove('day-topbar--compact');
       return;
     }
-    topbar.classList.toggle('day-topbar--compact', screen.scrollTop > threshold);
+    topbar.classList.toggle('day-topbar--compact', scroller.scrollTop > threshold);
   }, { passive: true });
   dayTopbarCompactBound = true;
 }
@@ -888,7 +1056,7 @@ function getTrainingGearPresets(tag, isComp) {
 function blockIsCompetition(b) {
   if (!b) return false;
   if (b.actId === 'competition') return true;
-  const act = getAllActivities().find(a => a.id === b.actId);
+  const act = findActivity(b.actId);
   return !!(act && act.isCompetition);
 }
 
@@ -1031,7 +1199,7 @@ function onTimelineBlockTap(blockId) {
   }
   const blocks = getDayBlocks(currentDayKey);
   const b = blocks.find(x => x.id === blockId);
-  const act = b && getAllActivities().find(a => a.id === b.actId);
+  const act = b && findActivity(b.actId);
   if (!b || !act) return;
   if (act.isRoutine) {
     openKidRoutineQuick(blockId);
@@ -1072,7 +1240,7 @@ function openKidRoutineQuick(blockId) {
   kidQuickBlockId = blockId;
   const blocks = getDayBlocks(currentDayKey);
   const b = blocks.find(x => x.id === blockId);
-  const act = b && getAllActivities().find(a => a.id === b.actId);
+  const act = b && findActivity(b.actId);
   if (!b || !act || !act.isRoutine) return;
   document.getElementById('kidRoutineTitle').textContent = `${act.icon} ${act.name}`;
   renderChecklist(b, act, 'kidRoutineChecklist', { skipAdd: true });
@@ -1113,7 +1281,7 @@ function openKidTrainingQuick(blockId) {
   kidQuickBlockId = blockId;
   const blocks = getDayBlocks(currentDayKey);
   const b = blocks.find(x => x.id === blockId);
-  const act = b && getAllActivities().find(a => a.id === b.actId);
+  const act = b && findActivity(b.actId);
   if (!b || !act || !act.isTraining) return;
   document.getElementById('kidTrainingTitle').textContent = `${act.icon} ${act.name}`;
   const objEl = document.getElementById('kidTrainingObjectives');
@@ -1160,15 +1328,20 @@ function kidTrainingOpenEdit() {
   if (id) openEditSheet(id);
 }
 
-/* Canvas tap → place new block at that pixel y */
+/* Canvas tap → place new block at that pixel y, on the day that canvas is.
+   The day comes off the canvas, not off currentDayKey: with two or three columns
+   on screen those differ, and reading the global would drop every block into
+   whichever day the topbar happened to name. */
 function handleCanvasTap(e, zMinStart) {
-  const rect = e.currentTarget.getBoundingClientRect();
+  const canvas = e.currentTarget;
+  const rect = canvas.getBoundingClientRect();
   const y = e.clientY - rect.top;
   const relMin = Math.round(y / PX_PER_MIN);
   // Snap to 15 min
   const snapped = Math.round(relMin / 15) * 15;
   const absMin = START_MIN + zMinStart + snapped;
 
+  focusDayColumn(canvas.dataset.dayKey);
   addActivityAtMin(absMin);
 }
 
@@ -1202,22 +1375,50 @@ function openSlotPicker(absMin) {
   slotPickerFilter = 'all';
   const title = document.getElementById('slotPickerTitle');
   const hint = document.getElementById('slotPickerHint');
-  if (title) title.textContent = `Add at ${formatTimeFromMin(absMin)}`;
+  /* Name the day as well as the time whenever more than one day is on screen.
+     "Add at 3:30pm" is ambiguous the moment there are three columns, and a
+     block landing on the wrong day is not a mistake a child can see. */
+  const many = dayViewKeys().length > 1;
+  const dayName = many ? `${DAY_SHORT[dayIdxOfKey(currentDayKey)]} ` : '';
+  if (title) title.textContent = `Add ${dayName}${formatTimeFromMin(absMin)}`;
   if (hint) hint.textContent = 'Pick what goes in this time slot.';
   renderSlotPicker();
   openSheet('slotPickerOverlay');
 }
+
+/* What she has actually been putting on her days, most-used first. Reads the
+   last four weeks of her own blocks — a library of forty activities sorted
+   alphabetically buries the six a real week is made of. */
+function slotPickerRecentActIds(limit) {
+  const counts = new Map();
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 28);
+  const weeks = (getProfData() || {}).weeks || {};
+  Object.keys(weeks).forEach(k => {
+    if (formatDayKey(k) < cutoff) return;
+    (weeks[k] || []).forEach(b => {
+      if (!b || !b.actId) return;
+      counts.set(b.actId, (counts.get(b.actId) || 0) + 1);
+    });
+  });
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])
+    .slice(0, limit || 6).map(e => e[0]);
+}
+
 function renderSlotPicker() {
   const filterWrap = document.getElementById('slotPickerFilter');
   const list = document.getElementById('slotPickerList');
   if (!filterWrap || !list) return;
-  const filters = [
-    {id:'all', label:'All'}, {id:'daily', label:'🍽 Daily'}, {id:'routine', label:'🌅 Routines'},
-    {id:'school', label:'📚 Learning'}, {id:'active', label:'🏃 Active'},
-    {id:'training', label:'🏋️ Competitive Sports'}, {id:'free', label:'🎮 Free'},
-  ];
+  const acts = getAllActivities();
+
+  /* One filter table, shared with everything else that filters activities
+     (js/01-config.js). This list used to be a hand-copied subset of the tray's,
+     which is exactly how the two drifted apart. Chips that match nothing are
+     dropped rather than offered as a dead end. */
+  const chips = [{ id: 'all', label: 'All' }].concat(
+    ACTIVITY_FILTERS.filter(f => acts.some(a => activityMatchesFilter(a, f.id))));
   filterWrap.innerHTML = '';
-  filters.forEach(f => {
+  if (!chips.some(f => f.id === slotPickerFilter)) slotPickerFilter = 'all';
+  chips.forEach(f => {
     const c = document.createElement('button');
     c.type = 'button';
     c.className = 'filter-chip' + (slotPickerFilter === f.id ? ' active' : '');
@@ -1225,16 +1426,23 @@ function renderSlotPicker() {
     c.onclick = () => { slotPickerFilter = f.id; renderSlotPicker(); };
     filterWrap.appendChild(c);
   });
-  const acts = getAllActivities().filter(a => {
-    if (slotPickerFilter === 'all') return true;
-    return a.cat === slotPickerFilter;
-  });
+
+  const filtered = acts.filter(a => activityMatchesFilter(a, slotPickerFilter));
+  // Most-used first, only on the unfiltered list — inside a category the
+  // library's own order is the one the child is looking for.
+  let ordered = filtered;
+  if (slotPickerFilter === 'all') {
+    const recent = slotPickerRecentActIds(6);
+    const rank = id => { const i = recent.indexOf(id); return i === -1 ? 999 : i; };
+    ordered = filtered.slice().sort((a, b) => rank(a.id) - rank(b.id));
+  }
+
   list.innerHTML = '';
-  acts.forEach(act => {
+  ordered.forEach(act => {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'slot-pick-chip' + ((act._locked || act._rewardLocked) ? ' locked' : '');
-    chip.innerHTML = `<span class="spc-icon">${act.icon}</span><span class="spc-name">${escapeHtml(act.name)}</span><span class="spc-dur">${formatDuration(act.durationMin || 60)}</span>`;
+    chip.innerHTML = `<span class="spc-icon">${escapeHtml(act.icon)}</span><span class="spc-name">${escapeHtml(act.name)}</span><span class="spc-dur">${escapeHtml(formatDuration(act.durationMin || 60))}</span>`;
     chip.onclick = () => pickFromSlot(act.id);
     list.appendChild(chip);
   });
@@ -1285,55 +1493,30 @@ function updatePlacementGuideFromPointer(ev, zMinStart) {
   }
 }
 
+/* Every canvas, not the first one — with three columns on screen, clearing only
+   `querySelector`'s first hit left a guide line hanging on the other two. */
 function clearPlacementGuide() {
   currentTimelineGuideY = null;
-  const canvas = document.querySelector('#timeline .tl-canvas');
-  if (!canvas) return;
-  canvas.classList.remove('placing');
-  canvas.style.removeProperty('--place-guide-y');
-  canvas.dataset.guideLabel = '';
-}
-
-function setDayFocusPane(pane) {
-  dayLandscapeFocusPane = pane || null;
-  const dayScreen = document.getElementById('screen-day');
-  if (!dayScreen) return;
-  dayScreen.classList.toggle('focus-left', dayLandscapeFocusPane === 'left');
-  dayScreen.classList.toggle('focus-center', dayLandscapeFocusPane === 'center');
-  dayScreen.classList.toggle('focus-right', dayLandscapeFocusPane === 'right');
-}
-
-/* leftPaneManualCollapsed / applyLeftPaneState / toggleLeftPane lived here, and
-   the ◀Panel button with them. All three existed to hide the left "Today" rail
-   to free up room for the schedule — and that rail is gone, so the schedule
-   already has the room. setDayFocusPane stays: focus-center still dims the
-   activity tray while a block is being placed, which is a different job. */
-
-function applyDayLandscapeFocusState() {
-  setDayFocusPane(dayLandscapeFocusPane);
-}
-
-function updateDayLandscapeChromeHeight() {
-  if (dayLandscapeChromeRaf) cancelAnimationFrame(dayLandscapeChromeRaf);
-  dayLandscapeChromeRaf = requestAnimationFrame(()=>{
-    dayLandscapeChromeRaf = 0;
-    const dayScreen = document.getElementById('screen-day');
-    if (!dayScreen) return;
-    const isLandscape = window.matchMedia('(min-width: 980px) and (orientation: landscape)').matches;
-    if (!isLandscape) {
-      dayScreen.style.removeProperty('--day-landscape-chrome');
-      return;
-    }
-    const parentBanner = dayScreen.querySelector(':scope > #parentBannerDay');
-    const topbar = dayScreen.querySelector(':scope > .day-topbar');
-    const pb = parentBanner && parentBanner.style.display !== 'none' ? parentBanner.offsetHeight : 0;
-    const tb = topbar ? topbar.offsetHeight : 0;
-    const chromePx = Math.max(112, Math.ceil(pb + tb + 10));
-    dayScreen.style.setProperty('--day-landscape-chrome', `${chromePx}px`);
+  document.querySelectorAll('#timeline .tl-canvas').forEach(canvas => {
+    canvas.classList.remove('placing');
+    canvas.style.removeProperty('--place-guide-y');
+    canvas.dataset.guideLabel = '';
   });
 }
-window.addEventListener('resize', updateDayLandscapeChromeHeight);
-window.addEventListener('orientationchange', updateDayLandscapeChromeHeight);
+
+/* setDayFocusPane / applyDayLandscapeFocusState / dayLandscapeFocusPane lived
+   here, dimming one pane of the day screen while the other was in use. Before
+   them, leftPaneManualCollapsed / applyLeftPaneState / toggleLeftPane hid the
+   left "Today" rail. Both existed to manage a multi-pane screen. There is one
+   pane now — the schedule — so there is nothing to focus and nothing to dim. */
+
+/* updateDayLandscapeChromeHeight lived here, with its two window listeners. It
+   measured the day screen's chrome into --day-landscape-chrome, which the three
+   rails each subtracted from the viewport to work out their own max-height —
+   the arithmetic that let three panes scroll independently. There is one
+   scroller now and it simply fills what is left, so there is nothing to
+   measure. */
+
 
 function placementFeedback() {
   try {
@@ -1442,10 +1625,7 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
   checkLevelUp(actId);
 
   buildTimeline();
-  buildTray();
   selectedActivity = null;
-  setDayFocusPane(null);
-  document.getElementById('trayHint').textContent = 'Tap an activity to pick';
 }
 
 async function removeBlock() {

@@ -65,17 +65,68 @@ function tdCurrentAndNext(kid) {
   return { current, next, count: blocks.length };
 }
 
-/* What she could still claim today, newest rules, already ordered by due time by
-   mrChoresForDay. Excludes anything already claimed or graded — those are in the
-   waiting/answered counts instead, and showing them twice would read as two
-   different jobs. */
-function tdClaimableToday(kid) {
+/* ── Today's jobs, and why the card was blank ──
+   "Jobs I can do" listed only what was still claimable, so the day a child
+   actually did everything the card rendered nothing at all — the reward for
+   finishing was an empty box. A week whose pool has no unscheduled rows gave
+   the same blank for a completely different reason, and neither said which.
+
+   This returns the whole of today with each row's state, so the card can always
+   say something true. Read through the accessors the chore screen uses
+   (mrGetClaim / mrGetChoreGrade); nothing here decides anything. */
+function tdJobsToday(kid) {
   const wk = ctThisWeekKey();
   const d = tdTodayIndex();
-  if (d == null) return [];
+  if (d == null) return { rows: [], hasPool: false };
   const { rows } = mrChoresForDay(kid, wk, d);
-  return rows.filter(r =>
-    !mrGetClaim(kid, wk, d, r.row.id) && !mrGetChoreGrade(kid, wk, d, r.row.id));
+  return {
+    hasPool: rows.length > 0,
+    rows: rows.map(r => {
+      const grade = mrGetChoreGrade(kid, wk, d, r.row.id);
+      const claim = mrGetClaim(kid, wk, d, r.row.id);
+      return {
+        row: r.row,
+        state: grade ? 'answered' : claim ? 'waiting' : 'todo',
+      };
+    }),
+  };
+}
+
+/* ── Quiet hours ──
+   At nine in the evening with nothing left on the plan, "Nothing scheduled —
+   the rest of today is yours" is technically true and useless: the rest of that
+   day is bedtime. Between QUIET_HOURS.startMin and the following morning the
+   NOW card says so instead. Only when nothing is actually running: a block that
+   genuinely runs past nine still wins, because the plan beats the clock. */
+function tdInQuietHours() {
+  const now = tdNowMin();
+  return now >= QUIET_HOURS.startMin || now < QUIET_HOURS.endMin;
+}
+
+/* Today's blocks split at "now": what is still to come, then what already
+   happened. The list used to run 6am-first all day, so by the afternoon the
+   next thing was halfway down the page behind a breakfast nobody needs to look
+   at again. Upcoming keeps time order — next is next — and the rest goes below
+   a divider that starts closed. */
+function tdSplitQuestsByNow(blocks) {
+  const now = tdNowMin();
+  const upcoming = [], earlier = [];
+  blocks.forEach(b => {
+    const end = (b.startMin || 0) + (b.durationMin || 0);
+    // A block still running counts as upcoming: it is what she is doing now.
+    (end > now ? upcoming : earlier).push(b);
+  });
+  return { upcoming, earlier };
+}
+
+/* Closed by default and remembered in localStorage — the house disclosure
+   pattern (tdExtrasOpen, mnyPricesOpen, ckPrivsOpen). Never synced state:
+   every state write is a full-document upload. */
+const TD_EARLIER_LS_KEY = 'wp_td_earlier_open';
+function tdEarlierOpen() { return localStorage.getItem(TD_EARLIER_LS_KEY) === '1'; }
+function tdToggleEarlier() {
+  try { localStorage.setItem(TD_EARLIER_LS_KEY, tdEarlierOpen() ? '0' : '1'); } catch (e) {}
+  tdRenderToday();
 }
 
 /* Today's quest cards — every scheduled block, done ones included, because a
@@ -94,7 +145,7 @@ function tdQuestsToday(kid) {
    card keeps its look; the difference is that both targets are data attributes
    read by the delegated listener rather than inline handlers. */
 function tdQuestCard(b, kid) {
-  const acts = getAllActivities(kid);
+  const acts = getAllActivities(kid, { includeArchived: true });
   const act = acts.find(a => a.id === b.actId) || { name: 'Quest', icon: '⭐' };
   const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
   const icon = topic ? topic.icon : (act.icon || '⭐');
@@ -166,7 +217,7 @@ function tdEncouragement(kid) {
 /* ── Rendering ───────────────────────────────────────────────────────────── */
 
 function tdBlockLine(b, kid) {
-  const act = getAllActivities(kid).find(a => a.id === b.actId);
+  const act = findActivity(b.actId, kid);
   const icon = (act && act.icon) || '📌';
   const name = (act && act.name) || 'Something';
   const time = (typeof formatTimeFromMin === 'function') ? formatTimeFromMin(b.startMin || 0) : '';
@@ -194,7 +245,6 @@ function tdRenderToday() {
   const wk = ctThisWeekKey();
   const d = tdTodayIndex();
   const { current, next } = tdCurrentAndNext(kid);
-  const claimable = tdClaimableToday(kid).slice(0, TD_MAX_CHORES);
   const quests = tdQuestsToday(kid);
   const waiting = d == null ? 0 : mrWaitingCount(kid, wk);
   const fresh = (d == null || typeof mrNewlyGraded !== 'function') ? [] : mrNewlyGraded(kid, wk);
@@ -211,6 +261,12 @@ function tdRenderToday() {
     nowHtml = `<div class="td-now-icon">${l.icon}</div>
       <div><div class="td-now-name">${escapeHtml(l.name)}</div>
         <div class="td-now-sub">next · ${escapeHtml(l.time)}</div></div>`;
+  } else if (tdInQuietHours()) {
+    /* Nine at night with nothing left on the plan. "The rest of today is yours"
+       is true and useless — the rest of that day is sleep. */
+    nowHtml = `<div class="td-now-icon">🌙</div>
+      <div><div class="td-now-name">Winding down</div>
+        <div class="td-now-sub">nothing left tonight — rest is the plan</div></div>`;
   } else {
     nowHtml = `<div class="td-now-icon">🌤️</div>
       <div><div class="td-now-name">Nothing scheduled</div>
@@ -227,14 +283,36 @@ function tdRenderToday() {
         ? `<span class="td-row-pay xp">+XP</span>`
         : `<span class="td-row-pay">up to ${mnyMoney(pay.amount)}</span>`)
     : '';
-  const choreHtml = claimable.length
-    ? claimable.map(c => `<button type="button" class="td-row" data-td-action="chore">
-          <span class="td-row-icon">${(typeof ctChoreIcon === 'function' ? ctChoreIcon(c.row.id) : '🧹')}</span>
-          <span class="td-row-name">${escapeHtml(c.row.label)}</span>
+  /* Every job on today, with where each one has got to — not only the ones
+     still claimable. Filtering to claimable meant the card went blank on the
+     day she finished everything, which is the day it should have most to say,
+     and blank again on a week with no pool for an entirely different reason.
+     A card that says nothing cannot be read; these three states can. */
+  const jobs = tdJobsToday(kid);
+  const jobIcon = id => (typeof ctChoreIcon === 'function' ? ctChoreIcon(id) : '🧹');
+  const jobRows = jobs.rows.slice(0, TD_MAX_CHORES + 2).map(j => {
+    if (j.state === 'todo') {
+      return `<button type="button" class="td-row" data-td-action="chore">
+          <span class="td-row-icon">${jobIcon(j.row.id)}</span>
+          <span class="td-row-name">${escapeHtml(j.row.label)}</span>
           ${payTag}
           <span class="td-row-go">Do it ›</span>
-        </button>`).join('')
-    : `<div class="td-empty">Nothing to claim today.</div>`;
+        </button>`;
+    }
+    // Class names written out rather than built from a ternary: the dead-CSS
+    // check matches literal strings, and a class it cannot see is a class it
+    // reports as dead.
+    const done = j.state === 'answered';
+    const cls = done ? 'td-row td-row--done' : 'td-row td-row--waiting';
+    return `<button type="button" class="${cls}" data-td-action="${done ? 'fresh' : 'waiting'}">
+        <span class="td-row-icon">${done ? '✓' : '⏳'}</span>
+        <span class="td-row-name">${escapeHtml(j.row.label)}</span>
+        <span class="td-row-go">${done ? 'done' : 'with Mum'}</span>
+      </button>`;
+  }).join('');
+  const choreHtml = jobRows || (jobs.hasPool
+    ? `<div class="td-empty">All today's jobs are done ✓</div>`
+    : `<div class="td-empty">No jobs set up for this week yet.</div>`);
 
   /* An empty day offers to be filled, and the offer is the thing you tap.
      This read "Tap ✏️ Plan my day to build one", pointing at a button in the
@@ -242,8 +320,23 @@ function tdRenderToday() {
      affordance than the control, and it costs more words on a screen held to
      200 with no ratchet. The permanent button stays for a day that already has
      a plan; this is the door on the day that has none. */
+  /* Next at the top. The list ran in plain time order, so from mid-morning
+     onward the thing she was about to do sat below a breakfast she had already
+     eaten — the top of the screen was about the past. Upcoming first, still in
+     time order so "next" is genuinely next; everything already finished drops
+     below a divider that starts closed. */
+  const split = tdSplitQuestsByNow(quests);
+  const earlierOpen = tdEarlierOpen();
   const questHtml = quests.length
-    ? `<div class="dq-list">${quests.map(b => tdQuestCard(b, kid)).join('')}</div>`
+    ? `${split.upcoming.length
+          ? `<div class="dq-list">${split.upcoming.map(b => tdQuestCard(b, kid)).join('')}</div>`
+          : `<div class="td-empty">That is the whole day done.</div>`}
+       ${split.earlier.length
+          ? `<button type="button" class="td-fold-btn td-earlier-btn" data-td-action="earlier">
+               ${earlierOpen ? '▾' : '▸'} Earlier today (${split.earlier.length})
+             </button>
+             ${earlierOpen ? `<div class="dq-list">${split.earlier.map(b => tdQuestCard(b, kid)).join('')}</div>` : ''}`
+          : ''}`
     : `<button type="button" class="td-row td-plan" data-td-action="plan">
          <span class="td-row-icon">✏️</span>
          <span class="td-row-name">Nothing planned — build a day?</span>
@@ -272,21 +365,7 @@ function tdRenderToday() {
      mnyTodayCard reads — extracted precisely so this row could not become a
      second answer to it. The whole row taps through to My money; nothing here
      spends, claims or settles. */
-  const owing = mnyTotalOwing(kid);
-  const earn = mnyEarnLeftToday(kid, wk);
-  const moneyTiles = [
-    { label: 'Cash', value: mnyMoney(mnyCash(kid)) },
-    owing > 0 ? { label: 'I owe', value: mnyMoney(owing) } : null,
-    earn.left == null
-      ? { label: 'Earned today', value: mnyMoney(earn.done) }
-      : { label: 'Still to earn', value: mnyMoney(earn.left) },
-  ].filter(Boolean);
-  const moneyHtml = `<button type="button" class="td-money" data-td-action="money">
-      ${moneyTiles.map(t => `<span class="td-money-tile">
-          <span class="td-money-label">${escapeHtml(t.label)}</span>
-          <span class="td-money-val">${t.value}</span>
-        </span>`).join('')}
-    </button>`;
+  const moneyHtml = tdMoneyChart(kid, wk);
 
   /* The evening wind-down nudge, carried over from the day timeline's banner —
      age-based, so it only appears once an age is set. */
@@ -311,12 +390,119 @@ function tdRenderToday() {
   /* The relocated panels are static siblings of the wrap, so they survive this
      re-render and only need their own renderers run. Each is the function that
      already owned that data on the day screen — called, not reimplemented. */
-  const quickRow = document.getElementById('dayKidQuickRow');
-  if (quickRow) quickRow.style.display = isParent() ? 'none' : 'flex';
   tdApplyExtras();
   if (typeof renderVibe === 'function') renderVibe();
   if (typeof renderDayGoalsTodos === 'function') renderDayGoalsTodos();
   if (typeof maybeShowRewardPrompt === 'function') maybeShowRewardPrompt();
+}
+
+/* ── Money, as a picture ──
+   This was three tiles of words and figures — "Cash $4.20 / I owe $2.00 /
+   Still to earn $1.50" — which is a table, and a table is the slowest way to
+   answer "how am I doing". Two pictures instead:
+
+   A stacked bar for where her money IS right now (cash · kept ready · locked ·
+   invested), because the shape of that bar is the whole financial-literacy
+   lesson — a bar that is all cash looks different from one that is mostly
+   saved, and she can see which is which without reading a number.
+
+   A sparkline underneath for how the total has moved, week by week, once there
+   are enough settled weeks for a line to mean anything. Below three it is a
+   shape drawn from noise, so it simply is not there.
+
+   Reads only. mnyCash / mnySavedTotal / mnyLockedTotal / mnyInvestedTotal and
+   mnyTotalOwing are the same accessors My money uses, so the two can never
+   disagree; the row taps through to that page, and nothing here moves money. */
+const TD_MONEY_SEGMENTS = [
+  { key: 'cash',   label: 'Cash',       colour: 'var(--cat-daily)' },
+  { key: 'saved',  label: 'Kept ready', colour: 'var(--cat-free)' },
+  { key: 'locked', label: 'Locked',     colour: 'var(--cat-school)' },
+  { key: 'stock',  label: 'Invested',   colour: 'var(--cat-custom)' },
+];
+
+/* Everything she has, per pot. */
+function tdMoneyParts(kid) {
+  return {
+    cash:   mnyCash(kid),
+    saved:  mnySavedTotal(kid),
+    locked: mnyLockedTotal(kid),
+    stock:  mnyInvestedTotal(kid),
+  };
+}
+
+/* What she was worth at the end of each settled week, oldest first. Built from
+   the frozen ledger rather than recomputed — history is a record, not a
+   recomputation (js/15-meeting.js says the same about the ledger itself). */
+function tdMoneyHistory(kid) {
+  ctEnsureShared();
+  const fin = state.shared.chore.finalizedWeeks || {};
+  const weeks = Object.keys(fin).filter(wk => fin[wk] && fin[wk][kid] != null).sort();
+  let running = 0;
+  return weeks.map(wk => { running = money2(running + Number(fin[wk][kid] || 0)); return { wk, total: running }; });
+}
+
+const TD_MONEY_SPARK_MIN_WEEKS = 3;   // below this a line is drawn from noise
+
+function tdMoneyChart(kid, wk) {
+  const parts = tdMoneyParts(kid);
+  const total = money2(parts.cash + parts.saved + parts.locked + parts.stock);
+  const owing = mnyTotalOwing(kid);
+  const segs = TD_MONEY_SEGMENTS
+    .map(s => ({ ...s, amount: money2(parts[s.key]) }))
+    .filter(s => s.amount > 0);
+
+  const bar = total > 0
+    ? `<span class="td-bar">${segs.map(s => `<span class="td-bar-seg" style="width:${(s.amount / total * 100).toFixed(2)}%;background:${s.colour}"
+            title="${escapeAttr(s.label + ' ' + mnyMoney(s.amount))}"></span>`).join('')}</span>`
+    : `<span class="td-bar td-bar--empty"></span>`;
+
+  // The key doubles as the numbers, so the picture needs no separate table.
+  const key = segs.map(s => `<span class="td-key">
+      <span class="td-key-dot" style="background:${s.colour}"></span>
+      ${escapeHtml(s.label)} ${escapeHtml(mnyMoney(s.amount))}</span>`).join('');
+
+  const hist = tdMoneyHistory(kid);
+  const spark = hist.length >= TD_MONEY_SPARK_MIN_WEEKS ? tdMoneySparkline(hist) : '';
+
+  /* The one figure on this card she can act on today, and the only reason it
+     survives the move from tiles to a picture: "I can still earn $2.00" is a
+     reason to go and do the bins. mnyEarnLeftToday is the very function
+     mnyTodayCard reads — extracted so this line could not become a second
+     answer to it. */
+  const earn = mnyEarnLeftToday(kid, wk);
+  const earnLine = earn.left == null
+    ? `Earned today ${mnyMoney(earn.done)}`
+    : `Still to earn today ${mnyMoney(earn.left)}`;
+
+  return `<button type="button" class="td-money" data-td-action="money">
+      <span class="td-money-total">${escapeHtml(mnyMoney(total))}${owing > 0
+        ? ` <span class="td-money-owing">owes ${escapeHtml(mnyMoney(owing))}</span>` : ''}</span>
+      ${bar}
+      <span class="td-keys">${key || '<span class="td-key">Nothing yet</span>'}</span>
+      <span class="td-money-earn">${escapeHtml(earnLine)}</span>
+      ${spark}
+    </button>`;
+}
+
+/* Inline SVG, no library, no external anything — the page is loaded over
+   file:// by the smoke suite and served from GitHub Pages otherwise.
+   preserveAspectRatio="none" so it stretches to whatever width the card is. */
+function tdMoneySparkline(hist) {
+  const vals = hist.map(h => h.total);
+  const max = Math.max(...vals), min = Math.min(...vals, 0);
+  const span = (max - min) || 1;
+  const pts = vals.map((v, i) => {
+    const x = vals.length === 1 ? 0 : (i / (vals.length - 1)) * 100;
+    const y = 20 - ((v - min) / span) * 20;
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  }).join(' ');
+  return `<span class="td-spark" aria-hidden="true">
+      <svg viewBox="0 0 100 20" preserveAspectRatio="none" focusable="false">
+        <polyline points="${pts}" fill="none" stroke="var(--accent-strong)" stroke-width="1.6"
+                  stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+      </svg>
+      <span class="td-spark-cap">${hist.length} settled weeks</span>
+    </span>`;
 }
 
 /* Vibe, to-dos and goals sit behind one toggle: they are reference panels, and
@@ -353,6 +539,7 @@ function tdHandleClick(e) {
   if (a === 'chore')   { openChoreTab(); if (d != null) ckSelectDay(d); return; }
   if (a === 'waiting') { openChoreTab(); ckGoWaiting(); return; }
   if (a === 'fresh')   { openChoreTab(); ckGoFresh(); return; }
+  if (a === 'earlier') { tdToggleEarlier(); return; }
   if (a === 'week')    { goWeek(); return; }
   if (a === 'money')   { openWeekMoney(); return; }
   // 🎯 — the arcade completion, unchanged, on today's block.
@@ -394,7 +581,7 @@ const TD_NAV = [
    in the portal does not need a child's bottom bar, and the profile picker is
    where you go to stop being a child. */
 const TD_NAV_SCREENS = ['screen-today', 'screen-week', 'screen-mymoney', 'screen-chore',
-                        'screen-quest', 'screen-day', 'screen-sync', 'screen-moneystory',
+                        'screen-day', 'screen-sync', 'screen-moneystory',
                         'screen-moneyschool'];
 
 function tdRenderNav() {
@@ -421,14 +608,20 @@ function tdRenderNav() {
    screen: it is a menu, and a menu you can dismiss beats a place you have to
    navigate back out of. */
 function tdOpenMore() {
+  /* Tiles, not rows. Seven full-width rows filled most of a phone screen for a
+     menu of seven short words — a stack of buttons whose text is two words each
+     is a list pretending to be a page. Three across says the same in a third of
+     the height, and every tile is still its own 44px target.
+
+     Quests is gone with the Quest Board: it opened the fourth rendering of
+     today's list, and Today is the list. */
   const items = [
-    { icon: '🎮', label: 'Quests',       go: 'quests' },
     { icon: '🧹', label: 'Chores',       go: 'chores' },
     { icon: '👯', label: 'Sisters',      go: 'sisters' },
     { icon: '📖', label: 'Money story',  go: 'story' },
     { icon: '🎓', label: 'Money school', go: 'school' },
-    { icon: '🖨', label: 'Print my week', go: 'print' },
-    { icon: '◀',  label: 'Switch who I am', go: 'profile' },
+    { icon: '🖨', label: 'Print',        go: 'print' },
+    { icon: '◀',  label: 'Switch',       go: 'profile' },
   ];
   let ov = document.getElementById('tdMoreOverlay');
   if (!ov) {
@@ -447,16 +640,16 @@ function tdOpenMore() {
   ov.innerHTML = `<div class="sheet td-more-sheet" role="dialog" aria-modal="true" aria-label="More places to go">
       <div class="sheet-handle"></div>
       <div class="td-cap">More</div>
-      ${items.map(i => `<button type="button" class="td-row" data-td-more="${i.go}">
-          <span class="td-row-icon">${i.icon}</span>
-          <span class="td-row-name">${escapeHtml(i.label)}</span>
-          <span class="td-row-go">›</span>
-        </button>`).join('')}
+      <div class="td-more-grid">
+        ${items.map(i => `<button type="button" class="td-more-tile" data-td-more="${i.go}">
+            <span class="td-more-icon" aria-hidden="true">${i.icon}</span>
+            <span class="td-more-label">${escapeHtml(i.label)}</span>
+          </button>`).join('')}
+      </div>
     </div>`;
   ov.classList.add('open');
 }
 function tdGoMore(where) {
-  if (where === 'quests')  { goQuestBoard(); return; }
   if (where === 'chores')  { openChoreTab(); return; }
   if (where === 'sisters') { openSisterSync(); return; }
   if (where === 'story')   { mnyOpenStory(); return; }

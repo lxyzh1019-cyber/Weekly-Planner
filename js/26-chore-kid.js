@@ -39,7 +39,7 @@ function ckMoney(n) {
    over getAllActivities(); this is the same lookup, reachable from here. */
 function ckActFor(block, kid) {
   if (!block) return null;
-  return getAllActivities(kid).find(a => a.id === block.actId) || null;
+  return findActivity(block.actId, kid) || null;
 }
 
 /* Every tickable item in a routine, in the order the day view shows them:

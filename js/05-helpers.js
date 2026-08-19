@@ -134,6 +134,20 @@ const BLOCK_TIERS = [
   { id: 'detail', min: 64 },
   { id: 'full',   min: 130 },   // measured: name + duration + the 2×2 checks
 ];
+/* The ladder above answers "how much may this block SAY at this height". This
+   answers a different question: at what height can the day view afford to STACK
+   what it says on two lines instead of one.
+
+   They had been conflated, and the day view stacked anything past the `meta`
+   tier's 34px. A 30-minute block is 40px tall; take off 10px of padding and two
+   lines need name (~19px) + meta (~15px) = 34px in a 30px box, so a half-hour
+   Breakfast rendered with its own title sliced in half. Measured: 46px is where
+   both lines fit. The CSS comment on .placed-block.compact already said "<45px"
+   — the ladder had drifted from the layout it was driving.
+
+   Day view only: the week cards and the print sheet lay a block out their own
+   way and keep reading the ladder unchanged. */
+const BLOCK_STACK_MIN = 46;
 function blockContentTier(pxHeight) {
   const h = Number(pxHeight) || 0;
   let id = 'icon';
@@ -228,12 +242,20 @@ function blockCountsSummary(lines) {
 function getCustomActivities(p=activeProfile()) { return getProfData(p).customActivities || []; }
 function getSharedActivities() { return (state.shared && state.shared.sharedActivities) || []; }
 
-function getAllActivities(p=activeProfile()) {
+/* Everything a child can PICK. Archived activities are absent by design: a
+   parent took them off the list, and the list is what this answers.
+
+   Anything that has to READ an existing block must go through findActivity
+   below instead — a block placed in March under an activity retired in June
+   still has to render as what it was. `opts.includeArchived` is how this
+   function serves that. */
+function getAllActivities(p=activeProfile(), opts) {
   const season = getCurrentSeason();
+  const keep = a => (opts && opts.includeArchived) ? true : !a.archived;
   const base = [
     ...DEFAULT_ACTIVITIES,
-    ...getCustomActivities(p),
-    ...getSharedActivities(),
+    ...getCustomActivities(p).filter(keep),
+    ...getSharedActivities().filter(keep),
     ...SEASONAL_ACTIVITIES.map(a=>({...a,_seasonal:true, _locked: a.season!==season})),
   ];
   // apply level-ups
@@ -255,6 +277,20 @@ function getAllActivities(p=activeProfile()) {
     }
     return act;
   });
+}
+
+/* Resolve the activity a placed block names — including one that has been
+   retired. Every renderer uses this: the day blocks, the week cards, the print
+   sheet, Today's quest cards. Picking from a list is getAllActivities' job;
+   reading back what was already picked is this one's, and conflating them is
+   how retiring an activity used to blank out its own history.
+
+   Falls back to a neutral record rather than returning undefined, because the
+   alternative — a caller bailing out on a missing activity — is a block that
+   silently does not render at all. */
+function findActivity(actId, p=activeProfile()) {
+  if (!actId) return null;
+  return getAllActivities(p, { includeArchived: true }).find(a => a.id === actId) || null;
 }
 
 function getUnlockedRoutineRewards(routineId, p=activeProfile()) {
@@ -381,7 +417,6 @@ function acceptRewardPrompt() {
   }
   pr.pendingRewards = pr.pendingRewards.filter(x=>x.id!==rw.id);
   saveAll();
-  buildTray();
   maybeShowRewardPrompt();
 }
 
@@ -428,11 +463,10 @@ function chooseTutorialStarter(actId) {
   unlockRewardAct(actId);
   closeSheet('tutorialOverlay');
   saveAll();
-  buildTray();
   const act = getAllActivities().find(a=>a.id===actId);
   if (act) {
-    selectActivity(act);
-    showToast(`Starter unlocked: ${act.name} — tap timeline to place it ✅`);
+    showToast(`Starter unlocked: ${act.name} ✅`);
+    startPlacingActivity(act);
   }
 }
 
@@ -442,9 +476,9 @@ function skipTutorial() {
 }
 
 function offerTutorialIfNeeded() {
-  // Family Hero onboarding is opt-in. Kids reach the starter chooser by
-  // tapping a locked Family Hero chip in the tray (see selectActivity),
-  // not via a pop-up that blocks the first day they try to plan.
+  // Family Hero onboarding is opt-in. Kids reach the starter chooser through
+  // the placement picker (see startPlacingActivity), not via a pop-up that
+  // blocks the first day they try to plan.
 }
 
 /* ── Rest days: a kid can mark a day as "off". Rest days are celebrated (rest is
@@ -769,8 +803,6 @@ function showScreen(id) {
   try { if (typeof tdRenderNav === 'function') tdRenderNav(); } catch(e){ console.error('tdRenderNav failed', e); }
   if (id === 'day') {
     try {
-      updateDayLandscapeChromeHeight();
-      applyDayLandscapeFocusState();
       maybeShowRewardPrompt();
       offerTutorialIfNeeded();
     } catch(e){ console.error('day-screen init failed', e); }

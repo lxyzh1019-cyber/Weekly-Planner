@@ -107,11 +107,14 @@ still rendered and only the numbers were wrong.
 
 `js/04-merge.js` implements conflict-aware sync: id-keyed unions, deletion
 tombstones (30-day pruning), deep object merge, per-week chore arbitration, and
-a forward-only `lastGradeSeen` watermark. It has 52 unit tests running the real
+a forward-only `lastGradeSeen` watermark. It has 57 unit tests running the real
 shipped functions.
 
 Do not refactor it for style. Change it only to fix a demonstrated sync bug, and
-only with a failing test written first.
+only with a failing test written first. Writing the test first also tells you
+when *not* to change it: `meetingsMet` was added expecting a merge change, and
+`deepMergeObj`'s union was already right for it — five tests went in, `04-merge.js`
+did not move.
 
 ## Escaping
 
@@ -196,15 +199,42 @@ topbars is exactly how their labels drifted apart, and it is gone.
 
 **Today is where a day gets done; the day screen is where one gets built.** That
 split is the whole design. Today carries the quest cards, the 🎯 completion, the
-XP strip, the breaks, the mood, the to-dos and the goals. `screen-day` is a
-planning tool — a schedule and an activity tray — with **one layout**. It has no
-mode toggle, and there is no `dayViewMode`: a mode that survives navigation is a
-mode a child never chose, which is what Quest mode became.
+XP strip, the mood, the to-dos, the goals, the sticker collection and the note to
+grown-ups. `screen-day` is a planning tool — one schedule, **one layout**. It has
+no mode toggle, and there is no `dayViewMode`: a mode that survives navigation is
+a mode a child never chose, which is what Quest mode became.
 
-Three renderings of one day have now been retired for the same reason — Checklist
-mode, the Quest Board's own list, and day-view Quest mode. If you find yourself
-adding a fourth place that lists today's blocks with ticks beside them, that is
-the mistake, and Today is the place that already does it.
+**Four** renderings of one day have now been retired for the same reason —
+Checklist mode, the Quest Board's own list, day-view Quest mode, and finally the
+Quest Board screen itself. If you find yourself adding a fifth place that lists
+today's blocks with ticks beside them, that is the mistake, and Today is the
+place that already does it.
+
+**The day screen scrolls as one surface.** It was three nested scrollers
+(`.day-workspace` → `.day-center-lane` → `.timeline-wrap`), which on an iPad
+meant a flick could move the wrong one. `.day-workspace` is the only scroller;
+`dayScreenScrollsAsOneSurface` in `tests/smoke.js` keeps it that way.
+
+**The activity rail is gone.** Placement goes through the picker that opens where
+you tap (`openSlotPicker`) — the interaction that was already doing the work.
+`buildTray` and `setDayFocusPane` were retired with it, and `selectedActivity` is
+now transient: set by `pickFromSlot`, cleared on placement. A caller that already
+knows which activity — the tutorial, a level-up reward, a mascot suggestion —
+calls `startPlacingActivity` (`js/09-sheets.js`).
+
+**1 / 2 / 3 days is a column count, not a mode.** `dayViewDays` lives in
+`localStorage` only, nothing about what a block says or how it is edited changes
+with it, and a narrow viewport is served one column whatever is stored.
+`dayViewAnchorKey` is the leftmost column; `currentDayKey` is the day being
+edited, and every writer downstream (`placeBlock`, `setDayMood`, `clearDay`, the
+edit sheet) still reads that one global — a tap in another column points it there
+first (`focusDayColumn`). Anything that renders a block must take its day key
+from the canvas's `dataset.dayKey`, never from the global.
+
+**Two thresholds, two questions.** `BLOCK_TIERS` answers *how much may a block
+say at this height*; `BLOCK_STACK_MIN` (46px) answers *when can the day view
+stack it on two lines*. Conflating them is what sliced a 30-minute Breakfast's
+own title in half — 40px of block, 30px of content box, two lines needing 34.
 
 Today **owns no data and no rules — but it does invoke them.** Every number it
 shows is read through the accessors the owning screen uses, and every write goes
@@ -217,8 +247,22 @@ settling still belong to the chore and money screens, and nothing on Today moves
 money.
 
 Today is also held to the **200-word budget with no ratchet**, which is why the
-vibe, to-do and goals panels ship collapsed behind one `localStorage` flag
-(`tdExtrasOpen`). Reference material starts closed.
+vibe, to-do, goals, sticker and note panels ship collapsed behind one
+`localStorage` flag (`tdExtrasOpen`), and why finished blocks fold away behind
+`tdExtrasOpen`'s sibling `tdEarlierOpen`. Reference material starts closed. The
+budget bites: an explanation on 💰 My money went in at 21 words over and had to
+come down to three.
+
+**Today leads with what is next.** The list splits at `tdNowMin()` — upcoming in
+time order, then everything finished under a closed "earlier today" fold. In
+`QUIET_HOURS` (9pm–7am, `js/01-config.js`) with nothing running, the NOW card
+reads as wind-down rather than "the rest of today is yours".
+
+**A card must never render blank.** "Jobs I can do" listed only what was still
+claimable, so the day a child finished everything her reward was an empty box —
+and a week with no chore pool gave the same blank for a different reason.
+`tdJobsToday` returns every job with its state, and the three empty cases each
+say which one they are.
 - Use the design tokens in `css/app.css` (`--space-*`, `--text-*`,
   `--shadow-*`, `--radius-*`). Avoid new inline `style="…"`.
 - `--accent` (`#ff7b54`) is decorative only. Anything with white text on it or
@@ -233,6 +277,56 @@ New user-created Claude skills for this ecosystem use the `HZ-` prefix
 (e.g. `HZ-web-app-audit`). Repo files, CSS classes and JS functions keep the
 existing conventions: `ct*` for chore-tracker functions, `mny*` for money,
 `tg2-*` for the current Day Blocks grid.
+
+## History is a record, not a working set
+
+An activity is **archived, never deleted** (`archiveParentActivity`,
+`js/11-parent.js`). Deleting used to sweep both kids' `weeks` with no date
+filter, removing every block that had ever named it — from last March as readily
+as from next Tuesday — and then rebuild `activityCounts` from what was left, so
+retiring a piano teacher deleted two years of piano. Irreversible, no undo.
+
+The rule now: the record stays and is **not tombstoned** (a tombstone is what
+makes a delete stick across devices); only blocks from **today forward** are
+removed; the counts are left alone. Same for `rejectKidActivity`, and for a
+retired custom sport.
+
+That splits one lookup into two, and the split is load-bearing:
+
+| Question | Function |
+|---|---|
+| What can she **pick**? | `getAllActivities(p)` — archived entries absent |
+| What does this placed block **name**? | `findActivity(actId, p)` — archived entries visible |
+
+Get it the wrong way round and either a retired activity is offered in a picker
+(visible, harmless) or every block that ever used it stops rendering (invisible,
+and the reason this rule exists). `retiringAnActivityKeepsItsHistory` in
+`tests/smoke.js` holds both ends.
+
+## "We met" and "the money moved" are different facts
+
+`meetingsHeld[wk]` is written in exactly one place — `commitMeetingShared` — and
+only once **both** kids have finished step 4. So a family that opened the
+meeting, reviewed the week, celebrated it and agreed the numbers on step 3
+recorded nothing at all, and the catch-up list called every one of the last eight
+weeks "never settled" — saturating at its own ceiling, which is where the
+reported "missing 8 weeks" came from after two real meetings.
+
+The same press credits the money, so the wallet reading `$0.00` while the meeting
+showed real figures was not a second bug: step 3 displays `ctWeekMoney`, a live
+preliminary figure, and nothing reaches the wallet until step 4.
+
+`meetingsMet[wk]` records the sitting down (`mmMarkWeekMet`, set on close from
+step 3 or later, and retroactively from the hub's catch-up list). `meetingsHeld`
+still means the money moved, and every existing reader of it is still asking that
+question correctly. Only `status: 'none'` weeks are nagged about. Neither the
+catch-up buttons nor `mmMarkWeekMet` moves money — "Settle" jumps to step 4,
+which owns that.
+
+The catch-up look-back stops at `max(mrModelStartWeek(), programStartDate)`. An
+"earliest week with any data" floor was tried and removed: it suppressed
+genuinely open weeks whenever the first record happened to be recent, which is
+the same class of wrongness as the bug it was meant to help.
 
 ## The school calendar expires every August
 

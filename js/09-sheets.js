@@ -1,78 +1,45 @@
 // Weekly-Planner — tray + bottom sheets: training/activity/edit sheets, templates, custom, reflection.
 // Extracted verbatim from index.html (classic script, global scope).
 /* ════════════════════════════════════════════════════════════════
-   TRAY
+   PLACING AN ACTIVITY
+
+   buildTray lived here — the Activities rail down the right of the day screen,
+   a scrolling grid of every activity in the library. It is gone, and with it the
+   pick-then-tap model it existed for: you chose a chip, the rail dimmed, and the
+   schedule waited for a second tap. Tapping a time opens the picker right there
+   instead, which is the interaction that was already doing the work, and the day
+   screen gets the rail's width back.
+
+   What is left is the other half of that model: a caller that already knows
+   which activity, and needs somewhere to put it.
 ════════════════════════════════════════════════════════════════ */
-function buildTray() {
-  // Filter chips
-  const filterWrap = document.getElementById('trayFilter');
-  filterWrap.innerHTML = '';
-  const filters = [
-    {id:'all', label:'All'},
-    {id:'daily', label:'🍽 Daily'},
-    {id:'routine', label:'🌅 Routines'},
-    {id:'school', label:'📚 Learning'},
-    {id:'active', label:'🏃 Active'},
-    {id:'training', label:'🏋️ Competitive Sports'},
-    {id:'free', label:'🎮 Free'},
-    {id:'seasonal', label:'🌟 Seasonal'},
-  ];
-  filters.forEach(f=>{
-    const c = document.createElement('div');
-    c.className = 'filter-chip'+(currentTrayFilter===f.id?' active':'');
-    c.textContent = f.label;
-    c.onclick = ()=>{ currentTrayFilter=f.id; buildTray(); };
-    filterWrap.appendChild(c);
-  });
 
-  const tray = document.getElementById('trayScroll');
-  tray.innerHTML = '';
-  const acts = getAllActivities();
-  const filtered = acts.filter(a=>{
-    if (currentTrayFilter==='all') return true;
-    if (currentTrayFilter==='seasonal') return a._seasonal;
-    // Category is the source of truth — isTraining is a shared UI mechanism
-    // (objectives/gear/tags) between Competitive Sports and Competition, not a category.
-    return a.cat===currentTrayFilter;
-  });
-
-  filtered.forEach(act=>{
-    const chip = document.createElement('div');
-    chip.className = 'activity-chip'+((act._locked || act._rewardLocked)?' locked':'');
-    chip.id = 'chip-'+act.id;
-    chip.style.borderColor = 'var(--ink)';
-    const durStr = formatDuration(act.durationMin || 60);
-
-    let levelBadge = '';
-    const rule = (state.shared.levelRules||[]).find(r=>r.activityId===act.id);
-    if (rule) {
-      const profd = getProfData();
-      const cur = rule.type==='count' ? (profd.activityCounts?.[act.id]||0) : (profd.activityHours?.[act.id]||0);
-      if (cur >= rule.target) levelBadge = `<div class="chip-level-badge">★</div>`;
-    }
-    let lockBadge = '';
-    if (act._locked || act._rewardLocked) lockBadge = `<div class="chip-lock-badge">🔒</div>`;
-
-    chip.innerHTML = `
-      ${levelBadge}${lockBadge}
-      <div class="chip-icon">${act.icon}</div>
-      <div class="chip-name">${escapeHtml(act.name)}</div>
-      <div class="chip-dur">${durStr}</div>
-    `;
-    chip.onclick = ()=>selectActivity(act);
-    tray.appendChild(chip);
-  });
-
-  const addChip = document.createElement('div');
-  addChip.className = 'chip-add';
-  addChip.innerHTML = '<div style="font-size:1.6rem">＋</div><div>Custom</div>';
-  addChip.onclick = ()=>openCustomActivity();
-  tray.appendChild(addChip);
-  enhanceAccessibility(document.getElementById('screen-day'));
+/* The first quarter-hour from `fromMin` with room for `durationMin` and nothing
+   already there. Falls back to the tapped-for time so a full day still opens the
+   sheet rather than silently doing nothing. */
+function nextFreeSlotMin(dayKey, durationMin, fromMin) {
+  const dur = Math.max(15, durationMin || 60);
+  const blocks = (getDayBlocks(dayKey) || []).slice()
+    .sort((a, b) => (a.startMin || 0) - (b.startMin || 0));
+  let start = fromMin != null ? fromMin : (dayKey === todayKey()
+    ? (new Date().getHours() * 60 + new Date().getMinutes())
+    : START_MIN + 120);
+  start = Math.max(START_MIN, Math.ceil(start / 15) * 15);
+  for (let t = start; t + dur <= END_MIN; t += 15) {
+    const clash = blocks.some(b => t < (b.startMin || 0) + (b.durationMin || 0) && (b.startMin || 0) < t + dur);
+    if (!clash) return t;
+  }
+  return Math.min(start, END_MIN - dur);
 }
 
-function selectActivity(act) {
-  // Opt-in Family Hero onboarding: tapping a starter chore before it's
+/* "Place this one." Called by the tutorial's starter pick, the level-up reward
+   flow and the mascot's suggestions — each of which has already decided which
+   activity, and used to hand it to the tray to be highlighted. They open the
+   placement sheet at the next free slot now, which is one tap rather than two
+   and does not depend on a rail that no longer exists. */
+function startPlacingActivity(act) {
+  if (!act) return;
+  // Opt-in Family Hero onboarding: choosing a starter chore before it's
   // been set up opens the chooser here, instead of forcing that sheet on
   // the first day-view load (and instead of a dead "locked" toast).
   const _pr = getProfData()?.progress;
@@ -82,12 +49,9 @@ function selectActivity(act) {
   if (act._locked) { showToast(`🔒 Unlocks in ${act.season}!`); return; }
   if (act._rewardLocked) { showToast('Keep going — unlock this reward soon ✨'); return; }
   selectedActivity = act;
-  setDayFocusPane('center');
-  document.querySelectorAll('.activity-chip').forEach(c=>c.classList.remove('selected'));
-  const el = document.getElementById('chip-'+act.id);
-  if (el) el.classList.add('selected');
-  document.getElementById('trayHint').textContent = `"${act.name}" picked — tap a time slot ☝️`;
   hideMascot();
+  if (!currentDayKey) currentDayKey = todayKey();
+  addActivityAtMin(nextFreeSlotMin(currentDayKey, act.durationMin));
 }
 
 /* Renders a tickable objectives/goals checklist — preset items plus any
@@ -157,17 +121,27 @@ function renderTrainingSheet() {
   // Tags
   const tagWrap = document.getElementById('trainingTagBtns');
   tagWrap.innerHTML = '';
-  TRAINING_TAGS.forEach(t=>{
+  const allTags = getTrainingTags();
+  allTags.forEach(t=>{
     const b = document.createElement('button');
     b.className = 'pill-btn'+(ts.tag===t.id?' active':'');
     b.textContent = t.label;
     b.onclick = ()=>{
       // Adopt the topic colour unless the user had picked a non-default custom one.
-      if (!ts.colour || ts.colour === CAT_HEX.training || TRAINING_TAGS.some(x=>x.colour===ts.colour)) ts.colour = t.colour;
+      if (!ts.colour || ts.colour === CAT_HEX.training || allTags.some(x=>x.colour===ts.colour)) ts.colour = t.colour;
       ts.tag=t.id; ts.objectives=[]; renderTrainingSheet();
     };
     tagWrap.appendChild(b);
   });
+  // A sport that is not one of the four. Parents only: the sports list is shared
+  // by both girls, so it is a household decision rather than a per-kid one.
+  if (isParent()) {
+    const add = document.createElement('button');
+    add.className = 'pill-btn pill-btn--add';
+    add.textContent = '＋ Sport';
+    add.onclick = ()=>openCustomSport();
+    tagWrap.appendChild(add);
+  }
 
   // Duration (in minutes) — a competition (meet/event) runs much longer than
   // a practice session, so it gets its own, larger set of preset lengths.
@@ -180,6 +154,10 @@ function renderTrainingSheet() {
     b.textContent = formatDuration(min);
     b.onclick = ()=>{ ts.durationMin=min; renderTrainingSheet(); };
     durWrap.appendChild(b);
+  });
+  // …and any length that is not one of them.
+  renderCustomDuration('trainingCustomDur', ts.durationMin, (m)=>{
+    ts.durationMin = m; renderTrainingSheet();
   });
 
   // Colour
@@ -246,12 +224,8 @@ function cancelCreatePlacement(overlayId, skipClose=false) {
   pendingStartMin = null;
   selectedActivity = null;
   currentTimelineGuideY = null;
-  setDayFocusPane(null);
   clearPlacementGuide();
   if (!skipClose && overlayId) closeSheet(overlayId);
-  const hint = document.getElementById('trayHint');
-  if (hint) hint.textContent = 'Tap an activity to pick';
-  document.querySelectorAll('.activity-chip').forEach(c=>c.classList.remove('selected'));
 }
 
 function confirmTraining() {
@@ -495,18 +469,25 @@ function renderStartTimePicker(containerId, curMin, onChange, onAfterRender) {
   requestAnimationFrame(()=>{ if (typeof onAfterRender === 'function') onAfterRender(curMin); });
 }
 
-function renderCustomDuration(containerId, curMin, onChange, onAfterChange) {
+/* The ceiling is the day, not an arbitrary number. It used to be a hard-coded
+   480, which was already below the app's own data — the competition presets go
+   to 600 — so a 9-hour meet could be picked from a pill but not typed. The real
+   limit is DAY_MIN_SPAN, and placeBlock trims anything that would run past the
+   end of the day anyway, so nothing here can create a block the canvas cannot
+   draw. */
+function renderCustomDuration(containerId, curMin, onChange, onAfterChange, maxMin) {
   const wrap = document.getElementById(containerId);
   if (!wrap) return;
+  const cap = Math.max(1, maxMin || DAY_MIN_SPAN);
   wrap.innerHTML = '';
   const row = document.createElement('div');
   row.className = 'custom-time-row';
   row.innerHTML = `<label>Custom min:</label>`;
   const input = document.createElement('input');
-  input.type = 'number'; input.min = 1; input.max = 480; input.step = 1;
+  input.type = 'number'; input.min = 1; input.max = cap; input.step = 1;
   input.value = curMin;
   input.onchange = ()=>{
-    const m = Math.max(1, Math.min(480, parseInt(input.value||15, 10) || 15));
+    const m = Math.max(1, Math.min(cap, parseInt(input.value||15, 10) || 15));
     onChange(m);
     if (typeof onAfterChange === 'function') onAfterChange(m);
   };
@@ -723,7 +704,7 @@ function openEditSheet(blockId) {
   editingBlockId = blockId;
   const block = getDayBlocks(currentDayKey).find(b=>b.id===blockId);
   if (!block) return;
-  const act = getAllActivities().find(a=>a.id===block.actId);
+  const act = findActivity(block.actId);
   if (!act) return;
 
   editState.startMin    = block.startMin;
@@ -1140,7 +1121,7 @@ async function saveEditChanges() {
     showToast('📌 Parent-pinned — ask a grown-up');
     return;
   }
-  const act = getAllActivities().find(a=>a.id===blk.actId);
+  const act = findActivity(blk.actId);
 
   const newStart = Math.max(START_MIN, Math.min(END_MIN-15, editState.startMin));
   // W5: never let a block run past the end of the day — clamp its duration to
@@ -1413,11 +1394,48 @@ async function confirmAllToday() {
 /* ════════════════════════════════════════════════════════════════
    TEMPLATES / CLEAR
 ════════════════════════════════════════════════════════════════ */
-function openTemplateSheet() { refreshRestDayButton(); openSheet('templateOverlay'); }
+function openTemplateSheet() { refreshRestDayButton(); renderCopyDayList(); openSheet('templateOverlay'); }
+
+/* The other days of the week on screen, each with what it actually holds, so
+   "copy Tuesday" is a decision made from the numbers rather than from memory.
+   Days with nothing on them are listed but not offered — copying a blank day
+   onto a planned one is a way to lose a plan, not a way to build one. */
+function renderCopyDayList() {
+  const wrap = document.getElementById('copyDayList');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  const keys = getDayKeys(weekOffset);
+  keys.forEach((k, i) => {
+    if (k === currentDayKey) return;
+    const n = (getDayBlocks(k) || []).length;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'copy-day-row' + (n ? '' : ' empty');
+    b.disabled = !n;
+    b.innerHTML = `<span class="cdr-day">${escapeHtml(DAY_LONG[i])}</span>
+      <span class="cdr-count">${n ? `${n} thing${n === 1 ? '' : 's'}` : 'nothing planned'}</span>
+      ${n ? '<span class="cdr-go">Copy ›</span>' : ''}`;
+    if (n) b.onclick = () => confirmCopyDay(k, DAY_LONG[i], n);
+    wrap.appendChild(b);
+  });
+}
+
+async function confirmCopyDay(srcKey, srcLabel, n) {
+  const had = (getDayBlocks(currentDayKey) || []).length;
+  const msg = had
+    ? `Copy ${srcLabel}'s ${n} thing${n === 1 ? '' : 's'} here? What is on this day now will be replaced.`
+    : `Copy ${srcLabel}'s ${n} thing${n === 1 ? '' : 's'} onto this day?`;
+  const ok = await showConfirm(msg, { okLabel: 'Copy it', cancelLabel: 'Not now', danger: had > 0 });
+  if (!ok) return;
+  const copied = copyDayInto(srcKey, currentDayKey, activeProfile());
+  closeSheet('templateOverlay');
+  buildTimeline();
+  showToast(copied ? `📋 Copied ${copied} — now fix what's wrong` : 'Nothing to copy');
+}
 
 function applyTemplate(type) {
   const tmpl = type==='school' ? SCHOOL_TEMPLATE : WEEKEND_TEMPLATE;
-  const acts = getAllActivities();
+  const acts = getAllActivities(activeProfile(), { includeArchived: true });
   const blocks = tmpl.map(t=>{
     const act = acts.find(a=>a.id===t.actId);
     return {
@@ -1516,10 +1534,88 @@ function confirmCustomActivity() {
   getProfData().customActivities = [...getCustomActivities(), act];
   saveAll();
   closeSheet('customOverlay');
-  buildTray();
   showToast(isParent() ? `"${name}" added ✨` : `"${name}" added — a grown-up will approve it ✨`);
   document.getElementById('customName').value='';
   document.getElementById('customIcon').value='';
+}
+
+/* ── A sport the family added ──
+   Shared, parent-only, and archived rather than deleted: a training block
+   stores its tag, so a sport that stopped resolving would turn every block
+   under it into "Training" with the wrong colour. Custom tasks already filter
+   by `sport`, so a new sport gets the "＋ Add custom task" path for free; the
+   starter objective list falls back to the general one (js/01-config.js). */
+let sportDraftColour = null;
+
+function openCustomSport() {
+  if (!isParent()) { showToast('A grown-up adds a sport 🔒'); return; }
+  sportDraftColour = COLOURS[0];
+  const nameEl = document.getElementById('sportName');
+  const iconEl = document.getElementById('sportIcon');
+  if (nameEl) nameEl.value = '';
+  if (iconEl) iconEl.value = '';
+  renderCustomSportSheet();
+  openSheet('customSportOverlay');
+}
+
+function renderCustomSportSheet() {
+  renderEmojiGrid('sportEmojiGrid', 'sportIcon', (document.getElementById('sportIcon')||{}).value || '');
+  const cp = document.getElementById('sportColourPicker');
+  if (cp) {
+    cp.innerHTML = '';
+    COLOURS.forEach(c => {
+      const d = document.createElement('div');
+      d.className = 'colour-dot' + (sportDraftColour === c ? ' selected' : '');
+      d.style.background = c;
+      d.onclick = () => { sportDraftColour = c; renderCustomSportSheet(); };
+      cp.appendChild(d);
+    });
+  }
+  // The sports already added, each with a way to retire it. The built-in four
+  // are not listed: they are not the family's to remove.
+  const list = document.getElementById('sportExistingList');
+  if (!list) return;
+  const mine = getCustomSports();
+  list.innerHTML = mine.length
+    ? `<div class="ct-meta">Sports you added</div>` + mine.map(s =>
+        `<div class="sport-row"><span class="sport-row-name">${escapeHtml(s.icon)} ${escapeHtml(s.name)}</span>
+           <button type="button" class="pill-btn danger" data-sport-retire="${escapeAttr(s.id)}">Retire</button></div>`).join('')
+    : '';
+  list.querySelectorAll('[data-sport-retire]').forEach(btn => {
+    btn.onclick = () => retireCustomSport(btn.getAttribute('data-sport-retire'));
+  });
+}
+
+function confirmCustomSport() {
+  if (!isParent()) { showToast('A grown-up adds a sport 🔒'); return; }
+  const name = (document.getElementById('sportName').value || '').trim();
+  const icon = (document.getElementById('sportIcon').value || '').trim() || '🤸';
+  if (!name) { showToast('Enter a name!'); return; }
+  const id = 'sport-' + Date.now().toString(36);
+  const sport = { id, name, label: `${icon} ${name}`, icon,
+                  colour: sportDraftColour || COLOURS[0],
+                  createdAt: Date.now(), updatedAt: syncNow() };
+  if (!state.shared.customSports) state.shared.customSports = [];
+  state.shared.customSports = [...state.shared.customSports, sport];
+  saveAll();
+  // Land on the sport that was just added, so the block being planned uses it.
+  if (typeof ts !== 'undefined' && ts) { ts.tag = id; ts.colour = sport.colour; ts.objectives = []; }
+  closeSheet('customSportOverlay');
+  if (document.getElementById('trainingOverlay')?.classList.contains('open')) renderTrainingSheet();
+  showToast(`${icon} ${name} added ✨`);
+}
+
+/* Retire, never remove: blocks already tagged with this sport keep resolving
+   through getTrainingTopic, which sees archived sports on purpose. */
+function retireCustomSport(id) {
+  if (!isParent()) { showToast('A grown-up manages sports 🔒'); return; }
+  const s = (state.shared.customSports || []).find(x => x && x.id === id);
+  if (!s) return;
+  s.archived = true;
+  s.updatedAt = syncNow();
+  saveAll();
+  renderCustomSportSheet();
+  showToast(`${s.name} retired — past sessions keep their name`);
 }
 
 function openCustomTask(context='training') {
@@ -1528,6 +1624,16 @@ function openCustomTask(context='training') {
   // goal is tagged to that activity instead (see confirmCustomTask).
   const sportRow = document.getElementById('taskSportRow');
   if (sportRow) sportRow.style.display = context === 'training' ? '' : 'none';
+  // Built from the live list — this select used to be a hardcoded copy of the
+  // four built-ins, so a custom sport could never be tagged on a custom task.
+  const sportSel = document.getElementById('taskSport');
+  if (sportSel) {
+    const keep = sportSel.value;
+    sportSel.innerHTML = getTrainingTags()
+      .map(t => `<option value="${escapeAttr(t.id)}">${escapeHtml(t.label)}</option>`).join('');
+    if (keep) sportSel.value = keep;
+    if (!sportSel.value) sportSel.value = 'general';
+  }
   const titleEl = document.getElementById('customTaskSheetTitle');
   if (titleEl) titleEl.textContent = context === 'training' ? '➕ Custom Training Task' : '➕ Custom Goal';
   openSheet('customTaskOverlay');
@@ -1580,7 +1686,7 @@ function openReflectSheet() {
   if (!blocks.length) {
     listWrap.innerHTML = '<p style="color:var(--ink-light);font-size:0.9rem">No blocks today</p>';
   } else {
-    const acts = getAllActivities();
+    const acts = getAllActivities(activeProfile(), { includeArchived: true });
     blocks.forEach(b=>{
       const act = acts.find(a=>a.id===b.actId);
       if (!act) return;
@@ -1631,7 +1737,7 @@ function openClosingRitual() {
   if (!blocks.length) return;
   const ritualBlocks = document.getElementById('ritualBlocks');
   ritualBlocks.innerHTML = '';
-  const acts = getAllActivities();
+  const acts = getAllActivities(activeProfile(), { includeArchived: true });
   blocks.slice().sort((a,b)=>a.startMin-b.startMin).forEach((b, i)=>{
     const act = acts.find(a=>a.id===b.actId);
     if (!act) return;

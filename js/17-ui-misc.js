@@ -279,10 +279,9 @@ function showMascotWithSuggestions(msg, suggestions, autoHide=true) {
     b.textContent = `${s.icon} ${s.name}`;
     b.onclick = () => {
       hideMascot();
-      // Pre-select the activity in the tray so the child can tap a slot
-      const all = getAllActivities();
-      const act = all.find(a => a.id === s.id);
-      if (act) selectActivity(act);
+      // Straight into placing it — there is no tray left to pre-select in.
+      const act = getAllActivities().find(a => a.id === s.id);
+      if (act) startPlacingActivity(act);
     };
     sugWrap.appendChild(b);
   });
@@ -413,7 +412,7 @@ async function inviteSisterFromEdit() {
   if (me !== 'jenn' && me !== 'jess') return;
   const sister = me === 'jenn' ? 'jess' : 'jenn';
   const sisterName = sister==='jenn'?'Jenn':'Jess';
-  const act = getAllActivities(me).find(a=>a.id===blk.actId) || getAllActivities().find(a=>a.id===blk.actId);
+  const act = findActivity(blk.actId, me) || findActivity(blk.actId);
   const activityLabel = act ? `${act.icon} ${act.name}` : 'this activity';
   const dayDate = formatDayKey(currentDayKey);
   const dayIdx = (dayDate.getDay()+6)%7;

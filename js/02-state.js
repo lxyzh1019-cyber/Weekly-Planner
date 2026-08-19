@@ -23,18 +23,28 @@ let profile = null;
 let parentViewing = 'jenn';
 let weekOffset = 0;
 let currentDayKey = null;
+/* The leftmost column of the day screen. currentDayKey is the day being edited
+   — the two are the same at one column, and differ the moment a tap lands in
+   another column of a 2- or 3-day view. Everything downstream (placeBlock,
+   setDayMood, clearDay, the edit sheet) still reads currentDayKey, which is why
+   the anchor is a separate name rather than a redefinition of it. */
+let dayViewAnchorKey = null;
 let selectedActivity = null;
 /* dayViewMode was here. The day screen has one layout now — the timeline —
-   so there is no mode to hold, and nothing to carry between visits. */
+   so there is no mode to hold, and nothing to carry between visits. The 1/2/3
+   control is a column count, not a mode: nothing about how a day is read or
+   edited changes with it, and it is a localStorage preference, not state. */
 let timelinePlacementGuideEl = null;
-let dayLandscapeChromeRaf = 0;
+/* dayLandscapeChromeRaf lived here, throttling the day screen's chrome
+   measurement. The measurement is gone — one scroller needs no arithmetic. */
 let pendingStartMin = null;
 let editingBlockId = null;
 let syncDayIdx = 0;
 let weekView = 'timegrid';   // Day Blocks is the front page of the week
 /* currentZone lived here, for the morning/afternoon/evening day filters.
    Those are gone and the day is always shown whole — see js/08-day-view.js. */
-let currentTrayFilter = 'all';
+/* currentTrayFilter lived here, for the activity rail's category chips. The
+   rail is gone; the placement picker keeps its own filter (slotPickerFilter). */
 let activeTimers = {}; // itemKey -> {remaining, interval}
 let pendingFocusBlockId = null;
 let pendingFocusAttempts = 0;
@@ -42,7 +52,8 @@ let activeStopwatchTick = null;
 let kidQuickBlockId = null;
 let kidRoutineStopwatchTick = null;
 let kidTrainingStopwatchTick = null;
-let dayLandscapeFocusPane = null;
+/* dayLandscapeFocusPane lived here, dimming one pane of the day screen while
+   the other was in use. There is one pane now — the schedule. */
 let currentTimelineGuideY = null;
 let dayTopbarCompactBound = false;
 const MORNING_UNLOCK_ITEM = { id:'m_unlock_warm_water', text:'Warm water before breakfast' };

@@ -539,6 +539,10 @@ function mergeRemoteState(remote) {
       // device pushed last. Merge them by id like everything else.
       sharedActivities: mergeArrayById(ls.sharedActivities, rs.sharedActivities, 'sa:'),
       levelRules: mergeArrayById(ls.levelRules, rs.levelRules, 'lr:'),
+      // Sports the family added themselves. Id-keyed like the rest; deletes are
+      // archives rather than removals, so no tombstone scope is needed — an
+      // archived sport must keep resolving for the blocks that still name it.
+      customSports: mergeArrayById(ls.customSports, rs.customSports),
       // Chore config/payouts (groups, goals, fired payouts, bank) is a nested
       // tree — conflict-aware merge so two devices' edits both survive: additive
       // maps union, groups arbitrate by id (+ tombstones), goals by per-week ts.
@@ -569,13 +573,12 @@ function refreshCurrentScreen() {
   if (!active) return;
   if (active.id === 'screen-today') { if (typeof tdRenderToday === 'function') tdRenderToday(); }
   else if (active.id === 'screen-week') renderWeek();
-  else if (active.id === 'screen-day') { buildTimeline(); buildTray(); renderVibe(); }
+  else if (active.id === 'screen-day') { buildTimeline(); renderVibe(); }
   else if (active.id === 'screen-chore') renderChoreTab();
   else if (active.id === 'screen-sync') renderSync();
   else if (active.id === 'screen-parent') renderParentHome();
   else if (active.id === 'screen-mymoney' && typeof mnyRenderMyMoney === 'function') mnyRenderMyMoney();
   else if (active.id === 'screen-moneystory' && typeof mnyRenderStory === 'function') mnyRenderStory();
   else if (active.id === 'screen-moneyschool' && typeof mnyRenderSchool === 'function') mnyRenderSchool();
-  else if (active.id === 'screen-quest' && typeof renderQuestBoard === 'function') renderQuestBoard();
 }
 

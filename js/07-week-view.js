@@ -72,6 +72,25 @@ function copyWeekInto(sourceMondayKey, targetMondayKey, p) {
   });
   return copied;
 }
+/* One day onto another, in either direction and across weeks. Same clone rule
+   as the week copy — new ids, completion and XP reset, checklist cleared — so a
+   copied Tuesday cannot arrive pre-ticked or pay XP twice.
+
+   The week copy skips a destination that already has blocks; a day copy cannot,
+   because "make Wednesday look like Tuesday" is exactly what you ask for when
+   Wednesday is already wrong. It replaces, and tombstones what it replaced —
+   without that, a merge from another device brings the old blocks straight
+   back (js/04-merge.js). Returns the number of blocks copied. */
+function copyDayInto(srcDayKey, dstDayKey, p) {
+  if (!srcDayKey || !dstDayKey || srcDayKey === dstDayKey) return 0;
+  const from = getDayBlocksForProfile(srcDayKey, p) || [];
+  const existing = getDayBlocksForProfile(dstDayKey, p) || [];
+  if (existing.length) tombstoneBlockIds(existing.map(b => b.id));
+  setDayBlocks(dstDayKey, from.map(b => weekCloneBlock(b)), p);
+  saveAll();
+  return from.length;
+}
+
 function fillWeekFromNearest(mondayKey) {
   const p = activeProfile();
   if (!weekIsBlank(mondayKey, p)) { showToast('This week already has a plan'); return; }
@@ -257,7 +276,7 @@ function renderWeek() {
 // the Sunday review nudge). Free = window minutes not scheduled. Counts the
 // full entered duration up to END_MIN so charts reflect what was planned (W6).
 function computeWeekTotals(keys) {
-  const acts = getAllActivities();
+  const acts = getAllActivities(activeProfile(), { includeArchived: true });
   const catMin = {};
   let planned = 0;
   keys.forEach(k => {
@@ -294,7 +313,7 @@ function renderWeekGlance(keys) {
     ageInput.value = (age != null && !isNaN(age)) ? age : '';
   }
 
-  const acts = getAllActivities();
+  const acts = getAllActivities(activeProfile(), { includeArchived: true });
   const CAT_LABELS = {
     sleep:'😴 Rest', school:'📚 Learning', active:'🏃 Active',
     free:'🎮 Free', daily:'🍽 Daily', training:'🏋️ Competitive Sports',
@@ -364,7 +383,7 @@ function applyWeekGlanceOpen() {
 
 // #6 Weekly wins recap — a celebratory look at what actually got done.
 function computeWeekWins(keys) {
-  const acts = getAllActivities();
+  const acts = getAllActivities(activeProfile(), { includeArchived: true });
   let done = 0, total = 0;
   const byCat = {};
   keys.forEach(k => {
@@ -473,7 +492,7 @@ function categorizeBlock(block, act) {
 const BRICK_COUNT = Math.round(DAY_MIN_SPAN / 30);
 function getBrickStrip(key) {
   const blocks = getDayBlocks(key);
-  const acts = getAllActivities(activeProfile());
+  const acts = getAllActivities(activeProfile(), { includeArchived: true });
   const bricks = [];
   for (let i = 0; i < BRICK_COUNT; i++) {
     const slotStart = START_MIN + i * 30;
@@ -582,7 +601,7 @@ function renderTimeGrid(keys) {
   const grid = document.getElementById('tgGrid');
   if (!grid) return;
   grid.innerHTML = '';
-  const acts = getAllActivities(activeProfile());
+  const acts = getAllActivities(activeProfile(), { includeArchived: true });
   const today = todayKey();
 
   const PX_PER_MIN = 0.5;
@@ -839,7 +858,7 @@ function renderDayBar(key, blocks) {
   moodEl.textContent = dayMood || '';
 
   const catMap = {};
-  const acts = getAllActivities();
+  const acts = getAllActivities(activeProfile(), { includeArchived: true });
   blocks.forEach(b=>{
     const act = acts.find(a=>a.id===b.actId);
     if(!act) return;
@@ -972,14 +991,14 @@ function attachMiddleDragPan(el) {
 }
 /* Every scroll surface a plan is read on. */
 function bindMiddleDragPan() {
-  ['.weekly-full-wrap', '.tg2-wrap', '#screen-day .timeline-wrap']
+  ['.weekly-full-wrap', '.tg2-wrap', '#screen-day .day-workspace']
     .forEach(sel => document.querySelectorAll(sel).forEach(attachMiddleDragPan));
 }
 
 function renderFullWeek(keys) {
   const grid = document.getElementById('weeklyFullGrid');
   grid.innerHTML = '';
-  const acts = getAllActivities();
+  const acts = getAllActivities(activeProfile(), { includeArchived: true });
 
   // ── Week-level conflict summary banner (shown above the grid) ──
   renderWeekConflictBanner(keys);
@@ -1256,7 +1275,7 @@ function renderFullWeek(keys) {
 function renderWeekConflictBanner(keys, bannerId = 'weekConflictBanner') {
   const banner = document.getElementById(bannerId);
   if (!banner) return;
-  const acts = getAllActivities();
+  const acts = getAllActivities(activeProfile(), { includeArchived: true });
   const dayLines = [];
   keys.forEach((key, i) => {
     const blocks = (getDayBlocks(key) || []).slice();
