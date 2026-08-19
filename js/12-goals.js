@@ -221,6 +221,9 @@ function addGoal() {
 
 
 function progressForAchievement(a) {
+  // No activity linked yet, so there is no progress to report — not zero of one,
+  // which reads as "you have done none of the thing you never picked".
+  if (!a.activityId) return null;
   const keys = getDayKeys(weekOffset);
   const blocks = keys.flatMap(k=>getDayBlocks(k));
   const linked = blocks.filter(b=>b.actId===a.activityId && b.completed);
@@ -239,9 +242,11 @@ function buildAchievementRow(a) {
   const act = acts.find(x=>x.id===a.activityId);
   const prog = progressForAchievement(a);
   const targetVal = Math.max(1, a.target||1);
-  const done = prog.value >= targetVal;
   const targetLabel = a.mode==='duration' ? formatDuration(targetVal) : String(targetVal);
-  row.innerHTML = `<div class=\"gt-text\"><b>${act ? act.icon+' '+escapeHtml(act.name) : 'Pick activity'}</b> · ${a.mode==='duration'?'minutes':'count'} target ${escapeHtml(targetLabel)}<br><span class="gt-achievement-meta">${escapeHtml(prog.label)}/${escapeHtml(targetLabel)} · ${done?'Completed ✅':(prog.value>0?'In progress ⏳':'Not started')}</span></div>`;
+  const meta = prog
+    ? `${escapeHtml(prog.label)}/${escapeHtml(targetLabel)} · ${prog.value >= targetVal ? 'Completed ✅' : (prog.value > 0 ? 'In progress ⏳' : 'Not started')}`
+    : 'Tap “Link activity” to choose what this tracks';
+  row.innerHTML = `<div class="gt-text"><b>${act ? act.icon+' '+escapeHtml(act.name) : 'No activity yet'}</b> · ${a.mode==='duration'?'minutes':'count'} target ${escapeHtml(targetLabel)}<br><span class="gt-achievement-meta">${meta}</span></div>`;
   const controls = document.createElement('div');
   controls.className = 'gt-achievement-controls';
 
@@ -286,14 +291,18 @@ function buildAchievementRow(a) {
   return row;
 }
 
+/* A new achievement starts unassigned.
+   It used to be seeded with getAllActivities()[0], and DEFAULT_ACTIVITIES[0] is
+   Breakfast — so every achievement anyone added arrived reading "🍳 Breakfast ·
+   count target 1". Nobody chose that; it was alphabetical accident presented as
+   a decision, and eating breakfast is not an achievement. The row now says to
+   pick one, which is the only honest default. */
 function addAchievement() {
   const p = getProfData();
   ensureGtFields(p);
-  const acts = getAllActivities();
-  const first = acts[0];
   p.achievements.push({
     id: 'a-'+Date.now().toString(36),
-    activityId: first ? first.id : null,
+    activityId: null,
     mode: 'count',
     target: 1,
     createdAt: syncNow(),

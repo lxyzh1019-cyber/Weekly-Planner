@@ -21,6 +21,16 @@ const COLOURS = ['#ff7b54','#ff9eb5','#ffd166','#95d5b2','#6fb1fc','#c3aed6','#e
    the age-based bedtime nudge (bedtimeReminderText) is a separate thing. */
 const QUIET_HOURS = { startMin: 21 * 60, endMin: 7 * 60 };
 
+/* Age, without ever asking a child for it and without putting a birth date in a
+   public repo. The only thing age decides here is the recommended-sleep band and
+   the evening wind-down nudge — a year either way changes nothing a child acts
+   on, so an age plus the August it was true for is precise enough, and it
+   carries no date of birth. currentAge() in js/05-helpers.js seeds this on first
+   read and rolls it forward one year each August. A grown-up can correct it in
+   the parent portal; the child is never asked. */
+const DEFAULT_KID_AGE = 10;
+const AGE_ROLLOVER_MONTH = 7;   // 0-based: August
+
 const CAT_COLOUR = {
   sleep:'var(--cat-sleep)', school:'var(--cat-school)', active:'var(--cat-active)',
   free:'var(--cat-free)', daily:'var(--cat-daily)', custom:'var(--cat-custom)',

@@ -273,6 +273,114 @@ function findChromium() {
     return document.querySelectorAll('.tg2-lane').length === 7 || ['no day lanes in Day Blocks'];
   });
 
+  /* ONE TOPBAR ROW. The week selector and the controls that act on the week it
+     names were split across two rows separated by a dashed rule, which cost
+     about a third of an iPad's first screen before the plan itself began.
+     Checked by geometry, not by markup: "they are in the same div" is satisfied
+     by a div that wraps, and what matters is that they are on one line. */
+  checks.weekTopbarIsOneRow = await page.evaluate(() => {
+    goWeek(); renderWeek();
+    const bad = [];
+    if (document.querySelector('#screen-week .week-topbar__row2')) {
+      bad.push('the second topbar row is back');
+    }
+    const label = document.getElementById('weekRangeLabel');
+    const tabs  = document.querySelector('#screen-week .view-tabs');
+    const print = document.querySelector('#screen-week .week-print-btn');
+    if (!label || !tabs || !print) return ['week selector, view tabs or print button missing'];
+    const mid = el => { const r = el.getBoundingClientRect(); return r.top + r.height / 2; };
+    // Same line, within a tolerance that allows for different control heights.
+    if (Math.abs(mid(tabs) - mid(label)) > 30) bad.push('the view tabs are not on the week selector\'s row');
+    if (Math.abs(mid(print) - mid(label)) > 30) bad.push('Print is not on the week selector\'s row');
+    // And they sit to the RIGHT of it, which is what was asked for.
+    if (tabs.getBoundingClientRect().left < label.getBoundingClientRect().right) {
+      bad.push('the view tabs are not to the right of the week selector');
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* CONCLUSIONS COME AFTER THE THING THEY ARE ABOUT. "Longest free stretch" and
+     the clash warning are both summaries of the grid, and both used to render
+     above it — so a child was told what her week added up to before she could
+     see the week. Document order, in both views. */
+  checks.weekSummariesSitUnderThePlan = await page.evaluate(() => {
+    const bad = [];
+    const after = (a, b) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    setWeekView('timegrid'); renderWeek();
+    const grid = document.getElementById('tgGrid');
+    if (!after(grid, document.getElementById('tgStreak'))) bad.push('the free-stretch line is still above the grid');
+    if (!after(grid, document.getElementById('tgConflictBanner'))) bad.push('the clash banner is still above the grid');
+    setWeekView('full'); renderWeek();
+    if (!after(document.getElementById('weeklyFullGrid'), document.getElementById('weekConflictBanner'))) {
+      bad.push('the Full view clash banner is still above the cards');
+    }
+    setWeekView('timegrid'); renderWeek();
+    return bad.length === 0 || bad;
+  });
+
+  /* One scroll surface on Day Blocks, the same rule the day screen is held to.
+     The grid was its own scroller inside a flex column, so the week had two: the
+     grid, and the page carrying the glance and goals under it. A wheel over the
+     grid moved the grid, reached its end, and stopped — overscroll-behavior:
+     contain made sure nothing chained to the page — so the panels below could
+     not be reached by scrolling over the grid at all. */
+  checks.weekScrollsAsOneSurfaceOnDayBlocks = await page.evaluate(() => {
+    setWeekView('timegrid'); renderWeek();
+    const bad = [];
+    const inner = [...document.querySelectorAll('#weekTimeGrid, #weekTimeGrid *')].filter(el => {
+      const st = getComputedStyle(el);
+      return /(auto|scroll)/.test(st.overflowY) && el.scrollHeight > el.clientHeight + 4;
+    });
+    if (inner.length) bad.push(`nested scrollers under Day Blocks: ${inner.map(e => e.className || e.tagName).join(' | ')}`);
+    const wrap = document.querySelector('.tg2-wrap');
+    if (wrap && /contain/.test(getComputedStyle(wrap).overscrollBehaviorY)) {
+      bad.push('the grid still refuses to chain its scroll to the page');
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* MIDDLE-BUTTON PANNING follows the cursor, and carries on past the grid.
+     Two defects, one check. It panned like a hand tool — moving the mouse down
+     scrolled UP — which is the opposite of the middle-click autoscroll a mouse
+     user is asking for. And it only ever moved the element it was bound to, so
+     once that element ran out there was nowhere left to go; pointerdown calls
+     preventDefault, so the browser's own autoscroll was not there to take over
+     either. Drives real pointer events rather than calling the handler. */
+  checks.middleDragFollowsTheCursorAndChains = await page.evaluate(() => {
+    goWeek(); setWeekView('timegrid'); renderWeek();
+    const bad = [];
+    const el = document.querySelector('.tg2-wrap');
+    if (!el) return ['no Day Blocks wrap to pan'];
+    const doc = document.scrollingElement || document.documentElement;
+    if (doc.scrollHeight <= doc.clientHeight + 4) return ['the week does not scroll at all, so panning cannot be tested'];
+
+    const send = (type, x, y, button) => el.dispatchEvent(new PointerEvent(type, {
+      bubbles: true, cancelable: true, pointerId: 1, button, buttons: button === 1 ? 4 : 0,
+      clientX: x, clientY: y,
+    }));
+    // Some engines have no real pointer capture on a detached run; the handler
+    // guards it, but keep the check honest about what it drove.
+    el.setPointerCapture = el.setPointerCapture || (() => {});
+    el.releasePointerCapture = el.releasePointerCapture || (() => {});
+
+    doc.scrollTop = 0;
+    send('pointerdown', 400, 400, 1);
+    send('pointermove', 400, 260, 1);      // cursor moves UP by 140
+    send('pointerup',   400, 260, 1);
+    const afterUp = doc.scrollTop;
+    if (afterUp !== 0) bad.push(`moving the cursor up from the top scrolled to ${afterUp}, expected to stay at 0`);
+
+    send('pointerdown', 400, 200, 1);
+    send('pointermove', 400, 340, 1);      // cursor moves DOWN by 140
+    send('pointerup',   400, 340, 1);
+    const afterDown = doc.scrollTop;
+    // Down means down, and it reached the page rather than dying in the grid.
+    if (afterDown <= 0) bad.push(`moving the cursor down scrolled to ${afterDown}, expected the page to move down`);
+
+    doc.scrollTop = 0;
+    return bad.length === 0 || bad;
+  });
+
   // Kid money surface: kids reach Pocket Money and may LOOK at the bank, but
   // every function that moves money refuses them.
   /* One label for one destination (audit P2-4). The Quest Board used to call it
@@ -1469,9 +1577,17 @@ function findChromium() {
      what the number actually is.
 
      Raising it stays a recorded decision with a date and a reason, never a quiet
-     bump, and the check stays in place. The 200 target is unchanged. */
+     bump, and the check stays in place. The 200 target is unchanged.
+
+     ── 2026-08-19, 277 → 261, tightened ──
+     The routines section's instruction line ("Tap when it's done · all three
+     closed counts the day toward the routine bonus") went, and a one-tap "all 3
+     done" button above the three routines went in — which is the same sentence
+     as a control you can press. A ratchet is tightened whenever the real number
+     comes down: 346 at the audit, 280 after the disclosures, 276 once the
+     duplicate shortcut rows went, 277 for the honest earnings label, 261 now. */
   const WORD_BUDGET = { 'screen-today': 200, 'screen-week': 200,
-                        'screen-mymoney': 200, 'screen-chore': 277 };
+                        'screen-mymoney': 200, 'screen-chore': 261 };
   const KID_SCREENS = [
     // Today is held to the full 200 with no ratchet: it was built to these rules
     // rather than measured against them afterwards, which was the point of
@@ -1515,6 +1631,35 @@ function findChromium() {
         renderWeek();
       } finally { setDayBlocks(key, had, kid); Date = RealDate; }
     }, 'screen-week/sunday'],
+    /* The same screen showing DAY BLOCKS, with something on it.
+       This row exists because the audit above could not see the view the week
+       actually opens on. renderWeek() draws whichever view is selected, and by
+       the time the sweep runs the earlier checks have emptied the week — so
+       there were no .tg2-block elements to measure and the grid's labels sat at
+       9.9px (8.8px on a phone) and its hour gutter at 9.6px, right through every
+       run of this audit. A rule the suite renders the wrong branch for is a rule
+       that is not enforced.
+
+       Seed one real day, switch to the view, then put the day back exactly as it
+       was — the same discipline the Sunday row uses. */
+    ['screen-week',    () => {
+      goWeek();
+      const kid = activeProfile();
+      const key = getDayKeys(0)[2];
+      const had = (getDayBlocks(key) || []).slice();
+      try {
+        setDayBlocks(key, [
+          // A 30-minute block is the case that forced the density change: at the
+          // old scale it was 15px tall, which no legible type fits inside.
+          { id: 'tg2-audit-a', actId: 'routine_morning', startMin: 7 * 60, durationMin: 30 },
+          { id: 'tg2-audit-b', actId: 'school_day', startMin: 9 * 60, durationMin: 5 * 60 },
+          { id: 'tg2-audit-c', actId: 'training', startMin: 17 * 60, durationMin: 90, tag: 'skating' },
+        ], kid);
+        weekOffset = 0;
+        setWeekView('timegrid');
+        renderWeek();
+      } finally { setDayBlocks(key, had, kid); }
+    }, 'screen-week/dayblocks'],
     /* screen-quest was audited here. The Quest Board is retired; its two unique
        panels moved into Today's disclosure, which the screen-today row already
        covers — with the disclosure opened, so the panels are actually measured
@@ -2844,13 +2989,21 @@ function findChromium() {
     if (typeof goQuestBoard === 'function') bad.push('goQuestBoard is back');
     if (typeof renderQuestBoard === 'function') bad.push('renderQuestBoard is back');
     goToday();
-    // Both blocks are listed once, between the upcoming list and the earlier fold.
+    /* Both blocks are listed once, across the up-next list, the "later today"
+       fold and the "earlier today" fold — so both folds open before counting.
+       Blocks only: free-time cards share the .quest-card shell but describe the
+       gaps BETWEEN blocks, and counting them here would be counting holes as
+       things. The invariant is unchanged — every block of the day is in #tdWrap
+       and nowhere else in the document. */
     if (!tdEarlierOpen()) tdToggleEarlier();
-    const here = document.querySelectorAll('#tdWrap .quest-card').length;
+    if (!tdLaterOpen()) tdToggleLater();
+    const sel = '.quest-card:not(.quest-card--free)';
+    const here = document.querySelectorAll('#tdWrap ' + sel).length;
     if (here !== 2) bad.push(`Today lists ${here} of 2 blocks`);
-    const everywhere = document.querySelectorAll('.quest-card').length;
+    const everywhere = document.querySelectorAll(sel).length;
     if (everywhere !== here) bad.push(`quest cards render in ${everywhere - here} other place(s)`);
     tdToggleEarlier();
+    tdToggleLater();
     setDayBlocks(key, [], 'jenn');
     return bad.length === 0 || bad;
   });
@@ -3591,7 +3744,12 @@ function findChromium() {
 
   /* Next at the top. The list ran in plain time order, so from mid-morning
      onward the thing she was about to do sat below a breakfast she had already
-     eaten — the top of the screen was about the past. */
+     eaten — the top of the screen was about the past.
+
+     What this asserts is that THE PAST is not above the future, so it counts
+     block cards and ignores free-time ones. A free stretch between now and the
+     next block legitimately sits above it: "you have an hour, then piano" is the
+     order the afternoon actually happens in, and it is still not the past. */
   checks.todayLeadsWithWhatIsNext = await page.evaluate(() => {
     const bad = [];
     profile = 'jenn'; parentViewing = 'jenn';
@@ -3607,22 +3765,373 @@ function findChromium() {
     if (wasOpen) tdToggleEarlier();
     goToday();
     const wrap = document.getElementById('tdWrap');
-    const cards = [...wrap.querySelectorAll('.quest-card')];
-    if (cards.length !== 1) bad.push(`${cards.length} cards shown with the fold closed, expected just the upcoming one`);
-    if (cards[0] && !/Piano/.test(cards[0].textContent)) bad.push('the card at the top is not the next thing');
+    const blocks = () => [...document.querySelectorAll('#tdWrap .quest-card:not(.quest-card--free)')];
+    const cards = blocks();
+    if (cards.length !== 1) bad.push(`${cards.length} block cards shown with the fold closed, expected just the upcoming one`);
+    if (cards[0] && !/Piano/.test(cards[0].textContent)) bad.push('the block at the top is not the next thing');
+    // The breakfast is behind the fold, so nothing on the screen is in the past.
+    if (/Breakfast/.test(wrap.textContent)) bad.push('a finished block is showing with the fold closed');
     const fold = wrap.querySelector('[data-td-action="earlier"]');
     if (!fold) bad.push('finished blocks are not folded away');
     else {
       if (!/1/.test(fold.textContent)) bad.push('the fold does not say how many are behind it');
       fold.click();
-      const after = [...document.querySelectorAll('#tdWrap .quest-card')];
-      if (after.length !== 2) bad.push(`opening the fold showed ${after.length} cards, expected 2`);
+      const after = blocks();
+      if (after.length !== 2) bad.push(`opening the fold showed ${after.length} block cards, expected 2`);
       // Order: next first, earlier below.
       if (after[0] && !/Piano/.test(after[0].textContent)) bad.push('the earlier block came back above the next one');
       tdToggleEarlier();
     }
     if (wasOpen) tdToggleEarlier();
     setDayBlocks(dk, [], 'jenn');
+    return bad.length === 0 || bad;
+  });
+
+  /* THREE THINGS LOUD, THE REST ONE TAP AWAY.
+     A ten-block day put ten cards on the screen, which is a list, which is what
+     Today replaced. The distinction this check exists to hold is between a CAP
+     and a DISCLOSURE: a cap deleted the overflow and a child never saw it (see
+     TD_MAX_QUESTS, retired for exactly that); a disclosure defers it and one tap
+     brings it back. So it asserts both halves — few by default, all reachable.
+
+     The clock is pinned so the fixture is the same at 6am and at 6pm: an
+     unpinned "six blocks from now" drifts past END_MIN in the evening and the
+     check would test a different day depending on when CI ran. */
+  checks.todayShowsThreeThingsAndFoldsTheRest = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    const bad = [];
+    const key = todayKey();
+    const before = (getDayBlocks(key, 'jenn') || []).slice();
+    const wasLater = tdLaterOpen();
+    const RealDate = Date;
+    const pin = (h, m) => {
+      const when = new RealDate(); when.setHours(h, m, 0, 0);
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+      Date.prototype = RealDate.prototype;
+      Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    };
+    const cards = () => [...document.querySelectorAll('#tdWrap .quest-card')];
+    const blocks = () => [...document.querySelectorAll('#tdWrap .quest-card:not(.quest-card--free)')];
+    const fold = () => document.querySelector('#tdWrap [data-td-action="later"]');
+    try {
+      if (wasLater) tdToggleLater();
+      /* 9am sharp, and six back-to-back blocks from 9am: no gap before the first
+         and none between any of them, so nothing here is a free-time card and
+         the count is purely about the fold. Free time gets its own check. */
+      pin(9, 0);
+      setDayBlocks(key, [0, 1, 2, 3, 4, 5].map(i => ({
+        id: 'td-many-' + i, actId: 'piano', startMin: (9 + i) * 60, durationMin: 60,
+      })), 'jenn');
+      goToday();
+
+      if (blocks().length !== 3) bad.push(`${blocks().length} blocks loud, expected 1 + TD_UP_NEXT = 3`);
+      const f = fold();
+      if (!f) return ['the rest of the day is not folded away'];
+      if (!/3/.test(f.textContent)) bad.push(`the fold does not say how many are behind it: "${f.textContent.trim()}"`);
+      // Reachable — the half a cap could never satisfy.
+      f.click();
+      if (blocks().length !== 6) bad.push(`opening the fold showed ${blocks().length} of 6 blocks`);
+      const times = [...document.querySelectorAll('#tdWrap .quest-time')].map(e => e.textContent.trim());
+      if (!times.includes('9:00am') || !times.includes('2:00pm')) {
+        bad.push(`the whole day is not reachable: ${times.join(', ')}`);
+      }
+      tdToggleLater();
+
+      /* A fold over ONE card hides as much as it saves, so at one there is no
+         fold and the card simply shows. Four blocks: three loud, one over. */
+      setDayBlocks(key, [0, 1, 2, 3].map(i => ({
+        id: 'td-four-' + i, actId: 'piano', startMin: (9 + i) * 60, durationMin: 60,
+      })), 'jenn');
+      goToday();
+      if (fold()) bad.push('a fold was drawn over a single card');
+      if (blocks().length !== 4) bad.push(`${blocks().length} of 4 blocks showing when the fold is not worth drawing`);
+      if (cards().length !== blocks().length) bad.push('a free-time card appeared in a back-to-back day');
+    } finally {
+      Date = RealDate;
+      if (tdLaterOpen() !== wasLater) tdToggleLater();
+      setDayBlocks(key, before, 'jenn');
+      goToday();
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* FREE TIME IS A THING ON THE LIST. A list that names only blocks cannot
+     answer "what now" on an afternoon whose next block is two hours off — the
+     honest answer is "nothing until four, it is yours", and that is an item.
+     It is presentation only: no id, nothing written, and tdQuestsToday still
+     returns exactly the blocks the day contains. */
+  checks.todayNamesFreeTime = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    const bad = [];
+    const key = todayKey();
+    const before = (getDayBlocks(key, 'jenn') || []).slice();
+    const RealDate = Date;
+    const pin = (h, m) => {
+      const when = new RealDate(); when.setHours(h, m, 0, 0);
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+      Date.prototype = RealDate.prototype;
+      Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    };
+    const free = () => [...document.querySelectorAll('#tdWrap .quest-card--free')];
+    try {
+      pin(9, 0);
+      // 9–10 piano, then a 90-minute hole, then 11:30 dinner.
+      setDayBlocks(key, [
+        { id: 'td-g1', actId: 'piano',  startMin: 9 * 60,      durationMin: 60 },
+        { id: 'td-g2', actId: 'dinner', startMin: 11 * 60 + 30, durationMin: 60 },
+      ], 'jenn');
+      goToday();
+      const gaps = free();
+      if (gaps.length !== 1) bad.push(`${gaps.length} free-time cards, expected 1`);
+      else {
+        const t = gaps[0].textContent;
+        if (!/Free time/.test(t)) bad.push('the free card does not say what it is');
+        if (!/1h\s?30m/.test(t)) bad.push(`the free card does not say how long: "${t.replace(/\s+/g, ' ').trim()}"`);
+        if (!/10:00am/.test(t)) bad.push('the free card does not say when it starts');
+        if (!/11:30am/.test(t)) bad.push('the free card does not say when it ends');
+      }
+      // In time order, between the two blocks.
+      const all = [...document.querySelectorAll('#tdWrap .dq-list .quest-card')];
+      if (all.length !== 3 || !all[1].classList.contains('quest-card--free')) {
+        bad.push('the free stretch is not in time order between the blocks');
+      }
+      // It offers itself: tapping opens the day screen to fill it.
+      free()[0].querySelector('[data-td-action="plan"]').click();
+      if (document.querySelector('.screen.active').id !== 'screen-day') {
+        bad.push('a free-time card does not offer to be planned');
+      }
+      goToday();
+      // It owns nothing: the day still contains exactly the two real blocks.
+      if (tdQuestsToday('jenn').length !== 2) bad.push('a free-time card became a block');
+
+      /* FREE TIME ENDS WHEN GETTING READY STARTS. A 5pm skate with kit, car and
+         warm-up in front of it is not something she is free until 5 o'clock for.
+         Without this the card read "free until 5:00pm" directly under a NOW card
+         reading "be moving by 3:55pm" — the screen contradicting itself about
+         the only number on it that matters. */
+      setDayBlocks(key, [
+        { id: 'td-g1', actId: 'piano', startMin: 9 * 60, durationMin: 60 },
+        { id: 'td-g2', actId: 'training', tag: 'skating', startMin: 12 * 60, durationMin: 90,
+          getReadyBuffer: true, getReadyBufMin: 15, travelBuffer: true, travelBufMin: 30 },
+      ], 'jenn');
+      goToday();
+      const trimmed = free();
+      if (trimmed.length !== 1) bad.push(`${trimmed.length} free cards before a block with prep, expected 1`);
+      else {
+        const t = trimmed[0].textContent;
+        // 12:00 − 30 travel − 15 ready = 11:15, so 10:00–11:15 is 1h15m.
+        if (!/11:15am/.test(t)) bad.push(`free time runs past the get-ready time: "${t.replace(/\s+/g, ' ').trim()}"`);
+        if (/12:00pm/.test(t)) bad.push('free time claims the get-ready and travel time as hers');
+        if (!/1h\s?15m/.test(t)) bad.push(`the trimmed gap is the wrong length: "${t.replace(/\s+/g, ' ').trim()}"`);
+      }
+      // Trimming can take a gap under the threshold — then it was never free
+      // time, it was the run-up to the next thing.
+      setDayBlocks(key, [
+        { id: 'td-g1', actId: 'piano', startMin: 9 * 60, durationMin: 60 },
+        { id: 'td-g2', actId: 'training', tag: 'skating', startMin: 10 * 60 + 50, durationMin: 90,
+          getReadyBuffer: true, getReadyBufMin: 15, travelBuffer: true, travelBufMin: 30 },
+      ], 'jenn');
+      goToday();
+      if (free().length) bad.push('a 50-minute run-up was named as free time once prep was taken off it');
+
+      // Under TD_FREE_MIN is turnaround, not free time.
+      setDayBlocks(key, [
+        { id: 'td-g1', actId: 'piano',  startMin: 9 * 60,      durationMin: 60 },
+        { id: 'td-g2', actId: 'dinner', startMin: 10 * 60 + 20, durationMin: 60 },
+      ], 'jenn');
+      goToday();
+      if (free().length) bad.push('a 20-minute turnaround was named as free time');
+    } finally {
+      Date = RealDate;
+      setDayBlocks(key, before, 'jenn');
+      goToday();
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* WHEN TO START MOVING. A block can carry get-ready, travel and warm-up time,
+     and the app has always known how to word it — the week grid, the Full week
+     and the print sheet all read wfBufferSegments/bufferSegLabels. Today, the
+     screen a child actually looks at before leaving the house, never mentioned
+     it. This asserts the number, the wording and the silence: the wording has to
+     be the SAME STRINGS the week grid uses, because two screens that word "leave
+     by" differently will eventually disagree about the time too. */
+  checks.todayTellsHerWhenToStartMoving = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    const bad = [];
+    const key = todayKey();
+    const before = (getDayBlocks(key, 'jenn') || []).slice();
+    const RealDate = Date;
+    const pin = (h, m) => {
+      const when = new RealDate(); when.setHours(h, m, 0, 0);
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+      Date.prototype = RealDate.prototype;
+      Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    };
+    const block = {
+      id: 'td-prep', actId: 'training', tag: 'skating',
+      startMin: 17 * 60, durationMin: 90,
+      getReadyBuffer: true, getReadyBufMin: 15,
+      travelBuffer: true, travelBufMin: 30,
+      warmupBuffer: true, warmupBufMin: 20,
+    };
+    try {
+      setDayBlocks(key, [block], 'jenn');
+      // 17:00 − 20 warm-up − 30 travel − 15 get-ready = 15:55.
+      const expect = 17 * 60 - 20 - 30 - 15;
+      const prep = tdPrepFor(block);
+      if (!prep) return ['tdPrepFor found no preparation on a block that has all three'];
+      if (prep.moveByMin !== expect) bad.push(`move-by ${prep.moveByMin}, expected ${expect}`);
+
+      pin(15, 0);   // before the deadline
+      goToday();
+      const wrap = document.getElementById('tdWrap');
+      const move = wrap.querySelector('.td-now-move');
+      if (!move) return ['the NOW card says nothing about getting ready'];
+      if (!/3:55pm/.test(move.textContent)) bad.push(`the headline reads "${move.textContent.trim()}", expected 3:55pm`);
+      if (/Time to get moving/.test(move.textContent)) bad.push('it says the deadline has arrived two hours early');
+      // The steps are the week grid's own words, not a second wording of them.
+      const steps = [...wrap.querySelectorAll('.td-now-steps span')].map(e => e.textContent.trim());
+      const owned = wfBufferSegments(block).filter(s => s.side === 'pre')
+        .sort((a, b) => a.startRel - b.startRel).map(s => bufferSegLabels(s, 'long'));
+      if (steps.join('|') !== owned.join('|')) {
+        bad.push(`the steps are a second wording: ${steps.join(' / ')} vs ${owned.join(' / ')}`);
+      }
+
+      pin(16, 30);  // past it
+      goToday();
+      const late = document.querySelector('#tdWrap .td-now-move');
+      if (!late || !/Time to get moving/.test(late.textContent)) {
+        bad.push('past the deadline it still reads as if there were time');
+      }
+      if (!late.classList.contains('td-now-move--now')) bad.push('an arrived deadline does not look different');
+
+      // A block with no buffers says nothing — most blocks, and silence is right.
+      setDayBlocks(key, [{ id: 'td-plain', actId: 'piano', startMin: 17 * 60, durationMin: 60 }], 'jenn');
+      goToday();
+      if (document.querySelector('#tdWrap .td-now-move')) {
+        bad.push('a block with no travel or get-ready time invented some');
+      }
+      if (tdPrepFor({ id: 'x', actId: 'piano', startMin: 600, durationMin: 60 }) !== null) {
+        bad.push('tdPrepFor returns something for a block with no buffers');
+      }
+    } finally {
+      Date = RealDate;
+      setDayBlocks(key, before, 'jenn');
+      goToday();
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* THE FAMILY'S SHARE OF THE WEEK.
+     "2 free chores left this week — those belong to the family" is a PRICING
+     rule: mrChoreWeek takes that many graded chores and pays nothing for them.
+     Nothing checked that they get done, so a week with no chores planned at all
+     priced out perfectly and was silently fine. The same number is now also a
+     floor, and mrFamilyChoreStatus owns the counting. */
+  checks.familyChoreFloorIsFlaggedWhileItCanBeFixed = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const bad = [];
+    const kid = 'jenn', wk = ctWeekKey;
+    const keys = mrWeekDayKeys(wk);
+    const before = keys.map(k => (getDayBlocks(k, kid) || []).slice());
+    const e = mrEnsureEarnings(kid, wk);
+    const hadChores = JSON.stringify(e.chores), hadClaims = JSON.stringify(e.claims);
+    try {
+      keys.forEach(k => setDayBlocks(k, [], kid));
+      e.chores = {}; e.claims = {};
+
+      const st0 = mrFamilyChoreStatus(kid, wk);
+      if (st0.needed !== 2) bad.push(`the floor is ${st0.needed}, expected freeChoresPerWeek = 2`);
+      if (st0.short !== st0.needed) bad.push(`an empty week is ${st0.short} short, expected ${st0.needed}`);
+
+      // Both surfaces say so, and they say the same number.
+      goToday();
+      const chip = document.querySelector('#tdWrap [data-td-action="chore"].td-chip-family');
+      if (!chip) bad.push('Today does not mention the family chores');
+      else if (!/2/.test(chip.textContent)) bad.push(`the chip says "${chip.textContent.trim()}"`);
+      goWeek(); setWeekView('timegrid'); renderWeek();
+      const banner = document.getElementById('tgFamilyBanner');
+      if (!banner || banner.style.display === 'none') bad.push('the week does not mention the family chores');
+      else if (!/2 family chores/.test(banner.textContent)) bad.push(`the banner says "${banner.textContent.trim()}"`);
+
+      // Planning one counts.
+      setDayBlocks(keys[1], [{ id: 'fam-a', actId: 'chores', startMin: 17 * 60, durationMin: 30, choreTags: ['dishes'] }], kid);
+      if (mrFamilyChoreStatus(kid, wk).short !== 1) bad.push('planning a chore did not count toward the floor');
+
+      // Doing one without planning it counts too — the work, not the paperwork.
+      mrSetClaim(kid, wk, 3, 'mop', 3);
+      const st2 = mrFamilyChoreStatus(kid, wk);
+      if (st2.counted !== 2 || st2.short !== 0) {
+        bad.push(`an unplanned but claimed chore did not count (counted ${st2.counted})`);
+      }
+
+      // Met: both surfaces go quiet. It is a to-do, not a scoreboard.
+      goToday();
+      if (document.querySelector('#tdWrap .td-chip-family')) bad.push('the chip stayed after the floor was met');
+      goWeek(); renderWeek();
+      if (document.getElementById('tgFamilyBanner').style.display !== 'none') {
+        bad.push('the banner stayed after the floor was met');
+      }
+
+      /* Standing responsibilities do not count. `own` and `helping` need no
+         block and show every day, so counting them would satisfy the floor
+         without anyone lifting anything. */
+      keys.forEach(k => setDayBlocks(k, [], kid));
+      e.chores = {}; e.claims = {};
+      const st3 = mrFamilyChoreStatus(kid, wk);
+      if (st3.short !== 2) bad.push(`own/helping rows counted toward the floor (short ${st3.short})`);
+
+      // A week that has gone by cannot be planned, so nothing is said about it.
+      weekOffset = -1;
+      goWeek(); renderWeek();
+      if (document.getElementById('tgFamilyBanner').style.display !== 'none') {
+        bad.push('a past week is nagged about chores nobody can still plan');
+      }
+      weekOffset = 0;
+    } finally {
+      weekOffset = 0;
+      keys.forEach((k, i) => setDayBlocks(k, before[i], kid));
+      const en = mrEnsureEarnings(kid, wk);
+      en.chores = JSON.parse(hadChores); en.claims = JSON.parse(hadClaims);
+      goToday();
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* …AND IT IS A TO-DO, NOT BLAME.
+     Every kid-facing warning in this app is either a setup mistake to report
+     (ck-warn) or exposure that has not happened yet (ck-risk) — never "you
+     failed to do X". That is a house rule about a nine-year-old's screen, and a
+     rule kept only in a comment is a rule one edit away from being lost. */
+  checks.familyChoreFlagIsForwardLookingNotBlame = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const bad = [];
+    const kid = 'jenn', wk = ctWeekKey;
+    const keys = mrWeekDayKeys(wk);
+    const before = keys.map(k => (getDayBlocks(k, kid) || []).slice());
+    const e = mrEnsureEarnings(kid, wk);
+    const hadChores = JSON.stringify(e.chores), hadClaims = JSON.stringify(e.claims);
+    try {
+      keys.forEach(k => setDayBlocks(k, [], kid));
+      e.chores = {}; e.claims = {};
+      goWeek(); setWeekView('timegrid'); renderWeek();
+      goToday();
+      const chip = document.querySelector('#tdWrap .td-chip-family');
+      const banner = document.getElementById('tgFamilyBanner');
+      const copy = [chip ? chip.textContent : '', banner ? banner.textContent : ''].join(' ');
+      if (!/to plan|find a day/i.test(copy)) bad.push(`the copy is not forward-looking: "${copy.replace(/\s+/g, ' ').trim()}"`);
+      if (/didn'?t|failed|missed|should have|behind/i.test(copy)) {
+        bad.push(`the copy blames her: "${copy.replace(/\s+/g, ' ').trim()}"`);
+      }
+    } finally {
+      keys.forEach((k, i) => setDayBlocks(k, before[i], kid));
+      const en = mrEnsureEarnings(kid, wk);
+      en.chores = JSON.parse(hadChores); en.claims = JSON.parse(hadClaims);
+      goToday();
+    }
     return bad.length === 0 || bad;
   });
 
@@ -3742,17 +4251,21 @@ function findChromium() {
       const after = JSON.stringify(mrEnsureEarnings('jenn', wk));
       if (!wentToChore || after !== before) return 'a Today row changed state or did not navigate';
     }
-    // The footer shortcuts are static markup now — siblings of #tdWrap, not
-    // inside it — so they are scoped to the screen.
-    goToday();
-    document.querySelector('#screen-today [data-td-action="week"]').click();
-    const toWeek = document.getElementById('screen-week').classList.contains('active');
+    /* The footer used to carry three static shortcuts and this checked the two
+       that repeated the nav. Those are gone — a second Week and Money button on
+       a screen whose nav already has Week and Money is exactly the drift
+       CLAUDE.md warns about — so what is left to check is the money card, which
+       is itself one big data-td-action="money" button, and the plan button. */
     goToday();
     document.querySelector('#screen-today [data-td-action="money"]').click();
     const toMoney = document.getElementById('screen-mymoney').classList.contains('active');
+    goToday();
+    document.querySelector('#screen-today .td-plan').click();
+    const toDay = document.getElementById('screen-day').classList.contains('active');
 
+    goToday();
     const untouched = JSON.stringify(mrEnsureEarnings('jenn', wk)) === before;
-    return toWeek && toMoney && untouched;
+    return toMoney && toDay && untouched;
   });
 
   // Today reads the same counts the chore screen does. If they can disagree, one
@@ -3834,14 +4347,23 @@ function findChromium() {
       { id: 'td-q2', actId: 'breakfast',  startMin: 7 * 60,  durationMin: 30 },
     ], 'jenn');
     /* The list leads with what is NEXT now, so a 7am breakfast is behind the
-       "earlier today" fold by mid-morning. Open it: the assertion is that the
-       whole day is still listed and reachable — not a capped teaser — which is
-       what it always was; only where the past sits has changed. */
-    const wasOpen = tdEarlierOpen();
+       "earlier today" fold by mid-morning, and anything past the third item is
+       behind "later today". Open both.
+
+       THE INVARIANT IS UNCHANGED and it is worth being exact about why, because
+       it looks like the capped teaser this check exists to forbid. A cap deletes:
+       the blocks past the limit were gone from Today and a child never saw them.
+       A disclosure defers: every block of the day is still on this screen, and
+       one tap reaches it. What the check holds is reachability, so it opens the
+       folds and then demands the whole day — which is exactly what it always
+       did. If a future change makes a block unreachable from here, this fails. */
+    const wasOpen = tdEarlierOpen(), wasLater = tdLaterOpen();
     if (!wasOpen) tdToggleEarlier();
+    if (!wasLater) tdToggleLater();
     goToday();
 
-    const cards = [...document.querySelectorAll('#tdWrap .quest-card')];
+    // Blocks only: free-time cards describe the gaps between them.
+    const cards = [...document.querySelectorAll('#tdWrap .quest-card:not(.quest-card--free)')];
     if (cards.length !== 2) bad.push(`expected 2 quest cards, got ${cards.length}`);
     // Within each group the order is still the day's own order.
     const times = [...document.querySelectorAll('#tdWrap .quest-time')].map(e => e.textContent.trim());
@@ -3888,6 +4410,7 @@ function findChromium() {
     tdToggleExtras();
 
     if (!wasOpen) tdToggleEarlier();
+    if (!wasLater) tdToggleLater();
     setDayBlocks(key, [], 'jenn');
     return bad.length === 0 || bad;
   });
@@ -4726,34 +5249,320 @@ function findChromium() {
 
   /* An empty day offers to be planned; a day with blocks on it does not. Both
      halves, or this only proves a button exists. */
+  /* ONE DOOR ONTO THE DAY, and it says which trip it is.
+     There used to be two affordances and a duplicate nav beside them: a
+     "Nothing planned — build a day?" row inside the "On today" card when the day
+     was empty, a permanent "✏️ Plan my day" button in a static footer row for
+     when it was not, and — next to that button — "The whole week" and "My money",
+     which are the Week and Money tabs of the persistent nav under other names.
+
+     So the invariant flips. It is no longer "the offer appears only on an empty
+     day"; it is that there is exactly ONE plan control, it is always there, its
+     verb tells her whether she is building a day or changing one, and either way
+     it lands on the day screen. Plus: no second Week button on a screen whose
+     nav has Week on it.
+
+     .td-plan, not [data-td-action="plan"]: every quest card's body carries that
+     action too, so the bare attribute would match several things. */
   checks.anEmptyDayOffersToBePlanned = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const key = todayKey();
     const before = JSON.stringify(getDayBlocks(key, 'jenn') || []);
-    /* .td-plan, not [data-td-action="plan"]: every quest card's body carries
-       that action too, so the bare attribute matches on a day that is full and
-       the "absent when planned" half below could never fail. */
-    const offer = () => document.querySelector('#tdWrap .td-plan');
-    setDayBlocks(key, [], 'jenn');
-    goToday();
-    const offered = !!offer();
-    const reaches = (() => {
-      const b = offer();
+    const bad = [];
+    const buttons = () => [...document.querySelectorAll('#tdWrap .td-plan')];
+    const reaches = () => {
+      const b = buttons()[0];
       if (!b) return false;
       b.click();
       const landed = document.getElementById('screen-day').classList.contains('active');
       goToday();
       return landed;
-    })();
-    // A day with something on it gets the quest list instead — the offer is for
-    // the day that has none.
+    };
+
+    setDayBlocks(key, [], 'jenn');
+    goToday();
+    let btns = buttons();
+    if (btns.length !== 1) bad.push(`${btns.length} plan buttons on an empty day, expected 1`);
+    else if (!/plan my day/i.test(btns[0].textContent)) bad.push(`empty day reads "${btns[0].textContent.trim()}"`);
+    if (!reaches()) bad.push('the plan button did not reach the day screen from an empty day');
+
+    // A day with a plan gets the same one button, saying the other thing.
     setDayBlocks(key, [{ id: 'td-plan-x', actId: 'piano', startMin: 15 * 60, durationMin: 60 }], 'jenn');
     goToday();
-    const hidden = !offer();
+    btns = buttons();
+    if (btns.length !== 1) bad.push(`${btns.length} plan buttons on a planned day, expected 1`);
+    else if (!/modify my plan/i.test(btns[0].textContent)) bad.push(`planned day reads "${btns[0].textContent.trim()}"`);
+    if (!reaches()) bad.push('the plan button did not reach the day screen from a planned day');
+
+    // And the nav is not repeated inside the screen.
+    if (document.querySelector('#screen-today [data-td-action="week"]')) {
+      bad.push('a second Week button is back on Today');
+    }
+
     setDayBlocks(key, JSON.parse(before), 'jenn');
     goToday();
-    return offered && reaches && hidden;
+    return bad.length === 0 || bad;
+  });
+
+  /* SLEEP IS NOT UNSCHEDULED TIME. The glance reported "🌤 Unscheduled: 41h"
+     with nothing beside it about the nights, which reads as if the eight hours
+     she is in bed are hours nobody has claimed. They were never in the number —
+     the window is 6am–10pm — but a figure that is right and reads wrong is a
+     figure that will be acted on wrongly. Both facts are now stated, and this
+     holds them apart arithmetically as well as on screen.
+
+     Also: every category leads with a per-day average, because a week total is
+     not a number a nine-year-old can use without dividing it by seven. */
+  checks.glanceSeparatesSleepFromUnscheduled = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    const bad = [];
+    const keys = getDayKeys(0);
+    const kid = 'jenn';
+    const before = keys.map(k => (getDayBlocks(k, kid) || []).slice());
+    try {
+      keys.forEach(k => setDayBlocks(k, [], kid));
+      // Four hours of school on the Monday, and nothing else all week.
+      setDayBlocks(keys[0], [{ id: 'gl-1', actId: 'school_day', startMin: 9 * 60, durationMin: 240 }], kid);
+      const t = computeWeekTotals(keys);
+
+      if (t.catMin.school !== 240) bad.push(`school counted as ${t.catMin.school}, expected 240`);
+      // Awake, unclaimed: the whole 6am–10pm week minus the one block.
+      const expectFree = DAY_MIN_SPAN * 7 - 240;
+      if (t.free !== expectFree) bad.push(`unscheduled ${t.free}, expected ${expectFree}`);
+      // The nights, stated on their own and NOT inside `free`.
+      const expectNight = (1440 - DAY_MIN_SPAN) * 7;
+      if (t.nightMin !== expectNight) bad.push(`overnight ${t.nightMin}, expected ${expectNight}`);
+      if (t.free + t.planned + t.nightMin !== 1440 * 7) {
+        bad.push('planned + unscheduled + overnight does not add up to the week');
+      }
+
+      goWeek(); renderWeek();
+      if (!weekGlanceOpen()) toggleWeekGlance();
+      renderWeekGlance(keys);
+      const body = document.getElementById('weekGlanceBody');
+      const text = body ? body.textContent : '';
+      if (!/Overnight/.test(text)) bad.push('the glance does not name overnight at all');
+      if (!/Unscheduled/.test(text)) bad.push('the glance does not name unscheduled time');
+      // Per-day leads. 240 minutes over 7 days is 34 minutes, not 4h.
+      const school = [...body.querySelectorAll('.glance-row')]
+        .find(r => /Learning/.test(r.textContent));
+      if (!school) bad.push('no Learning row in the glance');
+      else if (!/34m\/day/.test(school.textContent.replace(/\s+/g, ''))) {
+        bad.push(`Learning reads "${school.textContent.trim().replace(/\s+/g, ' ')}", expected a 34m/day average`);
+      }
+      if (weekGlanceOpen()) toggleWeekGlance();
+    } finally {
+      keys.forEach((k, i) => setDayBlocks(k, before[i], kid));
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* A CHILD IS NEVER ASKED HER AGE, and the answer does not go stale.
+     There was a 🎂 number field on her own week view, inside a reference panel,
+     which is an app asking a nine-year-old how old she is in order to show her a
+     sleep guideline. It is a grown-up's setting and it now lives in the portal;
+     the app assumes 10 and adds a year each August.
+
+     The clock stand-in is the idiom the Sunday row uses — only bare `new Date()`
+     is answered, every explicit form still builds the date it was given, and the
+     real Date goes back in a finally, because a fake clock left installed would
+     poison every check after this one. */
+  checks.ageIsNeverAskedAndRollsOverInAugust = await page.evaluate(() => {
+    const bad = [];
+    const kid = 'jenn';
+    const pd = getProfData(kid);
+    const hadAge = pd.age, hadYear = pd.ageYear;
+    const RealDate = Date;
+    const at = (y, m, d) => {
+      const when = new RealDate(y, m, d, 10, 0, 0);
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+      Date.prototype = RealDate.prototype;
+      Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    };
+    try {
+      // Never set: she is ten, as of this August.
+      delete pd.age; delete pd.ageYear;
+      at(2026, 8, 15);                       // September 2026
+      if (currentAge(kid) !== 10) bad.push(`an unset age read ${currentAge(kid)}, expected 10`);
+      if (pd.ageYear !== 2026) bad.push(`seeded ageYear ${pd.ageYear}, expected 2026`);
+
+      // Later the same school year: still ten. The rollover is August, not New Year.
+      at(2027, 2, 3);                        // March 2027
+      if (currentAge(kid) !== 10) bad.push('the age moved before August');
+
+      // First week of August: eleven, and only once however often it is read.
+      at(2027, 7, 3);                        // 3 August 2027
+      if (currentAge(kid) !== 11) bad.push(`August did not roll the age over (got ${currentAge(kid)})`);
+      if (currentAge(kid) !== 11) bad.push('reading the age twice aged her twice');
+
+      // Two Augusts missed at once — a device left in a drawer catches up whole.
+      at(2029, 8, 1);                        // September 2029
+      if (currentAge(kid) !== 13) bad.push(`two missed Augusts gave ${currentAge(kid)}, expected 13`);
+
+      // A grown-up's correction sticks, and is not immediately aged up again.
+      setKidAge(8, kid);
+      if (currentAge(kid) !== 8) bad.push('a corrected age did not stick');
+    } finally {
+      Date = RealDate;
+      if (hadAge === undefined) delete pd.age; else pd.age = hadAge;
+      if (hadYear === undefined) delete pd.ageYear; else pd.ageYear = hadYear;
+    }
+
+    // Nothing on a kid screen asks for it.
+    profile = 'jenn'; parentViewing = 'jenn';
+    goWeek(); renderWeek();
+    if (!weekGlanceOpen()) toggleWeekGlance();
+    renderWeek();
+    if (document.getElementById('weekAge')) bad.push('the age field is back on the week view');
+    if (document.querySelector('#screen-week input[type="number"]')) {
+      bad.push('a number field appeared on the week view');
+    }
+    if (weekGlanceOpen()) toggleWeekGlance();
+    // The grown-up's copy exists and is wired to the child being viewed.
+    profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jess';
+    showScreen('parent'); renderParentHome();
+    const el = document.getElementById('parentKidAge');
+    if (!el) bad.push('there is nowhere for a parent to correct the age');
+    else if (String(el.value) !== String(currentAge('jess'))) {
+      bad.push(`the portal shows "${el.value}" for Jess, not ${currentAge('jess')}`);
+    }
+    profile = 'jenn'; parentViewing = 'jenn'; goToday();
+    return bad.length === 0 || bad;
+  });
+
+  /* AN ACHIEVEMENT STARTS UNASSIGNED. Every new one arrived reading
+     "🍳 Breakfast · count target 1", because it was seeded with
+     getAllActivities()[0] and DEFAULT_ACTIVITIES[0] is Breakfast. Nobody chose
+     that, and eating breakfast is not an achievement — it was alphabetical
+     accident wearing the clothes of a decision. */
+  checks.achievementsStartUnassigned = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    const bad = [];
+    const p = getProfData('jenn');
+    const before = (p.achievements || []).slice();
+    try {
+      p.achievements = [];
+      addAchievement();
+      const a = p.achievements[p.achievements.length - 1];
+      if (!a) return ['adding an achievement produced nothing'];
+      if (a.activityId != null) bad.push(`a new achievement was pre-filled with "${a.activityId}"`);
+      if (progressForAchievement(a) !== null) bad.push('an unassigned achievement reports progress');
+
+      goWeek(); renderWeek();
+      const row = document.querySelector('#achievementsList .gt-achievement-row');
+      if (!row) bad.push('the achievement row did not render');
+      else {
+        if (/Breakfast/.test(row.textContent)) bad.push('the row still says Breakfast');
+        if (!/Link activity/.test(row.textContent)) bad.push('the row does not offer to link an activity');
+      }
+      // Once linked it behaves exactly as before.
+      setAchievementActivity(a.id, 'piano');
+      const prog = progressForAchievement(p.achievements[p.achievements.length - 1]);
+      if (!prog || typeof prog.value !== 'number') bad.push('a linked achievement stopped reporting progress');
+    } finally {
+      p.achievements = before;
+      saveAll();
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* THE TWO SCREENS ABOUT TODAY OPEN ON TODAY.
+     Sister Sync forced syncDayIdx = 0 on every open — Monday of the week being
+     viewed — while the copy underneath read "you're both free … today", so from
+     Tuesday onward it named one day and answered about another. The chore tab
+     had the same shape of bug one level along: it worked today out correctly on
+     open but ctChangeWeek reset it to Monday, so paging a week and coming back
+     left it on a day nobody was looking at. Both read the same helper now. */
+  checks.choreTabAndSisterSyncOpenOnToday = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
+    const bad = [];
+    const todayIdx = getDayKeys(0).indexOf(todayKey());
+    if (todayIdx < 0) return ['today is not in the current week, so this cannot be tested'];
+
+    openSisterSync();
+    if (syncDayIdx !== todayIdx) bad.push(`Sister Sync opened on day ${syncDayIdx}, today is ${todayIdx}`);
+    const label = document.getElementById('syncDayLabel').textContent;
+    const d = formatDayKey(todayKey());
+    if (!label.includes(String(d.getDate())) || !label.includes(MONTH_SHORT[d.getMonth()])) {
+      bad.push(`Sister Sync says "${label}", not today's date`);
+    }
+
+    openChoreTab();
+    if (ctDay !== todayIdx) bad.push(`the chore tab opened on day ${ctDay}, today is ${todayIdx}`);
+    // Page away and back: the day must not have collapsed to Monday.
+    ctChangeWeek(-1);
+    ctChangeWeek(1);
+    if (ctDay !== todayIdx) bad.push(`paging weeks left the chore tab on day ${ctDay}, not ${todayIdx}`);
+    // A week that does not contain today has no "today" to land on.
+    ctChangeWeek(-1);
+    if (ctDay !== 0) bad.push(`another week opened on day ${ctDay}, expected its first day`);
+    ctChangeWeek(1);
+    goToday();
+    return bad.length === 0 || bad;
+  });
+
+  /* THE WHOLE DAY'S ROUTINES, IN ONE TAP — and still through the owner.
+     There was an "all" button per routine block and nothing above them, so
+     closing a normal evening was three presses in three places; the routine
+     bonus needs all three, which made the thing she was aiming at the one thing
+     with no control. The bulk button writes the same checklistState the per-block
+     one writes and hands each block to ckAfterRoutineChange, so
+     ctAwardMandatoryFromRoutine still owns the award — Today's rule, applied
+     here: call an owner, never contain one. */
+  checks.routinesCloseInOneTap = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const bad = [];
+    const kid = 'jenn';
+    const dayKey = mrWeekDayKeys(ctWeekKey)[ctDay];
+    const before = (getDayBlocks(dayKey, kid) || []).slice();
+    try {
+      setDayBlocks(dayKey, [
+        { id: 'rt-m', actId: 'routine_morning',     startMin: 7 * 60,  durationMin: 30 },
+        { id: 'rt-a', actId: 'routine_afterschool', startMin: 15 * 60, durationMin: 30 },
+        { id: 'rt-e', actId: 'routine_evening',     startMin: 20 * 60, durationMin: 20 },
+      ], kid);
+      openChoreTab();
+
+      const btn = () => document.querySelector('#choreWrap [data-ct-action="ck-routine-all-day"]');
+      if (!btn()) return ['no one-tap control above the day\'s routines'];
+      const r = btn().getBoundingClientRect();
+      if (r.width < 44 || r.height < 44) bad.push(`the bulk button is ${Math.round(r.width)}x${Math.round(r.height)}, under 44`);
+
+      btn().click();
+      const closed = ckRoutineBlocks(kid, ctDay);
+      const allShut = closed.length === 3 && closed.every(b => b.total > 0 && b.done >= b.total);
+      if (!allShut) bad.push('one tap did not close all three routines');
+      // The award path fired for each — the same one the per-block button uses.
+      const kept = CT_SESSIONS.filter(s => ctGetMandatory(ctWeekKey, ctDay, s, kid)).length;
+      if (kept !== 3) bad.push(`${kept} routines recorded as kept, expected 3`);
+
+      // Pressing it again on a fully closed day clears, and only then.
+      btn().click();
+      const reopened = ckRoutineBlocks(kid, ctDay);
+      if (reopened.some(b => b.done > 0)) bad.push('a second tap did not clear the day');
+
+      // Half-done must close rather than clear: "all" cannot lose work she did.
+      ckToggleRoutineItem('rt-m', ckRoutineItems('morning')[0].id);
+      btn().click();
+      const afterHalf = ckRoutineBlocks(kid, ctDay);
+      if (!afterHalf.every(b => b.total > 0 && b.done >= b.total)) {
+        bad.push('pressing "all" on a half-done day cleared it instead of closing it');
+      }
+
+      // Nothing planned, nothing to tick — a travel day is not three empty lists.
+      setDayBlocks(dayKey, [], kid);
+      renderChoreTab();
+      if (btn()) bad.push('the bulk button shows on a day with no routines planned');
+      if (!/No routine on this day/i.test(document.getElementById('choreWrap').textContent)) {
+        bad.push('a day with no routines does not say so');
+      }
+    } finally {
+      setDayBlocks(dayKey, before, kid);
+      renderChoreTab();
+    }
+    return bad.length === 0 || bad;
   });
 
   /* No PHANTOM scroll under the kid nav. `.screen` carried min-height: 100vh

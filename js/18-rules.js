@@ -891,6 +891,43 @@ function mrChoreWouldPay(kid, weekKey, dayIdx) {
   };
 }
 
+/* ── The family's share of the week ──
+   freeChoresPerWeek is a PRICING rule: mrChoreWeek takes that many of the week's
+   graded chores and pays nothing for them, choosing the cheapest so the
+   arrangement is the one she would have picked herself. The child is told those
+   ones "belong to the family", which is the right way to explain why they are
+   unpaid — but nothing anywhere checked that they get done. A week with no
+   chores planned at all priced out perfectly and was silently fine.
+
+   So the same number is also a FLOOR: the family is owed that many chores a
+   week, and until the week has room for them something should say so. Reusing
+   freeChoresPerWeek rather than adding a per-chore "mandatory" flag keeps one
+   number in one place — a pool row has no such field, and a second control for
+   the same quantity is a second thing that can disagree.
+
+   Counted: distinct (day, chore) pairs that are either on the plan or already
+   done. Doing one without planning it counts — the point is the work, not the
+   paperwork. Only the paying lane: `own` and `helping` need no block and stand
+   every day, so counting them would satisfy the floor without anyone lifting
+   anything.
+
+   Reads only. Whether to say anything about `short` is the screen's business. */
+function mrFamilyChoreStatus(kid, weekKey) {
+  const needed = Number((mrRulesForWeek(weekKey).chores || {}).freeChoresPerWeek) || 0;
+  const seen = new Set();
+  for (let d = 0; d < 7; d++) {
+    const { rows } = mrChoresForDay(kid, weekKey, d);
+    rows.forEach(r => {
+      if (!r.row || !mrLanePays(r.row.lane)) return;
+      const done = mrGetClaim(kid, weekKey, d, r.row.id) > 0
+        || mrGetChoreGrade(kid, weekKey, d, r.row.id) > 0;
+      if (r.scheduled || done) seen.add(d + ':' + r.row.id);
+    });
+  }
+  const counted = seen.size;
+  return { needed, counted, short: Math.max(0, needed - counted) };
+}
+
 /* Personal chores done unasked, for the XP award. Never money. */
 function mrPersonalUnaskedCount(weekKey, kid) {
   const e = mrEnsureEarnings(kid, weekKey);

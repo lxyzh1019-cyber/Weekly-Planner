@@ -265,13 +265,31 @@ function ckHistory(kid) {
     ${rows}</div>`;
 }
 
-/* ── Routines ── */
+/* ── Routines ──
+   What is here is what the planner put on this day, and nothing else. A day with
+   no routine block shows no routines — travelling, a competition, a day at
+   grandma's are all days where morning/after-school/evening is the wrong shape,
+   and inventing three empty checklists for them would be asking a child to tick
+   something nobody planned. */
 function ckRoutines(kid) {
   const blocks = ckRoutineBlocks(kid, ctDay);
   if (!blocks.length) {
-    return `<div class="ck-sect"><div class="ck-h2">Your three routines</div>
-      <div class="ck-empty">No routine on today's plan.</div></div>`;
+    return `<div class="ck-sect"><div class="ck-h2">Routines</div>
+      <div class="ck-empty">No routine on this day's plan.</div></div>`;
   }
+  /* One tap for the whole day. There was a per-block "all" and nothing above it,
+     so closing a normal evening was three taps in three places — and the routine
+     bonus needs all three, which made the thing she was aiming at the one thing
+     with no button. It replaces the section's instruction line rather than
+     adding to it: this screen is on a word ratchet, and a control says what a
+     sentence about the control was saying. */
+  const allDone = blocks.every(b => b.total > 0 && b.done >= b.total);
+  const dayBtn = blocks.length > 1
+    ? `<button type="button" class="ck-allbtn ck-allday" data-ct-action="ck-routine-all-day"
+         title="Close every item in every routine on this day">
+         <span class="ck-check ${allDone ? 'on' : ''}">${allDone ? '✓' : ''}</span>
+         <span>${allDone ? `all ${blocks.length} kept` : `all ${blocks.length} done`}</span></button>`
+    : '';
   const body = blocks.map(({ block, act, items, done, total }) => {
     const allOn = total > 0 && done >= total;
     const rows = items.map(i => {
@@ -298,8 +316,11 @@ function ckRoutines(kid) {
     </div>`;
   }).join('');
   return `<div class="ck-sect">
-    <div class="ck-h2">Your three routines</div>
-    <div class="ck-sub">Tap when it's done · all three closed counts the day toward the routine bonus</div>
+    <div class="ck-sect-head">
+      <div class="ck-h2">Routines</div>
+      <span class="ck-spacer"></span>
+      ${dayBtn}
+    </div>
     ${body}</div>`;
 }
 
@@ -825,6 +846,33 @@ function ckCloseRoutine(blockId) {
   items.forEach(i => { b.checklistState[i.id] = !allOn; });
   setDayBlocks(dayKey, blocks, kid);
   ckAfterRoutineChange(b, dayKey, kid);
+}
+/* Every routine on the day, in one press. Toggles as a unit — if any is still
+   open the press closes all of them, and only a day that is already fully closed
+   clears. Half-done then "all" meaning "clear" would lose work she had done.
+
+   It writes the same checklistState the per-block button writes and hands each
+   block to ckAfterRoutineChange, so ctAwardMandatoryFromRoutine still owns the
+   award. One write for the whole day: every mutation is a full-document upload,
+   and this used to be three of them. */
+function ckCloseAllRoutines() {
+  const kid = ctActiveKid();
+  const dayKey = mrWeekDayKeys(ctWeekKey)[ctDay];
+  const blocks = getDayBlocks(dayKey, kid);
+  const routines = ckRoutineBlocks(kid, ctDay);
+  if (!routines.length) return;
+  const allOn = routines.every(r => r.total > 0 && r.done >= r.total);
+  routines.forEach(({ block, items }) => {
+    const b = blocks.find(x => x.id === block.id);
+    if (!b) return;
+    if (!b.checklistState) b.checklistState = {};
+    items.forEach(i => { b.checklistState[i.id] = !allOn; });
+  });
+  setDayBlocks(dayKey, blocks, kid);
+  routines.forEach(({ block }) => {
+    const b = blocks.find(x => x.id === block.id);
+    if (b) ckAfterRoutineChange(b, dayKey, kid);
+  });
 }
 function ckAfterRoutineChange(b, dayKey, kid) {
   const act = ckActFor(b, kid);

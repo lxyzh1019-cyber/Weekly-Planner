@@ -541,6 +541,7 @@ function ctHandleWrapClick(e) {
   else if (a === 'ck-week-cell') ckCycleWeekClaim(el.dataset.choreId, +el.dataset.day);
   else if (a === 'ck-routine-item') ckToggleRoutineItem(el.dataset.blockId, el.dataset.itemId);
   else if (a === 'ck-routine-all') ckCloseRoutine(el.dataset.blockId);
+  else if (a === 'ck-routine-all-day') ckCloseAllRoutines();
   else if (a === 'ck-attitude') ckRateSelf(+el.dataset.day, +el.dataset.n);
   else if (a === 'ck-waiting') ckGoWaiting();
   else if (a === 'ck-fresh') ckGoFresh();
@@ -1034,11 +1035,24 @@ function ctRenderWeekControls() {
     ${kidNote}
   </div>${parentControls}`;
 }
+/* Which slot of the chore tab's current week today is — 0 when today is not in
+   it at all, which is the right answer for a week paged away from.
+
+   Read through mrWeekDayKeys, the same list ckRoutineBlocks and every grade
+   lookup index into. openChoreTab worked this out a second way, by subtracting
+   getWeekStart(weekOffset) from today and clamping; the two agreed, but two
+   answers to "which day is showing" is one more than the screen can afford, and
+   ctChangeWeek had a third — it dropped to Monday, so paging a week and coming
+   back left the tab on a day nobody was looking at. One reader now. */
+function ctTodayIndex() {
+  const i = mrWeekDayKeys(ctWeekKey || ctThisWeekKey()).indexOf(todayKey());
+  return i >= 0 ? i : 0;
+}
 function ctChangeWeek(delta) {
   const mon = formatDayKey(ctWeekKey || ctThisWeekKey());
   mon.setDate(mon.getDate() + delta * 7);
   ctWeekKey = ctDateToKey(mon);
-  ctDay = 0;
+  ctDay = ctTodayIndex();
   renderChoreTab();
 }
 function ctSelectDay(dayIdx) {

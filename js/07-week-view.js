@@ -275,6 +275,12 @@ function renderWeek() {
 // Weekly time-per-category totals over the app's 6am–10pm window (shared by
 // the Sunday review nudge). Free = window minutes not scheduled. Counts the
 // full entered duration up to END_MIN so charts reflect what was planned (W6).
+//
+// `free` is AWAKE time nobody has claimed, and it always was — the window is
+// 6am–10pm, so the eight hours a child is in bed were never in the denominator.
+// It did not read that way: "Unscheduled: 41h" beside no mention of sleep looks
+// like it is counting the nights. nightMin is that figure, stated rather than
+// left implicit, and it is deliberately not folded into `free`.
 function computeWeekTotals(keys) {
   const acts = getAllActivities(activeProfile(), { includeArchived: true });
   const catMin = {};
@@ -291,27 +297,30 @@ function computeWeekTotals(keys) {
       planned += m;
     });
   });
-  return { catMin, planned, free: Math.max(0, DAY_MIN_SPAN * 7 - planned) };
+  const days = keys.length || 7;
+  return {
+    catMin, planned,
+    free: Math.max(0, DAY_MIN_SPAN * days - planned),
+    nightMin: (1440 - DAY_MIN_SPAN) * days,
+    days,
+  };
 }
 
-// "This week at a glance" panel on the week view: category/free-time totals,
-// an age-based sleep recommendation, and the week's notes & objectives.
-function onWeekAgeChange() {
-  const v = (document.getElementById('weekAge')?.value || '').trim();
-  const age = v === '' ? null : Math.max(1, Math.min(18, parseInt(v, 10) || 0));
-  const pd = getProfData();
-  if (pd) { pd.age = age; saveAll(); }
-  renderWeekGlance(getDayKeys(weekOffset));
-}
+/* "This week at a glance": time per day by category, what is still free, and the
+   week's notes & objectives.
 
+   It reported weekly totals as a wrap of coloured pills — "📚 Learning: 38h 30m"
+   — which is two problems at once. A week total is not a number a nine-year-old
+   can act on without dividing it by seven in her head, and a row of pills has no
+   column to read down, so comparing two categories means hunting. Per day leads
+   now, the week total sits behind it, and the whole thing is a two-column table.
+
+   onWeekAgeChange was here, behind a 🎂 Age field. Both are gone: the child is
+   not asked her age (currentAge answers it), and the parent portal corrects it. */
 function renderWeekGlance(keys) {
   const body = document.getElementById('weekGlanceBody');
   if (!body) return;
-  const ageInput = document.getElementById('weekAge');
-  const age = getProfData()?.age;
-  if (ageInput && document.activeElement !== ageInput) {
-    ageInput.value = (age != null && !isNaN(age)) ? age : '';
-  }
+  const age = currentAge();
 
   const acts = getAllActivities(activeProfile(), { includeArchived: true });
   const CAT_LABELS = {
@@ -321,22 +330,34 @@ function renderWeekGlance(keys) {
   };
   const t = computeWeekTotals(keys);
 
+  /* One row per category: the per-day average leads, the week total follows it
+     in smaller type. `swatch` is a hex the tables own, so it is safe in a style
+     attribute. */
+  const row = (label, min, note, swatch /* safe: from CAT_HEX */) => `
+    <div class="glance-row">
+      <span class="glance-row-label">
+        <span class="glance-dot" style="background:${swatch}"></span>${label}</span>
+      <span class="glance-row-figs">
+        <b class="glance-per-day">${fmtHrsMin(Math.round(min / t.days))}/day</b>
+        <span class="glance-total">${note || fmtHrsMin(min) + ' this week'}</span></span>
+    </div>`;
+
   const order = ['school','active','training','competition','routine','daily','free','sleep','custom'];
-  let chips = '';
+  let rows = '';
   order.forEach(cat => {
     if (!t.catMin[cat]) return;
-    chips += `<span class="glance-chip"><span class="glance-dot" style="background:${CAT_HEX[cat]||'#999'}"></span>${CAT_LABELS[cat]||cat}: <b>${fmtHrsMin(t.catMin[cat])}</b></span>`;
+    rows += row(CAT_LABELS[cat] || cat, t.catMin[cat], null, CAT_HEX[cat] || '#999999' /* safe: from CAT_HEX */);
   });
-  chips += `<span class="glance-chip"><span class="glance-dot" style="background:#fff;border:1px solid #999"></span>🌤 Unscheduled: <b>${fmtHrsMin(t.free)}</b></span>`;
+  /* Unscheduled and overnight are two different facts and used to read as one.
+     Unscheduled is awake time nobody has claimed; overnight is the 10pm–6am the
+     window never covered. Saying both, on their own lines, is the fix. */
+  rows += row('🌤 Unscheduled', t.free, null, '#ffffff' /* safe: constant */);
+  rows += row('😴 Overnight', t.nightMin, '10pm–6am, not counted above', '#cbc3e3' /* safe: constant */);
 
   const sleep = recommendedSleep(age);
-  let sleepHtml;
-  if (sleep) {
-    const perWeek = sleep.min * 7;
-    sleepHtml = `<div class="glance-sleep">💤 <b>Recommended sleep (age ${age}, ${sleep.group}):</b> ${sleep.min}–${sleep.max}h per night · aim for ~${perWeek}h across the week</div>`;
-  } else {
-    sleepHtml = `<div class="glance-sleep glance-sleep--muted">💤 Set the age above to see the recommended sleep for this age group.</div>`;
-  }
+  const sleepHtml = sleep
+    ? `<div class="glance-sleep">💤 <b>Sleep for age ${age}:</b> ${sleep.min}–${sleep.max}h a night</div>`
+    : '';
 
   // Notes & objectives across the week.
   const notes = [];
@@ -352,8 +373,8 @@ function renderWeekGlance(keys) {
     : '';
 
   body.innerHTML = `
-    <div class="glance-window">Totals over the 6am–10pm window (${fmtHrsMin(DAY_MIN_SPAN)}/day).</div>
-    <div class="glance-chips">${chips}</div>
+    <div class="glance-window">An average day, over the 6am–10pm window.</div>
+    <div class="glance-rows">${rows}</div>
     ${sleepHtml}
     ${notesHtml}
   `;
@@ -372,11 +393,9 @@ function toggleWeekGlance() {
 function applyWeekGlanceOpen() {
   const open = weekGlanceOpen();
   const body = document.getElementById('weekGlanceBody');
-  const age = document.getElementById('weekGlanceAge');
   const caret = document.getElementById('weekGlanceCaret');
   const btn = document.querySelector('#weekGlance .week-glance-toggle');
   if (body) body.hidden = !open;
-  if (age) age.hidden = !open;
   if (caret) caret.textContent = open ? 'Hide ▾' : 'Show ▸';
   if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
@@ -604,8 +623,17 @@ function renderTimeGrid(keys) {
   const acts = getAllActivities(activeProfile(), { includeArchived: true });
   const today = todayKey();
 
-  const PX_PER_MIN = 0.5;
+  /* 0.5px/min put a 30-minute block at 15px tall, which no legible type fits
+     in — the labels were drawn at 9.9px to squeeze into it, under the 13px kid
+     floor. Density and type size move together: at 0.85 an hour is ~51px and a
+     half-hour block ~25px, enough for one 13px line. The grid is then taller
+     than an iPad, which is why the week had to become one scroll surface. */
+  const PX_PER_MIN = 0.85;
   const totalH = Math.round(DAY_MIN_SPAN * PX_PER_MIN);
+  /* The second threshold (see .tg2-block--tiny in css/app.css): below this a
+     block shows its icon alone rather than type under the floor. 13px of line
+     plus 2px of padding and 3px of border needs about this much. */
+  const TG2_LABEL_MIN_H = 22;
   const firstHour = Math.ceil(START_MIN / 60);
   const lastHour  = Math.floor((START_MIN + DAY_MIN_SPAN) / 60);
 
@@ -665,8 +693,12 @@ function renderTimeGrid(keys) {
         const segE = Math.min(seg.startRel + seg.dur, DAY_MIN_SPAN);
         if (segE - segS < 2) return;
         const segConflict = !!bc && (seg.side === 'pre' ? bc.pre : bc.post);
+        /* 'tiny' — icon and minutes. A seventh of a phone is about 60px wide, so
+           even "🚗 Get ready 15m" at the 13px floor does not fit, and the week
+           grid is the overview: the instruction itself is on the block's title,
+           the day screen and the Full week, all of which have the room. */
         lane.appendChild(wfTravelStrip(segS * PX_PER_MIN, (segE - segS) * PX_PER_MIN,
-          leftCss, widthCss, seg, segColour, segConflict));
+          leftCss, widthCss, seg, segColour, segConflict, 'tiny'));
       });
     });
 
@@ -680,10 +712,14 @@ function renderTimeGrid(keys) {
       if (relEnd - relStart < 1) return;
       const el = document.createElement('div');
       const hasConflict = conflicts.affected.has(b.id);
+      const h = Math.max(11, (relEnd - relStart) * PX_PER_MIN - 1);
+      // Class names written out rather than built from a ternary — the dead-CSS
+      // check matches literal strings.
       el.className = 'tg2-block' + (isLightColour(bg) ? ' light-bg' : '')
-        + (b.completed ? ' tg2-block--done' : '') + (hasConflict ? ' tg2-block--conflict' : '');
+        + (b.completed ? ' tg2-block--done' : '') + (hasConflict ? ' tg2-block--conflict' : '')
+        + (h < TG2_LABEL_MIN_H ? ' tg2-block--tiny' : '');
       el.style.top = (relStart * PX_PER_MIN) + 'px';
-      el.style.height = Math.max(11, (relEnd - relStart) * PX_PER_MIN - 1) + 'px';
+      el.style.height = h + 'px';
       el.style.background = bg;
       // Column-pack overlapping blocks so they sit side-by-side, not stacked.
       const slot = cols.get(b.id) || { col: 0, count: 1 };
@@ -707,6 +743,7 @@ function renderTimeGrid(keys) {
 
   // Week-level clash banner (shared with the Full view), plus the streak + legend.
   renderWeekConflictBanner(keys, 'tgConflictBanner');
+  renderFamilyChoreBanner('tgFamilyBanner');
   renderTimeGridStreak(keys);
   const legend = document.getElementById('tgLegend');
   if (legend) {
@@ -950,32 +987,64 @@ function attachTapGuard(el, onTap) {
   };
 }
 
+/* Scroll one element by (dx, dy) and report back what it could not absorb.
+   Reading scrollTop after the write rather than doing the arithmetic is what
+   makes the clamp honest: an element with no vertical overflow returns the
+   whole of dy, which is what lets the caller pass it on. */
+function panLeftover(el, dx, dy) {
+  if (!el) return { dx, dy };
+  const l0 = el.scrollLeft, t0 = el.scrollTop;
+  el.scrollLeft = l0 + dx;
+  el.scrollTop  = t0 + dy;
+  return { dx: dx - (el.scrollLeft - l0), dy: dy - (el.scrollTop - t0) };
+}
+
 /* ── Middle-button panning ──
    The week grid is covered edge to edge in cards, each with its own pointer
    handlers, and the browser's own middle-click autoscroll is easy to lose:
    it needs an unobstructed scroll container under the cursor and a mousedown
    nobody cancelled. Rather than depend on that, drive it ourselves — press the
-   middle button anywhere in the view and drag to pan, in both axes.
+   middle button anywhere in the view and move to scroll, in both axes.
+
+   Two things were wrong with the first version and both are fixed here.
+
+   It grabbed the canvas — `scrollTop = start - dy`, so moving the mouse DOWN
+   panned the view UP. That is the convention for a hand tool you are dragging a
+   document with; it is the opposite of the browser's middle-click autoscroll,
+   which is what a mouse user pressing the middle button is asking for. Moving
+   down scrolls down now.
+
+   And it only ever moved the element it was bound to. Once the grid reached its
+   end the drag was dead, and because pointerdown calls preventDefault the
+   browser's own autoscroll was not there to take over either — so the glance and
+   goals panels below the grid could not be reached by middle-dragging over it at
+   all. Whatever the element cannot absorb now chains to the page, the way a
+   wheel does.
+
+   Deltas are taken move-to-move rather than from the press anchor, so a run that
+   crosses a scroll limit and comes back does not jump: the clamp is applied to
+   each step and the leftover is handed on.
 
    Idempotent: every render rebuilds the contents but the wrap element itself
    survives, so the flag stops listeners from stacking up. */
 function attachMiddleDragPan(el) {
   if (!el || el.dataset.midPanBound) return;
   el.dataset.midPanBound = '1';
-  let panning = false, sx = 0, sy = 0, sl = 0, st = 0;
+  let panning = false, lx = 0, ly = 0;
   el.addEventListener('pointerdown', (e) => {
     if (e.button !== 1) return;                 // middle button only
     panning = true;
-    sx = e.clientX; sy = e.clientY;
-    sl = el.scrollLeft; st = el.scrollTop;
+    lx = e.clientX; ly = e.clientY;
     el.setPointerCapture(e.pointerId);
     el.classList.add('is-mid-panning');
     e.preventDefault();                         // suppress the browser's own autoscroll
   });
   el.addEventListener('pointermove', (e) => {
     if (!panning) return;
-    el.scrollLeft = sl - (e.clientX - sx);
-    el.scrollTop  = st - (e.clientY - sy);
+    const dx = e.clientX - lx, dy = e.clientY - ly;
+    lx = e.clientX; ly = e.clientY;
+    const rest = panLeftover(el, dx, dy);
+    if (rest.dx || rest.dy) panLeftover(document.scrollingElement || document.documentElement, rest.dx, rest.dy);
     e.preventDefault();
   });
   const end = (e) => {
@@ -989,7 +1058,9 @@ function attachMiddleDragPan(el) {
   // Middle-click on a link/card would otherwise still fire after the drag.
   el.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
 }
-/* Every scroll surface a plan is read on. */
+/* Every scroll surface a plan is read on. .tg2-wrap is in the list even though
+   it no longer scrolls itself: it is where the cursor is when a child pans the
+   Day Blocks week, and its leftover — which is all of it — carries the page. */
 function bindMiddleDragPan() {
   ['.weekly-full-wrap', '.tg2-wrap', '#screen-day .day-workspace']
     .forEach(sel => document.querySelectorAll(sel).forEach(attachMiddleDragPan));
@@ -1002,6 +1073,7 @@ function renderFullWeek(keys) {
 
   // ── Week-level conflict summary banner (shown above the grid) ──
   renderWeekConflictBanner(keys);
+  renderFamilyChoreBanner('weekFamilyBanner');
 
   // Continuous single-column-per-day timeline (matches the Day view): each
   // activity is ONE unbroken block positioned by its real start time on a
@@ -1300,15 +1372,54 @@ function renderWeekConflictBanner(keys, bannerId = 'weekConflictBanner') {
     + `<span class="wcb-detail"><br>${dayLines.map(escapeHtml).join(' · ')}</span></span>`;
 }
 
+/* ── The family's chores, on the week that can still fit them ──
+   The count and the rule both belong to js/18-rules.js (mrFamilyChoreStatus);
+   this only asks and words the answer.
+
+   Three deliberate limits. It is shown on THIS week only — a week that has
+   already gone by cannot be planned, and a banner about it is a reproach with
+   nothing to do about it. It hides completely once the floor is met, so it is a
+   to-do and never a scoreboard. And it is worded forwards: "still to find a day
+   for", not "you didn't do". That is the rule every kid-facing warning in this
+   app follows (js/26-chore-kid.js's ck-warn points at a setup mistake to report;
+   ck-risk describes exposure that has not happened yet), and it is the reason
+   this is its own amber .week-todo-banner rather than the red clash banner —
+   nothing here is wrong yet. */
+function renderFamilyChoreBanner(bannerId = 'weekFamilyBanner') {
+  const banner = document.getElementById(bannerId);
+  if (!banner) return;
+  const kid = activeProfile();
+  const hide = () => { banner.style.display = 'none'; banner.innerHTML = ''; };
+  if (weekOffset !== 0 || !kid || kid === 'parent' || typeof mrFamilyChoreStatus !== 'function') return hide();
+  ctPrepareRead();
+  const st = mrFamilyChoreStatus(kid, ctThisWeekKey());
+  if (!st.short) return hide();
+  banner.style.display = 'flex';
+  banner.innerHTML =
+    `<span class="wcb-icon">🧹</span>`
+    + `<span>${st.short} family ${st.short === 1 ? 'chore' : 'chores'} still to find a day for this week`
+    + `<span class="wcb-detail"><br>These are the ${st.needed} the family shares — tap a day to put ${st.short === 1 ? 'it' : 'them'} on the plan.</span></span>`;
+}
+
 /* Build one travel/get-ready buffer strip for the weekly view. Positioned in
    px within the zone cell, hugging the card it belongs to. Non-interactive so
    taps fall through to the card/cell underneath. */
-function wfTravelStrip(topPx, hPx, leftCss, widthCss, seg, colour, conflict) {
+/* `maxTier` caps how much a strip may say regardless of how tall it is.
+   The tier ramp reads HEIGHT, which is the right question in the Full week and
+   the day timeline, where a column is wide. It is the wrong question on the Day
+   Blocks grid: a column there is a seventh of the screen, so a strip can easily
+   be tall enough for the long label and nowhere near wide enough for it — which
+   is how "Leave by 5:00pm (30m)" came to be sliced off mid-word at the column
+   edge once the grid got taller. Same distinction as BLOCK_TIERS vs the
+   stacking threshold: two questions, and height only answers one of them. */
+function wfTravelStrip(topPx, hPx, leftCss, widthCss, seg, colour, conflict, maxTier) {
   const s = document.createElement('div');
   // Per-kind class (ready/travel/warmup) so adjacent strips read as three
   // distinct things even before you can make out the text.
   const kindCls = seg.kind === 'ready' ? ' wf-travel--ready' : seg.kind === 'warmup' ? ' wf-travel--warmup' : ' wf-travel--travel';
-  const tier = hPx >= 13 ? 'long' : hPx >= 8 ? 'short' : 'tiny';
+  const RANK = { tiny: 0, short: 1, long: 2 };
+  let tier = hPx >= 13 ? 'long' : hPx >= 8 ? 'short' : 'tiny';
+  if (maxTier && RANK[tier] > RANK[maxTier]) tier = maxTier;
   s.className = 'wf-travel' + kindCls + ` wf-travel--tier-${tier}` + (tier !== 'tiny' ? ' wf-travel--label' : '') + (conflict ? ' wf-travel--conflict' : '');
   s.style.top = topPx + 'px';
   s.style.height = hPx + 'px';

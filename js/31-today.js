@@ -29,7 +29,18 @@
 const TD_MAX_CHORES = 4;      // beyond this it stops being "what now" and becomes a list
 /* TD_MAX_QUESTS was here. It capped the old summary at three, which is right for
    a teaser and wrong for the list itself — a capped list silently hides a quest
-   a child then never does. The whole day shows. */
+   a child then never does. The whole day shows.
+
+   That still holds, and TD_UP_NEXT is not a return to it. A ten-block day put
+   ten cards on the screen and Today was a list again, which is the thing it
+   exists to stop — so what is running plus the next TD_UP_NEXT are loud, and the
+   REST OF THE DAY IS STILL THERE, one tap away behind "Later today". A cap
+   deletes; a disclosure defers. The difference is whether she can get to it. */
+const TD_UP_NEXT = 2;
+/* Free time is a thing on the list, not the absence of things: "you have an hour
+   and a half" is an answer to "what now". Under half an hour is turnaround —
+   naming it would make the list busier, which is the opposite of the point. */
+const TD_FREE_MIN = 30;
 
 /* ── Reading the day ─────────────────────────────────────────────────────── */
 
@@ -128,6 +139,40 @@ function tdToggleEarlier() {
   try { localStorage.setItem(TD_EARLIER_LS_KEY, tdEarlierOpen() ? '0' : '1'); } catch (e) {}
   tdRenderToday();
 }
+/* The other end of the same day. Same idiom, its own key — closing the morning
+   and closing the evening are different decisions. */
+const TD_LATER_LS_KEY = 'wp_td_later_open';
+function tdLaterOpen() { return localStorage.getItem(TD_LATER_LS_KEY) === '1'; }
+function tdToggleLater() {
+  try { localStorage.setItem(TD_LATER_LS_KEY, tdLaterOpen() ? '0' : '1'); } catch (e) {}
+  tdRenderToday();
+}
+
+/* ── What she has to do before the next thing starts ──
+   A block can carry travel, get-ready and warm-up time, and the app has always
+   known how to turn that into instructions — wfBufferSegments works out the
+   segments, bufferSegLabels words them ("🚗 Leave by 5:00pm (30m)"). The week
+   grid, the Full week and the print sheet all read them. Today, the one screen a
+   child actually looks at before leaving the house, never mentioned them.
+
+   So: call the owner. The arithmetic and the wording both stay in
+   js/07-week-view.js, which is why the "leave by" on Today cannot drift from the
+   "leave by" on the week. This only picks the pre-side segments, sorts them, and
+   works out which of them binds first.
+
+   Returns null for a block with no buffers set — most blocks — so the card stays
+   quiet unless there is genuinely something to be early for. */
+function tdPrepFor(block) {
+  if (!block || typeof wfBufferSegments !== 'function') return null;
+  const pre = wfBufferSegments(block)
+    .filter(s => s.side === 'pre')
+    .sort((a, b) => a.startRel - b.startRel);
+  if (!pre.length) return null;
+  return {
+    moveByMin: pre[0].startRel + START_MIN,
+    steps: pre.map(s => bufferSegLabels(s, 'long')),
+  };
+}
 
 /* Today's quest cards — every scheduled block, done ones included, because a
    finished quest ticked green is the point of the list. Sorted by start so the
@@ -139,6 +184,68 @@ function tdQuestsToday(kid) {
     .filter(b => b && b.startMin != null && (b.durationMin || 0) > 0)
     .slice()
     .sort((a, b) => (a.startMin || 0) - (b.startMin || 0));
+}
+
+/* The rest of today, as a child experiences it: the things she has to do AND the
+   spaces between them. A gap is not the absence of an item, it is an item — an
+   afternoon with nothing in it until 4pm is the answer to "what now", and a list
+   that only names blocks cannot say it.
+
+   Gaps come from dayGaps (js/05-helpers.js), the one place a day's free stretches
+   are worked out. Nothing here is stored: a free-time entry has no id and no
+   state, it is a description of the hole between two blocks. `tdQuestsToday`
+   stays the only reader of what the day actually contains. */
+function tdUpcomingTimeline(kid, upcomingBlocks) {
+  const now = tdNowMin();
+  const items = upcomingBlocks.map(b => ({ kind: 'block', startMin: b.startMin || 0, block: b }));
+  /* Only gaps that are still ahead, and only from now — the hour before lunch is
+     not free time at four in the afternoon. A gap that has already started
+     counts from now, so "free until 4pm" stays true as the afternoon runs down.
+
+     FREE TIME IS THE SPACE BEFORE SOMETHING, so a gap has to end at a block.
+     dayGaps also returns the stretch after the last block, which runs to 10pm —
+     "🌤 Free time 3:00pm–10:00pm (7h)" is not information, it is the plan being
+     over, and the NOW card and the plan button already say that better. */
+  /* And it ends when GETTING READY starts, not when the block does. A 5pm skate
+     with fifteen minutes of kit, half an hour in the car and a warm-up is not
+     something a child is free until 5 o'clock for — she is free until 3:55. The
+     card said "free until 5:00pm" directly under a NOW card saying "be moving by
+     3:55pm", which is the screen contradicting itself about the only number on
+     it that matters. The buffers are commitments, so they close the gap. */
+  const claimedFrom = new Map();
+  upcomingBlocks.forEach(b => {
+    const prep = tdPrepFor(b);
+    claimedFrom.set(b.startMin || 0, prep ? Math.min(prep.moveByMin, b.startMin || 0) : (b.startMin || 0));
+  });
+  dayGaps(todayKey(), kid, TD_FREE_MIN, now).forEach(g => {
+    if (!claimedFrom.has(g.endMin)) return;
+    const endMin = claimedFrom.get(g.endMin);
+    const durationMin = endMin - g.startMin;
+    // Trimming can take a gap under the threshold, and then it was never free
+    // time — it was the run-up to the next thing.
+    if (durationMin < TD_FREE_MIN) return;
+    items.push({ kind: 'free', startMin: g.startMin, gap: { startMin: g.startMin, endMin, durationMin } });
+  });
+  return items.sort((a, b) => a.startMin - b.startMin);
+}
+
+/* A stretch of nothing, offered rather than reported. Taps through to the day
+   screen on the same action a block card uses, because the useful thing to do
+   with an empty afternoon is decide what goes in it. */
+function tdFreeCard(gap) {
+  return `<div class="quest-card quest-card--free">
+      <button type="button" class="dq-open" data-td-action="plan">
+        <div class="quest-time-col">
+          <div class="quest-time">${escapeHtml(formatQuestTime(gap.startMin))}</div>
+          <div class="quest-dur">${escapeHtml(formatDuration(gap.durationMin))}</div>
+        </div>
+        <div class="quest-card-icon">🌤</div>
+        <div class="quest-card-body">
+          <div class="quest-card-name">Free time</div>
+          <div class="quest-card-meta">until ${escapeHtml(formatTimeFromMin(gap.endMin))}</div>
+        </div>
+      </button>
+    </div>`;
 }
 
 /* One quest card. Structure and classes are the ones Quest mode used, so the
@@ -249,18 +356,35 @@ function tdRenderToday() {
   const waiting = d == null ? 0 : mrWaitingCount(kid, wk);
   const fresh = (d == null || typeof mrNewlyGraded !== 'function') ? [] : mrNewlyGraded(kid, wk);
 
+  /* ── The prep line ──
+     Always about the NEXT thing, whether or not something is running: the moment
+     a child most needs to know she has to leave at ten to five is while she is
+     still in the middle of something else. One time leads, because one time is
+     what she can act on; the steps sit under it for when she wants to know why.
+
+     Past the deadline it says so rather than repeating the same sentence — a
+     "be moving by 4:45" that reads identically at 4:30 and 5:10 is not helping. */
+  const prep = tdPrepFor(next);
+  let prepHtml = '';
+  if (prep) {
+    const late = tdNowMin() >= prep.moveByMin;
+    prepHtml = `<div class="td-now-move${late ? ' td-now-move--now' : ''}">
+        ${late ? '⏰ Time to get moving' : 'Be moving by ' + escapeHtml(formatTimeFromMin(prep.moveByMin))}</div>
+      <div class="td-now-steps">${prep.steps.map(s => `<span>${escapeHtml(s)}</span>`).join('')}</div>`;
+  }
+
   // NOW — the one thing the screen exists for.
   let nowHtml;
   if (current) {
     const l = tdBlockLine(current, kid);
     nowHtml = `<div class="td-now-icon">${l.icon}</div>
       <div><div class="td-now-name">${escapeHtml(l.name)}</div>
-        <div class="td-now-sub">now · started ${escapeHtml(l.time)}</div></div>`;
+        <div class="td-now-sub">now · started ${escapeHtml(l.time)}</div>${prepHtml}</div>`;
   } else if (next) {
     const l = tdBlockLine(next, kid);
     nowHtml = `<div class="td-now-icon">${l.icon}</div>
       <div><div class="td-now-name">${escapeHtml(l.name)}</div>
-        <div class="td-now-sub">next · ${escapeHtml(l.time)}</div></div>`;
+        <div class="td-now-sub">next · ${escapeHtml(l.time)}</div>${prepHtml}</div>`;
   } else if (tdInQuietHours()) {
     /* Nine at night with nothing left on the plan. "The rest of today is yours"
        is true and useless — the rest of that day is sleep. */
@@ -314,34 +438,56 @@ function tdRenderToday() {
     ? `<div class="td-empty">All today's jobs are done ✓</div>`
     : `<div class="td-empty">No jobs set up for this week yet.</div>`);
 
-  /* An empty day offers to be filled, and the offer is the thing you tap.
-     This read "Tap ✏️ Plan my day to build one", pointing at a button in the
-     static row below — an instruction to go and find a control is a worse
-     affordance than the control, and it costs more words on a screen held to
-     200 with no ratchet. The permanent button stays for a day that already has
-     a plan; this is the door on the day that has none. */
   /* Next at the top. The list ran in plain time order, so from mid-morning
      onward the thing she was about to do sat below a breakfast she had already
      eaten — the top of the screen was about the past. Upcoming first, still in
      time order so "next" is genuinely next; everything already finished drops
      below a divider that starts closed. */
+  /* And only the next few are loud. Ten blocks meant ten cards, which is a list,
+     which is what this screen replaced. What is running plus TD_UP_NEXT are on
+     the screen; the rest of the day goes under a fold that opens in one tap.
+     Free stretches sit in the same order, so an afternoon with nothing until 4pm
+     says so instead of showing the 4pm thing as if it were imminent. */
   const split = tdSplitQuestsByNow(quests);
   const earlierOpen = tdEarlierOpen();
+  const timeline = tdUpcomingTimeline(kid, split.upcoming);
+  const card = it => (it.kind === 'free' ? tdFreeCard(it.gap) : tdQuestCard(it.block, kid));
+  const upNext = timeline.slice(0, 1 + TD_UP_NEXT);
+  const later = timeline.slice(1 + TD_UP_NEXT);
+  /* A fold over one card hides as much as it saves, so at one the fold is not
+     worth the tap and the item simply shows. */
+  const laterOpen = tdLaterOpen() || later.length === 1;
   const questHtml = quests.length
-    ? `${split.upcoming.length
-          ? `<div class="dq-list">${split.upcoming.map(b => tdQuestCard(b, kid)).join('')}</div>`
+    ? `${upNext.length
+          ? `<div class="dq-list">${upNext.map(card).join('')}</div>`
           : `<div class="td-empty">That is the whole day done.</div>`}
+       ${later.length > 1
+          ? `<button type="button" class="td-fold-btn td-later-btn" data-td-action="later">
+               ${laterOpen ? '▾' : '▸'} Later today (${later.length})
+             </button>`
+          : ''}
+       ${later.length && laterOpen ? `<div class="dq-list">${later.map(card).join('')}</div>` : ''}
        ${split.earlier.length
           ? `<button type="button" class="td-fold-btn td-earlier-btn" data-td-action="earlier">
                ${earlierOpen ? '▾' : '▸'} Earlier today (${split.earlier.length})
              </button>
              ${earlierOpen ? `<div class="dq-list">${split.earlier.map(b => tdQuestCard(b, kid)).join('')}</div>` : ''}`
           : ''}`
-    : `<button type="button" class="td-row td-plan" data-td-action="plan">
-         <span class="td-row-icon">✏️</span>
-         <span class="td-row-name">Nothing planned — build a day?</span>
-         <span class="td-row-go">Plan it ›</span>
-       </button>`;
+    : `<div class="td-empty">Nothing planned yet.</div>`;
+
+  /* The one door onto the day screen, and it says which trip it is.
+     There were two, and then three: a static "✏️ Plan my day" button that was
+     always there, a "Nothing planned — build a day?" row inside this card when
+     the day was empty, and — beside that static button — "📋 The whole week"
+     and "💰 My money", which are the Week and Money tabs of the persistent nav
+     wearing different labels. CLAUDE.md names a second row of navigation as how
+     labels drift apart; this was the last one left.
+     So: one button, one destination, and the verb tells her which day she has.
+     `quests` is already computed above — no second reader of the day. */
+  const planHtml = `<div class="td-more">
+      <button type="button" class="td-morebtn td-plan" data-td-action="plan">
+        ✏️ ${quests.length ? 'Modify my plan' : 'Plan my day'}</button>
+    </div>`;
 
   // The loop back from a grown-up. Same counts the chore screen shows, so the two
   // can never disagree.
@@ -349,6 +495,16 @@ function tdRenderToday() {
   if (fresh.length) {
     loopHtml += `<button type="button" class="td-chip td-chip-fresh" data-td-action="fresh">
       ✨ <b>${fresh.length}</b> answered</button>`;
+  }
+  /* The family's share of the week, while there is still a week left to put it
+     in. mrFamilyChoreStatus owns the counting (js/18-rules.js); this only asks.
+     Forward-looking on purpose — "still to plan", never "you didn't" — which is
+     the rule every other kid-facing warning in the app follows. It disappears the
+     moment the floor is met, so it is a to-do and not a scoreboard. */
+  const family = (d == null) ? null : mrFamilyChoreStatus(kid, wk);
+  if (family && family.short > 0) {
+    loopHtml += `<button type="button" class="td-chip td-chip-family" data-td-action="chore">
+      🧹 <b>${family.short}</b> family ${family.short === 1 ? 'chore' : 'chores'} to plan</button>`;
   }
   if (waiting) {
     loopHtml += `<button type="button" class="td-chip" data-td-action="waiting">
@@ -367,10 +523,11 @@ function tdRenderToday() {
      spends, claims or settles. */
   const moneyHtml = tdMoneyChart(kid, wk);
 
-  /* The evening wind-down nudge, carried over from the day timeline's banner —
-     age-based, so it only appears once an age is set. */
+  /* The evening wind-down nudge, carried over from the day timeline's banner.
+     It used to appear only once someone had typed an age into the week glance,
+     which for most of the app's life meant never; currentAge always answers. */
   const nowH = new Date().getHours();
-  const age = getProfData(kid)?.age;
+  const age = currentAge(kid);
   const bedtime = (nowH >= 18 && age != null && typeof bedtimeReminderText === 'function')
     ? bedtimeReminderText(age) : null;
 
@@ -385,7 +542,8 @@ function tdRenderToday() {
     <div class="td-card">
       <div class="td-cap">My money</div>${moneyHtml}</div>
     <div class="td-say">${escapeHtml(tdEncouragement(kid))}</div>
-    ${bedtime ? `<div class="bedtime-tip">${escapeHtml(bedtime)}</div>` : ''}`;
+    ${bedtime ? `<div class="bedtime-tip">${escapeHtml(bedtime)}</div>` : ''}
+    ${planHtml}`;
 
   /* The relocated panels are static siblings of the wrap, so they survive this
      re-render and only need their own renderers run. Each is the function that
@@ -540,7 +698,10 @@ function tdHandleClick(e) {
   if (a === 'waiting') { openChoreTab(); ckGoWaiting(); return; }
   if (a === 'fresh')   { openChoreTab(); ckGoFresh(); return; }
   if (a === 'earlier') { tdToggleEarlier(); return; }
-  if (a === 'week')    { goWeek(); return; }
+  if (a === 'later')   { tdToggleLater(); return; }
+  /* 'week' was here, for a button that repeated the nav's Week tab. The money
+     branch stays: tdMoneyChart renders the whole money card as one
+     data-td-action="money" button, so this is still a live action. */
   if (a === 'money')   { openWeekMoney(); return; }
   // 🎯 — the arcade completion, unchanged, on today's block.
   if (a === 'blast')   { blastQuest(el.getAttribute('data-td-block'), el, todayKey()); return; }
@@ -620,7 +781,9 @@ function tdOpenMore() {
     { icon: '👯', label: 'Sisters',      go: 'sisters' },
     { icon: '📖', label: 'Money story',  go: 'story' },
     { icon: '🎓', label: 'Money school', go: 'school' },
-    { icon: '🖨', label: 'Print',        go: 'print' },
+    /* Print was here. It has a button on the week topbar, which is the week it
+       prints — a second door to it from a menu is a second label that can
+       drift, and printing is not something you go looking for in "more". */
     { icon: '◀',  label: 'Switch',       go: 'profile' },
   ];
   let ov = document.getElementById('tdMoreOverlay');
@@ -654,7 +817,6 @@ function tdGoMore(where) {
   if (where === 'sisters') { openSisterSync(); return; }
   if (where === 'story')   { mnyOpenStory(); return; }
   if (where === 'school')  { if (typeof mnyOpenSchool === 'function') mnyOpenSchool(); return; }
-  if (where === 'print')   { openPrint(); return; }
   if (where === 'profile') { goProfile(); return; }
 }
 function tdHandleNavClick(e) {
