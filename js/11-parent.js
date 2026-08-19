@@ -161,17 +161,20 @@ function approveKidActivity(owner, id) {
   renderParentActivities();
   showToast('Approved ✅');
 }
+/* Archived, not deleted — the same rule as deleteParentActivity, and for a
+   sharper reason: a kid can place blocks with an activity while it is still
+   waiting for approval, and the old path removed the record and left those
+   blocks pointing at nothing, which made them fail to render at all. */
 async function rejectKidActivity(owner, id) {
-  if (!(await showConfirm('Remove this activity the child added?', { danger:true, okLabel:'Remove' }))) return;
+  if (!(await showConfirm('Take this activity the child added off the list?', { danger:true, okLabel:'Take it off' }))) return;
   const arr = (state.profiles[owner] && state.profiles[owner].customActivities) || [];
-  const idx = arr.findIndex(x => x.id === id);
-  if (idx < 0) return;
-  arr.splice(idx, 1);
-  tombstoneIds('ca:' + owner + ':', [id]);
+  const act = arr.find(x => x.id === id);
+  if (!act) return;
+  archiveParentActivity(act);
   saveAll();
   renderPendingApproval();
   renderParentActivities();
-  showToast('Removed');
+  showToast('Off the list');
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -183,10 +186,15 @@ function renderParentActivities() {
   const wrap = document.getElementById('parentActivitiesList');
   if (!wrap) return;
   wrap.innerHTML = '';
+  const retired = [];
+
+  const add = (a, owner) => {
+    if (a.archived) { retired.push({ act: a, owner }); return; }
+    wrap.appendChild(parentActivityCard(a, owner));
+  };
 
   // Shared activities
-  const shared = getSharedActivities();
-  shared.forEach(a => wrap.appendChild(parentActivityCard(a, 'shared')));
+  getSharedActivities().forEach(a => add(a, 'shared'));
 
   // Per-child activities
   ['jenn','jess'].forEach(p=>{
@@ -195,13 +203,36 @@ function renderParentActivities() {
       // Skip routine-shadow activities (they're managed via the Routines section)
       if (a.isRoutine) return;
       // Pending kid-added activities show in the approval section above.
-      if (a.pendingApproval) return;
-      wrap.appendChild(parentActivityCard(a, p));
+      if (a.pendingApproval && !a.archived) return;
+      add(a, p);
     });
   });
 
-  if (!wrap.children.length) {
+  if (!wrap.children.length && !retired.length) {
     wrap.innerHTML = '<div class="gt-empty">No custom activities yet. Tap ＋ to add one.</div>';
+  }
+  /* Taken off the list, still holding their history — and reversible. A retired
+     activity that could not be brought back would be a delete with extra steps.
+     Collapsed by default: this is a shelf, not part of the working list. */
+  if (retired.length) {
+    const det = document.createElement('details');
+    det.className = 'pa-retired';
+    det.innerHTML = `<summary>🗄 Taken off the list (${retired.length})</summary>`;
+    retired.forEach(({ act, owner }) => {
+      const row = document.createElement('div');
+      row.className = 'pa-retired-row';
+      const n = countBlocksUsingActivity(act.id);
+      row.innerHTML = `<span class="pa-retired-name">${escapeHtml(act.icon || '⭐')} ${escapeHtml(act.name)}</span>
+        <span class="pa-retired-meta">${n} block${n === 1 ? '' : 's'} in history</span>`;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'pill-btn';
+      btn.textContent = 'Put it back';
+      btn.onclick = () => unarchiveParentActivity(owner, act.id);
+      row.appendChild(btn);
+      det.appendChild(row);
+    });
+    wrap.appendChild(det);
   }
 }
 
@@ -318,25 +349,46 @@ function confirmParentActivity() {
   showToast('Activity added ✅');
 }
 
+/* ── Retiring an activity ──
+   This used to delete: it stripped the activity from the library and then swept
+   BOTH kids' `weeks` with no date filter, removing every block that had ever
+   referenced it — from last March as readily as from next Tuesday — tombstoning
+   the lot so sync could not bring them back, and then rebuilding
+   activityCounts/activityHours from what was left, which zeroed the level-up
+   progress those years of blocks had earned. Irreversible, and there was no
+   undo. A piano teacher stops and the record of two years of piano goes with
+   her.
+
+   It is the exact opposite of the rule the routine editor next door already
+   follows ("Past blocks are preserved as historical record"), and the opposite
+   of what a family means by "take this off the list".
+
+   So: archive. The activity record stays, marked, so every past block still
+   resolves to its own name, icon and colour — findActivity sees archived
+   entries on purpose. It disappears from every picker. Blocks from TODAY
+   forward are removed, because a plan for next week that names a retired
+   activity is a plan nobody can act on. Nothing before today is touched, and
+   the counts stand. */
 async function deleteParentActivity(owner, id) {
-  // Count how many placed blocks reference this activity across both kids' weeks
-  const refs = countBlocksUsingActivity(id);
-  let msg;
-  if (refs === 0) {
-    msg = 'Delete this activity?';
-  } else {
-    msg = `⚠️ This activity is used in ${refs} placed block${refs===1?'':'s'}.\n\nOK = delete the activity AND all ${refs} block${refs===1?'':'s'}\nCancel = keep everything`;
-  }
-  if (!(await showConfirm(msg, { danger:true, okLabel:'Delete' }))) return;
-  // Remove the activity definition
-  removeParentActivity(owner, id);
-  // Cascade-delete every referencing block from both kids (tombstoned so the
-  // sync merge can't bring them back)
-  if (refs > 0) {
+  const act = findParentActivity(owner, id);
+  if (!act) { showToast('Not found'); return; }
+  const future = countBlocksUsingActivity(id, todayKey());
+  const past = countBlocksUsingActivity(id) - future;
+  const msg = future
+    ? `Take "${act.name}" off the list?\n\nIt is on ${future} day${future === 1 ? '' : 's'} from today onward — those will be removed.`
+      + (past ? `\n\n${past} earlier block${past === 1 ? '' : 's'} stay exactly as ${past === 1 ? 'it is' : 'they are'}.` : '')
+    : `Take "${act.name}" off the list?`
+      + (past ? `\n\n${past} earlier block${past === 1 ? '' : 's'} stay exactly as ${past === 1 ? 'it is' : 'they are'}.` : '');
+  if (!(await showConfirm(msg, { danger: true, okLabel: 'Take it off' }))) return;
+
+  archiveParentActivity(act);
+  if (future > 0) {
     const removedBlockIds = [];
+    const from = todayKey();
     ['jenn','jess'].forEach(p => {
       const weeks = (state.profiles[p] && state.profiles[p].weeks) || {};
       Object.keys(weeks).forEach(dayKey => {
+        if (dayKey < from) return;      // history is a record, not a working set
         const arr = weeks[dayKey] || [];
         const kept = arr.filter(b => {
           if (b.actId !== id) return true;
@@ -347,22 +399,47 @@ async function deleteParentActivity(owner, id) {
       });
     });
     tombstoneBlockIds(removedBlockIds);
-    // Recompute progress for both kids since their counts may have changed
-    recountActivityProgress('jenn');
-    recountActivityProgress('jess');
   }
+  /* recountActivityProgress is deliberately NOT called. It rebuilds the counts
+     from the blocks still standing, and the whole point here is that the past
+     ones are still standing — so there is nothing to recount, and calling it
+     would only risk undoing that. */
   saveAll();
   renderParentActivities();
-  showToast(refs > 0 ? `Activity + ${refs} block${refs===1?'':'s'} deleted 🗑` : 'Deleted 🗑');
+  showToast(future
+    ? `Off the list — ${future} upcoming removed, history kept 🗄`
+    : 'Off the list — history kept 🗄');
 }
 
-/* Count placed blocks across all profiles/weeks that reference an activity id. */
-function countBlocksUsingActivity(actId) {
+/* Marked, not removed, and NOT tombstoned: a tombstone is what makes a delete
+   stick across every device, and this must not stick as a delete. The record
+   has to survive so the blocks that name it keep rendering. */
+function archiveParentActivity(act) {
+  act.archived = true;
+  act.archivedAt = syncNow();
+  markItemUpdated(act);
+}
+function unarchiveParentActivity(owner, id) {
+  const act = findParentActivity(owner, id);
+  if (!act) return;
+  delete act.archived;
+  delete act.archivedAt;
+  markItemUpdated(act);
+  saveAll();
+  renderParentActivities();
+  showToast(`"${act.name}" is back on the list ✨`);
+}
+
+/* Count placed blocks across all profiles/weeks that reference an activity id.
+   `fromDayKey` narrows it to that day onward — the difference between "how much
+   history is there" and "how much of the plan ahead breaks". */
+function countBlocksUsingActivity(actId, fromDayKey) {
   let n = 0;
   ['jenn','jess'].forEach(p => {
     const weeks = (state.profiles[p] && state.profiles[p].weeks) || {};
-    Object.values(weeks).forEach(arr => {
-      (arr||[]).forEach(b => { if (b.actId === actId) n++; });
+    Object.keys(weeks).forEach(dayKey => {
+      if (fromDayKey && dayKey < fromDayKey) return;
+      (weeks[dayKey] || []).forEach(b => { if (b.actId === actId) n++; });
     });
   });
   return n;
@@ -412,7 +489,7 @@ function perfMondayKey(offset) {
 // One kid's numbers for the week starting at monKey.
 function perfWeekStats(monKey, kid) {
   const mon = formatDayKey(monKey);
-  const acts = getAllActivities(kid);
+  const acts = getAllActivities(kid, { includeArchived: true });
   let planned = 0, done = 0;
   const byCat = {};
   for (let i = 0; i < 7; i++) {
@@ -668,7 +745,7 @@ function confirmRoutine() {
         if (dayKey < today) return;
         const blocks = weeks[dayKey] || [];
         blocks.forEach(b=>{
-          const act = getAllActivities(p).find(a=>a.id===b.actId);
+          const act = findActivity(b.actId, p);
           if (!act?.isRoutine || act.routineId !== id) return;
           if (!b.checklistState) return;
           Object.keys(b.checklistState).forEach(itemId=>{
@@ -710,7 +787,7 @@ function confirmRoutine() {
         if (dayKey < today) return; // skip past days
         const blocks = weeks[dayKey] || [];
         blocks.forEach(b=>{
-          const act = getAllActivities(p).find(a=>a.id===b.actId);
+          const act = findActivity(b.actId, p);
           if (!act?.isRoutine || act.routineId !== routineBuilder.editingId) return;
           if (!b.checklistState) return;
           // Keep only valid template items in checklistState

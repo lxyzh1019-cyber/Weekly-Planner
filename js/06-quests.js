@@ -40,91 +40,22 @@ function addQuestXP(amount, p=activeProfile()) {
   return { leveledUp: lvAfter > lvBefore, newLevel: lvAfter };
 }
 
-function goQuestBoard() {
-  showScreen('quest');
-  renderQuestBoard();
-}
+/* goQuestBoard / renderQuestBoard / goQuestsToday lived here, and with them the
+   Quest Board's hero header, its date line and its "open today's quests" card.
 
-function renderQuestBoard() {
-  const p = activeProfile();
-  if (!p) return;
-  const profName = p.charAt(0).toUpperCase() + p.slice(1);
+   The board was the fourth rendering of one day — Checklist mode, then its own
+   quest list, then day-view Quest mode, now this — and CLAUDE.md names that as
+   the mistake: a tick that can happen in two places is a tick that can disagree
+   with itself. Today is the one list, and it already carried the same hero
+   strip (tdQuestHero), so the board's copy was a second Lv/XP readout of the
+   same XP.
 
-  // Hero header
-  const xp = getQuestXP(p);
-  const level = Math.floor(xp / QUEST_XP_PER_LEVEL) + 1;
-  const tier = heroTierForLevel(level);
-  const xpIntoLevel = xp % QUEST_XP_PER_LEVEL;
-  const pct = Math.round((xpIntoLevel / QUEST_XP_PER_LEVEL) * 100);
-  document.getElementById('questHeroAvatar').textContent = tier.emoji;
-  document.getElementById('questHeroTitle').textContent = `Lv ${level} — ${tier.name}`;
-  document.getElementById('questHeroName').textContent = profName + "'s adventure";
-  document.getElementById('questXpFill').style.width = pct + '%';
-  document.getElementById('questXpLabel').textContent = `${xpIntoLevel} / ${QUEST_XP_PER_LEVEL} XP  •  Total ${xp}`;
-
-  // Date
-  const today = new Date();
-  const dateStr = today.toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' });
-  document.getElementById('questBoardDate').textContent = dateStr;
-
-  renderQuestMoneyStrip(p);
-  renderStickerCollection(p);
-  loadKidWeekFeedback(p);
-
-  // Today's quests = today's blocks
-  const key = todayKey();
-  const blocks = (getDayBlocks(key) || []).filter(b => b && b.startMin != null);
-  const acts = getAllActivities(p);
-  const actById = id => acts.find(a => a.id === id);
-  const done = blocks.filter(b => b.completed).length;
-
-  /* ── One list, in one place ──
-     This used to render today's blocks as quest cards with their own complete
-     buttons — which is exactly what the day view's Quest mode does. Two
-     renderings of the same list means two sets of completion handlers and two
-     places a tick can go wrong, and it is the same duplication that got
-     Checklist mode removed.
-
-     The Quest Board keeps what only it has: the hero, the stickers, the money
-     panel and the weekly note. The list itself now lives in one place, and
-     this is the door to it. */
-  const list = document.getElementById('questList');
-  if (!blocks.length) {
-    list.innerHTML = `
-      <div class="quest-empty">
-        <div class="quest-empty-emoji">📜</div>
-        <div><strong>No quests for today!</strong></div>
-        <div style="margin-top:0.4rem;font-size:0.9rem">Tap <strong>＋ Add a quest</strong> above to start your adventure.</div>
-        <div class="quest-empty-cta">
-          <button class="quest-back-btn" onclick="goWeek()">📋 Plan the whole week</button>
-        </div>
-      </div>`;
-    return;
-  }
-
-  const left = blocks.length - done;
-  const donePct = Math.round(done / blocks.length * 100);   // `pct` above is the XP bar
-  const next = blocks.filter(b => !b.completed).sort((a, b) => a.startMin - b.startMin)[0];
-  const nextAct = next ? actById(next.actId) : null;
-  list.innerHTML = `
-    <button type="button" class="quest-today-card" onclick="goQuestsToday()">
-      <div class="quest-today-head">
-        <span class="quest-today-title">${left ? `${left} quest${left === 1 ? '' : 's'} to go` : 'Every quest done 🎉'}</span>
-        <span class="quest-today-count">${done}/${blocks.length}</span>
-      </div>
-      <div class="quest-today-bar"><span style="width:${donePct}%"></span></div>
-      ${next ? `<div class="quest-today-next">Next up — ${nextAct ? nextAct.icon : '⭐'} ${escapeHtml(nextAct ? nextAct.name : 'Quest')} at ${formatQuestTime(next.startMin)}</div>` : ''}
-      <span class="quest-today-go">Open today's quests ›</span>
-    </button>`;
-}
-
-/* The Quest Board's door into the one quest list — which is Today. It used to
-   open the day view in Quest mode; that mode is gone and the cards live on the
-   Today screen, so this is now a one-liner to the same list. Same blocks, same
-   ticks, same XP, still one implementation. */
-function goQuestsToday() {
-  goToday();
-}
+   Nothing that OWNS anything was removed. completeQuest, blastQuest,
+   awardBlockLinks, getQuestXP, heroTierForLevel, showQuestCompletePopup,
+   spawnQuestSparkles and the sticker store are all below, unchanged, and Today
+   calls every one of them. The board's two unique panels — the sticker
+   collection and the note to grown-ups — moved into Today's disclosure and are
+   still rendered by the functions right here. */
 
 // Sticker collection on the Quest Board — earned by real habits (#8).
 function renderStickerCollection(kid) {
@@ -144,35 +75,11 @@ function renderStickerCollection(kid) {
     <div class="sticker-grid">${cells}</div>`;
 }
 
-// Pocket money on the Quest Board is private by default — kids tap the toggle
-// to reveal the full breakdown (cash / savings / investments / GIC).
-let showPocketMoney = false;
-function togglePocketMoney() {
-  showPocketMoney = !showPocketMoney;
-  renderQuestMoneyStrip(activeProfile());
-}
-
-function renderQuestMoneyStrip(kid) {
-  const wrap = document.getElementById('questMoneyWrap');
-  if (!wrap) return;
-  if (kid !== 'jenn' && kid !== 'jess') { wrap.hidden = true; return; }
-  wrap.hidden = false;
-
-  const toggle = document.getElementById('questMoneyToggle');
-  const caret = document.getElementById('qmtCaret');
-  const panel = document.getElementById('questMoneyPanel');
-  if (toggle) toggle.setAttribute('aria-expanded', showPocketMoney ? 'true' : 'false');
-  if (caret) caret.textContent = showPocketMoney ? 'Hide ▾' : 'Show ▸';
-  if (!showPocketMoney) { panel.hidden = true; panel.innerHTML = ''; return; }
-
-  ctPrepareRead();
-  const wk = ctThisWeekKey();   // real current week, independent of chore-tab nav
-  // (A per-group chip row was built here and never rendered — it read the
-  // retired chore-group store, so it would have shown 0/0 on every current
-  // week anyway. buildHowIEarnCard is the whole panel.)
-  panel.hidden = false;
-  panel.innerHTML = buildHowIEarnCard(kid, wk);
-}
+/* showPocketMoney / togglePocketMoney / renderQuestMoneyStrip lived here. They
+   rendered into #questMoneyWrap on the Quest Board, which is gone; Today's own
+   money card (tdMoneyChart) is the kid-facing summary now, and 💰 My money is
+   still the page that owns the detail. buildHowIEarnCard, which this called,
+   is untouched — the money pages use it. */
 
 /* The Quest Board keeps a three-line answer to "how am I doing?" and hands the
    rest to 💰 My money (js/22-money-page1.js). This used to be the whole money
@@ -402,7 +309,7 @@ function completeQuest(blockId, dayKey) {
 
   blk.completed = true;
   markItemUpdated(blk); // stamp so the completion wins cross-device merges
-  const acts = getAllActivities();
+  const acts = getAllActivities(activeProfile(), { includeArchived: true });
   const act = acts.find(a => a.id === blk.actId) || { name:'Quest', icon:'⭐' };
   // awardBlockLinks is the single source of truth: it awards XP, counts the
   // completion toward sticker milestones, and fires routine/chore links. Do NOT
@@ -418,7 +325,6 @@ function completeQuest(blockId, dayKey) {
   const active = document.querySelector('.screen.active');
   if (active && active.id === 'screen-day') buildTimeline();
   else if (active && active.id === 'screen-today') tdRenderToday();
-  else renderQuestBoard();
 
   // After the popup: rest day → its own warm celebration (rest is a valid state,
   // not a failed perfect day); full clear → Mission Clear; partial progress → a
@@ -450,7 +356,7 @@ function awardBlockLinks(blk, dayKey) {
   let msg = '';
   let leveledUp = false, newLevel = null;
   const kid = isParent() ? parentViewing : activeProfile();
-  const act = getAllActivities().find(a => a.id === blk.actId);
+  const act = findActivity(blk.actId);
   if (!blk.xpAwarded) {
     blk.xpAwarded = true;
     const r = addQuestXP(QUEST_XP_PER_TASK);
@@ -629,7 +535,7 @@ function toggleBlockDone(dayKey, blockId, ev) {
   const active = document.querySelector('.screen.active');
   if (active && active.id === 'screen-week') renderWeek();
   else if (active && active.id === 'screen-day') buildTimeline();
-  else if (active && active.id === 'screen-quest') renderQuestBoard();
+  else if (active && active.id === 'screen-today') tdRenderToday();
   showToast(nowDone ? ('Done! ✓' + extra) : 'Marked not done');
 }
 
@@ -653,9 +559,12 @@ function showQuestCompletePopup(act, result) {
   }, 1400);
 }
 
-function spawnQuestSparkles(hostId = 'screen-quest') {
+/* Defaults to Today now that the Quest Board is gone — it is where a quest gets
+   ticked, so it is where the sparkles belong. Callers that name their own host
+   (the chore screen does) are unaffected. */
+function spawnQuestSparkles(hostId = 'screen-today') {
   const sparkles = ['✨','⭐','💫','🌟'];
-  const host = document.getElementById(hostId) || document.getElementById('screen-quest');
+  const host = document.getElementById(hostId) || document.getElementById('screen-today');
   if (!host) return;
   for (let i=0; i<6; i++) {
     const el = document.createElement('div');

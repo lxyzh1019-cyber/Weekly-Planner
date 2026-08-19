@@ -128,10 +128,12 @@
         <button type="button" class="reward-pill" onclick="skipRewardPrompt()">Not today</button>
       </div>
     </div>
-    <div id="dayKidQuickRow" class="day-kid-quick-row" style="display:none">
-      <button type="button" class="btn-break-quick" onclick="addQuickBreak(15)">☕ I need a break (15 min)</button>
-      <button type="button" class="btn-break-quick" onclick="addQuickBreak(10)">🫧 Short break (10 min)</button>
-    </div>
+    <!-- The two break buttons lived here — "I need a break (15 min)" and
+         "Short break (10 min)". They were a permanent row on the screen a child
+         opens most, for something she asked for a handful of times, and two
+         buttons that differ only by five minutes is a decision nobody wants to
+         make. addQuickBreak stays: it is still the owner anything else calls to
+         place a break. -->
 
     <!-- Collapsed by default and remembered in localStorage — the house
          disclosure pattern (mnyPricesOpen / ckPrivsOpen / weekGlanceOpen). Never
@@ -160,6 +162,16 @@
         </div>
         <div id="dayGoalsList" class="day-mini-list"></div>
       </div>
+      <!-- Both moved off the retired Quest Board, and both belong behind this
+           toggle rather than in Today's default view: a sticker wall and a note
+           box are things you go and look at, not things that answer "what now".
+           Ids kept, so renderStickerCollection / loadKidWeekFeedback /
+           saveKidWeekFeedback work untouched. -->
+      <div class="sticker-collection" id="questStickers"></div>
+      <div class="kid-feedback-box">
+        <label for="kidWeekFeedback">💬 Tell your grown-ups how your week is going</label>
+        <textarea id="kidWeekFeedback" rows="2" placeholder="What was fun? What was tricky?" onchange="saveKidWeekFeedback()"></textarea>
+      </div>
     </div>
   </div>
 
@@ -173,44 +185,16 @@
   </div>
 </div>
 
-<div class="screen" id="screen-quest">
-  <div class="quest-topbar">
-    <button class="quest-back-btn" onclick="goProfile()" aria-label="Back to profile">◀ Switch hero</button>
-    <button class="quest-back-btn" onclick="goWeek()" aria-label="Open full planner">📋 Full planner</button>
-  </div>
+<!-- The QUEST BOARD screen lived here. It was the fourth rendering of one day
+     — after Checklist mode, the Quest Board's own list and day-view Quest mode —
+     and CLAUDE.md names that as the mistake: a tick that can happen in two
+     places is a tick that can disagree with itself. Today is the one list.
 
-  <div class="quest-hero-card">
-    <div class="quest-hero-avatar" id="questHeroAvatar">🐣</div>
-    <div class="quest-hero-info">
-      <div class="quest-hero-title" id="questHeroTitle">Newbie Hero</div>
-      <div class="quest-hero-name" id="questHeroName"></div>
-      <div class="quest-xp-bar"><div class="quest-xp-fill" id="questXpFill" style="width:0%"></div></div>
-      <div class="quest-xp-label" id="questXpLabel">0 / 100 XP</div>
-    </div>
-  </div>
-
-  <div class="quest-money-wrap" id="questMoneyWrap" hidden>
-    <button type="button" class="quest-money-toggle" id="questMoneyToggle" onclick="togglePocketMoney()" aria-expanded="false" aria-controls="questMoneyPanel">
-      <span>💰 My money</span>
-      <span class="qmt-caret" id="qmtCaret">Show ▸</span>
-    </button>
-    <div class="quest-money-panel" id="questMoneyPanel" hidden></div>
-  </div>
-
-  <div class="quest-board-header">
-    <h2>🗺️ Today's Quests</h2>
-    <span class="quest-board-date" id="questBoardDate"></span>
-  </div>
-
-  <button type="button" class="quest-add-btn" onclick="goPlanToday()">＋ Add a quest for today</button>
-  <div class="quest-list" id="questList"></div>
-  <div class="sticker-collection" id="questStickers"></div>
-
-  <div class="kid-feedback-box">
-    <label for="kidWeekFeedback">💬 Tell your grown-ups how your week is going</label>
-    <textarea id="kidWeekFeedback" rows="2" placeholder="What was fun? What was tricky?" onchange="saveKidWeekFeedback()"></textarea>
-  </div>
-</div>
+     Only the screen went. Its three unique panels moved to Today (the Lv/XP
+     hero, the sticker collection, the note to grown-ups) and every owner it
+     called — completeQuest, blastQuest, getQuestXP, heroTierForLevel, the
+     sticker store, spawnQuestSparkles — is untouched and still called from
+     there. The quest-* CSS classes those panels use went with them. -->
 
 <!-- Quest Complete popup -->
 <div class="quest-popup" id="questPopup" aria-hidden="true">
@@ -260,6 +244,10 @@
         <button class="view-tab" id="viewTabFull" onclick="setWeekView('full')">📋 Full</button>
         <button class="view-tab active" id="viewTabTimeGrid" onclick="setWeekView('timegrid')">🧱 Day Blocks</button>
       </div>
+      <!-- Print sits on the week it prints. This is one button, not the six-button
+           shortcut row that used to live in row1 — and it calls the same openPrint()
+           the More sheet does, so the two doors cannot drift apart. -->
+      <button class="btn-template no-print week-print-btn" onclick="openPrint()">🖨 Print</button>
     </div>
   </div>
   <p class="kid-coach-tip" id="weekCoachTip" style="display:none;margin:0.35rem 0.75rem 0"></p>
@@ -409,61 +397,45 @@
     <button class="btn-icon no-print" style="padding:2px 8px;margin-left:8px" onclick="confirmAllToday()">✅ Confirm all today</button>
   </div>
 
+  <!-- One row, not two. The title, the date and every control the screen has
+       sit together: two topbar rows on a screen whose whole job is a single
+       vertical schedule cost a fifth of the plannable height and made the day
+       feel like a form. The zone filters and the Timeline/Quest switch that used
+       to justify the second row are both long gone. -->
   <div class="topbar day-topbar">
     <div class="day-topbar__row1">
-      <div class="topbar-left">
-        <button class="btn-icon btn-back-week" onclick="goWeek()" aria-label="Back to week view" title="Back to week view"><span aria-hidden="true">◀</span> Week</button>
-        <h2 id="dayTitle"></h2>
+      <button class="btn-icon btn-back-week" onclick="goWeek()" aria-label="Back to week view" title="Back to week view"><span aria-hidden="true">◀</span> Week</button>
+      <div class="day-nav-center">
+        <button class="btn-icon day-nav-arrow" onclick="navDay(-1)" aria-label="Previous day">◀</button>
+        <h3 id="daySubtitle"></h3>
+        <button class="btn-icon day-nav-arrow" onclick="navDay(1)" aria-label="Next day">▶</button>
       </div>
-      <div class="day-controls">
-        <div class="day-nav-center">
-          <button class="btn-icon day-nav-arrow" onclick="navDay(-1)" aria-label="Previous day">◀</button>
-          <h3 id="daySubtitle"></h3>
-          <button class="btn-icon day-nav-arrow" onclick="navDay(1)" aria-label="Next day">▶</button>
-        </div>
-      </div>
-      <div style="display:flex;gap:0.4rem;align-items:center" class="day-topbar-actions">
-        <button class="btn-icon" onclick="openTemplateSheet()" aria-label="Apply template">📋</button>
+      <!-- How many days at once. A column count, not a mode: what a block says
+           and how the day is edited are identical at 1, 2 and 3. Kept in
+           localStorage only — every synced write is a full-document upload. -->
+      <div class="day-span-tabs" id="daySpanTabs" role="group" aria-label="How many days to show"></div>
+      <div class="day-topbar-actions">
+        <button class="btn-icon" onclick="openTemplateSheet()" aria-label="Apply template" title="Templates and copying a day">📋</button>
         <button class="btn-icon" onclick="openReflectSheet()" aria-label="Reflect on today">🌙</button>
+        <button class="btn-icon day-clear-btn" onclick="clearDay()" aria-label="Clear this day" title="Clear this day">🗑</button>
         <button class="profile-badge" onclick="openProfileSwitcher()" id="dayProfileBadge" aria-label="Switch profile"></button>
       </div>
     </div>
-    <div class="day-topbar__row2">
-      <!-- The morning/afternoon/evening zone filters used to sit here. They
-           split a day that is already one screen tall, and the left sideband
-           already labels those stretches, so "All Day" is the only mode left
-           and the timeline no longer needs a filter above it. -->
-      <!-- The Timeline/Quest switch is gone with Quest mode: it was a second
-           rendering of a day this screen had just finished planning, and the
-           quest cards now live on Today, which is where a day gets done.
-           This screen builds a day; it has one layout and nothing to toggle. -->
-      <button class="btn-template danger" onclick="clearDay()">🗑 Clear</button>
-    </div>
+    <!-- #dayTitle kept: openDay and the parent view still write to it, and it is
+         read by the print sheet's heading. It carries no visible text here. -->
+    <h2 id="dayTitle" class="visually-hidden"></h2>
   </div>
 
-  <div class="day-workspace">
-    <div class="day-center-lane">
-      <div class="timeline-wrap">
-        <div class="day-panel-label day-panel-label--landscape-only day-schedule-label">
-          <span>Schedule</span>
-        </div>
-        <div class="timeline" id="timeline"></div>
-      </div>
-    </div>
+  <!-- One scroll container for the whole screen. It used to be three nested
+       ones — workspace, lane, timeline-wrap — which on an iPad meant the schedule
+       scrolled inside a box that itself scrolled inside the page, and a flick
+       could move the wrong one.
 
-    <div class="day-right-rail">
-      <div class="day-panel-label day-panel-label--landscape-only">Activities</div>
-      <!-- Activity tray -->
-      <div class="activity-tray">
-        <div class="tray-header">
-          <span class="tray-title">Pick one</span>
-          <span class="tray-hint" id="trayHint">Tap one to pick</span>
-        </div>
-        <p class="tray-bridge-hint" aria-hidden="true">Then tap the schedule to place it →</p>
-        <div class="tray-filter" id="trayFilter"></div>
-        <div class="tray-scroll" id="trayScroll"></div>
-      </div>
-    </div>
+       The Activities rail lived to the right of this. It is gone: placement now
+       goes through the popup that opens where you tap, which is the interaction
+       that was already doing the work. -->
+  <div class="day-workspace">
+    <div class="timeline" id="timeline"></div>
   </div>
 </div>
 
@@ -612,6 +584,10 @@
     <p class="parent-hint">All custom activities — yours and the girls'. Tap 🔗 to share with both, or 🔗 again to make it private to one child.</p>
     <div id="parentActivitiesList"></div>
     <button class="btn-confirm" style="margin-top:0.6rem" onclick="openParentActivityEditor()">＋ Add Activity</button>
+    <!-- Sports are shared by both girls and tag training blocks rather than
+         being activities of their own, so they are managed here rather than in
+         the activity list above. -->
+    <button class="btn-template" style="margin-top:0.6rem" onclick="openCustomSport()">🤸 Sports for training</button>
   </div>
 
   <!-- TAB: Level-Up Rules -->
@@ -716,6 +692,10 @@
 
     <h4>DURATION</h4>
     <div class="sheet-row" id="trainingDurBtns"></div>
+    <!-- A training session has never had a custom length: the presets were the
+         whole of it, so a 75-minute practice or a meet that runs past the longest
+         pill could not be entered. Same control the activity and edit sheets use. -->
+    <div id="trainingCustomDur"></div>
     <div id="trainingTimeSummary"></div>
 
     <h4>COLOUR</h4>
@@ -1048,6 +1028,12 @@
     <p style="font-size:0.9rem;color:var(--ink-light);margin-bottom:0.8rem">This replaces your current plan for this day.</p>
     <button class="pill-btn" style="width:100%;margin-bottom:0.5rem;font-size:1rem" onclick="applyTemplate('school')">🏫 School Day</button>
     <button class="pill-btn" style="width:100%;font-size:1rem" onclick="applyTemplate('weekend')">🌈 Weekend</button>
+    <!-- Copy another day of the same week onto this one. A week rarely has
+         seven different shapes: two Tuesdays that look alike were two Tuesdays
+         built by hand. Rows are built by renderCopyDayList so they can carry
+         each day's real block count. -->
+    <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">Or copy a day you have already planned.</p>
+    <div id="copyDayList" class="copy-day-list"></div>
     <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">Taking today off? Rest days keep your streak safe.</p>
     <button class="pill-btn" style="width:100%;font-size:1rem" id="restDayBtn" onclick="toggleRestDay(currentDayKey)" aria-label="Mark rest day" title="Mark today a rest day">😌 Rest</button>
   </div>
@@ -1100,10 +1086,34 @@
         <option value="active">🏃 Active</option>
         <option value="free" selected>🎮 Free Time</option>
         <option value="daily">🍽 Daily</option>
+        <option value="routine">🌅 Routines</option>
         <option value="training">🏋️ Competitive Sports</option>
+        <option value="appointment">🩺 Appointment</option>
       </select>
     </div>
     <button class="btn-confirm" onclick="confirmCustomActivity()">Add Activity ✅</button>
+  </div>
+</div>
+
+<!-- Custom Sport — the training tag list used to be a frozen four, so a sport
+     the family took up could not be entered at all. Shared by both girls, so a
+     grown-up adds it. -->
+<div class="overlay" id="customSportOverlay" onclick="overlayClick(event,'customSportOverlay')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3>🤸 Add a sport</h3>
+    <div class="custom-builder">
+      <label for="sportName">Sport name</label>
+      <input type="text" id="sportName" placeholder="e.g. Gymnastics" maxlength="24" aria-label="Sport name">
+      <label for="sportIcon">Icon (emoji)</label>
+      <input type="text" id="sportIcon" placeholder="🤸" maxlength="2" aria-label="Sport icon (emoji)" oninput="syncEmojiGrid('sportEmojiGrid', this.value)">
+      <label>Or tap an icon</label>
+      <div class="emoji-grid" id="sportEmojiGrid"></div>
+      <label>Colour</label>
+      <div class="colour-picker" id="sportColourPicker"></div>
+    </div>
+    <div class="sport-existing" id="sportExistingList"></div>
+    <button class="btn-confirm" onclick="confirmCustomSport()">Add sport ✅</button>
   </div>
 </div>
 
@@ -1140,7 +1150,9 @@
         <option value="active">🏃 Active</option>
         <option value="free" selected>🎮 Free Time</option>
         <option value="daily">🍽 Daily</option>
+        <option value="routine">🌅 Routines</option>
         <option value="training">🏋️ Competitive Sports</option>
+        <option value="appointment">🩺 Appointment</option>
       </select>
       <label>Visibility</label>
       <select id="paVisibility">

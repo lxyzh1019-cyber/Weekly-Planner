@@ -250,6 +250,50 @@ function mnyTodayCard(kid, wk) {
 }
 
 /* Everything she has, and the four places it can be. */
+/* ── Agreed, but not paid out ──
+   The gap that made $0.00 look like data loss. A week's money only reaches the
+   wallet when step 4 of the meeting commits it (commitKidWeek, js/15-meeting.js);
+   step 3 shows ctWeekMoney, which is a live preliminary figure. A family that
+   agreed the numbers and stopped there saw real amounts at the table and zero
+   on this page, with nothing anywhere naming the difference.
+
+   Reads the same two sources the meeting does — ctWeekMoney for what a week
+   comes to, finalizedWeeks for what has actually been credited — and moves
+   nothing itself. Parent-facing detail on a kid's page is fine here: the number
+   is hers, and "it is coming" is the honest answer to where it went. */
+function mnyUnpaidWeeks(kid, max) {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  const fin = c.finalizedWeeks || {};
+  const out = [];
+  for (let i = 0; i <= (max || 8); i++) {
+    const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - i * 7);
+    const wk = ctDateToKey(mon);
+    if (String(wk) < String(mrModelStartWeek())) break;
+    if ((fin[wk] || {})[kid] != null) continue;          // already credited
+    const amount = money2(ctWeekMoney(wk, kid));
+    if (amount <= 0) continue;
+    out.push({ wk, amount, agreed: mnyIsConfirmed(wk, kid), weeksAgo: i });
+  }
+  return out;
+}
+function mnyUnpaidNote(kid) {
+  const rows = mnyUnpaidWeeks(kid, 8).filter(r => r.weeksAgo > 0 || r.agreed);
+  if (!rows.length) return '';
+  const total = money2(rows.reduce((a, r) => a + r.amount, 0));
+  const n = rows.length;
+  /* Three words and a figure, and it took two goes to get there: the first
+     version of this explanation cost 21 words and put the page 21 over the
+     200-word kid budget, the second was still one over. That is the budget
+     doing its job. "Still to come" is the whole message — it is hers, it has
+     not arrived. Where it is and why is the meeting's business, and the meeting
+     is where it moves. The week count lives in the title, which costs nothing
+     visible and is there for a grown-up who asks. */
+  return `<div class="mny-unpaid" title="${escapeAttr(n + ' week' + (n === 1 ? '' : 's') + ' not settled yet')}">
+      <span class="mny-unpaid-amt">${escapeHtml(mnyMoney(total))} still to come</span>
+    </div>`;
+}
+
 function mnyWalletCard(kid) {
   const tiles = [
     { k: 'cash',  icon: '💵', label: 'Cash',        value: mnyCash(kid),          ask: 'cash' },
@@ -261,6 +305,7 @@ function mnyWalletCard(kid) {
       <div class="mny-label">Everything I have</div>
       <div class="mny-total">${mnyMoney(mnyEverything(kid))}</div>
       ${mnyBuysNote(mnyEverything(kid))}
+      ${mnyUnpaidNote(kid)}
       <div class="mny-tiles">
         ${tiles.map(t => `<div class="mny-tile">
             <div class="mny-tile-top">${t.icon} ${escapeHtml(t.label)} ${mnyAskBtn(t.ask)}</div>

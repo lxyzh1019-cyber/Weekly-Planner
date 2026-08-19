@@ -20,7 +20,7 @@ let mmCatchUpAsked = false; // the catch-up question, asked once per page load
 function openFamilyMeeting() {
   if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
   ctEnsureShared();
-  mmStep = 1; mmSelectedDay = null; mmUndo = null;
+  mmStep = 1; mmMaxStep = 1; mmSelectedDay = null; mmUndo = null;
   renderMeetingMode();
   openSheet('familyMeetingOverlay');
 }
@@ -45,7 +45,26 @@ function mmToggleConfirmDay(d) {
   saveAll();
   renderMeetingMode();
 }
-function mmGoStep(n) { mmStep = Math.max(1, Math.min(MM_STEPS.length, n)); renderMeetingMode(); }
+/* How far this sitting actually got. "We met" means the family reviewed the
+   week together, and the honest evidence for that is reaching step 3 — Review,
+   Celebrate, then agreeing what was earned. Steps 1-2 alone is opening the
+   sheet and looking at it. Reset whenever the meeting points at a new week. */
+let mmMaxStep = 1;
+function mmGoStep(n) {
+  mmStep = Math.max(1, Math.min(MM_STEPS.length, n));
+  mmMaxStep = Math.max(mmMaxStep, mmStep);
+  renderMeetingMode();
+}
+/* Called when the meeting sheet is closed. Records that the family sat down —
+   nothing else. The money is step 4's to move, and a week closed at step 3 is
+   exactly the case that used to leave no trace at all. */
+function mmCloseMeeting() {
+  const wk = mmWeekKey();
+  if (mmMaxStep >= 3 && isParent() && !mmIsSettled(wk)) mmMarkWeekMet(wk);
+  closeSheet('familyMeetingOverlay');
+  const hub = document.getElementById('meetingHub');
+  if (hub && document.getElementById('screen-parent')?.classList.contains('active')) renderMeetingHub();
+}
 
 /* ── Catching up on a week nobody got to ──────────────────────────
    The meeting has always run on whatever week `ctWeekKey` points at, so
@@ -79,9 +98,20 @@ function mmWeeksAgoWord(n) {
 }
 function mmLastReviewedLine() {
   const last = mmLastReviewed();
-  const open = mmUnsettledWeeks(8).length;
-  if (!last) return `<div class="mm-weekbar-last">No week has been settled yet.</div>`;
-  const gap = open ? ` · ${open} earlier week${open === 1 ? '' : 's'} still open` : '';
+  const rows = mmUnsettledWeeks(8);
+  const unopened = rows.filter(x => x.status === 'none').length;
+  const met = rows.length - unopened;
+  /* Counted separately on purpose. Lumping them together is what made two
+     meetings read as eight missed ones: a week the family sat down for is not
+     a week nobody got to, it is a week whose money is still waiting. */
+  const parts = [];
+  if (unopened) parts.push(`${unopened} earlier week${unopened === 1 ? '' : 's'} not yet opened`);
+  if (met) parts.push(`${met} met but not paid out`);
+  const gap = parts.length ? ` · ${parts.join(' · ')}` : '';
+  if (!last) {
+    const text = parts.length ? `No week has been settled yet${gap}` : 'No week has been settled yet.';
+    return `<div class="mm-weekbar-last">${escapeHtml(text)}</div>`;
+  }
   // Dates and counts only — no user text on this line.
   const text = `Last settled: ${mmWeekLabel(last.wk)} · ${mmWeeksAgoWord(last.weeksAgo)}${gap}`;
   return `<div class="mm-weekbar-last">${escapeHtml(text)}</div>`;
@@ -114,20 +144,29 @@ function mmWeekBar(wk) {
 function mmMaybeAskCatchUp() {
   if (mmCatchUpAsked || !isParent()) return;
   if (mmWeekKey() !== ctThisWeekKey()) return;   // already looking at a past week
-  const missing = mmUnsettledWeeks(8);
-  if (!missing.length) return;
+  const open = mmUnsettledWeeks(8);
+  if (!open.length) return;
   mmCatchUpAsked = true;
   const last = mmLastReviewed();
-  const nearest = missing[0];
+  const nearest = open[0];
+  const unopened = open.filter(x => x.status === 'none').length;
+  const met = open.length - unopened;
   const where = last
     ? `Last settled: week of ${mmWeekLabel(last.wk)} — ${mmWeeksAgoWord(last.weeksAgo)}.`
     : 'No week has been settled yet.';
-  const msg = `${where} ${missing.length} earlier week${missing.length === 1 ? '' : 's'} `
-    + `${missing.length === 1 ? 'was' : 'were'} never settled, and `
-    + `${missing.length === 1 ? 'it is' : 'they are'} still open. Edit one now?`;
+  /* Says which kind of open each week is. It used to call all of them "never
+     settled", which told a family who had sat down twice that they had missed
+     eight weeks — the app disagreeing with something they had actually done. */
+  const what = [
+    unopened ? `${unopened} earlier week${unopened === 1 ? '' : 's'} nobody has opened` : '',
+    met ? `${met} you met about but did not pay out` : '',
+  ].filter(Boolean).join(', and ');
+  const msg = `${where} There ${open.length === 1 ? 'is' : 'are'} ${what}. Open one now?`;
   showChoice(msg, [
-    { id: 'nearest', label: `Catch up on ${mmWeekLabel(nearest.wk)}`,
-      sub: `${mmWeeksAgoWord(nearest.weeksLate)} — the most recent one still open` },
+    { id: 'nearest', label: `Go to ${mmWeekLabel(nearest.wk)}`,
+      sub: nearest.status === 'met'
+        ? `${mmWeeksAgoWord(nearest.weeksLate)} — met, money still waiting`
+        : `${mmWeeksAgoWord(nearest.weeksLate)} — the most recent one still open` },
     { id: 'now', label: 'Carry on with this week',
       sub: 'The open weeks stay open, and stay editable' },
   ], { cancelLabel: 'Not now' }).then(id => {
@@ -152,22 +191,90 @@ function openFamilyMeetingAsk() {
   openFamilyMeeting();
   mmMaybeAskCatchUp();
 }
-/* Weeks behind us that were never recorded, most recent first. Stops at the
-   money model's own start week: before that the meeting has nothing to agree or
-   decide (mmKidSettled treats those as settled), so offering them would be
-   offering a dead end. */
+/* ── "We sat down" is a different fact from "the money moved" ──
+   meetingsHeld[wk] is written in exactly one place, commitMeetingShared, and
+   only once BOTH kids have finished step 4 — weekPlans[wk][kid].committedAt for
+   Jenn AND Jess. So a family that opened the meeting, reviewed the week,
+   celebrated it and even agreed the numbers on step 3 recorded nothing at all,
+   and "🎉 Finish meeting" left it unset. Two meetings held, and the catch-up
+   list still reported every one of the last eight weeks as never settled —
+   saturating at its own ceiling, which is where the number 8 came from.
+
+   The same press is what credits the money, so the wallet reading $0.00 while
+   the meeting showed real figures was not a second bug: it is this one seen
+   from the other end. Step 3 shows ctWeekMoney, a live preliminary figure;
+   nothing is in the wallet until step 4.
+
+   So there are two records now. meetingsMet says the family sat down;
+   meetingsHeld still says the money moved. Only a week with neither is
+   something to nag about. */
+function mmEnsureMet() {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  if (!c.meetingsMet) c.meetingsMet = {};
+  return c.meetingsMet;
+}
+function mmIsMet(wk) { return !!mmEnsureMet()[wk]; }
+function mmIsSettled(wk) {
+  ctEnsureShared();
+  return !!(state.shared.chore.meetingsHeld || {})[wk];
+}
+/* Recorded when the meeting is closed having done the reviewing, and by the
+   catch-up list's "we did this one" for a week that was run before this
+   existed. It records a fact about the family; it never moves money —
+   settling is step 4's job and stays there (CLAUDE.md: call an owner, never
+   contain one). */
+function mmMarkWeekMet(wk, opts) {
+  if (!isParent()) { showToast('Parents run the family meeting 🔒'); return false; }
+  const met = mmEnsureMet();
+  if (met[wk]) return false;
+  met[wk] = { at: syncNow(), by: (opts && opts.by) || 'a grown-up' };
+  saveAll();
+  return true;
+}
+
+/* The earliest week worth asking about: the later of the money model's start
+   (before it there is nothing to agree or decide — mmKidSettled treats those as
+   settled) and the program's start (before it there was no family in the app).
+   Whichever is later binds, because a week that fails either test is a week the
+   meeting cannot do anything with.
+
+   An "earliest week with any data" floor was tried here too and removed: it
+   suppressed genuinely open weeks whenever the first record happened to be
+   recent, which is the same class of wrongness as the bug this is fixing —
+   the count disagreeing with what the family actually did. programStartDate is
+   already the honest answer to "when did this family start". */
+function mmCatchUpFloor() {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  const model = String(mrModelStartWeek());
+  const program = c.programStartDate ? String(c.programStartDate) : '';
+  return program > model ? program : model;
+}
+
+/* Weeks behind us and what state each is in, most recent first:
+     'none'    nobody opened it   → the only state worth offering
+     'met'     the family sat down, the money has not moved
+     'settled' done
+   Returns only the weeks that are not settled, so existing callers that just
+   want a count of open weeks still read correctly. */
 function mmUnsettledWeeks(max) {
   ctEnsureShared();
-  const held = state.shared.chore.meetingsHeld || {};
-  const floor = String(mrModelStartWeek());
+  const floor = mmCatchUpFloor();
   const out = [];
   for (let i = 1; i <= (max || 8); i++) {
     const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - i * 7);
     const wk = ctDateToKey(mon);
     if (String(wk) < floor) break;
-    if (!held[wk]) out.push({ wk, weeksLate: i });
+    if (mmIsSettled(wk)) continue;
+    out.push({ wk, weeksLate: i, status: mmIsMet(wk) ? 'met' : 'none' });
   }
   return out;
+}
+/* Just the weeks nobody has opened. This is what the copy nags about — a week
+   the family sat down for is not a week they missed. */
+function mmUnopenedWeeks(max) {
+  return mmUnsettledWeeks(max).filter(x => x.status === 'none');
 }
 /* The parent hub's way in. Deliberately not a warning: a fortnight nobody
    wrote down is a normal outcome of a busy fortnight, and the copy says the
@@ -175,16 +282,55 @@ function mmUnsettledWeeks(max) {
 function mmCatchUpBanner() {
   const list = mmUnsettledWeeks(8);
   if (!list.length) return '';
-  const rows = list.map(x =>
-    `<button type="button" class="mm-catchup-row" onclick="mmGoToWeek('${escapeJsAttr(x.wk)}')">
+  const unopened = list.filter(x => x.status === 'none').length;
+  const met = list.length - unopened;
+  /* Each row says which kind of open it is, and offers the action that fits.
+     A week the family met about needs its money settling, not a nag about
+     having been missed; a week nobody opened can be ticked off as done if it
+     was run before the app could record it. Neither button moves money —
+     "Settle" jumps to the step that owns that (CLAUDE.md). */
+  const rows = list.map(x => {
+    const isMet = x.status === 'met';
+    const label = isMet ? '✅ met — money still waiting' : `${x.weeksLate} week${x.weeksLate === 1 ? '' : 's'} ago`;
+    const actions = isMet
+      ? `<button type="button" class="mm-catchup-go" data-mm-week="${escapeAttr(x.wk)}" data-mm-catch="settle">Settle the money ›</button>`
+      : `<button type="button" class="mm-catchup-did" data-mm-week="${escapeAttr(x.wk)}" data-mm-catch="met">We did this one ✓</button>
+         <button type="button" class="mm-catchup-go" data-mm-week="${escapeAttr(x.wk)}" data-mm-catch="open">Catch up ›</button>`;
+    return `<div class="mm-catchup-row${isMet ? ' met' : ''}">
         <span class="mm-catchup-wk">${escapeHtml(mmWeekLabel(x.wk))}</span>
-        <span class="mm-catchup-late">${x.weeksLate} week${x.weeksLate === 1 ? '' : 's'} ago</span>
-        <span class="mm-catchup-go">Catch up ›</span>
-      </button>`).join('');
+        <span class="mm-catchup-late">${escapeHtml(label)}</span>
+        ${actions}
+      </div>`;
+  }).join('');
+  const cap = [
+    unopened ? `${unopened} week${unopened === 1 ? '' : 's'} nobody has opened` : '',
+    met ? `${met} met but not paid out` : '',
+  ].filter(Boolean).join(' · ');
   return `<div class="mm-catchup">
-      <div class="mm-catchup-cap">🕰️ ${list.length} week${list.length === 1 ? '' : 's'} never settled.
-        Nothing expires — open one and agree it whenever you get to it.</div>
+      <div class="mm-catchup-cap">🕰️ ${escapeHtml(cap)}.
+        Nothing expires — open one whenever you get to it, or tick off one you already did.</div>
       ${rows}</div>`;
+}
+
+/* One delegated listener for the rows above, bound in js/99-main.js. Data
+   attributes rather than interpolated handlers — the pattern js/13-chores.js
+   and the money pages already use, and the one CLAUDE.md asks for in new code. */
+function mmHandleCatchUpClick(e) {
+  const el = e.target.closest('[data-mm-catch]');
+  if (!el) return;
+  const wk = el.getAttribute('data-mm-week');
+  const what = el.getAttribute('data-mm-catch');
+  if (what === 'met') {
+    if (mmMarkWeekMet(wk)) {
+      renderMeetingHub();
+      showToast('Marked as done — the money is still there to settle when you want');
+    }
+    return;
+  }
+  // 'open' and 'settle' both go to the week; settle lands on the step that
+  // moves the money rather than making a second place that does.
+  mmGoToWeek(wk);
+  if (what === 'settle') mmGoStep(4);
 }
 /* Point the meeting at another week. Everything downstream reads mmWeekKey(),
    so this is the whole of it — except the draft plan, which belongs to one kid
@@ -194,7 +340,7 @@ function mmCatchUpBanner() {
 function mmGoToWeek(wk) {
   if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
   ctWeekKey = wk;
-  mmStep = 1; mmSelectedDay = null; mmUndo = null; mmAddChoreFor = null;
+  mmStep = 1; mmMaxStep = 1; mmSelectedDay = null; mmUndo = null; mmAddChoreFor = null;
   if (typeof mnyDraft !== 'undefined') mnyDraft = null;
   const overlay = document.getElementById('familyMeetingOverlay');
   if (!overlay || !overlay.classList.contains('open')) openSheet('familyMeetingOverlay');
@@ -559,7 +705,7 @@ function mm2b(kid) {
   const info = ctWeekInfo();
   const CATS = [['school','📘 Learning'],['training','🏋️ Competitive Sports'],['competition','🏆 Competition'],['routine','📋 Routine'],['daily','🧹 Chores'],['free','🎮 Family/Free'],['active','🏃 Active']];
   const planned = {}, done = {};
-  const acts = getAllActivities(kid);
+  const acts = getAllActivities(kid, { includeArchived: true });
   info.keys.forEach(key => {
     (getDayBlocksForProfile(key, kid) || []).forEach(b => {
       const act = acts.find(a => a.id === b.actId);
@@ -804,7 +950,7 @@ function mmSettledStrip(wk) {
    come back, so this names the gap rather than refusing — and keeps a way out. */
 function mmFinishButtons(wk) {
   if (mmAllSettled(wk)) {
-    return `<button type="button" class="btn-confirm" onclick="closeSheet('familyMeetingOverlay')">🎉 Finish meeting</button>`;
+    return `<button type="button" class="btn-confirm" onclick="mmCloseMeeting()">🎉 Finish meeting</button>`;
   }
   const unsettled = ['jenn', 'jess'].map(k => mmKidSettled(wk, k)).filter(s => !s.decided);
   const gap = unsettled.length === 2
@@ -812,7 +958,7 @@ function mmFinishButtons(wk) {
     : `${unsettled[0].name}'s week isn't decided yet`;
   const goTo = unsettled[0];
   return `<span class="mm-finish-gap">
-      <button type="button" class="pill-btn" onclick="closeSheet('familyMeetingOverlay')">Close anyway</button>
+      <button type="button" class="pill-btn" onclick="mmCloseMeeting()">Close anyway</button>
       <button type="button" class="btn-confirm" onclick="mnySetMeetKid('${escapeJsAttr(goTo.kid)}');mmGoStep(${goTo.agreed ? 4 : 3})">${escapeHtml(gap)} ▶</button>
     </span>`;
 }

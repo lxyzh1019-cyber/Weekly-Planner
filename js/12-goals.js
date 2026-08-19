@@ -164,7 +164,7 @@ function buildTodoRow(t) {
   row.appendChild(inp);
 
   const tag = document.createElement('span');
-  const acts = getAllActivities();
+  const acts = getAllActivities(activeProfile(), { includeArchived: true });
   const linkedAct = linkStats?.actId ? acts.find(a=>a.id===linkStats.actId) : null;
   if (linkStats) {
     tag.className = 'gt-day-tag';
@@ -235,7 +235,7 @@ function progressForAchievement(a) {
 function buildAchievementRow(a) {
   const row = document.createElement('div');
   row.className = 'gt-item gt-achievement-row';
-  const acts = getAllActivities();
+  const acts = getAllActivities(activeProfile(), { includeArchived: true });
   const act = acts.find(x=>x.id===a.activityId);
   const prog = progressForAchievement(a);
   const targetVal = Math.max(1, a.target||1);

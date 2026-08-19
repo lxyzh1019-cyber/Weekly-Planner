@@ -377,5 +377,40 @@ const corrected = api.mergeArrayById(
 check('server-corrected stamps let the later edit win (the fix)',
   corrected.length === 1 && corrected[0].who === 'later-real-edit');
 
+/* ── "We sat down" is not "the money moved" ──
+   meetingsHeld is only written once BOTH kids have finished step 4, so a family
+   that reviewed, celebrated and agreed the numbers recorded nothing — and the
+   catch-up list then reported every one of the last eight weeks as never
+   settled. meetingsMet records the sitting down.
+
+   Its merge is a grow-only union, the same as meetingsHeld and for the same
+   reason: two parents cannot disagree about whether a meeting happened, and a
+   lost entry is a week the family gets nagged about having already done. */
+const metUnion = api.mergeSharedChore(
+  { meetingsMet: { 'w-1': { at: 100, by: 'Mum' } } },
+  { meetingsMet: { 'w-2': { at: 200, by: 'Dad' } } });
+check('two devices\' "we met" records both survive',
+  !!(metUnion.meetingsMet && metUnion.meetingsMet['w-1'] && metUnion.meetingsMet['w-2']));
+
+// A week recorded on one device and untouched on the other must stay recorded,
+// whichever way round the merge runs.
+const metOneSided = api.mergeSharedChore(
+  { meetingsMet: { 'w-3': { at: 300 } } },
+  { meetingsMet: {} });
+check('a "we met" record is not dropped by an emptier remote',
+  !!(metOneSided.meetingsMet && metOneSided.meetingsMet['w-3']));
+check('…and the same the other way round',
+  !!api.mergeSharedChore({ meetingsMet: {} }, { meetingsMet: { 'w-3': { at: 300 } } }).meetingsMet['w-3']);
+
+// Met and settled are separate records: settling must not erase the sitting
+// down, and a met week must not read as settled.
+const metAndHeld = api.mergeSharedChore(
+  { meetingsMet: { 'w-4': { at: 400 } } },
+  { meetingsHeld: { 'w-4': true } });
+check('met and settled are recorded independently',
+  !!metAndHeld.meetingsMet['w-4'] && metAndHeld.meetingsHeld['w-4'] === true);
+check('a met week is not silently marked settled',
+  api.mergeSharedChore({ meetingsMet: { 'w-5': { at: 500 } } }, {}).meetingsHeld === undefined);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

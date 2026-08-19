@@ -155,7 +155,7 @@ function renderPrintSheet() {
   ];
   const bandForSlot = (absMin) => PRINT_BANDS.find(b => absMin >= b.start && absMin < b.end);
   // rows
-  const acts = getAllActivities();
+  const acts = getAllActivities(activeProfile(), { includeArchived: true });
   // Time clashes flagged the same way as the Full/Day-Blocks views so the three
   // views agree on the printed sheet.
   const printConflicts = {};
