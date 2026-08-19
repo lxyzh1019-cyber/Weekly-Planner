@@ -25,7 +25,7 @@ function fmtHrsMin(totalMin) {
   return `${m}m`;
 }
 
-// Fill the start/end/age controls and reflect the current state.
+// Fill the start/end controls and reflect the current state.
 function renderPrintControls() {
   const startSel = document.getElementById('printStartHour');
   const endSel = document.getElementById('printEndHour');
@@ -53,13 +53,10 @@ function onPrintWindowChange() {
   renderPrintSheet();
 }
 
-function onPrintAgeChange() {
-  const v = document.getElementById('printAge').value.trim();
-  const age = v === '' ? null : Math.max(1, Math.min(18, parseInt(v, 10) || 0));
-  const pd = getProfData();
-  if (pd) { pd.age = age; saveAll(); }
-  renderPrintSheet();
-}
+/* onPrintAgeChange was here. It read document.getElementById('printAge').value
+   with no null guard, and there has been no #printAge element in index.html for
+   a long time — so the one thing it could have done was throw. Age is not asked
+   for anywhere now; currentAge() answers it. */
 
 function openPrint() {
   showScreen('print');
@@ -309,15 +306,14 @@ function buildPrintSummary(keys, acts, winStartMin, winEndMin) {
   });
   chips += `<span class="print-cat-chip"><span class="print-cat-dot" style="background:#fff;border:1px solid #999"></span>🌤 Unscheduled: <b>${fmtHrsMin(free)}</b></span>`;
 
-  // Sleep recommendation from age.
-  const age = getProfData()?.age;
+  // Sleep recommendation from age. currentAge always answers, so the "set the
+  // age to see this" fallback has nothing left to explain.
+  const age = currentAge();
   const sleep = recommendedSleep(age);
   let sleepHtml = '';
   if (sleep) {
     const perWeek = sleep.min * 7;
     sleepHtml = `<div class="print-sleep">💤 <b>Recommended sleep (age ${age}, ${sleep.group}):</b> ${sleep.min}–${sleep.max}h per night · aim for ~${perWeek}h across the week</div>`;
-  } else {
-    sleepHtml = `<div class="print-sleep print-sleep--muted">💤 Set the child's age to see the recommended sleep for their age group.</div>`;
   }
 
   return `

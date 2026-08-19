@@ -175,14 +175,11 @@
     </div>
   </div>
 
-  <!-- Static: these three never vary, so they do not need re-rendering. The
-       "Quests" shortcut that used to sit here is gone — Today is the quest list
-       now, so it would have been a button to the screen you are on. -->
-  <div class="td-more">
-    <button type="button" class="td-morebtn" data-td-action="plan">✏️ Plan my day</button>
-    <button type="button" class="td-morebtn" data-td-action="week">📋 The whole week</button>
-    <button type="button" class="td-morebtn" data-td-action="money">💰 My money</button>
-  </div>
+  <!-- The three-button shortcut row that used to sit here is gone. "The whole
+       week" and "My money" were the Week and Money tabs of the persistent nav
+       under other names, and "Plan my day" could not say whether the day
+       already had a plan because it never re-rendered. It is one button now,
+       written by tdRenderToday at the end of #tdWrap so its verb can change. -->
 </div>
 
 <!-- The QUEST BOARD screen lived here. It was the fourth rendering of one day
@@ -228,26 +225,27 @@
         <button class="profile-badge" onclick="openProfileSwitcher()" id="weekProfileBadge" aria-label="Switch profile"></button>
         <h2>My Week</h2>
       </div>
-      <div class="week-nav week-nav--inline">
-        <button class="btn-icon" onclick="changeWeek(-1)" aria-label="Previous week">◀</button>
-        <h3 id="weekRangeLabel"></h3>
-        <button class="btn-icon" onclick="changeWeek(1)" aria-label="Next week">▶</button>
+      <!-- The week selector and the controls that act on the week it names sit
+           together on the right. They were two rows — selector above, view tabs
+           and Print below a dashed rule — which spent a third of the screen
+           before the plan itself started. One row, wrapping as a unit on a
+           phone. The six-button shortcut row that predated both is long gone:
+           every destination is in the persistent nav or behind More. -->
+      <div class="week-topbar__tools">
+        <div class="week-nav week-nav--inline">
+          <button class="btn-icon" onclick="changeWeek(-1)" aria-label="Previous week">◀</button>
+          <h3 id="weekRangeLabel"></h3>
+          <button class="btn-icon" onclick="changeWeek(1)" aria-label="Next week">▶</button>
+        </div>
+        <!-- View switcher: Full (cards) / Time-Grid (hours) -->
+        <div class="view-tabs">
+          <button class="view-tab" id="viewTabFull" onclick="setWeekView('full')">📋 Full</button>
+          <button class="view-tab active" id="viewTabTimeGrid" onclick="setWeekView('timegrid')">🧱 Day Blocks</button>
+        </div>
+        <!-- Print sits on the week it prints, and this is now its only door:
+             the More sheet's copy is gone, so the two labels cannot drift. -->
+        <button class="btn-template no-print week-print-btn" onclick="openPrint()">🖨 Print</button>
       </div>
-      <!-- The six-button shortcut row that used to live here is gone: every one of
-           its destinations is in the persistent nav (Today, Money) or behind More
-           (Quests, Chores, Sisters, Print). Two rows of navigation on one screen
-           is how the labels drifted apart in the first place. -->
-    </div>
-    <div class="week-topbar__row2">
-      <!-- View switcher: Full (cards) / Time-Grid (hours) -->
-      <div class="view-tabs">
-        <button class="view-tab" id="viewTabFull" onclick="setWeekView('full')">📋 Full</button>
-        <button class="view-tab active" id="viewTabTimeGrid" onclick="setWeekView('timegrid')">🧱 Day Blocks</button>
-      </div>
-      <!-- Print sits on the week it prints. This is one button, not the six-button
-           shortcut row that used to live in row1 — and it calls the same openPrint()
-           the More sheet does, so the two doors cannot drift apart. -->
-      <button class="btn-template no-print week-print-btn" onclick="openPrint()">🖨 Print</button>
     </div>
   </div>
   <p class="kid-coach-tip" id="weekCoachTip" style="display:none;margin:0.35rem 0.75rem 0"></p>
@@ -262,8 +260,9 @@
   <!-- Full week view (the alternate; Day Blocks is the default) -->
   <div id="weekFull" style="display:none">
     <div class="weekly-full-wrap">
-      <div class="week-conflict-banner" id="weekConflictBanner" style="display:none"></div>
       <div class="weekly-full" id="weeklyFullGrid"></div>
+      <!-- Under the grid it describes, same as the Day Blocks copy. -->
+      <div class="week-conflict-banner" id="weekConflictBanner" style="display:none"></div>
       <div class="week-signature" id="weekSignatureBar"></div>
     </div>
   </div>
@@ -271,25 +270,32 @@
   <!-- Day Blocks view (2a): "plans pop, free stays quiet" — one column per day,
        planned activities carry colour + a short label, free time stays plain. -->
   <div id="weekTimeGrid" style="display:flex">
-    <div class="tg-controls">
-      <div class="tg-streak" id="tgStreak"></div>
-    </div>
-
     <div class="tg2-wrap">
-      <div class="week-conflict-banner" id="tgConflictBanner" style="display:none"></div>
       <p class="tg2-subtitle">Plans pop, free stays quiet ✨ — tap any day to open it.</p>
       <div class="tg2-grid" id="tgGrid"></div>
       <!-- 2a: kid-readable category legend — planned blocks carry colour, free
            time stays plain paper -->
       <div class="tg-legend" id="tgLegend"></div>
     </div>
+
+    <!-- Both of these are conclusions ABOUT the grid — the longest free stretch
+         and the clashes in it — so they read after it, not before. They sat
+         above, which meant a child was told what her week added up to before
+         she could see the week. Found by id, so the render functions in
+         js/07-week-view.js do not care where they live. -->
+    <div class="tg-controls">
+      <div class="tg-streak" id="tgStreak"></div>
+      <div class="week-conflict-banner" id="tgConflictBanner" style="display:none"></div>
+    </div>
   </div>
 
-  <!-- This week at a glance: category/free-time totals, sleep, notes.
-       Collapsed by default — it is a reference panel, and open it cost about a
-       fifth of the screen's 200-word budget before the week itself was read.
-       The age field lives inside, because the only thing it changes is the sleep
-       line it sits above. -->
+  <!-- This week at a glance: time per day by category, what is still free, and
+       the week's notes. Collapsed by default — it is a reference panel, and open
+       it cost about a fifth of the screen's 200-word budget before the week
+       itself was read.
+       The age field that used to live here is gone: a child should not be asked
+       her own age by an app, and the only thing it changed was the sleep line.
+       currentAge() answers it now, and a grown-up corrects it in the portal. -->
   <div class="week-glance" id="weekGlance">
     <div class="week-glance-header">
       <button type="button" class="week-glance-toggle" onclick="toggleWeekGlance()"
@@ -298,9 +304,6 @@
         <span class="week-glance-caret" id="weekGlanceCaret">Show ▸</span>
       </button>
     </div>
-    <label class="week-glance-age" id="weekGlanceAge" hidden>🎂 Age
-      <input type="number" id="weekAge" min="1" max="18" placeholder="—" onchange="onWeekAgeChange()">
-    </label>
     <div class="week-glance-body" id="weekGlanceBody" hidden></div>
   </div>
 
@@ -516,6 +519,14 @@
         <button class="pill-btn active" onclick="setParentKid('jenn')">🐥 Jenn</button>
         <button class="pill-btn" onclick="setParentKid('jess')">🦊 Jess</button>
       </div>
+      <!-- Age lives here, on a grown-up's screen, and only a grown-up sees it.
+           It used to be a 🎂 field on the child's own week view, which asked a
+           nine-year-old her age every time she opened a reference panel. The app
+           assumes 10 and adds a year each August; this is the correction. -->
+      <label class="pa-age">🎂 Age
+        <input type="number" id="parentKidAge" min="1" max="18"
+               onchange="onParentAgeChange()" aria-label="Age of the child being viewed">
+      </label>
       <button class="pill-btn" style="margin-left:auto" onclick="parentView(parentViewing)">📋 Open full week ›</button>
     </div>
     <h3 class="parent-h3">🗓️ This week — review &amp; confirm</h3>

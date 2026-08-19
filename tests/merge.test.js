@@ -412,5 +412,45 @@ check('met and settled are recorded independently',
 check('a met week is not silently marked settled',
   api.mergeSharedChore({ meetingsMet: { 'w-5': { at: 500 } } }, {}).meetingsHeld === undefined);
 
+/* ── Age survives a sync, and a stale device cannot un-age a child ──
+   Age is stored as the pair {age, ageYear}: how old she is, and the August that
+   was true for. currentAge() reads the pair and rolls it forward one year per
+   August since — which is the property these tests are really about, because it
+   is what makes a plain last-write-wins merge safe here.
+
+   Written before touching js/04-merge.js, per CLAUDE.md. They pass against the
+   shipped merge, so 04-merge.js does not move: the same conclusion meetingsMet
+   reached. A watermark like lastGradeSeen needs forward-only handling because a
+   backwards value is unrecoverable; a stale ageYear is not — the next read sees
+   an ageYear behind the current one and bumps again, so the staleness heals
+   itself rather than persisting. */
+const ageRollover = (d) => (d.getMonth() >= 7 ? d.getFullYear() : d.getFullYear() - 1);
+check('the August rollover year is this year from August, last year before it',
+  ageRollover(new Date(2026, 7, 1)) === 2026 && ageRollover(new Date(2026, 6, 31)) === 2025
+  && ageRollover(new Date(2026, 0, 15)) === 2025);
+
+// Both halves travel together, so a device that has never seen an age gets one.
+const ageFresh = api.mergeProfileState({}, { age: 10, ageYear: 2026 }, 'jenn');
+check('an age set on one device reaches the other',
+  ageFresh.age === 10 && ageFresh.ageYear === 2026);
+
+// The stale-device case. The phone pushes last August's pair; the merge takes
+// it, and the value is wrong for exactly as long as it takes something to read
+// it — the rollover puts it straight back.
+const ageStale = api.mergeProfileState({ age: 11, ageYear: 2026 }, { age: 10, ageYear: 2025 }, 'jenn');
+const healed = ageStale.age + (2026 - ageStale.ageYear);
+check('a stale age merges back to the right number on the next read', healed === 11);
+
+// A correction is a correction: it re-stamps the year, so it does not get
+// rolled forward on top of itself.
+const ageFixed = api.mergeProfileState({ age: 10, ageYear: 2026 }, { age: 8, ageYear: 2026 }, 'jess');
+check('a corrected age is not then aged up again',
+  ageFixed.age + (2026 - ageFixed.ageYear) === 8);
+
+// Age is per child. Merging one profile must not reach into the other's.
+check('ages are per profile',
+  api.mergeProfileState({ age: 12, ageYear: 2026 }, {}, 'jenn').age === 12
+  && api.mergeProfileState({}, { age: 8, ageYear: 2026 }, 'jess').age === 8);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

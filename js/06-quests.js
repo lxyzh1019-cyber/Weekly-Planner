@@ -636,11 +636,8 @@ function goWeek()    { selectedActivity=null; showScreen('week'); renderWeek(); 
 function openChoreTab() {
   selectedActivity = null;
   ctSetCurrentWeekFromPlanner();  // Sync with current weekOffset
-  // Default day to today's day of week (within the current week view)
-  const todayDate = formatDayKey(todayKey());
-  const monDate = getWeekStart(weekOffset);
-  const diff = Math.round((todayDate - monDate) / (24*60*60*1000));
-  ctDay = Math.max(0, Math.min(6, diff));
+  // Today, resolved the one way the rest of the chore tab resolves a day.
+  ctDay = ctTodayIndex();
   showScreen('chore');
   renderChoreTab();
 }

@@ -777,6 +777,61 @@ function getDayKeys(offset=0) {
 }
 function formatDayKey(key) { const [y,m,d]=key.split('-'); return new Date(+y,+m-1,+d); }
 function todayKey() { return toDayKeyInZone(new Date()); }
+
+/* ── Age, never asked for ──
+   The year of the most recent birthday-season rollover: this calendar year once
+   August has arrived, last year before it. School years turn over in August
+   here, which is when a child's answer to "how old are you" changes in the way
+   that matters to her. */
+function ageRolloverYear(d = new Date()) {
+  return d.getMonth() >= AGE_ROLLOVER_MONTH ? d.getFullYear() : d.getFullYear() - 1;
+}
+
+/* Her age today. Seeds DEFAULT_KID_AGE the first time it is read and carries it
+   forward one year per August since, so nothing ever has to prompt for it and it
+   cannot go stale. Stored as {age, ageYear} on the profile — the pair is the
+   whole point: an age on its own is only true for one year, and a birth date is
+   not something this repo should hold.
+
+   Writes, so it must not run at load: every caller is inside a render. */
+function currentAge(p = activeProfile()) {
+  const pd = getProfData(p);
+  if (!pd) return null;
+  const nowYear = ageRolloverYear();
+  const stored = Number(pd.age);
+  if (!Number.isFinite(stored) || stored <= 0) {
+    pd.age = DEFAULT_KID_AGE;
+    pd.ageYear = nowYear;
+    saveAll();
+    return pd.age;
+  }
+  const wasYear = Number(pd.ageYear);
+  if (!Number.isFinite(wasYear)) {
+    // An age set before this existed: take it as true for the current year
+    // rather than guessing how many Augusts it has already missed.
+    pd.ageYear = nowYear;
+    saveAll();
+    return stored;
+  }
+  if (nowYear > wasYear) {
+    pd.age = stored + (nowYear - wasYear);
+    pd.ageYear = nowYear;
+    saveAll();
+  }
+  return pd.age;
+}
+
+/* A grown-up correcting it. Re-stamps the year, so the correction is "she is N
+   now" and the next August moves it on from there. */
+function setKidAge(age, p = activeProfile()) {
+  const pd = getProfData(p);
+  if (!pd) return null;
+  const n = Math.max(1, Math.min(18, parseInt(age, 10) || 0));
+  pd.age = n;
+  pd.ageYear = ageRolloverYear();
+  saveAll();
+  return n;
+}
 const DAY_SHORT = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const DAY_LONG  = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];

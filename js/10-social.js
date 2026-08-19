@@ -5,7 +5,12 @@
 ════════════════════════════════════════════════════════════════ */
 function openSisterSync() {
   if (isParent()) { showToast('View each child separately 👀'); return; }
-  syncDayIdx = 0;
+  /* Today, not Monday. This opened on syncDayIdx = 0 unconditionally while the
+     copy underneath read "You're both free for about … today" — so from Tuesday
+     onward the screen named one day and answered about another. Falls back to
+     the start of the week only when today is not in the week being viewed. */
+  const i = getDayKeys(weekOffset).indexOf(todayKey());
+  syncDayIdx = i >= 0 ? i : 0;
   showScreen('sync');
   renderSync();
 }
@@ -58,9 +63,12 @@ function renderSync() {
     const totalMin = freeSlots.length * 15;
     const overlap = document.createElement('div');
     overlap.className = 'sync-overlap';
+    /* "today" was hardcoded, which was wrong on every day the arrows moved to
+       and — before this screen opened on today — on six days out of seven. */
+    const when = key === todayKey() ? 'today' : `on ${DAY_LONG[syncDayIdx]}`;
     overlap.innerHTML = windows.length
-      ? `🎉 You're both free for about <b>${fmtHrsMin(totalMin)}</b> today — e.g. <b>${windows.slice(0, 3).join(', ')}</b>. Why not hang out?`
-      : `🎉 You both have about <b>${fmtHrsMin(totalMin)}</b> of free time overlapping today!`;
+      ? `🎉 You're both free for about <b>${fmtHrsMin(totalMin)}</b> ${when} — e.g. <b>${windows.slice(0, 3).join(', ')}</b>. Why not hang out?`
+      : `🎉 You both have about <b>${fmtHrsMin(totalMin)}</b> of free time overlapping ${when}!`;
     overlapWrap.appendChild(overlap);
   }
 

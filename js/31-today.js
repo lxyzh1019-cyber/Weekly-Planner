@@ -314,12 +314,6 @@ function tdRenderToday() {
     ? `<div class="td-empty">All today's jobs are done ✓</div>`
     : `<div class="td-empty">No jobs set up for this week yet.</div>`);
 
-  /* An empty day offers to be filled, and the offer is the thing you tap.
-     This read "Tap ✏️ Plan my day to build one", pointing at a button in the
-     static row below — an instruction to go and find a control is a worse
-     affordance than the control, and it costs more words on a screen held to
-     200 with no ratchet. The permanent button stays for a day that already has
-     a plan; this is the door on the day that has none. */
   /* Next at the top. The list ran in plain time order, so from mid-morning
      onward the thing she was about to do sat below a breakfast she had already
      eaten — the top of the screen was about the past. Upcoming first, still in
@@ -337,11 +331,21 @@ function tdRenderToday() {
              </button>
              ${earlierOpen ? `<div class="dq-list">${split.earlier.map(b => tdQuestCard(b, kid)).join('')}</div>` : ''}`
           : ''}`
-    : `<button type="button" class="td-row td-plan" data-td-action="plan">
-         <span class="td-row-icon">✏️</span>
-         <span class="td-row-name">Nothing planned — build a day?</span>
-         <span class="td-row-go">Plan it ›</span>
-       </button>`;
+    : `<div class="td-empty">Nothing planned yet.</div>`;
+
+  /* The one door onto the day screen, and it says which trip it is.
+     There were two, and then three: a static "✏️ Plan my day" button that was
+     always there, a "Nothing planned — build a day?" row inside this card when
+     the day was empty, and — beside that static button — "📋 The whole week"
+     and "💰 My money", which are the Week and Money tabs of the persistent nav
+     wearing different labels. CLAUDE.md names a second row of navigation as how
+     labels drift apart; this was the last one left.
+     So: one button, one destination, and the verb tells her which day she has.
+     `quests` is already computed above — no second reader of the day. */
+  const planHtml = `<div class="td-more">
+      <button type="button" class="td-morebtn td-plan" data-td-action="plan">
+        ✏️ ${quests.length ? 'Modify my plan' : 'Plan my day'}</button>
+    </div>`;
 
   // The loop back from a grown-up. Same counts the chore screen shows, so the two
   // can never disagree.
@@ -367,10 +371,11 @@ function tdRenderToday() {
      spends, claims or settles. */
   const moneyHtml = tdMoneyChart(kid, wk);
 
-  /* The evening wind-down nudge, carried over from the day timeline's banner —
-     age-based, so it only appears once an age is set. */
+  /* The evening wind-down nudge, carried over from the day timeline's banner.
+     It used to appear only once someone had typed an age into the week glance,
+     which for most of the app's life meant never; currentAge always answers. */
   const nowH = new Date().getHours();
-  const age = getProfData(kid)?.age;
+  const age = currentAge(kid);
   const bedtime = (nowH >= 18 && age != null && typeof bedtimeReminderText === 'function')
     ? bedtimeReminderText(age) : null;
 
@@ -385,7 +390,8 @@ function tdRenderToday() {
     <div class="td-card">
       <div class="td-cap">My money</div>${moneyHtml}</div>
     <div class="td-say">${escapeHtml(tdEncouragement(kid))}</div>
-    ${bedtime ? `<div class="bedtime-tip">${escapeHtml(bedtime)}</div>` : ''}`;
+    ${bedtime ? `<div class="bedtime-tip">${escapeHtml(bedtime)}</div>` : ''}
+    ${planHtml}`;
 
   /* The relocated panels are static siblings of the wrap, so they survive this
      re-render and only need their own renderers run. Each is the function that
@@ -540,7 +546,9 @@ function tdHandleClick(e) {
   if (a === 'waiting') { openChoreTab(); ckGoWaiting(); return; }
   if (a === 'fresh')   { openChoreTab(); ckGoFresh(); return; }
   if (a === 'earlier') { tdToggleEarlier(); return; }
-  if (a === 'week')    { goWeek(); return; }
+  /* 'week' was here, for a button that repeated the nav's Week tab. The money
+     branch stays: tdMoneyChart renders the whole money card as one
+     data-td-action="money" button, so this is still a live action. */
   if (a === 'money')   { openWeekMoney(); return; }
   // 🎯 — the arcade completion, unchanged, on today's block.
   if (a === 'blast')   { blastQuest(el.getAttribute('data-td-block'), el, todayKey()); return; }
@@ -620,7 +628,9 @@ function tdOpenMore() {
     { icon: '👯', label: 'Sisters',      go: 'sisters' },
     { icon: '📖', label: 'Money story',  go: 'story' },
     { icon: '🎓', label: 'Money school', go: 'school' },
-    { icon: '🖨', label: 'Print',        go: 'print' },
+    /* Print was here. It has a button on the week topbar, which is the week it
+       prints — a second door to it from a menu is a second label that can
+       drift, and printing is not something you go looking for in "more". */
     { icon: '◀',  label: 'Switch',       go: 'profile' },
   ];
   let ov = document.getElementById('tdMoreOverlay');
@@ -654,7 +664,6 @@ function tdGoMore(where) {
   if (where === 'sisters') { openSisterSync(); return; }
   if (where === 'story')   { mnyOpenStory(); return; }
   if (where === 'school')  { if (typeof mnyOpenSchool === 'function') mnyOpenSchool(); return; }
-  if (where === 'print')   { openPrint(); return; }
   if (where === 'profile') { goProfile(); return; }
 }
 function tdHandleNavClick(e) {

@@ -7,6 +7,7 @@ let parentTab = 'review';
 function renderParentHome() {
   setParentTab(parentTab);
   document.getElementById('reviewKidName').textContent = parentViewing==='jenn' ? '🐥 Jenn' : '🦊 Jess';
+  renderParentAge();
   document.querySelectorAll('#parentWeekKidPills .pill-btn').forEach(b =>
     b.classList.toggle('active', b.textContent.includes(parentViewing==='jenn'?'Jenn':'Jess')));
   renderMeetingHub();
@@ -21,6 +22,24 @@ function renderParentHome() {
   ctrRenderTrends();
   coRenderOptions();
   bkRenderPanel();
+}
+
+/* The one place age can be set, and it is a grown-up's screen. currentAge seeds
+   and rolls it forward on its own, so this is a correction rather than a
+   question — which is why it is never blank and never prompts.
+   Guarded against clobbering a half-typed number, the same way the week glance's
+   field used to be. */
+function renderParentAge() {
+  const el = document.getElementById('parentKidAge');
+  if (!el || document.activeElement === el) return;
+  el.value = currentAge(parentViewing) ?? '';
+}
+function onParentAgeChange() {
+  const el = document.getElementById('parentKidAge');
+  if (!el) return;
+  const v = setKidAge(el.value, parentViewing);
+  el.value = v ?? '';
+  showToast(`Age set to ${v} 🎂`);
 }
 
 function setParentTab(tab) {
