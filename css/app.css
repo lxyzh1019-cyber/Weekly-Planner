@@ -3748,6 +3748,57 @@
     background: var(--accent-yellow); border: 1.5px solid var(--ink); border-radius: 999px;
     padding: 0 0.45rem; font-weight: 700; font-size: calc(0.85rem * var(--fs-scale, 1)); color: var(--ink);
   }
+  /* ── A block you travel to starts when you start getting ready ──
+     Swimming at four does not mean leaving the house at four. .quest-time above
+     carries the minute she has to ACT, and it is deliberately given no
+     tier-based override anywhere below — the same size and colour on the
+     --next card, on a plain card and inside .dq-list--quiet, because a child
+     who has to leave at ten to five needs to read that as easily on a folded
+     card as on the loud one. These two lines sit under it, and the block's own
+     start is still on the card, so it never lies about when swimming is.
+     --accent-strong, never --accent: this is informational accent text. */
+  .quest-ready-lab {
+    font-size: max(13px, calc(0.84rem * var(--fs-scale, 1)));
+    font-weight: 800; color: var(--accent-strong);
+    margin-top: 0.15rem; white-space: nowrap;
+  }
+  .quest-start-at {
+    font-size: max(13px, calc(0.84rem * var(--fs-scale, 1)));
+    color: var(--ink-light); margin-top: 0.1rem; white-space: nowrap;
+  }
+
+  /* ── A clash ──
+     Same red frame and corner flag the week grid and Full week already use
+     (.wf-card--conflict), on the same finding from the same
+     computeBufferConflicts — two screens flagging one problem two different
+     ways is how a child learns to trust neither. The outline composes with the
+     tier rather than replacing it, so a clashing next block is still the next
+     block. Worded as a fact on the card, never as a telling-off: the plan is
+     what does not fit, and she did not write it. */
+  .quest-card--conflict {
+    outline: 3px solid #d6453a; outline-offset: 1px;
+    box-shadow: 0 0 0 2px rgba(214,69,58,0.25), 0 2px 8px rgba(214,69,58,0.35);
+    overflow: visible;
+  }
+  .td-now--conflict {
+    outline: 3px solid #d6453a; outline-offset: 2px;
+    box-shadow: 7px 8px 0 var(--ink), 0 0 0 2px rgba(214,69,58,0.25);
+    overflow: visible; position: relative;
+  }
+  .quest-conflict-flag {
+    position: absolute; top: -9px; left: -9px; z-index: 4;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: #d6453a; color: #fff; font-weight: 700;
+    font-size: max(13px, calc(0.8rem * var(--fs-scale, 1))); line-height: 22px; text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+  }
+  /* #b3352b rather than the frame's #d6453a: the frame is a shape, this is text
+     on cream paper and has to clear AA. */
+  .quest-conflict-note {
+    font-size: max(13px, calc(0.84rem * var(--fs-scale, 1)));
+    font-weight: 700; color: #b3352b; margin-top: 0.35rem;
+  }
+
   .quest-complete-btn {
     background: var(--accent-green); border: 2.5px solid var(--ink); border-radius: 12px;
     box-shadow: 2px 2px 0 var(--ink);
@@ -5330,19 +5381,69 @@
   }
   .td-now-head { display: flex; align-items: center; gap: 0.9rem; }
   .td-now-line { flex: 1; min-width: 0; }
-  /* A tick, not a bar. Sized past the 44px floor with room over, because it sits
-     at the card's edge where a thumb arrives at an angle. */
+  /* The same button as .quest-complete-btn on the cards below — same 🎯, same
+     green, same 2.5px border, same diagonal offset. It was a ✓ on a 16px radius
+     with a downward 0 4px 0 shadow, and four centimetres under it the same
+     block's card carried a ✓ that meant "already done": one action wearing two
+     glyphs, with nothing to tell a child which tick did what.
+
+     Sized past the 44px floor with room over rather than to the row button's
+     size, because this one sits at the card's edge where a thumb arrives at an
+     angle. Size is the only thing about it that differs. */
   .td-now-tick {
     flex: 0 0 auto; width: 56px; height: 56px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.6rem; line-height: 1;
-    border: 3px solid var(--ink); border-radius: 16px;
+    font-size: 1.5rem; line-height: 1;
+    border: 2.5px solid var(--ink); border-radius: 12px;
     background: var(--accent-green); color: var(--ink);
-    box-shadow: 0 4px 0 var(--ink); cursor: pointer;
+    box-shadow: 2px 2px 0 var(--ink); cursor: pointer;
     transition: transform 0.08s, box-shadow 0.08s;
   }
-  .td-now-tick:active { transform: translateY(4px); box-shadow: 0 0 0 var(--ink); }
-  .td-now-tick:hover { background: #7fc9a1; }
+  .td-now-tick:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--ink); }
+
+  /* ── The countdown, drawn ──
+     "now · started 8:15am" made a child work out how much longer she had from a
+     time that had already passed. The head carries the block's window and what
+     is left of it; this draws the same fact, so "how much longer" can be
+     glanced at. Deliberately not a clock — the day screen owns absolute time,
+     and a second clock here is a second thing that can be wrong. */
+  .td-now-bar {
+    height: 14px; margin-top: 0.65rem;
+    background: var(--paper);
+    border: 2.5px solid var(--ink); border-radius: 999px; overflow: hidden;
+  }
+  .td-now-bar-fill {
+    display: block; height: 100%;
+    background: var(--accent-green);
+    transition: width 0.4s ease;
+  }
+  /* The bar animates a number, and a number does not need to slide to be read. */
+  @media (prefers-reduced-motion: reduce) {
+    .td-now-bar-fill { transition: none; }
+  }
+  /* The one number in the sub-line she acts on, so it does not sit at
+     --ink-light with the rest of it. */
+  .td-now-left { color: var(--ink); font-weight: 800; }
+
+  /* ── A break, and the gap it sits in ──
+     Under TD_FREE_MIN only: anything longer is free time and already has a card
+     of its own on the list, and one gap described twice is a screen
+     contradicting itself. The chip appears on the hero's NEXT line and as a
+     connector between two cards; both are readouts, neither is tappable. */
+  .td-break-chip {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    background: var(--bg2); border: 2px solid var(--ink); border-radius: 999px;
+    padding: 0.05rem 0.5rem; white-space: nowrap;
+    font-size: max(13px, calc(0.84rem * var(--fs-scale, 1))); font-weight: 700;
+  }
+  .td-gap-break {
+    display: flex; align-items: center; gap: 0.55rem;
+    padding: 0.15rem 0 0.15rem 1.6rem; color: var(--ink-light);
+  }
+  .td-gap-dots {
+    width: 3px; height: 22px; flex: 0 0 3px; border-radius: 2px; opacity: 0.4;
+    background: repeating-linear-gradient(var(--ink) 0 4px, transparent 4px 8px);
+  }
 
   /* ── NEXT ──
      Divided from the current block by a rule rather than by a second card: it is
@@ -5511,15 +5612,62 @@
      container is exactly the thing that puts content out of a child's reach on
      a tablet. Each state differs in border style as well as fill, so the row
      survives greyscale and colour-blindness. */
-  .td-ribbon { display: flex; flex-direction: column; gap: 0.45rem; }
-  .td-rib-strip { display: flex; flex-wrap: wrap; gap: 3px; }
+  /* T3, like the cards around it. The strip used to sit bare on the page
+     background, which was right while it was a readout and wrong the moment it
+     became the door onto the day: an unlabelled strip with no edges does not
+     read as something you can press, least of all to a nine-year-old. */
+  .td-ribbon {
+    display: flex; flex-direction: column; gap: 0.45rem;
+    border: 2.5px solid var(--ink); border-radius: var(--radius, 18px);
+    background: var(--paper); padding: 0.2rem 0.8rem 0.7rem;
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+  /* The strip is the tap target and opens the DAY SCREEN — the one surface that
+     already draws today at absolute times with its breaks and free stretches,
+     rather than a second copy of the day unfolding here. Padding, not an
+     ::after, gets it past 44px: the strip is full width, so there is nothing to
+     keep small. */
+  .td-rib-btn {
+    display: block; width: 100%; text-align: left;
+    font: inherit; color: inherit; cursor: pointer;
+    background: none; border: none;
+    padding: 0.7rem 0.1rem 0.3rem;
+    transition: transform 0.08s;
+  }
+  .td-rib-btn:active { transform: translateY(1px); }
+  .td-rib-btn:focus-visible { outline: 3px solid var(--accent-strong); outline-offset: 3px; border-radius: var(--radius-sm, 12px); }
+  /* No wrap and no gap: the cells are laid to scale and the empty stretches
+     between them ARE the gaps, so a flex gap would add time the day has not
+     got, and a wrap would break the one line the scale depends on. */
+  .td-rib-strip { position: relative; display: flex; height: 20px; align-items: stretch; }
   .td-rib-cell {
-    flex: 1 1 0; min-width: 10px; max-width: 26px; aspect-ratio: 1;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.8rem; line-height: 1;
-    border: 2px solid var(--ink); border-radius: 6px;
+    border: 2px solid var(--ink); border-radius: 5px;
     background: var(--paper);
   }
+  /* Real empty space, sized by how long the gap actually is. */
+  .td-rib-gap { border: none; background: transparent; }
+  /* Where she is in the day. Absolutely placed, so it is the one thing on the
+     strip that does not take part in the flex layout. */
+  .td-rib-now {
+    position: absolute; top: -6px; bottom: -6px; width: 3px;
+    background: var(--ink); border-radius: 2px;
+  }
+  .td-rib-now::before {
+    content: ""; position: absolute; top: -5px; left: -3.5px;
+    border-left: 5px solid transparent; border-right: 5px solid transparent;
+    border-top: 6px solid var(--ink);
+  }
+  /* Three times, and the scale the strip is drawn to. */
+  .td-rib-foot {
+    display: flex; align-items: baseline; gap: 0.5rem; margin-top: 0.55rem;
+    font-size: max(13px, calc(0.82rem * var(--fs-scale, 1))); color: var(--ink-light);
+  }
+  /* The three times share the width; the chevron sits at the end of them. */
+  .td-rib-foot > span:not(.td-rib-go) { flex: 1 1 0; text-align: center; }
+  .td-rib-foot > span:not(.td-rib-go):first-child { text-align: left; }
+  /* The affordance, and it costs no words. The same chevron .td-row-go uses for
+     the same promise: this one goes somewhere. */
+  .td-rib-go { flex: 0 0 auto; font-size: 1.1rem; color: var(--ink-light); }
   .td-rib-cell--done { background: var(--accent-green); }
   .td-rib-cell--now { border-width: 2.5px; background: var(--accent-yellow); box-shadow: 2px 2px 0 var(--ink); }
   /* Ended without being ticked. Dashed and faded — a record, not a reprimand:

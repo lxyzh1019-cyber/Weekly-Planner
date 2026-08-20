@@ -197,6 +197,41 @@ element outside the screens, filled by `tdRenderNav`. Do not add a second nav ro
 to a screen: the six-button shortcut row that used to sit in three different
 topbars is exactly how their labels drifted apart, and it is gone.
 
+**The hero owns the block she is in, and owns it alone.** The screen used to draw
+the running block twice — a NOW card saying "now · started 8:15am" with a green
+`✓`, and four centimetres below the very same block as a card with a `✓` of its
+own. Two controls for one action, two glyphs for one meaning, and nothing to tell
+a child which tick did what. The running block is now absent from the list
+entirely (not even as a passive marker), and the hero's button is the `🎯` the
+cards carry — same green, same border, same offset, 56px only because it sits at
+the card's edge. `theHeroIsTheOnlyPlaceTheRunningBlockAppears` holds both halves.
+
+The hero carries the block's **window and what is left of it** (`8:15–9:00am · 22m
+left`) with the countdown drawn under it, and `tdTick` (js/99-main.js starts the
+timer) repaints it every minute — patching those three nodes in place, and doing a
+full render only when what she is doing actually changes. Still no clock: absolute
+time belongs to the day screen.
+
+**A block you travel to starts when you start getting ready.** Swimming at four
+does not mean leaving the house at four, so `tdActionableStart` — `tdPrepFor`'s
+first pre-buffer, which is `wfBufferSegments` and therefore the week grid's own
+arithmetic — is what the card leads with, what the hero's NEXT names, and what the
+list sorts by. `.quest-time` carries it at full size on the `--next` card, a plain
+card and a folded one alike: a get-ready time shrunk to a footnote is exactly the
+case where it matters most.
+
+**A gap is a break or free time, never both.** Under `TD_FREE_MIN` it is a chip on
+the hero's NEXT line and a connector between two cards; from `TD_FREE_MIN` up it is
+the free-time card that already existed. `tdGapBefore` is the one place that line
+is drawn, and it measures to `tdActionableStart`, not to the block's start.
+
+**A clash is the week's finding, drawn the week's way.** `computeBufferConflicts`
+(js/03-sync.js) owns it; Today asks and reuses `.wf-card--conflict`'s red. Its
+`partners` map exists so a screen can say *which* activity a block runs into
+without a second overlap test growing somewhere else. Both blocks it names take
+the frame, and the wording states the fact — the plan is what does not fit, and a
+child did not write it.
+
 **Today is where a day gets done; the day screen is where one gets built.** That
 split is the whole design. Today carries the quest cards, the 🎯 completion, the
 XP strip, the mood, the to-dos, the goals, the sticker collection and the note to
@@ -209,6 +244,13 @@ Checklist mode, the Quest Board's own list, day-view Quest mode, and finally the
 Quest Board screen itself. If you find yourself adding a fifth place that lists
 today's blocks with ticks beside them, that is the mistake, and Today is the
 place that already does it.
+
+That is why the day ribbon **taps through to `screen-day`** rather than unfolding
+a copy of the day under itself. It is drawn to scale — cell widths proportional to
+duration, gaps as real empty space, one now-marker — because equal squares said
+how many things were on the day and nothing about its shape. It is one control,
+not twenty: a 14px cell is not a reachable target, and twenty tab stops is not a
+description of an afternoon.
 
 **The day screen scrolls as one surface.** It was three nested scrollers
 (`.day-workspace` → `.day-center-lane` → `.timeline-wrap`), which on an iPad

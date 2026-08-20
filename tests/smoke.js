@@ -3752,15 +3752,26 @@ function findChromium() {
     goToday();
     const wrap = document.getElementById('tdWrap');
     const txt = wrap.textContent;
-    const namesNow = /now · started/.test(txt);
-    const hasJobs = /Jobs I can do/.test(txt);
-    const says = !!wrap.querySelector('.td-say') && wrap.querySelector('.td-say').textContent.trim().length > 0;
+    /* The hero names the running block's own window and what is left of it.
+       It used to say "now · started 8:15am", which made a child work out how
+       much longer she had from a time that had already gone past. */
+    const bad = [];
+    const sub = wrap.querySelector('.td-now-sub');
+    const subTxt = sub ? sub.textContent : '';
+    if (!/\d–\d/.test(subTxt)) bad.push('the hero does not give the block\'s window: "' + subTxt + '"');
+    if (!/left/.test(subTxt)) bad.push('the hero does not say how much is left: "' + subTxt + '"');
+    if (!wrap.querySelector('.td-now-bar-fill')) bad.push('the countdown is not drawn');
+    if (!/Jobs I can do/.test(txt)) bad.push('the jobs card is gone');
+    const say = wrap.querySelector('.td-say');
+    if (!say || !say.textContent.trim()) bad.push('nothing is said to her');
 
     // With nothing on today it must not read as a failure — off days are valid.
     setDayBlocks(dk, [], 'jenn');
     goToday();
-    const kind = /allowed|yours|quiet|rest/i.test(document.getElementById('tdWrap').textContent);
-    return namesNow && hasJobs && says && kind;
+    if (!/allowed|yours|quiet|rest/i.test(document.getElementById('tdWrap').textContent)) {
+      bad.push('an empty day reads as a failure');
+    }
+    return bad.length ? bad : true;
   });
 
   /* Next at the top. The list ran in plain time order, so from mid-morning
@@ -3845,17 +3856,27 @@ function findChromium() {
       })), 'jenn');
       goToday();
 
-      if (blocks().length !== 3) bad.push(`${blocks().length} blocks loud, expected 1 + TD_UP_NEXT = 3`);
+      /* The 9am block is running, so the hero IS it and the list starts at 10.
+         Reachability is what matters, not which surface carries it, so the hero
+         counts alongside the cards — see the note above the check. */
+      const heroSub = () => (document.querySelector('#tdWrap .td-now-sub') || {}).textContent || '';
+      const reachable = () => [...document.querySelectorAll('#tdWrap .quest-time')]
+        .map(e => e.textContent.trim()).concat(heroSub());
+      if (blocks().length !== 3) bad.push(`${blocks().length} blocks loud, expected TD_UP_NEXT + 1 = 3`);
+      if (!/9:00/.test(heroSub())) bad.push(`the running block is not on the hero: "${heroSub()}"`);
+      if (blocks().some(c => /9:00am/.test(c.textContent))) {
+        bad.push('the running block is on the hero AND in the list');
+      }
       const f = fold();
       if (!f) return ['the rest of the day is not folded away'];
-      if (!/3/.test(f.textContent)) bad.push(`the fold does not say how many are behind it: "${f.textContent.trim()}"`);
+      if (!/2/.test(f.textContent)) bad.push(`the fold does not say how many are behind it: "${f.textContent.trim()}"`);
       // Reachable — the half a cap could never satisfy.
       f.click();
-      if (blocks().length !== 6) bad.push(`opening the fold showed ${blocks().length} of 6 blocks`);
-      const times = [...document.querySelectorAll('#tdWrap .quest-time')].map(e => e.textContent.trim());
-      if (!times.includes('9:00am') || !times.includes('2:00pm')) {
-        bad.push(`the whole day is not reachable: ${times.join(', ')}`);
-      }
+      if (blocks().length !== 5) bad.push(`opening the fold showed ${blocks().length} of the 5 blocks not on the hero`);
+      const times = reachable();
+      const missing = ['9:00', '10:00am', '11:00am', '12:00pm', '1:00pm', '2:00pm']
+        .filter(t => !times.some(x => x.includes(t)));
+      if (missing.length) bad.push(`the whole day is not reachable: missing ${missing.join(', ')}`);
       tdToggleLater();
 
       /* A fold over ONE card hides as much as it saves, so at one there is no
@@ -3865,7 +3886,8 @@ function findChromium() {
       })), 'jenn');
       goToday();
       if (fold()) bad.push('a fold was drawn over a single card');
-      if (blocks().length !== 4) bad.push(`${blocks().length} of 4 blocks showing when the fold is not worth drawing`);
+      // Three in the list, the fourth on the hero: four blocks, none hidden.
+      if (blocks().length !== 3) bad.push(`${blocks().length} of the 3 off-hero blocks showing when the fold is not worth drawing`);
       if (cards().length !== blocks().length) bad.push('a free-time card appeared in a back-to-back day');
     } finally {
       Date = RealDate;
@@ -3911,10 +3933,13 @@ function findChromium() {
         if (!/10:00am/.test(t)) bad.push('the free card does not say when it starts');
         if (!/11:30am/.test(t)) bad.push('the free card does not say when it ends');
       }
-      // In time order, between the two blocks.
+      /* In time order. The 9am block is running, so the hero has it and the
+         list opens on the hole it leaves behind — "you have an hour and a half,
+         then dinner" is the order the morning actually happens in. */
       const all = [...document.querySelectorAll('#tdWrap .dq-list .quest-card')];
-      if (all.length !== 3 || !all[1].classList.contains('quest-card--free')) {
-        bad.push('the free stretch is not in time order between the blocks');
+      if (all.length !== 2 || !all[0].classList.contains('quest-card--free')
+          || all[1].classList.contains('quest-card--free')) {
+        bad.push('the free stretch is not in time order before the block it precedes');
       }
       // It offers itself: tapping opens the day screen to fill it.
       free()[0].querySelector('[data-td-action="plan"]').click();
@@ -5811,15 +5836,40 @@ function findChromium() {
         if (doneCells !== doneBlocks) out.push(`${doneCells} filled cells for ${doneBlocks} finished blocks`);
         const nowCells = strip.querySelectorAll('.td-rib-cell--now').length;
         if (nowCells !== 1) out.push(`${nowCells} cells marked as running, expected 1`);
-        // The spoken label carries the same figures the strip draws.
-        const label = strip.getAttribute('aria-label') || '';
+        // The spoken label carries the same figures the strip draws, and lives
+        // on the button — the strip itself is aria-hidden, because twenty cells
+        // read out one at a time is not a description of a day.
+        const btn = document.querySelector('#tdWrap .td-rib-btn');
+        if (!btn) return ['the ribbon does not open anything'];
+        const label = btn.getAttribute('aria-label') || '';
         if (!label.includes(`${doneBlocks} of ${blocks.length}`)) {
           out.push(`the spoken label reads "${label}", which is not ${doneBlocks} of ${blocks.length}`);
         }
-        // A readout, not a control: no tab stops, no undersized targets.
+        /* ONE control, not twenty. The cells were never tappable — a 14px square
+           is not a reachable target — and making the strip open the day must not
+           turn each cell into its own tab stop. */
         if (strip.querySelector('button, [onclick], [role="button"], a[href]')) {
-          out.push('the ribbon has tappable cells — it is a readout, not a control');
+          out.push('the ribbon has tappable cells — the strip is one control, not twenty');
         }
+        const hit = btn.getBoundingClientRect();
+        if (hit.height < 44) out.push(`the ribbon's tap target is ${Math.round(hit.height)}px tall`);
+
+        /* DRAWN TO SCALE. Equal squares said how many things were on the day and
+           nothing about its shape: a five-minute vitamin and a five-hour school
+           day drew the same box. School is ten times piano's length, so its cell
+           has to be about ten times as wide. Ratios rather than absolutes, with
+           room for the minimum-width floor on the small ones. */
+        const w = id => {
+          const i = blocks.findIndex(b => b.id === id);
+          return cells[i].getBoundingClientRect().width;
+        };
+        const ratio = w('r2') / w('r3');   // 300 minutes against 60
+        if (ratio < 3.5) out.push(`a 5h block is only ${ratio.toFixed(1)}× the width of a 1h one`);
+        // Gaps are real empty space, not a uniform separator.
+        if (!strip.querySelector('.td-rib-gap')) out.push('the day has holes in it and the ribbon shows none');
+        // And the marker says where in that shape she is.
+        const marker = strip.querySelector('.td-rib-now');
+        if (!marker) out.push('the ribbon does not say where in the day she is');
 
         // Twenty blocks on a phone: one row, inside the viewport, no scroller.
         setDayBlocks(key, Array.from({ length: 20 }, (_, i) => ({
@@ -5827,11 +5877,21 @@ function findChromium() {
           completed: i < 9,
         })), 'jenn');
         goToday();
+        /* TAPPING IT OPENS THE DAY SCREEN — the surface that already draws today
+           at absolute times with its breaks and free stretches. Deliberately not
+           a second copy of the day unfolded here: four renderings of one day have
+           been retired in this app already (CLAUDE.md). */
+        document.querySelector('#tdWrap .td-rib-btn').click();
+        if (document.querySelector('.screen.active').id !== 'screen-day') {
+          out.push('tapping the ribbon does not open the day');
+        }
+        goToday();
+
         const s2 = document.querySelector('#tdWrap .td-rib-strip');
         const c2 = [...s2.querySelectorAll('.td-rib-cell')];
         if (c2.length !== 20) out.push(`${c2.length} cells for 20 blocks`);
         const box = s2.getBoundingClientRect(), cell = c2[0].getBoundingClientRect();
-        const rows = Math.round(box.height / (cell.height + 3));
+        const rows = Math.round(box.height / Math.max(1, cell.height));
         if (rows > 1) out.push(`20 blocks wrapped onto ${rows} rows on a phone`);
         if (box.right > window.innerWidth + 1) {
           out.push(`the ribbon runs ${Math.round(box.right - window.innerWidth)}px past the screen edge`);
@@ -5850,6 +5910,379 @@ function findChromium() {
     await page.evaluate(() => goToday());
     return bad.length === 0 || bad;
   })();
+
+  /* THE HERO OWNS THE RUNNING BLOCK, AND OWNS IT ALONE.
+     The screen used to draw it twice: a NOW card saying "now · started 8:15am"
+     with a green ✓, and — four centimetres below — the very same block as a card
+     with a ✓ of its own. Two controls for one action, two glyphs for one meaning,
+     and no way for a child to tell which tick did what. The hero is the only
+     place it appears and the only place it can be closed, and its button is the
+     🎯 the cards below carry rather than a tick that could be mistaken for the
+     one marking history. */
+  checks.theHeroIsTheOnlyPlaceTheRunningBlockAppears = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+    const out = [];
+    const key = todayKey();
+    const before = (getDayBlocks(key, 'jenn') || []).slice();
+    const RealDate = Date;
+    const when = new RealDate(); when.setHours(9, 30, 0, 0);
+    Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+    Date.prototype = RealDate.prototype;
+    Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    try {
+      setDayBlocks(key, [
+        { id: 'h1', actId: 'piano',    startMin: 9 * 60,  durationMin: 60 },
+        { id: 'h2', actId: 'homework', startMin: 11 * 60, durationMin: 45 },
+      ], 'jenn');
+      goToday();
+
+      if (!document.querySelector('#tdWrap .td-now')) return ['there is no NOW card'];
+      // Open both folds FIRST: each toggle re-renders the wrap, and a node held
+      // across that render is detached — which measures 0×0 and computes as
+      // unstyled, so every assertion below would be about a corpse.
+      if (tdEarlierOpen()) tdToggleEarlier();
+      if (!tdLaterOpen()) tdToggleLater();
+
+      const tick = document.querySelector('#tdWrap .td-now .td-now-tick');
+      if (!tick) return ['the running block cannot be closed from the hero'];
+      if (tick.getAttribute('data-td-block') !== 'h1') {
+        out.push('the hero tick does not point at the running block');
+      }
+      const listed = [...document.querySelectorAll('#tdWrap .quest-card [data-td-block="h1"]')];
+      if (listed.length) out.push(`the running block is on the hero AND ${listed.length}× in the list`);
+
+      /* ONE GLYPH FOR ONE ACTION. The hero button and the card buttons are the
+         same control in two sizes, so they must not differ in anything else. */
+      const row = document.querySelector('#tdWrap .quest-complete-btn');
+      if (!row) out.push('no card carries a completion button to compare against');
+      else {
+        if (tick.textContent.trim() !== row.textContent.trim()) {
+          out.push(`the hero says "${tick.textContent.trim()}" where a card says "${row.textContent.trim()}"`);
+        }
+        const a = getComputedStyle(tick), b = getComputedStyle(row);
+        if (a.backgroundColor !== b.backgroundColor) out.push('the hero button is not the cards\' green');
+        if (a.borderTopWidth !== b.borderTopWidth) out.push('the hero button is not the cards\' border');
+        if (a.borderRadius !== b.borderRadius) out.push('the hero button is not the cards\' shape');
+      }
+      // Still past the 44px floor, and still one completion path.
+      const box = tick.getBoundingClientRect();
+      if (box.width < 44 || box.height < 44) {
+        out.push(`the hero button is ${Math.round(box.width)}×${Math.round(box.height)}px`);
+      }
+      if (tick.getAttribute('data-td-action') !== 'blast') {
+        out.push('the hero does not route through the one completion path');
+      }
+    } finally {
+      Date = RealDate;
+      setDayBlocks(key, before, 'jenn');
+      goToday();
+    }
+    return out.length === 0 || out;
+  });
+
+  /* THE HERO COUNTS DOWN.
+     "now · started 8:15am" is the time she is already past, and it left her to
+     work out how much longer she had. The window and what is left of it, with
+     the same fact drawn underneath so it can be glanced at. The bar is checked
+     at two clock times because a bar that renders once and never moves looks
+     identical to a working one in a single screenshot. */
+  checks.theHeroCountsDownTheBlockSheIsIn = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+    const out = [];
+    const key = todayKey();
+    const before = (getDayBlocks(key, 'jenn') || []).slice();
+    const RealDate = Date;
+    const pin = (h, m) => {
+      const when = new RealDate(); when.setHours(h, m, 0, 0);
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+      Date.prototype = RealDate.prototype;
+      Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    };
+    const read = () => {
+      const sub = document.querySelector('#tdWrap .td-now-sub');
+      const bar = document.querySelector('#tdWrap .td-now-bar');
+      const fill = document.querySelector('#tdWrap .td-now-bar-fill');
+      return {
+        text: sub ? sub.textContent.replace(/\s+/g, ' ').trim() : '',
+        pct: (bar && fill)
+          ? fill.getBoundingClientRect().width / Math.max(1, bar.getBoundingClientRect().width)
+          : null,
+      };
+    };
+    try {
+      // 9:00–10:00. A quarter through at 9:15, three quarters through at 9:45.
+      setDayBlocks(key, [{ id: 'cd1', actId: 'piano', startMin: 9 * 60, durationMin: 60 }], 'jenn');
+      pin(9, 15); goToday();
+      const early = read();
+      if (!/9:00–10:00am/.test(early.text)) out.push(`the hero does not give the window: "${early.text}"`);
+      if (!/45m left/.test(early.text)) out.push(`the hero does not count down: "${early.text}"`);
+      if (early.pct === null) return ['the countdown is not drawn'];
+
+      pin(9, 45); goToday();
+      const late = read();
+      if (!/15m left/.test(late.text)) out.push(`the countdown did not move: "${late.text}"`);
+      if (!(late.pct > early.pct + 0.2)) {
+        out.push(`the bar sat at ${Math.round(early.pct * 100)}% then ${Math.round(late.pct * 100)}%`);
+      }
+      // No second clock: absolute time belongs to the day screen.
+      const heroTxt = document.querySelector('#tdWrap .td-now').textContent;
+      if (/\b9:4[0-9](am)?\b/.test(heroTxt)) out.push('the hero has grown a clock');
+    } finally {
+      Date = RealDate;
+      setDayBlocks(key, before, 'jenn');
+      goToday();
+    }
+    return out.length === 0 || out;
+  });
+
+  /* A SHORT GAP IS A BREAK; A LONG ONE IS FREE TIME. NEVER BOTH.
+     Two descriptions of one stretch is a screen contradicting itself, so the
+     thresholds have to meet exactly: under TD_FREE_MIN it is a break chip, from
+     TD_FREE_MIN up it is the free-time card that already existed, and neither
+     case may produce the other. */
+  checks.aShortGapReadsAsABreak = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+    const out = [];
+    const key = todayKey();
+    const before = (getDayBlocks(key, 'jenn') || []).slice();
+    const wasLater = tdLaterOpen();
+    const RealDate = Date;
+    const when = new RealDate(); when.setHours(9, 30, 0, 0);
+    Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+    Date.prototype = RealDate.prototype;
+    Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    try {
+      if (!tdLaterOpen()) tdToggleLater();
+      /* 9–10, then fifteen minutes, then 10:15–11, then fifteen more. The hero
+         names the gap it is standing in front of; the list threads the one
+         between the two cards it shows. */
+      setDayBlocks(key, [
+        { id: 'b1', actId: 'piano',    startMin: 9 * 60,       durationMin: 60 },
+        { id: 'b2', actId: 'homework', startMin: 10 * 60 + 15, durationMin: 45 },
+        { id: 'b3', actId: 'reading',  startMin: 11 * 60 + 15, durationMin: 45 },
+      ], 'jenn');
+      goToday();
+      const chip = document.querySelector('#tdWrap .td-now-next .td-break-chip');
+      if (!chip) out.push('the hero does not name the break before the next thing');
+      else if (!/15m/.test(chip.textContent)) {
+        out.push(`the hero calls it "${chip.textContent.trim()}", not a 15m break`);
+      }
+      const conn = [...document.querySelectorAll('#tdWrap .td-gap-break')];
+      if (conn.length !== 1) out.push(`${conn.length} break connectors in the list, expected 1`);
+      if (document.querySelector('#tdWrap .quest-card--free')) {
+        out.push('a 15-minute gap was also drawn as free time');
+      }
+      // A connector is a readout, not a third thing to do.
+      if (conn[0] && conn[0].querySelector('button, [data-td-action]')) {
+        out.push('the break connector is tappable');
+      }
+
+      /* Forty-five minutes is over TD_FREE_MIN, so it is free time and gets the
+         card it always got — and no chip, because the card already says it. */
+      setDayBlocks(key, [
+        { id: 'b1', actId: 'piano',    startMin: 9 * 60,       durationMin: 60 },
+        { id: 'b2', actId: 'homework', startMin: 10 * 60 + 45, durationMin: 45 },
+      ], 'jenn');
+      goToday();
+      if (!document.querySelector('#tdWrap .quest-card--free')) {
+        out.push('a 45-minute hole was not named as free time');
+      }
+      if (document.querySelector('#tdWrap .td-break-chip')) {
+        out.push('free time was also called a break');
+      }
+    } finally {
+      Date = RealDate;
+      if (tdLaterOpen() !== wasLater) tdToggleLater();
+      setDayBlocks(key, before, 'jenn');
+      goToday();
+    }
+    return out.length === 0 || out;
+  });
+
+  /* A BLOCK YOU TRAVEL TO STARTS WHEN YOU START GETTING READY.
+     Swimming at four o'clock does not mean leaving the house at four o'clock:
+     with ten minutes of kit and fifteen in the car, the first minute she has to
+     do something is 3:35, and a card leading with 4:00 names a time she is
+     already late for. The card leads with the actionable minute and the block's
+     own start follows it, so it still tells the truth about when swimming is.
+
+     The size assertion is the load-bearing one. A get-ready time shrunk to a
+     footnote on a folded card is exactly the case where it matters most — she
+     is looking at the rest of the day, not the next hour — so .quest-time must
+     compute identically on the --next card, a plain card and a quiet one. */
+  checks.aBlockYouTravelToStartsWhenYouStartGettingReady = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+    const out = [];
+    const key = todayKey();
+    const before = (getDayBlocks(key, 'jenn') || []).slice();
+    const wasLater = tdLaterOpen();
+    const RealDate = Date;
+    const when = new RealDate(); when.setHours(13, 0, 0, 0);
+    Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+    Date.prototype = RealDate.prototype;
+    Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    const travel = (id, startMin) => ({
+      id, actId: 'training', tag: 'swimming', startMin, durationMin: 60,
+      getReadyBuffer: true, getReadyBufMin: 10, travelBuffer: true, travelBufMin: 15,
+    });
+    try {
+      if (!tdLaterOpen()) tdToggleLater();
+      /* Five blocks she has to travel to. Spaced by exactly 85 minutes — the
+         hour they run plus the 25 of kit and car in front of the next one — so
+         each one's get-ready begins the moment the last one ends and no free
+         stretch or break comes between them. Free-time cards are legitimate
+         items and would otherwise spend the loud slots, leaving no plain block
+         card in the loud list to compare the folded ones against. */
+      setDayBlocks(key, [0, 1, 2, 3, 4].map(i => travel('tv' + i, 16 * 60 + i * 85)), 'jenn');
+      goToday();
+
+      // :not(--free) throughout — a free stretch legitimately sits above the
+      // block it precedes, and it is not the card under test.
+      const first = document.querySelector('#tdWrap .quest-card:not(.quest-card--free)');
+      if (!first) return ['no block cards rendered'];
+      const lead = first.querySelector('.quest-time').textContent.trim();
+      // 4:00pm minus 15m travel minus 10m getting ready.
+      if (lead !== '3:35pm') out.push(`the card leads with ${lead}, not the 3:35pm she has to move at`);
+      if (!/get ready/i.test(first.textContent)) out.push('the card does not say what 3:35pm is');
+      if (!/4:00pm/.test(first.textContent)) out.push('the card no longer says when swimming actually is');
+
+      /* The one number the app is allowed to compute here is the one
+         wfBufferSegments already computes for the week grid and the print sheet.
+         Not a second calculation — the same one. */
+      const blocks = tdQuestsToday('jenn');
+      const seg = wfBufferSegments(blocks[0]).filter(s => s.side === 'pre')
+        .sort((a, b) => a.startRel - b.startRel)[0];
+      if (formatQuestTime(seg.startRel + START_MIN) !== lead) {
+        out.push('the card\'s time is not the one wfBufferSegments gives');
+      }
+
+      // Same size and colour wherever the card sits.
+      const at = sel => {
+        const el = document.querySelector(sel);
+        if (!el) return null;
+        const cs = getComputedStyle(el);
+        return cs.fontSize + '/' + cs.color;
+      };
+      const next = at('#tdWrap .quest-card--next .quest-time');
+      const plain = at('#tdWrap .dq-list:not(.dq-list--quiet) .quest-card:not(.quest-card--next):not(.quest-card--free) .quest-time');
+      const quiet = at('#tdWrap .dq-list--quiet .quest-card:not(.quest-card--free) .quest-time');
+      if (!next || !plain || !quiet) {
+        out.push('the fixture did not produce a next, a plain and a folded card');
+      } else {
+        if (next !== plain) out.push(`the next card's time is ${next}, a plain one's is ${plain}`);
+        if (next !== quiet) out.push(`the next card's time is ${next}, a folded one's is ${quiet}`);
+      }
+
+      /* AND THE LIST IS ORDERED BY IT. A 6:30 skate she has to leave for at 5:50
+         belongs where 5:50 belongs — sorting by the block's own start put it
+         under a six o'clock block she would already have left the house for. */
+      setDayBlocks(key, [
+        travel('tv-late', 18 * 60 + 30),                                        // needs her at 6:05
+        { id: 'tv-mid', actId: 'homework', startMin: 18 * 60, durationMin: 30 }, // starts at 6:00
+      ], 'jenn');
+      goToday();
+      const order = [...document.querySelectorAll('#tdWrap .quest-card:not(.quest-card--free) .quest-time')]
+        .map(e => e.textContent.trim());
+      if (order[0] !== '6:00pm') out.push(`the list opens at ${order[0]}, not the 6:00pm homework`);
+      if (order[1] !== '6:05pm') out.push(`the skate she must leave for sits at ${order[1]}, not 6:05pm`);
+
+      // A block with no buffers is untouched: one time, and it is its own.
+      setDayBlocks(key, [{ id: 'tv-plain', actId: 'piano', startMin: 16 * 60, durationMin: 60 }], 'jenn');
+      goToday();
+      const plainCard = document.querySelector('#tdWrap .quest-card:not(.quest-card--free)');
+      if (plainCard.querySelector('.quest-ready-lab')) {
+        out.push('a block with no travel was given a get-ready time');
+      }
+      if (plainCard.querySelector('.quest-time').textContent.trim() !== '4:00pm') {
+        out.push('a block with no travel no longer leads with its own start');
+      }
+    } finally {
+      Date = RealDate;
+      if (tdLaterOpen() !== wasLater) tdToggleLater();
+      setDayBlocks(key, before, 'jenn');
+      goToday();
+    }
+    return out.length === 0 || out;
+  });
+
+  /* A CLASH READS THE SAME WAY IT DOES ON THE WEEK.
+     Piano runs 3:30–4:00 but swimming's get-ready starts at 3:35, so the plan
+     is not workable. computeBufferConflicts already finds this and the week grid
+     already draws it in red; Today asks the same function and uses the same red,
+     because two screens flagging one problem two different ways is how a child
+     learns to trust neither. Both blocks it names take the frame — a clash has
+     two sides and blaming one of them is arbitrary. */
+  checks.todayFlagsAClashTheSameWayTheWeekDoes = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+    const out = [];
+    const key = todayKey();
+    const before = (getDayBlocks(key, 'jenn') || []).slice();
+    const RealDate = Date;
+    const when = new RealDate(); when.setHours(15, 40, 0, 0);
+    Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+    Date.prototype = RealDate.prototype;
+    Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    const swim = start => ({
+      id: 'cf-swim', actId: 'training', tag: 'swimming', startMin: start, durationMin: 60,
+      getReadyBuffer: true, getReadyBufMin: 10, travelBuffer: true, travelBufMin: 15,
+    });
+    try {
+      setDayBlocks(key, [
+        { id: 'cf-read', actId: 'piano', startMin: 15 * 60 + 30, durationMin: 30 },
+        swim(16 * 60),
+      ], 'jenn');
+      goToday();
+
+      // The owner's own answer, which is the only one Today is allowed to have.
+      const { affected } = computeBufferConflicts(tdQuestsToday('jenn'));
+      if (affected.size !== 2) return [`the fixture does not clash: ${affected.size} blocks affected`];
+
+      // Piano is running, so it is on the hero; swimming is the next card.
+      const hero = document.querySelector('#tdWrap .td-now');
+      if (!hero.classList.contains('td-now--conflict')) {
+        out.push('the running block is in a clash and the hero does not show it');
+      }
+      const card = document.querySelector('#tdWrap .quest-card:not(.quest-card--free)');
+      if (!card.classList.contains('quest-card--conflict')) {
+        out.push('the block it clashes with is not framed');
+      }
+      /* The frame composes with the tier rather than replacing it: the next block
+         is still the next block whether or not its buffers fit, and dropping
+         --next would leave the screen with no T2 card for the hero's NEXT line
+         to agree with. */
+      if (!card.classList.contains('quest-card--next')) {
+        out.push('a clashing next block stopped being the next block');
+      }
+      if (!card.querySelector('.quest-conflict-flag')) out.push('the clash has no flag');
+      const note = card.querySelector('.quest-conflict-note');
+      if (!note) out.push('the card does not say what it clashes with');
+      else if (!/Piano/.test(note.textContent)) {
+        out.push(`the note reads "${note.textContent.trim()}" and does not name the piano it runs into`);
+      }
+      // Stated, never scolded — off days and imperfect plans are valid states.
+      const said = (note ? note.textContent : '') + hero.textContent;
+      if (/late|missed|failed|should|too slow/i.test(said)) {
+        out.push(`a clash is worded as a telling-off: "${said.replace(/\s+/g, ' ').trim()}"`);
+      }
+
+      /* AND IT GOES AWAY WHEN THE PLAN WORKS. Move reading an hour earlier and
+         the buffers fit, so nothing is framed — a warning that never clears is
+         one a child learns to ignore. */
+      setDayBlocks(key, [
+        { id: 'cf-read', actId: 'piano', startMin: 14 * 60, durationMin: 30 },
+        swim(16 * 60),
+      ], 'jenn');
+      goToday();
+      if (document.querySelector('#tdWrap .quest-card--conflict, #tdWrap .td-now--conflict')) {
+        out.push('a day whose buffers fit is still flagged as clashing');
+      }
+    } finally {
+      Date = RealDate;
+      setDayBlocks(key, before, 'jenn');
+      goToday();
+    }
+    return out.length === 0 || out;
+  });
 
   /* THE UNDO TOAST IS STRUCTURALLY OUTSIDE THE BUDGET.
      One line, and it exists to say why. The word-budget sweep and the 44px probe

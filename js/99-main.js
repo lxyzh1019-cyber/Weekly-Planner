@@ -14,8 +14,18 @@ window._currentRewardPrompt = null;
 // not reliably fire; visibilitychange covers app-switching on a tablet, which is
 // how this app is actually used.
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') flushPush();
+  if (document.visibilityState === 'hidden') { flushPush(); return; }
+  // Coming back to the app is the moment Today is most likely to be stale: an
+  // iPad put down after breakfast and picked up at four is still showing the
+  // morning's hero. Timers do not fire reliably in a backgrounded tab, so the
+  // return has to re-resolve rather than wait for the next tick.
+  if (typeof tdTick === 'function') tdTick();
 });
+// Today counts down, so it has to be told the minute has changed. tdTick patches
+// the countdown, the bar and the ribbon marker in place, and only re-renders when
+// what she is doing actually changes; it returns immediately unless Today is the
+// screen on show. A render is not a mutation — nothing here writes to Firestore.
+setInterval(() => { try { tdTick(); } catch (e) { console.error('tdTick failed', e); } }, TD_TICK_MS);
 window.addEventListener('pagehide', flushPush);
 // Chore tab uses event delegation on #choreWrap (survives innerHTML re-renders).
 (function(){
