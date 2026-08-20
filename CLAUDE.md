@@ -252,6 +252,16 @@ how many things were on the day and nothing about its shape. It is one control,
 not twenty: a 14px cell is not a reachable target, and twenty tab stops is not a
 description of an afternoon.
 
+Drawn to scale means the row has to **add up to a day**. It is one nowrap flex row
+of percentages with nothing able to shrink, so anything that oversubscribes it
+pushes the last cell straight through the edge of its column. Two things do:
+overlapping blocks — which is exactly the clash this screen draws in red, where a
+block's get-ready starts inside the block before it — and `MIN_CELL`, since a floor
+applied often enough overruns the row on its own. `tdProgressRibbon` clamps each
+cell to the cursor so no minute is spent twice, then scales the segments back if
+they still come to more than 100. It shipped without either guard and every check
+passed: no fixture had two blocks that overlap. A screenshot found it.
+
 **The day screen scrolls as one surface.** It was three nested scrollers
 (`.day-workspace` → `.day-center-lane` → `.timeline-wrap`), which on an iPad
 meant a flick could move the wrong one. `.day-workspace` is the only scroller;
@@ -288,7 +298,9 @@ the first, and a child has no way to tell which one is lying — so grading and
 settling still belong to the chore and money screens, and nothing on Today moves
 money.
 
-Today is also held to the **200-word budget with no ratchet**, which is why the
+Today measures **129 words** against the 200 on a busy day — one running block, a
+break, a get-ready column, a clash and a free stretch, with both folds open. Today
+is also held to the **200-word budget with no ratchet**, which is why the
 vibe, to-do, goals, sticker and note panels ship collapsed behind one
 `localStorage` flag (`tdExtrasOpen`), and why finished blocks fold away behind
 `tdExtrasOpen`'s sibling `tdEarlierOpen`. Reference material starts closed. The

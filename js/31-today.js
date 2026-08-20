@@ -559,15 +559,33 @@ function tdProgressRibbon(kid, blocks) {
   const span = to - from;
   const pctOf = min => Math.max(0, Math.min(100, (min - from) / span * 100));
 
-  /* Cells and the gaps between them, laid left to right. A cell narrower than
-     this reads as a scratch rather than a block, so it is floored — the strip
-     is a shape to glance at, not a measuring instrument. */
+  /* Cells and the gaps between them, laid left to right, as percentages of one
+     nowrap row. Two ways that row could add up to more than 100% — and it did,
+     which put the last cell through the right-hand edge of its column on an
+     iPad in landscape:
+
+     A BLOCK MAY START INSIDE THE ONE BEFORE IT. That is not a hypothetical, it
+     is exactly the clash this screen now draws in red: swimming needs her at
+     3:35 while piano runs to 4:00. Measured from its own start, its cell claims
+     twenty-five minutes the previous cell has already drawn. Clamping to the
+     cursor means the strip only ever spends each minute of the day once.
+
+     AND THE FLOOR IS A FLOOR. A cell thinner than MIN_CELL reads as a scratch
+     rather than a block, so it is widened — and enough short blocks widened
+     enough will overrun the row on their own, with no overlap involved.
+
+     So: build the segments, then scale the lot back if they came to more than a
+     day. Proportions survive; the strip fits. */
   const MIN_CELL = 3;
   let cursor = from;
-  const cells = blocks.map(b => {
+  const segs = [];
+  blocks.forEach(b => {
     const s = tdActionableStart(b);
     const e = (b.startMin || 0) + (b.durationMin || 0);
     const gap = Math.max(0, pctOf(s) - pctOf(cursor));
+    if (gap > 0.5) segs.push({ cls: 'td-rib-gap', w: gap });
+    // Never re-draw time an earlier block already occupies.
+    const drawFrom = Math.max(s, cursor);
     cursor = Math.max(cursor, e);
     // Written out rather than built from a ternary: check-dead-css.js matches
     // literal text, and a class it cannot see is a class that can quietly die.
@@ -575,10 +593,13 @@ function tdProgressRibbon(kid, blocks) {
     if (b.completed) cls = 'td-rib-cell td-rib-cell--done';
     else if (current && b.id === current.id) cls = 'td-rib-cell td-rib-cell--now';
     else if (e <= now) cls = 'td-rib-cell td-rib-cell--missed';
-    const w = Math.max(MIN_CELL, pctOf(e) - pctOf(s));
-    return (gap > 0.5 ? `<span class="td-rib-gap" style="flex:0 0 ${gap.toFixed(2)}%"></span>` : '')
-      + `<span class="${cls}" style="flex:0 0 ${w.toFixed(2)}%"></span>`;
-  }).join('');
+    segs.push({ cls, w: Math.max(MIN_CELL, pctOf(e) - pctOf(drawFrom)) });
+  });
+  const wide = segs.reduce((a, s) => a + s.w, 0);
+  const scale = wide > 100 ? 100 / wide : 1;
+  const cells = segs
+    .map(s => `<span class="${s.cls}" style="flex:0 0 ${(s.w * scale).toFixed(2)}%"></span>`)
+    .join('');
 
   /* The marker only exists while now is inside the day's span. Before the first
      block and after the last one there is nothing for it to point at, and an

@@ -1609,7 +1609,7 @@ function findChromium() {
     // Today is held to the full 200 with no ratchet: it was built to these rules
     // rather than measured against them afterwards, which was the point of
     // landing them first.
-    ['screen-today',   () => { goToday(); }],
+    ['screen-today',   () => { const undo = seedTodayAudit(); goToday(); undo(); }],
     ['screen-week',    () => { goWeek(); renderWeek(); }],
     /* The same screen on a Sunday. The weekly-review banner renders one day in
        seven (js/07-week-view.js, the `isSunday` branch) and it is the only place
@@ -1681,7 +1681,11 @@ function findChromium() {
        panels moved into Today's disclosure, which the screen-today row already
        covers — with the disclosure opened, so the panels are actually measured
        rather than skipped for being display:none. */
-    ['screen-today',   () => { goToday(); if (!tdExtrasOpen()) tdToggleExtras(); }, 'screen-today/extras'],
+    ['screen-today',   () => {
+      const undo = seedTodayAudit();
+      goToday(); if (!tdExtrasOpen()) tdToggleExtras();
+      undo();
+    }, 'screen-today/extras'],
     ['screen-chore',   () => { openChoreTab(); ckSelectDay(2); }],
     ['screen-mymoney', () => { mnyOpenMyMoney('jenn'); }],
   ];
@@ -1689,6 +1693,57 @@ function findChromium() {
   // changed nearly every layout only ever checked a phone and a desktop-ish
   // window, so iPad portrait and landscape — the sizes this app actually lives
   // on — went unmeasured through the whole rebuild.
+  /* ── Today gets a real day for the audit ─────────────────────────────────
+     Both screen-today rows used to be a bare goToday(), which measured whatever
+     blocks happened to be on today at this point in the run — and the
+     screen-week row a few lines up seeds its own fixture precisely because that
+     is not good enough. So the surfaces added with the hero refit (the running
+     block's countdown, the break chip and connector, the get-ready time column,
+     the clash frames) were never on screen while the five viewports were being
+     swept, and .quest-start-at's white-space: nowrap had never been measured
+     for overflow at any width.
+
+     Seeded, rendered, then put back — the same discipline as screen-week, plus
+     the clock, because none of it is reachable without pinning the time. The
+     Later fold is opened for the same reason the extras row opens its
+     disclosure: a panel behind display:none is a panel this audit skips.
+
+     Returns its own undo, so the caller reads seed → render → restore in order. */
+  await page.evaluate(() => {
+    window.seedTodayAudit = () => {
+      const kid = activeProfile();
+      const key = todayKey();
+      const hadBlocks = (getDayBlocks(key, kid) || []).slice();
+      const hadLater = tdLaterOpen();
+      const RealDate = Date;
+      const when = new RealDate(); when.setHours(9, 30, 0, 0);
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+      Date.prototype = RealDate.prototype;
+      Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+      setDayBlocks(key, [
+        // Running at 9:30 — the hero, its countdown and its 🎯.
+        { id: 'aud-a', actId: 'piano', startMin: 9 * 60, durationMin: 60 },
+        // 15 minutes after it: the break chip on the hero's NEXT line.
+        { id: 'aud-b', actId: 'math', startMin: 10 * 60 + 15, durationMin: 45 },
+        // 15 more between two list cards: the break connector. Ends 12:45.
+        { id: 'aud-c', actId: 'dinner', startMin: 11 * 60 + 15, durationMin: 90 },
+        /* Needs her at 12:35 (10m kit + 15m car), which lands inside the block
+           above — so this is the get-ready time column AND the clash, on both
+           blocks it names. */
+        { id: 'aud-d', actId: 'training', tag: 'swimming', startMin: 13 * 60, durationMin: 60,
+          getReadyBuffer: true, getReadyBufMin: 10, travelBuffer: true, travelBufMin: 15 },
+        // An hour after that one ends: the free-time card.
+        { id: 'aud-e', actId: 'french', startMin: 15 * 60, durationMin: 45 },
+      ], kid);
+      if (!tdLaterOpen()) tdToggleLater();
+      return () => {
+        Date = RealDate;
+        if (tdLaterOpen() !== hadLater) tdToggleLater();
+        setDayBlocks(key, hadBlocks, kid);
+      };
+    };
+  });
+
   const kidFindings = [];
   for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1440, 900], [900, 1100]]) {
     await page.setViewportSize({ width: w, height: h });
@@ -3758,7 +3813,15 @@ function findChromium() {
     const bad = [];
     const sub = wrap.querySelector('.td-now-sub');
     const subTxt = sub ? sub.textContent : '';
-    if (!/\d–\d/.test(subTxt)) bad.push('the hero does not give the block\'s window: "' + subTxt + '"');
+    /* A full range, either shape tdTimeRange produces: "9:00–10:00am" when both
+       ends share a meridiem and "11:42am–12:42pm" when they do not. The first
+       version of this asked for a digit either side of the dash, which is only
+       true of the first shape — so it passed or failed depending on what time
+       of day the suite happened to run, and nothing noticed until a fixture
+       moved the clock across noon. */
+    if (!/\d{1,2}:\d\d(am|pm)?–\d{1,2}:\d\d(am|pm)/.test(subTxt)) {
+      bad.push('the hero does not give the block\'s window: "' + subTxt + '"');
+    }
     if (!/left/.test(subTxt)) bad.push('the hero does not say how much is left: "' + subTxt + '"');
     if (!wrap.querySelector('.td-now-bar-fill')) bad.push('the countdown is not drawn');
     if (!/Jobs I can do/.test(txt)) bad.push('the jobs card is gone');
@@ -4789,8 +4852,35 @@ function findChromium() {
     mnyOpenMyMoney('jenn');
     const txt = document.getElementById('mnyPage1Wrap').textContent;
     if (!/still to come/.test(txt)) bad.push('My money does not say the money is still waiting');
-    if (!txt.includes(mnyMoney(money2(rows.reduce((a, r) => a + r.amount, 0))))) {
+    /* Through mnyUnpaidTotal, not by re-summing mnyUnpaidWeeks.
+
+       This used to add up the unfiltered rows and demand the page match, which
+       it never did and never should have: mnyUnpaidWeeks answers "which weeks
+       are uncredited" and includes the week running now, while "still to come"
+       is what is WAITING for her — and the week in progress is not waiting, it
+       is being earned. The check reported the page as wrong by exactly the
+       current week's earnings for as long as it has existed. The predicate now
+       has one owner and this asks that owner. */
+    if (!txt.includes(mnyMoney(mnyUnpaidTotal('jenn')))) {
       bad.push('the unpaid figure on the page is not the accessors\' own');
+    }
+
+    /* And the distinction the filter exists for, which nothing held in place —
+       which is how the two sums drifted apart unnoticed. This week's earnings
+       stay out of "still to come" until the family agrees them, and go in the
+       moment they do. */
+    const thisWk = ctThisWeekKey();
+    const live = money2(ctWeekMoney(thisWk, 'jenn'));
+    if (live > 0 && !mnyIsConfirmed(thisWk, 'jenn')) {
+      const withoutIt = mnyUnpaidTotal('jenn');
+      const cf = mnyEnsureWeekMaps();
+      const hadConfirm = JSON.parse(JSON.stringify(cf.weekConfirms[thisWk] || {}));
+      cf.weekConfirms[thisWk] = Object.assign({}, hadConfirm, { jenn: { at: Date.now() } });
+      const withIt = mnyUnpaidTotal('jenn');
+      cf.weekConfirms[thisWk] = hadConfirm;
+      if (money2(withIt - withoutIt) !== live) {
+        bad.push(`agreeing this week moved "still to come" by ${money2(withIt - withoutIt)}, not its ${live}`);
+      }
     }
     // Once the week is credited the note goes away rather than double-counting.
     if (!c.finalizedWeeks[lastWk]) c.finalizedWeeks[lastWk] = {};
@@ -5906,9 +5996,100 @@ function findChromium() {
       }
       return out;
     });
+    /* ── And on an iPad in landscape ──────────────────────────────────────
+       Everything above ran at 390px. At 980px and up in landscape .td-wrap
+       becomes a 1.42fr 1fr grid and the ribbon moves into the NARROWER right
+       column — so "it fits" at phone width says nothing about the width it
+       actually has to survive. Its column, not the viewport, is the edge that
+       matters here: a strip inside a 1fr column can overflow its column while
+       sitting comfortably inside the window. */
+    await page.setViewportSize({ width: 1024, height: 768 });
+    const land = await page.evaluate(() => {
+      profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+      const out = [];
+      const key = todayKey();
+      const before = (getDayBlocks(key, 'jenn') || []).slice();
+      const RealDate = Date;
+      const when = new RealDate(); when.setHours(15, 30, 0, 0);
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+      Date.prototype = RealDate.prototype;
+      Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+      try {
+        setDayBlocks(key, [
+          { id: 'r1', actId: 'breakfast', startMin: 8 * 60, durationMin: 30, completed: true },
+          { id: 'r2', actId: 'school', startMin: 9 * 60, durationMin: 300, completed: true },
+          { id: 'r3', actId: 'piano', startMin: 15 * 60, durationMin: 60 },
+          { id: 'r4', actId: 'homework', startMin: 16 * 60 + 30, durationMin: 45 },
+          { id: 'r5', actId: 'dinner', startMin: 18 * 60, durationMin: 45 },
+          { id: 'r6', actId: 'reading', startMin: 20 * 60, durationMin: 30 },
+        ], 'jenn');
+        goToday();
+
+        const side = document.querySelector('#tdWrap .td-col--side');
+        const strip = document.querySelector('#tdWrap .td-rib-strip');
+        const btn = document.querySelector('#tdWrap .td-rib-btn');
+        if (!side || !strip || !btn) return ['the ribbon is not in the side column at landscape'];
+
+        const sBox = side.getBoundingClientRect(), box = strip.getBoundingClientRect();
+        if (box.right > sBox.right + 1) {
+          out.push(`the ribbon runs ${Math.round(box.right - sBox.right)}px past its own column`);
+        }
+        const cells = [...strip.querySelectorAll('.td-rib-cell')];
+        if (cells.length !== 6) out.push(`${cells.length} cells for 6 blocks at landscape`);
+        const rows = Math.round(box.height / Math.max(1, cells[0].getBoundingClientRect().width ? cells[0].getBoundingClientRect().height : 1));
+        if (rows > 1) out.push(`the ribbon wrapped onto ${rows} rows in its column`);
+        // Still to scale in a column half the width — 5h against 1h.
+        const ratio = cells[1].getBoundingClientRect().width / cells[2].getBoundingClientRect().width;
+        if (ratio < 3.5) out.push(`at landscape a 5h block is only ${ratio.toFixed(1)}× a 1h one`);
+        if (!strip.querySelector('.td-rib-now')) out.push('the now-marker is gone at landscape');
+        const hit = btn.getBoundingClientRect();
+        if (hit.height < 44) out.push(`the landscape tap target is ${Math.round(hit.height)}px tall`);
+        if (document.body.scrollWidth > window.innerWidth + 1) {
+          out.push('the ribbon put a horizontal scrollbar on an iPad in landscape');
+        }
+
+        /* A DAY THAT OVERLAPS ITSELF STILL FITS.
+           The case every other fixture here misses, and the one that actually
+           broke: a block whose get-ready begins inside the block before it —
+           the clash this screen draws in red. Measured from its own start its
+           cell claims minutes the previous cell has already drawn, the row adds
+           up to more than 100%, and on a nowrap flex row with nothing to shrink
+           the last cell goes straight through the right edge of the column.
+           It shipped that way and no assertion saw it; a screenshot did. */
+        setDayBlocks(key, [
+          { id: 'o1', actId: 'math', startMin: 14 * 60, durationMin: 45, completed: true },
+          { id: 'o2', actId: 'piano', startMin: 15 * 60 + 30, durationMin: 30 },
+          { id: 'o3', actId: 'training', tag: 'swimming', startMin: 16 * 60, durationMin: 60,
+            getReadyBuffer: true, getReadyBufMin: 10, travelBuffer: true, travelBufMin: 15 },
+          { id: 'o4', actId: 'dinner', startMin: 17 * 60 + 30, durationMin: 45 },
+        ], 'jenn');
+        goToday();
+        const oSide = document.querySelector('#tdWrap .td-col--side');
+        const oStrip = document.querySelector('#tdWrap .td-rib-strip');
+        const oBox = oStrip.getBoundingClientRect(), oCol = oSide.getBoundingClientRect();
+        if (oBox.right > oCol.right + 1) {
+          out.push(`an overlapping day pushes the ribbon ${Math.round(oBox.right - oCol.right)}px past its column`);
+        }
+        // The row itself must not add up to more than one day.
+        const sum = [...oStrip.children]
+          .filter(el => el.classList.contains('td-rib-cell') || el.classList.contains('td-rib-gap'))
+          .reduce((a, el) => a + parseFloat(el.style.flexBasis || el.style.flex || 0), 0);
+        if (sum > 100.5) out.push(`the ribbon's segments add up to ${sum.toFixed(1)}% of the day`);
+        if (document.body.scrollWidth > window.innerWidth + 1) {
+          out.push('an overlapping day put a horizontal scrollbar on the page');
+        }
+      } finally {
+        Date = RealDate;
+        setDayBlocks(key, before, 'jenn');
+        goToday();
+      }
+      return out;
+    });
+
     await page.setViewportSize({ width: 900, height: 1100 });
     await page.evaluate(() => goToday());
-    return bad.length === 0 || bad;
+    const all = bad.concat(land);
+    return all.length === 0 || all;
   })();
 
   /* THE HERO OWNS THE RUNNING BLOCK, AND OWNS IT ALONE.
