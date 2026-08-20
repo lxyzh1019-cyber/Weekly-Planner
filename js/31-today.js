@@ -251,7 +251,14 @@ function tdFreeCard(gap) {
 /* One quest card. Structure and classes are the ones Quest mode used, so the
    card keeps its look; the difference is that both targets are data attributes
    read by the delegated listener rather than inline handlers. */
-function tdQuestCard(b, kid) {
+/* isNext marks the T2 card — the block she moves to when this one closes. It is
+   the same block the NOW card names under NEXT, read from the same
+   tdCurrentAndNext call, so the two can never point at different things.
+
+   The class strings are written out rather than built from a ternary because
+   tests/check-dead-css.js matches literal text: a name assembled at runtime is
+   invisible to it, and a rule it cannot see is a rule that can quietly die. */
+function tdQuestCard(b, kid, isNext) {
   const acts = getAllActivities(kid, { includeArchived: true });
   const act = acts.find(a => a.id === b.actId) || { name: 'Quest', icon: '⭐' };
   const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
@@ -261,7 +268,10 @@ function tdQuestCard(b, kid) {
     : (act.name || 'Quest');
   const id = escapeAttr(b.id);
   const done = !!b.completed;
-  return `<div class="quest-card${done ? ' quest-done' : ''}">
+  const cls = done ? 'quest-card quest-done'
+    : isNext ? 'quest-card quest-card--next'
+    : 'quest-card';
+  return `<div class="${cls}">
       <button type="button" class="dq-open" data-td-action="plan" data-td-block="${id}">
         <div class="quest-time-col">
           <div class="quest-time">${escapeHtml(formatQuestTime(b.startMin))}</div>
@@ -416,11 +426,16 @@ function tdRenderToday() {
   const jobIcon = id => (typeof ctChoreIcon === 'function' ? ctChoreIcon(id) : '🧹');
   const jobRows = jobs.rows.slice(0, TD_MAX_CHORES + 2).map(j => {
     if (j.state === 'todo') {
-      return `<button type="button" class="td-row" data-td-action="chore">
+      /* "Do it ›" became "›". The whole row is the target, so the words only
+         repeated the affordance the row already offers — and on a busy day
+         that phrase was six of the screen's 200-word budget. The chevron keeps
+         the visual affordance; aria-label keeps the spoken one. */
+      return `<button type="button" class="td-row" data-td-action="chore"
+            aria-label="Do ${escapeAttr(j.row.label)}">
           <span class="td-row-icon">${jobIcon(j.row.id)}</span>
           <span class="td-row-name">${escapeHtml(j.row.label)}</span>
           ${payTag}
-          <span class="td-row-go">Do it ›</span>
+          <span class="td-row-go" aria-hidden="true">›</span>
         </button>`;
     }
     // Class names written out rather than built from a ternary: the dead-CSS
@@ -451,7 +466,9 @@ function tdRenderToday() {
   const split = tdSplitQuestsByNow(quests);
   const earlierOpen = tdEarlierOpen();
   const timeline = tdUpcomingTimeline(kid, split.upcoming);
-  const card = it => (it.kind === 'free' ? tdFreeCard(it.gap) : tdQuestCard(it.block, kid));
+  const card = it => (it.kind === 'free'
+    ? tdFreeCard(it.gap)
+    : tdQuestCard(it.block, kid, !!(next && it.block && it.block.id === next.id)));
   const upNext = timeline.slice(0, 1 + TD_UP_NEXT);
   const later = timeline.slice(1 + TD_UP_NEXT);
   /* A fold over one card hides as much as it saves, so at one the fold is not
@@ -466,12 +483,12 @@ function tdRenderToday() {
                ${laterOpen ? '▾' : '▸'} Later today (${later.length})
              </button>`
           : ''}
-       ${later.length && laterOpen ? `<div class="dq-list">${later.map(card).join('')}</div>` : ''}
+       ${later.length && laterOpen ? `<div class="dq-list dq-list--quiet">${later.map(card).join('')}</div>` : ''}
        ${split.earlier.length
           ? `<button type="button" class="td-fold-btn td-earlier-btn" data-td-action="earlier">
                ${earlierOpen ? '▾' : '▸'} Earlier today (${split.earlier.length})
              </button>
-             ${earlierOpen ? `<div class="dq-list">${split.earlier.map(b => tdQuestCard(b, kid)).join('')}</div>` : ''}`
+             ${earlierOpen ? `<div class="dq-list dq-list--quiet">${split.earlier.map(b => tdQuestCard(b, kid)).join('')}</div>` : ''}`
           : ''}`
     : `<div class="td-empty">Nothing planned yet.</div>`;
 

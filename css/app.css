@@ -2012,18 +2012,27 @@
      Timeline/Quest switch. The day screen has one layout now. .dq-* stayed:
      the quest cards moved to Today and kept their styling. */
   .dq-list { display: flex; flex-direction: column; gap: 0.6rem; }
+  /* Off the gradient, onto paper and ink.
+
+     This was the only non-paper surface on Today and the loudest object on the
+     screen — and what it reports is a score, not an instruction. It keeps every
+     figure it carried; it just stops outranking the block she is meant to be
+     doing. Nothing is deleted, so no rule here goes dead. */
   .dq-hero {
     display: flex; align-items: center; gap: 10px;
-    background: linear-gradient(135deg, #6a5acd, #8a7be0);
+    background: var(--paper);
     border: 2px solid var(--ink); border-radius: 12px;
-    padding: 8px 10px; box-shadow: 2px 2px 0 var(--ink); color: #fff;
+    padding: 8px 10px; box-shadow: 2px 2px 0 var(--ink); color: var(--ink);
   }
   .dq-hero-avatar { font-size: 1.8rem; }
   .dq-hero-info { flex: 1; min-width: 0; }
   .dq-hero-title { font-weight: 800; font-size: calc(0.95rem * var(--fs-scale, 1)); }
-  .dq-hero-sub { font-size: calc(0.85rem * var(--fs-scale, 1)); opacity: 0.92; margin-top: 2px; }
-  .dq-xp-bar { height: 8px; border-radius: 999px; background: rgba(0,0,0,0.25); overflow: hidden; margin: 3px 0; }
-  .dq-xp-fill { height: 100%; background: #ffd166; border-radius: 999px; transition: width 0.3s; }
+  .dq-hero-sub {
+    font-size: max(13px, calc(0.85rem * var(--fs-scale, 1)));
+    color: var(--ink-light); margin-top: 2px;
+  }
+  .dq-xp-bar { height: 8px; border-radius: 999px; background: var(--paper-line); overflow: hidden; margin: 3px 0; border: 1.5px solid var(--ink); }
+  .dq-xp-fill { height: 100%; background: var(--accent-yellow); border-radius: 999px; transition: width 0.3s; }
   /* Pixel-canvas timeline: one hour gutter, then one column per day on show. */
   .timeline {
     position: relative;
@@ -3619,15 +3628,27 @@
   .sticker-emoji { font-size: 1.7rem; line-height: 1.1; }
   .sticker-name { font-size: calc(0.66rem * var(--fs-scale, 1)); font-weight: 700; color: var(--ink); margin-top: 0.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   @media (max-width: 380px) { .sticker-grid { grid-template-columns: repeat(3, 1fr); } }
+  /* T3 — the working weight of the list. */
   .quest-card {
     position: relative;
-    background: #fff; border: 3px solid var(--ink); border-radius: 18px;
-    box-shadow: 4px 4px 0 var(--ink);
+    background: #fff; border: 2.5px solid var(--ink); border-radius: 18px;
+    box-shadow: 3px 3px 0 var(--ink);
     padding: 0.9rem 1rem; display: flex; align-items: center; gap: 0.85rem;
     transition: transform 0.15s;
     cursor: pointer;
   }
-  .quest-card:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 var(--ink); }
+  .quest-card:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+  /* T2 — the next thing after the one she is on. Deeper than the rest of the
+     list, shallower than the NOW card, and tinted so the rank reads even where
+     the shadow falls off the edge of a narrow column. */
+  .quest-card--next {
+    border-width: 3px; box-shadow: 5px 5px 0 var(--ink); background: var(--bg2);
+  }
+  .quest-card--next:active { box-shadow: 2px 2px 0 var(--ink); }
+  /* T4 — what is folded away is reference, and reads like it. */
+  .dq-list--quiet .quest-card {
+    border-width: 2px; box-shadow: 2px 2px 0 rgba(42,35,32,0.2);
+  }
   .quest-card.quest-done {
     background: #e8f5e9; opacity: 0.78;
   }
@@ -5225,10 +5246,24 @@
      a new front door that looks like a different app is a new app. */
   .td-wrap { padding: 0.7rem 0.8rem 1.4rem; display: flex; flex-direction: column; gap: var(--space-3, 0.75rem); }
 
+  /* ── The shadow ladder ────────────────────────────────────────────────────
+     Every card on this screen used to carry the same border, radius and soft
+     2px shadow, so ranking them was work a child had to do. Depth does that
+     work now, in four steps:
+
+       T1  .td-now          3.5px border, 7px 8px offset   exactly one
+       T2  .quest-card--next  3px border, 5px 5px offset   at most one
+       T3  .td-card, .quest-card, rows   2.5px, 3px 3px    many
+       T4  gaps, folds, folded rows      2px dashed, flat  many
+
+     Depth rather than colour: the nine --cat-* hues already carry activity
+     identity and --accent is decorative only, so a colour-built hierarchy would
+     collide with both. Depth was unused, it survives greyscale, and the hard
+     offset is the app's own idiom rather than a new one. */
   .td-card {
     border: 2.5px solid var(--ink); border-radius: var(--radius, 18px);
     background: var(--paper); padding: 0.7rem 0.8rem;
-    box-shadow: var(--shadow-sm, 2px 2px 0 rgba(0,0,0,0.12));
+    box-shadow: 3px 3px 0 var(--ink);
   }
   .td-cap {
     font-size: calc(0.82rem * var(--fs-scale, 1)); font-weight: 800;
@@ -5236,10 +5271,21 @@
     margin-bottom: 0.4rem;
   }
 
-  /* The one thing the screen is for — deliberately the biggest object on it. */
-  .td-now { display: flex; align-items: center; gap: 0.8rem; background: var(--bg2); }
-  .td-now-icon { font-size: 2.2rem; line-height: 1; flex: 0 0 auto; }
-  .td-now-name { font-size: calc(1.25rem * var(--fs-scale, 1)); font-weight: 800; line-height: 1.15; }
+  /* T1. The one thing the screen is for — deliberately the biggest object on
+     it, and the only one at this depth. */
+  .td-now {
+    display: flex; align-items: center; gap: 0.9rem; background: var(--bg2);
+    border-width: 3.5px; border-radius: 22px;
+    box-shadow: 7px 8px 0 var(--ink);
+    padding: 0.9rem 1rem;
+  }
+  .td-now-icon {
+    font-size: 2rem; line-height: 1; flex: 0 0 auto;
+    width: 68px; height: 68px; display: flex; align-items: center; justify-content: center;
+    background: var(--paper); border: 3px solid var(--ink); border-radius: 16px;
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+  .td-now-name { font-size: calc(1.7rem * var(--fs-scale, 1)); font-weight: 800; line-height: 1.08; }
   .td-now-sub { font-size: max(13px, calc(0.9rem * var(--fs-scale, 1))); color: var(--ink-light); }
   /* The one time she has to act on, then why. --accent-strong, never --accent:
      this is informational accent text and --accent fails contrast. */
