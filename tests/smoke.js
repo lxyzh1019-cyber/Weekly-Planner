@@ -5949,6 +5949,58 @@ function findChromium() {
     return bad.length === 0 || bad;
   })();
 
+  /* THE APP TELLS FAMILY TIME, ON WHATEVER DEVICE IT IS OPENED.
+     todayKey() has always been fixed to America/Edmonton, but the TIME of day
+     came from the device clock — so the date and the hours inside it were read
+     from two different clocks. At home they agree and nothing shows. They come
+     apart on a device whose zone is set wrong or a laptop left on another one,
+     and then the app draws the "now" line hours from where the child actually
+     is in her day, or shows tomorrow's date against today's afternoon.
+
+     This is the only check in the suite that runs in a second timezone. The
+     whole rest of the run is pinned to Edmonton precisely so fixtures mean what
+     they say, which also means nothing else here can see this class of bug. */
+  checks.theAppTellsFamilyTimeOnAnyDevice = await (async () => {
+    const away = await browser.newContext({ timezoneId: 'Pacific/Auckland' });
+    const p2 = await away.newPage();
+    for (const pattern of [
+      '**://firestore.googleapis.com/**', '**://*.firebaseio.com/**',
+      '**://www.gstatic.com/firebasejs/**', '**://identitytoolkit.googleapis.com/**',
+      '**://firebaseinstallations.googleapis.com/**',
+    ]) await p2.route(pattern, r => r.abort());
+    try {
+      await p2.goto('file://' + path.join(__dirname, '..', 'index.html'));
+      await p2.waitForTimeout(1200);
+      const r = await p2.evaluate(() => {
+        const bad = [];
+        // What Edmonton says, worked out independently of the app's helpers.
+        const parts = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'America/Edmonton', hour12: false,
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit',
+        }).formatToParts(new Date()).reduce((o, x) => (o[x.type] = x.value, o), {});
+        const wantKey = `${parts.year}-${parts.month}-${parts.day}`;
+        const wantMin = (Number(parts.hour) % 24) * 60 + Number(parts.minute);
+        // The device is 18-20 hours ahead, so its own clock cannot agree by luck.
+        const deviceMin = new Date().getHours() * 60 + new Date().getMinutes();
+        if (deviceMin === wantMin) bad.push('the away device is not actually in another timezone');
+        if (todayKey() !== wantKey) bad.push(`todayKey is ${todayKey()}, Edmonton says ${wantKey}`);
+        if (tdNowMin() !== wantMin) {
+          bad.push(`tdNowMin is ${tdNowMin()}, Edmonton says ${wantMin} (device says ${deviceMin})`);
+        }
+        if (nowMinutesInZone() !== wantMin) bad.push('nowMinutesInZone disagrees with Edmonton');
+        // The date and the time of day must come from the same clock, always.
+        if (getDayKeys(0).indexOf(todayKey()) < 0) {
+          bad.push('today is not in the week the app is showing');
+        }
+        return bad;
+      });
+      return r.length === 0 || r;
+    } finally {
+      await away.close();
+    }
+  })();
+
   checks.noConsoleErrors = errors.length === 0;
 
   // A check passes only by being exactly true.

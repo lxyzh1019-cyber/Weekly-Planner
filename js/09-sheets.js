@@ -22,7 +22,7 @@ function nextFreeSlotMin(dayKey, durationMin, fromMin) {
   const blocks = (getDayBlocks(dayKey) || []).slice()
     .sort((a, b) => (a.startMin || 0) - (b.startMin || 0));
   let start = fromMin != null ? fromMin : (dayKey === todayKey()
-    ? (new Date().getHours() * 60 + new Date().getMinutes())
+    ? nowMinutesInZone()
     : START_MIN + 120);
   start = Math.max(START_MIN, Math.ceil(start / 15) * 15);
   for (let t = start; t + dur <= END_MIN; t += 15) {

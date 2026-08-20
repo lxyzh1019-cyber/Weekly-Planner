@@ -52,10 +52,11 @@ function tdTodayIndex() {
   return i >= 0 ? i : null;
 }
 
-/* Now, in minutes since midnight — the same unit blocks use. */
+/* Now, in minutes since midnight — the same unit blocks use, and the same zone
+   todayKey uses. Read through nowMinutesInZone so the time of day cannot drift
+   away from the date on a device whose clock is set to somewhere else. */
 function tdNowMin() {
-  const d = new Date();
-  return d.getHours() * 60 + d.getMinutes();
+  return nowMinutesInZone();
 }
 
 /* The block she is in, and the one after it. Reads today's real blocks; sorted
@@ -643,7 +644,7 @@ function tdRenderToday() {
   /* The evening wind-down nudge, carried over from the day timeline's banner.
      It used to appear only once someone had typed an age into the week glance,
      which for most of the app's life meant never; currentAge always answers. */
-  const nowH = new Date().getHours();
+  const nowH = Math.floor(nowMinutesInZone() / 60);
   const age = currentAge(kid);
   const bedtime = (nowH >= 18 && age != null && typeof bedtimeReminderText === 'function')
     ? bedtimeReminderText(age) : null;
@@ -686,6 +687,10 @@ function tdRenderToday() {
   tdApplyExtras();
   if (typeof renderVibe === 'function') renderVibe();
   if (typeof renderDayGoalsTodos === 'function') renderDayGoalsTodos();
+  /* The sticker wall. Its renderer had no caller anywhere in the repo, so the
+     shelf rendered empty wherever it was put — completing a block counted
+     towards stickers and unlocked them, and she was never shown. */
+  if (typeof renderStickerCollection === 'function') renderStickerCollection(kid);
   if (typeof maybeShowRewardPrompt === 'function') maybeShowRewardPrompt();
 }
 

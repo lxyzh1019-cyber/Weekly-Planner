@@ -100,8 +100,7 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   }
 
   // Gentle reflect prompt if evening and day has blocks and no mood set
-  const now = new Date();
-  if (now.getHours() >= 20 && currentDayKey === todayKey() && getDayBlocks(key).length > 0) {
+  if (nowMinutesInZone() >= 20 * 60 && currentDayKey === todayKey() && getDayBlocks(key).length > 0) {
     const m = getProfData().dayMoods?.[key];
     if (!m) showToast('💫 Tap 🌙 to reflect on today');
   }
@@ -381,8 +380,8 @@ function buildDayColumn(dayKey, canvasHeight, withHeader) {
 
   // "Now" line, on the column that is actually today
   if (dayKey === todayKey()) {
-    const now = new Date();
-    const nowMin = now.getHours()*60 + now.getMinutes() - START_MIN;
+    // Same zone as todayKey, or the line lands hours from where she actually is.
+    const nowMin = nowMinutesInZone() - START_MIN;
     if (nowMin >= zMinStart && nowMin <= zMinEnd) {
       const nowLine = document.createElement('div');
       nowLine.className = 'tl-now-line';
