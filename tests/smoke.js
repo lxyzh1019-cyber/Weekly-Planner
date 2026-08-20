@@ -79,7 +79,24 @@ function findChromium() {
   const shot = (name) => path.join(outDir, name + '.png');
 
   const browser = await chromium.launch({ executablePath: findChromium() });
-  const page = await browser.newPage({ viewport: { width: 900, height: 1100 } });
+  /* Run the browser in the family's timezone, not the runner's.
+
+     The app is inconsistent about zones, and only this pin hides it: todayKey()
+     goes through toDayKeyInZone (js/05-helpers.js:809, fixed to America/Edmonton)
+     while getDayKeys, dateToLocalKey and tdNowMin all read the machine's local
+     clock. On the iPad and the phone those agree, so nothing shows. On a UTC
+     runner they diverge for the six hours after Edmonton's 18:00, and the checks
+     that pin a wall-clock hour then write to one day key and read back from the
+     next — the blocks simply vanish. todayNamesFreeTime is where it lands first,
+     dereferencing a free-time card that was never rendered.
+
+     That made the suite pass or fail by the hour of day it happened to run, both
+     here and on the nightly CI schedule. Pinning the context zone makes every
+     run reproduce the devices the app is actually used on. */
+  const page = await browser.newPage({
+    viewport: { width: 900, height: 1100 },
+    timezoneId: 'America/Edmonton',
+  });
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => {
