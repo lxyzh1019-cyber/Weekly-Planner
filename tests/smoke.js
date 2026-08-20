@@ -5923,9 +5923,51 @@ function findChromium() {
         }
         const doneCells = strip.querySelectorAll('.td-rib-cell--done').length;
         const doneBlocks = blocks.filter(b => b.completed).length;
-        if (doneCells !== doneBlocks) out.push(`${doneCells} filled cells for ${doneBlocks} finished blocks`);
+        if (doneCells !== doneBlocks) out.push(`${doneCells} closed cells for ${doneBlocks} finished blocks`);
         const nowCells = strip.querySelectorAll('.td-rib-cell--now').length;
         if (nowCells !== 1) out.push(`${nowCells} cells marked as running, expected 1`);
+
+        /* COLOUR IS THE CATEGORY, THE BORDER IS THE STATUS.
+           Fill used to carry status — green done, yellow now, white to come —
+           which said how much was ticked and nothing about what any of it was.
+           Colour now comes from blockColour, the same answer the day view and
+           the week grid render, and status moved to the border.
+
+           The assertion that matters is the SECOND one: every cell stays solid,
+           whether or not it is confirmed. A child does not get to tick things
+           every hour, so an unconfirmed block must never be drawn faded or
+           hollow as though she had failed it. */
+        const rgb = s => (s.match(/\d+/g) || []).slice(0, 3).join(',');
+        const cellFor = id => cells[blocks.findIndex(b => b.id === id)];
+        blocks.forEach(b => {
+          const el = cellFor(b.id);
+          if (!el) { out.push(`no ribbon cell for ${b.id}`); return; }
+          const cs = getComputedStyle(el);
+          const want = blockColour(b, 'jenn');
+          const probe = document.createElement('span');
+          probe.style.color = want; document.body.appendChild(probe);
+          const wantRgb = rgb(getComputedStyle(probe).color);
+          probe.remove();
+          if (rgb(cs.backgroundColor) !== wantRgb) {
+            out.push(`${b.id} is ${cs.backgroundColor}, not its own ${want}`);
+          }
+          // Never faded, never hollow — solid at full strength either way.
+          if (parseFloat(cs.opacity) < 1) out.push(`${b.id} is faded to ${cs.opacity}`);
+          if (cs.backgroundColor === 'rgba(0, 0, 0, 0)') out.push(`${b.id} has no fill`);
+        });
+
+        // Confirmed vs not differs in BORDER STYLE, and in nothing else.
+        const doneEl = cellFor(blocks.find(b => b.completed).id);
+        const todoEl = cellFor(blocks.find(b => !b.completed && b.id !== 'r3').id);
+        const dcs = getComputedStyle(doneEl), tcs = getComputedStyle(todoEl);
+        if (dcs.borderTopStyle !== 'solid') out.push(`a confirmed block's border is ${dcs.borderTopStyle}`);
+        if (tcs.borderTopStyle !== 'dashed') out.push(`an unconfirmed block's border is ${tcs.borderTopStyle}`);
+        if (dcs.opacity !== tcs.opacity) out.push('confirmed and unconfirmed differ in opacity, not just border');
+
+        // --missed is retired: an unticked morning is not a reprimand.
+        if (strip.querySelector('.td-rib-cell--missed')) {
+          out.push('a passed block is still singled out as missed');
+        }
         // The spoken label carries the same figures the strip draws, and lives
         // on the button — the strip itself is aria-hidden, because twenty cells
         // read out one at a time is not a description of a day.
@@ -6465,6 +6507,121 @@ function findChromium() {
     return out.length === 0 || out;
   });
 
+  /* A REPEAT IS NUMBERED; A ONE-OFF IS NOT.
+     Five homework blocks in one day drew five identical cards, with nothing to
+     say which was which. The rule is conditional and per-day: one Homework
+     stays "Homework", five become Block 1…5.
+
+     Numbered by startMin and not by the order the caller holds them in. Today
+     sorts its list by tdActionableStart and the day view lays blocks out by
+     position; if the number followed either, Block 2 would be a different block
+     on the two screens — which is the drift the shared helper exists to stop,
+     so both are asserted here against the same day. */
+  checks.repeatsAreNumberedWithinTheDay = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+    const out = [];
+    const key = todayKey();
+    const before = (getDayBlocks(key, 'jenn') || []).slice();
+    const wasLater = tdLaterOpen();
+    const RealDate = Date;
+    const when = new RealDate(); when.setHours(9, 30, 0, 0);
+    Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+    Date.prototype = RealDate.prototype;
+    Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    try {
+      if (!tdLaterOpen()) tdToggleLater();
+      /* Three maths and one piano. Deliberately seeded out of time order so a
+         helper that numbered by array position rather than by clock would be
+         caught. */
+      setDayBlocks(key, [
+        { id: 'rp-c', actId: 'math',  startMin: 13 * 60, durationMin: 45 },
+        { id: 'rp-a', actId: 'math',  startMin: 9 * 60,  durationMin: 60 },
+        { id: 'rp-solo', actId: 'piano', startMin: 15 * 60, durationMin: 45 },
+        { id: 'rp-b', actId: 'math',  startMin: 11 * 60, durationMin: 45 },
+      ], 'jenn');
+      goToday();
+
+      const n = id => {
+        const r = blockDisplayName(getDayBlocks(key, 'jenn').find(b => b.id === id), 'jenn', key);
+        return r.n;
+      };
+      if (n('rp-a') !== 1) out.push(`the 9am maths is Block ${n('rp-a')}, not Block 1`);
+      if (n('rp-b') !== 2) out.push(`the 11am maths is Block ${n('rp-b')}, not Block 2`);
+      if (n('rp-c') !== 3) out.push(`the 1pm maths is Block ${n('rp-c')}, not Block 3`);
+      // The condition: a thing that does not repeat is not numbered.
+      if (n('rp-solo') !== 0) out.push(`the one piano block was numbered Block ${n('rp-solo')}`);
+
+      // On screen: the hero is the 9am maths, so it is Block 1.
+      const hero = document.querySelector('#tdWrap .td-now-name');
+      if (!/Block 1\b/.test(hero.textContent)) {
+        out.push(`the hero reads "${hero.textContent.replace(/\s+/g, ' ').trim()}"`);
+      }
+      const tags = [...document.querySelectorAll('#tdWrap .quest-card .td-blk')]
+        .map(e => e.textContent.trim());
+      if (!tags.includes('Block 2') || !tags.includes('Block 3')) {
+        out.push(`the cards read ${JSON.stringify(tags)}`);
+      }
+      // And the piano card carries no number at all.
+      const pianoCard = [...document.querySelectorAll('#tdWrap .quest-card')]
+        .find(c => /Piano/.test(c.textContent));
+      if (pianoCard && pianoCard.querySelector('.td-blk')) {
+        out.push('the one piano block was given a number on its card');
+      }
+
+      /* AND THE DAY SCREEN AGREES. Both read blockDisplayName on the same day,
+         so a block Today calls Block 2 cannot be Block 3 over there. */
+      openDayFromWeekCard(key, tdTodayIndex(), null);
+      const dayTxt = document.getElementById('screen-day').textContent;
+      if (!/Block 1/.test(dayTxt) || !/Block 3/.test(dayTxt)) {
+        out.push('the day screen does not number the same repeats');
+      }
+      goToday();
+    } finally {
+      Date = RealDate;
+      if (tdLaterOpen() !== wasLater) tdToggleLater();
+      setDayBlocks(key, before, 'jenn');
+      goToday();
+    }
+    return out.length === 0 || out;
+  });
+
+  /* ONE ANSWER FOR WHAT COLOUR A BLOCK IS.
+     The formula was written out four times — the week grid twice, the day view
+     and the print sheet — and two had already drifted: an unknown category came
+     out green on the week grid and grey everywhere else. Today's ribbon colours
+     by category now, which would have been a fifth copy.
+
+     A training block is the interesting case: Skating and Swimming are both cat
+     'training' and must NOT be the same pink, so a formula that reached for the
+     category first would collapse them together. */
+  checks.oneAnswerForWhatColourABlockIs = await page.evaluate(() => {
+    const out = [];
+    const skate = { id: 'c1', actId: 'training', tag: 'skating', startMin: 9 * 60, durationMin: 60 };
+    const swim = { id: 'c2', actId: 'training', tag: 'swimming', startMin: 11 * 60, durationMin: 60 };
+    const piano = { id: 'c3', actId: 'piano', startMin: 13 * 60, durationMin: 60 };
+    const picked = { id: 'c4', actId: 'piano', startMin: 15 * 60, durationMin: 60, colour: '#123456' };
+
+    if (blockColour(skate, 'jenn') === blockColour(swim, 'jenn')) {
+      out.push('skating and swimming come out the same colour');
+    }
+    // The topic beats the category for training…
+    if (blockColour(skate, 'jenn') !== getTrainingTopic('skating').colour) {
+      out.push('a skating block is not its topic colour');
+    }
+    // …and an explicit choice beats the category for everything else.
+    if (blockColour(picked, 'jenn') !== '#123456') out.push('a hand-picked colour was ignored');
+    if (blockColour(piano, 'jenn') !== CAT_HEX[findActivity('piano', 'jenn').cat]) {
+      out.push('a plain block is not its category colour');
+    }
+    // An unknown activity has one fallback, not two.
+    if (blockColour({ id: 'c5', actId: 'nope-not-real' }, 'jenn') !== '#888') {
+      out.push('an unknown activity does not fall back to the one grey');
+    }
+    // And nothing computes it for itself any more.
+    if (typeof blockColour !== 'function') out.push('blockColour is not the owner');
+    return out.length === 0 || out;
+  });
+
   /* THE UNDO TOAST IS STRUCTURALLY OUTSIDE THE BUDGET.
      One line, and it exists to say why. The word-budget sweep and the 44px probe
      both walk only #screen-today; move this node inside "to keep the markup
@@ -6606,6 +6763,20 @@ function findChromium() {
         // The date and the time of day must come from the same clock, always.
         if (getDayKeys(0).indexOf(todayKey()) < 0) {
           bad.push('today is not in the week the app is showing');
+        }
+        /* And the header now SAYS which day it is, which makes it a second place
+           the app can get this wrong — on a device eighteen hours ahead, a date
+           read from new Date() would name tomorrow to a child looking at today. */
+        profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+        goToday();
+        const shown = (document.getElementById('tdTodayDate') || {}).textContent || '';
+        const wantWeekday = new Intl.DateTimeFormat(undefined, {
+          timeZone: 'America/Edmonton', weekday: 'long',
+        }).format(new Date());
+        const wantDay = String(Number(parts.day));
+        if (!shown.trim()) bad.push('the header does not say what day it is');
+        else if (!shown.includes(wantWeekday) || !shown.includes(wantDay)) {
+          bad.push(`the header reads "${shown}", Edmonton says ${wantWeekday} the ${wantDay}`);
         }
         return bad;
       });

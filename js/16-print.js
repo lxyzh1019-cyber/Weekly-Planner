@@ -185,7 +185,7 @@ function renderPrintSheet() {
         const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
         // Computed once so the buffer strips can be tinted to match, the same
         // way the week view's strips hug their own activity's colour.
-        const bg = topic ? trainingBlockColour(b) : (b.colour || CAT_HEX[act.cat] || '#888');
+        const bg = blockColour(b);
 
         // Travel / get-ready buffer strips around the block, so the printed
         // sheet shows "leave at 5:00" for a 5:30 training just like the app —

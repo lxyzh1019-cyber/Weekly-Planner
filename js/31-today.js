@@ -461,7 +461,7 @@ function tdTimeCol(b) {
    whether a plan is workable, because the week grid already answers that and
    two answers to one question is one answer too many. */
 function tdQuestCard(b, kid, isNext, clash) {
-  const { icon, name: nm } = tdBlockLabel(b, kid);
+  const { icon, name: nm, block: blk } = tdBlockLabel(b, kid);
   const id = escapeAttr(b.id);
   const done = !!b.completed;
   /* --conflict composes with --next rather than replacing it: the frame is an
@@ -484,6 +484,7 @@ function tdQuestCard(b, kid, isNext, clash) {
         <div class="quest-card-icon">${icon}</div>
         <div class="quest-card-body">
           <div class="quest-card-name">${escapeHtml(nm)}</div>
+          ${tdBlockTag(blk)}
           <div class="quest-card-meta"><span class="quest-xp-tag">+${QUEST_XP_PER_TASK} XP</span></div>
           ${clash ? `<div class="quest-conflict-note">⚠️ Overlaps ${escapeHtml(clash)}</div>` : ''}
         </div>
@@ -587,18 +588,38 @@ function tdProgressRibbon(kid, blocks) {
     // Never re-draw time an earlier block already occupies.
     const drawFrom = Math.max(s, cursor);
     cursor = Math.max(cursor, e);
-    // Written out rather than built from a ternary: check-dead-css.js matches
-    // literal text, and a class it cannot see is a class that can quietly die.
+    /* COLOUR IS WHAT IT IS; THE BORDER IS WHETHER IT IS DONE.
+       Fill used to carry status — green done, yellow now, white to come — which
+       told a child how much was ticked and nothing at all about what any of it
+       was. Colour now comes from blockColour, the same answer the day view and
+       the week grid render, so the strip reads as the shape of HER day.
+
+       Status moved to the border, and every cell stays solid: she does not get
+       to tick things every hour, so a block she has not confirmed yet must not
+       be drawn faded or hollow as though she had failed it. Dashed means not
+       confirmed, solid means confirmed. That also retires --missed, which said
+       "you missed these" about a morning nobody had had a chance to close.
+
+       Border style rather than colour is what keeps the house rule — colour
+       alone is not a signal a child reliably reads — now that colour is
+       identity instead of status.
+
+       Written out rather than built from a ternary: check-dead-css.js matches
+       literal text, and a class it cannot see is a class that can quietly die. */
     let cls = 'td-rib-cell';
     if (b.completed) cls = 'td-rib-cell td-rib-cell--done';
     else if (current && b.id === current.id) cls = 'td-rib-cell td-rib-cell--now';
-    else if (e <= now) cls = 'td-rib-cell td-rib-cell--missed';
-    segs.push({ cls, w: Math.max(MIN_CELL, pctOf(e) - pctOf(drawFrom)) });
+    segs.push({
+      cls,
+      w: Math.max(MIN_CELL, pctOf(e) - pctOf(drawFrom)),
+      bg: blockColour(b, kid),
+    });
   });
   const wide = segs.reduce((a, s) => a + s.w, 0);
   const scale = wide > 100 ? 100 / wide : 1;
   const cells = segs
-    .map(s => `<span class="${s.cls}" style="flex:0 0 ${(s.w * scale).toFixed(2)}%"></span>`)
+    .map(s => `<span class="${s.cls}" style="flex:0 0 ${(s.w * scale).toFixed(2)}%${
+      s.bg ? ';background:' + escapeAttr(s.bg) : ''}"></span>`)
     .join('');
 
   /* The marker only exists while now is inside the day's span. Before the first
@@ -664,25 +685,37 @@ function tdEncouragement(kid) {
    while the two never shared a viewport. The hero names the next block now, so
    they always do. */
 function tdBlockLabel(b, kid) {
-  const act = findActivity(b.actId, kid) || {};
-  const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
-  const icon = topic ? topic.icon : (act.icon || '📌');
-  const name = topic
-    ? (act.isCompetition ? (topic.id === 'general' ? 'Competition' : topic.name + ' Comp.') : topic.name)
-    : (act.name || 'Something');
-  return { icon, name };
+  const { icon, name, n } = blockDisplayName(b, kid, todayKey());
+  // n is 0 unless the same thing genuinely repeats today, so a lone Homework
+  // block stays "Homework" and five of them become Block 1…5.
+  return { icon, name, block: n };
 }
 
 function tdBlockLine(b, kid) {
-  const { icon, name } = tdBlockLabel(b, kid);
+  const { icon, name, block } = tdBlockLabel(b, kid);
   const time = (typeof formatTimeFromMin === 'function') ? formatTimeFromMin(b.startMin || 0) : '';
-  return { icon, name, time };
+  return { icon, name, block, time };
+}
+
+/* "Block 2", or nothing at all. One place, so the hero and the cards cannot
+   word it two ways — and quiet, because which of five it is matters less than
+   what it is. */
+function tdBlockTag(n) {
+  return n ? `<span class="td-blk">Block ${n}</span>` : '';
 }
 
 function tdRenderToday() {
   const wrap = document.getElementById('tdWrap');
   if (!wrap) return;
   const kid = activeProfile();
+  /* The date, from todayKey() and not from a bare new Date(): formatDayKey
+     rebuilds it as local midnight of the day the app thinks it is, so the
+     weekday cannot drift away from the day the rest of the screen is about. */
+  const dateEl = document.getElementById('tdTodayDate');
+  if (dateEl) {
+    dateEl.textContent = formatDayKey(todayKey())
+      .toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  }
   const badge = document.getElementById('todayProfileBadge');
   if (badge) badge.textContent = kid === 'jenn' ? '🐥 Jenn' : kid === 'jess' ? '🦊 Jess' : '';
   if (!kid || kid === 'parent') {
@@ -756,7 +789,7 @@ function tdRenderToday() {
         <div class="td-now-nextline">
           <span class="td-now-nextlab">Next</span>
           ${brk ? `<span class="td-break-chip">☕ ${escapeHtml(formatDuration(brk))} break</span>` : ''}
-          <span class="td-now-nextname">${escapeHtml(nl.name)}</span>
+          <span class="td-now-nextname">${escapeHtml(nl.name)}</span>${tdBlockTag(nl.block)}
           <span class="td-now-nexttime">${escapeHtml(formatTimeFromMin(tdActionableStart(next)))}</span>
         </div>${prepHtml}
       </div>`;
@@ -789,7 +822,7 @@ function tdRenderToday() {
     const clash = clashes.get(current.id);
     nowHtml = `<div class="td-now-head">
         <div class="td-now-icon">${l.icon}</div>
-        <div class="td-now-line"><div class="td-now-name">${escapeHtml(l.name)}</div>
+        <div class="td-now-line"><div class="td-now-name">${escapeHtml(l.name)} ${tdBlockTag(l.block)}</div>
           <div class="td-now-sub">${escapeHtml(prog.range)} · <span class="td-now-left">${escapeHtml(formatDuration(prog.leftMin))} left</span></div>
           ${clash ? `<div class="quest-conflict-note">⚠️ Overlaps ${escapeHtml(clash)}</div>` : ''}</div>
         <button type="button" class="td-now-tick" data-td-action="blast"
@@ -826,7 +859,7 @@ function tdRenderToday() {
       : `next · ${escapeHtml(l.time)}`;
     nowHtml = `<div class="td-now-head">
         <div class="td-now-icon">${l.icon}</div>
-        <div class="td-now-line"><div class="td-now-name">${escapeHtml(l.name)}</div>
+        <div class="td-now-line"><div class="td-now-name">${escapeHtml(l.name)} ${tdBlockTag(l.block)}</div>
           <div class="td-now-sub">${sub}</div>
           ${clash ? `<div class="quest-conflict-note">⚠️ Overlaps ${escapeHtml(clash)}</div>` : ''}</div>
       </div>${nextHtml}`;

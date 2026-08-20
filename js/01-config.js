@@ -126,6 +126,27 @@ function trainingBlockColour(b) {
   return getTrainingTopic(b.tag).colour;
 }
 
+/* ── What colour is this block? ──
+   The formula was written out four times — the week grid twice, the day view and
+   the print sheet — and two of the copies had already drifted apart: an unknown
+   category came out green on the week grid and grey everywhere else. Today's
+   ribbon now colours its cells by category too, which would have made a fifth
+   copy and a second chance to disagree.
+
+   Order matters and is not arbitrary: a training block's topic colour beats the
+   category, because Skating and Swimming are both cat 'training' and must not be
+   the same pink; an explicit per-block colour beats the category for everything
+   else, because that is a choice somebody made on purpose.
+
+   findActivity rather than getAllActivities: this colours a block that already
+   exists, so an archived activity must still resolve. */
+function blockColour(b, kid) {
+  if (!b) return '#888';
+  const act = findActivity(b.actId, kid) || {};
+  if (act.isTraining) return trainingBlockColour(b);
+  return b.colour || CAT_HEX[act.cat] || '#888';
+}
+
 /* Figure skating: landing doubles, targeting double axel */
 const SKATING_OBJECTIVES = [
   'Double Axel attempts',
