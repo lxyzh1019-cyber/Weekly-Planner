@@ -277,10 +277,29 @@ function mnyUnpaidWeeks(kid, max) {
   }
   return out;
 }
+/* ── What "still to come" actually means, in one place ──
+   mnyUnpaidWeeks returns every uncredited week INCLUDING the one running now,
+   because "which weeks have not been paid out" is a different question from
+   "how much is waiting for her". The week in progress is not waiting for
+   anything — it is still being earned, and mnyEarnLeftToday already owns that
+   number. Counting it here would show the same dollar twice on one page.
+
+   That predicate lived inline in mnyUnpaidNote and nowhere else, so nothing
+   could check the figure without writing the predicate out a second time — and
+   the smoke check that tried summed the unfiltered rows instead, reporting the
+   page as wrong for four weeks when the page was right. One reader, one owner:
+   the same reason mnyEarnLeftToday was pulled out of mnyTodayCard. */
+function mnyUnpaidRows(kid) {
+  return mnyUnpaidWeeks(kid, 8).filter(r => r.weeksAgo > 0 || r.agreed);
+}
+function mnyUnpaidTotal(kid) {
+  return money2(mnyUnpaidRows(kid).reduce((a, r) => a + r.amount, 0));
+}
+
 function mnyUnpaidNote(kid) {
-  const rows = mnyUnpaidWeeks(kid, 8).filter(r => r.weeksAgo > 0 || r.agreed);
+  const rows = mnyUnpaidRows(kid);
   if (!rows.length) return '';
-  const total = money2(rows.reduce((a, r) => a + r.amount, 0));
+  const total = mnyUnpaidTotal(kid);
   const n = rows.length;
   /* Three words and a figure, and it took two goes to get there: the first
      version of this explanation cost 21 words and put the page 21 over the

@@ -340,10 +340,21 @@ function getWarmupBufMin(block) {
    time, the plan isn't actually workable (e.g. "leave by 5:30" but the next
    activity already starts at 5:30) — surface it instead of letting it be
    discovered by showing up late. Returns { perBlock: Map(id -> {pre,post}),
-   affected: Set(ids of every block touched by a conflict, either side) }. */
+   affected: Set(ids of every block touched by a conflict, either side),
+   partners: Map(id -> Set(ids it clashes with)) }.
+
+   partners records BOTH sides of every collision the sweep below already finds.
+   It exists so a screen can say WHICH activity a block runs into — "Overlaps
+   Reading" rather than "overlaps another activity" — without a second overlap
+   test living somewhere else and eventually disagreeing with this one. */
 function computeBufferConflicts(blocks) {
   const perBlock = new Map();
   const affected = new Set();
+  const partners = new Map();
+  const pair = (a, b) => {
+    if (!partners.has(a)) partners.set(a, new Set());
+    partners.get(a).add(b);
+  };
   (blocks || []).forEach(b => {
     const sideBuf = getTravelBufMin(b) + getGetReadyBufMin(b);
     const preBuf = sideBuf + getWarmupBufMin(b); // warm-up only ever sits before
@@ -355,12 +366,12 @@ function computeBufferConflicts(blocks) {
     (blocks || []).forEach(o => {
       if (o.id === b.id) return;
       const oStart = o.startMin, oEnd = o.startMin + (o.durationMin || 0);
-      if (preStart < oEnd && preEnd > oStart) { pre = true; affected.add(o.id); }
-      if (postStart < oEnd && postEnd > oStart) { post = true; affected.add(o.id); }
+      if (preStart < oEnd && preEnd > oStart) { pre = true; affected.add(o.id); pair(b.id, o.id); pair(o.id, b.id); }
+      if (postStart < oEnd && postEnd > oStart) { post = true; affected.add(o.id); pair(b.id, o.id); pair(o.id, b.id); }
     });
     if (pre || post) { perBlock.set(b.id, { pre, post }); affected.add(b.id); }
   });
-  return { perBlock, affected };
+  return { perBlock, affected, partners };
 }
 let localSaveFailed = false;
 function saveLocal() {

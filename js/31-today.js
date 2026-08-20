@@ -175,16 +175,133 @@ function tdPrepFor(block) {
   };
 }
 
+/* ── When does a block start needing her? ──
+   Swimming at four o'clock does not mean leaving the house at four o'clock: with
+   ten minutes of kit and fifteen in the car, the first minute she has to do
+   something is 3:35. A card that leads with 4:00 names a time she is already
+   late for.
+
+   This is the one place that question is answered, so the card's time, the
+   order of the list and the free-time trim in tdUpcomingTimeline all read the
+   same number and cannot drift apart. It delegates to tdPrepFor, which
+   delegates to wfBufferSegments (js/07-week-view.js) — the same arithmetic the
+   week grid and the print sheet use, so Today can never disagree with them
+   about when to leave.
+
+   The block's own startMin for anything without buffers, which is most of them. */
+function tdActionableStart(b) {
+  if (!b) return 0;
+  const prep = tdPrepFor(b);
+  const start = b.startMin || 0;
+  return prep ? Math.min(prep.moveByMin, start) : start;
+}
+
+/* ── A gap that is a break, not free time ──
+   The two must never describe the same stretch. tdUpcomingTimeline already
+   renders anything from TD_FREE_MIN up as a free-time card, so a break is
+   strictly what falls below it — long enough to notice (TD_BREAK_MIN), short
+   enough that it is turnaround rather than an afternoon.
+
+   Measured to the moment the next thing starts needing her, not to its start
+   time: a fifteen-minute gap before a block she has to leave for ten minutes
+   early is a five-minute break, and saying otherwise is the screen promising
+   time that does not exist. Returns null when there is no break to name. */
+const TD_BREAK_MIN = 10;
+function tdGapBefore(current, next) {
+  if (!current || !next) return null;
+  const end = (current.startMin || 0) + (current.durationMin || 0);
+  const mins = tdActionableStart(next) - end;
+  if (mins < TD_BREAK_MIN || mins >= TD_FREE_MIN) return null;
+  return mins;
+}
+
+/* "8:15–9:00am", and "11:30am–12:15pm" only when the two halves of the day
+   actually differ. Repeating am on both ends of a range costs two characters in
+   the tightest line on the screen and tells a child nothing she did not know. */
+function tdTimeRange(startMin, endMin) {
+  const a = formatTimeFromMin(startMin), b = formatTimeFromMin(endMin);
+  const ap = s => s.slice(-2);
+  return ap(a) === ap(b) ? a.slice(0, -2) + '–' + b : a + '–' + b;
+}
+
+/* Is she on a break right now, and how much of it is left?
+
+   Only between two blocks: the stretch from the end of the last thing to the
+   moment the next one starts needing her. Bounded by tdGapBefore, so it is a
+   break exactly when the list would draw a break connector there and never when
+   the list would draw a free-time card — the hero and the list describe the same
+   gap the same way. Returns null the rest of the time, including before the
+   day's first block, which is morning rather than a break.
+
+   pct counts UP so the bar fills as the break runs out, matching the running
+   block's bar rather than inverting it. */
+function tdBreakNow(blocks, next) {
+  if (!next) return null;
+  const now = tdNowMin();
+  const startsNeedingHer = tdActionableStart(next);
+  if (now >= startsNeedingHer) return null;
+  let prev = null;
+  blocks.forEach(b => {
+    if (b.id === next.id) return;
+    const end = (b.startMin || 0) + (b.durationMin || 0);
+    if (end <= now && (!prev || end > (prev.startMin || 0) + (prev.durationMin || 0))) prev = b;
+  });
+  if (!prev) return null;
+  const mins = tdGapBefore(prev, next);
+  if (!mins) return null;
+  const elapsed = Math.max(0, mins - (startsNeedingHer - now));
+  return { mins, leftMin: startsNeedingHer - now, pct: Math.round(elapsed / mins * 100) };
+}
+
+/* How far through the block she is, and how much is left. Pure arithmetic on
+   the numbers the block already carries — nothing stored, nothing decided. */
+function tdHeroProgress(b) {
+  const start = b.startMin || 0;
+  const dur = Math.max(1, b.durationMin || 0);
+  const elapsed = Math.min(dur, Math.max(0, tdNowMin() - start));
+  return {
+    pct: Math.round(elapsed / dur * 100),
+    leftMin: Math.max(0, dur - elapsed),
+    range: tdTimeRange(start, start + dur),
+  };
+}
+
 /* Today's quest cards — every scheduled block, done ones included, because a
    finished quest ticked green is the point of the list. Sorted by start so the
    order matches the day. This is the one list of today: the day screen's Quest
    mode used to render it too, and the Quest Board before that. */
+/* Sorted by tdActionableStart, not by startMin. A 6:30 skate she has to leave
+   for at 5:50 belongs where 5:50 belongs — sorting by the block's own start put
+   it under a six o'clock block she would already have left the house for.
+   startMin breaks the tie so two blocks that need her at the same minute still
+   run in the order the day does. */
 function tdQuestsToday(kid) {
   const key = todayKey();
   return (getDayBlocks(key, kid) || [])
     .filter(b => b && b.startMin != null && (b.durationMin || 0) > 0)
     .slice()
-    .sort((a, b) => (a.startMin || 0) - (b.startMin || 0));
+    .sort((a, b) => (tdActionableStart(a) - tdActionableStart(b))
+      || ((a.startMin || 0) - (b.startMin || 0)));
+}
+
+/* Which of today's blocks clash, and with what. One call to the owner
+   (computeBufferConflicts, js/03-sync.js) per render, and the answer is a Map
+   from block id to the NAME of the first activity it runs into — named through
+   tdBlockLabel, so a clashing block is called the same thing here as it is on
+   its own card. Empty map when the day works, which is most days. */
+function tdClashes(kid, blocks) {
+  const out = new Map();
+  if (typeof computeBufferConflicts !== 'function') return out;
+  const { affected, partners } = computeBufferConflicts(blocks);
+  if (!affected || !affected.size) return out;
+  const byId = new Map(blocks.map(b => [b.id, b]));
+  affected.forEach(id => {
+    const others = (partners && partners.get(id)) || new Set();
+    const first = [...others].map(oid => byId.get(oid)).filter(Boolean)
+      .sort((a, b) => (a.startMin || 0) - (b.startMin || 0))[0];
+    out.set(id, first ? tdBlockLabel(first, kid).name : 'another activity');
+  });
+  return out;
 }
 
 /* The rest of today, as a child experiences it: the things she has to do AND the
@@ -196,9 +313,16 @@ function tdQuestsToday(kid) {
    are worked out. Nothing here is stored: a free-time entry has no id and no
    state, it is a description of the hole between two blocks. `tdQuestsToday`
    stays the only reader of what the day actually contains. */
-function tdUpcomingTimeline(kid, upcomingBlocks) {
+/* currentId is the block she is in. It is excluded from the list because the
+   hero already IS it — the screen used to render the running block twice, once
+   as a hero with a tick and once as a card with a tick, which is two controls
+   for one action and two chances to disagree about its state. The hero owns it;
+   this is the window onto what comes after. */
+function tdUpcomingTimeline(kid, upcomingBlocks, currentId) {
   const now = tdNowMin();
-  const items = upcomingBlocks.map(b => ({ kind: 'block', startMin: b.startMin || 0, block: b }));
+  const items = upcomingBlocks
+    .filter(b => !currentId || b.id !== currentId)
+    .map(b => ({ kind: 'block', startMin: tdActionableStart(b), block: b }));
   /* Only gaps that are still ahead, and only from now — the hour before lunch is
      not free time at four in the afternoon. A gap that has already started
      counts from now, so "free until 4pm" stays true as the afternoon runs down.
@@ -227,7 +351,50 @@ function tdUpcomingTimeline(kid, upcomingBlocks) {
     if (durationMin < TD_FREE_MIN) return;
     items.push({ kind: 'free', startMin: g.startMin, gap: { startMin: g.startMin, endMin, durationMin } });
   });
-  return items.sort((a, b) => a.startMin - b.startMin);
+  items.sort((a, b) => a.startMin - b.startMin);
+
+  /* Breaks, threaded between the blocks they sit between. Strictly shorter than
+     TD_FREE_MIN (tdGapBefore enforces it), so a stretch is either a break or a
+     free-time card and never both — two descriptions of one gap is how a screen
+     starts contradicting itself. A break is a connector, not an item: it carries
+     no id, no state and nothing to tick. */
+  const out = [];
+  items.forEach((it, i) => {
+    const prev = items[i - 1];
+    if (prev && prev.kind === 'block' && it.kind === 'block') {
+      const mins = tdGapBefore(prev.block, it.block);
+      if (mins) out.push({ kind: 'break', startMin: it.startMin, mins });
+    }
+    out.push(it);
+  });
+  return out;
+}
+
+/* The break between two blocks, drawn as a connector rather than a card: it is
+   a fact about the space between two things she has to do, not a third thing.
+   No id, no state, nothing to tick, and not focusable — one action, one control. */
+function tdBreakConnector(mins) {
+  return `<div class="td-gap-break">
+      <span class="td-gap-dots" aria-hidden="true"></span>
+      <span class="td-break-chip">☕ ${escapeHtml(formatDuration(mins))} break</span>
+    </div>`;
+}
+
+/* Where the loud part of the list ends, counting only the things she has to do.
+   A break connector rides along with the block it precedes and never spends a
+   slot of its own — three cards means three cards, however many gaps sit
+   between them. */
+function tdLoudSlice(items, want) {
+  let n = 0, i = 0;
+  for (; i < items.length; i++) {
+    if (items[i].kind !== 'break') {
+      if (n === want) break;
+      n++;
+    }
+  }
+  // Never end the loud part on a dangling connector pointing at a folded card.
+  while (i > 0 && items[i - 1].kind === 'break') i--;
+  return i;
 }
 
 /* A stretch of nothing, offered rather than reported. Taps through to the day
@@ -259,23 +426,66 @@ function tdFreeCard(gap) {
    The class strings are written out rather than built from a ternary because
    tests/check-dead-css.js matches literal text: a name assembled at runtime is
    invisible to it, and a rule it cannot see is a rule that can quietly die. */
-function tdQuestCard(b, kid, isNext) {
+/* The time column, in two shapes.
+
+   A block with travel or get-ready leads with the minute she has to ACT, at the
+   SAME size and colour as every other card's time — deliberately not shrunk to a
+   footnote, and deliberately not overridden on the --next card or inside
+   .dq-list--quiet, because a child who has to leave at ten to five needs to read
+   that as easily on a folded card as on the loud one.
+
+   The block's own start still follows underneath, so the card never lies about
+   when swimming actually is. Two numbers, and the big one is the one she can act
+   on. */
+function tdTimeCol(b) {
+  const act = tdActionableStart(b);
+  const start = b.startMin || 0;
+  const dur = b.durationMin
+    ? ' · ' + escapeHtml(formatDuration(b.durationMin))
+    : '';
+  if (act >= start) {
+    return `<div class="quest-time-col">
+        <div class="quest-time">${escapeHtml(formatQuestTime(start))}</div>
+        ${b.durationMin ? `<div class="quest-dur">${escapeHtml(formatDuration(b.durationMin))}</div>` : ''}
+      </div>`;
+  }
+  return `<div class="quest-time-col">
+      <div class="quest-time">${escapeHtml(formatQuestTime(act))}</div>
+      <div class="quest-ready-lab">get ready</div>
+      <div class="quest-start-at">▸ ${escapeHtml(formatQuestTime(start))}${dur}</div>
+    </div>`;
+}
+
+/* clash names the other activity this one runs into, or null. Today asks
+   computeBufferConflicts (js/03-sync.js) — it does not work out for itself
+   whether a plan is workable, because the week grid already answers that and
+   two answers to one question is one answer too many. */
+function tdQuestCard(b, kid, isNext, clash) {
   const { icon, name: nm } = tdBlockLabel(b, kid);
   const id = escapeAttr(b.id);
   const done = !!b.completed;
+  /* --conflict composes with --next rather than replacing it: the frame is an
+     outline, the tier is border, shadow and fill, and the next block is still
+     the next block whether or not its buffers fit. Dropping --next here would
+     leave the screen with no T2 card at all, which is what the hero's NEXT line
+     is checked against. A finished block keeps its done styling — a clash that
+     has already been lived through is history, not a warning.
+     Written out rather than composed: check-dead-css.js matches literal text. */
   const cls = done ? 'quest-card quest-done'
+    : isNext && clash ? 'quest-card quest-card--next quest-card--conflict'
     : isNext ? 'quest-card quest-card--next'
+    : clash ? 'quest-card quest-card--conflict'
     : 'quest-card';
+  if (done) clash = null;
   return `<div class="${cls}">
+      ${clash ? '<span class="quest-conflict-flag" aria-hidden="true">!</span>' : ''}
       <button type="button" class="dq-open" data-td-action="plan" data-td-block="${id}">
-        <div class="quest-time-col">
-          <div class="quest-time">${escapeHtml(formatQuestTime(b.startMin))}</div>
-          ${b.durationMin ? `<div class="quest-dur">${escapeHtml(formatDuration(b.durationMin))}</div>` : ''}
-        </div>
+        ${tdTimeCol(b)}
         <div class="quest-card-icon">${icon}</div>
         <div class="quest-card-body">
           <div class="quest-card-name">${escapeHtml(nm)}</div>
           <div class="quest-card-meta"><span class="quest-xp-tag">+${QUEST_XP_PER_TASK} XP</span></div>
+          ${clash ? `<div class="quest-conflict-note">⚠️ Overlaps ${escapeHtml(clash)}</div>` : ''}
         </div>
       </button>
       ${done
@@ -304,10 +514,16 @@ function tdQuestHero(kid, blocks) {
     </div>`;
 }
 
-/* ── The shape of the day, as one row of squares ──────────────────────────────
+/* ── The shape of the day, drawn to scale ─────────────────────────────────
    A picture of a number the screen already prints: tdQuestHero's "4/8 done" is
    the same fact, and the ribbon carries no caption of its own because of that.
-   Its cells are unlabelled, so it costs nothing against the word budget.
+
+   It was a row of equal squares, which said how MANY things were on the day but
+   nothing about their shape — a five-minute vitamin and a three-hour training
+   drew the same box, and a free afternoon drew nothing at all. Cells are now
+   proportional to duration and the gaps between them are real empty space, so
+   the strip reads as the day's shape rather than its inventory. Three times
+   underneath give the scale; one marker says where she is in it.
 
    It reads the array tdRenderToday already computed rather than calling
    getDayBlocks again — one list of today, and a ribbon that cannot disagree
@@ -315,32 +531,99 @@ function tdQuestHero(kid, blocks) {
 
    Four states, and each differs in border STYLE as well as fill: colour alone
    is not a signal a child reliably reads, which is the same reason the nav's
-   current tab is underlined and not merely tinted.
+   current tab is underlined and not merely tinted. The emoji faces are gone
+   with the equal squares — a sliver eight pixels wide cannot hold one.
 
-   Not tappable, and deliberately so. A 14px square is not a reachable target,
-   and this is a readout rather than a control — the cards below are where a
-   block gets ticked. One role="img" with a spoken label, rather than twenty tab
-   stops a keyboard user has to walk through to reach the day. */
+   Now tappable, and it opens the DAY SCREEN. It does not unfold a copy of the
+   day here: four renderings of one day have been retired in this app already,
+   and the day screen is the one that draws today at absolute times with its
+   breaks and free stretches — and lets her change it. One button rather than
+   twenty tab stops, with the spoken label on the button itself. */
+function tdRibbonSpan(blocks) {
+  let from = Infinity, to = -Infinity;
+  blocks.forEach(b => {
+    from = Math.min(from, tdActionableStart(b));
+    to = Math.max(to, (b.startMin || 0) + (b.durationMin || 0));
+  });
+  // A day of one instant still needs a width to divide by.
+  return { from, to: Math.max(to, from + 1) };
+}
+
 function tdProgressRibbon(kid, blocks) {
   const total = blocks.length;
   if (!total) return tdQuestHero(kid, blocks);
   const { current } = tdCurrentAndNext(kid);
   const now = tdNowMin();
   const done = blocks.filter(b => b.completed).length;
-  const cells = blocks.map(b => {
-    const { icon } = tdBlockLabel(b, kid);
+  const { from, to } = tdRibbonSpan(blocks);
+  const span = to - from;
+  const pctOf = min => Math.max(0, Math.min(100, (min - from) / span * 100));
+
+  /* Cells and the gaps between them, laid left to right, as percentages of one
+     nowrap row. Two ways that row could add up to more than 100% — and it did,
+     which put the last cell through the right-hand edge of its column on an
+     iPad in landscape:
+
+     A BLOCK MAY START INSIDE THE ONE BEFORE IT. That is not a hypothetical, it
+     is exactly the clash this screen now draws in red: swimming needs her at
+     3:35 while piano runs to 4:00. Measured from its own start, its cell claims
+     twenty-five minutes the previous cell has already drawn. Clamping to the
+     cursor means the strip only ever spends each minute of the day once.
+
+     AND THE FLOOR IS A FLOOR. A cell thinner than MIN_CELL reads as a scratch
+     rather than a block, so it is widened — and enough short blocks widened
+     enough will overrun the row on their own, with no overlap involved.
+
+     So: build the segments, then scale the lot back if they came to more than a
+     day. Proportions survive; the strip fits. */
+  const MIN_CELL = 3;
+  let cursor = from;
+  const segs = [];
+  blocks.forEach(b => {
+    const s = tdActionableStart(b);
+    const e = (b.startMin || 0) + (b.durationMin || 0);
+    const gap = Math.max(0, pctOf(s) - pctOf(cursor));
+    if (gap > 0.5) segs.push({ cls: 'td-rib-gap', w: gap });
+    // Never re-draw time an earlier block already occupies.
+    const drawFrom = Math.max(s, cursor);
+    cursor = Math.max(cursor, e);
     // Written out rather than built from a ternary: check-dead-css.js matches
     // literal text, and a class it cannot see is a class that can quietly die.
     let cls = 'td-rib-cell';
-    let face = '';
-    if (b.completed) { cls = 'td-rib-cell td-rib-cell--done'; face = icon; }
+    if (b.completed) cls = 'td-rib-cell td-rib-cell--done';
     else if (current && b.id === current.id) cls = 'td-rib-cell td-rib-cell--now';
-    else if ((b.startMin || 0) + (b.durationMin || 0) <= now) cls = 'td-rib-cell td-rib-cell--missed';
-    return `<span class="${cls}" aria-hidden="true">${face}</span>`;
-  }).join('');
+    else if (e <= now) cls = 'td-rib-cell td-rib-cell--missed';
+    segs.push({ cls, w: Math.max(MIN_CELL, pctOf(e) - pctOf(drawFrom)) });
+  });
+  const wide = segs.reduce((a, s) => a + s.w, 0);
+  const scale = wide > 100 ? 100 / wide : 1;
+  const cells = segs
+    .map(s => `<span class="${s.cls}" style="flex:0 0 ${(s.w * scale).toFixed(2)}%"></span>`)
+    .join('');
+
+  /* The marker only exists while now is inside the day's span. Before the first
+     block and after the last one there is nothing for it to point at, and an
+     arrow pinned to the edge would claim otherwise. */
+  const marker = (now >= from && now <= to)
+    ? `<span class="td-rib-now" style="left:${pctOf(now).toFixed(2)}%"></span>`
+    : '';
+  const mid = Math.round((from + to) / 2);
+
+  /* The button wraps the strip only. tdQuestHero is a sibling inside the same
+     .td-ribbon container rather than a child of the button: it is a readout, it
+     contains block elements a <button> may not legally hold, and the level she
+     has reached is not a thing to tap. */
   return `<div class="td-ribbon">
-      <div class="td-rib-strip" role="img"
-        aria-label="${escapeAttr(done + ' of ' + total + ' blocks done today')}">${cells}</div>
+      <button type="button" class="td-rib-btn" data-td-action="plan"
+        aria-label="${escapeAttr(done + ' of ' + total + ' done today. Open the day.')}">
+        <span class="td-rib-strip" aria-hidden="true">${cells}${marker}</span>
+        <span class="td-rib-foot" aria-hidden="true">
+          <span>${escapeHtml(formatQuestTime(from))}</span>
+          <span>${escapeHtml(formatQuestTime(mid))}</span>
+          <span>${escapeHtml(formatQuestTime(to))}</span>
+          <span class="td-rib-go">›</span>
+        </span>
+      </button>
       ${tdQuestHero(kid, blocks)}
     </div>`;
 }
@@ -418,6 +701,9 @@ function tdRenderToday() {
   const d = tdTodayIndex();
   const { current, next } = tdCurrentAndNext(kid);
   const quests = tdQuestsToday(kid);
+  /* One call per render, read by both the hero and the cards, so a clash is
+     never flagged in one place and not the other. */
+  const clashes = tdClashes(kid, quests);
   const waiting = d == null ? 0 : mrWaitingCount(kid, wk);
   const fresh = (d == null || typeof mrNewlyGraded !== 'function') ? [] : mrNewlyGraded(kid, wk);
 
@@ -457,11 +743,21 @@ function tdRenderToday() {
   let nextHtml = '';
   if (current && next) {
     const nl = tdBlockLine(next, kid);
+    /* The gap between what she is doing and what is next, named when it is
+       short enough to be a break rather than an afternoon. tdGapBefore returns
+       null at TD_FREE_MIN and over, where the free-time card below already
+       describes the same stretch — one gap, one description. */
+    /* And the time beside it is the one she has to act on, not the one the
+       block starts at — the same number tdTimeCol puts on the card below, so the
+       hero and the card cannot name two different times for one thing. The prep
+       strip directly under this line says what the earlier time is for. */
+    const brk = tdGapBefore(current, next);
     nextHtml = `<div class="td-now-next">
         <div class="td-now-nextline">
           <span class="td-now-nextlab">Next</span>
+          ${brk ? `<span class="td-break-chip">☕ ${escapeHtml(formatDuration(brk))} break</span>` : ''}
           <span class="td-now-nextname">${escapeHtml(nl.name)}</span>
-          <span class="td-now-nexttime">${escapeHtml(nl.time)}</span>
+          <span class="td-now-nexttime">${escapeHtml(formatTimeFromMin(tdActionableStart(next)))}</span>
         </div>${prepHtml}
       </div>`;
   } else if (prepHtml) {
@@ -470,6 +766,7 @@ function tdRenderToday() {
   }
 
   // NOW — the one thing the screen exists for.
+  const breakNow = current ? null : tdBreakNow(quests, next);
   let nowHtml;
   if (current) {
     const l = tdBlockLine(current, kid);
@@ -477,20 +774,61 @@ function tdRenderToday() {
        the card only has to let her close it, and the height a big button would
        take belongs to NEXT. It routes to the same blastQuest the 🎯 on the card
        below routes to — one completion path, not two. */
+    /* "now · started 8:15am" made her do the arithmetic. The block's own window
+       and what is left of it, with the countdown drawn underneath so "how much
+       longer" can be read rather than worked out. No digital clock: the day
+       screen owns absolute time, and a clock here would be a second one.
+
+       The button is the 🎯 the cards below carry, not a ✓. It was a tick, and
+       four centimetres under it the same block's card showed a tick that meant
+       "already done" — one action wearing two glyphs, and a child with no way
+       to tell which tick did what. Same glyph, same green, same border. It is
+       still 56px because it sits at the card's edge where a thumb arrives at an
+       angle, and it still routes to the same blastQuest. */
+    const prog = tdHeroProgress(current);
+    const clash = clashes.get(current.id);
     nowHtml = `<div class="td-now-head">
         <div class="td-now-icon">${l.icon}</div>
         <div class="td-now-line"><div class="td-now-name">${escapeHtml(l.name)}</div>
-          <div class="td-now-sub">now · started ${escapeHtml(l.time)}</div></div>
+          <div class="td-now-sub">${escapeHtml(prog.range)} · <span class="td-now-left">${escapeHtml(formatDuration(prog.leftMin))} left</span></div>
+          ${clash ? `<div class="quest-conflict-note">⚠️ Overlaps ${escapeHtml(clash)}</div>` : ''}</div>
         <button type="button" class="td-now-tick" data-td-action="blast"
           data-td-block="${escapeAttr(current.id)}"
-          aria-label="Mark ${escapeAttr(l.name)} done" title="Done!">✓</button>
-      </div>${nextHtml}`;
+          aria-label="Mark ${escapeAttr(l.name)} done" title="Done it! 🎯">🎯</button>
+      </div>
+      <div class="td-now-bar"><span class="td-now-bar-fill" style="width:${prog.pct}%"></span></div>${nextHtml}`;
+  } else if (breakNow) {
+    /* Between two things, with only minutes in it. "Nothing scheduled — the rest
+       of today is yours" is false at ten past nine on a homework morning, and
+       "Homework, next 9:15am" is not what she is doing either: she is on a
+       break, and the useful number is how much of it is left. Nothing to tick,
+       so no 🎯 — the hero only carries a control when there is something to
+       close. Only under TD_FREE_MIN; a longer stretch is free time and the card
+       below already names it. */
+    const b = breakNow;
+    const l = tdBlockLine(next, kid);
+    nowHtml = `<div class="td-now-head">
+        <div class="td-now-icon">☕</div>
+        <div class="td-now-line"><div class="td-now-name">Break</div>
+          <div class="td-now-sub"><span class="td-now-left">${escapeHtml(formatDuration(b.leftMin))}</span> until ${escapeHtml(l.name)} · ${escapeHtml(l.time)}</div></div>
+      </div>
+      <div class="td-now-bar"><span class="td-now-bar-fill" style="width:${b.pct}%"></span></div>${nextHtml}`;
   } else if (next) {
     const l = tdBlockLine(next, kid);
+    const act = tdActionableStart(next);
+    const clash = clashes.get(next.id);
+    /* A block she has to travel to starts when she starts getting ready. Leading
+       with "next · 4:00pm" names a time she would already be late for, so when
+       there are buffers the head carries the actionable minute and the block's
+       own start follows it. */
+    const sub = act < (next.startMin || 0)
+      ? `<span class="td-now-left">get ready ${escapeHtml(formatTimeFromMin(act))}</span> · starts ${escapeHtml(l.time)}`
+      : `next · ${escapeHtml(l.time)}`;
     nowHtml = `<div class="td-now-head">
         <div class="td-now-icon">${l.icon}</div>
         <div class="td-now-line"><div class="td-now-name">${escapeHtml(l.name)}</div>
-          <div class="td-now-sub">next · ${escapeHtml(l.time)}</div></div>
+          <div class="td-now-sub">${sub}</div>
+          ${clash ? `<div class="quest-conflict-note">⚠️ Overlaps ${escapeHtml(clash)}</div>` : ''}</div>
       </div>${nextHtml}`;
   } else if (tdInQuietHours()) {
     /* Nine at night with nothing left on the plan. "The rest of today is yours"
@@ -566,25 +904,33 @@ function tdRenderToday() {
      says so instead of showing the 4pm thing as if it were imminent. */
   const split = tdSplitQuestsByNow(quests);
   const earlierOpen = tdEarlierOpen();
-  const timeline = tdUpcomingTimeline(kid, split.upcoming);
-  const card = it => (it.kind === 'free'
-    ? tdFreeCard(it.gap)
-    : tdQuestCard(it.block, kid, !!(next && it.block && it.block.id === next.id)));
-  const upNext = timeline.slice(0, 1 + TD_UP_NEXT);
-  const later = timeline.slice(1 + TD_UP_NEXT);
+  const timeline = tdUpcomingTimeline(kid, split.upcoming, current && current.id);
+  const card = it => (it.kind === 'free' ? tdFreeCard(it.gap)
+    : it.kind === 'break' ? tdBreakConnector(it.mins)
+    : tdQuestCard(it.block, kid, !!(next && it.block && it.block.id === next.id),
+        clashes.get(it.block.id)));
+  /* A break is a connector, not one of the things she has to do, so it does not
+     spend one of the three loud slots — count blocks and free stretches only.
+     Otherwise a morning of short gaps would push the third real card behind the
+     fold and the window would show two things while claiming three. */
+  const loudEnd = tdLoudSlice(timeline, 1 + TD_UP_NEXT);
+  const upNext = timeline.slice(0, loudEnd);
+  const later = timeline.slice(loudEnd);
   /* A fold over one card hides as much as it saves, so at one the fold is not
      worth the tap and the item simply shows. */
-  const laterOpen = tdLaterOpen() || later.length === 1;
+  // Connectors are not things to do, so they do not count in "Later today (n)".
+  const laterCount = later.filter(it => it.kind !== 'break').length;
+  const laterOpen = tdLaterOpen() || laterCount === 1;
   const questHtml = quests.length
     ? `${upNext.length
           ? `<div class="dq-list">${upNext.map(card).join('')}</div>`
           : `<div class="td-empty">That is the whole day done.</div>`}
-       ${later.length > 1
+       ${laterCount > 1
           ? `<button type="button" class="td-fold-btn td-later-btn" data-td-action="later">
-               ${laterOpen ? '▾' : '▸'} Later today (${later.length})
+               ${laterOpen ? '▾' : '▸'} Later today (${laterCount})
              </button>`
           : ''}
-       ${later.length && laterOpen ? `<div class="dq-list dq-list--quiet">${later.map(card).join('')}</div>` : ''}
+       ${laterCount && laterOpen ? `<div class="dq-list dq-list--quiet">${later.map(card).join('')}</div>` : ''}
        ${split.earlier.length
           ? `<button type="button" class="td-fold-btn td-earlier-btn" data-td-action="earlier">
                ${earlierOpen ? '▾' : '▸'} Earlier today (${split.earlier.length})
@@ -639,6 +985,14 @@ function tdRenderToday() {
      mnyTodayCard reads — extracted precisely so this row could not become a
      second answer to it. The whole row taps through to My money; nothing here
      spends, claims or settles. */
+  /* The hero takes the clash frame when the block it is showing is one of the
+     two the clash names — the same red the week grid uses, on the same finding.
+     Written out rather than composed: check-dead-css.js matches literal text. */
+  const heroBlock = current || (breakNow ? null : next);
+  const heroCls = (heroBlock && clashes.get(heroBlock.id))
+    ? 'td-card td-now td-now--conflict'
+    : 'td-card td-now';
+
   const moneyHtml = tdMoneyChart(kid, wk);
 
   /* The evening wind-down nudge, carried over from the day timeline's banner.
@@ -665,9 +1019,9 @@ function tdRenderToday() {
      depends on the viewport being wide. */
   wrap.innerHTML = `
     <div class="td-col td-col--day">
-      <div class="td-card td-now">${nowHtml}</div>
+      <div class="${heroCls}">${nowHtml}</div>
       <div class="td-card">
-        <div class="td-cap">On today</div>${questHtml}</div>
+        <div class="td-cap">Coming up</div>${questHtml}</div>
       ${planHtml}
     </div>
     <div class="td-col td-col--side">
@@ -855,6 +1209,71 @@ function tdHandleClick(e) {
     if (d == null) { goWeek(); return; }
     openDayFromWeekCard(todayKey(), d, el.getAttribute('data-td-block') || null);
     return;
+  }
+}
+
+/* ── The minute hand ──────────────────────────────────────────────────────
+   The hero now counts down, and a countdown that only moves when something else
+   re-renders is a clock that is wrong most of the time. A tablet left open on
+   this screen through an afternoon showed "22m left" for three hours.
+
+   Two costs to avoid. A full tdRenderToday every minute rebuilds every card and
+   throws away the scroll position, and refreshCurrentScreen already fires on
+   every remote snapshot; so the common tick patches the three things that
+   actually changed — the remaining time, the bar and the marker — in place, and
+   only a change of what she is doing earns a real re-render. And nothing here
+   writes: a render is not a mutation, so this never touches Firestore.
+
+   TD_TICK_MS is a minute because the smallest unit the hero prints is a minute.
+
+   Held in a module-level string rather than read back off the DOM: the point is
+   to notice the boundary at 9:15 even when the previous block was never ticked,
+   and the DOM cannot say which block it is showing without being asked.
+   Declaration only — js/99-main.js starts the timer. */
+const TD_TICK_MS = 60000;
+let tdTickShowing = null;
+
+function tdTickKey(kid) {
+  const { current, next } = tdCurrentAndNext(kid);
+  const breakNow = current ? null : tdBreakNow(tdQuestsToday(kid), next);
+  return [current ? current.id : '', next ? next.id : '', breakNow ? 'brk' : '', todayKey()].join('|');
+}
+
+function tdTick() {
+  // .active is what showScreen (js/05-helpers.js) sets; anything else is a
+  // screen the child is not looking at, and repainting it is wasted work.
+  const screen = document.getElementById('screen-today');
+  if (!screen || !screen.classList.contains('active')) return;
+  const kid = activeProfile();
+  if (!kid || kid === 'parent') return;
+
+  const key = tdTickKey(kid);
+  if (key !== tdTickShowing) { tdTickShowing = key; tdRenderToday(); return; }
+
+  const { current, next } = tdCurrentAndNext(kid);
+  const left = document.querySelector('#tdWrap .td-now-left');
+  const fill = document.querySelector('#tdWrap .td-now-bar-fill');
+  if (current) {
+    const p = tdHeroProgress(current);
+    if (left) left.textContent = formatDuration(p.leftMin) + ' left';
+    if (fill) fill.style.width = p.pct + '%';
+  } else {
+    const b = tdBreakNow(tdQuestsToday(kid), next);
+    if (b) {
+      if (left) left.textContent = formatDuration(b.leftMin);
+      if (fill) fill.style.width = b.pct + '%';
+    }
+  }
+  const marker = document.querySelector('#tdWrap .td-rib-now');
+  if (marker) {
+    const blocks = tdQuestsToday(kid);
+    if (blocks.length) {
+      const { from, to } = tdRibbonSpan(blocks);
+      const now = tdNowMin();
+      if (now >= from && now <= to) {
+        marker.style.left = ((now - from) / Math.max(1, to - from) * 100).toFixed(2) + '%';
+      }
+    }
   }
 }
 
