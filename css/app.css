@@ -2968,6 +2968,35 @@
   }
   .toast.show { opacity: 1; }
 
+  /* ── The way back from a mis-tapped tick ──
+     Bottom of the screen, clear of the kid nav; .toast is at the top, so the
+     two never overlap when a completion raises both. Dark ground on purpose:
+     this is the one transient thing on the screen and it should not read as
+     another card. */
+  .undo-toast {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(76px + env(safe-area-inset-bottom, 0));
+    z-index: var(--z-toast, 999);
+    display: flex; align-items: center; gap: 0.9rem;
+    max-width: calc(100% - 2rem);
+    background: var(--ink); color: var(--bg);
+    border: 2.5px solid var(--ink); border-radius: var(--radius-md, 14px);
+    box-shadow: 3px 3px 0 var(--accent);
+    padding: 0.5rem 0.6rem 0.5rem 1rem;
+  }
+  .undo-toast[hidden] { display: none; }
+  .undo-toast-text {
+    font-size: max(15px, calc(0.98rem * var(--fs-scale, 1))); font-weight: 700;
+  }
+  .undo-toast-btn {
+    flex: 0 0 auto; min-height: 44px; min-width: 44px; padding: 0.35rem 0.9rem;
+    border: 2.5px solid var(--bg); border-radius: var(--radius-sm, 12px);
+    background: transparent; color: var(--bg); font: inherit;
+    font-size: max(15px, calc(0.98rem * var(--fs-scale, 1)));
+    font-weight: 800; cursor: pointer;
+  }
+  .undo-toast-btn:hover { background: rgba(255,255,255,0.14); }
+
   /* ═══════════ CLOSING RITUAL ═══════════ */
   .ritual-screen {
     position: fixed; inset: 0;

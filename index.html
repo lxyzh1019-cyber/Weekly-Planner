@@ -29,6 +29,29 @@
 <!-- ═══════════ TOAST ═══════════ -->
 <div class="toast" id="toast"></div>
 
+<!-- ═══════════ UNDO ═══════════
+     A mis-tapped tick is a nine-year-old's most common mistake on this app, and
+     until now the only way back was to find the block again and toggle it.
+
+     This node lives OUTSIDE every .screen, deliberately, for three reasons:
+
+     1. tdRenderToday replaces #tdWrap.innerHTML wholesale, and the completion
+        that raises this toast also triggers that re-render — a toast inside the
+        wrap would be destroyed by the very event that created it.
+     2. The kid-standards sweep in tests/smoke.js walks only #screen-today, so a
+        node outside it costs nothing against the 200-word budget whether or not
+        it happens to be showing when the sweep runs. Inside, the budget would
+        depend on the timing of a 6-second timer.
+     3. Same for the 44px probe: an undo button should be a big target without
+        having to argue with elementFromPoint about it.
+
+     It sits at the bottom, above the kid nav; #toast is at the top, so the two
+     never collide. -->
+<div class="undo-toast" id="undoToast" role="status" aria-live="polite" hidden>
+  <span class="undo-toast-text" id="undoToastText"></span>
+  <button type="button" class="undo-toast-btn" id="undoToastBtn">↩ Undo</button>
+</div>
+
 <!-- ═══════════ MASCOT ═══════════ -->
 <button class="mascot-btn" id="mascotBtn" onclick="onMascotClick()" aria-label="Owl mascot — tap for tips">
   🦉<span class="deco" id="mascotDeco"></span>
