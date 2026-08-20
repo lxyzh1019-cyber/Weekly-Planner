@@ -185,17 +185,23 @@
         </div>
         <div id="dayGoalsList" class="day-mini-list"></div>
       </div>
-      <!-- Both moved off the retired Quest Board, and both belong behind this
-           toggle rather than in Today's default view: a sticker wall and a note
-           box are things you go and look at, not things that answer "what now".
-           Ids kept, so renderStickerCollection / loadKidWeekFeedback /
+      <!-- Moved off the retired Quest Board. A note box is something you go and
+           look at rather than something that answers "what now", so it stays
+           behind this toggle. Id kept, so loadKidWeekFeedback /
            saveKidWeekFeedback work untouched. -->
-      <div class="sticker-collection" id="questStickers"></div>
       <div class="kid-feedback-box">
         <label for="kidWeekFeedback">💬 Tell your grown-ups how your week is going</label>
         <textarea id="kidWeekFeedback" rows="2" placeholder="What was fun? What was tricky?" onchange="saveKidWeekFeedback()"></textarea>
       </div>
     </div>
+
+    <!-- The sticker wall, at the foot of the screen and out from behind the
+         fold. It sat inside the disclosure with the reference material, and its
+         renderer had no caller anywhere in the repo — so it rendered nothing at
+         all, from either place. It is the one thing here that is purely hers to
+         collect, which is reason enough for it to be visible; it goes last
+         because it is a reward to find at the bottom, not an instruction. -->
+    <div class="sticker-collection" id="questStickers"></div>
   </div>
 
   <!-- The three-button shortcut row that used to sit here is gone. "The whole

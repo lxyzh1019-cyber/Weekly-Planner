@@ -5099,7 +5099,10 @@
   #screen-chore .ck-chip-cap,
   #screen-chore .ck-lane-note,
   #screen-chore .ck-weeksub,
-  #screen-quest .sticker-name,
+  /* Was #screen-quest, a screen retired with the Quest Board — so this line
+     could never match anything. The sticker wall lives on Today now, and the
+     names sit at 10.56px without this. */
+  #screen-today .sticker-name,
   #screen-week .wf-col-dow,
   #screen-week .wf-band-label,
   #screen-week .wf-sideband-seg,
