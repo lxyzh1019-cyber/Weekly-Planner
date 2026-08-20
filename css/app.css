@@ -5453,6 +5453,27 @@
   .td-row--done .td-row-name { text-decoration: line-through; }
   .td-earlier-btn, .td-later-btn { margin-top: 0.4rem; }
 
+  /* ── The day as a row of squares ──────────────────────────────────────────
+     Cells flex from 10px to 26px and wrap rather than scroll: twenty blocks
+     still fit one row inside a 390px phone's content width, and an overflow
+     container is exactly the thing that puts content out of a child's reach on
+     a tablet. Each state differs in border style as well as fill, so the row
+     survives greyscale and colour-blindness. */
+  .td-ribbon { display: flex; flex-direction: column; gap: 0.45rem; }
+  .td-rib-strip { display: flex; flex-wrap: wrap; gap: 3px; }
+  .td-rib-cell {
+    flex: 1 1 0; min-width: 10px; max-width: 26px; aspect-ratio: 1;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; line-height: 1;
+    border: 2px solid var(--ink); border-radius: 6px;
+    background: var(--paper);
+  }
+  .td-rib-cell--done { background: var(--accent-green); }
+  .td-rib-cell--now { border-width: 2.5px; background: var(--accent-yellow); box-shadow: 2px 2px 0 var(--ink); }
+  /* Ended without being ticked. Dashed and faded — a record, not a reprimand:
+     off days are a valid state and nothing here is styled as a failure. */
+  .td-rib-cell--missed { border-style: dashed; opacity: 0.55; }
+
   .td-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; }
   .td-chip {
     display: flex; align-items: center; gap: 0.4rem;

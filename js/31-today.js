@@ -303,6 +303,47 @@ function tdQuestHero(kid, blocks) {
     </div>`;
 }
 
+/* ── The shape of the day, as one row of squares ──────────────────────────────
+   A picture of a number the screen already prints: tdQuestHero's "4/8 done" is
+   the same fact, and the ribbon carries no caption of its own because of that.
+   Its cells are unlabelled, so it costs nothing against the word budget.
+
+   It reads the array tdRenderToday already computed rather than calling
+   getDayBlocks again — one list of today, and a ribbon that cannot disagree
+   with the list beside it.
+
+   Four states, and each differs in border STYLE as well as fill: colour alone
+   is not a signal a child reliably reads, which is the same reason the nav's
+   current tab is underlined and not merely tinted.
+
+   Not tappable, and deliberately so. A 14px square is not a reachable target,
+   and this is a readout rather than a control — the cards below are where a
+   block gets ticked. One role="img" with a spoken label, rather than twenty tab
+   stops a keyboard user has to walk through to reach the day. */
+function tdProgressRibbon(kid, blocks) {
+  const total = blocks.length;
+  if (!total) return tdQuestHero(kid, blocks);
+  const { current } = tdCurrentAndNext(kid);
+  const now = tdNowMin();
+  const done = blocks.filter(b => b.completed).length;
+  const cells = blocks.map(b => {
+    const { icon } = tdBlockLabel(b, kid);
+    // Written out rather than built from a ternary: check-dead-css.js matches
+    // literal text, and a class it cannot see is a class that can quietly die.
+    let cls = 'td-rib-cell';
+    let face = '';
+    if (b.completed) { cls = 'td-rib-cell td-rib-cell--done'; face = icon; }
+    else if (current && b.id === current.id) cls = 'td-rib-cell td-rib-cell--now';
+    else if ((b.startMin || 0) + (b.durationMin || 0) <= now) cls = 'td-rib-cell td-rib-cell--missed';
+    return `<span class="${cls}" aria-hidden="true">${face}</span>`;
+  }).join('');
+  return `<div class="td-ribbon">
+      <div class="td-rib-strip" role="img"
+        aria-label="${escapeAttr(done + ' of ' + total + ' blocks done today')}">${cells}</div>
+      ${tdQuestHero(kid, blocks)}
+    </div>`;
+}
+
 /* One line, chosen from what actually happened rather than at random — an
    encouragement that ignores the day is noise. Off days are a valid state
    (CLAUDE.md), so a rest day gets its own line and a blank day is never framed
@@ -630,7 +671,7 @@ function tdRenderToday() {
     </div>
     <div class="td-col td-col--side">
       ${loopHtml ? `<div class="td-chips">${loopHtml}</div>` : ''}
-      ${tdQuestHero(kid, quests)}
+      ${tdProgressRibbon(kid, quests)}
       <div class="td-card">
         <div class="td-cap">Jobs I can do</div>${choreHtml}</div>
       <div class="td-card">
