@@ -724,8 +724,7 @@ function addQuickBreak(durationMin) {
     showToast('Switch to your profile to add a break 👤');
     return;
   }
-  const now = new Date();
-  const nowAbs = now.getHours() * 60 + now.getMinutes();
+  const nowAbs = nowMinutesInZone();
   let start = findNextGapForBreak(currentDayKey, durationMin, nowAbs);
   if (start == null) {
     start = findNextGapForBreak(currentDayKey, durationMin, START_MIN);
@@ -784,6 +783,29 @@ function toDayKeyInZone(date, timeZone = APP_TIMEZONE) {
   });
   return fmt.format(date);
 }
+/* What time is it, for this family?
+
+   The companion to toDayKeyInZone, and it exists because the two halves of
+   "now" used to come from different clocks: the DATE was Edmonton, fixed, while
+   the TIME OF DAY was whatever the device's clock said. On an iPad at home
+   those agree and nothing shows. They come apart in exactly the cases that
+   matter — a device with its timezone set wrong, a laptop left on another zone,
+   or the family away at a competition — and then the app would show tomorrow's
+   date against today's time of day, or draw the "now" line on the timeline
+   hours from where the child actually is in her day.
+
+   The date is the anchor: the day boundary is Edmonton, so the hours inside
+   that day have to be Edmonton too, or the two disagree at every midnight.
+
+   Returns minutes since midnight, which is the unit blocks are stored in. */
+function nowMinutesInZone(date = new Date(), timeZone = APP_TIMEZONE) {
+  const p = new Intl.DateTimeFormat('en-CA', {
+    timeZone, hour12: false, hour: '2-digit', minute: '2-digit',
+  }).formatToParts(date).reduce((o, x) => (o[x.type] = x.value, o), {});
+  // hour12:false yields "24" for midnight in some engines.
+  return (Number(p.hour) % 24) * 60 + Number(p.minute);
+}
+
 function dateToLocalKey(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth()+1).padStart(2,'0');

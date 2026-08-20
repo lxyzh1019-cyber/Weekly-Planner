@@ -326,6 +326,12 @@ function completeQuest(blockId, dayKey) {
   if (active && active.id === 'screen-day') buildTimeline();
   else if (active && active.id === 'screen-today') tdRenderToday();
 
+  /* Offer the way back. Today only: it is the screen a child taps through
+     quickly, and the day screen has the block's own sheet a tap away. */
+  if (active && active.id === 'screen-today') {
+    showUndoLastCompletion(blockId, key, act.name);
+  }
+
   // After the popup: rest day → its own warm celebration (rest is a valid state,
   // not a failed perfect day); full clear → Mission Clear; partial progress → a
   // warm, low-pressure nudge (never nothing, so off days don't feel like failure).
@@ -513,6 +519,60 @@ function checkStickerUnlocks(kid = activeProfile()) {
   });
   if (fresh.length) saveAll();
   return fresh;
+}
+
+/* ── Undo, for the tick that was not meant ────────────────────────────────────
+   Longer than showToast's 2.5s, because undoing needs reading and a decision
+   rather than just noticing. */
+const UNDO_TOAST_MS = 6000;
+let undoToastTimer = null;
+let undoToastBlock = null;   // { blockId, dayKey }
+
+/* Raised from completeQuest rather than from Today's blast handler: that is the
+   single completion path, so this fires however the block was ticked, including
+   the non-blast fallback. Raising it from Today would also duplicate knowledge
+   of the blast animation's timing.
+
+   XP and stickers do NOT come back. awardBlockLinks guards on blk.xpAwarded and
+   sticker unlocks are pushed permanently, so undo un-ticks the block and the
+   level bar holds. That is deliberate: a child who mis-tapped should not watch
+   her level go backwards, and the XP was for doing the thing, which she will
+   still do. Do not "fix" this without deciding that question first. */
+function showUndoLastCompletion(blockId, dayKey, label) {
+  const box = document.getElementById('undoToast');
+  if (!box) return;
+  undoToastBlock = { blockId, dayKey };
+  const text = document.getElementById('undoToastText');
+  if (text) text.textContent = label ? label + ' done' : 'Marked done';
+  box.hidden = false;
+  clearTimeout(undoToastTimer);
+  undoToastTimer = setTimeout(hideUndoToast, UNDO_TOAST_MS);
+}
+
+function hideUndoToast() {
+  clearTimeout(undoToastTimer);
+  undoToastTimer = null;
+  undoToastBlock = null;
+  const box = document.getElementById('undoToast');
+  if (box) box.hidden = true;
+}
+
+/* toggleBlockDone is the owner of un-completing — it withdraws the chore claim,
+   stamps the merge clock and writes through setDayBlocks. Today must not write
+   blk.completed itself; a second place that decides completion is a second
+   place that can disagree with the first.
+
+   But it is a TOGGLE, not an un-complete. Without this guard a second press —
+   a double tap, or a remote merge landing in between — would silently
+   re-complete the block and award nothing. */
+function undoLastCompletion() {
+  const target = undoToastBlock;
+  hideUndoToast();
+  if (!target) return;
+  const blocks = getDayBlocks(target.dayKey) || [];
+  const blk = blocks.find(b => b.id === target.blockId);
+  if (!blk || !blk.completed) return;
+  toggleBlockDone(target.dayKey, target.blockId);
 }
 
 /* Quick-complete: flip a block's done state straight from the week/day view

@@ -1187,8 +1187,8 @@ function renderFullWeek(keys) {
 
     // "Now" marker on today's column.
     if (key === todayKey()) {
-      const now = new Date();
-      const nowMin = now.getHours()*60 + now.getMinutes() - START_MIN;
+      // Same zone as todayKey, or the line lands on the wrong hour of the day.
+      const nowMin = nowMinutesInZone() - START_MIN;
       if (nowMin > 0 && nowMin < DAY_MIN_SPAN) {
         const nl = document.createElement('div');
         nl.className = 'wf-now-line';

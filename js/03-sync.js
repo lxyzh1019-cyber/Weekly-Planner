@@ -220,7 +220,11 @@ function shortTs(ts) {
   if (!ts) return '-';
   const d = new Date(ts);
   if (isNaN(d)) return String(ts);
-  return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}:${d.getSeconds().toString().padStart(2,'0')}`;
+  // Family time, like every other clock the app shows.
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: APP_TIMEZONE, hour12: false,
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).format(d);
 }
 function renderSyncDebugMessage() {
   const el = document.getElementById('syncDebugMsg');

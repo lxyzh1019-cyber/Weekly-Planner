@@ -79,7 +79,24 @@ function findChromium() {
   const shot = (name) => path.join(outDir, name + '.png');
 
   const browser = await chromium.launch({ executablePath: findChromium() });
-  const page = await browser.newPage({ viewport: { width: 900, height: 1100 } });
+  /* Run the browser in the family's timezone, not the runner's.
+
+     The app is inconsistent about zones, and only this pin hides it: todayKey()
+     goes through toDayKeyInZone (js/05-helpers.js:809, fixed to America/Edmonton)
+     while getDayKeys, dateToLocalKey and tdNowMin all read the machine's local
+     clock. On the iPad and the phone those agree, so nothing shows. On a UTC
+     runner they diverge for the six hours after Edmonton's 18:00, and the checks
+     that pin a wall-clock hour then write to one day key and read back from the
+     next — the blocks simply vanish. todayNamesFreeTime is where it lands first,
+     dereferencing a free-time card that was never rendered.
+
+     That made the suite pass or fail by the hour of day it happened to run, both
+     here and on the nightly CI schedule. Pinning the context zone makes every
+     run reproduce the devices the app is actually used on. */
+  const page = await browser.newPage({
+    viewport: { width: 900, height: 1100 },
+    timezoneId: 'America/Edmonton',
+  });
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => {
@@ -1712,6 +1729,10 @@ function findChromium() {
     for (const [id, nav] of [['today', () => goToday()], ['week', () => { goWeek(); renderWeek(); }],
                              ['mymoney', () => mnyOpenMyMoney('jenn')]]) {
       await page.evaluate(`(${nav.toString()})()`);
+      // Scroll position survives navigation, so these artifacts were being shot
+      // wherever the last check happened to leave the page — usually halfway
+      // down. The top of the screen is the part worth looking at.
+      await page.evaluate(() => window.scrollTo(0, 0));
       await page.waitForTimeout(150);
       await page.screenshot({ path: shot(`${label}_${id}`) });
     }
@@ -5600,6 +5621,385 @@ function findChromium() {
   await page.screenshot({ path: shot('ipad_today') });
   await page.setViewportSize({ width: 900, height: 1100 });
   await page.waitForTimeout(150);
+
+  /* ── THE REDESIGN'S OWN CHECKS ────────────────────────────────────────────
+     Today was six cards of identical weight; it now ranks them by shadow depth,
+     lays out in two columns on the tablet it is used on, draws the day as a row
+     of squares, and offers a way back from a mis-tapped tick. Each of those
+     needs an assertion or it will erode. */
+
+  /* THE HIERARCHY IS REAL, AND MEASURED.
+     This is the one that matters. "Make current and next stand out" is a
+     property of computed style, not of intent, and the way it dies is not a
+     revert — it is six months of small edits each of which flattens one step.
+     So: depth strictly decreases down the ladder, at every viewport, and only
+     one thing is ever at the top of it. */
+  checks.todayShoutsAtWhatIsNextAndWhispersAtTheRest = await (async () => {
+    const findings = [];
+    for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1440, 900], [900, 1100]]) {
+      await page.setViewportSize({ width: w, height: h });
+      const r = await page.evaluate((where) => {
+        profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+        const key = todayKey();
+        const RealDate = Date;
+        const when = new RealDate(); when.setHours(15, 30, 0, 0);
+        Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+        Date.prototype = RealDate.prototype;
+        Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+        const before = (getDayBlocks(key, 'jenn') || []).slice();
+        try {
+          setDayBlocks(key, [
+            { id: 'h1', actId: 'breakfast', startMin: 8 * 60, durationMin: 30, completed: true },
+            { id: 'h2', actId: 'piano', startMin: 15 * 60, durationMin: 60 },
+            { id: 'h3', actId: 'homework', startMin: 16 * 60 + 30, durationMin: 45 },
+            { id: 'h4', actId: 'dinner', startMin: 18 * 60, durationMin: 45 },
+          ], 'jenn');
+          goToday();
+          const bad = [];
+          // First px of a "Xpx Ypx 0 colour" offset shadow. 0 when there is none.
+          const depth = el => {
+            if (!el) return null;
+            const m = /(-?[\d.]+)px/.exec(getComputedStyle(el).boxShadow || '');
+            return m ? Math.abs(parseFloat(m[1])) : 0;
+          };
+          const fontOf = el => (el ? parseFloat(getComputedStyle(el).fontSize) : null);
+          const now = document.querySelector('#tdWrap .td-now');
+          const next = document.querySelector('#tdWrap .quest-card--next');
+          const plain = [...document.querySelectorAll('#tdWrap .quest-card')]
+            .find(c => !c.classList.contains('quest-card--next')
+                    && !c.classList.contains('quest-card--free'));
+          if (!now) bad.push('no NOW card');
+          if (!next) bad.push('nothing is marked as the next block');
+          if (!plain) bad.push('no ordinary quest card to compare against');
+          if (now && next && plain) {
+            const dn = depth(now), dx = depth(next), dp = depth(plain);
+            if (!(dn > dx)) bad.push(`NOW shadow ${dn} is not deeper than NEXT ${dx}`);
+            if (!(dx > dp)) bad.push(`NEXT shadow ${dx} is not deeper than an ordinary card ${dp}`);
+            const sn = fontOf(now.querySelector('.td-now-name'));
+            const sx = fontOf(next.querySelector('.quest-card-name'));
+            if (!(sn > sx)) bad.push(`the NOW name ${sn}px is not bigger than the next block's ${sx}px`);
+          }
+          // Exactly one thing at the top of the ladder.
+          const tier1 = [...document.querySelectorAll('#tdWrap .td-now')].length;
+          if (tier1 !== 1) bad.push(`${tier1} cards at the top tier, expected exactly 1`);
+          const marked = document.querySelectorAll('#tdWrap .quest-card--next').length;
+          if (marked > 1) bad.push(`${marked} blocks marked as next`);
+          return bad.map(b => `${where}: ${b}`);
+        } finally {
+          Date = RealDate;
+          setDayBlocks(key, before, 'jenn');
+        }
+      }, `${w}x${h}`);
+      findings.push(...r);
+    }
+    await page.setViewportSize({ width: 900, height: 1100 });
+    await page.evaluate(() => goToday());
+    return findings.length === 0 || findings;
+  })();
+
+  /* THE HERO NAMES THE NEXT BLOCK, AND SAYS WHEN TO LEAVE FOR IT.
+     tdPrepFor has always been asked about the NEXT block, but its answer used to
+     render inside the CURRENT block's text column — the most actionable line on
+     the screen, filed under the wrong thing. This holds the placement, and holds
+     the two names in agreement: the hero and the card below it must call one
+     block by one name. */
+  checks.theNextBlockSaysWhenToLeave = await page.evaluate(() => {
+    profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+    const bad = [];
+    const key = todayKey();
+    const before = (getDayBlocks(key, 'jenn') || []).slice();
+    const RealDate = Date;
+    const pin = (h, m) => {
+      const when = new RealDate(); when.setHours(h, m, 0, 0);
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+      Date.prototype = RealDate.prototype;
+      Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+    };
+    try {
+      setDayBlocks(key, [
+        { id: 'p-now', actId: 'piano', startMin: 15 * 60, durationMin: 60 },
+        { id: 'p-next', actId: 'training', tag: 'skating',
+          startMin: 17 * 60, durationMin: 90,
+          getReadyBuffer: true, getReadyBufMin: 15,
+          travelBuffer: true, travelBufMin: 30,
+          warmupBuffer: true, warmupBufMin: 20 },
+      ], 'jenn');
+      pin(15, 30);
+      goToday();
+      const nextBox = document.querySelector('#tdWrap .td-now-next');
+      if (!nextBox) return ['the hero says nothing about what is next'];
+      // The prep is INSIDE the NEXT section, not in the current block's column.
+      const move = nextBox.querySelector('.td-now-move');
+      if (!move) bad.push('the leave-by time is not under NEXT');
+      else if (!/3:55pm/.test(move.textContent)) {
+        bad.push(`leave-by reads "${move.textContent.trim()}", expected 3:55pm`);
+      }
+      const head = document.querySelector('#tdWrap .td-now-head');
+      if (head && head.querySelector('.td-now-move')) {
+        bad.push('the leave-by time is still inside the current block');
+      }
+      const steps = [...nextBox.querySelectorAll('.td-now-steps span')].map(e => e.textContent.trim());
+      if (steps.length !== 3) bad.push(`${steps.length} preparation steps under NEXT, expected 3`);
+
+      /* One block, one name. The training/competition unwrapping used to live
+         only in the card builder, so the hero said "Training" while the card for
+         the same block said "Skating". */
+      const heroName = (nextBox.querySelector('.td-now-nextname') || {}).textContent || '';
+      const cardName = (document.querySelector('#tdWrap .quest-card--next .quest-card-name') || {}).textContent || '';
+      if (!heroName.trim()) bad.push('the hero does not name the next block');
+      if (heroName.trim() !== cardName.trim()) {
+        bad.push(`the hero calls it "${heroName.trim()}" and the card calls it "${cardName.trim()}"`);
+      }
+
+      // A block with no buffers gets no strip — most blocks, and silence is right.
+      setDayBlocks(key, [
+        { id: 'p-now', actId: 'piano', startMin: 15 * 60, durationMin: 60 },
+        { id: 'p-plain', actId: 'dinner', startMin: 18 * 60, durationMin: 45 },
+      ], 'jenn');
+      goToday();
+      if (document.querySelector('#tdWrap .td-now-prep')) {
+        bad.push('a next block with no travel or get-ready time invented some');
+      }
+      if (!document.querySelector('#tdWrap .td-now-next')) {
+        bad.push('the hero stopped naming what is next when there was no prep to show');
+      }
+    } finally {
+      Date = RealDate;
+      setDayBlocks(key, before, 'jenn');
+      goToday();
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* THE RIBBON IS A PICTURE OF THE LIST BESIDE IT.
+     It reads the array tdRenderToday already computed, so the only way these can
+     disagree is if someone gives the ribbon its own reader. Plus the density
+     case, asserted rather than eyeballed: twenty blocks on a phone stay one row
+     inside the viewport, because an overflow container is what puts content out
+     of a child's reach on a tablet. */
+  checks.todayShowsTheShapeOfTheDay = await (async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const bad = await page.evaluate(() => {
+      profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+      const out = [];
+      const key = todayKey();
+      const before = (getDayBlocks(key, 'jenn') || []).slice();
+      const RealDate = Date;
+      const when = new RealDate(); when.setHours(15, 30, 0, 0);
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+      Date.prototype = RealDate.prototype;
+      Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+      try {
+        setDayBlocks(key, [
+          { id: 'r1', actId: 'breakfast', startMin: 8 * 60, durationMin: 30, completed: true },
+          { id: 'r2', actId: 'school', startMin: 9 * 60, durationMin: 300, completed: true },
+          { id: 'r3', actId: 'piano', startMin: 15 * 60, durationMin: 60 },
+          { id: 'r4', actId: 'homework', startMin: 16 * 60 + 30, durationMin: 45 },
+          { id: 'r5', actId: 'dinner', startMin: 18 * 60, durationMin: 45 },
+          { id: 'r6', actId: 'reading', startMin: 20 * 60, durationMin: 30 },
+        ], 'jenn');
+        goToday();
+        const strip = document.querySelector('#tdWrap .td-rib-strip');
+        if (!strip) return ['there is no ribbon'];
+        const cells = [...strip.querySelectorAll('.td-rib-cell')];
+        const blocks = tdQuestsToday('jenn');
+        if (cells.length !== blocks.length) {
+          out.push(`${cells.length} cells for ${blocks.length} blocks`);
+        }
+        const doneCells = strip.querySelectorAll('.td-rib-cell--done').length;
+        const doneBlocks = blocks.filter(b => b.completed).length;
+        if (doneCells !== doneBlocks) out.push(`${doneCells} filled cells for ${doneBlocks} finished blocks`);
+        const nowCells = strip.querySelectorAll('.td-rib-cell--now').length;
+        if (nowCells !== 1) out.push(`${nowCells} cells marked as running, expected 1`);
+        // The spoken label carries the same figures the strip draws.
+        const label = strip.getAttribute('aria-label') || '';
+        if (!label.includes(`${doneBlocks} of ${blocks.length}`)) {
+          out.push(`the spoken label reads "${label}", which is not ${doneBlocks} of ${blocks.length}`);
+        }
+        // A readout, not a control: no tab stops, no undersized targets.
+        if (strip.querySelector('button, [onclick], [role="button"], a[href]')) {
+          out.push('the ribbon has tappable cells — it is a readout, not a control');
+        }
+
+        // Twenty blocks on a phone: one row, inside the viewport, no scroller.
+        setDayBlocks(key, Array.from({ length: 20 }, (_, i) => ({
+          id: 'd' + i, actId: 'piano', startMin: 6 * 60 + i * 40, durationMin: 30,
+          completed: i < 9,
+        })), 'jenn');
+        goToday();
+        const s2 = document.querySelector('#tdWrap .td-rib-strip');
+        const c2 = [...s2.querySelectorAll('.td-rib-cell')];
+        if (c2.length !== 20) out.push(`${c2.length} cells for 20 blocks`);
+        const box = s2.getBoundingClientRect(), cell = c2[0].getBoundingClientRect();
+        const rows = Math.round(box.height / (cell.height + 3));
+        if (rows > 1) out.push(`20 blocks wrapped onto ${rows} rows on a phone`);
+        if (box.right > window.innerWidth + 1) {
+          out.push(`the ribbon runs ${Math.round(box.right - window.innerWidth)}px past the screen edge`);
+        }
+        if (document.body.scrollWidth > window.innerWidth + 1) {
+          out.push('the ribbon put a horizontal scrollbar on the page');
+        }
+      } finally {
+        Date = RealDate;
+        setDayBlocks(key, before, 'jenn');
+        goToday();
+      }
+      return out;
+    });
+    await page.setViewportSize({ width: 900, height: 1100 });
+    await page.evaluate(() => goToday());
+    return bad.length === 0 || bad;
+  })();
+
+  /* THE UNDO TOAST IS STRUCTURALLY OUTSIDE THE BUDGET.
+     One line, and it exists to say why. The word-budget sweep and the 44px probe
+     both walk only #screen-today; move this node inside "to keep the markup
+     together" and every viewport starts failing intermittently, depending on
+     whether a six-second timer happened to be running when the sweep ran. */
+  checks.theUndoToastIsOutsideTheWordBudget = await page.evaluate(() => {
+    const bad = [];
+    const box = document.getElementById('undoToast');
+    if (!box) return ['there is no undo toast'];
+    if (document.getElementById('screen-today').contains(box)) {
+      bad.push('the undo toast is inside #screen-today, where the word budget counts it');
+    }
+    if (!box.hidden) bad.push('the undo toast is showing when nothing has been completed');
+    return bad.length === 0 || bad;
+  });
+
+  /* COMPLETING OFFERS A WAY BACK, AND UNDO PUTS THE BLOCK BACK.
+     Both halves in one fixture because the second needs the first. The XP
+     assertion is the interesting one: it holds a deliberate decision in place
+     rather than a behaviour — undo un-ticks the block and the level bar does not
+     move, because a child who mis-tapped should not watch her level go
+     backwards. Without this, the next reader "fixes" it. */
+  checks.undoPutsTheBlockBackButKeepsTheXp = await (async () => {
+    const setup = await page.evaluate(() => {
+      profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+      const key = todayKey();
+      const RealDate = Date;
+      const when = new RealDate(); when.setHours(9, 30, 0, 0);
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+      Date.prototype = RealDate.prototype;
+      Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+      window.__undoBefore = (getDayBlocks(key, 'jenn') || []).slice();
+      window.__realDate = RealDate;
+      setDayBlocks(key, [{ id: 'un1', actId: 'piano', startMin: 9 * 60, durationMin: 60 }], 'jenn');
+      goToday();
+      return { xp: getQuestXP('jenn'), tick: !!document.querySelector('#tdWrap .td-now-tick') };
+    });
+    const bad = [];
+    if (!setup.tick) bad.push('the running block has no tick in the NOW card');
+    else {
+      await page.evaluate(() => document.querySelector('#tdWrap .td-now-tick').click());
+      await page.waitForTimeout(900);   // the blast animation, as todayIsWhereTheDayGetsDone waits
+      const after = await page.evaluate(() => {
+        const box = document.getElementById('undoToast');
+        return {
+          done: !!(getDayBlocks(todayKey(), 'jenn')[0] || {}).completed,
+          shown: !box.hidden,
+          text: (document.getElementById('undoToastText') || {}).textContent || '',
+          xp: getQuestXP('jenn'),
+        };
+      });
+      if (!after.done) bad.push('the tick did not complete the block');
+      if (!after.shown) bad.push('completing offered no undo');
+      if (!/Piano/i.test(after.text)) bad.push(`the toast does not name the block: "${after.text}"`);
+      if (!(after.xp > setup.xp)) bad.push('completing awarded no XP');
+
+      const undone = await page.evaluate(() => {
+        document.getElementById('undoToastBtn').click();
+        return {
+          done: !!(getDayBlocks(todayKey(), 'jenn')[0] || {}).completed,
+          hidden: document.getElementById('undoToast').hidden,
+          xp: getQuestXP('jenn'),
+        };
+      });
+      if (undone.done) bad.push('undo did not put the block back');
+      if (!undone.hidden) bad.push('the toast stayed up after undo');
+      if (undone.xp !== after.xp) {
+        bad.push(`undo moved the XP from ${after.xp} to ${undone.xp}; it is meant to hold`);
+      }
+
+      /* toggleBlockDone is a TOGGLE, so undo has to check the block is still
+         completed before calling it. The hazard is not a double press — the
+         first press clears the toast's target — it is the toast still being up
+         when something else un-completes the block underneath it: the day
+         screen, or a remote merge landing between the tick and the press.
+         Without the guard, pressing undo then RE-completes it and awards
+         nothing, silently. Staged here by un-completing behind the toast. */
+      const stale = await page.evaluate(() => {
+        const key = todayKey();
+        showUndoLastCompletion('un1', key, 'Piano Practice');   // toast back up
+        toggleBlockDone(key, 'un1');                            // now completed again
+        toggleBlockDone(key, 'un1');                            // and not-done again
+        document.getElementById('undoToastBtn').click();
+        return { done: !!(getDayBlocks(key, 'jenn')[0] || {}).completed };
+      });
+      if (stale.done) {
+        bad.push('undo re-completed a block that was already not-done — toggleBlockDone needs a guard');
+      }
+    }
+    await page.evaluate(() => {
+      if (window.__realDate) Date = window.__realDate;
+      setDayBlocks(todayKey(), window.__undoBefore || [], 'jenn');
+      hideUndoToast();
+      goToday();
+    });
+    return bad.length === 0 || bad;
+  })();
+
+  /* THE APP TELLS FAMILY TIME, ON WHATEVER DEVICE IT IS OPENED.
+     todayKey() has always been fixed to America/Edmonton, but the TIME of day
+     came from the device clock — so the date and the hours inside it were read
+     from two different clocks. At home they agree and nothing shows. They come
+     apart on a device whose zone is set wrong or a laptop left on another one,
+     and then the app draws the "now" line hours from where the child actually
+     is in her day, or shows tomorrow's date against today's afternoon.
+
+     This is the only check in the suite that runs in a second timezone. The
+     whole rest of the run is pinned to Edmonton precisely so fixtures mean what
+     they say, which also means nothing else here can see this class of bug. */
+  checks.theAppTellsFamilyTimeOnAnyDevice = await (async () => {
+    const away = await browser.newContext({ timezoneId: 'Pacific/Auckland' });
+    const p2 = await away.newPage();
+    for (const pattern of [
+      '**://firestore.googleapis.com/**', '**://*.firebaseio.com/**',
+      '**://www.gstatic.com/firebasejs/**', '**://identitytoolkit.googleapis.com/**',
+      '**://firebaseinstallations.googleapis.com/**',
+    ]) await p2.route(pattern, r => r.abort());
+    try {
+      await p2.goto('file://' + path.join(__dirname, '..', 'index.html'));
+      await p2.waitForTimeout(1200);
+      const r = await p2.evaluate(() => {
+        const bad = [];
+        // What Edmonton says, worked out independently of the app's helpers.
+        const parts = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'America/Edmonton', hour12: false,
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit',
+        }).formatToParts(new Date()).reduce((o, x) => (o[x.type] = x.value, o), {});
+        const wantKey = `${parts.year}-${parts.month}-${parts.day}`;
+        const wantMin = (Number(parts.hour) % 24) * 60 + Number(parts.minute);
+        // The device is 18-20 hours ahead, so its own clock cannot agree by luck.
+        const deviceMin = new Date().getHours() * 60 + new Date().getMinutes();
+        if (deviceMin === wantMin) bad.push('the away device is not actually in another timezone');
+        if (todayKey() !== wantKey) bad.push(`todayKey is ${todayKey()}, Edmonton says ${wantKey}`);
+        if (tdNowMin() !== wantMin) {
+          bad.push(`tdNowMin is ${tdNowMin()}, Edmonton says ${wantMin} (device says ${deviceMin})`);
+        }
+        if (nowMinutesInZone() !== wantMin) bad.push('nowMinutesInZone disagrees with Edmonton');
+        // The date and the time of day must come from the same clock, always.
+        if (getDayKeys(0).indexOf(todayKey()) < 0) {
+          bad.push('today is not in the week the app is showing');
+        }
+        return bad;
+      });
+      return r.length === 0 || r;
+    } finally {
+      await away.close();
+    }
+  })();
 
   checks.noConsoleErrors = errors.length === 0;
 

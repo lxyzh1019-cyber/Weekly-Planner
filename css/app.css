@@ -2012,18 +2012,27 @@
      Timeline/Quest switch. The day screen has one layout now. .dq-* stayed:
      the quest cards moved to Today and kept their styling. */
   .dq-list { display: flex; flex-direction: column; gap: 0.6rem; }
+  /* Off the gradient, onto paper and ink.
+
+     This was the only non-paper surface on Today and the loudest object on the
+     screen — and what it reports is a score, not an instruction. It keeps every
+     figure it carried; it just stops outranking the block she is meant to be
+     doing. Nothing is deleted, so no rule here goes dead. */
   .dq-hero {
     display: flex; align-items: center; gap: 10px;
-    background: linear-gradient(135deg, #6a5acd, #8a7be0);
+    background: var(--paper);
     border: 2px solid var(--ink); border-radius: 12px;
-    padding: 8px 10px; box-shadow: 2px 2px 0 var(--ink); color: #fff;
+    padding: 8px 10px; box-shadow: 2px 2px 0 var(--ink); color: var(--ink);
   }
   .dq-hero-avatar { font-size: 1.8rem; }
   .dq-hero-info { flex: 1; min-width: 0; }
   .dq-hero-title { font-weight: 800; font-size: calc(0.95rem * var(--fs-scale, 1)); }
-  .dq-hero-sub { font-size: calc(0.85rem * var(--fs-scale, 1)); opacity: 0.92; margin-top: 2px; }
-  .dq-xp-bar { height: 8px; border-radius: 999px; background: rgba(0,0,0,0.25); overflow: hidden; margin: 3px 0; }
-  .dq-xp-fill { height: 100%; background: #ffd166; border-radius: 999px; transition: width 0.3s; }
+  .dq-hero-sub {
+    font-size: max(13px, calc(0.85rem * var(--fs-scale, 1)));
+    color: var(--ink-light); margin-top: 2px;
+  }
+  .dq-xp-bar { height: 8px; border-radius: 999px; background: var(--paper-line); overflow: hidden; margin: 3px 0; border: 1.5px solid var(--ink); }
+  .dq-xp-fill { height: 100%; background: var(--accent-yellow); border-radius: 999px; transition: width 0.3s; }
   /* Pixel-canvas timeline: one hour gutter, then one column per day on show. */
   .timeline {
     position: relative;
@@ -2959,6 +2968,35 @@
   }
   .toast.show { opacity: 1; }
 
+  /* ── The way back from a mis-tapped tick ──
+     Bottom of the screen, clear of the kid nav; .toast is at the top, so the
+     two never overlap when a completion raises both. Dark ground on purpose:
+     this is the one transient thing on the screen and it should not read as
+     another card. */
+  .undo-toast {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(76px + env(safe-area-inset-bottom, 0));
+    z-index: var(--z-toast, 999);
+    display: flex; align-items: center; gap: 0.9rem;
+    max-width: calc(100% - 2rem);
+    background: var(--ink); color: var(--bg);
+    border: 2.5px solid var(--ink); border-radius: var(--radius-md, 14px);
+    box-shadow: 3px 3px 0 var(--accent);
+    padding: 0.5rem 0.6rem 0.5rem 1rem;
+  }
+  .undo-toast[hidden] { display: none; }
+  .undo-toast-text {
+    font-size: max(15px, calc(0.98rem * var(--fs-scale, 1))); font-weight: 700;
+  }
+  .undo-toast-btn {
+    flex: 0 0 auto; min-height: 44px; min-width: 44px; padding: 0.35rem 0.9rem;
+    border: 2.5px solid var(--bg); border-radius: var(--radius-sm, 12px);
+    background: transparent; color: var(--bg); font: inherit;
+    font-size: max(15px, calc(0.98rem * var(--fs-scale, 1)));
+    font-weight: 800; cursor: pointer;
+  }
+  .undo-toast-btn:hover { background: rgba(255,255,255,0.14); }
+
   /* ═══════════ CLOSING RITUAL ═══════════ */
   .ritual-screen {
     position: fixed; inset: 0;
@@ -3619,15 +3657,27 @@
   .sticker-emoji { font-size: 1.7rem; line-height: 1.1; }
   .sticker-name { font-size: calc(0.66rem * var(--fs-scale, 1)); font-weight: 700; color: var(--ink); margin-top: 0.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   @media (max-width: 380px) { .sticker-grid { grid-template-columns: repeat(3, 1fr); } }
+  /* T3 — the working weight of the list. */
   .quest-card {
     position: relative;
-    background: #fff; border: 3px solid var(--ink); border-radius: 18px;
-    box-shadow: 4px 4px 0 var(--ink);
+    background: #fff; border: 2.5px solid var(--ink); border-radius: 18px;
+    box-shadow: 3px 3px 0 var(--ink);
     padding: 0.9rem 1rem; display: flex; align-items: center; gap: 0.85rem;
     transition: transform 0.15s;
     cursor: pointer;
   }
-  .quest-card:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 var(--ink); }
+  .quest-card:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+  /* T2 — the next thing after the one she is on. Deeper than the rest of the
+     list, shallower than the NOW card, and tinted so the rank reads even where
+     the shadow falls off the edge of a narrow column. */
+  .quest-card--next {
+    border-width: 3px; box-shadow: 5px 5px 0 var(--ink); background: var(--bg2);
+  }
+  .quest-card--next:active { box-shadow: 2px 2px 0 var(--ink); }
+  /* T4 — what is folded away is reference, and reads like it. */
+  .dq-list--quiet .quest-card {
+    border-width: 2px; box-shadow: 2px 2px 0 rgba(42,35,32,0.2);
+  }
   .quest-card.quest-done {
     background: #e8f5e9; opacity: 0.78;
   }
@@ -5049,7 +5099,10 @@
   #screen-chore .ck-chip-cap,
   #screen-chore .ck-lane-note,
   #screen-chore .ck-weeksub,
-  #screen-quest .sticker-name,
+  /* Was #screen-quest, a screen retired with the Quest Board — so this line
+     could never match anything. The sticker wall lives on Today now, and the
+     names sit at 10.56px without this. */
+  #screen-today .sticker-name,
   #screen-week .wf-col-dow,
   #screen-week .wf-band-label,
   #screen-week .wf-sideband-seg,
@@ -5224,11 +5277,42 @@
      Uses the same tokens and hand-drawn borders as the rest of the app, because
      a new front door that looks like a different app is a new app. */
   .td-wrap { padding: 0.7rem 0.8rem 1.4rem; display: flex; flex-direction: column; gap: var(--space-3, 0.75rem); }
+  .td-col { display: flex; flex-direction: column; gap: var(--space-3, 0.75rem); min-width: 0; }
 
+  /* ── Landscape tablet: two columns ────────────────────────────────────────
+     The breakpoint the rest of this file already uses for the same device, so
+     Today turns at the same width as everything else rather than at a second
+     one of its own.
+
+     Left is the day — the block she is on, the ones after it, and the button
+     that changes the plan. Right is everything around it. The columns start at
+     the top rather than stretching, so a short right column does not drag the
+     left one's cards apart. */
+  @media (min-width: 980px) and (orientation: landscape) {
+    .td-wrap {
+      display: grid; grid-template-columns: 1.42fr 1fr;
+      gap: var(--space-4, 1rem); align-items: start;
+    }
+  }
+
+  /* ── The shadow ladder ────────────────────────────────────────────────────
+     Every card on this screen used to carry the same border, radius and soft
+     2px shadow, so ranking them was work a child had to do. Depth does that
+     work now, in four steps:
+
+       T1  .td-now          3.5px border, 7px 8px offset   exactly one
+       T2  .quest-card--next  3px border, 5px 5px offset   at most one
+       T3  .td-card, .quest-card, rows   2.5px, 3px 3px    many
+       T4  gaps, folds, folded rows      2px dashed, flat  many
+
+     Depth rather than colour: the nine --cat-* hues already carry activity
+     identity and --accent is decorative only, so a colour-built hierarchy would
+     collide with both. Depth was unused, it survives greyscale, and the hard
+     offset is the app's own idiom rather than a new one. */
   .td-card {
     border: 2.5px solid var(--ink); border-radius: var(--radius, 18px);
     background: var(--paper); padding: 0.7rem 0.8rem;
-    box-shadow: var(--shadow-sm, 2px 2px 0 rgba(0,0,0,0.12));
+    box-shadow: 3px 3px 0 var(--ink);
   }
   .td-cap {
     font-size: calc(0.82rem * var(--fs-scale, 1)); font-weight: 800;
@@ -5236,10 +5320,65 @@
     margin-bottom: 0.4rem;
   }
 
-  /* The one thing the screen is for — deliberately the biggest object on it. */
-  .td-now { display: flex; align-items: center; gap: 0.8rem; background: var(--bg2); }
-  .td-now-icon { font-size: 2.2rem; line-height: 1; flex: 0 0 auto; }
-  .td-now-name { font-size: calc(1.25rem * var(--fs-scale, 1)); font-weight: 800; line-height: 1.15; }
+  /* T1. The one thing the screen is for — deliberately the biggest object on
+     it, and the only one at this depth. */
+  .td-now {
+    display: block; background: var(--bg2);
+    border-width: 3.5px; border-radius: 22px;
+    box-shadow: 7px 8px 0 var(--ink);
+    padding: 0.9rem 1rem;
+  }
+  .td-now-head { display: flex; align-items: center; gap: 0.9rem; }
+  .td-now-line { flex: 1; min-width: 0; }
+  /* A tick, not a bar. Sized past the 44px floor with room over, because it sits
+     at the card's edge where a thumb arrives at an angle. */
+  .td-now-tick {
+    flex: 0 0 auto; width: 56px; height: 56px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem; line-height: 1;
+    border: 3px solid var(--ink); border-radius: 16px;
+    background: var(--accent-green); color: var(--ink);
+    box-shadow: 0 4px 0 var(--ink); cursor: pointer;
+    transition: transform 0.08s, box-shadow 0.08s;
+  }
+  .td-now-tick:active { transform: translateY(4px); box-shadow: 0 0 0 var(--ink); }
+  .td-now-tick:hover { background: #7fc9a1; }
+
+  /* ── NEXT ──
+     Divided from the current block by a rule rather than by a second card: it is
+     the same answer to the same question, one step further on. */
+  .td-now-next {
+    margin-top: 0.7rem; padding-top: 0.7rem;
+    border-top: 2.5px dashed var(--ink-light);
+  }
+  .td-now-nextline { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+  .td-now-nextlab {
+    font-size: max(13px, calc(0.78rem * var(--fs-scale, 1)));
+    font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-light);
+  }
+  .td-now-nextname {
+    font-size: max(15px, calc(1.08rem * var(--fs-scale, 1))); font-weight: 800;
+  }
+  .td-now-nexttime {
+    margin-left: auto;
+    font-size: max(13px, calc(0.88rem * var(--fs-scale, 1)));
+    font-weight: 700; color: var(--ink-light); white-space: nowrap;
+  }
+  /* Leaving on time is the one thing here that stops being possible if she reads
+     it late, so it gets a border of its own. */
+  .td-now-prep {
+    margin-top: 0.5rem; padding: 0.4rem 0.6rem;
+    border: 2.5px dashed var(--accent-strong); border-radius: var(--radius-sm, 12px);
+    background: var(--paper);
+  }
+  .td-now-icon {
+    font-size: 2rem; line-height: 1; flex: 0 0 auto;
+    width: 68px; height: 68px; display: flex; align-items: center; justify-content: center;
+    background: var(--paper); border: 3px solid var(--ink); border-radius: 16px;
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+  .td-now-name { font-size: calc(1.7rem * var(--fs-scale, 1)); font-weight: 800; line-height: 1.08; }
   .td-now-sub { font-size: max(13px, calc(0.9rem * var(--fs-scale, 1))); color: var(--ink-light); }
   /* The one time she has to act on, then why. --accent-strong, never --accent:
      this is informational accent text and --accent fails contrast. */
@@ -5326,10 +5465,30 @@
     width: 10px; height: 10px; border-radius: 50%;
     border: 1.5px solid var(--ink); flex: 0 0 auto;
   }
-  /* The one figure on this card she can act on today. */
+  /* ── The one figure on this card she can act on today ──
+     Everything above it is a picture of what she already has; this is the line
+     that is a reason to go and do the bins, so it gets the foot of the card and
+     a rule of its own rather than trailing off the bottom as one more small
+     grey sentence.
+
+     It stays INSIDE .td-money on purpose. todayMoneyRowMatchesMyMoney looks for
+     the figure there and asserts My money prints the same one from the same
+     reader — Today and the money page must never disagree about what is left to
+     earn. It also stays a display: nothing on this screen moves money. */
   .td-money-earn {
-    font-size: max(13px, calc(0.9rem * var(--fs-scale, 1)));
-    font-weight: 700; color: var(--accent-strong);
+    display: flex; align-items: baseline; gap: 0.5rem;
+    margin-top: 0.15rem; padding-top: 0.4rem;
+    border-top: 2px dashed var(--paper-line);
+  }
+  .td-money-earn-cap {
+    font-size: max(13px, calc(0.82rem * var(--fs-scale, 1)));
+    font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase;
+    color: var(--ink-light);
+  }
+  .td-money-earn-amt {
+    margin-left: auto;
+    font-size: max(15px, calc(1.15rem * var(--fs-scale, 1)));
+    font-weight: 800; color: var(--accent-strong);
   }
   /* How the total has moved, once there are enough settled weeks for a line to
      mean anything. Decorative — every figure it draws is already in the key. */
@@ -5345,6 +5504,27 @@
   .td-row--waiting, .td-row--done { opacity: 0.75; }
   .td-row--done .td-row-name { text-decoration: line-through; }
   .td-earlier-btn, .td-later-btn { margin-top: 0.4rem; }
+
+  /* ── The day as a row of squares ──────────────────────────────────────────
+     Cells flex from 10px to 26px and wrap rather than scroll: twenty blocks
+     still fit one row inside a 390px phone's content width, and an overflow
+     container is exactly the thing that puts content out of a child's reach on
+     a tablet. Each state differs in border style as well as fill, so the row
+     survives greyscale and colour-blindness. */
+  .td-ribbon { display: flex; flex-direction: column; gap: 0.45rem; }
+  .td-rib-strip { display: flex; flex-wrap: wrap; gap: 3px; }
+  .td-rib-cell {
+    flex: 1 1 0; min-width: 10px; max-width: 26px; aspect-ratio: 1;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; line-height: 1;
+    border: 2px solid var(--ink); border-radius: 6px;
+    background: var(--paper);
+  }
+  .td-rib-cell--done { background: var(--accent-green); }
+  .td-rib-cell--now { border-width: 2.5px; background: var(--accent-yellow); box-shadow: 2px 2px 0 var(--ink); }
+  /* Ended without being ticked. Dashed and faded — a record, not a reprimand:
+     off days are a valid state and nothing here is styled as a failure. */
+  .td-rib-cell--missed { border-style: dashed; opacity: 0.55; }
 
   .td-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; }
   .td-chip {
@@ -5390,6 +5570,23 @@
   }
   .td-fold-btn:hover { background: var(--bg2); }
   .td-fold-body { display: flex; flex-direction: column; gap: var(--space-3, 0.75rem); }
+  /* Landscape tablet: lay the reference panels out two across rather than
+     stacking four narrow ones down one side, which is what made this material
+     feel buried. This block sits AFTER the base rule on purpose — same
+     specificity, so source order is what decides, and putting it up with the
+     .td-wrap grid left the flex rule winning.
+
+     The sticker shelf collapses when it has nothing in it. In a stack an empty
+     container is invisible; in a grid it holds a cell open, so the panel beside
+     it sits next to a hole. */
+  .sticker-collection:empty { display: none; }
+  @media (min-width: 980px) and (orientation: landscape) {
+    .td-fold-body {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: var(--space-3, 0.75rem) var(--space-4, 1rem);
+      align-items: start;
+    }
+  }
   /* The quest card's tappable body. A button rather than a handler on the card,
      so the 🎯 beside it stays a separate target instead of a nested one. */
   .dq-open {

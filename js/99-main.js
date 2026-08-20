@@ -31,6 +31,10 @@ window.addEventListener('pagehide', flushPush);
   if (wrap) wrap.addEventListener('click', tdHandleClick);
   const nav = document.getElementById('kidNav');
   if (nav) nav.addEventListener('click', tdHandleNavClick);
+  // The undo toast is a static node outside every screen, so it binds directly
+  // rather than through a delegate — nothing ever replaces it.
+  const undo = document.getElementById('undoToastBtn');
+  if (undo) undo.addEventListener('click', undoLastCompletion);
 })();
 // The pocket-money pages delegate the same way, for the same reason: every
 // render replaces the whole wrap, so a listener bound to a card would be gone
