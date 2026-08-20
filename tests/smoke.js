@@ -1729,6 +1729,10 @@ function findChromium() {
     for (const [id, nav] of [['today', () => goToday()], ['week', () => { goWeek(); renderWeek(); }],
                              ['mymoney', () => mnyOpenMyMoney('jenn')]]) {
       await page.evaluate(`(${nav.toString()})()`);
+      // Scroll position survives navigation, so these artifacts were being shot
+      // wherever the last check happened to leave the page — usually halfway
+      // down. The top of the screen is the part worth looking at.
+      await page.evaluate(() => window.scrollTo(0, 0));
       await page.waitForTimeout(150);
       await page.screenshot({ path: shot(`${label}_${id}`) });
     }

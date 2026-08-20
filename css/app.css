@@ -5245,6 +5245,23 @@
      Uses the same tokens and hand-drawn borders as the rest of the app, because
      a new front door that looks like a different app is a new app. */
   .td-wrap { padding: 0.7rem 0.8rem 1.4rem; display: flex; flex-direction: column; gap: var(--space-3, 0.75rem); }
+  .td-col { display: flex; flex-direction: column; gap: var(--space-3, 0.75rem); min-width: 0; }
+
+  /* ── Landscape tablet: two columns ────────────────────────────────────────
+     The breakpoint the rest of this file already uses for the same device, so
+     Today turns at the same width as everything else rather than at a second
+     one of its own.
+
+     Left is the day — the block she is on, the ones after it, and the button
+     that changes the plan. Right is everything around it. The columns start at
+     the top rather than stretching, so a short right column does not drag the
+     left one's cards apart. */
+  @media (min-width: 980px) and (orientation: landscape) {
+    .td-wrap {
+      display: grid; grid-template-columns: 1.42fr 1fr;
+      gap: var(--space-4, 1rem); align-items: start;
+    }
+  }
 
   /* ── The shadow ladder ────────────────────────────────────────────────────
      Every card on this screen used to carry the same border, radius and soft
@@ -5274,10 +5291,54 @@
   /* T1. The one thing the screen is for — deliberately the biggest object on
      it, and the only one at this depth. */
   .td-now {
-    display: flex; align-items: center; gap: 0.9rem; background: var(--bg2);
+    display: block; background: var(--bg2);
     border-width: 3.5px; border-radius: 22px;
     box-shadow: 7px 8px 0 var(--ink);
     padding: 0.9rem 1rem;
+  }
+  .td-now-head { display: flex; align-items: center; gap: 0.9rem; }
+  .td-now-line { flex: 1; min-width: 0; }
+  /* A tick, not a bar. Sized past the 44px floor with room over, because it sits
+     at the card's edge where a thumb arrives at an angle. */
+  .td-now-tick {
+    flex: 0 0 auto; width: 56px; height: 56px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem; line-height: 1;
+    border: 3px solid var(--ink); border-radius: 16px;
+    background: var(--accent-green); color: var(--ink);
+    box-shadow: 0 4px 0 var(--ink); cursor: pointer;
+    transition: transform 0.08s, box-shadow 0.08s;
+  }
+  .td-now-tick:active { transform: translateY(4px); box-shadow: 0 0 0 var(--ink); }
+  .td-now-tick:hover { background: #7fc9a1; }
+
+  /* ── NEXT ──
+     Divided from the current block by a rule rather than by a second card: it is
+     the same answer to the same question, one step further on. */
+  .td-now-next {
+    margin-top: 0.7rem; padding-top: 0.7rem;
+    border-top: 2.5px dashed var(--ink-light);
+  }
+  .td-now-nextline { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+  .td-now-nextlab {
+    font-size: max(13px, calc(0.78rem * var(--fs-scale, 1)));
+    font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-light);
+  }
+  .td-now-nextname {
+    font-size: max(15px, calc(1.08rem * var(--fs-scale, 1))); font-weight: 800;
+  }
+  .td-now-nexttime {
+    margin-left: auto;
+    font-size: max(13px, calc(0.88rem * var(--fs-scale, 1)));
+    font-weight: 700; color: var(--ink-light); white-space: nowrap;
+  }
+  /* Leaving on time is the one thing here that stops being possible if she reads
+     it late, so it gets a border of its own. */
+  .td-now-prep {
+    margin-top: 0.5rem; padding: 0.4rem 0.6rem;
+    border: 2.5px dashed var(--accent-strong); border-radius: var(--radius-sm, 12px);
+    background: var(--paper);
   }
   .td-now-icon {
     font-size: 2rem; line-height: 1; flex: 0 0 auto;
@@ -5436,6 +5497,23 @@
   }
   .td-fold-btn:hover { background: var(--bg2); }
   .td-fold-body { display: flex; flex-direction: column; gap: var(--space-3, 0.75rem); }
+  /* Landscape tablet: lay the reference panels out two across rather than
+     stacking four narrow ones down one side, which is what made this material
+     feel buried. This block sits AFTER the base rule on purpose — same
+     specificity, so source order is what decides, and putting it up with the
+     .td-wrap grid left the flex rule winning.
+
+     The sticker shelf collapses when it has nothing in it. In a stack an empty
+     container is invisible; in a grid it holds a cell open, so the panel beside
+     it sits next to a hole. */
+  .sticker-collection:empty { display: none; }
+  @media (min-width: 980px) and (orientation: landscape) {
+    .td-fold-body {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: var(--space-3, 0.75rem) var(--space-4, 1rem);
+      align-items: start;
+    }
+  }
   /* The quest card's tappable body. A button rather than a handler on the card,
      so the 🎯 beside it stays a separate target instead of a nested one. */
   .dq-open {

@@ -259,13 +259,7 @@ function tdFreeCard(gap) {
    tests/check-dead-css.js matches literal text: a name assembled at runtime is
    invisible to it, and a rule it cannot see is a rule that can quietly die. */
 function tdQuestCard(b, kid, isNext) {
-  const acts = getAllActivities(kid, { includeArchived: true });
-  const act = acts.find(a => a.id === b.actId) || { name: 'Quest', icon: '⭐' };
-  const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
-  const icon = topic ? topic.icon : (act.icon || '⭐');
-  const nm = topic
-    ? (act.isCompetition ? (topic.id === 'general' ? 'Competition' : topic.name + ' Comp.') : topic.name)
-    : (act.name || 'Quest');
+  const { icon, name: nm } = tdBlockLabel(b, kid);
   const id = escapeAttr(b.id);
   const done = !!b.completed;
   const cls = done ? 'quest-card quest-done'
@@ -333,10 +327,29 @@ function tdEncouragement(kid) {
 
 /* ── Rendering ───────────────────────────────────────────────────────────── */
 
+/* What a placed block is called, and the only place that decides it.
+
+   findActivity rather than getAllActivities: this names a block that already
+   exists, so an archived activity must still resolve — a retired piano teacher
+   must not blank out last term's piano.
+
+   The training/competition unwrapping used to live only in tdQuestCard, so the
+   NOW card called a skating session "Training" while the card for the very same
+   block, a few centimetres below it, called it "Skating". That was survivable
+   while the two never shared a viewport. The hero names the next block now, so
+   they always do. */
+function tdBlockLabel(b, kid) {
+  const act = findActivity(b.actId, kid) || {};
+  const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
+  const icon = topic ? topic.icon : (act.icon || '📌');
+  const name = topic
+    ? (act.isCompetition ? (topic.id === 'general' ? 'Competition' : topic.name + ' Comp.') : topic.name)
+    : (act.name || 'Something');
+  return { icon, name };
+}
+
 function tdBlockLine(b, kid) {
-  const act = findActivity(b.actId, kid);
-  const icon = (act && act.icon) || '📌';
-  const name = (act && act.name) || 'Something';
+  const { icon, name } = tdBlockLabel(b, kid);
   const time = (typeof formatTimeFromMin === 'function') ? formatTimeFromMin(b.startMin || 0) : '';
   return { icon, name, time };
 }
@@ -378,33 +391,79 @@ function tdRenderToday() {
   let prepHtml = '';
   if (prep) {
     const late = tdNowMin() >= prep.moveByMin;
-    prepHtml = `<div class="td-now-move${late ? ' td-now-move--now' : ''}">
-        ${late ? '⏰ Time to get moving' : 'Be moving by ' + escapeHtml(formatTimeFromMin(prep.moveByMin))}</div>
-      <div class="td-now-steps">${prep.steps.map(s => `<span>${escapeHtml(s)}</span>`).join('')}</div>`;
+    /* The strip is bordered and set in --accent-strong because leaving on time
+       is the one thing on this screen that stops being possible if she reads it
+       late. It sits under NEXT rather than inside the current block's text,
+       which is where it used to be: tdPrepFor has always been asked about the
+       NEXT block, so rendering its answer inside the CURRENT one made the most
+       actionable line on the screen read as a footnote to the wrong thing.
+
+       .td-now-move and .td-now-steps keep their names and their exact wording —
+       the week grid and the print sheet say it the same way, and two screens
+       that word "leave by" differently will eventually disagree about the time
+       too. */
+    prepHtml = `<div class="td-now-prep">
+        <div class="td-now-move${late ? ' td-now-move--now' : ''}">
+          ${late ? '⏰ Time to get moving' : 'Be moving by ' + escapeHtml(formatTimeFromMin(prep.moveByMin))}</div>
+        <div class="td-now-steps">${prep.steps.map(s => `<span>${escapeHtml(s)}</span>`).join('')}</div>
+      </div>`;
+  }
+
+  /* The half of the hero that has something to say. When something is running,
+     what she needs from the screen is not "you are doing piano" — she knows —
+     it is what comes after it and whether she has to move for it. */
+  let nextHtml = '';
+  if (current && next) {
+    const nl = tdBlockLine(next, kid);
+    nextHtml = `<div class="td-now-next">
+        <div class="td-now-nextline">
+          <span class="td-now-nextlab">Next</span>
+          <span class="td-now-nextname">${escapeHtml(nl.name)}</span>
+          <span class="td-now-nexttime">${escapeHtml(nl.time)}</span>
+        </div>${prepHtml}
+      </div>`;
+  } else if (prepHtml) {
+    // No current block: the head IS the next one, so the prep needs no label.
+    nextHtml = `<div class="td-now-next">${prepHtml}</div>`;
   }
 
   // NOW — the one thing the screen exists for.
   let nowHtml;
   if (current) {
     const l = tdBlockLine(current, kid);
-    nowHtml = `<div class="td-now-icon">${l.icon}</div>
-      <div><div class="td-now-name">${escapeHtml(l.name)}</div>
-        <div class="td-now-sub">now · started ${escapeHtml(l.time)}</div>${prepHtml}</div>`;
+    /* A 56px tick, not a full-width bar. She already knows what she is doing;
+       the card only has to let her close it, and the height a big button would
+       take belongs to NEXT. It routes to the same blastQuest the 🎯 on the card
+       below routes to — one completion path, not two. */
+    nowHtml = `<div class="td-now-head">
+        <div class="td-now-icon">${l.icon}</div>
+        <div class="td-now-line"><div class="td-now-name">${escapeHtml(l.name)}</div>
+          <div class="td-now-sub">now · started ${escapeHtml(l.time)}</div></div>
+        <button type="button" class="td-now-tick" data-td-action="blast"
+          data-td-block="${escapeAttr(current.id)}"
+          aria-label="Mark ${escapeAttr(l.name)} done" title="Done!">✓</button>
+      </div>${nextHtml}`;
   } else if (next) {
     const l = tdBlockLine(next, kid);
-    nowHtml = `<div class="td-now-icon">${l.icon}</div>
-      <div><div class="td-now-name">${escapeHtml(l.name)}</div>
-        <div class="td-now-sub">next · ${escapeHtml(l.time)}</div>${prepHtml}</div>`;
+    nowHtml = `<div class="td-now-head">
+        <div class="td-now-icon">${l.icon}</div>
+        <div class="td-now-line"><div class="td-now-name">${escapeHtml(l.name)}</div>
+          <div class="td-now-sub">next · ${escapeHtml(l.time)}</div></div>
+      </div>${nextHtml}`;
   } else if (tdInQuietHours()) {
     /* Nine at night with nothing left on the plan. "The rest of today is yours"
        is true and useless — the rest of that day is sleep. */
-    nowHtml = `<div class="td-now-icon">🌙</div>
-      <div><div class="td-now-name">Winding down</div>
-        <div class="td-now-sub">nothing left tonight — rest is the plan</div></div>`;
+    nowHtml = `<div class="td-now-head">
+        <div class="td-now-icon">🌙</div>
+        <div class="td-now-line"><div class="td-now-name">Winding down</div>
+          <div class="td-now-sub">nothing left tonight — rest is the plan</div></div>
+      </div>`;
   } else {
-    nowHtml = `<div class="td-now-icon">🌤️</div>
-      <div><div class="td-now-name">Nothing scheduled</div>
-        <div class="td-now-sub">the rest of today is yours</div></div>`;
+    nowHtml = `<div class="td-now-head">
+        <div class="td-now-icon">🌤️</div>
+        <div class="td-now-line"><div class="td-now-name">Nothing scheduled</div>
+          <div class="td-now-sub">the rest of today is yours</div></div>
+      </div>`;
   }
 
   // Chores she can answer for, each with what it would be worth. A tap opens the
@@ -548,19 +607,37 @@ function tdRenderToday() {
   const bedtime = (nowH >= 18 && age != null && typeof bedtimeReminderText === 'function')
     ? bedtimeReminderText(age) : null;
 
+  /* ── Two columns on a landscape tablet, one everywhere else ───────────────
+     The iPad in landscape is the device this screen is used on, and it was
+     being served a single column: every card stretched to a thousand points to
+     hold one line of text, a third of the glass unused, and the day running off
+     the bottom.
+
+     The split is a distinction, not a way to fill width. Left is the day
+     itself — what she is on, what follows, and the button that changes it, so
+     the thing that edits the plan sits with the plan. Right is everything
+     around the day: how far through she is, what she could pick up, what it has
+     earned her. One eye movement answers "what now".
+
+     Source order is the phone order: the grid only reflows, so nothing here
+     depends on the viewport being wide. */
   wrap.innerHTML = `
-    <div class="td-card td-now">${nowHtml}</div>
-    ${loopHtml ? `<div class="td-chips">${loopHtml}</div>` : ''}
-    ${tdQuestHero(kid, quests)}
-    <div class="td-card">
-      <div class="td-cap">On today</div>${questHtml}</div>
-    <div class="td-card">
-      <div class="td-cap">Jobs I can do</div>${choreHtml}</div>
-    <div class="td-card">
-      <div class="td-cap">My money</div>${moneyHtml}</div>
-    <div class="td-say">${escapeHtml(tdEncouragement(kid))}</div>
-    ${bedtime ? `<div class="bedtime-tip">${escapeHtml(bedtime)}</div>` : ''}
-    ${planHtml}`;
+    <div class="td-col td-col--day">
+      <div class="td-card td-now">${nowHtml}</div>
+      <div class="td-card">
+        <div class="td-cap">On today</div>${questHtml}</div>
+      ${planHtml}
+    </div>
+    <div class="td-col td-col--side">
+      ${loopHtml ? `<div class="td-chips">${loopHtml}</div>` : ''}
+      ${tdQuestHero(kid, quests)}
+      <div class="td-card">
+        <div class="td-cap">Jobs I can do</div>${choreHtml}</div>
+      <div class="td-card">
+        <div class="td-cap">My money</div>${moneyHtml}</div>
+      <div class="td-say">${escapeHtml(tdEncouragement(kid))}</div>
+      ${bedtime ? `<div class="bedtime-tip">${escapeHtml(bedtime)}</div>` : ''}
+    </div>`;
 
   /* The relocated panels are static siblings of the wrap, so they survive this
      re-render and only need their own renderers run. Each is the function that
