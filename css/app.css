@@ -5462,10 +5462,30 @@
     width: 10px; height: 10px; border-radius: 50%;
     border: 1.5px solid var(--ink); flex: 0 0 auto;
   }
-  /* The one figure on this card she can act on today. */
+  /* ── The one figure on this card she can act on today ──
+     Everything above it is a picture of what she already has; this is the line
+     that is a reason to go and do the bins, so it gets the foot of the card and
+     a rule of its own rather than trailing off the bottom as one more small
+     grey sentence.
+
+     It stays INSIDE .td-money on purpose. todayMoneyRowMatchesMyMoney looks for
+     the figure there and asserts My money prints the same one from the same
+     reader — Today and the money page must never disagree about what is left to
+     earn. It also stays a display: nothing on this screen moves money. */
   .td-money-earn {
-    font-size: max(13px, calc(0.9rem * var(--fs-scale, 1)));
-    font-weight: 700; color: var(--accent-strong);
+    display: flex; align-items: baseline; gap: 0.5rem;
+    margin-top: 0.15rem; padding-top: 0.4rem;
+    border-top: 2px dashed var(--paper-line);
+  }
+  .td-money-earn-cap {
+    font-size: max(13px, calc(0.82rem * var(--fs-scale, 1)));
+    font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase;
+    color: var(--ink-light);
+  }
+  .td-money-earn-amt {
+    margin-left: auto;
+    font-size: max(15px, calc(1.15rem * var(--fs-scale, 1)));
+    font-weight: 800; color: var(--accent-strong);
   }
   /* How the total has moved, once there are enough settled weeks for a line to
      mean anything. Decorative — every figure it draws is already in the key. */

@@ -763,17 +763,19 @@ function tdMoneyChart(kid, wk) {
      mnyTodayCard reads — extracted so this line could not become a second
      answer to it. */
   const earn = mnyEarnLeftToday(kid, wk);
-  const earnLine = earn.left == null
-    ? `Earned today ${mnyMoney(earn.done)}`
-    : `Still to earn today ${mnyMoney(earn.left)}`;
+  const earnCap = earn.left == null ? 'Earned today' : 'Still to earn today';
+  const earnAmt = mnyMoney(earn.left == null ? earn.done : earn.left);
 
   return `<button type="button" class="td-money" data-td-action="money">
       <span class="td-money-total">${escapeHtml(mnyMoney(total))}${owing > 0
         ? ` <span class="td-money-owing">owes ${escapeHtml(mnyMoney(owing))}</span>` : ''}</span>
       ${bar}
       <span class="td-keys">${key || '<span class="td-key">Nothing yet</span>'}</span>
-      <span class="td-money-earn">${escapeHtml(earnLine)}</span>
       ${spark}
+      <span class="td-money-earn">
+        <span class="td-money-earn-cap">${escapeHtml(earnCap)}</span>
+        <span class="td-money-earn-amt">${escapeHtml(earnAmt)}</span>
+      </span>
     </button>`;
 }
 
