@@ -252,6 +252,27 @@ how many things were on the day and nothing about its shape. It is one control,
 not twenty: a 14px cell is not a reachable target, and twenty tab stops is not a
 description of an afternoon.
 
+**The ribbon's colour is what a block IS; its border is whether it is done.**
+Fill used to carry status — green done, yellow now, white to come — which said
+how much was ticked and nothing about what any of it was. Colour is now
+`blockColour`, the same answer the day view and the week grid render. Status
+moved to the border: **dashed not confirmed, solid confirmed**, and every cell
+stays solid-filled at full strength. A child does not get to tick things every
+hour, so an unconfirmed block must never be drawn faded or hollow as though she
+had failed it — which is why `--missed` is gone rather than restyled.
+
+**One owner for a block's colour, and one for its name.** Both were written out
+more than once, and the colour had already drifted: an unknown category came out
+green on the week grid and grey in the day view, print and Full week.
+`blockColour` (js/01-config.js) and `blockDisplayName` (js/05-helpers.js) are
+those owners now. A block is **numbered only when the same thing repeats within
+that day** — one Homework stays "Homework", five become Block 1…5 — and numbered
+by `startMin`, never by the order a caller holds them in: Today sorts by
+`tdActionableStart` and the day view lays out by position, so a number that
+followed either would point at a different block on the two screens. The week
+grid is deliberately excluded: `wfShortLabel` compresses to seven characters on
+purpose and "Block 2" cannot live there.
+
 Drawn to scale means the row has to **add up to a day**. It is one nowrap flex row
 of percentages with nothing able to shrink, so anything that oversubscribes it
 pushes the last cell straight through the edge of its column. Two things do:
@@ -298,8 +319,11 @@ the first, and a child has no way to tell which one is lying — so grading and
 settling still belong to the chore and money screens, and nothing on Today moves
 money.
 
-Today measures **129 words** against the 200 on a busy day — one running block, a
-break, a get-ready column, a clash and a free stretch, with both folds open. Today
+Today measures **97 words** against the 200 on the audit's seeded day — one
+running block, a break, a get-ready column, a clash and a free stretch, with both
+folds open. It has read as high as 129 on the same fixture: the figure moves with
+whatever the jobs and money cards happen to hold when the sweep reaches them, so
+re-measure rather than trusting the number written here. Today
 is also held to the **200-word budget with no ratchet**, which is why the
 vibe, to-do, goals, sticker and note panels ship collapsed behind one
 `localStorage` flag (`tdExtrasOpen`), and why finished blocks fold away behind

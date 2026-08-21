@@ -197,6 +197,20 @@
   }
   .topbar-left { display: flex; align-items: center; gap: 0.6rem; }
   .topbar h2 { font-size: 1.84rem; }
+  /* Which day it is, centred between the screen's name and whose screen it is.
+     flex:1 rather than relying on space-between, so it sits in the middle of the
+     BAR and not in the middle of whatever is left over — "Today" and the profile
+     badge are not the same width, and the date drifted with the name's length.
+
+     15px, the floor for anything a child has to read to act, and it wraps rather
+     than truncating: a date cut to "Thursday 20 Aug…" is worse than one on two
+     lines. At 390px it measures ~130px against ~178px of room, so the wrap is a
+     safety net rather than the normal case. */
+  .topbar-date {
+    flex: 1 1 auto; min-width: 0; text-align: center;
+    font-size: max(15px, calc(1rem * var(--fs-scale, 1)));
+    font-weight: 700; color: var(--ink-light);
+  }
 
   /* Day view: one sticky bar, one row inside it. */
   #screen-day .topbar.day-topbar {
@@ -5458,12 +5472,15 @@
     font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
     color: var(--ink-light);
   }
+  /* The second most important line on the screen, and it was sitting a whisker
+     above the 15px floor. Still clearly under .td-now-name's 1.7rem, so the
+     hero reads as one thing with a line under it rather than two headings. */
   .td-now-nextname {
-    font-size: max(15px, calc(1.08rem * var(--fs-scale, 1))); font-weight: 800;
+    font-size: max(17px, calc(1.28rem * var(--fs-scale, 1))); font-weight: 800;
   }
   .td-now-nexttime {
     margin-left: auto;
-    font-size: max(13px, calc(0.88rem * var(--fs-scale, 1)));
+    font-size: max(15px, calc(1rem * var(--fs-scale, 1)));
     font-weight: 700; color: var(--ink-light); white-space: nowrap;
   }
   /* Leaving on time is the one thing here that stops being possible if she reads
@@ -5640,8 +5657,16 @@
      between them ARE the gaps, so a flex gap would add time the day has not
      got, and a wrap would break the one line the scale depends on. */
   .td-rib-strip { position: relative; display: flex; height: 20px; align-items: stretch; }
+  /* Fill comes from blockColour, inline — the same colour the day view and the
+     week grid give the block, so the strip says what her day is MADE OF.
+
+     The border says whether it is done, and the default is dashed because the
+     default is "not confirmed yet". Nothing is faded or hollowed: a child does
+     not get to tick things every hour, and a block she has not closed is not a
+     block she failed. 2.5px rather than 2 so the dash still reads on a cell
+     only a few percent wide. */
   .td-rib-cell {
-    border: 2px solid var(--ink); border-radius: 5px;
+    border: 2.5px dashed var(--ink); border-radius: 5px;
     background: var(--paper);
   }
   /* Real empty space, sized by how long the gap actually is. */
@@ -5668,11 +5693,22 @@
   /* The affordance, and it costs no words. The same chevron .td-row-go uses for
      the same promise: this one goes somewhere. */
   .td-rib-go { flex: 0 0 auto; font-size: 1.1rem; color: var(--ink-light); }
-  .td-rib-cell--done { background: var(--accent-green); }
-  .td-rib-cell--now { border-width: 2.5px; background: var(--accent-yellow); box-shadow: 2px 2px 0 var(--ink); }
-  /* Ended without being ticked. Dashed and faded — a record, not a reprimand:
-     off days are a valid state and nothing here is styled as a failure. */
-  .td-rib-cell--missed { border-style: dashed; opacity: 0.55; }
+  /* Confirmed: the line closes. */
+  .td-rib-cell--done { border-style: solid; }
+  /* Running now. The ▲ marker already points at it, so this only has to make it
+     the heaviest thing on the strip — not a different colour, which now belongs
+     to the category. */
+  .td-rib-cell--now { border-width: 3.5px; box-shadow: 2px 2px 0 var(--ink); }
+
+  /* Which of the five this is. Quiet on purpose: what she is doing matters more
+     than its number, and the number only exists at all when the same thing
+     genuinely repeats within the day. */
+  .td-blk {
+    display: inline-block; margin-top: 0.15rem;
+    font-size: max(13px, calc(0.86rem * var(--fs-scale, 1)));
+    font-weight: 700; color: var(--ink-light); white-space: nowrap;
+  }
+  .td-now-name .td-blk { margin-top: 0; vertical-align: middle; }
 
   .td-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; }
   .td-chip {

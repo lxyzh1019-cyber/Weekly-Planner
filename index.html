@@ -133,6 +133,10 @@
     <div class="topbar-left">
       <h2>Today</h2>
     </div>
+    <!-- Which day this actually is. Filled by tdRenderToday from todayKey(), so
+         it reads the family's clock rather than the device's — the same reason
+         theAppTellsFamilyTimeOnAnyDevice exists. -->
+    <div class="topbar-date" id="tdTodayDate"></div>
     <div class="profile-badge" id="todayProfileBadge"></div>
   </div>
   <div id="tdWrap" class="td-wrap"></div>

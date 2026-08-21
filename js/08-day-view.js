@@ -753,7 +753,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   // Training topics (skating/swimming/dryland) each get their own icon + colour
   // so they read differently at a glance, not just by the text label.
   const topic = (act.isTraining) ? getTrainingTopic(b.tag) : null;
-  const blockBg = topic ? trainingBlockColour(b) : (b.colour || CAT_HEX[act.cat] || '#888');
+  const blockBg = blockColour(b);
   const dispIcon = topic ? topic.icon : act.icon;
   const hasConflict = !isBuffer && !!(conflictAffectedIds && conflictAffectedIds.has(b.id));
   blockEl.className = 'placed-block'
@@ -820,9 +820,14 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   // For a multi-chore House-Chore block, show the tagged chores in the name.
   const choreList = (b.actId === 'chores' && Array.isArray(b.choreTags) && b.choreTags.length)
     ? b.choreTags.join(', ') : '';
-  const baseName = topic
-    ? (act.isCompetition ? (topic.id === 'general' ? 'Competition' : topic.name + ' Comp.') : topic.name)
-    : act.name;
+  /* Through the same helper Today reads, on the block's own day — so a block
+     that Today calls "Homework · Block 2" is called that here too. dayKey is
+     the canvas's own, never the currentDayKey global: on a 2- or 3-column day
+     view the global points at whichever column was last focused. */
+  const named = blockDisplayName(b, undefined, dayKey);
+  const baseName = named.n
+    ? named.name + ' · Block ' + named.n
+    : named.name;
   const displayName = choreList ? `${act.name}: ${choreList}` : baseName;
   const nameHtml = isBuffer
     ? ''
