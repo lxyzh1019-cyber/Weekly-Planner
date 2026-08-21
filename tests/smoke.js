@@ -4768,7 +4768,7 @@ function findChromium() {
     const list = mmUnsettledWeeks(8);
     if (list.length !== 2 || list.some(x => x.wk === middle)) bad.push('a settled week did not drop out of the list');
 
-    showScreen('parent'); renderParentHome();
+    showScreen('parent'); renderParentHome(); setParentTab('review');
     const hub = document.getElementById('meetingHub');
     if (!hub.querySelector('.mm-catchup-row')) bad.push('the catch-up list is not on the hub');
     // A way in, not a telling-off: the copy must not scold a busy fortnight.
@@ -4815,7 +4815,7 @@ function findChromium() {
 
     /* The hub says which is which, and offers the action that fits each — so it
        has to be read while one week is still unopened and two are met. */
-    showScreen('parent'); renderParentHome();
+    showScreen('parent'); renderParentHome(); setParentTab('review');
     const hub = document.getElementById('meetingHub');
     if (!hub.querySelector('[data-mm-catch="settle"]')) bad.push('a met week is not offered a way to settle its money');
     if (!hub.querySelector('[data-mm-catch="met"]')) bad.push('an unopened week cannot be ticked off as already done');
@@ -5557,7 +5557,7 @@ function findChromium() {
     if (weekGlanceOpen()) toggleWeekGlance();
     // The grown-up's copy exists and is wired to the child being viewed.
     profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jess';
-    showScreen('parent'); renderParentHome();
+    showScreen('parent'); renderParentHome(); setParentTab('review');
     const el = document.getElementById('parentKidAge');
     if (!el) bad.push('there is nowhere for a parent to correct the age');
     else if (String(el.value) !== String(currentAge('jess'))) {

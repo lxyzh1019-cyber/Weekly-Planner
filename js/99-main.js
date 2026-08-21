@@ -79,6 +79,10 @@ window.addEventListener('pagehide', flushPush);
     rules.addEventListener('input', mnyParentInput);
     rules.addEventListener('change', mnyParentInput);
   }
+  // The portal's tab strip: arrow keys move between destinations. The strip is
+  // static markup, so one listener on the container is enough.
+  const ptabs = document.querySelector('#screen-parent .parent-tabs');
+  if (ptabs) ptabs.addEventListener('keydown', parentTabsKeydown);
 })();
 
 /* Desktop: convert vertical wheel scroll to horizontal on the tray + filter */

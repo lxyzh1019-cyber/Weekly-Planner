@@ -4,24 +4,43 @@
    PARENT MODE
 ════════════════════════════════════════════════════════════════ */
 let parentTab = 'review';
+
+/* One panel, one renderer. Tabs are pure show/hide, so rendering all ten on
+   every call threw nine of them away — including both charts and the whole
+   money rules page, on every kid switch, in an app where a render can trigger a
+   full-document write.
+
+   Every entry is an arrow rather than a bare reference: this file loads at 11
+   and most of these are declared at 24–30, so naming them directly here would
+   read them before their script has run. The arrow defers the lookup to the
+   call, which is the point at which they exist. */
+const PARENT_PANEL_RENDERERS = {
+  review:   () => { renderParentReviewHeader(); renderMeetingHub(); renderReviewFeedback(); },
+  chores:   () => cpRenderChoreTab(),
+  options:  () => coRenderOptions(),
+  trends:   () => ctrRenderTrends(),
+  analysis: () => renderPerformance(),
+  routines: () => renderRoutinesList(),
+  tasks:    () => { renderPendingApproval(); renderParentActivities(); },
+  money:    () => mnyRenderRulesTab(),
+  rules:    () => renderLevelRules(),
+  backup:   () => bkRenderPanel(),
+};
+
 function renderParentHome() {
+  // Shared chrome first, then only the panel actually on screen.
   setParentTab(parentTab);
-  document.getElementById('reviewKidName').textContent = parentViewing==='jenn' ? '🐥 Jenn' : '🦊 Jess';
+}
+
+/* The review panel's own header — kid name, age field, kid pills. It moved in
+   here with the rest of that panel's rendering rather than staying in
+   renderParentHome, where it would have run for every tab. */
+function renderParentReviewHeader() {
+  const name = document.getElementById('reviewKidName');
+  if (name) name.textContent = parentViewing === 'jenn' ? '🐥 Jenn' : '🦊 Jess';
   renderParentAge();
   document.querySelectorAll('#parentWeekKidPills .pill-btn').forEach(b =>
-    b.classList.toggle('active', b.textContent.includes(parentViewing==='jenn'?'Jenn':'Jess')));
-  renderMeetingHub();
-  renderReviewFeedback();
-  renderPerformance();
-  renderRoutinesList();
-  renderParentActivities();
-  renderPendingApproval();
-  renderLevelRules();
-  mnyRenderRulesTab();
-  cpRenderChoreTab();
-  ctrRenderTrends();
-  coRenderOptions();
-  bkRenderPanel();
+    b.classList.toggle('active', b.textContent.includes(parentViewing === 'jenn' ? 'Jenn' : 'Jess')));
 }
 
 /* The one place age can be set, and it is a grown-up's screen. currentAge seeds
@@ -44,10 +63,38 @@ function onParentAgeChange() {
 
 function setParentTab(tab) {
   parentTab = tab;
-  document.querySelectorAll('#screen-parent .parent-tab').forEach(t =>
-    t.classList.toggle('active', t.dataset.ptab === tab));
+  document.querySelectorAll('#screen-parent .parent-tab').forEach(t => {
+    const on = t.dataset.ptab === tab;
+    t.classList.toggle('active', on);
+    // A tab strip that says role="tab" has to answer which one is selected and
+    // what it controls, and has to be one stop in the tab order rather than ten.
+    t.setAttribute('aria-selected', on ? 'true' : 'false');
+    t.tabIndex = on ? 0 : -1;
+  });
   document.querySelectorAll('#screen-parent .parent-panel').forEach(p =>
     p.hidden = (p.id !== 'ptab-' + tab));
+  const render = PARENT_PANEL_RENDERERS[tab];
+  // Isolated the way showScreen isolates its hooks: one panel that throws must
+  // not be able to leave the portal on a blank screen with no way back.
+  if (render) { try { render(); } catch (e) { console.error('parent panel render failed:', tab, e); } }
+}
+
+/* Arrow keys move between destinations; Home/End jump to the ends. Bound once
+   in js/99-main.js. Roving tabindex is set in setParentTab above, so focus
+   follows selection and the strip stays a single stop in the tab order. */
+function parentTabsKeydown(e) {
+  const tabs = [...document.querySelectorAll('#screen-parent .parent-tab')];
+  const i = tabs.indexOf(document.activeElement);
+  if (i < 0 || !tabs.length) return;
+  let next = null;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (i + 1) % tabs.length;
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (i - 1 + tabs.length) % tabs.length;
+  else if (e.key === 'Home') next = 0;
+  else if (e.key === 'End') next = tabs.length - 1;
+  if (next === null) return;
+  e.preventDefault();
+  setParentTab(tabs[next].dataset.ptab);
+  tabs[next].focus();
 }
 
 // Switch which child the parent is reviewing without leaving the dashboard.
