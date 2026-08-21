@@ -83,6 +83,10 @@ window.addEventListener('pagehide', flushPush);
   // static markup, so one listener on the container is enough.
   const ptabs = document.querySelector('#screen-parent .parent-tabs');
   if (ptabs) ptabs.addEventListener('keydown', parentTabsKeydown);
+  // Now is rebuilt wholesale on every render, so its rows carry data attributes
+  // and the container holds the listener.
+  const now = document.getElementById('pnWrap');
+  if (now) { now.addEventListener('click', pnHandleClick); now.addEventListener('click', mmHandleCatchUpClick); }
 })();
 
 /* Desktop: convert vertical wheel scroll to horizontal on the tray + filter */

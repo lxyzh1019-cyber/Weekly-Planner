@@ -4833,6 +4833,59 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* ── Now counts, it does not decide ──
+     Every number on the front door is read through the accessor the owning
+     screen already uses. The failure this guards is the one the whole screen is
+     arranged against: a second place that works out how many chores are waiting
+     and quietly disagrees with the queue itself, leaving a parent no way to
+     tell which is lying. So each count is asserted against its owner, and the
+     rows are asserted to link rather than to act. */
+  checks.nowCountsMatchTheirOwners = await page.evaluate(() => {
+    const bad = [];
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+
+    // A claim with no grade is what the queue is made of.
+    ['jenn', 'jess'].forEach(k => mrSetClaim(k, wk, 2, 'dishes', 3));
+    const owner = ['jenn', 'jess'].reduce((n, k) => n + mrClaimQueue(wk, k).length, 0);
+    const now = pnClaimCounts();
+    if (now.total !== owner) bad.push(`Now says ${now.total} chores waiting, the queue has ${owner}`);
+    if (!owner) bad.push('the fixture produced no claims — nothing to compare');
+
+    if (pnPendingActs().length !== pendingApprovalActs().length) {
+      bad.push('Now disagrees with the pending-approval list');
+    }
+    if (pnBacklog().length !== mmUnsettledWeeks(8).length) {
+      bad.push('Now disagrees with the backlog');
+    }
+
+    // The screen renders, says the real number, and every row is a link.
+    showScreen('parent'); renderParentHome(); setParentTab('now');
+    const wrap = document.getElementById('pnWrap');
+    if (!wrap || !wrap.textContent.trim()) bad.push('Now rendered blank');
+    if (!wrap.textContent.includes(String(owner))) bad.push('the queue count is not on screen');
+    const rows = [...wrap.querySelectorAll('[data-pn-action]')];
+    if (!rows.length) bad.push('Now has no actionable rows');
+    // Nothing on this screen may be a way to grade, settle or approve in place.
+    if (wrap.querySelector('[data-cp-action="grade"], [data-mm-action="express-commit"]')) {
+      bad.push('Now contains a control that decides something instead of linking');
+    }
+
+    /* Grading removes what was graded. Not "clears the queue": earlier checks in
+       this page leave claims of their own in shared state, and asserting an
+       empty queue here would be asserting something this check does not
+       control. What it does control is its own two claims. */
+    const before = pnClaimCounts().total;
+    ['jenn', 'jess'].forEach(k => mrSetChoreGrade(k, wk, 2, 'dishes', 3));
+    const after = pnClaimCounts().total;
+    if (after !== before - 2) bad.push(`grading 2 claims moved the count ${before}→${after}`);
+    if (after !== ['jenn', 'jess'].reduce((n, k) => n + mrClaimQueue(wk, k).length, 0)) {
+      bad.push('Now and the queue disagreed after a grade');
+    }
+    return bad.length === 0 || bad;
+  });
+
   /* ── The catch-up screen is a shorter road, not a second one ──
      A backlogged week closed from the catch-up screen has to land the family in
      exactly the state a full sitting would have. The failure this guards is the

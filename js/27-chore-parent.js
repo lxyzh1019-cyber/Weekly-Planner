@@ -13,11 +13,15 @@ let cpDay = 0;
 
 /* The four answers a grown-up can give. $0 is here and absent from the kid's
    row, because recording a nought is a judgement only she makes. */
+/* `short` is what the button actually says. The wording used to live only in a
+   title attribute, which does not exist on a tablet — the primary device — so
+   all a grown-up saw was four dollar amounts and had to remember which was
+   which. It is the same defect the chore pool's unlabelled inputs have. */
 const CP_GRADES = [
-  { g: 3, label: 'On time & to standard' },
-  { g: 2, label: 'To standard, late' },
-  { g: 1, label: 'Redone, then to standard' },
-  { g: 0, label: 'Not done' },
+  { g: 3, label: 'On time & to standard',    short: 'on time' },
+  { g: 2, label: 'To standard, late',        short: 'late' },
+  { g: 1, label: 'Redone, then to standard', short: 'redone' },
+  { g: 0, label: 'Not done',                 short: 'not done' },
 ];
 
 function cpKid() { return parentViewing === 'jess' ? 'jess' : 'jenn'; }
@@ -137,7 +141,7 @@ function cpQueue() {
       <div class="cp-gradebar">${CP_GRADES.map(x => `
         <button type="button" class="cp-gbtn ${q.claim === x.g ? 'agrees' : ''}"
           data-cp-action="grade" data-chore-id="${escapeAttr(q.choreId)}" data-day="${q.dayIdx}" data-grade="${x.g}"
-          title="${escapeAttr(x.label)}">${ckMoney(ckGradePay(r, x.g))}</button>`).join('')}</div>
+          title="${escapeAttr(x.label)}"><span class="cp-gpay">${ckMoney(ckGradePay(r, x.g))}</span><span class="cp-gword">${escapeHtml(x.short)}</span></button>`).join('')}</div>
     </div>`;
   }).join('');
   return `<div class="cp-sect"><div class="cp-cap">Waiting on you</div>${body}</div>`;
@@ -357,35 +361,6 @@ function cpCompetition() {
     <button type="button" class="ck-btn" data-ct-action="add-comp">🏆 Record a result</button></div>`;
 }
 
-/* ── Every week ever recorded ──
-   The authoritative paid ledger, unbounded, with running totals. Frozen when
-   it was agreed, so changing a price today never rewrites what a week paid. */
-function cpMoneyHistory() {
-  ctEnsureShared();
-  const fw = state.shared.chore.finalizedWeeks || {};
-  const keys = Object.keys(fw).sort();
-  if (!keys.length) {
-    return `<div class="cp-sect"><div class="cp-cap">Recorded weeks</div>
-      <div class="ck-sub">Nothing recorded yet. A week lands here once you tap “Confirm &amp; record” for it in the family meeting.</div></div>`;
-  }
-  let jRun = 0, kRun = 0, rows = '';
-  keys.forEach(wk => {
-    const e = fw[wk] || {};
-    const j = Number(e.jenn) || 0, k = Number(e.jess) || 0;
-    if (e.jenn != null) jRun = money2(jRun + j);
-    if (e.jess != null) kRun = money2(kRun + k);
-    const d = formatDayKey(wk);
-    rows += `<tr><td>${MONTH_SHORT[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}</td>
-      <td>${e.jenn != null ? ckMoney(j) : '—'}</td><td>${ckMoney(jRun)}</td>
-      <td>${e.jess != null ? ckMoney(k) : '—'}</td><td>${ckMoney(kRun)}</td></tr>`;
-  });
-  return `<div class="cp-sect"><div class="cp-cap">Recorded weeks · ${keys.length}</div>
-    <div class="ck-sub">Every week recorded at a family meeting, oldest first, with running totals. Each week's breakdown is frozen when it was agreed.</div>
-    <div class="ck-gridwrap"><table class="wf-analytics-table">
-      <thead><tr><th>Week</th><th>${CT_PROFILE_ICON.jenn} Jenn</th><th>total</th><th>${CT_PROFILE_ICON.jess} Jess</th><th>total</th></tr></thead>
-      <tbody>${rows}</tbody></table></div></div>`;
-}
-
 /* ── Spot-check, honesty, box ── */
 function cpSundayTools() {
   const kid = cpKid();
@@ -429,7 +404,9 @@ function cpRenderChoreTab() {
         <div>${cpQueue()}${cpGraded()}${cpFines()}</div>
         <div>${cpPlanner()}${cpAttitudeSick()}</div>
       </div>`
-    : `${cpDualGrid()}${cpPayout()}${cpCompetition()}${cpSundayTools()}${cpMoneyHistory()}`;
+    /* cpMoneyHistory is gone: it listed the same settled weeks History › Money
+       already draws, and two lists of one thing is how they start disagreeing. */
+    : `${cpDualGrid()}${cpPayout()}${cpCompetition()}${cpSundayTools()}`;
   wrap.innerHTML = `<div class="cp-tab">${cpHeader()}${cpSettleCard()}${body}</div>`;
 }
 

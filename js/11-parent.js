@@ -3,7 +3,7 @@
 /* ════════════════════════════════════════════════════════════════
    PARENT MODE
 ════════════════════════════════════════════════════════════════ */
-let parentTab = 'review';
+let parentTab = 'now';   // the front door
 
 /* One panel, one renderer. Tabs are pure show/hide, so rendering all ten on
    every call threw nine of them away — including both charts and the whole
@@ -15,6 +15,7 @@ let parentTab = 'review';
    read them before their script has run. The arrow defers the lookup to the
    call, which is the point at which they exist. */
 const PARENT_PANEL_RENDERERS = {
+  now:      () => pnRenderNow(),
   review:   () => { renderParentReviewHeader(); renderMeetingHub(); renderReviewFeedback(); },
   chores:   () => cpRenderChoreTab(),
   options:  () => coRenderOptions(),

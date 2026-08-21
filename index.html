@@ -527,7 +527,8 @@
 
   <div style="padding:0.8rem 1rem 0">
     <div class="parent-tabs" role="tablist" aria-label="Parent sections">
-      <button class="parent-tab active" role="tab" id="ptabbtn-review" data-ptab="review" aria-selected="true" aria-controls="ptab-review" tabindex="0" onclick="setParentTab('review')">🗓️ Weekly Review</button>
+      <button class="parent-tab active" role="tab" id="ptabbtn-now" data-ptab="now" aria-selected="true" aria-controls="ptab-now" tabindex="0" onclick="setParentTab('now')">📥 Now<span class="pn-badge" id="pnTabBadge" hidden></span></button>
+      <button class="parent-tab" role="tab" id="ptabbtn-review" data-ptab="review" aria-selected="false" aria-controls="ptab-review" tabindex="-1" onclick="setParentTab('review')">🗓️ Weekly Review</button>
       <button class="parent-tab" role="tab" id="ptabbtn-chores" data-ptab="chores" aria-selected="false" aria-controls="ptab-chores" tabindex="-1" onclick="setParentTab('chores')">🧹 Chores</button>
       <button class="parent-tab" role="tab" id="ptabbtn-trends" data-ptab="trends" aria-selected="false" aria-controls="ptab-trends" tabindex="-1" onclick="setParentTab('trends')">📈 Trends</button>
       <button class="parent-tab" role="tab" id="ptabbtn-options" data-ptab="options" aria-selected="false" aria-controls="ptab-options" tabindex="-1" onclick="setParentTab('options')">⚙️ Chore setup</button>
@@ -543,7 +544,14 @@
   <!-- TAB: Weekly Review — Function 1: review & confirm THIS week.
        All reviewing/confirming happens inside the family meeting; this tab
        is a read-only hub that shows status and launches the meeting. -->
-  <div class="parent-panel active" id="ptab-review" role="tabpanel" aria-labelledby="ptabbtn-review">
+  <!-- TAB: Now — what is waiting on a grown-up, most urgent first. It owns no
+       data and no rules: every count is read through the accessor the owning
+       screen uses, and every row links to that screen. -->
+  <div class="parent-panel active" id="ptab-now" role="tabpanel" aria-labelledby="ptabbtn-now">
+    <div id="pnWrap"></div>
+  </div>
+
+  <div class="parent-panel" id="ptab-review" role="tabpanel" aria-labelledby="ptabbtn-review" hidden>
     <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.7rem">
       <span style="font-weight:800">Viewing:</span>
       <div style="display:flex;gap:0.5rem" id="parentWeekKidPills">
@@ -1399,6 +1407,7 @@
 
 <script src="js/30-backup.js"></script>
 <script src="js/31-today.js"></script>
+<script src="js/32-parent-now.js"></script>
 <script src="js/99-main.js"></script>
 </body>
 </html>
