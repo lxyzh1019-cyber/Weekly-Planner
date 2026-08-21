@@ -506,6 +506,8 @@ function mmHandleClick(e) {
   if (a === 'allroutines')    { mmToggleAllRoutines(kid, d); return; }
   if (a === 'addchore-open')  { mmToggleAddChore(kid, d); return; }
   if (a === 'addchore-pick')  { mmAddChoreHappened(kid, d, el.getAttribute('data-chore')); return; }
+  if (a === 'openday')        { mmSelectDay(d); return; }
+  if (a === 'confirmday')     { mmToggleConfirmDay(d); return; }
   if (a === 'express-tick')   { mmExpressToggle(el.getAttribute('data-which')); return; }
   if (a === 'express-commit') { mmExpressCommit(); return; }
   if (a === 'express-skip')   { mmExpressSkip(); return; }
@@ -655,24 +657,49 @@ function mmCaptureUiState(host) {
 }
 
 /* Step 1 — Review: 1b grouped bar chart + day drill-in + meeting readiness. */
+/* ── Step 1: seven rows, not a chart and a detour ──
+   It used to be a bar chart: tap a day, scroll to the detail below, confirm,
+   scroll back, tap the next day — seven times, and twenty-eight movements for a
+   week where nothing was wrong. Each day is a row now, confirmable in place,
+   and it only opens when something actually needs changing. The detail it opens
+   is the same two-column panel as before. */
 function mmRenderReview(wk) {
   const info = ctWeekInfo();
   const todayD = formatDayKey(todayKey());
-  let bars = '';
+  let rows = '';
   for (let d = 0; d < 7; d++) {
     const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
     const isToday = Math.round((date - todayD) / 864e5) === 0;
+    const ahead = date > todayD && !isToday;
     const jp = mmDayPct('jenn', d), sp = mmDayPct('jess', d);
-    const sel = mmSelectedDay === d ? ' mm-daygrp-sel' : '';
-    bars += `<button type="button" class="mm-daygrp${sel}" onclick="mmSelectDay(${d})">
-        <div class="mm-bars">
-          <div class="mm-bar mm-bar-j" style="height:${jp}%"></div>
-          <div class="mm-bar mm-bar-s" style="height:${sp}%"></div>
+    const open = mmSelectedDay === d;
+    const done = mmIsDayConfirmed(d);
+    const empty = jp === 0 && sp === 0;
+    const state = ahead
+      ? `<span class="mm-drow-note">Not here yet</span>`
+      : done
+      ? `<button type="button" class="mm-drow-ok" data-mm-action="confirmday" data-day="${d}">✓ Confirmed</button>`
+      : `<button type="button" class="mm-drow-go" data-mm-action="confirmday" data-day="${d}">Confirm this day</button>`;
+    const mid = (!ahead && empty)
+      ? `<span class="mm-drow-note">Nothing logged — open it and add what actually happened</span>`
+      : `<span class="mm-drow-bars">
+           <span class="mm-drow-track"><span class="mm-drow-fill mm-bar-j" style="width:${jp}%"></span></span>
+           <span class="mm-drow-track"><span class="mm-drow-fill mm-bar-s" style="width:${sp}%"></span></span>
+         </span>`;
+    rows += `<div class="mm-drow${open ? ' open' : ''}${done ? ' done' : ''}">
+        <div class="mm-drow-head">
+          <button type="button" class="mm-drow-day" data-mm-action="openday" data-day="${d}"
+            aria-expanded="${open ? 'true' : 'false'}">
+            <span class="mm-drow-dow">${DAY_SHORT[d]} ${date.getDate()}${isToday ? ' ★' : ''}</span>
+          </button>
+          ${mid}${state}
+          <button type="button" class="mm-drow-x" data-mm-action="openday" data-day="${d}"
+            aria-label="${open ? 'Close' : 'Open'} ${escapeAttr(DAY_SHORT[d])}">${open ? '▴' : '▾'}</button>
         </div>
-        <div class="mm-daylabel${mmSelectedDay === d ? ' mm-daylabel-sel' : ''}">${DAY_SHORT[d]}${isToday ? ' ★' : ''}</div>
-      </button>`;
+        ${open ? `<div class="mm-drow-body">${mmRenderDayDetail(wk, d)}</div>` : ''}
+      </div>`;
   }
-  const detail = mmSelectedDay != null ? mmRenderDayDetail(wk, mmSelectedDay) : `<div class="mm-hint">Tap a day to review each kid's items and confirm it.</div>`;
+  const detail = `<div class="mm-drows">${rows}</div>`;
   const nConfirmed = [0,1,2,3,4,5,6].filter(mmIsDayConfirmed).length;
   // Framed as a team total, not a head-to-head scoreboard: lead with how the two
   // did together, with each kid's number kept small for transparency.
@@ -684,7 +711,7 @@ function mmRenderReview(wk) {
   return `${mnyChecklist(wk, mnyMeetingKid())}
     <div class="mm-h">Review the week</div>
     <div class="mm-legend"><span><i class="mm-sw mm-bar-j"></i>Jenn</span><span><i class="mm-sw mm-bar-s"></i>Jess</span><span class="mm-legend-note">how the team's doing each day — cheer each other on</span></div>
-    <div class="mm-chart">${bars}</div>${detail}${footer}`;
+    ${detail}${footer}`;
 }
 function mmSelectDay(d) { mmSelectedDay = (mmSelectedDay === d ? null : d); renderMeetingMode(); }
 function mmRenderDayDetail(wk, d) {

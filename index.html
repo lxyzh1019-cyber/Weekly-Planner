@@ -556,6 +556,10 @@
   <div class="parent-panel" id="ptab-setup" role="tabpanel" aria-labelledby="pdestbtn-setup" hidden>
     <div id="ptab-setup-wrap"></div>
   </div>
+  <div class="parent-panel" id="ptab-access" role="tabpanel" hidden><div id="paAccessWrap"></div></div>
+  <div class="parent-panel" id="ptab-profiles" role="tabpanel" hidden><div id="paProfilesWrap"></div></div>
+  <div class="parent-panel" id="ptab-prefs" role="tabpanel" hidden><div id="paPrefsWrap"></div></div>
+  <div class="parent-panel" id="ptab-school" role="tabpanel" hidden><div id="paSchoolWrap"></div></div>
   <div class="parent-panel" id="ptab-app" role="tabpanel" aria-labelledby="pdestbtn-app" hidden>
     <div id="ptab-app-wrap"></div>
   </div>
@@ -567,26 +571,18 @@
     <div id="pnWrap"></div>
   </div>
 
+  <!-- Meeting. What used to be a "Weekly Review" tab whose whole job was to
+       launch the meeting and jump to another tab. The launcher is Now's rail,
+       the queue is Now, and what is left here is the meeting itself: which
+       weeks are open, which days are confirmed, and what the girls said. -->
   <div class="parent-panel" id="ptab-review" role="tabpanel" hidden>
-    <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.7rem">
-      <!-- Age lives here, on a grown-up's screen, and only a grown-up sees it.
-           It used to be a 🎂 field on the child's own week view, which asked a
-           nine-year-old her age every time she opened a reference panel. The app
-           assumes 10 and adds a year each August; this is the correction. -->
-      <label class="pa-age">🎂 Age
-        <input type="number" id="parentKidAge" min="1" max="18"
-               onchange="onParentAgeChange()" aria-label="Age of the child being viewed">
-      </label>
-      <button class="pill-btn" style="margin-left:auto" onclick="parentView(parentViewing)">📋 Open full week ›</button>
-    </div>
-    <h3 class="parent-h3">🗓️ This week — review &amp; confirm</h3>
-    <p class="parent-hint">The whole weekly review happens in the <b>family meeting</b>: check each day together, celebrate wins, confirm &amp; record pocket money, then plan next week. Tap a day below to jump straight to it in the meeting.</p>
+    <h3 class="parent-h3">🧑‍🧑‍🧒 The family meeting</h3>
+    <p class="parent-hint">Check each day together, celebrate the week, agree what was earned and what happens to it, then plan the next one. Tap a day to open the meeting straight at it.</p>
     <div id="meetingHub"></div>
 
-    <h3 class="parent-h3">💬 Feedback from <span id="reviewKidName">Jenn</span></h3>
-    <p class="parent-hint">What your kid logged this week — worth a look before the meeting.</p>
+    <h3 class="parent-h3">💬 What <span id="reviewKidName">Jenn</span> logged this week</h3>
+    <p class="parent-hint">Her own note and daily vibes — worth a look before you sit down.</p>
     <div id="reviewFeedback"></div>
-
   </div>
 
   <!-- TAB: Chores — the redesign's Parent frame. What's waiting on you, grade
@@ -1417,6 +1413,7 @@
 <script src="js/30-backup.js"></script>
 <script src="js/31-today.js"></script>
 <script src="js/32-parent-now.js"></script>
+<script src="js/33-parent-app.js"></script>
 <script src="js/99-main.js"></script>
 </body>
 </html>

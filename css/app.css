@@ -1311,16 +1311,7 @@
   .mm-legend-note { color: #6b5d4f; }
   .mm-bar-j { background: #ffd166; }
   .mm-bar-s { background: #ff7b54; }
-  .mm-chart {
-    display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; align-items: end;
-    height: 150px; padding: 6px; border: 2px solid var(--ink); border-radius: 12px; background: var(--paper-card, #fffdf5);
-  }
-  .mm-daygrp { display: flex; flex-direction: column; align-items: center; gap: 3px; height: 100%; border: 0; background: transparent; cursor: pointer; padding: 0; }
-  .mm-daygrp-sel { background: #fff4db; border-radius: 8px; }
-  .mm-bars { display: flex; align-items: flex-end; gap: 3px; height: 110px; width: 100%; justify-content: center; }
   .mm-bar { width: 40%; max-width: 18px; min-height: 2px; border: 2px solid var(--ink); border-bottom: 0; border-radius: 5px 5px 0 0; }
-  .mm-daylabel { font-size: calc(0.72rem * var(--fs-scale, 1)); font-weight: 800; }
-  .mm-daylabel-sel { background: #2a2320; color: #fffdf5; border-radius: 6px; padding: 0 5px; }
   .mm-detail { border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px; margin: 8px 0; background: var(--paper-card, #fffdf5); }
   .mm-detail-cols { display: grid; grid-template-columns: 1fr 2px 1fr; gap: 8px; }
   .mm-detail-div { background: repeating-linear-gradient(#c9bda6, #c9bda6 3px, transparent 3px, transparent 6px); }
@@ -3219,6 +3210,58 @@
     .mny-rail { flex-direction: row; overflow-x: auto; padding-bottom: var(--space-1); }
     .mny-rail-item { white-space: nowrap; flex: none; }
   }
+
+  /* ── Step 1's day rows ──
+     Confirmable in place; the two-column detail opens inside the row it belongs
+     to rather than below the whole chart. */
+  .mm-drows { display: flex; flex-direction: column; gap: var(--space-1); margin: var(--space-2) 0; }
+  .mm-drow { border: 2px solid var(--ink); border-radius: var(--radius-md); background: var(--paper); overflow: hidden; }
+  .mm-drow.done { background: #f4fbf6; }
+  .mm-drow.open { background: var(--bg2); }
+  .mm-drow-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); flex-wrap: wrap; }
+  .mm-drow-day {
+    min-height: 44px; min-width: 72px; text-align: left; flex: 0 0 auto;
+    font: inherit; font-weight: 800; color: inherit; background: transparent; border: 0; cursor: pointer;
+  }
+  .mm-drow-dow { font-size: max(13px, calc(0.9rem * var(--fs-scale, 1))); }
+  .mm-drow-bars { display: flex; gap: var(--space-1); flex: 1 1 8rem; min-width: 0; }
+  .mm-drow-track {
+    flex: 1; height: 10px; border: 2px solid var(--paper-line); border-radius: var(--radius-full);
+    background: var(--paper); overflow: hidden;
+  }
+  .mm-drow-fill { display: block; height: 100%; }
+  .mm-drow-note { flex: 1 1 8rem; font-size: max(13px, calc(0.8rem * var(--fs-scale, 1))); color: var(--ink-light); }
+  .mm-drow-go, .mm-drow-ok {
+    min-height: 44px; padding: 0 var(--space-3); white-space: nowrap; flex: 0 0 auto;
+    font: inherit; font-weight: 800; font-size: max(13px, calc(0.85rem * var(--fs-scale, 1)));
+    border: 2px solid var(--ink); border-radius: var(--radius-sm); cursor: pointer;
+  }
+  .mm-drow-go { background: var(--accent-strong); color: #fff; box-shadow: 2px 2px 0 var(--ink); }
+  .mm-drow-ok { background: transparent; border-color: transparent; color: var(--ink-light); }
+  .mm-drow-x {
+    min-width: 44px; min-height: 44px; flex: 0 0 auto; font: inherit;
+    color: var(--ink-light); background: transparent; border: 0; cursor: pointer;
+  }
+  .mm-drow-body { padding: 0 var(--space-3) var(--space-3); }
+
+  /* ── App's four screens ── */
+  .pn-row.pn-static { cursor: default; }
+  .pn-row.pn-static:hover { background: transparent; }
+  .pa-profiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: var(--space-3); }
+  .pa-profile { padding: var(--space-3); }
+  .pa-prof-head { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+  .pa-avatar {
+    width: 44px; height: 44px; flex: none; display: flex; align-items: center; justify-content: center;
+    border: 2px solid var(--ink); border-radius: 50%; font-size: calc(1.2rem * var(--fs-scale, 1));
+  }
+  .pa-avatar-jenn { background: var(--jenn); }
+  .pa-avatar-jess { background: var(--jess); }
+  .pa-age {
+    width: 72px; min-height: 44px; text-align: center; font: inherit; font-weight: 800;
+    color: var(--ink); background: var(--paper);
+    border: 2px solid var(--ink); border-radius: var(--radius-sm);
+  }
+  .pa-stale { border-color: var(--accent-strong); background: var(--bg2); }
 
   /* History's toggle: one screen, two readings of the same eight weeks. */
   .pn-toggle { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-2); }

@@ -93,6 +93,14 @@ window.addEventListener('pagehide', flushPush);
   // and the container holds the listener.
   const now = document.getElementById('pnWrap');
   if (now) now.addEventListener('click', pnHandleClick);
+  // App's four screens: PIN, the age fields, the reading-size choice.
+  ['paAccessWrap', 'paProfilesWrap', 'paPrefsWrap', 'paSchoolWrap'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('click', paHandleClick);
+    el.addEventListener('change', paHandleChange);
+  });
+  if (typeof paApplyTextScale === 'function') paApplyTextScale();
 })();
 
 /* Desktop: convert vertical wheel scroll to horizontal on the tray + filter */

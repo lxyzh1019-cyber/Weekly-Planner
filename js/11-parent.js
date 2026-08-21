@@ -33,7 +33,7 @@ const PARENT_PANEL_DEST = {
   review: 'meeting',
   history: 'history', trends: 'history', analysis: 'history',   // trends/analysis are the toggle's two halves
   setup: 'setup', options: 'setup', routines: 'setup', tasks: 'setup', money: 'setup', rules: 'setup',
-  app: 'app', backup: 'app',
+  app: 'app', access: 'app', profiles: 'app', prefs: 'app', school: 'app', backup: 'app',
 };
 /* The landing lists. The boundary test decides which side a row falls on:
    does changing this alter what the girls are asked to do, or what it is
@@ -45,9 +45,15 @@ const PARENT_LANDINGS = {
     { panel: 'tasks',    icon: '✅', title: 'Activities and sports', sub: 'The library both girls draw from' },
     { panel: 'money',    icon: '💰', title: 'Money rules',         sub: 'Grades, caps, fines, loans and the week history' },
     { panel: 'rules',    icon: '⭐', title: 'Level-up',            sub: 'What earns a star on an activity' },
+    { panel: 'money',    icon: '🕰️', title: 'Change history',      sub: 'Every version of the rules, when it took effect, and why',
+      section: 'history' },
   ],
   app: [
-    { panel: 'backup',   icon: '🗄️', title: 'Backup and data',     sub: 'Export, restore, cloud size, and resetting a week' },
+    { panel: 'access',   icon: '🔒', title: 'Access',          sub: 'The parent PIN that everything here sits behind' },
+    { panel: 'profiles', icon: '👤', title: 'Profiles',        sub: 'Who the girls are, and their age' },
+    { panel: 'prefs',    icon: '🎛️', title: 'Preferences',     sub: 'Reading size on grown-up screens' },
+    { panel: 'school',   icon: '📅', title: 'School calendar', sub: 'Term dates and days off — replaced each August' },
+    { panel: 'backup',   icon: '🗄️', title: 'Backup and data', sub: 'Export, restore, cloud size, and resetting a week' },
   ],
 };
 
@@ -91,7 +97,7 @@ function parentRenderLanding(destId) {
   if (!wrap) return;
   const dest = PARENT_DESTS.find(d => d.id === destId) || {};
   const rows = (PARENT_LANDINGS[destId] || []).map(r => `
-    <button type="button" class="pn-row" data-parent-panel="${escapeAttr(r.panel)}">
+    <button type="button" class="pn-row" data-parent-panel="${escapeAttr(r.panel)}"${r.section ? ` data-parent-section="${escapeAttr(r.section)}"` : ''}>
       <span class="pn-ico" aria-hidden="true">${r.icon}</span>
       <span class="pn-text"><span class="pn-title">${escapeHtml(r.title)}</span>
         <span class="pn-sub">${escapeHtml(r.sub)}</span></span>
@@ -153,7 +159,15 @@ function parentHandleNavClick(e) {
   const dest = e.target.closest('[data-parent-dest]');
   if (dest) { setParentDest(dest.getAttribute('data-parent-dest')); return; }
   const panel = e.target.closest('[data-parent-panel]');
-  if (panel) { setParentTab(panel.getAttribute('data-parent-panel')); return; }
+  if (panel) {
+    /* Change history is a section of Money rules, not a panel of its own — the
+       log only makes sense next to the things it logs. The row names the
+       section so it opens where it means to. */
+    const sec = panel.getAttribute('data-parent-section');
+    if (sec && typeof mnySetParentSection === 'function') mnyParentSection = sec;
+    setParentTab(panel.getAttribute('data-parent-panel'));
+    return;
+  }
   const scope = e.target.closest('[data-parent-scope]');
   if (scope) { setParentScope(scope.getAttribute('data-parent-scope')); return; }
   const hist = e.target.closest('[data-parent-history]');
@@ -185,6 +199,10 @@ const PARENT_PANEL_RENDERERS = {
   tasks:    () => { renderPendingApproval(); renderParentActivities(); },
   money:    () => mnyRenderRulesTab(),
   rules:    () => renderLevelRules(),
+  access:   () => paRenderAccess(),
+  profiles: () => paRenderProfiles(),
+  prefs:    () => paRenderPrefs(),
+  school:   () => paRenderSchool(),
   backup:   () => bkRenderPanel(),
 };
 
@@ -200,28 +218,11 @@ function renderParentHome() {
 function renderParentReviewHeader() {
   const name = document.getElementById('reviewKidName');
   if (name) name.textContent = parentViewing === 'jenn' ? '🐥 Jenn' : '🦊 Jess';
-  renderParentAge();
-  document.querySelectorAll('#parentWeekKidPills .pill-btn').forEach(b =>
-    b.classList.toggle('active', b.textContent.includes(parentViewing === 'jenn' ? 'Jenn' : 'Jess')));
 }
 
-/* The one place age can be set, and it is a grown-up's screen. currentAge seeds
-   and rolls it forward on its own, so this is a correction rather than a
-   question — which is why it is never blank and never prompts.
-   Guarded against clobbering a half-typed number, the same way the week glance's
-   field used to be. */
-function renderParentAge() {
-  const el = document.getElementById('parentKidAge');
-  if (!el || document.activeElement === el) return;
-  el.value = currentAge(parentViewing) ?? '';
-}
-function onParentAgeChange() {
-  const el = document.getElementById('parentKidAge');
-  if (!el) return;
-  const v = setKidAge(el.value, parentViewing);
-  el.value = v ?? '';
-  showToast(`Age set to ${v} 🎂`);
-}
+/* Age moved to App › Profiles, which draws a field per kid and writes through
+   setKidAge. renderParentAge and onParentAgeChange targeted one input on the
+   Weekly Review screen and had nothing left to point at. */
 
 function setParentTab(tab) {
   parentTab = tab;
@@ -279,8 +280,8 @@ function setParentKid(kid) {
   setParentScope(kid);
 }
 
-/* Weekly Review hub — Function 1 (review & confirm) lives in ONE place:
-   the family meeting. This hub is read-only status for the meeting's week:
+/* The Meeting destination's home. Review & confirm lives in ONE place —
+   the meeting itself. This is read-only status for the meeting's week:
    the 7-day strip mirrors the meeting's day-confirms (both kids), and every
    tap opens the meeting itself rather than confirming in a second surface. */
 function renderMeetingHub() {
@@ -330,11 +331,6 @@ function openFamilyMeetingAt(step, day) {
   mmStep = step;
   mmSelectedDay = day == null ? null : day;
   renderMeetingMode();
-}
-/* The chore setup a parent used to reach through the kid-shaped chore tab now
-   lives in the portal, next to the queue that needs it. */
-function parentOpenChoreReview() {
-  setParentTab('chores');
 }
 
 /* Feedback from the kid: the moods/vibes they logged each day this week,

@@ -4864,6 +4864,9 @@ function findChromium() {
       review: 'meeting', chores: 'now', trends: 'history', options: 'setup',
       analysis: 'history', routines: 'setup', tasks: 'setup', money: 'setup',
       rules: 'setup', backup: 'app',
+      // App's own four, built so the landing stops drawing rows for screens
+      // that were only ever proposals.
+      access: 'app', profiles: 'app', prefs: 'app', school: 'app',
     };
     Object.entries(MAP).forEach(([panel, dest]) => {
       setParentTab(panel);
@@ -4899,7 +4902,54 @@ function findChromium() {
       if (!PARENT_PANEL_DEST[id]) bad.push(`panel ${id} belongs to no destination`);
     });
 
+    /* Age is a once-a-year correction and it must be somewhere. It moved off the
+       weekly screen it used to sit on, so assert it landed rather than trusting
+       that it did. */
+    setParentTab('profiles');
+    const ages = document.querySelectorAll('[data-pa-age]');
+    if (ages.length !== 2) bad.push(`${ages.length} age fields in Profiles, expected one per kid`);
+    else if (String(ages[0].value) !== String(currentAge('jenn'))) {
+      bad.push(`Profiles shows "${ages[0].value}" for Jenn, not ${currentAge('jenn')}`);
+    }
+
     setParentDest('now');
+    return bad.length === 0 || bad;
+  });
+
+  /* Step 1 confirms a day where the day is, not in a panel below a chart.
+     Twenty-eight movements for a week where nothing was wrong is the friction
+     this whole phase exists to remove, so it is worth an assertion. */
+  checks.everyDayConfirmsWhereItIs = await page.evaluate(() => {
+    const bad = [];
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const store = state.shared.parentDayConfirm || {};
+    const before = JSON.parse(JSON.stringify(store));
+    ['jenn', 'jess'].forEach(k => { if (store[k]) delete store[k][mmDayKey(0)]; });
+
+    openFamilyMeeting(); mmGoStep(1);
+    const body = document.getElementById('familyMeetingBody');
+    const rows = body.querySelectorAll('.mm-drow');
+    if (rows.length !== 7) bad.push(`${rows.length} day rows, expected 7`);
+    const btn = body.querySelector('[data-mm-action="confirmday"][data-day="0"]');
+    if (!btn) bad.push('Monday cannot be confirmed from its own row');
+    else {
+      if (mmIsDayConfirmed(0)) bad.push('fixture started confirmed');
+      btn.click();
+      if (!mmIsDayConfirmed(0)) bad.push('confirming from the row did not take');
+      // And it stays a toggle — a mis-tap has a way back.
+      body.querySelector('[data-mm-action="confirmday"][data-day="0"]').click();
+      if (mmIsDayConfirmed(0)) bad.push('a day cannot be un-confirmed');
+    }
+    // The detail still opens, in the row it belongs to.
+    const open = body.querySelector('[data-mm-action="openday"][data-day="2"]');
+    if (open) {
+      open.click();
+      const row = document.getElementById('familyMeetingBody').querySelectorAll('.mm-drow')[2];
+      if (!row || !row.querySelector('.mm-drow-body')) bad.push('a day row does not open its detail');
+    }
+    closeSheet('familyMeetingOverlay');
+    state.shared.parentDayConfirm = before;
     return bad.length === 0 || bad;
   });
 
@@ -5812,13 +5862,17 @@ function findChromium() {
       bad.push('a number field appeared on the week view');
     }
     if (weekGlanceOpen()) toggleWeekGlance();
-    // The grown-up's copy exists and is wired to the child being viewed.
+    /* The grown-up's copy exists and reads the right child. It lives in
+       App › Profiles now — it used to sit in the primary filter row of the
+       weekly screen, which is a lot of prominence for a once-a-year
+       correction — and Profiles draws one field per kid rather than one field
+       that follows whoever is selected. */
     profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jess';
-    showScreen('parent'); renderParentHome(); setParentTab('review');
-    const el = document.getElementById('parentKidAge');
+    showScreen('parent'); renderParentHome(); setParentTab('profiles');
+    const el = document.querySelector('[data-pa-age="jess"]');
     if (!el) bad.push('there is nowhere for a parent to correct the age');
     else if (String(el.value) !== String(currentAge('jess'))) {
-      bad.push(`the portal shows "${el.value}" for Jess, not ${currentAge('jess')}`);
+      bad.push(`Profiles shows "${el.value}" for Jess, not ${currentAge('jess')}`);
     }
     profile = 'jenn'; parentViewing = 'jenn'; goToday();
     return bad.length === 0 || bad;
