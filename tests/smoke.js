@@ -4833,6 +4833,97 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* ── The catch-up screen is a shorter road, not a second one ──
+     A backlogged week closed from the catch-up screen has to land the family in
+     exactly the state a full sitting would have. The failure this guards is the
+     one the whole design is arranged against: a second path to pocket money
+     that drifts from commitFamilyMeeting and pays a different number.
+
+     It also holds the two facts apart. Ticking "we talked about this week"
+     alone must move nothing — that is mmMarkWeekMet's job, and it is not a
+     settle. */
+  checks.catchUpCommitsThroughTheMeeting = await page.evaluate(() => {
+    const bad = [];
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const c = state.shared.chore;
+    const heldBefore = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
+    const metBefore = JSON.parse(JSON.stringify(c.meetingsMet || {}));
+    const weekBefore = ctWeekKey;
+
+    // A week three back, with something actually earned in it.
+    const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - 21);
+    const wk = ctDateToKey(mon);
+    c.meetingsHeld = {}; c.meetingsMet = {};
+    // Enough chores to clear freeChoresPerWeek (2) and the daily cap, spread
+    // across days — two graded chores would net $0, and an assertion that
+    // 0 === 0 proves nothing about the commit path.
+    ['jenn', 'jess'].forEach(k => {
+      [['dishes', 1], ['mop', 2], ['vacuum', 3], ['laundry', 4], ['bins', 5]]
+        .forEach(([id, day]) => mrSetChoreGrade(k, wk, day, id, 3));
+    });
+    const owed = ['jenn', 'jess'].map(k => mrWeekBreakdown(wk, k).net);
+    if (!owed.every(v => v > 0)) bad.push(`the fixture week owes ${owed} — nothing to prove`);
+
+    // 1. "We talked about it" on its own moves no money.
+    const cashBefore = ['jenn', 'jess'].map(k => ensureWallet(k).cash);
+    mmOpenExpress(wk);
+    if (mmExpressWeek !== wk) bad.push('the catch-up screen did not open on the week asked for');
+    mmExpressToggle('money');            // money OFF, met ON — the record-only case
+    mmExpressToggle('met');
+    mmExpressCommit();
+    const cashAfterMet = ['jenn', 'jess'].map(k => ensureWallet(k).cash);
+    if (String(cashAfterMet) !== String(cashBefore)) bad.push('marking a week met moved money');
+    if (!mmIsMet(wk)) bad.push('marking a week met did not record it');
+    if (mmIsSettled(wk)) bad.push('marking a week met settled it');
+
+    // 2. Now record the money, and it must match what the week actually owed.
+    mmOpenExpress(wk);
+    mmExpressCommit();                   // money ON by default
+    const cashAfterPay = ['jenn', 'jess'].map(k => ensureWallet(k).cash);
+    const moved = cashAfterPay.map((v, i) => Math.round((v - cashBefore[i]) * 100) / 100);
+    if (String(moved) !== String(owed.map(v => Math.round(v * 100) / 100))) {
+      bad.push(`catch-up paid ${moved} but the week owed ${owed}`);
+    }
+    if (!mmIsSettled(wk)) bad.push('a closed catch-up week is not settled');
+
+    // 3. And it drops out of the list it came from.
+    if (mmUnsettledWeeks(8).some(x => x.wk === wk)) bad.push('a settled week is still offered');
+
+    c.meetingsHeld = heldBefore; c.meetingsMet = metBefore;
+    mmExpressWeek = null; ctWeekKey = weekBefore;
+    return bad.length === 0 || bad;
+  });
+
+  /* The catch-up list is a way in, not a wall. Eight open weeks is eight rows
+     of guilt; four and a count says the same thing. */
+  checks.theCatchUpListDoesNotGrowWithoutLimit = await page.evaluate(() => {
+    const bad = [];
+    profile = 'parent';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const c = state.shared.chore;
+    const heldBefore = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
+    const metBefore = JSON.parse(JSON.stringify(c.meetingsMet || {}));
+    const startBefore = c.moneyModelStartWeek, progBefore = c.programStartDate;
+    const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - 8 * 7);
+    c.moneyModelStartWeek = ctDateToKey(mon); c.programStartDate = ctDateToKey(mon);
+    c.meetingsHeld = {}; c.meetingsMet = {};
+
+    const open = mmUnsettledWeeks(8).length;
+    if (open <= MM_CATCHUP_VISIBLE) bad.push(`only ${open} open weeks — cannot test the roll-up`);
+    const html = mmCatchUpBanner();
+    const host = document.createElement('div'); host.innerHTML = html;
+    const rows = host.querySelectorAll('.mm-catchup-row:not(.mm-catchup-more)').length;
+    if (rows > MM_CATCHUP_VISIBLE) bad.push(`${rows} rows shown, ceiling is ${MM_CATCHUP_VISIBLE}`);
+    if (!host.querySelector('.mm-catchup-more')) bad.push('the older weeks are not reachable');
+    // The rolled-up weeks are still counted in the caption, not hidden from it.
+    if (!/nobody has opened/.test(host.textContent)) bad.push('the caption stopped saying how many are open');
+
+    c.meetingsHeld = heldBefore; c.meetingsMet = metBefore;
+    c.moneyModelStartWeek = startBefore; c.programStartDate = progBefore;
+    return bad.length === 0 || bad;
+  });
+
   /* The readout whose absence made $0.00 look like data loss: a week that has
      been agreed but not paid out has to say so somewhere she will look. */
   checks.agreedButUnpaidIsVisible = await page.evaluate(() => {

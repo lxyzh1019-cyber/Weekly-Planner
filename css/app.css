@@ -1462,6 +1462,44 @@
   }
   .mm-catchup-go { color: var(--accent-strong); }
   .mm-catchup-did { border-style: dashed; color: var(--ink-muted); }
+  /* The roll-up row: the weeks past the visible four, reachable in one tap. */
+  .mm-catchup-row.mm-catchup-more { border-style: dotted; background: transparent; }
+
+  /* ── The catch-up screen ──
+     Replaces the stepper for a backlogged week. Two per-kid columns, two ticks
+     and two buttons — the shape of a decision, not of a conversation. */
+  .mm-express { display: flex; flex-direction: column; gap: var(--space-3); }
+  .mm-xp-head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .mm-xp-title { font-family: 'Gochi Hand', cursive; font-size: calc(1.15rem * var(--fs-scale, 1)); }
+  .mm-xp-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: var(--space-3); }
+  .mm-xp-card {
+    padding: var(--space-3); background: var(--paper);
+    border: 2px solid var(--ink); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
+  }
+  .mm-xp-name { font-size: calc(0.95rem * var(--fs-scale, 1)); margin-bottom: var(--space-2); }
+  .mm-xp-row {
+    display: flex; justify-content: space-between; gap: var(--space-2);
+    padding: var(--space-1) 0; border-top: 1.5px solid var(--paper-line);
+    font-size: max(13px, calc(0.85rem * var(--fs-scale, 1)));
+  }
+  .mm-xp-row:first-of-type { border-top: 0; }
+  .mm-xp-n { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .mm-xp-total { border-top-width: 3px; }
+  .mm-xp-card .pill-btn { margin-top: var(--space-2); font-size: max(13px, calc(0.8rem * var(--fs-scale, 1))); }
+  /* Two facts, two ticks. They are separate controls because "we sat down" and
+     "the money moved" are separate facts everywhere else in this app. */
+  .mm-xp-ticks { display: flex; flex-direction: column; gap: var(--space-2); }
+  .mm-xp-tick {
+    display: flex; align-items: flex-start; gap: var(--space-2); width: 100%;
+    min-height: 44px; padding: var(--space-2) var(--space-3); text-align: left;
+    font-family: inherit; font-size: max(13px, calc(0.85rem * var(--fs-scale, 1)));
+    color: inherit; background: var(--paper);
+    border: 2px solid var(--ink); border-radius: var(--radius-sm); cursor: pointer;
+  }
+  .mm-xp-box { font-size: calc(1.1rem * var(--fs-scale, 1)); line-height: 1.2; }
+  .mm-xp-actions { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
+  .mm-xp-actions .btn-confirm { flex: 1 1 14rem; width: auto; }
+  .mm-xp-actions .pill-btn { min-height: 44px; }
   /* ── Making a blank day workable ──
      Both footers sit under their section's items and are the only way a week
      with no planner blocks in it gets anything to tick. */
