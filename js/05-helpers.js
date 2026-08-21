@@ -293,6 +293,52 @@ function findActivity(actId, p=activeProfile()) {
   return getAllActivities(p, { includeArchived: true }).find(a => a.id === actId) || null;
 }
 
+/* ── What a placed block is called, and the only place that decides it ──
+   This lived twice: tdBlockLabel on Today and baseName in the day view, the
+   same training/competition unwrapping written out character for character.
+   Numbering repeats in one and not the other would be how the hero comes to
+   call a session one thing while its own card calls it another — which is the
+   defect that put the unwrapping in one function in the first place.
+
+   findActivity rather than getAllActivities: this names a block that already
+   exists, so an archived activity must still resolve — a retired piano teacher
+   must not blank out last term's piano.
+
+   ── And the number ──
+   Five homework blocks in one day drew five identical cards. A block is
+   numbered only when the same thing genuinely repeats WITHIN THAT DAY: one
+   Homework stays "Homework", five become Block 1…5.
+
+   Numbered by startMin, never by the order the caller happens to hold them in.
+   Today sorts its list by tdActionableStart and the day view lays blocks out by
+   position; if the number followed either, Block 2 would be a different block
+   on the two screens, which is the whole thing this helper exists to stop.
+
+   Grouped by actId AND tag, because Skating and Swimming are both cat
+   'training' with different topics — they are not repeats of each other. */
+function blockGroupKey(b) {
+  return (b.actId || '') + '|' + (b.tag || '');
+}
+function blockDisplayName(b, p=activeProfile(), dayKey) {
+  const act = findActivity(b.actId, p) || {};
+  const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
+  const icon = topic ? topic.icon : (act.icon || '📌');
+  const name = topic
+    ? (act.isCompetition ? (topic.id === 'general' ? 'Competition' : topic.name + ' Comp.') : topic.name)
+    : (act.name || 'Something');
+  if (!dayKey) return { icon, name, n: 0, of: 1 };
+  const key = blockGroupKey(b);
+  const sameThing = (getDayBlocks(dayKey, p) || [])
+    .filter(o => o && blockGroupKey(o) === key)
+    .sort((x, y) => (x.startMin || 0) - (y.startMin || 0));
+  if (sameThing.length < 2) return { icon, name, n: 0, of: sameThing.length || 1 };
+  const n = sameThing.findIndex(o => o.id === b.id) + 1;
+  // A block that is not in the day it claims to be in gets no number rather
+  // than a wrong one: findIndex returning -1 would otherwise read as "Block 0".
+  if (n < 1) return { icon, name, n: 0, of: sameThing.length };
+  return { icon, name, n, of: sameThing.length };
+}
+
 function getUnlockedRoutineRewards(routineId, p=activeProfile()) {
   const pr = getProfData(p).progress || {};
   const map = pr.unlockedChecklistItems || {};

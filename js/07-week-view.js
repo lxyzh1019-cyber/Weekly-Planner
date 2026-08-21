@@ -706,7 +706,7 @@ function renderTimeGrid(keys) {
       const act = acts.find(a => a.id === b.actId);
       if (!act) return;
       const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
-      const bg = topic ? trainingBlockColour(b) : (b.colour || CAT_HEX[act.cat] || '#95d5b2');
+      const bg = blockColour(b);
       const relStart = Math.max(0, b.startMin - START_MIN);
       const relEnd = Math.min(DAY_MIN_SPAN, b.startMin - START_MIN + (b.durationMin || 0));
       if (relEnd - relStart < 1) return;
@@ -1245,7 +1245,7 @@ function renderFullWeek(keys) {
 
       // Training topics carry their own icon + colour (skating/swimming/dryland).
       const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
-      const bg = topic ? trainingBlockColour(b) : (b.colour || CAT_HEX[act.cat] || '#888');
+      const bg = blockColour(b);
       const dispIcon = topic ? topic.icon : act.icon;
       // Competition shares the sport topic's icon/colour, but reads as its own
       // task (a general competition says "Competition", a sport one says e.g.
