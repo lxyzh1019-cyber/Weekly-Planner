@@ -31,7 +31,7 @@ const PARENT_DESTS = [
 const PARENT_PANEL_DEST = {
   now: 'now', chores: 'now',
   review: 'meeting',
-  history: 'history', trends: 'history', analysis: 'history',
+  history: 'history', trends: 'history', analysis: 'history',   // trends/analysis are the toggle's two halves
   setup: 'setup', options: 'setup', routines: 'setup', tasks: 'setup', money: 'setup', rules: 'setup',
   app: 'app', backup: 'app',
 };
@@ -39,10 +39,6 @@ const PARENT_PANEL_DEST = {
    does changing this alter what the girls are asked to do, or what it is
    worth? Yes → Setup. No → App. */
 const PARENT_LANDINGS = {
-  history: [
-    { panel: 'trends',   icon: '💰', title: 'Money',            sub: 'What each week actually paid, eight weeks at a time' },
-    { panel: 'analysis', icon: '⏱️', title: 'Time and routines', sub: 'How much of what was planned got done, and the month at a glance' },
-  ],
   setup: [
     { panel: 'options',  icon: '🧹', title: 'Chores and pay',      sub: 'The pool, due times, lanes and who does what' },
     { panel: 'routines', icon: '🌅', title: 'Routines',            sub: 'Morning, after school, evening, and your own' },
@@ -54,6 +50,40 @@ const PARENT_LANDINGS = {
     { panel: 'backup',   icon: '🗄️', title: 'Backup and data',     sub: 'Export, restore, cloud size, and resetting a week' },
   ],
 };
+
+/* ── History ──
+   Trends and Performance both answered "how did the last eight weeks go", so
+   they are one screen with a toggle rather than two tabs. Nothing inside either
+   is rebuilt: the toggle shows one of the two panels that already exist, which
+   is why every part of both — the pager, the CSV, the cumulative line, the
+   heatmap, the written read, the nine categories, the month view — comes across
+   untouched. */
+let parentHistoryView = 'money';   // 'money' | 'time'
+const PARENT_HISTORY_VIEWS = [
+  { id: 'money', label: '💰 Money', panel: 'trends',
+    note: 'What each week actually paid. Weeks with no meeting held paid nothing — the gap is the finding, not missing data.' },
+  { id: 'time',  label: '⏱️ Time and routines', panel: 'analysis',
+    note: 'How much of what was planned actually got done, and the month at a glance.' },
+];
+function setParentHistoryView(id) {
+  parentHistoryView = id;
+  setParentTab('history');
+}
+function parentRenderHistory() {
+  const wrap = document.getElementById('ptab-history-wrap');
+  if (!wrap) return;
+  const view = PARENT_HISTORY_VIEWS.find(v => v.id === parentHistoryView) || PARENT_HISTORY_VIEWS[0];
+  wrap.innerHTML = `<div class="pn-toggle">${PARENT_HISTORY_VIEWS.map(v =>
+      `<button type="button" class="pill-btn${v.id === view.id ? ' active' : ''}" data-parent-history="${v.id}">${escapeHtml(v.label)}</button>`).join('')}</div>
+    <p class="pn-note">${escapeHtml(view.note)}</p>`;
+  // The two halves live in their own panels; show the one this view names.
+  PARENT_HISTORY_VIEWS.forEach(v => {
+    const el = document.getElementById('ptab-' + v.panel);
+    if (el) el.hidden = (v.id !== view.id);
+  });
+  const render = PARENT_PANEL_RENDERERS[view.panel];
+  if (render) { try { render(); } catch (e) { console.error('history view failed:', view.id, e); } }
+}
 
 /* A landing is rows, not a second row of tabs. */
 function parentRenderLanding(destId) {
@@ -126,6 +156,8 @@ function parentHandleNavClick(e) {
   if (panel) { setParentTab(panel.getAttribute('data-parent-panel')); return; }
   const scope = e.target.closest('[data-parent-scope]');
   if (scope) { setParentScope(scope.getAttribute('data-parent-scope')); return; }
+  const hist = e.target.closest('[data-parent-history]');
+  if (hist) { setParentHistoryView(hist.getAttribute('data-parent-history')); return; }
   const back = e.target.closest('[data-parent-back]');
   if (back) { setParentDest(parentDest); return; }
 }
@@ -141,7 +173,7 @@ function parentHandleNavClick(e) {
    call, which is the point at which they exist. */
 const PARENT_PANEL_RENDERERS = {
   now:      () => pnRenderNow(),
-  history:  () => parentRenderLanding('history'),
+  history:  () => parentRenderHistory(),
   setup:    () => parentRenderLanding('setup'),
   app:      () => parentRenderLanding('app'),
   review:   () => { renderParentReviewHeader(); renderMeetingHub(); renderReviewFeedback(); },

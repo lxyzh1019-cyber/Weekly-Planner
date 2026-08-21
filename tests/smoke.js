@@ -2571,8 +2571,17 @@ function findChromium() {
 
   /* ── The five pages are one system ── */
 
-  // The same numbered tab bar on every money surface. Five pages that look
-  // like five separate pages are five separate apps.
+  /* The same numbered tab bar on every money surface a CHILD reaches. Five
+     pages that look like five separate pages are five separate apps.
+
+     The parent's Money rules page is deliberately no longer one of them. It is
+     reached from Setup › Money rules, not from the girls' money nav, and the
+     bar rendered above the section rail — so a grown-up got the portal's nav,
+     then the kids' nav, then the sections: three rows before a single number.
+     The bar is the girls' wayfinding through their own five pages, and a parent
+     editing rates is not walking that path. It stays on all three kid pages and
+     inside the meeting, which is where the invariant was actually earning its
+     keep. */
   checks.tabBarOnEveryMoneySurface = await page.evaluate(() => {
     profile = 'parent'; parentViewing = 'jess'; ctParentKid = 'jess';
     const bar = (id) => {
@@ -2587,8 +2596,13 @@ function findChromium() {
     const onStory = !!bar('mnyStoryWrap');
     mnyOpenSchool('jess');
     const onSchool = !!bar('mnySchoolWrap');
+    // The parent's rules page carries the section rail instead, and must show
+    // which version is being edited without being asked.
     showScreen('parent'); setParentTab('money'); mnyRenderRulesTab();
-    const onRules = !!bar('mnyRulesWrap');
+    const rulesWrap = document.getElementById('mnyRulesWrap');
+    const onRules = !rulesWrap.querySelector('.mny-tab')
+      && rulesWrap.querySelectorAll('.mny-rail-item').length === MNY_PARENT_SECTIONS.length
+      && /In effect since/.test(rulesWrap.textContent);
     openFamilyMeeting(); mnySetMeetKid('jess'); mmGoStep(3);
     const body = document.getElementById('familyMeetingBody');
     const onEarned = body.querySelectorAll('.mny-tab').length === 5;

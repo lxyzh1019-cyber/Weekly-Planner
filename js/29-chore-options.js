@@ -50,6 +50,18 @@ function coPoolCard() {
     <div class="cp-cap">The chore pool — what a chore is</div>
     <div class="ck-sub">A row here says what a chore <b>is</b>: its name, its lane, when in the day it's due, and who it's for. It says nothing about <b>when</b> — a chore reaches a girl's day only when the weekly planner puts it there, which is why the week grid can grey out a day and mean it.</div>
     <div class="ck-sub">Pay comes from the grade you give, not from the chore, so there is no per-chore price to argue about. <b>8:30pm is bedtime and nothing can be due after it.</b> Only the <b>Chores</b> lane is checked and paid.</div>
+    <!-- What each column is. It used to live in title attributes, which do not
+         exist on a tablet — so a row read as a line of unlabelled boxes. Hidden
+         where the rows stack into cards, because there each field is labelled
+         by the card itself. -->
+    <div class="co-head" aria-hidden="true">
+      <span class="co-head-icon">Icon</span>
+      <span class="co-head-name">Chore</span>
+      <span class="co-head-due">Due by</span>
+      <span class="co-head-lane">Lane</span>
+      <span class="co-head-who">Who does it</span>
+      <span class="co-head-x"></span>
+    </div>
     ${rows}
     <div class="co-row co-draft">
       <input class="co-icon" value="${escapeAttr(coDraft.icon)}" data-co-action="draft-icon"
@@ -125,32 +137,28 @@ function coGoalsCard() {
 }
 
 /* ── Prices ── */
+/* The grade tiers live in one place — Money rules › What things pay. This used
+   to be a second editor for the same four numbers, which is two ways to change
+   one figure and no way to tell which was last. */
 function coPriceCard() {
   const r = mrRulesForWeek(ctWeekKey);
-  const c = r.chores || {};
-  const grade = c.grade || {};
-  const num = (label, path, value, hint) => `<div class="co-num">
-    <span class="cp-plan-name">${escapeHtml(label)}<span class="ck-item-due">${escapeHtml(hint)}</span></span>
-    <button type="button" class="ck-navbtn" data-co-action="num" data-path="${escapeAttr(path)}" data-delta="-1" aria-label="Lower ${escapeAttr(label)}">–</button>
-    <span class="co-numv">${value}</span>
-    <button type="button" class="ck-navbtn" data-co-action="num" data-path="${escapeAttr(path)}" data-delta="1" aria-label="Raise ${escapeAttr(label)}">+</button>
-  </div>`;
+  const tiers = CP_GRADES.map(x =>
+    `<div class="co-tier"><span>${escapeHtml(x.label)}</span><span class="co-tier-n">${ckMoney(ckGradePay(r, x.g))}</span></div>`).join('');
   return `<div class="cp-sect"><div class="cp-cap">What a grade is worth</div>
-    <div class="ck-sub">Every change here is dated from the week on screen and logged with a reason. Past weeks keep what they paid.</div>
-    ${num('On time & to standard', 'chores.grade.3', ckMoney(grade[3]), 'the full grade')}
-    ${num('To standard, late', 'chores.grade.2', ckMoney(grade[2]), 'or done after being asked')}
-    ${num('Redone, then to standard', 'chores.grade.1', ckMoney(grade[1]), 'it took a second go')}
-    ${num('Most a day can pay', 'chores.dailyCap', ckMoney(c.dailyCap), 'work past this becomes XP, not money')}
-    ${num('Free chores a week', 'chores.freeChoresPerWeek', String(c.freeChoresPerWeek), 'these belong to the family; they land on her lowest-paying work')}
-  </div>`;
+    <div class="ck-sub">Changed in one place only, so a price can never be two things at once.</div>
+    ${tiers}
+    <button type="button" class="ck-btn" data-parent-panel="money">Money rules › What things pay ›</button></div>`;
 }
 
+
 /* ── The blunt instruments ── */
+/* Rendered into App › Backup and data, not into chore setup. Clearing a week's
+   ticks and grades is destructive and undone by an export, so it belongs beside
+   the export rather than in a screen about what a chore is worth. */
 function coDangerCard() {
-  return `<div class="cp-sect"><div class="cp-cap">Backup &amp; reset</div>
-    <div class="ck-sub">A reset clears this week's ticks, grades and claims for both girls. Weeks already recorded at a meeting are not touched.</div>
+  return `<div class="cp-sect"><div class="cp-cap">Reset this week</div>
+    <div class="ck-sub">Clears this week's ticks, grades and claims for both girls. Weeks already recorded at a meeting are never touched.</div>
     <div class="cp-settle-btns">
-      <button type="button" class="ck-btn" data-co-action="export">Export a backup</button>
       <button type="button" class="ck-btn co-danger" data-co-action="clear">Reset this week</button>
     </div></div>`;
 }
@@ -174,7 +182,6 @@ function coRenderOptions() {
     ${coPoolCard()}
     ${coGoalsCard()}
     ${coPriceCard()}
-    ${coDangerCard()}
   </div>`;
 }
 
