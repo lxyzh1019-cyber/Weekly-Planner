@@ -172,8 +172,14 @@ function pnRenderNow() {
   if (!isParent()) { wrap.innerHTML = `<div class="pn-card">Parents only 🔒</div>`; return; }
   ctPrepareRead();
   if (!ctWeekKey) ctSetCurrentWeekFromPlanner();
+  /* The queue's backlog row is the only representation of the backlog here.
+     Rendering mmCatchUpBanner underneath it as well put the same fact on the
+     same screen twice — a row saying "3 weeks still open" above a list of the
+     same three weeks — which is exactly the duplication this screen exists to
+     stop. The row is the notification; the catch-up screen is where the work
+     happens; the meeting hub still lists the weeks. */
   wrap.innerHTML = `<div class="pn-cols">
-      <div><p class="pn-cap">Waiting on you</p>${pnQueueCard()}${mmCatchUpBanner()}</div>
+      <div><p class="pn-cap">Waiting on you</p>${pnQueueCard()}</div>
       <div><p class="pn-cap">This week</p>${pnWeekRail()}</div>
     </div>`;
   // The count on the tab itself, so a parent sees there is work without opening.

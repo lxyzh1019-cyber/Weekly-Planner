@@ -92,7 +92,7 @@ window.addEventListener('pagehide', flushPush);
   // Now is rebuilt wholesale on every render, so its rows carry data attributes
   // and the container holds the listener.
   const now = document.getElementById('pnWrap');
-  if (now) { now.addEventListener('click', pnHandleClick); now.addEventListener('click', mmHandleCatchUpClick); }
+  if (now) now.addEventListener('click', pnHandleClick);
 })();
 
 /* Desktop: convert vertical wheel scroll to horizontal on the tray + filter */

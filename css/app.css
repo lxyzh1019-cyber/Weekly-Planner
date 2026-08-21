@@ -3227,6 +3227,12 @@
   /* ── Five destinations ──
      One strip, never wrapping onto three lines the way ten tabs did. Below the
      phone breakpoint it hides and the fixed bottom bar takes over. */
+  /* Doing and looking on the left, changing things on the right. The gap is
+     the boundary test made visible: Now/Meeting/History are where the week
+     happens, Setup/App are where its rules and the app itself live. */
+  .parent-tab-right { margin-left: auto; }
+  @media (max-width: 780px) { .parent-tab-right { margin-left: 0; } }
+
   .parent-scope { display: flex; gap: var(--space-1); }
   .parent-scope .pill-btn { min-height: 44px; font-size: max(13px, calc(0.85rem * var(--fs-scale, 1))); }
   .parent-back { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4) 0; }
