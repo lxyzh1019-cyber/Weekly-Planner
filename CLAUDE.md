@@ -59,7 +59,7 @@ Or individually:
 # 1. Syntax check every module + the duplicate-name guard
 npm run check
 
-# 2. Merge-layer unit tests (50 checks, must be 50/50)
+# 2. Merge-layer unit tests (62 checks, must be 62/62)
 npm run test:merge
 
 # 3. Headless smoke test — boots the app, drives the main flows
@@ -107,7 +107,7 @@ still rendered and only the numbers were wrong.
 
 `js/04-merge.js` implements conflict-aware sync: id-keyed unions, deletion
 tombstones (30-day pruning), deep object merge, per-week chore arbitration, and
-a forward-only `lastGradeSeen` watermark. It has 57 unit tests running the real
+a forward-only `lastGradeSeen` watermark. It has 62 unit tests running the real
 shipped functions.
 
 Do not refactor it for style. Change it only to fix a demonstrated sync bug, and
@@ -331,6 +331,58 @@ New user-created Claude skills for this ecosystem use the `HZ-` prefix
 (e.g. `HZ-web-app-audit`). Repo files, CSS classes and JS functions keep the
 existing conventions: `ct*` for chore-tracker functions, `mny*` for money,
 `tg2-*` for the current Day Blocks grid.
+
+## The parent portal is five destinations
+
+`Now · Meeting · History · Setup · App`, declared in `PARENT_DESTS`
+(`js/11-parent.js`). It was ten flat tabs in a wrapping row, which on a phone
+was three lines and no order worth learning.
+
+**One panel renders at a time.** `renderParentHome()` used to call all ten panel
+renderers on every invocation, including every kid switch, in an app where a
+render can trigger a full-document write. `PARENT_PANEL_RENDERERS` maps panel id
+to renderer and `setParentTab` invokes only the one being opened. **Every entry
+is an arrow, not a bare reference** — this file loads at `11` and most renderers
+are declared at `24`–`30`, so naming them directly would read them before their
+script has run.
+
+**A destination owns a home panel; anything else is a detail** reached from that
+home with one back link. `PARENT_PANEL_DEST` says which destination owns each
+panel, and `everyOldTabIsStillReachable` asserts the mapping rather than leaving
+it to a person walking a checklist — a panel that quietly stops being reachable
+is the failure a restructure produces.
+
+**The boundary test decides where anything new goes:** *does changing this alter
+what the girls are asked to do, or what it is worth?* Yes → **Setup**. No →
+**App**. Change history sits in Setup, next to the things it logs.
+
+**`parentScope` is not `parentViewing`.** The switcher has a **Both** state, but
+that value must never reach `parentViewing`: 27 places read that global and most
+are outside the portal — `activeProfile`, the week view, block grading, the quest
+strip — and every one assumes a real child. Scope is a separate flag read only by
+the portal; `parentViewing` always holds a real kid. Anything that changes which
+child is shown goes through `setParentScope`, never straight at the global — that
+is what left three switchers disagreeing with each other.
+
+**The phone gets a bottom bar** (`parentRenderNav`), the kid nav's shape and 44px
+floor, below the 700px breakpoint only; the iPad keeps the top strip. It drives
+`setParentTab`, not `showScreen` — the portal is one screen with panels.
+
+**A backlogged week has a short road** (`mmOpenExpress`): totals, two ticks,
+close, next. It is not a second way to move money — it commits through
+`commitFamilyMeeting` like step 4, and `mmMarkWeekMet` stays the separate record
+of having sat down. `mmMaxStep` never leaves 1 while it is on, which is what
+keeps `mmCloseMeeting` from marking a week met that was only recorded.
+
+**Now counts and routes; it never decides.** Every number on it is read through
+the accessor the owning screen uses, and there is deliberately no control on it
+that grades, settles or approves. A second place that decides how a chore is
+graded is a second place that can disagree with the first.
+
+The girls' five-page money bar (`mnyTabBar`) is **not** on the parent's Money
+rules page. It is their wayfinding through their own pages, and it rendered above
+the section rail — portal nav, then kid nav, then sections. It stays on all three
+kid pages and inside the meeting.
 
 ## History is a record, not a working set
 
