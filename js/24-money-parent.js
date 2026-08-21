@@ -73,8 +73,7 @@ function mnyRenderRulesTab() {
        <div class="mny-card">
          <div class="mny-week-head">
            <span class="mny-label">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'}</span>
-           <span class="mny-chiprow">${['jenn', 'jess'].map(k =>
-             `<button type="button" class="mny-chip ${k === kid ? 'on' : ''}" data-mnyp-action="kid" data-mnyp-id="${k}">${CT_PROFILE_ICON[k]} ${k === 'jenn' ? 'Jenn' : 'Jess'}</button>`).join('')}</span>
+           <!-- The third kid switcher lived here. One in the top bar now. -->
          </div>
          <div class="mny-note">Every change is dated and recorded. Past weeks keep the prices that were live when the work was done — changing a price today never rewrites what they already earned. In effect since <b>${escapeHtml((v && v.effectiveFrom) || '—')}</b> · ${escapeHtml(mrReasonLabel(v && v.reason))}</div>
          <div class="mny-chiprow">${nav}</div>

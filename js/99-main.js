@@ -83,6 +83,12 @@ window.addEventListener('pagehide', flushPush);
   // static markup, so one listener on the container is enough.
   const ptabs = document.querySelector('#screen-parent .parent-tabs');
   if (ptabs) ptabs.addEventListener('keydown', parentTabsKeydown);
+  // Destinations, landings, the back link and the scope pills all ride on data
+  // attributes, so the screen itself carries one listener for the lot.
+  const portal = document.getElementById('screen-parent');
+  if (portal) portal.addEventListener('click', parentHandleNavClick);
+  const pnav = document.getElementById('parentNav');
+  if (pnav) pnav.addEventListener('click', parentHandleNavClick);
   // Now is rebuilt wholesale on every render, so its rows carry data attributes
   // and the container holds the listener.
   const now = document.getElementById('pnWrap');

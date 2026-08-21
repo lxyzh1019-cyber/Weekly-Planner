@@ -3,7 +3,132 @@
 /* ════════════════════════════════════════════════════════════════
    PARENT MODE
 ════════════════════════════════════════════════════════════════ */
-let parentTab = 'now';   // the front door
+let parentTab = 'now';   // the panel on screen
+let parentDest = 'now';  // which of the five destinations owns it
+
+/* ── Scope, and why it is not parentViewing ──
+   The switcher gains a "Both" state, but parentViewing cannot hold it: 27
+   places read that global, and most of them are outside the portal entirely —
+   activeProfile, the week view, block grading, the quest strip — and every one
+   assumes a real child. A third value would have them silently fall back to
+   Jenn or to Jess.
+
+   So scope is its own flag, read only by the portal's own screens.
+   parentViewing keeps holding the last real kid, so "open her full week" and
+   everything downstream still has someone to open. */
+let parentScope = 'both';   // 'both' | 'jenn' | 'jess'
+function parentScopeKid() { return parentScope === 'both' ? null : parentScope; }
+
+/* Five destinations. Each has a home panel; anything else it owns is a detail
+   reached from that home, with a back link rather than a second nav row. */
+const PARENT_DESTS = [
+  { id: 'now',     icon: '📥', label: 'Now',     home: 'now' },
+  { id: 'meeting', icon: '🧑‍🧑‍🧒', label: 'Meeting', home: 'review' },
+  { id: 'history', icon: '📊', label: 'History', home: 'history' },
+  { id: 'setup',   icon: '📋', label: 'Setup',   home: 'setup' },
+  { id: 'app',     icon: '⚙️', label: 'App',     home: 'app' },
+];
+const PARENT_PANEL_DEST = {
+  now: 'now', chores: 'now',
+  review: 'meeting',
+  history: 'history', trends: 'history', analysis: 'history',
+  setup: 'setup', options: 'setup', routines: 'setup', tasks: 'setup', money: 'setup', rules: 'setup',
+  app: 'app', backup: 'app',
+};
+/* The landing lists. The boundary test decides which side a row falls on:
+   does changing this alter what the girls are asked to do, or what it is
+   worth? Yes → Setup. No → App. */
+const PARENT_LANDINGS = {
+  history: [
+    { panel: 'trends',   icon: '💰', title: 'Money',            sub: 'What each week actually paid, eight weeks at a time' },
+    { panel: 'analysis', icon: '⏱️', title: 'Time and routines', sub: 'How much of what was planned got done, and the month at a glance' },
+  ],
+  setup: [
+    { panel: 'options',  icon: '🧹', title: 'Chores and pay',      sub: 'The pool, due times, lanes and who does what' },
+    { panel: 'routines', icon: '🌅', title: 'Routines',            sub: 'Morning, after school, evening, and your own' },
+    { panel: 'tasks',    icon: '✅', title: 'Activities and sports', sub: 'The library both girls draw from' },
+    { panel: 'money',    icon: '💰', title: 'Money rules',         sub: 'Grades, caps, fines, loans and the week history' },
+    { panel: 'rules',    icon: '⭐', title: 'Level-up',            sub: 'What earns a star on an activity' },
+  ],
+  app: [
+    { panel: 'backup',   icon: '🗄️', title: 'Backup and data',     sub: 'Export, restore, cloud size, and resetting a week' },
+  ],
+};
+
+/* A landing is rows, not a second row of tabs. */
+function parentRenderLanding(destId) {
+  const wrap = document.getElementById('ptab-' + destId + '-wrap');
+  if (!wrap) return;
+  const dest = PARENT_DESTS.find(d => d.id === destId) || {};
+  const rows = (PARENT_LANDINGS[destId] || []).map(r => `
+    <button type="button" class="pn-row" data-parent-panel="${escapeAttr(r.panel)}">
+      <span class="pn-ico" aria-hidden="true">${r.icon}</span>
+      <span class="pn-text"><span class="pn-title">${escapeHtml(r.title)}</span>
+        <span class="pn-sub">${escapeHtml(r.sub)}</span></span>
+      <span class="pn-chev" aria-hidden="true">›</span>
+    </button>`).join('');
+  wrap.innerHTML = `<p class="pn-cap">${escapeHtml(dest.label || '')}</p><div class="pn-card">${rows}</div>`;
+}
+
+/* One switcher, in the top bar, replacing the three that each drew their own. */
+function parentRenderScope() {
+  const wrap = document.getElementById('parentScopePills');
+  if (!wrap) return;
+  const opts = [['both', 'Both'], ['jenn', '🐥 Jenn'], ['jess', '🦊 Jess']];
+  wrap.innerHTML = opts.map(([id, label]) =>
+    `<button type="button" class="pill-btn${parentScope === id ? ' active' : ''}"
+       data-parent-scope="${id}">${label}</button>`).join('');
+}
+
+function setParentScope(scope) {
+  parentScope = scope;
+  // Keep parentViewing on a real child, always: everything outside this portal
+  // reads it and none of it can do anything with "both".
+  if (scope === 'jenn' || scope === 'jess') parentViewing = scope;
+  parentRenderScope();
+  setParentTab(parentTab);
+}
+
+/* The phone's bottom bar. Same idea as the kid nav (js/31-today.js) and the
+   same 44px floor, but it drives setParentDest rather than showScreen —
+   the portal is one screen with panels, not five screens. */
+function parentRenderNav() {
+  const nav = document.getElementById('parentNav');
+  if (!nav) return;
+  const show = isParent() && document.getElementById('screen-parent')?.classList.contains('active');
+  nav.hidden = !show;
+  document.body.classList.toggle('has-parent-nav', !!show);
+  if (!show) return;
+  const waiting = (typeof pnWaitingCount === 'function') ? pnWaitingCount() : 0;
+  nav.innerHTML = PARENT_DESTS.map(d => {
+    const on = d.id === parentDest;
+    const badge = (d.id === 'now' && waiting) ? `<span class="pn-navdot">${waiting}</span>` : '';
+    return `<button type="button" class="parent-nav-btn${on ? ' on' : ''}"
+        data-parent-dest="${d.id}"${on ? ' aria-current="page"' : ''}>
+        <span class="parent-nav-icon" aria-hidden="true">${d.icon}${badge}</span>
+        <span class="parent-nav-label">${escapeHtml(d.label)}</span>
+      </button>`;
+  }).join('');
+}
+
+function setParentDest(id) {
+  const dest = PARENT_DESTS.find(d => d.id === id);
+  if (!dest) return;
+  setParentTab(dest.home);
+}
+
+/* One delegated listener for the destination nav, the landings and the scope
+   pills, bound in js/99-main.js. */
+function parentHandleNavClick(e) {
+  const dest = e.target.closest('[data-parent-dest]');
+  if (dest) { setParentDest(dest.getAttribute('data-parent-dest')); return; }
+  const panel = e.target.closest('[data-parent-panel]');
+  if (panel) { setParentTab(panel.getAttribute('data-parent-panel')); return; }
+  const scope = e.target.closest('[data-parent-scope]');
+  if (scope) { setParentScope(scope.getAttribute('data-parent-scope')); return; }
+  const back = e.target.closest('[data-parent-back]');
+  if (back) { setParentDest(parentDest); return; }
+}
 
 /* One panel, one renderer. Tabs are pure show/hide, so rendering all ten on
    every call threw nine of them away — including both charts and the whole
@@ -16,6 +141,9 @@ let parentTab = 'now';   // the front door
    call, which is the point at which they exist. */
 const PARENT_PANEL_RENDERERS = {
   now:      () => pnRenderNow(),
+  history:  () => parentRenderLanding('history'),
+  setup:    () => parentRenderLanding('setup'),
+  app:      () => parentRenderLanding('app'),
   review:   () => { renderParentReviewHeader(); renderMeetingHub(); renderReviewFeedback(); },
   chores:   () => cpRenderChoreTab(),
   options:  () => coRenderOptions(),
@@ -30,6 +158,7 @@ const PARENT_PANEL_RENDERERS = {
 
 function renderParentHome() {
   // Shared chrome first, then only the panel actually on screen.
+  parentRenderScope();
   setParentTab(parentTab);
 }
 
@@ -64,20 +193,35 @@ function onParentAgeChange() {
 
 function setParentTab(tab) {
   parentTab = tab;
+  parentDest = PARENT_PANEL_DEST[tab] || parentDest;
+  const dest = PARENT_DESTS.find(d => d.id === parentDest);
   document.querySelectorAll('#screen-parent .parent-tab').forEach(t => {
-    const on = t.dataset.ptab === tab;
+    const on = t.dataset.pdest === parentDest;
     t.classList.toggle('active', on);
-    // A tab strip that says role="tab" has to answer which one is selected and
-    // what it controls, and has to be one stop in the tab order rather than ten.
+    // A strip that says role="tab" has to answer which one is selected and what
+    // it controls, and has to be one stop in the tab order rather than five.
     t.setAttribute('aria-selected', on ? 'true' : 'false');
     t.tabIndex = on ? 0 : -1;
   });
   document.querySelectorAll('#screen-parent .parent-panel').forEach(p =>
     p.hidden = (p.id !== 'ptab-' + tab));
+  /* A detail is reached from its destination's home, so it gets one back link
+     rather than the destination growing a second row of tabs. */
+  const back = document.getElementById('parentBack');
+  if (back) {
+    const isDetail = !!dest && dest.home !== tab;
+    back.hidden = !isDetail;
+    if (isDetail) {
+      const row = (PARENT_LANDINGS[parentDest] || []).find(r => r.panel === tab);
+      back.innerHTML = `<button type="button" class="pill-btn" data-parent-back="1">◀ ${escapeHtml(dest.label)}</button>
+        <span class="parent-crumb">${escapeHtml(row ? row.title : '')}</span>`;
+    }
+  }
   const render = PARENT_PANEL_RENDERERS[tab];
   // Isolated the way showScreen isolates its hooks: one panel that throws must
   // not be able to leave the portal on a blank screen with no way back.
   if (render) { try { render(); } catch (e) { console.error('parent panel render failed:', tab, e); } }
+  parentRenderNav();
 }
 
 /* Arrow keys move between destinations; Home/End jump to the ends. Bound once
@@ -94,14 +238,13 @@ function parentTabsKeydown(e) {
   else if (e.key === 'End') next = tabs.length - 1;
   if (next === null) return;
   e.preventDefault();
-  setParentTab(tabs[next].dataset.ptab);
+  setParentDest(tabs[next].dataset.pdest);
   tabs[next].focus();
 }
 
 // Switch which child the parent is reviewing without leaving the dashboard.
 function setParentKid(kid) {
-  parentViewing = kid;
-  renderParentHome();
+  setParentScope(kid);
 }
 
 /* Weekly Review hub — Function 1 (review & confirm) lives in ONE place:

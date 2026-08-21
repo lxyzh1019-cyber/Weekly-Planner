@@ -33,12 +33,16 @@ function cpHeader() {
   const info = ctWeekInfo();
   const kid = cpKid();
   const weekLabel = `${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()} – ${MONTH_SHORT[info.sun.getMonth()]} ${info.sun.getDate()}`;
+  /* The kid pills that used to live here are gone: one switcher in the top bar
+     now, because three of them all driving the same global is how the other two
+     went stale whenever you used one. What is worth keeping is the count, which
+     the pills carried and the switcher does not — so it stays, as a readout. */
   const pills = ['jenn', 'jess'].map(k => {
     const n = mrClaimQueue(ctWeekKey, k).length;
-    return `<button type="button" class="cp-kid ${k === kid ? 'on' : ''}" data-cp-action="kid" data-kid="${k}">
+    return `<span class="cp-kid ${k === kid ? 'on' : ''}">
       <span class="cp-kid-icon">${CT_PROFILE_ICON[k]}</span>
       <span><span class="cp-kid-name">${cpName(k)}</span>
-      <span class="cp-kid-badge ${n ? 'wait' : ''}">${n ? `${n} waiting` : 'nothing waiting'}</span></span></button>`;
+      <span class="cp-kid-badge ${n ? 'wait' : ''}">${n ? `${n} waiting` : 'nothing waiting'}</span></span></span>`;
   }).join('');
   const date = new Date(info.mon); date.setDate(info.mon.getDate() + cpDay);
   const isToday = ctDateToKey(date) === todayKey();
@@ -415,7 +419,10 @@ function cpHandleClick(e) {
   const el = e.target.closest('[data-cp-action]');
   if (!el || el.disabled) return;
   const a = el.dataset.cpAction;
-  if (a === 'kid') { parentViewing = el.dataset.kid; renderParentHome(); }
+  /* Through setParentScope, not straight at the global: the day cards are a
+     legitimate way to pick whose queue you are looking at, but writing
+     parentViewing here is what left the top bar showing the other child. */
+  if (a === 'kid') { setParentScope(el.dataset.kid); }
   else if (a === 'view') { cpView = el.dataset.view === 'week' ? 'week' : 'day'; cpRenderChoreTab(); }
   else if (a === 'day-step') { cpDay = Math.max(0, Math.min(6, cpDay + (+el.dataset.delta))); cpRenderChoreTab(); }
   else if (a === 'week-step') { ctChangeWeekParent(+el.dataset.delta); }

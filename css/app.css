@@ -3160,6 +3160,59 @@
   .parent-panel[hidden] { display: none; }
   .parent-h3 { font-size: 1.25rem; margin: 1rem 0 0.4rem; }
   .parent-panel > .parent-h3:first-child { margin-top: 0.4rem; }
+  /* The portal's top bar carries three things now — title, the one switcher and
+     the PIN/Exit pair — so it has to wrap rather than let the title slide under
+     a button on a phone. */
+  #screen-parent .topbar { flex-wrap: wrap; gap: var(--space-2); }
+  #screen-parent .topbar-left { flex: 1 1 auto; min-width: 0; }
+  @media (max-width: 699px) {
+    #screen-parent .topbar h2 { font-size: calc(1.25rem * var(--fs-scale, 1)); }
+    #screen-parent .topbar { padding: var(--space-2) var(--space-3); }
+  }
+
+  /* ── Five destinations ──
+     One strip, never wrapping onto three lines the way ten tabs did. Below the
+     phone breakpoint it hides and the fixed bottom bar takes over. */
+  .parent-scope { display: flex; gap: var(--space-1); }
+  .parent-scope .pill-btn { min-height: 44px; font-size: max(13px, calc(0.85rem * var(--fs-scale, 1))); }
+  .parent-back { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4) 0; }
+  .parent-back[hidden] { display: none; }
+  .parent-back .pill-btn { min-height: 44px; }
+  .parent-crumb { font-family: 'Gochi Hand', cursive; font-size: calc(1.1rem * var(--fs-scale, 1)); }
+  .pn-chev { color: var(--ink-light); font-size: calc(1.2rem * var(--fs-scale, 1)); padding: 0 var(--space-2); }
+
+  /* The phone's bottom bar. Same shape and the same 44px floor as the kid nav,
+     but it drives the portal's destinations rather than screens. */
+  .parent-nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-sticky);
+    display: flex; background: var(--bg2); border-top: 2px solid var(--ink);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .parent-nav[hidden] { display: none; }
+  body.has-parent-nav { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0)); }
+  .parent-nav-btn {
+    flex: 1; min-height: 56px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 1px;
+    border: 0; border-right: 2px solid var(--paper-line); background: transparent;
+    font-family: inherit; color: var(--ink-light); cursor: pointer;
+  }
+  .parent-nav-btn:last-child { border-right: 0; }
+  .parent-nav-btn.on { color: var(--accent-strong); background: var(--paper); }
+  .parent-nav-icon { font-size: calc(1.15rem * var(--fs-scale, 1)); position: relative; display: inline-block; }
+  .parent-nav-label { font-size: max(13px, calc(0.72rem * var(--fs-scale, 1))); }
+  .pn-navdot {
+    position: absolute; top: -3px; right: -10px; padding: 0 5px;
+    border-radius: var(--radius-full); background: var(--accent-strong); color: #fff;
+    font-size: max(13px, calc(0.68rem * var(--fs-scale, 1))); line-height: 1.4;
+  }
+  /* Above the phone the top strip is roomy enough, so the bar stays out of the
+     way and the iPad keeps the layout every other screen is drawn at. */
+  @media (min-width: 700px) {
+    .parent-nav { display: none; }
+    body.has-parent-nav { padding-bottom: 0; }
+  }
+  @media (max-width: 699px) { .parent-tabs { display: none; } }
+
   /* ── Now: the parent's front door ──
      Queue on the left, week rail on the right; one column below the tablet
      breakpoint. Every row is a link, so all of them clear 44px. */

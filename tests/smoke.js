@@ -4833,6 +4833,105 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* ── Nothing was lost on the way to five destinations ──
+     Ten tabs became five destinations, and the failure a restructure produces
+     is not a crash — it is a panel that quietly stops being reachable, which a
+     person walking a checklist misses. So the §2 mapping is asserted rather
+     than walked: every original panel is opened through the new nav and has to
+     render something. */
+  checks.everyOldTabIsStillReachable = await page.evaluate(() => {
+    const bad = [];
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    showScreen('parent'); renderParentHome();
+
+    // panel id -> the destination that must own it
+    const MAP = {
+      review: 'meeting', chores: 'now', trends: 'history', options: 'setup',
+      analysis: 'history', routines: 'setup', tasks: 'setup', money: 'setup',
+      rules: 'setup', backup: 'app',
+    };
+    Object.entries(MAP).forEach(([panel, dest]) => {
+      setParentTab(panel);
+      if (parentDest !== dest) bad.push(`${panel} lands on ${parentDest}, not ${dest}`);
+      const el = document.getElementById('ptab-' + panel);
+      if (!el) { bad.push(`${panel}: no panel`); return; }
+      if (el.hidden) bad.push(`${panel}: opened but still hidden`);
+      if (!el.textContent.trim()) bad.push(`${panel}: rendered blank`);
+    });
+
+    // Every destination's home renders, and each is reachable from the nav.
+    PARENT_DESTS.forEach(d => {
+      setParentDest(d.id);
+      const el = document.getElementById('ptab-' + d.home);
+      if (!el || el.hidden || !el.textContent.trim()) bad.push(`destination ${d.id} does not open`);
+    });
+
+    // Landings must actually offer their rows, or a panel is orphaned.
+    Object.entries(PARENT_LANDINGS).forEach(([dest, rows]) => {
+      setParentDest(dest);
+      const wrap = document.getElementById('ptab-' + dest + '-wrap');
+      rows.forEach(r => {
+        if (!wrap || !wrap.querySelector(`[data-parent-panel="${r.panel}"]`)) {
+          bad.push(`${dest} does not offer ${r.panel}`);
+        }
+      });
+    });
+
+    // And every panel that exists is owned by exactly one destination —
+    // an unmapped panel is one nothing can reach.
+    document.querySelectorAll('#screen-parent .parent-panel').forEach(el => {
+      const id = el.id.replace(/^ptab-/, '');
+      if (!PARENT_PANEL_DEST[id]) bad.push(`panel ${id} belongs to no destination`);
+    });
+
+    setParentDest('now');
+    return bad.length === 0 || bad;
+  });
+
+  /* One switcher, and it must not be able to hand the rest of the app a child
+     that does not exist. parentViewing is read in 27 places outside this
+     portal, every one of which assumes a real kid. */
+  checks.oneKidSwitcherThatCannotBreakTheRest = await page.evaluate(() => {
+    const bad = [];
+    profile = 'parent';
+    showScreen('parent'); renderParentHome();
+    const pills = document.querySelectorAll('[data-parent-scope]');
+    if (pills.length !== 3) bad.push(`${pills.length} scope options, expected Both/Jenn/Jess`);
+    // The two that used to draw their own are gone.
+    if (document.getElementById('parentWeekKidPills')) bad.push('the Weekly Review pills are still there');
+    setParentTab('money');
+    if (document.querySelector('[data-mnyp-action="kid"]')) bad.push('money rules still has its own switcher');
+    /* The chore tab's day cards still pick whose queue you are looking at, which
+       is a real job — with scope on Both something has to. What must not happen
+       is one of them writing parentViewing directly and leaving the top bar
+       showing the other child, which is exactly how the three switchers used to
+       disagree. So: tap the card, and the one switcher has to follow. */
+    setParentTab('chores');
+    setParentScope('jenn');
+    const card = document.querySelector('[data-cp-action="kid"][data-kid="jess"]');
+    if (!card) bad.push('the chore tab lost its way to pick a kid');
+    else {
+      card.click();
+      if (parentViewing !== 'jess') bad.push('the day card did not change who is shown');
+      if (parentScope !== 'jess') bad.push('the day card left the top-bar switcher stale');
+      const active = document.querySelector('[data-parent-scope].active');
+      if (!active || active.getAttribute('data-parent-scope') !== 'jess') {
+        bad.push('the top-bar switcher does not show what the chore tab is showing');
+      }
+    }
+
+    setParentScope('both');
+    if (parentScope !== 'both') bad.push('Both did not take');
+    if (parentViewing !== 'jenn' && parentViewing !== 'jess') {
+      bad.push(`Both left parentViewing as "${parentViewing}" — the rest of the app cannot use that`);
+    }
+    setParentScope('jess');
+    if (parentViewing !== 'jess') bad.push('picking a kid did not point parentViewing at her');
+    setParentScope('both');
+    return bad.length === 0 || bad;
+  });
+
   /* ── Now counts, it does not decide ──
      Every number on the front door is read through the accessor the owning
      screen already uses. The failure this guards is the one the whole screen is
