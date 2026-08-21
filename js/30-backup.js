@@ -260,5 +260,6 @@ function bkRenderPanel() {
     <h3 class="parent-h3">🧹 Chore-only export</h3>
     <p class="parent-hint">A smaller file with just the chore groups, prices and money snapshots — useful for checking the money setup, but <b>not</b> a backup of the planner and not restorable here.</p>
     <button class="pill-btn bk-btn" onclick="ctExportBackup()">⬇️ Export chore-only file</button>
+    <div class="bk-reset" onclick="coHandleClick(event)">${typeof coDangerCard === 'function' ? coDangerCard() : ''}</div>
   `;
 }

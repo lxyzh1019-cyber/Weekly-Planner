@@ -79,6 +79,28 @@ window.addEventListener('pagehide', flushPush);
     rules.addEventListener('input', mnyParentInput);
     rules.addEventListener('change', mnyParentInput);
   }
+  // The portal's tab strip: arrow keys move between destinations. The strip is
+  // static markup, so one listener on the container is enough.
+  const ptabs = document.querySelector('#screen-parent .parent-tabs');
+  if (ptabs) ptabs.addEventListener('keydown', parentTabsKeydown);
+  // Destinations, landings, the back link and the scope pills all ride on data
+  // attributes, so the screen itself carries one listener for the lot.
+  const portal = document.getElementById('screen-parent');
+  if (portal) portal.addEventListener('click', parentHandleNavClick);
+  const pnav = document.getElementById('parentNav');
+  if (pnav) pnav.addEventListener('click', parentHandleNavClick);
+  // Now is rebuilt wholesale on every render, so its rows carry data attributes
+  // and the container holds the listener.
+  const now = document.getElementById('pnWrap');
+  if (now) now.addEventListener('click', pnHandleClick);
+  // App's four screens: PIN, the age fields, the reading-size choice.
+  ['paAccessWrap', 'paProfilesWrap', 'paPrefsWrap', 'paSchoolWrap'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('click', paHandleClick);
+    el.addEventListener('change', paHandleChange);
+  });
+  if (typeof paApplyTextScale === 'function') paApplyTextScale();
 })();
 
 /* Desktop: convert vertical wheel scroll to horizontal on the tray + filter */

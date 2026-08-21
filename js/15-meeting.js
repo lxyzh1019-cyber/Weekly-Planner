@@ -17,10 +17,25 @@ let mmUndo = null;
 let mmAddChoreFor = null;   // "kid|dayIdx" whose add-a-chore picker is open
 let mmCatchUpAsked = false; // the catch-up question, asked once per page load
 
+/* ── Catching up a week ──
+   Eight weeks sat unopened, and the reason is not that the meeting is hard to
+   use once it is open — it is that a five-step sitting is the wrong shape for a
+   week that finished a month ago and that nobody is going to discuss. This is
+   the same commit reached by a shorter road: totals, adjust, close, next.
+
+   It is deliberately NOT a second way to move money. Everything below routes
+   through commitFamilyMeeting, exactly as step 4 does, and mmMarkWeekMet stays
+   the separate record of having sat down — the two facts do not imply each
+   other here any more than they do anywhere else. */
+let mmExpressWeek = null;   // week key while the catch-up screen is open
+let mmExpressMoney = true;  // tick 1 — record the money
+let mmExpressMet = false;   // tick 2 — we talked about this week together
+
 function openFamilyMeeting() {
   if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
   ctEnsureShared();
   mmStep = 1; mmMaxStep = 1; mmSelectedDay = null; mmUndo = null;
+  mmExpressWeek = null;   // the full sitting, not the catch-up run
   renderMeetingMode();
   openSheet('familyMeetingOverlay');
 }
@@ -60,7 +75,10 @@ function mmGoStep(n) {
    exactly the case that used to leave no trace at all. */
 function mmCloseMeeting() {
   const wk = mmWeekKey();
+  // mmMaxStep never leaves 1 in catch-up mode, so this cannot fire there — a
+  // week closed from the catch-up screen is only "met" if that box was ticked.
   if (mmMaxStep >= 3 && isParent() && !mmIsSettled(wk)) mmMarkWeekMet(wk);
+  mmExpressWeek = null;
   closeSheet('familyMeetingOverlay');
   const hub = document.getElementById('meetingHub');
   if (hub && document.getElementById('screen-parent')?.classList.contains('active')) renderMeetingHub();
@@ -276,6 +294,112 @@ function mmUnsettledWeeks(max) {
 function mmUnopenedWeeks(max) {
   return mmUnsettledWeeks(max).filter(x => x.status === 'none');
 }
+
+/* ── The catch-up screen ── */
+
+// How many rows the banner shows before rolling the rest up. Eight open weeks
+// is eight rows of guilt; four and a count is the same information.
+const MM_CATCHUP_VISIBLE = 4;
+
+function mmOpenExpress(wk) {
+  if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
+  ctEnsureShared();
+  mmExpressWeek = wk;
+  mmExpressMoney = true;
+  mmExpressMet = false;
+  // Set the mode first: mmGoToWeek points every downstream reader at the week,
+  // opens the sheet and renders — and renderMeetingMode already honours the flag.
+  mmGoToWeek(wk);
+}
+
+function mmCloseExpress() {
+  mmExpressWeek = null;
+  mmCloseMeeting();   // shares the close path, so the hub refreshes behind it
+}
+
+/* Leave this week as it is and look at the next one still open. */
+function mmExpressSkip() {
+  const next = mmUnsettledWeeks(8).find(x => x.wk !== mmExpressWeek);
+  if (next) mmOpenExpress(next.wk); else mmCloseExpress();
+}
+
+/* The only button here that changes anything. Money moves through
+   commitFamilyMeeting and nowhere else; "we talked about it" is recorded
+   separately, and either tick can be left off. */
+function mmExpressCommit() {
+  if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
+  const wk = mmExpressWeek;
+  if (!wk) return;
+  if (!mmExpressMoney && !mmExpressMet) {
+    showToast('Tick at least one, or skip this week');
+    return;
+  }
+  if (mmExpressMoney) commitFamilyMeeting(wk);
+  if (mmExpressMet) mmMarkWeekMet(wk);
+  saveAll();
+  const done = [mmExpressMoney ? 'money recorded' : '', mmExpressMet ? 'marked as met' : '']
+    .filter(Boolean).join(' · ');
+  showToast(`${mmWeekLabel(wk)} — ${done}`);
+  const next = mmUnsettledWeeks(8)[0];
+  if (next) mmOpenExpress(next.wk);
+  else { mmCloseExpress(); if (typeof renderParentHome === 'function') renderParentHome(); }
+}
+
+function mmExpressToggle(which) {
+  if (which === 'money') mmExpressMoney = !mmExpressMoney;
+  else mmExpressMet = !mmExpressMet;
+  renderMeetingMode();
+}
+
+/* One kid's column: the same five channels step 3 reads, from the same
+   accessor, so a figure here can never disagree with the full meeting's. */
+function mmExpressKidCard(wk, kid) {
+  const b = mrWeekBreakdown(wk, kid);
+  const name = kid === 'jenn' ? 'Jenn' : 'Jess';
+  const row = (label, value) =>
+    `<div class="mm-xp-row"><span>${escapeHtml(label)}</span><span class="mm-xp-n">${value}</span></div>`;
+  return `<div class="mm-xp-card">
+      <div class="mm-xp-name">${CT_PROFILE_ICON[kid]} <b>${name}</b></div>
+      ${row('Chores graded', ckMoney(b.chorePaid))}
+      ${row('Learning', ckMoney(b.learnPaid))}
+      ${row('Routine streak', ckMoney(b.streakBonus))}
+      ${row('Competition', ckMoney(b.compPaid))}
+      ${row('Fines', b.fines.total ? '−' + ckMoney(b.fines.total) : 'none')}
+      <div class="mm-xp-row mm-xp-total"><span><b>Total</b></span><span class="mm-xp-n"><b>${ckMoney(b.net)}</b></span></div>
+      <button type="button" class="pill-btn" data-mm-action="express-adjust">Adjust in the full meeting ›</button>
+    </div>`;
+}
+
+function mmRenderExpress(wk) {
+  const open = mmUnsettledWeeks(8);
+  const idx = open.findIndex(x => x.wk === wk);
+  const total = ['jenn', 'jess'].reduce((s, k) => s + mrWeekBreakdown(wk, k).net, 0);
+  const tick = on => on ? '☑' : '☐';
+  return `<div class="mm-express">
+      <div class="mm-xp-head">
+        <span>🕰️</span>
+        <div><div class="mm-xp-title">Catch up · ${escapeHtml(mmWeekLabel(wk))}</div>
+        <div class="ct-meta">${idx >= 0 ? `Week ${idx + 1} of ${open.length} still open` : 'This week is already closed'}</div></div>
+        <span class="ck-spacer"></span>
+        <button type="button" class="pill-btn" data-mm-action="express-full">Open the full meeting</button>
+      </div>
+      <div class="mm-xp-cards">${['jenn', 'jess'].map(k => mmExpressKidCard(wk, k)).join('')}</div>
+      <div class="mm-xp-ticks">
+        <button type="button" class="mm-xp-tick" data-mm-action="express-tick" data-which="money">
+          <span class="mm-xp-box">${tick(mmExpressMoney)}</span>
+          <span><b>Record the money</b><br><span class="ct-meta">Credits ${ckMoney(total)} to their pockets</span></span>
+        </button>
+        <button type="button" class="mm-xp-tick" data-mm-action="express-tick" data-which="met">
+          <span class="mm-xp-box">${tick(mmExpressMet)}</span>
+          <span><b>We talked about this week together</b><br><span class="ct-meta">Leave this unticked if you are only recording — History will show the week as never met</span></span>
+        </button>
+      </div>
+      <div class="mm-xp-actions">
+        <button type="button" class="btn-confirm" data-mm-action="express-commit">Close this week and go to the next</button>
+        <button type="button" class="pill-btn" data-mm-action="express-skip">Skip for now</button>
+      </div>
+    </div>`;
+}
 /* The parent hub's way in. Deliberately not a warning: a fortnight nobody
    wrote down is a normal outcome of a busy fortnight, and the copy says the
    week is still there rather than that something was missed. */
@@ -289,7 +413,11 @@ function mmCatchUpBanner() {
      having been missed; a week nobody opened can be ticked off as done if it
      was run before the app could record it. Neither button moves money —
      "Settle" jumps to the step that owns that (CLAUDE.md). */
-  const rows = list.map(x => {
+  // Four rows and a count, not eight rows of guilt. The roll-up keeps the rest
+  // reachable without making the hub a wall of missed weeks.
+  const shown = list.slice(0, MM_CATCHUP_VISIBLE);
+  const hidden = list.length - shown.length;
+  const rows = shown.map(x => {
     const isMet = x.status === 'met';
     const label = isMet ? '✅ met — money still waiting' : `${x.weeksLate} week${x.weeksLate === 1 ? '' : 's'} ago`;
     const actions = isMet
@@ -302,6 +430,13 @@ function mmCatchUpBanner() {
         ${actions}
       </div>`;
   }).join('');
+  const more = hidden
+    ? `<div class="mm-catchup-row mm-catchup-more">
+         <span class="mm-catchup-wk">${hidden} older week${hidden === 1 ? '' : 's'}</span>
+         <span class="mm-catchup-late">still open</span>
+         <button type="button" class="mm-catchup-go" data-mm-catch="all">Work through them ›</button>
+       </div>`
+    : '';
   const cap = [
     unopened ? `${unopened} week${unopened === 1 ? '' : 's'} nobody has opened` : '',
     met ? `${met} met but not paid out` : '',
@@ -309,7 +444,7 @@ function mmCatchUpBanner() {
   return `<div class="mm-catchup">
       <div class="mm-catchup-cap">🕰️ ${escapeHtml(cap)}.
         Nothing expires — open one whenever you get to it, or tick off one you already did.</div>
-      ${rows}</div>`;
+      ${rows}${more}</div>`;
 }
 
 /* One delegated listener for the rows above, bound in js/99-main.js. Data
@@ -327,8 +462,16 @@ function mmHandleCatchUpClick(e) {
     }
     return;
   }
-  // 'open' and 'settle' both go to the week; settle lands on the step that
-  // moves the money rather than making a second place that does.
+  // 'open' and the roll-up start the catch-up run — the shorter road to the
+  // same commit. 'settle' is a week the family already met about, so it wants
+  // the step that owns the money rather than a screen that re-asks whether they
+  // sat down.
+  if (what === 'open') { mmOpenExpress(wk); return; }
+  if (what === 'all') {
+    const first = mmUnsettledWeeks(8)[0];
+    if (first) mmOpenExpress(first.wk);
+    return;
+  }
   mmGoToWeek(wk);
   if (what === 'settle') mmGoStep(4);
 }
@@ -363,6 +506,15 @@ function mmHandleClick(e) {
   if (a === 'allroutines')    { mmToggleAllRoutines(kid, d); return; }
   if (a === 'addchore-open')  { mmToggleAddChore(kid, d); return; }
   if (a === 'addchore-pick')  { mmAddChoreHappened(kid, d, el.getAttribute('data-chore')); return; }
+  if (a === 'openday')        { mmSelectDay(d); return; }
+  if (a === 'confirmday')     { mmToggleConfirmDay(d); return; }
+  if (a === 'express-tick')   { mmExpressToggle(el.getAttribute('data-which')); return; }
+  if (a === 'express-commit') { mmExpressCommit(); return; }
+  if (a === 'express-skip')   { mmExpressSkip(); return; }
+  // Both routes out of catch-up mode land in the full meeting on the same week.
+  if (a === 'express-full' || a === 'express-adjust') {
+    mmExpressWeek = null; mmGoStep(1); return;
+  }
 }
 
 /* ── What Step 1 reviews ───────────────────────────────────────────
@@ -438,6 +590,16 @@ function renderMeetingMode() {
     return `<button type="button" class="mm-step ${cls}" onclick="mmGoStep(${n})">${n}·${label}</button>`;
   }).join('');
 
+  // Catch-up mode replaces the stepper entirely: a week nobody is going to
+  // discuss does not need five steps to close.
+  if (mmExpressWeek) {
+    const xhost = document.getElementById('familyMeetingBody');
+    const xrestore = mmCaptureUiState(xhost);
+    xhost.innerHTML = mmRenderExpress(mmExpressWeek);
+    xrestore();
+    return;
+  }
+
   let body;
   if (mmStep === 1) body = mmRenderReview(wk);
   else if (mmStep === 2) body = mmRenderCelebrate(wk);
@@ -495,24 +657,49 @@ function mmCaptureUiState(host) {
 }
 
 /* Step 1 — Review: 1b grouped bar chart + day drill-in + meeting readiness. */
+/* ── Step 1: seven rows, not a chart and a detour ──
+   It used to be a bar chart: tap a day, scroll to the detail below, confirm,
+   scroll back, tap the next day — seven times, and twenty-eight movements for a
+   week where nothing was wrong. Each day is a row now, confirmable in place,
+   and it only opens when something actually needs changing. The detail it opens
+   is the same two-column panel as before. */
 function mmRenderReview(wk) {
   const info = ctWeekInfo();
   const todayD = formatDayKey(todayKey());
-  let bars = '';
+  let rows = '';
   for (let d = 0; d < 7; d++) {
     const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
     const isToday = Math.round((date - todayD) / 864e5) === 0;
+    const ahead = date > todayD && !isToday;
     const jp = mmDayPct('jenn', d), sp = mmDayPct('jess', d);
-    const sel = mmSelectedDay === d ? ' mm-daygrp-sel' : '';
-    bars += `<button type="button" class="mm-daygrp${sel}" onclick="mmSelectDay(${d})">
-        <div class="mm-bars">
-          <div class="mm-bar mm-bar-j" style="height:${jp}%"></div>
-          <div class="mm-bar mm-bar-s" style="height:${sp}%"></div>
+    const open = mmSelectedDay === d;
+    const done = mmIsDayConfirmed(d);
+    const empty = jp === 0 && sp === 0;
+    const state = ahead
+      ? `<span class="mm-drow-note">Not here yet</span>`
+      : done
+      ? `<button type="button" class="mm-drow-ok" data-mm-action="confirmday" data-day="${d}">✓ Confirmed</button>`
+      : `<button type="button" class="mm-drow-go" data-mm-action="confirmday" data-day="${d}">Confirm this day</button>`;
+    const mid = (!ahead && empty)
+      ? `<span class="mm-drow-note">Nothing logged — open it and add what actually happened</span>`
+      : `<span class="mm-drow-bars">
+           <span class="mm-drow-track"><span class="mm-drow-fill mm-bar-j" style="width:${jp}%"></span></span>
+           <span class="mm-drow-track"><span class="mm-drow-fill mm-bar-s" style="width:${sp}%"></span></span>
+         </span>`;
+    rows += `<div class="mm-drow${open ? ' open' : ''}${done ? ' done' : ''}">
+        <div class="mm-drow-head">
+          <button type="button" class="mm-drow-day" data-mm-action="openday" data-day="${d}"
+            aria-expanded="${open ? 'true' : 'false'}">
+            <span class="mm-drow-dow">${DAY_SHORT[d]} ${date.getDate()}${isToday ? ' ★' : ''}</span>
+          </button>
+          ${mid}${state}
+          <button type="button" class="mm-drow-x" data-mm-action="openday" data-day="${d}"
+            aria-label="${open ? 'Close' : 'Open'} ${escapeAttr(DAY_SHORT[d])}">${open ? '▴' : '▾'}</button>
         </div>
-        <div class="mm-daylabel${mmSelectedDay === d ? ' mm-daylabel-sel' : ''}">${DAY_SHORT[d]}${isToday ? ' ★' : ''}</div>
-      </button>`;
+        ${open ? `<div class="mm-drow-body">${mmRenderDayDetail(wk, d)}</div>` : ''}
+      </div>`;
   }
-  const detail = mmSelectedDay != null ? mmRenderDayDetail(wk, mmSelectedDay) : `<div class="mm-hint">Tap a day to review each kid's items and confirm it.</div>`;
+  const detail = `<div class="mm-drows">${rows}</div>`;
   const nConfirmed = [0,1,2,3,4,5,6].filter(mmIsDayConfirmed).length;
   // Framed as a team total, not a head-to-head scoreboard: lead with how the two
   // did together, with each kid's number kept small for transparency.
@@ -524,7 +711,7 @@ function mmRenderReview(wk) {
   return `${mnyChecklist(wk, mnyMeetingKid())}
     <div class="mm-h">Review the week</div>
     <div class="mm-legend"><span><i class="mm-sw mm-bar-j"></i>Jenn</span><span><i class="mm-sw mm-bar-s"></i>Jess</span><span class="mm-legend-note">how the team's doing each day — cheer each other on</span></div>
-    <div class="mm-chart">${bars}</div>${detail}${footer}`;
+    ${detail}${footer}`;
 }
 function mmSelectDay(d) { mmSelectedDay = (mmSelectedDay === d ? null : d); renderMeetingMode(); }
 function mmRenderDayDetail(wk, d) {

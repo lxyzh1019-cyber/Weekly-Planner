@@ -3,61 +3,285 @@
 /* ════════════════════════════════════════════════════════════════
    PARENT MODE
 ════════════════════════════════════════════════════════════════ */
-let parentTab = 'review';
-function renderParentHome() {
-  setParentTab(parentTab);
-  document.getElementById('reviewKidName').textContent = parentViewing==='jenn' ? '🐥 Jenn' : '🦊 Jess';
-  renderParentAge();
-  document.querySelectorAll('#parentWeekKidPills .pill-btn').forEach(b =>
-    b.classList.toggle('active', b.textContent.includes(parentViewing==='jenn'?'Jenn':'Jess')));
-  renderMeetingHub();
-  renderReviewFeedback();
-  renderPerformance();
-  renderRoutinesList();
-  renderParentActivities();
-  renderPendingApproval();
-  renderLevelRules();
-  mnyRenderRulesTab();
-  cpRenderChoreTab();
-  ctrRenderTrends();
-  coRenderOptions();
-  bkRenderPanel();
+let parentTab = 'now';   // the panel on screen
+let parentDest = 'now';  // which of the five destinations owns it
+
+/* ── Scope, and why it is not parentViewing ──
+   The switcher gains a "Both" state, but parentViewing cannot hold it: 27
+   places read that global, and most of them are outside the portal entirely —
+   activeProfile, the week view, block grading, the quest strip — and every one
+   assumes a real child. A third value would have them silently fall back to
+   Jenn or to Jess.
+
+   So scope is its own flag, read only by the portal's own screens.
+   parentViewing keeps holding the last real kid, so "open her full week" and
+   everything downstream still has someone to open. */
+let parentScope = 'both';   // 'both' | 'jenn' | 'jess'
+function parentScopeKid() { return parentScope === 'both' ? null : parentScope; }
+
+/* Five destinations. Each has a home panel; anything else it owns is a detail
+   reached from that home, with a back link rather than a second nav row. */
+const PARENT_DESTS = [
+  { id: 'now',     icon: '📥', label: 'Now',     home: 'now' },
+  { id: 'meeting', icon: '🧑‍🧑‍🧒', label: 'Meeting', home: 'review' },
+  { id: 'history', icon: '📊', label: 'History', home: 'history' },
+  { id: 'setup',   icon: '📋', label: 'Setup',   home: 'setup' },
+  { id: 'app',     icon: '⚙️', label: 'App',     home: 'app' },
+];
+const PARENT_PANEL_DEST = {
+  now: 'now', chores: 'now',
+  review: 'meeting',
+  history: 'history', trends: 'history', analysis: 'history',   // trends/analysis are the toggle's two halves
+  setup: 'setup', options: 'setup', routines: 'setup', tasks: 'setup', money: 'setup', rules: 'setup',
+  app: 'app', access: 'app', profiles: 'app', prefs: 'app', school: 'app', backup: 'app',
+};
+/* The landing lists. The boundary test decides which side a row falls on:
+   does changing this alter what the girls are asked to do, or what it is
+   worth? Yes → Setup. No → App. */
+const PARENT_LANDINGS = {
+  setup: [
+    { panel: 'options',  icon: '🧹', title: 'Chores and pay',      sub: 'The pool, due times, lanes and who does what' },
+    { panel: 'routines', icon: '🌅', title: 'Routines',            sub: 'Morning, after school, evening, and your own' },
+    { panel: 'tasks',    icon: '✅', title: 'Activities and sports', sub: 'The library both girls draw from' },
+    { panel: 'money',    icon: '💰', title: 'Money rules',         sub: 'Grades, caps, fines, loans and the week history' },
+    { panel: 'rules',    icon: '⭐', title: 'Level-up',            sub: 'What earns a star on an activity' },
+    { panel: 'money',    icon: '🕰️', title: 'Change history',      sub: 'Every version of the rules, when it took effect, and why',
+      section: 'history' },
+  ],
+  app: [
+    { panel: 'access',   icon: '🔒', title: 'Access',          sub: 'The parent PIN that everything here sits behind' },
+    { panel: 'profiles', icon: '👤', title: 'Profiles',        sub: 'Who the girls are, and their age' },
+    { panel: 'prefs',    icon: '🎛️', title: 'Preferences',     sub: 'Reading size on grown-up screens' },
+    { panel: 'school',   icon: '📅', title: 'School calendar', sub: 'Term dates and days off — replaced each August' },
+    { panel: 'backup',   icon: '🗄️', title: 'Backup and data', sub: 'Export, restore, cloud size, and resetting a week' },
+  ],
+};
+
+/* ── History ──
+   Trends and Performance both answered "how did the last eight weeks go", so
+   they are one screen with a toggle rather than two tabs. Nothing inside either
+   is rebuilt: the toggle shows one of the two panels that already exist, which
+   is why every part of both — the pager, the CSV, the cumulative line, the
+   heatmap, the written read, the nine categories, the month view — comes across
+   untouched. */
+let parentHistoryView = 'money';   // 'money' | 'time'
+const PARENT_HISTORY_VIEWS = [
+  { id: 'money', label: '💰 Money', panel: 'trends',
+    note: 'What each week actually paid. Weeks with no meeting held paid nothing — the gap is the finding, not missing data.' },
+  { id: 'time',  label: '⏱️ Time and routines', panel: 'analysis',
+    note: 'How much of what was planned actually got done, and the month at a glance.' },
+];
+function setParentHistoryView(id) {
+  parentHistoryView = id;
+  setParentTab('history');
+}
+function parentRenderHistory() {
+  const wrap = document.getElementById('ptab-history-wrap');
+  if (!wrap) return;
+  const view = PARENT_HISTORY_VIEWS.find(v => v.id === parentHistoryView) || PARENT_HISTORY_VIEWS[0];
+  wrap.innerHTML = `<div class="pn-toggle">${PARENT_HISTORY_VIEWS.map(v =>
+      `<button type="button" class="pill-btn${v.id === view.id ? ' active' : ''}" data-parent-history="${v.id}">${escapeHtml(v.label)}</button>`).join('')}</div>
+    <p class="pn-note">${escapeHtml(view.note)}</p>`;
+  // The two halves live in their own panels; show the one this view names.
+  PARENT_HISTORY_VIEWS.forEach(v => {
+    const el = document.getElementById('ptab-' + v.panel);
+    if (el) el.hidden = (v.id !== view.id);
+  });
+  const render = PARENT_PANEL_RENDERERS[view.panel];
+  if (render) { try { render(); } catch (e) { console.error('history view failed:', view.id, e); } }
 }
 
-/* The one place age can be set, and it is a grown-up's screen. currentAge seeds
-   and rolls it forward on its own, so this is a correction rather than a
-   question — which is why it is never blank and never prompts.
-   Guarded against clobbering a half-typed number, the same way the week glance's
-   field used to be. */
-function renderParentAge() {
-  const el = document.getElementById('parentKidAge');
-  if (!el || document.activeElement === el) return;
-  el.value = currentAge(parentViewing) ?? '';
+/* A landing is rows, not a second row of tabs. */
+function parentRenderLanding(destId) {
+  const wrap = document.getElementById('ptab-' + destId + '-wrap');
+  if (!wrap) return;
+  const dest = PARENT_DESTS.find(d => d.id === destId) || {};
+  const rows = (PARENT_LANDINGS[destId] || []).map(r => `
+    <button type="button" class="pn-row" data-parent-panel="${escapeAttr(r.panel)}"${r.section ? ` data-parent-section="${escapeAttr(r.section)}"` : ''}>
+      <span class="pn-ico" aria-hidden="true">${r.icon}</span>
+      <span class="pn-text"><span class="pn-title">${escapeHtml(r.title)}</span>
+        <span class="pn-sub">${escapeHtml(r.sub)}</span></span>
+      <span class="pn-chev" aria-hidden="true">›</span>
+    </button>`).join('');
+  wrap.innerHTML = `<p class="pn-cap">${escapeHtml(dest.label || '')}</p><div class="pn-card">${rows}</div>`;
 }
-function onParentAgeChange() {
-  const el = document.getElementById('parentKidAge');
-  if (!el) return;
-  const v = setKidAge(el.value, parentViewing);
-  el.value = v ?? '';
-  showToast(`Age set to ${v} 🎂`);
+
+/* One switcher, in the top bar, replacing the three that each drew their own. */
+function parentRenderScope() {
+  const wrap = document.getElementById('parentScopePills');
+  if (!wrap) return;
+  const opts = [['both', 'Both'], ['jenn', '🐥 Jenn'], ['jess', '🦊 Jess']];
+  wrap.innerHTML = opts.map(([id, label]) =>
+    `<button type="button" class="pill-btn${parentScope === id ? ' active' : ''}"
+       data-parent-scope="${id}">${label}</button>`).join('');
 }
+
+function setParentScope(scope) {
+  parentScope = scope;
+  // Keep parentViewing on a real child, always: everything outside this portal
+  // reads it and none of it can do anything with "both".
+  if (scope === 'jenn' || scope === 'jess') parentViewing = scope;
+  parentRenderScope();
+  setParentTab(parentTab);
+}
+
+/* The phone's bottom bar. Same idea as the kid nav (js/31-today.js) and the
+   same 44px floor, but it drives setParentDest rather than showScreen —
+   the portal is one screen with panels, not five screens. */
+function parentRenderNav() {
+  const nav = document.getElementById('parentNav');
+  if (!nav) return;
+  const show = isParent() && document.getElementById('screen-parent')?.classList.contains('active');
+  nav.hidden = !show;
+  document.body.classList.toggle('has-parent-nav', !!show);
+  if (!show) return;
+  const waiting = (typeof pnWaitingCount === 'function') ? pnWaitingCount() : 0;
+  nav.innerHTML = PARENT_DESTS.map(d => {
+    const on = d.id === parentDest;
+    const badge = (d.id === 'now' && waiting) ? `<span class="pn-navdot">${waiting}</span>` : '';
+    return `<button type="button" class="parent-nav-btn${on ? ' on' : ''}"
+        data-parent-dest="${d.id}"${on ? ' aria-current="page"' : ''}>
+        <span class="parent-nav-icon" aria-hidden="true">${d.icon}${badge}</span>
+        <span class="parent-nav-label">${escapeHtml(d.label)}</span>
+      </button>`;
+  }).join('');
+}
+
+function setParentDest(id) {
+  const dest = PARENT_DESTS.find(d => d.id === id);
+  if (!dest) return;
+  setParentTab(dest.home);
+}
+
+/* One delegated listener for the destination nav, the landings and the scope
+   pills, bound in js/99-main.js. */
+function parentHandleNavClick(e) {
+  const dest = e.target.closest('[data-parent-dest]');
+  if (dest) { setParentDest(dest.getAttribute('data-parent-dest')); return; }
+  const panel = e.target.closest('[data-parent-panel]');
+  if (panel) {
+    /* Change history is a section of Money rules, not a panel of its own — the
+       log only makes sense next to the things it logs. The row names the
+       section so it opens where it means to. */
+    const sec = panel.getAttribute('data-parent-section');
+    if (sec && typeof mnySetParentSection === 'function') mnyParentSection = sec;
+    setParentTab(panel.getAttribute('data-parent-panel'));
+    return;
+  }
+  const scope = e.target.closest('[data-parent-scope]');
+  if (scope) { setParentScope(scope.getAttribute('data-parent-scope')); return; }
+  const hist = e.target.closest('[data-parent-history]');
+  if (hist) { setParentHistoryView(hist.getAttribute('data-parent-history')); return; }
+  const back = e.target.closest('[data-parent-back]');
+  if (back) { setParentDest(parentDest); return; }
+}
+
+/* One panel, one renderer. Tabs are pure show/hide, so rendering all ten on
+   every call threw nine of them away — including both charts and the whole
+   money rules page, on every kid switch, in an app where a render can trigger a
+   full-document write.
+
+   Every entry is an arrow rather than a bare reference: this file loads at 11
+   and most of these are declared at 24–30, so naming them directly here would
+   read them before their script has run. The arrow defers the lookup to the
+   call, which is the point at which they exist. */
+const PARENT_PANEL_RENDERERS = {
+  now:      () => pnRenderNow(),
+  history:  () => parentRenderHistory(),
+  setup:    () => parentRenderLanding('setup'),
+  app:      () => parentRenderLanding('app'),
+  review:   () => { renderParentReviewHeader(); renderMeetingHub(); renderReviewFeedback(); },
+  chores:   () => cpRenderChoreTab(),
+  options:  () => coRenderOptions(),
+  trends:   () => ctrRenderTrends(),
+  analysis: () => renderPerformance(),
+  routines: () => renderRoutinesList(),
+  tasks:    () => { renderPendingApproval(); renderParentActivities(); },
+  money:    () => mnyRenderRulesTab(),
+  rules:    () => renderLevelRules(),
+  access:   () => paRenderAccess(),
+  profiles: () => paRenderProfiles(),
+  prefs:    () => paRenderPrefs(),
+  school:   () => paRenderSchool(),
+  backup:   () => bkRenderPanel(),
+};
+
+function renderParentHome() {
+  // Shared chrome first, then only the panel actually on screen.
+  parentRenderScope();
+  setParentTab(parentTab);
+}
+
+/* The review panel's own header — kid name, age field, kid pills. It moved in
+   here with the rest of that panel's rendering rather than staying in
+   renderParentHome, where it would have run for every tab. */
+function renderParentReviewHeader() {
+  const name = document.getElementById('reviewKidName');
+  if (name) name.textContent = parentViewing === 'jenn' ? '🐥 Jenn' : '🦊 Jess';
+}
+
+/* Age moved to App › Profiles, which draws a field per kid and writes through
+   setKidAge. renderParentAge and onParentAgeChange targeted one input on the
+   Weekly Review screen and had nothing left to point at. */
 
 function setParentTab(tab) {
   parentTab = tab;
-  document.querySelectorAll('#screen-parent .parent-tab').forEach(t =>
-    t.classList.toggle('active', t.dataset.ptab === tab));
+  parentDest = PARENT_PANEL_DEST[tab] || parentDest;
+  const dest = PARENT_DESTS.find(d => d.id === parentDest);
+  document.querySelectorAll('#screen-parent .parent-tab').forEach(t => {
+    const on = t.dataset.pdest === parentDest;
+    t.classList.toggle('active', on);
+    // A strip that says role="tab" has to answer which one is selected and what
+    // it controls, and has to be one stop in the tab order rather than five.
+    t.setAttribute('aria-selected', on ? 'true' : 'false');
+    t.tabIndex = on ? 0 : -1;
+  });
   document.querySelectorAll('#screen-parent .parent-panel').forEach(p =>
     p.hidden = (p.id !== 'ptab-' + tab));
+  /* A detail is reached from its destination's home, so it gets one back link
+     rather than the destination growing a second row of tabs. */
+  const back = document.getElementById('parentBack');
+  if (back) {
+    const isDetail = !!dest && dest.home !== tab;
+    back.hidden = !isDetail;
+    if (isDetail) {
+      const row = (PARENT_LANDINGS[parentDest] || []).find(r => r.panel === tab);
+      back.innerHTML = `<button type="button" class="pill-btn" data-parent-back="1">◀ ${escapeHtml(dest.label)}</button>
+        <span class="parent-crumb">${escapeHtml(row ? row.title : '')}</span>`;
+    }
+  }
+  const render = PARENT_PANEL_RENDERERS[tab];
+  // Isolated the way showScreen isolates its hooks: one panel that throws must
+  // not be able to leave the portal on a blank screen with no way back.
+  if (render) { try { render(); } catch (e) { console.error('parent panel render failed:', tab, e); } }
+  parentRenderNav();
+}
+
+/* Arrow keys move between destinations; Home/End jump to the ends. Bound once
+   in js/99-main.js. Roving tabindex is set in setParentTab above, so focus
+   follows selection and the strip stays a single stop in the tab order. */
+function parentTabsKeydown(e) {
+  const tabs = [...document.querySelectorAll('#screen-parent .parent-tab')];
+  const i = tabs.indexOf(document.activeElement);
+  if (i < 0 || !tabs.length) return;
+  let next = null;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (i + 1) % tabs.length;
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (i - 1 + tabs.length) % tabs.length;
+  else if (e.key === 'Home') next = 0;
+  else if (e.key === 'End') next = tabs.length - 1;
+  if (next === null) return;
+  e.preventDefault();
+  setParentDest(tabs[next].dataset.pdest);
+  tabs[next].focus();
 }
 
 // Switch which child the parent is reviewing without leaving the dashboard.
 function setParentKid(kid) {
-  parentViewing = kid;
-  renderParentHome();
+  setParentScope(kid);
 }
 
-/* Weekly Review hub — Function 1 (review & confirm) lives in ONE place:
-   the family meeting. This hub is read-only status for the meeting's week:
+/* The Meeting destination's home. Review & confirm lives in ONE place —
+   the meeting itself. This is read-only status for the meeting's week:
    the 7-day strip mirrors the meeting's day-confirms (both kids), and every
    tap opens the meeting itself rather than confirming in a second surface. */
 function renderMeetingHub() {
@@ -107,11 +331,6 @@ function openFamilyMeetingAt(step, day) {
   mmStep = step;
   mmSelectedDay = day == null ? null : day;
   renderMeetingMode();
-}
-/* The chore setup a parent used to reach through the kid-shaped chore tab now
-   lives in the portal, next to the queue that needs it. */
-function parentOpenChoreReview() {
-  setParentTab('chores');
 }
 
 /* Feedback from the kid: the moods/vibes they logged each day this week,

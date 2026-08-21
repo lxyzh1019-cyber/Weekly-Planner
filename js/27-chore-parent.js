@@ -13,11 +13,15 @@ let cpDay = 0;
 
 /* The four answers a grown-up can give. $0 is here and absent from the kid's
    row, because recording a nought is a judgement only she makes. */
+/* `short` is what the button actually says. The wording used to live only in a
+   title attribute, which does not exist on a tablet — the primary device — so
+   all a grown-up saw was four dollar amounts and had to remember which was
+   which. It is the same defect the chore pool's unlabelled inputs have. */
 const CP_GRADES = [
-  { g: 3, label: 'On time & to standard' },
-  { g: 2, label: 'To standard, late' },
-  { g: 1, label: 'Redone, then to standard' },
-  { g: 0, label: 'Not done' },
+  { g: 3, label: 'On time & to standard',    short: 'on time' },
+  { g: 2, label: 'To standard, late',        short: 'late' },
+  { g: 1, label: 'Redone, then to standard', short: 'redone' },
+  { g: 0, label: 'Not done',                 short: 'not done' },
 ];
 
 function cpKid() { return parentViewing === 'jess' ? 'jess' : 'jenn'; }
@@ -29,12 +33,16 @@ function cpHeader() {
   const info = ctWeekInfo();
   const kid = cpKid();
   const weekLabel = `${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()} – ${MONTH_SHORT[info.sun.getMonth()]} ${info.sun.getDate()}`;
+  /* The kid pills that used to live here are gone: one switcher in the top bar
+     now, because three of them all driving the same global is how the other two
+     went stale whenever you used one. What is worth keeping is the count, which
+     the pills carried and the switcher does not — so it stays, as a readout. */
   const pills = ['jenn', 'jess'].map(k => {
     const n = mrClaimQueue(ctWeekKey, k).length;
-    return `<button type="button" class="cp-kid ${k === kid ? 'on' : ''}" data-cp-action="kid" data-kid="${k}">
+    return `<span class="cp-kid ${k === kid ? 'on' : ''}">
       <span class="cp-kid-icon">${CT_PROFILE_ICON[k]}</span>
       <span><span class="cp-kid-name">${cpName(k)}</span>
-      <span class="cp-kid-badge ${n ? 'wait' : ''}">${n ? `${n} waiting` : 'nothing waiting'}</span></span></button>`;
+      <span class="cp-kid-badge ${n ? 'wait' : ''}">${n ? `${n} waiting` : 'nothing waiting'}</span></span></span>`;
   }).join('');
   const date = new Date(info.mon); date.setDate(info.mon.getDate() + cpDay);
   const isToday = ctDateToKey(date) === todayKey();
@@ -137,7 +145,7 @@ function cpQueue() {
       <div class="cp-gradebar">${CP_GRADES.map(x => `
         <button type="button" class="cp-gbtn ${q.claim === x.g ? 'agrees' : ''}"
           data-cp-action="grade" data-chore-id="${escapeAttr(q.choreId)}" data-day="${q.dayIdx}" data-grade="${x.g}"
-          title="${escapeAttr(x.label)}">${ckMoney(ckGradePay(r, x.g))}</button>`).join('')}</div>
+          title="${escapeAttr(x.label)}"><span class="cp-gpay">${ckMoney(ckGradePay(r, x.g))}</span><span class="cp-gword">${escapeHtml(x.short)}</span></button>`).join('')}</div>
     </div>`;
   }).join('');
   return `<div class="cp-sect"><div class="cp-cap">Waiting on you</div>${body}</div>`;
@@ -357,35 +365,6 @@ function cpCompetition() {
     <button type="button" class="ck-btn" data-ct-action="add-comp">🏆 Record a result</button></div>`;
 }
 
-/* ── Every week ever recorded ──
-   The authoritative paid ledger, unbounded, with running totals. Frozen when
-   it was agreed, so changing a price today never rewrites what a week paid. */
-function cpMoneyHistory() {
-  ctEnsureShared();
-  const fw = state.shared.chore.finalizedWeeks || {};
-  const keys = Object.keys(fw).sort();
-  if (!keys.length) {
-    return `<div class="cp-sect"><div class="cp-cap">Recorded weeks</div>
-      <div class="ck-sub">Nothing recorded yet. A week lands here once you tap “Confirm &amp; record” for it in the family meeting.</div></div>`;
-  }
-  let jRun = 0, kRun = 0, rows = '';
-  keys.forEach(wk => {
-    const e = fw[wk] || {};
-    const j = Number(e.jenn) || 0, k = Number(e.jess) || 0;
-    if (e.jenn != null) jRun = money2(jRun + j);
-    if (e.jess != null) kRun = money2(kRun + k);
-    const d = formatDayKey(wk);
-    rows += `<tr><td>${MONTH_SHORT[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}</td>
-      <td>${e.jenn != null ? ckMoney(j) : '—'}</td><td>${ckMoney(jRun)}</td>
-      <td>${e.jess != null ? ckMoney(k) : '—'}</td><td>${ckMoney(kRun)}</td></tr>`;
-  });
-  return `<div class="cp-sect"><div class="cp-cap">Recorded weeks · ${keys.length}</div>
-    <div class="ck-sub">Every week recorded at a family meeting, oldest first, with running totals. Each week's breakdown is frozen when it was agreed.</div>
-    <div class="ck-gridwrap"><table class="wf-analytics-table">
-      <thead><tr><th>Week</th><th>${CT_PROFILE_ICON.jenn} Jenn</th><th>total</th><th>${CT_PROFILE_ICON.jess} Jess</th><th>total</th></tr></thead>
-      <tbody>${rows}</tbody></table></div></div>`;
-}
-
 /* ── Spot-check, honesty, box ── */
 function cpSundayTools() {
   const kid = cpKid();
@@ -429,7 +408,9 @@ function cpRenderChoreTab() {
         <div>${cpQueue()}${cpGraded()}${cpFines()}</div>
         <div>${cpPlanner()}${cpAttitudeSick()}</div>
       </div>`
-    : `${cpDualGrid()}${cpPayout()}${cpCompetition()}${cpSundayTools()}${cpMoneyHistory()}`;
+    /* cpMoneyHistory is gone: it listed the same settled weeks History › Money
+       already draws, and two lists of one thing is how they start disagreeing. */
+    : `${cpDualGrid()}${cpPayout()}${cpCompetition()}${cpSundayTools()}`;
   wrap.innerHTML = `<div class="cp-tab">${cpHeader()}${cpSettleCard()}${body}</div>`;
 }
 
@@ -438,7 +419,10 @@ function cpHandleClick(e) {
   const el = e.target.closest('[data-cp-action]');
   if (!el || el.disabled) return;
   const a = el.dataset.cpAction;
-  if (a === 'kid') { parentViewing = el.dataset.kid; renderParentHome(); }
+  /* Through setParentScope, not straight at the global: the day cards are a
+     legitimate way to pick whose queue you are looking at, but writing
+     parentViewing here is what left the top bar showing the other child. */
+  if (a === 'kid') { setParentScope(el.dataset.kid); }
   else if (a === 'view') { cpView = el.dataset.view === 'week' ? 'week' : 'day'; cpRenderChoreTab(); }
   else if (a === 'day-step') { cpDay = Math.max(0, Math.min(6, cpDay + (+el.dataset.delta))); cpRenderChoreTab(); }
   else if (a === 'week-step') { ctChangeWeekParent(+el.dataset.delta); }

@@ -523,7 +523,8 @@
     <div class="topbar-left">
       <h2>Parent Dashboard</h2>
     </div>
-    <div style="display:flex;gap:0.4rem;align-items:center">
+    <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap">
+      <div class="parent-scope" id="parentScopePills" aria-label="Which child"></div>
       <button class="btn-icon" onclick="changeParentPin()" title="Change parent PIN">🔒 PIN</button>
       <button class="btn-icon" onclick="goProfile()">Exit</button>
     </div>
@@ -531,50 +532,61 @@
 
   <div style="padding:0.8rem 1rem 0">
     <div class="parent-tabs" role="tablist" aria-label="Parent sections">
-      <button class="parent-tab active" role="tab" data-ptab="review" onclick="setParentTab('review')">🗓️ Weekly Review</button>
-      <button class="parent-tab" role="tab" data-ptab="chores" onclick="setParentTab('chores')">🧹 Chores</button>
-      <button class="parent-tab" role="tab" data-ptab="trends" onclick="setParentTab('trends')">📈 Trends</button>
-      <button class="parent-tab" role="tab" data-ptab="options" onclick="setParentTab('options')">⚙️ Chore setup</button>
-      <button class="parent-tab" role="tab" data-ptab="analysis" onclick="setParentTab('analysis')">📊 Performance</button>
-      <button class="parent-tab" role="tab" data-ptab="routines" onclick="setParentTab('routines')">🌅 Routines</button>
-      <button class="parent-tab" role="tab" data-ptab="tasks" onclick="setParentTab('tasks')">✅ Tasks</button>
-      <button class="parent-tab" role="tab" data-ptab="money" onclick="setParentTab('money')">💰 Money rules</button>
-      <button class="parent-tab" role="tab" data-ptab="rules" onclick="setParentTab('rules')">⚙️ Level-Up</button>
-      <button class="parent-tab" role="tab" data-ptab="backup" onclick="setParentTab('backup')">🗄️ Backup</button>
+      <button class="parent-tab active" role="tab" id="pdestbtn-now" data-pdest="now"
+        aria-selected="true" aria-controls="ptab-now" tabindex="0"
+        data-parent-dest="now">📥 Now<span class="pn-badge" id="pnTabBadge" hidden></span></button>
+      <button class="parent-tab" role="tab" id="pdestbtn-meeting" data-pdest="meeting"
+        aria-selected="false" aria-controls="ptab-meeting" tabindex="-1"
+        data-parent-dest="meeting">🧑‍🧑‍🧒 Meeting</button>
+      <button class="parent-tab" role="tab" id="pdestbtn-history" data-pdest="history"
+        aria-selected="false" aria-controls="ptab-history" tabindex="-1"
+        data-parent-dest="history">📊 History</button>
+      <button class="parent-tab parent-tab-right" role="tab" id="pdestbtn-setup" data-pdest="setup"
+        aria-selected="false" aria-controls="ptab-setup" tabindex="-1"
+        data-parent-dest="setup">📋 Setup</button>
+      <button class="parent-tab" role="tab" id="pdestbtn-app" data-pdest="app"
+        aria-selected="false" aria-controls="ptab-app" tabindex="-1"
+        data-parent-dest="app">⚙️ App</button>
     </div>
+    <div class="parent-back" id="parentBack" hidden></div>
   </div>
 
   <!-- TAB: Weekly Review — Function 1: review & confirm THIS week.
        All reviewing/confirming happens inside the family meeting; this tab
        is a read-only hub that shows status and launches the meeting. -->
-  <div class="parent-panel active" id="ptab-review" role="tabpanel">
-    <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.7rem">
-      <span style="font-weight:800">Viewing:</span>
-      <div style="display:flex;gap:0.5rem" id="parentWeekKidPills">
-        <button class="pill-btn active" onclick="setParentKid('jenn')">🐥 Jenn</button>
-        <button class="pill-btn" onclick="setParentKid('jess')">🦊 Jess</button>
-      </div>
-      <!-- Age lives here, on a grown-up's screen, and only a grown-up sees it.
-           It used to be a 🎂 field on the child's own week view, which asked a
-           nine-year-old her age every time she opened a reference panel. The app
-           assumes 10 and adds a year each August; this is the correction. -->
-      <label class="pa-age">🎂 Age
-        <input type="number" id="parentKidAge" min="1" max="18"
-               onchange="onParentAgeChange()" aria-label="Age of the child being viewed">
-      </label>
-      <button class="pill-btn" style="margin-left:auto" onclick="parentView(parentViewing)">📋 Open full week ›</button>
-    </div>
-    <h3 class="parent-h3">🗓️ This week — review &amp; confirm</h3>
-    <p class="parent-hint">The whole weekly review happens in the <b>family meeting</b>: check each day together, celebrate wins, confirm &amp; record pocket money, then plan next week. Tap a day below to jump straight to it in the meeting.</p>
+  <div class="parent-panel" id="ptab-history" role="tabpanel" aria-labelledby="pdestbtn-history" hidden>
+    <div id="ptab-history-wrap"></div>
+  </div>
+  <div class="parent-panel" id="ptab-setup" role="tabpanel" aria-labelledby="pdestbtn-setup" hidden>
+    <div id="ptab-setup-wrap"></div>
+  </div>
+  <div class="parent-panel" id="ptab-access" role="tabpanel" hidden><div id="paAccessWrap"></div></div>
+  <div class="parent-panel" id="ptab-profiles" role="tabpanel" hidden><div id="paProfilesWrap"></div></div>
+  <div class="parent-panel" id="ptab-prefs" role="tabpanel" hidden><div id="paPrefsWrap"></div></div>
+  <div class="parent-panel" id="ptab-school" role="tabpanel" hidden><div id="paSchoolWrap"></div></div>
+  <div class="parent-panel" id="ptab-app" role="tabpanel" aria-labelledby="pdestbtn-app" hidden>
+    <div id="ptab-app-wrap"></div>
+  </div>
+
+  <!-- TAB: Now — what is waiting on a grown-up, most urgent first. It owns no
+       data and no rules: every count is read through the accessor the owning
+       screen uses, and every row links to that screen. -->
+  <div class="parent-panel active" id="ptab-now" role="tabpanel">
+    <div id="pnWrap"></div>
+  </div>
+
+  <!-- Meeting. What used to be a "Weekly Review" tab whose whole job was to
+       launch the meeting and jump to another tab. The launcher is Now's rail,
+       the queue is Now, and what is left here is the meeting itself: which
+       weeks are open, which days are confirmed, and what the girls said. -->
+  <div class="parent-panel" id="ptab-review" role="tabpanel" hidden>
+    <h3 class="parent-h3">🧑‍🧑‍🧒 The family meeting</h3>
+    <p class="parent-hint">Check each day together, celebrate the week, agree what was earned and what happens to it, then plan the next one. Tap a day to open the meeting straight at it.</p>
     <div id="meetingHub"></div>
 
-    <h3 class="parent-h3">💬 Feedback from <span id="reviewKidName">Jenn</span></h3>
-    <p class="parent-hint">What your kid logged this week — worth a look before the meeting.</p>
+    <h3 class="parent-h3">💬 What <span id="reviewKidName">Jenn</span> logged this week</h3>
+    <p class="parent-hint">Her own note and daily vibes — worth a look before you sit down.</p>
     <div id="reviewFeedback"></div>
-
-    <h3 class="parent-h3">🧰 Setup &amp; management</h3>
-    <p class="parent-hint">Not part of the review — chore groups, amounts, custom chores and the full money history live in the chore tab.</p>
-    <button class="pill-btn" onclick="parentOpenChoreReview()">🧹 Manage chores &amp; money ›</button>
   </div>
 
   <!-- TAB: Chores — the redesign's Parent frame. What's waiting on you, grade
@@ -1400,9 +1412,12 @@
      (js/31-today.js). Six screens each carrying their own copy is six places for
      it to drift, which is what happened to the topbar row it will replace. -->
 <nav id="kidNav" class="kid-nav" aria-label="Where to go" hidden></nav>
+<nav id="parentNav" class="parent-nav" aria-label="Parent sections" hidden></nav>
 
 <script src="js/30-backup.js"></script>
 <script src="js/31-today.js"></script>
+<script src="js/32-parent-now.js"></script>
+<script src="js/33-parent-app.js"></script>
 <script src="js/99-main.js"></script>
 </body>
 </html>

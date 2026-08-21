@@ -2571,8 +2571,17 @@ function findChromium() {
 
   /* ── The five pages are one system ── */
 
-  // The same numbered tab bar on every money surface. Five pages that look
-  // like five separate pages are five separate apps.
+  /* The same numbered tab bar on every money surface a CHILD reaches. Five
+     pages that look like five separate pages are five separate apps.
+
+     The parent's Money rules page is deliberately no longer one of them. It is
+     reached from Setup › Money rules, not from the girls' money nav, and the
+     bar rendered above the section rail — so a grown-up got the portal's nav,
+     then the kids' nav, then the sections: three rows before a single number.
+     The bar is the girls' wayfinding through their own five pages, and a parent
+     editing rates is not walking that path. It stays on all three kid pages and
+     inside the meeting, which is where the invariant was actually earning its
+     keep. */
   checks.tabBarOnEveryMoneySurface = await page.evaluate(() => {
     profile = 'parent'; parentViewing = 'jess'; ctParentKid = 'jess';
     const bar = (id) => {
@@ -2587,8 +2596,13 @@ function findChromium() {
     const onStory = !!bar('mnyStoryWrap');
     mnyOpenSchool('jess');
     const onSchool = !!bar('mnySchoolWrap');
+    // The parent's rules page carries the section rail instead, and must show
+    // which version is being edited without being asked.
     showScreen('parent'); setParentTab('money'); mnyRenderRulesTab();
-    const onRules = !!bar('mnyRulesWrap');
+    const rulesWrap = document.getElementById('mnyRulesWrap');
+    const onRules = !rulesWrap.querySelector('.mny-tab')
+      && rulesWrap.querySelectorAll('.mny-rail-item').length === MNY_PARENT_SECTIONS.length
+      && /In effect since/.test(rulesWrap.textContent);
     openFamilyMeeting(); mnySetMeetKid('jess'); mmGoStep(3);
     const body = document.getElementById('familyMeetingBody');
     const onEarned = body.querySelectorAll('.mny-tab').length === 5;
@@ -4768,7 +4782,7 @@ function findChromium() {
     const list = mmUnsettledWeeks(8);
     if (list.length !== 2 || list.some(x => x.wk === middle)) bad.push('a settled week did not drop out of the list');
 
-    showScreen('parent'); renderParentHome();
+    showScreen('parent'); renderParentHome(); setParentTab('review');
     const hub = document.getElementById('meetingHub');
     if (!hub.querySelector('.mm-catchup-row')) bad.push('the catch-up list is not on the hub');
     // A way in, not a telling-off: the copy must not scold a busy fortnight.
@@ -4815,7 +4829,7 @@ function findChromium() {
 
     /* The hub says which is which, and offers the action that fits each — so it
        has to be read while one week is still unopened and two are met. */
-    showScreen('parent'); renderParentHome();
+    showScreen('parent'); renderParentHome(); setParentTab('review');
     const hub = document.getElementById('meetingHub');
     if (!hub.querySelector('[data-mm-catch="settle"]')) bad.push('a met week is not offered a way to settle its money');
     if (!hub.querySelector('[data-mm-catch="met"]')) bad.push('an unopened week cannot be ticked off as already done');
@@ -4830,6 +4844,299 @@ function findChromium() {
     c.meetingsHeld = heldBefore; c.meetingsMet = metBefore;
     c.moneyModelStartWeek = startBefore; c.programStartDate = progBefore;
     renderParentHome();
+    return bad.length === 0 || bad;
+  });
+
+  /* ── Nothing was lost on the way to five destinations ──
+     Ten tabs became five destinations, and the failure a restructure produces
+     is not a crash — it is a panel that quietly stops being reachable, which a
+     person walking a checklist misses. So the §2 mapping is asserted rather
+     than walked: every original panel is opened through the new nav and has to
+     render something. */
+  checks.everyOldTabIsStillReachable = await page.evaluate(() => {
+    const bad = [];
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    showScreen('parent'); renderParentHome();
+
+    // panel id -> the destination that must own it
+    const MAP = {
+      review: 'meeting', chores: 'now', trends: 'history', options: 'setup',
+      analysis: 'history', routines: 'setup', tasks: 'setup', money: 'setup',
+      rules: 'setup', backup: 'app',
+      // App's own four, built so the landing stops drawing rows for screens
+      // that were only ever proposals.
+      access: 'app', profiles: 'app', prefs: 'app', school: 'app',
+    };
+    Object.entries(MAP).forEach(([panel, dest]) => {
+      setParentTab(panel);
+      if (parentDest !== dest) bad.push(`${panel} lands on ${parentDest}, not ${dest}`);
+      const el = document.getElementById('ptab-' + panel);
+      if (!el) { bad.push(`${panel}: no panel`); return; }
+      if (el.hidden) bad.push(`${panel}: opened but still hidden`);
+      if (!el.textContent.trim()) bad.push(`${panel}: rendered blank`);
+    });
+
+    // Every destination's home renders, and each is reachable from the nav.
+    PARENT_DESTS.forEach(d => {
+      setParentDest(d.id);
+      const el = document.getElementById('ptab-' + d.home);
+      if (!el || el.hidden || !el.textContent.trim()) bad.push(`destination ${d.id} does not open`);
+    });
+
+    // Landings must actually offer their rows, or a panel is orphaned.
+    Object.entries(PARENT_LANDINGS).forEach(([dest, rows]) => {
+      setParentDest(dest);
+      const wrap = document.getElementById('ptab-' + dest + '-wrap');
+      rows.forEach(r => {
+        if (!wrap || !wrap.querySelector(`[data-parent-panel="${r.panel}"]`)) {
+          bad.push(`${dest} does not offer ${r.panel}`);
+        }
+      });
+    });
+
+    // And every panel that exists is owned by exactly one destination —
+    // an unmapped panel is one nothing can reach.
+    document.querySelectorAll('#screen-parent .parent-panel').forEach(el => {
+      const id = el.id.replace(/^ptab-/, '');
+      if (!PARENT_PANEL_DEST[id]) bad.push(`panel ${id} belongs to no destination`);
+    });
+
+    /* Age is a once-a-year correction and it must be somewhere. It moved off the
+       weekly screen it used to sit on, so assert it landed rather than trusting
+       that it did. */
+    setParentTab('profiles');
+    const ages = document.querySelectorAll('[data-pa-age]');
+    if (ages.length !== 2) bad.push(`${ages.length} age fields in Profiles, expected one per kid`);
+    else if (String(ages[0].value) !== String(currentAge('jenn'))) {
+      bad.push(`Profiles shows "${ages[0].value}" for Jenn, not ${currentAge('jenn')}`);
+    }
+
+    setParentDest('now');
+    return bad.length === 0 || bad;
+  });
+
+  /* Step 1 confirms a day where the day is, not in a panel below a chart.
+     Twenty-eight movements for a week where nothing was wrong is the friction
+     this whole phase exists to remove, so it is worth an assertion. */
+  checks.everyDayConfirmsWhereItIs = await page.evaluate(() => {
+    const bad = [];
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const store = state.shared.parentDayConfirm || {};
+    const before = JSON.parse(JSON.stringify(store));
+    ['jenn', 'jess'].forEach(k => { if (store[k]) delete store[k][mmDayKey(0)]; });
+
+    openFamilyMeeting(); mmGoStep(1);
+    const body = document.getElementById('familyMeetingBody');
+    const rows = body.querySelectorAll('.mm-drow');
+    if (rows.length !== 7) bad.push(`${rows.length} day rows, expected 7`);
+    const btn = body.querySelector('[data-mm-action="confirmday"][data-day="0"]');
+    if (!btn) bad.push('Monday cannot be confirmed from its own row');
+    else {
+      if (mmIsDayConfirmed(0)) bad.push('fixture started confirmed');
+      btn.click();
+      if (!mmIsDayConfirmed(0)) bad.push('confirming from the row did not take');
+      // And it stays a toggle — a mis-tap has a way back.
+      body.querySelector('[data-mm-action="confirmday"][data-day="0"]').click();
+      if (mmIsDayConfirmed(0)) bad.push('a day cannot be un-confirmed');
+    }
+    // The detail still opens, in the row it belongs to.
+    const open = body.querySelector('[data-mm-action="openday"][data-day="2"]');
+    if (open) {
+      open.click();
+      const row = document.getElementById('familyMeetingBody').querySelectorAll('.mm-drow')[2];
+      if (!row || !row.querySelector('.mm-drow-body')) bad.push('a day row does not open its detail');
+    }
+    closeSheet('familyMeetingOverlay');
+    state.shared.parentDayConfirm = before;
+    return bad.length === 0 || bad;
+  });
+
+  /* One switcher, and it must not be able to hand the rest of the app a child
+     that does not exist. parentViewing is read in 27 places outside this
+     portal, every one of which assumes a real kid. */
+  checks.oneKidSwitcherThatCannotBreakTheRest = await page.evaluate(() => {
+    const bad = [];
+    profile = 'parent';
+    showScreen('parent'); renderParentHome();
+    const pills = document.querySelectorAll('[data-parent-scope]');
+    if (pills.length !== 3) bad.push(`${pills.length} scope options, expected Both/Jenn/Jess`);
+    // The two that used to draw their own are gone.
+    if (document.getElementById('parentWeekKidPills')) bad.push('the Weekly Review pills are still there');
+    setParentTab('money');
+    if (document.querySelector('[data-mnyp-action="kid"]')) bad.push('money rules still has its own switcher');
+    /* The chore tab's day cards still pick whose queue you are looking at, which
+       is a real job — with scope on Both something has to. What must not happen
+       is one of them writing parentViewing directly and leaving the top bar
+       showing the other child, which is exactly how the three switchers used to
+       disagree. So: tap the card, and the one switcher has to follow. */
+    setParentTab('chores');
+    setParentScope('jenn');
+    const card = document.querySelector('[data-cp-action="kid"][data-kid="jess"]');
+    if (!card) bad.push('the chore tab lost its way to pick a kid');
+    else {
+      card.click();
+      if (parentViewing !== 'jess') bad.push('the day card did not change who is shown');
+      if (parentScope !== 'jess') bad.push('the day card left the top-bar switcher stale');
+      const active = document.querySelector('[data-parent-scope].active');
+      if (!active || active.getAttribute('data-parent-scope') !== 'jess') {
+        bad.push('the top-bar switcher does not show what the chore tab is showing');
+      }
+    }
+
+    setParentScope('both');
+    if (parentScope !== 'both') bad.push('Both did not take');
+    if (parentViewing !== 'jenn' && parentViewing !== 'jess') {
+      bad.push(`Both left parentViewing as "${parentViewing}" — the rest of the app cannot use that`);
+    }
+    setParentScope('jess');
+    if (parentViewing !== 'jess') bad.push('picking a kid did not point parentViewing at her');
+    setParentScope('both');
+    return bad.length === 0 || bad;
+  });
+
+  /* ── Now counts, it does not decide ──
+     Every number on the front door is read through the accessor the owning
+     screen already uses. The failure this guards is the one the whole screen is
+     arranged against: a second place that works out how many chores are waiting
+     and quietly disagrees with the queue itself, leaving a parent no way to
+     tell which is lying. So each count is asserted against its owner, and the
+     rows are asserted to link rather than to act. */
+  checks.nowCountsMatchTheirOwners = await page.evaluate(() => {
+    const bad = [];
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+
+    // A claim with no grade is what the queue is made of.
+    ['jenn', 'jess'].forEach(k => mrSetClaim(k, wk, 2, 'dishes', 3));
+    const owner = ['jenn', 'jess'].reduce((n, k) => n + mrClaimQueue(wk, k).length, 0);
+    const now = pnClaimCounts();
+    if (now.total !== owner) bad.push(`Now says ${now.total} chores waiting, the queue has ${owner}`);
+    if (!owner) bad.push('the fixture produced no claims — nothing to compare');
+
+    if (pnPendingActs().length !== pendingApprovalActs().length) {
+      bad.push('Now disagrees with the pending-approval list');
+    }
+    if (pnBacklog().length !== mmUnsettledWeeks(8).length) {
+      bad.push('Now disagrees with the backlog');
+    }
+
+    // The screen renders, says the real number, and every row is a link.
+    showScreen('parent'); renderParentHome(); setParentTab('now');
+    const wrap = document.getElementById('pnWrap');
+    if (!wrap || !wrap.textContent.trim()) bad.push('Now rendered blank');
+    if (!wrap.textContent.includes(String(owner))) bad.push('the queue count is not on screen');
+    const rows = [...wrap.querySelectorAll('[data-pn-action]')];
+    if (!rows.length) bad.push('Now has no actionable rows');
+    // Nothing on this screen may be a way to grade, settle or approve in place.
+    if (wrap.querySelector('[data-cp-action="grade"], [data-mm-action="express-commit"]')) {
+      bad.push('Now contains a control that decides something instead of linking');
+    }
+
+    /* Grading removes what was graded. Not "clears the queue": earlier checks in
+       this page leave claims of their own in shared state, and asserting an
+       empty queue here would be asserting something this check does not
+       control. What it does control is its own two claims. */
+    const before = pnClaimCounts().total;
+    ['jenn', 'jess'].forEach(k => mrSetChoreGrade(k, wk, 2, 'dishes', 3));
+    const after = pnClaimCounts().total;
+    if (after !== before - 2) bad.push(`grading 2 claims moved the count ${before}→${after}`);
+    if (after !== ['jenn', 'jess'].reduce((n, k) => n + mrClaimQueue(wk, k).length, 0)) {
+      bad.push('Now and the queue disagreed after a grade');
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* ── The catch-up screen is a shorter road, not a second one ──
+     A backlogged week closed from the catch-up screen has to land the family in
+     exactly the state a full sitting would have. The failure this guards is the
+     one the whole design is arranged against: a second path to pocket money
+     that drifts from commitFamilyMeeting and pays a different number.
+
+     It also holds the two facts apart. Ticking "we talked about this week"
+     alone must move nothing — that is mmMarkWeekMet's job, and it is not a
+     settle. */
+  checks.catchUpCommitsThroughTheMeeting = await page.evaluate(() => {
+    const bad = [];
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const c = state.shared.chore;
+    const heldBefore = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
+    const metBefore = JSON.parse(JSON.stringify(c.meetingsMet || {}));
+    const weekBefore = ctWeekKey;
+
+    // A week three back, with something actually earned in it.
+    const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - 21);
+    const wk = ctDateToKey(mon);
+    c.meetingsHeld = {}; c.meetingsMet = {};
+    // Enough chores to clear freeChoresPerWeek (2) and the daily cap, spread
+    // across days — two graded chores would net $0, and an assertion that
+    // 0 === 0 proves nothing about the commit path.
+    ['jenn', 'jess'].forEach(k => {
+      [['dishes', 1], ['mop', 2], ['vacuum', 3], ['laundry', 4], ['bins', 5]]
+        .forEach(([id, day]) => mrSetChoreGrade(k, wk, day, id, 3));
+    });
+    const owed = ['jenn', 'jess'].map(k => mrWeekBreakdown(wk, k).net);
+    if (!owed.every(v => v > 0)) bad.push(`the fixture week owes ${owed} — nothing to prove`);
+
+    // 1. "We talked about it" on its own moves no money.
+    const cashBefore = ['jenn', 'jess'].map(k => ensureWallet(k).cash);
+    mmOpenExpress(wk);
+    if (mmExpressWeek !== wk) bad.push('the catch-up screen did not open on the week asked for');
+    mmExpressToggle('money');            // money OFF, met ON — the record-only case
+    mmExpressToggle('met');
+    mmExpressCommit();
+    const cashAfterMet = ['jenn', 'jess'].map(k => ensureWallet(k).cash);
+    if (String(cashAfterMet) !== String(cashBefore)) bad.push('marking a week met moved money');
+    if (!mmIsMet(wk)) bad.push('marking a week met did not record it');
+    if (mmIsSettled(wk)) bad.push('marking a week met settled it');
+
+    // 2. Now record the money, and it must match what the week actually owed.
+    mmOpenExpress(wk);
+    mmExpressCommit();                   // money ON by default
+    const cashAfterPay = ['jenn', 'jess'].map(k => ensureWallet(k).cash);
+    const moved = cashAfterPay.map((v, i) => Math.round((v - cashBefore[i]) * 100) / 100);
+    if (String(moved) !== String(owed.map(v => Math.round(v * 100) / 100))) {
+      bad.push(`catch-up paid ${moved} but the week owed ${owed}`);
+    }
+    if (!mmIsSettled(wk)) bad.push('a closed catch-up week is not settled');
+
+    // 3. And it drops out of the list it came from.
+    if (mmUnsettledWeeks(8).some(x => x.wk === wk)) bad.push('a settled week is still offered');
+
+    c.meetingsHeld = heldBefore; c.meetingsMet = metBefore;
+    mmExpressWeek = null; ctWeekKey = weekBefore;
+    return bad.length === 0 || bad;
+  });
+
+  /* The catch-up list is a way in, not a wall. Eight open weeks is eight rows
+     of guilt; four and a count says the same thing. */
+  checks.theCatchUpListDoesNotGrowWithoutLimit = await page.evaluate(() => {
+    const bad = [];
+    profile = 'parent';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const c = state.shared.chore;
+    const heldBefore = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
+    const metBefore = JSON.parse(JSON.stringify(c.meetingsMet || {}));
+    const startBefore = c.moneyModelStartWeek, progBefore = c.programStartDate;
+    const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - 8 * 7);
+    c.moneyModelStartWeek = ctDateToKey(mon); c.programStartDate = ctDateToKey(mon);
+    c.meetingsHeld = {}; c.meetingsMet = {};
+
+    const open = mmUnsettledWeeks(8).length;
+    if (open <= MM_CATCHUP_VISIBLE) bad.push(`only ${open} open weeks — cannot test the roll-up`);
+    const html = mmCatchUpBanner();
+    const host = document.createElement('div'); host.innerHTML = html;
+    const rows = host.querySelectorAll('.mm-catchup-row:not(.mm-catchup-more)').length;
+    if (rows > MM_CATCHUP_VISIBLE) bad.push(`${rows} rows shown, ceiling is ${MM_CATCHUP_VISIBLE}`);
+    if (!host.querySelector('.mm-catchup-more')) bad.push('the older weeks are not reachable');
+    // The rolled-up weeks are still counted in the caption, not hidden from it.
+    if (!/nobody has opened/.test(host.textContent)) bad.push('the caption stopped saying how many are open');
+
+    c.meetingsHeld = heldBefore; c.meetingsMet = metBefore;
+    c.moneyModelStartWeek = startBefore; c.programStartDate = progBefore;
     return bad.length === 0 || bad;
   });
 
@@ -5555,13 +5862,17 @@ function findChromium() {
       bad.push('a number field appeared on the week view');
     }
     if (weekGlanceOpen()) toggleWeekGlance();
-    // The grown-up's copy exists and is wired to the child being viewed.
+    /* The grown-up's copy exists and reads the right child. It lives in
+       App › Profiles now — it used to sit in the primary filter row of the
+       weekly screen, which is a lot of prominence for a once-a-year
+       correction — and Profiles draws one field per kid rather than one field
+       that follows whoever is selected. */
     profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jess';
-    showScreen('parent'); renderParentHome();
-    const el = document.getElementById('parentKidAge');
+    showScreen('parent'); renderParentHome(); setParentTab('profiles');
+    const el = document.querySelector('[data-pa-age="jess"]');
     if (!el) bad.push('there is nowhere for a parent to correct the age');
     else if (String(el.value) !== String(currentAge('jess'))) {
-      bad.push(`the portal shows "${el.value}" for Jess, not ${currentAge('jess')}`);
+      bad.push(`Profiles shows "${el.value}" for Jess, not ${currentAge('jess')}`);
     }
     profile = 'jenn'; parentViewing = 'jenn'; goToday();
     return bad.length === 0 || bad;

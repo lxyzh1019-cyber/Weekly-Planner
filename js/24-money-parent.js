@@ -54,8 +54,10 @@ function mnyRenderRulesTab() {
   const kid = mnyParentKid();
   const v = mrLatestVersion();
 
+  /* A rail rather than a chip row: six sections read as a list of places, and
+     the one you are in stays visible while you scroll the one you opened. */
   const nav = MNY_PARENT_SECTIONS.map(s =>
-    `<button type="button" class="mny-chip ${mnyParentSection === s.id ? 'on' : ''}" data-mnyp-action="section" data-mnyp-id="${s.id}">${escapeHtml(s.label)}</button>`).join('');
+    `<button type="button" class="mny-rail-item ${mnyParentSection === s.id ? 'on' : ''}" data-mnyp-action="section" data-mnyp-id="${s.id}">${escapeHtml(s.label)}</button>`).join('');
 
   let body = '';
   if (mnyParentSection === 'prices') body = mnyRulePrices();
@@ -65,22 +67,26 @@ function mnyRenderRulesTab() {
   else if (mnyParentSection === 'lessons') body = mnyLessonEditor(kid);
   else body = mnyHistoryEditor(kid);
 
+  /* mnyTabBar is gone from here. It is the girls' own five-page wayfinding
+     (Earn · Bank · Goals · Learn · Rules) and it rendered above the section
+     chips, so the parent got the portal's nav, then the kids' nav, then the
+     sections — three rows before a single number. */
   wrap.innerHTML =
       `${mnyPageHead('⚙️ Money rules', 'The only page that changes a number', [
           { action: 'tourpar', label: '? How this page works' },
         ], { back: false })}
-       ${mnyTabBar('rules')}
-       <div class="mny-card">
-         <div class="mny-week-head">
-           <span class="mny-label">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'}</span>
-           <span class="mny-chiprow">${['jenn', 'jess'].map(k =>
-             `<button type="button" class="mny-chip ${k === kid ? 'on' : ''}" data-mnyp-action="kid" data-mnyp-id="${k}">${CT_PROFILE_ICON[k]} ${k === 'jenn' ? 'Jenn' : 'Jess'}</button>`).join('')}</span>
-         </div>
-         <div class="mny-note">Every change is dated and recorded. Past weeks keep the prices that were live when the work was done — changing a price today never rewrites what they already earned. In effect since <b>${escapeHtml((v && v.effectiveFrom) || '—')}</b> · ${escapeHtml(mrReasonLabel(v && v.reason))}</div>
-         <div class="mny-chiprow">${nav}</div>
+       <div class="mny-effect">
+         <span class="mny-label">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'}</span>
+         <span class="mny-effect-since">In effect since <b>${escapeHtml((v && v.effectiveFrom) || '—')}</b> · ${escapeHtml(mrReasonLabel(v && v.reason))}</span>
        </div>
        ${mnyPendingBar()}
-       ${body}
+       <div class="mny-rail-wrap">
+         <nav class="mny-rail" aria-label="Money rules sections">${nav}</nav>
+         <div class="mny-rail-body">
+           <div class="mny-note">Every change is dated and recorded. Past weeks keep the prices that were live when the work was done — changing a price today never rewrites what they already earned.</div>
+           ${body}
+         </div>
+       </div>
        ${mnyTargetsFooter()}`;
   if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
 }

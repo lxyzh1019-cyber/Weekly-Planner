@@ -954,6 +954,8 @@ function showScreen(id) {
   // a child's screens. Isolated like the hooks above: a nav that throws must not
   // be able to stop a screen from showing.
   try { if (typeof tdRenderNav === 'function') tdRenderNav(); } catch(e){ console.error('tdRenderNav failed', e); }
+  // The parent's bar follows the same rule and hides itself off the portal.
+  try { if (typeof parentRenderNav === 'function') parentRenderNav(); } catch(e){ console.error('parentRenderNav failed', e); }
   if (id === 'day') {
     try {
       maybeShowRewardPrompt();
