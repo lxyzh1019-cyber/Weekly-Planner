@@ -403,6 +403,32 @@ the accessor the owning screen uses, and there is deliberately no control on it
 that grades, settles or approves. A second place that decides how a chore is
 graded is a second place that can disagree with the first.
 
+**Copying a week is a plan, and it shows its work first.** Setup › Copy a week
+(`js/34-parent-copyweek.js`) is the third place a week gets copied, and it owns
+no clone rule: `weekCloneBlock` (`js/07-week-view.js`) still decides what a copy
+arrives as — not done, not confirmed, no XP, no ticked checklist. The other two
+are not general enough to replace it and are deliberately left alone:
+`mmPlanNextWeek` copies *this* week into next for both girls from inside the
+meeting, and `fillWeekFromNearest` fills a **blank** week from whichever
+neighbour it picks.
+
+`pcwPlan()` is the single decision — the preview and the commit both read it, so
+what a parent is shown is literally what will happen, and it reads every source
+day before anything is written (which is what makes a same-week cross-child copy
+safe). A day that already holds a plan is **skipped** by default; **Replace it**
+is a separate choice, confirmed, and tombstones what it removed — without the
+tombstone a merge from another device brings the old blocks straight back and
+the day ends up holding both plans. A copy that silently skipped four of seven
+days is how a parent comes to believe a week is planned when it is not, which is
+why the day-by-day preview is not optional chrome.
+
+Cross-child is the one place blocks are dropped: a block naming an activity
+private to Jenn renders as **nothing at all** on Jess's day — the same invisible
+failure the archive rule exists to stop — so `pcwPlaceableIds` filters them and
+the card says how many were left behind and why. Same-child copies are never
+filtered: her own blocks resolve however they resolve, and dropping one there
+would be this screen quietly deciding a block was wrong.
+
 The girls' five-page money bar (`mnyTabBar`) is **not** on the parent's Money
 rules page. It is their wayfinding through their own pages, and it rendered above
 the section rail — portal nav, then kid nav, then sections. It stays on all three

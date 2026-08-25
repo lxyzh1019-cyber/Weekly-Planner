@@ -4863,7 +4863,7 @@ function findChromium() {
     const MAP = {
       review: 'meeting', chores: 'now', trends: 'history', options: 'setup',
       analysis: 'history', routines: 'setup', tasks: 'setup', money: 'setup',
-      rules: 'setup', backup: 'app',
+      rules: 'setup', copyweek: 'setup', backup: 'app',
       // App's own four, built so the landing stops drawing rows for screens
       // that were only ever proposals.
       access: 'app', profiles: 'app', prefs: 'app', school: 'app',
@@ -4913,6 +4913,101 @@ function findChromium() {
     }
 
     setParentDest('now');
+    return bad.length === 0 || bad;
+  });
+
+  /* Copying a week is the parent's answer to a fortnight nobody planned, so it
+     has to be a plan and never a claim: fresh ids, nothing ticked, nothing paid.
+     The other half is what it must NOT do — a day that already holds a plan is
+     left alone unless a parent asked for it to be replaced, and a replaced day
+     has to be tombstoned or a merge from another device brings the old blocks
+     straight back and the parent ends up with two plans on one day. */
+  checks.copyingAWeekIsAPlanNotAClaim = await page.evaluate(async () => {
+    const bad = [];
+    const wasProfile = profile, wasScope = parentScope, wasViewing = parentViewing;
+    profile = 'parent'; parentViewing = 'jenn'; parentScope = 'jenn';
+    pcwFromOffset = -1; pcwToOffset = 0; pcwOnClash = 'skip'; pcwTargetKid = 'same';
+
+    const src = mrWeekDayKeys(pcwMonday(-1)), dst = mrWeekDayKeys(pcwMonday(0));
+    const restore = [];
+    const seed = (key, kid, blocks) => {
+      restore.push([key, kid, getDayBlocksForProfile(key, kid)]);
+      setDayBlocks(key, blocks, kid);
+    };
+    ['jenn', 'jess'].forEach(k => { src.forEach(d => seed(d, k, [])); dst.forEach(d => seed(d, k, [])); });
+    // Monday copies onto a free day; Wednesday copies onto one that is taken.
+    seed(src[0], 'jenn', [{ id: 'cw-a', actId: 'piano', startMin: 600, durationMin: 60,
+      completed: true, confirmed: true, xpAwarded: true, checklistState: { a: true } }]);
+    seed(src[2], 'jenn', [{ id: 'cw-b', actId: 'breakfast', startMin: 480, durationMin: 30 }]);
+    seed(dst[2], 'jenn', [{ id: 'cw-here', actId: 'homework', startMin: 900, durationMin: 45 }]);
+
+    // The preview is the commit's own plan, so what it says is what happens.
+    const plan = pcwPlan();
+    if (plan.copy !== 1) bad.push(`preview says ${plan.copy} blocks will copy, expected 1`);
+    if (plan.skipped !== 1) bad.push(`preview says ${plan.skipped} skipped, expected 1`);
+
+    setParentTab('copyweek');
+    const shown = (document.getElementById('pcwWrap') || {}).textContent || '';
+    if (!/skip/i.test(shown)) bad.push('the panel does not say a day will be skipped');
+
+    if (pcwCommit(pcwPlan()) !== 1) bad.push('the commit did not copy exactly the one free day');
+    const landed = getDayBlocksForProfile(dst[0], 'jenn');
+    if (landed.length !== 1) bad.push(`${landed.length} blocks landed on Monday, expected 1`);
+    else {
+      const b = landed[0];
+      if (b.id === 'cw-a') bad.push('the copy reused the source id');
+      if (b.actId !== 'piano') bad.push('the copy is not the source activity');
+      if (b.completed || b.confirmed || b.xpAwarded) bad.push('the copy arrived pre-completed');
+      if (Object.keys(b.checklistState || {}).length) bad.push('the copy arrived pre-ticked');
+    }
+    if ((getDayBlocksForProfile(dst[2], 'jenn')[0] || {}).id !== 'cw-here') {
+      bad.push('a day that already had a plan was overwritten without being asked');
+    }
+    if ((getDayBlocksForProfile(src[0], 'jenn')[0] || {}).id !== 'cw-a') bad.push('copying changed the source week');
+
+    // Replace: asked for, confirmed, and the replaced block tombstoned.
+    setDayBlocks(dst[0], [], 'jenn');
+    pcwOnClash = 'replace';
+    pcwRender();
+    const go = document.querySelector('#pcwWrap [data-pcw-go]');
+    if (!go) bad.push('replace mode offers no way to run the copy');
+    else {
+      const p = pcwApply();
+      await new Promise(r => setTimeout(r, 30));
+      const ok = document.getElementById('appDialogOkBtn');
+      if (!ok) bad.push('replacing a planned day was not confirmed first');
+      else ok.click();
+      await p;
+    }
+    if ((getDayBlocksForProfile(dst[2], 'jenn')[0] || {}).id === 'cw-here') bad.push('replace left the old block behind');
+    if (!(state.shared.tombstones || {})['cw-here']) bad.push('the replaced block was not tombstoned — a merge will resurrect it');
+
+    // A week onto itself for the same child is a no-op, not a copy.
+    pcwFromOffset = 0; pcwToOffset = 0; pcwOnClash = 'skip';
+    if (!pcwPlan().sameSpot) bad.push('copying a week onto itself was not refused');
+    if (pcwCommit(pcwPlan()) !== 0) bad.push('copying a week onto itself wrote blocks');
+
+    /* Cross-child: the same week is a legitimate target, and a block naming an
+       activity only Jenn has must not land on Jess as something that renders as
+       nothing at all. */
+    pcwFromOffset = -1; pcwToOffset = -1; pcwTargetKid = 'jess';
+    const priv = { id: 'cw-private', name: 'Jenn only', icon: '🎈', cat: 'free', durationMin: 30, custom: true };
+    state.profiles.jenn.customActivities = [...(state.profiles.jenn.customActivities || []), priv];
+    setDayBlocks(src[1], [{ id: 'cw-p', actId: 'cw-private', startMin: 600, durationMin: 30 },
+                          { id: 'cw-q', actId: 'breakfast', startMin: 480, durationMin: 30 }], 'jenn');
+    const cross = pcwPlan();
+    if (cross.sameSpot) bad.push('a cross-child copy in the same week was refused');
+    if (cross.dropped !== 1) bad.push(`${cross.dropped} blocks left behind, expected the 1 Jess cannot resolve`);
+    pcwCommit(cross);
+    const onJess = getDayBlocksForProfile(src[1], 'jess');
+    if (onJess.length !== 1) bad.push(`${onJess.length} blocks landed on Jess, expected 1`);
+    else if (onJess[0].actId !== 'breakfast') bad.push('Jess was given a block she cannot resolve');
+    state.profiles.jenn.customActivities = (state.profiles.jenn.customActivities || []).filter(a => a.id !== 'cw-private');
+
+    restore.forEach(([key, kid, blocks]) => setDayBlocks(key, blocks, kid));
+    pcwFromOffset = -1; pcwToOffset = 0; pcwOnClash = 'skip'; pcwTargetKid = 'same';
+    profile = wasProfile; parentScope = wasScope; parentViewing = wasViewing;
+    setParentTab('now');
     return bad.length === 0 || bad;
   });
 

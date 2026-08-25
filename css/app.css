@@ -3390,6 +3390,39 @@
     font-size: max(13px, calc(0.75rem * var(--fs-scale, 1)));
   }
   .pn-badge[hidden] { display: none; }
+
+  /* ── Setup › Copy a week ──
+     Two week steppers and a day-by-day preview of what the copy will actually
+     do. The arrows are the .ck-navbtn lesson written down again: a week arrow
+     is a week arrow wherever it is drawn, so it carries the 44px floor on the
+     component rather than waiting for a screen-scoped rule to reach it. */
+  .pcw-pick { display: flex; align-items: center; gap: var(--space-2); }
+  .pcw-step {
+    flex: 0 0 auto; min-width: 44px; min-height: 44px; padding: 0;
+    font: inherit; font-size: max(15px, calc(1rem * var(--fs-scale, 1))); font-weight: 900;
+    color: var(--ink); background: var(--paper);
+    border: 2px solid var(--ink); border-radius: var(--radius-sm); cursor: pointer;
+  }
+  .pcw-step:hover { background: var(--bg2); }
+  .pcw-wk { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; text-align: center; }
+  .pcw-wk-label { font-weight: 800; font-size: max(15px, calc(1rem * var(--fs-scale, 1))); }
+  .pcw-wk-sub { font-size: max(13px, calc(0.8rem * var(--fs-scale, 1))); color: var(--ink-light); }
+  .pcw-preview { margin-bottom: var(--space-2); }
+  .pcw-who { font-weight: 800; font-size: max(15px, calc(0.95rem * var(--fs-scale, 1))); margin-bottom: var(--space-1); }
+  .pcw-days { display: flex; flex-direction: column; }
+  .pcw-day {
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: var(--space-1) 0; border-top: 2px solid var(--paper-line);
+    font-size: max(13px, calc(0.85rem * var(--fs-scale, 1)));
+  }
+  .pcw-empty { font-size: max(13px, calc(0.85rem * var(--fs-scale, 1))); color: var(--ink-light); }
+  .pcw-day-dow { flex: 0 0 3.2em; font-weight: 800; }
+  .pcw-day-n { flex: 0 0 2em; text-align: right; font-variant-numeric: tabular-nums; }
+  .pcw-tag { flex: 1 1 auto; min-width: 0; color: var(--ink-light); }
+  .pcw-tag-copy { color: var(--ink); font-weight: 700; }
+  .pcw-tag-replace { color: var(--accent-strong); font-weight: 700; }
+  .pcw-tag-skip { color: var(--ink-light); }
+  .pcw-tag-none { color: var(--ink-light); opacity: 0.75; }
   .parent-hint { font-size: calc(0.9rem * var(--fs-scale, 1)); color: var(--ink-light); margin-bottom: 0.55rem; }
   /* Day-status strip in the weekly-review hub (read-only; taps open the meeting) */
   .review-day-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }

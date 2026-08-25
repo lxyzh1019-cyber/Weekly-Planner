@@ -93,6 +93,10 @@ window.addEventListener('pagehide', flushPush);
   // and the container holds the listener.
   const now = document.getElementById('pnWrap');
   if (now) now.addEventListener('click', pnHandleClick);
+  // Copy a week: the pickers and the preview are rebuilt on every change, so
+  // the wrap holds the listener rather than the buttons.
+  const copyweek = document.getElementById('pcwWrap');
+  if (copyweek) copyweek.addEventListener('click', pcwHandleClick);
   // App's four screens: PIN, the age fields, the reading-size choice.
   ['paAccessWrap', 'paProfilesWrap', 'paPrefsWrap', 'paSchoolWrap'].forEach(id => {
     const el = document.getElementById(id);
