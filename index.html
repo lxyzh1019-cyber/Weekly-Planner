@@ -662,6 +662,13 @@
     <button class="btn-confirm" style="margin-top:0.6rem" onclick="openNewLevelRule()">＋ Add Rule</button>
   </div>
 
+  <!-- TAB: Copy a week — one week's plan onto another, or onto her sister's.
+       Rendered by pcwRender (js/34-parent-copyweek.js). It owns no clone rule:
+       weekCloneBlock still decides what a copied block arrives as. -->
+  <div class="parent-panel" id="ptab-copyweek" role="tabpanel" hidden>
+    <div id="pcwWrap"></div>
+  </div>
+
   <!-- TAB: Backup — the only route back after a lost device, plus the cloud
        size readout. Rendered by bkRenderPanel (js/30-backup.js). -->
   <div class="parent-panel" id="ptab-backup" role="tabpanel" hidden>
@@ -1418,6 +1425,7 @@
 <script src="js/31-today.js"></script>
 <script src="js/32-parent-now.js"></script>
 <script src="js/33-parent-app.js"></script>
+<script src="js/34-parent-copyweek.js"></script>
 <script src="js/99-main.js"></script>
 </body>
 </html>

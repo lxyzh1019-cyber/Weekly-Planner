@@ -33,6 +33,7 @@ const PARENT_PANEL_DEST = {
   review: 'meeting',
   history: 'history', trends: 'history', analysis: 'history',   // trends/analysis are the toggle's two halves
   setup: 'setup', options: 'setup', routines: 'setup', tasks: 'setup', money: 'setup', rules: 'setup',
+  copyweek: 'setup',
   app: 'app', access: 'app', profiles: 'app', prefs: 'app', school: 'app', backup: 'app',
 };
 /* The landing lists. The boundary test decides which side a row falls on:
@@ -45,6 +46,7 @@ const PARENT_LANDINGS = {
     { panel: 'tasks',    icon: '✅', title: 'Activities and sports', sub: 'The library both girls draw from' },
     { panel: 'money',    icon: '💰', title: 'Money rules',         sub: 'Grades, caps, fines, loans and the week history' },
     { panel: 'rules',    icon: '⭐', title: 'Level-up',            sub: 'What earns a star on an activity' },
+    { panel: 'copyweek', icon: '📋', title: 'Copy a week',         sub: 'Put one week’s plan onto another, or onto her sister’s' },
     { panel: 'money',    icon: '🕰️', title: 'Change history',      sub: 'Every version of the rules, when it took effect, and why',
       section: 'history' },
   ],
@@ -199,6 +201,7 @@ const PARENT_PANEL_RENDERERS = {
   tasks:    () => { renderPendingApproval(); renderParentActivities(); },
   money:    () => mnyRenderRulesTab(),
   rules:    () => renderLevelRules(),
+  copyweek: () => pcwRender(),
   access:   () => paRenderAccess(),
   profiles: () => paRenderProfiles(),
   prefs:    () => paRenderPrefs(),
