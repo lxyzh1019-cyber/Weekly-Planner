@@ -241,6 +241,14 @@ function seriesSpecText(b) {
   return parts.join(', ');
 }
 
+/* The zone labels, shortened for a vertical axis 18px wide. Two surfaces draw
+   that axis — the Full week's sideband and the print sheet's — and both need
+   the same short form, so it is written once. */
+const ZONE_SHORT = {
+  '🌅 Before school': '🌅 Before', '🏫 School': '🏫 School', '🥪 Lunch recess': '🥪 Lunch',
+  '🎒 After school': '🎒 After', '🌙 Evening': '🌙 Evening', '🎉 Free time': '🎉 Free',
+};
+
 /* Every activity id the destination child can actually resolve. Only consulted
    for a CROSS-CHILD copy: a block naming an activity that is private to Jenn
    renders as nothing at all on Jess's day, which is the same invisible failure
@@ -682,19 +690,86 @@ function offerTutorialIfNeeded() {
    year this build was told about: the honest answer is that we no longer know,
    so callers fall back to weekday shape and the parent gets told to update it
    rather than the app quietly inventing a calendar. */
+/* ── The school year, as the family actually has it ──
+   js/01-config.js ships a calendar because a calendar is the same on every
+   device and the repo can carry dates safely. What it could never carry is a
+   family's own answer: which hours, when lunch is, and the days a district adds
+   or drops after August. Those live in state.shared.schoolCal, set in the
+   parent portal, and every question about school goes through these three so
+   there is one place that decides whether the shipped value or the set one wins.
+
+   Synced state, never committed: the repo stays dates-only, and the portal says
+   so where a parent types. */
+function schoolCal() {
+  return (typeof state === 'object' && state && state.shared && state.shared.schoolCal) || {};
+}
+
+/* Minutes are offsets from START_MIN (6AM), the unit every block uses.
+   lunchMin of 0 means the family has not told us there is a recess, which is
+   the shipped calendar's position too — it never had one. */
+function schoolHours() {
+  const h = schoolCal().hours || {};
+  const num = (v, fallback) => (typeof v === 'number' && isFinite(v) ? v : fallback);
+  const startMin = Math.max(0, Math.min(DAY_MIN_SPAN, num(h.startMin, SCHOOL_HOURS.startMin)));
+  const endMin = Math.max(startMin, Math.min(DAY_MIN_SPAN, num(h.endMin, SCHOOL_HOURS.endMin)));
+  const lunchMin = Math.max(0, Math.min(180, num(h.lunchMin, 0)));
+  let lunchStartMin = num(h.lunchStartMin, null);
+  // A recess outside the school day is not a recess; drop it rather than
+  // drawing a band hanging off the end of the afternoon.
+  if (lunchMin <= 0 || lunchStartMin == null
+      || lunchStartMin < startMin || lunchStartMin + lunchMin > endMin) {
+    lunchStartMin = null;
+  }
+  const days = Array.isArray(h.days) && h.days.length ? h.days : SCHOOL_HOURS.days;
+  return { startMin, endMin, lunchStartMin, lunchMin: lunchStartMin == null ? 0 : lunchMin, days };
+}
+
+function schoolTerm() {
+  const c = schoolCal();
+  return {
+    start: c.termStart || SCHOOL_TERM.start,
+    end: c.termEnd || SCHOOL_TERM.end,
+    nextStart: c.nextStart || SCHOOL_TERM.nextStart,
+  };
+}
+
+/* Days off: the shipped list plus anything the family added, minus nothing —
+   removing a shipped statutory holiday is not something a district does. */
+function schoolOffDays() {
+  const extra = (schoolCal().offDays || []).map(d => (d && d.date) || d).filter(Boolean);
+  return extra.length ? [...new Set([...NO_SCHOOL_DAYS, ...extra])] : NO_SCHOOL_DAYS;
+}
+
 function schoolDayInfo(dayKey) {
   const d = formatDayKey(dayKey);
   const dow = d.getDay();
-  const isWeekday = SCHOOL_HOURS.days.includes(dow);
-  if (dayKey > SCHOOL_TERM.nextStart) {
+  // Through the accessors, so a term a parent has typed in — or a day off an
+  // .ics brought — is the answer everything downstream gets.
+  const term = schoolTerm();
+  const isWeekday = schoolHours().days.includes(dow);
+  if (dayKey > term.nextStart) {
     return { school: isWeekday, reason: isWeekday ? null : 'weekend', stale: true };
   }
   if (!isWeekday) return { school: false, reason: 'weekend' };
-  if (dayKey < SCHOOL_TERM.start || dayKey > SCHOOL_TERM.end) {
+  if (dayKey < term.start || dayKey > term.end) {
     return { school: false, reason: 'summer' };
   }
-  if (NO_SCHOOL_DAYS.includes(dayKey)) return { school: false, reason: 'holiday' };
+  if (schoolOffDays().includes(dayKey)) return { school: false, reason: 'holiday' };
   return { school: true, reason: null };
+}
+
+/* HH:MM for an <input type="time">, and back. Minutes are from START_MIN, so a
+   parent typing 08:00 gets 120 and never has to know that. */
+function relMinToTimeStr(rel) {
+  const abs = Math.max(0, Math.min(24 * 60 - 1, START_MIN + (Number(rel) || 0)));
+  return `${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`;
+}
+function timeStrToRelMin(str) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(str || '').trim());
+  if (!m) return null;
+  const abs = (+m[1]) * 60 + (+m[2]);
+  if (abs < START_MIN || abs > START_MIN + DAY_MIN_SPAN) return null;
+  return abs - START_MIN;
 }
 function isSchoolDay(dayKey) { return schoolDayInfo(dayKey).school; }
 /* True once the shipped calendar has run out — a parent-facing prompt, not a

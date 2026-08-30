@@ -142,14 +142,20 @@ function renderPrintSheet() {
     const d = formatDayKey(k);
     html += `<div class="print-header-cell">${DAY_SHORT[i]} ${d.getDate()}</div>`;
   });
-  // Time-of-day sideband segments (absolute minutes), matching the day view's
-  // axis: 6–9am / 9am–3pm / 3–6pm / 6pm onward.
-  const PRINT_BANDS = [
-    { start: 360,  end: 540,  cls: 'print-band-before',  label: '🌅 Before' },
-    { start: 540,  end: 900,  cls: 'print-band-school',  label: '🏫 School' },
-    { start: 900,  end: 1080, cls: 'print-band-after',   label: '🎒 After'  },
-    { start: 1080, end: 1440, cls: 'print-band-evening', label: '🌙 Evening' },
-  ];
+  /* The sideband is one axis for seven days, so it describes the week's first
+     school day — the same choice the Full week's axis makes. These four were
+     hardcoded at 9am–3pm, which disagreed with the app by an hour and printed
+     a "🏫 School" band across a week in July. */
+  const printAxisKey = keys.find(k => isSchoolDay(k)) || null;
+  const printSegs = printAxisKey
+    ? dayZoneSegments(printAxisKey)
+    : [{ start: 0, end: DAY_MIN_SPAN, label: '🎉 Free time', cls: 'tl-band-free' }];
+  const PRINT_BANDS = printSegs.map(b => ({
+    start: START_MIN + b.start,
+    end: START_MIN + b.end,
+    cls: b.cls.replace('tl-band-', 'print-band-'),
+    label: ZONE_SHORT[b.label] || b.label,
+  }));
   const bandForSlot = (absMin) => PRINT_BANDS.find(b => absMin >= b.start && absMin < b.end);
   // rows
   const acts = getAllActivities(activeProfile(), { includeArchived: true });

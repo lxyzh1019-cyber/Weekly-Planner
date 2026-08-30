@@ -622,15 +622,27 @@ function dayZoneSegments(dayKey) {
   if (!isSchoolDay(dayKey)) {
     return [{ start: 0, end: DAY_MIN_SPAN, label: '🎉 Free time', cls: 'tl-band-free' }];
   }
-  const s = SCHOOL_HOURS.startMin, e = SCHOOL_HOURS.endMin;
+  const h = schoolHours();
+  const s = h.startMin, e = h.endMin;
   // 3h after the bell is "after school"; the rest of the night is evening.
   const afterEnd = Math.min(e + 180, DAY_MIN_SPAN);
   const segs = [];
   if (s > 0)                   segs.push({ start: 0, end: s, label: '🌅 Before school', cls: 'tl-band-before' });
+  /* Lunch recess splits the school band rather than sitting on top of it, so
+     the middle of the day reads as three stretches and not as one block with a
+     stripe through it. Only when a parent has set one — the shipped calendar
+     never knew about lunch, and inventing a time would be worse than silence. */
+  if (h.lunchMin > 0 && h.lunchStartMin != null) {
+    segs.push({ start: s, end: h.lunchStartMin, label: '🏫 School', cls: 'tl-band-school' });
+    segs.push({ start: h.lunchStartMin, end: h.lunchStartMin + h.lunchMin,
+                label: '🥪 Lunch recess', cls: 'tl-band-lunch' });
+    segs.push({ start: h.lunchStartMin + h.lunchMin, end: e, label: '🏫 School', cls: 'tl-band-school' });
+  } else {
                                segs.push({ start: s, end: e, label: '🏫 School', cls: 'tl-band-school' });
+  }
   if (afterEnd > e)            segs.push({ start: e, end: afterEnd, label: '🎒 After school', cls: 'tl-band-after' });
   if (DAY_MIN_SPAN > afterEnd) segs.push({ start: afterEnd, end: DAY_MIN_SPAN, label: '🌙 Evening', cls: 'tl-band-evening' });
-  return segs;
+  return segs.filter(x => x.end > x.start);
 }
 
 /* The bands used to be their own vertical strip beside the gutter, with the

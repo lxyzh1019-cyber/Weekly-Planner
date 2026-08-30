@@ -1708,7 +1708,7 @@ async function confirmCopyDay(srcKey, srcLabel, n) {
 }
 
 function applyTemplate(type) {
-  const tmpl = type==='school' ? SCHOOL_TEMPLATE : WEEKEND_TEMPLATE;
+  const tmpl = type==='school' ? schoolTemplate() : WEEKEND_TEMPLATE;
   const acts = getAllActivities(activeProfile(), { includeArchived: true });
   const blocks = tmpl.map(t=>{
     const act = acts.find(a=>a.id===t.actId);

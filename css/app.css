@@ -822,6 +822,8 @@
        as a time grid while naming no time. .hour-grid draws the real one. */
     overflow: hidden;
   }
+  /* The school-day tint, behind the travel strips (1) and the cards (2). */
+  .tg2-band { position: absolute; left: 0; right: 0; z-index: 0; pointer-events: none; opacity: 0.5; }
   .tg2-lane.today { border-color: #2f8f84; box-shadow: 0 0 0 1.5px rgba(47,143,132,0.35); }
   .tg2-block {
     /* Above the travel/get-ready strips (.wf-travel is z-index 1), which are
@@ -1756,6 +1758,7 @@
   .wf-band-school { background: #d7eafe; }
   .wf-band-after  { background: #ffe1d0; }
   .wf-band-evening{ background: #e8dcf2; }
+  .wf-band-lunch  { background: #fdf0c4; }
   .wf-band-free   { background: #d8f0e1; }
   /* Time-of-day slot label at the top of each tint band, so the week shows the
      same Before School / School / After School / Evening rhythm as the day and
@@ -2230,6 +2233,7 @@
   .tl-band-school { background: #d7eafe; }
   .tl-band-after  { background: #ffe1d0; }
   .tl-band-evening{ background: #e8dcf2; }
+  .tl-band-lunch  { background: #fdf0c4; }
   .tl-band-free   { background: #d8f0e1; }
   .tl-canvas {
     position: relative;
@@ -3507,6 +3511,10 @@
     font-size: max(13px, calc(0.85rem * var(--fs-scale, 1)));
   }
   .pn-n { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  /* A days-off row carries a reason and, for one the family added, a remove
+     button. nowrap on .pn-n put both past the card's edge; this row lets the
+     reason wrap and keeps the button beside it. */
+  .pn-kv .pn-n { display: inline-flex; align-items: center; gap: 0.2rem; white-space: normal; text-align: right; }
   .pn-note { font-size: max(13px, calc(0.82rem * var(--fs-scale, 1))); color: var(--ink-light); margin: var(--space-2) 0; }
   .pn-wide { width: 100%; margin-top: var(--space-2); min-height: 44px; }
   /* The count on the tab itself — a parent sees there is work without opening. */
@@ -3727,6 +3735,8 @@
   .print-band-school { background: #d7eafe; }
   .print-band-after  { background: #ffe1d0; }
   .print-band-evening{ background: #e8dcf2; }
+  .print-band-lunch  { background: #fdf0c4; }
+  .print-band-free   { background: #d8f0e1; }
   .print-band-label {
     position: absolute; left: 0; top: 0; width: 100%;
     display: flex; align-items: center; justify-content: center;
@@ -4384,6 +4394,26 @@
   .pcw-daybtn { flex: 1 1 0; min-width: 0; min-height: 44px; padding: 0.3rem 0.1rem; }
   /* An exercise the child can use now but a grown-up has not kept yet. */
   .obj-waiting { color: var(--accent-strong); font-weight: 800; }
+  /* School calendar: a label, a control, and an optional hint per row. Wraps
+     rather than shrinking, so a 390px phone keeps the 44px targets. */
+  .pa-time-row {
+    display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+    margin-bottom: 0.45rem;
+  }
+  .pa-time-row label {
+    flex: 0 0 auto; min-width: 7.5rem;
+    font-size: max(13px, calc(0.9rem * var(--fs-scale, 1)));
+    font-weight: 700; color: var(--ink);
+  }
+  .pa-time-row input { flex: 1 1 8rem; min-width: 0; min-height: 44px; }
+  .pa-time-row .pill-btn { min-height: 44px; }
+  .pa-time-hint { flex: 1 1 100%; margin: 0; }
+  .pa-x {
+    min-width: 32px; min-height: 32px; margin-left: 0.4rem;
+    border: 2px solid var(--ink); border-radius: 8px;
+    background: var(--paper); color: var(--ink); cursor: pointer;
+    font-weight: 800; line-height: 1;
+  }
   .repeat-every { min-height: 44px; width: 100%; }
   /* What a repeat says, above the detach button in the edit sheet. */
   .series-spec {

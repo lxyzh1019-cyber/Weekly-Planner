@@ -201,11 +201,12 @@ function findChromium() {
   checks.schoolCalendarIsRight = await page.evaluate(() => {
     const bad = [];
     const iso = (d) => d.toISOString().slice(0, 10);
-    // Template and band cannot disagree: both come from SCHOOL_HOURS.
-    const tpl = SCHOOL_TEMPLATE.find(b => b.actId === 'school_day');
-    if (!tpl || tpl.startMin !== SCHOOL_HOURS.startMin
-             || tpl.durationMin !== SCHOOL_HOURS.endMin - SCHOOL_HOURS.startMin)
-      bad.push('SCHOOL_TEMPLATE no longer derives from SCHOOL_HOURS');
+    // Template and band cannot disagree: both come from schoolHours(), which is
+    // a function precisely so a parent's setting reaches both.
+    const tpl = schoolTemplate().find(b => b.actId === 'school_day');
+    if (!tpl || tpl.startMin !== schoolHours().startMin
+             || tpl.durationMin !== schoolHours().endMin - schoolHours().startMin)
+      bad.push('the school-day template no longer derives from schoolHours()');
 
     // No weekend should ever appear in the holiday list — weekends are already
     // covered by SCHOOL_HOURS.days, and one there means a mistyped date.
@@ -273,14 +274,243 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* THE WEEK TWIN of dayBandsFollowTheCalendar. The day view has been
+     calendar-driven for a long time; the two week layouts and the print sheet
+     were not. Day Blocks — the layout the week actually opens on — showed
+     nothing school-related at all, so a school day and a Sunday were the same
+     white lane. Full week and print each carried their own hardcoded 9am–3pm
+     bands chosen by `dow === 0 || dow === 6`, so they disagreed with the rest of
+     the app by an hour AND drew "🏫 School" on Christmas Day, on a PD day, and
+     on every day of July. */
+  checks.everyWeekViewFollowsTheSchoolCalendar = await page.evaluate(() => {
+    const bad = [];
+    const wasOffset = weekOffset, wasView = weekView;
+    const startPx = (el) => parseFloat(el.style.top) || 0;
+
+    // A week inside the term, and a week that is nothing but holiday.
+    const termWeek = (() => {
+      for (let w = -20; w <= 40; w++) if (getDayKeys(w).some(k => isSchoolDay(k))) return w;
+      return null;
+    })();
+    if (termWeek == null) { bad.push('no week in range has a school day'); return bad; }
+
+    weekOffset = termWeek;
+    const keys = getDayKeys(termWeek);
+    const schoolKey = keys.find(k => isSchoolDay(k));
+    const idx = keys.indexOf(schoolKey);
+    const offKey = keys.find(k => !isSchoolDay(k));
+    const offIdx = keys.indexOf(offKey);
+    const wantStart = dayZoneSegments(schoolKey).find(b => b.label === '🏫 School').start;
+
+    // Day Blocks — the default layout.
+    goWeek(); setWeekView('timegrid'); renderWeek();
+    const lanes = document.querySelectorAll('.tg2-lane');
+    const schoolBand = lanes[idx] && lanes[idx].querySelector('.wf-band-school');
+    if (!schoolBand) bad.push('Day Blocks draws no school band on a term school day');
+    if (offIdx >= 0 && lanes[offIdx] && lanes[offIdx].querySelector('.wf-band-school')) {
+      bad.push('Day Blocks draws a school band on a day the calendar says is not school');
+    }
+
+    // Full week.
+    setWeekView('full'); renderWeek();
+    const cols = document.querySelectorAll('.wf-day-col');
+    const wfBand = cols[idx] && cols[idx].querySelector('.wf-band-school');
+    if (!wfBand) bad.push('the Full week draws no school band on a term school day');
+    if (offIdx >= 0 && cols[offIdx] && cols[offIdx].querySelector('.wf-band-school')) {
+      bad.push('the Full week draws a school band on a day that is not school');
+    }
+    /* The hour, not just the presence of a band: 9am-vs-8am is exactly the
+       disagreement this replaced, and a band drawn at the wrong time still
+       looks like a band. */
+    if (wfBand) {
+      const gotMin = Math.round(startPx(wfBand) / 0.72);
+      if (Math.abs(gotMin - wantStart) > 1) {
+        bad.push(`the Full week starts school at minute ${gotMin}, the calendar says ${wantStart}`);
+      }
+    }
+
+    // Print.
+    openPrint();
+    const printLabels = [...document.querySelectorAll('.print-band-label')].map(e => e.textContent);
+    if (!printLabels.some(t => /School/.test(t))) bad.push('the print sheet lost its school band');
+    goWeek();
+
+    /* And a week with no school in it anywhere — the July case. Nothing may
+       claim school on any of the three. */
+    const summerWeek = (() => {
+      for (let w = 0; w <= 60; w++) if (getDayKeys(w).every(k => !isSchoolDay(k))) return w;
+      return null;
+    })();
+    if (summerWeek != null) {
+      weekOffset = summerWeek;
+      setWeekView('timegrid'); renderWeek();
+      if (document.querySelector('.tg2-lane .wf-band-school')) {
+        bad.push('Day Blocks draws school in a week with no school in it');
+      }
+      setWeekView('full'); renderWeek();
+      if (document.querySelector('.wf-day-col .wf-band-school')) {
+        bad.push('the Full week draws school in a week with no school in it');
+      }
+      if (document.querySelector('.wf-sideband .wf-band-school')) {
+        bad.push('the axis describes a school day in a week that has none');
+      }
+    }
+
+    weekOffset = wasOffset; setWeekView(wasView); renderWeek();
+    return bad.length === 0 || bad;
+  });
+
+  /* SCHOOL HOURS ARE THE PARENT'S TO SET. They were a const in js/01-config.js,
+     which meant a district's bell times could only be corrected by editing the
+     source — and the shipped calendar never knew about lunch recess at all.
+     SCHOOL_TEMPLATE had to become schoolTemplate() for this: a const evaluated
+     at load can only ever see the shipped fallback. */
+  checks.schoolHoursAreTheParentsToSet = await page.evaluate(() => {
+    const bad = [];
+    const before = state.shared.schoolCal;
+    const shipped = schoolHours();
+    if (shipped.startMin !== SCHOOL_HOURS.startMin) bad.push('with nothing set, the shipped hours are not used');
+
+    state.shared.schoolCal = { hours: { startMin: 150, endMin: 555, lunchStartMin: 330, lunchMin: 45 } };
+    const h = schoolHours();
+    if (h.startMin !== 150 || h.endMin !== 555) bad.push("the parent's hours are not what the app reads");
+    const tpl = schoolTemplate().find(t => t.actId === 'school_day');
+    if (!tpl || tpl.startMin !== 150 || tpl.durationMin !== 405) {
+      bad.push('the School Day template did not follow the hours');
+    }
+    const termKey = (() => {
+      for (let w = -20; w <= 40; w++) { const k = getDayKeys(w).find(isSchoolDay); if (k) return k; }
+      return null;
+    })();
+    const segs = dayZoneSegments(termKey);
+    const lunch = segs.find(b => b.label === '🥪 Lunch recess');
+    if (!lunch) bad.push('a lunch recess was set and no band drew it');
+    else if (lunch.start !== 330 || lunch.end !== 375) bad.push('the lunch band is not where it was set');
+    if (segs.filter(b => b.label === '🏫 School').length !== 2) {
+      bad.push('lunch does not split the school day in two');
+    }
+
+    // A recess that does not fit inside the day is dropped, not drawn hanging
+    // off the end of the afternoon.
+    state.shared.schoolCal = { hours: { startMin: 150, endMin: 555, lunchStartMin: 540, lunchMin: 45 } };
+    if (schoolHours().lunchMin !== 0) bad.push('a lunch recess running past home time was kept');
+
+    // Term dates too.
+    state.shared.schoolCal = { termStart: '2030-01-07', termEnd: '2030-06-20', nextStart: '2030-08-26' };
+    if (schoolTerm().start !== '2030-01-07') bad.push("the parent's term start is not what the app reads");
+    if (isSchoolDay('2026-09-08')) bad.push('a date outside the set term still counts as school');
+
+    // And clearing it returns to the shipped calendar rather than a frozen copy,
+    // so next August's replacement reaches the family with nothing to press.
+    delete state.shared.schoolCal;
+    if (schoolHours().startMin !== SCHOOL_HOURS.startMin) bad.push('clearing the override did not restore the shipped hours');
+    if (schoolTerm().start !== SCHOOL_TERM.start) bad.push('clearing the override did not restore the shipped term');
+
+    state.shared.schoolCal = before;
+    return bad.length === 0 || bad;
+  });
+
+  /* SCHOOL DAYS ARE OFFERED, NOT ASSUMED. The calendar knows which days of a
+     week are school days; what it must not do is quietly fill them in, because
+     a week that arrived pre-planned is a week nobody decided. And only near the
+     front: a term is 40-odd weeks, and materialising all of it would write
+     hundreds of blocks into a document that uploads whole on every change, to
+     describe a Tuesday in May nobody is planning yet. */
+  checks.aBlankWeekOffersItsSchoolDays = await page.evaluate(async () => {
+    const bad = [];
+    const wasOffset = weekOffset, wasProfile = profile;
+    profile = 'jenn';
+    // The first week in the horizon that has school days in it.
+    let wk = null;
+    for (let w = 0; w < SCHOOL_FILL_HORIZON_WEEKS; w++) {
+      if (getDayKeys(w).some(k => isSchoolDay(k))) { wk = w; break; }
+    }
+    if (wk == null) { bad.push('no week inside the horizon has a school day'); return bad; }
+    const keys = getDayKeys(wk);
+    const restore = keys.map(k => [k, getDayBlocks(k, 'jenn')]);
+    keys.forEach(k => setDayBlocks(k, [], 'jenn'));
+    const schoolKeys = keys.filter(k => isSchoolDay(k));
+
+    weekOffset = wk;
+    goWeek(); renderWeek();
+    const tip = (document.getElementById('weekCoachTip') || {}).textContent || '';
+    if (!new RegExp(`Add ${schoolKeys.length} school day`).test(tip)) {
+      bad.push(`a blank term week does not offer its ${schoolKeys.length} school days: "${tip.slice(0, 120)}"`);
+    }
+
+    // Nothing is written until it is confirmed.
+    const p1 = addSchoolDaysToWeek(keys[0]);
+    await new Promise(r => setTimeout(r, 30));
+    const cancel = document.querySelector('.app-dialog-cancel');
+    if (!cancel) bad.push('adding school days was not confirmed first');
+    else cancel.click();
+    await p1;
+    if (keys.some(k => (getDayBlocks(k, 'jenn') || []).length)) {
+      bad.push('declining the offer still wrote blocks');
+    }
+
+    const p2 = addSchoolDaysToWeek(keys[0]);
+    await new Promise(r => setTimeout(r, 30));
+    const ok = document.getElementById('appDialogOkBtn');
+    if (ok) ok.click();
+    await p2;
+    const got = keys.filter(k => (getDayBlocks(k, 'jenn') || []).length);
+    if (got.join(',') !== schoolKeys.join(',')) {
+      bad.push(`blocks landed on ${got.length} days, the calendar names ${schoolKeys.length}`);
+    }
+    const h = schoolHours();
+    const b = (getDayBlocks(schoolKeys[0], 'jenn') || [])[0] || {};
+    if (b.actId !== 'school_day') bad.push('what landed is not a School Day block');
+    if (b.startMin !== START_MIN + h.startMin) bad.push('the School Day does not start when school does');
+    if (b.durationMin !== h.endMin - h.startMin) bad.push('the School Day is not as long as school');
+    if (b.confirmed) bad.push('an offered School Day arrived pre-confirmed');
+
+    // A day that already holds a plan is left alone.
+    keys.forEach(k => setDayBlocks(k, [], 'jenn'));
+    setDayBlocks(schoolKeys[0], [{ id: 'sd-keep', actId: 'piano', startMin: 600, durationMin: 60 }], 'jenn');
+    const offer = schoolDaysToOffer(keys, 'jenn');
+    if (offer.includes(schoolKeys[0])) bad.push('a day that already has a plan was offered anyway');
+
+    // And a week months out is not offered at all.
+    if (schoolOfferInHorizon(getDayKeys(SCHOOL_FILL_HORIZON_WEEKS + 6))) {
+      bad.push('a week months away is still offered its school days');
+    }
+
+    restore.forEach(([k, blocks]) => setDayBlocks(k, blocks, 'jenn'));
+    weekOffset = wasOffset; profile = wasProfile;
+    goWeek(); renderWeek();
+    return bad.length === 0 || bad;
+  });
+
   /* Weekly view: Y-axis sideband + hour lines + slot tint bands. These belong to
      the Full layout, which is no longer the one the week opens on — Day Blocks
      is. So select it first rather than assuming: the alternate layout still has
      to work, and an assertion that silently measured whichever view happened to
      be default would stop testing anything the day the default moved. */
+  /* The sideband is one axis describing seven days, so what matters is that it
+     describes a real one. It used to be four hardcoded stretches with school at
+     9am–3pm — an hour later than the rest of the app — drawn on every week of
+     the year. Counting segments is what let that stand: it asserted 4 and got 4,
+     on Christmas week as readily as on a term Tuesday. */
   checks.weekSideband = await page.evaluate(() => {
+    const bad = [];
     setWeekView('full');
-    return document.querySelectorAll('.wf-sideband-seg').length === 4;
+    const keys = getDayKeys(weekOffset);
+    const axisKey = keys.find(k => isSchoolDay(k)) || null;
+    const want = axisKey
+      ? dayZoneSegments(axisKey)
+      : [{ start: 0, end: DAY_MIN_SPAN, label: '🎉 Free time' }];
+    const segs = [...document.querySelectorAll('.wf-sideband-seg')];
+    if (segs.length !== want.length) {
+      bad.push(`the axis draws ${segs.length} stretches for a day that has ${want.length}`);
+    } else {
+      want.forEach((w, i) => {
+        if ((segs[i].title || '') !== w.label) {
+          bad.push(`axis stretch ${i} says "${segs[i].title}", the day says "${w.label}"`);
+        }
+      });
+    }
+    return bad.length === 0 || bad;
   });
   checks.weekHourLines = await page.evaluate(() =>
     document.querySelectorAll('.wf-day-col .hour-grid-line--hour').length > 0);
@@ -1201,8 +1431,15 @@ function findChromium() {
   await page.waitForTimeout(400);
   checks.printBuffers = await page.evaluate(() =>
     document.querySelectorAll('.print-buffer').length >= 4);
-  checks.printSideband = await page.evaluate(() =>
-    document.querySelectorAll('.print-band-label').length === 4);
+  // Same for the printed axis, and for the same reason — it carried its own
+  // copy of the 9am–3pm constants.
+  checks.printSideband = await page.evaluate(() => {
+    const keys = getDayKeys(weekOffset);
+    const axisKey = keys.find(k => isSchoolDay(k)) || null;
+    const want = axisKey ? dayZoneSegments(axisKey).length : 1;
+    const got = document.querySelectorAll('.print-band-label').length;
+    return got === want || [`the printed axis draws ${got} stretches for a day that has ${want}`];
+  });
   await page.screenshot({ path: shot('print'), fullPage: true });
 
   // Series removal survives a stale remote merge
