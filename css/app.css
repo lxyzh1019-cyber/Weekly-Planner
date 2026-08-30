@@ -4382,6 +4382,8 @@
      they are square rather than labelled — the 44px floor still applies. */
   .pcw-days-pick { display: flex; gap: 0.25rem; margin-top: 0.5rem; }
   .pcw-daybtn { flex: 1 1 0; min-width: 0; min-height: 44px; padding: 0.3rem 0.1rem; }
+  /* An exercise the child can use now but a grown-up has not kept yet. */
+  .obj-waiting { color: var(--accent-strong); font-weight: 800; }
   .repeat-every { min-height: 44px; width: 100%; }
   /* What a repeat says, above the detach button in the edit sheet. */
   .series-spec {

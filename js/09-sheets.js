@@ -87,7 +87,15 @@ function renderObjectivesList(containerId, stateObj, presets, myTasks, rerenderF
       const checked = stateObj.objectives.includes(label);
       const item = document.createElement('div');
       item.className = 'obj-item'+(checked?' checked':'');
-      item.innerHTML = `<div class="obj-check">${checked?'✓':''}</div><span>${label}</span><span class="obj-meta">saved</span><span class="obj-delete" title="delete">×</span>`;
+      /* escapeHtml, and it was missing: t.name and t.reps are typed by a child
+         and arrive from a world-writable Firestore document, and this line put
+         them straight into markup. tests/check-escaping.js did not catch it
+         because its "texty local" rule wants a capital — `label` is not
+         `Label` — which is a gap in the lint, not a reason the hole was safe. */
+      const waiting = t.pendingApproval
+        ? '<span class="obj-meta obj-waiting">waiting</span>'
+        : '<span class="obj-meta">saved</span>';
+      item.innerHTML = `<div class="obj-check">${checked?'✓':''}</div><span>${escapeHtml(label)}</span>${waiting}<span class="obj-delete" title="delete">×</span>`;
       item.onclick = (e)=>{
         if (e.target.classList.contains('obj-delete')) {
           state.shared.customTasks = state.shared.customTasks.filter(x=>x.id!==t.id);
@@ -114,6 +122,12 @@ function renderTrainingSheet() {
   const isCompetition = !!(selectedActivity && selectedActivity.isCompetition);
   const titleEl = document.getElementById('trainingSheetTitle');
   if (titleEl) titleEl.textContent = isCompetition ? '🏆 Competition' : '🏋️ Training Session';
+  // Which competition. Only asked for when it is one — a training session has
+  // no name of its own, it has a sport.
+  const compRow = document.getElementById('trainingCompNameRow');
+  if (compRow) compRow.style.display = isCompetition ? 'block' : 'none';
+  const compIn = document.getElementById('trainingCompName');
+  if (compIn && compIn.value !== (ts.compName || '')) compIn.value = ts.compName || '';
 
   // Start time picker
   renderStartTimePicker('trainingStartPicker', pendingStartMin, (m)=>{ pendingStartMin = m; renderTrainingSheet(); });
@@ -174,7 +188,9 @@ function renderTrainingSheet() {
   // Objectives — preset + custom tasks filtered by tag. Competition day gets its
   // own performance/meet checklist rather than the practice-drill objectives.
   const presets = getObjectivePresets(selectedActivity, ts.tag, isCompetition);
-  const myTasks = (state.shared.customTasks||[]).filter(t=>t.sport===ts.tag || t.sport==='general');
+  // Archived, not deleted — a rejected exercise leaves the picker but the record
+  // stays, the same rule the archive keeps for activities (CLAUDE.md, History).
+  const myTasks = (state.shared.customTasks||[]).filter(t=>!t.archived && (t.sport===ts.tag || t.sport==='general'));
   renderObjectivesList('objectivesList', ts, presets, myTasks, renderTrainingSheet);
 
   if (ts.travelBufMin == null || ts.travelBufMin < 5) ts.travelBufMin = DEFAULT_BUFFER_MIN;
@@ -240,9 +256,11 @@ function confirmTraining() {
   pendingStartMin = null;
   const isComp = !!(selectedActivity && selectedActivity.isCompetition);
   ts.note = document.getElementById('trainingNote').value;
+  ts.compName = isComp ? (document.getElementById('trainingCompName').value || '').trim().slice(0, 40) : '';
   const actId = (selectedActivity && selectedActivity.id) || 'training';
   placeBlock(actId, startMin, ts.durationMin, ts.colour, ts.objectives, ts.note, {
     tag: ts.tag,
+    compName: ts.compName || null,
     repeatDays: ts.repeat?ts.repeatDays:[],
     travelBuffer: ts.travelBuffer,
     getReadyBuffer: !!ts.getReadyBuffer,
@@ -297,7 +315,7 @@ function renderActivitySheet() {
   // Goals/objectives — same tickable-list UI as training, scoped to this
   // activity's own presets (or its category's) plus any saved custom goals.
   const objPresets = getObjectivePresets(act);
-  const objMyTasks = (state.shared.customTasks||[]).filter(t=>t.activityId===act.id);
+  const objMyTasks = (state.shared.customTasks||[]).filter(t=>!t.archived && t.activityId===act.id);
   renderObjectivesList('activityObjectivesList', as_, objPresets, objMyTasks, renderActivitySheet);
 
   const tbToggle = document.getElementById('activityTravelToggle');
@@ -1900,15 +1918,24 @@ function confirmCustomTask() {
   const reps = document.getElementById('taskReps').value.trim();
   const notes = document.getElementById('taskNotes').value.trim();
   if (!name) { showToast('Enter a name!'); return; }
+  /* An exercise a child adds is a proposal, exactly as a new ACTIVITY is
+     (confirmCustomActivity, below): addedBy says whose, pendingApproval puts it
+     in the parent's queue. She can tick it in this session straight away —
+     making her wait for the thing she just typed, in the session she typed it
+     for, is not a control worth having — and a parent decides whether it stays
+     in the shared library. */
+  const base = { id:'t-'+Date.now().toString(36), name, reps, notes,
+                 addedBy: isParent() ? 'parent' : activeProfile() };
+  if (!isParent()) base.pendingApproval = true;
   const task = customTaskContext === 'activity'
-    ? { id:'t-'+Date.now().toString(36), name, sport:'general', activityId: selectedActivity?.id || null, reps, notes }
-    : { id:'t-'+Date.now().toString(36), name, sport, reps, notes };
+    ? { ...base, sport:'general', activityId: selectedActivity?.id || null }
+    : { ...base, sport };
   state.shared.customTasks = [...(state.shared.customTasks||[]), task];
   saveAll();
   closeSheet('customTaskOverlay');
   if (customTaskContext === 'activity') renderActivitySheet();
   else renderTrainingSheet();
-  showToast('Task saved to library ✨');
+  showToast(isParent() ? 'Task saved to library ✨' : 'Saved — a grown-up will approve it ✨');
   document.getElementById('taskName').value='';
   document.getElementById('taskReps').value='';
   document.getElementById('taskNotes').value='';

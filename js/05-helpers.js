@@ -463,9 +463,15 @@ function blockDisplayName(b, p=activeProfile(), dayKey) {
   const act = findActivity(b.actId, p) || {};
   const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
   const icon = topic ? topic.icon : (act.icon || '📌');
-  const name = topic
-    ? (act.isCompetition ? (topic.id === 'general' ? 'Competition' : topic.name + ' Comp.') : topic.name)
-    : (act.name || 'Something');
+  /* A competition that was given a name is called by it, everywhere — the day,
+     both week views, Today and print all come through here. Without this every
+     meet read "Skating Comp." and the one thing that told two of them apart
+     lived only in a note. */
+  const named = act.isCompetition && b && typeof b.compName === 'string' && b.compName.trim();
+  const name = named ? b.compName.trim()
+    : topic
+      ? (act.isCompetition ? (topic.id === 'general' ? 'Competition' : topic.name + ' Comp.') : topic.name)
+      : (act.name || 'Something');
   if (!dayKey) return { icon, name, n: 0, of: 1 };
   const key = blockGroupKey(b);
   const sameThing = (getDayBlocks(dayKey, p) || [])

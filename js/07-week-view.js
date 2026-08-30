@@ -638,6 +638,8 @@ function tg2ShortLabel(act, b) {
   }
   if (act.isTraining) {
     const t = getTrainingTopic(b.tag);
+    /* Seven characters, deliberately (CLAUDE.md) — a typed competition name is
+       not going to fit here, so this stays the sport's short form. */
     if (act.isCompetition) return t.id === 'general' ? 'Comp' : (t.name.slice(0, 4) + '🏆');
     return ({ skating: 'Skate', swimming: 'Swim', dryland: 'Dry', general: 'Train' })[t.id] || 'Train';
   }
@@ -1290,12 +1292,13 @@ function renderFullWeek(keys) {
       const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
       const bg = blockColour(b);
       const dispIcon = topic ? topic.icon : act.icon;
-      // Competition shares the sport topic's icon/colour, but reads as its own
-      // task (a general competition says "Competition", a sport one says e.g.
-      // "Swimming 🏆") so it never looks like a plain Training block.
-      const dispName = topic
-        ? (act.isCompetition ? (topic.id === 'general' ? 'Competition 🏆' : topic.name + ' 🏆') : topic.name)
-        : act.name;
+      /* blockDisplayName (js/05-helpers.js) is the one owner of what a block is
+         called. This wrote its own answer, which is why a competition that had
+         been given a name — "Winter Invitational" — still read "Skating 🏆"
+         here while the day view said the right thing. The 🏆 stays: it is what
+         keeps a competition from reading as a plain Training block. */
+      const named = blockDisplayName(b, activeProfile()).name;
+      const dispName = act.isCompetition ? `${named} 🏆` : named;
       const card = document.createElement('div');
       // Same ladder the day timeline and the print sheet use — see
       // blockContentTier (js/05-helpers.js). The class names are the ones the

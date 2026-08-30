@@ -1411,7 +1411,7 @@ function addActivityAtMin(absMin) {
   pendingStartMin = absMin;
 
   if (selectedActivity.isTraining) {
-    ts = { durationMin: selectedActivity.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, warmupBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15, warmupBufMin:20 };
+    ts = { durationMin: selectedActivity.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, warmupBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15, warmupBufMin:20 };
     openTrainingSheet();
   } else {
     as_ = { durationMin: selectedActivity.durationMin||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15, choreTags: [], objectives: [] };
@@ -1519,7 +1519,7 @@ function pickFromSlot(actId) {
   closeSheet('slotPickerOverlay');
   // pendingStartMin was set by openSlotPicker.
   if (act.isTraining) {
-    ts = { durationMin: act.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, warmupBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15, warmupBufMin:20 };
+    ts = { durationMin: act.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, warmupBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15, warmupBufMin:20 };
     openTrainingSheet();
   } else {
     as_ = { durationMin: act.durationMin||60, colour: CAT_HEX[act.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15, choreTags: [], objectives: [] };
@@ -1598,6 +1598,8 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
     objectives: objectives||[],
     note: note||'',
     tag: opts.tag||null,
+    // Which meet this is. blockDisplayName is the one place it becomes a label.
+    compName: (opts.compName || '').trim().slice(0, 40) || null,
     choreTags: opts.choreTags || (opts.choreTag ? [opts.choreTag] : null),
     choreTag: opts.choreTag || (opts.choreTags && opts.choreTags[0]) || null,
     parentPinned: isParent() ? true : false,

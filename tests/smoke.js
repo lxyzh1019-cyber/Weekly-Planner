@@ -1293,6 +1293,151 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* A COMPETITION IS CALLED WHAT IT IS CALLED. The block's label was derived
+     from the sport tag, so every meet on every screen read "Skating Comp." and
+     the one thing that told two of them apart lived only in a note. Checked on
+     every surface, because three of them wrote their own answer rather than
+     asking blockDisplayName — which is exactly how the Full week and the print
+     sheet came to disagree with the day view. */
+  checks.aCompetitionCanCarryItsOwnName = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile, wasDay = currentDayKey;
+    profile = 'jenn';
+    const key = getDayKeys(0)[5];
+    const before = getDayBlocks(key, 'jenn');
+    const hostile = 'Winter <img src=x onerror=alert(1)> Invitational';
+    setDayBlocks(key, [{ id: 'comp-1', actId: 'competition', startMin: 9 * 60, durationMin: 240,
+      tag: 'skating', compName: hostile, checklistState: {} }], 'jenn');
+    const b = getDayBlocks(key, 'jenn')[0];
+
+    if (blockDisplayName(b, 'jenn').name !== hostile) {
+      bad.push(`blockDisplayName says "${blockDisplayName(b, 'jenn').name}", not the name it was given`);
+    }
+    /* Escaping is what puts the angle brackets into textContent, so finding
+       them there proves nothing either way — the assertion that means something
+       is that no <img> element was ever built. */
+    const sawIt = (where, text) => {
+      if (!text.includes('Winter')) bad.push(`${where} does not use the competition's name`);
+    };
+    // Day view.
+    currentDayKey = key;
+    openDay(key, 5);
+    sawIt('the day view', document.getElementById('timeline').textContent || '');
+    if (document.querySelector('#timeline img')) bad.push('the day view built an element out of the name');
+    // Full week.
+    goWeek(); setWeekView('full'); renderWeek();
+    sawIt('the Full week', document.getElementById('weeklyFullGrid').textContent || '');
+    if (document.querySelector('#weeklyFullGrid img')) bad.push('the Full week built an element out of the name');
+    // Print.
+    openPrint();
+    sawIt('the print sheet', (document.getElementById('screen-print') || {}).textContent || '');
+    if (document.querySelector('#screen-print img')) bad.push('the print sheet built an element out of the name');
+    goWeek();
+    setWeekView('timegrid');
+
+    /* And the meeting reads it from the planner rather than asking for it to be
+       typed a second time. Two records of one afternoon kept in agreement by
+       hand is how they come to disagree. */
+    const wk = getDayKeys(0)[0];
+    const planned = mmPlannedCompetitions(wk, 'jenn');
+    if (!planned.length) bad.push('the meeting cannot see the competition on the plan');
+    else {
+      if (planned[0].name !== hostile) bad.push('the meeting reads the wrong name off the plan');
+      if (planned[0].sport !== 'skate') bad.push(`the meeting read the sport as ${planned[0].sport}`);
+      if (planned[0].dayKey !== key) bad.push('the meeting read the wrong day');
+    }
+    const seeded = mmSeedCompDraft(wk, 'jenn');
+    if (seeded.name !== hostile) bad.push('the competition form does not prefill from the plan');
+    if (seeded.dayKey !== key) bad.push('the competition form prefills the wrong day');
+
+    // With nothing planned it is the empty form it always was.
+    setDayBlocks(key, [], 'jenn');
+    const empty = mmSeedCompDraft(wk, 'jenn');
+    if (empty.name !== '') bad.push('an unplanned week does not get an empty name to type into');
+
+    setDayBlocks(key, before, 'jenn');
+    profile = wasProfile; currentDayKey = wasDay;
+    return bad.length === 0 || bad;
+  });
+
+  /* A NEW EXERCISE WAITS FOR A GROWN-UP. state.shared.customTasks is the girls'
+     drill library, and anything either of them typed went straight into it with
+     nothing to tell a parent it had happened — while a new ACTIVITY had had an
+     approval queue all along. She can still use it in the session she typed it
+     for; what changed is that a parent gets to keep or drop it. */
+  checks.aNewExerciseWaitsForAGrownUp = await page.evaluate(async () => {
+    const bad = [];
+    const wasProfile = profile, wasViewing = parentViewing;
+    const before = (state.shared.customTasks || []).slice();
+    state.shared.customTasks = [];
+
+    profile = 'jenn';
+    customTaskContext = 'training';
+    ts = { durationMin: 60, colour: '#888', tag: 'swimming', objectives: [], note: '', compName: '',
+           repeat: false, repeatDays: [], travelBuffer: false, getReadyBuffer: false,
+           warmupBuffer: false, gearState: {}, travelBufMin: 15, getReadyBufMin: 15, warmupBufMin: 20 };
+    const hostile = '50m <b>Free</b>style';
+    document.getElementById('taskName').value = hostile;
+    document.getElementById('taskSport').value = 'swimming';
+    document.getElementById('taskReps').value = 'x4';
+    document.getElementById('taskNotes').value = '';
+    confirmCustomTask();
+
+    const t = (state.shared.customTasks || [])[0];
+    if (!t) { bad.push('the exercise was not saved at all'); }
+    else {
+      if (!t.pendingApproval) bad.push("a child's new exercise did not go to a grown-up");
+      if (t.addedBy !== 'jenn') bad.push(`the exercise records addedBy=${t.addedBy}`);
+    }
+
+    // She can tick it now — the point of not making her wait.
+    renderTrainingSheet();
+    const list = document.getElementById('objectivesList');
+    const txt = (list || {}).textContent || '';
+    if (!txt.includes('50m')) bad.push('the exercise she just typed is not offered in this session');
+    if (!/waiting/i.test(txt)) bad.push('nothing says the exercise is waiting for a grown-up');
+    if (list && list.querySelector('b')) bad.push('the exercise name was rendered as markup');
+
+    // The parent sees it, and Now counts it.
+    profile = 'parent'; parentViewing = 'jenn';
+    if (pendingApprovalTasks().length !== 1) bad.push('the parent queue does not hold the new exercise');
+    showScreen('parent'); renderParentHome(); setParentTab('tasks');
+    const q = (document.getElementById('pendingTaskList') || {}).textContent || '';
+    if (!q.includes('50m')) bad.push('the approval list does not show the exercise');
+    if (document.querySelector('#pendingTaskList b')) bad.push('the approval list rendered the name as markup');
+    pnRenderNow();
+    if (!/exercise/i.test((document.getElementById('pnWrap') || {}).textContent || '')) {
+      bad.push('Now does not mention an exercise waiting');
+    }
+
+    // Approving keeps it; the queue empties.
+    approveKidTask(t.id);
+    if (t.pendingApproval) bad.push('approving did not clear the flag');
+    if (pendingApprovalTasks().length) bad.push('the queue still holds an approved exercise');
+
+    // Rejecting archives rather than deletes, and it leaves the picker.
+    t.pendingApproval = true;
+    const p = rejectKidTask(t.id);
+    await new Promise(r => setTimeout(r, 30));
+    const ok = document.getElementById('appDialogOkBtn');
+    if (!ok) bad.push('rejecting an exercise was not confirmed first');
+    else ok.click();
+    await p;
+    const still = (state.shared.customTasks || []).find(x => x.id === t.id);
+    if (!still) bad.push('rejecting deleted the record instead of archiving it');
+    else if (!still.archived) bad.push('a rejected exercise was not archived');
+    profile = 'jenn';
+    renderTrainingSheet();
+    if (((document.getElementById('objectivesList') || {}).textContent || '').includes('50m')) {
+      bad.push('a rejected exercise is still offered in the picker');
+    }
+
+    state.shared.customTasks = before;
+    profile = wasProfile; parentViewing = wasViewing;
+    showScreen('today');
+    return bad.length === 0 || bad;
+  });
+
   // ── Redesign phase 3: the parent's chore tab, in the portal ──
   await page.evaluate(() => {
     profile = 'parent'; parentViewing = 'jenn';

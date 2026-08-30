@@ -217,9 +217,9 @@ function renderPrintSheet() {
         const slotSpan = Math.max(1, Math.round((segEnd - segStart)/15));
         const bh = slotSpan*slotPx - 1;
         const pIcon = topic ? topic.icon : act.icon;
-        const pName = topic
-          ? (act.isCompetition ? (topic.id === 'general' ? 'Competition 🏆' : topic.name + ' 🏆') : topic.name)
-          : act.name;
+        // Through the one owner — see the same change in renderFullWeek.
+        const pNamed = blockDisplayName(b, activeProfile()).name;
+        const pName = act.isCompetition ? `${pNamed} 🏆` : pNamed;
         const hasConflict = printConflicts[k] && printConflicts[k].has(b.id);
         const titleFpt = printBlockFontPt(bh);
         // Empty tick box so it can be checked off on the printed page — sized
