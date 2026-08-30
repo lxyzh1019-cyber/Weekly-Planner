@@ -41,7 +41,7 @@ Current permitted exceptions (do not add more): `js/03-sync.js:506`
 `module.exports` guards at the end of `04-merge.js`, `18-rules.js`,
 `21-money-data.js`.
 
-**One declaration per name, globally.** All 30 files share one scope, so a
+**One declaration per name, globally.** All 36 files share one scope, so a
 duplicate `function foo()` in two files means the later one silently wins. A
 `let`/`const` declared twice is a hard `SyntaxError` at load. Before adding a
 top-level name, grep for it across `js/`.
@@ -270,8 +270,17 @@ that day** — one Homework stays "Homework", five become Block 1…5 — and nu
 by `startMin`, never by the order a caller holds them in: Today sorts by
 `tdActionableStart` and the day view lays out by position, so a number that
 followed either would point at a different block on the two screens. The week
-grid is deliberately excluded: `wfShortLabel` compresses to seven characters on
+grid is deliberately excluded: `tg2ShortLabel` compresses to seven characters on
 purpose and "Block 2" cannot live there.
+
+**A competition is called what a parent typed.** `blockDisplayName` returns
+`b.compName` when there is one, which is what reaches the day view, both week
+layouts, Today and print — the Full week and the print sheet each used to derive
+"Skating Comp." themselves, so a named meet read correctly on one screen and
+wrongly on the two you actually pin up. The weekly meeting then reads the meet
+off the plan (`mmPlannedCompetitions`, `js/23-money-meeting.js`) instead of
+asking for it twice; it takes facts only — which meet, which day, which sport —
+and `mrScoreCompetition` still decides what the result is worth.
 
 Drawn to scale means the row has to **add up to a day**. It is one nowrap flex row
 of percentages with nothing able to shrink, so anything that oversubscribes it
@@ -283,10 +292,43 @@ cell to the cursor so no minute is spent twice, then scales the segments back if
 they still come to more than 100. It shipped without either guard and every check
 passed: no fixture had two blocks that overlap. A screenshot found it.
 
-**The day screen scrolls as one surface.** It was three nested scrollers
-(`.day-workspace` → `.day-center-lane` → `.timeline-wrap`), which on an iPad
-meant a flick could move the wrong one. `.day-workspace` is the only scroller;
-`dayScreenScrollsAsOneSurface` in `tests/smoke.js` keeps it that way.
+**The day screen scrolls as one surface, and that surface has to be BOUNDED.**
+It was three nested scrollers (`.day-workspace` → `.day-center-lane` →
+`.timeline-wrap`), which on an iPad meant a flick could move the wrong one.
+`.day-workspace` is the only scroller — but for a long time it was not a scroller
+at all: `#screen-day.screen.active` carried `min-height`, so the flex column grew
+to the 1344px schedule and the **document** scrolled instead, 832px of it. The
+wheel hid that (`overscroll-behavior: contain` on the workspace), but
+`attachMiddleDragPan` deliberately hands leftover scroll to the page, so the
+middle button was the one input that reached the document and it carried the
+topbar off screen. The screen carries a `height` now, at every width rather than
+only at ≥980px landscape, and `body.has-kid-nav #screen-day.screen.active` has the
+specificity it always needed. `dayScreenScrollsAsOneSurface` only walks INSIDE
+`#screen-day` and cannot see this; `onlyTheScheduleScrollsOnTheDayScreen` watches
+the document.
+
+**The day headers are a row of their own, outside the columns.** `.tl-col-head`
+used to sit inside `.tl-col`, above `.tl-canvas`, while `.tl-gutter` — a sibling
+of the whole column stack — started at the top of the header. Nothing put the two
+back in phase, so at 2 and 3 days every hour label named a line **46px, about 33
+minutes, below itself**. One day has no header, which is the only reason it was
+ever invisible. `.tl-headrow` stays inside `.day-workspace`, sticky at its top, so
+panning sideways keeps each header over its column with no `scrollLeft` mirroring
+and no second scroller. `focusDayColumn` marks both trees.
+
+**`.tl-canvas` draws its edge with an inset shadow, not a border**, and gets
+`z-index: 0`. The border was 2px on a border-box element whose height JS set to
+exactly the day, so the padding box was 4px short — the 10pm rule and the tail of
+a 10pm block were clipped, and taps measured 2px off what was drawn
+(`getBoundingClientRect` reports the border box). The stacking context is what
+stops `.placed-block` (z10) painting over the sticky header and gutter.
+
+**One owner for the :00 / :30 grid.** `buildHourGrid` (`js/05-helpers.js`),
+appended **last** on all three surfaces so the marks read through a placed block —
+under them they say nothing the moment a day is actually planned. Takes no pointer
+events. The Day Blocks lane used to carry a decorative 24px `repeating-linear-gradient`
+which at 0.85px/min is neither an hour (51px) nor a half-hour (25.5px), and drifted
+out of step with its own gutter labels from the first hour onwards.
 
 **The activity rail is gone.** Placement goes through the picker that opens where
 you tap (`openSlotPicker`) — the interaction that was already doing the work.
@@ -403,11 +445,46 @@ the accessor the owning screen uses, and there is deliberately no control on it
 that grades, settles or approves. A second place that decides how a chore is
 graded is a second place that can disagree with the first.
 
-**Copying a week is a plan, and it shows its work first.** Setup › Copy a week
-(`js/34-parent-copyweek.js`) is the third place a week gets copied, and it owns
-no clone rule: `weekCloneBlock` (`js/07-week-view.js`) still decides what a copy
-arrives as — not done, not confirmed, no XP, no ticked checklist. The other two
-are not general enough to replace it and are deliberately left alone:
+**Copying a plan shows its work first.** Setup › Copy a plan
+(`js/34-parent-copyweek.js`) does a whole week or a single day — a span toggle,
+not a second screen, because `pcwPlan()` stays the one decision either way. In
+day mode the two weekday pickers may differ: "put Tuesday's shape on Thursday" is
+a real thing to want. It owns no clone rule: `weekCloneBlock` (`js/07-week-view.js`)
+still decides what a copy arrives as — not done, not confirmed, no XP, no ticked
+checklist, no gear or training ticks, a stopwatch at zero, and **no `seriesId`**.
+
+That last one is the load-bearing part. A copy used to inherit the original's
+series, and `countSeriesBlocks` scans every week of a profile — so editing a
+copied block offered "update all" and rewrote the weeks it was copied FROM, and
+"remove all in series" wrote `'sr:'+seriesId` into `state.shared.tombstones`,
+which is **shared, not per-profile**, so through `blockTombstoned`
+(`js/04-merge.js`) one delete could drop the sister's cross-copied blocks on the
+next merge. `weekCloneBlock` also deep-copies `objectives`, `gearState`,
+`trainingCheck` and `stopwatch`: `Object.assign` is shallow, and a copy and its
+original shared those by reference until the next reload re-parsed the JSON.
+
+**A day copy reaches two children and any week.** `copyDayInto(srcKey, dstKey,
+srcP, dstP)` is the one engine; the kid's 📋 sheet drives it for last / this /
+next week on her own days, and cross-child is parent-only because a day copy
+REPLACES the destination. Unplaceable blocks are dropped through
+`placeableActivityIds` (`js/05-helpers.js` — one owner, shared with `pcw`) and
+the count of what was left behind is always said out loud.
+
+**A repeat is materialised, and it remembers what it is.** `seriesDayKeys`
+(`js/05-helpers.js`) is the one place that answers which days a repeat covers —
+days of the week, **every N weeks**, from a start date through an end date — and
+`placeBlock` stamps `seriesDays`, `seriesEvery`, `seriesStart` and `seriesEnd`
+onto every block it makes, so the edit sheet can read the repeat back instead of
+just counting siblings. The phase anchor is the Monday of the day the block was
+placed on, not of the start date: typing "from next Monday" must not silently
+shift which weeks are on. Horizon capped at `SERIES_MAX_WEEKS` (26) and
+`SERIES_MAX_BLOCKS` (120), because one press must not write a year of blocks into
+a document that uploads whole on every change. Moving the end date runs
+`seriesExtendTo`, which adds and removes real blocks — but never a day already
+ticked or confirmed, which is a record rather than a line in a plan.
+
+The other two week copies are not general enough to replace `pcw` and are
+deliberately left alone:
 `mmPlanNextWeek` copies *this* week into next for both girls from inside the
 meeting, and `fillWeekFromNearest` fills a **blank** week from whichever
 neighbour it picks.
@@ -454,6 +531,12 @@ That splits one lookup into two, and the split is load-bearing:
 | What can she **pick**? | `getAllActivities(p)` — archived entries absent |
 | What does this placed block **name**? | `findActivity(actId, p)` — archived entries visible |
 
+**An exercise a child types is a proposal, exactly as an activity is.** A new
+drill goes into `state.shared.customTasks` with `addedBy` and `pendingApproval`,
+is usable in the session she typed it for, and waits in Setup › Activities and
+sports for a parent to keep or drop it. Rejecting **archives**; the record stays,
+for the same reason `rejectKidActivity` archives.
+
 Get it the wrong way round and either a retired activity is offered in a picker
 (visible, harmless) or every block that ever used it stops rendering (invisible,
 and the reason this rule exists). `retiringAnActivityKeepsItsHistory` in
@@ -484,30 +567,73 @@ The catch-up look-back stops at `max(mrModelStartWeek(), programStartDate)`. An
 genuinely open weeks whenever the first record happened to be recent, which is
 the same class of wrongness as the bug it was meant to help.
 
-## The school calendar expires every August
+## The school calendar: shipped, then the family's
 
 `SCHOOL_HOURS`, `SCHOOL_TERM` and `NO_SCHOOL_DAYS` in `js/01-config.js` are the
-one source of truth for "is there school today, and when". Both consumers derive
-from them — `SCHOOL_TEMPLATE` and the day timeline's coloured bands — because
-when they were hardcoded separately they disagreed by an hour and nobody noticed.
+**fallback** — what a family that has set nothing gets, and what the app carries
+in the public repo, which is **dates only**: no school name, no district, no
+source document. That has not changed.
 
-Read it through `isSchoolDay(dayKey)` / `schoolDayInfo(dayKey)`
-(`js/05-helpers.js`), never by checking the day of the week: a Tuesday in July is
-not a school day, and neither is a PD day.
+What has: a family can now say otherwise, and their answer lives in
+`state.shared.schoolCal` (synced state, never committed). **Never read the
+constants directly.** Three accessors in `js/05-helpers.js` decide which wins:
 
-**Replace all three each August.** Past `SCHOOL_TERM.nextStart` the app stops
-claiming to know: bands fall back to weekday shape and `schoolCalendarIsStale()`
-puts a note on the week — *to a parent only*. A child is never told the app's
-data is out of date; she cannot act on it.
+| Question | Function |
+|---|---|
+| When is school, and is there a lunch recess? | `schoolHours()` |
+| When does the term run? | `schoolTerm()` |
+| Which days are off? | `schoolOffDays()` — the shipped list plus the family's |
 
-`schoolCalendarIsRight` in `tests/smoke.js` counts the instructional days the
-calendar yields and asserts the published total (177 for K-8). A mistyped date
-moves that number, which is the point — it is the only check here that can catch
-a plausible-looking wrong date.
+`isSchoolDay(dayKey)` / `schoolDayInfo(dayKey)` go through those, and are still
+the only way to ask — never by checking the day of the week: a Tuesday in July
+is not a school day, and neither is a PD day.
 
-This is deliberately shipped code, not synced state: it is identical on every
-device, and the repo is public, so it carries **dates only** — no school name, no
-district, no source document.
+`SCHOOL_TEMPLATE` is now **`schoolTemplate()`**, and the change is load-bearing:
+a top-level `const` is evaluated when `js/01-config.js` runs, so it can only ever
+see the shipped fallback. Anything that wants the school-day shape has to ask at
+the moment it needs it.
+
+**Every surface draws the day from `dayZoneSegments`** (`js/08-day-view.js`) — the
+day view, both week layouts and the print sheet. It had one caller for a long
+time while the others carried their own copies: the Full week and print each
+hardcoded school at 9am–3pm, an hour later than `SCHOOL_HOURS`, selected by
+`dow === 0 || dow === 6`, so Christmas Day, every PD day and every day of July
+drew a "🏫 School" band. Day Blocks — the layout the week actually opens on —
+drew nothing school-related at all. The two vertical axes (the Full week's
+sideband, the print sheet's) describe seven days with one column, so they
+describe the week's **first school day** and say so plainly when a week has none.
+
+**School days are offered, never assumed.** A blank week inside
+`SCHOOL_FILL_HORIZON_WEEKS` (3) offers to add its school days on one confirm —
+one School Day block each, not the whole template. Past that horizon there is no
+offer: a term is 40-odd weeks, and materialising all of it would write hundreds
+of blocks into a document that uploads whole on every change.
+
+**Importing** (`js/35-school-calendar.js`) reads a `.ics` file or URL. It is a
+hand-written parser because there is no build step and the CSP allows no
+third-party script. Three things about it are deliberate and should not be
+"simplified": an all-day `DTEND` is **exclusive**; an RRULE past
+`FREQ=WEEKLY`/`DAILY` with an end is **counted and skipped**, never half-applied;
+and **every all-day entry is listed, not only the ones that match a keyword** —
+"Christmas Day" contains none of the day-off words, so a list that gated
+visibility hid the most obvious day off in a school calendar. Nothing is written
+until it is ticked, and term dates arrive unticked because they are a year-long
+guess.
+
+**Replace the shipped dates each August.** Past `schoolTerm().nextStart` the app
+stops claiming to know: bands fall back to weekday shape and
+`schoolCalendarIsStale()` puts a note on the week — *to a parent only*. A child
+is never told the app's data is out of date; she cannot act on it.
+
+`schoolCalendarIsRight` counts the instructional days the **shipped** calendar
+yields and asserts the published total (177 for K-8) — a mistyped date moves that
+number, which is the point. `everyWeekViewFollowsTheSchoolCalendar`,
+`schoolHoursAreTheParentsToSet`, `aBlankWeekOffersItsSchoolDays` and
+`anIcsFileBecomesDaysOffOnlyAfterReview` hold the rest. Note what
+`weekSideband`/`printSideband` used to be: an assertion that there were exactly
+four segments, which counted to four on Christmas week as readily as on a term
+Tuesday and is exactly why the 9am band stood for so long. They assert the axis
+matches the day it claims to describe.
 
 ## Known trip hazards
 
