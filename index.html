@@ -819,7 +819,9 @@
         <input type="date" id="trainingDateStart" aria-label="Repeat start date">
         <label>through</label>
         <input type="date" id="trainingDateEnd" aria-label="Repeat end date">
-        <p class="hint">Leave empty to repeat only this week.</p>
+        <label for="trainingRepeatEvery">How often</label>
+        <select id="trainingRepeatEvery" class="repeat-every" aria-label="How often the repeat comes round"></select>
+        <p class="hint">Leave the dates empty to repeat only this week.</p>
       </div>
     </div>
 
@@ -896,7 +898,9 @@
         <input type="date" id="activityDateStart" aria-label="Repeat start date">
         <label>through</label>
         <input type="date" id="activityDateEnd" aria-label="Repeat end date">
-        <p class="hint">Leave empty to repeat only this week.</p>
+        <label for="activityRepeatEvery">How often</label>
+        <select id="activityRepeatEvery" class="repeat-every" aria-label="How often the repeat comes round"></select>
+        <p class="hint">Leave the dates empty to repeat only this week.</p>
       </div>
     </div>
     <div class="sheet-action-row">
@@ -1015,6 +1019,15 @@
 
     <!-- Series membership: only shown when this block is part of a multi-block series -->
     <div id="seriesWrap" style="display:none">
+      <!-- What the repeat actually says, and the one thing about it you can
+           change from here. Moving the last day adds or removes real blocks:
+           the repeat is materialised, so a date nobody acts on is decoration. -->
+      <p class="series-spec" id="seriesSpec"></p>
+      <div class="series-until" id="seriesUntilRow" hidden>
+        <label for="seriesUntilInput">Last day</label>
+        <input type="date" id="seriesUntilInput" aria-label="Last day of this repeat">
+        <button type="button" class="pill-btn" onclick="applySeriesUntil()">Update</button>
+      </div>
       <button class="pill-btn" style="width:100%" onclick="detachFromSeries()">✂️ Detach from series</button>
       <p style="font-size:0.75rem;color:var(--ink-light);margin-top:0.3rem">Future edits or deletes won't affect the rest of the series.</p>
     </div>

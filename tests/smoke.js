@@ -1218,6 +1218,81 @@ function findChromium() {
     return countSeriesBlocks(sid) === 0;
   });
 
+  /* A REPEAT REMEMBERS WHAT IT IS. The days, the frequency and the two dates
+     were read off the form, used once to decide where blocks went, and dropped
+     — so nothing afterwards could say what the repeat was, and the date inputs
+     were shown to a parent only (and on the activity sheet, only for the school
+     category). Runs in a far-future week so it cannot disturb the seeded one. */
+  checks.aSeriesRemembersItsDatesAndFrequency = await page.evaluate(() => {
+    const bad = [];
+    const wasDay = currentDayKey, wasOffset = weekOffset, wasProfile = profile;
+    profile = 'jenn';
+    const plus = (key, n) => { const d = formatDayKey(key); d.setDate(d.getDate() + n); return dateToLocalKey(d); };
+    const touched = [];
+    for (let w = 10; w <= 17; w++) getDayKeys(w).forEach(k => { touched.push(k); setDayBlocks(k, [], 'jenn'); });
+
+    const tue = getDayKeys(10)[1];
+    currentDayKey = tue; weekOffset = 10;
+    placeBlock('training', 17 * 60, 60, null, [], '', {
+      tag: 'swimming', repeatDays: [1, 3], repeatEvery: 2,
+      repeatDateStart: tue, repeatDateEnd: plus(tue, 28),
+    });
+
+    // Tuesday and Thursday, every second week, stopping at the end date.
+    const want = [tue, plus(tue, 2), plus(tue, 14), plus(tue, 16), plus(tue, 28)].sort();
+    const got = [];
+    for (let w = 10; w <= 17; w++) getDayKeys(w).forEach(k => {
+      if ((getDayBlocks(k, 'jenn') || []).some(b => b.seriesId)) got.push(k);
+    });
+    got.sort();
+    if (got.join(',') !== want.join(',')) {
+      bad.push(`every-2-weeks landed on ${got.join(', ')}, expected ${want.join(', ')}`);
+    }
+
+    const b0 = (getDayBlocks(tue, 'jenn') || [])[0] || {};
+    if ((b0.seriesDays || []).join(',') !== '1,3') bad.push(`the block forgot its days (${b0.seriesDays})`);
+    if (b0.seriesEvery !== 2) bad.push(`the block forgot its frequency (${b0.seriesEvery})`);
+    if (b0.seriesStart !== tue) bad.push('the block forgot its start date');
+    if (b0.seriesEnd !== plus(tue, 28)) bad.push('the block forgot its end date');
+    const spec = seriesSpecText(b0);
+    if (!/Tuesdays/.test(spec) || !/every 2 weeks/.test(spec) || !/until/.test(spec)) {
+      bad.push(`the repeat does not read back: "${spec}"`);
+    }
+
+    // Moving the last day moves real blocks, in both directions.
+    const shrink = seriesExtendTo(b0.seriesId, plus(tue, 16));
+    if (shrink.removed !== 1) bad.push(`pulling the end back removed ${shrink.removed}, expected 1`);
+    if (countSeriesBlocks(b0.seriesId) !== 4) bad.push('the series did not shrink');
+    const grow = seriesExtendTo(b0.seriesId, plus(tue, 42));
+    if (grow.added !== 3) bad.push(`pushing the end out added ${grow.added}, expected 3`);
+    if (countSeriesBlocks(b0.seriesId) !== 7) bad.push('the series did not grow');
+
+    // A day already lived is a record, not a line in a plan: it is kept.
+    const late = getDayBlocks(plus(tue, 42), 'jenn');
+    if (late[0]) { late[0].confirmed = true; setDayBlocks(plus(tue, 42), late, 'jenn'); }
+    const keep = seriesExtendTo(b0.seriesId, plus(tue, 16));
+    if (keep.kept !== 1) bad.push(`${keep.kept} confirmed days kept, expected 1`);
+    if (!(getDayBlocks(plus(tue, 42), 'jenn') || []).length) {
+      bad.push('a confirmed day was deleted by shortening the repeat');
+    }
+
+    // The span control is not a parent's alone any more.
+    profile = 'jenn';
+    openDay(getDayKeys(0)[0], 0);
+    startPlacingActivity('piano');
+    const range = document.getElementById('activityDateRange');
+    if (range && range.style.display === 'none') {
+      bad.push('a child placing a block is not offered a start and end date');
+    }
+    const every = document.getElementById('activityRepeatEvery');
+    if (!every || !every.options.length) bad.push('there is no way to say how often the repeat comes round');
+    cancelCreatePlacement('activityOverlay');
+
+    touched.forEach(k => setDayBlocks(k, [], 'jenn'));
+    currentDayKey = wasDay; weekOffset = wasOffset; profile = wasProfile;
+    return bad.length === 0 || bad;
+  });
+
   // ── Redesign phase 3: the parent's chore tab, in the portal ──
   await page.evaluate(() => {
     profile = 'parent'; parentViewing = 'jenn';

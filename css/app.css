@@ -4382,6 +4382,25 @@
      they are square rather than labelled — the 44px floor still applies. */
   .pcw-days-pick { display: flex; gap: 0.25rem; margin-top: 0.5rem; }
   .pcw-daybtn { flex: 1 1 0; min-width: 0; min-height: 44px; padding: 0.3rem 0.1rem; }
+  .repeat-every { min-height: 44px; width: 100%; }
+  /* What a repeat says, above the detach button in the edit sheet. */
+  .series-spec {
+    margin: 0 0 0.4rem;
+    font-size: max(13px, calc(0.92rem * var(--fs-scale, 1)));
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .series-until {
+    display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+  }
+  .series-until[hidden] { display: none; }
+  .series-until label {
+    font-size: max(13px, calc(0.86rem * var(--fs-scale, 1)));
+    color: var(--ink-light); font-weight: 700;
+  }
+  .series-until input { flex: 1 1 130px; min-width: 0; min-height: 44px; }
+  .series-until .pill-btn { min-height: 44px; }
   .copy-day-tabs { display: flex; gap: 0.3rem; margin-bottom: 0.4rem; }
   .copy-day-tabs[hidden] { display: none; }
   .copy-day-tab {

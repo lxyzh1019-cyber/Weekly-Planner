@@ -1635,45 +1635,42 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
   placementFeedback();
 
   if (opts.repeatDays?.length) {
-    // Stamp series on the original block first
+    /* THE SERIES REMEMBERS WHAT IT IS. The days, the frequency and the two dates
+       were read off the form, used once to decide where to drop blocks, and
+       thrown away — so nothing afterwards could say what the repeat was, and
+       the edit sheet could only count siblings. They are stamped on every block
+       of the series now, which is what lets seriesSpecText read it back and
+       seriesExtendTo change its mind later. */
     const seriesId = 'sr-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
-    block.seriesId = seriesId;
-    setDayBlocks(currentDayKey, blocks); // re-save to persist seriesId on original
+    const ranged = !!(opts.repeatDateStart || opts.repeatDateEnd);
+    block.seriesId    = seriesId;
+    block.seriesDays  = [...new Set(opts.repeatDays)].sort((a, b) => a - b);
+    block.seriesEvery = ranged ? seriesEveryWeeks(opts.repeatEvery) : 1;
+    if (opts.repeatDateStart) block.seriesStart = opts.repeatDateStart;
+    if (opts.repeatDateEnd)   block.seriesEnd   = opts.repeatDateEnd;
+    setDayBlocks(currentDayKey, blocks); // re-save to persist the series on the original
 
-    const useDateRange = !!(opts.repeatDateStart && opts.repeatDateEnd);
-    if (useDateRange) {
-      // Parent date-range mode: iterate every day from start..end, drop blocks
-      // on dates whose getDay() matches one of the repeatDays (Mon=0..Sun=6 internal).
-      const sd = new Date(opts.repeatDateStart);
-      const ed = new Date(opts.repeatDateEnd);
-      if (!isNaN(sd) && !isNaN(ed) && ed >= sd) {
-        const targetSet = new Set(opts.repeatDays); // 0..6 with Mon=0
-        for (let d = new Date(sd); d <= ed; d.setDate(d.getDate()+1)) {
-          // Map JS getDay() (Sun=0..Sat=6) to internal (Mon=0..Sun=6)
-          const jsDow = d.getDay();
-          const internalIdx = jsDow === 0 ? 6 : jsDow - 1;
-          if (!targetSet.has(internalIdx)) continue;
-          const targetKey = dateToLocalKey(d);
-          if (targetKey === currentDayKey) continue; // already placed
-          const db = getDayBlocks(targetKey);
-          // Avoid duplicating: skip if same series already on that day
-          if (db.some(b => b.seriesId === seriesId)) continue;
-          const nb = { ...block, id: Date.now().toString(36)+Math.random().toString(36).slice(2,5), checklistState:{}, seriesId, confirmed:false };
-          db.push(nb); setDayBlocks(targetKey, db);
-        }
-      }
-    } else {
-      // Single-week mode (existing behavior)
-      const keys = getDayKeys(weekOffset);
-      const curIdx = keys.indexOf(currentDayKey);
-      opts.repeatDays.forEach(idx=>{
-        if (idx === curIdx) return;
-        const targetKey = keys[idx];
-        if (!targetKey) return;
-        const nb = { ...block, id: Date.now().toString(36)+Math.random().toString(36).slice(2,5), checklistState:{}, seriesId, confirmed:false };
-        const db = getDayBlocks(targetKey); db.push(nb); setDayBlocks(targetKey, db);
-      });
-    }
+    /* With no dates the caller means this week only, which is what a kid gets
+       by default and what the hint under the picker promises. With either date
+       set it is a real span, and seriesDayKeys (js/05-helpers.js) owns which
+       days that covers — including the every-N-weeks phase and the horizon cap. */
+    const targets = ranged
+      ? seriesDayKeys({
+          days: block.seriesDays, everyWeeks: block.seriesEvery, anchorKey: currentDayKey,
+          startKey: opts.repeatDateStart || null, endKey: opts.repeatDateEnd || null,
+        })
+      : block.seriesDays.map(i => getDayKeys(weekOffset)[i]).filter(Boolean);
+
+    targets.forEach(targetKey => {
+      if (targetKey === currentDayKey) return;        // already placed
+      const db = getDayBlocks(targetKey);
+      if (db.some(b => b.seriesId === seriesId)) return;  // never twice on one day
+      db.push(Object.assign({}, block, {
+        id: Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+        checklistState: {}, confirmed: false,
+      }));
+      setDayBlocks(targetKey, db);
+    });
     saveAll();
   }
 

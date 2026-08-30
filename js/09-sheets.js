@@ -202,8 +202,7 @@ function renderTrainingSheet() {
   rt.classList.toggle('on', ts.repeat);
   document.getElementById('trainingRepeatDays').style.display = ts.repeat?'block':'none';
   renderDayPicker('trainingDayPicker', ts.repeatDays, (days)=>{ ts.repeatDays=days; });
-  // Date-range only in parent mode
-  document.getElementById('trainingDateRange').style.display = isParent() ? 'block' : 'none';
+  renderRepeatSpan('training');
 
   document.getElementById('trainingNote').value = ts.note;
 
@@ -233,12 +232,14 @@ function confirmTraining() {
   // longer hides itself after a tap, so we consume pendingStartMin immediately
   // and bail if it's already been consumed (the second tap of a double-tap).
   if (pendingStartMin == null) return;
+  // Read the span BEFORE consuming pendingStartMin: a refused span must leave
+  // the sheet exactly as it was, ready to be corrected and confirmed again.
+  const span = ts.repeat ? readRepeatSpan('training') : { start: null, end: null, every: 1 };
+  if (!span) return;
   const startMin = pendingStartMin;
   pendingStartMin = null;
   const isComp = !!(selectedActivity && selectedActivity.isCompetition);
   ts.note = document.getElementById('trainingNote').value;
-  const dateStart = isParent() ? document.getElementById('trainingDateStart').value : '';
-  const dateEnd   = isParent() ? document.getElementById('trainingDateEnd').value : '';
   const actId = (selectedActivity && selectedActivity.id) || 'training';
   placeBlock(actId, startMin, ts.durationMin, ts.colour, ts.objectives, ts.note, {
     tag: ts.tag,
@@ -250,8 +251,9 @@ function confirmTraining() {
     travelBufMin: ts.travelBufMin,
     getReadyBufMin: ts.getReadyBufMin,
     warmupBufMin: ts.warmupBufMin,
-    repeatDateStart: dateStart || null,
-    repeatDateEnd:   dateEnd   || null,
+    repeatDateStart: span.start,
+    repeatDateEnd:   span.end,
+    repeatEvery:     span.every,
   });
   closeSheet('trainingOverlay');
   showToast(isComp ? 'Competition placed 🏆' : 'Training placed 🏋️');
@@ -309,9 +311,7 @@ function renderActivitySheet() {
   rt.classList.toggle('on', as_.repeat);
   document.getElementById('activityRepeatDays').style.display = as_.repeat?'block':'none';
   renderDayPicker('activityDayPicker', as_.repeatDays, (days)=>{ as_.repeatDays=days; });
-  // Date-range repeat: parent mode + school category only (per design)
-  const showRange = isParent() && selectedActivity && selectedActivity.cat === 'school';
-  document.getElementById('activityDateRange').style.display = showRange ? 'block' : 'none';
+  renderRepeatSpan('activity');
 
   document.getElementById('activityNote').value = as_.note;
 
@@ -369,19 +369,20 @@ function confirmActivity() {
   // Guard against a rapid double-tap placing two blocks (and against a second
   // tap running after selectedActivity was cleared, which used to throw).
   if (pendingStartMin == null || !selectedActivity) return;
+  // Before consuming pendingStartMin — see confirmTraining.
+  const span = as_.repeat ? readRepeatSpan('activity') : { start: null, end: null, every: 1 };
+  if (!span) return;
   const startMin = pendingStartMin;
   pendingStartMin = null;
   as_.note = document.getElementById('activityNote').value;
-  const allowRange = isParent() && selectedActivity && selectedActivity.cat === 'school';
-  const dateStart = allowRange ? document.getElementById('activityDateStart').value : '';
-  const dateEnd   = allowRange ? document.getElementById('activityDateEnd').value   : '';
   const isChoreBlock = selectedActivity && selectedActivity.id === 'chores';
   placeBlock(selectedActivity.id, startMin, as_.durationMin, as_.colour, as_.objectives || [], as_.note, {
     repeatDays: as_.repeat?as_.repeatDays:[],
     travelBuffer: as_.travelBuffer,
     travelBufMin: as_.travelBufMin,
-    repeatDateStart: dateStart || null,
-    repeatDateEnd:   dateEnd   || null,
+    repeatDateStart: span.start,
+    repeatDateEnd:   span.end,
+    repeatEvery:     span.every,
     choreTags: isChoreBlock ? (as_.choreTags || []).slice() : null,
   });
   closeSheet('activityOverlay');
@@ -530,6 +531,46 @@ function toggleEditWarmupBuffer() {
 }
 
 /* Multi-day picker */
+/* ── How long a repeat lasts, and how often it comes round ──
+   The two date inputs already existed and were shown to a PARENT only — and on
+   the activity sheet, only for the school category. So the child who actually
+   swims every second Tuesday until December could describe none of it, and even
+   a parent's answer was read off the form, used once, and dropped: nothing was
+   stored, so nothing could read it back. Both sheets show the same control to
+   everyone now, and placeBlock stamps what it says onto every block it makes.
+
+   Empty dates still mean this week only, which is what the hint promises and
+   what a kid gets without touching anything. */
+function renderRepeatSpan(prefix) {
+  const wrap = document.getElementById(prefix + 'DateRange');
+  if (wrap) wrap.style.display = 'block';
+  const sel = document.getElementById(prefix + 'RepeatEvery');
+  if (!sel) return;
+  const cur = seriesEveryWeeks(sel.value);
+  sel.innerHTML = SERIES_EVERY_CHOICES.map(([n, label]) =>
+    `<option value="${n}"${n === cur ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('');
+}
+
+/* Reads a sheet's repeat span, or refuses one that cannot mean anything.
+   Returns null when it has already said why — the caller must not place. */
+function readRepeatSpan(prefix) {
+  const start = (document.getElementById(prefix + 'DateStart') || {}).value || '';
+  const end   = (document.getElementById(prefix + 'DateEnd') || {}).value || '';
+  const every = seriesEveryWeeks((document.getElementById(prefix + 'RepeatEvery') || {}).value);
+  if (start && end && end < start) {
+    showToast('The last day is before the first one');
+    return null;
+  }
+  if (start && end) {
+    const weeks = Math.round((formatDayKey(end) - formatDayKey(start)) / (7 * 24 * 3600 * 1000));
+    if (weeks > SERIES_MAX_WEEKS) {
+      showToast(`That is longer than ${SERIES_MAX_WEEKS} weeks — pick a nearer last day`);
+      return null;
+    }
+  }
+  return { start: start || null, end: end || null, every };
+}
+
 function renderDayPicker(containerId, selectedDays, onChange) {
   const wrap = document.getElementById(containerId);
   wrap.innerHTML = '';
@@ -694,6 +735,35 @@ function onEditBufferMinInput() {
   renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin, !!editState.warmupBuffer, editState.warmupBufMin);
 }
 
+/* The edit sheet's one control over the span. Confirmed first, and it reports
+   what it actually did — including the days it refused to remove because they
+   had already been lived. */
+async function applySeriesUntil() {
+  const block = getDayBlocks(currentDayKey).find(b => b.id === editingBlockId);
+  if (!block || !block.seriesId) return;
+  const val = (document.getElementById('seriesUntilInput') || {}).value || '';
+  if (!val) { showToast('Pick a last day'); return; }
+  if (val === block.seriesEnd) { showToast('That is already the last day'); return; }
+  const preview = seriesDayKeys({
+    days: block.seriesDays, everyWeeks: block.seriesEvery, anchorKey: block.seriesStart || currentDayKey,
+    startKey: block.seriesStart || currentDayKey, endKey: val,
+  });
+  const now = countSeriesBlocks(block.seriesId);
+  const ok = await showConfirm(
+    `Run this repeat until ${escapeHtml(val)}?\n\n${now} now, about ${preview.length} after. `
+    + 'Days already ticked or confirmed are kept either way.',
+    { okLabel: 'Update it', cancelLabel: 'Not now', danger: preview.length < now });
+  if (!ok) return;
+  const res = seriesExtendTo(block.seriesId, val);
+  closeSheet('editOverlay');
+  buildTimeline();
+  const bits = [];
+  if (res.added) bits.push(`${res.added} added`);
+  if (res.removed) bits.push(`${res.removed} removed`);
+  if (res.kept) bits.push(`${res.kept} kept — already done`);
+  showToast(bits.length ? `🔁 ${bits.join(', ')}` : '🔁 Nothing to change');
+}
+
 function onActivityTravelBufMinInput() {
   const tIn = document.getElementById('activityTravelBufMin');
   if (tIn) as_.travelBufMin = clampBufferMin(tIn.value);
@@ -724,8 +794,24 @@ function openEditSheet(blockId) {
   // Series-wrap visibility: show only if this block belongs to a series of >1
   const sw = document.getElementById('seriesWrap');
   if (sw) {
-    const inSeries = !!block.seriesId && countSeriesBlocks(block.seriesId) > 1;
-    sw.style.display = inSeries ? 'block' : 'none';
+    const n = block.seriesId ? countSeriesBlocks(block.seriesId) : 0;
+    sw.style.display = n > 1 ? 'block' : 'none';
+    /* Say what the repeat IS, not just how many of it there are. "Part of a
+       series of 12" was the whole of what this sheet could tell you about a
+       repeat, because the days, the frequency and the dates were never stored. */
+    const spec = document.getElementById('seriesSpec');
+    if (spec) {
+      const words = seriesSpecText(block);
+      spec.textContent = words
+        ? `🔁 ${words} — ${n} in all`
+        : `🔁 One of ${n} repeats`;
+    }
+    const row = document.getElementById('seriesUntilRow');
+    const inp = document.getElementById('seriesUntilInput');
+    // Only offered for a series that has a span; a this-week-only repeat has no
+    // last day to move, and inventing one would change what it meant.
+    if (row) row.hidden = !block.seriesEnd;
+    if (inp && block.seriesEnd) inp.value = block.seriesEnd;
   }
 
   document.getElementById('editSheetTitle').textContent = `${act.icon} ${act.name}`;
@@ -1266,6 +1352,88 @@ function applySeriesEdit(seriesId, sourceBlockId, fields) {
     });
     if (changed) setDayBlocks(dayKey, arr);
   });
+}
+
+/* ── Change a series' last day, and mean it ──
+   A repeat is materialised, so a stored end date nobody acts on is decoration:
+   pushing it out has to add real blocks and pulling it in has to remove them.
+
+   What it will not remove is a day that already happened to somebody. A block
+   she has ticked, or a parent has confirmed, is a record of a day rather than a
+   line in a plan — the same distinction weekCloneBlock draws — so those are
+   kept and counted, and the caller says how many. */
+function seriesExtendTo(seriesId, endKey, p = activeProfile()) {
+  const out = { added: 0, removed: 0, kept: 0 };
+  if (!seriesId || !endKey) return out;
+  const weeks = getProfData(p).weeks || {};
+  const members = [];
+  Object.keys(weeks).forEach(dayKey => (weeks[dayKey] || []).forEach(b => {
+    if (b && b.seriesId === seriesId) members.push({ dayKey, b });
+  }));
+  if (!members.length) return out;
+  members.sort((x, y) => (x.dayKey < y.dayKey ? -1 : x.dayKey > y.dayKey ? 1 : 0));
+  const first = members[0];
+  const template = first.b;
+  const days = (template.seriesDays && template.seriesDays.length)
+    ? template.seriesDays
+    // A series placed before the dates existed carries no seriesDays; the days
+    // it actually lands on are the next best answer, and a true one.
+    : [...new Set(members.map(m => (formatDayKey(m.dayKey).getDay() + 6) % 7))];
+  const startKey = template.seriesStart || first.dayKey;
+  const want = new Set(seriesDayKeys({
+    days, everyWeeks: template.seriesEvery, anchorKey: startKey, startKey, endKey,
+  }));
+
+  // Trim what falls outside the new span, keeping anything already lived.
+  const drop = [];
+  members.forEach(({ dayKey, b }) => {
+    if (want.has(dayKey)) return;
+    if (b.completed || b.confirmed || Object.keys(b.checklistState || {}).length) { out.kept++; return; }
+    drop.push({ dayKey, id: b.id });
+  });
+  const byDay = {};
+  drop.forEach(d => { (byDay[d.dayKey] = byDay[d.dayKey] || []).push(d.id); });
+  Object.keys(byDay).forEach(dayKey => {
+    const ids = new Set(byDay[dayKey]);
+    setDayBlocks(dayKey, (weeks[dayKey] || []).filter(b => !ids.has(b.id)), p);
+    out.removed += ids.size;
+  });
+  if (drop.length) tombstoneBlockIds(drop.map(d => d.id));
+
+  // Then fill in the days the span now covers and the series does not hold.
+  const held = new Set(members.filter(m => want.has(m.dayKey)).map(m => m.dayKey));
+  want.forEach(dayKey => {
+    if (held.has(dayKey)) return;
+    const arr = getDayBlocks(dayKey, p).slice();
+    if (arr.some(b => b.seriesId === seriesId)) return;
+    arr.push(Object.assign({}, template, {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      checklistState: {}, gearState: {}, trainingCheck: {},
+      completed: false, confirmed: false, xpAwarded: false,
+      seriesEnd: endKey, createdAt: syncNow(), updatedAt: syncNow(),
+    }));
+    setDayBlocks(dayKey, arr, p);
+    out.added++;
+  });
+
+  /* Every surviving member agrees about when the series ends. Done here rather
+     than through applySeriesEdit because that one reads getProfData() with no
+     argument — right for the edit sheet, wrong the moment a caller names a
+     profile that is not the active one. */
+  const after = getProfData(p).weeks || {};
+  Object.keys(after).forEach(dayKey => {
+    let changed = false;
+    (after[dayKey] || []).forEach(b => {
+      if (b.seriesId !== seriesId) return;
+      b.seriesEnd = endKey;
+      b.seriesDays = days.slice();
+      markItemUpdated && markItemUpdated(b);
+      changed = true;
+    });
+    if (changed) setDayBlocks(dayKey, after[dayKey], p);
+  });
+  saveAll();
+  return out;
 }
 
 /* Delete every block in series (optionally exclude one). */

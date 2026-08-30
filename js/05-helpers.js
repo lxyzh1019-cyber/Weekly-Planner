@@ -159,6 +159,88 @@ function blockTierAtLeast(tier, min) {
   return order.indexOf(tier) >= order.indexOf(min);
 }
 
+/* ── What a repeat actually means ──
+   A repeat is MATERIALISED here, not stored as a rule and evaluated later:
+   placeBlock drops a real block on every day the series covers. That is the
+   shape the app already had, and changing it would mean every reader of a day —
+   the week grid, Today, print, the chore join, the merge layer — learning about
+   recurrence. So this function is the one place that answers "which days", and
+   the horizon is capped, because one press must not write a year of blocks into
+   a document that uploads whole on every change.
+
+   `anchorKey` is the day the block was placed on, and its Monday sets the PHASE
+   for "every N weeks" — so a fortnightly swim placed on a Tuesday recurs on the
+   Tuesdays of that week, that week + 2, and so on, whatever start date is
+   typed. Anchoring on the start date instead would let a start of "next Monday"
+   silently shift which weeks are on.
+
+   `startKey`/`endKey` bound it. With neither, the caller wants this week only
+   and does not come here. */
+const SERIES_MAX_WEEKS = 26;     // half a year: a term, not a lifetime
+const SERIES_MAX_BLOCKS = 120;   // a hard stop, whatever the dates say
+const SERIES_EVERY_CHOICES = [
+  [1, 'Every week'], [2, 'Every 2 weeks'], [3, 'Every 3 weeks'], [4, 'Every 4 weeks'],
+];
+
+function seriesEveryWeeks(n) {
+  const v = Math.round(Number(n) || 1);
+  return Math.max(1, Math.min(4, v));
+}
+
+function seriesDayKeys(spec) {
+  const days = [...new Set((spec.days || []).map(Number))]
+    .filter(i => Number.isInteger(i) && i >= 0 && i <= 6).sort((a, b) => a - b);
+  if (!days.length || !spec.anchorKey) return [];
+  const every = seriesEveryWeeks(spec.everyWeeks);
+  const anchorMon = ctMondayOf(formatDayKey(spec.anchorKey));
+  const start = spec.startKey ? formatDayKey(spec.startKey) : new Date(anchorMon);
+  let end = spec.endKey ? formatDayKey(spec.endKey) : null;
+  const cap = new Date(anchorMon);
+  cap.setDate(cap.getDate() + SERIES_MAX_WEEKS * 7 - 1);
+  if (!end || end > cap) end = cap;
+  if (end < start) return [];
+
+  /* Begin at the in-phase week at or before the start, so a start date earlier
+     than the day the block was placed on is still covered. Whole weeks across a
+     DST boundary differ by an hour, which the round absorbs. */
+  const startMon = ctMondayOf(start);
+  const wk = Math.round((startMon - anchorMon) / (7 * 24 * 3600 * 1000));
+  const first = new Date(anchorMon);
+  first.setDate(anchorMon.getDate() + Math.floor(wk / every) * every * 7);
+
+  const out = [];
+  for (let mon = new Date(first); mon <= end && out.length < SERIES_MAX_BLOCKS;
+       mon.setDate(mon.getDate() + 7 * every)) {
+    for (const i of days) {
+      const d = new Date(mon);
+      d.setDate(mon.getDate() + i);
+      if (d < start || d > end) continue;
+      if (out.length >= SERIES_MAX_BLOCKS) break;
+      out.push(dateToLocalKey(d));
+    }
+  }
+  return out;
+}
+
+/* What the repeat says, in words, for a block that carries one. The edit sheet
+   read back "part of a series of 12" and nothing else, so the one thing a
+   series is actually about — which days, how often, until when — was the one
+   thing it could not tell you. */
+function seriesSpecText(b) {
+  if (!b || !b.seriesId) return '';
+  const parts = [];
+  const days = (b.seriesDays || []).filter(i => i >= 0 && i <= 6);
+  if (days.length === 7) parts.push('every day');
+  else if (days.length) parts.push(days.map(i => DAY_LONG[i] + 's').join(', '));
+  const every = seriesEveryWeeks(b.seriesEvery);
+  if (every > 1) parts.push(`every ${every} weeks`);
+  if (b.seriesEnd) {
+    const d = formatDayKey(b.seriesEnd);
+    parts.push(`until ${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`);
+  }
+  return parts.join(', ');
+}
+
 /* Every activity id the destination child can actually resolve. Only consulted
    for a CROSS-CHILD copy: a block naming an activity that is private to Jenn
    renders as nothing at all on Jess's day, which is the same invisible failure
