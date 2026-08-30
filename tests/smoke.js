@@ -735,6 +735,60 @@ function findChromium() {
     if (afterDown <= 0) bad.push(`moving the cursor down scrolled to ${afterDown}, expected the page to move down`);
 
     doc.scrollTop = 0;
+
+    /* THE DAY SCREEN, which is where this was reported broken. The workspace is
+       the scroller there, so a middle-drag must move IT and leave the document —
+       and the topbar with it — exactly where it was. That is the whole of the
+       bug: #screen-day was unbounded, the workspace could not scroll, and
+       panLeftover handed the entire gesture to the page.
+
+       Driven from a block as well as from open canvas, because the block's own
+       pointerdown handlers used to stopPropagation unconditionally, so a drag
+       that began two pixels inside a card did nothing at all. */
+    // The Saturday the suite seeded a training block on, so the gear rows and
+    // the training chip — the elements that used to swallow the press — exist.
+    openDay(getDayKeys(0)[5], 5);
+    const ws = document.querySelector('#screen-day .day-workspace');
+    if (!ws) { bad.push('no day workspace to pan'); return bad; }
+    if (ws.scrollHeight <= ws.clientHeight + 4) bad.push('the day workspace does not scroll, so nothing can pan it');
+    ws.setPointerCapture = ws.setPointerCapture || (() => {});
+    ws.releasePointerCapture = ws.releasePointerCapture || (() => {});
+    /* pointerId 1, like the week drag above: Chrome treats the primary mouse
+       pointer as active, so setPointerCapture inside the handler resolves
+       instead of throwing an uncaught NotFoundError on a synthetic id. */
+    const sendOn = (target, type, x, y, button) => target.dispatchEvent(new PointerEvent(type, {
+      bubbles: true, cancelable: true, pointerId: 1, button, buttons: button === 1 ? 4 : 0,
+      clientX: x, clientY: y,
+    }));
+
+    const from = (target, label) => {
+      ws.scrollTop = 0;
+      doc.scrollTop = 0;
+      const r = ws.getBoundingClientRect();
+      const x = r.left + r.width / 2;
+      // Cursor moves DOWN, which is the direction the browser's own autoscroll
+      // would take — the first version of attachMiddleDragPan had it inverted.
+      sendOn(target, 'pointerdown', x, r.top + 180, 1);
+      sendOn(target, 'pointermove', x, r.top + 320, 1);
+      sendOn(target, 'pointerup',   x, r.top + 320, 1);
+      if (ws.scrollTop <= 0) bad.push(`a middle-drag ${label} did not move the schedule`);
+      if (doc.scrollTop > 1) bad.push(`a middle-drag ${label} scrolled the page instead of the schedule`);
+      ws.scrollTop = 0;
+    };
+    from(ws, 'on open canvas');
+    /* Specifically an element that stops pointerdown, not just any block:
+       .block-gear-item and .block-train-chip called stopPropagation
+       unconditionally, so a drag beginning two pixels inside a card did nothing
+       while the same drag on open canvas panned the day. Asserted rather than
+       skipped — falling back to a plain .placed-block would let this coverage
+       lapse the moment the fixture changed. */
+    const chip = document.querySelector('#timeline .block-train-chip')
+              || document.querySelector('#timeline .block-gear-item');
+    if (!chip) bad.push('no training chip or gear row on the seeded day — this case is untested');
+    else from(chip, 'starting on a block');
+
+    ws.scrollTop = 0;
+    doc.scrollTop = 0;
     return bad.length === 0 || bad;
   });
 
