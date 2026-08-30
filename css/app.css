@@ -269,11 +269,30 @@
      be naming the only thing on screen. */
 
   /* Must chain .screen.active so #screen-day does not override .screen { display:none }. */
+  /* BOUNDED, not min-height. With min-height the flex column grew to its own
+     content — the 1344px schedule — so .day-workspace below never received a
+     definite size to scroll inside, and the DOCUMENT scrolled instead. The
+     wheel hid that (overscroll-behavior: contain on the workspace stops wheel
+     chaining) but middle-drag did not: attachMiddleDragPan deliberately hands
+     leftover scroll to the page, so the one input that reached the document was
+     the middle button, and it carried the topbar off the screen with it.
+     A fixed height makes .day-workspace the only thing that can move.
+     min-height: 0 is needed to beat .screen's own 100vh floor. */
   #screen-day.screen.active {
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
-    min-height: 100dvh;
+    min-height: 0;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+  /* The kid's bottom bar is fixed and the body pads 64px to clear it, so the
+     screen gets 100dvh MINUS the bar. body.has-kid-nav .screen says this too but
+     loses on specificity to the rule above — which is exactly why the day screen
+     kept a phantom 64px of document scroll. */
+  body.has-kid-nav #screen-day.screen.active {
+    height: calc(100vh - 64px - env(safe-area-inset-bottom, 0));
+    height: calc(100dvh - 64px - env(safe-area-inset-bottom, 0));
   }
   /* The one scroll surface on this screen. Vertically it carries the whole
      6am-10pm day; horizontally it carries however many day columns are on show,
@@ -391,8 +410,10 @@
   }
 
   @media (min-width: 980px) and (orientation: landscape) {
+    /* overflow:hidden lived here, and here only — which is why the day screen
+       scrolled correctly on a desktop in landscape and nowhere else. It is on
+       the base rule now; this keeps only the inset padding. */
     #screen-day.screen.active {
-      overflow: hidden;
       padding-bottom: env(safe-area-inset-bottom, 0px);
     }
     #screen-day > .parent-banner.sticky {
@@ -791,10 +812,14 @@
   /* Free time = plain lined paper, so an empty day genuinely looks empty. */
   .tg2-lane {
     position: relative;
+    /* Own stacking context — same reason as .wf-day-col and .tl-canvas. */
+    z-index: 0;
     background: var(--paper, #fffdf5);
     border: 1.5px solid rgba(42,35,32,0.18);
     border-radius: 7px;
-    background-image: repeating-linear-gradient(180deg, transparent 0 23px, rgba(42,35,32,0.06) 23px 24px);
+    /* The 24px repeating gradient that lived here matched neither the hour
+       (51px) nor the half-hour (25.5px) at this view's 0.85px/min, so it read
+       as a time grid while naming no time. .hour-grid draws the real one. */
     overflow: hidden;
   }
   .tg2-lane.today { border-color: #2f8f84; box-shadow: 0 0 0 1.5px rgba(47,143,132,0.35); }
@@ -1690,6 +1715,9 @@
     padding: 0;
     cursor: pointer;
     position: relative;
+    /* Its own stacking context, so the hour grid inside it can outrank the
+       cards without also outranking the sticky day header outside it. */
+    z-index: 0;
     overflow: hidden;
   }
   .wf-day-col:last-child { border-right: none; }
@@ -1743,18 +1771,12 @@
   /* "Now" marker on today's column */
   .wf-now-line {
     position: absolute; left: 0; right: 0; height: 0;
-    border-top: 2px solid #e5484d; z-index: 3; pointer-events: none;
+    /* Above .hour-grid--wf (4): where you are now beats what o'clock it is. */
+    border-top: 2px solid #e5484d; z-index: 5; pointer-events: none;
   }
   .wf-now-line::before {
     content: ''; position: absolute; left: 0; top: -3px;
     width: 5px; height: 5px; border-radius: 50%; background: #e5484d;
-  }
-  /* Hour gridlines — solid like the print view so each hour reads as its own
-     row. Above the tint bands, below the activity cards. */
-  .wf-hour-line {
-    position: absolute; left: 0; right: 0; height: 0;
-    border-top: 1px solid var(--paper-line); opacity: 0.9;
-    pointer-events: none; z-index: 1;
   }
   .wf-card {
     position: absolute;
@@ -2080,9 +2102,46 @@
   .timeline {
     position: relative;
     display: flex;
-    align-items: flex-start;
+    flex-direction: column;
     min-height: 1344px; /* DAY_MIN_SPAN(960) * PX_PER_MIN(1.4), see JS */
     padding: 0 0.8rem 200px;
+  }
+  /* The schedule proper: hour ladder beside the day columns. Its top is the
+     canvases' top, which is the whole point of moving the day headers out — see
+     buildTimeline in js/08-day-view.js. */
+  .tl-body {
+    display: flex;
+    align-items: flex-start;
+  }
+  /* The day names, pinned to the top of .day-workspace. Inside the scroller, so
+     panning sideways at 2 and 3 days keeps each header over its own column with
+     no scrollLeft mirroring. Only rendered when more than one day is on show —
+     with one column the topbar already says which day it is. */
+  .tl-headrow {
+    position: sticky;
+    top: 0;
+    z-index: 8;
+    display: flex;
+    background: var(--paper);
+  }
+  /* Sits over the hour gutter's column, and stays put horizontally the way the
+     gutter does, so headers slide under it rather than past it. */
+  .tl-headrow-spacer {
+    width: 50px;
+    flex-shrink: 0;
+    position: sticky;
+    left: 0;
+    z-index: 9;
+    background: var(--paper);
+  }
+  /* Same grid as .tl-cols — same column count, same gap — or a header would not
+     sit over the day it names. */
+  .tl-headcols {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(var(--day-cols, 1), minmax(0, 1fr));
+    gap: 0.5rem;
   }
   .tl-gutter {
     width: 50px;
@@ -2099,8 +2158,11 @@
     position: absolute;
     right: 8px;
     font-size: calc(0.92rem * var(--fs-scale, 1));
-    font-weight: 600;
-    color: var(--ink-muted);
+    /* Full ink at 800, not muted at 600. This label and the rule beside it are
+       the whole answer to "where does nine o'clock start", and it was the
+       lightest text on the screen. */
+    font-weight: 800;
+    color: var(--ink);
     font-family: 'Patrick Hand', sans-serif;
     transform: translateY(-50%);
   }
@@ -2113,18 +2175,17 @@
   }
   .tl-col { position: relative; min-width: 0; }
   /* The day the topbar's 📋 / 🌙 / 🗑 act on. Only marked when more than one day
-     is on screen — with one column there is nothing to distinguish it from. */
-  .timeline--multi .tl-col--current .tl-col-head {
+     is on screen — with one column there is nothing to distinguish it from.
+     Two selectors because the header and the canvas are no longer nested:
+     focusDayColumn marks both. */
+  .timeline--multi .tl-col-head--current {
     background: var(--accent-yellow);
   }
   .timeline--multi .tl-col--current .tl-canvas {
-    box-shadow: 0 0 0 2px var(--accent-strong);
+    box-shadow: inset 0 0 0 2px var(--paper-line), 0 0 0 2px var(--accent-strong);
     border-radius: 6px;
   }
   .tl-col-head {
-    position: sticky;
-    top: 0;
-    z-index: 7;
     width: 100%;
     display: flex;
     align-items: baseline;
@@ -2172,8 +2233,23 @@
   .tl-band-free   { background: #d8f0e1; }
   .tl-canvas {
     position: relative;
-    border: 2px solid var(--paper-line);
-    border-radius: 0 0 6px 6px;
+    /* A STACKING CONTEXT, deliberately. Without it .placed-block (z10),
+       .tl-now-line (z20) and .tl-doodle (z25) compete directly with the sticky
+       header row and hour gutter and win, so blocks slid over the day names as
+       you scrolled and over the hour labels as you panned. Pinning the canvas
+       at 0 traps everything it contains below them in one move, and changes
+       nothing about the order inside it. */
+    z-index: 0;
+    /* An INSET SHADOW, not a border, and that is load-bearing arithmetic. A 2px
+       border on a border-box element whose height JS sets to exactly the day's
+       1344px leaves a 1340px padding box — so the 10pm line and the tail of a
+       block ending at 10pm were clipped away, and every absolutely positioned
+       child sat 2px below where a tap measured from (getBoundingClientRect
+       reports the border box). An inset shadow occupies no layout, so the
+       canvas's content origin, its border-box top and the hour gutter's origin
+       are now one and the same. */
+    box-shadow: inset 0 0 0 2px var(--paper-line);
+    border-radius: 6px;
     background: var(--paper);
     overflow: hidden;
     cursor: pointer;
@@ -2207,18 +2283,68 @@
   .tl-canvas.placing .tl-placement-guide {
     opacity: 1;
   }
-  .tl-hour-line {
+  /* .tl-hour-line and .tl-halfhour-line lived here. Three surfaces each drew
+     their own rules — or, in the Day Blocks week, a decorative stripe that named
+     no time — and all of them drew them UNDER the blocks, so the grid said
+     nothing the moment a day was actually planned. One owner now: buildHourGrid
+     in js/05-helpers.js.
+
+     ── The :00 / :30 grid ──
+     Over the blocks, and no text: a label on every hour on three surfaces at
+     three scales is a lot of words on screens held to 200 of them, so the hour
+     reads as a heavier rule with a tick at the column's left edge and the half
+     hour as a lighter dashed one. The rule crossing the column stays quiet
+     because it crosses saturated block colours; the tick is what carries it,
+     and a white lower edge keeps both legible on the dark categories.
+     Takes no pointer events, so nothing it covers is harder to tap. */
+  .hour-grid {
     position: absolute;
-    left: 0; right: 0;
-    height: 0;
-    border-top: 1.5px solid var(--paper-line);
+    inset: 0;
+    pointer-events: none;
   }
-  .tl-halfhour-line {
+  .hour-grid-line { position: absolute; left: 0; right: 0; }
+  .hour-grid-line::before {
+    content: '';
     position: absolute;
-    left: 0; right: 0;
+    left: 0;
+    border-radius: 0 2px 2px 0;
+  }
+  .hour-grid-line--hour {
+    height: 2px;
+    margin-top: -1px;
+    background: rgba(42,35,32,0.46);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.5);
+  }
+  .hour-grid-line--hour::before {
+    top: -2px; width: 14px; height: 6px;
+    background: rgba(42,35,32,0.72);
+  }
+  .hour-grid-line--half {
     height: 0;
-    border-top: 1px dashed var(--paper-line);
-    opacity: 0.5;
+    border-top: 1px dashed rgba(42,35,32,0.26);
+  }
+  .hour-grid-line--half::before {
+    top: -1px; width: 6px; height: 2px;
+    background: rgba(42,35,32,0.38);
+  }
+  /* Per surface, above the blocks and below whatever must still win: on the day
+     that is the done button, the placement guide and the now line (14/18/20);
+     in the Full week the now line (5); in the Day Blocks lane nothing, so it
+     sits over the clash outline and its flag too. */
+  .hour-grid--day { z-index: 12; }
+  .hour-grid--wf  { z-index: 4; }
+  .hour-grid--tg2 { z-index: 7; }
+  /* The tick is sized to its column, not fixed. The day view has one wide
+     column and can carry a 14px mark; the week views have seven narrow ones,
+     where the same mark is a tenth of the lane and seventeen rows of them read
+     as a ladder rather than a scale. */
+  .hour-grid--wf .hour-grid-line--hour::before,
+  .hour-grid--tg2 .hour-grid-line--hour::before {
+    top: -1px; width: 8px; height: 4px;
+  }
+  .hour-grid--wf .hour-grid-line--half::before,
+  .hour-grid--tg2 .hour-grid-line--half::before {
+    width: 4px;
   }
   .tl-now-line {
     position: absolute;

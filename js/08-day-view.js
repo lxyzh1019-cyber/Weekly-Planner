@@ -24,11 +24,13 @@ function dayViewSpan() {
   const n = parseInt(localStorage.getItem(DAY_SPAN_LS_KEY) || '1', 10);
   return (n === 2 || n === 3) ? n : 1;
 }
+/* How many columns this viewport can carry at all, whatever is stored. */
+function dayViewSpanAvailable() {
+  return Math.max(1, Math.floor((window.innerWidth - 64) / DAY_SPAN_MIN_WIDTH_PER_COL));
+}
 /* What the viewport can actually carry, which is what buildTimeline renders. */
 function dayViewSpanEffective() {
-  const want = dayViewSpan();
-  const avail = Math.max(1, Math.floor((window.innerWidth - 64) / DAY_SPAN_MIN_WIDTH_PER_COL));
-  return Math.max(1, Math.min(want, avail));
+  return Math.max(1, Math.min(dayViewSpan(), dayViewSpanAvailable()));
 }
 function setDayViewSpan(n) {
   try { localStorage.setItem(DAY_SPAN_LS_KEY, String(n)); } catch (e) {}
@@ -53,12 +55,16 @@ function renderDaySpanTabs() {
   const wrap = document.getElementById('daySpanTabs');
   if (!wrap) return;
   const cur = dayViewSpan();
-  const eff = dayViewSpanEffective();
+  /* What the SCREEN can carry, not what is currently chosen. This read
+     dayViewSpanEffective(), which is min(chosen, available) — so on one day both
+     2 and 3 were drawn as unavailable, and on two days 3 was: the control told
+     you the wider views were impossible whenever you were not already in them. */
+  const avail = dayViewSpanAvailable();
   wrap.innerHTML = '';
   [1, 2, 3].forEach(n => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'day-span-tab' + (cur === n ? ' active' : '') + (n > eff ? ' unavailable' : '');
+    b.className = 'day-span-tab' + (cur === n ? ' active' : '') + (n > avail ? ' unavailable' : '');
     b.textContent = String(n);
     b.setAttribute('aria-label', n === 1 ? 'Show one day' : `Show ${n} days side by side`);
     b.setAttribute('aria-pressed', cur === n ? 'true' : 'false');
@@ -263,19 +269,47 @@ function buildTimeline() {
   tl.style.setProperty('--day-cols', String(keys.length));
 
   const canvasHeight = DAY_MIN_SPAN * PX_PER_MIN;
-  tl.appendChild(buildHourGutter(canvasHeight));
+
+  /* THE HEADER ROW IS NOT INSIDE THE COLUMNS. It used to be: .tl-col-head sat
+     at the top of each .tl-col, above .tl-canvas, so the canvas started ~48px
+     down while .tl-gutter — a sibling of the whole column stack — started at
+     zero. Nothing put the two back in phase, so at 2 and 3 days every hour
+     label in the gutter named a line ~34 minutes below itself. One day has no
+     header, which is the only reason this was ever invisible.
+
+     Splitting the row out gives the gutter and the canvases one origin again.
+     It stays INSIDE .day-workspace, sticky at its top: a header outside the
+     scroller would have to mirror scrollLeft by hand to stay over its columns
+     when the view pans sideways at 2 and 3 days, and this way the browser does
+     it. The workspace is still the only scroller. */
+  const multi = keys.length > 1;
+  const headRow = document.createElement('div');
+  headRow.className = 'tl-headrow';
+  const headSpacer = document.createElement('div');
+  headSpacer.className = 'tl-headrow-spacer';
+  headRow.appendChild(headSpacer);
+  const headCols = document.createElement('div');
+  headCols.className = 'tl-headcols';
+  headRow.appendChild(headCols);
+
+  const body = document.createElement('div');
+  body.className = 'tl-body';
+  body.appendChild(buildHourGutter(canvasHeight));
 
   const cols = document.createElement('div');
   cols.className = 'tl-cols';
   let running = false;
   const allBlocks = [];
   keys.forEach(key => {
-    const built = buildDayColumn(key, canvasHeight, keys.length > 1);
+    const built = buildDayColumn(key, canvasHeight, multi);
     cols.appendChild(built.el);
+    if (built.head) headCols.appendChild(built.head);
     if (built.hasRunningStopwatch) running = true;
     allBlocks.push(...built.blocks);
   });
-  tl.appendChild(cols);
+  if (multi) tl.appendChild(headRow);
+  body.appendChild(cols);
+  tl.appendChild(body);
 
   if (running) {
     activeStopwatchTick = setInterval(()=>{
@@ -322,16 +356,18 @@ function buildDayColumn(dayKey, canvasHeight, withHeader) {
   col.className = 'tl-col' + (dayKey === currentDayKey ? ' tl-col--current' : '');
   col.dataset.dayKey = dayKey;
 
+  let head = null;
   if (withHeader) {
     const d = formatDayKey(dayKey);
-    const head = document.createElement('button');
+    head = document.createElement('button');
     head.type = 'button';
-    head.className = 'tl-col-head' + (dayKey === todayKey() ? ' is-today' : '');
+    head.className = 'tl-col-head' + (dayKey === todayKey() ? ' is-today' : '')
+                   + (dayKey === currentDayKey ? ' tl-col-head--current' : '');
+    head.dataset.dayKey = dayKey;
     head.innerHTML = `<span class="tl-col-day">${escapeHtml(DAY_SHORT[dayIdxOfKey(dayKey)])}</span>
       <span class="tl-col-date">${d.getDate()}</span>`;
     // Tapping the header makes that day the one the topbar's 📋 / 🌙 / 🗑 act on.
     head.onclick = () => { focusDayColumn(dayKey); };
-    col.appendChild(head);
   }
 
   const canvas = document.createElement('div');
@@ -357,26 +393,9 @@ function buildDayColumn(dayKey, canvasHeight, withHeader) {
   canvas.appendChild(guide);
   if (dayKey === currentDayKey) timelinePlacementGuideEl = guide;
 
-  // Hour + half-hour rules
-  const firstHour = Math.ceil((zMinStart + START_MIN) / 60);
-  const lastHour  = Math.floor((zMinEnd + START_MIN) / 60);
-  for (let h = firstHour; h <= lastHour; h++) {
-    const minFromZoneStart = (h * 60) - START_MIN - zMinStart;
-    const y = minFromZoneStart * PX_PER_MIN;
-    const hourLine = document.createElement('div');
-    hourLine.className = 'tl-hour-line';
-    hourLine.style.top = y + 'px';
-    canvas.appendChild(hourLine);
-    if (h < lastHour || minFromZoneStart + 30 < spanMin) {
-      const halfY = y + 30 * PX_PER_MIN;
-      if (halfY < canvasHeight) {
-        const halfLine = document.createElement('div');
-        halfLine.className = 'tl-halfhour-line';
-        halfLine.style.top = halfY + 'px';
-        canvas.appendChild(halfLine);
-      }
-    }
-  }
+  /* The hour and half-hour rules are NOT drawn here. They go on last, over the
+     blocks — see the buildHourGrid append below. Drawn first, as they were,
+     every rule vanished under the first thing placed on top of it. */
 
   // "Now" line, on the column that is actually today
   if (dayKey === todayKey()) {
@@ -422,9 +441,15 @@ function buildDayColumn(dayKey, canvasHeight, withHeader) {
   // Pending invitations from sister — render as dashed-border blocks
   renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd, dayKey);
 
+  /* Last, so :00 and :30 stay readable across whatever is placed over them.
+     zMinStart is 0 on every path today, which is why the grid can measure from
+     START_MIN; a zoomed zone would have to pass its own offset in. */
+  canvas.appendChild(buildHourGrid(PX_PER_MIN, spanMin, { cls: 'hour-grid--day' }));
+
   col.appendChild(canvas);
   return {
     el: col,
+    head,
     blocks,
     hasRunningStopwatch: blocks.some(b => !!(b.stopwatch && b.stopwatch.enabled && b.stopwatch.running)),
   };
@@ -438,8 +463,13 @@ function focusDayColumn(dayKey) {
   if (!dayKey || dayKey === currentDayKey) return;
   currentDayKey = dayKey;
   renderDayHeading();
+  // Two trees since the headers moved out of the columns: the canvas keeps its
+  // outline, the header keeps its highlight, and both must agree on which day
+  // the topbar is acting on.
   document.querySelectorAll('#timeline .tl-col').forEach(c =>
     c.classList.toggle('tl-col--current', c.dataset.dayKey === dayKey));
+  document.querySelectorAll('#timeline .tl-col-head').forEach(h =>
+    h.classList.toggle('tl-col-head--current', h.dataset.dayKey === dayKey));
   renderVibe();
 }
 
@@ -1152,7 +1182,10 @@ function buildBlockTrainingChecks(b) {
         + `${TRAINING_CHECKS.filter(x => b.trainingCheck[x.id]).length}/${TRAINING_CHECKS.length}`;
     };
     // Real taps, not scroll gestures — let them through the block tap guard.
-    row.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+    // The middle button is a pan, never a tap, so it must reach .day-workspace:
+    // swallowing it here is why a middle-drag started over a gear row did
+    // nothing at all while the same drag two pixels away panned the day.
+    row.addEventListener('pointerdown', (ev) => { if (ev.button !== 1) ev.stopPropagation(); });
     wrap.appendChild(row);
   });
   return wrap;
@@ -1171,7 +1204,8 @@ function buildBlockTrainingChip(b) {
   el.innerHTML = `<span>${blockIsCompetition(b) ? '🏆' : '🏋️'} ${done}/${TRAINING_CHECKS.length}</span>`
     + `<span class="block-train-chip-go">check off ›</span>`;
   el.onclick = (e) => { e.stopPropagation(); openKidTrainingQuick(b.id); };
-  el.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+  // Middle button passes through to the workspace's pan — see buildBlockTrainingChecks.
+  el.addEventListener('pointerdown', (ev) => { if (ev.button !== 1) ev.stopPropagation(); });
   return el;
 }
 
@@ -1338,15 +1372,30 @@ function kidTrainingOpenEdit() {
    whichever day the topbar happened to name. */
 function handleCanvasTap(e, zMinStart) {
   const canvas = e.currentTarget;
-  const rect = canvas.getBoundingClientRect();
-  const y = e.clientY - rect.top;
-  const relMin = Math.round(y / PX_PER_MIN);
-  // Snap to 15 min
-  const snapped = Math.round(relMin / 15) * 15;
-  const absMin = START_MIN + zMinStart + snapped;
-
   focusDayColumn(canvas.dataset.dayKey);
-  addActivityAtMin(absMin);
+  addActivityAtMin(START_MIN + zMinStart + canvasSnapMin(canvas, e.clientY));
+}
+
+/* One place converts a pointer's y into a snapped minute, for the tap and for
+   the guide that promises where the tap will land — they disagreed before.
+
+   clientTop is subtracted because getBoundingClientRect() reports the BORDER
+   box while everything drawn in the canvas is positioned against the padding
+   box; it is 0 today (the canvas draws its edge with an inset shadow) and stays
+   correct if a real border ever comes back.
+
+   One rounding, not two: Math.round(Math.round(y / 1.4) / 15) * 15 rounded to
+   the minute and then to the quarter, so a boundary could move half a minute
+   before the quarter-hour round ever saw it.
+
+   And the last quarter-hour of the day is not a legal start. Without the clamp
+   a tap at the very bottom gave startMin === END_MIN, placeBlock trimmed the
+   duration to END_MIN - startMin = 0, and a zero-minute block was saved. */
+function canvasSnapMin(canvas, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const y = clientY - rect.top - canvas.clientTop;
+  const snapped = Math.round(y / (PX_PER_MIN * 15)) * 15;
+  return Math.max(0, Math.min(DAY_MIN_SPAN - 15, snapped));
 }
 
 /* Shared placement entry point used by both the timeline canvas tap and the
@@ -1481,12 +1530,9 @@ function pickFromSlot(actId) {
 function updatePlacementGuideFromPointer(ev, zMinStart) {
   const canvas = ev?.currentTarget;
   if (!canvas || !selectedActivity) return;
-  const rect = canvas.getBoundingClientRect();
-  const rawY = ev.clientY - rect.top;
-  const clampedY = Math.max(0, Math.min(rect.height, rawY));
-  const relMin = Math.round(clampedY / PX_PER_MIN);
-  const snapped = Math.round(relMin / 15) * 15;
-  const snappedY = Math.max(0, Math.min(rect.height, snapped * PX_PER_MIN));
+  // The same snap the tap will use, so the line promises where the block lands.
+  const snapped = canvasSnapMin(canvas, ev.clientY);
+  const snappedY = snapped * PX_PER_MIN;
   const absMin = START_MIN + zMinStart + snapped;
   currentTimelineGuideY = snappedY;
   canvas.style.setProperty('--place-guide-y', `${snappedY}px`);
@@ -1537,7 +1583,12 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
   // W5: keep the block inside the day — trim its duration to the room left from
   // its start so what's saved always renders in full.
   const reqDur = Math.max(5, durationMin || 0);
-  const fitDur = Math.min(reqDur, END_MIN - startMin);
+  /* The 5-minute floor belongs on the FITTED duration too. It only guarded the
+     requested one, so a start at the very end of the day trimmed to
+     END_MIN - startMin === 0 and saved a zero-minute block — which then drew at
+     the 22px minimum with "0m" beside it. Callers that snap now clamp as well
+     (canvasSnapMin), but placeBlock is the one every path goes through. */
+  const fitDur = Math.max(5, Math.min(reqDur, END_MIN - startMin));
   if (fitDur < reqDur) showToast('✂️ Trimmed to fit the day');
   durationMin = fitDur;
   const block = {

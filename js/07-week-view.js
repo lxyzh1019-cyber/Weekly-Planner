@@ -738,6 +738,12 @@ function renderTimeGrid(keys) {
       lane.appendChild(el);
     });
 
+    /* The lane used to carry a 24px repeating-linear-gradient as its "lined
+       paper". At 0.85px/min an hour is 51px and a half-hour 25.5px, so those
+       rules named no time at all and drifted out of step with the gutter labels
+       beside them from the first hour onwards. Real ones, over the blocks. */
+    lane.appendChild(buildHourGrid(PX_PER_MIN, DAY_MIN_SPAN, { cls: 'hour-grid--tg2' }));
+
     grid.appendChild(lane);
   });
 
@@ -1151,7 +1157,9 @@ function renderFullWeek(keys) {
     cell.style.height = totalH + 'px';
     cell.onclick = (e)=>{
       // Only open the day when the empty lane (not a card) is tapped.
-      if (e.target === cell || e.target.classList.contains('wf-band') || e.target.classList.contains('wf-hour-line')) {
+      // The bands and the hour grid take no pointer events, so a click on either
+      // arrives with the cell as its target; only the cards stop it.
+      if (e.target === cell || e.target.classList.contains('wf-band')) {
         openDay(key, ci);
       }
     };
@@ -1175,15 +1183,12 @@ function renderFullWeek(keys) {
       }
     });
 
-    // Hour gridlines to anchor the eye to the time grid.
-    for (let h = firstHour; h <= lastHour; h++) {
-      const rel = h*60 - START_MIN;
-      if (rel <= 0 || rel >= DAY_MIN_SPAN) continue;
-      const line = document.createElement('div');
-      line.className = 'wf-hour-line';
-      line.style.top = (rel * PX_PER_MIN) + 'px';
-      cell.appendChild(line);
-    }
+    /* The hour gridlines used to be drawn here, before the cards, at z-index 1
+       against .wf-card's 2 — so on a planned day they were under every block
+       and the eye had nothing to anchor to. They go on last now, as an overlay,
+       and the two loops that draw them no longer disagree: this one skipped 6am
+       and 10pm with `<=`/`>=` while the gutter labelled them with `<`/`>`.
+       buildHourGrid (js/05-helpers.js) owns both ends of that now. */
 
     // "Now" marker on today's column.
     if (key === todayKey()) {
@@ -1335,6 +1340,9 @@ function renderFullWeek(keys) {
       attachTapGuard(card, ()=> openDayFromWeekCard(key, ci, b.id));
       cell.appendChild(card);
     });
+
+    // Last, over the cards. See buildHourGrid (js/05-helpers.js).
+    cell.appendChild(buildHourGrid(PX_PER_MIN, DAY_MIN_SPAN, { cls: 'hour-grid--wf' }));
 
     grid.appendChild(cell);
   });

@@ -158,6 +158,50 @@ function blockTierAtLeast(tier, min) {
   const order = BLOCK_TIERS.map(t => t.id);
   return order.indexOf(tier) >= order.indexOf(min);
 }
+
+/* ── One owner for the :00 / :30 rules ──
+   Three surfaces draw a day against a clock — the day view, the week's Day
+   Blocks lanes and the Full week — at three different scales, and they each
+   drew their own grid or none at all. The Day Blocks lane drew a decorative
+   24px stripe, which at 0.85px/min is neither an hour (51px) nor a half-hour
+   (25.5px): it went out of phase with its own gutter labels at the first hour
+   and never came back.
+
+   The grid returned here is meant to be appended LAST, over the blocks. Under
+   them it says nothing the moment a day is actually planned — which is exactly
+   when a child needs to know where nine o'clock is. It takes no pointer events,
+   so nothing it covers becomes harder to tap.
+
+   `spanMin` is how much of the day the surface draws (DAY_MIN_SPAN everywhere
+   today) and `pxPerMin` its own scale. Half-hour rules are dropped below
+   `halfMin` px an hour, where they would sit on top of the hour rule. */
+function buildHourGrid(pxPerMin, spanMin, opts) {
+  const o = opts || {};
+  const grid = document.createElement('div');
+  grid.className = 'hour-grid' + (o.cls ? ' ' + o.cls : '');
+  const span = spanMin != null ? spanMin : DAY_MIN_SPAN;
+  const firstHour = Math.ceil(START_MIN / 60);
+  const lastHour = Math.floor((START_MIN + span) / 60);
+  const showHalf = o.halves !== false && 60 * pxPerMin >= (o.halfMin || 34);
+  for (let h = firstHour; h <= lastHour; h++) {
+    const rel = h * 60 - START_MIN;
+    if (rel >= 0 && rel <= span) {
+      const line = document.createElement('div');
+      line.className = 'hour-grid-line hour-grid-line--hour';
+      line.style.top = (rel * pxPerMin) + 'px';
+      grid.appendChild(line);
+    }
+    if (!showHalf) continue;
+    const half = rel + 30;
+    if (half > 0 && half < span) {
+      const line = document.createElement('div');
+      line.className = 'hour-grid-line hour-grid-line--half';
+      line.style.top = (half * pxPerMin) + 'px';
+      grid.appendChild(line);
+    }
+  }
+  return grid;
+}
 /* At most `max` badges, with the overflow folded into one chip. */
 function foldBadges(badges, max = 2) {
   const list = (badges || []).filter(Boolean);

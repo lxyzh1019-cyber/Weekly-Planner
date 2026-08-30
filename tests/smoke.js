@@ -283,7 +283,7 @@ function findChromium() {
     return document.querySelectorAll('.wf-sideband-seg').length === 4;
   });
   checks.weekHourLines = await page.evaluate(() =>
-    document.querySelectorAll('.wf-hour-line').length > 0);
+    document.querySelectorAll('.wf-day-col .hour-grid-line--hour').length > 0);
   // Day Blocks renders once selected.
   checks.dayBlocksRenders = await page.evaluate(() => {
     setWeekView('timegrid');
@@ -712,6 +712,138 @@ function findChromium() {
     }
     setDayViewSpan(spanBefore);
     if (document.querySelectorAll('#timeline .tl-col').length !== 1) bad.push('going back to 1 day left extra columns');
+    return bad.length === 0 || bad;
+  });
+
+  /* The hour ladder must name the line it sits beside. It did not: .tl-col-head
+     lived inside .tl-col and pushed .tl-canvas down, while .tl-gutter — a
+     sibling of the whole column stack — started at the top of the header. At 2
+     and 3 days every label read 46px, about 33 minutes, above its own line, and
+     1 day was 2px out from the canvas border. One day has no header, which is
+     why nobody saw it. Measured at every column count, because that is the
+     variable that broke it. */
+  checks.theHourLadderLinesUpWithTheSchedule = await page.evaluate(() => {
+    const bad = [];
+    const spanBefore = dayViewSpan();
+    const keys = getDayKeys(0);
+    [1, 2, 3].forEach(span => {
+      setDayViewSpan(span);
+      openDay(keys[0], 0);
+      const cols = document.querySelectorAll('#timeline .tl-col').length;
+      if (cols !== span) { bad.push(`asked for ${span} columns, got ${cols}`); return; }
+      const label = [...document.querySelectorAll('#timeline .tl-hour-label')]
+        .find(l => l.textContent.trim() === '9am');
+      const canvas = document.querySelector('#timeline .tl-canvas');
+      // 9am is (9*60 - START_MIN) * PX_PER_MIN from the top of the day.
+      const wantTop = (9 * 60 - START_MIN) * PX_PER_MIN;
+      const line = [...canvas.querySelectorAll('.hour-grid-line--hour')]
+        .find(l => Math.abs(parseFloat(l.style.top) - wantTop) < 0.5);
+      if (!label) { bad.push(`no 9am label at ${span} day(s)`); return; }
+      if (!line) { bad.push(`no 9am rule at ${span} day(s)`); return; }
+      const lr = label.getBoundingClientRect(), pr = line.getBoundingClientRect();
+      const off = (lr.top + lr.height / 2) - (pr.top + pr.height / 2);
+      if (Math.abs(off) > 1) {
+        bad.push(`at ${span} day(s) the 9am label is ${off.toFixed(1)}px from its own rule`);
+      }
+    });
+    setDayViewSpan(spanBefore);
+    return bad.length === 0 || bad;
+  });
+
+  /* The schedule is the only thing that moves. #screen-day carried min-height
+     rather than a height, so the flex column grew to the 1344px schedule and
+     the DOCUMENT scrolled instead — 832px of it. The wheel hid that
+     (overscroll-behavior: contain), but middle-drag hands its leftover to the
+     page on purpose, so the one input that reached the document was the middle
+     button, and it carried the topbar off screen. dayScreenScrollsAsOneSurface
+     cannot see this: it only walks INSIDE #screen-day. */
+  checks.onlyTheScheduleScrollsOnTheDayScreen = await page.evaluate(() => {
+    const bad = [];
+    openDay(getDayKeys(0)[0], 0);
+    const ws = document.querySelector('#screen-day .day-workspace');
+    const doc = document.scrollingElement;
+    if (!(ws.scrollHeight > ws.clientHeight + 4)) {
+      bad.push('the workspace does not scroll, so nothing does');
+    }
+    const overflow = doc.scrollHeight - window.innerHeight;
+    if (overflow > 4) bad.push(`the document itself has ${overflow}px of scroll`);
+    const topbar = document.querySelector('#screen-day .day-topbar');
+    const before = topbar.getBoundingClientRect().top;
+    ws.scrollTop = 0;
+    ws.scrollTop = 300;
+    if (ws.scrollTop < 250) bad.push('the workspace refused to scroll');
+    const moved = topbar.getBoundingClientRect().top - before;
+    if (Math.abs(moved) > 1) bad.push(`the topbar moved ${moved.toFixed(1)}px with the schedule`);
+    ws.scrollTop = 0;
+    return bad.length === 0 || bad;
+  });
+
+  /* :00 and :30 survive a block being placed over them. Every surface drew its
+     rules BEFORE the blocks, so the grid said nothing the moment a day was
+     actually planned — and the Day Blocks lane drew a 24px repeating gradient
+     that, at 0.85px/min, was neither an hour (51px) nor a half-hour (25.5px).
+     Checked by stacking order rather than by eye: the grid must out-rank the
+     block it crosses, and take no pointer events while doing it. */
+  checks.theHourGridReadsThroughABlock = await page.evaluate(() => {
+    const bad = [];
+    const zOf = (el) => {
+      for (let n = el; n && n !== document.body; n = n.parentElement) {
+        const z = getComputedStyle(n).zIndex;
+        if (z !== 'auto') return parseInt(z, 10);
+      }
+      return 0;
+    };
+    const crosses = (line, block) => {
+      const a = line.getBoundingClientRect(), b = block.getBoundingClientRect();
+      return a.top >= b.top - 1 && a.top <= b.bottom + 1 && a.right > b.left && a.left < b.right;
+    };
+    const keys = getDayKeys(0);
+    const before = getDayBlocks(keys[0], 'jenn');
+    setDayBlocks(keys[0], [{ id: 'grid-probe', actId: 'school_day',
+      startMin: 9 * 60, durationMin: 180, checklistState: {} }], 'jenn');
+
+    const surface = (name, root, gridSel, blockSel) => {
+      const grid = root && root.querySelector(gridSel);
+      const block = root && root.querySelector(blockSel);
+      if (!grid) { bad.push(`${name}: no hour grid`); return; }
+      if (!block) { bad.push(`${name}: nothing placed to read through`); return; }
+      const hours = [...grid.querySelectorAll('.hour-grid-line--hour')];
+      const halves = [...grid.querySelectorAll('.hour-grid-line--half')];
+      if (hours.length < 17) bad.push(`${name}: ${hours.length} hour rules, expected the whole day`);
+      if (!halves.length) bad.push(`${name}: no half-hour rules`);
+      if (!hours.some(h => crosses(h, block))) bad.push(`${name}: no hour rule crosses the block`);
+      if (zOf(grid) <= zOf(block)) {
+        bad.push(`${name}: the grid (z${zOf(grid)}) is under the block (z${zOf(block)})`);
+      }
+      if (!(block.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+        bad.push(`${name}: the grid is drawn before the block`);
+      }
+      if (getComputedStyle(grid).pointerEvents !== 'none') {
+        bad.push(`${name}: the grid takes pointer events and would swallow taps`);
+      }
+    };
+
+    setDayViewSpan(1);
+    openDay(keys[0], 0);
+    surface('day view', document.querySelector('#timeline .tl-canvas'),
+            '.hour-grid--day', '.placed-block');
+    goWeek();
+    setWeekView('timegrid'); renderWeek();
+    surface('Day Blocks week', document.querySelector('.tg2-lane'),
+            '.hour-grid--tg2', '.tg2-block');
+    setWeekView('full'); renderWeek();
+    surface('Full week', document.querySelector('.wf-day-col'),
+            '.hour-grid--wf', '.wf-card');
+
+    // 6am and 10pm both get a rule: the gutter used < / > and the line loop
+    // <= / >=, so the two ends were labelled but never drawn.
+    const tops = [...document.querySelector('.wf-day-col')
+      .querySelectorAll('.hour-grid-line--hour')].map(l => Math.round(parseFloat(l.style.top)));
+    if (!tops.includes(0)) bad.push('the Full week labels 6am but draws no rule for it');
+
+    setWeekView('timegrid');
+    setDayBlocks(keys[0], before, 'jenn');
+    openDay(keys[0], 0);
     return bad.length === 0 || bad;
   });
 
