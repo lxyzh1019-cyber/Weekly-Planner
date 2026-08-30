@@ -1913,7 +1913,9 @@ function openCustomTask(context='training') {
   openSheet('customTaskOverlay');
 }
 function confirmCustomTask() {
-  const name = document.getElementById('taskName').value.trim();
+  // Capitalised on the way in: an exercise typed in a hurry on a phone reads
+  // "backstroke drill", and it is then the label on every session that uses it.
+  const name = capitaliseFirst(document.getElementById('taskName').value.trim());
   const sport = document.getElementById('taskSport').value;
   const reps = document.getElementById('taskReps').value.trim();
   const notes = document.getElementById('taskNotes').value.trim();

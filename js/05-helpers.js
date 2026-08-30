@@ -241,6 +241,20 @@ function seriesSpecText(b) {
   return parts.join(', ');
 }
 
+/* First letter up, the rest left alone. Not title case: "50m freestyle kick"
+   becoming "50m Freestyle Kick" is a different string from the one that was
+   typed, and a name that starts with a digit has no first letter to raise.
+   Applied where a name is SAVED rather than where it is drawn, because the
+   value is stored and read back on half a dozen surfaces. */
+function capitaliseFirst(str) {
+  const s = String(str == null ? '' : str);
+  const i = s.search(/\S/);
+  if (i < 0) return s;
+  const c = s[i];
+  const up = c.toUpperCase();
+  return up === c ? s : s.slice(0, i) + up + s.slice(i + 1);
+}
+
 /* The zone labels, shortened for a vertical axis 18px wide. Two surfaces draw
    that axis — the Full week's sideband and the print sheet's — and both need
    the same short form, so it is written once. */

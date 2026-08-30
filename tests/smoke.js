@@ -1791,6 +1791,25 @@ function findChromium() {
       if (t.addedBy !== 'jenn') bad.push(`the exercise records addedBy=${t.addedBy}`);
     }
 
+    /* First letter up, on the way in. Typed in a hurry on a phone it comes out
+       "backstroke drill", and it is then the label on every session that uses
+       it. Not title case, and a name starting with a digit is left alone —
+       "50m freestyle" must not become "50m Freestyle". */
+    const cap = (typed) => {
+      document.getElementById('taskName').value = typed;
+      document.getElementById('taskReps').value = '';
+      confirmCustomTask();
+      const last = (state.shared.customTasks || []).slice(-1)[0] || {};
+      return last.name;
+    };
+    const got = cap('backstroke drill');
+    if (got !== 'Backstroke drill') bad.push(`"backstroke drill" saved as "${got}"`);
+    const digits = cap('50m freestyle kick');
+    if (digits !== '50m freestyle kick') bad.push(`a name starting with a digit was changed to "${digits}"`);
+    const already = cap('Dryland circuit');
+    if (already !== 'Dryland circuit') bad.push(`an already-capitalised name became "${already}"`);
+    state.shared.customTasks = state.shared.customTasks.slice(0, 1);
+
     // She can tick it now — the point of not making her wait.
     renderTrainingSheet();
     const list = document.getElementById('objectivesList');
