@@ -4414,6 +4414,19 @@
     background: var(--paper); color: var(--ink); cursor: pointer;
     font-weight: 800; line-height: 1;
   }
+  /* One reviewable row of an imported calendar: a tick, when, and what. */
+  .sc-row {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.35rem 0; min-height: 44px;
+    border-top: 2px solid var(--paper-line);
+    font-size: max(13px, calc(0.86rem * var(--fs-scale, 1)));
+    cursor: pointer;
+  }
+  .sc-row:first-child { border-top: none; }
+  .sc-row input { width: 22px; height: 22px; flex: 0 0 auto; }
+  .sc-when { flex: 0 0 auto; font-weight: 800; color: var(--ink); }
+  .sc-what { flex: 1 1 auto; min-width: 0; color: var(--ink-light); overflow-wrap: anywhere; }
+  .sc-row--term .sc-what { color: var(--ink); font-weight: 700; }
   .repeat-every { min-height: 44px; width: 100%; }
   /* What a repeat says, above the detach button in the edit sheet. */
   .series-spec {

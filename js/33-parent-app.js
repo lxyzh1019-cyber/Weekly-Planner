@@ -198,7 +198,12 @@ function paRenderSchool() {
       <p class="pn-note">Statutory holidays and breaks are already in the shipped calendar; this is for
         the ones your school adds. Anything you type here syncs to the family's devices, so keep it
         general — no school name, no address.</p>
-    </div>`;
+    </div>
+
+    <!-- Rendered by scRenderImport (js/35-school-calendar.js). It owns the
+         parsing and the preview; this page owns where they sit. -->
+    <div id="scWrap"></div>`;
+  scRenderImport();
 }
 
 /* Saving is one function per card rather than one per field: a school day whose
@@ -287,6 +292,7 @@ function paHandleSchoolClick(e) {
 
 /* One delegated listener for all four, bound in js/99-main.js. */
 function paHandleClick(e) {
+  if (e.target.closest('[data-sc]')) { scHandleClick(e); return; }
   if (e.target.closest('[data-pa-school]')) { paHandleSchoolClick(e); return; }
   const pin = e.target.closest('[data-pa-action="pin"]');
   if (pin) { changeParentPin(); return; }
@@ -294,6 +300,7 @@ function paHandleClick(e) {
   if (scale) { paSetTextScale(scale.getAttribute('data-pa-scale')); return; }
 }
 function paHandleChange(e) {
+  if (e.target.closest('[data-sc]')) { scHandleChange(e); return; }
   const age = e.target.closest('[data-pa-age]');
   if (age) { age.value = paSetAge(age.getAttribute('data-pa-age'), age.value) ?? ''; }
 }

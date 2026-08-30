@@ -410,6 +410,116 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* AN IMPORTED CALENDAR CHANGES NOTHING UNTIL IT IS REVIEWED. A file that
+     silently marked twelve days as no-school is how a family comes to believe a
+     term is set up when it is wrong, so every date the parser produces goes
+     into a preview with a tick beside it — the same discipline pcwPlan keeps
+     for copying a week.
+
+     The fixture carries the cases that actually bite: a folded SUMMARY line, an
+     escaped comma, an all-day span whose DTEND is exclusive, a fortnightly
+     RRULE, an RRULE this deliberately does not understand, and a statutory
+     holiday whose name contains none of the day-off keywords. */
+  checks.anIcsFileBecomesDaysOffOnlyAfterReview = await page.evaluate(() => {
+    const bad = [];
+    const wasCal = state.shared.schoolCal;
+    const wasProfile = profile, wasViewing = parentViewing;
+    const ics = [
+      'BEGIN:VCALENDAR', 'VERSION:2.0',
+      'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20260831', 'SUMMARY:First Day of School', 'END:VEVENT',
+      'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20261221', 'DTEND;VALUE=DATE:20261225', 'SUMMARY:Winter Break', 'END:VEVENT',
+      'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20261225', 'DTEND;VALUE=DATE:20261226', 'SUMMARY:Christmas Day', 'END:VEVENT',
+      'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20261015', 'SUMMARY:Picture Day', 'END:VEVENT',
+      'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20260918', 'SUMMARY:Staff Professional Develop', ' ment Day', 'END:VEVENT',
+      'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20270625', 'SUMMARY:Last Day of School', 'END:VEVENT',
+      'BEGIN:VEVENT', 'DTSTART:20260908T160000', 'DTEND:20260908T170000', 'SUMMARY:Physio\\, left knee',
+        'RRULE:FREQ=WEEKLY;BYDAY=TU;INTERVAL=2;COUNT=3', 'END:VEVENT',
+      'BEGIN:VEVENT', 'DTSTART:20261001T090000', 'SUMMARY:Monthly thing', 'RRULE:FREQ=MONTHLY;COUNT=4', 'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+
+    state.shared.schoolCal = {};
+    const d = scBuildDraft(ics, 'test');
+
+    // Parsing writes nothing.
+    if (Object.keys(state.shared.schoolCal).length) bad.push('parsing the file changed the calendar');
+
+    const off = d.offDays.map(o => o.date);
+    // Winter Break's DTEND is exclusive: 21st through 24th, not the 25th.
+    ['2026-12-21', '2026-12-22', '2026-12-23', '2026-12-24'].forEach(k => {
+      if (!off.includes(k)) bad.push(`the all-day span dropped ${k}`);
+    });
+    const brk = d.offDays.filter(o => o.label === 'Winter Break');
+    if (brk.length !== 4) bad.push(`the break expanded to ${brk.length} days, expected 4`);
+    // A folded line is one summary, not two.
+    if (!d.offDays.some(o => o.label === 'Staff Professional Development Day')) {
+      bad.push('a folded SUMMARY was not rejoined');
+    }
+    /* Every all-day entry is listed, ticked or not: a keyword list cannot be
+       complete, and "Christmas Day" contains none of the words. */
+    if (!off.includes('2026-12-25')) bad.push('Christmas Day was not even offered');
+    if (!off.includes('2026-10-15')) bad.push('an all-day entry that is not a day off was hidden rather than shown unticked');
+    const tick = (date) => (d.offDays.find(o => o.date === date) || {}).on;
+    if (!tick('2026-12-25')) bad.push('Christmas Day arrived unticked');
+    if (!tick('2026-09-18')) bad.push('a staff day arrived unticked');
+    if (tick('2026-10-15')) bad.push('Picture Day arrived ticked — that is a school day');
+
+    // Term dates are proposed from the file's own naming, and NOT taken by default.
+    if (d.termStart !== '2026-08-31' || d.termEnd !== '2027-06-25') {
+      bad.push(`term read as ${d.termStart}..${d.termEnd}`);
+    }
+    if (d.takeTerm) bad.push('the term dates were ticked by default — that is a year-long guess');
+
+    // Timed events: a fortnightly Tuesday, three times, with the escape undone.
+    const phys = d.timed.filter(e => e.summary === 'Physio, left knee');
+    if (phys.length !== 3) bad.push(`the fortnightly rule expanded to ${phys.length}, expected 3`);
+    if (phys[0] && phys[0].startMin !== 16 * 60) bad.push('a timed event lost its start time');
+    if (phys[0] && phys[0].durationMin !== 60) bad.push('a timed event lost its length');
+    if (phys[1] && phys[1].dayKey !== '2026-09-22') bad.push(`INTERVAL=2 landed on ${phys[1].dayKey}`);
+    // And a rule it does not understand is counted, not half-applied.
+    if (d.skipped !== 1) bad.push(`${d.skipped} events reported skipped, expected the 1 monthly rule`);
+    if (d.timed.some(e => e.summary === 'Monthly thing')) bad.push('a rule it cannot read was expanded anyway');
+
+    // Committing takes the ticked rows only.
+    profile = 'parent'; parentViewing = 'jenn';
+    scDraft = d;
+    d.offDays.forEach(o => { o.on = (o.date === '2026-12-25'); });
+    scCommitSchool();
+    const saved = (state.shared.schoolCal.offDays || []).map(x => x.date);
+    if (saved.join(',') !== '2026-12-25') bad.push(`committed ${saved.length} days, expected only the ticked one`);
+    if (state.shared.schoolCal.termStart) bad.push('an unticked term was written anyway');
+    if (!isSchoolDay('2026-10-15')) bad.push('an unticked day off took effect');
+
+    // Timed events land as blocks on the chosen child, once.
+    const restore = [];
+    ['2026-09-08', '2026-09-22', '2026-10-06'].forEach(k => {
+      restore.push([k, getDayBlocksForProfile(k, 'jenn')]);
+      setDayBlocks(k, [], 'jenn');
+    });
+    scDraft = scBuildDraft(ics, 'test');
+    scBlockKid = 'jenn'; scBlockActId = 'piano';
+    scCommitBlocks();
+    const landed = getDayBlocksForProfile('2026-09-08', 'jenn') || [];
+    if (landed.length !== 1) bad.push(`${landed.length} blocks landed on the first physio day`);
+    else {
+      if (landed[0].actId !== 'piano') bad.push('the block is not the chosen activity');
+      if (landed[0].startMin !== 16 * 60) bad.push('the block did not take the event time');
+      if (!/Physio/.test(landed[0].note || '')) bad.push('the block lost what the event was called');
+    }
+    // Importing the same file twice must not double it up.
+    scDraft = scBuildDraft(ics, 'test');
+    scCommitBlocks();
+    if ((getDayBlocksForProfile('2026-09-08', 'jenn') || []).length !== 1) {
+      bad.push('a second import of the same calendar doubled the appointment');
+    }
+
+    restore.forEach(([k, b]) => setDayBlocks(k, b, 'jenn'));
+    scDraft = null;
+    state.shared.schoolCal = wasCal;
+    profile = wasProfile; parentViewing = wasViewing;
+    return bad.length === 0 || bad;
+  });
+
   /* SCHOOL DAYS ARE OFFERED, NOT ASSUMED. The calendar knows which days of a
      week are school days; what it must not do is quietly fill them in, because
      a week that arrived pre-planned is a week nobody decided. And only near the
