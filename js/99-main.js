@@ -97,6 +97,10 @@ window.addEventListener('pagehide', flushPush);
   // the wrap holds the listener rather than the buttons.
   const copyweek = document.getElementById('pcwWrap');
   if (copyweek) copyweek.addEventListener('click', pcwHandleClick);
+  // Copy a day: the two toggles are rebuilt on every change, so the sheet holds
+  // the listener rather than the buttons.
+  const tmpl = document.getElementById('templateOverlay');
+  if (tmpl) tmpl.addEventListener('click', copyDayHandleClick);
   // App's four screens: PIN, the age fields, the reading-size choice.
   ['paAccessWrap', 'paProfilesWrap', 'paPrefsWrap', 'paSchoolWrap'].forEach(id => {
     const el = document.getElementById(id);

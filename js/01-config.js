@@ -414,6 +414,16 @@ const SEASONAL_ACTIVITIES = [
   { id:'leaf_hike',     name:'Leaf Hike',        icon:'🍂', cat:'active', durationMin:90,  season:'autumn', suitableTime:['weekend'], social:true },
 ];
 
+/* The two girls, named and iconed in one place. The pair
+   `p === 'jenn' ? '🐥 Jenn' : '🦊 Jess'` is written out in about ten files; this
+   is not a sweep of those, it is somewhere for new code to read them from
+   rather than making it eleven. */
+const KID_LABEL = {
+  jenn: { icon: '🐥', name: 'Jenn' },
+  jess: { icon: '🦊', name: 'Jess' },
+};
+function kidLabel(p) { return KID_LABEL[p] || { icon: '👤', name: String(p || '') }; }
+
 /* ── The school year ──────────────────────────────────────────────────────────
    One source of truth for "is there school today, and when". Before this, two
    places each answered it and disagreed: SCHOOL_TEMPLATE placed the School Day

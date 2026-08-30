@@ -1394,43 +1394,131 @@ async function confirmAllToday() {
 /* ════════════════════════════════════════════════════════════════
    TEMPLATES / CLEAR
 ════════════════════════════════════════════════════════════════ */
-function openTemplateSheet() { refreshRestDayButton(); renderCopyDayList(); openSheet('templateOverlay'); }
+function openTemplateSheet() {
+  copyDaySrcWeek = 0;
+  copyDayDstKid = null;
+  refreshRestDayButton();
+  renderCopyDayList();
+  openSheet('templateOverlay');
+}
 
-/* The other days of the week on screen, each with what it actually holds, so
-   "copy Tuesday" is a decision made from the numbers rather than from memory.
-   Days with nothing on them are listed but not offered — copying a blank day
-   onto a planned one is a way to lose a plan, not a way to build one. */
+/* Which week the days on offer come from, and — for a parent only — whose day
+   they land on. Both are transient: they last as long as the sheet is open and
+   are reset by openTemplateSheet, because a copy is a decision about the day in
+   front of you and should not carry a stale choice in from the last one. Never
+   synced; every synced write is a full-document upload. */
+let copyDaySrcWeek = 0;
+let copyDayDstKid = null;
+
+const COPY_DAY_WEEKS = [[-1, 'Last week'], [0, 'This week'], [1, 'Next week']];
+
+/* Days to copy from, each with what it actually holds, so "copy Tuesday" is a
+   decision made from the numbers rather than from memory. Days with nothing on
+   them are listed but not offered — copying a blank day onto a planned one is a
+   way to lose a plan, not a way to build one.
+
+   Three weeks, not one. "Make this Tuesday like last Tuesday" was the obvious
+   thing to want and the one thing this sheet could not do; the engine
+   (copyDayInto) always could. Three and no more: a stepper that walks the year
+   is a date picker, and this is a sheet a nine-year-old opens to fix one day. */
 function renderCopyDayList() {
+  renderCopyDayControls();
   const wrap = document.getElementById('copyDayList');
   if (!wrap) return;
   wrap.innerHTML = '';
-  const keys = getDayKeys(weekOffset);
+  const srcKid = activeProfile();
+  const dstKid = copyDayDestKid();
+  const keys = getDayKeys(weekOffset + copyDaySrcWeek);
+  let offered = 0;
   keys.forEach((k, i) => {
-    if (k === currentDayKey) return;
-    const n = (getDayBlocks(k) || []).length;
+    if (k === currentDayKey && dstKid === srcKid) return;
+    const n = (getDayBlocks(k, srcKid) || []).length;
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'copy-day-row' + (n ? '' : ' empty');
     b.disabled = !n;
+    if (n) offered++;
     b.innerHTML = `<span class="cdr-day">${escapeHtml(DAY_LONG[i])}</span>
       <span class="cdr-count">${n ? `${n} thing${n === 1 ? '' : 's'}` : 'nothing planned'}</span>
       ${n ? '<span class="cdr-go">Copy ›</span>' : ''}`;
     if (n) b.onclick = () => confirmCopyDay(k, DAY_LONG[i], n);
     wrap.appendChild(b);
   });
+  /* A week with nothing in it says which week it is. Seven greyed rows read as
+     "copying is broken" rather than "you did not plan that week". */
+  if (!offered) {
+    const p = document.createElement('p');
+    p.className = 'cdr-empty';
+    p.textContent = copyDaySrcWeek === 0
+      ? 'Nothing else is planned this week yet.'
+      : `Nothing was planned ${copyDaySrcWeek < 0 ? 'last' : 'next'} week.`;
+    wrap.appendChild(p);
+  }
+}
+
+/* Who the copy lands on. Always a real child, and always this one unless a
+   parent has deliberately picked the sister. */
+function copyDayDestKid() {
+  const me = activeProfile();
+  if (!isParent()) return me;
+  return (copyDayDstKid === 'jenn' || copyDayDstKid === 'jess') ? copyDayDstKid : me;
+}
+
+/* The week stepper, and the sister row a parent gets. Writing into the other
+   child's plan is a parent action — a copy REPLACES the destination day, so a
+   child able to do it could overwrite her sister's week from her own screen. */
+function renderCopyDayControls() {
+  const weeks = document.getElementById('copyDayWeekTabs');
+  if (weeks) {
+    weeks.innerHTML = COPY_DAY_WEEKS.map(([off, label]) =>
+      `<button type="button" class="copy-day-tab${off === copyDaySrcWeek ? ' active' : ''}"
+         data-copyday-week="${off}" aria-pressed="${off === copyDaySrcWeek}">${escapeHtml(label)}</button>`
+    ).join('');
+  }
+  const kids = document.getElementById('copyDayKidTabs');
+  if (!kids) return;
+  const me = activeProfile();
+  const sister = me === 'jenn' ? 'jess' : 'jenn';
+  if (!isParent()) { kids.innerHTML = ''; kids.hidden = true; return; }
+  kids.hidden = false;
+  const dst = copyDayDestKid();
+  kids.innerHTML = [[me, `${kidLabel(me).icon} Her own day`], [sister, `${kidLabel(sister).icon} Over to ${kidLabel(sister).name}`]]
+    .map(([kid, label]) =>
+      `<button type="button" class="copy-day-tab${kid === dst ? ' active' : ''}"
+         data-copyday-kid="${escapeAttr(kid)}" aria-pressed="${kid === dst}">${escapeHtml(label)}</button>`
+    ).join('');
+}
+
+/* One delegated listener for both rows, bound in js/99-main.js. */
+function copyDayHandleClick(e) {
+  const wk = e.target.closest('[data-copyday-week]');
+  if (wk) { copyDaySrcWeek = parseInt(wk.getAttribute('data-copyday-week'), 10) || 0; renderCopyDayList(); return; }
+  const kid = e.target.closest('[data-copyday-kid]');
+  if (kid) { copyDayDstKid = kid.getAttribute('data-copyday-kid'); renderCopyDayList(); }
 }
 
 async function confirmCopyDay(srcKey, srcLabel, n) {
-  const had = (getDayBlocks(currentDayKey) || []).length;
+  const srcKid = activeProfile();
+  const dstKid = copyDayDestKid();
+  const cross = dstKid !== srcKid;
+  const whose = cross ? ` onto ${kidLabel(dstKid).name}'s day` : '';
+  const had = (getDayBlocks(currentDayKey, dstKid) || []).length;
+  const thing = `${n} thing${n === 1 ? '' : 's'}`;
+  const when = copyDaySrcWeek === 0 ? '' : copyDaySrcWeek < 0 ? ' last week' : ' next week';
   const msg = had
-    ? `Copy ${srcLabel}'s ${n} thing${n === 1 ? '' : 's'} here? What is on this day now will be replaced.`
-    : `Copy ${srcLabel}'s ${n} thing${n === 1 ? '' : 's'} onto this day?`;
+    ? `Copy ${srcLabel}${when}'s ${thing}${whose}? What is on that day now will be replaced.`
+    : `Copy ${srcLabel}${when}'s ${thing}${whose || ' onto this day'}?`;
   const ok = await showConfirm(msg, { okLabel: 'Copy it', cancelLabel: 'Not now', danger: had > 0 });
   if (!ok) return;
-  const copied = copyDayInto(srcKey, currentDayKey, activeProfile());
+  const res = copyDayInto(srcKey, currentDayKey, srcKid, dstKid);
   closeSheet('templateOverlay');
   buildTimeline();
-  showToast(copied ? `📋 Copied ${copied} — now fix what's wrong` : 'Nothing to copy');
+  if (!res.copied) { showToast('Nothing to copy'); return; }
+  /* Say what was left behind. A copy that silently dropped blocks is how
+     someone comes to believe a day is planned when it is half planned. */
+  showToast(res.dropped
+    ? `📋 Copied ${res.copied} — ${res.dropped} left behind, not on ${kidLabel(dstKid).name}'s list`
+    : `📋 Copied ${res.copied} — now fix what's wrong`);
 }
 
 function applyTemplate(type) {

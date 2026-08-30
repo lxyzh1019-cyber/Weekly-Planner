@@ -159,6 +159,20 @@ function blockTierAtLeast(tier, min) {
   return order.indexOf(tier) >= order.indexOf(min);
 }
 
+/* Every activity id the destination child can actually resolve. Only consulted
+   for a CROSS-CHILD copy: a block naming an activity that is private to Jenn
+   renders as nothing at all on Jess's day, which is the same invisible failure
+   the archive rule exists to stop (CLAUDE.md, "History is a record"). Archived
+   entries count as resolvable for exactly that reason — findActivity sees them,
+   so a block that names one still draws.
+
+   Same-child copies are deliberately NOT filtered: her own blocks already
+   resolve however they resolve, and dropping one there would be a screen
+   quietly deciding a block was wrong. */
+function placeableActivityIds(kid) {
+  return new Set(getAllActivities(kid, { includeArchived: true }).map(a => a.id));
+}
+
 /* ── One owner for the :00 / :30 rules ──
    Three surfaces draw a day against a clock — the day view, the week's Day
    Blocks lanes and the Full week — at three different scales, and they each

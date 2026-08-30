@@ -28,6 +28,15 @@ let pcwFromOffset = -1;      // source week, relative to the week we are in
 let pcwToOffset   = 0;       // destination week
 let pcwOnClash    = 'skip';  // 'skip' | 'replace' — what to do with a day that already has a plan
 let pcwTargetKid  = 'same';  // 'same' | 'jenn' | 'jess' — only reachable when the scope is one kid
+/* A whole week or one day. Not a second screen: the decision, the preview and
+   the commit are the same three functions either way, and a day copy that grew
+   its own panel would be a second thing that could disagree with this one about
+   what a copy is. In day mode the two weekday pickers below say which day comes
+   from where — the source and the destination need not be the same weekday,
+   because "put Tuesday's shape on Thursday" is a real thing to want. */
+let pcwSpan    = 'week';     // 'week' | 'day'
+let pcwFromDay = 0;          // 0..6, Monday first — source weekday, day mode only
+let pcwToDay   = 0;          // 0..6 — destination weekday
 
 function pcwClamp(o) { return Math.max(PCW_MIN_OFFSET, Math.min(PCW_MAX_OFFSET, o)); }
 // perfMondayKey (js/11-parent.js) already turns an offset into a Monday key.
@@ -46,19 +55,10 @@ function pcwPairs() {
   return [[scoped, dst]];
 }
 
-/* Every activity id the destination child can actually resolve. Only consulted
-   for a cross-child copy: a block naming an activity that is private to Jenn
-   renders as nothing at all on Jess's day, which is the same invisible failure
-   the archive rule exists to stop (CLAUDE.md, "History is a record"). Archived
-   entries count as resolvable for exactly that reason — findActivity sees them,
-   so a block that names one still draws.
-
-   Same-child copies are deliberately NOT filtered: her own blocks already
-   resolve however they resolve, and dropping one here would be this screen
-   quietly deciding a block was wrong. */
-function pcwPlaceableIds(kid) {
-  return new Set(getAllActivities(kid, { includeArchived: true }).map(a => a.id));
-}
+/* pcwPlaceableIds lived here. The day copy needs the same answer now, so it is
+   placeableActivityIds in js/05-helpers.js — one owner, since two screens
+   deciding for themselves what the other child can resolve is exactly how they
+   would come to disagree. */
 
 function pcwWeekBlockCount(mondayKey, kid) {
   return mrWeekDayKeys(mondayKey)
@@ -75,16 +75,21 @@ function pcwPlan() {
   const toKey   = pcwMonday(pcwToOffset);
   const srcDays = mrWeekDayKeys(fromKey);
   const dstDays = mrWeekDayKeys(toKey);
-  const plan = { fromKey, toKey, rows: [], copy: 0, skipped: 0, replaced: 0, dropped: 0, sameSpot: false };
+  const day = pcwSpan === 'day';
+  const plan = { fromKey, toKey, day, rows: [], copy: 0, skipped: 0, replaced: 0, dropped: 0, sameSpot: false };
 
   pcwPairs().forEach(([srcKid, dstKid]) => {
     const cross = srcKid !== dstKid;
     // A week onto itself for the same child is not a copy, it is a no-op with a
-    // confirmation dialog in front of it.
-    if (!cross && fromKey === toKey) { plan.sameSpot = true; return; }
-    const canPlace = cross ? pcwPlaceableIds(dstKid) : null;
-    const days = srcDays.map((srcKey, i) => {
-      const dstKey = dstDays[i];
+    // confirmation dialog in front of it. In day mode the same is true only
+    // when it is also the same weekday.
+    const samePlace = day ? (fromKey === toKey && pcwFromDay === pcwToDay) : fromKey === toKey;
+    if (!cross && samePlace) { plan.sameSpot = true; return; }
+    const canPlace = cross ? placeableActivityIds(dstKid) : null;
+    const pairs = day ? [[srcDays[pcwFromDay], dstDays[pcwToDay], pcwFromDay, pcwToDay]]
+                      : srcDays.map((k, i) => [k, dstDays[i], i, i]);
+    const days = pairs.map(([srcKey, dstKey, si, di]) => {
+      const i = si, toIdx = di;
       const all = getDayBlocksForProfile(srcKey, srcKid) || [];
       const usable = canPlace ? all.filter(b => !b.actId || canPlace.has(b.actId)) : all.slice();
       const existing = getDayBlocksForProfile(dstKey, dstKid) || [];
@@ -98,7 +103,7 @@ function pcwPlan() {
       if (action === 'replace') plan.replaced += existing.length;
       plan.dropped += dropped;
       return {
-        i, srcKey, dstKey, action, dropped,
+        i, toIdx, srcKey, dstKey, action, dropped,
         usable, existingIds: existing.map(b => b.id), existing: existing.length,
       };
     });
@@ -134,8 +139,10 @@ async function pcwApply() {
   if (plan.replaced) {
     const n = plan.replaced;
     const ok = await showConfirm(
-      `Replace ${n} block${n === 1 ? '' : 's'} already planned in ${mmWeekLabel(plan.toKey)}?\n\n`
-      + `${plan.copy} block${plan.copy === 1 ? '' : 's'} from ${mmWeekLabel(plan.fromKey)} go in their place. `
+      `Replace ${n} block${n === 1 ? '' : 's'} already planned ${plan.day
+        ? `on ${DAY_LONG[pcwToDay]}, ${mmWeekLabel(plan.toKey)}` : `in ${mmWeekLabel(plan.toKey)}`}?\n\n`
+      + `${plan.copy} block${plan.copy === 1 ? '' : 's'} from ${plan.day
+        ? `${DAY_LONG[pcwFromDay]}, ${mmWeekLabel(plan.fromKey)}` : mmWeekLabel(plan.fromKey)} go in their place. `
       + `Nothing in ${mmWeekLabel(plan.fromKey)} is touched.`,
       { danger: true, okLabel: 'Replace them' });
     if (!ok) return;
@@ -198,8 +205,12 @@ function pcwPreviewRow(row) {
     const [cls, word] = PCW_ACTION_TEXT[d.action];
     const n = d.action === 'none' ? '—' : String(d.usable.length);
     const extra = d.action === 'replace' ? ` (${d.existing} removed)` : '';
+    // In day mode the two ends can be different weekdays, so the row has to say
+    // which one it lands on — "Tue" alone would not tell you it becomes Thursday.
+    const dow = (d.toIdx != null && d.toIdx !== d.i)
+      ? `${DAY_SHORT[d.i]} → ${DAY_SHORT[d.toIdx]}` : DAY_SHORT[d.i];
     return `<div class="pcw-day">
-        <span class="pcw-day-dow">${DAY_SHORT[d.i]}</span>
+        <span class="pcw-day-dow">${escapeHtml(dow)}</span>
         <span class="pcw-day-n">${n}</span>
         <span class="pcw-tag ${cls}">${escapeHtml(word + extra)}</span>
       </div>`;
@@ -226,21 +237,27 @@ function pcwRender() {
      genuinely two different jobs: "do last week again" and "give Jess her
      sister's swimming term". */
   const targets = scoped ? [
-    ['same', `${CT_PROFILE_ICON[scoped]} Her own week`],
+    ['same', `${CT_PROFILE_ICON[scoped]} Her own plan`],
     [scoped === 'jenn' ? 'jess' : 'jenn',
       `${CT_PROFILE_ICON[scoped === 'jenn' ? 'jess' : 'jenn']} Over to ${pcwKidName(scoped === 'jenn' ? 'jess' : 'jenn')}`],
   ] : null;
   const cur = (pcwTargetKid === 'jenn' || pcwTargetKid === 'jess') ? pcwTargetKid : 'same';
   const whoCard = targets
-    ? `<p class="pn-cap">Onto whose week</p>
+    ? `<p class="pn-cap">Onto whose plan</p>
        <div class="pn-toggle">${targets.map(([id, label]) =>
           `<button type="button" class="pill-btn${id === cur ? ' active' : ''}"
              data-pcw-target="${id}">${escapeHtml(label)}</button>`).join('')}</div>`
-    : `<p class="pn-note">Both girls — each one copies from her own week. Pick a single
-        child above to send one girl's week over to her sister.</p>`;
+    : `<p class="pn-note">Both girls — each one copies from her own plan. Pick a single
+        child above to send one girl's plan over to her sister.</p>`;
 
   const clash = [['skip', 'Leave it alone'], ['replace', 'Replace it']];
   const held = !!(((state.shared.chore || {}).meetingsHeld || {})[plan.toKey]);
+  const day = pcwSpan === 'day';
+  const spanToggle = [['week', '🗓 A whole week'], ['day', '📅 One day']];
+  const dayPicker = (which, cur) => `<div class="pcw-days-pick">${DAY_SHORT.map((d, i) =>
+      `<button type="button" class="pill-btn pcw-daybtn${i === cur ? ' active' : ''}"
+         data-pcw-day="${which}" data-pcw-i="${i}"
+         aria-pressed="${i === cur}">${escapeHtml(d)}</button>`).join('')}</div>`;
 
   /* Three empty cases, each saying which one it is — a card must never render
      blank, and "nothing will happen" has three different fixes. */
@@ -249,27 +266,38 @@ function pcwRender() {
     summary = `<div class="pn-card pn-clear">Those are the same week. Move one end, or send this
       week over to her sister.</div>`;
   } else if (!plan.copy && !plan.skipped) {
-    summary = `<div class="pn-card pn-clear">Nothing was planned in ${escapeHtml(mmWeekLabel(plan.fromKey))},
-      so there is nothing to copy. Pick a week that has a plan in it.</div>`;
+    summary = `<div class="pn-card pn-clear">Nothing was planned ${day
+      ? `on ${escapeHtml(DAY_LONG[pcwFromDay])} in ${escapeHtml(mmWeekLabel(plan.fromKey))}`
+      : `in ${escapeHtml(mmWeekLabel(plan.fromKey))}`},
+      so there is nothing to copy. Pick a ${day ? 'day' : 'week'} that has a plan in it.</div>`;
   } else if (!plan.copy) {
-    summary = `<div class="pn-card pn-clear">Every day in ${escapeHtml(mmWeekLabel(plan.toKey))} already has a
-      plan, so all ${plan.skipped} block${plan.skipped === 1 ? '' : 's'} would be skipped. Choose
+    summary = `<div class="pn-card pn-clear">${day
+      ? `${escapeHtml(DAY_LONG[pcwToDay])} in ${escapeHtml(mmWeekLabel(plan.toKey))} already has a plan`
+      : `Every day in ${escapeHtml(mmWeekLabel(plan.toKey))} already has a plan`},
+      so all ${plan.skipped} block${plan.skipped === 1 ? '' : 's'} would be skipped. Choose
       <b>Replace it</b> above to overwrite them.</div>`;
   } else {
+    const where = day
+      ? `${DAY_LONG[pcwToDay]}, ${mmWeekLabel(plan.toKey)}`
+      : mmWeekLabel(plan.toKey);
     summary = `<button type="button" class="btn-confirm pn-wide" data-pcw-go="1">📋 Copy ${plan.copy}
-      block${plan.copy === 1 ? '' : 's'} into ${escapeHtml(mmWeekLabel(plan.toKey))}</button>`;
+      block${plan.copy === 1 ? '' : 's'} into ${escapeHtml(where)}</button>`;
   }
 
-  wrap.innerHTML = `<p class="pn-cap">Copy a week</p>
-    <div class="pn-card pn-clear">Take the shape of one week and put it on another — a term that
-      repeats, a fortnight nobody planned, or one girl's schedule handed to her sister. Every copy
-      arrives as a plan: nothing is ticked, confirmed, or paid.</div>
+  wrap.innerHTML = `<p class="pn-cap">Copy a plan</p>
+    <div class="pn-card pn-clear">Take the shape of one week — or one day — and put it somewhere
+      else: a term that repeats, a fortnight nobody planned, or one girl's schedule handed to her
+      sister. Every copy arrives as a plan: nothing is ticked, confirmed, or paid.</div>
+
+    <div class="pn-toggle" style="margin-top:0.6rem">${spanToggle.map(([id, label]) =>
+      `<button type="button" class="pill-btn${id === pcwSpan ? ' active' : ''}"
+         data-pcw-span="${id}">${escapeHtml(label)}</button>`).join('')}</div>
 
     <p class="pn-cap" style="margin-top:0.8rem">Copy from</p>
-    <div class="pn-card">${pcwWeekPicker('from', pcwFromOffset)}</div>
+    <div class="pn-card">${pcwWeekPicker('from', pcwFromOffset)}${day ? dayPicker('from', pcwFromDay) : ''}</div>
 
     <p class="pn-cap" style="margin-top:0.8rem">Copy to</p>
-    <div class="pn-card">${pcwWeekPicker('to', pcwToOffset)}</div>
+    <div class="pn-card">${pcwWeekPicker('to', pcwToOffset)}${day ? dayPicker('to', pcwToDay) : ''}</div>
     ${held ? `<p class="pn-note">⚠️ ${escapeHtml(mmWeekLabel(plan.toKey))} was already settled at a meeting.
       The money that was paid does not move, but changing the plan changes what History reads back
       for that week.</p>` : ''}
@@ -298,6 +326,15 @@ function pcwHandleClick(e) {
     const d = Number(step.getAttribute('data-pcw-d')) || 0;
     if (step.getAttribute('data-pcw-step') === 'from') pcwFromOffset = pcwClamp(pcwFromOffset + d);
     else pcwToOffset = pcwClamp(pcwToOffset + d);
+    pcwRender();
+    return;
+  }
+  const span = e.target.closest('[data-pcw-span]');
+  if (span) { pcwSpan = span.getAttribute('data-pcw-span'); pcwRender(); return; }
+  const dayBtn = e.target.closest('[data-pcw-day]');
+  if (dayBtn) {
+    const i = Math.max(0, Math.min(6, Number(dayBtn.getAttribute('data-pcw-i')) || 0));
+    if (dayBtn.getAttribute('data-pcw-day') === 'from') pcwFromDay = i; else pcwToDay = i;
     pcwRender();
     return;
   }

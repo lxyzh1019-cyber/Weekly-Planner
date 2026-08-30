@@ -1093,11 +1093,14 @@
     <p style="font-size:0.9rem;color:var(--ink-light);margin-bottom:0.8rem">This replaces your current plan for this day.</p>
     <button class="pill-btn" style="width:100%;margin-bottom:0.5rem;font-size:1rem" onclick="applyTemplate('school')">🏫 School Day</button>
     <button class="pill-btn" style="width:100%;font-size:1rem" onclick="applyTemplate('weekend')">🌈 Weekend</button>
-    <!-- Copy another day of the same week onto this one. A week rarely has
+    <!-- Copy a day you have already planned onto this one. A week rarely has
          seven different shapes: two Tuesdays that look alike were two Tuesdays
          built by hand. Rows are built by renderCopyDayList so they can carry
-         each day's real block count. -->
+         each day's real block count, and the two toggles above them choose
+         which week to take from and — a parent only — whose day it lands on. -->
     <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">Or copy a day you have already planned.</p>
+    <div class="copy-day-tabs" id="copyDayWeekTabs" role="group" aria-label="Which week to copy from"></div>
+    <div class="copy-day-tabs" id="copyDayKidTabs" role="group" aria-label="Whose day to copy onto" hidden></div>
     <div id="copyDayList" class="copy-day-list"></div>
     <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">Taking today off? Rest days keep your streak safe.</p>
     <button class="pill-btn" style="width:100%;font-size:1rem" id="restDayBtn" onclick="toggleRestDay(currentDayKey)" aria-label="Mark rest day" title="Mark today a rest day">😌 Rest</button>

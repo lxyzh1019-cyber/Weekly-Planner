@@ -50,13 +50,38 @@ function nearestPlannedWeek(mondayKey, p, span) {
    which mmPlanNextWeek used to carry over: awardBlockLinks only awards when the
    flag is unset, so a copied block could never pay XP however often it was
    done. checklistState goes for the same reason — a pre-ticked checklist is a
-   claim nobody made. */
+   claim nobody made. gearState and trainingCheck are the same claim in two
+   more shapes, and a stopwatch carries somebody else's elapsed minutes.
+
+   A COPY IS NOT PART OF THE ORIGINAL'S SERIES. seriesId used to come through
+   untouched, and every consequence of that was invisible until it bit:
+   countSeriesBlocks scans every week of the profile, so editing a copied block
+   offered "update all" and rewrote the weeks it was copied FROM; "remove all in
+   series" deleted those originals and wrote 'sr:'+seriesId into
+   state.shared.tombstones, which is shared rather than per-profile — so via
+   blockTombstoned (js/04-merge.js) the same delete could drop the SISTER's
+   cross-copied blocks on the next merge. Every copy path inherits this fix:
+   the parent portal's copy, the meeting's plan-next-week, the blank-week fill
+   and the day copy.
+
+   The spreads matter too. Object.assign is shallow, so a copy and its original
+   shared their objectives array and their gear/check/stopwatch objects by
+   reference until the next reload re-parsed the JSON — editing one edited both
+   in memory, which is the kind of bug that only shows up on the device that
+   did the copy. */
 function weekCloneBlock(b) {
-  return Object.assign({}, b, {
+  const c = Object.assign({}, b, {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-    completed: false, confirmed: false, xpAwarded: false, checklistState: {},
+    completed: false, confirmed: false, xpAwarded: false,
+    checklistState: {}, gearState: {}, trainingCheck: {},
     createdAt: syncNow(), updatedAt: syncNow(),
   });
+  delete c.seriesId;
+  if (Array.isArray(b.objectives)) c.objectives = b.objectives.slice();
+  if (b.stopwatch) c.stopwatch = Object.assign({}, b.stopwatch, {
+    elapsedSec: 0, running: false, startedAt: null,
+  });
+  return c;
 }
 /* Days that already hold something are left alone — the same guard
    mmPlanNextWeek uses. A copy must never overwrite a plan somebody made. */
@@ -80,15 +105,28 @@ function copyWeekInto(sourceMondayKey, targetMondayKey, p) {
    because "make Wednesday look like Tuesday" is exactly what you ask for when
    Wednesday is already wrong. It replaces, and tombstones what it replaced —
    without that, a merge from another device brings the old blocks straight
-   back (js/04-merge.js). Returns the number of blocks copied. */
-function copyDayInto(srcDayKey, dstDayKey, p) {
-  if (!srcDayKey || !dstDayKey || srcDayKey === dstDayKey) return 0;
-  const from = getDayBlocksForProfile(srcDayKey, p) || [];
-  const existing = getDayBlocksForProfile(dstDayKey, p) || [];
+   back (js/04-merge.js).
+
+   Two children, not one. The signature took a single profile and used it for
+   both ends, so the one thing the engine could not do was the thing a parent
+   most often wants: put Jenn's Tuesday on Jess's. Cross-child drops the blocks
+   the destination cannot resolve, for the reason placeableActivityIds explains,
+   and says how many — a copy that silently dropped four blocks is how someone
+   comes to believe a day is planned when it is not.
+
+   Returns { copied, dropped }. */
+function copyDayInto(srcDayKey, dstDayKey, srcP, dstP) {
+  const to = dstP || srcP;
+  if (!srcDayKey || !dstDayKey) return { copied: 0, dropped: 0 };
+  if (srcDayKey === dstDayKey && to === srcP) return { copied: 0, dropped: 0 };
+  const all = getDayBlocksForProfile(srcDayKey, srcP) || [];
+  const canPlace = to === srcP ? null : placeableActivityIds(to);
+  const from = canPlace ? all.filter(b => !b.actId || canPlace.has(b.actId)) : all;
+  const existing = getDayBlocksForProfile(dstDayKey, to) || [];
   if (existing.length) tombstoneBlockIds(existing.map(b => b.id));
-  setDayBlocks(dstDayKey, from.map(b => weekCloneBlock(b)), p);
+  setDayBlocks(dstDayKey, from.map(b => weekCloneBlock(b)), to);
   saveAll();
-  return from.length;
+  return { copied: from.length, dropped: all.length - from.length };
 }
 
 function fillWeekFromNearest(mondayKey) {

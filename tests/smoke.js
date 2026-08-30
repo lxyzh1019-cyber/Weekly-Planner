@@ -877,7 +877,7 @@ function findChromium() {
     setDayBlocks(src, [{ id: 'cd-src', actId: 'piano', startMin: 600, durationMin: 60,
                          completed: true, confirmed: true, xpAwarded: true, checklistState: { a: true } }], 'jenn');
     setDayBlocks(dst, [{ id: 'cd-old', actId: 'breakfast', startMin: 480, durationMin: 30 }], 'jenn');
-    const n = copyDayInto(src, dst, 'jenn');
+    const n = copyDayInto(src, dst, 'jenn').copied;
     const got = getDayBlocks(dst, 'jenn');
     if (n !== 1) bad.push(`copied ${n} blocks, expected 1`);
     if (got.length !== 1) bad.push(`destination holds ${got.length} blocks, expected 1`);
@@ -5140,6 +5140,134 @@ function findChromium() {
     pcwFromOffset = -1; pcwToOffset = 0; pcwOnClash = 'skip'; pcwTargetKid = 'same';
     profile = wasProfile; parentScope = wasScope; parentViewing = wasViewing;
     setParentTab('now');
+    return bad.length === 0 || bad;
+  });
+
+  /* A COPY IS A NEW PLAN. weekCloneBlock carried seriesId through, and every
+     consequence was invisible until it bit: countSeriesBlocks scans every week
+     of the profile, so editing a copied block offered "update all" and rewrote
+     the weeks it was copied FROM, and "remove all in series" tombstoned
+     'sr:'+seriesId in state.shared.tombstones — which is shared, not
+     per-profile, so via blockTombstoned the same delete could drop the sister's
+     cross-copied blocks on the next merge. Also checks the shallow-copy half:
+     Object.assign shared the objectives array and the gear/check objects by
+     reference until the next reload. */
+  checks.aCopiedPlanIsNotPartOfTheOriginalsSeries = await page.evaluate(() => {
+    const bad = [];
+    const keys = getDayKeys(0);
+    const [src, dst] = [keys[0], keys[3]];
+    const beforeSrc = getDayBlocks(src, 'jenn'), beforeDst = getDayBlocks(dst, 'jenn');
+    const beforeJess = getDayBlocks(dst, 'jess');
+    const sid = 'sr-copytest';
+    setDayBlocks(src, [{ id: 'sr-1', actId: 'training', startMin: 600, durationMin: 60,
+      tag: 'skating', seriesId: sid, objectives: ['one'],
+      gearState: { 'gear-skating-0': true }, trainingCheck: { ready: true },
+      stopwatch: { enabled: true, running: true, elapsedSec: 900, startedAt: 123 } }], 'jenn');
+    setDayBlocks(dst, [], 'jenn');
+
+    const inSeriesBefore = countSeriesBlocks(sid);
+    copyDayInto(src, dst, 'jenn');
+    const copy = (getDayBlocks(dst, 'jenn') || [])[0];
+    if (!copy) { bad.push('nothing was copied'); }
+    else {
+      if (copy.seriesId) bad.push(`the copy joined the original's series (${copy.seriesId})`);
+      if (Object.keys(copy.gearState || {}).length) bad.push('the copy arrived with the gear already ticked');
+      if (Object.keys(copy.trainingCheck || {}).length) bad.push('the copy arrived with the training checks already ticked');
+      if ((copy.stopwatch || {}).elapsedSec) bad.push("the copy carried the original's stopwatch minutes");
+      if ((copy.stopwatch || {}).running) bad.push('the copy arrived with a running stopwatch');
+      // Deep, not shared: pushing to one must not reach the other.
+      copy.objectives.push('two');
+      const source = (getDayBlocks(src, 'jenn') || [])[0] || {};
+      if ((source.objectives || []).length !== 1) {
+        bad.push('the copy and the original share one objectives array');
+      }
+      if (source.objectives === copy.objectives) bad.push('the objectives array is the same object');
+    }
+    if (countSeriesBlocks(sid) !== inSeriesBefore) {
+      bad.push(`copying changed the size of the original series (${inSeriesBefore} → ${countSeriesBlocks(sid)})`);
+    }
+
+    /* And the sister: a cross-child copy that carried the series would let a
+       later "remove all in series" tombstone reach across profiles. */
+    setDayBlocks(dst, [], 'jess');
+    copyDayInto(src, dst, 'jenn', 'jess');
+    const hers = (getDayBlocks(dst, 'jess') || [])[0];
+    if (hers && hers.seriesId) bad.push("the sister's copy joined Jenn's series");
+
+    setDayBlocks(src, beforeSrc, 'jenn');
+    setDayBlocks(dst, beforeDst, 'jenn');
+    setDayBlocks(dst, beforeJess, 'jess');
+    return bad.length === 0 || bad;
+  });
+
+  /* Copying a day reaches other weeks and — for a parent — the other child.
+     The engine always could; only its callers were narrow. Cross-child stays
+     parent-only: a copy REPLACES the destination day, so a child able to do it
+     could overwrite her sister's week from her own screen. */
+  checks.copyingADayCrossesWeeksAndKids = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile, wasViewing = parentViewing;
+    const thisWk = getDayKeys(0), lastWk = getDayKeys(-1);
+    const restore = [];
+    const seed = (key, kid, blocks) => {
+      restore.push([key, kid, getDayBlocksForProfile(key, kid)]);
+      setDayBlocks(key, blocks, kid);
+    };
+    seed(lastWk[1], 'jenn', [{ id: 'cx-a', actId: 'piano', startMin: 600, durationMin: 60 }]);
+    seed(thisWk[1], 'jenn', []);
+    seed(thisWk[1], 'jess', []);
+
+    // The kid sheet offers three weeks, and last week's Tuesday is one of them.
+    profile = 'jenn';
+    openDay(thisWk[1], 1);
+    openTemplateSheet();
+    if (!document.querySelector('#copyDayWeekTabs [data-copyday-week="-1"]')) {
+      bad.push('the copy sheet does not offer last week');
+    }
+    if (!document.getElementById('copyDayKidTabs').hidden) {
+      bad.push("a child is offered her sister's day — a copy replaces, so that is a parent's call");
+    }
+    copyDayHandleClick({ target: document.querySelector('#copyDayWeekTabs [data-copyday-week="-1"]') });
+    if (copyDaySrcWeek !== -1) bad.push('picking last week did not take');
+    const rows = [...document.querySelectorAll('#copyDayList .copy-day-row')].filter(r => !r.disabled);
+    if (!rows.length) bad.push("last week's planned day is not offered to copy");
+    closeSheet('templateOverlay');
+
+    // Across weeks, through the engine the sheet calls.
+    const across = copyDayInto(lastWk[1], thisWk[1], 'jenn');
+    if (across.copied !== 1) bad.push(`copying across weeks moved ${across.copied} blocks, expected 1`);
+
+    // Cross-child drops what the sister cannot resolve, and says how many.
+    const priv = { id: 'cx-private', name: 'Jenn only', icon: '🎈', cat: 'free', durationMin: 30, custom: true };
+    state.profiles.jenn.customActivities = [...(state.profiles.jenn.customActivities || []), priv];
+    setDayBlocks(lastWk[1], [{ id: 'cx-p', actId: 'cx-private', startMin: 600, durationMin: 30 },
+                             { id: 'cx-q', actId: 'breakfast', startMin: 480, durationMin: 30 }], 'jenn');
+    const cross = copyDayInto(lastWk[1], thisWk[1], 'jenn', 'jess');
+    if (cross.copied !== 1) bad.push(`${cross.copied} blocks landed on Jess, expected 1`);
+    if (cross.dropped !== 1) bad.push(`${cross.dropped} reported left behind, expected 1`);
+    const onJess = getDayBlocksForProfile(thisWk[1], 'jess');
+    if ((onJess[0] || {}).actId !== 'breakfast') bad.push('Jess was given a block she cannot resolve');
+    state.profiles.jenn.customActivities = (state.profiles.jenn.customActivities || []).filter(a => a.id !== 'cx-private');
+
+    /* The parent portal's one-day mode: same decision object, one day in it,
+       and the two ends need not be the same weekday. */
+    profile = 'parent'; parentViewing = 'jenn';
+    const wasSpan = pcwSpan, wasFrom = pcwFromDay, wasTo = pcwToDay;
+    pcwSpan = 'day'; pcwFromDay = 1; pcwToDay = 3;
+    const plan = pcwPlan();
+    if (!plan.day) bad.push('the plan does not know it is a one-day copy');
+    const row = plan.rows[0];
+    if (!row) bad.push('the one-day plan has no rows');
+    else {
+      if (row.days.length !== 1) bad.push(`the one-day plan covers ${row.days.length} days`);
+      if (row.days[0].toIdx !== 3) bad.push('the one-day plan ignores which weekday it lands on');
+    }
+    pcwSpan = wasSpan; pcwFromDay = wasFrom; pcwToDay = wasTo;
+
+    restore.forEach(([key, kid, blocks]) => setDayBlocks(key, blocks, kid));
+    setDayBlocks(lastWk[1], [], 'jenn');
+    profile = wasProfile; parentViewing = wasViewing;
+    copyDaySrcWeek = 0; copyDayDstKid = null;
     return bad.length === 0 || bad;
   });
 
