@@ -50,7 +50,7 @@ top-level name, grep for it across `js/`.
 
 ```bash
 npm ci      # once
-npm test    # runs all three below, stops at the first failure
+npm test    # runs everything below, stops at the first failure
 ```
 
 Or individually:
@@ -62,7 +62,10 @@ npm run check
 # 2. Merge-layer unit tests (62 checks, must be 62/62)
 npm run test:merge
 
-# 3. Headless smoke test — boots the app, drives the main flows
+# 3. The calibrated XP values (see tools/xp-calibrate.js)
+npm run test:xp
+
+# 4. Headless smoke test — boots the app, drives the main flows
 npm run test:smoke          # screenshots land in tests/out/
 ```
 
@@ -271,7 +274,10 @@ by `startMin`, never by the order a caller holds them in: Today sorts by
 `tdActionableStart` and the day view lays out by position, so a number that
 followed either would point at a different block on the two screens. The week
 grid is deliberately excluded: `tg2ShortLabel` compresses to seven characters on
-purpose and "Block 2" cannot live there.
+purpose and "Block 2" cannot live there. **Meals are the one exception**: they used
+to render as a bare `🍳`/`🥗`/`🍽` beside the block's own icon, so a cell said the
+same glyph twice and named nothing. Words win — the budget exists to stop a typed
+competition name being crammed in, not to stop a meal being readable.
 
 **A competition is called what a parent typed.** `blockDisplayName` returns
 `b.compName` when there is one, which is what reaches the day view, both week
