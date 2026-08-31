@@ -4918,12 +4918,18 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
-  /* THE FAMILY'S SHARE OF THE WEEK.
+  /* THE FAMILY'S SHARE OF THE WEEK — three numbers, not one.
      "2 free chores left this week — those belong to the family" is a PRICING
      rule: mrChoreWeek takes that many graded chores and pays nothing for them.
      Nothing checked that they get done, so a week with no chores planned at all
-     priced out perfectly and was silently fine. The same number is now also a
-     floor, and mrFamilyChoreStatus owns the counting. */
+     priced out perfectly and was silently fine. The same number is also a floor.
+
+     It used to be checked against ONE count that mixed scheduled and done
+     together, which is the bug this rewrite is about: two chores merely placed
+     on the calendar satisfied the family's share without anybody lifting
+     anything. getFamilyChoreStatus (js/36-status.js) keeps planned, fulfilled
+     and waiting apart, and only a positive PARENT GRADE is fulfilled — a claim
+     is the child's account of it and sits as `waiting` until it is answered. */
   checks.familyChoreFloorIsFlaggedWhileItCanBeFixed = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -4937,9 +4943,12 @@ function findChromium() {
       keys.forEach(k => setDayBlocks(k, [], kid));
       e.chores = {}; e.claims = {};
 
-      const st0 = mrFamilyChoreStatus(kid, wk);
-      if (st0.needed !== 2) bad.push(`the floor is ${st0.needed}, expected freeChoresPerWeek = 2`);
-      if (st0.short !== st0.needed) bad.push(`an empty week is ${st0.short} short, expected ${st0.needed}`);
+      const st0 = getFamilyChoreStatus(kid, wk);
+      if (st0.required !== 2) bad.push(`the floor is ${st0.required}, expected freeChoresPerWeek = 2`);
+      if (st0.planned !== 0) bad.push(`an empty week reports ${st0.planned} planned`);
+      if (st0.fulfilled !== 0) bad.push(`an empty week reports ${st0.fulfilled} fulfilled`);
+      if (st0.stillNeedsADay !== 2) bad.push(`an empty week needs ${st0.stillNeedsADay} days, expected 2`);
+      if (st0.unfulfilled !== 2) bad.push(`an empty week is ${st0.unfulfilled} unfulfilled, expected 2`);
 
       // Both surfaces say so, and they say the same number.
       goToday();
@@ -4951,34 +4960,61 @@ function findChromium() {
       if (!banner || banner.style.display === 'none') bad.push('the week does not mention the family chores');
       else if (!/2 family chores/.test(banner.textContent)) bad.push(`the banner says "${banner.textContent.trim()}"`);
 
-      // Planning one counts.
+      /* SCHEDULED IS NOT FULFILLED. Two chores on the calendar and nothing
+         graded is 0 of 2 — this is the acceptance test the whole rewrite is
+         for, and the old single count reported it as satisfied. */
       setDayBlocks(keys[1], [{ id: 'fam-a', actId: 'chores', startMin: 17 * 60, durationMin: 30, choreTags: ['dishes'] }], kid);
-      if (mrFamilyChoreStatus(kid, wk).short !== 1) bad.push('planning a chore did not count toward the floor');
+      setDayBlocks(keys[2], [{ id: 'fam-b', actId: 'chores', startMin: 17 * 60, durationMin: 30, choreTags: ['mop'] }], kid);
+      const st1 = getFamilyChoreStatus(kid, wk);
+      if (st1.planned !== 2) bad.push(`two scheduled chores counted as ${st1.planned} planned`);
+      if (st1.fulfilled !== 0) bad.push(`a merely scheduled chore counted as fulfilled (${st1.fulfilled} of 2)`);
+      if (st1.unfulfilled !== 2) bad.push(`two scheduled, none done, reported ${st1.unfulfilled} unfulfilled`);
+      if (st1.stillNeedsADay !== 0) bad.push('two planned chores still ask for a day');
 
-      // Doing one without planning it counts too — the work, not the paperwork.
-      mrSetClaim(kid, wk, 3, 'mop', 3);
-      const st2 = mrFamilyChoreStatus(kid, wk);
-      if (st2.counted !== 2 || st2.short !== 0) {
-        bad.push(`an unplanned but claimed chore did not count (counted ${st2.counted})`);
-      }
+      /* A CLAIM IS NOT A GRADE. She says she did it; until a grown-up answers
+         it is waiting, and it counts as neither done nor undone. */
+      mrSetClaim(kid, wk, 1, 'dishes', 3);
+      const st2 = getFamilyChoreStatus(kid, wk);
+      if (st2.waiting !== 1) bad.push(`a claim without a grade reported ${st2.waiting} waiting, expected 1`);
+      if (st2.fulfilled !== 0) bad.push('a claim counted as fulfilled without a parent grade');
 
-      // Met: both surfaces go quiet. It is a to-do, not a scoreboard.
+      /* ONE PARENT GRADE IS ONE FULFILLED. */
+      const wasParent = profile; profile = 'parent';
+      mrSetChoreGrade(kid, wk, 1, 'dishes', 3);
+      profile = wasParent;
+      const st3a = getFamilyChoreStatus(kid, wk);
+      if (st3a.fulfilled !== 1) bad.push(`a graded chore reported ${st3a.fulfilled} fulfilled, expected 1`);
+      if (st3a.waiting !== 0) bad.push('a graded chore is still shown as waiting');
+      if (st3a.unfulfilled !== 1) bad.push(`1 of 2 graded reported ${st3a.unfulfilled} unfulfilled`);
+
+      /* The kid-facing surfaces measure what is still UNPLANNED — the one
+         number a child can act on today — so both go quiet once every chore has
+         a day, even while a grade is outstanding. A to-do, not a scoreboard. */
       goToday();
-      if (document.querySelector('#tdWrap .td-chip-family')) bad.push('the chip stayed after the floor was met');
+      if (document.querySelector('#tdWrap .td-chip-family')) bad.push('the chip stayed after every chore had a day');
       goWeek(); renderWeek();
       if (document.getElementById('tgFamilyBanner').style.display !== 'none') {
-        bad.push('the banner stayed after the floor was met');
+        bad.push('the banner stayed after every chore had a day');
       }
+
+      /* THE REVIEW VOICE. A parent has to be able to see a shortfall, and it
+         must not be hidden on a week that has already gone by. */
+      const review = mmFamilyChoreReview(wk);
+      if (!/2 family chores owed/.test(review)) bad.push('the review does not say how many are owed');
+      if (!/1 fulfilled/.test(review)) bad.push('the review does not say how many were fulfilled');
+      if (!/1 unfulfilled/.test(review)) bad.push('the review hides the shortfall');
 
       /* Standing responsibilities do not count. `own` and `helping` need no
          block and show every day, so counting them would satisfy the floor
          without anyone lifting anything. */
       keys.forEach(k => setDayBlocks(k, [], kid));
       e.chores = {}; e.claims = {};
-      const st3 = mrFamilyChoreStatus(kid, wk);
-      if (st3.short !== 2) bad.push(`own/helping rows counted toward the floor (short ${st3.short})`);
+      const st3 = getFamilyChoreStatus(kid, wk);
+      if (st3.planned !== 0) bad.push(`own/helping rows counted toward the floor (planned ${st3.planned})`);
 
-      // A week that has gone by cannot be planned, so nothing is said about it.
+      // A week that has gone by cannot be PLANNED, so the child's forward-looking
+      // banner still says nothing about it. The review voice above is where a
+      // past week's shortfall is shown instead.
       weekOffset = -1;
       goWeek(); renderWeek();
       if (document.getElementById('tgFamilyBanner').style.display !== 'none') {
@@ -6264,10 +6300,13 @@ function findChromium() {
     const body = document.getElementById('familyMeetingBody').textContent.replace(/\s+/g, ' ');
     /* Pinned, not fuzzy-matched. 60 + 30 copied in, plus the 15-minute block the
        clobber guard above left standing = 1h 45m planned; one of them ticked =
-       1h done. The arithmetic is the whole point — a copy that silently arrived
-       already "done" would still render a chart, just a lying one. */
-    const meetingCounts = body.includes('1h 45m planned · 1h done')
-                       && body.includes('Competitive Sports 1h / 1h 45m');
+       1h completed. The arithmetic is the whole point — a copy that silently
+       arrived already "done" would still render a chart, just a lying one.
+
+       Wording follows the chart: "planned hours completed", never "done", and
+       Competitive Sports is now Body Construction. */
+    const meetingCounts = body.includes('1h completed / 1h 45m planned')
+                       && body.includes('Body Construction 1h / 1h 45m');
     // …and it hands off to the screen that owns the blocks rather than listing
     // them a fourth time.
     const handsOff = !!document.querySelector('#familyMeetingBody [data-mm-action="openweek"]')
@@ -6437,6 +6476,12 @@ function findChromium() {
     const before = mnyPool(wk, kid).cameIn;
     // Mid-week, so the day lands inside this week whatever day today is.
     const dayKey = ctDateToKey(new Date(formatDayKey(wk).getTime() + 3 * 86400000));
+    /* …but the money page's competition card is a MONTH calendar, and a week
+       straddles a month roughly once a month — this Monday is 31 August and the
+       mid-week day is 3 September. Point the card at the competition's own
+       month before reading it, or this check fails on the calendar rather than
+       on anything the app got wrong. */
+    mnyCalMonth = String(dayKey).slice(0, 7);
     const saved = mrAddCompetition(kid, {
       sport: 'swim', name: 'Winter Invitational', dayKey, points: 6, qualified: true });
     // 6 points x $1 + $20 qualifying bonus, under the seeded rates.
@@ -6461,6 +6506,7 @@ function findChromium() {
       && hub.textContent.includes(CT_PROFILE_ICON[kid] + ' $' + after.cameIn.toFixed(2));
 
     getProfData(kid).competitions = [];
+    mnyCalMonth = null;
     return scored && inChannel && inPool && uncapped && inBar && onKidPage && onDashboard;
   });
 
@@ -6764,7 +6810,10 @@ function findChromium() {
       setDayBlocks(keys[0], [{ id: 'gl-1', actId: 'school_day', startMin: 9 * 60, durationMin: 240 }], kid);
       const t = computeWeekTotals(keys);
 
-      if (t.catMin.school !== 240) bad.push(`school counted as ${t.catMin.school}, expected 240`);
+      // Grouped by what the time is FOR: the school day is Brain Construction,
+      // alongside homework. `cat` still decides colour; it no longer decides
+      // this, which is what stopped dinner being counted as a chore.
+      if (t.catMin.brain !== 240) bad.push(`school counted as ${t.catMin.brain} under Brain, expected 240`);
       // Awake, unclaimed: the whole 6am–10pm week minus the one block.
       const expectFree = DAY_MIN_SPAN * 7 - 240;
       if (t.free !== expectFree) bad.push(`unscheduled ${t.free}, expected ${expectFree}`);
@@ -6784,10 +6833,10 @@ function findChromium() {
       if (!/Unscheduled/.test(text)) bad.push('the glance does not name unscheduled time');
       // Per-day leads. 240 minutes over 7 days is 34 minutes, not 4h.
       const school = [...body.querySelectorAll('.glance-row')]
-        .find(r => /Learning/.test(r.textContent));
-      if (!school) bad.push('no Learning row in the glance');
+        .find(r => /Brain/.test(r.textContent));
+      if (!school) bad.push('no Brain Construction row in the glance');
       else if (!/34m\/day/.test(school.textContent.replace(/\s+/g, ''))) {
-        bad.push(`Learning reads "${school.textContent.trim().replace(/\s+/g, ' ')}", expected a 34m/day average`);
+        bad.push(`Brain reads "${school.textContent.trim().replace(/\s+/g, ' ')}", expected a 34m/day average`);
       }
       if (weekGlanceOpen()) toggleWeekGlance();
     } finally {
@@ -8091,6 +8140,438 @@ function findChromium() {
       await away.close();
     }
   })();
+
+  /* ══ RELEASE 1: the status vocabulary ══════════════════════════════
+     Every check below pins something that was DEMONSTRABLY disagreeing between
+     screens before this release. They return `true` or the list of what went
+     wrong — never a bare truthy value, which is the house rule. */
+
+  /* ONE ANSWER TO "IS THIS ROUTINE DONE?", ON EVERY SCREEN.
+     The checklist and the block's completed flag were two records that never
+     spoke: ticking every item in Jenn's morning routine left the block reading
+     not-done on Today, the week, the portal and the meeting. Then unticking one
+     could not take anything back, because the day-level mark was sticky. */
+  checks.oneRoutineAnswerOnEveryScreen = await page.evaluate(() => {
+    const bad = [];
+    const kid = 'jenn';
+    profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+    const keys = mrWeekDayKeys(wk);
+    const day = keys[0];
+    const before = keys.map(k => (getDayBlocks(k, kid) || []).slice());
+    const e = mrEnsureEarnings(kid, wk);
+    const hadMand = JSON.stringify(getProfData(kid).chore || {});
+    try {
+      keys.forEach(k => setDayBlocks(k, [], kid));
+      /* ctMandatoryPoints is a WEEK-WIDE count and earlier checks in this suite
+         have already written into it, so clear this week's marks or every
+         assertion below is measuring somebody else's fixture. */
+      {
+        const pd = getProfData(kid);
+        ctEnsureProfile(pd);
+        delete pd.chore.mandatoryByWeek[wk];
+        if (pd.chore.mandatoryAutoByWeek) delete pd.chore.mandatoryAutoByWeek[wk];
+      }
+      setDayBlocks(day, [{ id: 'rr1', actId: 'routine_morning', startMin: 7 * 60,
+                           durationMin: 30, checklistState: {} }], kid);
+      currentDayKey = day; dayViewAnchorKey = day;
+
+      const items = routineItemsFor('morning', kid);
+      if (!items.length) bad.push('the morning routine has no items to tick');
+
+      const readAll = () => {
+        const b = getDayBlocks(day, kid)[0];
+        return {
+          shared: isBlockCompleted(b, kid),
+          flag: !!b.completed,
+          hours: getWeeklyHours(kid, wk).byGroup.routine.completed,
+          weekWins: computeWeekWins(keys).done,
+          today: (() => { goToday(); const r = document.querySelector('#tdWrap .td-rib-cell--done'); return !!r; })(),
+          portal: (() => {
+            const st = perfWeekStats(wk, kid);
+            return st.byCat.routine ? st.byCat.routine.completed : 0;
+          })(),
+          meeting: (() => {
+            const was = profile; profile = 'parent';
+            const html = mm2b(kid, 600);
+            profile = was;
+            return html;
+          })(),
+        };
+      };
+
+      const zero = readAll();
+      if (zero.shared || zero.flag) bad.push('an untouched routine already reads as done');
+      if (zero.hours !== 0) bad.push(`an untouched routine counts ${zero.hours} completed minutes`);
+
+      // Tick every item, the way the chore tab's one-tap does.
+      {
+        const blocks = getDayBlocks(day, kid);
+        const b = blocks[0];
+        items.forEach(i => { b.checklistState[i.id] = true; });
+        syncRoutineCompletion(b, kid);
+        ctSyncMandatoryFromRoutine('morning', kid, day, true);
+        setDayBlocks(day, blocks, kid);
+      }
+      const full = readAll();
+      if (!full.shared) bad.push('a fully ticked routine does not read as completed');
+      if (!full.flag) bad.push('block.completed was not derived from the checklist');
+      if (full.hours !== 30) bad.push(`the weekly hours count ${full.hours} routine minutes, expected 30`);
+      if (full.weekWins !== 1) bad.push('the week view does not count the routine as done');
+      if (!full.today) bad.push('Today does not draw the routine as done');
+      if (full.portal !== 30) bad.push(`the parent portal counts ${full.portal} routine minutes, expected 30`);
+      if (!/30m \/ 30m/.test(full.meeting)) bad.push('the meeting chart does not show the routine as completed');
+      if (ctMandatoryPoints(wk, kid) !== 1) bad.push('the day-level routine mark did not follow the checklist');
+
+      // Untick ONE. Everything has to come back.
+      {
+        const blocks = getDayBlocks(day, kid);
+        const b = blocks[0];
+        b.checklistState[items[0].id] = false;
+        syncRoutineCompletion(b, kid);
+        ctSyncMandatoryFromRoutine('morning', kid, day, false);
+        setDayBlocks(day, blocks, kid);
+      }
+      const partial = readAll();
+      if (partial.shared) bad.push('unticking an item left the routine reading as completed');
+      if (partial.flag) bad.push('unticking an item left block.completed set');
+      if (partial.hours !== 0) bad.push(`unticking left ${partial.hours} completed minutes in the hours`);
+      if (partial.weekWins !== 0) bad.push('unticking left the week view counting it as done');
+      if (partial.today) bad.push('unticking left Today drawing it as done');
+      if (partial.portal !== 0) bad.push('unticking left the parent portal counting it');
+      if (ctMandatoryPoints(wk, kid) !== 0) bad.push('the sticky day mark survived an untick');
+
+      /* A parent's OWN tick is not the app's to undo. She is asserting the day
+         from memory; a child unticking an item afterwards must not silently
+         overrule her. */
+      {
+        const was = profile; profile = 'parent';
+        ctSetMandatory(wk, 0, 'Morning', kid, true);
+        profile = was;
+      }
+      ctSyncMandatoryFromRoutine('morning', kid, day, false);
+      if (ctMandatoryPoints(wk, kid) !== 1) bad.push("a child's untick cleared a mark a parent made by hand");
+
+      /* A stale tick from an item that no longer exists is not progress — this
+         is what made the same block read 4/3 on one screen and 3/3 on another. */
+      {
+        const blocks = getDayBlocks(day, kid);
+        const b = blocks[0];
+        items.forEach(i => { b.checklistState[i.id] = true; });
+        b.checklistState['gone-item-nobody-has'] = true;
+        const act = findActivity('routine_morning', kid);
+        const t = routineTally(b, act, kid);
+        if (t.done !== items.length) bad.push(`a removed item's tick still counts (${t.done} of ${t.total})`);
+      }
+
+      /* Confirming is not completing. A parent may confirm an unfinished
+         routine, and it must not start reading as finished. */
+      {
+        const blocks = getDayBlocks(day, kid);
+        const b = blocks[0];
+        b.checklistState = {};
+        b.confirmed = true;
+        syncRoutineCompletion(b, kid);
+        setDayBlocks(day, blocks, kid);
+        const c = getDayBlocks(day, kid)[0];
+        if (isBlockCompleted(c, kid)) bad.push('confirming an empty checklist made it read as completed');
+        if (!isBlockConfirmed(c)) bad.push('the confirmation was lost');
+      }
+    } finally {
+      keys.forEach((k, i) => setDayBlocks(k, before[i], kid));
+      getProfData(kid).chore = JSON.parse(hadMand);
+      profile = 'jenn'; weekOffset = 0;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* CONFIRMING IS NOT REVIEWING, AND IT TICKS WHAT IT CLAIMS TO TICK.
+     "Confirm all today" set `confirmed` and nothing else, while every screen
+     draws its tick from `completed` — so pressing it moved one badge that is
+     hidden on short blocks, and on a busy day nothing visible changed. It also
+     repainted only the day timeline, and the meeting's day-confirm wrote BOTH
+     girls from one press. */
+  checks.confirmingIsNotReviewing = await page.evaluate(async () => {
+    const bad = [];
+    const wasConfirm = window.showConfirm;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const keys = mrWeekDayKeys(ctWeekKey);
+    const day = keys[0];
+    const beforeJ = (getDayBlocks(day, 'jenn') || []).slice();
+    const beforeS = (getDayBlocks(day, 'jess') || []).slice();
+    const store = JSON.parse(JSON.stringify(state.shared.parentDayConfirm || {}));
+    try {
+      ['jenn', 'jess'].forEach(k => markDayReviewed(k, day, false));
+      setDayBlocks(day, [
+        { id: 'ca1', actId: 'piano', startMin: 7 * 60, durationMin: 60, checklistState: {} },
+        { id: 'ca2', actId: 'french', startMin: 8 * 60, durationMin: 60, checklistState: {} },
+      ], 'jenn');
+      setDayBlocks(day, [
+        { id: 'cs1', actId: 'piano', startMin: 7 * 60, durationMin: 60, checklistState: {} },
+      ], 'jess');
+      currentDayKey = day;
+      window.showConfirm = async () => true;
+
+      await confirmAllBlocksForChild('jenn', day);
+
+      const j = getDayBlocks(day, 'jenn');
+      if (!j.every(b => isBlockCompleted(b, 'jenn'))) bad.push('confirm-all left blocks not marked completed');
+      if (!j.every(b => isBlockConfirmed(b))) bad.push('confirm-all left blocks unconfirmed');
+      const sB = getDayBlocks(day, 'jess');
+      if (sB.some(b => isBlockCompleted(b, 'jess') || isBlockConfirmed(b))) bad.push("confirming Jenn touched Jess's day");
+      if (isDayReviewed('jenn', day)) bad.push('confirm-all marked the day reviewed');
+
+      await markDayReviewedForChild('jenn', day);
+      if (!isDayReviewed('jenn', day)) bad.push('marking the day reviewed did not take');
+      if (isDayReviewed('jess', day)) bad.push("reviewing Jenn's day marked Jess's too");
+      if (!getDayBlocks(day, 'jenn').every(b => isBlockCompleted(b, 'jenn'))) {
+        bad.push('marking the day reviewed changed activity completion');
+      }
+
+      // The banner names the child it is acting on.
+      renderParentBanners();
+      const barTxt = (document.getElementById('parentDayActions') || {}).textContent || '';
+      if (!/Jenn/.test(barTxt)) bad.push(`the banner does not name the child: "${barTxt.trim()}"`);
+
+      /* A block later TODAY has not happened, and confirming it would be the
+         app inventing a fact. */
+      const today = todayKey();
+      const beforeToday = (getDayBlocks(today, 'jenn') || []).slice();
+      setDayBlocks(today, [
+        { id: 'el1', actId: 'piano', startMin: 1, durationMin: 30, checklistState: {} },
+        { id: 'el2', actId: 'french', startMin: 23 * 60 + 55, durationMin: 5, checklistState: {} },
+      ], 'jenn');
+      const elig = dayBlocksEligibleToConfirm(today, 'jenn').map(b => b.id);
+      if (elig.includes('el2')) bad.push('a block later today was eligible to be confirmed');
+      if (!elig.includes('el1')) bad.push('a block that already started was not eligible');
+      setDayBlocks(today, beforeToday, 'jenn');
+
+      /* The meeting reviews ONE child per control, and says "Both" when it
+         means both. */
+      ['jenn', 'jess'].forEach(k => markDayReviewed(k, day, false));
+      openFamilyMeeting(); mmGoStep(1);
+      const one = document.querySelector('#familyMeetingBody [data-mm-action="reviewday"][data-kid="jenn"][data-day="0"]');
+      if (!one) bad.push('the meeting has no per-child review control');
+      else {
+        one.click();
+        if (!isDayReviewed('jenn', day)) bad.push('the per-child control did not review Jenn');
+        if (isDayReviewed('jess', day)) bad.push('reviewing Jenn in the meeting also reviewed Jess');
+      }
+      const both = document.querySelector('#familyMeetingBody [data-mm-action="confirmday"][data-day="0"]');
+      if (!both || !/Both/.test(both.textContent)) bad.push('the meeting does not label the both-children control');
+      closeSheet('familyMeetingOverlay');
+    } finally {
+      window.showConfirm = wasConfirm;
+      setDayBlocks(day, beforeJ, 'jenn');
+      setDayBlocks(day, beforeS, 'jess');
+      state.shared.parentDayConfirm = store;
+      profile = 'jenn';
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* MEALS ARE NOT CHORES. cat:'daily' held breakfast, dinner, the house chore
+     and four Family Hero tasks, and was labelled "🧹 Chores" on two screens and
+     "🍽 Daily" on three. */
+  checks.mealsAreNotChores = await page.evaluate(() => {
+    const bad = [];
+    const want = {
+      breakfast: 'daily', lunch: 'daily', dinner: 'daily', appt_medical: 'daily',
+      chores: 'chores', family_set_table: 'chores', family_laundry_fold: 'chores',
+      school_day: 'brain', math: 'brain', french: 'brain', piano: 'brain',
+      routine_morning: 'routine', health_pack_tomorrow: 'routine',
+      training: 'body', competition: 'body',
+      family: 'free', relax: 'free', break_quick: 'free', snow_play: 'free',
+    };
+    Object.keys(want).forEach(id => {
+      const got = activityGroup(findActivity(id, 'jenn'));
+      if (got !== want[id]) bad.push(`${id} groups as ${got}, expected ${want[id]}`);
+    });
+    if (GROUP_ORDER.length !== 6) bad.push(`${GROUP_ORDER.length} groups, expected 6`);
+    // Every group has a label and a short form that fits a week-grid cell.
+    GROUP_ORDER.forEach(g => {
+      if (!groupLabel(g)) bad.push(`${g} has no label`);
+      if (groupShort(g).length > 7) bad.push(`${g}'s short form "${groupShort(g)}" is too long for the grid`);
+    });
+    // An activity nothing can resolve is filed, never dropped: an hours total
+    // that silently omits blocks is worse than one that files them vaguely.
+    if (activityGroup(null) !== 'daily') bad.push('an unresolved activity is not filed anywhere');
+    return bad.length === 0 || bad;
+  });
+
+  /* A PAST WEEK CANNOT PLAN FORWARD. The last step used to offer "copy this
+     week → next week" whatever week the meeting pointed at, and the copy ran
+     off the CURRENT week — so a six-week-old sitting wrote its plan over the
+     following historical week. */
+  checks.aPastWeekCannotPlanForward = await page.evaluate(() => {
+    const bad = [];
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const now = ctThisWeekKey();
+    const past = dateToLocalKey(new Date(formatDayKey(now).getTime() - 14 * 864e5));
+    const future = dateToLocalKey(new Date(formatDayKey(now).getTime() + 14 * 864e5));
+    try {
+      if (mmWeekPosition(past) !== 'past') bad.push('a two-week-old week is not read as past');
+      if (mmWeekPosition(now) !== 'current') bad.push('this week is not read as current');
+      if (mmWeekPosition(future) !== 'future') bad.push('a future week is not read as future');
+
+      mmCatchUpAsked = true;
+      mmGoToWeek(past); mmGoStep(5);
+      const pastBody = document.getElementById('familyMeetingBody').textContent;
+      if (/Copy this week/.test(pastBody)) bad.push('a past week still offers to copy itself forward');
+      if (/Plan next/.test(pastBody.replace(/\d·Plan next/g, ''))) bad.push('a past week still offers to plan next');
+      if (!/Finish reviewing this week/.test(pastBody)) bad.push('a past week does not offer to finish its review');
+      if (!/Return to this week/.test(pastBody)) bad.push('a past week offers no way back to the present');
+
+      mmGoToWeek(future); mmGoStep(5);
+      const futureBody = document.getElementById('familyMeetingBody').textContent;
+      if (!/hasn't happened yet/.test(futureBody)) bad.push('a future week does not say it cannot be reviewed');
+      if (/Close the week/.test(futureBody)) bad.push('a future week offers to be closed');
+
+      mmGoToWeek(now); mmGoStep(5);
+      const nowBody = document.getElementById('familyMeetingBody').textContent;
+      if (!/Close the week/.test(nowBody)) bad.push('the current week cannot be closed');
+      if (!/Open next week/.test(nowBody)) bad.push('the current week does not offer to open the next one');
+
+      /* Closing asserts BOTH girls were reviewed and settled, so it must refuse
+         until that is true — a record that can claim more than happened is the
+         thing this release is removing. */
+      if (canCloseWeek(now).ok) bad.push('a week with unreviewed days says it can be closed');
+      if (isWeekClosed(now)) bad.push('the week started out closed');
+      mmCloseWeekNow();
+      if (isWeekClosed(now)) bad.push('the week closed without both girls being reviewed and settled');
+      closeSheet('familyMeetingOverlay');
+    } finally {
+      ctSetCurrentWeekFromPlanner();
+      profile = 'jenn';
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* CELEBRATION COUNTS WHAT HAPPENED. Step 2 counted chores through
+     ctGetOptional — `optionalByWeek`, the retired chore-GROUP store that three
+     comments in this repo say nothing reads. On a week of real graded work it
+     reported zero, and it showed the preliminary money figure as though it had
+     been recorded. */
+  checks.celebrationCountsWhatHappened = await page.evaluate(() => {
+    const bad = [];
+    const kid = 'jenn';
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey, keys = mrWeekDayKeys(wk);
+    const before = keys.map(k => (getDayBlocks(k, kid) || []).slice());
+    const e = mrEnsureEarnings(kid, wk);
+    const hadChores = JSON.stringify(e.chores), hadClaims = JSON.stringify(e.claims);
+    const hadFinal = JSON.stringify((state.shared.chore.finalizedWeeks || {})[wk] || null);
+    try {
+      keys.forEach(k => setDayBlocks(k, [], kid));
+      e.chores = {}; e.claims = {};
+      /* An earlier check settles a week, so clear the frozen figure — otherwise
+         "money was recorded" is true and this asserts nothing. */
+      if (state.shared.chore.finalizedWeeks) delete state.shared.chore.finalizedWeeks[wk];
+      if (state.shared.chore.xpAwardedWeeks) delete state.shared.chore.xpAwardedWeeks[wk];
+      // A routine finished by its checklist, and a chore graded by a parent.
+      const items = routineItemsFor('morning', kid);
+      const st = {}; items.forEach(i => { st[i.id] = true; });
+      setDayBlocks(keys[1], [
+        { id: 'cel1', actId: 'routine_morning', startMin: 7 * 60, durationMin: 30, checklistState: st, completed: true },
+        { id: 'cel2', actId: 'chores', startMin: 17 * 60, durationMin: 30, choreTags: ['dishes'], checklistState: {} },
+      ], kid);
+      mrSetChoreGrade(kid, wk, 1, 'dishes', 3);
+
+      mmGoToWeek(wk); mmGoStep(2);
+      const body = document.getElementById('familyMeetingBody').textContent.replace(/\s+/g, ' ');
+      if (!/1\/1 routine kept/.test(body)) bad.push(`routines are not counted from the checklists: "${body.slice(0, 200)}"`);
+      if (!/1 chore checked off by a grown-up/.test(body)) bad.push('a graded chore is not celebrated');
+      if (!/planned hours completed/.test(body)) bad.push('the hours are not read from the shared computation');
+      // The preliminary figure must never be worded as though it were recorded.
+      if (/\$[\d.]+ recorded/.test(body)) bad.push('an unsettled week claims money was recorded');
+
+      /* And the retired store must not be able to bring it back to life: fill
+         optionalByWeek and the celebration must not change. */
+      const withoutLegacy = body;
+      ctSetOptional(wk, 2, kid, 'dishes', true);
+      mmGoStep(2);
+      const after = document.getElementById('familyMeetingBody').textContent.replace(/\s+/g, ' ');
+      if (after !== withoutLegacy) bad.push('the celebration still reads the retired chore-group store');
+      closeSheet('familyMeetingOverlay');
+    } finally {
+      keys.forEach((k, i) => setDayBlocks(k, before[i], kid));
+      e.chores = JSON.parse(hadChores); e.claims = JSON.parse(hadClaims);
+      const fin = JSON.parse(hadFinal);
+      if (fin && state.shared.chore.finalizedWeeks) state.shared.chore.finalizedWeeks[wk] = fin;
+      profile = 'jenn';
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* UNDO RETURNS BOTH CHILDREN.
+     mnyDoCommit took a fresh snapshot every time it ran, once per child.
+     Settling Jenn stored the state before Jenn; settling Jess overwrote it with
+     the state AFTER Jenn. Undo then put Jess back, left Jenn's money moved, and
+     printed "nothing was recorded" — false, in the one direction the family had
+     no way to notice. The snapshot is idempotent per week now. */
+  checks.undoReturnsBothChildren = await page.evaluate(() => {
+    const bad = [];
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+    const c = state.shared.chore;
+    const keep = {};
+    ['finalizedWeeks', 'xpAwardedWeeks', 'moneyLedger', 'weekPlans', 'weekConfirms',
+     'meetingsHeld', 'meetingsMet'].forEach(k => {
+      keep[k] = (c[k] && c[k][wk]) ? JSON.parse(JSON.stringify(c[k][wk])) : null;
+      if (c[k]) delete c[k][wk];
+    });
+    const hadCash = { jenn: ensureWallet('jenn').cash, jess: ensureWallet('jess').cash };
+    const hadUndo = mmUndo;
+    try {
+      mmUndo = null;
+      const read = k => ({
+        cash: ensureWallet(k).cash,
+        xp: (getProfData(k).progress || {}).questXP || 0,
+        committed: isChildMoneyCommitted(k, wk),
+      });
+      ['jenn', 'jess'].forEach(k => { ensureWallet(k).cash = 5; mnyConfirmWeek(wk, k, 'a grown-up'); });
+      const seeded = { jenn: read('jenn'), jess: read('jess') };
+
+      mnySetMeetKid('jenn'); mmStep = 4; mnyDraft = null; mnyRenderDecide(wk);
+      mnyDoCommit();
+      if (!read('jenn').committed) bad.push("committing Jenn did not settle her week");
+      const firstSnapshot = mmUndo;
+      if (!firstSnapshot) bad.push('committing took no undo snapshot at all');
+
+      mnySetMeetKid('jess'); mnyDraft = null; mnyRenderDecide(wk);
+      mnyDoCommit();
+      if (mmUndo !== firstSnapshot) bad.push('settling the second girl replaced the snapshot taken before the first');
+      if (!read('jess').committed) bad.push('committing Jess did not settle her week');
+
+      mmUndoRecord();
+      const after = { jenn: read('jenn'), jess: read('jess') };
+      ['jenn', 'jess'].forEach(k => {
+        if (after[k].cash !== seeded[k].cash) bad.push(`${k}'s wallet came back as ${after[k].cash}, expected ${seeded[k].cash}`);
+        if (after[k].xp !== seeded[k].xp) bad.push(`${k}'s XP came back as ${after[k].xp}, expected ${seeded[k].xp}`);
+        if (after[k].committed) bad.push(`${k} is still settled after the undo`);
+      });
+      if ((c.moneyLedger || {})[wk]) bad.push('the frozen ledger survived the undo');
+      if ((c.meetingsHeld || {})[wk]) bad.push('the week still reads as recorded after the undo');
+      if ((c.weekPlans || {})[wk]) bad.push("the girls' money plans survived the undo");
+    } finally {
+      ['finalizedWeeks', 'xpAwardedWeeks', 'moneyLedger', 'weekPlans', 'weekConfirms',
+       'meetingsHeld', 'meetingsMet'].forEach(k => {
+        if (!c[k]) return;
+        if (keep[k]) c[k][wk] = keep[k]; else delete c[k][wk];
+      });
+      ensureWallet('jenn').cash = hadCash.jenn;
+      ensureWallet('jess').cash = hadCash.jess;
+      mmUndo = hadUndo;
+      mnyDraft = null;
+      profile = 'jenn';
+    }
+    return bad.length === 0 || bad;
+  });
 
   checks.noConsoleErrors = errors.length === 0;
 
