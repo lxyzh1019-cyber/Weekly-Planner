@@ -1111,7 +1111,7 @@ function mmRenderConfirm(wk, held) {
   let action;
   if (mmUndo) {
     action = `<div class="mm-recorded">✅ Recorded — money credited.</div>
-      <button type="button" class="pill-btn danger" onclick="mmUndoRecord()">↩️ Undo (nothing is frozen yet)</button>`;
+      <button type="button" class="pill-btn danger" onclick="mmUndoRecord()">↩️ Undo this meeting — puts both girls back</button>`;
   } else if (alreadyHeld) {
     action = `<div class="mm-recorded">✅ This week was already recorded.</div>`;
   } else {
@@ -1193,11 +1193,20 @@ function mmConfirmAndRecord() {
   showToast(`💛 Recorded${parts.length ? ' · ' + parts.join(' · ') : ''}`);
 }
 
-/* Snapshot everything a commit mutates, so the undo can fully reverse it. Taken
-   before either kid is settled — step 4 settles them one at a time, and an undo
-   that only reversed the second would leave the first standing against a week
-   that was un-recorded. */
+/* ── ONE snapshot for the whole family, taken once ────────────────
+   The comment below always said what this was for, and the code did the
+   opposite: mnyDoCommit called it unconditionally, once per child. Settling
+   Jenn stored the state before Jenn; settling Jess then OVERWROTE it with the
+   state after Jenn. Undo put Jess back, left Jenn's money moved, and announced
+   "nothing was recorded" — which was false, and false in the one direction
+   that matters, because the family had no way to see the difference.
+
+   So it is idempotent per week now. The first commit of a week takes the
+   picture; every later one leaves it alone, and mmUndoRecord winds the whole
+   sitting back to before either girl was settled. */
 function mmTakeUndoSnapshot(wk) {
+  // Already holding the pre-commit picture for this week — do not replace it.
+  if (mmUndo && mmUndo.wk === wk) return;
   const c = state.shared.chore;
   // Snapshot everything the commit mutates so the undo can fully reverse it.
   // The commit now moves XP and the loan as well as the wallet, so the undo has
@@ -1216,6 +1225,11 @@ function mmTakeUndoSnapshot(wk) {
     xp: (getProfData(kid).progress || {}).questXP || 0,
     // The meeting also empties the box, so undo has to put it back.
     boxItems: (typeof mrBoxItems === 'function') ? mrBoxItems(kid) : null,
+    /* The "made on its own since the last meeting" baseline needs no field of
+       its own: mnyStampPassiveBaseline writes valueAtLastMeeting onto each
+       holding, and `holdings` above is a deep copy, so restoring it restores
+       the baseline with it. Worth saying out loud — it is not obvious, and an
+       undo that missed it would swallow a stretch of interest for good. */
   }));
   mmUndo = {
     wk,
@@ -1230,6 +1244,13 @@ function mmTakeUndoSnapshot(wk) {
     // decision recorded.
     plans: (c.weekPlans && c.weekPlans[wk]) ? JSON.parse(JSON.stringify(c.weekPlans[wk])) : null,
     confirms: (c.weekConfirms && c.weekConfirms[wk]) ? JSON.parse(JSON.stringify(c.weekConfirms[wk])) : null,
+    // "We sat down" is a separate record from "the money moved", and an undo
+    // that left it behind would show a week met with nothing settled.
+    met: !!((c.meetingsMet || {})[wk]),
+    heldBefore: !!((c.meetingsHeld || {})[wk]),
+    // Which girls were already committed when the picture was taken. This is
+    // what lets the message below be honest rather than assume.
+    committedBefore: ['jenn', 'jess'].filter(k => isChildMoneyCommitted(k, wk)),
   };
 }
 function mmUndoRecord() {
@@ -1264,19 +1285,119 @@ function mmUndoRecord() {
   if (c.weekPlans) { if (mmUndo.plans) c.weekPlans[wk] = mmUndo.plans; else delete c.weekPlans[wk]; }
   if (c.weekConfirms) { if (mmUndo.confirms) c.weekConfirms[wk] = mmUndo.confirms; else delete c.weekConfirms[wk]; }
   if (typeof mnyDraft !== 'undefined') mnyDraft = null;
-  if (c.meetingsHeld) delete c.meetingsHeld[wk];
+  if (c.meetingsHeld) { if (mmUndo.heldBefore) c.meetingsHeld[wk] = true; else delete c.meetingsHeld[wk]; }
+  // "We sat down" and "the money moved" are different facts, and the undo has
+  // to put each back the way it found it rather than assume both were false.
+  if (c.meetingsMet) { if (mmUndo.met) c.meetingsMet[wk] = true; else delete c.meetingsMet[wk]; }
+
+  /* Say only what is true. "Nothing was recorded" was printed unconditionally,
+     including in the case it was most wrong about: after settling both girls,
+     when the snapshot had been overwritten and only the second was actually
+     reversed. It now names who went back — and if a girl was already committed
+     before this sitting began, it says that instead of claiming the week is
+     clean. */
+  const wasClean = !(mmUndo.committedBefore || []).length;
   mmUndo = null;
   saveAll();
   renderMeetingMode();
-  showToast('↩️ Undone — nothing was recorded');
+  showToast(wasClean
+    ? '↩️ Undone — nothing was recorded for either girl'
+    : '↩️ Undone — both girls are back where they were before this meeting');
 }
 
-/* Step 4 — Plan next week: copy this week into next week as a template. */
+/* ── Where is this week, relative to now? ─────────────────────────
+   The last step used to offer "Copy this week → next week" whatever week the
+   meeting was pointed at, and mmPlanNextWeek read ctWeekInfo and then did
+   weekOffset += 1 — so opening a week from six weeks ago and pressing it
+   copied that historical week into the following historical one, over the top
+   of a week that had already happened. */
+function mmWeekPosition(wk) {
+  const now = ctThisWeekKey();
+  if (wk === now) return 'current';
+  return wk < now ? 'past' : 'future';
+}
+
+/* Step 5 — what this week can still have done to it. */
 function mmRenderPlan(wk) {
-  return `${mmSettledStrip(wk)}
-    <div class="mm-h">Plan next week</div>
-    <div class="ct-meta">Copy this week's schedule into next week for both kids as a starting template, then jump there to tweak. Days that already have plans next week are left untouched.</div>
-    <button type="button" class="btn-confirm" onclick="mmPlanNextWeek()">📋 Copy this week → next week</button>`;
+  const pos = mmWeekPosition(wk);
+  const strip = mmSettledStrip(wk);
+
+  if (pos === 'future') {
+    /* A week that has not happened cannot be reviewed, settled or closed —
+       there is nothing to review. Planning it is the week screen's job. */
+    return `${strip}
+      <div class="mm-h">This week hasn't happened yet</div>
+      <div class="ct-meta">A future week can't be reviewed or closed. Plan it in the weekly planner, and come back once it has been lived.</div>
+      <button type="button" class="btn-confirm" data-mm-action="thisweek">Go to this week ▶</button>`;
+  }
+
+  if (pos === 'past') {
+    /* Catching up. The two things that make sense here are finishing the
+       review and getting back to the present — never planning forward from a
+       week that is already behind. */
+    const unsettled = ['jenn', 'jess'].map(k => mmKidSettled(wk, k)).filter(x => !x.decided);
+    const go = unsettled[0];
+    return `${strip}
+      <div class="mm-h">Finish reviewing this week</div>
+      <div class="ct-meta">${escapeHtml(mmWeekLabel(wk))} has already been and gone, so there is nothing to plan forward from it. Finish what it still owes, then come back to the present.</div>
+      ${go
+        ? `<button type="button" class="btn-confirm" onclick="mnySetMeetKid('${escapeJsAttr(go.kid)}');mmGoStep(${go.agreed ? 4 : 3})">Finish ${escapeHtml(go.name)}'s week ▶</button>`
+        : `<div class="mm-recorded">✅ This week is fully reviewed and settled.</div>`}
+      <button type="button" class="pill-btn" data-mm-action="thisweek">Return to this week</button>`;
+  }
+
+  // Current week: close it, then move on. Copying a schedule stays where it
+  // already lives — inside the next week's planner — rather than growing a
+  // second copy control here.
+  const gate = canCloseWeek(wk);
+  const closed = isWeekClosed(wk);
+  let closeBtn;
+  if (closed) {
+    closeBtn = `<div class="mm-recorded">✅ This week is closed.</div>
+      <button type="button" class="pill-btn" onclick="mmReopenWeek()">Reopen it</button>`;
+  } else if (gate.ok) {
+    closeBtn = `<button type="button" class="btn-confirm" onclick="mmCloseWeekNow()">🔒 Close the week</button>`;
+  } else {
+    const why = gate.missing.map(m => m.reason === 'days'
+      ? `${m.kid === 'jenn' ? 'Jenn' : 'Jess'} has ${m.n} day${m.n === 1 ? '' : 's'} still to review`
+      : `${m.kid === 'jenn' ? 'Jenn' : 'Jess'}'s money is not settled yet`).join(' · ');
+    closeBtn = `<button type="button" class="btn-confirm" disabled>🔒 Close the week</button>
+      <div class="ct-meta">${escapeHtml(why)}.</div>`;
+  }
+  return `${strip}
+    <div class="mm-h">Close the week</div>
+    <div class="ct-meta">Closing records that both girls' days were reviewed and the money was settled. It is a separate fact from "we met" and from "the money moved".</div>
+    ${closeBtn}
+    <div class="mm-h mm-h-sub">Next week</div>
+    <div class="ct-meta">Open next week to plan it. Copying a schedule across lives in the planner itself, next to the week it would land on.</div>
+    <button type="button" class="pill-btn" onclick="mmOpenNextWeek()">Open next week ▶</button>`;
+}
+
+function mmCloseWeekNow() {
+  const wk = mmWeekKey();
+  const gate = canCloseWeek(wk);
+  if (!gate.ok) { showToast('Both girls need reviewing and settling first'); return; }
+  setWeekClosed(wk, true);
+  saveAll();
+  renderMeetingMode();
+  showToast('🔒 Week closed');
+}
+function mmReopenWeek() {
+  setWeekClosed(mmWeekKey(), false);
+  saveAll();
+  renderMeetingMode();
+  showToast('Week reopened');
+}
+/* Straight to next week's planner. No copying — the planner's own offer is
+   there, beside the week it would actually land on. */
+function mmOpenNextWeek() {
+  const wk = mmWeekKey();
+  const next = dateToLocalKey(new Date(formatDayKey(wk).getTime() + 7 * 864e5));
+  mmClearReturn();
+  closeSheet('familyMeetingOverlay');
+  weekOffset = computeWeekOffsetForDayKey(next);
+  showScreen('week');
+  renderWeek();
 }
 
 /* ── Is this meeting actually finished? ──
@@ -1335,29 +1456,14 @@ function mmFinishButtons(wk) {
       <button type="button" class="btn-confirm" onclick="mnySetMeetKid('${escapeJsAttr(goTo.kid)}');mmGoStep(${goTo.agreed ? 4 : 3})">${escapeHtml(gap)} ▶</button>
     </span>`;
 }
-function mmPlanNextWeek() {
-  const info = ctWeekInfo();
-  let copied = 0;
-  ['jenn','jess'].forEach(kid => {
-    info.keys.forEach(key => {
-      const src = getDayBlocksForProfile(key, kid) || [];
-      if (!src.length) return;
-      const date = formatDayKey(key); const next = new Date(date); next.setDate(date.getDate() + 7);
-      const nextKey = dateToLocalKey(next);
-      if ((getDayBlocksForProfile(nextKey, kid) || []).length) return; // don't clobber existing plans
-      // Shared clone rule (js/07-week-view.js) — it also clears xpAwarded and
-      // checklistState, which this inline copy used to carry over.
-      const clone = src.map(b => weekCloneBlock(b));
-      setDayBlocks(nextKey, clone, kid);
-      copied += clone.length;
-    });
-  });
-  saveAll();
-  closeSheet('familyMeetingOverlay');
-  weekOffset += 1;
-  showScreen('week'); renderWeek();
-  showToast(copied ? `📋 Copied ${copied} blocks into next week` : 'Next week already had plans — nothing copied');
-}
+/* mmPlanNextWeek lived here. It copied whatever week the meeting was pointed
+   at into the following one and then did `weekOffset += 1` — which is correct
+   only on the current week and silently wrong on every other, writing a
+   historical week's plan over the top of another week that had already
+   happened. The last step no longer offers it: copying a schedule belongs in
+   the planner, beside the week it would land on, where pcwPlan (Setup › Copy a
+   plan) and fillWeekFromNearest already do it and show their work first. */
+
 // Core money commit for the weekly meeting (no UI): credit each kid's prelim
 // pocket money to cash, advance the money world one month (interest + GIC
 // maturities), step the market, and mark the week held. Returns summary parts.

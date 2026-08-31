@@ -18,7 +18,7 @@ function setWeekView(v) {
 function changeWeek(d) { weekOffset += d; renderWeek(); }
 
 /* ── Putting back a week that was left blank ───────────────────────
-   The planner could only ever copy a week FORWARD (mmPlanNextWeek), which is
+   The planner could only ever copy a week FORWARD, which is
    the wrong direction for the case that actually happens: a fortnight goes by,
    nothing gets planned, and the family sits down to review two weeks with
    nothing in them. Placing fourteen days one block at a time is the real reason
@@ -45,9 +45,9 @@ function nearestPlannedWeek(mondayKey, p, span) {
   }
   return null;
 }
-/* One clone rule, shared with mmPlanNextWeek. Everything that records what
+/* One clone rule, shared with every copy path. Everything that records what
    HAPPENED is dropped, because a copy is a plan — and that includes xpAwarded,
-   which mmPlanNextWeek used to carry over: awardBlockLinks only awards when the
+   which the meeting's inline copy used to carry over: awardBlockLinks only awards when the
    flag is unset, so a copied block could never pay XP however often it was
    done. checklistState goes for the same reason — a pre-ticked checklist is a
    claim nobody made. gearState and trainingCheck are the same claim in two
@@ -84,7 +84,7 @@ function weekCloneBlock(b) {
   return c;
 }
 /* Days that already hold something are left alone — the same guard
-   mmPlanNextWeek uses. A copy must never overwrite a plan somebody made. */
+   every copy path uses. A copy must never overwrite a plan somebody made. */
 function copyWeekInto(sourceMondayKey, targetMondayKey, p) {
   const src = mrWeekDayKeys(sourceMondayKey), dst = mrWeekDayKeys(targetMondayKey);
   let copied = 0;
