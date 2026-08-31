@@ -2818,6 +2818,10 @@
   }
   .app-dialog-check input { width: 22px; height: 22px; flex: 0 0 auto; margin-top: 1px; }
   .app-dialog-btns .btn-confirm:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+  /* Anywhere else too. "Close the week" is offered disabled until both girls'
+     days are reviewed, and at full strength it reads as pressable — a button
+     that looks ready and does nothing is worse than one that says why not. */
+  .btn-confirm:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
   .sheet-close-x {
     position: absolute;
     top: 10px;

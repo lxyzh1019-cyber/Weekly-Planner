@@ -804,9 +804,24 @@ function perfMondayKey(offset) {
 function perfWeekStats(monKey, kid) {
   const h = getWeeklyHours(kid, monKey);
   const fw = (state.shared.chore.finalizedWeeks || {})[monKey] || {};
+  /* Routines counted from the CHECKLISTS, like every other surface, and out of
+     the routines actually on the plan rather than a notional 21. The old line
+     read ctMandatoryPoints — the legacy per-session store — so this panel could
+     show "30m / 30m" of routine time completed in the rows above and "0/21
+     routines kept" in its own footer, about the same week. */
+  let rDone = 0, rTotal = 0;
+  mrWeekDayKeys(monKey).forEach(key => {
+    (getDayBlocksForProfile(key, kid) || []).forEach(b => {
+      const act = findActivity(b.actId, kid);
+      if (!act || !act.isRoutine) return;
+      rTotal++;
+      if (isRoutineCompleted(b, kid)) rDone++;
+    });
+  });
   return {
     planned: h.planned, done: h.completed, byCat: h.byGroup, schoolMin: h.schoolMin,
-    routines: ctMandatoryPoints(monKey, kid), money: fw[kid],
+    routinesDone: rDone, routinesTotal: rTotal,
+    routines: rDone, money: fw[kid],
   };
 }
 
@@ -896,7 +911,7 @@ function renderPerfDetail() {
       : (perfWeekOffset === 0 ? `$${ctWeekMoney(monKey, kid).toFixed(2)} preliminary — recorded at the meeting` : 'not recorded');
     return `<div class="mm-2b-kid">
         <div class="mm-win-kid">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'} — ${fmtHrsMin(st.done)} completed / ${fmtHrsMin(st.planned)} planned</div>${rows}
-        <div class="perf-facts">✅ ${st.routines}/21 routines kept · 💰 ${money}</div>
+        <div class="perf-facts">✅ ${st.routinesTotal ? `${st.routinesDone}/${st.routinesTotal} routines kept` : 'no routines on the plan'} · 💰 ${money}</div>
       </div>`;
   };
   const label = `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} – ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()}`;
