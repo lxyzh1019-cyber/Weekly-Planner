@@ -18,7 +18,7 @@ function setWeekView(v) {
 function changeWeek(d) { weekOffset += d; renderWeek(); }
 
 /* ── Putting back a week that was left blank ───────────────────────
-   The planner could only ever copy a week FORWARD (mmPlanNextWeek), which is
+   The planner could only ever copy a week FORWARD, which is
    the wrong direction for the case that actually happens: a fortnight goes by,
    nothing gets planned, and the family sits down to review two weeks with
    nothing in them. Placing fourteen days one block at a time is the real reason
@@ -45,9 +45,9 @@ function nearestPlannedWeek(mondayKey, p, span) {
   }
   return null;
 }
-/* One clone rule, shared with mmPlanNextWeek. Everything that records what
+/* One clone rule, shared with every copy path. Everything that records what
    HAPPENED is dropped, because a copy is a plan — and that includes xpAwarded,
-   which mmPlanNextWeek used to carry over: awardBlockLinks only awards when the
+   which the meeting's inline copy used to carry over: awardBlockLinks only awards when the
    flag is unset, so a copied block could never pay XP however often it was
    done. checklistState goes for the same reason — a pre-ticked checklist is a
    claim nobody made. gearState and trainingCheck are the same claim in two
@@ -84,7 +84,7 @@ function weekCloneBlock(b) {
   return c;
 }
 /* Days that already hold something are left alone — the same guard
-   mmPlanNextWeek uses. A copy must never overwrite a plan somebody made. */
+   every copy path uses. A copy must never overwrite a plan somebody made. */
 function copyWeekInto(sourceMondayKey, targetMondayKey, p) {
   const src = mrWeekDayKeys(sourceMondayKey), dst = mrWeekDayKeys(targetMondayKey);
   let copied = 0;
@@ -164,8 +164,19 @@ function goPlanWeek(mondayKey) {
    Three weeks is as far ahead as anyone is actually laying out a week. */
 const SCHOOL_FILL_HORIZON_WEEKS = 3;
 
+/* ── Which school days have no school card yet? ───────────────────
+   This asked whether the DAY was empty, which is a different question and the
+   wrong one. The pale "🏫 School" band is a time-zone — business hours, and
+   what makes the summer and the winter break legible. The card is the plan.
+   They are not duplicates of each other and neither replaces the other.
+
+   So a Monday with Breakfast on it is not a Monday that has school on the
+   plan — but under the old test it was disqualified from ever being offered
+   one, and the offer only ever appeared on a WHOLLY blank week. Put one meal
+   anywhere and that week's school days could never get their cards. */
 function schoolDaysToOffer(keys, p = activeProfile()) {
-  return keys.filter(k => isSchoolDay(k) && !(getDayBlocksForProfile(k, p) || []).length);
+  return keys.filter(k => isSchoolDay(k)
+    && !(getDayBlocksForProfile(k, p) || []).some(b => b && b.actId === 'school_day'));
 }
 
 function schoolOfferInHorizon(keys) {
@@ -181,14 +192,14 @@ async function addSchoolDaysToWeek(mondayKey) {
   const p = activeProfile();
   const keys = mrWeekDayKeys(mondayKey);
   const days = schoolDaysToOffer(keys, p);
-  if (!days.length) { showToast('No empty school days in this week'); return; }
+  if (!days.length) { showToast('Every school day this week already has one'); return; }
   const names = days.map(k => DAY_LONG[(formatDayKey(k).getDay() + 6) % 7]);
   const h = schoolHours();
   const when = `${formatTimeFromMin(START_MIN + h.startMin)}–${formatTimeFromMin(START_MIN + h.endMin)}`;
   const ok = await showConfirm(
     `Add School Day to ${names.length} day${names.length === 1 ? '' : 's'} — ${names.join(', ')}?\n\n`
-    + `${when}, from the school calendar. Nothing else is added, and days that already `
-    + 'have something on them are left alone.',
+    + `${when}, from the school calendar, with travel and get-ready time on. Nothing `
+    + 'else is added, and a day that already has a School Day on it is left alone.',
     { okLabel: 'Add them', cancelLabel: 'Not now' });
   if (!ok) return;
   days.forEach(k => {
@@ -199,6 +210,10 @@ async function addSchoolDaysToWeek(mondayKey) {
       startMin: START_MIN + h.startMin,
       durationMin: h.endMin - h.startMin,
       objectives: [], note: '', checklistState: {},
+      // You go to school, so the get-ready and the journey are part of the
+      // morning — the same default anything you travel to now arrives with.
+      travelBuffer: true, travelBufMin: DEFAULT_BUFFER_MIN,
+      getReadyBuffer: true, getReadyBufMin: DEFAULT_BUFFER_MIN,
       completed: false, confirmed: false,
       createdAt: syncNow(), updatedAt: syncNow(),
     });
@@ -289,6 +304,12 @@ function renderWeek() {
   if (isParent()) {
     parentBanner.style.display = 'block';
     document.getElementById('parentViewingName').textContent = parentViewing==='jenn'?'🐥 Jenn':'🦊 Jess';
+    document.getElementById('parentBackWeek').innerHTML = parentBannerBackButton();
+    // Switching child mid-meeting loses the sitting, so the meeting lock hides
+    // this rather than leaving a control that quietly discards your place.
+    document.getElementById('parentWeekActions').innerHTML =
+      `<button type="button" class="btn-icon no-print pb-switch" onclick="parentSwitchView()">Switch</button>`;
+    applyMeetingLock();
   } else {
     parentBanner.style.display = 'none';
   }
@@ -356,8 +377,8 @@ function renderWeek() {
       // Sunday weekly-review nudge: a gentle look-back with a mini summary,
       // shown to parent and child alike so they can reflect together.
       const t = computeWeekTotals(keys);
-      const learn = fmtHrsMin(t.catMin.school || 0);
-      const active = fmtHrsMin((t.catMin.active || 0) + (t.catMin.training || 0));
+      const learn = fmtHrsMin(t.catMin.brain || 0);
+      const active = fmtHrsMin((t.catMin.body || 0) + (t.catMin.free || 0));
       const free = fmtHrsMin(t.free);
       coachEl.classList.add('week-review-tip');
       coachEl.style.display = 'block';
@@ -383,6 +404,11 @@ function renderWeek() {
 // It did not read that way: "Unscheduled: 41h" beside no mention of sleep looks
 // like it is counting the nights. nightMin is that figure, stated rather than
 // left implicit, and it is deliberately not folded into `free`.
+/* Grouped by what the time is FOR (activityGroup, js/01-config.js), not by the
+   category that decides a block's colour. Those were the same question until
+   `cat:'daily'` turned out to hold breakfast, dinner, the house chore and four
+   Family Hero tasks — and got labelled "🧹 Chores" on two screens and "🍽
+   Daily" on three. */
 function computeWeekTotals(keys) {
   const acts = getAllActivities(activeProfile(), { includeArchived: true });
   const catMin = {};
@@ -394,8 +420,8 @@ function computeWeekTotals(keys) {
       const m = e - s;
       if (m <= 0) return;
       const act = acts.find(a => a.id === b.actId);
-      const cat = act ? act.cat : 'custom';
-      catMin[cat] = (catMin[cat] || 0) + m;
+      const g = activityGroup(act);
+      catMin[g] = (catMin[g] || 0) + m;
       planned += m;
     });
   });
@@ -425,11 +451,6 @@ function renderWeekGlance(keys) {
   const age = currentAge();
 
   const acts = getAllActivities(activeProfile(), { includeArchived: true });
-  const CAT_LABELS = {
-    sleep:'😴 Rest', school:'📚 Learning', active:'🏃 Active',
-    free:'🎮 Free', daily:'🍽 Daily', training:'🏋️ Competitive Sports',
-    competition:'🏆 Competition', routine:'📋 Routine', custom:'✨ Custom'
-  };
   const t = computeWeekTotals(keys);
 
   /* One row per category: the per-day average leads, the week total follows it
@@ -444,11 +465,10 @@ function renderWeekGlance(keys) {
         <span class="glance-total">${note || fmtHrsMin(min) + ' this week'}</span></span>
     </div>`;
 
-  const order = ['school','active','training','competition','routine','daily','free','sleep','custom'];
   let rows = '';
-  order.forEach(cat => {
-    if (!t.catMin[cat]) return;
-    rows += row(CAT_LABELS[cat] || cat, t.catMin[cat], null, CAT_HEX[cat] || '#999999' /* safe: from CAT_HEX */);
+  GROUP_ORDER.forEach(g => {
+    if (!t.catMin[g]) return;
+    rows += row(groupLabel(g), t.catMin[g], null, groupHex(g) /* safe: from ACTIVITY_GROUPS */);
   });
   /* Unscheduled and overnight are two different facts and used to read as one.
      Unscheduled is awake time nobody has claimed; overnight is the 10pm–6am the
@@ -511,11 +531,11 @@ function computeWeekWins(keys) {
     (getDayBlocks(k) || []).forEach(b => {
       if (b.startMin == null) return;
       total++;
-      if (b.completed) {
+      if (isBlockCompleted(b, activeProfile())) {
         done++;
         const act = acts.find(a => a.id === b.actId);
-        const cat = act ? act.cat : 'custom';
-        byCat[cat] = (byCat[cat] || 0) + 1;
+        const g = activityGroup(act);
+        byCat[g] = (byCat[g] || 0) + 1;
       }
     });
   });
@@ -529,11 +549,10 @@ function computeWeekWins(keys) {
 function openWeeklyWins() {
   const keys = getDayKeys(weekOffset);
   const w = computeWeekWins(keys);
-  const CAT_LABELS = { school:'📚 Learning', active:'🏃 Active', free:'🎮 Free', daily:'🍽 Daily', routine:'📋 Routines', training:'🏋️ Competitive Sports', competition:'🏆 Competition', sleep:'😴 Rest', custom:'✨ Other' };
   const pct = w.total ? Math.round(w.done / w.total * 100) : 0;
   const cheer = pct >= 80 ? 'Incredible week! 🌟' : pct >= 50 ? 'Great effort this week! 💪' : w.done > 0 ? 'Every finished task counts 💛' : 'A fresh week ahead — you’ve got this!';
   const catLines = Object.keys(w.byCat).sort((a,b)=>w.byCat[b]-w.byCat[a])
-    .map(c => `<span class="wins-chip">${CAT_LABELS[c]||c}: <b>${w.byCat[c]}</b></span>`).join('');
+    .map(c => `<span class="wins-chip">${groupLabel(c)}: <b>${w.byCat[c]}</b></span>`).join('');
   const body = document.getElementById('weeklyWinsBody');
   if (body) {
     body.innerHTML = `
@@ -707,10 +726,15 @@ function tg2ShortLabel(act, b) {
     if (act.isCompetition) return t.id === 'general' ? 'Comp' : (t.name.slice(0, 4) + '🏆');
     return ({ skating: 'Skate', swimming: 'Swim', dryland: 'Dry', general: 'Train' })[t.id] || 'Train';
   }
+  /* Meals used to be the bare icon — 🍳 🥗 🍽 — which the caller then rendered
+     beside the block's OWN icon, so a cell said the same glyph twice and named
+     nothing. Words win here: "Breakfast" is over the seven-character budget the
+     rest of this table keeps, and that budget exists to stop a typed
+     competition name being crammed in, not to stop a meal being readable. */
   const idMap = {
     school_day: 'School', french: 'FR', chinese: 'CN', math: 'Math', piano: 'Piano',
-    chores: 'Chores', breakfast: '🍳', lunch: '🥗', dinner: '🍽', relax: 'Relax',
-    break_quick: 'Break', family: 'Family',
+    chores: 'Chores', breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner',
+    relax: 'Relax', break_quick: 'Break', family: 'Family',
   };
   if (idMap[act.id]) return idMap[act.id];
   const w = (act.name || '').split(/\s+/)[0];
@@ -834,7 +858,7 @@ function renderTimeGrid(keys) {
       // Class names written out rather than built from a ternary — the dead-CSS
       // check matches literal strings.
       el.className = 'tg2-block' + (isLightColour(bg) ? ' light-bg' : '')
-        + (b.completed ? ' tg2-block--done' : '') + (hasConflict ? ' tg2-block--conflict' : '')
+        + (isBlockCompleted(b, activeProfile()) ? ' tg2-block--done' : '') + (hasConflict ? ' tg2-block--conflict' : '')
         + (h < TG2_LABEL_MIN_H ? ' tg2-block--tiny' : '');
       el.style.top = (relStart * PX_PER_MIN) + 'px';
       el.style.height = h + 'px';
@@ -860,7 +884,8 @@ function renderTimeGrid(keys) {
        paper". At 0.85px/min an hour is 51px and a half-hour 25.5px, so those
        rules named no time at all and drifted out of step with the gutter labels
        beside them from the first hour onwards. Real ones, over the blocks. */
-    lane.appendChild(buildHourGrid(PX_PER_MIN, DAY_MIN_SPAN, { cls: 'hour-grid--tg2' }));
+    lane.appendChild(buildHourGrid(PX_PER_MIN, DAY_MIN_SPAN, { cls: 'hour-grid--tg2', layer: 'lines' }));
+    lane.appendChild(buildHourGrid(PX_PER_MIN, DAY_MIN_SPAN, { cls: 'hour-grid--tg2', layer: 'ticks' }));
 
     grid.appendChild(lane);
   });
@@ -868,16 +893,18 @@ function renderTimeGrid(keys) {
   // Week-level clash banner (shared with the Full view), plus the streak + legend.
   renderWeekConflictBanner(keys, 'tgConflictBanner');
   renderFamilyChoreBanner('tgFamilyBanner');
+  renderSchoolDayBanner('tgSchoolBanner');
   renderTimeGridStreak(keys);
   const legend = document.getElementById('tgLegend');
   if (legend) {
     legend.style.display = 'flex';
-    legend.innerHTML = [
-      ['school', '📚 Learning'], ['training', '🏋️ Competitive Sports'],
-      ['routine', '📋 Routine'], ['active', '🏃 Active'], ['daily', '🍽 Daily'],
-    ].map(([cat, label]) =>
-      `<span class="tg-legend-chip"><span class="tg-legend-dot" style="background:${CAT_HEX[cat] || '#999'}"></span>${label}</span>`
-    ).join('') + `<span class="tg-legend-chip"><span class="tg-legend-dot tg-legend-dot--free"></span>Free — plain paper</span>`;
+    /* The sixth copy of the label table, and it named five categories that no
+       longer decide anything on this screen. Short forms: this is a legend
+       under a grid, not a chart axis, and it is spending a child's word budget
+       to say what the colours mean. */
+    legend.innerHTML = GROUP_ORDER.map(g =>
+      `<span class="tg-legend-chip"><span class="tg-legend-dot" style="background:${groupHex(g) /* safe: from ACTIVITY_GROUPS */}"></span>${groupShort(g)}</span>`
+    ).join('') + `<span class="tg-legend-chip"><span class="tg-legend-dot tg-legend-dot--free"></span>Free time</span>`;
   }
 }
 
@@ -1198,6 +1225,7 @@ function renderFullWeek(keys) {
   // ── Week-level conflict summary banner (shown above the grid) ──
   renderWeekConflictBanner(keys);
   renderFamilyChoreBanner('weekFamilyBanner');
+  renderSchoolDayBanner('weekSchoolBanner');
 
   // Continuous single-column-per-day timeline (matches the Day view): each
   // activity is ONE unbroken block positioned by its real start time on a
@@ -1394,7 +1422,7 @@ function renderFullWeek(keys) {
       if (blockTierAtLeast(tier, 'detail')) cls += ' wf-card--tall'; // room to stack time/icon/name centered
       if (!blockTierAtLeast(tier, 'meta')) cls += ' wf-card--slim';
       if (!blockTierAtLeast(tier, 'name')) cls += ' wf-card--xslim wf-card--icononly';
-      if (b.completed) cls += ' wf-card--done';
+      if (isBlockCompleted(b, activeProfile())) cls += ' wf-card--done';
       const hasConflict = bufferConflicts.affected.has(b.id);
       if (hasConflict) cls += ' wf-card--conflict';
       card.className = cls;
@@ -1468,7 +1496,8 @@ function renderFullWeek(keys) {
     });
 
     // Last, over the cards. See buildHourGrid (js/05-helpers.js).
-    cell.appendChild(buildHourGrid(PX_PER_MIN, DAY_MIN_SPAN, { cls: 'hour-grid--wf' }));
+    cell.appendChild(buildHourGrid(PX_PER_MIN, DAY_MIN_SPAN, { cls: 'hour-grid--wf', layer: 'lines' }));
+    cell.appendChild(buildHourGrid(PX_PER_MIN, DAY_MIN_SPAN, { cls: 'hour-grid--wf', layer: 'ticks' }));
 
     grid.appendChild(cell);
   });
@@ -1519,20 +1548,64 @@ function renderWeekConflictBanner(keys, bannerId = 'weekConflictBanner') {
    ck-risk describes exposure that has not happened yet), and it is the reason
    this is its own amber .week-todo-banner rather than the red clash banner —
    nothing here is wrong yet. */
+/* ── School days that have no card yet ────────────────────────────
+   Its own banner rather than a line inside the blank-week offer, because it is
+   not about the week being blank. It follows the same rules as the family
+   chores banner beside it: THIS week and the next two only (materialising a
+   40-week term would write hundreds of blocks into a document that uploads
+   whole on every change), and it disappears the moment every school day has
+   its card, so it is a to-do and never a scoreboard. */
+function renderSchoolDayBanner(bannerId = 'weekSchoolBanner') {
+  const banner = document.getElementById(bannerId);
+  if (!banner) return;
+  const hide = () => { banner.style.display = 'none'; banner.innerHTML = ''; };
+  const p = activeProfile();
+  if (!p || p === 'parent') return hide();
+  const keys = getDayKeys(weekOffset);
+  if (!schoolOfferInHorizon(keys)) return hide();
+  const days = schoolDaysToOffer(keys, p);
+  if (!days.length) return hide();
+  const names = days.map(k => DAY_SHORT[(formatDayKey(k).getDay() + 6) % 7]);
+  banner.style.display = 'flex';
+  /* One line, and the times live in the confirm dialog where they are actually
+     being agreed to — the kid screens have a 200-word budget and this banner
+     is a to-do, not a description of the school day. */
+  banner.innerHTML =
+    `<span class="wcb-icon">🏫</span>`
+    + `<span>${days.length} school day${days.length === 1 ? '' : 's'} not on the plan: ${escapeHtml(names.join(', '))}</span>`
+    + `<button type="button" class="wins-btn" onclick="addSchoolDaysToWeek('${escapeJsAttr(keys[0])}')">Add ${days.length === 1 ? 'it' : 'them'}</button>`;
+}
+
 function renderFamilyChoreBanner(bannerId = 'weekFamilyBanner') {
   const banner = document.getElementById(bannerId);
   if (!banner) return;
   const kid = activeProfile();
   const hide = () => { banner.style.display = 'none'; banner.innerHTML = ''; };
-  if (weekOffset !== 0 || !kid || kid === 'parent' || typeof mrFamilyChoreStatus !== 'function') return hide();
+  if (weekOffset !== 0 || !kid || kid === 'parent' || typeof getFamilyChoreStatus !== 'function') return hide();
   ctPrepareRead();
-  const st = mrFamilyChoreStatus(kid, ctThisWeekKey());
-  if (!st.short) return hide();
+  const st = getFamilyChoreStatus(kid, ctThisWeekKey());
+  /* The first chores of the week are MANDATORY, so a week with fewer than that
+     PLANNED is a plan that does not meet the rule — a warning, not a nudge. It
+     used to hide as soon as anything was scheduled-or-done, which meant two
+     chores merely placed on the calendar silenced it for the week.
+
+     It still measures `planned`, not `fulfilled`: this is the forward-looking
+     kid surface, and telling a child on Sunday that she failed a week she can
+     no longer change is a reproach with nothing to do about it. The review
+     voice — owed / fulfilled / unfulfilled — belongs to the parent and meeting
+     screens, which is where a past week's shortfall is always shown. */
+  if (!st.stillNeedsADay) return hide();
+  const n = st.stillNeedsADay;
+  const waiting = st.waiting ? ` · ${st.waiting} waiting for a check` : '';
   banner.style.display = 'flex';
+  banner.classList.add('week-todo-banner--warn');
+  /* Kept to one line. This is a kid screen with a 200-word budget, and the
+     headline already carries the whole instruction — a second line restating
+     "tap a day to put them on the plan" was spending words to say it twice. */
   banner.innerHTML =
     `<span class="wcb-icon">🧹</span>`
-    + `<span>${st.short} family ${st.short === 1 ? 'chore' : 'chores'} still to find a day for this week`
-    + `<span class="wcb-detail"><br>These are the ${st.needed} the family shares — tap a day to put ${st.short === 1 ? 'it' : 'them'} on the plan.</span></span>`;
+    + `<span>${st.required} family ${st.required === 1 ? 'chore' : 'chores'} required · ${st.planned} planned · `
+    + `${n} still ${n === 1 ? 'needs' : 'need'} a day${waiting}</span>`;
 }
 
 /* Build one travel/get-ready buffer strip for the weekly view. Positioned in

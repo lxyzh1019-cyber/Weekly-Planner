@@ -831,7 +831,7 @@ function mnyCommittedCard(wk, kid) {
       <div class="mny-label">Done for this week</div>
       <div class="mny-today-big">The money has moved. ${escapeHtml(plan.label || '')}</div>
       ${mnyBarHtml(out, { empty: '' })}
-      ${mmUndo ? `<button type="button" class="mny-btn wide" onclick="mmUndoRecord()">↩️ Undo — nothing is frozen yet</button>` : ''}
+      ${mmUndo ? `<button type="button" class="mny-btn wide" onclick="mmUndoRecord()">↩️ Undo this meeting — puts both girls back</button>` : ''}
     </div>`;
 }
 
@@ -1016,6 +1016,9 @@ function mnyDoCommit() {
   mnySimCatchUp(kid);
   const passive = mnyPassiveSinceLastMeeting(kid);
 
+  /* Idempotent per week, and that is the whole fix: this ran once per child,
+     so settling Jess overwrote the picture taken before Jenn and the undo
+     could only ever reverse the second girl. */
   mmTakeUndoSnapshot(wk);
 
   // 1 · money from outside joins the pool FIRST. It carries no destination —

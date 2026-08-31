@@ -247,9 +247,9 @@
 ════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-week">
   <div class="parent-banner sticky" id="parentBannerWeek" style="display:none">
-    <button class="btn-icon no-print" style="padding:2px 8px;margin-right:8px" onclick="showScreen('parent')">◀ Hub</button>
+    <span class="pb-back" id="parentBackWeek"></span>
     👨‍👩‍👧‍👦 Parent Mode — Viewing <span id="parentViewingName"></span>
-    <button class="btn-icon no-print" style="padding:2px 8px;margin-left:8px" onclick="parentSwitchView()">Switch</button>
+    <span class="pb-actions" id="parentWeekActions"></span>
   </div>
 
   <div class="topbar week-topbar">
@@ -296,6 +296,7 @@
       <div class="weekly-full" id="weeklyFullGrid"></div>
       <!-- Under the grid it describes, same as the Day Blocks copy. -->
       <div class="week-todo-banner" id="weekFamilyBanner" style="display:none"></div>
+      <div class="week-todo-banner" id="weekSchoolBanner" style="display:none"></div>
       <div class="week-conflict-banner" id="weekConflictBanner" style="display:none"></div>
       <div class="week-signature" id="weekSignatureBar"></div>
     </div>
@@ -320,6 +321,7 @@
     <div class="tg-controls">
       <div class="tg-streak" id="tgStreak"></div>
       <div class="week-todo-banner" id="tgFamilyBanner" style="display:none"></div>
+      <div class="week-todo-banner" id="tgSchoolBanner" style="display:none"></div>
       <div class="week-conflict-banner" id="tgConflictBanner" style="display:none"></div>
     </div>
   </div>
@@ -429,10 +431,15 @@
      SCREEN: DAY EDITOR
 ════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-day">
+  <!-- Two named actions, not one that promised both. "Confirm all" asserts the
+       work happened; "Mark reviewed" asserts a grown-up looked at the day. They
+       are filled by renderParentBanners so the buttons always name the child
+       actually being viewed. The back button is parentBannerBackButton's: it
+       reads "Back to weekly meeting" when a meeting is waiting. -->
   <div class="parent-banner sticky" id="parentBannerDay" style="display:none">
-    <button class="btn-icon no-print" style="padding:2px 8px;margin-right:8px" onclick="showScreen('parent')">◀ Hub</button>
+    <span class="pb-back" id="parentBackDay"></span>
     👨‍👩‍👧‍👦 Parent Mode — Pin activities with long-tap
-    <button class="btn-icon no-print" style="padding:2px 8px;margin-left:8px" onclick="confirmAllToday()">✅ Confirm all today</button>
+    <span class="pb-actions" id="parentDayActions"></span>
   </div>
 
   <!-- One row, not two. The title, the date and every control the screen has
@@ -611,7 +618,7 @@
        nothing here confirms or records; that stays in the meeting. -->
   <div class="parent-panel" id="ptab-analysis" role="tabpanel" hidden>
     <h3 class="parent-h3">📊 Past weeks at a glance</h3>
-    <p class="parent-hint">How the last 8 weeks actually went — % of planned time completed, routines kept, and the pocket money recorded at each meeting.</p>
+    <p class="parent-hint">How the last 8 weeks actually went — planned hours completed, routines kept, and the pocket money recorded at each meeting.</p>
     <div id="perfTrend"></div>
 
     <h3 class="parent-h3">🔍 One week in detail</h3>
@@ -893,6 +900,17 @@
     <div class="buffer-dur-row" id="activityTravelDurRow" style="display:none">
       <label for="activityTravelBufMin">Travel minutes (each way)</label>
       <input type="number" id="activityTravelBufMin" min="5" max="180" step="5" value="15" onchange="onActivityTravelBufMinInput()">
+    </div>
+    <!-- Get-ready existed only on the training sheet, so an appointment or a
+         school day placed from here could name a journey but never the time
+         it takes to be ready for it. -->
+    <div class="buffer-toggle" id="activityReadyToggle" onclick="toggleGetReadyBuffer('activity')">
+      <div class="toggle-track"><div class="toggle-knob"></div></div>
+      <span class="toggle-label">👕 Needs get ready time (default 15 min before &amp; after — adjust below)</span>
+    </div>
+    <div class="buffer-dur-row" id="activityReadyDurRow" style="display:none">
+      <label for="activityReadyBufMin">Get-ready minutes (each way)</label>
+      <input type="number" id="activityReadyBufMin" min="5" max="120" step="5" value="15" onchange="onActivityReadyBufMinInput()">
     </div>
     <div class="repeat-toggle" id="activityRepeat" onclick="toggleRepeat('activityRepeat')">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
@@ -1456,6 +1474,10 @@
 <script src="js/33-parent-app.js"></script>
 <script src="js/34-parent-copyweek.js"></script>
 <script src="js/35-school-calendar.js"></script>
+<!-- The status vocabulary. Loaded last of the declaration files because it
+     calls into every one of them at runtime and none of them at load time.
+     99-main.js still owns all top-level executable code. -->
+<script src="js/36-status.js"></script>
 <script src="js/99-main.js"></script>
 </body>
 </html>

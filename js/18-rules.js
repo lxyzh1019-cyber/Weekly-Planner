@@ -130,7 +130,10 @@ const MR_DEFAULT_RULES = {
   },
 
   xp: {
-    perLevel: 100,
+    /* Calibrated, not chosen — see tools/xp-calibrate.js and the note on
+       QUEST_XP_PER_LEVEL. Kept in the rulebook because the money pages quote it
+       to the girls, but the CONSTANT is what the level maths uses. */
+    perLevel: 400,
     awards: [
       { id: 'chore_overflow', label: 'Extra household chore past your $3 day', xp: 20 },
       { id: 'personal_unasked', label: 'Personal chore done without being asked', xp: 10 },
@@ -892,6 +895,23 @@ function mrChoreWouldPay(kid, weekKey, dayIdx) {
 }
 
 /* ── The family's share of the week ──
+   NOTE: getFamilyChoreStatus (js/36-status.js) is the owner now. This wrapper
+   stays because three call sites and a merge test still name it, and because
+   the pricing rule it documents below is genuinely the same number. What it
+   must never go back to being is a SINGLE count: `counted` mixed scheduled and
+   done together, so two chores merely placed on the calendar satisfied the
+   family's share without anybody lifting anything. */
+function mrFamilyChoreStatus(kid, weekKey) {
+  const st = getFamilyChoreStatus(kid, weekKey);
+  return Object.assign({}, st, {
+    needed: st.required,
+    // Kept for readers that only ever wanted "is anything outstanding", but
+    // pointing at the number that is actually short of the rule.
+    short: st.unfulfilled,
+  });
+}
+
+/* ── The family's share of the week (the pricing half) ──
    freeChoresPerWeek is a PRICING rule: mrChoreWeek takes that many of the week's
    graded chores and pays nothing for them, choosing the cheapest so the
    arrangement is the one she would have picked herself. The child is told those
@@ -905,28 +925,13 @@ function mrChoreWouldPay(kid, weekKey, dayIdx) {
    number in one place — a pool row has no such field, and a second control for
    the same quantity is a second thing that can disagree.
 
-   Counted: distinct (day, chore) pairs that are either on the plan or already
-   done. Doing one without planning it counts — the point is the work, not the
-   paperwork. Only the paying lane: `own` and `helping` need no block and stand
-   every day, so counting them would satisfy the floor without anyone lifting
-   anything.
+   Only the paying lane: `own` and `helping` need no block and stand every day,
+   so counting them would satisfy the floor without anyone lifting anything.
 
-   Reads only. Whether to say anything about `short` is the screen's business. */
-function mrFamilyChoreStatus(kid, weekKey) {
-  const needed = Number((mrRulesForWeek(weekKey).chores || {}).freeChoresPerWeek) || 0;
-  const seen = new Set();
-  for (let d = 0; d < 7; d++) {
-    const { rows } = mrChoresForDay(kid, weekKey, d);
-    rows.forEach(r => {
-      if (!r.row || !mrLanePays(r.row.lane)) return;
-      const done = mrGetClaim(kid, weekKey, d, r.row.id) > 0
-        || mrGetChoreGrade(kid, weekKey, d, r.row.id) > 0;
-      if (r.scheduled || done) seen.add(d + ':' + r.row.id);
-    });
-  }
-  const counted = seen.size;
-  return { needed, counted, short: Math.max(0, needed - counted) };
-}
+   The counting itself lives in getFamilyChoreStatus (js/36-status.js), which
+   keeps planned, fulfilled and waiting apart. Whether to say anything about
+   them is the screen's business. */
+
 
 /* Personal chores done unasked, for the XP award. Never money. */
 function mrPersonalUnaskedCount(weekKey, kid) {
@@ -1406,8 +1411,16 @@ function mrXpForWeek(weekKey, kid) {
    competing XP system. */
 function mrXpLevelInfo(kid, weekKey) {
   const r = mrRulesForWeek(weekKey || todayKey());
-  const perLevel = Number((r.xp || {}).perLevel) || 100;
-  const xp = Number((getProfData(kid).progress || {}).questXP) || 0;
+  /* ONE level calculation. This read the rulebook while js/06-quests.js and
+     Today's hero each did the same arithmetic against QUEST_XP_PER_LEVEL, so a
+     stored rulebook carrying the old 100 could have the portal saying level 17
+     while Today said level 5 about the same child. The constant is the answer;
+     a rulebook that still names the old default is ignored rather than obeyed. */
+  const stored = Number((r.xp || {}).perLevel) || 0;
+  const perLevel = (!stored || stored === QUEST_XP_PER_LEVEL_LEGACY) ? QUEST_XP_PER_LEVEL : stored;
+  // Through getQuestXP, which knows which scale the stored figure is on.
+  const xp = (typeof getQuestXP === 'function') ? getQuestXP(kid)
+           : Number((getProfData(kid).progress || {}).questXP) || 0;
   const level = Math.floor(xp / perLevel) + 1;
   const into = xp % perLevel;
   const tiers = ((r.xp || {}).tiers || []).slice().sort((a, b) => a.level - b.level);
@@ -1432,9 +1445,15 @@ function mrCreditWeekXp(weekKey, kid) {
   if (!c.xpAwardedWeeks[weekKey]) c.xpAwardedWeeks[weekKey] = {};
   if (c.xpAwardedWeeks[weekKey][kid] != null) return 0;      // already credited
   const { total } = mrXpForWeek(weekKey, kid);
-  c.xpAwardedWeeks[weekKey][kid] = total;
-  if (total > 0) addQuestXP(total, kid);
-  return total;
+  /* Through the same gate the block awards go through, against the same weekly
+     allowance. These were two independent taps into one pool: block XP had no
+     cap at all and this added its own total on top, so a strong week could
+     print several levels at the meeting on work that had already been counted
+     as it happened. What is RECORDED is what was actually credited, so an undo
+     and a re-record cannot conjure the capped remainder into existence. */
+  const r = total > 0 ? addQuestXP(total, kid, weekKey) : { awarded: 0 };
+  c.xpAwardedWeeks[weekKey][kid] = r.awarded;
+  return r.awarded;
 }
 
 /* ── QUARTERLY REVIEW ──────────────────────────────────────────────

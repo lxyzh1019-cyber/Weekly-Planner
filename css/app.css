@@ -1365,6 +1365,34 @@
   .mm-item.on .mm-item-box { background: #95d5b2; }
   /* Step 5's settled readout: two kids, two states each, every cell a tap to
      the step that fixes it. Ticks green only when that half is genuinely done. */
+  /* Three states on a day row: Jenn reviewed, Jess reviewed, both. Each is its
+     own control because reviewing a day is a fact about one child — a single
+     tick that wrote both girls is what made "Confirm all" quietly mean both. */
+  /* Required / fulfilled / unfulfilled, in the review voice. Shown on every
+     week including past ones — a shortfall a parent cannot see is a shortfall
+     that quietly becomes the new normal. */
+  /* "(32h school)" inside the Brain row — the school day is most of that row,
+     and without this the homework inside it is invisible. */
+  .mm-2b-sub { font-weight: 600; opacity: 0.7; }
+  .mm-chore-review { border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px; margin: 8px 0; background: #fff4db; }
+  .mm-chore-row {
+    display: flex; gap: var(--space-2); align-items: baseline; flex-wrap: wrap;
+    font-size: max(13px, calc(0.84rem * var(--fs-scale, 1))); padding: 2px 0;
+  }
+  .mm-chore-row.met { opacity: 0.75; }
+  .mm-chore-who { font-weight: 800; min-width: 5.5rem; }
+  .mm-chore-wait { color: var(--accent-strong); font-weight: 700; }
+  .mm-drow-review { display: inline-flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+  .mm-drow-kid {
+    min-width: 44px; min-height: 44px;
+    border: 2px solid var(--ink); border-radius: 9px;
+    background: var(--paper-card, #fffdf5); color: inherit;
+    font-family: inherit; font-weight: 800;
+    font-size: max(13px, calc(0.82rem * var(--fs-scale, 1)));
+    cursor: pointer; padding: 0 6px;
+  }
+  .mm-drow-kid.on { background: #95d5b2; }
+  .mm-drow-kid:active { transform: translateY(1px); }
   .mm-settle { border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px; margin-bottom: 10px; background: #fff4db; }
   .mm-settle.done { background: #eaf6ef; }
   .mm-settle-cap { font-weight: 800; font-size: calc(0.82rem * var(--fs-scale, 1)); margin-bottom: 6px; }
@@ -1591,8 +1619,37 @@
   .mm-pay { border: 2px solid var(--ink); border-radius: 12px; background: #fff9e9; padding: 8px 10px; margin: 8px 0; }
   .mm-pay-row { display: flex; justify-content: space-between; font-size: calc(0.95rem * var(--fs-scale, 1)); padding: 2px 0; }
   .mm-recorded { font-size: calc(0.86rem * var(--fs-scale, 1)); font-weight: 700; background: #95d5b2; border: 2px solid var(--ink); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; }
-  .mm-nav { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; }
+  /* ── The meeting is ONE scrolling container ──────────────────────
+     The sheet has always been the scroller; what was missing is that the two
+     things you steer with scrolled away with the content. On step 3 or 4 —
+     long panels, several taps each — the week you were reviewing, the step you
+     were on and the only way to the next one were all off screen.
+
+     Sticky inside the sheet's own scroll area rather than a second scroller:
+     nesting one would put two scrollers on an iPad, and a flick would move the
+     wrong one. Negative margins let each band span the sheet's 1.2rem padding
+     so nothing shows through at the edges. */
+  .mm-head {
+    position: sticky; top: -1.2rem; z-index: 3;
+    margin: -1.2rem -1.2rem 0; padding: 1.2rem 1.2rem 0;
+    background: var(--paper);
+    border-bottom: 2px solid var(--paper-line);
+  }
+  .mm-head .mm-stepper { margin-bottom: 8px; }
+  .mm-nav {
+    display: flex; justify-content: space-between; gap: 8px;
+    position: sticky; bottom: -1.2rem; z-index: 3;
+    /* No margin-top: the body's own bottom padding was doing that job and
+       leaving a dead strip under the buttons on a short step. */
+    margin: 0 -1.2rem -1.2rem; padding: 0.6rem 1.2rem calc(0.6rem + env(safe-area-inset-bottom, 0px));
+    background: var(--paper);
+    border-top: 2px solid var(--paper-line);
+  }
   .mm-nav .btn-confirm { flex: 1; }
+  .mm-nav .pill-btn, .mm-nav .btn-confirm { min-height: 44px; }
+  /* The gap between the last card and the pinned buttons, owned in one place
+     instead of by whatever the final panel happened to end with. */
+  .mm-body { padding-bottom: var(--space-3); }
   .chore-card h3 { margin: 0 0 0.5rem 0; font-size: 1.2rem; }
   .ct-item {
     display: flex;
@@ -1888,6 +1945,10 @@
     padding: 0.55rem 0.8rem; margin: 0 0 0.6rem;
     box-shadow: 2px 2px 0 rgba(201,138,30,0.25);
   }
+  /* Under-planning the mandatory chores is a warning: the rule is not met and
+     the week can still be changed. A solid border rather than red — it is a
+     plan that needs a day, not a child who failed. */
+  .week-todo-banner--warn { border-width: 3px; box-shadow: 3px 3px 0 rgba(201,138,30,0.35); }
   .week-todo-banner .wcb-icon { font-size: 1.15rem; }
   .week-todo-banner .wcb-detail { font-weight: 600; opacity: 0.85; font-size: max(13px, calc(0.82rem * var(--fs-scale, 1))); }
   @media (prefers-color-scheme: dark) {
@@ -2335,9 +2396,15 @@
      that is the done button, the placement guide and the now line (14/18/20);
      in the Full week the now line (5); in the Day Blocks lane nothing, so it
      sits over the clash outline and its flag too. */
+  /* Hour marks ride over the cards; the half-hour rules sit under them. The
+     grid used to be one layer at z-index 12 on the day view — above
+     .placed-block (z10) — which read well on an empty morning and hatched a
+     planned afternoon. .hour-grid--behind is appended last too, so it needs a
+     stacking value BELOW the blocks rather than merely earlier in the DOM. */
   .hour-grid--day { z-index: 12; }
   .hour-grid--wf  { z-index: 4; }
   .hour-grid--tg2 { z-index: 7; }
+  .hour-grid--behind { z-index: 0; }
   /* The tick is sized to its column, not fixed. The day view has one wide
      column and can carry a 14px mark; the week views have seven narrow ones,
      where the same mark is a tenth of the lane and seventeen rows of them read
@@ -2751,6 +2818,10 @@
   }
   .app-dialog-check input { width: 22px; height: 22px; flex: 0 0 auto; margin-top: 1px; }
   .app-dialog-btns .btn-confirm:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+  /* Anywhere else too. "Close the week" is offered disabled until both girls'
+     days are reviewed, and at full strength it reads as pressable — a button
+     that looks ready and does nothing is worse than one that says why not. */
+  .btn-confirm:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
   .sheet-close-x {
     position: absolute;
     top: 10px;
@@ -3278,6 +3349,22 @@
     font-family: 'Patrick Hand', sans-serif;
   }
   .parent-banner.sticky { position: sticky; top: 0; z-index: 99; }
+  /* The banner's two halves. Inline styles used to set the spacing on each
+     button; the buttons are generated now, so the layout belongs here. Wrapping
+     rather than shrinking: on a phone "Confirm all Jenn's blocks" and "Mark
+     Jenn's day reviewed" do not fit beside each other, and a squeezed 30px
+     target is worse than a second line. */
+  .pb-back, .pb-actions { display: inline-flex; gap: var(--space-2); flex-wrap: wrap; vertical-align: middle; }
+  .pb-back { margin-right: var(--space-2); }
+  .pb-actions { margin-left: var(--space-2); }
+  .pb-back-btn, .pb-action, .pb-switch {
+    padding: 4px 10px;
+    min-height: 44px;
+    font-size: max(13px, calc(0.82rem * var(--fs-scale, 1)));
+  }
+  /* Reviewed reads as settled, not as another thing to press. */
+  .pb-action.on { background: #95d5b2; }
+  .pb-action[disabled] { opacity: 0.55; cursor: default; }
 
   /* Parent portal: tabbed sections */
   .parent-tabs {
@@ -3586,9 +3673,14 @@
   }
   .perf-row.sel { background: #fff4db; box-shadow: 2px 2px 0 var(--ink); }
   .perf-week { font-weight: 800; font-size: calc(0.82rem * var(--fs-scale, 1)); white-space: nowrap; }
-  .perf-track { height: 12px; border: 1.5px solid var(--ink); border-radius: 6px; overflow: hidden; background: #f3ecdc; min-width: 36px; }
-  .perf-fill { height: 100%; }
-  .perf-num { font-size: calc(0.72rem * var(--fs-scale, 1)); font-weight: 800; min-width: 28px; }
+  /* Two lengths in one track: planned behind, completed in front, both against
+     the SAME scale for every week and both girls. A bar normalised to its own
+     kid's total says nothing you can compare. */
+  .perf-track { position: relative; height: 12px; border: 1.5px solid var(--ink); border-radius: 6px; overflow: hidden; background: #f3ecdc; min-width: 36px; }
+  .perf-plan { position: absolute; inset: 0 auto 0 0; background: repeating-linear-gradient(90deg, #d9cfb4, #d9cfb4 3px, transparent 3px, transparent 6px); }
+  .perf-fill { position: relative; height: 100%; }
+  /* "6h 30m / 8h" needs real room; 28px was sized for "72%". */
+  .perf-num { font-size: max(13px, calc(0.72rem * var(--fs-scale, 1))); font-weight: 800; min-width: 5.6rem; white-space: nowrap; }
   .perf-money { font-size: calc(0.76rem * var(--fs-scale, 1)); font-weight: 800; white-space: nowrap; }
   .perf-facts { margin-top: 6px; font-size: calc(0.8rem * var(--fs-scale, 1)); font-weight: 700; }
   .perf-detail-nav { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; }

@@ -12,7 +12,7 @@ function getWeekBlockStatsByActId(actId) {
   const keys = getDayKeys(weekOffset);
   const weekBlocks = keys.flatMap(k=>getDayBlocks(k));
   const matches = weekBlocks.filter(b=>b.actId===actId);
-  const completed = matches.filter(b=>!!b.completed).length;
+  const completed = matches.filter(b=>isBlockCompleted(b)).length;
   return { total: matches.length, completed };
 }
 function getTodoLinkStats(todo) {
@@ -22,7 +22,7 @@ function getTodoLinkStats(todo) {
     const weekBlocks = keys.flatMap(k=>getDayBlocks(k));
     const blk = weekBlocks.find(b=>b.id===todo.linkBlockId);
     if (!blk) return null;
-    return { total: 1, completed: blk.completed ? 1 : 0, actId: blk.actId };
+    return { total: 1, completed: isBlockCompleted(blk) ? 1 : 0, actId: blk.actId };
   }
   if (todo.linkActId) {
     const s = getWeekBlockStatsByActId(todo.linkActId);
@@ -226,7 +226,7 @@ function progressForAchievement(a) {
   if (!a.activityId) return null;
   const keys = getDayKeys(weekOffset);
   const blocks = keys.flatMap(k=>getDayBlocks(k));
-  const linked = blocks.filter(b=>b.actId===a.activityId && b.completed);
+  const linked = blocks.filter(b=>b.actId===a.activityId && isBlockCompleted(b));
   if (a.mode==='duration') {
     const value = linked.reduce((sum,b)=>sum+(b.durationMin||0),0);
     return { value, label: formatDuration(value) };

@@ -293,23 +293,39 @@ function placeableActivityIds(kid) {
    `spanMin` is how much of the day the surface draws (DAY_MIN_SPAN everywhere
    today) and `pxPerMin` its own scale. Half-hour rules are dropped below
    `halfMin` px an hour, where they would sit on top of the hour rule. */
+/* `opts.layer` splits the grid in two, which is the whole point of it:
+
+     'lines'  the half-hour rules — BEHIND the cards
+     'ticks'  the hour rules — above them
+     (absent) both, as before
+
+   The grid used to be appended last on every surface so its marks read THROUGH
+   a placed block. That was the right call while a day was mostly empty and the
+   wrong one the moment it is planned: a full afternoon ended up hatched with
+   rules drawn over the top of the things they were meant to help you place.
+   Hour marks still ride above, because "where is four o'clock" is a question a
+   card should not be able to hide, and so does the now-line. Everything else
+   goes underneath. */
 function buildHourGrid(pxPerMin, spanMin, opts) {
   const o = opts || {};
+  const layer = o.layer || 'both';
   const grid = document.createElement('div');
-  grid.className = 'hour-grid' + (o.cls ? ' ' + o.cls : '');
+  grid.className = 'hour-grid'
+    + (layer === 'lines' ? ' hour-grid--behind' : '')
+    + (o.cls ? ' ' + o.cls : '');
   const span = spanMin != null ? spanMin : DAY_MIN_SPAN;
   const firstHour = Math.ceil(START_MIN / 60);
   const lastHour = Math.floor((START_MIN + span) / 60);
   const showHalf = o.halves !== false && 60 * pxPerMin >= (o.halfMin || 34);
   for (let h = firstHour; h <= lastHour; h++) {
     const rel = h * 60 - START_MIN;
-    if (rel >= 0 && rel <= span) {
+    if (layer !== 'lines' && rel >= 0 && rel <= span) {
       const line = document.createElement('div');
       line.className = 'hour-grid-line hour-grid-line--hour';
       line.style.top = (rel * pxPerMin) + 'px';
       grid.appendChild(line);
     }
-    if (!showHalf) continue;
+    if (!showHalf || layer === 'ticks') continue;
     const half = rel + 30;
     if (half > 0 && half < span) {
       const line = document.createElement('div');
@@ -827,10 +843,24 @@ function countRestDaysBetween(fromKey, toKey, kid = activeProfile()) {
   return n;
 }
 
-function markRoutineProgressOnChecklistToggle(block, act, prevDone, nextDone, total) {
+/* `kid` used to be missing: this read the ACTIVE profile and stamped the
+   streak on it, so a parent ticking Jenn's routine while viewing her advanced
+   the PARENT profile's streak. */
+function markRoutineProgressOnChecklistToggle(block, act, prevDone, nextDone, total, kid) {
   if (!act?.isRoutine || !total) return;
+  const rid0 = act.routineId;
+  const who = kid || activeProfile();
+  /* Falling back out of complete has to be handled here too — it is the one
+     path the day view takes, and until now nothing on it could undo the day's
+     "routine kept" mark. Streaks are left alone deliberately: a streak is a
+     record of days that happened, and re-walking it backwards from a mis-tap
+     would lose real history. */
+  if (rid0 && prevDone >= total && nextDone < total) {
+    ctSyncMandatoryFromRoutine(rid0, who, currentDayKey, false);
+    return;
+  }
   if (prevDone >= total || nextDone < total) return;
-  const p = getProfData();
+  const p = getProfData(who);
   const pr = p.progress;
   const rid = act.routineId;
   if (!rid) return;
@@ -870,14 +900,26 @@ function markRoutineProgressOnChecklistToggle(block, act, prevDone, nextDone, to
     if (next) queueChecklistReward('afterschool', next, '10-day after-school streak');
   }
   // Award chore point from routine completion
-  ctAwardMandatoryFromRoutine(rid, activeProfile(), today);
+  ctSyncMandatoryFromRoutine(rid, who, today, true);
   saveAll();
   maybeShowRewardPrompt();
 }
 
 const CT_ROUTINE_SESSION_MAP = { morning: 'Morning', afterschool: 'Afternoon', evening: 'Evening' };
 
-function ctAwardMandatoryFromRoutine(routineId, kid, dayKey) {
+/* ── The day-level "routine kept" mark follows the checklist, both ways ──
+   This used to be one-way and permanent — "sticky: once tracked, don't unset
+   even if routine is later unchecked". That single early-return is why
+   unticking an item could not make anything go back to incomplete: the block
+   said not-done while the week, the streak and the meeting all still said kept.
+
+   It clears now, but ONLY a mark the app set itself. ctSetMandatoryAuto stamps
+   that provenance, and a parent's own tick in the meeting has none — she is
+   asserting the day from memory, and a child unticking an item afterwards must
+   not silently overrule her.
+
+   Routines are tracked (heatmap, streaks, goal points) and pay NO money. */
+function ctSyncMandatoryFromRoutine(routineId, kid, dayKey, complete) {
   const session = CT_ROUTINE_SESSION_MAP[routineId];
   if (!session) return;
   const wk = ctWeekKeyForDate(dayKey);
@@ -887,14 +929,24 @@ function ctAwardMandatoryFromRoutine(routineId, kid, dayKey) {
   if (dayIdx < 0 || dayIdx > 6) return;
   const p = getProfData(kid);
   ctEnsureProfile(p);
-  // Sticky: once tracked, don't unset even if routine is later unchecked.
-  // Routines are mandatory + tracked (heatmap/streaks/goal points) but pay NO money —
-  // money now comes only from completing priced chore groups.
-  if (ctGetMandatory(wk, dayIdx, session, kid)) return;
-  ctSetMandatory(wk, dayIdx, session, kid, true);
-  ctSetMandatoryAuto(wk, dayIdx, session, kid);
-  ctMaybeFireGoalBonus(wk, kid);
-  showToast(`✅ ${session} routine complete`);
+  const on = ctGetMandatory(wk, dayIdx, session, kid);
+  if (complete) {
+    if (on) return;
+    ctSetMandatory(wk, dayIdx, session, kid, true);
+    ctSetMandatoryAuto(wk, dayIdx, session, kid);
+    ctMaybeFireGoalBonus(wk, kid);
+    showToast(`✅ ${session} routine complete`);
+    return;
+  }
+  // Going back to incomplete: only undo what this function put there.
+  if (!on) return;
+  if (!ctGetMandatoryAuto(wk, dayIdx, session, kid)) return;
+  ctSetMandatory(wk, dayIdx, session, kid, false);
+  ctSetMandatoryAuto(wk, dayIdx, session, kid, false);
+}
+/* Kept as the name every existing caller uses. Completing is all it ever did. */
+function ctAwardMandatoryFromRoutine(routineId, kid, dayKey) {
+  ctSyncMandatoryFromRoutine(routineId, kid, dayKey, true);
 }
 
 /* ── An icon for a routine checklist item ──────────────────────────

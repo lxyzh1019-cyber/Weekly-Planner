@@ -81,9 +81,15 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   dayViewAnchorKey = key;
   selectedActivity = null;
 
-  // Parent banner
+  // Parent banner — two named actions and one way out, both filled by their
+  // owners so the day and week banners cannot drift apart again.
   const banner = document.getElementById('parentBannerDay');
   banner.style.display = isParent() ? 'block' : 'none';
+  if (isParent()) {
+    document.getElementById('parentBackDay').innerHTML = parentBannerBackButton();
+    renderParentBanners();
+    applyMeetingLock();
+  }
 
   document.getElementById('dayProfileBadge').textContent =
     isParent() ? (parentViewing==='jenn'?'🐥 (P)':'🦊 (P)') :
@@ -441,10 +447,18 @@ function buildDayColumn(dayKey, canvasHeight, withHeader) {
   // Pending invitations from sister — render as dashed-border blocks
   renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd, dayKey);
 
-  /* Last, so :00 and :30 stay readable across whatever is placed over them.
+  /* Two layers, and only one of them rides over the cards. The half-hour rules
+     go BEHIND: a planned afternoon drawn across with them is hatched, and they
+     are helping nobody by the time there is something there to read. The hour
+     marks stay above, because "where is four o'clock" is a question a card
+     should not be able to hide, and the now-line is above them both.
+
+     Appended last either way so the ticks land over the blocks; the behind
+     layer carries its own negative stacking, which is what puts it under them.
      zMinStart is 0 on every path today, which is why the grid can measure from
      START_MIN; a zoomed zone would have to pass its own offset in. */
-  canvas.appendChild(buildHourGrid(PX_PER_MIN, spanMin, { cls: 'hour-grid--day' }));
+  canvas.appendChild(buildHourGrid(PX_PER_MIN, spanMin, { cls: 'hour-grid--day', layer: 'lines' }));
+  canvas.appendChild(buildHourGrid(PX_PER_MIN, spanMin, { cls: 'hour-grid--day', layer: 'ticks' }));
 
   col.appendChild(canvas);
   return {
@@ -735,6 +749,10 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   // 2- or 3-day view those are different, and a tick that wrote to the wrong one
   // would be a tick that silently completed another day's block.
   const ownDayKey = dayKey || currentDayKey;
+  // Whose block this is. A routine's completion is its checklist, and the item
+  // set is per child, so asking without naming the child is how a parent
+  // viewing Jenn came to measure her routine against Jess's items.
+  const blockKid = isParent() ? parentViewing : activeProfile();
   const act = findActivity(b.actId);
   if (!act) return;
 
@@ -801,7 +819,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   blockEl.className = 'placed-block'
     +(isBuffer ? ` travel-buf travel-buf--centered${b._bufferCls ? ' '+b._bufferCls : ''}${b._bufferConflict ? ' travel-buf--conflict' : ''}` : '')
     +(b.parentPinned?' parent-pinned':'')
-    +(b.completed?' placed-block--completed':'')
+    +(isBlockCompleted(b, blockKid)?' placed-block--completed':'')
     +(isLightColour(blockBg)?' light-bg':'')
     +(hasConflict ? ' placed-block--conflict' : '')
     +(isCompact?' compact':'')+(isTight?' compact-tight':'')+fontTier;
@@ -826,8 +844,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   // needs its own badge to stay visually distinct at a glance.
   if (!isBuffer && act.isCompetition) badgeList.push('<span class="badge" title="Competition">🏆</span>');
   if (act.isRoutine) {
-    const done = countChecklistDone(b, act);
-    const total = countChecklistTotal(b, act);
+    const { done, total } = routineTally(b, act, blockKid);
     if (total > 0) badgeList.push(`<span class="badge">✓ ${done}/${total}</span>`);
   }
   if (b.parentPinned) badgeList.push('<span class="badge">📌</span>');
@@ -880,8 +897,11 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
     ? `<div class="block-meta"><span class="travel-buf-label">${escapeHtml(b._bufferLabel || '')}</span></div>`
     : `<div class="block-meta">${durStr}${badges?' '+badges:''}</div>`;
   // Quick-complete tick — mark this block done straight from the timeline.
+  // Drawn from the shared answer, so a routine whose checklist is full shows a
+  // tick here even though nobody pressed this button.
+  const blockDone = isBlockCompleted(b, blockKid);
   const doneHtml = !isBuffer
-    ? `<button type="button" class="block-done-btn${b.completed?' done':''}" aria-label="${b.completed?'Mark not done':'Mark done'}" onclick="event.stopPropagation(); toggleBlockDone('${escapeJsAttr(ownDayKey)}','${escapeJsAttr(b.id)}',event)">${b.completed?'✓':''}</button>`
+    ? `<button type="button" class="block-done-btn${blockDone?' done':''}" aria-label="${blockDone?'Mark not done':'Mark done'}" onclick="event.stopPropagation(); toggleBlockDone('${escapeJsAttr(ownDayKey)}','${escapeJsAttr(b.id)}',event)">${blockDone?'✓':''}</button>`
     : '';
   // List as many objectives/goals as the block's own height can hold — same
   // "show what this block is about" idea as print/week, and the day view has
@@ -1221,16 +1241,16 @@ function buildBlockTrainingChip(b) {
   return el;
 }
 
-function countChecklistTotal(block, act) {
-  const tmpl = getRoutineTemplate(act.routineId);
-  const tmplCount = tmpl?.items?.length || 0;
-  const extraCount = getKidExtras(act.routineId).length;
-  const rewardCount = getUnlockedRoutineRewards(act.routineId).length;
-  return tmplCount + extraCount + rewardCount;
+/* Both counts come from routineTally (js/36-status.js) now. They used to be
+   written out here and disagree with ckRoutineItems: this copy counted DONE as
+   "every true value in checklistState", which counts a tick left behind by an
+   item a parent has since removed. A routine could report 4/3 done here and
+   3/3 on the chore tab, for the same block, at the same moment. */
+function countChecklistTotal(block, act, kid) {
+  return routineTally(block, act, kid).total;
 }
-function countChecklistDone(block, act) {
-  const state = block.checklistState || {};
-  return Object.values(state).filter(v=>v===true).length;
+function countChecklistDone(block, act, kid) {
+  return routineTally(block, act, kid).done;
 }
 
 function getRoutineTemplate(routineId) {
@@ -1423,10 +1443,10 @@ function addActivityAtMin(absMin) {
   pendingStartMin = absMin;
 
   if (selectedActivity.isTraining) {
-    ts = { durationMin: selectedActivity.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, warmupBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15, warmupBufMin:20 };
+    ts = { durationMin: selectedActivity.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(selectedActivity), getReadyBuffer:activityTravels(selectedActivity), warmupBuffer:false, gearState:{}, travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, warmupBufMin:DEFAULT_WARMUP_MIN };
     openTrainingSheet();
   } else {
-    as_ = { durationMin: selectedActivity.durationMin||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15, choreTags: [], objectives: [] };
+    as_ = { durationMin: selectedActivity.durationMin||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(selectedActivity), getReadyBuffer:activityTravels(selectedActivity), travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, choreTags: [], objectives: [] };
     openActivitySheet();
   }
 }
@@ -1531,10 +1551,10 @@ function pickFromSlot(actId) {
   closeSheet('slotPickerOverlay');
   // pendingStartMin was set by openSlotPicker.
   if (act.isTraining) {
-    ts = { durationMin: act.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, warmupBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15, warmupBufMin:20 };
+    ts = { durationMin: act.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(act), getReadyBuffer:activityTravels(act), warmupBuffer:false, gearState:{}, travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, warmupBufMin:DEFAULT_WARMUP_MIN };
     openTrainingSheet();
   } else {
-    as_ = { durationMin: act.durationMin||60, colour: CAT_HEX[act.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15, choreTags: [], objectives: [] };
+    as_ = { durationMin: act.durationMin||60, colour: CAT_HEX[act.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(act), getReadyBuffer:activityTravels(act), travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, choreTags: [], objectives: [] };
     openActivitySheet();
   }
 }

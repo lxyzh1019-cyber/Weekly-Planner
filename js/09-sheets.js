@@ -325,6 +325,13 @@ function renderActivitySheet() {
   const atIn = document.getElementById('activityTravelBufMin');
   if (atIn) atIn.value = String(as_.travelBufMin);
 
+  const rbToggle = document.getElementById('activityReadyToggle');
+  if (rbToggle) rbToggle.classList.toggle('on', !!as_.getReadyBuffer);
+  const arRow = document.getElementById('activityReadyDurRow');
+  if (arRow) arRow.style.display = as_.getReadyBuffer ? 'flex' : 'none';
+  const arIn = document.getElementById('activityReadyBufMin');
+  if (arIn) arIn.value = String(as_.getReadyBufMin != null ? as_.getReadyBufMin : DEFAULT_BUFFER_MIN);
+
   const rt = document.getElementById('activityRepeat');
   rt.classList.toggle('on', as_.repeat);
   document.getElementById('activityRepeatDays').style.display = as_.repeat?'block':'none';
@@ -380,7 +387,7 @@ function renderActivitySheet() {
     }
   }
 
-  renderSheetTimeSummary('activityTimeSummary', pendingStartMin, as_.durationMin, as_.travelBuffer, as_.travelBufMin);
+  renderSheetTimeSummary('activityTimeSummary', pendingStartMin, as_.durationMin, as_.travelBuffer, as_.travelBufMin, !!as_.getReadyBuffer, as_.getReadyBufMin);
   requestAnimationFrame(()=>syncDurationColumnSpacers('activity'));
 }
 function confirmActivity() {
@@ -398,6 +405,8 @@ function confirmActivity() {
     repeatDays: as_.repeat?as_.repeatDays:[],
     travelBuffer: as_.travelBuffer,
     travelBufMin: as_.travelBufMin,
+    getReadyBuffer: !!as_.getReadyBuffer,
+    getReadyBufMin: as_.getReadyBufMin,
     repeatDateStart: span.start,
     repeatDateEnd:   span.end,
     repeatEvery:     span.every,
@@ -527,6 +536,11 @@ function toggleTravelBuffer(which) {
 }
 function toggleGetReadyBuffer(which) {
   if (which==='training') { ts.getReadyBuffer = !ts.getReadyBuffer; renderTrainingSheet(); }
+  else if (which==='activity') {
+    as_.getReadyBuffer = !as_.getReadyBuffer;
+    if (as_.getReadyBuffer && (as_.getReadyBufMin == null || as_.getReadyBufMin < 5)) as_.getReadyBufMin = DEFAULT_BUFFER_MIN;
+    renderActivitySheet();
+  }
 }
 function toggleWarmupBuffer(which) {
   if (which==='training') { ts.warmupBuffer = !ts.warmupBuffer; renderTrainingSheet(); }
@@ -685,7 +699,24 @@ function syncEditStopwatchUI() {
   else editStopwatchClearTick();
 }
 
+/* On a ROUTINE this toggle is not the owner of anything — the checklist above
+   it is. It used to be a second, independent switch, so a child could tick
+   every step and still leave this off (or leave it on with the list half done)
+   and the two would sit there disagreeing. It now drives the list, through the
+   same write the day view and the chore tab use. */
 function toggleEditComplete() {
+  const kid = isParent() ? parentViewing : activeProfile();
+  const blocks = getDayBlocks(currentDayKey, kid) || [];
+  const blk = blocks.find(b => b.id === editingBlockId);
+  const act = blk ? findActivity(blk.actId, kid) : null;
+  if (blk && act && act.isRoutine) {
+    toggleBlockDone(currentDayKey, blk.id);
+    editState.completed = isRoutineCompleted(blk, kid);
+    document.getElementById('editCompleteToggle').classList.toggle('on', editState.completed);
+    const wrap = document.getElementById('editChecklistWrap');
+    if (wrap && wrap.style.display !== 'none') renderChecklist(blk, act, 'editChecklistList');
+    return;
+  }
   editState.completed = !editState.completed;
   document.getElementById('editCompleteToggle').classList.toggle('on', editState.completed);
 }
@@ -787,6 +818,11 @@ function onActivityTravelBufMinInput() {
   if (tIn) as_.travelBufMin = clampBufferMin(tIn.value);
   renderActivitySheet();
 }
+function onActivityReadyBufMinInput() {
+  const rIn = document.getElementById('activityReadyBufMin');
+  if (rIn) as_.getReadyBufMin = clampBufferMin(rIn.value);
+  renderActivitySheet();
+}
 
 function openEditSheet(blockId) {
   editingBlockId = blockId;
@@ -834,8 +870,18 @@ function openEditSheet(blockId) {
 
   document.getElementById('editSheetTitle').textContent = `${act.icon} ${act.name}`;
 
-  editState.completed = !!block.completed;
+  editState.completed = isBlockCompleted(block, isParent() ? parentViewing : activeProfile());
   document.getElementById('editCompleteToggle').classList.toggle('on', editState.completed);
+  /* Say what the switch actually does. On a routine it closes or reopens the
+     checklist, and a label that claimed otherwise is how two controls for one
+     fact stayed invisible for so long. */
+  {
+    const lbl = document.querySelector('#editCompleteToggle .toggle-label');
+    const isRoutineBlock = !!(act && act.isRoutine);
+    if (lbl) lbl.textContent = isRoutineBlock
+      ? '✅ Tick every step in the checklist'
+      : '✅ Mark this activity done';
+  }
   renderParentStampPicker(block);
 
   editState.stopwatch = cloneStopwatch(block.stopwatch);
@@ -1052,14 +1098,19 @@ function buildChecklistRow(block, act, item, isKidItem, listContainerId) {
     const b = blocks.find(x=>x.id===block.id);
     if (!b.checklistState) b.checklistState = {};
     b.checklistState[item.id] = !b.checklistState[item.id];
+    const kid = isParent() ? parentViewing : activeProfile();
+    if (act.isRoutine) {
+      // Derive the compatibility flag BEFORE the write, so what lands in the
+      // profile and what every other screen reads are the same thing.
+      syncRoutineCompletion(b, kid);
+    }
     setDayBlocks(currentDayKey, blocks);
     renderChecklist(b, act, cid);
     buildTimeline();
     if (act.isRoutine) {
-      const total = countChecklistTotal(b, act);
-      const done = countChecklistDone(b, act);
+      const { done, total } = routineTally(b, act, kid);
       const prevDone = b.checklistState[item.id] ? Math.max(0, done - 1) : Math.min(total, done + 1);
-      markRoutineProgressOnChecklistToggle(b, act, prevDone, done, total);
+      markRoutineProgressOnChecklistToggle(b, act, prevDone, done, total, kid);
       if (total > 0 && done >= total) {
         if (!routineCompleteToasted.has(b.id)) {
           routineCompleteToasted.add(b.id);
@@ -1115,10 +1166,13 @@ function buildChecklistRow(block, act, item, isKidItem, listContainerId) {
 }
 
 /* Get kid-added extras for the current child profile, for a specific routineId */
-function getKidExtras(routineId) {
-  const p = getProfData();
-  if (!p) return [];
-  const map = p.routineExtras || {};
+/* `p` used to be missing entirely, so this read the ACTIVE profile: the parent
+   portal viewing Jenn was handed Jess's extra items and then measured Jenn's
+   routine against them. Every caller passes the child now. */
+function getKidExtras(routineId, p = activeProfile()) {
+  const prof = getProfData(p);
+  if (!prof) return [];
+  const map = prof.routineExtras || {};
   return map[routineId] || [];
 }
 
@@ -1301,9 +1355,16 @@ async function saveEditChanges() {
   blk.gearState = newGearState;
   blk.note = newNote;
   const wasCompleted = !!blk.completed;
-  blk.completed = newCompleted;
-  // Unify rewards: marking done in the edit sheet now earns XP + fires links.
-  if (!wasCompleted && newCompleted) awardBlockLinks(blk, currentDayKey);
+  /* A routine's flag is derived from its checklist and was already written when
+     the list was ticked — writing the sheet's own copy back over it here would
+     reintroduce exactly the disagreement this release removes. */
+  const savingRoutine = !!(act && act.isRoutine);
+  if (!savingRoutine) {
+    blk.completed = newCompleted;
+    if (!wasCompleted && newCompleted) awardBlockLinks(blk, currentDayKey);
+  } else {
+    syncRoutineCompletion(blk, isParent() ? parentViewing : activeProfile());
+  }
   blk.objectives = newObjectives;
   if (newStopwatch) blk.stopwatch = newStopwatch;
   else delete blk.stopwatch;
@@ -1551,30 +1612,117 @@ function toggleConfirm() {
   buildTimeline();
 }
 
-/* Parent: confirm every block on the current day in one tap. */
-async function confirmAllToday() {
+/* ── "Confirm all today" was two promises it did not keep ─────────
+   It set `confirmed` and nothing else. Every screen draws its tick from
+   `completed`, so pressing it changed the one small ✅ badge — which is hidden
+   on shorter blocks anyway — and on a busy day nothing visible moved at all.
+   It then repainted only the day timeline, so from Today the screen never
+   redrew either. And its label promised a day review it never performed.
+
+   Two named actions now. This one asserts the WORK: every block that has
+   already started is marked completed and confirmed for ONE named child.
+   Completion goes through completeQuest, the function that already owned it,
+   so XP, sticker counting and chore claims fire exactly once and cannot
+   double-count; a routine completes by closing its checklist.
+
+   "Already started" is the guard that makes this safe to press at nine in the
+   morning: a block later today has not happened yet, and confirming it would
+   be the app inventing a fact. On a past day everything qualifies. */
+function dayBlocksEligibleToConfirm(dayKey, kid) {
+  const blocks = getDayBlocks(dayKey, kid) || [];
+  const isToday = dayKey === todayKey();
+  const isFuture = dayKey > todayKey();
+  if (isFuture) return [];
+  const now = (typeof tdNowMin === 'function') ? tdNowMin() : 24 * 60;
+  return blocks.filter(b => b && b.startMin != null && (!isToday || b.startMin <= now));
+}
+
+async function confirmAllBlocksForChild(kid, dayKey) {
   if (!isParent()) return;
-  const blocks = getDayBlocks(currentDayKey);
-  const unconfirmed = blocks.filter(b => !b.confirmed);
-  if (!unconfirmed.length) {
-    showToast('Already all confirmed ✅');
+  const who = kid || parentViewing;
+  const key = dayKey || currentDayKey;
+  const name = who === 'jenn' ? 'Jenn' : 'Jess';
+  const eligible = dayBlocksEligibleToConfirm(key, who);
+  if (!eligible.length) {
+    showToast(key > todayKey() ? 'That day has not happened yet' : `Nothing to confirm for ${name}`);
     return;
   }
-  if (!(await showConfirm(`Confirm all ${unconfirmed.length} block${unconfirmed.length===1?'':'s'} for this day?`))) return;
-  unconfirmed.forEach(b => { b.confirmed = true; });
-  setDayBlocks(currentDayKey, blocks);
-  recountActivityProgress();
-  // Check level-up and auto-chore for each unique actId touched
+  const pending = eligible.filter(b => !isBlockCompleted(b, who) || !isBlockConfirmed(b));
+  if (!pending.length) { showToast(`${name}'s day is already confirmed ✅`); return; }
+  if (!(await showConfirm(
+    `Confirm ${pending.length} block${pending.length === 1 ? '' : 's'} for ${name}?`
+    + `\n\nThey are marked done and confirmed. This does not mark the day reviewed, `
+    + `and it does not touch ${who === 'jenn' ? 'Jess' : 'Jenn'}.`,
+    { okLabel: 'Confirm them', cancelLabel: 'Not now' }))) return;
+
+  // Complete first, through the owner — it writes and saves per block.
+  pending.forEach(b => { if (!isBlockCompleted(b, who)) completeQuest(b.id, key); });
+  // Then confirm, re-reading because completing wrote through setDayBlocks.
+  const blocks = getDayBlocks(key, who) || [];
+  const ids = new Set(pending.map(b => b.id));
   const seen = new Set();
-  unconfirmed.forEach(b => {
-    if (b.actId === 'chores') gradeChoresFromBlock(b, currentDayKey, isParent() ? parentViewing : activeProfile());
-    if (seen.has(b.actId)) return;
-    seen.add(b.actId);
-    checkLevelUp(b.actId);
+  blocks.forEach(b => {
+    if (!ids.has(b.id) || b.confirmed) return;
+    b.confirmed = true;
+    markItemUpdated(b);
+    // A parent confirming a chore block IS the grading act — see gradeChoresFromBlock.
+    if (b.actId === 'chores') gradeChoresFromBlock(b, key, who);
+    if (!seen.has(b.actId)) { seen.add(b.actId); checkLevelUp(b.actId); }
   });
+  setDayBlocks(key, blocks, who);
+  recountActivityProgress();
   saveAll();
-  buildTimeline();
-  showToast(`${unconfirmed.length} block${unconfirmed.length===1?'':'s'} confirmed ✅`);
+  refreshAfterCompletion();
+  renderParentBanners();
+  showToast(`${name}: ${pending.length} block${pending.length === 1 ? '' : 's'} done and confirmed ✅`);
+}
+
+/* ── …and this one asserts the REVIEW ──────────────────────────────
+   A different fact, for one named child, changing no activity completion.
+   Offered only once nothing on the day is left unconfirmed, so the record can
+   never claim more than happened. */
+async function markDayReviewedForChild(kid, dayKey) {
+  if (!isParent()) return;
+  const who = kid || parentViewing;
+  const key = dayKey || currentDayKey;
+  const name = who === 'jenn' ? 'Jenn' : 'Jess';
+  if (isDayReviewed(who, key)) {
+    markDayReviewed(who, key, false);
+    saveAll(); renderParentBanners();
+    showToast(`${name}'s day is no longer marked reviewed`);
+    return;
+  }
+  const left = dayBlocksEligibleToConfirm(key, who).filter(b => !isBlockConfirmed(b));
+  if (left.length) {
+    showToast(`${left.length} block${left.length === 1 ? '' : 's'} still need${left.length === 1 ? 's' : ''} confirming`);
+    return;
+  }
+  markDayReviewed(who, key, true);
+  saveAll();
+  renderParentBanners();
+  showToast(`📋 ${name}'s day reviewed`);
+}
+
+/* The day screen's parent banner names the child it is acting on, and says
+   whether the review is still blocked. Both banners are redrawn from here so
+   the two buttons can never describe a different child from the one shown. */
+function renderParentBanners() {
+  const bar = document.getElementById('parentDayActions');
+  if (!bar) return;
+  if (!isParent()) { bar.innerHTML = ''; return; }
+  const who = parentViewing;
+  const name = who === 'jenn' ? 'Jenn' : 'Jess';
+  const key = currentDayKey;
+  const eligible = dayBlocksEligibleToConfirm(key, who);
+  const left = eligible.filter(b => !isBlockConfirmed(b)).length;
+  const reviewed = isDayReviewed(who, key);
+  bar.innerHTML =
+    `<button type="button" class="btn-icon pb-action" onclick="confirmAllBlocksForChild()">`
+    + `✅ Confirm all ${escapeHtml(name)}'s blocks${left ? ` (${left})` : ''}</button>`
+    + `<button type="button" class="btn-icon pb-action${reviewed ? ' on' : ''}"`
+    + `${(!reviewed && left) ? ' disabled title="Confirm the blocks first"' : ''}`
+    + ` onclick="markDayReviewedForChild()">`
+    + `${reviewed ? '📋 Day reviewed ✓' : `📋 Mark ${escapeHtml(name)}'s day reviewed`}</button>`;
 }
 
 /* ════════════════════════════════════════════════════════════════

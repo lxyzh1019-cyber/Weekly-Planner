@@ -44,13 +44,11 @@ function ckActFor(block, kid) {
 
 /* Every tickable item in a routine, in the order the day view shows them:
    the template, then anything she added, then anything she unlocked. */
-function ckRoutineItems(routineId) {
-  const tmpl = (typeof getRoutineTemplate === 'function') ? getRoutineTemplate(routineId) : null;
-  return [
-    ...((tmpl && tmpl.items) || []),
-    ...((typeof getKidExtras === 'function' ? getKidExtras(routineId) : []) || []),
-    ...((typeof getUnlockedRoutineRewards === 'function' ? getUnlockedRoutineRewards(routineId) : []) || []),
-  ];
+/* Delegates to the one owner (js/36-status.js). This was the CORRECT of the two
+   copies — it counts by item id — but it still dropped the child, so keep the
+   kid argument flowing. */
+function ckRoutineItems(routineId, kid) {
+  return routineItemsFor(routineId, kid || (typeof ctActiveKid === 'function' ? ctActiveKid() : undefined));
 }
 /* The day's routine blocks, as the planner placed them. Nothing appears here
    that the planner did not put on the day — the same rule the chores follow. */
@@ -60,7 +58,7 @@ function ckRoutineBlocks(kid, dayIdx) {
   return (getDayBlocks(dayKey, kid) || []).map(b => {
     const act = ckActFor(b, kid);
     if (!act || !act.isRoutine) return null;
-    const items = ckRoutineItems(act.routineId);
+    const items = ckRoutineItems(act.routineId, kid);
     const st = b.checklistState || {};
     const done = items.filter(i => st[i.id]).length;
     return { block: b, act, items, done, total: items.length, dayKey };
@@ -840,7 +838,7 @@ function ckCloseRoutine(blockId) {
   const b = blocks.find(x => x.id === blockId);
   if (!b) return;
   const act = ckActFor(b, kid);
-  const items = ckRoutineItems(act && act.routineId);
+  const items = ckRoutineItems(act && act.routineId, kid);
   if (!b.checklistState) b.checklistState = {};
   const allOn = items.every(i => b.checklistState[i.id]);
   items.forEach(i => { b.checklistState[i.id] = !allOn; });
@@ -876,12 +874,13 @@ function ckCloseAllRoutines() {
 }
 function ckAfterRoutineChange(b, dayKey, kid) {
   const act = ckActFor(b, kid);
-  const items = ckRoutineItems(act && act.routineId);
-  const done = items.filter(i => (b.checklistState || {})[i.id]).length;
-  // Same award path the day view uses — sticky, and it pays no money.
-  if (items.length && done >= items.length && act && act.routineId) {
-    ctAwardMandatoryFromRoutine(act.routineId, kid, dayKey);
-  }
+  // The block's `completed` flag is a mirror of the checklist, never a second
+  // opinion about it — so it is re-derived on every change, in both directions.
+  syncRoutineCompletion(b, kid);
+  // Same award path the day view uses, and it pays no money. It CLEARS as well
+  // as sets now: unticking an item has to be able to take the day back, or no
+  // screen can ever return to incomplete.
+  if (act && act.routineId) ctSyncMandatoryFromRoutine(act.routineId, kid, dayKey, isRoutineCompleted(b, kid));
   saveAll();
   renderChoreTab();
 }

@@ -1,7 +1,7 @@
 // Weekly-Planner — Setup › Copy a week.
 //
 // The planner could already copy a week in two places, and neither was
-// something a parent could ask for. mmPlanNextWeek (js/15-meeting.js) copies
+// something a parent could ask for. The meeting used to copy
 // THIS week into next, from inside the meeting, for both girls, with no choice
 // about any of it. fillWeekFromNearest (js/07-week-view.js) fills a blank week
 // from whichever neighbour it picks, and refuses if the week is not blank. A
