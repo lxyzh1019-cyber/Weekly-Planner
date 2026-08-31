@@ -797,24 +797,17 @@ function perfMondayKey(offset) {
   return ctDateToKey(mon);
 }
 // One kid's numbers for the week starting at monKey.
+/* One computation, shared with the meeting and the week glance. It used to be
+   written out here with its own category bucketing, its own idea of which
+   blocks count, and a direct read of b.completed — which is why a routine
+   whose checklist was full showed as zero minutes done. */
 function perfWeekStats(monKey, kid) {
-  const mon = formatDayKey(monKey);
-  const acts = getAllActivities(kid, { includeArchived: true });
-  let planned = 0, done = 0;
-  const byCat = {};
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(mon); d.setDate(mon.getDate() + i);
-    (getDayBlocksForProfile(ctDateToKey(d), kid) || []).forEach(b => {
-      const act = acts.find(a => a.id === b.actId);
-      const cat = act ? act.cat : 'custom';
-      const m = b.durationMin || 0;
-      if (!byCat[cat]) byCat[cat] = { planned: 0, done: 0 };
-      byCat[cat].planned += m; planned += m;
-      if (b.completed) { byCat[cat].done += m; done += m; }
-    });
-  }
+  const h = getWeeklyHours(kid, monKey);
   const fw = (state.shared.chore.finalizedWeeks || {})[monKey] || {};
-  return { planned, done, byCat, routines: ctMandatoryPoints(monKey, kid), money: fw[kid] };
+  return {
+    planned: h.planned, done: h.completed, byCat: h.byGroup, schoolMin: h.schoolMin,
+    routines: ctMandatoryPoints(monKey, kid), money: fw[kid],
+  };
 }
 
 function renderPerformance() {
@@ -827,25 +820,44 @@ function renderPerfTrend() {
   const wrap = document.getElementById('perfTrend');
   if (!wrap) return;
   const heldMap = state.shared.chore.meetingsHeld || {};
-  let rows = '';
+
+  /* Two passes, and the second one is the point. A percentage answered a
+     question nobody was asking — "of whatever she happened to plan, how much
+     got done" — so a child who planned two hours and did both read 100% beside
+     a sister who planned twenty and did eighteen. Worse, each bar was scaled
+     against its own kid's planned total, so two bars of equal length meant
+     different amounts of time and no bar could be compared week to week.
+
+     Hours now, on ONE scale computed across both children and every week shown.
+     And it is named for what it is: the app records no elapsed time, only which
+     planned blocks were completed, so it says "planned hours completed" and
+     never "time spent". */
+  const weeks = [];
   for (let off = 0; off > -8; off--) {
     const monKey = perfMondayKey(off);
-    const mon = formatDayKey(monKey);
     const j = perfWeekStats(monKey, 'jenn'), s = perfWeekStats(monKey, 'jess');
-    // Hide untouched history weeks, but always show the current one.
     if (off !== 0 && !j.planned && !s.planned && j.money == null && s.money == null && !j.routines && !s.routines) continue;
-    const bar = (st, cls) => {
-      const pct = st.planned ? Math.round(st.done / st.planned * 100) : 0;
-      return `<span class="perf-track"><span class="perf-fill ${cls}" style="display:block;width:${pct}%"></span></span><span class="perf-num">${st.planned ? pct + '%' : '—'}</span>`;
-    };
-    const money = (st) => st.money != null ? `$${st.money.toFixed(2)}` : '—';
-    rows += `<button type="button" class="perf-row${off === perfWeekOffset ? ' sel' : ''}" onclick="perfSelectWeek(${off})">
-        <span class="perf-week">${off === 0 ? 'This wk' : MONTH_SHORT[mon.getMonth()] + ' ' + mon.getDate()}${heldMap[monKey] ? ' ✅' : ''}</span>
-        ${bar(j, 'mm-bar-j')}${bar(s, 'mm-bar-s')}
-        <span class="perf-money">${money(j)} · ${money(s)}</span>
-      </button>`;
+    weeks.push({ off, monKey, mon: formatDayKey(monKey), j, s });
   }
-  wrap.innerHTML = `<div class="mm-legend"><span><i class="mm-sw mm-bar-j"></i>Jenn</span><span><i class="mm-sw mm-bar-s"></i>Jess</span><span class="mm-legend-note">bars = % of planned time done · ✅ = recorded at a meeting · $ = money recorded (Jenn · Jess)</span></div>
+  const scaleMax = Math.max(60, ...weeks.flatMap(w => [w.j.planned, w.s.planned]));
+
+  const bar = (st, cls) => {
+    const pw = Math.round(st.planned / scaleMax * 100);
+    const dw = Math.round(st.done / scaleMax * 100);
+    return `<span class="perf-track"><span class="perf-plan" style="width:${pw}%"></span>`
+      + `<span class="perf-fill ${cls}" style="display:block;width:${dw}%"></span></span>`
+      + `<span class="perf-num">${st.planned ? fmtHrsMin(st.done) + ' / ' + fmtHrsMin(st.planned) : '—'}</span>`;
+  };
+  const money = (st) => st.money != null ? `$${st.money.toFixed(2)}` : '—';
+  let rows = '';
+  weeks.forEach(w => {
+    rows += `<button type="button" class="perf-row${w.off === perfWeekOffset ? ' sel' : ''}" onclick="perfSelectWeek(${w.off})">
+        <span class="perf-week">${w.off === 0 ? 'This wk' : MONTH_SHORT[w.mon.getMonth()] + ' ' + w.mon.getDate()}${heldMap[w.monKey] ? ' ✅' : ''}</span>
+        ${bar(w.j, 'mm-bar-j')}${bar(w.s, 'mm-bar-s')}
+        <span class="perf-money">${money(w.j)} · ${money(w.s)}</span>
+      </button>`;
+  });
+  wrap.innerHTML = `<div class="mm-legend"><span><i class="mm-sw mm-bar-j"></i>Jenn</span><span><i class="mm-sw mm-bar-s"></i>Jess</span><span class="mm-legend-note">planned hours completed · same scale across both girls and every week · ✅ = recorded at a meeting · $ = money recorded (Jenn · Jess)</span></div>
     <div class="perf-table">${rows}</div>
     <div class="ct-meta" style="margin-top:0.4rem">Tap a week to see its detail below.</div>`;
 }
@@ -861,21 +873,29 @@ function renderPerfDetail() {
   const monKey = perfMondayKey(perfWeekOffset);
   const mon = formatDayKey(monKey);
   const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-  const CATS = [['school','📘 Learning'],['training','🏋️ Competitive Sports'],['competition','🏆 Competition'],['routine','📋 Routine'],['daily','🧹 Chores'],['free','🎮 Family/Free'],['active','🏃 Active'],['sleep','😴 Rest'],['custom','⭐ Custom']];
+  /* One scale across BOTH girls, so the two cards can be read side by side —
+     each card used to normalise to its own kid's biggest row. */
+  const stats = { jenn: perfWeekStats(monKey, 'jenn'), jess: perfWeekStats(monKey, 'jess') };
+  const maxMin = Math.max(60, ...['jenn', 'jess'].flatMap(k =>
+    Object.values(stats[k].byCat).map(v => v.planned)));
   const kidCard = (kid) => {
-    const st = perfWeekStats(monKey, kid);
-    const maxMin = Math.max(60, ...Object.values(st.byCat).map(v => v.planned));
-    const rows = CATS.filter(([c]) => st.byCat[c] && st.byCat[c].planned > 0).map(([c, label]) => {
-      const p = st.byCat[c].planned, dn = st.byCat[c].done;
-      return `<div class="mm-2b-row"><span class="mm-2b-label">${label}</span>
-          <span class="mm-2b-track"><span class="mm-2b-plan" style="width:${Math.round(p / maxMin * 100)}%"></span><span class="mm-2b-done" style="width:${Math.round(dn / maxMin * 100)}%;background:${CAT_HEX[c] || '#888'}"></span></span>
+    const st = stats[kid];
+    const rows = GROUP_ORDER.filter(g => st.byCat[g] && st.byCat[g].planned > 0).map(g => {
+      const p = st.byCat[g].planned, dn = st.byCat[g].completed;
+      /* School lives inside Brain, and at ~32 hours a week it would otherwise
+         swamp homework entirely — so the row says how much of itself was the
+         school day, and the rest becomes readable without its own row. */
+      const inner = (g === 'brain' && st.schoolMin > 0)
+        ? `<small class="mm-2b-sub"> (${fmtHrsMin(st.schoolMin)} school)</small>` : '';
+      return `<div class="mm-2b-row"><span class="mm-2b-label">${groupLabel(g)}${inner}</span>
+          <span class="mm-2b-track"><span class="mm-2b-plan" style="width:${Math.round(p / maxMin * 100)}%"></span><span class="mm-2b-done" style="width:${Math.round(dn / maxMin * 100)}%;background:${groupHex(g) /* safe: from ACTIVITY_GROUPS */}"></span></span>
           <span class="mm-2b-num">${fmtHrsMin(dn)} / ${fmtHrsMin(p)}</span></div>`;
     }).join('') || `<div class="ct-meta">Nothing was planned this week.</div>`;
     const money = st.money != null
       ? `$${st.money.toFixed(2)} recorded`
       : (perfWeekOffset === 0 ? `$${ctWeekMoney(monKey, kid).toFixed(2)} preliminary — recorded at the meeting` : 'not recorded');
     return `<div class="mm-2b-kid">
-        <div class="mm-win-kid">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'} — ${fmtHrsMin(st.done)} / ${fmtHrsMin(st.planned)} done</div>${rows}
+        <div class="mm-win-kid">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'} — ${fmtHrsMin(st.done)} completed / ${fmtHrsMin(st.planned)} planned</div>${rows}
         <div class="perf-facts">✅ ${st.routines}/21 routines kept · 💰 ${money}</div>
       </div>`;
   };
@@ -886,7 +906,7 @@ function renderPerfDetail() {
       <button type="button" class="btn-icon" ${perfWeekOffset >= 0 ? 'disabled' : ''} onclick="perfSelectWeek(${perfWeekOffset + 1})">▶</button>
     </div>
     <div class="mm-2b">${kidCard('jenn')}${kidCard('jess')}</div>
-    <div class="mm-cap">Solid = done · dashed = planned.</div>`;
+    <div class="mm-cap">Solid = planned hours completed · dashed = planned. The app records which planned blocks were finished, not how long anything actually took.</div>`;
 }
 
 function renderRoutinesList() {

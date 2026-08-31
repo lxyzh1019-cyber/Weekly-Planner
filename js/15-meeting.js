@@ -812,7 +812,38 @@ function mmRenderReview(wk) {
   return `${mnyChecklist(wk, mnyMeetingKid())}
     <div class="mm-h">Review the week</div>
     <div class="mm-legend"><span><i class="mm-sw mm-bar-j"></i>Jenn</span><span><i class="mm-sw mm-bar-s"></i>Jess</span><span class="mm-legend-note">how the team's doing each day — cheer each other on</span></div>
+    ${mmFamilyChoreReview(wk)}
     ${detail}${footer}`;
+}
+
+/* ── The family's chores, in the review voice ─────────────────────
+   The kid-facing banner is forward-looking and current-week only, on purpose.
+   This is the other half: a parent reviewing a week has to be able to see a
+   shortfall, including on a week that has already gone by, and nothing showed
+   it. A scheduled chore is not a fulfilled one — only a positive parent grade
+   is — and a chore the child claimed but nobody has answered is neither, so it
+   is named as waiting rather than counted against her.
+
+   Nothing is carried into the next week. The shortfall is the week's record. */
+function mmFamilyChoreReview(wk) {
+  if (typeof getFamilyChoreStatus !== 'function') return '';
+  const rows = ['jenn', 'jess'].map(kid => {
+    const st = getFamilyChoreStatus(kid, wk);
+    if (!st.required) return '';
+    const name = kid === 'jenn' ? 'Jenn' : 'Jess';
+    const met = st.unfulfilled === 0;
+    const waiting = st.waiting
+      ? ` · <span class="mm-chore-wait">${st.waiting} waiting for a parent check</span>` : '';
+    return `<div class="mm-chore-row${met ? ' met' : ''}">
+        <span class="mm-chore-who">${CT_PROFILE_ICON[kid]} ${escapeHtml(name)}</span>
+        <span>${st.required} family ${st.required === 1 ? 'chore' : 'chores'} owed · `
+      + `${st.fulfilled} fulfilled · ${st.unfulfilled} unfulfilled${waiting}</span>
+      </div>`;
+  }).join('');
+  if (!rows) return '';
+  return `<div class="mm-chore-review">${rows}
+      <div class="mm-cap">Only a parent's grade counts as fulfilled. A shortfall stays on this week — it is not carried forward.</div>
+    </div>`;
 }
 function mmSelectDay(d) { mmSelectedDay = (mmSelectedDay === d ? null : d); renderMeetingMode(); }
 function mmRenderDayDetail(wk, d) {
@@ -961,59 +992,113 @@ function mmToggleAllRoutines(kid, d) {
   renderMeetingMode();
 }
 
-/* Step 2 — Celebrate: auto-collected wins + 2b planned-vs-done analytics. */
+/* ── Step 2 — Celebrate ───────────────────────────────────────────
+   This counted chores through ctGetOptional — `optionalByWeek`, the retired
+   chore-GROUP store that three separate comments in this codebase already say
+   nothing downstream reads. Under the graded model it returns nothing, so a
+   week with real graded chores was celebrated as "0 chores done", and the
+   money line showed ctWeekMoney: a live preliminary figure, not what was
+   actually recorded. A celebration that congratulates a child for the wrong
+   things is worse than no celebration, because she cannot tell which.
+
+   Every line now reads a live source: routines from the same routine
+   completion every screen uses, chores from real parent grades, hours from
+   getWeeklyHours, money from the FROZEN ledger once it exists, XP from the XP
+   ledger. Nothing here is computed a second way. */
 function mmRenderCelebrate(wk) {
   const info = ctWeekInfo();
+  const scale = mm2bScale(wk);
   const wins = (kid) => {
-    const mand = ctMandatoryPoints(wk, kid);
-    const chores = [];
-    ctGroupsForKid(kid).forEach(g => (g.choreIds || []).forEach(cn => { if ([0,1,2,3,4,5,6].some(d => ctGetOptional(wk, d, kid, cn))) chores.push(cn); }));
-    const money = ctWeekMoney(wk, kid);
-    const goal = ctGetGoalBonus(wk, kid);
-    const w = [`✅ ${mand}/21 routines kept`];
-    if (chores.length) w.push(`🧹 ${chores.length} chore${chores.length > 1 ? 's' : ''} done`);
-    if (goal) w.push(`🎯 Weekly goal reached (+$1)`);
-    if (money > 0) w.push(`💰 $${money.toFixed(2)} pocket money`);
+    const w = [];
+
+    // Routines: what the checklists actually say, day by day.
+    let rDone = 0, rTotal = 0;
+    info.keys.forEach(key => {
+      (getDayBlocksForProfile(key, kid) || []).forEach(b => {
+        const act = findActivity(b.actId, kid);
+        if (!act || !act.isRoutine) return;
+        rTotal++;
+        if (isRoutineCompleted(b, kid)) rDone++;
+      });
+    });
+    if (rTotal) w.push(`✅ ${rDone}/${rTotal} routine${rTotal === 1 ? '' : 's'} kept`);
+
+    // Chores: only a positive parent grade. A claim is her account of it.
+    const fam = getFamilyChoreStatus(kid, wk);
+    let graded = 0;
+    for (let d = 0; d < 7; d++) {
+      mrChoresForDay(kid, wk, d).rows.forEach(r => {
+        if (r.row && mrGetChoreGrade(kid, wk, d, r.row.id) > 0) graded++;
+      });
+    }
+    if (graded) w.push(`🧹 ${graded} chore${graded === 1 ? '' : 's'} checked off by a grown-up`);
+    if (fam.waiting) w.push(`⏳ ${fam.waiting} waiting for a parent check`);
+
+    // Activity completion, from the one hours computation.
+    const h = getWeeklyHours(kid, wk);
+    if (h.planned) w.push(`⏱ ${fmtHrsMin(h.completed)} of ${fmtHrsMin(h.planned)} planned hours completed`);
+
+    if (ctGetGoalBonus(wk, kid)) w.push(`🎯 Weekly goal reached (+$1)`);
+
+    /* Money: the frozen ledger is the record. ctWeekMoney is a live preliminary
+       figure that step 3 shows on purpose, and nothing reaches the wallet until
+       step 4 — so saying it here as though it had happened is the same class of
+       wrongness as the chore count above. */
+    const finalised = ((state.shared.chore.finalizedWeeks || {})[wk] || {})[kid];
+    if (finalised != null) w.push(`💰 $${Number(finalised).toFixed(2)} recorded`);
+    else {
+      const prelim = ctWeekMoney(wk, kid);
+      if (prelim > 0) w.push(`💰 $${prelim.toFixed(2)} so far — recorded at step 4`);
+    }
+
+    // XP, from the one ledger, and only once it has actually been credited.
+    const credited = ((state.shared.chore.xpAwardedWeeks || {})[wk] || {})[kid];
+    if (credited != null) { if (credited > 0) w.push(`⭐ +${credited} XP credited`); }
+    else if (typeof mrXpForWeek === 'function') {
+      const t = mrXpForWeek(wk, kid).total;
+      if (t > 0) w.push(`⭐ +${t} XP to come`);
+    }
+
     const moods = (getProfData(kid).dayMoods) || {};
     const moodList = info.keys.map(k => moods[k]).filter(Boolean);
     if (moodList.length) w.push(`💫 Vibe: ${moodList.join(' ')}`);
+
+    if (!w.length) w.push('Nothing recorded for this week yet — step 1 is where it goes in.');
     return `<div class="mm-win"><div class="mm-win-kid">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'}</div>${w.map(x => `<div class="mm-win-item">${x}</div>`).join('')}</div>`;
   };
   return `<div class="mm-h">Celebrate the wins</div>
     <div class="mm-wins">${wins('jenn')}${wins('jess')}</div>
-    <div class="mm-h mm-h-sub">Planned vs done</div>
-    <div class="mm-2b">${mm2b('jenn')}${mm2b('jess')}</div>
-    <div class="mm-cap">Solid = done · dashed = planned.</div>
+    <div class="mm-h mm-h-sub">Planned vs completed</div>
+    <div class="mm-2b">${mm2b('jenn', scale)}${mm2b('jess', scale)}</div>
+    <div class="mm-cap">Solid = planned hours completed · dashed = planned, on one scale for both girls. The app records which planned blocks were finished, not how long anything took.</div>
     <div class="mm-blocklink">${['jenn', 'jess'].map(k =>
       `<button type="button" class="pill-btn" data-mm-action="openweek" data-kid="${escapeAttr(k)}"
         >${CT_PROFILE_ICON[k]} Open ${escapeHtml(k === 'jenn' ? 'Jenn' : 'Jess')}'s week ›</button>`).join('')}
       <span class="mm-cap">Ticking and confirming blocks happens there, not here.</span></div>`;
 }
-function mm2b(kid) {
-  const info = ctWeekInfo();
-  const CATS = [['school','📘 Learning'],['training','🏋️ Competitive Sports'],['competition','🏆 Competition'],['routine','📋 Routine'],['daily','🧹 Chores'],['free','🎮 Family/Free'],['active','🏃 Active']];
-  const planned = {}, done = {};
-  const acts = getAllActivities(kid, { includeArchived: true });
-  info.keys.forEach(key => {
-    (getDayBlocksForProfile(key, kid) || []).forEach(b => {
-      const act = acts.find(a => a.id === b.actId);
-      const cat = act ? act.cat : 'custom';
-      const m = b.durationMin || 0;
-      planned[cat] = (planned[cat] || 0) + m;
-      if (b.completed) done[cat] = (done[cat] || 0) + m;
-    });
-  });
-  let totalP = 0, totalD = 0;
-  Object.values(planned).forEach(v => totalP += v); Object.values(done).forEach(v => totalD += v);
-  const maxMin = Math.max(60, ...CATS.map(([c]) => planned[c] || 0));
-  const rows = CATS.filter(([c]) => (planned[c] || 0) > 0).map(([c, label]) => {
-    const p = planned[c] || 0, dn = done[c] || 0;
-    const pPct = Math.round(p / maxMin * 100), dPct = Math.round(dn / maxMin * 100);
-    return `<div class="mm-2b-row"><span class="mm-2b-label">${label}</span>
-        <span class="mm-2b-track"><span class="mm-2b-plan" style="width:${pPct}%"></span><span class="mm-2b-done" style="width:${dPct}%;background:${CAT_HEX[c] || '#888'}"></span></span>
+/* The third copy of this chart, and the third bucketing of the same blocks.
+   It read b.completed directly, so a routine finished by its checklist counted
+   as zero minutes done; and it scaled each kid's bars to her own biggest row,
+   so the two cards sat side by side and could not be compared. Both come from
+   getWeeklyHours now, on one scale. */
+function mm2b(kid, scaleMax) {
+  const wk = mmWeekKey();
+  const h = getWeeklyHours(kid, wk);
+  const maxMin = scaleMax || Math.max(60, ...Object.values(h.byGroup).map(v => v.planned));
+  const rows = GROUP_ORDER.filter(g => h.byGroup[g].planned > 0).map(g => {
+    const p = h.byGroup[g].planned, dn = h.byGroup[g].completed;
+    const inner = (g === 'brain' && h.schoolMin > 0)
+      ? `<small class="mm-2b-sub"> (${fmtHrsMin(h.schoolMin)} school)</small>` : '';
+    return `<div class="mm-2b-row"><span class="mm-2b-label">${groupLabel(g)}${inner}</span>
+        <span class="mm-2b-track"><span class="mm-2b-plan" style="width:${Math.round(p / maxMin * 100)}%"></span><span class="mm-2b-done" style="width:${Math.round(dn / maxMin * 100)}%;background:${groupHex(g) /* safe: from ACTIVITY_GROUPS */}"></span></span>
         <span class="mm-2b-num">${fmtHrsMin(dn)} / ${fmtHrsMin(p)}</span></div>`;
   }).join('') || `<div class="ct-meta">No scheduled blocks this week.</div>`;
-  return `<div class="mm-2b-kid"><div class="mm-win-kid">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'} — ${fmtHrsMin(totalP)} planned · ${fmtHrsMin(totalD)} done</div>${rows}</div>`;
+  return `<div class="mm-2b-kid"><div class="mm-win-kid">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'} — ${fmtHrsMin(h.completed)} completed / ${fmtHrsMin(h.planned)} planned</div>${rows}</div>`;
+}
+/* One scale for both girls, computed before either card is drawn. */
+function mm2bScale(wk) {
+  return Math.max(60, ...['jenn', 'jess'].flatMap(k =>
+    Object.values(getWeeklyHours(k, wk).byGroup).map(v => v.planned)));
 }
 
 /* Step 3 — Confirm & record (reuses commitFamilyMeeting; offers an undo). */

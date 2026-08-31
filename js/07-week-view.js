@@ -389,6 +389,11 @@ function renderWeek() {
 // It did not read that way: "Unscheduled: 41h" beside no mention of sleep looks
 // like it is counting the nights. nightMin is that figure, stated rather than
 // left implicit, and it is deliberately not folded into `free`.
+/* Grouped by what the time is FOR (activityGroup, js/01-config.js), not by the
+   category that decides a block's colour. Those were the same question until
+   `cat:'daily'` turned out to hold breakfast, dinner, the house chore and four
+   Family Hero tasks — and got labelled "🧹 Chores" on two screens and "🍽
+   Daily" on three. */
 function computeWeekTotals(keys) {
   const acts = getAllActivities(activeProfile(), { includeArchived: true });
   const catMin = {};
@@ -400,8 +405,8 @@ function computeWeekTotals(keys) {
       const m = e - s;
       if (m <= 0) return;
       const act = acts.find(a => a.id === b.actId);
-      const cat = act ? act.cat : 'custom';
-      catMin[cat] = (catMin[cat] || 0) + m;
+      const g = activityGroup(act);
+      catMin[g] = (catMin[g] || 0) + m;
       planned += m;
     });
   });
@@ -431,11 +436,6 @@ function renderWeekGlance(keys) {
   const age = currentAge();
 
   const acts = getAllActivities(activeProfile(), { includeArchived: true });
-  const CAT_LABELS = {
-    sleep:'😴 Rest', school:'📚 Learning', active:'🏃 Active',
-    free:'🎮 Free', daily:'🍽 Daily', training:'🏋️ Competitive Sports',
-    competition:'🏆 Competition', routine:'📋 Routine', custom:'✨ Custom'
-  };
   const t = computeWeekTotals(keys);
 
   /* One row per category: the per-day average leads, the week total follows it
@@ -450,11 +450,10 @@ function renderWeekGlance(keys) {
         <span class="glance-total">${note || fmtHrsMin(min) + ' this week'}</span></span>
     </div>`;
 
-  const order = ['school','active','training','competition','routine','daily','free','sleep','custom'];
   let rows = '';
-  order.forEach(cat => {
-    if (!t.catMin[cat]) return;
-    rows += row(CAT_LABELS[cat] || cat, t.catMin[cat], null, CAT_HEX[cat] || '#999999' /* safe: from CAT_HEX */);
+  GROUP_ORDER.forEach(g => {
+    if (!t.catMin[g]) return;
+    rows += row(groupLabel(g), t.catMin[g], null, groupHex(g) /* safe: from ACTIVITY_GROUPS */);
   });
   /* Unscheduled and overnight are two different facts and used to read as one.
      Unscheduled is awake time nobody has claimed; overnight is the 10pm–6am the
@@ -520,8 +519,8 @@ function computeWeekWins(keys) {
       if (isBlockCompleted(b, activeProfile())) {
         done++;
         const act = acts.find(a => a.id === b.actId);
-        const cat = act ? act.cat : 'custom';
-        byCat[cat] = (byCat[cat] || 0) + 1;
+        const g = activityGroup(act);
+        byCat[g] = (byCat[g] || 0) + 1;
       }
     });
   });
@@ -535,11 +534,10 @@ function computeWeekWins(keys) {
 function openWeeklyWins() {
   const keys = getDayKeys(weekOffset);
   const w = computeWeekWins(keys);
-  const CAT_LABELS = { school:'📚 Learning', active:'🏃 Active', free:'🎮 Free', daily:'🍽 Daily', routine:'📋 Routines', training:'🏋️ Competitive Sports', competition:'🏆 Competition', sleep:'😴 Rest', custom:'✨ Other' };
   const pct = w.total ? Math.round(w.done / w.total * 100) : 0;
   const cheer = pct >= 80 ? 'Incredible week! 🌟' : pct >= 50 ? 'Great effort this week! 💪' : w.done > 0 ? 'Every finished task counts 💛' : 'A fresh week ahead — you’ve got this!';
   const catLines = Object.keys(w.byCat).sort((a,b)=>w.byCat[b]-w.byCat[a])
-    .map(c => `<span class="wins-chip">${CAT_LABELS[c]||c}: <b>${w.byCat[c]}</b></span>`).join('');
+    .map(c => `<span class="wins-chip">${groupLabel(c)}: <b>${w.byCat[c]}</b></span>`).join('');
   const body = document.getElementById('weeklyWinsBody');
   if (body) {
     body.innerHTML = `
@@ -1530,15 +1528,29 @@ function renderFamilyChoreBanner(bannerId = 'weekFamilyBanner') {
   if (!banner) return;
   const kid = activeProfile();
   const hide = () => { banner.style.display = 'none'; banner.innerHTML = ''; };
-  if (weekOffset !== 0 || !kid || kid === 'parent' || typeof mrFamilyChoreStatus !== 'function') return hide();
+  if (weekOffset !== 0 || !kid || kid === 'parent' || typeof getFamilyChoreStatus !== 'function') return hide();
   ctPrepareRead();
-  const st = mrFamilyChoreStatus(kid, ctThisWeekKey());
-  if (!st.short) return hide();
+  const st = getFamilyChoreStatus(kid, ctThisWeekKey());
+  /* The first chores of the week are MANDATORY, so a week with fewer than that
+     PLANNED is a plan that does not meet the rule — a warning, not a nudge. It
+     used to hide as soon as anything was scheduled-or-done, which meant two
+     chores merely placed on the calendar silenced it for the week.
+
+     It still measures `planned`, not `fulfilled`: this is the forward-looking
+     kid surface, and telling a child on Sunday that she failed a week she can
+     no longer change is a reproach with nothing to do about it. The review
+     voice — owed / fulfilled / unfulfilled — belongs to the parent and meeting
+     screens, which is where a past week's shortfall is always shown. */
+  if (!st.stillNeedsADay) return hide();
+  const n = st.stillNeedsADay;
+  const waiting = st.waiting
+    ? ` <span class="wcb-detail">${st.waiting} waiting for a parent check.</span>` : '';
   banner.style.display = 'flex';
+  banner.classList.add('week-todo-banner--warn');
   banner.innerHTML =
     `<span class="wcb-icon">🧹</span>`
-    + `<span>${st.short} family ${st.short === 1 ? 'chore' : 'chores'} still to find a day for this week`
-    + `<span class="wcb-detail"><br>These are the ${st.needed} the family shares — tap a day to put ${st.short === 1 ? 'it' : 'them'} on the plan.</span></span>`;
+    + `<span>${st.required} family ${st.required === 1 ? 'chore' : 'chores'} required · ${st.planned} planned · ${n} still ${n === 1 ? 'needs' : 'need'} a day`
+    + `<span class="wcb-detail"><br>These are the ones the family shares — tap a day to put ${n === 1 ? 'it' : 'them'} on the plan.</span>${waiting}</span>`;
 }
 
 /* Build one travel/get-ready buffer strip for the weekly view. Positioned in

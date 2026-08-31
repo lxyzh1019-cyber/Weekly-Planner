@@ -1368,6 +1368,20 @@
   /* Three states on a day row: Jenn reviewed, Jess reviewed, both. Each is its
      own control because reviewing a day is a fact about one child — a single
      tick that wrote both girls is what made "Confirm all" quietly mean both. */
+  /* Required / fulfilled / unfulfilled, in the review voice. Shown on every
+     week including past ones — a shortfall a parent cannot see is a shortfall
+     that quietly becomes the new normal. */
+  /* "(32h school)" inside the Brain row — the school day is most of that row,
+     and without this the homework inside it is invisible. */
+  .mm-2b-sub { font-weight: 600; opacity: 0.7; }
+  .mm-chore-review { border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px; margin: 8px 0; background: #fff4db; }
+  .mm-chore-row {
+    display: flex; gap: var(--space-2); align-items: baseline; flex-wrap: wrap;
+    font-size: max(13px, calc(0.84rem * var(--fs-scale, 1))); padding: 2px 0;
+  }
+  .mm-chore-row.met { opacity: 0.75; }
+  .mm-chore-who { font-weight: 800; min-width: 5.5rem; }
+  .mm-chore-wait { color: var(--accent-strong); font-weight: 700; }
   .mm-drow-review { display: inline-flex; gap: 4px; align-items: center; flex-wrap: wrap; }
   .mm-drow-kid {
     min-width: 44px; min-height: 44px;
@@ -1902,6 +1916,10 @@
     padding: 0.55rem 0.8rem; margin: 0 0 0.6rem;
     box-shadow: 2px 2px 0 rgba(201,138,30,0.25);
   }
+  /* Under-planning the mandatory chores is a warning: the rule is not met and
+     the week can still be changed. A solid border rather than red — it is a
+     plan that needs a day, not a child who failed. */
+  .week-todo-banner--warn { border-width: 3px; box-shadow: 3px 3px 0 rgba(201,138,30,0.35); }
   .week-todo-banner .wcb-icon { font-size: 1.15rem; }
   .week-todo-banner .wcb-detail { font-weight: 600; opacity: 0.85; font-size: max(13px, calc(0.82rem * var(--fs-scale, 1))); }
   @media (prefers-color-scheme: dark) {
@@ -3616,9 +3634,14 @@
   }
   .perf-row.sel { background: #fff4db; box-shadow: 2px 2px 0 var(--ink); }
   .perf-week { font-weight: 800; font-size: calc(0.82rem * var(--fs-scale, 1)); white-space: nowrap; }
-  .perf-track { height: 12px; border: 1.5px solid var(--ink); border-radius: 6px; overflow: hidden; background: #f3ecdc; min-width: 36px; }
-  .perf-fill { height: 100%; }
-  .perf-num { font-size: calc(0.72rem * var(--fs-scale, 1)); font-weight: 800; min-width: 28px; }
+  /* Two lengths in one track: planned behind, completed in front, both against
+     the SAME scale for every week and both girls. A bar normalised to its own
+     kid's total says nothing you can compare. */
+  .perf-track { position: relative; height: 12px; border: 1.5px solid var(--ink); border-radius: 6px; overflow: hidden; background: #f3ecdc; min-width: 36px; }
+  .perf-plan { position: absolute; inset: 0 auto 0 0; background: repeating-linear-gradient(90deg, #d9cfb4, #d9cfb4 3px, transparent 3px, transparent 6px); }
+  .perf-fill { position: relative; height: 100%; }
+  /* "6h 30m / 8h" needs real room; 28px was sized for "72%". */
+  .perf-num { font-size: max(13px, calc(0.72rem * var(--fs-scale, 1))); font-weight: 800; min-width: 5.6rem; white-space: nowrap; }
   .perf-money { font-size: calc(0.76rem * var(--fs-scale, 1)); font-weight: 800; white-space: nowrap; }
   .perf-facts { margin-top: 6px; font-size: calc(0.8rem * var(--fs-scale, 1)); font-weight: 700; }
   .perf-detail-nav { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; }

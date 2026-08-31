@@ -281,11 +281,6 @@ function renderPrintSheet() {
 // Weekly time-per-category totals over the chosen window, plus unscheduled
 // (free) time and an age-based sleep recommendation.
 function buildPrintSummary(keys, acts, winStartMin, winEndMin) {
-  const CAT_LABELS = {
-    sleep:'😴 Rest', school:'📚 Learning', active:'🏃 Active',
-    free:'🎮 Free', daily:'🍽 Daily', training:'🏋️ Competitive Sports',
-    competition:'🏆 Competition', routine:'📋 Routine', custom:'✨ Custom'
-  };
   const catMin = {};
   let planned = 0;
   keys.forEach(k=>{
@@ -295,20 +290,21 @@ function buildPrintSummary(keys, acts, winStartMin, winEndMin) {
       const mins = segEnd - segStart;
       if (mins <= 0) return;
       const act = acts.find(a=>a.id===b.actId);
-      const cat = act ? act.cat : 'custom';
-      catMin[cat] = (catMin[cat]||0) + mins;
+      const g = activityGroup(act);
+      catMin[g] = (catMin[g]||0) + mins;
       planned += mins;
     });
   });
   const windowWeekMin = (winEndMin - winStartMin) * 7;
   const free = Math.max(0, windowWeekMin - planned);
 
-  // Ordered chips: each scheduled category with time, then unscheduled time.
-  const order = ['school','active','training','routine','daily','free','sleep','custom'];
+  // Ordered chips: each scheduled group with time, then unscheduled time.
+  // Same six groups and the same words as every other surface — this sheet used
+  // to carry its own copy of the label table, which is how it came to disagree.
   let chips = '';
-  order.forEach(cat=>{
-    if (!catMin[cat]) return;
-    chips += `<span class="print-cat-chip"><span class="print-cat-dot" style="background:${CAT_HEX[cat]||'#999'}"></span>${CAT_LABELS[cat]||cat}: <b>${fmtHrsMin(catMin[cat])}</b></span>`;
+  GROUP_ORDER.forEach(g=>{
+    if (!catMin[g]) return;
+    chips += `<span class="print-cat-chip"><span class="print-cat-dot" style="background:${groupHex(g) /* safe: from ACTIVITY_GROUPS */}"></span>${groupLabel(g)}: <b>${fmtHrsMin(catMin[g])}</b></span>`;
   });
   chips += `<span class="print-cat-chip"><span class="print-cat-dot" style="background:#fff;border:1px solid #999"></span>🌤 Unscheduled: <b>${fmtHrsMin(free)}</b></span>`;
 

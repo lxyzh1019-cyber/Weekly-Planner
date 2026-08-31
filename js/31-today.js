@@ -998,10 +998,14 @@ function tdRenderToday() {
      Forward-looking on purpose — "still to plan", never "you didn't" — which is
      the rule every other kid-facing warning in the app follows. It disappears the
      moment the floor is met, so it is a to-do and not a scoreboard. */
-  const family = (d == null) ? null : mrFamilyChoreStatus(kid, wk);
-  if (family && family.short > 0) {
+  const family = (d == null) ? null : getFamilyChoreStatus(kid, wk);
+  // Measures what is still unplanned, not what is unfinished: the chip's whole
+  // job is "there is a day left to put this on", and it is the one number a
+  // child can act on today.
+  if (family && family.stillNeedsADay > 0) {
+    const n = family.stillNeedsADay;
     loopHtml += `<button type="button" class="td-chip td-chip-family" data-td-action="chore">
-      🧹 <b>${family.short}</b> family ${family.short === 1 ? 'chore' : 'chores'} to plan</button>`;
+      🧹 <b>${n}</b> family ${n === 1 ? 'chore' : 'chores'} to plan</button>`;
   }
   if (waiting) {
     loopHtml += `<button type="button" class="td-chip" data-td-action="waiting">

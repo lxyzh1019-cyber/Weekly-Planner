@@ -892,6 +892,23 @@ function mrChoreWouldPay(kid, weekKey, dayIdx) {
 }
 
 /* ── The family's share of the week ──
+   NOTE: getFamilyChoreStatus (js/36-status.js) is the owner now. This wrapper
+   stays because three call sites and a merge test still name it, and because
+   the pricing rule it documents below is genuinely the same number. What it
+   must never go back to being is a SINGLE count: `counted` mixed scheduled and
+   done together, so two chores merely placed on the calendar satisfied the
+   family's share without anybody lifting anything. */
+function mrFamilyChoreStatus(kid, weekKey) {
+  const st = getFamilyChoreStatus(kid, weekKey);
+  return Object.assign({}, st, {
+    needed: st.required,
+    // Kept for readers that only ever wanted "is anything outstanding", but
+    // pointing at the number that is actually short of the rule.
+    short: st.unfulfilled,
+  });
+}
+
+/* ── The family's share of the week (the pricing half) ──
    freeChoresPerWeek is a PRICING rule: mrChoreWeek takes that many of the week's
    graded chores and pays nothing for them, choosing the cheapest so the
    arrangement is the one she would have picked herself. The child is told those
@@ -905,28 +922,13 @@ function mrChoreWouldPay(kid, weekKey, dayIdx) {
    number in one place — a pool row has no such field, and a second control for
    the same quantity is a second thing that can disagree.
 
-   Counted: distinct (day, chore) pairs that are either on the plan or already
-   done. Doing one without planning it counts — the point is the work, not the
-   paperwork. Only the paying lane: `own` and `helping` need no block and stand
-   every day, so counting them would satisfy the floor without anyone lifting
-   anything.
+   Only the paying lane: `own` and `helping` need no block and stand every day,
+   so counting them would satisfy the floor without anyone lifting anything.
 
-   Reads only. Whether to say anything about `short` is the screen's business. */
-function mrFamilyChoreStatus(kid, weekKey) {
-  const needed = Number((mrRulesForWeek(weekKey).chores || {}).freeChoresPerWeek) || 0;
-  const seen = new Set();
-  for (let d = 0; d < 7; d++) {
-    const { rows } = mrChoresForDay(kid, weekKey, d);
-    rows.forEach(r => {
-      if (!r.row || !mrLanePays(r.row.lane)) return;
-      const done = mrGetClaim(kid, weekKey, d, r.row.id) > 0
-        || mrGetChoreGrade(kid, weekKey, d, r.row.id) > 0;
-      if (r.scheduled || done) seen.add(d + ':' + r.row.id);
-    });
-  }
-  const counted = seen.size;
-  return { needed, counted, short: Math.max(0, needed - counted) };
-}
+   The counting itself lives in getFamilyChoreStatus (js/36-status.js), which
+   keeps planned, fulfilled and waiting apart. Whether to say anything about
+   them is the screen's business. */
+
 
 /* Personal chores done unasked, for the XP award. Never money. */
 function mrPersonalUnaskedCount(weekKey, kid) {
