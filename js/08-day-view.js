@@ -81,9 +81,15 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   dayViewAnchorKey = key;
   selectedActivity = null;
 
-  // Parent banner
+  // Parent banner — two named actions and one way out, both filled by their
+  // owners so the day and week banners cannot drift apart again.
   const banner = document.getElementById('parentBannerDay');
   banner.style.display = isParent() ? 'block' : 'none';
+  if (isParent()) {
+    document.getElementById('parentBackDay').innerHTML = parentBannerBackButton();
+    renderParentBanners();
+    applyMeetingLock();
+  }
 
   document.getElementById('dayProfileBadge').textContent =
     isParent() ? (parentViewing==='jenn'?'🐥 (P)':'🦊 (P)') :

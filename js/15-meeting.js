@@ -35,6 +35,7 @@ function openFamilyMeeting() {
   if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
   ctEnsureShared();
   mmStep = 1; mmMaxStep = 1; mmSelectedDay = null; mmUndo = null;
+  mmClearReturn();        // a fresh sitting has nowhere to go back to
   mmExpressWeek = null;   // the full sitting, not the catch-up run
   renderMeetingMode();
   openSheet('familyMeetingOverlay');
@@ -49,14 +50,25 @@ function mmIsDayConfirmed(d) {
   const store = state.shared.parentDayConfirm || {};
   return !!((store.jenn || {})[k]) && !!((store.jess || {})[k]);
 }
+/* Reviewing a day is a fact about ONE child. This wrote both girls' entries
+   from a single press, which is where "Confirm all" quietly came to mean "both
+   children": a parent who had looked at Jenn's Tuesday and never opened Jess's
+   left a record saying she had reviewed both.
+
+   The all-in-one press survives as an explicit "Both" control — it is a real
+   thing to want when a day genuinely was fine for everyone — but it now says
+   so on the button instead of being what a per-day tick happened to do. */
+function mmIsDayReviewedFor(kid, d) { return isDayReviewed(kid, mmDayKey(d)); }
+function mmToggleDayReviewed(kid, d) {
+  const k = mmDayKey(d);
+  markDayReviewed(kid, k, !isDayReviewed(kid, k));
+  saveAll();
+  renderMeetingMode();
+}
 function mmToggleConfirmDay(d) {
   const k = mmDayKey(d);
   const next = !mmIsDayConfirmed(d);
-  if (!state.shared.parentDayConfirm) state.shared.parentDayConfirm = {};
-  ['jenn', 'jess'].forEach(kid => {
-    if (!state.shared.parentDayConfirm[kid]) state.shared.parentDayConfirm[kid] = {};
-    state.shared.parentDayConfirm[kid][k] = next;
-  });
+  ['jenn', 'jess'].forEach(kid => markDayReviewed(kid, k, next));
   saveAll();
   renderMeetingMode();
 }
@@ -79,6 +91,9 @@ function mmCloseMeeting() {
   // week closed from the catch-up screen is only "met" if that box was ticked.
   if (mmMaxStep >= 3 && isParent() && !mmIsSettled(wk)) mmMarkWeekMet(wk);
   mmExpressWeek = null;
+  // Nothing to come back to once the sitting is over, so the week and day
+  // screens get their Hub button and their switchers back.
+  mmClearReturn();
   closeSheet('familyMeetingOverlay');
   const hub = document.getElementById('meetingHub');
   if (hub && document.getElementById('screen-parent')?.classList.contains('active')) renderMeetingHub();
@@ -198,11 +213,80 @@ function mmMaybeAskCatchUp() {
    them, which is what was missing once a kid could put a blank fortnight back
    in herself: the blocks still need confirming, and confirming is a day-view
    act. Lands on the meeting's week, not on today. */
+/* ── Leaving the meeting, and being able to come back ─────────────
+   Opening a child's week used to close the meeting and forget everything —
+   which week, which step, which child, which day, where you had scrolled to.
+   Getting back meant starting the sitting over from step 1.
+
+   Worse, once you landed there THREE buttons offered to take you somewhere
+   else: "◀ Hub", the parent's "Switch" and the round profile badge. Every one
+   of them silently abandoned the meeting and none of them said so.
+
+   This is the reusable return context. It is deliberately the shape the spec
+   named, because Meeting V2 is meant to use it unchanged. It lives in a module
+   global rather than synced state: it describes where THIS device is in a
+   sitting, and every synced write is a full-document upload. */
+let mmReturn = null;
+
+function mmCaptureReturn(kid, dayIdx) {
+  const sheet = document.querySelector('#familyMeetingOverlay .sheet');
+  mmReturn = {
+    source: 'weekly-meeting',
+    weekKey: mmWeekKey(),
+    step: mmStep,
+    child: kid || (typeof mnyMeetingKid === 'function' ? mnyMeetingKid() : 'jenn'),
+    selectedDay: (dayIdx == null) ? mmSelectedDay : dayIdx,
+    scrollTop: sheet ? sheet.scrollTop : 0,
+  };
+}
+function mmClearReturn() { mmReturn = null; }
+function mmHasReturn() { return !!(mmReturn && mmReturn.source === 'weekly-meeting'); }
+
+/* Put the sitting back exactly where it was. The scroll restore waits a frame
+   because renderMeetingMode replaces the body wholesale — setting scrollTop on
+   the old content would be measured against a height that is about to change. */
+function mmReturnToMeeting() {
+  if (!mmHasReturn()) { showScreen('parent'); return; }
+  const r = mmReturn;
+  mmClearReturn();
+  if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
+  ctWeekKey = r.weekKey;
+  mmSelectedDay = r.selectedDay;
+  if (typeof mnySetMeetKid === 'function') mnySetMeetKid(r.child);
+  showScreen('parent');
+  const overlay = document.getElementById('familyMeetingOverlay');
+  if (!overlay || !overlay.classList.contains('open')) openSheet('familyMeetingOverlay');
+  mmStep = Math.max(1, Math.min(MM_STEPS.length, r.step || 1));
+  mmMaxStep = Math.max(mmMaxStep, mmStep);
+  renderMeetingMode();
+  requestAnimationFrame(() => {
+    const sheet = document.querySelector('#familyMeetingOverlay .sheet');
+    if (sheet) sheet.scrollTop = r.scrollTop || 0;
+  });
+}
+
 function mmOpenWeekForBlocks(kid) {
   const wk = mmWeekKey();
+  mmCaptureReturn(kid);
   closeSheet('familyMeetingOverlay');
   weekOffset = computeWeekOffsetForDayKey(wk);
   parentView(kid);
+}
+
+/* Open one DAY from the meeting — same context, plus the day itself, so the
+   parent lands on the thing the row was about rather than on the week. */
+function mmOpenDayForBlocks(kid, dayIdx) {
+  const wk = mmWeekKey();
+  const keys = mrWeekDayKeys(wk);
+  const dayKey = keys[dayIdx] || keys[0];
+  mmCaptureReturn(kid, dayIdx);
+  closeSheet('familyMeetingOverlay');
+  weekOffset = computeWeekOffsetForDayKey(wk);
+  parentViewing = kid;
+  currentDayKey = dayKey;
+  dayViewAnchorKey = dayKey;
+  showScreen('day');
+  buildTimeline();
 }
 /* What the "run the family meeting" buttons call. */
 function openFamilyMeetingAsk() {
@@ -483,6 +567,9 @@ function mmHandleCatchUpClick(e) {
 function mmGoToWeek(wk) {
   if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
   ctWeekKey = wk;
+  // A context captured against another week would send the parent back to a
+  // sitting that no longer exists.
+  mmClearReturn();
   mmStep = 1; mmMaxStep = 1; mmSelectedDay = null; mmUndo = null; mmAddChoreFor = null;
   if (typeof mnyDraft !== 'undefined') mnyDraft = null;
   const overlay = document.getElementById('familyMeetingOverlay');
@@ -508,6 +595,8 @@ function mmHandleClick(e) {
   if (a === 'addchore-pick')  { mmAddChoreHappened(kid, d, el.getAttribute('data-chore')); return; }
   if (a === 'openday')        { mmSelectDay(d); return; }
   if (a === 'confirmday')     { mmToggleConfirmDay(d); return; }
+  if (a === 'reviewday')      { mmToggleDayReviewed(kid, d); return; }
+  if (a === 'openkidday')     { mmOpenDayForBlocks(kid, d); return; }
   if (a === 'express-tick')   { mmExpressToggle(el.getAttribute('data-which')); return; }
   if (a === 'express-commit') { mmExpressCommit(); return; }
   if (a === 'express-skip')   { mmExpressSkip(); return; }
@@ -675,11 +764,23 @@ function mmRenderReview(wk) {
     const open = mmSelectedDay === d;
     const done = mmIsDayConfirmed(d);
     const empty = jp === 0 && sp === 0;
+    /* Three states, said out loud: Jenn reviewed, Jess reviewed, both. There is
+       no hidden reading of "confirmed" that means both children any more — the
+       Both control is there, and it is labelled Both. */
+    const kidCell = (kid) => {
+      const on = mmIsDayReviewedFor(kid, d);
+      const nm = kid === 'jenn' ? 'Jenn' : 'Jess';
+      return `<button type="button" class="mm-drow-kid${on ? ' on' : ''}"
+          data-mm-action="reviewday" data-kid="${escapeAttr(kid)}" data-day="${d}"
+          aria-label="${on ? nm + ' reviewed' : 'Mark ' + nm + ' reviewed'}"
+        >${on ? '✓' : '○'} ${CT_PROFILE_ICON[kid]}</button>`;
+    };
     const state = ahead
       ? `<span class="mm-drow-note">Not here yet</span>`
-      : done
-      ? `<button type="button" class="mm-drow-ok" data-mm-action="confirmday" data-day="${d}">✓ Confirmed</button>`
-      : `<button type="button" class="mm-drow-go" data-mm-action="confirmday" data-day="${d}">Confirm this day</button>`;
+      : `<span class="mm-drow-review">${kidCell('jenn')}${kidCell('jess')}`
+        + `<button type="button" class="${done ? 'mm-drow-ok' : 'mm-drow-go'}"
+             data-mm-action="confirmday" data-day="${d}"
+           >${done ? '✓ Both reviewed' : 'Both'}</button></span>`;
     const mid = (!ahead && empty)
       ? `<span class="mm-drow-note">Nothing logged — open it and add what actually happened</span>`
       : `<span class="mm-drow-bars">

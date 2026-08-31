@@ -1365,6 +1365,20 @@
   .mm-item.on .mm-item-box { background: #95d5b2; }
   /* Step 5's settled readout: two kids, two states each, every cell a tap to
      the step that fixes it. Ticks green only when that half is genuinely done. */
+  /* Three states on a day row: Jenn reviewed, Jess reviewed, both. Each is its
+     own control because reviewing a day is a fact about one child — a single
+     tick that wrote both girls is what made "Confirm all" quietly mean both. */
+  .mm-drow-review { display: inline-flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+  .mm-drow-kid {
+    min-width: 44px; min-height: 44px;
+    border: 2px solid var(--ink); border-radius: 9px;
+    background: var(--paper-card, #fffdf5); color: inherit;
+    font-family: inherit; font-weight: 800;
+    font-size: max(13px, calc(0.82rem * var(--fs-scale, 1)));
+    cursor: pointer; padding: 0 6px;
+  }
+  .mm-drow-kid.on { background: #95d5b2; }
+  .mm-drow-kid:active { transform: translateY(1px); }
   .mm-settle { border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px; margin-bottom: 10px; background: #fff4db; }
   .mm-settle.done { background: #eaf6ef; }
   .mm-settle-cap { font-weight: 800; font-size: calc(0.82rem * var(--fs-scale, 1)); margin-bottom: 6px; }
@@ -3278,6 +3292,22 @@
     font-family: 'Patrick Hand', sans-serif;
   }
   .parent-banner.sticky { position: sticky; top: 0; z-index: 99; }
+  /* The banner's two halves. Inline styles used to set the spacing on each
+     button; the buttons are generated now, so the layout belongs here. Wrapping
+     rather than shrinking: on a phone "Confirm all Jenn's blocks" and "Mark
+     Jenn's day reviewed" do not fit beside each other, and a squeezed 30px
+     target is worse than a second line. */
+  .pb-back, .pb-actions { display: inline-flex; gap: var(--space-2); flex-wrap: wrap; vertical-align: middle; }
+  .pb-back { margin-right: var(--space-2); }
+  .pb-actions { margin-left: var(--space-2); }
+  .pb-back-btn, .pb-action, .pb-switch {
+    padding: 4px 10px;
+    min-height: 44px;
+    font-size: max(13px, calc(0.82rem * var(--fs-scale, 1)));
+  }
+  /* Reviewed reads as settled, not as another thing to press. */
+  .pb-action.on { background: #95d5b2; }
+  .pb-action[disabled] { opacity: 0.55; cursor: default; }
 
   /* Parent portal: tabbed sections */
   .parent-tabs {

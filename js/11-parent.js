@@ -1157,6 +1157,33 @@ async function deleteRoutine(id) {
   saveAll();
   renderRoutinesList();
 }
+/* ── One owner for the parent banner's way out ────────────────────
+   Both banners hard-coded "◀ Hub", which is right when you arrived from the
+   Parent Hub and wrong — actively misleading — when a family meeting is open
+   behind you and pressing it throws the sitting away.
+
+   It is one function so the two banners cannot drift, which is exactly how
+   they came to carry different controls in the first place. */
+function parentBannerBackButton() {
+  if (typeof mmHasReturn === 'function' && mmHasReturn()) {
+    return `<button type="button" class="btn-icon no-print pb-back-btn" onclick="mmReturnToMeeting()">`
+         + `◀ Back to weekly meeting</button>`;
+  }
+  return `<button type="button" class="btn-icon no-print pb-back-btn" onclick="showScreen('parent')">◀ Hub</button>`;
+}
+
+/* While a meeting is waiting, the back button is the ONLY way out of the week
+   or day screen. The child switchers and the Hub link all silently abandon the
+   sitting, so they are hidden rather than left there to be pressed — a control
+   that loses your place without saying so is worse than no control. They come
+   back the moment the meeting is finished or closed. */
+function applyMeetingLock() {
+  const locked = (typeof mmHasReturn === 'function') && mmHasReturn();
+  document.querySelectorAll('.profile-badge, #parentWeekActions .pb-switch')
+    .forEach(el => { el.hidden = locked; });
+  document.body.classList.toggle('meeting-return-pending', locked);
+}
+
 function parentView(p) {
   parentViewing = p;
   document.querySelectorAll('#parentWeekKidPills .pill-btn').forEach(b=>b.classList.toggle('active', b.textContent.includes(p==='jenn'?'Jenn':'Jess')));

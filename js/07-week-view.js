@@ -289,6 +289,12 @@ function renderWeek() {
   if (isParent()) {
     parentBanner.style.display = 'block';
     document.getElementById('parentViewingName').textContent = parentViewing==='jenn'?'🐥 Jenn':'🦊 Jess';
+    document.getElementById('parentBackWeek').innerHTML = parentBannerBackButton();
+    // Switching child mid-meeting loses the sitting, so the meeting lock hides
+    // this rather than leaving a control that quietly discards your place.
+    document.getElementById('parentWeekActions').innerHTML =
+      `<button type="button" class="btn-icon no-print pb-switch" onclick="parentSwitchView()">Switch</button>`;
+    applyMeetingLock();
   } else {
     parentBanner.style.display = 'none';
   }

@@ -247,9 +247,9 @@
 ════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-week">
   <div class="parent-banner sticky" id="parentBannerWeek" style="display:none">
-    <button class="btn-icon no-print" style="padding:2px 8px;margin-right:8px" onclick="showScreen('parent')">◀ Hub</button>
+    <span class="pb-back" id="parentBackWeek"></span>
     👨‍👩‍👧‍👦 Parent Mode — Viewing <span id="parentViewingName"></span>
-    <button class="btn-icon no-print" style="padding:2px 8px;margin-left:8px" onclick="parentSwitchView()">Switch</button>
+    <span class="pb-actions" id="parentWeekActions"></span>
   </div>
 
   <div class="topbar week-topbar">
@@ -429,10 +429,15 @@
      SCREEN: DAY EDITOR
 ════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-day">
+  <!-- Two named actions, not one that promised both. "Confirm all" asserts the
+       work happened; "Mark reviewed" asserts a grown-up looked at the day. They
+       are filled by renderParentBanners so the buttons always name the child
+       actually being viewed. The back button is parentBannerBackButton's: it
+       reads "Back to weekly meeting" when a meeting is waiting. -->
   <div class="parent-banner sticky" id="parentBannerDay" style="display:none">
-    <button class="btn-icon no-print" style="padding:2px 8px;margin-right:8px" onclick="showScreen('parent')">◀ Hub</button>
+    <span class="pb-back" id="parentBackDay"></span>
     👨‍👩‍👧‍👦 Parent Mode — Pin activities with long-tap
-    <button class="btn-icon no-print" style="padding:2px 8px;margin-left:8px" onclick="confirmAllToday()">✅ Confirm all today</button>
+    <span class="pb-actions" id="parentDayActions"></span>
   </div>
 
   <!-- One row, not two. The title, the date and every control the screen has
