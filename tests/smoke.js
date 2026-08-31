@@ -5354,16 +5354,23 @@ function findChromium() {
       bad.push(`the day is not fully listed: ${times.join(', ')}`);
     }
 
-    // 🎯 completes through the owning path: block marked done AND XP moved.
+    /* 🎯 completes through the owning path: block marked done AND XP moved.
+
+       Blasted on the PIANO block, not the breakfast one. XP is priced by what
+       the time is for now, and a meal is deliberately worth nothing — so
+       blasting breakfast would prove only that meals earn nothing, which is a
+       different check's job (dailyBlocksEarnNoXp). What this one is for is that
+       the tick routes through completeQuest rather than writing a flag itself,
+       and for that it needs a block that actually earns. */
     const xpBefore = getQuestXP('jenn');
-    const blast = document.querySelector('#tdWrap [data-td-action="blast"][data-td-block="td-q2"]');
+    const blast = document.querySelector('#tdWrap [data-td-action="blast"][data-td-block="td-q1"]');
     if (!blast) { bad.push('no 🎯 on a quest card'); }
     else {
       blast.click();
       // The blast is an animation: projectile 300ms, burst 240ms, then the
       // completion. Assert after it lands, not before.
       await new Promise(r => setTimeout(r, 900));
-      const blk = (getDayBlocks(key, 'jenn') || []).find(b => b.id === 'td-q2');
+      const blk = (getDayBlocks(key, 'jenn') || []).find(b => b.id === 'td-q1');
       if (!blk || !blk.completed) bad.push('🎯 did not complete the block');
       if (getQuestXP('jenn') <= xpBefore) bad.push('🎯 completed without awarding XP');
     }
@@ -8743,6 +8750,87 @@ function findChromium() {
       if (label !== want[id]) bad.push(`${id} reads "${label}", expected "${want[id]}"`);
       if (/\p{Extended_Pictographic}/u.test(label)) bad.push(`${id}'s label is still an emoji`);
     });
+    return bad.length === 0 || bad;
+  });
+
+  /* DAILY BLOCKS EARN NO XP, AND ONE ALLOWANCE COVERS BOTH WRITERS.
+     Every completed block used to earn a flat 20 against 100 per level, so five
+     blocks was a level and a bowl of cereal was worth the same as a swim. There
+     was no cap, and the meeting credited its weekly awards on top through a
+     second path that knew nothing about the first. */
+  checks.dailyBlocksEarnNoXp = await page.evaluate(() => {
+    const bad = [];
+    const kid = 'jenn';
+    profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey, keys = mrWeekDayKeys(wk), day = keys[0];
+    const before = keys.map(k => (getDayBlocks(k, kid) || []).slice());
+    const prog = getProfData(kid).progress;
+    const hadXp2 = prog.xp2, hadXp = prog.questXP;
+    const hadByWeek = JSON.parse(JSON.stringify(prog.xpByWeek || {}));
+    try {
+      keys.forEach(k => setDayBlocks(k, [], kid));
+      prog.xp2 = 0; prog.questXP = 0; prog.xpByWeek = {};
+
+      // A week of nothing but meals and appointments earns nothing at all.
+      setDayBlocks(day, [
+        { id: 'x1', actId: 'breakfast', startMin: 7 * 60, durationMin: 30, checklistState: {} },
+        { id: 'x2', actId: 'lunch', startMin: 12 * 60, durationMin: 30, checklistState: {} },
+        { id: 'x3', actId: 'dinner', startMin: 18 * 60, durationMin: 60, checklistState: {} },
+        { id: 'x4', actId: 'appt_medical', startMin: 15 * 60, durationMin: 30, checklistState: {} },
+        { id: 'x5', actId: 'family', startMin: 19 * 60 + 30, durationMin: 30, checklistState: {} },
+      ], kid);
+      currentDayKey = day;
+      ['x1', 'x2', 'x3', 'x4', 'x5'].forEach(id => completeQuest(id, day));
+      if (getQuestXP(kid) !== 0) bad.push(`a week of meals earned ${getQuestXP(kid)} XP`);
+
+      // Work does earn, and it is priced by what the time is for.
+      keys.forEach(k => setDayBlocks(k, [], kid));
+      prog.xp2 = 0; prog.questXP = 0; prog.xpByWeek = {};
+      setDayBlocks(day, [
+        { id: 'y1', actId: 'training', startMin: 17 * 60, durationMin: 60, tag: 'skating', checklistState: {} },
+      ], kid);
+      completeQuest('y1', day);
+      const bodyXp = getQuestXP(kid);
+      if (bodyXp !== QUEST_XP_BY_GROUP.body) bad.push(`a training block earned ${bodyXp}, expected ${QUEST_XP_BY_GROUP.body}`);
+
+      /* ONE ALLOWANCE. Spend it with block XP, then ask the meeting to credit
+         its weekly awards: it must find nothing left rather than adding its own
+         total on top. */
+      prog.xp2 = 0; prog.questXP = 0;
+      prog.xpByWeek = {}; prog.xpByWeek[wk] = XP_WEEKLY_CAP;
+      const r = addQuestXP(50, kid, wk);
+      if (r.awarded !== 0) bad.push(`a full week still credited ${r.awarded} XP`);
+      if (!r.capped) bad.push('a credit past the cap did not report itself as capped');
+      if (xpRoomLeft(kid, wk) !== 0) bad.push('a full week reports room left');
+
+      // Under the cap, a credit lands whole and the tally follows it.
+      prog.xpByWeek = {}; prog.xp2 = 0;
+      const r2 = addQuestXP(30, kid, wk);
+      if (r2.awarded !== 30) bad.push(`a credit under the cap awarded ${r2.awarded}`);
+      if (xpRoomLeft(kid, wk) !== XP_WEEKLY_CAP - 30) bad.push('the weekly tally did not follow the credit');
+
+      /* ONE LEVEL CALCULATION. Today's hero and the parent portal each used to
+         do this arithmetic themselves and could disagree about the same child. */
+      prog.xp2 = QUEST_XP_PER_LEVEL * 2 + 10;
+      const info = mrXpLevelInfo(kid);
+      if (info.level !== 3) bad.push(`mrXpLevelInfo says level ${info.level}, expected 3`);
+      if (info.perLevel !== QUEST_XP_PER_LEVEL) bad.push('the portal is using a different level threshold');
+
+      /* Raising the threshold must not demote a child whose XP was banked on
+         the old scale: with no xp2 stored the answer is DERIVED, so it is the
+         same however many times anything runs and in whatever merge order. */
+      delete prog.xp2;
+      prog.questXP = 300;              // level 4 under the old 100-per-level scale
+      if (mrXpLevelInfo(kid).level !== 4) {
+        bad.push(`a child banked on the old scale reads as level ${mrXpLevelInfo(kid).level}, expected 4`);
+      }
+      const twice = getQuestXP(kid);
+      if (getQuestXP(kid) !== twice) bad.push('reading the legacy total twice gives different answers');
+    } finally {
+      keys.forEach((k, i) => setDayBlocks(k, before[i], kid));
+      prog.xp2 = hadXp2; prog.questXP = hadXp; prog.xpByWeek = hadByWeek;
+    }
     return bad.length === 0 || bad;
   });
 

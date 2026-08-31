@@ -1229,7 +1229,12 @@ function mmTakeUndoSnapshot(wk) {
     deposits: (typeof mnyEnsureDeposits === 'function') ? mnyEnsureDeposits(kid) : null,
     // Goal progress moves with the money, so it has to come back with it.
     savingGoals: (typeof mnyEnsureGoals === 'function') ? mnyEnsureGoals(kid) : null,
-    xp: (getProfData(kid).progress || {}).questXP || 0,
+    /* Both XP fields AND the week's tally. Restoring the total without the
+       tally would leave the cap thinking the week's allowance was already
+       spent, so a re-record after an undo would credit nothing. */
+    xp: (typeof getQuestXP === 'function') ? getQuestXP(kid) : ((getProfData(kid).progress || {}).questXP || 0),
+    xpLegacy: (getProfData(kid).progress || {}).questXP || 0,
+    xpByWeek: JSON.parse(JSON.stringify((getProfData(kid).progress || {}).xpByWeek || {})),
     // The meeting also empties the box, so undo has to put it back.
     boxItems: (typeof mrBoxItems === 'function') ? mrBoxItems(kid) : null,
     /* The "made on its own since the last meeting" baseline needs no field of
@@ -1273,7 +1278,9 @@ function mmUndoRecord() {
     if (s.savingGoals) pd.savingGoals = s.savingGoals;
     if (s.boxItems) pd.boxItems = s.boxItems;
     if (!pd.progress) pd.progress = {};
-    pd.progress.questXP = s.xp;
+    pd.progress.xp2 = s.xp;
+    pd.progress.questXP = s.xpLegacy;
+    pd.progress.xpByWeek = s.xpByWeek;
   });
   bankConfig().marketMonth = mmUndo.marketMonth;
   if (mmUndo.finalized) c.finalizedWeeks[wk] = mmUndo.finalized; else if (c.finalizedWeeks) delete c.finalizedWeeks[wk];

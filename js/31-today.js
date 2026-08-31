@@ -464,6 +464,11 @@ function tdQuestCard(b, kid, isNext, clash) {
   const { icon, name: nm, block: blk } = tdBlockLabel(b, kid);
   const id = escapeAttr(b.id);
   const done = isBlockCompleted(b, kid);
+  /* What this one is actually worth. A flat "+20 XP" on every card was a
+     promise the ledger stopped keeping, and it said the same thing about
+     dinner as about a swim session. Nothing is printed where nothing is
+     earned: "+0 XP" on a meal is noise, and it reads as a mark against it. */
+  const xpWorth = blockQuestXP(findActivity(b.actId, kid));
   /* --conflict composes with --next rather than replacing it: the frame is an
      outline, the tier is border, shadow and fill, and the next block is still
      the next block whether or not its buffers fit. Dropping --next here would
@@ -485,7 +490,7 @@ function tdQuestCard(b, kid, isNext, clash) {
         <div class="quest-card-body">
           <div class="quest-card-name">${escapeHtml(nm)}</div>
           ${tdBlockTag(blk)}
-          <div class="quest-card-meta"><span class="quest-xp-tag">+${QUEST_XP_PER_TASK} XP</span></div>
+          ${xpWorth > 0 ? `<div class="quest-card-meta"><span class="quest-xp-tag">+${xpWorth} XP</span></div>` : ''}
           ${clash ? `<div class="quest-conflict-note">⚠️ Overlaps ${escapeHtml(clash)}</div>` : ''}
         </div>
       </button>
@@ -499,18 +504,22 @@ function tdQuestCard(b, kid, isNext, clash) {
 /* The hero strip that used to sit at the top of Quest mode. Numbers, not prose —
    it costs almost nothing against the word budget. */
 function tdQuestHero(kid, blocks) {
-  const xp = getQuestXP(kid);
-  const level = Math.floor(xp / QUEST_XP_PER_LEVEL) + 1;
+  /* Through the one level calculation (mrXpLevelInfo, js/18-rules.js) rather
+     than repeating the arithmetic here — this hero and the parent portal used
+     to work it out separately and could disagree about the same child. */
+  const info = mrXpLevelInfo(kid);
+  const xp = info.xp;
+  const level = info.level;
   const tier = heroTierForLevel(level);
-  const into = xp % QUEST_XP_PER_LEVEL;
-  const pct = Math.round(into / QUEST_XP_PER_LEVEL * 100);
+  const into = info.into;
+  const pct = info.pct;
   const done = blocks.filter(b => isBlockCompleted(b, kid)).length;
   return `<div class="dq-hero">
       <div class="dq-hero-avatar">${tier.emoji}</div>
       <div class="dq-hero-info">
         <div class="dq-hero-title">Lv ${level} · ${escapeHtml(tier.name)}</div>
         <div class="dq-xp-bar"><div class="dq-xp-fill" style="width:${pct}%"></div></div>
-        <div class="dq-hero-sub">${done}/${blocks.length} done · ${into}/${QUEST_XP_PER_LEVEL} XP</div>
+        <div class="dq-hero-sub">${done}/${blocks.length} done · ${into}/${info.perLevel} XP</div>
       </div>
     </div>`;
 }

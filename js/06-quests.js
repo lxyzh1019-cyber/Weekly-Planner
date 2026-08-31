@@ -3,8 +3,45 @@
 /* ════════════════════════════════════════════════════════════════
    QUEST BOARD — gamified daily plan view
 ════════════════════════════════════════════════════════════════ */
+/* What one completed block is worth, BY GROUP. A flat rate for everything is
+   how a bowl of cereal came to be worth the same as a swim session, and how a
+   child could level twice in an ordinary day.
+
+   Daily and Free earn nothing. That is not a judgement about them — rest and
+   family time are the point of the week, and a child is told so elsewhere —
+   it is that XP is the record of effort, and eating dinner is not effort. The
+   groups that do earn are the ones where turning up is a choice. */
+const QUEST_XP_BY_GROUP = {
+  routine: 3,   // three a day, so this is the steady drumbeat rather than a spike
+  brain:   5,   // homework, reading, an instrument — and the school day itself
+  body:    8,   // training and competitions: the biggest single ask of her week
+  chores:  5,
+  daily:   0,   // meals, snacks, appointments
+  free:    0,   // family time, play, rest
+};
+/* The old flat rate. Still the number the quest-complete popup promises, and
+   still what an unresolvable activity is worth, so nothing silently drops to
+   zero for want of an answer. */
 const QUEST_XP_PER_TASK = 20;
-const QUEST_XP_PER_LEVEL = 100;
+
+/* What this block is worth on completion. */
+function blockQuestXP(act) {
+  const g = (typeof activityGroup === 'function') ? activityGroup(act) : 'daily';
+  const v = QUEST_XP_BY_GROUP[g];
+  return v == null ? 0 : v;
+}
+/* 100 was never calibrated against anything. At the old flat 20 XP a block it
+   made five blocks a level and an ordinary day two — a child could pass the
+   top tier in a fortnight without anything changing about how she spent her
+   week, which makes the number say nothing.
+
+   400 comes out of tools/xp-calibrate.js: with the per-block values below it
+   puts a realistic term at about one level every four weeks, holds every week
+   to at most one level, and still lets a strong week move faster. Raising it
+   would have DEMOTED both girls overnight, so migrateXpScale rescales what is
+   already banked — see js/99-main.js. */
+const QUEST_XP_PER_LEVEL = 400;
+const QUEST_XP_PER_LEVEL_LEGACY = 100;
 /* Tiers run to 10. Six topped out at 500 XP, which the chore-overflow and
    personal-best awards clear well inside a single season — a kid who stays at
    the top tier from October onward has nothing left to climb. */
@@ -23,21 +60,88 @@ const HERO_TIERS = [
 function heroTierForLevel(lv) {
   return HERO_TIERS[Math.min(lv-1, HERO_TIERS.length-1)] || HERO_TIERS[0];
 }
+/* ── Where the XP actually lives ──────────────────────────────────
+   Raising the level threshold from 100 to 400 would have demoted both girls
+   overnight — a child at level 12 waking up at level 3 — so the banked total
+   has to move with it. The obvious fix is a one-time rescale, and it is the
+   wrong one here: deepMergeObj (js/04-merge.js) lets a remote SCALAR win, so a
+   device still serving the old bundle out of a GitHub Pages cache could push an
+   un-rescaled total over a rescaled one, or two devices could rescale the same
+   figure twice.
+
+   So nothing is migrated. `progress.xp2` is the new-scale total; when it is
+   absent the answer is DERIVED from the legacy field, which means the same
+   answer comes out whether or not anything has run, however many times, in any
+   merge order. An old client keeps reading `questXP`, which is still written,
+   so it is not frozen out either. */
 function getQuestXP(p=activeProfile()) {
   const prog = getProfData(p)?.progress || {};
-  return prog.questXP || 0;
+  if (prog.xp2 != null) return Number(prog.xp2) || 0;
+  return (Number(prog.questXP) || 0) * (QUEST_XP_PER_LEVEL / QUEST_XP_PER_LEVEL_LEGACY);
 }
-function addQuestXP(amount, p=activeProfile()) {
+/* ── ONE LEDGER, ONE GATE ─────────────────────────────────────────
+   Every completed block earned a flat 20 XP — a bowl of cereal included —
+   against 100 per level. Five blocks was a level; an ordinary day was two, and
+   a child could pass Captain in a fortnight without anything changing about
+   how she spent it. There was no cap of any kind, and the meeting's weekly
+   awards were added on top through a second path that knew nothing about the
+   first.
+
+   So both paths come through here now. `weekKey` is what makes the cap
+   possible: XP is tallied per week in the profile, block XP and the meeting's
+   awards draw on the same allowance, and once it is spent further work still
+   happens and still counts — it just stops printing levels. A cap that
+   silenced the work would be worse than no cap.
+
+   The numbers below are calibrated, not guessed: tools/xp-calibrate.js replays
+   these rules over synthetic quiet / ordinary / strong weeks and reports levels
+   gained. Change one and re-run it. */
+const XP_WEEKLY_CAP = 260;
+
+function xpWeekKeyFor(dayKey) {
+  return (typeof ctWeekKeyForDate === 'function') ? ctWeekKeyForDate(dayKey || todayKey()) : null;
+}
+function xpWeekTally(p, weekKey) {
+  const prog = getProfData(p).progress || {};
+  return Number((prog.xpByWeek || {})[weekKey]) || 0;
+}
+/* How much of this week's allowance is left. Exposed so a screen can say so
+   rather than a child discovering it by getting nothing. */
+function xpRoomLeft(p = activeProfile(), weekKey = xpWeekKeyFor()) {
+  return Math.max(0, XP_WEEKLY_CAP - xpWeekTally(p, weekKey));
+}
+
+/* The single writer of progress.questXP. `weekKey` may be null for a credit
+   that belongs to no week (there are none today); such a credit skips the cap
+   rather than silently landing in the current week's tally. */
+function xpCredit(amount, p = activeProfile(), weekKey = xpWeekKeyFor()) {
   const profd = getProfData(p);
-  if (!profd) return { leveledUp:false };
+  if (!profd) return { leveledUp: false, awarded: 0, capped: false };
   if (!profd.progress) profd.progress = {};
-  const before = profd.progress.questXP || 0;
-  const after = before + amount;
-  profd.progress.questXP = after;
+  const prog = profd.progress;
+  let give = Math.max(0, Number(amount) || 0);
+  let capped = false;
+  if (weekKey) {
+    const room = Math.max(0, XP_WEEKLY_CAP - xpWeekTally(p, weekKey));
+    if (give > room) { give = room; capped = true; }
+    if (!prog.xpByWeek) prog.xpByWeek = {};
+    prog.xpByWeek[weekKey] = xpWeekTally(p, weekKey) + give;
+  }
+  const before = getQuestXP(p);
+  const after = before + give;
+  prog.xp2 = after;
+  // Kept in step so a device still on the old bundle reads a sane level rather
+  // than a frozen one.
+  prog.questXP = Math.round(after * QUEST_XP_PER_LEVEL_LEGACY / QUEST_XP_PER_LEVEL);
   const lvBefore = Math.floor(before / QUEST_XP_PER_LEVEL) + 1;
   const lvAfter  = Math.floor(after  / QUEST_XP_PER_LEVEL) + 1;
   saveAll();
-  return { leveledUp: lvAfter > lvBefore, newLevel: lvAfter };
+  return { leveledUp: lvAfter > lvBefore, newLevel: lvAfter, awarded: give, capped };
+}
+
+/* Kept as the name every caller uses. */
+function addQuestXP(amount, p=activeProfile(), weekKey = xpWeekKeyFor()) {
+  return xpCredit(amount, p, weekKey);
 }
 
 /* goQuestBoard / renderQuestBoard / goQuestsToday lived here, and with them the
@@ -367,15 +471,23 @@ function completeQuest(blockId, dayKey) {
    feed the quest-complete popup. */
 function awardBlockLinks(blk, dayKey) {
   let msg = '';
-  let leveledUp = false, newLevel = null;
+  let leveledUp = false, newLevel = null, awarded = 0;
   const kid = isParent() ? parentViewing : activeProfile();
   const act = findActivity(blk.actId);
   if (!blk.xpAwarded) {
     blk.xpAwarded = true;
-    const r = addQuestXP(QUEST_XP_PER_TASK);
+    /* Priced by what the time is for, credited against this WEEK's allowance,
+       and against the same allowance the meeting's awards draw on — those were
+       two independent taps into one pool before. */
+    const worth = blockQuestXP(act);
+    const r = worth > 0 ? addQuestXP(worth, kid, ctWeekKeyForDate(dayKey)) : null;
+    awarded = r ? r.awarded : 0;
     leveledUp = !!(r && r.leveledUp);
     newLevel = r && r.newLevel;
-    msg = ` +${QUEST_XP_PER_TASK} XP`;
+    if (r && r.awarded > 0) {
+      msg = ` +${r.awarded} XP`;
+      if (r.capped) msg += ' (week\u2019s XP is full \u2014 it still counts)';
+    }
     if (leveledUp) msg += ' • LEVEL UP! 🎉';
     // Count the completion toward the collectible-sticker milestones (#8).
     const pd = getProfData(kid);
@@ -396,7 +508,7 @@ function awardBlockLinks(blk, dayKey) {
   // portal. Now it asks how it went and files that as a claim, exactly as the
   // chore tab does.
   if (blk.actId === 'chores') claimChoresFromBlock(blk, dayKey, kid);
-  return { msg, leveledUp, newLevel };
+  return { msg, leveledUp, newLevel, awarded };
 }
 
 /* Every pool chore this block is tagged with, resolved for a given day.
@@ -640,7 +752,10 @@ function refreshAfterCompletion() {
 function showQuestCompletePopup(act, result) {
   const pop = document.getElementById('questPopup');
   document.getElementById('questPopupIcon').textContent = act.icon || '⭐';
-  document.getElementById('questPopupXp').textContent = `+${QUEST_XP_PER_TASK} XP`;
+  /* What she actually got, not a flat number the app no longer awards. A popup
+     that promises 20 while the ledger credits 8 is the app lying to a child. */
+  const gained = (result && result.awarded != null) ? result.awarded : blockQuestXP(act);
+  document.getElementById('questPopupXp').textContent = gained > 0 ? `+${gained} XP` : 'Nice ✓';
   const sub = document.getElementById('questPopupSub');
   if (result?.leveledUp) {
     const tier = heroTierForLevel(result.newLevel);

@@ -130,7 +130,10 @@ const MR_DEFAULT_RULES = {
   },
 
   xp: {
-    perLevel: 100,
+    /* Calibrated, not chosen — see tools/xp-calibrate.js and the note on
+       QUEST_XP_PER_LEVEL. Kept in the rulebook because the money pages quote it
+       to the girls, but the CONSTANT is what the level maths uses. */
+    perLevel: 400,
     awards: [
       { id: 'chore_overflow', label: 'Extra household chore past your $3 day', xp: 20 },
       { id: 'personal_unasked', label: 'Personal chore done without being asked', xp: 10 },
@@ -1408,8 +1411,16 @@ function mrXpForWeek(weekKey, kid) {
    competing XP system. */
 function mrXpLevelInfo(kid, weekKey) {
   const r = mrRulesForWeek(weekKey || todayKey());
-  const perLevel = Number((r.xp || {}).perLevel) || 100;
-  const xp = Number((getProfData(kid).progress || {}).questXP) || 0;
+  /* ONE level calculation. This read the rulebook while js/06-quests.js and
+     Today's hero each did the same arithmetic against QUEST_XP_PER_LEVEL, so a
+     stored rulebook carrying the old 100 could have the portal saying level 17
+     while Today said level 5 about the same child. The constant is the answer;
+     a rulebook that still names the old default is ignored rather than obeyed. */
+  const stored = Number((r.xp || {}).perLevel) || 0;
+  const perLevel = (!stored || stored === QUEST_XP_PER_LEVEL_LEGACY) ? QUEST_XP_PER_LEVEL : stored;
+  // Through getQuestXP, which knows which scale the stored figure is on.
+  const xp = (typeof getQuestXP === 'function') ? getQuestXP(kid)
+           : Number((getProfData(kid).progress || {}).questXP) || 0;
   const level = Math.floor(xp / perLevel) + 1;
   const into = xp % perLevel;
   const tiers = ((r.xp || {}).tiers || []).slice().sort((a, b) => a.level - b.level);
@@ -1434,9 +1445,15 @@ function mrCreditWeekXp(weekKey, kid) {
   if (!c.xpAwardedWeeks[weekKey]) c.xpAwardedWeeks[weekKey] = {};
   if (c.xpAwardedWeeks[weekKey][kid] != null) return 0;      // already credited
   const { total } = mrXpForWeek(weekKey, kid);
-  c.xpAwardedWeeks[weekKey][kid] = total;
-  if (total > 0) addQuestXP(total, kid);
-  return total;
+  /* Through the same gate the block awards go through, against the same weekly
+     allowance. These were two independent taps into one pool: block XP had no
+     cap at all and this added its own total on top, so a strong week could
+     print several levels at the meeting on work that had already been counted
+     as it happened. What is RECORDED is what was actually credited, so an undo
+     and a re-record cannot conjure the capped remainder into existence. */
+  const r = total > 0 ? addQuestXP(total, kid, weekKey) : { awarded: 0 };
+  c.xpAwardedWeeks[weekKey][kid] = r.awarded;
+  return r.awarded;
 }
 
 /* ── QUARTERLY REVIEW ──────────────────────────────────────────────
