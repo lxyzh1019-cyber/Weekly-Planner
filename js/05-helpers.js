@@ -827,10 +827,24 @@ function countRestDaysBetween(fromKey, toKey, kid = activeProfile()) {
   return n;
 }
 
-function markRoutineProgressOnChecklistToggle(block, act, prevDone, nextDone, total) {
+/* `kid` used to be missing: this read the ACTIVE profile and stamped the
+   streak on it, so a parent ticking Jenn's routine while viewing her advanced
+   the PARENT profile's streak. */
+function markRoutineProgressOnChecklistToggle(block, act, prevDone, nextDone, total, kid) {
   if (!act?.isRoutine || !total) return;
+  const rid0 = act.routineId;
+  const who = kid || activeProfile();
+  /* Falling back out of complete has to be handled here too — it is the one
+     path the day view takes, and until now nothing on it could undo the day's
+     "routine kept" mark. Streaks are left alone deliberately: a streak is a
+     record of days that happened, and re-walking it backwards from a mis-tap
+     would lose real history. */
+  if (rid0 && prevDone >= total && nextDone < total) {
+    ctSyncMandatoryFromRoutine(rid0, who, currentDayKey, false);
+    return;
+  }
   if (prevDone >= total || nextDone < total) return;
-  const p = getProfData();
+  const p = getProfData(who);
   const pr = p.progress;
   const rid = act.routineId;
   if (!rid) return;
@@ -870,14 +884,26 @@ function markRoutineProgressOnChecklistToggle(block, act, prevDone, nextDone, to
     if (next) queueChecklistReward('afterschool', next, '10-day after-school streak');
   }
   // Award chore point from routine completion
-  ctAwardMandatoryFromRoutine(rid, activeProfile(), today);
+  ctSyncMandatoryFromRoutine(rid, who, today, true);
   saveAll();
   maybeShowRewardPrompt();
 }
 
 const CT_ROUTINE_SESSION_MAP = { morning: 'Morning', afterschool: 'Afternoon', evening: 'Evening' };
 
-function ctAwardMandatoryFromRoutine(routineId, kid, dayKey) {
+/* ── The day-level "routine kept" mark follows the checklist, both ways ──
+   This used to be one-way and permanent — "sticky: once tracked, don't unset
+   even if routine is later unchecked". That single early-return is why
+   unticking an item could not make anything go back to incomplete: the block
+   said not-done while the week, the streak and the meeting all still said kept.
+
+   It clears now, but ONLY a mark the app set itself. ctSetMandatoryAuto stamps
+   that provenance, and a parent's own tick in the meeting has none — she is
+   asserting the day from memory, and a child unticking an item afterwards must
+   not silently overrule her.
+
+   Routines are tracked (heatmap, streaks, goal points) and pay NO money. */
+function ctSyncMandatoryFromRoutine(routineId, kid, dayKey, complete) {
   const session = CT_ROUTINE_SESSION_MAP[routineId];
   if (!session) return;
   const wk = ctWeekKeyForDate(dayKey);
@@ -887,14 +913,24 @@ function ctAwardMandatoryFromRoutine(routineId, kid, dayKey) {
   if (dayIdx < 0 || dayIdx > 6) return;
   const p = getProfData(kid);
   ctEnsureProfile(p);
-  // Sticky: once tracked, don't unset even if routine is later unchecked.
-  // Routines are mandatory + tracked (heatmap/streaks/goal points) but pay NO money —
-  // money now comes only from completing priced chore groups.
-  if (ctGetMandatory(wk, dayIdx, session, kid)) return;
-  ctSetMandatory(wk, dayIdx, session, kid, true);
-  ctSetMandatoryAuto(wk, dayIdx, session, kid);
-  ctMaybeFireGoalBonus(wk, kid);
-  showToast(`✅ ${session} routine complete`);
+  const on = ctGetMandatory(wk, dayIdx, session, kid);
+  if (complete) {
+    if (on) return;
+    ctSetMandatory(wk, dayIdx, session, kid, true);
+    ctSetMandatoryAuto(wk, dayIdx, session, kid);
+    ctMaybeFireGoalBonus(wk, kid);
+    showToast(`✅ ${session} routine complete`);
+    return;
+  }
+  // Going back to incomplete: only undo what this function put there.
+  if (!on) return;
+  if (!ctGetMandatoryAuto(wk, dayIdx, session, kid)) return;
+  ctSetMandatory(wk, dayIdx, session, kid, false);
+  ctSetMandatoryAuto(wk, dayIdx, session, kid, false);
+}
+/* Kept as the name every existing caller uses. Completing is all it ever did. */
+function ctAwardMandatoryFromRoutine(routineId, kid, dayKey) {
+  ctSyncMandatoryFromRoutine(routineId, kid, dayKey, true);
 }
 
 /* ── An icon for a routine checklist item ──────────────────────────

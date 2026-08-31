@@ -279,12 +279,19 @@ function ctGetMandatoryAuto(weekKey, dayIdx, session, kid) {
   ctEnsureProfile(p);
   return !!((((p.chore.mandatoryAutoByWeek || {})[weekKey] || {})[String(dayIdx)] || {})[session]);
 }
-function ctSetMandatoryAuto(weekKey, dayIdx, session, kid) {
+/* Provenance: did the APP set this mark, or did a grown-up? It only ever set
+   true, which was fine while the mark could never be taken back. Now that
+   unticking a routine item clears it (ctSyncMandatoryFromRoutine), the stamp
+   has to be clearable too — otherwise a day the app set, then cleared, then a
+   parent ticked by hand would still look auto, and the next untick would
+   silently overrule her. */
+function ctSetMandatoryAuto(weekKey, dayIdx, session, kid, value = true) {
   const p = getProfData(kid);
   ctEnsureProfile(p);
   if (!p.chore.mandatoryAutoByWeek[weekKey]) p.chore.mandatoryAutoByWeek[weekKey] = {};
   if (!p.chore.mandatoryAutoByWeek[weekKey][String(dayIdx)]) p.chore.mandatoryAutoByWeek[weekKey][String(dayIdx)] = {};
-  p.chore.mandatoryAutoByWeek[weekKey][String(dayIdx)][session] = true;
+  if (value) p.chore.mandatoryAutoByWeek[weekKey][String(dayIdx)][session] = true;
+  else delete p.chore.mandatoryAutoByWeek[weekKey][String(dayIdx)][session];
   ctStampChoreWeek(p, weekKey);
 }
 function ctMandatoryPoints(weekKey, kid) {

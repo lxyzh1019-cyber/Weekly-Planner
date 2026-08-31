@@ -511,7 +511,7 @@ function computeWeekWins(keys) {
     (getDayBlocks(k) || []).forEach(b => {
       if (b.startMin == null) return;
       total++;
-      if (b.completed) {
+      if (isBlockCompleted(b, activeProfile())) {
         done++;
         const act = acts.find(a => a.id === b.actId);
         const cat = act ? act.cat : 'custom';
@@ -834,7 +834,7 @@ function renderTimeGrid(keys) {
       // Class names written out rather than built from a ternary — the dead-CSS
       // check matches literal strings.
       el.className = 'tg2-block' + (isLightColour(bg) ? ' light-bg' : '')
-        + (b.completed ? ' tg2-block--done' : '') + (hasConflict ? ' tg2-block--conflict' : '')
+        + (isBlockCompleted(b, activeProfile()) ? ' tg2-block--done' : '') + (hasConflict ? ' tg2-block--conflict' : '')
         + (h < TG2_LABEL_MIN_H ? ' tg2-block--tiny' : '');
       el.style.top = (relStart * PX_PER_MIN) + 'px';
       el.style.height = h + 'px';
@@ -1394,7 +1394,7 @@ function renderFullWeek(keys) {
       if (blockTierAtLeast(tier, 'detail')) cls += ' wf-card--tall'; // room to stack time/icon/name centered
       if (!blockTierAtLeast(tier, 'meta')) cls += ' wf-card--slim';
       if (!blockTierAtLeast(tier, 'name')) cls += ' wf-card--xslim wf-card--icononly';
-      if (b.completed) cls += ' wf-card--done';
+      if (isBlockCompleted(b, activeProfile())) cls += ' wf-card--done';
       const hasConflict = bufferConflicts.affected.has(b.id);
       if (hasConflict) cls += ' wf-card--conflict';
       card.className = cls;

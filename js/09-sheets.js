@@ -685,7 +685,24 @@ function syncEditStopwatchUI() {
   else editStopwatchClearTick();
 }
 
+/* On a ROUTINE this toggle is not the owner of anything — the checklist above
+   it is. It used to be a second, independent switch, so a child could tick
+   every step and still leave this off (or leave it on with the list half done)
+   and the two would sit there disagreeing. It now drives the list, through the
+   same write the day view and the chore tab use. */
 function toggleEditComplete() {
+  const kid = isParent() ? parentViewing : activeProfile();
+  const blocks = getDayBlocks(currentDayKey, kid) || [];
+  const blk = blocks.find(b => b.id === editingBlockId);
+  const act = blk ? findActivity(blk.actId, kid) : null;
+  if (blk && act && act.isRoutine) {
+    toggleBlockDone(currentDayKey, blk.id);
+    editState.completed = isRoutineCompleted(blk, kid);
+    document.getElementById('editCompleteToggle').classList.toggle('on', editState.completed);
+    const wrap = document.getElementById('editChecklistWrap');
+    if (wrap && wrap.style.display !== 'none') renderChecklist(blk, act, 'editChecklistList');
+    return;
+  }
   editState.completed = !editState.completed;
   document.getElementById('editCompleteToggle').classList.toggle('on', editState.completed);
 }
@@ -834,8 +851,18 @@ function openEditSheet(blockId) {
 
   document.getElementById('editSheetTitle').textContent = `${act.icon} ${act.name}`;
 
-  editState.completed = !!block.completed;
+  editState.completed = isBlockCompleted(block, isParent() ? parentViewing : activeProfile());
   document.getElementById('editCompleteToggle').classList.toggle('on', editState.completed);
+  /* Say what the switch actually does. On a routine it closes or reopens the
+     checklist, and a label that claimed otherwise is how two controls for one
+     fact stayed invisible for so long. */
+  {
+    const lbl = document.querySelector('#editCompleteToggle .toggle-label');
+    const isRoutineBlock = !!(act && act.isRoutine);
+    if (lbl) lbl.textContent = isRoutineBlock
+      ? '✅ Tick every step in the checklist'
+      : '✅ Mark this activity done';
+  }
   renderParentStampPicker(block);
 
   editState.stopwatch = cloneStopwatch(block.stopwatch);
@@ -1052,14 +1079,19 @@ function buildChecklistRow(block, act, item, isKidItem, listContainerId) {
     const b = blocks.find(x=>x.id===block.id);
     if (!b.checklistState) b.checklistState = {};
     b.checklistState[item.id] = !b.checklistState[item.id];
+    const kid = isParent() ? parentViewing : activeProfile();
+    if (act.isRoutine) {
+      // Derive the compatibility flag BEFORE the write, so what lands in the
+      // profile and what every other screen reads are the same thing.
+      syncRoutineCompletion(b, kid);
+    }
     setDayBlocks(currentDayKey, blocks);
     renderChecklist(b, act, cid);
     buildTimeline();
     if (act.isRoutine) {
-      const total = countChecklistTotal(b, act);
-      const done = countChecklistDone(b, act);
+      const { done, total } = routineTally(b, act, kid);
       const prevDone = b.checklistState[item.id] ? Math.max(0, done - 1) : Math.min(total, done + 1);
-      markRoutineProgressOnChecklistToggle(b, act, prevDone, done, total);
+      markRoutineProgressOnChecklistToggle(b, act, prevDone, done, total, kid);
       if (total > 0 && done >= total) {
         if (!routineCompleteToasted.has(b.id)) {
           routineCompleteToasted.add(b.id);
@@ -1115,10 +1147,13 @@ function buildChecklistRow(block, act, item, isKidItem, listContainerId) {
 }
 
 /* Get kid-added extras for the current child profile, for a specific routineId */
-function getKidExtras(routineId) {
-  const p = getProfData();
-  if (!p) return [];
-  const map = p.routineExtras || {};
+/* `p` used to be missing entirely, so this read the ACTIVE profile: the parent
+   portal viewing Jenn was handed Jess's extra items and then measured Jenn's
+   routine against them. Every caller passes the child now. */
+function getKidExtras(routineId, p = activeProfile()) {
+  const prof = getProfData(p);
+  if (!prof) return [];
+  const map = prof.routineExtras || {};
   return map[routineId] || [];
 }
 
@@ -1301,9 +1336,16 @@ async function saveEditChanges() {
   blk.gearState = newGearState;
   blk.note = newNote;
   const wasCompleted = !!blk.completed;
-  blk.completed = newCompleted;
-  // Unify rewards: marking done in the edit sheet now earns XP + fires links.
-  if (!wasCompleted && newCompleted) awardBlockLinks(blk, currentDayKey);
+  /* A routine's flag is derived from its checklist and was already written when
+     the list was ticked — writing the sheet's own copy back over it here would
+     reintroduce exactly the disagreement this release removes. */
+  const savingRoutine = !!(act && act.isRoutine);
+  if (!savingRoutine) {
+    blk.completed = newCompleted;
+    if (!wasCompleted && newCompleted) awardBlockLinks(blk, currentDayKey);
+  } else {
+    syncRoutineCompletion(blk, isParent() ? parentViewing : activeProfile());
+  }
   blk.objectives = newObjectives;
   if (newStopwatch) blk.stopwatch = newStopwatch;
   else delete blk.stopwatch;

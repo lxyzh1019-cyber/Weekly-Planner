@@ -1456,6 +1456,10 @@
 <script src="js/33-parent-app.js"></script>
 <script src="js/34-parent-copyweek.js"></script>
 <script src="js/35-school-calendar.js"></script>
+<!-- The status vocabulary. Loaded last of the declaration files because it
+     calls into every one of them at runtime and none of them at load time.
+     99-main.js still owns all top-level executable code. -->
+<script src="js/36-status.js"></script>
 <script src="js/99-main.js"></script>
 </body>
 </html>

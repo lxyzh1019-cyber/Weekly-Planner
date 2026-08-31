@@ -302,10 +302,17 @@ function spawnQuestBurst(card) {
    its own day, which is why this can no longer assume one. */
 function completeQuest(blockId, dayKey) {
   const key = dayKey || todayKey();
-  const blocks = getDayBlocks(key) || [];
+  const who = isParent() ? parentViewing : activeProfile();
+  const blocks = getDayBlocks(key, who) || [];
   const blk = blocks.find(b => b.id === blockId);
   if (!blk) return;
-  if (blk.completed) return;
+  if (isBlockCompleted(blk, who)) return;
+
+  /* A routine is completed by closing its checklist, not by setting a flag
+     beside it — toggleBlockDone owns that write, so hand it over rather than
+     growing a second one here. It repaints and toasts on its own. */
+  const rAct = findActivity(blk.actId, who);
+  if (rAct && rAct.isRoutine) { toggleBlockDone(key, blockId); return; }
 
   blk.completed = true;
   markItemUpdated(blk); // stamp so the completion wins cross-device merges
@@ -316,7 +323,7 @@ function completeQuest(blockId, dayKey) {
   // pre-set xpAwarded here — that would skip the sticker counting (bug: quest
   // board taps never advanced the sticker shelf shown right on this screen).
   const result = awardBlockLinks(blk, key);
-  setDayBlocks(key, blocks);
+  setDayBlocks(key, blocks, who);
 
   showQuestCompletePopup(act, result);
   spawnQuestSparkles();
@@ -337,8 +344,8 @@ function completeQuest(blockId, dayKey) {
   // warm, low-pressure nudge (never nothing, so off days don't feel like failure).
   const restKid = isParent() ? parentViewing : activeProfile();
   setTimeout(()=>{
-    const scheduled = (getDayBlocks(key)||[]).filter(b => b && b.startMin!=null);
-    const remaining = scheduled.filter(b => !b.completed);
+    const scheduled = (getDayBlocks(key, who)||[]).filter(b => b && b.startMin!=null);
+    const remaining = scheduled.filter(b => !isBlockCompleted(b, who));
     if (isRestDay(key, restKid)) {
       showMissionClear({ emoji:'😌', title:'REST DAY', sub:'Resting is part of the plan — every bit you did still counts, and your streak stays safe. 💛' });
     } else if (remaining.length === 0) {
@@ -571,7 +578,7 @@ function undoLastCompletion() {
   if (!target) return;
   const blocks = getDayBlocks(target.dayKey) || [];
   const blk = blocks.find(b => b.id === target.blockId);
-  if (!blk || !blk.completed) return;
+  if (!blk || !isBlockCompleted(blk)) return;
   toggleBlockDone(target.dayKey, target.blockId);
 }
 
@@ -580,9 +587,31 @@ function undoLastCompletion() {
    on completion (unified with the quest board). */
 function toggleBlockDone(dayKey, blockId, ev) {
   if (ev) ev.stopPropagation();
-  const blocks = getDayBlocks(dayKey) || [];
+  const kid = isParent() ? parentViewing : activeProfile();
+  const blocks = getDayBlocks(dayKey, kid) || [];
   const blk = blocks.find(b => b.id === blockId);
   if (!blk) return;
+  /* A routine's Done control drives its CHECKLIST. It used to set `completed`
+     beside the checklist instead — two controls for one fact, and a child who
+     ticked every item still saw an empty box here. Closing the list is what the
+     chore tab's one-tap already did, so this is the same write, not a new one. */
+  const act = findActivity(blk.actId, kid);
+  if (act && act.isRoutine) {
+    const willComplete = !isRoutineCompleted(blk, kid);
+    const items = routineItemsFor(act.routineId, kid);
+    if (!items.length) { showToast('This routine has no steps yet'); return; }
+    if (!blk.checklistState) blk.checklistState = {};
+    items.forEach(i => { blk.checklistState[i.id] = willComplete; });
+    syncRoutineCompletion(blk, kid);
+    markItemUpdated(blk);
+    ctSyncMandatoryFromRoutine(act.routineId, kid, dayKey, willComplete);
+    let rmsg = '';
+    if (willComplete) rmsg = awardBlockLinks(blk, dayKey).msg;
+    setDayBlocks(dayKey, blocks, kid);
+    refreshAfterCompletion();
+    showToast(willComplete ? ('Routine complete! ✓' + rmsg) : 'Routine reopened');
+    return;
+  }
   blk.completed = !blk.completed;
   markItemUpdated(blk); // stamp so the completion wins cross-device merges
   const nowDone = blk.completed;
@@ -591,12 +620,21 @@ function toggleBlockDone(dayKey, blockId, ev) {
   else if (blk.actId === 'chores') {
     unclaimChoresFromBlock(blk, dayKey, isParent() ? parentViewing : activeProfile());
   }
-  setDayBlocks(dayKey, blocks);
-  const active = document.querySelector('.screen.active');
-  if (active && active.id === 'screen-week') renderWeek();
-  else if (active && active.id === 'screen-day') buildTimeline();
-  else if (active && active.id === 'screen-today') tdRenderToday();
+  setDayBlocks(dayKey, blocks, kid);
+  refreshAfterCompletion();
   showToast(nowDone ? ('Done! ✓' + extra) : 'Marked not done');
+}
+
+/* Redraw whichever screen the tick came from. Extracted because three callers
+   need it and one of them — confirmAllBlocksForChild — used to repaint only the
+   day timeline, so pressing it while looking at Today changed nothing at all. */
+function refreshAfterCompletion() {
+  const active = document.querySelector('.screen.active');
+  if (!active) return;
+  if (active.id === 'screen-week') renderWeek();
+  else if (active.id === 'screen-day') buildTimeline();
+  else if (active.id === 'screen-today') tdRenderToday();
+  else if (active.id === 'screen-chore' && typeof renderChoreTab === 'function') renderChoreTab();
 }
 
 function showQuestCompletePopup(act, result) {

@@ -52,6 +52,68 @@ const CAT_HEX = {
   competition:'#f4a340'
 };
 
+/* ── ONE owner for what KIND of thing a block is ──────────────────
+   Six groups, and the reason there is a table at all is that there used to be
+   five of them, drifting. `cat:'daily'` was labelled "🧹 Chores" by the meeting
+   and the parent trend chart and "🍽 Daily" by the week glance, the weekly wins
+   and the print sheet — while actually holding breakfast, lunch, dinner, the
+   house chore, four Family Hero tasks and two health tasks. So a week's hours
+   counted dinner as a chore on two screens and as something else on three.
+
+   `cat` still decides a block's COLOUR (CAT_HEX / blockColour) and still drives
+   the activity picker's filters. This answers a different question — what is
+   this time FOR — and it is the only thing the hours charts and the XP gate may
+   ask. Two questions, two tables, on purpose.
+
+   `short` exists because the week grid compresses a label into about seven
+   characters; "Brain Construction" cannot live there.
+
+   Brain and Body as a pair is deliberate: they name building something rather
+   than being good at something, which is the performance-identity framing the
+   copy rules forbid. */
+const ACTIVITY_GROUPS = [
+  { id: 'routine', label: '🌅 Routine',            short: 'Routine', hex: '#80cbc4' },
+  { id: 'brain',   label: '🧠 Brain Construction', short: 'Brain',   hex: '#6fb1fc' },
+  { id: 'body',    label: '💪 Body Construction',  short: 'Body',    hex: '#ef476f' },
+  { id: 'chores',  label: '🧹 Chores',             short: 'Chores',  hex: '#ffd166' },
+  { id: 'daily',   label: '🍽 Daily',              short: 'Daily',   hex: '#e8a87c' },
+  { id: 'free',    label: '🎮 Free',               short: 'Free',    hex: '#95d5b2' },
+];
+const GROUP_ORDER = ACTIVITY_GROUPS.map(g => g.id);
+function groupDef(id) { return ACTIVITY_GROUPS.find(g => g.id === id) || ACTIVITY_GROUPS[4]; }
+function groupLabel(id) { return groupDef(id).label; }
+function groupShort(id) { return groupDef(id).short; }
+function groupHex(id)   { return groupDef(id).hex; }
+
+/* Which group does this activity belong to?
+
+   An explicit `group:` on the activity wins, which is how the four Family Hero
+   quests become Chores — whoever did the chore is the hero, so they are chores
+   with an encouraging name rather than a separate kind of thing — and how a
+   parent's custom activity can be declared a chore. Everything else falls back
+   to `cat`.
+
+   An activity that cannot be resolved at all (a block naming an actId nothing
+   answers to, which findActivity's archived pass usually prevents) comes back
+   as `daily`: it is time spent on something the app can no longer name, and
+   Daily is the neutral "part of the day" bucket. It is never dropped, because
+   an hours total that silently omits blocks is worse than one that files them
+   vaguely. */
+function activityGroup(act) {
+  if (!act) return 'daily';
+  if (act.group && GROUP_ORDER.includes(act.group)) return act.group;
+  if (act.isRoutine) return 'routine';
+  if (act.isTraining || act.isCompetition) return 'body';
+  switch (act.cat) {
+    case 'training': case 'competition': return 'body';
+    case 'school':                       return 'brain';
+    case 'routine':                      return 'routine';
+    case 'daily': case 'appointment':    return 'daily';
+    case 'active': case 'free': case 'sleep': return 'free';
+    default:                             return 'daily';
+  }
+}
+
 /* ── One filter table ──
    The day screen's activity picker and the tray each carried their own copy of
    this list, and they had drifted: the picker was missing Seasonal, and neither
@@ -275,10 +337,10 @@ function getObjectivePresets(act, tag, isCompetition) {
 
 const REWARD_POOLS = {
   family: [
-    { id:'family_set_table', name:'Family Hero: Set the Table', icon:'🍽', cat:'daily', durationMin:20, suitableTime:['evening','weekend'] },
-    { id:'family_prep_bag', name:'Family Hero: Prep School Bag', icon:'🎒', cat:'daily', durationMin:15, suitableTime:['evening'] },
-    { id:'family_laundry_fold', name:'Home Champion: Fold Laundry', icon:'🧺', cat:'daily', durationMin:20, suitableTime:['weekend','evening'] },
-    { id:'family_kitchen_helper', name:'Kitchen Helper Quest', icon:'🥕', cat:'daily', durationMin:20, suitableTime:['evening','weekend'] },
+    { id:'family_set_table', name:'Family Hero: Set the Table', icon:'🍽', cat:'daily', group:'chores', durationMin:20, suitableTime:['evening','weekend'] },
+    { id:'family_prep_bag', name:'Family Hero: Prep School Bag', icon:'🎒', cat:'daily', group:'chores', durationMin:15, suitableTime:['evening'] },
+    { id:'family_laundry_fold', name:'Home Champion: Fold Laundry', icon:'🧺', cat:'daily', group:'chores', durationMin:20, suitableTime:['weekend','evening'] },
+    { id:'family_kitchen_helper', name:'Kitchen Helper Quest', icon:'🥕', cat:'daily', group:'chores', durationMin:20, suitableTime:['evening','weekend'] },
   ],
   academic: [
     { id:'acad_focus_sprint', name:'Focus Sprint', icon:'📘', cat:'school', durationMin:25, suitableTime:['after-school','evening'] },
@@ -288,7 +350,7 @@ const REWARD_POOLS = {
   health: [
     { id:'health_recovery_fuel', name:'Recovery Fuel', icon:'🍎', cat:'daily', durationMin:15, suitableTime:['after-school','evening'] },
     { id:'health_stretch_reset', name:'Stretch Reset', icon:'🤸', cat:'active', durationMin:15, suitableTime:['after-school','evening'] },
-    { id:'health_pack_tomorrow', name:'Tomorrow Ready', icon:'👜', cat:'daily', durationMin:15, suitableTime:['evening'] },
+    { id:'health_pack_tomorrow', name:'Tomorrow Ready', icon:'👜', cat:'daily', group:'routine', durationMin:15, suitableTime:['evening'] },
   ],
   culture: [
     { id:'culture_story_circle', name:'Culture Explorer Story', icon:'🏮', cat:'free', durationMin:25, suitableTime:['evening','weekend'] },
@@ -347,7 +409,7 @@ const DEFAULT_ACTIVITIES = [
   { id:'appt_school_meet', name:'School Meeting',  icon:'🧑‍🏫', cat:'appointment', durationMin:60, suitableTime:['after-school','school'] },
   { id:'break_quick', name:'Quick Break',     icon:'☕', cat:'free',     durationMin:15, suitableTime:['before-school','school','after-school','evening','weekend'], quickBreak:true },
   { id:'piano',      name:'Piano Practice',    icon:'🎹', cat:'school',   durationMin:60, suitableTime:['after-school','evening','weekend'] },
-  { id:'chores',     name:'House Chore',       icon:'🧹', cat:'daily',    durationMin:60, suitableTime:['after-school','evening','weekend'] },
+  { id:'chores',     name:'House Chore',       icon:'🧹', cat:'daily', group:'chores',    durationMin:60, suitableTime:['after-school','evening','weekend'] },
   { id:'family',     name:'Family Time',       icon:'👨‍👩‍👧‍👦', cat:'free', durationMin:120, suitableTime:['evening','weekend'], social:true },
   ...Object.values(REWARD_POOLS).flat().map(a => ({ ...a, rewardLocked: true })),
   // Routines

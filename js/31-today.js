@@ -463,7 +463,7 @@ function tdTimeCol(b) {
 function tdQuestCard(b, kid, isNext, clash) {
   const { icon, name: nm, block: blk } = tdBlockLabel(b, kid);
   const id = escapeAttr(b.id);
-  const done = !!b.completed;
+  const done = isBlockCompleted(b, kid);
   /* --conflict composes with --next rather than replacing it: the frame is an
      outline, the tier is border, shadow and fill, and the next block is still
      the next block whether or not its buffers fit. Dropping --next here would
@@ -504,7 +504,7 @@ function tdQuestHero(kid, blocks) {
   const tier = heroTierForLevel(level);
   const into = xp % QUEST_XP_PER_LEVEL;
   const pct = Math.round(into / QUEST_XP_PER_LEVEL * 100);
-  const done = blocks.filter(b => b.completed).length;
+  const done = blocks.filter(b => isBlockCompleted(b, kid)).length;
   return `<div class="dq-hero">
       <div class="dq-hero-avatar">${tier.emoji}</div>
       <div class="dq-hero-info">
@@ -555,7 +555,7 @@ function tdProgressRibbon(kid, blocks) {
   if (!total) return tdQuestHero(kid, blocks);
   const { current } = tdCurrentAndNext(kid);
   const now = tdNowMin();
-  const done = blocks.filter(b => b.completed).length;
+  const done = blocks.filter(b => isBlockCompleted(b, kid)).length;
   const { from, to } = tdRibbonSpan(blocks);
   const span = to - from;
   const pctOf = min => Math.max(0, Math.min(100, (min - from) / span * 100));
@@ -607,7 +607,7 @@ function tdProgressRibbon(kid, blocks) {
        Written out rather than built from a ternary: check-dead-css.js matches
        literal text, and a class it cannot see is a class that can quietly die. */
     let cls = 'td-rib-cell';
-    if (b.completed) cls = 'td-rib-cell td-rib-cell--done';
+    if (isBlockCompleted(b, kid)) cls = 'td-rib-cell td-rib-cell--done';
     else if (current && b.id === current.id) cls = 'td-rib-cell td-rib-cell--now';
     segs.push({
       cls,
