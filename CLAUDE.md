@@ -323,12 +323,23 @@ a 10pm block were clipped, and taps measured 2px off what was drawn
 (`getBoundingClientRect` reports the border box). The stacking context is what
 stops `.placed-block` (z10) painting over the sticky header and gutter.
 
-**One owner for the :00 / :30 grid.** `buildHourGrid` (`js/05-helpers.js`),
-appended **last** on all three surfaces so the marks read through a placed block —
-under them they say nothing the moment a day is actually planned. Takes no pointer
-events. The Day Blocks lane used to carry a decorative 24px `repeating-linear-gradient`
-which at 0.85px/min is neither an hour (51px) nor a half-hour (25.5px), and drifted
-out of step with its own gutter labels from the first hour onwards.
+**One owner for the :00 / :30 grid, drawn in two layers.** `buildHourGrid`
+(`js/05-helpers.js`) takes `layer: 'lines' | 'ticks'` and each surface appends
+both. **Half-hour rules go BEHIND the cards; hour marks and the now-line stay
+above.** It used to be one layer appended last so every mark read *through* a
+placed block, which is right on an empty morning and wrong the moment a day is
+planned — a full afternoon came out hatched with rules drawn over the top of the
+things they were meant to help you place. "Where is four o'clock" is still a
+question a card must not be able to hide, which is why the hour marks did not
+move. Both layers are appended after the blocks, so `.hour-grid--behind` earns
+its place with a z-index rather than DOM order — `theHourGridReadsThroughABlock`
+asserts each side separately, because a stacking value that silently stopped
+applying is exactly the failure that would otherwise look fine.
+
+Takes no pointer events. The Day Blocks lane used to carry a decorative 24px
+`repeating-linear-gradient` which at 0.85px/min is neither an hour (51px) nor a
+half-hour (25.5px), and drifted out of step with its own gutter labels from the
+first hour onwards.
 
 **The activity rail is gone.** Placement goes through the picker that opens where
 you tap (`openSlotPicker`) — the interaction that was already doing the work.
@@ -390,6 +401,164 @@ say which one they are.
   contrast fix, don't undo it.
 - Never white text on the pastel category colors (all fail contrast).
 - Use the app's `.sheet` / `appDialog` patterns, not native `confirm()`/`prompt()`.
+
+## One answer per question — `js/36-status.js`
+
+Six screens each worked out "is this done?" for themselves, and the copies had
+drifted far enough that a parent could not tell which one was lying. This file
+is the vocabulary now. **It owns no data**: every function reads through
+whichever accessor already owned that fact, and every write goes to the function
+that already owned that write. Ask it; do not re-derive it.
+
+| Question | Function |
+|---|---|
+| Did she perform it? | `isBlockCompleted(block, kid)` |
+| …and for a routine, which is its checklist? | `isRoutineCompleted(block, kid)` |
+| Did a grown-up verify it? | `isBlockConfirmed(block)` |
+| Did a parent review this child's day? | `isDayReviewed(kid, dayKey)` |
+| What does the family's share of the chores stand at? | `getFamilyChoreStatus(kid, weekKey)` |
+| How did the week's hours go? | `getWeeklyHours(kid, weekKey)` |
+| Did her money move as she decided? | `isChildMoneyCommitted(kid, weekKey)` |
+| Is the week closed? | `isWeekClosed(weekKey)` |
+
+It loads at `36`, last of the declaration files, because it calls into `01`–`35`
+at runtime and none of them at load time. `99-main.js` still owns every line of
+top-level executable code.
+
+**A routine's completion IS its checklist.** `block.completed` survives as a
+derived mirror — written on every checklist change, never decided beside it.
+Three defects used to compound here: `countChecklistDone` counted every `true`
+in `checklistState` while `countChecklistTotal` counted only current items, so
+one block read 4/3 on the day view and 3/3 on the chore tab; `getKidExtras` took
+no child and read the active profile, so the portal viewing Jenn measured her
+routine against Jess's items; and the day-level "kept" mark was sticky by design,
+so unticking could never take anything back. `routineItemsFor` is the one item
+list, counted by id, per child. `ctSyncMandatoryFromRoutine` sets **and clears**
+— but only clears a mark the app itself made, because a parent's tick in the
+meeting is her assertion and a child unticking must not overrule it.
+
+**Confirming is not completing, and neither is reviewing.** A parent may confirm
+an unfinished routine and it must not start reading as finished. `confirmAllBlocksForChild`
+marks blocks *completed and confirmed* for **one named child** — only blocks that
+have already started, so a nine o'clock press cannot mark the evening's swim
+done — and never touches `parentDayConfirm`. `markDayReviewedForChild` is the
+other fact and changes no completion. Reviewing a day is **per child**: the
+meeting's day rows carry a control each plus an explicit Both.
+
+**A scheduled chore is not a fulfilled one.** `required` / `planned` /
+`fulfilled` / `waiting` are four numbers, and only a positive parent grade is
+fulfilled. The kid surfaces measure `stillNeedsADay` and stay forward-voiced and
+current-week; the **review voice** (owed / fulfilled / unfulfilled) lives on the
+parent and meeting screens, where a past week's shortfall is always shown. No
+shortfall is carried into the next week.
+
+## Six activity groups — what the time is FOR
+
+`ACTIVITY_GROUPS` and `activityGroup(act)` in `js/01-config.js`. **Routine ·
+Brain Construction · Body Construction · Chores · Daily · Free**, each with a
+`short` form because the week grid compresses a label to about seven characters.
+
+`cat` still decides a block's **colour** (`CAT_HEX`, `blockColour`) and drives
+the picker's filters. This answers a different question, and it is the only one
+the hours charts and the XP gate may ask. Two questions, two tables.
+
+There were **six** copies of a label table before this, already disagreeing:
+`cat:'daily'` held breakfast, lunch, dinner, the house chore, four Family Hero
+tasks and two health tasks, and rendered as "🧹 Chores" on two screens and "🍽
+Daily" on three. Family Hero **is** a chore — whoever did the chore is the hero —
+so those carry an explicit `group:'chores'`. An activity nothing can resolve is
+filed under Daily, never dropped: an hours total that silently omits blocks is
+worse than one that files them vaguely.
+
+School lives inside Brain and is ~32 hours a week, so the Brain row **names how
+much of itself was the school day** — otherwise homework can never be seen to
+move. `getWeeklyHours` returns `schoolMin` for exactly that.
+
+**The charts say hours, on one scale.** `6h 30m completed / 8h planned`, scaled
+against a single maximum across both girls and every week shown. Each bar used to
+be normalised to its own kid's planned total, so two equal bars meant different
+amounts and no bar could be compared week to week. Labelled **"planned hours
+completed"** — the app records no elapsed time and must not imply it does.
+
+## XP: one ledger, one gate, calibrated
+
+`tools/xp-calibrate.js` replays the rules over synthetic quiet / ordinary /
+strong weeks and reports levels gained; `tests/xp.test.js` locks the values and
+re-runs it. **Change a number and re-run the tool** — the first set of values
+tried here levelled a child every half-week, and the tool is what said so.
+
+Every completed block used to earn a flat `QUEST_XP_PER_TASK` (20) against 100
+per level: five blocks was a level, an ordinary day was two, and a bowl of cereal
+was worth a swim session. There was no cap, and `mrCreditWeekXp` added the
+meeting's awards on top through a second path.
+
+Now: `xpCredit` (`js/06-quests.js`) is the **only** writer of the total, both
+paths go through it with a `weekKey`, and `XP_WEEKLY_CAP` (260) is one allowance
+they share. Work past the cap still happens and still counts — it just stops
+printing levels; a cap that silenced the work would be worse than none.
+`QUEST_XP_BY_GROUP` prices a block by group, and **Daily and Free earn nothing** —
+not a judgement about rest, but a statement that XP records effort.
+`mrXpLevelInfo` is the one level calculation; Today's hero and the parent portal
+each did their own and could disagree about the same child.
+
+**Nothing is migrated, deliberately.** Raising the threshold 100 → 400 would
+demote both girls, and a one-time rescale is unsafe here: `deepMergeObj` lets a
+remote **scalar** win, so a device still serving the old bundle out of a Pages
+cache could push an un-rescaled total over a rescaled one, or two devices could
+rescale the same figure twice. `progress.xp2` holds the new scale and, when it is
+absent, the answer is **derived** from the legacy `questXP` — the same answer
+whatever has run, however often, in any merge order.
+
+## The meeting
+
+**A return context, reused unchanged by Meeting V2.** `mmReturn` records
+`{ source, weekKey, step, child, selectedDay, scrollTop }` before the overlay
+closes. Both parent banners share `parentBannerBackButton()`, which reads "Back
+to weekly meeting" while one is waiting and "◀ Hub" otherwise. `applyMeetingLock`
+**hides the Hub link and both child switchers** while a sitting is open: three
+controls that each silently abandoned the meeting is worse than one that says
+where it goes.
+
+**A past week cannot plan forward.** `mmWeekPosition(wk)` decides what step 5
+offers. Current: close the week (`canCloseWeek` refuses until both girls' days
+are reviewed and both are settled) and open next week. Past: finish reviewing,
+return to the present — no copy. Future: cannot be reviewed or closed.
+`mmPlanNextWeek` is **gone**; it read whichever week the meeting pointed at and
+then did `weekOffset += 1`, so a six-week-old sitting wrote its plan over the
+following historical week. Copying belongs in the planner, beside the week it
+would land on.
+
+**One undo snapshot per week, taken by whichever commit comes first.**
+`mmTakeUndoSnapshot` ran once per child, so settling Jess overwrote the picture
+taken before Jenn; undo put Jess back, left Jenn's money moved, and printed
+"nothing was recorded". It is idempotent per week now, and the message says what
+actually happened.
+
+**Celebrate reads live sources only.** It counted chores through `ctGetOptional`
+— `optionalByWeek`, the retired chore-group store — so a week of real graded work
+was celebrated as zero, and it showed the preliminary money figure as though it
+had been recorded.
+
+**One scroller, both ends pinned.** `.mm-head` sticks to the top of the sheet and
+`.mm-nav` to the bottom, inside the sheet's own scroll area — nesting a second
+scroller would mean a flick on an iPad moves the wrong one.
+
+## Buffer defaults: you go to some things
+
+`travels: true` on an activity (`js/01-config.js`) makes travel **and** get-ready
+default **on** when a block is placed. Training, competition, the four `appt_*`
+and School Day carry it. Both sheets started every buffer off, so a swim was
+planned as though it happened at the kitchen table and `tdActionableStart` — the
+get-ready time Today leads with — had nothing to compute from until somebody
+remembered the toggle. The default comes from the **activity**, never globally:
+a global default would put a fifteen-minute car journey in front of Breakfast.
+
+## Writing a plan for this repo
+
+Problems and fixes in **plain language** — what is wrong, what it will do
+instead, which files. Not code, not line numbers. Mark what changed since the
+previous revision of the plan with a ```` ```diff ```` block so it carries a
+background colour and can be found at a glance. Keep the whole thing scannable.
 
 ## Naming
 
@@ -603,11 +772,20 @@ drew nothing school-related at all. The two vertical axes (the Full week's
 sideband, the print sheet's) describe seven days with one column, so they
 describe the week's **first school day** and say so plainly when a week has none.
 
-**School days are offered, never assumed.** A blank week inside
-`SCHOOL_FILL_HORIZON_WEEKS` (3) offers to add its school days on one confirm —
-one School Day block each, not the whole template. Past that horizon there is no
-offer: a term is 40-odd weeks, and materialising all of it would write hundreds
-of blocks into a document that uploads whole on every change.
+**School days are offered, never assumed — but offered whenever they are
+missing.** The band and the card are different things and neither replaces the
+other: the pale `🏫 School` band is a **time-zone**, business hours, and what
+makes the summer and winter breaks legible; the card is the plan. So the offer
+asks whether the school **card** is missing, not whether the day is empty. It
+used to ask the second, and only on a wholly blank week, so one breakfast on a
+Monday disqualified that Monday from ever getting its school card.
+
+`renderSchoolDayBanner` owns it, as its own banner beside the family-chores one,
+inside `SCHOOL_FILL_HORIZON_WEEKS` (3). One School Day block each on one
+confirm, not the whole template, and they arrive with **travel and get-ready on**
+(see the buffer defaults below). Past that horizon there is no offer: a term is
+40-odd weeks, and materialising all of it would write hundreds of blocks into a
+document that uploads whole on every change.
 
 **Importing** (`js/35-school-calendar.js`) reads a `.ics` file or URL. It is a
 hand-written parser because there is no build step and the CSP allows no
