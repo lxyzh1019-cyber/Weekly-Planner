@@ -158,6 +158,168 @@ function blockTierAtLeast(tier, min) {
   const order = BLOCK_TIERS.map(t => t.id);
   return order.indexOf(tier) >= order.indexOf(min);
 }
+
+/* ── What a repeat actually means ──
+   A repeat is MATERIALISED here, not stored as a rule and evaluated later:
+   placeBlock drops a real block on every day the series covers. That is the
+   shape the app already had, and changing it would mean every reader of a day —
+   the week grid, Today, print, the chore join, the merge layer — learning about
+   recurrence. So this function is the one place that answers "which days", and
+   the horizon is capped, because one press must not write a year of blocks into
+   a document that uploads whole on every change.
+
+   `anchorKey` is the day the block was placed on, and its Monday sets the PHASE
+   for "every N weeks" — so a fortnightly swim placed on a Tuesday recurs on the
+   Tuesdays of that week, that week + 2, and so on, whatever start date is
+   typed. Anchoring on the start date instead would let a start of "next Monday"
+   silently shift which weeks are on.
+
+   `startKey`/`endKey` bound it. With neither, the caller wants this week only
+   and does not come here. */
+const SERIES_MAX_WEEKS = 26;     // half a year: a term, not a lifetime
+const SERIES_MAX_BLOCKS = 120;   // a hard stop, whatever the dates say
+const SERIES_EVERY_CHOICES = [
+  [1, 'Every week'], [2, 'Every 2 weeks'], [3, 'Every 3 weeks'], [4, 'Every 4 weeks'],
+];
+
+function seriesEveryWeeks(n) {
+  const v = Math.round(Number(n) || 1);
+  return Math.max(1, Math.min(4, v));
+}
+
+function seriesDayKeys(spec) {
+  const days = [...new Set((spec.days || []).map(Number))]
+    .filter(i => Number.isInteger(i) && i >= 0 && i <= 6).sort((a, b) => a - b);
+  if (!days.length || !spec.anchorKey) return [];
+  const every = seriesEveryWeeks(spec.everyWeeks);
+  const anchorMon = ctMondayOf(formatDayKey(spec.anchorKey));
+  const start = spec.startKey ? formatDayKey(spec.startKey) : new Date(anchorMon);
+  let end = spec.endKey ? formatDayKey(spec.endKey) : null;
+  const cap = new Date(anchorMon);
+  cap.setDate(cap.getDate() + SERIES_MAX_WEEKS * 7 - 1);
+  if (!end || end > cap) end = cap;
+  if (end < start) return [];
+
+  /* Begin at the in-phase week at or before the start, so a start date earlier
+     than the day the block was placed on is still covered. Whole weeks across a
+     DST boundary differ by an hour, which the round absorbs. */
+  const startMon = ctMondayOf(start);
+  const wk = Math.round((startMon - anchorMon) / (7 * 24 * 3600 * 1000));
+  const first = new Date(anchorMon);
+  first.setDate(anchorMon.getDate() + Math.floor(wk / every) * every * 7);
+
+  const out = [];
+  for (let mon = new Date(first); mon <= end && out.length < SERIES_MAX_BLOCKS;
+       mon.setDate(mon.getDate() + 7 * every)) {
+    for (const i of days) {
+      const d = new Date(mon);
+      d.setDate(mon.getDate() + i);
+      if (d < start || d > end) continue;
+      if (out.length >= SERIES_MAX_BLOCKS) break;
+      out.push(dateToLocalKey(d));
+    }
+  }
+  return out;
+}
+
+/* What the repeat says, in words, for a block that carries one. The edit sheet
+   read back "part of a series of 12" and nothing else, so the one thing a
+   series is actually about — which days, how often, until when — was the one
+   thing it could not tell you. */
+function seriesSpecText(b) {
+  if (!b || !b.seriesId) return '';
+  const parts = [];
+  const days = (b.seriesDays || []).filter(i => i >= 0 && i <= 6);
+  if (days.length === 7) parts.push('every day');
+  else if (days.length) parts.push(days.map(i => DAY_LONG[i] + 's').join(', '));
+  const every = seriesEveryWeeks(b.seriesEvery);
+  if (every > 1) parts.push(`every ${every} weeks`);
+  if (b.seriesEnd) {
+    const d = formatDayKey(b.seriesEnd);
+    parts.push(`until ${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`);
+  }
+  return parts.join(', ');
+}
+
+/* First letter up, the rest left alone. Not title case: "50m freestyle kick"
+   becoming "50m Freestyle Kick" is a different string from the one that was
+   typed, and a name that starts with a digit has no first letter to raise.
+   Applied where a name is SAVED rather than where it is drawn, because the
+   value is stored and read back on half a dozen surfaces. */
+function capitaliseFirst(str) {
+  const s = String(str == null ? '' : str);
+  const i = s.search(/\S/);
+  if (i < 0) return s;
+  const c = s[i];
+  const up = c.toUpperCase();
+  return up === c ? s : s.slice(0, i) + up + s.slice(i + 1);
+}
+
+/* The zone labels, shortened for a vertical axis 18px wide. Two surfaces draw
+   that axis — the Full week's sideband and the print sheet's — and both need
+   the same short form, so it is written once. */
+const ZONE_SHORT = {
+  '🌅 Before school': '🌅 Before', '🏫 School': '🏫 School', '🥪 Lunch recess': '🥪 Lunch',
+  '🎒 After school': '🎒 After', '🌙 Evening': '🌙 Evening', '🎉 Free time': '🎉 Free',
+};
+
+/* Every activity id the destination child can actually resolve. Only consulted
+   for a CROSS-CHILD copy: a block naming an activity that is private to Jenn
+   renders as nothing at all on Jess's day, which is the same invisible failure
+   the archive rule exists to stop (CLAUDE.md, "History is a record"). Archived
+   entries count as resolvable for exactly that reason — findActivity sees them,
+   so a block that names one still draws.
+
+   Same-child copies are deliberately NOT filtered: her own blocks already
+   resolve however they resolve, and dropping one there would be a screen
+   quietly deciding a block was wrong. */
+function placeableActivityIds(kid) {
+  return new Set(getAllActivities(kid, { includeArchived: true }).map(a => a.id));
+}
+
+/* ── One owner for the :00 / :30 rules ──
+   Three surfaces draw a day against a clock — the day view, the week's Day
+   Blocks lanes and the Full week — at three different scales, and they each
+   drew their own grid or none at all. The Day Blocks lane drew a decorative
+   24px stripe, which at 0.85px/min is neither an hour (51px) nor a half-hour
+   (25.5px): it went out of phase with its own gutter labels at the first hour
+   and never came back.
+
+   The grid returned here is meant to be appended LAST, over the blocks. Under
+   them it says nothing the moment a day is actually planned — which is exactly
+   when a child needs to know where nine o'clock is. It takes no pointer events,
+   so nothing it covers becomes harder to tap.
+
+   `spanMin` is how much of the day the surface draws (DAY_MIN_SPAN everywhere
+   today) and `pxPerMin` its own scale. Half-hour rules are dropped below
+   `halfMin` px an hour, where they would sit on top of the hour rule. */
+function buildHourGrid(pxPerMin, spanMin, opts) {
+  const o = opts || {};
+  const grid = document.createElement('div');
+  grid.className = 'hour-grid' + (o.cls ? ' ' + o.cls : '');
+  const span = spanMin != null ? spanMin : DAY_MIN_SPAN;
+  const firstHour = Math.ceil(START_MIN / 60);
+  const lastHour = Math.floor((START_MIN + span) / 60);
+  const showHalf = o.halves !== false && 60 * pxPerMin >= (o.halfMin || 34);
+  for (let h = firstHour; h <= lastHour; h++) {
+    const rel = h * 60 - START_MIN;
+    if (rel >= 0 && rel <= span) {
+      const line = document.createElement('div');
+      line.className = 'hour-grid-line hour-grid-line--hour';
+      line.style.top = (rel * pxPerMin) + 'px';
+      grid.appendChild(line);
+    }
+    if (!showHalf) continue;
+    const half = rel + 30;
+    if (half > 0 && half < span) {
+      const line = document.createElement('div');
+      line.className = 'hour-grid-line hour-grid-line--half';
+      line.style.top = (half * pxPerMin) + 'px';
+      grid.appendChild(line);
+    }
+  }
+  return grid;
+}
 /* At most `max` badges, with the overflow folded into one chip. */
 function foldBadges(badges, max = 2) {
   const list = (badges || []).filter(Boolean);
@@ -323,9 +485,15 @@ function blockDisplayName(b, p=activeProfile(), dayKey) {
   const act = findActivity(b.actId, p) || {};
   const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
   const icon = topic ? topic.icon : (act.icon || '📌');
-  const name = topic
-    ? (act.isCompetition ? (topic.id === 'general' ? 'Competition' : topic.name + ' Comp.') : topic.name)
-    : (act.name || 'Something');
+  /* A competition that was given a name is called by it, everywhere — the day,
+     both week views, Today and print all come through here. Without this every
+     meet read "Skating Comp." and the one thing that told two of them apart
+     lived only in a note. */
+  const named = act.isCompetition && b && typeof b.compName === 'string' && b.compName.trim();
+  const name = named ? b.compName.trim()
+    : topic
+      ? (act.isCompetition ? (topic.id === 'general' ? 'Competition' : topic.name + ' Comp.') : topic.name)
+      : (act.name || 'Something');
   if (!dayKey) return { icon, name, n: 0, of: 1 };
   const key = blockGroupKey(b);
   const sameThing = (getDayBlocks(dayKey, p) || [])
@@ -536,19 +704,86 @@ function offerTutorialIfNeeded() {
    year this build was told about: the honest answer is that we no longer know,
    so callers fall back to weekday shape and the parent gets told to update it
    rather than the app quietly inventing a calendar. */
+/* ── The school year, as the family actually has it ──
+   js/01-config.js ships a calendar because a calendar is the same on every
+   device and the repo can carry dates safely. What it could never carry is a
+   family's own answer: which hours, when lunch is, and the days a district adds
+   or drops after August. Those live in state.shared.schoolCal, set in the
+   parent portal, and every question about school goes through these three so
+   there is one place that decides whether the shipped value or the set one wins.
+
+   Synced state, never committed: the repo stays dates-only, and the portal says
+   so where a parent types. */
+function schoolCal() {
+  return (typeof state === 'object' && state && state.shared && state.shared.schoolCal) || {};
+}
+
+/* Minutes are offsets from START_MIN (6AM), the unit every block uses.
+   lunchMin of 0 means the family has not told us there is a recess, which is
+   the shipped calendar's position too — it never had one. */
+function schoolHours() {
+  const h = schoolCal().hours || {};
+  const num = (v, fallback) => (typeof v === 'number' && isFinite(v) ? v : fallback);
+  const startMin = Math.max(0, Math.min(DAY_MIN_SPAN, num(h.startMin, SCHOOL_HOURS.startMin)));
+  const endMin = Math.max(startMin, Math.min(DAY_MIN_SPAN, num(h.endMin, SCHOOL_HOURS.endMin)));
+  const lunchMin = Math.max(0, Math.min(180, num(h.lunchMin, 0)));
+  let lunchStartMin = num(h.lunchStartMin, null);
+  // A recess outside the school day is not a recess; drop it rather than
+  // drawing a band hanging off the end of the afternoon.
+  if (lunchMin <= 0 || lunchStartMin == null
+      || lunchStartMin < startMin || lunchStartMin + lunchMin > endMin) {
+    lunchStartMin = null;
+  }
+  const days = Array.isArray(h.days) && h.days.length ? h.days : SCHOOL_HOURS.days;
+  return { startMin, endMin, lunchStartMin, lunchMin: lunchStartMin == null ? 0 : lunchMin, days };
+}
+
+function schoolTerm() {
+  const c = schoolCal();
+  return {
+    start: c.termStart || SCHOOL_TERM.start,
+    end: c.termEnd || SCHOOL_TERM.end,
+    nextStart: c.nextStart || SCHOOL_TERM.nextStart,
+  };
+}
+
+/* Days off: the shipped list plus anything the family added, minus nothing —
+   removing a shipped statutory holiday is not something a district does. */
+function schoolOffDays() {
+  const extra = (schoolCal().offDays || []).map(d => (d && d.date) || d).filter(Boolean);
+  return extra.length ? [...new Set([...NO_SCHOOL_DAYS, ...extra])] : NO_SCHOOL_DAYS;
+}
+
 function schoolDayInfo(dayKey) {
   const d = formatDayKey(dayKey);
   const dow = d.getDay();
-  const isWeekday = SCHOOL_HOURS.days.includes(dow);
-  if (dayKey > SCHOOL_TERM.nextStart) {
+  // Through the accessors, so a term a parent has typed in — or a day off an
+  // .ics brought — is the answer everything downstream gets.
+  const term = schoolTerm();
+  const isWeekday = schoolHours().days.includes(dow);
+  if (dayKey > term.nextStart) {
     return { school: isWeekday, reason: isWeekday ? null : 'weekend', stale: true };
   }
   if (!isWeekday) return { school: false, reason: 'weekend' };
-  if (dayKey < SCHOOL_TERM.start || dayKey > SCHOOL_TERM.end) {
+  if (dayKey < term.start || dayKey > term.end) {
     return { school: false, reason: 'summer' };
   }
-  if (NO_SCHOOL_DAYS.includes(dayKey)) return { school: false, reason: 'holiday' };
+  if (schoolOffDays().includes(dayKey)) return { school: false, reason: 'holiday' };
   return { school: true, reason: null };
+}
+
+/* HH:MM for an <input type="time">, and back. Minutes are from START_MIN, so a
+   parent typing 08:00 gets 120 and never has to know that. */
+function relMinToTimeStr(rel) {
+  const abs = Math.max(0, Math.min(24 * 60 - 1, START_MIN + (Number(rel) || 0)));
+  return `${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`;
+}
+function timeStrToRelMin(str) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(str || '').trim());
+  if (!m) return null;
+  const abs = (+m[1]) * 60 + (+m[2]);
+  if (abs < START_MIN || abs > START_MIN + DAY_MIN_SPAN) return null;
+  return abs - START_MIN;
 }
 function isSchoolDay(dayKey) { return schoolDayInfo(dayKey).school; }
 /* True once the shipped calendar has run out — a parent-facing prompt, not a

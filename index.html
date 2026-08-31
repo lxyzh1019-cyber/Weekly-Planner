@@ -638,6 +638,11 @@
     <h3 class="parent-h3">🕓 Pending approval</h3>
     <p class="parent-hint">New activities the girls added themselves. Approve, edit, or remove.</p>
     <div id="pendingApprovalList"></div>
+    <!-- Exercises typed into a training session go the same way an activity
+         does: usable straight away, and here for a grown-up to keep or drop. -->
+    <h3 class="parent-h3">🏋️ New exercises</h3>
+    <p class="parent-hint">Drills the girls added to a training session. Approving keeps it in their shared library.</p>
+    <div id="pendingTaskList"></div>
     <h3 class="parent-h3">🎨 All activities</h3>
     <p class="parent-hint">All custom activities — yours and the girls'. Tap 🔗 to share with both, or 🔗 again to make it private to one child.</p>
     <div id="parentActivitiesList"></div>
@@ -749,6 +754,14 @@
     <div class="sheet-handle"></div>
     <h3 id="trainingSheetTitle">🏋️ Competitive Sports Session</h3>
 
+    <!-- Competitions only. Without it every meet on every screen read "Skating
+         Comp." and the one thing that tells them apart lived nowhere. -->
+    <div id="trainingCompNameRow" style="display:none">
+      <h4>WHICH COMPETITION</h4>
+      <input type="text" id="trainingCompName" maxlength="40"
+        placeholder="e.g. Winter Invitational" aria-label="Competition name">
+    </div>
+
     <h4>START TIME</h4>
     <div id="trainingStartPicker"></div>
 
@@ -819,7 +832,9 @@
         <input type="date" id="trainingDateStart" aria-label="Repeat start date">
         <label>through</label>
         <input type="date" id="trainingDateEnd" aria-label="Repeat end date">
-        <p class="hint">Leave empty to repeat only this week.</p>
+        <label for="trainingRepeatEvery">How often</label>
+        <select id="trainingRepeatEvery" class="repeat-every" aria-label="How often the repeat comes round"></select>
+        <p class="hint">Leave the dates empty to repeat only this week.</p>
       </div>
     </div>
 
@@ -896,7 +911,9 @@
         <input type="date" id="activityDateStart" aria-label="Repeat start date">
         <label>through</label>
         <input type="date" id="activityDateEnd" aria-label="Repeat end date">
-        <p class="hint">Leave empty to repeat only this week.</p>
+        <label for="activityRepeatEvery">How often</label>
+        <select id="activityRepeatEvery" class="repeat-every" aria-label="How often the repeat comes round"></select>
+        <p class="hint">Leave the dates empty to repeat only this week.</p>
       </div>
     </div>
     <div class="sheet-action-row">
@@ -1015,6 +1032,15 @@
 
     <!-- Series membership: only shown when this block is part of a multi-block series -->
     <div id="seriesWrap" style="display:none">
+      <!-- What the repeat actually says, and the one thing about it you can
+           change from here. Moving the last day adds or removes real blocks:
+           the repeat is materialised, so a date nobody acts on is decoration. -->
+      <p class="series-spec" id="seriesSpec"></p>
+      <div class="series-until" id="seriesUntilRow" hidden>
+        <label for="seriesUntilInput">Last day</label>
+        <input type="date" id="seriesUntilInput" aria-label="Last day of this repeat">
+        <button type="button" class="pill-btn" onclick="applySeriesUntil()">Update</button>
+      </div>
       <button class="pill-btn" style="width:100%" onclick="detachFromSeries()">✂️ Detach from series</button>
       <p style="font-size:0.75rem;color:var(--ink-light);margin-top:0.3rem">Future edits or deletes won't affect the rest of the series.</p>
     </div>
@@ -1093,11 +1119,14 @@
     <p style="font-size:0.9rem;color:var(--ink-light);margin-bottom:0.8rem">This replaces your current plan for this day.</p>
     <button class="pill-btn" style="width:100%;margin-bottom:0.5rem;font-size:1rem" onclick="applyTemplate('school')">🏫 School Day</button>
     <button class="pill-btn" style="width:100%;font-size:1rem" onclick="applyTemplate('weekend')">🌈 Weekend</button>
-    <!-- Copy another day of the same week onto this one. A week rarely has
+    <!-- Copy a day you have already planned onto this one. A week rarely has
          seven different shapes: two Tuesdays that look alike were two Tuesdays
          built by hand. Rows are built by renderCopyDayList so they can carry
-         each day's real block count. -->
+         each day's real block count, and the two toggles above them choose
+         which week to take from and — a parent only — whose day it lands on. -->
     <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">Or copy a day you have already planned.</p>
+    <div class="copy-day-tabs" id="copyDayWeekTabs" role="group" aria-label="Which week to copy from"></div>
+    <div class="copy-day-tabs" id="copyDayKidTabs" role="group" aria-label="Whose day to copy onto" hidden></div>
     <div id="copyDayList" class="copy-day-list"></div>
     <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">Taking today off? Rest days keep your streak safe.</p>
     <button class="pill-btn" style="width:100%;font-size:1rem" id="restDayBtn" onclick="toggleRestDay(currentDayKey)" aria-label="Mark rest day" title="Mark today a rest day">😌 Rest</button>
@@ -1426,6 +1455,7 @@
 <script src="js/32-parent-now.js"></script>
 <script src="js/33-parent-app.js"></script>
 <script src="js/34-parent-copyweek.js"></script>
+<script src="js/35-school-calendar.js"></script>
 <script src="js/99-main.js"></script>
 </body>
 </html>

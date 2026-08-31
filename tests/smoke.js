@@ -201,11 +201,12 @@ function findChromium() {
   checks.schoolCalendarIsRight = await page.evaluate(() => {
     const bad = [];
     const iso = (d) => d.toISOString().slice(0, 10);
-    // Template and band cannot disagree: both come from SCHOOL_HOURS.
-    const tpl = SCHOOL_TEMPLATE.find(b => b.actId === 'school_day');
-    if (!tpl || tpl.startMin !== SCHOOL_HOURS.startMin
-             || tpl.durationMin !== SCHOOL_HOURS.endMin - SCHOOL_HOURS.startMin)
-      bad.push('SCHOOL_TEMPLATE no longer derives from SCHOOL_HOURS');
+    // Template and band cannot disagree: both come from schoolHours(), which is
+    // a function precisely so a parent's setting reaches both.
+    const tpl = schoolTemplate().find(b => b.actId === 'school_day');
+    if (!tpl || tpl.startMin !== schoolHours().startMin
+             || tpl.durationMin !== schoolHours().endMin - schoolHours().startMin)
+      bad.push('the school-day template no longer derives from schoolHours()');
 
     // No weekend should ever appear in the holiday list — weekends are already
     // covered by SCHOOL_HOURS.days, and one there means a mistyped date.
@@ -273,17 +274,356 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* THE WEEK TWIN of dayBandsFollowTheCalendar. The day view has been
+     calendar-driven for a long time; the two week layouts and the print sheet
+     were not. Day Blocks — the layout the week actually opens on — showed
+     nothing school-related at all, so a school day and a Sunday were the same
+     white lane. Full week and print each carried their own hardcoded 9am–3pm
+     bands chosen by `dow === 0 || dow === 6`, so they disagreed with the rest of
+     the app by an hour AND drew "🏫 School" on Christmas Day, on a PD day, and
+     on every day of July. */
+  checks.everyWeekViewFollowsTheSchoolCalendar = await page.evaluate(() => {
+    const bad = [];
+    const wasOffset = weekOffset, wasView = weekView;
+    const startPx = (el) => parseFloat(el.style.top) || 0;
+
+    // A week inside the term, and a week that is nothing but holiday.
+    const termWeek = (() => {
+      for (let w = -20; w <= 40; w++) if (getDayKeys(w).some(k => isSchoolDay(k))) return w;
+      return null;
+    })();
+    if (termWeek == null) { bad.push('no week in range has a school day'); return bad; }
+
+    weekOffset = termWeek;
+    const keys = getDayKeys(termWeek);
+    const schoolKey = keys.find(k => isSchoolDay(k));
+    const idx = keys.indexOf(schoolKey);
+    const offKey = keys.find(k => !isSchoolDay(k));
+    const offIdx = keys.indexOf(offKey);
+    const wantStart = dayZoneSegments(schoolKey).find(b => b.label === '🏫 School').start;
+
+    // Day Blocks — the default layout.
+    goWeek(); setWeekView('timegrid'); renderWeek();
+    const lanes = document.querySelectorAll('.tg2-lane');
+    const schoolBand = lanes[idx] && lanes[idx].querySelector('.wf-band-school');
+    if (!schoolBand) bad.push('Day Blocks draws no school band on a term school day');
+    if (offIdx >= 0 && lanes[offIdx] && lanes[offIdx].querySelector('.wf-band-school')) {
+      bad.push('Day Blocks draws a school band on a day the calendar says is not school');
+    }
+
+    // Full week.
+    setWeekView('full'); renderWeek();
+    const cols = document.querySelectorAll('.wf-day-col');
+    const wfBand = cols[idx] && cols[idx].querySelector('.wf-band-school');
+    if (!wfBand) bad.push('the Full week draws no school band on a term school day');
+    if (offIdx >= 0 && cols[offIdx] && cols[offIdx].querySelector('.wf-band-school')) {
+      bad.push('the Full week draws a school band on a day that is not school');
+    }
+    /* The hour, not just the presence of a band: 9am-vs-8am is exactly the
+       disagreement this replaced, and a band drawn at the wrong time still
+       looks like a band. */
+    if (wfBand) {
+      const gotMin = Math.round(startPx(wfBand) / 0.72);
+      if (Math.abs(gotMin - wantStart) > 1) {
+        bad.push(`the Full week starts school at minute ${gotMin}, the calendar says ${wantStart}`);
+      }
+    }
+
+    // Print.
+    openPrint();
+    const printLabels = [...document.querySelectorAll('.print-band-label')].map(e => e.textContent);
+    if (!printLabels.some(t => /School/.test(t))) bad.push('the print sheet lost its school band');
+    goWeek();
+
+    /* And a week with no school in it anywhere — the July case. Nothing may
+       claim school on any of the three. */
+    const summerWeek = (() => {
+      for (let w = 0; w <= 60; w++) if (getDayKeys(w).every(k => !isSchoolDay(k))) return w;
+      return null;
+    })();
+    if (summerWeek != null) {
+      weekOffset = summerWeek;
+      setWeekView('timegrid'); renderWeek();
+      if (document.querySelector('.tg2-lane .wf-band-school')) {
+        bad.push('Day Blocks draws school in a week with no school in it');
+      }
+      setWeekView('full'); renderWeek();
+      if (document.querySelector('.wf-day-col .wf-band-school')) {
+        bad.push('the Full week draws school in a week with no school in it');
+      }
+      if (document.querySelector('.wf-sideband .wf-band-school')) {
+        bad.push('the axis describes a school day in a week that has none');
+      }
+    }
+
+    weekOffset = wasOffset; setWeekView(wasView); renderWeek();
+    return bad.length === 0 || bad;
+  });
+
+  /* SCHOOL HOURS ARE THE PARENT'S TO SET. They were a const in js/01-config.js,
+     which meant a district's bell times could only be corrected by editing the
+     source — and the shipped calendar never knew about lunch recess at all.
+     SCHOOL_TEMPLATE had to become schoolTemplate() for this: a const evaluated
+     at load can only ever see the shipped fallback. */
+  checks.schoolHoursAreTheParentsToSet = await page.evaluate(() => {
+    const bad = [];
+    const before = state.shared.schoolCal;
+    const shipped = schoolHours();
+    if (shipped.startMin !== SCHOOL_HOURS.startMin) bad.push('with nothing set, the shipped hours are not used');
+
+    state.shared.schoolCal = { hours: { startMin: 150, endMin: 555, lunchStartMin: 330, lunchMin: 45 } };
+    const h = schoolHours();
+    if (h.startMin !== 150 || h.endMin !== 555) bad.push("the parent's hours are not what the app reads");
+    const tpl = schoolTemplate().find(t => t.actId === 'school_day');
+    if (!tpl || tpl.startMin !== 150 || tpl.durationMin !== 405) {
+      bad.push('the School Day template did not follow the hours');
+    }
+    const termKey = (() => {
+      for (let w = -20; w <= 40; w++) { const k = getDayKeys(w).find(isSchoolDay); if (k) return k; }
+      return null;
+    })();
+    const segs = dayZoneSegments(termKey);
+    const lunch = segs.find(b => b.label === '🥪 Lunch recess');
+    if (!lunch) bad.push('a lunch recess was set and no band drew it');
+    else if (lunch.start !== 330 || lunch.end !== 375) bad.push('the lunch band is not where it was set');
+    if (segs.filter(b => b.label === '🏫 School').length !== 2) {
+      bad.push('lunch does not split the school day in two');
+    }
+
+    // A recess that does not fit inside the day is dropped, not drawn hanging
+    // off the end of the afternoon.
+    state.shared.schoolCal = { hours: { startMin: 150, endMin: 555, lunchStartMin: 540, lunchMin: 45 } };
+    if (schoolHours().lunchMin !== 0) bad.push('a lunch recess running past home time was kept');
+
+    // Term dates too.
+    state.shared.schoolCal = { termStart: '2030-01-07', termEnd: '2030-06-20', nextStart: '2030-08-26' };
+    if (schoolTerm().start !== '2030-01-07') bad.push("the parent's term start is not what the app reads");
+    if (isSchoolDay('2026-09-08')) bad.push('a date outside the set term still counts as school');
+
+    // And clearing it returns to the shipped calendar rather than a frozen copy,
+    // so next August's replacement reaches the family with nothing to press.
+    delete state.shared.schoolCal;
+    if (schoolHours().startMin !== SCHOOL_HOURS.startMin) bad.push('clearing the override did not restore the shipped hours');
+    if (schoolTerm().start !== SCHOOL_TERM.start) bad.push('clearing the override did not restore the shipped term');
+
+    state.shared.schoolCal = before;
+    return bad.length === 0 || bad;
+  });
+
+  /* AN IMPORTED CALENDAR CHANGES NOTHING UNTIL IT IS REVIEWED. A file that
+     silently marked twelve days as no-school is how a family comes to believe a
+     term is set up when it is wrong, so every date the parser produces goes
+     into a preview with a tick beside it — the same discipline pcwPlan keeps
+     for copying a week.
+
+     The fixture carries the cases that actually bite: a folded SUMMARY line, an
+     escaped comma, an all-day span whose DTEND is exclusive, a fortnightly
+     RRULE, an RRULE this deliberately does not understand, and a statutory
+     holiday whose name contains none of the day-off keywords. */
+  checks.anIcsFileBecomesDaysOffOnlyAfterReview = await page.evaluate(() => {
+    const bad = [];
+    const wasCal = state.shared.schoolCal;
+    const wasProfile = profile, wasViewing = parentViewing;
+    const ics = [
+      'BEGIN:VCALENDAR', 'VERSION:2.0',
+      'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20260831', 'SUMMARY:First Day of School', 'END:VEVENT',
+      'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20261221', 'DTEND;VALUE=DATE:20261225', 'SUMMARY:Winter Break', 'END:VEVENT',
+      'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20261225', 'DTEND;VALUE=DATE:20261226', 'SUMMARY:Christmas Day', 'END:VEVENT',
+      'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20261015', 'SUMMARY:Picture Day', 'END:VEVENT',
+      'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20260918', 'SUMMARY:Staff Professional Develop', ' ment Day', 'END:VEVENT',
+      'BEGIN:VEVENT', 'DTSTART;VALUE=DATE:20270625', 'SUMMARY:Last Day of School', 'END:VEVENT',
+      'BEGIN:VEVENT', 'DTSTART:20260908T160000', 'DTEND:20260908T170000', 'SUMMARY:Physio\\, left knee',
+        'RRULE:FREQ=WEEKLY;BYDAY=TU;INTERVAL=2;COUNT=3', 'END:VEVENT',
+      'BEGIN:VEVENT', 'DTSTART:20261001T090000', 'SUMMARY:Monthly thing', 'RRULE:FREQ=MONTHLY;COUNT=4', 'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+
+    state.shared.schoolCal = {};
+    const d = scBuildDraft(ics, 'test');
+
+    // Parsing writes nothing.
+    if (Object.keys(state.shared.schoolCal).length) bad.push('parsing the file changed the calendar');
+
+    const off = d.offDays.map(o => o.date);
+    // Winter Break's DTEND is exclusive: 21st through 24th, not the 25th.
+    ['2026-12-21', '2026-12-22', '2026-12-23', '2026-12-24'].forEach(k => {
+      if (!off.includes(k)) bad.push(`the all-day span dropped ${k}`);
+    });
+    const brk = d.offDays.filter(o => o.label === 'Winter Break');
+    if (brk.length !== 4) bad.push(`the break expanded to ${brk.length} days, expected 4`);
+    // A folded line is one summary, not two.
+    if (!d.offDays.some(o => o.label === 'Staff Professional Development Day')) {
+      bad.push('a folded SUMMARY was not rejoined');
+    }
+    /* Every all-day entry is listed, ticked or not: a keyword list cannot be
+       complete, and "Christmas Day" contains none of the words. */
+    if (!off.includes('2026-12-25')) bad.push('Christmas Day was not even offered');
+    if (!off.includes('2026-10-15')) bad.push('an all-day entry that is not a day off was hidden rather than shown unticked');
+    const tick = (date) => (d.offDays.find(o => o.date === date) || {}).on;
+    if (!tick('2026-12-25')) bad.push('Christmas Day arrived unticked');
+    if (!tick('2026-09-18')) bad.push('a staff day arrived unticked');
+    if (tick('2026-10-15')) bad.push('Picture Day arrived ticked — that is a school day');
+
+    // Term dates are proposed from the file's own naming, and NOT taken by default.
+    if (d.termStart !== '2026-08-31' || d.termEnd !== '2027-06-25') {
+      bad.push(`term read as ${d.termStart}..${d.termEnd}`);
+    }
+    if (d.takeTerm) bad.push('the term dates were ticked by default — that is a year-long guess');
+
+    // Timed events: a fortnightly Tuesday, three times, with the escape undone.
+    const phys = d.timed.filter(e => e.summary === 'Physio, left knee');
+    if (phys.length !== 3) bad.push(`the fortnightly rule expanded to ${phys.length}, expected 3`);
+    if (phys[0] && phys[0].startMin !== 16 * 60) bad.push('a timed event lost its start time');
+    if (phys[0] && phys[0].durationMin !== 60) bad.push('a timed event lost its length');
+    if (phys[1] && phys[1].dayKey !== '2026-09-22') bad.push(`INTERVAL=2 landed on ${phys[1].dayKey}`);
+    // And a rule it does not understand is counted, not half-applied.
+    if (d.skipped !== 1) bad.push(`${d.skipped} events reported skipped, expected the 1 monthly rule`);
+    if (d.timed.some(e => e.summary === 'Monthly thing')) bad.push('a rule it cannot read was expanded anyway');
+
+    // Committing takes the ticked rows only.
+    profile = 'parent'; parentViewing = 'jenn';
+    scDraft = d;
+    d.offDays.forEach(o => { o.on = (o.date === '2026-12-25'); });
+    scCommitSchool();
+    const saved = (state.shared.schoolCal.offDays || []).map(x => x.date);
+    if (saved.join(',') !== '2026-12-25') bad.push(`committed ${saved.length} days, expected only the ticked one`);
+    if (state.shared.schoolCal.termStart) bad.push('an unticked term was written anyway');
+    if (!isSchoolDay('2026-10-15')) bad.push('an unticked day off took effect');
+
+    // Timed events land as blocks on the chosen child, once.
+    const restore = [];
+    ['2026-09-08', '2026-09-22', '2026-10-06'].forEach(k => {
+      restore.push([k, getDayBlocksForProfile(k, 'jenn')]);
+      setDayBlocks(k, [], 'jenn');
+    });
+    scDraft = scBuildDraft(ics, 'test');
+    scBlockKid = 'jenn'; scBlockActId = 'piano';
+    scCommitBlocks();
+    const landed = getDayBlocksForProfile('2026-09-08', 'jenn') || [];
+    if (landed.length !== 1) bad.push(`${landed.length} blocks landed on the first physio day`);
+    else {
+      if (landed[0].actId !== 'piano') bad.push('the block is not the chosen activity');
+      if (landed[0].startMin !== 16 * 60) bad.push('the block did not take the event time');
+      if (!/Physio/.test(landed[0].note || '')) bad.push('the block lost what the event was called');
+    }
+    // Importing the same file twice must not double it up.
+    scDraft = scBuildDraft(ics, 'test');
+    scCommitBlocks();
+    if ((getDayBlocksForProfile('2026-09-08', 'jenn') || []).length !== 1) {
+      bad.push('a second import of the same calendar doubled the appointment');
+    }
+
+    restore.forEach(([k, b]) => setDayBlocks(k, b, 'jenn'));
+    scDraft = null;
+    state.shared.schoolCal = wasCal;
+    profile = wasProfile; parentViewing = wasViewing;
+    return bad.length === 0 || bad;
+  });
+
+  /* SCHOOL DAYS ARE OFFERED, NOT ASSUMED. The calendar knows which days of a
+     week are school days; what it must not do is quietly fill them in, because
+     a week that arrived pre-planned is a week nobody decided. And only near the
+     front: a term is 40-odd weeks, and materialising all of it would write
+     hundreds of blocks into a document that uploads whole on every change, to
+     describe a Tuesday in May nobody is planning yet. */
+  checks.aBlankWeekOffersItsSchoolDays = await page.evaluate(async () => {
+    const bad = [];
+    const wasOffset = weekOffset, wasProfile = profile;
+    profile = 'jenn';
+    // The first week in the horizon that has school days in it.
+    let wk = null;
+    for (let w = 0; w < SCHOOL_FILL_HORIZON_WEEKS; w++) {
+      if (getDayKeys(w).some(k => isSchoolDay(k))) { wk = w; break; }
+    }
+    if (wk == null) { bad.push('no week inside the horizon has a school day'); return bad; }
+    const keys = getDayKeys(wk);
+    const restore = keys.map(k => [k, getDayBlocks(k, 'jenn')]);
+    keys.forEach(k => setDayBlocks(k, [], 'jenn'));
+    const schoolKeys = keys.filter(k => isSchoolDay(k));
+
+    weekOffset = wk;
+    goWeek(); renderWeek();
+    const tip = (document.getElementById('weekCoachTip') || {}).textContent || '';
+    if (!new RegExp(`Add ${schoolKeys.length} school day`).test(tip)) {
+      bad.push(`a blank term week does not offer its ${schoolKeys.length} school days: "${tip.slice(0, 120)}"`);
+    }
+
+    // Nothing is written until it is confirmed.
+    const p1 = addSchoolDaysToWeek(keys[0]);
+    await new Promise(r => setTimeout(r, 30));
+    const cancel = document.querySelector('.app-dialog-cancel');
+    if (!cancel) bad.push('adding school days was not confirmed first');
+    else cancel.click();
+    await p1;
+    if (keys.some(k => (getDayBlocks(k, 'jenn') || []).length)) {
+      bad.push('declining the offer still wrote blocks');
+    }
+
+    const p2 = addSchoolDaysToWeek(keys[0]);
+    await new Promise(r => setTimeout(r, 30));
+    const ok = document.getElementById('appDialogOkBtn');
+    if (ok) ok.click();
+    await p2;
+    const got = keys.filter(k => (getDayBlocks(k, 'jenn') || []).length);
+    if (got.join(',') !== schoolKeys.join(',')) {
+      bad.push(`blocks landed on ${got.length} days, the calendar names ${schoolKeys.length}`);
+    }
+    const h = schoolHours();
+    const b = (getDayBlocks(schoolKeys[0], 'jenn') || [])[0] || {};
+    if (b.actId !== 'school_day') bad.push('what landed is not a School Day block');
+    if (b.startMin !== START_MIN + h.startMin) bad.push('the School Day does not start when school does');
+    if (b.durationMin !== h.endMin - h.startMin) bad.push('the School Day is not as long as school');
+    if (b.confirmed) bad.push('an offered School Day arrived pre-confirmed');
+
+    // A day that already holds a plan is left alone.
+    keys.forEach(k => setDayBlocks(k, [], 'jenn'));
+    setDayBlocks(schoolKeys[0], [{ id: 'sd-keep', actId: 'piano', startMin: 600, durationMin: 60 }], 'jenn');
+    const offer = schoolDaysToOffer(keys, 'jenn');
+    if (offer.includes(schoolKeys[0])) bad.push('a day that already has a plan was offered anyway');
+
+    // And a week months out is not offered at all.
+    if (schoolOfferInHorizon(getDayKeys(SCHOOL_FILL_HORIZON_WEEKS + 6))) {
+      bad.push('a week months away is still offered its school days');
+    }
+
+    restore.forEach(([k, blocks]) => setDayBlocks(k, blocks, 'jenn'));
+    weekOffset = wasOffset; profile = wasProfile;
+    goWeek(); renderWeek();
+    return bad.length === 0 || bad;
+  });
+
   /* Weekly view: Y-axis sideband + hour lines + slot tint bands. These belong to
      the Full layout, which is no longer the one the week opens on — Day Blocks
      is. So select it first rather than assuming: the alternate layout still has
      to work, and an assertion that silently measured whichever view happened to
      be default would stop testing anything the day the default moved. */
+  /* The sideband is one axis describing seven days, so what matters is that it
+     describes a real one. It used to be four hardcoded stretches with school at
+     9am–3pm — an hour later than the rest of the app — drawn on every week of
+     the year. Counting segments is what let that stand: it asserted 4 and got 4,
+     on Christmas week as readily as on a term Tuesday. */
   checks.weekSideband = await page.evaluate(() => {
+    const bad = [];
     setWeekView('full');
-    return document.querySelectorAll('.wf-sideband-seg').length === 4;
+    const keys = getDayKeys(weekOffset);
+    const axisKey = keys.find(k => isSchoolDay(k)) || null;
+    const want = axisKey
+      ? dayZoneSegments(axisKey)
+      : [{ start: 0, end: DAY_MIN_SPAN, label: '🎉 Free time' }];
+    const segs = [...document.querySelectorAll('.wf-sideband-seg')];
+    if (segs.length !== want.length) {
+      bad.push(`the axis draws ${segs.length} stretches for a day that has ${want.length}`);
+    } else {
+      want.forEach((w, i) => {
+        if ((segs[i].title || '') !== w.label) {
+          bad.push(`axis stretch ${i} says "${segs[i].title}", the day says "${w.label}"`);
+        }
+      });
+    }
+    return bad.length === 0 || bad;
   });
   checks.weekHourLines = await page.evaluate(() =>
-    document.querySelectorAll('.wf-hour-line').length > 0);
+    document.querySelectorAll('.wf-day-col .hour-grid-line--hour').length > 0);
   // Day Blocks renders once selected.
   checks.dayBlocksRenders = await page.evaluate(() => {
     setWeekView('timegrid');
@@ -394,6 +734,60 @@ function findChromium() {
     // Down means down, and it reached the page rather than dying in the grid.
     if (afterDown <= 0) bad.push(`moving the cursor down scrolled to ${afterDown}, expected the page to move down`);
 
+    doc.scrollTop = 0;
+
+    /* THE DAY SCREEN, which is where this was reported broken. The workspace is
+       the scroller there, so a middle-drag must move IT and leave the document —
+       and the topbar with it — exactly where it was. That is the whole of the
+       bug: #screen-day was unbounded, the workspace could not scroll, and
+       panLeftover handed the entire gesture to the page.
+
+       Driven from a block as well as from open canvas, because the block's own
+       pointerdown handlers used to stopPropagation unconditionally, so a drag
+       that began two pixels inside a card did nothing at all. */
+    // The Saturday the suite seeded a training block on, so the gear rows and
+    // the training chip — the elements that used to swallow the press — exist.
+    openDay(getDayKeys(0)[5], 5);
+    const ws = document.querySelector('#screen-day .day-workspace');
+    if (!ws) { bad.push('no day workspace to pan'); return bad; }
+    if (ws.scrollHeight <= ws.clientHeight + 4) bad.push('the day workspace does not scroll, so nothing can pan it');
+    ws.setPointerCapture = ws.setPointerCapture || (() => {});
+    ws.releasePointerCapture = ws.releasePointerCapture || (() => {});
+    /* pointerId 1, like the week drag above: Chrome treats the primary mouse
+       pointer as active, so setPointerCapture inside the handler resolves
+       instead of throwing an uncaught NotFoundError on a synthetic id. */
+    const sendOn = (target, type, x, y, button) => target.dispatchEvent(new PointerEvent(type, {
+      bubbles: true, cancelable: true, pointerId: 1, button, buttons: button === 1 ? 4 : 0,
+      clientX: x, clientY: y,
+    }));
+
+    const from = (target, label) => {
+      ws.scrollTop = 0;
+      doc.scrollTop = 0;
+      const r = ws.getBoundingClientRect();
+      const x = r.left + r.width / 2;
+      // Cursor moves DOWN, which is the direction the browser's own autoscroll
+      // would take — the first version of attachMiddleDragPan had it inverted.
+      sendOn(target, 'pointerdown', x, r.top + 180, 1);
+      sendOn(target, 'pointermove', x, r.top + 320, 1);
+      sendOn(target, 'pointerup',   x, r.top + 320, 1);
+      if (ws.scrollTop <= 0) bad.push(`a middle-drag ${label} did not move the schedule`);
+      if (doc.scrollTop > 1) bad.push(`a middle-drag ${label} scrolled the page instead of the schedule`);
+      ws.scrollTop = 0;
+    };
+    from(ws, 'on open canvas');
+    /* Specifically an element that stops pointerdown, not just any block:
+       .block-gear-item and .block-train-chip called stopPropagation
+       unconditionally, so a drag beginning two pixels inside a card did nothing
+       while the same drag on open canvas panned the day. Asserted rather than
+       skipped — falling back to a plain .placed-block would let this coverage
+       lapse the moment the fixture changed. */
+    const chip = document.querySelector('#timeline .block-train-chip')
+              || document.querySelector('#timeline .block-gear-item');
+    if (!chip) bad.push('no training chip or gear row on the seeded day — this case is untested');
+    else from(chip, 'starting on a block');
+
+    ws.scrollTop = 0;
     doc.scrollTop = 0;
     return bad.length === 0 || bad;
   });
@@ -715,6 +1109,138 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* The hour ladder must name the line it sits beside. It did not: .tl-col-head
+     lived inside .tl-col and pushed .tl-canvas down, while .tl-gutter — a
+     sibling of the whole column stack — started at the top of the header. At 2
+     and 3 days every label read 46px, about 33 minutes, above its own line, and
+     1 day was 2px out from the canvas border. One day has no header, which is
+     why nobody saw it. Measured at every column count, because that is the
+     variable that broke it. */
+  checks.theHourLadderLinesUpWithTheSchedule = await page.evaluate(() => {
+    const bad = [];
+    const spanBefore = dayViewSpan();
+    const keys = getDayKeys(0);
+    [1, 2, 3].forEach(span => {
+      setDayViewSpan(span);
+      openDay(keys[0], 0);
+      const cols = document.querySelectorAll('#timeline .tl-col').length;
+      if (cols !== span) { bad.push(`asked for ${span} columns, got ${cols}`); return; }
+      const label = [...document.querySelectorAll('#timeline .tl-hour-label')]
+        .find(l => l.textContent.trim() === '9am');
+      const canvas = document.querySelector('#timeline .tl-canvas');
+      // 9am is (9*60 - START_MIN) * PX_PER_MIN from the top of the day.
+      const wantTop = (9 * 60 - START_MIN) * PX_PER_MIN;
+      const line = [...canvas.querySelectorAll('.hour-grid-line--hour')]
+        .find(l => Math.abs(parseFloat(l.style.top) - wantTop) < 0.5);
+      if (!label) { bad.push(`no 9am label at ${span} day(s)`); return; }
+      if (!line) { bad.push(`no 9am rule at ${span} day(s)`); return; }
+      const lr = label.getBoundingClientRect(), pr = line.getBoundingClientRect();
+      const off = (lr.top + lr.height / 2) - (pr.top + pr.height / 2);
+      if (Math.abs(off) > 1) {
+        bad.push(`at ${span} day(s) the 9am label is ${off.toFixed(1)}px from its own rule`);
+      }
+    });
+    setDayViewSpan(spanBefore);
+    return bad.length === 0 || bad;
+  });
+
+  /* The schedule is the only thing that moves. #screen-day carried min-height
+     rather than a height, so the flex column grew to the 1344px schedule and
+     the DOCUMENT scrolled instead — 832px of it. The wheel hid that
+     (overscroll-behavior: contain), but middle-drag hands its leftover to the
+     page on purpose, so the one input that reached the document was the middle
+     button, and it carried the topbar off screen. dayScreenScrollsAsOneSurface
+     cannot see this: it only walks INSIDE #screen-day. */
+  checks.onlyTheScheduleScrollsOnTheDayScreen = await page.evaluate(() => {
+    const bad = [];
+    openDay(getDayKeys(0)[0], 0);
+    const ws = document.querySelector('#screen-day .day-workspace');
+    const doc = document.scrollingElement;
+    if (!(ws.scrollHeight > ws.clientHeight + 4)) {
+      bad.push('the workspace does not scroll, so nothing does');
+    }
+    const overflow = doc.scrollHeight - window.innerHeight;
+    if (overflow > 4) bad.push(`the document itself has ${overflow}px of scroll`);
+    const topbar = document.querySelector('#screen-day .day-topbar');
+    const before = topbar.getBoundingClientRect().top;
+    ws.scrollTop = 0;
+    ws.scrollTop = 300;
+    if (ws.scrollTop < 250) bad.push('the workspace refused to scroll');
+    const moved = topbar.getBoundingClientRect().top - before;
+    if (Math.abs(moved) > 1) bad.push(`the topbar moved ${moved.toFixed(1)}px with the schedule`);
+    ws.scrollTop = 0;
+    return bad.length === 0 || bad;
+  });
+
+  /* :00 and :30 survive a block being placed over them. Every surface drew its
+     rules BEFORE the blocks, so the grid said nothing the moment a day was
+     actually planned — and the Day Blocks lane drew a 24px repeating gradient
+     that, at 0.85px/min, was neither an hour (51px) nor a half-hour (25.5px).
+     Checked by stacking order rather than by eye: the grid must out-rank the
+     block it crosses, and take no pointer events while doing it. */
+  checks.theHourGridReadsThroughABlock = await page.evaluate(() => {
+    const bad = [];
+    const zOf = (el) => {
+      for (let n = el; n && n !== document.body; n = n.parentElement) {
+        const z = getComputedStyle(n).zIndex;
+        if (z !== 'auto') return parseInt(z, 10);
+      }
+      return 0;
+    };
+    const crosses = (line, block) => {
+      const a = line.getBoundingClientRect(), b = block.getBoundingClientRect();
+      return a.top >= b.top - 1 && a.top <= b.bottom + 1 && a.right > b.left && a.left < b.right;
+    };
+    const keys = getDayKeys(0);
+    const before = getDayBlocks(keys[0], 'jenn');
+    setDayBlocks(keys[0], [{ id: 'grid-probe', actId: 'school_day',
+      startMin: 9 * 60, durationMin: 180, checklistState: {} }], 'jenn');
+
+    const surface = (name, root, gridSel, blockSel) => {
+      const grid = root && root.querySelector(gridSel);
+      const block = root && root.querySelector(blockSel);
+      if (!grid) { bad.push(`${name}: no hour grid`); return; }
+      if (!block) { bad.push(`${name}: nothing placed to read through`); return; }
+      const hours = [...grid.querySelectorAll('.hour-grid-line--hour')];
+      const halves = [...grid.querySelectorAll('.hour-grid-line--half')];
+      if (hours.length < 17) bad.push(`${name}: ${hours.length} hour rules, expected the whole day`);
+      if (!halves.length) bad.push(`${name}: no half-hour rules`);
+      if (!hours.some(h => crosses(h, block))) bad.push(`${name}: no hour rule crosses the block`);
+      if (zOf(grid) <= zOf(block)) {
+        bad.push(`${name}: the grid (z${zOf(grid)}) is under the block (z${zOf(block)})`);
+      }
+      if (!(block.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+        bad.push(`${name}: the grid is drawn before the block`);
+      }
+      if (getComputedStyle(grid).pointerEvents !== 'none') {
+        bad.push(`${name}: the grid takes pointer events and would swallow taps`);
+      }
+    };
+
+    setDayViewSpan(1);
+    openDay(keys[0], 0);
+    surface('day view', document.querySelector('#timeline .tl-canvas'),
+            '.hour-grid--day', '.placed-block');
+    goWeek();
+    setWeekView('timegrid'); renderWeek();
+    surface('Day Blocks week', document.querySelector('.tg2-lane'),
+            '.hour-grid--tg2', '.tg2-block');
+    setWeekView('full'); renderWeek();
+    surface('Full week', document.querySelector('.wf-day-col'),
+            '.hour-grid--wf', '.wf-card');
+
+    // 6am and 10pm both get a rule: the gutter used < / > and the line loop
+    // <= / >=, so the two ends were labelled but never drawn.
+    const tops = [...document.querySelector('.wf-day-col')
+      .querySelectorAll('.hour-grid-line--hour')].map(l => Math.round(parseFloat(l.style.top)));
+    if (!tops.includes(0)) bad.push('the Full week labels 6am but draws no rule for it');
+
+    setWeekView('timegrid');
+    setDayBlocks(keys[0], before, 'jenn');
+    openDay(keys[0], 0);
+    return bad.length === 0 || bad;
+  });
+
   /* Three columns on a phone is confetti, not a plan. The preference is kept —
      a narrow viewport serves fewer without forgetting what was chosen. */
   await page.setViewportSize({ width: 390, height: 844 });
@@ -745,7 +1271,7 @@ function findChromium() {
     setDayBlocks(src, [{ id: 'cd-src', actId: 'piano', startMin: 600, durationMin: 60,
                          completed: true, confirmed: true, xpAwarded: true, checklistState: { a: true } }], 'jenn');
     setDayBlocks(dst, [{ id: 'cd-old', actId: 'breakfast', startMin: 480, durationMin: 30 }], 'jenn');
-    const n = copyDayInto(src, dst, 'jenn');
+    const n = copyDayInto(src, dst, 'jenn').copied;
     const got = getDayBlocks(dst, 'jenn');
     if (n !== 1) bad.push(`copied ${n} blocks, expected 1`);
     if (got.length !== 1) bad.push(`destination holds ${got.length} blocks, expected 1`);
@@ -1069,8 +1595,15 @@ function findChromium() {
   await page.waitForTimeout(400);
   checks.printBuffers = await page.evaluate(() =>
     document.querySelectorAll('.print-buffer').length >= 4);
-  checks.printSideband = await page.evaluate(() =>
-    document.querySelectorAll('.print-band-label').length === 4);
+  // Same for the printed axis, and for the same reason — it carried its own
+  // copy of the 9am–3pm constants.
+  checks.printSideband = await page.evaluate(() => {
+    const keys = getDayKeys(weekOffset);
+    const axisKey = keys.find(k => isSchoolDay(k)) || null;
+    const want = axisKey ? dayZoneSegments(axisKey).length : 1;
+    const got = document.querySelectorAll('.print-band-label').length;
+    return got === want || [`the printed axis draws ${got} stretches for a day that has ${want}`];
+  });
   await page.screenshot({ path: shot('print'), fullPage: true });
 
   // Series removal survives a stale remote merge
@@ -1084,6 +1617,245 @@ function findChromium() {
     mergeRemoteState({ profiles: { jenn: { weeks: {
       [keys[1]]: [{ id:'ghost', actId:'piano', startMin:960, durationMin:60, seriesId:sid }] } } } });
     return countSeriesBlocks(sid) === 0;
+  });
+
+  /* A REPEAT REMEMBERS WHAT IT IS. The days, the frequency and the two dates
+     were read off the form, used once to decide where blocks went, and dropped
+     — so nothing afterwards could say what the repeat was, and the date inputs
+     were shown to a parent only (and on the activity sheet, only for the school
+     category). Runs in a far-future week so it cannot disturb the seeded one. */
+  checks.aSeriesRemembersItsDatesAndFrequency = await page.evaluate(() => {
+    const bad = [];
+    const wasDay = currentDayKey, wasOffset = weekOffset, wasProfile = profile;
+    profile = 'jenn';
+    const plus = (key, n) => { const d = formatDayKey(key); d.setDate(d.getDate() + n); return dateToLocalKey(d); };
+    const touched = [];
+    for (let w = 10; w <= 17; w++) getDayKeys(w).forEach(k => { touched.push(k); setDayBlocks(k, [], 'jenn'); });
+
+    const tue = getDayKeys(10)[1];
+    currentDayKey = tue; weekOffset = 10;
+    placeBlock('training', 17 * 60, 60, null, [], '', {
+      tag: 'swimming', repeatDays: [1, 3], repeatEvery: 2,
+      repeatDateStart: tue, repeatDateEnd: plus(tue, 28),
+    });
+
+    // Tuesday and Thursday, every second week, stopping at the end date.
+    const want = [tue, plus(tue, 2), plus(tue, 14), plus(tue, 16), plus(tue, 28)].sort();
+    const got = [];
+    for (let w = 10; w <= 17; w++) getDayKeys(w).forEach(k => {
+      if ((getDayBlocks(k, 'jenn') || []).some(b => b.seriesId)) got.push(k);
+    });
+    got.sort();
+    if (got.join(',') !== want.join(',')) {
+      bad.push(`every-2-weeks landed on ${got.join(', ')}, expected ${want.join(', ')}`);
+    }
+
+    const b0 = (getDayBlocks(tue, 'jenn') || [])[0] || {};
+    if ((b0.seriesDays || []).join(',') !== '1,3') bad.push(`the block forgot its days (${b0.seriesDays})`);
+    if (b0.seriesEvery !== 2) bad.push(`the block forgot its frequency (${b0.seriesEvery})`);
+    if (b0.seriesStart !== tue) bad.push('the block forgot its start date');
+    if (b0.seriesEnd !== plus(tue, 28)) bad.push('the block forgot its end date');
+    const spec = seriesSpecText(b0);
+    if (!/Tuesdays/.test(spec) || !/every 2 weeks/.test(spec) || !/until/.test(spec)) {
+      bad.push(`the repeat does not read back: "${spec}"`);
+    }
+
+    // Moving the last day moves real blocks, in both directions.
+    const shrink = seriesExtendTo(b0.seriesId, plus(tue, 16));
+    if (shrink.removed !== 1) bad.push(`pulling the end back removed ${shrink.removed}, expected 1`);
+    if (countSeriesBlocks(b0.seriesId) !== 4) bad.push('the series did not shrink');
+    const grow = seriesExtendTo(b0.seriesId, plus(tue, 42));
+    if (grow.added !== 3) bad.push(`pushing the end out added ${grow.added}, expected 3`);
+    if (countSeriesBlocks(b0.seriesId) !== 7) bad.push('the series did not grow');
+
+    // A day already lived is a record, not a line in a plan: it is kept.
+    const late = getDayBlocks(plus(tue, 42), 'jenn');
+    if (late[0]) { late[0].confirmed = true; setDayBlocks(plus(tue, 42), late, 'jenn'); }
+    const keep = seriesExtendTo(b0.seriesId, plus(tue, 16));
+    if (keep.kept !== 1) bad.push(`${keep.kept} confirmed days kept, expected 1`);
+    if (!(getDayBlocks(plus(tue, 42), 'jenn') || []).length) {
+      bad.push('a confirmed day was deleted by shortening the repeat');
+    }
+
+    // The span control is not a parent's alone any more.
+    profile = 'jenn';
+    openDay(getDayKeys(0)[0], 0);
+    startPlacingActivity('piano');
+    const range = document.getElementById('activityDateRange');
+    if (range && range.style.display === 'none') {
+      bad.push('a child placing a block is not offered a start and end date');
+    }
+    const every = document.getElementById('activityRepeatEvery');
+    if (!every || !every.options.length) bad.push('there is no way to say how often the repeat comes round');
+    cancelCreatePlacement('activityOverlay');
+
+    touched.forEach(k => setDayBlocks(k, [], 'jenn'));
+    currentDayKey = wasDay; weekOffset = wasOffset; profile = wasProfile;
+    return bad.length === 0 || bad;
+  });
+
+  /* A COMPETITION IS CALLED WHAT IT IS CALLED. The block's label was derived
+     from the sport tag, so every meet on every screen read "Skating Comp." and
+     the one thing that told two of them apart lived only in a note. Checked on
+     every surface, because three of them wrote their own answer rather than
+     asking blockDisplayName — which is exactly how the Full week and the print
+     sheet came to disagree with the day view. */
+  checks.aCompetitionCanCarryItsOwnName = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile, wasDay = currentDayKey;
+    profile = 'jenn';
+    const key = getDayKeys(0)[5];
+    const before = getDayBlocks(key, 'jenn');
+    const hostile = 'Winter <img src=x onerror=alert(1)> Invitational';
+    setDayBlocks(key, [{ id: 'comp-1', actId: 'competition', startMin: 9 * 60, durationMin: 240,
+      tag: 'skating', compName: hostile, checklistState: {} }], 'jenn');
+    const b = getDayBlocks(key, 'jenn')[0];
+
+    if (blockDisplayName(b, 'jenn').name !== hostile) {
+      bad.push(`blockDisplayName says "${blockDisplayName(b, 'jenn').name}", not the name it was given`);
+    }
+    /* Escaping is what puts the angle brackets into textContent, so finding
+       them there proves nothing either way — the assertion that means something
+       is that no <img> element was ever built. */
+    const sawIt = (where, text) => {
+      if (!text.includes('Winter')) bad.push(`${where} does not use the competition's name`);
+    };
+    // Day view.
+    currentDayKey = key;
+    openDay(key, 5);
+    sawIt('the day view', document.getElementById('timeline').textContent || '');
+    if (document.querySelector('#timeline img')) bad.push('the day view built an element out of the name');
+    // Full week.
+    goWeek(); setWeekView('full'); renderWeek();
+    sawIt('the Full week', document.getElementById('weeklyFullGrid').textContent || '');
+    if (document.querySelector('#weeklyFullGrid img')) bad.push('the Full week built an element out of the name');
+    // Print.
+    openPrint();
+    sawIt('the print sheet', (document.getElementById('screen-print') || {}).textContent || '');
+    if (document.querySelector('#screen-print img')) bad.push('the print sheet built an element out of the name');
+    goWeek();
+    setWeekView('timegrid');
+
+    /* And the meeting reads it from the planner rather than asking for it to be
+       typed a second time. Two records of one afternoon kept in agreement by
+       hand is how they come to disagree. */
+    const wk = getDayKeys(0)[0];
+    const planned = mmPlannedCompetitions(wk, 'jenn');
+    if (!planned.length) bad.push('the meeting cannot see the competition on the plan');
+    else {
+      if (planned[0].name !== hostile) bad.push('the meeting reads the wrong name off the plan');
+      if (planned[0].sport !== 'skate') bad.push(`the meeting read the sport as ${planned[0].sport}`);
+      if (planned[0].dayKey !== key) bad.push('the meeting read the wrong day');
+    }
+    const seeded = mmSeedCompDraft(wk, 'jenn');
+    if (seeded.name !== hostile) bad.push('the competition form does not prefill from the plan');
+    if (seeded.dayKey !== key) bad.push('the competition form prefills the wrong day');
+
+    // With nothing planned it is the empty form it always was.
+    setDayBlocks(key, [], 'jenn');
+    const empty = mmSeedCompDraft(wk, 'jenn');
+    if (empty.name !== '') bad.push('an unplanned week does not get an empty name to type into');
+
+    setDayBlocks(key, before, 'jenn');
+    profile = wasProfile; currentDayKey = wasDay;
+    return bad.length === 0 || bad;
+  });
+
+  /* A NEW EXERCISE WAITS FOR A GROWN-UP. state.shared.customTasks is the girls'
+     drill library, and anything either of them typed went straight into it with
+     nothing to tell a parent it had happened — while a new ACTIVITY had had an
+     approval queue all along. She can still use it in the session she typed it
+     for; what changed is that a parent gets to keep or drop it. */
+  checks.aNewExerciseWaitsForAGrownUp = await page.evaluate(async () => {
+    const bad = [];
+    const wasProfile = profile, wasViewing = parentViewing;
+    const before = (state.shared.customTasks || []).slice();
+    state.shared.customTasks = [];
+
+    profile = 'jenn';
+    customTaskContext = 'training';
+    ts = { durationMin: 60, colour: '#888', tag: 'swimming', objectives: [], note: '', compName: '',
+           repeat: false, repeatDays: [], travelBuffer: false, getReadyBuffer: false,
+           warmupBuffer: false, gearState: {}, travelBufMin: 15, getReadyBufMin: 15, warmupBufMin: 20 };
+    const hostile = '50m <b>Free</b>style';
+    document.getElementById('taskName').value = hostile;
+    document.getElementById('taskSport').value = 'swimming';
+    document.getElementById('taskReps').value = 'x4';
+    document.getElementById('taskNotes').value = '';
+    confirmCustomTask();
+
+    const t = (state.shared.customTasks || [])[0];
+    if (!t) { bad.push('the exercise was not saved at all'); }
+    else {
+      if (!t.pendingApproval) bad.push("a child's new exercise did not go to a grown-up");
+      if (t.addedBy !== 'jenn') bad.push(`the exercise records addedBy=${t.addedBy}`);
+    }
+
+    /* First letter up, on the way in. Typed in a hurry on a phone it comes out
+       "backstroke drill", and it is then the label on every session that uses
+       it. Not title case, and a name starting with a digit is left alone —
+       "50m freestyle" must not become "50m Freestyle". */
+    const cap = (typed) => {
+      document.getElementById('taskName').value = typed;
+      document.getElementById('taskReps').value = '';
+      confirmCustomTask();
+      const last = (state.shared.customTasks || []).slice(-1)[0] || {};
+      return last.name;
+    };
+    const got = cap('backstroke drill');
+    if (got !== 'Backstroke drill') bad.push(`"backstroke drill" saved as "${got}"`);
+    const digits = cap('50m freestyle kick');
+    if (digits !== '50m freestyle kick') bad.push(`a name starting with a digit was changed to "${digits}"`);
+    const already = cap('Dryland circuit');
+    if (already !== 'Dryland circuit') bad.push(`an already-capitalised name became "${already}"`);
+    state.shared.customTasks = state.shared.customTasks.slice(0, 1);
+
+    // She can tick it now — the point of not making her wait.
+    renderTrainingSheet();
+    const list = document.getElementById('objectivesList');
+    const txt = (list || {}).textContent || '';
+    if (!txt.includes('50m')) bad.push('the exercise she just typed is not offered in this session');
+    if (!/waiting/i.test(txt)) bad.push('nothing says the exercise is waiting for a grown-up');
+    if (list && list.querySelector('b')) bad.push('the exercise name was rendered as markup');
+
+    // The parent sees it, and Now counts it.
+    profile = 'parent'; parentViewing = 'jenn';
+    if (pendingApprovalTasks().length !== 1) bad.push('the parent queue does not hold the new exercise');
+    showScreen('parent'); renderParentHome(); setParentTab('tasks');
+    const q = (document.getElementById('pendingTaskList') || {}).textContent || '';
+    if (!q.includes('50m')) bad.push('the approval list does not show the exercise');
+    if (document.querySelector('#pendingTaskList b')) bad.push('the approval list rendered the name as markup');
+    pnRenderNow();
+    if (!/exercise/i.test((document.getElementById('pnWrap') || {}).textContent || '')) {
+      bad.push('Now does not mention an exercise waiting');
+    }
+
+    // Approving keeps it; the queue empties.
+    approveKidTask(t.id);
+    if (t.pendingApproval) bad.push('approving did not clear the flag');
+    if (pendingApprovalTasks().length) bad.push('the queue still holds an approved exercise');
+
+    // Rejecting archives rather than deletes, and it leaves the picker.
+    t.pendingApproval = true;
+    const p = rejectKidTask(t.id);
+    await new Promise(r => setTimeout(r, 30));
+    const ok = document.getElementById('appDialogOkBtn');
+    if (!ok) bad.push('rejecting an exercise was not confirmed first');
+    else ok.click();
+    await p;
+    const still = (state.shared.customTasks || []).find(x => x.id === t.id);
+    if (!still) bad.push('rejecting deleted the record instead of archiving it');
+    else if (!still.archived) bad.push('a rejected exercise was not archived');
+    profile = 'jenn';
+    renderTrainingSheet();
+    if (((document.getElementById('objectivesList') || {}).textContent || '').includes('50m')) {
+      bad.push('a rejected exercise is still offered in the picker');
+    }
+
+    state.shared.customTasks = before;
+    profile = wasProfile; parentViewing = wasViewing;
+    showScreen('today');
+    return bad.length === 0 || bad;
   });
 
   // ── Redesign phase 3: the parent's chore tab, in the portal ──
@@ -5008,6 +5780,134 @@ function findChromium() {
     pcwFromOffset = -1; pcwToOffset = 0; pcwOnClash = 'skip'; pcwTargetKid = 'same';
     profile = wasProfile; parentScope = wasScope; parentViewing = wasViewing;
     setParentTab('now');
+    return bad.length === 0 || bad;
+  });
+
+  /* A COPY IS A NEW PLAN. weekCloneBlock carried seriesId through, and every
+     consequence was invisible until it bit: countSeriesBlocks scans every week
+     of the profile, so editing a copied block offered "update all" and rewrote
+     the weeks it was copied FROM, and "remove all in series" tombstoned
+     'sr:'+seriesId in state.shared.tombstones — which is shared, not
+     per-profile, so via blockTombstoned the same delete could drop the sister's
+     cross-copied blocks on the next merge. Also checks the shallow-copy half:
+     Object.assign shared the objectives array and the gear/check objects by
+     reference until the next reload. */
+  checks.aCopiedPlanIsNotPartOfTheOriginalsSeries = await page.evaluate(() => {
+    const bad = [];
+    const keys = getDayKeys(0);
+    const [src, dst] = [keys[0], keys[3]];
+    const beforeSrc = getDayBlocks(src, 'jenn'), beforeDst = getDayBlocks(dst, 'jenn');
+    const beforeJess = getDayBlocks(dst, 'jess');
+    const sid = 'sr-copytest';
+    setDayBlocks(src, [{ id: 'sr-1', actId: 'training', startMin: 600, durationMin: 60,
+      tag: 'skating', seriesId: sid, objectives: ['one'],
+      gearState: { 'gear-skating-0': true }, trainingCheck: { ready: true },
+      stopwatch: { enabled: true, running: true, elapsedSec: 900, startedAt: 123 } }], 'jenn');
+    setDayBlocks(dst, [], 'jenn');
+
+    const inSeriesBefore = countSeriesBlocks(sid);
+    copyDayInto(src, dst, 'jenn');
+    const copy = (getDayBlocks(dst, 'jenn') || [])[0];
+    if (!copy) { bad.push('nothing was copied'); }
+    else {
+      if (copy.seriesId) bad.push(`the copy joined the original's series (${copy.seriesId})`);
+      if (Object.keys(copy.gearState || {}).length) bad.push('the copy arrived with the gear already ticked');
+      if (Object.keys(copy.trainingCheck || {}).length) bad.push('the copy arrived with the training checks already ticked');
+      if ((copy.stopwatch || {}).elapsedSec) bad.push("the copy carried the original's stopwatch minutes");
+      if ((copy.stopwatch || {}).running) bad.push('the copy arrived with a running stopwatch');
+      // Deep, not shared: pushing to one must not reach the other.
+      copy.objectives.push('two');
+      const source = (getDayBlocks(src, 'jenn') || [])[0] || {};
+      if ((source.objectives || []).length !== 1) {
+        bad.push('the copy and the original share one objectives array');
+      }
+      if (source.objectives === copy.objectives) bad.push('the objectives array is the same object');
+    }
+    if (countSeriesBlocks(sid) !== inSeriesBefore) {
+      bad.push(`copying changed the size of the original series (${inSeriesBefore} → ${countSeriesBlocks(sid)})`);
+    }
+
+    /* And the sister: a cross-child copy that carried the series would let a
+       later "remove all in series" tombstone reach across profiles. */
+    setDayBlocks(dst, [], 'jess');
+    copyDayInto(src, dst, 'jenn', 'jess');
+    const hers = (getDayBlocks(dst, 'jess') || [])[0];
+    if (hers && hers.seriesId) bad.push("the sister's copy joined Jenn's series");
+
+    setDayBlocks(src, beforeSrc, 'jenn');
+    setDayBlocks(dst, beforeDst, 'jenn');
+    setDayBlocks(dst, beforeJess, 'jess');
+    return bad.length === 0 || bad;
+  });
+
+  /* Copying a day reaches other weeks and — for a parent — the other child.
+     The engine always could; only its callers were narrow. Cross-child stays
+     parent-only: a copy REPLACES the destination day, so a child able to do it
+     could overwrite her sister's week from her own screen. */
+  checks.copyingADayCrossesWeeksAndKids = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile, wasViewing = parentViewing;
+    const thisWk = getDayKeys(0), lastWk = getDayKeys(-1);
+    const restore = [];
+    const seed = (key, kid, blocks) => {
+      restore.push([key, kid, getDayBlocksForProfile(key, kid)]);
+      setDayBlocks(key, blocks, kid);
+    };
+    seed(lastWk[1], 'jenn', [{ id: 'cx-a', actId: 'piano', startMin: 600, durationMin: 60 }]);
+    seed(thisWk[1], 'jenn', []);
+    seed(thisWk[1], 'jess', []);
+
+    // The kid sheet offers three weeks, and last week's Tuesday is one of them.
+    profile = 'jenn';
+    openDay(thisWk[1], 1);
+    openTemplateSheet();
+    if (!document.querySelector('#copyDayWeekTabs [data-copyday-week="-1"]')) {
+      bad.push('the copy sheet does not offer last week');
+    }
+    if (!document.getElementById('copyDayKidTabs').hidden) {
+      bad.push("a child is offered her sister's day — a copy replaces, so that is a parent's call");
+    }
+    copyDayHandleClick({ target: document.querySelector('#copyDayWeekTabs [data-copyday-week="-1"]') });
+    if (copyDaySrcWeek !== -1) bad.push('picking last week did not take');
+    const rows = [...document.querySelectorAll('#copyDayList .copy-day-row')].filter(r => !r.disabled);
+    if (!rows.length) bad.push("last week's planned day is not offered to copy");
+    closeSheet('templateOverlay');
+
+    // Across weeks, through the engine the sheet calls.
+    const across = copyDayInto(lastWk[1], thisWk[1], 'jenn');
+    if (across.copied !== 1) bad.push(`copying across weeks moved ${across.copied} blocks, expected 1`);
+
+    // Cross-child drops what the sister cannot resolve, and says how many.
+    const priv = { id: 'cx-private', name: 'Jenn only', icon: '🎈', cat: 'free', durationMin: 30, custom: true };
+    state.profiles.jenn.customActivities = [...(state.profiles.jenn.customActivities || []), priv];
+    setDayBlocks(lastWk[1], [{ id: 'cx-p', actId: 'cx-private', startMin: 600, durationMin: 30 },
+                             { id: 'cx-q', actId: 'breakfast', startMin: 480, durationMin: 30 }], 'jenn');
+    const cross = copyDayInto(lastWk[1], thisWk[1], 'jenn', 'jess');
+    if (cross.copied !== 1) bad.push(`${cross.copied} blocks landed on Jess, expected 1`);
+    if (cross.dropped !== 1) bad.push(`${cross.dropped} reported left behind, expected 1`);
+    const onJess = getDayBlocksForProfile(thisWk[1], 'jess');
+    if ((onJess[0] || {}).actId !== 'breakfast') bad.push('Jess was given a block she cannot resolve');
+    state.profiles.jenn.customActivities = (state.profiles.jenn.customActivities || []).filter(a => a.id !== 'cx-private');
+
+    /* The parent portal's one-day mode: same decision object, one day in it,
+       and the two ends need not be the same weekday. */
+    profile = 'parent'; parentViewing = 'jenn';
+    const wasSpan = pcwSpan, wasFrom = pcwFromDay, wasTo = pcwToDay;
+    pcwSpan = 'day'; pcwFromDay = 1; pcwToDay = 3;
+    const plan = pcwPlan();
+    if (!plan.day) bad.push('the plan does not know it is a one-day copy');
+    const row = plan.rows[0];
+    if (!row) bad.push('the one-day plan has no rows');
+    else {
+      if (row.days.length !== 1) bad.push(`the one-day plan covers ${row.days.length} days`);
+      if (row.days[0].toIdx !== 3) bad.push('the one-day plan ignores which weekday it lands on');
+    }
+    pcwSpan = wasSpan; pcwFromDay = wasFrom; pcwToDay = wasTo;
+
+    restore.forEach(([key, kid, blocks]) => setDayBlocks(key, blocks, kid));
+    setDayBlocks(lastWk[1], [], 'jenn');
+    profile = wasProfile; parentViewing = wasViewing;
+    copyDaySrcWeek = 0; copyDayDstKid = null;
     return bad.length === 0 || bad;
   });
 

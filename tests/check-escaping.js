@@ -48,6 +48,19 @@ const TEXTY_MEMBER = /(?:\?\.|\.)\s*(?:name|label|title|text|note)\s*$/;
    an <img> from a custom activity's name. Naming is the only signal available
    without a real parser, so anything named like display text is treated as
    display text. */
+/* KNOWN GAP, measured rather than guessed: this is case-SENSITIVE, so a local
+   called `label` or `name` slips through where `dispName` does not. One real
+   XSS hid there — js/09-sheets.js built
+   `const label = \`${t.name}${t.reps ? ` (${t.reps})` : ''}\`` from a child's
+   typed exercise and put it straight into markup.
+
+   Making the rule case-insensitive was tried: it flags 44 sites, and a sample
+   of them — 'Jenn'/'Jess', hardcoded lane and legend labels, a formatted date
+   range — are all constants. Forty-four opt-out comments to catch one hole is
+   the "check nobody can keep green" that CLAUDE.md warns about, so the rule
+   stays as it is and the runtime checks carry this case: aNewExerciseWaitsForAGrownUp
+   and hostileNamesCannotBecomeCode both assert no element is built from a name.
+   A real fix needs dataflow, not naming. */
 const TEXTY_LOCAL = /^(?:disp[A-Z]\w*|\w*(?:Name|Label|Title|Text|Note))$/;
 function isTexty(expr) {
   // Ignore a trailing `|| 'fallback'`; the fallback is a literal either way.

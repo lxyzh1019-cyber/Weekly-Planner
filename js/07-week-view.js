@@ -50,13 +50,38 @@ function nearestPlannedWeek(mondayKey, p, span) {
    which mmPlanNextWeek used to carry over: awardBlockLinks only awards when the
    flag is unset, so a copied block could never pay XP however often it was
    done. checklistState goes for the same reason — a pre-ticked checklist is a
-   claim nobody made. */
+   claim nobody made. gearState and trainingCheck are the same claim in two
+   more shapes, and a stopwatch carries somebody else's elapsed minutes.
+
+   A COPY IS NOT PART OF THE ORIGINAL'S SERIES. seriesId used to come through
+   untouched, and every consequence of that was invisible until it bit:
+   countSeriesBlocks scans every week of the profile, so editing a copied block
+   offered "update all" and rewrote the weeks it was copied FROM; "remove all in
+   series" deleted those originals and wrote 'sr:'+seriesId into
+   state.shared.tombstones, which is shared rather than per-profile — so via
+   blockTombstoned (js/04-merge.js) the same delete could drop the SISTER's
+   cross-copied blocks on the next merge. Every copy path inherits this fix:
+   the parent portal's copy, the meeting's plan-next-week, the blank-week fill
+   and the day copy.
+
+   The spreads matter too. Object.assign is shallow, so a copy and its original
+   shared their objectives array and their gear/check/stopwatch objects by
+   reference until the next reload re-parsed the JSON — editing one edited both
+   in memory, which is the kind of bug that only shows up on the device that
+   did the copy. */
 function weekCloneBlock(b) {
-  return Object.assign({}, b, {
+  const c = Object.assign({}, b, {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-    completed: false, confirmed: false, xpAwarded: false, checklistState: {},
+    completed: false, confirmed: false, xpAwarded: false,
+    checklistState: {}, gearState: {}, trainingCheck: {},
     createdAt: syncNow(), updatedAt: syncNow(),
   });
+  delete c.seriesId;
+  if (Array.isArray(b.objectives)) c.objectives = b.objectives.slice();
+  if (b.stopwatch) c.stopwatch = Object.assign({}, b.stopwatch, {
+    elapsedSec: 0, running: false, startedAt: null,
+  });
+  return c;
 }
 /* Days that already hold something are left alone — the same guard
    mmPlanNextWeek uses. A copy must never overwrite a plan somebody made. */
@@ -80,15 +105,28 @@ function copyWeekInto(sourceMondayKey, targetMondayKey, p) {
    because "make Wednesday look like Tuesday" is exactly what you ask for when
    Wednesday is already wrong. It replaces, and tombstones what it replaced —
    without that, a merge from another device brings the old blocks straight
-   back (js/04-merge.js). Returns the number of blocks copied. */
-function copyDayInto(srcDayKey, dstDayKey, p) {
-  if (!srcDayKey || !dstDayKey || srcDayKey === dstDayKey) return 0;
-  const from = getDayBlocksForProfile(srcDayKey, p) || [];
-  const existing = getDayBlocksForProfile(dstDayKey, p) || [];
+   back (js/04-merge.js).
+
+   Two children, not one. The signature took a single profile and used it for
+   both ends, so the one thing the engine could not do was the thing a parent
+   most often wants: put Jenn's Tuesday on Jess's. Cross-child drops the blocks
+   the destination cannot resolve, for the reason placeableActivityIds explains,
+   and says how many — a copy that silently dropped four blocks is how someone
+   comes to believe a day is planned when it is not.
+
+   Returns { copied, dropped }. */
+function copyDayInto(srcDayKey, dstDayKey, srcP, dstP) {
+  const to = dstP || srcP;
+  if (!srcDayKey || !dstDayKey) return { copied: 0, dropped: 0 };
+  if (srcDayKey === dstDayKey && to === srcP) return { copied: 0, dropped: 0 };
+  const all = getDayBlocksForProfile(srcDayKey, srcP) || [];
+  const canPlace = to === srcP ? null : placeableActivityIds(to);
+  const from = canPlace ? all.filter(b => !b.actId || canPlace.has(b.actId)) : all;
+  const existing = getDayBlocksForProfile(dstDayKey, to) || [];
   if (existing.length) tombstoneBlockIds(existing.map(b => b.id));
-  setDayBlocks(dstDayKey, from.map(b => weekCloneBlock(b)), p);
+  setDayBlocks(dstDayKey, from.map(b => weekCloneBlock(b)), to);
   saveAll();
-  return from.length;
+  return { copied: from.length, dropped: all.length - from.length };
 }
 
 function fillWeekFromNearest(mondayKey) {
@@ -114,11 +152,75 @@ function goPlanWeek(mondayKey) {
    thing in", it is "put back what actually happened" — and there may be a
    week's shape next door to start from. One line either way; screen-week is on
    the 200-word kid budget. */
+/* ── School days, offered rather than assumed ──
+   The calendar knows which days of this week are school days. What it must not
+   do is quietly fill them in: a week that arrived pre-planned is a week nobody
+   decided, and the girls' plans are theirs to make. So the offer says how many
+   and which, and nothing is written until it is pressed.
+
+   And only near the front. A term is 40-odd weeks; materialising every school
+   day of it would write hundreds of blocks into a document that uploads whole
+   on every change, to describe a Tuesday in May that nobody is planning yet.
+   Three weeks is as far ahead as anyone is actually laying out a week. */
+const SCHOOL_FILL_HORIZON_WEEKS = 3;
+
+function schoolDaysToOffer(keys, p = activeProfile()) {
+  return keys.filter(k => isSchoolDay(k) && !(getDayBlocksForProfile(k, p) || []).length);
+}
+
+function schoolOfferInHorizon(keys) {
+  const off = computeWeekOffsetForDayKey(keys[0]);
+  return off >= 0 && off < SCHOOL_FILL_HORIZON_WEEKS;
+}
+
+/* Names the days before it writes anything, the way the parent portal's copy
+   preview does. One School Day block per day — not the whole school-day
+   template, which would also invent a piano lesson and a bedtime routine
+   nobody asked for. */
+async function addSchoolDaysToWeek(mondayKey) {
+  const p = activeProfile();
+  const keys = mrWeekDayKeys(mondayKey);
+  const days = schoolDaysToOffer(keys, p);
+  if (!days.length) { showToast('No empty school days in this week'); return; }
+  const names = days.map(k => DAY_LONG[(formatDayKey(k).getDay() + 6) % 7]);
+  const h = schoolHours();
+  const when = `${formatTimeFromMin(START_MIN + h.startMin)}–${formatTimeFromMin(START_MIN + h.endMin)}`;
+  const ok = await showConfirm(
+    `Add School Day to ${names.length} day${names.length === 1 ? '' : 's'} — ${names.join(', ')}?\n\n`
+    + `${when}, from the school calendar. Nothing else is added, and days that already `
+    + 'have something on them are left alone.',
+    { okLabel: 'Add them', cancelLabel: 'Not now' });
+  if (!ok) return;
+  days.forEach(k => {
+    const arr = getDayBlocksForProfile(k, p) || [];
+    arr.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      actId: 'school_day',
+      startMin: START_MIN + h.startMin,
+      durationMin: h.endMin - h.startMin,
+      objectives: [], note: '', checklistState: {},
+      completed: false, confirmed: false,
+      createdAt: syncNow(), updatedAt: syncNow(),
+    });
+    setDayBlocks(k, arr, p);
+  });
+  saveAll();
+  renderWeek();
+  showToast(`🏫 Added ${days.length} school day${days.length === 1 ? '' : 's'} — now build round them`);
+}
+
 function weekEmptyOffer(keys) {
   const p = activeProfile();
   const plan = `<button class="wins-btn" onclick="goPlanWeek('${escapeJsAttr(keys[0])}')">✏️ Start planning</button>`;
+  /* Offered on a blank week only — which is exactly "the new week you are
+     planning" — so it cannot become a thing that nags every time a week is
+     half full. */
+  const schoolDays = schoolOfferInHorizon(keys) ? schoolDaysToOffer(keys, p) : [];
+  const school = schoolDays.length
+    ? ` <button class="wins-btn" onclick="addSchoolDaysToWeek('${escapeJsAttr(keys[0])}')">🏫 Add ${schoolDays.length} school day${schoolDays.length === 1 ? '' : 's'}</button>`
+    : '';
   if (keys[6] >= todayKey()) {
-    return `📝 <b>This week is empty.</b> Pick a day and put the first thing in — you can move it later. ${plan}`;
+    return `📝 <b>This week is empty.</b> Pick a day and put the first thing in — you can move it later. ${plan}${school}`;
   }
   const src = nearestPlannedWeek(keys[0], p, 8);
   const copy = src
@@ -245,7 +347,7 @@ function renderWeek() {
       coachEl.classList.remove('week-review-tip');
       coachEl.style.display = 'block';
       coachEl.textContent = '🗓️ The school calendar in this app ends after '
-        + SCHOOL_TERM.nextStart + '. Until it is updated, school days are guessed from the weekday only.';
+        + schoolTerm().nextStart + '. Until it is updated, school days are guessed from the weekday only.';
     } else if (nothingPlanned) {
       coachEl.classList.remove('week-review-tip');
       coachEl.style.display = 'block';
@@ -600,6 +702,8 @@ function tg2ShortLabel(act, b) {
   }
   if (act.isTraining) {
     const t = getTrainingTopic(b.tag);
+    /* Seven characters, deliberately (CLAUDE.md) — a typed competition name is
+       not going to fit here, so this stays the sport's short form. */
     if (act.isCompetition) return t.id === 'general' ? 'Comp' : (t.name.slice(0, 4) + '🏆');
     return ({ skating: 'Skate', swimming: 'Swim', dryland: 'Dry', general: 'Train' })[t.id] || 'Train';
   }
@@ -671,6 +775,20 @@ function renderTimeGrid(keys) {
     lane.style.height = totalH + 'px';
     lane.onclick = () => openDay(key, dayIdx);
 
+    /* SCHOOL HOURS, on the view the week actually opens on. This is the layout
+       the app defaults to and the one a parent means by "the weekly planner",
+       and it showed nothing school-related at all — a school day and a Sunday
+       were the same white lane. Same source as the day view and the Full week:
+       dayZoneSegments, which reads the calendar rather than the weekday. */
+    dayZoneSegments(key).forEach(bd => {
+      const seg = document.createElement('div');
+      seg.className = 'tg2-band ' + bd.cls.replace('tl-band-', 'wf-band-');
+      seg.style.top = (bd.start * PX_PER_MIN) + 'px';
+      seg.style.height = ((bd.end - bd.start) * PX_PER_MIN) + 'px';
+      seg.title = bd.label;
+      lane.appendChild(seg);
+    });
+
     const blocks = (getDayBlocks(key) || []).slice().sort((a, b) => a.startMin - b.startMin);
     const conflicts = computeBufferConflicts(blocks);
     const cols = wfAssignColumns(blocks);
@@ -737,6 +855,12 @@ function renderTimeGrid(keys) {
       el.onclick = (e) => { e.stopPropagation(); openDay(key, dayIdx, b.id); };
       lane.appendChild(el);
     });
+
+    /* The lane used to carry a 24px repeating-linear-gradient as its "lined
+       paper". At 0.85px/min an hour is 51px and a half-hour 25.5px, so those
+       rules named no time at all and drifted out of step with the gutter labels
+       beside them from the first hour onwards. Real ones, over the blocks. */
+    lane.appendChild(buildHourGrid(PX_PER_MIN, DAY_MIN_SPAN, { cls: 'hour-grid--tg2' }));
 
     grid.appendChild(lane);
   });
@@ -1081,16 +1205,13 @@ function renderFullWeek(keys) {
   const PX_PER_MIN = 0.72;
   const totalH = Math.round(DAY_MIN_SPAN * PX_PER_MIN);
 
-  // Time-of-day tint bands + slot labels. Boundaries match the day view's
-  // sideband (buildSideband): 6–9am / 9am–3pm / 3–6pm / 6pm–end. `side` is the
-  // compact label used on the left axis band.
-  const WEEKDAY_BANDS = [
-    { start: 0,   end: 180,          cls: 'wf-band-before',  label: '🌅 Before School', side: '🌅 Before' },
-    { start: 180, end: 540,          cls: 'wf-band-school',  label: '🏫 School',        side: '🏫 School' },
-    { start: 540, end: 720,          cls: 'wf-band-after',   label: '🎒 After School',  side: '🎒 After'  },
-    { start: 720, end: DAY_MIN_SPAN, cls: 'wf-band-evening', label: '🌙 Evening',       side: '🌙 Evening' },
-  ];
-  const WEEKEND_BANDS = [ { start: 0, end: DAY_MIN_SPAN, cls: 'wf-band-free', label: '🎉 Free Time' } ];
+  /* WEEKDAY_BANDS and WEEKEND_BANDS lived here: four hardcoded stretches with
+     school at 180–540, which is 9am–3pm, and a `dow === 0 || dow === 6` test to
+     choose between them. Both halves were wrong. The band said 9am while
+     schoolHours() says 8, so this view disagreed with the day view by an hour;
+     and asking the weekday meant Christmas Day, a PD day and every day of July
+     drew a full "🏫 School" band. dayZoneSegments (js/08-day-view.js) has been
+     the calendar-aware answer all along — it just had one caller. */
 
   // ── Header row: sideband corner + gutter corner + 7 day headers ──
   const bandCorner = document.createElement('div');
@@ -1115,12 +1236,21 @@ function renderFullWeek(keys) {
   const sideband = document.createElement('div');
   sideband.className = 'wf-sideband';
   sideband.style.height = totalH + 'px';
-  WEEKDAY_BANDS.forEach(bd => {
+  /* One axis describes seven days, so it has to pick one to describe. The
+     week's first school day is the honest choice: it is the rhythm the axis is
+     for. A week with no school in it says so rather than drawing a school shape
+     nothing on screen has. */
+  const axisKey = keys.find(k => isSchoolDay(k)) || null;
+  const axisSegs = axisKey
+    ? dayZoneSegments(axisKey)
+    : [{ start: 0, end: DAY_MIN_SPAN, label: '🎉 Free time', cls: 'tl-band-free' }];
+  axisSegs.forEach(bd => {
     const seg = document.createElement('div');
-    seg.className = 'wf-sideband-seg ' + bd.cls;
+    // The day view's palette, so the two screens tint a school day alike.
+    seg.className = 'wf-sideband-seg ' + bd.cls.replace('tl-band-', 'wf-band-');
     seg.style.top = (bd.start * PX_PER_MIN + 1) + 'px';
-    seg.style.height = ((bd.end - bd.start) * PX_PER_MIN - 3) + 'px';
-    seg.textContent = bd.side;
+    seg.style.height = Math.max(0, (bd.end - bd.start) * PX_PER_MIN - 3) + 'px';
+    seg.textContent = ZONE_SHORT[bd.label] || bd.label;
     seg.title = bd.label;
     sideband.appendChild(seg);
   });
@@ -1143,30 +1273,33 @@ function renderFullWeek(keys) {
 
   // ── One continuous lane per day ──
   keys.forEach((key, ci) => {
-    const dow = formatDayKey(key).getDay();
-    const bands = (dow===0 || dow===6) ? WEEKEND_BANDS : WEEKDAY_BANDS;
+    // The calendar decides, not the weekday. Same function the day view uses.
+    const bands = dayZoneSegments(key).map(b => ({ ...b, cls: b.cls.replace('tl-band-', 'wf-band-') }));
+    const labelledCol = !isSchoolDay(key) || key !== axisKey;
 
     const cell = document.createElement('div');
     cell.className = 'wf-day-col' + (key===todayKey() ? ' today' : '');
     cell.style.height = totalH + 'px';
     cell.onclick = (e)=>{
       // Only open the day when the empty lane (not a card) is tapped.
-      if (e.target === cell || e.target.classList.contains('wf-band') || e.target.classList.contains('wf-hour-line')) {
+      // The bands and the hour grid take no pointer events, so a click on either
+      // arrives with the cell as its target; only the cards stop it.
+      if (e.target === cell || e.target.classList.contains('wf-band')) {
         openDay(key, ci);
       }
     };
 
-    // Zone tint bands behind everything. Weekday band names live on the left
-    // sideband axis; weekend columns keep their own "Free Time" label since
-    // the axis shows the school-day rhythm.
-    const isWeekendCol = (dow === 0 || dow === 6);
+    /* Zone tint bands behind everything. The left axis already names the shape
+       it describes, so the column that matches it stays unlabelled; every other
+       column names its own — which is what makes a holiday in the middle of a
+       term readable as one rather than as a column that lost its tint. */
     bands.forEach(bd => {
       const seg = document.createElement('div');
       seg.className = 'wf-band ' + bd.cls;
       seg.style.top = (bd.start * PX_PER_MIN) + 'px';
       seg.style.height = ((bd.end - bd.start) * PX_PER_MIN) + 'px';
       cell.appendChild(seg);
-      if (isWeekendCol && bd.label && (bd.end - bd.start) * PX_PER_MIN >= 24) {
+      if (labelledCol && bd.label && (bd.end - bd.start) * PX_PER_MIN >= 24) {
         const lbl = document.createElement('div');
         lbl.className = 'wf-band-label';
         lbl.style.top = (bd.start * PX_PER_MIN + 2) + 'px';
@@ -1175,15 +1308,12 @@ function renderFullWeek(keys) {
       }
     });
 
-    // Hour gridlines to anchor the eye to the time grid.
-    for (let h = firstHour; h <= lastHour; h++) {
-      const rel = h*60 - START_MIN;
-      if (rel <= 0 || rel >= DAY_MIN_SPAN) continue;
-      const line = document.createElement('div');
-      line.className = 'wf-hour-line';
-      line.style.top = (rel * PX_PER_MIN) + 'px';
-      cell.appendChild(line);
-    }
+    /* The hour gridlines used to be drawn here, before the cards, at z-index 1
+       against .wf-card's 2 — so on a planned day they were under every block
+       and the eye had nothing to anchor to. They go on last now, as an overlay,
+       and the two loops that draw them no longer disagree: this one skipped 6am
+       and 10pm with `<=`/`>=` while the gutter labelled them with `<`/`>`.
+       buildHourGrid (js/05-helpers.js) owns both ends of that now. */
 
     // "Now" marker on today's column.
     if (key === todayKey()) {
@@ -1247,12 +1377,13 @@ function renderFullWeek(keys) {
       const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
       const bg = blockColour(b);
       const dispIcon = topic ? topic.icon : act.icon;
-      // Competition shares the sport topic's icon/colour, but reads as its own
-      // task (a general competition says "Competition", a sport one says e.g.
-      // "Swimming 🏆") so it never looks like a plain Training block.
-      const dispName = topic
-        ? (act.isCompetition ? (topic.id === 'general' ? 'Competition 🏆' : topic.name + ' 🏆') : topic.name)
-        : act.name;
+      /* blockDisplayName (js/05-helpers.js) is the one owner of what a block is
+         called. This wrote its own answer, which is why a competition that had
+         been given a name — "Winter Invitational" — still read "Skating 🏆"
+         here while the day view said the right thing. The 🏆 stays: it is what
+         keeps a competition from reading as a plain Training block. */
+      const named = blockDisplayName(b, activeProfile()).name;
+      const dispName = act.isCompetition ? `${named} 🏆` : named;
       const card = document.createElement('div');
       // Same ladder the day timeline and the print sheet use — see
       // blockContentTier (js/05-helpers.js). The class names are the ones the
@@ -1335,6 +1466,9 @@ function renderFullWeek(keys) {
       attachTapGuard(card, ()=> openDayFromWeekCard(key, ci, b.id));
       cell.appendChild(card);
     });
+
+    // Last, over the cards. See buildHourGrid (js/05-helpers.js).
+    cell.appendChild(buildHourGrid(PX_PER_MIN, DAY_MIN_SPAN, { cls: 'hour-grid--wf' }));
 
     grid.appendChild(cell);
   });

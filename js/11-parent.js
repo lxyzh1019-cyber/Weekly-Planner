@@ -46,7 +46,7 @@ const PARENT_LANDINGS = {
     { panel: 'tasks',    icon: '✅', title: 'Activities and sports', sub: 'The library both girls draw from' },
     { panel: 'money',    icon: '💰', title: 'Money rules',         sub: 'Grades, caps, fines, loans and the week history' },
     { panel: 'rules',    icon: '⭐', title: 'Level-up',            sub: 'What earns a star on an activity' },
-    { panel: 'copyweek', icon: '📋', title: 'Copy a week',         sub: 'Put one week’s plan onto another, or onto her sister’s' },
+    { panel: 'copyweek', icon: '📋', title: 'Copy a plan',         sub: 'Put a week — or one day — onto another, or onto her sister’s' },
     { panel: 'money',    icon: '🕰️', title: 'Change history',      sub: 'Every version of the rules, when it took effect, and why',
       section: 'history' },
   ],
@@ -198,7 +198,7 @@ const PARENT_PANEL_RENDERERS = {
   trends:   () => ctrRenderTrends(),
   analysis: () => renderPerformance(),
   routines: () => renderRoutinesList(),
-  tasks:    () => { renderPendingApproval(); renderParentActivities(); },
+  tasks:    () => { renderPendingApproval(); renderPendingTaskApproval(); renderParentActivities(); },
   money:    () => mnyRenderRulesTab(),
   rules:    () => renderLevelRules(),
   copyweek: () => pcwRender(),
@@ -391,6 +391,75 @@ function renderPendingApproval() {
     wrap.appendChild(card);
   });
 }
+/* ── The same queue, for exercises ──
+   state.shared.customTasks is the girls' library of drills — "50m Freestyle
+   (x4)" — and anything either of them typed went straight into it with nothing
+   to tell a parent it had happened. It is a proposal now, like an activity.
+
+   Shared rather than per-child, so there is no owner array to read: addedBy on
+   the record says whose it is. */
+function pendingApprovalTasks() {
+  return (state.shared.customTasks || [])
+    .filter(t => t && t.pendingApproval && !t.archived)
+    .map(t => ({ task: t, owner: t.addedBy }));
+}
+function renderPendingTaskApproval() {
+  const wrap = document.getElementById('pendingTaskList');
+  if (!wrap) return;
+  const pending = pendingApprovalTasks();
+  if (!pending.length) {
+    wrap.innerHTML = '<p class="feedback-empty">Nothing waiting — new exercises the girls add will appear here.</p>';
+    return;
+  }
+  wrap.innerHTML = '';
+  pending.forEach(({ task, owner }) => {
+    const who = kidLabel(owner);
+    const sport = getTrainingTopic(task.sport);
+    const card = document.createElement('div');
+    card.className = 'challenge-card';
+    card.innerHTML = `
+      <div class="challenge-title">🏋️ ${escapeHtml(task.name)}${task.reps ? ` <span style="font-weight:700">(${escapeHtml(task.reps)})</span>` : ''}
+        <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· ${escapeHtml(who.icon + ' ' + who.name)} added</span></div>
+      <div style="font-size:0.85rem;color:var(--ink-light)">${escapeHtml(sport ? sport.name : (task.sport || 'general'))}${task.notes ? ' · ' + escapeHtml(task.notes) : ''}</div>
+      <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
+        <button class="btn-icon" style="padding:2px 8px;background:var(--accent-green)" data-task-approve="${escapeAttr(task.id)}">✅ Approve</button>
+        <button class="btn-icon" style="padding:2px 8px" data-task-reject="${escapeAttr(task.id)}">🗑 Reject</button>
+      </div>`;
+    wrap.appendChild(card);
+  });
+}
+function approveKidTask(id) {
+  const t = (state.shared.customTasks || []).find(x => x.id === id);
+  if (!t) return;
+  delete t.pendingApproval;
+  markItemUpdated && markItemUpdated(t);
+  saveAll();
+  renderPendingTaskApproval();
+  showToast('Approved ✅ — it stays in the library');
+}
+/* Archived, not deleted, and for the same reason rejectKidActivity archives:
+   a task's text is already flattened into the blocks that used it, and keeping
+   the record is what stops a delete on one device resurrecting elsewhere. */
+async function rejectKidTask(id) {
+  const t = (state.shared.customTasks || []).find(x => x.id === id);
+  if (!t) return;
+  if (!(await showConfirm('Take this exercise off the girls\' list?', { danger: true, okLabel: 'Take it off' }))) return;
+  t.archived = true;
+  t.archivedAt = syncNow();
+  delete t.pendingApproval;
+  markItemUpdated && markItemUpdated(t);
+  saveAll();
+  renderPendingTaskApproval();
+  showToast('Off the list');
+}
+/* One delegated listener for the two buttons above, bound in js/99-main.js. */
+function parentTaskApprovalClick(e) {
+  const ok = e.target.closest('[data-task-approve]');
+  if (ok) { approveKidTask(ok.getAttribute('data-task-approve')); return; }
+  const no = e.target.closest('[data-task-reject]');
+  if (no) { rejectKidTask(no.getAttribute('data-task-reject')); }
+}
+
 function approveKidActivity(owner, id) {
   const acts = (state.profiles[owner] && state.profiles[owner].customActivities) || [];
   const a = acts.find(x => x.id === id);

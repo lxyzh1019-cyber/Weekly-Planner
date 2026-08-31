@@ -414,6 +414,16 @@ const SEASONAL_ACTIVITIES = [
   { id:'leaf_hike',     name:'Leaf Hike',        icon:'🍂', cat:'active', durationMin:90,  season:'autumn', suitableTime:['weekend'], social:true },
 ];
 
+/* The two girls, named and iconed in one place. The pair
+   `p === 'jenn' ? '🐥 Jenn' : '🦊 Jess'` is written out in about ten files; this
+   is not a sweep of those, it is somewhere for new code to read them from
+   rather than making it eleven. */
+const KID_LABEL = {
+  jenn: { icon: '🐥', name: 'Jenn' },
+  jess: { icon: '🦊', name: 'Jess' },
+};
+function kidLabel(p) { return KID_LABEL[p] || { icon: '👤', name: String(p || '') }; }
+
 /* ── The school year ──────────────────────────────────────────────────────────
    One source of truth for "is there school today, and when". Before this, two
    places each answered it and disagreed: SCHOOL_TEMPLATE placed the School Day
@@ -428,6 +438,11 @@ const SEASONAL_ACTIVITIES = [
    Replace all three each August. Past SCHOOL_TERM.nextStart the app stops
    claiming to know — it falls back to plain weekday rules rather than inventing
    holidays for a year it has never been told about. */
+/* The SHIPPED fallback. What the app actually uses is schoolHours()
+   (js/05-helpers.js), which prefers whatever a parent has set in the portal —
+   including a lunch recess, which this never had. These three constants stay as
+   the answer for a family that has set nothing, and as the thing an August
+   without a parent nearby still falls back to. */
 const SCHOOL_HOURS = { startMin: 120, endMin: 540, days: [1, 2, 3, 4, 5] };  // Mon–Fri, 8:00am–3:00pm
 
 const SCHOOL_TERM = { start: '2026-08-31', end: '2027-06-25', nextStart: '2027-08-30' };
@@ -463,19 +478,28 @@ const NO_SCHOOL_DAYS = [
 ];
 
 /* School day / weekend templates (minute-based from 6AM). The school block
-   derives from SCHOOL_HOURS so it can never drift from the coloured band. */
-const SCHOOL_TEMPLATE = [
-  {actId:'routine_morning',   startMin: 60,  durationMin: 30},   // 7:00am
-  {actId:'breakfast',         startMin: 90,  durationMin: 30},   // 7:30am
-  {actId:'school_day',        startMin: SCHOOL_HOURS.startMin,
-                              durationMin: SCHOOL_HOURS.endMin - SCHOOL_HOURS.startMin},
-  {actId:'routine_afterschool',startMin: SCHOOL_HOURS.endMin, durationMin: 30},
-  {actId:'piano',             startMin: 570, durationMin: 60},   // 3:30pm
-  {actId:'dinner',            startMin: 690, durationMin: 60},   // 5:30pm
-  {actId:'chores',            startMin: 750, durationMin: 30},   // 6:30pm
-  {actId:'family',            startMin: 780, durationMin: 90},   // 7:00pm
-  {actId:'routine_evening',   startMin: 870, durationMin: 20},   // 8:30pm
-];
+   derives from the school hours so it can never drift from the coloured band.
+
+   A FUNCTION, not a const, and that is the whole reason this changed: school
+   hours are something a parent sets now (schoolHours(), js/05-helpers.js), and
+   a const evaluated when this file loads can only ever see the shipped
+   fallback. Anything that wants the school-day shape has to ask at the moment
+   it needs it. */
+function schoolTemplate() {
+  const h = schoolHours();
+  return [
+    {actId:'routine_morning',   startMin: 60,  durationMin: 30},   // 7:00am
+    {actId:'breakfast',         startMin: 90,  durationMin: 30},   // 7:30am
+    {actId:'school_day',        startMin: h.startMin,
+                                durationMin: h.endMin - h.startMin},
+    {actId:'routine_afterschool',startMin: h.endMin, durationMin: 30},
+    {actId:'piano',             startMin: 570, durationMin: 60},   // 3:30pm
+    {actId:'dinner',            startMin: 690, durationMin: 60},   // 5:30pm
+    {actId:'chores',            startMin: 750, durationMin: 30},   // 6:30pm
+    {actId:'family',            startMin: 780, durationMin: 90},   // 7:00pm
+    {actId:'routine_evening',   startMin: 870, durationMin: 20},   // 8:30pm
+  ];
+}
 const WEEKEND_TEMPLATE = [
   {actId:'routine_morning',   startMin: 120, durationMin: 30},   // 8:00am
   {actId:'breakfast',         startMin: 150, durationMin: 30},   // 8:30am

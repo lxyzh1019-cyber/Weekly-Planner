@@ -227,6 +227,61 @@ function mnyWeekEnd(wk) {
    Entered here, at the table, with the results sheet in hand. The rules engine
    already knows what a result is worth (mrScoreCompetition), so this form only
    has to collect it honestly. */
+/* ── The planner arranged it; the meeting pays for it ──
+   The competition form asked a parent to retype the name of a meet that was
+   already sitting on the week's plan. Two records of one afternoon, kept in
+   agreement by hand, is how they come to disagree — and the planner is the one
+   that had the name first, so it supplies it.
+
+   It supplies FACTS only: which meet, which day, which sport. What the result
+   was worth is still decided here, by mrScoreCompetition against the rules of
+   that date, because a second place that decides what money moves is a second
+   place that can disagree with the first. When no competition was planned, the
+   form is exactly what it was — an empty name to type into. */
+const MM_COMP_SPORT_FROM_TAG = { swimming: 'swim', skating: 'skate' };
+
+function mmPlannedCompetitions(wk, kid) {
+  const out = [];
+  mrWeekDayKeys(wk).forEach(dayKey => {
+    (getDayBlocksForProfile(dayKey, kid) || []).forEach(b => {
+      if (typeof blockIsCompetition !== 'function' || !blockIsCompetition(b)) return;
+      const disp = blockDisplayName(b, kid);
+      // "Competition" and "Skating Comp." are what the app calls an unnamed
+      // one; neither is a name a parent typed, so neither is offered as one.
+      const name = (b.compName || '').trim()
+        || (/^(Competition|.+ Comp\.)$/.test(disp.name) ? '' : disp.name);
+      out.push({ dayKey, name, sport: MM_COMP_SPORT_FROM_TAG[b.tag] || null,
+                 startMin: b.startMin || 0, icon: disp.icon });
+    });
+  });
+  return out.sort((a, b) =>
+    a.dayKey < b.dayKey ? -1 : a.dayKey > b.dayKey ? 1 : a.startMin - b.startMin);
+}
+
+/* The planned competitions this week that have not been written down yet.
+   Matched on the day rather than the name: a parent who corrects the spelling
+   while recording the result has still recorded that afternoon. */
+function mmUnrecordedCompetitions(wk, kid) {
+  const done = new Set(mrCompetitions(kid)
+    .filter(c => String(c.dayKey) >= wk && String(c.dayKey) <= mnyWeekEnd(wk))
+    .map(c => String(c.dayKey)));
+  return mmPlannedCompetitions(wk, kid).filter(p => !done.has(p.dayKey));
+}
+
+/* Fill a fresh draft from the plan when the plan has something to say. */
+function mmSeedCompDraft(wk, kid) {
+  const base = { sport: 'swim', dayKey: todayKey(), name: '', points: 0, qualified: false,
+                 provincial: false, group: 0, overall: 0, silver: 0, gold: 0, allGold: false };
+  const from = mmUnrecordedCompetitions(wk, kid)[0];
+  if (!from) return base;
+  return Object.assign(base, {
+    dayKey: from.dayKey,
+    name: from.name,
+    sport: from.sport || base.sport,
+    fromPlan: true,
+  });
+}
+
 function mnyCompetitionForm(wk, kid) {
   const entries = mrCompetitions(kid).filter(c => String(c.dayKey) >= wk && String(c.dayKey) <= mnyWeekEnd(wk));
   if (!mnyCompOpen) {
@@ -242,8 +297,7 @@ function mnyCompetitionForm(wk, kid) {
           : `<div class="mny-note">No competition this week.</div>`}
       </div>`;
   }
-  const d = mnyCompDraft || (mnyCompDraft = { sport: 'swim', dayKey: todayKey(), name: '',
-    points: 0, qualified: false, provincial: false, group: 0, overall: 0, silver: 0, gold: 0, allGold: false });
+  const d = mnyCompDraft || (mnyCompDraft = mmSeedCompDraft(wk, kid));
   const preview = mrScoreCompetition({
     sport: d.sport, dayKey: d.dayKey, points: d.points, qualified: d.qualified, provincial: d.provincial,
     placement: { group: d.group || undefined, overall: d.overall || undefined },
@@ -273,8 +327,20 @@ function mnyCompetitionForm(wk, kid) {
       <div class="mny-chiprow"><button type="button" class="mny-chip ${d.allGold ? 'on' : ''}" onclick="mnyCompSet('allGold',${!d.allGold})">Every item was Gold</button></div>`;
   }
 
+  /* Where this came from, and the other meets the plan holds. One planned
+     competition fills the form; several offer themselves. */
+  const planned = mmUnrecordedCompetitions(wk, kid);
+  const fromPlan = planned.length
+    ? `<div class="mny-note">📋 From the plan for this week${planned.length > 1 ? ' — pick one' : ''}.</div>
+       <div class="mny-chiprow">${planned.map((c, i) => {
+          const lbl = `${c.icon || '🏆'} ${c.name || 'Competition'} · ${mnyShortDate(c.dayKey)}`;
+          return `<button type="button" class="mny-chip ${c.dayKey === d.dayKey ? 'on' : ''}" onclick="mmUsePlannedComp(${i})">${escapeHtml(lbl)}</button>`;
+        }).join('')}</div>`
+    : '';
+
   return `<div class="mny-card">
       <div class="mny-label">🏆 Competition day</div>
+      ${fromPlan}
       <div class="mny-chiprow">${sportChips}</div>
       <label class="mny-field"><span>What it was called</span>
         <input type="text" data-mm-field="comp-name" value="${escapeAttr(d.name)}"
@@ -777,7 +843,22 @@ function mnyToggleEdit() {
   mnyEditOn = !mnyEditOn; renderMeetingMode();
 }
 function mnyToggleRow(key) { mnyExpandRow = (mnyExpandRow === key) ? null : key; renderMeetingMode(); }
-function mnyToggleComp() { mnyCompOpen = !mnyCompOpen; if (!mnyCompOpen) mnyCompDraft = null; renderMeetingMode(); }
+function mnyToggleComp() {
+  mnyCompOpen = !mnyCompOpen;
+  // Opening builds the draft from the plan; closing throws it away.
+  mnyCompDraft = mnyCompOpen ? mmSeedCompDraft(mnyWeekKeyMeeting(), mnyMeetingKid()) : null;
+  renderMeetingMode();
+}
+/* Switch the form to another competition the plan holds. */
+function mmUsePlannedComp(i) {
+  const list = mmUnrecordedCompetitions(mnyWeekKeyMeeting(), mnyMeetingKid());
+  const c = list[i];
+  if (!c || !mnyCompDraft) return;
+  mnyCompDraft.dayKey = c.dayKey;
+  mnyCompDraft.name = c.name;
+  if (c.sport) mnyCompDraft.sport = c.sport;
+  renderMeetingMode();
+}
 function mnyToggleDep() { mnyDepOpen = !mnyDepOpen; if (!mnyDepOpen) mnyDepDraft = null; renderMeetingMode(); }
 function mnyToggleChecks() { mnyChecksOpen = !mnyChecksOpen; renderMeetingMode(); }
 function mnyTogglePlan() { mnyPlanOpen = !mnyPlanOpen; renderMeetingMode(); }

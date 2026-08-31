@@ -35,6 +35,14 @@ function pnPendingActs() {
   return (typeof pendingApprovalActs === 'function') ? pendingApprovalActs() : [];
 }
 
+// Exercises a child typed into a training session that nobody has kept or
+// dropped yet. Same shape of question as pnPendingActs, so it gets a row of its
+// own rather than being folded into that count — approving an activity and
+// approving a drill are two different presses in two different lists.
+function pnPendingTasks() {
+  return (typeof pendingApprovalTasks === 'function') ? pendingApprovalTasks() : [];
+}
+
 // Whose free-text note is sitting unread on this week.
 function pnNoteKids() {
   const keys = getDayKeys(0);
@@ -94,6 +102,16 @@ function pnQueueRows() {
       icon: '➕', action: 'approve', cta: 'Look ›',
       title: `${pend.length} activit${pend.length === 1 ? 'y' : 'ies'} to approve`,
       sub: `${CT_PROFILE_ICON[first.owner] || ''} ${first.owner === 'jenn' ? 'Jenn' : 'Jess'} added “${first.act.name}”`,
+    });
+  }
+  const pendT = pnPendingTasks();
+  if (pendT.length) {
+    const first = pendT[0];
+    const who = kidLabel(first.owner);
+    rows.push({
+      icon: '🏋️', action: 'approve', cta: 'Look ›',
+      title: `${pendT.length} exercise${pendT.length === 1 ? '' : 's'} to approve`,
+      sub: `${who.icon} ${who.name} added “${first.task.name}”`,
     });
   }
   const notes = pnNoteKids();
