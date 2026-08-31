@@ -64,7 +64,7 @@ const AFTERSCHOOL_REWARD_ITEMS = [
 ];
 
 let ts  = { durationMin:120, colour: CAT_HEX.training, tag:'skating', objectives:[], note:'', repeat:false, repeatDays: [], travelBuffer:false, getReadyBuffer:false, warmupBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15, warmupBufMin:20 };
-let as_ = { durationMin:60,  colour: COLOURS[0], note:'', repeat:false, repeatDays: [], travelBuffer:false, travelBufMin:15, choreTags: [], objectives: [] };
+let as_ = { durationMin:60,  colour: COLOURS[0], note:'', repeat:false, repeatDays: [], travelBuffer:false, getReadyBuffer:false, travelBufMin:15, getReadyBufMin:15, choreTags: [], objectives: [] };
 let customTaskContext = 'training'; // 'training' | 'activity' — which sheet opened the custom-goal editor
 
 function isParent() { return profile === 'parent'; }

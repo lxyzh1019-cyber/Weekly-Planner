@@ -701,10 +701,17 @@ function renderMeetingMode() {
     ? `<button type="button" class="btn-confirm" onclick="mmGoStep(${mmStep + 1})">Next ▶</button>`
     : mmFinishButtons(wk);
 
+  /* One scroller — the sheet — with the week-and-step header pinned to its top
+     and Back/Next/Finish pinned to its bottom. A five-step sitting spends most
+     of its time in the middle of a long panel, and both of the things you
+     navigate with used to scroll away with it: which week you were reviewing,
+     which step you were on, and the only way to the next one. */
   const host = document.getElementById('familyMeetingBody');
   const restore = mmCaptureUiState(host);
   host.innerHTML =
-    `${mmWeekBar(wk)}<div class="mm-stepper">${stepper}</div><div class="mm-body">${body}</div><div class="mm-nav">${back}${next}</div>`;
+    `<div class="mm-head">${mmWeekBar(wk)}<div class="mm-stepper">${stepper}</div></div>`
+    + `<div class="mm-body">${body}</div>`
+    + `<div class="mm-nav">${back}${next}</div>`;
   restore();
 }
 

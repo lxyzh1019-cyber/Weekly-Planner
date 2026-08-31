@@ -325,6 +325,13 @@ function renderActivitySheet() {
   const atIn = document.getElementById('activityTravelBufMin');
   if (atIn) atIn.value = String(as_.travelBufMin);
 
+  const rbToggle = document.getElementById('activityReadyToggle');
+  if (rbToggle) rbToggle.classList.toggle('on', !!as_.getReadyBuffer);
+  const arRow = document.getElementById('activityReadyDurRow');
+  if (arRow) arRow.style.display = as_.getReadyBuffer ? 'flex' : 'none';
+  const arIn = document.getElementById('activityReadyBufMin');
+  if (arIn) arIn.value = String(as_.getReadyBufMin != null ? as_.getReadyBufMin : DEFAULT_BUFFER_MIN);
+
   const rt = document.getElementById('activityRepeat');
   rt.classList.toggle('on', as_.repeat);
   document.getElementById('activityRepeatDays').style.display = as_.repeat?'block':'none';
@@ -380,7 +387,7 @@ function renderActivitySheet() {
     }
   }
 
-  renderSheetTimeSummary('activityTimeSummary', pendingStartMin, as_.durationMin, as_.travelBuffer, as_.travelBufMin);
+  renderSheetTimeSummary('activityTimeSummary', pendingStartMin, as_.durationMin, as_.travelBuffer, as_.travelBufMin, !!as_.getReadyBuffer, as_.getReadyBufMin);
   requestAnimationFrame(()=>syncDurationColumnSpacers('activity'));
 }
 function confirmActivity() {
@@ -398,6 +405,8 @@ function confirmActivity() {
     repeatDays: as_.repeat?as_.repeatDays:[],
     travelBuffer: as_.travelBuffer,
     travelBufMin: as_.travelBufMin,
+    getReadyBuffer: !!as_.getReadyBuffer,
+    getReadyBufMin: as_.getReadyBufMin,
     repeatDateStart: span.start,
     repeatDateEnd:   span.end,
     repeatEvery:     span.every,
@@ -527,6 +536,11 @@ function toggleTravelBuffer(which) {
 }
 function toggleGetReadyBuffer(which) {
   if (which==='training') { ts.getReadyBuffer = !ts.getReadyBuffer; renderTrainingSheet(); }
+  else if (which==='activity') {
+    as_.getReadyBuffer = !as_.getReadyBuffer;
+    if (as_.getReadyBuffer && (as_.getReadyBufMin == null || as_.getReadyBufMin < 5)) as_.getReadyBufMin = DEFAULT_BUFFER_MIN;
+    renderActivitySheet();
+  }
 }
 function toggleWarmupBuffer(which) {
   if (which==='training') { ts.warmupBuffer = !ts.warmupBuffer; renderTrainingSheet(); }
@@ -802,6 +816,11 @@ async function applySeriesUntil() {
 function onActivityTravelBufMinInput() {
   const tIn = document.getElementById('activityTravelBufMin');
   if (tIn) as_.travelBufMin = clampBufferMin(tIn.value);
+  renderActivitySheet();
+}
+function onActivityReadyBufMinInput() {
+  const rIn = document.getElementById('activityReadyBufMin');
+  if (rIn) as_.getReadyBufMin = clampBufferMin(rIn.value);
   renderActivitySheet();
 }
 

@@ -447,10 +447,18 @@ function buildDayColumn(dayKey, canvasHeight, withHeader) {
   // Pending invitations from sister — render as dashed-border blocks
   renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd, dayKey);
 
-  /* Last, so :00 and :30 stay readable across whatever is placed over them.
+  /* Two layers, and only one of them rides over the cards. The half-hour rules
+     go BEHIND: a planned afternoon drawn across with them is hatched, and they
+     are helping nobody by the time there is something there to read. The hour
+     marks stay above, because "where is four o'clock" is a question a card
+     should not be able to hide, and the now-line is above them both.
+
+     Appended last either way so the ticks land over the blocks; the behind
+     layer carries its own negative stacking, which is what puts it under them.
      zMinStart is 0 on every path today, which is why the grid can measure from
      START_MIN; a zoomed zone would have to pass its own offset in. */
-  canvas.appendChild(buildHourGrid(PX_PER_MIN, spanMin, { cls: 'hour-grid--day' }));
+  canvas.appendChild(buildHourGrid(PX_PER_MIN, spanMin, { cls: 'hour-grid--day', layer: 'lines' }));
+  canvas.appendChild(buildHourGrid(PX_PER_MIN, spanMin, { cls: 'hour-grid--day', layer: 'ticks' }));
 
   col.appendChild(canvas);
   return {
@@ -1435,10 +1443,10 @@ function addActivityAtMin(absMin) {
   pendingStartMin = absMin;
 
   if (selectedActivity.isTraining) {
-    ts = { durationMin: selectedActivity.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, warmupBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15, warmupBufMin:20 };
+    ts = { durationMin: selectedActivity.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(selectedActivity), getReadyBuffer:activityTravels(selectedActivity), warmupBuffer:false, gearState:{}, travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, warmupBufMin:DEFAULT_WARMUP_MIN };
     openTrainingSheet();
   } else {
-    as_ = { durationMin: selectedActivity.durationMin||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15, choreTags: [], objectives: [] };
+    as_ = { durationMin: selectedActivity.durationMin||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(selectedActivity), getReadyBuffer:activityTravels(selectedActivity), travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, choreTags: [], objectives: [] };
     openActivitySheet();
   }
 }
@@ -1543,10 +1551,10 @@ function pickFromSlot(actId) {
   closeSheet('slotPickerOverlay');
   // pendingStartMin was set by openSlotPicker.
   if (act.isTraining) {
-    ts = { durationMin: act.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:false, getReadyBuffer:false, warmupBuffer:false, gearState:{}, travelBufMin:15, getReadyBufMin:15, warmupBufMin:20 };
+    ts = { durationMin: act.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(act), getReadyBuffer:activityTravels(act), warmupBuffer:false, gearState:{}, travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, warmupBufMin:DEFAULT_WARMUP_MIN };
     openTrainingSheet();
   } else {
-    as_ = { durationMin: act.durationMin||60, colour: CAT_HEX[act.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:false, travelBufMin:15, choreTags: [], objectives: [] };
+    as_ = { durationMin: act.durationMin||60, colour: CAT_HEX[act.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(act), getReadyBuffer:activityTravels(act), travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, choreTags: [], objectives: [] };
     openActivitySheet();
   }
 }

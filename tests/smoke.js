@@ -575,11 +575,41 @@ function findChromium() {
     if (b.durationMin !== h.endMin - h.startMin) bad.push('the School Day is not as long as school');
     if (b.confirmed) bad.push('an offered School Day arrived pre-confirmed');
 
-    // A day that already holds a plan is left alone.
+    /* Travel and get-ready come on with it. You go to school, so the journey
+       and being ready for it are part of the morning — and Today's "get ready
+       by" has nothing to compute from without them. */
+    if (!b.travelBuffer) bad.push('an offered School Day arrived with no travel time');
+    if (!b.getReadyBuffer) bad.push('an offered School Day arrived with no get-ready time');
+
+    /* THE OFFER IS ABOUT THE SCHOOL CARD, NOT ABOUT THE DAY BEING EMPTY.
+       This used to test whether the day held anything at all, which is a
+       different question and the wrong one: the pale School band is a
+       time-zone — business hours, and what makes the summer break legible —
+       while the card is the plan. They are not duplicates of each other. So one
+       meal on a Monday disqualified that Monday from ever being offered its
+       school card, and the offer only ever appeared on a WHOLLY blank week. */
     keys.forEach(k => setDayBlocks(k, [], 'jenn'));
-    setDayBlocks(schoolKeys[0], [{ id: 'sd-keep', actId: 'piano', startMin: 600, durationMin: 60 }], 'jenn');
+    setDayBlocks(schoolKeys[0], [{ id: 'sd-keep', actId: 'breakfast', startMin: 7 * 60, durationMin: 30 }], 'jenn');
     const offer = schoolDaysToOffer(keys, 'jenn');
-    if (offer.includes(schoolKeys[0])) bad.push('a day that already has a plan was offered anyway');
+    if (!offer.includes(schoolKeys[0])) {
+      bad.push('a school day with breakfast on it was never offered its school card');
+    }
+    // …but a day that already HAS its school card is left alone.
+    setDayBlocks(schoolKeys[0], [{ id: 'sd-has', actId: 'school_day', startMin: 9 * 60, durationMin: 300 }], 'jenn');
+    if (schoolDaysToOffer(keys, 'jenn').includes(schoolKeys[0])) {
+      bad.push('a day that already has its School Day was offered another');
+    }
+
+    // And it is its own banner, not a line inside the blank-week offer.
+    keys.forEach(k => setDayBlocks(k, [], 'jenn'));
+    setDayBlocks(schoolKeys[0], [{ id: 'sd-keep2', actId: 'breakfast', startMin: 7 * 60, durationMin: 30 }], 'jenn');
+    goWeek(); setWeekView('timegrid'); renderWeek();
+    const sb = document.getElementById('tgSchoolBanner');
+    if (!sb || sb.style.display === 'none') {
+      bad.push('a part-planned week does not surface its missing school days');
+    } else if (!/school day/.test(sb.textContent)) {
+      bad.push(`the school banner says "${sb.textContent.trim().slice(0, 80)}"`);
+    }
 
     // And a week months out is not offered at all.
     if (schoolOfferInHorizon(getDayKeys(SCHOOL_FILL_HORIZON_WEEKS + 6))) {
@@ -1196,25 +1226,46 @@ function findChromium() {
     setDayBlocks(keys[0], [{ id: 'grid-probe', actId: 'school_day',
       startMin: 9 * 60, durationMin: 180, checklistState: {} }], 'jenn');
 
+    /* TWO LAYERS, and which side of the cards each one sits on is the point.
+
+       The grid used to be a single layer appended last, so every rule read
+       THROUGH a placed block. That was right on an empty morning and wrong on a
+       planned afternoon, which came out hatched with rules drawn over the top
+       of the things they were meant to help you place.
+
+       Hour marks still ride above — "where is four o'clock" is a question a
+       card must not be able to hide — and the half-hour rules go underneath.
+       Both are still appended after the blocks, so the behind layer has to earn
+       its place with stacking rather than DOM order; asserting both separately
+       is what would catch a z-index that silently stopped applying. */
     const surface = (name, root, gridSel, blockSel) => {
-      const grid = root && root.querySelector(gridSel);
+      const ticks = root && root.querySelector(gridSel + ':not(.hour-grid--behind)');
+      const lines = root && root.querySelector(gridSel + '.hour-grid--behind');
       const block = root && root.querySelector(blockSel);
-      if (!grid) { bad.push(`${name}: no hour grid`); return; }
-      if (!block) { bad.push(`${name}: nothing placed to read through`); return; }
-      const hours = [...grid.querySelectorAll('.hour-grid-line--hour')];
-      const halves = [...grid.querySelectorAll('.hour-grid-line--half')];
+      if (!ticks) { bad.push(`${name}: no hour-tick layer`); return; }
+      if (!lines) { bad.push(`${name}: no behind layer for the half-hour rules`); return; }
+      if (!block) { bad.push(`${name}: nothing placed to read against`); return; }
+      const hours = [...ticks.querySelectorAll('.hour-grid-line--hour')];
+      const halves = [...lines.querySelectorAll('.hour-grid-line--half')];
       if (hours.length < 17) bad.push(`${name}: ${hours.length} hour rules, expected the whole day`);
       if (!halves.length) bad.push(`${name}: no half-hour rules`);
+      if (ticks.querySelector('.hour-grid-line--half')) bad.push(`${name}: a half-hour rule rode above the cards`);
+      if (lines.querySelector('.hour-grid-line--hour')) bad.push(`${name}: an hour mark was buried behind the cards`);
       if (!hours.some(h => crosses(h, block))) bad.push(`${name}: no hour rule crosses the block`);
-      if (zOf(grid) <= zOf(block)) {
-        bad.push(`${name}: the grid (z${zOf(grid)}) is under the block (z${zOf(block)})`);
+      if (zOf(ticks) <= zOf(block)) {
+        bad.push(`${name}: the hour marks (z${zOf(ticks)}) are under the block (z${zOf(block)})`);
       }
-      if (!(block.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING)) {
-        bad.push(`${name}: the grid is drawn before the block`);
+      if (zOf(lines) >= zOf(block)) {
+        bad.push(`${name}: the half-hour rules (z${zOf(lines)}) still ride over the block (z${zOf(block)})`);
       }
-      if (getComputedStyle(grid).pointerEvents !== 'none') {
-        bad.push(`${name}: the grid takes pointer events and would swallow taps`);
+      if (!(block.compareDocumentPosition(ticks) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+        bad.push(`${name}: the hour marks are drawn before the block`);
       }
+      [['hour marks', ticks], ['half-hour rules', lines]].forEach(([what, g]) => {
+        if (getComputedStyle(g).pointerEvents !== 'none') {
+          bad.push(`${name}: the ${what} take pointer events and would swallow taps`);
+        }
+      });
     };
 
     setDayViewSpan(1);
@@ -1232,7 +1283,8 @@ function findChromium() {
     // 6am and 10pm both get a rule: the gutter used < / > and the line loop
     // <= / >=, so the two ends were labelled but never drawn.
     const tops = [...document.querySelector('.wf-day-col')
-      .querySelectorAll('.hour-grid-line--hour')].map(l => Math.round(parseFloat(l.style.top)));
+      .querySelectorAll('.hour-grid--wf:not(.hour-grid--behind) .hour-grid-line--hour')]
+      .map(l => Math.round(parseFloat(l.style.top)));
     if (!tops.includes(0)) bad.push('the Full week labels 6am but draws no rule for it');
 
     setWeekView('timegrid');
@@ -8570,6 +8622,127 @@ function findChromium() {
       mnyDraft = null;
       profile = 'jenn';
     }
+    return bad.length === 0 || bad;
+  });
+
+  /* YOU TRAVEL TO TRAINING, AND THE PLANNER SHOULD KNOW.
+     Both placement sheets started every buffer off, so a swim was planned as
+     though it happened at the kitchen table and tdActionableStart — the get-
+     ready time Today leads with — had nothing to compute from until somebody
+     remembered the toggle. The default comes from the activity, because
+     flipping it globally would put a car journey in front of Breakfast. */
+  checks.youTravelToTraining = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile, wasKey = currentDayKey;
+    profile = 'jenn'; weekOffset = 0;
+    const keys = getDayKeys(0), day = keys[3];
+    const before = (getDayBlocks(day, 'jenn') || []).slice();
+    currentDayKey = day;
+    const place = (id) => {
+      setDayBlocks(day, [], 'jenn');
+      const act = findActivity(id, 'jenn');
+      if (!act) { bad.push(`no activity called ${id}`); return null; }
+      startPlacingActivity(act);
+      (act.isTraining ? confirmTraining : confirmActivity)();
+      return (getDayBlocks(day, 'jenn') || [])[0] || null;
+    };
+    try {
+      // Things you GO to.
+      ['training', 'competition', 'appt_medical', 'school_day'].forEach(id => {
+        const b = place(id);
+        if (!b) { bad.push(`${id} placed nothing`); return; }
+        if (!b.travelBuffer) bad.push(`${id} arrived with no travel time`);
+        if (!b.getReadyBuffer) bad.push(`${id} arrived with no get-ready time`);
+        if (b.travelBufMin !== DEFAULT_BUFFER_MIN) bad.push(`${id} travel is ${b.travelBufMin}, expected the default`);
+      });
+      // Things you do at home. A car journey before Breakfast is the failure
+      // a global default would have produced.
+      ['breakfast', 'piano', 'chores', 'family', 'routine_morning'].forEach(id => {
+        const b = place(id);
+        if (!b) { bad.push(`${id} placed nothing`); return; }
+        if (b.travelBuffer) bad.push(`${id} arrived with travel time it does not need`);
+        if (b.getReadyBuffer) bad.push(`${id} arrived with get-ready time it does not need`);
+      });
+      // And Today reads the lead time without anyone touching a toggle.
+      const t = place('training');
+      if (t) {
+        const lead = tdActionableStart(t);
+        if (!(lead < t.startMin)) {
+          bad.push(`Today's get-ready time (${lead}) is not before the block (${t.startMin})`);
+        }
+      }
+    } finally {
+      setDayBlocks(day, before, 'jenn');
+      profile = wasProfile; currentDayKey = wasKey;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* THE MEETING IS ONE SCROLLER, WITH BOTH ENDS PINNED.
+     A five-step sitting spends its time in the middle of a long panel, and the
+     week you were reviewing, the step you were on and the only way to the next
+     one all scrolled away with the content. */
+  checks.theMeetingKeepsItsHeadAndFeet = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    try {
+      openFamilyMeeting(); mmGoStep(3);
+      const sheet = document.querySelector('#familyMeetingOverlay .sheet');
+      const head = document.querySelector('#familyMeetingBody .mm-head');
+      const nav = document.querySelector('#familyMeetingBody .mm-nav');
+      if (!head) bad.push('the week and step header is not its own band');
+      if (!nav) bad.push('there is no navigation band');
+      if (head && getComputedStyle(head).position !== 'sticky') bad.push('the header is not sticky');
+      if (nav && getComputedStyle(nav).position !== 'sticky') bad.push('Back/Next/Finish is not sticky');
+
+      // One scroller. A second one inside the sheet is how a flick on an iPad
+      // comes to move the wrong thing.
+      const scrollers = [...document.querySelectorAll('#familyMeetingOverlay *')].filter(el => {
+        const o = getComputedStyle(el).overflowY;
+        return (o === 'auto' || o === 'scroll') && el.scrollHeight > el.clientHeight + 4;
+      });
+      if (scrollers.length > 1) {
+        bad.push(`${scrollers.length} scrollers inside the meeting: ${scrollers.map(e => '.' + String(e.className).split(' ')[0]).join(', ')}`);
+      }
+      if (scrollers.length === 1 && scrollers[0] !== sheet) {
+        bad.push('the meeting scrolls something other than the sheet');
+      }
+
+      // Scrolled to the bottom, both bands are still on screen.
+      if (sheet && sheet.scrollHeight > sheet.clientHeight) {
+        sheet.scrollTop = sheet.scrollHeight;
+        const sr = sheet.getBoundingClientRect();
+        const hr = head.getBoundingClientRect(), nr = nav.getBoundingClientRect();
+        if (hr.bottom <= sr.top + 1) bad.push('the header scrolled off the top');
+        if (nr.top >= sr.bottom - 1) bad.push('the buttons scrolled off the bottom');
+        // Dead space under the buttons is exactly what the sticky footer is
+        // meant to remove.
+        if (sheet.scrollHeight - (sheet.scrollTop + sheet.clientHeight) > 2) {
+          bad.push('there is blank space left under the buttons');
+        }
+        sheet.scrollTop = 0;
+      }
+      closeSheet('familyMeetingOverlay');
+    } finally {
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* MEAL BLOCKS SAY THEIR NAME. The week grid rendered meals as a bare icon
+     next to the block's OWN icon, so a cell showed the same glyph twice and
+     named nothing. */
+  checks.mealsAreNamedNotJustDrawn = await page.evaluate(() => {
+    const bad = [];
+    const want = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner' };
+    Object.keys(want).forEach(id => {
+      const act = findActivity(id, 'jenn');
+      const label = tg2ShortLabel(act, { actId: id });
+      if (label !== want[id]) bad.push(`${id} reads "${label}", expected "${want[id]}"`);
+      if (/\p{Extended_Pictographic}/u.test(label)) bad.push(`${id}'s label is still an emoji`);
+    });
     return bad.length === 0 || bad;
   });
 

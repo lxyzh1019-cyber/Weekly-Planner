@@ -293,23 +293,39 @@ function placeableActivityIds(kid) {
    `spanMin` is how much of the day the surface draws (DAY_MIN_SPAN everywhere
    today) and `pxPerMin` its own scale. Half-hour rules are dropped below
    `halfMin` px an hour, where they would sit on top of the hour rule. */
+/* `opts.layer` splits the grid in two, which is the whole point of it:
+
+     'lines'  the half-hour rules — BEHIND the cards
+     'ticks'  the hour rules — above them
+     (absent) both, as before
+
+   The grid used to be appended last on every surface so its marks read THROUGH
+   a placed block. That was the right call while a day was mostly empty and the
+   wrong one the moment it is planned: a full afternoon ended up hatched with
+   rules drawn over the top of the things they were meant to help you place.
+   Hour marks still ride above, because "where is four o'clock" is a question a
+   card should not be able to hide, and so does the now-line. Everything else
+   goes underneath. */
 function buildHourGrid(pxPerMin, spanMin, opts) {
   const o = opts || {};
+  const layer = o.layer || 'both';
   const grid = document.createElement('div');
-  grid.className = 'hour-grid' + (o.cls ? ' ' + o.cls : '');
+  grid.className = 'hour-grid'
+    + (layer === 'lines' ? ' hour-grid--behind' : '')
+    + (o.cls ? ' ' + o.cls : '');
   const span = spanMin != null ? spanMin : DAY_MIN_SPAN;
   const firstHour = Math.ceil(START_MIN / 60);
   const lastHour = Math.floor((START_MIN + span) / 60);
   const showHalf = o.halves !== false && 60 * pxPerMin >= (o.halfMin || 34);
   for (let h = firstHour; h <= lastHour; h++) {
     const rel = h * 60 - START_MIN;
-    if (rel >= 0 && rel <= span) {
+    if (layer !== 'lines' && rel >= 0 && rel <= span) {
       const line = document.createElement('div');
       line.className = 'hour-grid-line hour-grid-line--hour';
       line.style.top = (rel * pxPerMin) + 'px';
       grid.appendChild(line);
     }
-    if (!showHalf) continue;
+    if (!showHalf || layer === 'ticks') continue;
     const half = rel + 30;
     if (half > 0 && half < span) {
       const line = document.createElement('div');

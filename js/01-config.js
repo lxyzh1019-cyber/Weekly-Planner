@@ -114,6 +114,20 @@ function activityGroup(act) {
   }
 }
 
+/* ── Do you GO to this, or do you do it here? ─────────────────────
+   Both placement sheets started every buffer switched off, so a swim and a
+   skate were planned as though they happened at the kitchen table — and
+   tdActionableStart, the get-ready time Today leads with, had nothing to
+   compute from until somebody remembered to reach for the toggle.
+
+   The default comes from the ACTIVITY rather than from a global switch, which
+   is the whole point: flipping it globally would put a fifteen-minute car
+   journey in front of Breakfast. Warm-up is untouched — it is a training-
+   specific idea with its own 20-minute default and its own toggle.
+
+   Every toggle stays exactly where it is. Only the starting position moves. */
+function activityTravels(act) { return !!(act && act.travels); }
+
 /* ── One filter table ──
    The day screen's activity picker and the tray each carried their own copy of
    this list, and they had drifted: the picker was missing Seasonal, and neither
@@ -391,22 +405,22 @@ const DEFAULT_ACTIVITIES = [
   { id:'breakfast',  name:'Breakfast',        icon:'🍳', cat:'daily',    durationMin:30, suitableTime:['before-school','weekend'] },
   { id:'lunch',      name:'Lunch',             icon:'🥗', cat:'daily',    durationMin:30, suitableTime:['school','weekend'] },
   { id:'dinner',     name:'Dinner',            icon:'🍽', cat:'daily',    durationMin:60, suitableTime:['evening','weekend'] },
-  { id:'school_day', name:'School Day',        icon:'🏫', cat:'school',   durationMin:420, suitableTime:['school'] }, // 7h
+  { id:'school_day', name:'School Day',        icon:'🏫', cat:'school', travels:true,   durationMin:420, suitableTime:['school'] }, // 7h
   { id:'french',     name:'French Adventure',  icon:'🇫🇷', cat:'school',   durationMin:60, suitableTime:['after-school','weekend','evening'] },
   { id:'chinese',    name:'Chinese Adventure', icon:'🇨🇳', cat:'school',   durationMin:60, suitableTime:['after-school','weekend','evening'] },
   { id:'math',       name:'Math Adventure',    icon:'🦘', cat:'school',   durationMin:60, suitableTime:['after-school','weekend','evening'] },
-  { id:'training',   name:'Training',          icon:'🏋️', cat:'training', durationMin:120, isTraining:true, suitableTime:['after-school','weekend'] },
-  { id:'competition', name:'Competition',      icon:'🏆', cat:'training', durationMin:480, isTraining:true, isCompetition:true, suitableTime:['weekend'] },
+  { id:'training',   name:'Training',          icon:'🏋️', cat:'training', durationMin:120, isTraining:true, travels:true, suitableTime:['after-school','weekend'] },
+  { id:'competition', name:'Competition',      icon:'🏆', cat:'training', durationMin:480, isTraining:true, isCompetition:true, travels:true, suitableTime:['weekend'] },
   // Filed under Rest, not Active. It is the opposite of a workout, and Rest was
   // a category with a colour, a chip and nothing in it.
   { id:'relax',      name:'Muscle Relaxation', icon:'🧘', cat:'sleep',    durationMin:60, suitableTime:['after-school','evening','weekend'] },
   // Appointments — a time somebody else set. Not moveable, and a week with one
   // is shaped around it, which is why they are their own category rather than
   // being filed under Daily.
-  { id:'appt_general',    name:'Appointment',      icon:'🗓', cat:'appointment', durationMin:60, suitableTime:['after-school','school','weekend'] },
-  { id:'appt_medical',    name:'Doctor / Dentist', icon:'🩺', cat:'appointment', durationMin:60, suitableTime:['after-school','school','weekend'] },
-  { id:'appt_haircut',    name:'Haircut',          icon:'✂️', cat:'appointment', durationMin:45, suitableTime:['after-school','weekend'] },
-  { id:'appt_school_meet', name:'School Meeting',  icon:'🧑‍🏫', cat:'appointment', durationMin:60, suitableTime:['after-school','school'] },
+  { id:'appt_general',    name:'Appointment',      icon:'🗓', cat:'appointment', travels:true, durationMin:60, suitableTime:['after-school','school','weekend'] },
+  { id:'appt_medical',    name:'Doctor / Dentist', icon:'🩺', cat:'appointment', travels:true, durationMin:60, suitableTime:['after-school','school','weekend'] },
+  { id:'appt_haircut',    name:'Haircut',          icon:'✂️', cat:'appointment', travels:true, durationMin:45, suitableTime:['after-school','weekend'] },
+  { id:'appt_school_meet', name:'School Meeting',  icon:'🧑‍🏫', cat:'appointment', travels:true, durationMin:60, suitableTime:['after-school','school'] },
   { id:'break_quick', name:'Quick Break',     icon:'☕', cat:'free',     durationMin:15, suitableTime:['before-school','school','after-school','evening','weekend'], quickBreak:true },
   { id:'piano',      name:'Piano Practice',    icon:'🎹', cat:'school',   durationMin:60, suitableTime:['after-school','evening','weekend'] },
   { id:'chores',     name:'House Chore',       icon:'🧹', cat:'daily', group:'chores',    durationMin:60, suitableTime:['after-school','evening','weekend'] },

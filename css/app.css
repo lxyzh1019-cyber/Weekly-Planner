@@ -1619,8 +1619,37 @@
   .mm-pay { border: 2px solid var(--ink); border-radius: 12px; background: #fff9e9; padding: 8px 10px; margin: 8px 0; }
   .mm-pay-row { display: flex; justify-content: space-between; font-size: calc(0.95rem * var(--fs-scale, 1)); padding: 2px 0; }
   .mm-recorded { font-size: calc(0.86rem * var(--fs-scale, 1)); font-weight: 700; background: #95d5b2; border: 2px solid var(--ink); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; }
-  .mm-nav { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; }
+  /* ── The meeting is ONE scrolling container ──────────────────────
+     The sheet has always been the scroller; what was missing is that the two
+     things you steer with scrolled away with the content. On step 3 or 4 —
+     long panels, several taps each — the week you were reviewing, the step you
+     were on and the only way to the next one were all off screen.
+
+     Sticky inside the sheet's own scroll area rather than a second scroller:
+     nesting one would put two scrollers on an iPad, and a flick would move the
+     wrong one. Negative margins let each band span the sheet's 1.2rem padding
+     so nothing shows through at the edges. */
+  .mm-head {
+    position: sticky; top: -1.2rem; z-index: 3;
+    margin: -1.2rem -1.2rem 0; padding: 1.2rem 1.2rem 0;
+    background: var(--paper);
+    border-bottom: 2px solid var(--paper-line);
+  }
+  .mm-head .mm-stepper { margin-bottom: 8px; }
+  .mm-nav {
+    display: flex; justify-content: space-between; gap: 8px;
+    position: sticky; bottom: -1.2rem; z-index: 3;
+    /* No margin-top: the body's own bottom padding was doing that job and
+       leaving a dead strip under the buttons on a short step. */
+    margin: 0 -1.2rem -1.2rem; padding: 0.6rem 1.2rem calc(0.6rem + env(safe-area-inset-bottom, 0px));
+    background: var(--paper);
+    border-top: 2px solid var(--paper-line);
+  }
   .mm-nav .btn-confirm { flex: 1; }
+  .mm-nav .pill-btn, .mm-nav .btn-confirm { min-height: 44px; }
+  /* The gap between the last card and the pinned buttons, owned in one place
+     instead of by whatever the final panel happened to end with. */
+  .mm-body { padding-bottom: var(--space-3); }
   .chore-card h3 { margin: 0 0 0.5rem 0; font-size: 1.2rem; }
   .ct-item {
     display: flex;
@@ -2367,9 +2396,15 @@
      that is the done button, the placement guide and the now line (14/18/20);
      in the Full week the now line (5); in the Day Blocks lane nothing, so it
      sits over the clash outline and its flag too. */
+  /* Hour marks ride over the cards; the half-hour rules sit under them. The
+     grid used to be one layer at z-index 12 on the day view — above
+     .placed-block (z10) — which read well on an empty morning and hatched a
+     planned afternoon. .hour-grid--behind is appended last too, so it needs a
+     stacking value BELOW the blocks rather than merely earlier in the DOM. */
   .hour-grid--day { z-index: 12; }
   .hour-grid--wf  { z-index: 4; }
   .hour-grid--tg2 { z-index: 7; }
+  .hour-grid--behind { z-index: 0; }
   /* The tick is sized to its column, not fixed. The day view has one wide
      column and can carry a 14px mark; the week views have seven narrow ones,
      where the same mark is a tenth of the lane and seventeen rows of them read

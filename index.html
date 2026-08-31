@@ -296,6 +296,7 @@
       <div class="weekly-full" id="weeklyFullGrid"></div>
       <!-- Under the grid it describes, same as the Day Blocks copy. -->
       <div class="week-todo-banner" id="weekFamilyBanner" style="display:none"></div>
+      <div class="week-todo-banner" id="weekSchoolBanner" style="display:none"></div>
       <div class="week-conflict-banner" id="weekConflictBanner" style="display:none"></div>
       <div class="week-signature" id="weekSignatureBar"></div>
     </div>
@@ -320,6 +321,7 @@
     <div class="tg-controls">
       <div class="tg-streak" id="tgStreak"></div>
       <div class="week-todo-banner" id="tgFamilyBanner" style="display:none"></div>
+      <div class="week-todo-banner" id="tgSchoolBanner" style="display:none"></div>
       <div class="week-conflict-banner" id="tgConflictBanner" style="display:none"></div>
     </div>
   </div>
@@ -898,6 +900,17 @@
     <div class="buffer-dur-row" id="activityTravelDurRow" style="display:none">
       <label for="activityTravelBufMin">Travel minutes (each way)</label>
       <input type="number" id="activityTravelBufMin" min="5" max="180" step="5" value="15" onchange="onActivityTravelBufMinInput()">
+    </div>
+    <!-- Get-ready existed only on the training sheet, so an appointment or a
+         school day placed from here could name a journey but never the time
+         it takes to be ready for it. -->
+    <div class="buffer-toggle" id="activityReadyToggle" onclick="toggleGetReadyBuffer('activity')">
+      <div class="toggle-track"><div class="toggle-knob"></div></div>
+      <span class="toggle-label">👕 Needs get ready time (default 15 min before &amp; after — adjust below)</span>
+    </div>
+    <div class="buffer-dur-row" id="activityReadyDurRow" style="display:none">
+      <label for="activityReadyBufMin">Get-ready minutes (each way)</label>
+      <input type="number" id="activityReadyBufMin" min="5" max="120" step="5" value="15" onchange="onActivityReadyBufMinInput()">
     </div>
     <div class="repeat-toggle" id="activityRepeat" onclick="toggleRepeat('activityRepeat')">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
