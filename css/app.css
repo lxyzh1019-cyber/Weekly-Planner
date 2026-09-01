@@ -1571,6 +1571,32 @@
     border-left: 3px solid var(--paper-line); padding-left: 10px; margin-top: 4px;
   }
   .refl-ev-item { font-size: calc(0.9rem * var(--fs-scale, 1)); padding: 2px 0; }
+  /* How the answer was given, not what it was. */
+  .refl-aloud {
+    min-height: 44px; margin-top: 8px; padding: 6px 12px;
+    border: 2px dashed var(--ink); border-radius: 14px;
+    background: var(--paper); cursor: pointer;
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: calc(0.9rem * var(--fs-scale, 1));
+  }
+  .refl-aloud.on { border-style: solid; background: #e7f3ff; }
+  /* Carrying the action into a plan: offered, never automatic. */
+  .refl-carry { margin-top: 12px; }
+  .refl-carry-cap { display: block; font-size: calc(0.9rem * var(--fs-scale, 1)); opacity: 0.8; }
+  .refl-carry-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .refl-carry-btns .pill-btn { min-height: 44px; }
+  .refl-carry--done {
+    padding: 8px 10px; border: 2px solid #2f8f84; border-radius: 12px;
+    background: #d8f3dc; font-size: calc(0.9rem * var(--fs-scale, 1));
+  }
+  /* A closed week is a record. The panel says so instead of offering controls
+     that would refuse. */
+  .refl-locked {
+    padding: 8px 10px; margin-bottom: 8px;
+    border: 2px solid var(--ink); border-radius: 12px; background: #f3efe3;
+    font-size: calc(0.9rem * var(--fs-scale, 1));
+  }
+  .refl-body--locked .refl-chip, .refl-body--locked .refl-note { opacity: 0.85; }
   .refl-card {
     margin-top: 12px; padding: 10px;
     border: 2px solid var(--ink); border-radius: 12px; background: #fff8e7;

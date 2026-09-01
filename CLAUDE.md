@@ -603,6 +603,32 @@ markup — a `disabled` attribute is a hint to the pointer, not a rule:
   agreement and changes no completion, grade, XP or money.
 - **skipping is explicit and reversible**, and never blocks the settlement.
 
+**The action is saved either way; putting it in a plan is a separate act.** She
+picks it and it is in the record immediately. Carrying it forward is offered, not
+automatic, and never happens without a confirmation naming the child, the week
+and what will appear. `reflTargetWeek` decides where it lands, and **not** by
+taking the week after the one on screen: a current week plans into next week, and
+anything older plans into the week we are actually in — a sitting held six weeks
+late must not write into a week that has already happened, which is the defect
+that retired `mmPlanNextWeek`. Attaching to a routine she already has writes no
+to-do at all, because a duplicate helps nobody.
+
+**A closed week's reflection is a record.** `reflIsLocked` gates every edit path —
+chips, keyboard, the parent tick, the skip and the carry-forward — because the
+money and the grades are already frozen when a week closes and a reflection that
+could still be rewritten would be the odd one out. Paging through it stays
+available; reopening the week on step 5 is the way back in, the same door every
+other frozen fact uses.
+
+**Two things are kept apart from her own words.** `inputMode` records *how* the
+answer was given — spoken, or scribed by whoever held the iPad — and nothing
+about what it was: a child who explained it well to her parent has answered, and
+making her type it to make it count turns a conversation into a form.
+`parentObservation` is a second account of the week in its own labelled field,
+and it can never overwrite hers. `evidenceIds` keeps what the app was *offering*
+when she answered, never what she picked — nothing on this screen selects an
+answer.
+
 **A tap edits a draft, not the document.** Every write is a full-document upload
 and this is the tap-heaviest screen in the app, so `reflDraft` is device-local
 and `reflCommitDraft` writes on the moves that mean she has finished with a tab —

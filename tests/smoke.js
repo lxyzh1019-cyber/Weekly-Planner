@@ -8515,6 +8515,247 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* THE ACTION IS SAVED EITHER WAY; PUTTING IT IN A PLAN IS A SEPARATE ACT.
+     A reflection that only files the action changes nothing about next week,
+     and one that writes into the planner on its own is a screen taking a
+     decision the family did not make. So: saved in the record the moment she
+     picks it, and carried into a plan only behind a confirmation that says
+     which child, which week and what will appear.
+
+     The week it lands on is not "the one after the week on screen" — a meeting
+     held six weeks late must not write into a week that has already happened,
+     which is the defect that retired mmPlanNextWeek. */
+  checks.theActionCanBeCarriedIntoAPlan = await page.evaluate(async () => {
+    const bad = [];
+    const wasProfile = profile;
+    const wasConfirm = window.showConfirm;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+    const hadRefl = JSON.parse(JSON.stringify(state.shared.chore.reflections || {}));
+    const hadTodos = JSON.parse(JSON.stringify(getProfData('jenn').todos || []));
+    try {
+      state.shared.chore.reflections = {}; reflDraft = null;
+      getProfData('jenn').todos = [];
+      mmGoToWeek(wk); mmGoStep(2); mnySetMeetKid('jenn');
+      reflTab = 'planNext'; renderMeetingMode();
+      const host = document.getElementById('familyMeetingBody');
+
+      // Nothing is offered until she has chosen an action.
+      if (host.querySelector('[data-mm-action="refl-carry"]')) {
+        bad.push('carrying forward was offered before an action was chosen');
+      }
+      host.querySelector('[data-mm-action="refl-action"]').click();
+      if (!reflWorking(wk, 'jenn').planNext.actionId) bad.push('the action did not save');
+      if (!host.querySelector('[data-mm-action="refl-carry"]')) {
+        bad.push('the action was chosen but cannot be carried forward');
+      }
+
+      // Declining the confirmation writes nothing at all.
+      window.showConfirm = async () => false;
+      const carryBtns = [...host.querySelectorAll('[data-mm-action="refl-carry"]')];
+      const todoBtn = carryBtns[carryBtns.length - 1];
+      await reflAddToPlan(wk, 'jenn', '');
+      if ((getProfData('jenn').todos || []).length) bad.push('a declined preview still wrote a to-do');
+      if (reflCarriedForward(reflWorking(wk, 'jenn'))) bad.push('a declined preview recorded a carry');
+
+      // Accepting writes exactly one to-do, on the week she will live it.
+      window.showConfirm = async () => true;
+      await reflAddToPlan(wk, 'jenn', '');
+      const todos = getProfData('jenn').todos || [];
+      if (todos.length !== 1) bad.push(`accepting wrote ${todos.length} to-dos`);
+      else {
+        if (todos[0].weekKey === wk) bad.push('the to-do landed on the week being reviewed, not the one ahead');
+        if (todos[0].weekKey !== reflTargetWeek(wk)) bad.push('the to-do did not land on the target week');
+        if (!/timer|Check|Ask|Finish|Prepare|Repeat|Follow/i.test(todos[0].text)) {
+          bad.push(`the to-do does not name the action: "${todos[0].text}"`);
+        }
+      }
+      if (!reflCarriedForward(reflWorking(wk, 'jenn'))) bad.push('the carry was not recorded');
+      // …and it cannot be written twice.
+      renderMeetingMode();
+      if (host.querySelector('[data-mm-action="refl-carry"]')) {
+        bad.push('a carried action was still offered for carrying');
+      }
+
+      /* A past week plans into the present, never into the week after itself. */
+      const past = mrWeekDayKeys(wk)[0].slice(0, 8) + '01';
+      if (reflTargetWeek('2020-01-06') !== ctThisWeekKey()) {
+        bad.push('a historical week plans forward into another historical week');
+      }
+      // Attaching to a routine creates no to-do at all.
+      state.shared.chore.reflections = {}; reflDraft = null;
+      getProfData('jenn').todos = [];
+      const routine = reflLinkTargets('jenn')[0];
+      if (!routine) bad.push('there is nothing to attach an action to');
+      else {
+        reflEdit(wk, 'jenn', r => { r.planNext.actionId = 'timer'; });
+        await reflAddToPlan(wk, 'jenn', routine.id);
+        if ((getProfData('jenn').todos || []).length) bad.push('attaching to a routine still added a duplicate to-do');
+        if (reflGet(wk, 'jenn').planNext.linkedRoutineId !== routine.id) bad.push('the routine link was not recorded');
+      }
+    } finally {
+      window.showConfirm = wasConfirm;
+      state.shared.chore.reflections = hadRefl;
+      getProfData('jenn').todos = hadTodos;
+      reflDraft = null;
+      closeSheet('familyMeetingOverlay');
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* HOW THE ANSWER WAS GIVEN, AND WHOSE ANSWER IT IS.
+     Two things the reflection has to keep apart from her own words. "Said out
+     loud" is a complete answer — a child who explained it well to her parent
+     has answered, and making her type it to make it count turns a conversation
+     into a form. "Parent noticed" is a second account of the week, stored in
+     its own field and labelled, because a grown-up's reading must never
+     overwrite the child's. */
+  checks.theReflectionKeepsVoicesApart = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+    const hadRefl = JSON.parse(JSON.stringify(state.shared.chore.reflections || {}));
+    try {
+      state.shared.chore.reflections = {}; reflDraft = null;
+      mmGoToWeek(wk); mmGoStep(2); mnySetMeetKid('jenn');
+      reflTab = 'doingWell'; renderMeetingMode();
+      const host = document.getElementById('familyMeetingBody');
+
+      // Spoken is the default: recording it should cost nothing.
+      const aloud = host.querySelector('[data-mm-action="refl-aloud"]');
+      if (!aloud) { bad.push('there is no way to say the answer was spoken'); }
+      else {
+        if (aloud.getAttribute('aria-pressed') !== 'true') bad.push('spoken is not the default');
+        // A chip answer plus "said out loud" finishes the tab with no typing.
+        host.querySelector('[data-mm-action="refl-well"]').click();
+        if (!reflTabComplete(reflWorking(wk, 'jenn'), 'doingWell')) {
+          bad.push('a tapped answer did not finish the tab without the keyboard');
+        }
+        host.querySelector('[data-mm-action="refl-aloud"]').click();
+        if (reflWorking(wk, 'jenn').doingWell.inputMode !== 'parent_scribed') {
+          bad.push('how the answer was given was not recorded');
+        }
+        // …and it changes nothing about WHAT she answered.
+        if (!(reflWorking(wk, 'jenn').doingWell.answerIds || []).length) {
+          bad.push('recording how it was given changed what was answered');
+        }
+      }
+
+      // Parent noticed: its own field, and it cannot reach her answer.
+      reflTab = 'needsWork'; renderMeetingMode();
+      host.querySelector('[data-mm-action="refl-problem"]').click();
+      const her = reflWorking(wk, 'jenn').needsWork.answerId;
+      const field = document.querySelector('[data-refl-field="refl-parent"]');
+      if (!field) { bad.push('there is nowhere to record what a parent noticed'); }
+      else {
+        if (!/Parent noticed/i.test(host.textContent)) bad.push("the parent's line is not labelled as theirs");
+        field.value = 'she was tired all week';
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        const rec = reflWorking(wk, 'jenn');
+        if (rec.needsWork.parentObservation !== 'she was tired all week') {
+          bad.push('the parent observation did not record');
+        }
+        if (rec.needsWork.answerId !== her) bad.push("the parent's note overwrote the child's answer");
+        if (rec.needsWork.controllableText === 'she was tired all week') {
+          bad.push("the parent's note landed in the child's own field");
+        }
+      }
+
+      /* What the app was OFFERING when she answered is kept, so a reflection
+         read a year later shows what she was looking at. It is never what she
+         picked — nothing here selects an answer. */
+      const rec = reflWorking(wk, 'jenn');
+      if (!Array.isArray(rec.needsWork.evidenceIds)) bad.push('the evidence shown was not recorded');
+      if (rec.needsWork.evidenceIds.includes(rec.needsWork.answerId)) {
+        bad.push('the evidence list is storing her answer rather than what was shown');
+      }
+    } finally {
+      state.shared.chore.reflections = hadRefl;
+      reflDraft = null;
+      closeSheet('familyMeetingOverlay');
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* A CLOSED WEEK'S REFLECTION IS A RECORD.
+     The money is frozen when a week closes and the grades are frozen with it.
+     The reflection has to match, or a parent can reopen step 2 on a settled
+     week months later and change what a child said about it. Reopening the
+     week is the way back in — the same door every other frozen fact uses. */
+  checks.aClosedWeeksReflectionCannotBeRewritten = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+    const hadRefl = JSON.parse(JSON.stringify(state.shared.chore.reflections || {}));
+    const hadClosed = JSON.parse(JSON.stringify(state.shared.chore.weeksClosed || {}));
+    try {
+      state.shared.chore.reflections = {}; reflDraft = null;
+      setWeekClosed(wk, false);
+      mmGoToWeek(wk); mmGoStep(2); mnySetMeetKid('jenn');
+      reflTab = 'doingWell'; renderMeetingMode();
+      const host = document.getElementById('familyMeetingBody');
+      host.querySelector('[data-mm-action="refl-well"]').click();
+      const answered = (reflWorking(wk, 'jenn').doingWell.answerIds || []).slice();
+      if (!answered.length) bad.push('the answer did not record while the week was open');
+      reflCommitDraft();
+
+      setWeekClosed(wk, true);
+      renderMeetingMode();
+      if (!/closed/i.test(host.textContent)) bad.push('a closed week does not say so on the reflection');
+
+      // Every edit path refuses: a chip, the keyboard, and the two footer writes.
+      const chip = host.querySelector('[data-mm-action="refl-well"]:not([aria-pressed="true"])');
+      if (chip) chip.click();
+      if (JSON.stringify(reflGet(wk, 'jenn').doingWell.answerIds) !== JSON.stringify(answered)) {
+        bad.push('a tap changed a closed week\'s answers');
+      }
+      /* Asserted against the WORKING record, not the stored one. reflEdit
+         writes to a draft that is only committed later, so reading the store
+         here would report success while the edit sat in memory waiting to be
+         written — which is exactly what it did the first time this was run. */
+      reflEdit(wk, 'jenn', r => { r.needsWork.answerId = 'rushed'; });
+      if (reflWorking(wk, 'jenn').needsWork.answerId === 'rushed') {
+        bad.push('reflEdit wrote through on a closed week');
+      }
+      reflCommitDraft();
+      if (reflGet(wk, 'jenn').needsWork.answerId === 'rushed') {
+        bad.push('a closed week\'s edit reached the document');
+      }
+      if (host.querySelector('[data-mm-action="refl-talked"]')) bad.push('the parent tick is still offered');
+      if (host.querySelector('[data-mm-action="refl-skip"]')) bad.push('skipping is still offered');
+      const note = host.querySelector('.refl-note');
+      if (note && !note.readOnly) bad.push('a scribed note is still editable');
+
+      // Reading it is still allowed — a record you cannot page through is poor.
+      const tab = host.querySelector('[data-mm-action="refl-tab"][data-refl-tab="needsWork"]');
+      if (tab) tab.click();
+      if (reflTab !== 'needsWork') bad.push('a closed week cannot be paged through');
+
+      // Reopening is the way back in.
+      setWeekClosed(wk, false);
+      reflTab = 'doingWell'; renderMeetingMode();
+      const again = host.querySelector('[data-mm-action="refl-well"]:not([aria-pressed="true"])');
+      if (again) again.click();
+      if ((reflWorking(wk, 'jenn').doingWell.answerIds || []).length === answered.length) {
+        bad.push('reopening the week did not make the reflection editable again');
+      }
+    } finally {
+      state.shared.chore.reflections = hadRefl;
+      state.shared.chore.weeksClosed = hadClosed;
+      reflDraft = null;
+      closeSheet('familyMeetingOverlay');
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
   /* STEP 5 SHOWS THE WHOLE WEEK BEFORE IT CLOSES IT.
      Closing is the confirmation the old workflow never had, and it was offered
      against a gate whose reasons a parent could not see. The summary is the
