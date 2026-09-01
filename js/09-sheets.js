@@ -32,20 +32,13 @@ function nextFreeSlotMin(dayKey, durationMin, fromMin) {
   return Math.min(start, END_MIN - dur);
 }
 
-/* "Place this one." Called by the tutorial's starter pick, the level-up reward
-   flow and the mascot's suggestions — each of which has already decided which
-   activity, and used to hand it to the tray to be highlighted. They open the
-   placement sheet at the next free slot now, which is one tap rather than two
-   and does not depend on a rail that no longer exists. */
+/* "Place this one." Called by the level-up reward flow and the mascot's
+   suggestions — each of which has already decided which activity, and used to
+   hand it to the tray to be highlighted. They open the placement sheet at the
+   next free slot now, which is one tap rather than two and does not depend on a
+   rail that no longer exists. */
 function startPlacingActivity(act) {
   if (!act) return;
-  // Opt-in Family Hero onboarding: choosing a starter chore before it's
-  // been set up opens the chooser here, instead of forcing that sheet on
-  // the first day-view load (and instead of a dead "locked" toast).
-  const _pr = getProfData()?.progress;
-  if (_pr && !_pr.tutorialDone && TUTORIAL_STARTER_CHOICES.some(c=>c.id===act.id)) {
-    openTutorial(); return;
-  }
   if (act._locked) { showToast(`🔒 Unlocks in ${act.season}!`); return; }
   if (act._rewardLocked) { showToast('Keep going — unlock this reward soon ✨'); return; }
   selectedActivity = act;
@@ -1625,16 +1618,25 @@ function toggleConfirm() {
    so XP, sticker counting and chore claims fire exactly once and cannot
    double-count; a routine completes by closing its checklist.
 
-   "Already started" is the guard that makes this safe to press at nine in the
+   "Already ENDED" is the guard that makes this safe to press at nine in the
    morning: a block later today has not happened yet, and confirming it would
-   be the app inventing a fact. On a past day everything qualifies. */
+   be the app inventing a fact. On a past day everything qualifies.
+
+   It measures the end, not the start. It used to ask `startMin <= now`, which
+   meant a swim that began ten minutes ago and runs for another hour counted as
+   something a parent could mark done — the app asserting a fact about an hour
+   that had not been lived yet. `startMin + durationMin` is the honest test, and
+   it is the same one canReviewDay (js/36-status.js) asks, because "can this be
+   confirmed" and "can this day be reviewed" must not disagree about whether an
+   afternoon is over. */
 function dayBlocksEligibleToConfirm(dayKey, kid) {
   const blocks = getDayBlocks(dayKey, kid) || [];
   const isToday = dayKey === todayKey();
   const isFuture = dayKey > todayKey();
   if (isFuture) return [];
   const now = (typeof tdNowMin === 'function') ? tdNowMin() : 24 * 60;
-  return blocks.filter(b => b && b.startMin != null && (!isToday || b.startMin <= now));
+  return blocks.filter(b => b && b.startMin != null
+    && (!isToday || (b.startMin + (b.durationMin || 0)) <= now));
 }
 
 async function confirmAllBlocksForChild(kid, dayKey) {
@@ -1692,11 +1694,16 @@ async function markDayReviewedForChild(kid, dayKey) {
     showToast(`${name}'s day is no longer marked reviewed`);
     return;
   }
-  const left = dayBlocksEligibleToConfirm(key, who).filter(b => !isBlockConfirmed(b));
-  if (left.length) {
-    showToast(`${left.length} block${left.length === 1 ? '' : 's'} still need${left.length === 1 ? 's' : ''} confirming`);
-    return;
-  }
+  /* One decision, asked rather than re-derived — see canReviewDay
+     (js/36-status.js). It refuses a day that has not happened, and a day the
+     child is still living. */
+  const can = canReviewDay(who, key);
+  if (!can.ok) { showToast(reviewBlockedReason(can)); return; }
+  /* An empty day is reviewable, but never silently: a parent should not be
+     able to sign off a blank page without being told it is blank. */
+  if (can.reason === 'empty' && !(await showConfirm(
+      `Nothing was recorded for ${name} on this day.\n\nMark it reviewed anyway?`,
+      { okLabel: 'Mark it reviewed', cancelLabel: 'Not now' }))) return;
   markDayReviewed(who, key, true);
   saveAll();
   renderParentBanners();
@@ -1716,11 +1723,16 @@ function renderParentBanners() {
   const eligible = dayBlocksEligibleToConfirm(key, who);
   const left = eligible.filter(b => !isBlockConfirmed(b)).length;
   const reviewed = isDayReviewed(who, key);
+  /* The refusal names itself. "Confirm the blocks first" was the only thing it
+     could ever say, so a day refused for having not happened yet told the
+     parent to go and confirm blocks that did not exist. */
+  const can = canReviewDay(who, key);
+  const why = reviewed ? '' : reviewBlockedReason(can);
   bar.innerHTML =
     `<button type="button" class="btn-icon pb-action" onclick="confirmAllBlocksForChild()">`
     + `✅ Confirm all ${escapeHtml(name)}'s blocks${left ? ` (${left})` : ''}</button>`
     + `<button type="button" class="btn-icon pb-action${reviewed ? ' on' : ''}"`
-    + `${(!reviewed && left) ? ' disabled title="Confirm the blocks first"' : ''}`
+    + `${why ? ` disabled title="${escapeAttr(why)}"` : ''}`
     + ` onclick="markDayReviewedForChild()">`
     + `${reviewed ? '📋 Day reviewed ✓' : `📋 Mark ${escapeHtml(name)}'s day reviewed`}</button>`;
 }

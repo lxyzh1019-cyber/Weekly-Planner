@@ -40,7 +40,11 @@ let timelinePlacementGuideEl = null;
 let pendingStartMin = null;
 let editingBlockId = null;
 let syncDayIdx = 0;
-let weekView = 'timegrid';   // Day Blocks is the front page of the week
+/* 'full' | 'preview'. The Full layout is the front page of the week: it is the
+   one you can plan and tick in. 'timegrid' — Day Blocks — was the default and
+   is retired; setWeekView folds any other value into 'full' rather than leaving
+   the screen on a container that no longer exists. */
+let weekView = 'full';
 /* currentZone lived here, for the morning/afternoon/evening day filters.
    Those are gone and the day is always shown whole — see js/08-day-view.js. */
 /* currentTrayFilter lived here, for the activity rail's category chips. The
@@ -58,7 +62,6 @@ let currentTimelineGuideY = null;
 let dayTopbarCompactBound = false;
 const MORNING_UNLOCK_ITEM = { id:'m_unlock_warm_water', text:'Warm water before breakfast' };
 const AFTERSCHOOL_REWARD_ITEMS = [
-  { id:'a_unlock_helper', text:'Reward pick: Family Hero helper task (your choice)' },
   { id:'a_unlock_focus', text:'Reward pick: Focus Sprint bonus (15 min)' },
   { id:'a_unlock_culture', text:'Reward pick: Culture Explorer mini time' },
 ];

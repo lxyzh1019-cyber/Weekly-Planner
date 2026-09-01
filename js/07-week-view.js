@@ -3,16 +3,16 @@
 /* ════════════════════════════════════════════════════════════════
    WEEK VIEW
 ════════════════════════════════════════════════════════════════ */
+/* Two views: the week you plan in, and a read-only preview of what the Print
+   button prints. 'timegrid' — Day Blocks — was the third, and was what the
+   screen opened on; it is retired, and anything still asking for it lands on
+   the Full week rather than on a blank container. */
 function setWeekView(v) {
-  weekView = v;
-  // Tab active state
-  document.getElementById('viewTabFull').classList.toggle('active', v==='full');
-  document.getElementById('viewTabTimeGrid').classList.toggle('active', v==='timegrid');
-  // Containers
-  document.getElementById('weekFull').style.display     = v==='full' ? 'flex' : 'none';
-  // flex, not block, so .tg2-wrap's `flex:1; min-height:0` gives it a bounded
-  // height and it becomes a real scroll container (same as #weekFull).
-  document.getElementById('weekTimeGrid').style.display = v==='timegrid' ? 'flex' : 'none';
+  weekView = (v === 'preview') ? 'preview' : 'full';
+  document.getElementById('viewTabFull').classList.toggle('active', weekView === 'full');
+  document.getElementById('viewTabPrintPreview').classList.toggle('active', weekView === 'preview');
+  document.getElementById('weekFull').style.display = weekView === 'full' ? 'flex' : 'none';
+  document.getElementById('weekPrintPreview').style.display = weekView === 'preview' ? 'flex' : 'none';
   renderWeek();
 }
 function changeWeek(d) { weekOffset += d; renderWeek(); }
@@ -271,7 +271,7 @@ function renderWeekSignature(keys) {
   } else {
     bar.innerHTML = `
       <div class="wk-sig-line wk-sig-line--empty">
-        <span class="wk-sig-label">✍️ ${name}, sign your week</span>
+        <span class="wk-sig-label">✍️ ${name}</span>
         <span class="wk-sig-blank"></span>
       </div>
       <button type="button" class="wk-sig-btn" onclick="signWeek()">Sign this week ✍️</button>`;
@@ -325,8 +325,8 @@ function renderWeek() {
   document.getElementById('weekRangeLabel').textContent =
     `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} — ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()}`;
 
-  if (weekView === 'full') renderFullWeek(keys);
-  else                     renderTimeGrid(keys);
+  if (weekView === 'preview') renderWeekPrintPreview();
+  else                        renderFullWeek(keys);
 
   /* A parent-only category legend was toggled here. Its markup lived inside the
      permanently hidden compact view, so it could never appear no matter what
@@ -386,9 +386,12 @@ function renderWeek() {
     } else if (!isParent()) {
       coachEl.classList.remove('week-review-tip');
       coachEl.style.display = 'block';
-      // "Time-Grid" was a name for this view that no longer exists anywhere in
-      // the UI — the tab reads Day Blocks.
-      coachEl.textContent = '🌟 Tip: Tap a day to see your timeline. Check off routines as you go — each tick is a small win. Use “My free time” in Day Blocks to spot when you can choose rest or a goal.';
+      /* Twice now this line has named a view that no longer exists — first
+         "Time-Grid", then "Day Blocks", and it also sent a child to a "My free
+         time" panel that had already lost its markup. A tip that points at
+         something is a tip that goes stale, so this one points at nothing but
+         the day she is already looking at. */
+      coachEl.textContent = '🌟 Tip: Tap a day to see your timeline. Check off routines as you go — each tick is a small win.';
     } else {
       coachEl.style.display = 'none';
     }
@@ -657,15 +660,6 @@ function getBrickStrip(key) {
   return bricks;
 }
 
-function tgFreeBrickClass() {
-  const p = activeProfile();
-  return p === 'jess' ? 'tg-brick-free-jess' : 'tg-brick-free-jenn';
-}
-function tgFreeCellClass() {
-  const p = activeProfile();
-  return p === 'jess' ? 'tg-free-jess' : 'tg-free-jenn';
-}
-
 /**
  * Find the longest contiguous run of 'free' bricks across the whole week.
  * Returns { minutes, dayKey, dayIdx, startMin } or null if no free time.
@@ -708,209 +702,49 @@ function formatStretchLabel(stretch) {
 }
 
 /* Time-Grid: 7-column hour grid that visualizes free time. */
-/* Short label for the 2a Day-Blocks view — a Skating block reads "Skate", French
-   reads "FR", the morning routine reads "AM", etc. Kept compact so a block only a
-   few pixels tall still says something useful. */
-function tg2ShortLabel(act, b) {
-  if (!act) return '';
-  if (act.isRoutine) {
-    if (act.routineId === 'morning') return 'AM';
-    if (act.routineId === 'afterschool') return 'PM';
-    if (act.routineId === 'evening') return 'Eve';
-    return 'Routine';
-  }
-  if (act.isTraining) {
-    const t = getTrainingTopic(b.tag);
-    /* Seven characters, deliberately (CLAUDE.md) — a typed competition name is
-       not going to fit here, so this stays the sport's short form. */
-    if (act.isCompetition) return t.id === 'general' ? 'Comp' : (t.name.slice(0, 4) + '🏆');
-    return ({ skating: 'Skate', swimming: 'Swim', dryland: 'Dry', general: 'Train' })[t.id] || 'Train';
-  }
-  /* Meals used to be the bare icon — 🍳 🥗 🍽 — which the caller then rendered
-     beside the block's OWN icon, so a cell said the same glyph twice and named
-     nothing. Words win here: "Breakfast" is over the seven-character budget the
-     rest of this table keeps, and that budget exists to stop a typed
-     competition name being crammed in, not to stop a meal being readable. */
-  const idMap = {
-    school_day: 'School', french: 'FR', chinese: 'CN', math: 'Math', piano: 'Piano',
-    chores: 'Chores', breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner',
-    relax: 'Relax', break_quick: 'Break', family: 'Family',
-  };
-  if (idMap[act.id]) return idMap[act.id];
-  const w = (act.name || '').split(/\s+/)[0];
-  return w.length > 7 ? w.slice(0, 7) : w;
+
+
+/* ── The second tab: what the Print button will print ─────────────
+   A HOST, not a second renderer. renderPrintSheet (js/16-print.js) draws the
+   same sheet into #printSheet for the real thing and into this element for the
+   preview, so the two can never drift — the whole reason Day Blocks was
+   retired rather than restyled was that a fourth rendering of a week is a
+   fourth thing that can disagree.
+
+   Read-only costs nothing to enforce here: the print markup carries no
+   handlers at all, only title attributes. It follows the week and the child
+   the screen is already showing. */
+function renderWeekPrintPreview() {
+  renderPrintSheet('weekPreviewSheet', { weekOffset, profile: activeProfile() });
 }
 
-/* 2a "Day Blocks": one column per day, planned activities carry colour + a short
-   label, free time is plain lined paper. Conflicts get the same red flag as the
-   Full week and the print sheet so the three views agree. */
-function renderTimeGrid(keys) {
-  const grid = document.getElementById('tgGrid');
-  if (!grid) return;
-  grid.innerHTML = '';
-  const acts = getAllActivities(activeProfile(), { includeArchived: true });
-  const today = todayKey();
+/* renderTimeGrid drew the Day Blocks layout — one lane per day, an hour grid
+   behind, a short label on every block. It was the week's default view and is
+   retired: the week opens on the Full layout, which is the one you can plan and
+   tick in, and the second tab is now a read-only preview of the printed sheet.
+   tg2ShortLabel went with it — it compressed a name to about seven characters,
+   which no surviving surface asks for. */
 
-  /* 0.5px/min put a 30-minute block at 15px tall, which no legible type fits
-     in — the labels were drawn at 9.9px to squeeze into it, under the 13px kid
-     floor. Density and type size move together: at 0.85 an hour is ~51px and a
-     half-hour block ~25px, enough for one 13px line. The grid is then taller
-     than an iPad, which is why the week had to become one scroll surface. */
-  const PX_PER_MIN = 0.85;
-  const totalH = Math.round(DAY_MIN_SPAN * PX_PER_MIN);
-  /* The second threshold (see .tg2-block--tiny in css/app.css): below this a
-     block shows its icon alone rather than type under the floor. 13px of line
-     plus 2px of padding and 3px of border needs about this much. */
-  const TG2_LABEL_MIN_H = 22;
-  const firstHour = Math.ceil(START_MIN / 60);
-  const lastHour  = Math.floor((START_MIN + DAY_MIN_SPAN) / 60);
-
-  // ── Header row: corner + 7 day headers ──
-  const corner = document.createElement('div');
-  corner.className = 'tg2-corner';
-  grid.appendChild(corner);
-  keys.forEach((key, i) => {
-    const d = formatDayKey(key);
-    const head = document.createElement('div');
-    head.className = 'tg2-head' + (key === today ? ' today' : '');
-    head.innerHTML = `${DAY_SHORT[i]}<small>${d.getDate()}</small>`;
-    head.onclick = () => openDay(key, i);
-    grid.appendChild(head);
-  });
-
-  // ── Body row: time gutter + 7 lanes ──
-  const gutter = document.createElement('div');
-  gutter.className = 'tg2-gutter';
-  gutter.style.height = totalH + 'px';
-  for (let h = firstHour; h <= lastHour; h++) {
-    const rel = h * 60 - START_MIN;
-    if (rel < 0 || rel > DAY_MIN_SPAN) continue;
-    const lbl = document.createElement('div');
-    lbl.className = 'tg2-gutter-hour';
-    lbl.style.top = (rel * PX_PER_MIN) + 'px';
-    lbl.textContent = `${((h + 11) % 12) + 1}${h >= 12 ? 'p' : 'a'}`;
-    gutter.appendChild(lbl);
-  }
-  grid.appendChild(gutter);
-
-  keys.forEach((key, dayIdx) => {
-    const lane = document.createElement('div');
-    lane.className = 'tg2-lane' + (key === today ? ' today' : '');
-    lane.style.height = totalH + 'px';
-    lane.onclick = () => openDay(key, dayIdx);
-
-    /* SCHOOL HOURS, on the view the week actually opens on. This is the layout
-       the app defaults to and the one a parent means by "the weekly planner",
-       and it showed nothing school-related at all — a school day and a Sunday
-       were the same white lane. Same source as the day view and the Full week:
-       dayZoneSegments, which reads the calendar rather than the weekday. */
-    dayZoneSegments(key).forEach(bd => {
-      const seg = document.createElement('div');
-      seg.className = 'tg2-band ' + bd.cls.replace('tl-band-', 'wf-band-');
-      seg.style.top = (bd.start * PX_PER_MIN) + 'px';
-      seg.style.height = ((bd.end - bd.start) * PX_PER_MIN) + 'px';
-      seg.title = bd.label;
-      lane.appendChild(seg);
-    });
-
-    const blocks = (getDayBlocks(key) || []).slice().sort((a, b) => a.startMin - b.startMin);
-    const conflicts = computeBufferConflicts(blocks);
-    const cols = wfAssignColumns(blocks);
-
-    // The strips that make a training block possible — get ready, drive, warm
-    // up — belong on this view too. Without them a 5pm skate looks like it
-    // starts at 5pm, when the day really starts at 4:15. Drawn first so the
-    // activity cards sit on top, same as the Full week.
-    blocks.forEach(b => {
-      const act = acts.find(a => a.id === b.actId);
-      const topic = act && act.isTraining ? getTrainingTopic(b.tag) : null;
-      const segColour = topic ? trainingBlockColour(b) : (b.colour || (act && CAT_HEX[act.cat]) || '#888');
-      const bc = conflicts.perBlock.get(b.id);
-      const slot = cols.get(b.id) || { col: 0, count: 1 };
-      const cc = slot.count || 1;
-      const leftCss  = `calc(${(slot.col * 100 / cc)}% + 1px)`;
-      const widthCss = `calc(${100 / cc}% - 3px)`;
-      wfBufferSegments(b).forEach(seg => {
-        const segS = Math.max(seg.startRel, 0);
-        const segE = Math.min(seg.startRel + seg.dur, DAY_MIN_SPAN);
-        if (segE - segS < 2) return;
-        const segConflict = !!bc && (seg.side === 'pre' ? bc.pre : bc.post);
-        /* 'tiny' — icon and minutes. A seventh of a phone is about 60px wide, so
-           even "🚗 Get ready 15m" at the 13px floor does not fit, and the week
-           grid is the overview: the instruction itself is on the block's title,
-           the day screen and the Full week, all of which have the room. */
-        lane.appendChild(wfTravelStrip(segS * PX_PER_MIN, (segE - segS) * PX_PER_MIN,
-          leftCss, widthCss, seg, segColour, segConflict, 'tiny'));
-      });
-    });
-
-    blocks.forEach(b => {
-      const act = acts.find(a => a.id === b.actId);
-      if (!act) return;
-      const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
-      const bg = blockColour(b);
-      const relStart = Math.max(0, b.startMin - START_MIN);
-      const relEnd = Math.min(DAY_MIN_SPAN, b.startMin - START_MIN + (b.durationMin || 0));
-      if (relEnd - relStart < 1) return;
-      const el = document.createElement('div');
-      const hasConflict = conflicts.affected.has(b.id);
-      const h = Math.max(11, (relEnd - relStart) * PX_PER_MIN - 1);
-      // Class names written out rather than built from a ternary — the dead-CSS
-      // check matches literal strings.
-      el.className = 'tg2-block' + (isLightColour(bg) ? ' light-bg' : '')
-        + (isBlockCompleted(b, activeProfile()) ? ' tg2-block--done' : '') + (hasConflict ? ' tg2-block--conflict' : '')
-        + (h < TG2_LABEL_MIN_H ? ' tg2-block--tiny' : '');
-      el.style.top = (relStart * PX_PER_MIN) + 'px';
-      el.style.height = h + 'px';
-      el.style.background = bg;
-      // Column-pack overlapping blocks so they sit side-by-side, not stacked.
-      const slot = cols.get(b.id) || { col: 0, count: 1 };
-      const cc = slot.count || 1;
-      if (cc > 1) {
-        el.style.left = `calc(${(slot.col * 100 / cc)}% + 1px)`;
-        el.style.right = 'auto';
-        el.style.width = `calc(${100 / cc}% - 3px)`;
-      }
-      const icon = topic ? topic.icon : act.icon;
-      const flag = hasConflict ? `<div class="tg2-block-flag" title="Time clash — not enough travel/get-ready time">!</div>` : '';
-      el.innerHTML = `${flag}${icon}<span class="tg2-block-lbl">${escapeHtml(tg2ShortLabel(act, b))}</span>`;
-      el.title = `${icon} ${topic ? topic.name : act.name} — ${formatTimeFromMin(b.startMin)}, ${formatDuration(b.durationMin)}`
-        + (hasConflict ? ' · ⚠️ overlaps another activity' : '');
-      el.onclick = (e) => { e.stopPropagation(); openDay(key, dayIdx, b.id); };
-      lane.appendChild(el);
-    });
-
-    /* The lane used to carry a 24px repeating-linear-gradient as its "lined
-       paper". At 0.85px/min an hour is 51px and a half-hour 25.5px, so those
-       rules named no time at all and drifted out of step with the gutter labels
-       beside them from the first hour onwards. Real ones, over the blocks. */
-    lane.appendChild(buildHourGrid(PX_PER_MIN, DAY_MIN_SPAN, { cls: 'hour-grid--tg2', layer: 'lines' }));
-    lane.appendChild(buildHourGrid(PX_PER_MIN, DAY_MIN_SPAN, { cls: 'hour-grid--tg2', layer: 'ticks' }));
-
-    grid.appendChild(lane);
-  });
-
-  // Week-level clash banner (shared with the Full view), plus the streak + legend.
-  renderWeekConflictBanner(keys, 'tgConflictBanner');
-  renderFamilyChoreBanner('tgFamilyBanner');
-  renderSchoolDayBanner('tgSchoolBanner');
-  renderTimeGridStreak(keys);
-  const legend = document.getElementById('tgLegend');
-  if (legend) {
-    legend.style.display = 'flex';
-    /* The sixth copy of the label table, and it named five categories that no
-       longer decide anything on this screen. Short forms: this is a legend
-       under a grid, not a chart axis, and it is spending a child's word budget
-       to say what the colours mean. */
-    legend.innerHTML = GROUP_ORDER.map(g =>
-      `<span class="tg-legend-chip"><span class="tg-legend-dot" style="background:${groupHex(g) /* safe: from ACTIVITY_GROUPS */}"></span>${groupShort(g)}</span>`
-    ).join('') + `<span class="tg-legend-chip"><span class="tg-legend-dot tg-legend-dot--free"></span>Free time</span>`;
-  }
-}
 
 /* Render the streak banner above the grid */
-function renderTimeGridStreak(keys) {
-  const el = document.getElementById('tgStreak');
+/* The colour key, built live from the group table rather than typed out. The
+   version before this was parent-only, hardcoded, and sat inside a container
+   that was permanently display:none — so it could never appear whatever set it.
+   Short forms: this is a key under a grid, not a chart axis, and it is spending
+   a child's word budget to say what the colours mean. */
+function renderWeekLegend() {
+  const legend = document.getElementById('weekLegend');
+  if (!legend) return;
+  legend.style.display = 'flex';
+  legend.innerHTML = GROUP_ORDER.map(g =>
+    `<span class="tg-legend-chip"><span class="tg-legend-dot" style="background:${groupHex(g) /* safe: from ACTIVITY_GROUPS */}"></span>${groupShort(g)}</span>`
+  ).join('') + `<span class="tg-legend-chip"><span class="tg-legend-dot tg-legend-dot--free"></span>Free time</span>`;
+}
+
+/* The longest free stretch, under the week it describes. Named for the layout
+   it used to live in; it belongs to the week, not to a tab. */
+function renderWeekStreak(keys) {
+  const el = document.getElementById('weekStreak');
   if (!el) return;
   const stretch = calculateLongestFreeStretch(keys);
   const label = formatStretchLabel(stretch);
@@ -921,156 +755,6 @@ function renderTimeGridStreak(keys) {
   el.innerHTML = `<span class="star">🌟</span> Longest free stretch: <strong>${label}</strong>`;
 }
 
-/* Render the weekly overview: 7 days × 30 bricks each (compact, glanceable) */
-function renderTimeGridWeekOverview(keys) {
-  const wrap = document.getElementById('tgWeekOverview');
-  if (!wrap) return;
-  wrap.innerHTML = '';
-  const today = todayKey();
-  const freeCls = tgFreeBrickClass();
-
-  // Spacer in first column to align with grid
-  const spacer = document.createElement('div');
-  spacer.className = 'tg-wo-label';
-  spacer.textContent = '';
-  wrap.appendChild(spacer);
-
-  keys.forEach((key, i) => {
-    const d = formatDayKey(key);
-    const dayEl = document.createElement('div');
-    dayEl.className = 'tg-wo-day' + (key === today ? ' today' : '');
-    dayEl.onclick = () => openDay(key, i);
-
-    const lbl = document.createElement('div');
-    lbl.className = 'tg-wo-daylabel';
-    lbl.textContent = `${DAY_SHORT[i]} ${d.getDate()}`;
-    dayEl.appendChild(lbl);
-
-    const bricksWrap = document.createElement('div');
-    bricksWrap.className = 'tg-wo-bricks';
-    const bricks = getBrickStrip(key);
-    bricks.forEach(b => {
-      const brk = document.createElement('div');
-      let cls = 'tg-wo-brick ';
-      if (b.category === 'sleep-meal')    cls += 'tg-brick-sleep-meal';
-      else if (b.category === 'learning') cls += 'tg-brick-learning';
-      else                                cls += freeCls;
-      brk.className = cls;
-      bricksWrap.appendChild(brk);
-    });
-    dayEl.appendChild(bricksWrap);
-
-    const count = bricks.filter(b => b.category === 'free').length;
-    const cnt = document.createElement('div');
-    cnt.className = 'tg-wo-count';
-    cnt.textContent = `${count}/30 free`;
-    dayEl.appendChild(cnt);
-
-    wrap.appendChild(dayEl);
-  });
-}
-
-/* Render TODAY's MY FREE TIME panel (kid view only) */
-function renderTimeGridMyTime(keys) {
-  const panel = document.getElementById('tgMyTime');
-  if (!panel) return;
-  // Hide for parent (weekly totals will live in parent analytics later)
-  if (isParent()) { panel.style.display = 'none'; return; }
-
-  const today = todayKey();
-  const todayIdx = keys.indexOf(today);
-  const targetKey = todayIdx >= 0 ? today : keys[0];
-  const targetIdx = keys.indexOf(targetKey);
-  const td = formatDayKey(targetKey);
-  const dateStr = `${DAY_SHORT[targetIdx >= 0 ? targetIdx : 0]}, ${MONTH_SHORT[td.getMonth()]} ${td.getDate()}`;
-  const dayLabel = (targetKey === today) ? `${dateStr} · Today` : `${dateStr} (this week)`;
-
-  const bricks = getBrickStrip(targetKey);
-  const freeCount = bricks.filter(b => b.category === 'free').length;
-  const learnCount = bricks.filter(b => b.category === 'learning').length;
-  const mealCount = bricks.filter(b => b.category === 'sleep-meal').length;
-  const freeMin = freeCount * 30;
-  const fh = Math.floor(freeMin / 60), fm = freeMin % 60;
-  const valueStr = fh > 0 ? (fm > 0 ? `${fh}h ${fm}m` : `${fh}h`) : `${fm}m`;
-
-  panel.style.display = 'block';
-  panel.dataset.profile = activeProfile();
-  panel.classList.toggle('tg-mytime--today', targetKey === today);
-  document.querySelector('#tgMyTime .tg-mytime-label').innerHTML = `🌟 MY FREE TIME<br><span style="font-size:0.95rem;font-family:'Patrick Hand',sans-serif;font-weight:700">${escapeHtml(dayLabel)}</span>`;
-  document.getElementById('tgMyTimeValue').textContent = valueStr;
-
-  // Mini brick strip showing today's bricks across the full 6am–10pm window
-  const bricksEl = document.getElementById('tgMyTimeBricks');
-  bricksEl.innerHTML = '';
-  bricksEl.style.gridTemplateColumns = `repeat(${bricks.length}, 1fr)`;
-  const freeCls = tgFreeBrickClass();
-  bricks.forEach(b => {
-    const brk = document.createElement('div');
-    let cls = 'tg-mytime-brick ';
-    if (b.category === 'sleep-meal')    cls += 'tg-brick-sleep-meal';
-    else if (b.category === 'learning') cls += 'tg-brick-learning';
-    else                                cls += freeCls;
-    brk.className = cls;
-    bricksEl.appendChild(brk);
-  });
-
-  // Breakdown line
-  const parts = [];
-  if (freeCount > 0)  parts.push(`${freeCount} free`);
-  if (learnCount > 0) parts.push(`${learnCount} learning`);
-  if (mealCount > 0)  parts.push(`${mealCount} meals`);
-  document.getElementById('tgMyTimeBreakdown').textContent = parts.length ? parts.join(' · ') + ' (30-min blocks)' : 'Nothing planned yet — your whole day is free!';
-}
-
-/* renderCompactWeek lived here — one card per day listing that day's blocks as
-   text. It was unreachable: weekView is only ever 'full' or 'timegrid'. */
-
-function renderDayBar(key, blocks) {
-  const wrap = document.getElementById('daybar-'+key);
-  const pctEl = document.getElementById('daypct-'+key);
-  const moodEl = document.getElementById('daymood-'+key);
-  if (!wrap) return;
-  wrap.innerHTML = '';
-  if (!blocks.length) { pctEl.textContent=''; moodEl.textContent=''; return; }
-
-  const filled = new Set();
-  blocks.forEach(b=>{
-    const startSlot = Math.floor((b.startMin - START_MIN)/15);
-    const endSlot = Math.ceil((b.startMin - START_MIN + b.durationMin)/15);
-    for(let s=startSlot;s<endSlot;s++) filled.add(s);
-  });
-  const pct = Math.round(filled.size / TOTAL_SLOTS * 100);
-  pctEl.textContent = pct+'%';
-
-  const dayMood = getProfData().dayMoods?.[key];
-  moodEl.textContent = dayMood || '';
-
-  const catMap = {};
-  const acts = getAllActivities(activeProfile(), { includeArchived: true });
-  blocks.forEach(b=>{
-    const act = acts.find(a=>a.id===b.actId);
-    if(!act) return;
-    const cat = act.cat;
-    catMap[cat] = (catMap[cat]||0) + (b.durationMin/15);
-  });
-  // Category breakdown visible only in Parent Mode — kids just see completion %
-  if (isParent()) {
-    Object.entries(catMap).forEach(([cat, slots])=>{
-      const seg = document.createElement('div');
-      seg.className = 'day-bar-seg';
-      seg.style.height = Math.max(4, Math.round(slots/TOTAL_SLOTS*70))+'px';
-      seg.style.background = CAT_COLOUR[cat]||'var(--cat-free)';
-      wrap.appendChild(seg);
-    });
-  } else {
-    // Kid view: single soft completion bar (no category judgment)
-    const seg = document.createElement('div');
-    seg.className = 'day-bar-seg';
-    seg.style.height = Math.max(6, Math.round(pct/100*70))+'px';
-    seg.style.background = 'var(--accent-yellow)';
-    wrap.appendChild(seg);
-  }
-}
 
 /* Buffer segments for a block, stacked so get-ready/travel/warm-up never occupy
    the same minutes: before the block you get ready FIRST, then travel (drive),
@@ -1209,11 +893,12 @@ function attachMiddleDragPan(el) {
   // Middle-click on a link/card would otherwise still fire after the drag.
   el.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
 }
-/* Every scroll surface a plan is read on. .tg2-wrap is in the list even though
-   it no longer scrolls itself: it is where the cursor is when a child pans the
-   Day Blocks week, and its leftover — which is all of it — carries the page. */
+/* Every scroll surface a plan is read on. .wpp-wrap is in the list even though
+   it does not scroll itself: it is where the cursor is when a parent pans the
+   print preview, and its leftover — which is all of it — carries the page.
+   (.tg2-wrap was here for the same reason, for the retired Day Blocks week.) */
 function bindMiddleDragPan() {
-  ['.weekly-full-wrap', '.tg2-wrap', '#screen-day .day-workspace']
+  ['.weekly-full-wrap', '.wpp-wrap', '#screen-day .day-workspace']
     .forEach(sel => document.querySelectorAll(sel).forEach(attachMiddleDragPan));
 }
 
@@ -1226,6 +911,8 @@ function renderFullWeek(keys) {
   renderWeekConflictBanner(keys);
   renderFamilyChoreBanner('weekFamilyBanner');
   renderSchoolDayBanner('weekSchoolBanner');
+  renderWeekStreak(keys);
+  renderWeekLegend();
 
   // Continuous single-column-per-day timeline (matches the Day view): each
   // activity is ONE unbroken block positioned by its real start time on a
@@ -1495,7 +1182,10 @@ function renderFullWeek(keys) {
       cell.appendChild(card);
     });
 
-    // Last, over the cards. See buildHourGrid (js/05-helpers.js).
+    /* Rules behind the cards, the hour's mark above them. At 0.72px per minute
+       a 15-minute row is under 11px, so this surface keeps the half hour rather
+       than taking the day view's quarter rows. See buildHourGrid
+       (js/05-helpers.js). */
     cell.appendChild(buildHourGrid(PX_PER_MIN, DAY_MIN_SPAN, { cls: 'hour-grid--wf', layer: 'lines' }));
     cell.appendChild(buildHourGrid(PX_PER_MIN, DAY_MIN_SPAN, { cls: 'hour-grid--wf', layer: 'ticks' }));
 

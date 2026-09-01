@@ -295,6 +295,47 @@ const planMerge = api.mergeSharedChore(
   { weekPlans: { w1: { jess: { planId:'debt',  committedAt: 900 } } } });
 check('newest week plan wins', planMerge.weekPlans.w1.jess.planId === 'debt');
 
+/* ── The meeting's reflection: what a child said about her week ──
+   The record is a two-level week/kid store like weekConfirms and weekPlans, and
+   it has to merge the same way for the same reason: every field in it can be
+   CHANGED on either device, and a plain deep-merge union cannot express taking
+   something back.
+
+   The array fields are what force the issue. deepMergeObj treats an array as a
+   scalar, so `answerIds` is replaced wholesale by whichever snapshot arrives
+   last, with no timestamp consulted — untick an answer on the iPad and a stale
+   phone can put it back, silently. Arbitrating the whole per-kid record by
+   updatedAt is what makes a deselection stick: a record replaced whole cannot
+   lose one of its own fields. */
+const reflNewer = api.mergeSharedChore(
+  { reflections: { w1: { jenn: { doingWell: { answerIds: ['tried', 'helped'] }, updatedAt: 100 } } } },
+  { reflections: { w1: { jenn: { doingWell: { answerIds: ['tried'] },           updatedAt: 900 } } } });
+check('unticking a reflection answer sticks',
+  reflNewer.reflections.w1.jenn.doingWell.answerIds.length === 1);
+
+// …and the stale side does not win just by arriving second.
+const reflStale = api.mergeSharedChore(
+  { reflections: { w1: { jenn: { doingWell: { answerIds: ['tried'] },           updatedAt: 900 } } } },
+  { reflections: { w1: { jenn: { doingWell: { answerIds: ['tried', 'helped'] }, updatedAt: 100 } } } });
+check('a stale reflection does not overwrite a newer one',
+  reflStale.reflections.w1.jenn.doingWell.answerIds.length === 1);
+
+// One child's reflection must never overwrite the other's — they are answered
+// on the same screen, often on two devices, in the same sitting.
+const reflTwoKids = api.mergeSharedChore(
+  { reflections: { w1: { jenn: { needsWork: { answerId: 'rushed' }, updatedAt: 10 } } } },
+  { reflections: { w1: { jess: { needsWork: { answerId: 'forgot' }, updatedAt: 20 } } } });
+check('both children keep their own reflection',
+  reflTwoKids.reflections.w1.jenn.needsWork.answerId === 'rushed'
+  && reflTwoKids.reflections.w1.jess.needsWork.answerId === 'forgot');
+
+// Two weeks are two records; settling one must not disturb the other.
+const reflTwoWeeks = api.mergeSharedChore(
+  { reflections: { w1: { jenn: { updatedAt: 10 } } } },
+  { reflections: { w2: { jenn: { updatedAt: 20 } } } });
+check('reflections from two weeks both survive',
+  reflTwoWeeks.reflections.w1.jenn && reflTwoWeeks.reflections.w2.jenn);
+
 /* ── State added by the viewer/flow work ──
    Four new stores crossed the wire without a check between them. None of them
    is exotic; the point is that a merge bug here is invisible until two devices

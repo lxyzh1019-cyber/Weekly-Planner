@@ -104,7 +104,6 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   renderVibe();
   renderDayGoalsTodos();
   maybeShowRewardPrompt();
-  offerTutorialIfNeeded();
   if (focusBlockId) {
     pendingFocusBlockId = focusBlockId;
     pendingFocusAttempts = 0;
@@ -447,17 +446,21 @@ function buildDayColumn(dayKey, canvasHeight, withHeader) {
   // Pending invitations from sister — render as dashed-border blocks
   renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd, dayKey);
 
-  /* Two layers, and only one of them rides over the cards. The half-hour rules
-     go BEHIND: a planned afternoon drawn across with them is hatched, and they
-     are helping nobody by the time there is something there to read. The hour
-     marks stay above, because "where is four o'clock" is a question a card
-     should not be able to hide, and the now-line is above them both.
+  /* Two layers, and only one of them rides over the cards.
 
-     Appended last either way so the ticks land over the blocks; the behind
-     layer carries its own negative stacking, which is what puts it under them.
+     The background is Print's own mechanism: 64 rows of 15 minutes, which at
+     1.4px per minute are 21px each and tile this canvas exactly. Every rule is
+     a cell boundary BEHIND the blocks, so a card covers any line running
+     through it — the reason a line never crosses text on the printed sheet.
+
+     Above the cards there is only the short hour mark at the gutter edge:
+     "where is four o'clock" is a question a card should not be able to hide,
+     but the answer does not have to be a rule drawn across the afternoon. The
+     now-line is above them both.
+
      zMinStart is 0 on every path today, which is why the grid can measure from
      START_MIN; a zoomed zone would have to pass its own offset in. */
-  canvas.appendChild(buildHourGrid(PX_PER_MIN, spanMin, { cls: 'hour-grid--day', layer: 'lines' }));
+  canvas.appendChild(buildSlotGrid(spanMin, { cls: 'slot-grid--day' }));
   canvas.appendChild(buildHourGrid(PX_PER_MIN, spanMin, { cls: 'hour-grid--day', layer: 'ticks' }));
 
   col.appendChild(canvas);
@@ -1544,9 +1547,6 @@ function pickFromSlot(actId) {
   if (act._locked) { showToast(`🔒 Unlocks in ${act.season}!`); return; }
   if (act._rewardLocked) { showToast('Keep going — unlock this reward soon ✨'); return; }
   const _pr = getProfData()?.progress;
-  if (_pr && !_pr.tutorialDone && TUTORIAL_STARTER_CHOICES.some(c => c.id === act.id)) {
-    closeSheet('slotPickerOverlay'); openTutorial(); return;
-  }
   selectedActivity = act;
   closeSheet('slotPickerOverlay');
   // pendingStartMin was set by openSlotPicker.

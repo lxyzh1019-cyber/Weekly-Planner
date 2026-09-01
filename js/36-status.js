@@ -110,6 +110,72 @@ function markDayReviewed(kid, dayKey, value) {
   return true;
 }
 
+/* ── …and whether it is even reviewable yet ───────────────────────
+   Reviewing a day is an assertion about a day that HAPPENED. Three surfaces
+   asked their own version of that question — the parent day banner, the
+   meeting's step 1 rows and the week-close gate — and between them they left
+   two holes:
+
+     · "has it started" was standing in for "has it finished". A parent
+       pressing at nine in the morning could review a day whose swim was still
+       three hours away, because the only blocks measured were the ones that
+       had begun.
+     · a day with NO blocks passed every check trivially, so a Thursday in
+       three weeks' time could be marked reviewed. There was nothing to find
+       unconfirmed, so nothing objected.
+
+   One decision now. It owns no data: the blocks come from getDayBlocks, the
+   confirmation from isBlockConfirmed, the clock from tdNowMin. `reason` is
+   what the disabled control says out loud — a control that refuses without
+   saying why is the thing this repo keeps having to fix. */
+function canReviewDay(kid, dayKey) {
+  const none = { pendingCount: 0, futureCount: 0, endsAt: null, blockName: '' };
+  if (!kid || !dayKey) return { ok: false, reason: 'future', ...none };
+  const today = todayKey();
+  const blocks = getDayBlocks(dayKey, kid) || [];
+  if (dayKey > today) return { ok: false, reason: 'future', ...none, futureCount: blocks.length };
+
+  /* Only today can still be in progress: a past day is over whatever the
+     clock says, and a future one never got here. */
+  const now = (typeof tdNowMin === 'function') ? tdNowMin() : 24 * 60;
+  const ended = (b) => (b.startMin + (b.durationMin || 0)) <= now;
+  const unfinished = (dayKey === today)
+    ? blocks.filter(b => b && b.startMin != null && !ended(b))
+    : [];
+  if (unfinished.length) {
+    const soonest = unfinished.slice().sort(
+      (a, b) => (a.startMin + (a.durationMin || 0)) - (b.startMin + (b.durationMin || 0)))[0];
+    const named = (typeof blockDisplayName === 'function')
+      ? blockDisplayName(soonest, kid, dayKey) : null;
+    return { ok: false, reason: 'running', ...none,
+             futureCount: unfinished.length,
+             endsAt: soonest.startMin + (soonest.durationMin || 0),
+             blockName: (named && named.name) || 'An activity' };
+  }
+
+  const pending = (typeof dayBlocksEligibleToConfirm === 'function'
+    ? dayBlocksEligibleToConfirm(dayKey, kid) : blocks).filter(b => !isBlockConfirmed(b));
+  if (pending.length) return { ok: false, reason: 'unconfirmed', ...none, pendingCount: pending.length };
+
+  /* A day that holds nothing CAN be reviewed — a quiet Sunday is a real
+     answer. It is reported separately so the caller says "nothing was
+     recorded" out loud rather than writing a review of an empty page. */
+  return { ok: true, reason: blocks.length ? 'ready' : 'empty', ...none };
+}
+
+/* The sentence a refused control says, in one place, so the banner, the
+   meeting and the week-close gate cannot describe the same day differently. */
+function reviewBlockedReason(info) {
+  if (!info || info.ok) return '';
+  if (info.reason === 'future') return 'This day has not happened yet';
+  if (info.reason === 'running') {
+    const at = (typeof formatTimeFromMin === 'function') ? formatTimeFromMin(info.endsAt) : 'later today';
+    return `${info.blockName} ends at ${at}`;
+  }
+  const n = info.pendingCount;
+  return `${n} block${n === 1 ? '' : 's'} still need${n === 1 ? 's' : ''} confirming`;
+}
+
 /* ── The family's chores: three numbers, not one ──────────────────
    `required` is the family's share (freeChoresPerWeek — the first two house
    chores are mandatory). It used to be compared against ONE count that mixed
@@ -207,7 +273,14 @@ function isWeekClosed(weekKey) {
 function canCloseWeek(weekKey) {
   const missing = [];
   ['jenn', 'jess'].forEach(kid => {
-    const unreviewed = mrWeekDayKeys(weekKey).filter(k => !isDayReviewed(kid, k)).length;
+    /* A day that has not happened is not a day anybody failed to review, so it
+       cannot be what is holding a week open. Everything else counts: a past day
+       with blocks left unconfirmed is unfinished work, not an excused absence. */
+    const unreviewed = mrWeekDayKeys(weekKey).filter(k => {
+      const can = canReviewDay(kid, k);
+      if (can.reason === 'future' || can.reason === 'running') return false;
+      return !isDayReviewed(kid, k);
+    }).length;
     if (unreviewed) missing.push({ kid, reason: 'days', n: unreviewed });
     else if (!isChildMoneyCommitted(kid, weekKey)) missing.push({ kid, reason: 'money', n: 0 });
   });

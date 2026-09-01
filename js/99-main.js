@@ -65,6 +65,9 @@ window.addEventListener('pagehide', flushPush);
   // carry data-mm-action. Same reason as above — every step rebuilds the body.
   const meeting = document.getElementById('familyMeetingBody');
   if (meeting) meeting.addEventListener('click', mmHandleClick);
+  /* The reflection's scribed notes. Typed into a device-local draft rather than
+     written per keystroke — every write is a full-document upload. */
+  if (meeting) meeting.addEventListener('input', (e) => reflHandleInput(e, mmWeekKey()));
   // The catch-up list lives on the parent hub rather than inside the meeting,
   // and is rebuilt on every hub render, so it needs its own delegated listener
   // on the container rather than handlers on the rows.

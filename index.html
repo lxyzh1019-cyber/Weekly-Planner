@@ -271,9 +271,12 @@
           <button class="btn-icon" onclick="changeWeek(1)" aria-label="Next week">▶</button>
         </div>
         <!-- View switcher: Full (cards) / Time-Grid (hours) -->
+        <!-- Full is the week now. Day Blocks was what the screen opened on,
+             and the tab beside it is read-only, so landing on the preview
+             would have meant landing somewhere nothing can be planned. -->
         <div class="view-tabs">
-          <button class="view-tab" id="viewTabFull" onclick="setWeekView('full')">📋 Full</button>
-          <button class="view-tab active" id="viewTabTimeGrid" onclick="setWeekView('timegrid')">🧱 Day Blocks</button>
+          <button class="view-tab active" id="viewTabFull" onclick="setWeekView('full')">📋 Full</button>
+          <button class="view-tab" id="viewTabPrintPreview" onclick="setWeekView('preview')">🖨 Print preview</button>
         </div>
         <!-- Print sits on the week it prints, and this is now its only door:
              the More sheet's copy is gone, so the two labels cannot drift. -->
@@ -290,11 +293,19 @@
        because its container was permanently display:none. The Day Blocks view
        builds a live one from CAT_HEX (#tgLegend) that everyone can see. -->
 
-  <!-- Full week view (the alternate; Day Blocks is the default) -->
-  <div id="weekFull" style="display:none">
+  <!-- Full week view — the one the week opens on, and the only one you plan in. -->
+  <div id="weekFull" style="display:flex">
     <div class="weekly-full-wrap">
       <div class="weekly-full" id="weeklyFullGrid"></div>
       <!-- Under the grid it describes, same as the Day Blocks copy. -->
+      <!-- The colour key, live from the group table. It lived under Day Blocks;
+           the Full week's cards carry the same colours, so it moved here rather
+           than being retired with the tab. -->
+      <div class="tg-legend" id="weekLegend"></div>
+      <!-- The longest free stretch. It lived under Day Blocks; it is a fact
+           about the week rather than about a layout, so it moved here rather
+           than being retired with the tab. -->
+      <div class="tg-streak" id="weekStreak"></div>
       <div class="week-todo-banner" id="weekFamilyBanner" style="display:none"></div>
       <div class="week-todo-banner" id="weekSchoolBanner" style="display:none"></div>
       <div class="week-conflict-banner" id="weekConflictBanner" style="display:none"></div>
@@ -302,27 +313,15 @@
     </div>
   </div>
 
-  <!-- Day Blocks view (2a): "plans pop, free stays quiet" — one column per day,
-       planned activities carry colour + a short label, free time stays plain. -->
-  <div id="weekTimeGrid" style="display:flex">
-    <div class="tg2-wrap">
-      <p class="tg2-subtitle">Plans pop, free stays quiet ✨ — tap any day to open it.</p>
-      <div class="tg2-grid" id="tgGrid"></div>
-      <!-- 2a: kid-readable category legend — planned blocks carry colour, free
-           time stays plain paper -->
-      <div class="tg-legend" id="tgLegend"></div>
-    </div>
-
-    <!-- Both of these are conclusions ABOUT the grid — the longest free stretch
-         and the clashes in it — so they read after it, not before. They sat
-         above, which meant a child was told what her week added up to before
-         she could see the week. Found by id, so the render functions in
-         js/07-week-view.js do not care where they live. -->
-    <div class="tg-controls">
-      <div class="tg-streak" id="tgStreak"></div>
-      <div class="week-todo-banner" id="tgFamilyBanner" style="display:none"></div>
-      <div class="week-todo-banner" id="tgSchoolBanner" style="display:none"></div>
-      <div class="week-conflict-banner" id="tgConflictBanner" style="display:none"></div>
+  <!-- Print preview. The same sheet the Print button produces, rendered
+       read-only into the week screen so a parent can see what will come out
+       before spending paper. renderPrintSheet (js/16-print.js) is the one
+       renderer; this is a second HOST, never a second copy of it. Its output
+       carries no handlers, which is what makes read-only free to enforce. -->
+  <div id="weekPrintPreview" style="display:none">
+    <div class="wpp-wrap">
+      <p class="wpp-note">This is what the Print button prints. Tap 🖨 Print to open it full size.</p>
+      <div class="print-sheet wpp-sheet" id="weekPreviewSheet" aria-label="Print preview of this week"></div>
     </div>
   </div>
 
@@ -349,10 +348,9 @@
   <div class="gt-panel" id="gtPanel">
     <div class="gt-col">
       <div class="gt-col-header">
-        <h3>🎯 Goals</h3>
+        <h3>🎯 Goals — long-term</h3>
         <button class="btn-icon gt-add-btn" onclick="addGoal()" title="Add goal">＋</button>
       </div>
-      <p class="gt-hint">Long-term — they stay until you remove them.</p>
       <div id="goalsList"></div>
     </div>
     <div class="gt-col">
@@ -360,7 +358,6 @@
         <h3>✅ This Week's To-do</h3>
         <button class="btn-icon gt-add-btn" onclick="addTodo()" title="Add todo">＋</button>
       </div>
-      <p class="gt-hint">Just for this week. Tick them off when done.</p>
       <div id="todosList"></div>
     </div>
     <div class="gt-col">
@@ -368,7 +365,7 @@
         <h3>🏅 Achievements</h3>
         <button class="btn-icon gt-add-btn" onclick="addAchievement()" title="Add achievement">＋</button>
       </div>
-      <p class="gt-hint">Link to one activity and track weekly progress.</p>
+      <p class="gt-hint">Linked to one activity.</p>
       <div id="achievementsList"></div>
     </div>
   </div>
@@ -1119,15 +1116,11 @@
   </div>
 </div>
 
-<div class="overlay" id="tutorialOverlay" onclick="overlayClick(event,'tutorialOverlay')">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <h3>Build your first Family Hero task</h3>
-    <p class="tutorial-overlay-note">Choose one Family Responsibility activity to create now. More options unlock as rewards.</p>
-    <div id="tutorialChoices"></div>
-    <button type="button" class="pill-btn" style="width:100%;margin-top:0.5rem" onclick="skipTutorial()">Skip for now</button>
-  </div>
-</div>
+<!-- #tutorialOverlay lived here: "Build your first Family Hero task", three
+     chores to pick from and a line promising more would unlock as rewards.
+     Family Hero is a chore rather than a prize now, so the sheet had nothing
+     left to offer — every activity it listed is on the ordinary picker, opened
+     from the slot the child just tapped. -->
 
 <!-- Template Sheet -->
 <div class="overlay" id="templateOverlay" onclick="overlayClick(event,'templateOverlay')">
@@ -1478,6 +1471,7 @@
      calls into every one of them at runtime and none of them at load time.
      99-main.js still owns all top-level executable code. -->
 <script src="js/36-status.js"></script>
+<script src="js/37-reflection.js"></script>
 <script src="js/99-main.js"></script>
 </body>
 </html>

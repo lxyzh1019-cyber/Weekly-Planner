@@ -397,17 +397,6 @@
   .day-mini-list .gt-text-input {
     font-size: calc(0.92rem * var(--fs-scale, 1));
   }
-  .tutorial-overlay-note {
-    font-family: 'Patrick Hand', sans-serif;
-    font-size: 1rem;
-    color: var(--ink-muted);
-    margin-bottom: 0.55rem;
-  }
-  .tutorial-choice-btn {
-    width: 100%;
-    text-align: left;
-    margin-bottom: 0.4rem;
-  }
 
   @media (min-width: 980px) and (orientation: landscape) {
     /* overflow:hidden lived here, and here only — which is why the day screen
@@ -777,102 +766,29 @@
      the rest never chained to the page — so nothing under the grid could be
      reached by scrolling over it. The page is the only scroller now and the
      grid renders at its natural height. */
-  #weekTimeGrid { flex-direction: column; }
   /* While middle-dragging, the grab cursor and a text-selection block, so a
      pan across a week of cards doesn't leave everything highlighted. */
   .is-mid-panning { cursor: grabbing; user-select: none; }
-  .tg2-wrap { padding: 0.2rem 0.6rem 0.4rem; }
-  .tg2-subtitle { text-align: center; color: var(--ink-light); font-size: calc(0.85rem * var(--fs-scale, 1)); font-style: italic; margin: 0 0 0.5rem; }
-  .tg2-grid {
-    display: grid;
-    /* Wide enough for a 13px hour label. The gutter grew with the type rather
-       than letting "12p" collide with "1p" — same fix .wf-gutter-hour carries. */
-    grid-template-columns: 34px repeat(7, 1fr);
-    gap: 3px;
-    align-items: start;
-  }
-  .tg2-corner { }
   /* Every figure on this grid is at or above the 13px kid floor. They were
      9.6–12.5px, and the smoke sweep never saw it: it renders #screen-week on a
      week the earlier checks had already emptied, so there were no blocks to
      measure. The sweep now seeds a day and switches to this view. */
-  .tg2-head {
-    font-weight: 800; font-size: max(13px, calc(0.85rem * var(--fs-scale, 1))); text-align: center;
-    padding: 3px 1px; color: var(--ink);
-    border-bottom: 2px solid var(--ink);
-    cursor: pointer; border-radius: 6px 6px 0 0;
-  }
-  .tg2-head.today { background: #fff4db; }
-  .tg2-head small { display: block; font-size: max(13px, calc(0.82rem * var(--fs-scale, 1))); color: var(--ink-light); font-weight: 700; }
-  .tg2-gutter { position: relative; }
-  .tg2-gutter-hour {
-    position: absolute; right: 2px; transform: translateY(-50%);
-    font-size: max(13px, calc(0.82rem * var(--fs-scale, 1))); color: var(--ink-light); font-weight: 700; white-space: nowrap;
-  }
   /* Free time = plain lined paper, so an empty day genuinely looks empty. */
-  .tg2-lane {
-    position: relative;
-    /* Own stacking context — same reason as .wf-day-col and .tl-canvas. */
-    z-index: 0;
-    background: var(--paper, #fffdf5);
-    border: 1.5px solid rgba(42,35,32,0.18);
-    border-radius: 7px;
-    /* The 24px repeating gradient that lived here matched neither the hour
-       (51px) nor the half-hour (25.5px) at this view's 0.85px/min, so it read
-       as a time grid while naming no time. .hour-grid draws the real one. */
-    overflow: hidden;
-  }
   /* The school-day tint, behind the travel strips (1) and the cards (2). */
-  .tg2-band { position: absolute; left: 0; right: 0; z-index: 0; pointer-events: none; opacity: 0.5; }
-  .tg2-lane.today { border-color: #2f8f84; box-shadow: 0 0 0 1.5px rgba(47,143,132,0.35); }
-  .tg2-block {
-    /* Above the travel/get-ready strips (.wf-travel is z-index 1), which are
-       drawn first and are context for the block, not a peer of it. */
-    z-index: 2;
-    position: absolute; left: 2px; right: 2px;
-    border-radius: 5px; border: 1.5px solid var(--ink);
-    color: #fff; font-size: max(13px, calc(0.82rem * var(--fs-scale, 1))); font-weight: 800; line-height: 1.1;
-    padding: 1px 3px; overflow: hidden; cursor: pointer;
-    display: flex; align-items: center; gap: 2px;
-    box-shadow: 1px 1px 0 rgba(42,35,32,0.25);
-    text-shadow: 0 1px 1px rgba(0,0,0,0.22);
-  }
-  .tg2-block.light-bg { color: var(--ink); text-shadow: none; }
-  .tg2-block--done { opacity: 0.55; }
-  .tg2-block--conflict { outline: 2.5px solid #d6453a; outline-offset: 1px; overflow: visible; z-index: 5; }
   /* TWO THRESHOLDS, TWO QUESTIONS — the same split CLAUDE.md draws between
      BLOCK_TIERS and BLOCK_STACK_MIN on the day screen, applied here.
      TG2_LABEL_MIN_H answers "is there room for a 13px line", and the answer for
      a short block is the icon on its own, never type shrunk under the floor.
      The full name is on the block's title attribute either way. */
-  .tg2-block--tiny { justify-content: center; padding: 0 1px; }
-  .tg2-block--tiny .tg2-block-lbl { display: none; }
-  .tg2-block-flag {
-    position: absolute; top: -7px; left: -7px; z-index: 6;
-    width: 18px; height: 18px; border-radius: 50%;
-    background: #d6453a; color: #fff; font-size: max(13px, calc(0.82rem * var(--fs-scale, 1))); line-height: 18px; text-align: center;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.35);
-  }
-  .tg2-block-lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* A phone gets a tighter gutter and tighter padding, never smaller type: the
      13px floor is the floor everywhere, and this override used to drop the
      block label to 8.8px. */
   @media (max-width: 640px) {
-    .tg2-grid { grid-template-columns: 30px repeat(7, 1fr); gap: 2px; }
-    .tg2-block { padding: 1px 2px; }
   }
 
   /* ── INVERTED MODE (default) ──
      Free cells = bright profile color (saturated, celebratory).
      Scheduled cells = neutral grey with small icon. */
-  .tg-wrap.inverted .tg-free-jenn {
-    background: #ffd166;
-    background-image: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 50%);
-  }
-  .tg-wrap.inverted .tg-free-jess {
-    background: #6fb1fc;
-    background-image: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 50%);
-  }
   .tg-wrap.inverted .tg-block {
     background: #d4ccb8 !important;
     color: #6b5d4f;
@@ -916,54 +832,8 @@
   }
   .tg-toggle:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 rgba(42,35,32,0.15); }
 
-  .tg-wo-day {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 4px 3px;
-    background: var(--paper);
-    border-radius: 8px;
-    border: 1.5px solid var(--paper-line);
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .tg-wo-day.today { border-color: var(--accent); border-width: 2px; }
-  .tg-wo-day:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
-  .tg-wo-daylabel {
-    font-size: calc(0.7rem * var(--fs-scale, 1));
-    font-weight: 700;
-    color: var(--ink);
-    text-align: center;
-    margin-bottom: 2px;
-  }
-  .tg-wo-bricks {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1.5px;
-  }
-  .tg-wo-brick {
-    height: 8px;
-    border-radius: 2px;
-    border: 1px solid rgba(42,35,32,0.22);
-    box-shadow:
-      inset 0 2px 0 rgba(255,255,255,0.35),
-      inset 0 -2px 0 rgba(0,0,0,0.06),
-      2px 0 0 0 rgba(42,35,32,0.12),
-      6px 0 0 0 rgba(42,35,32,0.12);
-  }
-  .tg-wo-count {
-    font-size: calc(0.7rem * var(--fs-scale, 1));
-    color: var(--ink-light);
-    text-align: center;
-    margin-top: 3px;
-    font-family: 'Patrick Hand', cursive;
-  }
 
   /* Brick colors — shared between weekly overview and MY TIME panel */
-  .tg-brick-sleep-meal { background: #c8bfa8; }       /* muted tan/grey */
-  .tg-brick-learning   { background: #9aa5b8; }       /* muted slate */
-  .tg-brick-free-jenn  { background: #ffd166; } /* bright yellow */
-  .tg-brick-free-jess  { background: #6fb1fc; } /* bright sky blue */
 
   /* ── MY FREE TIME TODAY summary panel (kid view) ── */
   .tg-mytime {
@@ -978,54 +848,6 @@
     background: linear-gradient(135deg, #e3f0ff 0%, #fffdf5 100%);
     border-color: var(--accent-blue);
     box-shadow: 3px 4px 0 rgba(111,177,252,0.3);
-  }
-  .tg-mytime-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-  }
-  .tg-mytime-label {
-    font-family: 'Gochi Hand', cursive;
-    font-size: 1.3rem;
-    color: var(--ink);
-    transform: rotate(-1deg);
-  }
-  .tg-mytime-value {
-    font-family: 'Gochi Hand', cursive;
-    font-size: 1.8rem;
-    color: var(--accent-strong);
-    font-weight: 700;
-  }
-  .tg-mytime-bricks {
-    display: grid;
-    grid-template-columns: repeat(32, 1fr); /* full 6am–10pm window; set precisely in JS */
-    gap: 2px;
-    margin: 0.5rem 0;
-  }
-  .tg-mytime-brick {
-    height: 14px;
-    border-radius: 3px;
-    border: 1px solid rgba(42,35,32,0.2);
-    box-shadow:
-      inset 0 3px 0 rgba(255,255,255,0.28),
-      inset 0 -2px 0 rgba(0,0,0,0.06),
-      3px 0 0 0 rgba(42,35,32,0.1),
-      8px 0 0 0 rgba(42,35,32,0.1);
-  }
-  .tg-mytime--today {
-    outline: 3px solid var(--accent);
-    outline-offset: 2px;
-  }
-  .tg-mytime[data-profile="jess"].tg-mytime--today {
-    outline-color: var(--accent-blue);
-  }
-  .tg-mytime-breakdown {
-    font-size: calc(0.85rem * var(--fs-scale, 1));
-    color: var(--ink-light);
-    text-align: center;
-    margin-top: 0.4rem;
-    font-style: italic;
   }
 
   /* .week-grid lived here, for the retired compact week view. */
@@ -1053,8 +875,6 @@
   }
   .day-label { font-size: calc(0.75rem * var(--fs-scale, 1)); font-weight: 700; text-transform: uppercase; color: var(--ink-light); letter-spacing: 1px; }
   .day-date { font-size: 1.2rem; font-weight: 800; font-family: 'Gochi Hand', cursive; }
-  .day-bar-wrap { width: 100%; flex: 1; display: flex; flex-direction: column; gap: 2px; justify-content: flex-end; padding: 0 2px; }
-  .day-bar-seg { border-radius: 3px; min-height: 4px; }
   .day-mood { font-size: 1.3rem; margin-top: 2px; }
   .day-pct { font-size: calc(0.7rem * var(--fs-scale, 1)); color: var(--ink-light); font-weight: 700; }
 
@@ -1619,18 +1439,42 @@
   .mm-pay { border: 2px solid var(--ink); border-radius: 12px; background: #fff9e9; padding: 8px 10px; margin: 8px 0; }
   .mm-pay-row { display: flex; justify-content: space-between; font-size: calc(0.95rem * var(--fs-scale, 1)); padding: 2px 0; }
   .mm-recorded { font-size: calc(0.86rem * var(--fs-scale, 1)); font-weight: 700; background: #95d5b2; border: 2px solid var(--ink); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; }
-  /* ── The meeting is ONE scrolling container ──────────────────────
-     The sheet has always been the scroller; what was missing is that the two
-     things you steer with scrolled away with the content. On step 3 or 4 —
+  /* ── The meeting is a BOUNDED COLUMN, and the ends are OUTSIDE it ──
+     The two things you steer with must never scroll away: on step 3 or 4 —
      long panels, several taps each — the week you were reviewing, the step you
-     were on and the only way to the next one were all off screen.
+     were on and the only way to the next one all used to leave the screen.
 
-     Sticky inside the sheet's own scroll area rather than a second scroller:
-     nesting one would put two scrollers on an iPad, and a flick would move the
-     wrong one. Negative margins let each band span the sheet's 1.2rem padding
-     so nothing shows through at the edges. */
+     They were sticky inside the sheet's own scroll area, which held them still
+     but left them FLOATING OVER the content: on an iPad a card could sit under
+     the Back/Next bar with nothing to say it was there, and the last card of a
+     step was unreachable behind it. Sticky pins a thing without reserving it
+     any room.
+
+     So the sheet is a flex column that does not scroll, and .mm-body is the one
+     thing in it that does. The header and the footer are ordinary flex children
+     taking real layout space, which is what stops them covering a card at any
+     scroll position. Still ONE scroller — nesting a second is what makes a
+     flick move the wrong surface on a tablet.
+
+     Negative horizontal margins still let each band span the sheet's 1.2rem
+     padding so nothing shows through at the edges. */
+  #familyMeetingOverlay .sheet {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* dvh so iPad Safari's shrinking toolbar cannot push the footer out of
+       reach; vh first for anything that does not know dvh. */
+    max-height: 88vh;
+    max-height: 88dvh;
+  }
+  #familyMeetingBody {
+    flex: 1 1 auto;
+    min-height: 0;   /* or the body refuses to shrink and the column overflows */
+    display: flex;
+    flex-direction: column;
+  }
   .mm-head {
-    position: sticky; top: -1.2rem; z-index: 3;
+    flex: 0 0 auto;
     margin: -1.2rem -1.2rem 0; padding: 1.2rem 1.2rem 0;
     background: var(--paper);
     border-bottom: 2px solid var(--paper-line);
@@ -1638,18 +1482,141 @@
   .mm-head .mm-stepper { margin-bottom: 8px; }
   .mm-nav {
     display: flex; justify-content: space-between; gap: 8px;
-    position: sticky; bottom: -1.2rem; z-index: 3;
+    flex: 0 0 auto;
     /* No margin-top: the body's own bottom padding was doing that job and
        leaving a dead strip under the buttons on a short step. */
     margin: 0 -1.2rem -1.2rem; padding: 0.6rem 1.2rem calc(0.6rem + env(safe-area-inset-bottom, 0px));
     background: var(--paper);
     border-top: 2px solid var(--paper-line);
   }
+  /* ── Step 2: the weekly reflection ───────────────────────────────
+     A kid surface inside a parent screen, so it takes the kid rules: every
+     control has a 44px hit area, nothing under 13px, and the evidence ships
+     folded because three tabs of eight answers is well past the 200 visible
+     words a child's screen gets. */
+  /* Step 5's two-child summary: the last place in the sitting where the whole
+     week is visible at once. */
+  .mm-close-sum { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+  .mm-close-kid {
+    flex: 1 1 180px; min-width: 0;
+    border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px;
+    background: var(--paper);
+  }
+  .mm-close-name { font-weight: 700; margin-bottom: 4px; }
+  .mm-close-row {
+    display: flex; justify-content: space-between; gap: 8px;
+    font-size: calc(0.9rem * var(--fs-scale, 1)); padding: 1px 0;
+  }
+  .mm-close-action {
+    margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--paper-line);
+    font-size: calc(0.9rem * var(--fs-scale, 1));
+  }
+  .refl-kids { display: flex; gap: 8px; margin-bottom: 10px; }
+  .refl-kid {
+    flex: 1; min-height: 44px;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    border: 2px solid var(--ink); border-radius: 12px;
+    background: var(--paper); cursor: pointer;
+    font-family: 'Patrick Hand', sans-serif; font-weight: 700;
+    font-size: calc(1rem * var(--fs-scale, 1));
+  }
+  .refl-kid.on { background: var(--accent-strong); color: #fff; }
+  .refl-kid-n { font-size: calc(0.86rem * var(--fs-scale, 1)); opacity: 0.85; }
+  .refl-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .refl-tab {
+    flex: 1; min-height: 44px; padding: 0 6px;
+    border: 2px solid var(--ink); border-radius: 12px;
+    background: var(--paper); cursor: pointer;
+    font-family: 'Patrick Hand', sans-serif; font-weight: 700;
+    font-size: calc(0.95rem * var(--fs-scale, 1));
+  }
+  .refl-tab.on { background: #ffe9a8; }
+  .refl-tab.done { border-color: #2f8f84; }
+  .refl-prompt {
+    margin: 0 0 4px; font-family: 'Gochi Hand', cursive;
+    font-size: calc(1.25rem * var(--fs-scale, 1)); font-weight: 700;
+  }
+  .refl-prompt--sub { margin-top: 12px; font-size: calc(1.05rem * var(--fs-scale, 1)); }
+  .refl-say { margin: 0 0 8px; font-size: calc(0.9rem * var(--fs-scale, 1)); opacity: 0.8; }
+  .refl-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .refl-chip {
+    min-height: 44px; padding: 6px 12px;
+    border: 2px solid var(--ink); border-radius: 14px;
+    background: var(--paper); cursor: pointer; text-align: left;
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: calc(0.95rem * var(--fs-scale, 1));
+  }
+  .refl-chip.on { background: #b7e4c7; }
+  .refl-chip[disabled] { opacity: 0.4; cursor: default; }
+  /* The action the app thinks fits the problem she named. A hint, never a
+     selection — the ring says "this one connects", not "this one is chosen". */
+  .refl-chip[data-refl-suggested] { box-shadow: 0 0 0 2px rgba(193,74,36,0.35); }
+  .refl-note {
+    width: 100%; min-height: 44px; margin-top: 8px;
+    border: 2px solid var(--ink); border-radius: 12px; padding: 6px 10px;
+    background: var(--paper); font-family: 'Patrick Hand', sans-serif;
+    font-size: calc(0.95rem * var(--fs-scale, 1));
+  }
+  .refl-field { display: block; margin-top: 8px; font-size: calc(0.9rem * var(--fs-scale, 1)); }
+  .refl-ev { margin-top: 12px; }
+  .refl-ev-toggle {
+    min-height: 44px; width: 100%; text-align: left;
+    border: none; background: none; cursor: pointer; padding: 0;
+    font-family: 'Patrick Hand', sans-serif; font-weight: 700;
+    font-size: calc(0.95rem * var(--fs-scale, 1));
+  }
+  /* Underneath her answer, never above it: the app's account of the week is
+     supporting information, not the answer to the question she was asked. */
+  .refl-ev-list {
+    border-left: 3px solid var(--paper-line); padding-left: 10px; margin-top: 4px;
+  }
+  .refl-ev-item { font-size: calc(0.9rem * var(--fs-scale, 1)); padding: 2px 0; }
+  /* How the answer was given, not what it was. */
+  .refl-aloud {
+    min-height: 44px; margin-top: 8px; padding: 6px 12px;
+    border: 2px dashed var(--ink); border-radius: 14px;
+    background: var(--paper); cursor: pointer;
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: calc(0.9rem * var(--fs-scale, 1));
+  }
+  .refl-aloud.on { border-style: solid; background: #e7f3ff; }
+  /* Carrying the action into a plan: offered, never automatic. */
+  .refl-carry { margin-top: 12px; }
+  .refl-carry-cap { display: block; font-size: calc(0.9rem * var(--fs-scale, 1)); opacity: 0.8; }
+  .refl-carry-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .refl-carry-btns .pill-btn { min-height: 44px; }
+  .refl-carry--done {
+    padding: 8px 10px; border: 2px solid #2f8f84; border-radius: 12px;
+    background: #d8f3dc; font-size: calc(0.9rem * var(--fs-scale, 1));
+  }
+  /* A closed week is a record. The panel says so instead of offering controls
+     that would refuse. */
+  .refl-locked {
+    padding: 8px 10px; margin-bottom: 8px;
+    border: 2px solid var(--ink); border-radius: 12px; background: #f3efe3;
+    font-size: calc(0.9rem * var(--fs-scale, 1));
+  }
+  .refl-body--locked .refl-chip, .refl-body--locked .refl-note { opacity: 0.85; }
+  .refl-card {
+    margin-top: 12px; padding: 10px;
+    border: 2px solid var(--ink); border-radius: 12px; background: #fff8e7;
+    font-size: calc(0.95rem * var(--fs-scale, 1));
+  }
+  .refl-foot { display: flex; gap: 8px; margin-top: 12px; }
+  .refl-foot .refl-talked { flex: 1; }
+  .refl-foot .refl-talked.on { background: #95d5b2; }
+  .refl-foot .pill-btn, .refl-foot .btn-confirm { min-height: 44px; }
   .mm-nav .btn-confirm { flex: 1; }
   .mm-nav .pill-btn, .mm-nav .btn-confirm { min-height: 44px; }
-  /* The gap between the last card and the pinned buttons, owned in one place
-     instead of by whatever the final panel happened to end with. */
-  .mm-body { padding-bottom: var(--space-3); }
+  /* The one scroller. The gap between the last card and the buttons is owned
+     here instead of by whatever the final panel happened to end with. */
+  .mm-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: var(--space-3);
+  }
   .chore-card h3 { margin: 0 0 0.5rem 0; font-size: 1.2rem; }
   .ct-item {
     display: flex;
@@ -1718,6 +1685,43 @@
      `overscroll-behavior: contain` is gone though: it stopped a wheel that
      reached the bottom of the cards from carrying on down the page. */
   .weekly-full-wrap { padding: 0.5rem; overflow: auto; flex: 1; min-height: 0; padding-bottom: 0.5rem; }
+  /* ── The print preview tab ────────────────────────────────────────
+     The same sheet the Print button produces, at the same 15-minute row grid,
+     shown read-only inside the week screen. It borrows the print styles rather
+     than restating them — .print-week-grid and everything under it are the
+     print sheet's own rules — so what a parent sees here and what comes out of
+     the printer cannot drift.
+
+     One scroller, like .weekly-full-wrap beside it: the sheet is wider than a
+     phone and taller than the pane, and a second scroller inside would mean a
+     flick on an iPad moves the wrong one. */
+  #weekPrintPreview { flex: 1; min-height: 0; }
+  .wpp-wrap {
+    padding: 0.5rem;
+    overflow: auto;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    width: 100%;
+  }
+  .wpp-note {
+    margin: 0;
+    font-size: calc(0.86rem * var(--fs-scale, 1));
+    color: var(--ink);
+    opacity: 0.75;
+  }
+  /* On screen the sheet is paper: a white page with the week on it. In print
+     the .print-sheet rules take over and this pane is not rendered at all. */
+  .wpp-sheet {
+    background: #fff;
+    border: 2px solid var(--ink);
+    border-radius: 10px;
+    box-shadow: 2px 2px 0 rgba(42,35,32,0.14);
+    padding: 0.6rem;
+    min-width: 720px;
+  }
   /* On phones the 7 columns would be too thin to read, so give them a
      floor and let this one view scroll instead of squishing. */
   @media (max-width: 600px) { .weekly-full { min-width: 560px; } }
@@ -2362,61 +2366,65 @@
      because it crosses saturated block colours; the tick is what carries it,
      and a white lower edge keeps both legible on the dark categories.
      Takes no pointer events, so nothing it covers is harder to tap. */
-  .hour-grid {
+  /* ── The schedule background: rules behind, the hour's mark above ──
+     Print reads well because its rules are the borders of 15-minute cells: a
+     block sits on top of them, so a line can never cross its text. Both layers
+     below follow that, and the palette is Print's — 1px --paper-line at the
+     quarter and half, 1.5px --ink at the hour.
+
+     The hour used to be ONE element whose ::before drew a short mark at the
+     gutter edge, which meant the rule could not go behind the cards without
+     taking the mark with it. They are separate now: .hour-grid-line--hour is
+     the rule (behind), .hour-grid-tick is the mark (above). */
+  .slot-grid, .hour-grid {
     position: absolute;
     inset: 0;
     pointer-events: none;
   }
+  /* The day view's background: real rows, sized by the browser. 1fr rather
+     than a pixel height so subpixel distribution is the layout engine's job
+     and the boundaries land where the absolutely-positioned blocks expect. */
+  .slot-grid {
+    display: grid;
+    z-index: 0;          /* under .placed-block (z10) */
+  }
+  .slot-row { border-top: 1px solid var(--paper-line); }
+  .slot-row--half { border-top-color: rgba(42,35,32,0.20); }
+  .slot-row--hour { border-top: 1.5px solid rgba(42,35,32,0.46); }
+  /* The first row would otherwise draw a rule along the canvas's own edge,
+     which .tl-canvas already carries as an inset shadow. */
+  .slot-row:first-child { border-top: none; }
+
   .hour-grid-line { position: absolute; left: 0; right: 0; }
-  .hour-grid-line::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    border-radius: 0 2px 2px 0;
-  }
   .hour-grid-line--hour {
-    height: 2px;
-    margin-top: -1px;
-    background: rgba(42,35,32,0.46);
-    box-shadow: 0 1px 0 rgba(255,255,255,0.5);
-  }
-  .hour-grid-line--hour::before {
-    top: -2px; width: 14px; height: 6px;
-    background: rgba(42,35,32,0.72);
+    height: 0;
+    border-top: 1.5px solid rgba(42,35,32,0.46);
   }
   .hour-grid-line--half {
     height: 0;
-    border-top: 1px dashed rgba(42,35,32,0.26);
+    border-top: 1px solid var(--paper-line);
   }
-  .hour-grid-line--half::before {
-    top: -1px; width: 6px; height: 2px;
-    background: rgba(42,35,32,0.38);
+  /* The mark, and the only thing on any schedule surface drawn over a card.
+     It is short and at the gutter edge, so it answers "where is four o'clock"
+     without being able to hide anything. */
+  .hour-grid-tick {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 14px; height: 6px;
+    margin-top: -3px;
+    border-radius: 0 2px 2px 0;
+    background: rgba(42,35,32,0.72);
   }
-  /* Per surface, above the blocks and below whatever must still win: on the day
-     that is the done button, the placement guide and the now line (14/18/20);
-     in the Full week the now line (5); in the Day Blocks lane nothing, so it
-     sits over the clash outline and its flag too. */
-  /* Hour marks ride over the cards; the half-hour rules sit under them. The
-     grid used to be one layer at z-index 12 on the day view — above
-     .placed-block (z10) — which read well on an empty morning and hatched a
-     planned afternoon. .hour-grid--behind is appended last too, so it needs a
-     stacking value BELOW the blocks rather than merely earlier in the DOM. */
+  /* Per surface. The behind layer is appended after the blocks, so it needs a
+     stacking value below them rather than merely an earlier place in the DOM. */
   .hour-grid--day { z-index: 12; }
   .hour-grid--wf  { z-index: 4; }
-  .hour-grid--tg2 { z-index: 7; }
   .hour-grid--behind { z-index: 0; }
-  /* The tick is sized to its column, not fixed. The day view has one wide
-     column and can carry a 14px mark; the week views have seven narrow ones,
-     where the same mark is a tenth of the lane and seventeen rows of them read
-     as a ladder rather than a scale. */
-  .hour-grid--wf .hour-grid-line--hour::before,
-  .hour-grid--tg2 .hour-grid-line--hour::before {
-    top: -1px; width: 8px; height: 4px;
-  }
-  .hour-grid--wf .hour-grid-line--half::before,
-  .hour-grid--tg2 .hour-grid-line--half::before {
-    width: 4px;
-  }
+  /* The mark is sized to its column. The day view has one wide column and can
+     carry 14px; the week has seven narrow ones, where the same mark is a tenth
+     of the lane and seventeen of them read as a ladder rather than a scale. */
+  .hour-grid--wf .hour-grid-tick { width: 8px; height: 4px; margin-top: -2px; }
   .tl-now-line {
     position: absolute;
     left: -6px; right: 0;
@@ -3800,11 +3808,6 @@
   .print-ctrl-hint { font-size: calc(0.85rem * var(--fs-scale, 1)); color: var(--ink-light); }
   /* Printed summary */
   .print-summary { margin-top: 0.7rem; padding-top: 0.4rem; border-top: 2px solid var(--ink); }
-  .print-summary-title { font-family: 'Gochi Hand', cursive; font-size: 12pt; font-weight: 700; margin-bottom: 0.3rem; }
-  .print-summary-window { font-family: 'Patrick Hand', sans-serif; font-size: 9pt; color: #666; font-weight: 600; }
-  .print-cat-chips { display: flex; flex-wrap: wrap; gap: 0.35rem 0.7rem; font-size: 9.5pt; }
-  .print-cat-chip { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
-  .print-cat-dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
   .print-sleep { margin-top: 0.45rem; font-size: 9.5pt; padding: 0.3rem 0.5rem; background: #f3eefb; border-radius: 8px; }
   @media print { .print-sleep { background: #f3eefb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   .print-week-grid {
@@ -4121,9 +4124,6 @@
     40%  { transform: scale(1.45) rotate(12deg); }
     70%  { transform: scale(0.9) rotate(-5deg); }
     100% { transform: scale(1.1) rotate(0deg); }
-  }
-  .mood-btn.selected {
-    animation: moodPop 0.4s ease-out forwards;
   }
 
   /* ── Audit fix: iPad portrait (820px) explicit base layout ── */
