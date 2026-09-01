@@ -6093,13 +6093,29 @@ function findChromium() {
   /* Step 1 confirms a day where the day is, not in a panel below a chart.
      Twenty-eight movements for a week where nothing was wrong is the friction
      this whole phase exists to remove, so it is worth an assertion. */
-  checks.everyDayConfirmsWhereItIs = await page.evaluate(() => {
+  checks.everyDayConfirmsWhereItIs = await page.evaluate(async () => {
     const bad = [];
+    const wasConfirm = window.showConfirm;
     profile = 'parent'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const store = state.shared.parentDayConfirm || {};
     const before = JSON.parse(JSON.stringify(store));
-    ['jenn', 'jess'].forEach(k => { if (store[k]) delete store[k][mmDayKey(0)]; });
+    const day0 = mmDayKey(0);
+    const hadBlocks = ['jenn', 'jess'].map(k => (getDayBlocks(day0, k) || []).slice());
+    ['jenn', 'jess'].forEach(k => { if (store[k]) delete store[k][day0]; });
+
+    /* This check is about WHERE the control lives and that it toggles — the
+       gate deciding whether a day may be reviewed at all has its own check
+       (aDayIsNotReviewableUntilItHasHappened). So give it a day that can
+       actually be reviewed: unconfirmed blocks on that day made the click a
+       no-op and the failure read as "confirming from the row did not take".
+       If day 0 is today it is also 'open', which asks before it signs off. */
+    ['jenn', 'jess'].forEach(k => {
+      const blocks = (getDayBlocks(day0, k) || []).map(b =>
+        Object.assign({}, b, { completed: true, confirmed: true }));
+      setDayBlocks(day0, blocks, k);
+    });
+    window.showConfirm = async () => true;
 
     openFamilyMeeting(); mmGoStep(1);
     const body = document.getElementById('familyMeetingBody');
@@ -6109,10 +6125,14 @@ function findChromium() {
     if (!btn) bad.push('Monday cannot be confirmed from its own row');
     else {
       if (mmIsDayConfirmed(0)) bad.push('fixture started confirmed');
+      /* Signing off an open day asks first, so the handler is async now — let
+         its confirmation settle before reading the record back. */
       btn.click();
+      await new Promise(r => setTimeout(r, 0));
       if (!mmIsDayConfirmed(0)) bad.push('confirming from the row did not take');
       // And it stays a toggle — a mis-tap has a way back.
       body.querySelector('[data-mm-action="confirmday"][data-day="0"]').click();
+      await new Promise(r => setTimeout(r, 0));
       if (mmIsDayConfirmed(0)) bad.push('a day cannot be un-confirmed');
     }
     // The detail still opens, in the row it belongs to.
@@ -6123,6 +6143,8 @@ function findChromium() {
       if (!row || !row.querySelector('.mm-drow-body')) bad.push('a day row does not open its detail');
     }
     closeSheet('familyMeetingOverlay');
+    window.showConfirm = wasConfirm;
+    ['jenn', 'jess'].forEach((k, i) => setDayBlocks(day0, hadBlocks[i], k));
     state.shared.parentDayConfirm = before;
     return bad.length === 0 || bad;
   });
@@ -8301,7 +8323,11 @@ function findChromium() {
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const wk = ctWeekKey;
     const keys = mrWeekDayKeys(wk);
-    const day = keys[0];
+    /* One of the five surfaces this check reads is TODAY, so the routine has to
+       be on today — pinning it to keys[0] meant the Today assertion could only
+       ever pass when the suite happened to run on a Monday. The other four are
+       week-scoped and do not care which day of the week it sits on. */
+    const day = keys.includes(todayKey()) ? todayKey() : keys[0];
     const before = keys.map(k => (getDayBlocks(k, kid) || []).slice());
     const e = mrEnsureEarnings(kid, wk);
     const hadMand = JSON.stringify(getProfData(kid).chore || {});
@@ -8583,7 +8609,12 @@ function findChromium() {
       if (reflTargetWeek('2020-01-06') !== ctThisWeekKey()) {
         bad.push('a historical week plans forward into another historical week');
       }
-      // Attaching to a routine creates no to-do at all.
+      /* CHOOSING A ROUTINE DECIDES WHAT THE TO-DO IS TIED TO, NOT WHETHER ONE
+         EXISTS. This assertion used to be `linkedRoutineId was recorded` — a
+         field nothing in the app reads — so it passed green while the button
+         did nothing at all and told the parent "Attached ✅". Assert the
+         EFFECT: a real to-do, on the target week, linked to that routine and
+         resolvable through the planner's own accessor. */
       state.shared.chore.reflections = {}; reflDraft = null;
       getProfData('jenn').todos = [];
       const routine = reflLinkTargets('jenn')[0];
@@ -8591,8 +8622,19 @@ function findChromium() {
       else {
         reflEdit(wk, 'jenn', r => { r.planNext.actionId = 'timer'; });
         await reflAddToPlan(wk, 'jenn', routine.id);
-        if ((getProfData('jenn').todos || []).length) bad.push('attaching to a routine still added a duplicate to-do');
+        const rt = getProfData('jenn').todos || [];
+        if (rt.length !== 1) bad.push(`attaching to a routine wrote ${rt.length} to-dos, expected 1`);
+        else {
+          if (rt[0].weekKey !== reflTargetWeek(wk)) bad.push('the linked to-do did not land on the target week');
+          if (rt[0].linkType !== 'activity') bad.push(`the to-do is not linked to an activity (linkType=${rt[0].linkType})`);
+          if (rt[0].linkActId !== routine.id) bad.push('the to-do is not linked to the routine that was chosen');
+          if (!getTodoLinkStats(rt[0])) bad.push('the planner cannot resolve the link the carry created');
+        }
         if (reflGet(wk, 'jenn').planNext.linkedRoutineId !== routine.id) bad.push('the routine link was not recorded');
+        if (!reflGet(wk, 'jenn').planNext.carriedTodoId) bad.push('the record does not name the to-do it created');
+        if (!/to-dos/.test(reflCarryLabel(reflGet(wk, 'jenn'), 'jenn'))) {
+          bad.push(`the carry does not describe itself: "${reflCarryLabel(reflGet(wk, 'jenn'), 'jenn')}"`);
+        }
       }
     } finally {
       window.showConfirm = wasConfirm;
@@ -8797,11 +8839,18 @@ function findChromium() {
       if (kids.length !== 2) bad.push(`the summary shows ${kids.length} children`);
       // No space: the label and the figure are two spans in one row.
       const denom = (txt.match(/Days reviewed\s*(\d+)\/(\d+)/) || [])[2];
-      const due = mrWeekDayKeys(wk).filter(k => {
-        const can = canReviewDay('jenn', k);
-        return !(can.reason === 'future' || can.reason === 'running');
-      }).length;
-      if (Number(denom) !== due) bad.push(`the summary counts ${denom} reviewable days, canReviewDay says ${due}`);
+      /* ONLY a future day is excused. A running day used to be excluded here
+         and in canCloseWeek alike, which is how a week closed over a Sunday
+         whose swimming was still in the pool while the summary read 6/6. */
+      const due = weekDaysAwaitingReview('jenn', wk).length
+                + mrWeekDayKeys(wk).filter(k => canReviewDay('jenn', k).reason !== 'future'
+                                             && isDayReviewed('jenn', k)).length;
+      if (Number(denom) !== due) bad.push(`the summary counts ${denom} reviewable days, the close gate says ${due}`);
+
+      // And it says what became of the action, not just what it was.
+      if (!/not carried forward|to-dos/.test(txt)) {
+        bad.push('the summary does not say whether the action reached a plan');
+      }
 
       // Copying a plan forward is still not offered here.
       if (/Copy this week/i.test(txt)) bad.push('step 5 offers to copy the week again');
@@ -8941,7 +8990,14 @@ function findChromium() {
       if (JSON.stringify(state.shared.chore.finalizedWeeks || {}) !== beforeMoney) bad.push('the parent tick moved money');
       if (JSON.stringify(state.shared.chore.xpAwardedWeeks || {}) !== beforeXp) bad.push('the parent tick moved XP');
 
-      // Skipping is explicit, and reversible.
+      /* Skipping is explicit, and reversible. It is offered while there is
+         still something to skip: setting aside a reflection that is already
+         answered is a contradiction, and completing one takes the skip back
+         (see aReflectionCannotBeSkippedAndComplete), so the button would
+         silently do nothing here. Un-answer the last tab to get it back. */
+      tap('[data-mm-action="refl-tab"][data-refl-tab="planNext"]');
+      host.querySelector('[data-mm-action="refl-action"][aria-pressed="true"]').click();
+      if (reflIsComplete(reflWorking(wk, 'jenn'))) bad.push('the action could not be un-chosen');
       tap('[data-mm-action="refl-skip"]');
       if (!reflIsSkipped(reflGet(wk, 'jenn'))) bad.push('skipping was not recorded');
       tap('[data-mm-action="refl-skip"]');
@@ -9239,6 +9295,363 @@ function findChromium() {
       setDayBlocks(future, beforeFuture, 'jenn');
       state.shared.parentDayConfirm = store;
       profile = 'jenn';
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* A WEEK DOES NOT CLOSE OVER A DAY STILL BEING LIVED.
+     canReviewDay always refused a running day, but canCloseWeek excused it
+     alongside a future one — so a Sunday sitting held while the swimming was
+     still in the pool counted six of six reviewable days and closed. The
+     summary carried the SAME exclusion, so the figure a parent read agreed with
+     the gate they pressed while both were wrong together. */
+  checks.aRunningDayHoldsTheWeekOpen = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+    const today = todayKey();
+    const store = JSON.parse(JSON.stringify(state.shared.parentDayConfirm || {}));
+    const before = (getDayBlocks(today, 'jenn') || []).slice();
+    try {
+      // Every day of the week signed off, so only the running day can be at issue.
+      ['jenn', 'jess'].forEach(k => mrWeekDayKeys(wk).forEach(d => markDayReviewed(k, d, true)));
+      const now = tdNowMin();
+      setDayBlocks(today, [{ id: 'rw1', actId: 'piano', startMin: Math.max(0, now - 10),
+                             durationMin: 180, checklistState: {} }], 'jenn');
+      markDayReviewed('jenn', today, false);
+
+      if (canReviewDay('jenn', today).reason !== 'running') {
+        bad.push('the fixture did not produce a running day');
+      }
+      if (weekDaysAwaitingReview('jenn', wk).indexOf(today) < 0) {
+        bad.push('a running day was excused from the days the week is waiting on');
+      }
+      const gate = canCloseWeek(wk);
+      if (gate.ok) bad.push('the week closed with an activity still running');
+      if (!gate.missing.some(m => m.kid === 'jenn' && m.reason === 'days')) {
+        bad.push('the refusal does not name the unreviewed day');
+      }
+      // …and the summary must not report that day as already accounted for.
+      mmGoToWeek(wk); mmGoStep(5); renderMeetingMode();
+      const txt = document.getElementById('familyMeetingBody')
+        .textContent.replace(/\s+/g, ' ');
+      const m = txt.match(/Days reviewed\s*(\d+)\/(\d+)/);
+      if (!m) bad.push('the summary does not report days reviewed');
+      else if (Number(m[1]) === Number(m[2])) {
+        bad.push(`the summary reads ${m[1]}/${m[2]} while the gate is refusing`);
+      }
+      // A future day is still excused — the fix must not close that door.
+      const future = toDayKeyInZone(new Date(Date.now() + 3 * 864e5));
+      if (mrWeekDayKeys(wk).includes(future)
+          && weekDaysAwaitingReview('jenn', wk).includes(future)) {
+        bad.push('a day that has not happened is being counted against her');
+      }
+    } finally {
+      setDayBlocks(today, before, 'jenn');
+      state.shared.parentDayConfirm = store;
+      closeSheet('familyMeetingOverlay');
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* TODAY IS NOT OVER JUST BECAUSE IT IS QUIET RIGHT NOW.
+     An empty PAST day is a real answer — a quiet Sunday happened. Today is not:
+     at nine in the morning it holds nothing because the day has not been lived,
+     not because nothing was asked of her, and signing it off then reviews
+     activities that have not been put on it yet. It stays reviewable, but only
+     through an explicit "nothing else is planned", the way an empty day already
+     asks before it is signed off blank. */
+  checks.todayIsNotReviewedByAccident = await page.evaluate(async () => {
+    const bad = [];
+    const wasConfirm = window.showConfirm;
+    const wasProfile = profile;
+    profile = 'parent'; parentViewing = 'jenn';
+    const today = todayKey();
+    const past = toDayKeyInZone(new Date(Date.now() - 3 * 864e5));
+    const store = JSON.parse(JSON.stringify(state.shared.parentDayConfirm || {}));
+    const beforeToday = (getDayBlocks(today, 'jenn') || []).slice();
+    const beforePast = (getDayBlocks(past, 'jenn') || []).slice();
+    try {
+      ['jenn', 'jess'].forEach(k => [today, past].forEach(d => markDayReviewed(k, d, false)));
+
+      // An empty today reports 'open', not 'empty' — the two are different facts.
+      setDayBlocks(today, [], 'jenn');
+      const open = canReviewDay('jenn', today);
+      if (open.reason !== 'open') bad.push(`an empty today gave reason '${open.reason}'`);
+      if (!/not over/i.test(reviewBlockedReason({ ok: false, reason: 'open' }))) {
+        bad.push('an open day has no sentence of its own');
+      }
+
+      // A today whose blocks have all ENDED is open too — the hole is not just emptiness.
+      setDayBlocks(today, [{ id: 'op1', actId: 'piano', startMin: 0, durationMin: 1,
+                             completed: true, confirmed: true, checklistState: {} }], 'jenn');
+      if (canReviewDay('jenn', today).reason !== 'open') {
+        bad.push('a today whose blocks have all finished was treated as a finished day');
+      }
+
+      // Declining the confirmation reviews nothing.
+      window.showConfirm = async () => false;
+      await markDayReviewedForChild('jenn', today);
+      if (isDayReviewed('jenn', today)) bad.push('today was reviewed without anybody confirming it');
+
+      // Accepting it does.
+      window.showConfirm = async () => true;
+      await markDayReviewedForChild('jenn', today);
+      if (!isDayReviewed('jenn', today)) {
+        bad.push('today could not be reviewed even after "nothing else today"');
+      }
+
+      // An empty PAST day is untouched by this — it is still 'empty'.
+      setDayBlocks(past, [], 'jenn');
+      if (canReviewDay('jenn', past).reason !== 'empty') {
+        bad.push('a quiet past day stopped being a real answer');
+      }
+    } finally {
+      window.showConfirm = wasConfirm;
+      setDayBlocks(today, beforeToday, 'jenn');
+      setDayBlocks(past, beforePast, 'jenn');
+      state.shared.parentDayConfirm = store;
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* A BLANK REFLECTION DOES NOT CLOSE A WEEK.
+     Step 5 displayed 0/3 and closed anyway, so a week could be recorded as
+     reviewed and settled with neither child having been asked. Either she
+     answered it or it was deliberately set aside — both are answers, and a
+     blank record is neither. The money stays independent of it. */
+  checks.aBlankReflectionHoldsTheWeekOpen = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+    const hadRefl = JSON.parse(JSON.stringify(state.shared.chore.reflections || {}));
+    const store = JSON.parse(JSON.stringify(state.shared.parentDayConfirm || {}));
+    const done = () => Object.assign(reflBlank(), {
+      doingWell: { answerIds: ['finished'], evidenceIds: [], customNote: '', inputMode: 'spoken' },
+      needsWork: { answerId: 'rushed', evidenceIds: [], customNote: '', controllableText: 'slow down',
+                   needsHelpFindingControl: false, parentObservation: '', inputMode: 'spoken' },
+      planNext: Object.assign(reflBlank().planNext, { actionId: 'timer' }),
+    });
+    try {
+      ['jenn', 'jess'].forEach(k => mrWeekDayKeys(wk).forEach(d => markDayReviewed(k, d, true)));
+      state.shared.chore.reflections = {}; reflDraft = null;
+
+      const blank = canCloseWeek(wk);
+      if (blank.ok) bad.push('the week closed with both reflections blank');
+      if (!blank.missing.some(m => m.reason === 'reflection')) {
+        bad.push('the refusal does not name the reflection');
+      }
+
+      // A finished one satisfies it…
+      state.shared.chore.reflections = { [wk]: { jenn: done(), jess: done() } };
+      if (canCloseWeek(wk).missing.some(m => m.reason === 'reflection')) {
+        bad.push('a finished reflection still held the week open');
+      }
+      // …and so does one deliberately set aside.
+      state.shared.chore.reflections = { [wk]: {
+        jenn: Object.assign(reflBlank(), { skippedAt: Date.now() }),
+        jess: Object.assign(reflBlank(), { skippedAt: Date.now() }) } };
+      if (canCloseWeek(wk).missing.some(m => m.reason === 'reflection')) {
+        bad.push('a skipped reflection held the week open');
+      }
+      // The refusal has to be sayable, not a blank line under the button.
+      mmGoToWeek(wk); mmGoStep(5);
+      state.shared.chore.reflections = {}; reflDraft = null;
+      renderMeetingMode();
+      const txt = document.getElementById('familyMeetingBody')
+        .textContent.replace(/\s+/g, ' ');
+      if (!/reflection/i.test(txt)) bad.push('the close gate does not say the reflection is why');
+    } finally {
+      state.shared.chore.reflections = hadRefl;
+      state.shared.parentDayConfirm = store;
+      reflDraft = null;
+      closeSheet('familyMeetingOverlay');
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* A REFLECTION CANNOT BE TWO THINGS AT ONCE.
+     Three states could contradict each other: the parent's "we talked about
+     this" survived the child rewriting the answer it described, a skipped
+     record could reach 3/3 and still print "left unfinished on purpose", and
+     the tick could be pressed against a blank record — which, now that closing
+     the week counts it, would be a conversation recorded about nothing. */
+  checks.aReflectionCannotBeSkippedAndComplete = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+    const hadRefl = JSON.parse(JSON.stringify(state.shared.chore.reflections || {}));
+    try {
+      state.shared.chore.reflections = {}; reflDraft = null;
+
+      // Nothing to confirm on a blank record — in the markup AND in the handler.
+      if (reflIsSettled(reflGet(wk, 'jenn'))) bad.push('a blank reflection offered the parent tick');
+      mmGoToWeek(wk); mmGoStep(2); mnySetMeetKid('jenn');
+      reflTab = 'doingWell'; renderMeetingMode();
+      const host = document.getElementById('familyMeetingBody');
+      if (host.querySelector('[data-mm-action="refl-talked"]')) {
+        bad.push('the parent tick was drawn against a 0/3 reflection');
+      }
+      reflHandleAction('refl-talked', document.createElement('button'), wk);
+      if (reflWorking(wk, 'jenn').parentReviewedAt) {
+        bad.push('the handler recorded a conversation about a blank reflection');
+      }
+
+      // Finish it, and the tick becomes available and sticks.
+      reflEdit(wk, 'jenn', r => {
+        r.doingWell.answerIds = ['finished'];
+        r.needsWork.answerId = 'rushed';
+        r.needsWork.controllableText = 'slow down';
+        r.planNext.actionId = 'timer';
+      });
+      if (!reflIsComplete(reflWorking(wk, 'jenn'))) bad.push('the fixture did not complete the reflection');
+      reflHandleAction('refl-talked', document.createElement('button'), wk);
+      if (!reflWorking(wk, 'jenn').parentReviewedAt) bad.push('the parent tick did not take');
+
+      // The parent's own observation is not her answer — the tick survives it.
+      reflEdit(wk, 'jenn', r => { r.needsWork.parentObservation = 'she tried hard'; });
+      if (!reflWorking(wk, 'jenn').parentReviewedAt) {
+        bad.push('the tick cleared when the parent wrote in their own field');
+      }
+
+      // Her changing her answer clears it: it described a different record.
+      reflEdit(wk, 'jenn', r => { r.needsWork.answerId = 'forgot'; });
+      if (reflWorking(wk, 'jenn').parentReviewedAt) {
+        bad.push('"we talked about this" survived the child changing her answer');
+      }
+
+      // Skipped, then finished — the skip goes, and cannot print alongside it.
+      reflEdit(wk, 'jenn', r => { r.skippedAt = Date.now(); r.planNext.actionId = ''; });
+      if (!reflIsSkipped(reflWorking(wk, 'jenn'))) bad.push('the fixture did not skip the reflection');
+      reflEdit(wk, 'jenn', r => { r.planNext.actionId = 'timer'; });
+      const rec = reflWorking(wk, 'jenn');
+      if (!reflIsComplete(rec)) bad.push('completing after a skip did not finish it');
+      if (reflIsSkipped(rec)) bad.push('a finished reflection still reads as skipped');
+      renderMeetingMode();
+      const txt = document.getElementById('familyMeetingBody').textContent;
+      if (/unfinished on purpose/.test(txt)) {
+        bad.push('a completed reflection still prints "left unfinished on purpose"');
+      }
+    } finally {
+      state.shared.chore.reflections = hadRefl;
+      reflDraft = null;
+      closeSheet('familyMeetingOverlay');
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* EVIDENCE COUNTS WHAT HAS ENDED, AND NAMES WHAT IS WAITING.
+     Needs Work read the week from midnight, so a swim at six was offered to a
+     child at breakfast as a block she had "not marked done" — the app telling
+     her she had failed at something she had not yet had the chance to do. And a
+     chore she had DONE and claimed was reported as "still owed" while it sat in
+     a parent's queue, which blames a child for somebody else's inbox. */
+  checks.evidenceCountsOnlyWhatHasEnded = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+    const today = todayKey();
+    const before = (getDayBlocks(today, 'jenn') || []).slice();
+    try {
+      const now = tdNowMin();
+      const has = (id) => reflEvidence(wk, 'jenn', 'needsWork').some(e => e.id === id);
+      const line = (id) => (reflEvidence(wk, 'jenn', 'needsWork')
+        .find(e => e.id === id) || {}).text || '';
+
+      // Nothing but a block still to come, unticked. It is not a failure yet.
+      setDayBlocks(today, [{ id: 'ev1', actId: 'piano', startMin: Math.min(23 * 60, now + 120),
+                             durationMin: 60, checklistState: {} }], 'jenn');
+      const ahead = /(\d+) planned block/.exec(line('not_done'));
+      const aheadN = ahead ? Number(ahead[1]) : 0;
+
+      // The same block, moved into the past and still unticked, IS one.
+      setDayBlocks(today, [{ id: 'ev1', actId: 'piano', startMin: 0,
+                             durationMin: 1, checklistState: {} }], 'jenn');
+      const behind = /(\d+) planned block/.exec(line('not_done'));
+      const behindN = behind ? Number(behind[1]) : 0;
+      if (!(behindN > aheadN)) {
+        bad.push(`a finished unticked block did not count (ahead ${aheadN}, behind ${behindN})`);
+      }
+      if (!blockHasEnded({ startMin: 0, durationMin: 1 }, today)) {
+        bad.push('blockHasEnded says a block finished at 00:01 has not ended');
+      }
+      if (blockHasEnded({ startMin: 23 * 60 + 59, durationMin: 60 }, today)) {
+        bad.push('blockHasEnded says a block late tonight has already ended');
+      }
+
+      // Claimed work is never described as owed.
+      const fam = getFamilyChoreStatus('jenn', wk);
+      if (fam.waiting && !has('chores_waiting')) {
+        bad.push('work waiting on a grown-up is not named as waiting');
+      }
+      if (/still owed/.test(line('chores_short'))) {
+        bad.push('the chore line still uses the word "owed"');
+      }
+      const owedM = /(\d+) family chore/.exec(line('chores_short'));
+      if (owedM && Number(owedM[1]) > Math.max(0, fam.required - fam.fulfilled - fam.waiting)) {
+        bad.push('the chore line counts claimed work as outstanding');
+      }
+      // Nothing on this screen may select an answer.
+      if (reflEvidence(wk, 'jenn', 'needsWork').some(e => e.selected)) {
+        bad.push('evidence selected an answer for her');
+      }
+    } finally {
+      setDayBlocks(today, before, 'jenn');
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* A RECORDED ACTION KEEPS ITS OWN WORDS.
+     `actionText` was written on every change and read by nothing: the display
+     rebuilt the label from the current answer list, so rewording an option
+     would silently change what a reflection from six months ago appears to
+     say. The stored words win; the live label is the fallback only. */
+  checks.aRecordedActionKeepsItsOwnWords = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+    const hadRefl = JSON.parse(JSON.stringify(state.shared.chore.reflections || {}));
+    const timer = REFL_PLAN_NEXT.find(a => a.id === 'timer');
+    const wasText = timer.text;
+    try {
+      state.shared.chore.reflections = {}; reflDraft = null;
+      reflEdit(wk, 'jenn', r => { r.planNext.actionId = 'timer'; });
+      const stored = reflWorking(wk, 'jenn').planNext.actionText;
+      if (stored !== wasText) bad.push(`choosing an action stored "${stored}", expected "${wasText}"`);
+
+      // Reword the option underneath the record.
+      timer.text = 'Set a stopwatch instead';
+      if (reflActionText(reflWorking(wk, 'jenn')) !== wasText) {
+        bad.push('rewording the answer list changed what an existing record says');
+      }
+      if (reflActionLabel({ planNext: { actionId: 'timer' } }) !== 'Set a stopwatch instead') {
+        bad.push('the live label did not follow the answer list');
+      }
+      // A record written before the field existed still reads correctly.
+      if (reflActionText({ planNext: { actionId: 'timer', actionText: '' } })
+          !== 'Set a stopwatch instead') {
+        bad.push('a record with no stored words lost its action entirely');
+      }
+    } finally {
+      timer.text = wasText;
+      state.shared.chore.reflections = hadRefl;
+      reflDraft = null;
+      profile = wasProfile;
     }
     return bad.length === 0 || bad;
   });

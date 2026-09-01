@@ -455,6 +455,8 @@ that already owned that write. Ask it; do not re-derive it.
 | Did her money move as she decided? | `isChildMoneyCommitted(kid, weekKey)` |
 | Is the week closed? | `isWeekClosed(weekKey)` |
 | Can this day be reviewed yet? | `canReviewDay(kid, dayKey)` |
+| Has this block's time passed? | `blockHasEnded(block, dayKey)` |
+| What is the week still waiting on? | `weekDaysAwaitingReview(kid, weekKey)` |
 
 It loads at `36`, last of the declaration files, because it calls into `01`–`35`
 at runtime and none of them at load time. `99-main.js` still owns every line of
@@ -485,6 +487,27 @@ recorded" out loud first. `reviewBlockedReason` is the sentence a refused contro
 says: it could previously only ever be "Confirm the blocks first", so a day
 refused for not having happened told a parent to confirm blocks that did not
 exist.
+
+**Today is `'open'`, and that is a third thing.** An empty PAST day is a real
+answer; today holding nothing at nine in the morning is not — it is a day that
+has not been lived, and signing it off reviews the swimming nobody has put on it
+yet. Nor is it only about emptiness: a today whose blocks have all ENDED is the
+same case. So today reports `'open'` — reviewable, but only through an explicit
+"nothing else is planned", the way an empty day already asks before it is signed
+off blank — and until somebody says that, it holds the week open.
+
+**Only a day that has not happened is excused from closing a week.**
+`canCloseWeek` used to excuse a **running** day alongside a future one, so a
+Sunday sitting held while the swimming was still in the pool counted six of six
+and closed. `mmCloseSummary` carried the same exclusion, so the figure a parent
+read agreed with the gate they pressed while both were wrong together —
+`weekDaysAwaitingReview` is that one decision now, and both ask it.
+
+**A week does not close over a blank reflection.** Step 5 showed `0/3` and closed
+anyway. Closure requires each child's record to be `reflIsSettled` — three tabs
+answered, or explicitly skipped; a blank record is neither, and closing over one
+files "we reflected" against a conversation that never happened. Money settlement
+stays independent of it, deliberately.
 
 **Confirming is not completing, and neither is reviewing.** A parent may confirm
 an unfinished routine and it must not start reading as finished. `confirmAllBlocksForChild`
@@ -600,8 +623,38 @@ markup — a `disabled` attribute is a hint to the pointer, not a rule:
 - **naming a cause does not finish the second tab.** An explanation is not a
   solution; "I need help finding one" is a real answer where silence is not.
 - the parent's tick records **that the conversation happened**. It asserts no
-  agreement and changes no completion, grade, XP or money.
-- **skipping is explicit and reversible**, and never blocks the settlement.
+  agreement and changes no completion, grade, XP or money. It is offered only
+  once there is something to have talked about — complete, or explicitly
+  skipped — because closing a week now counts it, and a tick on a blank record
+  would be a conversation recorded about nothing.
+- **skipping is explicit and reversible**, and never blocks the settlement. It is
+  offered only while something is still unanswered: setting aside a reflection
+  that is already finished is a contradiction, and finishing one clears
+  `skippedAt`.
+- **no two of those states may disagree.** `reflStampAnswered` owns the derived
+  marks so no caller has to remember them: completing clears the skip, and any
+  change to *her answers* clears `parentReviewedAt` — a tick describes the
+  answers that were on screen when they talked, so it cannot survive her
+  rewriting one. `reflAnswerSignature` is what draws that line, which is how the
+  tick survives its own write and the parent's own observation field.
+
+**Evidence counts what has ENDED, and names what is waiting.** Needs Work read
+the week from midnight, so a swim at six was offered to a child at breakfast as a
+block she had "not marked done" — telling her she had failed at something she had
+not yet had the chance to do. It measures `blockHasEnded` now, the same
+arithmetic `canReviewDay` uses. And a chore she had DONE and claimed read as
+"still owed" while it sat in a parent's queue: `getFamilyChoreStatus` already
+separates `waiting` from `fulfilled` and outstanding, so the evidence says which
+is which rather than blaming a child for somebody else's inbox.
+
+**A recorded action keeps its own words.** `actionText` was written and read by
+nothing — the display rebuilt the label from the current answer list, so
+rewording an option would silently change what a reflection from six months ago
+appears to say. `reflActionLabel` derives the live label and is what gets STORED;
+`reflActionText` prefers the stored words and falls back to the label only for a
+record written before the field carried anything. `actionTextId` says which
+answer the stored words belong to, so picking a different action rewrites them
+and rewording the list never does.
 
 **The action is saved either way; putting it in a plan is a separate act.** She
 picks it and it is in the record immediately. Carrying it forward is offered, not
@@ -610,8 +663,21 @@ and what will appear. `reflTargetWeek` decides where it lands, and **not** by
 taking the week after the one on screen: a current week plans into next week, and
 anything older plans into the week we are actually in — a sitting held six weeks
 late must not write into a week that has already happened, which is the defect
-that retired `mmPlanNextWeek`. Attaching to a routine she already has writes no
-to-do at all, because a duplicate helps nobody.
+that retired `mmPlanNextWeek`.
+
+**Choosing a routine decides what the to-do is TIED TO, not whether one exists.**
+Attaching used to write no to-do at all — only `linkedRoutineId` into the
+reflection, a field no routine, block, checklist or planner ever read. The app
+said "Attached ✅" and nothing anywhere changed, and the smoke check asserted
+that the *field* was recorded, so it passed green over a complete no-op — the
+same shape as the `|| break` bug this file already documents. Both paths write a
+real to-do now; picking a routine additionally sets `linkType:'activity'` and
+`linkActId`, which is what `getTodoLinkStats` (`js/12-goals.js`) already read, so
+the to-do carries that routine's progress beside it. `carriedTodoId` names what
+was created; `reflCarryLabel` is the one sentence saying where it went, which is
+what step 5 reports. `addKidExtra` is deliberately NOT used: it reads the active
+profile rather than the child being reviewed, and a routine checklist item is a
+standing rule rather than one week's action.
 
 **A closed week's reflection is a record.** `reflIsLocked` gates every edit path —
 chips, keyboard, the parent tick, the skip and the carry-forward — because the

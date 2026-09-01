@@ -89,7 +89,7 @@ function reflBlank() {
                  needsHelpFindingControl: false, parentObservation: '', inputMode: 'spoken' },
     planNext:  { actionId: '', customNote: '', actionText: '', whenText: '', helpText: '',
                  doneText: '', targetWeek: '', linkedBlockId: '', linkedRoutineId: '',
-                 inputMode: 'spoken' },
+                 carriedTodoId: '', actionTextId: '', inputMode: 'spoken' },
     childCompletedAt: null,
     parentReviewedAt: null,
     skippedAt: null,
@@ -133,13 +133,37 @@ function reflWorking(wk, kid) {
   return reflGet(wk, kid);
 }
 
+/* Just her answers — not the evidence the app offered, not how the answer was
+   given, and not the parent's own observation. Comparing this across a mutation
+   is what tells `reflEdit` whether the child changed her mind or somebody
+   merely ticked something beside it. */
+function reflAnswerSignature(rec) {
+  const d = (rec && rec.doingWell) || {}, n = (rec && rec.needsWork) || {},
+        p = (rec && rec.planNext) || {};
+  return JSON.stringify([
+    (d.answerIds || []).slice().sort(), (d.customNote || '').trim(),
+    n.answerId || '', (n.customNote || '').trim(),
+    (n.controllableText || '').trim(), !!n.needsHelpFindingControl,
+    p.actionId || '', (p.customNote || '').trim(), (p.whenText || '').trim(),
+    (p.helpText || '').trim(), (p.doneText || '').trim(),
+  ]);
+}
+
 function reflEdit(wk, kid, mutate) {
   // The one gate. Every tap and every keystroke comes through here.
   if (reflIsLocked(wk)) return reflGet(wk, kid);
   if (!reflDraft || reflDraft.wk !== wk || reflDraft.kid !== kid) {
     reflDraft = { wk, kid, rec: JSON.parse(JSON.stringify(reflGet(wk, kid))) };
   }
+  const before = reflAnswerSignature(reflDraft.rec);
   mutate(reflDraft.rec);
+  /* A parent ticks "we talked about this" against the answers that were on
+     screen when they talked. If the child then changes one, the tick describes
+     a conversation that no longer matches the record, so it goes — the parent
+     can tick again once they have seen what she changed it to. The comparison
+     is what lets the tick survive its OWN write, and every keystroke in the
+     parent's own observation field. */
+  if (reflAnswerSignature(reflDraft.rec) !== before) reflDraft.rec.parentReviewedAt = null;
   reflStampAnswered(reflDraft.rec, wk, kid);
   return reflDraft.rec;
 }
@@ -162,9 +186,31 @@ function reflStampAnswered(rec, wk, kid) {
       rec[section].evidenceIds = reflEvidence(wk, kid, section).map(e => e.id);
     }
   });
+  /* Her action, in the words the list used AT THE MOMENT SHE CHOSE IT. Two
+     handlers used to write this and nothing else did, so a record created any
+     other way carried no words at all and fell back to a live label that can
+     move underneath it. `actionTextId` says which answer the stored words
+     belong to: while it matches, the words are frozen; when she picks a
+     different action, they are rewritten for the new one. A record from before
+     this field existed adopts its current action rather than being rewritten,
+     so nothing already recorded is restated. */
+  const pn = rec.planNext || {};
+  if (!pn.actionId) { pn.actionText = ''; pn.actionTextId = ''; }
+  else if (pn.actionId === 'other') { pn.actionText = reflActionLabel(rec); pn.actionTextId = 'other'; }
+  else if (!pn.actionText) { pn.actionText = reflActionLabel(rec); pn.actionTextId = pn.actionId; }
+  else if (!pn.actionTextId) { pn.actionTextId = pn.actionId; }
+  else if (pn.actionTextId !== pn.actionId) {
+    pn.actionText = reflActionLabel(rec); pn.actionTextId = pn.actionId;
+  }
+
   const done = reflIsComplete(rec);
   if (done && !rec.childCompletedAt) rec.childCompletedAt = Date.now();
   if (!done) rec.childCompletedAt = null;
+  /* Skipping is a state, not an absence — but it is the state of NOT having
+     answered, so finishing the three tabs takes it back. Otherwise a record
+     reads "left unfinished on purpose" directly under its own completed
+     summary, and the closing gate cannot tell which of the two it is. */
+  if (done) rec.skippedAt = null;
 }
 
 /* Write the draft through, once. Safe to call when there is nothing pending. */
@@ -227,6 +273,11 @@ function reflDoneCount(rec) {
 function reflIsComplete(rec) { return reflDoneCount(rec) === REFL_TABS.length; }
 function reflIsSkipped(rec) { return !!(rec && rec.skippedAt); }
 
+/* Answered one way or the other — three tabs done, or deliberately set aside.
+   The parent's tick and the week-closing gate ask this same question, so they
+   cannot come to different conclusions about the same record. */
+function reflIsSettled(rec) { return reflIsComplete(rec) || reflIsSkipped(rec); }
+
 /* ── Evidence ─────────────────────────────────────────────────────
    What the week SHOWS, offered underneath her own answer and never above it.
    Nothing here selects anything: a suggestion that fills in the answer has
@@ -265,19 +316,29 @@ function reflEvidence(wk, kid, tab) {
   }
 
   if (tab === 'needsWork') {
+    /* Three states, not two. A chore she has DONE and claimed is waiting on a
+       grown-up, and calling that "owed" blames a child for her parent's inbox.
+       getFamilyChoreStatus already separates them; this only has to say so. */
     const fam = getFamilyChoreStatus(kid, wk);
-    if (fam.required > fam.fulfilled) {
-      add('chores_short', `${fam.required - fam.fulfilled} family chore${fam.required - fam.fulfilled === 1 ? '' : 's'} still owed.`);
+    if (fam.waiting) {
+      add('chores_waiting', `${fam.waiting} family chore${fam.waiting === 1 ? '' : 's'} waiting for a grown-up to check.`);
+    }
+    const owed = Math.max(0, fam.required - fam.fulfilled - fam.waiting);
+    if (owed) {
+      add('chores_short', `${owed} family chore${owed === 1 ? '' : 's'} still to do.`);
     }
     let missed = 0;
     (info.keys || []).forEach(key => {
       (getDayBlocksForProfile(key, kid) || []).forEach(b => {
-        if (key > todayKey()) return;
+        if (!blockHasEnded(b, key)) return;
         if (!isBlockCompleted(b, kid)) missed++;
       });
     });
     if (missed) add('not_done', `${missed} planned block${missed === 1 ? '' : 's'} not marked done.`);
-    const unreviewed = (info.keys || []).filter(k => k <= todayKey() && !isDayReviewed(kid, k)).length;
+    /* Only days that COULD have been reviewed. Counting today from midnight
+       made "1 day not reviewed yet" appear every morning of the week. */
+    const unreviewed = (info.keys || []).filter(k =>
+      canReviewDay(kid, k).ok && !isDayReviewed(kid, k)).length;
     if (unreviewed) add('unreviewed', `${unreviewed} day${unreviewed === 1 ? '' : 's'} not reviewed yet.`);
     /* A clash is the week's own finding, drawn the week's way. Asked, not
        recomputed — computeBufferConflicts owns it. */
@@ -319,7 +380,25 @@ function reflTargetWeekLabel(wk) {
    than from the planner, so the button cannot offer to write it twice. */
 function reflCarriedForward(rec) {
   const p = (rec && rec.planNext) || {};
-  return !!(p.targetWeek && (p.linkedRoutineId || p.linkedBlockId));
+  /* carriedTodoId is the real evidence — a to-do that exists. The other two are
+     read for records written before the carry created one, so a reflection
+     already marked as carried is not offered the button a second time. */
+  return !!(p.targetWeek && (p.carriedTodoId || p.linkedRoutineId || p.linkedBlockId));
+}
+
+/* Where the action actually went, in one sentence, for a screen that is asking
+   rather than deciding. Step 5 showed the chosen action and stopped there, so a
+   parent closing the week could not tell whether it had been carried into a
+   plan at all, or which week it would land on. Reads the record, never the
+   planner — the to-do it names may be on a week nobody has open. */
+function reflCarryLabel(rec, kid) {
+  const p = (rec && rec.planNext) || {};
+  if (!reflCarriedForward(rec)) return 'not carried forward';
+  const when = !p.targetWeek ? 'the plan'
+    : p.targetWeek === ctThisWeekKey() ? "this week" : "next week";
+  const tied = p.linkedRoutineId
+    ? (reflLinkTargets(kid).find(t => t.id === p.linkedRoutineId) || {}).name : '';
+  return `in ${when}'s to-dos${tied ? ` · with ${tied}` : ''}`;
 }
 
 /* The routines and activities the action could be attached to instead of a new
@@ -468,8 +547,10 @@ function reflRenderPlanNext(wk, kid, rec) {
 function reflRenderCarry(wk, kid, rec) {
   if (reflCarriedForward(rec)) {
     const p = rec.planNext;
-    return `<div class="refl-carry refl-carry--done">✅ Carried into ${escapeHtml(reflTargetWeekLabel(wk) || 'the plan')}${
-      p.linkedRoutineId ? ` · attached to a routine` : ` · as a to-do`}</div>`;
+    const tied = p.linkedRoutineId
+      ? (reflLinkTargets(kid).find(t => t.id === p.linkedRoutineId) || {}).name : '';
+    return `<div class="refl-carry refl-carry--done">✅ In ${escapeHtml(reflTargetWeekLabel(wk) || 'the plan')}'s to-dos${
+      tied ? ` · with ${escapeHtml(tied)}` : ''}</div>`;
   }
   const when = reflTargetWeekLabel(wk);
   if (!when) return `<div class="refl-carry"><span class="mm-cap">A future week is planned in the planner.</span></div>`;
@@ -478,7 +559,7 @@ function reflRenderCarry(wk, kid, rec) {
       <span class="refl-carry-cap">Saved either way. Want it in the plan too?</span>
       <div class="refl-carry-btns">
         ${links.map(l => `<button type="button" class="pill-btn" data-mm-action="refl-carry"
-            data-refl-link="${escapeAttr(l.id)}">${l.icon} Add to ${escapeHtml(l.name)}</button>`).join('')}
+            data-refl-link="${escapeAttr(l.id)}">${l.icon} As a to-do, with ${escapeHtml(l.name)}</button>`).join('')}
         <button type="button" class="pill-btn" data-mm-action="refl-carry"
           >➕ Add to ${escapeHtml(when)}'s to-dos</button>
       </div>
@@ -526,12 +607,13 @@ function mmRenderReflect(wk) {
         ${rec.planNext.doneText ? `<div><b>We will check:</b> ${escapeHtml(rec.planNext.doneText)}</div>` : ''}
       </div>` : ''}
     ${locked ? '' : `<div class="refl-foot">
-      <button type="button" class="btn-confirm refl-talked${rec.parentReviewedAt ? ' on' : ''}"
+      ${reflIsSettled(rec) ? `<button type="button" class="btn-confirm refl-talked${rec.parentReviewedAt ? ' on' : ''}"
         data-mm-action="refl-talked" data-kid="${escapeAttr(kid)}"
         >${rec.parentReviewedAt ? `✓ We talked about ${escapeHtml(name)}'s reflection`
-                                : `We talked about ${escapeHtml(name)}'s reflection`}</button>
-      <button type="button" class="pill-btn" data-mm-action="refl-skip" data-kid="${escapeAttr(kid)}"
-        >${skipped ? 'Skipped — pick it back up' : 'Skip for now'}</button>
+                                : `We talked about ${escapeHtml(name)}'s reflection`}</button>`
+      : `<span class="mm-cap">${reflDoneCount(rec)}/${REFL_TABS.length} answered — finish them, or skip, before recording the conversation.</span>`}
+      ${reflIsComplete(rec) ? '' : `<button type="button" class="pill-btn" data-mm-action="refl-skip" data-kid="${escapeAttr(kid)}"
+        >${skipped ? 'Skipped — pick it back up' : 'Skip for now'}</button>`}
     </div>`}
     ${skipped ? `<p class="mm-cap">Left unfinished on purpose. It does not hold up the money.</p>` : ''}
     <div class="mm-h mm-h-sub">Planned vs completed</div>
@@ -546,11 +628,25 @@ function mmRenderReflect(wk) {
 /* The label the summary card shows. Frozen at display time from the fixed list
    or the parent's note, so a later rewording of an answer does not change what
    a past week says she decided. */
-function reflActionText(rec) {
+/* What the CURRENT answer list calls this action. This is what gets STORED at
+   the moment she picks it — never what a later reader displays, or rewording an
+   option would quietly rewrite what a past reflection appears to say. */
+function reflActionLabel(rec) {
   const p = (rec && rec.planNext) || {};
   if (p.actionId === 'other') return p.customNote || '';
   const a = REFL_PLAN_NEXT.find(x => x.id === p.actionId);
   return a ? a.text : '';
+}
+
+/* What she actually said, as it was recorded. `actionText` is written on every
+   change to the action, so a reflection keeps its own words even after the
+   fixed list moves underneath it. The live label is the fallback only — for a
+   record written before this field carried anything. */
+function reflActionText(rec) {
+  const p = (rec && rec.planNext) || {};
+  const stored = (p.actionText || '').trim();
+  if (stored) return stored;
+  return reflActionLabel(rec);
 }
 
 /* Write the action into a plan. Called only from a confirmed tap — it opens the
@@ -571,33 +667,41 @@ async function reflAddToPlan(wk, kid, linkId) {
      will appear, before anything is written. */
   const ok = await showConfirm(
     link
-      ? `Attach to ${link.name} ${when}?\n\n"${text}"\n\nIt joins a routine ${kid === 'jenn' ? 'Jenn' : 'Jess'} already has, rather than adding another thing to the week.`
+      ? `Add to ${kid === 'jenn' ? "Jenn's" : "Jess's"} to-do list for ${when}, alongside ${link.name}?\n\n"${text}"\n\nOne to-do, on the week she will be living it, showing how that routine is going.`
       : `Add to ${kid === 'jenn' ? "Jenn's" : "Jess's"} to-do list for ${when}?\n\n"${text}"\n\nOne to-do, on the week she will be living it.`,
-    { okLabel: link ? 'Attach it' : 'Add it', cancelLabel: 'Not now' });
+    { okLabel: 'Add it', cancelLabel: 'Not now' });
   if (!ok) return false;
 
-  if (!link) {
-    const pd = getProfData(kid);
-    if (!pd.todos) pd.todos = [];
-    pd.todos.push({
-      id: 'refl-' + Date.now().toString(36),
-      text,
-      color: GT_COLOURS[(pd.todos.length + 1) % GT_COLOURS.length],
-      weekKey: target,
-      assignedDay: null,
-      done: false,
-      linkType: null, linkActId: null, linkBlockId: null,
-      createdAt: syncNow(),
-    });
-  }
+  /* A to-do is written EITHER WAY. Attaching to a routine used to write only
+     `linkedRoutineId` into the reflection — a field no routine, block, checklist
+     or planner reads — so the app said "Attached ✅" and nothing anywhere
+     changed. Choosing a routine now decides what the to-do is TIED TO, not
+     whether one exists: linkType/linkActId are the fields js/12-goals.js already
+     reads, so getTodoLinkStats shows that routine's progress beside it. */
+  const pd = getProfData(kid);
+  if (!pd.todos) pd.todos = [];
+  const todoId = 'refl-' + Date.now().toString(36);
+  pd.todos.push({
+    id: todoId,
+    text,
+    color: GT_COLOURS[(pd.todos.length + 1) % GT_COLOURS.length],
+    weekKey: target,
+    assignedDay: null,
+    done: false,
+    linkType: link ? 'activity' : null,
+    linkActId: link ? link.id : null,
+    linkBlockId: null,
+    createdAt: syncNow(),
+  });
   reflEdit(wk, kid, r => {
     r.planNext.targetWeek = target;
     r.planNext.linkedRoutineId = link ? link.id : '';
-    r.planNext.linkedBlockId = link ? '' : 'todo';
+    r.planNext.carriedTodoId = todoId;
   });
   reflCommitDraft();          // one write for the to-do and the record together
   renderMeetingMode();
-  showToast(link ? `Attached to ${link.name} ✅` : `Added to ${when}'s to-do list ✅`);
+  showToast(link ? `Added to ${when}'s to-dos · with ${link.name} ✅`
+                 : `Added to ${when}'s to-do list ✅`);
   return true;
 }
 
@@ -649,7 +753,6 @@ function reflHandleAction(a, el, wk) {
     reflEdit(wk, kid, r => {
       r.planNext.actionId = (r.planNext.actionId === id) ? '' : id;
       if (r.planNext.actionId !== 'other') r.planNext.customNote = '';
-      r.planNext.actionText = reflActionText(r);
     });
     renderMeetingMode(); return true;
   }
@@ -667,7 +770,16 @@ function reflHandleAction(a, el, wk) {
   }
   if (a === 'refl-talked') {
     /* Records that the conversation happened. It asserts nothing about whether
-       the parent agrees, and it changes no completion, grade, XP or money. */
+       the parent agrees, and it changes no completion, grade, XP or money.
+
+       There has to be something to have talked ABOUT: a tick on a blank record
+       says a conversation happened about nothing, and step 5 would then count
+       it towards closing the week. A `disabled` attribute is a hint to the
+       pointer, so the rule lives here as well as in the markup. */
+    if (!reflIsSettled(reflWorking(wk, kid))) {
+      showToast('Finish the reflection, or skip it, first');
+      return true;
+    }
     reflEdit(wk, kid, r => {
       r.parentReviewedAt = r.parentReviewedAt ? null : Date.now();
     });
@@ -696,7 +808,7 @@ function reflHandleInput(e, wk) {
     if (field === 'refl-problem-note') r.needsWork.customNote = val;
     if (field === 'refl-control')      r.needsWork.controllableText = val;
     if (field === 'refl-parent')       r.needsWork.parentObservation = val;
-    if (field === 'refl-action-note') { r.planNext.customNote = val; r.planNext.actionText = reflActionText(r); }
+    if (field === 'refl-action-note') r.planNext.customNote = val;
     if (field === 'refl-when')         r.planNext.whenText = val;
     if (field === 'refl-help')         r.planNext.helpText = val;
     if (field === 'refl-done')         r.planNext.doneText = val;

@@ -68,25 +68,37 @@ function mmIsDayReviewedFor(kid, d) { return isDayReviewed(kid, mmDayKey(d)); }
    off a Wednesday that had not arrived. Un-reviewing is always allowed: taking
    back a record is never the thing that needs gating. */
 function mmCanReviewDay(kid, d) { return canReviewDay(kid, mmDayKey(d)); }
-function mmToggleDayReviewed(kid, d) {
+/* Today is reviewable but not finished, so it is signed off through an explicit
+   "nothing else is planned" rather than a plain tap — the same shape the parent
+   day banner uses for an empty day, and for the same reason: the record must not
+   be able to say a day was reviewed before the day was over. */
+async function mmConfirmOpenDay(names) {
+  return showConfirm(
+    `Today is not over yet.\n\nIs nothing else planned for ${names}?`,
+    { okLabel: 'Nothing else today', cancelLabel: 'Not yet' });
+}
+async function mmToggleDayReviewed(kid, d) {
   const k = mmDayKey(d);
   const on = isDayReviewed(kid, k);
   if (!on) {
     const can = canReviewDay(kid, k);
     if (!can.ok) { showToast(reviewBlockedReason(can)); return; }
+    if (can.reason === 'open' && !(await mmConfirmOpenDay(kid === 'jenn' ? 'Jenn' : 'Jess'))) return;
   }
   markDayReviewed(kid, k, !on);
   saveAll();
   renderMeetingMode();
 }
-function mmToggleConfirmDay(d) {
+async function mmToggleConfirmDay(d) {
   const k = mmDayKey(d);
   const next = !mmIsDayConfirmed(d);
   /* "Both" is a convenience that calls the same owner twice — it must not be a
      side door that reviews a day neither child could be reviewed for. */
   if (next) {
-    const blocked = ['jenn', 'jess'].map(kid => canReviewDay(kid, k)).find(c => !c.ok);
+    const cans = ['jenn', 'jess'].map(kid => canReviewDay(kid, k));
+    const blocked = cans.find(c => !c.ok);
     if (blocked) { showToast(reviewBlockedReason(blocked)); return; }
+    if (cans.some(c => c.reason === 'open') && !(await mmConfirmOpenDay('Jenn or Jess'))) return;
   }
   ['jenn', 'jess'].forEach(kid => markDayReviewed(kid, k, next));
   saveAll();
@@ -1341,11 +1353,11 @@ function mmCloseSummary(wk) {
   return `<div class="mm-close-sum">${['jenn', 'jess'].map(kid => {
     const name = kid === 'jenn' ? 'Jenn' : 'Jess';
     /* Only days that COULD be reviewed count against her — a day that has not
-       happened is not a day anybody failed to review. */
-    const due = keys.filter(k => {
-      const can = canReviewDay(kid, k);
-      return !(can.reason === 'future' || can.reason === 'running');
-    });
+       happened is not a day anybody failed to review. A day still RUNNING is a
+       different matter and counts: this used to exclude it exactly as the close
+       gate did, so a week with Sunday's swim still in the pool read "6/6" and
+       closed. weekDaysAwaitingReview (js/36-status.js) is that one decision. */
+    const due = keys.filter(k => canReviewDay(kid, k).reason !== 'future');
     const reviewed = due.filter(k => isDayReviewed(kid, k)).length;
     const rec = (typeof reflGet === 'function') ? reflGet(wk, kid) : null;
     const refl = !rec ? '—'
@@ -1354,12 +1366,29 @@ function mmCloseSummary(wk) {
       : `${reflDoneCount(rec)}/3`;
     const money = mmKidSettled(wk, kid);
     const action = (rec && typeof reflActionText === 'function') ? reflActionText(rec) : '';
+    /* Where the action went. The summary named the action and stopped, so the
+       one screen that exists to say what the week stands at could not say
+       whether the thing she decided to do had reached a plan she will open. */
+    const carry = (rec && action && typeof reflCarryLabel === 'function')
+      ? reflCarryLabel(rec, kid) : '';
+    /* A clash is the week's own finding, asked the week's way — the same
+       question computeBufferConflicts already answers for the week grid and for
+       the reflection's evidence. Reported here, never resolved here: the plan is
+       what does not fit, and closing a week must not quietly move a block. */
+    let clashes = 0;
+    if (typeof computeBufferConflicts === 'function') {
+      keys.forEach(k => {
+        clashes += computeBufferConflicts(getDayBlocksForProfile(k, kid) || []).affected.size;
+      });
+    }
     return `<div class="mm-close-kid">
         <div class="mm-close-name">${CT_PROFILE_ICON[kid]} ${escapeHtml(name)}</div>
         <div class="mm-close-row"><span>Days reviewed</span><span>${reviewed}/${due.length}</span></div>
         <div class="mm-close-row"><span>Reflection</span><span>${refl}</span></div>
         <div class="mm-close-row"><span>Money</span><span>${money.decided ? '✅ settled' : (money.agreed ? 'agreed, not settled' : 'not agreed')}</span></div>
-        ${action ? `<div class="mm-close-action"><b>Next week:</b> ${escapeHtml(action)}</div>` : ''}
+        ${clashes ? `<div class="mm-close-row mm-close-clash"><span>Clashes</span><span>${clashes} block${clashes === 1 ? '' : 's'} ran into something else</span></div>` : ''}
+        ${action ? `<div class="mm-close-action"><b>Next week:</b> ${escapeHtml(action)}
+          <span class="mm-cap">${escapeHtml(carry)}</span></div>` : ''}
       </div>`;
   }).join('')}</div>`;
 }
@@ -1405,9 +1434,12 @@ function mmRenderPlan(wk) {
   } else if (gate.ok) {
     closeBtn = `<button type="button" class="btn-confirm" onclick="mmCloseWeekNow()">🔒 Close the week</button>`;
   } else {
-    const why = gate.missing.map(m => m.reason === 'days'
-      ? `${m.kid === 'jenn' ? 'Jenn' : 'Jess'} has ${m.n} day${m.n === 1 ? '' : 's'} still to review`
-      : `${m.kid === 'jenn' ? 'Jenn' : 'Jess'}'s money is not settled yet`).join(' · ');
+    const why = gate.missing.map(m => {
+      const who = m.kid === 'jenn' ? 'Jenn' : 'Jess';
+      if (m.reason === 'days') return `${who} has ${m.n} day${m.n === 1 ? '' : 's'} still to review`;
+      if (m.reason === 'reflection') return `${who}'s reflection is not finished or skipped`;
+      return `${who}'s money is not settled yet`;
+    }).join(' · ');
     closeBtn = `<button type="button" class="btn-confirm" disabled>🔒 Close the week</button>
       <div class="ct-meta">${escapeHtml(why)}.</div>`;
   }

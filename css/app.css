@@ -1507,10 +1507,16 @@
     display: flex; justify-content: space-between; gap: 8px;
     font-size: calc(0.9rem * var(--fs-scale, 1)); padding: 1px 0;
   }
+  /* The same finding the week grid draws in red (.wf-card--conflict), on the
+     same computeBufferConflicts answer — one problem flagged one way. Stated as
+     a fact: closing a week reports a clash, it never resolves one. */
+  .mm-close-clash { color: #b3392f; font-weight: 700; }
   .mm-close-action {
     margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--paper-line);
     font-size: calc(0.9rem * var(--fs-scale, 1));
   }
+  /* Where the action went, under the action itself. */
+  .mm-close-action .mm-cap { display: block; margin-top: 2px; }
   .refl-kids { display: flex; gap: 8px; margin-bottom: 10px; }
   .refl-kid {
     flex: 1; min-height: 44px;
