@@ -1700,10 +1700,15 @@ async function markDayReviewedForChild(kid, dayKey) {
   const can = canReviewDay(who, key);
   if (!can.ok) { showToast(reviewBlockedReason(can)); return; }
   /* An empty day is reviewable, but never silently: a parent should not be
-     able to sign off a blank page without being told it is blank. */
+     able to sign off a blank page without being told it is blank. Today gets
+     the same treatment for a different reason — it is not over, so anything
+     still to come would be reviewed before it happened. */
   if (can.reason === 'empty' && !(await showConfirm(
       `Nothing was recorded for ${name} on this day.\n\nMark it reviewed anyway?`,
       { okLabel: 'Mark it reviewed', cancelLabel: 'Not now' }))) return;
+  if (can.reason === 'open' && !(await showConfirm(
+      `Today is not over yet.\n\nIs nothing else planned for ${name}?`,
+      { okLabel: 'Nothing else today', cancelLabel: 'Not yet' }))) return;
   markDayReviewed(who, key, true);
   saveAll();
   renderParentBanners();

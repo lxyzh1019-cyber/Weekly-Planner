@@ -110,6 +110,21 @@ function markDayReviewed(kid, dayKey, value) {
   return true;
 }
 
+/* ── Has this block's time passed? ───────────────────────────────
+   Asked by the review gate and by the reflection's evidence, which used to
+   decide it separately: `canReviewDay` measured startMin + durationMin against
+   the clock, while the evidence asked only whether the DAY had arrived. So a
+   swim at six read as "not marked done" from breakfast time onwards, and told a
+   child she had missed something she had not yet had the chance to do. */
+function blockHasEnded(block, dayKey) {
+  if (!block || block.startMin == null) return false;
+  const today = todayKey();
+  if (dayKey < today) return true;      // a past day is over whatever the clock says
+  if (dayKey > today) return false;     // and a future one never got here
+  const now = (typeof tdNowMin === 'function') ? tdNowMin() : 24 * 60;
+  return (block.startMin + (block.durationMin || 0)) <= now;
+}
+
 /* ── …and whether it is even reviewable yet ───────────────────────
    Reviewing a day is an assertion about a day that HAPPENED. Three surfaces
    asked their own version of that question — the parent day banner, the
@@ -135,12 +150,10 @@ function canReviewDay(kid, dayKey) {
   const blocks = getDayBlocks(dayKey, kid) || [];
   if (dayKey > today) return { ok: false, reason: 'future', ...none, futureCount: blocks.length };
 
-  /* Only today can still be in progress: a past day is over whatever the
-     clock says, and a future one never got here. */
-  const now = (typeof tdNowMin === 'function') ? tdNowMin() : 24 * 60;
-  const ended = (b) => (b.startMin + (b.durationMin || 0)) <= now;
+  /* Only today can still be in progress; blockHasEnded owns that arithmetic
+     now, so the evidence lines and this gate cannot disagree about it. */
   const unfinished = (dayKey === today)
-    ? blocks.filter(b => b && b.startMin != null && !ended(b))
+    ? blocks.filter(b => b && b.startMin != null && !blockHasEnded(b, dayKey))
     : [];
   if (unfinished.length) {
     const soonest = unfinished.slice().sort(
@@ -159,7 +172,15 @@ function canReviewDay(kid, dayKey) {
 
   /* A day that holds nothing CAN be reviewed — a quiet Sunday is a real
      answer. It is reported separately so the caller says "nothing was
-     recorded" out loud rather than writing a review of an empty page. */
+     recorded" out loud rather than writing a review of an empty page.
+
+     TODAY is the exception, and not only when it is empty: nothing is running
+     and nothing is left to confirm at nine in the morning of a day whose
+     swimming has not been put on it yet. A past day is over and cannot gain
+     anything; today can. So today reports 'open' — reviewable, but only
+     through an explicit "nothing else is planned" the way an empty day already
+     asks — and until somebody says that, it holds the week open. */
+  if (dayKey === today) return { ok: true, reason: 'open', ...none };
   return { ok: true, reason: blocks.length ? 'ready' : 'empty', ...none };
 }
 
@@ -168,6 +189,7 @@ function canReviewDay(kid, dayKey) {
 function reviewBlockedReason(info) {
   if (!info || info.ok) return '';
   if (info.reason === 'future') return 'This day has not happened yet';
+  if (info.reason === 'open') return 'Today is not over yet';
   if (info.reason === 'running') {
     const at = (typeof formatTimeFromMin === 'function') ? formatTimeFromMin(info.endsAt) : 'later today';
     return `${info.blockName} ends at ${at}`;
@@ -270,19 +292,35 @@ function isWeekClosed(weekKey) {
   ctEnsureShared();
   return !!((state.shared.chore.weeksClosed || {})[weekKey]);
 }
+/* Which days of a week count against a child when the week is asked to close.
+   ONLY a day that has not happened is excused. A day still being lived is the
+   opposite of an excuse: closing a week over a Sunday whose swimming is still
+   in the pool records that the week was reviewed when an hour of it had not
+   happened yet. mmCloseSummary counts through this same function, so the
+   figure a parent reads and the gate they press cannot disagree. */
+function weekDaysAwaitingReview(kid, weekKey) {
+  return mrWeekDayKeys(weekKey).filter(k => {
+    if (canReviewDay(kid, k).reason === 'future') return false;
+    return !isDayReviewed(kid, k);
+  });
+}
+
 function canCloseWeek(weekKey) {
   const missing = [];
   ['jenn', 'jess'].forEach(kid => {
-    /* A day that has not happened is not a day anybody failed to review, so it
-       cannot be what is holding a week open. Everything else counts: a past day
-       with blocks left unconfirmed is unfinished work, not an excused absence. */
-    const unreviewed = mrWeekDayKeys(weekKey).filter(k => {
-      const can = canReviewDay(kid, k);
-      if (can.reason === 'future' || can.reason === 'running') return false;
-      return !isDayReviewed(kid, k);
-    }).length;
-    if (unreviewed) missing.push({ kid, reason: 'days', n: unreviewed });
-    else if (!isChildMoneyCommitted(kid, weekKey)) missing.push({ kid, reason: 'money', n: 0 });
+    const unreviewed = weekDaysAwaitingReview(kid, weekKey).length;
+    if (unreviewed) { missing.push({ kid, reason: 'days', n: unreviewed }); return; }
+    /* The reflection is part of what closing a week records, so it has to be
+       part of what closing a week REQUIRES. Either she answered it or it
+       was deliberately set aside — a blank record is neither, and closing over
+       one files "we reflected" against a conversation that never happened.
+       Money stays independent of it, as designed. */
+    if (typeof reflGet === 'function' && typeof reflIsSettled === 'function'
+        && !reflIsSettled(reflGet(weekKey, kid))) {
+      missing.push({ kid, reason: 'reflection', n: 0 });
+      return;
+    }
+    if (!isChildMoneyCommitted(kid, weekKey)) missing.push({ kid, reason: 'money', n: 0 });
   });
   return { ok: missing.length === 0, missing };
 }
