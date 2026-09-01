@@ -372,10 +372,12 @@ const REWARD_POOLS = {
     { id:'culture_calligraphy_play', name:'Brush Art Play', icon:'🖌️', cat:'free', durationMin:30, suitableTime:['weekend'] },
   ],
 };
-const TUTORIAL_STARTER_CHOICES = REWARD_POOLS.family.slice(0, 3);
+/* TUTORIAL_STARTER_CHOICES lived here — the three Family Hero chores the
+   first-run overlay offered as a "starter" to unlock. Onboarding went with the
+   unlock subsystem: its whole content was picking a locked chore, so with
+   nothing locked there was nothing left for it to say. */
 const AFTERSCHOOL_CHECKLIST_REWARDS = [
   { id:'ar1', text:'Champion Prep: 10-minute reading star mission' },
-  { id:'ar2', text:'Family Hero Bonus: organize tomorrow clothes' },
   { id:'ar3', text:'Calm Finish Bonus: 5-minute stretch reset' },
 ];
 const MORNING_LOCKED_REWARD = { id:'mw1', text:'Warm water with breakfast' };
@@ -425,7 +427,15 @@ const DEFAULT_ACTIVITIES = [
   { id:'piano',      name:'Piano Practice',    icon:'🎹', cat:'school',   durationMin:60, suitableTime:['after-school','evening','weekend'] },
   { id:'chores',     name:'House Chore',       icon:'🧹', cat:'daily', group:'chores',    durationMin:60, suitableTime:['after-school','evening','weekend'] },
   { id:'family',     name:'Family Time',       icon:'👨‍👩‍👧‍👦', cat:'free', durationMin:120, suitableTime:['evening','weekend'], social:true },
-  ...Object.values(REWARD_POOLS).flat().map(a => ({ ...a, rewardLocked: true })),
+  /* Family Hero is a CHORE, not a prize. Its four activities are ordinary
+     available ones — same ids, so every block that ever named one still
+     resolves through findActivity — and only the other three pools are still
+     earned. Whoever did the chore is the hero; making the chore itself the
+     reward said the opposite. */
+  ...REWARD_POOLS.family.map(a => ({ ...a })),
+  ...Object.entries(REWARD_POOLS)
+    .filter(([k]) => k !== 'family')
+    .flatMap(([, pool]) => pool.map(a => ({ ...a, rewardLocked: true }))),
   // Routines
   { id:'routine_morning',   name:'Morning Routine',      icon:'🌅', cat:'routine', durationMin:30, isRoutine:true, routineId:'morning',     suitableTime:['before-school','weekend'] },
   { id:'routine_afterschool', name:'After-School Routine', icon:'🎒', cat:'routine', durationMin:30, isRoutine:true, routineId:'afterschool', suitableTime:['after-school'] },

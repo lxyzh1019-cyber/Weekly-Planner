@@ -73,8 +73,6 @@ function getProfData(p=activeProfile()) {
   const prof = state.profiles[p];
   if (!prof.progress) {
     prof.progress = {
-      tutorialDone: false,
-      tutorialStarterActId: null,
       unlockedActs: [],
       pendingRewards: [],
       streaks: {},
@@ -441,10 +439,14 @@ function getAllActivities(p=activeProfile(), opts) {
   const profd = getProfData(p);
   const progress = getProfData(p).progress || {};
   const unlockedSet = new Set(progress.unlockedActs || []);
-  const starter = progress.tutorialStarterActId;
   return base.map(act => {
     if (act.rewardLocked) {
-      const unlocked = unlockedSet.has(act.id) || (starter && starter === act.id);
+      /* tutorialStarterActId used to unlock one activity here as well. It is no
+         longer read: the pool it pointed into is unlocked outright. Stored
+         values are left alone rather than deleted — a device still serving an
+         older bundle out of a Pages cache must not be able to merge a
+         resurrected lock back in. */
+      const unlocked = unlockedSet.has(act.id);
       act = { ...act, _rewardLocked: !unlocked, _locked: !unlocked };
     }
     const rule = rules.find(r => r.activityId===act.id);
@@ -584,7 +586,10 @@ function enqueueMilestoneRewards() {
   milestones.forEach(m=>{
     const key = `manual-${m}`;
     if (n >= m && !pr.unlockedThisWeek[key]) {
-      const cycle = m===10 ? ['family','academic'] : (m===15 ? ['health'] : ['culture']);
+      /* 'family' led this list. A Family Hero chore is not a prize for having
+         placed ten blocks, so the tenth milestone draws from academic like the
+         others. */
+      const cycle = m===10 ? ['academic'] : (m===15 ? ['health'] : ['culture']);
       let queued = false;
       cycle.forEach(k=>{
         const id = pickLockedReward(k);
@@ -662,54 +667,12 @@ function skipRewardPrompt() {
   maybeShowRewardPrompt();
 }
 
-function openTutorial() {
-  const wrap = document.getElementById('tutorialChoices');
-  if (!wrap) return;
-  wrap.innerHTML = '';
-  const p = getProfData();
-  const progress = p.progress;
-  TUTORIAL_STARTER_CHOICES.forEach(act=>{
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'pill-btn tutorial-choice-btn';
-    btn.textContent = `${act.icon} ${act.name} (${formatDuration(act.durationMin)})`;
-    btn.onclick = ()=>chooseTutorialStarter(act.id);
-    wrap.appendChild(btn);
-  });
-  if (progress.tutorialStarterActId) {
-    const note = document.createElement('p');
-    note.className = 'tutorial-overlay-note';
-    note.textContent = 'You already picked a starter. You can keep building your Family Hero streak!';
-    wrap.appendChild(note);
-  }
-  openSheet('tutorialOverlay');
-}
+/* openTutorial, chooseTutorialStarter, skipTutorial and offerTutorialIfNeeded
+   lived here. They were the first-run flow, and all four existed to hand a
+   child one Family Hero chore as an unlocked "starter". Family Hero is not a
+   prize any more, so the overlay had nothing to offer: every chore it listed is
+   now on the ordinary picker, reachable from the slot she just tapped. */
 
-function chooseTutorialStarter(actId) {
-  const p = getProfData();
-  const pr = p.progress;
-  pr.tutorialDone = true;
-  pr.tutorialStarterActId = actId;
-  unlockRewardAct(actId);
-  closeSheet('tutorialOverlay');
-  saveAll();
-  const act = getAllActivities().find(a=>a.id===actId);
-  if (act) {
-    showToast(`Starter unlocked: ${act.name} ✅`);
-    startPlacingActivity(act);
-  }
-}
-
-function skipTutorial() {
-  closeSheet('tutorialOverlay');
-  showToast('Tutorial skipped — you can open it later from day view');
-}
-
-function offerTutorialIfNeeded() {
-  // Family Hero onboarding is opt-in. Kids reach the starter chooser through
-  // the placement picker (see startPlacingActivity), not via a pop-up that
-  // blocks the first day they try to plan.
-}
 
 /* ── Rest days: a kid can mark a day as "off". Rest days are celebrated (rest is
    part of the plan) and never count against a streak — the gap logic below
@@ -1246,7 +1209,6 @@ function showScreen(id) {
   if (id === 'day') {
     try {
       maybeShowRewardPrompt();
-      offerTutorialIfNeeded();
     } catch(e){ console.error('day-screen init failed', e); }
   }
 }

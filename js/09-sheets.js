@@ -32,20 +32,13 @@ function nextFreeSlotMin(dayKey, durationMin, fromMin) {
   return Math.min(start, END_MIN - dur);
 }
 
-/* "Place this one." Called by the tutorial's starter pick, the level-up reward
-   flow and the mascot's suggestions — each of which has already decided which
-   activity, and used to hand it to the tray to be highlighted. They open the
-   placement sheet at the next free slot now, which is one tap rather than two
-   and does not depend on a rail that no longer exists. */
+/* "Place this one." Called by the level-up reward flow and the mascot's
+   suggestions — each of which has already decided which activity, and used to
+   hand it to the tray to be highlighted. They open the placement sheet at the
+   next free slot now, which is one tap rather than two and does not depend on a
+   rail that no longer exists. */
 function startPlacingActivity(act) {
   if (!act) return;
-  // Opt-in Family Hero onboarding: choosing a starter chore before it's
-  // been set up opens the chooser here, instead of forcing that sheet on
-  // the first day-view load (and instead of a dead "locked" toast).
-  const _pr = getProfData()?.progress;
-  if (_pr && !_pr.tutorialDone && TUTORIAL_STARTER_CHOICES.some(c=>c.id===act.id)) {
-    openTutorial(); return;
-  }
   if (act._locked) { showToast(`🔒 Unlocks in ${act.season}!`); return; }
   if (act._rewardLocked) { showToast('Keep going — unlock this reward soon ✨'); return; }
   selectedActivity = act;

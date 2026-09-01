@@ -397,17 +397,6 @@
   .day-mini-list .gt-text-input {
     font-size: calc(0.92rem * var(--fs-scale, 1));
   }
-  .tutorial-overlay-note {
-    font-family: 'Patrick Hand', sans-serif;
-    font-size: 1rem;
-    color: var(--ink-muted);
-    margin-bottom: 0.55rem;
-  }
-  .tutorial-choice-btn {
-    width: 100%;
-    text-align: left;
-    margin-bottom: 0.4rem;
-  }
 
   @media (min-width: 980px) and (orientation: landscape) {
     /* overflow:hidden lived here, and here only — which is why the day screen

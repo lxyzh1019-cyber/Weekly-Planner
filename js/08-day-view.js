@@ -104,7 +104,6 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   renderVibe();
   renderDayGoalsTodos();
   maybeShowRewardPrompt();
-  offerTutorialIfNeeded();
   if (focusBlockId) {
     pendingFocusBlockId = focusBlockId;
     pendingFocusAttempts = 0;
@@ -1544,9 +1543,6 @@ function pickFromSlot(actId) {
   if (act._locked) { showToast(`🔒 Unlocks in ${act.season}!`); return; }
   if (act._rewardLocked) { showToast('Keep going — unlock this reward soon ✨'); return; }
   const _pr = getProfData()?.progress;
-  if (_pr && !_pr.tutorialDone && TUTORIAL_STARTER_CHOICES.some(c => c.id === act.id)) {
-    closeSheet('slotPickerOverlay'); openTutorial(); return;
-  }
   selectedActivity = act;
   closeSheet('slotPickerOverlay');
   // pendingStartMin was set by openSlotPicker.

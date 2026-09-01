@@ -8431,6 +8431,88 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* FAMILY HERO IS A CHORE, NOT A PRIZE.
+     Its four activities sat in REWARD_POOLS with rewardLocked:true, so the
+     thing a child had to earn was the right to help at home — and the first-run
+     overlay's whole content was picking one of them as an unlocked "starter".
+     Whoever did the chore is the hero; making the chore the reward said the
+     opposite.
+
+     The ids do not move, which is the load-bearing part: every block ever
+     placed against one still has to resolve. And the other three pools are
+     still earned — this removed one subsystem, not the reward mechanism. */
+  checks.familyHeroIsAChoreNotAPrize = await page.evaluate(() => {
+    const bad = [];
+    const FAMILY = ['family_set_table', 'family_prep_bag', 'family_laundry_fold', 'family_kitchen_helper'];
+    const EARNED = ['acad_focus_sprint', 'health_stretch_reset', 'culture_story_circle'];
+    const wasProfile = profile;
+    profile = 'jenn';
+    const pr = getProfData('jenn').progress;
+    const wasUnlocked = (pr.unlockedActs || []).slice();
+    const wasCount = pr.manualPlacedCount;
+    const wasWeek = JSON.parse(JSON.stringify(pr.unlockedThisWeek || {}));
+    const wasPending = (pr.pendingRewards || []).slice();
+    try {
+      pr.unlockedActs = [];
+      const avail = getAllActivities('jenn');
+
+      FAMILY.forEach(id => {
+        const act = avail.find(a => a.id === id);
+        if (!act) { bad.push(`${id} is not on the picker at all`); return; }
+        if (act._rewardLocked) bad.push(`${id} is still reward-locked`);
+        if (act._locked) bad.push(`${id} is still locked`);
+        // Still a chore, so it still counts as one in the hours charts.
+        if (activityGroup(act) !== 'chores') {
+          bad.push(`${id} is grouped as '${activityGroup(act)}', not a chore`);
+        }
+        // The id resolves for a block placed against it in any past week.
+        const past = findActivity(id, 'jenn');
+        if (!past) bad.push(`a historical block naming ${id} no longer resolves`);
+        const shown = blockDisplayName({ actId: id }, 'jenn');
+        if (!shown || !shown.name || shown.name === 'Something') {
+          bad.push(`${id} renders as "${shown && shown.name}"`);
+        }
+      });
+
+      // Unrelated rewards are untouched: they are still earned.
+      EARNED.forEach(id => {
+        const act = avail.find(a => a.id === id);
+        if (!act) { bad.push(`${id} vanished from the picker`); return; }
+        if (!act._rewardLocked) bad.push(`${id} is no longer a reward — the wrong pool was unlocked`);
+      });
+
+      // A placement milestone must never queue a chore as a prize.
+      pr.unlockedActs = [];
+      pr.pendingRewards = [];
+      pr.unlockedThisWeek = {};
+      pr.manualPlacedCount = 10;
+      enqueueMilestoneRewards();
+      const queued = (pr.pendingRewards || []).map(r => r.actId);
+      const chore = queued.find(id => FAMILY.includes(id));
+      if (chore) bad.push(`the 10-block milestone queued ${chore} as a reward`);
+      if (!queued.length) bad.push('the 10-block milestone queued nothing at all');
+
+      // The unlock flow itself is gone, not merely unreachable.
+      ['openTutorial', 'chooseTutorialStarter', 'skipTutorial', 'TUTORIAL_STARTER_CHOICES']
+        .forEach(name => {
+          if (typeof window[name] !== 'undefined') bad.push(`${name} is still defined`);
+        });
+      if (document.getElementById('tutorialOverlay')) bad.push('the tutorial overlay is still in the markup');
+      // Family Hero checklist "reward picks" went with it.
+      const items = [...AFTERSCHOOL_REWARD_ITEMS, ...AFTERSCHOOL_CHECKLIST_REWARDS];
+      const heroItem = items.find(i => /family hero/i.test(i.text));
+      if (heroItem) bad.push(`a Family Hero reward item survives: "${heroItem.text}"`);
+      if (items.length < 4) bad.push('the unrelated Focus/Culture reward items went too');
+    } finally {
+      pr.unlockedActs = wasUnlocked;
+      pr.manualPlacedCount = wasCount;
+      pr.unlockedThisWeek = wasWeek;
+      pr.pendingRewards = wasPending;
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
   /* A DAY CANNOT BE REVIEWED BEFORE IT HAS HAPPENED.
      Eligibility used to ask whether a block had STARTED, so a swim that began
      ten minutes ago and runs for another hour counted as something a parent

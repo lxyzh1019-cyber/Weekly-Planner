@@ -58,7 +58,6 @@ let currentTimelineGuideY = null;
 let dayTopbarCompactBound = false;
 const MORNING_UNLOCK_ITEM = { id:'m_unlock_warm_water', text:'Warm water before breakfast' };
 const AFTERSCHOOL_REWARD_ITEMS = [
-  { id:'a_unlock_helper', text:'Reward pick: Family Hero helper task (your choice)' },
   { id:'a_unlock_focus', text:'Reward pick: Focus Sprint bonus (15 min)' },
   { id:'a_unlock_culture', text:'Reward pick: Culture Explorer mini time' },
 ];
