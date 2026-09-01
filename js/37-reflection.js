@@ -274,9 +274,24 @@ function reflIsComplete(rec) { return reflDoneCount(rec) === REFL_TABS.length; }
 function reflIsSkipped(rec) { return !!(rec && rec.skippedAt); }
 
 /* Answered one way or the other — three tabs done, or deliberately set aside.
-   The parent's tick and the week-closing gate ask this same question, so they
-   cannot come to different conclusions about the same record. */
+   This is what decides whether there is anything for a parent to TICK. */
 function reflIsSettled(rec) { return reflIsComplete(rec) || reflIsSkipped(rec); }
+
+/* …and whether the week may close on it, which is a different question.
+   Step 2 exists to produce a conversation, and a week could be closed with all
+   three prompts answered and the parent and child never having sat down — the
+   record then says the reflection happened, which is the one thing it must not
+   be able to say falsely. So a finished reflection needs the tick; a
+   deliberately skipped one does not, because there was no conversation to
+   confirm and a skip must never be able to trap the family.
+
+   `reflEdit` clears parentReviewedAt whenever HER answers change, so reworking
+   an answer after they talked correctly re-opens this — which is why step 5
+   names the state rather than only showing "complete". */
+function reflIsClosable(rec) {
+  if (reflIsSkipped(rec)) return true;
+  return reflIsComplete(rec) && !!(rec && rec.parentReviewedAt);
+}
 
 /* ── Evidence ─────────────────────────────────────────────────────
    What the week SHOWS, offered underneath her own answer and never above it.
@@ -380,10 +395,19 @@ function reflTargetWeekLabel(wk) {
    than from the planner, so the button cannot offer to write it twice. */
 function reflCarriedForward(rec) {
   const p = (rec && rec.planNext) || {};
-  /* carriedTodoId is the real evidence — a to-do that exists. The other two are
-     read for records written before the carry created one, so a reflection
-     already marked as carried is not offered the button a second time. */
-  return !!(p.targetWeek && (p.carriedTodoId || p.linkedRoutineId || p.linkedBlockId));
+  /* carriedTodoId is the real evidence: a to-do that exists. `linkedBlockId` is
+     the legacy to-do marker and counts, because the old to-do path DID write a
+     to-do alongside it.
+
+     `linkedRoutineId` deliberately does NOT count on its own. A record carrying
+     targetWeek and a routine id with no carriedTodoId is exactly what the broken
+     "Add to routine" button produced — it wrote those two fields and no to-do at
+     all. Reading it as carried is worse than the bug it came from: the old build
+     failed silently, and this would state "in next week's to-dos · with Morning
+     Routine" about a to-do that has never existed, while never offering the
+     button again. Treated as not carried, the offer comes back and the next tap
+     writes the real thing, so the record repairs itself without a migration. */
+  return !!(p.targetWeek && (p.carriedTodoId || p.linkedBlockId));
 }
 
 /* Where the action actually went, in one sentence, for a screen that is asking

@@ -503,11 +503,26 @@ and closed. `mmCloseSummary` carried the same exclusion, so the figure a parent
 read agreed with the gate they pressed while both were wrong together —
 `weekDaysAwaitingReview` is that one decision now, and both ask it.
 
-**A week does not close over a blank reflection.** Step 5 showed `0/3` and closed
-anyway. Closure requires each child's record to be `reflIsSettled` — three tabs
-answered, or explicitly skipped; a blank record is neither, and closing over one
-files "we reflected" against a conversation that never happened. Money settlement
-stays independent of it, deliberately.
+**A week does not close over a blank reflection, nor over a conversation nobody
+had.** Step 5 showed `0/3` and closed anyway. Two questions, deliberately kept
+apart because different callers ask them: `reflIsSettled` — three tabs answered
+or explicitly skipped — decides whether there is anything for a parent to TICK;
+`reflIsClosable` decides whether the week may close on it, and a **finished**
+reflection needs `parentReviewedAt` as well. A skipped one does not: there was no
+conversation to confirm, and a skip must never be able to trap the family. Since
+`reflEdit` clears the tick whenever her answers move, reworking an answer after
+they talked correctly re-opens the week — which is why step 5 says *complete ·
+conversation not confirmed* rather than just "complete". Money settlement stays
+independent of all of it, deliberately.
+
+**Closing a week that has not ended is offered, not refused.** Every elapsed day
+being reviewed is not the same as the week being over: with today signed off
+through "nothing else today", a Tuesday satisfies the gate. `isWeekClosed` has
+only two readers — step 5's own UI and `reflIsLocked` — the money is frozen by
+settlement rather than by closure, and `mmReopenWeek` is the way back, so this
+is a confirmation rather than a prohibition. `mmDaysStillAhead` names the days
+still to come and is empty on the last day, so the ordinary Sunday-afternoon
+meeting is never asked to justify itself.
 
 **Confirming is not completing, and neither is reviewing.** A parent may confirm
 an unfinished routine and it must not start reading as finished. `confirmAllBlocksForChild`
@@ -675,7 +690,18 @@ real to-do now; picking a routine additionally sets `linkType:'activity'` and
 `linkActId`, which is what `getTodoLinkStats` (`js/12-goals.js`) already read, so
 the to-do carries that routine's progress beside it. `carriedTodoId` names what
 was created; `reflCarryLabel` is the one sentence saying where it went, which is
-what step 5 reports. `addKidExtra` is deliberately NOT used: it reads the active
+what step 5 reports.
+
+**`carriedTodoId` is the only evidence a carry actually happened.**
+`reflCarriedForward` accepts it, and accepts the legacy `linkedBlockId` because
+the old to-do path DID write a to-do beside it. It deliberately does **not**
+accept `linkedRoutineId` on its own: `targetWeek` plus a routine id and no
+`carriedTodoId` is precisely what the broken button produced, and reading that as
+carried is worse than the bug it came from — the old build failed silently, this
+would state "in next week's to-dos · with Morning Routine" about something that
+never existed while never offering the button again. Read as not carried, the
+offer returns and the next tap writes the real thing, so the record repairs
+itself with no migration. `addKidExtra` is deliberately NOT used: it reads the active
 profile rather than the child being reviewed, and a routine checklist item is a
 standing rule rather than one week's action.
 
@@ -862,6 +888,35 @@ The girls' five-page money bar (`mnyTabBar`) is **not** on the parent's Money
 rules page. It is their wayfinding through their own pages, and it rendered above
 the section rail — portal nav, then kid nav, then sections. It stays on all three
 kid pages and inside the meeting.
+
+## An achievement nobody chose is not an achievement
+
+`addAchievement` used to seed `getAllActivities()[0]`, and `DEFAULT_ACTIVITIES[0]`
+is Breakfast, so every achievement anyone added arrived reading **"🍳 Breakfast ·
+count target 1"**. Nobody chose that; it was alphabetical accident presented as a
+decision. New ones start `activityId: null`, but the records already written were
+never corrected and still read as somebody's decision.
+
+`achievementActivityId(a)` (`js/12-goals.js`) is the one place that answers *which
+activity did somebody actually choose*, and every reader goes through it —
+`progressForAchievement` and `buildAchievementRow`, which already render "No
+activity yet · Tap 'Link activity'" for an unassigned one, so nothing else had to
+change.
+
+**The seeded shape is identifiable exactly.** The old creator wrote `createdAt`
+and never `updatedAt`, while every edit path — `setAchievementActivity`,
+`setAchievementMode`, `setAchievementTarget` — goes through `markItemUpdated`. So
+an `activityId` on a record with **no `updatedAt`** can only have come from the
+seeder, and a parent who genuinely picked Breakfast stamped `updatedAt` in doing
+so and is left alone.
+
+**Derived, never migrated** — the same reasoning as `xp2`. `achievements` is an
+**array**, and `deepMergeObj` treats an array as a scalar, so a device still
+serving an old bundle out of a Pages cache could push the un-cleaned array back
+over a cleaned one. Answering at read time gives the same answer whatever has run,
+however often, in any merge order, and writes nothing.
+`aSeededAchievementIsNotAChoice` asserts both halves, and that reading twice
+changes nothing.
 
 ## History is a record, not a working set
 

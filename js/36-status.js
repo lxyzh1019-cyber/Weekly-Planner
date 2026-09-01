@@ -315,10 +315,16 @@ function canCloseWeek(weekKey) {
        was deliberately set aside — a blank record is neither, and closing over
        one files "we reflected" against a conversation that never happened.
        Money stays independent of it, as designed. */
-    if (typeof reflGet === 'function' && typeof reflIsSettled === 'function'
-        && !reflIsSettled(reflGet(weekKey, kid))) {
-      missing.push({ kid, reason: 'reflection', n: 0 });
-      return;
+    if (typeof reflGet === 'function' && typeof reflIsSettled === 'function') {
+      const rec = reflGet(weekKey, kid);
+      if (!reflIsSettled(rec)) { missing.push({ kid, reason: 'reflection', n: 0 }); return; }
+      /* Answered, but nobody has said the conversation happened. A finished
+         reflection nobody talked about is a form, not a meeting. A skipped one
+         is exempt: there was nothing to talk about. */
+      if (typeof reflIsClosable === 'function' && !reflIsClosable(rec)) {
+        missing.push({ kid, reason: 'reflection-talk', n: 0 });
+        return;
+      }
     }
     if (!isChildMoneyCommitted(kid, weekKey)) missing.push({ kid, reason: 'money', n: 0 });
   });

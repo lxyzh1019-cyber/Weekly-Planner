@@ -9656,6 +9656,321 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* A RECORD OF A TO-DO THAT WAS NEVER WRITTEN IS WORSE THAN NO RECORD.
+     The broken "Add to routine" button wrote targetWeek + linkedRoutineId and
+     no to-do at all. Treating that shape as carried would state "in next week's
+     to-dos · with Morning Routine" about something that has never existed, and
+     never offer the button again — the old build failed silently, this would
+     fail confidently. It reads as not carried, so the offer comes back and the
+     next tap writes the real thing.
+
+     The legacy TO-DO shape is a different case and must not be swept up with
+     it: that path set linkedBlockId and DID write a to-do. */
+  checks.aLegacyRoutineCarryIsOfferedAgain = await page.evaluate(async () => {
+    const bad = [];
+    const wasProfile = profile;
+    const wasConfirm = window.showConfirm;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+    const hadRefl = JSON.parse(JSON.stringify(state.shared.chore.reflections || {}));
+    const hadTodos = JSON.parse(JSON.stringify(getProfData('jenn').todos || []));
+    const seed = (extra) => {
+      state.shared.chore.reflections = { [wk]: { jenn: Object.assign(reflBlank(), {
+        planNext: Object.assign(reflBlank().planNext, Object.assign({
+          actionId: 'timer', targetWeek: reflTargetWeek(wk),
+        }, extra)),
+      }) } };
+      reflDraft = null;
+    };
+    try {
+      const routine = reflLinkTargets('jenn')[0];
+      if (!routine) bad.push('there is no routine to attach an action to');
+
+      /* ── The broken era's output: a routine id, and no to-do anywhere ── */
+      getProfData('jenn').todos = [];
+      seed({ linkedRoutineId: routine ? routine.id : 'r1' });
+      if (reflCarriedForward(reflGet(wk, 'jenn'))) {
+        bad.push('a routine-linked record with no to-do still reads as carried');
+      }
+      mmGoToWeek(wk); mmGoStep(2); mnySetMeetKid('jenn');
+      reflTab = 'planNext'; renderMeetingMode();
+      const host = document.getElementById('familyMeetingBody');
+      if (!host.querySelector('[data-mm-action="refl-carry"]')) {
+        bad.push('the carry was not offered again for a record that never wrote one');
+      }
+      const txt = host.textContent.replace(/\s+/g, ' ');
+      if (/In (this|next) week's to-dos/.test(txt)) {
+        bad.push('the screen claims a to-do exists that was never written');
+      }
+      // Taking the offer repairs it, and writes the real linked to-do.
+      window.showConfirm = async () => true;
+      await reflAddToPlan(wk, 'jenn', routine ? routine.id : '');
+      const made = getProfData('jenn').todos || [];
+      if (made.length !== 1) bad.push(`repairing the record wrote ${made.length} to-dos`);
+      else if (made[0].linkActId !== (routine && routine.id)) {
+        bad.push('the repaired to-do is not linked to the routine');
+      }
+      if (!reflGet(wk, 'jenn').planNext.carriedTodoId) {
+        bad.push('the repaired record does not name the to-do it created');
+      }
+      if (!reflCarriedForward(reflGet(wk, 'jenn'))) bad.push('the repair did not record a carry');
+
+      /* ── The legacy TO-DO shape did write one, and still counts ── */
+      getProfData('jenn').todos = [];
+      seed({ linkedBlockId: 'todo' });
+      if (!reflCarriedForward(reflGet(wk, 'jenn'))) {
+        bad.push('a legacy to-do carry stopped being recognised');
+      }
+      /* ── And a record with no target at all is not carried ── */
+      state.shared.chore.reflections = { [wk]: { jenn: Object.assign(reflBlank(), {
+        planNext: Object.assign(reflBlank().planNext, { actionId: 'timer' }) }) } };
+      reflDraft = null;
+      if (reflCarriedForward(reflGet(wk, 'jenn'))) bad.push('an uncarried action reads as carried');
+    } finally {
+      window.showConfirm = wasConfirm;
+      state.shared.chore.reflections = hadRefl;
+      getProfData('jenn').todos = hadTodos;
+      reflDraft = null;
+      closeSheet('familyMeetingOverlay');
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* A WEEK DOES NOT CLOSE ON A CONVERSATION THAT DID NOT HAPPEN.
+     Step 2 exists to produce a conversation. All three prompts could be
+     answered and the week closed without the parent and child ever sitting
+     down, and the record would then say the reflection happened. A skipped
+     reflection is exempt — there was nothing to talk about, and a skip must
+     never be able to trap the family. */
+  checks.aWeekDoesNotCloseOnAConversationThatDidNotHappen = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+    const hadRefl = JSON.parse(JSON.stringify(state.shared.chore.reflections || {}));
+    const store = JSON.parse(JSON.stringify(state.shared.parentDayConfirm || {}));
+    const done = () => Object.assign(reflBlank(), {
+      doingWell: { answerIds: ['finished'], evidenceIds: [], customNote: '', inputMode: 'spoken' },
+      needsWork: { answerId: 'rushed', evidenceIds: [], customNote: '', controllableText: 'slow down',
+                   needsHelpFindingControl: false, parentObservation: '', inputMode: 'spoken' },
+      planNext: Object.assign(reflBlank().planNext, { actionId: 'timer' }),
+    });
+    const reasons = () => canCloseWeek(wk).missing.map(m => m.reason);
+    try {
+      ['jenn', 'jess'].forEach(k => mrWeekDayKeys(wk).forEach(d => markDayReviewed(k, d, true)));
+
+      // Answered by both, ticked by nobody.
+      state.shared.chore.reflections = { [wk]: { jenn: done(), jess: done() } };
+      reflDraft = null;
+      if (!reasons().includes('reflection-talk')) {
+        bad.push('the week closed on a reflection nobody talked through');
+      }
+      if (reflIsClosable(reflGet(wk, 'jenn'))) bad.push('an unticked reflection reads as closable');
+
+      // The tick clears it.
+      ['jenn', 'jess'].forEach(k => {
+        state.shared.chore.reflections[wk][k].parentReviewedAt = Date.now();
+      });
+      if (reasons().includes('reflection-talk')) {
+        bad.push('the conversation was recorded and the week still refused');
+      }
+
+      // A skipped reflection needs no tick.
+      state.shared.chore.reflections = { [wk]: {
+        jenn: Object.assign(reflBlank(), { skippedAt: Date.now() }),
+        jess: Object.assign(reflBlank(), { skippedAt: Date.now() }) } };
+      if (reasons().some(r => r === 'reflection' || r === 'reflection-talk')) {
+        bad.push('a deliberately skipped reflection held the week open');
+      }
+
+      /* Her changing an answer after they talked re-opens it — the tick
+         described a record that no longer exists. */
+      state.shared.chore.reflections = { [wk]: { jenn: done(), jess: done() } };
+      ['jenn', 'jess'].forEach(k => {
+        state.shared.chore.reflections[wk][k].parentReviewedAt = Date.now();
+      });
+      reflDraft = null;
+      reflEdit(wk, 'jenn', r => { r.needsWork.answerId = 'forgot'; });
+      reflCommitDraft();
+      if (!reasons().includes('reflection-talk')) {
+        bad.push('rewriting an answer did not re-open the conversation requirement');
+      }
+
+      // Step 5 names the state rather than just saying "complete".
+      state.shared.chore.reflections = { [wk]: { jenn: done(), jess: done() } };
+      reflDraft = null;
+      mmGoToWeek(wk); mmGoStep(5); renderMeetingMode();
+      const txt = document.getElementById('familyMeetingBody')
+        .textContent.replace(/\s+/g, ' ');
+      if (!/conversation not confirmed/.test(txt)) {
+        bad.push('step 5 does not say the conversation is what is missing');
+      }
+    } finally {
+      state.shared.chore.reflections = hadRefl;
+      state.shared.parentDayConfirm = store;
+      reflDraft = null;
+      closeSheet('familyMeetingOverlay');
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* CLOSING A WEEK THAT HAS NOT ENDED IS AN EXPLICIT CHOICE.
+     Every elapsed day being reviewed is not the same as the week being over —
+     with today signed off through "nothing else today", a Tuesday satisfies the
+     gate. Closing is reversible and does not touch the money, so this asks
+     rather than refuses, and names the days still to come. */
+  checks.closingAWeekEarlyIsAnExplicitChoice = await page.evaluate(async () => {
+    const bad = [];
+    const wasProfile = profile;
+    const wasConfirm = window.showConfirm;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+    const hadRefl = JSON.parse(JSON.stringify(state.shared.chore.reflections || {}));
+    const store = JSON.parse(JSON.stringify(state.shared.parentDayConfirm || {}));
+    const wasClosed = JSON.parse(JSON.stringify(state.shared.chore.weeksClosed || {}));
+    let realGateRef = null;
+    try {
+      const ahead = mmDaysStillAhead(wk);
+      // Every day named must be a real day of this week, and still to come.
+      const keys = mrWeekDayKeys(wk);
+      ahead.forEach(d => {
+        if (!keys.includes(d.key)) bad.push(`${d.key} is not a day of this week`);
+        if (d.key <= todayKey()) bad.push(`${d.key} is named as still ahead but is not`);
+        if (!d.name) bad.push(`${d.key} was named with nothing`);
+      });
+      if (ahead.length !== keys.filter(k => k > todayKey()).length) {
+        bad.push('the days still ahead do not match the week');
+      }
+
+      mmGoToWeek(wk);
+      /* The gate — days reviewed, reflections settled and talked through, money
+         committed — has its own checks. This one is about what happens AFTER it
+         passes, so stand it up rather than rebuilding a whole settled week here.
+         The refusal-before-confirm ordering is asserted first, against the real
+         gate. */
+      const realGate = canCloseWeek;
+      realGateRef = realGate;
+      if (!realGate(wk).ok) {
+        let askedWhileRefusing = 0;
+        window.showConfirm = async () => { askedWhileRefusing++; return true; };
+        await mmCloseWeekNow();
+        if (askedWhileRefusing) bad.push('an unclosable week still asked about closing early');
+        if (isWeekClosed(wk)) bad.push('a week closed while the gate was refusing');
+      }
+      canCloseWeek = () => ({ ok: true, missing: [] });
+      if (ahead.length) {
+        // Declining writes nothing at all.
+        setWeekClosed(wk, false);
+        let asked = 0;
+        window.showConfirm = async (msg) => { asked++;
+          if (!new RegExp(ahead[0].name).test(String(msg))) {
+            bad.push('the warning does not name the days still to come');
+          }
+          if (!/reopen/i.test(String(msg))) bad.push('the warning does not say it can be undone');
+          return false; };
+        await mmCloseWeekNow();
+        if (!asked) bad.push('closing a week mid-week did not ask first');
+        if (isWeekClosed(wk)) bad.push('a declined early close closed the week anyway');
+
+        // Accepting does close it.
+        window.showConfirm = async () => true;
+        await mmCloseWeekNow();
+        if (!isWeekClosed(wk)) bad.push('accepting the warning did not close the week');
+      }
+      canCloseWeek = realGate;
+      /* On the last day of the week there is nothing ahead, so the ordinary
+         Sunday-afternoon meeting is never asked to justify itself. */
+      if (!keys.filter(k => k > todayKey()).length && ahead.length) {
+        bad.push('the last day of the week still counts days ahead');
+      }
+    } finally {
+      if (typeof realGateRef === 'function') canCloseWeek = realGateRef;
+      window.showConfirm = wasConfirm;
+      state.shared.chore.weeksClosed = wasClosed;
+      state.shared.chore.reflections = hadRefl;
+      state.shared.parentDayConfirm = store;
+      reflDraft = null;
+      closeSheet('familyMeetingOverlay');
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* AN ACHIEVEMENT NOBODY CHOSE IS NOT AN ACHIEVEMENT.
+     addAchievement used to seed getAllActivities()[0] — Breakfast — so every
+     achievement ever added arrived reading "🍳 Breakfast · count target 1".
+     New ones start unassigned, but the records already written were never
+     corrected. The seeded shape is identifiable exactly: the old creator wrote
+     createdAt and never updatedAt, and every edit path stamps updatedAt. Read,
+     never migrated — achievements is an array and deepMergeObj treats an array
+     as a scalar, so a cleanup written to the document could be pushed back. */
+  checks.aSeededAchievementIsNotAChoice = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'jenn';
+    const p = getProfData('jenn');
+    const had = JSON.parse(JSON.stringify(p.achievements || []));
+    try {
+      const acts = getAllActivities('jenn');
+      const breakfast = acts.find(a => /breakfast/i.test(a.name)) || acts[0];
+      if (!breakfast) { bad.push('there are no activities to seed from'); return bad; }
+
+      const seeded = { id: 'a-old', activityId: breakfast.id, mode: 'count',
+                       target: 1, createdAt: 1 };
+      const chosen = { id: 'a-new', activityId: breakfast.id, mode: 'count',
+                       target: 1, createdAt: 1, updatedAt: 2 };
+      const fresh   = { id: 'a-blank', activityId: null, mode: 'count',
+                        target: 1, createdAt: 1 };
+      p.achievements = [seeded, chosen, fresh];
+
+      if (achievementActivityId(seeded)) bad.push('a seeded achievement still names an activity');
+      if (achievementActivityId(chosen) !== breakfast.id) {
+        bad.push('an achievement somebody chose lost its activity');
+      }
+      if (achievementActivityId(fresh)) bad.push('a new achievement gained an activity');
+      if (progressForAchievement(seeded)) bad.push('a seeded achievement reports progress');
+      if (!progressForAchievement(chosen)) bad.push('a chosen achievement stopped reporting progress');
+
+      // The row says to pick one rather than naming a meal.
+      renderGoalsTodos();
+      const rows = [...document.querySelectorAll('.gt-achievement-row')];
+      const seededRow = rows[0];
+      if (!seededRow) bad.push('the achievements did not render');
+      else {
+        if (!/No activity yet/.test(seededRow.textContent)) {
+          bad.push(`a seeded achievement still reads: "${seededRow.textContent.slice(0, 60)}"`);
+        }
+        if (/Breakfast/.test(seededRow.textContent)) {
+          bad.push('a seeded achievement still names Breakfast');
+        }
+        if (!/Link activity/.test(seededRow.textContent)) {
+          bad.push('the row does not say how to choose one');
+        }
+      }
+
+      /* Derived, not migrated: reading it must not change what is stored, and
+         must give the same answer however many times it runs. */
+      const after = JSON.stringify(p.achievements);
+      renderGoalsTodos();
+      achievementActivityId(seeded); progressForAchievement(seeded);
+      if (JSON.stringify(p.achievements) !== after) {
+        bad.push('reading an achievement rewrote the stored record');
+      }
+      if (p.achievements[0].activityId !== breakfast.id) {
+        bad.push('the stored activityId was cleaned up rather than derived');
+      }
+    } finally {
+      p.achievements = had;
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
   /* MEALS ARE NOT CHORES. cat:'daily' held breakfast, dinner, the house chore
      and four Family Hero tasks, and was labelled "🧹 Chores" on two screens and
      "🍽 Daily" on three. */
