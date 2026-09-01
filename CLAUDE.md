@@ -574,6 +574,42 @@ to weekly meeting" while one is waiting and "◀ Hub" otherwise. `applyMeetingLo
 controls that each silently abandoned the meeting is worse than one that says
 where it goes.
 
+**Step 2 asks the child; it does not tell her about herself.** `js/37-reflection.js`
+owns the record and nothing else. Three questions in this order — *What went
+well? · What problem did you notice? · What will you do next time?* — because a
+child asked what went wrong before she is asked what went right has been told
+what the conversation is about. The second tab is **Needs work**, never "Bad": a
+behaviour can need work, a child cannot.
+
+The record is `state.shared.chore.reflections[weekKey][kid]`, the same shape and
+container as `weekConfirms` and `weekPlans`, and `mergeSharedChore` arbitrates it
+the same way — **newest whole record per week per kid**. That is not a style
+choice: `deepMergeObj` treats an array as a scalar, so `answerIds` would be
+replaced by whichever snapshot arrived last with no timestamp consulted, and
+unticking an answer on the iPad could be undone by a stale phone. A record
+replaced whole cannot lose one of its own fields.
+
+Rules the screen holds, all of them in the handler rather than only in the
+markup — a `disabled` attribute is a hint to the pointer, not a rule:
+
+- **evidence never selects an answer.** It is offered *underneath* her own, and
+  folded by default. The app answering for her is the one thing this screen must
+  not do.
+- at most **two** things went well, exactly **one** problem, exactly **one**
+  action.
+- **naming a cause does not finish the second tab.** An explanation is not a
+  solution; "I need help finding one" is a real answer where silence is not.
+- the parent's tick records **that the conversation happened**. It asserts no
+  agreement and changes no completion, grade, XP or money.
+- **skipping is explicit and reversible**, and never blocks the settlement.
+
+**A tap edits a draft, not the document.** Every write is a full-document upload
+and this is the tap-heaviest screen in the app, so `reflDraft` is device-local
+and `reflCommitDraft` writes on the moves that mean she has finished with a tab —
+switching tab or child, leaving for her week, changing step, closing the meeting.
+Three writes per child per sitting instead of twenty, and the smoke check counts
+them rather than trusting it.
+
 **A past week cannot plan forward.** `mmWeekPosition(wk)` decides what step 5
 offers. Current: close the week (`canCloseWeek` refuses until both girls' days
 are reviewed and both are settled) and open next week. Past: finish reviewing,

@@ -29,7 +29,9 @@ per the house convention for plans in this repo.
 ```diff
 + rev A (2026-08-31) — first reviewed version. Establishes the baseline.
 + rev B (2026-09-01) — Release 1.1a/b/c landed. Notes below record what the
-+   build found that the plan did not predict; Release 2 is unchanged.
++   build found that the plan did not predict.
++ rev C (2026-09-01) — Release 2 landed: the reflection record and its merge
++   rule, step 2 rebuilt, step 5's summary. All four releases are now built.
 ```
 
 ## What the build found that this plan did not predict
@@ -55,6 +57,18 @@ been rendering Day Blocks, so the Full week had never been held to the 200 at
 all, and measured 242. Most came out as duplicative copy; what remains sits on
 the seeded row and is the seeded blocks' own names, which are the plan rather
 than chrome. That row carries its own recorded number.
+
+**The merge test caught one case of four, and that was the point.** Three of the
+four reflection merge tests passed against the unchanged merge layer — the array
+replacement happens to give the right answer when the newer side arrives second.
+Only "a stale reflection does not overwrite a newer one" failed. Writing the
+tests first is what separated the real rule from three that would have looked
+like proof.
+
+**A check can prove the markup and miss the rule.** The first version of the
+reflection check asserted that a third answer chip was `disabled`. Removing the
+cap from the handler left that attribute in place, so the mutation walked
+straight past it. The check now reaches the action directly.
 
 **The screenshot pass earned its place.** Every check was green when the week's
 coach tip still sent a child to "My free time" in Day Blocks — a retired tab and
