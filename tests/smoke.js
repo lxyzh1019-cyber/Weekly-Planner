@@ -8431,6 +8431,100 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* A DAY CANNOT BE REVIEWED BEFORE IT HAS HAPPENED.
+     Eligibility used to ask whether a block had STARTED, so a swim that began
+     ten minutes ago and runs for another hour counted as something a parent
+     could sign off — the app asserting a fact about an hour nobody had lived
+     yet. And a day holding NO blocks passed every check trivially, so a
+     Thursday three weeks out could be marked reviewed because there was
+     nothing there to object.
+
+     canReviewDay (js/36-status.js) is the one decision now, and this asserts
+     both halves plus the sentence a refused control says. */
+  checks.aDayIsNotReviewableUntilItHasHappened = await page.evaluate(async () => {
+    const bad = [];
+    const wasConfirm = window.showConfirm;
+    profile = 'parent'; parentViewing = 'jenn';
+    const store = JSON.parse(JSON.stringify(state.shared.parentDayConfirm || {}));
+    const today = todayKey();
+    const past = toDayKeyInZone(new Date(Date.now() - 3 * 864e5));
+    const future = toDayKeyInZone(new Date(Date.now() + 3 * 864e5));
+    const beforeToday = (getDayBlocks(today, 'jenn') || []).slice();
+    const beforePast = (getDayBlocks(past, 'jenn') || []).slice();
+    const beforeFuture = (getDayBlocks(future, 'jenn') || []).slice();
+    try {
+      window.showConfirm = async () => true;
+      ['jenn', 'jess'].forEach(k => [today, past, future].forEach(d => markDayReviewed(k, d, false)));
+
+      /* ── Still running: started, but not over ── */
+      const now = tdNowMin();
+      setDayBlocks(today, [{ id: 'cr1', actId: 'piano', startMin: Math.max(0, now - 10),
+                             durationMin: 120, checklistState: {} }], 'jenn');
+      if (dayBlocksEligibleToConfirm(today, 'jenn').some(b => b.id === 'cr1')) {
+        bad.push('a block that has started but not ended was eligible to confirm');
+      }
+      const running = canReviewDay('jenn', today);
+      if (running.ok) bad.push('today was reviewable while an activity was still running');
+      if (running.reason !== 'running') bad.push(`a running day gave reason '${running.reason}'`);
+      if (!/ends at/.test(reviewBlockedReason(running))) {
+        bad.push(`the refusal does not say when it ends: "${reviewBlockedReason(running)}"`);
+      }
+      await markDayReviewedForChild('jenn', today);
+      if (isDayReviewed('jenn', today)) bad.push('a day with a running activity was marked reviewed anyway');
+
+      /* ── Over, but nobody has confirmed it ── */
+      setDayBlocks(past, [{ id: 'cp1', actId: 'piano', startMin: 9 * 60,
+                            durationMin: 60, checklistState: {} }], 'jenn');
+      const unconf = canReviewDay('jenn', past);
+      if (unconf.ok) bad.push('a past day was reviewable with a block still unconfirmed');
+      if (unconf.reason !== 'unconfirmed') bad.push(`an unconfirmed day gave reason '${unconf.reason}'`);
+      if (unconf.pendingCount !== 1) bad.push(`pendingCount was ${unconf.pendingCount}, expected 1`);
+      const blocks = getDayBlocks(past, 'jenn');
+      blocks.forEach(b => { b.completed = true; b.confirmed = true; });
+      setDayBlocks(past, blocks, 'jenn');
+      const ready = canReviewDay('jenn', past);
+      if (!ready.ok) bad.push(`a finished, confirmed past day was still refused: ${ready.reason}`);
+      if (ready.reason !== 'ready') bad.push(`a finished day gave reason '${ready.reason}'`);
+
+      /* ── A day that has not arrived, empty or not ── */
+      setDayBlocks(future, [], 'jenn');
+      const ahead = canReviewDay('jenn', future);
+      if (ahead.ok) bad.push('an empty future day was reviewable');
+      if (ahead.reason !== 'future') bad.push(`a future day gave reason '${ahead.reason}'`);
+      await markDayReviewedForChild('jenn', future);
+      if (isDayReviewed('jenn', future)) bad.push('an empty future day was marked reviewed');
+
+      /* ── An empty PAST day is reviewable, but says it is empty ── */
+      setDayBlocks(past, [], 'jenn');
+      const blank = canReviewDay('jenn', past);
+      if (!blank.ok) bad.push('a past day with nothing on it could not be reviewed');
+      if (blank.reason !== 'empty') bad.push(`a blank past day gave reason '${blank.reason}'`);
+
+      /* ── The refused control carries the reason, not a generic line ── */
+      setDayBlocks(today, [{ id: 'cr2', actId: 'piano', startMin: Math.max(0, now - 10),
+                             durationMin: 120, checklistState: {} }], 'jenn');
+      currentDayKey = today;
+      renderParentBanners();
+      const btn = document.querySelector('#parentDayActions .pb-action[disabled]');
+      if (!btn) bad.push('the review button was not disabled while an activity was running');
+      else if (!/ends at/.test(btn.getAttribute('title') || '')) {
+        bad.push(`the disabled button does not say why: "${btn.getAttribute('title')}"`);
+      }
+
+      /* ── The week cannot be held open by a day that has not happened ── */
+      const futureOnly = canReviewDay('jenn', future);
+      if (futureOnly.reason !== 'future') bad.push('the week-close gate would count a future day');
+    } finally {
+      window.showConfirm = wasConfirm;
+      setDayBlocks(today, beforeToday, 'jenn');
+      setDayBlocks(past, beforePast, 'jenn');
+      setDayBlocks(future, beforeFuture, 'jenn');
+      state.shared.parentDayConfirm = store;
+      profile = 'jenn';
+    }
+    return bad.length === 0 || bad;
+  });
+
   /* MEALS ARE NOT CHORES. cat:'daily' held breakfast, dinner, the house chore
      and four Family Hero tasks, and was labelled "🧹 Chores" on two screens and
      "🍽 Daily" on three. */

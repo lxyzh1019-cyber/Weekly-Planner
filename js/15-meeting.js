@@ -59,15 +59,31 @@ function mmIsDayConfirmed(d) {
    thing to want when a day genuinely was fine for everyone — but it now says
    so on the button instead of being what a per-day tick happened to do. */
 function mmIsDayReviewedFor(kid, d) { return isDayReviewed(kid, mmDayKey(d)); }
+/* Whether the meeting may review this day at all — asked, never re-derived.
+   This screen had its own idea of it, which is how a Sunday sitting could sign
+   off a Wednesday that had not arrived. Un-reviewing is always allowed: taking
+   back a record is never the thing that needs gating. */
+function mmCanReviewDay(kid, d) { return canReviewDay(kid, mmDayKey(d)); }
 function mmToggleDayReviewed(kid, d) {
   const k = mmDayKey(d);
-  markDayReviewed(kid, k, !isDayReviewed(kid, k));
+  const on = isDayReviewed(kid, k);
+  if (!on) {
+    const can = canReviewDay(kid, k);
+    if (!can.ok) { showToast(reviewBlockedReason(can)); return; }
+  }
+  markDayReviewed(kid, k, !on);
   saveAll();
   renderMeetingMode();
 }
 function mmToggleConfirmDay(d) {
   const k = mmDayKey(d);
   const next = !mmIsDayConfirmed(d);
+  /* "Both" is a convenience that calls the same owner twice — it must not be a
+     side door that reviews a day neither child could be reviewed for. */
+  if (next) {
+    const blocked = ['jenn', 'jess'].map(kid => canReviewDay(kid, k)).find(c => !c.ok);
+    if (blocked) { showToast(reviewBlockedReason(blocked)); return; }
+  }
   ['jenn', 'jess'].forEach(kid => markDayReviewed(kid, k, next));
   saveAll();
   renderMeetingMode();
@@ -777,16 +793,23 @@ function mmRenderReview(wk) {
     const kidCell = (kid) => {
       const on = mmIsDayReviewedFor(kid, d);
       const nm = kid === 'jenn' ? 'Jenn' : 'Jess';
+      /* A control that cannot act says why on itself. Un-ticking is always
+         offered: taking a record back needs no permission. */
+      const why = on ? '' : reviewBlockedReason(mmCanReviewDay(kid, d));
       return `<button type="button" class="mm-drow-kid${on ? ' on' : ''}"
           data-mm-action="reviewday" data-kid="${escapeAttr(kid)}" data-day="${d}"
+          ${why ? `disabled title="${escapeAttr(nm + ': ' + why)}"` : ''}
           aria-label="${on ? nm + ' reviewed' : 'Mark ' + nm + ' reviewed'}"
         >${on ? '✓' : '○'} ${CT_PROFILE_ICON[kid]}</button>`;
     };
+    const bothWhy = done ? '' : reviewBlockedReason(
+      ['jenn', 'jess'].map(k => mmCanReviewDay(k, d)).find(c => !c.ok));
     const state = ahead
       ? `<span class="mm-drow-note">Not here yet</span>`
       : `<span class="mm-drow-review">${kidCell('jenn')}${kidCell('jess')}`
         + `<button type="button" class="${done ? 'mm-drow-ok' : 'mm-drow-go'}"
              data-mm-action="confirmday" data-day="${d}"
+             ${bothWhy ? `disabled title="${escapeAttr(bothWhy)}"` : ''}
            >${done ? '✓ Both reviewed' : 'Both'}</button></span>`;
     const mid = (!ahead && empty)
       ? `<span class="mm-drow-note">Nothing logged — open it and add what actually happened</span>`
