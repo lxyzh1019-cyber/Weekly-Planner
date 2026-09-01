@@ -2249,61 +2249,65 @@
      because it crosses saturated block colours; the tick is what carries it,
      and a white lower edge keeps both legible on the dark categories.
      Takes no pointer events, so nothing it covers is harder to tap. */
-  .hour-grid {
+  /* ── The schedule background: rules behind, the hour's mark above ──
+     Print reads well because its rules are the borders of 15-minute cells: a
+     block sits on top of them, so a line can never cross its text. Both layers
+     below follow that, and the palette is Print's — 1px --paper-line at the
+     quarter and half, 1.5px --ink at the hour.
+
+     The hour used to be ONE element whose ::before drew a short mark at the
+     gutter edge, which meant the rule could not go behind the cards without
+     taking the mark with it. They are separate now: .hour-grid-line--hour is
+     the rule (behind), .hour-grid-tick is the mark (above). */
+  .slot-grid, .hour-grid {
     position: absolute;
     inset: 0;
     pointer-events: none;
   }
+  /* The day view's background: real rows, sized by the browser. 1fr rather
+     than a pixel height so subpixel distribution is the layout engine's job
+     and the boundaries land where the absolutely-positioned blocks expect. */
+  .slot-grid {
+    display: grid;
+    z-index: 0;          /* under .placed-block (z10) */
+  }
+  .slot-row { border-top: 1px solid var(--paper-line); }
+  .slot-row--half { border-top-color: rgba(42,35,32,0.20); }
+  .slot-row--hour { border-top: 1.5px solid rgba(42,35,32,0.46); }
+  /* The first row would otherwise draw a rule along the canvas's own edge,
+     which .tl-canvas already carries as an inset shadow. */
+  .slot-row:first-child { border-top: none; }
+
   .hour-grid-line { position: absolute; left: 0; right: 0; }
-  .hour-grid-line::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    border-radius: 0 2px 2px 0;
-  }
   .hour-grid-line--hour {
-    height: 2px;
-    margin-top: -1px;
-    background: rgba(42,35,32,0.46);
-    box-shadow: 0 1px 0 rgba(255,255,255,0.5);
-  }
-  .hour-grid-line--hour::before {
-    top: -2px; width: 14px; height: 6px;
-    background: rgba(42,35,32,0.72);
+    height: 0;
+    border-top: 1.5px solid rgba(42,35,32,0.46);
   }
   .hour-grid-line--half {
     height: 0;
-    border-top: 1px dashed rgba(42,35,32,0.26);
+    border-top: 1px solid var(--paper-line);
   }
-  .hour-grid-line--half::before {
-    top: -1px; width: 6px; height: 2px;
-    background: rgba(42,35,32,0.38);
+  /* The mark, and the only thing on any schedule surface drawn over a card.
+     It is short and at the gutter edge, so it answers "where is four o'clock"
+     without being able to hide anything. */
+  .hour-grid-tick {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 14px; height: 6px;
+    margin-top: -3px;
+    border-radius: 0 2px 2px 0;
+    background: rgba(42,35,32,0.72);
   }
-  /* Per surface, above the blocks and below whatever must still win: on the day
-     that is the done button, the placement guide and the now line (14/18/20);
-     in the Full week the now line (5); in the Day Blocks lane nothing, so it
-     sits over the clash outline and its flag too. */
-  /* Hour marks ride over the cards; the half-hour rules sit under them. The
-     grid used to be one layer at z-index 12 on the day view — above
-     .placed-block (z10) — which read well on an empty morning and hatched a
-     planned afternoon. .hour-grid--behind is appended last too, so it needs a
-     stacking value BELOW the blocks rather than merely earlier in the DOM. */
+  /* Per surface. The behind layer is appended after the blocks, so it needs a
+     stacking value below them rather than merely an earlier place in the DOM. */
   .hour-grid--day { z-index: 12; }
   .hour-grid--wf  { z-index: 4; }
-  .hour-grid--tg2 { z-index: 7; }
   .hour-grid--behind { z-index: 0; }
-  /* The tick is sized to its column, not fixed. The day view has one wide
-     column and can carry a 14px mark; the week views have seven narrow ones,
-     where the same mark is a tenth of the lane and seventeen rows of them read
-     as a ladder rather than a scale. */
-  .hour-grid--wf .hour-grid-line--hour::before,
-  .hour-grid--tg2 .hour-grid-line--hour::before {
-    top: -1px; width: 8px; height: 4px;
-  }
-  .hour-grid--wf .hour-grid-line--half::before,
-  .hour-grid--tg2 .hour-grid-line--half::before {
-    width: 4px;
-  }
+  /* The mark is sized to its column. The day view has one wide column and can
+     carry 14px; the week has seven narrow ones, where the same mark is a tenth
+     of the lane and seventeen of them read as a ladder rather than a scale. */
+  .hour-grid--wf .hour-grid-tick { width: 8px; height: 4px; margin-top: -2px; }
   .tl-now-line {
     position: absolute;
     left: -6px; right: 0;

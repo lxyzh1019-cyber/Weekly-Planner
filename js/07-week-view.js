@@ -386,9 +386,12 @@ function renderWeek() {
     } else if (!isParent()) {
       coachEl.classList.remove('week-review-tip');
       coachEl.style.display = 'block';
-      // "Time-Grid" was a name for this view that no longer exists anywhere in
-      // the UI — the tab reads Day Blocks.
-      coachEl.textContent = '🌟 Tip: Tap a day to see your timeline. Check off routines as you go — each tick is a small win. Use “My free time” in Day Blocks to spot when you can choose rest or a goal.';
+      /* Twice now this line has named a view that no longer exists — first
+         "Time-Grid", then "Day Blocks", and it also sent a child to a "My free
+         time" panel that had already lost its markup. A tip that points at
+         something is a tip that goes stale, so this one points at nothing but
+         the day she is already looking at. */
+      coachEl.textContent = '🌟 Tip: Tap a day to see your timeline. Check off routines as you go — each tick is a small win.';
     } else {
       coachEl.style.display = 'none';
     }
@@ -1179,7 +1182,10 @@ function renderFullWeek(keys) {
       cell.appendChild(card);
     });
 
-    // Last, over the cards. See buildHourGrid (js/05-helpers.js).
+    /* Rules behind the cards, the hour's mark above them. At 0.72px per minute
+       a 15-minute row is under 11px, so this surface keeps the half hour rather
+       than taking the day view's quarter rows. See buildHourGrid
+       (js/05-helpers.js). */
     cell.appendChild(buildHourGrid(PX_PER_MIN, DAY_MIN_SPAN, { cls: 'hour-grid--wf', layer: 'lines' }));
     cell.appendChild(buildHourGrid(PX_PER_MIN, DAY_MIN_SPAN, { cls: 'hour-grid--wf', layer: 'ticks' }));
 

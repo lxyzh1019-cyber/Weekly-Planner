@@ -291,19 +291,53 @@ function placeableActivityIds(kid) {
    `spanMin` is how much of the day the surface draws (DAY_MIN_SPAN everywhere
    today) and `pxPerMin` its own scale. Half-hour rules are dropped below
    `halfMin` px an hour, where they would sit on top of the hour rule. */
-/* `opts.layer` splits the grid in two, which is the whole point of it:
+/* ── The schedule's background, in two layers ─────────────────────
+   Print reads well because it is a grid of 15-minute ROWS: the text of a block
+   sits in a cell, so a rule can never cross it. The day view and the week are
+   absolutely-positioned canvases, where the rules were DOM nodes drawn over the
+   top — which read well on an empty morning and hatched a planned afternoon.
 
-     'lines'  the half-hour rules — BEHIND the cards
-     'ticks'  the hour rules — above them
-     (absent) both, as before
+   Both surfaces now put every full-width rule BEHIND the cards, so a card
+   covers any line running through it, exactly as a block covers the cell
+   borders on the printed sheet. That leaves "where is four o'clock" to answer,
+   which is why the hour keeps a mark ABOVE the cards — but only the short one
+   at the gutter edge, never the rule across the day. The two used to be one
+   element with the mark as its ::before, which is why the rule could not go
+   behind without taking the mark with it.
 
-   The grid used to be appended last on every surface so its marks read THROUGH
-   a placed block. That was the right call while a day was mostly empty and the
-   wrong one the moment it is planned: a full afternoon ended up hatched with
-   rules drawn over the top of the things they were meant to help you place.
-   Hour marks still ride above, because "where is four o'clock" is a question a
-   card should not be able to hide, and so does the now-line. Everything else
-   goes underneath. */
+   Two builders because the surfaces are drawn at different scales. The day view
+   is 1.4px per minute, so a 15-minute row is 21px and 64 of them tile its
+   1344px canvas exactly — Print's own mechanism, with no rounding to manage.
+   The Full week is 0.72, where the same row is under 11px and four rules an
+   hour read as hatching rather than as a scale; it keeps rules at the half
+   hour. */
+
+/* Print's mechanism: real rows, sized by the browser rather than by us.
+   grid-template-rows with 1fr hands subpixel distribution to the layout engine,
+   so the boundaries land where the absolutely-positioned blocks expect them
+   even when the row height is not a whole number. */
+function buildSlotGrid(spanMin, opts) {
+  const o = opts || {};
+  const slot = o.slotMin || 15;
+  const rows = Math.round(spanMin / slot);
+  const grid = document.createElement('div');
+  grid.className = 'slot-grid' + (o.cls ? ' ' + o.cls : '');
+  grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+  for (let r = 0; r < rows; r++) {
+    const min = r * slot;
+    const cell = document.createElement('div');
+    // The boundary this row STARTS on — the same three weights Print uses.
+    cell.className = 'slot-row'
+      + (min % 60 === 0 ? ' slot-row--hour' : (min % 30 === 0 ? ' slot-row--half' : ' slot-row--quarter'));
+    grid.appendChild(cell);
+  }
+  return grid;
+}
+
+/* The week's mechanism, kept: positioned rules at the hour and half hour.
+   `layer: 'lines'` is every full-width rule and goes behind the cards;
+   `layer: 'ticks'` is the short gutter-edge mark for each hour and goes above
+   them. Nothing is drawn full-width above a card on either layer. */
 function buildHourGrid(pxPerMin, spanMin, opts) {
   const o = opts || {};
   const layer = o.layer || 'both';
@@ -317,11 +351,14 @@ function buildHourGrid(pxPerMin, spanMin, opts) {
   const showHalf = o.halves !== false && 60 * pxPerMin >= (o.halfMin || 34);
   for (let h = firstHour; h <= lastHour; h++) {
     const rel = h * 60 - START_MIN;
-    if (layer !== 'lines' && rel >= 0 && rel <= span) {
-      const line = document.createElement('div');
-      line.className = 'hour-grid-line hour-grid-line--hour';
-      line.style.top = (rel * pxPerMin) + 'px';
-      grid.appendChild(line);
+    if (rel >= 0 && rel <= span) {
+      const el = document.createElement('div');
+      // Above the cards it is a mark; behind them it is a rule.
+      el.className = layer === 'ticks'
+        ? 'hour-grid-tick'
+        : 'hour-grid-line hour-grid-line--hour';
+      el.style.top = (rel * pxPerMin) + 'px';
+      grid.appendChild(el);
     }
     if (!showHalf || layer === 'ticks') continue;
     const half = rel + 30;
@@ -334,6 +371,7 @@ function buildHourGrid(pxPerMin, spanMin, opts) {
   }
   return grid;
 }
+
 /* At most `max` badges, with the overflow folded into one chip. */
 function foldBadges(badges, max = 2) {
   const list = (badges || []).filter(Boolean);

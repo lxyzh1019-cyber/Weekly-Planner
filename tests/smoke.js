@@ -1186,16 +1186,31 @@ function findChromium() {
       const label = [...document.querySelectorAll('#timeline .tl-hour-label')]
         .find(l => l.textContent.trim() === '9am');
       const canvas = document.querySelector('#timeline .tl-canvas');
-      // 9am is (9*60 - START_MIN) * PX_PER_MIN from the top of the day.
-      const wantTop = (9 * 60 - START_MIN) * PX_PER_MIN;
-      const line = [...canvas.querySelectorAll('.hour-grid-line--hour')]
-        .find(l => Math.abs(parseFloat(l.style.top) - wantTop) < 0.5);
+      /* The rules are grid-row boundaries now, not positioned elements, so
+         9am is the TOP EDGE of the row that starts at 9am — index
+         (9*60 - START_MIN) / 15 into the day. Measuring the boundary rather
+         than an inline `top` is the whole point of the row grid: if the browser
+         distributes a fractional row height differently from the way the blocks
+         are positioned, this is what catches it. */
+      const rows = [...canvas.querySelectorAll('.slot-grid--day .slot-row')];
+      const row = rows[(9 * 60 - START_MIN) / 15];
       if (!label) { bad.push(`no 9am label at ${span} day(s)`); return; }
-      if (!line) { bad.push(`no 9am rule at ${span} day(s)`); return; }
-      const lr = label.getBoundingClientRect(), pr = line.getBoundingClientRect();
-      const off = (lr.top + lr.height / 2) - (pr.top + pr.height / 2);
+      if (!row) { bad.push(`no 9am row at ${span} day(s)`); return; }
+      if (!row.classList.contains('slot-row--hour')) {
+        bad.push(`the row at 9am is not drawn as an hour boundary at ${span} day(s)`);
+      }
+      const lr = label.getBoundingClientRect(), pr = row.getBoundingClientRect();
+      const off = (lr.top + lr.height / 2) - pr.top;
       if (Math.abs(off) > 1) {
         bad.push(`at ${span} day(s) the 9am label is ${off.toFixed(1)}px from its own rule`);
+      }
+      // And the mark above the cards lands on the same line.
+      const mark = [...canvas.querySelectorAll('.hour-grid-tick')]
+        .find(m => Math.abs(parseFloat(m.style.top) - (9 * 60 - START_MIN) * PX_PER_MIN) < 0.5);
+      if (!mark) { bad.push(`no 9am mark at ${span} day(s)`); return; }
+      const mr = mark.getBoundingClientRect();
+      if (Math.abs((mr.top + mr.height / 2) - pr.top) > 1.5) {
+        bad.push(`at ${span} day(s) the 9am mark is ${((mr.top + mr.height / 2) - pr.top).toFixed(1)}px from its rule`);
       }
     });
     setDayViewSpan(spanBefore);
@@ -1230,13 +1245,23 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
-  /* :00 and :30 survive a block being placed over them. Every surface drew its
-     rules BEFORE the blocks, so the grid said nothing the moment a day was
-     actually planned — and the Day Blocks lane drew a 24px repeating gradient
-     that, at 0.85px/min, was neither an hour (51px) nor a half-hour (25.5px).
-     Checked by stacking order rather than by eye: the grid must out-rank the
-     block it crosses, and take no pointer events while doing it. */
-  checks.theHourGridReadsThroughABlock = await page.evaluate(() => {
+  /* NO RULE CROSSES A CARD'S TEXT, AND THE HOUR IS STILL FINDABLE.
+     The grid used to be a single layer appended last, so every rule read
+     THROUGH a placed block: right on an empty morning, wrong on a planned
+     afternoon, which came out hatched with rules drawn over the top of the
+     things they were meant to help you place. Half of it was fixed by putting
+     the half-hour rules behind — but the hour stayed above, a full-width rule
+     across every card on the day.
+
+     Both surfaces now put every full-width rule behind, the way the printed
+     sheet does: a block sits on its cell borders, so a line cannot cross its
+     text. What survives above a card is the short mark at the gutter edge, so
+     "where is four o'clock" still has an answer that nothing can hide.
+
+     Checked by stacking order rather than by eye, and each side asserted
+     separately — a z-index that silently stopped applying is exactly the
+     failure that would otherwise look fine. */
+  checks.noRuleIsDrawnAcrossACard = await page.evaluate(() => {
     const bad = [];
     const zOf = (el) => {
       for (let n = el; n && n !== document.body; n = n.parentElement) {
@@ -1254,42 +1279,48 @@ function findChromium() {
     setDayBlocks(keys[0], [{ id: 'grid-probe', actId: 'school_day',
       startMin: 9 * 60, durationMin: 180, checklistState: {} }], 'jenn');
 
-    /* TWO LAYERS, and which side of the cards each one sits on is the point.
-
-       The grid used to be a single layer appended last, so every rule read
-       THROUGH a placed block. That was right on an empty morning and wrong on a
-       planned afternoon, which came out hatched with rules drawn over the top
-       of the things they were meant to help you place.
-
-       Hour marks still ride above — "where is four o'clock" is a question a
-       card must not be able to hide — and the half-hour rules go underneath.
-       Both are still appended after the blocks, so the behind layer has to earn
-       its place with stacking rather than DOM order; asserting both separately
-       is what would catch a z-index that silently stopped applying. */
-    const surface = (name, root, gridSel, blockSel) => {
-      const ticks = root && root.querySelector(gridSel + ':not(.hour-grid--behind)');
-      const lines = root && root.querySelector(gridSel + '.hour-grid--behind');
+    /* `back` is whatever draws the full-width rules on this surface — the day
+       view's row grid or the week's behind layer. `ticks` is the mark layer.
+       Neither may put anything full-width over a card; the marks must stay
+       above one; nothing in either may take a tap. */
+    const surface = (name, root, backSel, tickSel, blockSel, wantQuarters) => {
+      const back = root && root.querySelector(backSel);
+      const ticks = root && root.querySelector(tickSel);
       const block = root && root.querySelector(blockSel);
-      if (!ticks) { bad.push(`${name}: no hour-tick layer`); return; }
-      if (!lines) { bad.push(`${name}: no behind layer for the half-hour rules`); return; }
+      if (!back) { bad.push(`${name}: nothing draws the rules`); return; }
+      if (!ticks) { bad.push(`${name}: no hour-mark layer`); return; }
       if (!block) { bad.push(`${name}: nothing placed to read against`); return; }
-      const hours = [...ticks.querySelectorAll('.hour-grid-line--hour')];
-      const halves = [...lines.querySelectorAll('.hour-grid-line--half')];
-      if (hours.length < 17) bad.push(`${name}: ${hours.length} hour rules, expected the whole day`);
-      if (!halves.length) bad.push(`${name}: no half-hour rules`);
-      if (ticks.querySelector('.hour-grid-line--half')) bad.push(`${name}: a half-hour rule rode above the cards`);
-      if (lines.querySelector('.hour-grid-line--hour')) bad.push(`${name}: an hour mark was buried behind the cards`);
-      if (!hours.some(h => crosses(h, block))) bad.push(`${name}: no hour rule crosses the block`);
+
+      // Nothing full-width above the cards.
+      if (ticks.querySelector('.hour-grid-line')) {
+        bad.push(`${name}: a full-width rule rode above the cards`);
+      }
+      if (zOf(back) >= zOf(block)) {
+        bad.push(`${name}: the rules (z${zOf(back)}) still ride over the block (z${zOf(block)})`);
+      }
+      // The hour mark is above, and it is a mark rather than a rule.
+      const tick = ticks.querySelector('.hour-grid-tick');
+      if (!tick) { bad.push(`${name}: no hour mark`); return; }
       if (zOf(ticks) <= zOf(block)) {
         bad.push(`${name}: the hour marks (z${zOf(ticks)}) are under the block (z${zOf(block)})`);
       }
-      if (zOf(lines) >= zOf(block)) {
-        bad.push(`${name}: the half-hour rules (z${zOf(lines)}) still ride over the block (z${zOf(block)})`);
+      if (tick.getBoundingClientRect().width > 20) {
+        bad.push(`${name}: the hour mark is ${Math.round(tick.getBoundingClientRect().width)}px wide — that is a rule`);
       }
+      const marks = [...ticks.querySelectorAll('.hour-grid-tick')];
+      if (marks.length < 17) bad.push(`${name}: ${marks.length} hour marks, expected the whole day`);
+      if (!marks.some(m => crosses(m, block))) {
+        bad.push(`${name}: no hour mark sits beside the block at all`);
+      }
+      // Appended after the blocks, so the marks earn their place by stacking.
       if (!(block.compareDocumentPosition(ticks) & Node.DOCUMENT_POSITION_FOLLOWING)) {
         bad.push(`${name}: the hour marks are drawn before the block`);
       }
-      [['hour marks', ticks], ['half-hour rules', lines]].forEach(([what, g]) => {
+      // The density decision: quarters on the day, never on the week.
+      const quarters = back.querySelectorAll('.slot-row--quarter').length;
+      if (wantQuarters && !quarters) bad.push(`${name}: no quarter-hour rows`);
+      if (!wantQuarters && quarters) bad.push(`${name}: drew ${quarters} quarter-hour rules at this scale`);
+      [['rules', back], ['hour marks', ticks]].forEach(([what, g]) => {
         if (getComputedStyle(g).pointerEvents !== 'none') {
           bad.push(`${name}: the ${what} take pointer events and would swallow taps`);
         }
@@ -1299,19 +1330,24 @@ function findChromium() {
     setDayViewSpan(1);
     openDay(keys[0], 0);
     surface('day view', document.querySelector('#timeline .tl-canvas'),
-            '.hour-grid--day', '.placed-block');
-    goWeek();
+            '.slot-grid--day', '.hour-grid--day', '.placed-block', true);
+    /* The day divides exactly: 64 rows of 15 minutes at 1.4px/min tile its
+       1344px canvas, which is why it can take Print's mechanism whole. */
+    const rows = document.querySelectorAll('#timeline .tl-canvas .slot-grid--day .slot-row');
+    if (rows.length !== 64) bad.push(`the day draws ${rows.length} slot rows, expected 64`);
+
     /* Two surfaces, not three: the Day Blocks arm had no successor. The tab
-       that replaced it previews the print sheet, which draws no .hour-grid at
-       all — its rules are the cell borders of a 15-minute row grid. */
+       that replaced it previews the print sheet, whose rules ARE cell borders
+       and which draws no grid layer of its own. */
     goWeek(); setWeekView('full'); renderWeek();
     surface('Full week', document.querySelector('.wf-day-col'),
-            '.hour-grid--wf', '.wf-card');
+            '.hour-grid--wf.hour-grid--behind', '.hour-grid--wf:not(.hour-grid--behind)',
+            '.wf-card', false);
 
     // 6am and 10pm both get a rule: the gutter used < / > and the line loop
     // <= / >=, so the two ends were labelled but never drawn.
     const tops = [...document.querySelector('.wf-day-col')
-      .querySelectorAll('.hour-grid--wf:not(.hour-grid--behind) .hour-grid-line--hour')]
+      .querySelectorAll('.hour-grid--wf.hour-grid--behind .hour-grid-line--hour')]
       .map(l => Math.round(parseFloat(l.style.top)));
     if (!tops.includes(0)) bad.push('the Full week labels 6am but draws no rule for it');
 
