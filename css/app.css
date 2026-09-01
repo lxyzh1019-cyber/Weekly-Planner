@@ -1489,6 +1489,80 @@
     background: var(--paper);
     border-top: 2px solid var(--paper-line);
   }
+  /* ── Step 2: the weekly reflection ───────────────────────────────
+     A kid surface inside a parent screen, so it takes the kid rules: every
+     control has a 44px hit area, nothing under 13px, and the evidence ships
+     folded because three tabs of eight answers is well past the 200 visible
+     words a child's screen gets. */
+  .refl-kids { display: flex; gap: 8px; margin-bottom: 10px; }
+  .refl-kid {
+    flex: 1; min-height: 44px;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    border: 2px solid var(--ink); border-radius: 12px;
+    background: var(--paper); cursor: pointer;
+    font-family: 'Patrick Hand', sans-serif; font-weight: 700;
+    font-size: calc(1rem * var(--fs-scale, 1));
+  }
+  .refl-kid.on { background: var(--accent-strong); color: #fff; }
+  .refl-kid-n { font-size: calc(0.86rem * var(--fs-scale, 1)); opacity: 0.85; }
+  .refl-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .refl-tab {
+    flex: 1; min-height: 44px; padding: 0 6px;
+    border: 2px solid var(--ink); border-radius: 12px;
+    background: var(--paper); cursor: pointer;
+    font-family: 'Patrick Hand', sans-serif; font-weight: 700;
+    font-size: calc(0.95rem * var(--fs-scale, 1));
+  }
+  .refl-tab.on { background: #ffe9a8; }
+  .refl-tab.done { border-color: #2f8f84; }
+  .refl-prompt {
+    margin: 0 0 4px; font-family: 'Gochi Hand', cursive;
+    font-size: calc(1.25rem * var(--fs-scale, 1)); font-weight: 700;
+  }
+  .refl-prompt--sub { margin-top: 12px; font-size: calc(1.05rem * var(--fs-scale, 1)); }
+  .refl-say { margin: 0 0 8px; font-size: calc(0.9rem * var(--fs-scale, 1)); opacity: 0.8; }
+  .refl-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .refl-chip {
+    min-height: 44px; padding: 6px 12px;
+    border: 2px solid var(--ink); border-radius: 14px;
+    background: var(--paper); cursor: pointer; text-align: left;
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: calc(0.95rem * var(--fs-scale, 1));
+  }
+  .refl-chip.on { background: #b7e4c7; }
+  .refl-chip[disabled] { opacity: 0.4; cursor: default; }
+  /* The action the app thinks fits the problem she named. A hint, never a
+     selection — the ring says "this one connects", not "this one is chosen". */
+  .refl-chip[data-refl-suggested] { box-shadow: 0 0 0 2px rgba(193,74,36,0.35); }
+  .refl-note {
+    width: 100%; min-height: 44px; margin-top: 8px;
+    border: 2px solid var(--ink); border-radius: 12px; padding: 6px 10px;
+    background: var(--paper); font-family: 'Patrick Hand', sans-serif;
+    font-size: calc(0.95rem * var(--fs-scale, 1));
+  }
+  .refl-field { display: block; margin-top: 8px; font-size: calc(0.9rem * var(--fs-scale, 1)); }
+  .refl-ev { margin-top: 12px; }
+  .refl-ev-toggle {
+    min-height: 44px; width: 100%; text-align: left;
+    border: none; background: none; cursor: pointer; padding: 0;
+    font-family: 'Patrick Hand', sans-serif; font-weight: 700;
+    font-size: calc(0.95rem * var(--fs-scale, 1));
+  }
+  /* Underneath her answer, never above it: the app's account of the week is
+     supporting information, not the answer to the question she was asked. */
+  .refl-ev-list {
+    border-left: 3px solid var(--paper-line); padding-left: 10px; margin-top: 4px;
+  }
+  .refl-ev-item { font-size: calc(0.9rem * var(--fs-scale, 1)); padding: 2px 0; }
+  .refl-card {
+    margin-top: 12px; padding: 10px;
+    border: 2px solid var(--ink); border-radius: 12px; background: #fff8e7;
+    font-size: calc(0.95rem * var(--fs-scale, 1));
+  }
+  .refl-foot { display: flex; gap: 8px; margin-top: 12px; }
+  .refl-foot .refl-talked { flex: 1; }
+  .refl-foot .refl-talked.on { background: #95d5b2; }
+  .refl-foot .pill-btn, .refl-foot .btn-confirm { min-height: 44px; }
   .mm-nav .btn-confirm { flex: 1; }
   .mm-nav .pill-btn, .mm-nav .btn-confirm { min-height: 44px; }
   /* The one scroller. The gap between the last card and the buttons is owned

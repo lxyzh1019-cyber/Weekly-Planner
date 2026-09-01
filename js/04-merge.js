@@ -168,8 +168,14 @@ function mergeSharedChore(localChore, remoteChore) {
   //     keep a stale confirm alive over the reopen that came after it, and the
   //     kid's decision page would unlock on a week that is no longer agreed.
   //   weekPlans    — what she decided to do with the money.
+  //   reflections  — what she said about her week. Every field in it can be
+  //     changed, and the ARRAY fields are what force this: deepMergeObj treats
+  //     an array as a scalar, so answerIds would be replaced by whichever
+  //     snapshot arrived last with no timestamp consulted — untick an answer on
+  //     the iPad and a stale phone puts it back, silently. A record arbitrated
+  //     whole cannot lose one of its own fields.
   // Newest write wins per week, per kid, mirroring goalsByWeek above.
-  ['weekConfirms', 'weekPlans'].forEach(field => {
+  ['weekConfirms', 'weekPlans', 'reflections'].forEach(field => {
     const lf = lc[field] || {}, rf = rc[field] || {};
     if (!lc[field] && !rc[field]) return;
     const stampOf = (rec) => (rec && (rec.reopenedAt || rec.committedAt || rec.updatedAt || rec.at)) || 0;

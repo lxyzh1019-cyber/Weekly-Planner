@@ -10,7 +10,11 @@
    one press, which meant a correction after the fact had to be unwound. Steps
    3 and 4 (js/23-money-meeting.js) separate them — 3 agrees the numbers, 4
    decides where they go and is the only thing that moves money. */
-const MM_STEPS = ['Review', 'Celebrate', 'What I earned', 'What I do with it', 'Plan next'];
+/* Five steps, named for the question each one answers rather than for what the
+   grown-ups do in it. "Celebrate" was step 2 and only ever showed the child a
+   list the app had written about her; it is a reflection now — she answers, and
+   the week's evidence sits underneath. */
+const MM_STEPS = ['Check the week', 'Reflect', 'What I earned', 'What I do with it', 'Close & plan'];
 let mmStep = 1;
 let mmSelectedDay = null;
 let mmUndo = null;
@@ -94,6 +98,10 @@ function mmToggleConfirmDay(d) {
    sheet and looking at it. Reset whenever the meeting points at a new week. */
 let mmMaxStep = 1;
 function mmGoStep(n) {
+  /* Leaving a step is a natural place to write the reflection through. Every
+     tap in step 2 edits a device-local draft rather than uploading the whole
+     family document — see reflCommitDraft (js/37-reflection.js). */
+  if (typeof reflCommitDraft === 'function') reflCommitDraft();
   mmStep = Math.max(1, Math.min(MM_STEPS.length, n));
   mmMaxStep = Math.max(mmMaxStep, mmStep);
   renderMeetingMode();
@@ -103,6 +111,9 @@ function mmGoStep(n) {
    exactly the case that used to leave no trace at all. */
 function mmCloseMeeting() {
   const wk = mmWeekKey();
+  // The sitting is over: whatever the reflection was holding goes to the
+  // document now rather than being lost with the overlay.
+  if (typeof reflCommitDraft === 'function') reflCommitDraft();
   // mmMaxStep never leaves 1 in catch-up mode, so this cannot fire there — a
   // week closed from the catch-up screen is only "met" if that box was ticked.
   if (mmMaxStep >= 3 && isParent() && !mmIsSettled(wk)) mmMarkWeekMet(wk);
@@ -258,6 +269,9 @@ function mmScroller() {
 }
 
 function mmCaptureReturn(kid, dayIdx) {
+  /* Leaving the meeting for another screen is a moment to write, not a moment
+     to hold a draft in memory and hope the tab survives. */
+  if (typeof reflCommitDraft === 'function') reflCommitDraft();
   const sheet = mmScroller();
   mmReturn = {
     source: 'weekly-meeting',
@@ -617,6 +631,8 @@ function mmHandleClick(e) {
   const a = el.getAttribute('data-mm-action');
   const kid = el.getAttribute('data-kid') || '';
   const d = Number(el.getAttribute('data-day'));
+  // The reflection owns its own taps — see js/37-reflection.js.
+  if (a.startsWith('refl-') && reflHandleAction(a, el, mmWeekKey())) return;
   if (a === 'thisweek')       { mmGoToWeek(ctThisWeekKey()); return; }
   if (a === 'openweek')       { mmOpenWeekForBlocks(kid); return; }
   if (a === 'allroutines')    { mmToggleAllRoutines(kid, d); return; }
@@ -720,7 +736,7 @@ function renderMeetingMode() {
 
   let body;
   if (mmStep === 1) body = mmRenderReview(wk);
-  else if (mmStep === 2) body = mmRenderCelebrate(wk);
+  else if (mmStep === 2) body = mmRenderReflect(wk);
   else if (mmStep === 3) body = mnyRenderEarned(wk);
   else if (mmStep === 4) body = mnyRenderDecide(wk);
   else body = mmRenderPlan(wk);
@@ -1055,77 +1071,14 @@ function mmToggleAllRoutines(kid, d) {
    completion every screen uses, chores from real parent grades, hours from
    getWeeklyHours, money from the FROZEN ledger once it exists, XP from the XP
    ledger. Nothing here is computed a second way. */
-function mmRenderCelebrate(wk) {
-  const info = ctWeekInfo();
-  const scale = mm2bScale(wk);
-  const wins = (kid) => {
-    const w = [];
+/* mmRenderCelebrate lived here. Its per-child "wins" list re-derived what the
+   week showed — routines, chores, hours, XP — beside the accessors that already
+   owned each one. Step 2 asks the child first and offers the same facts as
+   evidence underneath, through reflEvidence (js/37-reflection.js), so the list
+   became a second answer to a question that now has an owner. The planned-vs-
+   completed chart it carried was the celebration half and survives on step 2;
+   mm2b and mm2bScale still draw it. */
 
-    // Routines: what the checklists actually say, day by day.
-    let rDone = 0, rTotal = 0;
-    info.keys.forEach(key => {
-      (getDayBlocksForProfile(key, kid) || []).forEach(b => {
-        const act = findActivity(b.actId, kid);
-        if (!act || !act.isRoutine) return;
-        rTotal++;
-        if (isRoutineCompleted(b, kid)) rDone++;
-      });
-    });
-    if (rTotal) w.push(`✅ ${rDone}/${rTotal} routine${rTotal === 1 ? '' : 's'} kept`);
-
-    // Chores: only a positive parent grade. A claim is her account of it.
-    const fam = getFamilyChoreStatus(kid, wk);
-    let graded = 0;
-    for (let d = 0; d < 7; d++) {
-      mrChoresForDay(kid, wk, d).rows.forEach(r => {
-        if (r.row && mrGetChoreGrade(kid, wk, d, r.row.id) > 0) graded++;
-      });
-    }
-    if (graded) w.push(`🧹 ${graded} chore${graded === 1 ? '' : 's'} checked off by a grown-up`);
-    if (fam.waiting) w.push(`⏳ ${fam.waiting} waiting for a parent check`);
-
-    // Activity completion, from the one hours computation.
-    const h = getWeeklyHours(kid, wk);
-    if (h.planned) w.push(`⏱ ${fmtHrsMin(h.completed)} of ${fmtHrsMin(h.planned)} planned hours completed`);
-
-    if (ctGetGoalBonus(wk, kid)) w.push(`🎯 Weekly goal reached (+$1)`);
-
-    /* Money: the frozen ledger is the record. ctWeekMoney is a live preliminary
-       figure that step 3 shows on purpose, and nothing reaches the wallet until
-       step 4 — so saying it here as though it had happened is the same class of
-       wrongness as the chore count above. */
-    const finalised = ((state.shared.chore.finalizedWeeks || {})[wk] || {})[kid];
-    if (finalised != null) w.push(`💰 $${Number(finalised).toFixed(2)} recorded`);
-    else {
-      const prelim = ctWeekMoney(wk, kid);
-      if (prelim > 0) w.push(`💰 $${prelim.toFixed(2)} so far — recorded at step 4`);
-    }
-
-    // XP, from the one ledger, and only once it has actually been credited.
-    const credited = ((state.shared.chore.xpAwardedWeeks || {})[wk] || {})[kid];
-    if (credited != null) { if (credited > 0) w.push(`⭐ +${credited} XP credited`); }
-    else if (typeof mrXpForWeek === 'function') {
-      const t = mrXpForWeek(wk, kid).total;
-      if (t > 0) w.push(`⭐ +${t} XP to come`);
-    }
-
-    const moods = (getProfData(kid).dayMoods) || {};
-    const moodList = info.keys.map(k => moods[k]).filter(Boolean);
-    if (moodList.length) w.push(`💫 Vibe: ${moodList.join(' ')}`);
-
-    if (!w.length) w.push('Nothing recorded for this week yet — step 1 is where it goes in.');
-    return `<div class="mm-win"><div class="mm-win-kid">${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'}</div>${w.map(x => `<div class="mm-win-item">${x}</div>`).join('')}</div>`;
-  };
-  return `<div class="mm-h">Celebrate the wins</div>
-    <div class="mm-wins">${wins('jenn')}${wins('jess')}</div>
-    <div class="mm-h mm-h-sub">Planned vs completed</div>
-    <div class="mm-2b">${mm2b('jenn', scale)}${mm2b('jess', scale)}</div>
-    <div class="mm-cap">Solid = planned hours completed · dashed = planned, on one scale for both girls. The app records which planned blocks were finished, not how long anything took.</div>
-    <div class="mm-blocklink">${['jenn', 'jess'].map(k =>
-      `<button type="button" class="pill-btn" data-mm-action="openweek" data-kid="${escapeAttr(k)}"
-        >${CT_PROFILE_ICON[k]} Open ${escapeHtml(k === 'jenn' ? 'Jenn' : 'Jess')}'s week ›</button>`).join('')}
-      <span class="mm-cap">Ticking and confirming blocks happens there, not here.</span></div>`;
-}
 /* The third copy of this chart, and the third bucketing of the same blocks.
    It read b.completed directly, so a routine finished by its checklist counted
    as zero minutes done; and it scaled each kid's bars to her own biggest row,

@@ -8515,6 +8515,159 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* THE WEEKLY REFLECTION IS THE CHILD'S ANSWER, NOT THE APP'S.
+     Step 2 used to show a list the app had written about her. She answers now:
+     what went well, what problem she noticed, what she will do next time — in
+     that order, because a child asked what went wrong before she is asked what
+     went right has been told what the conversation is about.
+
+     The rules that matter, and what each would look like if it broke:
+       · evidence never selects an answer — the app answering for her;
+       · at most two things went well, exactly one problem, exactly one action;
+       · naming a cause does not finish the second tab — an explanation is not
+         a solution, and "I need help finding one" is a real answer;
+       · the parent's tick records the conversation and changes nothing else;
+       · skipping is explicit and does not block the money;
+       · a tap does not upload the whole family document. */
+  checks.theReflectionIsHerAnswer = await page.evaluate(async () => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+    const hadRefl = JSON.parse(JSON.stringify((state.shared.chore.reflections || {})));
+    const wasSave = window.saveAll;
+    try {
+      state.shared.chore.reflections = {};
+      reflDraft = null;
+      mmGoToWeek(wk); mmGoStep(2); mnySetMeetKid('jenn');
+      reflTab = 'doingWell'; reflEvidenceOpen = false;
+      renderMeetingMode();
+
+      const host = document.getElementById('familyMeetingBody');
+      const chips = () => [...host.querySelectorAll('[data-mm-action="refl-well"]')];
+      const tap = (sel) => { const el = host.querySelector(sel); if (el) el.click(); return !!el; };
+
+      // The prompts, in the order they must be asked.
+      const tabs = [...host.querySelectorAll('[data-mm-action="refl-tab"]')].map(t => t.textContent.trim());
+      if (!/Doing well/.test(tabs[0] || '')) bad.push(`first tab is "${tabs[0]}"`);
+      if (!/Needs work/.test(tabs[1] || '')) bad.push(`second tab is "${tabs[1]}"`);
+      if (!/Plan next/.test(tabs[2] || '')) bad.push(`third tab is "${tabs[2]}"`);
+      if (/\bBad\b/.test(host.textContent)) bad.push('a tab is labelled "Bad"');
+      if (!/What went well\?/.test(host.textContent)) bad.push('the first prompt is not asked');
+
+      // Nothing is selected for her, whatever the week shows.
+      if (chips().some(c => c.getAttribute('aria-pressed') === 'true')) {
+        bad.push('an answer was preselected');
+      }
+
+      // At most two.
+      chips()[0].click(); chips()[1].click();
+      let on = chips().filter(c => c.getAttribute('aria-pressed') === 'true');
+      if (on.length !== 2) bad.push(`two taps selected ${on.length}`);
+      const third = chips().find(c => c.getAttribute('aria-pressed') !== 'true');
+      if (!third.disabled) bad.push('a third answer was still offered');
+      /* And the cap is in the handler, not only in the markup. A disabled
+         attribute is a hint to the pointer; the rule has to hold when something
+         reaches the action anyway — a stale render, a keyboard, a stray tap
+         between paints. */
+      third.disabled = false;
+      third.click();
+      if (chips().filter(c => c.getAttribute('aria-pressed') === 'true').length > 2) {
+        bad.push('a third answer was accepted once the markup stopped refusing');
+      }
+      /* Re-queried: every tap rebuilds the body, so an element captured before
+         one is detached and clicking it does nothing at all. */
+      chips().find(c => c.getAttribute('aria-pressed') === 'true').click();
+      if (chips().filter(c => c.getAttribute('aria-pressed') === 'true').length !== 1) {
+        bad.push('unticking an answer did not take it back');
+      }
+
+      // Evidence is offered, folded, and underneath her answer.
+      const toggle = host.querySelector('[data-mm-action="refl-evidence"]');
+      if (!toggle) bad.push('the week shows nothing at all');
+      else {
+        if (host.querySelector('.refl-ev-list')) bad.push('the evidence is open by default');
+        toggle.click();
+        const list = host.querySelector('.refl-ev-list');
+        if (!list) bad.push('the evidence did not open');
+        const answers = host.querySelector('.refl-chips');
+        if (list && answers && !(answers.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+          bad.push('the evidence is drawn above her own answer');
+        }
+        if (chips().filter(c => c.getAttribute('aria-pressed') === 'true').length !== 1) {
+          bad.push('opening the evidence changed her answer');
+        }
+      }
+
+      // Tab 2: exactly one problem, and a cause is not yet a solution.
+      tap('[data-mm-action="refl-tab"][data-refl-tab="needsWork"]');
+      const probs = () => [...host.querySelectorAll('[data-mm-action="refl-problem"]')];
+      probs()[0].click(); probs()[1].click();
+      if (probs().filter(p => p.getAttribute('aria-pressed') === 'true').length !== 1) {
+        bad.push('two problems were selectable at once');
+      }
+      let rec = reflWorking(wk, 'jenn');
+      if (reflTabComplete(rec, 'needsWork')) {
+        bad.push('naming a cause finished the tab without a controllable part');
+      }
+      tap('[data-mm-action="refl-needhelp"]');
+      rec = reflWorking(wk, 'jenn');
+      if (!reflTabComplete(rec, 'needsWork')) bad.push('"I need help finding one" did not close the tab');
+
+      // Tab 3: one action, and the app may suggest but never choose.
+      tap('[data-mm-action="refl-tab"][data-refl-tab="planNext"]');
+      const acts = [...host.querySelectorAll('[data-mm-action="refl-action"]')];
+      if (acts.some(a => a.getAttribute('aria-pressed') === 'true')) {
+        bad.push('an action was preselected from the problem');
+      }
+      if (!host.querySelector('[data-refl-suggested]')) {
+        bad.push('no action was connected to the problem she named');
+      }
+      acts[0].click();
+      rec = reflWorking(wk, 'jenn');
+      if (!reflTabComplete(rec, 'planNext')) bad.push('one action did not finish the tab');
+      if (reflDoneCount(rec) !== 3) bad.push(`the reflection reads ${reflDoneCount(rec)}/3 when all three are answered`);
+
+      // Both children keep their own, and the selector says where each is.
+      tap('[data-mm-action="refl-kid"][data-kid="jess"]');
+      if (reflDoneCount(reflWorking(wk, 'jess')) !== 0) bad.push("Jenn's answers followed the child switch");
+      tap('[data-mm-action="refl-kid"][data-kid="jenn"]');
+      if (reflDoneCount(reflWorking(wk, 'jenn')) !== 3) bad.push("Jenn's answers did not survive the switch");
+
+      /* The parent's tick records the conversation and nothing else. */
+      const beforeMoney = JSON.stringify(state.shared.chore.finalizedWeeks || {});
+      const beforeXp = JSON.stringify(state.shared.chore.xpAwardedWeeks || {});
+      tap('[data-mm-action="refl-talked"]');
+      if (!reflGet(wk, 'jenn').parentReviewedAt) bad.push('the parent tick did not record');
+      if (JSON.stringify(state.shared.chore.finalizedWeeks || {}) !== beforeMoney) bad.push('the parent tick moved money');
+      if (JSON.stringify(state.shared.chore.xpAwardedWeeks || {}) !== beforeXp) bad.push('the parent tick moved XP');
+
+      // Skipping is explicit, and reversible.
+      tap('[data-mm-action="refl-skip"]');
+      if (!reflIsSkipped(reflGet(wk, 'jenn'))) bad.push('skipping was not recorded');
+      tap('[data-mm-action="refl-skip"]');
+      if (reflIsSkipped(reflGet(wk, 'jenn'))) bad.push('a skip could not be picked back up');
+
+      /* A tap edits a device-local draft. Every write here is a full-document
+         upload, and this is the tap-heaviest screen in the app. */
+      let saves = 0;
+      window.saveAll = () => { saves++; };
+      reflTab = 'doingWell'; renderMeetingMode();
+      [...host.querySelectorAll('[data-mm-action="refl-well"]')].slice(0, 2).forEach(c => c.click());
+      if (saves !== 0) bad.push(`${saves} document writes for two chip taps`);
+      reflCommitDraft();
+      if (saves !== 1) bad.push(`committing the reflection wrote ${saves} times`);
+    } finally {
+      window.saveAll = wasSave;
+      state.shared.chore.reflections = hadRefl;
+      reflDraft = null;
+      closeSheet('familyMeetingOverlay');
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
   /* CHANGING SCHOOL HOURS RECONCILES THE CARDS ALREADY PLACED.
      schoolHours() drives the bands and any NEW School Day card, so moving the
      hours left every card already on the calendar at the old time — the app
@@ -8901,21 +9054,29 @@ function findChromium() {
       ], kid);
       mrSetChoreGrade(kid, wk, 1, 'dishes', 3);
 
+      /* Step 2 asks the child first; what the week SHOWS is evidence under her
+         own answer, and it ships folded because the screen has a word budget.
+         Open it, and hold the same invariants the wins list was holding. */
       mmGoToWeek(wk); mmGoStep(2);
+      mnySetMeetKid(kid);
+      reflEvidenceOpen = true; reflTab = 'doingWell';
+      renderMeetingMode();
       const body = document.getElementById('familyMeetingBody').textContent.replace(/\s+/g, ' ');
-      if (!/1\/1 routine kept/.test(body)) bad.push(`routines are not counted from the checklists: "${body.slice(0, 200)}"`);
-      if (!/1 chore checked off by a grown-up/.test(body)) bad.push('a graded chore is not celebrated');
+      if (!/kept all 1 of your routines|kept 1 of 1 routines/.test(body)) {
+        bad.push(`routines are not counted from the checklists: "${body.slice(0, 240)}"`);
+      }
+      if (!/1 family chore checked off by a grown-up/.test(body)) bad.push('a graded chore is not celebrated');
       if (!/planned hours completed/.test(body)) bad.push('the hours are not read from the shared computation');
       // The preliminary figure must never be worded as though it were recorded.
       if (/\$[\d.]+ recorded/.test(body)) bad.push('an unsettled week claims money was recorded');
 
       /* And the retired store must not be able to bring it back to life: fill
-         optionalByWeek and the celebration must not change. */
+         optionalByWeek and the evidence must not change. */
       const withoutLegacy = body;
       ctSetOptional(wk, 2, kid, 'dishes', true);
-      mmGoStep(2);
+      renderMeetingMode();
       const after = document.getElementById('familyMeetingBody').textContent.replace(/\s+/g, ' ');
-      if (after !== withoutLegacy) bad.push('the celebration still reads the retired chore-group store');
+      if (after !== withoutLegacy) bad.push('the evidence still reads the retired chore-group store');
       closeSheet('familyMeetingOverlay');
     } finally {
       keys.forEach((k, i) => setDayBlocks(k, before[i], kid));
