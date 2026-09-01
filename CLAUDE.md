@@ -248,6 +248,21 @@ Quest Board screen itself. If you find yourself adding a fifth place that lists
 today's blocks with ticks beside them, that is the mistake, and Today is the
 place that already does it.
 
+**The week has two tabs, and only one of them is a week you can plan.** Full is
+what the screen opens on: the cards, the quick-complete `.wf-card-check` ticks,
+the planning controls and the three banners — including the offer to add missing
+School Day cards, which is a mutation and so can only live there. The second tab
+is a read-only preview of the printed sheet, and it is a second **host** for
+`renderPrintSheet` (`js/16-print.js`), never a second copy of it: that function
+takes `(host, { weekOffset, profile, window })` and sets `--print-slot` on the
+host, because two live copies on one page would otherwise fight over one element
+and one variable. `setWeekView` folds any unknown value into `'full'`, so a stale
+`'timegrid'` lands somewhere you can plan.
+
+Day Blocks was the third rendering and was the default, which is the only reason
+replacing it needed a default flip: landing on a read-only surface is worse than
+the problem the preview solves.
+
 That is why the day ribbon **taps through to `screen-day`** rather than unfolding
 a copy of the day under itself. It is drawn to scale — cell widths proportional to
 duration, gaps as real empty space, one now-marker — because equal squares said
@@ -272,9 +287,10 @@ those owners now. A block is **numbered only when the same thing repeats within
 that day** — one Homework stays "Homework", five become Block 1…5 — and numbered
 by `startMin`, never by the order a caller holds them in: Today sorts by
 `tdActionableStart` and the day view lays out by position, so a number that
-followed either would point at a different block on the two screens. The week
-grid is deliberately excluded: `tg2ShortLabel` compresses to seven characters on
-purpose and "Block 2" cannot live there. **Meals are the one exception**: they used
+followed either would point at a different block on the two screens. (The week
+grid used to be excluded, because `tg2ShortLabel` compressed to seven characters
+and "Block 2" could not live there. Both went with the Day Blocks layout.)
+**Meals are the one exception**: they used
 to render as a bare `🍳`/`🥗`/`🍽` beside the block's own icon, so a cell said the
 same glyph twice and named nothing. Words win — the budget exists to stop a typed
 competition name being crammed in, not to stop a meal being readable.
@@ -329,23 +345,35 @@ a 10pm block were clipped, and taps measured 2px off what was drawn
 (`getBoundingClientRect` reports the border box). The stacking context is what
 stops `.placed-block` (z10) painting over the sticky header and gutter.
 
-**One owner for the :00 / :30 grid, drawn in two layers.** `buildHourGrid`
-(`js/05-helpers.js`) takes `layer: 'lines' | 'ticks'` and each surface appends
-both. **Half-hour rules go BEHIND the cards; hour marks and the now-line stay
-above.** It used to be one layer appended last so every mark read *through* a
-placed block, which is right on an empty morning and wrong the moment a day is
-planned — a full afternoon came out hatched with rules drawn over the top of the
-things they were meant to help you place. "Where is four o'clock" is still a
-question a card must not be able to hide, which is why the hour marks did not
-move. Both layers are appended after the blocks, so `.hour-grid--behind` earns
-its place with a z-index rather than DOM order — `theHourGridReadsThroughABlock`
-asserts each side separately, because a stacking value that silently stopped
-applying is exactly the failure that would otherwise look fine.
+**No rule is drawn across a card.** Print reads well because its rules are the
+borders of 15-minute cells: a block sits on top of them, so a line cannot cross
+its text. Both schedule surfaces follow that now — **every full-width rule goes
+BEHIND the cards**, and the only thing drawn over one is the short hour mark at
+the gutter edge, because "where is four o'clock" is a question a card must not be
+able to hide. The rule and that mark used to be ONE element with the mark as its
+`::before`, which is why the hour could not go behind without taking its own
+answer with it.
 
-Takes no pointer events. The Day Blocks lane used to carry a decorative 24px
-`repeating-linear-gradient` which at 0.85px/min is neither an hour (51px) nor a
-half-hour (25.5px), and drifted out of step with its own gutter labels from the
-first hour onwards.
+**Two surfaces, two builders, because they are drawn at different scales.**
+`buildSlotGrid` (`js/05-helpers.js`) is Print's mechanism — real 15-minute rows —
+and the **day view** takes it whole: at 1.4px/min a row is 21px and 64 of them
+tile its 1344px canvas exactly. `grid-template-rows: repeat(n, 1fr)` rather than a
+pixel height hands subpixel distribution to the layout engine, so boundaries land
+where the absolutely-positioned blocks expect them.
+`buildHourGrid` still serves the **Full week** at the 30-minute interval, with
+`layer: 'lines'` the rules (behind) and `layer: 'ticks'` the marks (above): at
+0.72px/min a 15-minute row is under 11px, and four rules an hour read as hatching
+rather than as a scale. Do not "unify" these — the split IS the decision.
+
+Blocks, drag arithmetic, `renderBlocksWithCollision`, the buffers and the now-line
+know nothing about any of it; only the background changed. Both layers are
+appended after the blocks, so the behind layer earns its place with a z-index
+rather than DOM order — `noRuleIsDrawnAcrossACard` asserts each side separately,
+because a stacking value that silently stopped applying is exactly the failure
+that would otherwise look fine, and `theHourLadderLinesUpWithTheSchedule` measures
+the gutter label against the row boundary at 1, 2 and 3 columns.
+
+Takes no pointer events.
 
 **The activity rail is gone.** Placement goes through the picker that opens where
 you tap (`openSlotPicker`) — the interaction that was already doing the work.
@@ -426,6 +454,7 @@ that already owned that write. Ask it; do not re-derive it.
 | How did the week's hours go? | `getWeeklyHours(kid, weekKey)` |
 | Did her money move as she decided? | `isChildMoneyCommitted(kid, weekKey)` |
 | Is the week closed? | `isWeekClosed(weekKey)` |
+| Can this day be reviewed yet? | `canReviewDay(kid, dayKey)` |
 
 It loads at `36`, last of the declaration files, because it calls into `01`–`35`
 at runtime and none of them at load time. `99-main.js` still owns every line of
@@ -442,6 +471,20 @@ so unticking could never take anything back. `routineItemsFor` is the one item
 list, counted by id, per child. `ctSyncMandatoryFromRoutine` sets **and clears**
 — but only clears a mark the app itself made, because a parent's tick in the
 meeting is her assertion and a child unticking must not overrule it.
+
+**A day cannot be reviewed before it has happened.** `canReviewDay` is the one
+decision, asked by the parent day banner, the meeting's step 1 rows (and its
+Both control) and `canCloseWeek` — which no longer counts a day that has not
+arrived as a day somebody failed to review. Two holes it closed: eligibility
+asked whether a block had **started**, so a swim still running counted as
+something to sign off, and `dayBlocksEligibleToConfirm` measures
+`startMin + durationMin` now; and a day with **no blocks** passed every check
+trivially, so a Thursday three weeks out could be marked reviewed. An empty past
+day stays reviewable — a quiet Sunday is a real answer — but says "nothing was
+recorded" out loud first. `reviewBlockedReason` is the sentence a refused control
+says: it could previously only ever be "Confirm the blocks first", so a day
+refused for not having happened told a parent to confirm blocks that did not
+exist.
 
 **Confirming is not completing, and neither is reviewing.** A parent may confirm
 an unfinished routine and it must not start reading as finished. `confirmAllBlocksForChild`
@@ -472,7 +515,13 @@ There were **six** copies of a label table before this, already disagreeing:
 `cat:'daily'` held breakfast, lunch, dinner, the house chore, four Family Hero
 tasks and two health tasks, and rendered as "🧹 Chores" on two screens and "🍽
 Daily" on three. Family Hero **is** a chore — whoever did the chore is the hero —
-so those carry an explicit `group:'chores'`. An activity nothing can resolve is
+so those carry an explicit `group:'chores'`. That is also why they are **not
+rewards**: the four `REWARD_POOLS.family` activities used to carry
+`rewardLocked: true`, so the thing a child had to earn was the right to help at
+home. They are ordinary available activities now, ids unchanged so every
+historical block still resolves; the other three pools are still earned. The
+first-run tutorial went with the lock, because its entire content was picking one
+of those chores as an unlocked "starter". An activity nothing can resolve is
 filed under Daily, never dropped: an hours total that silently omits blocks is
 worse than one that files them vaguely.
 
@@ -571,7 +620,7 @@ background colour and can be found at a glance. Keep the whole thing scannable.
 New user-created Claude skills for this ecosystem use the `HZ-` prefix
 (e.g. `HZ-web-app-audit`). Repo files, CSS classes and JS functions keep the
 existing conventions: `ct*` for chore-tracker functions, `mny*` for money,
-`tg2-*` for the current Day Blocks grid.
+`wf-*` for the Full week grid, `wpp-*` for the week's print preview.
 
 ## The parent portal is five destinations
 
@@ -763,20 +812,30 @@ constants directly.** Three accessors in `js/05-helpers.js` decide which wins:
 the only way to ask — never by checking the day of the week: a Tuesday in July
 is not a school day, and neither is a PD day.
 
+**Changing the hours reconciles the cards already placed.** `schoolHours()` drives
+the bands and any NEW School Day card, so moving it used to leave every card
+already on the calendar at the old time — the app disagreeing with itself, visible
+only by opening each week. `paSaveSchoolHours` (`js/33-parent-app.js`) previews
+first and offers three answers. `paSchoolCardPlan` decides and **reads only**, so
+the preview is literally what `paSchoolCardPlan`'s companion will do. A completed
+or confirmed card never moves, a past day is not touched, only `startMin` and
+`durationMin` change, and a clash is reported rather than resolved. The sweep ends
+in **one** `saveAll()` — `setDayBlocks` saves on every call, so reconciling
+fourteen cards through it would upload the whole family document fourteen times.
+
 `SCHOOL_TEMPLATE` is now **`schoolTemplate()`**, and the change is load-bearing:
 a top-level `const` is evaluated when `js/01-config.js` runs, so it can only ever
 see the shipped fallback. Anything that wants the school-day shape has to ask at
 the moment it needs it.
 
 **Every surface draws the day from `dayZoneSegments`** (`js/08-day-view.js`) — the
-day view, both week layouts and the print sheet. It had one caller for a long
-time while the others carried their own copies: the Full week and print each
-hardcoded school at 9am–3pm, an hour later than `SCHOOL_HOURS`, selected by
+day view, the Full week and the print sheet. It had one caller for a long time
+while the others carried their own copies: the Full week and print each hardcoded
+school at 9am–3pm, an hour later than `SCHOOL_HOURS`, selected by
 `dow === 0 || dow === 6`, so Christmas Day, every PD day and every day of July
-drew a "🏫 School" band. Day Blocks — the layout the week actually opens on —
-drew nothing school-related at all. The two vertical axes (the Full week's
-sideband, the print sheet's) describe seven days with one column, so they
-describe the week's **first school day** and say so plainly when a week has none.
+drew a "🏫 School" band. The two vertical axes (the Full week's sideband, the
+print sheet's) describe seven days with one column, so they describe the week's
+**first school day** and say so plainly when a week has none.
 
 **School days are offered, never assumed — but offered whenever they are
 missing.** The band and the card are different things and neither replaces the

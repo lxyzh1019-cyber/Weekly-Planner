@@ -28,7 +28,38 @@ per the house convention for plans in this repo.
 
 ```diff
 + rev A (2026-08-31) — first reviewed version. Establishes the baseline.
++ rev B (2026-09-01) — Release 1.1a/b/c landed. Notes below record what the
++   build found that the plan did not predict; Release 2 is unchanged.
 ```
+
+## What the build found that this plan did not predict
+
+Four things surfaced during 1.1 that were not in rev A. They are recorded here
+because a plan that is only ever right is a plan nobody checked.
+
+**The meeting's scroller move broke a fourth caller, not three.**
+`mmCaptureUiState` held the scroller *element* across a re-render. `.sheet`
+survives `host.innerHTML = ...`; `.mm-body` does not, because it is inside the
+host being replaced — so `restore()` was setting `scrollTop` on a detached node
+and every tap in steps 3 and 4 silently jumped to the top of the panel. The new
+assertion found it, not a person.
+
+**Removing the tutorial left two live call sites that every static check
+passed.** `node --check` and `check-globals` were both green while
+`offerTutorialIfNeeded` was still being called from `openDay` and `showScreen`.
+Only the smoke test caught it. A runtime reference in a file that parses is
+invisible to both guards.
+
+**Flipping the week default exposed an unmeasured word budget.** The audit had
+been rendering Day Blocks, so the Full week had never been held to the 200 at
+all, and measured 242. Most came out as duplicative copy; what remains sits on
+the seeded row and is the seeded blocks' own names, which are the plan rather
+than chrome. That row carries its own recorded number.
+
+**The screenshot pass earned its place.** Every check was green when the week's
+coach tip still sent a child to "My free time" in Day Blocks — a retired tab and
+a panel whose markup had already gone. Nothing that asserts layering can catch
+stale copy.
 
 ## Decisions taken
 
