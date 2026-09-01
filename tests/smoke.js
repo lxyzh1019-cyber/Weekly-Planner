@@ -8515,6 +8515,63 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* STEP 5 SHOWS THE WHOLE WEEK BEFORE IT CLOSES IT.
+     Closing is the confirmation the old workflow never had, and it was offered
+     against a gate whose reasons a parent could not see. The summary is the
+     last place in the sitting where both children's weeks are visible at once —
+     days reviewed, reflection, money, and the action each child carries
+     forward — and it OWNS none of them: every figure is read through the
+     accessor that already answers that question. A day that has not happened is
+     not counted against her. */
+  checks.closingAWeekShowsWhatItStandsAt = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+    const hadRefl = JSON.parse(JSON.stringify(state.shared.chore.reflections || {}));
+    try {
+      state.shared.chore.reflections = { [wk]: { jenn: Object.assign(reflBlank(), {
+        doingWell: { answerIds: ['finished'], evidenceIds: [], customNote: '', inputMode: 'spoken' },
+        needsWork: { answerId: 'rushed', evidenceIds: [], customNote: '', controllableText: 'slow down',
+                     needsHelpFindingControl: false, parentObservation: '', inputMode: 'spoken' },
+        planNext: Object.assign(reflBlank().planNext, { actionId: 'timer' }),
+      }) } };
+      mmGoToWeek(wk); mmGoStep(5); renderMeetingMode();
+      const host = document.getElementById('familyMeetingBody');
+      const txt = host.textContent.replace(/\s+/g, ' ');
+
+      if (!/Days reviewed/.test(txt)) bad.push('the summary does not say how many days were reviewed');
+      if (!/Reflection/.test(txt)) bad.push('the summary does not say where the reflection stands');
+      if (!/Money/.test(txt)) bad.push('the summary does not say whether the money moved');
+      // A finished reflection carries its action forward by name.
+      if (!/Use a timer/.test(txt)) bad.push('the action she chose is not carried into the close');
+      if (!/complete/.test(txt)) bad.push("a finished reflection does not read as complete");
+      // Jess answered nothing; hers must read as unfinished rather than absent.
+      if (!/0\/3|—/.test(txt)) bad.push("an unanswered reflection is not shown as unfinished");
+
+      /* Only days that could be reviewed count. Seeding a future-heavy week
+         must not make the denominator the whole seven regardless. */
+      const kids = host.querySelectorAll('.mm-close-kid');
+      if (kids.length !== 2) bad.push(`the summary shows ${kids.length} children`);
+      // No space: the label and the figure are two spans in one row.
+      const denom = (txt.match(/Days reviewed\s*(\d+)\/(\d+)/) || [])[2];
+      const due = mrWeekDayKeys(wk).filter(k => {
+        const can = canReviewDay('jenn', k);
+        return !(can.reason === 'future' || can.reason === 'running');
+      }).length;
+      if (Number(denom) !== due) bad.push(`the summary counts ${denom} reviewable days, canReviewDay says ${due}`);
+
+      // Copying a plan forward is still not offered here.
+      if (/Copy this week/i.test(txt)) bad.push('step 5 offers to copy the week again');
+    } finally {
+      state.shared.chore.reflections = hadRefl;
+      closeSheet('familyMeetingOverlay');
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
   /* THE WEEKLY REFLECTION IS THE CHILD'S ANSWER, NOT THE APP'S.
      Step 2 used to show a list the app had written about her. She answers now:
      what went well, what problem she noticed, what she will do next time — in

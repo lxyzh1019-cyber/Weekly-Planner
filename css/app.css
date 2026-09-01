@@ -1494,6 +1494,23 @@
      control has a 44px hit area, nothing under 13px, and the evidence ships
      folded because three tabs of eight answers is well past the 200 visible
      words a child's screen gets. */
+  /* Step 5's two-child summary: the last place in the sitting where the whole
+     week is visible at once. */
+  .mm-close-sum { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+  .mm-close-kid {
+    flex: 1 1 180px; min-width: 0;
+    border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px;
+    background: var(--paper);
+  }
+  .mm-close-name { font-weight: 700; margin-bottom: 4px; }
+  .mm-close-row {
+    display: flex; justify-content: space-between; gap: 8px;
+    font-size: calc(0.9rem * var(--fs-scale, 1)); padding: 1px 0;
+  }
+  .mm-close-action {
+    margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--paper-line);
+    font-size: calc(0.9rem * var(--fs-scale, 1));
+  }
   .refl-kids { display: flex; gap: 8px; margin-bottom: 10px; }
   .refl-kid {
     flex: 1; min-height: 44px;

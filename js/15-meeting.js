@@ -1328,6 +1328,42 @@ function mmWeekPosition(wk) {
 }
 
 /* Step 5 — what this week can still have done to it. */
+/* ── What the week actually stands at, per child ──────────────────
+   Four facts, each read through whichever accessor already owns it: days
+   reviewed (isDayReviewed, with canReviewDay deciding which days could even
+   count), the reflection (reflGet), the money (mmKidSettled), and the action
+   she chose to carry forward. This owns none of them and decides nothing — it
+   is the last place in the sitting where a parent can see the whole week, and a
+   second opinion about any of these numbers is the thing the status vocabulary
+   exists to prevent. */
+function mmCloseSummary(wk) {
+  const keys = mrWeekDayKeys(wk);
+  return `<div class="mm-close-sum">${['jenn', 'jess'].map(kid => {
+    const name = kid === 'jenn' ? 'Jenn' : 'Jess';
+    /* Only days that COULD be reviewed count against her — a day that has not
+       happened is not a day anybody failed to review. */
+    const due = keys.filter(k => {
+      const can = canReviewDay(kid, k);
+      return !(can.reason === 'future' || can.reason === 'running');
+    });
+    const reviewed = due.filter(k => isDayReviewed(kid, k)).length;
+    const rec = (typeof reflGet === 'function') ? reflGet(wk, kid) : null;
+    const refl = !rec ? '—'
+      : reflIsComplete(rec) ? '✅ complete'
+      : reflIsSkipped(rec) ? '⏭ skipped'
+      : `${reflDoneCount(rec)}/3`;
+    const money = mmKidSettled(wk, kid);
+    const action = (rec && typeof reflActionText === 'function') ? reflActionText(rec) : '';
+    return `<div class="mm-close-kid">
+        <div class="mm-close-name">${CT_PROFILE_ICON[kid]} ${escapeHtml(name)}</div>
+        <div class="mm-close-row"><span>Days reviewed</span><span>${reviewed}/${due.length}</span></div>
+        <div class="mm-close-row"><span>Reflection</span><span>${refl}</span></div>
+        <div class="mm-close-row"><span>Money</span><span>${money.decided ? '✅ settled' : (money.agreed ? 'agreed, not settled' : 'not agreed')}</span></div>
+        ${action ? `<div class="mm-close-action"><b>Next week:</b> ${escapeHtml(action)}</div>` : ''}
+      </div>`;
+  }).join('')}</div>`;
+}
+
 function mmRenderPlan(wk) {
   const pos = mmWeekPosition(wk);
   const strip = mmSettledStrip(wk);
@@ -1349,6 +1385,7 @@ function mmRenderPlan(wk) {
     const go = unsettled[0];
     return `${strip}
       <div class="mm-h">Finish reviewing this week</div>
+      ${mmCloseSummary(wk)}
       <div class="ct-meta">${escapeHtml(mmWeekLabel(wk))} has already been and gone, so there is nothing to plan forward from it. Finish what it still owes, then come back to the present.</div>
       ${go
         ? `<button type="button" class="btn-confirm" onclick="mnySetMeetKid('${escapeJsAttr(go.kid)}');mmGoStep(${go.agreed ? 4 : 3})">Finish ${escapeHtml(go.name)}'s week ▶</button>`
@@ -1376,6 +1413,7 @@ function mmRenderPlan(wk) {
   }
   return `${strip}
     <div class="mm-h">Close the week</div>
+    ${mmCloseSummary(wk)}
     <div class="ct-meta">Closing records that both girls' days were reviewed and the money was settled. It is a separate fact from "we met" and from "the money moved".</div>
     ${closeBtn}
     <div class="mm-h mm-h-sub">Next week</div>
