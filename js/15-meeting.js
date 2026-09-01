@@ -1360,9 +1360,13 @@ function mmCloseSummary(wk) {
     const due = keys.filter(k => canReviewDay(kid, k).reason !== 'future');
     const reviewed = due.filter(k => isDayReviewed(kid, k)).length;
     const rec = (typeof reflGet === 'function') ? reflGet(wk, kid) : null;
+    /* Complete is no longer the end of the story: closing the week now needs
+       the conversation to have been recorded, so a finished reflection nobody
+       has ticked has to say which of the two it is waiting on. */
     const refl = !rec ? '—'
-      : reflIsComplete(rec) ? '✅ complete'
       : reflIsSkipped(rec) ? '⏭ skipped'
+      : reflIsComplete(rec) ? (rec.parentReviewedAt
+          ? '✅ complete' : '✅ complete · conversation not confirmed')
       : `${reflDoneCount(rec)}/3`;
     const money = mmKidSettled(wk, kid);
     const action = (rec && typeof reflActionText === 'function') ? reflActionText(rec) : '';
@@ -1438,6 +1442,7 @@ function mmRenderPlan(wk) {
       const who = m.kid === 'jenn' ? 'Jenn' : 'Jess';
       if (m.reason === 'days') return `${who} has ${m.n} day${m.n === 1 ? '' : 's'} still to review`;
       if (m.reason === 'reflection') return `${who}'s reflection is not finished or skipped`;
+      if (m.reason === 'reflection-talk') return `nobody has recorded talking through ${who}'s reflection`;
       return `${who}'s money is not settled yet`;
     }).join(' · ');
     closeBtn = `<button type="button" class="btn-confirm" disabled>🔒 Close the week</button>
@@ -1453,10 +1458,35 @@ function mmRenderPlan(wk) {
     <button type="button" class="pill-btn" onclick="mmOpenNextWeek()">Open next week ▶</button>`;
 }
 
-function mmCloseWeekNow() {
+/* Which days of this week are still ahead, named. Empty on the last day, so the
+   ordinary Sunday-afternoon meeting is never asked to justify itself. Named by
+   POSITION in the week rather than by parsing the key — mrWeekDayKeys is already
+   Monday-first, which is the order DAY_LONG is written in. */
+function mmDaysStillAhead(wk) {
+  const keys = mrWeekDayKeys(wk);
+  const today = todayKey();
+  return keys.map((k, i) => ({ key: k, name: DAY_LONG[i] })).filter(d => d.key > today);
+}
+
+async function mmCloseWeekNow() {
   const wk = mmWeekKey();
   const gate = canCloseWeek(wk);
   if (!gate.ok) { showToast('Both girls need reviewing and settling first'); return; }
+  /* Every elapsed day being reviewed is not the same as the week being over —
+     with today signed off through "nothing else today", a Tuesday can satisfy
+     the gate. Closing is reversible and does not touch the money, so this asks
+     rather than refuses; it names the days still to come, because "Close the
+     week" on a Wednesday does not sound like what it does. */
+  const ahead = mmDaysStillAhead(wk);
+  if (ahead.length) {
+    const span = ahead.length === 1
+      ? ahead[0].name : `${ahead[0].name} to ${ahead[ahead.length - 1].name}`;
+    const ok = await showConfirm(
+      `The week is still in progress — ${span} ${ahead.length === 1 ? 'has' : 'have'} not happened yet.\n\n`
+      + `Closing it records the week as reviewed and locks both reflections. You can reopen it.\n\nClose it early?`,
+      { okLabel: 'Close it early', cancelLabel: 'Not yet' });
+    if (!ok) return;
+  }
   setWeekClosed(wk, true);
   saveAll();
   renderMeetingMode();

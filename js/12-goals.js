@@ -220,13 +220,38 @@ function addGoal() {
 }
 
 
+/* ── Which activity did somebody actually CHOOSE for this? ────────
+   addAchievement used to seed getAllActivities()[0], and DEFAULT_ACTIVITIES[0]
+   is Breakfast, so every achievement ever added arrived reading
+   "🍳 Breakfast · count target 1". New ones start unassigned (see below), but
+   the records already written were never corrected, and they still read as a
+   decision somebody made.
+
+   The seeded shape is identifiable exactly: the old creator wrote `createdAt`
+   and never `updatedAt`, while every edit path — setAchievementActivity,
+   setAchievementMode, setAchievementTarget — goes through markItemUpdated. So
+   an activityId on a record with no updatedAt can ONLY have come from the
+   seeder. A parent who genuinely picked Breakfast stamped updatedAt in doing
+   so, and is left alone.
+
+   DERIVED, never migrated, for the reason CLAUDE.md gives for xp2: `achievements`
+   is an array, deepMergeObj treats an array as a scalar, and a device still
+   serving an old bundle could push the un-cleaned array back over a cleaned one.
+   Answering the question at read time gives the same answer whatever has run,
+   however often, in any merge order — and writes nothing. */
+function achievementActivityId(a) {
+  if (!a || !a.activityId) return null;
+  return a.updatedAt ? a.activityId : null;
+}
+
 function progressForAchievement(a) {
   // No activity linked yet, so there is no progress to report — not zero of one,
   // which reads as "you have done none of the thing you never picked".
-  if (!a.activityId) return null;
+  const actId = achievementActivityId(a);
+  if (!actId) return null;
   const keys = getDayKeys(weekOffset);
   const blocks = keys.flatMap(k=>getDayBlocks(k));
-  const linked = blocks.filter(b=>b.actId===a.activityId && isBlockCompleted(b));
+  const linked = blocks.filter(b=>b.actId===actId && isBlockCompleted(b));
   if (a.mode==='duration') {
     const value = linked.reduce((sum,b)=>sum+(b.durationMin||0),0);
     return { value, label: formatDuration(value) };
@@ -239,7 +264,7 @@ function buildAchievementRow(a) {
   const row = document.createElement('div');
   row.className = 'gt-item gt-achievement-row';
   const acts = getAllActivities(activeProfile(), { includeArchived: true });
-  const act = acts.find(x=>x.id===a.activityId);
+  const act = acts.find(x=>x.id===achievementActivityId(a));
   const prog = progressForAchievement(a);
   const targetVal = Math.max(1, a.target||1);
   const targetLabel = a.mode==='duration' ? formatDuration(targetVal) : String(targetVal);
