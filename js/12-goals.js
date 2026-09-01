@@ -47,7 +47,7 @@ function renderGoalsTodos() {
   if (!goalsList) return;
   goalsList.innerHTML = '';
   if (!p.goals.length) {
-    goalsList.innerHTML = '<div class="gt-empty">No goals yet. Tap ＋ to add one.</div>';
+    goalsList.innerHTML = '<div class="gt-empty">Nothing here yet.</div>';
   } else {
     p.goals.forEach(g => goalsList.appendChild(buildGoalRow(g)));
   }
@@ -58,7 +58,7 @@ function renderGoalsTodos() {
   todosList.innerHTML = '';
   const weekTodos = p.todos.filter(t => t.weekKey === wk);
   if (!weekTodos.length) {
-    todosList.innerHTML = '<div class="gt-empty">Nothing yet. Tap ＋ to add a to-do.</div>';
+    todosList.innerHTML = '<div class="gt-empty">Nothing here yet.</div>';
   } else {
     weekTodos.forEach(t => todosList.appendChild(buildTodoRow(t)));
   }
@@ -67,7 +67,7 @@ function renderGoalsTodos() {
   if (!achList) return;
   achList.innerHTML = '';
   if (!p.achievements.length) {
-    achList.innerHTML = '<div class="gt-empty">No achievements yet. Tap ＋ to add one.</div>';
+    achList.innerHTML = '<div class="gt-empty">Nothing here yet.</div>';
   } else {
     p.achievements.forEach(a => achList.appendChild(buildAchievementRow(a)));
   }

@@ -40,7 +40,11 @@ let timelinePlacementGuideEl = null;
 let pendingStartMin = null;
 let editingBlockId = null;
 let syncDayIdx = 0;
-let weekView = 'timegrid';   // Day Blocks is the front page of the week
+/* 'full' | 'preview'. The Full layout is the front page of the week: it is the
+   one you can plan and tick in. 'timegrid' — Day Blocks — was the default and
+   is retired; setWeekView folds any other value into 'full' rather than leaving
+   the screen on a container that no longer exists. */
+let weekView = 'full';
 /* currentZone lived here, for the morning/afternoon/evening day filters.
    Those are gone and the day is always shown whole — see js/08-day-view.js. */
 /* currentTrayFilter lived here, for the activity rail's category chips. The

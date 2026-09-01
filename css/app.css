@@ -766,89 +766,24 @@
      the rest never chained to the page — so nothing under the grid could be
      reached by scrolling over it. The page is the only scroller now and the
      grid renders at its natural height. */
-  #weekTimeGrid { flex-direction: column; }
   /* While middle-dragging, the grab cursor and a text-selection block, so a
      pan across a week of cards doesn't leave everything highlighted. */
   .is-mid-panning { cursor: grabbing; user-select: none; }
-  .tg2-wrap { padding: 0.2rem 0.6rem 0.4rem; }
-  .tg2-subtitle { text-align: center; color: var(--ink-light); font-size: calc(0.85rem * var(--fs-scale, 1)); font-style: italic; margin: 0 0 0.5rem; }
-  .tg2-grid {
-    display: grid;
-    /* Wide enough for a 13px hour label. The gutter grew with the type rather
-       than letting "12p" collide with "1p" — same fix .wf-gutter-hour carries. */
-    grid-template-columns: 34px repeat(7, 1fr);
-    gap: 3px;
-    align-items: start;
-  }
-  .tg2-corner { }
   /* Every figure on this grid is at or above the 13px kid floor. They were
      9.6–12.5px, and the smoke sweep never saw it: it renders #screen-week on a
      week the earlier checks had already emptied, so there were no blocks to
      measure. The sweep now seeds a day and switches to this view. */
-  .tg2-head {
-    font-weight: 800; font-size: max(13px, calc(0.85rem * var(--fs-scale, 1))); text-align: center;
-    padding: 3px 1px; color: var(--ink);
-    border-bottom: 2px solid var(--ink);
-    cursor: pointer; border-radius: 6px 6px 0 0;
-  }
-  .tg2-head.today { background: #fff4db; }
-  .tg2-head small { display: block; font-size: max(13px, calc(0.82rem * var(--fs-scale, 1))); color: var(--ink-light); font-weight: 700; }
-  .tg2-gutter { position: relative; }
-  .tg2-gutter-hour {
-    position: absolute; right: 2px; transform: translateY(-50%);
-    font-size: max(13px, calc(0.82rem * var(--fs-scale, 1))); color: var(--ink-light); font-weight: 700; white-space: nowrap;
-  }
   /* Free time = plain lined paper, so an empty day genuinely looks empty. */
-  .tg2-lane {
-    position: relative;
-    /* Own stacking context — same reason as .wf-day-col and .tl-canvas. */
-    z-index: 0;
-    background: var(--paper, #fffdf5);
-    border: 1.5px solid rgba(42,35,32,0.18);
-    border-radius: 7px;
-    /* The 24px repeating gradient that lived here matched neither the hour
-       (51px) nor the half-hour (25.5px) at this view's 0.85px/min, so it read
-       as a time grid while naming no time. .hour-grid draws the real one. */
-    overflow: hidden;
-  }
   /* The school-day tint, behind the travel strips (1) and the cards (2). */
-  .tg2-band { position: absolute; left: 0; right: 0; z-index: 0; pointer-events: none; opacity: 0.5; }
-  .tg2-lane.today { border-color: #2f8f84; box-shadow: 0 0 0 1.5px rgba(47,143,132,0.35); }
-  .tg2-block {
-    /* Above the travel/get-ready strips (.wf-travel is z-index 1), which are
-       drawn first and are context for the block, not a peer of it. */
-    z-index: 2;
-    position: absolute; left: 2px; right: 2px;
-    border-radius: 5px; border: 1.5px solid var(--ink);
-    color: #fff; font-size: max(13px, calc(0.82rem * var(--fs-scale, 1))); font-weight: 800; line-height: 1.1;
-    padding: 1px 3px; overflow: hidden; cursor: pointer;
-    display: flex; align-items: center; gap: 2px;
-    box-shadow: 1px 1px 0 rgba(42,35,32,0.25);
-    text-shadow: 0 1px 1px rgba(0,0,0,0.22);
-  }
-  .tg2-block.light-bg { color: var(--ink); text-shadow: none; }
-  .tg2-block--done { opacity: 0.55; }
-  .tg2-block--conflict { outline: 2.5px solid #d6453a; outline-offset: 1px; overflow: visible; z-index: 5; }
   /* TWO THRESHOLDS, TWO QUESTIONS — the same split CLAUDE.md draws between
      BLOCK_TIERS and BLOCK_STACK_MIN on the day screen, applied here.
      TG2_LABEL_MIN_H answers "is there room for a 13px line", and the answer for
      a short block is the icon on its own, never type shrunk under the floor.
      The full name is on the block's title attribute either way. */
-  .tg2-block--tiny { justify-content: center; padding: 0 1px; }
-  .tg2-block--tiny .tg2-block-lbl { display: none; }
-  .tg2-block-flag {
-    position: absolute; top: -7px; left: -7px; z-index: 6;
-    width: 18px; height: 18px; border-radius: 50%;
-    background: #d6453a; color: #fff; font-size: max(13px, calc(0.82rem * var(--fs-scale, 1))); line-height: 18px; text-align: center;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.35);
-  }
-  .tg2-block-lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* A phone gets a tighter gutter and tighter padding, never smaller type: the
      13px floor is the floor everywhere, and this override used to drop the
      block label to 8.8px. */
   @media (max-width: 640px) {
-    .tg2-grid { grid-template-columns: 30px repeat(7, 1fr); gap: 2px; }
-    .tg2-block { padding: 1px 2px; }
   }
 
   /* ── INVERTED MODE (default) ──
@@ -1633,6 +1568,43 @@
      `overscroll-behavior: contain` is gone though: it stopped a wheel that
      reached the bottom of the cards from carrying on down the page. */
   .weekly-full-wrap { padding: 0.5rem; overflow: auto; flex: 1; min-height: 0; padding-bottom: 0.5rem; }
+  /* ── The print preview tab ────────────────────────────────────────
+     The same sheet the Print button produces, at the same 15-minute row grid,
+     shown read-only inside the week screen. It borrows the print styles rather
+     than restating them — .print-week-grid and everything under it are the
+     print sheet's own rules — so what a parent sees here and what comes out of
+     the printer cannot drift.
+
+     One scroller, like .weekly-full-wrap beside it: the sheet is wider than a
+     phone and taller than the pane, and a second scroller inside would mean a
+     flick on an iPad moves the wrong one. */
+  #weekPrintPreview { flex: 1; min-height: 0; }
+  .wpp-wrap {
+    padding: 0.5rem;
+    overflow: auto;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    width: 100%;
+  }
+  .wpp-note {
+    margin: 0;
+    font-size: calc(0.86rem * var(--fs-scale, 1));
+    color: var(--ink);
+    opacity: 0.75;
+  }
+  /* On screen the sheet is paper: a white page with the week on it. In print
+     the .print-sheet rules take over and this pane is not rendered at all. */
+  .wpp-sheet {
+    background: #fff;
+    border: 2px solid var(--ink);
+    border-radius: 10px;
+    box-shadow: 2px 2px 0 rgba(42,35,32,0.14);
+    padding: 0.6rem;
+    min-width: 720px;
+  }
   /* On phones the 7 columns would be too thin to read, so give them a
      floor and let this one view scroll instead of squishing. */
   @media (max-width: 600px) { .weekly-full { min-width: 560px; } }

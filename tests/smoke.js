@@ -179,17 +179,28 @@ function findChromium() {
      containers — only setWeekView does — so if the state default and the markup
      drift apart, the week boots showing one layout while rendering into another,
      and nothing else in this suite would notice. */
-  checks.weekOpensOnDayBlocks = await page.evaluate(() => {
+  checks.weekOpensOnTheLayoutYouCanPlanIn = await page.evaluate(() => {
     const bad = [];
-    if (weekView !== 'timegrid') bad.push(`default weekView is '${weekView}', expected 'timegrid'`);
-    if (getComputedStyle(document.getElementById('weekTimeGrid')).display === 'none')
-      bad.push('index.html hides #weekTimeGrid, which the default weekView selects');
-    if (getComputedStyle(document.getElementById('weekFull')).display !== 'none')
-      bad.push('index.html leaves #weekFull visible too');
-    if (!document.getElementById('viewTabTimeGrid').classList.contains('active'))
-      bad.push('the Day Blocks tab is not marked active in index.html');
-    if (document.getElementById('viewTabFull').classList.contains('active'))
-      bad.push('the Full tab is still marked active in index.html');
+    if (weekView !== 'full') bad.push(`default weekView is '${weekView}', expected 'full'`);
+    if (getComputedStyle(document.getElementById('weekFull')).display === 'none') {
+      bad.push('index.html hides #weekFull, which the default weekView selects');
+    }
+    if (getComputedStyle(document.getElementById('weekPrintPreview')).display !== 'none') {
+      bad.push('index.html leaves the print preview visible too');
+    }
+    if (!document.getElementById('viewTabFull').classList.contains('active')) {
+      bad.push('the Full tab is not marked active in index.html');
+    }
+    if (document.getElementById('viewTabPrintPreview').classList.contains('active')) {
+      bad.push('the preview tab is marked active in index.html');
+    }
+    /* Anything still asking for the retired layout lands somewhere you can
+       plan, not on a container that no longer exists. */
+    setWeekView('timegrid');
+    if (weekView !== 'full') bad.push(`a stale 'timegrid' left weekView at '${weekView}'`);
+    if (getComputedStyle(document.getElementById('weekFull')).display === 'none') {
+      bad.push("a stale 'timegrid' showed nothing");
+    }
     return bad.length === 0 || bad;
   });
 
@@ -275,13 +286,13 @@ function findChromium() {
   });
 
   /* THE WEEK TWIN of dayBandsFollowTheCalendar. The day view has been
-     calendar-driven for a long time; the two week layouts and the print sheet
-     were not. Day Blocks — the layout the week actually opens on — showed
-     nothing school-related at all, so a school day and a Sunday were the same
-     white lane. Full week and print each carried their own hardcoded 9am–3pm
-     bands chosen by `dow === 0 || dow === 6`, so they disagreed with the rest of
-     the app by an hour AND drew "🏫 School" on Christmas Day, on a PD day, and
-     on every day of July. */
+     calendar-driven for a long time; the week layouts and the print sheet were
+     not. Full week and print each carried their own hardcoded 9am–3pm bands
+     chosen by `dow === 0 || dow === 6`, so they disagreed with the rest of the
+     app by an hour AND drew "🏫 School" on Christmas Day, on a PD day, and on
+     every day of July. Day Blocks was the third surface and drew nothing
+     school-related at all; it is retired, and the preview that replaced it
+     describes the week with one axis rather than seven bands. */
   checks.everyWeekViewFollowsTheSchoolCalendar = await page.evaluate(() => {
     const bad = [];
     const wasOffset = weekOffset, wasView = weekView;
@@ -302,15 +313,10 @@ function findChromium() {
     const offIdx = keys.indexOf(offKey);
     const wantStart = dayZoneSegments(schoolKey).find(b => b.label === '🏫 School').start;
 
-    // Day Blocks — the default layout.
-    goWeek(); setWeekView('timegrid'); renderWeek();
-    const lanes = document.querySelectorAll('.tg2-lane');
-    const schoolBand = lanes[idx] && lanes[idx].querySelector('.wf-band-school');
-    if (!schoolBand) bad.push('Day Blocks draws no school band on a term school day');
-    if (offIdx >= 0 && lanes[offIdx] && lanes[offIdx].querySelector('.wf-band-school')) {
-      bad.push('Day Blocks draws a school band on a day the calendar says is not school');
-    }
-
+    /* Two surfaces now, not three. Day Blocks was the third and is retired; the
+       tab in its place is a preview of the print sheet, whose sideband is ONE
+       axis describing seven days, so it has no per-day band to test — that
+       axis is held by printSideband instead. */
     // Full week.
     setWeekView('full'); renderWeek();
     const cols = document.querySelectorAll('.wf-day-col');
@@ -343,10 +349,6 @@ function findChromium() {
     })();
     if (summerWeek != null) {
       weekOffset = summerWeek;
-      setWeekView('timegrid'); renderWeek();
-      if (document.querySelector('.tg2-lane .wf-band-school')) {
-        bad.push('Day Blocks draws school in a week with no school in it');
-      }
       setWeekView('full'); renderWeek();
       if (document.querySelector('.wf-day-col .wf-band-school')) {
         bad.push('the Full week draws school in a week with no school in it');
@@ -603,8 +605,8 @@ function findChromium() {
     // And it is its own banner, not a line inside the blank-week offer.
     keys.forEach(k => setDayBlocks(k, [], 'jenn'));
     setDayBlocks(schoolKeys[0], [{ id: 'sd-keep2', actId: 'breakfast', startMin: 7 * 60, durationMin: 30 }], 'jenn');
-    goWeek(); setWeekView('timegrid'); renderWeek();
-    const sb = document.getElementById('tgSchoolBanner');
+    goWeek(); setWeekView('full'); renderWeek();
+    const sb = document.getElementById('weekSchoolBanner');
     if (!sb || sb.style.display === 'none') {
       bad.push('a part-planned week does not surface its missing school days');
     } else if (!/school day/.test(sb.textContent)) {
@@ -654,10 +656,39 @@ function findChromium() {
   });
   checks.weekHourLines = await page.evaluate(() =>
     document.querySelectorAll('.wf-day-col .hour-grid-line--hour').length > 0);
-  // Day Blocks renders once selected.
-  checks.dayBlocksRenders = await page.evaluate(() => {
-    setWeekView('timegrid');
-    return document.querySelectorAll('.tg2-lane').length === 7 || ['no day lanes in Day Blocks'];
+  /* THE SECOND TAB IS A READ-ONLY PREVIEW OF THE PRINTED SHEET.
+     It renders the week and child the screen is already showing, through the
+     SAME renderer the Print button uses, and exposes no way to change anything:
+     the print markup carries no handlers at all, which is what makes read-only
+     free to enforce rather than a promise. */
+  checks.theSecondWeekTabPreviewsThePrintedSheet = await page.evaluate(() => {
+    const bad = [];
+    goWeek(); setWeekView('preview'); renderWeek();
+    const host = document.getElementById('weekPreviewSheet');
+    if (!host) return ['there is no preview host'];
+    if (!host.querySelector('.print-week-grid')) bad.push('the preview did not render the print grid');
+    if (!host.querySelector('.print-header-cell')) bad.push('the preview has no day headers');
+    // Read-only: no handler, no mutation hook, no tick.
+    if (host.querySelector('[onclick]')) bad.push('the preview carries a click handler');
+    if (host.querySelector('.wf-card-check')) bad.push('the preview offers a completion tick');
+    if (host.innerHTML.includes('data-mm-action') || host.innerHTML.includes('data-pa-')) {
+      bad.push('the preview carries a mutation hook');
+    }
+    // It follows the week and child the screen is showing, not the print globals.
+    const heading = (host.querySelector('.print-header h1') || {}).textContent || '';
+    if (!new RegExp(activeProfile() === 'jenn' ? 'Jenn' : 'Jess').test(heading)) {
+      bad.push(`the preview names the wrong child: "${heading}"`);
+    }
+    // Two live copies must not fight over --print-slot: it is set on the host.
+    if (document.documentElement.style.getPropertyValue('--print-slot')) {
+      bad.push('the renderer still sets --print-slot on <html>');
+    }
+    // And the Full week is still the one you can tick in.
+    setWeekView('full'); renderWeek();
+    if (!document.querySelector('#weekFull .wf-card-check')) {
+      bad.push('the Full week lost its quick-complete tick');
+    }
+    return bad.length === 0 || bad;
   });
 
   /* ONE TOPBAR ROW. The week selector and the controls that act on the week it
@@ -693,36 +724,33 @@ function findChromium() {
   checks.weekSummariesSitUnderThePlan = await page.evaluate(() => {
     const bad = [];
     const after = (a, b) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
-    setWeekView('timegrid'); renderWeek();
-    const grid = document.getElementById('tgGrid');
-    if (!after(grid, document.getElementById('tgStreak'))) bad.push('the free-stretch line is still above the grid');
-    if (!after(grid, document.getElementById('tgConflictBanner'))) bad.push('the clash banner is still above the grid');
     setWeekView('full'); renderWeek();
-    if (!after(document.getElementById('weeklyFullGrid'), document.getElementById('weekConflictBanner'))) {
-      bad.push('the Full view clash banner is still above the cards');
-    }
-    setWeekView('timegrid'); renderWeek();
+    const grid = document.getElementById('weeklyFullGrid');
+    if (!after(grid, document.getElementById('weekStreak'))) bad.push('the free-stretch line is still above the grid');
+    if (!after(grid, document.getElementById('weekConflictBanner'))) bad.push('the clash banner is still above the cards');
     return bad.length === 0 || bad;
   });
 
-  /* One scroll surface on Day Blocks, the same rule the day screen is held to.
-     The grid was its own scroller inside a flex column, so the week had two: the
-     grid, and the page carrying the glance and goals under it. A wheel over the
-     grid moved the grid, reached its end, and stopped — overscroll-behavior:
-     contain made sure nothing chained to the page — so the panels below could
-     not be reached by scrolling over the grid at all. */
-  checks.weekScrollsAsOneSurfaceOnDayBlocks = await page.evaluate(() => {
-    setWeekView('timegrid'); renderWeek();
+  /* One scroll surface on the week, the same rule the day screen is held to.
+     The grid used to be its own scroller inside a flex column, so the week had
+     two: the grid, and the page carrying the glance and goals under it. A wheel
+     over the grid moved the grid, reached its end, and stopped —
+     overscroll-behavior: contain made sure nothing chained to the page — so the
+     panels below could not be reached by scrolling over the grid at all. */
+  checks.weekScrollsAsOneSurface = await page.evaluate(() => {
     const bad = [];
-    const inner = [...document.querySelectorAll('#weekTimeGrid, #weekTimeGrid *')].filter(el => {
-      const st = getComputedStyle(el);
-      return /(auto|scroll)/.test(st.overflowY) && el.scrollHeight > el.clientHeight + 4;
+    ['full', 'preview'].forEach(view => {
+      setWeekView(view); renderWeek();
+      const host = view === 'full' ? '#weekFull' : '#weekPrintPreview';
+      const inner = [...document.querySelectorAll(`${host}, ${host} *`)].filter(el => {
+        const st = getComputedStyle(el);
+        return /(auto|scroll)/.test(st.overflowY) && el.scrollHeight > el.clientHeight + 4;
+      });
+      if (inner.length) {
+        bad.push(`nested scrollers under ${view}: ${inner.map(e => e.className || e.tagName).join(' | ')}`);
+      }
     });
-    if (inner.length) bad.push(`nested scrollers under Day Blocks: ${inner.map(e => e.className || e.tagName).join(' | ')}`);
-    const wrap = document.querySelector('.tg2-wrap');
-    if (wrap && /contain/.test(getComputedStyle(wrap).overscrollBehaviorY)) {
-      bad.push('the grid still refuses to chain its scroll to the page');
-    }
+    setWeekView('full'); renderWeek();
     return bad.length === 0 || bad;
   });
 
@@ -734,10 +762,10 @@ function findChromium() {
      preventDefault, so the browser's own autoscroll was not there to take over
      either. Drives real pointer events rather than calling the handler. */
   checks.middleDragFollowsTheCursorAndChains = await page.evaluate(() => {
-    goWeek(); setWeekView('timegrid'); renderWeek();
+    goWeek(); setWeekView('full'); renderWeek();
     const bad = [];
-    const el = document.querySelector('.tg2-wrap');
-    if (!el) return ['no Day Blocks wrap to pan'];
+    const el = document.querySelector('.weekly-full-wrap');
+    if (!el) return ['no week wrap to pan'];
     const doc = document.scrollingElement || document.documentElement;
     if (doc.scrollHeight <= doc.clientHeight + 4) return ['the week does not scroll at all, so panning cannot be tested'];
 
@@ -1273,10 +1301,10 @@ function findChromium() {
     surface('day view', document.querySelector('#timeline .tl-canvas'),
             '.hour-grid--day', '.placed-block');
     goWeek();
-    setWeekView('timegrid'); renderWeek();
-    surface('Day Blocks week', document.querySelector('.tg2-lane'),
-            '.hour-grid--tg2', '.tg2-block');
-    setWeekView('full'); renderWeek();
+    /* Two surfaces, not three: the Day Blocks arm had no successor. The tab
+       that replaced it previews the print sheet, which draws no .hour-grid at
+       all — its rules are the cell borders of a 15-minute row grid. */
+    goWeek(); setWeekView('full'); renderWeek();
     surface('Full week', document.querySelector('.wf-day-col'),
             '.hour-grid--wf', '.wf-card');
 
@@ -1287,7 +1315,7 @@ function findChromium() {
       .map(l => Math.round(parseFloat(l.style.top)));
     if (!tops.includes(0)) bad.push('the Full week labels 6am but draws no rule for it');
 
-    setWeekView('timegrid');
+    setWeekView('full');
     setDayBlocks(keys[0], before, 'jenn');
     openDay(keys[0], 0);
     return bad.length === 0 || bad;
@@ -1350,14 +1378,13 @@ function findChromium() {
   });
   await page.evaluate(() => closeSheet('templateOverlay'));
 
-  // Time-Grid legend for kids
-  await page.evaluate(() => { goWeek(); setWeekView('timegrid'); });
+  // The week legend, for kids
+  await page.evaluate(() => { goWeek(); setWeekView('full'); });
   await page.waitForTimeout(400);
-  checks.timeGridLegend = await page.evaluate(() => {
-    const el = document.getElementById('tgLegend');
+  checks.weekLegend = await page.evaluate(() => {
+    const el = document.getElementById('weekLegend');
     return !!el && el.style.display !== 'none' && el.children.length >= 5;
   });
-  await page.evaluate(() => setWeekView('full'));
 
   // ── Redesign phase 2: the kid's chore tab ──
   // Put a chore on the day the tab will open on, so there is something to answer for.
@@ -1653,7 +1680,10 @@ function findChromium() {
     const keys = getDayKeys(weekOffset);
     const axisKey = keys.find(k => isSchoolDay(k)) || null;
     const want = axisKey ? dayZoneSegments(axisKey).length : 1;
-    const got = document.querySelectorAll('.print-band-label').length;
+    /* Scoped to the print SHEET. The week's preview tab renders the same
+       markup through the same renderer, so an unscoped query counts both and
+       reports exactly double. */
+    const got = document.querySelectorAll('#printSheet .print-band-label').length;
     return got === want || [`the printed axis draws ${got} stretches for a day that has ${want}`];
   });
   await page.screenshot({ path: shot('print'), fullPage: true });
@@ -1786,7 +1816,7 @@ function findChromium() {
     sawIt('the print sheet', (document.getElementById('screen-print') || {}).textContent || '');
     if (document.querySelector('#screen-print img')) bad.push('the print sheet built an element out of the name');
     goWeek();
-    setWeekView('timegrid');
+    setWeekView('full');
 
     /* And the meeting reads it from the planner rather than asking for it to be
        typed a second time. Two records of one afternoon kept in agreement by
@@ -2427,7 +2457,25 @@ function findChromium() {
      as a control you can press. A ratchet is tightened whenever the real number
      comes down: 346 at the audit, 280 after the disclosures, 276 once the
      duplicate shortcut rows went, 277 for the honest earnings label, 261 now. */
+  /* ── 2026-08-31, screen-week/planned added at 208, owner's call ──
+     Day Blocks was the week's default, so this audit measured THAT and the Full
+     layout was never held to the budget at all. The week opens on Full now, and
+     the first honest measurement was 242.
+
+     Most of that came out: three hint lines under the Goals / To-do /
+     Achievements headings that restated the headings, three empty states that
+     restated the ＋ button beside them, and a signature label that said "sign
+     your week" directly above a button saying "Sign this week". The screen
+     itself now measures 200 or under at every width, with no ratchet.
+
+     What is left over sits on the SEEDED row, and it is the seeded blocks
+     themselves — Morning Routine, School Day, a skating session and their
+     detail lines. Those words are the plan, not chrome: a week with things on
+     it says what they are, and cutting them would mean a card that does not
+     name its own activity. So the variant carries its own number and the bare
+     screen keeps the 200. Tighten this whenever the real figure drops. */
   const WORD_BUDGET = { 'screen-today': 200, 'screen-week': 200,
+                        'screen-week/planned': 208,
                         'screen-mymoney': 200, 'screen-chore': 261 };
   const KID_SCREENS = [
     // Today is held to the full 200 with no ratchet: it was built to these rules
@@ -2472,17 +2520,14 @@ function findChromium() {
         renderWeek();
       } finally { setDayBlocks(key, had, kid); Date = RealDate; }
     }, 'screen-week/sunday'],
-    /* The same screen showing DAY BLOCKS, with something on it.
-       This row exists because the audit above could not see the view the week
-       actually opens on. renderWeek() draws whichever view is selected, and by
-       the time the sweep runs the earlier checks have emptied the week — so
-       there were no .tg2-block elements to measure and the grid's labels sat at
-       9.9px (8.8px on a phone) and its hour gutter at 9.6px, right through every
-       run of this audit. A rule the suite renders the wrong branch for is a rule
-       that is not enforced.
+    /* The week WITH SOMETHING ON IT. By the time the sweep runs the earlier
+       checks have emptied the week, so an audit of the bare screen measures no
+       cards at all — and the type inside a card is exactly what the 13px floor
+       is about. A rule the suite renders no content for is a rule that is not
+       enforced.
 
-       Seed one real day, switch to the view, then put the day back exactly as it
-       was — the same discipline the Sunday row uses. */
+       Seed one real day, then put it back exactly as it was — the same
+       discipline the Sunday row uses. */
     ['screen-week',    () => {
       goWeek();
       const kid = activeProfile();
@@ -2492,15 +2537,15 @@ function findChromium() {
         setDayBlocks(key, [
           // A 30-minute block is the case that forced the density change: at the
           // old scale it was 15px tall, which no legible type fits inside.
-          { id: 'tg2-audit-a', actId: 'routine_morning', startMin: 7 * 60, durationMin: 30 },
-          { id: 'tg2-audit-b', actId: 'school_day', startMin: 9 * 60, durationMin: 5 * 60 },
-          { id: 'tg2-audit-c', actId: 'training', startMin: 17 * 60, durationMin: 90, tag: 'skating' },
+          { id: 'wk-audit-a', actId: 'routine_morning', startMin: 7 * 60, durationMin: 30 },
+          { id: 'wk-audit-b', actId: 'school_day', startMin: 9 * 60, durationMin: 5 * 60 },
+          { id: 'wk-audit-c', actId: 'training', startMin: 17 * 60, durationMin: 90, tag: 'skating' },
         ], kid);
         weekOffset = 0;
-        setWeekView('timegrid');
+        setWeekView('full');
         renderWeek();
       } finally { setDayBlocks(key, had, kid); }
-    }, 'screen-week/dayblocks'],
+    }, 'screen-week/planned'],
     /* screen-quest was audited here. The Quest Board is retired; its two unique
        panels moved into Today's disclosure, which the screen-today row already
        covers — with the disclosure opened, so the panels are actually measured
@@ -2575,7 +2620,10 @@ function findChromium() {
       await page.evaluate(`(${nav.toString()})()`);
       await page.waitForTimeout(200);
       const r = await kidStandards(id);
-      const budget = WORD_BUDGET[id] || 200;
+      /* Keyed by the row's LABEL where it has one, so a seeded variant can
+         carry its own number: the words a plan puts on the screen are not the
+         same thing as the chrome around it. */
+      const budget = WORD_BUDGET[label || id] || WORD_BUDGET[id] || 200;
       const problems = [];
       if (r.error) problems.push(r.error);
       // Sideways scroll is the failure a screenshot needs a human to notice and
@@ -4388,16 +4436,16 @@ function findChromium() {
       state.shared.challenges = [{ id: 'xss5-ch', title: payload, target: 3, unit: 'times' }];
     }, PAYLOAD);
 
-    /* Both week layouts render user text and both must be proved, so neither is
-       left to whichever happens to be the default. They need different proofs:
-       the Full view prints the whole name, but Day Blocks passes it through
-       tg2ShortLabel, which shortens in JS — so demanding the entire payload
-       there would fail on a view that is behaving correctly. For that one the
-       proof of render is that a label element exists at all; the assertions
-       that matter — no <img> built, no onerror fired — are identical. */
+    /* The week and its print preview both render user text and both must be
+       proved. They need different proofs: the Full view prints the whole name,
+       but the print sheet truncates a long title to the height of its block —
+       so demanding the entire payload there would fail on a surface that is
+       behaving correctly. For that one the proof of render is that a block
+       element exists at all; the assertions that matter — no <img> built, no
+       onerror fired — are identical. */
     const SURFACES = [
-      ['week',        () => { goWeek(); setWeekView('full'); }, true],
-      ['week-blocks', () => { goWeek(); setWeekView('timegrid'); }, false],
+      ['week',         () => { goWeek(); setWeekView('full'); }, true],
+      ['week-preview', () => { goWeek(); setWeekView('preview'); }, false],
       ['day',   () => { openDay(getDayKeys(0)[1], 1); }, true],
       ['sheet', () => { openDay(getDayKeys(0)[1], 1); openEditSheet('xss5-blk'); }, true],
       ['sync',  () => { openSisterSync(); }, true],
@@ -4412,9 +4460,9 @@ function findChromium() {
           // The raw string must appear as text somewhere — proof it rendered
           // rather than being dropped or swallowed into an attribute.
           literal: document.body.innerText.includes(payload),
-          // Day Blocks shortens every label deliberately; a rendered label is
-          // the proof that this surface drew the hostile block at all.
-          rendered: !!document.querySelector('.tg2-block-lbl'),
+          // The print sheet truncates by height; a rendered block title is the
+          // proof that this surface drew the hostile block at all.
+          rendered: !!document.querySelector('.print-block-title'),
           fired: window.__xss5 === true,
         };
       }, { src: nav.toString(), payload: PAYLOAD });
@@ -5007,8 +5055,8 @@ function findChromium() {
       const chip = document.querySelector('#tdWrap [data-td-action="chore"].td-chip-family');
       if (!chip) bad.push('Today does not mention the family chores');
       else if (!/2/.test(chip.textContent)) bad.push(`the chip says "${chip.textContent.trim()}"`);
-      goWeek(); setWeekView('timegrid'); renderWeek();
-      const banner = document.getElementById('tgFamilyBanner');
+      goWeek(); setWeekView('full'); renderWeek();
+      const banner = document.getElementById('weekFamilyBanner');
       if (!banner || banner.style.display === 'none') bad.push('the week does not mention the family chores');
       else if (!/2 family chores/.test(banner.textContent)) bad.push(`the banner says "${banner.textContent.trim()}"`);
 
@@ -5045,7 +5093,7 @@ function findChromium() {
       goToday();
       if (document.querySelector('#tdWrap .td-chip-family')) bad.push('the chip stayed after every chore had a day');
       goWeek(); renderWeek();
-      if (document.getElementById('tgFamilyBanner').style.display !== 'none') {
+      if (document.getElementById('weekFamilyBanner').style.display !== 'none') {
         bad.push('the banner stayed after every chore had a day');
       }
 
@@ -5069,7 +5117,7 @@ function findChromium() {
       // past week's shortfall is shown instead.
       weekOffset = -1;
       goWeek(); renderWeek();
-      if (document.getElementById('tgFamilyBanner').style.display !== 'none') {
+      if (document.getElementById('weekFamilyBanner').style.display !== 'none') {
         bad.push('a past week is nagged about chores nobody can still plan');
       }
       weekOffset = 0;
@@ -5100,10 +5148,10 @@ function findChromium() {
     try {
       keys.forEach(k => setDayBlocks(k, [], kid));
       e.chores = {}; e.claims = {};
-      goWeek(); setWeekView('timegrid'); renderWeek();
+      goWeek(); setWeekView('full'); renderWeek();
       goToday();
       const chip = document.querySelector('#tdWrap .td-chip-family');
-      const banner = document.getElementById('tgFamilyBanner');
+      const banner = document.getElementById('weekFamilyBanner');
       const copy = [chip ? chip.textContent : '', banner ? banner.textContent : ''].join(' ');
       if (!/to plan|find a day/i.test(copy)) bad.push(`the copy is not forward-looking: "${copy.replace(/\s+/g, ' ').trim()}"`);
       if (/didn'?t|failed|missed|should have|behind/i.test(copy)) {
@@ -9069,13 +9117,14 @@ function findChromium() {
 
   /* MEAL BLOCKS SAY THEIR NAME. The week grid rendered meals as a bare icon
      next to the block's OWN icon, so a cell showed the same glyph twice and
-     named nothing. */
+     named nothing. Asked of blockDisplayName, which is the one owner of what a
+     block is called — tg2ShortLabel was the compressing form and went with the
+     Day Blocks layout. */
   checks.mealsAreNamedNotJustDrawn = await page.evaluate(() => {
     const bad = [];
     const want = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner' };
     Object.keys(want).forEach(id => {
-      const act = findActivity(id, 'jenn');
-      const label = tg2ShortLabel(act, { actId: id });
+      const label = blockDisplayName({ actId: id }, 'jenn').name;
       if (label !== want[id]) bad.push(`${id} reads "${label}", expected "${want[id]}"`);
       if (/\p{Extended_Pictographic}/u.test(label)) bad.push(`${id}'s label is still an emoji`);
     });

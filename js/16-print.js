@@ -111,29 +111,49 @@ function printCheckboxPx(heightPx, { min = 6, max = 12, base = 5, divisor = 20 }
   return Math.max(min, Math.min(max, Math.round(base + heightPx / divisor)));
 }
 
-function renderPrintSheet() {
-  const keys = getDayKeys(weekOffset);
+/* ── One renderer, two hosts ──────────────────────────────────────
+   This read `weekOffset`, `activeProfile()` and `printWindow` straight out of
+   the module scope and wrote to a hardcoded `#printSheet`. That is fine while
+   there is one copy on the page and impossible the moment there are two: the
+   week's read-only preview shows the same sheet, and both would have fought
+   over the same element and the same `--print-slot`, which was being set on
+   <html>.
+
+   So it takes a host and an explicit week/profile/window, each defaulting to
+   what it used to read. `--print-slot` is set on the HOST — the rule that uses
+   it inherits, and two copies at different sizes stay independent.
+
+   Copying this renderer into the week view instead would have been the fifth
+   place that lists a day's blocks, which is the mistake CLAUDE.md names. */
+function renderPrintSheet(host, opts) {
+  const o = opts || {};
+  const el = (typeof host === 'string' ? document.getElementById(host) : host)
+    || document.getElementById('printSheet');
+  if (!el) return;
+  const wkOffset = o.weekOffset != null ? o.weekOffset : weekOffset;
+  const win = o.window || printWindow;
+  const keys = getDayKeys(wkOffset);
   const mon = formatDayKey(keys[0]);
   const sun = formatDayKey(keys[6]);
-  const p = activeProfile();
+  const p = o.profile || activeProfile();
   const nameStr = p==='jenn'?'🐥 Jenn':'🦊 Jess';
 
   // Chosen display window (defaults to 6am–9pm).
-  const winStartMin = printWindow.startHour * 60;
-  const winEndMin   = printWindow.endHour * 60;
+  const winStartMin = win.startHour * 60;
+  const winEndMin   = win.endHour * 60;
   const winSlots    = Math.round((winEndMin - winStartMin) / 15);
-  const winStartHr  = printWindow.startHour;
+  const winStartHr  = win.startHour;
 
   const fmtHr = (h) => `${((h+11)%12)+1}${h>=12 && h<24 ? 'pm' : 'am'}`;
   let html = `
     <div class="print-header">
-      <h1>${nameStr}'s Week — ${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} to ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()} &nbsp;·&nbsp; ${fmtHr(winStartHr)}–${fmtHr(printWindow.endHour)}</h1>
+      <h1>${nameStr}'s Week — ${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} to ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()} &nbsp;·&nbsp; ${fmtHr(winStartHr)}–${fmtHr(win.endHour)}</h1>
     </div>
   `;
 
   // Row height scales so the chosen window still fits one landscape page.
   const slotPx = Math.max(7, Math.min(11, Math.floor(660 / winSlots)));
-  document.documentElement.style.setProperty('--print-slot', slotPx + 'px');
+  el.style.setProperty('--print-slot', slotPx + 'px');
 
   html += `<div class="print-week-grid">`;
   // header row (band-axis corner + time corner + 7 days)
@@ -158,11 +178,11 @@ function renderPrintSheet() {
   }));
   const bandForSlot = (absMin) => PRINT_BANDS.find(b => absMin >= b.start && absMin < b.end);
   // rows
-  const acts = getAllActivities(activeProfile(), { includeArchived: true });
+  const acts = getAllActivities(p, { includeArchived: true });
   // Time clashes flagged the same way as the Full/Day-Blocks views so the three
   // views agree on the printed sheet.
   const printConflicts = {};
-  keys.forEach(k => { printConflicts[k] = computeBufferConflicts(getDayBlocks(k) || []).affected; });
+  keys.forEach(k => { printConflicts[k] = computeBufferConflicts(getDayBlocks(k, p) || []).affected; });
   for (let s=0;s<winSlots;s++) {
     const totalMin=s*15;
     const hour = winStartHr + Math.floor(totalMin/60);
@@ -183,7 +203,7 @@ function renderPrintSheet() {
     html += `<div class="print-band-cell${band ? ' ' + band.cls : ''}">${bandHtml}</div>`;
     html += `<div class="print-time-cell${isHourStart?' print-hour-start':''}">${isHourStart ? (hour>12?hour-12:hour)+(hour>=12?'pm':'am') : ''}</div>`;
     keys.forEach(k=>{
-      const bks = getDayBlocks(k);
+      const bks = getDayBlocks(k, p);
       let blockHtml = '';
       bks.forEach(b=>{
         const act = acts.find(a=>a.id===b.actId);
@@ -224,7 +244,7 @@ function renderPrintSheet() {
         const bh = slotSpan*slotPx - 1;
         const pIcon = topic ? topic.icon : act.icon;
         // Through the one owner — see the same change in renderFullWeek.
-        const pNamed = blockDisplayName(b, activeProfile()).name;
+        const pNamed = blockDisplayName(b, p).name;
         const pName = act.isCompetition ? `${pNamed} 🏆` : pNamed;
         const hasConflict = printConflicts[k] && printConflicts[k].has(b.id);
         const titleFpt = printBlockFontPt(bh);
@@ -275,7 +295,7 @@ function renderPrintSheet() {
       <div class="print-sig-block print-sig-block--date"><span class="print-sig-caption">Date</span><span class="print-sig-line"></span></div>
     </div>`;
 
-  document.getElementById('printSheet').innerHTML = html;
+  el.innerHTML = html;
 }
 
 // Weekly time-per-category totals over the chosen window, plus unscheduled
