@@ -8779,10 +8779,17 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
-  /* THE MEETING IS ONE SCROLLER, WITH BOTH ENDS PINNED.
+  /* THE MEETING IS ONE SCROLLER, AND ITS ENDS RESERVE THEIR OWN SPACE.
      A five-step sitting spends its time in the middle of a long panel, and the
      week you were reviewing, the step you were on and the only way to the next
-     one all scrolled away with the content. */
+     one all used to scroll away with the content.
+
+     Sticky fixed that and introduced the next fault: a pinned band FLOATS over
+     the content, taking no layout space, so on an iPad the last card of a step
+     sat underneath the Back/Next bar with nothing to say it was there. The
+     sheet is a bounded flex column now and .mm-body is the only scroller, so
+     this asserts the layering rather than just the pinning — at every scroll
+     position, neither band may overlap a card. */
   checks.theMeetingKeepsItsHeadAndFeet = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
@@ -8795,8 +8802,17 @@ function findChromium() {
       const nav = document.querySelector('#familyMeetingBody .mm-nav');
       if (!head) bad.push('the week and step header is not its own band');
       if (!nav) bad.push('there is no navigation band');
-      if (head && getComputedStyle(head).position !== 'sticky') bad.push('the header is not sticky');
-      if (nav && getComputedStyle(nav).position !== 'sticky') bad.push('Back/Next/Finish is not sticky');
+      /* Ordinary flex children, not floated over the content. Sticky or fixed
+         here is the bug: both take the band out of the layout. */
+      [['header', head], ['Back/Next bar', nav]].forEach(([label, el]) => {
+        if (!el) return;
+        const pos = getComputedStyle(el).position;
+        if (pos === 'sticky' || pos === 'fixed') {
+          bad.push(`the ${label} is ${pos} — it floats over the cards instead of reserving room`);
+        }
+      });
+      const sheetPos = sheet ? getComputedStyle(sheet) : null;
+      if (sheetPos && sheetPos.display !== 'flex') bad.push('the meeting sheet is not a flex column');
 
       // One scroller. A second one inside the sheet is how a flick on an iPad
       // comes to move the wrong thing.
@@ -8807,23 +8823,59 @@ function findChromium() {
       if (scrollers.length > 1) {
         bad.push(`${scrollers.length} scrollers inside the meeting: ${scrollers.map(e => '.' + String(e.className).split(' ')[0]).join(', ')}`);
       }
-      if (scrollers.length === 1 && scrollers[0] !== sheet) {
-        bad.push('the meeting scrolls something other than the sheet');
+      const body = document.querySelector('#familyMeetingBody .mm-body');
+      if (!body) bad.push('there is no meeting body to scroll');
+      if (scrollers.length === 1 && scrollers[0] !== body) {
+        bad.push('the meeting scrolls something other than .mm-body');
+      }
+      if (sheet && sheet.scrollHeight > sheet.clientHeight + 4) {
+        bad.push('the sheet itself scrolls — it is meant to be a bounded column');
       }
 
-      // Scrolled to the bottom, both bands are still on screen.
-      if (sheet && sheet.scrollHeight > sheet.clientHeight) {
-        sheet.scrollTop = sheet.scrollHeight;
-        const sr = sheet.getBoundingClientRect();
-        const hr = head.getBoundingClientRect(), nr = nav.getBoundingClientRect();
-        if (hr.bottom <= sr.top + 1) bad.push('the header scrolled off the top');
-        if (nr.top >= sr.bottom - 1) bad.push('the buttons scrolled off the bottom');
-        // Dead space under the buttons is exactly what the sticky footer is
-        // meant to remove.
-        if (sheet.scrollHeight - (sheet.scrollTop + sheet.clientHeight) > 2) {
-          bad.push('there is blank space left under the buttons');
+      /* At the top, the middle and the bottom of the longest step, neither band
+         may cover a card. mmScroller() is the app's own answer to "what
+         scrolls", so a future layout change moves one selector and this check
+         follows it. */
+      if (body && mmScroller() !== body) bad.push('mmScroller() does not point at the scroller');
+      if (body && body.scrollHeight > body.clientHeight) {
+        const overlaps = (a, b) => {
+          const r = a.getBoundingClientRect(), c = b.getBoundingClientRect();
+          return r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top;
+        };
+        [0, Math.floor(body.scrollHeight / 2), body.scrollHeight].forEach(pos => {
+          body.scrollTop = pos;
+          const cards = [...body.querySelectorAll('.chore-card, .mm-drow, .mm-pay-row')]
+            .filter(el => el.getBoundingClientRect().height > 4);
+          [['header', head], ['Back/Next bar', nav]].forEach(([label, band]) => {
+            if (!band) return;
+            const hit = cards.find(c => overlaps(band, c));
+            if (hit) {
+              bad.push(`at scrollTop ${pos} the ${label} covers a ${String(hit.className).split(' ')[0]}`);
+            }
+          });
+        });
+        body.scrollTop = 0;
+        // Dead space under the buttons is what the pinned footer removes.
+        if (body.scrollHeight - (body.scrollTop + body.clientHeight) > 2) {
+          body.scrollTop = body.scrollHeight;
+          if (body.scrollHeight - (body.scrollTop + body.clientHeight) > 2) {
+            bad.push('there is blank space left under the buttons');
+          }
+          body.scrollTop = 0;
         }
-        sheet.scrollTop = 0;
+      }
+
+      /* The scroll position survives a re-render and a return. Every tap in
+         steps 3 and 4 rebuilds the body wholesale, and the readers that put it
+         back used to name .sheet — which no longer scrolls. */
+      if (body && body.scrollHeight > body.clientHeight + 40) {
+        body.scrollTop = 40;
+        renderMeetingMode();
+        const after = mmScroller();
+        if (!after || Math.abs(after.scrollTop - 40) > 2) {
+          bad.push(`a re-render lost the scroll position (${after ? after.scrollTop : 'no scroller'}, expected 40)`);
+        }
+        if (after) after.scrollTop = 0;
       }
       closeSheet('familyMeetingOverlay');
     } finally {

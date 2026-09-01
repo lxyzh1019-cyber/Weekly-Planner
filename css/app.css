@@ -1619,18 +1619,42 @@
   .mm-pay { border: 2px solid var(--ink); border-radius: 12px; background: #fff9e9; padding: 8px 10px; margin: 8px 0; }
   .mm-pay-row { display: flex; justify-content: space-between; font-size: calc(0.95rem * var(--fs-scale, 1)); padding: 2px 0; }
   .mm-recorded { font-size: calc(0.86rem * var(--fs-scale, 1)); font-weight: 700; background: #95d5b2; border: 2px solid var(--ink); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; }
-  /* ── The meeting is ONE scrolling container ──────────────────────
-     The sheet has always been the scroller; what was missing is that the two
-     things you steer with scrolled away with the content. On step 3 or 4 —
+  /* ── The meeting is a BOUNDED COLUMN, and the ends are OUTSIDE it ──
+     The two things you steer with must never scroll away: on step 3 or 4 —
      long panels, several taps each — the week you were reviewing, the step you
-     were on and the only way to the next one were all off screen.
+     were on and the only way to the next one all used to leave the screen.
 
-     Sticky inside the sheet's own scroll area rather than a second scroller:
-     nesting one would put two scrollers on an iPad, and a flick would move the
-     wrong one. Negative margins let each band span the sheet's 1.2rem padding
-     so nothing shows through at the edges. */
+     They were sticky inside the sheet's own scroll area, which held them still
+     but left them FLOATING OVER the content: on an iPad a card could sit under
+     the Back/Next bar with nothing to say it was there, and the last card of a
+     step was unreachable behind it. Sticky pins a thing without reserving it
+     any room.
+
+     So the sheet is a flex column that does not scroll, and .mm-body is the one
+     thing in it that does. The header and the footer are ordinary flex children
+     taking real layout space, which is what stops them covering a card at any
+     scroll position. Still ONE scroller — nesting a second is what makes a
+     flick move the wrong surface on a tablet.
+
+     Negative horizontal margins still let each band span the sheet's 1.2rem
+     padding so nothing shows through at the edges. */
+  #familyMeetingOverlay .sheet {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* dvh so iPad Safari's shrinking toolbar cannot push the footer out of
+       reach; vh first for anything that does not know dvh. */
+    max-height: 88vh;
+    max-height: 88dvh;
+  }
+  #familyMeetingBody {
+    flex: 1 1 auto;
+    min-height: 0;   /* or the body refuses to shrink and the column overflows */
+    display: flex;
+    flex-direction: column;
+  }
   .mm-head {
-    position: sticky; top: -1.2rem; z-index: 3;
+    flex: 0 0 auto;
     margin: -1.2rem -1.2rem 0; padding: 1.2rem 1.2rem 0;
     background: var(--paper);
     border-bottom: 2px solid var(--paper-line);
@@ -1638,7 +1662,7 @@
   .mm-head .mm-stepper { margin-bottom: 8px; }
   .mm-nav {
     display: flex; justify-content: space-between; gap: 8px;
-    position: sticky; bottom: -1.2rem; z-index: 3;
+    flex: 0 0 auto;
     /* No margin-top: the body's own bottom padding was doing that job and
        leaving a dead strip under the buttons on a short step. */
     margin: 0 -1.2rem -1.2rem; padding: 0.6rem 1.2rem calc(0.6rem + env(safe-area-inset-bottom, 0px));
@@ -1647,9 +1671,15 @@
   }
   .mm-nav .btn-confirm { flex: 1; }
   .mm-nav .pill-btn, .mm-nav .btn-confirm { min-height: 44px; }
-  /* The gap between the last card and the pinned buttons, owned in one place
-     instead of by whatever the final panel happened to end with. */
-  .mm-body { padding-bottom: var(--space-3); }
+  /* The one scroller. The gap between the last card and the buttons is owned
+     here instead of by whatever the final panel happened to end with. */
+  .mm-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: var(--space-3);
+  }
   .chore-card h3 { margin: 0 0 0.5rem 0; font-size: 1.2rem; }
   .ct-item {
     display: flex;

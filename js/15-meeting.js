@@ -244,8 +244,21 @@ function mmMaybeAskCatchUp() {
    sitting, and every synced write is a full-document upload. */
 let mmReturn = null;
 
+/* Which element actually scrolls the meeting. It was the sheet, and three
+   places read `.sheet` directly to save and restore a scroll position. The
+   sheet is a bounded flex column now and does not scroll at all — .mm-body
+   does — so a hardcoded `.sheet` would silently store 0 and restore 0, and
+   every return-to-meeting would land at the top of the step.
+
+   One owner, so the next layout change moves one selector. Falls back to the
+   sheet for any state where the body has not been rendered yet. */
+function mmScroller() {
+  return document.querySelector('#familyMeetingOverlay .mm-body')
+      || document.querySelector('#familyMeetingOverlay .sheet');
+}
+
 function mmCaptureReturn(kid, dayIdx) {
-  const sheet = document.querySelector('#familyMeetingOverlay .sheet');
+  const sheet = mmScroller();
   mmReturn = {
     source: 'weekly-meeting',
     weekKey: mmWeekKey(),
@@ -276,7 +289,7 @@ function mmReturnToMeeting() {
   mmMaxStep = Math.max(mmMaxStep, mmStep);
   renderMeetingMode();
   requestAnimationFrame(() => {
-    const sheet = document.querySelector('#familyMeetingOverlay .sheet');
+    const sheet = mmScroller();
     if (sheet) sheet.scrollTop = r.scrollTop || 0;
   });
 }
@@ -743,8 +756,14 @@ function renderMeetingMode() {
    `data-mm-field` rather than DOM position, so a re-render that changes the
    surrounding markup still finds the right input. */
 function mmCaptureUiState(host) {
-  const sheet = document.querySelector('#familyMeetingOverlay .sheet');
-  const scrollTop = sheet ? sheet.scrollTop : 0;
+  /* The VALUE, not the element. The scroller used to be the sheet, which
+     survives `host.innerHTML = ...`; it is .mm-body now, which does not — it is
+     inside the host being replaced. Holding the node meant restoring a scroll
+     position onto a detached element, which is silent: every tap in steps 3 and
+     4 quietly jumped the family back to the top of the panel. Re-query after
+     the swap. */
+  const scroller = mmScroller();
+  const scrollTop = scroller ? scroller.scrollTop : 0;
   const active = document.activeElement;
   let field = null, selStart = null, selEnd = null;
   if (active && host && host.contains(active)) {
@@ -758,7 +777,8 @@ function mmCaptureUiState(host) {
     } catch (e) { /* number/date inputs throw on selectionStart — ignore */ }
   }
   return function restore() {
-    if (sheet) sheet.scrollTop = scrollTop;
+    const scroller = mmScroller();
+    if (scroller) scroller.scrollTop = scrollTop;
     if (!field || !host) return;
     const next = host.querySelector(`[data-mm-field="${CSS.escape(field)}"]`);
     if (!next) return;
