@@ -854,14 +854,6 @@
   /* ── INVERTED MODE (default) ──
      Free cells = bright profile color (saturated, celebratory).
      Scheduled cells = neutral grey with small icon. */
-  .tg-wrap.inverted .tg-free-jenn {
-    background: #ffd166;
-    background-image: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 50%);
-  }
-  .tg-wrap.inverted .tg-free-jess {
-    background: #6fb1fc;
-    background-image: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 50%);
-  }
   .tg-wrap.inverted .tg-block {
     background: #d4ccb8 !important;
     color: #6b5d4f;
@@ -905,54 +897,8 @@
   }
   .tg-toggle:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 rgba(42,35,32,0.15); }
 
-  .tg-wo-day {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 4px 3px;
-    background: var(--paper);
-    border-radius: 8px;
-    border: 1.5px solid var(--paper-line);
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .tg-wo-day.today { border-color: var(--accent); border-width: 2px; }
-  .tg-wo-day:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
-  .tg-wo-daylabel {
-    font-size: calc(0.7rem * var(--fs-scale, 1));
-    font-weight: 700;
-    color: var(--ink);
-    text-align: center;
-    margin-bottom: 2px;
-  }
-  .tg-wo-bricks {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1.5px;
-  }
-  .tg-wo-brick {
-    height: 8px;
-    border-radius: 2px;
-    border: 1px solid rgba(42,35,32,0.22);
-    box-shadow:
-      inset 0 2px 0 rgba(255,255,255,0.35),
-      inset 0 -2px 0 rgba(0,0,0,0.06),
-      2px 0 0 0 rgba(42,35,32,0.12),
-      6px 0 0 0 rgba(42,35,32,0.12);
-  }
-  .tg-wo-count {
-    font-size: calc(0.7rem * var(--fs-scale, 1));
-    color: var(--ink-light);
-    text-align: center;
-    margin-top: 3px;
-    font-family: 'Patrick Hand', cursive;
-  }
 
   /* Brick colors — shared between weekly overview and MY TIME panel */
-  .tg-brick-sleep-meal { background: #c8bfa8; }       /* muted tan/grey */
-  .tg-brick-learning   { background: #9aa5b8; }       /* muted slate */
-  .tg-brick-free-jenn  { background: #ffd166; } /* bright yellow */
-  .tg-brick-free-jess  { background: #6fb1fc; } /* bright sky blue */
 
   /* ── MY FREE TIME TODAY summary panel (kid view) ── */
   .tg-mytime {
@@ -967,54 +913,6 @@
     background: linear-gradient(135deg, #e3f0ff 0%, #fffdf5 100%);
     border-color: var(--accent-blue);
     box-shadow: 3px 4px 0 rgba(111,177,252,0.3);
-  }
-  .tg-mytime-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-  }
-  .tg-mytime-label {
-    font-family: 'Gochi Hand', cursive;
-    font-size: 1.3rem;
-    color: var(--ink);
-    transform: rotate(-1deg);
-  }
-  .tg-mytime-value {
-    font-family: 'Gochi Hand', cursive;
-    font-size: 1.8rem;
-    color: var(--accent-strong);
-    font-weight: 700;
-  }
-  .tg-mytime-bricks {
-    display: grid;
-    grid-template-columns: repeat(32, 1fr); /* full 6am–10pm window; set precisely in JS */
-    gap: 2px;
-    margin: 0.5rem 0;
-  }
-  .tg-mytime-brick {
-    height: 14px;
-    border-radius: 3px;
-    border: 1px solid rgba(42,35,32,0.2);
-    box-shadow:
-      inset 0 3px 0 rgba(255,255,255,0.28),
-      inset 0 -2px 0 rgba(0,0,0,0.06),
-      3px 0 0 0 rgba(42,35,32,0.1),
-      8px 0 0 0 rgba(42,35,32,0.1);
-  }
-  .tg-mytime--today {
-    outline: 3px solid var(--accent);
-    outline-offset: 2px;
-  }
-  .tg-mytime[data-profile="jess"].tg-mytime--today {
-    outline-color: var(--accent-blue);
-  }
-  .tg-mytime-breakdown {
-    font-size: calc(0.85rem * var(--fs-scale, 1));
-    color: var(--ink-light);
-    text-align: center;
-    margin-top: 0.4rem;
-    font-style: italic;
   }
 
   /* .week-grid lived here, for the retired compact week view. */
@@ -1042,8 +940,6 @@
   }
   .day-label { font-size: calc(0.75rem * var(--fs-scale, 1)); font-weight: 700; text-transform: uppercase; color: var(--ink-light); letter-spacing: 1px; }
   .day-date { font-size: 1.2rem; font-weight: 800; font-family: 'Gochi Hand', cursive; }
-  .day-bar-wrap { width: 100%; flex: 1; display: flex; flex-direction: column; gap: 2px; justify-content: flex-end; padding: 0 2px; }
-  .day-bar-seg { border-radius: 3px; min-height: 4px; }
   .day-mood { font-size: 1.3rem; margin-top: 2px; }
   .day-pct { font-size: calc(0.7rem * var(--fs-scale, 1)); color: var(--ink-light); font-weight: 700; }
 
@@ -3819,11 +3715,6 @@
   .print-ctrl-hint { font-size: calc(0.85rem * var(--fs-scale, 1)); color: var(--ink-light); }
   /* Printed summary */
   .print-summary { margin-top: 0.7rem; padding-top: 0.4rem; border-top: 2px solid var(--ink); }
-  .print-summary-title { font-family: 'Gochi Hand', cursive; font-size: 12pt; font-weight: 700; margin-bottom: 0.3rem; }
-  .print-summary-window { font-family: 'Patrick Hand', sans-serif; font-size: 9pt; color: #666; font-weight: 600; }
-  .print-cat-chips { display: flex; flex-wrap: wrap; gap: 0.35rem 0.7rem; font-size: 9.5pt; }
-  .print-cat-chip { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
-  .print-cat-dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
   .print-sleep { margin-top: 0.45rem; font-size: 9.5pt; padding: 0.3rem 0.5rem; background: #f3eefb; border-radius: 8px; }
   @media print { .print-sleep { background: #f3eefb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   .print-week-grid {
@@ -4140,9 +4031,6 @@
     40%  { transform: scale(1.45) rotate(12deg); }
     70%  { transform: scale(0.9) rotate(-5deg); }
     100% { transform: scale(1.1) rotate(0deg); }
-  }
-  .mood-btn.selected {
-    animation: moodPop 0.4s ease-out forwards;
   }
 
   /* ── Audit fix: iPad portrait (820px) explicit base layout ── */

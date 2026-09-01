@@ -280,50 +280,8 @@ function renderPrintSheet() {
 
 // Weekly time-per-category totals over the chosen window, plus unscheduled
 // (free) time and an age-based sleep recommendation.
-function buildPrintSummary(keys, acts, winStartMin, winEndMin) {
-  const catMin = {};
-  let planned = 0;
-  keys.forEach(k=>{
-    (getDayBlocks(k) || []).forEach(b=>{
-      const segStart = Math.max(b.startMin, winStartMin);
-      const segEnd   = Math.min(b.startMin + (b.durationMin||0), winEndMin);
-      const mins = segEnd - segStart;
-      if (mins <= 0) return;
-      const act = acts.find(a=>a.id===b.actId);
-      const g = activityGroup(act);
-      catMin[g] = (catMin[g]||0) + mins;
-      planned += mins;
-    });
-  });
-  const windowWeekMin = (winEndMin - winStartMin) * 7;
-  const free = Math.max(0, windowWeekMin - planned);
+/* buildPrintSummary lived here — the week's totals as a footer under the print
+   grid. It had no caller: the summary was dropped from the sheet deliberately
+   (see the note above the render) and the function outlived it. */
 
-  // Ordered chips: each scheduled group with time, then unscheduled time.
-  // Same six groups and the same words as every other surface — this sheet used
-  // to carry its own copy of the label table, which is how it came to disagree.
-  let chips = '';
-  GROUP_ORDER.forEach(g=>{
-    if (!catMin[g]) return;
-    chips += `<span class="print-cat-chip"><span class="print-cat-dot" style="background:${groupHex(g) /* safe: from ACTIVITY_GROUPS */}"></span>${groupLabel(g)}: <b>${fmtHrsMin(catMin[g])}</b></span>`;
-  });
-  chips += `<span class="print-cat-chip"><span class="print-cat-dot" style="background:#fff;border:1px solid #999"></span>🌤 Unscheduled: <b>${fmtHrsMin(free)}</b></span>`;
-
-  // Sleep recommendation from age. currentAge always answers, so the "set the
-  // age to see this" fallback has nothing left to explain.
-  const age = currentAge();
-  const sleep = recommendedSleep(age);
-  let sleepHtml = '';
-  if (sleep) {
-    const perWeek = sleep.min * 7;
-    sleepHtml = `<div class="print-sleep">💤 <b>Recommended sleep (age ${age}, ${sleep.group}):</b> ${sleep.min}–${sleep.max}h per night · aim for ~${perWeek}h across the week</div>`;
-  }
-
-  return `
-    <div class="print-summary">
-      <div class="print-summary-title">This week at a glance <span class="print-summary-window">(${fmtHrsMin(winEndMin-winStartMin)}/day window)</span></div>
-      <div class="print-cat-chips">${chips}</div>
-      ${sleepHtml}
-    </div>
-  `;
-}
 
