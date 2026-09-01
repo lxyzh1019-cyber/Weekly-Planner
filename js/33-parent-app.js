@@ -206,10 +206,89 @@ function paRenderSchool() {
   scRenderImport();
 }
 
+/* ── What a change to the hours would do to cards already placed ──
+   schoolHours() drives the bands and any NEW School Day card, so moving the
+   hours used to leave every card already on the calendar sitting at the old
+   time — the app quietly disagreeing with itself, and no way to see it except
+   by opening each week.
+
+   This reports before anything is written. It is a pure read: it decides
+   nothing and mutates nothing, so the preview a parent is shown is literally
+   what paApplySchoolHours will do.
+
+   Blocks store ABSOLUTE planner minutes (START_MIN + the relative hour), which
+   is the same arithmetic renderSchoolDayBanner uses when it places one. */
+function paSchoolCardPlan(hours) {
+  const today = todayKey();
+  const startMin = START_MIN + hours.startMin;
+  const durationMin = hours.endMin - hours.startMin;
+  const plan = { update: [], locked: [], clashes: 0, byKid: { jenn: 0, jess: 0 }, startMin, durationMin };
+  ['jenn', 'jess'].forEach(kid => {
+    const weeks = (state.profiles[kid] || {}).weeks || {};
+    Object.keys(weeks).forEach(dayKey => {
+      // Today forward only. A past school day is a record of what happened.
+      if (dayKey < today) return;
+      const arr = weeks[dayKey] || [];
+      arr.forEach(b => {
+        if (!b || b.actId !== 'school_day' || b.startMin == null) return;
+        plan.byKid[kid]++;
+        /* A card a child completed or a parent confirmed is a record, not a
+           plan. Never rewritten, whatever the hours now say. */
+        if (b.completed || b.confirmed) { plan.locked.push({ kid, dayKey, id: b.id }); return; }
+        if (b.startMin === startMin && b.durationMin === durationMin) return;
+        /* Report a clash; never resolve one. Moving somebody else's activity to
+           make room is a decision this screen does not get to take. */
+        const clash = arr.some(o => o && o.id !== b.id && o.startMin != null
+          && startMin < o.startMin + (o.durationMin || 0)
+          && startMin + durationMin > o.startMin);
+        if (clash) plan.clashes++;
+        plan.update.push({ kid, dayKey, id: b.id, clash });
+      });
+    });
+  });
+  return plan;
+}
+
+/* Applies exactly what paSchoolCardPlan reported, and writes NOTHING itself —
+   the single saveAll() belongs to the caller. setDayBlocks saves on every call,
+   so touching fourteen cards through it would be fourteen uploads of the whole
+   family document. */
+function paApplySchoolCardPlan(plan) {
+  let n = 0;
+  plan.update.forEach(({ kid, dayKey, id }) => {
+    const arr = ((state.profiles[kid] || {}).weeks || {})[dayKey] || [];
+    const b = arr.find(x => x && x.id === id);
+    if (!b) return;
+    /* Only the two fields the hours decide. The id, note, objectives, buffers,
+       series data and whose card it is all survive — a card that came back with
+       a new id would read as a different block to every merge on every
+       device. */
+    b.startMin = plan.startMin;
+    b.durationMin = plan.durationMin;
+    markItemUpdated(b);
+    n++;
+  });
+  return n;
+}
+
+function paSchoolPlanSummary(plan, oldH, newH) {
+  const at = (rel) => formatTimeFromMin(START_MIN + rel);
+  const lines = [
+    `Now: ${at(oldH.startMin)}–${at(oldH.endMin)}`,
+    `New: ${at(newH.startMin)}–${at(newH.endMin)}`,
+    '',
+    `School Day cards from today on — Jenn ${plan.byKid.jenn}, Jess ${plan.byKid.jess}.`,
+    `${plan.update.length} can be updated.`,
+  ];
+  if (plan.locked.length) lines.push(`${plan.locked.length} left alone — already done or confirmed.`);
+  if (plan.clashes) lines.push(`${plan.clashes} would then overlap another activity. Nothing else is moved.`);
+  return lines.join('\n');
+}
+
 /* Saving is one function per card rather than one per field: a school day whose
    start moved past its end is not a state worth storing for the half-second
    between two field changes. */
-function paSaveSchoolHours() {
+async function paSaveSchoolHours() {
   const startMin = timeStrToRelMin((document.getElementById('paSchoolStart') || {}).value);
   const endMin = timeStrToRelMin((document.getElementById('paSchoolEnd') || {}).value);
   const lunchStartMin = timeStrToRelMin((document.getElementById('paSchoolLunch') || {}).value);
@@ -219,12 +298,34 @@ function paSaveSchoolHours() {
   if (lunchMin > 0 && (lunchStartMin == null || lunchStartMin < startMin || lunchStartMin + lunchMin > endMin)) {
     showToast('Lunch recess has to sit inside the school day'); return;
   }
+  const next = { startMin, endMin, lunchStartMin: lunchMin > 0 ? lunchStartMin : null, lunchMin };
+  const prev = schoolHours();
+  /* A lunch-only change moves the bands and leaves the card's own start and end
+     where they are, so there is nothing to reconcile and nothing to ask. */
+  const dayMoved = prev.startMin !== startMin || prev.endMin !== endMin;
+  const plan = dayMoved ? paSchoolCardPlan(next) : null;
+
+  let apply = false;
+  if (plan && plan.update.length) {
+    const answer = await showChoice(paSchoolPlanSummary(plan, prev, next), [
+      { id: 'update', label: 'Save and update future cards',
+        sub: `${plan.update.length} card${plan.update.length === 1 ? '' : 's'} moved to the new hours` },
+      { id: 'hours', label: 'Save for new school days only',
+        sub: 'Cards already on the calendar stay where they are' },
+    ], { cancelLabel: 'Cancel' });
+    if (!answer) return;
+    apply = answer === 'update';
+  }
+
   if (!state.shared.schoolCal) state.shared.schoolCal = {};
-  state.shared.schoolCal.hours = { startMin, endMin, lunchStartMin: lunchMin > 0 ? lunchStartMin : null, lunchMin };
-  saveAll();
+  state.shared.schoolCal.hours = next;
+  const moved = apply ? paApplySchoolCardPlan(plan) : 0;
+  saveAll();   // once, for the setting and every card it touched
   paRenderSchool();
   refreshCurrentScreen && refreshCurrentScreen();
-  showToast('School hours saved 🏫');
+  showToast(moved
+    ? `School hours saved — ${moved} card${moved === 1 ? '' : 's'} moved 🏫`
+    : 'School hours saved 🏫');
 }
 
 function paSaveSchoolTerm() {

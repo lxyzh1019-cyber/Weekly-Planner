@@ -8431,6 +8431,107 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* CHANGING SCHOOL HOURS RECONCILES THE CARDS ALREADY PLACED.
+     schoolHours() drives the bands and any NEW School Day card, so moving the
+     hours left every card already on the calendar at the old time — the app
+     disagreeing with itself, visible only by opening each week.
+
+     The three things this has to get right are the ones a careless sweep gets
+     wrong: a completed or confirmed card is a record and must not move, a past
+     day is not touched at all, and everything the card carries besides its two
+     time fields has to survive. Plus the write count: setDayBlocks saves on
+     every call, so a per-card write would upload the whole family document once
+     per card. */
+  checks.schoolHoursReconcileTheCardsAlreadyPlaced = await page.evaluate(async () => {
+    const bad = [];
+    const wasProfile = profile;
+    const wasCal = JSON.parse(JSON.stringify(state.shared.schoolCal || {}));
+    const wasWeeks = JSON.parse(JSON.stringify(state.profiles.jenn.weeks || {}));
+    const wasChoice = window.showChoice;
+    const wasSave = window.saveAll;
+    profile = 'parent'; parentViewing = 'jenn';
+    const today = todayKey();
+    const soon = toDayKeyInZone(new Date(Date.now() + 2 * 864e5));
+    const past = toDayKeyInZone(new Date(Date.now() - 2 * 864e5));
+    try {
+      const before = schoolHours();
+      const oldStart = START_MIN + before.startMin;
+      const oldDur = before.endMin - before.startMin;
+      const card = (id, extra) => Object.assign({
+        id, actId: 'school_day', startMin: oldStart, durationMin: oldDur,
+        objectives: [{ id: 'o1', text: 'keep' }], note: 'do not lose me', checklistState: {},
+        travelBuffer: true, travelBufMin: 15, getReadyBuffer: true, getReadyBufMin: 15,
+        seriesId: 'sr-keep', completed: false, confirmed: false,
+      }, extra || {});
+
+      state.profiles.jenn.weeks[soon] = [card('sc-move')];
+      state.profiles.jenn.weeks[today] = [card('sc-done', { completed: true, confirmed: true })];
+      state.profiles.jenn.weeks[past] = [card('sc-past')];
+
+      const next = { startMin: before.startMin + 60, endMin: before.endMin + 60,
+                     lunchStartMin: null, lunchMin: 0 };
+      const plan = paSchoolCardPlan(next);
+      const ids = plan.update.map(u => u.id);
+      if (!ids.includes('sc-move')) bad.push('a movable future card was not in the plan');
+      if (ids.includes('sc-done')) bad.push('a confirmed card was going to be rewritten');
+      if (ids.includes('sc-past')) bad.push('a card on a past day was going to be rewritten');
+      if (!plan.locked.some(l => l.id === 'sc-done')) bad.push('the confirmed card was not reported as protected');
+
+      // A clash is reported, and the other activity is not moved.
+      state.profiles.jenn.weeks[soon] = [card('sc-move'),
+        { id: 'sc-other', actId: 'piano', startMin: oldStart + 60, durationMin: 60, checklistState: {} }];
+      const clashPlan = paSchoolCardPlan(next);
+      if (!clashPlan.clashes) bad.push('an overlap after the move was not reported');
+
+      /* One write for the setting and every card it touches. */
+      let saves = 0;
+      window.saveAll = () => { saves++; };
+      window.showChoice = async () => 'update';
+      document.getElementById('paSchoolStart').value =
+        `${String(Math.floor((START_MIN + next.startMin) / 60)).padStart(2, '0')}:${String((START_MIN + next.startMin) % 60).padStart(2, '0')}`;
+      document.getElementById('paSchoolEnd').value =
+        `${String(Math.floor((START_MIN + next.endMin) / 60)).padStart(2, '0')}:${String((START_MIN + next.endMin) % 60).padStart(2, '0')}`;
+      document.getElementById('paSchoolLunchMin').value = '0';
+      await paSaveSchoolHours();
+      if (saves !== 1) bad.push(`saving the hours wrote ${saves} times, expected 1`);
+
+      const moved = (state.profiles.jenn.weeks[soon] || []).find(b => b.id === 'sc-move');
+      if (!moved) bad.push('the card being reconciled disappeared');
+      else {
+        if (moved.startMin !== START_MIN + next.startMin) bad.push('the card did not take the new start');
+        if (moved.durationMin !== next.endMin - next.startMin) bad.push('the card did not take the new length');
+        if (moved.note !== 'do not lose me') bad.push('the note was lost');
+        if (!moved.objectives || !moved.objectives.length) bad.push('the objectives were lost');
+        if (!moved.travelBuffer || !moved.getReadyBuffer) bad.push('the buffers were lost');
+        if (moved.seriesId !== 'sr-keep') bad.push('the series link was lost');
+        if (moved.id !== 'sc-move') bad.push('the card came back with a different id');
+      }
+      const other = (state.profiles.jenn.weeks[soon] || []).find(b => b.id === 'sc-other');
+      if (other && other.startMin !== oldStart + 60) bad.push('the clashing activity was moved automatically');
+      const done = (state.profiles.jenn.weeks[today] || []).find(b => b.id === 'sc-done');
+      if (done && done.startMin !== oldStart) bad.push('the confirmed card moved after all');
+      const old = (state.profiles.jenn.weeks[past] || []).find(b => b.id === 'sc-past');
+      if (old && old.startMin !== oldStart) bad.push('a past card moved after all');
+
+      /* Choosing "new school days only" saves the hours and leaves cards be. */
+      state.profiles.jenn.weeks[soon] = [card('sc-stay')];
+      window.showChoice = async () => 'hours';
+      document.getElementById('paSchoolStart').value = '08:15';
+      document.getElementById('paSchoolEnd').value = '15:15';
+      await paSaveSchoolHours();
+      const stayed = (state.profiles.jenn.weeks[soon] || []).find(b => b.id === 'sc-stay');
+      if (stayed && stayed.startMin !== oldStart) bad.push('"new days only" moved an existing card');
+      if (schoolHours().startMin !== timeStrToRelMin('08:15')) bad.push('"new days only" did not save the hours');
+    } finally {
+      window.showChoice = wasChoice;
+      window.saveAll = wasSave;
+      state.shared.schoolCal = wasCal;
+      state.profiles.jenn.weeks = wasWeeks;
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
   /* FAMILY HERO IS A CHORE, NOT A PRIZE.
      Its four activities sat in REWARD_POOLS with rewardLocked:true, so the
      thing a child had to earn was the right to help at home — and the first-run
