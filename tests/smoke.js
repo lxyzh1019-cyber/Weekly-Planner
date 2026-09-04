@@ -5404,14 +5404,85 @@ function findChromium() {
      off the day timeline. The 🎯 must go through completeQuest — the single
      owner of completion, XP and sticker counting — rather than a second copy of
      it, which is the thing the Today rules actually forbid. */
+  /* The clock passing is not the same fact as having done it.
+
+     tdCurrentAndNext is driven entirely by tdNowMin: once the last block's
+     window closes, `current` and `next` are both null whatever was actually
+     ticked. Three pieces of copy hung off that and read as reassurance —
+     "Everything on today is done. That is the whole day.", "the rest of today
+     is yours", and the quiet-hours "nothing left tonight" — while the hero
+     four centimetres above printed a real 2/8 counted through isBlockCompleted.
+     Two numbers on one screen, disagreeing, and the cheerful one was wrong.
+
+     This seeds a day whose blocks have all elapsed and NONE of which were
+     ticked, then ticks them. */
+  checks.todayDoesNotCallAnUntickedDayDone = await page.evaluate(async () => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const key = todayKey();
+    const bad = [];
+    const now = tdNowMin();
+    // Before about half past midnight nothing can have elapsed yet, and an
+    // empty-so-far day is a real answer rather than the case under test.
+    if (now <= 35) return true;
+    const s1 = Math.max(0, now - 180);
+    const s2 = Math.max(0, now - 120);
+    setDayBlocks(key, [
+      { id: 'td-open1', actId: 'piano',     startMin: s1, durationMin: 30 },
+      { id: 'td-open2', actId: 'breakfast', startMin: s2, durationMin: 30 },
+    ], 'jenn');
+
+    const before = tdCurrentAndNext('jenn');
+    if (before.current || before.next) bad.push('fixture blocks have not all elapsed');
+    if (before.openCount !== 2) bad.push('expected 2 open blocks, got ' + before.openCount);
+    // The one claim that must hold whichever branch of tdEncouragement fires
+    // (a pending grade outranks the block lines, and other checks leave some).
+    if (/Everything on today is done/.test(tdEncouragement('jenn'))) {
+      bad.push('called a wholly unticked day done');
+    }
+
+    tdRenderToday();
+    const heroBefore = (document.querySelector('#tdWrap .td-now-head') || {}).textContent || '';
+    if (/the rest of today is yours/.test(heroBefore)) bad.push('hero handed her a day she has not finished');
+    if (!/still open|to tick/.test(heroBefore)) bad.push('hero does not say what is open: ' + heroBefore.trim());
+
+    // Tick both through the owner rather than by writing the flag. completeQuest
+    // takes (blockId, dayKey) — the child comes from the active profile.
+    const keyBefore = tdTickKey('jenn');
+    completeQuest('td-open1', key);
+    completeQuest('td-open2', key);
+    const after = tdCurrentAndNext('jenn');
+    if (after.openCount !== 0) bad.push('ticking did not close them, openCount ' + after.openCount);
+    // The minute-tick cache has to notice, or the hero keeps the stale count.
+    if (tdTickKey('jenn') === keyBefore) bad.push('the tick key did not move, so a tick would not repaint');
+
+    tdRenderToday();
+    const heroAfter = (document.querySelector('#tdWrap .td-now-head') || {}).textContent || '';
+    if (/still open/.test(heroAfter)) bad.push('hero still claims something is open: ' + heroAfter.trim());
+
+    return bad.length ? bad : true;
+  });
+
   checks.todayIsWhereTheDayGetsDone = await page.evaluate(async () => {
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const key = todayKey();
     const bad = [];
+    /* Both windows are placed relative to NOW, and neither can contain it.
+
+       They used to be fixed at 3pm and 7am, which made this a check that passed
+       twenty-three hours a day: run it between 3 and 4 in the afternoon and the
+       piano block is the RUNNING one, the hero owns it, and it is deliberately
+       absent from the list below (theHeroIsTheOnlyPlaceTheRunningBlockAppears
+       holds that on purpose) — so the count came to 1 and this failed. A test
+       that reports a problem by the hour of day is the same shape as the ones
+       CLAUDE.md already records: it cannot be trusted either way. */
+    const now = tdNowMin();
+    const q1Start = Math.min(now + 60, 1380);                              // always ahead
+    const q2Start = now >= 150 ? now - 150 : Math.min(now + 150, 1380);    // never running
     setDayBlocks(key, [
-      { id: 'td-q1', actId: 'piano',      startMin: 15 * 60, durationMin: 60 },
-      { id: 'td-q2', actId: 'breakfast',  startMin: 7 * 60,  durationMin: 30 },
+      { id: 'td-q1', actId: 'piano',      startMin: q1Start, durationMin: 60 },
+      { id: 'td-q2', actId: 'breakfast',  startMin: q2Start, durationMin: 30 },
     ], 'jenn');
     /* The list leads with what is NEXT now, so a 7am breakfast is behind the
        "earlier today" fold by mid-morning, and anything past the third item is
@@ -5434,8 +5505,9 @@ function findChromium() {
     if (cards.length !== 2) bad.push(`expected 2 quest cards, got ${cards.length}`);
     // Within each group the order is still the day's own order.
     const times = [...document.querySelectorAll('#tdWrap .quest-time')].map(e => e.textContent.trim());
-    if (!times.includes('7:00am') || !times.includes('3:00pm')) {
-      bad.push(`the day is not fully listed: ${times.join(', ')}`);
+    const wantQ1 = formatTimeFromMin(q1Start), wantQ2 = formatTimeFromMin(q2Start);
+    if (!times.includes(wantQ1) || !times.includes(wantQ2)) {
+      bad.push(`the day is not fully listed: want ${wantQ2} and ${wantQ1}, got ${times.join(', ')}`);
     }
 
     /* 🎯 completes through the owning path: block marked done AND XP moved.

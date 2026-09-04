@@ -67,14 +67,27 @@ function tdCurrentAndNext(kid) {
     .slice()
     .sort((a, b) => (a.startMin || 0) - (b.startMin || 0));
   const now = tdNowMin();
-  let current = null, next = null;
+  let current = null, next = null, openCount = 0;
   for (const b of blocks) {
     const start = b.startMin || 0;
     const end = start + (b.durationMin || 0);
     if (now >= start && now < end) { current = b; continue; }
     if (start > now && !next) next = b;
+    /* Elapsed and never ticked. THE CLOCK PASSING IS NOT THE SAME FACT AS
+       HAVING DONE IT, and this screen used to conflate them: `current` and
+       `next` are both null once the last block's window closes, whatever was
+       actually done, so at eight in the evening on a day where nothing was
+       ticked Today said "Everything on today is done. That is the whole day."
+       — printed a few centimetres under a hero counting a real 2/8 from
+       isBlockCompleted. Two numbers on one screen, disagreeing, and the
+       cheerful one was the lie.
+
+       isBlockCompleted (js/36-status.js) is the owner of "did she perform it?"
+       and blockHasEnded of "has its time passed?" — the whole reason those are
+       two functions. Call them; do not re-derive either here. */
+    if (end <= now && !isBlockCompleted(b, kid)) openCount++;
   }
-  return { current, next, count: blocks.length };
+  return { current, next, count: blocks.length, openCount };
 }
 
 /* ── Today's jobs, and why the card was blank ──
@@ -673,9 +686,18 @@ function tdEncouragement(kid) {
   if (fresh.length) return `Mum answered ${fresh.length === 1 ? 'something' : fresh.length + ' things'}. Have a look.`;
   const waiting = mrWaitingCount(kid, wk);
   if (waiting) return `${waiting} ${waiting === 1 ? 'job is' : 'jobs are'} with Mum. Nothing else to do about ${waiting === 1 ? 'it' : 'them'}.`;
-  const { current, next, count } = tdCurrentAndNext(kid);
+  const { current, next, count, openCount } = tdCurrentAndNext(kid);
   if (current) return 'You are in the middle of something. Keep going.';
   if (next) return 'Nothing right now. Next thing is coming up.';
+  if (count && openCount) {
+    /* Forward-voiced, and it does not decide what happened. An unticked block
+       is a block nobody has said anything about yet — she may well have done it
+       and not tapped — so this offers the tick rather than recording a failure.
+       Off days are a valid state (CLAUDE.md) and so is a day that got away. */
+    return openCount === 1
+      ? 'One thing from earlier is still open. Tick it if you did it.'
+      : `${openCount} things from earlier are still open. Tick what you did.`;
+  }
   if (count) return 'Everything on today is done. That is the whole day.';
   return 'Nothing planned today. A quiet day is allowed.';
 }
@@ -741,7 +763,7 @@ function tdRenderToday() {
   currentDayKey = todayKey();
   const wk = ctThisWeekKey();
   const d = tdTodayIndex();
-  const { current, next } = tdCurrentAndNext(kid);
+  const { current, next, openCount } = tdCurrentAndNext(kid);
   const quests = tdQuestsToday(kid);
   /* One call per render, read by both the hero and the cards, so a clash is
      never flagged in one place and not the other. */
@@ -874,11 +896,29 @@ function tdRenderToday() {
       </div>${nextHtml}`;
   } else if (tdInQuietHours()) {
     /* Nine at night with nothing left on the plan. "The rest of today is yours"
-       is true and useless — the rest of that day is sleep. */
+       is true and useless — the rest of that day is sleep.
+
+       But "nothing left" has to mean nothing left, not merely that the clock has
+       moved past everything. Both this branch and the one below are reached with
+       current, next and breakNow all null, and none of those asks whether
+       anything was DONE — so an unticked evening produced the same reassurance
+       as a finished one. openCount is the difference. */
     nowHtml = `<div class="td-now-head">
         <div class="td-now-icon">🌙</div>
         <div class="td-now-line"><div class="td-now-name">Winding down</div>
-          <div class="td-now-sub">nothing left tonight — rest is the plan</div></div>
+          <div class="td-now-sub">${openCount
+            ? `${escapeHtml(String(openCount))} still to tick — or leave ${openCount === 1 ? 'it' : 'them'} for tomorrow`
+            : 'nothing left tonight — rest is the plan'}</div></div>
+      </div>`;
+  } else if (openCount) {
+    /* The clock is past everything on the plan and some of it was never ticked.
+       Not "the rest of today is yours" — that names a freedom she has not been
+       given yet — and not an accusation either: the tick is offered, and the
+       earlier fold is where it lives. */
+    nowHtml = `<div class="td-now-head">
+        <div class="td-now-icon">📋</div>
+        <div class="td-now-line"><div class="td-now-name">Nothing scheduled next</div>
+          <div class="td-now-sub">${escapeHtml(String(openCount))} from earlier ${openCount === 1 ? 'is' : 'are'} still open</div></div>
       </div>`;
   } else {
     nowHtml = `<div class="td-now-head">
@@ -1280,9 +1320,14 @@ const TD_TICK_MS = 60000;
 let tdTickShowing = null;
 
 function tdTickKey(kid) {
-  const { current, next } = tdCurrentAndNext(kid);
+  const { current, next, openCount } = tdCurrentAndNext(kid);
   const breakNow = current ? null : tdBreakNow(tdQuestsToday(kid), next);
-  return [current ? current.id : '', next ? next.id : '', breakNow ? 'brk' : '', todayKey()].join('|');
+  /* openCount is in the key so a tick repaints. Without it the minute-tick
+     cache saw an unchanged string — ticking a block changes neither what is
+     running nor what is next — and the hero went on saying how many things were
+     still open after she had closed one. */
+  return [current ? current.id : '', next ? next.id : '', breakNow ? 'brk' : '',
+          String(openCount), todayKey()].join('|');
 }
 
 function tdTick() {
