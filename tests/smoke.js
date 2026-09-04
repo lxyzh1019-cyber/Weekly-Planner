@@ -4215,7 +4215,12 @@ function findChromium() {
     // Structural equality, not spot-checks. A few keys legitimately recompute on
     // load — the streak-freeze week is rewritten by getProfData for the current
     // week — so they are excluded by name rather than by loosening the compare.
-    const RECOMPUTED = new Set(['streakFreezeWeek', 'streakFreezeTokens', 'unlockedThisWeek']);
+    /* dataEpoch MUST differ, and that is the point of it: a Replace increments
+       it so every other device takes the restore whole instead of merging its
+       own newer-stamped records back over the top. A restore that left the
+       epoch alone would be the bug. */
+    const RECOMPUTED = new Set(['streakFreezeWeek', 'streakFreezeTokens', 'unlockedThisWeek',
+                                'dataEpoch']);
     const diff = [];
     (function walk(a, b, at) {
       if (diff.length > 6) return;
@@ -5416,6 +5421,86 @@ function findChromium() {
 
      This seeds a day whose blocks have all elapsed and NONE of which were
      ticked, then ticks them. */
+  /* Two devices saved different versions of one record, and a grown-up decides.
+
+     The merge layer settles what is DISPLAYED by the stamp, because something
+     has to be on screen and the girls must never be shown a warning about a
+     sync. But a stamp orders two writes and says nothing about which one holds
+     the better information, so the loser is kept and this is where it is
+     chosen between. What this drives is the real panel and the real writer —
+     cfChoose, not a hand-written flag. */
+  checks.aConflictIsAParentsToDecideNotTheClocks = await page.evaluate(async () => {
+    const bad = [];
+    profile = 'parent'; parentViewing = 'jenn';
+    ctEnsureShared();
+    const wk = ctThisWeekKey();
+    const older = { opId: 'ipad-2',  baseOpId: 'seed-1', updatedAt: 200, wentWell: ['swimming'] };
+    const newer = { opId: 'phone-2', baseOpId: 'seed-1', updatedAt: 300, wentWell: ['reading'] };
+    // What the merge would have left behind, recorded the way mergeWholeRecord
+    // records it — both versions, and which one went on screen.
+    state.shared.chore.reflections = state.shared.chore.reflections || {};
+    state.shared.chore.reflections[wk] = { jenn: JSON.parse(JSON.stringify(newer)) };
+    state.shared.conflicts = [{
+      id: conflictId('reflections', wk + '/jenn', 'ipad-2', 'phone-2'),
+      store: 'reflections', key: wk + '/jenn',
+      at: Date.now(), updatedAt: Date.now(), shownOpId: 'phone-2',
+      versions: [JSON.parse(JSON.stringify(older)), JSON.parse(JSON.stringify(newer))],
+    }];
+
+    if (openConflicts().length !== 1) bad.push('the open conflict was not counted');
+
+    // On screen for real: the 44px measurement below reads a live rect, and a
+    // hidden panel measures zero.
+    showScreen('parent');
+    // The banner has to find a grown-up rather than wait to be looked for, so
+    // it is drawn on whichever parent panel is open.
+    setParentTab('now');
+    const banner = document.getElementById('parentConflictBanner');
+    if (!banner || banner.hidden) bad.push('no banner on the parent portal');
+    else if (!/different versions/.test(banner.textContent)) {
+      bad.push('banner does not say what happened: ' + banner.textContent.trim());
+    }
+
+    // The panel offers both, and marks which is on screen without favouring it.
+    setParentTab('conflicts');
+    const cards = [...document.querySelectorAll('#cfWrap .cf-version')];
+    if (cards.length !== 2) bad.push(`expected 2 versions offered, got ${cards.length}`);
+    const shownTags = [...document.querySelectorAll('#cfWrap .cf-version--shown')];
+    if (shownTags.length !== 1) bad.push('exactly one version should be marked as showing');
+    const text = (document.getElementById('cfWrap') || {}).textContent || '';
+    if (!/swimming/.test(text) || !/reading/.test(text)) {
+      bad.push('both versions must be legible, got: ' + text.slice(0, 200));
+    }
+    // Every pick button clears the house 44px floor — a parent surface, but the
+    // floor is about thumbs, not about which screen.
+    const picks = [...document.querySelectorAll('#cfWrap [data-cf-pick]')];
+    if (picks.length !== 2) bad.push(`expected 2 pick buttons, got ${picks.length}`);
+    picks.forEach((b, i) => {
+      const r = b.getBoundingClientRect();
+      if (r.height < 44) bad.push(`pick button ${i} is ${Math.round(r.height)}px tall`);
+    });
+
+    // Choose the OLDER one. That is the whole point: newer is not right.
+    const olderBtn = picks.find(b => b.closest('.cf-version').textContent.includes('swimming'));
+    if (!olderBtn) { bad.push('could not find the older version to keep'); return bad; }
+    olderBtn.click();
+
+    const kept = state.shared.chore.reflections[wk].jenn;
+    if (!kept || kept.wentWell[0] !== 'swimming') {
+      bad.push('the chosen version was not written back: ' + JSON.stringify(kept));
+    }
+    // Ancestry is the version that was ON SCREEN, not the one chosen — or the
+    // other device raises a second conflict about a settled question.
+    if (kept.baseOpId !== 'phone-2') bad.push('resolution does not descend from what was displayed');
+    if (!kept.opId || kept.opId === 'ipad-2') bad.push('the resolution is not a new version');
+    if (openConflicts().length !== 0) bad.push('the row is still open after choosing');
+    const bannerAfter = document.getElementById('parentConflictBanner');
+    if (bannerAfter && !bannerAfter.hidden) bad.push('the banner outlived the decision');
+
+    state.shared.conflicts = [];
+    return bad.length ? bad : true;
+  });
+
   checks.todayDoesNotCallAnUntickedDayDone = await page.evaluate(async () => {
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();

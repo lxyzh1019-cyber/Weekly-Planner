@@ -59,7 +59,7 @@ Or individually:
 # 1. Syntax check every module + the duplicate-name guard
 npm run check
 
-# 2. Merge-layer unit tests (78 checks, must be 78/78)
+# 2. Merge-layer unit tests (90 checks, must be 90/90)
 npm run test:merge
 
 # 3. The calibrated XP values (see tools/xp-calibrate.js)
@@ -110,7 +110,7 @@ still rendered and only the numbers were wrong.
 
 `js/04-merge.js` implements conflict-aware sync: id-keyed unions, deletion
 tombstones (30-day pruning), deep object merge, per-week chore arbitration, and
-a forward-only `lastGradeSeen` watermark. It has 78 unit tests running the real
+a forward-only `lastGradeSeen` watermark. It has 90 unit tests running the real
 shipped functions.
 
 Do not refactor it for style. Change it only to fix a demonstrated sync bug, and
@@ -154,6 +154,61 @@ exactly as before, so no stale device can un-record a meeting that predates the
 mechanism. Same idiom as `goalsByWeek` and `mergeEarnings`: the unstamped case
 keeps the union. The guard checks this too; mark a genuine exception
 `// safe-delete: <why>`.
+
+## A conflict is a parent's to decide, not the clock's
+
+Whole-record arbitration keeps the higher stamp. That is the right **display**
+rule — something has to be on screen, and the girls must never be shown a
+warning about a sync — but it is the wrong final answer: **a timestamp orders
+two writes and says nothing about which one is right.** The loser used to be
+discarded with no trace.
+
+Detection is **causal, not chronological**. Every write records `opId` (this
+write) and `baseOpId` (the version it was made from), stamped by
+`markItemUpdated` (`js/03-sync.js`). `recordsDiverged` (`js/04-merge.js`) then
+asks whether either version descends from the other:
+
+| | |
+|---|---|
+| `R.baseOpId === L.opId` | R was edited from L → fast-forward, no conflict |
+| `L.baseOpId === R.opId` | L was edited from R → fast-forward, no conflict |
+| `L.opId === R.opId` | the same version |
+| neither, and both stamped | **a real conflict** |
+| either lacks `opId` | pre-upgrade: nothing provable, treated as ordinary |
+
+That distinction is the whole design. Raise a conflict on every ordinary
+catch-up sync and a parent is asked about all of them and learns to dismiss the
+question, which is worse than not asking.
+
+On a genuine conflict the newer stamp is what **displays** and the loser is kept
+whole in `state.shared.conflicts`. The id is derived from store, key and **both**
+opIds, sorted — so two devices independently generate the *same* id and the row
+merges to one. `conflicts:` is the **last** key in `mergeSharedState`'s literal,
+and that is load-bearing: properties evaluate in source order and `chore:` is
+what discovers a conflict, so reading it any earlier drops the row that was just
+found.
+
+`js/38-conflicts.js` is the chooser, under the parent portal's **App**. It owns
+no data: it hands one of two versions the app already holds back to the writer
+that owns it. Two rules learned from tests rather than from thinking:
+
+- **The cards quote her own words.** A summary that counts ("2 things that went
+  well") reads identically for both versions, so the screen would ask a parent
+  to choose between two things it refused to show them.
+- **A resolution's content is the version chosen; its `baseOpId` is the version
+  that was on SCREEN** (`shownOpId`). Descending from the chosen one looks
+  natural and raises a *second* conflict about the question just settled,
+  because the other device is not holding that version.
+
+## Backup Replace is authoritative — `dataEpoch`
+
+Replace used to mean replace on one device. It pushed, every other device
+received that snapshot and **merged** it, and their newer-stamped records won
+arbitration and went straight back up. `_meta`-adjacent `state.shared.dataEpoch`
+is incremented by `bkApplyBackup(…, 'replace')` and nowhere else;
+`mergeRemoteState` takes a **higher** incoming epoch wholesale with no merging
+at all, and it is a `Math.max` high-water mark in the merge so it can never go
+backwards.
 
 ## Two devices, or it isn't tested
 

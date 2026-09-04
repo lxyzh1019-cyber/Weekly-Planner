@@ -14,7 +14,7 @@ The three parts, individually:
 npm run check         # tests/check-syntax.js, tests/check-globals.js
 
 # 2. Sync/merge unit tests (no dependencies, runs the real merge functions)
-npm run test:merge    # tests/merge.test.js — 78 assertions, must be 78/78
+npm run test:merge    # tests/merge.test.js — 90 assertions, must be 90/90
 
 # 3. Headless-browser smoke test (boots the app, drives the main flows)
 npm run test:smoke    # tests/smoke.js — screenshots land in tests/out/

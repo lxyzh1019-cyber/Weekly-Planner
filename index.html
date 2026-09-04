@@ -555,6 +555,11 @@
     <div class="parent-back" id="parentBack" hidden></div>
   </div>
 
+  <!-- Two devices saved different versions of one record. Above the panels, so
+       it is on every destination rather than only the one that can fix it. It
+       renders nothing at all when there is nothing to decide. -->
+  <div id="parentConflictBanner" hidden></div>
+
   <!-- TAB: Weekly Review — Function 1: review & confirm THIS week.
        All reviewing/confirming happens inside the family meeting; this tab
        is a read-only hub that shows status and launches the meeting. -->
@@ -682,6 +687,9 @@
        size readout. Rendered by bkRenderPanel (js/30-backup.js). -->
   <div class="parent-panel" id="ptab-backup" role="tabpanel" hidden>
     <div id="bkWrap"></div>
+  </div>
+  <div class="parent-panel" id="ptab-conflicts" role="tabpanel" hidden>
+    <div id="cfWrap"></div>
   </div>
 </div>
 
@@ -1472,6 +1480,7 @@
      99-main.js still owns all top-level executable code. -->
 <script src="js/36-status.js"></script>
 <script src="js/37-reflection.js"></script>
+<script src="js/38-conflicts.js"></script>
 <script src="js/99-main.js"></script>
 </body>
 </html>

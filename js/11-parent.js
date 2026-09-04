@@ -35,6 +35,7 @@ const PARENT_PANEL_DEST = {
   setup: 'setup', options: 'setup', routines: 'setup', tasks: 'setup', money: 'setup', rules: 'setup',
   copyweek: 'setup',
   app: 'app', access: 'app', profiles: 'app', prefs: 'app', school: 'app', backup: 'app',
+  conflicts: 'app',
 };
 /* The landing lists. The boundary test decides which side a row falls on:
    does changing this alter what the girls are asked to do, or what it is
@@ -56,6 +57,7 @@ const PARENT_LANDINGS = {
     { panel: 'prefs',    icon: '🎛️', title: 'Preferences',     sub: 'Reading size on grown-up screens' },
     { panel: 'school',   icon: '📅', title: 'School calendar', sub: 'Term dates and days off — replaced each August' },
     { panel: 'backup',   icon: '🗄️', title: 'Backup and data', sub: 'Export, restore, cloud size, and resetting a week' },
+    { panel: 'conflicts', icon: '🔀', title: 'Two versions',      sub: 'When two devices saved different versions of one record' },
   ],
 };
 
@@ -207,6 +209,7 @@ const PARENT_PANEL_RENDERERS = {
   prefs:    () => paRenderPrefs(),
   school:   () => paRenderSchool(),
   backup:   () => bkRenderPanel(),
+  conflicts: () => cfRenderPanel(),
 };
 
 function renderParentHome() {
@@ -257,6 +260,10 @@ function setParentTab(tab) {
   // Isolated the way showScreen isolates its hooks: one panel that throws must
   // not be able to leave the portal on a blank screen with no way back.
   if (render) { try { render(); } catch (e) { console.error('parent panel render failed:', tab, e); } }
+  // On every panel, not just App: a disagreement between two devices has to
+  // find a grown-up rather than wait to be looked for. It draws nothing at all
+  // when there is nothing to decide.
+  if (typeof cfRenderBanner === 'function') { try { cfRenderBanner(); } catch (e) { console.error('cfRenderBanner failed', e); } }
   parentRenderNav();
 }
 

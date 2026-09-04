@@ -124,6 +124,18 @@ function bkValidateBackup(data) {
    substituted wholesale, and shared settings are laid over the current
    structural defaults so no key the app expects goes missing. migrateBlocks
    then normalises any legacy {start, slots} blocks, exactly as a page load does. */
+/* The generation counter that makes Replace authoritative. Local, monotonic,
+   and pushed inside _meta — see mergeRemoteState (js/03-sync.js). */
+function bkDataEpoch() {
+  return Number(state.shared && state.shared.dataEpoch) || 0;
+}
+function bkBumpDataEpoch() {
+  if (!state.shared) state.shared = {};
+  // Past whatever any other device has said, including one that restored while
+  // this one was offline — a restore is the newest word by definition.
+  state.shared.dataEpoch = Math.max(bkDataEpoch(), Number(lastRemoteDataEpoch) || 0) + 1;
+}
+
 function bkApplyBackup(data, mode) {
   if (mode === 'merge') {
     mergeRemoteState({ profiles: data.profiles, shared: data.shared });
@@ -132,6 +144,20 @@ function bkApplyBackup(data, mode) {
       if (k === 'jenn' || k === 'jess') state.profiles[k] = data.profiles[k];
     });
     state.shared = { ...state.shared, ...(data.shared || {}) };
+    /* Replace has to mean replace on every device, not just this one.
+
+       It did not. This device took the backup, pushed it, and every other
+       device received that snapshot and MERGED it — their newer-stamped records
+       survived arbitration and went straight back up. The dialog promises "Make
+       this device match the backup exactly" and delivered exactly that: one
+       device, until the next sync undid it.
+
+       dataEpoch is the one thing a merge cannot argue with. mergeRemoteState
+       compares the incoming epoch to the local one: a HIGHER epoch is taken
+       wholesale with no merging at all, an equal one merges as usual, a lower
+       one is ignored and this device re-pushes. It is incremented here and
+       nowhere else, so nothing but a deliberate Replace can trigger it. */
+    bkBumpDataEpoch();
     migrateBlocks();
   }
   saveAll();

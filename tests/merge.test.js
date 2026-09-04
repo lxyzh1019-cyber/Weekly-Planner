@@ -740,5 +740,113 @@ function sync(a, b) {
     && t['id-0'] === undefined);
 }
 
+
+/* ══ Same record, two devices ══════════════════════════════════════════════
+   The case the whole conflict mechanism exists for, and the one thing a
+   timestamp genuinely cannot settle: which of two versions is RIGHT. */
+
+// An ordinary catch-up — this device simply has not seen that edit yet — is a
+// fast-forward and nobody is asked anything. If this raised a conflict, a parent
+// would be asked about every sync and would learn to dismiss the question.
+{
+  const base   = { id: 'r1', opId: 'a-1', updatedAt: 100 };
+  const edited = { id: 'r1', opId: 'a-2', baseOpId: 'a-1', updatedAt: 200 };
+  check('an edit made from the version we hold is not a conflict',
+    api.recordsDiverged(base, edited) === false &&
+    api.recordsDiverged(edited, base) === false);
+}
+
+// The same version on both sides, and a record from before this shipped: no
+// conflict either way. Nothing can be PROVED about an unstamped record, and a
+// false alarm is worse than a missed one here.
+{
+  check('the same version, and pre-upgrade records, raise nothing',
+    api.recordsDiverged({ opId: 'a-1' }, { opId: 'a-1' }) === false &&
+    api.recordsDiverged({ opId: 'a-1' }, { updatedAt: 5 }) === false &&
+    api.recordsDiverged({ updatedAt: 5 }, { updatedAt: 9 }) === false);
+}
+
+// Two edits from a common ancestor neither device has seen. This is a conflict.
+{
+  const fromIpad  = { opId: 'a-2', baseOpId: 'a-1', updatedAt: 200 };
+  const fromPhone = { opId: 'b-2', baseOpId: 'a-1', updatedAt: 300 };
+  check('two edits from an unseen common ancestor do conflict',
+    api.recordsDiverged(fromIpad, fromPhone) === true);
+}
+
+// Both devices must name the same disagreement the same way, or the log grows
+// two rows for one problem and resolving either leaves the other open.
+{
+  check('both devices generate the same conflict id',
+    api.conflictId('reflections', 'w1/jenn', 'a-2', 'b-2') ===
+    api.conflictId('reflections', 'w1/jenn', 'b-2', 'a-2'));
+}
+
+// End to end: two devices write different reflections for the same week while
+// neither can see the other. The newer one is what shows — nothing on a kid
+// screen changes and nothing waits for an adult — and the other is KEPT.
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  const seed = st => {
+    st.shared.chore.reflections = { w1: { jenn: { opId: 'seed-1', updatedAt: 100, wentWell: ['a'] } } };
+  };
+  on(ipad, seed); on(phone, seed);
+  sync(ipad, phone);
+  on(ipad,  st => { st.shared.chore.reflections.w1.jenn =
+    { opId: 'ipad-2', baseOpId: 'seed-1', updatedAt: 200, wentWell: ['swimming'] }; });
+  on(phone, st => { st.shared.chore.reflections.w1.jenn =
+    { opId: 'phone-2', baseOpId: 'seed-1', updatedAt: 300, wentWell: ['reading'] }; });
+  sync(ipad, phone);
+
+  const shownI = ipad.state.shared.chore.reflections.w1.jenn;
+  const shownP = phone.state.shared.chore.reflections.w1.jenn;
+  const rowsI = ipad.state.shared.conflicts || [];
+  const rowsP = phone.state.shared.conflicts || [];
+  check('the newer version is what both devices display',
+    shownI.opId === 'phone-2' && shownP.opId === 'phone-2');
+  check('the displaced version is kept, once, on both devices',
+    rowsI.length === 1 && rowsP.length === 1 && rowsI[0].id === rowsP[0].id);
+  check('the kept row holds BOTH versions, not just the loser',
+    rowsI[0].versions.length === 2 &&
+    rowsI[0].versions.some(v => v.opId === 'ipad-2') &&
+    rowsI[0].versions.some(v => v.opId === 'phone-2'));
+  check('the row records which one is on screen', rowsI[0].shownOpId === 'phone-2');
+
+  // A parent picks the OLDER one — the whole point, since newer is not right.
+  // It is written back as a new version descending from the one chosen, so the
+  // other device fast-forwards instead of raising the same disagreement again.
+  const keep = rowsI[0].versions.find(v => v.opId === 'ipad-2');
+  const shown = rowsI[0].shownOpId;
+  const resolvedAt = Date.now() + 60000;   // the row already carries a real stamp
+  on(ipad, st => {
+    // Content from the chosen version; ancestry from the one on screen — which
+    // is what cfChoose (js/38-conflicts.js) does, and why.
+    st.shared.chore.reflections.w1.jenn =
+      Object.assign({}, keep, { opId: 'ipad-3', baseOpId: shown, updatedAt: resolvedAt });
+    st.shared.conflicts[0].resolvedAt = resolvedAt;
+    st.shared.conflicts[0].updatedAt = resolvedAt;
+  });
+  sync(ipad, phone);
+  check('the older version a parent chose is what both devices then show',
+    phone.state.shared.chore.reflections.w1.jenn.wentWell[0] === 'swimming' &&
+    ipad.state.shared.chore.reflections.w1.jenn.wentWell[0] === 'swimming');
+  check('resolving it closes the row on both devices',
+    (ipad.state.shared.conflicts || []).every(c => c.resolvedAt) &&
+    (phone.state.shared.conflicts || []).every(c => c.resolvedAt));
+  check('and choosing does not raise a second conflict',
+    (phone.state.shared.conflicts || []).length === 1);
+}
+
+// A restore from backup is the one write that is not a merge. Replace bumps
+// dataEpoch, and a higher epoch is taken whole — otherwise the other device's
+// newer-stamped records win arbitration and go straight back up, which is
+// exactly how Replace used to undo itself on the next sync.
+{
+  check('dataEpoch only ever counts up',
+    api.mergeSharedState({ dataEpoch: 5 }, { dataEpoch: 2 }).dataEpoch === 5 &&
+    api.mergeSharedState({ dataEpoch: 2 }, { dataEpoch: 5 }).dataEpoch === 5 &&
+    api.mergeSharedState({}, {}).dataEpoch === 0);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

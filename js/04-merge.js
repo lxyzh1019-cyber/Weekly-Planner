@@ -45,6 +45,93 @@ function mergeArrayById(localArr, remoteArr, tombScope) {
   return out;
 }
 
+/* ── A conflict is two people editing one thing without seeing each other ──
+
+   Whole-record arbitration keeps the higher stamp and drops the other outright.
+   That is the right DISPLAY rule — something has to be on screen, and the girls
+   must never be shown a warning about a sync — but it is the wrong final answer,
+   because a timestamp orders two writes and says nothing about which one holds
+   the better information. The loser used to be discarded with no trace.
+
+   Now it is kept, and a grown-up decides. Three questions, in order:
+
+     1. Is this a conflict at all? Only if neither version descends from the
+        other (see markItemUpdated, js/03-sync.js). An ordinary catch-up sync —
+        this device simply has not seen that edit yet — is a fast-forward and
+        nobody is asked anything. Getting this wrong in the other direction is
+        what makes conflict prompts useless: ask about everything and they are
+        dismissed without being read.
+     2. What is displayed meanwhile? The newer stamp, exactly as before. Nothing
+        about the kid screens changes and nothing is blocked waiting on an adult.
+     3. Where does the loser go? Into state.shared.conflicts, whole.
+
+   The id is derived from the store, the key and BOTH opIds, so the two devices
+   independently generate the SAME id for the same disagreement and the entry
+   merges to one row instead of two. */
+const CONFLICT_MAX = 40;
+function conflictId(store, key, aId, bId) {
+  // Sorted, so the id does not depend on which device is doing the merging.
+  const pair = [String(aId || '?'), String(bId || '?')].sort();
+  return 'cf:' + store + ':' + key + ':' + pair[0] + ':' + pair[1];
+}
+/* Can we PROVE these two diverged? Anything less is treated as no conflict —
+   a false negative loses nothing that was not already lost, while a false
+   positive trains a parent to ignore the question. */
+function recordsDiverged(l, r) {
+  if (!l || !r) return false;
+  const lo = l.opId, ro = r.opId;
+  if (!lo || !ro) return false;          // pre-upgrade record: nothing provable
+  if (lo === ro) return false;           // the same version
+  if (r.baseOpId && r.baseOpId === lo) return false;   // remote edited from local
+  if (l.baseOpId && l.baseOpId === ro) return false;   // local edited from remote
+  return true;
+}
+/* Keep the version that is NOT being displayed, so it can be chosen later. */
+function recordConflict(store, key, local, remote, shownOpId) {
+  if (!state.shared) state.shared = {};
+  if (!Array.isArray(state.shared.conflicts)) state.shared.conflicts = [];
+  const list = state.shared.conflicts;
+  const id = conflictId(store, key, local.opId, remote.opId);
+  if (list.some(c => c && c.id === id)) return;        // already known, either side
+  list.push({
+    id, store, key,
+    at: mergeNow(),
+    // updatedAt so the row merges by id like everything else, and so a
+    // resolution made on one device wins over the unresolved copy on the other.
+    updatedAt: mergeNow(),
+    shownOpId: shownOpId || null,
+    versions: [clonePlain(local), clonePlain(remote)],
+  });
+  // Bounded. Resolved rows go first, then the oldest — a conflict nobody has
+  // answered is worth more than one somebody has.
+  if (list.length > CONFLICT_MAX) {
+    list.sort((a, b) => (a.resolvedAt ? 0 : 1) - (b.resolvedAt ? 0 : 1) || (a.at || 0) - (b.at || 0));
+    list.splice(0, list.length - CONFLICT_MAX);
+  }
+}
+function clonePlain(v) {
+  try { return JSON.parse(JSON.stringify(v)); } catch (e) { return v; }
+}
+/* Arbitrate one whole record, and remember the loser if the two genuinely
+   diverged. `store` and `key` are what the parent screen shows to say WHICH
+   disagreement this is, so they have to be readable: 'reflection', 'weekPlan'.
+   Returns the version to display. */
+function mergeWholeRecord(store, key, local, remote, stampOf) {
+  if (local == null) return remote;
+  if (remote == null) return local;
+  const ts = stampOf || (rec => Number(rec && rec.updatedAt) || 0);
+  const shown = mergePickNewer(local, remote, ts(local), ts(remote));
+  if (recordsDiverged(local, remote)) {
+    recordConflict(store, key, local, remote, shown.opId);
+  }
+  return shown;
+}
+/* Has a grown-up dealt with this one? */
+function conflictIsOpen(c) { return !!c && !c.resolvedAt; }
+function openConflicts() {
+  return ((state.shared && state.shared.conflicts) || []).filter(conflictIsOpen);
+}
+
 /* ── Deletion tombstones ──
    mergeArrayById is a union: without a record of the delete, a removed block
    comes straight back from any device still holding it (this is what broke
@@ -241,10 +328,14 @@ function mergeSharedChore(localChore, remoteChore) {
       const lw = lf[wk] || {}, rw = rf[wk] || {};
       out[field][wk] = {};
       new Set([...Object.keys(lw), ...Object.keys(rw)]).forEach(kid => {
-        const l = lw[kid], r = rw[kid];
-        if (l == null) { out[field][wk][kid] = r; return; }
-        if (r == null) { out[field][wk][kid] = l; return; }
-        out[field][wk][kid] = stampOf(r) > stampOf(l) ? r : l;
+        /* These three are the records a PERSON wrote — what she said about her
+           week, what she decided to do with her money, what a grown-up agreed
+           to. Newest-wins still decides what is displayed, but where the two
+           genuinely diverged the loser is kept for a parent to choose from
+           rather than discarded: a stamp orders two writes and says nothing
+           about which one holds the better information. */
+        out[field][wk][kid] = mergeWholeRecord(field, wk + '/' + kid,
+          lw[kid], rw[kid], stampOf);
       });
     });
   });
@@ -506,6 +597,19 @@ function mergeSharedState(localShared, remoteShared) {
     // an 'ovr:' tombstone so removing an override sticks instead of coming
     // back from the other device's copy.
     builtInRoutineOverrides: mergeRoutineOverrides(ls.builtInRoutineOverrides, rs.builtInRoutineOverrides),
+    /* Two devices that edited the same record without seeing each other. Rows
+       are id-keyed and the id is derived from both opIds, so each device
+       generates the SAME id for one disagreement and it merges to a single row.
+       Never tombstoned: a conflict is resolved, not deleted, and the resolution
+       is a field on the row so it travels like any other edit. */
+    conflicts: mergeArrayById(ls.conflicts, rs.conflicts),
+    /* The restore generation. A high-water mark, never a value: it only ever
+       counts up, and taking the max means a device that was offline through a
+       Replace cannot drag it back down and re-trigger one. mergeRemoteState
+       short-circuits on a HIGHER remote epoch before it ever reaches here, so
+       by this point the two are level and the max is simply the safe way to
+       say so. */
+    dataEpoch: Math.max(Number(ls.dataEpoch) || 0, Number(rs.dataEpoch) || 0),
     // The family's own school calendar. Newest whole record wins — its
     // days-off list is an array, so a field-by-field merge could otherwise
     // produce a calendar that exists on neither device.
@@ -515,6 +619,19 @@ function mergeSharedState(localShared, remoteShared) {
     // maps union, groups arbitrate by id (+ tombstones), goals by per-week ts.
     chore: mergeSharedChore(ls.chore, rs.chore),
     tombstones: ensureTombstones(),
+    /* Two devices that edited the same record without seeing each other. Rows
+       are id-keyed and the id is derived from both opIds, so each device
+       generates the SAME id for one disagreement and it merges to a single row.
+       Never tombstoned: a conflict is resolved, not deleted, and the resolution
+       is a field on the row so it travels like any other edit.
+
+       LAST in this literal, and that is load-bearing: object properties are
+       evaluated in source order, and `chore` above is what DISCOVERS a conflict
+       and pushes it onto ls.conflicts. Read this key any earlier and the row
+       just found is read before it exists and then thrown away by the
+       assignment — the merge would report no conflict and quietly drop the
+       losing version, which is the exact bug this mechanism exists to fix. */
+    conflicts: mergeArrayById(ls.conflicts, rs.conflicts),
     };
 }
 
@@ -525,5 +642,6 @@ if (typeof module !== 'undefined' && module.exports) {
     mergeEarnings, mergeSharedChore, mergeWeeks, mergeProfileState,
     mergePickNewer, pruneTombstones, TOMBSTONE_MAX, CHORE_WEEK_STATE_MAPS,
     mergeParentDayConfirm, mergeSchoolCal, mergeRoutineOverrides,
-    mergeSharedState };
+    mergeSharedState, recordsDiverged, mergeWholeRecord, conflictId,
+    openConflicts, conflictIsOpen, CONFLICT_MAX };
 }
