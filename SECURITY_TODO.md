@@ -86,6 +86,13 @@ not the PIN.
 - **The merge layer is no longer last-write-wins.** This section used to say two
   devices editing in the same window could drop one side's change. That was true
   of the old wholesale-replace merge and is **no longer accurate**:
+  **Superseded in part — see `AUDIT-SYNC.md`.** The caveats below about the
+  device clock and about `mergeRemoteState` were fixed after this was written:
+  arbitration stamps come from `syncNow` throughout, four unarbitrated shared
+  keys were closed, and `tests/check-shared-merge.js` now fails the build on a
+  fifth. The one remaining caveat here that is still open is the shared
+  `shared_state` document, which is the Firebase Auth work this file owns.
+
   `mergeRemoteState` (`js/03-sync.js`) now runs the conflict-aware layer in
   `js/04-merge.js` — id-keyed unions (`mergeArrayById`), deletion tombstones with
   30-day pruning (`mergeTombstones`), per-week chore arbitration, a forward-only
