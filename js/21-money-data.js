@@ -789,7 +789,9 @@ function mnyConfirmWeek(weekKey, kid, by) {
   if (!isParent()) { showToast('A grown-up confirms the week 🔒'); return false; }
   const c = mnyEnsureWeekMaps();
   if (!c.weekConfirms[weekKey]) c.weekConfirms[weekKey] = {};
-  c.weekConfirms[weekKey][kid] = { by: by || 'a grown-up', at: Date.now(), reopenedAt: null,
+  // syncNow: mergeSharedChore arbitrates weekConfirms on this stamp against
+  // reopenedAt, which is already corrected — two clocks cannot be compared.
+  c.weekConfirms[weekKey][kid] = { by: by || 'a grown-up', at: syncNow(), reopenedAt: null,
                                    checks: (c.weekConfirms[weekKey][kid] || {}).checks || {} };
   saveAll();
   return true;

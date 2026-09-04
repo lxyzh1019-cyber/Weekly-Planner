@@ -4215,7 +4215,12 @@ function findChromium() {
     // Structural equality, not spot-checks. A few keys legitimately recompute on
     // load — the streak-freeze week is rewritten by getProfData for the current
     // week — so they are excluded by name rather than by loosening the compare.
-    const RECOMPUTED = new Set(['streakFreezeWeek', 'streakFreezeTokens', 'unlockedThisWeek']);
+    /* dataEpoch MUST differ, and that is the point of it: a Replace increments
+       it so every other device takes the restore whole instead of merging its
+       own newer-stamped records back over the top. A restore that left the
+       epoch alone would be the bug. */
+    const RECOMPUTED = new Set(['streakFreezeWeek', 'streakFreezeTokens', 'unlockedThisWeek',
+                                'dataEpoch']);
     const diff = [];
     (function walk(a, b, at) {
       if (diff.length > 6) return;
@@ -5404,14 +5409,165 @@ function findChromium() {
      off the day timeline. The 🎯 must go through completeQuest — the single
      owner of completion, XP and sticker counting — rather than a second copy of
      it, which is the thing the Today rules actually forbid. */
+  /* The clock passing is not the same fact as having done it.
+
+     tdCurrentAndNext is driven entirely by tdNowMin: once the last block's
+     window closes, `current` and `next` are both null whatever was actually
+     ticked. Three pieces of copy hung off that and read as reassurance —
+     "Everything on today is done. That is the whole day.", "the rest of today
+     is yours", and the quiet-hours "nothing left tonight" — while the hero
+     four centimetres above printed a real 2/8 counted through isBlockCompleted.
+     Two numbers on one screen, disagreeing, and the cheerful one was wrong.
+
+     This seeds a day whose blocks have all elapsed and NONE of which were
+     ticked, then ticks them. */
+  /* Two devices saved different versions of one record, and a grown-up decides.
+
+     The merge layer settles what is DISPLAYED by the stamp, because something
+     has to be on screen and the girls must never be shown a warning about a
+     sync. But a stamp orders two writes and says nothing about which one holds
+     the better information, so the loser is kept and this is where it is
+     chosen between. What this drives is the real panel and the real writer —
+     cfChoose, not a hand-written flag. */
+  checks.aConflictIsAParentsToDecideNotTheClocks = await page.evaluate(async () => {
+    const bad = [];
+    profile = 'parent'; parentViewing = 'jenn';
+    ctEnsureShared();
+    const wk = ctThisWeekKey();
+    const older = { opId: 'ipad-2',  baseOpId: 'seed-1', updatedAt: 200, wentWell: ['swimming'] };
+    const newer = { opId: 'phone-2', baseOpId: 'seed-1', updatedAt: 300, wentWell: ['reading'] };
+    // What the merge would have left behind, recorded the way mergeWholeRecord
+    // records it — both versions, and which one went on screen.
+    state.shared.chore.reflections = state.shared.chore.reflections || {};
+    state.shared.chore.reflections[wk] = { jenn: JSON.parse(JSON.stringify(newer)) };
+    state.shared.conflicts = [{
+      id: conflictId('reflections', wk + '/jenn', 'ipad-2', 'phone-2'),
+      store: 'reflections', key: wk + '/jenn',
+      at: Date.now(), updatedAt: Date.now(), shownOpId: 'phone-2',
+      versions: [JSON.parse(JSON.stringify(older)), JSON.parse(JSON.stringify(newer))],
+    }];
+
+    if (openConflicts().length !== 1) bad.push('the open conflict was not counted');
+
+    // On screen for real: the 44px measurement below reads a live rect, and a
+    // hidden panel measures zero.
+    showScreen('parent');
+    // The banner has to find a grown-up rather than wait to be looked for, so
+    // it is drawn on whichever parent panel is open.
+    setParentTab('now');
+    const banner = document.getElementById('parentConflictBanner');
+    if (!banner || banner.hidden) bad.push('no banner on the parent portal');
+    else if (!/different versions/.test(banner.textContent)) {
+      bad.push('banner does not say what happened: ' + banner.textContent.trim());
+    }
+
+    // The panel offers both, and marks which is on screen without favouring it.
+    setParentTab('conflicts');
+    const cards = [...document.querySelectorAll('#cfWrap .cf-version')];
+    if (cards.length !== 2) bad.push(`expected 2 versions offered, got ${cards.length}`);
+    const shownTags = [...document.querySelectorAll('#cfWrap .cf-version--shown')];
+    if (shownTags.length !== 1) bad.push('exactly one version should be marked as showing');
+    const text = (document.getElementById('cfWrap') || {}).textContent || '';
+    if (!/swimming/.test(text) || !/reading/.test(text)) {
+      bad.push('both versions must be legible, got: ' + text.slice(0, 200));
+    }
+    // Every pick button clears the house 44px floor — a parent surface, but the
+    // floor is about thumbs, not about which screen.
+    const picks = [...document.querySelectorAll('#cfWrap [data-cf-pick]')];
+    if (picks.length !== 2) bad.push(`expected 2 pick buttons, got ${picks.length}`);
+    picks.forEach((b, i) => {
+      const r = b.getBoundingClientRect();
+      if (r.height < 44) bad.push(`pick button ${i} is ${Math.round(r.height)}px tall`);
+    });
+
+    // Choose the OLDER one. That is the whole point: newer is not right.
+    const olderBtn = picks.find(b => b.closest('.cf-version').textContent.includes('swimming'));
+    if (!olderBtn) { bad.push('could not find the older version to keep'); return bad; }
+    olderBtn.click();
+
+    const kept = state.shared.chore.reflections[wk].jenn;
+    if (!kept || kept.wentWell[0] !== 'swimming') {
+      bad.push('the chosen version was not written back: ' + JSON.stringify(kept));
+    }
+    // Ancestry is the version that was ON SCREEN, not the one chosen — or the
+    // other device raises a second conflict about a settled question.
+    if (kept.baseOpId !== 'phone-2') bad.push('resolution does not descend from what was displayed');
+    if (!kept.opId || kept.opId === 'ipad-2') bad.push('the resolution is not a new version');
+    if (openConflicts().length !== 0) bad.push('the row is still open after choosing');
+    const bannerAfter = document.getElementById('parentConflictBanner');
+    if (bannerAfter && !bannerAfter.hidden) bad.push('the banner outlived the decision');
+
+    state.shared.conflicts = [];
+    return bad.length ? bad : true;
+  });
+
+  checks.todayDoesNotCallAnUntickedDayDone = await page.evaluate(async () => {
+    profile = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const key = todayKey();
+    const bad = [];
+    const now = tdNowMin();
+    // Before about half past midnight nothing can have elapsed yet, and an
+    // empty-so-far day is a real answer rather than the case under test.
+    if (now <= 35) return true;
+    const s1 = Math.max(0, now - 180);
+    const s2 = Math.max(0, now - 120);
+    setDayBlocks(key, [
+      { id: 'td-open1', actId: 'piano',     startMin: s1, durationMin: 30 },
+      { id: 'td-open2', actId: 'breakfast', startMin: s2, durationMin: 30 },
+    ], 'jenn');
+
+    const before = tdCurrentAndNext('jenn');
+    if (before.current || before.next) bad.push('fixture blocks have not all elapsed');
+    if (before.openCount !== 2) bad.push('expected 2 open blocks, got ' + before.openCount);
+    // The one claim that must hold whichever branch of tdEncouragement fires
+    // (a pending grade outranks the block lines, and other checks leave some).
+    if (/Everything on today is done/.test(tdEncouragement('jenn'))) {
+      bad.push('called a wholly unticked day done');
+    }
+
+    tdRenderToday();
+    const heroBefore = (document.querySelector('#tdWrap .td-now-head') || {}).textContent || '';
+    if (/the rest of today is yours/.test(heroBefore)) bad.push('hero handed her a day she has not finished');
+    if (!/still open|to tick/.test(heroBefore)) bad.push('hero does not say what is open: ' + heroBefore.trim());
+
+    // Tick both through the owner rather than by writing the flag. completeQuest
+    // takes (blockId, dayKey) — the child comes from the active profile.
+    const keyBefore = tdTickKey('jenn');
+    completeQuest('td-open1', key);
+    completeQuest('td-open2', key);
+    const after = tdCurrentAndNext('jenn');
+    if (after.openCount !== 0) bad.push('ticking did not close them, openCount ' + after.openCount);
+    // The minute-tick cache has to notice, or the hero keeps the stale count.
+    if (tdTickKey('jenn') === keyBefore) bad.push('the tick key did not move, so a tick would not repaint');
+
+    tdRenderToday();
+    const heroAfter = (document.querySelector('#tdWrap .td-now-head') || {}).textContent || '';
+    if (/still open/.test(heroAfter)) bad.push('hero still claims something is open: ' + heroAfter.trim());
+
+    return bad.length ? bad : true;
+  });
+
   checks.todayIsWhereTheDayGetsDone = await page.evaluate(async () => {
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const key = todayKey();
     const bad = [];
+    /* Both windows are placed relative to NOW, and neither can contain it.
+
+       They used to be fixed at 3pm and 7am, which made this a check that passed
+       twenty-three hours a day: run it between 3 and 4 in the afternoon and the
+       piano block is the RUNNING one, the hero owns it, and it is deliberately
+       absent from the list below (theHeroIsTheOnlyPlaceTheRunningBlockAppears
+       holds that on purpose) — so the count came to 1 and this failed. A test
+       that reports a problem by the hour of day is the same shape as the ones
+       CLAUDE.md already records: it cannot be trusted either way. */
+    const now = tdNowMin();
+    const q1Start = Math.min(now + 60, 1380);                              // always ahead
+    const q2Start = now >= 150 ? now - 150 : Math.min(now + 150, 1380);    // never running
     setDayBlocks(key, [
-      { id: 'td-q1', actId: 'piano',      startMin: 15 * 60, durationMin: 60 },
-      { id: 'td-q2', actId: 'breakfast',  startMin: 7 * 60,  durationMin: 30 },
+      { id: 'td-q1', actId: 'piano',      startMin: q1Start, durationMin: 60 },
+      { id: 'td-q2', actId: 'breakfast',  startMin: q2Start, durationMin: 30 },
     ], 'jenn');
     /* The list leads with what is NEXT now, so a 7am breakfast is behind the
        "earlier today" fold by mid-morning, and anything past the third item is
@@ -5434,8 +5590,9 @@ function findChromium() {
     if (cards.length !== 2) bad.push(`expected 2 quest cards, got ${cards.length}`);
     // Within each group the order is still the day's own order.
     const times = [...document.querySelectorAll('#tdWrap .quest-time')].map(e => e.textContent.trim());
-    if (!times.includes('7:00am') || !times.includes('3:00pm')) {
-      bad.push(`the day is not fully listed: ${times.join(', ')}`);
+    const wantQ1 = formatTimeFromMin(q1Start), wantQ2 = formatTimeFromMin(q2Start);
+    if (!times.includes(wantQ1) || !times.includes(wantQ2)) {
+      bad.push(`the day is not fully listed: want ${wantQ2} and ${wantQ1}, got ${times.join(', ')}`);
     }
 
     /* 🎯 completes through the owning path: block marked done AND XP moved.

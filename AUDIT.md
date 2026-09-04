@@ -239,6 +239,13 @@ nothing. Lint returns clean.
 
 ## P1-3 · Merge arbitration trusts the device clock
 
+> **Done, then finished properly.** The offset mechanism shipped in `0ad103a`.
+> Five merge-relevant stamps were missed at the time and still called
+> `Date.now()` — including the tombstones, where the mismatch meant a delete
+> made on a device running behind the server never stuck. All converted; see
+> `AUDIT-SYNC.md`.
+
+
 **Where:** `markItemUpdated` (`js/03-sync.js:~347`), `mergeArrayById`
 (`js/04-merge.js:6`), `_meta.updatedAt` (`js/03-sync.js:~300`)
 

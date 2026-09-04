@@ -23,6 +23,10 @@ let hasPendingSync = false;
 let lastSyncError = '';
 let syncRetryTimer = null;
 let lastLocalWriteAt = 0;
+/* The highest dataEpoch any snapshot has carried. bkBumpDataEpoch reads it so a
+   Replace made here outranks a Replace made on another device while this one
+   was offline. */
+let lastRemoteDataEpoch = 0;
 let lastRemoteSeenAt = 0;
 const SHOW_SYNC_DEBUG = false;
 
@@ -519,13 +523,84 @@ function saveAll() {
   try { schedulePush(); } catch (e) { console.error('schedulePush failed', e); }
 }
 window._skipRewardPrompt = false;
+
+/* ── Which version an edit was made FROM ────────────────────────────────────
+   A stamp orders two writes. It says nothing about which one is RIGHT, and the
+   merge layer's whole-record arbitration throws the loser away — so a week's
+   reflection written on the iPad while the phone was also offline simply
+   vanished, with nothing anywhere recording that a second version had existed.
+
+   Ordering by time cannot fix that, because the question is not "which is
+   later" but "did these two people edit the same thing without seeing each
+   other". That is a question about causality, and it needs one more field.
+
+   Every write records the opId of the version it was made from. Then, merging
+   local L against remote R:
+
+     R.baseOpId === L.opId   R was edited FROM L      → fast-forward, no conflict
+     L.baseOpId === R.opId   L was edited FROM R      → fast-forward, no conflict
+     L.opId     === R.opId   the same version         → nothing to decide
+     otherwise               both from an unseen ancestor → a real conflict
+
+   The last case is the only one a person is ever asked about. Without it every
+   ordinary catch-up sync would look like a conflict, a parent would be asked
+   about all of them, and they would learn to dismiss the question — which is
+   worse than not asking. A record written before this shipped has no opId, so
+   nothing can be proved about it and it is treated as the ordinary case.
+
+   The device id is deliberately LOCAL — it identifies a device across its own
+   writes and is never merged, because a synced device id would be the same on
+   both devices and could not tell them apart. */
+const SYNC_DEVICE_KEY = 'wp_device_id';
+let syncOpCounter = 0;
+function syncDeviceId() {
+  let id = null;
+  try { id = localStorage.getItem(SYNC_DEVICE_KEY); } catch (e) { /* private mode */ }
+  if (!id) {
+    id = 'd' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+    try { localStorage.setItem(SYNC_DEVICE_KEY, id); } catch (e) { /* not fatal */ }
+  }
+  return id;
+}
+/* Unique per write, and comparable across devices — which is also what breaks
+   an exact stamp tie deterministically (mergePickNewer, js/04-merge.js). */
+function syncOpId() {
+  return syncDeviceId() + '-' + (++syncOpCounter).toString(36) + '-' + syncNow().toString(36);
+}
 function markItemUpdated(item) {
   if (!item) return item;
+  // The version this edit was made from — before it is overwritten.
+  item.baseOpId = item.opId || null;
+  item.opId = syncOpId();
   item.updatedAt = syncNow();
   return item;
 }
 function mergeRemoteState(remote) {
   if (!remote) return;
+  /* A restore from backup is the one write that is not a merge.
+
+     Every other snapshot is two devices with partial pictures, and merging is
+     right. A Replace is a person saying "this file is the truth now", and
+     merging it against whatever the other device still holds is exactly what
+     used to undo it — their newer-stamped records won arbitration and went back
+     up. dataEpoch is incremented only by bkApplyBackup(…, 'replace'), so a
+     higher one can only mean that. Take it whole and stop. */
+  const remoteEpoch = Number((remote.shared || {}).dataEpoch) || 0;
+  const localEpoch = Number((state.shared || {}).dataEpoch) || 0;
+  if (remoteEpoch > lastRemoteDataEpoch) lastRemoteDataEpoch = remoteEpoch;
+  if (remoteEpoch > localEpoch) {
+    if (remote.profiles) {
+      ['jenn', 'jess'].forEach(p => {
+        if (remote.profiles[p]) state.profiles[p] = remote.profiles[p];
+      });
+    }
+    if (remote.shared) state.shared = remote.shared;
+    migrateBlocks();
+    saveLocal();
+    refreshCurrentScreen();
+    showToast('↩️ Restored from another device’s backup');
+    return;
+  }
   // Tombstones first, so the week merges below already know about deletes
   // recorded on other devices.
   if (remote.shared) mergeTombstones(remote.shared.tombstones);
@@ -540,30 +615,9 @@ function mergeRemoteState(remote) {
     });
   }
   if (remote.shared) {
-    const ls = state.shared || {};
-    const rs = remote.shared || {};
-    state.shared = {
-      ...ls,
-      ...rs,
-      invites: mergeArrayById(ls.invites, rs.invites),
-      challenges: mergeArrayById(ls.challenges, rs.challenges),
-      customTasks: mergeArrayById(ls.customTasks, rs.customTasks, 'task:'),
-      routineTemplates: mergeArrayById(ls.routineTemplates, rs.routineTemplates, 'rt:'),
-      // Shared activities & level rules were previously replaced wholesale by
-      // the remote copy — which made share/unshare/edit only stick when this
-      // device pushed last. Merge them by id like everything else.
-      sharedActivities: mergeArrayById(ls.sharedActivities, rs.sharedActivities, 'sa:'),
-      levelRules: mergeArrayById(ls.levelRules, rs.levelRules, 'lr:'),
-      // Sports the family added themselves. Id-keyed like the rest; deletes are
-      // archives rather than removals, so no tombstone scope is needed — an
-      // archived sport must keep resolving for the blocks that still name it.
-      customSports: mergeArrayById(ls.customSports, rs.customSports),
-      // Chore config/payouts (groups, goals, fired payouts, bank) is a nested
-      // tree — conflict-aware merge so two devices' edits both survive: additive
-      // maps union, groups arbitrate by id (+ tombstones), goals by per-week ts.
-      chore: mergeSharedChore(ls.chore, rs.chore),
-      tombstones: ensureTombstones(),
-    };
+    // One function, in js/04-merge.js, so tests/merge.test.js drives the real
+    // composition rather than a copy of it that can drift away from it.
+    state.shared = mergeSharedState(state.shared, remote.shared);
   }
   migrateBlocks();
   saveLocal();

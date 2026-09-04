@@ -6475,3 +6475,62 @@
 
   /* Print must never carry the nav. */
   @media print { .kid-nav { display: none !important; } body.has-kid-nav { padding-bottom: 0; } }
+
+/* ── Two versions ─────────────────────────────────────────────────────────
+   The conflict banner and chooser (js/38-conflicts.js). Parent surfaces only —
+   the girls never see either — but the 44px target floor is a house rule about
+   thumbs, not about which screen, so the buttons keep it.
+
+   Both panels are drawn in the same flat, bordered style the rest of the portal
+   uses. The version that is currently showing is marked rather than favoured:
+   the whole point of the screen is that newer is not the same as right, so
+   nothing here styles one card as the recommended answer. */
+.cf-banner {
+  display: flex; align-items: center; gap: var(--space-2, 0.6rem);
+  flex-wrap: wrap;
+  margin: 0 0 var(--space-3, 0.8rem);
+  padding: var(--space-3, 0.75rem);
+  border: 2px solid var(--ink); border-radius: var(--radius-sm, 12px);
+  background: var(--bg2); color: var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.cf-banner-icon { font-size: 1.3rem; line-height: 1; }
+.cf-banner-text { flex: 1 1 12rem; font-size: max(13px, 0.95rem); line-height: 1.35; }
+.cf-banner .pill-btn { min-height: 44px; }
+
+.cf-row {
+  margin: 0 0 var(--space-3, 0.8rem);
+  padding: var(--space-3, 0.75rem);
+  border: 2px solid var(--ink); border-radius: var(--radius-sm, 12px);
+  background: var(--paper); color: var(--ink);
+}
+.cf-row--done { opacity: 0.72; }
+.cf-row-head { display: flex; align-items: center; gap: var(--space-2, 0.5rem); flex-wrap: wrap; }
+.cf-row-icon { font-size: 1.2rem; line-height: 1; }
+.cf-row-title { font-weight: 800; font-size: max(13px, 1rem); }
+.cf-row-sub { margin: 0.35rem 0 0.6rem; }
+.cf-tag {
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--ink); border-radius: 999px;
+  font-size: max(13px, 0.78rem); font-weight: 700;
+  background: var(--bg2);
+}
+.cf-tag--done { background: transparent; }
+
+/* Side by side where there is room, stacked on a phone. Equal columns on
+   purpose: neither version is the default. */
+.cf-versions {
+  display: grid; gap: var(--space-2, 0.6rem);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+}
+.cf-version {
+  display: flex; flex-direction: column; gap: 0.35rem;
+  padding: var(--space-2, 0.6rem);
+  border: 2px solid var(--ink); border-radius: var(--radius-sm, 10px);
+  background: var(--bg2);
+}
+.cf-version--shown { background: var(--paper); }
+.cf-version-head { display: flex; align-items: flex-start; gap: 0.4rem; flex-wrap: wrap; }
+.cf-version-what { flex: 1 1 8rem; font-size: max(13px, 0.95rem); line-height: 1.35; }
+.cf-version-when { font-size: max(13px, 0.82rem); opacity: 0.8; }
+.cf-pick { min-height: 44px; margin-top: auto; }

@@ -82,6 +82,15 @@ window.addEventListener('pagehide', flushPush);
     rules.addEventListener('input', mnyParentInput);
     rules.addEventListener('change', mnyParentInput);
   }
+  /* The conflict chooser: both the banner and the panel ride on data
+     attributes, like the money rules tab, so no version's content is ever
+     interpolated into an inline handler — and a conflict's content came off a
+     world-writable Firestore document, which is exactly the case CLAUDE.md's
+     escaping rules exist for. */
+  const cfWrap = document.getElementById('cfWrap');
+  if (cfWrap) cfWrap.addEventListener('click', cfHandleClick);
+  const cfBanner = document.getElementById('parentConflictBanner');
+  if (cfBanner) cfBanner.addEventListener('click', cfHandleClick);
   // The portal's tab strip: arrow keys move between destinations. The strip is
   // static markup, so one listener on the container is enough.
   const ptabs = document.querySelector('#screen-parent .parent-tabs');

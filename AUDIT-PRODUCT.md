@@ -145,7 +145,7 @@ Move Week, Money, and secondary features behind a stable four-item navigation sy
 
 **Observed:** Recent PR notes limit visual verification to 1024×768 landscape and state that portrait/phone and live Firebase round trips were not verified.
 
-**Impact:** The app may work on the development viewport while controls overflow, become too small, or reorder poorly on the devices children actually use. Merge unit tests do not prove timing, permissions, offline recovery, or simultaneous two-device behavior against Firestore.
+**Impact:** The app may work on the development viewport while controls overflow, become too small, or reorder poorly on the devices children actually use. Merge unit tests do not prove timing, permissions, offline recovery, or simultaneous two-device behavior against Firestore. **(The two-device half of this is built — `tests/merge.test.js` carries the harness and the matrix below. Timing against real Firestore is still not covered. See `AUDIT-SYNC.md`.)**
 
 **Required test matrix:**
 
