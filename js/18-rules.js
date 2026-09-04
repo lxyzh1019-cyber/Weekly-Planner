@@ -469,7 +469,9 @@ function mrEnsureEarnings(kid, weekKey) {
 function mrStampEarnings(kid, weekKey) {
   const p = getProfData(kid);
   if (!p.earningsUpdatedAtByWeek) p.earningsUpdatedAtByWeek = {};
-  p.earningsUpdatedAtByWeek[weekKey] = Date.now();
+  // syncNow, not Date.now: mergeEarnings gives the strictly-newer side this
+  // whole week, so a raw device clock decided which grades and money survived.
+  p.earningsUpdatedAtByWeek[weekKey] = syncNow();
 }
 
 function mrGetChoreGrade(kid, weekKey, dayIdx, choreId) {
@@ -1453,6 +1455,9 @@ function mrCreditWeekXp(weekKey, kid) {
      and a re-record cannot conjure the capped remainder into existence. */
   const r = total > 0 ? addQuestXP(total, kid, weekKey) : { awarded: 0 };
   c.xpAwardedWeeks[weekKey][kid] = r.awarded;
+  // Stamp: the meeting's Undo clears this week's XP ledger, so a re-credit that
+  // did not stamp would lose to that stale removal and never be re-awarded.
+  if (typeof ctStampWeekState === 'function') ctStampWeekState(weekKey);
   return r.awarded;
 }
 

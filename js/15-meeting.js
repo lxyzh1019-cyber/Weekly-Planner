@@ -386,6 +386,7 @@ function mmMarkWeekMet(wk, opts) {
   const met = mmEnsureMet();
   if (met[wk]) return false;
   met[wk] = { at: syncNow(), by: (opts && opts.by) || 'a grown-up' };
+  ctStampWeekState(wk);   // see commitMeetingShared: an add after an undo must stamp too
   saveAll();
   return true;
 }
@@ -1291,26 +1292,41 @@ function mmUndoRecord() {
     pd.progress.xpByWeek = s.xpByWeek;
   });
   bankConfig().marketMonth = mmUndo.marketMonth;
+  // safe-delete: ctStampWeekState(wk) at the end of this function
   if (mmUndo.finalized) c.finalizedWeeks[wk] = mmUndo.finalized; else if (c.finalizedWeeks) delete c.finalizedWeeks[wk];
   // Clearing the XP ledger for the week is what lets a re-record award again;
   // without it the reversed XP could never be re-credited.
   if (c.xpAwardedWeeks) {
+    // safe-delete: stamped at the end of mmUndoRecord
     if (mmUndo.xpAwarded) c.xpAwardedWeeks[wk] = mmUndo.xpAwarded; else delete c.xpAwardedWeeks[wk];
   }
   // The frozen ledger has to go back too, or an un-recorded week keeps a
   // history entry claiming it was settled.
   if (c.moneyLedger) {
+    // safe-delete: stamped at the end of mmUndoRecord
     if (mmUndo.ledger) c.moneyLedger[wk] = mmUndo.ledger; else delete c.moneyLedger[wk];
   }
   // The decision and the agreement go back with the money. Leaving the plan
   // behind would leave the week showing as settled with nothing to settle.
+  // safe-delete: stamped at the end of mmUndoRecord
   if (c.weekPlans) { if (mmUndo.plans) c.weekPlans[wk] = mmUndo.plans; else delete c.weekPlans[wk]; }
+  // safe-delete: stamped at the end of mmUndoRecord
   if (c.weekConfirms) { if (mmUndo.confirms) c.weekConfirms[wk] = mmUndo.confirms; else delete c.weekConfirms[wk]; }
   if (typeof mnyDraft !== 'undefined') mnyDraft = null;
+  // safe-delete: stamped at the end of mmUndoRecord
   if (c.meetingsHeld) { if (mmUndo.heldBefore) c.meetingsHeld[wk] = true; else delete c.meetingsHeld[wk]; }
   // "We sat down" and "the money moved" are different facts, and the undo has
   // to put each back the way it found it rather than assume both were false.
+  // safe-delete: stamped at the end of mmUndoRecord
   if (c.meetingsMet) { if (mmUndo.met) c.meetingsMet[wk] = true; else delete c.meetingsMet[wk]; }
+  /* One stamp for the whole undo. Every branch above either restores a week's
+     entry or REMOVES it, and a removal is an absence — which deepMergeObj
+     cannot express, so each of those deletes was undone by the next snapshot
+     from the other device. The wallet went back (profiles are arbitrated per
+     record) while the week still read as settled over there: a half-undo, and
+     the half that was wrong was the money's own paperwork. Stamping the week
+     hands it to the newer side whole, across all eight maps. */
+  ctStampWeekState(wk);
 
   /* Say only what is true. "Nothing was recorded" was printed unconditionally,
      including in the case it was most wrong about: after settling both girls,
@@ -1502,7 +1518,15 @@ function mmReopenWeek() {
    there, beside the week it would actually land on. */
 function mmOpenNextWeek() {
   const wk = mmWeekKey();
-  const next = dateToLocalKey(new Date(formatDayKey(wk).getTime() + 7 * 864e5));
+  // setDate(+7), not +7*864e5. A week is not always 168 hours: on the weekend
+  // the clocks go back it is 169, so adding milliseconds landed at 23:00 on the
+  // SUNDAY, dateToLocalKey returned a Sunday key, and computeWeekOffsetForDayKey
+  // mapped that straight back to the current Monday — "open next week" opened
+  // the week you were already on, once a year. Every other week-step in the repo
+  // uses setDate for exactly this reason.
+  const nextMon = formatDayKey(wk);
+  nextMon.setDate(nextMon.getDate() + 7);
+  const next = dateToLocalKey(nextMon);
   mmClearReturn();
   closeSheet('familyMeetingOverlay');
   weekOffset = computeWeekOffsetForDayKey(next);
@@ -1663,6 +1687,9 @@ function commitMeetingShared(wk) {
   if (!c.meetingsHeld) c.meetingsHeld = {};
   bankSyncMarketMonth();   // the calendar moves the market, not the meeting count
   c.meetingsHeld[wk] = true;
+  // Stamp the add as well as the removals: a week that has been undone once
+  // carries a stamp forever after, and an unstamped re-record would lose to it.
+  ctStampWeekState(wk);
   saveAll();
 }
 

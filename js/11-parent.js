@@ -1009,7 +1009,11 @@ function openEditBuiltInRoutine(id) {
 
 async function resetBuiltInRoutine(id) {
   if (!(await showConfirm('Reset this routine to the built-in default? Your edits will be lost.', { danger:true, okLabel:'Reset' }))) return;
+  // The tombstone is what makes the reset stick: mergeRoutineOverrides unions
+  // by id, so without a record of the removal the override comes straight back
+  // from any device still holding it and the button undoes itself.
   if (state.shared.builtInRoutineOverrides) delete state.shared.builtInRoutineOverrides[id];
+  tombstoneIds('ovr:', [id]);
   saveAll();
   renderRoutinesList();
   showToast('Reset to default ↩️');
@@ -1079,7 +1083,9 @@ function confirmRoutine() {
     // EDIT BUILT-IN — store as override; preset stays untouched
     const id = routineBuilder.editingBuiltinId;
     if (!state.shared.builtInRoutineOverrides) state.shared.builtInRoutineOverrides = {};
-    state.shared.builtInRoutineOverrides[id] = { title, icon, items };
+    // updatedAt so two parents editing the same routine merge by recency
+    // rather than by whichever device pushed last.
+    state.shared.builtInRoutineOverrides[id] = { title, icon, items, updatedAt: syncNow() };
 
     // Prune checklistState in FUTURE blocks for items that no longer exist (same logic as custom)
     const validIds = new Set(items.map(i=>i.id));

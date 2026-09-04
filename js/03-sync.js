@@ -540,30 +540,9 @@ function mergeRemoteState(remote) {
     });
   }
   if (remote.shared) {
-    const ls = state.shared || {};
-    const rs = remote.shared || {};
-    state.shared = {
-      ...ls,
-      ...rs,
-      invites: mergeArrayById(ls.invites, rs.invites),
-      challenges: mergeArrayById(ls.challenges, rs.challenges),
-      customTasks: mergeArrayById(ls.customTasks, rs.customTasks, 'task:'),
-      routineTemplates: mergeArrayById(ls.routineTemplates, rs.routineTemplates, 'rt:'),
-      // Shared activities & level rules were previously replaced wholesale by
-      // the remote copy — which made share/unshare/edit only stick when this
-      // device pushed last. Merge them by id like everything else.
-      sharedActivities: mergeArrayById(ls.sharedActivities, rs.sharedActivities, 'sa:'),
-      levelRules: mergeArrayById(ls.levelRules, rs.levelRules, 'lr:'),
-      // Sports the family added themselves. Id-keyed like the rest; deletes are
-      // archives rather than removals, so no tombstone scope is needed — an
-      // archived sport must keep resolving for the blocks that still name it.
-      customSports: mergeArrayById(ls.customSports, rs.customSports),
-      // Chore config/payouts (groups, goals, fired payouts, bank) is a nested
-      // tree — conflict-aware merge so two devices' edits both survive: additive
-      // maps union, groups arbitrate by id (+ tombstones), goals by per-week ts.
-      chore: mergeSharedChore(ls.chore, rs.chore),
-      tombstones: ensureTombstones(),
-    };
+    // One function, in js/04-merge.js, so tests/merge.test.js drives the real
+    // composition rather than a copy of it that can drift away from it.
+    state.shared = mergeSharedState(state.shared, remote.shared);
   }
   migrateBlocks();
   saveLocal();

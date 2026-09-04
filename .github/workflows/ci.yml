@@ -38,7 +38,7 @@ jobs:
       - name: Syntax and global-scope checks
         run: npm run check
 
-      # 50 assertions against the real shipped merge functions.
+      # Runs the real shipped merge functions, including the two-device harness.
       - name: Merge-layer unit tests
         run: npm run test:merge
 
@@ -92,6 +92,9 @@ jobs:
       # requests the database at all.
       - name: Cleanup-tool tests
         run: npm run test:cleanup
+
+      - name: XP calibration
+        run: npm run test:xp
 
       - name: Smoke test
         run: npm run test:smoke

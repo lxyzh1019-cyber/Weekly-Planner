@@ -420,7 +420,7 @@ function mnyChangeHistory() {
       </button>
       <div class="mny-rows">
         ${entries.length ? entries.map(e => `<div class="mny-row">
-            <span>${escapeHtml(e.note || e.path)} · ${escapeHtml(mrReasonLabel(e.reason))} · ${escapeHtml(mnyShortDate(new Date(e.at).toISOString().slice(0, 10)))}</span>
+            <span>${escapeHtml(e.note || e.path)} · ${escapeHtml(mrReasonLabel(e.reason))} · ${escapeHtml(mnyShortDate(toDayKeyInZone(new Date(e.at))))}</span>
             <b>${escapeHtml(e.from == null ? '—' : String(e.from))} → ${escapeHtml(e.to == null ? '—' : String(e.to))}</b>
           </div>`).join('') : `<div class="mny-note">No changes yet — the starting template is still in effect.</div>`}
       </div>
@@ -608,6 +608,7 @@ function mnyAddMissedWeek(kid) {
   const wk = ctDateToKey(d);
   if (!c.moneyLedger[wk]) c.moneyLedger[wk] = {};
   if (c.moneyLedger[wk][kid]) { showToast('That week is already on record'); return; }
+  if (typeof ctStampWeekState === 'function') ctStampWeekState(wk);
   c.moneyLedger[wk][kid] = {
     at: Date.now(), handEntered: true, updatedAt: syncNow(),
     chores: 0, learning: 0, streak: 0, competition: 0, fines: 0, outside: 0,

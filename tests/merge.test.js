@@ -493,5 +493,252 @@ check('ages are per profile',
   api.mergeProfileState({ age: 12, ageYear: 2026 }, {}, 'jenn').age === 12
   && api.mergeProfileState({}, { age: 8, ageYear: 2026 }, 'jess').age === 8);
 
+
+/* ══ Two devices ═══════════════════════════════════════════════════════════
+   Everything above this line calls one merge function with two hand-built
+   objects. That is a real test of that function and no test at all of the
+   thing that actually goes wrong: two devices, each holding a whole document,
+   editing while offline, reconnecting in some order. AUDIT-PRODUCT.md asked
+   for this matrix; it was never built, and every defect this release fixes
+   lived in the gap.
+
+   The harness is deliberately small. Each device owns a `state`, edits it
+   through the real writers' shapes, and `sync()` runs the REAL
+   mergeSharedState / mergeProfileState in both directions — which is why
+   mergeSharedState was lifted out of js/03-sync.js: a merge only reachable
+   from a browser is a merge no unit test can hold.
+
+   The one thing it fakes is `global.state`, because the merge layer reads
+   tombstones off it. Each device swaps its own in for the duration of its own
+   merge, which is exactly what a device does. */
+function makeDevice(name) {
+  return {
+    name,
+    state: { shared: { tombstones: {}, chore: {} }, profiles: { jenn: {}, jess: {} } },
+    clockOffset: 0,
+  };
+}
+/* Run fn with this device's state installed as the global — and with its clock
+   skew applied, so "a device ten minutes behind the server" is expressible. */
+function on(dev, fn) {
+  const prevState = global.state;
+  const prevNow = global.syncNow;
+  global.state = dev.state;
+  global.syncNow = () => Date.now() + dev.clockOffset;
+  try { return fn(dev.state); } finally { global.state = prevState; global.syncNow = prevNow; }
+}
+/* One device receives the other's whole document, exactly as onSnapshot does:
+   tombstones first (so the week merges below already know about deletes), then
+   shared, then each profile. */
+function receive(dev, remote) {
+  on(dev, st => {
+    api.mergeTombstones((remote.shared || {}).tombstones);
+    st.shared = api.mergeSharedState(st.shared, remote.shared);
+    ['jenn', 'jess'].forEach(p => {
+      st.profiles[p] = api.mergeProfileState(st.profiles[p], (remote.profiles || {})[p], p);
+    });
+  });
+}
+const clone = o => JSON.parse(JSON.stringify(o));
+/* Both devices come back online and exchange documents. Each merges the other's
+   copy as it was at the moment of reconnection, which is what actually happens:
+   neither has seen the other's writes yet. */
+function sync(a, b) {
+  const snapA = clone(a.state), snapB = clone(b.state);
+  receive(a, snapB);
+  receive(b, snapA);
+}
+
+// Two devices editing DIFFERENT records: both edits must survive. This is the
+// case the merge layer already handled, and it is here as the control — if it
+// ever fails, the harness itself is wrong.
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  on(ipad, st => { st.shared.sharedActivities = [{ id: 'a1', name: 'Swim', updatedAt: 100 }]; });
+  on(phone, st => { st.shared.sharedActivities = [{ id: 'a2', name: 'Skate', updatedAt: 100 }]; });
+  sync(ipad, phone);
+  check('two devices, different records — both survive',
+    ipad.state.shared.sharedActivities.length === 2 &&
+    phone.state.shared.sharedActivities.length === 2);
+}
+
+// A day reviewed on one device must survive a snapshot from the other. Before
+// parentDayConfirm was arbitrated it fell through the `...rs` spread and the
+// remote copy replaced it whole, so two adults working through one Sunday
+// meeting lost half their reviews — and then canCloseWeek refused the week
+// with nothing on screen to say why.
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  on(ipad, st => { st.shared.parentDayConfirm = { jenn: { '2026-09-01': true } }; });
+  on(phone, st => { st.shared.parentDayConfirm = { jenn: { '2026-09-02': true } }; });
+  sync(ipad, phone);
+  const j = ipad.state.shared.parentDayConfirm.jenn;
+  check('a day reviewed on each device survives the other',
+    j['2026-09-01'] === true && j['2026-09-02'] === true &&
+    phone.state.shared.parentDayConfirm.jenn['2026-09-01'] === true);
+}
+
+// Reopening a week has to travel. The reopen is a REMOVAL, and deepMergeObj
+// iterates the remote's keys, so it could not be expressed at all: a close
+// always won, the reopen never left the device that made it, and reflIsLocked
+// re-locked both girls' reflections behind it.
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  const wk = '2026-08-31';
+  const close = st => {
+    st.shared.chore.weeksClosed = { [wk]: { at: 1000, by: 'a grown-up' } };
+    st.shared.chore.weekStateUpdatedAt = { [wk]: 1000 };
+  };
+  on(ipad, close); on(phone, close);
+  sync(ipad, phone);
+  // Now reopen on the iPad only, stamped later, and let the phone hear about it.
+  on(ipad, st => {
+    delete st.shared.chore.weeksClosed[wk];
+    st.shared.chore.weekStateUpdatedAt[wk] = 2000;
+  });
+  sync(ipad, phone);
+  check('reopening a week reaches the other device',
+    !ipad.state.shared.chore.weeksClosed[wk] && !phone.state.shared.chore.weeksClosed[wk]);
+}
+
+// The meeting's Undo removes from seven week-keyed maps at once. The wallet
+// went back because profiles are arbitrated per record; the paperwork did not,
+// so the other device still read the week as settled. One stamp covers them.
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  const wk = '2026-08-31';
+  const settled = st => {
+    st.shared.chore.meetingsHeld = { [wk]: true };
+    st.shared.chore.moneyLedger = { [wk]: { jenn: { total: 12 } } };
+    st.shared.chore.finalizedWeeks = { [wk]: { jenn: 12 } };
+    st.shared.chore.weekStateUpdatedAt = { [wk]: 1000 };
+  };
+  on(ipad, settled); on(phone, settled);
+  on(ipad, st => {
+    delete st.shared.chore.meetingsHeld[wk];
+    delete st.shared.chore.moneyLedger[wk];
+    delete st.shared.chore.finalizedWeeks[wk];
+    st.shared.chore.weekStateUpdatedAt[wk] = 2000;
+  });
+  sync(ipad, phone);
+  const c = phone.state.shared.chore;
+  check('an undone settlement is undone on both devices',
+    !c.meetingsHeld[wk] && !c.moneyLedger[wk] && !c.finalizedWeeks[wk]);
+}
+
+// A week nobody has stamped keeps the grow-only union it always had, so a
+// device that predates the stamp cannot quietly un-record a real meeting.
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  on(ipad, st => { st.shared.chore.meetingsHeld = { 'w1': true }; });
+  on(phone, st => { st.shared.chore.meetingsHeld = {}; });
+  sync(ipad, phone);
+  check('an unstamped week still keeps the grow-only union',
+    ipad.state.shared.chore.meetingsHeld.w1 === true &&
+    phone.state.shared.chore.meetingsHeld.w1 === true);
+}
+
+// A device whose clock runs BEHIND the server deletes a block. Tombstones were
+// stamped with Date.now() while the records they delete carry syncNow, so the
+// tombstone came out older than its own block, blockTombstoned's `>=` was
+// false, and the delete silently did not stick — for anyone.
+{
+  const slow = makeDevice('slow');
+  // syncNow is Date.now() PLUS the offset the device learned from the server,
+  // so a device whose own clock runs ten minutes behind carries a POSITIVE
+  // offset — its corrected stamps land ahead of its raw ones. That is the whole
+  // bug: the block was stamped corrected and the tombstone raw, so the
+  // tombstone came out older than the block it was meant to delete.
+  slow.clockOffset = +10 * 60 * 1000;
+  const block = on(slow, () => ({ id: 'b9', updatedAt: global.syncNow() }));
+  on(slow, st => { st.shared.tombstones = {}; api.tombstoneBlockIds(['b9']); });
+  const kept = on(slow, () => api.mergeWeeks({}, { d1: [block] }));
+  check('a device behind the server can still delete a block',
+    (kept.d1 || []).length === 0);
+}
+
+// Equal stamps must resolve to the SAME record on both devices. The old
+// tie-break kept `prev`, which is a different record depending on which side
+// you are standing on, so two devices diverged permanently and the document
+// went to whichever pushed last.
+{
+  const a = { id: 'x', updatedAt: 500, opId: 'dev-a-1', name: 'A' };
+  const b = { id: 'x', updatedAt: 500, opId: 'dev-b-1', name: 'B' };
+  const fromA = api.mergeArrayById([a], [b])[0].name;
+  const fromB = api.mergeArrayById([b], [a])[0].name;
+  check('an exact tie resolves the same way on both devices', fromA === fromB);
+}
+
+// A record written before this release carries no stamp at all. It must never
+// beat one that has a stamp, in either direction.
+{
+  const legacy = { id: 'y', name: 'legacy' };
+  const stamped = { id: 'y', name: 'stamped', updatedAt: 900 };
+  check('an unstamped record never beats a stamped one',
+    api.mergeArrayById([legacy], [stamped])[0].name === 'stamped' &&
+    api.mergeArrayById([stamped], [legacy])[0].name === 'stamped');
+}
+
+// A parent's routine override, and the reset that puts it back. Without the
+// 'ovr:' tombstone the reset came straight back from the other device's copy
+// and the button undid itself on the next sync.
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  const set = st => { st.shared.builtInRoutineOverrides = { morning: { title: 'Mine', updatedAt: 100 } }; };
+  on(ipad, set); on(phone, set);
+  sync(ipad, phone);
+  on(ipad, st => {
+    delete st.shared.builtInRoutineOverrides.morning;
+    api.tombstoneIds('ovr:', ['morning']);
+  });
+  sync(ipad, phone);
+  check('resetting a routine override stays reset on both devices',
+    !ipad.state.shared.builtInRoutineOverrides.morning &&
+    !phone.state.shared.builtInRoutineOverrides.morning);
+}
+
+// The school calendar is imported and reviewed as one thing. Its days-off list
+// is an array, which deepMergeObj treats as a scalar, so a field-by-field merge
+// could pair one device's term dates with the other's days off — a calendar
+// that never existed anywhere.
+{
+  const older = { updatedAt: 100, term: { start: '2026-09-01' }, offDays: ['2026-12-25'] };
+  const newer = { updatedAt: 200, term: { start: '2026-09-08' }, offDays: ['2026-11-11'] };
+  // Both directions. Remote-newer is the easy one — a plain spread gets it right
+  // by accident. LOCAL-newer is the case that was broken: the remote copy
+  // replaced it whole, so an import done here was undone by the other device.
+  const remoteNewer = api.mergeSchoolCal(older, newer);
+  const localNewer  = api.mergeSchoolCal(newer, older);
+  check('a school calendar merges whole, never half of each',
+    remoteNewer.term.start === '2026-09-08' && remoteNewer.offDays[0] === '2026-11-11'
+    && localNewer.term.start === '2026-09-08' && localNewer.offDays[0] === '2026-11-11');
+}
+
+// A tombstone map cannot be emptied by a device with a wrong clock. Pruning
+// used to measure age against `now`, so a tablet set a year fast dropped every
+// tombstone it held, pushed the emptied map, and resurrected the family's
+// deletes. It prunes by count now and asks no clock anything.
+{
+  const slow = makeDevice('slow');
+  slow.clockOffset = 400 * 24 * 3600 * 1000 * 3;      // absurdly fast clock
+  const t = { 'ancient': 1000, 'older': 2000 };
+  on(slow, st => { st.shared.tombstones = t; api.tombstoneBlockIds(['fresh']); });
+  check('a wrong clock cannot empty the tombstone map',
+    t.ancient === 1000 && t.older === 2000 && t.fresh !== undefined);
+}
+
+// It does still prune, once there are more than any family could have — and it
+// keeps the newest, which are the ones a straggling device could still argue
+// with.
+{
+  const t = {};
+  for (let i = 0; i < api.TOMBSTONE_MAX + 50; i++) t['id-' + i] = 1000 + i;
+  api.pruneTombstones(t);
+  check('the tombstone map is capped, keeping the newest',
+    Object.keys(t).length === api.TOMBSTONE_MAX
+    && t['id-' + (api.TOMBSTONE_MAX + 49)] !== undefined
+    && t['id-0'] === undefined);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

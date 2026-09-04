@@ -4,12 +4,12 @@
   "private": true,
   "description": "Family weekly planner \u2014 static site, classic scripts, no build step.",
   "scripts": {
-    "check": "node tests/check-syntax.js && node tests/check-globals.js && node tests/check-escaping.js && node tests/check-dead-css.js",
-    "test:merge": "node tests/merge.test.js",
+    "check": "node tests/check-syntax.js && node tests/check-globals.js && node tests/check-shared-merge.js && node tests/check-escaping.js && node tests/check-dead-css.js",
+    "test:merge": "TZ=UTC node tests/merge.test.js",
     "test:smoke": "node tests/smoke.js",
-    "test:cleanup": "node tests/cleanup-tool.test.js",
+    "test:cleanup": "TZ=UTC node tests/cleanup-tool.test.js",
     "test": "npm run check && npm run test:merge && npm run test:cleanup && npm run test:xp && npm run test:smoke",
-    "test:xp": "node tests/xp.test.js"
+    "test:xp": "TZ=UTC node tests/xp.test.js"
   },
   "devDependencies": {
     "playwright-core": "1.62.1"

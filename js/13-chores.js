@@ -120,7 +120,25 @@ function ctEnsureProfile(p) {
    (this is what lets an UNcheck beat a stale remote check). */
 function ctStampChoreWeek(p, weekKey) {
   if (!p.chore.updatedAtByWeek) p.chore.updatedAtByWeek = {};
-  p.chore.updatedAtByWeek[weekKey] = Date.now();
+  // syncNow, not Date.now: mergeChoreState compares this stamp against the
+  // other device's to decide which side of the week wins outright, so it has to
+  // be on the same corrected clock as everything else it is measured against.
+  p.chore.updatedAtByWeek[weekKey] = syncNow();
+}
+/* Stamp a week whose RECORDED STATE was deliberately changed — closed,
+   reopened, settled, reset, or undone. Eight week-keyed maps carry that state
+   (CHORE_WEEK_STATE_MAPS, js/04-merge.js) and they are grow-only unions until a
+   week is stamped, at which point the newest side takes that week across all
+   eight — including the keys it does NOT have, which is the only way one device
+   can tell another that something was taken back. Without it Undo reversed the
+   wallet and left the week reading as settled on the other device, and
+   reopening a week never travelled at all. */
+function ctStampWeekState(weekKey) {
+  if (!weekKey) return;
+  ctEnsureShared();
+  const c = state.shared.chore;
+  if (!c.weekStateUpdatedAt) c.weekStateUpdatedAt = {};
+  c.weekStateUpdatedAt[weekKey] = syncNow();
 }
 /* One shared prepare step for EVERY chore-reading surface (chore tab, kid week
    matrix, weekly-review hub, family meeting). All migrations run everywhere so
@@ -183,7 +201,7 @@ function ctGetWeekGoals(weekKey) {
 function ctSetWeekGoals(weekKey, jGoal, kGoal) {
   ctEnsureShared();
   state.shared.chore.goalsByWeek[weekKey] = { jenn: jGoal || null, jess: kGoal || null };
-  state.shared.chore.goalsUpdatedAtByWeek[weekKey] = Date.now(); // stamp so a concurrent edit merges by recency
+  state.shared.chore.goalsUpdatedAtByWeek[weekKey] = syncNow(); // corrected clock; mergeSharedChore arbitrates on it
   const bonus = state.shared.chore.goalBonusByWeek[weekKey] || { jenn:false, jess:false };
   if (jGoal == null) bonus.jenn = false;
   if (kGoal == null) bonus.jess = false;
@@ -459,8 +477,13 @@ async function ctClearWeek() {
   ctSetGoalBonus(ctWeekKey, 'jenn', false);
   ctSetGoalBonus(ctWeekKey, 'jess', false);
   ctEnsureShared();
+  // safe-delete: stamped by ctStampWeekState below. A reset REMOVES from two
+  // grow-only maps, and an absence is the one thing deepMergeObj cannot
+  // express — without the stamp the other device's snapshot puts both straight
+  // back and the reset quietly undoes itself.
   delete state.shared.chore.groupPayoutsFired[ctWeekKey];  // explicit parent reset beats stickiness
-  delete state.shared.chore.moneySnapshots[ctWeekKey];
+  delete state.shared.chore.moneySnapshots[ctWeekKey];  // safe-delete: stamped below
+  ctStampWeekState(ctWeekKey);
   saveAll();
   renderChoreTab();
 }
@@ -1227,7 +1250,11 @@ function ctMigrateNumberedKeys() {
     if (!c.goalsByWeek[String(w)] && !c.goalBonusByWeek[String(w)]) continue;
     const weekMon = new Date(anchorDate); weekMon.setDate(anchorDate.getDate() + (w-1)*7);
     const wk = ctDateToKey(weekMon);
+    // safe-delete: legacy numeric week keys ('1'..'8') from before date keys.
+    // Nothing reads them after the migration, and dateKeyMigration.done stops
+    // it re-running, so a stale copy arriving from another device is inert.
     if (c.goalsByWeek[String(w)])    { newGoals[wk] = c.goalsByWeek[String(w)];    delete c.goalsByWeek[String(w)];    didMigrate = true; }
+    // safe-delete: same legacy numeric keys as the line above
     if (c.goalBonusByWeek[String(w)]){ newBonus[wk] = c.goalBonusByWeek[String(w)]; delete c.goalBonusByWeek[String(w)]; didMigrate = true; }
   }
   Object.assign(c.goalsByWeek, newGoals);
@@ -1262,6 +1289,7 @@ function ctMigrateToGroups() {
       const old = Math.min(CT_MONEY_CAP, 2 + ctBonusDaysLegacy(wk, kid) + (ctGetGoalBonus(wk, kid) ? 1 : 0));
       if (!c.moneySnapshots[wk]) c.moneySnapshots[wk] = {};
       c.moneySnapshots[wk][kid] = old;
+  ctStampWeekState(wk);   // a reset can remove this; an add after one must stamp too
     });
   }
 

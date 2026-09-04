@@ -330,12 +330,28 @@ function canCloseWeek(weekKey) {
   });
   return { ok: missing.length === 0, missing };
 }
+/* Close or reopen a week.
+
+   Reopening removes the record, and for a long time that was all it did — which
+   meant it did nothing at all beyond this device. `weeksClosed` lives inside
+   state.shared.chore, merged by deepMergeObj, which iterates the keys the
+   REMOTE has; an absence cannot be expressed that way, so a close always won,
+   a reopen never travelled, and the week re-closed itself on the next snapshot
+   with reflIsLocked re-locking both girls' reflections behind it.
+
+   ctStampWeekState is what makes the removal sayable: a stamped week is
+   arbitrated whole by the newer side across all eight week-state maps,
+   including the keys it does not have. Reopening still touches no money —
+   mnyReopenWeek is the separate door for that, deliberately. */
 function setWeekClosed(weekKey, value) {
   ctEnsureShared();
   const c = state.shared.chore;
   if (!c.weeksClosed) c.weeksClosed = {};
+  // safe-delete: stamped by ctStampWeekState below, so the newer side takes
+  // this week across every week-state map — absence included.
   if (value === false) delete c.weeksClosed[weekKey];
-  else c.weeksClosed[weekKey] = { at: Date.now(), by: 'a grown-up' };
+  else c.weeksClosed[weekKey] = { at: syncNow(), by: 'a grown-up' };
+  ctStampWeekState(weekKey);
   return true;
 }
 
