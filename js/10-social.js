@@ -189,11 +189,6 @@ function startBlockStopwatch(blockId) {
 /* ════════════════════════════════════════════════════════════════
    CHALLENGES
 ════════════════════════════════════════════════════════════════ */
-// Challenges are now part of Sister Sync — keep this entry point as a redirect
-// for any lingering callers/deep links.
-function openChallenges() {
-  openSisterSync();
-}
 
 function renderChallenges() {
   const list = document.getElementById('challengesList');

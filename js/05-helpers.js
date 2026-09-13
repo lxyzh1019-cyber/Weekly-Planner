@@ -994,14 +994,6 @@ function routineItemIcon(item) {
   return '•';
 }
 
-function getRoutineChecklistWithUnlocks(routineId) {
-  const tmpl = getRoutineTemplate(routineId);
-  const base = (tmpl?.items || []).slice();
-  const p = getProfData();
-  const unlocked = (p.progress && p.progress.unlockedChecklistItems && p.progress.unlockedChecklistItems[routineId]) || [];
-  return [...base, ...unlocked];
-}
-
 /* Track celebration toasts so we do not spam on every re-render */
 const routineCompleteToasted = new Set();
 const stopwatchGoalToasted = new Set();

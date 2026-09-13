@@ -2800,7 +2800,7 @@ function findChromium() {
     loanSundayTransfer(kid, 'pay_available', { dayKey: '2026-10-04' });
     const after = loanDueNow(kid, '2026-11-01');
     return before.kind === 'down'
-        && before.amount === loanDownPayment(kid)
+        && before.amount === money2(loanState(kid).downPayment)
         && loanDownOutstanding(kid) === 0
         && after.kind === 'scheduled';
   });
@@ -2974,10 +2974,10 @@ function findChromium() {
                       principal: 300, monthly: 25, bonusRate: 15,
                       downPaymentDue: '2026-01-01' });
     const first = mnyDebtsByPriority(kid)[0];
-    const spread = mnySpreadEarlyPayment(kid, 100);
+    const rec = loanRecordPayment(kid, 100, 'early', first.id);
     const ok = first.id === 'bike'                 // 15% beats the loan's 10%
-            && spread.length === 1 && spread[0].debtId === 'bike'
-            && spread[0].cleared === 115;          // $100 clears $115
+            && rec && rec.debtId === 'bike'
+            && rec.credited === 115;               // $100 clears $115
     delete pd.debts;
     return ok;
   });
@@ -10560,13 +10560,13 @@ function findChromium() {
       const r = addQuestXP(50, kid, wk);
       if (r.awarded !== 0) bad.push(`a full week still credited ${r.awarded} XP`);
       if (!r.capped) bad.push('a credit past the cap did not report itself as capped');
-      if (xpRoomLeft(kid, wk) !== 0) bad.push('a full week reports room left');
+      if (xpWeekTally(kid, wk) !== XP_WEEKLY_CAP) bad.push('a full week does not read as full');
 
       // Under the cap, a credit lands whole and the tally follows it.
       prog.xpByWeek = {}; prog.xp2 = 0;
       const r2 = addQuestXP(30, kid, wk);
       if (r2.awarded !== 30) bad.push(`a credit under the cap awarded ${r2.awarded}`);
-      if (xpRoomLeft(kid, wk) !== XP_WEEKLY_CAP - 30) bad.push('the weekly tally did not follow the credit');
+      if (xpWeekTally(kid, wk) !== 30) bad.push('the weekly tally did not follow the credit');
 
       /* ONE LEVEL CALCULATION. Today's hero and the parent portal each used to
          do this arithmetic themselves and could disagree about the same child. */

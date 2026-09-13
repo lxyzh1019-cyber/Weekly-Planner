@@ -328,21 +328,6 @@ function renderWeek() {
   if (weekView === 'preview') renderWeekPrintPreview();
   else                        renderFullWeek(keys);
 
-  /* A parent-only category legend was toggled here. Its markup lived inside the
-     permanently hidden compact view, so it could never appear no matter what
-     this line set. The Day Blocks view renders a live one from CAT_HEX that
-     parent and child both see. */
-
-  // Money button: both roles open 💰 My money. A parent looking at a kid's
-  // money should see exactly what the kid sees; everything a parent can change
-  // lives on the Money rules tab of the portal instead.
-  const moneyBtn = document.getElementById('weekMoneyBtn');
-  if (moneyBtn) {
-    moneyBtn.innerHTML = '<span aria-hidden="true">💰</span><span class="btn-icon__label">My money</span>';
-    moneyBtn.title = 'My money';
-    moneyBtn.setAttribute('aria-label', moneyBtn.title);
-  }
-
   renderGoalsTodos();
   renderWeekGlance(keys);
   renderWeekSignature(keys);

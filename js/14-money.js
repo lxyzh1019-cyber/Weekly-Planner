@@ -77,12 +77,6 @@ function stockPrice(ticker, monthOverride) {
   const m = ((cfg.startMonth + simMonth) % 12 + 12) % 12;
   return STOCKS_2023[ticker].prices[m];
 }
-function marketMonthLabel() {
-  const cfg = bankConfig();
-  const total = cfg.startMonth + cfg.marketMonth;
-  const year = cfg.startYear + Math.floor(total / 12);
-  return MONEY_MONTHS[((total % 12) + 12) % 12] + ' ' + year;
-}
 /* What she owns now lives in one record per holding (js/21-money-data.js), so
    a parent can keep it truthful by hand instead of a simulation deciding for
    them. These four keep their old names because half the app calls them. */

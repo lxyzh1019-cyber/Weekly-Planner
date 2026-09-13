@@ -345,7 +345,7 @@
 
   <!-- Goals + Todos panel (side-by-side, below Full Week grid) -->
   <h2 class="sr-only">Week Tools</h2>
-  <div class="gt-panel" id="gtPanel">
+  <div class="gt-panel">
     <div class="gt-col">
       <div class="gt-col-header">
         <h3>🎯 Goals — long-term</h3>
@@ -791,7 +791,7 @@
     <h4>COLOUR</h4>
     <div class="colour-picker" id="trainingColourPicker"></div>
 
-    <h4 id="objectivesHeader">OBJECTIVES <span style="font-weight:400;font-size:0.85rem;color:var(--ink-light)">(optional)</span></h4>
+    <h4>OBJECTIVES <span style="font-weight:400;font-size:0.85rem;color:var(--ink-light)">(optional)</span></h4>
     <div class="objectives-list" id="objectivesList"></div>
     <button class="pill-btn" style="margin-bottom:0.8rem" onclick="openCustomTask()">＋ Add custom task</button>
 
@@ -822,7 +822,7 @@
       <label for="trainingTravelBufMin">Travel minutes (each way)</label>
       <input type="number" id="trainingTravelBufMin" min="5" max="180" step="5" value="15" onchange="onTrainingBufferMinInput()">
     </div>
-    <div id="trainingGearWrap">
+    <div>
       <h4>GEAR LIST</h4>
       <div class="checklist-wrap" id="trainingGearList"></div>
     </div>
@@ -893,7 +893,7 @@
       <h4>CHORE TYPE</h4>
       <div class="sheet-row" id="choreTypePicker"></div>
     </div>
-    <h4 id="activityObjectivesHeader">GOAL / OBJECTIVES <span style="font-weight:400;font-size:0.85rem;color:var(--ink-light)">(optional)</span></h4>
+    <h4>GOAL / OBJECTIVES <span style="font-weight:400;font-size:0.85rem;color:var(--ink-light)">(optional)</span></h4>
     <div class="objectives-list" id="activityObjectivesList"></div>
     <button class="pill-btn" style="margin-bottom:0.8rem" onclick="openCustomTask('activity')">＋ Add custom goal</button>
     <h4>NOTE</h4>

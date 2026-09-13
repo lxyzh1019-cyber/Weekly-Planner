@@ -905,7 +905,6 @@ function mnyStepper(field, value, which, step) {
    and redrawing on each letter is what threw the caret out of the box. The
    value is already in the draft, so the next real render picks it up. */
 function mnyCompSetQuiet(field, value) { if (mnyCompDraft) mnyCompDraft[field] = value; }
-function mnyDepSetQuiet(field, value) { if (mnyDepDraft) mnyDepDraft[field] = value; }
 function mnyCompSet(field, value) { if (!mnyCompDraft) return; mnyCompDraft[field] = value; renderMeetingMode(); }
 function mnyCompBump(field, delta) { if (!mnyCompDraft) return; mnyCompDraft[field] = Math.max(0, (Number(mnyCompDraft[field]) || 0) + delta); renderMeetingMode(); }
 function mnyDepSet(field, value) { if (!mnyDepDraft) return; mnyDepDraft[field] = value; renderMeetingMode(); }

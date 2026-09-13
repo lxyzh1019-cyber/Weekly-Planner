@@ -2449,16 +2449,6 @@
     border-radius: 50%;
     border: 2px solid #fff;
   }
-  .tl-zone-label {
-    position: absolute;
-    left: 4px;
-    font-family: 'Gochi Hand', cursive;
-    font-size: calc(0.9rem * var(--fs-scale, 1));
-    color: var(--accent-strong);
-    opacity: 0.9;
-    pointer-events: none;
-    z-index: 1;
-  }
 
   /* Placed blocks */
   .placed-block {

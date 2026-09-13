@@ -529,14 +529,6 @@ function mnyAddGoal(kid, fields) {
   saveAll();
   return g;
 }
-function mnyEditGoal(kid, id, field, value) {
-  const g = mnyGoalById(kid, id);
-  if (!g) return false;
-  g[field] = (field === 'target' || field === 'saved') ? Math.max(0, money2(value)) : value;
-  g.updatedAt = syncNow();
-  saveAll();
-  return true;
-}
 function mnyRemoveGoal(kid, id) {
   const list = mnyEnsureGoals(kid);
   const i = list.findIndex(g => g.id === id);
