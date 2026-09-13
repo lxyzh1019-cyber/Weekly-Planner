@@ -4,7 +4,7 @@
   "private": true,
   "description": "Family weekly planner \u2014 static site, classic scripts, no build step.",
   "scripts": {
-    "check": "node tests/check-syntax.js && node tests/check-globals.js && node tests/check-shared-merge.js && node tests/check-escaping.js && node tests/check-dead-css.js",
+    "check": "node tests/check-syntax.js && node tests/check-globals.js && node tests/check-shared-merge.js && node tests/check-escaping.js && node tests/check-dead-css.js && node tests/check-dead-ids.js",
     "test:merge": "TZ=UTC node tests/merge.test.js",
     "test:smoke": "node tests/smoke.js",
     "test:cleanup": "TZ=UTC node tests/cleanup-tool.test.js",
