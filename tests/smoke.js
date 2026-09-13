@@ -898,11 +898,15 @@ function findChromium() {
     const wrap = document.getElementById('mnyPage1Wrap');
     // Her page has no control that moves money — not a disabled one, none.
     const noMovers = !wrap.querySelector('[data-mny-action="commit"], [data-mnyp-action]');
-    // And the guard the commit path leans on refuses her.
+    // And the guard the commit path leans on refuses her — as do the two doors
+    // back to cash on the parent's holdings page, if she ever reaches them.
     const guarded = moneyCanTransact() === false;
+    const cashBefore = mnyCash(kid);
+    mnyAskMoveSavedToCash(kid);
+    const noDoor = !document.querySelector('#appDialogOverlay.open') && mnyCash(kid) === cashBefore;
     // Her earnings are not hers to change either.
     const cannotOverride = mnySetOverride(kid, mnyWeekKey(), 'chores', 99, 'fixing') === false;
-    return noMovers && guarded && cannotOverride;
+    return noMovers && guarded && noDoor && cannotOverride;
   });
   // A kid editing a rule must be refused, leaving no new version or log entry.
   checks.kidCannotEditRules = await page.evaluate(() => {
@@ -3059,6 +3063,82 @@ function findChromium() {
     const back = mnySavedTotal(kid) === 150 && ensureWallet(kid).cash === 72.20;
     return migrated && moved && back
         && mnyEverything(kid) === 222.20;
+  });
+
+  // Money went INTO savings and companies through the meeting, but the way
+  // back out left with the old pocket-money screen: moneyWithdraw and
+  // moneySellStock kept working with nothing to call them. The parent's
+  // holdings page is the door now, and it opens only for a grown-up.
+  checks.parentCanMoveSavedBackToCash = await page.evaluate(async () => {
+    const bad = [];
+    const kid = 'jenn';
+    profile = 'parent'; parentViewing = kid;
+    const pd = getProfData(kid);
+    pd.holdings = [];
+    pd.wallet = { cash: 10, savings: 0, gics: [], holdings: {}, lastMeetingWeek: null };
+    mnyAddToSaved(kid, 100);
+    mnyAddHolding(kid, { kind: 'stock', name: 'Lemonade Co', units: 4, priceNow: 12.5, costBasis: 40 });
+    showScreen('parent'); setParentTab('money'); mnySetParentSection('holdings'); mnyRenderRulesTab();
+    const wrap = document.getElementById('mnyRulesWrap') || document.querySelector('#ptab-money');
+    if (!wrap.querySelector('[data-mnyp-action="saved2cash"]')) bad.push('no way to move kept-ready money back to cash');
+    const sell = wrap.querySelector('[data-mnyp-action="holdsell"]');
+    if (!sell) bad.push('no way to sell a company holding');
+
+    // Through the real prompt: type an amount, press OK.
+    const answer = async (v) => {
+      for (let i = 0; i < 50 && !document.querySelector('#appDialogOverlay.open'); i++) await new Promise(r => setTimeout(r, 10));
+      const inp = document.getElementById('appDialogInput');
+      if (!inp) return false;
+      inp.value = String(v);
+      document.getElementById('appDialogOkBtn').click();
+      for (let i = 0; i < 50 && document.querySelector('#appDialogOverlay.open'); i++) await new Promise(r => setTimeout(r, 10));
+      await new Promise(r => setTimeout(r, 20));
+      return true;
+    };
+    wrap.querySelector('[data-mnyp-action="saved2cash"]').click();
+    if (!(await answer(30))) bad.push('moving to cash asked no amount');
+    if (mnyCash(kid) !== 40) bad.push(`cash after withdraw is ${mnyCash(kid)}, expected 40`);
+    if (mnySavedTotal(kid) !== 70) bad.push(`kept ready after withdraw is ${mnySavedTotal(kid)}, expected 70`);
+
+    if (sell) {
+      document.querySelector('[data-mnyp-action="holdsell"]').click();
+      if (!(await answer(2))) bad.push('selling asked no count');
+      if (mnyCash(kid) !== 65) bad.push(`cash after sale is ${mnyCash(kid)}, expected 65`);
+      const h = mnyHoldingsOfKind(kid, 'stock')[0];
+      if (!h || h.units !== 2) bad.push('two shares did not remain after selling two');
+      if (h && money2(h.costBasis) !== 20) bad.push('cost basis did not come off in proportion');
+    }
+    // Asking for more than she has is capped, never overdrawn.
+    moneyWithdraw(kid, 999);
+    if (mnySavedTotal(kid) !== 0 || mnyCash(kid) !== 135) bad.push('overdrawing kept-ready money was not capped at what there was');
+    pd.holdings = []; pd.wallet.cash = 0;
+    return bad.length === 0 || bad;
+  });
+
+  // A split bumped past what clears a debt used to hand the difference to
+  // nobody: the wallet lost it and the loan credited only what was owed.
+  checks.splitCannotOverpayADebt = await page.evaluate(() => {
+    const bad = [];
+    const kid = 'jess';
+    profile = 'parent'; ctParentKid = kid;
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+    const pd = getProfData(kid);
+    delete pd.debts;
+    mnyDebts(kid);
+    mnyAddDebt(kid, { id: 'kite', name: 'Kite loan', icon: '🪁', principal: 50, monthly: 5, bonusRate: 10,
+                      downPaymentDue: '2026-01-01' });
+    const need = mnyCashToClear(kid, mnyDebtById(kid, 'kite'));
+    if (Math.abs(need - 45.45) > 0.01) bad.push(`$50 at 10% needs ${need} of cash, expected 45.45`);
+    mrEnsureEarnings(kid, wk).overrides = {};
+    mnySetOverride(kid, wk, 'chores', 80, 'agreed');
+    const d = mnyEnsureDraft(wk, kid);
+    d.split['loan:kite'] = need;
+    mnyTuneBucket('loan:kite', 1);
+    if (money2(d.split['loan:kite']) !== need) bad.push('the stepper let the loan share pass what clears it');
+    mrEnsureEarnings(kid, wk).overrides = {};
+    delete pd.debts; mnyDraft = null;
+    return bad.length === 0 || bad;
   });
 
   /* ── The Sunday meeting's two money steps ── */

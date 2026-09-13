@@ -4867,6 +4867,7 @@
   .mny-src.amber { background: #ffe0a3; color: #7a4b00; border-color: #7a4b00; }
   .mny-stepgrp { display: inline-flex; align-items: center; gap: 0.25rem; }
   .mny-stepgrp .mny-step { min-width: 30px; min-height: 30px; }
+  .mny-step--wide { padding-inline: 0.55rem; font-size: 0.85rem; }
   .mny-stepgrp .mny-step.on { background: #ffe0a3; }
   .mny-working {
     margin-top: 0.35rem; padding: 0.4rem 0.5rem; background: var(--bg);

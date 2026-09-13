@@ -76,7 +76,7 @@ function pnQueueRows() {
   const rows = [];
   const back = pnBacklog();
   if (back.length) {
-    const unopened = back.filter(x => x.status === 'none').length;
+    const unopened = mmUnopenedWeeks(8).length;
     rows.push({
       icon: '🕰️', action: 'catchup', cta: 'Catch up ›', go: true,
       title: `${back.length} week${back.length === 1 ? '' : 's'} still open`,

@@ -982,9 +982,7 @@ function mnySplitFor(weekKey, kid, planId, own) {
     let left = dollars;
     debts.forEach(d => {
       if (!(left > 0)) return;
-      const bonus = (Number(d.bonusRate) || 0) / 100;
-      const need = money2(loanBalance(kid, d.id) / (1 + bonus));
-      const give = money2(Math.min(left, need));
+      const give = money2(Math.min(left, mnyCashToClear(kid, d)));
       out['loan:' + d.id] = money2(out['loan:' + d.id] + give);
       left = money2(left - give);
     });
