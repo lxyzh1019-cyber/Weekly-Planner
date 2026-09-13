@@ -1914,6 +1914,11 @@
   .wf-card--slim .wf-card-travel, .wf-card--xslim .wf-card-travel { display: none; }
   /* Buffer/conflict warning badge inline on the card name */
   .wf-card-conflict-badge { margin-left: 3px; font-size: calc(0.68rem * var(--fs-scale, 1)); filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); }
+  .wf-card-notdone-badge { margin-right: 3px; font-size: calc(0.68rem * var(--fs-scale, 1)); filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); }
+  /* Same rule as the day view's ring, and the same reason: a record, not a
+     grading-down. Inset so it cannot be confused with the conflict outline,
+     which sits outside the card and is red. */
+  .wf-card--notdone { box-shadow: inset 0 0 0 2.5px var(--ink); }
   /* A conflict is a real scheduling problem, so it must read at a glance without
      hovering: bold red frame, a soft red glow, and an always-visible corner
      flag even on the slimmest cards. */
@@ -2725,8 +2730,18 @@
   }
   /* Activity itself touched by a conflicting buffer (its own or a neighbour's) */
   .placed-block.placed-block--conflict { outline: 2px solid #d6453a; outline-offset: -1px; }
+  /* Recorded as not having happened. A RING, never a fade: --missed was removed
+     deliberately because an unconfirmed block must not be drawn as though the
+     child failed it, and this is the opposite case — a fact a grown-up wrote
+     down. So the fill stays at full strength and the frame carries it.
+     box-shadow rather than outline so a block that is also in a clash keeps
+     both signals. */
+  .placed-block.placed-block--notdone { box-shadow: inset 0 0 0 2.5px var(--ink); }
   .block-badges { display:flex; gap: 3px; }
   .badge { font-size: calc(0.75rem * var(--fs-scale, 1)); filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2)); }
+  /* Dark ink on a light neutral chip — never white on a pastel, which all fail
+     contrast against the category colours this sits on top of. */
+  .badge-notdone { background: #ece7e3; border-radius: 4px; padding: 0 2px; }
 
   /* The ACTIVITY TRAY section lived here: the fixed bottom/side rail of
      activity chips, its filters, its header and its level/lock badges. The
@@ -3369,6 +3384,10 @@
   }
   /* Reviewed reads as settled, not as another thing to press. */
   .pb-action.on { background: #95d5b2; }
+  /* Recording what did not happen is a different act from confirming what did,
+     so it does not borrow the confirm button's green. Neutral, not red: it is
+     a record a parent chose to make, not a warning. */
+  .pb-action--notdone { background: #ece7e3; }
   .pb-action[disabled] { opacity: 0.55; cursor: default; }
 
   /* Parent portal: tabbed sections */
@@ -6308,6 +6327,12 @@
      the heaviest thing on the strip — not a different colour, which now belongs
      to the category. */
   .td-rib-cell--now { border-width: 3.5px; box-shadow: 2px 2px 0 var(--ink); }
+  /* The third answer. Dashed means nobody has said, solid means confirmed —
+     so a block recorded as NOT having happened is answered too, and must not
+     read as the unanswered case. Double is the one remaining border style that
+     is unmistakable at this size, and it needs the extra width to render as
+     two lines at all. Still solid-filled at full strength. */
+  .td-rib-cell--notdone { border-style: double; border-width: 4px; }
 
   /* Which of the five this is. Quiet on purpose: what she is doing matters more
      than its number, and the number only exists at all when the same thing

@@ -9576,6 +9576,150 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* A SKIPPED BLOCK IS RECORDED, NOT DELETED.
+     Reviewing a past week, a day whose chores were planned and not done could
+     not be marked reviewed at all: canReviewDay wanted every elapsed block
+     confirmed, and every route out of that stated something false. "Confirm
+     all" marks them done AND grades their chores at "on time"; the edit
+     sheet's confirm toggle grades a chore nobody claimed; deleting the blocks
+     rewrites the plan the reflection reads. The day then held the whole week
+     open through canCloseWeek, for the one reason a parent had no move
+     against.
+
+     This asserts the third answer end to end: the plan survives, nothing reads
+     as done, the money comes back, and the day becomes reviewable. */
+  checks.aSkippedBlockIsRecordedNotDeleted = await page.evaluate(async () => {
+    const bad = [];
+    const wasProfile = profile;
+    const wasConfirm = window.showConfirm;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const past = toDayKeyInZone(new Date(Date.now() - 3 * 864e5));
+    const wk = ctWeekKeyForDate(past);
+    const dayIdx = Math.round((formatDayKey(past) - formatDayKey(wk)) / 864e5);
+    const before = (getDayBlocks(past, 'jenn') || []).slice();
+    const store = JSON.parse(JSON.stringify(state.shared.parentDayConfirm || {}));
+    try {
+      window.showConfirm = async () => true;
+      markDayReviewed('jenn', past, false);
+      setDayBlocks(past, [{ id: 'nd1', actId: 'piano', startMin: 9 * 60,
+                            durationMin: 60, checklistState: {} }], 'jenn');
+
+      if (canReviewDay('jenn', past).reason !== 'unconfirmed') {
+        bad.push('a past day with an unanswered block did not report unconfirmed');
+      }
+      await markRemainingNotDoneForChild('jenn', past);
+
+      const after = getDayBlocks(past, 'jenn') || [];
+      const blk = after.find(b => b.id === 'nd1');
+      // The plan is what the reflection reads. Recording is not deleting.
+      if (!blk) bad.push('the block was removed rather than recorded');
+      if (blk && !isBlockNotDone(blk)) bad.push('the block was not marked as not done');
+      if (blk && isBlockConfirmed(blk)) bad.push('a not-done block also reads as confirmed');
+      if (blk && isBlockCompleted(blk, 'jenn')) bad.push('a not-done block reads as completed');
+      if (blk && !blk.updatedAt) bad.push('the write was not stamped, so a sync can undo it');
+
+      // It stops being something left to confirm, so "Confirm all" cannot
+      // sweep it back into being done.
+      if (dayBlocksEligibleToConfirm(past, 'jenn').some(b => b.id === 'nd1')) {
+        bad.push('a not-done block was still eligible for Confirm all');
+      }
+      if (dayBlocksAwaitingAccount('jenn', past).length !== 0) {
+        bad.push('the day still reports something waiting after it was answered');
+      }
+      // …and the day can finally be reviewed.
+      const can = canReviewDay('jenn', past);
+      if (!can.ok) bad.push(`the day was still refused after being answered: ${can.reason}`);
+
+      /* The marker renders on both surfaces. A record nobody can see is the
+         same as no record — and it must be a MARKER, not a fade: --missed was
+         removed deliberately, so the block keeps its own colour at full
+         strength. */
+      currentDayKey = past; dayViewAnchorKey = past;
+      buildTimeline();
+      const dayEl = document.querySelector('#screen-day .placed-block--notdone');
+      if (!dayEl) bad.push('the day view does not mark a not-done block');
+      if (dayEl && !dayEl.querySelector('.badge-notdone')) {
+        bad.push('the day view marker carries no badge');
+      }
+      if (dayEl) {
+        const cs = getComputedStyle(dayEl);
+        if (Number(cs.opacity) < 1) bad.push('a not-done block is faded, which reads as failure');
+      }
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      window.showConfirm = wasConfirm;
+      setDayBlocks(past, before, 'jenn');
+      state.shared.parentDayConfirm = store;
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* RECORDING IT TAKES THE MONEY BACK, AND SAYS SO FIRST.
+     A chore block's grade IS money: a parent confirming the block grades it at
+     "on time" and that pays. So a block recorded as not having happened must
+     not leave its chore reading as fulfilled and paid — and a parent taking
+     money back must be shown the figure before it moves, never discover it
+     afterwards. */
+  checks.recordingNotDoneTakesTheMoneyBack = await page.evaluate(async () => {
+    const bad = [];
+    const wasProfile = profile;
+    const wasConfirm = window.showConfirm;
+    let sawMessage = '';
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const past = toDayKeyInZone(new Date(Date.now() - 3 * 864e5));
+    const wk = ctWeekKeyForDate(past);
+    const dayIdx = Math.round((formatDayKey(past) - formatDayKey(wk)) / 864e5);
+    const before = (getDayBlocks(past, 'jenn') || []).slice();
+    const row = (mrPoolRows(wk) || []).find(r => mrLanePays(r.lane)
+      && (r.who === 'both' || r.who === 'jenn'));
+    try {
+      if (!row) { bad.push('no paying chore in the pool to test with'); return bad; }
+      window.showConfirm = async (msg) => { sawMessage = String(msg || ''); return true; };
+
+      setDayBlocks(past, [{ id: 'ndm1', actId: 'chores', choreTags: [row.id],
+                            startMin: 9 * 60, durationMin: 30, checklistState: {} }], 'jenn');
+      mrSetChoreGrade('jenn', wk, dayIdx, row.id, 3);
+      if (!(mrGetChoreGrade('jenn', wk, dayIdx, row.id) > 0)) {
+        bad.push('the fixture grade did not take');
+      }
+      const paidBefore = getFamilyChoreStatus('jenn', wk).fulfilled;
+
+      await markRemainingNotDoneForChild('jenn', past);
+
+      // The confirmation named the chore and the figure BEFORE anything moved.
+      if (!/\$/.test(sawMessage)) bad.push('the confirmation did not name any money');
+      if (sawMessage && sawMessage.indexOf(row.label) === -1) {
+        bad.push('the confirmation did not name the chore losing its grade');
+      }
+      if (!/XP/.test(sawMessage)) {
+        bad.push('the confirmation did not say XP already earned stays');
+      }
+      // …and then it actually moved.
+      if (mrGetChoreGrade('jenn', wk, dayIdx, row.id) !== 0) {
+        bad.push('the grade survived, so the week still pays for work nobody did');
+      }
+      if (mrGetClaim('jenn', wk, dayIdx, row.id) !== 0) {
+        bad.push('an unanswered claim survived');
+      }
+      const st = getFamilyChoreStatus('jenn', wk);
+      if (st.fulfilled >= paidBefore && paidBefore > 0) {
+        bad.push('the chore still reads as fulfilled');
+      }
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      window.showConfirm = wasConfirm;
+      try { mrSetChoreGrade('jenn', wk, dayIdx, row && row.id, 0); } catch (e) {}
+      setDayBlocks(past, before, 'jenn');
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
   /* A WEEK DOES NOT CLOSE OVER A DAY STILL BEING LIVED.
      canReviewDay always refused a running day, but canCloseWeek excused it
      alongside a future one — so a Sunday sitting held while the swimming was

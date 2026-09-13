@@ -809,6 +809,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
     +(isBuffer ? ` travel-buf travel-buf--centered${b._bufferCls ? ' '+b._bufferCls : ''}${b._bufferConflict ? ' travel-buf--conflict' : ''}` : '')
     +(b.parentPinned?' parent-pinned':'')
     +(isBlockCompleted(b, blockKid)?' placed-block--completed':'')
+    +(isBlockNotDone(b)?' placed-block--notdone':'')
     +(isLightColour(blockBg)?' light-bg':'')
     +(hasConflict ? ' placed-block--conflict' : '')
     +(isCompact?' compact':'')+(isTight?' compact-tight':'')+fontTier;
@@ -828,6 +829,11 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   // a single "+N" chip (foldBadges).
   const badgeList = [];
   if (hasConflict) badgeList.push('<span class="badge" title="Not enough travel/get-ready time — overlaps another activity">⚠️</span>');
+  /* SECOND, deliberately. foldBadges keeps only the first two or three and
+     rolls the rest into a "+N" chip, so this is the only position that still
+     shows on a compact block that also has a clash — and "a grown-up recorded
+     that this did not happen" is not a fact to hide behind a chip. */
+  if (isBlockNotDone(b)) badgeList.push('<span class="badge badge-notdone" title="A grown-up recorded that this did not happen">🚫</span>');
   // (Training sport is shown by the block's own icon now, so no separate badge.)
   // Competition shares the sport's topic icon/colour/name with Competitive Sports, so it
   // needs its own badge to stay visually distinct at a glance.

@@ -583,7 +583,13 @@ function unclaimChoresFromBlock(blk, dayKey, kid) {
 function blockChoreGradesGiven(blk, dayKey, kid) {
   const { wk, dayIdx, targets } = blockChoreTargets(blk, dayKey, kid);
   if (dayIdx < 0) return [];
-  return targets.filter(t => mrGetChoreGrade(kid, wk, dayIdx, t.choreId) > 0);
+  const r = mrRulesForWeek(wk);
+  const out = [];
+  targets.forEach(t => {
+    const grade = mrGetChoreGrade(kid, wk, dayIdx, t.choreId);
+    if (grade > 0) out.push({ choreId: t.choreId, label: t.label, grade, pay: ckGradePay(r, grade) });
+  });
+  return out;
 }
 
 /* The inverse of gradeChoresFromBlock. A parent saying the block did not

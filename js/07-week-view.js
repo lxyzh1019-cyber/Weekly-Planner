@@ -1095,6 +1095,12 @@ function renderFullWeek(keys) {
       if (!blockTierAtLeast(tier, 'meta')) cls += ' wf-card--slim';
       if (!blockTierAtLeast(tier, 'name')) cls += ' wf-card--xslim wf-card--icononly';
       if (isBlockCompleted(b, activeProfile())) cls += ' wf-card--done';
+      /* A marker, never a fade. --missed was removed deliberately: an
+         UNCONFIRMED block must not be drawn as though the child failed it.
+         This is the opposite case — an explicit record a parent made — so it
+         gets a ring and a tag, and the fill stays at full strength. */
+      const notDone = isBlockNotDone(b);
+      if (notDone) cls += ' wf-card--notdone';
       const hasConflict = bufferConflicts.affected.has(b.id);
       if (hasConflict) cls += ' wf-card--conflict';
       card.className = cls;
@@ -1128,6 +1134,7 @@ function renderFullWeek(keys) {
         ? `<span class="wf-card-travel">${bufKinds.join(' ')}</span>` : '';
       const stampEmoji = b.parentStamp && b.parentStamp.emoji ? b.parentStamp.emoji + ' ' : '';
       const conflictTag = hasConflict ? `<span class="wf-card-conflict-badge" title="Not enough travel/get-ready time — overlaps another activity">⚠️</span>` : '';
+      const notDoneTag = notDone ? `<span class="wf-card-notdone-badge" title="A grown-up recorded that this did not happen">🚫</span>` : '';
       // Corner flag stays visible on every card size (the inline badge is hidden
       // when a card is too slim for its name), so a clash never hides off-screen.
       const conflictFlag = hasConflict ? `<div class="wf-card-conflict-flag" title="Time clash — not enough travel/get-ready time">!</div>` : '';
@@ -1154,7 +1161,7 @@ function renderFullWeek(keys) {
         ${conflictFlag}
         <div class="wf-card-time">${timeStr}</div>
         <div class="wf-card-icon">${escapeHtml(dispIcon)}</div>
-        <div class="wf-card-name">${stampEmoji}${escapeHtml(dispName)}${travelTag}${conflictTag}</div>
+        <div class="wf-card-name">${stampEmoji}${notDoneTag}${escapeHtml(dispName)}${travelTag}${conflictTag}</div>
         ${sumHtml}
         <div class="wf-card-dur">${durHtml}</div>
         <button type="button" class="wf-card-check" style="width:${checkPx}px;height:${checkPx}px;font-size:${Math.round(checkPx*0.58)}px" aria-label="${b.completed?'Mark not done':'Mark done'}"
@@ -1162,6 +1169,7 @@ function renderFullWeek(keys) {
       `;
       card.title = `${dispIcon} ${dispName} — ${timeStr}, ${formatDuration(b.durationMin)}`
         + (bufKinds.length ? ` · ${bufKinds.join(', ')} each way` : '')
+        + (notDone ? ' · 🚫 recorded as not done' : '')
         + (hasConflict ? ' · ⚠️ overlaps another activity — not enough time' : '');
       attachTapGuard(card, ()=> openDayFromWeekCard(key, ci, b.id));
       cell.appendChild(card);

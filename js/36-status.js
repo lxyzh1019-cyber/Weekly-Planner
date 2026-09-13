@@ -105,6 +105,23 @@ function isBlockAccountedFor(block) {
   return isBlockConfirmed(block) || isBlockNotDone(block);
 }
 
+/* What is this day still waiting on? Three surfaces need exactly this list —
+   the banner's two buttons and their badge counts, the bulk action itself, and
+   canReviewDay's gate — and it was written inline in the gate, which is one
+   copy away from the drift this file exists to end.
+
+   NOTE the argument order. Everything in this file reads (kid, dayKey), while
+   dayBlocksEligibleToConfirm (js/09-sheets.js) is (dayKey, kid). Keeping the
+   house order here and flipping at the call is deliberate; getting it the wrong
+   way round returns an empty list rather than throwing, which would read as
+   "this day is finished" on every screen. */
+function dayBlocksAwaitingAccount(kid, dayKey) {
+  const elapsed = (typeof dayBlocksEligibleToConfirm === 'function')
+    ? dayBlocksEligibleToConfirm(dayKey, kid)
+    : (getDayBlocks(dayKey, kid) || []);
+  return elapsed.filter(b => !isBlockAccountedFor(b));
+}
+
 /* ── Which routines is this day actually asking for? ──────────────
    All three sessions were evaluated on every day of every week, so a family
    who never planned an after-school routine was permanently marked down for
@@ -227,9 +244,10 @@ function canReviewDay(kid, dayKey) {
 
   /* Accounted for, not merely confirmed — a block a parent has recorded as
      not having happened is answered, and holding the day open over it is what
-     left a whole week unclosable with no move a parent could make. */
-  const pending = (typeof dayBlocksEligibleToConfirm === 'function'
-    ? dayBlocksEligibleToConfirm(dayKey, kid) : blocks).filter(b => !isBlockAccountedFor(b));
+     left a whole week unclosable with no move a parent could make. Asked, not
+     re-derived: dayBlocksAwaitingAccount is the one list, shared with the
+     banner's buttons and the bulk action. */
+  const pending = dayBlocksAwaitingAccount(kid, dayKey);
   if (pending.length) return { ok: false, reason: 'unconfirmed', ...none, pendingCount: pending.length };
 
   /* A day that holds nothing CAN be reviewed — a quiet Sunday is a real

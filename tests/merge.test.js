@@ -848,5 +848,82 @@ function sync(a, b) {
     api.mergeSharedState({}, {}).dataEpoch === 0);
 }
 
+/* ── "It did not happen" is a block field, and blocks merge whole-record ──
+   `notDone` lives at state.profiles[kid].weeks[dayKey][i], so it does NOT go
+   through deepMergeObj and it does NOT go through check-shared-merge.js, which
+   only scans state.shared.*. It merges through mergeArrayById: newest
+   updatedAt wins the WHOLE record. That makes two things load-bearing, and
+   these checks are what hold them.
+
+   1. Every write must stamp markItemUpdated, or the other device's untouched
+      copy of the same block wins and the mark is silently gone.
+   2. The exclusion between confirmed and notDone has to live in the RECORD.
+      Whole-record merge means a block carrying both flags survives a sync
+      intact, and every predicate downstream then disagrees with the next. */
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  // The phone still holds the block as it was BEFORE anyone answered it.
+  on(phone, st => {
+    st.profiles.jenn.weeks = { '2026-08-03': [
+      { id: 'b1', actId: 'chores', startMin: 540, durationMin: 30, updatedAt: 1000 },
+    ] };
+  });
+  // The iPad records it as not done, later, stamped.
+  on(ipad, st => {
+    st.profiles.jenn.weeks = { '2026-08-03': [
+      { id: 'b1', actId: 'chores', startMin: 540, durationMin: 30, notDone: true, updatedAt: 2000 },
+    ] };
+  });
+  sync(ipad, phone);
+  const onIpad = ipad.state.profiles.jenn.weeks['2026-08-03'][0];
+  const onPhone = phone.state.profiles.jenn.weeks['2026-08-03'][0];
+  check('a block recorded as not done survives the other device\'s stale snapshot',
+    onIpad.notDone === true && onPhone.notDone === true);
+}
+
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  // The iPad recorded it as not done first…
+  on(ipad, st => {
+    st.profiles.jenn.weeks = { '2026-08-03': [
+      { id: 'b1', actId: 'chores', notDone: true, updatedAt: 1000 },
+    ] };
+  });
+  // …then a parent confirmed it on the phone. toggleConfirm deletes notDone, so
+  // the record that arrives carries confirmed and no notDone key at all.
+  on(phone, st => {
+    st.profiles.jenn.weeks = { '2026-08-03': [
+      { id: 'b1', actId: 'chores', confirmed: true, updatedAt: 2000 },
+    ] };
+  });
+  sync(ipad, phone);
+  const both = [ipad, phone].map(d => d.state.profiles.jenn.weeks['2026-08-03'][0]);
+  check('confirming later clears the not-done mark on both devices',
+    both.every(b => b.confirmed === true && !b.notDone));
+  check('and no block ever ends up carrying both answers at once',
+    both.every(b => !(b.confirmed && b.notDone)));
+}
+
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  // The hazard, asserted rather than left as a comment: an UNSTAMPED write
+  // loses. This is why applyNotDoneToBlocks and toggleConfirm both call
+  // markItemUpdated — setDayBlocks does not stamp for them.
+  on(phone, st => {
+    st.profiles.jenn.weeks = { '2026-08-03': [
+      { id: 'b1', actId: 'chores', updatedAt: 5000 },
+    ] };
+  });
+  on(ipad, st => {
+    st.profiles.jenn.weeks = { '2026-08-03': [
+      { id: 'b1', actId: 'chores', notDone: true },   // no updatedAt — never stamped
+    ] };
+  });
+  sync(ipad, phone);
+  check('an unstamped not-done write loses to a stamped remote copy',
+    !ipad.state.profiles.jenn.weeks['2026-08-03'][0].notDone &&
+    !phone.state.profiles.jenn.weeks['2026-08-03'][0].notDone);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

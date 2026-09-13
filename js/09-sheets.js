@@ -979,6 +979,7 @@ function openEditSheet(blockId) {
     ppWrap.style.display = 'block';
     document.getElementById('pinToggle').classList.toggle('on', !!block.parentPinned);
     document.getElementById('confirmToggle').classList.toggle('on', !!block.confirmed);
+    document.getElementById('notDoneToggle').classList.toggle('on', !!block.notDone);
   } else ppWrap.style.display = 'none';
 
   // Sister Sync per-activity controls: parent-only
@@ -1593,8 +1594,20 @@ function toggleConfirm() {
   const blk = blocks.find(b=>b.id===editingBlockId);
   if (!blk) return;
   blk.confirmed = !blk.confirmed;
+  /* Confirmed and not-done are the same question answered two ways, so the
+     exclusion is written into the RECORD rather than worked out at read time.
+     Blocks merge whole-record newest-wins (mergeArrayById, js/04-merge.js), so
+     a block carrying both flags survives a sync intact and every predicate
+     downstream then disagrees with the next. */
+  if (blk.confirmed) delete blk.notDone;
+  /* …and the stamp, which was missing. setDayBlocks does not stamp, so until
+     now a confirmation could lose arbitration to a stale remote copy of the
+     same block and quietly come undone on the next snapshot. */
+  markItemUpdated(blk);
   setDayBlocks(currentDayKey, blocks);
   document.getElementById('confirmToggle').classList.toggle('on', !!blk.confirmed);
+  const ndEl = document.getElementById('notDoneToggle');
+  if (ndEl) ndEl.classList.toggle('on', !!blk.notDone);
   recountActivityProgress();
   if (blk.confirmed) {
     checkLevelUp(blk.actId);
@@ -1603,6 +1616,151 @@ function toggleConfirm() {
   }
   saveAll();
   buildTimeline();
+}
+
+/* ── "It was planned and it did not happen" ────────────────────────
+   The third answer. See isBlockNotDone (js/36-status.js) for why it exists;
+   these are the writers.
+
+   Split into a reader, a confirmation and a writer on purpose. The reader is
+   what lets the confirmation NAME the money before it moves — a parent taking
+   a grade back must never discover it afterwards — and the writer is the one
+   place the flags are set, so the per-block toggle, the bulk day button and
+   the meeting's offer cannot drift apart. */
+
+/* Read-only. What recording these blocks as not done would cost, through the
+   money owner. Returns rows the confirmation can print plus the total. */
+function notDoneBlocksWouldCost(blocks, dayKey, kid) {
+  const rows = [];
+  (blocks || []).forEach(b => {
+    if (typeof blockChoreGradesGiven !== 'function') return;
+    blockChoreGradesGiven(b, dayKey, kid).forEach(g => rows.push(g));
+  });
+  const total = rows.reduce((s, r) => s + (Number(r.pay) || 0), 0);
+  return { rows, total: Math.round(total * 100) / 100 };
+}
+
+/* A completed ROUTINE is refused rather than overwritten: a routine's
+   completion IS its checklist (js/36-status.js), so clearing it would wipe the
+   child's own ticks to make a parent's record fit. She unticks it, or it
+   stands. */
+function notDoneWouldWipeARoutine(block, kid) {
+  return typeof isRoutineCompleted === 'function' && isRoutineCompleted(block, kid);
+}
+
+/* The one confirmation. Says what the mark means, names every grade coming
+   back and the total, and says plainly what it does NOT undo. */
+async function confirmNotDone(blocks, dayKey, kid) {
+  const name = kid === 'jenn' ? 'Jenn' : 'Jess';
+  const n = blocks.length;
+  const { rows, total } = notDoneBlocksWouldCost(blocks, dayKey, kid);
+  let msg = `Record ${n} block${n === 1 ? '' : 's'} as not done for ${name}?\n\n`
+    + `${n === 1 ? 'It is' : 'They are'} marked as planned but not carried out. `
+    + `Nothing is marked done.`;
+  if (rows.length) {
+    msg += `\n\nThis money comes back:\n`
+      + rows.map(r => `  ${r.label} — ${mnyMoney(r.pay)}`).join('\n')
+      + `\n  Total — ${mnyMoney(total)}`;
+  }
+  // XP is forward-only by design: xpCredit is its single writer and there is no
+  // path back into the ledger. Say so rather than let it be discovered.
+  msg += `\n\nXP she already earned stays.`;
+  return showConfirm(msg, { okLabel: n === 1 ? 'Record it' : 'Record them', cancelLabel: 'Not now' });
+}
+
+/* The one writer. Takes ids rather than block objects because completing and
+   grading write through setDayBlocks, so any object held across those calls is
+   stale. One save at the end: setDayBlocks saves on every call, and a bulk
+   press would otherwise upload the whole family document once per block. */
+function applyNotDoneToBlocks(ids, dayKey, kid) {
+  const want = new Set(ids || []);
+  const blocks = getDayBlocks(dayKey, kid) || [];
+  let n = 0;
+  blocks.forEach(b => {
+    if (!want.has(b.id) || isBlockNotDone(b)) return;
+    b.notDone = true;
+    // Mutually exclusive with both other answers — see toggleConfirm above.
+    delete b.confirmed;
+    if (!notDoneWouldWipeARoutine(b, kid)) b.completed = false;
+    // A grade above zero is paying for work that did not happen. The owner
+    // clears it; ungradeChoresFromBlock also takes back an unanswered claim.
+    if (typeof ungradeChoresFromBlock === 'function') ungradeChoresFromBlock(b, dayKey, kid);
+    markItemUpdated(b);
+    n++;
+  });
+  if (!n) return 0;
+  setDayBlocks(dayKey, blocks, kid);
+  recountActivityProgress();
+  saveAll();
+  return n;
+}
+
+/* The edit sheet's toggle. Shaped like togglePin and toggleConfirm beside it. */
+async function toggleNotDone() {
+  if (!isParent()) { showToast('Only a grown-up records this 🔒'); return; }
+  const who = isParent() ? parentViewing : activeProfile();
+  const blocks = getDayBlocks(currentDayKey, who) || [];
+  const blk = blocks.find(b => b.id === editingBlockId);
+  if (!blk) return;
+
+  // Un-marking takes a record back and needs no permission and no money move.
+  if (isBlockNotDone(blk)) {
+    delete blk.notDone;
+    markItemUpdated(blk);
+    setDayBlocks(currentDayKey, blocks, who);
+    document.getElementById('notDoneToggle').classList.toggle('on', false);
+    saveAll();
+    buildTimeline();
+    return;
+  }
+
+  /* A block that has not ended yet cannot be recorded as not having happened —
+     the same guard that makes dayBlocksEligibleToConfirm safe to press at nine
+     in the morning. */
+  if (typeof blockHasEnded === 'function' && !blockHasEnded(blk, currentDayKey)) {
+    showToast('That has not happened yet');
+    return;
+  }
+  if (notDoneWouldWipeARoutine(blk, who)) {
+    const nm = who === 'jenn' ? 'Jenn' : 'Jess';
+    showToast(`${nm} ticked every step — untick the routine first`);
+    return;
+  }
+  if (!(await confirmNotDone([blk], currentDayKey, who))) return;
+  applyNotDoneToBlocks([blk.id], currentDayKey, who);
+  const el = document.getElementById('notDoneToggle');
+  if (el) el.classList.toggle('on', true);
+  const cf = document.getElementById('confirmToggle');
+  if (cf) cf.classList.toggle('on', false);
+  refreshAfterCompletion();
+  renderParentBanners();
+  buildTimeline();
+}
+
+/* The bulk day action, beside "Confirm all". Four blocks is one tap, not
+   twelve. A completed routine is skipped and said out loud rather than
+   silently left behind. */
+async function markRemainingNotDoneForChild(kid, dayKey) {
+  if (!isParent()) { showToast('Only a grown-up records this 🔒'); return; }
+  const who = kid || parentViewing;
+  const key = dayKey || currentDayKey;
+  const name = who === 'jenn' ? 'Jenn' : 'Jess';
+  const waiting = dayBlocksAwaitingAccount(who, key);
+  if (!waiting.length) { showToast(`Nothing left to answer for ${name}`); return; }
+
+  const routines = waiting.filter(b => notDoneWouldWipeARoutine(b, who));
+  const doable = waiting.filter(b => !notDoneWouldWipeARoutine(b, who));
+  if (!doable.length) {
+    showToast(`${name} ticked every step of ${routines.length === 1 ? 'that routine' : 'those routines'}`);
+    return;
+  }
+  if (!(await confirmNotDone(doable, key, who))) return;
+  const n = applyNotDoneToBlocks(doable.map(b => b.id), key, who);
+  refreshAfterCompletion();
+  renderParentBanners();
+  buildTimeline();
+  showToast(`${name}: ${n} block${n === 1 ? '' : 's'} recorded as not done`
+    + (routines.length ? ` · ${routines.length} finished routine${routines.length === 1 ? '' : 's'} left alone` : ''));
 }
 
 /* ── "Confirm all today" was two promises it did not keep ─────────
@@ -1671,6 +1829,9 @@ async function confirmAllBlocksForChild(kid, dayKey) {
   blocks.forEach(b => {
     if (!ids.has(b.id) || b.confirmed) return;
     b.confirmed = true;
+    // The other half of the exclusion written in toggleConfirm: confirming is
+    // the opposite answer to "it did not happen", so it clears that mark.
+    delete b.notDone;
     markItemUpdated(b);
     // A parent confirming a chore block IS the grading act — see gradeChoresFromBlock.
     if (b.actId === 'chores') gradeChoresFromBlock(b, key, who);
@@ -1738,9 +1899,20 @@ function renderParentBanners() {
      parent to go and confirm blocks that did not exist. */
   const can = canReviewDay(who, key);
   const why = reviewed ? '' : reviewBlockedReason(can);
+  /* The third control: what is left when a parent is not going to confirm it.
+     Hidden rather than disabled at zero — a day already answered should not
+     carry a dead button — and it counts through the same one list the review
+     gate reads, so the badge and the gate cannot disagree. */
+  const waiting = (typeof dayBlocksAwaitingAccount === 'function')
+    ? dayBlocksAwaitingAccount(who, key).length : 0;
   bar.innerHTML =
     `<button type="button" class="btn-icon pb-action" onclick="confirmAllBlocksForChild()">`
     + `✅ Confirm all ${escapeHtml(name)}'s blocks${left ? ` (${left})` : ''}</button>`
+    + (waiting
+      ? `<button type="button" class="btn-icon pb-action pb-action--notdone"`
+        + ` onclick="markRemainingNotDoneForChild()">`
+        + `🚫 Mark the rest not done (${waiting})</button>`
+      : '')
     + `<button type="button" class="btn-icon pb-action${reviewed ? ' on' : ''}"`
     + `${why ? ` disabled title="${escapeAttr(why)}"` : ''}`
     + ` onclick="markDayReviewedForChild()">`

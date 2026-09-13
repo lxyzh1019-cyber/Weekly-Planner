@@ -629,7 +629,14 @@ function tdProgressRibbon(kid, blocks) {
        Written out rather than built from a ternary: check-dead-css.js matches
        literal text, and a class it cannot see is a class that can quietly die. */
     let cls = 'td-rib-cell';
-    if (isBlockCompleted(b, kid)) cls = 'td-rib-cell td-rib-cell--done';
+    /* A third state, and it goes FIRST. The border says dashed-not-confirmed /
+       solid-confirmed, so a block a grown-up recorded as not having happened
+       would otherwise read as merely "not confirmed yet" — the exact thing the
+       record exists to distinguish. Still solid-filled at full strength: she
+       does not get to tick things every hour, and a hollow cell would read as
+       a failure rather than as a fact somebody wrote down. */
+    if (isBlockNotDone(b)) cls = 'td-rib-cell td-rib-cell--notdone';
+    else if (isBlockCompleted(b, kid)) cls = 'td-rib-cell td-rib-cell--done';
     else if (current && b.id === current.id) cls = 'td-rib-cell td-rib-cell--now';
     segs.push({
       cls,
