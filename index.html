@@ -27,7 +27,7 @@
 <body>
 
 <!-- ═══════════ TOAST ═══════════ -->
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <!-- ═══════════ UNDO ═══════════
      A mis-tapped tick is a nine-year-old's most common mistake on this app, and
@@ -77,6 +77,7 @@
 <!-- ═══════════════════════════════════════════════════════
      SCREEN: PROFILE SELECT
 ════════════════════════════════════════════════════════ -->
+<main>
 <div class="screen active" id="screen-profile">
   <div class="profile-header">
     <h1>My Weekly Planner</h1>
@@ -110,7 +111,7 @@
   </div>
   <p style="position:absolute;bottom:1rem;color:var(--ink-light);font-size:0.8rem">
     <span id="fbStatus">⚙️ Connecting...</span>
-    <br><span id="syncPendingMsg" class="sync-pending-msg"></span>
+    <br><span id="syncPendingMsg" role="status" aria-live="polite" class="sync-pending-msg"></span>
     <br><span id="syncDebugMsg" class="sync-debug-msg"></span>
   </p>
 </div>
@@ -129,7 +130,7 @@
      Reachable from the week's tab bar; not yet the default landing.
 ════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-today">
-  <div class="topbar">
+  <header class="topbar">
     <div class="topbar-left">
       <h2>Today</h2>
     </div>
@@ -138,7 +139,7 @@
          theAppTellsFamilyTimeOnAnyDevice exists. -->
     <div class="topbar-date" id="tdTodayDate"></div>
     <div class="profile-badge" id="todayProfileBadge"></div>
-  </div>
+  </header>
   <div id="tdWrap" class="td-wrap"></div>
 
   <!-- Moved here off the day timeline's left rail, which was headed "Today" and
@@ -177,7 +178,7 @@
       </div>
       <div class="day-mini-panel">
         <div class="day-mini-panel__header">
-          <h4>✅ To-do</h4>
+          <h3>✅ To-do</h3>
           <button class="btn-icon gt-add-btn" onclick="addTodo()" title="Add todo">＋</button>
         </div>
         <div id="dayTodosList" class="day-mini-list"></div>
@@ -252,7 +253,7 @@
     <span class="pb-actions" id="parentWeekActions"></span>
   </div>
 
-  <div class="topbar week-topbar">
+  <header class="topbar week-topbar">
     <div class="week-topbar__row1">
       <div class="topbar-left">
         <button class="profile-badge" onclick="openProfileSwitcher()" id="weekProfileBadge" aria-label="Switch profile"></button>
@@ -283,7 +284,7 @@
         <button class="btn-template no-print week-print-btn" onclick="openPrint()">🖨 Print</button>
       </div>
     </div>
-  </div>
+  </header>
   <p class="kid-coach-tip" id="weekCoachTip" style="display:none;margin:0.35rem 0.75rem 0"></p>
 
   <!-- The compact week view lived here, with #weekGrid and #weekLegend. It was
@@ -375,7 +376,7 @@
      SCREEN: CHORE TAB
 ════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-chore">
-  <div class="topbar">
+  <header class="topbar">
     <div class="topbar-left">
       <button class="btn-icon" onclick="goWeek()">◀</button>
       <h2>Weekly Chore 🧹</h2>
@@ -383,7 +384,7 @@
     <div class="topbar-actions">
       <div class="profile-badge" id="choreProfileBadge"></div>
     </div>
-  </div>
+  </header>
   <div class="chore-wrap" id="choreWrap"></div>
 </div>
 
@@ -408,18 +409,18 @@
 
 <!-- Weekly family meeting overlay -->
 <div class="overlay" id="familyMeetingOverlay" onclick="overlayClick(event,'familyMeetingOverlay')">
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="fmSheetTitle">
     <div class="sheet-handle"></div>
-    <h3>🧑‍🧑‍🧒 Weekly family meeting</h3>
+    <h3 id="fmSheetTitle">🧑‍🧑‍🧒 Weekly family meeting</h3>
     <div id="familyMeetingBody"></div>
   </div>
 </div>
 
 <!-- Quick profile switcher (tap the profile icon) -->
 <div class="overlay" id="profileSwitchOverlay" onclick="overlayClick(event,'profileSwitchOverlay')">
-  <div class="sheet sheet--compact">
+  <div class="sheet sheet--compact" role="dialog" aria-modal="true" aria-labelledby="profileSwitchTitle">
     <div class="sheet-handle"></div>
-    <h3>Switch profile 👤</h3>
+    <h3 id="profileSwitchTitle">Switch profile 👤</h3>
     <div class="profile-switch-list" id="profileSwitchBody"></div>
   </div>
 </div>
@@ -444,7 +445,7 @@
        vertical schedule cost a fifth of the plannable height and made the day
        feel like a form. The zone filters and the Timeline/Quest switch that used
        to justify the second row are both long gone. -->
-  <div class="topbar day-topbar">
+  <header class="topbar day-topbar">
     <div class="day-topbar__row1">
       <button class="btn-icon btn-back-week" onclick="goWeek()" aria-label="Back to week view" title="Back to week view"><span aria-hidden="true">◀</span> Week</button>
       <div class="day-nav-center">
@@ -466,7 +467,7 @@
     <!-- #dayTitle kept: openDay and the parent view still write to it, and it is
          read by the print sheet's heading. It carries no visible text here. -->
     <h2 id="dayTitle" class="visually-hidden"></h2>
-  </div>
+  </header>
 
   <!-- One scroll container for the whole screen. It used to be three nested
        ones — workspace, lane, timeline-wrap — which on an iPad meant the schedule
@@ -485,13 +486,13 @@
      SCREEN: SISTER SYNC
 ════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-sync">
-  <div class="topbar">
+  <header class="topbar">
     <div class="topbar-left">
       <button class="btn-icon" onclick="goWeek()">◀</button>
       <h2>Sister Sync 👯</h2>
     </div>
     <div class="profile-badge" id="syncProfileBadge"></div>
-  </div>
+  </header>
 
   <div class="week-nav">
     <button class="btn-icon" onclick="changeSyncDay(-1)">◀</button>
@@ -523,7 +524,7 @@
 ════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-parent">
   <div class="parent-banner">👨‍👩‍👧‍👦 Parent Mode</div>
-  <div class="topbar">
+  <header class="topbar">
     <div class="topbar-left">
       <h2>Parent Dashboard</h2>
     </div>
@@ -532,7 +533,7 @@
       <button class="btn-icon" onclick="changeParentPin()" title="Change parent PIN">🔒 PIN</button>
       <button class="btn-icon" onclick="goProfile()">Exit</button>
     </div>
-  </div>
+  </header>
 
   <div style="padding:0.8rem 1rem 0">
     <div class="parent-tabs" role="tablist" aria-label="Parent sections">
@@ -540,7 +541,7 @@
         aria-selected="true" aria-controls="ptab-now" tabindex="0"
         data-parent-dest="now">📥 Now<span class="pn-badge" id="pnTabBadge" hidden></span></button>
       <button class="parent-tab" role="tab" id="pdestbtn-meeting" data-pdest="meeting"
-        aria-selected="false" aria-controls="ptab-meeting" tabindex="-1"
+        aria-selected="false" aria-controls="ptab-review" tabindex="-1"
         data-parent-dest="meeting">🧑‍🧑‍🧒 Meeting</button>
       <button class="parent-tab" role="tab" id="pdestbtn-history" data-pdest="history"
         aria-selected="false" aria-controls="ptab-history" tabindex="-1"
@@ -569,10 +570,10 @@
   <div class="parent-panel" id="ptab-setup" role="tabpanel" aria-labelledby="pdestbtn-setup" hidden>
     <div id="ptab-setup-wrap"></div>
   </div>
-  <div class="parent-panel" id="ptab-access" role="tabpanel" hidden><div id="paAccessWrap"></div></div>
-  <div class="parent-panel" id="ptab-profiles" role="tabpanel" hidden><div id="paProfilesWrap"></div></div>
-  <div class="parent-panel" id="ptab-prefs" role="tabpanel" hidden><div id="paPrefsWrap"></div></div>
-  <div class="parent-panel" id="ptab-school" role="tabpanel" hidden><div id="paSchoolWrap"></div></div>
+  <div class="parent-panel" id="ptab-access" role="region" aria-label="Access and PIN" hidden><div id="paAccessWrap"></div></div>
+  <div class="parent-panel" id="ptab-profiles" role="region" aria-label="Profiles" hidden><div id="paProfilesWrap"></div></div>
+  <div class="parent-panel" id="ptab-prefs" role="region" aria-label="Preferences" hidden><div id="paPrefsWrap"></div></div>
+  <div class="parent-panel" id="ptab-school" role="region" aria-label="School calendar" hidden><div id="paSchoolWrap"></div></div>
   <div class="parent-panel" id="ptab-app" role="tabpanel" aria-labelledby="pdestbtn-app" hidden>
     <div id="ptab-app-wrap"></div>
   </div>
@@ -580,7 +581,7 @@
   <!-- TAB: Now — what is waiting on a grown-up, most urgent first. It owns no
        data and no rules: every count is read through the accessor the owning
        screen uses, and every row links to that screen. -->
-  <div class="parent-panel active" id="ptab-now" role="tabpanel">
+  <div class="parent-panel active" id="ptab-now" role="tabpanel" aria-labelledby="pdestbtn-now">
     <div id="pnWrap"></div>
   </div>
 
@@ -588,7 +589,7 @@
        launch the meeting and jump to another tab. The launcher is Now's rail,
        the queue is Now, and what is left here is the meeting itself: which
        weeks are open, which days are confirmed, and what the girls said. -->
-  <div class="parent-panel" id="ptab-review" role="tabpanel" hidden>
+  <div class="parent-panel" id="ptab-review" role="tabpanel" aria-labelledby="pdestbtn-meeting" hidden>
     <h3 class="parent-h3">🧑‍🧑‍🧒 The family meeting</h3>
     <p class="parent-hint">Check each day together, celebrate the week, agree what was earned and what happens to it, then plan the next one. Tap a day to open the meeting straight at it.</p>
     <div id="meetingHub"></div>
@@ -600,25 +601,25 @@
 
   <!-- TAB: Chores — the redesign's Parent frame. What's waiting on you, grade
        it, put work on a day. It settles nothing: the meeting does that. -->
-  <div class="parent-panel" id="ptab-chores" role="tabpanel" hidden>
+  <div class="parent-panel" id="ptab-chores" role="region" aria-label="Chores" hidden>
     <div class="chore-wrap" id="cpWrap" onclick="cpHandleClick(event);cpHandleCtClick(event)"></div>
   </div>
 
   <!-- TAB: Chore setup — the pool, the goals and the prices. In the handoff
        drawing this tab was an archive of superseded directions; it is the
        setup screen the portal was actually missing. -->
-  <div class="parent-panel" id="ptab-options" role="tabpanel" hidden>
+  <div class="parent-panel" id="ptab-options" role="region" aria-label="Chores and pay" hidden>
     <div class="chore-wrap" id="coWrap" onclick="coHandleClick(event)" onchange="coHandleChange(event)"></div>
   </div>
 
   <!-- TAB: Trends — the eight-week read of what the chore system actually paid. -->
-  <div class="parent-panel" id="ptab-trends" role="tabpanel" hidden>
+  <div class="parent-panel" id="ptab-trends" role="region" aria-label="Trends" hidden>
     <div class="chore-wrap" id="ctrWrap" onclick="ctrHandleClick(event)"></div>
   </div>
 
   <!-- TAB: Performance — Function 2: analyse PAST weeks. Read-only:
        nothing here confirms or records; that stays in the meeting. -->
-  <div class="parent-panel" id="ptab-analysis" role="tabpanel" hidden>
+  <div class="parent-panel" id="ptab-analysis" role="region" aria-label="Analysis" hidden>
     <h3 class="parent-h3">📊 Past weeks at a glance</h3>
     <p class="parent-hint">How the last 8 weeks actually went — planned hours completed, routines kept, and the pocket money recorded at each meeting.</p>
     <div id="perfTrend"></div>
@@ -635,7 +636,7 @@
   </div>
 
   <!-- TAB: Routines -->
-  <div class="parent-panel" id="ptab-routines" role="tabpanel" hidden>
+  <div class="parent-panel" id="ptab-routines" role="region" aria-label="Routines" hidden>
     <h3 class="parent-h3">🌅 Routines</h3>
     <p class="parent-hint">Built-in (Morning / After-School / Evening) and custom routines. All shared with both girls.</p>
     <div id="routinesList"></div>
@@ -643,7 +644,7 @@
   </div>
 
   <!-- TAB: Tasks -->
-  <div class="parent-panel" id="ptab-tasks" role="tabpanel" hidden>
+  <div class="parent-panel" id="ptab-tasks" role="region" aria-label="Activities and sports" hidden>
     <h3 class="parent-h3">🕓 Pending approval</h3>
     <p class="parent-hint">New activities the girls added themselves. Approve, edit, or remove.</p>
     <div id="pendingApprovalList"></div>
@@ -665,11 +666,11 @@
   <!-- TAB: Level-Up Rules -->
   <!-- TAB: Money rules — everything a grown-up can change about the money
        system, in one place. Every save is effective-dated and logged. -->
-  <div class="parent-panel" id="ptab-money" role="tabpanel" hidden>
+  <div class="parent-panel" id="ptab-money" role="region" aria-label="Money rules" hidden>
     <div class="chore-wrap" id="mnyRulesWrap"></div>
   </div>
 
-  <div class="parent-panel" id="ptab-rules" role="tabpanel" hidden>
+  <div class="parent-panel" id="ptab-rules" role="region" aria-label="Level-up" hidden>
     <h3 class="parent-h3">⚙️ Level-Up Rules</h3>
     <p class="parent-hint">Earn a ★ on an activity after enough sessions/hours. Shared between both girls.</p>
     <div id="levelRulesList"></div>
@@ -679,16 +680,16 @@
   <!-- TAB: Copy a week — one week's plan onto another, or onto her sister's.
        Rendered by pcwRender (js/34-parent-copyweek.js). It owns no clone rule:
        weekCloneBlock still decides what a copied block arrives as. -->
-  <div class="parent-panel" id="ptab-copyweek" role="tabpanel" hidden>
+  <div class="parent-panel" id="ptab-copyweek" role="region" aria-label="Copy a plan" hidden>
     <div id="pcwWrap"></div>
   </div>
 
   <!-- TAB: Backup — the only route back after a lost device, plus the cloud
        size readout. Rendered by bkRenderPanel (js/30-backup.js). -->
-  <div class="parent-panel" id="ptab-backup" role="tabpanel" hidden>
+  <div class="parent-panel" id="ptab-backup" role="region" aria-label="Backup" hidden>
     <div id="bkWrap"></div>
   </div>
-  <div class="parent-panel" id="ptab-conflicts" role="tabpanel" hidden>
+  <div class="parent-panel" id="ptab-conflicts" role="region" aria-label="Conflicts" hidden>
     <div id="cfWrap"></div>
   </div>
 </div>
@@ -698,7 +699,7 @@
 ════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-parent-monthly">
   <div class="parent-banner">👨‍👩‍👧‍👦 Parent Mode — Monthly Overview</div>
-  <div class="topbar">
+  <header class="topbar">
     <div class="topbar-left">
       <button class="btn-icon" onclick="showScreen('parent')">◀</button>
       <h2 id="pmTitle">Monthly</h2>
@@ -707,7 +708,7 @@
       <button class="pill-btn" id="pmKidJenn" onclick="setParentMonthlyKid('jenn')">🐥 Jenn</button>
       <button class="pill-btn" id="pmKidJess" onclick="setParentMonthlyKid('jess')">🦊 Jess</button>
     </div>
-  </div>
+  </header>
 
   <div class="week-nav">
     <button class="btn-icon" onclick="changeParentMonth(-1)">◀</button>
@@ -738,23 +739,24 @@
      SCREEN: PRINT
 ════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-print">
-  <div class="topbar no-print">
+  <header class="topbar no-print">
     <div class="topbar-left">
       <button class="btn-icon" onclick="goWeek()">◀</button>
       <h2>Print Week</h2>
     </div>
     <button class="btn-template" onclick="window.print()">🖨 Print</button>
-  </div>
+  </header>
   <div class="print-controls no-print">
     <label class="print-ctrl">🕐 Show
-      <select id="printStartHour" onchange="onPrintWindowChange()"></select>
+      <select id="printStartHour" aria-label="Print from hour" onchange="onPrintWindowChange()"></select>
       to
-      <select id="printEndHour" onchange="onPrintWindowChange()"></select>
+      <select id="printEndHour" aria-label="Print to hour" onchange="onPrintWindowChange()"></select>
     </label>
     <span class="print-ctrl-hint">Prints the weekly plan on one A4 landscape page.</span>
   </div>
   <div class="print-sheet" id="printSheet"></div>
 </div>
+</main>
 
 <!-- ═══════════════════════════════════════════════════════════════
      ═══════════ OVERLAYS / SHEETS ═══════════
@@ -762,7 +764,7 @@
 
 <!-- Training Sheet -->
 <div class="overlay" id="trainingOverlay" onclick="overlayClick(event,'trainingOverlay')">
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="trainingSheetTitle">
     <div class="sheet-handle"></div>
     <h3 id="trainingSheetTitle">🏋️ Competitive Sports Session</h3>
 
@@ -796,9 +798,9 @@
     <button class="pill-btn" style="margin-bottom:0.8rem" onclick="openCustomTask()">＋ Add custom task</button>
 
     <h4>NOTE</h4>
-    <textarea class="note-input" id="trainingNote" rows="2" placeholder="e.g. Terwillegar, bring skates…"></textarea>
+    <textarea class="note-input" id="trainingNote" aria-label="Note for this session" rows="2" placeholder="e.g. Terwillegar, bring skates…"></textarea>
 
-    <div class="buffer-toggle" id="trainingWarmupToggle" onclick="toggleWarmupBuffer('training')">
+    <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="trainingWarmupToggle" onclick="toggleWarmupBuffer('training')">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
       <span class="toggle-label">🔥 Needs warm-up time (default 20 min right before — adjust below)</span>
     </div>
@@ -806,7 +808,7 @@
       <label for="trainingWarmupBufMin">Warm-up minutes (before only)</label>
       <input type="number" id="trainingWarmupBufMin" min="5" max="120" step="5" value="20" onchange="onTrainingBufferMinInput()">
     </div>
-    <div class="buffer-toggle" id="trainingReadyToggle" onclick="toggleGetReadyBuffer('training')">
+    <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="trainingReadyToggle" onclick="toggleGetReadyBuffer('training')">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
       <span class="toggle-label">👕 Needs get ready time (default 15 min before & after — adjust below)</span>
     </div>
@@ -814,7 +816,7 @@
       <label for="trainingReadyBufMin">Get-ready minutes (each way)</label>
       <input type="number" id="trainingReadyBufMin" min="5" max="120" step="5" value="15" onchange="onTrainingBufferMinInput()">
     </div>
-    <div class="buffer-toggle" id="trainingTravelToggle" onclick="toggleTravelBuffer('training')">
+    <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="trainingTravelToggle" onclick="toggleTravelBuffer('training')">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
       <span class="toggle-label">🚗 Needs travel time (default 15 min before & after — adjust below)</span>
     </div>
@@ -827,7 +829,7 @@
       <div class="checklist-wrap" id="trainingGearList"></div>
     </div>
 
-    <div class="repeat-toggle" id="trainingRepeat" onclick="toggleRepeat('trainingRepeat')">
+    <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="trainingRepeat" onclick="toggleRepeat('trainingRepeat')">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
       <span class="toggle-label">🔁 Repeat on other days…</span>
     </div>
@@ -861,7 +863,7 @@
 <!-- Quick activity picker: opens when a kid taps an empty time slot without
      having selected an activity first (item 6). -->
 <div class="overlay" id="slotPickerOverlay" onclick="overlayClick(event,'slotPickerOverlay')">
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="slotPickerTitle">
     <div class="sheet-handle"></div>
     <h3 id="slotPickerTitle">Add an activity</h3>
     <p class="slot-picker-hint" id="slotPickerHint">Pick what goes here.</p>
@@ -871,7 +873,7 @@
 </div>
 
 <div class="overlay" id="activityOverlay" onclick="overlayClick(event,'activityOverlay')">
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="activitySheetTitle">
     <div class="sheet-handle"></div>
     <h3 id="activitySheetTitle"></h3>
     <div class="sheet-time-grid-row">
@@ -897,8 +899,8 @@
     <div class="objectives-list" id="activityObjectivesList"></div>
     <button class="pill-btn" style="margin-bottom:0.8rem" onclick="openCustomTask('activity')">＋ Add custom goal</button>
     <h4>NOTE</h4>
-    <textarea class="note-input" id="activityNote" rows="2" placeholder="Add a note…"></textarea>
-    <div class="buffer-toggle" id="activityTravelToggle" onclick="toggleTravelBuffer('activity')">
+    <textarea class="note-input" id="activityNote" aria-label="Note for this activity" rows="2" placeholder="Add a note…"></textarea>
+    <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="activityTravelToggle" onclick="toggleTravelBuffer('activity')">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
       <span class="toggle-label">🚗 Needs travel time (default 15 min each way — adjust below)</span>
     </div>
@@ -909,7 +911,7 @@
     <!-- Get-ready existed only on the training sheet, so an appointment or a
          school day placed from here could name a journey but never the time
          it takes to be ready for it. -->
-    <div class="buffer-toggle" id="activityReadyToggle" onclick="toggleGetReadyBuffer('activity')">
+    <div class="buffer-toggle" role="switch" tabindex="0" aria-checked="false" id="activityReadyToggle" onclick="toggleGetReadyBuffer('activity')">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
       <span class="toggle-label">👕 Needs get ready time (default 15 min before &amp; after — adjust below)</span>
     </div>
@@ -917,7 +919,7 @@
       <label for="activityReadyBufMin">Get-ready minutes (each way)</label>
       <input type="number" id="activityReadyBufMin" min="5" max="120" step="5" value="15" onchange="onActivityReadyBufMinInput()">
     </div>
-    <div class="repeat-toggle" id="activityRepeat" onclick="toggleRepeat('activityRepeat')">
+    <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="activityRepeat" onclick="toggleRepeat('activityRepeat')">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
       <span class="toggle-label">🔁 Repeat on other days…</span>
     </div>
@@ -948,7 +950,7 @@
 
 <!-- Edit Sheet -->
 <div class="overlay" id="editOverlay" onclick="overlayClick(event,'editOverlay')">
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="editSheetTitle">
     <div class="sheet-handle"></div>
     <div class="edit-title-row">
       <h3 id="editSheetTitle"></h3>
@@ -979,14 +981,14 @@
       <div id="editObjectivesView" style="margin-bottom:0.8rem"></div>
       <div id="editObjectivesEditWrap" style="display:none">
         <label style="font-size:0.95rem;font-weight:700;color:#5a4d41">Edit your goals (one per line)</label>
-        <textarea class="note-input" id="editObjectivesInput" rows="4" placeholder="e.g. 10 good jumps&#10;2 run-throughs"></textarea>
+        <textarea class="note-input" id="editObjectivesInput" aria-label="Objectives" rows="4" placeholder="e.g. 10 good jumps&#10;2 run-throughs"></textarea>
       </div>
     </div>
 
     <h4>NOTE</h4>
-    <textarea class="note-input" id="editNoteInput" rows="2" placeholder="Add a note…"></textarea>
+    <textarea class="note-input" id="editNoteInput" aria-label="Note" rows="2" placeholder="Add a note…"></textarea>
 
-    <div class="buffer-toggle sheet-toggle-row" id="editWarmupToggle" onclick="toggleEditWarmupBuffer()" style="display:none">
+    <div class="buffer-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editWarmupToggle" onclick="toggleEditWarmupBuffer()" style="display:none">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
       <span class="toggle-label">🔥 Needs warm-up time</span>
     </div>
@@ -994,7 +996,7 @@
       <label for="editWarmupBufMin">Warm-up minutes (before only)</label>
       <input type="number" id="editWarmupBufMin" min="5" max="120" step="5" value="20" onchange="onEditBufferMinInput()">
     </div>
-    <div class="buffer-toggle sheet-toggle-row" id="editReadyToggle" onclick="toggleEditGetReadyBuffer()" style="display:none">
+    <div class="buffer-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editReadyToggle" onclick="toggleEditGetReadyBuffer()" style="display:none">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
       <span class="toggle-label">👕 Needs get ready time</span>
     </div>
@@ -1003,11 +1005,11 @@
       <input type="number" id="editReadyBufMin" min="5" max="120" step="5" value="15" onchange="onEditBufferMinInput()">
     </div>
     <div class="edit-primary-toggle-row">
-      <div class="buffer-toggle sheet-toggle-row" id="editTravelToggle" onclick="toggleEditTravelBuffer()">
+      <div class="buffer-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editTravelToggle" onclick="toggleEditTravelBuffer()">
         <div class="toggle-track"><div class="toggle-knob"></div></div>
         <span class="toggle-label">🚗 Needs travel time</span>
       </div>
-      <div class="repeat-toggle sheet-toggle-row" id="editCompleteToggle" onclick="toggleEditComplete()">
+      <div class="repeat-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editCompleteToggle" onclick="toggleEditComplete()">
         <div class="toggle-track"><div class="toggle-knob"></div></div>
         <span class="toggle-label">✅ Mark this activity done</span>
       </div>
@@ -1026,7 +1028,7 @@
     </div>
 
     <div class="edit-stopwatch-wrap" id="editStopwatchWrap">
-      <div class="repeat-toggle" id="editStopwatchToggle" onclick="toggleEditStopwatch()">
+      <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="editStopwatchToggle" onclick="toggleEditStopwatch()">
         <div class="toggle-track"><div class="toggle-knob"></div></div>
         <span class="toggle-label">⏱ Stopwatch (goal vs time used)</span>
       </div>
@@ -1039,7 +1041,7 @@
     </div>
 
     <!-- Repeat to other days of this week -->
-    <div class="repeat-toggle sheet-toggle-row" id="editRepeat" onclick="toggleRepeat('editRepeat')">
+    <div class="repeat-toggle sheet-toggle-row" role="switch" tabindex="0" aria-checked="false" id="editRepeat" onclick="toggleRepeat('editRepeat')">
       <div class="toggle-track"><div class="toggle-knob"></div></div>
       <span class="toggle-label">🔁 Repeat on other days…</span>
     </div>
@@ -1070,7 +1072,7 @@
 
     <!-- Sister Sync: public visibility + invite -->
     <div id="sisterSyncWrap" style="display:none">
-      <div class="repeat-toggle" id="publicToggle" onclick="togglePublic()">
+      <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="publicToggle" onclick="togglePublic()">
         <div class="toggle-track"><div class="toggle-knob"></div></div>
         <span class="toggle-label">👯 Show details to your sister (Sister Sync)</span>
       </div>
@@ -1078,11 +1080,11 @@
     </div>
 
     <div id="parentPinWrap" style="display:none">
-      <div class="repeat-toggle" id="pinToggle" onclick="togglePin()">
+      <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="pinToggle" onclick="togglePin()">
         <div class="toggle-track"><div class="toggle-knob"></div></div>
         <span class="toggle-label">📌 Parent-pinned (locked)</span>
       </div>
-      <div class="repeat-toggle" id="confirmToggle" onclick="toggleConfirm()">
+      <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="confirmToggle" onclick="toggleConfirm()">
         <div class="toggle-track"><div class="toggle-knob"></div></div>
         <span class="toggle-label">✅ Confirm progress (counts toward level-up)</span>
       </div>
@@ -1097,7 +1099,7 @@
 
 <!-- Kid quick view: routine checklist + auto stopwatch -->
 <div class="overlay kid-block-overlay" id="kidRoutineOverlay" onclick="overlayClick(event,'kidRoutineOverlay')">
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="kidRoutineTitle">
     <div class="sheet-handle"></div>
     <h3 id="kidRoutineTitle"></h3>
     <div class="checklist-wrap" id="kidRoutineChecklist"></div>
@@ -1109,7 +1111,7 @@
 
 <!-- Kid quick view: training objectives + gear -->
 <div class="overlay kid-block-overlay" id="kidTrainingOverlay" onclick="overlayClick(event,'kidTrainingOverlay')">
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="kidTrainingTitle">
     <div class="sheet-handle"></div>
     <h3 id="kidTrainingTitle"></h3>
     <p style="font-size:0.92rem;color:var(--ink-light);margin:0 0 0.5rem">Your plan for this session:</p>
@@ -1132,9 +1134,9 @@
 
 <!-- Template Sheet -->
 <div class="overlay" id="templateOverlay" onclick="overlayClick(event,'templateOverlay')">
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="templateSheetTitle">
     <div class="sheet-handle"></div>
-    <h3>📋 Start from a Template</h3>
+    <h3 id="templateSheetTitle">📋 Start from a Template</h3>
     <p style="font-size:0.9rem;color:var(--ink-light);margin-bottom:0.8rem">This replaces your current plan for this day.</p>
     <button class="pill-btn" style="width:100%;margin-bottom:0.5rem;font-size:1rem" onclick="applyTemplate('school')">🏫 School Day</button>
     <button class="pill-btn" style="width:100%;font-size:1rem" onclick="applyTemplate('weekend')">🌈 Weekend</button>
@@ -1154,9 +1156,9 @@
 
 <!-- Weekly Wins recap (#6) -->
 <div class="overlay" id="weeklyWinsOverlay" onclick="overlayClick(event,'weeklyWinsOverlay')">
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="weeklyWinsTitle">
     <div class="sheet-handle"></div>
-    <h3>🎉 This week's wins</h3>
+    <h3 id="weeklyWinsTitle">🎉 This week's wins</h3>
     <div id="weeklyWinsBody"></div>
     <button class="btn-confirm" onclick="closeSheet('weeklyWinsOverlay')">Awesome! 🙌</button>
   </div>
@@ -1168,9 +1170,9 @@
 
 <!-- Custom Activity -->
 <div class="overlay" id="customOverlay" onclick="overlayClick(event,'customOverlay')">
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="customSheetTitle">
     <div class="sheet-handle"></div>
-    <h3>✨ Create Activity</h3>
+    <h3 id="customSheetTitle">✨ Create Activity</h3>
     <div class="custom-builder">
       <label>Activity Name</label>
       <input type="text" id="customName" placeholder="e.g. Guitar, Swimming…" maxlength="30" aria-label="Activity name">
@@ -1181,7 +1183,7 @@
         </div>
         <div>
           <label>Default Duration</label>
-          <select id="customDur">
+          <select id="customDur" aria-label="How long">
             <option value="15">15 min</option>
             <option value="30">30 min</option>
             <option value="60" selected>1 hour</option>
@@ -1193,7 +1195,7 @@
       <label>Or tap an icon</label>
       <div class="emoji-grid" id="customEmojiGrid"></div>
       <label>Category</label>
-      <select id="customCat">
+      <select id="customCat" aria-label="Category">
         <option value="sleep">😴 Rest</option>
         <option value="school">📚 Learning</option>
         <option value="active">🏃 Active</option>
@@ -1212,9 +1214,9 @@
      the family took up could not be entered at all. Shared by both girls, so a
      grown-up adds it. -->
 <div class="overlay" id="customSportOverlay" onclick="overlayClick(event,'customSportOverlay')">
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="customSportTitle">
     <div class="sheet-handle"></div>
-    <h3>🤸 Add a sport</h3>
+    <h3 id="customSportTitle">🤸 Add a sport</h3>
     <div class="custom-builder">
       <label for="sportName">Sport name</label>
       <input type="text" id="sportName" placeholder="e.g. Gymnastics" maxlength="24" aria-label="Sport name">
@@ -1232,7 +1234,7 @@
 
 <!-- Parent Activity Editor (create + edit) -->
 <div class="overlay" id="parentActivityOverlay" onclick="overlayClick(event,'parentActivityOverlay')">
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="parentActivityHeading">
     <div class="sheet-handle"></div>
     <h3 id="parentActivityHeading">✨ Add Activity</h3>
     <div class="custom-builder">
@@ -1241,11 +1243,11 @@
       <div class="row">
         <div>
           <label>Icon (emoji)</label>
-          <input type="text" id="paIcon" placeholder="🎾" maxlength="2" oninput="syncEmojiGrid('paEmojiGrid', this.value)">
+          <input type="text" id="paIcon" aria-label="Icon" placeholder="🎾" maxlength="2" oninput="syncEmojiGrid('paEmojiGrid', this.value)">
         </div>
         <div>
           <label>Default Duration</label>
-          <select id="paDur">
+          <select id="paDur" aria-label="How long">
             <option value="15">15 min</option>
             <option value="30">30 min</option>
             <option value="60" selected>1 hour</option>
@@ -1257,7 +1259,7 @@
       <label>Or tap an icon</label>
       <div class="emoji-grid" id="paEmojiGrid"></div>
       <label>Category</label>
-      <select id="paCat">
+      <select id="paCat" aria-label="Category">
         <option value="sleep">😴 Rest</option>
         <option value="school">📚 Learning</option>
         <option value="active">🏃 Active</option>
@@ -1268,7 +1270,7 @@
         <option value="appointment">🩺 Appointment</option>
       </select>
       <label>Visibility</label>
-      <select id="paVisibility">
+      <select id="paVisibility" aria-label="Who can see it">
         <option value="shared">🔗 Shared (both girls)</option>
         <option value="jenn">🐥 Jenn only</option>
         <option value="jess">🦊 Jess only</option>
@@ -1280,7 +1282,7 @@
 
 <!-- Custom Training Task -->
 <div class="overlay" id="customTaskOverlay" onclick="overlayClick(event,'customTaskOverlay')">
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="customTaskSheetTitle">
     <div class="sheet-handle"></div>
     <h3 id="customTaskSheetTitle">➕ Custom Training Task</h3>
     <p style="font-size:0.88rem;color:var(--ink-light);margin-bottom:0.5rem">Saved to your library for reuse.</p>
@@ -1290,7 +1292,7 @@
       <div class="row">
         <div id="taskSportRow">
           <label>Sport</label>
-          <select id="taskSport">
+          <select id="taskSport" aria-label="Sport">
             <option value="skating">⛸ Skating</option>
             <option value="swimming">🏊 Swimming</option>
             <option value="dryland">💪 Dryland</option>
@@ -1303,7 +1305,7 @@
         </div>
       </div>
       <label>Notes (optional)</label>
-      <textarea class="note-input" id="taskNotes" rows="2" placeholder="Focus on form, breathing, etc."></textarea>
+      <textarea class="note-input" id="taskNotes" aria-label="Notes for this task" rows="2" placeholder="Focus on form, breathing, etc."></textarea>
     </div>
     <button class="btn-confirm" onclick="confirmCustomTask()">Save Task ✅</button>
   </div>
@@ -1311,9 +1313,9 @@
 
 <!-- End-of-day Reflect Sheet -->
 <div class="overlay" id="reflectOverlay" onclick="overlayClick(event,'reflectOverlay')">
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="reflectSheetTitle">
     <div class="sheet-handle"></div>
-    <h3>🌙 Reflect on Today</h3>
+    <h3 id="reflectSheetTitle">🌙 Reflect on Today</h3>
     <h4>Overall vibe</h4>
     <div class="vibe-moods" id="reflectOverallMoods" style="margin-bottom:1rem"></div>
     <h4>How did each block feel? <span style="font-weight:400;font-size:0.85rem">(optional)</span></h4>
@@ -1324,14 +1326,14 @@
 
 <!-- New Challenge -->
 <div class="overlay" id="newChallengeOverlay" onclick="overlayClick(event,'newChallengeOverlay')">
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="newChallengeTitle">
     <div class="sheet-handle"></div>
-    <h3>🎯 New Weekly Challenge</h3>
+    <h3 id="newChallengeTitle">🎯 New Weekly Challenge</h3>
     <div class="custom-builder">
       <label>Challenge title</label>
       <input type="text" id="chTitle" placeholder="e.g. Practice piano 5x this week" aria-label="Challenge title">
       <label>Activity</label>
-      <select id="chActivity"></select>
+      <select id="chActivity" aria-label="Activity"></select>
       <div class="row">
         <div>
           <label>Target count</label>
@@ -1339,7 +1341,7 @@
         </div>
         <div>
           <label>For</label>
-          <select id="chWho">
+          <select id="chWho" aria-label="Who it is for">
             <option value="both">Both sisters</option>
             <option value="jenn">Jenn only</option>
             <option value="jess">Jess only</option>
@@ -1353,14 +1355,14 @@
 
 <!-- New Level Rule -->
 <div class="overlay" id="newRuleOverlay" onclick="overlayClick(event,'newRuleOverlay')">
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="newRuleTitle">
     <div class="sheet-handle"></div>
-    <h3>⚙️ New Level-Up Rule</h3>
+    <h3 id="newRuleTitle">⚙️ New Level-Up Rule</h3>
     <div class="custom-builder">
       <label>Activity</label>
-      <select id="ruleActivity"></select>
+      <select id="ruleActivity" aria-label="Activity"></select>
       <label>Rule type</label>
-      <select id="ruleType">
+      <select id="ruleType" aria-label="Kind of rule">
         <option value="count">Count (do X times)</option>
         <option value="hours">Time (accumulate X hours)</option>
       </select>
@@ -1377,7 +1379,7 @@
 
 <!-- New / Edit Money Group -->
 <div class="overlay" id="choreGroupOverlay" onclick="overlayClick(event,'choreGroupOverlay')">
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="cgTitle">
     <div class="sheet-handle"></div>
     <h3 id="cgTitle">💰 New Money Group</h3>
     <div class="custom-builder">
@@ -1411,7 +1413,7 @@
 
 <!-- New Custom Routine -->
 <div class="overlay" id="newRoutineOverlay" onclick="overlayClick(event,'newRoutineOverlay')">
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rbHeading">
     <div class="sheet-handle"></div>
     <h3 id="rbHeading">🌅 New Custom Routine</h3>
     <p style="font-size:0.88rem;color:var(--ink-light);margin-bottom:0.5rem">Add a checklist routine both girls can use.</p>

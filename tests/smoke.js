@@ -4790,6 +4790,46 @@ function findChromium() {
           }
         }
       }
+      /* The shell is cached by sw.js, network-first with the cache as the
+         fallback — so being online always gets the deployed code, and offline
+         gets the shell. Prove all three: the worker registers, the shell is in
+         its cache, and the page comes back with the network off. */
+      const sw = await httpPage.evaluate(async () => {
+        if (!('serviceWorker' in navigator)) return { err: 'no serviceWorker API in this browser' };
+        const reg = await Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(() => r(null), 8000))]);
+        if (!reg) return { err: 'the worker never became ready' };
+        let name = null, cache = null;
+        for (let i = 0; i < 100 && !cache; i++) {
+          name = (await caches.keys()).find(k => k.startsWith('wp-shell-'));
+          if (name) { const c = await caches.open(name); if (await c.match('./js/99-main.js')) cache = c; }
+          if (!cache) await new Promise(r => setTimeout(r, 100));
+        }
+        if (!cache) return { err: 'no wp-shell cache holding the scripts' };
+        const missing = [];
+        for (const u of ['./index.html', './manifest.json', './css/app.css', './js/01-config.js', './js/99-main.js', './assets/icons/icon-192.png']) {
+          if (!(await cache.match(u))) missing.push(u);
+        }
+        return { name, missing };
+      });
+      if (sw.err) problems.push(sw.err);
+      else if (sw.missing.length) problems.push(`shell files not cached: ${sw.missing.join(', ')}`);
+      if (!sw.err) {
+        await httpPage.reload();                       // now controlled by the worker
+        await httpPage.context().setOffline(true);
+        try {
+          const off = await httpPage.goto(`http://127.0.0.1:${port}/index.html`);
+          if (!off || !off.ok()) problems.push('offline, the page did not come back from the cache');
+          const booted = await httpPage.evaluate(() => typeof showScreen === 'function' && !!document.getElementById('screen-today'));
+          if (!booted) problems.push('offline, the shell loaded but the app did not boot');
+        } catch (e) {
+          problems.push(`offline navigation failed: ${e.message.split('\n')[0]}`);
+        }
+        await httpPage.context().setOffline(false);
+        await httpPage.evaluate(async () => {
+          for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+          for (const k of await caches.keys()) await caches.delete(k);
+        });
+      }
       await httpPage.close();
     } finally {
       server.close();
@@ -10669,6 +10709,115 @@ function findChromium() {
       keys.forEach((k, i) => setDayBlocks(k, before[i], kid));
       prog.xp2 = hadXp2; prog.questXP = hadXp; prog.xpByWeek = hadByWeek;
     }
+    return bad.length === 0 || bad;
+  });
+
+  /* ── Semantics an outside audit found missing ──
+     None of the 19 sheets said it was a dialog, Escape did nothing, and focus
+     stayed on the page behind. The markup carries the roles now, and
+     openSheet/closeSheet own focus. The roles are asserted on the FILE, not
+     the DOM: js/99-main.js patches the DOM at load, and a check that read the
+     patched tree would pass on markup that says nothing. */
+  {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const bad = [];
+    const count = (re) => (html.match(re) || []).length;
+    if (count(/<main\b/g) !== 1) bad.push(`${count(/<main\b/g)} <main> elements, want 1`);
+    if (count(/<header class="topbar/g) !== 8) bad.push(`${count(/<header class="topbar/g)} topbars are <header>, want 8`);
+    if (count(/<div class="topbar(?:\s|")/g)) bad.push('a topbar is still a <div>');
+    const toggles = html.match(/<div class="(?:buffer|repeat)-toggle[^>]*>/g) || [];
+    const bare = toggles.filter(t => !/role="switch"/.test(t) || !/tabindex="0"/.test(t) || !/aria-checked=/.test(t));
+    if (bare.length) bad.push(`${bare.length} of ${toggles.length} toggles carry no switch semantics in the markup`);
+    const overlays = html.match(/<div class="overlay[^"]*" id="[^"]+"/g) || [];
+    if (overlays.length !== 19) bad.push(`${overlays.length} static overlays, expected 19`);
+    if (count(/role="tabpanel"/g) !== 5) bad.push(`${count(/role="tabpanel"/g)} tabpanels in the file, want 5 (one per tab)`);
+    if (count(/<h4>✅ To-do<\/h4>/g)) bad.push('the To-do heading still skips from h2 to h4');
+    checks.theMarkupSaysWhatThingsAre = bad.length === 0 || bad;
+  }
+
+  checks.sheetsAreDialogsYouCanLeave = await page.evaluate(async () => {
+    const bad = [];
+    profile = 'jenn'; parentViewing = 'jenn';
+    showScreen('week');
+    // Every static overlay's sheet is a labelled modal dialog.
+    document.querySelectorAll('.overlay[id]').forEach(ov => {
+      if (ov.id === 'appDialogOverlay') return;
+      const sheet = ov.querySelector('.sheet');
+      if (!sheet) { bad.push(`${ov.id}: no sheet`); return; }
+      if (sheet.getAttribute('role') !== 'dialog') bad.push(`${ov.id}: sheet is not role=dialog`);
+      if (sheet.getAttribute('aria-modal') !== 'true') bad.push(`${ov.id}: not aria-modal`);
+      const by = sheet.getAttribute('aria-labelledby');
+      const named = (sheet.getAttribute('aria-label') || '').trim() || (by && document.getElementById(by));
+      if (!named) bad.push(`${ov.id}: the dialog has no accessible name`);
+    });
+    // Open one from a button: focus moves in, Escape closes it, focus comes back.
+    const opener = document.querySelector('#screen-week button');
+    opener.focus();
+    openSheet('templateOverlay');
+    const ov = document.getElementById('templateOverlay');
+    if (!ov.classList.contains('open')) bad.push('openSheet did not open the sheet');
+    if (!ov.contains(document.activeElement)) bad.push('opening a sheet left focus on the page behind it');
+    if (ov._opener !== opener) bad.push('the sheet did not remember what opened it');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await new Promise(r => setTimeout(r, 20));
+    if (ov.classList.contains('open')) bad.push('Escape did not close the sheet');
+    if (document.activeElement !== opener) bad.push('closing the sheet did not give focus back to the opener');
+    // Escape with nothing open is nobody's business.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    // The app dialog owns Escape while it is up: a sheet under it must survive.
+    openSheet('templateOverlay');
+    const p = showPrompt('name?');
+    await new Promise(r => setTimeout(r, 20));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await p;
+    await new Promise(r => setTimeout(r, 20));
+    if (!ov.classList.contains('open')) bad.push('Escape on the app dialog also closed the sheet beneath it');
+    closeSheet('templateOverlay');
+    // The runtime dialogs are named too.
+    const q = showConfirm('sure?');
+    const dlg = document.querySelector('#appDialogOverlay .sheet');
+    const by = dlg && dlg.getAttribute('aria-labelledby');
+    if (!by || !document.getElementById(by) || !document.getElementById(by).textContent.trim()) bad.push('the app dialog has no accessible name');
+    _appDialogCancel(); await q;
+    return bad.length === 0 || bad;
+  });
+
+  // The portal's five destinations are tabs; the fifteen detail panels under
+  // them are not, and a screen reader must not be told a tab exists for them.
+  checks.theParentPortalTellsATabFromARegion = await page.evaluate(() => {
+    const bad = [];
+    const tabs = [...document.querySelectorAll('[role="tab"]')];
+    if (tabs.length !== 5) bad.push(`${tabs.length} tabs, expected 5`);
+    tabs.forEach(t => {
+      const panel = document.getElementById(t.getAttribute('aria-controls') || '');
+      if (!panel) { bad.push(`${t.id}: aria-controls points at nothing`); return; }
+      if (panel.getAttribute('role') !== 'tabpanel') bad.push(`${t.id}: its panel is not a tabpanel`);
+      if (panel.getAttribute('aria-labelledby') !== t.id) bad.push(`${panel.id}: not labelled by its tab`);
+    });
+    document.querySelectorAll('.parent-panel').forEach(p => {
+      const role = p.getAttribute('role');
+      if (role === 'tabpanel') return;
+      if (role !== 'region') { bad.push(`${p.id}: role is ${role}, want region`); return; }
+      if (!p.getAttribute('aria-label')) bad.push(`${p.id}: region with no name`);
+    });
+    // The Meeting tab used to control a panel that did not exist.
+    profile = 'parent'; showScreen('parent'); setParentTab('review');
+    const meetingPanel = document.getElementById(document.getElementById('pdestbtn-meeting').getAttribute('aria-controls'));
+    if (!meetingPanel || meetingPanel.hidden) bad.push('the Meeting tab does not show the panel it claims to control');
+    return bad.length === 0 || bad;
+  });
+
+  // Every form control has a name a screen reader can say. Placeholder text
+  // is not one: it vanishes the moment she types.
+  checks.everyControlHasAName = await page.evaluate(() => {
+    const bad = [];
+    document.querySelectorAll('input[id]:not([type=hidden]), select[id], textarea[id]').forEach(el => {
+      const named = (el.getAttribute('aria-label') || '').trim()
+        || el.getAttribute('aria-labelledby')
+        || document.querySelector(`label[for="${el.id}"]`)
+        || el.closest('label');
+      if (!named) bad.push(el.id);
+    });
     return bad.length === 0 || bad;
   });
 

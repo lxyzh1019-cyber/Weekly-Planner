@@ -373,6 +373,7 @@
     border-bottom: 2px dashed var(--paper-line);
     background: rgba(255, 248, 230, 0.85);
   }
+  .day-mini-panel__header h3,
   .day-mini-panel__header h4 {
     margin: 0;
     font-size: 1.05rem;
