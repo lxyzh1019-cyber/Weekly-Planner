@@ -8,8 +8,9 @@
     "test:merge": "TZ=UTC node tests/merge.test.js",
     "test:smoke": "node tests/smoke.js",
     "test:cleanup": "TZ=UTC node tests/cleanup-tool.test.js",
-    "test": "npm run check && npm run test:merge && npm run test:cleanup && npm run test:xp && npm run test:smoke",
-    "test:xp": "TZ=UTC node tests/xp.test.js"
+    "test": "npm run check && npm run test:merge && npm run test:cleanup && npm run test:xp && npm run test:money && npm run test:smoke",
+    "test:xp": "TZ=UTC node tests/xp.test.js",
+    "test:money": "TZ=UTC node tests/money.test.js"
   },
   "devDependencies": {
     "playwright-core": "1.62.1"

@@ -80,6 +80,65 @@ function isBlockCompleted(block, kid) {
    two disagreeing is information, not a bug to paper over. */
 function isBlockConfirmed(block) { return !!(block && block.confirmed); }
 
+/* ── …and the third answer: a grown-up says it did NOT happen ──────
+   `confirmed` and its absence used to be the whole vocabulary, so a plan that
+   was not carried out had nowhere to be recorded. Every route out of it stated
+   something false: "Confirm all" marks the blocks done and grades their chores
+   at "on time", the edit sheet's confirm toggle graded a chore nobody claimed,
+   and deleting the blocks rewrites the plan so the reflection can no longer
+   see what was missed. Meanwhile the day could never be reviewed, which held
+   the whole week open through canCloseWeek — for the one reason a parent
+   cannot act on.
+
+   So this is not "unconfirmed" and it is not "completed". It is a parent's
+   account of the day, and it is what makes a skipped block ACCOUNTED FOR
+   without anybody claiming it was done. It pays nothing, earns no XP and
+   completes nothing; it only lets the review finish honestly. */
+function isBlockNotDone(block) { return !!(block && block.notDone); }
+
+/* Answered one way or the other — verified, or recorded as not having
+   happened. This is what the review gate actually needs to know, and keeping
+   it here stops the banner, the meeting and the close gate from each deciding
+   it. A block cannot be both: toggleNotDone (js/09-sheets.js) clears the
+   confirmation, and confirming clears the not-done mark. */
+function isBlockAccountedFor(block) {
+  return isBlockConfirmed(block) || isBlockNotDone(block);
+}
+
+/* ── Which routines is this day actually asking for? ──────────────
+   All three sessions were evaluated on every day of every week, so a family
+   who never planned an after-school routine was permanently marked down for
+   one — the meeting's day rows offered a tick for something nobody had asked
+   the child to do, the week percentage counted it against her, and the streak
+   could never be clean.
+
+   The plan is what says which routines a day wants. If ANY routine block is on
+   the day, those are the ones reviewed; if none is planned, all three stand,
+   because a day with no routine on the calendar is not evidence that the
+   family stopped expecting them. Order follows CT_SESSIONS so the meeting
+   always reads Morning · Afternoon · Evening.
+
+   One owner, deliberately: mrStreakDayDone asks it too, so the sessions the
+   meeting shows and the sessions the streak requires cannot disagree — which
+   would otherwise mean a parent ticking every routine the screen offered and
+   the clean-day streak never moving, with nothing on any screen to say why. */
+function routineSessionsForDay(kid, weekKey, dayIdx) {
+  const all = (typeof CT_SESSIONS !== 'undefined') ? CT_SESSIONS.slice() : [];
+  const map = (typeof CT_ROUTINE_SESSION_MAP !== 'undefined') ? CT_ROUTINE_SESSION_MAP : {};
+  if (!all.length || typeof mrWeekDayKeys !== 'function') return all;
+  const dayKey = mrWeekDayKeys(weekKey)[dayIdx];
+  if (!dayKey) return all;
+  const planned = new Set();
+  (getDayBlocks(dayKey, kid) || []).forEach(b => {
+    const act = (typeof findActivity === 'function') ? findActivity(b && b.actId, kid) : null;
+    if (!act || !act.isRoutine) return;
+    const s = map[act.routineId];
+    if (s) planned.add(s);
+  });
+  if (!planned.size) return all;
+  return all.filter(s => planned.has(s));
+}
+
 /* Keep the compatibility mirror honest. Called by every checklist write path;
    returns whether the stored flag actually moved. */
 function syncRoutineCompletion(block, kid) {
@@ -166,8 +225,11 @@ function canReviewDay(kid, dayKey) {
              blockName: (named && named.name) || 'An activity' };
   }
 
+  /* Accounted for, not merely confirmed — a block a parent has recorded as
+     not having happened is answered, and holding the day open over it is what
+     left a whole week unclosable with no move a parent could make. */
   const pending = (typeof dayBlocksEligibleToConfirm === 'function'
-    ? dayBlocksEligibleToConfirm(dayKey, kid) : blocks).filter(b => !isBlockConfirmed(b));
+    ? dayBlocksEligibleToConfirm(dayKey, kid) : blocks).filter(b => !isBlockAccountedFor(b));
   if (pending.length) return { ok: false, reason: 'unconfirmed', ...none, pendingCount: pending.length };
 
   /* A day that holds nothing CAN be reviewed — a quiet Sunday is a real

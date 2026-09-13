@@ -573,6 +573,35 @@ function unclaimChoresFromBlock(blk, dayKey, kid) {
   });
 }
 
+/* ── …and what a grade would still be saying ───────────────────────
+   Recording a block as not having happened has to reach the money, or the
+   week says two things at once: the plan reads "didn't happen" while the
+   chore it named stays graded above zero and therefore FULFILLED and paid.
+   Read-only, so the caller can name the figure in its confirmation before
+   anything moves — this is a parent taking money back, which must never be a
+   side effect nobody was shown. */
+function blockChoreGradesGiven(blk, dayKey, kid) {
+  const { wk, dayIdx, targets } = blockChoreTargets(blk, dayKey, kid);
+  if (dayIdx < 0) return [];
+  return targets.filter(t => mrGetChoreGrade(kid, wk, dayIdx, t.choreId) > 0);
+}
+
+/* The inverse of gradeChoresFromBlock. A parent saying the block did not
+   happen IS her answer, and it is the later one, so it replaces the earlier
+   grade rather than sitting beside it. Goes through mrSetChoreGrade — the
+   owner — which deletes the entry at zero, so the chore reads unfulfilled the
+   same way one that was never graded does. */
+function ungradeChoresFromBlock(blk, dayKey, kid) {
+  const { wk, dayIdx, targets } = blockChoreTargets(blk, dayKey, kid);
+  if (dayIdx < 0) return 0;
+  let n = 0;
+  targets.forEach(t => {
+    if (mrGetChoreGrade(kid, wk, dayIdx, t.choreId) > 0) { mrSetChoreGrade(kid, wk, dayIdx, t.choreId, 0); n++; }
+    if (mrGetClaim(kid, wk, dayIdx, t.choreId) > 0) mrSetClaim(kid, wk, dayIdx, t.choreId, 0);
+  });
+  return n;
+}
+
 /* ── #5 Parent "proud of you" stamp: a warm mark a parent drops on a block ── */
 const PARENT_STAMPS = ['⭐','🏆','💖','👏','🌟','🔥','💪','🦄'];
 function renderParentStampPicker(block) {

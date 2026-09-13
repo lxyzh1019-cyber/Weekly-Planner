@@ -1635,7 +1635,12 @@ function dayBlocksEligibleToConfirm(dayKey, kid) {
   const isFuture = dayKey > todayKey();
   if (isFuture) return [];
   const now = (typeof tdNowMin === 'function') ? tdNowMin() : 24 * 60;
+  /* A block a parent has recorded as not having happened is already answered,
+     so it is not something left to confirm: it must not be swept into "Confirm
+     all" (which would mark it done and grade its chores at "on time"), and it
+     must not keep counting on the button's own badge. */
   return blocks.filter(b => b && b.startMin != null
+    && !(typeof isBlockNotDone === 'function' && isBlockNotDone(b))
     && (!isToday || (b.startMin + (b.durationMin || 0)) <= now));
 }
 
