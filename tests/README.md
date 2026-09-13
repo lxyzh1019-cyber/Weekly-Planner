@@ -11,7 +11,7 @@ The three parts, individually:
 
 ```bash
 # 1. Syntax + global-scope checks (no dependencies)
-npm run check         # tests/check-syntax.js, tests/check-globals.js
+npm run check         # tests/check-*.js: syntax, globals, shared-merge, escaping, dead CSS, dead ids
 
 # 2. Sync/merge unit tests (no dependencies, runs the real merge functions)
 npm run test:merge    # tests/merge.test.js — 90 assertions, must be 90/90
@@ -39,6 +39,11 @@ later-loaded file silently wins, and two top-level `let`/`const` of one name is 
 hard `SyntaxError` at load that per-file `node --check` cannot see. It covers
 `function`, `async function`, and `let`/`const`/`var` including the
 comma-separated form (`let a = null, b = null;`).
+
+**`check-dead-ids.js`** fails on an `id` in `index.html` that nothing reads —
+no `getElementById` in `js/`, no `for=` / `aria-*` back-reference, no `#id`
+rule in the stylesheet. Names built at runtime (`'ptab-' + panel`) are found by
+scanning the source for quoted prefixes and suffixes, not kept in a hand table.
 
 **`smoke.js`** covers, among much else, the chore -> money hand-off: a chore
 finished in the planner reaching the parent's grading queue, and a grade given

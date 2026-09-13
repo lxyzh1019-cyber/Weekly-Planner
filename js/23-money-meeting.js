@@ -905,7 +905,6 @@ function mnyStepper(field, value, which, step) {
    and redrawing on each letter is what threw the caret out of the box. The
    value is already in the draft, so the next real render picks it up. */
 function mnyCompSetQuiet(field, value) { if (mnyCompDraft) mnyCompDraft[field] = value; }
-function mnyDepSetQuiet(field, value) { if (mnyDepDraft) mnyDepDraft[field] = value; }
 function mnyCompSet(field, value) { if (!mnyCompDraft) return; mnyCompDraft[field] = value; renderMeetingMode(); }
 function mnyCompBump(field, delta) { if (!mnyCompDraft) return; mnyCompDraft[field] = Math.max(0, (Number(mnyCompDraft[field]) || 0) + delta); renderMeetingMode(); }
 function mnyDepSet(field, value) { if (!mnyDepDraft) return; mnyDepDraft[field] = value; renderMeetingMode(); }
@@ -988,10 +987,20 @@ function mnySetDoor(v) { mnyDoorAmt = v; renderMeetingMode(); }
 /* Touching any stepper turns the plan into a hand-built one, seeded from
    wherever it already was — so nudging one number never silently discards the
    other three. */
+/* The cash that clears a debt outright: with a 10% bonus, $100 clears $110, so
+   the balance divided by 1 + bonus. mnyDefaultSplit and the commit both ask. */
+function mnyCashToClear(kid, debt) {
+  const bonus = (Number(debt.bonusRate) || 0) / 100;
+  return money2(loanBalance(kid, debt.id) / (1 + bonus));
+}
 function mnyTuneBucket(key, dir) {
   const d = mnyDraft; if (!d) return;
   const pool = mnyPool(d.wk, d.kid);
   const next = Math.max(0, money2(money2(d.split[key]) + dir));
+  if (key.indexOf('loan:') === 0) {
+    const debt = mnyDebtById(d.kid, key.slice(5));
+    if (debt && next > mnyCashToClear(d.kid, debt) + 0.005) { showToast(`${mnyMoney(mnyCashToClear(d.kid, debt))} clears ${debt.name} — no need for more`); return; }
+  }
   if (key === 'stock' && next > pool.stockCap) { showToast(`A fifth of the week is the most — ${mnyMoney(pool.stockCap)}`); return; }
   if (key === 'spend' && next > pool.spendCap) { showToast(`A fifth of the week is the most to spend — ${mnyMoney(pool.spendCap)}`); return; }
   const others = money2(mnySplitTotal(d.split) - money2(d.split[key]));
@@ -1046,7 +1055,10 @@ function mnyDoCommit() {
     const amt = money2(split['loan:' + debt.id]);
     if (!(amt > 0)) return;
     const w = ensureWallet(kid);
-    const pay = money2(Math.min(amt, w.cash));
+    // Never hand over more than clears the debt: loanRecordPayment credits at
+    // most what is owed, but the cash was already gone from the wallet, so a
+    // split bumped past the balance simply lost the difference.
+    const pay = money2(Math.min(amt, w.cash, mnyCashToClear(kid, debt)));
     if (!(pay > 0)) return;
     w.cash = money2(w.cash - pay);
     const rec = loanRecordPayment(kid, pay, 'early', debt.id);

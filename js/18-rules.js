@@ -398,9 +398,6 @@ function mrApplyEdits(changes, { reason, note, effectiveFrom } = {}) {
 function mrTargetFor(kid) {
   return Number(((mrRules().targets || {})[kid] || {}).annual) || 0;
 }
-function mrChoreById(id, weekKey) {
-  return (mrRulesForWeek(weekKey).chorePool || []).find(c => c.id === id) || null;
-}
 /* Apply a cap that may legitimately be null/absent ("no cap"). Centralised so a
    missing cap can never silently become 0. */
 function mrApplyCap(amount, cap) {

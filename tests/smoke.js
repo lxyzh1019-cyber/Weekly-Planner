@@ -898,11 +898,15 @@ function findChromium() {
     const wrap = document.getElementById('mnyPage1Wrap');
     // Her page has no control that moves money — not a disabled one, none.
     const noMovers = !wrap.querySelector('[data-mny-action="commit"], [data-mnyp-action]');
-    // And the guard the commit path leans on refuses her.
+    // And the guard the commit path leans on refuses her — as do the two doors
+    // back to cash on the parent's holdings page, if she ever reaches them.
     const guarded = moneyCanTransact() === false;
+    const cashBefore = mnyCash(kid);
+    mnyAskMoveSavedToCash(kid);
+    const noDoor = !document.querySelector('#appDialogOverlay.open') && mnyCash(kid) === cashBefore;
     // Her earnings are not hers to change either.
     const cannotOverride = mnySetOverride(kid, mnyWeekKey(), 'chores', 99, 'fixing') === false;
-    return noMovers && guarded && cannotOverride;
+    return noMovers && guarded && noDoor && cannotOverride;
   });
   // A kid editing a rule must be refused, leaving no new version or log entry.
   checks.kidCannotEditRules = await page.evaluate(() => {
@@ -2800,7 +2804,7 @@ function findChromium() {
     loanSundayTransfer(kid, 'pay_available', { dayKey: '2026-10-04' });
     const after = loanDueNow(kid, '2026-11-01');
     return before.kind === 'down'
-        && before.amount === loanDownPayment(kid)
+        && before.amount === money2(loanState(kid).downPayment)
         && loanDownOutstanding(kid) === 0
         && after.kind === 'scheduled';
   });
@@ -2974,10 +2978,10 @@ function findChromium() {
                       principal: 300, monthly: 25, bonusRate: 15,
                       downPaymentDue: '2026-01-01' });
     const first = mnyDebtsByPriority(kid)[0];
-    const spread = mnySpreadEarlyPayment(kid, 100);
+    const rec = loanRecordPayment(kid, 100, 'early', first.id);
     const ok = first.id === 'bike'                 // 15% beats the loan's 10%
-            && spread.length === 1 && spread[0].debtId === 'bike'
-            && spread[0].cleared === 115;          // $100 clears $115
+            && rec && rec.debtId === 'bike'
+            && rec.credited === 115;               // $100 clears $115
     delete pd.debts;
     return ok;
   });
@@ -3059,6 +3063,82 @@ function findChromium() {
     const back = mnySavedTotal(kid) === 150 && ensureWallet(kid).cash === 72.20;
     return migrated && moved && back
         && mnyEverything(kid) === 222.20;
+  });
+
+  // Money went INTO savings and companies through the meeting, but the way
+  // back out left with the old pocket-money screen: moneyWithdraw and
+  // moneySellStock kept working with nothing to call them. The parent's
+  // holdings page is the door now, and it opens only for a grown-up.
+  checks.parentCanMoveSavedBackToCash = await page.evaluate(async () => {
+    const bad = [];
+    const kid = 'jenn';
+    profile = 'parent'; parentViewing = kid;
+    const pd = getProfData(kid);
+    pd.holdings = [];
+    pd.wallet = { cash: 10, savings: 0, gics: [], holdings: {}, lastMeetingWeek: null };
+    mnyAddToSaved(kid, 100);
+    mnyAddHolding(kid, { kind: 'stock', name: 'Lemonade Co', units: 4, priceNow: 12.5, costBasis: 40 });
+    showScreen('parent'); setParentTab('money'); mnySetParentSection('holdings'); mnyRenderRulesTab();
+    const wrap = document.getElementById('mnyRulesWrap') || document.querySelector('#ptab-money');
+    if (!wrap.querySelector('[data-mnyp-action="saved2cash"]')) bad.push('no way to move kept-ready money back to cash');
+    const sell = wrap.querySelector('[data-mnyp-action="holdsell"]');
+    if (!sell) bad.push('no way to sell a company holding');
+
+    // Through the real prompt: type an amount, press OK.
+    const answer = async (v) => {
+      for (let i = 0; i < 50 && !document.querySelector('#appDialogOverlay.open'); i++) await new Promise(r => setTimeout(r, 10));
+      const inp = document.getElementById('appDialogInput');
+      if (!inp) return false;
+      inp.value = String(v);
+      document.getElementById('appDialogOkBtn').click();
+      for (let i = 0; i < 50 && document.querySelector('#appDialogOverlay.open'); i++) await new Promise(r => setTimeout(r, 10));
+      await new Promise(r => setTimeout(r, 20));
+      return true;
+    };
+    wrap.querySelector('[data-mnyp-action="saved2cash"]').click();
+    if (!(await answer(30))) bad.push('moving to cash asked no amount');
+    if (mnyCash(kid) !== 40) bad.push(`cash after withdraw is ${mnyCash(kid)}, expected 40`);
+    if (mnySavedTotal(kid) !== 70) bad.push(`kept ready after withdraw is ${mnySavedTotal(kid)}, expected 70`);
+
+    if (sell) {
+      document.querySelector('[data-mnyp-action="holdsell"]').click();
+      if (!(await answer(2))) bad.push('selling asked no count');
+      if (mnyCash(kid) !== 65) bad.push(`cash after sale is ${mnyCash(kid)}, expected 65`);
+      const h = mnyHoldingsOfKind(kid, 'stock')[0];
+      if (!h || h.units !== 2) bad.push('two shares did not remain after selling two');
+      if (h && money2(h.costBasis) !== 20) bad.push('cost basis did not come off in proportion');
+    }
+    // Asking for more than she has is capped, never overdrawn.
+    moneyWithdraw(kid, 999);
+    if (mnySavedTotal(kid) !== 0 || mnyCash(kid) !== 135) bad.push('overdrawing kept-ready money was not capped at what there was');
+    pd.holdings = []; pd.wallet.cash = 0;
+    return bad.length === 0 || bad;
+  });
+
+  // A split bumped past what clears a debt used to hand the difference to
+  // nobody: the wallet lost it and the loan credited only what was owed.
+  checks.splitCannotOverpayADebt = await page.evaluate(() => {
+    const bad = [];
+    const kid = 'jess';
+    profile = 'parent'; ctParentKid = kid;
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+    const pd = getProfData(kid);
+    delete pd.debts;
+    mnyDebts(kid);
+    mnyAddDebt(kid, { id: 'kite', name: 'Kite loan', icon: '🪁', principal: 50, monthly: 5, bonusRate: 10,
+                      downPaymentDue: '2026-01-01' });
+    const need = mnyCashToClear(kid, mnyDebtById(kid, 'kite'));
+    if (Math.abs(need - 45.45) > 0.01) bad.push(`$50 at 10% needs ${need} of cash, expected 45.45`);
+    mrEnsureEarnings(kid, wk).overrides = {};
+    mnySetOverride(kid, wk, 'chores', 80, 'agreed');
+    const d = mnyEnsureDraft(wk, kid);
+    d.split['loan:kite'] = need;
+    mnyTuneBucket('loan:kite', 1);
+    if (money2(d.split['loan:kite']) !== need) bad.push('the stepper let the loan share pass what clears it');
+    mrEnsureEarnings(kid, wk).overrides = {};
+    delete pd.debts; mnyDraft = null;
+    return bad.length === 0 || bad;
   });
 
   /* ── The Sunday meeting's two money steps ── */
@@ -4709,6 +4789,46 @@ function findChromium() {
             problems.push(`icon ${icon.src} claims ${icon.declared} but is ${icon.dims.w}x${icon.dims.h}`);
           }
         }
+      }
+      /* The shell is cached by sw.js, network-first with the cache as the
+         fallback — so being online always gets the deployed code, and offline
+         gets the shell. Prove all three: the worker registers, the shell is in
+         its cache, and the page comes back with the network off. */
+      const sw = await httpPage.evaluate(async () => {
+        if (!('serviceWorker' in navigator)) return { err: 'no serviceWorker API in this browser' };
+        const reg = await Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(() => r(null), 8000))]);
+        if (!reg) return { err: 'the worker never became ready' };
+        let name = null, cache = null;
+        for (let i = 0; i < 100 && !cache; i++) {
+          name = (await caches.keys()).find(k => k.startsWith('wp-shell-'));
+          if (name) { const c = await caches.open(name); if (await c.match('./js/99-main.js')) cache = c; }
+          if (!cache) await new Promise(r => setTimeout(r, 100));
+        }
+        if (!cache) return { err: 'no wp-shell cache holding the scripts' };
+        const missing = [];
+        for (const u of ['./index.html', './manifest.json', './css/app.css', './js/01-config.js', './js/99-main.js', './assets/icons/icon-192.png']) {
+          if (!(await cache.match(u))) missing.push(u);
+        }
+        return { name, missing };
+      });
+      if (sw.err) problems.push(sw.err);
+      else if (sw.missing.length) problems.push(`shell files not cached: ${sw.missing.join(', ')}`);
+      if (!sw.err) {
+        await httpPage.reload();                       // now controlled by the worker
+        await httpPage.context().setOffline(true);
+        try {
+          const off = await httpPage.goto(`http://127.0.0.1:${port}/index.html`);
+          if (!off || !off.ok()) problems.push('offline, the page did not come back from the cache');
+          const booted = await httpPage.evaluate(() => typeof showScreen === 'function' && !!document.getElementById('screen-today'));
+          if (!booted) problems.push('offline, the shell loaded but the app did not boot');
+        } catch (e) {
+          problems.push(`offline navigation failed: ${e.message.split('\n')[0]}`);
+        }
+        await httpPage.context().setOffline(false);
+        await httpPage.evaluate(async () => {
+          for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+          for (const k of await caches.keys()) await caches.delete(k);
+        });
       }
       await httpPage.close();
     } finally {
@@ -10560,13 +10680,13 @@ function findChromium() {
       const r = addQuestXP(50, kid, wk);
       if (r.awarded !== 0) bad.push(`a full week still credited ${r.awarded} XP`);
       if (!r.capped) bad.push('a credit past the cap did not report itself as capped');
-      if (xpRoomLeft(kid, wk) !== 0) bad.push('a full week reports room left');
+      if (xpWeekTally(kid, wk) !== XP_WEEKLY_CAP) bad.push('a full week does not read as full');
 
       // Under the cap, a credit lands whole and the tally follows it.
       prog.xpByWeek = {}; prog.xp2 = 0;
       const r2 = addQuestXP(30, kid, wk);
       if (r2.awarded !== 30) bad.push(`a credit under the cap awarded ${r2.awarded}`);
-      if (xpRoomLeft(kid, wk) !== XP_WEEKLY_CAP - 30) bad.push('the weekly tally did not follow the credit');
+      if (xpWeekTally(kid, wk) !== 30) bad.push('the weekly tally did not follow the credit');
 
       /* ONE LEVEL CALCULATION. Today's hero and the parent portal each used to
          do this arithmetic themselves and could disagree about the same child. */
@@ -10589,6 +10709,115 @@ function findChromium() {
       keys.forEach((k, i) => setDayBlocks(k, before[i], kid));
       prog.xp2 = hadXp2; prog.questXP = hadXp; prog.xpByWeek = hadByWeek;
     }
+    return bad.length === 0 || bad;
+  });
+
+  /* ── Semantics an outside audit found missing ──
+     None of the 19 sheets said it was a dialog, Escape did nothing, and focus
+     stayed on the page behind. The markup carries the roles now, and
+     openSheet/closeSheet own focus. The roles are asserted on the FILE, not
+     the DOM: js/99-main.js patches the DOM at load, and a check that read the
+     patched tree would pass on markup that says nothing. */
+  {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const bad = [];
+    const count = (re) => (html.match(re) || []).length;
+    if (count(/<main\b/g) !== 1) bad.push(`${count(/<main\b/g)} <main> elements, want 1`);
+    if (count(/<header class="topbar/g) !== 8) bad.push(`${count(/<header class="topbar/g)} topbars are <header>, want 8`);
+    if (count(/<div class="topbar(?:\s|")/g)) bad.push('a topbar is still a <div>');
+    const toggles = html.match(/<div class="(?:buffer|repeat)-toggle[^>]*>/g) || [];
+    const bare = toggles.filter(t => !/role="switch"/.test(t) || !/tabindex="0"/.test(t) || !/aria-checked=/.test(t));
+    if (bare.length) bad.push(`${bare.length} of ${toggles.length} toggles carry no switch semantics in the markup`);
+    const overlays = html.match(/<div class="overlay[^"]*" id="[^"]+"/g) || [];
+    if (overlays.length !== 19) bad.push(`${overlays.length} static overlays, expected 19`);
+    if (count(/role="tabpanel"/g) !== 5) bad.push(`${count(/role="tabpanel"/g)} tabpanels in the file, want 5 (one per tab)`);
+    if (count(/<h4>✅ To-do<\/h4>/g)) bad.push('the To-do heading still skips from h2 to h4');
+    checks.theMarkupSaysWhatThingsAre = bad.length === 0 || bad;
+  }
+
+  checks.sheetsAreDialogsYouCanLeave = await page.evaluate(async () => {
+    const bad = [];
+    profile = 'jenn'; parentViewing = 'jenn';
+    showScreen('week');
+    // Every static overlay's sheet is a labelled modal dialog.
+    document.querySelectorAll('.overlay[id]').forEach(ov => {
+      if (ov.id === 'appDialogOverlay') return;
+      const sheet = ov.querySelector('.sheet');
+      if (!sheet) { bad.push(`${ov.id}: no sheet`); return; }
+      if (sheet.getAttribute('role') !== 'dialog') bad.push(`${ov.id}: sheet is not role=dialog`);
+      if (sheet.getAttribute('aria-modal') !== 'true') bad.push(`${ov.id}: not aria-modal`);
+      const by = sheet.getAttribute('aria-labelledby');
+      const named = (sheet.getAttribute('aria-label') || '').trim() || (by && document.getElementById(by));
+      if (!named) bad.push(`${ov.id}: the dialog has no accessible name`);
+    });
+    // Open one from a button: focus moves in, Escape closes it, focus comes back.
+    const opener = document.querySelector('#screen-week button');
+    opener.focus();
+    openSheet('templateOverlay');
+    const ov = document.getElementById('templateOverlay');
+    if (!ov.classList.contains('open')) bad.push('openSheet did not open the sheet');
+    if (!ov.contains(document.activeElement)) bad.push('opening a sheet left focus on the page behind it');
+    if (ov._opener !== opener) bad.push('the sheet did not remember what opened it');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await new Promise(r => setTimeout(r, 20));
+    if (ov.classList.contains('open')) bad.push('Escape did not close the sheet');
+    if (document.activeElement !== opener) bad.push('closing the sheet did not give focus back to the opener');
+    // Escape with nothing open is nobody's business.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    // The app dialog owns Escape while it is up: a sheet under it must survive.
+    openSheet('templateOverlay');
+    const p = showPrompt('name?');
+    await new Promise(r => setTimeout(r, 20));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await p;
+    await new Promise(r => setTimeout(r, 20));
+    if (!ov.classList.contains('open')) bad.push('Escape on the app dialog also closed the sheet beneath it');
+    closeSheet('templateOverlay');
+    // The runtime dialogs are named too.
+    const q = showConfirm('sure?');
+    const dlg = document.querySelector('#appDialogOverlay .sheet');
+    const by = dlg && dlg.getAttribute('aria-labelledby');
+    if (!by || !document.getElementById(by) || !document.getElementById(by).textContent.trim()) bad.push('the app dialog has no accessible name');
+    _appDialogCancel(); await q;
+    return bad.length === 0 || bad;
+  });
+
+  // The portal's five destinations are tabs; the fifteen detail panels under
+  // them are not, and a screen reader must not be told a tab exists for them.
+  checks.theParentPortalTellsATabFromARegion = await page.evaluate(() => {
+    const bad = [];
+    const tabs = [...document.querySelectorAll('[role="tab"]')];
+    if (tabs.length !== 5) bad.push(`${tabs.length} tabs, expected 5`);
+    tabs.forEach(t => {
+      const panel = document.getElementById(t.getAttribute('aria-controls') || '');
+      if (!panel) { bad.push(`${t.id}: aria-controls points at nothing`); return; }
+      if (panel.getAttribute('role') !== 'tabpanel') bad.push(`${t.id}: its panel is not a tabpanel`);
+      if (panel.getAttribute('aria-labelledby') !== t.id) bad.push(`${panel.id}: not labelled by its tab`);
+    });
+    document.querySelectorAll('.parent-panel').forEach(p => {
+      const role = p.getAttribute('role');
+      if (role === 'tabpanel') return;
+      if (role !== 'region') { bad.push(`${p.id}: role is ${role}, want region`); return; }
+      if (!p.getAttribute('aria-label')) bad.push(`${p.id}: region with no name`);
+    });
+    // The Meeting tab used to control a panel that did not exist.
+    profile = 'parent'; showScreen('parent'); setParentTab('review');
+    const meetingPanel = document.getElementById(document.getElementById('pdestbtn-meeting').getAttribute('aria-controls'));
+    if (!meetingPanel || meetingPanel.hidden) bad.push('the Meeting tab does not show the panel it claims to control');
+    return bad.length === 0 || bad;
+  });
+
+  // Every form control has a name a screen reader can say. Placeholder text
+  // is not one: it vanishes the moment she types.
+  checks.everyControlHasAName = await page.evaluate(() => {
+    const bad = [];
+    document.querySelectorAll('input[id]:not([type=hidden]), select[id], textarea[id]').forEach(el => {
+      const named = (el.getAttribute('aria-label') || '').trim()
+        || el.getAttribute('aria-labelledby')
+        || document.querySelector(`label[for="${el.id}"]`)
+        || el.closest('label');
+      if (!named) bad.push(el.id);
+    });
     return bad.length === 0 || bad;
   });
 

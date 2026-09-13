@@ -343,7 +343,10 @@ function mnyHoldingsEditor(kid) {
     return `<div class="mny-card">
         <div class="mny-week-head">
           <span class="mny-label">${escapeHtml(h.name)}</span>
-          <button type="button" class="mny-step" data-mnyp-action="holddel" data-mnyp-id="${escapeAttr(h.id)}" aria-label="Remove">✕</button>
+          <span class="mny-stepgrp">
+            ${h.kind === 'stock' && mnyHoldingValue(h) > 0 ? `<button type="button" class="mny-step mny-step--wide" data-mnyp-action="holdsell" data-mnyp-id="${escapeAttr(h.id)}" aria-label="Sell some of this for cash">Sell</button>` : ''}
+            <button type="button" class="mny-step" data-mnyp-action="holddel" data-mnyp-id="${escapeAttr(h.id)}" aria-label="Remove">✕</button>
+          </span>
         </div>
         <div class="mny-chiprow">${MNY_HOLDING_KINDS.map(k =>
           `<button type="button" class="mny-chip ${h.kind === k.id ? 'on' : ''}" data-mnyp-action="holdkind" data-mnyp-id="${escapeAttr(h.id)}" data-mnyp-k="${k.id}">${k.icon} ${escapeHtml(k.label)}</button>`).join('')}</div>
@@ -371,7 +374,8 @@ function mnyHoldingsEditor(kid) {
       <div class="mny-label">📈 What she owns</div>
       <div class="mny-rows">
         <div class="mny-row"><span>Cash</span><b>${mnyMoney(mnyCash(kid))}</b></div>
-        <div class="mny-row"><span>Kept ready</span><b>${mnyMoney(mnySavedTotal(kid))}</b></div>
+        <div class="mny-row"><span>Kept ready</span><span class="mny-stepgrp"><b>${mnyMoney(mnySavedTotal(kid))}</b>
+          ${mnySavedTotal(kid) > 0 ? `<button type="button" class="mny-step mny-step--wide" data-mnyp-action="saved2cash" aria-label="Move kept-ready money back to cash">→ cash</button>` : ''}</span></div>
         <div class="mny-row"><span>Locked away</span><b>${mnyMoney(mnyLockedTotal(kid))}</b></div>
         <div class="mny-row"><span>In companies</span><b>${mnyMoney(mnyInvestedTotal(kid))}</b></div>
         <div class="mny-row total"><span>Everything</span><b>${mnyMoney(mnyEverything(kid))}</b></div>
@@ -494,6 +498,40 @@ function mnyTargetsFooter() {
 /* ════════════════════════════════════════════════════════════════
    CLICKS — one delegated handler, actions on data attributes
    ════════════════════════════════════════════════════════════════ */
+/* ── The two doors back to cash ──
+   Money goes INTO savings and companies through the meeting's step 4, but the
+   only way back out used to be a parent editing a holding's numbers by hand —
+   the buttons left with the old pocket-money screen. These reuse the functions
+   that never stopped working (moneyWithdraw, moneySellStock), behind the same
+   parent-only guard the commit path leans on. */
+function mnyAskMoveSavedToCash(kid) {
+  if (!moneyCanTransact()) return;
+  const have = mnySavedTotal(kid);
+  showPrompt(`Move how much of her kept-ready ${mnyMoney(have)} back to cash?`, { type: 'number', value: String(have) })
+    .then(v => {
+      if (v == null) return;
+      const amt = money2(Number(v));
+      if (!(amt > 0)) return;
+      if (moneyWithdraw(kid, amt)) showToast(`${mnyMoney(Math.min(amt, have))} moved to cash`);
+      mnyRenderRulesTab();
+    });
+}
+function mnyAskSellHolding(kid, id) {
+  if (!moneyCanTransact()) return;
+  const h = mnyHoldings(kid).find(x => x.id === id);
+  if (!h || h.kind !== 'stock') return;
+  const have = Number(h.units) || 0;
+  showPrompt(`Sell how many of ${h.name}? She has ${Math.round(have * 1000) / 1000}, worth ${mnyMoney(h.priceNow)} each.`, { type: 'number', value: String(have) })
+    .then(v => {
+      if (v == null) return;
+      const n = Number(v);
+      if (!(n > 0)) return;
+      const before = mnyCash(kid);
+      if (moneySellStock(kid, id, n)) showToast(`Sold for ${mnyMoney(money2(mnyCash(kid) - before))}`);
+      mnyRenderRulesTab();
+    });
+}
+
 function mnyParentClick(ev) {
   const el = ev.target.closest('[data-mnyp-action]');
   if (!el) return;
@@ -548,6 +586,8 @@ function mnyParentClick(ev) {
     return;
   }
   if (a === 'holddel')  { mnyRemoveHolding(kid, id); mnyRenderRulesTab(); return; }
+  if (a === 'saved2cash') { mnyAskMoveSavedToCash(kid); return; }
+  if (a === 'holdsell')   { mnyAskSellHolding(kid, id); return; }
   if (a === 'holdkind') { mnyEditHolding(kid, id, 'kind', el.getAttribute('data-mnyp-k')); mnyRenderRulesTab(); return; }
   if (a === 'hold') {
     const f = el.getAttribute('data-mnyp-f');

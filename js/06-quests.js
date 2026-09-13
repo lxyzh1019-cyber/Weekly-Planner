@@ -105,11 +105,6 @@ function xpWeekTally(p, weekKey) {
   const prog = getProfData(p).progress || {};
   return Number((prog.xpByWeek || {})[weekKey]) || 0;
 }
-/* How much of this week's allowance is left. Exposed so a screen can say so
-   rather than a child discovering it by getting nothing. */
-function xpRoomLeft(p = activeProfile(), weekKey = xpWeekKeyFor()) {
-  return Math.max(0, XP_WEEKLY_CAP - xpWeekTally(p, weekKey));
-}
 
 /* The single writer of progress.questXP. `weekKey` may be null for a credit
    that belongs to no week (there are none today); such a credit skips the cap

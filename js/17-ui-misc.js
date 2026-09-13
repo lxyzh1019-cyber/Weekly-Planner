@@ -64,9 +64,9 @@ function _appDialog({ message, kind, value = '', inputType = 'text', okLabel = '
     ? `<label class="app-dialog-check"><input type="checkbox" id="appDialogCheck" onchange="_appDialogCheckToggle()"> <span>${escapeHtml(checkLabel)}</span></label>`
     : '';
   ov.innerHTML =
-    `<div class="sheet app-dialog-sheet" role="dialog" aria-modal="true">
+    `<div class="sheet app-dialog-sheet" role="dialog" aria-modal="true" aria-labelledby="appDialogMsg">
       <div class="sheet-handle"></div>
-      <p class="app-dialog-msg">${escapeHtml(message)}</p>
+      <p class="app-dialog-msg" id="appDialogMsg">${escapeHtml(message)}</p>
       ${inputHtml}${checkHtml}
       <div class="app-dialog-btns">
         ${hideCancel ? '' : `<button type="button" class="pill-btn app-dialog-cancel" onclick="_appDialogCancel()">${escapeHtml(cancelLabel)}</button>`}
@@ -118,9 +118,9 @@ function showChoice(message, options, opts = {}) {
        ${o.sub ? `<span class="app-dialog-choice-sub">${escapeHtml(o.sub)}</span>` : ''}
      </button>`).join('');
   ov.innerHTML =
-    `<div class="sheet app-dialog-sheet" role="dialog" aria-modal="true">
+    `<div class="sheet app-dialog-sheet" role="dialog" aria-modal="true" aria-labelledby="appDialogMsg">
       <div class="sheet-handle"></div>
-      <p class="app-dialog-msg">${escapeHtml(message)}</p>
+      <p class="app-dialog-msg" id="appDialogMsg">${escapeHtml(message)}</p>
       <div class="app-dialog-choices">${btns}</div>
       <div class="app-dialog-btns">
         <button type="button" class="pill-btn app-dialog-cancel" onclick="_closeAppDialog(null)">${escapeHtml(opts.cancelLabel || 'Not yet')}</button>
@@ -178,13 +178,48 @@ function resetActionGuard() { _actGuardBtn = null; _actGuardAt = 0; }
   }, true);
 })();
 
-function openSheet(id) { resetActionGuard(); document.getElementById(id).classList.add('open'); }
+/* Sheets are dialogs. Opening one remembers what had focus and moves focus
+   inside; closing puts it back. Escape closes the topmost open sheet
+   (registered in js/99-main.js). No Tab trap — the girls use touch, and a trap
+   that goes wrong is a screen nobody can leave. */
+/* Text entry is deliberately NOT in this list: on an iPad, focusing a field
+   raises the keyboard over half the sheet, so a sheet must only land on a
+   field that asks for it with [autofocus]. Buttons, selects and switches are
+   safe first stops; failing those, the sheet itself. */
+const SHEET_FOCUSABLE = 'button:not([disabled]), select:not([disabled]), [href], [role="switch"], [tabindex]:not([tabindex="-1"])';
+function sheetFocusIn(ov) {
+  const sheet = ov.querySelector('.sheet') || ov;
+  const first = sheet.querySelector('[autofocus]') || sheet.querySelector(SHEET_FOCUSABLE) || sheet;
+  if (first === sheet && !sheet.hasAttribute('tabindex')) sheet.setAttribute('tabindex', '-1');
+  try { first.focus({ preventScroll: true }); } catch (e) {}
+}
+function sheetFocusBack(ov) {
+  const back = ov._opener; ov._opener = null;
+  if (back && document.contains(back) && typeof back.focus === 'function') {
+    try { back.focus({ preventScroll: true }); } catch (e) {}
+  }
+}
+function topOpenSheetId() {
+  const open = document.querySelectorAll('.overlay.open');
+  return open.length ? open[open.length - 1].id : null;
+}
+function openSheet(id) {
+  resetActionGuard();
+  const ov = document.getElementById(id);
+  const active = document.activeElement;
+  if (!ov.classList.contains('open')) ov._opener = (active && !ov.contains(active)) ? active : null;
+  ov.classList.add('open');
+  sheetFocusIn(ov);
+}
 function closeSheet(id) {
   if (id === 'editOverlay') editStopwatchClearTick();
   if (id === 'kidRoutineOverlay') kidRoutineStopwatchClearTick();
   if (id === 'kidTrainingOverlay') kidTrainingStopwatchClearTick();
   if (id === 'activityOverlay' || id === 'trainingOverlay') cancelCreatePlacement(null, true);
-  document.getElementById(id).classList.remove('open');
+  const ov = document.getElementById(id);
+  const wasOpen = ov.classList.contains('open');
+  ov.classList.remove('open');
+  if (wasOpen && ov.contains(document.activeElement)) sheetFocusBack(ov); else ov._opener = null;
   // The meeting is the only surface that confirms days / records the week, so
   // refresh the parent dashboard's read-only hub whenever the meeting closes.
   if (id === 'familyMeetingOverlay') {

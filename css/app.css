@@ -373,6 +373,7 @@
     border-bottom: 2px dashed var(--paper-line);
     background: rgba(255, 248, 230, 0.85);
   }
+  .day-mini-panel__header h3,
   .day-mini-panel__header h4 {
     margin: 0;
     font-size: 1.05rem;
@@ -2448,16 +2449,6 @@
     background: var(--accent);
     border-radius: 50%;
     border: 2px solid #fff;
-  }
-  .tl-zone-label {
-    position: absolute;
-    left: 4px;
-    font-family: 'Gochi Hand', cursive;
-    font-size: calc(0.9rem * var(--fs-scale, 1));
-    color: var(--accent-strong);
-    opacity: 0.9;
-    pointer-events: none;
-    z-index: 1;
   }
 
   /* Placed blocks */
@@ -4877,6 +4868,7 @@
   .mny-src.amber { background: #ffe0a3; color: #7a4b00; border-color: #7a4b00; }
   .mny-stepgrp { display: inline-flex; align-items: center; gap: 0.25rem; }
   .mny-stepgrp .mny-step { min-width: 30px; min-height: 30px; }
+  .mny-step--wide { padding-inline: 0.55rem; font-size: 0.85rem; }
   .mny-stepgrp .mny-step.on { background: #ffe0a3; }
   .mny-working {
     margin-top: 0.35rem; padding: 0.4rem 0.5rem; background: var(--bg);

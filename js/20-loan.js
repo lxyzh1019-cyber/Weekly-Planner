@@ -107,10 +107,6 @@ function mnyDebtById(kid, debtId) {
   if (!debtId) return list[0] || null;
   return list.find(d => d.id === debtId) || null;
 }
-function mnyDebtLabel(kid, debtId) {
-  const d = mnyDebtById(kid, debtId);
-  return d ? (d.icon + ' ' + d.name) : 'the loan';
-}
 
 /* Everything owed across every debt — what page 1 and the meeting show. */
 function mnyTotalOwing(kid) {
@@ -190,10 +186,6 @@ function loanState(kid, debtId) {
   return mnyDebtById(kid, debtId) || mnyNormalizeDebt({ id: 'none' });
 }
 
-function loanPrincipal(kid, debtId)   { return money2(loanState(kid, debtId).principal); }
-function loanMonthly(kid, debtId)     { return money2(loanState(kid, debtId).monthly); }
-function loanDownPayment(kid, debtId) { return money2(loanState(kid, debtId).downPayment); }
-
 /* The calendar month a date belongs to. 'YYYY-MM-DD' slices chronologically. */
 function loanMonthKey(dayKey) { return String(dayKey || todayKey()).slice(0, 7); }
 
@@ -201,10 +193,6 @@ function loanMonthKey(dayKey) { return String(dayKey || todayKey()).slice(0, 7);
 function loanDownOutstanding(kid, debtId) {
   const d = loanState(kid, debtId);
   return money2(Math.max(0, money2(d.downPayment) - money2(d.downPaid)));
-}
-function loanDownIsDue(kid, dayKey, debtId) {
-  const due = loanState(kid, debtId).downPaymentDue;
-  return !!due && String(dayKey || todayKey()) >= due && loanDownOutstanding(kid, debtId) > 0;
 }
 
 /* What the schedule asks for right now, and which kind of payment it is.
@@ -244,9 +232,6 @@ function mnyDueNowAll(kid, dayKey) {
   return mnyDebtsByPriority(kid)
     .map(d => Object.assign({ debtId: d.id, debt: d }, loanDueNow(kid, dayKey, d.id)))
     .filter(x => x.amount > 0 && loanState(kid, x.debtId).lastPaymentMonth !== monthKey);
-}
-function mnyDueNowTotal(kid, dayKey) {
-  return money2(mnyDueNowAll(kid, dayKey).reduce((s, x) => s + x.amount, 0));
 }
 
 /* What's still owed: principal not yet cleared, plus any interest charged. */
@@ -299,30 +284,6 @@ function loanRecordPayment(kid, amount, kind, debtId) {
   l.payments.push(rec);
   saveAll();
   return rec;
-}
-
-/* Pay extra across every debt, highest bonus first — the split page 3 commits.
-   Returns what landed where so the meeting can say it out loud. */
-function mnySpreadEarlyPayment(kid, amount, debtId) {
-  let left = money2(amount);
-  if (!(left > 0)) return [];
-  const order = debtId ? [mnyDebtById(kid, debtId)].filter(Boolean) : mnyDebtsByPriority(kid);
-  const out = [];
-  order.forEach(d => {
-    if (!(left > 0)) return;
-    const owed = loanBalance(kid, d.id);
-    if (!(owed > 0)) return;
-    // Never hand over more than clears the debt: with a 10% bonus, $100 of cash
-    // clears $110, so the cash needed is the balance divided by 1 + bonus.
-    const bonus = (Number(d.bonusRate) || 0) / 100;
-    const need = money2(owed / (1 + bonus));
-    const pay = money2(Math.min(left, need));
-    if (!(pay > 0)) return;
-    const rec = loanRecordPayment(kid, pay, 'early', d.id);
-    if (rec) out.push({ debtId: d.id, name: d.name, icon: d.icon, paid: pay, cleared: rec.credited });
-    left = money2(left - pay);
-  });
-  return out;
 }
 
 /* Pay the deposit — hers to make early, in whatever pieces she can manage.

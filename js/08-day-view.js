@@ -191,10 +191,6 @@ function focusBlockOnTimeline(blockId) {
   pendingFocusBlockId = null;
 }
 
-function tickActiveStopwatch() {
-  buildTimeline();
-}
-
 /* Navigate to previous/next day (cross-week aware) */
 function navDay(delta) {
   const keys = getDayKeys(weekOffset);
@@ -534,16 +530,6 @@ function acceptInviteFromTimeline(id) {
 function declineInviteFromTimeline(id) {
   declineInvite(id);
   buildTimeline();
-}
-
-function addZoneLabel(canvas, text, minOffset, zMinStart) {
-  const rel = minOffset - zMinStart;
-  if (rel < 0 || rel * PX_PER_MIN > canvas.offsetHeight + 200) return;
-  const lbl = document.createElement('div');
-  lbl.className = 'tl-zone-label';
-  lbl.textContent = text;
-  lbl.style.top = (rel * PX_PER_MIN + 4) + 'px';
-  canvas.appendChild(lbl);
 }
 
 /* Returns true when a background is better paired with DARK (ink) text than
@@ -1263,7 +1249,6 @@ function getRoutineTemplate(routineId) {
   if (ROUTINE_PRESETS[routineId]) return ROUTINE_PRESETS[routineId];
   return (state.shared.routineTemplates||[]).find(r=>r.id===routineId);
 }
-function isBuiltInRoutine(routineId) { return !!ROUTINE_PRESETS[routineId]; }
 
 function onTimelineBlockTap(blockId) {
   if (isParent()) {
@@ -1283,12 +1268,6 @@ function onTimelineBlockTap(blockId) {
     return;
   }
   openEditSheet(blockId);
-}
-
-function isActivitySelectable(act) {
-  if (!act) return false;
-  if (act._locked || act._rewardLocked) return false;
-  return true;
 }
 
 // getUnlockedRoutineRewards lives in js/05-helpers.js — that copy takes an

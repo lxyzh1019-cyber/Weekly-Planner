@@ -529,14 +529,6 @@ function mnyAddGoal(kid, fields) {
   saveAll();
   return g;
 }
-function mnyEditGoal(kid, id, field, value) {
-  const g = mnyGoalById(kid, id);
-  if (!g) return false;
-  g[field] = (field === 'target' || field === 'saved') ? Math.max(0, money2(value)) : value;
-  g.updatedAt = syncNow();
-  saveAll();
-  return true;
-}
 function mnyRemoveGoal(kid, id) {
   const list = mnyEnsureGoals(kid);
   const i = list.findIndex(g => g.id === id);
@@ -990,9 +982,7 @@ function mnySplitFor(weekKey, kid, planId, own) {
     let left = dollars;
     debts.forEach(d => {
       if (!(left > 0)) return;
-      const bonus = (Number(d.bonusRate) || 0) / 100;
-      const need = money2(loanBalance(kid, d.id) / (1 + bonus));
-      const give = money2(Math.min(left, need));
+      const give = money2(Math.min(left, mnyCashToClear(kid, d)));
       out['loan:' + d.id] = money2(out['loan:' + d.id] + give);
       left = money2(left - give);
     });

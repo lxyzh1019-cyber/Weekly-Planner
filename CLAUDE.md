@@ -70,8 +70,10 @@ npm run test:smoke          # screenshots land in tests/out/
 ```
 
 `npm run check` runs `tests/check-syntax.js`, `tests/check-globals.js`,
-`tests/check-escaping.js` and `tests/check-dead-css.js`. **Do
-not go back to the old shell loop** —
+`tests/check-shared-merge.js`, `tests/check-escaping.js`, `tests/check-dead-css.js`
+and `tests/check-dead-ids.js` (an `id` in `index.html` that nothing reads — the
+same blind spot as dead CSS, with runtime-built prefixes discovered from the
+source rather than listed by hand). **Do not go back to the old shell loop** —
 
 ```bash
 for f in js/*.js; do node --check "$f" || break; done && echo OK   # BROKEN
@@ -1186,4 +1188,13 @@ matches the day it claims to describe.
 - `refreshCurrentScreen()` fires on every remote snapshot, including the echo of
   the device's own write. Don't assume a render happens once.
 - GitHub Pages caches aggressively. After a deploy that changes `js/*.js`,
-  hard-refresh or bump a `?v=` query on the script tags.
+  hard-refresh or bump a `?v=` query on the script tags. `sw.js` is the other
+  cache: it is **network-first** so being online always gets the deployed code,
+  and the shell it holds only answers offline — but **bump `SW_VERSION` on every
+  deploy that changes a shell file**, or an installed device keeps the old
+  offline copy. There is no build step to do it for you.
+- Toggles (`.buffer-toggle`, `.repeat-toggle`) and the 19 overlays carry their
+  ARIA **statically** in `index.html`; `enhanceNonButtonClickables`
+  (`js/99-main.js`) only keeps `aria-checked` in step with `.on`. Focus and
+  Escape for sheets live in `openSheet`/`closeSheet` (`js/17-ui-misc.js`) — do
+  not add a second dialog mechanism beside them.

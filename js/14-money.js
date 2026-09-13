@@ -77,12 +77,6 @@ function stockPrice(ticker, monthOverride) {
   const m = ((cfg.startMonth + simMonth) % 12 + 12) % 12;
   return STOCKS_2023[ticker].prices[m];
 }
-function marketMonthLabel() {
-  const cfg = bankConfig();
-  const total = cfg.startMonth + cfg.marketMonth;
-  const year = cfg.startYear + Math.floor(total / 12);
-  return MONEY_MONTHS[((total % 12) + 12) % 12] + ' ' + year;
-}
 /* What she owns now lives in one record per holding (js/21-money-data.js), so
    a parent can keep it truthful by hand instead of a simulation deciding for
    them. These four keep their old names because half the app calls them. */
@@ -139,14 +133,17 @@ function moneyBuyStock(kid, ticker, dollars) {     // cash → a bit of a compan
   }
   saveAll(); return true;
 }
-function moneySellStock(kid, ticker, shares) {     // a bit of a company → cash
+function moneySellStock(kid, ref, shares) {        // a bit of a company → cash
+  // `ref` is a holding id or a ticker: a company a parent typed in by hand has
+  // no ticker, and it must be as sellable as one from the price table.
   const w = ensureWallet(kid);
-  const held = mnyHoldingsOfKind(kid, 'stock').find(h => h.ticker === ticker);
+  const held = mnyHoldingsOfKind(kid, 'stock').find(h => h.id === ref || (h.ticker && h.ticker === ref));
   if (!held) return false;
   const have = Number(held.units) || 0;
   shares = Math.min(shares, have);
   if (shares <= 1e-9) return false;
-  const price = money2(held.priceNow) || stockPrice(ticker);
+  const price = money2(held.priceNow) || (held.ticker ? stockPrice(held.ticker) : 0);
+  if (!(price > 0)) return false;
   const proceeds = money2(shares * price);
   // Cost comes off in proportion, so what is left still knows what it cost.
   held.costBasis = money2(money2(held.costBasis) * (1 - shares / have));

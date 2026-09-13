@@ -7,6 +7,11 @@
 loadLocal();
 initFirebase();
 showScreen('profile');
+// The shell is cached by sw.js so the installed app opens without signal. Only
+// over http(s): the smoke suite runs over file://, where a worker cannot exist.
+if (/^https?:$/.test(location.protocol) && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(e => console.warn('service worker did not register:', e));
+}
 window._currentRewardPrompt = null;
 // Cloud writes are debounced (SYNC_DEBOUNCE_MS, js/03-sync.js). A tab being
 // hidden or torn down is the one case where waiting out the window risks losing
@@ -259,6 +264,16 @@ function initA11yEnhancements() {
 enableHorizontalWheelScroll();
 bindMiddleDragPan();
 initA11yEnhancements();
+// Escape closes the topmost sheet. The app dialog and the chooser own Escape
+// while they are up (js/17-ui-misc.js, capture phase), so this only sees it
+// when neither is open.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || e.defaultPrevented) return;
+  const id = topOpenSheetId();
+  if (!id || id === 'appDialogOverlay') return;
+  e.preventDefault();
+  closeSheet(id);
+});
 /* Hero Mode is gone (js/05-helpers.js). Drop its key so a switch nobody can see
    is not still remembered on the girls' iPad. */
 try { localStorage.removeItem('wp_hero_mode'); } catch (e) {}

@@ -171,7 +171,7 @@ function mmWeeksAgoWord(n) {
 function mmLastReviewedLine() {
   const last = mmLastReviewed();
   const rows = mmUnsettledWeeks(8);
-  const unopened = rows.filter(x => x.status === 'none').length;
+  const unopened = mmUnopenedWeeks(8).length;
   const met = rows.length - unopened;
   /* Counted separately on purpose. Lumping them together is what made two
      meetings read as eight missed ones: a week the family sat down for is not
@@ -221,7 +221,7 @@ function mmMaybeAskCatchUp() {
   mmCatchUpAsked = true;
   const last = mmLastReviewed();
   const nearest = open[0];
-  const unopened = open.filter(x => x.status === 'none').length;
+  const unopened = mmUnopenedWeeks(8).length;
   const met = open.length - unopened;
   const where = last
     ? `Last settled: week of ${mmWeekLabel(last.wk)} — ${mmWeeksAgoWord(last.weeksAgo)}.`
@@ -546,7 +546,7 @@ function mmRenderExpress(wk) {
 function mmCatchUpBanner() {
   const list = mmUnsettledWeeks(8);
   if (!list.length) return '';
-  const unopened = list.filter(x => x.status === 'none').length;
+  const unopened = mmUnopenedWeeks(8).length;
   const met = list.length - unopened;
   /* Each row says which kind of open it is, and offers the action that fits.
      A week the family met about needs its money settling, not a nag about

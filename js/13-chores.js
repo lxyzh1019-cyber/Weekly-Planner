@@ -437,12 +437,6 @@ function ctCelebrateGroupPayouts(fired, hostId) {
 function ctSetCurrentWeekFromPlanner() {
   ctWeekKey = dateToLocalKey(getWeekStart(weekOffset));
 }
-function ctDayIndexForDate(dayKey) {
-  const wk = ctWeekKey || ctThisWeekKey();
-  const mon = formatDayKey(wk);
-  const day = formatDayKey(dayKey);
-  return Math.round((day - mon) / (24*60*60*1000));
-}
 function ctWeekKeyForDate(dayKey) {
   return ctDateToKey(ctMondayOf(formatDayKey(dayKey)));
 }
