@@ -1798,6 +1798,26 @@ function applyNotDoneToBlocks(ids, dayKey, kid) {
   return n;
 }
 
+/* ── Settled money is frozen, and only the money is ─────────────────
+   A week's money is committed at the meeting and there is no way back: nothing
+   clears `committedAt`, mnyReopenWeek refuses a committed week outright, and
+   the meeting's own Undo lives in a session-local `mmUndo` that is gone the
+   moment the sheet closes. So a grade in a settled week genuinely cannot
+   change, and any control that offers to is lying.
+
+   The guard is deliberately narrow: it asks whether THIS action would move
+   money, not whether the week is settled. Recording a swim as not done in a
+   settled week costs nothing and must still be allowed — refusing it would
+   make a whole week of plan unrecordable to protect a grade that is not there. */
+function notDoneIsFrozenFor(blocks, dayKey, kid) {
+  if (typeof mnyIsCommitted !== 'function' || typeof ctWeekKeyForDate !== 'function') return null;
+  const wk = ctWeekKeyForDate(dayKey);
+  if (!mnyIsCommitted(wk, kid)) return null;
+  const cost = notDoneBlocksWouldCost(blocks, dayKey, kid);
+  if (!cost.rows.length) return null;
+  return cost;
+}
+
 /* The edit sheet's toggle. Shaped like togglePin and toggleConfirm beside it. */
 async function toggleNotDone() {
   if (!isParent()) { showToast('Only a grown-up records this 🔒'); return; }
@@ -1829,6 +1849,11 @@ async function toggleNotDone() {
     showToast(`${nm} ticked every step — untick the routine first`);
     return;
   }
+  const frozen = notDoneIsFrozenFor([blk], currentDayKey, who);
+  if (frozen) {
+    showToast(`That week's money is settled — ${mnyMoney(frozen.total)} cannot come back`);
+    return;
+  }
   if (!(await confirmNotDone([blk], currentDayKey, who))) return;
   applyNotDoneToBlocks([blk.id], currentDayKey, who);
   const el = document.getElementById('notDoneToggle');
@@ -1856,6 +1881,25 @@ async function markRemainingNotDoneForChild(kid, dayKey) {
   if (!doable.length) {
     showToast(`${name} ticked every step of ${routines.length === 1 ? 'that routine' : 'those routines'}`);
     return 0;
+  }
+  const frozenBulk = notDoneIsFrozenFor(doable, key, who);
+  if (frozenBulk) {
+    /* Refuse the money, not the day. The blocks that carry no grade can still
+       be recorded, which is what lets a settled week's review finish. */
+    const free = doable.filter(b => !notDoneBlocksWouldCost([b], key, who).rows.length);
+    if (!free.length) {
+      showToast(`${name}'s money for that week is settled — ${mnyMoney(frozenBulk.total)} cannot come back`);
+      return 0;
+    }
+    if (!(await showConfirm(
+      `${name}'s money for this week is already settled, so the graded chores cannot change.`
+      + `\n\nRecord the other ${free.length} block${free.length === 1 ? '' : 's'} as not done?`,
+      { okLabel: 'Record the rest', cancelLabel: 'Not now' }))) return 0;
+    const nFree = applyNotDoneToBlocks(free.map(b => b.id), key, who);
+    refreshAfterCompletion();
+    renderParentBanners();
+    showToast(`${name}: ${nFree} recorded · graded chores left as settled`);
+    return nFree;
   }
   if (!(await confirmNotDone(doable, key, who))) return 0;
   const n = applyNotDoneToBlocks(doable.map(b => b.id), key, who);

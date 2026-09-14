@@ -81,13 +81,6 @@ function mmCanReviewDay(kid, d) { return canReviewDay(kid, mmDayKey(d)); }
 function mmOverridableRefusal(info) {
   return !!(info && !info.ok && info.reason === 'unconfirmed');
 }
-/* Whether this child's money for the week is already settled. Changing a grade
-   after that would edit a record the wallet no longer reflects, so the offer
-   to record blocks as not done refuses and points at the way back in — the
-   same door every other frozen fact uses. */
-function mmWeekIsSettledFor(kid) {
-  return typeof mnyIsCommitted === 'function' && mnyIsCommitted(mmWeekKey(), kid);
-}
 /* Today is reviewable but not finished, so it is signed off through an explicit
    "nothing else is planned" rather than a plain tap — the same shape the parent
    day banner uses for an empty day, and for the same reason: the record must not
@@ -136,21 +129,16 @@ function mmReviewLeavingBlocks(kid, d) {
 async function mmRecordNotDoneAndReview(kid, d) {
   const key = mmDayKey(d);
   const nm = kid === 'jenn' ? 'Jenn' : 'Jess';
-  /* A settled week's money is frozen. Changing a grade now would edit a record
-     the wallet no longer reflects, so refuse and offer the door back in rather
-     than writing a change nobody would be paid. */
-  if (mmWeekIsSettledFor(kid)) {
-    if (await showConfirm(
-      `${nm}'s money for this week is already settled, so a grade cannot change.`
-      + `\n\nReopen her week to record what did not happen?`,
-      { okLabel: 'Reopen her week', cancelLabel: 'Leave it settled' })) {
-      mnyReopenWeek(kid, mmWeekKey());
-      saveAll();
-      renderMeetingMode();
-      showToast(`${nm}'s week reopened — record it, then settle again`);
-    }
-    return;
-  }
+  /* A settled week's money is frozen, and there is no way back: nothing clears
+     committedAt, mnyReopenWeek refuses a committed week, and the meeting's Undo
+     is a session-local snapshot that is gone once the sheet closes. An earlier
+     draft offered to "reopen her week" here and called mnyReopenWeek, which
+     returns false for exactly this case — a button that announced something it
+     had not done, which is the defect this repo keeps having to fix.
+
+     markRemainingNotDoneForChild (js/09-sheets.js) owns the decision now, and
+     it is narrower than "refuse the week": it refuses only the blocks whose
+     grades would move, and records the rest. So the review can still finish. */
   const n = await markRemainingNotDoneForChild(kid, key);
   if (!n) { renderMeetingMode(); return; }
   markDayReviewed(kid, key, true);

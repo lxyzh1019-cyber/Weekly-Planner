@@ -925,5 +925,103 @@ function sync(a, b) {
     !phone.state.profiles.jenn.weeks['2026-08-03'][0].notDone);
 }
 
+/* ── A gift crosses devices, and is credited exactly ONCE ──────────
+   Money from outside now reaches the wallet the moment it is recorded rather
+   than waiting for the week's commit, and `appliedAt` is the only thing
+   standing between that and a second credit. It has two readers — the commit
+   loop in mnyDoCommit and mnyApproveDeposit — and both skip a stamped deposit.
+
+   Deposits merge through mergeArrayById with the `dep:` tombstone scope, so a
+   deposit is arbitrated WHOLE, newest updatedAt wins. That makes the stamp the
+   load-bearing field: if a device that has not seen the credit holds a newer
+   copy of the same record, the stamp is lost and the next commit credits it a
+   second time. These are what hold that.
+
+   The wallet itself is a scalar under deepMergeObj and is deliberately not
+   asserted here — arbitrating a balance is a different question from whether a
+   gift can be credited twice, and this is the second one. */
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  // The phone still holds the gift as it was BEFORE anyone applied it.
+  on(phone, st => {
+    st.profiles.jenn.deposits = [
+      { id: 'dep-1', weekKey: '2026-09-07', amount: 20, from: 'Birthday money',
+        giver: 'Grandma', appliedAt: null, updatedAt: 1000 },
+    ];
+  });
+  // The iPad recorded it, which credited the wallet and stamped it.
+  on(ipad, st => {
+    st.profiles.jenn.deposits = [
+      { id: 'dep-1', weekKey: '2026-09-07', amount: 20, from: 'Birthday money',
+        giver: 'Grandma', appliedAt: 1234, updatedAt: 2000 },
+    ];
+  });
+  sync(ipad, phone);
+  const both = [ipad, phone].map(d => d.state.profiles.jenn.deposits);
+  check('a gift appears on both devices, once',
+    both.every(list => list.length === 1 && list[0].id === 'dep-1'));
+  check('and the applied stamp survives, so it cannot be credited twice',
+    both.every(list => list[0].appliedAt === 1234));
+  check('the giver crosses with it',
+    both.every(list => list[0].giver === 'Grandma'));
+}
+
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  /* A gift a CHILD proposed. It credits nothing until a grown-up approves, so
+     the pending flag has to survive a sync from a device that has not seen the
+     approval — otherwise the commit loop, which skips a pending deposit, would
+     stop skipping it. */
+  on(ipad, st => {
+    st.profiles.jenn.deposits = [
+      { id: 'dep-2', weekKey: '2026-09-07', amount: 50, from: 'A gift',
+        addedBy: 'jenn', pendingApproval: true, appliedAt: null, updatedAt: 1000 },
+    ];
+  });
+  on(phone, st => { st.profiles.jenn.deposits = []; });
+  sync(ipad, phone);
+  const both = [ipad, phone].map(d => d.state.profiles.jenn.deposits[0]);
+  check('a gift a child proposed reaches the other device still waiting',
+    both.every(d => d && d.pendingApproval === true && !d.appliedAt));
+
+  /* …and once a parent approves it on one device, the approval — not the
+     proposal — is what the other device ends up holding. */
+  on(phone, st => {
+    const d = st.profiles.jenn.deposits[0];
+    delete d.pendingApproval; d.appliedAt = 5678; d.updatedAt = 3000;
+  });
+  sync(ipad, phone);
+  const after = [ipad, phone].map(d => d.state.profiles.jenn.deposits[0]);
+  check('approving on one device clears the wait on both',
+    after.every(d => !d.pendingApproval && d.appliedAt === 5678));
+}
+
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  /* Removing a gift takes the money back, and the removal has to STICK. Without
+     the tombstone the other device's copy walks straight back in on the next
+     snapshot and the wallet is short by a gift that exists again. */
+  on(ipad, st => {
+    st.profiles.jenn.deposits = [
+      { id: 'dep-3', weekKey: '2026-09-07', amount: 20, from: 'A gift', updatedAt: 1000 },
+    ];
+  });
+  on(phone, st => {
+    st.profiles.jenn.deposits = [
+      { id: 'dep-3', weekKey: '2026-09-07', amount: 20, from: 'A gift', updatedAt: 1000 },
+    ];
+  });
+  sync(ipad, phone);
+  // The iPad removes it, exactly as mnyRemoveDeposit does.
+  on(ipad, st => {
+    st.profiles.jenn.deposits = [];
+    st.shared.tombstones['dep:dep-3'] = 2000;
+  });
+  sync(ipad, phone);
+  check('a removed gift does not come back from the other device',
+    ipad.state.profiles.jenn.deposits.length === 0 &&
+    phone.state.profiles.jenn.deposits.length === 0);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

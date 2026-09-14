@@ -808,6 +808,19 @@ done and review. Only the last moves money, so only the last confirms. A week
 already settled refuses it and offers `mnyReopenWeek` instead, because changing
 a grade after settlement edits a record the wallet no longer reflects.
 
+**A settled week's money cannot be taken back, and nothing may claim it can.**
+`committedAt` is written once at step 4 and **nothing anywhere clears it**;
+`mnyReopenWeek` refuses a committed week outright; and the meeting's Undo lives
+in a session-local `mmUndo` that is gone the moment the sheet closes. So the
+record-and-review answer refuses — but NARROWLY, through
+`notDoneIsFrozenFor` (`js/09-sheets.js`): it asks whether *this* action would
+move money, not whether the week is settled. A swim recorded as not done in a
+settled week costs nothing and is still allowed, so a whole week does not become
+unrecordable to protect one grade. An earlier draft offered to "reopen her week"
+and called `mnyReopenWeek`, which returns false for exactly this case, then
+toasted that it had — a button announcing something it had not done, which is
+the defect this file keeps recording. The check that guards it is what found it.
+
 **Step 1 had no route to the day or the week at all**, on any week: `openkidday`
 was dispatched with no button anywhere rendering it, and the only `openweek`
 button was in step 2. Both steps carry the per-child pair now, from one writer
