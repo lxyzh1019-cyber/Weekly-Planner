@@ -465,11 +465,23 @@ function getSharedActivities() { return (state.shared && state.shared.sharedActi
 function getAllActivities(p=activeProfile(), opts) {
   const season = getCurrentSeason();
   const keep = a => (opts && opts.includeArchived) ? true : !a.archived;
+  /* `keep` used to be applied to the custom and shared lists ONLY, so
+     `archived: true` written onto a built-in was read by nothing — the archive
+     rule covered half the catalog and silently ignored the other half. It is
+     applied to all four now, which is what lets a shipped activity be retired
+     from the pickers while every block that ever named it still renders:
+     findActivity passes includeArchived, so the read-back half already worked.
+     Same pick-vs-read-back split getTrainingTags/getTrainingTopic already uses
+     for a sport the family has dropped.
+
+     On the seasonal line the filter goes BEFORE the map, so a retired entry is
+     never cloned just to be thrown away — and `_locked` keeps being written by
+     the map, because that flag is what keeps Beach Day out of January. */
   const base = [
-    ...DEFAULT_ACTIVITIES,
+    ...DEFAULT_ACTIVITIES.filter(keep),
     ...getCustomActivities(p).filter(keep),
     ...getSharedActivities().filter(keep),
-    ...SEASONAL_ACTIVITIES.map(a=>({...a,_seasonal:true, _locked: a.season!==season})),
+    ...SEASONAL_ACTIVITIES.filter(keep).map(a=>({...a,_seasonal:true, _locked: !inSeason(a, season)})),
   ];
   // apply level-ups
   const rules = state.shared.levelRules || [];
@@ -695,6 +707,23 @@ function schoolHours() {
   }
   const days = Array.isArray(h.days) && h.days.length ? h.days : SCHOOL_HOURS.days;
   return { startMin, endMin, lunchStartMin, lunchMin: lunchStartMin == null ? 0 : lunchMin, days };
+}
+
+/* How long a block of this activity should default to when somebody picks it
+   by hand. Everything is its own durationMin except School Day, whose length is
+   the family's actual school day — every path that PLACES a school card already
+   computed it from schoolHours(), but the picker read the shipped 420 and so
+   handed out a seven-hour card to a family whose day is 6h40. A top-level const
+   cannot ask: js/01-config.js runs before there is any state to read, which is
+   why schoolTemplate() is a function too. */
+function activityDefaultDuration(act) {
+  if (!act) return 60;
+  if (act.id === 'school_day') {
+    const h = schoolHours();
+    const span = h.endMin - h.startMin;
+    if (span > 0) return span;
+  }
+  return act.durationMin;
 }
 
 function schoolTerm() {

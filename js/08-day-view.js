@@ -1422,15 +1422,15 @@ function addActivityAtMin(absMin) {
   // Seasonal only. The _rewardLocked gate below this used to refuse a further
   // nine activities with "Keep going — this reward unlocks soon ✨"; nothing is
   // reward-locked any more.
-  if (selectedActivity._locked) { showToast(`🔒 Unlocks in ${selectedActivity.season}!`); return; }
+  if (selectedActivity._locked) { showToast(`🔒 Unlocks in ${seasonLabel(selectedActivity)}!`); return; }
 
   pendingStartMin = absMin;
 
   if (selectedActivity.isTraining) {
-    ts = { durationMin: selectedActivity.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(selectedActivity), getReadyBuffer:activityTravels(selectedActivity), warmupBuffer:false, gearState:{}, travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, warmupBufMin:DEFAULT_WARMUP_MIN };
+    ts = { durationMin: activityDefaultDuration(selectedActivity)||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(selectedActivity), getReadyBuffer:activityTravels(selectedActivity), warmupBuffer:false, gearState:{}, travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, warmupBufMin:DEFAULT_WARMUP_MIN };
     openTrainingSheet();
   } else {
-    as_ = { durationMin: selectedActivity.durationMin||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(selectedActivity), getReadyBuffer:activityTravels(selectedActivity), travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, choreTags: [], objectives: [] };
+    as_ = { durationMin: activityDefaultDuration(selectedActivity)||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(selectedActivity), getReadyBuffer:activityTravels(selectedActivity), travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, choreTags: [], objectives: [] };
     openActivitySheet();
   }
 }
@@ -1511,7 +1511,7 @@ function renderSlotPicker() {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'slot-pick-chip' + (act._locked ? ' locked' : '');
-    chip.innerHTML = `<span class="spc-icon">${escapeHtml(act.icon)}</span><span class="spc-name">${escapeHtml(act.name)}</span><span class="spc-dur">${escapeHtml(formatDuration(act.durationMin || 60))}</span>`;
+    chip.innerHTML = `<span class="spc-icon">${escapeHtml(act.icon)}</span><span class="spc-name">${escapeHtml(act.name)}</span><span class="spc-dur">${escapeHtml(formatDuration(activityDefaultDuration(act) || 60))}</span>`;
     chip.onclick = () => pickFromSlot(act.id);
     list.appendChild(chip);
   });
@@ -1525,15 +1525,15 @@ function renderSlotPicker() {
 function pickFromSlot(actId) {
   const act = getAllActivities().find(a => a.id === actId);
   if (!act) return;
-  if (act._locked) { showToast(`🔒 Unlocks in ${act.season}!`); return; }
+  if (act._locked) { showToast(`🔒 Unlocks in ${seasonLabel(act)}!`); return; }
   selectedActivity = act;
   closeSheet('slotPickerOverlay');
   // pendingStartMin was set by openSlotPicker.
   if (act.isTraining) {
-    ts = { durationMin: act.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(act), getReadyBuffer:activityTravels(act), warmupBuffer:false, gearState:{}, travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, warmupBufMin:DEFAULT_WARMUP_MIN };
+    ts = { durationMin: activityDefaultDuration(act)||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(act), getReadyBuffer:activityTravels(act), warmupBuffer:false, gearState:{}, travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, warmupBufMin:DEFAULT_WARMUP_MIN };
     openTrainingSheet();
   } else {
-    as_ = { durationMin: act.durationMin||60, colour: CAT_HEX[act.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(act), getReadyBuffer:activityTravels(act), travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, choreTags: [], objectives: [] };
+    as_ = { durationMin: activityDefaultDuration(act)||60, colour: CAT_HEX[act.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(act), getReadyBuffer:activityTravels(act), travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, choreTags: [], objectives: [] };
     openActivitySheet();
   }
 }

@@ -9546,10 +9546,13 @@ function findChromium() {
   checks.noActivityHasToBeEarned = await page.evaluate(() => {
     const bad = [];
     const FAMILY = ['family_set_table', 'family_prep_bag', 'family_laundry_fold', 'family_kitchen_helper'];
+    /* The nine that were locked. Five have since been RETIRED by the catalog
+       rewrite — they are asserted by theCatalogResolvesEveryBlockItEverNamed
+       instead, because "not on the picker" is now the correct answer for them
+       and demanding both would be two checks contradicting each other. */
     const FORMERLY_EARNED = [
-      'acad_focus_sprint', 'acad_preview_power', 'acad_reading_star',
-      'health_recovery_fuel', 'health_stretch_reset', 'health_pack_tomorrow',
-      'culture_story_circle', 'culture_festival_prep', 'culture_calligraphy_play',
+      'health_recovery_fuel', 'health_stretch_reset',
+      'culture_story_circle', 'culture_festival_prep',
     ];
     const wasProfile = profile;
     profile = 'jenn';
@@ -9617,6 +9620,97 @@ function findChromium() {
     } finally {
       profile = wasProfile;
     }
+    return bad.length === 0 || bad;
+  });
+
+  /* THE CATALOG STILL RESOLVES EVERY BLOCK IT EVER NAMED.
+
+     Retiring an activity is the one change in this app that fails INVISIBLY.
+     A block whose actId nothing can resolve does not warn and does not fall
+     back — it renders as nothing at all, and the only way to notice is to open
+     the week it was in. So every retired id has to answer three ways: gone from
+     the pickers, still resolvable, and still able to say its own name.
+
+     The mechanism this exercises was half-built until now. getAllActivities
+     applied its `archived` filter to the custom and shared lists only, so the
+     flag on a built-in was read by nobody — the catalog rewrite is the first
+     thing that needed it, and a rule that covers half a catalog is worse than
+     no rule, because it reads as though it works. */
+  checks.theCatalogResolvesEveryBlockItEverNamed = await page.evaluate(() => {
+    const bad = [];
+    const RETIRED = [
+      'acad_focus_sprint', 'acad_preview_power', 'acad_reading_star',
+      'health_pack_tomorrow', 'culture_calligraphy_play',
+      'leaf_hike', 'rainy_craft',
+    ];
+    const wasProfile = profile;
+    profile = 'jenn';
+    try {
+      const pickable = getAllActivities('jenn');
+      RETIRED.forEach(id => {
+        if (pickable.some(a => a.id === id)) bad.push(`${id} is retired but still offered in the picker`);
+
+        const act = findActivity(id, 'jenn');
+        if (!act) { bad.push(`a block naming ${id} resolves to nothing and would render blank`); return; }
+        if (!act.name) bad.push(`${id} resolves but has no name`);
+        if (!act.icon) bad.push(`${id} resolves but has no icon`);
+
+        const shown = blockDisplayName({ actId: id }, 'jenn');
+        if (!shown || !shown.name || shown.name === 'Something') {
+          bad.push(`${id} renders as "${shown && shown.name}"`);
+        }
+        // Colour comes off the category, and an unresolvable block goes grey.
+        const col = blockColour({ actId: id }, 'jenn');
+        if (!col || col === '#888') bad.push(`${id} draws as the unknown-activity grey`);
+        // It still counts in the hours, under a real group.
+        if (!GROUP_ORDER.includes(activityGroup(act))) {
+          bad.push(`${id} groups as "${activityGroup(act)}", which is not a group`);
+        }
+      });
+
+      // And the half that was never wired: the flag has to actually do something.
+      const all = getAllActivities('jenn', { includeArchived: true });
+      if (!all.some(a => a.archived)) bad.push('nothing is archived, so this check proves nothing');
+      if (pickable.some(a => a.archived)) bad.push('an archived activity reached the picker');
+    } finally { profile = wasProfile; }
+    return bad.length === 0 || bad;
+  });
+
+  /* EVERY ACTIVITY KNOWS WHAT IT IS FOR.
+
+     Three fields decide where an activity's time is counted, when it is
+     suggested, and what a child is asked to aim at. A new row in the catalog
+     that forgets one of them does not break anything loudly: it just files its
+     hours under Daily, never gets suggested, and offers an empty goal sheet. */
+  checks.everyActivityKnowsWhatItIsFor = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'jenn';
+    /* Routines answer with their checklist instead (CLAUDE.md: a routine's
+       completion IS its checklist), and Rest is deliberately a state rather
+       than a task list. */
+    const NO_GOALS_BY_DESIGN = ['routine_morning', 'routine_afterschool', 'routine_evening'];
+    try {
+      getAllActivities('jenn', { includeArchived: true }).forEach(act => {
+        if (act.custom) return;   // a family's own activity sets its own terms
+        const g = activityGroup(act);
+        if (!GROUP_ORDER.includes(g)) bad.push(`${act.id} groups as "${g}", which is not a group`);
+        if (!Array.isArray(act.suitableTime) || !act.suitableTime.length) {
+          bad.push(`${act.id} says nothing about when it suits, so it is never suggested`);
+        }
+        if (act.isTraining || act.isRoutine || NO_GOALS_BY_DESIGN.includes(act.id)) return;
+        if (!getObjectivePresets(act).length) {
+          bad.push(`${act.id} offers an empty goal sheet`);
+        }
+      });
+
+      // Every group the app declares must be reachable by something, or it is a
+      // row on a chart that can never draw.
+      const groups = new Set(getAllActivities('jenn').map(a => activityGroup(a)));
+      GROUP_ORDER.forEach(g => {
+        if (!groups.has(g)) bad.push(`no activity lands in "${g}" — the chart row can never draw`);
+      });
+    } finally { profile = wasProfile; }
     return bad.length === 0 || bad;
   });
 
@@ -10430,12 +10524,28 @@ function findChromium() {
       routine_morning: 'routine', health_pack_tomorrow: 'routine',
       training: 'body', competition: 'body',
       family: 'free', relax: 'free', break_quick: 'free', snow_play: 'free',
+      /* Everyday movement is hers, not a coach's — a Saturday swim is not the
+         same ask as a coached hour, and both used to land in one place.
+         `relax` stays Free on purpose: rest that scores is rest turned into
+         another thing to perform. */
+      swimming: 'move', skating: 'move', bike_ride: 'move', health_stretch_reset: 'move',
+      // Outings carry an explicit group; cat is busy saying what colour they are.
+      day_trip: 'explore', museum: 'explore', nature_walk: 'explore', beach_day: 'explore',
+      // A seasonal treat is not training, whatever its category says.
+      garden_time: 'free',
     };
     Object.keys(want).forEach(id => {
       const got = activityGroup(findActivity(id, 'jenn'));
       if (got !== want[id]) bad.push(`${id} groups as ${got}, expected ${want[id]}`);
     });
-    if (GROUP_ORDER.length !== 6) bad.push(`${GROUP_ORDER.length} groups, expected 6`);
+    if (GROUP_ORDER.length !== 8) bad.push(`${GROUP_ORDER.length} groups, expected 8`);
+    /* groupDef's fallback used to be the positional ACTIVITY_GROUPS[4], which
+       was 'daily' only because daily happened to be fifth — so adding a group
+       above it would have re-pointed every unknown-group lookup at a different
+       row in silence. Nothing tested it; this does. */
+    if (groupDef('no-such-group').id !== 'daily') {
+      bad.push(`an unknown group falls back to ${groupDef('no-such-group').id}, expected daily`);
+    }
     // Every group has a label and a short form that fits a week-grid cell.
     GROUP_ORDER.forEach(g => {
       if (!groupLabel(g)) bad.push(`${g} has no label`);

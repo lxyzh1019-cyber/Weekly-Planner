@@ -656,11 +656,34 @@ current-week; the **review voice** (owed / fulfilled / unfulfilled) lives on the
 parent and meeting screens, where a past week's shortfall is always shown. No
 shortfall is carried into the next week.
 
-## Six activity groups — what the time is FOR
+## Eight activity groups — what the time is FOR
 
 `ACTIVITY_GROUPS` and `activityGroup(act)` in `js/01-config.js`. **Routine ·
-Brain Construction · Body Construction · Chores · Daily · Free**, each with a
-`short` form because the week grid compresses a label to about seven characters.
+Brain Construction · Body Construction · Chores · Daily · Free · Everyday
+movement · Explore**, each with a `short` form because the week grid compresses
+a label to about seven characters.
+
+**Move and Explore were the two the table could not say.** A Saturday swim was
+filed under Body beside a coached session, so the hours chart said a length of
+the pool was the same ask as a training hour; and a day at a museum was "free
+time", which is what the app calls doing nothing. `cat: 'active'` maps to
+`move`; `explore` has no category behind it and is set explicitly, because `cat`
+is busy answering the other question. `relax` carries an explicit `group:'free'`
+for the same reason in reverse: rest that scores is rest turned into another
+thing to perform.
+
+**`groupDef`'s fallback is by id, not by position.** It used to return
+`ACTIVITY_GROUPS[4]` — `daily`, but only because daily happened to be the fifth
+row, so adding a group above it would have silently re-pointed every
+unknown-group lookup. Nothing tested it until `mealsAreNotChores` did.
+
+**`tools/xp-calibrate.js` reads the group list from the source.** It summed over
+a hand-written six-id array, so adding a group left it reporting the economy the
+app no longer had — no error, just the wrong numbers, which makes "change a
+number and re-run the tool" a no-op. `tests/xp.test.js` now also asserts the
+other direction: every group the app prices must be one the test has an opinion
+about, because iterating its own `want` map is a whitelist that a new group
+passes unnoticed.
 
 `cat` still decides a block's **colour** (`CAT_HEX`, `blockColour`) and drives
 the picker's filters. This answers a different question, and it is the only one
@@ -1061,6 +1084,16 @@ changes nothing.
 
 ## History is a record, not a working set
 
+**The archive rule covered half the catalog.** `getAllActivities` applied its
+`archived` filter to the custom and shared lists only — `DEFAULT_ACTIVITIES` and
+`SEASONAL_ACTIVITIES` were spread raw, so the flag written onto a shipped
+activity was read by nobody. It is applied to all four now, which is what lets a
+built-in be retired; `findActivity` already passed `includeArchived`, so the
+read-back half always worked. Same pick-vs-read-back split
+`getTrainingTags`/`getTrainingTopic` uses for a sport the family has dropped.
+`theCatalogResolvesEveryBlockItEverNamed` holds every retired id to three
+answers: gone from the pickers, still resolvable, still able to say its name.
+
 An activity is **archived, never deleted** (`archiveParentActivity`,
 `js/11-parent.js`). Deleting used to sweep both kids' `weeks` with no date
 filter, removing every block that had ever named it — from last March as readily
@@ -1131,6 +1164,19 @@ constants directly.** Three accessors in `js/05-helpers.js` decide which wins:
 | When is school, and is there a lunch recess? | `schoolHours()` |
 | When does the term run? | `schoolTerm()` |
 | Which days are off? | `schoolOffDays()` — the shipped list plus the family's |
+| How long does a block of this default to? | `activityDefaultDuration(act)` |
+
+`activityDefaultDuration` exists for School Day alone: every path that PLACES a
+school card already computed its length from `schoolHours()`, but the picker
+read the shipped `durationMin: 420` and handed a seven-hour card to a family
+whose day is 6h40. `zoneForGap` (`js/17-ui-misc.js`) reads `schoolHours()` too
+now — it hardcoded 8:00/15:00/18:00, so it disagreed with `dayZoneSegments`, the
+bands the day view actually draws.
+
+**A season can be more than one season.** `season` took a single string and the
+garden does not stop in June, so `inSeason(act, season)` is the one comparison
+and `seasonLabel(act)` is what the three "🔒 Unlocks in …" toasts print — a bare
+array would have read "spring,summer".
 
 `isSchoolDay(dayKey)` / `schoolDayInfo(dayKey)` go through those, and are still
 the only way to ask — never by checking the day of the week: a Tuesday in July

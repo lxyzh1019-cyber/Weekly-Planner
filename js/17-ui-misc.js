@@ -334,10 +334,19 @@ function hideMascot() { document.getElementById('mascot').classList.remove('show
    (absolute minutes-from-midnight). Weekends return 'weekend' always. */
 function zoneForGap(absStartMin, isWeekend) {
   if (isWeekend) return 'weekend';
-  // before-school < 8:00 (480), school 8:00-15:00 (900), after-school 15:00-18:00 (1080), evening >= 18:00
-  if (absStartMin < 8*60)  return 'before-school';
-  if (absStartMin < 15*60) return 'school';
-  if (absStartMin < 18*60) return 'after-school';
+  /* Read from the school calendar rather than the 8:00/15:00/18:00 that used to
+     be written here. Those were a guess, they disagreed with schoolHours() and
+     therefore with dayZoneSegments — the bands the day view actually draws —
+     and a family whose day ends at 2:50 had the mascot calling 2:55 "school".
+     START_MIN is 6am, and these minutes are absolute from midnight, so the
+     school hours (offsets from START_MIN) are shifted to match. */
+  const h = schoolHours();
+  const schoolStart = START_MIN + h.startMin;
+  const schoolEnd   = START_MIN + h.endMin;
+  if (absStartMin < schoolStart) return 'before-school';
+  if (absStartMin < schoolEnd)   return 'school';
+  // After school runs to the evening, three hours on from the last bell.
+  if (absStartMin < schoolEnd + 180) return 'after-school';
   return 'evening';
 }
 

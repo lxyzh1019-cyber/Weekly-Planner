@@ -18,6 +18,8 @@ const QUEST_XP_BY_GROUP = {
   chores:  5,
   daily:   0,   // meals, snacks, appointments
   free:    0,   // family time, play, rest
+  move:    5,   // a swim, a skate, a bike ride — hers, not a coach's
+  explore: 3,   // a day out is a real part of a week, and not a rest day
 };
 /* The old flat rate. Still the number the quest-complete popup promises, and
    still what an unresolvable activity is worth, so nothing silently drops to

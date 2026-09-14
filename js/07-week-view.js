@@ -363,7 +363,13 @@ function renderWeek() {
       // shown to parent and child alike so they can reflect together.
       const t = computeWeekTotals(keys);
       const learn = fmtHrsMin(t.catMin.brain || 0);
-      const active = fmtHrsMin((t.catMin.body || 0) + (t.catMin.free || 0));
+      /* Move and Explore are counted here too. They used to fall inside `free`
+         via cat:'active', so splitting them out without naming them here would
+         have quietly dropped every swim, bike ride and hike out of the one
+         number this banner offers — smaller for the same week, with nothing on
+         screen to say why. */
+      const active = fmtHrsMin((t.catMin.body || 0) + (t.catMin.move || 0)
+                             + (t.catMin.explore || 0) + (t.catMin.free || 0));
       const free = fmtHrsMin(t.free);
       coachEl.classList.add('week-review-tip');
       coachEl.style.display = 'block';
