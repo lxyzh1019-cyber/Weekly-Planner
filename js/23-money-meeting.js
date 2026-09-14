@@ -261,11 +261,23 @@ function mmPlannedCompetitions(wk, kid) {
 /* The planned competitions this week that have not been written down yet.
    Matched on the day rather than the name: a parent who corrects the spelling
    while recording the result has still recorded that afternoon. */
+/* Matched on the day AND the name. Matching by dayKey alone meant two meets on
+   one Saturday were both satisfied by recording either of them — the second
+   would never be asked for, and its money would never be entered. A meet with
+   no name recorded still answers for the unnamed planned one on that day, which
+   is the honest reading of a parent who typed nothing. */
+function mmCompKey(dayKey, name) {
+  return String(dayKey) + '|' + String(name || '').trim().toLowerCase();
+}
 function mmUnrecordedCompetitions(wk, kid) {
-  const done = new Set(mrCompetitions(kid)
-    .filter(c => String(c.dayKey) >= wk && String(c.dayKey) <= mnyWeekEnd(wk))
+  const inWeek = mrCompetitions(kid)
+    .filter(c => String(c.dayKey) >= wk && String(c.dayKey) <= mnyWeekEnd(wk));
+  const done = new Set(inWeek.map(c => mmCompKey(c.dayKey, c.name)));
+  const daysWithUnnamed = new Set(inWeek.filter(c => !String(c.name || '').trim())
     .map(c => String(c.dayKey)));
-  return mmPlannedCompetitions(wk, kid).filter(p => !done.has(p.dayKey));
+  return mmPlannedCompetitions(wk, kid).filter(p =>
+    !done.has(mmCompKey(p.dayKey, p.name))
+    && !(!String(p.name || '').trim() && daysWithUnnamed.has(String(p.dayKey))));
 }
 
 /* Fill a fresh draft from the plan when the plan has something to say. */
@@ -282,6 +294,43 @@ function mmSeedCompDraft(wk, kid) {
   });
 }
 
+/* ── A PLANNED meet with no result is an unanswered question ────────
+   A competition could be planned and then never scored, and nothing asked.
+   Worse, the answer was unsayable: $0 in the totals reads identically for "no
+   meet", "a meet worth nothing", "a voided channel" and "an override to zero",
+   so a parent had no way to record that she swam and no criterion was met.
+
+   mrAddCompetition already persists a zero-award entry cleanly — unlike
+   mrSetChoreGrade, which DELETES at zero — so the record can exist. What was
+   missing is a way to ask for it and a one-tap way to give it. A parent should
+   not have to fake their way through a points form to say nothing was won. */
+function mnyUnrecordedCompRows(wk, kid) {
+  const pending = (typeof mmUnrecordedCompetitions === 'function')
+    ? mmUnrecordedCompetitions(wk, kid) : [];
+  if (!pending.length) return '';
+  return pending.map(p => `<div class="mny-row mny-row--todo">
+      <span>${p.icon || '🏆'} ${escapeHtml(p.name || mnySportLabel(p.sport) || 'Competition')} · ${mnyShortDate(p.dayKey)}
+        <small class="mny-note">planned — no result yet</small></span>
+      <button type="button" class="mny-chip" data-mny-action="comp-from-plan"
+        data-daykey="${escapeAttr(p.dayKey)}">Record it</button>
+      <button type="button" class="mny-chip" data-mny-action="comp-zero"
+        data-daykey="${escapeAttr(p.dayKey)}" data-name="${escapeAttr(p.name || '')}"
+        data-sport="${escapeAttr(p.sport || 'swim')}">No criteria met · $0</button>
+    </div>`).join('');
+}
+
+/* The one-tap answer. A real record, worth nothing, which is a different fact
+   from no record at all — and it is what unblocks the settle gate below. */
+function mnyRecordCompZero(kid, dayKey, name, sport) {
+  if (!isParent()) { showToast('A grown-up records results 🔒'); return; }
+  const wk = mmWeekKey();
+  mrAddCompetition(kid, { dayKey, name, sport: sport || 'swim', points: 0 });
+  mnyReopenWeek(kid, wk);
+  saveAll();
+  renderMeetingMode();
+  showToast(`Recorded — ${mnyMoney(0)}, no criteria met`);
+}
+
 function mnyCompetitionForm(wk, kid) {
   const entries = mrCompetitions(kid).filter(c => String(c.dayKey) >= wk && String(c.dayKey) <= mnyWeekEnd(wk));
   if (!mnyCompOpen) {
@@ -294,7 +343,10 @@ function mnyCompetitionForm(wk, kid) {
           ? entries.map(c => `<div class="mny-row"><span>${mnySportIcon(c.sport)} ${escapeHtml(c.name || mnySportLabel(c.sport))} · ${mnyShortDate(c.dayKey)}</span>
               <b>${mnyMoney(c.awarded)}</b>
               <button type="button" class="mny-step" onclick="mnyDeleteComp('${escapeJsAttr(c.id)}')" aria-label="Remove">✕</button></div>`).join('')
-          : `<div class="mny-note">No competition this week.</div>`}
+          : ''}
+        ${mnyUnrecordedCompRows(wk, kid)}
+        ${(!entries.length && !mmUnrecordedCompetitions(wk, kid).length)
+          ? `<div class="mny-note">No competition this week.</div>` : ''}
       </div>`;
   }
   const d = mnyCompDraft || (mnyCompDraft = mmSeedCompDraft(wk, kid));
@@ -372,14 +424,16 @@ function mnyDepositForm(wk, kid) {
           <button type="button" class="mny-chip" onclick="mnyToggleDep()">${saved.length ? 'Add another' : 'Add some'}</button>
         </div>
         ${saved.length
-          ? saved.map(s => `<div class="mny-row"><span>🎁 ${escapeHtml(s.from)}</span>
+          ? saved.map(s => `<div class="mny-row"><span>🎁 ${escapeHtml(s.from)}${
+                s.giver ? ' · from ' + escapeHtml(s.giver) : ''}${
+                s.pendingApproval ? ' <small class="mny-note">waiting for a grown-up</small>' : ''}</span>
               <b>${mnyMoney(s.amount)}</b>
               <button type="button" class="mny-step" onclick="mnyDeleteDep('${escapeJsAttr(s.id)}')" aria-label="Remove">✕</button></div>`).join('')
           : `<div class="mny-note">Nothing from outside this week.</div>`}
         ${saved.length ? `<div class="mny-note">One-offs stay one-offs — this does not change what any week pays.</div>` : ''}
       </div>`;
   }
-  const d = mnyDepDraft || (mnyDepDraft = { amount: 20, from: MNY_FROM[0] });
+  const d = mnyDepDraft || (mnyDepDraft = { amount: 20, from: MNY_FROM[0], giver: '' });
   return `<div class="mny-card">
       <div class="mny-label">🎁 Money from outside</div>
       <div class="mny-row"><span>How much</span>${mnyStepper('amount', d.amount, 'dep', 5)}</div>
@@ -388,6 +442,10 @@ function mnyDepositForm(wk, kid) {
       <div class="mny-label">Where it came from</div>
       <div class="mny-chiprow">${MNY_FROM.map(f =>
         `<button type="button" class="mny-chip ${d.from === f ? 'on' : ''}" onclick="mnyDepSet('from','${escapeJsAttr(f)}')">${escapeHtml(f)}</button>`).join('')}</div>
+      <label class="mny-field"><span>Who gave it</span>
+        <input type="text" maxlength="40" placeholder="Grandma, Uncle Ming…"
+          value="${escapeAttr(d.giver || '')}" data-mny-action="dep-giver"></label>
+      <div class="mny-note">A name, not a category — a red pocket is from somebody, and that is worth keeping.</div>
       <div class="mny-note">This goes into the same pile as everything else you earned. You decide where all of it goes on the next step.</div>
       <div class="mny-chiprow">
         <button type="button" class="mny-btn primary" onclick="mnySaveDep()">Save it</button>
@@ -406,8 +464,16 @@ function mnyConfirmBar(wk, kid) {
   const confirmed = mnyIsConfirmed(wk, kid);
   const committed = mnyIsCommitted(wk, kid);
   const needsReason = mnyAnyEdited(kid, wk) && !mnyWeekReason(kid, wk);
+  /* A meet that was planned and never scored blocks settling, the same way the
+     "not counted yet" flag already does. A week must not settle over a
+     competition nobody answered — and answering can be a real result OR an
+     explicit "no criteria met", which saves a record worth nothing and clears
+     this. The record is what counts here, never the amount. */
+  const unscored = (typeof mmUnrecordedCompetitions === 'function')
+    ? mmUnrecordedCompetitions(wk, kid) : [];
   const blocked = missing.length ? `${missing.length} thing${missing.length > 1 ? 's are' : ' is'} not counted yet`
-                : (needsReason ? 'Pick why a number was changed' : '');
+                : (unscored.length ? `${unscored.length} competition${unscored.length > 1 ? 's have' : ' has'} no result yet`
+                : (needsReason ? 'Pick why a number was changed' : ''));
 
   let button;
   if (committed) {
@@ -850,6 +916,25 @@ function mnyToggleComp() {
   renderMeetingMode();
 }
 /* Switch the form to another competition the plan holds. */
+/* Open the full form already seeded from THIS planned meet. mmUsePlannedComp
+   takes a position in the pending list, which is fine for its own picker and
+   wrong from a row that names a specific day — the list is rebuilt on every
+   render, so a position can point at a different meet than the one tapped. */
+function mnyOpenCompForPlanned(dayKey) {
+  const wk = mnyWeekKeyMeeting();
+  const kid = mnyMeetingKid();
+  const hit = mmUnrecordedCompetitions(wk, kid).find(p => String(p.dayKey) === String(dayKey));
+  mnyCompOpen = true;
+  mnyCompDraft = mmSeedCompDraft(wk, kid);
+  if (hit) {
+    mnyCompDraft.dayKey = hit.dayKey;
+    mnyCompDraft.name = hit.name;
+    if (hit.sport) mnyCompDraft.sport = hit.sport;
+    mnyCompDraft.fromPlan = true;
+  }
+  renderMeetingMode();
+}
+
 function mmUsePlannedComp(i) {
   const list = mmUnrecordedCompetitions(mnyWeekKeyMeeting(), mnyMeetingKid());
   const c = list[i];
@@ -1037,6 +1122,10 @@ function mnyDoCommit() {
   //     that was sitting on the table the whole time.
   mnyDepositsForWeek(kid, wk).forEach(dep => {
     if (dep.appliedAt) return;
+    /* A gift a CHILD proposed has not been approved yet, so it must not slip
+       into the wallet through the commit — that would be the approval gate
+       working on one screen and not on the other. It waits. */
+    if (dep.pendingApproval) return;
     moneyAddCash(kid, dep.amount);
     dep.appliedAt = Date.now();
     dep.updatedAt = syncNow();

@@ -70,6 +70,16 @@ window.addEventListener('pagehide', flushPush);
   // carry data-mm-action. Same reason as above — every step rebuilds the body.
   const meeting = document.getElementById('familyMeetingBody');
   if (meeting) meeting.addEventListener('click', mmHandleClick);
+  /* The day's chore grade strip. Delegated because the strip is rebuilt on
+     every render, and data attributes rather than an inline handler because a
+     chore id reaches this from a world-writable document — see the escaping
+     rules in CLAUDE.md. */
+  const choreStrip = document.getElementById('parentDayChores');
+  if (choreStrip) choreStrip.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-pc-chore]');
+    if (!el) return;
+    cycleDayChoreGrade(el.getAttribute('data-pc-chore'), el.getAttribute('data-pc-block'));
+  });
   /* The reflection's scribed notes. Typed into a device-local draft rather than
      written per keystroke — every write is a full-document upload. */
   if (meeting) meeting.addEventListener('input', (e) => reflHandleInput(e, mmWeekKey()));

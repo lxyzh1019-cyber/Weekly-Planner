@@ -80,7 +80,17 @@ const MNY_FUNDS = [
 /* Where money from outside came FROM. Not where it goes — a gift carries no
    destination. It joins the pool like every other dollar and gets decided on
    page 3 with the rest. */
-const MNY_FROM = ['Birthday money', 'A gift', 'Grandma & Grandpa', 'Sold something', 'Found a job'];
+/* Where it came from — a CATEGORY, never a person. The giver's name is its own
+   field: "who gave her the red pocket" is a thing worth keeping and this list
+   could never hold it.
+
+   The two scholarships are kept APART from the competition channel on purpose.
+   mrScoreCompetition pays for a RESULT under the rules; a scholarship is a gift
+   somebody chose to give, and collapsing them would make a grandparent's cheque
+   read as prize money the rules produced. */
+const MNY_FROM = ['Birthday money', 'A gift', 'Grandma & Grandpa',
+                  'Sports scholarship', 'Academic scholarship',
+                  'Sold something', 'Found a job'];
 const MNY_DEPOSIT_CHIPS = [20, 50, 100, 200];
 
 /* Why a number was changed at the meeting. Chips only — a free-text box turns
@@ -614,30 +624,89 @@ function mnyEnsureDeposits(kid) {
 function mnyDepositsForWeek(kid, weekKey) {
   return mnyEnsureDeposits(kid).filter(d => d.weekKey === weekKey);
 }
+/* ── Money from outside, recorded when it actually arrives ─────────
+   A red pocket arrives at a birthday or at New Year, not on a Sunday, so this
+   no longer waits for the week's commit: it credits the wallet at once and
+   stamps appliedAt there and then. The commit loop already skips a stamped
+   deposit, so it cannot be credited twice and no new idempotence machinery is
+   needed.
+
+   ALWAYS DATED TODAY, into the CURRENT week. Back-dating into a committed week
+   would reopen a week whose split has already run, and this function calls
+   mnyReopenWeek on every add.
+
+   THE PARENT GATE IS NEW AND IS LOAD-BEARING. This was the one money mutator in
+   the app with no isParent() check, which was safe only while it lived behind
+   the meeting. On a kid-visible page that credits immediately, its absence
+   would let a child hand herself any sum. A child may now PROPOSE one — the
+   same pendingApproval + addedBy idiom a kid-created activity and a custom task
+   already use — and it credits nothing until a grown-up approves it. */
 function mnyAddDeposit(kid, weekKey, fields) {
+  const proposed = !isParent();
   const d = Object.assign({
-    id: mrNewId('dep-'), weekKey, amount: 0, from: MNY_FROM[0],
+    id: mrNewId('dep-'), weekKey, amount: 0, from: MNY_FROM[0], giver: '',
     dayKey: todayKey(), appliedAt: null, createdAt: syncNow(), updatedAt: syncNow(),
   }, fields || {});
   d.amount = money2(d.amount);
   if (!(d.amount > 0)) return null;
+  d.giver = String(d.giver || '').trim().slice(0, 40);
+  if (proposed) {
+    d.addedBy = (typeof activeProfile === 'function') ? activeProfile() : kid;
+    d.pendingApproval = true;
+  } else {
+    // A grown-up's own entry needs no approval and lands at once.
+    moneyAddCash(kid, d.amount);
+    d.appliedAt = Date.now();
+  }
   mnyEnsureDeposits(kid).push(d);
   mnyReopenWeek(kid, weekKey);
   saveAll();
   return d;
 }
+
+/* A parent's answer to a child's proposal. Approval is the single moment the
+   money moves, stamped so a re-merge cannot credit it twice. */
+function mnyApproveDeposit(kid, depositId) {
+  if (!isParent()) { showToast('A grown-up approves this 🔒'); return false; }
+  const d = mnyEnsureDeposits(kid).find(x => x.id === depositId);
+  if (!d || !d.pendingApproval) return false;
+  delete d.pendingApproval;
+  if (!d.appliedAt) { moneyAddCash(kid, d.amount); d.appliedAt = Date.now(); }
+  markItemUpdated(d);
+  mnyReopenWeek(kid, d.weekKey);
+  saveAll();
+  return true;
+}
+
 function mnyRemoveDeposit(kid, depositId) {
+  if (!isParent()) { showToast('A grown-up records this 🔒'); return false; }
   const list = mnyEnsureDeposits(kid);
   const i = list.findIndex(d => d.id === depositId);
   if (i < 0) return false;
   const [gone] = list.splice(i, 1);
+  /* If it already reached the wallet, taking the record away has to take the
+     money with it. A removal that left the cash behind would be a gift that
+     exists only as a number nobody can account for. */
+  if (gone.appliedAt) moneyTakeBackCash(kid, gone.amount);
   ensureTombstones()['dep:' + gone.id] = Date.now();
   if (gone.weekKey) mnyReopenWeek(kid, gone.weekKey);
   saveAll();
   return true;
 }
+
+/* Waiting on a grown-up. Read by the gifts section and by the parent's pending
+   list, the same shape pendingApprovalActs and pendingApprovalTasks have. */
+function mnyPendingDeposits(kid) {
+  return mnyEnsureDeposits(kid).filter(d => d && d.pendingApproval);
+}
+/* What actually came in. A gift a child has PROPOSED is not money yet — nobody
+   has agreed it — so it is left out of the pool and out of the caps the pool
+   sizes. Counting it would let an unapproved number raise the spend and stock
+   ceilings before a grown-up had seen it. */
 function mnyDepositTotal(kid, weekKey) {
-  return money2(mnyDepositsForWeek(kid, weekKey).reduce((s, d) => s + money2(d.amount), 0));
+  return money2(mnyDepositsForWeek(kid, weekKey)
+    .filter(d => !d.pendingApproval)
+    .reduce((s, d) => s + money2(d.amount), 0));
 }
 
 /* ════════════════════════════════════════════════════════════════

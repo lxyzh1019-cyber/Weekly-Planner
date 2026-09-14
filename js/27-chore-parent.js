@@ -108,13 +108,16 @@ function cpDayCards() {
     const chores = mrChoreWeek(ctWeekKey, k);
     const day = chores.days[cpDay] || { paid: 0 };
     const waiting = mrClaimQueue(ctWeekKey, k).filter(q => q.dayIdx === cpDay).length;
-    const routines = CT_SESSIONS.filter(s => ctGetMandatory(ctWeekKey, cpDay, s, k)).length;
+    /* Out of what the day ASKED for, not out of three. A Saturday plans two
+       routines, so "1/3 routines closed" read as a failing day forever. */
+    const asked = routineSessionsForDay(k, ctWeekKey, cpDay);
+    const routines = asked.filter(s => ctGetMandatory(ctWeekKey, cpDay, s, k)).length;
     const sick = mrIsSick(k, ctWeekKey, cpDay);
     return `<button type="button" class="cp-daycard ${k === cpKid() ? 'on' : ''}" data-cp-action="kid" data-kid="${k}">
       <span class="cp-daycard-top">${CT_PROFILE_ICON[k]} <b>${cpName(k)}</b>
         <span class="ck-spacer"></span><span class="ck-hist-total">${ckMoney(day.paid)}</span></span>
       <span class="ck-pill ${waiting ? '' : 'cp-pill-quiet'}">${waiting ? `${waiting} waiting` : 'all answered'}</span>
-      <span class="ck-sub">${routines}/3 routines closed${sick ? ' · 🤒 sick day' : ''}</span>
+      <span class="ck-sub">${routines}/${asked.length} routines closed${sick ? ' · 🤒 sick day' : ''}</span>
     </button>`;
   }).join('');
   return `<div class="cp-sect"><div class="cp-cap">Both girls, this day</div>
