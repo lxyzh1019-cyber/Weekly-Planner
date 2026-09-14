@@ -725,6 +725,9 @@ function mmHandleClick(e) {
   if (a.startsWith('refl-') && reflHandleAction(a, el, mmWeekKey())) return;
   if (a === 'thisweek')       { mmGoToWeek(ctThisWeekKey()); return; }
   if (a === 'openweek')       { mmOpenWeekForBlocks(kid); return; }
+  if (a === 'item')           { mmToggleItem(kid, d, el.getAttribute('data-kind'), el.getAttribute('data-key')); return; }
+  if (a === 'fine-add')       { mmAddFineOnDay(kid, d, el.getAttribute('data-fine')); return; }
+  if (a === 'fine-undo')      { mmUndoFine(kid, el.getAttribute('data-fine-id')); return; }
   if (a === 'allroutines')    { mmToggleAllRoutines(kid, d); return; }
   if (a === 'nd-leave')       { mmReviewLeavingBlocks(kid, d); return; }
   if (a === 'nd-open')        { mmOpenDayForBlocks(kid, d); return; }
@@ -763,7 +766,13 @@ function mmHandleClick(e) {
    Step 3. */
 function mmReviewRows(kid, dayIdx) {
   const wk = mmWeekKey();
-  const rows = CT_SESSIONS.map(s => ({
+  /* Only what the day actually asked for. All three used to be offered on every
+     day of every week, so a family that never planned an after-school routine
+     was permanently marked down for one: a tick for something nobody had asked
+     the child to do, counted against her in the day percentage. Asked, never
+     re-derived — routineSessionsForDay (js/36-status.js) is the one owner, and
+     mrStreakDayDone reads it too. */
+  const rows = routineSessionsForDay(kid, wk, dayIdx).map(s => ({
     kind: 'routine', key: s, label: s, icon: CT_SESSION_ICONS[s] || '📋',
     on: !!ctGetMandatory(wk, dayIdx, s, kid),
     claim: 0, pays: false,
@@ -1066,9 +1075,19 @@ function mmRenderDayDetail(wk, d) {
        is precisely the day that needs them. */
     const footer = (kind) => {
       if (kind === 'routine') {
-        const allOn = CT_SESSIONS.every(s => ctGetMandatory(wk, d, s, kid));
+        /* The label and the button must move TOGETHER with mmToggleAllRoutines
+           below. A footer counted over the day's own sessions beside a toggle
+           writing all three would leave the label permanently out of step with
+           what the button did — and the word "three" had to go with them, since
+           a Saturday asks two. */
+        const asked = routineSessionsForDay(kid, wk, d);
+        const n = asked.length;
+        const allOn = n > 0 && asked.every(s => ctGetMandatory(wk, d, s, kid));
+        const label = allOn
+          ? (n === 1 ? 'Clear it' : `Clear all ${n}`)
+          : (n === 1 ? 'Mark it kept' : `All ${n} kept`);
         return `<button type="button" class="mm-routine-all" data-mm-action="allroutines"
-            data-kid="${escapeAttr(kid)}" data-day="${d}">${allOn ? 'Clear all three' : 'All three kept'}</button>`;
+            data-kid="${escapeAttr(kid)}" data-day="${d}">${escapeHtml(label)}</button>`;
       }
       const open = mmAddChoreFor === kid + '|' + d;
       const opts = open ? mmAddChoreOptions(kid, d) : [];
@@ -1083,6 +1102,41 @@ function mmRenderDayDetail(wk, d) {
           data-kid="${escapeAttr(kid)}" data-day="${d}" aria-expanded="${open}"
         >${open ? '✕ Never mind' : '＋ Add a chore that happened'}</button>${list}`;
     };
+    /* ── Fines, on the day they belong to ──────────────────────────
+       NOT a second fines engine. mrAddFine owns the write and mrFinesWeek owns
+       the arithmetic — the repeat-only rule and the floor at zero — exactly as
+       they do for cpFines on the parent chore tab, which stays as the
+       day-to-day surface for a fine nobody wants to hold until Sunday.
+
+       Step 1 rather than step 3, because a fine belongs to a DAY:
+       mrAddFine takes a dayKey, this is the screen that already walks the week
+       day by day with that key in hand, and step 3 is a totals screen where
+       entering a per-day fact would mean picking the day from a control this
+       one gives you by position. Step 3 still SHOWS the week's total. */
+    const fineSection = (kid) => {
+      const r = mrRulesForWeek(wk);
+      // box_repeat is not given by hand: it fires off a repeat in the Sunday box.
+      const items = ((r.fines || {}).items || []).filter(f => f.id !== 'box_repeat');
+      if (!items.length) return '';
+      const key = mmDayKey(d);
+      const givenToday = mrFines(kid).filter(f => f.dayKey === key);
+      const names = {}; ((r.fines || {}).items || []).forEach(i => { names[i.id] = i.label; });
+      const chips = items.map(f => `<button type="button" class="mm-fine"
+          data-mm-action="fine-add" data-kid="${escapeAttr(kid)}" data-day="${d}"
+          data-fine="${escapeAttr(f.id)}"
+        >${escapeHtml(f.label)} <b>−${ckMoney(f.amount)}</b></button>`).join('');
+      const given = givenToday.map(f => `<div class="mm-fine-given">
+          <span>${escapeHtml(names[f.itemId] || f.itemId)}</span>
+          <span class="ck-red">−${ckMoney(1)}</span>
+          <button type="button" class="mm-fine-x" data-mm-action="fine-undo"
+            data-kid="${escapeAttr(kid)}" data-fine-id="${escapeAttr(f.id)}"
+            aria-label="Take this fine back">×</button>
+        </div>`).join('');
+      return `<div class="mm-detail-sect">
+        <div class="mm-detail-cap">Fines <small>${givenToday.length || ''}</small></div>
+        <div class="mm-detail-note">Flat, and a day never goes below $0. Something left out goes in the box first.</div>
+        ${chips}${given}</div>`;
+    };
     const section = (title, note, kind) => {
       const mine = rows.map((row, i) => ({ row, i })).filter(x => x.row.kind === kind);
       if (!mine.length) {
@@ -1091,7 +1145,7 @@ function mmRenderDayDetail(wk, d) {
             ? 'No chores on the plan for this day.'
             : 'No routines tracked for this day.'}</div>${footer(kind)}</div>`;
       }
-      const items = mine.map(({ row, i }) => {
+      const items = mine.map(({ row }) => {
         // What she said, before a grown-up agreed — so the parent is confirming
         // her answer rather than guessing at it.
         const said = row.claim > 0
@@ -1102,7 +1156,12 @@ function mmRenderDayDetail(wk, d) {
              : said ? `<span class="mm-item-said">she said: ${escapeHtml(said.toLowerCase())}</span>`
              : `<span class="mm-item-said">not answered</span>`)
           : '';
-        return `<button type="button" class="mm-item ${row.on ? 'on' : ''}" onclick="mmToggleItem('${escapeJsAttr(kid)}',${d},${i})"
+        /* Data attributes plus the delegated listener, which CLAUDE.md already
+           prefers over interpolating into a handler — and which drops three
+           escapeJsAttr sites on the way. */
+        return `<button type="button" class="mm-item ${row.on ? 'on' : ''}"
+            data-mm-action="item" data-kid="${escapeAttr(kid)}" data-day="${d}"
+            data-kind="${escapeAttr(row.kind)}" data-key="${escapeAttr(row.key)}"
             role="checkbox" aria-checked="${row.on}" aria-label="${escapeAttr(row.label)} ${DAY_SHORT[d]}, ${name}"><span class="mm-item-box">${row.on ? '✓' : ''}</span>${row.icon ? row.icon + ' ' : ''}${escapeHtml(row.label)}${tag}</button>`;
       }).join('');
       const done = mine.filter(x => x.row.on).length;
@@ -1119,6 +1178,7 @@ function mmRenderDayDetail(wk, d) {
       <div class="mm-detail-kid">${CT_PROFILE_ICON[kid]} ${name} <small>${done}/${rows.length} done</small></div>
       ${section('Routines', 'You mark these. They pay no money — they build the clean-day streak.', 'routine')}
       ${section('Chores', 'Tapping one agrees her answer and pays it.', 'chore')}
+      ${fineSection(kid)}
     </div>`;
   };
   const confirmed = mmIsDayConfirmed(d);
@@ -1135,9 +1195,20 @@ function mmRenderDayDetail(wk, d) {
    plain "on time" when she never answered. Tapping a graded chore ungrades it.
    Either way it is the same store the portal and the money engine read, so
    Step 3 recomputes from it the moment this returns. */
-function mmToggleItem(kid, d, idx) {
+/* ── Keyed by WHAT it is, never by where it sat ────────────────────
+   This took `idx` and indexed mmReviewRows(kid, d)[idx], with the rendered
+   button carrying that position. That was safe only while every day produced
+   the same rows. The moment the routine set varies per day — which is the whole
+   point of routineSessionsForDay — a stale index from a previous render toggles
+   the WRONG session, or falls past the routines into the chore branch and
+   writes a GRADE, which is money.
+
+   So the row is found by kind and key. A miss returns silently: the render is
+   stale, and doing nothing is the only safe answer when you cannot tell what
+   the tap meant. */
+function mmToggleItem(kid, d, kind, key) {
   const wk = mmWeekKey();
-  const row = mmReviewRows(kid, d)[idx];
+  const row = mmReviewRows(kid, d).find(r => r.kind === kind && r.key === key);
   if (!row) return;
   if (row.kind === 'routine') {
     ctSetMandatory(wk, d, row.key, kid, !row.on);
@@ -1192,10 +1263,34 @@ function mmAddChoreHappened(kid, d, choreId) {
    at a time is 42 taps per kid, which is how a catch-up becomes a week nobody
    bothers to settle. Still the parent's assertion, and still the same store a
    live tick writes — this only saves the taps. */
+/* Both go through the owners: mrAddFine and mrDeleteFine. This screen is a
+   second ENTRY POINT, never a second decision — the same shape as the gift's
+   two doors, and not the "six copies" defect, which was six places each
+   deciding the answer for themselves. */
+function mmAddFineOnDay(kid, d, itemId) {
+  if (!isParent()) { showToast('A grown-up records a fine 🔒'); return; }
+  if (!itemId) return;
+  mrAddFine(kid, itemId, mmDayKey(d));
+  mnyReopenWeek(kid, mmWeekKey());
+  saveAll();
+  renderMeetingMode();
+}
+function mmUndoFine(kid, fineId) {
+  if (!isParent()) { showToast('A grown-up records a fine 🔒'); return; }
+  if (!fineId) return;
+  mrRemoveFine(kid, fineId);
+  mnyReopenWeek(kid, mmWeekKey());
+  saveAll();
+  renderMeetingMode();
+}
+
 function mmToggleAllRoutines(kid, d) {
   const wk = mmWeekKey();
-  const all = CT_SESSIONS.every(s => ctGetMandatory(wk, d, s, kid));
-  CT_SESSIONS.forEach(s => ctSetMandatory(wk, d, s, kid, !all));
+  // The same set the footer label counted — see mmRenderDayDetail above.
+  const asked = routineSessionsForDay(kid, wk, d);
+  if (!asked.length) return;
+  const all = asked.every(s => ctGetMandatory(wk, d, s, kid));
+  asked.forEach(s => ctSetMandatory(wk, d, s, kid, !all));
   ctMaybeFireGoalBonus(wk, kid);
   mnyReopenWeek(kid, wk);
   saveAll();

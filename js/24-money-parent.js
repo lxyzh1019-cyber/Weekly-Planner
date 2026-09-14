@@ -435,9 +435,140 @@ function mnyChangeHistory() {
    The frozen ledger, and a way to type in the weeks that happened before the
    app did. Hand-entered rows are marked as such: a week somebody typed from
    memory is not the same evidence as a week the app watched happen. */
+/* ── The default for a week nobody sat down for ─────────────────────
+   mmUnsettledWeeks looks back eight weeks and stops, so weeks older than that
+   are invisible AND unsettleable: the catch-up list cannot show them and there
+   is no other door. They sit unsettled forever, and the money for them is
+   simply never credited.
+
+   A flat default per child clears them. Deliberately NOT applied to weeks the
+   catch-up list can still reach — those still hold real chore and routine data
+   and should be settled on their own numbers, which is the whole point of the
+   catch-up list. */
+const MNY_DEFAULT_WEEK = 3;
+const MNY_CATCHUP_REACH = 8;
+
+/* Read-only, so the card can show the total and the weeks BEFORE anything
+   moves. Sixteen weeks is a real amount of money and it must never arrive as a
+   surprise — the same shape as Copy a plan, which shows its work first. */
+function mnyDefaultSweepPlan() {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  const floor = (typeof mmCatchUpFloor === 'function') ? String(mmCatchUpFloor()) : null;
+  const weeks = [];
+  if (!floor) return { weeks, total: 0 };
+  /* Start one week BEYOND the catch-up reach and walk back to the floor. */
+  const mon = formatDayKey(ctThisWeekKey());
+  mon.setDate(mon.getDate() - (MNY_CATCHUP_REACH + 1) * 7);
+  for (let i = 0; i < 260; i++) {
+    const wk = ctDateToKey(mon);
+    if (String(wk) < floor) break;
+    if (!((c.meetingsHeld || {})[wk])) {
+      const kids = ['jenn', 'jess'].filter(k =>
+        ((c.finalizedWeeks || {})[wk] || {})[k] == null);
+      if (kids.length) weeks.push({ wk, kids, amount: MNY_DEFAULT_WEEK * kids.length });
+    }
+    mon.setDate(mon.getDate() - 7);
+  }
+  return { weeks, total: money2(weeks.reduce((s, w) => s + w.amount, 0)) };
+}
+
+/* The writer. Idempotent through the SAME guard commitKidWeek already uses —
+   finalizedWeeks[wk][kid] == null is the has-been-credited test — so this can
+   run twice, on two devices, in any merge order, and credit once.
+
+   A defaulted week is LABELLED, not disguised: the ledger row carries its own
+   mark so the money story can say "no meeting was held, the default applied"
+   rather than presenting $3 as a week's earnings. It also carries handEntered,
+   because mnyEditLedger refuses any row without it and a defaulted row must
+   stay correctable by the same door. */
+async function mnyRunDefaultSweep() {
+  if (!isParent()) { showToast('A grown-up settles the weeks 🔒'); return; }
+  const plan = mnyDefaultSweepPlan();
+  if (!plan.weeks.length) { showToast('No un-met weeks older than the catch-up window'); return; }
+  const ok = await showConfirm(
+    `Credit ${mnyMoney(plan.total)} across ${plan.weeks.length} week`
+    + `${plan.weeks.length === 1 ? '' : 's'} nobody sat down for?\n\n`
+    + `${mnyMoney(MNY_DEFAULT_WEEK)} per child per week, from `
+    + `${mnyShortDate(plan.weeks[plan.weeks.length - 1].wk)} to ${mnyShortDate(plan.weeks[0].wk)}.\n\n`
+    + `Weeks the catch-up list can still reach are left alone — settle those on their real numbers.`,
+    { okLabel: 'Credit it', cancelLabel: 'Not now' });
+  if (!ok) return;
+
+  ctEnsureShared();
+  const c = state.shared.chore;
+  if (!c.moneyLedger) c.moneyLedger = {};
+  if (!c.finalizedWeeks) c.finalizedWeeks = {};
+  let credited = 0, moved = 0;
+  plan.weeks.forEach(w => {
+    if (!c.moneyLedger[w.wk]) c.moneyLedger[w.wk] = {};
+    if (!c.finalizedWeeks[w.wk]) c.finalizedWeeks[w.wk] = {};
+    w.kids.forEach(kid => {
+      // The guard, re-read at write time rather than trusted from the plan.
+      if (c.finalizedWeeks[w.wk][kid] != null) return;
+      moneyAddCash(kid, MNY_DEFAULT_WEEK);
+      c.finalizedWeeks[w.wk][kid] = MNY_DEFAULT_WEEK;
+      c.moneyLedger[w.wk][kid] = {
+        at: Date.now(), handEntered: true, defaulted: true, updatedAt: syncNow(),
+        chores: 0, learning: 0, streak: 0, competition: 0, fines: 0, outside: 0,
+        ready: 0, gic: 0, stock: 0, debtExtra: 0,
+        gross: MNY_DEFAULT_WEEK, net: MNY_DEFAULT_WEEK,
+        xp: 0, boxReleased: 0, loan: null,
+      };
+      credited += MNY_DEFAULT_WEEK;
+      moved++;
+    });
+    if (typeof ctStampWeekState === 'function') ctStampWeekState(w.wk);
+  });
+  saveAll();
+  mnyRenderRulesTab();
+  showToast(moved
+    ? `Credited ${mnyMoney(credited)} across ${plan.weeks.length} week${plan.weeks.length === 1 ? '' : 's'}`
+    : 'Those weeks were already credited');
+}
+
+/* ── When the pocket money system starts, and the backlog before it ──
+   Two stores gate how far back the meeting will look, and BOTH self-seed to the
+   current Monday the first time anything reads them — which is why a family
+   that has been running for months has no floor and the catch-up list saturates
+   at its own ceiling. Set them, once, and the look-back has a real beginning.
+
+   A parent-visible date rather than a constant in the source: a family's start
+   date is the family's, and hardcoding one would ship this household's date in
+   a public repo. */
+function mnyStartDateCard() {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  const model = String(mrModelStartWeek());
+  const program = c.programStartDate ? String(c.programStartDate) : model;
+  const floor = (typeof mmCatchUpFloor === 'function') ? mmCatchUpFloor() : model;
+  const pending = mnyDefaultSweepPlan();
+  return `<div class="mny-card">
+      <div class="mny-week-head"><span class="mny-label">📅 When pocket money started</span></div>
+      <label class="mny-field"><span>First week</span>
+        <input type="date" value="${escapeAttr(program)}" data-mnyp-action="startweek"></label>
+      <div class="mny-note">The meeting looks back to the Monday of this week and no further.
+        Currently ${escapeHtml(mnyShortDate(floor))}.</div>
+      ${pending.weeks.length ? `
+        <div class="mny-week-head mny-gap"><span class="mny-label">🕰 Weeks nobody sat down for</span>
+          <b>${mnyMoney(pending.total)}</b></div>
+        <div class="mny-note">${pending.weeks.length} week${pending.weeks.length === 1 ? '' : 's'}
+          older than the eight the catch-up list can reach, so ${pending.weeks.length === 1 ? 'it' : 'they'}
+          cannot be settled on real numbers any more.
+          ${mnyMoney(MNY_DEFAULT_WEEK)} each, per child, is the default.</div>
+        ${pending.weeks.slice(0, 8).map(w => `<div class="mny-row"><span>Week of ${escapeHtml(mnyShortDate(w.wk))}</span>
+          <b>${mnyMoney(w.amount)}</b></div>`).join('')}
+        ${pending.weeks.length > 8 ? `<div class="mny-note">…and ${pending.weeks.length - 8} more.</div>` : ''}
+        <button type="button" class="mny-btn wide" data-mnyp-action="sweepdefault"
+          >Credit ${mnyMoney(pending.total)} across ${pending.weeks.length} week${pending.weeks.length === 1 ? '' : 's'}</button>
+        <div class="mny-note">Shown before anything moves. Weeks the catch-up list can still reach are left alone — those still hold real chore and routine data and should be settled on their own numbers.</div>`
+      : `<div class="mny-note mny-gap">No un-met weeks older than the catch-up window.</div>`}
+    </div>`;
+}
+
 function mnyHistoryEditor(kid) {
   const rows = mnyLedgerRows(kid);
-  return `<div class="mny-card">
+  return `${mnyStartDateCard()}<div class="mny-card">
       <div class="mny-week-head"><span class="mny-label">📖 Weeks on record</span><b>${rows.length}</b></div>
       <button type="button" class="mny-btn wide" data-mnyp-action="addweek">＋ Add a week that happened before this</button>
       <div class="mny-note">Each tap steps one week further back from the earliest week on record.</div>
@@ -615,6 +746,27 @@ function mnyParentClick(ev) {
   }
   if (a === 'leddel')  { mnyDeleteLedgerWeek(kid, id); mnyRenderRulesTab(); return; }
   if (a === 'addweek') { mnyAddMissedWeek(kid); mnyRenderRulesTab(); return; }
+  if (a === 'sweepdefault') { mnyRunDefaultSweep(); return; }
+}
+
+/* Both stores, together. They gate different things — moneyModelStartWeek
+   decides which money model a week uses, programStartDate anchors the rules and
+   the chore rotation — but mmCatchUpFloor is max() of the two, so setting only
+   one leaves the look-back where it was. Normalised to the MONDAY of whatever
+   date was typed, because every week key in this app is a Monday. */
+function mnySetStartWeek(value) {
+  if (!isParent()) { showToast('A grown-up sets this 🔒'); return; }
+  if (!value) return;
+  const d = formatDayKey(value);
+  if (!d || isNaN(d)) return;
+  const wk = (typeof ctWeekKeyForDate === 'function') ? ctWeekKeyForDate(value) : value;
+  ctEnsureShared();
+  const c = state.shared.chore;
+  c.programStartDate = wk;
+  c.moneyModelStartWeek = wk;
+  saveAll();
+  mnyRenderRulesTab();
+  showToast('Pocket money starts the week of ' + mnyShortDate(wk));
 }
 
 /* Typed fields need input/change rather than click. */
@@ -626,6 +778,7 @@ function mnyParentInput(ev) {
   const kid = mnyParentKid();
   if (a === 'search') { mnyRuleSearch = el.value; mnyRenderRulesTab(); return; }
   if (a === 'from')   { mnyPendingFrom = el.value; return; }
+  if (a === 'startweek') { mnySetStartWeek(el.value); return; }
   if (a === 'debtname') { mnyEditDebt(kid, id, 'name', el.value); return; }
   if (a === 'debtitem') { mnyEditDebt(kid, id, 'item', el.value); return; }
   if (a === 'debtdue')  { mnyEditDebt(kid, id, 'downPaymentDue', el.value); return; }

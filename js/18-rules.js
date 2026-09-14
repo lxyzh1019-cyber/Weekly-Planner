@@ -426,6 +426,36 @@ function mrModelStartWeek() {
   if (!c.moneyModelStartWeek) c.moneyModelStartWeek = ctThisWeekKey();
   return c.moneyModelStartWeek;
 }
+/* ── When the per-day routine rule starts PRICING ──────────────────
+   routineSessionsForDay changes which routines a day asks for, and a day that
+   asks for fewer is easier to keep clean, which makes a streak tier easier to
+   reach. That is the right answer going forward and the wrong one backwards:
+   an unsettled week from July re-prices from the live plan, so applying it to
+   the whole backlog would quietly pay more for weeks already lived — on top of
+   the default sweep that is about to credit those same weeks.
+
+   So the rule SHOWS everywhere and PRICES only from here on. Seeded to the
+   current Monday on first read, exactly like mrModelStartWeek above, so no
+   date is hardcoded and a family that starts later gets their own.
+
+   Every other surface asks routineSessionsForDay directly and is unaffected:
+   nothing on screen lies, only the money is held still. */
+function mrRoutineRuleStartWeek() {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  if (!c.routineRuleStartWeek) c.routineRuleStartWeek = ctThisWeekKey();
+  return c.routineRuleStartWeek;
+}
+
+/* THE routine question, money side. mrStreakDayDone and mrStreakWeek both ask
+   it, so the sessions a clean day requires and the days the streak is allowed
+   to count cannot disagree about the same week. */
+function mrRoutineSessionsFor(weekKey, kid, dayIdx) {
+  if (typeof routineSessionsForDay !== 'function') return CT_SESSIONS;
+  if (String(weekKey) < String(mrRoutineRuleStartWeek())) return CT_SESSIONS;
+  return routineSessionsForDay(kid, weekKey, dayIdx);
+}
+
 function mrUsesNewModel(weekKey) {
   return String(weekKey || '') >= mrModelStartWeek();   // 'YYYY-MM-DD' compares chronologically
 }
@@ -1011,7 +1041,13 @@ function mrLearningWeek(weekKey, kid) {
    six days that genuinely happened — "3 days in a row" is a thing you either
    did or didn't. */
 function mrStreakDayDone(weekKey, kid, dayIdx) {
-  return CT_SESSIONS.every(s => ctGetMandatory(weekKey, dayIdx, s, kid));
+  const asked = mrRoutineSessionsFor(weekKey, kid, dayIdx);
+  /* A day that asked for nothing is not a day she kept — it is a day with no
+     question on it, and mrStreakWeek skips it rather than counting it. Guarding
+     here too because `[].every()` is TRUE, which would make an empty day
+     vacuously clean and pay for it. */
+  if (!asked.length) return false;
+  return asked.every(s => ctGetMandatory(weekKey, dayIdx, s, kid));
 }
 function mrStreakWeek(weekKey, kid) {
   const r = mrRulesForWeek(weekKey);
@@ -1019,7 +1055,15 @@ function mrStreakWeek(weekKey, kid) {
   let run = 0, best = 0;
   for (let d = 0; d < 7; d++) {
     if (mrIsSick(kid, weekKey, d)) continue;              // paused, not broken
-    if (mrStreakDayDone(weekKey, kid, d)) { run++; best = Math.max(best, run); }
+    /* Asked ONCE per day and reused. Going through mrStreakDayDone here would
+       resolve the same day's sessions a second time, and this loop already sits
+       under mrWeekBreakdown, which plenty of renders call. */
+    const asked = mrRoutineSessionsFor(weekKey, kid, d);
+    // A day the plan asked no routine of is paused too: nothing was kept and
+    // nothing was missed. Under the day-type default this cannot arise; it is a
+    // guard, not a behaviour — and it stops `[].every()` paying for an empty day.
+    if (!asked.length) continue;
+    if (asked.every(s => ctGetMandatory(weekKey, d, s, kid))) { run++; best = Math.max(best, run); }
     else run = 0;
   }
   let bonus = 0, tier = 0;
@@ -1043,7 +1087,13 @@ function mrScoreCompetition(entry, rules) {
   let total = 0;
   if (entry.sport === 'swim') {
     const s = c.swim || {};
-    total += pts * Number(entry.provincial ? s.provincialPerPoint : s.perPoint || 0);
+    /* The `|| 0` used to sit INSIDE the ternary's else-branch, so it only ever
+       defended s.perPoint. A rules version carrying no provincialPerPoint gave
+       Number(undefined) = NaN, and NaN spreads: the award, the week's gross,
+       the net and the frozen ledger all became NaN from one missing key. The
+       guard belongs outside the ternary, where it defends whichever branch
+       runs. */
+    total += pts * (Number(entry.provincial ? s.provincialPerPoint : s.perPoint) || 0);
     if (entry.qualified) total += Number(s.qualifyBonus) || 0;
   } else if (entry.sport === 'skate') {
     const s = c.skate || {};

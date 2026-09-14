@@ -330,6 +330,12 @@ function ctBonusDaysLegacy(weekKey, kid) {
   }
   return n;
 }
+/* Still CT_SESSIONS, deliberately. This asks whether the legacy per-session
+   store ever HELD anything for a historic week, to decide if that week needs a
+   migration snapshot. "What does today's plan ask for" is the wrong question
+   about a week from two years ago — the blocks that would answer it may not
+   exist — and narrowing it would make a week carrying real ticks read as empty
+   and silently skip its money snapshot. */
 function ctWeekHasData(weekKey, kid) {
   for (let d = 0; d < 7; d++) {
     if (CT_SESSIONS.some(s=>ctGetMandatory(weekKey, d, s, kid))) return true;
@@ -787,6 +793,14 @@ function ctChoreIcon(name) { return CT_CHORE_ICONS[name] || '🧺'; }
 // then extras. Each row carries how to read/write its cell.
 function ctMatrixRows(kid) {
   const rows = [];
+  /* All three rows STAY. This is the parent's input surface for a whole week —
+     the only door to recording a routine that happened on a day nobody planned
+     it, which is a grown-up's assertion from memory and exactly what
+     ctSetMandatoryAuto's provenance rule exists to protect. Dropping a row
+     would remove the write. What was wrong is not the row, it is the
+     EVALUATION: the cells and the total below now measure against the days
+     that actually asked. The kid's week grid is a report and drops the row;
+     this is a form and keeps it. */
   CT_SESSIONS.forEach(s => rows.push({ section:'Routines · tracked, no money', label:s, kind:'mandatory', key:s, icon:CT_SESSION_ICONS[s]||'📋' }));
   const groups = ctGroupsForKid(kid);
   const inGroups = new Set();
@@ -858,6 +872,10 @@ function ctRenderWeekMatrix(kid) {
   }
   cells += `<div class="cm-wkhead">wk</div>`;
 
+  /* Which routines each day actually asked for — one pass, read by the cells,
+     the row totals and the progress bar below. */
+  const cmSessionsByDay = routineSessionsByDay(kid, ctWeekKey);
+
   // Section + data rows.
   let lastSection = null;
   rows.forEach(row => {
@@ -866,7 +884,7 @@ function ctRenderWeekMatrix(kid) {
       lastSection = row.section;
     }
     cells += `<div class="cm-rowlabel" title="${escapeAttr(row.label)}"><span class="cm-rowicon">${row.icon||''}</span>${escapeHtml(row.label)}</div>`;
-    let weekN = 0;
+    let weekN = 0, weekAsked = 0;
     for (let d = 0; d < 7; d++) {
       const on = ctMatrixCellChecked(kid, d, row);
       if (on) weekN++;
@@ -876,23 +894,39 @@ function ctRenderWeekMatrix(kid) {
       const readOnly = !isParent();
       const disabled = readOnly || (auto && !isParent());
       const st = dayStatus[d];
+      /* Still tappable — this is the form, and a parent recording a routine
+         that happened on an unplanned day is the whole reason the row stays.
+         Just quieter, and it says so, so the row total below reads honestly. */
+      const unplanned = row.kind === 'mandatory' && !cmSessionsByDay[d].includes(row.key);
+      if (!unplanned) weekAsked++;
       const glyph = on ? '✓' : (st === 'future' ? '' : '·');
       const dataAttrs = row.kind === 'mandatory'
         ? `data-ct-action="matrix-mandatory" data-session="${escapeAttr(row.key)}"`
         : `data-ct-action="matrix-optional" data-chore="${escapeAttr(row.key)}"`;
-      cells += `<button type="button" class="cm-cell ${on?'on':''} cm-${st}${readOnly?' cm-readonly':(disabled?' cm-disabled':'')}"`
-        + ` role="checkbox" aria-checked="${on}" aria-label="${escapeAttr(row.label)} ${DAY_SHORT[d]}"`
+      cells += `<button type="button" class="cm-cell ${on?'on':''} cm-${st}${unplanned?' cm-unplanned':''}${readOnly?' cm-readonly':(disabled?' cm-disabled':'')}"`
+        + ` role="checkbox" aria-checked="${on}"`
+        + ` title="${unplanned ? escapeAttr('Not planned this day') : ''}"`
+        + ` aria-label="${escapeAttr(row.label)} ${DAY_SHORT[d]}${unplanned ? ', not planned this day' : ''}"`
         + ` ${dataAttrs} data-day="${d}" data-kid="${kid}"${disabled ? ' disabled' : ''}>${glyph}</button>`;
     }
-    cells += `<div class="cm-rowtotal">${weekN}/7</div>`;
+    /* Out of the days that asked, not out of seven. A weekday-only routine read
+       5/7 forever and looked like failure when it was kept every day it was
+       wanted. A chore row asks every day, so its denominator is still seven. */
+    cells += `<div class="cm-rowtotal">${weekN}/${weekAsked || 7}</div>`;
   });
 
-  // Bottom row: per-day mini progress bars (% of that day's items done).
-  const totalRows = rows.length || 1;
+  /* Bottom row: per-day mini progress bars (% of that day's items done).
+     The denominator is THAT DAY's items, not the whole matrix: a Saturday asks
+     two routines, so counting it out of three read as 33% for a day she kept
+     everything she was asked to. */
+  const rowsAskedOn = (d) => rows.filter(row =>
+    row.kind !== 'mandatory' || cmSessionsByDay[d].includes(row.key));
   cells += `<div class="cm-rowlabel cm-progress-label">Progress</div>`;
   for (let d = 0; d < 7; d++) {
     if (dayStatus[d] === 'future') { cells += `<div class="cm-bar cm-bar-future">–</div>`; continue; }
-    const done = rows.reduce((s,row)=> s + (ctMatrixCellChecked(kid, d, row) ? 1 : 0), 0);
+    const mine = rowsAskedOn(d);
+    const totalRows = mine.length || 1;
+    const done = mine.reduce((s,row)=> s + (ctMatrixCellChecked(kid, d, row) ? 1 : 0), 0);
     const pct = Math.round(done / totalRows * 100);
     cells += `<div class="cm-bar"><div class="cm-bar-fill" style="height:${pct}%"></div><span class="cm-bar-pct">${pct}%</span></div>`;
   }
@@ -1196,6 +1230,10 @@ function ctApplyLegacyPayloadToState(parsed) {
     const weekMon = new Date(anchorDate); weekMon.setDate(anchorDate.getDate() + (w-1)*7);
     const wk = ctDateToKey(weekMon);
     for (let d = 0; d < 7; d++) {
+      // Still CT_SESSIONS, deliberately: this replays an external legacy payload
+      // that carries a value for all three sessions on every day. Writing only
+      // the "planned" subset would drop data that was genuinely recorded, and
+      // the blocks that would decide the subset do not exist for those weeks.
       for (const s of CT_SESSIONS) {
         const src = (((dataObj[String(w)]||{})[String(d)]||{})[s]||{});
         ctSetMandatory(wk, d, s, 'jenn', !!src.jenn);

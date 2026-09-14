@@ -130,10 +130,22 @@ function dayBlocksAwaitingAccount(kid, dayKey) {
    could never be clean.
 
    The plan is what says which routines a day wants. If ANY routine block is on
-   the day, those are the ones reviewed; if none is planned, all three stand,
-   because a day with no routine on the calendar is not evidence that the
-   family stopped expecting them. Order follows CT_SESSIONS so the meeting
-   always reads Morning · Afternoon · Evening.
+   the day, those are the ones reviewed. If none is planned, the DEFAULT for
+   that kind of day stands, because a day with no routine on the calendar is not
+   evidence the family stopped expecting them:
+
+     · a school day asks all three
+     · a weekend or a school-free day asks two — morning and evening. There is
+       no after-school routine on a day with no school, and asking for one is
+       exactly the permanent unticked dot this change exists to remove.
+
+   Which kind of day it is comes from isSchoolDay (js/05-helpers.js), NEVER from
+   the day of the week: a Tuesday in July is not a school day and neither is a
+   PD day, so the family's own imported calendar decides it rather than the
+   shipped fallback.
+
+   Order follows CT_SESSIONS so the meeting always reads Morning · Afternoon ·
+   Evening.
 
    One owner, deliberately: mrStreakDayDone asks it too, so the sessions the
    meeting shows and the sessions the streak requires cannot disagree — which
@@ -142,8 +154,16 @@ function dayBlocksAwaitingAccount(kid, dayKey) {
 function routineSessionsForDay(kid, weekKey, dayIdx) {
   const all = (typeof CT_SESSIONS !== 'undefined') ? CT_SESSIONS.slice() : [];
   const map = (typeof CT_ROUTINE_SESSION_MAP !== 'undefined') ? CT_ROUTINE_SESSION_MAP : {};
-  if (!all.length || typeof mrWeekDayKeys !== 'function') return all;
-  const dayKey = mrWeekDayKeys(weekKey)[dayIdx];
+  if (!all.length || typeof formatDayKey !== 'function') return all;
+  /* One Date, not seven. mrWeekDayKeys builds the whole week, and this is a hot
+     path: mrStreakWeek asks it per day, mrWeekBreakdown asks mrStreakWeek, and
+     plenty of renders ask mrWeekBreakdown. Deliberately NOT memoised — a cache
+     keyed on kid and week goes stale on every block write, which is a worse
+     bug than the cost it saves. */
+  const mon = formatDayKey(weekKey);
+  if (!mon || isNaN(mon)) return all;
+  mon.setDate(mon.getDate() + dayIdx);
+  const dayKey = ctDateToKey(mon);
   if (!dayKey) return all;
   const planned = new Set();
   (getDayBlocks(dayKey, kid) || []).forEach(b => {
@@ -152,8 +172,38 @@ function routineSessionsForDay(kid, weekKey, dayIdx) {
     const s = map[act.routineId];
     if (s) planned.add(s);
   });
-  if (!planned.size) return all;
+  if (!planned.size) return routineSessionsByDefault(dayKey);
   return all.filter(s => planned.has(s));
+}
+
+/* The default set for a day nobody planned a routine on. Named rather than
+   inlined because three surfaces show it and the streak prices it, and a
+   second copy of "which day gets how many" is exactly the drift this file
+   exists to end. */
+function routineSessionsByDefault(dayKey) {
+  const all = (typeof CT_SESSIONS !== 'undefined') ? CT_SESSIONS.slice() : [];
+  const map = (typeof CT_ROUTINE_SESSION_MAP !== 'undefined') ? CT_ROUTINE_SESSION_MAP : {};
+  const school = (typeof isSchoolDay === 'function') ? isSchoolDay(dayKey) : true;
+  if (school) return all;
+  const afterSchool = map.afterschool;
+  return all.filter(s => s !== afterSchool);
+}
+
+/* One pass over the week, for the surfaces that draw seven days at once. They
+   would otherwise call routineSessionsForDay once per row per day — 21 reads
+   of getDayBlocks to render one grid. */
+function routineSessionsByDay(kid, weekKey) {
+  const out = [];
+  for (let d = 0; d < 7; d++) out.push(routineSessionsForDay(kid, weekKey, d));
+  return out;
+}
+
+/* How many days of the week actually asked for this session. The denominator
+   the week grids need: a routine planned only on weekdays reads 5/7 forever
+   and looks like failure, when it was kept every day it was asked for. Zero
+   means no day asked, which is the signal a report uses to drop the row. */
+function routineSessionDayCount(kid, weekKey, session) {
+  return routineSessionsByDay(kid, weekKey).filter(list => list.includes(session)).length;
 }
 
 /* Keep the compatibility mirror honest. Called by every checklist write path;

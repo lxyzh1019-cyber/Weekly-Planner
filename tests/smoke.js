@@ -3730,10 +3730,10 @@ function findChromium() {
     // Routines are the parent's to mark; chores come from the planner.
     const bothKinds = rows.filter(r => r.kind === 'routine').length === 3
                    && rows.some(r => r.kind === 'chore' && r.key === 'vacuum');
-    const idx = rows.findIndex(r => r.key === 'vacuum');
+    // Keyed by kind and key now, never by position — see mmToggleItem.
 
     const before = mrWeekBreakdown(wk, kid).chorePaid;
-    mmToggleItem(kid, 2, idx);                       // the tap IS the grading
+    mmToggleItem(kid, 2, 'chore', 'vacuum');         // the tap IS the grading
     const graded = mrGetChoreGrade(kid, wk, 2, 'vacuum') === 3;
     const after = mrWeekBreakdown(wk, kid).chorePaid;
 
@@ -3742,7 +3742,7 @@ function findChromium() {
     const shown = document.getElementById('familyMeetingBody').textContent
       .includes(mnyMoney(after));
 
-    mmToggleItem(kid, 2, idx);                       // and it is reversible
+    mmToggleItem(kid, 2, 'chore', 'vacuum');         // and it is reversible
     const ungraded = mrGetChoreGrade(kid, wk, 2, 'vacuum') === 0;
 
     closeSheet('familyMeetingOverlay');
@@ -5963,11 +5963,22 @@ function findChromium() {
       mmReviewRows(kid, i + 1).some(r => r.kind === 'chore' && r.key === id && r.on));
     const paid = mrWeekBreakdown(past, kid).chorePaid > paidBefore;
 
-    // Routines are reconstructable too — and they must stay out of the chore
-    // channel, feeding the streak instead.
+    /* Routines are reconstructable too — and they must stay out of the chore
+       channel, feeding the streak instead.
+
+       "Every routine the day ASKED for", not "all three": a blank week plans no
+       routine block, so each day falls back to its own default — three on a
+       school day, two on a weekend, because there is no after-school routine on
+       a day with no school. Asserting three here asserted the retired rule, and
+       the bulk control now writes exactly the set its own label counted. */
     const choresAfterChore = mrWeekBreakdown(past, kid).chorePaid;
+    const askedThatDay = routineSessionsForDay(kid, past, 1);
     mmToggleAllRoutines(kid, 1);
-    const allThree = CT_SESSIONS.every(s => ctGetMandatory(past, 1, s, kid));
+    const allThree = askedThatDay.length > 0
+      && askedThatDay.every(s => ctGetMandatory(past, 1, s, kid))
+      // …and it did not reach past what the day asked for.
+      && CT_SESSIONS.filter(s => !askedThatDay.includes(s))
+           .every(s => !ctGetMandatory(past, 1, s, kid));
     const routinesDontPayChores = mrWeekBreakdown(past, kid).chorePaid === choresAfterChore;
 
     closeSheet('familyMeetingOverlay');
@@ -9825,6 +9836,341 @@ function findChromium() {
       setDayBlocks(past, beforePast, 'jenn');
       setDayBlocks(today, beforeToday, 'jenn');
       state.shared.parentDayConfirm = store;
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* ONLY THE ROUTINES A DAY ASKED FOR ARE EVALUATED.
+     All three sessions were evaluated on every day of every week, so a family
+     that never planned an after-school routine was permanently marked down for
+     one: a tick offered for something nobody had asked the child to do, counted
+     against her in the day percentage, and a clean day she could never reach.
+
+     The rule: the plan decides when there IS one, and otherwise the day type
+     does — three on a school day, two on a weekend or school-free day, because
+     there is no after-school routine on a day with no school. Which kind of day
+     it is comes from isSchoolDay, never from the day of the week. */
+  checks.onlyThePlannedRoutinesAreEvaluated = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+    const keys = mrWeekDayKeys(wk);
+    const schoolIdx = keys.findIndex(k => isSchoolDay(k));
+    const offIdx = keys.findIndex(k => !isSchoolDay(k));
+    const saved = {};
+    keys.forEach((k, i) => { saved[i] = (getDayBlocks(k, 'jenn') || []).slice(); });
+    try {
+      if (schoolIdx < 0 || offIdx < 0) {
+        bad.push('this week has no school day and no off day to compare');
+        return bad;
+      }
+      // Nothing planned anywhere: the DEFAULT for each kind of day stands.
+      keys.forEach(k => setDayBlocks(k, [], 'jenn'));
+      const onSchool = routineSessionsForDay('jenn', wk, schoolIdx);
+      const onOff = routineSessionsForDay('jenn', wk, offIdx);
+      if (onSchool.length !== 3) {
+        bad.push(`a school day with nothing planned asked for ${onSchool.length}, expected 3`);
+      }
+      if (onOff.length !== 2) {
+        bad.push(`an off day with nothing planned asked for ${onOff.length}, expected 2`);
+      }
+      const afternoon = CT_ROUTINE_SESSION_MAP.afterschool;
+      if (onOff.includes(afternoon)) {
+        bad.push('an off day still asks for the after-school routine');
+      }
+
+      // Plan ONE routine on the school day: that is now the whole ask.
+      setDayBlocks(keys[schoolIdx], [{ id: 'rs1', actId: 'routine_morning',
+        startMin: 7 * 60, durationMin: 30, checklistState: {} }], 'jenn');
+      const planned = routineSessionsForDay('jenn', wk, schoolIdx);
+      if (planned.length !== 1 || planned[0] !== CT_ROUTINE_SESSION_MAP.morning) {
+        bad.push(`a day planning one routine asked for ${JSON.stringify(planned)}`);
+      }
+
+      /* The money reads the SAME owner, so a clean day and the rows a parent
+         sees cannot disagree. Ticking just the planned one makes the day
+         clean. */
+      CT_SESSIONS.forEach(sn => ctSetMandatory(wk, schoolIdx, sn, 'jenn', false));
+      ctSetMandatory(wk, schoolIdx, CT_ROUTINE_SESSION_MAP.morning, 'jenn', true);
+      if (!mrStreakDayDone(wk, 'jenn', schoolIdx)) {
+        bad.push('a day whose only planned routine was kept did not count as clean');
+      }
+
+      /* The meeting shows exactly those rows, and its bulk control writes
+         exactly those sessions — the label and the button must move together or
+         the label lies about what the button did. */
+      const rows = mmReviewRows('jenn', schoolIdx).filter(r => r.kind === 'routine');
+      if (rows.length !== 1) bad.push(`the meeting offered ${rows.length} routine rows, expected 1`);
+      mmSelectDay(schoolIdx);
+      openFamilyMeeting(); mmGoStep(1); renderMeetingMode();
+      const footer = document.querySelector('#familyMeetingOverlay .mm-routine-all');
+      if (footer && /three/i.test(footer.textContent)) {
+        bad.push(`the footer still says three: "${footer.textContent.trim()}"`);
+      }
+      mmToggleAllRoutines('jenn', schoolIdx);
+      if (ctGetMandatory(wk, schoolIdx, afternoon, 'jenn')) {
+        bad.push('the bulk control ticked a routine the day never asked for');
+      }
+
+      /* A denominator worked out on two screens is the drift this change
+         exists to end: the parent day card said "/3" whatever the day asked. */
+      cpDay = offIdx;
+      const cp = cpDayCards();
+      if (/\/3 routines closed/.test(cp) && onOff.length !== 3) {
+        bad.push('the parent day card still counts routines out of three');
+      }
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      try { closeSheet('familyMeetingOverlay'); } catch (e) {}
+      keys.forEach((k, i) => setDayBlocks(k, saved[i], 'jenn'));
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* …AND A WEEK LIVED UNDER THE OLD RULE IS NOT RE-PRICED.
+     Requiring fewer routines makes a clean day easier, which makes a streak
+     tier easier, which is more money. That is the right answer going forward
+     and the wrong one backwards: an unsettled week from July re-prices from the
+     live plan, so applying it to the whole backlog would quietly pay more for
+     weeks already lived. The rule SHOWS everywhere and PRICES only from
+     mrRoutineRuleStartWeek on. */
+  checks.theRoutineRuleDoesNotRepriceOldWeeks = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead();
+    const startWk = mrRoutineRuleStartWeek();
+    const oldMon = formatDayKey(startWk);
+    oldMon.setDate(oldMon.getDate() - 28);
+    const oldWk = ctDateToKey(oldMon);
+    const keys = mrWeekDayKeys(oldWk);
+    const offIdx = keys.findIndex(k => !isSchoolDay(k));
+    const saved = {};
+    keys.forEach((k, i) => { saved[i] = (getDayBlocks(k, 'jenn') || []).slice(); });
+    try {
+      if (offIdx < 0) { bad.push('no off day in the sample old week'); return bad; }
+      keys.forEach(k => setDayBlocks(k, [], 'jenn'));
+      // Under the new rule an off day asks two; under the old one it asked three.
+      CT_SESSIONS.forEach(sn => ctSetMandatory(oldWk, offIdx, sn, 'jenn', false));
+      const two = routineSessionsForDay('jenn', oldWk, offIdx);
+      two.forEach(sn => ctSetMandatory(oldWk, offIdx, sn, 'jenn', true));
+
+      // The DISPLAY follows the new rule on every week…
+      if (two.length !== 2) bad.push('an old off day does not SHOW the new two-routine ask');
+      if (mmReviewRows('jenn', offIdx).filter(r => r.kind === 'routine').length === 3
+          && ctWeekKey === oldWk) {
+        bad.push('the meeting shows three rows on an old off day');
+      }
+      // …but the MONEY still asks what it asked then, so nothing re-prices.
+      if (mrStreakDayDone(oldWk, 'jenn', offIdx)) {
+        bad.push('an old week was re-priced under the new rule');
+      }
+      if (String(oldWk) >= String(startWk)) {
+        bad.push('the sample week was not actually before the rule start');
+      }
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      keys.forEach((k, i) => setDayBlocks(k, saved[i], 'jenn'));
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* A PLANNED COMPETITION MUST BE SCORED BEFORE THE WEEK SETTLES.
+     A meet could be planned and then never recorded, and nothing asked. Worse,
+     the answer was unsayable: $0 in the totals reads identically for "no meet",
+     "a meet worth nothing", "a voided channel" and "an override to zero". */
+  checks.aPlannedCompetitionMustBeScored = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctWeekKey;
+    const keys = mrWeekDayKeys(wk);
+    const dayKey = keys[1];
+    const before = (getDayBlocks(dayKey, 'jenn') || []).slice();
+    const compsBefore = mrCompetitions('jenn').slice();
+    try {
+      setDayBlocks(dayKey, [{ id: 'cmp1', actId: 'competition', compName: 'City Meet',
+                              tag: 'swimming', startMin: 9 * 60, durationMin: 180,
+                              checklistState: {} }], 'jenn');
+      const planned = mmPlannedCompetitions(wk, 'jenn');
+      if (!planned.length) bad.push('a competition block was not read off the plan');
+      if (!mmUnrecordedCompetitions(wk, 'jenn').length) {
+        bad.push('a planned meet with no result did not read as unrecorded');
+      }
+      // It blocks settling…
+      const barBlocked = mnyConfirmBar(wk, 'jenn');
+      if (!/no result yet/.test(barBlocked)) {
+        bad.push('an unscored competition does not block the confirm bar');
+      }
+      // …and an explicit $0 is a real answer that clears it.
+      mnyRecordCompZero('jenn', dayKey, 'City Meet', 'swim');
+      const rec = mrCompetitions('jenn').find(c => c.name === 'City Meet');
+      if (!rec) bad.push('a no-criteria-met result was not persisted');
+      if (rec && rec.awarded !== 0) bad.push(`a zero result was worth ${rec.awarded}`);
+      if (mmUnrecordedCompetitions(wk, 'jenn').length) {
+        bad.push('a saved $0 result did not clear the unrecorded list');
+      }
+      const barClear = mnyConfirmBar(wk, 'jenn');
+      if (/no result yet/.test(barClear)) bad.push('a saved $0 result still blocks settling');
+
+      /* Two meets on one day are two questions. Matching on dayKey alone meant
+         recording either one answered for both. */
+      const second = mmCompKey(dayKey, 'Other Meet') !== mmCompKey(dayKey, 'City Meet');
+      if (!second) bad.push('two meets on one day share a key');
+
+      // The NaN: a rules version with no provincialPerPoint must score 0, not NaN.
+      const score = mrScoreCompetition(
+        { sport: 'swim', points: 6, provincial: true },
+        { competition: { swim: { perPoint: 1, qualifyBonus: 20 } } });
+      if (!Number.isFinite(score)) bad.push('a missing provincial rate still yields NaN');
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      setDayBlocks(dayKey, before, 'jenn');
+      getProfData('jenn').competitions = compsBefore;
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* A GIFT A CHILD RECORDS IS A PROPOSAL, NOT A CREDIT.
+     mnyAddDeposit was the one money mutator in the app with no isParent()
+     check, which was safe only while it lived behind the meeting. Now that a
+     gift credits the wallet the moment it is recorded, and can be recorded from
+     a kid-visible page, its absence would let a child hand herself any sum. */
+  checks.aGiftFromAChildWaitsForAGrownUp = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const wk = ctThisWeekKey();
+    const depsBefore = (getProfData('jenn').deposits || []).slice();
+    const cashBefore = ensureWallet('jenn').cash;
+    try {
+      /* ── As the CHILD: proposed, and nothing moves ── */
+      profile = 'jenn';
+      const proposed = mnyAddDeposit('jenn', wk, { amount: 20, from: 'Birthday money', giver: 'Grandma' });
+      if (!proposed) { bad.push('a child could not even propose a gift'); return bad; }
+      if (!proposed.pendingApproval) bad.push('a child\'s gift was not marked as waiting');
+      if (proposed.appliedAt) bad.push('a child\'s gift reached the wallet at once');
+      if (ensureWallet('jenn').cash !== cashBefore) {
+        bad.push('a child credited herself');
+      }
+      if (proposed.giver !== 'Grandma') bad.push('the giver was not kept');
+      // It is not money yet, so it must not raise the pool or its caps.
+      if (mnyDepositTotal('jenn', wk) !== 0) {
+        bad.push('an unapproved gift counted as money that came in');
+      }
+
+      /* ── A parent approves it: the money moves ONCE ── */
+      profile = 'parent'; parentViewing = 'jenn';
+      mnyApproveDeposit('jenn', proposed.id);
+      const after = (getProfData('jenn').deposits || []).find(d => d.id === proposed.id);
+      if (after && after.pendingApproval) bad.push('approval did not clear the wait');
+      if (!after || !after.appliedAt) bad.push('approval did not stamp it as applied');
+      if (ensureWallet('jenn').cash !== cashBefore + 20) {
+        bad.push(`approval credited ${ensureWallet('jenn').cash - cashBefore}, expected 20`);
+      }
+      // …and cannot move it again.
+      mnyApproveDeposit('jenn', proposed.id);
+      if (ensureWallet('jenn').cash !== cashBefore + 20) {
+        bad.push('approving twice credited twice');
+      }
+
+      /* ── Taking the record away takes the money with it ── */
+      mnyRemoveDeposit('jenn', proposed.id);
+      if (ensureWallet('jenn').cash !== cashBefore) {
+        bad.push('removing an applied gift left the cash behind');
+      }
+
+      /* ── A PARENT's own entry needs no approval ── */
+      const direct = mnyAddDeposit('jenn', wk, { amount: 5, from: 'A gift' });
+      if (direct && direct.pendingApproval) bad.push('a parent\'s own gift was held for approval');
+      if (ensureWallet('jenn').cash !== cashBefore + 5) {
+        bad.push('a parent\'s own gift did not credit at once');
+      }
+      if (direct) mnyRemoveDeposit('jenn', direct.id);
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      getProfData('jenn').deposits = depsBefore;
+      ensureWallet('jenn').cash = cashBefore;
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* THE DEFAULT SWEEP CREDITS ONCE, AND LEAVES THE REACHABLE WEEKS ALONE.
+     mmUnsettledWeeks looks back eight weeks and stops, so older un-met weeks
+     are invisible AND unsettleable — they sit there forever and their money is
+     never credited. A flat default clears them, and the guard that makes it
+     safe is the one commitKidWeek already uses. */
+  checks.theDefaultSweepCreditsOldWeeksOnce = await page.evaluate(async () => {
+    const bad = [];
+    const wasProfile = profile;
+    const wasConfirm = window.showConfirm;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead();
+    const c = state.shared.chore;
+    const savedFinal = JSON.parse(JSON.stringify(c.finalizedWeeks || {}));
+    const savedLedger = JSON.parse(JSON.stringify(c.moneyLedger || {}));
+    const savedHeld = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
+    const savedProgram = c.programStartDate;
+    const savedModel = c.moneyModelStartWeek;
+    const cashBefore = { jenn: ensureWallet('jenn').cash, jess: ensureWallet('jess').cash };
+    try {
+      window.showConfirm = async () => true;
+      // A start date well back, so there are weeks beyond the catch-up reach.
+      const mon = formatDayKey(ctThisWeekKey());
+      mon.setDate(mon.getDate() - 16 * 7);
+      const start = ctDateToKey(mon);
+      c.programStartDate = start; c.moneyModelStartWeek = start;
+      c.finalizedWeeks = {}; c.moneyLedger = {}; c.meetingsHeld = {};
+
+      const plan = mnyDefaultSweepPlan();
+      if (!plan.weeks.length) { bad.push('no weeks were found beyond the catch-up reach'); return bad; }
+
+      // Nothing inside the catch-up window may be touched.
+      const reachable = new Set(mmUnsettledWeeks(8).map(u => u.wk));
+      if (plan.weeks.some(w => reachable.has(w.wk))) {
+        bad.push('the sweep reached a week the catch-up list can still settle');
+      }
+
+      const expect = plan.total;
+      await mnyRunDefaultSweep();
+      const moved = (ensureWallet('jenn').cash - cashBefore.jenn)
+                  + (ensureWallet('jess').cash - cashBefore.jess);
+      if (Math.abs(moved - expect) > 0.005) {
+        bad.push(`the sweep credited ${moved}, the preview said ${expect}`);
+      }
+      // Labelled, not disguised as a week's earnings.
+      const row = (c.moneyLedger[plan.weeks[0].wk] || {}).jenn;
+      if (!row) bad.push('no ledger row was written for a defaulted week');
+      if (row && !row.defaulted) bad.push('a defaulted week is not marked as one');
+      if (row && !row.handEntered) bad.push('a defaulted row cannot be corrected by mnyEditLedger');
+
+      // Idempotent: running it again credits nothing.
+      await mnyRunDefaultSweep();
+      const movedAgain = (ensureWallet('jenn').cash - cashBefore.jenn)
+                       + (ensureWallet('jess').cash - cashBefore.jess);
+      if (Math.abs(movedAgain - expect) > 0.005) {
+        bad.push('a second run credited again');
+      }
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      window.showConfirm = wasConfirm;
+      c.finalizedWeeks = savedFinal; c.moneyLedger = savedLedger; c.meetingsHeld = savedHeld;
+      c.programStartDate = savedProgram; c.moneyModelStartWeek = savedModel;
+      ensureWallet('jenn').cash = cashBefore.jenn;
+      ensureWallet('jess').cash = cashBefore.jess;
       profile = wasProfile;
     }
     return bad.length === 0 || bad;

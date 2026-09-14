@@ -410,15 +410,46 @@ function pendingApprovalTasks() {
     .filter(t => t && t.pendingApproval && !t.archived)
     .map(t => ({ task: t, owner: t.addedBy }));
 }
+/* Gifts a child has proposed. Same idiom as the two above — pendingApproval
+   plus addedBy — and rendered in the same place, because a parent answering
+   "she says Grandma gave her twenty dollars" is doing the same job as answering
+   "she added a new drill". Per-child rather than shared, so both are read. */
+function pendingApprovalGifts() {
+  const out = [];
+  ['jenn', 'jess'].forEach(kid => {
+    if (typeof mnyPendingDeposits !== 'function') return;
+    mnyPendingDeposits(kid).forEach(d => out.push({ gift: d, owner: kid }));
+  });
+  return out;
+}
+
 function renderPendingTaskApproval() {
   const wrap = document.getElementById('pendingTaskList');
   if (!wrap) return;
   const pending = pendingApprovalTasks();
-  if (!pending.length) {
-    wrap.innerHTML = '<p class="feedback-empty">Nothing waiting — new exercises the girls add will appear here.</p>';
+  const gifts = pendingApprovalGifts();
+  if (!pending.length && !gifts.length) {
+    wrap.innerHTML = '<p class="feedback-empty">Nothing waiting — new exercises and gifts the girls add will appear here.</p>';
     return;
   }
   wrap.innerHTML = '';
+  /* Money first: it is the one of the two that is a claim about something that
+     already happened, and it is the one that moves a wallet. */
+  gifts.forEach(({ gift, owner }) => {
+    const who = kidLabel(owner);
+    const card = document.createElement('div');
+    card.className = 'challenge-card';
+    card.innerHTML = `
+      <div class="challenge-title">🎁 ${escapeHtml(mnyMoney(gift.amount))} · ${escapeHtml(gift.from || 'A gift')}
+        <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· ${escapeHtml(who.icon + ' ' + who.name)} says</span></div>
+      <div style="font-size:0.85rem;color:var(--ink-light)">${gift.giver ? 'From ' + escapeHtml(gift.giver) + ' · ' : ''}${escapeHtml(mnyShortDate(gift.dayKey || gift.weekKey))}
+        · nothing has moved yet</div>
+      <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
+        <button class="btn-icon" style="padding:2px 8px;background:var(--accent-green)" data-gift-approve="${escapeAttr(gift.id)}" data-gift-kid="${escapeAttr(owner)}">✅ Approve</button>
+        <button class="btn-icon" style="padding:2px 8px" data-gift-reject="${escapeAttr(gift.id)}" data-gift-kid="${escapeAttr(owner)}">🗑 Reject</button>
+      </div>`;
+    wrap.appendChild(card);
+  });
   pending.forEach(({ task, owner }) => {
     const who = kidLabel(owner);
     const sport = getTrainingTopic(task.sport);
@@ -435,6 +466,24 @@ function renderPendingTaskApproval() {
     wrap.appendChild(card);
   });
 }
+/* Approval is the single moment the money moves — mnyApproveDeposit stamps
+   appliedAt so a re-merge cannot credit it twice. Rejecting REMOVES the record
+   and tombstones it, which is right here and different from rejectKidActivity's
+   archive: an activity that was archived still has to resolve on old blocks,
+   while a gift that was never agreed names nothing. */
+function approveKidGift(kid, id) {
+  if (typeof mnyApproveDeposit !== 'function') return;
+  if (!mnyApproveDeposit(kid, id)) return;
+  renderPendingTaskApproval();
+  showToast('Gift approved — it is in her wallet');
+}
+function rejectKidGift(kid, id) {
+  if (typeof mnyRemoveDeposit !== 'function') return;
+  mnyRemoveDeposit(kid, id);
+  renderPendingTaskApproval();
+  showToast('Gift not recorded');
+}
+
 function approveKidTask(id) {
   const t = (state.shared.customTasks || []).find(x => x.id === id);
   if (!t) return;
@@ -459,8 +508,14 @@ async function rejectKidTask(id) {
   renderPendingTaskApproval();
   showToast('Off the list');
 }
-/* One delegated listener for the two buttons above, bound in js/99-main.js. */
+/* One delegated listener for every button above, bound in js/99-main.js. The
+   gift rows render into the same list, so they ride the same listener rather
+   than growing a second one beside it. */
 function parentTaskApprovalClick(e) {
+  const gy = e.target.closest('[data-gift-approve]');
+  if (gy) { approveKidGift(gy.getAttribute('data-gift-kid'), gy.getAttribute('data-gift-approve')); return; }
+  const gn = e.target.closest('[data-gift-reject]');
+  if (gn) { rejectKidGift(gn.getAttribute('data-gift-kid'), gn.getAttribute('data-gift-reject')); return; }
   const ok = e.target.closest('[data-task-approve]');
   if (ok) { approveKidTask(ok.getAttribute('data-task-approve')); return; }
   const no = e.target.closest('[data-task-reject]');

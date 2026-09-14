@@ -1141,6 +1141,57 @@
   }
   .cm-cell.cm-readonly { cursor: default; }
   .cm-cell.cm-disabled { opacity: 0.55; cursor: default; }
+  /* A routine this day did not ask for. Still TAPPABLE — the matrix is the
+     parent's form, and recording a routine that happened on an unplanned day is
+     the only reason the row stays — so it is quieter, not disabled. */
+  .cm-cell.cm-unplanned { border-style: dotted; color: #a89a82; }
+
+  /* The day's chore grades, where the day is. Parent-only, and hidden entirely
+     when the planner put no chore here rather than explaining an empty state. */
+  .parent-chores {
+    display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: #fdf6ef; border-bottom: 1.5px solid var(--ink);
+  }
+  .pc-cap { font-size: var(--text-sm); font-weight: 700; color: var(--ink); }
+  .pc-chore {
+    display: inline-flex; align-items: center; gap: var(--space-1);
+    min-height: 44px; padding: 0 var(--space-3);
+    border: 1.5px solid var(--ink); border-radius: 999px;
+    background: #fff; color: var(--ink);
+    font-size: var(--text-sm); font-family: inherit; cursor: pointer;
+  }
+  .pc-chore.on { background: #95d5b2; }
+  /* A second heading inside one card needs air above it. */
+  .mny-gap { margin-top: var(--space-3); }
+
+  /* The meeting's own fine chips, on the day they belong to. Same 44px floor as
+     every other control a grown-up taps. */
+  .mm-fine {
+    display: inline-flex; align-items: center; gap: var(--space-1);
+    min-height: 44px; margin: 0 var(--space-1) var(--space-1) 0;
+    padding: 0 var(--space-3);
+    border: 1.5px solid var(--ink); border-radius: 999px;
+    background: #fff; color: var(--ink);
+    font-size: var(--text-sm); font-family: inherit; cursor: pointer;
+  }
+  .mm-fine-given {
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: var(--space-1) 0; font-size: var(--text-sm);
+  }
+  .mm-fine-x {
+    min-width: 44px; min-height: 44px;
+    border: 1.5px solid var(--ink); border-radius: 999px;
+    background: #fff; color: var(--ink); font-size: 1rem; cursor: pointer;
+  }
+
+  /* A planned competition with no result yet. An open question, drawn as one:
+     dashed, so it does not read as a settled row sitting among settled rows. */
+  .mny-row--todo {
+    border: 1.5px dashed var(--ink); border-radius: var(--radius-sm);
+    padding: var(--space-2); margin: var(--space-2) 0;
+    background: #fdf6ef; flex-wrap: wrap; gap: var(--space-2);
+  }
   .cm-cell:not(.on):not(.cm-future) { color: #b9ac95; }
   .cm-rowtotal, .cm-wkhead { font-size: calc(0.74rem * var(--fs-scale, 1)); font-weight: 800; text-align: center; display: flex; align-items: center; justify-content: center; }
   .cm-bar {
@@ -5174,6 +5225,10 @@
   }
   .ck-dot.on { border-color: var(--ck-ink); background: var(--ck-green-ink); }
   .ck-dot.chore { border-color: var(--ck-ink); background: var(--ck-amber); }
+  /* A routine this day never asked for. A hollow placeholder keeps the seven day
+     buttons the same width without drawing a miss — a grey dot for something
+     nobody asked her to do is the thing this change removes. */
+  .ck-dot.ck-dot-na { border-style: dotted; border-color: #cfc6b4; background: transparent; }
 
   /* ── body: 268px rail beside a fluid main column ── */
   .ck-body { display: flex; align-items: stretch; }
@@ -5329,6 +5384,9 @@
   button.ck-cell:hover { background: var(--ck-cream); }
   .ck-cell.done { background: var(--ck-green); color: #143024; }
   .ck-cell.claimed { background: var(--ck-cream); color: #c14a24; box-shadow: inset 0 0 0 3px #ffd166; }
+  /* Same answer on the week grid: not asked, so not missed. Dark enough to read
+     at the 13px kid floor rather than faded to nothing. */
+  .ck-cell.ck-cell-na { border-style: dotted; border-color: #cfc6b4; color: #a89a82; cursor: default; }
   /* Never planned, so never judged — inert on purpose, not merely disabled. */
   .ck-cell-off { background: #eae4d5; border-color: var(--ck-dash); cursor: default; }
   .ck-legend2 {

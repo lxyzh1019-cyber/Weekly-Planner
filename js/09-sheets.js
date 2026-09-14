@@ -979,7 +979,14 @@ function openEditSheet(blockId) {
     ppWrap.style.display = 'block';
     document.getElementById('pinToggle').classList.toggle('on', !!block.parentPinned);
     document.getElementById('confirmToggle').classList.toggle('on', !!block.confirmed);
-    document.getElementById('notDoneToggle').classList.toggle('on', !!block.notDone);
+    /* On a CHORE block the grade cycle owns this answer: reaching $0 is the
+       same assertion as "it did not happen", and two controls for one meaning
+       is the defect the NOW-card fix already records. Everywhere else the
+       toggle is the only way to say it. */
+    const ndWrap = document.getElementById('notDoneToggle');
+    const choreOwned = block.actId === 'chores';
+    ndWrap.style.display = choreOwned ? 'none' : '';
+    ndWrap.classList.toggle('on', !!block.notDone);
   } else ppWrap.style.display = 'none';
 
   // Sister Sync per-activity controls: parent-only
@@ -1618,6 +1625,102 @@ function toggleConfirm() {
   buildTimeline();
 }
 
+/* ── The day's chores, graded where the day is ─────────────────────
+   Confirming a chore block ALREADY graded it at "on time", silently, through
+   gradeChoresFromBlock — so the day view has always moved money, it just never
+   said so or let a parent pick a different answer. A visible cycle is strictly
+   better than a hidden side effect.
+
+   Tap to cycle $3 → $2 → $1 → $0, which is the shipped grade table: on time
+   and to standard, to standard but late, a passed redo, not done.
+
+   TWO THINGS MAKE THIS ONE CONTROL RATHER THAN A FIFTH WAY TO SAY THE SAME
+   THING:
+
+   · $0 and "it did not happen" are the same assertion about a chore, so
+     reaching $0 sets the block's notDone mark and the separate toggle does not
+     render on a chore block. Two controls for one meaning is the NOW-card
+     defect CLAUDE.md already records.
+   · mrSetChoreGrade DELETES the entry at zero, so "graded zero" and "never
+     graded" are identical in the store. The block's notDone mark is what
+     carries the difference — the same $0 ambiguity the competition channel has,
+     and the same answer: a zero that was DECIDED needs its own marker beside
+     the number.
+
+   Driven by the planner. A day with no chore on it renders nothing at all,
+   which is the planned/simple rule the routines follow. */
+function dayChoreRowsForParent(dayKey, kid) {
+  const out = [];
+  (getDayBlocks(dayKey, kid) || []).forEach(b => {
+    if (b.actId !== 'chores') return;
+    if (typeof blockChoreTargets !== 'function') return;
+    const { wk, dayIdx, targets } = blockChoreTargets(b, dayKey, kid);
+    if (dayIdx < 0) return;
+    targets.forEach(t => out.push({
+      blockId: b.id, choreId: t.choreId, label: t.label, wk, dayIdx,
+      grade: mrGetChoreGrade(kid, wk, dayIdx, t.choreId),
+      notDone: isBlockNotDone(b),
+    }));
+  });
+  return out;
+}
+
+function renderParentChoreStrip() {
+  const bar = document.getElementById('parentDayChores');
+  if (!bar) return;
+  if (!isParent()) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+  const who = parentViewing;
+  const key = currentDayKey;
+  const rows = dayChoreRowsForParent(key, who);
+  // Blank when the planner put no chore here. Nothing to grade is not an
+  // empty state to explain, it is simply a day without chores on it.
+  if (!rows.length) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+  const r = mrRulesForWeek(rows[0].wk);
+  const name = who === 'jenn' ? 'Jenn' : 'Jess';
+  bar.style.display = 'flex';
+  bar.innerHTML = `<span class="pc-cap">🧺 ${escapeHtml(name)}'s chores today</span>`
+    + rows.map(row => {
+      const paid = row.grade > 0 ? ckGradePay(r, row.grade) : 0;
+      const said = row.grade > 0 ? mnyMoney(paid) : (row.notDone ? '$0 · didn\'t happen' : 'not graded');
+      return `<button type="button" class="pc-chore${row.grade > 0 ? ' on' : ''}"
+          data-pc-chore="${escapeAttr(row.choreId)}" data-pc-block="${escapeAttr(row.blockId)}"
+          title="Tap to cycle $3 → $2 → $1 → $0"
+        >${escapeHtml(row.label)} <b>${escapeHtml(said)}</b></button>`;
+    }).join('');
+}
+
+/* One tap down the ladder, wrapping back to the top. Grading goes through
+   mrSetChoreGrade — the owner — and this screen holds no second rule about
+   what a grade is worth. */
+function cycleDayChoreGrade(choreId, blockId) {
+  if (!isParent()) { showToast('A grown-up grades the chores 🔒'); return; }
+  const who = parentViewing;
+  const key = currentDayKey;
+  const row = dayChoreRowsForParent(key, who).find(x => x.choreId === choreId && x.blockId === blockId);
+  if (!row) return;
+  // 3 → 2 → 1 → 0 → 3. An ungraded chore starts the ladder at the top, which is
+  // what confirming the block used to assert without asking.
+  const next = row.grade > 0 ? row.grade - 1 : 3;
+  mrSetChoreGrade(who, row.wk, row.dayIdx, choreId, next);
+
+  /* Reaching zero IS "it did not happen" for a chore, so the block carries the
+     mark and the two cannot disagree. Coming back up clears it. */
+  const blocks = getDayBlocks(key, who) || [];
+  const blk = blocks.find(b => b.id === blockId);
+  if (blk) {
+    const others = dayChoreRowsForParent(key, who)
+      .filter(x => x.blockId === blockId && x.choreId !== choreId);
+    const allZero = next === 0 && others.every(x => x.grade === 0);
+    if (allZero && !blk.notDone) { blk.notDone = true; delete blk.confirmed; blk.completed = false; markItemUpdated(blk); }
+    if (next > 0 && blk.notDone) { delete blk.notDone; markItemUpdated(blk); }
+    setDayBlocks(key, blocks, who);
+  }
+  saveAll();
+  renderParentChoreStrip();
+  renderParentBanners();
+  buildTimeline();
+}
+
 /* ── "It was planned and it did not happen" ────────────────────────
    The third answer. See isBlockNotDone (js/36-status.js) for why it exists;
    these are the writers.
@@ -1891,6 +1994,9 @@ async function markDayReviewedForChild(kid, dayKey) {
    whether the review is still blocked. Both banners are redrawn from here so
    the two buttons can never describe a different child from the one shown. */
 function renderParentBanners() {
+  // The chore strip is the same surface's other half, so it is never redrawn
+  // separately and cannot fall out of step with the child the banner names.
+  renderParentChoreStrip();
   const bar = document.getElementById('parentDayActions');
   if (!bar) return;
   if (!isParent()) { bar.innerHTML = ''; return; }
