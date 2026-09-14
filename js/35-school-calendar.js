@@ -454,7 +454,7 @@ function scRenderImport() {
         <button type="button" class="pill-btn" data-sc="discard">Discard</button>
       </div>`;
   } else {
-    const acts = getAllActivities(scBlockKid).filter(a => !a._locked && !a._rewardLocked);
+    const acts = getAllActivities(scBlockKid).filter(a => !a._locked);
     if (!scBlockActId && acts.length) scBlockActId = (acts.find(a => a.id === 'appointment') || acts[0]).id;
     const rows = d.timed.slice(0, 60).map((e, i) => {
       const dt = formatDayKey(e.dayKey);

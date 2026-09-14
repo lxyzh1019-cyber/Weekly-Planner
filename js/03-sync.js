@@ -522,7 +522,6 @@ function saveAll() {
   // interval in initFirebase is the backstop if this window is ever missed.
   try { schedulePush(); } catch (e) { console.error('schedulePush failed', e); }
 }
-window._skipRewardPrompt = false;
 
 /* ── Which version an edit was made FROM ────────────────────────────────────
    A stamp orders two writes. It says nothing about which one is RIGHT, and the

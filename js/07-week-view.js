@@ -363,7 +363,13 @@ function renderWeek() {
       // shown to parent and child alike so they can reflect together.
       const t = computeWeekTotals(keys);
       const learn = fmtHrsMin(t.catMin.brain || 0);
-      const active = fmtHrsMin((t.catMin.body || 0) + (t.catMin.free || 0));
+      /* Move and Explore are counted here too. They used to fall inside `free`
+         via cat:'active', so splitting them out without naming them here would
+         have quietly dropped every swim, bike ride and hike out of the one
+         number this banner offers — smaller for the same week, with nothing on
+         screen to say why. */
+      const active = fmtHrsMin((t.catMin.body || 0) + (t.catMin.move || 0)
+                             + (t.catMin.explore || 0) + (t.catMin.free || 0));
       const free = fmtHrsMin(t.free);
       coachEl.classList.add('week-review-tip');
       coachEl.style.display = 'block';
@@ -903,6 +909,51 @@ function renderFullWeek(keys) {
   // activity is ONE unbroken block positioned by its real start time on a
   // shared px-per-minute scale, so nothing is ever sliced at a band boundary.
   const PX_PER_MIN = 0.72;
+  /* The shortest a card is ever drawn. The stylesheet carries the same number
+     (.wf-card min-height in css/app.css) and the two must not drift: this was
+     16 here against 18 there, so a 15-minute card was JUDGED at a height it
+     never had. blockContentTier saw 16, the `name` tier needs 20, and a card
+     that actually rendered 18px tall was told it had no room for its own name
+     — the reason a quarter-hour block showed one emoji and nothing else.
+     20 is the `name` tier, so the shortest block the app allows can say what
+     it is. */
+  const WF_CARD_MIN_PX = 20;
+  /* What each row of a STACKED card actually costs, measured in the browser at
+     the sizes #screen-week ships rather than guessed. The old arithmetic
+     budgeted 58px for the four fixed rows and 20px a goal line; the real
+     figures are 66 and 17, because the kid readability floor lifted
+     .wf-card-time, -dur and -sum to 13.1px and nothing re-measured what fits.
+     Worse, .wf-card--tall .wf-card-name allows TWO lines (max-height: 2.3em)
+     and the budget only ever counted one. Every stacked card had been
+     overflowing its own box by 7-21px, which is how a training block's goals
+     came to run straight through the duration underneath them.
+     theStackedCardFitsWhatItDraws (tests/smoke.js) is what keeps these
+     honest — they are measurements, so a font change invalidates them. */
+  const WF_ROW = { icon: 20, name1: 14, name2: 29, dur: 13, time: 13, sum: 15, gap: 2 };
+  const WF_NAME_ONE_LINE_CHARS = 13;
+
+  /* What a card of this height can afford to stack, in priority order: the icon
+     and name always, then the duration (the one thing the card's position and
+     size do not already say precisely), then as many goal lines as fit, then
+     the start-time chip with whatever is left. A two-line name is a luxury the
+     card buys only if a goal line still fits after it. */
+  function wfStackPlan(pxHeight, name) {
+    const fixed = WF_ROW.icon + WF_ROW.dur + 3 * WF_ROW.gap;
+    /* Reserving two lines for a name that renders on one wastes a goal line on
+       every card, and "Skating" has never needed two. The estimate is crude —
+       a column is 95-129px and this type is ~7px a character — but it cannot
+       overflow, because a plan that says one line ALSO emits .wf-card--nameclamp,
+       which holds the name to one line whatever the estimate got wrong. A long
+       name a parent typed still gets its second line. */
+    const mightWrap = [...String(name || '')].length > WF_NAME_ONE_LINE_CHARS;
+    const twoLine = mightWrap && (pxHeight - fixed - WF_ROW.name2) >= (WF_ROW.sum + WF_ROW.gap);
+    const nameH = twoLine ? WF_ROW.name2 : WF_ROW.name1;
+    let room = pxHeight - fixed - nameH;
+    if (room < 0) return { stack: false, rows: 0, twoLine: false, time: false };
+    const rows = Math.max(0, Math.floor(room / (WF_ROW.sum + WF_ROW.gap)));
+    room -= rows * (WF_ROW.sum + WF_ROW.gap);
+    return { stack: true, rows, twoLine, time: room >= WF_ROW.time + WF_ROW.gap };
+  }
   const totalH = Math.round(DAY_MIN_SPAN * PX_PER_MIN);
 
   /* WEEKDAY_BANDS and WEEKEND_BANDS lived here: four hardcoded stretches with
@@ -1071,7 +1122,7 @@ function renderFullWeek(keys) {
       const relStart = b.startMin - START_MIN;
       const dur = Math.max(5, b.durationMin || 0);
       const topPx = relStart * PX_PER_MIN;
-      const pxHeight = Math.max(dur * PX_PER_MIN, 16);
+      const pxHeight = Math.max(dur * PX_PER_MIN, WF_CARD_MIN_PX);
 
       // Training topics carry their own icon + colour (skating/swimming/dryland).
       const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
@@ -1090,10 +1141,26 @@ function renderFullWeek(keys) {
       // stylesheet already knows; what changed is that one function decides
       // them, so a block does not read differently in two views.
       const tier = blockContentTier(pxHeight);
+      /* The tier says how much this block may SAY; the plan says how much of it
+         actually fits. They disagreed: `detail` starts at 64px and a stacked
+         card needs 66 before it draws a single goal line, so the ladder was
+         promoting cards into a layout they could not hold. */
+      const plan = blockTierAtLeast(tier, 'detail')
+        ? wfStackPlan(pxHeight, dispName)
+        : { stack: false, rows: 0, twoLine: false, time: false };
       let cls = 'wf-card' + (isLightColour(bg) ? ' light-bg' : '');
-      if (blockTierAtLeast(tier, 'detail')) cls += ' wf-card--tall'; // room to stack time/icon/name centered
-      if (!blockTierAtLeast(tier, 'meta')) cls += ' wf-card--slim';
-      if (!blockTierAtLeast(tier, 'name')) cls += ' wf-card--xslim wf-card--icononly';
+      if (plan.stack) {
+        cls += ' wf-card--tall'; // room to stack time/icon/name centered
+        if (!plan.twoLine) cls += ' wf-card--nameclamp';
+        if (!plan.time)    cls += ' wf-card--notime';
+      }
+      /* Below `meta` a 28px square tick does not fit: at 30px of card, a
+         28px box offset 3px from the top overruns the card and is clipped.
+         So the tick becomes a full-height strip on the card's edge instead —
+         proportional by construction, and it can never again be taller than
+         the block it belongs to. There is no icon-only tier any more: the
+         floor above IS the `name` tier, so every drawn card can say its name. */
+      if (!blockTierAtLeast(tier, 'meta')) cls += ' wf-card--slim wf-card--stripcheck';
       if (isBlockCompleted(b, activeProfile())) cls += ' wf-card--done';
       /* A marker, never a fade. --missed was removed deliberately: an
          UNCONFIRMED block must not be drawn as though the child failed it.
@@ -1122,7 +1189,7 @@ function renderFullWeek(keys) {
       if (warmupMin > 0) bufKinds.push(`🔥${warmupMin}m`);
 
       card.style.top = topPx + 'px';
-      card.style.height = Math.max(pxHeight - 2, 12) + 'px';
+      card.style.height = Math.max(pxHeight - 2, WF_CARD_MIN_PX) + 'px';
       card.style.left  = leftCss;
       card.style.width = widthCss;
       card.style.background = bg;
@@ -1144,19 +1211,12 @@ function renderFullWeek(keys) {
       // fit — degrading to a one-line count on cards too short for a list.
       const detailLines = blockDetailLines(b, act);
       let sumHtml = '';
-      if (blockTierAtLeast(tier, 'detail') && detailLines.length) {
-        // Scales continuously above the 'detail' floor, so a long training
-        // session gets room for its four checks plus its goals rather than
-        // being cut at a fixed row count.
-        const maxRows = Math.max(0, Math.floor((pxHeight - 58) / 20) + 1);
-        sumHtml = sliceDetailLines(detailLines, maxRows)
+      if (plan.rows && detailLines.length) {
+        sumHtml = sliceDetailLines(detailLines, plan.rows)
           .map(r => `<div class="wf-card-sum" title="${escapeHtml(r.text)}">${r.icon} ${escapeHtml(r.text)}</div>`)
           .join('');
       }
       const durHtml = `${formatDuration(b.durationMin)}${(!sumHtml && detailLines.length) ? ' · ' + blockCountsSummary(detailLines) : ''}`;
-      // Done-tick sized to the card's own height, same idea as the print
-      // checkboxes, so a slim card doesn't carry an oversized tap target.
-      const checkPx = Math.max(14, Math.min(24, Math.round(10 + pxHeight / 4)));
       card.innerHTML = `
         ${conflictFlag}
         <div class="wf-card-time">${timeStr}</div>
@@ -1164,7 +1224,7 @@ function renderFullWeek(keys) {
         <div class="wf-card-name">${stampEmoji}${notDoneTag}${escapeHtml(dispName)}${travelTag}${conflictTag}</div>
         ${sumHtml}
         <div class="wf-card-dur">${durHtml}</div>
-        <button type="button" class="wf-card-check" style="width:${checkPx}px;height:${checkPx}px;font-size:${Math.round(checkPx*0.58)}px" aria-label="${b.completed?'Mark not done':'Mark done'}"
+        <button type="button" class="wf-card-check" aria-label="${b.completed?'Mark not done':'Mark done'}"
           onclick="toggleBlockDone('${escapeJsAttr(key)}','${escapeJsAttr(b.id)}',event)">${b.completed?'✓':''}</button>
       `;
       card.title = `${dispIcon} ${dispName} — ${timeStr}, ${formatDuration(b.durationMin)}`

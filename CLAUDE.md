@@ -34,12 +34,13 @@ event wiring, first render) lives in `js/99-main.js`, loaded last. Function
 hoisting means a declaration in `05` may freely *call* something declared in
 `22`; it just must not *run* at load time.
 
-Current permitted exceptions (do not add more): `js/03-sync.js:506`
-(`window._skipRewardPrompt = false`), `js/08-day-view.js:1351-1352` (two
-`window.addEventListener` calls that only register), `js/17-ui-misc.js:159`
+Current permitted exceptions (do not add more): `js/08-day-view.js:1351-1352`
+(two `window.addEventListener` calls that only register), `js/17-ui-misc.js:159`
 (the self-contained `installActionDoubleTapGuard` IIFE), and the
 `module.exports` guards at the end of `04-merge.js`, `18-rules.js`,
-`21-money-data.js`.
+`21-money-data.js`. (`js/03-sync.js`'s `window._skipRewardPrompt = false` was a
+fourth. It was written once and read nowhere, and went with the activity-unlock
+subsystem below.)
 
 **One declaration per name, globally.** All 36 files share one scope, so a
 duplicate `function foo()` in two files means the later one silently wins. A
@@ -515,6 +516,27 @@ say at this height*; `BLOCK_STACK_MIN` (46px) answers *when can the day view
 stack it on two lines*. Conflating them is what sliced a 30-minute Breakfast's
 own title in half — 40px of block, 30px of content box, two lines needing 34.
 
+**A tier is permission, not a fit.** On the Full week the two disagreed:
+`detail` starts at 64px and a stacked card needs 66 before it draws a single
+goal line, so the ladder promoted cards into a layout they could not hold.
+`wfStackPlan` (`js/07-week-view.js`) is what decides the layout now, against
+`WF_ROW` — the **measured** cost of each row at the sizes this grid ships. The
+old arithmetic budgeted 58px for the four fixed rows and 20px a goal line; the
+real figures are 66 and 17, because the kid readability floor lifted
+`.wf-card-time`, `-dur` and `-sum` to 13.1px and nothing re-measured. On top of
+that `.wf-card--tall .wf-card-name` is allowed two lines and the budget counted
+one. Every stacked card overflowed by 7–21px, which is how a training block's
+goals came to run through the duration underneath them.
+
+Priority on a stacked card: icon and name always, then the duration (the one
+thing position and size do not already say), then goal lines, then the
+start-time chip with whatever is left. A second line of name is bought only
+when the name is long enough to need it — and that estimate cannot overflow,
+because a plan that says one line also emits `.wf-card--nameclamp`, which holds
+it to one whatever the guess got wrong. `theStackedCardFitsWhatItDraws` measures
+in-flow children against the card's own height; `WF_ROW` is a set of
+measurements, so changing the type invalidates it.
+
 Today **owns no data and no rules — but it does invoke them.** Every number it
 shows is read through the accessors the owning screen uses, and every write goes
 through the function that already owned that write: `completeQuest` for a tick
@@ -694,11 +716,34 @@ current-week; the **review voice** (owed / fulfilled / unfulfilled) lives on the
 parent and meeting screens, where a past week's shortfall is always shown. No
 shortfall is carried into the next week.
 
-## Six activity groups — what the time is FOR
+## Eight activity groups — what the time is FOR
 
 `ACTIVITY_GROUPS` and `activityGroup(act)` in `js/01-config.js`. **Routine ·
-Brain Construction · Body Construction · Chores · Daily · Free**, each with a
-`short` form because the week grid compresses a label to about seven characters.
+Brain Construction · Body Construction · Chores · Daily · Free · Everyday
+movement · Explore**, each with a `short` form because the week grid compresses
+a label to about seven characters.
+
+**Move and Explore were the two the table could not say.** A Saturday swim was
+filed under Body beside a coached session, so the hours chart said a length of
+the pool was the same ask as a training hour; and a day at a museum was "free
+time", which is what the app calls doing nothing. `cat: 'active'` maps to
+`move`; `explore` has no category behind it and is set explicitly, because `cat`
+is busy answering the other question. `relax` carries an explicit `group:'free'`
+for the same reason in reverse: rest that scores is rest turned into another
+thing to perform.
+
+**`groupDef`'s fallback is by id, not by position.** It used to return
+`ACTIVITY_GROUPS[4]` — `daily`, but only because daily happened to be the fifth
+row, so adding a group above it would have silently re-pointed every
+unknown-group lookup. Nothing tested it until `mealsAreNotChores` did.
+
+**`tools/xp-calibrate.js` reads the group list from the source.** It summed over
+a hand-written six-id array, so adding a group left it reporting the economy the
+app no longer had — no error, just the wrong numbers, which makes "change a
+number and re-run the tool" a no-op. `tests/xp.test.js` now also asserts the
+other direction: every group the app prices must be one the test has an opinion
+about, because iterating its own `want` map is a whitelist that a new group
+passes unnoticed.
 
 `cat` still decides a block's **colour** (`CAT_HEX`, `blockColour`) and drives
 the picker's filters. This answers a different question, and it is the only one
@@ -712,11 +757,35 @@ so those carry an explicit `group:'chores'`. That is also why they are **not
 rewards**: the four `REWARD_POOLS.family` activities used to carry
 `rewardLocked: true`, so the thing a child had to earn was the right to help at
 home. They are ordinary available activities now, ids unchanged so every
-historical block still resolves; the other three pools are still earned. The
-first-run tutorial went with the lock, because its entire content was picking one
-of those chores as an unlocked "starter". An activity nothing can resolve is
+historical block still resolves. The first-run tutorial went with the lock,
+because its entire content was picking one of those chores as an unlocked
+"starter". An activity nothing can resolve is
 filed under Daily, never dropped: an hours total that silently omits blocks is
 worse than one that files them vaguely.
+
+**Nothing is earned before it can be planned.** The other nine pool activities
+followed Family Hero, and `REWARD_POOLS` went with them — their literals are
+inlined into `DEFAULT_ACTIVITIES`, ids unchanged. The grant was never a level-up,
+whatever the surrounding prose said: `checkLevelUp` only ever renamed and
+re-iconed through `levelRules`. It was a **placed-block milestone** at 10/15/20,
+so the app's answer to "you have planned ten things" was to hand back the right
+to plan an eleventh *kind* of thing. `unlockedActs`, `manualPlacedCount` and
+`unlockedThisWeek` are no longer seeded; a stored document that still carries
+them is left alone, because `deepMergeObj` cannot express a deletion and a
+tidy-up would churn the document on every sync to no effect.
+
+Two things survive this and must not be swept up with it. **`_locked` still has
+a writer** — the seasonal out-of-season rule in `getAllActivities` — and it is
+the one that keeps Beach Day out of January; only `_rewardLocked` went. And the
+**routine-checklist rewards** (`MORNING_LOCKED_REWARD`,
+`AFTERSCHOOL_CHECKLIST_REWARDS`, `queueChecklistReward`) are a different feature
+that merely shares the `#dayRewardPrompt` widget: they earn an extra checklist
+*item* off a real streak rather than gating an activity. `maybeShowRewardPrompt`
+drains any `{actId}` entry it is handed, because `pendingRewards` syncs and a
+device serving an older bundle out of a Pages cache can still queue one — an
+offer that cannot be accepted would wedge the widget for the checklist rewards
+behind it. `noActivityHasToBeEarned` and `aLegacyActivityRewardDrainsAway` hold
+all of this.
 
 **A day asks for the routines it PLANNED, or its own default.** All three
 sessions used to be evaluated on every day of every week, so a family that never
@@ -1149,6 +1218,16 @@ changes nothing.
 
 ## History is a record, not a working set
 
+**The archive rule covered half the catalog.** `getAllActivities` applied its
+`archived` filter to the custom and shared lists only — `DEFAULT_ACTIVITIES` and
+`SEASONAL_ACTIVITIES` were spread raw, so the flag written onto a shipped
+activity was read by nobody. It is applied to all four now, which is what lets a
+built-in be retired; `findActivity` already passed `includeArchived`, so the
+read-back half always worked. Same pick-vs-read-back split
+`getTrainingTags`/`getTrainingTopic` uses for a sport the family has dropped.
+`theCatalogResolvesEveryBlockItEverNamed` holds every retired id to three
+answers: gone from the pickers, still resolvable, still able to say its name.
+
 An activity is **archived, never deleted** (`archiveParentActivity`,
 `js/11-parent.js`). Deleting used to sweep both kids' `weeks` with no date
 filter, removing every block that had ever named it — from last March as readily
@@ -1219,6 +1298,19 @@ constants directly.** Three accessors in `js/05-helpers.js` decide which wins:
 | When is school, and is there a lunch recess? | `schoolHours()` |
 | When does the term run? | `schoolTerm()` |
 | Which days are off? | `schoolOffDays()` — the shipped list plus the family's |
+| How long does a block of this default to? | `activityDefaultDuration(act)` |
+
+`activityDefaultDuration` exists for School Day alone: every path that PLACES a
+school card already computed its length from `schoolHours()`, but the picker
+read the shipped `durationMin: 420` and handed a seven-hour card to a family
+whose day is 6h40. `zoneForGap` (`js/17-ui-misc.js`) reads `schoolHours()` too
+now — it hardcoded 8:00/15:00/18:00, so it disagreed with `dayZoneSegments`, the
+bands the day view actually draws.
+
+**A season can be more than one season.** `season` took a single string and the
+garden does not stop in June, so `inSeason(act, season)` is the one comparison
+and `seasonLabel(act)` is what the three "🔒 Unlocks in …" toasts print — a bare
+array would have read "spring,summer".
 
 `isSchoolDay(dayKey)` / `schoolDayInfo(dayKey)` go through those, and are still
 the only way to ask — never by checking the day of the week: a Tuesday in July

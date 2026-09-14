@@ -754,6 +754,185 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* A SHORT BLOCK STILL SAYS WHAT IT IS, and its tick fits inside it.
+
+     Three defects met on the quarter-hour card and none of them was visible to
+     this suite. The tick's size was written inline by the renderer and then
+     overridden by min-width/min-height in css/app.css — different properties,
+     so they beat the inline width rather than losing to it. Every tick was
+     28x28 at every height, which on an 18px card is TALLER THAN THE CARD, and
+     the name was dropped to make room for a control that did not fit either.
+     Meanwhile blockContentTier was asked about a height the card never had
+     (16 in JS against an 18px CSS floor), so a card that could have shown its
+     name was told it could not.
+
+     Asserts the invariant rather than the pixel count: whatever the tick's
+     size rule becomes, it may never exceed the block it belongs to, and a
+     rendered block always says its own name. */
+  checks.aShortBlockStillSaysWhatItIs = await page.evaluate(() => {
+    goWeek(); setWeekView('full');
+    const kid = activeProfile();
+    const key = getDayKeys(0)[2];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    try {
+      setDayBlocks(key, [
+        { id: 'wk-min-a', actId: 'break_quick',     startMin: 6 * 60,      durationMin: 15, completed: true },
+        { id: 'wk-min-b', actId: 'routine_evening', startMin: 6 * 60 + 30, durationMin: 20 },
+        { id: 'wk-min-c', actId: 'piano',           startMin: 8 * 60,      durationMin: 60 },
+      ], kid);
+      weekOffset = 0; renderWeek();
+
+      const cards = [...document.querySelectorAll('#screen-week .wf-card')]
+        .filter(c => ['wk-min-a', 'wk-min-b', 'wk-min-c'].some(id => (c.outerHTML || '').includes(id)));
+      if (cards.length < 3) return [`seeded 3 blocks, the week drew ${cards.length}`];
+
+      cards.forEach(c => {
+        const box  = c.getBoundingClientRect();
+        const name = c.querySelector('.wf-card-name');
+        const tick = c.querySelector('.wf-card-check');
+        const label = (name && name.textContent.trim()) || '(unnamed)';
+
+        if (!name || getComputedStyle(name).display === 'none' || name.getBoundingClientRect().width < 1) {
+          bad.push(`${label}: a ${Math.round(box.height)}px card renders no name`);
+        }
+        if (!tick) {
+          bad.push(`${label}: no way to check the block off`);
+          return;
+        }
+        const t = tick.getBoundingClientRect();
+        // The defect, stated directly.
+        if (t.height > box.height + 0.5) {
+          bad.push(`${label}: tick is ${Math.round(t.height)}px tall on a ${Math.round(box.height)}px card`);
+        }
+        // The glyph is only measurable on a completed block; the font sweep in
+        // kidScreensMeetTheHouseRules skips a button with no text node, which
+        // is why an 8px tick survived it.
+        if (tick.textContent.trim()) {
+          const f = parseFloat(getComputedStyle(tick).fontSize);
+          if (f < 13) bad.push(`${label}: the tick's glyph is ${f}px, under the 13px floor`);
+        }
+      });
+    } finally { setDayBlocks(key, had, kid); renderWeek(); }
+    return bad.length === 0 || bad;
+  });
+
+  /* A STACKED CARD FITS WHAT IT DRAWS.
+
+     The week card's tall layout budgeted 58px for its four fixed rows and 20px
+     a goal line. At the sizes this grid actually ships those rows cost 66 and
+     17 — the kid readability floor lifted .wf-card-time, -dur and -sum to
+     13.1px and nothing re-measured what fits — and .wf-card--tall .wf-card-name
+     is allowed TWO lines, which the budget never counted at all. So every
+     stacked card overflowed its own box by 7-21px and a training block's goal
+     lines ran straight through the duration underneath them.
+
+     Measures the real thing: the in-flow children of each stacked card against
+     the card's own height. The tick is absolutely positioned and deliberately
+     excluded — it is the one child that is meant to sit outside the flow. Same
+     shape of assertion as aShortBlockStillSaysWhatItIs: whatever the row costs
+     become, a card may never draw more than it can hold. */
+  checks.theStackedCardFitsWhatItDraws = await page.evaluate(() => {
+    goWeek(); setWeekView('full');
+    const kid = activeProfile();
+    const key = getDayKeys(0)[2];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    try {
+      /* Training blocks carry the most rows of anything in the app — four gear
+         checks plus their goals — so they are where the budget breaks first.
+         The ladder spans every stacked height the grid can draw. */
+      setDayBlocks(key, [
+        { id: 'st-90',  actId: 'training', startMin: 7 * 60,  durationMin: 90,  tag: 'skating',
+          gearState: {}, objectives: ['Double Axel attempts', 'Layback spin'] },
+        { id: 'st-120', actId: 'training', startMin: 9 * 60,  durationMin: 120, tag: 'skating',
+          gearState: {}, objectives: ['Double Axel attempts', 'Layback spin', 'Footwork sequence'] },
+        { id: 'st-180', actId: 'training', startMin: 11 * 60 + 30, durationMin: 180, tag: 'swimming',
+          gearState: {}, objectives: ['Breaststroke KICK (board only)', 'Butterfly strength set', 'Freestyle endurance'] },
+        { id: 'st-240', actId: 'competition', startMin: 15 * 60, durationMin: 240, tag: 'skating',
+          gearState: {}, objectives: ['Program run-through', 'Land my key jumps clean'] },
+      ], kid);
+      weekOffset = 0; renderWeek();
+
+      const tall = [...document.querySelectorAll('#screen-week .wf-card--tall')];
+      if (tall.length < 4) return [`seeded 4 stackable blocks, the week stacked ${tall.length}`];
+
+      tall.forEach(c => {
+        const box = c.getBoundingClientRect();
+        const gap = parseFloat(getComputedStyle(c).rowGap) || 0;
+        const rows = [...c.children].filter(e => {
+          const st = getComputedStyle(e);
+          // The tick sits outside the flow on purpose; everything else stacks.
+          return st.display !== 'none' && st.position !== 'absolute';
+        });
+        let content = 0;
+        rows.forEach(e => { content += e.getBoundingClientRect().height; });
+        content += gap * Math.max(0, rows.length - 1);
+
+        const name = c.querySelector('.wf-card-name');
+        const label = (name && name.textContent.trim()) || '(unnamed)';
+        if (content > box.height + 0.5) {
+          bad.push(`${label}: ${rows.length} rows need ${Math.round(content)}px in a ${Math.round(box.height)}px card`);
+        }
+        // A stacked card that cannot even show its name has no business being
+        // stacked — that is what the one-row layout is for.
+        if (!name || getComputedStyle(name).display === 'none') {
+          bad.push(`a ${Math.round(box.height)}px stacked card renders no name`);
+        }
+      });
+    } finally { setDayBlocks(key, had, kid); renderWeek(); }
+    return bad.length === 0 || bad;
+  });
+
+  /* THE WEEK KEEPS ITS COLUMN FLOOR ON A PHONE.
+
+     css/app.css carried `@media (max-width:600px){ .weekly-full{min-width:560px} }`
+     under a comment saying the 7 columns would otherwise be too thin to read —
+     and the plain `.weekly-full` block eight lines BELOW it set `min-width: 0`
+     at the same specificity, so the floor never applied once. At 430px every
+     column was 44px wide and NO card name rendered at ANY duration: a two-hour
+     training block was as nameless as a fifteen-minute break.
+
+     Measured at a real phone viewport rather than by reading the rule — the
+     suite runs over file://, where cssRules on a linked stylesheet throws, and
+     a check that silently reads nothing would pass on an empty set. What
+     matters is the rendered column anyway, not which rule produced it. */
+  await page.setViewportSize({ width: 390, height: 844 });
+  checks.theWeekGridKeepsItsColumnFloor = await page.evaluate(() => {
+    goWeek(); setWeekView('full');
+    const kid = activeProfile();
+    const key = getDayKeys(0)[2];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    try {
+      setDayBlocks(key, [
+        { id: 'wk-floor-a', actId: 'piano', startMin: 8 * 60, durationMin: 60 },
+      ], kid);
+      weekOffset = 0; renderWeek();
+
+      const wrap = document.querySelector('.weekly-full-wrap');
+      const card = [...document.querySelectorAll('#screen-week .wf-card')]
+        .find(c => (c.outerHTML || '').includes('wk-floor-a'));
+      if (!card) return ['the week drew no card to measure'];
+
+      // 7 columns plus the 58px sideband + gutter. Below roughly 700 a column
+      // cannot hold an icon and a name together, which is the point of a floor.
+      const col = card.getBoundingClientRect().width;
+      if (col < 90) bad.push(`a phone column is ${Math.round(col)}px, too thin to name a block`);
+
+      const name = card.querySelector('.wf-card-name');
+      if (!name || name.getBoundingClientRect().width < 20) {
+        bad.push(`a 60-minute block gets ${name ? Math.round(name.getBoundingClientRect().width) : 0}px of name on a phone`);
+      }
+      // The floor is only survivable because this one view scrolls sideways.
+      if (wrap && !/(auto|scroll)/.test(getComputedStyle(wrap).overflowX)) {
+        bad.push('the floor has nothing to scroll in: .weekly-full-wrap is not an x-scroller');
+      }
+    } finally { setDayBlocks(key, had, kid); renderWeek(); }
+    return bad.length === 0 || bad;
+  });
+  await page.setViewportSize({ width: 900, height: 1100 });
+
   /* MIDDLE-BUTTON PANNING follows the cursor, and carries on past the grid.
      Two defects, one check. It panned like a hand tool — moving the mouse down
      scrolled UP — which is the opposite of the middle-click autoscroll a mouse
@@ -2401,10 +2580,12 @@ function findChromium() {
       if (t) words += t.split(/\s+/).filter(w => /[A-Za-z]/.test(w)).length;
     }
 
-    // The week card's done-tick is sized inline per block height and sits at a
-    // card corner, so a 44px hit area there would swallow the tap that opens the
-    // day. Exempted deliberately, by name, with the reason in css/app.css — the
-    // Today-first rebuild is what actually relieves that grid.
+    // The week card's done-tick sits at a card corner, so a 44px hit area there
+    // would swallow the tap that opens the day. Exempted deliberately, by name,
+    // with the reason in css/app.css — the Today-first rebuild is what actually
+    // relieves that grid. It is 28px square where a square fits and a full-height
+    // 20px edge strip below that; the earlier note here described inline sizing
+    // that never applied, because min-width/min-height in css/app.css beat it.
     const EXEMPT = ['wf-card-check'];
 
     /* Measure the hit area, not the box. CLAUDE.md's own advice for a control
@@ -2575,6 +2756,14 @@ function findChromium() {
       const had = (getDayBlocks(key) || []).slice();
       try {
         setDayBlocks(key, [
+          /* The shortest block the app allows, and for a long time the shortest
+             this fixture did NOT contain: every row here started at 30 minutes,
+             one notch above the tier boundary, so the sliver path was never
+             drawn and none of its type was ever measured. It is `completed` on
+             purpose too — the font sweep below skips an element with no text
+             node, and an unticked button holds none, so the tick's own glyph
+             (8px, inline, under the floor) could not be seen either. */
+          { id: 'wk-audit-s', actId: 'break_quick', startMin: 6 * 60, durationMin: 15, completed: true },
           // A 30-minute block is the case that forced the density change: at the
           // old scale it was 15px tall, which no legible type fits inside.
           { id: 'wk-audit-a', actId: 'routine_morning', startMin: 7 * 60, durationMin: 30 },
@@ -9411,84 +9600,226 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
-  /* FAMILY HERO IS A CHORE, NOT A PRIZE.
-     Its four activities sat in REWARD_POOLS with rewardLocked:true, so the
-     thing a child had to earn was the right to help at home — and the first-run
-     overlay's whole content was picking one of them as an unlocked "starter".
-     Whoever did the chore is the hero; making the chore the reward said the
-     opposite.
+  /* NO ACTIVITY HAS TO BE EARNED — and seasonal locking still works.
 
-     The ids do not move, which is the load-bearing part: every block ever
-     placed against one still has to resolve. And the other three pools are
-     still earned — this removed one subsystem, not the reward mechanism. */
-  checks.familyHeroIsAChoreNotAPrize = await page.evaluate(() => {
+     Family Hero went first: its four activities sat in REWARD_POOLS with
+     rewardLocked:true, so the thing a child had to earn was the right to help
+     at home, and the first-run overlay's whole content was picking one of them
+     as an unlocked "starter". Whoever did the chore is the hero.
+
+     The remaining nine followed. The grant was never a level-up, whatever the
+     surrounding prose said — it was a placed-block milestone at 10/15/20, so
+     the app's answer to "you have planned ten things" was to hand back the
+     right to plan an eleventh KIND of thing.
+
+     Two things this check has to hold that the removal could easily have
+     broken. The ids do not move: every block ever placed against one still has
+     to resolve, or it renders as nothing at all. And _locked had TWO writers —
+     reward-locking and the seasonal out-of-season rule — so retiring the first
+     must leave the second exactly as it was, or Beach Day turns up in January.
+
+     The routine-streak checklist rewards are a different feature sharing the
+     same prompt widget, and they stay; asserted here so a later tidy-up does
+     not take them along by association. */
+  checks.noActivityHasToBeEarned = await page.evaluate(() => {
     const bad = [];
     const FAMILY = ['family_set_table', 'family_prep_bag', 'family_laundry_fold', 'family_kitchen_helper'];
-    const EARNED = ['acad_focus_sprint', 'health_stretch_reset', 'culture_story_circle'];
+    /* The nine that were locked. Five have since been RETIRED by the catalog
+       rewrite — they are asserted by theCatalogResolvesEveryBlockItEverNamed
+       instead, because "not on the picker" is now the correct answer for them
+       and demanding both would be two checks contradicting each other. */
+    const FORMERLY_EARNED = [
+      'health_recovery_fuel', 'health_stretch_reset',
+      'culture_story_circle', 'culture_festival_prep',
+    ];
     const wasProfile = profile;
     profile = 'jenn';
-    const pr = getProfData('jenn').progress;
-    const wasUnlocked = (pr.unlockedActs || []).slice();
-    const wasCount = pr.manualPlacedCount;
-    const wasWeek = JSON.parse(JSON.stringify(pr.unlockedThisWeek || {}));
-    const wasPending = (pr.pendingRewards || []).slice();
     try {
-      pr.unlockedActs = [];
       const avail = getAllActivities('jenn');
 
-      FAMILY.forEach(id => {
+      [...FAMILY, ...FORMERLY_EARNED].forEach(id => {
         const act = avail.find(a => a.id === id);
         if (!act) { bad.push(`${id} is not on the picker at all`); return; }
         if (act._rewardLocked) bad.push(`${id} is still reward-locked`);
         if (act._locked) bad.push(`${id} is still locked`);
-        // Still a chore, so it still counts as one in the hours charts.
-        if (activityGroup(act) !== 'chores') {
-          bad.push(`${id} is grouped as '${activityGroup(act)}', not a chore`);
-        }
         // The id resolves for a block placed against it in any past week.
-        const past = findActivity(id, 'jenn');
-        if (!past) bad.push(`a historical block naming ${id} no longer resolves`);
+        if (!findActivity(id, 'jenn')) bad.push(`a historical block naming ${id} no longer resolves`);
         const shown = blockDisplayName({ actId: id }, 'jenn');
         if (!shown || !shown.name || shown.name === 'Something') {
           bad.push(`${id} renders as "${shown && shown.name}"`);
         }
       });
 
-      // Unrelated rewards are untouched: they are still earned.
-      EARNED.forEach(id => {
+      // Family Hero is still a chore, so it still counts as one in the charts.
+      FAMILY.forEach(id => {
         const act = avail.find(a => a.id === id);
-        if (!act) { bad.push(`${id} vanished from the picker`); return; }
-        if (!act._rewardLocked) bad.push(`${id} is no longer a reward — the wrong pool was unlocked`);
+        if (act && activityGroup(act) !== 'chores') {
+          bad.push(`${id} is grouped as '${activityGroup(act)}', not a chore`);
+        }
       });
 
-      // A placement milestone must never queue a chore as a prize.
-      pr.unlockedActs = [];
-      pr.pendingRewards = [];
-      pr.unlockedThisWeek = {};
-      pr.manualPlacedCount = 10;
-      enqueueMilestoneRewards();
-      const queued = (pr.pendingRewards || []).map(r => r.actId);
-      const chore = queued.find(id => FAMILY.includes(id));
-      if (chore) bad.push(`the 10-block milestone queued ${chore} as a reward`);
-      if (!queued.length) bad.push('the 10-block milestone queued nothing at all');
-
-      // The unlock flow itself is gone, not merely unreachable.
-      ['openTutorial', 'chooseTutorialStarter', 'skipTutorial', 'TUTORIAL_STARTER_CHOICES']
+      // The machinery is gone, not merely unreachable.
+      ['REWARD_POOLS', 'enqueueMilestoneRewards', 'pickLockedReward', 'unlockRewardAct', 'queueReward',
+       'openTutorial', 'chooseTutorialStarter', 'skipTutorial', 'TUTORIAL_STARTER_CHOICES']
         .forEach(name => {
           if (typeof window[name] !== 'undefined') bad.push(`${name} is still defined`);
         });
       if (document.getElementById('tutorialOverlay')) bad.push('the tutorial overlay is still in the markup');
-      // Family Hero checklist "reward picks" went with it.
+      if (getAllActivities('jenn').some(a => a.rewardLocked)) bad.push('an activity still carries rewardLocked');
+
+      /* SEASONAL LOCKING, the other writer of _locked. Asserted against the
+         real current season rather than a fixed month, so it holds all year. */
+      const season = getCurrentSeason();
+      const offSeason = SEASONAL_ACTIVITIES.find(a => a.season !== season);
+      const inSeason  = SEASONAL_ACTIVITIES.find(a => a.season === season);
+      if (!offSeason) {
+        bad.push('no out-of-season activity to test seasonal locking with');
+      } else {
+        const act = avail.find(a => a.id === offSeason.id);
+        if (!act) bad.push(`${offSeason.id} vanished from the picker`);
+        else if (!act._locked) bad.push(`${offSeason.id} is a ${offSeason.season} activity and is not locked in ${season}`);
+      }
+      if (inSeason) {
+        const act = avail.find(a => a.id === inSeason.id);
+        if (act && act._locked) bad.push(`${inSeason.id} is in season (${season}) and is locked anyway`);
+      }
+
+      /* The checklist rewards, deliberately kept: a different feature that
+         earns an extra checklist ITEM off a real streak. */
+      ['queueChecklistReward', 'getUnlockedRoutineRewards', 'maybeShowRewardPrompt', 'acceptRewardPrompt']
+        .forEach(name => {
+          if (typeof window[name] !== 'function') bad.push(`${name} went with the activity unlocks`);
+        });
       const items = [...AFTERSCHOOL_REWARD_ITEMS, ...AFTERSCHOOL_CHECKLIST_REWARDS];
       const heroItem = items.find(i => /family hero/i.test(i.text));
       if (heroItem) bad.push(`a Family Hero reward item survives: "${heroItem.text}"`);
       if (items.length < 4) bad.push('the unrelated Focus/Culture reward items went too');
+      if (!document.getElementById('dayRewardPrompt')) bad.push('the reward prompt the checklist rewards still use is gone');
     } finally {
-      pr.unlockedActs = wasUnlocked;
-      pr.manualPlacedCount = wasCount;
-      pr.unlockedThisWeek = wasWeek;
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* THE CATALOG STILL RESOLVES EVERY BLOCK IT EVER NAMED.
+
+     Retiring an activity is the one change in this app that fails INVISIBLY.
+     A block whose actId nothing can resolve does not warn and does not fall
+     back — it renders as nothing at all, and the only way to notice is to open
+     the week it was in. So every retired id has to answer three ways: gone from
+     the pickers, still resolvable, and still able to say its own name.
+
+     The mechanism this exercises was half-built until now. getAllActivities
+     applied its `archived` filter to the custom and shared lists only, so the
+     flag on a built-in was read by nobody — the catalog rewrite is the first
+     thing that needed it, and a rule that covers half a catalog is worse than
+     no rule, because it reads as though it works. */
+  checks.theCatalogResolvesEveryBlockItEverNamed = await page.evaluate(() => {
+    const bad = [];
+    const RETIRED = [
+      'acad_focus_sprint', 'acad_preview_power', 'acad_reading_star',
+      'health_pack_tomorrow', 'culture_calligraphy_play',
+      'leaf_hike', 'rainy_craft',
+    ];
+    const wasProfile = profile;
+    profile = 'jenn';
+    try {
+      const pickable = getAllActivities('jenn');
+      RETIRED.forEach(id => {
+        if (pickable.some(a => a.id === id)) bad.push(`${id} is retired but still offered in the picker`);
+
+        const act = findActivity(id, 'jenn');
+        if (!act) { bad.push(`a block naming ${id} resolves to nothing and would render blank`); return; }
+        if (!act.name) bad.push(`${id} resolves but has no name`);
+        if (!act.icon) bad.push(`${id} resolves but has no icon`);
+
+        const shown = blockDisplayName({ actId: id }, 'jenn');
+        if (!shown || !shown.name || shown.name === 'Something') {
+          bad.push(`${id} renders as "${shown && shown.name}"`);
+        }
+        // Colour comes off the category, and an unresolvable block goes grey.
+        const col = blockColour({ actId: id }, 'jenn');
+        if (!col || col === '#888') bad.push(`${id} draws as the unknown-activity grey`);
+        // It still counts in the hours, under a real group.
+        if (!GROUP_ORDER.includes(activityGroup(act))) {
+          bad.push(`${id} groups as "${activityGroup(act)}", which is not a group`);
+        }
+      });
+
+      // And the half that was never wired: the flag has to actually do something.
+      const all = getAllActivities('jenn', { includeArchived: true });
+      if (!all.some(a => a.archived)) bad.push('nothing is archived, so this check proves nothing');
+      if (pickable.some(a => a.archived)) bad.push('an archived activity reached the picker');
+    } finally { profile = wasProfile; }
+    return bad.length === 0 || bad;
+  });
+
+  /* EVERY ACTIVITY KNOWS WHAT IT IS FOR.
+
+     Three fields decide where an activity's time is counted, when it is
+     suggested, and what a child is asked to aim at. A new row in the catalog
+     that forgets one of them does not break anything loudly: it just files its
+     hours under Daily, never gets suggested, and offers an empty goal sheet. */
+  checks.everyActivityKnowsWhatItIsFor = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'jenn';
+    /* Routines answer with their checklist instead (CLAUDE.md: a routine's
+       completion IS its checklist), and Rest is deliberately a state rather
+       than a task list. */
+    const NO_GOALS_BY_DESIGN = ['routine_morning', 'routine_afterschool', 'routine_evening'];
+    try {
+      getAllActivities('jenn', { includeArchived: true }).forEach(act => {
+        if (act.custom) return;   // a family's own activity sets its own terms
+        const g = activityGroup(act);
+        if (!GROUP_ORDER.includes(g)) bad.push(`${act.id} groups as "${g}", which is not a group`);
+        if (!Array.isArray(act.suitableTime) || !act.suitableTime.length) {
+          bad.push(`${act.id} says nothing about when it suits, so it is never suggested`);
+        }
+        if (act.isTraining || act.isRoutine || NO_GOALS_BY_DESIGN.includes(act.id)) return;
+        if (!getObjectivePresets(act).length) {
+          bad.push(`${act.id} offers an empty goal sheet`);
+        }
+      });
+
+      // Every group the app declares must be reachable by something, or it is a
+      // row on a chart that can never draw.
+      const groups = new Set(getAllActivities('jenn').map(a => activityGroup(a)));
+      GROUP_ORDER.forEach(g => {
+        if (!groups.has(g)) bad.push(`no activity lands in "${g}" — the chart row can never draw`);
+      });
+    } finally { profile = wasProfile; }
+    return bad.length === 0 || bad;
+  });
+
+  /* A LEGACY ACTIVITY REWARD DRAINS INSTEAD OF STICKING.
+     pendingRewards syncs, and a device serving an older bundle out of a Pages
+     cache can still queue an {actId} entry. There is nothing left to grant —
+     she can already use the activity — so the prompt must drop it rather than
+     show an offer that cannot be accepted, which would wedge the widget for
+     the checklist rewards queued behind it. */
+  checks.aLegacyActivityRewardDrainsAway = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'jenn';
+    const pr = getProfData('jenn').progress;
+    const wasPending = (pr.pendingRewards || []).slice();
+    try {
+      pr.pendingRewards = [
+        { id: 'rw-legacy', actId: 'culture_story_circle', reason: 'Placed 20 blocks' },
+        { id: 'rw-list', type: 'checklist', routineId: 'morning',
+          item: { id: 'mw1', text: 'Warm water with breakfast' }, reason: '5-day streak' },
+      ];
+      maybeShowRewardPrompt();
+      const left = (pr.pendingRewards || []).map(r => r.id);
+      if (left.includes('rw-legacy')) bad.push('the legacy activity reward is still queued');
+      if (!left.includes('rw-list')) bad.push('draining the legacy reward took the checklist reward with it');
+      const txt = (document.getElementById('dayRewardText') || {}).textContent || '';
+      if (!/Warm water/.test(txt)) bad.push(`the prompt shows "${txt}" instead of the checklist reward behind it`);
+    } finally {
       pr.pendingRewards = wasPending;
       profile = wasProfile;
+      maybeShowRewardPrompt();
     }
     return bad.length === 0 || bad;
   });
@@ -11120,12 +11451,28 @@ function findChromium() {
       routine_morning: 'routine', health_pack_tomorrow: 'routine',
       training: 'body', competition: 'body',
       family: 'free', relax: 'free', break_quick: 'free', snow_play: 'free',
+      /* Everyday movement is hers, not a coach's — a Saturday swim is not the
+         same ask as a coached hour, and both used to land in one place.
+         `relax` stays Free on purpose: rest that scores is rest turned into
+         another thing to perform. */
+      swimming: 'move', skating: 'move', bike_ride: 'move', health_stretch_reset: 'move',
+      // Outings carry an explicit group; cat is busy saying what colour they are.
+      day_trip: 'explore', museum: 'explore', nature_walk: 'explore', beach_day: 'explore',
+      // A seasonal treat is not training, whatever its category says.
+      garden_time: 'free',
     };
     Object.keys(want).forEach(id => {
       const got = activityGroup(findActivity(id, 'jenn'));
       if (got !== want[id]) bad.push(`${id} groups as ${got}, expected ${want[id]}`);
     });
-    if (GROUP_ORDER.length !== 6) bad.push(`${GROUP_ORDER.length} groups, expected 6`);
+    if (GROUP_ORDER.length !== 8) bad.push(`${GROUP_ORDER.length} groups, expected 8`);
+    /* groupDef's fallback used to be the positional ACTIVITY_GROUPS[4], which
+       was 'daily' only because daily happened to be fifth — so adding a group
+       above it would have re-pointed every unknown-group lookup at a different
+       row in silence. Nothing tested it; this does. */
+    if (groupDef('no-such-group').id !== 'daily') {
+      bad.push(`an unknown group falls back to ${groupDef('no-such-group').id}, expected daily`);
+    }
     // Every group has a label and a short form that fits a week-grid cell.
     GROUP_ORDER.forEach(g => {
       if (!groupLabel(g)) bad.push(`${g} has no label`);
