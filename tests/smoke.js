@@ -754,6 +754,118 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* A SHORT BLOCK STILL SAYS WHAT IT IS, and its tick fits inside it.
+
+     Three defects met on the quarter-hour card and none of them was visible to
+     this suite. The tick's size was written inline by the renderer and then
+     overridden by min-width/min-height in css/app.css — different properties,
+     so they beat the inline width rather than losing to it. Every tick was
+     28x28 at every height, which on an 18px card is TALLER THAN THE CARD, and
+     the name was dropped to make room for a control that did not fit either.
+     Meanwhile blockContentTier was asked about a height the card never had
+     (16 in JS against an 18px CSS floor), so a card that could have shown its
+     name was told it could not.
+
+     Asserts the invariant rather than the pixel count: whatever the tick's
+     size rule becomes, it may never exceed the block it belongs to, and a
+     rendered block always says its own name. */
+  checks.aShortBlockStillSaysWhatItIs = await page.evaluate(() => {
+    goWeek(); setWeekView('full');
+    const kid = activeProfile();
+    const key = getDayKeys(0)[2];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    try {
+      setDayBlocks(key, [
+        { id: 'wk-min-a', actId: 'break_quick',     startMin: 6 * 60,      durationMin: 15, completed: true },
+        { id: 'wk-min-b', actId: 'routine_evening', startMin: 6 * 60 + 30, durationMin: 20 },
+        { id: 'wk-min-c', actId: 'piano',           startMin: 8 * 60,      durationMin: 60 },
+      ], kid);
+      weekOffset = 0; renderWeek();
+
+      const cards = [...document.querySelectorAll('#screen-week .wf-card')]
+        .filter(c => ['wk-min-a', 'wk-min-b', 'wk-min-c'].some(id => (c.outerHTML || '').includes(id)));
+      if (cards.length < 3) return [`seeded 3 blocks, the week drew ${cards.length}`];
+
+      cards.forEach(c => {
+        const box  = c.getBoundingClientRect();
+        const name = c.querySelector('.wf-card-name');
+        const tick = c.querySelector('.wf-card-check');
+        const label = (name && name.textContent.trim()) || '(unnamed)';
+
+        if (!name || getComputedStyle(name).display === 'none' || name.getBoundingClientRect().width < 1) {
+          bad.push(`${label}: a ${Math.round(box.height)}px card renders no name`);
+        }
+        if (!tick) {
+          bad.push(`${label}: no way to check the block off`);
+          return;
+        }
+        const t = tick.getBoundingClientRect();
+        // The defect, stated directly.
+        if (t.height > box.height + 0.5) {
+          bad.push(`${label}: tick is ${Math.round(t.height)}px tall on a ${Math.round(box.height)}px card`);
+        }
+        // The glyph is only measurable on a completed block; the font sweep in
+        // kidScreensMeetTheHouseRules skips a button with no text node, which
+        // is why an 8px tick survived it.
+        if (tick.textContent.trim()) {
+          const f = parseFloat(getComputedStyle(tick).fontSize);
+          if (f < 13) bad.push(`${label}: the tick's glyph is ${f}px, under the 13px floor`);
+        }
+      });
+    } finally { setDayBlocks(key, had, kid); renderWeek(); }
+    return bad.length === 0 || bad;
+  });
+
+  /* THE WEEK KEEPS ITS COLUMN FLOOR ON A PHONE.
+
+     css/app.css carried `@media (max-width:600px){ .weekly-full{min-width:560px} }`
+     under a comment saying the 7 columns would otherwise be too thin to read —
+     and the plain `.weekly-full` block eight lines BELOW it set `min-width: 0`
+     at the same specificity, so the floor never applied once. At 430px every
+     column was 44px wide and NO card name rendered at ANY duration: a two-hour
+     training block was as nameless as a fifteen-minute break.
+
+     Measured at a real phone viewport rather than by reading the rule — the
+     suite runs over file://, where cssRules on a linked stylesheet throws, and
+     a check that silently reads nothing would pass on an empty set. What
+     matters is the rendered column anyway, not which rule produced it. */
+  await page.setViewportSize({ width: 390, height: 844 });
+  checks.theWeekGridKeepsItsColumnFloor = await page.evaluate(() => {
+    goWeek(); setWeekView('full');
+    const kid = activeProfile();
+    const key = getDayKeys(0)[2];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    try {
+      setDayBlocks(key, [
+        { id: 'wk-floor-a', actId: 'piano', startMin: 8 * 60, durationMin: 60 },
+      ], kid);
+      weekOffset = 0; renderWeek();
+
+      const wrap = document.querySelector('.weekly-full-wrap');
+      const card = [...document.querySelectorAll('#screen-week .wf-card')]
+        .find(c => (c.outerHTML || '').includes('wk-floor-a'));
+      if (!card) return ['the week drew no card to measure'];
+
+      // 7 columns plus the 58px sideband + gutter. Below roughly 700 a column
+      // cannot hold an icon and a name together, which is the point of a floor.
+      const col = card.getBoundingClientRect().width;
+      if (col < 90) bad.push(`a phone column is ${Math.round(col)}px, too thin to name a block`);
+
+      const name = card.querySelector('.wf-card-name');
+      if (!name || name.getBoundingClientRect().width < 20) {
+        bad.push(`a 60-minute block gets ${name ? Math.round(name.getBoundingClientRect().width) : 0}px of name on a phone`);
+      }
+      // The floor is only survivable because this one view scrolls sideways.
+      if (wrap && !/(auto|scroll)/.test(getComputedStyle(wrap).overflowX)) {
+        bad.push('the floor has nothing to scroll in: .weekly-full-wrap is not an x-scroller');
+      }
+    } finally { setDayBlocks(key, had, kid); renderWeek(); }
+    return bad.length === 0 || bad;
+  });
+  await page.setViewportSize({ width: 900, height: 1100 });
+
   /* MIDDLE-BUTTON PANNING follows the cursor, and carries on past the grid.
      Two defects, one check. It panned like a hand tool — moving the mouse down
      scrolled UP — which is the opposite of the middle-click autoscroll a mouse
@@ -2401,10 +2513,12 @@ function findChromium() {
       if (t) words += t.split(/\s+/).filter(w => /[A-Za-z]/.test(w)).length;
     }
 
-    // The week card's done-tick is sized inline per block height and sits at a
-    // card corner, so a 44px hit area there would swallow the tap that opens the
-    // day. Exempted deliberately, by name, with the reason in css/app.css — the
-    // Today-first rebuild is what actually relieves that grid.
+    // The week card's done-tick sits at a card corner, so a 44px hit area there
+    // would swallow the tap that opens the day. Exempted deliberately, by name,
+    // with the reason in css/app.css — the Today-first rebuild is what actually
+    // relieves that grid. It is 28px square where a square fits and a full-height
+    // 20px edge strip below that; the earlier note here described inline sizing
+    // that never applied, because min-width/min-height in css/app.css beat it.
     const EXEMPT = ['wf-card-check'];
 
     /* Measure the hit area, not the box. CLAUDE.md's own advice for a control
@@ -2575,6 +2689,14 @@ function findChromium() {
       const had = (getDayBlocks(key) || []).slice();
       try {
         setDayBlocks(key, [
+          /* The shortest block the app allows, and for a long time the shortest
+             this fixture did NOT contain: every row here started at 30 minutes,
+             one notch above the tier boundary, so the sliver path was never
+             drawn and none of its type was ever measured. It is `completed` on
+             purpose too — the font sweep below skips an element with no text
+             node, and an unticked button holds none, so the tick's own glyph
+             (8px, inline, under the floor) could not be seen either. */
+          { id: 'wk-audit-s', actId: 'break_quick', startMin: 6 * 60, durationMin: 15, completed: true },
           // A 30-minute block is the case that forced the density change: at the
           // old scale it was 15px tall, which no legible type fits inside.
           { id: 'wk-audit-a', actId: 'routine_morning', startMin: 7 * 60, durationMin: 30 },

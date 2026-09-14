@@ -903,6 +903,15 @@ function renderFullWeek(keys) {
   // activity is ONE unbroken block positioned by its real start time on a
   // shared px-per-minute scale, so nothing is ever sliced at a band boundary.
   const PX_PER_MIN = 0.72;
+  /* The shortest a card is ever drawn. The stylesheet carries the same number
+     (.wf-card min-height in css/app.css) and the two must not drift: this was
+     16 here against 18 there, so a 15-minute card was JUDGED at a height it
+     never had. blockContentTier saw 16, the `name` tier needs 20, and a card
+     that actually rendered 18px tall was told it had no room for its own name
+     — the reason a quarter-hour block showed one emoji and nothing else.
+     20 is the `name` tier, so the shortest block the app allows can say what
+     it is. */
+  const WF_CARD_MIN_PX = 20;
   const totalH = Math.round(DAY_MIN_SPAN * PX_PER_MIN);
 
   /* WEEKDAY_BANDS and WEEKEND_BANDS lived here: four hardcoded stretches with
@@ -1071,7 +1080,7 @@ function renderFullWeek(keys) {
       const relStart = b.startMin - START_MIN;
       const dur = Math.max(5, b.durationMin || 0);
       const topPx = relStart * PX_PER_MIN;
-      const pxHeight = Math.max(dur * PX_PER_MIN, 16);
+      const pxHeight = Math.max(dur * PX_PER_MIN, WF_CARD_MIN_PX);
 
       // Training topics carry their own icon + colour (skating/swimming/dryland).
       const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
@@ -1092,8 +1101,13 @@ function renderFullWeek(keys) {
       const tier = blockContentTier(pxHeight);
       let cls = 'wf-card' + (isLightColour(bg) ? ' light-bg' : '');
       if (blockTierAtLeast(tier, 'detail')) cls += ' wf-card--tall'; // room to stack time/icon/name centered
-      if (!blockTierAtLeast(tier, 'meta')) cls += ' wf-card--slim';
-      if (!blockTierAtLeast(tier, 'name')) cls += ' wf-card--xslim wf-card--icononly';
+      /* Below `meta` a 28px square tick does not fit: at 30px of card, a
+         28px box offset 3px from the top overruns the card and is clipped.
+         So the tick becomes a full-height strip on the card's edge instead —
+         proportional by construction, and it can never again be taller than
+         the block it belongs to. There is no icon-only tier any more: the
+         floor above IS the `name` tier, so every drawn card can say its name. */
+      if (!blockTierAtLeast(tier, 'meta')) cls += ' wf-card--slim wf-card--stripcheck';
       if (isBlockCompleted(b, activeProfile())) cls += ' wf-card--done';
       const hasConflict = bufferConflicts.affected.has(b.id);
       if (hasConflict) cls += ' wf-card--conflict';
@@ -1116,7 +1130,7 @@ function renderFullWeek(keys) {
       if (warmupMin > 0) bufKinds.push(`🔥${warmupMin}m`);
 
       card.style.top = topPx + 'px';
-      card.style.height = Math.max(pxHeight - 2, 12) + 'px';
+      card.style.height = Math.max(pxHeight - 2, WF_CARD_MIN_PX) + 'px';
       card.style.left  = leftCss;
       card.style.width = widthCss;
       card.style.background = bg;
@@ -1147,9 +1161,6 @@ function renderFullWeek(keys) {
           .join('');
       }
       const durHtml = `${formatDuration(b.durationMin)}${(!sumHtml && detailLines.length) ? ' · ' + blockCountsSummary(detailLines) : ''}`;
-      // Done-tick sized to the card's own height, same idea as the print
-      // checkboxes, so a slim card doesn't carry an oversized tap target.
-      const checkPx = Math.max(14, Math.min(24, Math.round(10 + pxHeight / 4)));
       card.innerHTML = `
         ${conflictFlag}
         <div class="wf-card-time">${timeStr}</div>
@@ -1157,7 +1168,7 @@ function renderFullWeek(keys) {
         <div class="wf-card-name">${stampEmoji}${escapeHtml(dispName)}${travelTag}${conflictTag}</div>
         ${sumHtml}
         <div class="wf-card-dur">${durHtml}</div>
-        <button type="button" class="wf-card-check" style="width:${checkPx}px;height:${checkPx}px;font-size:${Math.round(checkPx*0.58)}px" aria-label="${b.completed?'Mark not done':'Mark done'}"
+        <button type="button" class="wf-card-check" aria-label="${b.completed?'Mark not done':'Mark done'}"
           onclick="toggleBlockDone('${escapeJsAttr(key)}','${escapeJsAttr(b.id)}',event)">${b.completed?'✓':''}</button>
       `;
       card.title = `${dispIcon} ${dispName} — ${timeStr}, ${formatDuration(b.durationMin)}`

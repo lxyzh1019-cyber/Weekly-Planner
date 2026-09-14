@@ -1729,9 +1729,6 @@
     padding: 0.6rem;
     min-width: 720px;
   }
-  /* On phones the 7 columns would be too thin to read, so give them a
-     floor and let this one view scroll instead of squishing. */
-  @media (max-width: 600px) { .weekly-full { min-width: 560px; } }
   .weekly-full {
     display: grid;
     /* Leading 18px column = time-of-day sideband (Before School / School /
@@ -1740,11 +1737,28 @@
     grid-template-columns: 18px 40px repeat(7, minmax(0, 1fr));
     gap: 0;
     min-width: 0;
+    /* Keep the reset above for wide screens, where the grid should fill its
+       wrapper and no more. */
     background: var(--paper);
     border: 2px solid var(--ink);
     border-radius: 14px;
     overflow: hidden;
     box-shadow: 3px 3px 0 var(--ink);
+  }
+  /* On phones the 7 columns are too thin to read, so give them a floor and let
+     this one view scroll sideways instead of squishing — .weekly-full-wrap is
+     already overflow:auto, so the scroll it always needed just works.
+
+     This rule used to sit ABOVE the .weekly-full block, whose `min-width: 0`
+     then beat it at equal specificity from further down the file. The floor
+     therefore never applied once: at 430px every column was 44px wide and NO
+     card name rendered at ANY duration — a two-hour training block was as
+     nameless as a fifteen-minute break. It has to stay after that reset.
+
+     770, not the 560 originally written: 560 gives a 65px column and 18px of
+     name, which is an ellipsis. 770 gives 95px and 48px of name. */
+  @media (max-width: 600px) {
+    .weekly-full { min-width: 770px; }
   }
   .wf-corner {
     background: var(--bg2);
@@ -1870,8 +1884,11 @@
     text-shadow: 0 1px 1px rgba(0,0,0,0.25);
     overflow: hidden;
     box-sizing: border-box;
-    /* Floor so even a 15-min block stays tall enough to tap & read (W2). */
-    min-height: 18px;
+    /* Floor so even a 15-min block stays tall enough to tap & read (W2).
+       Must equal WF_CARD_MIN_PX in js/07-week-view.js, which is what
+       blockContentTier is asked about — they were 18 and 16, so the ladder
+       judged a card 2px shorter than it drew and refused it its own name. */
+    min-height: 20px;
     z-index: 2;
   }
   .wf-card:hover { transform: translate(-1px,-1px); box-shadow: 2.5px 2.5px 0 var(--ink); z-index: 3; }
@@ -1911,7 +1928,7 @@
     margin-left: 4px; font-size: calc(0.62rem * var(--fs-scale, 1)); font-weight: 800;
     opacity: 0.9; white-space: nowrap;
   }
-  .wf-card--slim .wf-card-travel, .wf-card--xslim .wf-card-travel { display: none; }
+  .wf-card--slim .wf-card-travel { display: none; }
   /* Buffer/conflict warning badge inline on the card name */
   .wf-card-conflict-badge { margin-left: 3px; font-size: calc(0.68rem * var(--fs-scale, 1)); filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); }
   /* A conflict is a real scheduling problem, so it must read at a glance without
@@ -2020,7 +2037,7 @@
   /* Quick-complete tick in the card corner — check off without opening detail */
   .wf-card-check {
     position: absolute; top: 3px; right: 3px;
-    width: 24px; height: 24px; border-radius: 6px;
+    width: 28px; height: 28px; border-radius: 6px;
     border: 2px solid var(--ink); background: rgba(255,255,255,0.9);
     color: var(--ink); font-size: 1rem; font-weight: 900; line-height: 1;
     display: flex; align-items: center; justify-content: center;
@@ -2030,23 +2047,35 @@
   .wf-card--done { opacity: 0.6; }
   .wf-card--done .wf-card-name { text-decoration: line-through; }
   .wf-card--done .wf-card-check { background: var(--accent-green); color: var(--ink); }
-  /* W4: even the shortest block keeps a tappable tick, just smaller — never
-     leave a rendered block with no way to check it off. */
-  .wf-card--xslim .wf-card-check { width: 19px; height: 19px; font-size: calc(0.78rem * var(--fs-scale, 1)); top: 2px; right: 2px; border-radius: 5px; }
+  /* W4: even the shortest block keeps a tappable tick — never leave a rendered
+     block with no way to check it off.
+
+     Below the `meta` tier the 28px square above does not fit: a 30px card with
+     a 28px box offset 3px from the top overruns by 1px, and an 18px card was
+     overrun by 13px and clipped by .wf-card's own overflow:hidden — the tick
+     was literally taller than the block it belonged to, and the name was
+     dropped to make room for it. A full-height edge strip is proportional by
+     construction, so that cannot recur at any duration. The glyph is 13px,
+     the house floor; it used to be sized inline and computed to 8px. */
+  .wf-card--stripcheck .wf-card-check {
+    top: 0; right: 0; bottom: 0;
+    width: 20px; height: auto;
+    border-radius: 0 3px 3px 0;
+    border-width: 0 0 0 2px;
+    font-size: 13px;
+  }
+  /* Keep the name clear of the strip. */
+  .wf-card--stripcheck { padding-right: 22px; }
   /* Short blocks: drop the duration/time chips so the name + icon still fit */
   .wf-card.wf-card--slim { padding: 0 0.4rem; align-items: center; }
   .wf-card.wf-card--slim .wf-card-dur { display: none; }
   .wf-card.wf-card--slim .wf-card-icon { font-size: calc(0.9rem * var(--fs-scale, 1)); }
-  .wf-card.wf-card--xslim .wf-card-time { display: none; }
-  .wf-card.wf-card--xslim { grid-template-columns: auto 1fr auto; font-size: calc(0.74rem * var(--fs-scale, 1)); padding: 0 0.3rem; }
-  .wf-card.wf-card--xslim .wf-card-icon { font-size: calc(0.8rem * var(--fs-scale, 1)); }
-  /* W2: too short even for a name → show the icon only, keep the title tooltip
-     and (on the first segment) the check button. */
-  .wf-card--icononly { grid-template-columns: 1fr auto; padding: 0 0.2rem; justify-items: center; }
-  .wf-card--icononly .wf-card-name,
-  .wf-card--icononly .wf-card-time,
-  .wf-card--icononly .wf-card-dur { display: none; }
-  .wf-card--icononly .wf-card-icon { font-size: calc(0.78rem * var(--fs-scale, 1)); }
+  /* W2 was here: an icon-only tier for a block too short even for a name, plus
+     the --xslim type ramp that went with it (11.84px card text, 12.8px icon —
+     both under the 13px floor). Nothing sets either class now. The week's card
+     floor is the `name` tier, so the shortest block the app allows says what it
+     is instead of rendering as a bare emoji with the name only in a title
+     tooltip, which a child on an iPad can never reach. */
   /* W1: continuation segment of a block that crosses a zone boundary. Dashed
      top edge + ⤵ marker, no time/check (those live on the first segment). */
   /* The .week-legend rules lived here. That legend was parent-only markup inside
@@ -2676,8 +2705,12 @@
   }
   .block-done-btn:hover { background: rgba(255,255,255,0.95); transform: scale(1.08); }
   .block-done-btn.done { background: var(--accent-green); color: var(--ink); }
-  /* On short/compact blocks there isn't room for both buttons — hide the
-     tick there (the block can still be checked from the week view or detail). */
+  /* On short/compact blocks there isn't room for both buttons — hide the tick
+     there. The block is still checkable from Today's quest cards, from the
+     block's own detail sheet, and from the week grid, whose short cards carry
+     an edge-strip tick (.wf-card--stripcheck) for exactly this reason — for a
+     long time that last route was the 28px box described above, which on a
+     15-minute card was taller than the card itself. */
   .placed-block.compact .block-done-btn { display: none; }
   /* Doodle decorations scattered around blocks */
   .tl-doodle {
@@ -5906,18 +5939,18 @@
     transform: translate(-50%, -50%);
   }
 
-  /* The week card's done-tick is the one control this rule cannot reach yet, and
-     it is worth saying why rather than quietly exempting it. Its size is set
-     inline per block height (js/07-week-view.js) so the shortest block still gets
-     a tick, and it sits at the card's corner — a 44x44 overlay there would cover
-     most of a short card and swallow the tap that opens the day. So: raise the
-     floor from 15px to 28px, which is a real gain, and leave the rest to the
-     Today-first rebuild, whose whole point is that a child stops having to work
-     in this grid. tests/smoke.js records the exemption by name. */
-  #screen-week .wf-card-check {
-    min-width: 28px;
-    min-height: 28px;
-  }
+  /* The week card's done-tick is the one control this rule cannot reach, and it
+     is worth saying why rather than quietly exempting it. It sits at the card's
+     corner, where a 44x44 overlay would cover most of a short card and swallow
+     the tap that opens the day. tests/smoke.js records the exemption by name.
+
+     This used to impose the 28px floor from HERE, as min-width/min-height. Those
+     are different properties from the width/height the renderer was writing
+     inline, so they beat it rather than losing to it: every tick was 28x28 at
+     every block height, the inline arithmetic was dead (it capped at 24 and
+     could never reach 28), and on an 18px card the tick was taller than the
+     block. The size now lives with the component, in one place, in two states —
+     see .wf-card-check and .wf-card--stripcheck above. */
 
   /* Disclosure control for the privilege ladder — same shape as the app's other
      "show the rest" affordances, and a full-size target because a child taps it. */
