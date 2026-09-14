@@ -230,6 +230,8 @@ function onTrainingBufferMinInput() {
 function cancelCreatePlacement(overlayId, skipClose=false) {
   pendingStartMin = null;
   selectedActivity = null;
+  // Nothing landed on a day, so the category learns nothing.
+  slotPickerPickedUnder = null;
   currentTimelineGuideY = null;
   clearPlacementGuide();
   if (!skipClose && overlayId) closeSheet(overlayId);

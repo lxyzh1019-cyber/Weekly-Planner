@@ -2569,6 +2569,66 @@
   }
   .placed-block:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--ink); }
   .placed-block.parent-pinned { border-style: dashed; border-width: 3px; }
+
+  /* ── Drag handles (js/39-block-drag.js) ──
+     THE ONLY touch-action declarations in the project, and they must stay that
+     way. `.day-workspace` is the day screen's one scroller; a finger anywhere
+     on a block that was not a handle has to keep scrolling the day, so putting
+     touch-action on .placed-block or .tl-canvas would make a planned day
+     unscrollable over most of its surface — and no automated check can see a
+     swallowed flick.
+
+     The three handles tile the block's edges and never overlap: the left strip
+     moves, the top and bottom strips resize, and everything else still opens
+     the editor.
+
+     TARGET SIZE, deliberately exempted, the same shape as .wf-card-check. The
+     grip is 32px wide rather than 44 because a 44px column on a 150px-wide
+     block takes a third of the space its name needs, and a resize strip is
+     14px because two 44px strips would consume a 46px block entirely. Both run
+     the full length of the edge they sit on, so they are generous in the
+     dimension that has room. Missing one is not a dead end: the tap lands on
+     the block and opens the edit sheet, which changes the same two facts. */
+  .block-drag-handle {
+    position: absolute; z-index: 12;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .block-grip {
+    left: 0; top: 0; bottom: 0; width: 32px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; line-height: 1; color: inherit; opacity: 0.75;
+    cursor: grab;
+  }
+  .block-grip:active { cursor: grabbing; }
+  .placed-block.has-grip { padding-left: 34px; }
+  .block-resize { left: 32px; right: 0; height: 14px; cursor: ns-resize; }
+  .block-resize--top { top: 0; }
+  .block-resize--bottom { bottom: 0; }
+  /* A short bar so the edge reads as something you can pull. Drawn inside the
+     handle, because .placed-block clips its overflow. */
+  .block-resize::after {
+    content: ''; position: absolute; left: 50%; transform: translateX(-50%);
+    width: 30px; height: 3px; border-radius: 2px;
+    background: currentColor; opacity: 0.6;
+  }
+  .block-resize--top::after { top: 3px; }
+  .block-resize--bottom::after { bottom: 3px; }
+
+  /* Mid-drag. The transition would otherwise lag every pointermove by 150ms,
+     and the hover translate would compose against the drag's own transform —
+     neutralised without !important, which would beat the inline transform the
+     drag is steering with. */
+  .placed-block.is-block-dragging {
+    transition: none; z-index: 30; opacity: 0.92;
+    box-shadow: 5px 5px 0 var(--ink);
+  }
+  .placed-block.is-block-dragging:hover { transform: translate(0,0); }
+  /* Which day a drop will land on. Only ever set on a column that is NOT the
+     one the block came from, so it appears exactly when the answer has stopped
+     being obvious — a block arriving on the wrong day is not a mistake a child
+     can see afterwards. */
+  .tl-col--droptarget { outline: 3px dashed var(--accent-strong); outline-offset: -3px; border-radius: 10px; }
   /* W7: a block spilling past the selected zone's edge shows a "continues"
      marker at that edge instead of being silently cut off. */
   .block-clip-marker {
@@ -4745,6 +4805,15 @@
   .slot-pick-chip:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
   .slot-pick-chip:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 var(--ink); }
   .slot-pick-chip.locked { opacity: 0.55; }
+  /* The one she last added from this category, lifted to the front. The tag is
+     not decoration: a chip that silently jumped to the top is a reordering a
+     child cannot learn from. 13px is the kid floor — this is a label she reads
+     to understand the list, not a footnote. */
+  .slot-pick-chip--last { border-color: var(--accent-strong); box-shadow: 2px 2px 0 var(--accent-strong); }
+  .spc-last {
+    flex-shrink: 0; font-size: 13px; font-weight: 800;
+    color: var(--accent-strong); white-space: nowrap;
+  }
   .slot-pick-add { background: var(--bg2); border-style: dashed; }
   .spc-icon { font-size: 1.4rem; flex-shrink: 0; }
   /* Wraps rather than ellipses, and a step down from the inherited 19.5px so two

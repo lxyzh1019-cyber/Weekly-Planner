@@ -1350,6 +1350,574 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* ── Dragging a placed block (js/39-block-drag.js) ──
+     One in-page helper drives every drag check. PointerEvent triples with
+     pointerId 1, and setPointerCapture stubbed before dispatch: without the
+     pointer id Chrome throws NotFoundError from inside the handler, which lands
+     in errors[] and fails noConsoleErrors rather than the check you wrote.
+     Mirrors middleDragFollowsTheCursorAndChains. */
+  await page.evaluate(() => {
+    window.dragHandle = (blockId, sel, dx, dy, steps = 4, hold = false) => {
+      const el = document.getElementById('block-' + blockId);
+      if (!el) return 'no block ' + blockId;
+      const h = el.querySelector(sel);
+      if (!h) return 'no handle ' + sel + ' on ' + blockId;
+      h.setPointerCapture = h.setPointerCapture || (() => {});
+      h.releasePointerCapture = h.releasePointerCapture || (() => {});
+      const r = h.getBoundingClientRect();
+      const x0 = r.left + r.width / 2, y0 = r.top + r.height / 2;
+      const send = (type, x, y) => h.dispatchEvent(new PointerEvent(type, {
+        bubbles: true, cancelable: true, pointerId: 1, button: 0, buttons: 1,
+        clientX: x, clientY: y,
+      }));
+      send('pointerdown', x0, y0);
+      for (let i = 1; i <= steps; i++) send('pointermove', x0 + dx * i / steps, y0 + dy * i / steps);
+      if (hold) { window._dragRelease = () => { send('pointerup', x0 + dx, y0 + dy); window._dragRelease = null; }; return null; }
+      send('pointerup', x0 + dx, y0 + dy);
+      return null;
+    };
+    // One 60-minute block at 9am on a known day, and the day put back after.
+    window.seedDragDay = (dur = 60, startMin = 9 * 60) => {
+      const key = getDayKeys(0)[3];
+      const before = (getDayBlocks(key, 'jenn') || []).slice();
+      setDayBlocks(key, [{
+        id: 'dg1', actId: 'piano', startMin, durationMin: dur,
+        objectives: [], note: '', checklistState: {},
+      }], 'jenn');
+      openDay(key, 3);
+      return { key, undo: () => { setDayBlocks(key, before, 'jenn'); openDay(key, 3); } };
+    };
+  });
+
+  checks.draggingABlockMovesItToTheTimeItWasDroppedAt = await page.evaluate(() => {
+    const bad = [];
+    profile = 'jenn'; parentViewing = 'jenn';
+    const { key, undo } = seedDragDay();
+    try {
+      const err = dragHandle('dg1', '.block-grip', 0, 120 * PX_PER_MIN);
+      if (err) { bad.push(err); return bad; }
+      const b = (getDayBlocks(key, 'jenn') || [])[0];
+      if (!b) bad.push('the block is gone after a drag');
+      else {
+        if (b.startMin !== 11 * 60) bad.push(`dropped two hours down and landed at ${b.startMin}, not ${11 * 60}`);
+        if (b.durationMin !== 60) bad.push(`moving changed the duration to ${b.durationMin}`);
+        if (b.id !== 'dg1') bad.push('a same-day move changed the block id');
+        const el = document.getElementById('block-dg1');
+        const topPx = el ? parseFloat(el.style.top) : -1;
+        const want = (11 * 60 - START_MIN) * PX_PER_MIN;
+        if (Math.abs(topPx - want) > 2) bad.push(`redrawn at ${topPx}px, expected about ${want}px`);
+      }
+    } finally { undo(); }
+    return bad.length === 0 || bad;
+  });
+
+  /* THE regression this exists for. An unstamped edit loses whole-record
+     arbitration to a stale remote copy and the move is silently undone on the
+     next sync — invisible on every screen, which is why it is asserted rather
+     than trusted. baseOpId is the half that proves markItemUpdated ran rather
+     than something merely touching updatedAt. */
+  checks.aDraggedBlockIsStampedSoAMergeCannotLoseIt = await page.evaluate(() => {
+    const bad = [];
+    const { key, undo } = seedDragDay();
+    try {
+      const b0 = getDayBlocks(key, 'jenn')[0];
+      b0.opId = 'op-before'; b0.updatedAt = 1;
+      const err = dragHandle('dg1', '.block-grip', 0, 60 * PX_PER_MIN);
+      if (err) { bad.push(err); return bad; }
+      const b = getDayBlocks(key, 'jenn')[0];
+      if (!b.updatedAt || b.updatedAt <= 1) bad.push('the drag did not move updatedAt');
+      if (!b.opId || b.opId === 'op-before') bad.push('the drag did not mint a new opId');
+      if (b.baseOpId !== 'op-before') bad.push(`baseOpId is ${b.baseOpId}, so markItemUpdated did not run`);
+    } finally { undo(); }
+    return bad.length === 0 || bad;
+  });
+
+  checks.resizingABlockChangesOnlyItsDuration = await page.evaluate(() => {
+    const bad = [];
+    const at = (id, k) => { const b = (getDayBlocks(k, 'jenn') || [])[0]; return b ? b[id] : null; };
+
+    let s = seedDragDay(60, 9 * 60);
+    try {
+      dragHandle('dg1', '.block-resize--bottom', 0, 30 * PX_PER_MIN);
+      if (at('startMin', s.key) !== 9 * 60) bad.push('the bottom edge moved the start');
+      if (at('durationMin', s.key) !== 90) bad.push(`the bottom edge gave ${at('durationMin', s.key)} minutes, not 90`);
+    } finally { s.undo(); }
+
+    // A top edge moves the start and HOLDS the end.
+    s = seedDragDay(60, 9 * 60);
+    try {
+      dragHandle('dg1', '.block-resize--top', 0, 15 * PX_PER_MIN);
+      const st = at('startMin', s.key), du = at('durationMin', s.key);
+      if (st !== 9 * 60 + 15) bad.push(`the top edge put the start at ${st}`);
+      if (st + du !== 10 * 60) bad.push(`the top edge moved the END to ${st + du}, it must stay at ${10 * 60}`);
+    } finally { s.undo(); }
+
+    // Dragged past itself it stops at the floor, never at zero or below.
+    s = seedDragDay(60, 9 * 60);
+    try {
+      dragHandle('dg1', '.block-resize--bottom', 0, -300 * PX_PER_MIN);
+      const du = at('durationMin', s.key);
+      if (du !== BLOCK_DRAG_MIN_DUR) bad.push(`shrunk past the floor to ${du}`);
+    } finally { s.undo(); }
+
+    // And it cannot be grown out through the end of the day.
+    s = seedDragDay(60, END_MIN - 90);
+    try {
+      dragHandle('dg1', '.block-resize--bottom', 0, 300 * PX_PER_MIN);
+      const st = at('startMin', s.key), du = at('durationMin', s.key);
+      if (st + du > END_MIN) bad.push(`a late block was grown to ${st + du}, past END_MIN ${END_MIN}`);
+    } finally { s.undo(); }
+
+    return bad.length === 0 || bad;
+  });
+
+  /* Every mutation is a full-document Firestore upload with no debounce, so a
+     drag that wrote per pointermove would upload the family document eight
+     times for one gesture. Counted, not trusted — the same discipline
+     reflCommitDraft's check uses. */
+  checks.aDragWritesOnceAndOnlyOnDrop = await page.evaluate(() => {
+    const bad = [];
+    const { key, undo } = seedDragDay();
+    const realSave = window.saveAll;
+    let n = 0;
+    try {
+      window.saveAll = function (...a) { n++; return realSave.apply(this, a); };
+      dragHandle('dg1', '.block-grip', 0, 90 * PX_PER_MIN, 8);
+      if (n !== 1) bad.push(`eight pointermoves and a drop wrote ${n} times, expected exactly 1`);
+    } finally { window.saveAll = realSave; undo(); }
+    return bad.length === 0 || bad;
+  });
+
+  /* attachTapGuard (js/07-week-view.js) is the whole click suppression: it owns
+     blockEl.onclick and its `moved` flag is set by a pointermove on any
+     DESCENDANT, and the handles are descendants. Nothing on the drag side would
+     notice if that stopped being true, so it is asserted from both ends — a
+     drag must not open the editor, and a still tap must still open it. */
+  checks.aDraggedBlockDoesNotAlsoOpenItsEditor = await page.evaluate(() => {
+    const bad = [];
+    const { key, undo } = seedDragDay();
+    try {
+      editingBlockId = null;
+      closeSheet('editOverlay');
+      dragHandle('dg1', '.block-grip', 0, 60 * PX_PER_MIN);
+      if (editingBlockId) bad.push(`the drag also opened the editor on ${editingBlockId}`);
+      const ov = document.getElementById('editOverlay');
+      if (ov && ov.classList.contains('open')) bad.push('the drag left the edit sheet open');
+
+      // The other direction: a tap on the block body still opens it.
+      const el = document.getElementById('block-dg1');
+      if (el) { el.click(); }
+      if (!editingBlockId) bad.push('a still tap on the block no longer opens the editor');
+      closeSheet('editOverlay'); editingBlockId = null;
+    } finally { undo(); }
+    return bad.length === 0 || bad;
+  });
+
+  /* Two thresholds, two questions — and the handles answer the second. Below
+     BLOCK_STACK_MIN a block is 22-40px tall and two edge strips plus a grip
+     would leave nothing to tap, swallowing the gesture that opens it: the very
+     failure .wf-card-check is exempted for. Asserted at every duration a short
+     block is actually used at. */
+  checks.onlyBlocksWithRoomToSpareOfferDragHandles = await page.evaluate(() => {
+    const bad = [];
+    const key = getDayKeys(0)[3];
+    const before = (getDayBlocks(key, 'jenn') || []).slice();
+    const durs = [15, 30, 45, 60, 120];
+    try {
+      setDayBlocks(key, durs.map((d, i) => ({
+        id: 'hz-' + d, actId: 'piano', startMin: 7 * 60 + i * 150, durationMin: d,
+        objectives: [], note: '', checklistState: {},
+      })), 'jenn');
+      openDay(key, 3);
+      durs.forEach(d => {
+        const el = document.getElementById('block-hz-' + d);
+        if (!el) { bad.push(`no block rendered for ${d} min`); return; }
+        const h = parseFloat(el.style.height) || 0;
+        const grip = el.querySelector('.block-grip');
+        const edges = el.querySelectorAll('.block-resize');
+        if (h < BLOCK_STACK_MIN) {
+          if (grip || edges.length) bad.push(`${d}-min block (${h}px) offers handles it has no room for`);
+          return;
+        }
+        if (!grip) { bad.push(`${d}-min block (${h}px) has no grip`); return; }
+        if (edges.length !== 2) bad.push(`${d}-min block has ${edges.length} resize handles, not 2`);
+        // The handles must TILE the edges, never overlap: an overlap means one
+        // gesture silently shadows another.
+        const g = grip.getBoundingClientRect();
+        if (g.width < 28) bad.push(`the grip is only ${Math.round(g.width)}px wide`);
+        if (g.height < 44) bad.push(`the grip is only ${Math.round(g.height)}px tall`);
+        edges.forEach(e => {
+          const r = e.getBoundingClientRect();
+          if (r.left < g.right - 1) bad.push(`a resize handle overlaps the grip on the ${d}-min block`);
+        });
+        // And the body is still reachable: the point under the block's own
+        // centre-right must not be a handle.
+        const br = el.getBoundingClientRect();
+        const hit = document.elementFromPoint(br.right - 8, br.top + br.height / 2);
+        if (hit && hit.classList && hit.classList.contains('block-drag-handle')) {
+          bad.push(`${d}-min block: a handle covers the body, so the tap that opens it is gone`);
+        }
+      });
+    } finally { setDayBlocks(key, before, 'jenn'); openDay(key, 3); }
+    return bad.length === 0 || bad;
+  });
+
+  /* A block a child may not move offers no grip at all. Refusing at the drop
+     instead would be a control that lets her drag for two seconds and then
+     announces it did nothing. */
+  checks.aPinnedBlockOffersNoGripToDragItBy = await page.evaluate(() => {
+    const bad = [];
+    const key = getDayKeys(0)[3];
+    const before = (getDayBlocks(key, 'jenn') || []).slice();
+    const wasProfile = profile;
+    try {
+      profile = 'jenn';
+      setDayBlocks(key, [{
+        id: 'pin1', actId: 'training', startMin: 16 * 60, durationMin: 120,
+        parentPinned: true, objectives: [], note: '', checklistState: {},
+      }], 'jenn');
+      openDay(key, 3);
+      const el = document.getElementById('block-pin1');
+      if (!el) bad.push('the pinned block did not render');
+      else if (el.querySelector('.block-grip')) bad.push('a kid is offered a grip on a parent-pinned block');
+      // The writer refuses it too, whatever the UI did.
+      const moved = moveBlockToDay(key, key, 'pin1', { startMin: 10 * 60, durationMin: 120 });
+      if (moved) bad.push('moveBlockToDay moved a pinned block for a kid');
+      if ((getDayBlocks(key, 'jenn')[0] || {}).startMin !== 16 * 60) bad.push('the pinned block moved anyway');
+    } finally { profile = wasProfile; setDayBlocks(key, before, 'jenn'); openDay(key, 3); }
+    return bad.length === 0 || bad;
+  });
+
+  /* The day screen has exactly one scroller and there is no touch-action
+     anywhere else in the project. Neither dayScreenScrollsAsOneSurface (which
+     walks the DOM for scrollers) nor onlyTheScheduleScrollsOnTheDayScreen
+     (which watches the document) can see a flick a handle swallowed, so the
+     positions are measured across a real gesture. */
+  checks.theScheduleStaysTheOnlyThingThatScrollsWhileDragging = await page.evaluate(() => {
+    const bad = [];
+    const { key, undo } = seedDragDay();
+    try {
+      const doc = document.scrollingElement || document.documentElement;
+      const ws = document.querySelector('#screen-day .day-workspace');
+      const d0 = doc.scrollTop, w0 = ws ? ws.scrollTop : 0;
+      dragHandle('dg1', '.block-grip', 0, 100 * PX_PER_MIN, 6);
+      if (doc.scrollTop !== d0) bad.push(`the document scrolled ${doc.scrollTop - d0}px during a drag`);
+      if (ws && ws.scrollTop !== w0) bad.push(`the workspace scrolled ${ws.scrollTop - w0}px during a drag`);
+      // And the handles are the ONLY things carrying touch-action.
+      const offenders = [];
+      ['.placed-block', '.tl-canvas', '.day-workspace', '.tl-col'].forEach(sel => {
+        const el = document.querySelector('#screen-day ' + sel);
+        if (el && getComputedStyle(el).touchAction === 'none') offenders.push(sel);
+      });
+      if (offenders.length) bad.push('touch-action:none has spread to ' + offenders.join(', '));
+    } finally { undo(); }
+    return bad.length === 0 || bad;
+  });
+
+  /* ── Cross-day dragging ──
+     Needs more than one column, so the viewport is widened the way
+     multiDayColumnsPlaceOnTheirOwnDay does it. The failure this catches is a
+     drop that wrote through the currentDayKey global — which placeBlock still
+     does by design — and would land the block on column 1 whatever column it
+     was dropped on. */
+  await page.setViewportSize({ width: 1400, height: 1000 });
+  await page.waitForTimeout(150);
+  checks.draggingAcrossColumnsWritesToTheColumnItWasDroppedOn = await page.evaluate(() => {
+    const bad = [];
+    profile = 'jenn'; parentViewing = 'jenn';
+    const keys = getDayKeys(0);
+    const spanBefore = dayViewSpan();
+    const had = keys.slice(0, 3).map(k => (getDayBlocks(k, 'jenn') || []).slice());
+    try {
+      keys.slice(0, 3).forEach(k => setDayBlocks(k, [], 'jenn'));
+      setDayBlocks(keys[0], [{
+        id: 'xd1', actId: 'piano', startMin: 9 * 60, durationMin: 60,
+        objectives: [], note: '', checklistState: {},
+      }], 'jenn');
+      openDay(keys[0], 0);
+      setDayViewSpan(3);
+      const cols = [...document.querySelectorAll('#timeline .tl-col')];
+      if (cols.length !== 3) { bad.push(`asked for 3 columns, rendered ${cols.length}`); return bad; }
+      const from = document.getElementById('block-xd1');
+      const to = cols[2].getBoundingClientRect();
+      if (!from) { bad.push('the block did not render in column 1'); return bad; }
+      const dx = (to.left + to.width / 2) - from.getBoundingClientRect().left;
+
+      /* Held mid-gesture, because this is where the one thing no data
+         assertion can see would go wrong: .tl-canvas clips its overflow and is
+         a stacking context, so without the lift into #timeline the block is
+         simply cut off at its own column's edge on the way across. */
+      let err = dragHandle('xd1', '.block-grip', dx, 0, 5, true);
+      if (err) { bad.push(err); return bad; }
+      const mid = document.getElementById('block-xd1');
+      if (!mid) bad.push('the block disappeared mid-drag');
+      else {
+        const mr = mid.getBoundingClientRect();
+        if (mr.width < 8 || mr.height < 8) bad.push(`mid-drag the block is ${Math.round(mr.width)}x${Math.round(mr.height)} — it is being clipped`);
+        const centre = mr.left + mr.width / 2;
+        if (centre < to.left - 4 || centre > to.right + 4) {
+          bad.push(`mid-drag the block sits at ${Math.round(centre)}, not over the target column ${Math.round(to.left)}-${Math.round(to.right)}`);
+        }
+        // And it must actually be the topmost thing at its own centre, or it is
+        // painted under the column it is being dragged over.
+        const hit = document.elementFromPoint(centre, mr.top + mr.height / 2);
+        if (hit && !mid.contains(hit) && hit !== mid) {
+          bad.push(`mid-drag something else is on top of the block: .${(hit.className || '').toString().split(' ')[0]}`);
+        }
+      }
+      window._dragRelease();
+
+      const src = getDayBlocks(keys[0], 'jenn') || [];
+      const dst = getDayBlocks(keys[2], 'jenn') || [];
+      if (src.length !== 0) bad.push(`the block is still on its old day (${src.length} there)`);
+      if (dst.length !== 1) bad.push(`column 3 holds ${dst.length} blocks, expected exactly 1`);
+      if (dst[0]) {
+        if (dst[0].actId !== 'piano') bad.push('something other than the dragged block arrived');
+        if (dst[0].startMin !== 9 * 60) bad.push(`it landed at ${dst[0].startMin}, not ${9 * 60}`);
+        /* The id MUST change. mergeWeeks unions by id per day key, so an
+           absence cannot be expressed — see moveBlockToDay, and the two-device
+           proof in tests/merge.test.js. */
+        if (dst[0].id === 'xd1') bad.push('the moved block kept its id, so a stale device will restore it on its old day');
+      }
+      const t = (state.shared.tombstones || {})['xd1'];
+      if (!t) bad.push('no tombstone for the old id — the removal cannot travel');
+      /* Asked of the real merge predicate rather than restated as a timestamp
+         comparison: what must be true is that the next merge does not delete
+         the block that just arrived. Reusing the id would make this fail, which
+         is the trap the two ids exist to avoid. */
+      if (dst[0] && blockTombstoned(dst[0])) {
+        bad.push('the arrival is itself tombstoned, so the next merge deletes it');
+      }
+      if (currentDayKey !== keys[2]) bad.push(`the screen still names ${currentDayKey} after dropping on ${keys[2]}`);
+      if (getDayBlocks(keys[1], 'jenn').length) bad.push('a column nobody dropped on gained a block');
+    } finally {
+      setDayViewSpan(spanBefore);
+      keys.slice(0, 3).forEach((k, i) => setDayBlocks(k, had[i], 'jenn'));
+      openDay(keys[0], 0);
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* Off its own weekday a block is no longer one of the series' days, so the
+     move says so and drops the repeat rather than leaving a record claiming a
+     repeat it is not part of — which seriesExtendTo would later act on. */
+  checks.aRepeatDraggedToAnotherDayLeavesItsRepeat = await page.evaluate(async () => {
+    const bad = [];
+    const keys = getDayKeys(0);
+    const had = keys.slice(0, 3).map(k => (getDayBlocks(k, 'jenn') || []).slice());
+    const wasConfirm = window.showConfirm;
+    try {
+      keys.slice(0, 3).forEach(k => setDayBlocks(k, [], 'jenn'));
+      const mk = () => ({
+        id: 'sr1', actId: 'piano', startMin: 9 * 60, durationMin: 60,
+        seriesId: 'sr-x', seriesDays: [1, 3], seriesEvery: 1,
+        objectives: [], note: '', checklistState: {},
+      });
+      setDayBlocks(keys[0], [mk()], 'jenn');
+      setDayBlocks(keys[1], [Object.assign(mk(), { id: 'sr2' })], 'jenn');
+      openDay(keys[0], 0);
+
+      let asked = 0;
+      window.showConfirm = async () => { asked++; return true; };
+      const moved = moveBlockToDay(keys[0], keys[2], 'sr1', { startMin: 9 * 60, durationMin: 60 });
+      if (!moved) bad.push('the cross-day move refused a series block outright');
+      const dst = (getDayBlocks(keys[2], 'jenn') || [])[0];
+      if (!dst) bad.push('the series block did not arrive on the new day');
+      else {
+        ['seriesId', 'seriesDays', 'seriesEvery', 'seriesStart', 'seriesEnd'].forEach(k => {
+          if (dst[k] !== undefined) bad.push(`the moved copy still carries ${k}`);
+        });
+      }
+      // The other member is untouched where it was.
+      const sib = (getDayBlocks(keys[1], 'jenn') || [])[0];
+      if (!sib || sib.seriesId !== 'sr-x') bad.push('moving one member disturbed the rest of the series');
+    } finally {
+      window.showConfirm = wasConfirm;
+      keys.slice(0, 3).forEach((k, i) => setDayBlocks(k, had[i], 'jenn'));
+      openDay(keys[0], 0);
+    }
+    return bad.length === 0 || bad;
+  });
+  /* Deliberately NOT narrowed again: this section inherited the wide viewport
+     from multiDayColumnsPlaceOnTheirOwnDay, and theHourLadderLinesUpWithTheSchedule
+     below needs 3 columns to be available at all — at 900px
+     dayViewSpanAvailable() is 2 and it fails on a viewport, not on a bug. */
+
+  /* ── The category remembers what she last added from it ──
+     Recorded by placeBlock, not by pickFromSlot: picking only opens a sheet and
+     a cancel is one tap away, so recording at pick time would have a category
+     remembering something that never landed on a day. */
+  checks.aCategoryOffersWhatSheAddedFromItLastTime = await page.evaluate(() => {
+    const bad = [];
+    profile = 'jenn'; parentViewing = 'jenn';
+    const key = getDayKeys(0)[3];
+    const before = (getDayBlocks(key, 'jenn') || []).slice();
+    try {
+      localStorage.removeItem('wp_slot_last_by_cat');
+      setDayBlocks(key, [], 'jenn');
+      openDay(key, 3);
+
+      openSlotPicker(9 * 60);
+      const chips = [...document.querySelectorAll('#slotPickerFilter .filter-chip')];
+      const routines = chips.find(c => /Routine/i.test(c.textContent));
+      if (!routines) { bad.push('no Routines chip in the picker'); return bad; }
+      routines.click();
+      const listed = [...document.querySelectorAll('#slotPickerList .slot-pick-chip:not(.slot-pick-add)')];
+      if (listed.length < 2) { bad.push('the Routines category has too few entries to reorder'); return bad; }
+      const wantedName = listed[listed.length - 1].querySelector('.spc-name').textContent;
+      listed[listed.length - 1].click();          // NOT the one already at the top
+      confirmActivity();
+
+      openSlotPicker(13 * 60);
+      const chips2 = [...document.querySelectorAll('#slotPickerFilter .filter-chip')];
+      chips2.find(c => /Routine/i.test(c.textContent)).click();
+      const first = document.querySelector('#slotPickerList .slot-pick-chip');
+      const firstName = first ? first.querySelector('.spc-name').textContent : '';
+      if (firstName !== wantedName) {
+        bad.push(`the category leads with "${firstName}", not the "${wantedName}" she added from it`);
+      }
+      if (first && !first.classList.contains('slot-pick-chip--last')) {
+        bad.push('the lifted chip does not say why it moved');
+      }
+
+      /* The All tab is ranked by slotPickerRecentActIds and must not have
+         acquired a second rule. */
+      const allChip = chips2.find(c => c.textContent.trim() === 'All');
+      allChip.click();
+      const allFirst = document.querySelector('#slotPickerList .slot-pick-chip');
+      const recent = slotPickerRecentActIds(6);
+      if (recent.length && allFirst) {
+        const acts = getAllActivities();
+        const wantAll = (acts.find(a => a.id === recent[0]) || {}).name;
+        const gotAll = allFirst.querySelector('.spc-name').textContent;
+        if (wantAll && gotAll !== wantAll) bad.push(`the All tab reordered: leads with "${gotAll}", expected "${wantAll}"`);
+      }
+      closeSheet('slotPickerOverlay');
+
+      // A placement she backed out of teaches the category nothing.
+      openSlotPicker(15 * 60);
+      const chips3 = [...document.querySelectorAll('#slotPickerFilter .filter-chip')];
+      chips3.find(c => /Routine/i.test(c.textContent)).click();
+      const others = [...document.querySelectorAll('#slotPickerList .slot-pick-chip:not(.slot-pick-add)')]
+        .filter(c => c.querySelector('.spc-name').textContent !== wantedName);
+      if (others.length) {
+        others[0].click();
+        cancelCreatePlacement('activityOverlay');
+        openSlotPicker(16 * 60);
+        const chips4 = [...document.querySelectorAll('#slotPickerFilter .filter-chip')];
+        chips4.find(c => /Routine/i.test(c.textContent)).click();
+        const stillFirst = document.querySelector('#slotPickerList .slot-pick-chip');
+        const n = stillFirst ? stillFirst.querySelector('.spc-name').textContent : '';
+        if (n !== wantedName) bad.push(`a cancelled placement was remembered: the category now leads with "${n}"`);
+      }
+      closeSheet('slotPickerOverlay');
+
+      // And the picker itself still opens on All — a category it reopened into
+      // would be a mode nobody chose.
+      openSlotPicker(17 * 60);
+      if (slotPickerFilter !== 'all') bad.push(`the picker reopened on "${slotPickerFilter}" instead of All`);
+      closeSheet('slotPickerOverlay');
+    } finally {
+      localStorage.removeItem('wp_slot_last_by_cat');
+      setDayBlocks(key, before, 'jenn');
+      openDay(key, 3);
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* Answered at read time and never pruned — the same reasoning as xp2 and
+     achievementActivityId. A season comes back and an archive can be undone, so
+     a memory is not deleted for pointing at something temporarily unavailable;
+     it just does not get to reorder anything. */
+  checks.aRememberedActivityThatIsGoneDoesNotBreakItsCategory = await page.evaluate(() => {
+    const bad = [];
+    const seen = [];
+    try {
+      // _locked (out of season) is the only lock left; the reward gate retired.
+      const locked = getAllActivities().find(a => a._locked);
+      const store = { jenn: { routine: 'no-such-activity-at-all' } };
+      if (locked) store.jenn[locked.cat] = locked.id;
+      localStorage.setItem('wp_slot_last_by_cat', JSON.stringify(store));
+
+      Object.keys(store.jenn).forEach(cat => {
+        openSlotPicker(9 * 60);
+        const chip = [...document.querySelectorAll('#slotPickerFilter .filter-chip')]
+          .find(c => c.dataset.f === cat) ||
+          [...document.querySelectorAll('#slotPickerFilter .filter-chip')][1];
+        if (!chip) return;
+        slotPickerFilter = cat;
+        renderSlotPicker();
+        const list = [...document.querySelectorAll('#slotPickerList .slot-pick-chip:not(.slot-pick-add)')];
+        seen.push(cat + ':' + list.length);
+        if (!list.length) { bad.push(`the "${cat}" category rendered nothing at all`); return; }
+        if (list[0].classList.contains('locked')) {
+          bad.push(`the "${cat}" category leads with a locked activity, which pickFromSlot refuses`);
+        }
+        closeSheet('slotPickerOverlay');
+      });
+      // Corrupt storage must not take the picker with it.
+      localStorage.setItem('wp_slot_last_by_cat', '{not json at all');
+      slotPickerFilter = 'routine';
+      renderSlotPicker();
+      if (!document.querySelectorAll('#slotPickerList .slot-pick-chip').length) {
+        bad.push('a corrupt memory emptied the picker');
+      }
+    } finally {
+      localStorage.removeItem('wp_slot_last_by_cat');
+      slotPickerFilter = 'all';
+      closeSheet('slotPickerOverlay');
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* A drag is the easiest way there has ever been to make two blocks overlap —
+     a child drops swimming on top of dinner in two seconds. tdProgressRibbon is
+     one nowrap flex row of percentages with nothing able to shrink, and
+     CLAUDE.md records that it shipped without its clamp and every check passed
+     because no fixture had an overlap. So the overlap here is made BY A DRAG,
+     the way a real one will be, rather than seeded straight into the record. */
+  checks.aDragThatCreatesAnOverlapDoesNotBreakTodaysRibbon = await page.evaluate(() => {
+    const bad = [];
+    profile = 'jenn'; parentViewing = 'jenn';
+    const key = todayKey();
+    const before = (getDayBlocks(key, 'jenn') || []).slice();
+    try {
+      setDayBlocks(key, [
+        { id: 'ov1', actId: 'dinner', startMin: 17 * 60, durationMin: 60, objectives: [], note: '', checklistState: {} },
+        { id: 'ov2', actId: 'training', startMin: 19 * 60, durationMin: 120, tag: 'skating',
+          travelBuffer: true, travelBufMin: 30, getReadyBuffer: true, getReadyBufMin: 15,
+          objectives: [], note: '', checklistState: {} },
+      ], 'jenn');
+      openDay(key, dayIdxOfKey(key));
+
+      // Drag the training block back on top of dinner.
+      const err = dragHandle('ov2', '.block-grip', 0, -120 * PX_PER_MIN, 5);
+      if (err) { bad.push(err); return bad; }
+      const blocks = getDayBlocks(key, 'jenn');
+      const a = blocks.find(b => b.id === 'ov1'), b = blocks.find(b => b.id === 'ov2');
+      if (!a || !b) { bad.push('a block vanished during the overlapping drag'); return bad; }
+      const overlaps = b.startMin < a.startMin + a.durationMin && a.startMin < b.startMin + b.durationMin;
+      if (!overlaps) bad.push(`the drag did not actually overlap them (${a.startMin}+${a.durationMin} vs ${b.startMin})`);
+
+      goToday();
+      tdRenderToday();
+      const strip = document.querySelector('#screen-today .td-rib-strip');
+      if (!strip) { bad.push('Today rendered no ribbon over an overlapping day'); return bad; }
+      /* The row has to add up to a day. Percentages, nothing able to shrink, so
+         anything over 100 pushes the last cell through the edge of its column. */
+      const cells = [...strip.children].filter(c => !c.classList.contains('td-rib-now'));
+      const total = cells.reduce((n, c) => n + (parseFloat((c.style.flexBasis || '0')) || 0), 0);
+      if (total > 100.5) bad.push(`the ribbon oversubscribes its row at ${total.toFixed(1)}%`);
+      if (strip.scrollWidth > strip.clientWidth + 1) {
+        bad.push(`the ribbon overflows its own box (${strip.scrollWidth}px into ${strip.clientWidth}px)`);
+      }
+    } finally {
+      setDayBlocks(key, before, 'jenn');
+      goToday();
+    }
+    return bad.length === 0 || bad;
+  });
+
   /* The hour ladder must name the line it sits beside. It did not: .tl-col-head
      lived inside .tl-col and pushed .tl-canvas down, while .tl-gutter — a
      sibling of the whole column stack — started at the top of the header. At 2
@@ -8943,7 +9511,24 @@ function findChromium() {
     const wasConfirm = window.showConfirm;
     profile = 'parent'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
-    const keys = mrWeekDayKeys(ctWeekKey);
+    const wasWeek = ctWeekKey;
+    /* LAST week's Monday, not this week's. mrWeekDayKeys(ctWeekKey)[0] is the
+       CURRENT week's Monday, so on a Monday it IS today — and canReviewDay
+       refuses today: 'running' while any block has not ended, 'open' once none
+       has. Both refusals are correct behaviour this check is not about, so one
+       day in seven it reported five failures for a day that simply had not been
+       lived yet. A day from the previous week is unambiguously past on all
+       seven days, which is what lets the same assertions run every day rather
+       than skipping themselves on Mondays — the lesson CLAUDE.md already
+       records for the Sunday review banner.
+
+       Nothing else has to change: parentDayConfirm is keyed by a bare day key
+       with no week dimension, so reviewing a day from another week is the same
+       operation on the same store. The clock-sensitive half of this check is
+       the `todayKey()` section further down, which is deliberately about today
+       and stays there. */
+    const wk = getDayKeys(-1)[0];
+    const keys = mrWeekDayKeys(wk);
     const day = keys[0];
     const beforeJ = (getDayBlocks(day, 'jenn') || []).slice();
     const beforeS = (getDayBlocks(day, 'jess') || []).slice();
@@ -8959,6 +9544,14 @@ function findChromium() {
       ], 'jess');
       currentDayKey = day;
       window.showConfirm = async () => true;
+
+      /* The fixture's own precondition, stated once. Without it, moving this
+         day back onto today fails as five confusing sentences about confirming
+         and reviewing instead of one about the day. */
+      const pre = canReviewDay('jenn', day);
+      if (pre.reason === 'running' || pre.reason === 'open') {
+        bad.push(`the fixture day ${day} is today — canReviewDay says "${pre.reason}", so this check cannot run`);
+      }
 
       await confirmAllBlocksForChild('jenn', day);
 
@@ -8997,7 +9590,10 @@ function findChromium() {
       /* The meeting reviews ONE child per control, and says "Both" when it
          means both. */
       ['jenn', 'jess'].forEach(k => markDayReviewed(k, day, false));
-      openFamilyMeeting(); mmGoStep(1);
+      // Pointed at the fixture's own week: step 1's rows are indexed within
+      // whichever week the meeting holds, so data-day="0" is only this Monday
+      // if the meeting is on this week.
+      mmGoToWeek(wk); mmGoStep(1);
       const one = document.querySelector('#familyMeetingBody [data-mm-action="reviewday"][data-kid="jenn"][data-day="0"]');
       if (!one) bad.push('the meeting has no per-child review control');
       else {
@@ -9013,6 +9609,8 @@ function findChromium() {
       setDayBlocks(day, beforeJ, 'jenn');
       setDayBlocks(day, beforeS, 'jess');
       state.shared.parentDayConfirm = store;
+      // mmGoToWeek moved the chore week; put it back for whatever runs next.
+      ctWeekKey = wasWeek;
       profile = 'jenn';
     }
     return bad.length === 0 || bad;

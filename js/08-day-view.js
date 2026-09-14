@@ -941,7 +941,13 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
     blockEl.appendChild(m);
     blockEl.title = `${act.name} continues past this section — switch to “All” to see the whole block`;
   }
+  if (isBuffer && b._ownerId) blockEl.dataset.ownerId = b._ownerId;
   if (!isBuffer) attachTapGuard(blockEl, ()=> { focusDayColumn(ownDayKey); onTimelineBlockTap(b.id); });
+  /* AFTER attachTapGuard, and that order is not incidental: the guard owns
+     blockEl.onclick and watches pointer moves on every descendant, so the
+     handles appended here are what make it set `moved` — which is why a drag
+     can never also open the edit sheet. See js/39-block-drag.js. */
+  if (!isBuffer) attachBlockDrag(blockEl, b, ownDayKey);
   canvas.appendChild(blockEl);
 
   // Decorative doodle (seasonal, stable per block per month)
@@ -983,6 +989,10 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0
     return {
       id: `${b.id}-${startMin}-${bufDur}-${cls || 'travel'}`,
       actId: b.actId,
+      // Which block these minutes belong to. Read only by the drag layer, so a
+      // travel strip follows the block it describes instead of being left
+      // behind at the old time.
+      _ownerId: b.id,
       startMin,
       durationMin: bufDur,
       colour: b.colour || CAT_HEX[sourceAct?.cat] || '#888',
@@ -1411,11 +1421,20 @@ function handleCanvasTap(e, zMinStart) {
    And the last quarter-hour of the day is not a legal start. Without the clamp
    a tap at the very bottom gave startMin === END_MIN, placeBlock trimmed the
    duration to END_MIN - startMin = 0, and a zero-minute block was saved. */
-function canvasSnapMin(canvas, clientY) {
+function canvasSnapMinRaw(canvas, clientY) {
   const rect = canvas.getBoundingClientRect();
   const y = clientY - rect.top - canvas.clientTop;
   const snapped = Math.round(y / (PX_PER_MIN * 15)) * 15;
-  return Math.max(0, Math.min(DAY_MIN_SPAN - 15, snapped));
+  return Math.max(0, Math.min(DAY_MIN_SPAN, snapped));
+}
+/* The same arithmetic, clamped to a legal START. Split out because a block's
+   END may legally be the last minute of the day, which this clamp refuses —
+   the resize gesture asks canvasSnapMinRaw for exactly that reason. One owner
+   for the conversion either way: js/07-week-view.js shadows PX_PER_MIN at the
+   week grid's scale, so a second copy of these three lines would be wrong the
+   moment somebody read it out of that file. */
+function canvasSnapMin(canvas, clientY) {
+  return Math.min(DAY_MIN_SPAN - 15, canvasSnapMinRaw(canvas, clientY));
 }
 
 /* Shared placement entry point used by both the timeline canvas tap and the
@@ -1445,6 +1464,48 @@ function addActivityAtMin(absMin) {
    selected. Keeps pendingStartMin from the tap, then routes into the normal
    placement sheet once an activity is chosen. */
 let slotPickerFilter = 'all';
+
+/* ── Each category remembers what she last put in it ──
+   The All tab is ranked by slotPickerRecentActIds — what the household has
+   actually been doing for four weeks. Inside a category that ranking is not
+   applied, so the routine she adds every single evening sat wherever
+   DEFAULT_ACTIVITIES happened to put it.
+
+   Per-device localStorage and never synced state: every state write here is a
+   full-document upload, and which of Jess's five routines she reached for last
+   on the iPad is not a fact the phone needs. Keyed by PROFILE first, so one
+   shared iPad never hands one girl the other's order. */
+const SLOT_PICKER_LAST_LS_KEY = 'wp_slot_last_by_cat';
+
+function slotPickerLastByCat() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SLOT_PICKER_LAST_LS_KEY) || '{}');
+    return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+  } catch (e) { return {}; }
+}
+function slotPickerLastForFilter(filterId) {
+  if (!filterId || filterId === 'all') return null;
+  const forKid = slotPickerLastByCat()[activeProfile()];
+  return (forKid && typeof forKid === 'object') ? (forKid[filterId] || null) : null;
+}
+/* Recorded by placeBlock, never by pickFromSlot — picking only opens a sheet,
+   and cancelCreatePlacement is one tap away. A category that remembers
+   something which never landed on a day is the same class of wrongness as the
+   reflection's linkedRoutineId, which recorded an intent while nothing
+   happened. 'all' records nothing: the memory is per CATEGORY. */
+function slotPickerRememberPick(filterId, actId) {
+  if (!filterId || filterId === 'all' || !actId) return;
+  const all = slotPickerLastByCat();
+  const kid = activeProfile();
+  if (!all[kid] || typeof all[kid] !== 'object') all[kid] = {};
+  all[kid][filterId] = actId;
+  try { localStorage.setItem(SLOT_PICKER_LAST_LS_KEY, JSON.stringify(all)); } catch (e) {}
+}
+/* Which chip was open when she picked. Transient, exactly like selectedActivity:
+   set by pickFromSlot, consumed by placeBlock, cleared by a cancelled
+   placement. */
+let slotPickerPickedUnder = null;
+
 function openSlotPicker(absMin) {
   pendingStartMin = absMin;
   slotPickerFilter = 'all';
@@ -1506,18 +1567,45 @@ function renderSlotPicker() {
   // Most-used first, only on the unfiltered list — inside a category the
   // library's own order is the one the child is looking for.
   let ordered = filtered;
+  let liftedId = null;
   if (slotPickerFilter === 'all') {
     const recent = slotPickerRecentActIds(6);
     const rank = id => { const i = recent.indexOf(id); return i === -1 ? 999 : i; };
     ordered = filtered.slice().sort((a, b) => rank(a.id) - rank(b.id));
+  } else {
+    /* Inside a category, what she last added from THIS chip leads. One unshift
+       rather than a sort, so nothing else moves — a list that reorders itself
+       wholesale is a list a child cannot learn.
+
+       An out-of-season activity is skipped: it is still in the list, but
+       pickFromSlot refuses it, so lifting it to the top would be offering a
+       dead end. (_locked is the only lock left — the reward gate was retired,
+       and _rewardLocked no longer exists.) An ARCHIVED one is already absent
+       from getAllActivities, so the find simply misses and the order stands —
+       no pruning, no migration, the same read-time answer as xp2 and
+       achievementActivityId. */
+    const lastId = slotPickerLastForFilter(slotPickerFilter);
+    const idx = lastId ? filtered.findIndex(a => a.id === lastId) : -1;
+    if (idx >= 0 && !filtered[idx]._locked) {
+      liftedId = filtered[idx].id;
+      if (idx > 0) {
+        ordered = filtered.slice();
+        const lifted = ordered.splice(idx, 1)[0];
+        ordered.unshift(lifted);
+      }
+    }
   }
 
   list.innerHTML = '';
   ordered.forEach(act => {
     const chip = document.createElement('button');
     chip.type = 'button';
-    chip.className = 'slot-pick-chip' + (act._locked ? ' locked' : '');
-    chip.innerHTML = `<span class="spc-icon">${escapeHtml(act.icon)}</span><span class="spc-name">${escapeHtml(act.name)}</span><span class="spc-dur">${escapeHtml(formatDuration(activityDefaultDuration(act) || 60))}</span>`;
+    chip.className = 'slot-pick-chip' + (act._locked ? ' locked' : '')
+      + (act.id === liftedId ? ' slot-pick-chip--last' : '');
+    // Say WHY it moved. A chip that silently jumped to the front is a chip the
+    // next person reads as a bug.
+    const lastTag = act.id === liftedId ? '<span class="spc-last">last time</span>' : '';
+    chip.innerHTML = `<span class="spc-icon">${escapeHtml(act.icon)}</span><span class="spc-name">${escapeHtml(act.name)}</span>${lastTag}<span class="spc-dur">${escapeHtml(formatDuration(activityDefaultDuration(act) || 60))}</span>`;
     chip.onclick = () => pickFromSlot(act.id);
     list.appendChild(chip);
   });
@@ -1533,6 +1621,8 @@ function pickFromSlot(actId) {
   if (!act) return;
   if (act._locked) { showToast(`🔒 Unlocks in ${seasonLabel(act)}!`); return; }
   selectedActivity = act;
+  // Which chip this came from, for placeBlock to record once the block exists.
+  slotPickerPickedUnder = slotPickerFilter;
   closeSheet('slotPickerOverlay');
   // pendingStartMin was set by openSlotPicker.
   if (act.isTraining) {
@@ -1696,6 +1786,10 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
 
   buildTimeline();
   selectedActivity = null;
+  /* The category remembers, now that the block actually exists. One writer, at
+     the one moment the answer is true — every placement path reaches here. */
+  slotPickerRememberPick(slotPickerPickedUnder, actId);
+  slotPickerPickedUnder = null;
 }
 
 async function removeBlock() {
