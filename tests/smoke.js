@@ -9321,7 +9321,24 @@ function findChromium() {
     const wasConfirm = window.showConfirm;
     profile = 'parent'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
-    const keys = mrWeekDayKeys(ctWeekKey);
+    const wasWeek = ctWeekKey;
+    /* LAST week's Monday, not this week's. mrWeekDayKeys(ctWeekKey)[0] is the
+       CURRENT week's Monday, so on a Monday it IS today — and canReviewDay
+       refuses today: 'running' while any block has not ended, 'open' once none
+       has. Both refusals are correct behaviour this check is not about, so one
+       day in seven it reported five failures for a day that simply had not been
+       lived yet. A day from the previous week is unambiguously past on all
+       seven days, which is what lets the same assertions run every day rather
+       than skipping themselves on Mondays — the lesson CLAUDE.md already
+       records for the Sunday review banner.
+
+       Nothing else has to change: parentDayConfirm is keyed by a bare day key
+       with no week dimension, so reviewing a day from another week is the same
+       operation on the same store. The clock-sensitive half of this check is
+       the `todayKey()` section further down, which is deliberately about today
+       and stays there. */
+    const wk = getDayKeys(-1)[0];
+    const keys = mrWeekDayKeys(wk);
     const day = keys[0];
     const beforeJ = (getDayBlocks(day, 'jenn') || []).slice();
     const beforeS = (getDayBlocks(day, 'jess') || []).slice();
@@ -9337,6 +9354,14 @@ function findChromium() {
       ], 'jess');
       currentDayKey = day;
       window.showConfirm = async () => true;
+
+      /* The fixture's own precondition, stated once. Without it, moving this
+         day back onto today fails as five confusing sentences about confirming
+         and reviewing instead of one about the day. */
+      const pre = canReviewDay('jenn', day);
+      if (pre.reason === 'running' || pre.reason === 'open') {
+        bad.push(`the fixture day ${day} is today — canReviewDay says "${pre.reason}", so this check cannot run`);
+      }
 
       await confirmAllBlocksForChild('jenn', day);
 
@@ -9375,7 +9400,10 @@ function findChromium() {
       /* The meeting reviews ONE child per control, and says "Both" when it
          means both. */
       ['jenn', 'jess'].forEach(k => markDayReviewed(k, day, false));
-      openFamilyMeeting(); mmGoStep(1);
+      // Pointed at the fixture's own week: step 1's rows are indexed within
+      // whichever week the meeting holds, so data-day="0" is only this Monday
+      // if the meeting is on this week.
+      mmGoToWeek(wk); mmGoStep(1);
       const one = document.querySelector('#familyMeetingBody [data-mm-action="reviewday"][data-kid="jenn"][data-day="0"]');
       if (!one) bad.push('the meeting has no per-child review control');
       else {
@@ -9391,6 +9419,8 @@ function findChromium() {
       setDayBlocks(day, beforeJ, 'jenn');
       setDayBlocks(day, beforeS, 'jess');
       state.shared.parentDayConfirm = store;
+      // mmGoToWeek moved the chore week; put it back for whatever runs next.
+      ctWeekKey = wasWeek;
       profile = 'jenn';
     }
     return bad.length === 0 || bad;
