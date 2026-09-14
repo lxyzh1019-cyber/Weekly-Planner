@@ -40,7 +40,6 @@ function nextFreeSlotMin(dayKey, durationMin, fromMin) {
 function startPlacingActivity(act) {
   if (!act) return;
   if (act._locked) { showToast(`🔒 Unlocks in ${act.season}!`); return; }
-  if (act._rewardLocked) { showToast('Keep going — unlock this reward soon ✨'); return; }
   selectedActivity = act;
   hideMascot();
   if (!currentDayKey) currentDayKey = todayKey();

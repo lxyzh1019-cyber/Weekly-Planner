@@ -72,23 +72,23 @@ function getProfData(p=activeProfile()) {
   if (!state.profiles[p]) state.profiles[p] = { weeks:{}, customActivities:[], dayMoods:{}, blockMoods:{}, activityCounts:{}, activityHours:{} };
   const prof = state.profiles[p];
   if (!prof.progress) {
+    /* unlockedActs, manualPlacedCount and unlockedThisWeek were seeded here and
+       existed ONLY to drive the placed-block milestone that gated nine
+       activities. That is retired, so they are no longer seeded — but a stored
+       document that still carries them is left exactly as it is. Deleting a
+       field from a device's copy is not something deepMergeObj can express:
+       the remote copy simply puts it back, so a "cleanup" would churn the
+       document on every sync and change nothing. Inert is the right state. */
     prof.progress = {
-      unlockedActs: [],
       pendingRewards: [],
       streaks: {},
-      manualPlacedCount: 0,
       streakFreezeTokens: 1,
       streakFreezeWeek: dateToLocalKey(getWeekStart(weekOffset)),
-      unlockedThisWeek: {},
     };
   }
-  if (!Array.isArray(prof.progress.unlockedActs)) prof.progress.unlockedActs = [];
   if (!Array.isArray(prof.progress.pendingRewards)) prof.progress.pendingRewards = [];
   if (!prof.progress.unlockedChecklistItems) prof.progress.unlockedChecklistItems = {};
   if (!prof.progress.streaks) prof.progress.streaks = {};
-  if (!prof.progress.unlockedThisWeek) prof.progress.unlockedThisWeek = {};
-  if (!prof.progress.unlockedChecklistItems) prof.progress.unlockedChecklistItems = {};
-  if (prof.progress.manualPlacedCount == null) prof.progress.manualPlacedCount = 0;
   if (!Array.isArray(prof.progress.stickers)) prof.progress.stickers = [];      // unlocked collectible ids
   if (prof.progress.tasksCompleted == null) prof.progress.tasksCompleted = 0;   // lifetime completions
   if (!prof.progress.completedByCat) prof.progress.completedByCat = {};         // per-category completions
@@ -99,7 +99,6 @@ function getProfData(p=activeProfile()) {
   if (prof.progress.streakFreezeWeek !== wk) {
     prof.progress.streakFreezeWeek = wk;
     prof.progress.streakFreezeTokens = 1;
-    prof.progress.unlockedThisWeek = {};
   }
   return state.profiles[p];
 }
@@ -475,18 +474,12 @@ function getAllActivities(p=activeProfile(), opts) {
   // apply level-ups
   const rules = state.shared.levelRules || [];
   const profd = getProfData(p);
-  const progress = getProfData(p).progress || {};
-  const unlockedSet = new Set(progress.unlockedActs || []);
+  /* A `rewardLocked` branch stood here and set _rewardLocked/_locked from
+     progress.unlockedActs. Nothing carries rewardLocked any more, so the ONLY
+     writer of _locked is the seasonal line above — which is the one that must
+     keep working, or Beach Day turns up in January. The two were always
+     disjoint sets; retiring one leaves the other exactly as it was. */
   return base.map(act => {
-    if (act.rewardLocked) {
-      /* tutorialStarterActId used to unlock one activity here as well. It is no
-         longer read: the pool it pointed into is unlocked outright. Stored
-         values are left alone rather than deleted — a device still serving an
-         older bundle out of a Pages cache must not be able to merge a
-         resurrected lock back in. */
-      const unlocked = unlockedSet.has(act.id);
-      act = { ...act, _rewardLocked: !unlocked, _locked: !unlocked };
-    }
     const rule = rules.find(r => r.activityId===act.id);
     if (!rule) return act;
     const cur = rule.type==='count' ? (profd.activityCounts?.[act.id]||0) : (profd.activityHours?.[act.id]||0);
@@ -569,15 +562,6 @@ function getUnlockedRoutineRewards(routineId, p=activeProfile()) {
   return map[routineId] || [];
 }
 
-function queueReward(actId, reason) {
-  const p = getProfData();
-  const pr = p.progress;
-  if (!actId) return;
-  const existsPending = (pr.pendingRewards || []).some(r=>r.actId===actId);
-  if (existsPending || (pr.unlockedActs||[]).includes(actId)) return;
-  pr.pendingRewards.push({ id:'rw-'+Date.now().toString(36)+Math.random().toString(36).slice(2,4), actId, reason: reason||'progress' });
-}
-
 function queueChecklistReward(routineId, item, reason) {
   const p = getProfData();
   const pr = p.progress;
@@ -595,51 +579,12 @@ function queueChecklistReward(routineId, item, reason) {
   });
 }
 
-function unlockRewardAct(actId) {
-  const p = getProfData();
-  const pr = p.progress;
-  if (!actId) return false;
-  if (!pr.unlockedActs.includes(actId)) {
-    pr.unlockedActs.push(actId);
-    return true;
-  }
-  return false;
-}
-
-function pickLockedReward(poolKey, excludeIds=[]) {
-  const p = getProfData();
-  const pr = p.progress;
-  const unlocked = new Set(pr.unlockedActs || []);
-  const exclude = new Set(excludeIds || []);
-  const pool = REWARD_POOLS[poolKey] || [];
-  const act = pool.find(a => !unlocked.has(a.id) && !exclude.has(a.id));
-  return act ? act.id : null;
-}
-
-function enqueueMilestoneRewards() {
-  const p = getProfData();
-  const pr = p.progress;
-  const n = pr.manualPlacedCount || 0;
-  const milestones = [10,15,20];
-  milestones.forEach(m=>{
-    const key = `manual-${m}`;
-    if (n >= m && !pr.unlockedThisWeek[key]) {
-      /* 'family' led this list. A Family Hero chore is not a prize for having
-         placed ten blocks, so the tenth milestone draws from academic like the
-         others. */
-      const cycle = m===10 ? ['academic'] : (m===15 ? ['health'] : ['culture']);
-      let queued = false;
-      cycle.forEach(k=>{
-        const id = pickLockedReward(k);
-        if (id && !queued) {
-          queueReward(id, `Placed ${m} blocks`);
-          queued = true;
-        }
-      });
-      if (queued) pr.unlockedThisWeek[key] = true;
-    }
-  });
-}
+/* unlockRewardAct, pickLockedReward and enqueueMilestoneRewards stood here.
+   Together they were the whole grant: place 10, 15 or 20 blocks and the app
+   handed back one activity from academic, then health, then culture. The
+   answer to "you have planned ten things" should not be the right to plan an
+   eleventh KIND of thing. queueChecklistReward below is the surviving half —
+   a different feature that earns an extra checklist item off a real streak. */
 
 function maybeShowRewardPrompt() {
   if (isParent()) return;
@@ -658,14 +603,15 @@ function maybeShowRewardPrompt() {
   if (first.type === 'checklist') {
     txt.textContent = `Reward unlocked: ${first.item.text} (${first.reason})`;
   } else {
-    const act = DEFAULT_ACTIVITIES.find(a=>a.id===first.actId) || Object.values(REWARD_POOLS).flat().find(a=>a.id===first.actId);
-    if (!act) {
-      pr.pendingRewards.shift();
-      saveAll();
-      maybeShowRewardPrompt();
-      return;
-    }
-    txt.textContent = `Reward unlocked: ${act.icon} ${act.name} (${first.reason})`;
+    /* An ACTIVITY reward queued by a bundle that still had the milestone — a
+       device can be serving one out of a Pages cache, and the entry syncs. It
+       names something she can already use, so there is nothing left to grant:
+       drain it rather than leave a prompt that cannot be answered. Same shape
+       as the "activity not found" path this replaces. */
+    pr.pendingRewards.shift();
+    saveAll();
+    maybeShowRewardPrompt();
+    return;
   }
   box.style.display = 'flex';
 }
@@ -681,13 +627,9 @@ function acceptRewardPrompt() {
       pr.unlockedChecklistItems[rw.routineId].push({ ...rw.item });
       showToast(`Unlocked checklist reward ✨`);
     }
-  } else if (rw.actId) {
-    const changed = unlockRewardAct(rw.actId);
-    if (changed) {
-      const act = DEFAULT_ACTIVITIES.find(a=>a.id===rw.actId) || Object.values(REWARD_POOLS).flat().find(a=>a.id===rw.actId);
-      showToast(`Unlocked: ${act?.name || 'New reward'} ✨`);
-    }
   }
+  // Only a checklist reward can reach here: maybeShowRewardPrompt drains any
+  // other kind before it is ever shown.
   pr.pendingRewards = pr.pendingRewards.filter(x=>x.id!==rw.id);
   saveAll();
   maybeShowRewardPrompt();

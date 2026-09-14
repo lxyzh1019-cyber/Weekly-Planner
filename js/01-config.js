@@ -349,29 +349,22 @@ function getObjectivePresets(act, tag, isCompetition) {
   return ACTIVITY_OBJECTIVES_BY_ID[act.id] || ACTIVITY_OBJECTIVES_BY_CAT[act.cat] || [];
 }
 
-const REWARD_POOLS = {
-  family: [
-    { id:'family_set_table', name:'Family Hero: Set the Table', icon:'🍽', cat:'daily', group:'chores', durationMin:20, suitableTime:['evening','weekend'] },
-    { id:'family_prep_bag', name:'Family Hero: Prep School Bag', icon:'🎒', cat:'daily', group:'chores', durationMin:15, suitableTime:['evening'] },
-    { id:'family_laundry_fold', name:'Home Champion: Fold Laundry', icon:'🧺', cat:'daily', group:'chores', durationMin:20, suitableTime:['weekend','evening'] },
-    { id:'family_kitchen_helper', name:'Kitchen Helper Quest', icon:'🥕', cat:'daily', group:'chores', durationMin:20, suitableTime:['evening','weekend'] },
-  ],
-  academic: [
-    { id:'acad_focus_sprint', name:'Focus Sprint', icon:'📘', cat:'school', durationMin:25, suitableTime:['after-school','evening'] },
-    { id:'acad_preview_power', name:'Preview Power', icon:'🧠', cat:'school', durationMin:20, suitableTime:['evening','weekend'] },
-    { id:'acad_reading_star', name:'Reading Star', icon:'📚', cat:'school', durationMin:30, suitableTime:['after-school','evening','weekend'] },
-  ],
-  health: [
-    { id:'health_recovery_fuel', name:'Recovery Fuel', icon:'🍎', cat:'daily', durationMin:15, suitableTime:['after-school','evening'] },
-    { id:'health_stretch_reset', name:'Stretch Reset', icon:'🤸', cat:'active', durationMin:15, suitableTime:['after-school','evening'] },
-    { id:'health_pack_tomorrow', name:'Tomorrow Ready', icon:'👜', cat:'daily', group:'routine', durationMin:15, suitableTime:['evening'] },
-  ],
-  culture: [
-    { id:'culture_story_circle', name:'Culture Explorer Story', icon:'🏮', cat:'free', durationMin:25, suitableTime:['evening','weekend'] },
-    { id:'culture_festival_prep', name:'Festival Prep Mission', icon:'🥮', cat:'free', durationMin:30, suitableTime:['weekend','evening'] },
-    { id:'culture_calligraphy_play', name:'Brush Art Play', icon:'🖌️', cat:'free', durationMin:30, suitableTime:['weekend'] },
-  ],
-};
+/* REWARD_POOLS lived here: four pools of activities, three of which a child had
+   to EARN before she could put them on her own day. The grant was never a
+   level-up, whatever the surrounding prose said — it was a placed-block
+   milestone, so the app's answer to "you have planned ten things" was to hand
+   back the right to plan an eleventh kind of thing.
+
+   Family Hero went first, for the reason recorded below. The same argument
+   finishes the job: a child should not have to earn the right to eat after
+   training, to stretch, or to hear a story about where her family is from.
+   The thirteen activities are inlined into DEFAULT_ACTIVITIES with their ids
+   unchanged, so every block that ever named one still resolves.
+
+   The routine-checklist rewards (MORNING_LOCKED_REWARD,
+   AFTERSCHOOL_CHECKLIST_REWARDS) are a DIFFERENT feature that happens to share
+   the same prompt widget, and they stay: those earn an extra checklist item off
+   a real streak rather than gating an activity. */
 /* TUTORIAL_STARTER_CHOICES lived here — the three Family Hero chores the
    first-run overlay offered as a "starter" to unlock. Onboarding went with the
    unlock subsystem: its whole content was picking a locked chore, so with
@@ -427,15 +420,24 @@ const DEFAULT_ACTIVITIES = [
   { id:'piano',      name:'Piano Practice',    icon:'🎹', cat:'school',   durationMin:60, suitableTime:['after-school','evening','weekend'] },
   { id:'chores',     name:'House Chore',       icon:'🧹', cat:'daily', group:'chores',    durationMin:60, suitableTime:['after-school','evening','weekend'] },
   { id:'family',     name:'Family Time',       icon:'👨‍👩‍👧‍👦', cat:'free', durationMin:120, suitableTime:['evening','weekend'], social:true },
-  /* Family Hero is a CHORE, not a prize. Its four activities are ordinary
-     available ones — same ids, so every block that ever named one still
-     resolves through findActivity — and only the other three pools are still
-     earned. Whoever did the chore is the hero; making the chore itself the
-     reward said the opposite. */
-  ...REWARD_POOLS.family.map(a => ({ ...a })),
-  ...Object.entries(REWARD_POOLS)
-    .filter(([k]) => k !== 'family')
-    .flatMap(([, pool]) => pool.map(a => ({ ...a, rewardLocked: true }))),
+  /* Family Hero is a CHORE, not a prize: whoever did the chore is the hero, and
+     making the chore itself the reward said the opposite. The other nine were
+     locked behind a placed-block milestone until that was retired too — see the
+     note where REWARD_POOLS used to be declared. Ids are unchanged throughout,
+     so every block that ever named one still resolves through findActivity. */
+  { id:'family_set_table', name:'Family Hero: Set the Table', icon:'🍽', cat:'daily', group:'chores', durationMin:20, suitableTime:['evening','weekend'] },
+  { id:'family_prep_bag', name:'Family Hero: Prep School Bag', icon:'🎒', cat:'daily', group:'chores', durationMin:15, suitableTime:['evening'] },
+  { id:'family_laundry_fold', name:'Home Champion: Fold Laundry', icon:'🧺', cat:'daily', group:'chores', durationMin:20, suitableTime:['weekend','evening'] },
+  { id:'family_kitchen_helper', name:'Kitchen Helper Quest', icon:'🥕', cat:'daily', group:'chores', durationMin:20, suitableTime:['evening','weekend'] },
+  { id:'acad_focus_sprint', name:'Focus Sprint', icon:'📘', cat:'school', durationMin:25, suitableTime:['after-school','evening'] },
+  { id:'acad_preview_power', name:'Preview Power', icon:'🧠', cat:'school', durationMin:20, suitableTime:['evening','weekend'] },
+  { id:'acad_reading_star', name:'Reading Star', icon:'📚', cat:'school', durationMin:30, suitableTime:['after-school','evening','weekend'] },
+  { id:'health_recovery_fuel', name:'Recovery Fuel', icon:'🍎', cat:'daily', durationMin:15, suitableTime:['after-school','evening'] },
+  { id:'health_stretch_reset', name:'Stretch Reset', icon:'🤸', cat:'active', durationMin:15, suitableTime:['after-school','evening'] },
+  { id:'health_pack_tomorrow', name:'Tomorrow Ready', icon:'👜', cat:'daily', group:'routine', durationMin:15, suitableTime:['evening'] },
+  { id:'culture_story_circle', name:'Culture Explorer Story', icon:'🏮', cat:'free', durationMin:25, suitableTime:['evening','weekend'] },
+  { id:'culture_festival_prep', name:'Festival Prep Mission', icon:'🥮', cat:'free', durationMin:30, suitableTime:['weekend','evening'] },
+  { id:'culture_calligraphy_play', name:'Brush Art Play', icon:'🖌️', cat:'free', durationMin:30, suitableTime:['weekend'] },
   // Routines
   { id:'routine_morning',   name:'Morning Routine',      icon:'🌅', cat:'routine', durationMin:30, isRoutine:true, routineId:'morning',     suitableTime:['before-school','weekend'] },
   { id:'routine_afterschool', name:'After-School Routine', icon:'🎒', cat:'routine', durationMin:30, isRoutine:true, routineId:'afterschool', suitableTime:['after-school'] },

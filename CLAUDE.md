@@ -34,12 +34,13 @@ event wiring, first render) lives in `js/99-main.js`, loaded last. Function
 hoisting means a declaration in `05` may freely *call* something declared in
 `22`; it just must not *run* at load time.
 
-Current permitted exceptions (do not add more): `js/03-sync.js:506`
-(`window._skipRewardPrompt = false`), `js/08-day-view.js:1351-1352` (two
-`window.addEventListener` calls that only register), `js/17-ui-misc.js:159`
+Current permitted exceptions (do not add more): `js/08-day-view.js:1351-1352`
+(two `window.addEventListener` calls that only register), `js/17-ui-misc.js:159`
 (the self-contained `installActionDoubleTapGuard` IIFE), and the
 `module.exports` guards at the end of `04-merge.js`, `18-rules.js`,
-`21-money-data.js`.
+`21-money-data.js`. (`js/03-sync.js`'s `window._skipRewardPrompt = false` was a
+fourth. It was written once and read nowhere, and went with the activity-unlock
+subsystem below.)
 
 **One declaration per name, globally.** All 36 files share one scope, so a
 duplicate `function foo()` in two files means the later one silently wins. A
@@ -673,11 +674,35 @@ so those carry an explicit `group:'chores'`. That is also why they are **not
 rewards**: the four `REWARD_POOLS.family` activities used to carry
 `rewardLocked: true`, so the thing a child had to earn was the right to help at
 home. They are ordinary available activities now, ids unchanged so every
-historical block still resolves; the other three pools are still earned. The
-first-run tutorial went with the lock, because its entire content was picking one
-of those chores as an unlocked "starter". An activity nothing can resolve is
+historical block still resolves. The first-run tutorial went with the lock,
+because its entire content was picking one of those chores as an unlocked
+"starter". An activity nothing can resolve is
 filed under Daily, never dropped: an hours total that silently omits blocks is
 worse than one that files them vaguely.
+
+**Nothing is earned before it can be planned.** The other nine pool activities
+followed Family Hero, and `REWARD_POOLS` went with them — their literals are
+inlined into `DEFAULT_ACTIVITIES`, ids unchanged. The grant was never a level-up,
+whatever the surrounding prose said: `checkLevelUp` only ever renamed and
+re-iconed through `levelRules`. It was a **placed-block milestone** at 10/15/20,
+so the app's answer to "you have planned ten things" was to hand back the right
+to plan an eleventh *kind* of thing. `unlockedActs`, `manualPlacedCount` and
+`unlockedThisWeek` are no longer seeded; a stored document that still carries
+them is left alone, because `deepMergeObj` cannot express a deletion and a
+tidy-up would churn the document on every sync to no effect.
+
+Two things survive this and must not be swept up with it. **`_locked` still has
+a writer** — the seasonal out-of-season rule in `getAllActivities` — and it is
+the one that keeps Beach Day out of January; only `_rewardLocked` went. And the
+**routine-checklist rewards** (`MORNING_LOCKED_REWARD`,
+`AFTERSCHOOL_CHECKLIST_REWARDS`, `queueChecklistReward`) are a different feature
+that merely shares the `#dayRewardPrompt` widget: they earn an extra checklist
+*item* off a real streak rather than gating an activity. `maybeShowRewardPrompt`
+drains any `{actId}` entry it is handed, because `pendingRewards` syncs and a
+device serving an older bundle out of a Pages cache can still queue one — an
+offer that cannot be accepted would wedge the widget for the checklist rewards
+behind it. `noActivityHasToBeEarned` and `aLegacyActivityRewardDrainsAway` hold
+all of this.
 
 School lives inside Brain and is ~32 hours a week, so the Brain row **names how
 much of itself was the school day** — otherwise homework can never be seen to

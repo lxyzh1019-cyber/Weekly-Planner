@@ -1419,8 +1419,10 @@ function addActivityAtMin(absMin) {
   // No activity picked yet → offer the picker right at the tapped time so the
   // kid doesn't have to select from the tray first.
   if (!selectedActivity) { openSlotPicker(absMin); return; }
+  // Seasonal only. The _rewardLocked gate below this used to refuse a further
+  // nine activities with "Keep going — this reward unlocks soon ✨"; nothing is
+  // reward-locked any more.
   if (selectedActivity._locked) { showToast(`🔒 Unlocks in ${selectedActivity.season}!`); return; }
-  if (selectedActivity._rewardLocked) { showToast('Keep going — this reward unlocks soon ✨'); return; }
 
   pendingStartMin = absMin;
 
@@ -1508,7 +1510,7 @@ function renderSlotPicker() {
   ordered.forEach(act => {
     const chip = document.createElement('button');
     chip.type = 'button';
-    chip.className = 'slot-pick-chip' + ((act._locked || act._rewardLocked) ? ' locked' : '');
+    chip.className = 'slot-pick-chip' + (act._locked ? ' locked' : '');
     chip.innerHTML = `<span class="spc-icon">${escapeHtml(act.icon)}</span><span class="spc-name">${escapeHtml(act.name)}</span><span class="spc-dur">${escapeHtml(formatDuration(act.durationMin || 60))}</span>`;
     chip.onclick = () => pickFromSlot(act.id);
     list.appendChild(chip);
@@ -1524,8 +1526,6 @@ function pickFromSlot(actId) {
   const act = getAllActivities().find(a => a.id === actId);
   if (!act) return;
   if (act._locked) { showToast(`🔒 Unlocks in ${act.season}!`); return; }
-  if (act._rewardLocked) { showToast('Keep going — unlock this reward soon ✨'); return; }
-  const _pr = getProfData()?.progress;
   selectedActivity = act;
   closeSheet('slotPickerOverlay');
   // pendingStartMin was set by openSlotPicker.
@@ -1633,12 +1633,11 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
   const blocks = getDayBlocks(currentDayKey);
   blocks.push(block);
   setDayBlocks(currentDayKey, blocks);
-  if (!isParent()) {
-    const p = getProfData();
-    p.progress.manualPlacedCount = (p.progress.manualPlacedCount || 0) + 1;
-    enqueueMilestoneRewards();
-    maybeShowRewardPrompt();
-  }
+  /* manualPlacedCount was counted here and fed enqueueMilestoneRewards, which
+     granted an activity at 10, 15 and 20 placed blocks. Both are retired. The
+     prompt call stays: the routine-streak checklist rewards still use it, and
+     placing a block is a reasonable moment to notice one is waiting. */
+  if (!isParent()) maybeShowRewardPrompt();
 
   // Counts are recomputed from confirmed blocks elsewhere — no manual increment here.
   const profd = getProfData();

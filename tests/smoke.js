@@ -9522,84 +9522,132 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
-  /* FAMILY HERO IS A CHORE, NOT A PRIZE.
-     Its four activities sat in REWARD_POOLS with rewardLocked:true, so the
-     thing a child had to earn was the right to help at home — and the first-run
-     overlay's whole content was picking one of them as an unlocked "starter".
-     Whoever did the chore is the hero; making the chore the reward said the
-     opposite.
+  /* NO ACTIVITY HAS TO BE EARNED — and seasonal locking still works.
 
-     The ids do not move, which is the load-bearing part: every block ever
-     placed against one still has to resolve. And the other three pools are
-     still earned — this removed one subsystem, not the reward mechanism. */
-  checks.familyHeroIsAChoreNotAPrize = await page.evaluate(() => {
+     Family Hero went first: its four activities sat in REWARD_POOLS with
+     rewardLocked:true, so the thing a child had to earn was the right to help
+     at home, and the first-run overlay's whole content was picking one of them
+     as an unlocked "starter". Whoever did the chore is the hero.
+
+     The remaining nine followed. The grant was never a level-up, whatever the
+     surrounding prose said — it was a placed-block milestone at 10/15/20, so
+     the app's answer to "you have planned ten things" was to hand back the
+     right to plan an eleventh KIND of thing.
+
+     Two things this check has to hold that the removal could easily have
+     broken. The ids do not move: every block ever placed against one still has
+     to resolve, or it renders as nothing at all. And _locked had TWO writers —
+     reward-locking and the seasonal out-of-season rule — so retiring the first
+     must leave the second exactly as it was, or Beach Day turns up in January.
+
+     The routine-streak checklist rewards are a different feature sharing the
+     same prompt widget, and they stay; asserted here so a later tidy-up does
+     not take them along by association. */
+  checks.noActivityHasToBeEarned = await page.evaluate(() => {
     const bad = [];
     const FAMILY = ['family_set_table', 'family_prep_bag', 'family_laundry_fold', 'family_kitchen_helper'];
-    const EARNED = ['acad_focus_sprint', 'health_stretch_reset', 'culture_story_circle'];
+    const FORMERLY_EARNED = [
+      'acad_focus_sprint', 'acad_preview_power', 'acad_reading_star',
+      'health_recovery_fuel', 'health_stretch_reset', 'health_pack_tomorrow',
+      'culture_story_circle', 'culture_festival_prep', 'culture_calligraphy_play',
+    ];
     const wasProfile = profile;
     profile = 'jenn';
-    const pr = getProfData('jenn').progress;
-    const wasUnlocked = (pr.unlockedActs || []).slice();
-    const wasCount = pr.manualPlacedCount;
-    const wasWeek = JSON.parse(JSON.stringify(pr.unlockedThisWeek || {}));
-    const wasPending = (pr.pendingRewards || []).slice();
     try {
-      pr.unlockedActs = [];
       const avail = getAllActivities('jenn');
 
-      FAMILY.forEach(id => {
+      [...FAMILY, ...FORMERLY_EARNED].forEach(id => {
         const act = avail.find(a => a.id === id);
         if (!act) { bad.push(`${id} is not on the picker at all`); return; }
         if (act._rewardLocked) bad.push(`${id} is still reward-locked`);
         if (act._locked) bad.push(`${id} is still locked`);
-        // Still a chore, so it still counts as one in the hours charts.
-        if (activityGroup(act) !== 'chores') {
-          bad.push(`${id} is grouped as '${activityGroup(act)}', not a chore`);
-        }
         // The id resolves for a block placed against it in any past week.
-        const past = findActivity(id, 'jenn');
-        if (!past) bad.push(`a historical block naming ${id} no longer resolves`);
+        if (!findActivity(id, 'jenn')) bad.push(`a historical block naming ${id} no longer resolves`);
         const shown = blockDisplayName({ actId: id }, 'jenn');
         if (!shown || !shown.name || shown.name === 'Something') {
           bad.push(`${id} renders as "${shown && shown.name}"`);
         }
       });
 
-      // Unrelated rewards are untouched: they are still earned.
-      EARNED.forEach(id => {
+      // Family Hero is still a chore, so it still counts as one in the charts.
+      FAMILY.forEach(id => {
         const act = avail.find(a => a.id === id);
-        if (!act) { bad.push(`${id} vanished from the picker`); return; }
-        if (!act._rewardLocked) bad.push(`${id} is no longer a reward — the wrong pool was unlocked`);
+        if (act && activityGroup(act) !== 'chores') {
+          bad.push(`${id} is grouped as '${activityGroup(act)}', not a chore`);
+        }
       });
 
-      // A placement milestone must never queue a chore as a prize.
-      pr.unlockedActs = [];
-      pr.pendingRewards = [];
-      pr.unlockedThisWeek = {};
-      pr.manualPlacedCount = 10;
-      enqueueMilestoneRewards();
-      const queued = (pr.pendingRewards || []).map(r => r.actId);
-      const chore = queued.find(id => FAMILY.includes(id));
-      if (chore) bad.push(`the 10-block milestone queued ${chore} as a reward`);
-      if (!queued.length) bad.push('the 10-block milestone queued nothing at all');
-
-      // The unlock flow itself is gone, not merely unreachable.
-      ['openTutorial', 'chooseTutorialStarter', 'skipTutorial', 'TUTORIAL_STARTER_CHOICES']
+      // The machinery is gone, not merely unreachable.
+      ['REWARD_POOLS', 'enqueueMilestoneRewards', 'pickLockedReward', 'unlockRewardAct', 'queueReward',
+       'openTutorial', 'chooseTutorialStarter', 'skipTutorial', 'TUTORIAL_STARTER_CHOICES']
         .forEach(name => {
           if (typeof window[name] !== 'undefined') bad.push(`${name} is still defined`);
         });
       if (document.getElementById('tutorialOverlay')) bad.push('the tutorial overlay is still in the markup');
-      // Family Hero checklist "reward picks" went with it.
+      if (getAllActivities('jenn').some(a => a.rewardLocked)) bad.push('an activity still carries rewardLocked');
+
+      /* SEASONAL LOCKING, the other writer of _locked. Asserted against the
+         real current season rather than a fixed month, so it holds all year. */
+      const season = getCurrentSeason();
+      const offSeason = SEASONAL_ACTIVITIES.find(a => a.season !== season);
+      const inSeason  = SEASONAL_ACTIVITIES.find(a => a.season === season);
+      if (!offSeason) {
+        bad.push('no out-of-season activity to test seasonal locking with');
+      } else {
+        const act = avail.find(a => a.id === offSeason.id);
+        if (!act) bad.push(`${offSeason.id} vanished from the picker`);
+        else if (!act._locked) bad.push(`${offSeason.id} is a ${offSeason.season} activity and is not locked in ${season}`);
+      }
+      if (inSeason) {
+        const act = avail.find(a => a.id === inSeason.id);
+        if (act && act._locked) bad.push(`${inSeason.id} is in season (${season}) and is locked anyway`);
+      }
+
+      /* The checklist rewards, deliberately kept: a different feature that
+         earns an extra checklist ITEM off a real streak. */
+      ['queueChecklistReward', 'getUnlockedRoutineRewards', 'maybeShowRewardPrompt', 'acceptRewardPrompt']
+        .forEach(name => {
+          if (typeof window[name] !== 'function') bad.push(`${name} went with the activity unlocks`);
+        });
       const items = [...AFTERSCHOOL_REWARD_ITEMS, ...AFTERSCHOOL_CHECKLIST_REWARDS];
       const heroItem = items.find(i => /family hero/i.test(i.text));
       if (heroItem) bad.push(`a Family Hero reward item survives: "${heroItem.text}"`);
       if (items.length < 4) bad.push('the unrelated Focus/Culture reward items went too');
+      if (!document.getElementById('dayRewardPrompt')) bad.push('the reward prompt the checklist rewards still use is gone');
     } finally {
-      pr.unlockedActs = wasUnlocked;
-      pr.manualPlacedCount = wasCount;
-      pr.unlockedThisWeek = wasWeek;
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* A LEGACY ACTIVITY REWARD DRAINS INSTEAD OF STICKING.
+     pendingRewards syncs, and a device serving an older bundle out of a Pages
+     cache can still queue an {actId} entry. There is nothing left to grant —
+     she can already use the activity — so the prompt must drop it rather than
+     show an offer that cannot be accepted, which would wedge the widget for
+     the checklist rewards queued behind it. */
+  checks.aLegacyActivityRewardDrainsAway = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'jenn';
+    const pr = getProfData('jenn').progress;
+    const wasPending = (pr.pendingRewards || []).slice();
+    try {
+      pr.pendingRewards = [
+        { id: 'rw-legacy', actId: 'culture_story_circle', reason: 'Placed 20 blocks' },
+        { id: 'rw-list', type: 'checklist', routineId: 'morning',
+          item: { id: 'mw1', text: 'Warm water with breakfast' }, reason: '5-day streak' },
+      ];
+      maybeShowRewardPrompt();
+      const left = (pr.pendingRewards || []).map(r => r.id);
+      if (left.includes('rw-legacy')) bad.push('the legacy activity reward is still queued');
+      if (!left.includes('rw-list')) bad.push('draining the legacy reward took the checklist reward with it');
+      const txt = (document.getElementById('dayRewardText') || {}).textContent || '';
+      if (!/Warm water/.test(txt)) bad.push(`the prompt shows "${txt}" instead of the checklist reward behind it`);
+    } finally {
       pr.pendingRewards = wasPending;
       profile = wasProfile;
+      maybeShowRewardPrompt();
     }
     return bad.length === 0 || bad;
   });
