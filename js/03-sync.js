@@ -642,7 +642,13 @@ function refreshCurrentScreen() {
   if (!active) return;
   if (active.id === 'screen-today') { if (typeof tdRenderToday === 'function') tdRenderToday(); }
   else if (active.id === 'screen-week') renderWeek();
-  else if (active.id === 'screen-day') { buildTimeline(); renderVibe(); }
+  /* A snapshot — including the echo of this device's own write — would destroy
+     the element under the finger and the gesture would die with a detached
+     node. The drag's own drop calls buildTimeline, so the deferred render is
+     not lost. typeof, so 03 never hard-depends on 39. */
+  else if (active.id === 'screen-day') {
+    if (!(typeof blockDragActive === 'function' && blockDragActive())) { buildTimeline(); renderVibe(); }
+  }
   else if (active.id === 'screen-chore') renderChoreTab();
   else if (active.id === 'screen-sync') renderSync();
   else if (active.id === 'screen-parent') renderParentHome();

@@ -792,7 +792,15 @@ function bufferSegLabels(seg, tier) {
    fills the timeline doesn't open its editor every time the user tries to
    scroll past it. If the pointer moves beyond a small threshold — or the
    browser cancels the pointer to start scrolling — the following click is
-   treated as a scroll gesture and ignored. */
+   treated as a scroll gesture and ignored.
+
+   LOAD-BEARING FOR THE DRAG LAYER: `moved` is set by a pointermove on this
+   element OR ANY DESCENDANT, and js/39-block-drag.js appends its grip and
+   resize handles as descendants of the block. That is the whole reason a drag
+   cannot also open the edit sheet, and there is no suppression code on the
+   other side to notice if it stopped being true. Narrowing these listeners to
+   the element itself would make every drag open the editor as well.
+   `aDraggedBlockDoesNotAlsoOpenItsEditor` in tests/smoke.js holds it. */
 function attachTapGuard(el, onTap) {
   let sx = 0, sy = 0, moved = false;
   el.addEventListener('pointerdown', (e) => { sx = e.clientX; sy = e.clientY; moved = false; }, { passive: true });

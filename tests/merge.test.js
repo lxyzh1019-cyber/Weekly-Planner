@@ -1023,5 +1023,65 @@ function sync(a, b) {
     phone.state.profiles.jenn.deposits.length === 0);
 }
 
+/* ── Dragging a block to another day ──
+
+   mergeWeeks unions each day key by id, so an ABSENCE cannot be expressed —
+   the same defect deepMergeObj has for state.shared.chore. Remove a block from
+   Tuesday and add it to Wednesday and any device that has not seen the move
+   puts the Tuesday copy straight back: the block then exists on BOTH days,
+   silently, with nothing on any screen to say so.
+
+   These two checks are the reason moveBlockToDay changes the id on a day
+   change. Keeping the id and tombstoning it cannot work: blockTombstoned drops
+   a block when `tombstone >= b.updatedAt`, note the >=, and mergeNow() IS
+   syncNow() — written in the same millisecond the moved block is deleted
+   everywhere. Two ids make that unreachable rather than merely unlikely. */
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  const tue = '2026-09-01', wed = '2026-09-02';
+  const seed = st => {
+    st.profiles.jenn.weeks = {
+      [tue]: [{ id: 'b1', actId: 'piano', startMin: 960, durationMin: 60, updatedAt: 1000 }],
+      [wed]: [],
+    };
+  };
+  on(ipad, seed); on(phone, seed);
+  sync(ipad, phone);
+
+  // The iPad drags it to Wednesday, exactly as moveBlockToDay does it.
+  on(ipad, st => {
+    st.profiles.jenn.weeks[tue] = [];
+    st.profiles.jenn.weeks[wed] = [{ id: 'b1-moved', actId: 'piano', startMin: 960, durationMin: 60, updatedAt: 2000 }];
+    st.shared.tombstones['b1'] = 2000;
+  });
+  sync(ipad, phone);
+
+  const days = d => [d.state.profiles.jenn.weeks[tue].length, d.state.profiles.jenn.weeks[wed].length];
+  check('a block dragged to another day does not come back on its old one',
+    JSON.stringify(days(ipad)) === '[0,1]' && JSON.stringify(days(phone)) === '[0,1]');
+
+  // And it is ONE block, not two — the half that a missing tombstone breaks.
+  check('a block dragged to another day exists exactly once',
+    ipad.state.profiles.jenn.weeks[wed].length === 1 &&
+    phone.state.profiles.jenn.weeks[wed].length === 1 &&
+    phone.state.profiles.jenn.weeks[wed][0].id === 'b1-moved');
+}
+
+/* The trap the new id exists to avoid, asserted directly: a tombstone written
+   at the same stamp as the record it is meant to supersede deletes it. If a
+   later change ever reverts to reusing the id, this is what fails. */
+{
+  const ipad = makeDevice('ipad');
+  const wed = '2026-09-02';
+  on(ipad, st => {
+    st.profiles.jenn.weeks = { [wed]: [{ id: 'b9', actId: 'piano', startMin: 960, durationMin: 60, updatedAt: 5000 }] };
+    st.shared.tombstones['b9'] = 5000;               // same millisecond
+  });
+  const before = clone(ipad.state);
+  receive(ipad, before);
+  check('a tombstone at the record\'s own stamp would erase it (why a move re-ids)',
+    ipad.state.profiles.jenn.weeks[wed].length === 0);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
