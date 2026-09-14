@@ -1895,7 +1895,12 @@
   .wf-card-time { font-weight: 800; font-size: calc(0.72rem * var(--fs-scale, 1)); line-height: 1; }
   .wf-card-icon { font-size: 1rem; line-height: 1; text-shadow: none; }
   .wf-card-name { font-weight: 800; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-  .wf-card-dur { font-size: calc(0.7rem * var(--fs-scale, 1)); font-weight: 700; line-height: 1; }
+  /* One line, always. It carries a counts summary ("1h30m · 2 goals") when
+     there is no room to list them, and that wrapped to two lines on a narrow
+     column — 13px of budget spending 26, which is the whole overflow on a
+     90-minute card. */
+  .wf-card-dur { font-size: calc(0.7rem * var(--fs-scale, 1)); font-weight: 700; line-height: 1;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   /* Columns are narrow: below the tall threshold the time/duration chips are
      dropped so the NAME gets the room (start time still reads off the grid
      position + tooltip). Tall cards stack everything centered, like a printed
@@ -1915,6 +1920,16 @@
      wraps past two lines spilled over the summary row underneath instead of
      being clipped, which is what made a training card read as overlapping text. */
   .wf-card--tall .wf-card-name { white-space: normal; max-height: 2.3em; overflow: hidden; }
+  /* A card too short to afford a second line of name keeps it to one, and a
+     card with nothing left over drops the start-time chip — the grid row it
+     sits on already says when it begins. Both are decided in wfStackPlan
+     (js/07-week-view.js) against measured row heights, because a name that
+     wraps where the budget assumed one line is what pushed the goal lines
+     through the duration below them. */
+  .wf-card--tall.wf-card--nameclamp .wf-card-name {
+    white-space: nowrap; max-height: none; text-overflow: ellipsis;
+  }
+  .wf-card--tall.wf-card--notime .wf-card-time { display: none; }
   /* Main-category summary rows (objective/gear/note) on tall cards only —
      shorter cards fold the same info into the duration line as a count string. */
   .wf-card-sum {

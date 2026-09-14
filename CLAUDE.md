@@ -513,6 +513,27 @@ say at this height*; `BLOCK_STACK_MIN` (46px) answers *when can the day view
 stack it on two lines*. Conflating them is what sliced a 30-minute Breakfast's
 own title in half — 40px of block, 30px of content box, two lines needing 34.
 
+**A tier is permission, not a fit.** On the Full week the two disagreed:
+`detail` starts at 64px and a stacked card needs 66 before it draws a single
+goal line, so the ladder promoted cards into a layout they could not hold.
+`wfStackPlan` (`js/07-week-view.js`) is what decides the layout now, against
+`WF_ROW` — the **measured** cost of each row at the sizes this grid ships. The
+old arithmetic budgeted 58px for the four fixed rows and 20px a goal line; the
+real figures are 66 and 17, because the kid readability floor lifted
+`.wf-card-time`, `-dur` and `-sum` to 13.1px and nothing re-measured. On top of
+that `.wf-card--tall .wf-card-name` is allowed two lines and the budget counted
+one. Every stacked card overflowed by 7–21px, which is how a training block's
+goals came to run through the duration underneath them.
+
+Priority on a stacked card: icon and name always, then the duration (the one
+thing position and size do not already say), then goal lines, then the
+start-time chip with whatever is left. A second line of name is bought only
+when the name is long enough to need it — and that estimate cannot overflow,
+because a plan that says one line also emits `.wf-card--nameclamp`, which holds
+it to one whatever the guess got wrong. `theStackedCardFitsWhatItDraws` measures
+in-flow children against the card's own height; `WF_ROW` is a set of
+measurements, so changing the type invalidates it.
+
 Today **owns no data and no rules — but it does invoke them.** Every number it
 shows is read through the accessors the owning screen uses, and every write goes
 through the function that already owned that write: `completeQuest` for a tick

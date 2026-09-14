@@ -817,6 +817,73 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* A STACKED CARD FITS WHAT IT DRAWS.
+
+     The week card's tall layout budgeted 58px for its four fixed rows and 20px
+     a goal line. At the sizes this grid actually ships those rows cost 66 and
+     17 — the kid readability floor lifted .wf-card-time, -dur and -sum to
+     13.1px and nothing re-measured what fits — and .wf-card--tall .wf-card-name
+     is allowed TWO lines, which the budget never counted at all. So every
+     stacked card overflowed its own box by 7-21px and a training block's goal
+     lines ran straight through the duration underneath them.
+
+     Measures the real thing: the in-flow children of each stacked card against
+     the card's own height. The tick is absolutely positioned and deliberately
+     excluded — it is the one child that is meant to sit outside the flow. Same
+     shape of assertion as aShortBlockStillSaysWhatItIs: whatever the row costs
+     become, a card may never draw more than it can hold. */
+  checks.theStackedCardFitsWhatItDraws = await page.evaluate(() => {
+    goWeek(); setWeekView('full');
+    const kid = activeProfile();
+    const key = getDayKeys(0)[2];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    try {
+      /* Training blocks carry the most rows of anything in the app — four gear
+         checks plus their goals — so they are where the budget breaks first.
+         The ladder spans every stacked height the grid can draw. */
+      setDayBlocks(key, [
+        { id: 'st-90',  actId: 'training', startMin: 7 * 60,  durationMin: 90,  tag: 'skating',
+          gearState: {}, objectives: ['Double Axel attempts', 'Layback spin'] },
+        { id: 'st-120', actId: 'training', startMin: 9 * 60,  durationMin: 120, tag: 'skating',
+          gearState: {}, objectives: ['Double Axel attempts', 'Layback spin', 'Footwork sequence'] },
+        { id: 'st-180', actId: 'training', startMin: 11 * 60 + 30, durationMin: 180, tag: 'swimming',
+          gearState: {}, objectives: ['Breaststroke KICK (board only)', 'Butterfly strength set', 'Freestyle endurance'] },
+        { id: 'st-240', actId: 'competition', startMin: 15 * 60, durationMin: 240, tag: 'skating',
+          gearState: {}, objectives: ['Program run-through', 'Land my key jumps clean'] },
+      ], kid);
+      weekOffset = 0; renderWeek();
+
+      const tall = [...document.querySelectorAll('#screen-week .wf-card--tall')];
+      if (tall.length < 4) return [`seeded 4 stackable blocks, the week stacked ${tall.length}`];
+
+      tall.forEach(c => {
+        const box = c.getBoundingClientRect();
+        const gap = parseFloat(getComputedStyle(c).rowGap) || 0;
+        const rows = [...c.children].filter(e => {
+          const st = getComputedStyle(e);
+          // The tick sits outside the flow on purpose; everything else stacks.
+          return st.display !== 'none' && st.position !== 'absolute';
+        });
+        let content = 0;
+        rows.forEach(e => { content += e.getBoundingClientRect().height; });
+        content += gap * Math.max(0, rows.length - 1);
+
+        const name = c.querySelector('.wf-card-name');
+        const label = (name && name.textContent.trim()) || '(unnamed)';
+        if (content > box.height + 0.5) {
+          bad.push(`${label}: ${rows.length} rows need ${Math.round(content)}px in a ${Math.round(box.height)}px card`);
+        }
+        // A stacked card that cannot even show its name has no business being
+        // stacked — that is what the one-row layout is for.
+        if (!name || getComputedStyle(name).display === 'none') {
+          bad.push(`a ${Math.round(box.height)}px stacked card renders no name`);
+        }
+      });
+    } finally { setDayBlocks(key, had, kid); renderWeek(); }
+    return bad.length === 0 || bad;
+  });
+
   /* THE WEEK KEEPS ITS COLUMN FLOOR ON A PHONE.
 
      css/app.css carried `@media (max-width:600px){ .weekly-full{min-width:560px} }`
