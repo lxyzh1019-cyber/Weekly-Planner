@@ -1746,21 +1746,27 @@ async function markRemainingNotDoneForChild(kid, dayKey) {
   const key = dayKey || currentDayKey;
   const name = who === 'jenn' ? 'Jenn' : 'Jess';
   const waiting = dayBlocksAwaitingAccount(who, key);
-  if (!waiting.length) { showToast(`Nothing left to answer for ${name}`); return; }
+  if (!waiting.length) { showToast(`Nothing left to answer for ${name}`); return 0; }
 
   const routines = waiting.filter(b => notDoneWouldWipeARoutine(b, who));
   const doable = waiting.filter(b => !notDoneWouldWipeARoutine(b, who));
   if (!doable.length) {
     showToast(`${name} ticked every step of ${routines.length === 1 ? 'that routine' : 'those routines'}`);
-    return;
+    return 0;
   }
-  if (!(await confirmNotDone(doable, key, who))) return;
+  if (!(await confirmNotDone(doable, key, who))) return 0;
   const n = applyNotDoneToBlocks(doable.map(b => b.id), key, who);
   refreshAfterCompletion();
   renderParentBanners();
-  buildTimeline();
+  /* Only when the day screen is the one on show. The meeting calls this too,
+     and rebuilding a timeline nobody is looking at is work for nothing. */
+  const dayScreen = document.getElementById('screen-day');
+  if (dayScreen && dayScreen.classList.contains('active')) buildTimeline();
   showToast(`${name}: ${n} block${n === 1 ? '' : 's'} recorded as not done`
     + (routines.length ? ` · ${routines.length} finished routine${routines.length === 1 ? '' : 's'} left alone` : ''));
+  /* The count, so the meeting can tell "recorded" from "cancelled" and only
+     mark the day reviewed when something actually was. */
+  return n;
 }
 
 /* ── "Confirm all today" was two promises it did not keep ─────────

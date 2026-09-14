@@ -3388,6 +3388,28 @@
      so it does not borrow the confirm button's green. Neutral, not red: it is
      a record a parent chose to make, not a warning. */
   .pb-action--notdone { background: #ece7e3; }
+
+  /* ── The meeting's offer on an unconfirmed day row ──────────────────
+     Inline rather than a modal: a three-button sheet would be a second dialog
+     mechanism beside openSheet/closeSheet, and an offer that has to be
+     discovered is one a parent works around. */
+  .mm-drow-offer {
+    display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-top: 1.5px dashed var(--ink);
+    background: #fdf6ef;
+  }
+  .mm-drow-offer-say { flex: 1 1 auto; font-size: var(--text-sm); color: var(--ink); }
+  /* 44px floor, like every other control a grown-up taps on a phone. */
+  .mm-offer-btn {
+    min-height: 44px; padding: 0 var(--space-3);
+    border: 1.5px solid var(--ink); border-radius: 999px;
+    background: #fff; color: var(--ink);
+    font-size: var(--text-sm); font-weight: 600; cursor: pointer;
+  }
+  /* The one that moves money. Neutral rather than red: it is a record a parent
+     chose to make, not a warning — and it confirms before it writes. */
+  .mm-offer-btn--nd { background: #ece7e3; }
   .pb-action[disabled] { opacity: 0.55; cursor: default; }
 
   /* Parent portal: tabbed sections */

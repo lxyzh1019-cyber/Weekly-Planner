@@ -68,6 +68,26 @@ function mmIsDayReviewedFor(kid, d) { return isDayReviewed(kid, mmDayKey(d)); }
    off a Wednesday that had not arrived. Un-reviewing is always allowed: taking
    back a record is never the thing that needs gating. */
 function mmCanReviewDay(kid, d) { return canReviewDay(kid, mmDayKey(d)); }
+/* ── The one refusal the MEETING may talk its way past ──────────────
+   A day refused for `unconfirmed` is refused over blocks nobody answered, and
+   that is the whole reason a backlogged week sticks. A day refused for
+   `future` or `running` is refused over time, which no amount of agreeing can
+   change, so those stay hard everywhere.
+
+   Meeting-only, deliberately. The parent day banner keeps its hard refusal:
+   the offer belongs to a sitting where a grown-up is working through a week on
+   purpose, not to the day screen where a stray tap would record a review
+   nobody meant. */
+function mmOverridableRefusal(info) {
+  return !!(info && !info.ok && info.reason === 'unconfirmed');
+}
+/* Whether this child's money for the week is already settled. Changing a grade
+   after that would edit a record the wallet no longer reflects, so the offer
+   to record blocks as not done refuses and points at the way back in — the
+   same door every other frozen fact uses. */
+function mmWeekIsSettledFor(kid) {
+  return typeof mnyIsCommitted === 'function' && mnyIsCommitted(mmWeekKey(), kid);
+}
 /* Today is reviewable but not finished, so it is signed off through an explicit
    "nothing else is planned" rather than a plain tap — the same shape the parent
    day banner uses for an empty day, and for the same reason: the record must not
@@ -82,6 +102,13 @@ async function mmToggleDayReviewed(kid, d) {
   const on = isDayReviewed(kid, k);
   if (!on) {
     const can = canReviewDay(kid, k);
+    /* Enabled but not a shortcut. The row's own offer names the three answers
+       and says what each costs; reviewing silently from here would be a second
+       door to one of them with none of that said. */
+    if (mmOverridableRefusal(can)) {
+      showToast(`${reviewBlockedReason(can)} — choose what to do with them below`);
+      return;
+    }
     if (!can.ok) { showToast(reviewBlockedReason(can)); return; }
     if (can.reason === 'open' && !(await mmConfirmOpenDay(kid === 'jenn' ? 'Jenn' : 'Jess'))) return;
   }
@@ -89,6 +116,48 @@ async function mmToggleDayReviewed(kid, d) {
   saveAll();
   renderMeetingMode();
 }
+/* "Leave them as they are — review the day."
+   Writes only parentDayConfirm. No completion, no grade, no XP, no money. The
+   blocks keep their unanswered state and the day counts as reviewed, which is
+   a parent saying "I have looked at this" and nothing more. */
+function mmReviewLeavingBlocks(kid, d) {
+  const nm = kid === 'jenn' ? 'Jenn' : 'Jess';
+  markDayReviewed(kid, mmDayKey(d), true);
+  saveAll();
+  renderMeetingMode();
+  showToast(`📋 ${nm}'s day reviewed — the blocks were left as they were`);
+}
+
+/* "They didn't happen — record and review."
+   The only answer here that moves money, so it is the only one that confirms
+   first. markRemainingNotDoneForChild (js/09-sheets.js) owns the write and
+   names every grade coming back before anything moves; this adds the review
+   and the meeting's own refresh. */
+async function mmRecordNotDoneAndReview(kid, d) {
+  const key = mmDayKey(d);
+  const nm = kid === 'jenn' ? 'Jenn' : 'Jess';
+  /* A settled week's money is frozen. Changing a grade now would edit a record
+     the wallet no longer reflects, so refuse and offer the door back in rather
+     than writing a change nobody would be paid. */
+  if (mmWeekIsSettledFor(kid)) {
+    if (await showConfirm(
+      `${nm}'s money for this week is already settled, so a grade cannot change.`
+      + `\n\nReopen her week to record what did not happen?`,
+      { okLabel: 'Reopen her week', cancelLabel: 'Leave it settled' })) {
+      mnyReopenWeek(kid, mmWeekKey());
+      saveAll();
+      renderMeetingMode();
+      showToast(`${nm}'s week reopened — record it, then settle again`);
+    }
+    return;
+  }
+  const n = await markRemainingNotDoneForChild(kid, key);
+  if (!n) { renderMeetingMode(); return; }
+  markDayReviewed(kid, key, true);
+  saveAll();
+  renderMeetingMode();
+}
+
 async function mmToggleConfirmDay(d) {
   const k = mmDayKey(d);
   const next = !mmIsDayConfirmed(d);
@@ -96,6 +165,14 @@ async function mmToggleConfirmDay(d) {
      side door that reviews a day neither child could be reviewed for. */
   if (next) {
     const cans = ['jenn', 'jess'].map(kid => canReviewDay(kid, k));
+    // The hard reason wins over an overridable one — see mmOverridableRefusal.
+    const hard = cans.find(c => !c.ok && !mmOverridableRefusal(c));
+    if (hard) { showToast(reviewBlockedReason(hard)); return; }
+    const soft = cans.find(c => mmOverridableRefusal(c));
+    if (soft) {
+      showToast(`${reviewBlockedReason(soft)} — choose what to do with them below`);
+      return;
+    }
     const blocked = cans.find(c => !c.ok);
     if (blocked) { showToast(reviewBlockedReason(blocked)); return; }
     if (cans.some(c => c.reason === 'open') && !(await mmConfirmOpenDay('Jenn or Jess'))) return;
@@ -649,6 +726,9 @@ function mmHandleClick(e) {
   if (a === 'thisweek')       { mmGoToWeek(ctThisWeekKey()); return; }
   if (a === 'openweek')       { mmOpenWeekForBlocks(kid); return; }
   if (a === 'allroutines')    { mmToggleAllRoutines(kid, d); return; }
+  if (a === 'nd-leave')       { mmReviewLeavingBlocks(kid, d); return; }
+  if (a === 'nd-open')        { mmOpenDayForBlocks(kid, d); return; }
+  if (a === 'nd-record')      { mmRecordNotDoneAndReview(kid, d); return; }
   if (a === 'addchore-open')  { mmToggleAddChore(kid, d); return; }
   if (a === 'addchore-pick')  { mmAddChoreHappened(kid, d, el.getAttribute('data-chore')); return; }
   if (a === 'openday')        { mmSelectDay(d); return; }
@@ -844,21 +924,30 @@ function mmRenderReview(wk) {
       const nm = kid === 'jenn' ? 'Jenn' : 'Jess';
       /* A control that cannot act says why on itself. Un-ticking is always
          offered: taking a record back needs no permission. */
-      const why = on ? '' : reviewBlockedReason(mmCanReviewDay(kid, d));
+      const can = on ? null : mmCanReviewDay(kid, d);
+      const why = on ? '' : reviewBlockedReason(can);
+      /* Still says why; only stops REFUSING when the reason is one the offer
+         below can settle. A control that behaves unusually must say so out
+         loud, which is what the disabled title was doing before. */
+      const hard = !!why && !mmOverridableRefusal(can);
       return `<button type="button" class="mm-drow-kid${on ? ' on' : ''}"
           data-mm-action="reviewday" data-kid="${escapeAttr(kid)}" data-day="${d}"
-          ${why ? `disabled title="${escapeAttr(nm + ': ' + why)}"` : ''}
-          aria-label="${on ? nm + ' reviewed' : 'Mark ' + nm + ' reviewed'}"
+          ${hard ? `disabled ` : ''}${why ? `title="${escapeAttr(nm + ': ' + why)}"` : ''}
+          aria-label="${on ? nm + ' reviewed' : 'Mark ' + nm + ' reviewed'}${why ? ' — ' + escapeAttr(why) : ''}"
         >${on ? '✓' : '○'} ${CT_PROFILE_ICON[kid]}</button>`;
     };
-    const bothWhy = done ? '' : reviewBlockedReason(
-      ['jenn', 'jess'].map(k => mmCanReviewDay(k, d)).find(c => !c.ok));
+    /* Both: the HARD reason wins. A running block for Jess blocks the control
+       even when Jenn's day is merely unconfirmed — the convenience must not be
+       a side door into a day neither child could be reviewed for. */
+    const bothCans = ['jenn', 'jess'].map(k => mmCanReviewDay(k, d));
+    const bothHard = done ? null : bothCans.find(c => !c.ok && !mmOverridableRefusal(c));
+    const bothWhy = done ? '' : reviewBlockedReason(bothHard || bothCans.find(c => !c.ok));
     const state = ahead
       ? `<span class="mm-drow-note">Not here yet</span>`
       : `<span class="mm-drow-review">${kidCell('jenn')}${kidCell('jess')}`
         + `<button type="button" class="${done ? 'mm-drow-ok' : 'mm-drow-go'}"
              data-mm-action="confirmday" data-day="${d}"
-             ${bothWhy ? `disabled title="${escapeAttr(bothWhy)}"` : ''}
+             ${bothHard ? `disabled ` : ''}${bothWhy ? `title="${escapeAttr(bothWhy)}"` : ''}
            >${done ? '✓ Both reviewed' : 'Both'}</button></span>`;
     const mid = (!ahead && empty)
       ? `<span class="mm-drow-note">Nothing logged — open it and add what actually happened</span>`
@@ -866,6 +955,36 @@ function mmRenderReview(wk) {
            <span class="mm-drow-track"><span class="mm-drow-fill mm-bar-j" style="width:${jp}%"></span></span>
            <span class="mm-drow-track"><span class="mm-drow-fill mm-bar-s" style="width:${sp}%"></span></span>
          </span>`;
+    /* ── The offer, inline on the row ──────────────────────────────
+       Not a modal. Three answers a parent needs and a new three-button sheet
+       would be a second dialog mechanism beside openSheet/closeSheet, which own
+       focus and Escape. Inline is also visible rather than waiting to be
+       discovered, which is the same reason a refused control was made to say
+       why on itself.
+
+       Only the money-moving answer opens a confirmation, and that one is the
+       ordinary two-button showConfirm naming the cost. */
+    const offerFor = (kid) => {
+      if (ahead || mmIsDayReviewedFor(kid, d)) return '';
+      const can = mmCanReviewDay(kid, d);
+      if (!mmOverridableRefusal(can)) return '';
+      const nm = kid === 'jenn' ? 'Jenn' : 'Jess';
+      const n = can.pendingCount;
+      return `<div class="mm-drow-offer">
+          <span class="mm-drow-offer-say">${CT_PROFILE_ICON[kid]} ${escapeHtml(nm)} · `
+        + `${n} block${n === 1 ? ' was' : 's were'} never confirmed</span>
+          <button type="button" class="mm-offer-btn" data-mm-action="nd-leave"
+            data-kid="${escapeAttr(kid)}" data-day="${d}"
+            >Leave them</button>
+          <button type="button" class="mm-offer-btn" data-mm-action="nd-open"
+            data-kid="${escapeAttr(kid)}" data-day="${d}"
+            >Open the day ›</button>
+          <button type="button" class="mm-offer-btn mm-offer-btn--nd" data-mm-action="nd-record"
+            data-kid="${escapeAttr(kid)}" data-day="${d}"
+            >Didn't happen</button>
+        </div>`;
+    };
+    const offers = ahead ? '' : ['jenn', 'jess'].map(offerFor).join('');
     rows += `<div class="mm-drow${open ? ' open' : ''}${done ? ' done' : ''}">
         <div class="mm-drow-head">
           <button type="button" class="mm-drow-day" data-mm-action="openday" data-day="${d}"
@@ -876,6 +995,7 @@ function mmRenderReview(wk) {
           <button type="button" class="mm-drow-x" data-mm-action="openday" data-day="${d}"
             aria-label="${open ? 'Close' : 'Open'} ${escapeAttr(DAY_SHORT[d])}">${open ? '▴' : '▾'}</button>
         </div>
+        ${offers}
         ${open ? `<div class="mm-drow-body">${mmRenderDayDetail(wk, d)}</div>` : ''}
       </div>`;
   }
@@ -888,8 +1008,19 @@ function mmRenderReview(wk) {
   const footer = `<div class="mm-ready">Meeting-ready: ${nConfirmed}/7 days confirmed · 💪 Together you kept ${together}% of the days so far <small>(🐥 ${jp}% · 🦊 ${sp}%)</small></div>`;
   // The readiness list belongs before anything is agreed, not after (it lived
    // in step 4 until now). Per-kid state, so it follows whoever step 3/4 is on.
+  /* Getting OUT of step 1 to the plan. mmOpenWeekForBlocks was written and
+     unreachable from here on any week — the only openweek button in the app
+     was in step 2 — so a parent working a backlogged week had no way to reach
+     the week itself. Always present rather than only on an unconfirmed day:
+     reading the plan is what a review is, and it is not a repair action.
+     Same writer and same labels as step 2's pair, so the two cannot drift. */
+  const openWeek = `<div class="mm-blocklink">${['jenn', 'jess'].map(k =>
+    `<button type="button" class="pill-btn" data-mm-action="openweek" data-kid="${escapeAttr(k)}"
+      >${CT_PROFILE_ICON[k]} Open ${escapeHtml(k === 'jenn' ? 'Jenn' : 'Jess')}'s week ›</button>`).join('')}
+    <span class="mm-cap">Ticking and confirming blocks happens there, not here.</span></div>`;
   return `${mnyChecklist(wk, mnyMeetingKid())}
     <div class="mm-h">Review the week</div>
+    ${openWeek}
     <div class="mm-legend"><span><i class="mm-sw mm-bar-j"></i>Jenn</span><span><i class="mm-sw mm-bar-s"></i>Jess</span><span class="mm-legend-note">how the team's doing each day — cheer each other on</span></div>
     ${mmFamilyChoreReview(wk)}
     ${detail}${footer}`;

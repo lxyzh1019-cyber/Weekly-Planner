@@ -9720,6 +9720,116 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* THE MEETING OFFERS A WAY OUT OF AN UNCONFIRMED DAY, AND A WAY TO THE PLAN.
+     Two findings drove this. A day refused only for `unconfirmed` was a hard
+     refusal everywhere, so a backlogged week stuck with no move a parent could
+     make. And step 1 had NO route to the day or the week at all: openkidday
+     was dispatched with no button anywhere rendering it, and the only openweek
+     button in the app was in step 2.
+
+     The offer is inline on the row rather than a modal, because a three-button
+     sheet would be a second dialog mechanism beside openSheet/closeSheet, which
+     own focus and Escape. */
+  checks.theMeetingOffersAWayOutOfAnUnconfirmedDay = await page.evaluate(async () => {
+    const bad = [];
+    const wasProfile = profile;
+    const wasConfirm = window.showConfirm;
+    profile = 'parent'; parentViewing = 'jenn';
+    ctPrepareRead();
+    const past = toDayKeyInZone(new Date(Date.now() - 3 * 864e5));
+    const wk = ctWeekKeyForDate(past);
+    const dayIdx = Math.round((formatDayKey(past) - formatDayKey(wk)) / 864e5);
+    const today = todayKey();
+    const store = JSON.parse(JSON.stringify(state.shared.parentDayConfirm || {}));
+    const beforePast = (getDayBlocks(past, 'jenn') || []).slice();
+    const beforeToday = (getDayBlocks(today, 'jenn') || []).slice();
+    try {
+      window.showConfirm = async () => true;
+      openFamilyMeeting();
+      mmGoToWeek(wk);
+      mmGoStep(1);
+      markDayReviewed('jenn', past, false);
+      setDayBlocks(past, [{ id: 'mb1', actId: 'piano', startMin: 9 * 60,
+                            durationMin: 60, checklistState: {} }], 'jenn');
+      renderMeetingMode();
+
+      /* ── The offer is on the row, with all three answers ── */
+      const offer = document.querySelector('#familyMeetingOverlay .mm-drow-offer');
+      if (!offer) bad.push('an unconfirmed day row carries no offer');
+      const actions = offer
+        ? Array.from(offer.querySelectorAll('[data-mm-action]')).map(b => b.getAttribute('data-mm-action'))
+        : [];
+      ['nd-leave', 'nd-open', 'nd-record'].forEach(a => {
+        if (actions.indexOf(a) === -1) bad.push(`the offer is missing ${a}`);
+      });
+      // Every control a grown-up taps keeps the 44px floor.
+      (offer ? Array.from(offer.querySelectorAll('button')) : []).forEach(b => {
+        if (b.getBoundingClientRect().height < 44) {
+          bad.push('an offer button is under the 44px floor');
+        }
+      });
+
+      /* ── The control is enabled for `unconfirmed`, refused for `running` ── */
+      const cell = document.querySelector(
+        `#familyMeetingOverlay .mm-drow-kid[data-kid="jenn"][data-day="${dayIdx}"]`);
+      if (cell && cell.disabled) bad.push('an unconfirmed day is still a hard refusal');
+      if (cell && !(cell.getAttribute('title') || '').length) {
+        bad.push('the enabled control does not say why it is offering anything');
+      }
+
+      /* ── STEP 1 AND STEP 2 BOTH REACH THE WEEK, on a PAST week ── */
+      const wkBtns = document.querySelectorAll(
+        '#familyMeetingOverlay [data-mm-action="openweek"]');
+      if (wkBtns.length < 2) {
+        bad.push(`step 1 offers ${wkBtns.length} open-week buttons, expected one per child`);
+      }
+      mmGoStep(2);
+      const wkBtns2 = document.querySelectorAll(
+        '#familyMeetingOverlay [data-mm-action="openweek"]');
+      if (wkBtns2.length < 2) {
+        bad.push(`step 2 offers ${wkBtns2.length} open-week buttons on a past week`);
+      }
+      mmGoStep(1);
+
+      /* ── "Leave them" reviews and moves nothing ── */
+      mmReviewLeavingBlocks('jenn', dayIdx);
+      if (!isDayReviewed('jenn', past)) bad.push('Leave them did not review the day');
+      const kept = (getDayBlocks(past, 'jenn') || []).find(b => b.id === 'mb1');
+      if (!kept) bad.push('Leave them removed the block');
+      if (kept && (kept.confirmed || kept.notDone || kept.completed)) {
+        bad.push('Leave them changed what the block says');
+      }
+
+      /* ── A running day is still refused outright ── */
+      const now = tdNowMin();
+      markDayReviewed('jenn', today, false);
+      setDayBlocks(today, [{ id: 'mb2', actId: 'piano', startMin: Math.max(0, now - 10),
+                             durationMin: 180, checklistState: {} }], 'jenn');
+      const run = canReviewDay('jenn', today);
+      if (mmOverridableRefusal(run)) bad.push('a running day was treated as overridable');
+      renderMeetingMode();
+      const todayIdx = Math.round((formatDayKey(today) - formatDayKey(ctWeekKeyForDate(today))) / 864e5);
+
+      /* ── …and the DAY BANNER keeps its hard refusal. The override is the
+            meeting's, not the day screen's. ── */
+      markDayReviewed('jenn', past, false);
+      currentDayKey = past;
+      renderParentBanners();
+      const banner = document.querySelector('#parentDayActions .pb-action[disabled]');
+      if (!banner) bad.push('the day banner stopped refusing an unconfirmed day');
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      window.showConfirm = wasConfirm;
+      try { closeSheet('familyMeetingOverlay'); } catch (e) {}
+      setDayBlocks(past, beforePast, 'jenn');
+      setDayBlocks(today, beforeToday, 'jenn');
+      state.shared.parentDayConfirm = store;
+      profile = wasProfile;
+    }
+    return bad.length === 0 || bad;
+  });
+
   /* A WEEK DOES NOT CLOSE OVER A DAY STILL BEING LIVED.
      canReviewDay always refused a running day, but canCloseWeek excused it
      alongside a future one — so a Sunday sitting held while the swimming was
