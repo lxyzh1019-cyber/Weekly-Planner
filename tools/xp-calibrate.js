@@ -77,6 +77,8 @@ const WEEKS = {
     chores:  { planned: 2,  done: 0 },
     daily:   { planned: 21, done: 18 },  // meals: must contribute nothing
     free:    { planned: 6,  done: 6 },
+    move:    { planned: 1,  done: 0 },   // the swim she did not go to
+    explore: { planned: 0,  done: 0 },
     weekly:  {},
   },
   ordinary: {
@@ -87,6 +89,11 @@ const WEEKS = {
     chores:  { planned: 2,  done: 2 },
     daily:   { planned: 21, done: 20 },
     free:    { planned: 6,  done: 6 },
+    move:    { planned: 1,  done: 1 },   // one bike ride or a swim
+    /* None. An ordinary school week does not contain a museum — that is what
+       makes an outing worth recording, and pricing the ordinary week as though
+       one happens every time is what pushed levelling under its own floor. */
+    explore: { planned: 0,  done: 0 },
     weekly:  { personal_unasked: 1, training_attitude: 2 },
   },
   strong: {
@@ -97,6 +104,8 @@ const WEEKS = {
     chores:  { planned: 4,  done: 4 },
     daily:   { planned: 21, done: 21 },
     free:    { planned: 8,  done: 8 },
+    move:    { planned: 3,  done: 3 },
+    explore: { planned: 2,  done: 2 },   // a trip and a hike
     weekly:  { streak_7: 1, personal_best: 1, chore_overflow: 2,
                personal_unasked: 2, training_attitude: 3, app_level: 1 },
   },
@@ -104,7 +113,12 @@ const WEEKS = {
 
 function weekXP(w) {
   let blocks = 0;
-  ['routine', 'brain', 'body', 'chores', 'daily', 'free'].forEach(g => {
+  /* Read from the same table the app declares rather than a hand-kept list.
+     This WAS a literal six-id array, which meant adding a group to
+     QUEST_XP_BY_GROUP left the calibrator summing the old economy — it would
+     not error, it would just quietly report numbers for an app that no longer
+     exists, and "change a number and re-run the tool" would be a no-op. */
+  Object.keys(BY_GROUP).forEach(g => {
     blocks += (w[g] ? w[g].done : 0) * (BY_GROUP[g] || 0);
   });
   let weekly = 0;

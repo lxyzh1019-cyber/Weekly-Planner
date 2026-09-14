@@ -43,9 +43,17 @@ const byGroup = (() => {
   return out;
 })();
 
-const want = { routine: 3, brain: 5, body: 8, chores: 5, daily: 0, free: 0 };
+const want = { routine: 3, brain: 5, body: 8, chores: 5, daily: 0, free: 0, move: 5, explore: 3 };
 Object.keys(want).forEach(g => {
   check(`${g} blocks are worth ${want[g]} XP`, byGroup[g] === want[g], `read ${byGroup[g]}`);
+});
+/* Iterating `want` alone is a whitelist: a group added to the source passes
+   unnoticed because nothing here asks about it. So check the other direction
+   too — every group the app prices must be a group this file has an opinion
+   about, or the table can grow a number no test ever saw. */
+Object.keys(byGroup).forEach(g => {
+  check(`${g} is a group this test knows about`, Object.hasOwn(want, g),
+    `QUEST_XP_BY_GROUP prices "${g}" at ${byGroup[g]} and nothing locks it`);
 });
 
 /* The one rule that is not a tuning knob. Meals, appointments, rest and family
@@ -58,7 +66,11 @@ check('free and rest time earns nothing', byGroup.free === 0);
    strong week worth exactly as much as an ordinary one, which is the opposite of
    what the brief asks for. The calibration proves the gap; this proves the cap
    is above what an ordinary week actually earns. */
-const ordinaryBlocks = 15 * byGroup.routine + 10 * byGroup.brain + 3 * byGroup.body + 2 * byGroup.chores;
+/* Mirrors WEEKS.ordinary in tools/xp-calibrate.js. It is a second hand-written
+   copy of the same week and the two have to move together — the calibrator is
+   what proves the shape is sane, this is what proves the cap sits above it. */
+const ordinaryBlocks = 15 * byGroup.routine + 10 * byGroup.brain + 3 * byGroup.body
+                     + 2 * byGroup.chores + 1 * byGroup.move + 0 * byGroup.explore;
 check('an ordinary week does not hit the cap', ordinaryBlocks + 30 < cap,
   `ordinary earns ${ordinaryBlocks + 30}, cap is ${cap}`);
 check('one week can never be worth more than one level', cap < perLevel,

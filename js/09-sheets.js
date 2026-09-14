@@ -39,12 +39,11 @@ function nextFreeSlotMin(dayKey, durationMin, fromMin) {
    rail that no longer exists. */
 function startPlacingActivity(act) {
   if (!act) return;
-  if (act._locked) { showToast(`🔒 Unlocks in ${act.season}!`); return; }
-  if (act._rewardLocked) { showToast('Keep going — unlock this reward soon ✨'); return; }
+  if (act._locked) { showToast(`🔒 Unlocks in ${seasonLabel(act)}!`); return; }
   selectedActivity = act;
   hideMascot();
   if (!currentDayKey) currentDayKey = todayKey();
-  addActivityAtMin(nextFreeSlotMin(currentDayKey, act.durationMin));
+  addActivityAtMin(nextFreeSlotMin(currentDayKey, activityDefaultDuration(act)));
 }
 
 /* Renders a tickable objectives/goals checklist — preset items plus any

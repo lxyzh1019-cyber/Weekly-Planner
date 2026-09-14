@@ -78,9 +78,24 @@ const ACTIVITY_GROUPS = [
   { id: 'chores',  label: '🧹 Chores',             short: 'Chores',  hex: '#ffd166' },
   { id: 'daily',   label: '🍽 Daily',              short: 'Daily',   hex: '#e8a87c' },
   { id: 'free',    label: '🎮 Free',               short: 'Free',    hex: '#95d5b2' },
+  /* Swimming for the fun of it is not the same ask as a training session, and
+     filing both under Body said a length of the pool on Saturday was worth what
+     a coached hour is. Everyday movement is its own row. */
+  { id: 'move',    label: '🏊 Everyday movement',  short: 'Move',    hex: '#f4a340' },
+  /* A museum, a hike, a morning at the lake. Not effort in the sense Body means
+     it, and not "free time" either — the week is shaped around it the way it is
+     around an appointment. */
+  { id: 'explore', label: '🧭 Explore',            short: 'Explore', hex: '#7fb3a0' },
 ];
 const GROUP_ORDER = ACTIVITY_GROUPS.map(g => g.id);
-function groupDef(id) { return ACTIVITY_GROUPS.find(g => g.id === id) || ACTIVITY_GROUPS[4]; }
+/* The fallback is looked up BY ID, not by position. It used to be
+   ACTIVITY_GROUPS[4], which was 'daily' only because daily happened to be the
+   fifth row — so adding a group anywhere above it would have quietly re-pointed
+   every unknown-group lookup at a different row, with nothing to say so. */
+function groupDef(id) {
+  return ACTIVITY_GROUPS.find(g => g.id === id)
+      || ACTIVITY_GROUPS.find(g => g.id === 'daily');
+}
 function groupLabel(id) { return groupDef(id).label; }
 function groupShort(id) { return groupDef(id).short; }
 function groupHex(id)   { return groupDef(id).hex; }
@@ -109,7 +124,12 @@ function activityGroup(act) {
     case 'school':                       return 'brain';
     case 'routine':                      return 'routine';
     case 'daily': case 'appointment':    return 'daily';
-    case 'active': case 'free': case 'sleep': return 'free';
+    /* 'active' means she moved, so it answers to Move. The three that are
+       seasonal treats or outings rather than exercise carry an explicit
+       `group` and never reach this line. `cat:'active'` itself has to stay —
+       the athlete achievement counts on it. */
+    case 'active':                       return 'move';
+    case 'free': case 'sleep':           return 'free';
     default:                             return 'daily';
   }
 }
@@ -309,12 +329,71 @@ const COMPETITION_OBJECTIVES_BY_TAG = {
    specific activity like Piano gets its own goals), falling back to its
    category. */
 const ACTIVITY_OBJECTIVES_BY_ID = {
-  piano: ['Scales / technique', 'New piece — learn notes', 'Polish a piece', 'Sight-reading'],
-  french: ['Vocabulary', 'Listening practice', 'Conversation practice', 'Reading'],
-  chinese: ['Vocabulary / characters', 'Listening practice', 'Conversation practice', 'Reading'],
-  math: ['Times tables / facts', 'Word problems', 'Homework review', 'New concept'],
-  chores: ['Finish assigned chore(s)', 'Do it without being asked twice', 'Clean up after'],
-  relax: ['Deep breathing', 'Stretch', 'Quiet time — no screens'],
+  /* The three ROUTINES are deliberately absent. A routine's completion IS its
+     checklist (ROUTINE_PRESETS, and CLAUDE.md says so), so giving one goals as
+     well would draw two lists on one block with nothing to say which counts. */
+
+  // Fuel and care
+  breakfast: ['Eat sitting down', 'Water bottle filled', 'Snack packed'],
+  lunch: ['Finish the main', 'Fruit or veg', 'Clear your plate'],
+  dinner: ['Help set the table', 'Screens away', 'Share one thing from today'],
+  health_recovery_fuel: ['Protein + carb', 'Big glass of water', 'Within 30 min of training'],
+  appt_general: ['Bring the paper/card', 'Two questions ready', 'Thank the person'],
+  appt_medical: ['Health card', 'Know what to tell them', 'Brush before the dentist'],
+  appt_haircut: ['Photo of the cut you want', 'Sit still', 'Say thank you'],
+  appt_school_meet: ["One thing you're proud of", 'One thing to ask', 'Bring your agenda'],
+  appt_physio: ['Exercise sheet packed', 'Say what hurt this week', 'Home exercises tonight'],
+  family_meeting: ['Review the week', 'Money check', 'Plan next week'],
+
+  // Brain
+  school_day: ['Agenda filled in', 'Hand in what is due', 'Ask one question'],
+  homework: ["Finish today's sheet", 'Check the answers', 'Pack it in the bag'],
+  reading: ['Read 20 minutes', 'Finish the chapter', 'Tell someone what happened'],
+  math: ["Beat yesterday's score", 'One Kangaroo problem', 'Explain one solution'],
+  french: ['10 new words', 'One conversation with a parent', 'Finish the lesson'],
+  chinese: ['Write 5 characters', 'Read one page aloud', 'Speak Chinese at dinner'],
+  piano: ['Scales first', 'Trouble spot 5x slow', 'One piece start to finish'],
+  singing: ['Warm-up', 'Learn one verse', 'Record it and listen back'],
+  // The medium is a goal rather than a second activity or a new picker: one
+  // Drawing block, and the first line says which kind of drawing it was.
+  drawing: ['Sketch, or brush art', 'Finish one piece', 'Try a new technique', 'Sign and date it'],
+  craft: ['Gather materials first', 'Finish it or store it safely', 'Tidy the table'],
+
+  // Everyday movement
+  swimming: ['20 lengths', 'Work on breathing', 'Stretch after'],
+  skating: ['Helmet and guards packed', 'Warm up your edges', 'Try one new thing'],
+  ballet: ['Bun and tights packed', 'Stretch before', 'Practise the combination'],
+  bike_ride: ['Helmet on', 'Pick the route', 'Water bottle'],
+  health_stretch_reset: ['Hamstrings', 'Hips', 'Shoulders'],
+  relax: ['Foam roll', 'Legs up the wall', 'Slow breathing'],
+
+  // Explore
+  day_trip: ['Pack water and a snack', 'Take one photo', 'Tell the story at dinner'],
+  air_show: ['Sunscreen and hat', 'Ear protection', 'Pick a favourite aircraft'],
+  aviation_day: ['Ask a pilot one question', 'Sit in a cockpit', 'Bring home one thing'],
+  museum: ['Pick 3 exhibits', 'One fact to share', 'Gift-shop budget agreed first'],
+  library: ['Return the old ones', 'Choose 2 new', 'Read 10 minutes there'],
+  fishing: ['Bait and licence packed', 'Cast 10 times', 'Release gently'],
+  nature_walk: ['Spot 5 things', 'Bring a bag for treasures', 'No screens'],
+  beach_day: ['Sunscreen every 2 hours', 'Swim with a buddy', 'Pack up your own things'],
+
+  // Play and rest
+  game_time: ['Timer on', 'Stop when it rings', 'Off an hour before bed'],
+  break_quick: ['Water', 'Move', 'Back on time'],
+  family: ['Everyone picks one thing', 'Phones away', 'Finish together'],
+  free_time: ['Your pick', 'Try something not on a screen'],
+  play_sister: ['Agree the game first', 'Take turns choosing', 'Tidy up together'],
+  culture_story_circle: ['One story', 'Where is it from', 'Tell it back'],
+  culture_festival_prep: ['Pick the festival', 'Make or decorate one thing', 'Help set it up'],
+  cozy_reading: ['Blanket and cocoa', 'A book you chose', 'No stopping for a screen'],
+  hot_cocoa: ['Make it yourself', 'Sit with someone', 'Wash the mug'],
+  ice_cream: ['Walk or bike there', 'Try a new flavour', 'Bring the change back'],
+  snow_play: ['Snow pants and mitts', 'Build or slide', 'Wet things on the rack after'],
+  garden_time: ['Water', 'Pull 10 weeds', "Check what's growing"],
+
+  // Helping hands. The chore TYPE comes from the paid pool, so the goals are
+  // about doing the whole job rather than about which job it was.
+  chores: ['Do the whole job', 'Put the tools back', 'Ask for a check'],
 };
 const ACTIVITY_OBJECTIVES_BY_CAT = {
   school: ['Homework', 'Reading', 'Review for a test'],
@@ -349,29 +428,22 @@ function getObjectivePresets(act, tag, isCompetition) {
   return ACTIVITY_OBJECTIVES_BY_ID[act.id] || ACTIVITY_OBJECTIVES_BY_CAT[act.cat] || [];
 }
 
-const REWARD_POOLS = {
-  family: [
-    { id:'family_set_table', name:'Family Hero: Set the Table', icon:'🍽', cat:'daily', group:'chores', durationMin:20, suitableTime:['evening','weekend'] },
-    { id:'family_prep_bag', name:'Family Hero: Prep School Bag', icon:'🎒', cat:'daily', group:'chores', durationMin:15, suitableTime:['evening'] },
-    { id:'family_laundry_fold', name:'Home Champion: Fold Laundry', icon:'🧺', cat:'daily', group:'chores', durationMin:20, suitableTime:['weekend','evening'] },
-    { id:'family_kitchen_helper', name:'Kitchen Helper Quest', icon:'🥕', cat:'daily', group:'chores', durationMin:20, suitableTime:['evening','weekend'] },
-  ],
-  academic: [
-    { id:'acad_focus_sprint', name:'Focus Sprint', icon:'📘', cat:'school', durationMin:25, suitableTime:['after-school','evening'] },
-    { id:'acad_preview_power', name:'Preview Power', icon:'🧠', cat:'school', durationMin:20, suitableTime:['evening','weekend'] },
-    { id:'acad_reading_star', name:'Reading Star', icon:'📚', cat:'school', durationMin:30, suitableTime:['after-school','evening','weekend'] },
-  ],
-  health: [
-    { id:'health_recovery_fuel', name:'Recovery Fuel', icon:'🍎', cat:'daily', durationMin:15, suitableTime:['after-school','evening'] },
-    { id:'health_stretch_reset', name:'Stretch Reset', icon:'🤸', cat:'active', durationMin:15, suitableTime:['after-school','evening'] },
-    { id:'health_pack_tomorrow', name:'Tomorrow Ready', icon:'👜', cat:'daily', group:'routine', durationMin:15, suitableTime:['evening'] },
-  ],
-  culture: [
-    { id:'culture_story_circle', name:'Culture Explorer Story', icon:'🏮', cat:'free', durationMin:25, suitableTime:['evening','weekend'] },
-    { id:'culture_festival_prep', name:'Festival Prep Mission', icon:'🥮', cat:'free', durationMin:30, suitableTime:['weekend','evening'] },
-    { id:'culture_calligraphy_play', name:'Brush Art Play', icon:'🖌️', cat:'free', durationMin:30, suitableTime:['weekend'] },
-  ],
-};
+/* REWARD_POOLS lived here: four pools of activities, three of which a child had
+   to EARN before she could put them on her own day. The grant was never a
+   level-up, whatever the surrounding prose said — it was a placed-block
+   milestone, so the app's answer to "you have planned ten things" was to hand
+   back the right to plan an eleventh kind of thing.
+
+   Family Hero went first, for the reason recorded below. The same argument
+   finishes the job: a child should not have to earn the right to eat after
+   training, to stretch, or to hear a story about where her family is from.
+   The thirteen activities are inlined into DEFAULT_ACTIVITIES with their ids
+   unchanged, so every block that ever named one still resolves.
+
+   The routine-checklist rewards (MORNING_LOCKED_REWARD,
+   AFTERSCHOOL_CHECKLIST_REWARDS) are a DIFFERENT feature that happens to share
+   the same prompt widget, and they stay: those earn an extra checklist item off
+   a real streak rather than gating an activity. */
 /* TUTORIAL_STARTER_CHOICES lived here — the three Family Hero chores the
    first-run overlay offered as a "starter" to unlock. Onboarding went with the
    unlock subsystem: its whole content was picking a locked chore, so with
@@ -404,42 +476,137 @@ const TRAINING_CHECKS = [
    Used by mascot recommendations.
    social: true = can be invited to sister via Sister Sync. */
 const DEFAULT_ACTIVITIES = [
-  { id:'breakfast',  name:'Breakfast',        icon:'🍳', cat:'daily',    durationMin:30, suitableTime:['before-school','weekend'] },
-  { id:'lunch',      name:'Lunch',             icon:'🥗', cat:'daily',    durationMin:30, suitableTime:['school','weekend'] },
-  { id:'dinner',     name:'Dinner',            icon:'🍽', cat:'daily',    durationMin:60, suitableTime:['evening','weekend'] },
-  { id:'school_day', name:'School Day',        icon:'🏫', cat:'school', travels:true,   durationMin:420, suitableTime:['school'] }, // 7h
-  { id:'french',     name:'French Adventure',  icon:'🇫🇷', cat:'school',   durationMin:60, suitableTime:['after-school','weekend','evening'] },
-  { id:'chinese',    name:'Chinese Adventure', icon:'🇨🇳', cat:'school',   durationMin:60, suitableTime:['after-school','weekend','evening'] },
-  { id:'math',       name:'Math Adventure',    icon:'🦘', cat:'school',   durationMin:60, suitableTime:['after-school','weekend','evening'] },
-  { id:'training',   name:'Training',          icon:'🏋️', cat:'training', durationMin:120, isTraining:true, travels:true, suitableTime:['after-school','weekend'] },
-  { id:'competition', name:'Competition',      icon:'🏆', cat:'training', durationMin:480, isTraining:true, isCompetition:true, travels:true, suitableTime:['weekend'] },
-  // Filed under Rest, not Active. It is the opposite of a workout, and Rest was
-  // a category with a colour, a chip and nothing in it.
-  { id:'relax',      name:'Muscle Relaxation', icon:'🧘', cat:'sleep',    durationMin:60, suitableTime:['after-school','evening','weekend'] },
-  // Appointments — a time somebody else set. Not moveable, and a week with one
-  // is shaped around it, which is why they are their own category rather than
-  // being filed under Daily.
-  { id:'appt_general',    name:'Appointment',      icon:'🗓', cat:'appointment', travels:true, durationMin:60, suitableTime:['after-school','school','weekend'] },
-  { id:'appt_medical',    name:'Doctor / Dentist', icon:'🩺', cat:'appointment', travels:true, durationMin:60, suitableTime:['after-school','school','weekend'] },
-  { id:'appt_haircut',    name:'Haircut',          icon:'✂️', cat:'appointment', travels:true, durationMin:45, suitableTime:['after-school','weekend'] },
-  { id:'appt_school_meet', name:'School Meeting',  icon:'🧑‍🏫', cat:'appointment', travels:true, durationMin:60, suitableTime:['after-school','school'] },
-  { id:'break_quick', name:'Quick Break',     icon:'☕', cat:'free',     durationMin:15, suitableTime:['before-school','school','after-school','evening','weekend'], quickBreak:true },
-  { id:'piano',      name:'Piano Practice',    icon:'🎹', cat:'school',   durationMin:60, suitableTime:['after-school','evening','weekend'] },
-  { id:'chores',     name:'House Chore',       icon:'🧹', cat:'daily', group:'chores',    durationMin:60, suitableTime:['after-school','evening','weekend'] },
-  { id:'family',     name:'Family Time',       icon:'👨‍👩‍👧‍👦', cat:'free', durationMin:120, suitableTime:['evening','weekend'], social:true },
-  /* Family Hero is a CHORE, not a prize. Its four activities are ordinary
-     available ones — same ids, so every block that ever named one still
-     resolves through findActivity — and only the other three pools are still
-     earned. Whoever did the chore is the hero; making the chore itself the
-     reward said the opposite. */
-  ...REWARD_POOLS.family.map(a => ({ ...a })),
-  ...Object.entries(REWARD_POOLS)
-    .filter(([k]) => k !== 'family')
-    .flatMap(([, pool]) => pool.map(a => ({ ...a, rewardLocked: true }))),
-  // Routines
-  { id:'routine_morning',   name:'Morning Routine',      icon:'🌅', cat:'routine', durationMin:30, isRoutine:true, routineId:'morning',     suitableTime:['before-school','weekend'] },
-  { id:'routine_afterschool', name:'After-School Routine', icon:'🎒', cat:'routine', durationMin:30, isRoutine:true, routineId:'afterschool', suitableTime:['after-school'] },
-  { id:'routine_evening',   name:'Evening Routine',      icon:'🌙', cat:'routine', durationMin:20, isRoutine:true, routineId:'evening',     suitableTime:['evening','weekend'] },
+  /* ── Daily rhythm ──────────────────────────────────────────────
+     The three that bracket a day. Evening grew to 30 and After-School shrank to
+     20 because that is what they actually take; Tomorrow Ready is archived
+     below, since "pack for tomorrow" is a LINE of the evening routine and two
+     blocks for one job is how a child ends up ticking neither. */
+  { id:'routine_morning',     name:'Morning Routine',      icon:'🌅', cat:'routine', durationMin:30, isRoutine:true, routineId:'morning',     suitableTime:['before-school','weekend'] },
+  { id:'routine_afterschool', name:'After-School Routine', icon:'🎒', cat:'routine', durationMin:20, isRoutine:true, routineId:'afterschool', suitableTime:['after-school'] },
+  { id:'routine_evening',     name:'Evening Routine',      icon:'🌙', cat:'routine', durationMin:30, isRoutine:true, routineId:'evening',     suitableTime:['evening','weekend'] },
+
+  /* ── Fuel and care ─────────────────────────────────────────────
+     Lunch is weekends only: on a school day it sits inside the School band and
+     is set by the lunch recess in the calendar, so offering it as a block to
+     place was asking her to plan something the school had already planned. */
+  { id:'breakfast',  name:'Breakfast', icon:'🍳', cat:'daily', durationMin:20, suitableTime:['before-school','weekend'] },
+  { id:'lunch',      name:'Lunch',     icon:'🥗', cat:'daily', durationMin:30, suitableTime:['weekend'] },
+  { id:'dinner',     name:'Dinner',    icon:'🍽', cat:'daily', durationMin:45, suitableTime:['evening','weekend'] },
+  // Renamed from "Recovery Fuel" — same id, so every block that ever named it
+  // still resolves, and the name now says when it is for.
+  { id:'health_recovery_fuel', name:'Post-Training Snack', icon:'🍎', cat:'daily', durationMin:15, suitableTime:['after-school','evening'] },
+
+  /* Appointments — a time somebody else set. Not moveable, and a week with one
+     is shaped around it, which is why they are their own category rather than
+     being filed under Daily. */
+  { id:'appt_general',     name:'Appointment',      icon:'🗓', cat:'appointment', travels:true, durationMin:60, suitableTime:['after-school','school','weekend'] },
+  { id:'appt_medical',     name:'Doctor / Dentist', icon:'🩺', cat:'appointment', travels:true, durationMin:60, suitableTime:['after-school','school','weekend'] },
+  { id:'appt_haircut',     name:'Haircut',          icon:'✂️', cat:'appointment', travels:true, durationMin:45, suitableTime:['after-school','weekend'] },
+  { id:'appt_school_meet', name:'School Meeting',   icon:'🧑‍🏫', cat:'appointment', travels:true, durationMin:30, suitableTime:['after-school','evening'] },
+  { id:'appt_physio',      name:'Physio',           icon:'🦴', cat:'appointment', travels:true, durationMin:45, suitableTime:['after-school'] },
+  // The family sitting down together. Not the weekly meeting the app runs —
+  // that is a parent tool; this is the hour it takes on the calendar.
+  { id:'family_meeting',   name:'Family Meeting',   icon:'🗣', cat:'daily', durationMin:30, suitableTime:['evening','weekend'] },
+
+  /* ── Brain construction ────────────────────────────────────────
+     Homework defaults to 45, not 90: at this age two 45s beat one 90, and the
+     girls were already placing 45s by hand. Piano is 30 for the same reason —
+     the old 60 is why a second 30-minute "Piano" kept getting created. */
+  { id:'school_day', name:'School Day',        icon:'🏫', cat:'school', travels:true, durationMin:420, suitableTime:['school'] },
+  { id:'homework',   name:'Homework',          icon:'📚', cat:'school', durationMin:45, suitableTime:['after-school','evening'] },
+  { id:'reading',    name:'Reading',           icon:'📖', cat:'school', durationMin:30, suitableTime:['before-school','evening','weekend'] },
+  { id:'math',       name:'Math Adventure',    icon:'🦘', cat:'school', durationMin:30, suitableTime:['after-school','evening','weekend'] },
+  { id:'french',     name:'French Adventure',  icon:'🇫🇷', cat:'school', durationMin:30, suitableTime:['after-school','evening','weekend'] },
+  { id:'chinese',    name:'Chinese Adventure', icon:'🇨🇳', cat:'school', durationMin:30, suitableTime:['after-school','evening','weekend'] },
+  { id:'piano',      name:'Piano Practice',    icon:'🎹', cat:'school', durationMin:30, suitableTime:['after-school','evening','weekend'] },
+  { id:'singing',    name:'Singing',           icon:'🎤', cat:'school', durationMin:30, suitableTime:['after-school','evening','weekend'] },
+  // One Drawing, not one per medium: which kind is a goal on the block (see
+  // ACTIVITY_OBJECTIVES_BY_ID), the way a Training block carries its focus.
+  { id:'drawing',    name:'Drawing',           icon:'🎨', cat:'school', durationMin:45, suitableTime:['after-school','weekend'] },
+  // 🧵 rather than the scissors: ✂️ is Haircut, and on a short week card the
+  // icon is sometimes the only thing drawn.
+  { id:'craft',      name:'Craft',             icon:'🧵', cat:'school', durationMin:60, suitableTime:['weekend'] },
+
+  /* ── Body construction: training ───────────────────────────────
+     A coached session. Body Maintenance is isTraining so it resolves the
+     dryland objectives, but it carries no travel — it happens on the floor at
+     home. */
+  { id:'training',         name:'Training',         icon:'🏋️', cat:'training', durationMin:120, isTraining:true, travels:true, suitableTime:['after-school','weekend'] },
+  { id:'competition',      name:'Competition',      icon:'🏆', cat:'training', durationMin:480, isTraining:true, isCompetition:true, travels:true, suitableTime:['weekend'] },
+  { id:'body_maintenance', name:'Body Maintenance', icon:'⛹️', cat:'training', durationMin:30, isTraining:true, suitableTime:['evening','weekend'] },
+
+  /* ── Everyday movement ─────────────────────────────────────────
+     Hers, not a coach's. Swimming and Skating exist here AS WELL AS the
+     training tags of the same names, and that is the point: a length of the
+     pool on a Saturday is not the same ask as a coached hour, and filing both
+     under Training made the hours chart unable to tell them apart. */
+  { id:'swimming',  name:'Swimming',   icon:'🏊', cat:'active', travels:true, durationMin:60, suitableTime:['after-school','weekend'] },
+  { id:'skating',   name:'Skating',    icon:'⛸', cat:'active', travels:true, durationMin:60, suitableTime:['after-school','weekend'] },
+  { id:'ballet',    name:'Ballet',     icon:'🩰', cat:'active', travels:true, durationMin:60, suitableTime:['after-school'] },
+  { id:'bike_ride', name:'Bike ride',  icon:'🚴', cat:'active', durationMin:45, suitableTime:['after-school','weekend'] },
+  { id:'health_stretch_reset', name:'Stretch Reset', icon:'🤸', cat:'active', durationMin:15, suitableTime:['after-school','evening'] },
+  /* Filed under Rest and earning nothing, deliberately. It sits with the
+     movement activities on the page because that is where it belongs in her
+     week, but rest that scores is rest turned into another thing to perform —
+     see CLAUDE.md on off days being a valid state. */
+  { id:'relax',     name:'Muscle Relaxation', icon:'🧘', cat:'sleep', group:'free', durationMin:30, suitableTime:['evening','weekend'] },
+
+  /* ── Explore ───────────────────────────────────────────────────
+     One-word names wherever one will do. "Nature Walk / Hike" and "Museum /
+     Science Centre" both wrapped to two lines on a week card and ran straight
+     through the duration under them — the grid gives a 90-minute block 65px and
+     centres four rows in it, so a name that wraps has nowhere to go.
+
+     Everything here travels. They carry an explicit group because `cat` is
+     doing its other job — saying what colour the block is — and there is no
+     outing colour: two questions, two tables. */
+  { id:'day_trip',     name:'Day Trip',                icon:'🎈', cat:'free',   group:'explore', travels:true, durationMin:360, suitableTime:['weekend'], social:true },
+  { id:'air_show',     name:'Air Show',                icon:'✈️', cat:'free',   group:'explore', travels:true, durationMin:240, suitableTime:['weekend'], social:true },
+  { id:'aviation_day', name:'Aviation Day',           icon:'👩‍✈️', cat:'free', group:'explore', travels:true, durationMin:240, suitableTime:['weekend'], social:true },
+  { id:'museum',       name:'Museum',                 icon:'🏛', cat:'free',   group:'explore', travels:true, durationMin:180, suitableTime:['weekend'], social:true },
+  // 📕 rather than 📚: Homework already has the stack of books.
+  { id:'library',      name:'Library Visit',           icon:'📕', cat:'free',   group:'explore', travels:true, durationMin:45,  suitableTime:['after-school','weekend'] },
+  { id:'fishing',      name:'Fishing Trip',            icon:'🎣', cat:'free',   group:'explore', travels:true, durationMin:240, suitableTime:['weekend'], social:true },
+  { id:'nature_walk',  name:'Nature Walk',            icon:'🥾', cat:'active', group:'explore', travels:true, durationMin:90,  suitableTime:['weekend'], social:true },
+
+  /* ── Play and rest ─────────────────────────────────────────────  */
+  { id:'game_time',   name:'Game Time',  icon:'🎮', cat:'free', durationMin:45, suitableTime:['after-school','weekend'] },
+  { id:'break_quick', name:'Quick Break', icon:'☕', cat:'free', durationMin:15, suitableTime:['before-school','school','after-school','evening','weekend'], quickBreak:true },
+  { id:'family',      name:'Family Time', icon:'👨‍👩‍👧‍👦', cat:'free', durationMin:90, suitableTime:['evening','weekend'], social:true },
+  { id:'free_time',   name:'Free Time',   icon:'🌤', cat:'free', durationMin:60, suitableTime:['after-school','weekend'] },
+  { id:'play_sister', name:'Play together', icon:'⭐', cat:'free', durationMin:60, suitableTime:['weekend'], social:true },
+  { id:'culture_story_circle',  name:'Culture Explorer Story', icon:'🏮', cat:'free', durationMin:25, suitableTime:['evening','weekend'] },
+  { id:'culture_festival_prep', name:'Festival Prep Mission',  icon:'🥮', cat:'free', durationMin:45, suitableTime:['weekend','evening'], social:true },
+
+  /* ── Helping hands ─────────────────────────────────────────────
+     30, not 60: the paid pool's rows run 15–30 minutes, so a 60-minute default
+     drew every chore at twice its real length on the hours charts — and
+     schoolTemplate() was already placing this at 30, so the table and the
+     template disagreed with each other.
+
+     Family Hero is a CHORE, not a prize: whoever did the chore is the hero, and
+     making the chore itself the reward said the opposite. */
+  { id:'chores',                name:'House Chore',                 icon:'🧹', cat:'daily', group:'chores', durationMin:30, suitableTime:['after-school','evening','weekend'] },
+  { id:'family_set_table',      name:'Family Hero: Set the Table',   icon:'🍽', cat:'daily', group:'chores', durationMin:20, suitableTime:['evening','weekend'] },
+  { id:'family_prep_bag',       name:'Family Hero: Prep School Bag', icon:'🎒', cat:'daily', group:'chores', durationMin:15, suitableTime:['evening'] },
+  { id:'family_laundry_fold',   name:'Home Champion: Fold Laundry',  icon:'🧺', cat:'daily', group:'chores', durationMin:20, suitableTime:['weekend','evening'] },
+  { id:'family_kitchen_helper', name:'Kitchen Helper Quest',         icon:'🥕', cat:'daily', group:'chores', durationMin:20, suitableTime:['evening','weekend'] },
+
+  /* ── Retired ───────────────────────────────────────────────────
+     Archived, never deleted. getAllActivities drops these from every picker;
+     findActivity still resolves them, so a block placed against one last March
+     keeps its name, icon and colour instead of rendering as nothing at all —
+     which is the silent failure the archive rule exists to stop.
+
+     Each one was folded into something that says the same thing better:
+     Tomorrow Ready into the evening routine's own "pack for tomorrow" line,
+     Reading Star into Reading, Brush Art Play into Drawing's goals. Focus
+     Sprint and Preview Power were study techniques dressed as activities. */
+  { id:'acad_focus_sprint',        name:'Focus Sprint',           icon:'📘', cat:'school', durationMin:25, archived:true, suitableTime:['after-school','evening'] },
+  { id:'acad_preview_power',       name:'Preview Power',          icon:'🧠', cat:'school', durationMin:20, archived:true, suitableTime:['evening','weekend'] },
+  { id:'acad_reading_star',        name:'Reading Star',           icon:'📚', cat:'school', durationMin:30, archived:true, suitableTime:['after-school','evening','weekend'] },
+  { id:'health_pack_tomorrow',     name:'Tomorrow Ready',         icon:'👜', cat:'daily', group:'routine', durationMin:15, archived:true, suitableTime:['evening'] },
+  { id:'culture_calligraphy_play', name:'Brush Art Play',         icon:'🖌️', cat:'free', durationMin:30, archived:true, suitableTime:['weekend'] },
 ];
 
 /* Routine preset checklists. Items: {id, text, timerSec (optional)} */
@@ -481,6 +648,17 @@ const ROUTINE_PRESETS = {
   }
 };
 
+/* An activity's `season` is one season or several — Garden Time runs through
+   spring AND summer — so every reader goes through these two rather than
+   comparing the field directly. A plain string still works unchanged. */
+function inSeason(act, season) {
+  if (!act || !act.season) return true;
+  return [].concat(act.season).includes(season || getCurrentSeason());
+}
+function seasonLabel(act) {
+  return [].concat((act && act.season) || []).join(' or ');
+}
+
 /* Seasonal/rare activities — unlock by season */
 function getCurrentSeason() {
   const m = formatDayKey(toDayKeyInZone(new Date())).getMonth(); // 0..11, app timezone
@@ -490,14 +668,21 @@ function getCurrentSeason() {
   return 'winter';
 }
 const SEASONAL_ACTIVITIES = [
-  { id:'cozy_reading',  name:'Cozy Reading',     icon:'📖', cat:'free',   durationMin:60,  season:'winter', suitableTime:['after-school','evening','weekend'] },
-  { id:'hot_cocoa',     name:'Hot Cocoa Time',   icon:'☕', cat:'free',   durationMin:30,  season:'winter', suitableTime:['after-school','evening','weekend'], social:true },
-  { id:'snow_play',     name:'Snow Adventure',   icon:'⛄', cat:'active', durationMin:60,  season:'winter', suitableTime:['weekend','after-school'], social:true },
-  { id:'beach_day',     name:'Beach Day',        icon:'🏖', cat:'free',   durationMin:180, season:'summer', suitableTime:['weekend'], social:true },
-  { id:'ice_cream',     name:'Ice Cream Run',    icon:'🍦', cat:'free',   durationMin:30,  season:'summer', suitableTime:['after-school','weekend'], social:true },
-  { id:'garden_time',   name:'Garden Time',      icon:'🌻', cat:'active', durationMin:60,  season:'spring', suitableTime:['after-school','weekend'], social:true },
-  { id:'rainy_craft',   name:'Rainy Day Craft',  icon:'🎨', cat:'free',   durationMin:60,  season:'spring', suitableTime:['after-school','weekend','evening'], social:true },
-  { id:'leaf_hike',     name:'Leaf Hike',        icon:'🍂', cat:'active', durationMin:90,  season:'autumn', suitableTime:['weekend'], social:true },
+  { id:'cozy_reading',  name:'Cozy Reading',     icon:'🧣', cat:'free',   durationMin:45,  season:'winter', suitableTime:['evening'] },
+  { id:'hot_cocoa',     name:'Hot Cocoa Time',   icon:'☕', cat:'free',   durationMin:20,  season:'winter', suitableTime:['evening','weekend'], social:true },
+  /* Snow and the garden are physical, but they are seasonal TREATS rather than
+     training, so they carry an explicit group and stay out of Move — otherwise
+     `cat:'active'` would file a snowball fight as exercise she is owed XP for. */
+  { id:'snow_play',     name:'Snow Adventure',   icon:'⛄', cat:'active', group:'free', durationMin:60, season:'winter', suitableTime:['weekend','after-school'], social:true },
+  { id:'beach_day',     name:'Beach Day',        icon:'🏖', cat:'free',   group:'explore', travels:true, durationMin:180, season:'summer', suitableTime:['weekend'], social:true },
+  { id:'ice_cream',     name:'Ice Cream Run',    icon:'🍦', cat:'free',   travels:true, durationMin:30, season:'summer', suitableTime:['evening','weekend'], social:true },
+  // Two seasons, which is what inSeason() exists for — the field took a single
+  // string and the garden does not stop in June.
+  { id:'garden_time',   name:'Garden Time',      icon:'🌻', cat:'active', group:'free', durationMin:45, season:['spring','summer'], suitableTime:['weekend'], social:true },
+  /* Archived: Rainy Day Craft is Craft, and Leaf Hike is a Nature Walk in
+     October. Both keep resolving for every block that ever named them. */
+  { id:'rainy_craft',   name:'Rainy Day Craft',  icon:'🎨', cat:'free',   durationMin:60, season:'spring', archived:true, suitableTime:['after-school','weekend','evening'], social:true },
+  { id:'leaf_hike',     name:'Leaf Hike',        icon:'🍂', cat:'active', durationMin:90, season:'autumn', archived:true, suitableTime:['weekend'], social:true },
 ];
 
 /* The two girls, named and iconed in one place. The pair

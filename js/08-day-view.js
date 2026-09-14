@@ -1444,16 +1444,18 @@ function addActivityAtMin(absMin) {
   // No activity picked yet → offer the picker right at the tapped time so the
   // kid doesn't have to select from the tray first.
   if (!selectedActivity) { openSlotPicker(absMin); return; }
-  if (selectedActivity._locked) { showToast(`🔒 Unlocks in ${selectedActivity.season}!`); return; }
-  if (selectedActivity._rewardLocked) { showToast('Keep going — this reward unlocks soon ✨'); return; }
+  // Seasonal only. The _rewardLocked gate below this used to refuse a further
+  // nine activities with "Keep going — this reward unlocks soon ✨"; nothing is
+  // reward-locked any more.
+  if (selectedActivity._locked) { showToast(`🔒 Unlocks in ${seasonLabel(selectedActivity)}!`); return; }
 
   pendingStartMin = absMin;
 
   if (selectedActivity.isTraining) {
-    ts = { durationMin: selectedActivity.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(selectedActivity), getReadyBuffer:activityTravels(selectedActivity), warmupBuffer:false, gearState:{}, travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, warmupBufMin:DEFAULT_WARMUP_MIN };
+    ts = { durationMin: activityDefaultDuration(selectedActivity)||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(selectedActivity), getReadyBuffer:activityTravels(selectedActivity), warmupBuffer:false, gearState:{}, travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, warmupBufMin:DEFAULT_WARMUP_MIN };
     openTrainingSheet();
   } else {
-    as_ = { durationMin: selectedActivity.durationMin||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(selectedActivity), getReadyBuffer:activityTravels(selectedActivity), travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, choreTags: [], objectives: [] };
+    as_ = { durationMin: activityDefaultDuration(selectedActivity)||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(selectedActivity), getReadyBuffer:activityTravels(selectedActivity), travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, choreTags: [], objectives: [] };
     openActivitySheet();
   }
 }
@@ -1575,14 +1577,16 @@ function renderSlotPicker() {
        rather than a sort, so nothing else moves — a list that reorders itself
        wholesale is a list a child cannot learn.
 
-       A locked or out-of-season activity is skipped: it is still in the list,
-       but pickFromSlot refuses it, so lifting it to the top would be offering a
-       dead end. An ARCHIVED one is already absent from getAllActivities, so the
-       find simply misses and the order stands — no pruning, no migration, the
-       same read-time answer as xp2 and achievementActivityId. */
+       An out-of-season activity is skipped: it is still in the list, but
+       pickFromSlot refuses it, so lifting it to the top would be offering a
+       dead end. (_locked is the only lock left — the reward gate was retired,
+       and _rewardLocked no longer exists.) An ARCHIVED one is already absent
+       from getAllActivities, so the find simply misses and the order stands —
+       no pruning, no migration, the same read-time answer as xp2 and
+       achievementActivityId. */
     const lastId = slotPickerLastForFilter(slotPickerFilter);
     const idx = lastId ? filtered.findIndex(a => a.id === lastId) : -1;
-    if (idx >= 0 && !filtered[idx]._locked && !filtered[idx]._rewardLocked) {
+    if (idx >= 0 && !filtered[idx]._locked) {
       liftedId = filtered[idx].id;
       if (idx > 0) {
         ordered = filtered.slice();
@@ -1596,12 +1600,12 @@ function renderSlotPicker() {
   ordered.forEach(act => {
     const chip = document.createElement('button');
     chip.type = 'button';
-    chip.className = 'slot-pick-chip' + ((act._locked || act._rewardLocked) ? ' locked' : '')
+    chip.className = 'slot-pick-chip' + (act._locked ? ' locked' : '')
       + (act.id === liftedId ? ' slot-pick-chip--last' : '');
     // Say WHY it moved. A chip that silently jumped to the front is a chip the
     // next person reads as a bug.
     const lastTag = act.id === liftedId ? '<span class="spc-last">last time</span>' : '';
-    chip.innerHTML = `<span class="spc-icon">${escapeHtml(act.icon)}</span><span class="spc-name">${escapeHtml(act.name)}</span>${lastTag}<span class="spc-dur">${escapeHtml(formatDuration(act.durationMin || 60))}</span>`;
+    chip.innerHTML = `<span class="spc-icon">${escapeHtml(act.icon)}</span><span class="spc-name">${escapeHtml(act.name)}</span>${lastTag}<span class="spc-dur">${escapeHtml(formatDuration(activityDefaultDuration(act) || 60))}</span>`;
     chip.onclick = () => pickFromSlot(act.id);
     list.appendChild(chip);
   });
@@ -1615,19 +1619,17 @@ function renderSlotPicker() {
 function pickFromSlot(actId) {
   const act = getAllActivities().find(a => a.id === actId);
   if (!act) return;
-  if (act._locked) { showToast(`🔒 Unlocks in ${act.season}!`); return; }
-  if (act._rewardLocked) { showToast('Keep going — unlock this reward soon ✨'); return; }
-  const _pr = getProfData()?.progress;
+  if (act._locked) { showToast(`🔒 Unlocks in ${seasonLabel(act)}!`); return; }
   selectedActivity = act;
   // Which chip this came from, for placeBlock to record once the block exists.
   slotPickerPickedUnder = slotPickerFilter;
   closeSheet('slotPickerOverlay');
   // pendingStartMin was set by openSlotPicker.
   if (act.isTraining) {
-    ts = { durationMin: act.durationMin||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(act), getReadyBuffer:activityTravels(act), warmupBuffer:false, gearState:{}, travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, warmupBufMin:DEFAULT_WARMUP_MIN };
+    ts = { durationMin: activityDefaultDuration(act)||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(act), getReadyBuffer:activityTravels(act), warmupBuffer:false, gearState:{}, travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, warmupBufMin:DEFAULT_WARMUP_MIN };
     openTrainingSheet();
   } else {
-    as_ = { durationMin: act.durationMin||60, colour: CAT_HEX[act.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(act), getReadyBuffer:activityTravels(act), travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, choreTags: [], objectives: [] };
+    as_ = { durationMin: activityDefaultDuration(act)||60, colour: CAT_HEX[act.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(act), getReadyBuffer:activityTravels(act), travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, choreTags: [], objectives: [] };
     openActivitySheet();
   }
 }
@@ -1727,12 +1729,11 @@ function placeBlock(actId, startMin, durationMin, colour, objectives, note, opts
   const blocks = getDayBlocks(currentDayKey);
   blocks.push(block);
   setDayBlocks(currentDayKey, blocks);
-  if (!isParent()) {
-    const p = getProfData();
-    p.progress.manualPlacedCount = (p.progress.manualPlacedCount || 0) + 1;
-    enqueueMilestoneRewards();
-    maybeShowRewardPrompt();
-  }
+  /* manualPlacedCount was counted here and fed enqueueMilestoneRewards, which
+     granted an activity at 10, 15 and 20 placed blocks. Both are retired. The
+     prompt call stays: the routine-streak checklist rewards still use it, and
+     placing a block is a reasonable moment to notice one is waiting. */
+  if (!isParent()) maybeShowRewardPrompt();
 
   // Counts are recomputed from confirmed blocks elsewhere — no manual increment here.
   const profd = getProfData();
