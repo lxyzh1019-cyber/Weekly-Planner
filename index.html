@@ -439,6 +439,10 @@
     👨‍👩‍👧‍👦 Parent Mode — Pin activities with long-tap
     <span class="pb-actions" id="parentDayActions"></span>
   </div>
+  <!-- The day's paid chores, graded where the day is. Parent-only, filled by
+       renderParentChoreStrip, and deliberately EMPTY when the planner put no
+       chore on this day: the plan is what says there is anything to grade. -->
+  <div class="parent-chores sticky" id="parentDayChores" style="display:none"></div>
 
   <!-- One row, not two. The title, the date and every control the screen has
        sit together: two topbar rows on a screen whose whole job is a single
@@ -1087,6 +1091,10 @@
       <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="confirmToggle" onclick="toggleConfirm()">
         <div class="toggle-track"><div class="toggle-knob"></div></div>
         <span class="toggle-label">✅ Confirm progress (counts toward level-up)</span>
+      </div>
+      <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="notDoneToggle" onclick="toggleNotDone()">
+        <div class="toggle-track"><div class="toggle-knob"></div></div>
+        <span class="toggle-label">🚫 Didn't happen (recorded, not done)</span>
       </div>
     </div>
 

@@ -68,6 +68,19 @@ function mmIsDayReviewedFor(kid, d) { return isDayReviewed(kid, mmDayKey(d)); }
    off a Wednesday that had not arrived. Un-reviewing is always allowed: taking
    back a record is never the thing that needs gating. */
 function mmCanReviewDay(kid, d) { return canReviewDay(kid, mmDayKey(d)); }
+/* ── The one refusal the MEETING may talk its way past ──────────────
+   A day refused for `unconfirmed` is refused over blocks nobody answered, and
+   that is the whole reason a backlogged week sticks. A day refused for
+   `future` or `running` is refused over time, which no amount of agreeing can
+   change, so those stay hard everywhere.
+
+   Meeting-only, deliberately. The parent day banner keeps its hard refusal:
+   the offer belongs to a sitting where a grown-up is working through a week on
+   purpose, not to the day screen where a stray tap would record a review
+   nobody meant. */
+function mmOverridableRefusal(info) {
+  return !!(info && !info.ok && info.reason === 'unconfirmed');
+}
 /* Today is reviewable but not finished, so it is signed off through an explicit
    "nothing else is planned" rather than a plain tap — the same shape the parent
    day banner uses for an empty day, and for the same reason: the record must not
@@ -82,6 +95,13 @@ async function mmToggleDayReviewed(kid, d) {
   const on = isDayReviewed(kid, k);
   if (!on) {
     const can = canReviewDay(kid, k);
+    /* Enabled but not a shortcut. The row's own offer names the three answers
+       and says what each costs; reviewing silently from here would be a second
+       door to one of them with none of that said. */
+    if (mmOverridableRefusal(can)) {
+      showToast(`${reviewBlockedReason(can)} — choose what to do with them below`);
+      return;
+    }
     if (!can.ok) { showToast(reviewBlockedReason(can)); return; }
     if (can.reason === 'open' && !(await mmConfirmOpenDay(kid === 'jenn' ? 'Jenn' : 'Jess'))) return;
   }
@@ -89,6 +109,43 @@ async function mmToggleDayReviewed(kid, d) {
   saveAll();
   renderMeetingMode();
 }
+/* "Leave them as they are — review the day."
+   Writes only parentDayConfirm. No completion, no grade, no XP, no money. The
+   blocks keep their unanswered state and the day counts as reviewed, which is
+   a parent saying "I have looked at this" and nothing more. */
+function mmReviewLeavingBlocks(kid, d) {
+  const nm = kid === 'jenn' ? 'Jenn' : 'Jess';
+  markDayReviewed(kid, mmDayKey(d), true);
+  saveAll();
+  renderMeetingMode();
+  showToast(`📋 ${nm}'s day reviewed — the blocks were left as they were`);
+}
+
+/* "They didn't happen — record and review."
+   The only answer here that moves money, so it is the only one that confirms
+   first. markRemainingNotDoneForChild (js/09-sheets.js) owns the write and
+   names every grade coming back before anything moves; this adds the review
+   and the meeting's own refresh. */
+async function mmRecordNotDoneAndReview(kid, d) {
+  const key = mmDayKey(d);
+  const nm = kid === 'jenn' ? 'Jenn' : 'Jess';
+  /* A settled week's money is frozen, and there is no way back: nothing clears
+     committedAt, mnyReopenWeek refuses a committed week, and the meeting's Undo
+     is a session-local snapshot that is gone once the sheet closes. An earlier
+     draft offered to "reopen her week" here and called mnyReopenWeek, which
+     returns false for exactly this case — a button that announced something it
+     had not done, which is the defect this repo keeps having to fix.
+
+     markRemainingNotDoneForChild (js/09-sheets.js) owns the decision now, and
+     it is narrower than "refuse the week": it refuses only the blocks whose
+     grades would move, and records the rest. So the review can still finish. */
+  const n = await markRemainingNotDoneForChild(kid, key);
+  if (!n) { renderMeetingMode(); return; }
+  markDayReviewed(kid, key, true);
+  saveAll();
+  renderMeetingMode();
+}
+
 async function mmToggleConfirmDay(d) {
   const k = mmDayKey(d);
   const next = !mmIsDayConfirmed(d);
@@ -96,6 +153,14 @@ async function mmToggleConfirmDay(d) {
      side door that reviews a day neither child could be reviewed for. */
   if (next) {
     const cans = ['jenn', 'jess'].map(kid => canReviewDay(kid, k));
+    // The hard reason wins over an overridable one — see mmOverridableRefusal.
+    const hard = cans.find(c => !c.ok && !mmOverridableRefusal(c));
+    if (hard) { showToast(reviewBlockedReason(hard)); return; }
+    const soft = cans.find(c => mmOverridableRefusal(c));
+    if (soft) {
+      showToast(`${reviewBlockedReason(soft)} — choose what to do with them below`);
+      return;
+    }
     const blocked = cans.find(c => !c.ok);
     if (blocked) { showToast(reviewBlockedReason(blocked)); return; }
     if (cans.some(c => c.reason === 'open') && !(await mmConfirmOpenDay('Jenn or Jess'))) return;
@@ -648,7 +713,13 @@ function mmHandleClick(e) {
   if (a.startsWith('refl-') && reflHandleAction(a, el, mmWeekKey())) return;
   if (a === 'thisweek')       { mmGoToWeek(ctThisWeekKey()); return; }
   if (a === 'openweek')       { mmOpenWeekForBlocks(kid); return; }
+  if (a === 'item')           { mmToggleItem(kid, d, el.getAttribute('data-kind'), el.getAttribute('data-key')); return; }
+  if (a === 'fine-add')       { mmAddFineOnDay(kid, d, el.getAttribute('data-fine')); return; }
+  if (a === 'fine-undo')      { mmUndoFine(kid, el.getAttribute('data-fine-id')); return; }
   if (a === 'allroutines')    { mmToggleAllRoutines(kid, d); return; }
+  if (a === 'nd-leave')       { mmReviewLeavingBlocks(kid, d); return; }
+  if (a === 'nd-open')        { mmOpenDayForBlocks(kid, d); return; }
+  if (a === 'nd-record')      { mmRecordNotDoneAndReview(kid, d); return; }
   if (a === 'addchore-open')  { mmToggleAddChore(kid, d); return; }
   if (a === 'addchore-pick')  { mmAddChoreHappened(kid, d, el.getAttribute('data-chore')); return; }
   if (a === 'openday')        { mmSelectDay(d); return; }
@@ -683,7 +754,13 @@ function mmHandleClick(e) {
    Step 3. */
 function mmReviewRows(kid, dayIdx) {
   const wk = mmWeekKey();
-  const rows = CT_SESSIONS.map(s => ({
+  /* Only what the day actually asked for. All three used to be offered on every
+     day of every week, so a family that never planned an after-school routine
+     was permanently marked down for one: a tick for something nobody had asked
+     the child to do, counted against her in the day percentage. Asked, never
+     re-derived — routineSessionsForDay (js/36-status.js) is the one owner, and
+     mrStreakDayDone reads it too. */
+  const rows = routineSessionsForDay(kid, wk, dayIdx).map(s => ({
     kind: 'routine', key: s, label: s, icon: CT_SESSION_ICONS[s] || '📋',
     on: !!ctGetMandatory(wk, dayIdx, s, kid),
     claim: 0, pays: false,
@@ -844,21 +921,30 @@ function mmRenderReview(wk) {
       const nm = kid === 'jenn' ? 'Jenn' : 'Jess';
       /* A control that cannot act says why on itself. Un-ticking is always
          offered: taking a record back needs no permission. */
-      const why = on ? '' : reviewBlockedReason(mmCanReviewDay(kid, d));
+      const can = on ? null : mmCanReviewDay(kid, d);
+      const why = on ? '' : reviewBlockedReason(can);
+      /* Still says why; only stops REFUSING when the reason is one the offer
+         below can settle. A control that behaves unusually must say so out
+         loud, which is what the disabled title was doing before. */
+      const hard = !!why && !mmOverridableRefusal(can);
       return `<button type="button" class="mm-drow-kid${on ? ' on' : ''}"
           data-mm-action="reviewday" data-kid="${escapeAttr(kid)}" data-day="${d}"
-          ${why ? `disabled title="${escapeAttr(nm + ': ' + why)}"` : ''}
-          aria-label="${on ? nm + ' reviewed' : 'Mark ' + nm + ' reviewed'}"
+          ${hard ? `disabled ` : ''}${why ? `title="${escapeAttr(nm + ': ' + why)}"` : ''}
+          aria-label="${on ? nm + ' reviewed' : 'Mark ' + nm + ' reviewed'}${why ? ' — ' + escapeAttr(why) : ''}"
         >${on ? '✓' : '○'} ${CT_PROFILE_ICON[kid]}</button>`;
     };
-    const bothWhy = done ? '' : reviewBlockedReason(
-      ['jenn', 'jess'].map(k => mmCanReviewDay(k, d)).find(c => !c.ok));
+    /* Both: the HARD reason wins. A running block for Jess blocks the control
+       even when Jenn's day is merely unconfirmed — the convenience must not be
+       a side door into a day neither child could be reviewed for. */
+    const bothCans = ['jenn', 'jess'].map(k => mmCanReviewDay(k, d));
+    const bothHard = done ? null : bothCans.find(c => !c.ok && !mmOverridableRefusal(c));
+    const bothWhy = done ? '' : reviewBlockedReason(bothHard || bothCans.find(c => !c.ok));
     const state = ahead
       ? `<span class="mm-drow-note">Not here yet</span>`
       : `<span class="mm-drow-review">${kidCell('jenn')}${kidCell('jess')}`
         + `<button type="button" class="${done ? 'mm-drow-ok' : 'mm-drow-go'}"
              data-mm-action="confirmday" data-day="${d}"
-             ${bothWhy ? `disabled title="${escapeAttr(bothWhy)}"` : ''}
+             ${bothHard ? `disabled ` : ''}${bothWhy ? `title="${escapeAttr(bothWhy)}"` : ''}
            >${done ? '✓ Both reviewed' : 'Both'}</button></span>`;
     const mid = (!ahead && empty)
       ? `<span class="mm-drow-note">Nothing logged — open it and add what actually happened</span>`
@@ -866,6 +952,36 @@ function mmRenderReview(wk) {
            <span class="mm-drow-track"><span class="mm-drow-fill mm-bar-j" style="width:${jp}%"></span></span>
            <span class="mm-drow-track"><span class="mm-drow-fill mm-bar-s" style="width:${sp}%"></span></span>
          </span>`;
+    /* ── The offer, inline on the row ──────────────────────────────
+       Not a modal. Three answers a parent needs and a new three-button sheet
+       would be a second dialog mechanism beside openSheet/closeSheet, which own
+       focus and Escape. Inline is also visible rather than waiting to be
+       discovered, which is the same reason a refused control was made to say
+       why on itself.
+
+       Only the money-moving answer opens a confirmation, and that one is the
+       ordinary two-button showConfirm naming the cost. */
+    const offerFor = (kid) => {
+      if (ahead || mmIsDayReviewedFor(kid, d)) return '';
+      const can = mmCanReviewDay(kid, d);
+      if (!mmOverridableRefusal(can)) return '';
+      const nm = kid === 'jenn' ? 'Jenn' : 'Jess';
+      const n = can.pendingCount;
+      return `<div class="mm-drow-offer">
+          <span class="mm-drow-offer-say">${CT_PROFILE_ICON[kid]} ${escapeHtml(nm)} · `
+        + `${n} block${n === 1 ? ' was' : 's were'} never confirmed</span>
+          <button type="button" class="mm-offer-btn" data-mm-action="nd-leave"
+            data-kid="${escapeAttr(kid)}" data-day="${d}"
+            >Leave them</button>
+          <button type="button" class="mm-offer-btn" data-mm-action="nd-open"
+            data-kid="${escapeAttr(kid)}" data-day="${d}"
+            >Open the day ›</button>
+          <button type="button" class="mm-offer-btn mm-offer-btn--nd" data-mm-action="nd-record"
+            data-kid="${escapeAttr(kid)}" data-day="${d}"
+            >Didn't happen</button>
+        </div>`;
+    };
+    const offers = ahead ? '' : ['jenn', 'jess'].map(offerFor).join('');
     rows += `<div class="mm-drow${open ? ' open' : ''}${done ? ' done' : ''}">
         <div class="mm-drow-head">
           <button type="button" class="mm-drow-day" data-mm-action="openday" data-day="${d}"
@@ -876,6 +992,7 @@ function mmRenderReview(wk) {
           <button type="button" class="mm-drow-x" data-mm-action="openday" data-day="${d}"
             aria-label="${open ? 'Close' : 'Open'} ${escapeAttr(DAY_SHORT[d])}">${open ? '▴' : '▾'}</button>
         </div>
+        ${offers}
         ${open ? `<div class="mm-drow-body">${mmRenderDayDetail(wk, d)}</div>` : ''}
       </div>`;
   }
@@ -888,8 +1005,19 @@ function mmRenderReview(wk) {
   const footer = `<div class="mm-ready">Meeting-ready: ${nConfirmed}/7 days confirmed · 💪 Together you kept ${together}% of the days so far <small>(🐥 ${jp}% · 🦊 ${sp}%)</small></div>`;
   // The readiness list belongs before anything is agreed, not after (it lived
    // in step 4 until now). Per-kid state, so it follows whoever step 3/4 is on.
+  /* Getting OUT of step 1 to the plan. mmOpenWeekForBlocks was written and
+     unreachable from here on any week — the only openweek button in the app
+     was in step 2 — so a parent working a backlogged week had no way to reach
+     the week itself. Always present rather than only on an unconfirmed day:
+     reading the plan is what a review is, and it is not a repair action.
+     Same writer and same labels as step 2's pair, so the two cannot drift. */
+  const openWeek = `<div class="mm-blocklink">${['jenn', 'jess'].map(k =>
+    `<button type="button" class="pill-btn" data-mm-action="openweek" data-kid="${escapeAttr(k)}"
+      >${CT_PROFILE_ICON[k]} Open ${escapeHtml(k === 'jenn' ? 'Jenn' : 'Jess')}'s week ›</button>`).join('')}
+    <span class="mm-cap">Ticking and confirming blocks happens there, not here.</span></div>`;
   return `${mnyChecklist(wk, mnyMeetingKid())}
     <div class="mm-h">Review the week</div>
+    ${openWeek}
     <div class="mm-legend"><span><i class="mm-sw mm-bar-j"></i>Jenn</span><span><i class="mm-sw mm-bar-s"></i>Jess</span><span class="mm-legend-note">how the team's doing each day — cheer each other on</span></div>
     ${mmFamilyChoreReview(wk)}
     ${detail}${footer}`;
@@ -935,9 +1063,19 @@ function mmRenderDayDetail(wk, d) {
        is precisely the day that needs them. */
     const footer = (kind) => {
       if (kind === 'routine') {
-        const allOn = CT_SESSIONS.every(s => ctGetMandatory(wk, d, s, kid));
+        /* The label and the button must move TOGETHER with mmToggleAllRoutines
+           below. A footer counted over the day's own sessions beside a toggle
+           writing all three would leave the label permanently out of step with
+           what the button did — and the word "three" had to go with them, since
+           a Saturday asks two. */
+        const asked = routineSessionsForDay(kid, wk, d);
+        const n = asked.length;
+        const allOn = n > 0 && asked.every(s => ctGetMandatory(wk, d, s, kid));
+        const label = allOn
+          ? (n === 1 ? 'Clear it' : `Clear all ${n}`)
+          : (n === 1 ? 'Mark it kept' : `All ${n} kept`);
         return `<button type="button" class="mm-routine-all" data-mm-action="allroutines"
-            data-kid="${escapeAttr(kid)}" data-day="${d}">${allOn ? 'Clear all three' : 'All three kept'}</button>`;
+            data-kid="${escapeAttr(kid)}" data-day="${d}">${escapeHtml(label)}</button>`;
       }
       const open = mmAddChoreFor === kid + '|' + d;
       const opts = open ? mmAddChoreOptions(kid, d) : [];
@@ -952,6 +1090,41 @@ function mmRenderDayDetail(wk, d) {
           data-kid="${escapeAttr(kid)}" data-day="${d}" aria-expanded="${open}"
         >${open ? '✕ Never mind' : '＋ Add a chore that happened'}</button>${list}`;
     };
+    /* ── Fines, on the day they belong to ──────────────────────────
+       NOT a second fines engine. mrAddFine owns the write and mrFinesWeek owns
+       the arithmetic — the repeat-only rule and the floor at zero — exactly as
+       they do for cpFines on the parent chore tab, which stays as the
+       day-to-day surface for a fine nobody wants to hold until Sunday.
+
+       Step 1 rather than step 3, because a fine belongs to a DAY:
+       mrAddFine takes a dayKey, this is the screen that already walks the week
+       day by day with that key in hand, and step 3 is a totals screen where
+       entering a per-day fact would mean picking the day from a control this
+       one gives you by position. Step 3 still SHOWS the week's total. */
+    const fineSection = (kid) => {
+      const r = mrRulesForWeek(wk);
+      // box_repeat is not given by hand: it fires off a repeat in the Sunday box.
+      const items = ((r.fines || {}).items || []).filter(f => f.id !== 'box_repeat');
+      if (!items.length) return '';
+      const key = mmDayKey(d);
+      const givenToday = mrFines(kid).filter(f => f.dayKey === key);
+      const names = {}; ((r.fines || {}).items || []).forEach(i => { names[i.id] = i.label; });
+      const chips = items.map(f => `<button type="button" class="mm-fine"
+          data-mm-action="fine-add" data-kid="${escapeAttr(kid)}" data-day="${d}"
+          data-fine="${escapeAttr(f.id)}"
+        >${escapeHtml(f.label)} <b>−${ckMoney(f.amount)}</b></button>`).join('');
+      const given = givenToday.map(f => `<div class="mm-fine-given">
+          <span>${escapeHtml(names[f.itemId] || f.itemId)}</span>
+          <span class="ck-red">−${ckMoney(1)}</span>
+          <button type="button" class="mm-fine-x" data-mm-action="fine-undo"
+            data-kid="${escapeAttr(kid)}" data-fine-id="${escapeAttr(f.id)}"
+            aria-label="Take this fine back">×</button>
+        </div>`).join('');
+      return `<div class="mm-detail-sect">
+        <div class="mm-detail-cap">Fines <small>${givenToday.length || ''}</small></div>
+        <div class="mm-detail-note">Flat, and a day never goes below $0. Something left out goes in the box first.</div>
+        ${chips}${given}</div>`;
+    };
     const section = (title, note, kind) => {
       const mine = rows.map((row, i) => ({ row, i })).filter(x => x.row.kind === kind);
       if (!mine.length) {
@@ -960,7 +1133,7 @@ function mmRenderDayDetail(wk, d) {
             ? 'No chores on the plan for this day.'
             : 'No routines tracked for this day.'}</div>${footer(kind)}</div>`;
       }
-      const items = mine.map(({ row, i }) => {
+      const items = mine.map(({ row }) => {
         // What she said, before a grown-up agreed — so the parent is confirming
         // her answer rather than guessing at it.
         const said = row.claim > 0
@@ -971,7 +1144,12 @@ function mmRenderDayDetail(wk, d) {
              : said ? `<span class="mm-item-said">she said: ${escapeHtml(said.toLowerCase())}</span>`
              : `<span class="mm-item-said">not answered</span>`)
           : '';
-        return `<button type="button" class="mm-item ${row.on ? 'on' : ''}" onclick="mmToggleItem('${escapeJsAttr(kid)}',${d},${i})"
+        /* Data attributes plus the delegated listener, which CLAUDE.md already
+           prefers over interpolating into a handler — and which drops three
+           escapeJsAttr sites on the way. */
+        return `<button type="button" class="mm-item ${row.on ? 'on' : ''}"
+            data-mm-action="item" data-kid="${escapeAttr(kid)}" data-day="${d}"
+            data-kind="${escapeAttr(row.kind)}" data-key="${escapeAttr(row.key)}"
             role="checkbox" aria-checked="${row.on}" aria-label="${escapeAttr(row.label)} ${DAY_SHORT[d]}, ${name}"><span class="mm-item-box">${row.on ? '✓' : ''}</span>${row.icon ? row.icon + ' ' : ''}${escapeHtml(row.label)}${tag}</button>`;
       }).join('');
       const done = mine.filter(x => x.row.on).length;
@@ -988,6 +1166,7 @@ function mmRenderDayDetail(wk, d) {
       <div class="mm-detail-kid">${CT_PROFILE_ICON[kid]} ${name} <small>${done}/${rows.length} done</small></div>
       ${section('Routines', 'You mark these. They pay no money — they build the clean-day streak.', 'routine')}
       ${section('Chores', 'Tapping one agrees her answer and pays it.', 'chore')}
+      ${fineSection(kid)}
     </div>`;
   };
   const confirmed = mmIsDayConfirmed(d);
@@ -1004,9 +1183,20 @@ function mmRenderDayDetail(wk, d) {
    plain "on time" when she never answered. Tapping a graded chore ungrades it.
    Either way it is the same store the portal and the money engine read, so
    Step 3 recomputes from it the moment this returns. */
-function mmToggleItem(kid, d, idx) {
+/* ── Keyed by WHAT it is, never by where it sat ────────────────────
+   This took `idx` and indexed mmReviewRows(kid, d)[idx], with the rendered
+   button carrying that position. That was safe only while every day produced
+   the same rows. The moment the routine set varies per day — which is the whole
+   point of routineSessionsForDay — a stale index from a previous render toggles
+   the WRONG session, or falls past the routines into the chore branch and
+   writes a GRADE, which is money.
+
+   So the row is found by kind and key. A miss returns silently: the render is
+   stale, and doing nothing is the only safe answer when you cannot tell what
+   the tap meant. */
+function mmToggleItem(kid, d, kind, key) {
   const wk = mmWeekKey();
-  const row = mmReviewRows(kid, d)[idx];
+  const row = mmReviewRows(kid, d).find(r => r.kind === kind && r.key === key);
   if (!row) return;
   if (row.kind === 'routine') {
     ctSetMandatory(wk, d, row.key, kid, !row.on);
@@ -1061,10 +1251,34 @@ function mmAddChoreHappened(kid, d, choreId) {
    at a time is 42 taps per kid, which is how a catch-up becomes a week nobody
    bothers to settle. Still the parent's assertion, and still the same store a
    live tick writes — this only saves the taps. */
+/* Both go through the owners: mrAddFine and mrDeleteFine. This screen is a
+   second ENTRY POINT, never a second decision — the same shape as the gift's
+   two doors, and not the "six copies" defect, which was six places each
+   deciding the answer for themselves. */
+function mmAddFineOnDay(kid, d, itemId) {
+  if (!isParent()) { showToast('A grown-up records a fine 🔒'); return; }
+  if (!itemId) return;
+  mrAddFine(kid, itemId, mmDayKey(d));
+  mnyReopenWeek(kid, mmWeekKey());
+  saveAll();
+  renderMeetingMode();
+}
+function mmUndoFine(kid, fineId) {
+  if (!isParent()) { showToast('A grown-up records a fine 🔒'); return; }
+  if (!fineId) return;
+  mrRemoveFine(kid, fineId);
+  mnyReopenWeek(kid, mmWeekKey());
+  saveAll();
+  renderMeetingMode();
+}
+
 function mmToggleAllRoutines(kid, d) {
   const wk = mmWeekKey();
-  const all = CT_SESSIONS.every(s => ctGetMandatory(wk, d, s, kid));
-  CT_SESSIONS.forEach(s => ctSetMandatory(wk, d, s, kid, !all));
+  // The same set the footer label counted — see mmRenderDayDetail above.
+  const asked = routineSessionsForDay(kid, wk, d);
+  if (!asked.length) return;
+  const all = asked.every(s => ctGetMandatory(wk, d, s, kid));
+  asked.forEach(s => ctSetMandatory(wk, d, s, kid, !all));
   ctMaybeFireGoalBonus(wk, kid);
   mnyReopenWeek(kid, wk);
   saveAll();

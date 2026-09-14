@@ -1141,6 +1141,57 @@
   }
   .cm-cell.cm-readonly { cursor: default; }
   .cm-cell.cm-disabled { opacity: 0.55; cursor: default; }
+  /* A routine this day did not ask for. Still TAPPABLE — the matrix is the
+     parent's form, and recording a routine that happened on an unplanned day is
+     the only reason the row stays — so it is quieter, not disabled. */
+  .cm-cell.cm-unplanned { border-style: dotted; color: #a89a82; }
+
+  /* The day's chore grades, where the day is. Parent-only, and hidden entirely
+     when the planner put no chore here rather than explaining an empty state. */
+  .parent-chores {
+    display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: #fdf6ef; border-bottom: 1.5px solid var(--ink);
+  }
+  .pc-cap { font-size: var(--text-sm); font-weight: 700; color: var(--ink); }
+  .pc-chore {
+    display: inline-flex; align-items: center; gap: var(--space-1);
+    min-height: 44px; padding: 0 var(--space-3);
+    border: 1.5px solid var(--ink); border-radius: 999px;
+    background: #fff; color: var(--ink);
+    font-size: var(--text-sm); font-family: inherit; cursor: pointer;
+  }
+  .pc-chore.on { background: #95d5b2; }
+  /* A second heading inside one card needs air above it. */
+  .mny-gap { margin-top: var(--space-3); }
+
+  /* The meeting's own fine chips, on the day they belong to. Same 44px floor as
+     every other control a grown-up taps. */
+  .mm-fine {
+    display: inline-flex; align-items: center; gap: var(--space-1);
+    min-height: 44px; margin: 0 var(--space-1) var(--space-1) 0;
+    padding: 0 var(--space-3);
+    border: 1.5px solid var(--ink); border-radius: 999px;
+    background: #fff; color: var(--ink);
+    font-size: var(--text-sm); font-family: inherit; cursor: pointer;
+  }
+  .mm-fine-given {
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: var(--space-1) 0; font-size: var(--text-sm);
+  }
+  .mm-fine-x {
+    min-width: 44px; min-height: 44px;
+    border: 1.5px solid var(--ink); border-radius: 999px;
+    background: #fff; color: var(--ink); font-size: 1rem; cursor: pointer;
+  }
+
+  /* A planned competition with no result yet. An open question, drawn as one:
+     dashed, so it does not read as a settled row sitting among settled rows. */
+  .mny-row--todo {
+    border: 1.5px dashed var(--ink); border-radius: var(--radius-sm);
+    padding: var(--space-2); margin: var(--space-2) 0;
+    background: #fdf6ef; flex-wrap: wrap; gap: var(--space-2);
+  }
   .cm-cell:not(.on):not(.cm-future) { color: #b9ac95; }
   .cm-rowtotal, .cm-wkhead { font-size: calc(0.74rem * var(--fs-scale, 1)); font-weight: 800; text-align: center; display: flex; align-items: center; justify-content: center; }
   .cm-bar {
@@ -1946,6 +1997,11 @@
   .wf-card--slim .wf-card-travel { display: none; }
   /* Buffer/conflict warning badge inline on the card name */
   .wf-card-conflict-badge { margin-left: 3px; font-size: calc(0.68rem * var(--fs-scale, 1)); filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); }
+  .wf-card-notdone-badge { margin-right: 3px; font-size: calc(0.68rem * var(--fs-scale, 1)); filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); }
+  /* Same rule as the day view's ring, and the same reason: a record, not a
+     grading-down. Inset so it cannot be confused with the conflict outline,
+     which sits outside the card and is red. */
+  .wf-card--notdone { box-shadow: inset 0 0 0 2.5px var(--ink); }
   /* A conflict is a real scheduling problem, so it must read at a glance without
      hovering: bold red frame, a soft red glow, and an always-visible corner
      flag even on the slimmest cards. */
@@ -2773,8 +2829,18 @@
   }
   /* Activity itself touched by a conflicting buffer (its own or a neighbour's) */
   .placed-block.placed-block--conflict { outline: 2px solid #d6453a; outline-offset: -1px; }
+  /* Recorded as not having happened. A RING, never a fade: --missed was removed
+     deliberately because an unconfirmed block must not be drawn as though the
+     child failed it, and this is the opposite case — a fact a grown-up wrote
+     down. So the fill stays at full strength and the frame carries it.
+     box-shadow rather than outline so a block that is also in a clash keeps
+     both signals. */
+  .placed-block.placed-block--notdone { box-shadow: inset 0 0 0 2.5px var(--ink); }
   .block-badges { display:flex; gap: 3px; }
   .badge { font-size: calc(0.75rem * var(--fs-scale, 1)); filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2)); }
+  /* Dark ink on a light neutral chip — never white on a pastel, which all fail
+     contrast against the category colours this sits on top of. */
+  .badge-notdone { background: #ece7e3; border-radius: 4px; padding: 0 2px; }
 
   /* The ACTIVITY TRAY section lived here: the fixed bottom/side rail of
      activity chips, its filters, its header and its level/lock badges. The
@@ -3417,6 +3483,32 @@
   }
   /* Reviewed reads as settled, not as another thing to press. */
   .pb-action.on { background: #95d5b2; }
+  /* Recording what did not happen is a different act from confirming what did,
+     so it does not borrow the confirm button's green. Neutral, not red: it is
+     a record a parent chose to make, not a warning. */
+  .pb-action--notdone { background: #ece7e3; }
+
+  /* ── The meeting's offer on an unconfirmed day row ──────────────────
+     Inline rather than a modal: a three-button sheet would be a second dialog
+     mechanism beside openSheet/closeSheet, and an offer that has to be
+     discovered is one a parent works around. */
+  .mm-drow-offer {
+    display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-top: 1.5px dashed var(--ink);
+    background: #fdf6ef;
+  }
+  .mm-drow-offer-say { flex: 1 1 auto; font-size: var(--text-sm); color: var(--ink); }
+  /* 44px floor, like every other control a grown-up taps on a phone. */
+  .mm-offer-btn {
+    min-height: 44px; padding: 0 var(--space-3);
+    border: 1.5px solid var(--ink); border-radius: 999px;
+    background: #fff; color: var(--ink);
+    font-size: var(--text-sm); font-weight: 600; cursor: pointer;
+  }
+  /* The one that moves money. Neutral rather than red: it is a record a parent
+     chose to make, not a warning — and it confirms before it writes. */
+  .mm-offer-btn--nd { background: #ece7e3; }
   .pb-action[disabled] { opacity: 0.55; cursor: default; }
 
   /* Parent portal: tabbed sections */
@@ -5181,6 +5273,10 @@
   }
   .ck-dot.on { border-color: var(--ck-ink); background: var(--ck-green-ink); }
   .ck-dot.chore { border-color: var(--ck-ink); background: var(--ck-amber); }
+  /* A routine this day never asked for. A hollow placeholder keeps the seven day
+     buttons the same width without drawing a miss — a grey dot for something
+     nobody asked her to do is the thing this change removes. */
+  .ck-dot.ck-dot-na { border-style: dotted; border-color: #cfc6b4; background: transparent; }
 
   /* ── body: 268px rail beside a fluid main column ── */
   .ck-body { display: flex; align-items: stretch; }
@@ -5336,6 +5432,9 @@
   button.ck-cell:hover { background: var(--ck-cream); }
   .ck-cell.done { background: var(--ck-green); color: #143024; }
   .ck-cell.claimed { background: var(--ck-cream); color: #c14a24; box-shadow: inset 0 0 0 3px #ffd166; }
+  /* Same answer on the week grid: not asked, so not missed. Dark enough to read
+     at the 13px kid floor rather than faded to nothing. */
+  .ck-cell.ck-cell-na { border-style: dotted; border-color: #cfc6b4; color: #a89a82; cursor: default; }
   /* Never planned, so never judged — inert on purpose, not merely disabled. */
   .ck-cell-off { background: #eae4d5; border-color: var(--ck-dash); cursor: default; }
   .ck-legend2 {
@@ -6356,6 +6455,12 @@
      the heaviest thing on the strip — not a different colour, which now belongs
      to the category. */
   .td-rib-cell--now { border-width: 3.5px; box-shadow: 2px 2px 0 var(--ink); }
+  /* The third answer. Dashed means nobody has said, solid means confirmed —
+     so a block recorded as NOT having happened is answered too, and must not
+     read as the unanswered case. Double is the one remaining border style that
+     is unmistakable at this size, and it needs the extra width to render as
+     two lines at all. Still solid-filled at full strength. */
+  .td-rib-cell--notdone { border-style: double; border-width: 4px; }
 
   /* Which of the five this is. Quiet on purpose: what she is doing matters more
      than its number, and the number only exists at all when the same thing

@@ -43,6 +43,17 @@ let mnyCalMonth = null;       // 'YYYY-MM' for the competition calendar
    Stored in localStorage rather than synced state — it is a per-device view
    preference, and every state write is a full-document upload. Same idiom as
    HERO_MODE_LS_KEY in js/05-helpers.js. */
+/* Gifts: what came in, from whom, when. Collapsed by default and remembered
+   per device, the mnyPricesOpen pattern — page 1 is held to the 200-word kid
+   budget and a list of past gifts is reference material, not something she has
+   to read to act. localStorage, never synced state: every state write is a
+   full-document upload and this is a view preference. */
+const MNY_GIFTS_LS_KEY = 'wp_mny_gifts_open';
+function mnyGiftsOpen() { return localStorage.getItem(MNY_GIFTS_LS_KEY) === '1'; }
+function mnySetGiftsOpen(open) {
+  try { localStorage.setItem(MNY_GIFTS_LS_KEY, open ? '1' : '0'); } catch (e) {}
+}
+
 const MNY_PRICES_LS_KEY = 'wp_mny_prices_open';
 function mnyPricesOpen() {
   return localStorage.getItem(MNY_PRICES_LS_KEY) === '1';
@@ -192,6 +203,7 @@ function mnyRenderMyMoney() {
          <div class="mny-col">
            ${mnyDebtCards(kid, wk)}
            ${mnyCompetitionCard(kid)}
+           ${mnyGiftsCard(kid)}
            ${mnyLinksCard(kid)}
          </div>
        </div>`;
@@ -506,6 +518,75 @@ function mnyDebtCards(kid, wk) {
 }
 
 /* Competition days, as a month she can actually point at. */
+/* ── Gifts she has been given ──────────────────────────────────────
+   The record side of "money from outside". Entry lives here AND in the meeting,
+   both through mnyAddDeposit, so there is one writer and two doors — the same
+   shape as a fine, and not the "six copies" defect, which was six places each
+   deciding the answer.
+
+   The form renders only for a parent. A child sees the section and can PROPOSE
+   one; it credits nothing until a grown-up approves it. That is what keeps
+   "entered with her in the room" true while closing the hole immediate
+   crediting would otherwise open on a kid-visible page. */
+/* Three questions in sequence, each a real one, rather than a second inline
+   form beside the meeting's. Sequential is the house idiom for this
+   (claimChoresFromBlock makes the same call): overlapping dialogs are a
+   pile-up, one after another is a conversation.
+
+   Both roles use this. mnyAddDeposit decides what happens with the answer —
+   a grown-up's entry credits at once, a child's waits for approval — so this
+   asks the same three things either way and holds no rule of its own. */
+async function mnyPromptGift(kid) {
+  const who = kid || mnyViewKid();
+  const asking = !isParent();
+  const raw = await showPrompt(
+    asking ? 'How much were you given?' : 'How much came in?',
+    { type: 'number', value: '20', okLabel: 'Next' });
+  const amount = money2(Number(raw));
+  if (!(amount > 0)) return;
+
+  const from = await showChoice('What kind of money is it?',
+    MNY_FROM.map(f => ({ id: f, label: f })));
+  if (!from) return;
+
+  const giver = await showPrompt('Who gave it? (you can leave this blank)',
+    { value: '', okLabel: 'Save it' });
+  if (giver === null) return;
+
+  const wk = (typeof mnyWeekKey === 'function') ? mnyWeekKey() : ctThisWeekKey();
+  const d = mnyAddDeposit(who, wk, { amount, from, giver });
+  if (!d) { showToast('Nothing was recorded'); return; }
+  mnySetGiftsOpen(true);
+  mnyRenderMyMoney();
+  showToast(d.pendingApproval
+    ? `Asked a grown-up about ${mnyMoney(amount)} 🎁`
+    : `${mnyMoney(amount)} added 🎁`);
+}
+
+function mnyGiftsCard(kid) {
+  const all = (typeof mnyEnsureDeposits === 'function') ? mnyEnsureDeposits(kid) : [];
+  if (!all.length && !isParent()) return '';
+  const open = mnyGiftsOpen();
+  const recent = all.slice().sort((a, b) =>
+    String(b.dayKey || '').localeCompare(String(a.dayKey || ''))).slice(0, 10);
+  const waiting = all.filter(d => d.pendingApproval).length;
+  const rows = recent.map(d => `<div class="mny-row">
+      <span>🎁 ${escapeHtml(d.from || 'A gift')}${d.giver ? ' · from ' + escapeHtml(d.giver) : ''}
+        <small class="mny-note">${escapeHtml(mnyShortDate(d.dayKey || d.weekKey))}${
+          d.pendingApproval ? ' · waiting for a grown-up' : ''}</small></span>
+      <b>${mnyMoney(d.amount)}</b>
+    </div>`).join('');
+  return `<div class="mny-card">
+      <button type="button" class="mny-acc" data-mny-action="gifts" aria-expanded="${open}">
+        <span class="mny-label">🎁 Gifts${waiting ? ` · ${waiting} waiting` : ''}</span>
+        <span>${open ? 'Hide ▾' : 'Show ▸'}</span>
+      </button>
+      ${open ? (rows || `<div class="mny-note">No gifts recorded yet.</div>`) : ''}
+      ${open ? `<button type="button" class="mny-btn wide" data-mny-action="gift-add"
+        >${isParent() ? '＋ Record a gift' : '＋ I was given something'}</button>` : ''}
+    </div>`;
+}
+
 function mnyCompetitionCard(kid) {
   const month = mnyCalMonth || String(todayKey()).slice(0, 7);
   const entries = mrCompetitions(kid).filter(c => String(c.dayKey || '').slice(0, 7) === month);
@@ -629,7 +710,11 @@ function mnyRenderStory() {
 
   // Totals for whatever period is showing, so the header is never just decoration.
   const sum = (f) => money2(rows.reduce((s, r) => s + money2(r[f]), 0));
-  const inTotal = money2(sum('chores') + sum('learning') + sum('streak') + sum('competition'));
+  /* `outside` was missing, while the per-week bar directly below this listed
+     "From outside" as a row — so every gift was under-reported in the one
+     figure that claims to be everything that came in. */
+  const inTotal = money2(sum('chores') + sum('learning') + sum('streak')
+    + sum('competition') + sum('outside'));
 
   wrap.innerHTML =
       `${mnyPageHead('📖 My money story', 'Every week you have settled', [], { back: 'backmoney' })}
@@ -706,6 +791,17 @@ function mnyHandleClick(ev) {
   if (!el) return;
   const a = el.getAttribute('data-mny-action');
 
+  /* A planned meet with no result yet, in step 3. Recording it is the full
+     form; "no criteria met" is the one-tap answer that writes a real record
+     worth nothing — a different fact from no record at all. */
+  if (a === 'gifts') { mnySetGiftsOpen(!mnyGiftsOpen()); mnyRenderMyMoney(); return; }
+  if (a === 'gift-add') { mnyPromptGift(mnyViewKid()); return; }
+  if (a === 'comp-from-plan') { mnyOpenCompForPlanned(el.getAttribute('data-daykey')); return; }
+  if (a === 'comp-zero') {
+    mnyRecordCompZero(mnyMeetingKid(), el.getAttribute('data-daykey'),
+      el.getAttribute('data-name'), el.getAttribute('data-sport'));
+    return;
+  }
   if (a === 'kid')     { mnySetKid(el.getAttribute('data-mny-kid')); return; }
   if (a === 'story')   { mnyOpenStory(); return; }
   if (a === 'school')  { if (typeof mnyOpenSchool === 'function') mnyOpenSchool(mnyViewKid()); return; }
@@ -773,6 +869,10 @@ function mnyHandleClick(ev) {
 /* Typed fields in the goal form. Kept out of mnyHandleClick and off re-render:
    redrawing the card on every keystroke would take the caret with it. */
 function mnyHandleInput(ev) {
+  {
+    const g = ev.target.closest('[data-mny-action="dep-giver"]');
+    if (g) { if (mnyDepDraft) mnyDepDraft.giver = g.value; return; }
+  }
   const el = ev.target.closest('[data-mny-action]');
   if (!el) return;
   const a = el.getAttribute('data-mny-action');

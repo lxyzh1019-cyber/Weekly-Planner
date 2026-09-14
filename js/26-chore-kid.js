@@ -204,14 +204,21 @@ function ckGoFresh() {
 function ckControls(kid) {
   const info = ctWeekInfo();
   const todayD = formatDayKey(todayKey());
+  // One pass for the whole strip rather than a read per dot per day.
+  const sessionsByDay = routineSessionsByDay(kid, ctWeekKey);
   let cells = '';
   for (let d = 0; d < 7; d++) {
     const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
     const isToday = Math.round((date - todayD) / 86400000) === 0;
     const sel = d === ctDay;
-    // Three routine dots then one for a chore graded that day.
-    let dots = CT_SESSIONS.map(s =>
-      `<span class="ck-dot ${ctGetMandatory(ctWeekKey, d, s, kid) ? 'on' : ''}"></span>`).join('');
+    /* Three dot SLOTS always, so the seven day buttons keep identical widths —
+       but a session the day never asked for is drawn as a hollow placeholder
+       rather than a missed one. A permanently grey dot for something nobody
+       asked her to do is the complaint this change exists to answer. */
+    const askedToday = sessionsByDay[d];
+    let dots = CT_SESSIONS.map(s => askedToday.includes(s)
+      ? `<span class="ck-dot ${ctGetMandatory(ctWeekKey, d, s, kid) ? 'on' : ''}"></span>`
+      : `<span class="ck-dot ck-dot-na" title="Not planned this day"></span>`).join('');
     const gradedToday = Object.keys(mrEnsureEarnings(kid, ctWeekKey).chores[String(d)] || {}).length > 0;
     dots += `<span class="ck-dot ${gradedToday ? 'chore' : ''}"></span>`;
     cells += `<button type="button" class="ck-day ${sel ? 'sel' : ''} ${isToday ? 'today' : ''}"
@@ -579,19 +586,28 @@ function ckWeekGrid(kid) {
       }).join('') + '</div>';
   };
 
+  /* A REPORT, so it drops a row no day asked for and counts each row out of the
+     days that did. `n/7` measured a session against seven days that never
+     wanted it, so a weekday-only routine read 5/7 forever and looked like
+     failure. (The chore matrix keeps all three rows for the opposite reason:
+     it is a FORM, and the row is the only door to recording a routine that
+     happened on a day nobody planned it.) */
+  const ckSessionsByDay = routineSessionsByDay(kid, ctWeekKey);
   const routineRows = CT_SESSIONS.map(s => {
+    const days = [0, 1, 2, 3, 4, 5, 6].filter(d => ckSessionsByDay[d].includes(s));
     let n = 0;
-    for (let d = 0; d < 7; d++) if (ctGetMandatory(ctWeekKey, d, s, kid)) n++;
-    return {
-      name: s,
-      icon: CT_SESSION_ICONS[s] || '📋',
-      cell: (d) => {
-        const on = ctGetMandatory(ctWeekKey, d, s, kid);
-        return `<div class="ck-cell ${on ? 'done' : ''}">${on ? '✓' : '·'}</div>`;
-      },
-      total: () => `${n}/7`,
-    };
-  });
+    days.forEach(d => { if (ctGetMandatory(ctWeekKey, d, s, kid)) n++; });
+    return { session: s, days, n };
+  }).filter(r => r.days.length > 0).map(r => ({
+    name: r.session,
+    icon: CT_SESSION_ICONS[r.session] || '📋',
+    cell: (d) => {
+      if (!r.days.includes(d)) return `<div class="ck-cell ck-cell-na" title="Not planned this day">–</div>`;
+      const on = ctGetMandatory(ctWeekKey, d, r.session, kid);
+      return `<div class="ck-cell ${on ? 'done' : ''}">${on ? '✓' : '·'}</div>`;
+    },
+    total: () => `${r.n}/${r.days.length}`,
+  }));
 
   const poolChores = mrPoolRows(ctWeekKey).filter(p => p.lane === 'chores');
   const choreRows = poolChores.map(p => {

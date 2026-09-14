@@ -66,6 +66,9 @@ npm run test:merge
 # 3. The calibrated XP values (see tools/xp-calibrate.js)
 npm run test:xp
 
+# 3b. The calibrated MONEY values (see tools/money-calibrate.js)
+npm run test:money
+
 # 4. Headless smoke test — boots the app, drives the main flows
 npm run test:smoke          # screenshots land in tests/out/
 ```
@@ -587,6 +590,10 @@ that already owned that write. Ask it; do not re-derive it.
 | Did she perform it? | `isBlockCompleted(block, kid)` |
 | …and for a routine, which is its checklist? | `isRoutineCompleted(block, kid)` |
 | Did a grown-up verify it? | `isBlockConfirmed(block)` |
+| …or record that it did NOT happen? | `isBlockNotDone(block)` |
+| Is this block answered either way? | `isBlockAccountedFor(block)` |
+| What is this day still waiting on? | `dayBlocksAwaitingAccount(kid, dayKey)` |
+| Which routines did this day ask for? | `routineSessionsForDay(kid, weekKey, dayIdx)` |
 | Did a parent review this child's day? | `isDayReviewed(kid, dayKey)` |
 | What does the family's share of the chores stand at? | `getFamilyChoreStatus(kid, weekKey)` |
 | How did the week's hours go? | `getWeeklyHours(kid, weekKey)` |
@@ -670,6 +677,38 @@ done — and never touches `parentDayConfirm`. `markDayReviewedForChild` is the
 other fact and changes no completion. Reviewing a day is **per child**: the
 meeting's day rows carry a control each plus an explicit Both.
 
+**"It was planned and it did not happen" is a THIRD answer.** `confirmed` and
+its absence were the whole vocabulary, so a plan that was not carried out had
+nowhere to be recorded, and every route out stated something false: "Confirm
+all" marks the blocks done *and* grades their chores at "on time", the edit
+sheet's confirm toggle graded a chore nobody claimed, and deleting the blocks
+rewrites the plan the reflection reads. The day then held the whole week open
+through `canCloseWeek`, for the one reason a parent had no move against.
+
+`isBlockNotDone` is not "unconfirmed" and not "completed" — it is a parent's
+account of the day. It completes nothing and earns no XP, but it **reaches the
+money**: a grade above zero on a block that did not happen is paying for work
+nobody did, so `ungradeChoresFromBlock` clears it through `mrSetChoreGrade`, and
+the confirmation names every chore and the total first. XP is not clawed back —
+`xpCredit` is forward-only and there is no path back into the ledger — so the
+confirmation says so. A block that has not ENDED is refused, and a completed
+routine is refused rather than overwritten, because a routine's completion IS
+its checklist and clearing it would wipe the child's own ticks.
+
+**Confirmed and not-done are mutually exclusive IN THE RECORD**, never worked
+out at read time. Blocks merge whole-record newest-wins through `mergeArrayById`,
+so a block carrying both flags survives a sync intact and every predicate
+downstream then disagrees with the next. Both writers `delete` the other flag,
+and both stamp `markItemUpdated` — `setDayBlocks` does NOT stamp, which is why
+`toggleConfirm` could previously lose a confirmation to a stale remote copy.
+
+Drawn as a **marker, never a fade**, on the day view, the week card and Today's
+ribbon. `--missed` was removed deliberately because an *unconfirmed* block must
+not look like a child's failure; this is the opposite case, so the fill keeps
+full strength and a ring and badge carry it. On the ribbon it needs a third
+border treatment, or dashed-not-confirmed reads as "nobody has said" about the
+one block somebody has.
+
 **A scheduled chore is not a fulfilled one.** `required` / `planned` /
 `fulfilled` / `waiting` are four numbers, and only a positive parent grade is
 fulfilled. The kid surfaces measure `stillNeedsADay` and stay forward-voiced and
@@ -748,6 +787,31 @@ offer that cannot be accepted would wedge the widget for the checklist rewards
 behind it. `noActivityHasToBeEarned` and `aLegacyActivityRewardDrainsAway` hold
 all of this.
 
+**A day asks for the routines it PLANNED, or its own default.** All three
+sessions used to be evaluated on every day of every week, so a family that never
+planned an after-school routine was permanently marked down for one.
+`routineSessionsForDay` (`js/36-status.js`) is the one owner: the day's routine
+blocks when there are any, otherwise **three on a school day and two on a
+weekend or school-free day** — there is no after-school routine on a day with no
+school. Which kind of day it is comes from `isSchoolDay`, never from the day of
+the week, so the family's own calendar decides it.
+
+`routineSessionsByDay` and `routineSessionDayCount` are derivations for the week
+grids, which need a denominator: `n/7` measured a session against seven days
+that never wanted it, so a weekday-only routine read 5/7 forever and looked like
+failure. The kid's week grid is a **report** and drops a row no day asked for;
+`ctMatrixRows` is a **form** and keeps all three, because the row is the only
+door to recording a routine that happened on an unplanned day.
+
+**The rule SHOWS everywhere and PRICES only from `mrRoutineRuleStartWeek` on.**
+A day that asks for fewer routines is easier to keep clean, which makes a streak
+tier easier to reach — right going forward, wrong backwards, because an
+unsettled old week re-prices from the live plan. `mrRoutineSessionsFor`
+(`js/18-rules.js`) is the money-side gate, and `mrStreakDayDone` and
+`mrStreakWeek` both ask it so they cannot disagree about the same week.
+`ctWeekHasData` and the legacy import still say `CT_SESSIONS` on purpose, with a
+reason at each site.
+
 School lives inside Brain and is ~32 hours a week, so the Brain row **names how
 much of itself was the school day** — otherwise homework can never be seen to
 move. `getWeeklyHours` returns `schoolMin` for exactly that.
@@ -796,6 +860,55 @@ to weekly meeting" while one is waiting and "◀ Hub" otherwise. `applyMeetingLo
 **hides the Hub link and both child switchers** while a sitting is open: three
 controls that each silently abandoned the meeting is worse than one that says
 where it goes.
+
+**A day refused only for `unconfirmed` is the one refusal a SITTING may talk its
+way past.** `mmOverridableRefusal` names it: blocks nobody answered, which is
+exactly what makes an old week stick. `future` and `running` are refused over
+time, which no amount of agreeing changes, so they stay hard everywhere — and so
+does the parent day banner, because the offer belongs to a sitting where a
+grown-up is working through a week on purpose, not to the day screen where a
+stray tap would record a review nobody meant.
+
+The offer is **inline on the row, never a modal**: a three-button sheet would be
+a second dialog mechanism beside `openSheet`/`closeSheet`, which own focus and
+Escape, and an offer that has to be discovered is one a parent works around.
+Three answers — leave the blocks and review, open the day, or record them as not
+done and review. Only the last moves money, so only the last confirms. A week
+already settled refuses it and offers `mnyReopenWeek` instead, because changing
+a grade after settlement edits a record the wallet no longer reflects.
+
+**A settled week's money cannot be taken back, and nothing may claim it can.**
+`committedAt` is written once at step 4 and **nothing anywhere clears it**;
+`mnyReopenWeek` refuses a committed week outright; and the meeting's Undo lives
+in a session-local `mmUndo` that is gone the moment the sheet closes. So the
+record-and-review answer refuses — but NARROWLY, through
+`notDoneIsFrozenFor` (`js/09-sheets.js`): it asks whether *this* action would
+move money, not whether the week is settled. A swim recorded as not done in a
+settled week costs nothing and is still allowed, so a whole week does not become
+unrecordable to protect one grade. An earlier draft offered to "reopen her week"
+and called `mnyReopenWeek`, which returns false for exactly this case, then
+toasted that it had — a button announcing something it had not done, which is
+the defect this file keeps recording. The check that guards it is what found it.
+
+**Step 1 had no route to the day or the week at all**, on any week: `openkidday`
+was dispatched with no button anywhere rendering it, and the only `openweek`
+button was in step 2. Both steps carry the per-child pair now, from one writer
+with one set of labels.
+
+**Fines are entered on step 1, where the day key already is.** `mrAddFine` takes
+a `dayKey`, step 1 walks the week day by day, and step 3 is a totals screen that
+would have to ask which day. `cpFines` stays as the day-to-day surface. Two
+entry points, one writer (`mrAddFine`), one arithmetic owner (`mrFinesWeek`) —
+not the "six copies" defect, which was six places each deciding the answer.
+
+**A planned competition must be scored before the week settles.** A meet could
+be planned and never recorded, and the answer was unsayable: `$0` in the totals
+reads identically for "no meet", "a meet worth nothing", "a voided channel" and
+"an override to zero". Step 3 lists every planned meet with no result and offers
+a one-tap **No criteria met · $0**, which `mrAddCompetition` persists cleanly
+(unlike `mrSetChoreGrade`, which DELETES at zero). `mmUnrecordedCompetitions`
+matches on day **and** name, or two meets on one Saturday are both satisfied by
+recording either.
 
 **Step 2 asks the child; it does not tell her about herself.** `js/37-reflection.js`
 owns the record and nothing else. Three questions in this order — *What went
@@ -1268,6 +1381,61 @@ number, which is the point. `everyWeekViewFollowsTheSchoolCalendar`,
 four segments, which counted to four on Christmas week as readily as on a term
 Tuesday and is exactly why the 9am band stood for so long. They assert the axis
 matches the day it claims to describe.
+
+## Money: a start date, a default, and gifts
+
+**The system has a beginning, and it is the family's.** `moneyModelStartWeek`
+and `programStartDate` both self-seed to the current Monday on first read, which
+is why a household running for months has no floor and the catch-up list
+saturates at its own ceiling. Both are set together from Setup › Weeks on
+record, as a parent-visible date rather than a constant — hardcoding one would
+ship a household's date in a public repo.
+
+**Weeks older than the catch-up reach get a flat default.** `mmUnsettledWeeks`
+looks back eight weeks and stops, so anything older is invisible AND
+unsettleable. `mnyRunDefaultSweep` credits `MNY_DEFAULT_WEEK` per child for each
+un-met week beyond that reach, and three things make it safe: it is idempotent
+through the **same** `finalizedWeeks[wk][kid] == null` guard `commitKidWeek`
+uses, so two devices in any merge order credit once; it previews every week and
+the total before moving anything; and the ledger row is marked `defaulted` so
+the money story can say "no meeting was held" rather than presenting the figure
+as a week's earnings. Weeks the catch-up list can still reach are left alone —
+those hold real data and belong on their own numbers.
+
+**Gifts are `profile.deposits`, which already existed.** A new store would
+duplicate it and fight the one-pool rule: which door a dollar came in through
+has no bearing on which door it leaves by. What changed:
+
+- a **giver** field beside the category chip, because `from` names a kind of
+  money and never a person, and a red pocket is from somebody;
+- **Sports scholarship** and **Academic scholarship** as categories, kept apart
+  from the competition channel so a grandparent's cheque never reads as prize
+  money the rules produced;
+- recorded **any time and credited at once**, always dated today into the
+  current week — back-dating would reopen a week whose split has already run;
+- a **parent gate**, which `mnyAddDeposit` never had. That was safe only while
+  it lived behind the meeting; on a kid-visible page that credits immediately
+  its absence would let a child hand herself any sum. A child now PROPOSES one
+  (`pendingApproval` + `addedBy`, the same idiom a kid-created activity and a
+  custom task use) and it credits nothing until approved. The commit loop skips
+  a pending deposit and `mnyDepositTotal` leaves it out of the pool, or the gate
+  would work on one screen and not the other. Removing an applied gift debits
+  the wallet back through `moneyTakeBackCash`, floored at zero so a correction
+  can never invent a debt.
+
+**`tools/money-calibrate.js` is the twin of `tools/xp-calibrate.js`.** XP got a
+calibration and money never did, so a rules change could be argued about but not
+measured. It requires `MR_DEFAULT_RULES` through the module guard rather than
+restating a price, and mirrors the four places money is actually decided: the
+first two chores are free and are the CHEAPEST, the daily cap bites per day, the
+streak pays the longest run at the highest tier only, and a fine is floored at
+what that day earned. `tests/money.test.js` locks the result, so changing a rate
+and not re-running shows up as a failing test rather than at a Sunday meeting.
+
+It also settles a number that is easy to get wrong: **routines are worth at most
+$3 per child per week.** They pay nothing directly, and the $1 weekly goal bonus
+is on the LEGACY branch of `ctWeekMoney` and is never added in the current
+model. The streak is the whole routine channel.
 
 ## Known trip hazards
 

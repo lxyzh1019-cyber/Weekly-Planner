@@ -96,6 +96,17 @@ function moneyAddCash(kid, amount) {          // extra cash from outside chores 
   if (!(amount > 0)) return false;
   w.cash = money2(w.cash + amount); saveAll(); return true;
 }
+/* The inverse of moneyAddCash, and the ONLY caller is a gift being taken back
+   after it already reached the wallet. Floored at zero: taking a record away
+   must never invent a debt the child then has to work off. If the cash is
+   already spent the floor absorbs it, which is the honest outcome — the money
+   is gone, and pretending otherwise would put her in the red for a parent's
+   correction. */
+function moneyTakeBackCash(kid, amount) {
+  const w = ensureWallet(kid); amount = money2(amount);
+  if (!(amount > 0)) return false;
+  w.cash = money2(Math.max(0, w.cash - amount)); saveAll(); return true;
+}
 function moneyWithdraw(kid, amount) {         // kept ready → cash (two-way)
   const w = ensureWallet(kid); amount = money2(Math.min(amount, mnySavedTotal(kid)));
   if (amount <= 0) return false;
