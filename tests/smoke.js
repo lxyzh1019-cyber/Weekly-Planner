@@ -1337,38 +1337,51 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
-  /* A FLOORED CARD NEVER SITS ON THE ONE BELOW IT.
+  /* A FLOORED CARD NEVER SITS ON THE ONE BELOW IT — AND NEVER COSTS IT A LANE.
 
-     The lane pass compared startMin and durationMin, which is the wrong question
-     on a surface with a minimum card height: at 0.72px per minute the 20px floor
-     is 28 minutes, so a ten-minute After-School Routine at 8:50pm is DRAWN
-     through a 9:00pm Evening Routine while the arithmetic says they are clear.
-     Nothing split them and nothing could. Lanes are decided on drawn pixels now.
+     At 0.72px per minute the 20px floor is 28 minutes, so every block shorter
+     than that is drawn taller than it is. Two answers to that have now been
+     wrong in opposite directions. Comparing startMin and durationMin drew a
+     ten-minute After-School Routine at 8:50pm straight THROUGH a 9:00pm Evening
+     Routine. Comparing the floored pixels stopped that, but then split a lane
+     for any near neighbour — a 3:40pm routine and a 4:00pm piano lesson, which
+     do not overlap by a single minute, came out as two half-width cards with
+     their names erased.
 
-     This is the Tuesday evening from the original screenshot. */
+     wfCardBoxes settles it: the floor borrows the EMPTY minutes before the
+     block, so the card's bottom edge — the one that abuts the next card — stays
+     truthful, and a lane is split only when the two really do overlap or when
+     there was nothing to borrow.
+
+     Both cases here, on one fixture each: the Tuesday evening from the original
+     screenshot, and the Wednesday from this one. */
   checks.aFlooredCardNeverSitsOnTheOneBelowIt = await page.evaluate(() => {
     goWeek(); setWeekView('full');
     const kid = activeProfile();
     const key = getDayKeys(0)[1];
     const had = (getDayBlocks(key) || []).slice();
     const bad = [];
+    const cardFor = id => [...document.querySelectorAll('#screen-week .wf-card')]
+      .find(c => (c.outerHTML || '').includes(id));
+    const colWidth = () => {
+      const h = document.querySelector('#screen-week .wf-day-header');
+      return h ? h.getBoundingClientRect().width : 0;
+    };
     try {
+      // (1) Two short routines minutes apart: drawn clear of each other …
       setDayBlocks(key, [
         { id: 'fl-after', actId: 'routine_afterschool', startMin: 20 * 60 + 50, durationMin: 10 },
         { id: 'fl-eve',   actId: 'routine_evening',     startMin: 21 * 60,      durationMin: 30 },
       ], kid);
       weekOffset = 0; renderWeek();
 
-      const a = [...document.querySelectorAll('#screen-week .wf-card')]
-        .find(c => (c.outerHTML || '').includes('fl-after'));
-      const b = [...document.querySelectorAll('#screen-week .wf-card')]
-        .find(c => (c.outerHTML || '').includes('fl-eve'));
+      const a = cardFor('fl-after'), b = cardFor('fl-eve');
       if (!a || !b) return ['the two routines did not both draw'];
       const ar = a.getBoundingClientRect(), br = b.getBoundingClientRect();
       const hit = ar.left < br.right - 0.5 && ar.right > br.left + 0.5
                && ar.top  < br.bottom - 0.5 && ar.bottom > br.top + 0.5;
       if (hit) bad.push('the two cards are still drawn on top of each other');
-      // Side by side means each gets about half the column, not the whole of it.
+      // … and still the same width as each other, whichever width that is.
       if (ar.width > br.width * 1.6 || br.width > ar.width * 1.6) {
         bad.push(`the lanes are uneven: ${Math.round(ar.width)}px against ${Math.round(br.width)}px`);
       }
@@ -1377,6 +1390,42 @@ function findChromium() {
         const nm = card.querySelector('.wf-card-name');
         if (!nm || !nm.textContent.trim()) bad.push(`the ${want} card draws no name`);
       });
+
+      /* (2) THE WEDNESDAY. A 20-minute After-School Routine ending at 4:00pm
+         and a 4:00pm Piano lesson share not one minute, so neither may lose
+         half its column — the day view draws both full width and is right. */
+      setDayBlocks(key, [
+        { id: 'fl-asr',   actId: 'routine_afterschool', startMin: 15 * 60 + 40, durationMin: 20 },
+        { id: 'fl-piano', actId: 'piano',               startMin: 16 * 60,      durationMin: 30 },
+      ], kid);
+      renderWeek();
+
+      const asr = cardFor('fl-asr'), piano = cardFor('fl-piano');
+      if (!asr || !piano) {
+        bad.push('the routine and the piano lesson did not both draw');
+      } else {
+        const pr = asr.getBoundingClientRect(), qr = piano.getBoundingClientRect();
+        const clash = pr.left < qr.right - 0.5 && pr.right > qr.left + 0.5
+                   && pr.top  < qr.bottom - 0.5 && pr.bottom > qr.top + 0.5;
+        if (clash) bad.push('the routine and the piano lesson overlap on screen');
+        /* Full width: they do not overlap in TIME, so nothing may halve them.
+           Measured against the real column rather than a constant, because the
+           column width is exactly the number this surface kept getting wrong. */
+        const col = colWidth();
+        if (!col) bad.push('could not measure a day column');
+        else [[asr, 'After-School Routine'], [piano, 'Piano']].forEach(([card, want]) => {
+          const w = card.getBoundingClientRect().width;
+          if (w < col * 0.8) {
+            bad.push(`${want} is ${Math.round(w)}px in a ${Math.round(col)}px column — it lost a lane to nothing`);
+          }
+          const nm = card.querySelector('.wf-card-name');
+          if (!nm || !nm.textContent.trim()) bad.push(`${want} draws no name`);
+        });
+        // The bottom edge stays truthful: a floored card grows upward, never past 4:00pm.
+        if (pr.bottom > qr.top + 1.5) {
+          bad.push('the floored routine is drawn past the start of the piano lesson');
+        }
+      }
     } finally { setDayBlocks(key, had, kid); renderWeek(); }
     return bad.length === 0 || bad;
   });
@@ -5483,12 +5532,38 @@ function findChromium() {
        Blocks only: free-time cards share the .quest-card shell but describe the
        gaps BETWEEN blocks, and counting them here would be counting holes as
        things. The invariant is unchanged — every block of the day is in #tdWrap
-       and nowhere else in the document. */
+       and nowhere else in the document.
+
+       EXCEPT THE RUNNING ONE, which is in the hero and deliberately nowhere
+       else (theHeroIsTheOnlyPlaceTheRunningBlockAppears, below). This counted a
+       flat 2 and so FAILED for an hour and a half every day — whenever the
+       browser's own clock sat inside 7:00–7:30 or 16:00–17:00, which is where
+       these two fixtures are pinned. A check that passes or fails by the time
+       of day is the `|| break` bug in another costume: it reports a defect that
+       is not there, and it reports nothing at all the rest of the time. So the
+       expected count is derived from the clock rather than written down, and
+       the hero is asserted to hold exactly what the list is missing. */
     if (!tdEarlierOpen()) tdToggleEarlier();
     if (!tdLaterOpen()) tdToggleLater();
+    const now = tdNowMin();
+    const seeded = (getDayBlocks(key, 'jenn') || []);
+    const running = seeded.filter(b => now >= b.startMin && now < b.startMin + (b.durationMin || 0));
     const sel = '.quest-card:not(.quest-card--free)';
     const here = document.querySelectorAll('#tdWrap ' + sel).length;
-    if (here !== 2) bad.push(`Today lists ${here} of 2 blocks`);
+    const wantListed = 2 - running.length;
+    if (here !== wantListed) {
+      bad.push(`Today lists ${here} of ${wantListed} blocks`
+        + (running.length ? ` (${running.length} running, so in the hero)` : ''));
+    }
+    const hero = document.querySelector('#tdWrap .td-now');
+    if (!hero) bad.push('Today draws no NOW card');
+    else running.forEach(b => {
+      const act = findActivity(b.actId, 'jenn');
+      const nm = act && blockDisplayName(b, 'jenn').name;
+      if (nm && !hero.textContent.includes(nm)) {
+        bad.push(`${nm} is running but the hero does not name it`);
+      }
+    });
     const everywhere = document.querySelectorAll(sel).length;
     if (everywhere !== here) bad.push(`quest cards render in ${everywhere - here} other place(s)`);
     tdToggleEarlier();

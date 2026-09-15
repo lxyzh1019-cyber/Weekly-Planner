@@ -1035,6 +1035,26 @@ function renderFullWeek(keys) {
   }
   grid.appendChild(gutter);
 
+  /* ── HOW WIDE A DAY COLUMN REALLY IS ──
+     Everything below that refuses a label for not fitting ACROSS needs this
+     number, and it was being read off `cell.clientWidth` — from a cell that is
+     appended to the grid at the END of its own iteration, so the value was
+     always 0 and the `|| 120` fallback was always what got used. That is not a
+     near miss: the band label "👕15 🚗15 · 7:40am" costs 118.8px and missed the
+     115px that fallback produces by under four pixels, so every buffer strip on
+     this surface went silent over a budget nothing had measured.
+
+     The day HEADERS are already in the grid and sit in the same tracks
+     (`grid-template-columns: 18px 40px repeat(7, minmax(0, 1fr))`), so one
+     header measures every column, once, with no per-cell reflow. A render while
+     the screen is hidden measures 0 — then derive from the grid, and only if
+     that is 0 too fall back to a realistic column rather than an optimistic
+     one. */
+  const headerEl = grid.querySelector('.wf-day-header');
+  const measuredCol = headerEl ? headerEl.getBoundingClientRect().width : 0;
+  const derivedCol = grid.clientWidth ? (grid.clientWidth - 58) / 7 : 0;
+  const dayColPx = Math.round(measuredCol || derivedCol || 110);
+
   // ── One continuous lane per day ──
   keys.forEach((key, ci) => {
     // The calendar decides, not the weekday. Same function the day view uses.
@@ -1092,12 +1112,11 @@ function renderFullWeek(keys) {
     }
 
     const blocks = (getDayBlocks(key) || []).slice().sort((a,b)=>a.startMin - b.startMin);
-    /* In PIXELS, because that is what a reader sees overlap in — a card is
-       floored at WF_CARD_MIN_PX (28 minutes at this scale), so two short
-       routines minutes apart are drawn through each other while their start
-       times say they are clear. The 3px lane gap is the same one the cards and
-       strips below lay out with. */
-    const cols = wfAssignColumns(blocks, { pxPerMin: PX_PER_MIN, minPx: WF_CARD_MIN_PX, gapPx: 3 });
+    /* One geometry, read by the lane pass, the cards and the overrun layer.
+       The 3px lane gap is the same one the cards and strips below lay out
+       with. */
+    const boxes = wfCardBoxes(blocks, { pxPerMin: PX_PER_MIN, minPx: WF_CARD_MIN_PX, gapPx: 3 });
+    const cols = wfAssignColumns(blocks, { boxes, gapPx: 3 });
     const bufferConflicts = computeBufferConflicts(blocks);
 
     // Travel / get-ready strips (underneath cards), stacked so getting ready and
@@ -1119,7 +1138,7 @@ function renderFullWeek(keys) {
       const widthCss = 'calc(' + (100 / colCount) + '% - ' + (gap + 2) + 'px)';
       /* How wide this strip will actually be, so a label can be refused for not
          fitting ACROSS as well as for not fitting down. A lane split halves it. */
-      const colPx = Math.max(40, (cell.clientWidth || 120) / colCount - (gap + 2));
+      const colPx = Math.max(40, dayColPx / colCount - (gap + 2));
       const sideBufMin = getTravelBufMin(b) + getGetReadyBufMin(b);
       const preBufMin = sideBufMin + getWarmupBufMin(b);
       const postBufMin = sideBufMin;
@@ -1170,8 +1189,13 @@ function renderFullWeek(keys) {
 
       const relStart = b.startMin - START_MIN;
       const dur = Math.max(5, b.durationMin || 0);
-      const topPx = relStart * PX_PER_MIN;
-      const pxHeight = Math.max(dur * PX_PER_MIN, WF_CARD_MIN_PX);
+      /* From the ONE geometry, so the card is drawn exactly where the lane pass
+         thought it would be — including the minutes a floored card borrowed
+         from the empty time before it. */
+      const cardBox = boxes.get(b.id)
+        || { topPx: relStart * PX_PER_MIN, hPx: Math.max(dur * PX_PER_MIN, WF_CARD_MIN_PX) };
+      const topPx = cardBox.topPx;
+      const pxHeight = cardBox.hPx;
 
       // Training topics carry their own icon + colour (skating/swimming/dryland).
       const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
@@ -1226,7 +1250,7 @@ function renderFullWeek(keys) {
       const gap = 3; // px between overlapping columns
       const leftCss  = 'calc(' + (slot.col * 100 / colCount) + '% + 1px)';
       const widthCss = 'calc(' + (100 / colCount) + '% - ' + (gap + 2) + 'px)';
-      const colPx = Math.max(20, (cell.clientWidth || 120) / colCount - (gap + 2));
+      const colPx = Math.max(20, dayColPx / colCount - (gap + 2));
       /* TOO NARROW TO SAY A WORD. The same question the buffer strips ask about
          their own labels: a seven-day column is about 100px and a lane split
          halves it, so "After-School Routine" renders as a single letter and an
@@ -1611,31 +1635,91 @@ function wfBufferBand(topPx, hPx, leftCss, widthCss, segs, colour, conflict, col
   return s;
 }
 
+/* ── THE DRAWN BOX OF EVERY CARD ON ONE DAY ──
+   Computed once, and read by BOTH the lane pass and the cards themselves. A
+   lane decided on one geometry and a card drawn on another is the disagreement
+   this file records six times over; here it would be invisible, because the
+   card that ends up in the wrong lane still looks like a card.
+
+   A CARD FLOORED TO A MINIMUM BORROWS THE MINUTES BEFORE IT, NOT AFTER.
+   At 0.72px per minute the WF_CARD_MIN_PX floor is 28 minutes, so every block
+   shorter than that is drawn taller than it is. Growing DOWNWARD spends that
+   height on the one edge a reader uses to tell where one activity stops and the
+   next begins — and it made the grid split lanes for blocks that do not overlap
+   at all: a 20-minute After-School Routine ending at 4:00pm pushed a 4:00pm
+   Piano into a second half-width lane, while the day view (whose own floor is
+   below almost every real duration) drew both full width and was right.
+
+   Growing UPWARD spends it on minutes that are empty by construction. The
+   card's bottom edge — when the thing actually ends — stays truthful, which is
+   the edge that abuts the next card.
+
+   Room is measured against the other blocks' REAL extents, and against the
+   already-decided bottom of the block before it, so two short blocks either
+   side of one gap can never both borrow it. A card with nowhere to borrow from
+   keeps its full floored height and overruns; the lane pass then splits it,
+   which is the only case that should ever halve a column. */
+function wfCardBoxes(blocks, opts) {
+  const o = opts || {};
+  const pxPerMin = o.pxPerMin || 1;
+  const minPx = o.minPx || 0;
+  const gapPx = o.gapPx || 0;
+  const sorted = (blocks || []).slice()
+    .sort((a, b) => (a.startMin - b.startMin) || ((a.durationMin || 0) - (b.durationMin || 0)));
+  const realTop = b => (b.startMin - START_MIN) * pxPerMin;
+  const realBot = b => realTop(b) + Math.max(0, b.durationMin || 0) * pxPerMin;
+  const boxes = new Map();
+  const tops = sorted.map(realTop);
+  /* Starts at the top of the day, not at -Infinity: a 6am block has no earlier
+     minutes to borrow, and a card drawn above the canvas is clipped away. */
+  let prevDrawnBot = 0;
+  sorted.forEach((b, i) => {
+    const top = tops[i];
+    const natural = Math.max(0, b.durationMin || 0) * pxPerMin;
+    let topPx = top, hPx = natural;
+    let grow = Math.max(minPx, natural) - natural;
+    if (grow > 0) {
+      const roomBefore = Math.max(0, top - prevDrawnBot - gapPx);
+      // The earliest real top after this one. `tops` is non-decreasing, so the
+      // first entry past this block that is strictly lower is the nearest.
+      let nextTop = Infinity;
+      for (let j = i + 1; j < tops.length; j++) {
+        if (tops[j] > top) { nextTop = tops[j]; break; }
+      }
+      const roomAfter = nextTop === Infinity ? Infinity
+        : Math.max(0, nextTop - (top + natural) - gapPx);
+      const up = Math.min(grow, roomBefore);
+      topPx -= up; hPx += up; grow -= up;
+      const down = Math.min(grow, roomAfter);
+      hPx += down; grow -= down;
+      // Nowhere to borrow: take the height anyway and let the lane pass split.
+      if (grow > 0) hPx += grow;
+    }
+    boxes.set(b.id, { topPx, hPx });
+    prevDrawnBot = Math.max(prevDrawnBot, topPx + hPx);
+  });
+  return boxes;
+}
+
 /* Assign overlapping blocks to columns (greedy) so time-positioned cards
    never sit on top of each other. Returns a Map of id -> {col, count} where
-   count is the column count of that block's own overlap group. */
-/* LANES ARE DECIDED ON WHAT IS DRAWN, NOT ON MINUTES. This compared startMin
-   and durationMin, which is the wrong question on a surface with a minimum card
-   height: at 0.72px per minute a 20px floor is 28 minutes, so a ten-minute
-   After-School Routine at 8:50pm is drawn straight through a 9:00pm Evening
-   Routine while these two numbers say they do not touch. Nothing split them and
-   nothing could, because by the arithmetic there was no overlap.
+   count is the column count of that block's own overlap group.
 
-   So each block is measured in PIXELS — its drawn top and bottom after the
-   floor, plus the lane gap — and two cards that would touch on screen go side
-   by side exactly as two that overlap in time already do.
+   LANES ARE DECIDED ON WHAT IS DRAWN, and `wfCardBoxes` above is what says
+   what that is. Two cards go side by side when their boxes would touch on
+   screen, plus the lane gap — which now happens only when they really do
+   overlap in time, or when a floored card had no empty minute to borrow.
 
-   `epsPx` keeps a hair's-breadth graze from halving two long cards for nothing:
-   only an overrun of at least a few pixels splits, which is what every floored
-   short card produces and no correctly-abutting pair does. */
+   `epsPx` keeps a hair's-breadth graze from halving two long cards for
+   nothing. */
 function wfAssignColumns(blocks, opts) {
-  const pxPerMin = (opts && opts.pxPerMin) || 1;
-  const minPx    = (opts && opts.minPx) || 0;
   const gapPx    = (opts && opts.gapPx) || 0;
   const epsPx    = (opts && opts.epsPx != null) ? opts.epsPx : 4;
+  const boxes    = (opts && opts.boxes) || wfCardBoxes(blocks, opts);
   const map = new Map();
-  const drawnTop = b => (b.startMin - START_MIN) * pxPerMin;
-  const drawnBot = b => drawnTop(b) + Math.max(minPx, (b.durationMin || 0) * pxPerMin) + gapPx;
+  const box = b => boxes.get(b.id) || { topPx: 0, hPx: 0 };
+  const drawnTop = b => box(b).topPx;
+  const drawnBot = b => box(b).topPx + box(b).hPx + gapPx;
   const sorted = blocks.slice().sort((a,b)=> (a.startMin - b.startMin) || (a.durationMin - b.durationMin));
   // Group runs of mutually-overlapping blocks, then column-pack each group.
   let group = [];

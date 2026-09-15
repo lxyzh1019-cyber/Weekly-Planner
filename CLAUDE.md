@@ -412,16 +412,37 @@ pair. It used to join every affected name on a day into one chain — "School Da
 ⇆ Homework ⇆ Ballet ⇆ Evening Routine" — which names four things while saying
 neither which two clash nor by how much.
 
-**Lanes are decided on what is DRAWN, not on minutes.** `wfAssignColumns` and
-`renderBlocksWithCollision` compared `startMin` and `durationMin`, which is the
-wrong question on a surface with a minimum card height: at 0.72px per minute the
-20px floor is 28 minutes, so a ten-minute After-School Routine at 8:50pm was
-drawn straight through a 9:00pm Evening Routine while the arithmetic said they
-were clear — nothing split them and nothing could. Both measure drawn top and
-bottom now, plus the lane gap, with a few pixels of tolerance so a hair's-breadth
-graze between two long cards does not halve both for nothing. A lane-narrowed
-card under 64px drops its name to the icon (`.wf-card--noname`): one clipped
-letter is not a name, and the icon is already what a short card draws.
+**Lanes are decided on what is DRAWN, and a floored card borrows the minutes
+BEFORE it.** `wfAssignColumns` and `renderBlocksWithCollision` compared
+`startMin` and `durationMin`, which is the wrong question on a surface with a
+minimum card height: at 0.72px per minute the 20px floor is 28 minutes, so a
+ten-minute After-School Routine at 8:50pm was drawn straight through a 9:00pm
+Evening Routine while the arithmetic said they were clear. Measuring the floored
+pixels instead fixed that and broke the other direction — a 3:40pm routine and a
+4:00pm piano lesson, which share not one minute, came out as two half-width
+cards with their names erased, while the day view drew both full width and was
+right.
+
+`wfCardBoxes` (`js/07-week-view.js`) settles it, and is **the one geometry** the
+lane pass, the cards and the overrun layer all read: a lane decided on one set
+of numbers and a card drawn on another is invisible, because the card in the
+wrong lane still looks like a card. The floor grows a short card **upward**, into
+minutes that are empty by construction, so the card's bottom edge — the one a
+reader uses to see where one activity stops and the next begins — stays
+truthful. Room is measured against the other blocks' real extents and against
+the already-decided bottom of the block before it, so two short blocks either
+side of one gap can never both borrow it, and a 6am block has nothing above to
+borrow. Only a card with nowhere to borrow from overruns, and only that splits a
+lane. A lane-narrowed card under 64px drops its name to the icon
+(`.wf-card--noname`): one clipped letter is not a name, and the icon is already
+what a short card draws.
+
+**A width nothing measured.** `colPx` — the budget every buffer label and the
+`--noname` threshold are checked against — was read off `cell.clientWidth`, from
+a cell appended to the grid at the END of its own iteration. It was **always 0**,
+so the `|| 120` fallback was always the answer. The day headers are already in
+the grid and sit in the same tracks, so one of them measures every column once,
+with no per-cell reflow.
 
 `.placed-block { min-height: 22px }` applied to buffer strips too, so every strip
 under about seventeen minutes was silently grown and pushed past the block it
