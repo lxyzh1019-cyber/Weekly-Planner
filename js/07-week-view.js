@@ -769,20 +769,23 @@ function renderWeekStreak(keys) {
    min — time order. Getting skate boots ready can't happen while driving, so
    the buffers are laid end-to-end, not stacked on the same slot. */
 function wfBufferSegments(b) {
-  const travelMin = getTravelBufMin(b);
-  const readyMin  = getGetReadyBufMin(b);
-  const warmupMin = getWarmupBufMin(b);
+  // Per leg: going there and coming home are separate facts on a block now.
+  const travelPre  = getTravelBufMin(b, 'pre');
+  const travelPost = getTravelBufMin(b, 'post');
+  const readyPre   = getGetReadyBufMin(b, 'pre');
+  const readyPost  = getGetReadyBufMin(b, 'post');
+  const warmupMin  = getWarmupBufMin(b);
   const relStart = b.startMin - START_MIN;
   const dur = Math.max(5, b.durationMin || 0);
   const relEnd = relStart + dur;
   const segs = [];
   // Before: [get-ready][travel][warm-up][ACTIVITY]
-  if (warmupMin > 0) segs.push({ startRel: relStart - warmupMin, dur: warmupMin, icon: '🔥', min: warmupMin, kind: 'warmup', side: 'pre' });
-  if (travelMin > 0) segs.push({ startRel: relStart - warmupMin - travelMin, dur: travelMin, icon: '🚗', min: travelMin, kind: 'travel', side: 'pre' });
-  if (readyMin  > 0) segs.push({ startRel: relStart - warmupMin - travelMin - readyMin, dur: readyMin, icon: '👕', min: readyMin, kind: 'ready', side: 'pre' });
+  if (warmupMin > 0)  segs.push({ startRel: relStart - warmupMin, dur: warmupMin, icon: '🔥', min: warmupMin, kind: 'warmup', side: 'pre' });
+  if (travelPre > 0)  segs.push({ startRel: relStart - warmupMin - travelPre, dur: travelPre, icon: '🚗', min: travelPre, kind: 'travel', side: 'pre' });
+  if (readyPre  > 0)  segs.push({ startRel: relStart - warmupMin - travelPre - readyPre, dur: readyPre, icon: '👕', min: readyPre, kind: 'ready', side: 'pre' });
   // After: [ACTIVITY][travel][get-ready]
-  if (travelMin > 0) segs.push({ startRel: relEnd, dur: travelMin, icon: '🚗', min: travelMin, kind: 'travel', side: 'post' });
-  if (readyMin  > 0) segs.push({ startRel: relEnd + travelMin, dur: readyMin, icon: '👕', min: readyMin, kind: 'ready', side: 'post' });
+  if (travelPost > 0) segs.push({ startRel: relEnd, dur: travelPost, icon: '🚗', min: travelPost, kind: 'travel', side: 'post' });
+  if (readyPost  > 0) segs.push({ startRel: relEnd + travelPost, dur: readyPost, icon: '👕', min: readyPost, kind: 'ready', side: 'post' });
   segs.forEach(s => { s.endRel = s.startRel + s.dur; });
   return segs;
 }
@@ -1180,9 +1183,9 @@ function renderFullWeek(keys) {
       /* How wide this strip will actually be, so a label can be refused for not
          fitting ACROSS as well as for not fitting down. A lane split halves it. */
       const colPx = Math.max(40, dayColPx / colCount - (gap + 2));
-      const sideBufMin = getTravelBufMin(b) + getGetReadyBufMin(b);
-      const preBufMin = sideBufMin + getWarmupBufMin(b);
-      const postBufMin = sideBufMin;
+      const preBufMin  = getTravelBufMin(b, 'pre') + getGetReadyBufMin(b, 'pre')
+                       + getWarmupBufMin(b);
+      const postBufMin = getTravelBufMin(b, 'post') + getGetReadyBufMin(b, 'post');
       /* A STRIP STOPS WHERE THE NEXT CARD STARTS. It used to be drawn at its
          full length, straight through whatever it ran into — School Day's
          travel home painted over the top of Homework, so neither the strip nor

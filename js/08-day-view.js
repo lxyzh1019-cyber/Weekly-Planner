@@ -411,8 +411,9 @@ function dayDrawnSpanMin(keys) {
   (keys || []).forEach(key => {
     (getDayBlocks(key) || []).forEach(b => {
       if (!b) return;
+      // The POST legs only: those are the minutes drawn after the block ends.
       const end = (b.startMin - START_MIN) + (b.durationMin || 0)
-        + getTravelBufMin(b) + getGetReadyBufMin(b);
+        + getTravelBufMin(b, 'post') + getGetReadyBufMin(b, 'post');
       if (end > last) last = end;
     });
   });
@@ -1101,8 +1102,14 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey)
 }
 
 function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0, colCount = 1, dayKeyForBuffers = null) {
-  const travelBuf = getTravelBufMin(b);
-  const readyBuf = getGetReadyBufMin(b);
+  /* PER LEG. Getting there and coming home are separate facts on a block: a
+     School Day you go straight on from has a drive TO it and none home, and the
+     training it runs into has a short hop from the school gates and a longer
+     drive back. One mirrored figure could say neither. */
+  const travelPre  = getTravelBufMin(b, 'pre');
+  const travelPost = getTravelBufMin(b, 'post');
+  const readyPre   = getGetReadyBufMin(b, 'pre');
+  const readyPost  = getGetReadyBufMin(b, 'post');
   const warmupBuf = getWarmupBufMin(b);
   const endMin = b.startMin + b.durationMin;
   const entries = [];
@@ -1116,18 +1123,17 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0
     );
   }
   const preWarmup = (b.warmupBuffer ? warmupBuf : 0);
-  if (b.travelBuffer && travelBuf > 0) {
-    entries.push(
-      { startMin: b.startMin - preWarmup - travelBuf, label: '🚗 ➡ travel', bufDur: travelBuf, cls: '', side: 'pre' },
-      { startMin: endMin, label: '🚗 ⬅ travel', bufDur: travelBuf, cls: '', side: 'post' },
-    );
+  if (travelPre > 0) {
+    entries.push({ startMin: b.startMin - preWarmup - travelPre, label: '🚗 ➡ travel', bufDur: travelPre, cls: '', side: 'pre' });
   }
-  if (b.getReadyBuffer && readyBuf > 0) {
-    const preTravel = (b.travelBuffer ? travelBuf : 0);
-    entries.push(
-      { startMin: b.startMin - preWarmup - preTravel - readyBuf, label: '👕 ➡ get ready', bufDur: readyBuf, cls: 'travel-buf-ready', side: 'pre' },
-      { startMin: endMin + preTravel, label: '👕 ⬅ get ready', bufDur: readyBuf, cls: 'travel-buf-ready', side: 'post' },
-    );
+  if (travelPost > 0) {
+    entries.push({ startMin: endMin, label: '🚗 ⬅ travel', bufDur: travelPost, cls: '', side: 'post' });
+  }
+  if (readyPre > 0) {
+    entries.push({ startMin: b.startMin - preWarmup - travelPre - readyPre, label: '👕 ➡ get ready', bufDur: readyPre, cls: 'travel-buf-ready', side: 'pre' });
+  }
+  if (readyPost > 0) {
+    entries.push({ startMin: endMin + travelPost, label: '👕 ⬅ get ready', bufDur: readyPost, cls: 'travel-buf-ready', side: 'post' });
   }
   const sourceAct = findActivity(b.actId);
   /* A STRIP STOPS WHERE THE NEXT CARD STARTS — the same rule as the Full week,
@@ -1138,8 +1144,8 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0
   const dayBlocks = (getDayBlocks(dayKeyForBuffers || currentDayKey) || [])
     .filter(o => o && o.id !== b.id);
   const clip = bufferClip(b.startMin, endMin,
-    (b.warmupBuffer ? warmupBuf : 0) + (b.travelBuffer ? travelBuf : 0) + (b.getReadyBuffer ? readyBuf : 0),
-    (b.travelBuffer ? travelBuf : 0) + (b.getReadyBuffer ? readyBuf : 0),
+    preWarmup + travelPre + readyPre,
+    travelPost + readyPost,
     dayBlocks);
   const overlayBlocks = entries.map(({ startMin, label, bufDur, cls, side }) => {
     const segConflict = !!conflict && (side === 'pre' ? conflict.pre : conflict.post);

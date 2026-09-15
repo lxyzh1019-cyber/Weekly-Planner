@@ -1337,6 +1337,80 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* A BLOCK CAN GO STRAIGHT ON WITHOUT COMING HOME.
+
+     `travelBufMin` was one number drawn before a block and after it, so the
+     ordinary Tuesday could not be said at all: school, then straight on to
+     training, then home. There is no drive home from school that day, the drive
+     to training leaves from the school gates rather than the house, and the
+     drive home afterwards is longer than either.
+
+     Three things have to hold. The legs are independent and carry their own
+     minutes. A block that predates the split behaves EXACTLY as it does today,
+     with nothing written to it — derived, never migrated, the same rule as xp2.
+     And the clash arithmetic follows: a School Day with no drive home must stop
+     being reported as running into whatever comes next. */
+  checks.aBlockCanGoStraightOnWithoutComingHome = await page.evaluate(() => {
+    const bad = [];
+
+    // (1) A legacy block — only the symmetric fields — is unchanged.
+    const legacy = { id: 'lg', startMin: 8 * 60, durationMin: 60,
+      travelBuffer: true, travelBufMin: 20, getReadyBuffer: true, getReadyBufMin: 10 };
+    if (getTravelBufMin(legacy, 'pre') !== 20) bad.push('legacy pre travel is not 20');
+    if (getTravelBufMin(legacy, 'post') !== 20) bad.push('legacy post travel is not 20');
+    if (getGetReadyBufMin(legacy, 'pre') !== 10) bad.push('legacy pre get-ready is not 10');
+    if (getGetReadyBufMin(legacy, 'post') !== 10) bad.push('legacy post get-ready is not 10');
+    // Asked without a side — the shape every existing caller uses — it still answers.
+    if (getTravelBufMin(legacy) !== 20) bad.push('legacy sideless travel is not 20');
+
+    // (2) Tuesday: school with a drive there and none home.
+    const school = { id: 'tu-school', startMin: 8 * 60, durationMin: 400,
+      travelBuffer: true, travelBufMin: 15,
+      travelTo: true, travelToMin: 15, travelHome: false,
+      getReadyBuffer: true, getReadyBufMin: 15,
+      readyBefore: true, readyBeforeMin: 15, readyAfter: false };
+    if (getTravelBufMin(school, 'pre') !== 15) bad.push('the drive to school is not 15');
+    if (getTravelBufMin(school, 'post') !== 0) bad.push('a drive home was drawn from a day with none');
+    if (getGetReadyBufMin(school, 'post') !== 0) bad.push('gear-away was drawn after a straight-on day');
+
+    // …and the training it goes on to: a short hop there, a longer drive back.
+    const training = { id: 'tu-train', startMin: 15 * 60 + 30, durationMin: 90,
+      travelBuffer: true, travelBufMin: 20,
+      travelTo: true, travelToMin: 20, travelHome: true, travelHomeMin: 35 };
+    if (getTravelBufMin(training, 'pre') !== 20) bad.push('the hop from school is not 20');
+    if (getTravelBufMin(training, 'post') !== 35) bad.push('the drive home is not 35');
+
+    // (3) The segments drawn follow, and so does the clash arithmetic.
+    const segs = wfBufferSegments(school);
+    const post = segs.filter(s => s.side === 'post');
+    if (post.length) bad.push(`${post.length} segment(s) drawn after a block with no return leg`);
+    const pre = segs.filter(s => s.side === 'pre');
+    if (pre.length !== 2) bad.push(`expected get-ready and travel before school, got ${pre.length}`);
+
+    /* The whole point: with no drive home, School Day no longer runs into the
+       thing after it. The same pair WITH a return leg is a 20-minute clash —
+       assert both, or this only proves the conflict test can return nothing. */
+    const after = { id: 'tu-next', startMin: 15 * 60, durationMin: 60 };
+    const quiet = computeBufferConflicts([school, after]);
+    if (quiet.affected.has('tu-next')) {
+      bad.push('a block with no drive home is still reported as clashing');
+    }
+    const symmetric = Object.assign({}, school, { travelHome: true, readyAfter: true });
+    const loud = computeBufferConflicts([symmetric, after]);
+    if (!loud.affected.has('tu-next')) {
+      bad.push('the same pair WITH a return leg reports no clash — the test proves nothing');
+    }
+
+    // (4) A block carrying the new fields survives the merge whole.
+    const merged = mergeArrayById([school], [Object.assign({}, school,
+      { travelHomeMin: 40, updatedAt: Date.now() + 1000 })]);
+    const got = merged.find(x => x.id === 'tu-school');
+    if (!got || got.travelHome !== false) {
+      bad.push('travelHome did not survive a whole-record merge');
+    }
+    return bad.length === 0 || bad;
+  });
+
   /* EVERY SUBGROUP TELLS ITSELF APART.
 
      Five of the twelve subgroups were crowded into one green-teal corner, and

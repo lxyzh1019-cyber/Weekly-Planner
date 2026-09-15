@@ -631,6 +631,9 @@ function pickPreset(which, preset) {
 ════════════════════════════════════════════════════════════════ */
 let editState = {
   startMin: null, durationMin: null, travelBuffer: false, getReadyBuffer: false, travelBufMin: 15, getReadyBufMin: 15,
+  /* The return legs. Default ON, which is what "each way" always meant, so a
+     block nobody has thought about behaves exactly as it does today. */
+  travelHome: true, travelHomeMin: 15, readyAfter: true, readyAfterMin: 15,
   warmupBuffer: false, warmupBufMin: 20,
   repeat: false, repeatDays: [],
   completed: false,
@@ -780,6 +783,15 @@ function onEditBufferMinInput() {
   if (tIn && editState.travelBuffer) editState.travelBufMin = clampBufferMin(tIn.value);
   if (rIn && editState.getReadyBuffer) editState.getReadyBufMin = clampBufferMin(rIn.value);
   if (wIn && editState.warmupBuffer) editState.warmupBufMin = clampBufferMin(wIn.value);
+  // The return legs. Same rule: a hidden input is never read.
+  const thTog = document.getElementById('editTravelHomeToggle');
+  const thIn = document.getElementById('editTravelHomeMin');
+  if (thTog && editState.travelBuffer) editState.travelHome = !!thTog.checked;
+  if (thIn && editState.travelBuffer && editState.travelHome) editState.travelHomeMin = clampBufferMin(thIn.value);
+  const raTog = document.getElementById('editReadyAfterToggle');
+  const raIn = document.getElementById('editReadyAfterMin');
+  if (raTog && editState.getReadyBuffer) editState.readyAfter = !!raTog.checked;
+  if (raIn && editState.getReadyBuffer && editState.readyAfter) editState.readyAfterMin = clampBufferMin(raIn.value);
   renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin, !!editState.warmupBuffer, editState.warmupBufMin);
 }
 
@@ -835,8 +847,15 @@ function openEditSheet(blockId) {
   editState.travelBuffer = !!block.travelBuffer;
   editState.getReadyBuffer = !!block.getReadyBuffer;
   editState.warmupBuffer = !!block.warmupBuffer;
-  editState.travelBufMin = getTravelBufMin(block) || DEFAULT_BUFFER_MIN;
-  editState.getReadyBufMin = getGetReadyBufMin(block) || DEFAULT_BUFFER_MIN;
+  /* PER LEG, read through the accessors so a block that predates the split
+     still loads as the symmetric pair it has always been. The `home`/`after`
+     switches start ON for such a block, which is exactly what it does today. */
+  editState.travelBufMin = getTravelBufMin(block, 'pre') || DEFAULT_BUFFER_MIN;
+  editState.getReadyBufMin = getGetReadyBufMin(block, 'pre') || DEFAULT_BUFFER_MIN;
+  editState.travelHome = getTravelBufMin(block, 'post') > 0;
+  editState.travelHomeMin = getTravelBufMin(block, 'post') || DEFAULT_BUFFER_MIN;
+  editState.readyAfter = getGetReadyBufMin(block, 'post') > 0;
+  editState.readyAfterMin = getGetReadyBufMin(block, 'post') || DEFAULT_BUFFER_MIN;
   editState.warmupBufMin = getWarmupBufMin(block) || DEFAULT_WARMUP_MIN;
   editState.gearState = { ...(block.gearState||{}) }
   editState.repeat = false;
@@ -980,6 +999,14 @@ function openEditSheet(blockId) {
   if (etIn) etIn.value = String(editState.travelBufMin);
   if (erIn) erIn.value = String(editState.getReadyBufMin);
   if (ewIn) ewIn.value = String(editState.warmupBufMin);
+  const ethTog = document.getElementById('editTravelHomeToggle');
+  const ethIn  = document.getElementById('editTravelHomeMin');
+  const eraTog = document.getElementById('editReadyAfterToggle');
+  const eraIn  = document.getElementById('editReadyAfterMin');
+  if (ethTog) ethTog.checked = !!editState.travelHome;
+  if (ethIn)  { ethIn.value = String(editState.travelHomeMin); ethIn.disabled = !editState.travelHome; }
+  if (eraTog) eraTog.checked = !!editState.readyAfter;
+  if (eraIn)  { eraIn.value = String(editState.readyAfterMin); eraIn.disabled = !editState.readyAfter; }
   if (act.isTraining) {
     editWarmup.style.display = 'flex';
     editWarmup.classList.toggle('on', !!editState.warmupBuffer);
@@ -1316,6 +1343,8 @@ async function saveEditChanges() {
   const newWarmup = !!editState.warmupBuffer;
   const newTravelBuf = newTravel ? clampBufferMin(editState.travelBufMin) : null;
   const newReadyBuf = newGetReady ? clampBufferMin(editState.getReadyBufMin) : null;
+  const newTravelHomeBuf = (newTravel && editState.travelHome) ? clampBufferMin(editState.travelHomeMin) : 0;
+  const newReadyAfterBuf = (newGetReady && editState.readyAfter) ? clampBufferMin(editState.readyAfterMin) : 0;
   const newWarmupBuf = newWarmup ? clampBufferMin(editState.warmupBufMin) : null;
   const newGearState = editState.gearState ? { ...editState.gearState } : {};
   const newNote  = document.getElementById('editNoteInput').value;
@@ -1344,8 +1373,10 @@ async function saveEditChanges() {
     blk.travelBuffer !== newTravel ||
     !!blk.getReadyBuffer !== newGetReady ||
     !!blk.warmupBuffer !== newWarmup ||
-    getTravelBufMin(blk) !== (newTravelBuf || 0) ||
-    getGetReadyBufMin(blk) !== (newReadyBuf || 0) ||
+    getTravelBufMin(blk, 'pre') !== (newTravelBuf || 0) ||
+    getGetReadyBufMin(blk, 'pre') !== (newReadyBuf || 0) ||
+    getTravelBufMin(blk, 'post') !== (newTravelHomeBuf || 0) ||
+    getGetReadyBufMin(blk, 'post') !== (newReadyAfterBuf || 0) ||
     getWarmupBufMin(blk) !== (newWarmupBuf || 0) ||
     JSON.stringify(blk.gearState||{}) !== JSON.stringify(newGearState||{}) ||
     (blk.note||'') !== newNote ||
@@ -1369,10 +1400,29 @@ async function saveEditChanges() {
   blk.travelBuffer = newTravel;
   blk.getReadyBuffer = newGetReady;
   blk.warmupBuffer = newWarmup;
-  if (newTravel) blk.travelBufMin = newTravelBuf;
-  else delete blk.travelBufMin;
-  if (newGetReady) blk.getReadyBufMin = newReadyBuf;
-  else delete blk.getReadyBufMin;
+  /* Both legs written out whenever the master toggle is on, so the block says
+     what it means rather than leaning on the symmetric fallback — which cannot
+     express "no drive home" at all. */
+  if (newTravel) {
+    blk.travelBufMin = newTravelBuf;
+    blk.travelTo = true;
+    blk.travelToMin = newTravelBuf;
+    blk.travelHome = newTravelHomeBuf > 0;
+    blk.travelHomeMin = newTravelHomeBuf || newTravelBuf;
+  } else {
+    delete blk.travelBufMin; delete blk.travelTo; delete blk.travelToMin;
+    delete blk.travelHome; delete blk.travelHomeMin;
+  }
+  if (newGetReady) {
+    blk.getReadyBufMin = newReadyBuf;
+    blk.readyBefore = true;
+    blk.readyBeforeMin = newReadyBuf;
+    blk.readyAfter = newReadyAfterBuf > 0;
+    blk.readyAfterMin = newReadyAfterBuf || newReadyBuf;
+  } else {
+    delete blk.getReadyBufMin; delete blk.readyBefore; delete blk.readyBeforeMin;
+    delete blk.readyAfter; delete blk.readyAfterMin;
+  }
   if (newWarmup) blk.warmupBufMin = newWarmupBuf;
   else delete blk.warmupBufMin;
   blk.gearState = newGearState;
@@ -1400,10 +1450,28 @@ async function saveEditChanges() {
       startMin: newStart, durationMin: newDur, travelBuffer: newTravel, getReadyBuffer: newGetReady, warmupBuffer: newWarmup, gearState: { ...newGearState }, note: newNote,
       completed: newCompleted,
     };
-    if (newTravel) seriesPatch.travelBufMin = newTravelBuf;
-    else seriesPatch.travelBufMin = null;
-    if (newGetReady) seriesPatch.getReadyBufMin = newReadyBuf;
-    else seriesPatch.getReadyBufMin = null;
+    if (newTravel) {
+      seriesPatch.travelBufMin = newTravelBuf;
+      seriesPatch.travelTo = true;
+      seriesPatch.travelToMin = newTravelBuf;
+      seriesPatch.travelHome = newTravelHomeBuf > 0;
+      seriesPatch.travelHomeMin = newTravelHomeBuf || newTravelBuf;
+    } else {
+      seriesPatch.travelBufMin = null; seriesPatch.travelTo = null;
+      seriesPatch.travelToMin = null; seriesPatch.travelHome = null;
+      seriesPatch.travelHomeMin = null;
+    }
+    if (newGetReady) {
+      seriesPatch.getReadyBufMin = newReadyBuf;
+      seriesPatch.readyBefore = true;
+      seriesPatch.readyBeforeMin = newReadyBuf;
+      seriesPatch.readyAfter = newReadyAfterBuf > 0;
+      seriesPatch.readyAfterMin = newReadyAfterBuf || newReadyBuf;
+    } else {
+      seriesPatch.getReadyBufMin = null; seriesPatch.readyBefore = null;
+      seriesPatch.readyBeforeMin = null; seriesPatch.readyAfter = null;
+      seriesPatch.readyAfterMin = null;
+    }
     if (newWarmup) seriesPatch.warmupBufMin = newWarmupBuf;
     else seriesPatch.warmupBufMin = null;
     seriesPatch.objectives = [...newObjectives];

@@ -224,9 +224,11 @@ function renderPrintSheet(host, opts) {
            dropped rather than printed as a quarter-hour that is not there. A
            strip that loses its row loses its tick box with it, which is right:
            you cannot tick time that does not exist. */
-        const sideBufMin = getTravelBufMin(b) + getGetReadyBufMin(b);
+        // Per leg, like every other surface that clips a buffer window.
+        const preBufMin  = getTravelBufMin(b, 'pre') + getGetReadyBufMin(b, 'pre');
+        const postBufMin = getTravelBufMin(b, 'post') + getGetReadyBufMin(b, 'post');
         const pClip = bufferClip(b.startMin, b.startMin + (b.durationMin || 0),
-          sideBufMin + getWarmupBufMin(b), sideBufMin,
+          preBufMin + getWarmupBufMin(b), postBufMin,
           (bks || []).filter(o => o && o.id !== b.id));
         wfBufferSegments(b).forEach(seg=>{
           const absStart = seg.startRel + START_MIN;

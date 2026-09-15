@@ -324,13 +324,44 @@ function clampBufferMin(n) {
   if (Number.isNaN(v)) return DEFAULT_BUFFER_MIN;
   return Math.max(5, Math.min(180, v));
 }
-function getTravelBufMin(block) {
-  if (!block || !block.travelBuffer) return 0;
-  return clampBufferMin(block.travelBufMin != null ? block.travelBufMin : DEFAULT_BUFFER_MIN);
+/* ── TRAVEL IS TWO LEGS, NOT ONE FIGURE MIRRORED ──
+   `travelBufMin` was a single number drawn before the block and after it, which
+   cannot say the ordinary Tuesday: school, then straight on to training, then
+   home. There is no drive home from school that day, the drive to training is
+   from the school gates rather than the house, and the drive home afterwards is
+   longer than either. The activity you are going TO owns the travel, so the
+   fact is per-leg.
+
+   `travelTo` / `travelHome` and `readyBefore` / `readyAfter` (each with its own
+   minutes) say it. DERIVED, NEVER MIGRATED: absent means fall back to the
+   symmetric `travelBuffer` / `travelBufMin`, so every block already in
+   Firestore behaves exactly as it does today with nothing written — the same
+   reasoning as `xp2` and `achievementActivityId`. They are block fields inside
+   `weeks`, arbitrated whole-record by `mergeArrayById`, so this is not a
+   `state.shared` key and needs no merge decision of its own.
+
+   `side` is 'pre' | 'post'. OMITTING IT KEEPS THE OLD ANSWER — the larger of
+   the two legs — so a caller that asks "does this block carry travel at all"
+   is still right, and no existing call site had to be found and changed to
+   avoid being silently wrong. Anything that draws or measures one SEGMENT
+   passes a side. */
+function bufferLeg(block, side, onKey, minKey, legOnKey, legMinKey) {
+  if (!block) return 0;
+  const on = block[legOnKey] != null ? block[legOnKey] : block[onKey];
+  if (!on) return 0;
+  const raw = block[legMinKey] != null ? block[legMinKey]
+            : (block[minKey] != null ? block[minKey] : DEFAULT_BUFFER_MIN);
+  return clampBufferMin(raw);
 }
-function getGetReadyBufMin(block) {
-  if (!block || !block.getReadyBuffer) return 0;
-  return clampBufferMin(block.getReadyBufMin != null ? block.getReadyBufMin : DEFAULT_BUFFER_MIN);
+function getTravelBufMin(block, side) {
+  if (side === 'pre')  return bufferLeg(block, 'pre',  'travelBuffer', 'travelBufMin', 'travelTo',   'travelToMin');
+  if (side === 'post') return bufferLeg(block, 'post', 'travelBuffer', 'travelBufMin', 'travelHome', 'travelHomeMin');
+  return Math.max(getTravelBufMin(block, 'pre'), getTravelBufMin(block, 'post'));
+}
+function getGetReadyBufMin(block, side) {
+  if (side === 'pre')  return bufferLeg(block, 'pre',  'getReadyBuffer', 'getReadyBufMin', 'readyBefore', 'readyBeforeMin');
+  if (side === 'post') return bufferLeg(block, 'post', 'getReadyBuffer', 'getReadyBufMin', 'readyAfter',  'readyAfterMin');
+  return Math.max(getGetReadyBufMin(block, 'pre'), getGetReadyBufMin(block, 'post'));
 }
 const DEFAULT_WARMUP_MIN = 20;
 /* Warm-up is one-sided — you warm up right before competing/training, never
@@ -361,9 +392,12 @@ function computeBufferConflicts(blocks) {
     partners.get(a).add(b);
   };
   (blocks || []).forEach(b => {
-    const sideBuf = getTravelBufMin(b) + getGetReadyBufMin(b);
-    const preBuf = sideBuf + getWarmupBufMin(b); // warm-up only ever sits before
-    const postBuf = sideBuf;
+    /* Per leg. These were one `sideBuf` mirrored, which is exactly the thing
+       travelTo/travelHome exist to stop: a block with no drive home was still
+       reported as clashing with whatever followed it. */
+    const preBuf = getTravelBufMin(b, 'pre') + getGetReadyBufMin(b, 'pre')
+                 + getWarmupBufMin(b); // warm-up only ever sits before
+    const postBuf = getTravelBufMin(b, 'post') + getGetReadyBufMin(b, 'post');
     if (preBuf <= 0 && postBuf <= 0) return;
     const preStart = b.startMin - preBuf, preEnd = b.startMin;
     const postStart = b.startMin + (b.durationMin || 0), postEnd = postStart + postBuf;

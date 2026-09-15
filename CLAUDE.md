@@ -1388,6 +1388,43 @@ get-ready time Today leads with — had nothing to compute from until somebody
 remembered the toggle. The default comes from the **activity**, never globally:
 a global default would put a fifteen-minute car journey in front of Breakfast.
 
+## Travel is two legs, not one figure mirrored
+
+`travelBufMin` was a single number drawn before a block and after it, so the
+ordinary Tuesday could not be said at all: **school, then straight on to
+training, then home.** There is no drive home from school that day; the drive to
+training leaves from the school gates rather than the house; the drive home
+afterwards is longer than either. The activity you are going TO owns the travel,
+so the fact is **per leg**.
+
+`travelTo` / `travelHome` and `readyBefore` / `readyAfter`, each with its own
+minutes. **Derived, never migrated:** absent means fall back to the symmetric
+`travelBuffer` / `travelBufMin`, so every block already in Firestore behaves
+exactly as it does today with nothing written — same reasoning as `xp2` and
+`achievementActivityId`. They are block fields inside `weeks`, arbitrated
+whole-record by `mergeArrayById`, so this is **not** a `state.shared` key and
+needs no merge decision of its own.
+
+`getTravelBufMin(block, side)` and `getGetReadyBufMin(block, side)` take
+`'pre'` | `'post'`. **Omitting the side keeps the old answer** — the larger of
+the two legs — so "does this block carry travel at all" is still right and no
+existing call site could be left silently wrong by the change. Everything that
+draws or measures a SEGMENT passes a side: `wfBufferSegments`,
+`renderTravelBuffers`, `computeBufferConflicts`, `renderPrintSheet`,
+`dayDrawnSpanMin` (post legs only — those are the minutes after the block ends).
+
+The edit sheet's two rows read **Getting there / Coming home** and **Before /
+Putting things away after**, the return leg a checkbox with its own number
+beside it, greyed until it is ticked. Both legs are written out whenever the
+master toggle is on, so a block says what it means rather than leaning on the
+fallback — which cannot express "no drive home" at all. Warm-up stays one-sided
+and training-only.
+
+`aBlockCanGoStraightOnWithoutComingHome` asserts the legacy shape is untouched,
+that the Tuesday draws no post segments, and — the half that would otherwise
+prove nothing — that the *same pair with a return leg* still reports its
+20-minute clash.
+
 ## Every buffer a block carries, it can edit
 
 `#editReadyToggle` and `#editReadyBufMin` have been in `index.html` all along,

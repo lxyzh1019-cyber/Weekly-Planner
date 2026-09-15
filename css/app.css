@@ -3195,6 +3195,31 @@
     color: var(--ink-muted);
   }
   .buffer-dur-row label { margin: 0; }
+  /* TWO LEGS ON ONE ROW. The second reads as a rider on the first rather than a
+     second setting: the checkbox is the question ("coming home after?") and the
+     number beside it only matters once it is ticked, so it greys out when it is
+     not. A 44px target on the checkbox, like every other control. */
+  .buffer-leg-row .buffer-leg-off {
+    margin-left: auto;
+    display: inline-flex; align-items: center;
+    font-size: calc(0.86rem * var(--fs-scale, 1));
+  }
+  .buffer-leg-row input[type="checkbox"] {
+    width: 22px; height: 22px; min-width: 22px;
+    accent-color: var(--accent-strong);
+    position: relative; cursor: pointer;
+  }
+  /* Keep the box small and grow the hit area, the technique the target audit
+     probes for with elementFromPoint. */
+  .buffer-leg-row input[type="checkbox"]::after {
+    content: ''; position: absolute;
+    left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 44px; height: 44px;
+  }
+  .buffer-leg-row input[type="number"]:disabled {
+    opacity: 0.4;
+    border-style: dashed;
+  }
   .buffer-dur-row input {
     width: 64px;
     border: 2px solid var(--ink);
