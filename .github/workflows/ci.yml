@@ -42,6 +42,15 @@ jobs:
       - name: Merge-layer unit tests
         run: npm run test:merge
 
+      # The buffer-clip arithmetic every surface reads to decide how much of a
+      # travel/get-ready window is real time. Listed here explicitly because
+      # this workflow enumerates the npm scripts rather than running `npm test`
+      # — a suite added to package.json and not to this file is a suite CI never
+      # runs, which is the same shape as the `|| break` loop CLAUDE.md records:
+      # a check that can never fail.
+      - name: Buffer-clip unit tests
+        run: npm run test:buffers
+
   # Boots the app over file:// in headless Chromium and drives the main flows,
   # including the chore -> money hand-off that is the most valuable join in the
   # suite. Runs on pull requests too: it is the only check that would catch a
