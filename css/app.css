@@ -2972,6 +2972,19 @@
   /* Dark ink on a light neutral chip — never white on a pastel, which all fail
      contrast against the category colours this sits on top of. */
   .badge-notdone { background: #ece7e3; border-radius: 4px; padding: 0 2px; }
+  /* HOW MANY MINUTES OVER, on the block itself. The week grid hangs this figure
+     on a pill outside the card's corner because a week card can be 20px tall; a
+     day-view block has room for it inline, where the badges already sit. Dark
+     ink on a light chip, like .badge-notdone and for the same reason — white on
+     these pastels fails contrast. */
+  .badge-clash {
+    background: #fdeceb; color: #7a1f18; border: 1px solid #d6453a;
+    border-radius: 5px; padding: 0 3px; font-weight: 800; white-space: nowrap;
+  }
+  /* The overrun on the day view. .wf-overrun carries the look; this only says
+     where it sits in the stack — over the block (z10) rather than the week
+     grid's z4, and still never taking a tap. */
+  .tl-overrun { z-index: 11; }
 
   /* The ACTIVITY TRAY section lived here: the fixed bottom/side rail of
      activity chips, its filters, its header and its level/lock badges. The

@@ -339,6 +339,57 @@ function bufferDrawSegments(segs, startMin, endMin, preBuf, postBuf, others) {
   return { segs: out, preShort: clip.preShort, postShort: clip.postShort };
 }
 
+/* ── How far a block is run INTO, and by what ──
+   A clash has two sides: the block whose travel does not fit, and the block
+   that travel runs into. `computeBufferConflicts` records the shortfall against
+   the FIRST — it is that block's window that is short — so a card asking "how
+   far am I run into" has to read its PARTNERS' figures, not its own.
+
+   These lived in js/07-week-view.js, where the week grid was the only surface
+   that could say how many minutes a clash was or which activity it ran into.
+   The day view drew the same finding as a red outline and a ⚠️ whose tooltip
+   named nothing and counted nothing — the same defect in the other direction
+   from the six copies this file's rules keep recording: not two answers that
+   disagree, but one answer that only one screen was allowed to give. Here so
+   both ask it, and the week banner and Today's note stay in step with both. */
+function clashWorstShort(conflicts, id, blocks) {
+  if (!conflicts || !conflicts.shortMin) return 0;
+  const me = (blocks || []).find(x => x.id === id);
+  if (!me) return 0;
+  const myStart = me.startMin;
+  const partners = (conflicts.partners && conflicts.partners.get(id)) || new Set();
+  let worst = 0;
+  partners.forEach(pid => {
+    const sh = conflicts.shortMin.get(pid);
+    const other = (blocks || []).find(x => x.id === pid);
+    if (!sh || !other) return;
+    /* Which side of the partner am I on? A block that sits AFTER it is run into
+       by its post buffer; one before it, by its pre buffer. */
+    const side = myStart >= other.startMin ? sh.post : sh.pre;
+    if (side > worst) worst = side;
+  });
+  return worst;
+}
+
+/* The sentence a clash says, wherever it is said. Names the activity this one
+   runs into and by how much, so "overlaps another activity" — which named
+   nothing and quantified nothing — is gone from every surface at once. */
+function clashTitle(conflicts, id, blocks, acts) {
+  const partners = (conflicts.partners && conflicts.partners.get(id)) || new Set();
+  const list = [...partners].map(pid => {
+    const other = (blocks || []).find(x => x.id === pid);
+    if (!other) return null;
+    const act = (acts || []).find(a => a.id === other.actId);
+    const topic = act && act.isTraining ? getTrainingTopic(other.tag) : null;
+    return act ? (topic ? topic.name : act.name) : 'another activity';
+  }).filter(Boolean);
+  const names = [...new Set(list)];
+  const short = Math.max(clashWorstShort(conflicts, id, blocks),
+    (() => { const s = conflicts.shortMin && conflicts.shortMin.get(id); return s ? Math.max(s.pre, s.post) : 0; })());
+  return (names.length ? 'Overlaps ' + names.join(' and ') : 'Time clash')
+    + (short ? ` · ${short}m short` : '') + ' — not enough travel/get-ready time';
+}
+
 /* ── One owner for the :00 / :30 rules ──
    Three surfaces draw a day against a clock — the day view, the week's Day
    Blocks lanes and the Full week — at three different scales, and they each

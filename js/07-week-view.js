@@ -1350,9 +1350,9 @@ function renderFullWeek(keys) {
          right-hand lane hangs it at its top-RIGHT, or two lanes' pills collide.
          The partner block — the one whose travel is too long — keeps a plain
          "!": it is not the card being run into. */
-      const myShort = wfWorstShort(bufferConflicts, b.id, blocks);
+      const myShort = clashWorstShort(bufferConflicts, b.id, blocks);
       const conflictFlag = hasConflict
-        ? `<div class="wf-card-conflict-flag${myShort ? ' wf-card-conflict-flag--min' : ''}${slot.col > 0 ? ' wf-card-conflict-flag--right' : ''}" title="${escapeAttr(wfClashTitle(bufferConflicts, b.id, blocks, acts))}">${myShort ? '! ' + myShort + 'm over' : '!'}</div>`
+        ? `<div class="wf-card-conflict-flag${myShort ? ' wf-card-conflict-flag--min' : ''}${slot.col > 0 ? ' wf-card-conflict-flag--right' : ''}" title="${escapeAttr(clashTitle(bufferConflicts, b.id, blocks, acts))}">${myShort ? '! ' + myShort + 'm over' : '!'}</div>`
         : '';
       // List as much of "what this block is about" (gear/objectives/note) as
       // the card's own height can hold — gear first since packing is
@@ -1379,7 +1379,7 @@ function renderFullWeek(keys) {
       card.title = `${dispIcon} ${dispName} — ${timeStr}, ${formatDuration(b.durationMin)}`
         + (bufKinds.length ? ` · ${bufKinds.join(', ')} each way` : '')
         + (notDone ? ' · 🚫 recorded as not done' : '')
-        + (hasConflict ? ' · ⚠️ ' + wfClashTitle(bufferConflicts, b.id, blocks, acts) : '');
+        + (hasConflict ? ' · ⚠️ ' + clashTitle(bufferConflicts, b.id, blocks, acts) : '');
       attachTapGuard(card, ()=> openDayFromWeekCard(key, ci, b.id));
       cell.appendChild(card);
       /* The minutes that did not fit, drawn OVER the card they run into at a
@@ -1407,53 +1407,6 @@ function renderFullWeek(keys) {
 
     grid.appendChild(cell);
   });
-}
-
-/* ── How far a block is run INTO, and by what ──
-   Two questions one screen kept answering inconsistently. A clash has two
-   sides: the block whose travel does not fit, and the block that travel runs
-   into. computeBufferConflicts records the shortfall against the FIRST — it is
-   that block's window that is short — so a card asking "how far am I run into"
-   has to look at its partners' shortfalls, not its own.
-
-   Both live here so the card flag, the card tooltip and the week banner cannot
-   drift apart, which is the defect this file already records six times over. */
-function wfWorstShort(conflicts, id, blocks) {
-  if (!conflicts || !conflicts.shortMin) return 0;
-  const me = (blocks || []).find(x => x.id === id);
-  if (!me) return 0;
-  const myStart = me.startMin;
-  const partners = (conflicts.partners && conflicts.partners.get(id)) || new Set();
-  let worst = 0;
-  partners.forEach(pid => {
-    const sh = conflicts.shortMin.get(pid);
-    const other = (blocks || []).find(x => x.id === pid);
-    if (!sh || !other) return;
-    /* Which side of the partner am I on? A block that sits AFTER it is run into
-       by its post buffer; one before it, by its pre buffer. */
-    const side = myStart >= other.startMin ? sh.post : sh.pre;
-    if (side > worst) worst = side;
-  });
-  return worst;
-}
-
-/* The sentence a clash says, wherever it is said. Names the activity this one
-   runs into and by how much, so "overlaps another activity" — which named
-   nothing and quantified nothing — is gone from every surface at once. */
-function wfClashTitle(conflicts, id, blocks, acts) {
-  const partners = (conflicts.partners && conflicts.partners.get(id)) || new Set();
-  const list = [...partners].map(pid => {
-    const other = (blocks || []).find(x => x.id === pid);
-    if (!other) return null;
-    const act = (acts || []).find(a => a.id === other.actId);
-    const topic = act && act.isTraining ? getTrainingTopic(other.tag) : null;
-    return act ? (topic ? topic.name : act.name) : 'another activity';
-  }).filter(Boolean);
-  const names = [...new Set(list)];
-  const short = Math.max(wfWorstShort(conflicts, id, blocks),
-    (() => { const s = conflicts.shortMin && conflicts.shortMin.get(id); return s ? Math.max(s.pre, s.post) : 0; })());
-  return (names.length ? 'Overlaps ' + names.join(' and ') : 'Time clash')
-    + (short ? ` · ${short}m short` : '') + ' — not enough travel/get-ready time';
 }
 
 /* Scan the whole week for buffer/time clashes and surface a plain-language

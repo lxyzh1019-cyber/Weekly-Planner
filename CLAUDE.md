@@ -431,10 +431,26 @@ and it showed it by making both unreadable. The number itself rides on the
 `! 20m over`, hung above its top-left corner and mostly outside the card, which
 is the one place that never covers a centred name at any card height; a card in
 a right-hand lane hangs it top-RIGHT or two lanes' pills collide. The partner
-card keeps the plain `!`. `wfWorstShort` and `wfClashTitle` are the one pair
-that answers "how far am I run into, and by what", because the shortfall is
-recorded against the block whose window is short — so a card must read its
-PARTNERS' figures, not its own. `tdClashText` is the same sentence on Today.
+card keeps the plain `!`. `clashWorstShort` and `clashTitle`
+(**`js/05-helpers.js`**) are the one pair that answers "how far am I run into,
+and by what", because the shortfall is recorded against the block whose window
+is short — so a card must read its PARTNERS' figures, not its own.
+`tdClashText` is the same sentence on Today.
+
+**Both schedule surfaces say it, and say the same thing.** That pair lived in
+`js/07-week-view.js`, so the week grid was the only screen that could name the
+activity a block runs into or count the minutes: the day view drew a red outline
+and a `⚠️` whose tooltip read *overlaps another activity*, naming nothing and
+counting nothing. Backwards, because the week grid is where a clash is SEEN and
+the day view is where it is dragged away. The day view carries the same
+`! 20m over` figure — inline on the block, where it has the room a 20px week
+card does not — the same named sentence, and the same quarter-strength
+`.wf-overrun` drawn to its own scale. `renderBlocksWithCollision` and
+`renderBlockPixel` take the whole finding now rather than the `affected` Set
+alone, which is what made the surface unable to explain its own warning.
+`theDayViewSaysTheSameThingAboutAClash` seeds one fixture and asserts both
+screens report the same number and the same partner — the failure worth guarding
+is disagreement, not absence.
 
 The week banner lists **one line per clashing pair**, deduped on the sorted id
 pair. It used to join every affected name on a day into one chain — "School Day

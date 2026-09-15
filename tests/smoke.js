@@ -1518,6 +1518,88 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* THE DAY VIEW SAYS THE SAME THING ABOUT A CLASH.
+
+     The quantified half of the clash story was week-grid-only. The day view drew
+     a red outline and a ⚠️ whose tooltip read "overlaps another activity" —
+     naming nothing, counting nothing — which is backwards: the week grid is
+     where you SEE a clash, the day view is where you drag it away, and only the
+     first would tell you how big it was. A tooltip is also no use on an iPad.
+
+     The failure to guard against is not "the badge is missing" but "the two
+     surfaces disagree", so this seeds one fixture and asserts the SAME number
+     and the SAME partner name on both. */
+  checks.theDayViewSaysTheSameThingAboutAClash = await page.evaluate(() => {
+    const kid = activeProfile();
+    const key = getDayKeys(0)[4];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    const minutesIn = s => {
+      const m = (s || '').match(/(\d+)\s*m\s*(over|short)/);
+      return m ? Number(m[1]) : null;
+    };
+    try {
+      /* School Day home at 2:50pm with fifteen minutes of driving and fifteen of
+         putting things away — thirty minutes of buffer into a 3:00pm Homework
+         block, so twenty of them do not fit. */
+      setDayBlocks(key, [
+        { id: 'cl-school', actId: 'school_day', startMin: 8 * 60 + 10, durationMin: 400,
+          travelBuffer: true, travelBufMin: 15, getReadyBuffer: true, getReadyBufMin: 15 },
+        { id: 'cl-home', actId: 'homework', startMin: 15 * 60, durationMin: 150 },
+      ], kid);
+
+      // What the shared owner says, which is what both screens must show.
+      const blocks = getDayBlocks(key, kid);
+      const conflicts = computeBufferConflicts(blocks);
+      const want = clashWorstShort(conflicts, 'cl-home', blocks);
+      if (want !== 20) bad.push(`the fixture is ${want}m over, expected 20`);
+
+      // ── The week grid.
+      goWeek(); setWeekView('full'); weekOffset = 0; renderWeek();
+      const wkCard = [...document.querySelectorAll('#screen-week .wf-card')]
+        .find(c => (c.outerHTML || '').includes('cl-home'));
+      const wkFlag = wkCard && wkCard.querySelector('.wf-card-conflict-flag');
+      const wkMin = wkFlag && minutesIn(wkFlag.textContent);
+      if (wkMin !== want) bad.push(`the week grid says ${wkMin}, the owner says ${want}`);
+
+      // ── The day view, on the same fixture.
+      currentDayKey = key;
+      openDay(key);
+      const dvBlock = document.getElementById('block-cl-home');
+      if (!dvBlock) return bad.concat(['Homework did not draw on the day view']);
+      if (!dvBlock.classList.contains('placed-block--conflict')) {
+        bad.push('the day view does not mark Homework as clashing');
+      }
+      const dvBadge = dvBlock.querySelector('.badge-clash');
+      const dvMin = dvBadge && minutesIn(dvBadge.textContent);
+      if (dvMin !== want) {
+        bad.push(`the day view says ${dvMin === null ? 'nothing' : dvMin}, the owner says ${want}`);
+      }
+      // It names what it runs into, rather than "another activity".
+      const dvTitle = (dvBadge && dvBadge.getAttribute('title')) || '';
+      if (!/School Day/.test(dvTitle)) {
+        bad.push(`the day view does not name the partner: "${dvTitle}"`);
+      }
+      if (/another activity/.test(dvTitle)) {
+        bad.push('the day view still says "another activity"');
+      }
+      // And the shortfall is drawn to scale, without swallowing taps.
+      const ov = dvBlock.parentElement.querySelector('.tl-overrun');
+      if (!ov) bad.push('the day view draws no overrun');
+      else {
+        if (getComputedStyle(ov).pointerEvents !== 'none') {
+          bad.push('the day-view overrun swallows taps meant for the block');
+        }
+        const drawn = ov.getBoundingClientRect().height;
+        const expect = want * PX_PER_MIN;
+        if (Math.abs(drawn - expect) > 2) {
+          bad.push(`the overrun is ${Math.round(drawn)}px for ${want}m, expected ${Math.round(expect)}px`);
+        }
+      }
+    } finally { setDayBlocks(key, had, kid); }
+    return bad.length === 0 || bad;
+  });
+
   /* THE DAY VIEW CLIPS ITS BUFFERS THE SAME WAY.
 
      Strips there sit UNDER the blocks, so nothing was overprinted — but a strip

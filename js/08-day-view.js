@@ -418,7 +418,19 @@ function buildDayColumn(dayKey, canvasHeight, withHeader) {
   // A block's travel/get-ready buffer can overlap an adjacent activity — flag
   // both the buffer strip and the activity it collides with.
   const bufferConflicts = computeBufferConflicts(blocks);
-  const colAssignments = renderBlocksWithCollision(canvas, visibleBlocks, zMinStart, bufferConflicts.affected, dayKey);
+  /* THE SAME FINDING, SAID THE SAME WAY. The week grid could name which
+     activity a block runs into and by how many minutes; here the identical
+     clash drew a red outline and a ⚠️ whose tooltip said "overlaps another
+     activity" — naming nothing, counting nothing. Both surfaces ask
+     clashWorstShort / clashTitle (js/05-helpers.js) now, so a parent cannot be
+     told two different things about one clash. */
+  const clash = {
+    affected: bufferConflicts.affected,
+    conflicts: bufferConflicts,
+    blocks,
+    acts: getAllActivities(isParent() ? parentViewing : activeProfile(), { includeArchived: true }),
+  };
+  const colAssignments = renderBlocksWithCollision(canvas, visibleBlocks, zMinStart, clash, dayKey);
 
   if (!blocks.length) {
     const emptyState = document.createElement('div');
@@ -680,13 +692,16 @@ function paintZoneBands(canvas, dayKey, zMinStart, zMinEnd) {
 }
 
 /* Greedy column-packing collision: blocks that overlap get assigned to columns.
-   conflictAffectedIds (optional Set) flags blocks whose buffer overlaps a
-   neighbour, or that a neighbour's buffer overlaps — surfaced as a badge.
+   `clash` (optional) carries the day's whole clash finding — the affected Set,
+   the computeBufferConflicts result, the day's blocks and its activities — so a
+   block can say WHICH activity it runs into and BY HOW MUCH, not merely that
+   something is wrong. It used to be the Set alone, which is the whole reason
+   this surface could only draw a warning it could not explain.
    Returns a Map of id -> {col, count} so the buffer pass below can reuse the
    same column/width as the activity a buffer belongs to, instead of each
    buffer strip claiming the full lane width and sprawling under a
    side-by-side neighbour. */
-function renderBlocksWithCollision(canvas, blocks, zMinStart, conflictAffectedIds, dayKey) {
+function renderBlocksWithCollision(canvas, blocks, zMinStart, clash, dayKey) {
   const assignments = new Map();
   if (!blocks.length) return assignments;
 
@@ -737,13 +752,13 @@ function renderBlocksWithCollision(canvas, blocks, zMinStart, conflictAffectedId
     g.blocks.forEach(b=>{
       const colIdx = assignments.get(b.id).col;
       assignments.get(b.id).count = colCount;
-      renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffectedIds, dayKey);
+      renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey);
     });
   });
   return assignments;
 }
 
-function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffectedIds, dayKey) {
+function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey) {
   // The day this block belongs to, not "whichever day the topbar names" — in a
   // 2- or 3-day view those are different, and a tick that wrote to the wrong one
   // would be a tick that silently completed another day's block.
@@ -814,7 +829,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   const topic = (act.isTraining) ? getTrainingTopic(b.tag) : null;
   const blockBg = blockColour(b);
   const dispIcon = topic ? topic.icon : act.icon;
-  const hasConflict = !isBuffer && !!(conflictAffectedIds && conflictAffectedIds.has(b.id));
+  const hasConflict = !isBuffer && !!(clash && clash.affected && clash.affected.has(b.id));
   blockEl.className = 'placed-block'
     +(isBuffer ? ` travel-buf travel-buf--centered${b._bufferCls ? ' '+b._bufferCls : ''}${b._bufferConflict ? ' travel-buf--conflict' : ''}${b._bufferMute ? ' travel-buf--mute' : ''}` : '')
     +(b.parentPinned?' parent-pinned':'')
@@ -837,8 +852,23 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   // a clash first, then what it is, then decoration. Only the first two show —
   // eight emoji in a row is texture, not information — and the rest fold into
   // a single "+N" chip (foldBadges).
+  /* HOW SHORT, AND BY WHAT — the same two answers the week grid gives, from the
+     same pair of functions. The old badge was a bare ⚠️ whose tooltip said
+     "overlaps another activity": it named nothing and counted nothing, so the
+     one surface a parent opens to FIX a clash was the one that would not say
+     how big it was. A tooltip is also no use on an iPad, which is why the
+     figure rides on the badge itself. */
+  const myShort = hasConflict
+    ? clashWorstShort(clash.conflicts, b.id, clash.blocks) : 0;
+  const clashWords = hasConflict
+    ? clashTitle(clash.conflicts, b.id, clash.blocks, clash.acts)
+    : '';
   const badgeList = [];
-  if (hasConflict) badgeList.push('<span class="badge" title="Not enough travel/get-ready time — overlaps another activity">⚠️</span>');
+  if (hasConflict) {
+    badgeList.push(myShort
+      ? `<span class="badge badge-clash" title="${escapeAttr(clashWords)}">! ${myShort}m over</span>`
+      : `<span class="badge" title="${escapeAttr(clashWords)}">⚠️</span>`);
+  }
   /* SECOND, deliberately. foldBadges keeps only the first two or three and
      rolls the rest into a "+N" chip, so this is the only position that still
      shows on a compact block that also has a clash — and "a grown-up recorded
@@ -959,6 +989,23 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
      can never also open the edit sheet. See js/39-block-drag.js. */
   if (!isBuffer) attachBlockDrag(blockEl, b, ownDayKey);
   canvas.appendChild(blockEl);
+
+  /* THE MINUTES THAT DID NOT FIT, DRAWN. The week grid lays the shortfall over
+     the card it runs into at a quarter strength, exactly as tall as the
+     overrun; the day view — the surface a parent opens in order to FIX the
+     clash — drew nothing of the kind, so the one screen where the overlap can
+     be dragged away was the one that would not show its size. Same class, same
+     quarter strength, same dashed foot, same refusal of pointer events, sized
+     by this surface's own scale. */
+  if (!isBuffer && myShort) {
+    const ov = document.createElement('div');
+    ov.className = 'wf-overrun tl-overrun';
+    ov.style.top = top + 'px';
+    ov.style.height = Math.min(myShort * PX_PER_MIN, height) + 'px';
+    ov.style.left = `calc(${leftPct}% + 2px)`;
+    ov.style.width = `calc(${widthPct}% - 4px)`;
+    canvas.appendChild(ov);
+  }
 
   // Decorative doodle (seasonal, stable per block per month)
   if (!isBuffer) renderDoodle(canvas, b.id, top, height, leftPct, widthPct);
