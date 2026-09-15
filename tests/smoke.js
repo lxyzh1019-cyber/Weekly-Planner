@@ -817,6 +817,224 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+
+  /* A BUFFER STRIP NEVER COVERS A CARD, AND NEVER SAYS MORE THAN IT CAN SHOW.
+
+     Two separate defects, one fixture — the Wednesday from the screenshot that
+     prompted this work.
+
+     (1) A travel/get-ready strip was drawn at its full length whatever was in
+     the way, so School Day's thirty minutes of driving home painted straight
+     over the top of Homework: the strip could not be read, and neither could
+     the card's name or its tick. bufferClip (js/05-helpers.js) now trims a
+     strip to the minutes that actually exist, and the minutes that did not fit
+     are drawn OVER the card at a quarter strength (.wf-overrun) so how bad the
+     clash is still reads at a glance.
+
+     (2) At 0.72px per minute a fifteen-minute strip is 10.8px tall, and the kid
+     readability floor sets its text to 13.1px — so two stacked strips each
+     printed a label through the other. A strip speaks only when a line fits
+     (WF_TRAVEL_TEXT_MIN_PX, a measurement), and a run of short same-side
+     segments merges into one band that can.
+
+     Geometry, not classes: it measures real rectangles, because a z-index or a
+     clip that silently stopped applying is exactly the failure that still looks
+     plausible in the DOM. */
+  checks.aBufferStripNeverCoversACard = await page.evaluate(() => {
+    goWeek(); setWeekView('full');
+    const kid = activeProfile();
+    const key = getDayKeys(0)[2];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    const overlaps = (a, b) => a.left < b.right - 0.5 && a.right > b.left + 0.5
+                            && a.top  < b.bottom - 0.5 && a.bottom > b.top + 0.5;
+    try {
+      setDayBlocks(key, [
+        { id: 'bs-school', actId: 'school_day', startMin: 8 * 60 + 10, durationMin: 400,
+          travelBuffer: true, travelBufMin: 15, getReadyBuffer: true, getReadyBufMin: 15 },
+        { id: 'bs-home',   actId: 'homework',   startMin: 15 * 60, durationMin: 150 },
+        { id: 'bs-ballet', actId: 'ballet',     startMin: 20 * 60, durationMin: 45,
+          travelBuffer: true, travelBufMin: 25, getReadyBuffer: true, getReadyBufMin: 15 },
+        { id: 'bs-eve',    actId: 'routine_evening', startMin: 21 * 60, durationMin: 30 },
+      ], kid);
+      weekOffset = 0; renderWeek();
+
+      const cell = document.querySelectorAll('#weeklyFullGrid .wf-daycell')[2]
+                || document.querySelectorAll('#weeklyFullGrid > *')[2];
+      const strips = [...document.querySelectorAll('#screen-week .wf-travel')];
+      const cards  = [...document.querySelectorAll('#screen-week .wf-card')];
+      if (!strips.length) return ['no buffer strips drew at all'];
+      if (cards.length < 4) return [`seeded 4 blocks, the week drew ${cards.length} cards`];
+
+      // (1) No strip may cover any card.
+      strips.forEach(s => {
+        const sr = s.getBoundingClientRect();
+        if (sr.height < 1) return;
+        cards.forEach(c => {
+          if (overlaps(sr, c.getBoundingClientRect())) {
+            const nm = (c.querySelector('.wf-card-name') || {}).textContent || '(card)';
+            bad.push(`a ${Math.round(sr.height)}px strip is drawn over "${nm.trim()}"`);
+          }
+        });
+      });
+
+      // (2) Anything that speaks must fit, down AND across.
+      strips.forEach(s => {
+        const txt = (s.textContent || '').trim();
+        if (!txt) return;
+        if (s.scrollHeight > s.clientHeight + 1) {
+          bad.push(`strip "${txt}" needs ${s.scrollHeight}px of height in ${s.clientHeight}px`);
+        }
+        if (s.scrollWidth > s.clientWidth + 1) {
+          bad.push(`strip "${txt}" needs ${s.scrollWidth}px of width in ${s.clientWidth}px`);
+        }
+      });
+
+      // (3) The shortfall is stated in words, on the flag and in the banner.
+      const blocks = getDayBlocks(key, kid);
+      const conflicts = computeBufferConflicts(blocks);
+      const schoolShort = conflicts.shortMin && conflicts.shortMin.get('bs-school');
+      if (!schoolShort || schoolShort.post !== 20) {
+        bad.push(`School Day should be 20m short after; got ${schoolShort ? schoolShort.post : 'nothing'}`);
+      }
+      const balletShort = conflicts.shortMin && conflicts.shortMin.get('bs-ballet');
+      if (!balletShort || balletShort.post !== 25) {
+        bad.push(`Ballet should be 25m short after; got ${balletShort ? balletShort.post : 'nothing'}`);
+      }
+      const banner = document.getElementById('weekConflictBanner');
+      const bText = (banner && banner.textContent) || '';
+      if (!/20m short/.test(bText)) bad.push('the banner never says how short School Day is');
+      if (!/Homework/.test(bText))  bad.push('the banner does not name what School Day runs into');
+      /* One line per clashing PAIR, not one chain per day: the old banner read
+         "School Day ⇆ Homework ⇆ Ballet ⇆ Evening Routine", which names four
+         things while saying neither which two clash nor by how much. Split on
+         the real line breaks, because textContent runs them together. */
+      const lines = ((banner && banner.innerHTML) || '').split(/<br\s*\/?>/i).slice(1);
+      if (lines.length !== 2) bad.push(`the banner drew ${lines.length} clash lines, not 2`);
+      lines.forEach(l => {
+        const n = (l.match(/⇆/g) || []).length;
+        if (n !== 1) bad.push(`a banner line names ${n + 1} activities: "${l.replace(/<[^>]*>/g, '').trim()}"`);
+        if (!/\dm short/.test(l)) bad.push(`a banner line says no shortfall: "${l.replace(/<[^>]*>/g, '').trim()}"`);
+      });
+
+      // (4) The overrun is drawn on the card that is run into, to scale, and the
+      // card underneath still reads through it.
+      const ov = [...document.querySelectorAll('#screen-week .wf-overrun')];
+      if (!ov.length) bad.push('no overrun is drawn for either clash');
+      ov.forEach(o => {
+        if (getComputedStyle(o).pointerEvents !== 'none') {
+          bad.push('the overrun swallows taps meant for the card');
+        }
+      });
+      const homeCard = cards.find(c => (c.outerHTML || '').includes('bs-home'));
+      if (homeCard) {
+        const flag = homeCard.querySelector('.wf-card-conflict-flag');
+        if (!flag) bad.push('Homework carries no clash flag');
+        else if (!/20m over/.test(flag.textContent || '')) {
+          bad.push(`Homework's flag reads "${(flag.textContent || '').trim()}" rather than the minutes`);
+        }
+        const nm = homeCard.querySelector('.wf-card-name');
+        if (nm) {
+          const r = nm.getBoundingClientRect();
+          const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          if (at && at.classList.contains('wf-overrun')) {
+            bad.push('the overrun sits on top of the name it is supposed to leave readable');
+          }
+        }
+      }
+    } finally { setDayBlocks(key, had, kid); renderWeek(); }
+    return bad.length === 0 || bad;
+  });
+
+  /* A FLOORED CARD NEVER SITS ON THE ONE BELOW IT.
+
+     The lane pass compared startMin and durationMin, which is the wrong question
+     on a surface with a minimum card height: at 0.72px per minute the 20px floor
+     is 28 minutes, so a ten-minute After-School Routine at 8:50pm is DRAWN
+     through a 9:00pm Evening Routine while the arithmetic says they are clear.
+     Nothing split them and nothing could. Lanes are decided on drawn pixels now.
+
+     This is the Tuesday evening from the original screenshot. */
+  checks.aFlooredCardNeverSitsOnTheOneBelowIt = await page.evaluate(() => {
+    goWeek(); setWeekView('full');
+    const kid = activeProfile();
+    const key = getDayKeys(0)[1];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    try {
+      setDayBlocks(key, [
+        { id: 'fl-after', actId: 'routine_afterschool', startMin: 20 * 60 + 50, durationMin: 10 },
+        { id: 'fl-eve',   actId: 'routine_evening',     startMin: 21 * 60,      durationMin: 30 },
+      ], kid);
+      weekOffset = 0; renderWeek();
+
+      const a = [...document.querySelectorAll('#screen-week .wf-card')]
+        .find(c => (c.outerHTML || '').includes('fl-after'));
+      const b = [...document.querySelectorAll('#screen-week .wf-card')]
+        .find(c => (c.outerHTML || '').includes('fl-eve'));
+      if (!a || !b) return ['the two routines did not both draw'];
+      const ar = a.getBoundingClientRect(), br = b.getBoundingClientRect();
+      const hit = ar.left < br.right - 0.5 && ar.right > br.left + 0.5
+               && ar.top  < br.bottom - 0.5 && ar.bottom > br.top + 0.5;
+      if (hit) bad.push('the two cards are still drawn on top of each other');
+      // Side by side means each gets about half the column, not the whole of it.
+      if (ar.width > br.width * 1.6 || br.width > ar.width * 1.6) {
+        bad.push(`the lanes are uneven: ${Math.round(ar.width)}px against ${Math.round(br.width)}px`);
+      }
+      // And both still say what they are.
+      [[a, 'After-School'], [b, 'Evening']].forEach(([card, want]) => {
+        const nm = card.querySelector('.wf-card-name');
+        if (!nm || !nm.textContent.trim()) bad.push(`the ${want} card draws no name`);
+      });
+    } finally { setDayBlocks(key, had, kid); renderWeek(); }
+    return bad.length === 0 || bad;
+  });
+
+  /* THE DAY VIEW CLIPS ITS BUFFERS THE SAME WAY.
+
+     Strips there sit UNDER the blocks, so nothing was overprinted — but a strip
+     drawn at full length still claimed minutes the next activity was using, and
+     its centred label landed beneath a card where nobody could read it. Same
+     owner, same answer: three surfaces, one rule. */
+  checks.theDayViewClipsItsBuffersTheSameWay = await page.evaluate(() => {
+    const kid = activeProfile();
+    const key = getDayKeys(0)[2];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    try {
+      setDayBlocks(key, [
+        { id: 'dv-school', actId: 'school_day', startMin: 8 * 60 + 10, durationMin: 400,
+          travelBuffer: true, travelBufMin: 15, getReadyBuffer: true, getReadyBufMin: 15 },
+        { id: 'dv-home',   actId: 'homework',   startMin: 15 * 60, durationMin: 150 },
+      ], kid);
+      currentDayKey = key;
+      openDay(key);
+
+      const strips = [...document.querySelectorAll('#timeline .placed-block.travel-buf')];
+      const blocks = [...document.querySelectorAll('#timeline .placed-block')]
+        .filter(el => !el.classList.contains('travel-buf'));
+      if (!strips.length) return ['the day view drew no buffer strips'];
+
+      strips.forEach(s => {
+        const sr = s.getBoundingClientRect();
+        if (sr.height < 1) return;
+        blocks.forEach(b => {
+          const br = b.getBoundingClientRect();
+          const hit = sr.left < br.right - 0.5 && sr.right > br.left + 0.5
+                   && sr.top  < br.bottom - 0.5 && sr.bottom > br.top + 0.5;
+          if (hit) bad.push(`a ${Math.round(sr.height)}px strip runs under ${b.id}`);
+        });
+        // A strip too short for a line says nothing rather than printing over itself.
+        const meta = s.querySelector('.block-meta');
+        const txt = (meta && meta.textContent.trim()) || '';
+        if (txt && sr.height < 17) {
+          bad.push(`a ${Math.round(sr.height)}px strip still prints "${txt}"`);
+        }
+      });
+    } finally { setDayBlocks(key, had, kid); }
+    return bad.length === 0 || bad;
+  });
+
   /* A STACKED CARD FITS WHAT IT DRAWS.
 
      The week card's tall layout budgeted 58px for its four fixed rows and 20px

@@ -436,7 +436,7 @@ function buildDayColumn(dayKey, canvasHeight, withHeader) {
   blocks.forEach(b => {
     if (!b.travelBuffer && !b.getReadyBuffer && !b.warmupBuffer) return;
     const slot = colAssignments.get(b.id) || { col: 0, count: 1 };
-    renderTravelBuffers(canvas, b, zMinStart, zMinEnd, bufferConflicts.perBlock.get(b.id), slot.col, slot.count || 1);
+    renderTravelBuffers(canvas, b, zMinStart, zMinEnd, bufferConflicts.perBlock.get(b.id), slot.col, slot.count || 1, dayKey);
   });
 
   // Pending invitations from sister — render as dashed-border blocks
@@ -693,32 +693,42 @@ function renderBlocksWithCollision(canvas, blocks, zMinStart, conflictAffectedId
   // Build overlap groups
   const sorted = blocks.slice().sort((a,b)=> (a.startMin - b.startMin) || (a.durationMin - b.durationMin));
 
+  /* IN PIXELS, not minutes — the same correction the Full week needed. A block
+     is floored at 22px, which at 1.4px/min is 16 minutes, so a ten-minute
+     routine is drawn through whatever starts within a quarter-hour of it while
+     these start times say they are clear. The 4px here is the horizontal gap
+     the left/width calc below leaves; epsPx keeps a one-pixel graze between two
+     long blocks from halving both for nothing. */
+  const drawnTop = b => (b.startMin - START_MIN) * PX_PER_MIN;
+  const drawnBot = b => drawnTop(b) + Math.max(22, (b.durationMin || 0) * PX_PER_MIN);
+  const EPS_PX = 4;
+
   // Group consecutively-overlapping blocks
   const groups = [];
   sorted.forEach(b=>{
-    const bStart = b.startMin;
-    const bEnd   = b.startMin + b.durationMin;
-    const g = groups.find(g=> g.end > bStart);
+    const bTop = drawnTop(b);
+    const bBot = drawnBot(b);
+    const g = groups.find(g=> g.end - bTop > EPS_PX);
     if (g) {
       g.blocks.push(b);
-      g.end = Math.max(g.end, bEnd);
+      g.end = Math.max(g.end, bBot);
     } else {
-      groups.push({ blocks:[b], end: bEnd });
+      groups.push({ blocks:[b], end: bBot });
     }
   });
 
   groups.forEach(g=>{
     // Within a group, assign each block to the lowest-indexed column that's free
-    const cols = []; // each col = {endMin}
+    const cols = []; // each col = {endPx}
     g.blocks.forEach(b=>{
-      const bStart = b.startMin;
-      const bEnd = b.startMin + b.durationMin;
-      let colIdx = cols.findIndex(c => c.endMin <= bStart);
+      const bTop = drawnTop(b);
+      const bBot = drawnBot(b);
+      let colIdx = cols.findIndex(c => c.endPx - bTop <= EPS_PX);
       if (colIdx === -1) {
         colIdx = cols.length;
-        cols.push({ endMin: bEnd });
+        cols.push({ endPx: bBot });
       } else {
-        cols[colIdx].endMin = bEnd;
+        cols[colIdx].endPx = bBot;
       }
       assignments.set(b.id, { col: colIdx });
     });
@@ -806,7 +816,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   const dispIcon = topic ? topic.icon : act.icon;
   const hasConflict = !isBuffer && !!(conflictAffectedIds && conflictAffectedIds.has(b.id));
   blockEl.className = 'placed-block'
-    +(isBuffer ? ` travel-buf travel-buf--centered${b._bufferCls ? ' '+b._bufferCls : ''}${b._bufferConflict ? ' travel-buf--conflict' : ''}` : '')
+    +(isBuffer ? ` travel-buf travel-buf--centered${b._bufferCls ? ' '+b._bufferCls : ''}${b._bufferConflict ? ' travel-buf--conflict' : ''}${b._bufferMute ? ' travel-buf--mute' : ''}` : '')
     +(b.parentPinned?' parent-pinned':'')
     +(isBlockCompleted(b, blockKid)?' placed-block--completed':'')
     +(isBlockNotDone(b)?' placed-block--notdone':'')
@@ -954,7 +964,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   if (!isBuffer) renderDoodle(canvas, b.id, top, height, leftPct, widthPct);
 }
 
-function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0, colCount = 1) {
+function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0, colCount = 1, dayKeyForBuffers = null) {
   const travelBuf = getTravelBufMin(b);
   const readyBuf = getGetReadyBufMin(b);
   const warmupBuf = getWarmupBufMin(b);
@@ -984,6 +994,17 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0
     );
   }
   const sourceAct = findActivity(b.actId);
+  /* A STRIP STOPS WHERE THE NEXT CARD STARTS — the same rule as the Full week,
+     through the same owner (bufferClip, js/05-helpers.js). Strips here sit UNDER
+     the blocks (z5 vs z10) so nothing was overprinted, but a clipped strip's
+     centred label still landed beneath a card where nobody could read it, and
+     the red said "these minutes are yours" about minutes that are not. */
+  const dayBlocks = (getDayBlocks(dayKeyForBuffers || currentDayKey) || [])
+    .filter(o => o && o.id !== b.id);
+  const clip = bufferClip(b.startMin, endMin,
+    (b.warmupBuffer ? warmupBuf : 0) + (b.travelBuffer ? travelBuf : 0) + (b.getReadyBuffer ? readyBuf : 0),
+    (b.travelBuffer ? travelBuf : 0) + (b.getReadyBuffer ? readyBuf : 0),
+    dayBlocks);
   const overlayBlocks = entries.map(({ startMin, label, bufDur, cls, side }) => {
     const segConflict = !!conflict && (side === 'pre' ? conflict.pre : conflict.post);
     return {
@@ -1002,6 +1023,20 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0
       _bufferConflict: segConflict,
       _bufferSide: side,
     };
+  }).map(buf => {
+    // Trim to the minutes that actually exist, then drop anything left empty.
+    const from = buf._bufferSide === 'pre' ? Math.max(buf.startMin, clip.preFrom) : buf.startMin;
+    const to   = buf._bufferSide === 'pre'
+      ? buf.startMin + buf.durationMin
+      : Math.min(buf.startMin + buf.durationMin, clip.postTo);
+    return Object.assign({}, buf, { startMin: from, durationMin: to - from });
+  }).filter(buf => buf.durationMin > 0).map(buf => {
+    /* Text only where a line fits, the same question the week grid asks. The
+       day view's .block-meta is ~13px at line-height 1.15 inside 4px of border
+       and padding, so a strip under 17px drawn height carries its hatch and its
+       tooltip and no words. */
+    const drawnPx = buf.durationMin * PX_PER_MIN - 2;
+    return drawnPx < 17 ? Object.assign({}, buf, { _bufferLabel: '', _bufferMute: true }) : buf;
   }).filter(buf => {
     const bufStart = buf.startMin - START_MIN;
     const bufEnd = bufStart + buf.durationMin;

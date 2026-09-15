@@ -216,10 +216,26 @@ function renderPrintSheet(host, opts) {
         // Travel / get-ready buffer strips around the block, so the printed
         // sheet shows "leave at 5:00" for a 5:30 training just like the app —
         // each with its own tick box and a real deadline, not just "🚗15m".
+        /* Clipped to the minutes that exist, through the same owner the day view
+           and the Full week read (bufferClip, js/05-helpers.js) — a printed
+           strip must not claim half an hour of driving that the next activity
+           is already using. Rows here are 15 minutes and Math.max(1, …) below
+           rounds a remnant UP to a whole row, so anything under 8 minutes is
+           dropped rather than printed as a quarter-hour that is not there. A
+           strip that loses its row loses its tick box with it, which is right:
+           you cannot tick time that does not exist. */
+        const sideBufMin = getTravelBufMin(b) + getGetReadyBufMin(b);
+        const pClip = bufferClip(b.startMin, b.startMin + (b.durationMin || 0),
+          sideBufMin + getWarmupBufMin(b), sideBufMin,
+          (bks || []).filter(o => o && o.id !== b.id));
         wfBufferSegments(b).forEach(seg=>{
           const absStart = seg.startRel + START_MIN;
-          const segStart = Math.max(absStart, winStartMin);
-          const segEnd   = Math.min(absStart + seg.dur, winEndMin);
+          const rawStart = seg.side === 'pre' ? Math.max(absStart, pClip.preFrom) : absStart;
+          const rawEnd   = seg.side === 'pre' ? absStart + seg.dur
+                                              : Math.min(absStart + seg.dur, pClip.postTo);
+          if (rawEnd - rawStart < 8) return;
+          const segStart = Math.max(rawStart, winStartMin);
+          const segEnd   = Math.min(rawEnd, winEndMin);
           if (segEnd <= segStart) return;
           if (Math.round((segStart - winStartMin)/15) !== s) return;
           const slotSpan = Math.max(1, Math.round((segEnd - segStart)/15));

@@ -348,6 +348,71 @@ the hero's NEXT line and a connector between two cards; from `TD_FREE_MIN` up it
 the free-time card that already existed. `tdGapBefore` is the one place that line
 is drawn, and it measures to `tdActionableStart`, not to the block's start.
 
+**A strip stops where the next card starts, and never says more than it can
+show.** Two defects, one fixture — a School Day with 15m travel + 15m get-ready
+running into Homework at three o'clock. A buffer strip was drawn at its full
+length whatever was in the way, straight over the top of the next card, so
+neither the strip nor the card's name and tick could be read; and at 0.72px per
+minute a 15-minute strip is 10.8px tall while the kid readability floor sets its
+text to 13.1px, so two stacked strips each printed a label through the other.
+
+`bufferClip` (`js/05-helpers.js`) is the one owner of **how much of a buffer
+window is real, unoccupied time** — pure numbers, with a `module.exports` guard,
+so `tests/buffers.test.js` can hold it. `computeBufferConflicts` calls it and
+returns `shortMin` beside the booleans it always returned, and the sweep in that
+unit test asserts the equivalence that `short > 0` happens exactly when the
+overlap test fires: two definitions of one fact is the six-copies defect this
+file already records. The Full week, the day view and the print sheet all clip
+through it, so the red a screen draws and the minutes the banner prints can
+never describe different amounts of time. `wfBufferSegments` itself is
+**untouched** — Today's `tdPrepFor` reads it for "leave by 7:40", and that is
+still 7:40 whether or not the plan fits.
+
+`WF_TRAVEL_TEXT_MIN_PX` (17) is a **measurement**, like `WF_ROW`: 13.12px of
+text plus a 1.5px conflict border each side is 16.1, so 16 sits on the edge and
+17 is the first height that always holds a line. A strip under it keeps its
+hatch and its tooltip and says nothing; several short same-side segments merge
+into one **band** whose per-kind hatches stay as children and whose single label
+names both (`👕15 🚗15 · 7:40am`). Height only answers one of the two questions —
+a column is 95–129px and the long label is about 168px — so `wfTravelStrip`'s
+`maxTier`, which had no caller passing one, now caps the tier by width too.
+
+**The minutes that did not fit are drawn, not just described.** `.wf-overrun`
+lays the shortfall over the card it runs into at a quarter strength, exactly as
+tall as the overrun and ending in a dashed line, taking no pointer events — the
+old full-strength overprint was the only thing that showed how bad a clash was,
+and it showed it by making both unreadable. The number itself rides on the
+**flag**: the card that is run into swaps its round `!` for a pill reading
+`! 20m over`, hung above its top-left corner and mostly outside the card, which
+is the one place that never covers a centred name at any card height; a card in
+a right-hand lane hangs it top-RIGHT or two lanes' pills collide. The partner
+card keeps the plain `!`. `wfWorstShort` and `wfClashTitle` are the one pair
+that answers "how far am I run into, and by what", because the shortfall is
+recorded against the block whose window is short — so a card must read its
+PARTNERS' figures, not its own. `tdClashText` is the same sentence on Today.
+
+The week banner lists **one line per clashing pair**, deduped on the sorted id
+pair. It used to join every affected name on a day into one chain — "School Day
+⇆ Homework ⇆ Ballet ⇆ Evening Routine" — which names four things while saying
+neither which two clash nor by how much.
+
+**Lanes are decided on what is DRAWN, not on minutes.** `wfAssignColumns` and
+`renderBlocksWithCollision` compared `startMin` and `durationMin`, which is the
+wrong question on a surface with a minimum card height: at 0.72px per minute the
+20px floor is 28 minutes, so a ten-minute After-School Routine at 8:50pm was
+drawn straight through a 9:00pm Evening Routine while the arithmetic said they
+were clear — nothing split them and nothing could. Both measure drawn top and
+bottom now, plus the lane gap, with a few pixels of tolerance so a hair's-breadth
+graze between two long cards does not halve both for nothing. A lane-narrowed
+card under 64px drops its name to the icon (`.wf-card--noname`): one clipped
+letter is not a name, and the icon is already what a short card draws.
+
+`.placed-block { min-height: 22px }` applied to buffer strips too, so every strip
+under about seventeen minutes was silently grown and pushed past the block it
+abuts — the overlap `renderBlockPixel`'s own comment calls impossible by
+construction, made possible by a floor in another file. `.placed-block.travel-buf`
+carries its own 6px floor, matching the JS.
+
 **A clash is the week's finding, drawn the week's way.** `computeBufferConflicts`
 (js/03-sync.js) owns it; Today asks and reuses `.wf-card--conflict`'s red. Its
 `partners` map exists so a screen can say *which* activity a block runs into

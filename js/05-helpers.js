@@ -274,6 +274,71 @@ function placeableActivityIds(kid) {
   return new Set(getAllActivities(kid, { includeArchived: true }).map(a => a.id));
 }
 
+/* ── How much of a buffer window is real, unoccupied time ──
+   A block's travel/get-ready needs minutes that nothing else is using. When the
+   next activity starts inside that window the plan is not workable, and three
+   surfaces used to say so by painting the whole red strip straight THROUGH the
+   neighbouring card — so neither the strip nor the card's own name could be
+   read, which is the defect this exists to fix.
+
+   Pure numbers, deliberately: it takes the window and the day's other blocks
+   rather than a block plus getTravelBufMin, so js/03-sync.js, the week grid,
+   the day view and the print sheet all reach one answer, and a Node unit test
+   can hold it (tests/buffers.test.js) without loading a browser.
+
+   `others` is every OTHER block on that day — not just the ones sharing a
+   column. A strip must not paint over any card, and computeBufferConflicts
+   already sweeps all of them, so clipping against a subset would draw a full
+   red strip beside a card the app has just called impossible.
+
+   What it measures is the CONTIGUOUS free stretch touching the block, which is
+   the honest question: a ten-minute snack in the middle of a 45-minute
+   get-ready does not leave you 35 usable minutes, it leaves you the run before
+   it and the run after it, and only the one against the block is the one you
+   can actually use. So the minutes before that snack count as short. */
+function bufferClip(startMin, endMin, preBuf, postBuf, others) {
+  const list = Array.isArray(others) ? others : [];
+  let preFrom = startMin - Math.max(0, preBuf || 0);
+  let postTo  = endMin + Math.max(0, postBuf || 0);
+  list.forEach(o => {
+    if (!o) return;
+    const oStart = o.startMin;
+    const oEnd = o.startMin + (o.durationMin || 0);
+    if (!(oEnd > oStart)) return;
+    // Anything overlapping the pre-window pushes its start forward; the latest
+    // such end wins, which is what makes the result contiguous with the block.
+    if (oEnd > preFrom && oStart < startMin) preFrom = Math.max(preFrom, Math.min(oEnd, startMin));
+    if (oStart < postTo && oEnd > endMin)    postTo  = Math.min(postTo,  Math.max(oStart, endMin));
+  });
+  const preWant = Math.max(0, preBuf || 0);
+  const postWant = Math.max(0, postBuf || 0);
+  return {
+    preFrom, postTo,
+    preShort:  Math.max(0, preWant  - (startMin - preFrom)),
+    postShort: Math.max(0, postWant - (postTo - endMin)),
+  };
+}
+
+/* The one place a buffer strip's DRAWN extent is decided. Takes the segments
+   wfBufferSegments already computes (which stay unclipped — Today reads them
+   for "leave by 7:40", and that time is still 7:40 whether or not the plan
+   fits) and trims each to the clipped window, dropping any left with nothing.
+
+   Every segment is relative to START_MIN, like its caller. */
+function bufferDrawSegments(segs, startMin, endMin, preBuf, postBuf, others) {
+  const clip = bufferClip(startMin, endMin, preBuf, postBuf, others);
+  const preFromRel = clip.preFrom - START_MIN;
+  const postToRel  = clip.postTo  - START_MIN;
+  const out = [];
+  (segs || []).forEach(s => {
+    const drawStartRel = s.side === 'pre' ? Math.max(s.startRel, preFromRel) : s.startRel;
+    const drawEndRel   = s.side === 'pre' ? s.endRel : Math.min(s.endRel, postToRel);
+    if (drawEndRel - drawStartRel <= 0) return;
+    out.push(Object.assign({}, s, { drawStartRel, drawEndRel, drawDur: drawEndRel - drawStartRel }));
+  });
+  return { segs: out, preShort: clip.preShort, postShort: clip.postShort };
+}
+
 /* ── One owner for the :00 / :30 rules ──
    Three surfaces draw a day against a clock — the day view, the week's Day
    Blocks lanes and the Full week — at three different scales, and they each
@@ -1270,3 +1335,18 @@ async function selectProfile(p) {
   }
 }
 
+
+/* Node reach for the buffer arithmetic only. tests/buffers.test.js requires this
+   file to hold bufferClip to the numbers, the way tests/merge.test.js holds the
+   merge layer — a rule reachable only from a browser is a rule no unit test can
+   hold, which is why the week grid, the day view, print and the conflict sweep
+   all read ONE function for how much of a buffer window is real.
+
+   Same guard as 04-merge, 18-rules, 21-money-data, 36-status and 37-reflection.
+   START_MIN is declared in js/01-config.js, so a bare `require` of this file
+   would not resolve it: bufferClip takes plain numbers and needs nothing, and
+   bufferDrawSegments is exported for completeness but is only ever called from
+   the browser, where 01 has already loaded. */
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { bufferClip };
+}
