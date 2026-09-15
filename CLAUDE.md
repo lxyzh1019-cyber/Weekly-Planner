@@ -389,9 +389,38 @@ text plus a 1.5px conflict border each side is 16.1, so 16 sits on the edge and
 17 is the first height that always holds a line. A strip under it keeps its
 hatch and its tooltip and says nothing; several short same-side segments merge
 into one **band** whose per-kind hatches stay as children and whose single label
-names both (`👕15 🚗15 · 7:40am`). Height only answers one of the two questions —
-a column is 95–129px and the long label is about 168px — so `wfTravelStrip`'s
-`maxTier`, which had no caller passing one, now caps the tier by width too.
+speaks for both. Height only answers one of the two questions — a column is
+95–129px and the long label is about 168px — so `wfTravelStrip`'s `maxTier`,
+which had no caller passing one, now caps the tier by width too.
+
+**When a label has to shrink, the CLOCK is what survives.** The width cap made
+the `long` tier structurally unreachable on this surface — every label carrying
+a time is 158–211px against a 115px budget — and the ladder's next rung was
+`short`, `🚗 Travel 15m`, which throws away the one figure a parent acts on and
+keeps the one the strip's own length already draws. The result was that no
+clock time reached the Full week at all. `time` (`🚗 7:40a` out, `🏠 3:20p`
+back, about 59px) sits between them and is what a strip picks whenever it is
+tall enough for a line; `short` is not on that ladder, being both wider and less
+use, and survives only because the print sheet picks tiers by block height and
+does want it.
+
+**One figure per side, one owner.** `wfSideEdgeRel` / `wfSideTimeLabel`: going
+out it is the start of the whole run — School Day at 8:10 with fifteen minutes
+of getting ready and fifteen of driving says **7:40**, not the 7:55 the car
+leaves — and coming back it is the end of the last **travel** segment, when you
+are through the door, not the end of the put-the-gear-away that follows. The
+band named that second one wrong, so even when it did print, the number was
+wrong.
+
+**And the fact never disappears.** A lone fifteen-minute buffer is 10.8px and
+cannot hold a line at any width, so its side goes silent and the time is simply
+gone from the screen. The strips are **asked** whether they muted — rather than
+the card re-deriving the tier ladder, which is how the two would drift — and the
+card prints whatever its sides could not say, at any tier, as the time and never
+the minutes. `theStripStillSaysWhenToLeave` holds the fact rather than the
+mechanism: for a block that carries travel, leave-by and back-by must appear
+somewhere on that day, at one lane and at two, without overflowing what draws
+them.
 
 **The minutes that did not fit are drawn, not just described.** `.wf-overrun`
 lays the shortfall over the card it runs into at a quarter strength, exactly as

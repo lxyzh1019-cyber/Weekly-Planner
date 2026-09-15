@@ -781,11 +781,32 @@ function wfBufferSegments(b) {
 /* Human label for one buffer segment, at three widths, so a strip reads as a
    real instruction ("leave by 5:30p") rather than a bare "🚗15m" wherever
    there's room for it — the print sheet and the weekly cards both need this,
-   not just the day view. `tier` is 'long' | 'short' | 'tiny'. */
+   not just the day view. `tier` is 'long' | 'short' | 'time' | 'tiny' — and
+   they are not one ramp: `short` names the KIND and the minutes, `time` names
+   the clock, and which of the two is worth more depends on the surface. The
+   print sheet has room for the kind; the Full week's column does not, and there
+   the clock is the whole point. */
+/* WHEN TO LEAVE AND WHEN YOU ARE BACK — the shortest form that still says it.
+   Somewhere to put the fact when the full sentence does not fit the column,
+   which on the Full week is always: "🚗 Leave by 7:40am (15m)" costs about
+   168px of this type and a seven-day column is 95–129px. The old ladder went
+   straight from that to "🚗 Travel 15m", which drops the only figure a parent
+   acts on and keeps the one the strip's own length already shows. THE CLOCK
+   TIME IS WHAT SURVIVES; the minutes are what go. */
+function bufferSegTime(seg) {
+  const startAbs = seg.startRel + START_MIN;
+  const endAbs = seg.endRel + START_MIN;
+  // 🏠 rather than 🚗 coming home: the icon says which end of the trip it is.
+  if (seg.kind === 'travel' && seg.side === 'post') return `🏠 ${formatTimeFromMin(endAbs)}`;
+  if (seg.kind === 'ready'  && seg.side === 'post') return `${seg.icon} ${formatTimeFromMin(endAbs)}`;
+  return `${seg.icon} ${formatTimeFromMin(startAbs)}`;
+}
+
 function bufferSegLabels(seg, tier) {
   const startAbs = seg.startRel + START_MIN;
   const endAbs = seg.endRel + START_MIN;
   if (tier === 'tiny') return `${seg.icon}${seg.min}m`;
+  if (tier === 'time') return bufferSegTime(seg);
   if (tier === 'short') {
     const kindLabel = seg.kind === 'travel' ? 'Travel' : seg.kind === 'warmup' ? 'Warm up' : 'Get ready';
     return `${seg.icon} ${kindLabel} ${seg.min}m`;
@@ -1117,6 +1138,10 @@ function renderFullWeek(keys) {
        with. */
     const boxes = wfCardBoxes(blocks, { pxPerMin: PX_PER_MIN, minPx: WF_CARD_MIN_PX, gapPx: 3 });
     const cols = wfAssignColumns(blocks, { boxes, gapPx: 3 });
+    /* block id -> { pre?: segs, post?: segs } for the sides whose strips were
+       too small to print their own time. Filled by the strip pass below and
+       read by the cards, which have the height the strips do not. */
+    const silent = new Map();
     const bufferConflicts = computeBufferConflicts(blocks);
 
     // Travel / get-ready strips (underneath cards), stacked so getting ready and
@@ -1159,22 +1184,39 @@ function renderFullWeek(keys) {
         const sideSegs = drawn.segs.filter(x => x.side === side)
           .filter(x => Math.min(x.drawEndRel, DAY_MIN_SPAN) - Math.max(x.drawStartRel, 0) >= 2);
         if (!sideSegs.length) return;
+        /* THE FACT NEVER DISAPPEARS. A lone fifteen-minute buffer is 10.8px and
+           cannot hold a 13.1px line at any width, so the strip says nothing and
+           "when do we leave" is simply gone from the screen. Rather than guess
+           at that here — a second copy of the tier ladder is exactly how these
+           two would drift — the elements are ASKED whether they muted, and the
+           card picks up whatever the strips could not say. */
+        silent.set(b.id, silent.get(b.id) || {});
+        const spoke = els => els.length > 0 && els.some(el => !el.classList.contains('wf-travel--mute'));
+        const record = els => {
+          if (!spoke(els)) silent.get(b.id)[side] = sideSegs;
+        };
         const segConflict = !!bc && (side === 'pre' ? bc.pre : bc.post);
         const anyMute = sideSegs.some(x =>
           (Math.min(x.drawEndRel, DAY_MIN_SPAN) - Math.max(x.drawStartRel, 0)) * PX_PER_MIN < WF_TRAVEL_TEXT_MIN_PX);
         if (anyMute && sideSegs.length > 1) {
           const bandS = Math.max(Math.min(...sideSegs.map(x => x.drawStartRel)), 0);
           const bandE = Math.min(Math.max(...sideSegs.map(x => x.drawEndRel)), DAY_MIN_SPAN);
-          cell.appendChild(wfBufferBand(bandS * PX_PER_MIN, (bandE - bandS) * PX_PER_MIN,
-            leftCss, widthCss, sideSegs, segColour, segConflict, colPx));
+          const band = wfBufferBand(bandS * PX_PER_MIN, (bandE - bandS) * PX_PER_MIN,
+            leftCss, widthCss, sideSegs, segColour, segConflict, colPx);
+          cell.appendChild(band);
+          record([band]);
           return;
         }
+        const made = [];
         sideSegs.forEach(seg => {
           const segS = Math.max(seg.drawStartRel, 0);
           const segE = Math.min(seg.drawEndRel, DAY_MIN_SPAN);
-          cell.appendChild(wfTravelStrip(segS * PX_PER_MIN, (segE - segS) * PX_PER_MIN,
-            leftCss, widthCss, seg, segColour, segConflict, null, colPx));
+          const strip = wfTravelStrip(segS * PX_PER_MIN, (segE - segS) * PX_PER_MIN,
+            leftCss, widthCss, seg, segColour, segConflict, null, colPx);
+          cell.appendChild(strip);
+          made.push(strip);
         });
+        record(made);
       });
     });
 
@@ -1274,12 +1316,26 @@ function renderFullWeek(keys) {
       card.style.left  = leftCss;
       card.style.width = widthCss;
       card.style.background = bg;
-      // The buffers already have their own labelled strips beside the card
-      // ("Leave by 3:50pm"), so repeating them inside the name is noise — and
-      // on a tall card it is noise that pushes the name into the rows below.
-      // Keep the inline tag only where the strips are too short to read.
-      const travelTag = (bufKinds.length && !blockTierAtLeast(tier, 'detail'))
-        ? `<span class="wf-card-travel">${bufKinds.join(' ')}</span>` : '';
+      /* The buffers already have their own labelled strips beside the card
+         ("🚗 7:40a"), so repeating them inside the name is noise — and on a tall
+         card it is noise that pushes the name into the rows below. Keep the
+         inline tag only where the strips are too short to read.
+
+         WHEN A SIDE WENT SILENT THE CARD SAYS THE TIME, not the minutes, and
+         says it at ANY tier. A lone fifteen-minute travel buffer is 10.8px —
+         under the height a line of this type needs at any width — so without
+         this the one figure a parent acts on is nowhere on the screen. The
+         minutes are the wrong fallback for the same reason they are the wrong
+         label: the strip's own length already draws them. */
+      const mute = silent.get(b.id) || {};
+      const muteTimes = ['pre', 'post']
+        .filter(side => mute[side])
+        .map(side => wfSideTimeLabel(mute[side]))
+        .filter(Boolean);
+      const travelTag = muteTimes.length
+        ? `<span class="wf-card-travel">${muteTimes.join(' ')}</span>`
+        : (bufKinds.length && !blockTierAtLeast(tier, 'detail'))
+          ? `<span class="wf-card-travel">${bufKinds.join(' ')}</span>` : '';
       const stampEmoji = b.parentStamp && b.parentStamp.emoji ? b.parentStamp.emoji + ' ' : '';
       const conflictTag = hasConflict ? `<span class="wf-card-conflict-badge" title="Not enough travel/get-ready time — overlaps another activity">⚠️</span>` : '';
       const notDoneTag = notDone ? `<span class="wf-card-notdone-badge" title="A grown-up recorded that this did not happen">🚫</span>` : '';
@@ -1535,8 +1591,8 @@ function renderFamilyChoreBanner(bannerId = 'weekFamilyBanner') {
 
    At the Full week's 0.72px per minute that is 24 minutes: a fifteen-minute
    strip is mute and a thirty-minute band speaks. A type change invalidates this
-   number — theBufferStripSaysOnlyWhatItCanShow (tests/smoke.js) is what keeps
-   it honest. */
+   number — aBufferStripNeverCoversACard and theStripStillSaysWhenToLeave
+   (tests/smoke.js) are what keep it honest. */
 const WF_TRAVEL_TEXT_MIN_PX = 17;
 
 /* Build one travel/get-ready buffer strip for the weekly view. Positioned in
@@ -1555,7 +1611,7 @@ function wfTravelStrip(topPx, hPx, leftCss, widthCss, seg, colour, conflict, max
   // Per-kind class (ready/travel/warmup) so adjacent strips read as three
   // distinct things even before you can make out the text.
   const kindCls = seg.kind === 'ready' ? ' wf-travel--ready' : seg.kind === 'warmup' ? ' wf-travel--warmup' : ' wf-travel--travel';
-  const RANK = { tiny: 0, short: 1, long: 2 };
+  const RANK = { tiny: 0, time: 1, short: 2, long: 3 };
   /* A strip carries text only when a LINE OF TEXT FITS IN IT. The old floor was
      8px, and the kid readability floor lifts this type to 13.1px with a 1px
      dashed border each side (1.5px on a conflict strip) — so at 0.72px per
@@ -1566,11 +1622,22 @@ function wfTravelStrip(topPx, hPx, leftCss, widthCss, seg, colour, conflict, max
   if (maxTier && RANK[tier] > RANK[maxTier]) tier = maxTier;
   /* And height only answers one of the two questions. A column is 95–129px and
      "🚗 Leave by 7:40am (15m)" is about 168px of this type, so a strip tall
-     enough for the long label is routinely nowhere near wide enough — it
-     ellipsed mid-word at the column edge. maxTier was built for exactly this
-     and had no caller passing one. */
-  if (tier === 'long' && colPx && bufferSegLabels(seg, 'long').length * 6.6 > colPx) tier = 'short';
-  if (tier === 'short' && colPx && bufferSegLabels(seg, 'short').length * 6.6 > colPx) tier = 'tiny';
+     enough for the long label is routinely nowhere near wide enough.
+
+     WHAT THE LADDER DROPS FIRST MATTERS. It used to fall from `long` straight
+     to `short` — "🚗 Travel 15m" — which throws away the clock time, the only
+     figure anybody acts on, and keeps the minutes, which the strip's own length
+     already draws. The demotion fires on every strip on this surface, so the
+     effect was that no time reached the Full week at all.
+
+     `time` is the icon and the clock, about 59px, which holds in a 95px column
+     even after a lane split. `short` is not on this ladder: it is BOTH less use
+     and wider than `time`, so there is no width at which it is the right
+     answer here. It stays in bufferSegLabels because the print sheet
+     (js/16-print.js) picks its tiers by block height and does want it. */
+  const fitsIn = t => !colPx || bufferSegLabels(seg, t).length * 6.6 <= colPx;
+  if (tier === 'long' && !fitsIn('long')) tier = 'time';
+  if (tier === 'time' && !fitsIn('time')) tier = 'tiny';
   const mute = tier === 'tiny';
   s.className = 'wf-travel' + kindCls + ` wf-travel--tier-${tier}`
     + (mute ? ' wf-travel--mute' : ' wf-travel--label')
@@ -1588,13 +1655,56 @@ function wfTravelStrip(topPx, hPx, leftCss, widthCss, seg, colour, conflict, max
   return s;
 }
 
+/* ── WHAT ONE SIDE OF A BLOCK IS ABOUT, IN ONE FIGURE ──
+   Going out it is when you have to START — the beginning of the whole run, so a
+   School Day at 8:10 with fifteen minutes of getting ready and fifteen of
+   driving says 7:40, not the 7:55 the car leaves. Coming back it is when you
+   are through the door: the end of the last TRAVEL segment, not the end of the
+   run, which is after the gear is put away.
+
+   One owner, because it is asked in two places — the band's label, and the
+   card's tag when the band could not be drawn at all — and two answers to "when
+   do we have to leave" is the defect this file records six times over. */
+function wfSideEdgeRel(segs, side) {
+  const list = (segs || []).filter(Boolean);
+  if (!list.length) return null;
+  if (side === 'pre') return Math.min(...list.map(x => x.drawStartRel != null ? x.drawStartRel : x.startRel));
+  const travel = list.filter(x => x.kind === 'travel');
+  const use = travel.length ? travel : list;
+  return Math.max(...use.map(x => x.drawEndRel != null ? x.drawEndRel : x.endRel));
+}
+
+function wfSideTimeLabel(segs) {
+  const list = (segs || []).filter(Boolean);
+  if (!list.length) return '';
+  const side = list[0].side || 'pre';
+  const rel = wfSideEdgeRel(list, side);
+  if (rel == null) return '';
+  // 🏠 for the way back, so the icon says which end of the trip this is.
+  const icon = side === 'post' && list.some(x => x.kind === 'travel')
+    ? '🏠'
+    : (list.find(x => x.kind === 'travel') || list[0]).icon || '🚗';
+  return `${icon} ${formatTimeFromMin(rel + START_MIN)}`;
+}
+
 /* One BAND standing for several segments that are each too short to speak.
    Get-ready and travel run end to end before a block, so at fifteen minutes
    apiece neither can hold a line but the pair can: 30 minutes is 21.6px here,
    which fits one. The per-kind hatches stay as unlabeled children inside it, so
-   the band still reads as two different things at a glance, and the one label
-   names both — "👕15 🚗15 · 7:40am", the time being when the whole run starts
-   (pre) or ends (post), which is the only figure a parent acts on. */
+   the band still reads as two different things at a glance.
+
+   THE LABEL IS THE TIME. It used to be "👕15 🚗15 · 7:40am" — eighteen units,
+   118.8px, against a column that is 95–129px, so the one path by which a clock
+   time could still reach this surface printed nothing more often than not. The
+   minutes are already drawn: that is what the band's own length is. The label
+   is "🚗 7:40a" going out and "🏠 3:20p" coming back, and the kinds and figures
+   stay in the tooltip.
+
+   AND IT NAMES THE RIGHT MOMENT. Coming home the edge was the end of the whole
+   run — after the gear is put away, 3:35 — not when you actually get through
+   the door, 3:20. The post edge is the end of the last TRAVEL segment; a run
+   with no travel in it (gear away alone) still falls back to its own end,
+   because then that is the fact. */
 function wfBufferBand(topPx, hPx, leftCss, widthCss, segs, colour, conflict, colPx) {
   const s = document.createElement('div');
   s.className = 'wf-travel wf-travel--band' + (conflict ? ' wf-travel--conflict' : '');
@@ -1615,15 +1725,9 @@ function wfBufferBand(topPx, hPx, leftCss, widthCss, segs, colour, conflict, col
     s.appendChild(child);
     cursor += segH;
   });
-  const side = segs[0] ? segs[0].side : 'pre';
-  const edgeRel = side === 'pre'
-    ? Math.min(...segs.map(x => x.drawStartRel))
-    : Math.max(...segs.map(x => x.drawEndRel));
-  const kinds = segs.map(x => `${x.icon}${x.min}`).join(' ');
-  const timeStr = formatTimeFromMin(edgeRel + START_MIN);
   const label = document.createElement('div');
   label.className = 'wf-travel-band-label';
-  const full = `${kinds} · ${timeStr}`;
+  const full = wfSideTimeLabel(segs);
   /* The same two questions as a single strip: does a line fit in the height,
      and does this line fit in the width. A band that can hold neither keeps its
      hatches and says nothing — the card's own inline tag then carries it. */
@@ -1631,6 +1735,7 @@ function wfBufferBand(topPx, hPx, leftCss, widthCss, segs, colour, conflict, col
   label.textContent = fits ? full : '';
   if (!fits) s.classList.add('wf-travel--mute');
   s.appendChild(label);
+  // The kinds and the minutes the label no longer carries.
   s.title = segs.map(x => `${x.kind === 'travel' ? 'Travel' : x.kind === 'warmup' ? 'Warm-up' : 'Get ready'} — ${x.min} min`).join(' · ');
   return s;
 }

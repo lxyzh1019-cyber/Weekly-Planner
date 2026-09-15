@@ -1337,6 +1337,94 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* THE STRIP STILL SAYS WHEN TO LEAVE, AND WHEN YOU ARE BACK.
+
+     Every clock time vanished from this surface. Three causes, compounding:
+
+     (1) `colPx`, the width every label is checked against, was read off a cell
+     that is appended to the grid at the END of its own iteration — always 0, so
+     the `|| 120` fallback was always the answer. (2) Every label carrying a time
+     is 158–211px of this type, so against that 115px budget the `long` tier was
+     structurally unreachable, and the ladder's next rung threw the CLOCK away
+     and kept the MINUTES — which the strip's own length already draws. (3) A
+     lone fifteen-minute buffer is 10.8px and cannot hold a 13.1px line at any
+     width, so it says nothing at all.
+
+     What must hold is the FACT, not the mechanism: for a block that carries
+     travel, the time it has to be left by and the time it is back must appear
+     somewhere on that day — on the strip, on the merged band, or on the card —
+     at one lane and at two, and without overflowing whatever draws it. */
+  checks.theStripStillSaysWhenToLeave = await page.evaluate(() => {
+    goWeek(); setWeekView('full');
+    const kid = activeProfile();
+    const key = getDayKeys(0)[3];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    const colText = () => {
+      const cells = [...document.querySelectorAll('#weeklyFullGrid .wf-day-col')];
+      const cell = cells[3] || cells[0];
+      if (!cell) return '';
+      // The label text plus every tooltip and card tag drawn in the column.
+      return (cell.textContent || '') + ' '
+        + [...cell.querySelectorAll('[title]')].map(el => el.getAttribute('title')).join(' ');
+    };
+    const wants = (label, mins) => {
+      const want = formatTimeFromMin(mins);
+      if (!colText().includes(want)) bad.push(`${label}: nothing on the day says ${want}`);
+    };
+    try {
+      /* School Day 8:10am–2:50pm, fifteen minutes of getting ready and fifteen
+         of driving each way. Leave by 7:40, back through the door at 3:05 —
+         the run's start going out, the end of the TRAVEL coming back, never the
+         end of the put-the-gear-away that follows it. */
+      setDayBlocks(key, [
+        { id: 'ts-school', actId: 'school_day', startMin: 8 * 60 + 10, durationMin: 400,
+          travelBuffer: true, travelBufMin: 15, getReadyBuffer: true, getReadyBufMin: 15 },
+      ], kid);
+      weekOffset = 0; renderWeek();
+      wants('one lane, band', 8 * 60 + 10 - 30);
+      wants('one lane, home', 8 * 60 + 10 + 400 + 15);
+
+      /* A LONE SHORT BUFFER. Travel only, no get-ready: 10.8px, under the height
+         a line needs at any width, so the strip cannot speak and the card has to.
+         This is the case that has no band to fall back on. */
+      setDayBlocks(key, [
+        { id: 'ts-solo', actId: 'ballet', startMin: 17 * 60, durationMin: 60,
+          travelBuffer: true, travelBufMin: 15, getReadyBuffer: false },
+      ], kid);
+      renderWeek();
+      wants('lone strip', 17 * 60 - 15);
+
+      /* AND IN HALF A COLUMN. A lane split halves every width budget, which is
+         where the old code went silent first. */
+      setDayBlocks(key, [
+        { id: 'ts-a', actId: 'school_day', startMin: 8 * 60 + 10, durationMin: 400,
+          travelBuffer: true, travelBufMin: 15, getReadyBuffer: true, getReadyBufMin: 15 },
+        { id: 'ts-b', actId: 'homework', startMin: 10 * 60, durationMin: 120 },
+      ], kid);
+      renderWeek();
+      const lanes = [...document.querySelectorAll('#weeklyFullGrid .wf-day-col')][3];
+      const cards = lanes ? [...lanes.querySelectorAll('.wf-card')] : [];
+      if (cards.length === 2 && cards[0].getBoundingClientRect().width > 20) {
+        wants('two lanes', 8 * 60 + 10 - 30);
+      }
+
+      // Whatever spoke must fit what it drew — no ellipsis, no second line.
+      [...document.querySelectorAll('#screen-week .wf-travel, #screen-week .wf-card-travel')]
+        .forEach(el => {
+          const txt = (el.textContent || '').trim();
+          if (!txt) return;
+          if (el.scrollWidth > el.clientWidth + 1) {
+            bad.push(`"${txt}" needs ${el.scrollWidth}px of width in ${el.clientWidth}px`);
+          }
+          if (el.scrollHeight > el.clientHeight + 1) {
+            bad.push(`"${txt}" needs ${el.scrollHeight}px of height in ${el.clientHeight}px`);
+          }
+        });
+    } finally { setDayBlocks(key, had, kid); renderWeek(); }
+    return bad.length === 0 || bad;
+  });
+
   /* A FLOORED CARD NEVER SITS ON THE ONE BELOW IT — AND NEVER COSTS IT A LANE.
 
      At 0.72px per minute the 20px floor is 28 minutes, so every block shorter
