@@ -2331,13 +2331,36 @@
   .dq-xp-bar { height: 8px; border-radius: 999px; background: var(--paper-line); overflow: hidden; margin: 3px 0; border: 1.5px solid var(--ink); }
   .dq-xp-fill { height: 100%; background: var(--accent-yellow); border-radius: 999px; transition: width 0.3s; }
   /* Pixel-canvas timeline: one hour gutter, then one column per day on show. */
+  /* THE DAY STOPS WHERE THE DAY STOPS. This carried min-height: 1344px — the
+     whole 6am–10pm day — and 200px of padding under it, so a Tuesday whose last
+     block ends at a quarter to nine drew an hour of empty grid and then most of
+     a screen of nothing at all, and no amount of trimming in JS could take
+     either back. dayViewSpan sizes the canvas now; the padding here is the room
+     the kid nav needs plus the expander, and nothing more. */
   .timeline {
     position: relative;
     display: flex;
     flex-direction: column;
-    min-height: 1344px; /* DAY_MIN_SPAN(960) * PX_PER_MIN(1.4), see JS */
-    padding: 0 0.8rem 200px;
+    padding: 0 0.8rem 24px;
   }
+  /* One tap back to the rest of the evening, and the only thing that says which
+     state the canvas is in — a day that stops at nine looks exactly like a day
+     with no evening. Full width so it reads as the foot of the schedule rather
+     than a control floating under it; 44px like every other target. */
+  .tl-later {
+    margin: 8px 0 0;
+    min-height: 44px;
+    width: 100%;
+    font: inherit;
+    font-size: calc(0.82rem * var(--fs-scale, 1));
+    font-weight: 700;
+    color: var(--ink-muted);
+    background: transparent;
+    border: 1.5px dashed var(--paper-line);
+    border-radius: var(--radius-sm, 8px);
+    cursor: pointer;
+  }
+  .tl-later:hover { background: var(--bg2); }
   /* The schedule proper: hour ladder beside the day columns. Its top is the
      canvases' top, which is the whole point of moving the day headers out — see
      buildTimeline in js/08-day-view.js. */

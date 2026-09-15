@@ -102,11 +102,14 @@ function blockDragGeometry(canvas, clientY) {
   let dur = d.origDur;
   if (d.mode === 'move') {
     relStart = canvasSnapMin(canvas, clientY - d.grabOffsetPx);
-    relStart = Math.max(0, Math.min(relStart, DAY_MIN_SPAN - dur));
+    /* Against what this canvas was DRAWN to, not the whole day. The day view
+       trims its evening when nothing is planned there, and clamping to the
+       global would let a drop land below the bottom of the visible grid. */
+    relStart = Math.max(0, Math.min(relStart, canvasSpanMin(canvas) - dur));
   } else if (d.mode === 'resize-bottom') {
     // An END may legally be the last minute of the day, which is exactly what
     // canvasSnapMin's "not a legal start" clamp refuses — hence the raw form.
-    const end = Math.min(DAY_MIN_SPAN,
+    const end = Math.min(canvasSpanMin(canvas),
       Math.max(d.origRelStart + BLOCK_DRAG_MIN_DUR,
         canvasSnapMinRaw(canvas, clientY - d.grabOffsetPx)));
     dur = end - d.origRelStart;

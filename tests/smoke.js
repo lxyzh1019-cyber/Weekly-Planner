@@ -2814,6 +2814,104 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* THE DAY ENDS WHERE THE DAY ENDS.
+
+     The schedule was drawn 6am–10pm whatever was on it, and `.timeline` carried
+     min-height: 1344px with 200px of padding under that — so an evening whose
+     last block finishes at a quarter to nine showed an hour of empty grid and
+     then most of a screen of nothing, and no trimming in JS could have taken
+     either back.
+
+     Three things have to hold together, and the third is the one that would
+     rot quietly: the canvas ends shortly after the last thing planned; the
+     expander reaches the rest of the evening and says which state it is in; and
+     every OTHER number derived from the day — the gutter's last hour, where a
+     tap lands, where a drag may be dropped — follows the canvas rather than the
+     global. A gutter label hanging below its own canvas is the exact shape of
+     the phase bug this file already records. */
+  checks.theDayEndsWhereTheDayEnds = await page.evaluate(() => {
+    const kid = activeProfile();
+    const key = getDayKeys(0)[2];
+    const had = (getDayBlocks(key) || []).slice();
+    const spanBefore = dayViewSpan();
+    const showBefore = dayViewShowAll();
+    const bad = [];
+    const canvasMin = () => {
+      const c = document.querySelector('#timeline .tl-canvas');
+      return c ? c.getBoundingClientRect().height / PX_PER_MIN : 0;
+    };
+    try {
+      setDayViewSpan(1);
+      setDayViewShowAll(false);
+      // A day that finishes at 8:45pm, the evening from the screenshot.
+      setDayBlocks(key, [
+        { id: 'de-eve', actId: 'routine_evening', startMin: 20 * 60 + 15, durationMin: 30 },
+      ], kid);
+      currentDayKey = key;
+      openDay(key);
+
+      const drawn = canvasMin();
+      const lastEnd = 20 * 60 + 45 - START_MIN;
+      if (drawn >= DAY_MIN_SPAN) bad.push('the canvas still runs to the end of the day');
+      if (drawn < lastEnd) bad.push(`the canvas stops at ${Math.round(drawn)}m, before the 8:45pm block ends`);
+      if (drawn > lastEnd + 75) {
+        bad.push(`the canvas runs ${Math.round(drawn - lastEnd)}m past the last block`);
+      }
+      if (Math.abs(drawn - Math.round(drawn / 15) * 15) > 0.5) {
+        bad.push(`the canvas is ${drawn.toFixed(1)} minutes — not a whole number of 15-minute rows`);
+      }
+
+      // The gutter stops with it: no hour label hanging below its own canvas.
+      const gutter = document.querySelector('#timeline .tl-gutter');
+      const gr = gutter && gutter.getBoundingClientRect();
+      [...document.querySelectorAll('#timeline .tl-hour-label')].forEach(l => {
+        const r = l.getBoundingClientRect();
+        if (gr && r.top > gr.bottom + 1) {
+          bad.push(`the hour label "${l.textContent.trim()}" hangs below the canvas`);
+        }
+      });
+
+      // A tap at the very bottom resolves to a time inside the drawn day.
+      const canvas = document.querySelector('#timeline .tl-canvas');
+      const cr = canvas.getBoundingClientRect();
+      const snapped = canvasSnapMin(canvas, cr.bottom - 1);
+      if (snapped > drawn - 15 + 0.5) {
+        bad.push(`a tap at the bottom gives ${snapped}m on a ${Math.round(drawn)}m canvas`);
+      }
+
+      // The expander says which state it is in, and reaches the whole evening.
+      const later = document.querySelector('#timeline .tl-later');
+      if (!later) return bad.concat(['a trimmed day offers no way to the evening']);
+      if (!/Planning something after/.test(later.textContent)) {
+        bad.push(`the expander reads "${later.textContent.trim()}"`);
+      }
+      later.click();
+      if (canvasMin() < DAY_MIN_SPAN - 0.5) {
+        bad.push('the expander did not open the rest of the evening');
+      }
+      const back = document.querySelector('#timeline .tl-later');
+      if (!back || !/Stop at the last thing/.test(back.textContent)) {
+        bad.push('the expander does not offer the way back');
+      }
+
+      /* AND A DAY THAT REALLY RUNS LATE IS NOT TRIMMED. The trim must follow the
+         plan, not a preference about evenings. */
+      setDayViewShowAll(false);
+      setDayBlocks(key, [
+        { id: 'de-late', actId: 'routine_evening', startMin: 21 * 60 + 30, durationMin: 30 },
+      ], kid);
+      openDay(key);
+      if (canvasMin() < DAY_MIN_SPAN - 0.5) {
+        bad.push('a block ending at 10pm still got its evening trimmed');
+      }
+    } finally {
+      setDayBlocks(key, had, kid);
+      setDayViewShowAll(showBefore);
+      setDayViewSpan(spanBefore);
+    }
+    return bad.length === 0 || bad;
+  });
+
   /* The schedule is the only thing that moves. #screen-day carried min-height
      rather than a height, so the flex column grew to the 1344px schedule and
      the DOCUMENT scrolled instead — 832px of it. The wheel hid that
@@ -2823,22 +2921,43 @@ function findChromium() {
      cannot see this: it only walks INSIDE #screen-day. */
   checks.onlyTheScheduleScrollsOnTheDayScreen = await page.evaluate(() => {
     const bad = [];
-    openDay(getDayKeys(0)[0], 0);
-    const ws = document.querySelector('#screen-day .day-workspace');
-    const doc = document.scrollingElement;
-    if (!(ws.scrollHeight > ws.clientHeight + 4)) {
-      bad.push('the workspace does not scroll, so nothing does');
+    /* A DAY TALL ENOUGH TO SCROLL, seeded rather than assumed. This opened
+       whatever the fixture happened to hold and relied on the canvas always
+       being the full 1344px — which stopped being true when the day started
+       ending where the plan ends. A workspace that does not overflow is not a
+       defect, it is a short day; what must never happen is the DOCUMENT
+       scrolling instead, and that needs a schedule taller than the viewport to
+       be worth asserting at all. */
+    const kid = activeProfile();
+    const key = getDayKeys(0)[0];
+    const had = (getDayBlocks(key) || []).slice();
+    const showBefore = dayViewShowAll();
+    try {
+      setDayViewShowAll(true);
+      setDayBlocks(key, [
+        { id: 'sc-early', actId: 'breakfast', startMin: 7 * 60, durationMin: 30 },
+        { id: 'sc-late', actId: 'routine_evening', startMin: 21 * 60 + 30, durationMin: 30 },
+      ], kid);
+      openDay(key, 0);
+      const ws = document.querySelector('#screen-day .day-workspace');
+      const doc = document.scrollingElement;
+      if (!(ws.scrollHeight > ws.clientHeight + 4)) {
+        bad.push('the workspace does not scroll, so nothing does');
+      }
+      const overflow = doc.scrollHeight - window.innerHeight;
+      if (overflow > 4) bad.push(`the document itself has ${overflow}px of scroll`);
+      const topbar = document.querySelector('#screen-day .day-topbar');
+      const before = topbar.getBoundingClientRect().top;
+      ws.scrollTop = 0;
+      ws.scrollTop = 300;
+      if (ws.scrollTop < 250) bad.push('the workspace refused to scroll');
+      const moved = topbar.getBoundingClientRect().top - before;
+      if (Math.abs(moved) > 1) bad.push(`the topbar moved ${moved.toFixed(1)}px with the schedule`);
+      ws.scrollTop = 0;
+    } finally {
+      setDayBlocks(key, had, kid);
+      setDayViewShowAll(showBefore);
     }
-    const overflow = doc.scrollHeight - window.innerHeight;
-    if (overflow > 4) bad.push(`the document itself has ${overflow}px of scroll`);
-    const topbar = document.querySelector('#screen-day .day-topbar');
-    const before = topbar.getBoundingClientRect().top;
-    ws.scrollTop = 0;
-    ws.scrollTop = 300;
-    if (ws.scrollTop < 250) bad.push('the workspace refused to scroll');
-    const moved = topbar.getBoundingClientRect().top - before;
-    if (Math.abs(moved) > 1) bad.push(`the topbar moved ${moved.toFixed(1)}px with the schedule`);
-    ws.scrollTop = 0;
     return bad.length === 0 || bad;
   });
 
@@ -2880,7 +2999,7 @@ function findChromium() {
        view's row grid or the week's behind layer. `ticks` is the mark layer.
        Neither may put anything full-width over a card; the marks must stay
        above one; nothing in either may take a tap. */
-    const surface = (name, root, backSel, tickSel, blockSel, wantQuarters) => {
+    const surface = (name, root, backSel, tickSel, blockSel, wantQuarters, pxPerMin) => {
       const back = root && root.querySelector(backSel);
       const ticks = root && root.querySelector(tickSel);
       const block = root && root.querySelector(blockSel);
@@ -2904,8 +3023,17 @@ function findChromium() {
       if (tick.getBoundingClientRect().width > 20) {
         bad.push(`${name}: the hour mark is ${Math.round(tick.getBoundingClientRect().width)}px wide — that is a rule`);
       }
+      /* One mark per whole hour the surface actually DRAWS. This was a flat
+         `< 17` — hours 6 through 22 — which is right for the week grid and
+         wrong for the day view the moment it stops at the last thing planned.
+         Derived from the rendered height, so it still catches a layer that
+         silently stopped emitting marks. */
       const marks = [...ticks.querySelectorAll('.hour-grid-tick')];
-      if (marks.length < 17) bad.push(`${name}: ${marks.length} hour marks, expected the whole day`);
+      const drawnMin = root.getBoundingClientRect().height / pxPerMin;
+      const wantMarks = Math.floor((START_MIN + drawnMin) / 60) - Math.ceil(START_MIN / 60) + 1;
+      if (marks.length < wantMarks) {
+        bad.push(`${name}: ${marks.length} hour marks over ${Math.round(drawnMin)} minutes, expected ${wantMarks}`);
+      }
       if (!marks.some(m => crosses(m, block))) {
         bad.push(`${name}: no hour mark sits beside the block at all`);
       }
@@ -2927,19 +3055,31 @@ function findChromium() {
     setDayViewSpan(1);
     openDay(keys[0], 0);
     surface('day view', document.querySelector('#timeline .tl-canvas'),
-            '.slot-grid--day', '.hour-grid--day', '.placed-block', true);
-    /* The day divides exactly: 64 rows of 15 minutes at 1.4px/min tile its
-       1344px canvas, which is why it can take Print's mechanism whole. */
+            '.slot-grid--day', '.hour-grid--day', '.placed-block', true, PX_PER_MIN);
+    /* The day divides exactly: 15-minute rows at 1.4px/min tile its canvas with
+       nothing left over, which is why it can take Print's mechanism whole. The
+       count was a flat 64 — the whole 6am–10pm day — and the canvas is trimmed
+       to what is planned now, so the figure comes from the rendered height. The
+       property that matters is that it divides, not that it is 64. */
+    const dayCanvas = document.querySelector('#timeline .tl-canvas');
     const rows = document.querySelectorAll('#timeline .tl-canvas .slot-grid--day .slot-row');
-    if (rows.length !== 64) bad.push(`the day draws ${rows.length} slot rows, expected 64`);
+    const canvasMin = dayCanvas.getBoundingClientRect().height / PX_PER_MIN;
+    const wantRows = Math.round(canvasMin / 15);
+    if (Math.abs(canvasMin - wantRows * 15) > 0.5) {
+      bad.push(`the day canvas is ${canvasMin.toFixed(1)} minutes, not a whole number of 15-minute rows`);
+    }
+    if (rows.length !== wantRows) {
+      bad.push(`the day draws ${rows.length} slot rows over ${Math.round(canvasMin)} minutes, expected ${wantRows}`);
+    }
 
     /* Two surfaces, not three: the Day Blocks arm had no successor. The tab
        that replaced it previews the print sheet, whose rules ARE cell borders
        and which draws no grid layer of its own. */
     goWeek(); setWeekView('full'); renderWeek();
+    // 0.72px/min — the week grid shadows PX_PER_MIN at its own scale.
     surface('Full week', document.querySelector('.wf-day-col'),
             '.hour-grid--wf.hour-grid--behind', '.hour-grid--wf:not(.hour-grid--behind)',
-            '.wf-card', false);
+            '.wf-card', false, 0.72);
 
     // 6am and 10pm both get a rule: the gutter used < / > and the line loop
     // <= / >=, so the two ends were labelled but never drawn.

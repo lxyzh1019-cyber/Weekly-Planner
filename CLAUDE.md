@@ -594,7 +594,33 @@ topbar off screen. The screen carries a `height` now, at every width rather than
 only at ≥980px landscape, and `body.has-kid-nav #screen-day.screen.active` has the
 specificity it always needed. `dayScreenScrollsAsOneSurface` only walks INSIDE
 `#screen-day` and cannot see this; `onlyTheScheduleScrollsOnTheDayScreen` watches
-the document.
+the document — and seeds a day tall enough to scroll rather than assuming one,
+because a workspace that does not overflow is a short day, not a defect.
+
+**The day STOPS where the day stops.** The schedule was drawn 6am–10pm whatever
+was on it, and `.timeline` carried `min-height: 1344px` with 200px of padding
+under that, so an evening whose last block ends at a quarter to nine showed an
+hour of empty grid and then most of a screen of nothing — and no trimming in JS
+could have taken either back. `dayDrawnSpanMin(keys)` (**not** `dayViewSpan`,
+which has meant the column count since the 1/2/3-day view landed) takes the last
+drawn edge across the visible columns, buffers included, adds
+`DAY_TAIL_SPARE_MIN` so there is somewhere to tap to put something later, floors
+at `DAY_MIN_TAIL_MIN` so a blank day is still a canvas you can plan on, and
+rounds to a **multiple of 15** because `buildSlotGrid` tiles the canvas in
+quarter-hour rows. `tlShowEvening` (`localStorage`, never synced state) opens
+the rest, through `.tl-later` — which also says which state the canvas is in,
+since a day that stops at nine looks exactly like a day with no evening.
+
+The span is **on the canvas** (`dataset.spanMin`, read back by `canvasSpanMin`),
+not passed down five signatures and never taken from the global: the gutter's
+last hour, `renderBlockPixel`'s clipping, `canvasSnapMin` and the drag clamps in
+`js/39-block-drag.js` all followed `DAY_MIN_SPAN` and would each have put
+something — a label, a tap, a drop — below the bottom of a trimmed canvas.
+`dayZoneSegments` is deliberately NOT span-aware: the week grid and the print
+sheet read it too, and `paintZoneBands` already clips to the column's own end.
+Two smoke checks asserted the old fixed day — 64 slot rows and 17 hour marks —
+and now derive both from the rendered height; what matters is that the canvas
+divides exactly into 15-minute rows, not that it is 64 of them.
 
 **The day headers are a row of their own, outside the columns.** `.tl-col-head`
 used to sit inside `.tl-col`, above `.tl-canvas`, while `.tl-gutter` — a sibling

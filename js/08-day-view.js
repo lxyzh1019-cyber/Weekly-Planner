@@ -269,7 +269,8 @@ function buildTimeline() {
   tl.classList.toggle('timeline--multi', keys.length > 1);
   tl.style.setProperty('--day-cols', String(keys.length));
 
-  const canvasHeight = DAY_MIN_SPAN * PX_PER_MIN;
+  const spanMin = dayDrawnSpanMin(keys);
+  const canvasHeight = spanMin * PX_PER_MIN;
 
   /* THE HEADER ROW IS NOT INSIDE THE COLUMNS. It used to be: .tl-col-head sat
      at the top of each .tl-col, above .tl-canvas, so the canvas started ~48px
@@ -295,14 +296,14 @@ function buildTimeline() {
 
   const body = document.createElement('div');
   body.className = 'tl-body';
-  body.appendChild(buildHourGutter(canvasHeight));
+  body.appendChild(buildHourGutter(canvasHeight, spanMin));
 
   const cols = document.createElement('div');
   cols.className = 'tl-cols';
   let running = false;
   const allBlocks = [];
   keys.forEach(key => {
-    const built = buildDayColumn(key, canvasHeight, multi);
+    const built = buildDayColumn(key, canvasHeight, multi, spanMin);
     cols.appendChild(built.el);
     if (built.head) headCols.appendChild(built.head);
     if (built.hasRunningStopwatch) running = true;
@@ -311,6 +312,23 @@ function buildTimeline() {
   if (multi) tl.appendChild(headRow);
   body.appendChild(cols);
   tl.appendChild(body);
+
+  /* THE WAY BACK TO THE REST OF THE EVENING. A trimmed canvas has to be
+     reversible in one tap or it is a limit rather than a tidy-up — and it has
+     to say which state it is in, because a day that simply stops at nine looks
+     identical to a day that has no evening. Hidden once the whole day is drawn
+     and there is nothing left to show. */
+  if (spanMin < DAY_MIN_SPAN || dayViewShowAll()) {
+    const later = document.createElement('button');
+    later.type = 'button';
+    later.className = 'tl-later';
+    later.onclick = toggleDayViewEvening;
+    const endsAt = formatTimeFromMin(START_MIN + spanMin);
+    later.textContent = dayViewShowAll()
+      ? '▴ Stop at the last thing planned'
+      : `▾ Planning something after ${endsAt}?`;
+    tl.appendChild(later);
+  }
 
   if (running) {
     activeStopwatchTick = setInterval(()=>{
@@ -328,12 +346,15 @@ function buildTimeline() {
 }
 
 /* The 6am-10pm ladder, once. */
-function buildHourGutter(canvasHeight) {
+function buildHourGutter(canvasHeight, spanMin) {
   const gutter = document.createElement('div');
   gutter.className = 'tl-gutter';
   gutter.style.height = canvasHeight + 'px';
   const firstHour = Math.ceil(START_MIN / 60);
-  const lastHour  = Math.floor(END_MIN / 60);
+  /* From the span it was handed, not from the global END_MIN. The gutter is a
+     sibling of the whole column stack and has no overflow of its own, so an
+     hour label past the end of a trimmed canvas simply hangs below it. */
+  const lastHour  = Math.floor((START_MIN + (spanMin || DAY_MIN_SPAN)) / 60);
   for (let h = firstHour; h <= lastHour; h++) {
     const label = document.createElement('div');
     label.className = 'tl-hour-label';
@@ -344,12 +365,77 @@ function buildHourGutter(canvasHeight) {
   return gutter;
 }
 
+/* ── THE DAY STOPS WHERE THE DAY STOPS ──
+   The schedule was always drawn 6am–10pm, so an evening whose last block ends
+   at a quarter to nine showed an hour of empty grid and then, below it, a
+   stretch of nothing at all. A calendar that reserves room for a 10pm bedtime
+   every single day is describing a day nobody has.
+
+   Two numbers, both deliberate:
+
+   DAY_TAIL_SPARE_MIN is why the canvas does not stop dead at the last block —
+   there has to be somewhere to tap to put something later. An hour of it, so
+   the room is a real target rather than a sliver.
+
+   DAY_MIN_TAIL_MIN is the floor for a day with nothing on it: a blank canvas
+   trimmed to nothing is not a shorter day, it is a screen you cannot plan on.
+
+   Past either, `tlShowEvening` opens the rest of the evening. It lives in
+   localStorage and never in synced state — every state write uploads the whole
+   document, and which part of a day this device is looking at is nobody else's
+   business. The span stays a MULTIPLE OF 15: buildSlotGrid tiles the canvas in
+   quarter-hour rows and a ragged end would put every boundary out of phase. */
+const DAY_TAIL_SPARE_MIN = 60;
+const DAY_MIN_TAIL_MIN = 8 * 60; // 6am–2pm on a day with nothing planned
+
+function dayViewShowAll() {
+  try { return localStorage.getItem('tlShowEvening') === '1'; } catch (e) { return false; }
+}
+function setDayViewShowAll(on) {
+  try { localStorage.setItem('tlShowEvening', on ? '1' : '0'); } catch (e) {}
+}
+function toggleDayViewEvening() {
+  setDayViewShowAll(!dayViewShowAll());
+  buildTimeline();
+}
+
+/* The drawn span, in minutes from START_MIN. Buffers count: a block that ends
+   at six with half an hour of driving home after it needs its drive drawn, and
+   bufferClip may trim that but never lengthens it, so the unclipped figure is
+   the safe ceiling. */
+/* NOT dayViewSpan, which has meant the COLUMN COUNT since the 1/2/3-day view
+   landed. Minutes, and named so. */
+function dayDrawnSpanMin(keys) {
+  if (dayViewShowAll()) return DAY_MIN_SPAN;
+  let last = 0;
+  (keys || []).forEach(key => {
+    (getDayBlocks(key) || []).forEach(b => {
+      if (!b) return;
+      const end = (b.startMin - START_MIN) + (b.durationMin || 0)
+        + getTravelBufMin(b) + getGetReadyBufMin(b);
+      if (end > last) last = end;
+    });
+  });
+  const wanted = last > 0 ? last + DAY_TAIL_SPARE_MIN : DAY_MIN_TAIL_MIN;
+  const span = Math.ceil(Math.max(wanted, DAY_MIN_TAIL_MIN) / 15) * 15;
+  return Math.min(span, DAY_MIN_SPAN);
+}
+
+/* What one canvas was drawn to, for the handful of things that convert a
+   pointer position back into a time. Read from the element rather than passed
+   down through five signatures — and never from the global, which is the whole
+   day and would put a drop past the bottom of a trimmed canvas. */
+function canvasSpanMin(canvas) {
+  const n = canvas && Number(canvas.dataset && canvas.dataset.spanMin);
+  return n > 0 ? n : DAY_MIN_SPAN;
+}
+
 /* One day. Everything that used to be the body of buildTimeline, with the day
    it belongs to passed in rather than read off the global — which is what makes
    two and three columns possible at all. Each canvas carries its own dayKey, so
    a tap knows which day it landed on without anything having to guess. */
-function buildDayColumn(dayKey, canvasHeight, withHeader) {
-  const zMinStart = 0, zMinEnd = DAY_MIN_SPAN;
+function buildDayColumn(dayKey, canvasHeight, withHeader, drawnSpan) {
+  const zMinStart = 0, zMinEnd = drawnSpan || DAY_MIN_SPAN;
   const spanMin = zMinEnd - zMinStart;
   const blocks = getDayBlocks(dayKey);
 
@@ -375,6 +461,7 @@ function buildDayColumn(dayKey, canvasHeight, withHeader) {
   canvas.className = 'tl-canvas';
   canvas.style.height = canvasHeight + 'px';
   canvas.dataset.zmin = zMinStart;
+  canvas.dataset.spanMin = zMinEnd - zMinStart;
   canvas.dataset.dayKey = dayKey;
   canvas.onclick = (e)=>handleCanvasTap(e, zMinStart);
   canvas.onmousemove = (e)=>updatePlacementGuideFromPointer(e, zMinStart);
@@ -773,7 +860,9 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey)
   // The day is always shown whole, so a block can only be clipped by running
   // past the 6am-9pm canvas itself — the "continues" markers below still cover
   // that. The zone filter that used to narrow this is gone.
-  const zoneSpan = DAY_MIN_SPAN - zMinStart;
+  /* What THIS canvas was drawn to. It read the global, so on a trimmed canvas a
+     block running past the end was neither clipped nor marked as continuing. */
+  const zoneSpan = canvasSpanMin(canvas);
   const relStart = (b.startMin - START_MIN) - zMinStart;
   const relEnd   = relStart + (b.durationMin || 0);
   const clippedTop    = relStart < 0;
@@ -1507,7 +1596,7 @@ function canvasSnapMinRaw(canvas, clientY) {
   const rect = canvas.getBoundingClientRect();
   const y = clientY - rect.top - canvas.clientTop;
   const snapped = Math.round(y / (PX_PER_MIN * 15)) * 15;
-  return Math.max(0, Math.min(DAY_MIN_SPAN, snapped));
+  return Math.max(0, Math.min(canvasSpanMin(canvas), snapped));
 }
 /* The same arithmetic, clamped to a legal START. Split out because a block's
    END may legally be the last minute of the day, which this clamp refuses —
@@ -1516,7 +1605,7 @@ function canvasSnapMinRaw(canvas, clientY) {
    week grid's scale, so a second copy of these three lines would be wrong the
    moment somebody read it out of that file. */
 function canvasSnapMin(canvas, clientY) {
-  return Math.min(DAY_MIN_SPAN - 15, canvasSnapMinRaw(canvas, clientY));
+  return Math.min(canvasSpanMin(canvas) - 15, canvasSnapMinRaw(canvas, clientY));
 }
 
 /* Shared placement entry point used by both the timeline canvas tap and the
