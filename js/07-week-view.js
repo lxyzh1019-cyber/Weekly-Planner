@@ -727,13 +727,22 @@ function renderWeekLegend() {
   const legend = document.getElementById('weekLegend');
   if (!legend) return;
   legend.style.display = 'flex';
-  /* THE COLOURS THE CARDS ACTUALLY WEAR. This listed the eight chart groups and
-     their hues, which is a different table: a block is coloured by its
-     subgroup, so the legend's "Body" pink sat beside swimming cards drawn in
-     coral and the key explained a scheme nothing on the grid used. Six
-     categories, the hue each one's cards start from. */
+  /* THE COLOURS THE CARDS ACTUALLY WEAR — every one of them. This listed the
+     eight chart groups first, which is a different table entirely, and then the
+     six CATEGORIES, which is closer but still not what a card wears: a block is
+     coloured by its SUBGROUP, and half of those never appeared in the key.
+     Helping hands, Appointments, Language, Arts, Everyday movement and Seasonal
+     treats were six hues on the grid that the legend did not explain — and one
+     of them, Helping hands, was the colour a parent could not tell from Play.
+
+     Grouped under the category heading so twelve chips still read as six ideas
+     rather than a wall of dots. */
   legend.innerHTML = ACTIVITY_CATEGORIES.map(c =>
-    `<span class="tg-legend-chip"><span class="tg-legend-dot" style="background:${c.hex /* safe: from ACTIVITY_CATEGORIES */}"></span>${escapeHtml(c.short)}</span>`
+    `<span class="tg-legend-group"><span class="tg-legend-cat">${escapeHtml(c.short)}</span>`
+    + c.subs.map(sg =>
+        `<span class="tg-legend-chip"><span class="tg-legend-dot" style="background:${sg.hex /* safe: from ACTIVITY_CATEGORIES */}"></span>${escapeHtml(sg.label.replace(/^\S+\s*/, ''))}</span>`
+      ).join('')
+    + `</span>`
   ).join('') + `<span class="tg-legend-chip"><span class="tg-legend-dot tg-legend-dot--free"></span>Free time</span>`;
 }
 
@@ -1151,7 +1160,14 @@ function renderFullWeek(keys) {
     blocks.forEach(b => {
       const act = acts.find(a=>a.id===b.actId);
       const topic = act && act.isTraining ? getTrainingTopic(b.tag) : null;
-      const segColour = topic ? trainingBlockColour(b) : (b.colour || (act && CAT_HEX[act.cat]) || '#888');
+      /* THE STRIP WEARS THE BLOCK'S COLOUR, from the one owner. This read
+         `b.colour` first — the hex a placement SEEDED onto the block — which
+         blockColour deliberately ignores when the value is one the table itself
+         wrote. So the moment a subgroup's hue changed, every card already on the
+         calendar drew in the new colour with its own travel strip still in the
+         old one. blockColour is the answer to "what colour is this block", and
+         it already handles the training topics this line was special-casing. */
+      const segColour = blockColour(b);
       const bc = bufferConflicts.perBlock.get(b.id);
       // Match the buffer strip to its own block's column, so a get-ready/drive
       // strip sits directly under (and the same width as) the card it belongs to

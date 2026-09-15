@@ -2237,7 +2237,8 @@ function applyTemplate(type) {
       actId: t.actId,
       startMin: START_MIN + t.startMin,
       durationMin: t.durationMin,
-      colour: t.colour || CAT_HEX[act?.cat] || '#888',
+      // Subgroup first, for the same reason as the quick break in js/05-helpers.js.
+      colour: t.colour || (act && activitySub(act).hex) || CAT_HEX[act?.cat] || '#888',
       objectives: t.objectives||[],
       note: '',
       tag: t.tag||null,

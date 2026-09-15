@@ -28,11 +28,11 @@
     --cat-sleep:   #c3aed6;
     --cat-school:  #6fb1fc;
     --cat-active:  #fb6f1c;
-    --cat-free:    #95d5b2;
+    --cat-free:    #7fca79;
     --cat-daily:   #ffd166;
     --cat-custom:  #ff9eb5;
-    --cat-training:#ef476f;
-    --cat-routine: #80cbc4;
+    --cat-training:#f2597d;
+    --cat-routine: #8ad8d0;
     /* Appointments — muted slate-blue. Deliberately the quietest category:
        an orthodontist visit is neither a treat nor a chore, and white text on
        it fails contrast like every other pastel here, so blocks carry dark ink. */
@@ -753,6 +753,19 @@
     font-size: calc(0.82rem * var(--fs-scale, 1)); font-weight: 700; color: var(--ink);
   }
   .tg-legend-chip { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+  /* Twelve subgroups read as six ideas: each category's chips sit together
+     behind its own name, so the key explains every hue on the grid without
+     becoming a wall of dots. */
+  .tg-legend-group { display: inline-flex; align-items: center; gap: 0.45rem; white-space: nowrap; }
+  /* At the kid floor (13.1px), not below it. Set smaller first and
+     kidScreensMeetTheHouseRules refused it at every width — this is a kid
+     screen, and "it is only a heading" is not an exemption. It stays quieter
+     than the chips through case, colour and tracking rather than size. */
+  .tg-legend-cat {
+    font-size: calc(0.82rem * var(--fs-scale, 1));
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--ink-muted); font-weight: 800;
+  }
   .tg-legend-dot {
     width: 12px; height: 12px; border-radius: 4px; display: inline-block;
     border: 1.5px solid var(--ink);

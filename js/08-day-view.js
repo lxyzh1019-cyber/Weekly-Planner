@@ -1152,7 +1152,8 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0
       _ownerId: b.id,
       startMin,
       durationMin: bufDur,
-      colour: b.colour || CAT_HEX[sourceAct?.cat] || '#888',
+      // The owner, not the seeded value — see the same note in js/07-week-view.js.
+      colour: blockColour(b),
       _isBuffer: true,
       _bufferCls: cls || '',
       _bufferLabel: (segConflict ? '⚠️ ' : '') + label,

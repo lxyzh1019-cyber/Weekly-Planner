@@ -1337,6 +1337,115 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* EVERY SUBGROUP TELLS ITSELF APART.
+
+     Five of the twelve subgroups were crowded into one green-teal corner, and
+     the worst pair — Helping hands and Play — sat at CIEDE2000 2.9, which is
+     not a difference an eye can report. They are in DIFFERENT categories, so a
+     chore and an afternoon of Minecraft drew as the same colour.
+
+     Two things this asserts, and the second is the subtler one.
+
+     THE METRIC. The palette was first separated with CIE76, which overstates
+     the distance between saturated greens by about double — it scored that same
+     pair at 49 after a "fix" that had not fixed it. colourDistance
+     (js/05-helpers.js) is CIEDE2000, and this check measures the same way the
+     table was chosen, rather than carrying its own copy.
+
+     WHICH PAIRS COUNT. Two subgroups inside ONE category are meant to look
+     related — Meals and Appointments are both Fuel & Care and sit at 9.8, and
+     that is the design working, not a defect. The floor applies to pairs that
+     cross a category boundary; within one, all that is required is that they
+     are not literally the same value. */
+  checks.everySubgroupTellsItselfApart = await page.evaluate(() => {
+    const bad = [];
+    /* 14 is the floor this palette clears with room (its worst cross-category
+       pair is Arts vs Outings at 15.0) and is comfortably above the ~5 at which
+       two colours stop being reliably distinguishable on a small card. Raising
+       it is a design decision, not a bug fix — six categories over a pastel
+       wheel that must all take dark ink is a genuinely tight budget. */
+    const FLOOR = 14;
+    const subs = [];
+    ACTIVITY_CATEGORIES.forEach(c => c.subs.forEach(sg => {
+      subs.push({ id: sg.id, label: sg.label, hex: sg.hex, cat: c.id });
+    }));
+    if (subs.length < 12) bad.push(`only ${subs.length} subgroups found`);
+
+    for (let i = 0; i < subs.length; i++) {
+      for (let j = i + 1; j < subs.length; j++) {
+        const a = subs[i], b = subs[j];
+        const d = colourDistance(a.hex, b.hex);
+        if (a.cat === b.cat) {
+          if (a.hex.toLowerCase() === b.hex.toLowerCase()) {
+            bad.push(`${a.label} and ${b.label} are the same hex ${a.hex}`);
+          }
+          continue;
+        }
+        if (d < FLOOR) {
+          bad.push(`${a.label} (${a.cat}) and ${b.label} (${b.cat}) are ${d.toFixed(1)} apart, under ${FLOOR}`);
+        }
+      }
+    }
+
+    /* Dark ink on every one of them, to AA. White text fails on all these
+       pastels (CLAUDE.md, UI rules), so a value too dark for ink has no legible
+       text at all — Training shipped at 4.27 until this check went in. */
+    subs.forEach(sg => {
+      if (!isLightColour(sg.hex)) bad.push(`${sg.label} ${sg.hex} is too dark for ink`);
+      const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+      const v = [1, 3, 5].map(i => parseInt(sg.hex.substr(i, 2), 16));
+      const L = 0.2126 * lin(v[0]) + 0.7152 * lin(v[1]) + 0.0722 * lin(v[2]);
+      const Link = 0.2126 * lin(0x2a) + 0.7152 * lin(0x23) + 0.0722 * lin(0x20);
+      const ratio = (L + 0.05) / (Link + 0.05);
+      if (ratio < 4.5) bad.push(`${sg.label} ${sg.hex} gives ink only ${ratio.toFixed(2)}:1`);
+    });
+
+    /* EVERY RETIRED HEX IS STILL SEEDED. blockColour ignores b.colour only
+       while the value is one the table itself wrote, so a hex dropped from
+       SEEDED_HEX_VALUES makes every block already carrying it read as a colour
+       somebody CHOSE — frozen at the old hue forever, with no migration
+       possible. This is the half of a recolour that fails silently. */
+    RETIRED_SEEDED_HEXES.forEach(h => {
+      if (!SEEDED_HEX_VALUES.has(h.toLowerCase())) {
+        bad.push(`retired hex ${h} is not in SEEDED_HEX_VALUES`);
+      }
+    });
+    const kid = activeProfile();
+    const key = getDayKeys(0)[0];
+    const had = (getDayBlocks(key) || []).slice();
+    try {
+      // A block seeded with a retired hue re-derives rather than keeping it.
+      setDayBlocks(key, [{ id: 'pal-old', actId: 'chores', startMin: 17 * 60,
+        durationMin: 30, colour: '#9fd3b8' }], kid);
+      const drew = blockColour(getDayBlocks(key, kid)[0], kid);
+      if (drew.toLowerCase() === '#9fd3b8') {
+        bad.push('a block seeded with the retired Helping hands hue still wears it');
+      }
+      // …while a colour a person really picked is left alone.
+      setDayBlocks(key, [{ id: 'pal-mine', actId: 'chores', startMin: 17 * 60,
+        durationMin: 30, colour: '#123456' }], kid);
+      if (blockColour(getDayBlocks(key, kid)[0], kid).toLowerCase() !== '#123456') {
+        bad.push('a hand-picked colour was overridden');
+      }
+    } finally { setDayBlocks(key, had, kid); }
+
+    /* ONE OWNER. groupHex used to be a second table holding four of these hexes
+       again, so a recolour would have moved the cards and left the hours charts
+       and the meeting bars on the old values. */
+    ACTIVITY_CATEGORIES.forEach(c => c.subs.forEach(sg => {
+      const g = groupHex(sg.group);
+      const anyWithGroup = [];
+      ACTIVITY_CATEGORIES.forEach(c2 => c2.subs.forEach(s2 => {
+        if (s2.group === sg.group) anyWithGroup.push(s2.hex.toLowerCase());
+      }));
+      if (!anyWithGroup.includes(String(g).toLowerCase())) {
+        bad.push(`groupHex('${sg.group}') is ${g}, which no subgroup wears`);
+      }
+    }));
+
+    return bad.length === 0 || bad;
+  });
+
   /* THE STRIP STILL SAYS WHEN TO LEAVE, AND WHEN YOU ARE BACK.
 
      Every clock time vanished from this surface. Three causes, compounding:

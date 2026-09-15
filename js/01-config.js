@@ -31,12 +31,11 @@ const QUIET_HOURS = { startMin: 21 * 60, endMin: 7 * 60 };
 const DEFAULT_KID_AGE = 10;
 const AGE_ROLLOVER_MONTH = 7;   // 0-based: August
 
-const CAT_COLOUR = {
-  sleep:'var(--cat-sleep)', school:'var(--cat-school)', active:'var(--cat-active)',
-  free:'var(--cat-free)', daily:'var(--cat-daily)', custom:'var(--cat-custom)',
-  training:'var(--cat-training)', routine:'var(--cat-routine)',
-  appointment:'var(--cat-appointment)'
-};
+/* CAT_COLOUR lived here: the same nine categories again, as `var(--cat-*)`
+   strings. It had ZERO consumers — a third copy of a colour table that nothing
+   ever read, which is worse than a duplicate that drifts, because a duplicate
+   that drifts at least shows up on a screen. CAT_HEX below is what the app
+   asks, and ACTIVITY_CATEGORIES is what owns the hues. */
 const CAT_HEX = {
   sleep:'#c3aed6', school:'#6fb1fc', active:'#fb6f1c',
   free:'#95d5b2', daily:'#ffd166', custom:'#ff9eb5', training:'#ef476f',
@@ -55,7 +54,8 @@ const CAT_HEX = {
 /* The nine shipped defaults, frozen as a SET so blockColour can tell a colour
    somebody chose from one a placement copied out of this table. Every placement
    path seeded `colour` from CAT_HEX, so the value alone cannot say which it
-   was — but a value that is exactly one of these was never a decision. */
+   was — but a value that is exactly one of these was never a decision. The
+   subgroup hexes and every hex this table has RETIRED join the set below. */
 const CAT_HEX_VALUES = new Set(Object.values(CAT_HEX).map(h => h.toLowerCase()));
 /* Every hex this app has ever SEEDED onto a block, as opposed to one somebody
    picked off the sheet's colour dots. The subgroup hexes join it below, once
@@ -84,21 +84,28 @@ const SEEDED_HEX_VALUES = new Set(CAT_HEX_VALUES);
    Brain and Body as a pair is deliberate: they name building something rather
    than being good at something, which is the performance-identity framing the
    copy rules forbid. */
+/* NO `hex` HERE. This table carried one, and eight of its rows repeated a value
+   that ACTIVITY_CATEGORIES below already owns — four of them exactly (routine,
+   chores, free, explore). A second copy of a colour table is the six-copies
+   defect this repo keeps recording, and it was one recolour away from firing:
+   move a subgroup's hue and the cards would wear the new one while the hours
+   charts and the meeting bars kept the old. `groupHex` derives from the
+   subgroups now, so there is one owner and nothing to keep in step. */
 const ACTIVITY_GROUPS = [
-  { id: 'routine', label: '🌅 Routine',            short: 'Routine', hex: '#80cbc4' },
-  { id: 'brain',   label: '🧠 Brain Construction', short: 'Brain',   hex: '#6fb1fc' },
-  { id: 'body',    label: '💪 Body Construction',  short: 'Body',    hex: '#ef476f' },
-  { id: 'chores',  label: '🧹 Helping hands',      short: 'Chores',  hex: '#9fd3b8' },
-  { id: 'daily',   label: '🍎 Fuel & Care',        short: 'Fuel',    hex: '#ffd166' },
-  { id: 'free',    label: '🎮 Play & Rest',        short: 'Play',    hex: '#95d5b2' },
+  { id: 'routine', label: '🌅 Routine',            short: 'Routine' },
+  { id: 'brain',   label: '🧠 Brain Construction', short: 'Brain'   },
+  { id: 'body',    label: '💪 Body Construction',  short: 'Body'    },
+  { id: 'chores',  label: '🧹 Helping hands',      short: 'Chores'  },
+  { id: 'daily',   label: '🍎 Fuel & Care',        short: 'Fuel'    },
+  { id: 'free',    label: '🎮 Play & Rest',        short: 'Play'    },
   /* Swimming for the fun of it is not the same ask as a training session, and
      filing both under Body said a length of the pool on Saturday was worth what
      a coached hour is. Everyday movement is its own row. */
-  { id: 'move',    label: '🏊 Everyday movement',  short: 'Move',    hex: '#ff9a76' },
+  { id: 'move',    label: '🏊 Everyday movement',  short: 'Move'    },
   /* A museum, a hike, a morning at the lake. Not effort in the sense Body means
      it, and not "free time" either — the week is shaped around it the way it is
      around an appointment. */
-  { id: 'explore', label: '🧭 Explore',            short: 'Explore', hex: '#7fb3a0' },
+  { id: 'explore', label: '🧭 Explore',            short: 'Explore' },
 ];
 const GROUP_ORDER = ACTIVITY_GROUPS.map(g => g.id);
 /* The fallback is looked up BY ID, not by position. It used to be
@@ -111,7 +118,15 @@ function groupDef(id) {
 }
 function groupLabel(id) { return groupDef(id).label; }
 function groupShort(id) { return groupDef(id).short; }
-function groupHex(id)   { return groupDef(id).hex; }
+/* Derived from the subgroup table, which is the one owner of every hue in the
+   app. A group is what the hours charts and the XP gate read; the FIRST
+   subgroup that names this group is the colour those rows should wear, so the
+   bar and the card a child sees can never disagree. The fallback is the grey
+   blockColour uses for a block nothing resolves — same answer, same reason. */
+function groupHex(id) {
+  const sub = Object.values(ACTIVITY_SUBS).find(sg => sg.group === id);
+  return (sub && sub.hex) || '#888';
+}
 
 /* Which group does this activity belong to?
 
@@ -178,10 +193,33 @@ function activityGroup(act) {
    contrast (CLAUDE.md, UI rules). Where a family already knows a colour it is
    kept: Routine's teal, Meals' amber, School's blue, Training's pink and Play's
    green are the shipped values unchanged. */
+/* ── MEASURE COLOUR DISTANCE THE WAY AN EYE DOES ──
+   These were first separated with CIE76, which overstates the distance between
+   saturated greens by roughly double: it scored Helping hands against Play at
+   49 where CIEDE2000 says 19, and a palette that cleared every threshold on
+   paper still had two DIFFERENT categories reading as one colour on an iPad.
+   `subgroupDistance` (js/05-helpers.js) is CIEDE2000, and
+   `everySubgroupTellsItselfApart` (tests/smoke.js) is what holds this table to
+   it. If you move a hex, run the suite — the arithmetic disagrees with intuition
+   in exactly the cases that matter.
+
+   THE FIGURE THAT MATTERS IS THE WORST *CROSS*-CATEGORY PAIR. Two subgroups
+   inside one category are MEANT to look related: Meals and Appointments are
+   both Fuel & Care and sit at 9.8, which is the design working. Two subgroups
+   in different categories reading as one colour is the defect — and that pair
+   used to be 2.9.
+
+   The green-teal corner held five of the twelve, so Helping hands leaves it
+   entirely: chores are not a shade of rest. It stays a cyan rather than going
+   warm, so Daily Rhythm still reads as one category — a light aqua and a deep
+   cyan are obviously siblings, which is the whole point of having categories. */
 const ACTIVITY_CATEGORIES = [
-  { id: 'rhythm', label: '🌅 Daily Rhythm', short: 'Rhythm', hex: '#80cbc4', subs: [
-    { id: 'routine',  label: '🌅 Routine',       hex: '#80cbc4', group: 'routine' },
-    { id: 'helping',  label: '🧹 Helping hands', hex: '#9fd3b8', group: 'chores'  },
+  { id: 'rhythm', label: '🌅 Daily Rhythm', short: 'Rhythm', hex: '#8ad8d0', subs: [
+    { id: 'routine',  label: '🌅 Routine',       hex: '#8ad8d0', group: 'routine' },
+    /* Deep cyan, not a green. This was #9fd3b8, which sat 2.9 from Play in
+       another category and 12.4 from its own sibling — the same colour to any
+       eye, on two cards that mean opposite things. */
+    { id: 'helping',  label: '🧹 Helping hands', hex: '#229eb1', group: 'chores'  },
   ]},
   { id: 'fuel', label: '🍎 Fuel & Care', short: 'Fuel', hex: '#ffd166', subs: [
     { id: 'meals',    label: '🍽 Meals',        hex: '#ffd166', group: 'daily' },
@@ -192,19 +230,48 @@ const ACTIVITY_CATEGORIES = [
   { id: 'brain', label: '🧠 Brain Construction', short: 'Brain', hex: '#6fb1fc', subs: [
     { id: 'school',   label: '🏫 School',   hex: '#6fb1fc', group: 'brain' },
     { id: 'language', label: '🗣 Language', hex: '#8ed0f0', group: 'brain' },
-    { id: 'arts',     label: '🎨 Arts',     hex: '#b3a4f0', group: 'brain' },
+    // Nudged off #b3a4f0 to hold its distance from Outings' orchid.
+    { id: 'arts',     label: '🎨 Arts',     hex: '#b0a0ea', group: 'brain' },
   ]},
-  { id: 'body', label: '💪 Body Construction', short: 'Body', hex: '#ef476f', subs: [
-    { id: 'training', label: '🏋️ Training',          hex: '#ef476f', group: 'body' },
+  { id: 'body', label: '💪 Body Construction', short: 'Body', hex: '#f2597d', subs: [
+    /* Lifted from #ef476f, which gave dark ink 4.27:1 — under the 4.5:1 the
+       house contrast rule asks for, and the only value in the table that failed
+       it. This is 4.78:1. */
+    { id: 'training', label: '🏋️ Training',          hex: '#f2597d', group: 'body' },
     { id: 'move',     label: '🏊 Everyday movement', hex: '#ff9a76', group: 'move' },
   ]},
-  { id: 'explore', label: '🧭 Explore', short: 'Explore', hex: '#7fb3a0', subs: [
-    { id: 'outings',  label: '🧭 Outings', hex: '#7fb3a0', group: 'explore' },
+  /* Out of the greens altogether. Explore was #7fb3a0, a sage that sat between
+     Routine's teal and Play's mint and was the reason all three blurred. */
+  { id: 'explore', label: '🧭 Explore', short: 'Explore', hex: '#d98ac8', subs: [
+    { id: 'outings',  label: '🧭 Outings', hex: '#d98ac8', group: 'explore' },
   ]},
-  { id: 'play', label: '🎮 Play & Rest', short: 'Play', hex: '#95d5b2', subs: [
-    { id: 'playtime', label: '🎮 Play',            hex: '#95d5b2', group: 'free' },
-    { id: 'seasonal', label: '🌟 Seasonal treats', hex: '#c8e6a0', group: 'free' },
+  { id: 'play', label: '🎮 Play & Rest', short: 'Play', hex: '#7fca79', subs: [
+    { id: 'playtime', label: '🎮 Play',            hex: '#7fca79', group: 'free' },
+    { id: 'seasonal', label: '🌟 Seasonal treats', hex: '#cfe06b', group: 'free' },
   ]},
+];
+
+/* ── WHAT THIS TABLE USED TO SAY ──
+   SEEDED_HEX_VALUES is what lets blockColour tell a colour somebody CHOSE from
+   one a placement copied out of the table, and every placement seeds the
+   subgroup's own hex. So the moment a hex changes here, the retired value drops
+   out of that set — and every block already on the calendar, carrying the old
+   value in `b.colour`, starts reading as a deliberate choice and keeps wearing
+   the hue it replaced FOREVER. No migration can fix that: `deepMergeObj` lets a
+   remote scalar win, so a device serving an older bundle out of a Pages cache
+   would push the old colours back over the new ones.
+
+   Answering at read time is the only safe shape, the same reasoning as `xp2`
+   and `achievementActivityId` — which means this list has to grow every time a
+   hex moves, and must never be pruned. */
+const RETIRED_SEEDED_HEXES = [
+  '#80cbc4', // routine, and Daily Rhythm's own hex
+  '#9fd3b8', // helping hands
+  '#b3a4f0', // arts
+  '#ef476f', // training, and Body Construction's own hex
+  '#7fb3a0', // outings, and Explore's own hex
+  '#95d5b2', // play, and Play & Rest's own hex
+  '#c8e6a0', // seasonal treats
 ];
 /* Flattened once, because every lookup below is by subgroup id and walking six
    nested arrays on every block of every render is work nobody needs. */
@@ -216,6 +283,7 @@ ACTIVITY_CATEGORIES.forEach(c => {
   SEEDED_HEX_VALUES.add(c.hex.toLowerCase());
   c.subs.forEach(sg => SEEDED_HEX_VALUES.add(sg.hex.toLowerCase()));
 });
+RETIRED_SEEDED_HEXES.forEach(h => SEEDED_HEX_VALUES.add(h.toLowerCase()));
 
 /* What a NEW block of this activity starts as. The four placement paths — two
    in addActivityAtMin, two in pickFromSlot — each wrote this out, so a default

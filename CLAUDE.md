@@ -901,14 +901,70 @@ practice, and all three drew in the same blue.
 So `ACTIVITY_CATEGORIES` (`js/01-config.js`): **six categories, each holding one
 or more subgroups**, and every shipped activity names one with `sub:`.
 
-| Category | Subgroups |
+| Category | Subgroups (hue) |
 |---|---|
-| 🌅 Daily Rhythm | Routine · Helping hands |
-| 🍎 Fuel & Care | Meals · Appointments |
-| 🧠 Brain Construction | School · Language · Arts |
-| 💪 Body Construction | Training · Everyday movement |
-| 🧭 Explore | Outings |
-| 🎮 Play & Rest | Play · Seasonal treats |
+| 🌅 Daily Rhythm | Routine `#8ad8d0` · Helping hands `#229eb1` |
+| 🍎 Fuel & Care | Meals `#ffd166` · Appointments `#e3c48f` |
+| 🧠 Brain Construction | School `#6fb1fc` · Language `#8ed0f0` · Arts `#b0a0ea` |
+| 💪 Body Construction | Training `#f2597d` · Everyday movement `#ff9a76` |
+| 🧭 Explore | Outings `#d98ac8` |
+| 🎮 Play & Rest | Play `#7fca79` · Seasonal treats `#cfe06b` |
+
+**Measure colour distance the way an eye does — CIEDE2000, never CIE76.** The
+first separation of this table used CIE76, which overstates the distance between
+saturated greens by roughly double: it scored Helping hands against Play at 49
+where the answer is **19**, so a palette that cleared every threshold on paper
+still had two *different* categories reading as one colour on an iPad. Worse,
+the "fix" it endorsed — deepening Play — walked it *toward* Helping hands,
+because both are greens. `colourDistance` (`js/05-helpers.js`) is CIEDE2000 and
+`everySubgroupTellsItselfApart` (`tests/smoke.js`) holds the table to it, so the
+check measures the same way the palette was chosen.
+
+**The figure that matters is the worst CROSS-category pair.** Two subgroups
+inside one category are *meant* to look related — Meals and Appointments are both
+Fuel & Care and sit at 9.8, which is the design working. Two subgroups in
+different categories reading as one colour is the defect, and that pair was
+**2.9**: Helping hands and Play, a chore and an afternoon of Minecraft, the same
+colour to any eye. The floor is 14 on cross-category pairs only; within a
+category all that is required is that two are not literally the same hex.
+
+Five of the twelve were crowded into one green-teal corner, so **Helping hands
+left it entirely** (chores are not a shade of rest) and **Explore left the greens
+too**. Helping hands went to a deep cyan rather than somewhere warm, so Daily
+Rhythm still reads as one category — a light aqua and a deep cyan are obviously
+siblings, which is the point of having categories at all. Training was lifted off
+`#ef476f` in the same pass: it gave dark ink 4.27:1, the one value in the table
+under the 4.5:1 the contrast rule asks for.
+
+**A recolour has a half that fails silently.** `SEEDED_HEX_VALUES` is what lets
+`blockColour` tell a colour somebody CHOSE from one a placement copied out of the
+table — so the moment a hex changes, the retired value drops out of that set and
+every block already on the calendar starts reading as a deliberate choice,
+frozen at the old hue **forever**. No migration can fix it: `deepMergeObj` lets a
+remote scalar win, so a device serving an older bundle out of a Pages cache would
+push the old colours straight back. `RETIRED_SEEDED_HEXES` (`js/01-config.js`)
+must **grow on every recolour and never be pruned**, and the guard asserts both
+halves — a retired hue re-derives, a hand-picked one is left alone.
+
+**One owner, and the recolour is what proves it.** `ACTIVITY_GROUPS` carried its
+own `hex` on every row, four of them repeating a subgroup value exactly, so
+moving a hue would have recoloured the cards and left the hours charts and the
+meeting bars on the old values. `groupHex` derives from the subgroup table now.
+The same trap sat in three render paths that read `b.colour || CAT_HEX[act.cat]`
+directly — the week and day buffer strips and the sibling preview — which takes
+the SEEDED value `blockColour` exists to ignore, so a card would have drawn in
+the new hue with its own travel strip still in the old one. All three call
+`blockColour`. `CAT_COLOUR`, a third copy of the same table with zero consumers,
+is gone.
+
+**The week legend draws the colours the cards actually wear.** It listed the
+eight chart groups, then the six categories — closer, but still not what a card
+wears. Half the hues on the grid (Helping hands, Appointments, Language, Arts,
+Everyday movement, Seasonal treats) appeared in no key at all, one of them the
+very colour a parent could not tell from Play. All twelve now, grouped under
+their category so it still reads as six ideas. `.tg-legend-cat` sits at the kid
+floor of 13.1px, not below it — this is a kid screen, and "it is only a heading"
+is not an exemption.
 
 **The subgroup is the hue; the category picks it.** `blockColour` reads
 `activitySub(act).hex`. A stored `b.colour` counts only when somebody CHOSE it:
@@ -1017,8 +1073,8 @@ other direction: every group the app prices must be one the test has an opinion
 about, because iterating its own `want` map is a whitelist that a new group
 passes unnoticed.
 
-`cat` still decides a block's **colour** (`CAT_HEX`, `blockColour`) and drives
-the picker's filters. This answers a different question, and it is the only one
+`cat` still drives the picker's filters, and `CAT_HEX` survives only as
+`blockColour`'s last fallback — the SUBGROUP is what decides a block's colour. This answers a different question, and it is the only one
 the hours charts and the XP gate may ask. Two questions, two tables.
 
 There were **six** copies of a label table before this, already disagreeing:
