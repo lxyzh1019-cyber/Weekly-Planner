@@ -52,6 +52,19 @@ const CAT_HEX = {
   competition:'#f4a340'
 };
 
+/* The nine shipped defaults, frozen as a SET so blockColour can tell a colour
+   somebody chose from one a placement copied out of this table. Every placement
+   path seeded `colour` from CAT_HEX, so the value alone cannot say which it
+   was — but a value that is exactly one of these was never a decision. */
+const CAT_HEX_VALUES = new Set(Object.values(CAT_HEX).map(h => h.toLowerCase()));
+/* Every hex this app has ever SEEDED onto a block, as opposed to one somebody
+   picked off the sheet's colour dots. The subgroup hexes join it below, once
+   ACTIVITY_CATEGORIES exists — a placement seeds the subgroup's own colour so
+   the sheet opens showing the right one, and that must not then read as a
+   decision, or changing a subgroup's hue would leave every block already placed
+   wearing the old one. */
+const SEEDED_HEX_VALUES = new Set(CAT_HEX_VALUES);
+
 /* ── ONE owner for what KIND of thing a block is ──────────────────
    Six groups, and the reason there is a table at all is that there used to be
    five of them, drifting. `cat:'daily'` was labelled "🧹 Chores" by the meeting
@@ -75,13 +88,13 @@ const ACTIVITY_GROUPS = [
   { id: 'routine', label: '🌅 Routine',            short: 'Routine', hex: '#80cbc4' },
   { id: 'brain',   label: '🧠 Brain Construction', short: 'Brain',   hex: '#6fb1fc' },
   { id: 'body',    label: '💪 Body Construction',  short: 'Body',    hex: '#ef476f' },
-  { id: 'chores',  label: '🧹 Chores',             short: 'Chores',  hex: '#ffd166' },
-  { id: 'daily',   label: '🍽 Daily',              short: 'Daily',   hex: '#e8a87c' },
-  { id: 'free',    label: '🎮 Free',               short: 'Free',    hex: '#95d5b2' },
+  { id: 'chores',  label: '🧹 Helping hands',      short: 'Chores',  hex: '#9fd3b8' },
+  { id: 'daily',   label: '🍎 Fuel & Care',        short: 'Fuel',    hex: '#ffd166' },
+  { id: 'free',    label: '🎮 Play & Rest',        short: 'Play',    hex: '#95d5b2' },
   /* Swimming for the fun of it is not the same ask as a training session, and
      filing both under Body said a length of the pool on Saturday was worth what
      a coached hour is. Everyday movement is its own row. */
-  { id: 'move',    label: '🏊 Everyday movement',  short: 'Move',    hex: '#f4a340' },
+  { id: 'move',    label: '🏊 Everyday movement',  short: 'Move',    hex: '#ff9a76' },
   /* A museum, a hike, a morning at the lake. Not effort in the sense Body means
      it, and not "free time" either — the week is shaped around it the way it is
      around an appointment. */
@@ -117,6 +130,13 @@ function groupHex(id)   { return groupDef(id).hex; }
 function activityGroup(act) {
   if (!act) return 'daily';
   if (act.group && GROUP_ORDER.includes(act.group)) return act.group;
+  /* The subgroup names a default group, which is what lets the catalog say
+     "Arts" once instead of "Arts, and by the way that counts as Brain" on ten
+     rows. An explicit `group:` above still wins — that is how Muscle Relaxation
+     sits with the movement activities on the page and still earns nothing. */
+  if (act.sub && ACTIVITY_SUBS[act.sub] && GROUP_ORDER.includes(ACTIVITY_SUBS[act.sub].group)) {
+    return ACTIVITY_SUBS[act.sub].group;
+  }
   if (act.isRoutine) return 'routine';
   if (act.isTraining || act.isCompetition) return 'body';
   switch (act.cat) {
@@ -134,6 +154,142 @@ function activityGroup(act) {
   }
 }
 
+/* ── CATEGORY › SUBGROUP › ACTIVITY ───────────────────────────────
+   The third question about an activity, and the reason it is a third table
+   rather than a column on one of the other two.
+
+   `cat` answers "what colour is this block" and drives nothing else now.
+   `group` answers "what is this time FOR" — the eight rows every hours chart
+   and the XP gate read, unchanged. Neither is a shape a person can navigate: a
+   picker with nine flat chips, three of which mean the same thing to a
+   ten-year-old, is a list you scroll rather than a place you know your way
+   around.
+
+   So: six categories, each holding one or more subgroups, and every activity
+   names a subgroup with `sub:`. The subgroup decides the COLOUR (a variant of
+   its category's hue) and where the activity sits in the picker; the subgroup's
+   `group` is the default for the chart row, and an explicit `group:` on the
+   activity still wins — which is how Muscle Relaxation sits with the movement
+   activities where it belongs in her week while still earning nothing, and how
+   Family Meeting sits beside the routines without being counted as one.
+
+   Colours: a category picks the hue, a subgroup varies it. Every one is a
+   pastel that takes dark ink — never white text on these, which all fail
+   contrast (CLAUDE.md, UI rules). Where a family already knows a colour it is
+   kept: Routine's teal, Meals' amber, School's blue, Training's pink and Play's
+   green are the shipped values unchanged. */
+const ACTIVITY_CATEGORIES = [
+  { id: 'rhythm', label: '🌅 Daily Rhythm', short: 'Rhythm', hex: '#80cbc4', subs: [
+    { id: 'routine',  label: '🌅 Routine',       hex: '#80cbc4', group: 'routine' },
+    { id: 'helping',  label: '🧹 Helping hands', hex: '#9fd3b8', group: 'chores'  },
+  ]},
+  { id: 'fuel', label: '🍎 Fuel & Care', short: 'Fuel', hex: '#ffd166', subs: [
+    { id: 'meals',    label: '🍽 Meals',        hex: '#ffd166', group: 'daily' },
+    /* Muted on purpose and kept apart from the meals: an appointment is a time
+       somebody else set, it is not a treat, and it is not a chore either. */
+    { id: 'appts',    label: '🩺 Appointments', hex: '#e3c48f', group: 'daily' },
+  ]},
+  { id: 'brain', label: '🧠 Brain Construction', short: 'Brain', hex: '#6fb1fc', subs: [
+    { id: 'school',   label: '🏫 School',   hex: '#6fb1fc', group: 'brain' },
+    { id: 'language', label: '🗣 Language', hex: '#8ed0f0', group: 'brain' },
+    { id: 'arts',     label: '🎨 Arts',     hex: '#b3a4f0', group: 'brain' },
+  ]},
+  { id: 'body', label: '💪 Body Construction', short: 'Body', hex: '#ef476f', subs: [
+    { id: 'training', label: '🏋️ Training',          hex: '#ef476f', group: 'body' },
+    { id: 'move',     label: '🏊 Everyday movement', hex: '#ff9a76', group: 'move' },
+  ]},
+  { id: 'explore', label: '🧭 Explore', short: 'Explore', hex: '#7fb3a0', subs: [
+    { id: 'outings',  label: '🧭 Outings', hex: '#7fb3a0', group: 'explore' },
+  ]},
+  { id: 'play', label: '🎮 Play & Rest', short: 'Play', hex: '#95d5b2', subs: [
+    { id: 'playtime', label: '🎮 Play',            hex: '#95d5b2', group: 'free' },
+    { id: 'seasonal', label: '🌟 Seasonal treats', hex: '#c8e6a0', group: 'free' },
+  ]},
+];
+/* Flattened once, because every lookup below is by subgroup id and walking six
+   nested arrays on every block of every render is work nobody needs. */
+const ACTIVITY_SUBS = ACTIVITY_CATEGORIES.reduce((m, c) => {
+  c.subs.forEach(sg => { m[sg.id] = Object.assign({}, sg, { cat: c.id }); });
+  return m;
+}, {});
+ACTIVITY_CATEGORIES.forEach(c => {
+  SEEDED_HEX_VALUES.add(c.hex.toLowerCase());
+  c.subs.forEach(sg => SEEDED_HEX_VALUES.add(sg.hex.toLowerCase()));
+});
+
+/* What a NEW block of this activity starts as. The four placement paths — two
+   in addActivityAtMin, two in pickFromSlot — each wrote this out, so a default
+   added to one pair was missing from the other; warm-up is the case in point,
+   since only a coached session wants one. One writer, both sheets. */
+function activityPlacementDraft(act) {
+  const training = !!(act && act.isTraining);
+  const base = {
+    durationMin: activityDefaultDuration(act) || (training ? 120 : 60),
+    colour: training ? CAT_HEX.training : (activitySub(act).hex || COLOURS[0]),
+    note: '', repeat: false, repeatDays: [], objectives: [],
+    travelBuffer: activityTravels(act),
+    getReadyBuffer: activityTravels(act),
+    travelBufMin: DEFAULT_BUFFER_MIN,
+    getReadyBufMin: DEFAULT_BUFFER_MIN,
+  };
+  if (!training) return Object.assign(base, { choreTags: [] });
+  return Object.assign(base, {
+    tag: 'skating', compName: '', gearState: {},
+    warmupBuffer: activityWarmsUp(act),
+    warmupBufMin: DEFAULT_WARMUP_MIN,
+  });
+}
+
+/* Which subgroup does this activity belong to?
+
+   DERIVED, NEVER MIGRATED — the same reasoning as `xp2` and
+   `achievementActivityId`. Every custom activity already in Firestore carries a
+   `cat` and no `sub`, and `deepMergeObj` lets a remote scalar win, so a device
+   still serving an older bundle out of a Pages cache could push an un-stamped
+   record back over a stamped one. Answering at read time gives the same answer
+   whatever has run, however often, in any merge order, and writes nothing. */
+function activitySub(act) {
+  if (!act) return ACTIVITY_SUBS.meals;
+  if (act.sub && ACTIVITY_SUBS[act.sub]) return ACTIVITY_SUBS[act.sub];
+  // A family's own activity, or a shipped one from before this table existed.
+  if (act.isRoutine) return ACTIVITY_SUBS.routine;
+  if (act.group === 'chores') return ACTIVITY_SUBS.helping;
+  if (act.group === 'explore') return ACTIVITY_SUBS.outings;
+  if (act._seasonal || act.season) return ACTIVITY_SUBS.seasonal;
+  switch (act.cat) {
+    case 'routine':     return ACTIVITY_SUBS.routine;
+    case 'appointment': return ACTIVITY_SUBS.appts;
+    case 'school':      return ACTIVITY_SUBS.school;
+    case 'training':    return ACTIVITY_SUBS.training;
+    case 'active':      return ACTIVITY_SUBS.move;
+    case 'daily':       return ACTIVITY_SUBS.meals;
+    case 'free': case 'sleep': case 'custom': return ACTIVITY_SUBS.playtime;
+    /* Same neutral landing as activityGroup's: an activity nothing can resolve
+       is filed rather than dropped, because a picker that silently omits an
+       entry is worse than one that files it vaguely. */
+    default:            return ACTIVITY_SUBS.meals;
+  }
+}
+function activityCategory(act) {
+  return ACTIVITY_CATEGORIES.find(c => c.id === activitySub(act).cat) || ACTIVITY_CATEGORIES[1];
+}
+function subDef(id) { return ACTIVITY_SUBS[id] || ACTIVITY_SUBS.meals; }
+/* The legacy `cat` a new activity should carry. Still written on every record,
+   because the sticker conditions (js/06-quests.js), the Athlete achievement and
+   ACTIVITY_OBJECTIVES_BY_CAT all key on it — an activity saved without one
+   would silently drop out of all three. Nothing reads it for colour or
+   filtering any more. */
+const SUB_LEGACY_CAT = {
+  routine: 'routine', helping: 'daily', meals: 'daily', appts: 'appointment',
+  school: 'school', language: 'school', arts: 'school',
+  training: 'training', move: 'active', outings: 'free',
+  playtime: 'free', seasonal: 'free',
+};
+function catForSub(id) { return SUB_LEGACY_CAT[id] || 'free'; }
+function catDef(id) {
+  return ACTIVITY_CATEGORIES.find(c => c.id === id) || ACTIVITY_CATEGORIES[1];
+}
+
 /* ── Do you GO to this, or do you do it here? ─────────────────────
    Both placement sheets started every buffer switched off, so a swim and a
    skate were planned as though they happened at the kitchen table — and
@@ -147,6 +303,11 @@ function activityGroup(act) {
 
    Every toggle stays exactly where it is. Only the starting position moves. */
 function activityTravels(act) { return !!(act && act.travels); }
+/* And a coached session warms up at the venue, which is a third buffer with its
+   own default. Same rule as travels: it comes from the ACTIVITY, never from a
+   global switch — a warm-up in front of Breakfast is exactly what that would
+   produce. Only Training and Competition carry it. */
+function activityWarmsUp(act) { return !!(act && act.warmsUp); }
 
 /* ── One filter table ──
    The day screen's activity picker and the tray each carried their own copy of
@@ -157,29 +318,30 @@ function activityTravels(act) { return !!(act && act.travels); }
 
    `seasonal` and `custom` match on a flag rather than a category, which is why
    filtering goes through activityMatchesFilter instead of comparing a.cat. */
-const ACTIVITY_FILTERS = [
-  { id:'daily',       label:'🍽 Daily' },
-  { id:'routine',     label:'🌅 Routines' },
-  { id:'school',      label:'📚 Learning' },
-  { id:'active',      label:'🏃 Active' },
-  { id:'training',    label:'🏋️ Competitive Sports' },
-  { id:'appointment', label:'🩺 Appointments' },
-  { id:'free',        label:'🎮 Free' },
-  { id:'sleep',       label:'😴 Rest' },
-  { id:'custom',      label:'✨ Mine' },
-  { id:'seasonal',    label:'🌟 Seasonal' },
-];
+/* THE CHIPS ARE THE CATEGORIES. This was nine flat `cat` values plus Seasonal
+   and Mine, and three of them — Daily, Routines, Rest — name the same part of a
+   ten-year-old's day; "Learning" held a school day, a French lesson and a piano
+   practice; and Seasonal was a chip about WHEN an activity is available rather
+   than what it is.
+
+   One row per category now, so the chips and the activity tree are the same
+   shape, and inside a category the list is grouped by subgroup. Seasonal is a
+   subgroup of Play & Rest — `_locked` still keeps Beach Day out of January, so
+   nothing about availability changes, only where it is filed.
+
+   Mine stays, and stays last: it means "made by this family, wherever it was
+   filed", which is a different question from all six and the only way to find
+   the thing you made. */
+const ACTIVITY_FILTERS = ACTIVITY_CATEGORIES.map(c => ({ id: c.id, label: c.label }))
+  .concat([{ id: 'custom', label: '✨ Mine' }]);
 function activityMatchesFilter(act, filterId) {
   if (!act) return false;
   if (!filterId || filterId === 'all') return true;
-  if (filterId === 'seasonal') return !!act._seasonal;
   // "Mine" means made by this family, wherever it was filed. A custom activity
-  // saved as, say, Free would otherwise be findable only under Free — and the
+  // saved as, say, Play would otherwise be findable only under Play — and the
   // point of the chip is to find the thing you made.
   if (filterId === 'custom') return !!act.custom || act.cat === 'custom';
-  // Category is the source of truth — isTraining is a shared UI mechanism
-  // (objectives/gear/tags) between Competitive Sports and Competition, not a category.
-  return act.cat === filterId;
+  return activitySub(act).cat === filterId;
 }
 
 /* Training tags + sport-specific starter objectives. Each topic carries its
@@ -238,9 +400,27 @@ function trainingBlockColour(b) {
    exists, so an archived activity must still resolve. */
 function blockColour(b, kid) {
   if (!b) return '#888';
-  const act = findActivity(b.actId, kid) || {};
+  const act = findActivity(b.actId, kid);
+  /* NOTHING ANSWERS TO THIS ID — an import, or a custom activity deleted on
+     another device before the archive rule existed. Grey is the honest answer
+     and it must stay explicit: activitySub's neutral landing is `meals`, which
+     is right for filing an hours total vaguely and wrong for colour. A block
+     nobody can name drawn in Breakfast amber does not say "unknown", it says
+     "breakfast". */
+  if (!act) return b.colour || '#888';
   if (act.isTraining) return trainingBlockColour(b);
-  return b.colour || CAT_HEX[act.cat] || '#888';
+  /* THE SUBGROUP IS THE HUE. `cat` used to be, and nine flat values could not
+     tell a piano lesson from a French lesson from a school day — all three came
+     out the same blue — nor an appointment from a museum trip.
+
+     A stored `b.colour` only counts when somebody CHOSE it. Every placement
+     wrote one, seeding it from CAT_HEX, so a colour equal to one of those nine
+     shipped defaults is not a choice, it is the old default written down; a
+     colour picked from the sheet's dots is, and survives. Nothing is migrated —
+     the answer is derived on every read, which is the same answer in any merge
+     order (see activitySub). */
+  if (b.colour && !SEEDED_HEX_VALUES.has(String(b.colour).toLowerCase())) return b.colour;
+  return activitySub(act).hex || CAT_HEX[act.cat] || '#888';
 }
 
 /* Figure skating: landing doubles, targeting double axel */
@@ -481,75 +661,75 @@ const DEFAULT_ACTIVITIES = [
      20 because that is what they actually take; Tomorrow Ready is archived
      below, since "pack for tomorrow" is a LINE of the evening routine and two
      blocks for one job is how a child ends up ticking neither. */
-  { id:'routine_morning',     name:'Morning Routine',      icon:'🌅', cat:'routine', durationMin:30, isRoutine:true, routineId:'morning',     suitableTime:['before-school','weekend'] },
-  { id:'routine_afterschool', name:'After-School Routine', icon:'🎒', cat:'routine', durationMin:20, isRoutine:true, routineId:'afterschool', suitableTime:['after-school'] },
-  { id:'routine_evening',     name:'Evening Routine',      icon:'🌙', cat:'routine', durationMin:30, isRoutine:true, routineId:'evening',     suitableTime:['evening','weekend'] },
+  { id:'routine_morning', sub:'routine',     name:'Morning Routine',      icon:'🌅', cat:'routine', durationMin:30, isRoutine:true, routineId:'morning',     suitableTime:['before-school','weekend'] },
+  { id:'routine_afterschool', sub:'routine', name:'After-School Routine', icon:'🎒', cat:'routine', durationMin:20, isRoutine:true, routineId:'afterschool', suitableTime:['after-school'] },
+  { id:'routine_evening', sub:'routine',     name:'Evening Routine',      icon:'🌙', cat:'routine', durationMin:30, isRoutine:true, routineId:'evening',     suitableTime:['evening','weekend'] },
 
   /* ── Fuel and care ─────────────────────────────────────────────
      Lunch is weekends only: on a school day it sits inside the School band and
      is set by the lunch recess in the calendar, so offering it as a block to
      place was asking her to plan something the school had already planned. */
-  { id:'breakfast',  name:'Breakfast', icon:'🍳', cat:'daily', durationMin:20, suitableTime:['before-school','weekend'] },
-  { id:'lunch',      name:'Lunch',     icon:'🥗', cat:'daily', durationMin:30, suitableTime:['weekend'] },
-  { id:'dinner',     name:'Dinner',    icon:'🍽', cat:'daily', durationMin:45, suitableTime:['evening','weekend'] },
+  { id:'breakfast', sub:'meals',  name:'Breakfast', icon:'🍳', cat:'daily', durationMin:20, suitableTime:['before-school','weekend'] },
+  { id:'lunch', sub:'meals',      name:'Lunch',     icon:'🥗', cat:'daily', durationMin:30, suitableTime:['weekend'] },
+  { id:'dinner', sub:'meals',     name:'Dinner',    icon:'🍽', cat:'daily', durationMin:45, suitableTime:['evening','weekend'] },
   // Renamed from "Recovery Fuel" — same id, so every block that ever named it
   // still resolves, and the name now says when it is for.
-  { id:'health_recovery_fuel', name:'Post-Training Snack', icon:'🍎', cat:'daily', durationMin:15, suitableTime:['after-school','evening'] },
+  { id:'health_recovery_fuel', sub:'meals', name:'Post-Training Snack', icon:'🍎', cat:'daily', durationMin:15, suitableTime:['after-school','evening'] },
 
   /* Appointments — a time somebody else set. Not moveable, and a week with one
      is shaped around it, which is why they are their own category rather than
      being filed under Daily. */
-  { id:'appt_general',     name:'Appointment',      icon:'🗓', cat:'appointment', travels:true, durationMin:60, suitableTime:['after-school','school','weekend'] },
-  { id:'appt_medical',     name:'Doctor / Dentist', icon:'🩺', cat:'appointment', travels:true, durationMin:60, suitableTime:['after-school','school','weekend'] },
-  { id:'appt_haircut',     name:'Haircut',          icon:'✂️', cat:'appointment', travels:true, durationMin:45, suitableTime:['after-school','weekend'] },
-  { id:'appt_school_meet', name:'School Meeting',   icon:'🧑‍🏫', cat:'appointment', travels:true, durationMin:30, suitableTime:['after-school','evening'] },
-  { id:'appt_physio',      name:'Physio',           icon:'🦴', cat:'appointment', travels:true, durationMin:45, suitableTime:['after-school'] },
+  { id:'appt_general', sub:'appts',     name:'Appointment',      icon:'🗓', cat:'appointment', travels:true, durationMin:60, suitableTime:['after-school'] },
+  { id:'appt_medical', sub:'appts',     name:'Doctor / Dentist', icon:'🩺', cat:'appointment', travels:true, durationMin:60, suitableTime:['after-school'] },
+  { id:'appt_haircut', sub:'appts',     name:'Haircut',          icon:'✂️', cat:'appointment', travels:true, durationMin:45, suitableTime:['after-school','weekend'] },
+  { id:'appt_school_meet', sub:'appts', name:'School Meeting',   icon:'🧑‍🏫', cat:'appointment', travels:true, durationMin:30, suitableTime:['after-school','evening'] },
+  { id:'appt_physio', sub:'appts',      name:'Physio',           icon:'🦴', cat:'appointment', travels:true, durationMin:45, suitableTime:['after-school'] },
   // The family sitting down together. Not the weekly meeting the app runs —
   // that is a parent tool; this is the hour it takes on the calendar.
-  { id:'family_meeting',   name:'Family Meeting',   icon:'🗣', cat:'daily', durationMin:30, suitableTime:['evening','weekend'] },
+  { id:'family_meeting', sub:'routine', group:'daily', name:'Family Meeting', icon:'🗣', cat:'daily', durationMin:30, suitableTime:['evening','weekend'] },
 
   /* ── Brain construction ────────────────────────────────────────
      Homework defaults to 45, not 90: at this age two 45s beat one 90, and the
      girls were already placing 45s by hand. Piano is 30 for the same reason —
      the old 60 is why a second 30-minute "Piano" kept getting created. */
-  { id:'school_day', name:'School Day',        icon:'🏫', cat:'school', travels:true, durationMin:420, suitableTime:['school'] },
-  { id:'homework',   name:'Homework',          icon:'📚', cat:'school', durationMin:45, suitableTime:['after-school','evening'] },
-  { id:'reading',    name:'Reading',           icon:'📖', cat:'school', durationMin:30, suitableTime:['before-school','evening','weekend'] },
-  { id:'math',       name:'Math Adventure',    icon:'🦘', cat:'school', durationMin:30, suitableTime:['after-school','evening','weekend'] },
-  { id:'french',     name:'French Adventure',  icon:'🇫🇷', cat:'school', durationMin:30, suitableTime:['after-school','evening','weekend'] },
-  { id:'chinese',    name:'Chinese Adventure', icon:'🇨🇳', cat:'school', durationMin:30, suitableTime:['after-school','evening','weekend'] },
-  { id:'piano',      name:'Piano Practice',    icon:'🎹', cat:'school', durationMin:30, suitableTime:['after-school','evening','weekend'] },
-  { id:'singing',    name:'Singing',           icon:'🎤', cat:'school', durationMin:30, suitableTime:['after-school','evening','weekend'] },
+  { id:'school_day', sub:'school', name:'School Day',        icon:'🏫', cat:'school', travels:true, durationMin:420, suitableTime:['school'] },
+  { id:'homework', sub:'school',   name:'Homework',          icon:'📚', cat:'school', durationMin:45, suitableTime:['after-school','evening'] },
+  { id:'reading', sub:'school',    name:'Reading',           icon:'📖', cat:'school', durationMin:30, suitableTime:['before-school','evening','weekend'] },
+  { id:'math', sub:'school',       name:'Math Adventure',    icon:'🦘', cat:'school', durationMin:30, suitableTime:['after-school','evening','weekend'] },
+  { id:'french', sub:'language',     name:'French Adventure',  icon:'🇫🇷', cat:'school', durationMin:30, suitableTime:['after-school','evening','weekend'] },
+  { id:'chinese', sub:'language',    name:'Chinese Adventure', icon:'🇨🇳', cat:'school', durationMin:30, suitableTime:['after-school','evening','weekend'] },
+  { id:'piano', sub:'arts',      name:'Piano Practice',    icon:'🎹', cat:'school', durationMin:30, suitableTime:['after-school','evening','weekend'] },
+  { id:'singing', sub:'arts',    name:'Singing',           icon:'🎤', cat:'school', durationMin:30, suitableTime:['after-school','evening','weekend'] },
   // One Drawing, not one per medium: which kind is a goal on the block (see
   // ACTIVITY_OBJECTIVES_BY_ID), the way a Training block carries its focus.
-  { id:'drawing',    name:'Drawing',           icon:'🎨', cat:'school', durationMin:45, suitableTime:['after-school','weekend'] },
+  { id:'drawing', sub:'arts',    name:'Drawing',           icon:'🎨', cat:'school', durationMin:45, suitableTime:['after-school','weekend'] },
   // 🧵 rather than the scissors: ✂️ is Haircut, and on a short week card the
   // icon is sometimes the only thing drawn.
-  { id:'craft',      name:'Craft',             icon:'🧵', cat:'school', durationMin:60, suitableTime:['weekend'] },
+  { id:'craft', sub:'arts',      name:'Craft',             icon:'🧵', cat:'school', durationMin:60, suitableTime:['weekend'] },
 
   /* ── Body construction: training ───────────────────────────────
      A coached session. Body Maintenance is isTraining so it resolves the
      dryland objectives, but it carries no travel — it happens on the floor at
      home. */
-  { id:'training',         name:'Training',         icon:'🏋️', cat:'training', durationMin:120, isTraining:true, travels:true, suitableTime:['after-school','weekend'] },
-  { id:'competition',      name:'Competition',      icon:'🏆', cat:'training', durationMin:480, isTraining:true, isCompetition:true, travels:true, suitableTime:['weekend'] },
-  { id:'body_maintenance', name:'Body Maintenance', icon:'⛹️', cat:'training', durationMin:30, isTraining:true, suitableTime:['evening','weekend'] },
+  { id:'training', sub:'training',         name:'Training',         icon:'🏋️', cat:'training', durationMin:120, isTraining:true, travels:true, warmsUp:true, suitableTime:['after-school','weekend'] },
+  { id:'competition', sub:'training',      name:'Competition',      icon:'🏆', cat:'training', durationMin:480, isTraining:true, isCompetition:true, travels:true, warmsUp:true, suitableTime:['weekend'] },
+  { id:'body_maintenance', sub:'training', name:'Body Maintenance', icon:'⛹️', cat:'training', durationMin:30, isTraining:true, suitableTime:['evening','weekend'] },
 
   /* ── Everyday movement ─────────────────────────────────────────
      Hers, not a coach's. Swimming and Skating exist here AS WELL AS the
      training tags of the same names, and that is the point: a length of the
      pool on a Saturday is not the same ask as a coached hour, and filing both
      under Training made the hours chart unable to tell them apart. */
-  { id:'swimming',  name:'Swimming',   icon:'🏊', cat:'active', travels:true, durationMin:60, suitableTime:['after-school','weekend'] },
-  { id:'skating',   name:'Skating',    icon:'⛸', cat:'active', travels:true, durationMin:60, suitableTime:['after-school','weekend'] },
-  { id:'ballet',    name:'Ballet',     icon:'🩰', cat:'active', travels:true, durationMin:60, suitableTime:['after-school'] },
-  { id:'bike_ride', name:'Bike ride',  icon:'🚴', cat:'active', durationMin:45, suitableTime:['after-school','weekend'] },
-  { id:'health_stretch_reset', name:'Stretch Reset', icon:'🤸', cat:'active', durationMin:15, suitableTime:['after-school','evening'] },
+  { id:'swimming', sub:'move',  name:'Swimming',   icon:'🏊', cat:'active', travels:true, durationMin:60, suitableTime:['after-school','weekend'] },
+  { id:'skating', sub:'move',   name:'Skating',    icon:'⛸', cat:'active', travels:true, durationMin:60, suitableTime:['after-school','weekend'] },
+  { id:'ballet', sub:'move',    name:'Ballet',     icon:'🩰', cat:'active', travels:true, durationMin:60, suitableTime:['after-school'] },
+  { id:'bike_ride', sub:'move', name:'Bike ride',  icon:'🚴', cat:'active', durationMin:45, suitableTime:['after-school','weekend'] },
+  { id:'health_stretch_reset', sub:'move', name:'Stretch Reset', icon:'🤸', cat:'active', durationMin:15, suitableTime:['after-school','evening'] },
   /* Filed under Rest and earning nothing, deliberately. It sits with the
      movement activities on the page because that is where it belongs in her
      week, but rest that scores is rest turned into another thing to perform —
      see CLAUDE.md on off days being a valid state. */
-  { id:'relax',     name:'Muscle Relaxation', icon:'🧘', cat:'sleep', group:'free', durationMin:30, suitableTime:['evening','weekend'] },
+  { id:'relax', sub:'move',     name:'Muscle Relaxation', icon:'🧘', cat:'sleep', group:'free', durationMin:30, suitableTime:['evening'] },
 
   /* ── Explore ───────────────────────────────────────────────────
      One-word names wherever one will do. "Nature Walk / Hike" and "Museum /
@@ -560,23 +740,23 @@ const DEFAULT_ACTIVITIES = [
      Everything here travels. They carry an explicit group because `cat` is
      doing its other job — saying what colour the block is — and there is no
      outing colour: two questions, two tables. */
-  { id:'day_trip',     name:'Day Trip',                icon:'🎈', cat:'free',   group:'explore', travels:true, durationMin:360, suitableTime:['weekend'], social:true },
-  { id:'air_show',     name:'Air Show',                icon:'✈️', cat:'free',   group:'explore', travels:true, durationMin:240, suitableTime:['weekend'], social:true },
-  { id:'aviation_day', name:'Aviation Day',           icon:'👩‍✈️', cat:'free', group:'explore', travels:true, durationMin:240, suitableTime:['weekend'], social:true },
-  { id:'museum',       name:'Museum',                 icon:'🏛', cat:'free',   group:'explore', travels:true, durationMin:180, suitableTime:['weekend'], social:true },
+  { id:'day_trip', sub:'outings',     name:'Day Trip',                icon:'🎈', cat:'free',   group:'explore', travels:true, durationMin:360, suitableTime:['weekend'], social:true },
+  { id:'air_show', sub:'outings',     name:'Air Show',                icon:'✈️', cat:'free',   group:'explore', travels:true, durationMin:240, suitableTime:['weekend'], social:true },
+  { id:'aviation_day', sub:'outings', name:'Aviation Day',           icon:'👩‍✈️', cat:'free', group:'explore', travels:true, durationMin:240, suitableTime:['weekend'], social:true },
+  { id:'museum', sub:'outings',       name:'Museum',                 icon:'🏛', cat:'free',   group:'explore', travels:true, durationMin:180, suitableTime:['weekend'], social:true },
   // 📕 rather than 📚: Homework already has the stack of books.
-  { id:'library',      name:'Library Visit',           icon:'📕', cat:'free',   group:'explore', travels:true, durationMin:45,  suitableTime:['after-school','weekend'] },
-  { id:'fishing',      name:'Fishing Trip',            icon:'🎣', cat:'free',   group:'explore', travels:true, durationMin:240, suitableTime:['weekend'], social:true },
-  { id:'nature_walk',  name:'Nature Walk',            icon:'🥾', cat:'active', group:'explore', travels:true, durationMin:90,  suitableTime:['weekend'], social:true },
+  { id:'library', sub:'outings',      name:'Library Visit',           icon:'📕', cat:'free',   group:'explore', travels:true, durationMin:45,  suitableTime:['after-school','weekend'] },
+  { id:'fishing', sub:'outings',      name:'Fishing Trip',            icon:'🎣', cat:'free',   group:'explore', travels:true, durationMin:240, suitableTime:['weekend'], social:true },
+  { id:'nature_walk', sub:'outings',  name:'Nature Walk',            icon:'🥾', cat:'active', group:'explore', travels:true, durationMin:90,  suitableTime:['weekend'], social:true },
 
   /* ── Play and rest ─────────────────────────────────────────────  */
-  { id:'game_time',   name:'Game Time',  icon:'🎮', cat:'free', durationMin:45, suitableTime:['after-school','weekend'] },
-  { id:'break_quick', name:'Quick Break', icon:'☕', cat:'free', durationMin:15, suitableTime:['before-school','school','after-school','evening','weekend'], quickBreak:true },
-  { id:'family',      name:'Family Time', icon:'👨‍👩‍👧‍👦', cat:'free', durationMin:90, suitableTime:['evening','weekend'], social:true },
-  { id:'free_time',   name:'Free Time',   icon:'🌤', cat:'free', durationMin:60, suitableTime:['after-school','weekend'] },
-  { id:'play_sister', name:'Play together', icon:'⭐', cat:'free', durationMin:60, suitableTime:['weekend'], social:true },
-  { id:'culture_story_circle',  name:'Culture Explorer Story', icon:'🏮', cat:'free', durationMin:25, suitableTime:['evening','weekend'] },
-  { id:'culture_festival_prep', name:'Festival Prep Mission',  icon:'🥮', cat:'free', durationMin:45, suitableTime:['weekend','evening'], social:true },
+  { id:'game_time', sub:'playtime',   name:'Game Time',  icon:'🎮', cat:'free', durationMin:45, suitableTime:['after-school','weekend'] },
+  { id:'break_quick', sub:'playtime', name:'Quick Break', icon:'☕', cat:'free', durationMin:15, suitableTime:['before-school','school','after-school','evening','weekend'], quickBreak:true },
+  { id:'family', sub:'playtime',      name:'Family Time', icon:'👨‍👩‍👧‍👦', cat:'free', durationMin:90, suitableTime:['evening','weekend'], social:true },
+  { id:'free_time', sub:'playtime',   name:'Free Time',   icon:'🌤', cat:'free', durationMin:60, suitableTime:['after-school','weekend'] },
+  { id:'play_sister', sub:'playtime', name:'Play together', icon:'⭐', cat:'free', durationMin:60, suitableTime:['weekend'], social:true },
+  { id:'culture_story_circle', sub:'playtime',  name:'Culture Explorer Story', icon:'🏮', cat:'free', durationMin:25, suitableTime:['evening'] },
+  { id:'culture_festival_prep', sub:'playtime', name:'Festival Prep Mission',  icon:'🥮', cat:'free', travels:true, durationMin:45, suitableTime:['weekend'], social:true },
 
   /* ── Helping hands ─────────────────────────────────────────────
      30, not 60: the paid pool's rows run 15–30 minutes, so a 60-minute default
@@ -585,12 +765,25 @@ const DEFAULT_ACTIVITIES = [
      template disagreed with each other.
 
      Family Hero is a CHORE, not a prize: whoever did the chore is the hero, and
-     making the chore itself the reward said the opposite. */
-  { id:'chores',                name:'House Chore',                 icon:'🧹', cat:'daily', group:'chores', durationMin:30, suitableTime:['after-school','evening','weekend'] },
-  { id:'family_set_table',      name:'Family Hero: Set the Table',   icon:'🍽', cat:'daily', group:'chores', durationMin:20, suitableTime:['evening','weekend'] },
-  { id:'family_prep_bag',       name:'Family Hero: Prep School Bag', icon:'🎒', cat:'daily', group:'chores', durationMin:15, suitableTime:['evening'] },
-  { id:'family_laundry_fold',   name:'Home Champion: Fold Laundry',  icon:'🧺', cat:'daily', group:'chores', durationMin:20, suitableTime:['weekend','evening'] },
-  { id:'family_kitchen_helper', name:'Kitchen Helper Quest',         icon:'🥕', cat:'daily', group:'chores', durationMin:20, suitableTime:['evening','weekend'] },
+     making the chore itself the reward said the opposite.
+
+     ── And the four of them are now archived ──
+     They named four specific jobs — set the table, prep the school bag, fold
+     laundry, help in the kitchen — which is exactly what the PAID POOL already
+     holds, row by row, with a price against each. So a chore could be planned
+     twice under two names, and only one of them reached the money:
+     mrChoreTagsForDay keys on `actId !== 'chores'`, so a Family Hero block was
+     never a claimable chore at all. A child could do the washing-up under the
+     Kitchen Helper Quest and be paid nothing for it.
+
+     House Chore plus a pool row is the one way to say it. Archived rather than
+     deleted, as always — every block that ever named one still resolves, still
+     draws and still counts in the hours. */
+  { id:'chores', sub:'helping',                name:'House Chore',                 icon:'🧹', cat:'daily', group:'chores', durationMin:30, suitableTime:['after-school','evening','weekend'] },
+  { id:'family_set_table', sub:'helping',      name:'Family Hero: Set the Table',   icon:'🍽', cat:'daily', group:'chores', durationMin:20, suitableTime:['evening','weekend'], archived:true },
+  { id:'family_prep_bag', sub:'helping',       name:'Family Hero: Prep School Bag', icon:'🎒', cat:'daily', group:'chores', durationMin:15, suitableTime:['evening'], archived:true },
+  { id:'family_laundry_fold', sub:'helping',   name:'Home Champion: Fold Laundry',  icon:'🧺', cat:'daily', group:'chores', durationMin:20, suitableTime:['weekend','evening'], archived:true },
+  { id:'family_kitchen_helper', sub:'helping', name:'Kitchen Helper Quest',         icon:'🥕', cat:'daily', group:'chores', durationMin:20, suitableTime:['evening','weekend'], archived:true },
 
   /* ── Retired ───────────────────────────────────────────────────
      Archived, never deleted. getAllActivities drops these from every picker;
@@ -602,11 +795,11 @@ const DEFAULT_ACTIVITIES = [
      Tomorrow Ready into the evening routine's own "pack for tomorrow" line,
      Reading Star into Reading, Brush Art Play into Drawing's goals. Focus
      Sprint and Preview Power were study techniques dressed as activities. */
-  { id:'acad_focus_sprint',        name:'Focus Sprint',           icon:'📘', cat:'school', durationMin:25, archived:true, suitableTime:['after-school','evening'] },
-  { id:'acad_preview_power',       name:'Preview Power',          icon:'🧠', cat:'school', durationMin:20, archived:true, suitableTime:['evening','weekend'] },
-  { id:'acad_reading_star',        name:'Reading Star',           icon:'📚', cat:'school', durationMin:30, archived:true, suitableTime:['after-school','evening','weekend'] },
-  { id:'health_pack_tomorrow',     name:'Tomorrow Ready',         icon:'👜', cat:'daily', group:'routine', durationMin:15, archived:true, suitableTime:['evening'] },
-  { id:'culture_calligraphy_play', name:'Brush Art Play',         icon:'🖌️', cat:'free', durationMin:30, archived:true, suitableTime:['weekend'] },
+  { id:'acad_focus_sprint', sub:'school',        name:'Focus Sprint',           icon:'📘', cat:'school', durationMin:25, archived:true, suitableTime:['after-school','evening'] },
+  { id:'acad_preview_power', sub:'school',       name:'Preview Power',          icon:'🧠', cat:'school', durationMin:20, archived:true, suitableTime:['evening','weekend'] },
+  { id:'acad_reading_star', sub:'school',        name:'Reading Star',           icon:'📚', cat:'school', durationMin:30, archived:true, suitableTime:['after-school','evening','weekend'] },
+  { id:'health_pack_tomorrow', sub:'routine',     name:'Tomorrow Ready',         icon:'👜', cat:'daily', group:'routine', durationMin:15, archived:true, suitableTime:['evening'] },
+  { id:'culture_calligraphy_play', sub:'arts', name:'Brush Art Play',         icon:'🖌️', cat:'free', durationMin:30, archived:true, suitableTime:['weekend'] },
 ];
 
 /* Routine preset checklists. Items: {id, text, timerSec (optional)} */
@@ -668,21 +861,21 @@ function getCurrentSeason() {
   return 'winter';
 }
 const SEASONAL_ACTIVITIES = [
-  { id:'cozy_reading',  name:'Cozy Reading',     icon:'🧣', cat:'free',   durationMin:45,  season:'winter', suitableTime:['evening'] },
-  { id:'hot_cocoa',     name:'Hot Cocoa Time',   icon:'☕', cat:'free',   durationMin:20,  season:'winter', suitableTime:['evening','weekend'], social:true },
+  { id:'cozy_reading', sub:'seasonal',  name:'Cozy Reading',     icon:'🧣', cat:'free',   durationMin:45,  season:'winter', suitableTime:['evening'] },
+  { id:'hot_cocoa', sub:'seasonal',     name:'Hot Cocoa Time',   icon:'☕', cat:'free',   durationMin:20,  season:'winter', suitableTime:['evening','weekend'], social:true },
   /* Snow and the garden are physical, but they are seasonal TREATS rather than
      training, so they carry an explicit group and stay out of Move — otherwise
      `cat:'active'` would file a snowball fight as exercise she is owed XP for. */
-  { id:'snow_play',     name:'Snow Adventure',   icon:'⛄', cat:'active', group:'free', durationMin:60, season:'winter', suitableTime:['weekend','after-school'], social:true },
-  { id:'beach_day',     name:'Beach Day',        icon:'🏖', cat:'free',   group:'explore', travels:true, durationMin:180, season:'summer', suitableTime:['weekend'], social:true },
-  { id:'ice_cream',     name:'Ice Cream Run',    icon:'🍦', cat:'free',   travels:true, durationMin:30, season:'summer', suitableTime:['evening','weekend'], social:true },
+  { id:'snow_play', sub:'seasonal',     name:'Snow Adventure',   icon:'⛄', cat:'active', group:'free', durationMin:60, season:'winter', suitableTime:['weekend'], social:true },
+  { id:'beach_day', sub:'outings',     name:'Beach Day',        icon:'🏖', cat:'free',   group:'explore', travels:true, durationMin:180, season:'summer', suitableTime:['weekend'], social:true },
+  { id:'ice_cream', sub:'seasonal',     name:'Ice Cream Run',    icon:'🍦', cat:'free',   travels:true, durationMin:30, season:'summer', suitableTime:['evening','weekend'], social:true },
   // Two seasons, which is what inSeason() exists for — the field took a single
   // string and the garden does not stop in June.
-  { id:'garden_time',   name:'Garden Time',      icon:'🌻', cat:'active', group:'free', durationMin:45, season:['spring','summer'], suitableTime:['weekend'], social:true },
+  { id:'garden_time', sub:'seasonal',   name:'Garden Time',      icon:'🌻', cat:'active', group:'free', durationMin:45, season:['spring','summer'], suitableTime:['weekend'], social:true },
   /* Archived: Rainy Day Craft is Craft, and Leaf Hike is a Nature Walk in
      October. Both keep resolving for every block that ever named them. */
-  { id:'rainy_craft',   name:'Rainy Day Craft',  icon:'🎨', cat:'free',   durationMin:60, season:'spring', archived:true, suitableTime:['after-school','weekend','evening'], social:true },
-  { id:'leaf_hike',     name:'Leaf Hike',        icon:'🍂', cat:'active', durationMin:90, season:'autumn', archived:true, suitableTime:['weekend'], social:true },
+  { id:'rainy_craft', sub:'seasonal',   name:'Rainy Day Craft',  icon:'🎨', cat:'free',   durationMin:60, season:'spring', archived:true, suitableTime:['after-school','weekend','evening'], social:true },
+  { id:'leaf_hike', sub:'outings',     name:'Leaf Hike',        icon:'🍂', cat:'active', durationMin:90, season:'autumn', archived:true, suitableTime:['weekend'], social:true },
 ];
 
 /* The two girls, named and iconed in one place. The pair

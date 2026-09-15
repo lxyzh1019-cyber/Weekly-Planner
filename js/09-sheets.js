@@ -768,13 +768,18 @@ function onEditStartMinChange(m) {
   }
 }
 
+/* A HIDDEN INPUT IS NEVER READ. These three elements exist in the DOM whether or
+   not their buffer is on, and this took all three unconditionally — so a number
+   nobody could see, left over from another block or from the static value in
+   index.html, was written into editState and saved by the next press. Each is
+   read only when its own buffer is switched on. */
 function onEditBufferMinInput() {
   const tIn = document.getElementById('editTravelBufMin');
   const rIn = document.getElementById('editReadyBufMin');
   const wIn = document.getElementById('editWarmupBufMin');
-  if (tIn) editState.travelBufMin = clampBufferMin(tIn.value);
-  if (rIn) editState.getReadyBufMin = clampBufferMin(rIn.value);
-  if (wIn) editState.warmupBufMin = clampBufferMin(wIn.value);
+  if (tIn && editState.travelBuffer) editState.travelBufMin = clampBufferMin(tIn.value);
+  if (rIn && editState.getReadyBuffer) editState.getReadyBufMin = clampBufferMin(rIn.value);
+  if (wIn && editState.warmupBuffer) editState.warmupBufMin = clampBufferMin(wIn.value);
   renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin, !!editState.warmupBuffer, editState.warmupBufMin);
 }
 
@@ -942,33 +947,49 @@ function openEditSheet(blockId) {
   const editTrRow = document.getElementById('editTravelDurRow');
   const editRdRow = document.getElementById('editReadyDurRow');
   const editWuRow = document.getElementById('editWarmupDurRow');
+  /* GET-READY IS EDITABLE ON ANYTHING THAT CARRIES IT. Both controls have been
+     in index.html all along, and this branch showed them for a TRAINING block
+     only — so travel could be adjusted anywhere and get-ready almost nowhere.
+
+     Which is exactly backwards. Placing an activity sets
+     `getReadyBuffer: activityTravels(act)` (js/01-config.js), so School Day,
+     all five appointments, Ballet, Swimming, Skating and every Explore outing
+     arrive with the buffer switched ON — and not one of them is isTraining.
+     Every block that carries get-ready by default was a block whose get-ready
+     could not be edited, which is also most of what the week grid now draws in
+     red: a parent looking at a twenty-minute clash had no control anywhere in
+     the app that would fix it.
+
+     WARM-UP stays training-only. It is a training-specific idea with its own
+     20-minute default and its own toggle (CLAUDE.md, buffer defaults), and
+     putting one in front of Breakfast is what that rule exists to prevent. */
+  editReady.style.display = 'flex';
+  editReady.classList.toggle('on', !!editState.getReadyBuffer);
+  editTrRow.style.display = editState.travelBuffer ? 'flex' : 'none';
+  editRdRow.style.display = editState.getReadyBuffer ? 'flex' : 'none';
+  /* ALL THREE LOADED FROM THE BLOCK, on every path. The non-training branch
+     used to skip this, leaving #editReadyBufMin holding its static value="15"
+     or whatever was typed on the last training block opened this session — and
+     onEditBufferMinInput read it anyway. So changing the TRAVEL minutes on a
+     Swimming block copied that stale number into the block's get-ready and
+     saved it: a field with no visible control silently rewriting itself from
+     another block's value. */
+  const etIn = document.getElementById('editTravelBufMin');
+  const erIn = document.getElementById('editReadyBufMin');
+  const ewIn = document.getElementById('editWarmupBufMin');
+  if (etIn) etIn.value = String(editState.travelBufMin);
+  if (erIn) erIn.value = String(editState.getReadyBufMin);
+  if (ewIn) ewIn.value = String(editState.warmupBufMin);
   if (act.isTraining) {
-    editReady.style.display = 'flex';
-    editReady.classList.toggle('on', !!editState.getReadyBuffer);
     editWarmup.style.display = 'flex';
     editWarmup.classList.toggle('on', !!editState.warmupBuffer);
     editGearWrap.style.display = 'block';
     renderTrainingGearChecklist('editTrainingGearList', editState, block.tag || 'skating', false, act.isCompetition);
-    editTrRow.style.display = editState.travelBuffer ? 'flex' : 'none';
-    editRdRow.style.display = editState.getReadyBuffer ? 'flex' : 'none';
     editWuRow.style.display = editState.warmupBuffer ? 'flex' : 'none';
-    const etIn = document.getElementById('editTravelBufMin');
-    const erIn = document.getElementById('editReadyBufMin');
-    const ewIn = document.getElementById('editWarmupBufMin');
-    if (etIn) etIn.value = String(editState.travelBufMin);
-    if (erIn) erIn.value = String(editState.getReadyBufMin);
-    if (ewIn) ewIn.value = String(editState.warmupBufMin);
   } else {
-    editReady.style.display = 'none';
     editWarmup.style.display = 'none';
     editGearWrap.style.display = 'none';
-    editTrRow.style.display = editState.travelBuffer ? 'flex' : 'none';
-    editRdRow.style.display = 'none';
     editWuRow.style.display = 'none';
-    if (editTrRow.style.display === 'flex') {
-      const etIn = document.getElementById('editTravelBufMin');
-      if (etIn) etIn.value = String(editState.travelBufMin);
-    }
   }
 
   renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin, !!editState.warmupBuffer, editState.warmupBufMin);
@@ -2289,19 +2310,61 @@ function syncEmojiGrid(gridId, current) {
   [...grid.children].forEach(c => c.classList.toggle('selected', c.textContent === current));
 }
 
-function openCustomActivity() {
+/* ── The category and its subgroup, filled from one table ──
+   Both dialogs held a hardcoded list of eight options, copied byte for byte
+   from one to the other — so a category added to the app reached neither, and
+   the two could drift apart with nothing to say so. One writer now, driven by
+   ACTIVITY_CATEGORIES (js/01-config.js).
+
+   The subgroup select follows the category and HIDES when that category has
+   only one, because asking "which kind of Explore?" when there is one answer is
+   a control that can only be got wrong. */
+function renderCategorySelects(catId, subId, ids) {
+  const catEl = document.getElementById(ids.cat);
+  const subEl = document.getElementById(ids.sub);
+  const wrap  = document.getElementById(ids.wrap);
+  if (!catEl || !subEl) return;
+  const cat = catDef(catId || 'play');
+  catEl.innerHTML = ACTIVITY_CATEGORIES
+    .map(c => `<option value="${escapeAttr(c.id)}"${c.id === cat.id ? ' selected' : ''}>${escapeHtml(c.label)}</option>`)
+    .join('');
+  const chosen = cat.subs.some(sg => sg.id === subId) ? subId : cat.subs[0].id;
+  subEl.innerHTML = cat.subs
+    .map(sg => `<option value="${escapeAttr(sg.id)}"${sg.id === chosen ? ' selected' : ''}>${escapeHtml(sg.label)}</option>`)
+    .join('');
+  if (wrap) wrap.style.display = cat.subs.length > 1 ? '' : 'none';
+  catEl.onchange = () => renderCategorySelects(catEl.value, null, ids);
+}
+
+const CUSTOM_ACT_IDS = { cat: 'customCat', sub: 'customSub', wrap: 'customSubWrap' };
+
+/* `fromCat` is the picker chip that was open when she tapped "＋ Custom
+   activity". Adding a drawing from inside Brain and being handed a form that
+   says Play & Rest is the app forgetting where she was one tap ago. */
+function openCustomActivity(fromCat) {
   openSheet('customOverlay');
   const cur = (document.getElementById('customIcon').value || '').trim();
   renderEmojiGrid('customEmojiGrid', 'customIcon', cur);
+  const start = ACTIVITY_CATEGORIES.some(c => c.id === fromCat) ? fromCat : 'play';
+  renderCategorySelects(start, null, CUSTOM_ACT_IDS);
 }
 
 function confirmCustomActivity() {
   const name = document.getElementById('customName').value.trim();
   const icon = document.getElementById('customIcon').value.trim() || '⭐';
-  const cat  = document.getElementById('customCat').value;
+  const sub  = document.getElementById('customSub').value;
   const durationMin = parseInt(document.getElementById('customDur').value);
   if (!name) { showToast('Enter a name!'); return; }
-  const act = { id:'custom-'+Date.now().toString(36), name, icon, cat, durationMin, custom:true,
+  /* `cat` is still written, derived from the subgroup. Nothing reads it for
+     colour or filtering any more, but the sticker conditions, the Athlete
+     achievement and ACTIVITY_OBJECTIVES_BY_CAT all key on it, and a record
+     without one would quietly drop out of those. */
+  const act = { id:'custom-'+Date.now().toString(36), name, icon, sub, cat: catForSub(sub),
+    durationMin, custom:true,
+    /* When it can be planned. A kid-made activity inherits the window she is
+       standing in, so the thing she just invented turns up in the picker's
+       suggestions at the time she invented it for rather than never. */
+    suitableTime: [slotPickerWindow()].filter(Boolean),
     addedBy: isParent() ? 'parent' : activeProfile(),
     pendingApproval: !isParent() };  // a kid's new activity waits for a parent's OK
   getProfData().customActivities = [...getCustomActivities(), act];

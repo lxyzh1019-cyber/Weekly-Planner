@@ -436,7 +436,7 @@ function buildDayColumn(dayKey, canvasHeight, withHeader) {
   blocks.forEach(b => {
     if (!b.travelBuffer && !b.getReadyBuffer && !b.warmupBuffer) return;
     const slot = colAssignments.get(b.id) || { col: 0, count: 1 };
-    renderTravelBuffers(canvas, b, zMinStart, zMinEnd, bufferConflicts.perBlock.get(b.id), slot.col, slot.count || 1);
+    renderTravelBuffers(canvas, b, zMinStart, zMinEnd, bufferConflicts.perBlock.get(b.id), slot.col, slot.count || 1, dayKey);
   });
 
   // Pending invitations from sister — render as dashed-border blocks
@@ -693,32 +693,42 @@ function renderBlocksWithCollision(canvas, blocks, zMinStart, conflictAffectedId
   // Build overlap groups
   const sorted = blocks.slice().sort((a,b)=> (a.startMin - b.startMin) || (a.durationMin - b.durationMin));
 
+  /* IN PIXELS, not minutes — the same correction the Full week needed. A block
+     is floored at 22px, which at 1.4px/min is 16 minutes, so a ten-minute
+     routine is drawn through whatever starts within a quarter-hour of it while
+     these start times say they are clear. The 4px here is the horizontal gap
+     the left/width calc below leaves; epsPx keeps a one-pixel graze between two
+     long blocks from halving both for nothing. */
+  const drawnTop = b => (b.startMin - START_MIN) * PX_PER_MIN;
+  const drawnBot = b => drawnTop(b) + Math.max(22, (b.durationMin || 0) * PX_PER_MIN);
+  const EPS_PX = 4;
+
   // Group consecutively-overlapping blocks
   const groups = [];
   sorted.forEach(b=>{
-    const bStart = b.startMin;
-    const bEnd   = b.startMin + b.durationMin;
-    const g = groups.find(g=> g.end > bStart);
+    const bTop = drawnTop(b);
+    const bBot = drawnBot(b);
+    const g = groups.find(g=> g.end - bTop > EPS_PX);
     if (g) {
       g.blocks.push(b);
-      g.end = Math.max(g.end, bEnd);
+      g.end = Math.max(g.end, bBot);
     } else {
-      groups.push({ blocks:[b], end: bEnd });
+      groups.push({ blocks:[b], end: bBot });
     }
   });
 
   groups.forEach(g=>{
     // Within a group, assign each block to the lowest-indexed column that's free
-    const cols = []; // each col = {endMin}
+    const cols = []; // each col = {endPx}
     g.blocks.forEach(b=>{
-      const bStart = b.startMin;
-      const bEnd = b.startMin + b.durationMin;
-      let colIdx = cols.findIndex(c => c.endMin <= bStart);
+      const bTop = drawnTop(b);
+      const bBot = drawnBot(b);
+      let colIdx = cols.findIndex(c => c.endPx - bTop <= EPS_PX);
       if (colIdx === -1) {
         colIdx = cols.length;
-        cols.push({ endMin: bEnd });
+        cols.push({ endPx: bBot });
       } else {
-        cols[colIdx].endMin = bEnd;
+        cols[colIdx].endPx = bBot;
       }
       assignments.set(b.id, { col: colIdx });
     });
@@ -806,7 +816,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   const dispIcon = topic ? topic.icon : act.icon;
   const hasConflict = !isBuffer && !!(conflictAffectedIds && conflictAffectedIds.has(b.id));
   blockEl.className = 'placed-block'
-    +(isBuffer ? ` travel-buf travel-buf--centered${b._bufferCls ? ' '+b._bufferCls : ''}${b._bufferConflict ? ' travel-buf--conflict' : ''}` : '')
+    +(isBuffer ? ` travel-buf travel-buf--centered${b._bufferCls ? ' '+b._bufferCls : ''}${b._bufferConflict ? ' travel-buf--conflict' : ''}${b._bufferMute ? ' travel-buf--mute' : ''}` : '')
     +(b.parentPinned?' parent-pinned':'')
     +(isBlockCompleted(b, blockKid)?' placed-block--completed':'')
     +(isBlockNotDone(b)?' placed-block--notdone':'')
@@ -954,7 +964,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   if (!isBuffer) renderDoodle(canvas, b.id, top, height, leftPct, widthPct);
 }
 
-function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0, colCount = 1) {
+function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0, colCount = 1, dayKeyForBuffers = null) {
   const travelBuf = getTravelBufMin(b);
   const readyBuf = getGetReadyBufMin(b);
   const warmupBuf = getWarmupBufMin(b);
@@ -984,6 +994,17 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0
     );
   }
   const sourceAct = findActivity(b.actId);
+  /* A STRIP STOPS WHERE THE NEXT CARD STARTS — the same rule as the Full week,
+     through the same owner (bufferClip, js/05-helpers.js). Strips here sit UNDER
+     the blocks (z5 vs z10) so nothing was overprinted, but a clipped strip's
+     centred label still landed beneath a card where nobody could read it, and
+     the red said "these minutes are yours" about minutes that are not. */
+  const dayBlocks = (getDayBlocks(dayKeyForBuffers || currentDayKey) || [])
+    .filter(o => o && o.id !== b.id);
+  const clip = bufferClip(b.startMin, endMin,
+    (b.warmupBuffer ? warmupBuf : 0) + (b.travelBuffer ? travelBuf : 0) + (b.getReadyBuffer ? readyBuf : 0),
+    (b.travelBuffer ? travelBuf : 0) + (b.getReadyBuffer ? readyBuf : 0),
+    dayBlocks);
   const overlayBlocks = entries.map(({ startMin, label, bufDur, cls, side }) => {
     const segConflict = !!conflict && (side === 'pre' ? conflict.pre : conflict.post);
     return {
@@ -1002,6 +1023,20 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0
       _bufferConflict: segConflict,
       _bufferSide: side,
     };
+  }).map(buf => {
+    // Trim to the minutes that actually exist, then drop anything left empty.
+    const from = buf._bufferSide === 'pre' ? Math.max(buf.startMin, clip.preFrom) : buf.startMin;
+    const to   = buf._bufferSide === 'pre'
+      ? buf.startMin + buf.durationMin
+      : Math.min(buf.startMin + buf.durationMin, clip.postTo);
+    return Object.assign({}, buf, { startMin: from, durationMin: to - from });
+  }).filter(buf => buf.durationMin > 0).map(buf => {
+    /* Text only where a line fits, the same question the week grid asks. The
+       day view's .block-meta is ~13px at line-height 1.15 inside 4px of border
+       and padding, so a strip under 17px drawn height carries its hatch and its
+       tooltip and no words. */
+    const drawnPx = buf.durationMin * PX_PER_MIN - 2;
+    return drawnPx < 17 ? Object.assign({}, buf, { _bufferLabel: '', _bufferMute: true }) : buf;
   }).filter(buf => {
     const bufStart = buf.startMin - START_MIN;
     const bufEnd = bufStart + buf.durationMin;
@@ -1451,11 +1486,15 @@ function addActivityAtMin(absMin) {
 
   pendingStartMin = absMin;
 
+  /* One owner for what a new block starts as (activityPlacementDraft,
+     js/01-config.js). These four lines were written out here AND in
+     pickFromSlot, so a default added to one pair was silently missing from the
+     other — which is exactly what happened to the training warm-up. */
   if (selectedActivity.isTraining) {
-    ts = { durationMin: activityDefaultDuration(selectedActivity)||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(selectedActivity), getReadyBuffer:activityTravels(selectedActivity), warmupBuffer:false, gearState:{}, travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, warmupBufMin:DEFAULT_WARMUP_MIN };
+    ts = activityPlacementDraft(selectedActivity);
     openTrainingSheet();
   } else {
-    as_ = { durationMin: activityDefaultDuration(selectedActivity)||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(selectedActivity), getReadyBuffer:activityTravels(selectedActivity), travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, choreTags: [], objectives: [] };
+    as_ = activityPlacementDraft(selectedActivity);
     openActivitySheet();
   }
 }
@@ -1517,7 +1556,20 @@ function openSlotPicker(absMin) {
   const many = dayViewKeys().length > 1;
   const dayName = many ? `${DAY_SHORT[dayIdxOfKey(currentDayKey)]} ` : '';
   if (title) title.textContent = `Add ${dayName}${formatTimeFromMin(absMin)}`;
-  if (hint) hint.textContent = 'Pick what goes in this time slot.';
+  /* How much room there actually is, not "pick what goes in this time slot" —
+     which is true of every slot on every day and says nothing about this one.
+     The next block's name is what makes the number mean something. */
+  if (hint) {
+    const free = slotPickerFreeMin();
+    if (free && free.min > 0) {
+      const until = free.next
+        ? ` until ${blockDisplayName(free.next, undefined, currentDayKey).name}`
+        : ' left today';
+      hint.textContent = `${formatDuration(free.min)} free${until}`;
+    } else {
+      hint.textContent = 'Pick what goes in this time slot.';
+    }
+  }
   renderSlotPicker();
   openSheet('slotPickerOverlay');
 }
@@ -1538,6 +1590,33 @@ function slotPickerRecentActIds(limit) {
   });
   return [...counts.entries()].sort((a, b) => b[1] - a[1])
     .slice(0, limit || 6).map(e => e[0]);
+}
+
+/* WHICH PART OF THE DAY SHE TAPPED. zoneForGap (js/17-ui-misc.js) already maps
+   a minute to the exact vocabulary suitableTime uses — before-school / school /
+   after-school / evening / weekend — reading the family's own school hours
+   rather than a guess. Whether it is a weekend is decided by isSchoolDay, never
+   by the day of the week: a Tuesday in July is not a school day and neither is
+   a PD day, and an activity offered for "after school" on a day with no school
+   is an offer about a day that does not exist. */
+function slotPickerWindow() {
+  if (pendingStartMin == null) return null;
+  const key = currentDayKey;
+  const schoolDay = (typeof isSchoolDay === 'function') ? isSchoolDay(key) : false;
+  return zoneForGap(pendingStartMin, !schoolDay);
+}
+
+/* How long she actually has before the next thing, so the hint can say it. The
+   picker used to open on "Pick what goes in this time slot", which is true of
+   every slot and tells her nothing about this one. */
+function slotPickerFreeMin() {
+  if (pendingStartMin == null) return null;
+  const blocks = (getDayBlocks(currentDayKey) || [])
+    .filter(b => b && b.startMin > pendingStartMin)
+    .sort((a, b) => a.startMin - b.startMin);
+  const next = blocks[0];
+  const until = next ? next.startMin : (START_MIN + DAY_MIN_SPAN);
+  return { min: Math.max(0, until - pendingStartMin), next: next || null };
 }
 
 function renderSlotPicker() {
@@ -1564,14 +1643,51 @@ function renderSlotPicker() {
   });
 
   const filtered = acts.filter(a => activityMatchesFilter(a, slotPickerFilter));
+  /* WHAT FITS THE TIME SHE TAPPED, first. Every activity has carried a
+     suitableTime window since the catalog was written, and the picker was the
+     one screen that never asked — a child tapping 7:15 on a school morning was
+     offered a six-hour day trip and a two-hour training session in the same
+     list as Breakfast. Only the mascot ever used it, from a corner of the app
+     nobody opens on purpose.
+
+     It RANKS, it does not filter: the rest of the library follows underneath,
+     because a picker that hides things is a picker she stops trusting. */
+  const zone = slotPickerWindow();
+  const free = slotPickerFreeMin();
+  /* BOTH halves of "does this fit": the moment she tapped, and the room that is
+     left before the next thing. A seven-hour School Day matches the school
+     window and cannot possibly go in the ninety minutes before dinner, and
+     offering it there is the picker ignoring the question it just asked. */
+  const fitsNow = a => {
+    if (!zone || a._locked) return false;
+    if (!Array.isArray(a.suitableTime) || !a.suitableTime.includes(zone)) return false;
+    const need = activityDefaultDuration(a) || 60;
+    return !free || !free.min || need <= free.min;
+  };
+  /* An APPOINTMENT is a time somebody else set. It belongs to the window it
+     belongs to, but it is not something a child picks to fill an afternoon
+     with — she records one a parent made. Four of them leading the suggestions
+     is the row answering a question nobody asked, so they rank last within it
+     rather than being excluded: a haircut on Thursday is still a real thing to
+     put on Thursday. */
+  const suggestRank = a => (activitySub(a).id === 'appts' ? 1 : 0);
   // Most-used first, only on the unfiltered list — inside a category the
   // library's own order is the one the child is looking for.
   let ordered = filtered;
   let liftedId = null;
+  let suggested = [];
   if (slotPickerFilter === 'all') {
     const recent = slotPickerRecentActIds(6);
     const rank = id => { const i = recent.indexOf(id); return i === -1 ? 999 : i; };
     ordered = filtered.slice().sort((a, b) => rank(a.id) - rank(b.id));
+    /* Ranked by what the household has actually been doing, capped at six: a
+       heading with twenty things under it is the same undifferentiated list
+       again, one heading lower. */
+    suggested = ordered.filter(fitsNow)
+      .sort((a, b) => suggestRank(a) - suggestRank(b))
+      .slice(0, 6);
+    const sugIds = new Set(suggested.map(a => a.id));
+    ordered = ordered.filter(a => !sugIds.has(a.id));
   } else {
     /* Inside a category, what she last added from THIS chip leads. One unshift
        rather than a sort, so nothing else moves — a list that reorders itself
@@ -1597,7 +1713,7 @@ function renderSlotPicker() {
   }
 
   list.innerHTML = '';
-  ordered.forEach(act => {
+  const tile = act => {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'slot-pick-chip' + (act._locked ? ' locked' : '')
@@ -1605,15 +1721,68 @@ function renderSlotPicker() {
     // Say WHY it moved. A chip that silently jumped to the front is a chip the
     // next person reads as a bug.
     const lastTag = act.id === liftedId ? '<span class="spc-last">last time</span>' : '';
-    chip.innerHTML = `<span class="spc-icon">${escapeHtml(act.icon)}</span><span class="spc-name">${escapeHtml(act.name)}</span>${lastTag}<span class="spc-dur">${escapeHtml(formatDuration(activityDefaultDuration(act) || 60))}</span>`;
+    /* The subgroup's own colour on the tile's edge, which is the colour the
+       block will actually be. A picker that gives no clue what a thing will
+       look like on the day makes the girls place one to find out. */
+    chip.innerHTML = `<span class="spc-icon">${escapeHtml(act.icon)}</span><span class="spc-name">${escapeHtml(act.name)}</span>${lastTag}<span class="spc-dur">${escapeHtml(formatDuration(activityDefaultDuration(act) || 60))}</span><span class="spc-sw" style="background:${escapeAttr(activitySub(act).hex)}"></span>`;
     chip.onclick = () => pickFromSlot(act.id);
-    list.appendChild(chip);
-  });
+    return chip;
+  };
+  const heading = (text, hex) => {
+    const h = document.createElement('div');
+    h.className = 'spc-subhead';
+    h.innerHTML = (hex ? `<i class="spc-subdot" style="background:${escapeAttr(hex)}"></i>` : '')
+      + escapeHtml(text);
+    return h;
+  };
+
+  if (suggested.length) {
+    list.appendChild(heading(`✨ Good for ${formatTimeFromMin(pendingStartMin)}`, null));
+    suggested.forEach(a => list.appendChild(tile(a)));
+    list.appendChild(heading('Everything else', null));
+    ordered.forEach(a => list.appendChild(tile(a)));
+  } else if (slotPickerFilter === 'all') {
+    ordered.forEach(a => list.appendChild(tile(a)));
+  } else {
+    /* INSIDE A CATEGORY, GROUPED BY SUBGROUP. Brain holds ten activities and
+       "School, Language, Arts" is the difference between a list you read and a
+       list you scan. A category with one subgroup draws no heading — a label
+       over the whole list names nothing the chip has not already said. */
+    const cat = catDef(slotPickerFilter);
+    /* THE LIFT COMES OUT OF THE GROUPING, not into it. What she last added from
+       this chip leads the list — but grouping by subgroup re-sorts everything
+       into table order, so a House Chore lifted to the front landed back at the
+       bottom under "Helping hands" and the memory silently stopped working.
+       It is drawn first, above every heading, and removed from its own group so
+       it is not offered twice. */
+    const bySub = new Map();
+    ordered.filter(a => a.id !== liftedId).forEach(a => {
+      const sg = activitySub(a).id;
+      if (!bySub.has(sg)) bySub.set(sg, []);
+      bySub.get(sg).push(a);
+    });
+    const lifted = liftedId ? ordered.find(a => a.id === liftedId) : null;
+    if (lifted) list.appendChild(tile(lifted));
+    const many = cat.subs.filter(sg => (bySub.get(sg.id) || []).length).length > 1;
+    cat.subs.forEach(sg => {
+      const items = bySub.get(sg.id) || [];
+      if (!items.length) return;
+      if (many) list.appendChild(heading(sg.label, sg.hex));
+      items.forEach(a => list.appendChild(tile(a)));
+    });
+    // Anything whose subgroup is not one of this category's (a legacy custom
+    // activity) still has to appear, or the chip hides what it matched.
+    ordered.forEach(a => {
+      if (!cat.subs.some(sg => sg.id === activitySub(a).id)) list.appendChild(tile(a));
+    });
+  }
   const addC = document.createElement('button');
   addC.type = 'button';
   addC.className = 'slot-pick-chip slot-pick-add';
   addC.innerHTML = '<span class="spc-icon">＋</span><span class="spc-name">Custom activity</span>';
-  addC.onclick = () => { closeSheet('slotPickerOverlay'); openCustomActivity(); };
+  // Opens on the chip she is standing in, so adding a drawing from inside Brain
+  // does not hand her a form that says Play & Rest.
+  addC.onclick = () => { const from = slotPickerFilter; closeSheet('slotPickerOverlay'); openCustomActivity(from); };
   list.appendChild(addC);
 }
 function pickFromSlot(actId) {
@@ -1626,10 +1795,10 @@ function pickFromSlot(actId) {
   closeSheet('slotPickerOverlay');
   // pendingStartMin was set by openSlotPicker.
   if (act.isTraining) {
-    ts = { durationMin: activityDefaultDuration(act)||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(act), getReadyBuffer:activityTravels(act), warmupBuffer:false, gearState:{}, travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, warmupBufMin:DEFAULT_WARMUP_MIN };
+    ts = activityPlacementDraft(act);
     openTrainingSheet();
   } else {
-    as_ = { durationMin: activityDefaultDuration(act)||60, colour: CAT_HEX[act.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(act), getReadyBuffer:activityTravels(act), travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, choreTags: [], objectives: [] };
+    as_ = activityPlacementDraft(act);
     openActivitySheet();
   }
 }

@@ -355,6 +355,7 @@ function computeBufferConflicts(blocks) {
   const perBlock = new Map();
   const affected = new Set();
   const partners = new Map();
+  const shortMin = new Map();
   const pair = (a, b) => {
     if (!partners.has(a)) partners.set(a, new Set());
     partners.get(a).add(b);
@@ -373,9 +374,22 @@ function computeBufferConflicts(blocks) {
       if (preStart < oEnd && preEnd > oStart) { pre = true; affected.add(o.id); pair(b.id, o.id); pair(o.id, b.id); }
       if (postStart < oEnd && postEnd > oStart) { post = true; affected.add(o.id); pair(b.id, o.id); pair(o.id, b.id); }
     });
-    if (pre || post) { perBlock.set(b.id, { pre, post }); affected.add(b.id); }
+    /* HOW SHORT, not just whether. bufferClip (js/05-helpers.js) is the one
+       owner of that arithmetic and every surface that DRAWS a clipped strip
+       reads the same function, so the red the week grid paints and the minutes
+       the banner prints can never describe different amounts of time. The
+       booleans above are left exactly as they were: tests/buffers.test.js
+       sweeps the equivalence that `short > 0` happens precisely when this
+       overlap test fires. */
+    const clip = bufferClip(b.startMin, postStart, preBuf, postBuf,
+      (blocks || []).filter(o => o.id !== b.id));
+    if (pre || post) {
+      perBlock.set(b.id, { pre, post, preShort: clip.preShort, postShort: clip.postShort });
+      affected.add(b.id);
+      shortMin.set(b.id, { pre: clip.preShort, post: clip.postShort });
+    }
   });
-  return { perBlock, affected, partners };
+  return { perBlock, affected, partners, shortMin };
 }
 let localSaveFailed = false;
 function saveLocal() {

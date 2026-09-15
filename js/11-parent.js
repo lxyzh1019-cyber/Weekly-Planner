@@ -389,7 +389,7 @@ function renderPendingApproval() {
     card.className = 'challenge-card';
     card.innerHTML = `
       <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· ${owner==='jenn'?'🐥 Jenn':'🦊 Jess'} added</span></div>
-      <div style="font-size:0.85rem;color:var(--ink-light)">${(act.durationMin||60)} min · ${act.cat||'free'}</div>
+      <div style="font-size:0.85rem;color:var(--ink-light)">${(act.durationMin||60)} min · ${escapeHtml(activityCategory(act).short)} › ${escapeHtml(activitySub(act).label)}</div>
       <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
         <button class="btn-icon" style="padding:2px 8px;background:var(--accent-green)" onclick="approveKidActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✅ Approve</button>
         <button class="btn-icon" style="padding:2px 8px" onclick="openParentActivityEditor('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✏️ Modify</button>
@@ -554,6 +554,34 @@ async function rejectKidActivity(owner, id) {
 ════════════════════════════════════════════════════════════════ */
 let parentActivityEdit = { mode:'new', sourceProfile:null, originalId:null };
 
+const PARENT_ACT_IDS = { cat: 'paCat', sub: 'paSub', wrap: 'paSubWrap' };
+
+/* WHEN A FAMILY'S OWN ACTIVITY FITS, in the same vocabulary the shipped catalog
+   uses. `suitableTime` was a field only the catalog could set, so an activity a
+   parent added could never be suggested for a time of day — and with the picker
+   now leading on what fits the moment she tapped, one without it would sit
+   permanently in the "everything else" pile. `travels` likewise: a family's own
+   swimming club is a place you drive to, and the buffer defaults had no way to
+   be told so. */
+const PA_WINDOWS = [
+  ['paWhenBefore',  'before-school'],
+  ['paWhenAfter',   'after-school'],
+  ['paWhenEvening', 'evening'],
+  ['paWhenWeekend', 'weekend'],
+];
+function paSetWindows(list) {
+  const want = new Set(Array.isArray(list) ? list : []);
+  PA_WINDOWS.forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) el.checked = want.has(key);
+  });
+}
+function paReadWindows() {
+  return PA_WINDOWS
+    .filter(([id]) => { const el = document.getElementById(id); return el && el.checked; })
+    .map(([, key]) => key);
+}
+
 function renderParentActivities() {
   const wrap = document.getElementById('parentActivitiesList');
   if (!wrap) return;
@@ -616,7 +644,7 @@ function parentActivityCard(act, owner) {
                     : '🦊 Jess only';
   card.innerHTML = `
     <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· ${escapeHtml(ownerLabel)}</span></div>
-    <div style="font-size:0.85rem;color:var(--ink-light)">${(act.durationMin||60)} min · ${act.cat||'free'}</div>
+    <div style="font-size:0.85rem;color:var(--ink-light)">${(act.durationMin||60)} min · ${escapeHtml(activityCategory(act).short)} › ${escapeHtml(activitySub(act).label)}</div>
     <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
       <button class="btn-icon" onclick="toggleShareActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')" style="padding:2px 8px" title="${owner==='shared'?'Move to single child':'Promote to shared'}">${owner==='shared'?'↩️ Unshare':'🔗 Share'}</button>
       <button class="btn-icon" onclick="openParentActivityEditor('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')" style="padding:2px 8px">✏️ Edit</button>
@@ -635,7 +663,9 @@ function openParentActivityEditor(owner, id) {
     document.getElementById('paName').value = '';
     document.getElementById('paIcon').value = '';
     document.getElementById('paDur').value = '60';
-    document.getElementById('paCat').value = 'free';
+    renderCategorySelects('play', null, PARENT_ACT_IDS);
+    paSetWindows(['after-school', 'weekend']);
+    document.getElementById('paTravels').checked = false;
     document.getElementById('paVisibility').value = 'shared';
     renderEmojiGrid('paEmojiGrid', 'paIcon', '');
     openSheet('parentActivityOverlay');
@@ -649,7 +679,10 @@ function openParentActivityEditor(owner, id) {
   document.getElementById('paName').value = act.name || '';
   document.getElementById('paIcon').value = act.icon || '';
   document.getElementById('paDur').value = String(act.durationMin || 60);
-  document.getElementById('paCat').value = act.cat || 'free';
+  const sg = activitySub(act);
+  renderCategorySelects(sg.cat, sg.id, PARENT_ACT_IDS);
+  paSetWindows(act.suitableTime);
+  document.getElementById('paTravels').checked = !!act.travels;
   document.getElementById('paVisibility').value = owner==='shared' ? 'shared' : owner;
   renderEmojiGrid('paEmojiGrid', 'paIcon', act.icon || '');
   openSheet('parentActivityOverlay');
@@ -675,10 +708,17 @@ function removeParentActivity(owner, id) {
 function confirmParentActivity() {
   const name = document.getElementById('paName').value.trim();
   const icon = document.getElementById('paIcon').value.trim() || '⭐';
-  const cat  = document.getElementById('paCat').value;
+  const sub  = document.getElementById('paSub').value;
+  const cat  = catForSub(sub);   // legacy, still read by the stickers and the goal presets
   const durationMin = parseInt(document.getElementById('paDur').value) || 60;
   const vis  = document.getElementById('paVisibility').value;
+  const suitableTime = paReadWindows();
+  const travels = !!document.getElementById('paTravels').checked;
   if (!name) { showToast('Enter a name'); return; }
+  /* An activity that fits nowhere can never be suggested and reads as a mistake
+     rather than a choice, so the form refuses it rather than saving something
+     the picker will quietly never offer. */
+  if (!suitableTime.length) { showToast('Pick at least one time of day'); return; }
 
   if (parentActivityEdit.mode === 'edit') {
     // Find + update the existing activity in place.
@@ -687,6 +727,7 @@ function confirmParentActivity() {
     const existing = findParentActivity(oldOwner, id);
     if (!existing) { showToast('Not found'); return; }
     existing.name = name; existing.icon = icon; existing.cat = cat; existing.durationMin = durationMin;
+    existing.sub = sub; existing.suitableTime = suitableTime; existing.travels = travels;
     markItemUpdated(existing);
     // Visibility moved? Migrate the activity object to the new collection (preserving its id so placed blocks still resolve).
     const newOwner = vis;
@@ -708,7 +749,7 @@ function confirmParentActivity() {
   // Create new
   const newAct = {
     id: 'custom-'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),
-    name, icon, cat, durationMin, custom:true
+    name, icon, cat, sub, durationMin, suitableTime, travels, custom:true
   };
   if (vis === 'shared') {
     state.shared.sharedActivities = [...(state.shared.sharedActivities||[]), newAct];

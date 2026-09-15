@@ -817,6 +817,615 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+
+
+
+  /* EVERY ACTIVITY KNOWS WHICH SUBGROUP IT IS IN, and every subgroup is
+     reachable. `cat` answers what colour a block is and `group` what the time is
+     FOR; neither is a shape a person can navigate, which is why there is a third
+     table. A subgroup nothing lands in is a heading the picker can never draw,
+     and an activity whose subgroup is not in the table would be filed under the
+     neutral landing with nothing to say so. */
+  checks.everyActivityHasASubgroup = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'jenn';
+    try {
+      const all = getAllActivities('jenn', { includeArchived: true });
+      all.forEach(a => {
+        if (a.custom) return;   // a family's own is derived, never stamped
+        if (!a.sub) { bad.push(`${a.id} names no subgroup`); return; }
+        if (!ACTIVITY_SUBS[a.sub]) { bad.push(`${a.id} is filed under "${a.sub}", which is not a subgroup`); return; }
+        if (!GROUP_ORDER.includes(activityGroup(a))) {
+          bad.push(`${a.id} groups as "${activityGroup(a)}", which no chart row draws`);
+        }
+      });
+      // Every subgroup has something pickable in it.
+      const pickable = getAllActivities('jenn');
+      Object.keys(ACTIVITY_SUBS).forEach(sg => {
+        if (!pickable.some(a => activitySub(a).id === sg)) {
+          bad.push(`nothing is filed under "${sg}" — its heading can never draw`);
+        }
+      });
+      // And every subgroup belongs to exactly one category.
+      const seen = new Set();
+      ACTIVITY_CATEGORIES.forEach(c => c.subs.forEach(sg => {
+        if (seen.has(sg.id)) bad.push(`"${sg.id}" is in two categories`);
+        seen.add(sg.id);
+      }));
+      /* A family's own activity has no `sub` and never will — deriving it at
+         read time is the same answer in any merge order, which is why nothing
+         is migrated (see activitySub, and xp2 before it). */
+      const derived = activitySub({ id: 'legacy', cat: 'school', name: 'Old' });
+      if (!derived || derived.id !== 'school') {
+        bad.push(`a legacy cat:'school' activity derives as "${derived && derived.id}"`);
+      }
+      if (activitySub({ cat: 'daily', group: 'chores' }).id !== 'helping') {
+        bad.push('a legacy house chore does not derive as helping hands');
+      }
+      // Reading twice changes nothing.
+      const a1 = activitySub({ cat: 'free' }).id, a2 = activitySub({ cat: 'free' }).id;
+      if (a1 !== a2) bad.push('deriving a subgroup is not stable');
+    } finally { profile = wasProfile; }
+    return bad.length === 0 || bad;
+  });
+
+  /* THE PICKER KEEPS ITS HEIGHT. The list was `max-height`, so the sheet was as
+     tall as whichever category happened to be open — twelve tiles under Play &
+     Rest, six under Fuel & Care — and the whole dialog jumped every time a chip
+     was tapped, moving the chips themselves out from under her thumb. The chip
+     row wrapped for the same reason. Both are fixed now; this measures it. */
+  checks.thePickerKeepsItsHeight = await page.evaluate(() => {
+    const bad = [];
+    const wasKey = currentDayKey;
+    currentDayKey = getDayKeys(0)[0];
+    openSlotPicker(15 * 60 + 30);
+    const list = document.getElementById('slotPickerList');
+    const sheet = document.querySelector('#slotPickerOverlay .sheet');
+    const chipRow = document.getElementById('slotPickerFilter');
+    if (!list || !sheet || !chipRow) return ['the picker did not open'];
+    const chips = [...chipRow.querySelectorAll('.filter-chip')];
+    if (chips.length < 6) bad.push(`only ${chips.length} chips — the six categories should all be there`);
+    const h0 = Math.round(list.getBoundingClientRect().height);
+    const s0 = Math.round(sheet.getBoundingClientRect().height);
+    const r0 = Math.round(chipRow.getBoundingClientRect().height);
+    chips.forEach(c => {
+      c.click();
+      const h = Math.round(list.getBoundingClientRect().height);
+      const s = Math.round(sheet.getBoundingClientRect().height);
+      const r = Math.round(chipRow.getBoundingClientRect().height);
+      if (Math.abs(h - h0) > 1) bad.push(`"${c.textContent.trim()}" changes the list from ${h0}px to ${h}px`);
+      if (Math.abs(s - s0) > 1) bad.push(`"${c.textContent.trim()}" changes the sheet from ${s0}px to ${s}px`);
+      if (Math.abs(r - r0) > 1) bad.push(`"${c.textContent.trim()}" makes the chip row wrap: ${r0}px to ${r}px`);
+    });
+    /* And when a category does outgrow the box it scrolls INSIDE it rather than
+       pushing the sheet taller. Not "it must scroll" — the 336px was chosen so
+       the largest category fits on an iPad, and fitting is the better outcome;
+       what must hold is that the overflow has somewhere to go. */
+    const play = chips.find(c => /Play/.test(c.textContent));
+    if (play) {
+      play.click();
+      if (getComputedStyle(list).overflowY !== 'auto') {
+        bad.push('the list cannot scroll, so a long category would push the sheet taller');
+      }
+      if (Math.round(list.getBoundingClientRect().height) !== h0) {
+        bad.push('the longest category still resizes the list');
+      }
+    }
+    closeSheet('slotPickerOverlay');
+    currentDayKey = wasKey;
+    return bad.length === 0 || bad;
+  });
+
+  /* THE PICKER LEADS WITH WHAT FITS THE TIME. Every activity has carried a
+     suitableTime window since the catalog was written and the picker never
+     asked — a child tapping 7:15 on a school morning was offered a six-hour day
+     trip in the same undifferentiated list as Breakfast. It RANKS rather than
+     filters: the rest of the library follows underneath, because a picker that
+     hides things is one she stops trusting. */
+  checks.thePickerLeadsWithWhatFitsTheTime = await page.evaluate(() => {
+    const bad = [];
+    const keys = getDayKeys(0);
+    const schoolKey = keys.find(k => isSchoolDay(k));
+    const freeKey = keys.find(k => !isSchoolDay(k));
+    /* Everything this check seeds is put back. The suite shares one week and
+       later checks read blocks seeded at boot, so a day left empty here is a
+       crash three hundred lines further down — which is exactly what the first
+       draft of this did. */
+    const wasKey = currentDayKey;
+    const hadSchool = schoolKey ? (getDayBlocks(schoolKey, 'jenn') || []).slice() : null;
+    try {
+    const names = () => [...document.querySelectorAll('#slotPickerList .slot-pick-chip .spc-name')]
+      .map(n => n.textContent);
+    const headings = () => [...document.querySelectorAll('#slotPickerList .spc-subhead')]
+      .map(h => h.textContent.trim());
+
+    if (schoolKey) {
+      currentDayKey = schoolKey;
+      openSlotPicker(7 * 60 + 15);
+      if (slotPickerWindow() !== 'before-school') {
+        bad.push(`7:15 on a school day reads as "${slotPickerWindow()}"`);
+      }
+      const head = headings().find(h => /Good for/.test(h));
+      if (!head) bad.push('a school morning suggests nothing');
+      // Everything above "Everything else" must genuinely fit the morning.
+      const all = names();
+      const cut = all.indexOf(
+        [...document.querySelectorAll('#slotPickerList .slot-pick-chip, #slotPickerList .spc-subhead')]
+          .filter(e => e.classList.contains('slot-pick-chip'))
+          .map(e => e.querySelector('.spc-name').textContent)[0]);
+      const lib = getAllActivities();
+      const shown = [...document.querySelectorAll('#slotPickerList > *')];
+      let inSug = false;
+      shown.forEach(el => {
+        if (el.classList.contains('spc-subhead')) {
+          inSug = /Good for/.test(el.textContent);
+          return;
+        }
+        if (!inSug) return;
+        const nm = (el.querySelector('.spc-name') || {}).textContent;
+        const act = lib.find(a => a.name === nm);
+        if (act && !(act.suitableTime || []).includes('before-school')) {
+          bad.push(`"${nm}" is suggested for a school morning and does not fit it`);
+        }
+      });
+      // The hint says how much room there is, not "pick what goes here".
+      const hint = (document.getElementById('slotPickerHint') || {}).textContent || '';
+      if (!/free/.test(hint)) bad.push(`the hint reads "${hint}" and names no free time`);
+      closeSheet('slotPickerOverlay');
+    }
+
+    /* AND HOW MUCH ROOM IS LEFT, not only the moment. A seven-hour School Day
+       matches the school window and cannot go in the hour before dinner. */
+    if (schoolKey) {
+      currentDayKey = schoolKey;
+      setDayBlocks(schoolKey, [{ id: 'fit-dinner', actId: 'dinner', startMin: 17 * 60, durationMin: 45 }], 'jenn');
+      openSlotPicker(16 * 60);   // one hour before dinner
+      const lib2 = getAllActivities();
+      let inSug2 = false;
+      [...document.querySelectorAll('#slotPickerList > *')].forEach(el => {
+        if (el.classList.contains('spc-subhead')) { inSug2 = /Good for/.test(el.textContent); return; }
+        if (!inSug2) return;
+        const nm = (el.querySelector('.spc-name') || {}).textContent;
+        const act = lib2.find(a => a.name === nm);
+        if (act && (activityDefaultDuration(act) || 60) > 60) {
+          bad.push(`"${nm}" is suggested for a 1h gap and wants ${activityDefaultDuration(act)}m`);
+        }
+      });
+      /* An appointment is a time somebody else set, not something she picks to
+         fill an afternoon. It ranks last in the row rather than being hidden. */
+      const sugNames = [];
+      let inSug3 = false;
+      [...document.querySelectorAll('#slotPickerList > *')].forEach(el => {
+        if (el.classList.contains('spc-subhead')) { inSug3 = /Good for/.test(el.textContent); return; }
+        if (inSug3) sugNames.push((el.querySelector('.spc-name') || {}).textContent);
+      });
+      const isAppt = nm => { const a = lib2.find(x => x.name === nm); return a && activitySub(a).id === 'appts'; };
+      const firstAppt = sugNames.findIndex(isAppt);
+      const lastPlain = sugNames.map(isAppt).lastIndexOf(false);
+      if (firstAppt !== -1 && lastPlain !== -1 && firstAppt < lastPlain) {
+        bad.push(`an appointment leads the suggestions: ${JSON.stringify(sugNames)}`);
+      }
+      closeSheet('slotPickerOverlay');
+    }
+
+    if (freeKey) {
+      currentDayKey = freeKey;
+      openSlotPicker(10 * 60);
+      if (slotPickerWindow() !== 'weekend') {
+        bad.push(`10am on a day with no school reads as "${slotPickerWindow()}"`);
+      }
+      closeSheet('slotPickerOverlay');
+    }
+
+    /* Which kind of day it is comes from the calendar, never the day of the
+       week: a Tuesday in July is not a school day and neither is a PD day. */
+    const pd = keys.find(k => !isSchoolDay(k) && [1,2,3,4,5].includes(formatDayKey(k).getDay()));
+    if (pd) {
+      currentDayKey = pd;
+      openSlotPicker(10 * 60);
+      if (slotPickerWindow() === 'school') {
+        bad.push('a weekday with no school is still being called school time');
+      }
+      closeSheet('slotPickerOverlay');
+    }
+    } finally {
+      if (schoolKey) setDayBlocks(schoolKey, hadSchool, 'jenn');
+      currentDayKey = wasKey;
+      closeSheet('slotPickerOverlay');
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* A NEW ACTIVITY STARTS IN THE CATEGORY IT CAME FROM, and carries enough for
+     the picker to offer it again. The kid dialog used to save a `cat` and a
+     duration and nothing else — so an activity she invented for a Tuesday
+     evening had no window, and with the picker now leading on what fits the
+     moment she tapped it would sit permanently in "everything else". */
+  checks.aNewActivityStartsInTheCategoryItCameFrom = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile;
+    profile = 'jenn';
+    const had = (getProfData('jenn').customActivities || []).slice();
+    const wasKey = currentDayKey;
+    try {
+      currentDayKey = getDayKeys(0)[0];
+      openSlotPicker(19 * 60);
+      const chips = [...document.querySelectorAll('#slotPickerFilter .filter-chip')];
+      const brain = chips.find(c => /Brain/.test(c.textContent));
+      if (!brain) return ['no Brain chip to add from'];
+      brain.click();
+      const add = document.querySelector('#slotPickerList .slot-pick-add');
+      if (!add) return ['no "custom activity" tile'];
+      add.click();
+
+      const catSel = document.getElementById('customCat');
+      const subSel = document.getElementById('customSub');
+      if (!catSel || catSel.value !== 'brain') {
+        bad.push(`added from Brain, the form opens on "${catSel && catSel.value}"`);
+      }
+      // The subgroup select offers only kinds of Brain.
+      const brainSubs = catDef('brain').subs.map(sg => sg.id);
+      [...subSel.options].forEach(o => {
+        if (!brainSubs.includes(o.value)) bad.push(`"Kind" offers ${o.value}, not a kind of Brain`);
+      });
+      subSel.value = 'arts';
+
+      document.getElementById('customName').value = 'Ukulele';
+      document.getElementById('customIcon').value = '🎸';
+      document.getElementById('customDur').value = '30';
+      confirmCustomActivity();
+
+      const made = (getProfData('jenn').customActivities || []).find(a => a.name === 'Ukulele');
+      if (!made) return ['the activity was not saved'];
+      if (made.sub !== 'arts') bad.push(`saved under "${made.sub}", not arts`);
+      /* `cat` is still written, derived from the subgroup: the stickers, the
+         Athlete achievement and ACTIVITY_OBJECTIVES_BY_CAT all key on it, and a
+         record without one drops out of all three. */
+      if (made.cat !== catForSub('arts')) bad.push(`its legacy cat is "${made.cat}"`);
+      if (!Array.isArray(made.suitableTime) || !made.suitableTime.length) {
+        bad.push('it carries no window, so the picker can never suggest it');
+      }
+      if (!made.suitableTime.includes('evening')) {
+        bad.push(`invented at 7pm, its window is ${JSON.stringify(made.suitableTime)}`);
+      }
+      // It wears its subgroup's colour, and is findable under its own chip.
+      if (blockColour({ id: 'z', actId: made.id }, 'jenn') !== subDef('arts').hex) {
+        bad.push('it does not wear the Arts colour');
+      }
+      if (!activityMatchesFilter(made, 'brain')) bad.push('it cannot be found under Brain');
+    } finally {
+      getProfData('jenn').customActivities = had;
+      profile = wasProfile;
+      currentDayKey = wasKey;
+      closeSheet('customOverlay');
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* GET-READY IS EDITABLE ON ANYTHING THAT CARRIES IT.
+
+     The toggle and the minutes box have been in index.html all along, and
+     openEditSheet showed them for a TRAINING block only — so travel could be
+     adjusted on any block and get-ready on almost none. Exactly backwards:
+     placing an activity sets getReadyBuffer from activityTravels(), so School
+     Day, the five appointments, Ballet, Swimming, Skating and the Explore
+     outings all arrive with the buffer ON, and not one of them is isTraining.
+     Every block that carried it by default was a block that could not edit it. */
+  checks.getReadyIsEditableOnAnythingThatCarriesIt = await page.evaluate(async () => {
+    const kid = activeProfile();
+    const key = getDayKeys(0)[3];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    try {
+      setDayBlocks(key, [{ id: 'gr-swim', actId: 'swimming', startMin: 16 * 60, durationMin: 60,
+        travelBuffer: true, travelBufMin: 20, getReadyBuffer: true, getReadyBufMin: 15 }], kid);
+      currentDayKey = key;
+      openEditSheet('gr-swim');
+
+      const tg = document.getElementById('editReadyToggle');
+      const row = document.getElementById('editReadyDurRow');
+      const box = document.getElementById('editReadyBufMin');
+      if (!tg || getComputedStyle(tg).display === 'none') {
+        bad.push('a swimming block offers no get-ready toggle');
+      }
+      if (!row || getComputedStyle(row).display === 'none') {
+        bad.push('a swimming block offers no get-ready minutes');
+      }
+      if (box && box.value !== '15') {
+        bad.push(`the box reads "${box.value}" rather than the block's own 15`);
+      }
+      // Warm-up stays training-only: a car journey in front of Breakfast is what
+      // the buffer-default rule exists to prevent.
+      const wu = document.getElementById('editWarmupToggle');
+      if (wu && getComputedStyle(wu).display !== 'none') {
+        bad.push('warm-up is offered on a block that is not training');
+      }
+
+      // Change it, save it, read it back off the block.
+      if (box) { box.value = '25'; onEditBufferMinInput(); }
+      await saveEditChanges();
+      const after = (getDayBlocks(key, kid) || []).find(b => b.id === 'gr-swim');
+      if (!after || getGetReadyBufMin(after) !== 25) {
+        bad.push(`saved get-ready is ${after ? getGetReadyBufMin(after) : 'gone'}, not 25`);
+      }
+
+      // And it can be switched off entirely.
+      openEditSheet('gr-swim');
+      toggleEditGetReadyBuffer();
+      await saveEditChanges();
+      const off = (getDayBlocks(key, kid) || []).find(b => b.id === 'gr-swim');
+      if (off && getGetReadyBufMin(off) !== 0) {
+        bad.push(`get-ready survived being switched off at ${getGetReadyBufMin(off)}m`);
+      }
+    } finally { setDayBlocks(key, had, kid); closeSheet('editOverlay'); }
+    return bad.length === 0 || bad;
+  });
+
+  /* CHANGING TRAVEL DOES NOT REWRITE GET-READY.
+
+     The quieter half of the same defect. onEditBufferMinInput read all three
+     number inputs unconditionally, but the non-training branch never loaded the
+     get-ready box from the block — so it kept its static value="15" from
+     index.html, or whatever was typed on the last training block opened this
+     session. Touch the TRAVEL minutes on a swimming block and that stale number
+     was copied into the block's get-ready and saved: a field with no visible
+     control silently rewriting itself from another block's value. */
+  checks.changingTravelDoesNotRewriteGetReady = await page.evaluate(async () => {
+    const kid = activeProfile();
+    const key = getDayKeys(0)[4];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    try {
+      setDayBlocks(key, [
+        { id: 'rw-train', actId: 'training', startMin: 10 * 60, durationMin: 120, tag: 'skating',
+          travelBuffer: true, travelBufMin: 30, getReadyBuffer: true, getReadyBufMin: 15 },
+        { id: 'rw-swim', actId: 'swimming', startMin: 16 * 60, durationMin: 60,
+          travelBuffer: true, travelBufMin: 20, getReadyBuffer: true, getReadyBufMin: 45 },
+      ], kid);
+      currentDayKey = key;
+
+      // Leave a big number in the get-ready box via a training block.
+      openEditSheet('rw-train');
+      const gr = document.getElementById('editReadyBufMin');
+      if (gr) { gr.value = '40'; onEditBufferMinInput(); }
+      closeSheet('editOverlay');
+
+      // Now touch ONLY the travel minutes on the swimming block.
+      openEditSheet('rw-swim');
+      const tv = document.getElementById('editTravelBufMin');
+      if (tv) { tv.value = '35'; onEditBufferMinInput(); }
+      await saveEditChanges();
+
+      const swim = (getDayBlocks(key, kid) || []).find(b => b.id === 'rw-swim');
+      if (!swim) return ['the swimming block vanished'];
+      if (getGetReadyBufMin(swim) !== 45) {
+        bad.push(`its get-ready became ${getGetReadyBufMin(swim)}m — it was never touched, and was 45`);
+      }
+      if (getTravelBufMin(swim) !== 35) {
+        bad.push(`its travel is ${getTravelBufMin(swim)}m, not the 35 that was typed`);
+      }
+    } finally { setDayBlocks(key, had, kid); closeSheet('editOverlay'); }
+    return bad.length === 0 || bad;
+  });
+
+  /* A BUFFER STRIP NEVER COVERS A CARD, AND NEVER SAYS MORE THAN IT CAN SHOW.
+
+     Two separate defects, one fixture — the Wednesday from the screenshot that
+     prompted this work.
+
+     (1) A travel/get-ready strip was drawn at its full length whatever was in
+     the way, so School Day's thirty minutes of driving home painted straight
+     over the top of Homework: the strip could not be read, and neither could
+     the card's name or its tick. bufferClip (js/05-helpers.js) now trims a
+     strip to the minutes that actually exist, and the minutes that did not fit
+     are drawn OVER the card at a quarter strength (.wf-overrun) so how bad the
+     clash is still reads at a glance.
+
+     (2) At 0.72px per minute a fifteen-minute strip is 10.8px tall, and the kid
+     readability floor sets its text to 13.1px — so two stacked strips each
+     printed a label through the other. A strip speaks only when a line fits
+     (WF_TRAVEL_TEXT_MIN_PX, a measurement), and a run of short same-side
+     segments merges into one band that can.
+
+     Geometry, not classes: it measures real rectangles, because a z-index or a
+     clip that silently stopped applying is exactly the failure that still looks
+     plausible in the DOM. */
+  checks.aBufferStripNeverCoversACard = await page.evaluate(() => {
+    goWeek(); setWeekView('full');
+    const kid = activeProfile();
+    const key = getDayKeys(0)[2];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    const overlaps = (a, b) => a.left < b.right - 0.5 && a.right > b.left + 0.5
+                            && a.top  < b.bottom - 0.5 && a.bottom > b.top + 0.5;
+    try {
+      setDayBlocks(key, [
+        { id: 'bs-school', actId: 'school_day', startMin: 8 * 60 + 10, durationMin: 400,
+          travelBuffer: true, travelBufMin: 15, getReadyBuffer: true, getReadyBufMin: 15 },
+        { id: 'bs-home',   actId: 'homework',   startMin: 15 * 60, durationMin: 150 },
+        { id: 'bs-ballet', actId: 'ballet',     startMin: 20 * 60, durationMin: 45,
+          travelBuffer: true, travelBufMin: 25, getReadyBuffer: true, getReadyBufMin: 15 },
+        { id: 'bs-eve',    actId: 'routine_evening', startMin: 21 * 60, durationMin: 30 },
+      ], kid);
+      weekOffset = 0; renderWeek();
+
+      const cell = document.querySelectorAll('#weeklyFullGrid .wf-daycell')[2]
+                || document.querySelectorAll('#weeklyFullGrid > *')[2];
+      const strips = [...document.querySelectorAll('#screen-week .wf-travel')];
+      const cards  = [...document.querySelectorAll('#screen-week .wf-card')];
+      if (!strips.length) return ['no buffer strips drew at all'];
+      if (cards.length < 4) return [`seeded 4 blocks, the week drew ${cards.length} cards`];
+
+      // (1) No strip may cover any card.
+      strips.forEach(s => {
+        const sr = s.getBoundingClientRect();
+        if (sr.height < 1) return;
+        cards.forEach(c => {
+          if (overlaps(sr, c.getBoundingClientRect())) {
+            const nm = (c.querySelector('.wf-card-name') || {}).textContent || '(card)';
+            bad.push(`a ${Math.round(sr.height)}px strip is drawn over "${nm.trim()}"`);
+          }
+        });
+      });
+
+      // (2) Anything that speaks must fit, down AND across.
+      strips.forEach(s => {
+        const txt = (s.textContent || '').trim();
+        if (!txt) return;
+        if (s.scrollHeight > s.clientHeight + 1) {
+          bad.push(`strip "${txt}" needs ${s.scrollHeight}px of height in ${s.clientHeight}px`);
+        }
+        if (s.scrollWidth > s.clientWidth + 1) {
+          bad.push(`strip "${txt}" needs ${s.scrollWidth}px of width in ${s.clientWidth}px`);
+        }
+      });
+
+      // (3) The shortfall is stated in words, on the flag and in the banner.
+      const blocks = getDayBlocks(key, kid);
+      const conflicts = computeBufferConflicts(blocks);
+      const schoolShort = conflicts.shortMin && conflicts.shortMin.get('bs-school');
+      if (!schoolShort || schoolShort.post !== 20) {
+        bad.push(`School Day should be 20m short after; got ${schoolShort ? schoolShort.post : 'nothing'}`);
+      }
+      const balletShort = conflicts.shortMin && conflicts.shortMin.get('bs-ballet');
+      if (!balletShort || balletShort.post !== 25) {
+        bad.push(`Ballet should be 25m short after; got ${balletShort ? balletShort.post : 'nothing'}`);
+      }
+      const banner = document.getElementById('weekConflictBanner');
+      const bText = (banner && banner.textContent) || '';
+      if (!/20m short/.test(bText)) bad.push('the banner never says how short School Day is');
+      if (!/Homework/.test(bText))  bad.push('the banner does not name what School Day runs into');
+      /* One line per clashing PAIR, not one chain per day: the old banner read
+         "School Day ⇆ Homework ⇆ Ballet ⇆ Evening Routine", which names four
+         things while saying neither which two clash nor by how much. Split on
+         the real line breaks, because textContent runs them together. */
+      const lines = ((banner && banner.innerHTML) || '').split(/<br\s*\/?>/i).slice(1);
+      if (lines.length !== 2) bad.push(`the banner drew ${lines.length} clash lines, not 2`);
+      lines.forEach(l => {
+        const n = (l.match(/⇆/g) || []).length;
+        if (n !== 1) bad.push(`a banner line names ${n + 1} activities: "${l.replace(/<[^>]*>/g, '').trim()}"`);
+        if (!/\dm short/.test(l)) bad.push(`a banner line says no shortfall: "${l.replace(/<[^>]*>/g, '').trim()}"`);
+      });
+
+      // (4) The overrun is drawn on the card that is run into, to scale, and the
+      // card underneath still reads through it.
+      const ov = [...document.querySelectorAll('#screen-week .wf-overrun')];
+      if (!ov.length) bad.push('no overrun is drawn for either clash');
+      ov.forEach(o => {
+        if (getComputedStyle(o).pointerEvents !== 'none') {
+          bad.push('the overrun swallows taps meant for the card');
+        }
+      });
+      const homeCard = cards.find(c => (c.outerHTML || '').includes('bs-home'));
+      if (homeCard) {
+        const flag = homeCard.querySelector('.wf-card-conflict-flag');
+        if (!flag) bad.push('Homework carries no clash flag');
+        else if (!/20m over/.test(flag.textContent || '')) {
+          bad.push(`Homework's flag reads "${(flag.textContent || '').trim()}" rather than the minutes`);
+        }
+        const nm = homeCard.querySelector('.wf-card-name');
+        if (nm) {
+          const r = nm.getBoundingClientRect();
+          const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          if (at && at.classList.contains('wf-overrun')) {
+            bad.push('the overrun sits on top of the name it is supposed to leave readable');
+          }
+        }
+      }
+    } finally { setDayBlocks(key, had, kid); renderWeek(); }
+    return bad.length === 0 || bad;
+  });
+
+  /* A FLOORED CARD NEVER SITS ON THE ONE BELOW IT.
+
+     The lane pass compared startMin and durationMin, which is the wrong question
+     on a surface with a minimum card height: at 0.72px per minute the 20px floor
+     is 28 minutes, so a ten-minute After-School Routine at 8:50pm is DRAWN
+     through a 9:00pm Evening Routine while the arithmetic says they are clear.
+     Nothing split them and nothing could. Lanes are decided on drawn pixels now.
+
+     This is the Tuesday evening from the original screenshot. */
+  checks.aFlooredCardNeverSitsOnTheOneBelowIt = await page.evaluate(() => {
+    goWeek(); setWeekView('full');
+    const kid = activeProfile();
+    const key = getDayKeys(0)[1];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    try {
+      setDayBlocks(key, [
+        { id: 'fl-after', actId: 'routine_afterschool', startMin: 20 * 60 + 50, durationMin: 10 },
+        { id: 'fl-eve',   actId: 'routine_evening',     startMin: 21 * 60,      durationMin: 30 },
+      ], kid);
+      weekOffset = 0; renderWeek();
+
+      const a = [...document.querySelectorAll('#screen-week .wf-card')]
+        .find(c => (c.outerHTML || '').includes('fl-after'));
+      const b = [...document.querySelectorAll('#screen-week .wf-card')]
+        .find(c => (c.outerHTML || '').includes('fl-eve'));
+      if (!a || !b) return ['the two routines did not both draw'];
+      const ar = a.getBoundingClientRect(), br = b.getBoundingClientRect();
+      const hit = ar.left < br.right - 0.5 && ar.right > br.left + 0.5
+               && ar.top  < br.bottom - 0.5 && ar.bottom > br.top + 0.5;
+      if (hit) bad.push('the two cards are still drawn on top of each other');
+      // Side by side means each gets about half the column, not the whole of it.
+      if (ar.width > br.width * 1.6 || br.width > ar.width * 1.6) {
+        bad.push(`the lanes are uneven: ${Math.round(ar.width)}px against ${Math.round(br.width)}px`);
+      }
+      // And both still say what they are.
+      [[a, 'After-School'], [b, 'Evening']].forEach(([card, want]) => {
+        const nm = card.querySelector('.wf-card-name');
+        if (!nm || !nm.textContent.trim()) bad.push(`the ${want} card draws no name`);
+      });
+    } finally { setDayBlocks(key, had, kid); renderWeek(); }
+    return bad.length === 0 || bad;
+  });
+
+  /* THE DAY VIEW CLIPS ITS BUFFERS THE SAME WAY.
+
+     Strips there sit UNDER the blocks, so nothing was overprinted — but a strip
+     drawn at full length still claimed minutes the next activity was using, and
+     its centred label landed beneath a card where nobody could read it. Same
+     owner, same answer: three surfaces, one rule. */
+  checks.theDayViewClipsItsBuffersTheSameWay = await page.evaluate(() => {
+    const kid = activeProfile();
+    const key = getDayKeys(0)[2];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    try {
+      setDayBlocks(key, [
+        { id: 'dv-school', actId: 'school_day', startMin: 8 * 60 + 10, durationMin: 400,
+          travelBuffer: true, travelBufMin: 15, getReadyBuffer: true, getReadyBufMin: 15 },
+        { id: 'dv-home',   actId: 'homework',   startMin: 15 * 60, durationMin: 150 },
+      ], kid);
+      currentDayKey = key;
+      openDay(key);
+
+      const strips = [...document.querySelectorAll('#timeline .placed-block.travel-buf')];
+      const blocks = [...document.querySelectorAll('#timeline .placed-block')]
+        .filter(el => !el.classList.contains('travel-buf'));
+      if (!strips.length) return ['the day view drew no buffer strips'];
+
+      strips.forEach(s => {
+        const sr = s.getBoundingClientRect();
+        if (sr.height < 1) return;
+        blocks.forEach(b => {
+          const br = b.getBoundingClientRect();
+          const hit = sr.left < br.right - 0.5 && sr.right > br.left + 0.5
+                   && sr.top  < br.bottom - 0.5 && sr.bottom > br.top + 0.5;
+          if (hit) bad.push(`a ${Math.round(sr.height)}px strip runs under ${b.id}`);
+        });
+        // A strip too short for a line says nothing rather than printing over itself.
+        const meta = s.querySelector('.block-meta');
+        const txt = (meta && meta.textContent.trim()) || '';
+        if (txt && sr.height < 17) {
+          bad.push(`a ${Math.round(sr.height)}px strip still prints "${txt}"`);
+        }
+      });
+    } finally { setDayBlocks(key, had, kid); }
+    return bad.length === 0 || bad;
+  });
+
   /* A STACKED CARD FITS WHAT IT DRAWS.
 
      The week card's tall layout budgeted 58px for its four fixed rows and 20px
@@ -1759,18 +2368,21 @@ function findChromium() {
 
       openSlotPicker(9 * 60);
       const chips = [...document.querySelectorAll('#slotPickerFilter .filter-chip')];
-      const routines = chips.find(c => /Routine/i.test(c.textContent));
-      if (!routines) { bad.push('no Routines chip in the picker'); return bad; }
+      /* The chip is a CATEGORY now — Daily Rhythm, which holds the routines and
+         the helping hands. The per-chip memory is unchanged; what it is keyed
+         to is the category rather than one of nine flat `cat` values. */
+      const routines = chips.find(c => /Daily Rhythm/i.test(c.textContent));
+      if (!routines) { bad.push('no Daily Rhythm chip in the picker'); return bad; }
       routines.click();
       const listed = [...document.querySelectorAll('#slotPickerList .slot-pick-chip:not(.slot-pick-add)')];
-      if (listed.length < 2) { bad.push('the Routines category has too few entries to reorder'); return bad; }
+      if (listed.length < 2) { bad.push('the Daily Rhythm category has too few entries to reorder'); return bad; }
       const wantedName = listed[listed.length - 1].querySelector('.spc-name').textContent;
       listed[listed.length - 1].click();          // NOT the one already at the top
       confirmActivity();
 
       openSlotPicker(13 * 60);
       const chips2 = [...document.querySelectorAll('#slotPickerFilter .filter-chip')];
-      chips2.find(c => /Routine/i.test(c.textContent)).click();
+      chips2.find(c => /Daily Rhythm/i.test(c.textContent)).click();
       const first = document.querySelector('#slotPickerList .slot-pick-chip');
       const firstName = first ? first.querySelector('.spc-name').textContent : '';
       if (firstName !== wantedName) {
@@ -1780,24 +2392,39 @@ function findChromium() {
         bad.push('the lifted chip does not say why it moved');
       }
 
-      /* The All tab is ranked by slotPickerRecentActIds and must not have
-         acquired a second rule. */
+      /* The All tab has exactly TWO rules and they are in this order: what fits
+         the time she tapped, then what the household has actually been doing.
+         Everything under "Everything else" is still recency-ranked — the
+         suggestion row leads, it does not replace. */
       const allChip = chips2.find(c => c.textContent.trim() === 'All');
       allChip.click();
-      const allFirst = document.querySelector('#slotPickerList .slot-pick-chip');
-      const recent = slotPickerRecentActIds(6);
-      if (recent.length && allFirst) {
-        const acts = getAllActivities();
-        const wantAll = (acts.find(a => a.id === recent[0]) || {}).name;
-        const gotAll = allFirst.querySelector('.spc-name').textContent;
-        if (wantAll && gotAll !== wantAll) bad.push(`the All tab reordered: leads with "${gotAll}", expected "${wantAll}"`);
+      const heads = [...document.querySelectorAll('#slotPickerList .spc-subhead')]
+        .map(h => h.textContent.trim());
+      const zone = slotPickerWindow();
+      const anyFits = getAllActivities().some(a => !a._locked
+        && Array.isArray(a.suitableTime) && a.suitableTime.includes(zone));
+      if (anyFits && !heads.some(h => /Good for/.test(h))) {
+        bad.push('nothing leads on what fits the time she tapped');
+      }
+      if (anyFits && !heads.some(h => /Everything else/.test(h))) {
+        bad.push('the rest of the library is not offered under the suggestions');
+      }
+      /* And a suggestion is genuinely for this time of day, not just the top of
+         the old list wearing a new heading. */
+      const firstTile = document.querySelector('#slotPickerList .slot-pick-chip');
+      if (anyFits && firstTile) {
+        const nm = firstTile.querySelector('.spc-name').textContent;
+        const act = getAllActivities().find(a => a.name === nm);
+        if (act && !(act.suitableTime || []).includes(zone)) {
+          bad.push(`"${nm}" is suggested for ${zone}, which it does not fit`);
+        }
       }
       closeSheet('slotPickerOverlay');
 
       // A placement she backed out of teaches the category nothing.
       openSlotPicker(15 * 60);
       const chips3 = [...document.querySelectorAll('#slotPickerFilter .filter-chip')];
-      chips3.find(c => /Routine/i.test(c.textContent)).click();
+      chips3.find(c => /Daily Rhythm/i.test(c.textContent)).click();
       const others = [...document.querySelectorAll('#slotPickerList .slot-pick-chip:not(.slot-pick-add)')]
         .filter(c => c.querySelector('.spc-name').textContent !== wantedName);
       if (others.length) {
@@ -1805,7 +2432,7 @@ function findChromium() {
         cancelCreatePlacement('activityOverlay');
         openSlotPicker(16 * 60);
         const chips4 = [...document.querySelectorAll('#slotPickerFilter .filter-chip')];
-        chips4.find(c => /Routine/i.test(c.textContent)).click();
+        chips4.find(c => /Daily Rhythm/i.test(c.textContent)).click();
         const stillFirst = document.querySelector('#slotPickerList .slot-pick-chip');
         const n = stillFirst ? stillFirst.querySelector('.spc-name').textContent : '';
         if (n !== wantedName) bad.push(`a cancelled placement was remembered: the category now leads with "${n}"`);
@@ -2431,6 +3058,7 @@ function findChromium() {
     /* And the picker hides a chip with nothing behind it rather than offering a
        dead end — which is what makes an always-populated table safe. */
     currentDayKey = getDayKeys(0)[0];
+    pendingStartMin = 9 * 60;
     openSlotPicker(9 * 60);
     const chipLabels = [...document.querySelectorAll('#slotPickerFilter .filter-chip')].map(c => c.textContent);
     ACTIVITY_FILTERS.forEach(f => {
@@ -2440,19 +3068,45 @@ function findChromium() {
     });
     closeSheet('slotPickerOverlay');
     getProfData('jenn').customActivities = had;
-    // Every category a parent or kid can file something under has a chip.
-    ['customCat', 'paCat'].forEach(id => {
-      const sel = document.getElementById(id);
-      if (!sel) { bad.push(`no #${id} select`); return; }
+    /* Every category a parent or kid can file something under is a chip, and
+       every SUBGROUP offered belongs to the category above it — a "Kind" select
+       listing something the chosen category does not hold is a record filed
+       where no chip will ever find it. Both dialogs are rendered from one table
+       now; they used to hold a hardcoded eight each, copied byte for byte. */
+    /* Opened, because both selects are rendered when the dialog opens rather
+       than sitting in the markup — one table fills them, so reading them cold
+       would be reading an empty shell and calling it a pass. */
+    openCustomActivity('brain');
+    openParentActivityEditor();
+    [['customCat', 'customSub'], ['paCat', 'paSub']].forEach(([catId, subId]) => {
+      const sel = document.getElementById(catId);
+      const sub = document.getElementById(subId);
+      if (!sel) { bad.push(`no #${catId} select`); return; }
+      if (!sub) { bad.push(`no #${subId} select`); return; }
+      if (!sel.options.length) bad.push(`#${catId} is empty — nothing rendered it`);
       [...sel.options].forEach(o => {
         if (!ACTIVITY_FILTERS.some(f => f.id === o.value)) {
-          bad.push(`#${id} offers "${o.value}" but nothing can filter to it`);
+          bad.push(`#${catId} offers "${o.value}" but nothing can filter to it`);
+        }
+      });
+      const cat = catDef(sel.value);
+      [...sub.options].forEach(o => {
+        if (!cat.subs.some(sg => sg.id === o.value)) {
+          bad.push(`#${subId} offers "${o.value}", which is not a kind of ${cat.short}`);
         }
       });
     });
+    /* And it opens on the chip she came from: adding a drawing from inside
+       Brain and being handed a form that says Play & Rest is the app forgetting
+       where she was one tap ago. */
+    const openedOn = document.getElementById('customCat');
+    if (openedOn && openedOn.value !== 'brain') {
+      bad.push(`opened from the Brain chip, the form says "${openedOn.value}"`);
+    }
+    closeSheet('customOverlay'); closeSheet('parentActivityOverlay');
     // Appointments arrived with something in them.
-    if (!acts.some(a => a.cat === 'appointment')) bad.push('the appointment category is empty');
-    if (!CAT_HEX.appointment) bad.push('appointments have no colour');
+    if (!acts.some(a => activitySub(a).id === 'appts')) bad.push('the appointment subgroup is empty');
+    if (!subDef('appts').hex) bad.push('appointments have no colour');
     return bad.length === 0 || bad;
   });
 
@@ -9175,8 +9829,23 @@ function findChromium() {
     }
     // …and an explicit choice beats the category for everything else.
     if (blockColour(picked, 'jenn') !== '#123456') out.push('a hand-picked colour was ignored');
-    if (blockColour(piano, 'jenn') !== CAT_HEX[findActivity('piano', 'jenn').cat]) {
-      out.push('a plain block is not its category colour');
+    /* THE SUBGROUP IS THE HUE, not the category. `cat` used to decide this, and
+       nine flat values could not tell a piano lesson from a French lesson from
+       a school day — all three came out the same blue. Piano is Arts. */
+    if (blockColour(piano, 'jenn') !== activitySub(findActivity('piano', 'jenn')).hex) {
+      out.push('a plain block is not its subgroup colour');
+    }
+    if (blockColour(piano, 'jenn') === blockColour({ id: 'c6', actId: 'school_day' }, 'jenn')) {
+      out.push('a piano practice and a school day are still the same colour');
+    }
+    /* A colour every placement SEEDED is not a colour anybody chose. Each path
+       wrote one out of the shipped table, so a stored value equal to one of
+       those is the old default written down, and blockColour derives instead —
+       otherwise changing a subgroup's hue would leave every block already
+       placed wearing the one it replaced. */
+    const seeded = { id: 'c7', actId: 'piano', startMin: 9 * 60, durationMin: 30, colour: CAT_HEX.school };
+    if (blockColour(seeded, 'jenn') !== activitySub(findActivity('piano', 'jenn')).hex) {
+      out.push('a seeded default colour is being treated as a decision');
     }
     // An unknown activity has one fallback, not two.
     if (blockColour({ id: 'c5', actId: 'nope-not-real' }, 'jenn') !== '#888') {
@@ -10221,7 +10890,15 @@ function findChromium() {
      not take them along by association. */
   checks.noActivityHasToBeEarned = await page.evaluate(() => {
     const bad = [];
-    const FAMILY = ['family_set_table', 'family_prep_bag', 'family_laundry_fold', 'family_kitchen_helper'];
+    /* The four Family Hero chores have since been ARCHIVED — they named four
+       specific jobs the paid pool already holds, and mrChoreTagsForDay keys on
+       `actId !== 'chores'`, so a child could do the washing-up under Kitchen
+       Helper Quest and be paid nothing for it. "Not on the picker" is the right
+       answer for them now, and theCatalogResolvesEveryBlockItEverNamed is what
+       holds their history. What this check still owns is that the retirement
+       was not a DELETE and did not change what they count as. */
+    const FAMILY = [];
+    const FAMILY_RETIRED = ['family_set_table', 'family_prep_bag', 'family_laundry_fold', 'family_kitchen_helper'];
     /* The nine that were locked. Five have since been RETIRED by the catalog
        rewrite — they are asserted by theCatalogResolvesEveryBlockItEverNamed
        instead, because "not on the picker" is now the correct answer for them
@@ -10248,11 +10925,19 @@ function findChromium() {
         }
       });
 
-      // Family Hero is still a chore, so it still counts as one in the charts.
-      FAMILY.forEach(id => {
-        const act = avail.find(a => a.id === id);
-        if (act && activityGroup(act) !== 'chores') {
+      /* Retired from the pickers, and still a chore wherever a block names one:
+         an hours chart that reclassified two years of Family Hero blocks would
+         be the archive rule failing in the direction it exists to prevent. */
+      FAMILY_RETIRED.forEach(id => {
+        if (avail.some(a => a.id === id)) bad.push(`${id} is retired but still on the picker`);
+        const act = findActivity(id, 'jenn');
+        if (!act) { bad.push(`a historical block naming ${id} no longer resolves`); return; }
+        if (activityGroup(act) !== 'chores') {
           bad.push(`${id} is grouped as '${activityGroup(act)}', not a chore`);
+        }
+        const shown = blockDisplayName({ actId: id }, 'jenn');
+        if (!shown || !shown.name || shown.name === 'Something') {
+          bad.push(`${id} renders as "${shown && shown.name}"`);
         }
       });
 
@@ -10318,6 +11003,11 @@ function findChromium() {
       'acad_focus_sprint', 'acad_preview_power', 'acad_reading_star',
       'health_pack_tomorrow', 'culture_calligraphy_play',
       'leaf_hike', 'rainy_craft',
+      /* The four Family Hero chores: four named jobs the paid pool already
+         holds row by row, and never claimable as chores because the money side
+         keys on actId === 'chores'. House Chore plus a pool row is the one way
+         to say it now. */
+      'family_set_table', 'family_prep_bag', 'family_laundry_fold', 'family_kitchen_helper',
     ];
     const wasProfile = profile;
     profile = 'jenn';
@@ -12049,6 +12739,10 @@ function findChromium() {
       routine_morning: 'routine', health_pack_tomorrow: 'routine',
       training: 'body', competition: 'body',
       family: 'free', relax: 'free', break_quick: 'free', snow_play: 'free',
+      /* The family sitting down together is filed BESIDE the routines, because
+         that is where it belongs in her week — but it is not a routine session
+         and must never be counted as one, so it carries an explicit group. */
+      family_meeting: 'daily',
       /* Everyday movement is hers, not a coach's — a Saturday swim is not the
          same ask as a coached hour, and both used to land in one place.
          `relax` stays Free on purpose: rest that scores is rest turned into

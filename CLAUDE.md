@@ -108,6 +108,22 @@ covering `function`, `async function` and top-level `let`/`const`/`var`
 CI (`.github/workflows/ci.yml`) runs all three on every pull request and pushes
 to `main`, plus nightly, and uploads the smoke screenshots as an artifact.
 
+**The workflow ENUMERATES its npm scripts rather than running `npm test`.** That
+is deliberate — the fast gate runs without a browser and the smoke job installs
+one — but it makes `package.json` and the workflow two lists that have to agree,
+and nothing made them. A suite added to one and not the other is a suite CI
+never runs: green on a laptop, absent from every pull request, reporting nothing
+while the code it guards rots. The same shape as the `|| break` loop above.
+
+Not hypothetical: `tests/buffers.test.js` and `tests/money.test.js` were both in
+that state, the second for as long as it had existed — so a rates change in
+`js/18-rules.js` could break the calibrated totals and still show a green PR,
+against the promise `tools/money-calibrate.js` is written to make.
+`tests/check-ci-scripts.js` (in `npm run check`) now fails the build on a
+`test:*` script the workflow does not run, on a workflow step naming a script
+that does not exist, and on a suite missing from the `test` chain. **Add the
+step in the same change that adds the suite.**
+
 New features ship with a new check in `smoke.js`. The chore→money hand-off
 checks are the most valuable ones in there — when that join broke, every screen
 still rendered and only the numbers were wrong.
@@ -347,6 +363,71 @@ case where it matters most.
 the hero's NEXT line and a connector between two cards; from `TD_FREE_MIN` up it is
 the free-time card that already existed. `tdGapBefore` is the one place that line
 is drawn, and it measures to `tdActionableStart`, not to the block's start.
+
+**A strip stops where the next card starts, and never says more than it can
+show.** Two defects, one fixture — a School Day with 15m travel + 15m get-ready
+running into Homework at three o'clock. A buffer strip was drawn at its full
+length whatever was in the way, straight over the top of the next card, so
+neither the strip nor the card's name and tick could be read; and at 0.72px per
+minute a 15-minute strip is 10.8px tall while the kid readability floor sets its
+text to 13.1px, so two stacked strips each printed a label through the other.
+
+`bufferClip` (`js/05-helpers.js`) is the one owner of **how much of a buffer
+window is real, unoccupied time** — pure numbers, with a `module.exports` guard,
+so `tests/buffers.test.js` can hold it. `computeBufferConflicts` calls it and
+returns `shortMin` beside the booleans it always returned, and the sweep in that
+unit test asserts the equivalence that `short > 0` happens exactly when the
+overlap test fires: two definitions of one fact is the six-copies defect this
+file already records. The Full week, the day view and the print sheet all clip
+through it, so the red a screen draws and the minutes the banner prints can
+never describe different amounts of time. `wfBufferSegments` itself is
+**untouched** — Today's `tdPrepFor` reads it for "leave by 7:40", and that is
+still 7:40 whether or not the plan fits.
+
+`WF_TRAVEL_TEXT_MIN_PX` (17) is a **measurement**, like `WF_ROW`: 13.12px of
+text plus a 1.5px conflict border each side is 16.1, so 16 sits on the edge and
+17 is the first height that always holds a line. A strip under it keeps its
+hatch and its tooltip and says nothing; several short same-side segments merge
+into one **band** whose per-kind hatches stay as children and whose single label
+names both (`👕15 🚗15 · 7:40am`). Height only answers one of the two questions —
+a column is 95–129px and the long label is about 168px — so `wfTravelStrip`'s
+`maxTier`, which had no caller passing one, now caps the tier by width too.
+
+**The minutes that did not fit are drawn, not just described.** `.wf-overrun`
+lays the shortfall over the card it runs into at a quarter strength, exactly as
+tall as the overrun and ending in a dashed line, taking no pointer events — the
+old full-strength overprint was the only thing that showed how bad a clash was,
+and it showed it by making both unreadable. The number itself rides on the
+**flag**: the card that is run into swaps its round `!` for a pill reading
+`! 20m over`, hung above its top-left corner and mostly outside the card, which
+is the one place that never covers a centred name at any card height; a card in
+a right-hand lane hangs it top-RIGHT or two lanes' pills collide. The partner
+card keeps the plain `!`. `wfWorstShort` and `wfClashTitle` are the one pair
+that answers "how far am I run into, and by what", because the shortfall is
+recorded against the block whose window is short — so a card must read its
+PARTNERS' figures, not its own. `tdClashText` is the same sentence on Today.
+
+The week banner lists **one line per clashing pair**, deduped on the sorted id
+pair. It used to join every affected name on a day into one chain — "School Day
+⇆ Homework ⇆ Ballet ⇆ Evening Routine" — which names four things while saying
+neither which two clash nor by how much.
+
+**Lanes are decided on what is DRAWN, not on minutes.** `wfAssignColumns` and
+`renderBlocksWithCollision` compared `startMin` and `durationMin`, which is the
+wrong question on a surface with a minimum card height: at 0.72px per minute the
+20px floor is 28 minutes, so a ten-minute After-School Routine at 8:50pm was
+drawn straight through a 9:00pm Evening Routine while the arithmetic said they
+were clear — nothing split them and nothing could. Both measure drawn top and
+bottom now, plus the lane gap, with a few pixels of tolerance so a hair's-breadth
+graze between two long cards does not halve both for nothing. A lane-narrowed
+card under 64px drops its name to the icon (`.wf-card--noname`): one clipped
+letter is not a name, and the icon is already what a short card draws.
+
+`.placed-block { min-height: 22px }` applied to buffer strips too, so every strip
+under about seventeen minutes was silently grown and pushed past the block it
+abuts — the overlap `renderBlockPixel`'s own comment calls impossible by
+construction, made possible by a floor in another file. `.placed-block.travel-buf`
+carries its own 6px floor, matching the JS.
 
 **A clash is the week's finding, drawn the week's way.** `computeBufferConflicts`
 (js/03-sync.js) owns it; Today asks and reuses `.wf-card--conflict`'s red. Its
@@ -716,6 +797,105 @@ current-week; the **review voice** (owed / fulfilled / unfulfilled) lives on the
 parent and meeting screens, where a past week's shortfall is always shown. No
 shortfall is carried into the next week.
 
+## Category › subgroup › activity — the third question
+
+`cat` answers **what colour is this block**. `group` answers **what is this time
+FOR** — the eight rows every hours chart and the XP gate read. Neither is a shape
+a person can navigate: a picker with nine flat chips, three of which mean the
+same thing to a ten-year-old, is a list you scroll rather than a place you know
+your way around. "Learning" held a school day, a French lesson and a piano
+practice, and all three drew in the same blue.
+
+So `ACTIVITY_CATEGORIES` (`js/01-config.js`): **six categories, each holding one
+or more subgroups**, and every shipped activity names one with `sub:`.
+
+| Category | Subgroups |
+|---|---|
+| 🌅 Daily Rhythm | Routine · Helping hands |
+| 🍎 Fuel & Care | Meals · Appointments |
+| 🧠 Brain Construction | School · Language · Arts |
+| 💪 Body Construction | Training · Everyday movement |
+| 🧭 Explore | Outings |
+| 🎮 Play & Rest | Play · Seasonal treats |
+
+**The subgroup is the hue; the category picks it.** `blockColour` reads
+`activitySub(act).hex`. A stored `b.colour` counts only when somebody CHOSE it:
+every placement path seeded one out of the shipped table, so a value equal to
+anything in `SEEDED_HEX_VALUES` is the old default written down and the answer is
+derived instead — otherwise changing a subgroup's hue would leave every block
+already placed wearing the one it replaced. A block whose activity **nothing
+resolves** keeps the grey `#888`, explicitly: `activitySub`'s neutral landing is
+Meals, which is right for filing an hours total vaguely and wrong for colour. A
+block nobody can name drawn in Breakfast amber does not say "unknown", it says
+"breakfast".
+
+**The chart rows do not move.** A subgroup names a default `group`, and an
+explicit `group:` on an activity still wins — that is how Muscle Relaxation sits
+with the movement activities where it belongs in her week and still earns
+nothing, and how Family Meeting sits beside the routines without ever being
+counted as a routine session. Eight ids, same prices; three labels changed to
+match the words on the picker (Daily → Fuel & Care, Free → Play & Rest, Chores →
+Helping hands).
+
+**Derived, never migrated.** Every custom activity already in Firestore carries a
+`cat` and no `sub`, and `deepMergeObj` lets a remote scalar win, so a device
+serving an older bundle out of a Pages cache could push an un-stamped record back
+over a stamped one. `activitySub` answers at read time — the same answer whatever
+has run, however often, in any merge order — and writes nothing. The same
+reasoning as `xp2` and `achievementActivityId`. `cat` is still WRITTEN on a new
+record (`catForSub`) because the sticker conditions, the Athlete achievement and
+`ACTIVITY_OBJECTIVES_BY_CAT` all key on it.
+
+**The Family Hero chores are archived.** They named four specific jobs the paid
+pool already holds row by row — and `mrChoreTagsForDay` keys on
+`actId !== 'chores'`, so a Family Hero block was never a claimable chore at all: a
+child could do the washing-up under Kitchen Helper Quest and be paid nothing for
+it. House Chore plus a pool row is the one way to say it.
+
+## The picker asks what time it is
+
+`ACTIVITY_FILTERS` is the six categories plus **✨ Mine** (which means "made by
+this family, wherever it was filed" — a different question from all six, and the
+only way to find the thing you made). Seasonal is a subgroup now, not a chip:
+`_locked` still keeps Beach Day out of January, so nothing about availability
+changed, only where it is filed.
+
+**It leads with what fits.** Every activity has carried `suitableTime` since the
+catalog was written and the picker never asked — a child tapping 7:15 on a school
+morning was offered a six-hour day trip in the same undifferentiated list as
+Breakfast, and only the mascot ever read the field. `slotPickerWindow()` goes
+through `zoneForGap` (the family's own school hours) and `isSchoolDay`, never the
+day of the week. Two halves to "fits": the **moment** she tapped, and the **room**
+before the next block — a seven-hour School Day matches the school window and
+cannot go in the hour before dinner. It RANKS, it does not filter: everything else
+follows under its own heading, because a picker that hides things is one she stops
+trusting. An **appointment ranks last** inside the suggestions — it is a time
+somebody else set, not something a child picks to fill an afternoon with, and four
+of them leading the row is the picker answering a question nobody asked.
+
+**Inside a category the list is grouped by subgroup**, with the subgroup's colour
+on the heading and on each tile's edge. The per-chip "last time" lift is drawn
+**above every heading and removed from its own group**: grouping re-sorts into
+table order, so a lifted House Chore landed back at the bottom under Helping hands
+and the memory silently stopped working.
+
+**Fixed height, fixed chip row.** `.slot-picker-list` was a `max-height`, so the
+sheet was as tall as whichever category happened to be open and the whole dialog
+jumped on every chip — moving the chips out from under her thumb. It is
+`min(336px, 50vh)`, five rows of 56px tiles, which holds the largest category on
+an iPad and scrolls inside itself on a phone. The chip row is one line that
+scrolls sideways rather than wrapping, for the same reason.
+
+**Both add-activity dialogs are rendered from the one table.** `#customCat` and
+`#paCat` held a hardcoded list of eight each, copied byte for byte, so a category
+added to the app reached neither. `renderCategorySelects` fills a category select
+and a dependent subgroup select, hiding the second when the category has one
+subgroup. The kid dialog **opens on the chip she came from** and stamps the window
+she is standing in, so the thing she just invented turns up in the suggestions at
+the time she invented it for. The parent editor sets the four windows and
+`travels` by hand, and refuses an activity that fits nowhere — one that can never
+be suggested reads as a mistake rather than a choice.
+
 ## Eight activity groups — what the time is FOR
 
 `ACTIVITY_GROUPS` and `activityGroup(act)` in `js/01-config.js`. **Routine ·
@@ -1059,6 +1239,35 @@ planned as though it happened at the kitchen table and `tdActionableStart` — t
 get-ready time Today leads with — had nothing to compute from until somebody
 remembered the toggle. The default comes from the **activity**, never globally:
 a global default would put a fifteen-minute car journey in front of Breakfast.
+
+## Every buffer a block carries, it can edit
+
+`#editReadyToggle` and `#editReadyBufMin` have been in `index.html` all along,
+and `openEditSheet` (`js/09-sheets.js`) showed them for a **training** block
+only — everything else fell into an `else` branch that set both to
+`display:none`. So travel could be adjusted on any block and get-ready on almost
+none.
+
+Exactly backwards, because of the buffer default above: placing an activity sets
+`getReadyBuffer: activityTravels(act)`, so School Day, all five appointments,
+Ballet, Swimming, Skating and every Explore outing arrive with get-ready
+**on** — and not one of them is `isTraining`. Every block that carries the buffer
+by default was a block whose buffer could not be edited, which is also most of
+what the week grid draws in red: a parent looking at a twenty-minute clash had
+no control anywhere in the app that would fix it.
+
+The quieter half: `onEditBufferMinInput` read all three number inputs
+unconditionally, and the non-training branch never loaded the get-ready box from
+the block — so it kept its static `value="15"`, or whatever was typed on the
+last training block opened that session. Changing the **travel** minutes on a
+Swimming block copied that stale number into the block's get-ready and saved it.
+**A hidden input is never read**, and all three are loaded from the block on
+every path, not on one branch of two.
+
+**Warm-up stays training-only.** It is a training-specific idea with its own
+20-minute default, and a warm-up in front of Breakfast is what the buffer-default
+rule exists to prevent. `getReadyIsEditableOnAnythingThatCarriesIt` and
+`changingTravelDoesNotRewriteGetReady` hold both halves.
 
 ## Writing a plan for this repo
 

@@ -1995,6 +1995,11 @@
     opacity: 0.9; white-space: nowrap;
   }
   .wf-card--slim .wf-card-travel { display: none; }
+  /* A lane-split card in a seven-day column has room for its icon and nothing
+     else. One clipped letter is not a name; the icon says what it is and the
+     tooltip says it in full. */
+  .wf-card--noname .wf-card-name { font-size: 0; }
+  .wf-card--noname .wf-card-name::first-letter { font-size: 0; }
   /* Buffer/conflict warning badge inline on the card name */
   .wf-card-conflict-badge { margin-left: 3px; font-size: calc(0.68rem * var(--fs-scale, 1)); filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); }
   .wf-card-notdone-badge { margin-right: 3px; font-size: calc(0.68rem * var(--fs-scale, 1)); filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); }
@@ -2012,13 +2017,25 @@
     z-index: 3;
   }
   .wf-card-conflict-flag {
-    position: absolute; top: -7px; left: -7px; z-index: 4;
+    position: absolute; top: -7px; left: -7px; z-index: 5;
     width: 18px; height: 18px; border-radius: 50%;
     background: #d6453a; color: #fff;
     font-size: calc(0.7rem * var(--fs-scale, 1)); line-height: 18px; text-align: center;
     box-shadow: 0 1px 3px rgba(0,0,0,0.35);
     animation: wf-conflict-pulse 1.6s ease-in-out infinite;
   }
+  /* Carrying the minutes, it stops being a dot. Hung ABOVE the card's corner and
+     mostly outside it, so it never lands on a centred name — which a pill inside
+     the card did at every height the card comes in. 13px is the kid floor and
+     this is a figure a parent acts on. */
+  .wf-card-conflict-flag--min {
+    width: auto; height: 18px; border-radius: 999px; padding: 0 6px;
+    top: -13px; left: -4px; white-space: nowrap; font-weight: 800;
+    font-size: max(13px, calc(0.7rem * var(--fs-scale, 1))); line-height: 18px;
+  }
+  /* A card in a right-hand lane hangs it at its own right edge, or two lanes'
+     pills sit on top of each other in the middle of the day. */
+  .wf-card-conflict-flag--right { left: auto; right: -4px; }
   /* Banner above the grid summarizing the week's clashes so they're impossible
      to miss (the per-card flag then tells you which blocks). */
   .week-conflict-banner {
@@ -2100,6 +2117,46 @@
     color: #7a1f18;
     z-index: 2;
     animation: wf-conflict-pulse 1.6s ease-in-out infinite;
+  }
+  /* A strip with no room for a line keeps its hatch and says nothing. The hatch
+     is the information at that size; a 13px label in 10px of space was two
+     labels printed through each other. */
+  .wf-travel--mute { font-size: 0; }
+  /* Several short same-side segments drawn as ONE band: the per-kind hatches
+     stay as children so it still reads as get-ready THEN travel, and the single
+     label names both. */
+  .wf-travel--band { position: absolute; overflow: hidden; display: block; padding: 0; }
+  .wf-travel-band-seg {
+    position: absolute; left: 0; right: 0;
+    background: repeating-linear-gradient(-45deg,
+      color-mix(in srgb, var(--wf-travel-colour) 45%, transparent) 0 4px,
+      color-mix(in srgb, var(--wf-travel-colour) 15%, transparent) 4px 8px);
+  }
+  .wf-travel-band-seg.wf-travel--travel {
+    background: repeating-linear-gradient(45deg,
+      color-mix(in srgb, var(--wf-travel-colour) 45%, transparent) 0 4px,
+      color-mix(in srgb, var(--wf-travel-colour) 15%, transparent) 4px 8px);
+  }
+  .wf-travel-band-seg.wf-travel--warmup {
+    background: repeating-linear-gradient(0deg,
+      color-mix(in srgb, var(--wf-travel-colour) 48%, transparent) 0 3px,
+      color-mix(in srgb, var(--wf-travel-colour) 16%, transparent) 3px 7px);
+  }
+  .wf-travel-band-label {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-weight: 800; line-height: 1; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; padding: 0 2px;
+  }
+  /* THE MINUTES THAT DID NOT FIT, over the card they run into. A quarter
+     strength so the name and tick read through it, exactly as tall as the
+     overrun so how bad the clash is still reads at a glance — which is the one
+     thing the old full-strength overprint did well. Never takes a tap. */
+  .wf-overrun {
+    position: absolute; box-sizing: border-box; z-index: 4; pointer-events: none;
+    border-radius: 7px 7px 3px 3px;
+    border-bottom: 2px dashed rgba(214,69,58,0.85);
+    background: repeating-linear-gradient(-45deg,
+      rgba(214,69,58,0.28) 0 4px, rgba(214,69,58,0.10) 4px 8px);
   }
   @keyframes wf-conflict-pulse {
     0%, 100% { box-shadow: 0 0 0 rgba(214,69,58,0); }
@@ -2864,6 +2921,16 @@
     cursor: default;
     border-style: dotted;
     box-shadow: none;
+    /* ITS OWN FLOOR, matching the one renderBlockPixel applies (6px). The JS
+       there reasons that a buffer is never inflated because clampBufferMin's
+       five-minute minimum is 7px at 1.4px/min — but .placed-block above sets
+       min-height: 22px and that applies here too, so EVERY strip under about
+       seventeen minutes was silently grown to 22px and pushed past the block it
+       abuts. A pre-side strip is bottom-anchored, so the extra height spilled
+       forward over the activity it belongs to; a post-side one ran into the
+       next card. That is the overlap the comment in js/08-day-view.js calls
+       impossible by construction, made possible by a floor in another file. */
+    min-height: 6px;
   }
   .placed-block.travel-buf.travel-buf-ready {
     z-index: 6;
@@ -2876,6 +2943,10 @@
       rgba(244,163,64,0.5) 0 5px, rgba(244,163,64,0.2) 5px 10px) !important;
   }
   .placed-block.travel-buf:hover { transform: none; box-shadow: none; }
+  /* Too short to hold a line: the hatch and the tooltip carry it, the way a
+     muted strip does on the Full week. Printing 13px of label into 10px of
+     strip is what made two stacked buffers unreadable. */
+  .placed-block.travel-buf.travel-buf--mute .block-meta { display: none; }
   /* Buffer overlaps an adjacent activity — not enough real time to travel or
      get ready. Full opacity + red dashed border so it can't be missed. */
   .placed-block.travel-buf.travel-buf--conflict {
@@ -4787,13 +4858,43 @@
 
   /* Quick slot-picker sheet (tap an empty slot to add an activity) */
   .slot-picker-hint { color: var(--ink-light); font-size: calc(0.92rem * var(--fs-scale, 1)); margin: 0.1rem 0 0.5rem; }
-  .slot-picker-filter { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+  /* ONE LINE THAT SCROLLS, never a wrapping block. Ten chips wrapped to two or
+     three rows depending on which labels were showing, so the list below moved
+     up and down as she changed category — the sheet resizing under her thumb
+     between one tap and the next. */
+  .slot-picker-filter {
+    display: flex; gap: 0.3rem; margin-bottom: 0.6rem;
+    overflow-x: auto; overflow-y: hidden; padding-bottom: 0.25rem;
+    scrollbar-width: thin; -webkit-overflow-scrolling: touch;
+  }
+  .slot-picker-filter .filter-chip { flex: 0 0 auto; white-space: nowrap; }
   /* 180px, not 130px: at 130 a tile had to fit icon + name + duration on one
      row, so every name past ~8 characters ellipsed — "Breakfast" read "Bre…",
      "School Day" read "Sch…". A child cannot pick from a list she cannot read. */
+  /* A FIXED HEIGHT, not a max. With max-height the sheet was as tall as whatever
+     category happened to be open — Play & Rest twelve tiles, Explore eight,
+     Fuel & Care six — so the whole dialog jumped every time a chip was tapped
+     and the chips themselves moved out from under her finger.
+
+     336px is five rows of 56px tiles plus their gaps, which holds the largest
+     category on an iPad without scrolling and scrolls inside itself on a phone.
+     min() keeps it inside a short viewport. */
   .slot-picker-list {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 0.5rem; max-height: 52vh; overflow-y: auto; padding: 0.15rem;
+    gap: 0.5rem; height: min(336px, 50vh); overflow-y: auto; padding: 0.15rem;
+    align-content: start;
+  }
+  /* Which subgroup these belong to, spanning the grid. 13px is the kid floor —
+     this is a label she reads to find her way, not a footnote. */
+  .spc-subhead {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 0.4rem;
+    font-size: max(13px, calc(0.78rem * var(--fs-scale, 1)));
+    font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--ink-light); padding-top: 0.2rem;
+  }
+  .spc-subdot {
+    width: 12px; height: 12px; border-radius: 3px;
+    border: 1.5px solid var(--ink); flex: 0 0 auto;
   }
   .slot-pick-chip {
     display: flex; align-items: center; gap: 0.45rem;
@@ -4815,6 +4916,15 @@
     color: var(--accent-strong); white-space: nowrap;
   }
   .slot-pick-add { background: var(--bg2); border-style: dashed; }
+  /* The window boxes and the travel toggle in the parent's activity editor. */
+  .pa-when-row { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; margin-bottom: 0.5rem; }
+  .pa-when {
+    display: flex; align-items: center; gap: 0.35rem;
+    font-size: max(13px, calc(0.9rem * var(--fs-scale, 1))); font-weight: 700;
+    min-height: 44px;
+  }
+  .pa-when--solo { margin-bottom: 0.5rem; }
+  .pa-when input { width: 20px; height: 20px; }
   .spc-icon { font-size: 1.4rem; flex-shrink: 0; }
   /* Wraps rather than ellipses, and a step down from the inherited 19.5px so two
      words fit on one line. 16.6px at the default scale — above the 15px floor
@@ -4825,6 +4935,13 @@
     line-height: 1.2; overflow-wrap: anywhere;
   }
   .spc-dur { font-size: calc(0.78rem * var(--fs-scale, 1)); font-weight: 700; color: var(--ink-light); flex-shrink: 0; }
+  /* The colour this activity's blocks will actually be, on the tile's edge. A
+     picker that gives no clue what a thing looks like on the day makes a child
+     place one to find out. */
+  .spc-sw {
+    width: 8px; align-self: stretch; border-radius: 4px; flex: 0 0 auto;
+    margin: -0.55rem -0.6rem -0.55rem 0;
+  }
 
   /* Sparkles */
   .quest-spark {
@@ -5997,6 +6114,7 @@
   #screen-week .wf-band-label,
   #screen-week .wf-sideband-seg,
   #screen-week .wf-travel,
+  #screen-week .wf-travel-band-label,
   #screen-week .wf-card-sum,
   #screen-week .wf-card-dur,
   #screen-week .wf-card-time,

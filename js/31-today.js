@@ -305,16 +305,45 @@ function tdQuestsToday(kid) {
 function tdClashes(kid, blocks) {
   const out = new Map();
   if (typeof computeBufferConflicts !== 'function') return out;
-  const { affected, partners } = computeBufferConflicts(blocks);
+  const { affected, partners, shortMin } = computeBufferConflicts(blocks);
   if (!affected || !affected.size) return out;
   const byId = new Map(blocks.map(b => [b.id, b]));
   affected.forEach(id => {
+    const me = byId.get(id);
     const others = (partners && partners.get(id)) || new Set();
     const first = [...others].map(oid => byId.get(oid)).filter(Boolean)
       .sort((a, b) => (a.startMin || 0) - (b.startMin || 0))[0];
-    out.set(id, first ? tdBlockLabel(first, kid).name : 'another activity');
+    /* HOW SHORT as well as with what. The shortfall is recorded against the
+       block whose window does not fit, so a block asking how far it is run into
+       reads its partner's figure — the same reading wfWorstShort makes on the
+       week grid, from the same Map, so the two screens cannot print different
+       numbers about one clash. */
+    let short = 0;
+    if (shortMin) {
+      const mine = shortMin.get(id);
+      if (mine) short = Math.max(mine.pre, mine.post);
+      others.forEach(oid => {
+        const sh = shortMin.get(oid);
+        const other = byId.get(oid);
+        if (!sh || !other || !me) return;
+        const side = (me.startMin || 0) >= (other.startMin || 0) ? sh.post : sh.pre;
+        if (side > short) short = side;
+      });
+    }
+    out.set(id, { name: first ? tdBlockLabel(first, kid).name : 'another activity', shortMin: short });
   });
   return out;
+}
+
+/* The one sentence a clash says on Today. Three places drew this note and each
+   built its own string from the map; with a number in it that is three chances
+   to word one fact differently. States the fact and nothing about the child —
+   the plan is what does not fit, and she did not write it. */
+function tdClashText(clash) {
+  if (!clash) return '';
+  const name = typeof clash === 'string' ? clash : clash.name;
+  const short = (clash && clash.shortMin) || 0;
+  return `⚠️ Overlaps ${name}` + (short ? ` · ${short}m short` : '');
 }
 
 /* The rest of today, as a child experiences it: the things she has to do AND the
@@ -469,7 +498,8 @@ function tdTimeCol(b) {
     </div>`;
 }
 
-/* clash names the other activity this one runs into, or null. Today asks
+/* clash is { name, shortMin } for the activity this one runs into, or null —
+   worded by tdClashText, never by a caller. Today asks
    computeBufferConflicts (js/03-sync.js) — it does not work out for itself
    whether a plan is workable, because the week grid already answers that and
    two answers to one question is one answer too many. */
@@ -504,7 +534,7 @@ function tdQuestCard(b, kid, isNext, clash) {
           <div class="quest-card-name">${escapeHtml(nm)}</div>
           ${tdBlockTag(blk)}
           ${xpWorth > 0 ? `<div class="quest-card-meta"><span class="quest-xp-tag">+${xpWorth} XP</span></div>` : ''}
-          ${clash ? `<div class="quest-conflict-note">⚠️ Overlaps ${escapeHtml(clash)}</div>` : ''}
+          ${clash ? `<div class="quest-conflict-note">${escapeHtml(tdClashText(clash))}</div>` : ''}
         </div>
       </button>
       ${done
@@ -862,7 +892,7 @@ function tdRenderToday() {
         <div class="td-now-icon">${l.icon}</div>
         <div class="td-now-line"><div class="td-now-name">${escapeHtml(l.name)} ${tdBlockTag(l.block)}</div>
           <div class="td-now-sub">${escapeHtml(prog.range)} · <span class="td-now-left">${escapeHtml(formatDuration(prog.leftMin))} left</span></div>
-          ${clash ? `<div class="quest-conflict-note">⚠️ Overlaps ${escapeHtml(clash)}</div>` : ''}</div>
+          ${clash ? `<div class="quest-conflict-note">${escapeHtml(tdClashText(clash))}</div>` : ''}</div>
         <button type="button" class="td-now-tick" data-td-action="blast"
           data-td-block="${escapeAttr(current.id)}"
           aria-label="Mark ${escapeAttr(l.name)} done" title="Done it! 🎯">🎯</button>
@@ -899,7 +929,7 @@ function tdRenderToday() {
         <div class="td-now-icon">${l.icon}</div>
         <div class="td-now-line"><div class="td-now-name">${escapeHtml(l.name)} ${tdBlockTag(l.block)}</div>
           <div class="td-now-sub">${sub}</div>
-          ${clash ? `<div class="quest-conflict-note">⚠️ Overlaps ${escapeHtml(clash)}</div>` : ''}</div>
+          ${clash ? `<div class="quest-conflict-note">${escapeHtml(tdClashText(clash))}</div>` : ''}</div>
       </div>${nextHtml}`;
   } else if (tdInQuietHours()) {
     /* Nine at night with nothing left on the plan. "The rest of today is yours"
