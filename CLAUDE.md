@@ -1125,6 +1125,35 @@ get-ready time Today leads with — had nothing to compute from until somebody
 remembered the toggle. The default comes from the **activity**, never globally:
 a global default would put a fifteen-minute car journey in front of Breakfast.
 
+## Every buffer a block carries, it can edit
+
+`#editReadyToggle` and `#editReadyBufMin` have been in `index.html` all along,
+and `openEditSheet` (`js/09-sheets.js`) showed them for a **training** block
+only — everything else fell into an `else` branch that set both to
+`display:none`. So travel could be adjusted on any block and get-ready on almost
+none.
+
+Exactly backwards, because of the buffer default above: placing an activity sets
+`getReadyBuffer: activityTravels(act)`, so School Day, all five appointments,
+Ballet, Swimming, Skating and every Explore outing arrive with get-ready
+**on** — and not one of them is `isTraining`. Every block that carries the buffer
+by default was a block whose buffer could not be edited, which is also most of
+what the week grid draws in red: a parent looking at a twenty-minute clash had
+no control anywhere in the app that would fix it.
+
+The quieter half: `onEditBufferMinInput` read all three number inputs
+unconditionally, and the non-training branch never loaded the get-ready box from
+the block — so it kept its static `value="15"`, or whatever was typed on the
+last training block opened that session. Changing the **travel** minutes on a
+Swimming block copied that stale number into the block's get-ready and saved it.
+**A hidden input is never read**, and all three are loaded from the block on
+every path, not on one branch of two.
+
+**Warm-up stays training-only.** It is a training-specific idea with its own
+20-minute default, and a warm-up in front of Breakfast is what the buffer-default
+rule exists to prevent. `getReadyIsEditableOnAnythingThatCarriesIt` and
+`changingTravelDoesNotRewriteGetReady` hold both halves.
+
 ## Writing a plan for this repo
 
 Problems and fixes in **plain language** — what is wrong, what it will do

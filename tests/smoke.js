@@ -818,6 +818,113 @@ function findChromium() {
   });
 
 
+
+  /* GET-READY IS EDITABLE ON ANYTHING THAT CARRIES IT.
+
+     The toggle and the minutes box have been in index.html all along, and
+     openEditSheet showed them for a TRAINING block only — so travel could be
+     adjusted on any block and get-ready on almost none. Exactly backwards:
+     placing an activity sets getReadyBuffer from activityTravels(), so School
+     Day, the five appointments, Ballet, Swimming, Skating and the Explore
+     outings all arrive with the buffer ON, and not one of them is isTraining.
+     Every block that carried it by default was a block that could not edit it. */
+  checks.getReadyIsEditableOnAnythingThatCarriesIt = await page.evaluate(async () => {
+    const kid = activeProfile();
+    const key = getDayKeys(0)[3];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    try {
+      setDayBlocks(key, [{ id: 'gr-swim', actId: 'swimming', startMin: 16 * 60, durationMin: 60,
+        travelBuffer: true, travelBufMin: 20, getReadyBuffer: true, getReadyBufMin: 15 }], kid);
+      currentDayKey = key;
+      openEditSheet('gr-swim');
+
+      const tg = document.getElementById('editReadyToggle');
+      const row = document.getElementById('editReadyDurRow');
+      const box = document.getElementById('editReadyBufMin');
+      if (!tg || getComputedStyle(tg).display === 'none') {
+        bad.push('a swimming block offers no get-ready toggle');
+      }
+      if (!row || getComputedStyle(row).display === 'none') {
+        bad.push('a swimming block offers no get-ready minutes');
+      }
+      if (box && box.value !== '15') {
+        bad.push(`the box reads "${box.value}" rather than the block's own 15`);
+      }
+      // Warm-up stays training-only: a car journey in front of Breakfast is what
+      // the buffer-default rule exists to prevent.
+      const wu = document.getElementById('editWarmupToggle');
+      if (wu && getComputedStyle(wu).display !== 'none') {
+        bad.push('warm-up is offered on a block that is not training');
+      }
+
+      // Change it, save it, read it back off the block.
+      if (box) { box.value = '25'; onEditBufferMinInput(); }
+      await saveEditChanges();
+      const after = (getDayBlocks(key, kid) || []).find(b => b.id === 'gr-swim');
+      if (!after || getGetReadyBufMin(after) !== 25) {
+        bad.push(`saved get-ready is ${after ? getGetReadyBufMin(after) : 'gone'}, not 25`);
+      }
+
+      // And it can be switched off entirely.
+      openEditSheet('gr-swim');
+      toggleEditGetReadyBuffer();
+      await saveEditChanges();
+      const off = (getDayBlocks(key, kid) || []).find(b => b.id === 'gr-swim');
+      if (off && getGetReadyBufMin(off) !== 0) {
+        bad.push(`get-ready survived being switched off at ${getGetReadyBufMin(off)}m`);
+      }
+    } finally { setDayBlocks(key, had, kid); closeSheet('editOverlay'); }
+    return bad.length === 0 || bad;
+  });
+
+  /* CHANGING TRAVEL DOES NOT REWRITE GET-READY.
+
+     The quieter half of the same defect. onEditBufferMinInput read all three
+     number inputs unconditionally, but the non-training branch never loaded the
+     get-ready box from the block — so it kept its static value="15" from
+     index.html, or whatever was typed on the last training block opened this
+     session. Touch the TRAVEL minutes on a swimming block and that stale number
+     was copied into the block's get-ready and saved: a field with no visible
+     control silently rewriting itself from another block's value. */
+  checks.changingTravelDoesNotRewriteGetReady = await page.evaluate(async () => {
+    const kid = activeProfile();
+    const key = getDayKeys(0)[4];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    try {
+      setDayBlocks(key, [
+        { id: 'rw-train', actId: 'training', startMin: 10 * 60, durationMin: 120, tag: 'skating',
+          travelBuffer: true, travelBufMin: 30, getReadyBuffer: true, getReadyBufMin: 15 },
+        { id: 'rw-swim', actId: 'swimming', startMin: 16 * 60, durationMin: 60,
+          travelBuffer: true, travelBufMin: 20, getReadyBuffer: true, getReadyBufMin: 45 },
+      ], kid);
+      currentDayKey = key;
+
+      // Leave a big number in the get-ready box via a training block.
+      openEditSheet('rw-train');
+      const gr = document.getElementById('editReadyBufMin');
+      if (gr) { gr.value = '40'; onEditBufferMinInput(); }
+      closeSheet('editOverlay');
+
+      // Now touch ONLY the travel minutes on the swimming block.
+      openEditSheet('rw-swim');
+      const tv = document.getElementById('editTravelBufMin');
+      if (tv) { tv.value = '35'; onEditBufferMinInput(); }
+      await saveEditChanges();
+
+      const swim = (getDayBlocks(key, kid) || []).find(b => b.id === 'rw-swim');
+      if (!swim) return ['the swimming block vanished'];
+      if (getGetReadyBufMin(swim) !== 45) {
+        bad.push(`its get-ready became ${getGetReadyBufMin(swim)}m — it was never touched, and was 45`);
+      }
+      if (getTravelBufMin(swim) !== 35) {
+        bad.push(`its travel is ${getTravelBufMin(swim)}m, not the 35 that was typed`);
+      }
+    } finally { setDayBlocks(key, had, kid); closeSheet('editOverlay'); }
+    return bad.length === 0 || bad;
+  });
+
   /* A BUFFER STRIP NEVER COVERS A CARD, AND NEVER SAYS MORE THAN IT CAN SHOW.
 
      Two separate defects, one fixture — the Wednesday from the screenshot that
