@@ -781,6 +781,105 @@ current-week; the **review voice** (owed / fulfilled / unfulfilled) lives on the
 parent and meeting screens, where a past week's shortfall is always shown. No
 shortfall is carried into the next week.
 
+## Category › subgroup › activity — the third question
+
+`cat` answers **what colour is this block**. `group` answers **what is this time
+FOR** — the eight rows every hours chart and the XP gate read. Neither is a shape
+a person can navigate: a picker with nine flat chips, three of which mean the
+same thing to a ten-year-old, is a list you scroll rather than a place you know
+your way around. "Learning" held a school day, a French lesson and a piano
+practice, and all three drew in the same blue.
+
+So `ACTIVITY_CATEGORIES` (`js/01-config.js`): **six categories, each holding one
+or more subgroups**, and every shipped activity names one with `sub:`.
+
+| Category | Subgroups |
+|---|---|
+| 🌅 Daily Rhythm | Routine · Helping hands |
+| 🍎 Fuel & Care | Meals · Appointments |
+| 🧠 Brain Construction | School · Language · Arts |
+| 💪 Body Construction | Training · Everyday movement |
+| 🧭 Explore | Outings |
+| 🎮 Play & Rest | Play · Seasonal treats |
+
+**The subgroup is the hue; the category picks it.** `blockColour` reads
+`activitySub(act).hex`. A stored `b.colour` counts only when somebody CHOSE it:
+every placement path seeded one out of the shipped table, so a value equal to
+anything in `SEEDED_HEX_VALUES` is the old default written down and the answer is
+derived instead — otherwise changing a subgroup's hue would leave every block
+already placed wearing the one it replaced. A block whose activity **nothing
+resolves** keeps the grey `#888`, explicitly: `activitySub`'s neutral landing is
+Meals, which is right for filing an hours total vaguely and wrong for colour. A
+block nobody can name drawn in Breakfast amber does not say "unknown", it says
+"breakfast".
+
+**The chart rows do not move.** A subgroup names a default `group`, and an
+explicit `group:` on an activity still wins — that is how Muscle Relaxation sits
+with the movement activities where it belongs in her week and still earns
+nothing, and how Family Meeting sits beside the routines without ever being
+counted as a routine session. Eight ids, same prices; three labels changed to
+match the words on the picker (Daily → Fuel & Care, Free → Play & Rest, Chores →
+Helping hands).
+
+**Derived, never migrated.** Every custom activity already in Firestore carries a
+`cat` and no `sub`, and `deepMergeObj` lets a remote scalar win, so a device
+serving an older bundle out of a Pages cache could push an un-stamped record back
+over a stamped one. `activitySub` answers at read time — the same answer whatever
+has run, however often, in any merge order — and writes nothing. The same
+reasoning as `xp2` and `achievementActivityId`. `cat` is still WRITTEN on a new
+record (`catForSub`) because the sticker conditions, the Athlete achievement and
+`ACTIVITY_OBJECTIVES_BY_CAT` all key on it.
+
+**The Family Hero chores are archived.** They named four specific jobs the paid
+pool already holds row by row — and `mrChoreTagsForDay` keys on
+`actId !== 'chores'`, so a Family Hero block was never a claimable chore at all: a
+child could do the washing-up under Kitchen Helper Quest and be paid nothing for
+it. House Chore plus a pool row is the one way to say it.
+
+## The picker asks what time it is
+
+`ACTIVITY_FILTERS` is the six categories plus **✨ Mine** (which means "made by
+this family, wherever it was filed" — a different question from all six, and the
+only way to find the thing you made). Seasonal is a subgroup now, not a chip:
+`_locked` still keeps Beach Day out of January, so nothing about availability
+changed, only where it is filed.
+
+**It leads with what fits.** Every activity has carried `suitableTime` since the
+catalog was written and the picker never asked — a child tapping 7:15 on a school
+morning was offered a six-hour day trip in the same undifferentiated list as
+Breakfast, and only the mascot ever read the field. `slotPickerWindow()` goes
+through `zoneForGap` (the family's own school hours) and `isSchoolDay`, never the
+day of the week. Two halves to "fits": the **moment** she tapped, and the **room**
+before the next block — a seven-hour School Day matches the school window and
+cannot go in the hour before dinner. It RANKS, it does not filter: everything else
+follows under its own heading, because a picker that hides things is one she stops
+trusting. An **appointment ranks last** inside the suggestions — it is a time
+somebody else set, not something a child picks to fill an afternoon with, and four
+of them leading the row is the picker answering a question nobody asked.
+
+**Inside a category the list is grouped by subgroup**, with the subgroup's colour
+on the heading and on each tile's edge. The per-chip "last time" lift is drawn
+**above every heading and removed from its own group**: grouping re-sorts into
+table order, so a lifted House Chore landed back at the bottom under Helping hands
+and the memory silently stopped working.
+
+**Fixed height, fixed chip row.** `.slot-picker-list` was a `max-height`, so the
+sheet was as tall as whichever category happened to be open and the whole dialog
+jumped on every chip — moving the chips out from under her thumb. It is
+`min(336px, 50vh)`, five rows of 56px tiles, which holds the largest category on
+an iPad and scrolls inside itself on a phone. The chip row is one line that
+scrolls sideways rather than wrapping, for the same reason.
+
+**Both add-activity dialogs are rendered from the one table.** `#customCat` and
+`#paCat` held a hardcoded list of eight each, copied byte for byte, so a category
+added to the app reached neither. `renderCategorySelects` fills a category select
+and a dependent subgroup select, hiding the second when the category has one
+subgroup. The kid dialog **opens on the chip she came from** and stamps the window
+she is standing in, so the thing she just invented turns up in the suggestions at
+the time she invented it for. The parent editor sets the four windows and
+`travels` by hand, and refuses an activity that fits nowhere — one that can never
+be suggested reads as a mistake rather than a choice.
+
 ## Eight activity groups — what the time is FOR
 
 `ACTIVITY_GROUPS` and `activityGroup(act)` in `js/01-config.js`. **Routine ·

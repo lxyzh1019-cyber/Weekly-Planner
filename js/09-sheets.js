@@ -2310,19 +2310,61 @@ function syncEmojiGrid(gridId, current) {
   [...grid.children].forEach(c => c.classList.toggle('selected', c.textContent === current));
 }
 
-function openCustomActivity() {
+/* ── The category and its subgroup, filled from one table ──
+   Both dialogs held a hardcoded list of eight options, copied byte for byte
+   from one to the other — so a category added to the app reached neither, and
+   the two could drift apart with nothing to say so. One writer now, driven by
+   ACTIVITY_CATEGORIES (js/01-config.js).
+
+   The subgroup select follows the category and HIDES when that category has
+   only one, because asking "which kind of Explore?" when there is one answer is
+   a control that can only be got wrong. */
+function renderCategorySelects(catId, subId, ids) {
+  const catEl = document.getElementById(ids.cat);
+  const subEl = document.getElementById(ids.sub);
+  const wrap  = document.getElementById(ids.wrap);
+  if (!catEl || !subEl) return;
+  const cat = catDef(catId || 'play');
+  catEl.innerHTML = ACTIVITY_CATEGORIES
+    .map(c => `<option value="${escapeAttr(c.id)}"${c.id === cat.id ? ' selected' : ''}>${escapeHtml(c.label)}</option>`)
+    .join('');
+  const chosen = cat.subs.some(sg => sg.id === subId) ? subId : cat.subs[0].id;
+  subEl.innerHTML = cat.subs
+    .map(sg => `<option value="${escapeAttr(sg.id)}"${sg.id === chosen ? ' selected' : ''}>${escapeHtml(sg.label)}</option>`)
+    .join('');
+  if (wrap) wrap.style.display = cat.subs.length > 1 ? '' : 'none';
+  catEl.onchange = () => renderCategorySelects(catEl.value, null, ids);
+}
+
+const CUSTOM_ACT_IDS = { cat: 'customCat', sub: 'customSub', wrap: 'customSubWrap' };
+
+/* `fromCat` is the picker chip that was open when she tapped "＋ Custom
+   activity". Adding a drawing from inside Brain and being handed a form that
+   says Play & Rest is the app forgetting where she was one tap ago. */
+function openCustomActivity(fromCat) {
   openSheet('customOverlay');
   const cur = (document.getElementById('customIcon').value || '').trim();
   renderEmojiGrid('customEmojiGrid', 'customIcon', cur);
+  const start = ACTIVITY_CATEGORIES.some(c => c.id === fromCat) ? fromCat : 'play';
+  renderCategorySelects(start, null, CUSTOM_ACT_IDS);
 }
 
 function confirmCustomActivity() {
   const name = document.getElementById('customName').value.trim();
   const icon = document.getElementById('customIcon').value.trim() || '⭐';
-  const cat  = document.getElementById('customCat').value;
+  const sub  = document.getElementById('customSub').value;
   const durationMin = parseInt(document.getElementById('customDur').value);
   if (!name) { showToast('Enter a name!'); return; }
-  const act = { id:'custom-'+Date.now().toString(36), name, icon, cat, durationMin, custom:true,
+  /* `cat` is still written, derived from the subgroup. Nothing reads it for
+     colour or filtering any more, but the sticker conditions, the Athlete
+     achievement and ACTIVITY_OBJECTIVES_BY_CAT all key on it, and a record
+     without one would quietly drop out of those. */
+  const act = { id:'custom-'+Date.now().toString(36), name, icon, sub, cat: catForSub(sub),
+    durationMin, custom:true,
+    /* When it can be planned. A kid-made activity inherits the window she is
+       standing in, so the thing she just invented turns up in the picker's
+       suggestions at the time she invented it for rather than never. */
+    suitableTime: [slotPickerWindow()].filter(Boolean),
     addedBy: isParent() ? 'parent' : activeProfile(),
     pendingApproval: !isParent() };  // a kid's new activity waits for a parent's OK
   getProfData().customActivities = [...getCustomActivities(), act];

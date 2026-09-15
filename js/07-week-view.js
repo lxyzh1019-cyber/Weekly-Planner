@@ -727,8 +727,13 @@ function renderWeekLegend() {
   const legend = document.getElementById('weekLegend');
   if (!legend) return;
   legend.style.display = 'flex';
-  legend.innerHTML = GROUP_ORDER.map(g =>
-    `<span class="tg-legend-chip"><span class="tg-legend-dot" style="background:${groupHex(g) /* safe: from ACTIVITY_GROUPS */}"></span>${groupShort(g)}</span>`
+  /* THE COLOURS THE CARDS ACTUALLY WEAR. This listed the eight chart groups and
+     their hues, which is a different table: a block is coloured by its
+     subgroup, so the legend's "Body" pink sat beside swimming cards drawn in
+     coral and the key explained a scheme nothing on the grid used. Six
+     categories, the hue each one's cards start from. */
+  legend.innerHTML = ACTIVITY_CATEGORIES.map(c =>
+    `<span class="tg-legend-chip"><span class="tg-legend-dot" style="background:${c.hex /* safe: from ACTIVITY_CATEGORIES */}"></span>${escapeHtml(c.short)}</span>`
   ).join('') + `<span class="tg-legend-chip"><span class="tg-legend-dot tg-legend-dot--free"></span>Free time</span>`;
 }
 

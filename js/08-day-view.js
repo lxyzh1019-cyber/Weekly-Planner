@@ -1486,11 +1486,15 @@ function addActivityAtMin(absMin) {
 
   pendingStartMin = absMin;
 
+  /* One owner for what a new block starts as (activityPlacementDraft,
+     js/01-config.js). These four lines were written out here AND in
+     pickFromSlot, so a default added to one pair was silently missing from the
+     other — which is exactly what happened to the training warm-up. */
   if (selectedActivity.isTraining) {
-    ts = { durationMin: activityDefaultDuration(selectedActivity)||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(selectedActivity), getReadyBuffer:activityTravels(selectedActivity), warmupBuffer:false, gearState:{}, travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, warmupBufMin:DEFAULT_WARMUP_MIN };
+    ts = activityPlacementDraft(selectedActivity);
     openTrainingSheet();
   } else {
-    as_ = { durationMin: activityDefaultDuration(selectedActivity)||60, colour: CAT_HEX[selectedActivity.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(selectedActivity), getReadyBuffer:activityTravels(selectedActivity), travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, choreTags: [], objectives: [] };
+    as_ = activityPlacementDraft(selectedActivity);
     openActivitySheet();
   }
 }
@@ -1552,7 +1556,20 @@ function openSlotPicker(absMin) {
   const many = dayViewKeys().length > 1;
   const dayName = many ? `${DAY_SHORT[dayIdxOfKey(currentDayKey)]} ` : '';
   if (title) title.textContent = `Add ${dayName}${formatTimeFromMin(absMin)}`;
-  if (hint) hint.textContent = 'Pick what goes in this time slot.';
+  /* How much room there actually is, not "pick what goes in this time slot" —
+     which is true of every slot on every day and says nothing about this one.
+     The next block's name is what makes the number mean something. */
+  if (hint) {
+    const free = slotPickerFreeMin();
+    if (free && free.min > 0) {
+      const until = free.next
+        ? ` until ${blockDisplayName(free.next, undefined, currentDayKey).name}`
+        : ' left today';
+      hint.textContent = `${formatDuration(free.min)} free${until}`;
+    } else {
+      hint.textContent = 'Pick what goes in this time slot.';
+    }
+  }
   renderSlotPicker();
   openSheet('slotPickerOverlay');
 }
@@ -1573,6 +1590,33 @@ function slotPickerRecentActIds(limit) {
   });
   return [...counts.entries()].sort((a, b) => b[1] - a[1])
     .slice(0, limit || 6).map(e => e[0]);
+}
+
+/* WHICH PART OF THE DAY SHE TAPPED. zoneForGap (js/17-ui-misc.js) already maps
+   a minute to the exact vocabulary suitableTime uses — before-school / school /
+   after-school / evening / weekend — reading the family's own school hours
+   rather than a guess. Whether it is a weekend is decided by isSchoolDay, never
+   by the day of the week: a Tuesday in July is not a school day and neither is
+   a PD day, and an activity offered for "after school" on a day with no school
+   is an offer about a day that does not exist. */
+function slotPickerWindow() {
+  if (pendingStartMin == null) return null;
+  const key = currentDayKey;
+  const schoolDay = (typeof isSchoolDay === 'function') ? isSchoolDay(key) : false;
+  return zoneForGap(pendingStartMin, !schoolDay);
+}
+
+/* How long she actually has before the next thing, so the hint can say it. The
+   picker used to open on "Pick what goes in this time slot", which is true of
+   every slot and tells her nothing about this one. */
+function slotPickerFreeMin() {
+  if (pendingStartMin == null) return null;
+  const blocks = (getDayBlocks(currentDayKey) || [])
+    .filter(b => b && b.startMin > pendingStartMin)
+    .sort((a, b) => a.startMin - b.startMin);
+  const next = blocks[0];
+  const until = next ? next.startMin : (START_MIN + DAY_MIN_SPAN);
+  return { min: Math.max(0, until - pendingStartMin), next: next || null };
 }
 
 function renderSlotPicker() {
@@ -1599,14 +1643,51 @@ function renderSlotPicker() {
   });
 
   const filtered = acts.filter(a => activityMatchesFilter(a, slotPickerFilter));
+  /* WHAT FITS THE TIME SHE TAPPED, first. Every activity has carried a
+     suitableTime window since the catalog was written, and the picker was the
+     one screen that never asked — a child tapping 7:15 on a school morning was
+     offered a six-hour day trip and a two-hour training session in the same
+     list as Breakfast. Only the mascot ever used it, from a corner of the app
+     nobody opens on purpose.
+
+     It RANKS, it does not filter: the rest of the library follows underneath,
+     because a picker that hides things is a picker she stops trusting. */
+  const zone = slotPickerWindow();
+  const free = slotPickerFreeMin();
+  /* BOTH halves of "does this fit": the moment she tapped, and the room that is
+     left before the next thing. A seven-hour School Day matches the school
+     window and cannot possibly go in the ninety minutes before dinner, and
+     offering it there is the picker ignoring the question it just asked. */
+  const fitsNow = a => {
+    if (!zone || a._locked) return false;
+    if (!Array.isArray(a.suitableTime) || !a.suitableTime.includes(zone)) return false;
+    const need = activityDefaultDuration(a) || 60;
+    return !free || !free.min || need <= free.min;
+  };
+  /* An APPOINTMENT is a time somebody else set. It belongs to the window it
+     belongs to, but it is not something a child picks to fill an afternoon
+     with — she records one a parent made. Four of them leading the suggestions
+     is the row answering a question nobody asked, so they rank last within it
+     rather than being excluded: a haircut on Thursday is still a real thing to
+     put on Thursday. */
+  const suggestRank = a => (activitySub(a).id === 'appts' ? 1 : 0);
   // Most-used first, only on the unfiltered list — inside a category the
   // library's own order is the one the child is looking for.
   let ordered = filtered;
   let liftedId = null;
+  let suggested = [];
   if (slotPickerFilter === 'all') {
     const recent = slotPickerRecentActIds(6);
     const rank = id => { const i = recent.indexOf(id); return i === -1 ? 999 : i; };
     ordered = filtered.slice().sort((a, b) => rank(a.id) - rank(b.id));
+    /* Ranked by what the household has actually been doing, capped at six: a
+       heading with twenty things under it is the same undifferentiated list
+       again, one heading lower. */
+    suggested = ordered.filter(fitsNow)
+      .sort((a, b) => suggestRank(a) - suggestRank(b))
+      .slice(0, 6);
+    const sugIds = new Set(suggested.map(a => a.id));
+    ordered = ordered.filter(a => !sugIds.has(a.id));
   } else {
     /* Inside a category, what she last added from THIS chip leads. One unshift
        rather than a sort, so nothing else moves — a list that reorders itself
@@ -1632,7 +1713,7 @@ function renderSlotPicker() {
   }
 
   list.innerHTML = '';
-  ordered.forEach(act => {
+  const tile = act => {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'slot-pick-chip' + (act._locked ? ' locked' : '')
@@ -1640,15 +1721,68 @@ function renderSlotPicker() {
     // Say WHY it moved. A chip that silently jumped to the front is a chip the
     // next person reads as a bug.
     const lastTag = act.id === liftedId ? '<span class="spc-last">last time</span>' : '';
-    chip.innerHTML = `<span class="spc-icon">${escapeHtml(act.icon)}</span><span class="spc-name">${escapeHtml(act.name)}</span>${lastTag}<span class="spc-dur">${escapeHtml(formatDuration(activityDefaultDuration(act) || 60))}</span>`;
+    /* The subgroup's own colour on the tile's edge, which is the colour the
+       block will actually be. A picker that gives no clue what a thing will
+       look like on the day makes the girls place one to find out. */
+    chip.innerHTML = `<span class="spc-icon">${escapeHtml(act.icon)}</span><span class="spc-name">${escapeHtml(act.name)}</span>${lastTag}<span class="spc-dur">${escapeHtml(formatDuration(activityDefaultDuration(act) || 60))}</span><span class="spc-sw" style="background:${escapeAttr(activitySub(act).hex)}"></span>`;
     chip.onclick = () => pickFromSlot(act.id);
-    list.appendChild(chip);
-  });
+    return chip;
+  };
+  const heading = (text, hex) => {
+    const h = document.createElement('div');
+    h.className = 'spc-subhead';
+    h.innerHTML = (hex ? `<i class="spc-subdot" style="background:${escapeAttr(hex)}"></i>` : '')
+      + escapeHtml(text);
+    return h;
+  };
+
+  if (suggested.length) {
+    list.appendChild(heading(`✨ Good for ${formatTimeFromMin(pendingStartMin)}`, null));
+    suggested.forEach(a => list.appendChild(tile(a)));
+    list.appendChild(heading('Everything else', null));
+    ordered.forEach(a => list.appendChild(tile(a)));
+  } else if (slotPickerFilter === 'all') {
+    ordered.forEach(a => list.appendChild(tile(a)));
+  } else {
+    /* INSIDE A CATEGORY, GROUPED BY SUBGROUP. Brain holds ten activities and
+       "School, Language, Arts" is the difference between a list you read and a
+       list you scan. A category with one subgroup draws no heading — a label
+       over the whole list names nothing the chip has not already said. */
+    const cat = catDef(slotPickerFilter);
+    /* THE LIFT COMES OUT OF THE GROUPING, not into it. What she last added from
+       this chip leads the list — but grouping by subgroup re-sorts everything
+       into table order, so a House Chore lifted to the front landed back at the
+       bottom under "Helping hands" and the memory silently stopped working.
+       It is drawn first, above every heading, and removed from its own group so
+       it is not offered twice. */
+    const bySub = new Map();
+    ordered.filter(a => a.id !== liftedId).forEach(a => {
+      const sg = activitySub(a).id;
+      if (!bySub.has(sg)) bySub.set(sg, []);
+      bySub.get(sg).push(a);
+    });
+    const lifted = liftedId ? ordered.find(a => a.id === liftedId) : null;
+    if (lifted) list.appendChild(tile(lifted));
+    const many = cat.subs.filter(sg => (bySub.get(sg.id) || []).length).length > 1;
+    cat.subs.forEach(sg => {
+      const items = bySub.get(sg.id) || [];
+      if (!items.length) return;
+      if (many) list.appendChild(heading(sg.label, sg.hex));
+      items.forEach(a => list.appendChild(tile(a)));
+    });
+    // Anything whose subgroup is not one of this category's (a legacy custom
+    // activity) still has to appear, or the chip hides what it matched.
+    ordered.forEach(a => {
+      if (!cat.subs.some(sg => sg.id === activitySub(a).id)) list.appendChild(tile(a));
+    });
+  }
   const addC = document.createElement('button');
   addC.type = 'button';
   addC.className = 'slot-pick-chip slot-pick-add';
   addC.innerHTML = '<span class="spc-icon">＋</span><span class="spc-name">Custom activity</span>';
-  addC.onclick = () => { closeSheet('slotPickerOverlay'); openCustomActivity(); };
+  // Opens on the chip she is standing in, so adding a drawing from inside Brain
+  // does not hand her a form that says Play & Rest.
+  addC.onclick = () => { const from = slotPickerFilter; closeSheet('slotPickerOverlay'); openCustomActivity(from); };
   list.appendChild(addC);
 }
 function pickFromSlot(actId) {
@@ -1661,10 +1795,10 @@ function pickFromSlot(actId) {
   closeSheet('slotPickerOverlay');
   // pendingStartMin was set by openSlotPicker.
   if (act.isTraining) {
-    ts = { durationMin: activityDefaultDuration(act)||120, colour:CAT_HEX.training, tag:'skating', objectives:[], note:'', compName:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(act), getReadyBuffer:activityTravels(act), warmupBuffer:false, gearState:{}, travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, warmupBufMin:DEFAULT_WARMUP_MIN };
+    ts = activityPlacementDraft(act);
     openTrainingSheet();
   } else {
-    as_ = { durationMin: activityDefaultDuration(act)||60, colour: CAT_HEX[act.cat]||COLOURS[0], note:'', repeat:false, repeatDays:[], travelBuffer:activityTravels(act), getReadyBuffer:activityTravels(act), travelBufMin:DEFAULT_BUFFER_MIN, getReadyBufMin:DEFAULT_BUFFER_MIN, choreTags: [], objectives: [] };
+    as_ = activityPlacementDraft(act);
     openActivitySheet();
   }
 }

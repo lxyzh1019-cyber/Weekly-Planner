@@ -1193,7 +1193,9 @@
           <label>Default Duration</label>
           <select id="customDur" aria-label="How long">
             <option value="15">15 min</option>
+            <option value="20">20 min</option>
             <option value="30">30 min</option>
+            <option value="45">45 min</option>
             <option value="60" selected>1 hour</option>
             <option value="90">1.5 hours</option>
             <option value="120">2 hours</option>
@@ -1202,17 +1204,16 @@
       </div>
       <label>Or tap an icon</label>
       <div class="emoji-grid" id="customEmojiGrid"></div>
-      <label>Category</label>
-      <select id="customCat" aria-label="Category">
-        <option value="sleep">😴 Rest</option>
-        <option value="school">📚 Learning</option>
-        <option value="active">🏃 Active</option>
-        <option value="free" selected>🎮 Free Time</option>
-        <option value="daily">🍽 Daily</option>
-        <option value="routine">🌅 Routines</option>
-        <option value="training">🏋️ Competitive Sports</option>
-        <option value="appointment">🩺 Appointment</option>
-      </select>
+      <!-- Built from ACTIVITY_CATEGORIES by renderCategorySelects (js/09-sheets.js).
+           It was a hardcoded list of eight, copied byte for byte into the parent
+           editor below, so the two could drift and a category added to the app
+           reached neither. -->
+      <label for="customCat">Category</label>
+      <select id="customCat" aria-label="Category"></select>
+      <div id="customSubWrap">
+        <label for="customSub">Kind</label>
+        <select id="customSub" aria-label="Kind"></select>
+      </div>
     </div>
     <button class="btn-confirm" onclick="confirmCustomActivity()">Add Activity ✅</button>
   </div>
@@ -1257,7 +1258,9 @@
           <label>Default Duration</label>
           <select id="paDur" aria-label="How long">
             <option value="15">15 min</option>
+            <option value="20">20 min</option>
             <option value="30">30 min</option>
+            <option value="45">45 min</option>
             <option value="60" selected>1 hour</option>
             <option value="90">1.5 hours</option>
             <option value="120">2 hours</option>
@@ -1266,17 +1269,27 @@
       </div>
       <label>Or tap an icon</label>
       <div class="emoji-grid" id="paEmojiGrid"></div>
-      <label>Category</label>
-      <select id="paCat" aria-label="Category">
-        <option value="sleep">😴 Rest</option>
-        <option value="school">📚 Learning</option>
-        <option value="active">🏃 Active</option>
-        <option value="free" selected>🎮 Free Time</option>
-        <option value="daily">🍽 Daily</option>
-        <option value="routine">🌅 Routines</option>
-        <option value="training">🏋️ Competitive Sports</option>
-        <option value="appointment">🩺 Appointment</option>
-      </select>
+      <label for="paCat">Category</label>
+      <select id="paCat" aria-label="Category"></select>
+      <div id="paSubWrap">
+        <label for="paSub">Kind</label>
+        <select id="paSub" aria-label="Kind"></select>
+      </div>
+      <!-- When it can be planned, and whether you go somewhere to do it. Both
+           were fields only the shipped catalog could set, so a family's own
+           activity never turned up in the picker's suggestions and never
+           arrived with its travel time. -->
+      <!-- A labelled group rather than a bare row of boxes: four checkboxes with
+           a heading above them and nothing tying the two together reads to a
+           screen reader as four unrelated questions. -->
+      <label id="paWhenLabel">When does it fit?</label>
+      <div class="pa-when-row" role="group" aria-labelledby="paWhenLabel">
+        <label class="pa-when"><input type="checkbox" id="paWhenBefore"> 🌅 Before school</label>
+        <label class="pa-when"><input type="checkbox" id="paWhenAfter" checked> 🎒 After school</label>
+        <label class="pa-when"><input type="checkbox" id="paWhenEvening"> 🌙 Evening</label>
+        <label class="pa-when"><input type="checkbox" id="paWhenWeekend" checked> 🎉 Weekend</label>
+      </div>
+      <label class="pa-when pa-when--solo"><input type="checkbox" id="paTravels"> 🚗 You go somewhere to do it</label>
       <label>Visibility</label>
       <select id="paVisibility" aria-label="Who can see it">
         <option value="shared">🔗 Shared (both girls)</option>
