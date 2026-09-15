@@ -105,6 +105,20 @@ jobs:
       - name: XP calibration
         run: npm run test:xp
 
+      # Its twin, and it was missing. This workflow enumerates the npm scripts
+      # it runs rather than running `npm test`, so a suite in package.json but
+      # not in this file is a suite CI never runs — the same shape as the
+      # `|| break` loop CLAUDE.md records: a check that can never fail.
+      #
+      # It matters here for what the suite promises. CLAUDE.md says of
+      # tools/money-calibrate.js that "changing a rate and not re-running shows
+      # up as a failing test rather than at a Sunday meeting" — which only holds
+      # if CI runs the test. Until now a rates change in js/18-rules.js or
+      # js/21-money-data.js could break the calibrated totals and still show a
+      # green pull request.
+      - name: Money calibration
+        run: npm run test:money
+
       - name: Smoke test
         run: npm run test:smoke
 

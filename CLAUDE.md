@@ -108,6 +108,22 @@ covering `function`, `async function` and top-level `let`/`const`/`var`
 CI (`.github/workflows/ci.yml`) runs all three on every pull request and pushes
 to `main`, plus nightly, and uploads the smoke screenshots as an artifact.
 
+**The workflow ENUMERATES its npm scripts rather than running `npm test`.** That
+is deliberate — the fast gate runs without a browser and the smoke job installs
+one — but it makes `package.json` and the workflow two lists that have to agree,
+and nothing made them. A suite added to one and not the other is a suite CI
+never runs: green on a laptop, absent from every pull request, reporting nothing
+while the code it guards rots. The same shape as the `|| break` loop above.
+
+Not hypothetical: `tests/buffers.test.js` and `tests/money.test.js` were both in
+that state, the second for as long as it had existed — so a rates change in
+`js/18-rules.js` could break the calibrated totals and still show a green PR,
+against the promise `tools/money-calibrate.js` is written to make.
+`tests/check-ci-scripts.js` (in `npm run check`) now fails the build on a
+`test:*` script the workflow does not run, on a workflow step naming a script
+that does not exist, and on a suite missing from the `test` chain. **Add the
+step in the same change that adds the suite.**
+
 New features ship with a new check in `smoke.js`. The chore→money hand-off
 checks are the most valuable ones in there — when that join broke, every screen
 still rendered and only the numbers were wrong.
