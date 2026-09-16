@@ -487,9 +487,22 @@ label is mostly emoji, so `🚗 7:55am` is eight units and 65.6 real pixels (8.2
 each) while `🎒 After school` is fifteen and 100 (6.7 each). One number was
 wrong in **both** directions and wrong by a third: it refused labels that fitted
 and, worse, accepted labels that then ran off the column edge, which is the one
-failure the width cap exists to prevent. An emoji is about 21px in this type, an
-arrow 12, a digit 7.6, a letter 8.6, a space or a colon 4 — letters rounded
-**up**, because over-estimating only refuses a label that would have fitted.
+failure the width cap exists to prevent. Measured in
+`.wf-travel-band-label`'s own type (0.82rem lifted to the 13.1px kid floor): an
+**emoji 21**, an **arrow 12**, a **digit 7.3**, a **lowercase letter 9.6**, an
+**uppercase 10.6**, a **space 1**, a **colon or bracket 4**. The letters are
+rounded up, because over-estimating only refuses a label that would have fitted
+while under-estimating draws one that does not.
+
+**The space is the load-bearing row, and it is charged 1 rather than its own
+3.6.** Every space in a label on this surface follows an emoji, whose advance
+already carries it — and charging it in full put the two-figure form
+`👕7:40 🚗7:55` about four pixels over a 390px-viewport column that it
+really fits in, so a phone silently dropped the get-ready time. These numbers
+were re-derived once already against real rendered widths, which is the reason
+they are written here rather than left in the code: a first calibration that
+looks reasonable is exactly what ships wrong.
+
 `.wf-travel-band-label` is in the overflow sweep for the same reason: it is the
 element that actually carries a band's text, and while it was left out a label
 30px too wide for its column passed that sweep untouched.
