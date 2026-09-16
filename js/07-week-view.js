@@ -1094,6 +1094,12 @@ function renderFullWeek(keys) {
     const bands = dayZoneSegments(key).map(b => ({ ...b, cls: b.cls.replace('tl-band-', 'wf-band-') }));
     const labelledCol = !isSchoolDay(key) || key !== axisKey;
 
+    /* The zone names this column draws, kept so a buffer strip landing in the
+       same pixels can take one down — see the note at the end of the strip
+       pass below. Declared here because the band loop fills it. */
+    const bandLabels = [];
+    const spokenStrips = [];
+
     const cell = document.createElement('div');
     cell.className = 'wf-day-col' + (key===todayKey() ? ' today' : '');
     cell.style.height = totalH + 'px';
@@ -1121,7 +1127,9 @@ function renderFullWeek(keys) {
         lbl.className = 'wf-band-label';
         lbl.style.top = (bd.start * PX_PER_MIN + 2) + 'px';
         lbl.textContent = bd.label;
+        lbl.dataset.top = String(bd.start * PX_PER_MIN + 2);
         cell.appendChild(lbl);
+        bandLabels.push(lbl);
       }
     });
 
@@ -1154,6 +1162,7 @@ function renderFullWeek(keys) {
        too small to print their own time. Filled by the strip pass below and
        read by the cards, which have the height the strips do not. */
     const silent = new Map();
+
     const bufferConflicts = computeBufferConflicts(blocks);
 
     // Travel / get-ready strips (underneath cards), stacked so getting ready and
@@ -1213,6 +1222,12 @@ function renderFullWeek(keys) {
         const spoke = els => els.length > 0 && els.some(el => !el.classList.contains('wf-travel--mute'));
         const record = els => {
           if (!spoke(els)) silent.get(b.id)[side] = sideSegs;
+          // Where a time actually printed, for the band-label pass below.
+          els.forEach(el => {
+            if (el.classList.contains('wf-travel--mute')) return;
+            const top = parseFloat(el.style.top) || 0;
+            spokenStrips.push([top, top + (parseFloat(el.style.height) || 0)]);
+          });
         };
         const segConflict = !!bc && (side === 'pre' ? bc.pre : bc.post);
         const anyMute = sideSegs.some(x =>
@@ -1238,6 +1253,26 @@ function renderFullWeek(keys) {
         record(made);
       });
     });
+
+    /* ── A ZONE NAME IS NOT DRAWN WHERE A BUFFER STRIP SPEAKS ──
+       The bands print their own name at the top of each stretch — "🏫 SCHOOL",
+       "🎒 AFTER SCHOOL" — and a buffer run that begins on that boundary lands
+       its time in exactly those pixels. While the strips were mute nobody could
+       see it; restoring the clock times put two lines of text through each
+       other, which is the defect WF_TRAVEL_TEXT_MIN_PX exists to prevent.
+
+       The time wins. It is the one fact on this surface a parent acts on, and
+       the zone is still said twice over — by the band's own tint, and by the
+       left axis, which names every stretch of the day in full. Pure arithmetic
+       on inline pixel values, so it needs no layout and costs no reflow. */
+    if (bandLabels.length && spokenStrips.length) {
+      bandLabels.forEach(lbl => {
+        const top = Number(lbl.dataset.top) || 0;
+        const bottom = top + WF_BAND_LABEL_PX;
+        const hit = spokenStrips.some(([a, z]) => top < z - 0.5 && bottom > a + 0.5);
+        if (hit) lbl.remove();
+      });
+    }
 
     // Activity cards — one unbroken block each.
     blocks.forEach(b=>{
@@ -1566,6 +1601,12 @@ function renderFamilyChoreBanner(bannerId = 'weekFamilyBanner') {
    number — aBufferStripNeverCoversACard and theStripStillSaysWhenToLeave
    (tests/smoke.js) are what keep it honest. */
 const WF_TRAVEL_TEXT_MIN_PX = 17;
+
+/* How tall a zone name is, for the overlap test that takes one down when a
+   buffer strip needs the same pixels. A MEASUREMENT, like the constant above:
+   .wf-band-label is 0.56rem lifted to the kid floor of 13.1px at line-height 1,
+   plus its 1px top padding. */
+const WF_BAND_LABEL_PX = 15;
 
 /* Build one travel/get-ready buffer strip for the weekly view. Positioned in
    px within the zone cell, hugging the card it belongs to. Non-interactive so

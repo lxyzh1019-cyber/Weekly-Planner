@@ -2135,6 +2135,22 @@
      is the information at that size; a 13px label in 10px of space was two
      labels printed through each other. */
   .wf-travel--mute { font-size: 0; }
+  /* A LABEL THAT READS OVER WHATEVER IS BEHIND IT. The zone bands print their
+     own name at the top of each stretch — "🏫 SCHOOL", "🎒 AFTER SCHOOL" — and a
+     buffer band beginning on that boundary lands its time in exactly those
+     pixels. While the strips were mute the clash could not be seen; restoring
+     the clock times put two lines of text through each other, which is the
+     defect WF_TRAVEL_TEXT_MIN_PX exists to prevent in the first place.
+
+     The time wins, on a paper chip. The zone is still said by the band's tint
+     and by the left axis, which names every stretch of the day in full; the
+     minute you have to leave the house is said in exactly one place. */
+  .wf-travel--label,
+  .wf-travel-band-label {
+    text-shadow:
+      0 0 3px var(--paper), 0 0 3px var(--paper),
+      0 0 2px var(--paper), 0 0 2px var(--paper);
+  }
   /* Several short same-side segments drawn as ONE band: the per-kind hatches
      stay as children so it still reads as get-ready THEN travel, and the single
      label names both. */

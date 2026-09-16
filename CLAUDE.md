@@ -412,6 +412,17 @@ are through the door, not the end of the put-the-gear-away that follows. The
 band named that second one wrong, so even when it did print, the number was
 wrong.
 
+**A zone name is not drawn where a buffer strip speaks.** The bands print their
+own name at the top of each stretch — `🏫 SCHOOL`, `🎒 AFTER SCHOOL` — and a
+buffer run beginning on that boundary lands its time in exactly those pixels.
+Invisible while the strips were mute; two lines of text through each other the
+moment they spoke again, which is the defect `WF_TRAVEL_TEXT_MIN_PX` exists to
+prevent. The **time wins**: it is the one figure on this surface a parent acts
+on, and the zone is still said twice over, by the band's tint and by the left
+axis. Pure arithmetic on inline pixel values (`WF_BAND_LABEL_PX`, another
+measurement), so it costs no reflow. A screenshot found this — the suite was
+green.
+
 **And the fact never disappears.** A lone fifteen-minute buffer is 10.8px and
 cannot hold a line at any width, so its side goes silent and the time is simply
 gone from the screen. The strips are **asked** whether they muted — rather than

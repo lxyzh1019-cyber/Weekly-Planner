@@ -1703,6 +1703,26 @@ function findChromium() {
             bad.push(`"${txt}" needs ${el.scrollHeight}px of height in ${el.clientHeight}px`);
           }
         });
+
+      /* AND NOTHING IS PRINTED THROUGH IT. The zone bands name each stretch of
+         the day at its top edge, and a buffer run beginning on that boundary
+         lands its time in the same pixels — invisible while the strips were
+         mute, and two lines of text through each other the moment they spoke
+         again. Restore the first fix and this is what it missed. */
+      const spoken = [...document.querySelectorAll('#screen-week .wf-travel')]
+        .filter(el => (el.textContent || '').trim());
+      [...document.querySelectorAll('#screen-week .wf-band-label')].forEach(lbl => {
+        const lr = lbl.getBoundingClientRect();
+        if (lr.height < 1) return;
+        spoken.forEach(el => {
+          const sr = el.getBoundingClientRect();
+          const hit = lr.left < sr.right - 0.5 && lr.right > sr.left + 0.5
+                   && lr.top  < sr.bottom - 0.5 && lr.bottom > sr.top + 0.5;
+          if (hit) {
+            bad.push(`"${lbl.textContent.trim()}" is printed through "${el.textContent.trim()}"`);
+          }
+        });
+      });
     } finally { setDayBlocks(key, had, kid); renderWeek(); }
     return bad.length === 0 || bad;
   });
