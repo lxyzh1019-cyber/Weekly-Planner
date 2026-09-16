@@ -545,7 +545,7 @@ function toggleEditGetReadyBuffer() {
   if (tg) tg.classList.toggle('on', !!editState.getReadyBuffer);
   const row = document.getElementById('editReadyDurRow');
   if (row) row.style.display = editState.getReadyBuffer ? 'flex' : 'none';
-  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin, !!editState.warmupBuffer, editState.warmupBufMin);
+  renderEditTimeSummary();
 }
 function toggleEditWarmupBuffer() {
   editState.warmupBuffer = !editState.warmupBuffer;
@@ -553,7 +553,7 @@ function toggleEditWarmupBuffer() {
   if (tg) tg.classList.toggle('on', !!editState.warmupBuffer);
   const row = document.getElementById('editWarmupDurRow');
   if (row) row.style.display = editState.warmupBuffer ? 'flex' : 'none';
-  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin, !!editState.warmupBuffer, editState.warmupBufMin);
+  renderEditTimeSummary();
 }
 
 /* Multi-day picker */
@@ -641,6 +641,20 @@ let editState = {
   stopwatch: { goalSec: null, elapsedSec: 0, running: false, startedAt: null },
 };
 let editStopwatchTick = null;
+
+/* ONE CALLER FOR THE EDIT SHEET'S SUMMARY. This line was written out seven
+   times, byte for byte — seven chances to update six of them, which is exactly
+   what happened when travel grew a second leg. */
+function renderEditTimeSummary() {
+  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin,
+    editState.travelBuffer, editState.travelBufMin,
+    !!editState.getReadyBuffer, editState.getReadyBufMin,
+    !!editState.warmupBuffer, editState.warmupBufMin,
+    {
+      travelHome: editState.travelHome, travelHomeMin: editState.travelHomeMin,
+      readyAfter: editState.readyAfter, readyAfterMin: editState.readyAfterMin,
+    });
+}
 
 function defaultStopwatch() {
   return { goalSec: null, elapsedSec: 0, running: false, startedAt: null, enabled: false };
@@ -764,7 +778,7 @@ function editStopwatchReset() {
 function onEditStartMinChange(m) {
   editState.startMin = m;
   renderStartTimePicker('editStartPicker', editState.startMin, onEditStartMinChange, ()=>syncDurationColumnSpacers('edit'));
-  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin, !!editState.warmupBuffer, editState.warmupBufMin);
+  renderEditTimeSummary();
   if (editState.stopwatch && editState.stopwatchEnabled) {
     editState.stopwatch.goalSec = Math.max(60, (editState.durationMin|0) * 60);
     renderEditStopwatchStats();
@@ -792,7 +806,7 @@ function onEditBufferMinInput() {
   const raIn = document.getElementById('editReadyAfterMin');
   if (raTog && editState.getReadyBuffer) editState.readyAfter = !!raTog.checked;
   if (raIn && editState.getReadyBuffer && editState.readyAfter) editState.readyAfterMin = clampBufferMin(raIn.value);
-  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin, !!editState.warmupBuffer, editState.warmupBufMin);
+  renderEditTimeSummary();
 }
 
 /* The edit sheet's one control over the span. Confirmed first, and it reports
@@ -1019,7 +1033,7 @@ function openEditSheet(blockId) {
     editWuRow.style.display = 'none';
   }
 
-  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin, !!editState.warmupBuffer, editState.warmupBufMin);
+  renderEditTimeSummary();
   syncEditStopwatchUI();
 
   // Parent pin toggle
@@ -1073,7 +1087,7 @@ function renderEditDurationPicker(act) {
   renderCustomDuration('editCustomDur', editState.durationMin, (m)=>{
     editState.durationMin = m; renderEditDurationPicker(act);
   }, ()=>syncDurationColumnSpacers('edit'));
-  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin, !!editState.warmupBuffer, editState.warmupBufMin);
+  renderEditTimeSummary();
   if (editState.stopwatch) {
     editState.stopwatch.goalSec = Math.max(60, (editState.durationMin|0) * 60);
     renderEditStopwatchStats();
@@ -1316,7 +1330,7 @@ function toggleEditTravelBuffer() {
   document.getElementById('editTravelToggle').classList.toggle('on', editState.travelBuffer);
   const row = document.getElementById('editTravelDurRow');
   if (row) row.style.display = editState.travelBuffer ? 'flex' : 'none';
-  renderSheetTimeSummary('editTimeSummary', editState.startMin, editState.durationMin, editState.travelBuffer, editState.travelBufMin, !!editState.getReadyBuffer, editState.getReadyBufMin, !!editState.warmupBuffer, editState.warmupBufMin);
+  renderEditTimeSummary();
 }
 
 async function saveEditChanges() {

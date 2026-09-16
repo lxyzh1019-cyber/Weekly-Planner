@@ -404,13 +404,57 @@ tall enough for a line; `short` is not on that ladder, being both wider and less
 use, and survives only because the print sheet picks tiers by block height and
 does want it.
 
-**One figure per side, one owner.** `wfSideEdgeRel` / `wfSideTimeLabel`: going
-out it is the start of the whole run — School Day at 8:10 with fifteen minutes
-of getting ready and fifteen of driving says **7:40**, not the 7:55 the car
-leaves — and coming back it is the end of the last **travel** segment, when you
-are through the door, not the end of the put-the-gear-away that follows. The
-band named that second one wrong, so even when it did print, the number was
-wrong.
+**A LABEL NAMES THE EVENT, NOT JUST THE TIME.** One figure per side was the
+first answer and it was a figure short: School Day at 8:10 with fifteen minutes
+of getting ready and fifteen of driving printed `🚗 7:40am`, which is when she
+starts *getting ready* — the right number wearing the wrong icon, and the car
+does not leave until 7:55. Going out there are **two** facts and a parent acts
+on both, so the full form is `👕 7:40 🏠→🚗 7:55`. Coming back it is
+`🚗→🏠 3:05 🧺 3:20`, and the arrow is what says which end of the trip this
+is.
+
+**What each side drops first is decided by which fact has a DEADLINE.** Getting
+ready before a block has to be finished when the car leaves, so both figures
+matter and the **direction arrow** is what goes first — `👕 7:40 🚗 7:55` keeps
+both times down to a 100px column, which is every real one-lane column on this
+grid. Unpacking afterwards has no deadline at all, so coming home it is the
+**unpack figure** that goes and the arrow that stays: through-the-door is what
+somebody is waiting on. `wfSideTimeForms` is the one ladder, widest rung first;
+`wfSideEdgeRel` and `wfKindEdgeRel` are what it reads. Coming back the travel
+edge is the end of the last **travel** segment, when you are through the door,
+never the end of the put-the-gear-away that follows it.
+
+**The after-buffer is UNPACKING, and says so everywhere.** The two get-ready
+buffers are different jobs — preparation with a deadline, unloading with none —
+and three of the four places that named a buffer kind were not side-aware, so
+the post side read "Get ready" on the print sheet and in every tooltip while
+`seg.side` sat in scope at each of them unasked. `bufferKindLabel` and
+`bufferKindIcon` (`js/07-week-view.js`) are the one owner: 👕 **Get ready**
+before, 🧺 **Unpack** after. Today is deliberately untouched — `tdPrepFor`
+filters `side === 'pre'`, so it is only ever talking about getting ready.
+
+**The tooltip is the full sentence at every width.** A visible label that has
+fallen to its bare rung drops the meridiem and one of its two figures; the
+`title` names every segment, its minutes and its clock time the long way round,
+which is also what a screen reader gets. `bufferSegLabels(seg, 'long')` is that
+sentence, and its pre-get-ready form says **from** 7:40 rather than "done by
+7:55" — the deadline is already said by the travel label beside it, and the
+moment she has to start was the one figure nothing anywhere carried.
+
+**A zone name is drawn where it is NEWS.** `labelledCol` was
+`!isSchoolDay(key) || key !== axisKey`, which silences the axis day itself and
+labels every OTHER identical school day — four columns × four zones on an
+ordinary week, sixteen repeats of what the left sideband already says once,
+competing with the cards and the buffer times for the same pixels. The same
+expression failed the other way round on a week with no school in it: `axisKey`
+is then `null`, `key !== axisKey` is true everywhere, and all seven columns
+printed `🎉 Free time`. A column now names its zones only when its **shape
+differs** from the day the axis is describing — compared as a signature of the
+segments rather than as `isSchoolDay(key) === isSchoolDay(axisKey)`, which is
+equivalent today only because `schoolHours()` takes no day argument. So the
+school columns of a term week say nothing, a Saturday inside one still speaks,
+a PD day speaks, and a week that is all holiday says it once on the axis.
+`aZoneNameIsDrawnOnlyWhereItIsNews` holds all four.
 
 **A zone name is not drawn where a buffer strip speaks.** The bands print their
 own name at the top of each stretch — `🏫 SCHOOL`, `🎒 AFTER SCHOOL` — and a
@@ -428,10 +472,27 @@ cannot hold a line at any width, so its side goes silent and the time is simply
 gone from the screen. The strips are **asked** whether they muted — rather than
 the card re-deriving the tier ladder, which is how the two would drift — and the
 card prints whatever its sides could not say, at any tier, as the time and never
-the minutes. `theStripStillSaysWhenToLeave` holds the fact rather than the
-mechanism: for a block that carries travel, leave-by and back-by must appear
-somewhere on that day, at one lane and at two, without overflowing what draws
-them.
+the minutes. Now that a side carries two figures there is a **second** way to
+come up short: half a column holds one clock time, so a band can speak and still
+be a fact down. Same contract one rung further in — the elements are asked what
+they **printed**, `wfSideTimeUnsaid` answers what is missing from it, and the
+card carries the remainder. `theStripStillSaysWhenToLeave` holds the fact rather
+than the mechanism: both figures visible in a full column, the leave-by one
+visible in a split lane with the other spelled out in a tooltip, at one lane and
+at two, without overflowing what draws them.
+
+**`wfTextPx` is how wide a label will be, and it is a MEASUREMENT.** It replaces
+`text.length * 6.6`, which charged every character the same width — and a buffer
+label is mostly emoji, so `🚗 7:55am` is eight units and 65.6 real pixels (8.2
+each) while `🎒 After school` is fifteen and 100 (6.7 each). One number was
+wrong in **both** directions and wrong by a third: it refused labels that fitted
+and, worse, accepted labels that then ran off the column edge, which is the one
+failure the width cap exists to prevent. An emoji is about 21px in this type, an
+arrow 12, a digit 7.6, a letter 8.6, a space or a colon 4 — letters rounded
+**up**, because over-estimating only refuses a label that would have fitted.
+`.wf-travel-band-label` is in the overflow sweep for the same reason: it is the
+element that actually carries a band's text, and while it was left out a label
+30px too wide for its column passed that sweep untouched.
 
 **The minutes that did not fit are drawn, not just described.** `.wf-overrun`
 lays the shortfall over the card it runs into at a quarter strength, exactly as
@@ -1459,10 +1520,22 @@ master toggle is on, so a block says what it means rather than leaning on the
 fallback — which cannot express "no drive home" at all. Warm-up stays one-sided
 and training-only.
 
+**And the sheet that summarises it names each leg from its own figure.**
+`renderSheetTimeSummary` (`js/08-day-view.js`) took one travel number and one
+get-ready number and applied both symmetrically, so a block with fifteen minutes
+before and thirty-five after read as *15m before + 15m after*, and a block with
+no drive home still promised one. Its `legs` argument is optional and absent
+means symmetric — which is what the two **placement** sheets pass, because a
+block being placed genuinely is symmetric until somebody edits it. A block that
+goes straight on says *Going straight on — no travel home* out loud, because a
+missing line reads as "nobody set it" rather than as the answer. The function
+also replaced seven byte-identical call sites.
+
 `aBlockCanGoStraightOnWithoutComingHome` asserts the legacy shape is untouched,
-that the Tuesday draws no post segments, and — the half that would otherwise
-prove nothing — that the *same pair with a return leg* still reports its
-20-minute clash.
+that the Tuesday draws no post segments, that the sheet names 35m and 25m rather
+than mirroring the outbound pair, and — the half that would otherwise prove
+nothing — that the *same pair with a return leg* still reports its 20-minute
+clash.
 
 ## Every buffer a block carries, it can edit
 

@@ -244,7 +244,8 @@ function renderPrintSheet(host, opts) {
           const bh = slotSpan*slotPx - 1;
           const tier = bh >= 12 ? 'long' : bh >= 9 ? 'short' : 'tiny';
           const label = bh >= 6 ? bufferSegLabels(seg, tier) : '';
-          const kindLabel = seg.kind==='travel' ? 'Travel' : seg.kind==='warmup' ? 'Warm-up' : 'Get ready';
+          // One owner (js/07-week-view.js), side-aware: after a block is Unpack.
+          const kindLabel = bufferKindLabel(seg);
           const kindCls = seg.kind === 'ready' ? ' print-buffer--ready' : seg.kind === 'warmup' ? ' print-buffer--warmup' : ' print-buffer--travel';
           const bufCheckPx = printCheckboxPx(bh, { min: 5, max: 9, base: 4, divisor: 8 });
           const checkbox = bh >= 9 ? `<span class="print-check" style="border-color:${printTextColor(bg)};width:${bufCheckPx}px;height:${bufCheckPx}px"></span>` : '';

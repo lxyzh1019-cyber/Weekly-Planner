@@ -1983,7 +1983,11 @@
   /* overflow:hidden matters as much as the max-height: without it a name that
      wraps past two lines spilled over the summary row underneath instead of
      being clipped, which is what made a training card read as overlapping text. */
-  .wf-card--tall .wf-card-name { white-space: normal; max-height: 2.3em; overflow: hidden; }
+  /* max-width matters as much as max-height, for the same reason one row
+     down: a centred name carrying an inline buffer tag is one unbreakable
+     token wider than the card, so without it the whole line overflowed on
+     BOTH sides and "School Day" rendered as "hool Day". */
+  .wf-card--tall .wf-card-name { white-space: normal; max-height: 2.3em; max-width: 100%; overflow: hidden; }
   /* A card too short to afford a second line of name keeps it to one, and a
      card with nothing left over drops the start-time chip — the grid row it
      sits on already says when it begins. Both are decided in wfStackPlan
@@ -6208,6 +6212,11 @@
   #screen-week .wf-card-sum,
   #screen-week .wf-card-dur,
   #screen-week .wf-card-time,
+  /* The card's inline buffer tag. It only ever renders where the strips
+     could not say a time, so it is a FIGURE A PARENT ACTS ON standing in
+     for a label that went quiet — the last place it may be 9.92px. It is
+     also the size wfTextPx (js/07-week-view.js) budgets it at. */
+  #screen-week .wf-card-travel,
   #screen-chore .ck-allbtn span,
   #screen-chore .ck-navbtn,
   #screen-chore .ck-btn,

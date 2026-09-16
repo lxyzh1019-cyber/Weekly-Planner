@@ -1116,7 +1116,8 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0
   // Stack the buffers end-to-end so get-ready/driving/warm-up never share the
   // same minutes — you can't get skate boots ready while the car is moving.
   // Before the block: [get ready][travel][warm-up][ACTIVITY]; after: [ACTIVITY]
-  // [travel][get ready] — warm-up never happens on the way home.
+  // [travel][unpack] — warm-up never happens on the way home, and unpacking is
+  // not getting ready: it has no deadline, nothing downstream waits on it.
   if (b.warmupBuffer && warmupBuf > 0) {
     entries.push(
       { startMin: b.startMin - warmupBuf, label: '🔥 warm-up', bufDur: warmupBuf, cls: 'travel-buf-warmup', side: 'pre' },
@@ -1133,7 +1134,9 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0
     entries.push({ startMin: b.startMin - preWarmup - travelPre - readyPre, label: '👕 ➡ get ready', bufDur: readyPre, cls: 'travel-buf-ready', side: 'pre' });
   }
   if (readyPost > 0) {
-    entries.push({ startMin: endMin + travelPost, label: '👕 ⬅ get ready', bufDur: readyPost, cls: 'travel-buf-ready', side: 'post' });
+    // Unpacking, not getting ready — a different job with no deadline. The
+    // arrows were the only thing telling the two apart.
+    entries.push({ startMin: endMin + travelPost, label: '🧺 ⬅ unpack', bufDur: readyPost, cls: 'travel-buf-ready', side: 'post' });
   }
   const sourceAct = findActivity(b.actId);
   /* A STRIP STOPS WHERE THE NEXT CARD STARTS — the same rule as the Full week,
@@ -1234,7 +1237,14 @@ function formatTimeFromMin(min) {
 // all call them, so a primitive declared here meant three earlier files
 // depended on a later one.
 
-function renderSheetTimeSummary(elId, startMin, durationMin, travelOn, travelBufMin, readyOn=false, readyBufMin=15, warmupOn=false, warmupBufMin=20) {
+/* EACH LEG FROM ITS OWN FIGURE. This took one travel number and one get-ready
+   number and applied both symmetrically — so once travel became two legs, a
+   block with fifteen minutes before and thirty-five after read as
+   "15m before + 15m after", and a block with no drive home still promised one.
+   `legs` is optional and absent means symmetric, which is what the two
+   placement sheets pass: a block being placed genuinely is symmetric until
+   somebody edits it. */
+function renderSheetTimeSummary(elId, startMin, durationMin, travelOn, travelBufMin, readyOn=false, readyBufMin=15, warmupOn=false, warmupBufMin=20, legs=null) {
   const el = document.getElementById(elId);
   if (!el) return;
   const dur = Math.max(0, durationMin|0);
@@ -1243,23 +1253,34 @@ function renderSheetTimeSummary(elId, startMin, durationMin, travelOn, travelBuf
   const tBuf = Math.max(0, travelBufMin|0);
   const rBuf = Math.max(0, readyBufMin|0);
   const wBuf = Math.max(0, warmupBufMin|0);
-  const homeMin = travelOn ? endMin + tBuf : null;
+  const L = legs || {};
+  const homeOn = travelOn && (L.travelHome != null ? !!L.travelHome : true);
+  const tHome = Math.max(0, (L.travelHomeMin != null ? L.travelHomeMin : travelBufMin)|0);
+  const unpackOn = readyOn && (L.readyAfter != null ? !!L.readyAfter : true);
+  const rAfter = Math.max(0, (L.readyAfterMin != null ? L.readyAfterMin : readyBufMin)|0);
+  const homeMin = homeOn ? endMin + tHome : null;
   const prepMin = readyOn ? start - rBuf : null;
   const warmupStartMin = warmupOn ? start - wBuf : null;
   let html = '';
-  if (travelOn && homeMin != null) {
+  if (homeMin != null) {
     html += `<div class="sheet-time-summary-row">`;
     html += `<div class="sheet-time-summary">Ends about ${formatTimeFromMin(endMin)}</div>`;
-    html += `<div class="sheet-time-summary">Home about ${formatTimeFromMin(homeMin)} (after ${tBuf}m travel)</div>`;
+    html += `<div class="sheet-time-summary">🚗→🏠 Home about ${formatTimeFromMin(homeMin)} (after ${tHome}m travel)</div>`;
     html += `</div>`;
   } else {
     html += `<div class="sheet-time-summary">Ends about ${formatTimeFromMin(endMin)}</div>`;
+    // Said out loud, because a missing line reads as "nobody set it" rather
+    // than "this is the day we go straight on to the next thing".
+    if (travelOn) html += `<div class="sheet-time-summary">Going straight on — no travel home</div>`;
   }
   if (warmupOn && warmupStartMin != null) {
     html += `<div class="sheet-time-summary">🔥 Warm up by ${formatTimeFromMin(warmupStartMin)} (${wBuf}m before)</div>`;
   }
   if (readyOn && prepMin != null) {
-    html += `<div class="sheet-time-summary">Start getting ready by ${formatTimeFromMin(prepMin)} (${rBuf}m before + ${rBuf}m after)</div>`;
+    html += `<div class="sheet-time-summary">👕 Start getting ready by ${formatTimeFromMin(prepMin)} (${rBuf}m)</div>`;
+  }
+  if (unpackOn) {
+    html += `<div class="sheet-time-summary">🧺 Unpack after (${rAfter}m)</div>`;
   }
   el.innerHTML = html;
 }

@@ -805,30 +805,52 @@ function wfBufferSegments(b) {
    straight from that to "🚗 Travel 15m", which drops the only figure a parent
    acts on and keeps the one the strip's own length already shows. THE CLOCK
    TIME IS WHAT SURVIVES; the minutes are what go. */
+/* ── WHAT A BUFFER SEGMENT IS CALLED ──
+   Side-aware, because the two get-ready buffers are different jobs: before a
+   block you are GETTING READY, with a deadline; after it you are UNPACKING,
+   with none. Three of the four places that named a kind were not side-aware, so
+   the post side read "Get ready" on the print sheet and in every tooltip —
+   `seg.side` was in scope at each of them and simply not asked. */
+function bufferKindLabel(seg) {
+  if (!seg) return '';
+  if (seg.kind === 'travel') return 'Travel';
+  if (seg.kind === 'warmup') return 'Warm-up';
+  return seg.side === 'post' ? 'Unpack' : 'Get ready';
+}
+/* And the glyph, for the same reason. 🧺 coming back, 👕 going out. */
+function bufferKindIcon(seg) {
+  if (!seg) return '';
+  if (seg.kind === 'ready' && seg.side === 'post') return '🧺';
+  return seg.icon;
+}
+
 function bufferSegTime(seg) {
   const startAbs = seg.startRel + START_MIN;
   const endAbs = seg.endRel + START_MIN;
   // 🏠 rather than 🚗 coming home: the icon says which end of the trip it is.
   if (seg.kind === 'travel' && seg.side === 'post') return `🏠 ${formatTimeFromMin(endAbs)}`;
-  if (seg.kind === 'ready'  && seg.side === 'post') return `${seg.icon} ${formatTimeFromMin(endAbs)}`;
+  if (seg.kind === 'ready'  && seg.side === 'post') return `🧺 ${formatTimeFromMin(endAbs)}`;
   return `${seg.icon} ${formatTimeFromMin(startAbs)}`;
 }
 
 function bufferSegLabels(seg, tier) {
   const startAbs = seg.startRel + START_MIN;
   const endAbs = seg.endRel + START_MIN;
-  if (tier === 'tiny') return `${seg.icon}${seg.min}m`;
+  if (tier === 'tiny') return `${bufferKindIcon(seg)}${seg.min}m`;
   if (tier === 'time') return bufferSegTime(seg);
   if (tier === 'short') {
-    const kindLabel = seg.kind === 'travel' ? 'Travel' : seg.kind === 'warmup' ? 'Warm up' : 'Get ready';
-    return `${seg.icon} ${kindLabel} ${seg.min}m`;
+    return `${bufferKindIcon(seg)} ${bufferKindLabel(seg)} ${seg.min}m`;
   }
   // long
-  if (seg.kind === 'ready' && seg.side === 'pre')  return `${seg.icon} Get ready ${seg.min}m — done by ${formatTimeFromMin(endAbs)}`;
+  /* FROM, not "done by". The deadline is already said by the travel label
+     that follows it ("Leave by 7:55am"), and it was the only figure here:
+     the moment she has to START is the one this tooltip alone can give,
+     and it is what the visible band drops first when the column narrows. */
+  if (seg.kind === 'ready' && seg.side === 'pre')  return `${seg.icon} Get ready from ${formatTimeFromMin(startAbs)} (${seg.min}m)`;
   if (seg.kind === 'travel' && seg.side === 'pre') return `${seg.icon} Leave by ${formatTimeFromMin(startAbs)} (${seg.min}m)`;
   if (seg.kind === 'warmup')                       return `${seg.icon} Warm up by ${formatTimeFromMin(startAbs)} (${seg.min}m)`;
   if (seg.kind === 'travel' && seg.side === 'post') return `${seg.icon} Home about ${formatTimeFromMin(endAbs)} (${seg.min}m)`;
-  if (seg.kind === 'ready' && seg.side === 'post')  return `${seg.icon} Put gear away ${seg.min}m`;
+  if (seg.kind === 'ready' && seg.side === 'post')  return `🧺 Unpack ${seg.min}m — done by ${formatTimeFromMin(endAbs)}`;
   return `${seg.icon} ${seg.min}m`;
 }
 
@@ -1041,6 +1063,10 @@ function renderFullWeek(keys) {
   const axisSegs = axisKey
     ? dayZoneSegments(axisKey)
     : [{ start: 0, end: DAY_MIN_SPAN, label: '🎉 Free time', cls: 'tl-band-free' }];
+  /* What SHAPE a day has, as one comparable string. A column names its zones
+     only when its shape differs from the one the axis is describing — see the
+     note on `labelledCol` below. */
+  const axisShape = axisSegs.map(x => `${x.start}:${x.end}:${x.label}`).join('|');
   axisSegs.forEach(bd => {
     const seg = document.createElement('div');
     // The day view's palette, so the two screens tint a school day alike.
@@ -1092,7 +1118,27 @@ function renderFullWeek(keys) {
   keys.forEach((key, ci) => {
     // The calendar decides, not the weekday. Same function the day view uses.
     const bands = dayZoneSegments(key).map(b => ({ ...b, cls: b.cls.replace('tl-band-', 'wf-band-') }));
-    const labelledCol = !isSchoolDay(key) || key !== axisKey;
+    /* ── A ZONE NAME IS DRAWN WHERE IT IS NEWS ──
+       This was `!isSchoolDay(key) || key !== axisKey`, which silences the axis
+       day itself and labels every OTHER identical school day — four columns
+       times four zones on an ordinary week, sixteen repeats of what the
+       sideband already says once, competing with the cards and the buffer
+       times for the same pixels. The same expression failed the other way on a
+       week with no school at all: `axisKey` is then null, `key !== axisKey` is
+       true everywhere, and all seven columns printed "🎉 Free time".
+
+       A column speaks only when its shape DIFFERS from the axis day's. An
+       ordinary school week draws none — the tint carries it and the sideband
+       names all four once, vertically, for the whole grid — and a PD day or a
+       holiday inside a term week is the one thing worth saying, so it says it.
+
+       Compared as a signature rather than as `isSchoolDay(key) ===
+       isSchoolDay(axisKey)`. Those are equivalent today, because schoolHours()
+       takes no day argument — but the signature states the rule the screen
+       actually follows, so an early-dismissal Wednesday would light up on its
+       own instead of needing this line found again. */
+    const colShape = bands.map(x => `${x.start}:${x.end}:${x.label}`).join('|');
+    const labelledCol = colShape !== axisShape;
 
     /* The zone names this column draws, kept so a buffer strip landing in the
        same pixels can take one down — see the note at the end of the strip
@@ -1162,6 +1208,11 @@ function renderFullWeek(keys) {
        too small to print their own time. Filled by the strip pass below and
        read by the cards, which have the height the strips do not. */
     const silent = new Map();
+    /* block id -> { pre?: '👕7:40am', post?: ... } for a side that DID
+       speak and was still a figure short, because its width only stretched to
+       the leave-by time. Same contract as `silent` above, one rung further in:
+       the strips are asked what they printed, the card prints the remainder. */
+    const unsaidTimes = new Map();
 
     const bufferConflicts = computeBufferConflicts(blocks);
 
@@ -1222,6 +1273,11 @@ function renderFullWeek(keys) {
         const spoke = els => els.length > 0 && els.some(el => !el.classList.contains('wf-travel--mute'));
         const record = els => {
           if (!spoke(els)) silent.get(b.id)[side] = sideSegs;
+          else {
+            const said = els.map(el => el.textContent || '').join(' ');
+            const un = wfSideTimeUnsaid(sideSegs, said);
+            if (un) unsaidTimes.set(b.id, Object.assign(unsaidTimes.get(b.id) || {}, { [side]: un }));
+          }
           // Where a time actually printed, for the band-label pass below.
           els.forEach(el => {
             if (el.classList.contains('wf-travel--mute')) return;
@@ -1382,10 +1438,27 @@ function renderFullWeek(keys) {
          minutes are the wrong fallback for the same reason they are the wrong
          label: the strip's own length already draws them. */
       const mute = silent.get(b.id) || {};
-      const muteTimes = ['pre', 'post']
-        .filter(side => mute[side])
-        .map(side => wfSideTimeLabel(mute[side]))
-        .filter(Boolean);
+      /* Budgeted, and SHARED when both sides went quiet: a block with a lone
+         fifteen-minute leg each way has two facts to fit on one card row, so
+         each gets half the width and both fall to their bare form rather than
+         one of them running off the edge. */
+      /* PRE ONLY. A side that spoke and came up a figure short did so because
+         the column is narrow, and on this card the shortfall competes with the
+         block's own NAME for the same line. Going out the missing figure is
+         when she has to start getting ready, which has a deadline and is worth
+         that; coming home it is the unpack time, which has none, so it stays in
+         the tooltip rather than pushing "School Day" out of its own card. */
+      const short = unsaidTimes.get(b.id) || {};
+      const muteSides   = ['pre', 'post'].filter(side => mute[side]);
+      const shortSides  = ['pre'].filter(side => short[side]);
+      const perSide = (muteSides.length + shortSides.length) > 1 ? (colPx - 6) / 2 : colPx;
+      const muteTimes = muteSides
+        .map(side => wfSideTimeLabel(mute[side], perSide))
+        .filter(Boolean)
+        /* And the figure a strip that DID speak still had to drop. In a split
+           lane the pre band falls to "🚗7:55" and the moment it starts
+           getting ready is nowhere on the grid; this is where it lands. */
+        .concat(shortSides.map(side => short[side]).filter(t => wfTextPx(t) <= perSide));
       const travelTag = muteTimes.length
         ? `<span class="wf-card-travel">${muteTimes.join(' ')}</span>`
         : (bufKinds.length && !blockTierAtLeast(tier, 'detail'))
@@ -1608,6 +1681,42 @@ const WF_TRAVEL_TEXT_MIN_PX = 17;
    plus its 1px top padding. */
 const WF_BAND_LABEL_PX = 15;
 
+/* -- HOW WIDE A LABEL WILL BE, BEFORE IT IS DRAWN --
+   A MEASUREMENT, like the two constants above, and it replaces the
+   `text.length * 6.6` this file used to budget with. That estimate charged
+   every character the same width, and a buffer label is mostly emoji: the car
+   plus "7:55am" is eight units and 65.6 real pixels -- 8.2 each -- while the
+   backpack plus " After school" is fifteen units and 100 -- 6.7 each. One
+   number was therefore wrong in BOTH directions and wrong by a third: it
+   refused labels that fitted, and it accepted labels that then ran off the
+   column edge, which is the whole failure the width cap exists to prevent.
+
+   Measured in .wf-travel-band-label's own type (0.82rem lifted to the 13.1px
+   kid floor): an emoji is about 21px, an arrow 12, a digit 7.3, a colon 4, a
+   letter 9.6. The LETTERS are rounded up, because over-estimating only refuses
+   a label that would have fitted while under-estimating draws one that does
+   not. The SPACE is charged 1 rather than its own 3.6: every space in a label
+   on this surface follows an emoji, whose advance already carries it, and
+   charging it in full is what put the two-figure form 4px over a phone column
+   it really fits in. A type change invalidates these
+   numbers exactly as it invalidates WF_TRAVEL_TEXT_MIN_PX, and
+   theStripStillSaysWhenToLeave (tests/smoke.js) measures the real elements
+   against what they were allowed to draw. */
+function wfTextPx(s) {
+  let px = 0;
+  for (const ch of String(s == null ? '' : s)) {
+    const cp = ch.codePointAt(0);
+    if (cp > 0xffff) px += 21;             // emoji
+    else if (cp > 0x7f) px += 12;          // arrows and other symbols
+    else if (ch >= '0' && ch <= '9') px += 7.3;
+    else if (ch >= 'a' && ch <= 'z') px += 9.6;
+    else if (ch >= 'A' && ch <= 'Z') px += 10.6;
+    else if (ch === ' ') px += 1;          // see the note above
+    else px += 4;                          // colon, brackets
+  }
+  return px;
+}
+
 /* Build one travel/get-ready buffer strip for the weekly view. Positioned in
    px within the zone cell, hugging the card it belongs to. Non-interactive so
    taps fall through to the card/cell underneath. */
@@ -1648,7 +1757,7 @@ function wfTravelStrip(topPx, hPx, leftCss, widthCss, seg, colour, conflict, max
      and wider than `time`, so there is no width at which it is the right
      answer here. It stays in bufferSegLabels because the print sheet
      (js/16-print.js) picks its tiers by block height and does want it. */
-  const fitsIn = t => !colPx || bufferSegLabels(seg, t).length * 6.6 <= colPx;
+  const fitsIn = t => !colPx || wfTextPx(bufferSegLabels(seg, t)) <= colPx;
   if (tier === 'long' && !fitsIn('long')) tier = 'time';
   if (tier === 'time' && !fitsIn('time')) tier = 'tiny';
   const mute = tier === 'tiny';
@@ -1660,24 +1769,37 @@ function wfTravelStrip(topPx, hPx, leftCss, widthCss, seg, colour, conflict, max
   s.style.left = leftCss;
   s.style.width = widthCss;
   if (colour && !conflict) s.style.setProperty('--wf-travel-colour', colour);
-  const kindLabel = seg.kind === 'travel' ? 'Travel' : seg.kind === 'warmup' ? 'Warm-up' : 'Get ready';
   /* A muted strip still says what it is on hover and to a screen reader; what it
-     stops doing is printing a line of text into 10px of space. */
+     stops doing is printing a line of text into 10px of space. The tooltip is
+     the FULL sentence at every width -- "Leave by 7:55am (15m)" -- because it
+     is the one place the clock time can never be squeezed out, and it is what a
+     screen reader reads when the visible label has fallen to its bare rung. */
   s.textContent = mute ? '' : (conflict ? `⚠️${seg.min}m` : bufferSegLabels(seg, tier));
-  s.title = (conflict ? '⚠️ Overlaps another activity — not enough time. ' : '') + `${kindLabel} — ${seg.min} min`;
+  s.title = (conflict ? '⚠️ Overlaps another activity — not enough time. ' : '') + bufferSegLabels(seg, 'long');
   return s;
 }
 
-/* ── WHAT ONE SIDE OF A BLOCK IS ABOUT, IN ONE FIGURE ──
-   Going out it is when you have to START — the beginning of the whole run, so a
-   School Day at 8:10 with fifteen minutes of getting ready and fifteen of
-   driving says 7:40, not the 7:55 the car leaves. Coming back it is when you
-   are through the door: the end of the last TRAVEL segment, not the end of the
-   run, which is after the gear is put away.
+/* ── WHAT ONE SIDE OF A BLOCK IS ABOUT ──
+   The two get-ready buffers are NOT the same activity, and that is what decides
+   how many times each side prints. Before a block it is preparation — packing
+   the bag, shoes on — and it has a hard deadline: it must be finished when the
+   car leaves. After a block it is unloading, and it has no deadline at all;
+   nothing downstream waits on it.
 
-   One owner, because it is asked in two places — the band's label, and the
-   card's tag when the band could not be drawn at all — and two answers to "when
-   do we have to leave" is the defect this file records six times over. */
+   So the PRE side has two figures a parent acts on — when you must start, and
+   when you must leave — and missing the first makes the second impossible. The
+   POST side has one: when you are through the door. The unpack still has to be
+   reserved so nothing else is booked into it, but nobody sets an alarm to
+   finish putting a bag away.
+
+   It used to print ONE figure per side, and on the pre side that was the start
+   of the whole run carrying the TRAVEL icon: `🚗 7:50am` on a block whose car
+   does not leave until 8:05. The right number labelled as the wrong event is
+   worse than either fact alone.
+
+   THE ARROW READS AWAY FROM HOME AND BACK TO IT — `🏠→🚗` going out, `🚗→🏠`
+   coming back — so the direction of travel is in the glyph rather than in a
+   word there is no room for. */
 function wfSideEdgeRel(segs, side) {
   const list = (segs || []).filter(Boolean);
   if (!list.length) return null;
@@ -1687,17 +1809,95 @@ function wfSideEdgeRel(segs, side) {
   return Math.max(...use.map(x => x.drawEndRel != null ? x.drawEndRel : x.endRel));
 }
 
-function wfSideTimeLabel(segs) {
+/* The edge of one KIND within a side, so each figure can name its own event.
+   Pre: a segment's start is when that thing begins. Post: its end is when that
+   thing is finished. */
+function wfKindEdgeRel(segs, side, kind) {
+  const list = (segs || []).filter(x => x && x.kind === kind);
+  if (!list.length) return null;
+  return side === 'pre'
+    ? Math.min(...list.map(x => x.drawStartRel != null ? x.drawStartRel : x.startRel))
+    : Math.max(...list.map(x => x.drawEndRel != null ? x.drawEndRel : x.endRel));
+}
+
+/* Every form this side's label can take, widest first. The caller walks the
+   list and prints the first that fits — a lane split halves the budget, so the
+   last rung has to survive about 55px. Built from the segments the block
+   actually has, so a side carrying only one kind never prints a figure for a
+   thing that is not there. */
+function wfSideTimeForms(segs) {
+  const list = (segs || []).filter(Boolean);
+  if (!list.length) return [];
+  const side = list[0].side || 'pre';
+  const at = rel => rel == null ? null : formatTimeFromMin(rel + START_MIN);
+  /* NO MERIDIEM WHEN TWO TIMES SHARE THE LABEL. "am" costs two units of a
+     budget that is 101px on an iPad in portrait, and it is the least load-
+     bearing part of the string: the two figures are minutes apart, and the hour
+     gutter is drawn six pixels to the left of them. Keeping it turned the
+     two-fact form from 106px into 132px, which is the difference between
+     fitting a real column and never being chosen. */
+  const bare = t => t == null ? null : t.replace(/(am|pm)$/, '');
+  const travelAt = at(wfKindEdgeRel(list, side, 'travel'));
+  const readyAt  = at(wfKindEdgeRel(list, side, 'ready'));
+  const forms = [];
+  if (side === 'pre') {
+    /* GOING OUT, BOTH FIGURES MATTER, so the DIRECTION is what is sacrificed
+       first. Getting ready before a block has a hard deadline -- it has to be
+       finished when the car leaves -- so "start at 7:40, leave at 7:55" is two
+       facts a parent acts on separately. The house-and-arrow costs 33px of a
+       budget that is about 112px on an iPad; dropping it keeps both times down
+       to a 100px column, which is every real one-lane column on this grid. */
+    if (readyAt && travelAt) {
+      forms.push(`👕${bare(readyAt)} 🏠→🚗${bare(travelAt)}`);
+      forms.push(`👕${bare(readyAt)} 🚗${bare(travelAt)}`);
+    } else if (travelAt) {
+      forms.push(`🏠→🚗 ${travelAt}`);
+    }
+    if (travelAt) { forms.push(`🚗${travelAt}`); forms.push(`🚗${bare(travelAt)}`); }
+    else if (readyAt) { forms.push(`👕 ${readyAt}`); forms.push(`👕${bare(readyAt)}`); }
+  } else {
+    /* COMING HOME THE SOFT FIGURE GOES FIRST. Unpacking has no deadline --
+       nothing downstream waits on it -- so when the width runs out it is the
+       unpack time that goes and the direction that stays. Through the door is
+       the figure somebody is waiting on. */
+    if (travelAt && readyAt) forms.push(`🚗→🏠${bare(travelAt)} 🧺${bare(readyAt)}`);
+    if (travelAt) {
+      forms.push(`🚗→🏠 ${travelAt}`);
+      forms.push(`🏠${travelAt}`);
+      forms.push(`🏠${bare(travelAt)}`);
+    } else if (readyAt) { forms.push(`🧺 ${readyAt}`); forms.push(`🧺${bare(readyAt)}`); }
+  }
+  return forms;
+}
+
+/* WHAT THIS SIDE COULD NOT SAY, given what it actually printed.
+
+   The ladder above drops the get-ready figure before the leave-by one, and the
+   unpack figure before the through-the-door one, so in a split lane a side can
+   speak and still be a fact short. That is the same hole the mute mechanism
+   already covers for a side that says nothing at all, and it is closed the same
+   way: the elements are ASKED what they printed -- a second copy of the ladder
+   here is exactly how the two would drift -- and the card carries the
+   remainder. Returns '' when the side said everything it had. */
+function wfSideTimeUnsaid(segs, saidText) {
   const list = (segs || []).filter(Boolean);
   if (!list.length) return '';
   const side = list[0].side || 'pre';
-  const rel = wfSideEdgeRel(list, side);
+  const rel = wfKindEdgeRel(list, side, 'ready');
   if (rel == null) return '';
-  // 🏠 for the way back, so the icon says which end of the trip this is.
-  const icon = side === 'post' && list.some(x => x.kind === 'travel')
-    ? '🏠'
-    : (list.find(x => x.kind === 'travel') || list[0]).icon || '🚗';
-  return `${icon} ${formatTimeFromMin(rel + START_MIN)}`;
+  const t = formatTimeFromMin(rel + START_MIN);
+  const bare = t.replace(/(am|pm)$/, '');
+  if (String(saidText || '').includes(bare)) return '';
+  return (side === 'pre' ? '👕' : '🧺') + t;
+}
+
+/* The widest form that fits the width it is given. `colPx` unset means no
+   budget — take the fullest. */
+function wfSideTimeLabel(segs, colPx) {
+  const forms = wfSideTimeForms(segs);
+  if (!forms.length) return '';
+  if (!colPx) return forms[0];
+  return forms.find(f => wfTextPx(f) <= colPx) || '';
 }
 
 /* One BAND standing for several segments that are each too short to speak.
@@ -1740,16 +1940,20 @@ function wfBufferBand(topPx, hPx, leftCss, widthCss, segs, colour, conflict, col
   });
   const label = document.createElement('div');
   label.className = 'wf-travel-band-label';
-  const full = wfSideTimeLabel(segs);
-  /* The same two questions as a single strip: does a line fit in the height,
-     and does this line fit in the width. A band that can hold neither keeps its
-     hatches and says nothing — the card's own inline tag then carries it. */
-  const fits = hPx >= WF_TRAVEL_TEXT_MIN_PX && (!colPx || full.length * 6.6 <= colPx);
-  label.textContent = fits ? full : '';
+  /* The label PICKS ITS OWN FORM from the width it is given — both figures at
+     full width, the leave/arrive time alone in a split lane, the bare time
+     below that. Height is the other question and the band still answers it: a
+     run too short for one line of this type keeps its hatches and says nothing,
+     and the card's own inline tag then carries the fact. */
+  const full = hPx >= WF_TRAVEL_TEXT_MIN_PX ? wfSideTimeLabel(segs, colPx) : '';
+  const fits = !!full;
+  label.textContent = full;
   if (!fits) s.classList.add('wf-travel--mute');
   s.appendChild(label);
-  // The kinds and the minutes the label no longer carries.
-  s.title = segs.map(x => `${x.kind === 'travel' ? 'Travel' : x.kind === 'warmup' ? 'Warm-up' : 'Get ready'} — ${x.min} min`).join(' · ');
+  /* Every figure the visible label had to drop, in full. The band prints at
+     most two times and loses the meridiem doing it; the tooltip names each
+     segment, its minutes and its clock time the long way round. */
+  s.title = segs.map(x => bufferSegLabels(x, 'long')).join(' · ');
   return s;
 }
 

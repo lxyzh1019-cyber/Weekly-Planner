@@ -1500,7 +1500,35 @@ function findChromium() {
       bad.push('the same pair WITH a return leg reports no clash — the test proves nothing');
     }
 
-    // (4) A block carrying the new fields survives the merge whole.
+    /* (4) AND THE SHEET SAYS EACH LEG FROM ITS OWN FIGURE. renderSheetTimeSummary
+       (js/08-day-view.js) took ONE travel number and ONE get-ready number and
+       applied both symmetrically, so the training above read "15m before + 15m
+       after" while its real drive home is 35, and the Tuesday school block
+       promised a drive home it does not have. Rendered into a scratch host, so
+       this tests the function every sheet calls rather than one sheet's
+       plumbing. */
+    const host = document.createElement('div');
+    host.id = 'smk-time-summary';
+    document.body.appendChild(host);
+    try {
+      renderSheetTimeSummary('smk-time-summary', training.startMin, training.durationMin,
+        true, 20, true, 15, false, 20,
+        { travelHome: true, travelHomeMin: 35, readyAfter: true, readyAfterMin: 25 });
+      const t = host.textContent || '';
+      if (!t.includes('35m')) bad.push(`the sheet does not name the 35m drive home: "${t}"`);
+      if (!t.includes('25m')) bad.push(`the sheet does not name the 25m unpack: "${t}"`);
+      const wantHome = formatTimeFromMin(training.startMin + training.durationMin + 35);
+      if (!t.includes(wantHome)) bad.push(`the sheet puts her home at something other than ${wantHome}: "${t}"`);
+
+      renderSheetTimeSummary('smk-time-summary', school.startMin, school.durationMin,
+        true, 15, true, 15, false, 20, { travelHome: false, readyAfter: false });
+      const u = host.textContent || '';
+      if (/Home about/i.test(u)) bad.push('a block with no drive home still promises one');
+      if (!/straight on/i.test(u)) bad.push('a block with no drive home says nothing about it');
+      if (/Unpack/i.test(u)) bad.push('a block with no return leg still offers unpacking');
+    } finally { host.remove(); }
+
+    // (5) A block carrying the new fields survives the merge whole.
     const merged = mergeArrayById([school], [Object.assign({}, school,
       { travelHomeMin: 40, updatedAt: Date.now() + 1000 })]);
     const got = merged.find(x => x.id === 'tu-school');
@@ -1635,24 +1663,48 @@ function findChromium() {
      What must hold is the FACT, not the mechanism: for a block that carries
      travel, the time it has to be left by and the time it is back must appear
      somewhere on that day — on the strip, on the merged band, or on the card —
-     at one lane and at two, and without overflowing whatever draws it. */
+     at one lane and at two, and without overflowing whatever draws it.
+
+     AND NOW THERE ARE TWO FACTS A SIDE, not one. Going out, the moment she
+     starts getting ready and the moment the car leaves are half an hour apart
+     and a parent acts on both; a label that prints the first figure under the
+     travel icon is the right number wearing the wrong name. Both must be
+     VISIBLE in a full column. In a split lane they cannot be — the column is
+     about 54px and two clock times are 130 — so what is required there is that
+     the leave-by time is visible and the other is spelled out in a tooltip,
+     which is also what a screen reader gets at every width. That is the
+     distinction the old check could not make: it searched the label text and
+     the tooltips together, so an overflowing label and a fitted one read the
+     same to it. */
   checks.theStripStillSaysWhenToLeave = await page.evaluate(() => {
     goWeek(); setWeekView('full');
     const kid = activeProfile();
     const key = getDayKeys(0)[3];
     const had = (getDayBlocks(key) || []).slice();
     const bad = [];
-    const colText = () => {
+    const col = () => {
       const cells = [...document.querySelectorAll('#weeklyFullGrid .wf-day-col')];
-      const cell = cells[3] || cells[0];
-      if (!cell) return '';
-      // The label text plus every tooltip and card tag drawn in the column.
-      return (cell.textContent || '') + ' '
-        + [...cell.querySelectorAll('[title]')].map(el => el.getAttribute('title')).join(' ');
+      return cells[3] || cells[0] || null;
     };
+    // Drawn text and tooltip text are kept APART, because they answer different
+    // questions: what a parent can read at a glance, and what the record holds.
+    const seen = () => (col() ? col().textContent || '' : '');
+    const tips = () => (col()
+      ? [...col().querySelectorAll('[title]')].map(el => el.getAttribute('title')).join(' ')
+      : '');
+    /* A visible figure may have dropped its meridiem — two times sharing one
+       label cannot afford "am" twice — so the bare form counts on screen while
+       the tooltip is held to the whole thing. */
     const wants = (label, mins) => {
-      const want = formatTimeFromMin(mins);
-      if (!colText().includes(want)) bad.push(`${label}: nothing on the day says ${want}`);
+      const full = formatTimeFromMin(mins);
+      const bare = full.replace(/(am|pm)$/, '');
+      if (!seen().includes(bare)) bad.push(`${label}: nothing on the day shows ${full}`);
+      if (!tips().includes(full)) bad.push(`${label}: no tooltip spells out ${full}`);
+    };
+    // For a figure the visible surface has no room for: the record still has it.
+    const wantsOnRecord = (label, mins) => {
+      const full = formatTimeFromMin(mins);
+      if (!tips().includes(full)) bad.push(`${label}: no tooltip spells out ${full}`);
     };
     try {
       /* School Day 8:10am–2:50pm, fifteen minutes of getting ready and fifteen
@@ -1664,8 +1716,11 @@ function findChromium() {
           travelBuffer: true, travelBufMin: 15, getReadyBuffer: true, getReadyBufMin: 15 },
       ], kid);
       weekOffset = 0; renderWeek();
-      wants('one lane, band', 8 * 60 + 10 - 30);
-      wants('one lane, home', 8 * 60 + 10 + 400 + 15);
+      wants('one lane, get ready from', 8 * 60 + 10 - 30);
+      wants('one lane, leave by',       8 * 60 + 10 - 15);
+      wants('one lane, home by',        8 * 60 + 10 + 400 + 15);
+      // Unpacking has no deadline, so it is the figure the label drops first.
+      wantsOnRecord('one lane, unpacked by', 8 * 60 + 10 + 400 + 30);
 
       /* A LONE SHORT BUFFER. Travel only, no get-ready: 10.8px, under the height
          a line needs at any width, so the strip cannot speak and the card has to.
@@ -1688,11 +1743,16 @@ function findChromium() {
       const lanes = [...document.querySelectorAll('#weeklyFullGrid .wf-day-col')][3];
       const cards = lanes ? [...lanes.querySelectorAll('.wf-card')] : [];
       if (cards.length === 2 && cards[0].getBoundingClientRect().width > 20) {
-        wants('two lanes', 8 * 60 + 10 - 30);
+        // Half a column holds one clock time. It has to be the leave-by one.
+        wants('two lanes, leave by', 8 * 60 + 10 - 15);
+        wantsOnRecord('two lanes, get ready from', 8 * 60 + 10 - 30);
       }
 
-      // Whatever spoke must fit what it drew — no ellipsis, no second line.
-      [...document.querySelectorAll('#screen-week .wf-travel, #screen-week .wf-card-travel')]
+      /* Whatever spoke must fit what it drew — no ellipsis, no second line.
+         .wf-travel-band-label is in this list deliberately: it is the element
+         that actually carries a band's text, and while it was left out a band
+         label 30px too wide for its column passed this sweep untouched. */
+      [...document.querySelectorAll('#screen-week .wf-travel, #screen-week .wf-travel-band-label, #screen-week .wf-card-travel')]
         .forEach(el => {
           const txt = (el.textContent || '').trim();
           if (!txt) return;
@@ -1724,6 +1784,144 @@ function findChromium() {
         });
       });
     } finally { setDayBlocks(key, had, kid); renderWeek(); }
+    return bad.length === 0 || bad;
+  });
+
+  /* THE AFTER-BUFFER IS UNPACKING, AND SAYS SO.
+
+     The two get-ready buffers are not the same job. Before a block it is
+     preparation and it has a hard deadline -- it has to be finished when the
+     car leaves. After it, it is unloading: wet kit out, gear away, and nothing
+     downstream waits on it. Three of the four places that named a buffer kind
+     were not side-aware, so the post side read "Get ready" on the print sheet
+     and in every tooltip, and `seg.side` was in scope at each one of them and
+     simply not asked.
+
+     Held on the VOCABULARY and on the screens both, because one owner answering
+     correctly proves nothing if a surface still writes its own ternary -- which
+     is exactly the state this found. */
+  checks.theAfterBufferIsNotCalledGettingReady = await page.evaluate(() => {
+    const bad = [];
+    const seg = (side, kind) => ({
+      side, kind, min: 15, icon: kind === 'travel' ? '🚗' : '👕',
+      startRel: 9 * 60, endRel: 9 * 60 + 15,
+    });
+    // 1. Every tier any surface may pick, in both directions.
+    ['tiny', 'time', 'short', 'long'].forEach(t => {
+      const post = bufferSegLabels(seg('post', 'ready'), t);
+      const pre  = bufferSegLabels(seg('pre',  'ready'), t);
+      if (/get\s*ready/i.test(post)) bad.push(`post ${t}: "${post}" still says get ready`);
+      if (/unpack/i.test(pre))       bad.push(`pre ${t}: "${pre}" says unpack before the block`);
+    });
+    // The words themselves, so a silently empty label cannot pass the test above.
+    if (!/unpack/i.test(bufferSegLabels(seg('post', 'ready'), 'short'))) bad.push('the short tier does not say unpack');
+    if (!/unpack/i.test(bufferSegLabels(seg('post', 'ready'), 'long')))  bad.push('the long tier does not say unpack');
+    if (!/get\s*ready/i.test(bufferSegLabels(seg('pre', 'ready'), 'long'))) bad.push('the long tier no longer says get ready before a block');
+    if (bufferKindLabel(seg('post', 'ready')) !== 'Unpack')    bad.push(`bufferKindLabel: "${bufferKindLabel(seg('post', 'ready'))}" after a block`);
+    if (bufferKindLabel(seg('pre',  'ready')) !== 'Get ready') bad.push(`bufferKindLabel: "${bufferKindLabel(seg('pre',  'ready'))}" before a block`);
+
+    // 2. And on the surfaces, where the copies used to live.
+    const kid = activeProfile();
+    const key = getDayKeys(0)[2];
+    const had = (getDayBlocks(key) || []).slice();
+    try {
+      setDayBlocks(key, [
+        { id: 'unp-1', actId: 'swimming', startMin: 16 * 60, durationMin: 60,
+          travelBuffer: true, travelBufMin: 15, getReadyBuffer: true, getReadyBufMin: 15 },
+      ], kid);
+
+      // The week grid: labels and tooltips alike.
+      goWeek(); setWeekView('full'); weekOffset = 0; renderWeek();
+      const cols = [...document.querySelectorAll('#weeklyFullGrid .wf-day-col')];
+      const cell = cols[2];
+      const wkText = cell ? (cell.textContent || '') + ' '
+        + [...cell.querySelectorAll('[title]')].map(e => e.getAttribute('title')).join(' ') : '';
+      if (!/unpack/i.test(wkText)) bad.push('the week grid never says unpack for a block with a return leg');
+      if (!/get\s*ready/i.test(wkText)) bad.push('the week grid no longer says get ready');
+
+      // The print sheet, which carried its own copy of the ternary.
+      openPrint();
+      const printText = [...document.querySelectorAll('.print-travel, .print-travel [title], .print-sheet [title]')]
+        .map(e => (e.textContent || '') + ' ' + (e.getAttribute('title') || '')).join(' ');
+      if (/get\s*ready/i.test(printText) && !/unpack/i.test(printText)) {
+        bad.push('the print sheet names the after-buffer as getting ready');
+      }
+      goWeek();
+
+      // The day view's two strip labels. The arrow is what says which side.
+      currentDayKey = key;
+      openDay(key);
+      [...document.querySelectorAll('#screen-day .placed-block.travel-buf')].forEach(el => {
+        const txt = (el.textContent || '').trim();
+        if (txt.includes('⬅') && /get\s*ready/i.test(txt)) {
+          bad.push(`the day view draws "${txt}" after a block`);
+        }
+      });
+      const dayText = document.getElementById('screen-day').textContent || '';
+      if (!/unpack/i.test(dayText)) bad.push('the day view never says unpack for a block with a return leg');
+    } finally {
+      setDayBlocks(key, had, kid);
+      goWeek(); setWeekView('full'); renderWeek();
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* A ZONE NAME IS DRAWN WHERE IT IS NEWS.
+
+     `labelledCol` was `!isSchoolDay(key) || key !== axisKey`, which silences the
+     axis day itself and labels every OTHER identical school day: four columns
+     times four zones on an ordinary week, sixteen repeats of what the left
+     sideband already says once, competing with the cards and the buffer times
+     for the same pixels. The same expression failed the other way round on a
+     week with no school in it at all -- `axisKey` is then null, `key !==
+     axisKey` is true everywhere, and all seven columns printed the same
+     "Free time".
+
+     The rule now: a column names its zones only when its SHAPE differs from the
+     day the axis is describing. So the school columns of a term week say
+     nothing, a Saturday inside one still speaks because it really is different,
+     and a week that is all holiday says it once on the axis. */
+  checks.aZoneNameIsDrawnOnlyWhereItIsNews = await page.evaluate(() => {
+    const bad = [];
+    const wasOffset = weekOffset;
+    const perCol = () => [...document.querySelectorAll('#weeklyFullGrid .wf-day-col')]
+      .map(c => [...c.querySelectorAll('.wf-band-label')]
+        .map(l => (l.textContent || '').trim()).filter(Boolean));
+    try {
+      const termWeek = (() => {
+        for (let w = -20; w <= 40; w++) if (getDayKeys(w).some(k => isSchoolDay(k))) return w;
+        return null;
+      })();
+      if (termWeek == null) return ['no week in range has a school day'];
+
+      goWeek(); setWeekView('full');
+      weekOffset = termWeek; renderWeek();
+      const keys = getDayKeys(termWeek);
+      const cols = perCol();
+      keys.forEach((k, i) => {
+        const drew = cols[i] || [];
+        if (isSchoolDay(k) && drew.length) {
+          bad.push(`${k}: a school column repeats "${drew.join('", "')}" that the axis already says`);
+        }
+        if (!isSchoolDay(k) && !drew.length) {
+          bad.push(`${k}: a day unlike the axis day names none of its zones`);
+        }
+      });
+
+      /* And the July case: every column has the axis's own shape, so not one of
+         them is news. This is the half the old expression got exactly backwards. */
+      const summerWeek = (() => {
+        for (let w = 0; w <= 60; w++) if (getDayKeys(w).every(k => !isSchoolDay(k))) return w;
+        return null;
+      })();
+      if (summerWeek != null) {
+        weekOffset = summerWeek; renderWeek();
+        const n = perCol().reduce((a, x) => a + x.length, 0);
+        if (n) bad.push(`a week with no school in it labels ${n} zones across its columns`);
+      }
+    } finally {
+      weekOffset = wasOffset; goWeek(); setWeekView('full'); renderWeek();
+    }
     return bad.length === 0 || bad;
   });
 
