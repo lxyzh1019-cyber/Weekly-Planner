@@ -315,7 +315,7 @@ function tdClashes(kid, blocks) {
       .sort((a, b) => (a.startMin || 0) - (b.startMin || 0))[0];
     /* HOW SHORT as well as with what. The shortfall is recorded against the
        block whose window does not fit, so a block asking how far it is run into
-       reads its partner's figure — the same reading wfWorstShort makes on the
+       reads its partner's figure — the same reading clashWorstShort makes on the
        week grid, from the same Map, so the two screens cannot print different
        numbers about one clash. */
     let short = 0;

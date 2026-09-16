@@ -1337,38 +1337,639 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
-  /* A FLOORED CARD NEVER SITS ON THE ONE BELOW IT.
+  /* THE SUGGESTIONS ANSWER THE CLOCK.
 
-     The lane pass compared startMin and durationMin, which is the wrong question
-     on a surface with a minimum card height: at 0.72px per minute the 20px floor
-     is 28 minutes, so a ten-minute After-School Routine at 8:50pm is DRAWN
-     through a 9:00pm Evening Routine while the arithmetic says they are clear.
-     Nothing split them and nothing could. Lanes are decided on drawn pixels now.
+     Tapping 12:30 on a free day offered Evening Routine, Morning Routine and
+     Dinner ahead of Lunch. Two defects compounding, and neither was about the
+     picker's wording.
 
-     This is the Tuesday evening from the original screenshot. */
+     `zoneForGap` answers 'weekend' on its FIRST LINE for every minute from six
+     in the morning to ten at night, so the zone carried no time-of-day
+     information at all — and 47 of the 70 catalog entries declare 'weekend', so
+     they all "fit" equally. The row then fell through to `slotPickerRecentActIds`,
+     which is placement frequency over four weeks: the observed order was exactly
+     the household's most-placed six. The hour she tapped changed nothing but the
+     heading text.
+
+     What must hold is an ORDERING, not the presence of a heading — the previous
+     check here asserted only that "Good for" existed, which was true throughout
+     and is why this shipped. */
+  checks.theSuggestionsAnswerTheClock = await page.evaluate(() => {
+    const bad = [];
+    const keyFor = want => getDayKeys(0).find(k => isSchoolDay(k) === want);
+    const namesIn = () => [...document.querySelectorAll('#slotPickerList .slot-pick-chip')]
+      .map(t => (t.textContent || '').trim());
+    const headings = () => [...document.querySelectorAll('#slotPickerList .spc-subhead')]
+      .map(h => (h.textContent || '').trim());
+    const suggestedNames = () => {
+      /* Everything between the first heading and "Everything else" — read off
+         the rendered list rather than the internals, so this measures what a
+         child is actually shown. */
+      const kids = [...document.querySelectorAll('#slotPickerList > *')];
+      const start = kids.findIndex(el => el.classList.contains('spc-subhead'));
+      const end = kids.findIndex((el, i) => i > start && el.classList.contains('spc-subhead'));
+      if (start === -1 || end === -1) return [];
+      return kids.slice(start + 1, end).map(t => (t.textContent || '').trim());
+    };
+
+    const freeKey = keyFor(false);
+    const schoolKey = keyFor(true);
+    if (!freeKey || !schoolKey) return ['the week holds no school day and free day to test with'];
+
+    const had = { free: (getDayBlocks(freeKey) || []).slice(),
+                  school: (getDayBlocks(schoolKey) || []).slice() };
+    const kid = activeProfile();
+    try {
+      // ── 12:30 on a day with no school. Nothing else planned, so room is not
+      //    what is being tested here.
+      setDayBlocks(freeKey, [], kid);
+      currentDayKey = freeKey;
+      openDay(freeKey);
+      openSlotPicker(12 * 60 + 30);
+      const sug = suggestedNames();
+      if (!sug.length) bad.push('nothing at all was suggested for 12:30 on a free day');
+
+      const has = re => sug.some(n => re.test(n));
+      if (!has(/Lunch/)) bad.push(`Lunch is not suggested at 12:30 — got: ${sug.join(', ')}`);
+      [[/Evening Routine/, 'Evening Routine'], [/Morning Routine/, 'Morning Routine'],
+       [/Breakfast/, 'Breakfast'], [/Dinner/, 'Dinner']].forEach(([re, name]) => {
+        if (has(re)) bad.push(`${name} is still suggested at half past twelve`);
+      });
+      closeSheet('slotPickerOverlay');
+
+      // ── The same list at half past seven in the morning: now the breakfast
+      //    end of the day is right and Lunch is the one that does not belong.
+      openSlotPicker(7 * 60 + 30);
+      const morning = suggestedNames();
+      if (morning.length) {
+        if (!morning.some(n => /Breakfast|Morning Routine/.test(n))) {
+          bad.push(`nothing morning-ish suggested at 7:30 — got: ${morning.join(', ')}`);
+        }
+        if (morning.some(n => /Dinner|Evening Routine/.test(n))) {
+          bad.push('the evening is still suggested at half past seven in the morning');
+        }
+      }
+      closeSheet('slotPickerOverlay');
+
+      /* ── BOTH HEADINGS SURVIVE AN EMPTY ROW. On a real school day at 12:30
+         the only activity matching the school band is School Day itself, which
+         is far too long to fit — so the suggestion row is empty, and both
+         headings used to disappear together leaving a bare list with nothing to
+         say the app had looked. */
+      setDayBlocks(schoolKey, [], kid);
+      currentDayKey = schoolKey;
+      openDay(schoolKey);
+      openSlotPicker(12 * 60 + 30);
+      const hs = headings();
+      if (!hs.some(h => /Good for|Nothing obvious/.test(h))) {
+        bad.push(`the picker lost its first heading on a school day: ${hs.join(' | ')}`);
+      }
+      if (!hs.some(h => /Everything else/.test(h))) {
+        bad.push(`the picker lost "Everything else" on a school day: ${hs.join(' | ')}`);
+      }
+      if (!namesIn().length) bad.push('the school-day picker listed nothing at all');
+      closeSheet('slotPickerOverlay');
+    } finally {
+      setDayBlocks(freeKey, had.free, kid);
+      setDayBlocks(schoolKey, had.school, kid);
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* A BLOCK CAN GO STRAIGHT ON WITHOUT COMING HOME.
+
+     `travelBufMin` was one number drawn before a block and after it, so the
+     ordinary Tuesday could not be said at all: school, then straight on to
+     training, then home. There is no drive home from school that day, the drive
+     to training leaves from the school gates rather than the house, and the
+     drive home afterwards is longer than either.
+
+     Three things have to hold. The legs are independent and carry their own
+     minutes. A block that predates the split behaves EXACTLY as it does today,
+     with nothing written to it — derived, never migrated, the same rule as xp2.
+     And the clash arithmetic follows: a School Day with no drive home must stop
+     being reported as running into whatever comes next. */
+  checks.aBlockCanGoStraightOnWithoutComingHome = await page.evaluate(() => {
+    const bad = [];
+
+    // (1) A legacy block — only the symmetric fields — is unchanged.
+    const legacy = { id: 'lg', startMin: 8 * 60, durationMin: 60,
+      travelBuffer: true, travelBufMin: 20, getReadyBuffer: true, getReadyBufMin: 10 };
+    if (getTravelBufMin(legacy, 'pre') !== 20) bad.push('legacy pre travel is not 20');
+    if (getTravelBufMin(legacy, 'post') !== 20) bad.push('legacy post travel is not 20');
+    if (getGetReadyBufMin(legacy, 'pre') !== 10) bad.push('legacy pre get-ready is not 10');
+    if (getGetReadyBufMin(legacy, 'post') !== 10) bad.push('legacy post get-ready is not 10');
+    // Asked without a side — the shape every existing caller uses — it still answers.
+    if (getTravelBufMin(legacy) !== 20) bad.push('legacy sideless travel is not 20');
+
+    // (2) Tuesday: school with a drive there and none home.
+    const school = { id: 'tu-school', startMin: 8 * 60, durationMin: 400,
+      travelBuffer: true, travelBufMin: 15,
+      travelTo: true, travelToMin: 15, travelHome: false,
+      getReadyBuffer: true, getReadyBufMin: 15,
+      readyBefore: true, readyBeforeMin: 15, readyAfter: false };
+    if (getTravelBufMin(school, 'pre') !== 15) bad.push('the drive to school is not 15');
+    if (getTravelBufMin(school, 'post') !== 0) bad.push('a drive home was drawn from a day with none');
+    if (getGetReadyBufMin(school, 'post') !== 0) bad.push('gear-away was drawn after a straight-on day');
+
+    // …and the training it goes on to: a short hop there, a longer drive back.
+    const training = { id: 'tu-train', startMin: 15 * 60 + 30, durationMin: 90,
+      travelBuffer: true, travelBufMin: 20,
+      travelTo: true, travelToMin: 20, travelHome: true, travelHomeMin: 35 };
+    if (getTravelBufMin(training, 'pre') !== 20) bad.push('the hop from school is not 20');
+    if (getTravelBufMin(training, 'post') !== 35) bad.push('the drive home is not 35');
+
+    // (3) The segments drawn follow, and so does the clash arithmetic.
+    const segs = wfBufferSegments(school);
+    const post = segs.filter(s => s.side === 'post');
+    if (post.length) bad.push(`${post.length} segment(s) drawn after a block with no return leg`);
+    const pre = segs.filter(s => s.side === 'pre');
+    if (pre.length !== 2) bad.push(`expected get-ready and travel before school, got ${pre.length}`);
+
+    /* The whole point: with no drive home, School Day no longer runs into the
+       thing after it. The same pair WITH a return leg is a 20-minute clash —
+       assert both, or this only proves the conflict test can return nothing. */
+    const after = { id: 'tu-next', startMin: 15 * 60, durationMin: 60 };
+    const quiet = computeBufferConflicts([school, after]);
+    if (quiet.affected.has('tu-next')) {
+      bad.push('a block with no drive home is still reported as clashing');
+    }
+    const symmetric = Object.assign({}, school, { travelHome: true, readyAfter: true });
+    const loud = computeBufferConflicts([symmetric, after]);
+    if (!loud.affected.has('tu-next')) {
+      bad.push('the same pair WITH a return leg reports no clash — the test proves nothing');
+    }
+
+    /* (4) AND THE SHEET SAYS EACH LEG FROM ITS OWN FIGURE. renderSheetTimeSummary
+       (js/08-day-view.js) took ONE travel number and ONE get-ready number and
+       applied both symmetrically, so the training above read "15m before + 15m
+       after" while its real drive home is 35, and the Tuesday school block
+       promised a drive home it does not have. Rendered into a scratch host, so
+       this tests the function every sheet calls rather than one sheet's
+       plumbing. */
+    const host = document.createElement('div');
+    host.id = 'smk-time-summary';
+    document.body.appendChild(host);
+    try {
+      renderSheetTimeSummary('smk-time-summary', training.startMin, training.durationMin,
+        true, 20, true, 15, false, 20,
+        { travelHome: true, travelHomeMin: 35, readyAfter: true, readyAfterMin: 25 });
+      const t = host.textContent || '';
+      if (!t.includes('35m')) bad.push(`the sheet does not name the 35m drive home: "${t}"`);
+      if (!t.includes('25m')) bad.push(`the sheet does not name the 25m unpack: "${t}"`);
+      const wantHome = formatTimeFromMin(training.startMin + training.durationMin + 35);
+      if (!t.includes(wantHome)) bad.push(`the sheet puts her home at something other than ${wantHome}: "${t}"`);
+
+      renderSheetTimeSummary('smk-time-summary', school.startMin, school.durationMin,
+        true, 15, true, 15, false, 20, { travelHome: false, readyAfter: false });
+      const u = host.textContent || '';
+      if (/Home about/i.test(u)) bad.push('a block with no drive home still promises one');
+      if (!/straight on/i.test(u)) bad.push('a block with no drive home says nothing about it');
+      if (/Unpack/i.test(u)) bad.push('a block with no return leg still offers unpacking');
+    } finally { host.remove(); }
+
+    // (5) A block carrying the new fields survives the merge whole.
+    const merged = mergeArrayById([school], [Object.assign({}, school,
+      { travelHomeMin: 40, updatedAt: Date.now() + 1000 })]);
+    const got = merged.find(x => x.id === 'tu-school');
+    if (!got || got.travelHome !== false) {
+      bad.push('travelHome did not survive a whole-record merge');
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* EVERY SUBGROUP TELLS ITSELF APART.
+
+     Five of the twelve subgroups were crowded into one green-teal corner, and
+     the worst pair — Helping hands and Play — sat at CIEDE2000 2.9, which is
+     not a difference an eye can report. They are in DIFFERENT categories, so a
+     chore and an afternoon of Minecraft drew as the same colour.
+
+     Two things this asserts, and the second is the subtler one.
+
+     THE METRIC. The palette was first separated with CIE76, which overstates
+     the distance between saturated greens by about double — it scored that same
+     pair at 49 after a "fix" that had not fixed it. colourDistance
+     (js/05-helpers.js) is CIEDE2000, and this check measures the same way the
+     table was chosen, rather than carrying its own copy.
+
+     WHICH PAIRS COUNT. Two subgroups inside ONE category are meant to look
+     related — Meals and Appointments are both Fuel & Care and sit at 9.8, and
+     that is the design working, not a defect. The floor applies to pairs that
+     cross a category boundary; within one, all that is required is that they
+     are not literally the same value. */
+  checks.everySubgroupTellsItselfApart = await page.evaluate(() => {
+    const bad = [];
+    /* 14 is the floor this palette clears with room (its worst cross-category
+       pair is Arts vs Outings at 15.0) and is comfortably above the ~5 at which
+       two colours stop being reliably distinguishable on a small card. Raising
+       it is a design decision, not a bug fix — six categories over a pastel
+       wheel that must all take dark ink is a genuinely tight budget. */
+    const FLOOR = 14;
+    const subs = [];
+    ACTIVITY_CATEGORIES.forEach(c => c.subs.forEach(sg => {
+      subs.push({ id: sg.id, label: sg.label, hex: sg.hex, cat: c.id });
+    }));
+    if (subs.length < 12) bad.push(`only ${subs.length} subgroups found`);
+
+    for (let i = 0; i < subs.length; i++) {
+      for (let j = i + 1; j < subs.length; j++) {
+        const a = subs[i], b = subs[j];
+        const d = colourDistance(a.hex, b.hex);
+        if (a.cat === b.cat) {
+          if (a.hex.toLowerCase() === b.hex.toLowerCase()) {
+            bad.push(`${a.label} and ${b.label} are the same hex ${a.hex}`);
+          }
+          continue;
+        }
+        if (d < FLOOR) {
+          bad.push(`${a.label} (${a.cat}) and ${b.label} (${b.cat}) are ${d.toFixed(1)} apart, under ${FLOOR}`);
+        }
+      }
+    }
+
+    /* Dark ink on every one of them, to AA. White text fails on all these
+       pastels (CLAUDE.md, UI rules), so a value too dark for ink has no legible
+       text at all — Training shipped at 4.27 until this check went in. */
+    subs.forEach(sg => {
+      if (!isLightColour(sg.hex)) bad.push(`${sg.label} ${sg.hex} is too dark for ink`);
+      const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+      const v = [1, 3, 5].map(i => parseInt(sg.hex.substr(i, 2), 16));
+      const L = 0.2126 * lin(v[0]) + 0.7152 * lin(v[1]) + 0.0722 * lin(v[2]);
+      const Link = 0.2126 * lin(0x2a) + 0.7152 * lin(0x23) + 0.0722 * lin(0x20);
+      const ratio = (L + 0.05) / (Link + 0.05);
+      if (ratio < 4.5) bad.push(`${sg.label} ${sg.hex} gives ink only ${ratio.toFixed(2)}:1`);
+    });
+
+    /* EVERY RETIRED HEX IS STILL SEEDED. blockColour ignores b.colour only
+       while the value is one the table itself wrote, so a hex dropped from
+       SEEDED_HEX_VALUES makes every block already carrying it read as a colour
+       somebody CHOSE — frozen at the old hue forever, with no migration
+       possible. This is the half of a recolour that fails silently. */
+    RETIRED_SEEDED_HEXES.forEach(h => {
+      if (!SEEDED_HEX_VALUES.has(h.toLowerCase())) {
+        bad.push(`retired hex ${h} is not in SEEDED_HEX_VALUES`);
+      }
+    });
+    const kid = activeProfile();
+    const key = getDayKeys(0)[0];
+    const had = (getDayBlocks(key) || []).slice();
+    try {
+      // A block seeded with a retired hue re-derives rather than keeping it.
+      setDayBlocks(key, [{ id: 'pal-old', actId: 'chores', startMin: 17 * 60,
+        durationMin: 30, colour: '#9fd3b8' }], kid);
+      const drew = blockColour(getDayBlocks(key, kid)[0], kid);
+      if (drew.toLowerCase() === '#9fd3b8') {
+        bad.push('a block seeded with the retired Helping hands hue still wears it');
+      }
+      // …while a colour a person really picked is left alone.
+      setDayBlocks(key, [{ id: 'pal-mine', actId: 'chores', startMin: 17 * 60,
+        durationMin: 30, colour: '#123456' }], kid);
+      if (blockColour(getDayBlocks(key, kid)[0], kid).toLowerCase() !== '#123456') {
+        bad.push('a hand-picked colour was overridden');
+      }
+    } finally { setDayBlocks(key, had, kid); }
+
+    /* ONE OWNER. groupHex used to be a second table holding four of these hexes
+       again, so a recolour would have moved the cards and left the hours charts
+       and the meeting bars on the old values. */
+    ACTIVITY_CATEGORIES.forEach(c => c.subs.forEach(sg => {
+      const g = groupHex(sg.group);
+      const anyWithGroup = [];
+      ACTIVITY_CATEGORIES.forEach(c2 => c2.subs.forEach(s2 => {
+        if (s2.group === sg.group) anyWithGroup.push(s2.hex.toLowerCase());
+      }));
+      if (!anyWithGroup.includes(String(g).toLowerCase())) {
+        bad.push(`groupHex('${sg.group}') is ${g}, which no subgroup wears`);
+      }
+    }));
+
+    return bad.length === 0 || bad;
+  });
+
+  /* THE STRIP STILL SAYS WHEN TO LEAVE, AND WHEN YOU ARE BACK.
+
+     Every clock time vanished from this surface. Three causes, compounding:
+
+     (1) `colPx`, the width every label is checked against, was read off a cell
+     that is appended to the grid at the END of its own iteration — always 0, so
+     the `|| 120` fallback was always the answer. (2) Every label carrying a time
+     is 158–211px of this type, so against that 115px budget the `long` tier was
+     structurally unreachable, and the ladder's next rung threw the CLOCK away
+     and kept the MINUTES — which the strip's own length already draws. (3) A
+     lone fifteen-minute buffer is 10.8px and cannot hold a 13.1px line at any
+     width, so it says nothing at all.
+
+     What must hold is the FACT, not the mechanism: for a block that carries
+     travel, the time it has to be left by and the time it is back must appear
+     somewhere on that day — on the strip, on the merged band, or on the card —
+     at one lane and at two, and without overflowing whatever draws it.
+
+     AND NOW THERE ARE TWO FACTS A SIDE, not one. Going out, the moment she
+     starts getting ready and the moment the car leaves are half an hour apart
+     and a parent acts on both; a label that prints the first figure under the
+     travel icon is the right number wearing the wrong name. Both must be
+     VISIBLE in a full column. In a split lane they cannot be — the column is
+     about 54px and two clock times are 130 — so what is required there is that
+     the leave-by time is visible and the other is spelled out in a tooltip,
+     which is also what a screen reader gets at every width. That is the
+     distinction the old check could not make: it searched the label text and
+     the tooltips together, so an overflowing label and a fitted one read the
+     same to it. */
+  checks.theStripStillSaysWhenToLeave = await page.evaluate(() => {
+    goWeek(); setWeekView('full');
+    const kid = activeProfile();
+    const key = getDayKeys(0)[3];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    const col = () => {
+      const cells = [...document.querySelectorAll('#weeklyFullGrid .wf-day-col')];
+      return cells[3] || cells[0] || null;
+    };
+    // Drawn text and tooltip text are kept APART, because they answer different
+    // questions: what a parent can read at a glance, and what the record holds.
+    const seen = () => (col() ? col().textContent || '' : '');
+    const tips = () => (col()
+      ? [...col().querySelectorAll('[title]')].map(el => el.getAttribute('title')).join(' ')
+      : '');
+    /* A visible figure may have dropped its meridiem — two times sharing one
+       label cannot afford "am" twice — so the bare form counts on screen while
+       the tooltip is held to the whole thing. */
+    const wants = (label, mins) => {
+      const full = formatTimeFromMin(mins);
+      const bare = full.replace(/(am|pm)$/, '');
+      if (!seen().includes(bare)) bad.push(`${label}: nothing on the day shows ${full}`);
+      if (!tips().includes(full)) bad.push(`${label}: no tooltip spells out ${full}`);
+    };
+    // For a figure the visible surface has no room for: the record still has it.
+    const wantsOnRecord = (label, mins) => {
+      const full = formatTimeFromMin(mins);
+      if (!tips().includes(full)) bad.push(`${label}: no tooltip spells out ${full}`);
+    };
+    try {
+      /* School Day 8:10am–2:50pm, fifteen minutes of getting ready and fifteen
+         of driving each way. Leave by 7:40, back through the door at 3:05 —
+         the run's start going out, the end of the TRAVEL coming back, never the
+         end of the put-the-gear-away that follows it. */
+      setDayBlocks(key, [
+        { id: 'ts-school', actId: 'school_day', startMin: 8 * 60 + 10, durationMin: 400,
+          travelBuffer: true, travelBufMin: 15, getReadyBuffer: true, getReadyBufMin: 15 },
+      ], kid);
+      weekOffset = 0; renderWeek();
+      wants('one lane, get ready from', 8 * 60 + 10 - 30);
+      wants('one lane, leave by',       8 * 60 + 10 - 15);
+      wants('one lane, home by',        8 * 60 + 10 + 400 + 15);
+      // Unpacking has no deadline, so it is the figure the label drops first.
+      wantsOnRecord('one lane, unpacked by', 8 * 60 + 10 + 400 + 30);
+
+      /* A LONE SHORT BUFFER. Travel only, no get-ready: 10.8px, under the height
+         a line needs at any width, so the strip cannot speak and the card has to.
+         This is the case that has no band to fall back on. */
+      setDayBlocks(key, [
+        { id: 'ts-solo', actId: 'ballet', startMin: 17 * 60, durationMin: 60,
+          travelBuffer: true, travelBufMin: 15, getReadyBuffer: false },
+      ], kid);
+      renderWeek();
+      wants('lone strip', 17 * 60 - 15);
+
+      /* AND IN HALF A COLUMN. A lane split halves every width budget, which is
+         where the old code went silent first. */
+      setDayBlocks(key, [
+        { id: 'ts-a', actId: 'school_day', startMin: 8 * 60 + 10, durationMin: 400,
+          travelBuffer: true, travelBufMin: 15, getReadyBuffer: true, getReadyBufMin: 15 },
+        { id: 'ts-b', actId: 'homework', startMin: 10 * 60, durationMin: 120 },
+      ], kid);
+      renderWeek();
+      const lanes = [...document.querySelectorAll('#weeklyFullGrid .wf-day-col')][3];
+      const cards = lanes ? [...lanes.querySelectorAll('.wf-card')] : [];
+      if (cards.length === 2 && cards[0].getBoundingClientRect().width > 20) {
+        // Half a column holds one clock time. It has to be the leave-by one.
+        wants('two lanes, leave by', 8 * 60 + 10 - 15);
+        wantsOnRecord('two lanes, get ready from', 8 * 60 + 10 - 30);
+      }
+
+      /* Whatever spoke must fit what it drew — no ellipsis, no second line.
+         .wf-travel-band-label is in this list deliberately: it is the element
+         that actually carries a band's text, and while it was left out a band
+         label 30px too wide for its column passed this sweep untouched. */
+      [...document.querySelectorAll('#screen-week .wf-travel, #screen-week .wf-travel-band-label, #screen-week .wf-card-travel')]
+        .forEach(el => {
+          const txt = (el.textContent || '').trim();
+          if (!txt) return;
+          if (el.scrollWidth > el.clientWidth + 1) {
+            bad.push(`"${txt}" needs ${el.scrollWidth}px of width in ${el.clientWidth}px`);
+          }
+          if (el.scrollHeight > el.clientHeight + 1) {
+            bad.push(`"${txt}" needs ${el.scrollHeight}px of height in ${el.clientHeight}px`);
+          }
+        });
+
+      /* AND NOTHING IS PRINTED THROUGH IT. The zone bands name each stretch of
+         the day at its top edge, and a buffer run beginning on that boundary
+         lands its time in the same pixels — invisible while the strips were
+         mute, and two lines of text through each other the moment they spoke
+         again. Restore the first fix and this is what it missed. */
+      const spoken = [...document.querySelectorAll('#screen-week .wf-travel')]
+        .filter(el => (el.textContent || '').trim());
+      [...document.querySelectorAll('#screen-week .wf-band-label')].forEach(lbl => {
+        const lr = lbl.getBoundingClientRect();
+        if (lr.height < 1) return;
+        spoken.forEach(el => {
+          const sr = el.getBoundingClientRect();
+          const hit = lr.left < sr.right - 0.5 && lr.right > sr.left + 0.5
+                   && lr.top  < sr.bottom - 0.5 && lr.bottom > sr.top + 0.5;
+          if (hit) {
+            bad.push(`"${lbl.textContent.trim()}" is printed through "${el.textContent.trim()}"`);
+          }
+        });
+      });
+    } finally { setDayBlocks(key, had, kid); renderWeek(); }
+    return bad.length === 0 || bad;
+  });
+
+  /* THE AFTER-BUFFER IS UNPACKING, AND SAYS SO.
+
+     The two get-ready buffers are not the same job. Before a block it is
+     preparation and it has a hard deadline -- it has to be finished when the
+     car leaves. After it, it is unloading: wet kit out, gear away, and nothing
+     downstream waits on it. Three of the four places that named a buffer kind
+     were not side-aware, so the post side read "Get ready" on the print sheet
+     and in every tooltip, and `seg.side` was in scope at each one of them and
+     simply not asked.
+
+     Held on the VOCABULARY and on the screens both, because one owner answering
+     correctly proves nothing if a surface still writes its own ternary -- which
+     is exactly the state this found. */
+  checks.theAfterBufferIsNotCalledGettingReady = await page.evaluate(() => {
+    const bad = [];
+    const seg = (side, kind) => ({
+      side, kind, min: 15, icon: kind === 'travel' ? '🚗' : '👕',
+      startRel: 9 * 60, endRel: 9 * 60 + 15,
+    });
+    // 1. Every tier any surface may pick, in both directions.
+    ['tiny', 'time', 'short', 'long'].forEach(t => {
+      const post = bufferSegLabels(seg('post', 'ready'), t);
+      const pre  = bufferSegLabels(seg('pre',  'ready'), t);
+      if (/get\s*ready/i.test(post)) bad.push(`post ${t}: "${post}" still says get ready`);
+      if (/unpack/i.test(pre))       bad.push(`pre ${t}: "${pre}" says unpack before the block`);
+    });
+    // The words themselves, so a silently empty label cannot pass the test above.
+    if (!/unpack/i.test(bufferSegLabels(seg('post', 'ready'), 'short'))) bad.push('the short tier does not say unpack');
+    if (!/unpack/i.test(bufferSegLabels(seg('post', 'ready'), 'long')))  bad.push('the long tier does not say unpack');
+    if (!/get\s*ready/i.test(bufferSegLabels(seg('pre', 'ready'), 'long'))) bad.push('the long tier no longer says get ready before a block');
+    if (bufferKindLabel(seg('post', 'ready')) !== 'Unpack')    bad.push(`bufferKindLabel: "${bufferKindLabel(seg('post', 'ready'))}" after a block`);
+    if (bufferKindLabel(seg('pre',  'ready')) !== 'Get ready') bad.push(`bufferKindLabel: "${bufferKindLabel(seg('pre',  'ready'))}" before a block`);
+
+    // 2. And on the surfaces, where the copies used to live.
+    const kid = activeProfile();
+    const key = getDayKeys(0)[2];
+    const had = (getDayBlocks(key) || []).slice();
+    try {
+      setDayBlocks(key, [
+        { id: 'unp-1', actId: 'swimming', startMin: 16 * 60, durationMin: 60,
+          travelBuffer: true, travelBufMin: 15, getReadyBuffer: true, getReadyBufMin: 15 },
+      ], kid);
+
+      // The week grid: labels and tooltips alike.
+      goWeek(); setWeekView('full'); weekOffset = 0; renderWeek();
+      const cols = [...document.querySelectorAll('#weeklyFullGrid .wf-day-col')];
+      const cell = cols[2];
+      const wkText = cell ? (cell.textContent || '') + ' '
+        + [...cell.querySelectorAll('[title]')].map(e => e.getAttribute('title')).join(' ') : '';
+      if (!/unpack/i.test(wkText)) bad.push('the week grid never says unpack for a block with a return leg');
+      if (!/get\s*ready/i.test(wkText)) bad.push('the week grid no longer says get ready');
+
+      // The print sheet, which carried its own copy of the ternary.
+      openPrint();
+      const printText = [...document.querySelectorAll('.print-travel, .print-travel [title], .print-sheet [title]')]
+        .map(e => (e.textContent || '') + ' ' + (e.getAttribute('title') || '')).join(' ');
+      if (/get\s*ready/i.test(printText) && !/unpack/i.test(printText)) {
+        bad.push('the print sheet names the after-buffer as getting ready');
+      }
+      goWeek();
+
+      // The day view's two strip labels. The arrow is what says which side.
+      currentDayKey = key;
+      openDay(key);
+      [...document.querySelectorAll('#screen-day .placed-block.travel-buf')].forEach(el => {
+        const txt = (el.textContent || '').trim();
+        if (txt.includes('⬅') && /get\s*ready/i.test(txt)) {
+          bad.push(`the day view draws "${txt}" after a block`);
+        }
+      });
+      const dayText = document.getElementById('screen-day').textContent || '';
+      if (!/unpack/i.test(dayText)) bad.push('the day view never says unpack for a block with a return leg');
+    } finally {
+      setDayBlocks(key, had, kid);
+      goWeek(); setWeekView('full'); renderWeek();
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* A ZONE NAME IS DRAWN WHERE IT IS NEWS.
+
+     `labelledCol` was `!isSchoolDay(key) || key !== axisKey`, which silences the
+     axis day itself and labels every OTHER identical school day: four columns
+     times four zones on an ordinary week, sixteen repeats of what the left
+     sideband already says once, competing with the cards and the buffer times
+     for the same pixels. The same expression failed the other way round on a
+     week with no school in it at all -- `axisKey` is then null, `key !==
+     axisKey` is true everywhere, and all seven columns printed the same
+     "Free time".
+
+     The rule now: a column names its zones only when its SHAPE differs from the
+     day the axis is describing. So the school columns of a term week say
+     nothing, a Saturday inside one still speaks because it really is different,
+     and a week that is all holiday says it once on the axis. */
+  checks.aZoneNameIsDrawnOnlyWhereItIsNews = await page.evaluate(() => {
+    const bad = [];
+    const wasOffset = weekOffset;
+    const perCol = () => [...document.querySelectorAll('#weeklyFullGrid .wf-day-col')]
+      .map(c => [...c.querySelectorAll('.wf-band-label')]
+        .map(l => (l.textContent || '').trim()).filter(Boolean));
+    try {
+      const termWeek = (() => {
+        for (let w = -20; w <= 40; w++) if (getDayKeys(w).some(k => isSchoolDay(k))) return w;
+        return null;
+      })();
+      if (termWeek == null) return ['no week in range has a school day'];
+
+      goWeek(); setWeekView('full');
+      weekOffset = termWeek; renderWeek();
+      const keys = getDayKeys(termWeek);
+      const cols = perCol();
+      keys.forEach((k, i) => {
+        const drew = cols[i] || [];
+        if (isSchoolDay(k) && drew.length) {
+          bad.push(`${k}: a school column repeats "${drew.join('", "')}" that the axis already says`);
+        }
+        if (!isSchoolDay(k) && !drew.length) {
+          bad.push(`${k}: a day unlike the axis day names none of its zones`);
+        }
+      });
+
+      /* And the July case: every column has the axis's own shape, so not one of
+         them is news. This is the half the old expression got exactly backwards. */
+      const summerWeek = (() => {
+        for (let w = 0; w <= 60; w++) if (getDayKeys(w).every(k => !isSchoolDay(k))) return w;
+        return null;
+      })();
+      if (summerWeek != null) {
+        weekOffset = summerWeek; renderWeek();
+        const n = perCol().reduce((a, x) => a + x.length, 0);
+        if (n) bad.push(`a week with no school in it labels ${n} zones across its columns`);
+      }
+    } finally {
+      weekOffset = wasOffset; goWeek(); setWeekView('full'); renderWeek();
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* A FLOORED CARD NEVER SITS ON THE ONE BELOW IT — AND NEVER COSTS IT A LANE.
+
+     At 0.72px per minute the 20px floor is 28 minutes, so every block shorter
+     than that is drawn taller than it is. Two answers to that have now been
+     wrong in opposite directions. Comparing startMin and durationMin drew a
+     ten-minute After-School Routine at 8:50pm straight THROUGH a 9:00pm Evening
+     Routine. Comparing the floored pixels stopped that, but then split a lane
+     for any near neighbour — a 3:40pm routine and a 4:00pm piano lesson, which
+     do not overlap by a single minute, came out as two half-width cards with
+     their names erased.
+
+     wfCardBoxes settles it: the floor borrows the EMPTY minutes before the
+     block, so the card's bottom edge — the one that abuts the next card — stays
+     truthful, and a lane is split only when the two really do overlap or when
+     there was nothing to borrow.
+
+     Both cases here, on one fixture each: the Tuesday evening from the original
+     screenshot, and the Wednesday from this one. */
   checks.aFlooredCardNeverSitsOnTheOneBelowIt = await page.evaluate(() => {
     goWeek(); setWeekView('full');
     const kid = activeProfile();
     const key = getDayKeys(0)[1];
     const had = (getDayBlocks(key) || []).slice();
     const bad = [];
+    const cardFor = id => [...document.querySelectorAll('#screen-week .wf-card')]
+      .find(c => (c.outerHTML || '').includes(id));
+    const colWidth = () => {
+      const h = document.querySelector('#screen-week .wf-day-header');
+      return h ? h.getBoundingClientRect().width : 0;
+    };
     try {
+      // (1) Two short routines minutes apart: drawn clear of each other …
       setDayBlocks(key, [
         { id: 'fl-after', actId: 'routine_afterschool', startMin: 20 * 60 + 50, durationMin: 10 },
         { id: 'fl-eve',   actId: 'routine_evening',     startMin: 21 * 60,      durationMin: 30 },
       ], kid);
       weekOffset = 0; renderWeek();
 
-      const a = [...document.querySelectorAll('#screen-week .wf-card')]
-        .find(c => (c.outerHTML || '').includes('fl-after'));
-      const b = [...document.querySelectorAll('#screen-week .wf-card')]
-        .find(c => (c.outerHTML || '').includes('fl-eve'));
+      const a = cardFor('fl-after'), b = cardFor('fl-eve');
       if (!a || !b) return ['the two routines did not both draw'];
       const ar = a.getBoundingClientRect(), br = b.getBoundingClientRect();
       const hit = ar.left < br.right - 0.5 && ar.right > br.left + 0.5
                && ar.top  < br.bottom - 0.5 && ar.bottom > br.top + 0.5;
       if (hit) bad.push('the two cards are still drawn on top of each other');
-      // Side by side means each gets about half the column, not the whole of it.
+      // … and still the same width as each other, whichever width that is.
       if (ar.width > br.width * 1.6 || br.width > ar.width * 1.6) {
         bad.push(`the lanes are uneven: ${Math.round(ar.width)}px against ${Math.round(br.width)}px`);
       }
@@ -1377,7 +1978,125 @@ function findChromium() {
         const nm = card.querySelector('.wf-card-name');
         if (!nm || !nm.textContent.trim()) bad.push(`the ${want} card draws no name`);
       });
+
+      /* (2) THE WEDNESDAY. A 20-minute After-School Routine ending at 4:00pm
+         and a 4:00pm Piano lesson share not one minute, so neither may lose
+         half its column — the day view draws both full width and is right. */
+      setDayBlocks(key, [
+        { id: 'fl-asr',   actId: 'routine_afterschool', startMin: 15 * 60 + 40, durationMin: 20 },
+        { id: 'fl-piano', actId: 'piano',               startMin: 16 * 60,      durationMin: 30 },
+      ], kid);
+      renderWeek();
+
+      const asr = cardFor('fl-asr'), piano = cardFor('fl-piano');
+      if (!asr || !piano) {
+        bad.push('the routine and the piano lesson did not both draw');
+      } else {
+        const pr = asr.getBoundingClientRect(), qr = piano.getBoundingClientRect();
+        const clash = pr.left < qr.right - 0.5 && pr.right > qr.left + 0.5
+                   && pr.top  < qr.bottom - 0.5 && pr.bottom > qr.top + 0.5;
+        if (clash) bad.push('the routine and the piano lesson overlap on screen');
+        /* Full width: they do not overlap in TIME, so nothing may halve them.
+           Measured against the real column rather than a constant, because the
+           column width is exactly the number this surface kept getting wrong. */
+        const col = colWidth();
+        if (!col) bad.push('could not measure a day column');
+        else [[asr, 'After-School Routine'], [piano, 'Piano']].forEach(([card, want]) => {
+          const w = card.getBoundingClientRect().width;
+          if (w < col * 0.8) {
+            bad.push(`${want} is ${Math.round(w)}px in a ${Math.round(col)}px column — it lost a lane to nothing`);
+          }
+          const nm = card.querySelector('.wf-card-name');
+          if (!nm || !nm.textContent.trim()) bad.push(`${want} draws no name`);
+        });
+        // The bottom edge stays truthful: a floored card grows upward, never past 4:00pm.
+        if (pr.bottom > qr.top + 1.5) {
+          bad.push('the floored routine is drawn past the start of the piano lesson');
+        }
+      }
     } finally { setDayBlocks(key, had, kid); renderWeek(); }
+    return bad.length === 0 || bad;
+  });
+
+  /* THE DAY VIEW SAYS THE SAME THING ABOUT A CLASH.
+
+     The quantified half of the clash story was week-grid-only. The day view drew
+     a red outline and a ⚠️ whose tooltip read "overlaps another activity" —
+     naming nothing, counting nothing — which is backwards: the week grid is
+     where you SEE a clash, the day view is where you drag it away, and only the
+     first would tell you how big it was. A tooltip is also no use on an iPad.
+
+     The failure to guard against is not "the badge is missing" but "the two
+     surfaces disagree", so this seeds one fixture and asserts the SAME number
+     and the SAME partner name on both. */
+  checks.theDayViewSaysTheSameThingAboutAClash = await page.evaluate(() => {
+    const kid = activeProfile();
+    const key = getDayKeys(0)[4];
+    const had = (getDayBlocks(key) || []).slice();
+    const bad = [];
+    const minutesIn = s => {
+      const m = (s || '').match(/(\d+)\s*m\s*(over|short)/);
+      return m ? Number(m[1]) : null;
+    };
+    try {
+      /* School Day home at 2:50pm with fifteen minutes of driving and fifteen of
+         putting things away — thirty minutes of buffer into a 3:00pm Homework
+         block, so twenty of them do not fit. */
+      setDayBlocks(key, [
+        { id: 'cl-school', actId: 'school_day', startMin: 8 * 60 + 10, durationMin: 400,
+          travelBuffer: true, travelBufMin: 15, getReadyBuffer: true, getReadyBufMin: 15 },
+        { id: 'cl-home', actId: 'homework', startMin: 15 * 60, durationMin: 150 },
+      ], kid);
+
+      // What the shared owner says, which is what both screens must show.
+      const blocks = getDayBlocks(key, kid);
+      const conflicts = computeBufferConflicts(blocks);
+      const want = clashWorstShort(conflicts, 'cl-home', blocks);
+      if (want !== 20) bad.push(`the fixture is ${want}m over, expected 20`);
+
+      // ── The week grid.
+      goWeek(); setWeekView('full'); weekOffset = 0; renderWeek();
+      const wkCard = [...document.querySelectorAll('#screen-week .wf-card')]
+        .find(c => (c.outerHTML || '').includes('cl-home'));
+      const wkFlag = wkCard && wkCard.querySelector('.wf-card-conflict-flag');
+      const wkMin = wkFlag && minutesIn(wkFlag.textContent);
+      if (wkMin !== want) bad.push(`the week grid says ${wkMin}, the owner says ${want}`);
+
+      // ── The day view, on the same fixture.
+      currentDayKey = key;
+      openDay(key);
+      const dvBlock = document.getElementById('block-cl-home');
+      if (!dvBlock) return bad.concat(['Homework did not draw on the day view']);
+      if (!dvBlock.classList.contains('placed-block--conflict')) {
+        bad.push('the day view does not mark Homework as clashing');
+      }
+      const dvBadge = dvBlock.querySelector('.badge-clash');
+      const dvMin = dvBadge && minutesIn(dvBadge.textContent);
+      if (dvMin !== want) {
+        bad.push(`the day view says ${dvMin === null ? 'nothing' : dvMin}, the owner says ${want}`);
+      }
+      // It names what it runs into, rather than "another activity".
+      const dvTitle = (dvBadge && dvBadge.getAttribute('title')) || '';
+      if (!/School Day/.test(dvTitle)) {
+        bad.push(`the day view does not name the partner: "${dvTitle}"`);
+      }
+      if (/another activity/.test(dvTitle)) {
+        bad.push('the day view still says "another activity"');
+      }
+      // And the shortfall is drawn to scale, without swallowing taps.
+      const ov = dvBlock.parentElement.querySelector('.tl-overrun');
+      if (!ov) bad.push('the day view draws no overrun');
+      else {
+        if (getComputedStyle(ov).pointerEvents !== 'none') {
+          bad.push('the day-view overrun swallows taps meant for the block');
+        }
+        const drawn = ov.getBoundingClientRect().height;
+        const expect = want * PX_PER_MIN;
+        if (Math.abs(drawn - expect) > 2) {
+          bad.push(`the overrun is ${Math.round(drawn)}px for ${want}m, expected ${Math.round(expect)}px`);
+        }
+      }
+    } finally { setDayBlocks(key, had, kid); }
     return bad.length === 0 || bad;
   });
 
@@ -2595,6 +3314,104 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* THE DAY ENDS WHERE THE DAY ENDS.
+
+     The schedule was drawn 6am–10pm whatever was on it, and `.timeline` carried
+     min-height: 1344px with 200px of padding under that — so an evening whose
+     last block finishes at a quarter to nine showed an hour of empty grid and
+     then most of a screen of nothing, and no trimming in JS could have taken
+     either back.
+
+     Three things have to hold together, and the third is the one that would
+     rot quietly: the canvas ends shortly after the last thing planned; the
+     expander reaches the rest of the evening and says which state it is in; and
+     every OTHER number derived from the day — the gutter's last hour, where a
+     tap lands, where a drag may be dropped — follows the canvas rather than the
+     global. A gutter label hanging below its own canvas is the exact shape of
+     the phase bug this file already records. */
+  checks.theDayEndsWhereTheDayEnds = await page.evaluate(() => {
+    const kid = activeProfile();
+    const key = getDayKeys(0)[2];
+    const had = (getDayBlocks(key) || []).slice();
+    const spanBefore = dayViewSpan();
+    const showBefore = dayViewShowAll();
+    const bad = [];
+    const canvasMin = () => {
+      const c = document.querySelector('#timeline .tl-canvas');
+      return c ? c.getBoundingClientRect().height / PX_PER_MIN : 0;
+    };
+    try {
+      setDayViewSpan(1);
+      setDayViewShowAll(false);
+      // A day that finishes at 8:45pm, the evening from the screenshot.
+      setDayBlocks(key, [
+        { id: 'de-eve', actId: 'routine_evening', startMin: 20 * 60 + 15, durationMin: 30 },
+      ], kid);
+      currentDayKey = key;
+      openDay(key);
+
+      const drawn = canvasMin();
+      const lastEnd = 20 * 60 + 45 - START_MIN;
+      if (drawn >= DAY_MIN_SPAN) bad.push('the canvas still runs to the end of the day');
+      if (drawn < lastEnd) bad.push(`the canvas stops at ${Math.round(drawn)}m, before the 8:45pm block ends`);
+      if (drawn > lastEnd + 75) {
+        bad.push(`the canvas runs ${Math.round(drawn - lastEnd)}m past the last block`);
+      }
+      if (Math.abs(drawn - Math.round(drawn / 15) * 15) > 0.5) {
+        bad.push(`the canvas is ${drawn.toFixed(1)} minutes — not a whole number of 15-minute rows`);
+      }
+
+      // The gutter stops with it: no hour label hanging below its own canvas.
+      const gutter = document.querySelector('#timeline .tl-gutter');
+      const gr = gutter && gutter.getBoundingClientRect();
+      [...document.querySelectorAll('#timeline .tl-hour-label')].forEach(l => {
+        const r = l.getBoundingClientRect();
+        if (gr && r.top > gr.bottom + 1) {
+          bad.push(`the hour label "${l.textContent.trim()}" hangs below the canvas`);
+        }
+      });
+
+      // A tap at the very bottom resolves to a time inside the drawn day.
+      const canvas = document.querySelector('#timeline .tl-canvas');
+      const cr = canvas.getBoundingClientRect();
+      const snapped = canvasSnapMin(canvas, cr.bottom - 1);
+      if (snapped > drawn - 15 + 0.5) {
+        bad.push(`a tap at the bottom gives ${snapped}m on a ${Math.round(drawn)}m canvas`);
+      }
+
+      // The expander says which state it is in, and reaches the whole evening.
+      const later = document.querySelector('#timeline .tl-later');
+      if (!later) return bad.concat(['a trimmed day offers no way to the evening']);
+      if (!/Planning something after/.test(later.textContent)) {
+        bad.push(`the expander reads "${later.textContent.trim()}"`);
+      }
+      later.click();
+      if (canvasMin() < DAY_MIN_SPAN - 0.5) {
+        bad.push('the expander did not open the rest of the evening');
+      }
+      const back = document.querySelector('#timeline .tl-later');
+      if (!back || !/Stop at the last thing/.test(back.textContent)) {
+        bad.push('the expander does not offer the way back');
+      }
+
+      /* AND A DAY THAT REALLY RUNS LATE IS NOT TRIMMED. The trim must follow the
+         plan, not a preference about evenings. */
+      setDayViewShowAll(false);
+      setDayBlocks(key, [
+        { id: 'de-late', actId: 'routine_evening', startMin: 21 * 60 + 30, durationMin: 30 },
+      ], kid);
+      openDay(key);
+      if (canvasMin() < DAY_MIN_SPAN - 0.5) {
+        bad.push('a block ending at 10pm still got its evening trimmed');
+      }
+    } finally {
+      setDayBlocks(key, had, kid);
+      setDayViewShowAll(showBefore);
+      setDayViewSpan(spanBefore);
+    }
+    return bad.length === 0 || bad;
+  });
+
   /* The schedule is the only thing that moves. #screen-day carried min-height
      rather than a height, so the flex column grew to the 1344px schedule and
      the DOCUMENT scrolled instead — 832px of it. The wheel hid that
@@ -2604,22 +3421,43 @@ function findChromium() {
      cannot see this: it only walks INSIDE #screen-day. */
   checks.onlyTheScheduleScrollsOnTheDayScreen = await page.evaluate(() => {
     const bad = [];
-    openDay(getDayKeys(0)[0], 0);
-    const ws = document.querySelector('#screen-day .day-workspace');
-    const doc = document.scrollingElement;
-    if (!(ws.scrollHeight > ws.clientHeight + 4)) {
-      bad.push('the workspace does not scroll, so nothing does');
+    /* A DAY TALL ENOUGH TO SCROLL, seeded rather than assumed. This opened
+       whatever the fixture happened to hold and relied on the canvas always
+       being the full 1344px — which stopped being true when the day started
+       ending where the plan ends. A workspace that does not overflow is not a
+       defect, it is a short day; what must never happen is the DOCUMENT
+       scrolling instead, and that needs a schedule taller than the viewport to
+       be worth asserting at all. */
+    const kid = activeProfile();
+    const key = getDayKeys(0)[0];
+    const had = (getDayBlocks(key) || []).slice();
+    const showBefore = dayViewShowAll();
+    try {
+      setDayViewShowAll(true);
+      setDayBlocks(key, [
+        { id: 'sc-early', actId: 'breakfast', startMin: 7 * 60, durationMin: 30 },
+        { id: 'sc-late', actId: 'routine_evening', startMin: 21 * 60 + 30, durationMin: 30 },
+      ], kid);
+      openDay(key, 0);
+      const ws = document.querySelector('#screen-day .day-workspace');
+      const doc = document.scrollingElement;
+      if (!(ws.scrollHeight > ws.clientHeight + 4)) {
+        bad.push('the workspace does not scroll, so nothing does');
+      }
+      const overflow = doc.scrollHeight - window.innerHeight;
+      if (overflow > 4) bad.push(`the document itself has ${overflow}px of scroll`);
+      const topbar = document.querySelector('#screen-day .day-topbar');
+      const before = topbar.getBoundingClientRect().top;
+      ws.scrollTop = 0;
+      ws.scrollTop = 300;
+      if (ws.scrollTop < 250) bad.push('the workspace refused to scroll');
+      const moved = topbar.getBoundingClientRect().top - before;
+      if (Math.abs(moved) > 1) bad.push(`the topbar moved ${moved.toFixed(1)}px with the schedule`);
+      ws.scrollTop = 0;
+    } finally {
+      setDayBlocks(key, had, kid);
+      setDayViewShowAll(showBefore);
     }
-    const overflow = doc.scrollHeight - window.innerHeight;
-    if (overflow > 4) bad.push(`the document itself has ${overflow}px of scroll`);
-    const topbar = document.querySelector('#screen-day .day-topbar');
-    const before = topbar.getBoundingClientRect().top;
-    ws.scrollTop = 0;
-    ws.scrollTop = 300;
-    if (ws.scrollTop < 250) bad.push('the workspace refused to scroll');
-    const moved = topbar.getBoundingClientRect().top - before;
-    if (Math.abs(moved) > 1) bad.push(`the topbar moved ${moved.toFixed(1)}px with the schedule`);
-    ws.scrollTop = 0;
     return bad.length === 0 || bad;
   });
 
@@ -2661,7 +3499,7 @@ function findChromium() {
        view's row grid or the week's behind layer. `ticks` is the mark layer.
        Neither may put anything full-width over a card; the marks must stay
        above one; nothing in either may take a tap. */
-    const surface = (name, root, backSel, tickSel, blockSel, wantQuarters) => {
+    const surface = (name, root, backSel, tickSel, blockSel, wantQuarters, pxPerMin) => {
       const back = root && root.querySelector(backSel);
       const ticks = root && root.querySelector(tickSel);
       const block = root && root.querySelector(blockSel);
@@ -2685,8 +3523,17 @@ function findChromium() {
       if (tick.getBoundingClientRect().width > 20) {
         bad.push(`${name}: the hour mark is ${Math.round(tick.getBoundingClientRect().width)}px wide — that is a rule`);
       }
+      /* One mark per whole hour the surface actually DRAWS. This was a flat
+         `< 17` — hours 6 through 22 — which is right for the week grid and
+         wrong for the day view the moment it stops at the last thing planned.
+         Derived from the rendered height, so it still catches a layer that
+         silently stopped emitting marks. */
       const marks = [...ticks.querySelectorAll('.hour-grid-tick')];
-      if (marks.length < 17) bad.push(`${name}: ${marks.length} hour marks, expected the whole day`);
+      const drawnMin = root.getBoundingClientRect().height / pxPerMin;
+      const wantMarks = Math.floor((START_MIN + drawnMin) / 60) - Math.ceil(START_MIN / 60) + 1;
+      if (marks.length < wantMarks) {
+        bad.push(`${name}: ${marks.length} hour marks over ${Math.round(drawnMin)} minutes, expected ${wantMarks}`);
+      }
       if (!marks.some(m => crosses(m, block))) {
         bad.push(`${name}: no hour mark sits beside the block at all`);
       }
@@ -2708,19 +3555,31 @@ function findChromium() {
     setDayViewSpan(1);
     openDay(keys[0], 0);
     surface('day view', document.querySelector('#timeline .tl-canvas'),
-            '.slot-grid--day', '.hour-grid--day', '.placed-block', true);
-    /* The day divides exactly: 64 rows of 15 minutes at 1.4px/min tile its
-       1344px canvas, which is why it can take Print's mechanism whole. */
+            '.slot-grid--day', '.hour-grid--day', '.placed-block', true, PX_PER_MIN);
+    /* The day divides exactly: 15-minute rows at 1.4px/min tile its canvas with
+       nothing left over, which is why it can take Print's mechanism whole. The
+       count was a flat 64 — the whole 6am–10pm day — and the canvas is trimmed
+       to what is planned now, so the figure comes from the rendered height. The
+       property that matters is that it divides, not that it is 64. */
+    const dayCanvas = document.querySelector('#timeline .tl-canvas');
     const rows = document.querySelectorAll('#timeline .tl-canvas .slot-grid--day .slot-row');
-    if (rows.length !== 64) bad.push(`the day draws ${rows.length} slot rows, expected 64`);
+    const canvasMin = dayCanvas.getBoundingClientRect().height / PX_PER_MIN;
+    const wantRows = Math.round(canvasMin / 15);
+    if (Math.abs(canvasMin - wantRows * 15) > 0.5) {
+      bad.push(`the day canvas is ${canvasMin.toFixed(1)} minutes, not a whole number of 15-minute rows`);
+    }
+    if (rows.length !== wantRows) {
+      bad.push(`the day draws ${rows.length} slot rows over ${Math.round(canvasMin)} minutes, expected ${wantRows}`);
+    }
 
     /* Two surfaces, not three: the Day Blocks arm had no successor. The tab
        that replaced it previews the print sheet, whose rules ARE cell borders
        and which draws no grid layer of its own. */
     goWeek(); setWeekView('full'); renderWeek();
+    // 0.72px/min — the week grid shadows PX_PER_MIN at its own scale.
     surface('Full week', document.querySelector('.wf-day-col'),
             '.hour-grid--wf.hour-grid--behind', '.hour-grid--wf:not(.hour-grid--behind)',
-            '.wf-card', false);
+            '.wf-card', false, 0.72);
 
     // 6am and 10pm both get a rule: the gutter used < / > and the line loop
     // <= / >=, so the two ends were labelled but never drawn.
@@ -5483,12 +6342,38 @@ function findChromium() {
        Blocks only: free-time cards share the .quest-card shell but describe the
        gaps BETWEEN blocks, and counting them here would be counting holes as
        things. The invariant is unchanged — every block of the day is in #tdWrap
-       and nowhere else in the document. */
+       and nowhere else in the document.
+
+       EXCEPT THE RUNNING ONE, which is in the hero and deliberately nowhere
+       else (theHeroIsTheOnlyPlaceTheRunningBlockAppears, below). This counted a
+       flat 2 and so FAILED for an hour and a half every day — whenever the
+       browser's own clock sat inside 7:00–7:30 or 16:00–17:00, which is where
+       these two fixtures are pinned. A check that passes or fails by the time
+       of day is the `|| break` bug in another costume: it reports a defect that
+       is not there, and it reports nothing at all the rest of the time. So the
+       expected count is derived from the clock rather than written down, and
+       the hero is asserted to hold exactly what the list is missing. */
     if (!tdEarlierOpen()) tdToggleEarlier();
     if (!tdLaterOpen()) tdToggleLater();
+    const now = tdNowMin();
+    const seeded = (getDayBlocks(key, 'jenn') || []);
+    const running = seeded.filter(b => now >= b.startMin && now < b.startMin + (b.durationMin || 0));
     const sel = '.quest-card:not(.quest-card--free)';
     const here = document.querySelectorAll('#tdWrap ' + sel).length;
-    if (here !== 2) bad.push(`Today lists ${here} of 2 blocks`);
+    const wantListed = 2 - running.length;
+    if (here !== wantListed) {
+      bad.push(`Today lists ${here} of ${wantListed} blocks`
+        + (running.length ? ` (${running.length} running, so in the hero)` : ''));
+    }
+    const hero = document.querySelector('#tdWrap .td-now');
+    if (!hero) bad.push('Today draws no NOW card');
+    else running.forEach(b => {
+      const act = findActivity(b.actId, 'jenn');
+      const nm = act && blockDisplayName(b, 'jenn').name;
+      if (nm && !hero.textContent.includes(nm)) {
+        bad.push(`${nm} is running but the hero does not name it`);
+      }
+    });
     const everywhere = document.querySelectorAll(sel).length;
     if (everywhere !== here) bad.push(`quest cards render in ${everywhere - here} other place(s)`);
     tdToggleEarlier();

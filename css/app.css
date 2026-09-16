@@ -28,11 +28,11 @@
     --cat-sleep:   #c3aed6;
     --cat-school:  #6fb1fc;
     --cat-active:  #fb6f1c;
-    --cat-free:    #95d5b2;
+    --cat-free:    #7fca79;
     --cat-daily:   #ffd166;
     --cat-custom:  #ff9eb5;
-    --cat-training:#ef476f;
-    --cat-routine: #80cbc4;
+    --cat-training:#f2597d;
+    --cat-routine: #8ad8d0;
     /* Appointments — muted slate-blue. Deliberately the quietest category:
        an orthodontist visit is neither a treat nor a chore, and white text on
        it fails contrast like every other pastel here, so blocks carry dark ink. */
@@ -753,6 +753,19 @@
     font-size: calc(0.82rem * var(--fs-scale, 1)); font-weight: 700; color: var(--ink);
   }
   .tg-legend-chip { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+  /* Twelve subgroups read as six ideas: each category's chips sit together
+     behind its own name, so the key explains every hue on the grid without
+     becoming a wall of dots. */
+  .tg-legend-group { display: inline-flex; align-items: center; gap: 0.45rem; white-space: nowrap; }
+  /* At the kid floor (13.1px), not below it. Set smaller first and
+     kidScreensMeetTheHouseRules refused it at every width — this is a kid
+     screen, and "it is only a heading" is not an exemption. It stays quieter
+     than the chips through case, colour and tracking rather than size. */
+  .tg-legend-cat {
+    font-size: calc(0.82rem * var(--fs-scale, 1));
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--ink-muted); font-weight: 800;
+  }
   .tg-legend-dot {
     width: 12px; height: 12px; border-radius: 4px; display: inline-block;
     border: 1.5px solid var(--ink);
@@ -1970,7 +1983,11 @@
   /* overflow:hidden matters as much as the max-height: without it a name that
      wraps past two lines spilled over the summary row underneath instead of
      being clipped, which is what made a training card read as overlapping text. */
-  .wf-card--tall .wf-card-name { white-space: normal; max-height: 2.3em; overflow: hidden; }
+  /* max-width matters as much as max-height, for the same reason one row
+     down: a centred name carrying an inline buffer tag is one unbreakable
+     token wider than the card, so without it the whole line overflowed on
+     BOTH sides and "School Day" rendered as "hool Day". */
+  .wf-card--tall .wf-card-name { white-space: normal; max-height: 2.3em; max-width: 100%; overflow: hidden; }
   /* A card too short to afford a second line of name keeps it to one, and a
      card with nothing left over drops the start-time chip — the grid row it
      sits on already says when it begins. Both are decided in wfStackPlan
@@ -2122,6 +2139,22 @@
      is the information at that size; a 13px label in 10px of space was two
      labels printed through each other. */
   .wf-travel--mute { font-size: 0; }
+  /* A LABEL THAT READS OVER WHATEVER IS BEHIND IT. The zone bands print their
+     own name at the top of each stretch — "🏫 SCHOOL", "🎒 AFTER SCHOOL" — and a
+     buffer band beginning on that boundary lands its time in exactly those
+     pixels. While the strips were mute the clash could not be seen; restoring
+     the clock times put two lines of text through each other, which is the
+     defect WF_TRAVEL_TEXT_MIN_PX exists to prevent in the first place.
+
+     The time wins, on a paper chip. The zone is still said by the band's tint
+     and by the left axis, which names every stretch of the day in full; the
+     minute you have to leave the house is said in exactly one place. */
+  .wf-travel--label,
+  .wf-travel-band-label {
+    text-shadow:
+      0 0 3px var(--paper), 0 0 3px var(--paper),
+      0 0 2px var(--paper), 0 0 2px var(--paper);
+  }
   /* Several short same-side segments drawn as ONE band: the per-kind hatches
      stay as children so it still reads as get-ready THEN travel, and the single
      label names both. */
@@ -2331,13 +2364,36 @@
   .dq-xp-bar { height: 8px; border-radius: 999px; background: var(--paper-line); overflow: hidden; margin: 3px 0; border: 1.5px solid var(--ink); }
   .dq-xp-fill { height: 100%; background: var(--accent-yellow); border-radius: 999px; transition: width 0.3s; }
   /* Pixel-canvas timeline: one hour gutter, then one column per day on show. */
+  /* THE DAY STOPS WHERE THE DAY STOPS. This carried min-height: 1344px — the
+     whole 6am–10pm day — and 200px of padding under it, so a Tuesday whose last
+     block ends at a quarter to nine drew an hour of empty grid and then most of
+     a screen of nothing at all, and no amount of trimming in JS could take
+     either back. dayViewSpan sizes the canvas now; the padding here is the room
+     the kid nav needs plus the expander, and nothing more. */
   .timeline {
     position: relative;
     display: flex;
     flex-direction: column;
-    min-height: 1344px; /* DAY_MIN_SPAN(960) * PX_PER_MIN(1.4), see JS */
-    padding: 0 0.8rem 200px;
+    padding: 0 0.8rem 24px;
   }
+  /* One tap back to the rest of the evening, and the only thing that says which
+     state the canvas is in — a day that stops at nine looks exactly like a day
+     with no evening. Full width so it reads as the foot of the schedule rather
+     than a control floating under it; 44px like every other target. */
+  .tl-later {
+    margin: 8px 0 0;
+    min-height: 44px;
+    width: 100%;
+    font: inherit;
+    font-size: calc(0.82rem * var(--fs-scale, 1));
+    font-weight: 700;
+    color: var(--ink-muted);
+    background: transparent;
+    border: 1.5px dashed var(--paper-line);
+    border-radius: var(--radius-sm, 8px);
+    cursor: pointer;
+  }
+  .tl-later:hover { background: var(--bg2); }
   /* The schedule proper: hour ladder beside the day columns. Its top is the
      canvases' top, which is the whole point of moving the day headers out — see
      buildTimeline in js/08-day-view.js. */
@@ -2972,6 +3028,19 @@
   /* Dark ink on a light neutral chip — never white on a pastel, which all fail
      contrast against the category colours this sits on top of. */
   .badge-notdone { background: #ece7e3; border-radius: 4px; padding: 0 2px; }
+  /* HOW MANY MINUTES OVER, on the block itself. The week grid hangs this figure
+     on a pill outside the card's corner because a week card can be 20px tall; a
+     day-view block has room for it inline, where the badges already sit. Dark
+     ink on a light chip, like .badge-notdone and for the same reason — white on
+     these pastels fails contrast. */
+  .badge-clash {
+    background: #fdeceb; color: #7a1f18; border: 1px solid #d6453a;
+    border-radius: 5px; padding: 0 3px; font-weight: 800; white-space: nowrap;
+  }
+  /* The overrun on the day view. .wf-overrun carries the look; this only says
+     where it sits in the stack — over the block (z10) rather than the week
+     grid's z4, and still never taking a tap. */
+  .tl-overrun { z-index: 11; }
 
   /* The ACTIVITY TRAY section lived here: the fixed bottom/side rail of
      activity chips, its filters, its header and its level/lock badges. The
@@ -3146,6 +3215,31 @@
     color: var(--ink-muted);
   }
   .buffer-dur-row label { margin: 0; }
+  /* TWO LEGS ON ONE ROW. The second reads as a rider on the first rather than a
+     second setting: the checkbox is the question ("coming home after?") and the
+     number beside it only matters once it is ticked, so it greys out when it is
+     not. A 44px target on the checkbox, like every other control. */
+  .buffer-leg-row .buffer-leg-off {
+    margin-left: auto;
+    display: inline-flex; align-items: center;
+    font-size: calc(0.86rem * var(--fs-scale, 1));
+  }
+  .buffer-leg-row input[type="checkbox"] {
+    width: 22px; height: 22px; min-width: 22px;
+    accent-color: var(--accent-strong);
+    position: relative; cursor: pointer;
+  }
+  /* Keep the box small and grow the hit area, the technique the target audit
+     probes for with elementFromPoint. */
+  .buffer-leg-row input[type="checkbox"]::after {
+    content: ''; position: absolute;
+    left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 44px; height: 44px;
+  }
+  .buffer-leg-row input[type="number"]:disabled {
+    opacity: 0.4;
+    border-style: dashed;
+  }
   .buffer-dur-row input {
     width: 64px;
     border: 2px solid var(--ink);
@@ -6118,6 +6212,11 @@
   #screen-week .wf-card-sum,
   #screen-week .wf-card-dur,
   #screen-week .wf-card-time,
+  /* The card's inline buffer tag. It only ever renders where the strips
+     could not say a time, so it is a FIGURE A PARENT ACTS ON standing in
+     for a label that went quiet — the last place it may be 9.92px. It is
+     also the size wfTextPx (js/07-week-view.js) budgets it at. */
+  #screen-week .wf-card-travel,
   #screen-chore .ck-allbtn span,
   #screen-chore .ck-navbtn,
   #screen-chore .ck-btn,

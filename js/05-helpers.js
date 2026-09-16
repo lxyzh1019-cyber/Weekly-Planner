@@ -339,6 +339,115 @@ function bufferDrawSegments(segs, startMin, endMin, preBuf, postBuf, others) {
   return { segs: out, preShort: clip.preShort, postShort: clip.postShort };
 }
 
+/* ── HOW DIFFERENT DO TWO COLOURS LOOK ──
+   CIEDE2000, and the metric is the whole point. The subgroup palette was first
+   separated with CIE76, which overstates the distance between saturated greens
+   by roughly double: it scored Helping hands against Play at 49 where this says
+   19. Every threshold passed and two DIFFERENT categories still read as one
+   colour on an iPad — the arithmetic disagreed with an eye, and the eye was
+   right.
+
+   Used by `everySubgroupTellsItselfApart` (tests/smoke.js) rather than by any
+   rendering path: nothing on screen needs to compute this at runtime, and the
+   table it guards is a constant. It lives here so the check measures the same
+   way the palette was chosen, instead of carrying its own copy. */
+function colourDistance(hexA, hexB) {
+  const srgb = h => {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(h || '').trim());
+    if (!m) return null;
+    return [0, 2, 4].map(i => parseInt(m[1].substr(i, 2), 16));
+  };
+  const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const toLab = h => {
+    const v = srgb(h);
+    if (!v) return null;
+    const [r, g, b] = v.map(lin);
+    const X = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047;
+    const Y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const Z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883;
+    const f = t => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
+    return [116 * f(Y) - 16, 500 * (f(X) - f(Y)), 200 * (f(Y) - f(Z))];
+  };
+  const A = toLab(hexA), B = toLab(hexB);
+  if (!A || !B) return 0;
+  const [L1, a1, b1] = A, [L2, a2, b2] = B;
+  const rad = Math.PI / 180, deg = 180 / Math.PI;
+  const C1 = Math.hypot(a1, b1), C2 = Math.hypot(a2, b2), Cb = (C1 + C2) / 2;
+  const G = 0.5 * (1 - Math.sqrt(Math.pow(Cb, 7) / (Math.pow(Cb, 7) + Math.pow(25, 7))));
+  const ap1 = (1 + G) * a1, ap2 = (1 + G) * a2;
+  const Cp1 = Math.hypot(ap1, b1), Cp2 = Math.hypot(ap2, b2);
+  const hp = (bb, ap) => { if (bb === 0 && ap === 0) return 0; const h = Math.atan2(bb, ap) * deg; return h < 0 ? h + 360 : h; };
+  const hp1 = hp(b1, ap1), hp2 = hp(b2, ap2);
+  const dLp = L2 - L1, dCp = Cp2 - Cp1;
+  let dhp = 0;
+  if (Cp1 * Cp2 !== 0) { dhp = hp2 - hp1; if (dhp > 180) dhp -= 360; else if (dhp < -180) dhp += 360; }
+  const dHp = 2 * Math.sqrt(Cp1 * Cp2) * Math.sin(dhp / 2 * rad);
+  const Lp = (L1 + L2) / 2, Cp = (Cp1 + Cp2) / 2;
+  let Hp;
+  if (Cp1 * Cp2 === 0) Hp = hp1 + hp2;
+  else { Hp = (hp1 + hp2) / 2; if (Math.abs(hp1 - hp2) > 180) Hp += (hp1 + hp2 < 360) ? 180 : -180; }
+  const T = 1 - 0.17 * Math.cos((Hp - 30) * rad) + 0.24 * Math.cos(2 * Hp * rad)
+          + 0.32 * Math.cos((3 * Hp + 6) * rad) - 0.20 * Math.cos((4 * Hp - 63) * rad);
+  const dTh = 30 * Math.exp(-Math.pow((Hp - 275) / 25, 2));
+  const Rc = 2 * Math.sqrt(Math.pow(Cp, 7) / (Math.pow(Cp, 7) + Math.pow(25, 7)));
+  const Sl = 1 + (0.015 * Math.pow(Lp - 50, 2)) / Math.sqrt(20 + Math.pow(Lp - 50, 2));
+  const Sc = 1 + 0.045 * Cp, Sh = 1 + 0.015 * Cp * T;
+  const Rt = -Math.sin(2 * dTh * rad) * Rc;
+  return Math.sqrt(Math.pow(dLp / Sl, 2) + Math.pow(dCp / Sc, 2) + Math.pow(dHp / Sh, 2)
+    + Rt * (dCp / Sc) * (dHp / Sh));
+}
+
+/* ── How far a block is run INTO, and by what ──
+   A clash has two sides: the block whose travel does not fit, and the block
+   that travel runs into. `computeBufferConflicts` records the shortfall against
+   the FIRST — it is that block's window that is short — so a card asking "how
+   far am I run into" has to read its PARTNERS' figures, not its own.
+
+   These lived in js/07-week-view.js, where the week grid was the only surface
+   that could say how many minutes a clash was or which activity it ran into.
+   The day view drew the same finding as a red outline and a ⚠️ whose tooltip
+   named nothing and counted nothing — the same defect in the other direction
+   from the six copies this file's rules keep recording: not two answers that
+   disagree, but one answer that only one screen was allowed to give. Here so
+   both ask it, and the week banner and Today's note stay in step with both. */
+function clashWorstShort(conflicts, id, blocks) {
+  if (!conflicts || !conflicts.shortMin) return 0;
+  const me = (blocks || []).find(x => x.id === id);
+  if (!me) return 0;
+  const myStart = me.startMin;
+  const partners = (conflicts.partners && conflicts.partners.get(id)) || new Set();
+  let worst = 0;
+  partners.forEach(pid => {
+    const sh = conflicts.shortMin.get(pid);
+    const other = (blocks || []).find(x => x.id === pid);
+    if (!sh || !other) return;
+    /* Which side of the partner am I on? A block that sits AFTER it is run into
+       by its post buffer; one before it, by its pre buffer. */
+    const side = myStart >= other.startMin ? sh.post : sh.pre;
+    if (side > worst) worst = side;
+  });
+  return worst;
+}
+
+/* The sentence a clash says, wherever it is said. Names the activity this one
+   runs into and by how much, so "overlaps another activity" — which named
+   nothing and quantified nothing — is gone from every surface at once. */
+function clashTitle(conflicts, id, blocks, acts) {
+  const partners = (conflicts.partners && conflicts.partners.get(id)) || new Set();
+  const list = [...partners].map(pid => {
+    const other = (blocks || []).find(x => x.id === pid);
+    if (!other) return null;
+    const act = (acts || []).find(a => a.id === other.actId);
+    const topic = act && act.isTraining ? getTrainingTopic(other.tag) : null;
+    return act ? (topic ? topic.name : act.name) : 'another activity';
+  }).filter(Boolean);
+  const names = [...new Set(list)];
+  const short = Math.max(clashWorstShort(conflicts, id, blocks),
+    (() => { const s = conflicts.shortMin && conflicts.shortMin.get(id); return s ? Math.max(s.pre, s.post) : 0; })());
+  return (names.length ? 'Overlaps ' + names.join(' and ') : 'Time clash')
+    + (short ? ` · ${short}m short` : '') + ' — not enough travel/get-ready time';
+}
+
 /* ── One owner for the :00 / :30 rules ──
    Three surfaces draw a day against a clock — the day view, the week's Day
    Blocks lanes and the Full week — at three different scales, and they each
@@ -1096,7 +1205,11 @@ function addQuickBreak(durationMin) {
     return;
   }
   const act = getAllActivities().find(a => a.id === 'break_quick');
-  const colour = act ? (CAT_HEX[act.cat] || '#95d5b2') : '#95d5b2';
+  /* Seeded from the SUBGROUP, so the value lands inside SEEDED_HEX_VALUES and
+     blockColour keeps deriving it. Seeding from CAT_HEX wrote a hex the
+     subgroup table does not own, which reads as a colour somebody chose and
+     would freeze this block at the old hue on the next recolour. */
+  const colour = act ? (activitySub(act).hex || CAT_HEX[act.cat] || '#7fca79') : '#7fca79';
   placeBlock('break_quick', start, durationMin, colour, [], 'Quick break', { travelBuffer: false });
   showToast(`Break added at ${formatTimeFromMin(start)} ✨`);
 }

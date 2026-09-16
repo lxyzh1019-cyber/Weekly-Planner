@@ -269,7 +269,8 @@ function buildTimeline() {
   tl.classList.toggle('timeline--multi', keys.length > 1);
   tl.style.setProperty('--day-cols', String(keys.length));
 
-  const canvasHeight = DAY_MIN_SPAN * PX_PER_MIN;
+  const spanMin = dayDrawnSpanMin(keys);
+  const canvasHeight = spanMin * PX_PER_MIN;
 
   /* THE HEADER ROW IS NOT INSIDE THE COLUMNS. It used to be: .tl-col-head sat
      at the top of each .tl-col, above .tl-canvas, so the canvas started ~48px
@@ -295,14 +296,14 @@ function buildTimeline() {
 
   const body = document.createElement('div');
   body.className = 'tl-body';
-  body.appendChild(buildHourGutter(canvasHeight));
+  body.appendChild(buildHourGutter(canvasHeight, spanMin));
 
   const cols = document.createElement('div');
   cols.className = 'tl-cols';
   let running = false;
   const allBlocks = [];
   keys.forEach(key => {
-    const built = buildDayColumn(key, canvasHeight, multi);
+    const built = buildDayColumn(key, canvasHeight, multi, spanMin);
     cols.appendChild(built.el);
     if (built.head) headCols.appendChild(built.head);
     if (built.hasRunningStopwatch) running = true;
@@ -311,6 +312,23 @@ function buildTimeline() {
   if (multi) tl.appendChild(headRow);
   body.appendChild(cols);
   tl.appendChild(body);
+
+  /* THE WAY BACK TO THE REST OF THE EVENING. A trimmed canvas has to be
+     reversible in one tap or it is a limit rather than a tidy-up — and it has
+     to say which state it is in, because a day that simply stops at nine looks
+     identical to a day that has no evening. Hidden once the whole day is drawn
+     and there is nothing left to show. */
+  if (spanMin < DAY_MIN_SPAN || dayViewShowAll()) {
+    const later = document.createElement('button');
+    later.type = 'button';
+    later.className = 'tl-later';
+    later.onclick = toggleDayViewEvening;
+    const endsAt = formatTimeFromMin(START_MIN + spanMin);
+    later.textContent = dayViewShowAll()
+      ? '▴ Stop at the last thing planned'
+      : `▾ Planning something after ${endsAt}?`;
+    tl.appendChild(later);
+  }
 
   if (running) {
     activeStopwatchTick = setInterval(()=>{
@@ -328,12 +346,15 @@ function buildTimeline() {
 }
 
 /* The 6am-10pm ladder, once. */
-function buildHourGutter(canvasHeight) {
+function buildHourGutter(canvasHeight, spanMin) {
   const gutter = document.createElement('div');
   gutter.className = 'tl-gutter';
   gutter.style.height = canvasHeight + 'px';
   const firstHour = Math.ceil(START_MIN / 60);
-  const lastHour  = Math.floor(END_MIN / 60);
+  /* From the span it was handed, not from the global END_MIN. The gutter is a
+     sibling of the whole column stack and has no overflow of its own, so an
+     hour label past the end of a trimmed canvas simply hangs below it. */
+  const lastHour  = Math.floor((START_MIN + (spanMin || DAY_MIN_SPAN)) / 60);
   for (let h = firstHour; h <= lastHour; h++) {
     const label = document.createElement('div');
     label.className = 'tl-hour-label';
@@ -344,12 +365,78 @@ function buildHourGutter(canvasHeight) {
   return gutter;
 }
 
+/* ── THE DAY STOPS WHERE THE DAY STOPS ──
+   The schedule was always drawn 6am–10pm, so an evening whose last block ends
+   at a quarter to nine showed an hour of empty grid and then, below it, a
+   stretch of nothing at all. A calendar that reserves room for a 10pm bedtime
+   every single day is describing a day nobody has.
+
+   Two numbers, both deliberate:
+
+   DAY_TAIL_SPARE_MIN is why the canvas does not stop dead at the last block —
+   there has to be somewhere to tap to put something later. An hour of it, so
+   the room is a real target rather than a sliver.
+
+   DAY_MIN_TAIL_MIN is the floor for a day with nothing on it: a blank canvas
+   trimmed to nothing is not a shorter day, it is a screen you cannot plan on.
+
+   Past either, `tlShowEvening` opens the rest of the evening. It lives in
+   localStorage and never in synced state — every state write uploads the whole
+   document, and which part of a day this device is looking at is nobody else's
+   business. The span stays a MULTIPLE OF 15: buildSlotGrid tiles the canvas in
+   quarter-hour rows and a ragged end would put every boundary out of phase. */
+const DAY_TAIL_SPARE_MIN = 60;
+const DAY_MIN_TAIL_MIN = 8 * 60; // 6am–2pm on a day with nothing planned
+
+function dayViewShowAll() {
+  try { return localStorage.getItem('tlShowEvening') === '1'; } catch (e) { return false; }
+}
+function setDayViewShowAll(on) {
+  try { localStorage.setItem('tlShowEvening', on ? '1' : '0'); } catch (e) {}
+}
+function toggleDayViewEvening() {
+  setDayViewShowAll(!dayViewShowAll());
+  buildTimeline();
+}
+
+/* The drawn span, in minutes from START_MIN. Buffers count: a block that ends
+   at six with half an hour of driving home after it needs its drive drawn, and
+   bufferClip may trim that but never lengthens it, so the unclipped figure is
+   the safe ceiling. */
+/* NOT dayViewSpan, which has meant the COLUMN COUNT since the 1/2/3-day view
+   landed. Minutes, and named so. */
+function dayDrawnSpanMin(keys) {
+  if (dayViewShowAll()) return DAY_MIN_SPAN;
+  let last = 0;
+  (keys || []).forEach(key => {
+    (getDayBlocks(key) || []).forEach(b => {
+      if (!b) return;
+      // The POST legs only: those are the minutes drawn after the block ends.
+      const end = (b.startMin - START_MIN) + (b.durationMin || 0)
+        + getTravelBufMin(b, 'post') + getGetReadyBufMin(b, 'post');
+      if (end > last) last = end;
+    });
+  });
+  const wanted = last > 0 ? last + DAY_TAIL_SPARE_MIN : DAY_MIN_TAIL_MIN;
+  const span = Math.ceil(Math.max(wanted, DAY_MIN_TAIL_MIN) / 15) * 15;
+  return Math.min(span, DAY_MIN_SPAN);
+}
+
+/* What one canvas was drawn to, for the handful of things that convert a
+   pointer position back into a time. Read from the element rather than passed
+   down through five signatures — and never from the global, which is the whole
+   day and would put a drop past the bottom of a trimmed canvas. */
+function canvasSpanMin(canvas) {
+  const n = canvas && Number(canvas.dataset && canvas.dataset.spanMin);
+  return n > 0 ? n : DAY_MIN_SPAN;
+}
+
 /* One day. Everything that used to be the body of buildTimeline, with the day
    it belongs to passed in rather than read off the global — which is what makes
    two and three columns possible at all. Each canvas carries its own dayKey, so
    a tap knows which day it landed on without anything having to guess. */
-function buildDayColumn(dayKey, canvasHeight, withHeader) {
-  const zMinStart = 0, zMinEnd = DAY_MIN_SPAN;
+function buildDayColumn(dayKey, canvasHeight, withHeader, drawnSpan) {
+  const zMinStart = 0, zMinEnd = drawnSpan || DAY_MIN_SPAN;
   const spanMin = zMinEnd - zMinStart;
   const blocks = getDayBlocks(dayKey);
 
@@ -375,6 +462,7 @@ function buildDayColumn(dayKey, canvasHeight, withHeader) {
   canvas.className = 'tl-canvas';
   canvas.style.height = canvasHeight + 'px';
   canvas.dataset.zmin = zMinStart;
+  canvas.dataset.spanMin = zMinEnd - zMinStart;
   canvas.dataset.dayKey = dayKey;
   canvas.onclick = (e)=>handleCanvasTap(e, zMinStart);
   canvas.onmousemove = (e)=>updatePlacementGuideFromPointer(e, zMinStart);
@@ -418,7 +506,19 @@ function buildDayColumn(dayKey, canvasHeight, withHeader) {
   // A block's travel/get-ready buffer can overlap an adjacent activity — flag
   // both the buffer strip and the activity it collides with.
   const bufferConflicts = computeBufferConflicts(blocks);
-  const colAssignments = renderBlocksWithCollision(canvas, visibleBlocks, zMinStart, bufferConflicts.affected, dayKey);
+  /* THE SAME FINDING, SAID THE SAME WAY. The week grid could name which
+     activity a block runs into and by how many minutes; here the identical
+     clash drew a red outline and a ⚠️ whose tooltip said "overlaps another
+     activity" — naming nothing, counting nothing. Both surfaces ask
+     clashWorstShort / clashTitle (js/05-helpers.js) now, so a parent cannot be
+     told two different things about one clash. */
+  const clash = {
+    affected: bufferConflicts.affected,
+    conflicts: bufferConflicts,
+    blocks,
+    acts: getAllActivities(isParent() ? parentViewing : activeProfile(), { includeArchived: true }),
+  };
+  const colAssignments = renderBlocksWithCollision(canvas, visibleBlocks, zMinStart, clash, dayKey);
 
   if (!blocks.length) {
     const emptyState = document.createElement('div');
@@ -680,13 +780,16 @@ function paintZoneBands(canvas, dayKey, zMinStart, zMinEnd) {
 }
 
 /* Greedy column-packing collision: blocks that overlap get assigned to columns.
-   conflictAffectedIds (optional Set) flags blocks whose buffer overlaps a
-   neighbour, or that a neighbour's buffer overlaps — surfaced as a badge.
+   `clash` (optional) carries the day's whole clash finding — the affected Set,
+   the computeBufferConflicts result, the day's blocks and its activities — so a
+   block can say WHICH activity it runs into and BY HOW MUCH, not merely that
+   something is wrong. It used to be the Set alone, which is the whole reason
+   this surface could only draw a warning it could not explain.
    Returns a Map of id -> {col, count} so the buffer pass below can reuse the
    same column/width as the activity a buffer belongs to, instead of each
    buffer strip claiming the full lane width and sprawling under a
    side-by-side neighbour. */
-function renderBlocksWithCollision(canvas, blocks, zMinStart, conflictAffectedIds, dayKey) {
+function renderBlocksWithCollision(canvas, blocks, zMinStart, clash, dayKey) {
   const assignments = new Map();
   if (!blocks.length) return assignments;
 
@@ -737,13 +840,13 @@ function renderBlocksWithCollision(canvas, blocks, zMinStart, conflictAffectedId
     g.blocks.forEach(b=>{
       const colIdx = assignments.get(b.id).col;
       assignments.get(b.id).count = colCount;
-      renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffectedIds, dayKey);
+      renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey);
     });
   });
   return assignments;
 }
 
-function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffectedIds, dayKey) {
+function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey) {
   // The day this block belongs to, not "whichever day the topbar names" — in a
   // 2- or 3-day view those are different, and a tick that wrote to the wrong one
   // would be a tick that silently completed another day's block.
@@ -758,7 +861,9 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   // The day is always shown whole, so a block can only be clipped by running
   // past the 6am-9pm canvas itself — the "continues" markers below still cover
   // that. The zone filter that used to narrow this is gone.
-  const zoneSpan = DAY_MIN_SPAN - zMinStart;
+  /* What THIS canvas was drawn to. It read the global, so on a trimmed canvas a
+     block running past the end was neither clipped nor marked as continuing. */
+  const zoneSpan = canvasSpanMin(canvas);
   const relStart = (b.startMin - START_MIN) - zMinStart;
   const relEnd   = relStart + (b.durationMin || 0);
   const clippedTop    = relStart < 0;
@@ -814,7 +919,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   const topic = (act.isTraining) ? getTrainingTopic(b.tag) : null;
   const blockBg = blockColour(b);
   const dispIcon = topic ? topic.icon : act.icon;
-  const hasConflict = !isBuffer && !!(conflictAffectedIds && conflictAffectedIds.has(b.id));
+  const hasConflict = !isBuffer && !!(clash && clash.affected && clash.affected.has(b.id));
   blockEl.className = 'placed-block'
     +(isBuffer ? ` travel-buf travel-buf--centered${b._bufferCls ? ' '+b._bufferCls : ''}${b._bufferConflict ? ' travel-buf--conflict' : ''}${b._bufferMute ? ' travel-buf--mute' : ''}` : '')
     +(b.parentPinned?' parent-pinned':'')
@@ -837,8 +942,23 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   // a clash first, then what it is, then decoration. Only the first two show —
   // eight emoji in a row is texture, not information — and the rest fold into
   // a single "+N" chip (foldBadges).
+  /* HOW SHORT, AND BY WHAT — the same two answers the week grid gives, from the
+     same pair of functions. The old badge was a bare ⚠️ whose tooltip said
+     "overlaps another activity": it named nothing and counted nothing, so the
+     one surface a parent opens to FIX a clash was the one that would not say
+     how big it was. A tooltip is also no use on an iPad, which is why the
+     figure rides on the badge itself. */
+  const myShort = hasConflict
+    ? clashWorstShort(clash.conflicts, b.id, clash.blocks) : 0;
+  const clashWords = hasConflict
+    ? clashTitle(clash.conflicts, b.id, clash.blocks, clash.acts)
+    : '';
   const badgeList = [];
-  if (hasConflict) badgeList.push('<span class="badge" title="Not enough travel/get-ready time — overlaps another activity">⚠️</span>');
+  if (hasConflict) {
+    badgeList.push(myShort
+      ? `<span class="badge badge-clash" title="${escapeAttr(clashWords)}">! ${myShort}m over</span>`
+      : `<span class="badge" title="${escapeAttr(clashWords)}">⚠️</span>`);
+  }
   /* SECOND, deliberately. foldBadges keeps only the first two or three and
      rolls the rest into a "+N" chip, so this is the only position that still
      shows on a compact block that also has a clash — and "a grown-up recorded
@@ -960,38 +1080,63 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, conflictAffect
   if (!isBuffer) attachBlockDrag(blockEl, b, ownDayKey);
   canvas.appendChild(blockEl);
 
+  /* THE MINUTES THAT DID NOT FIT, DRAWN. The week grid lays the shortfall over
+     the card it runs into at a quarter strength, exactly as tall as the
+     overrun; the day view — the surface a parent opens in order to FIX the
+     clash — drew nothing of the kind, so the one screen where the overlap can
+     be dragged away was the one that would not show its size. Same class, same
+     quarter strength, same dashed foot, same refusal of pointer events, sized
+     by this surface's own scale. */
+  if (!isBuffer && myShort) {
+    const ov = document.createElement('div');
+    ov.className = 'wf-overrun tl-overrun';
+    ov.style.top = top + 'px';
+    ov.style.height = Math.min(myShort * PX_PER_MIN, height) + 'px';
+    ov.style.left = `calc(${leftPct}% + 2px)`;
+    ov.style.width = `calc(${widthPct}% - 4px)`;
+    canvas.appendChild(ov);
+  }
+
   // Decorative doodle (seasonal, stable per block per month)
   if (!isBuffer) renderDoodle(canvas, b.id, top, height, leftPct, widthPct);
 }
 
 function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0, colCount = 1, dayKeyForBuffers = null) {
-  const travelBuf = getTravelBufMin(b);
-  const readyBuf = getGetReadyBufMin(b);
+  /* PER LEG. Getting there and coming home are separate facts on a block: a
+     School Day you go straight on from has a drive TO it and none home, and the
+     training it runs into has a short hop from the school gates and a longer
+     drive back. One mirrored figure could say neither. */
+  const travelPre  = getTravelBufMin(b, 'pre');
+  const travelPost = getTravelBufMin(b, 'post');
+  const readyPre   = getGetReadyBufMin(b, 'pre');
+  const readyPost  = getGetReadyBufMin(b, 'post');
   const warmupBuf = getWarmupBufMin(b);
   const endMin = b.startMin + b.durationMin;
   const entries = [];
   // Stack the buffers end-to-end so get-ready/driving/warm-up never share the
   // same minutes — you can't get skate boots ready while the car is moving.
   // Before the block: [get ready][travel][warm-up][ACTIVITY]; after: [ACTIVITY]
-  // [travel][get ready] — warm-up never happens on the way home.
+  // [travel][unpack] — warm-up never happens on the way home, and unpacking is
+  // not getting ready: it has no deadline, nothing downstream waits on it.
   if (b.warmupBuffer && warmupBuf > 0) {
     entries.push(
       { startMin: b.startMin - warmupBuf, label: '🔥 warm-up', bufDur: warmupBuf, cls: 'travel-buf-warmup', side: 'pre' },
     );
   }
   const preWarmup = (b.warmupBuffer ? warmupBuf : 0);
-  if (b.travelBuffer && travelBuf > 0) {
-    entries.push(
-      { startMin: b.startMin - preWarmup - travelBuf, label: '🚗 ➡ travel', bufDur: travelBuf, cls: '', side: 'pre' },
-      { startMin: endMin, label: '🚗 ⬅ travel', bufDur: travelBuf, cls: '', side: 'post' },
-    );
+  if (travelPre > 0) {
+    entries.push({ startMin: b.startMin - preWarmup - travelPre, label: '🚗 ➡ travel', bufDur: travelPre, cls: '', side: 'pre' });
   }
-  if (b.getReadyBuffer && readyBuf > 0) {
-    const preTravel = (b.travelBuffer ? travelBuf : 0);
-    entries.push(
-      { startMin: b.startMin - preWarmup - preTravel - readyBuf, label: '👕 ➡ get ready', bufDur: readyBuf, cls: 'travel-buf-ready', side: 'pre' },
-      { startMin: endMin + preTravel, label: '👕 ⬅ get ready', bufDur: readyBuf, cls: 'travel-buf-ready', side: 'post' },
-    );
+  if (travelPost > 0) {
+    entries.push({ startMin: endMin, label: '🚗 ⬅ travel', bufDur: travelPost, cls: '', side: 'post' });
+  }
+  if (readyPre > 0) {
+    entries.push({ startMin: b.startMin - preWarmup - travelPre - readyPre, label: '👕 ➡ get ready', bufDur: readyPre, cls: 'travel-buf-ready', side: 'pre' });
+  }
+  if (readyPost > 0) {
+    // Unpacking, not getting ready — a different job with no deadline. The
+    // arrows were the only thing telling the two apart.
+    entries.push({ startMin: endMin + travelPost, label: '🧺 ⬅ unpack', bufDur: readyPost, cls: 'travel-buf-ready', side: 'post' });
   }
   const sourceAct = findActivity(b.actId);
   /* A STRIP STOPS WHERE THE NEXT CARD STARTS — the same rule as the Full week,
@@ -1002,8 +1147,8 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0
   const dayBlocks = (getDayBlocks(dayKeyForBuffers || currentDayKey) || [])
     .filter(o => o && o.id !== b.id);
   const clip = bufferClip(b.startMin, endMin,
-    (b.warmupBuffer ? warmupBuf : 0) + (b.travelBuffer ? travelBuf : 0) + (b.getReadyBuffer ? readyBuf : 0),
-    (b.travelBuffer ? travelBuf : 0) + (b.getReadyBuffer ? readyBuf : 0),
+    preWarmup + travelPre + readyPre,
+    travelPost + readyPost,
     dayBlocks);
   const overlayBlocks = entries.map(({ startMin, label, bufDur, cls, side }) => {
     const segConflict = !!conflict && (side === 'pre' ? conflict.pre : conflict.post);
@@ -1016,7 +1161,8 @@ function renderTravelBuffers(canvas, b, zMinStart, zMinEnd, conflict, colIdx = 0
       _ownerId: b.id,
       startMin,
       durationMin: bufDur,
-      colour: b.colour || CAT_HEX[sourceAct?.cat] || '#888',
+      // The owner, not the seeded value — see the same note in js/07-week-view.js.
+      colour: blockColour(b),
       _isBuffer: true,
       _bufferCls: cls || '',
       _bufferLabel: (segConflict ? '⚠️ ' : '') + label,
@@ -1091,7 +1237,14 @@ function formatTimeFromMin(min) {
 // all call them, so a primitive declared here meant three earlier files
 // depended on a later one.
 
-function renderSheetTimeSummary(elId, startMin, durationMin, travelOn, travelBufMin, readyOn=false, readyBufMin=15, warmupOn=false, warmupBufMin=20) {
+/* EACH LEG FROM ITS OWN FIGURE. This took one travel number and one get-ready
+   number and applied both symmetrically — so once travel became two legs, a
+   block with fifteen minutes before and thirty-five after read as
+   "15m before + 15m after", and a block with no drive home still promised one.
+   `legs` is optional and absent means symmetric, which is what the two
+   placement sheets pass: a block being placed genuinely is symmetric until
+   somebody edits it. */
+function renderSheetTimeSummary(elId, startMin, durationMin, travelOn, travelBufMin, readyOn=false, readyBufMin=15, warmupOn=false, warmupBufMin=20, legs=null) {
   const el = document.getElementById(elId);
   if (!el) return;
   const dur = Math.max(0, durationMin|0);
@@ -1100,23 +1253,34 @@ function renderSheetTimeSummary(elId, startMin, durationMin, travelOn, travelBuf
   const tBuf = Math.max(0, travelBufMin|0);
   const rBuf = Math.max(0, readyBufMin|0);
   const wBuf = Math.max(0, warmupBufMin|0);
-  const homeMin = travelOn ? endMin + tBuf : null;
+  const L = legs || {};
+  const homeOn = travelOn && (L.travelHome != null ? !!L.travelHome : true);
+  const tHome = Math.max(0, (L.travelHomeMin != null ? L.travelHomeMin : travelBufMin)|0);
+  const unpackOn = readyOn && (L.readyAfter != null ? !!L.readyAfter : true);
+  const rAfter = Math.max(0, (L.readyAfterMin != null ? L.readyAfterMin : readyBufMin)|0);
+  const homeMin = homeOn ? endMin + tHome : null;
   const prepMin = readyOn ? start - rBuf : null;
   const warmupStartMin = warmupOn ? start - wBuf : null;
   let html = '';
-  if (travelOn && homeMin != null) {
+  if (homeMin != null) {
     html += `<div class="sheet-time-summary-row">`;
     html += `<div class="sheet-time-summary">Ends about ${formatTimeFromMin(endMin)}</div>`;
-    html += `<div class="sheet-time-summary">Home about ${formatTimeFromMin(homeMin)} (after ${tBuf}m travel)</div>`;
+    html += `<div class="sheet-time-summary">🚗→🏠 Home about ${formatTimeFromMin(homeMin)} (after ${tHome}m travel)</div>`;
     html += `</div>`;
   } else {
     html += `<div class="sheet-time-summary">Ends about ${formatTimeFromMin(endMin)}</div>`;
+    // Said out loud, because a missing line reads as "nobody set it" rather
+    // than "this is the day we go straight on to the next thing".
+    if (travelOn) html += `<div class="sheet-time-summary">Going straight on — no travel home</div>`;
   }
   if (warmupOn && warmupStartMin != null) {
     html += `<div class="sheet-time-summary">🔥 Warm up by ${formatTimeFromMin(warmupStartMin)} (${wBuf}m before)</div>`;
   }
   if (readyOn && prepMin != null) {
-    html += `<div class="sheet-time-summary">Start getting ready by ${formatTimeFromMin(prepMin)} (${rBuf}m before + ${rBuf}m after)</div>`;
+    html += `<div class="sheet-time-summary">👕 Start getting ready by ${formatTimeFromMin(prepMin)} (${rBuf}m)</div>`;
+  }
+  if (unpackOn) {
+    html += `<div class="sheet-time-summary">🧺 Unpack after (${rAfter}m)</div>`;
   }
   el.innerHTML = html;
 }
@@ -1460,7 +1624,7 @@ function canvasSnapMinRaw(canvas, clientY) {
   const rect = canvas.getBoundingClientRect();
   const y = clientY - rect.top - canvas.clientTop;
   const snapped = Math.round(y / (PX_PER_MIN * 15)) * 15;
-  return Math.max(0, Math.min(DAY_MIN_SPAN, snapped));
+  return Math.max(0, Math.min(canvasSpanMin(canvas), snapped));
 }
 /* The same arithmetic, clamped to a legal START. Split out because a block's
    END may legally be the last minute of the day, which this clamp refuses —
@@ -1469,7 +1633,7 @@ function canvasSnapMinRaw(canvas, clientY) {
    week grid's scale, so a second copy of these three lines would be wrong the
    moment somebody read it out of that file. */
 function canvasSnapMin(canvas, clientY) {
-  return Math.min(DAY_MIN_SPAN - 15, canvasSnapMinRaw(canvas, clientY));
+  return Math.min(canvasSpanMin(canvas) - 15, canvasSnapMinRaw(canvas, clientY));
 }
 
 /* Shared placement entry point used by both the timeline canvas tap and the
@@ -1658,12 +1822,22 @@ function renderSlotPicker() {
      left before the next thing. A seven-hour School Day matches the school
      window and cannot possibly go in the ninety minutes before dinner, and
      offering it there is the picker ignoring the question it just asked. */
-  const fitsNow = a => {
-    if (!zone || a._locked) return false;
-    if (!Array.isArray(a.suitableTime) || !a.suitableTime.includes(zone)) return false;
+  /* FITNESS IS A SCORE AGAINST THE CLOCK, not a boolean against the calendar.
+     This was `suitableTime.includes(zone)`, and zoneForGap answers 'weekend'
+     for every minute of a non-school day — so at half past twelve on a Saturday
+     forty-seven of the seventy activities "fit" equally, and the real ordering
+     fell through to how often the household had placed each one. Evening
+     Routine came first because it gets placed every night.
+
+     slotPickerFit (js/17-ui-misc.js) is the one owner of the score; the ROOM
+     check stays a hard filter, because a seven-hour School Day in the hour
+     before dinner is not a poor fit, it is impossible. */
+  const clockZone = pendingStartMin == null ? null : clockZoneForMin(pendingStartMin);
+  const roomFor = a => {
     const need = activityDefaultDuration(a) || 60;
     return !free || !free.min || need <= free.min;
   };
+  const fitOf = a => (a._locked ? -99 : slotPickerFit(a, clockZone, zone));
   /* An APPOINTMENT is a time somebody else set. It belongs to the window it
      belongs to, but it is not something a child picks to fill an afternoon
      with — she records one a parent made. Four of them leading the suggestions
@@ -1683,8 +1857,11 @@ function renderSlotPicker() {
     /* Ranked by what the household has actually been doing, capped at six: a
        heading with twenty things under it is the same undifferentiated list
        again, one heading lower. */
-    suggested = ordered.filter(fitsNow)
-      .sort((a, b) => suggestRank(a) - suggestRank(b))
+    /* Score first, appointments last inside a score, and only then the
+       household's own habits — a stable sort, so recency survives as the
+       tie-break it should always have been rather than the whole answer. */
+    suggested = ordered.filter(a => fitOf(a) > 0 && roomFor(a))
+      .sort((a, b) => (fitOf(b) - fitOf(a)) || (suggestRank(a) - suggestRank(b)))
       .slice(0, 6);
     const sugIds = new Set(suggested.map(a => a.id));
     ordered = ordered.filter(a => !sugIds.has(a.id));
@@ -1736,9 +1913,19 @@ function renderSlotPicker() {
     return h;
   };
 
-  if (suggested.length) {
-    list.appendChild(heading(`✨ Good for ${formatTimeFromMin(pendingStartMin)}`, null));
-    suggested.forEach(a => list.appendChild(tile(a)));
+  if (slotPickerFilter === 'all' && pendingStartMin != null) {
+    /* THE STRUCTURE SURVIVES AN EMPTY SUGGESTION ROW. Both headings used to
+       vanish together, leaving a bare undifferentiated list — which is the
+       NORMAL case at midday on a school day, where the only activity matching
+       the school band is School Day itself and it is far too long to fit. The
+       list then looked exactly like the one this whole feature replaced, with
+       nothing to say the app had looked and found nothing. */
+    if (suggested.length) {
+      list.appendChild(heading(`✨ Good for ${formatTimeFromMin(pendingStartMin)}`, null));
+      suggested.forEach(a => list.appendChild(tile(a)));
+    } else {
+      list.appendChild(heading(`✨ Nothing obvious for ${formatTimeFromMin(pendingStartMin)}`, null));
+    }
     list.appendChild(heading('Everything else', null));
     ordered.forEach(a => list.appendChild(tile(a)));
   } else if (slotPickerFilter === 'all') {

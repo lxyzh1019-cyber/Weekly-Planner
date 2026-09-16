@@ -389,9 +389,123 @@ text plus a 1.5px conflict border each side is 16.1, so 16 sits on the edge and
 17 is the first height that always holds a line. A strip under it keeps its
 hatch and its tooltip and says nothing; several short same-side segments merge
 into one **band** whose per-kind hatches stay as children and whose single label
-names both (`👕15 🚗15 · 7:40am`). Height only answers one of the two questions —
-a column is 95–129px and the long label is about 168px — so `wfTravelStrip`'s
-`maxTier`, which had no caller passing one, now caps the tier by width too.
+speaks for both. Height only answers one of the two questions — a column is
+95–129px and the long label is about 168px — so `wfTravelStrip`'s `maxTier`,
+which had no caller passing one, now caps the tier by width too.
+
+**When a label has to shrink, the CLOCK is what survives.** The width cap made
+the `long` tier structurally unreachable on this surface — every label carrying
+a time is 158–211px against a 115px budget — and the ladder's next rung was
+`short`, `🚗 Travel 15m`, which throws away the one figure a parent acts on and
+keeps the one the strip's own length already draws. The result was that no
+clock time reached the Full week at all. `time` (`🚗 7:40a` out, `🏠 3:20p`
+back, about 59px) sits between them and is what a strip picks whenever it is
+tall enough for a line; `short` is not on that ladder, being both wider and less
+use, and survives only because the print sheet picks tiers by block height and
+does want it.
+
+**A LABEL NAMES THE EVENT, NOT JUST THE TIME.** One figure per side was the
+first answer and it was a figure short: School Day at 8:10 with fifteen minutes
+of getting ready and fifteen of driving printed `🚗 7:40am`, which is when she
+starts *getting ready* — the right number wearing the wrong icon, and the car
+does not leave until 7:55. Going out there are **two** facts and a parent acts
+on both, so the full form is `👕 7:40 🏠→🚗 7:55`. Coming back it is
+`🚗→🏠 3:05 🧺 3:20`, and the arrow is what says which end of the trip this
+is.
+
+**What each side drops first is decided by which fact has a DEADLINE.** Getting
+ready before a block has to be finished when the car leaves, so both figures
+matter and the **direction arrow** is what goes first — `👕 7:40 🚗 7:55` keeps
+both times down to a 100px column, which is every real one-lane column on this
+grid. Unpacking afterwards has no deadline at all, so coming home it is the
+**unpack figure** that goes and the arrow that stays: through-the-door is what
+somebody is waiting on. `wfSideTimeForms` is the one ladder, widest rung first;
+`wfSideEdgeRel` and `wfKindEdgeRel` are what it reads. Coming back the travel
+edge is the end of the last **travel** segment, when you are through the door,
+never the end of the put-the-gear-away that follows it.
+
+**The after-buffer is UNPACKING, and says so everywhere.** The two get-ready
+buffers are different jobs — preparation with a deadline, unloading with none —
+and three of the four places that named a buffer kind were not side-aware, so
+the post side read "Get ready" on the print sheet and in every tooltip while
+`seg.side` sat in scope at each of them unasked. `bufferKindLabel` and
+`bufferKindIcon` (`js/07-week-view.js`) are the one owner: 👕 **Get ready**
+before, 🧺 **Unpack** after. Today is deliberately untouched — `tdPrepFor`
+filters `side === 'pre'`, so it is only ever talking about getting ready.
+
+**The tooltip is the full sentence at every width.** A visible label that has
+fallen to its bare rung drops the meridiem and one of its two figures; the
+`title` names every segment, its minutes and its clock time the long way round,
+which is also what a screen reader gets. `bufferSegLabels(seg, 'long')` is that
+sentence, and its pre-get-ready form says **from** 7:40 rather than "done by
+7:55" — the deadline is already said by the travel label beside it, and the
+moment she has to start was the one figure nothing anywhere carried.
+
+**A zone name is drawn where it is NEWS.** `labelledCol` was
+`!isSchoolDay(key) || key !== axisKey`, which silences the axis day itself and
+labels every OTHER identical school day — four columns × four zones on an
+ordinary week, sixteen repeats of what the left sideband already says once,
+competing with the cards and the buffer times for the same pixels. The same
+expression failed the other way round on a week with no school in it: `axisKey`
+is then `null`, `key !== axisKey` is true everywhere, and all seven columns
+printed `🎉 Free time`. A column now names its zones only when its **shape
+differs** from the day the axis is describing — compared as a signature of the
+segments rather than as `isSchoolDay(key) === isSchoolDay(axisKey)`, which is
+equivalent today only because `schoolHours()` takes no day argument. So the
+school columns of a term week say nothing, a Saturday inside one still speaks,
+a PD day speaks, and a week that is all holiday says it once on the axis.
+`aZoneNameIsDrawnOnlyWhereItIsNews` holds all four.
+
+**A zone name is not drawn where a buffer strip speaks.** The bands print their
+own name at the top of each stretch — `🏫 SCHOOL`, `🎒 AFTER SCHOOL` — and a
+buffer run beginning on that boundary lands its time in exactly those pixels.
+Invisible while the strips were mute; two lines of text through each other the
+moment they spoke again, which is the defect `WF_TRAVEL_TEXT_MIN_PX` exists to
+prevent. The **time wins**: it is the one figure on this surface a parent acts
+on, and the zone is still said twice over, by the band's tint and by the left
+axis. Pure arithmetic on inline pixel values (`WF_BAND_LABEL_PX`, another
+measurement), so it costs no reflow. A screenshot found this — the suite was
+green.
+
+**And the fact never disappears.** A lone fifteen-minute buffer is 10.8px and
+cannot hold a line at any width, so its side goes silent and the time is simply
+gone from the screen. The strips are **asked** whether they muted — rather than
+the card re-deriving the tier ladder, which is how the two would drift — and the
+card prints whatever its sides could not say, at any tier, as the time and never
+the minutes. Now that a side carries two figures there is a **second** way to
+come up short: half a column holds one clock time, so a band can speak and still
+be a fact down. Same contract one rung further in — the elements are asked what
+they **printed**, `wfSideTimeUnsaid` answers what is missing from it, and the
+card carries the remainder. `theStripStillSaysWhenToLeave` holds the fact rather
+than the mechanism: both figures visible in a full column, the leave-by one
+visible in a split lane with the other spelled out in a tooltip, at one lane and
+at two, without overflowing what draws them.
+
+**`wfTextPx` is how wide a label will be, and it is a MEASUREMENT.** It replaces
+`text.length * 6.6`, which charged every character the same width — and a buffer
+label is mostly emoji, so `🚗 7:55am` is eight units and 65.6 real pixels (8.2
+each) while `🎒 After school` is fifteen and 100 (6.7 each). One number was
+wrong in **both** directions and wrong by a third: it refused labels that fitted
+and, worse, accepted labels that then ran off the column edge, which is the one
+failure the width cap exists to prevent. Measured in
+`.wf-travel-band-label`'s own type (0.82rem lifted to the 13.1px kid floor): an
+**emoji 21**, an **arrow 12**, a **digit 7.3**, a **lowercase letter 9.6**, an
+**uppercase 10.6**, a **space 1**, a **colon or bracket 4**. The letters are
+rounded up, because over-estimating only refuses a label that would have fitted
+while under-estimating draws one that does not.
+
+**The space is the load-bearing row, and it is charged 1 rather than its own
+3.6.** Every space in a label on this surface follows an emoji, whose advance
+already carries it — and charging it in full put the two-figure form
+`👕7:40 🚗7:55` about four pixels over a 390px-viewport column that it
+really fits in, so a phone silently dropped the get-ready time. These numbers
+were re-derived once already against real rendered widths, which is the reason
+they are written here rather than left in the code: a first calibration that
+looks reasonable is exactly what ships wrong.
+
+`.wf-travel-band-label` is in the overflow sweep for the same reason: it is the
+element that actually carries a band's text, and while it was left out a label
+30px too wide for its column passed that sweep untouched.
 
 **The minutes that did not fit are drawn, not just described.** `.wf-overrun`
 lays the shortfall over the card it runs into at a quarter strength, exactly as
@@ -402,26 +516,63 @@ and it showed it by making both unreadable. The number itself rides on the
 `! 20m over`, hung above its top-left corner and mostly outside the card, which
 is the one place that never covers a centred name at any card height; a card in
 a right-hand lane hangs it top-RIGHT or two lanes' pills collide. The partner
-card keeps the plain `!`. `wfWorstShort` and `wfClashTitle` are the one pair
-that answers "how far am I run into, and by what", because the shortfall is
-recorded against the block whose window is short — so a card must read its
-PARTNERS' figures, not its own. `tdClashText` is the same sentence on Today.
+card keeps the plain `!`. `clashWorstShort` and `clashTitle`
+(**`js/05-helpers.js`**) are the one pair that answers "how far am I run into,
+and by what", because the shortfall is recorded against the block whose window
+is short — so a card must read its PARTNERS' figures, not its own.
+`tdClashText` is the same sentence on Today.
+
+**Both schedule surfaces say it, and say the same thing.** That pair lived in
+`js/07-week-view.js`, so the week grid was the only screen that could name the
+activity a block runs into or count the minutes: the day view drew a red outline
+and a `⚠️` whose tooltip read *overlaps another activity*, naming nothing and
+counting nothing. Backwards, because the week grid is where a clash is SEEN and
+the day view is where it is dragged away. The day view carries the same
+`! 20m over` figure — inline on the block, where it has the room a 20px week
+card does not — the same named sentence, and the same quarter-strength
+`.wf-overrun` drawn to its own scale. `renderBlocksWithCollision` and
+`renderBlockPixel` take the whole finding now rather than the `affected` Set
+alone, which is what made the surface unable to explain its own warning.
+`theDayViewSaysTheSameThingAboutAClash` seeds one fixture and asserts both
+screens report the same number and the same partner — the failure worth guarding
+is disagreement, not absence.
 
 The week banner lists **one line per clashing pair**, deduped on the sorted id
 pair. It used to join every affected name on a day into one chain — "School Day
 ⇆ Homework ⇆ Ballet ⇆ Evening Routine" — which names four things while saying
 neither which two clash nor by how much.
 
-**Lanes are decided on what is DRAWN, not on minutes.** `wfAssignColumns` and
-`renderBlocksWithCollision` compared `startMin` and `durationMin`, which is the
-wrong question on a surface with a minimum card height: at 0.72px per minute the
-20px floor is 28 minutes, so a ten-minute After-School Routine at 8:50pm was
-drawn straight through a 9:00pm Evening Routine while the arithmetic said they
-were clear — nothing split them and nothing could. Both measure drawn top and
-bottom now, plus the lane gap, with a few pixels of tolerance so a hair's-breadth
-graze between two long cards does not halve both for nothing. A lane-narrowed
-card under 64px drops its name to the icon (`.wf-card--noname`): one clipped
-letter is not a name, and the icon is already what a short card draws.
+**Lanes are decided on what is DRAWN, and a floored card borrows the minutes
+BEFORE it.** `wfAssignColumns` and `renderBlocksWithCollision` compared
+`startMin` and `durationMin`, which is the wrong question on a surface with a
+minimum card height: at 0.72px per minute the 20px floor is 28 minutes, so a
+ten-minute After-School Routine at 8:50pm was drawn straight through a 9:00pm
+Evening Routine while the arithmetic said they were clear. Measuring the floored
+pixels instead fixed that and broke the other direction — a 3:40pm routine and a
+4:00pm piano lesson, which share not one minute, came out as two half-width
+cards with their names erased, while the day view drew both full width and was
+right.
+
+`wfCardBoxes` (`js/07-week-view.js`) settles it, and is **the one geometry** the
+lane pass, the cards and the overrun layer all read: a lane decided on one set
+of numbers and a card drawn on another is invisible, because the card in the
+wrong lane still looks like a card. The floor grows a short card **upward**, into
+minutes that are empty by construction, so the card's bottom edge — the one a
+reader uses to see where one activity stops and the next begins — stays
+truthful. Room is measured against the other blocks' real extents and against
+the already-decided bottom of the block before it, so two short blocks either
+side of one gap can never both borrow it, and a 6am block has nothing above to
+borrow. Only a card with nowhere to borrow from overruns, and only that splits a
+lane. A lane-narrowed card under 64px drops its name to the icon
+(`.wf-card--noname`): one clipped letter is not a name, and the icon is already
+what a short card draws.
+
+**A width nothing measured.** `colPx` — the budget every buffer label and the
+`--noname` threshold are checked against — was read off `cell.clientWidth`, from
+a cell appended to the grid at the END of its own iteration. It was **always 0**,
+so the `|| 120` fallback was always the answer. The day headers are already in
+the grid and sit in the same tracks, so one of them measures every column once,
+with no per-cell reflow.
 
 `.placed-block { min-height: 22px }` applied to buffer strips too, so every strip
 under about seventeen minutes was silently grown and pushed past the block it
@@ -528,7 +679,33 @@ topbar off screen. The screen carries a `height` now, at every width rather than
 only at ≥980px landscape, and `body.has-kid-nav #screen-day.screen.active` has the
 specificity it always needed. `dayScreenScrollsAsOneSurface` only walks INSIDE
 `#screen-day` and cannot see this; `onlyTheScheduleScrollsOnTheDayScreen` watches
-the document.
+the document — and seeds a day tall enough to scroll rather than assuming one,
+because a workspace that does not overflow is a short day, not a defect.
+
+**The day STOPS where the day stops.** The schedule was drawn 6am–10pm whatever
+was on it, and `.timeline` carried `min-height: 1344px` with 200px of padding
+under that, so an evening whose last block ends at a quarter to nine showed an
+hour of empty grid and then most of a screen of nothing — and no trimming in JS
+could have taken either back. `dayDrawnSpanMin(keys)` (**not** `dayViewSpan`,
+which has meant the column count since the 1/2/3-day view landed) takes the last
+drawn edge across the visible columns, buffers included, adds
+`DAY_TAIL_SPARE_MIN` so there is somewhere to tap to put something later, floors
+at `DAY_MIN_TAIL_MIN` so a blank day is still a canvas you can plan on, and
+rounds to a **multiple of 15** because `buildSlotGrid` tiles the canvas in
+quarter-hour rows. `tlShowEvening` (`localStorage`, never synced state) opens
+the rest, through `.tl-later` — which also says which state the canvas is in,
+since a day that stops at nine looks exactly like a day with no evening.
+
+The span is **on the canvas** (`dataset.spanMin`, read back by `canvasSpanMin`),
+not passed down five signatures and never taken from the global: the gutter's
+last hour, `renderBlockPixel`'s clipping, `canvasSnapMin` and the drag clamps in
+`js/39-block-drag.js` all followed `DAY_MIN_SPAN` and would each have put
+something — a label, a tap, a drop — below the bottom of a trimmed canvas.
+`dayZoneSegments` is deliberately NOT span-aware: the week grid and the print
+sheet read it too, and `paintZoneBands` already clips to the column's own end.
+Two smoke checks asserted the old fixed day — 64 slot rows and 17 hour marks —
+and now derive both from the rendered height; what matters is that the canvas
+divides exactly into 15-minute rows, not that it is 64 of them.
 
 **The day headers are a row of their own, outside the columns.** `.tl-col-head`
 used to sit inside `.tl-col`, above `.tl-canvas`, while `.tl-gutter` — a sibling
@@ -809,14 +986,70 @@ practice, and all three drew in the same blue.
 So `ACTIVITY_CATEGORIES` (`js/01-config.js`): **six categories, each holding one
 or more subgroups**, and every shipped activity names one with `sub:`.
 
-| Category | Subgroups |
+| Category | Subgroups (hue) |
 |---|---|
-| 🌅 Daily Rhythm | Routine · Helping hands |
-| 🍎 Fuel & Care | Meals · Appointments |
-| 🧠 Brain Construction | School · Language · Arts |
-| 💪 Body Construction | Training · Everyday movement |
-| 🧭 Explore | Outings |
-| 🎮 Play & Rest | Play · Seasonal treats |
+| 🌅 Daily Rhythm | Routine `#8ad8d0` · Helping hands `#229eb1` |
+| 🍎 Fuel & Care | Meals `#ffd166` · Appointments `#e3c48f` |
+| 🧠 Brain Construction | School `#6fb1fc` · Language `#8ed0f0` · Arts `#b0a0ea` |
+| 💪 Body Construction | Training `#f2597d` · Everyday movement `#ff9a76` |
+| 🧭 Explore | Outings `#d98ac8` |
+| 🎮 Play & Rest | Play `#7fca79` · Seasonal treats `#cfe06b` |
+
+**Measure colour distance the way an eye does — CIEDE2000, never CIE76.** The
+first separation of this table used CIE76, which overstates the distance between
+saturated greens by roughly double: it scored Helping hands against Play at 49
+where the answer is **19**, so a palette that cleared every threshold on paper
+still had two *different* categories reading as one colour on an iPad. Worse,
+the "fix" it endorsed — deepening Play — walked it *toward* Helping hands,
+because both are greens. `colourDistance` (`js/05-helpers.js`) is CIEDE2000 and
+`everySubgroupTellsItselfApart` (`tests/smoke.js`) holds the table to it, so the
+check measures the same way the palette was chosen.
+
+**The figure that matters is the worst CROSS-category pair.** Two subgroups
+inside one category are *meant* to look related — Meals and Appointments are both
+Fuel & Care and sit at 9.8, which is the design working. Two subgroups in
+different categories reading as one colour is the defect, and that pair was
+**2.9**: Helping hands and Play, a chore and an afternoon of Minecraft, the same
+colour to any eye. The floor is 14 on cross-category pairs only; within a
+category all that is required is that two are not literally the same hex.
+
+Five of the twelve were crowded into one green-teal corner, so **Helping hands
+left it entirely** (chores are not a shade of rest) and **Explore left the greens
+too**. Helping hands went to a deep cyan rather than somewhere warm, so Daily
+Rhythm still reads as one category — a light aqua and a deep cyan are obviously
+siblings, which is the point of having categories at all. Training was lifted off
+`#ef476f` in the same pass: it gave dark ink 4.27:1, the one value in the table
+under the 4.5:1 the contrast rule asks for.
+
+**A recolour has a half that fails silently.** `SEEDED_HEX_VALUES` is what lets
+`blockColour` tell a colour somebody CHOSE from one a placement copied out of the
+table — so the moment a hex changes, the retired value drops out of that set and
+every block already on the calendar starts reading as a deliberate choice,
+frozen at the old hue **forever**. No migration can fix it: `deepMergeObj` lets a
+remote scalar win, so a device serving an older bundle out of a Pages cache would
+push the old colours straight back. `RETIRED_SEEDED_HEXES` (`js/01-config.js`)
+must **grow on every recolour and never be pruned**, and the guard asserts both
+halves — a retired hue re-derives, a hand-picked one is left alone.
+
+**One owner, and the recolour is what proves it.** `ACTIVITY_GROUPS` carried its
+own `hex` on every row, four of them repeating a subgroup value exactly, so
+moving a hue would have recoloured the cards and left the hours charts and the
+meeting bars on the old values. `groupHex` derives from the subgroup table now.
+The same trap sat in three render paths that read `b.colour || CAT_HEX[act.cat]`
+directly — the week and day buffer strips and the sibling preview — which takes
+the SEEDED value `blockColour` exists to ignore, so a card would have drawn in
+the new hue with its own travel strip still in the old one. All three call
+`blockColour`. `CAT_COLOUR`, a third copy of the same table with zero consumers,
+is gone.
+
+**The week legend draws the colours the cards actually wear.** It listed the
+eight chart groups, then the six categories — closer, but still not what a card
+wears. Half the hues on the grid (Helping hands, Appointments, Language, Arts,
+Everyday movement, Seasonal treats) appeared in no key at all, one of them the
+very colour a parent could not tell from Play. All twelve now, grouped under
+their category so it still reads as six ideas. `.tg-legend-cat` sits at the kid
+floor of 13.1px, not below it — this is a kid screen, and "it is only a heading"
+is not an exemption.
 
 **The subgroup is the hue; the category picks it.** `blockColour` reads
 `activitySub(act).hex`. A stored `b.colour` counts only when somebody CHOSE it:
@@ -860,18 +1093,46 @@ only way to find the thing you made). Seasonal is a subgroup now, not a chip:
 `_locked` still keeps Beach Day out of January, so nothing about availability
 changed, only where it is filed.
 
-**It leads with what fits.** Every activity has carried `suitableTime` since the
-catalog was written and the picker never asked — a child tapping 7:15 on a school
-morning was offered a six-hour day trip in the same undifferentiated list as
-Breakfast, and only the mascot ever read the field. `slotPickerWindow()` goes
-through `zoneForGap` (the family's own school hours) and `isSchoolDay`, never the
-day of the week. Two halves to "fits": the **moment** she tapped, and the **room**
-before the next block — a seven-hour School Day matches the school window and
-cannot go in the hour before dinner. It RANKS, it does not filter: everything else
-follows under its own heading, because a picker that hides things is one she stops
-trusting. An **appointment ranks last** inside the suggestions — it is a time
-somebody else set, not something a child picks to fill an afternoon with, and four
-of them leading the row is the picker answering a question nobody asked.
+**It leads with what fits, and "fits" is a SCORE against the clock.** Every
+activity has carried `suitableTime` since the catalog was written and the picker
+never asked. Asking it as a boolean was not enough: `zoneForGap` answers
+`'weekend'` on its **first line** for every minute from six in the morning to ten
+at night, so on a non-school day the zone carries no time-of-day information
+whatever — and 47 of the 70 entries declare `'weekend'`, so they all matched
+equally and the real ordering fell through to `slotPickerRecentActIds`, which is
+placement frequency over four weeks. Tapping **12:30 offered Evening Routine,
+Morning Routine and Dinner ahead of Lunch**, in exactly the household's
+most-placed order. The hour changed nothing but the heading text.
+
+Two questions, two owners. `clockZoneForMin` (`js/17-ui-misc.js`) is the band
+regardless of what KIND of day it is; `zoneForGap` stays the calendar answer.
+**`'midday'`** joins the vocabulary as the school-hours band on a day with no
+school — the one band it could not say, and the reason Lunch had nowhere to
+belong. `slotPickerFit` scores: **+3** a direct hit on the clock band, **+1** the
+calendar zone alone (right kind of day, nothing about the hour), **−2** when the
+activity names clock bands and none of them is this one. `school` and `midday`
+read each other as a near miss, being the same hours on two kinds of day.
+
+The penalty keys on the **clock hit, not on the total** — written as
+`score === 0` it never fires for anything also carrying `'weekend'`, so Breakfast
+stayed level with an activity that had never said when it belongs. Being on
+record as a morning thing is what should sink it at midday.
+
+The **room** check stays a hard filter, because a seven-hour School Day in the
+hour before dinner is not a poor fit but an impossible one. It RANKS, it does not
+hide: everything else follows under its own heading, because a picker that hides
+things is one she stops trusting. An **appointment ranks last** within a score —
+a time somebody else set is not something a child picks to fill an afternoon
+with. Recency survives as the final tie-break, which is where the household's own
+habits still count.
+
+**Both headings survive an empty suggestion row.** They used to vanish together,
+leaving a bare undifferentiated list — and that is the NORMAL case at midday on a
+school day, where the only match for the school band is School Day itself and it
+is far too long to fit. It says *Nothing obvious for 12:30pm* rather than saying
+nothing. `theSuggestionsAnswerTheClock` asserts the ORDERING, not the presence of
+a heading: the previous check asserted only that "Good for" existed, which was
+true throughout, and is why this shipped.
 
 **Inside a category the list is grouped by subgroup**, with the subgroup's colour
 on the heading and on each tile's edge. The per-chip "last time" lift is drawn
@@ -925,8 +1186,8 @@ other direction: every group the app prices must be one the test has an opinion
 about, because iterating its own `want` map is a whitelist that a new group
 passes unnoticed.
 
-`cat` still decides a block's **colour** (`CAT_HEX`, `blockColour`) and drives
-the picker's filters. This answers a different question, and it is the only one
+`cat` still drives the picker's filters, and `CAT_HEX` survives only as
+`blockColour`'s last fallback — the SUBGROUP is what decides a block's colour. This answers a different question, and it is the only one
 the hours charts and the XP gate may ask. Two questions, two tables.
 
 There were **six** copies of a label table before this, already disagreeing:
@@ -1239,6 +1500,55 @@ planned as though it happened at the kitchen table and `tdActionableStart` — t
 get-ready time Today leads with — had nothing to compute from until somebody
 remembered the toggle. The default comes from the **activity**, never globally:
 a global default would put a fifteen-minute car journey in front of Breakfast.
+
+## Travel is two legs, not one figure mirrored
+
+`travelBufMin` was a single number drawn before a block and after it, so the
+ordinary Tuesday could not be said at all: **school, then straight on to
+training, then home.** There is no drive home from school that day; the drive to
+training leaves from the school gates rather than the house; the drive home
+afterwards is longer than either. The activity you are going TO owns the travel,
+so the fact is **per leg**.
+
+`travelTo` / `travelHome` and `readyBefore` / `readyAfter`, each with its own
+minutes. **Derived, never migrated:** absent means fall back to the symmetric
+`travelBuffer` / `travelBufMin`, so every block already in Firestore behaves
+exactly as it does today with nothing written — same reasoning as `xp2` and
+`achievementActivityId`. They are block fields inside `weeks`, arbitrated
+whole-record by `mergeArrayById`, so this is **not** a `state.shared` key and
+needs no merge decision of its own.
+
+`getTravelBufMin(block, side)` and `getGetReadyBufMin(block, side)` take
+`'pre'` | `'post'`. **Omitting the side keeps the old answer** — the larger of
+the two legs — so "does this block carry travel at all" is still right and no
+existing call site could be left silently wrong by the change. Everything that
+draws or measures a SEGMENT passes a side: `wfBufferSegments`,
+`renderTravelBuffers`, `computeBufferConflicts`, `renderPrintSheet`,
+`dayDrawnSpanMin` (post legs only — those are the minutes after the block ends).
+
+The edit sheet's two rows read **Getting there / Coming home** and **Before /
+Putting things away after**, the return leg a checkbox with its own number
+beside it, greyed until it is ticked. Both legs are written out whenever the
+master toggle is on, so a block says what it means rather than leaning on the
+fallback — which cannot express "no drive home" at all. Warm-up stays one-sided
+and training-only.
+
+**And the sheet that summarises it names each leg from its own figure.**
+`renderSheetTimeSummary` (`js/08-day-view.js`) took one travel number and one
+get-ready number and applied both symmetrically, so a block with fifteen minutes
+before and thirty-five after read as *15m before + 15m after*, and a block with
+no drive home still promised one. Its `legs` argument is optional and absent
+means symmetric — which is what the two **placement** sheets pass, because a
+block being placed genuinely is symmetric until somebody edits it. A block that
+goes straight on says *Going straight on — no travel home* out loud, because a
+missing line reads as "nobody set it" rather than as the answer. The function
+also replaced seven byte-identical call sites.
+
+`aBlockCanGoStraightOnWithoutComingHome` asserts the legacy shape is untouched,
+that the Tuesday draws no post segments, that the sheet names 35m and 25m rather
+than mirroring the outbound pair, and — the half that would otherwise prove
+nothing — that the *same pair with a return leg* still reports its 20-minute
+clash.
 
 ## Every buffer a block carries, it can edit
 

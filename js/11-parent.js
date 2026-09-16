@@ -565,6 +565,9 @@ const PARENT_ACT_IDS = { cat: 'paCat', sub: 'paSub', wrap: 'paSubWrap' };
    be told so. */
 const PA_WINDOWS = [
   ['paWhenBefore',  'before-school'],
+  /* The band the vocabulary could not say. School hours on a day with no
+     school — where Lunch lives, and where a family's own Saturday club does. */
+  ['paWhenMidday',  'midday'],
   ['paWhenAfter',   'after-school'],
   ['paWhenEvening', 'evening'],
   ['paWhenWeekend', 'weekend'],

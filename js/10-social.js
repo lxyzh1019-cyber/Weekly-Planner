@@ -102,7 +102,8 @@ function renderSync() {
       // Sister's private blocks: show time+"Busy" only. Public blocks show details.
       const showDetails = isMe || (showAll && !!b.public);
       if (showDetails) {
-        mini.style.background = b.colour||CAT_HEX[act.cat];
+        // One owner, so a sister's day is not drawn in a retired hue.
+        mini.style.background = blockColour(b, p);
         mini.style.color = '#fff';
         mini.textContent = `${tStr} ${act.icon} ${act.name}`;
       } else {
