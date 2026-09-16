@@ -350,6 +350,71 @@ function zoneForGap(absStartMin, isWeekend) {
   return 'evening';
 }
 
+/* ── WHAT TIME OF DAY IS IT, REGARDLESS OF WHAT KIND OF DAY IT IS ──
+   `zoneForGap` answers 'weekend' on its FIRST LINE for every minute from six in
+   the morning to ten at night, so on a non-school day the zone carries no
+   time-of-day information whatever. Forty-seven of the seventy catalog entries
+   declare 'weekend', so at half past twelve on a Saturday the picker was
+   offering Evening Routine, Morning Routine and Dinner as things that "fit" —
+   and ranking them above Lunch, because the row was ordered by how often the
+   household had placed each one in the last four weeks. The hour she tapped
+   changed nothing but the heading text.
+
+   This is the clock alone. `midday` is the school-hours band on a day with no
+   school — the one band the vocabulary could not say, and the reason Lunch had
+   nowhere to belong. The bands come from the family's own schoolHours(), never
+   from a constant, so they keep agreeing with the ones the day view draws. */
+function clockZoneForMin(absStartMin) {
+  const h = schoolHours();
+  const schoolStart = START_MIN + h.startMin;
+  const schoolEnd   = START_MIN + h.endMin;
+  if (absStartMin < schoolStart) return 'before-school';
+  if (absStartMin < schoolEnd)   return 'midday';
+  if (absStartMin < schoolEnd + 180) return 'after-school';
+  return 'evening';
+}
+
+/* ── HOW WELL DOES THIS ACTIVITY FIT THE MOMENT SHE TAPPED ──
+   A score, not a yes/no. `suitableTime.includes(zone)` was a boolean with no
+   notion of how well anything matched, so everything carrying 'weekend'
+   qualified equally and the real ordering fell through to placement frequency.
+
+   +3  the activity names this clock band: a direct hit on the hour.
+   +1  it names the calendar zone ('weekend'): the right kind of day, and
+       nothing at all about the time.
+   −2  it names clock bands and none of them is this one. Breakfast is on
+       record as a before-school thing; offered at half past twelve it is not
+       merely unranked, it is wrong, and it should fall behind an activity that
+       simply never said when it belongs.
+
+   Only a positive score is suggested. Ties break appointments-last — a time
+   somebody else set is not something a child picks to fill an afternoon — and
+   then on recency, which is where the household's own habits still count. */
+const PICKER_CLOCK_BANDS = ['before-school', 'midday', 'school', 'after-school', 'evening'];
+function slotPickerFit(act, clockZone, calendarZone) {
+  const want = Array.isArray(act && act.suitableTime) ? act.suitableTime : [];
+  if (!want.length) return 0;
+  let score = 0;
+  let clockHit = false;
+  if (clockZone && want.includes(clockZone)) { score += 3; clockHit = true; }
+  /* A school day's 'school' band and a free day's 'midday' are the same hours.
+     School Day itself says 'school'; Lunch says 'midday'. Each should read the
+     other as a near miss rather than a contradiction — they are the same part
+     of the day, just a different kind of one. */
+  else if (clockZone === 'midday' && want.includes('school')) { score += 1; clockHit = true; }
+  else if (clockZone === 'school' && want.includes('midday')) { score += 1; clockHit = true; }
+  if (calendarZone && calendarZone !== clockZone && want.includes(calendarZone)) score += 1;
+  /* THE PENALTY KEYS ON THE CLOCK, NOT ON THE TOTAL. Written as
+     `score === 0` it never fired for anything carrying 'weekend' as well:
+     Breakfast is `['before-school','weekend']`, so at half past twelve on a
+     Saturday the weekend point rescued it and it ranked level with an activity
+     that had never said when it belongs. Being on record as a MORNING thing is
+     exactly what should sink it at midday. */
+  const namesABand = want.some(w => PICKER_CLOCK_BANDS.includes(w));
+  if (namesABand && !clockHit) score -= 2;
+  return score;
+}
+
 /* Scan the current day's blocks, find the biggest free gap >= 90 min,
    pick 1–2 suitable activities, then show a suggestion. */
 function mascotRecommend() {

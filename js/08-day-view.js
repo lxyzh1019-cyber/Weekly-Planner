@@ -1801,12 +1801,22 @@ function renderSlotPicker() {
      left before the next thing. A seven-hour School Day matches the school
      window and cannot possibly go in the ninety minutes before dinner, and
      offering it there is the picker ignoring the question it just asked. */
-  const fitsNow = a => {
-    if (!zone || a._locked) return false;
-    if (!Array.isArray(a.suitableTime) || !a.suitableTime.includes(zone)) return false;
+  /* FITNESS IS A SCORE AGAINST THE CLOCK, not a boolean against the calendar.
+     This was `suitableTime.includes(zone)`, and zoneForGap answers 'weekend'
+     for every minute of a non-school day — so at half past twelve on a Saturday
+     forty-seven of the seventy activities "fit" equally, and the real ordering
+     fell through to how often the household had placed each one. Evening
+     Routine came first because it gets placed every night.
+
+     slotPickerFit (js/17-ui-misc.js) is the one owner of the score; the ROOM
+     check stays a hard filter, because a seven-hour School Day in the hour
+     before dinner is not a poor fit, it is impossible. */
+  const clockZone = pendingStartMin == null ? null : clockZoneForMin(pendingStartMin);
+  const roomFor = a => {
     const need = activityDefaultDuration(a) || 60;
     return !free || !free.min || need <= free.min;
   };
+  const fitOf = a => (a._locked ? -99 : slotPickerFit(a, clockZone, zone));
   /* An APPOINTMENT is a time somebody else set. It belongs to the window it
      belongs to, but it is not something a child picks to fill an afternoon
      with — she records one a parent made. Four of them leading the suggestions
@@ -1826,8 +1836,11 @@ function renderSlotPicker() {
     /* Ranked by what the household has actually been doing, capped at six: a
        heading with twenty things under it is the same undifferentiated list
        again, one heading lower. */
-    suggested = ordered.filter(fitsNow)
-      .sort((a, b) => suggestRank(a) - suggestRank(b))
+    /* Score first, appointments last inside a score, and only then the
+       household's own habits — a stable sort, so recency survives as the
+       tie-break it should always have been rather than the whole answer. */
+    suggested = ordered.filter(a => fitOf(a) > 0 && roomFor(a))
+      .sort((a, b) => (fitOf(b) - fitOf(a)) || (suggestRank(a) - suggestRank(b)))
       .slice(0, 6);
     const sugIds = new Set(suggested.map(a => a.id));
     ordered = ordered.filter(a => !sugIds.has(a.id));
@@ -1879,9 +1892,19 @@ function renderSlotPicker() {
     return h;
   };
 
-  if (suggested.length) {
-    list.appendChild(heading(`✨ Good for ${formatTimeFromMin(pendingStartMin)}`, null));
-    suggested.forEach(a => list.appendChild(tile(a)));
+  if (slotPickerFilter === 'all' && pendingStartMin != null) {
+    /* THE STRUCTURE SURVIVES AN EMPTY SUGGESTION ROW. Both headings used to
+       vanish together, leaving a bare undifferentiated list — which is the
+       NORMAL case at midday on a school day, where the only activity matching
+       the school band is School Day itself and it is far too long to fit. The
+       list then looked exactly like the one this whole feature replaced, with
+       nothing to say the app had looked and found nothing. */
+    if (suggested.length) {
+      list.appendChild(heading(`✨ Good for ${formatTimeFromMin(pendingStartMin)}`, null));
+      suggested.forEach(a => list.appendChild(tile(a)));
+    } else {
+      list.appendChild(heading(`✨ Nothing obvious for ${formatTimeFromMin(pendingStartMin)}`, null));
+    }
     list.appendChild(heading('Everything else', null));
     ordered.forEach(a => list.appendChild(tile(a)));
   } else if (slotPickerFilter === 'all') {

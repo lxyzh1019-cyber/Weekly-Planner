@@ -2433,7 +2433,15 @@ function confirmCustomActivity() {
     /* When it can be planned. A kid-made activity inherits the window she is
        standing in, so the thing she just invented turns up in the picker's
        suggestions at the time she invented it for rather than never. */
-    suitableTime: [slotPickerWindow()].filter(Boolean),
+    /* BOTH dimensions, so the thing she just invented turns up in the
+       suggestions at the time she invented it for. This stamped the calendar
+       zone alone, which on a non-school day is 'weekend' — no hour at all — so
+       a Saturday-afternoon invention scored nothing for the clock and sank
+       straight into "everything else" the next time she looked for it. */
+    suitableTime: [...new Set([
+      slotPickerWindow(),
+      pendingStartMin == null ? null : clockZoneForMin(pendingStartMin),
+    ].filter(Boolean))],
     addedBy: isParent() ? 'parent' : activeProfile(),
     pendingApproval: !isParent() };  // a kid's new activity waits for a parent's OK
   getProfData().customActivities = [...getCustomActivities(), act];

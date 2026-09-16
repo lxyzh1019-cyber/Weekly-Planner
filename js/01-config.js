@@ -720,8 +720,19 @@ const TRAINING_CHECKS = [
 ];
 
 /* Built-in activities — durationMin is default duration in minutes */
-/* suitableTime values: 'before-school' | 'school' | 'after-school' | 'evening' | 'weekend'
-   Used by mascot recommendations.
+/* suitableTime values:
+     'before-school' | 'school' | 'midday' | 'after-school' | 'evening' — the
+       CLOCK bands, from the family's own schoolHours(). `school` and `midday`
+       are the same hours on two different kinds of day.
+     'weekend' — the kind of DAY, and nothing about the hour.
+
+   'midday' was the band the vocabulary could not say, and it is why Lunch had
+   nowhere to belong: zoneForGap answers 'weekend' for every minute of a
+   non-school day, so at half past twelve the picker could tell a Saturday from
+   a Tuesday and could not tell lunchtime from bedtime. slotPickerFit
+   (js/17-ui-misc.js) scores against both dimensions.
+
+   Used by the picker's suggestion row and by mascot recommendations.
    social: true = can be invited to sister via Sister Sync. */
 const DEFAULT_ACTIVITIES = [
   /* ── Daily rhythm ──────────────────────────────────────────────
@@ -738,7 +749,9 @@ const DEFAULT_ACTIVITIES = [
      is set by the lunch recess in the calendar, so offering it as a block to
      place was asking her to plan something the school had already planned. */
   { id:'breakfast', sub:'meals',  name:'Breakfast', icon:'🍳', cat:'daily', durationMin:20, suitableTime:['before-school','weekend'] },
-  { id:'lunch', sub:'meals',      name:'Lunch',     icon:'🥗', cat:'daily', durationMin:30, suitableTime:['weekend'] },
+  // The middle of the day on ANY kind of day — on a school day she eats it at
+  // school, which is why this says midday rather than 'school'.
+  { id:'lunch', sub:'meals',      name:'Lunch',     icon:'🥗', cat:'daily', durationMin:30, suitableTime:['midday','weekend'] },
   { id:'dinner', sub:'meals',     name:'Dinner',    icon:'🍽', cat:'daily', durationMin:45, suitableTime:['evening','weekend'] },
   // Renamed from "Recovery Fuel" — same id, so every block that ever named it
   // still resolves, and the name now says when it is for.
@@ -808,7 +821,7 @@ const DEFAULT_ACTIVITIES = [
      Everything here travels. They carry an explicit group because `cat` is
      doing its other job — saying what colour the block is — and there is no
      outing colour: two questions, two tables. */
-  { id:'day_trip', sub:'outings',     name:'Day Trip',                icon:'🎈', cat:'free',   group:'explore', travels:true, durationMin:360, suitableTime:['weekend'], social:true },
+  { id:'day_trip', sub:'outings',     name:'Day Trip',                icon:'🎈', cat:'free',   group:'explore', travels:true, durationMin:360, suitableTime:['midday','weekend'], social:true },
   { id:'air_show', sub:'outings',     name:'Air Show',                icon:'✈️', cat:'free',   group:'explore', travels:true, durationMin:240, suitableTime:['weekend'], social:true },
   { id:'aviation_day', sub:'outings', name:'Aviation Day',           icon:'👩‍✈️', cat:'free', group:'explore', travels:true, durationMin:240, suitableTime:['weekend'], social:true },
   { id:'museum', sub:'outings',       name:'Museum',                 icon:'🏛', cat:'free',   group:'explore', travels:true, durationMin:180, suitableTime:['weekend'], social:true },
@@ -819,7 +832,7 @@ const DEFAULT_ACTIVITIES = [
 
   /* ── Play and rest ─────────────────────────────────────────────  */
   { id:'game_time', sub:'playtime',   name:'Game Time',  icon:'🎮', cat:'free', durationMin:45, suitableTime:['after-school','weekend'] },
-  { id:'break_quick', sub:'playtime', name:'Quick Break', icon:'☕', cat:'free', durationMin:15, suitableTime:['before-school','school','after-school','evening','weekend'], quickBreak:true },
+  { id:'break_quick', sub:'playtime', name:'Quick Break', icon:'☕', cat:'free', durationMin:15, suitableTime:['before-school','school','midday','after-school','evening','weekend'], quickBreak:true },
   { id:'family', sub:'playtime',      name:'Family Time', icon:'👨‍👩‍👧‍👦', cat:'free', durationMin:90, suitableTime:['evening','weekend'], social:true },
   { id:'free_time', sub:'playtime',   name:'Free Time',   icon:'🌤', cat:'free', durationMin:60, suitableTime:['after-school','weekend'] },
   { id:'play_sister', sub:'playtime', name:'Play together', icon:'⭐', cat:'free', durationMin:60, suitableTime:['weekend'], social:true },
@@ -847,7 +860,7 @@ const DEFAULT_ACTIVITIES = [
      House Chore plus a pool row is the one way to say it. Archived rather than
      deleted, as always — every block that ever named one still resolves, still
      draws and still counts in the hours. */
-  { id:'chores', sub:'helping',                name:'House Chore',                 icon:'🧹', cat:'daily', group:'chores', durationMin:30, suitableTime:['after-school','evening','weekend'] },
+  { id:'chores', sub:'helping',                name:'House Chore',                 icon:'🧹', cat:'daily', group:'chores', durationMin:30, suitableTime:['midday','after-school','evening','weekend'] },
   { id:'family_set_table', sub:'helping',      name:'Family Hero: Set the Table',   icon:'🍽', cat:'daily', group:'chores', durationMin:20, suitableTime:['evening','weekend'], archived:true },
   { id:'family_prep_bag', sub:'helping',       name:'Family Hero: Prep School Bag', icon:'🎒', cat:'daily', group:'chores', durationMin:15, suitableTime:['evening'], archived:true },
   { id:'family_laundry_fold', sub:'helping',   name:'Home Champion: Fold Laundry',  icon:'🧺', cat:'daily', group:'chores', durationMin:20, suitableTime:['weekend','evening'], archived:true },

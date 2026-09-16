@@ -1337,6 +1337,105 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* THE SUGGESTIONS ANSWER THE CLOCK.
+
+     Tapping 12:30 on a free day offered Evening Routine, Morning Routine and
+     Dinner ahead of Lunch. Two defects compounding, and neither was about the
+     picker's wording.
+
+     `zoneForGap` answers 'weekend' on its FIRST LINE for every minute from six
+     in the morning to ten at night, so the zone carried no time-of-day
+     information at all — and 47 of the 70 catalog entries declare 'weekend', so
+     they all "fit" equally. The row then fell through to `slotPickerRecentActIds`,
+     which is placement frequency over four weeks: the observed order was exactly
+     the household's most-placed six. The hour she tapped changed nothing but the
+     heading text.
+
+     What must hold is an ORDERING, not the presence of a heading — the previous
+     check here asserted only that "Good for" existed, which was true throughout
+     and is why this shipped. */
+  checks.theSuggestionsAnswerTheClock = await page.evaluate(() => {
+    const bad = [];
+    const keyFor = want => getDayKeys(0).find(k => isSchoolDay(k) === want);
+    const namesIn = () => [...document.querySelectorAll('#slotPickerList .slot-pick-chip')]
+      .map(t => (t.textContent || '').trim());
+    const headings = () => [...document.querySelectorAll('#slotPickerList .spc-subhead')]
+      .map(h => (h.textContent || '').trim());
+    const suggestedNames = () => {
+      /* Everything between the first heading and "Everything else" — read off
+         the rendered list rather than the internals, so this measures what a
+         child is actually shown. */
+      const kids = [...document.querySelectorAll('#slotPickerList > *')];
+      const start = kids.findIndex(el => el.classList.contains('spc-subhead'));
+      const end = kids.findIndex((el, i) => i > start && el.classList.contains('spc-subhead'));
+      if (start === -1 || end === -1) return [];
+      return kids.slice(start + 1, end).map(t => (t.textContent || '').trim());
+    };
+
+    const freeKey = keyFor(false);
+    const schoolKey = keyFor(true);
+    if (!freeKey || !schoolKey) return ['the week holds no school day and free day to test with'];
+
+    const had = { free: (getDayBlocks(freeKey) || []).slice(),
+                  school: (getDayBlocks(schoolKey) || []).slice() };
+    const kid = activeProfile();
+    try {
+      // ── 12:30 on a day with no school. Nothing else planned, so room is not
+      //    what is being tested here.
+      setDayBlocks(freeKey, [], kid);
+      currentDayKey = freeKey;
+      openDay(freeKey);
+      openSlotPicker(12 * 60 + 30);
+      const sug = suggestedNames();
+      if (!sug.length) bad.push('nothing at all was suggested for 12:30 on a free day');
+
+      const has = re => sug.some(n => re.test(n));
+      if (!has(/Lunch/)) bad.push(`Lunch is not suggested at 12:30 — got: ${sug.join(', ')}`);
+      [[/Evening Routine/, 'Evening Routine'], [/Morning Routine/, 'Morning Routine'],
+       [/Breakfast/, 'Breakfast'], [/Dinner/, 'Dinner']].forEach(([re, name]) => {
+        if (has(re)) bad.push(`${name} is still suggested at half past twelve`);
+      });
+      closeSheet('slotPickerOverlay');
+
+      // ── The same list at half past seven in the morning: now the breakfast
+      //    end of the day is right and Lunch is the one that does not belong.
+      openSlotPicker(7 * 60 + 30);
+      const morning = suggestedNames();
+      if (morning.length) {
+        if (!morning.some(n => /Breakfast|Morning Routine/.test(n))) {
+          bad.push(`nothing morning-ish suggested at 7:30 — got: ${morning.join(', ')}`);
+        }
+        if (morning.some(n => /Dinner|Evening Routine/.test(n))) {
+          bad.push('the evening is still suggested at half past seven in the morning');
+        }
+      }
+      closeSheet('slotPickerOverlay');
+
+      /* ── BOTH HEADINGS SURVIVE AN EMPTY ROW. On a real school day at 12:30
+         the only activity matching the school band is School Day itself, which
+         is far too long to fit — so the suggestion row is empty, and both
+         headings used to disappear together leaving a bare list with nothing to
+         say the app had looked. */
+      setDayBlocks(schoolKey, [], kid);
+      currentDayKey = schoolKey;
+      openDay(schoolKey);
+      openSlotPicker(12 * 60 + 30);
+      const hs = headings();
+      if (!hs.some(h => /Good for|Nothing obvious/.test(h))) {
+        bad.push(`the picker lost its first heading on a school day: ${hs.join(' | ')}`);
+      }
+      if (!hs.some(h => /Everything else/.test(h))) {
+        bad.push(`the picker lost "Everything else" on a school day: ${hs.join(' | ')}`);
+      }
+      if (!namesIn().length) bad.push('the school-day picker listed nothing at all');
+      closeSheet('slotPickerOverlay');
+    } finally {
+      setDayBlocks(freeKey, had.free, kid);
+      setDayBlocks(schoolKey, had.school, kid);
+    }
+    return bad.length === 0 || bad;
+  });
+
   /* A BLOCK CAN GO STRAIGHT ON WITHOUT COMING HOME.
 
      `travelBufMin` was one number drawn before a block and after it, so the

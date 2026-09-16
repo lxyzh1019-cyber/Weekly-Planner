@@ -1008,18 +1008,46 @@ only way to find the thing you made). Seasonal is a subgroup now, not a chip:
 `_locked` still keeps Beach Day out of January, so nothing about availability
 changed, only where it is filed.
 
-**It leads with what fits.** Every activity has carried `suitableTime` since the
-catalog was written and the picker never asked — a child tapping 7:15 on a school
-morning was offered a six-hour day trip in the same undifferentiated list as
-Breakfast, and only the mascot ever read the field. `slotPickerWindow()` goes
-through `zoneForGap` (the family's own school hours) and `isSchoolDay`, never the
-day of the week. Two halves to "fits": the **moment** she tapped, and the **room**
-before the next block — a seven-hour School Day matches the school window and
-cannot go in the hour before dinner. It RANKS, it does not filter: everything else
-follows under its own heading, because a picker that hides things is one she stops
-trusting. An **appointment ranks last** inside the suggestions — it is a time
-somebody else set, not something a child picks to fill an afternoon with, and four
-of them leading the row is the picker answering a question nobody asked.
+**It leads with what fits, and "fits" is a SCORE against the clock.** Every
+activity has carried `suitableTime` since the catalog was written and the picker
+never asked. Asking it as a boolean was not enough: `zoneForGap` answers
+`'weekend'` on its **first line** for every minute from six in the morning to ten
+at night, so on a non-school day the zone carries no time-of-day information
+whatever — and 47 of the 70 entries declare `'weekend'`, so they all matched
+equally and the real ordering fell through to `slotPickerRecentActIds`, which is
+placement frequency over four weeks. Tapping **12:30 offered Evening Routine,
+Morning Routine and Dinner ahead of Lunch**, in exactly the household's
+most-placed order. The hour changed nothing but the heading text.
+
+Two questions, two owners. `clockZoneForMin` (`js/17-ui-misc.js`) is the band
+regardless of what KIND of day it is; `zoneForGap` stays the calendar answer.
+**`'midday'`** joins the vocabulary as the school-hours band on a day with no
+school — the one band it could not say, and the reason Lunch had nowhere to
+belong. `slotPickerFit` scores: **+3** a direct hit on the clock band, **+1** the
+calendar zone alone (right kind of day, nothing about the hour), **−2** when the
+activity names clock bands and none of them is this one. `school` and `midday`
+read each other as a near miss, being the same hours on two kinds of day.
+
+The penalty keys on the **clock hit, not on the total** — written as
+`score === 0` it never fires for anything also carrying `'weekend'`, so Breakfast
+stayed level with an activity that had never said when it belongs. Being on
+record as a morning thing is what should sink it at midday.
+
+The **room** check stays a hard filter, because a seven-hour School Day in the
+hour before dinner is not a poor fit but an impossible one. It RANKS, it does not
+hide: everything else follows under its own heading, because a picker that hides
+things is one she stops trusting. An **appointment ranks last** within a score —
+a time somebody else set is not something a child picks to fill an afternoon
+with. Recency survives as the final tie-break, which is where the household's own
+habits still count.
+
+**Both headings survive an empty suggestion row.** They used to vanish together,
+leaving a bare undifferentiated list — and that is the NORMAL case at midday on a
+school day, where the only match for the school band is School Day itself and it
+is far too long to fit. It says *Nothing obvious for 12:30pm* rather than saying
+nothing. `theSuggestionsAnswerTheClock` asserts the ORDERING, not the presence of
+a heading: the previous check asserted only that "Good for" existed, which was
+true throughout, and is why this shipped.
 
 **Inside a category the list is grouped by subgroup**, with the subgroup's colour
 on the heading and on each tile's edge. The per-chip "last time" lift is drawn
