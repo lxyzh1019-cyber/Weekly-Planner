@@ -301,6 +301,8 @@ async function loanPayDownPaymentPrompt(kid, debtId) {
   const amt = money2(Math.min(parseFloat(v) || 0, w.cash, owing));
   if (!(amt > 0)) { showToast('Enter an amount like 20'); return; }
   w.cash = money2(w.cash - amt);
+  evMirror(kid, { kind: 'loan', from: 'cash', to: 'loan:' + d.id, amount: amt,
+                  ref: d.id, note: 'Deposit on ' + (d.name || 'her loan') });
   loanRecordPayment(kid, amt, 'down', d.id);
   const left = loanDownOutstanding(kid, debtId);
   showToast(left > 0
@@ -390,6 +392,8 @@ function loanSundayTransfer(kid, choice, opts) {
 
   if (w.cash >= due) {
     w.cash = money2(w.cash - due);
+    evMirror(kid, { kind: 'loan', from: 'cash', to: 'loan:' + l.id, amount: due,
+                    ref: l.id, note: (l.name || 'Loan') + ' payment' });
     loanRecordPayment(kid, due, kind, l.id);
     return settle({ status: agreedShort > 0 ? 'partial' : 'paid', paid: due, shortfall: 0 });
   }
@@ -405,7 +409,14 @@ function loanSundayTransfer(kid, choice, opts) {
     } else {
       mnyTakeFromSaved(kid, fromSavings);
       w.cash = money2(w.cash + fromSavings);
+      /* Two movements, because two things happened: money came OUT of kept-ready
+         and then went to the loan. Recording only the payment would leave the
+         kept-ready balance derived too high by exactly what was raided. */
+      evMirror(kid, { kind: 'move', from: 'ready', to: 'cash', amount: money2(fromSavings),
+                      note: 'To cover ' + (l.name || 'the loan') });
       w.cash = money2(w.cash - due);
+      evMirror(kid, { kind: 'loan', from: 'cash', to: 'loan:' + l.id, amount: due,
+                      ref: l.id, note: (l.name || 'Loan') + ' payment' });
       loanRecordPayment(kid, due, kind, l.id);
       return settle({ status: 'covered-from-savings', paid: due, shortfall: 0, fromSavings });
     }
@@ -418,7 +429,11 @@ function loanSundayTransfer(kid, choice, opts) {
 
   // pay_available (also the fallback)
   w.cash = money2(w.cash - available);
-  if (available > 0) loanRecordPayment(kid, available, kind, l.id);
+  if (available > 0) {
+    evMirror(kid, { kind: 'loan', from: 'cash', to: 'loan:' + l.id, amount: available,
+                    ref: l.id, note: (l.name || 'Loan') + ' — part payment' });
+    loanRecordPayment(kid, available, kind, l.id);
+  }
   const shortfall = money2(due - available);
   l.arrears = money2(l.arrears + shortfall);
   return settle({ status: 'partial', paid: available, shortfall });
@@ -458,6 +473,8 @@ async function loanPayExtraPrompt(kid, debtId) {
   const amt = money2(Math.min(parseFloat(v) || 0, w.cash));
   if (!(amt > 0)) { showToast('Enter an amount like 20'); return; }
   w.cash = money2(w.cash - amt);
+  evMirror(kid, { kind: 'loan', from: 'cash', to: 'loan:' + d.id, amount: amt,
+                  ref: d.id, note: 'Extra off ' + (d.name || 'her loan') });
   const rec = loanRecordPayment(kid, amt, 'early', d.id);
   showToast(`${d.icon} Paid $${amt.toFixed(2)} — cleared $${(rec ? rec.credited : amt).toFixed(2)} with the ${bonus}% bonus`);
   if (typeof mnyRerenderMoney === 'function') mnyRerenderMoney();

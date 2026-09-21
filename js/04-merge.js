@@ -293,6 +293,27 @@ function mergeSharedChore(localChore, remoteChore) {
   // Groups: union by id so concurrent adds both survive; newest edit wins;
   // a delete recorded as a 'grp:' tombstone stays deleted instead of resurrecting.
   out.groups = mergeArrayById(lc.groups, rc.groups, 'grp:');
+  /* ── Where the family's record begins ──
+     `programStartDate` is one scalar that decides how far back the meeting can
+     reach and which weeks are in the system at all, and `deepMergeObj` lets a
+     REMOTE scalar win — so a device still holding its own older idea of it
+     would push that straight back over a parent's choice, silently, and the
+     backlog would fall out of reach again.
+
+     Arbitrated newest-stamp-wins, the same shape as goalsByWeek above. An
+     UNSTAMPED value counts as 0 on purpose: it can only have come from an old
+     build that seeded this to whatever Monday it first ran on, and a deliberate
+     choice must always beat a seed. */
+  {
+    const lAt = Number(lc.programStartDateAt) || 0;
+    const rAt = Number(rc.programStartDateAt) || 0;
+    if (lAt || rAt) {
+      const src = rAt > lAt ? rc : lc;
+      out.programStartDateAt = Math.max(lAt, rAt);
+      if (src.programStartDate) out.programStartDate = src.programStartDate;
+      else delete out.programStartDate;
+    }
+  }
   // Weekly goals: the strictly-newer side takes that whole week, so an edit that
   // lowers or clears a goal wins over a stale copy (a plain union can't express
   // a removal). A tie / unstamped week keeps the deep-merged union already in out.
@@ -442,6 +463,32 @@ function mergeProfileState(localProfile, remoteProfile, profName) {
   merged.honesty      = mergeArrayById(lp.honesty,      rp.honesty,      'hon:');
   // Money from outside — birthday money, a gift. Append-only, like the others.
   merged.deposits = mergeArrayById(lp.deposits, rp.deposits, 'dep:');
+  /* ── The money stream (js/40-stream.js) ──
+     Every movement of money as its own record: where it came from, where it
+     went, when. Balances are DERIVED from this, never stored, so the union by
+     id is what makes two devices agree about how much a child has — neither
+     can change what the other wrote, so the merged stream is simply both.
+
+     Append-only by contract: a correction is a reversing event, never an edit
+     (evReverse), which is why newest-wins per id never has to arbitrate
+     anything real here. A movement genuinely removed carries an 'ev:'
+     tombstone so it stays removed, exactly like deposits above — without it a
+     correction would undo itself on the next sync, which is money appearing
+     from nowhere. */
+  merged.events = mergeArrayById(lp.events, rp.events, 'ev:');
+  /* ── What she asked a grown-up for ──
+     A move between her own pots that a child proposed. Deliberately NOT a
+     stream event: the stream records money that MOVED, and a request has moved
+     nothing — putting one there would make every balance derived from it wrong
+     until somebody said no.
+
+     Union by id with its own tombstone scope, like every other append-only
+     record here. The answer is an EDIT to the record (`approvedAt` /
+     `rejectedAt`), so newest-wins per id is what carries a parent answering on
+     the phone through to the iPad; without the tombstone a withdrawn request
+     comes back on the next snapshot and a parent is asked the same question
+     for ever. */
+  merged.moveRequests = mergeArrayById(lp.moveRequests, rp.moveRequests, 'mvq:');
   // What she is saving for. A kid can add one on either device, so these union
   // by id; a goal she deleted stays deleted via its 'sgoal:' tombstone.
   merged.savingGoals = mergeArrayById(lp.savingGoals, rp.savingGoals, 'sgoal:');

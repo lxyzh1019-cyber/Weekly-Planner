@@ -86,15 +86,42 @@ function savingsTotal(kid) { return mnySavedTotal(kid); }
 function netWorth(kid) { return mnyEverything(kid); }
 
 /* ── Transactions (each guards against overdraw; returns true on success) ── */
-function moneyDeposit(kid, amount) {          // cash → kept ready
+/* ── Shadow writes into the money stream ──
+   Stage 1 of the money redesign: every function below that moves a dollar also
+   records WHERE IT CAME FROM AND WHERE IT WENT in js/40-stream.js, beside the
+   stored balance it has always written. Nothing reads the stream yet; the
+   point is to prove the two agree (evShadowDrift) before the stored balance is
+   retired. `evMirror` swallows its own failures deliberately — a mirror that
+   could break a real money write would be worse than no mirror.
+
+   `opts.kind`/`opts.ref`/`opts.note` let a caller say what the movement WAS
+   ("the week of 7 Sep settled", "Grandma's red pocket"), which is the whole
+   thing the old wallet could not say.
+
+   A caller may LABEL a movement; it may never REDIRECT one. The fields each
+   function owns — which pot the money left, which it arrived in, how much — are
+   applied AFTER `opts`, so they always win. Spread the other way round and
+   `mnyRemoveDeposit` passing `from: 'gift'` turns a debit from her cash into a
+   movement that never touches cash at all: the wallet drops $50 and the stream
+   does not, silently, for ever. That is not hypothetical — it is what
+   `theMoneyStreamAgreesWithTheWallet` caught on the first run. */
+function moneyDeposit(kid, amount, opts) {          // cash → kept ready
   const w = ensureWallet(kid); amount = money2(Math.min(amount, w.cash));
   if (amount <= 0) return false;
-  w.cash = money2(w.cash - amount); mnyAddToSaved(kid, amount); saveAll(); return true;
+  w.cash = money2(w.cash - amount); mnyAddToSaved(kid, amount);
+  evMirror(kid, Object.assign({ kind: 'ready' }, opts || {}, { from: 'cash', to: 'ready', amount }));
+  saveAll(); return true;
 }
-function moneyAddCash(kid, amount) {          // extra cash from outside chores → wallet cash
+function moneyAddCash(kid, amount, opts) {          // extra cash from outside chores → wallet cash
   const w = ensureWallet(kid); amount = money2(amount);
   if (!(amount > 0)) return false;
-  w.cash = money2(w.cash + amount); saveAll(); return true;
+  w.cash = money2(w.cash + amount);
+  /* `from` defaults to 'earned' only because most callers are the weekly
+     settlement. A gift, a prize or a migration opening passes its own source —
+     an unlabelled dollar is exactly what made "where did the $50 go"
+     unanswerable in the first place. */
+  evMirror(kid, Object.assign({ kind: 'in', from: 'earned' }, opts || {}, { to: 'cash', amount }));
+  saveAll(); return true;
 }
 /* The inverse of moneyAddCash, and the ONLY caller is a gift being taken back
    after it already reached the wallet. Floored at zero: taking a record away
@@ -102,18 +129,33 @@ function moneyAddCash(kid, amount) {          // extra cash from outside chores 
    already spent the floor absorbs it, which is the honest outcome — the money
    is gone, and pretending otherwise would put her in the red for a parent's
    correction. */
-function moneyTakeBackCash(kid, amount) {
+function moneyTakeBackCash(kid, amount, opts) {
   const w = ensureWallet(kid); amount = money2(amount);
   if (!(amount > 0)) return false;
-  w.cash = money2(Math.max(0, w.cash - amount)); saveAll(); return true;
+  const before = money2(w.cash);
+  w.cash = money2(Math.max(0, w.cash - amount));
+  /* Mirror what ACTUALLY left, not what was asked for: the floor above can
+     absorb part of it, and a stream line for money that never moved would put
+     the derived balance permanently below the stored one. */
+  /* BOTH ends are this function's to name, not just the one it leaves. A gift
+     being taken back passes the gift's own mirror fields as a label, and while
+     `to` was left caller-settable that made the movement cash → cash: a
+     self-transfer, net zero, and the debit never happened. If a function owns
+     the movement it owns every part of it. */
+  evMirror(kid, Object.assign({ kind: 'out' }, opts || {},
+                              { from: 'cash', to: 'returned',
+                                amount: money2(before - w.cash) }));
+  saveAll(); return true;
 }
-function moneyWithdraw(kid, amount) {         // kept ready → cash (two-way)
+function moneyWithdraw(kid, amount, opts) {         // kept ready → cash (two-way)
   const w = ensureWallet(kid); amount = money2(Math.min(amount, mnySavedTotal(kid)));
   if (amount <= 0) return false;
   const took = mnyTakeFromSaved(kid, amount);
-  w.cash = money2(w.cash + took); saveAll(); return true;
+  w.cash = money2(w.cash + took);
+  evMirror(kid, Object.assign({ kind: 'move' }, opts || {}, { from: 'ready', to: 'cash', amount: money2(took) }));
+  saveAll(); return true;
 }
-function moneyOpenGIC(kid, amount, termMonths) {   // cash → locked away
+function moneyOpenGIC(kid, amount, termMonths, opts) {   // cash → locked away
   const w = ensureWallet(kid); amount = money2(Math.min(amount, w.cash));
   const term = termMonths || 12;
   if (amount <= 0 || ![3, 6, 12].includes(term)) return false;
@@ -125,9 +167,11 @@ function moneyOpenGIC(kid, amount, termMonths) {   // cash → locked away
   mnyAddHolding(kid, { kind: 'gic', name: 'Locked away for a year', units: 1,
                        priceNow: amount, costBasis: amount, rateAnnual: rate,
                        termMonths: term, maturesOn: ctDateToKey(matures) });
+  evMirror(kid, Object.assign({ kind: 'locked', note: term + '-month lock' },
+                              opts || {}, { from: 'cash', to: 'locked', amount }));
   saveAll(); return true;
 }
-function moneyBuyStock(kid, ticker, dollars) {     // cash → a bit of a company
+function moneyBuyStock(kid, ticker, dollars, opts) {     // cash → a bit of a company
   const w = ensureWallet(kid); dollars = money2(Math.min(dollars, w.cash));
   if (dollars <= 0 || !STOCKS_2023[ticker]) return false;
   const price = stockPrice(ticker);
@@ -142,9 +186,11 @@ function moneyBuyStock(kid, ticker, dollars) {     // cash → a bit of a compan
     mnyAddHolding(kid, { kind: 'stock', name: STOCKS_2023[ticker].name, ticker,
                          units: dollars / price, priceNow: money2(price), costBasis: dollars });
   }
+  evMirror(kid, Object.assign({ kind: 'invest', note: STOCKS_2023[ticker].name },
+                              opts || {}, { from: 'cash', to: 'invest', amount: dollars }));
   saveAll(); return true;
 }
-function moneySellStock(kid, ref, shares) {        // a bit of a company → cash
+function moneySellStock(kid, ref, shares, opts) {        // a bit of a company → cash
   // `ref` is a holding id or a ticker: a company a parent typed in by hand has
   // no ticker, and it must be as sellable as one from the price table.
   const w = ensureWallet(kid);
@@ -161,7 +207,13 @@ function moneySellStock(kid, ref, shares) {        // a bit of a company → cas
   held.units = have - shares;
   held.updatedAt = syncNow();
   if (held.units < 1e-9) mnyRemoveHolding(kid, held.id);
-  w.cash = money2(w.cash + proceeds); saveAll(); return true;
+  w.cash = money2(w.cash + proceeds);
+  /* Proceeds, not cost. A company sold for more than it cost brings back more
+     than went in, and the difference is real money the stream has to carry or
+     the derived balance falls behind the stored one by exactly the gain. */
+  evMirror(kid, Object.assign({ kind: 'move', note: 'Sold ' + (held.name || 'a company') },
+                              opts || {}, { from: 'invest', to: 'cash', amount: proceeds }));
+  saveAll(); return true;
 }
 
 /* Bring the world up to today. The simulation runs on real calendar time
@@ -174,7 +226,13 @@ function moneyAdvanceMonth(kid) {
   return { interest: r.interest, matured: r.matured };
 }
 
-/* Kids may look at what they own on 💰 My money; every function that moves it
+/* These three took no `opts` until Move money needed one, so a movement they
+   made could not be LABELLED — the stream got "Sold a company" and never which
+   sheet asked for it or why. Structural fields (from, to, amount) are still
+   applied last, so a caller can name a movement and never redirect one; that
+   rule cost two silent defects in Stage 1 and is not relaxed here.
+
+   Kids may look at what they own on 💰 My money; every function that moves it
    is parent-only. This is the guard the old bank screen enforced, kept because
    the commit path and the rules page both still lean on it. */
 function moneyCanTransact() {

@@ -280,6 +280,17 @@ function mnySimCatchUp(kid, opts) {
       const term = (Number(h.termMonths) || 12) / 12;
       const payout = money2(value * (1 + (Number(h.rateAnnual) || 0) * term));
       w.cash = money2(w.cash + payout);
+      /* The whole payout comes back, principal and the interest it was promised
+         — so the stream says both: what was locked returns from `locked`, and
+         the extra is new money from `interest`. Booking the lot against
+         `locked` would derive a negative locked balance over time. */
+      evMirror(kid, { kind: 'move', from: 'locked', to: 'cash', amount: money2(value),
+                      ref: h.id, note: 'Unlocked ' + (h.name || 'locked money') });
+      if (money2(payout - value) > 0) {
+        evMirror(kid, { kind: 'interest', from: 'interest', to: 'cash',
+                        amount: money2(payout - value), ref: h.id,
+                        note: 'Interest on ' + (h.name || 'locked money') });
+      }
       matured.push({ id: h.id, name: h.name, amount: value, payout });
       mnyRemoveHolding(kid, h.id);
       moved = true;
@@ -298,6 +309,7 @@ function mnySimCatchUp(kid, opts) {
         h.units = 1;
         h.priceNow = money2(mnyHoldingValue(h) + add);
         interest = money2(interest + add);
+        evMirrorValueChange(kid, h.kind, add, { ref: h.id, note: 'Interest on ' + (h.name || 'her savings') });
         moved = true;
       }
     } else if (h.kind === 'stock' && h.ticker) {
@@ -305,7 +317,10 @@ function mnySimCatchUp(kid, opts) {
       // as it goes up, which is the entire point of holding one.
       const price = mnyPriceForMonth(h.ticker, today);
       if (price != null && money2(price) !== money2(h.priceNow)) {
+        const was = mnyHoldingValue(h);
         h.priceNow = money2(price);
+        evMirrorValueChange(kid, h.kind, money2(mnyHoldingValue(h) - was),
+                            { ref: h.id, note: (h.name || 'A company') + ' moved' });
         moved = true;
       }
     }
@@ -419,8 +434,14 @@ function mnyEditHolding(kid, holdingId, field, value) {
   const h = mnyEnsureHoldings(kid).find(x => x.id === holdingId);
   if (!h) return false;
   const num = ['units', 'priceNow', 'costBasis', 'rateAnnual'];
+  /* A parent keeping a holding truthful by hand is a real change in what she
+     has. Mirrored like any other, or the stream would derive a balance that
+     disagrees with the screen the moment a number is corrected. */
+  const was = mnyHoldingValue(h);
   h[field] = num.includes(field) ? Math.max(0, Number(value) || 0) : value;
   h.updatedAt = syncNow();
+  evMirrorValueChange(kid, h.kind, money2(mnyHoldingValue(h) - was),
+                      { kind: 'correction', ref: h.id, note: 'Corrected ' + (h.name || 'a holding') });
   saveAll();
   return true;
 }
@@ -616,6 +637,88 @@ function mnyRecentSavingRate(kid) {
    It records how much and where from. It does NOT record where it goes: that
    is decided on page 3 along with everything else in the pool.
    ════════════════════════════════════════════════════════════════ */
+/* How a gift is NAMED on the stream and on the flow diagram. "$50 · gift" says
+   nothing a child can hold on to; "Birthday money from Grandma" is the thing
+   she remembers, and `giver` exists precisely because `from` is a category and
+   never a person. One owner, because the movement, the ribbon and the month
+   card all print it and three copies would drift. */
+function mnyGiftLabel(d) {
+  const from = String((d && d.from) || 'A gift');
+  const giver = String((d && d.giver) || '').trim();
+  return giver ? from + ' from ' + giver : from;
+}
+/* The stream fields a gift movement carries, wherever it is credited. Dated to
+   the gift's OWN day, not to today — a red pocket arrives at New Year, and a
+   flow that files it under the month somebody typed it in is a flow that lies
+   about when her money came in. */
+function mnyGiftMirror(d) {
+  /* `to` is named explicitly even though a gift always lands in cash: the
+     migration adds these rows up itself to work out an opening balance, and an
+     absent destination reads there as "went nowhere" — which put every gift on
+     the stream twice over. A movement says both ends, always. */
+  return { kind: 'gift', from: 'gift', to: 'cash',
+           dayKey: (d && d.dayKey) || todayKey(),
+           weekKey: (d && d.weekKey) || null, ref: (d && d.id) || null,
+           note: mnyGiftLabel(d) };
+}
+
+/* ── WHEN IT ARRIVED, AND WHICH MEETING DECIDES IT ─────────────────
+   Two different questions, and a gift needs both answered separately.
+
+   `dayKey` is WHEN IT CAME — the birthday, the New Year, the Saturday somebody
+   sold something. It is what the flow diagram and the month history read, and
+   getting it wrong files a red pocket in the wrong month of her life. Until
+   now it was hardcoded to `todayKey()` with no form offering a date at all.
+
+   `weekKey` is WHICH SUNDAY DECIDES WHERE IT GOES. A settled week's split has
+   already run and its ledger is frozen, so it cannot decide anything more: the
+   gift keeps its real date and is decided at the next still-open meeting.
+
+   Before this, the week came from whatever week the PLANNER happened to be
+   showing, and a gift landing in a committed week called `mnyReopenWeek`, which
+   returns false for exactly that case — so the gift credited her cash and then
+   belonged to no week's split at all, silently. */
+function mnyGiftWeekFor(kid, dayKey) {
+  const from = mnyWeekOfDay(dayKey);
+  if (!mnyIsCommitted(from, kid)) return from;
+  /* Walk forward to the first week that can still decide it. Bounded by a year
+     rather than `while (true)`: a wrong device clock must not spin. Landing on
+     the current week is the honest floor — a week that has not happened cannot
+     have been settled, so the loop always terminates on something real. */
+  const d = formatDayKey(from);
+  for (let i = 0; i < 53; i++) {
+    d.setDate(d.getDate() + 7);
+    const wk = ctDateToKey(d);
+    if (!mnyIsCommitted(wk, kid)) return wk;
+  }
+  return mnyWeekKey();
+}
+
+/* Which week a day belongs to, named the way the PLANNER names it.
+
+   `ctWeekKeyForDate` goes through `ctMondayOf`, which reads the device's raw
+   clock; `ctThisWeekKey` goes through `getWeekStart`, which goes through the
+   app's timezone. CLAUDE.md records that these two can name DIFFERENT MONDAYS
+   for part of every day, and that the disagreement already cost this repo a
+   defect once. A gift filed under the raw-clock Monday while every money
+   surface reads the planner's would be invisible in its own week — so for
+   today, the planner's name wins, and only an older day goes through the
+   date-walking path where no such second opinion exists. */
+function mnyWeekOfDay(dayKey) {
+  const day = dayKey || todayKey();
+  if (typeof ctWeekKeyForDate !== 'function') return mnyWeekKey();
+  const raw = ctWeekKeyForDate(day);
+  return raw === ctWeekKeyForDate(todayKey()) ? mnyWeekKey() : raw;
+}
+
+/* Is this gift's decision happening somewhere other than the week it arrived
+   in? The forms say so out loud rather than letting a parent discover it. */
+function mnyGiftDecidedElsewhere(kid, dayKey) {
+  const arrived = mnyWeekOfDay(dayKey);
+  const decides = mnyGiftWeekFor(kid, dayKey);
+  return String(arrived) === String(decides) ? null : decides;
+}
+
 function mnyEnsureDeposits(kid) {
   const p = getProfData(kid);
   if (!Array.isArray(p.deposits)) p.deposits = [];
@@ -647,6 +750,12 @@ function mnyAddDeposit(kid, weekKey, fields) {
     id: mrNewId('dep-'), weekKey, amount: 0, from: MNY_FROM[0], giver: '',
     dayKey: todayKey(), appliedAt: null, createdAt: syncNow(), updatedAt: syncNow(),
   }, fields || {});
+  /* The week follows the DAY, not the caller's idea of "this week". A caller
+     that passes no dayKey still gets today's week, so nothing that already
+     works changes; a dated gift is filed where it belongs, and one dated into a
+     settled week is decided at the next open meeting instead of belonging
+     nowhere. */
+  d.weekKey = mnyGiftWeekFor(kid, d.dayKey);
   d.amount = money2(d.amount);
   if (!(d.amount > 0)) return null;
   d.giver = String(d.giver || '').trim().slice(0, 40);
@@ -655,7 +764,7 @@ function mnyAddDeposit(kid, weekKey, fields) {
     d.pendingApproval = true;
   } else {
     // A grown-up's own entry needs no approval and lands at once.
-    moneyAddCash(kid, d.amount);
+    moneyAddCash(kid, d.amount, mnyGiftMirror(d));
     d.appliedAt = Date.now();
   }
   mnyEnsureDeposits(kid).push(d);
@@ -671,8 +780,77 @@ function mnyApproveDeposit(kid, depositId) {
   const d = mnyEnsureDeposits(kid).find(x => x.id === depositId);
   if (!d || !d.pendingApproval) return false;
   delete d.pendingApproval;
-  if (!d.appliedAt) { moneyAddCash(kid, d.amount); d.appliedAt = Date.now(); }
+  if (!d.appliedAt) { moneyAddCash(kid, d.amount, mnyGiftMirror(d)); d.appliedAt = Date.now(); }
   markItemUpdated(d);
+  mnyReopenWeek(kid, d.weekKey);
+  saveAll();
+  return true;
+}
+
+/* The stream event a gift wrote, found by the id it carries as `ref`. A
+   correction has to reverse THE MOVEMENT THAT HAPPENED, not write an opposite
+   one and hope the two cancel — the second leaves the original unmarked, so the
+   history shows two unrelated rows and nothing says one undid the other. */
+function mnyGiftEvent(kid, depositId) {
+  if (typeof evList !== 'function') return null;
+  const rows = evList(kid).filter(e => e && e.ref === depositId && e.kind === 'gift');
+  // The newest un-reversed one: a gift edited twice has a chain behind it.
+  const reversed = new Set(evList(kid).map(e => e && e.reverses).filter(Boolean));
+  const live = rows.filter(e => !reversed.has(e.id));
+  return live.length ? live[live.length - 1] : null;
+}
+
+/* ── EDITING A GIFT ────────────────────────────────────────────────
+   There was no edit path at all: a typo meant delete-and-retype, which debited
+   her wallet and re-credited it, and left two unexplained rows in the history.
+
+   An applied gift moves the wallet by the DIFFERENCE only, and the stream
+   records it as a reversal plus a new movement — so a child asking "what
+   happened to my $50" sees both the entry and its correction rather than a
+   history that quietly lost its mistake. A gift still waiting on a grown-up has
+   moved nothing, so it simply edits. */
+function mnyEditDeposit(kid, depositId, fields) {
+  if (!isParent()) { showToast('A grown-up records this 🔒'); return false; }
+  const d = mnyEnsureDeposits(kid).find(x => x.id === depositId);
+  if (!d) return false;
+  const f = fields || {};
+  const wasAmount = money2(d.amount);
+  const wasApplied = !!d.appliedAt;
+
+  if (f.amount != null) {
+    const next = money2(f.amount);
+    if (!(next > 0)) { showToast('An amount, like 20'); return false; }
+    d.amount = next;
+  }
+  if (f.from != null) d.from = f.from;
+  if (f.giver != null) d.giver = String(f.giver).trim().slice(0, 40);
+  if (f.dayKey) {
+    d.dayKey = f.dayKey;
+    d.weekKey = mnyGiftWeekFor(kid, f.dayKey);
+  }
+  markItemUpdated(d);
+
+  if (wasApplied) {
+    /* THE WALLET MOVES BY THE DIFFERENCE, AND SO DOES THE STREAM.
+
+       The first attempt reversed the original event in full and then moved the
+       wallet by the delta — two different amounts, so the derived balance fell
+       behind the stored one by the whole gift. A full reversal is not what an
+       edit IS: $50 corrected to $30 is a twenty-dollar adjustment, not a
+       fifty-dollar undo followed by a thirty-dollar re-gift.
+
+       The original row stays exactly as written, which is what keeps the
+       mistake readable; the correction sits beside it saying what changed. */
+    const delta = money2(d.amount - wasAmount);
+    const note = 'Corrected to ' + mnyMoney(d.amount) + ' — ' + mnyGiftLabel(d);
+    if (delta > 0) {
+      moneyAddCash(kid, delta, { kind: 'correction', from: 'gift', ref: d.id,
+                                 dayKey: d.dayKey, weekKey: d.weekKey, note });
+    } else if (delta < 0) {
+      moneyTakeBackCash(kid, money2(-delta), {
+        kind: 'correction', ref: d.id, dayKey: todayKey(), note });
+    }
+  }
   mnyReopenWeek(kid, d.weekKey);
   saveAll();
   return true;
@@ -687,7 +865,26 @@ function mnyRemoveDeposit(kid, depositId) {
   /* If it already reached the wallet, taking the record away has to take the
      money with it. A removal that left the cash behind would be a gift that
      exists only as a number nobody can account for. */
-  if (gone.appliedAt) moneyTakeBackCash(kid, gone.amount);
+  if (gone.appliedAt) {
+    /* Labels only, through the one writer that owns a debit from cash.
+       `moneyTakeBackCash` mirrors WHAT ACTUALLY LEFT — it floors at zero, so a
+       gift already spent gives back only what is there — and that floor is
+       exactly why this cannot be an `evReverse`: a reversal copies the
+       original's amount, so removing a spent gift would debit the stream by
+       more than the wallet could give back and the two would disagree forever.
+
+       `reverses` still rides along when the whole gift came back, so the
+       original row is MARKED as undone rather than left standing beside a debit
+       that looks unrelated. When the floor bit, it is genuinely a partial
+       correction and does not claim to be a reversal. */
+    const orig = mnyGiftEvent(kid, gone.id);
+    const w = ensureWallet(kid);
+    const whole = money2(w.cash) >= money2(gone.amount);
+    moneyTakeBackCash(kid, gone.amount, Object.assign(
+      { kind: 'correction', ref: gone.id, dayKey: todayKey(),
+        note: 'Gift removed — ' + mnyGiftLabel(gone) },
+      (orig && whole) ? { reverses: orig.id } : {}));
+  }
   ensureTombstones()['dep:' + gone.id] = Date.now();
   if (gone.weekKey) mnyReopenWeek(kid, gone.weekKey);
   saveAll();

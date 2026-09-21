@@ -4328,12 +4328,12 @@ function findChromium() {
   // empty chart proves only that nothing threw.
   await page.evaluate(() => {
     const cur = ctMondayOf(formatDayKey(ctWeekKey));
-    // Weeks before moneyModelStartWeek resolve through the RETIRED model and
-    // correctly show nothing here. Walk the start back so this window is all
-    // new-model weeks — i.e. a family two months into the current rules.
+    // One money model for every week now, so nothing has to be walked back for
+    // these bars to draw. The start date still has to cover the window, or the
+    // weeks sit before the family's own record.
     const back = new Date(cur); back.setDate(cur.getDate() - 8 * 7);
     ctEnsureShared();
-    state.shared.chore.moneyModelStartWeek = ctDateToKey(back);
+    state.shared.chore.programStartDate = ctDateToKey(back);
     for (let i = 1; i < 8; i++) {
       const d = new Date(cur); d.setDate(cur.getDate() - i * 7);
       const wk = ctDateToKey(d);
@@ -4776,9 +4776,20 @@ function findChromium() {
      it says what they are, and cutting them would mean a card that does not
      name its own activity. So the variant carries its own number and the bare
      screen keeps the 200. Tighten this whenever the real figure drops. */
+  /* ── 2026-09-21, screen-mymoney 200 → 204, owner's call ──
+     The wallet card grew its Move door (`mnyMoveDoor`, js/22-money-page1.js).
+     Until Stage 3 the only way a dollar left cash was the Sunday split, so a
+     gift that arrived on a Tuesday sat there whatever anybody wanted — and a
+     door that exists only on the parent's rules page is a door a child does
+     not have. Four words buy a control that was not there, which is the same
+     call as the 2026-08-10 raise: where a word buys something not misleading,
+     the word wins. Tighten it whenever the real number drops.
+
+     The owner has asked for the 200-word budget to be removed everywhere; that
+     is its own change, to the rule and not to one number. */
   const WORD_BUDGET = { 'screen-today': 200, 'screen-week': 200,
                         'screen-week/planned': 208,
-                        'screen-mymoney': 200, 'screen-chore': 261 };
+                        'screen-mymoney': 204, 'screen-chore': 261 };
   const KID_SCREENS = [
     // Today is held to the full 200 with no ratchet: it was built to these rules
     // rather than measured against them afterwards, which was the point of
@@ -5493,6 +5504,867 @@ function findChromium() {
         && blockedNoAnswer && moved && notHeldYet && reversed;
   });
 
+  /* ── THE MONEY STREAM AGREES WITH THE WALLET ──────────────────────
+     js/40-stream.js records every movement of money — where it came from and
+     where it went — and derives every balance from those, instead of trusting
+     one stored `wallet.cash` that eight separate functions had to remember to
+     update. Stage 1 runs it in SHADOW: both are written, nothing on screen
+     reads the stream yet, and this is the check that licenses retiring the
+     stored number.
+
+     It drives the REAL writers — a settlement, a gift, money into savings, a
+     loan payment, a company bought and sold — and then asks whether the two
+     ways of counting arrive at the same figure. `evShadowDrift` returns the
+     findings rather than a boolean, so a failure says WHICH pot drifted and by
+     how much; a bare `true` here would be a check that reports a problem and
+     returns success, which is the exact shape CLAUDE.md records twice. */
+  checks.theMoneyStreamAgreesWithTheWallet = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jenn', wk = ctWeekKey, c = state.shared.chore;
+    ['meetingsHeld', 'finalizedWeeks', 'moneyLedger', 'weekConfirms', 'weekPlans', 'xpAwardedWeeks']
+      .forEach(m => { if (c[m]) delete c[m][wk]; });
+    const pd = getProfData(kid);
+    pd.deposits = []; pd.competitions = []; pd.honesty = []; pd.holdings = [];
+    pd.events = [];                     // a clean stream, so drift is this test's
+    delete pd.debts;
+    ensureWallet(kid).cash = 0;
+    mrEnsureEarnings(kid, wk).overrides = {};
+
+    const problems = [];
+    const drift = (where) => {
+      const found = evShadowDrift(kid);
+      if (found.length) problems.push(where + ': ' + found.join(', '));
+    };
+
+    // An empty stream and an empty wallet already agree — the base case, and
+    // the one that would hide a sign error in every case after it.
+    drift('at the start');
+
+    // 1 · money arrives: a settled week and a birthday gift on their own days.
+    //     Four chores, not two: the first two each week are free by the rules,
+    //     so a two-chore week pays nothing and would prove nothing here.
+    ['dishes', 'mop', 'vacuum', 'bins'].forEach((ch, i) => mrSetChoreGrade(kid, wk, i, ch, 3));
+    mnyAddDeposit(kid, wk, { amount: 50, from: 'Birthday money', giver: 'Grandma' });
+    commitKidWeek(wk, kid);
+    drift('after a week was settled and a gift arrived');
+
+    // 2 · money moves between pots, and out to a company and back.
+    const cash = mnyCash(kid);
+    if (cash > 20) {
+      moneyDeposit(kid, 10);            // cash → kept ready
+      drift('after putting money aside');
+      moneyWithdraw(kid, 4);            // and back again
+      drift('after taking some of it back');
+      moneyOpenGIC(kid, 5, 12);         // cash → locked away
+      drift('after locking money away');
+      mnyBuyChosenFund(kid, 5);         // cash → a company
+      drift('after buying into a company');
+      const held = mnyHoldingsOfKind(kid, 'stock')[0];
+      if (held) {
+        mnyEditHolding(kid, held.id, 'priceNow', money2(money2(held.priceNow) + 3));
+        drift('after the company went up');
+        mnyEditHolding(kid, held.id, 'priceNow', money2(Math.max(0, money2(held.priceNow) - 7)));
+        drift('after the company went down');
+      }
+    } else {
+      problems.push('the seeded week earned too little to move anything: ' + cash);
+    }
+
+    // 3 · a gift taken back takes its money with it.
+    const gift = (pd.deposits || [])[0];
+    if (gift) { mnyRemoveDeposit(kid, gift.id); drift('after a gift was taken back'); }
+    else problems.push('the gift was not recorded at all');
+
+    // 4 · and the stream can say what the wallet never could: where it came
+    //     from, where it went, and that a settled week is a settled week.
+    const flow = evFlow(kid, null, null);
+    if (!(flow.sources.earned > 0)) problems.push('nothing is recorded as earned');
+    if (!(flow.dests.ready > 0)) problems.push('money put aside is not on the flow');
+    if (!evWeekIsSettled(kid, wk)) problems.push('the settled week is not on the stream');
+    // Every dollar in hand is accounted for by what came in and what went out.
+    if (money2(flow.inTotal - flow.outTotal) !== evWorth(kid)) {
+      problems.push('in minus out does not equal what she has: '
+        + money2(flow.inTotal - flow.outTotal) + ' vs ' + evWorth(kid));
+    }
+
+    return problems.length ? problems : true;
+  });
+
+  /* ── MONEY CAN MOVE BETWEEN SUNDAYS ──────────────────────────────
+     Until now the ONLY way a dollar left cash was the Sunday split. The two
+     doors that existed went one way — kept-ready back to cash, a company back
+     to cash — and both were buried on the parent's Money rules page. So a gift
+     that arrived on a Tuesday sat in cash until the following Sunday whatever
+     anybody wanted, which is the "$50 with nowhere to go" that started this.
+
+     The gates matter more than the movement: Money school opens the pots as the
+     loan comes down, and a sheet that moved money into a pot she has not
+     reached would make the whole ladder decorative. */
+  checks.moneyCanMoveOutsideAMeeting = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jenn', pd = getProfData(kid);
+    const savedHold = (pd.holdings || []).slice();
+    const savedReq = (pd.moveRequests || []).slice();
+    const savedEvents = (pd.events || []).slice();
+    const savedDebts = pd.debts ? JSON.parse(JSON.stringify(pd.debts)) : null;
+    /* The seeded cash is an UNMIRRORED write, so it is drift this check makes
+       and must take away with it: `aGiftHasADate`, thirty checks later, reads
+       `evShadowDrift` absolutely and would otherwise report this fixture's
+       leftovers as a defect in dating a gift. */
+    const savedCash = ensureWallet(kid).cash;
+    const r = mrRules();
+    const savedUnlock = JSON.parse(JSON.stringify((r.school || {}).unlockStage || {}));
+    try {
+      pd.holdings = []; pd.moveRequests = [];
+      ensureWallet(kid).cash = 100;
+      // Money school fully open, so the movement itself is what is measured.
+      if (!r.school) r.school = {};
+      r.school.unlockStage = Object.assign({}, savedUnlock, { [kid]: 4 });
+
+      const cash0 = mnyCash(kid);
+      const stream0 = evBalance(kid, 'cash');
+
+      // ── cash → kept ready → cash, both ways, both mirrored.
+      if (!mnyMoveMoney(kid, 'cash', 'ready', 25)) problems.push('cash to kept-ready was refused');
+      if (mnySavedTotal(kid) !== 25) problems.push('kept ready holds ' + mnySavedTotal(kid) + ', not 25');
+      if (mnyCash(kid) !== money2(cash0 - 25)) problems.push('cash did not go down by 25');
+      if (!mnyMoveMoney(kid, 'ready', 'cash', 10)) problems.push('kept-ready back to cash was refused');
+      if (mnySavedTotal(kid) !== 15) problems.push('kept ready holds ' + mnySavedTotal(kid) + ', not 15');
+      // Stream and wallet moved together — the whole contract of Stage 1.
+      if (money2(evBalance(kid, 'cash') - stream0) !== money2(mnyCash(kid) - cash0)) {
+        problems.push('the stream and the wallet disagree about the move');
+      }
+      // Every movement is NAMED, which is what the old one-way doors never did.
+      const moves = evList(kid).filter(e => e && e.kind === 'move' && e.note);
+      if (!moves.length) problems.push('a move reached the stream with nothing said about it');
+
+      // ── The refusals a child must be told, not silently denied.
+      if (!mnyMoveRefusal(kid, 'cash', 'cash', 5)) problems.push('moving money to where it already is was allowed');
+      if (!mnyMoveRefusal(kid, 'cash', 'ready', 0)) problems.push('a zero move was allowed');
+      if (!mnyMoveRefusal(kid, 'cash', 'ready', 99999)) problems.push('she could move money she does not have');
+      if (!mnyMoveRefusal(kid, 'locked', 'cash', 5)) problems.push('locked money came out early');
+
+      // ── The Money-school gate, with the ladder back where it starts.
+      r.school.unlockStage = Object.assign({}, savedUnlock, { [kid]: 0 });
+      if (typeof mnyTotalPrincipal === 'function' && mnyTotalPrincipal(kid) > 0) {
+        const gated = mnyMoveRefusal(kid, 'cash', 'invest', 5);
+        if (!gated) problems.push('companies were open before Money school opened them');
+        else if (!/Opens at/.test(gated)) problems.push('the refusal does not say when it opens: ' + gated);
+        if (mnyMoveMoney(kid, 'cash', 'invest', 5)) problems.push('the gate greyed the row but the move still ran');
+      }
+      r.school.unlockStage = Object.assign({}, savedUnlock, { [kid]: 4 });
+
+      // ── She proposes; it waits; a grown-up says yes.
+      profile = 'jenn';
+      const req = mnyRequestMove(kid, 'cash', 'ready', 5, 'for my bike');
+      if (!req) { problems.push('a child could not ask'); return problems; }
+      if (mnyPendingMoves(kid).length !== 1) problems.push('the request is not waiting');
+      /* A request nobody can answer is worse than one that cannot be made, so
+         the answering surface has to exist BEFORE the asking one. Both halves:
+         a grown-up is told, and the control to answer is on the page. */
+      profile = 'parent';
+      const qrow = pnQueueRows().find(r => r.action === 'moves');
+      if (!qrow) problems.push('a waiting move is not in the Waiting-on-you queue');
+      else if (!/5/.test(qrow.sub)) problems.push('the queue row does not say how much: ' + qrow.sub);
+      const card = mnyMoveRequestsCard(kid);
+      if (!/data-mnyp-action="mvok"/.test(card) || !/data-mnyp-action="mvno"/.test(card)) {
+        problems.push('the money page offers no way to answer the request');
+      }
+      if (!/for my bike/.test(card)) problems.push('the card drops her reason for asking');
+      profile = 'jenn';
+      const heldReady = mnySavedTotal(kid);
+      if (mnyMoveMoney(kid, 'cash', 'ready', 5)) problems.push('a child moved money without asking');
+      if (mnySavedTotal(kid) !== heldReady) problems.push('a refused move moved money anyway');
+
+      profile = 'parent';
+      if (!mnyApproveMove(kid, req.id)) problems.push('a grown-up could not approve it');
+      if (mnySavedTotal(kid) !== money2(heldReady + 5)) problems.push('approving moved nothing');
+      if (mnyPendingMoves(kid).length !== 0) problems.push('an answered request is still waiting');
+      // Twice is once: two devices will each see the row.
+      if (mnyApproveMove(kid, req.id)) problems.push('approving twice moved the money twice');
+
+      // A refusal is an answer, and stays readable.
+      const no = mnyRequestMove(kid, 'cash', 'ready', 5, 'again');
+      mnyRejectMove(kid, no.id, 'we talked about it');
+      const kept = mnyEnsureMoveRequests(kid).find(x => x.id === no.id);
+      if (!kept || !kept.rejectedAt) problems.push('a refused request was thrown away rather than answered');
+      if (mnyPendingMoves(kid).length !== 0) problems.push('a refused request is still waiting');
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      profile = 'parent';
+      pd.holdings = savedHold;
+      pd.moveRequests = savedReq;
+      pd.events = savedEvents;
+      ensureWallet(kid).cash = savedCash;
+      if (savedDebts) pd.debts = savedDebts;
+      const rr = mrRules();
+      if (rr.school) rr.school.unlockStage = savedUnlock;
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── EVERY RECORD HAS ONE DOOR ────────────────────────────────────
+     Five facts, five entry roads, none of them complete and three of them
+     chains of sequential prompt dialogs — eleven of them for a meet result.
+     A prompt chain is the worst shape a form can have: you cannot see what you
+     already answered, you cannot change it, and backing out of the last one
+     throws away all of it.
+
+     What this asserts is that the sheet REACHES EVERY WRITER — not that it
+     renders. A door that opens onto nothing is exactly the defect
+     `aLegacyRoutineCarryIsOfferedAgain` records: the app said "Attached ✅" and
+     no to-do existed, and the check of the day asserted the FIELD rather than
+     the consequence, so it passed green over a complete no-op. */
+  checks.everyRecordHasOneDoor = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jenn', wk = ctWeekKey;
+    const pd = getProfData(kid);
+    const savedDeps = (pd.deposits || []).slice();
+    const savedComps = (pd.competitions || []).slice();
+    const savedFines = (pd.fines || []).slice();
+    const savedEvents = (pd.events || []).slice();
+    const savedHold = (pd.holdings || []).slice();
+    const savedReq = (pd.moveRequests || []).slice();
+    const savedCash = ensureWallet(kid).cash;
+    /* The grade this check records is real money in a real week, so the week's
+       earnings go back exactly as they were. Thirty checks run after this one
+       and every money figure they read is the same week. */
+    const savedEarn = JSON.parse(JSON.stringify(mrEnsureEarnings(kid, wk)));
+    const keys = mrWeekDayKeys(wk);
+    const savedBlocks = keys.map(k => (getDayBlocks(k, kid) || []).slice());
+    const r = mrRules();
+    const savedUnlock = JSON.parse(JSON.stringify((r.school || {}).unlockStage || {}));
+    try {
+      pd.deposits = []; pd.competitions = []; pd.fines = [];
+      pd.holdings = []; pd.moveRequests = [];
+      keys.forEach(k => setDayBlocks(k, [], kid));
+      ensureWallet(kid).cash = 100;
+      if (!r.school) r.school = {};
+      r.school.unlockStage = Object.assign({}, savedUnlock, { [kid]: 4 });
+
+      // ── The sheet asks which record this is when nobody has said.
+      openRecordSheet({ kid });
+      if (!rcDraft) { problems.push('the sheet did not open'); return problems; }
+      if (rcDraft.kind) problems.push('it chose a record for a parent who had not');
+      const shown = document.getElementById('recordBody').innerHTML;
+      RC_KINDS.forEach(k => {
+        if (shown.indexOf('data-rc-id="' + k.id + '"') < 0) {
+          problems.push('a parent is not offered ' + k.id);
+        }
+      });
+
+      // ── 🏆 a meet, which also has to place its block (the Stage 3 join).
+      const satKey = keys[5];
+      openRecordSheet({ kind: 'meet', kid, dayKey: satKey });
+      Object.assign(rcDraft, { name: 'Winter Invitational', sport: 'swim', points: 12 });
+      rcSave();
+      const comp = mrCompetitions(kid).find(c => c && c.name === 'Winter Invitational');
+      if (!comp) problems.push('the meet never reached mrAddCompetition');
+      else {
+        if (comp.dayKey !== satKey) problems.push('the meet lost the day it was given');
+        const block = (getDayBlocks(satKey, kid) || []).find(b => b && b.compId === comp.id);
+        if (!block) problems.push('recording a meet drew no block on the calendar');
+      }
+      if (rcDraft) problems.push('the sheet stayed open after recording');
+
+      // Correcting it goes through the SAME door, keeping the id.
+      if (comp) {
+        openRecordSheet({ kind: 'meet', kid, id: comp.id });
+        if (rcDraft.name !== 'Winter Invitational') problems.push('the correction form did not load the meet');
+        rcDraft.points = 20;
+        rcSave();
+        const again = mrCompetitions(kid).filter(c => c && c.name === 'Winter Invitational');
+        if (again.length !== 1) problems.push('correcting a meet made a second one');
+        else if (again[0].points !== 20) problems.push('the correction was not saved');
+      }
+
+      // ── 🎁 a gift.
+      openRecordSheet({ kind: 'gift', kid });
+      Object.assign(rcDraft, { amount: 25, from: 'Birthday money', giver: 'Grandma' });
+      rcSave();
+      if (!mnyEnsureDeposits(kid).some(d => d && money2(d.amount) === 25)) {
+        problems.push('the gift never reached mnyAddDeposit');
+      }
+
+      // ── 📦 a fine, from the week's own catalog.
+      const fineItems = ((mrRulesForWeek(wk).fines) || {}).items || [];
+      if (fineItems.length) {
+        openRecordSheet({ kind: 'fine', kid, dayKey: keys[0] });
+        rcDraft.fineId = fineItems[0].id;
+        rcSave();
+        if (!mrFines(kid).some(f => f && f.itemId === fineItems[0].id)) {
+          problems.push('the fine never reached mrAddFine');
+        }
+      }
+
+      // ── 🧹 a chore grade.
+      const pool = mrChoresForDay(kid, wk, 0);
+      if (pool.rows.length) {
+        const choreId = pool.rows[0].row.id;
+        openRecordSheet({ kind: 'chore', kid, dayKey: keys[0] });
+        Object.assign(rcDraft, { choreId, grade: 2 });
+        rcSave();
+        if (mrGetChoreGrade(kid, wk, 0, choreId) !== 2) {
+          problems.push('the grade never reached mrSetChoreGrade');
+        }
+      }
+
+      // ── 🔀 a move.
+      const ready0 = mnySavedTotal(kid);
+      openRecordSheet({ kind: 'move', kid });
+      Object.assign(rcDraft, { moveFrom: 'cash', moveTo: 'ready', amount: 15, why: 'my bike' });
+      rcSave();
+      if (mnySavedTotal(kid) !== money2(ready0 + 15)) problems.push('the move never reached mnyMoveMoney');
+
+      // ── A child gets the two that are hers, and none of the three that are a
+      //    grown-up's judgement about her week.
+      profile = 'jenn';
+      const hers = rcKindsFor().map(k => k.id).sort().join(',');
+      if (hers !== 'gift,move') problems.push('a child is offered ' + hers);
+      openRecordSheet({ kind: 'move', kid });
+      Object.assign(rcDraft, { moveFrom: 'cash', moveTo: 'ready', amount: 5, why: 'saving' });
+      const beforeAsk = mnySavedTotal(kid);
+      rcSave();
+      if (mnySavedTotal(kid) !== beforeAsk) problems.push("a child's move moved money without asking");
+      if (mnyPendingMoves(kid).length !== 1) problems.push("a child's move did not wait for a grown-up");
+      profile = 'parent';
+
+      // ── The prompt chains are GONE, not merely bypassed. A retired chain left
+      //    reachable is a second entry road with different rules.
+      if (typeof ctPromptCompetition !== 'undefined') problems.push('ctPromptCompetition is still here');
+      if (typeof mnyPromptGift !== 'undefined') problems.push('mnyPromptGift is still here');
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      if (typeof closeRecordSheet === 'function') closeRecordSheet();
+      profile = 'parent';
+      pd.deposits = savedDeps; pd.competitions = savedComps; pd.fines = savedFines;
+      pd.events = savedEvents; pd.holdings = savedHold; pd.moveRequests = savedReq;
+      ensureWallet(kid).cash = savedCash;
+      getProfData(kid).earnings[wk] = savedEarn;
+      keys.forEach((k, i) => setDayBlocks(k, savedBlocks[i], kid));
+      const rr = mrRules();
+      if (rr.school) rr.school.unlockStage = savedUnlock;
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── A GIFT HAS A DATE, AND TWO QUESTIONS ─────────────────────────
+     `mnyAddDeposit` hardcoded `dayKey: todayKey()` and NO FORM ANYWHERE offered
+     a date, so a birthday recorded a fortnight later sat in the wrong month of
+     her history. Worse, the week came from whatever week the PLANNER happened
+     to be showing — and a gift landing in a committed week called
+     `mnyReopenWeek`, which returns false for exactly that case, so the gift
+     credited her cash and then belonged to no week's split at all, silently.
+
+     Two fields, two questions: `dayKey` is when it came, `weekKey` is which
+     Sunday decides where it goes. */
+  checks.aGiftHasADate = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jenn', c = state.shared.chore;
+    const pd = getProfData(kid);
+    const savedDeps = (pd.deposits || []).slice();
+    const savedEvents = (pd.events || []).slice();
+    const savedPlans = JSON.parse(JSON.stringify(c.weekPlans || {}));
+    try {
+      pd.deposits = [];
+      // A birthday three weeks ago, recorded today.
+      const back = formatDayKey(todayKey()); back.setDate(back.getDate() - 21);
+      const birthday = ctDateToKey(back);
+      const itsWeek = ctWeekKeyForDate(birthday);
+
+      const g = mnyAddDeposit(kid, ctWeekKey, {
+        amount: 50, from: 'Birthday money', giver: 'Grandma', dayKey: birthday });
+      if (!g) { problems.push('the gift was not recorded'); return problems; }
+      if (g.dayKey !== birthday) problems.push('the gift lost its own date: ' + g.dayKey);
+      if (g.weekKey !== itsWeek) problems.push('an open week did not decide it: ' + g.weekKey);
+      // It reads in the month it arrived, which is the whole point.
+      const flow = evFlow(kid, birthday, birthday);
+      if (!(flow.sources.gift >= 50)) {
+        problems.push('the gift is not on the flow for the day it arrived');
+      }
+
+      // ── Now the same gift into a SETTLED week.
+      pd.deposits = [];
+      if (!c.weekPlans) c.weekPlans = {};
+      if (!c.weekPlans[itsWeek]) c.weekPlans[itsWeek] = {};
+      c.weekPlans[itsWeek][kid] = { planId: 'balanced', committedAt: syncNow() };
+      if (!mnyIsCommitted(itsWeek, kid)) problems.push('the fixture did not settle the week');
+
+      const g2 = mnyAddDeposit(kid, ctWeekKey, {
+        amount: 20, from: 'A gift', dayKey: birthday });
+      if (!g2) { problems.push('a gift into a settled week was refused outright'); return problems; }
+      if (g2.dayKey !== birthday) problems.push('it lost its date to protect a settled week');
+      if (g2.weekKey === itsWeek) problems.push('a settled week was given something to decide');
+      if (mnyIsCommitted(g2.weekKey, kid)) problems.push('it was handed to another settled week');
+      // And the app can say so rather than leaving a parent to find out.
+      if (!mnyGiftDecidedElsewhere(kid, birthday)) {
+        problems.push('nothing says the decision moved to another week');
+      }
+      // The settled week is still settled — nothing reopened it.
+      if (!mnyIsCommitted(itsWeek, kid)) problems.push('recording a gift reopened a settled week');
+
+      // ── No caller regression: a gift with no date is still today's week.
+      pd.deposits = [];
+      const plain = mnyAddDeposit(kid, ctWeekKey, { amount: 5, from: 'A gift' });
+      if (!plain || plain.dayKey !== todayKey()) {
+        problems.push('an undated gift no longer falls back to today');
+      }
+      evShadowDrift(kid).forEach(d => problems.push('after dating gifts — ' + d));
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      pd.deposits = savedDeps;
+      pd.events = savedEvents;
+      c.weekPlans = savedPlans;
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── A CORRECTION IS A REVERSAL, NEVER A SILENT EDIT ──────────────
+     Neither a gift nor a meet could be edited at all: a typo meant
+     delete-and-retype, which for a gift debited the wallet and re-credited it
+     and left two unexplained rows, and for a meet minted a new id — breaking
+     the link to its block and making the planned meet read as unrecorded again.
+
+     The wallet must move by the DIFFERENCE only, and both the mistake and its
+     correction must stay readable. */
+  checks.aCorrectionIsAReversal = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey;
+    const pd = getProfData(kid);
+    const savedDeps = (pd.deposits || []).slice();
+    const savedComps = (pd.competitions || []).slice();
+    const savedEvents = (pd.events || []).slice();
+    const keys = mrWeekDayKeys(wk);
+    const savedBlocks = keys.map(k => (getDayBlocks(k, kid) || []).slice());
+    try {
+      pd.deposits = []; pd.competitions = [];
+      keys.forEach(k => setDayBlocks(k, [], kid));
+
+      /* ── A gift typed as $50 that was really $30.
+         Drift is measured as a DELTA, not as absolute agreement: earlier checks
+         in this suite set `ensureWallet(kid).cash` by hand to seed a fixture,
+         which no writer can mirror, so jess's stream and wallet are already
+         apart before this runs. What matters is that a correction moves both by
+         the same amount — which is exactly what the first attempt got wrong,
+         reversing the whole original while the wallet moved by the difference. */
+      const cash0 = mnyCash(kid);
+      const stream0 = evBalance(kid, 'cash');
+      const g = mnyAddDeposit(kid, wk, { amount: 50, from: 'Birthday money', giver: 'Grandma' });
+      if (mnyCash(kid) !== money2(cash0 + 50)) problems.push('the gift did not credit 50');
+      mnyEditDeposit(kid, g.id, { amount: 30 });
+      if (mnyCash(kid) !== money2(cash0 + 30)) {
+        problems.push('correcting 50 to 30 left ' + mnyCash(kid) + ', not ' + money2(cash0 + 30));
+      }
+      if (money2(evBalance(kid, 'cash') - stream0) !== 30) {
+        problems.push('the stream moved ' + money2(evBalance(kid, 'cash') - stream0)
+          + ' where the wallet moved 30');
+      }
+      // The mistake is still readable — the original row is not rewritten.
+      const fifty = evList(kid).filter(e => e && e.ref === g.id && money2(e.amount) === 50);
+      if (!fifty.length) problems.push('the $50 that was recorded is no longer in the history');
+      const corrected = evList(kid).some(e => e && e.ref === g.id && e.kind === 'correction');
+      if (!corrected) problems.push('the correction itself is not on the record');
+
+      /* Removing it takes back what is actually there, and — because the whole
+         gift is still in hand — MARKS the original as reversed. A gift already
+         spent would give back only what is left and would not claim to be a
+         reversal, which is why this is asserted here and not on the edit. */
+      mnyRemoveDeposit(kid, g.id);
+      if (mnyCash(kid) !== cash0) {
+        problems.push('removing the corrected gift left ' + mnyCash(kid) + ', not ' + cash0);
+      }
+      if (money2(evBalance(kid, 'cash') - stream0) !== 0) {
+        problems.push('the stream did not come back with the wallet');
+      }
+      if (!evList(kid).some(e => e && e.reverses)) {
+        problems.push('taking a whole gift back did not mark the original as reversed');
+      }
+
+      // ── A meet recorded with the wrong points, on the wrong day.
+      const sat = keys[5], sun = keys[6];
+      const meet = mrAddCompetition(kid, { dayKey: sat, sport: 'swim', name: 'City Meet', points: 3 });
+      const firstAward = money2(meet.awarded);
+      const blockId = meet.blockId;
+      if (!blockId) problems.push('the meet was not linked to a block');
+
+      const fixed = mrUpdateCompetition(kid, meet.id, { points: 9, dayKey: sun, name: 'City Open' });
+      if (!fixed) { problems.push('the meet could not be corrected'); return problems; }
+      if (fixed.id !== meet.id) problems.push('correcting a meet minted a new id');
+      if (money2(fixed.awarded) === firstAward) problems.push('the award was not re-scored');
+      if (fixed.dayKey !== sun) problems.push('the date did not move');
+      // The block moved with it — a face left behind is a second meet nobody held.
+      const onOld = (getDayBlocks(sat, kid) || []).filter(blockIsCompetition).length;
+      const onNew = (getDayBlocks(sun, kid) || []).find(b => b.compId === meet.id);
+      if (onOld !== 0) problems.push('a block was left behind on the old day');
+      if (!onNew) problems.push('the block did not follow the meet to its new day');
+      if (onNew && onNew.compName !== 'City Open') problems.push('the block kept the old name');
+      // And it still reads as recorded, not as a meet waiting for a result.
+      if (mmUnrecordedCompetitions(wk, kid).some(p => p.dayKey === sun)) {
+        problems.push('a corrected meet reads as unrecorded');
+      }
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      pd.deposits = savedDeps;
+      pd.competitions = savedComps;
+      pd.events = savedEvents;
+      keys.forEach((k, i) => setDayBlocks(k, savedBlocks[i], kid));
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── A MEET IS ONE FACT WITH TWO FACES ────────────────────────────
+     A competition is a record of what it was worth AND a block on the calendar,
+     and either side may be created first. They carry each other's id now, which
+     is what makes the pair survive an edit.
+
+     The defect this closes: the planned/recorded join was `dayKey` plus the
+     LOWERCASED NAME, and both sides are mutable. A parent who fixed a spelling
+     while recording the result left the planned meet permanently unrecorded —
+     and an unrecorded planned meet DISABLES THE CONFIRM BAR, so the week could
+     not settle and nothing on screen said why. */
+  checks.aMeetIsOneFactWithTwoFaces = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jenn', wk = ctWeekKey;
+    const pd = getProfData(kid);
+    const savedComps = (pd.competitions || []).slice();
+    const keys = mrWeekDayKeys(wk);
+    const satKey = keys[5];
+    const savedBlocks = keys.map(k => (getDayBlocks(k, kid) || []).slice());
+    try {
+      pd.competitions = [];
+      keys.forEach(k => setDayBlocks(k, [], kid));
+
+      // ── Record → block. A result on a day with nothing planned places one.
+      const meet = mrAddCompetition(kid, {
+        dayKey: satKey, sport: 'swim', name: 'Regional meet', points: 8 });
+      if (!meet) { problems.push('the meet was not recorded at all'); return problems; }
+      const block = (getDayBlocks(satKey, kid) || []).find(b => b.compId === meet.id);
+      if (!block) problems.push('recording a meet placed no block on its day');
+      else {
+        if (block.startMin !== COMP_BLOCK_START) problems.push('the block does not start at 8am: ' + block.startMin);
+        if (block.durationMin !== COMP_BLOCK_DUR) problems.push('the block is not 8am–3pm: ' + block.durationMin);
+        // Both legs and the warm-up, per side — the readers ask by side.
+        if (getTravelBufMin(block, 'pre') !== COMP_TRAVEL_MIN) problems.push('no travel out');
+        if (getTravelBufMin(block, 'post') !== COMP_TRAVEL_MIN) problems.push('no travel home');
+        if (getWarmupBufMin(block) !== COMP_WARMUP_MIN) problems.push('no warm-up');
+        if (block.tag !== 'swimming') problems.push('the block was not tagged with its sport: ' + block.tag);
+        if (meet.blockId !== block.id) problems.push('the record does not name its block');
+      }
+      // It reads as recorded, not as a meet still waiting for a result.
+      if (mmUnrecordedCompetitions(wk, kid).some(p => p.dayKey === satKey)) {
+        problems.push('a meet with a result still reads as unrecorded');
+      }
+
+      // ── Recording twice on one day does not draw two 🏆.
+      const before = (getDayBlocks(satKey, kid) || []).filter(blockIsCompetition).length;
+      mrAddCompetition(kid, { dayKey: satKey, sport: 'swim', name: 'Regional meet', points: 8 });
+      const after = (getDayBlocks(satKey, kid) || []).filter(blockIsCompetition).length;
+      if (after !== before + 1) {
+        problems.push('a second meet on one day drew ' + (after - before) + ' blocks, not 1');
+      }
+
+      // ── Block → record, and THE CORRECTED SPELLING. A planned block is
+      //    offered; recording it under a fixed name must still satisfy it.
+      pd.competitions = [];
+      keys.forEach(k => setDayBlocks(k, [], kid));
+      const planned = {
+        id: 'cb-test-1', actId: 'competition', compName: 'Wnter Invitatonal',
+        tag: 'skating', startMin: COMP_BLOCK_START, durationMin: COMP_BLOCK_DUR,
+        objectives: [], checklistState: {}, gearState: {},
+      };
+      setDayBlocks(satKey, [planned], kid);
+      const offered = mmUnrecordedCompetitions(wk, kid);
+      const row = offered.find(p => p.dayKey === satKey);
+      if (!row) problems.push('a planned meet was not offered for recording');
+      else {
+        if (row.blockId !== 'cb-test-1') problems.push('the offer throws the block id away');
+        if (row.sport !== 'skate') problems.push('a skating block did not resolve to skate: ' + row.sport);
+        // Record it with the spelling CORRECTED — the case that used to jam.
+        mrAddCompetition(kid, { dayKey: satKey, sport: 'skate',
+                                name: 'Winter Invitational', points: 3,
+                                blockId: row.blockId });
+        if (mmUnrecordedCompetitions(wk, kid).some(p => p.dayKey === satKey)) {
+          problems.push('correcting the spelling left the planned meet unrecorded for ever');
+        }
+        // And the name the join could not survive really did change.
+        if (mmCompKey(satKey, 'Wnter Invitatonal') === mmCompKey(satKey, 'Winter Invitational')) {
+          problems.push('the fixture did not actually change the name');
+        }
+      }
+
+      // ── Deleting the result keeps the block: the meet still happened.
+      const rec = mrCompetitions(kid).find(c => c.dayKey === satKey);
+      if (rec) mrDeleteCompetition(kid, rec.id);
+      const stillThere = (getDayBlocks(satKey, kid) || []).find(b => b.id === 'cb-test-1');
+      if (!stillThere) problems.push('deleting a result deleted the meet from the calendar');
+      else if (stillThere.compId) problems.push('the block still claims a record that is gone');
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      pd.competitions = savedComps;
+      keys.forEach((k, i) => setDayBlocks(k, savedBlocks[i], kid));
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── THE SYSTEM DID NOT BEGIN TODAY ───────────────────────────────
+     Three stores answered "when did this family start", and every one of them
+     SEEDED ITSELF to the current Monday the first time anything read it. On a
+     device that first ran a build in September that made every earlier week a
+     different kind of week: priced by a retired formula, its competition and
+     gift forms absent from the meeting, and out of reach of both the catch-up
+     list and the default sweep. "Unset" was being read as "the system began
+     today", which is the one thing it cannot mean.
+
+     One store now, DERIVED from the earliest week on file and never written —
+     so it costs no sync, cannot be frozen wrong by whichever device looked
+     first, and moves back on its own when an older week arrives. */
+  checks.theSystemDidNotBeginToday = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const c = state.shared.chore;
+    const savedProgram = c.programStartDate, savedAt = c.programStartDateAt;
+    const savedLedger = c.moneyLedger, savedFin = c.finalizedWeeks;
+    try {
+      // A household with three months of history and nobody having set a date.
+      delete c.programStartDate; delete c.programStartDateAt;
+      const back = (n) => {
+        const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - n * 7);
+        return ctDateToKey(d);
+      };
+      c.moneyLedger = {}; c.moneyLedger[back(12)] = { jenn: { net: 5 } };
+      c.finalizedWeeks = {}; c.finalizedWeeks[back(12)] = { jenn: 5 };
+
+      const derived = mrStartWeek();
+      if (derived !== back(12)) {
+        problems.push('derived start is ' + derived + ', not the earliest week on file ' + back(12));
+      }
+      // Derived, not written: nothing may be stored by having asked.
+      if (c.programStartDate) problems.push('asking for the start date wrote one');
+      // And the backlog is reachable because of it.
+      if (mmCatchUpFloor() !== back(12)) {
+        problems.push('the catch-up floor is ' + mmCatchUpFloor() + ', not the start');
+      }
+      // A parent can still say the family began earlier, and that is stamped —
+      // without a stamp a stale device pushes its own idea straight back.
+      mnySetStartWeek(back(30));
+      if (String(mrStartWeek()) !== back(30)) problems.push('a parent could not set the start date');
+      if (!c.programStartDateAt) problems.push('the parent\'s choice was not stamped');
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      c.programStartDate = savedProgram; c.programStartDateAt = savedAt;
+      if (savedProgram === undefined) delete c.programStartDate;
+      if (savedAt === undefined) delete c.programStartDateAt;
+      c.moneyLedger = savedLedger; c.finalizedWeeks = savedFin;
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── A FULL WEEK OF ROUTINES PAYS THE FULL STREAK ─────────────────
+     The defect this whole redesign started from, asserted on its own fixture.
+
+     Mon 7 Sep 2026 is Labour Day. Under the held-back rule the money asked for
+     three routines on every day of that week, so Monday, Saturday and Sunday
+     each wanted an after-school routine no plan contained — the longest clean
+     run came to four days instead of seven, and a child who kept every routine
+     she was asked for was paid the 3-day step, $1 instead of $3, with her own
+     week grid reading 7/7 beside it.
+
+     Seeded rather than assumed: the week has to actually open on a day with no
+     school, or the check proves nothing about the case it is named for. */
+  checks.aFullWeekOfRoutinesPaysTheFullStreak = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead();
+    const kid = 'jenn';
+    // Walk back to a week whose Monday is a no-school day — a holiday Monday.
+    let wk = null;
+    for (let i = 1; i <= 60; i++) {
+      const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - i * 7);
+      const key = ctDateToKey(d);
+      if (!isSchoolDay(key)) { wk = key; break; }
+    }
+    if (!wk) return ['no holiday Monday within a year to test on'];
+    const keys = mrWeekDayKeys(wk);
+    const saved = keys.map(k => (getDayBlocks(k, kid) || []).slice());
+    /* The routine marks go back too, not just the blocks. Leaving a week fully
+       ticked made `blankPastWeekCanBeMadeUp` fail thirty checks later, because
+       `mmToggleAllRoutines` is a TOGGLE and an already-clean day turns OFF. A
+       check that leaves state behind is a check that breaks its neighbours. */
+    const savedMarks = [];
+    for (let d = 0; d < 7; d++) {
+      savedMarks.push(CT_SESSIONS.map(sn => !!ctGetMandatory(wk, d, sn, kid)));
+    }
+    try {
+      keys.forEach(k => setDayBlocks(k, [], kid));
+      // She keeps every routine each day ASKED her for — nothing more.
+      for (let d = 0; d < 7; d++) {
+        CT_SESSIONS.forEach(sn => ctSetMandatory(wk, d, sn, kid, false));
+        routineSessionsForDay(kid, wk, d).forEach(sn => ctSetMandatory(wk, d, sn, kid, true));
+      }
+      const streak = mrStreakWeek(wk, kid);
+      if (streak.days !== 7) {
+        problems.push('a week of kept routines counts ' + streak.days + ' clean days, not 7');
+      }
+      const top = MR_DEFAULT_RULES.streak.tiers.reduce((a, b) => (b.days > a.days ? b : a));
+      if (money2(streak.bonus) !== money2(top.bonus)) {
+        problems.push('it pays ' + mnyMoney(streak.bonus) + ', not the top tier ' + mnyMoney(top.bonus));
+      }
+      // The half that made it invisible: the screen and the money must ask the
+      // same question of the same day, on the holiday Monday itself.
+      const shown = routineSessionsForDay(kid, wk, 0).length;
+      const priced = mrRoutineSessionsFor(wk, kid, 0).length;
+      if (shown !== priced) {
+        problems.push('on the holiday Monday the screen asks ' + shown + ' and the money asks ' + priced);
+      }
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      keys.forEach((k, i) => setDayBlocks(k, saved[i], kid));
+      for (let d = 0; d < 7; d++) {
+        CT_SESSIONS.forEach((sn, i) => ctSetMandatory(wk, d, sn, kid, savedMarks[d][i]));
+      }
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── A WEEK THE RETIRED BRANCH SHORT-CHANGED IS PAID, ONCE ────────
+     A competition recorded in a week that settled under the retired formula
+     reached the wallet as $0, and `finalizedWeeks[wk][kid] == null` then
+     refused to credit it ever again — which is how $21 of prize money came to
+     sit in a settled week with no way to collect it.
+
+     The repair re-prices each week under ITS OWN rules, only ever adds, and is
+     idempotent, because two devices will each run it and then sync. */
+  checks.aShortChangedWeekIsPaidOnce = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', c = state.shared.chore;
+    const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - 21);
+    const wk = ctDateToKey(mon);
+    const pd = getProfData(kid);
+    const savedComp = (pd.competitions || []).slice();
+    const savedEvents = (pd.events || []).slice();
+    const savedFin = JSON.parse(JSON.stringify(c.finalizedWeeks || {}));
+    const savedLed = JSON.parse(JSON.stringify(c.moneyLedger || {}));
+    const savedProgram = c.programStartDate;
+    try {
+      c.programStartDate = wk;
+      pd.competitions = [];
+      // A real meet in that week, scored at entry — 21 points, $1 a point.
+      mrAddCompetition(kid, { dayKey: mrWeekDayKeys(wk)[5], sport: 'swim',
+                              name: 'Regional meet', points: 21 });
+      const worth = money2(mrWeekBreakdown(wk, kid).net);
+      if (!(worth >= 21)) problems.push('the seeded meet is only worth ' + worth);
+
+      // The week as the retired branch left it: settled, and paid nothing.
+      if (!c.finalizedWeeks[wk]) c.finalizedWeeks[wk] = {};
+      c.finalizedWeeks[wk][kid] = 0;
+      if (!c.moneyLedger[wk]) c.moneyLedger[wk] = {};
+      c.moneyLedger[wk][kid] = { at: Date.now(), chores: 0, learning: 0, streak: 0,
+                                 competition: 0, fines: 0, gross: 0, net: 0 };
+
+      const plan = evRepairPlanFor(kid);
+      const row = plan.weeks.find(w => w.wk === wk);
+      if (!row) problems.push('the short-changed week is not in the plan');
+      else if (money2(row.gap) !== worth) problems.push('the plan offers ' + row.gap + ', not ' + worth);
+
+      const before = mnyCash(kid);
+      const streamBefore = evBalance(kid, 'cash');
+      evRunRepair();
+      const after = mnyCash(kid);
+      if (money2(after - before) !== worth) {
+        problems.push('the wallet moved ' + money2(after - before) + ', not ' + worth);
+      }
+      // The frozen ledger has to agree with the wallet, or the money story and
+      // the year total keep quoting the figure the retired branch produced.
+      const led = c.moneyLedger[wk][kid];
+      if (money2(led.competition) !== money2(mrWeekBreakdown(wk, kid).compPaid)) {
+        problems.push('the ledger still says competition ' + led.competition);
+      }
+      if (!led.repricedAt) problems.push('the correction is not on the record');
+
+      // Twice must be once: two devices will each run this and then sync.
+      const second = evRunRepair();
+      if (second.weeks !== 0) problems.push('running it twice repaired ' + second.weeks + ' more');
+      if (mnyCash(kid) !== after) problems.push('running it twice moved the wallet again');
+      /* The repair's own movement has to reach the stream. Measured as a DELTA,
+         not as absolute agreement: earlier checks in this suite set
+         `ensureWallet(kid).cash` by hand to seed a fixture, which no writer can
+         mirror, so jess's stream and wallet are already apart by then. What
+         matters here is that the repair moved both by the same amount. */
+      const streamMoved = money2(evBalance(kid, 'cash') - streamBefore);
+      if (streamMoved !== worth) {
+        problems.push('the stream recorded ' + streamMoved + ' where the wallet moved ' + worth);
+      }
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      pd.competitions = savedComp;
+      pd.events = savedEvents;
+      c.finalizedWeeks = savedFin;
+      c.moneyLedger = savedLed;
+      c.programStartDate = savedProgram;
+      if (savedProgram === undefined) delete c.programStartDate;
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* Setting the stream up on a household that already has months of history
+     must leave every total EXACTLY as it reads today — it records where money
+     went, it does not move any. And running it twice must change nothing,
+     because two devices will each run it and then sync. */
+  checks.settingUpTheStreamMovesNoMoney = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess';
+    const pd = getProfData(kid);
+    pd.events = [];
+    const before = { cash: mnyCash(kid), ready: mnySavedTotal(kid),
+                     locked: mnyLockedTotal(kid), invest: mnyInvestedTotal(kid) };
+
+    const plan = evMigrationPlanFor(kid);
+    const previewed = plan.rows.length;
+    const res = evRunMigration();
+    const after = { cash: mnyCash(kid), ready: mnySavedTotal(kid),
+                    locked: mnyLockedTotal(kid), invest: mnyInvestedTotal(kid) };
+
+    const problems = [];
+    Object.keys(before).forEach(h => {
+      if (before[h] !== after[h]) problems.push(h + ' moved: ' + before[h] + ' → ' + after[h]);
+    });
+    // The whole point: what the stream derives now equals what the app stores.
+    evShadowDrift(kid).forEach(d => problems.push('after setting up — ' + d));
+    // The preview is what ran, not an estimate of it.
+    if (res.written < previewed) {
+      problems.push('preview said ' + previewed + ', wrote ' + res.written);
+    }
+    // Idempotent: a second run has nothing left to do.
+    const second = evRunMigration();
+    if (second.written !== 0) problems.push('running it twice wrote ' + second.written + ' more');
+    evShadowDrift(kid).forEach(d => problems.push('after running twice — ' + d));
+
+    return problems.length ? problems : true;
+  });
+
   // The schedule draws on the POOL, not on her chores. A week where she earned
   // nothing but was given $50 still covers the loan payment — which is what a
   // cash pool means, and the opposite of what tagging inflows would do.
@@ -6123,8 +6995,7 @@ function findChromium() {
   checks.oneCurrentWeekEverywhere = await page.evaluate(() => {
     const planner = dateToLocalKey(getWeekStart(0));
     return ctThisWeekKey() === planner
-        && mnyWeekKey() === (ctWeekKey || planner)
-        && mrUsesNewModel(planner);
+        && mnyWeekKey() === (ctWeekKey || planner);
   });
 
   /* ══════════════════════════════════════════════════════════════
@@ -8222,11 +9093,11 @@ function findChromium() {
     profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jenn', c = state.shared.chore;
-    const startBefore = c.moneyModelStartWeek;
+    const startBefore = c.programStartDate;
     const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - 14);
     const past = ctDateToKey(mon);
-    // The model has to cover the week, or step 4 says "nothing to decide".
-    c.moneyModelStartWeek = past;
+    // The family's record has to reach the week, or it is before they began.
+    c.programStartDate = past;
     // Exactly what a fortnight nobody opened the app in leaves behind.
     const e = mrEnsureEarnings(kid, past);
     e.chores = {}; e.claims = {}; e.overrides = {};
@@ -8279,7 +9150,7 @@ function findChromium() {
 
     closeSheet('familyMeetingOverlay');
     e.chores = {}; e.claims = {};
-    c.moneyModelStartWeek = startBefore;
+    c.programStartDate = startBefore;
     ctSetCurrentWeekFromPlanner();
     return (onPastWeek && labelled && noChores && canAdd && picker && nowListed
             && paid && allThree && routinesDontPayChores) || [{ onPastWeek, labelled,
@@ -8298,12 +9169,11 @@ function findChromium() {
     const c = state.shared.chore;
     const heldBefore = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
     const metBefore = JSON.parse(JSON.stringify(c.meetingsMet || {}));
-    const startBefore = c.moneyModelStartWeek, progBefore = c.programStartDate;
+    const progBefore = c.programStartDate;
     const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - 21);
     // A family three weeks in. Both floors, because the look-back stops at
     // whichever is later — a week before the family existed is not a week
     // they missed.
-    c.moneyModelStartWeek = ctDateToKey(mon);
     c.programStartDate = ctDateToKey(mon);
 
     c.meetingsHeld = {}; c.meetingsMet = {};
@@ -8323,12 +9193,13 @@ function findChromium() {
     // A way in, not a telling-off: the copy must not scold a busy fortnight.
     if (!hub.textContent.includes('Nothing expires')) bad.push('the copy scolds instead of offering');
 
-    // Weeks before the money model began are a dead end — never offered.
-    c.moneyModelStartWeek = ctThisWeekKey();
-    if (mmUnsettledWeeks(8).length !== 0) bad.push('weeks before the money model started are still offered');
+    // Weeks before the family's own record began are a dead end — never
+    // offered. One date decides this now; it used to be the later of two.
+    c.programStartDate = ctThisWeekKey();
+    if (mmUnsettledWeeks(8).length !== 0) bad.push('weeks before the record began are still offered');
 
     c.meetingsHeld = heldBefore; c.meetingsMet = metBefore;
-    c.moneyModelStartWeek = startBefore; c.programStartDate = progBefore;
+    c.programStartDate = progBefore;
     return bad.length === 0 || bad;
   });
 
@@ -8346,9 +9217,9 @@ function findChromium() {
     const c = state.shared.chore;
     const heldBefore = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
     const metBefore = JSON.parse(JSON.stringify(c.meetingsMet || {}));
-    const startBefore = c.moneyModelStartWeek, progBefore = c.programStartDate;
+    const progBefore = c.programStartDate;
     const back = n => { const m = formatDayKey(ctThisWeekKey()); m.setDate(m.getDate() - n * 7); return ctDateToKey(m); };
-    c.moneyModelStartWeek = back(3); c.programStartDate = back(3);
+    c.programStartDate = back(3);
     c.meetingsHeld = {}; c.meetingsMet = {};
 
     // Two of the three were actually met. They must stop being nagged about…
@@ -8377,7 +9248,7 @@ function findChromium() {
     if (mmUnopenedWeeks(8).length !== 0) bad.push('ticking off the last unopened week did not take it off the list');
 
     c.meetingsHeld = heldBefore; c.meetingsMet = metBefore;
-    c.moneyModelStartWeek = startBefore; c.programStartDate = progBefore;
+    c.programStartDate = progBefore;
     renderParentHome();
     return bad.length === 0 || bad;
   });
@@ -8900,9 +9771,9 @@ function findChromium() {
     const c = state.shared.chore;
     const heldBefore = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
     const metBefore = JSON.parse(JSON.stringify(c.meetingsMet || {}));
-    const startBefore = c.moneyModelStartWeek, progBefore = c.programStartDate;
+    const progBefore = c.programStartDate;
     const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - 8 * 7);
-    c.moneyModelStartWeek = ctDateToKey(mon); c.programStartDate = ctDateToKey(mon);
+    c.programStartDate = ctDateToKey(mon);
     c.meetingsHeld = {}; c.meetingsMet = {};
 
     const open = mmUnsettledWeeks(8).length;
@@ -8916,7 +9787,7 @@ function findChromium() {
     if (!/nobody has opened/.test(host.textContent)) bad.push('the caption stopped saying how many are open');
 
     c.meetingsHeld = heldBefore; c.meetingsMet = metBefore;
-    c.moneyModelStartWeek = startBefore; c.programStartDate = progBefore;
+    c.programStartDate = progBefore;
     return bad.length === 0 || bad;
   });
 
@@ -9084,15 +9955,14 @@ function findChromium() {
     const c = state.shared.chore;
     const heldBefore = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
     const metBefore = JSON.parse(JSON.stringify(c.meetingsMet || {}));
-    const startBefore = c.moneyModelStartWeek, progBefore = c.programStartDate;
+    const progBefore = c.programStartDate;
     const askedBefore = mmCatchUpAsked;
     const back = (n) => {
       const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - n * 7);
       return ctDateToKey(d);
     };
-    // Both floors: the look-back stops at whichever is later, because a week
+    // One floor: the look-back stops at the family's own start, because a week
     // before the family existed is not a week they missed.
-    c.moneyModelStartWeek = back(3);
     c.programStartDate = back(3);
     // Settled three weeks ago and nothing since: two weeks open behind us.
     c.meetingsHeld = {}; c.meetingsHeld[back(3)] = true;
@@ -9144,7 +10014,7 @@ function findChromium() {
     closeSheet('familyMeetingOverlay');
 
     c.meetingsHeld = heldBefore; c.meetingsMet = metBefore;
-    c.moneyModelStartWeek = startBefore; c.programStartDate = progBefore;
+    c.programStartDate = progBefore;
     mmCatchUpAsked = askedBefore;
     ctSetCurrentWeekFromPlanner();
     return (lastIs && shows && quietOnDeepLink && asked && movedToGap && askedOnce
@@ -9268,6 +10138,13 @@ function findChromium() {
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey;
     mrEnsureEarnings(kid, wk).overrides = {};
+    /* savingGoalEndToEnd settles this same week for this same child and never
+       undoes it, and a settled week's split has already run — so a gift dated
+       into it is now decided at the NEXT open meeting instead of belonging
+       nowhere. This check is about the hub printing the pool's figure rather
+       than the net, so it needs a week that can still take one. */
+    const wasPlan = ((state.shared.chore.weekPlans || {})[wk] || {})[kid];
+    if (wasPlan) delete (state.shared.chore.weekPlans[wk] || {})[kid];
     ['dishes', 'mop', 'vacuum'].forEach((c, i) => mrSetChoreGrade(kid, wk, i, c, 3));
     mnyAddDeposit(kid, wk, { amount: 50, from: 'Birthday money' });
 
@@ -9285,7 +10162,8 @@ function findChromium() {
     const hidesNet = !txt.includes(seg(mrWeekBreakdown(wk, kid).net));
 
     mnyRemoveDeposit(kid, (mnyDepositsForWeek(kid, wk)[0] || {}).id);
-    return giftMatters && showsPool && hidesNet;
+    if (wasPlan) state.shared.chore.weekPlans[wk][kid] = wasPlan;
+    return (giftMatters && showsPool && hidesNet) || [{ giftMatters, showsPool, hidesNet }];
   });
 
   /* The pool must not reserve a loan payment that has already been made.
@@ -9370,33 +10248,38 @@ function findChromium() {
     return threeCells && mineShown && cardSaysThisMonth && payZero && cardSaysPaid;
   });
 
-  /* The quest wallet strip must read the accessors, not the legacy wallet field
-     that mnyEnsureHoldings zeroes on migration — it showed Savings $0.00 while
-     the money page showed the real figure.
+  /* The wallet tiles must read the ACCESSORS, not the legacy `wallet.savings`
+     field that `mnyEnsureHoldings` zeroes on migration — that field showed
+     Savings $0.00 while the money page showed the real figure.
 
-     Driven directly rather than through renderQuestBoard: this strip lives in
-     buildHowIEarnCardLegacy, which only renders for weeks before the rulebook
-     model, so the board on a current week never reaches it. Calling the real
-     shipped function is the honest way to cover a legacy-only surface.
+     This used to drive `buildHowIEarnCardLegacy`, which only rendered for weeks
+     before the rulebook model. There is one model now and that card is gone, so
+     it asserts the same fact on the surface a child actually opens. Worth
+     keeping pointed at a live screen for its own sake: while the only reference
+     to those class names was this test's own regex, `check-dead-css` read them
+     as referenced and the rules outlived the markup.
 
      Asserting the number alone would pass on unmigrated data, so assert the old
      field really is empty by then — that is what makes it a regression test. */
-  checks.questStripReadsTheRealSavings = await page.evaluate(() => {
+  checks.walletTilesReadTheRealSavings = await page.evaluate(() => {
     profile = 'jess'; parentViewing = 'jess';
     ctPrepareRead();
-    const kid = 'jess', wk = ctThisWeekKey();
+    const kid = 'jess';
     const pd = getProfData(kid);
     delete pd.holdings;
     pd.wallet = { cash: 42.20, savings: 180, gics: [], holdings: {}, lastMeetingWeek: null };
 
-    const html = buildHowIEarnCardLegacy(kid, wk);
+    const html = mnyWalletCard(kid).replace(/\s+/g, ' ');
     const legacyZeroed = money2(getProfData(kid).wallet.savings) === 0;
     const migrated = mnySavedTotal(kid) === 180;
-    // The savings tile, and only it, must carry the real figure.
-    const tile = /class="hm-wtile w-savings">.*?hm-wtile-amt">([^<]+)</.exec(
-      html.replace(/\s+/g, ' '));
+    // The kept-ready tile, and only it, must carry the real figure.
+    const tile = /Kept ready.*?mny-tile-val">([^<]+)</.exec(html);
     const shows = !!tile && tile[1].trim() === '$180.00';
-    return shows && legacyZeroed && migrated;
+    const problems = [];
+    if (!shows) problems.push('the kept-ready tile reads ' + (tile ? tile[1].trim() : 'nothing'));
+    if (!legacyZeroed) problems.push('the legacy wallet.savings field was not zeroed');
+    if (!migrated) problems.push('mnySavedTotal reads ' + mnySavedTotal(kid) + ', not 180');
+    return problems.length ? problems : true;
   });
 
   /* ── Today ───────────────────────────────────────────────────────────────
@@ -12436,21 +13319,33 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
-  /* …AND A WEEK LIVED UNDER THE OLD RULE IS NOT RE-PRICED.
-     Requiring fewer routines makes a clean day easier, which makes a streak
-     tier easier, which is more money. That is the right answer going forward
-     and the wrong one backwards: an unsettled week from July re-prices from the
-     live plan, so applying it to the whole backlog would quietly pay more for
-     weeks already lived. The rule SHOWS everywhere and PRICES only from
-     mrRoutineRuleStartWeek on. */
-  checks.theRoutineRuleDoesNotRepriceOldWeeks = await page.evaluate(() => {
+  /* …AND EVERY WEEK IS PRICED BY IT, INCLUDING THE ONES ALREADY LIVED.
+     This check used to assert the opposite, and the opposite was the defect.
+
+     The rule was held back behind `routineRuleStartWeek` so that requiring
+     fewer routines could not quietly pay more for weeks already lived. The
+     reasoning was sound; the mechanism was not. That store SEEDED ITSELF to
+     the current Monday, so on any device running a new build it held back the
+     rule for every week the family had ever lived — and the money then asked
+     for three routines a day on days no plan contained one.
+
+     The exact cost, which is where this whole redesign started: the week of
+     Mon 7 Sep 2026 opens on Labour Day, so Monday, Saturday and Sunday each
+     wanted an after-school routine that was never planned. The longest clean
+     run came to four days instead of seven, the streak paid the 3-day step —
+     $1 instead of $3 — and her own week grid read 7/7 beside it with nothing
+     anywhere to say why.
+
+     So: an off day asks for two routines, and keeping both makes the day clean
+     for the MONEY as well as on the screen, in a week from any time. */
+  checks.theRoutineRulePricesEveryWeekAlike = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'parent'; parentViewing = 'jenn';
     ctPrepareRead();
-    const startWk = mrRoutineRuleStartWeek();
-    const oldMon = formatDayKey(startWk);
-    oldMon.setDate(oldMon.getDate() - 28);
+    // A week well before anything this family has on file.
+    const oldMon = formatDayKey(ctThisWeekKey());
+    oldMon.setDate(oldMon.getDate() - 28 * 7);
     const oldWk = ctDateToKey(oldMon);
     const keys = mrWeekDayKeys(oldWk);
     const offIdx = keys.findIndex(k => !isSchoolDay(k));
@@ -12459,23 +13354,21 @@ function findChromium() {
     try {
       if (offIdx < 0) { bad.push('no off day in the sample old week'); return bad; }
       keys.forEach(k => setDayBlocks(k, [], 'jenn'));
-      // Under the new rule an off day asks two; under the old one it asked three.
       CT_SESSIONS.forEach(sn => ctSetMandatory(oldWk, offIdx, sn, 'jenn', false));
-      const two = routineSessionsForDay('jenn', oldWk, offIdx);
-      two.forEach(sn => ctSetMandatory(oldWk, offIdx, sn, 'jenn', true));
+      const asked = routineSessionsForDay('jenn', oldWk, offIdx);
+      asked.forEach(sn => ctSetMandatory(oldWk, offIdx, sn, 'jenn', true));
 
-      // The DISPLAY follows the new rule on every week…
-      if (two.length !== 2) bad.push('an old off day does not SHOW the new two-routine ask');
-      if (mmReviewRows('jenn', offIdx).filter(r => r.kind === 'routine').length === 3
-          && ctWeekKey === oldWk) {
-        bad.push('the meeting shows three rows on an old off day');
+      // A day with no school asks for two, on screen and in the money alike.
+      if (asked.length !== 2) bad.push('an off day does not ask for two routines');
+      if (!mrStreakDayDone(oldWk, 'jenn', offIdx)) {
+        bad.push('keeping every routine an old off day asked for is not a clean day');
       }
-      // …but the MONEY still asks what it asked then, so nothing re-prices.
-      if (mrStreakDayDone(oldWk, 'jenn', offIdx)) {
-        bad.push('an old week was re-priced under the new rule');
-      }
-      if (String(oldWk) >= String(startWk)) {
-        bad.push('the sample week was not actually before the rule start');
+      // And the money side asks the same question the screen does — one owner,
+      // so a parent ticking everything offered can never watch the streak sit
+      // still with nothing to explain it.
+      const moneyAsked = mrRoutineSessionsFor(oldWk, 'jenn', offIdx);
+      if (moneyAsked.length !== asked.length) {
+        bad.push('the money asks for ' + moneyAsked.length + ' where the screen shows ' + asked.length);
       }
     } catch (e) {
       bad.push('threw: ' + e.message);
@@ -12627,7 +13520,6 @@ function findChromium() {
     const savedLedger = JSON.parse(JSON.stringify(c.moneyLedger || {}));
     const savedHeld = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
     const savedProgram = c.programStartDate;
-    const savedModel = c.moneyModelStartWeek;
     const cashBefore = { jenn: ensureWallet('jenn').cash, jess: ensureWallet('jess').cash };
     try {
       window.showConfirm = async () => true;
@@ -12635,7 +13527,7 @@ function findChromium() {
       const mon = formatDayKey(ctThisWeekKey());
       mon.setDate(mon.getDate() - 16 * 7);
       const start = ctDateToKey(mon);
-      c.programStartDate = start; c.moneyModelStartWeek = start;
+      c.programStartDate = start;
       c.finalizedWeeks = {}; c.moneyLedger = {}; c.meetingsHeld = {};
 
       const plan = mnyDefaultSweepPlan();
@@ -12672,7 +13564,7 @@ function findChromium() {
     } finally {
       window.showConfirm = wasConfirm;
       c.finalizedWeeks = savedFinal; c.moneyLedger = savedLedger; c.meetingsHeld = savedHeld;
-      c.programStartDate = savedProgram; c.moneyModelStartWeek = savedModel;
+      c.programStartDate = savedProgram;
       ensureWallet('jenn').cash = cashBefore.jenn;
       ensureWallet('jess').cash = cashBefore.jess;
       profile = wasProfile;
@@ -14113,7 +15005,11 @@ function findChromium() {
     const bare = toggles.filter(t => !/role="switch"/.test(t) || !/tabindex="0"/.test(t) || !/aria-checked=/.test(t));
     if (bare.length) bad.push(`${bare.length} of ${toggles.length} toggles carry no switch semantics in the markup`);
     const overlays = html.match(/<div class="overlay[^"]*" id="[^"]+"/g) || [];
-    if (overlays.length !== 19) bad.push(`${overlays.length} static overlays, expected 19`);
+    /* 20 since the Record sheet (js/41-record.js) landed. The count is stated
+       rather than derived on purpose: a NEW overlay is a new dialog mechanism
+       unless it goes through openSheet/closeSheet, which own focus and Escape,
+       so one appearing unannounced is the thing worth being told about. */
+    if (overlays.length !== 20) bad.push(`${overlays.length} static overlays, expected 20`);
     if (count(/role="tabpanel"/g) !== 5) bad.push(`${count(/role="tabpanel"/g)} tabpanels in the file, want 5 (one per tab)`);
     if (count(/<h4>✅ To-do<\/h4>/g)) bad.push('the To-do heading still skips from h2 to h4');
     checks.theMarkupSaysWhatThingsAre = bad.length === 0 || bad;

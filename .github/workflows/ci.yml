@@ -51,6 +51,17 @@ jobs:
       - name: Buffer-clip unit tests
         run: npm run test:buffers
 
+      # The money stream (js/40-stream.js): every dollar as a movement, with
+      # every balance derived from it. Holds the invariant the whole redesign
+      # rests on — opening + in - out === what is in hand — over a thousand
+      # randomly generated histories, in any arrival order, because a merge
+      # from another device delivers events shuffled. Listed here explicitly
+      # for the same reason as the step above: this workflow enumerates its
+      # scripts, so a suite in package.json and not here is a suite CI never
+      # runs (tests/check-ci-scripts.js fails the build on exactly that).
+      - name: Money-stream unit tests
+        run: npm run test:stream
+
   # Boots the app over file:// in headless Chromium and drives the main flows,
   # including the chore -> money hand-off that is the most valuable join in the
   # suite. Runs on pull requests too: it is the only check that would catch a

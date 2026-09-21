@@ -1083,5 +1083,144 @@ function sync(a, b) {
     ipad.state.profiles.jenn.weeks[wed].length === 0);
 }
 
+
+/* ── THE MONEY STREAM, on two devices ──────────────────────────────
+   js/40-stream.js stores money as MOVEMENTS and derives every balance, which
+   is only safe if two devices that each recorded a movement offline end up
+   agreeing about the total. A union by id is what makes that true: neither
+   device can change what the other wrote, so the merged stream is simply both
+   of them and the derived balance follows.
+
+   This is the check that licenses retiring `wallet.cash`. A one-device check
+   would prove nothing here — CLAUDE.md records two occasions where it did. */
+{
+  const stream = require('../js/40-stream.js');
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+
+  // Both girls' streams start from the same migrated opening balance, then each
+  // device records a different movement while offline.
+  const opening = { id: 'ev-open', at: 1, dayKey: '2026-09-01', kind: 'open',
+                    from: 'opening', to: 'cash', amount: 50, updatedAt: 1 };
+  on(ipad,  st => { st.profiles.jenn.events = [opening,
+    { id: 'ev-meet', at: 20, dayKey: '2026-09-12', kind: 'settle',
+      from: 'prize', to: 'cash', amount: 21, updatedAt: 20 }]; });
+  on(phone, st => { st.profiles.jenn.events = [opening,
+    { id: 'ev-gift', at: 30, dayKey: '2026-09-13', kind: 'gift',
+      from: 'gift', to: 'cash', amount: 10, updatedAt: 30 }]; });
+  sync(ipad, phone);
+
+  const evOf = d => d.state.profiles.jenn.events;
+  check('two devices, two movements — the stream holds both',
+    evOf(ipad).length === 3 && evOf(phone).length === 3);
+
+  // The point of the whole redesign: the DERIVED balance agrees on both sides.
+  check('two devices derive the same balance from the merged stream',
+    stream.evBalanceOf(evOf(ipad), 'cash') === 81 &&
+    stream.evBalanceOf(evOf(phone), 'cash') === 81);
+
+  // Merging again must not double-count — the union is by id, so a second
+  // snapshot of the same document is a no-op. A balance system cannot promise
+  // this; an append-only stream can.
+  sync(ipad, phone);
+  check('re-merging the same stream changes no balance',
+    evOf(ipad).length === 3 && stream.evBalanceOf(evOf(ipad), 'cash') === 81);
+}
+
+/* A movement deleted on one device must not come back from the other — the
+   same 'ev:' tombstone scope every other append-only record uses. Without it
+   a correction would silently undo itself on the next sync, which is money
+   appearing from nowhere. */
+{
+  const stream = require('../js/40-stream.js');
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  const gift = { id: 'ev-g1', at: 10, dayKey: '2026-09-10', kind: 'gift',
+                 from: 'gift', to: 'cash', amount: 40, updatedAt: 10 };
+  on(ipad,  st => { st.profiles.jenn.events = [gift]; });
+  on(phone, st => { st.profiles.jenn.events = [gift]; });
+  // The iPad removes it (a gift recorded by mistake) and tombstones it.
+  on(ipad, st => {
+    st.profiles.jenn.events = [];
+    api.tombstoneIds('ev:', ['ev-g1']);
+  });
+  sync(ipad, phone);
+  check('a deleted movement does not come back on the other device',
+    ipad.state.profiles.jenn.events.length === 0 &&
+    phone.state.profiles.jenn.events.length === 0 &&
+    stream.evBalanceOf(phone.state.profiles.jenn.events, 'cash') === 0);
+}
+
+
+/* ── WHERE THE RECORD BEGINS, on two devices ───────────────────────
+   One scalar decides how far back the meeting reaches and which weeks are in
+   the system at all. deepMergeObj lets a remote scalar win, so without an
+   explicit decision a device still holding an older idea of the start date
+   pushes it back over a parent's choice and the whole backlog falls out of
+   reach — which is the defect that started this redesign, arriving by a
+   different door. */
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  // The phone carries what an old build seeded: unstamped, and wrong.
+  on(phone, st => { st.shared.chore.programStartDate = '2026-09-21'; });
+  // A parent sets the real one on the iPad, which stamps it.
+  on(ipad, st => {
+    st.shared.chore.programStartDate = '2026-01-05';
+    st.shared.chore.programStartDateAt = 5000;
+  });
+  sync(ipad, phone);
+  check('a parent\'s start date beats a stale device\'s seeded one',
+    ipad.state.shared.chore.programStartDate === '2026-01-05' &&
+    phone.state.shared.chore.programStartDate === '2026-01-05');
+
+  // And the other direction: a LATER deliberate change wins over the earlier one.
+  on(phone, st => {
+    st.shared.chore.programStartDate = '2025-08-25';
+    st.shared.chore.programStartDateAt = 9000;
+  });
+  sync(ipad, phone);
+  check('the newer of two deliberate choices is the one that survives',
+    ipad.state.shared.chore.programStartDate === '2025-08-25' &&
+    phone.state.shared.chore.programStartDate === '2025-08-25');
+}
+
+
+/* ── WHAT SHE ASKED FOR, on two devices ────────────────────────────
+   A move request is NOT a stream event: the stream records money that moved,
+   and a request has moved nothing. It is its own append-only record, and a
+   child asking on the iPad while a parent answers on the phone is the ordinary
+   case, not the exotic one. */
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  on(ipad,  st => { st.profiles.jenn.moveRequests = [
+    { id: 'mvq-1', from: 'cash', to: 'ready', amount: 10, updatedAt: 10 }]; });
+  on(phone, st => { st.profiles.jenn.moveRequests = [
+    { id: 'mvq-2', from: 'cash', to: 'ready', amount: 5, updatedAt: 20 }]; });
+  sync(ipad, phone);
+  check('two devices, two requests — both survive',
+    ipad.state.profiles.jenn.moveRequests.length === 2 &&
+    phone.state.profiles.jenn.moveRequests.length === 2);
+
+  // A parent answering on one device must be what the other sees. The answer is
+  // an edit to the record, so newest-wins per id is what carries it.
+  on(phone, st => {
+    const r = st.profiles.jenn.moveRequests.find(x => x.id === 'mvq-1');
+    r.approvedAt = 100; r.updatedAt = 100;
+  });
+  sync(ipad, phone);
+  const onIpad = ipad.state.profiles.jenn.moveRequests.find(r => r.id === 'mvq-1');
+  check('an answer given on one device is the answer on both',
+    !!onIpad && onIpad.approvedAt === 100);
+
+  // And a request withdrawn stays withdrawn — without the tombstone it comes
+  // back on the next snapshot and a parent is asked the same question forever.
+  on(ipad, st => {
+    st.profiles.jenn.moveRequests = st.profiles.jenn.moveRequests.filter(r => r.id !== 'mvq-2');
+    api.tombstoneIds('mvq:', ['mvq-2']);
+  });
+  sync(ipad, phone);
+  check('a withdrawn request does not come back from the other device',
+    ipad.state.profiles.jenn.moveRequests.length === 1 &&
+    phone.state.profiles.jenn.moveRequests.length === 1);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

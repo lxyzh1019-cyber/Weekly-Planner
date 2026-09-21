@@ -281,7 +281,7 @@ function mnyUnpaidWeeks(kid, max) {
   for (let i = 0; i <= (max || 8); i++) {
     const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - i * 7);
     const wk = ctDateToKey(mon);
-    if (String(wk) < String(mrModelStartWeek())) break;
+    if (String(wk) < String(mrStartWeek())) break;
     if ((fin[wk] || {})[kid] != null) continue;          // already credited
     const amount = money2(ctWeekMoney(wk, kid));
     if (amount <= 0) continue;
@@ -343,7 +343,22 @@ function mnyWalletCard(kid) {
             <div class="mny-tile-val">${mnyMoney(t.value)}</div>
           </div>`).join('')}
       </div>
+      ${mnyMoveDoor(kid)}
     </div>`;
+}
+
+/* The door out of cash, on the page where she can SEE what is in each pot.
+   Until Stage 3 there was none: a dollar left cash on a Sunday or not at all,
+   so a gift that arrived on a Tuesday sat there whatever anybody wanted.
+
+   Both roles get the same door and the sheet decides what pressing it does —
+   a grown-up moves it, a child asks. Two doors with two labels would be two
+   places to keep in step. */
+function mnyMoveDoor(kid) {
+  const waiting = (typeof mnyPendingMoves === 'function') ? mnyPendingMoves(kid).length : 0;
+  return `<button type="button" class="mny-btn wide" data-mny-action="move-ask">🔀 ${
+    isParent() ? 'Move money between these' : 'Ask to move some'}</button>
+    ${waiting ? `<div class="mny-note">${waiting} ${waiting === 1 ? 'move is' : 'moves are'} waiting for a grown-up.</div>` : ''}`;
 }
 
 /* ── What she is saving for ──
@@ -536,32 +551,11 @@ function mnyDebtCards(kid, wk) {
    Both roles use this. mnyAddDeposit decides what happens with the answer —
    a grown-up's entry credits at once, a child's waits for approval — so this
    asks the same three things either way and holds no rule of its own. */
-async function mnyPromptGift(kid) {
-  const who = kid || mnyViewKid();
-  const asking = !isParent();
-  const raw = await showPrompt(
-    asking ? 'How much were you given?' : 'How much came in?',
-    { type: 'number', value: '20', okLabel: 'Next' });
-  const amount = money2(Number(raw));
-  if (!(amount > 0)) return;
-
-  const from = await showChoice('What kind of money is it?',
-    MNY_FROM.map(f => ({ id: f, label: f })));
-  if (!from) return;
-
-  const giver = await showPrompt('Who gave it? (you can leave this blank)',
-    { value: '', okLabel: 'Save it' });
-  if (giver === null) return;
-
-  const wk = (typeof mnyWeekKey === 'function') ? mnyWeekKey() : ctThisWeekKey();
-  const d = mnyAddDeposit(who, wk, { amount, from, giver });
-  if (!d) { showToast('Nothing was recorded'); return; }
-  mnySetGiftsOpen(true);
-  mnyRenderMyMoney();
-  showToast(d.pendingApproval
-    ? `Asked a grown-up about ${mnyMoney(amount)} 🎁`
-    : `${mnyMoney(amount)} added 🎁`);
-}
+/* `mnyPromptGift` is gone. It asked four questions in four sequential dialogs
+   — how much, what kind, who from, which day — with no way to see or change an
+   earlier answer and nothing kept if you backed out of the fourth. The Record
+   sheet (js/41-record.js) asks the same four on one screen, through the same
+   writer. */
 
 function mnyGiftsCard(kid) {
   const all = (typeof mnyEnsureDeposits === 'function') ? mnyEnsureDeposits(kid) : [];
@@ -570,12 +564,19 @@ function mnyGiftsCard(kid) {
   const recent = all.slice().sort((a, b) =>
     String(b.dayKey || '').localeCompare(String(a.dayKey || ''))).slice(0, 10);
   const waiting = all.filter(d => d.pendingApproval).length;
-  const rows = recent.map(d => `<div class="mny-row">
-      <span>🎁 ${escapeHtml(d.from || 'A gift')}${d.giver ? ' · from ' + escapeHtml(d.giver) : ''}
+  /* A parent taps a row to CORRECT it, through the same sheet that recorded it.
+     A typo used to mean delete-and-retype, which debited the wallet and
+     re-credited it and left two rows nobody could explain. */
+  const rows = recent.map(d => {
+    const inner = `<span>🎁 ${escapeHtml(d.from || 'A gift')}${d.giver ? ' · from ' + escapeHtml(d.giver) : ''}
         <small class="mny-note">${escapeHtml(mnyShortDate(d.dayKey || d.weekKey))}${
           d.pendingApproval ? ' · waiting for a grown-up' : ''}</small></span>
-      <b>${mnyMoney(d.amount)}</b>
-    </div>`).join('');
+      <b>${mnyMoney(d.amount)}</b>`;
+    return isParent()
+      ? `<button type="button" class="mny-row mny-row--tap" data-mny-action="gift-edit"
+           data-mny-dep="${escapeAttr(d.id)}">${inner}</button>`
+      : `<div class="mny-row">${inner}</div>`;
+  }).join('');
   return `<div class="mny-card">
       <button type="button" class="mny-acc" data-mny-action="gifts" aria-expanded="${open}">
         <span class="mny-label">🎁 Gifts${waiting ? ` · ${waiting} waiting` : ''}</span>
@@ -617,10 +618,16 @@ function mnyCompetitionCard(kid) {
       <div class="mny-dow">${['M','T','W','T','F','S','S'].map(d => `<span>${d}</span>`).join('')}</div>
       <div class="mny-cal">${cells}</div>
       ${entries.length
-        ? `<div class="mny-rows">${entries.sort((a, b) => a.dayKey < b.dayKey ? -1 : 1).map(c =>
-             `<div class="mny-row"><span>${mnySportIcon(c.sport)} ${escapeHtml(c.name || mnySportLabel(c.sport))} · ${mnyShortDate(c.dayKey)}</span><b>${mnyMoney(c.awarded)}</b></div>`).join('')}</div>
+        ? `<div class="mny-rows">${entries.sort((a, b) => a.dayKey < b.dayKey ? -1 : 1).map(c => {
+             const inner = `<span>${mnySportIcon(c.sport)} ${escapeHtml(c.name || mnySportLabel(c.sport))} · ${mnyShortDate(c.dayKey)}</span><b>${mnyMoney(c.awarded)}</b>`;
+             return isParent()
+               ? `<button type="button" class="mny-row mny-row--tap" data-mny-action="meet-edit"
+                    data-mny-comp="${escapeAttr(c.id)}">${inner}</button>`
+               : `<div class="mny-row">${inner}</div>`;
+           }).join('')}</div>
            <div class="mny-row total"><span>This month</span><b>${mnyMoney(total)}</b></div>`
         : `<div class="mny-note">No competition days this month.</div>`}
+      ${isParent() ? `<button type="button" class="mny-btn wide" data-mny-action="meet-add">＋ Record a meet result</button>` : ''}
       <div class="mny-note">We never talk about money before or during a competition. That is a promise, not a rule.</div>
     </div>`;
 }
@@ -795,7 +802,13 @@ function mnyHandleClick(ev) {
      form; "no criteria met" is the one-tap answer that writes a real record
      worth nothing — a different fact from no record at all. */
   if (a === 'gifts') { mnySetGiftsOpen(!mnyGiftsOpen()); mnyRenderMyMoney(); return; }
-  if (a === 'gift-add') { mnyPromptGift(mnyViewKid()); return; }
+  if (a === 'gift-add')  { openRecordSheet({ kind: 'gift', kid: mnyViewKid() }); return; }
+  if (a === 'gift-edit') { openRecordSheet({ kind: 'gift', kid: mnyViewKid(), id: el.getAttribute('data-mny-dep') }); return; }
+  if (a === 'meet-add')  { openRecordSheet({ kind: 'meet', kid: mnyViewKid() }); return; }
+  if (a === 'meet-edit') { openRecordSheet({ kind: 'meet', kid: mnyViewKid(), id: el.getAttribute('data-mny-comp') }); return; }
+  if (a === 'move-ask')  { openRecordSheet({ kind: 'move', kid: mnyViewKid() }); return; }
+  /* No kind chosen: which record this is is the first thing the sheet asks. */
+  if (a === 'record-any') { openRecordSheet({ kid: mnyViewKid() }); return; }
   if (a === 'comp-from-plan') { mnyOpenCompForPlanned(el.getAttribute('data-daykey')); return; }
   if (a === 'comp-zero') {
     mnyRecordCompZero(mnyMeetingKid(), el.getAttribute('data-daykey'),
@@ -872,6 +885,15 @@ function mnyHandleInput(ev) {
   {
     const g = ev.target.closest('[data-mny-action="dep-giver"]');
     if (g) { if (mnyDepDraft) mnyDepDraft.giver = g.value; return; }
+    /* The date DOES re-render, unlike the giver above: changing it can change
+       which Sunday decides the gift, and that sentence is on the card. A caret
+       is not at risk in a date input the way it is in a text one. */
+    const dk = ev.target.closest('[data-mny-action="dep-day"]');
+    if (dk) {
+      if (mnyDepDraft) mnyDepDraft.dayKey = dk.value || todayKey();
+      if (typeof renderMeetingMode === 'function') renderMeetingMode();
+      return;
+    }
   }
   const el = ev.target.closest('[data-mny-action]');
   if (!el) return;

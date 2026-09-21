@@ -416,6 +416,15 @@
   </div>
 </div>
 
+<!-- The Record sheet: one door for a chore grade, a meet, a gift, a fine and a move -->
+<div class="overlay" id="recordOverlay" onclick="overlayClick(event,'recordOverlay')">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rcSheetTitle">
+    <div class="sheet-handle"></div>
+    <h3 id="rcSheetTitle">✍️ Record something</h3>
+    <div id="recordBody"></div>
+  </div>
+</div>
+
 <!-- Quick profile switcher (tap the profile icon) -->
 <div class="overlay" id="profileSwitchOverlay" onclick="overlayClick(event,'profileSwitchOverlay')">
   <div class="sheet sheet--compact" role="dialog" aria-modal="true" aria-labelledby="profileSwitchTitle">
@@ -1516,6 +1525,8 @@
 <script src="js/37-reflection.js"></script>
 <script src="js/38-conflicts.js"></script>
   <script src="js/39-block-drag.js"></script>
+<script src="js/40-stream.js"></script>
+<script src="js/41-record.js"></script>
 <script src="js/99-main.js"></script>
 </body>
 </html>

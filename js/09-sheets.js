@@ -353,19 +353,19 @@ function renderActivitySheet() {
            Pre-pool weeks keep the old name list, since they have no pool to
            pick from. */
         const wk = ctWeekKeyForDate(currentDayKey || todayKey());
-        const options = mrUsesNewModel(wk)
+        const options = true
           ? mrPoolRows(wk).filter(p => p.lane === 'chores').map(p => ({ id: p.id, label: p.label }))
           : ctPickableChoreNames().map(n => ({ id: n, label: n }));
         options.forEach(({ id, label }) => {
           const b = document.createElement('button');
           const on = as_.choreTags.some(t => t === id
-            || (mrUsesNewModel(wk) && (mrPoolRowForTag(t, wk) || {}).id === id));
+            || (true && (mrPoolRowForTag(t, wk) || {}).id === id));
           b.className = 'pill-btn' + (on ? ' active' : '');
           b.textContent = (on ? '✓ ' : '') + label;
           b.onclick = () => {
             as_.choreTags = on
               ? as_.choreTags.filter(t => t !== id
-                  && (!mrUsesNewModel(wk) || (mrPoolRowForTag(t, wk) || {}).id !== id))
+                  && (!true || (mrPoolRowForTag(t, wk) || {}).id !== id))
               : [...as_.choreTags, id];
             renderActivitySheet();
           };

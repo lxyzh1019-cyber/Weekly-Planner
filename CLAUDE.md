@@ -74,8 +74,8 @@ npm run test:smoke          # screenshots land in tests/out/
 ```
 
 `npm run check` runs `tests/check-syntax.js`, `tests/check-globals.js`,
-`tests/check-shared-merge.js`, `tests/check-escaping.js`, `tests/check-dead-css.js`
-and `tests/check-dead-ids.js` (an `id` in `index.html` that nothing reads — the
+`tests/check-shared-merge.js`, `tests/check-escaping.js`, `tests/check-dead-css.js`,
+`tests/check-dead-ids.js` and `tests/check-sw-shell.js` (an `id` in `index.html` that nothing reads — the
 same blind spot as dead CSS, with runtime-built prefixes discovered from the
 source rather than listed by hand). **Do not go back to the old shell loop** —
 
@@ -324,9 +324,12 @@ Kid-facing copy is a product surface, not filler. The rules:
   is not banned, it starts collapsed — `mnyPricesOpen`, `ckPrivsOpen` and
   `weekGlanceOpen` are the pattern: closed by default, remembered in
   `localStorage` (never synced state — every state write is a full-document
-  upload). `screen-chore` is on a **ratchet** (276) rather than the 200 target: it
+  upload). `screen-chore` is on a **ratchet** (261) rather than the 200 target: it
   must not grow, tighten it whenever the real number drops, and the target stays
-  written down.
+  written down. `screen-week/planned` (208) and `screen-mymoney` (204) carry
+  their own, each raised once with a dated reason in `tests/smoke.js`. The
+  numbers live there, not here: two places stating one budget is how they come
+  apart, and this line said 276 for a month after the real ceiling reached 261.
 
 ## Navigation
 
@@ -1901,6 +1904,384 @@ four segments, which counted to four on Christmas week as readily as on a term
 Tuesday and is exactly why the 9am band stood for so long. They assert the axis
 matches the day it claims to describe.
 
+## One clock — the system did not begin today
+
+**There is one date, `state.shared.chore.programStartDate`, it is DERIVED when
+nobody has set it, and it is never written by being read.** `mrStartWeek()`
+(`js/18-rules.js`) is the one owner.
+
+Three stores used to answer three versions of this question —
+`programStartDate`, `moneyModelStartWeek`, `routineRuleStartWeek` — and every
+one of them **self-seeded to the current Monday** the first time anything read
+it. On a device that first ran a given build in September, that made every week
+before September a different kind of week:
+
+- priced by the retired group-payout formula, so graded chores and the routine
+  streak paid **nothing** in all of them;
+- meeting step 3 swapped wholesale for the legacy confirm screen, so the
+  competition form and the gift form were **not on the page**, with nothing to
+  say why;
+- `mmCatchUpFloor` was the later of two of them, so the catch-up list reached
+  **one week** and the $3 default sweep found **none at all** and said so;
+- and the routine streak asked for three routines on every day of every week,
+  so Labour Day and both weekend days broke the run.
+
+"Unset" was being read as "the system began today", which is the one thing it
+cannot mean for a family that has been running for months.
+
+**Deriving rather than seeding is the load-bearing half.** `mrDerivedStartWeek`
+reads the earliest week with anything in it — the money ledger, finalised
+weeks, group payouts, meetings held, each child's stream and each child's
+placed blocks — and **writes nothing**. So it costs no sync, it cannot be frozen
+wrong by whichever device happened to look first, and it moves back on its own
+the moment an older week arrives from another device. A parent can still say the
+family began earlier (Setup › Weeks on record), and that is the only way a
+household whose real beginning predates anything on file can say so.
+
+This exact derivation was tried once as the **catch-up floor** and removed,
+because there it suppressed genuinely open weeks whenever the first record
+happened to be recent. As a **default start** it errs the other way: against a
+seed of "today" it can only ever reach further back.
+
+**Merge decision:** `programStartDate` is arbitrated newest-stamp-wins against
+`programStartDateAt` in `mergeSharedChore`, the same shape as `goalsByWeek`. An
+**unstamped** value counts as 0 deliberately — it can only have come from a
+build that seeded this, and a deliberate choice must always beat a seed. Without
+it `deepMergeObj` lets a remote scalar win and a stale device pushes its own
+idea straight back, putting the whole backlog out of reach again.
+
+`moneyModelStartWeek` and `routineRuleStartWeek` are retired but **not deleted**:
+a delete inside `state.shared.chore` cannot propagate (`deepMergeObj` iterates
+the keys the remote has), so tidying them would churn the document on every sync
+to no effect. Same reasoning as the retired `unlockedActs`.
+
+## One money model, for every week
+
+`mrUsesNewModel` is **gone**, and with it the legacy branch of `ctWeekMoney`,
+the legacy step 3 and step 4, `buildHowIEarnCardLegacy` and its CSS,
+`ctGroupEarned`, and the `newModel` skip in `commitKidWeek` that took the ledger
+freeze, the XP credit, the arrears, the loan transfer and the Sunday Box with it.
+
+The reasoning for having two models was right — history must not move when the
+family switches to graded chores — but the **mechanism was never what made that
+true**. Two other things do, and both are still here:
+
+- a settled week is a **frozen ledger** and is never recomputed at all;
+- a price edit lands as an **effective-dated rule version** (`mrVersionForDate`),
+  so an old week still prices under the rules that were live when it was lived.
+
+`moneySnapshots` still comes first in `ctWeekMoney`: weeks frozen at the
+original migration are a record, not a calculation. `ctWeekIsPreSystem` is the
+one owner of that question, and it is what now decides whether the chore tab
+draws the retired board — the honest test, where `mrUsesNewModel` sent every
+past week there and left a child with no chore rows and nothing to claim.
+
+## The repair — weeks the retired branch mispriced
+
+`evRepairPlan` / `evRunRepair` (`js/40-stream.js`), previewed on the parent's
+Money page. Four rules, each load-bearing:
+
+1. **Each week prices under ITS OWN rules.** `mrWeekBreakdown` resolves that
+   week's effective-dated rule version, so a price edited last month cannot
+   restate a week from March. Repairing is not re-pricing under today's
+   rulebook, and that difference is the whole reason a parent can agree to it.
+2. **It only ever ADDS.** A week the old branch happened to pay *more* for keeps
+   what it paid. Money already in a child's hand is hers.
+3. **A week frozen at the original migration is never touched.**
+4. **Idempotent by a derived id**, because two devices will each run it and then
+   sync.
+
+The frozen ledger is corrected alongside the wallet and stamped `repricedAt`, or
+the money story and `mrYearToDate` would keep quoting the figure the retired
+branch produced while the wallet said something else — which is the
+two-answers-to-one-question defect this file keeps recording.
+
+**A defaulted week says so.** `defaulted` was written and read nowhere, so a
+week credited at the flat default because nobody sat down read as "typed in" —
+the same label as a week a parent entered from memory. They are different facts
+and the history says which, alongside "re-priced".
+
+**The $3 default is offered where the backlog is.** `mmUnsettledWeeks` stops at
+eight, so anything older was invisible there AND unsettleable — the only door
+was a card in Setup that a parent had no reason to open. The catch-up banner now
+carries the older weeks and the sweep. Still a tap, still previewed, still moves
+no money until `mnyRunDefaultSweep` confirms.
+
+## A gift has a date, and a correction is not an edit
+
+**`dayKey` is when it came; `weekKey` is which Sunday decides where it goes.**
+Two questions, and a gift needs both answered separately.
+
+`mnyAddDeposit` hardcoded `dayKey: todayKey()` and **no form anywhere offered a
+date**, so a birthday recorded a fortnight later sat in the wrong month of her
+history. Worse, the week came from whatever week the PLANNER happened to be
+showing, and a gift landing in a committed week called `mnyReopenWeek` — which
+returns `false` for exactly that case. The gift credited her cash and then
+belonged to **no week's split at all**, silently.
+
+`mnyGiftWeekFor` is the one owner: the week follows the day, and a settled week
+hands the decision to the next still-open one, which both forms say out loud.
+A caller that passes no `dayKey` still gets today's week, so nothing that
+already worked changed.
+
+**`mnyWeekOfDay` exists because two functions name different Mondays.**
+`ctWeekKeyForDate` goes through `ctMondayOf`, which reads the device's raw
+clock; `ctWeekKey` comes from `getWeekStart`, which goes through the app's
+timezone. This file already records that those disagree for part of every day.
+A gift filed under the raw-clock Monday while every money surface reads the
+planner's would be invisible in its own week — so for today the planner's name
+wins, and only an older day takes the date-walking path.
+
+**The wallet and the stream move by the SAME amount, always.** The first attempt
+at `mnyEditDeposit` reversed the original event in full and then moved the
+wallet by the difference — two different figures, so the derived balance fell
+behind the stored one by the whole gift, on every correction. A full reversal is
+not what an edit *is*: $50 corrected to $30 is a twenty-dollar adjustment, not a
+fifty-dollar undo followed by a thirty-dollar re-gift. The original row stays
+exactly as written, which is what keeps the mistake readable; the correction
+sits beside it saying what changed.
+
+**A removal cannot be `evReverse` either, and the floor is why.**
+`moneyTakeBackCash` floors at zero, so a gift already spent gives back only what
+is there — while a reversal copies the original's amount. Removing a spent gift
+through `evReverse` would debit the stream by more than the wallet could give
+back, forever. It goes through `moneyTakeBackCash`, which mirrors what actually
+left, and carries `reverses` **only when the whole gift came back**; when the
+floor bit it is a partial correction and does not claim otherwise.
+
+**`mrUpdateCompetition` keeps the id and re-scores.** There was no edit path at
+all, so a wrong figure meant delete-and-re-add — which minted a new id, broke
+the link to the block, and made the planned meet read as unrecorded again.
+`awarded` is frozen at entry precisely so a later price change cannot restate
+it, so an edit is a new entry of the same fact and must re-score; mutating
+`points` in place would leave the record saying one thing and its money another.
+Moving the date moves the block with it — a face left behind on the old Saturday
+is a second meet nobody held.
+
+## The Record sheet — one door, five records
+
+`js/41-record.js`, with a static `recordOverlay` in `index.html` (chrome in
+HTML, body filled by JS — the `familyMeetingOverlay` pattern), opened by
+`openRecordSheet({ kind, kid, dayKey, id })` through `openSheet`/`closeSheet`,
+which own focus and Escape. **Do not add a second dialog mechanism beside
+them.**
+
+**Five facts had five entry roads and none of them met.** A meet could only be
+recorded inside the Sunday meeting or through `ctPromptCompetition`'s chain of
+**eleven sequential prompts**; a gift went through `mnyPromptGift`'s four; a
+fine was a numbered list typed into a prompt box; a chore grade was reachable
+only from the chore tab, on the week and day that tab happened to be showing;
+a move had no door at all until Stage 3 built one.
+
+**A prompt chain is the worst shape a form can have.** You cannot see what you
+have already answered, you cannot change an earlier answer, and abandoning it
+halfway leaves nothing. Every one of these is four to six fields on one screen,
+which is what this sheet is.
+
+**It owns no rules.** Every row calls the function that already owned that
+write — the same contract Today keeps, *call an owner, never contain one*:
+
+| Record | Writes through |
+|---|---|
+| 🧹 a chore grade | `mrSetChoreGrade` |
+| 🏆 a meet result | `mrAddCompetition` / `mrUpdateCompetition` |
+| 🎁 a gift | `mnyAddDeposit` / `mnyEditDeposit` |
+| 📦 a fine | `mrAddFine` |
+| 🔀 a move | `mnyMoveMoney` / `mnyRequestMove` |
+
+Each branch validates only what the **owner cannot** — that a name was left
+empty on a form the owner never saw. Everything else, every gate included, is
+the owner's.
+
+**The draft is module-level, and that is load-bearing.** `rcRender` writes
+`innerHTML`, so a re-render per keystroke would throw away the caret and every
+other field. Answers live in `rcDraft` and the DOM is drawn FROM it — the same
+shape `mmCaptureUiState` uses inside the meeting. **Typing never re-renders**;
+only a change that alters what the form ASKS does: the day (which week's rules
+apply, and which chores exist on it) and the two pots on a move (whether it is
+refused).
+
+**A child gets two of the five, and both as proposals** — a gift she was given
+and a move between her own pots. `mnyAddDeposit` and `mnyRequestMove` already
+carry the propose/approve gate, so the sheet adds no rule of its own; it just
+does not offer her the three that are a grown-up's judgement about her week.
+`rcSaveLabel` is what says so: the button reads *Ask a grown-up* rather than
+*Save*, because a button that says less than it knows is how a child learns the
+app is not telling her things.
+
+**The tables are read, never restated.** `CP_GRADES` is the parent grader's own
+four grades and `mrRulesForWeek(...).fines.items` is the week's own catalog —
+two tables of grades is how the wording on two screens comes apart, and a fine
+entered against an old day must be the amount that was live then.
+
+**Retired by it:** `ctPromptCompetition` and `mnyPromptGift`, deleted rather
+than left unreachable — a retired chain still callable is a second entry road
+with different rules. `ctRemoveCompetition` stays: removing is not recording.
+The meeting's inline competition and deposit **cards stay** too; they are where
+the conversation happens on a Sunday, and they call the same writers.
+
+**Correcting goes through the same door.** A parent taps a gift row or a meet
+row to open the sheet on that record, carrying its id — so a typo is a
+correction rather than the delete-and-retype that debited the wallet,
+re-credited it, and left two rows nobody could explain.
+
+Entry points: parent **Now** (a dashed ✍️ that routes, because Now counts and
+routes and never decides), the parent **Money rules** head, **meeting step 3**,
+the kid's **gift** and **competition** cards, and the wallet card's
+`mnyMoveDoor` — one door whose label changes with the role, never two.
+
+## Money can move between Sundays
+
+**Until Stage 3 the only door out of cash was the Sunday split.** The two that
+existed went one way — kept-ready back to cash, a company back to cash — and
+both were buried on the parent's Money rules page. So a $50 birthday gift that
+arrived on a Tuesday sat in cash until the following Sunday whatever anybody
+wanted, which is the "nowhere to put it" this redesign started from.
+
+**`mnyMoveMoney(kid, from, to, amount, opts)` is THE one writer** (`js/40-stream.js`),
+and it owns no arithmetic: it routes to the primitives that already own each
+movement — `moneyDeposit`, `moneyWithdraw`, `moneyOpenGIC`, `mnyBuyChosenFund`,
+`moneySellStock`. Three of those took no `opts`, so a movement through them
+could not be labelled; they take one now, with the structural fields still
+applied **after** it per the Stage-1 rule — a caller may label a movement, never
+redirect one.
+
+**Pots do not touch; money goes through cash.** `ready → locked` and
+`ready → invest` are a withdrawal and then a purchase, **two recorded
+movements**, because that is what actually happens. One movement pretending the
+pots are adjacent is a row the flow cannot explain. `invest → cash` converts
+dollars to shares newest-holding-first, once, beside the only caller that needs
+it — `moneySellStock` takes shares and everything else on this surface is
+dollars.
+
+**The stage gates are not optional.** Every destination is checked with
+`mnyIsOpen` against `MNY_BUCKETS` — the same predicate `mnySplitFor` uses when
+it sends a locked bucket's share to the debt instead. `evHomeNeed` maps a home
+to its bucket rather than restating the percentages: two tables naming one gate
+is how they come to disagree. A sheet that could put money in a pot Money
+school has not opened would make the whole ladder decorative. And the gate must
+block the **action**, not just grey the row — a `disabled` attribute is a hint
+to the pointer, not a rule.
+
+**A refusal is a SENTENCE, not a false.** `mnyMoveRefusal` returns the words or
+`null`, so a row can be greyed *and say why beside it*. Locked money is the one
+refusal that is a lesson rather than a limit: it comes back on its own date
+(`mnySimCatchUp`), and letting it out early teaches the opposite of what locking
+it away is for.
+
+**A child proposes; a grown-up approves.** A proposal is **not a movement**, so
+it must never be a stream event — the stream records money that moved, and a
+request on it would make every derived balance wrong until somebody said no.
+Requests are `profile.moveRequests`, `mergeArrayById(..., 'mvq:')` in
+`mergeProfileState`, with their own two-device check.
+
+- **`mnyRequestMove` refuses for the same reasons a parent's move would**, in
+  the same sentence, so a child is never told to ask about something a grown-up
+  could not do either.
+- **The move runs at APPROVAL, never pre-authorised at the ask.** What she had
+  on Tuesday is not what she has on Sunday, so `mnyApproveMove` re-checks every
+  refusal against the wallet as it is now, and stamps `approvedAt` only once the
+  money actually moved. Approving twice moves nothing — two devices will each
+  see the row.
+- **A rejection is kept, not deleted.** "We talked about it and decided not to"
+  is a real answer, and a child should see her request was answered rather than
+  find it simply gone.
+
+`moneyCanTransact` is called by two functions and **none of the primitives check
+`isParent()` themselves**, so `mnyMoveMoney` carries that gate explicitly.
+
+## The money stream — a flow, not a balance
+
+`js/40-stream.js`. **Money is stored as MOVEMENTS and every balance is derived
+from them.** This is Stage 1 of the money redesign and the thing the rest of it
+rests on.
+
+What it replaces: `wallet.cash` was one number written by **eight** separate
+functions — `js/14-money.js`'s six, the loan's four paths, the maturity payout,
+the meeting's commit — and not one of them recorded *why*. So "where did the $50
+go" had no answer anywhere in the app, and a stored total that eight writers have
+to keep right is a total that goes wrong. It is also the wrong lesson: a child
+watching a total learns to watch a total.
+
+Every event moves an amount **from** somewhere **to** somewhere:
+
+| | |
+|---|---|
+| **sources** (outside → in) | `earned` · `gift` · `prize` · `borrowed` · `interest` · `typed` · `opening` |
+| **homes** (inside) | `cash` · `ready` · `locked` · `invest` |
+| **sinks** (in → outside) | `spent` · `fine` · `loan:<debtId>` · `returned` |
+
+A home's balance is what arrived minus what left. That is the whole engine, and
+it is why `tests/stream.test.js` can state the invariant at all — *opening + Σin
+− Σout === what is in hand* — over a thousand randomly generated histories, on
+two devices, in any arrival order. A balance system cannot say that about
+itself.
+
+**A caller may LABEL a movement; it may never REDIRECT one.** Every writer
+applies the fields it owns — which pot the money left, which it arrived in, how
+much — **after** the caller's `opts`, so they always win. Spread the other way
+round and `mnyRemoveDeposit` passing the gift's own mirror fields turned a debit
+from her cash into `gift → returned`, and then into `cash → cash`: the wallet
+dropped $50 and the stream did not, silently, forever. Both were caught by
+`theMoneyStreamAgreesWithTheWallet` on its first two runs, which is exactly what
+that check is for.
+
+**A marker is a ZERO-AMOUNT event, not a kind of event.** `settle` names both
+the dollars a week paid and the fact that it was settled, so deciding markerhood
+by `kind` nulled the from/to on every settlement and credited nothing. The
+amount decides; `EV_MARKER_KINDS` only says which zero-amount rows are
+legitimate. A week settled at $0 still has to be answerable as settled, which is
+the reason markers exist.
+
+**A movement says both ends, always.** `mnyGiftMirror` named no destination and
+the migration's own arithmetic read that as "went nowhere", which put every gift
+on the stream twice over.
+
+**Shadow mode, and what licenses retiring the old stores.** Nothing on any
+screen reads the stream yet. `evMirror` is called beside every existing writer,
+`wallet.cash` is still what the app displays, and `evShadowDrift(kid)` returns
+the **findings** — never a bare boolean — for every pot where the two disagree.
+`theMoneyStreamAgreesWithTheWallet` drives the real writers (a settlement, a
+gift, money aside and back, a lock, a company bought and revalued, a gift taken
+back) and checks drift after *every* step, including before anything has
+happened: a base case that agrees is what would otherwise hide a sign error in
+every case after it. The old stores are retired in Stage 2, only after that
+drift has been zero on real household data.
+
+**The migration reconstructs history, then plugs the gap.** `evMigrationPlan`
+reads the frozen `moneyLedger` and the applied `deposits`, dates each row to the
+day it happened, and *then* computes the opening balance per home as
+`stored − everything reconstructed`. That order is the trick: the derived
+balance equals the stored balance **by construction**, on any household however
+incomplete its history, rather than by hoping the reconstruction is exhaustive.
+Whatever the old stores cannot account for lands in one honest line a child can
+read — *What she already had* — instead of as a drift nobody can see. A negative
+gap is written as money leaving, the same way a holding losing value is.
+
+It is **read-only and idempotent**: `evMigrationPlan` writes nothing, so the
+preview a parent approves is literally what runs, and every row carries a
+derived id (`evMigId`) so a second run — or two devices that then sync — produces
+one copy of each. It re-prices **nothing**; the weeks the legacy branch
+mispriced are repaired in Stage 2, under each week's own rules, with their own
+preview.
+
+**Merge decision:** `profile.events` is `mergeArrayById(..., 'ev:')` in
+`mergeProfileState` — a union by id with its own tombstone scope. Append-only by
+contract, so newest-wins per id never has to arbitrate anything real: a
+correction is a **reversing event** (`evReverse`), never an edit. Without the
+tombstone a correction would undo itself on the next sync, which is money
+appearing from nowhere.
+
+**Pure core, app wrapper.** `evBalanceOf`, `evFlowOf`, `evSpanOf`, `evMonthsOf`,
+`evTypicalMonthOf` take an array and return numbers, with a `module.exports`
+guard; the `kid`-taking wrappers just fetch the array. Same split and same
+reason as `bufferClip` — a calculation reachable only from a browser is one no
+unit test can hold, and the money layer has been burned by exactly that twice.
+
+**A typical month divides by the months that PASSED**, not by the months that
+happen to hold events — the same mistake `mrYearToDate` makes with settled
+weeks, deliberately not repeated: a quiet summer must not read as a good one.
+
 ## Money: a start date, a default, and gifts
 
 **The system has a beginning, and it is the family's.** `moneyModelStartWeek`
@@ -1930,8 +2311,9 @@ has no bearing on which door it leaves by. What changed:
 - **Sports scholarship** and **Academic scholarship** as categories, kept apart
   from the competition channel so a grandparent's cheque never reads as prize
   money the rules produced;
-- recorded **any time and credited at once**, always dated today into the
-  current week — back-dating would reopen a week whose split has already run;
+- recorded **any time and credited at once**, and **dated** — see *A gift has
+  a date* above. It was dated today into whatever week the planner was showing,
+  which is the defect that section exists to record;
 - a **parent gate**, which `mnyAddDeposit` never had. That was safe only while
   it lived behind the meeting; on a kid-visible page that credits immediately
   its absence would let a child hand herself any sum. A child now PROPOSES one
@@ -1972,6 +2354,19 @@ model. The streak is the whole routine channel.
   and the shell it holds only answers offline — but **bump `SW_VERSION` on every
   deploy that changes a shell file**, or an installed device keeps the old
   offline copy. There is no build step to do it for you.
+
+  `tests/check-sw-shell.js` (in `npm run check`) is what makes that enforceable.
+  `index.html`'s script tags and `sw.js`'s `SHELL` are two hand-written lists
+  that have to agree and nothing made them — the same shape as the
+  `package.json`/`ci.yml` split. **A script in one and not the other is
+  invisible until the device is offline**, because the worker is network-first:
+  online it is fetched and nothing looks wrong. Not hypothetical —
+  `js/40-stream.js` shipped that way, and offline every `ev*` function was
+  undefined, so `moneyAddCash` and with it every gift, settlement and loan
+  payment threw on the first tap. The guard also fails the build when a branch
+  changes a shell file and never touches `sw.js`, reading the working tree as
+  well as the committed diff so the warning arrives before the commit rather
+  than after it.
 - Toggles (`.buffer-toggle`, `.repeat-toggle`) and the 19 overlays carry their
   ARIA **statically** in `index.html`; `enhanceNonButtonClickables`
   (`js/99-main.js`) only keeps `aria-checked` in step with `.on`. Focus and

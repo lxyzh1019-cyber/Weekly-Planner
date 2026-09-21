@@ -97,6 +97,17 @@ window.addEventListener('pagehide', flushPush);
     rules.addEventListener('input', mnyParentInput);
     rules.addEventListener('change', mnyParentInput);
   }
+  /* The Record sheet (js/41-record.js). Delegated for the same reason as the
+     chore strip: it is rebuilt on every answer, and a chore id, a fine id or a
+     gift category reaches it from a world-writable document, so none of them
+     may be interpolated into an inline handler. `change` as well as `input`
+     because the date fields fire only on change in Safari. */
+  const record = document.getElementById('recordBody');
+  if (record) {
+    record.addEventListener('click', rcHandleClick);
+    record.addEventListener('input', rcHandleInput);
+    record.addEventListener('change', rcHandleInput);
+  }
   /* The conflict chooser: both the banner and the panel ride on data
      attributes, like the money rules tab, so no version's content is ever
      interpolated into an inline handler — and a conflict's content came off a

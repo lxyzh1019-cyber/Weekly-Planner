@@ -249,7 +249,7 @@ function mrEnsure() {
     const now = Date.now();
     mr.versions.push({
       id: mrNewId('mrv-'),
-      effectiveFrom: c.programStartDate || ctThisWeekKey(),
+      effectiveFrom: mrStartWeek(),
       createdAt: now, updatedAt: now, createdBy: 'parent',
       reason: MR_DEFAULT_REASON,
       note: 'Rulebook v2 — starting template.',
@@ -416,49 +416,88 @@ function mrApplyCap(amount, cap) {
      PERSONAL chore   — mandatory, unpaid; XP only when done unasked.
    ════════════════════════════════════════════════════════════════ */
 
-/* The week the new model takes over. Weeks before it keep the old
-   group-payout formula, so switching the family to graded chores can't
-   restate money that was already earned under the old rules. Set once, to the
-   Monday of whichever week the app first runs the new code. */
-function mrModelStartWeek() {
+/* ── WHERE THE RECORD BEGINS — derived, never seeded to today ──────
+   Three stores used to answer three versions of this question — `programStartDate`,
+   `moneyModelStartWeek`, `routineRuleStartWeek` — and every one of them
+   SELF-SEEDED to the current Monday the first time anything read it. On a
+   device that first ran a given build in September, that made every week before
+   September a different kind of week: priced under a retired formula, its
+   competition form absent from the meeting, its chores and routine streak worth
+   nothing, and unreachable by both the catch-up list and the default sweep.
+   "Unset" was being read as "the system began today", which is the one thing it
+   cannot mean for a family that has been running for months.
+
+   One store now, and it is DERIVED when nobody has set it: the earliest week
+   anything was recorded in. Deriving rather than seeding is the load-bearing
+   half — it writes nothing, so it costs no sync, it cannot be frozen wrong by
+   whichever device happened to look first, and it moves back on its own the
+   moment an older week arrives from another device.
+
+   A parent can say otherwise (Setup › Weeks on record). That is the only way a
+   household whose real beginning predates anything on file can say so, and it
+   is why this is a date on a screen rather than a constant in a public repo. */
+function mrStartWeek() {
   ctEnsureShared();
   const c = state.shared.chore;
-  if (!c.moneyModelStartWeek) c.moneyModelStartWeek = ctThisWeekKey();
-  return c.moneyModelStartWeek;
+  if (c.programStartDate) return String(c.programStartDate);
+  return mrDerivedStartWeek();
 }
-/* ── When the per-day routine rule starts PRICING ──────────────────
-   routineSessionsForDay changes which routines a day asks for, and a day that
-   asks for fewer is easier to keep clean, which makes a streak tier easier to
-   reach. That is the right answer going forward and the wrong one backwards:
-   an unsettled week from July re-prices from the live plan, so applying it to
-   the whole backlog would quietly pay more for weeks already lived — on top of
-   the default sweep that is about to credit those same weeks.
 
-   So the rule SHOWS everywhere and PRICES only from here on. Seeded to the
-   current Monday on first read, exactly like mrModelStartWeek above, so no
-   date is hardcoded and a family that starts later gets their own.
+/* The earliest week with any evidence in it, across every store that records
+   one. Reads only. Returns this week when the family genuinely has no history,
+   which is the one case where "it starts now" is the truth.
 
-   Every other surface asks routineSessionsForDay directly and is unaffected:
-   nothing on screen lies, only the money is held still. */
-function mrRoutineRuleStartWeek() {
-  ctEnsureShared();
-  const c = state.shared.chore;
-  if (!c.routineRuleStartWeek) c.routineRuleStartWeek = ctThisWeekKey();
-  return c.routineRuleStartWeek;
+   This was tried once as the CATCH-UP FLOOR and removed, because there it
+   suppressed genuinely open weeks whenever the first record happened to be
+   recent. As a DEFAULT START it errs the other way: against a seed of "today"
+   it can only ever reach further back, never less far, and a parent who needs
+   it earlier still can type one. */
+function mrDerivedStartWeek() {
+  const c = (state.shared || {}).chore || {};
+  let best = null;
+  const seen = (key) => {
+    if (!key) return;
+    const wk = (typeof ctWeekKeyForDate === 'function') ? ctWeekKeyForDate(key) : key;
+    if (wk && (!best || String(wk) < String(best))) best = String(wk);
+  };
+  const firstKeyOf = (obj) => {
+    const keys = Object.keys(obj || {});
+    if (keys.length) seen(keys.sort()[0]);
+  };
+  firstKeyOf(c.moneyLedger);
+  firstKeyOf(c.finalizedWeeks);
+  firstKeyOf(c.groupPayoutsFired);
+  firstKeyOf(c.meetingsHeld);
+  ['jenn', 'jess'].forEach(kid => {
+    const p = (state.profiles || {})[kid] || {};
+    // The money stream, and the plan itself: a family that planned a week in
+    // June began in June, whether or not anyone settled it.
+    if (Array.isArray(p.events) && p.events.length) {
+      seen(p.events.map(e => (e && e.dayKey) || '').filter(Boolean).sort()[0]);
+    }
+    firstKeyOf(p.weeks);
+  });
+  return best || ctThisWeekKey();
 }
 
 /* THE routine question, money side. mrStreakDayDone and mrStreakWeek both ask
    it, so the sessions a clean day requires and the days the streak is allowed
-   to count cannot disagree about the same week. */
+   to count cannot disagree about the same week.
+
+   No start-week gate any more. It used to fall back to CT_SESSIONS — all three
+   routines every day — for any week before `routineRuleStartWeek`, which on a
+   freshly-seeded clock meant every week the family had ever lived. The cost was
+   exact and is the defect that began this redesign: the week of Mon 7 Sep 2026
+   opens on Labour Day, so Monday, Saturday and Sunday each asked for an
+   after-school routine that no plan contained, the longest clean run came to
+   four days instead of seven, and a child who kept every routine she was asked
+   for was paid the 3-day step — $1 instead of $3 — with her own week grid
+   showing 7/7 beside it and nothing anywhere to say why. */
 function mrRoutineSessionsFor(weekKey, kid, dayIdx) {
   if (typeof routineSessionsForDay !== 'function') return CT_SESSIONS;
-  if (String(weekKey) < String(mrRoutineRuleStartWeek())) return CT_SESSIONS;
   return routineSessionsForDay(kid, weekKey, dayIdx);
 }
 
-function mrUsesNewModel(weekKey) {
-  return String(weekKey || '') >= mrModelStartWeek();   // 'YYYY-MM-DD' compares chronologically
-}
 /* How many weeks back this week is — 0 for the current one.
    Lives here rather than in the meeting because two different things need it
    and neither owns it: the frozen ledger stamps how late a week was settled,
@@ -1122,18 +1161,182 @@ function mrAddCompetition(kid, entry) {
     points: Number(entry.points) || 0, placement: entry.placement || {},
     qualified: !!entry.qualified, provincial: !!entry.provincial,
     danceItems: entry.danceItems || {}, personalBest: !!entry.personalBest,
+    /* Which block on the calendar this meet IS. Carried so the planned/recorded
+       join cannot be broken by renaming either side — see
+       mmUnrecordedCompetitions (js/23-money-meeting.js). Null is fine and
+       normal: every meet recorded before the link existed has none, and the
+       name match still answers for those. */
+    blockId: entry.blockId || null,
     updatedAt: syncNow(),
   };
   e.awarded = mrScoreCompetition(e, mrRulesFor(e.dayKey));   // frozen at entry
   mrCompetitions(kid).push(e);
+  /* The other face. A meet recorded on a day with no competition block places
+     one; a meet seeded FROM a block adopts that block rather than drawing a
+     second 🏆 on the same afternoon. Either way the plan and the money agree
+     about what happened, which is the whole point of the pair. */
+  const block = mrPlaceCompetitionBlock(kid, e);
+  if (block && block.id) e.blockId = block.id;
   saveAll();
   return e;
 }
+/* ── THE BLOCK A MEET PLACES, AND THE LINK BACK ────────────────────
+   A competition is ONE FACT with TWO FACES: the record that says what it was
+   worth, and the block that says it is on the calendar. Either side may be
+   created first, and from here on they carry each other's id — `comp.blockId`
+   and `block.compId` — so the join survives a parent correcting a spelling.
+
+   Why not `placeBlock`: it writes to the global `currentDayKey` for the ACTIVE
+   PROFILE only, so it cannot put a block on Jenn's Saturday while a parent is
+   standing on Jess's Tuesday. This follows `cpSchedule` (js/27-chore-parent.js)
+   — build the block by hand, then `setDayBlocks(dayKey, blocks, kid)`.
+
+   Returns the block, or the one already linked. Idempotent: a meet whose block
+   exists never gets a second one. */
+function mrPlaceCompetitionBlock(kid, comp) {
+  if (!comp || !comp.dayKey) return null;
+  const blocks = (getDayBlocks(comp.dayKey, kid) || []).slice();
+  const already = blocks.find(b => b && b.compId === comp.id);
+  if (already) return already;
+  /* An unlinked competition block already on that day is THIS meet's block —
+     a parent planned it, then recorded the result. Adopt it rather than drawing
+     a second 🏆 on the same day, which is what a naive create would do. */
+  const orphan = blocks.find(b =>
+    b && !b.compId && typeof blockIsCompetition === 'function' && blockIsCompetition(b));
+  if (orphan) {
+    orphan.compId = comp.id;
+    if (comp.name) orphan.compName = String(comp.name).slice(0, 40);
+    markItemUpdated(orphan);
+    setDayBlocks(comp.dayKey, blocks, kid);
+    return orphan;
+  }
+  const block = {
+    id: 'cb-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+    actId: 'competition',
+    compId: comp.id,
+    compName: comp.name ? String(comp.name).slice(0, 40) : null,
+    tag: mrTagForSport(comp.sport),
+    startMin: COMP_BLOCK_START,
+    durationMin: COMP_BLOCK_DUR,
+    objectives: [], note: '', gearState: {}, checklistState: {},
+    parentPinned: true, confirmed: false,
+    // Both legs, explicitly. The symmetric pair is what every reader falls back
+    // to, and the per-leg fields are what the edit sheet writes — saying both
+    // means the block reads the same before and after anyone opens it.
+    travelBuffer: true, travelBufMin: COMP_TRAVEL_MIN,
+    travelTo: true, travelToMin: COMP_TRAVEL_MIN,
+    travelHome: true, travelHomeMin: COMP_TRAVEL_MIN,
+    warmupBuffer: true, warmupBufMin: COMP_WARMUP_MIN,
+    createdAt: syncNow(), updatedAt: syncNow(),
+  };
+  blocks.push(block);
+  setDayBlocks(comp.dayKey, blocks, kid);
+  return block;
+}
+
+/* The block a meet is linked to, wherever it is. Reads only. */
+function mrCompetitionBlock(kid, comp) {
+  if (!comp || !comp.dayKey) return null;
+  return (getDayBlocks(comp.dayKey, kid) || []).find(b => b && b.compId === comp.id) || null;
+}
+
+/* Sport → training tag, the inverse of MM_COMP_SPORT_FROM_TAG. One owner per
+   direction, so a sport added to one shows up as a missing row in the other
+   rather than as a silent null.
+
+   `dance` is deliberately absent from the right-hand side: TRAINING_TAGS ships
+   skating, swimming, dryland and general, and dance exists only if the family
+   added it as a custom sport. So the tag is RESOLVED rather than asserted —
+   `mrTagForSport` returns a tag only when one really exists, and null
+   otherwise. Writing `dance: 'dance'` here would put an unresolvable tag on the
+   block, and `getTrainingTopic` lands an unknown tag on "General": a dance meet
+   would quietly render as 🏃 Training. */
+const MR_TAG_FOR_SPORT = { swim: 'swimming', skate: 'skating' };
+function mrTagForSport(sport) {
+  const direct = MR_TAG_FOR_SPORT[String(sport)];
+  if (direct) return direct;
+  // A custom sport whose id or name matches — how a family that added dance,
+  // gymnastics or diving gets its own tag on a meet it recorded.
+  const want = String(sport || '').trim().toLowerCase();
+  if (!want) return null;
+  const all = (typeof getTrainingTags === 'function') ? getTrainingTags() : [];
+  const hit = all.find(t => t && (String(t.id).toLowerCase() === want
+    || String(t.name || '').toLowerCase() === want));
+  return hit ? hit.id : null;
+}
+
+/* ── CORRECTING A MEET ─────────────────────────────────────────────
+   There was no edit path, so a wrong figure meant delete-and-re-add — which
+   minted a new id, broke the link to the block, and made the planned meet read
+   as unrecorded again.
+
+   `awarded` is RE-SCORED under the rules live on the meet's (possibly new)
+   date, not left standing: the figure is frozen at entry precisely so a later
+   price change cannot restate it, and an edit is a new entry of the same fact.
+   Mutating `points` in place without re-scoring would leave the record saying
+   one thing and its money saying another.
+
+   The id survives, so the block stays linked. Moving the date moves the block
+   with it — a meet is one fact with two faces, and a face that stayed behind on
+   the old Saturday would be a second meet nobody held. */
+function mrUpdateCompetition(kid, id, fields) {
+  if (!isParent()) { showToast('A grown-up records results 🔒'); return null; }
+  const e = mrCompetitions(kid).find(c => c && c.id === id);
+  if (!e) return null;
+  const f = fields || {};
+  const wasDay = e.dayKey;
+
+  if (f.dayKey) e.dayKey = f.dayKey;
+  if (f.sport != null) e.sport = f.sport;
+  if (f.name != null) e.name = String(f.name).trim();
+  if (f.points != null) e.points = Number(f.points) || 0;
+  if (f.placement) e.placement = f.placement;
+  if (f.danceItems) e.danceItems = f.danceItems;
+  if (f.qualified != null) e.qualified = !!f.qualified;
+  if (f.provincial != null) e.provincial = !!f.provincial;
+  if (f.personalBest != null) e.personalBest = !!f.personalBest;
+  e.awarded = mrScoreCompetition(e, mrRulesFor(e.dayKey));
+  markItemUpdated(e);
+
+  /* The block follows. A moved date takes the block to the new day; a new name
+     renames it; a changed sport re-tags it. Each one is what a parent means by
+     "I got that wrong", and leaving any of them behind splits the pair. */
+  const moved = String(wasDay) !== String(e.dayKey);
+  if (moved && wasDay) {
+    const old = (getDayBlocks(wasDay, kid) || []).slice();
+    const keep = old.filter(b => !(b && b.compId === e.id));
+    if (keep.length !== old.length) setDayBlocks(wasDay, keep, kid);
+    e.blockId = null;
+  }
+  const block = mrPlaceCompetitionBlock(kid, e);
+  if (block) {
+    e.blockId = block.id;
+    if (f.name != null) block.compName = e.name ? String(e.name).slice(0, 40) : null;
+    if (f.sport != null) block.tag = mrTagForSport(e.sport);
+    markItemUpdated(block);
+    setDayBlocks(e.dayKey, getDayBlocks(e.dayKey, kid), kid);
+  }
+  saveAll();
+  return e;
+}
+
 function mrDeleteCompetition(kid, id) {
   if (!isParent()) { showToast('A grown-up records results 🔒'); return; }
   const p = getProfData(kid);
+  const gone = mrCompetitions(kid).find(c => c.id === id);
   p.competitions = mrCompetitions(kid).filter(c => c.id !== id);
   tombstoneIds('comp:', [id]);
+  /* The block STAYS — it is the plan, and removing a result does not mean the
+     meet did not happen. Only the link goes, so the day reads as a competition
+     nobody has recorded a result for yet, which is exactly what it now is. */
+  if (gone && gone.dayKey) {
+    const blocks = (getDayBlocks(gone.dayKey, kid) || []).slice();
+    let touched = false;
+    blocks.forEach(b => {
+      if (b && b.compId === id) { delete b.compId; markItemUpdated(b); touched = true; }
+    });
+    if (touched) setDayBlocks(gone.dayKey, blocks, kid);
+  }
   saveAll();
 }
 function mrCompetitionWeek(weekKey, kid) {
@@ -1319,7 +1522,6 @@ function mrHonestyEffect(kid, weekKey) {
 function mrLosesChoices(kid, weekKey) {
   const wk = weekKey || (typeof ctWeekKey !== 'undefined' && ctWeekKey)
              || ctThisWeekKey();
-  if (!mrUsesNewModel(wk)) return false;
   return !!mrHonestyEffect(kid, wk).losesChoices;
 }
 
@@ -1541,7 +1743,6 @@ function mrYearToDate(kid) {
   const channels = { chores: 0, learning: 0, streak: 0, competition: 0, fines: 0 };
   weeks.forEach(wk => {
     paidTotal += Number(fin[wk][kid]) || 0;
-    if (!mrUsesNewModel(wk)) return;                 // legacy weeks have no channel split
     const b = mrWeekBreakdown(wk, kid);
     channels.chores      += b.chorePaid;
     channels.learning    += b.learnPaid;
