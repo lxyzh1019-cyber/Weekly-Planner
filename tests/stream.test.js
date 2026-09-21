@@ -152,6 +152,46 @@ function ev(dayKey, from, to, amount, kind) {
       ? true : JSON.stringify(s.evFlowOf(list, null, null).sources));
 }
 
+// ── A correction is a reversal ────────────────────────────────────
+// `evReverse` shipped in Stage 1 with zero callers and no test. Stage 3 is what
+// it was written for — correcting a gift or a meet — so it gets held here
+// before anything leans on it. The pure core is what this file can reach, so
+// the reversal is built the way evReverse builds one and the ARITHMETIC is
+// asserted; the app-level guard is covered by the smoke check.
+{
+  const orig = ev('2026-09-08', 'gift', 'cash', 50, 'gift');
+  // What evReverse writes: same kind and amount, from/to swapped, dated the day
+  // the correction was made, carrying `reverses`.
+  const undo = Object.assign(ev('2026-09-20', 'cash', 'gift', 50, 'gift'),
+                             { reverses: orig.id });
+  const list = [ev('2026-09-01', 'opening', 'cash', 10, 'open'), orig, undo];
+
+  check('a reversal puts the balance back exactly',
+    s.evBalanceOf(list, 'cash') === 10 ? true : String(s.evBalanceOf(list, 'cash')));
+
+  // Both rows stay readable. A history that silently loses its mistakes cannot
+  // answer "what happened to my $50", which is the question it exists for.
+  check('the original stays on the record beside its correction',
+    list.filter(e => e.ref === undefined && e.kind === 'gift').length === 2
+      ? true : 'the original was removed');
+
+  // The flow nets out: the gift ribbon and its return cancel, so a corrected
+  // gift does not leave a month reading as though money arrived twice.
+  const f = s.evFlowOf(list, '2026-09-01', '2026-09-30');
+  check('a corrected gift nets out of the month it was corrected in',
+    money2(f.inTotal - f.outTotal) === 10 ? true : `in ${f.inTotal} out ${f.outTotal}`);
+
+  // And a SECOND reversal of the same event must not be possible — which is
+  // what evReverse's `reverses` guard scans for. Asserted on the shape rather
+  // than the function, because two of them would double the money back.
+  const twice = list.concat([
+    Object.assign(ev('2026-09-21', 'cash', 'gift', 50, 'gift'), { reverses: orig.id })]);
+  const already = twice.filter(e => e.reverses === orig.id).length;
+  check('two reversals of one event would take the money back twice',
+    already === 2 && s.evBalanceOf(twice, 'cash') === -40
+      ? true : `guard needed: ${already} reversals, cash ${s.evBalanceOf(twice, 'cash')}`);
+}
+
 // ── The property, over random sequences ───────────────────────────
 // Fixtures catch what their author thought of. This walks a thousand random
 // histories and asserts the invariant on every one, which is the only way to

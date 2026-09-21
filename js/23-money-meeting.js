@@ -489,7 +489,11 @@ function mnyDepositForm(wk, kid) {
         ${saved.length ? `<div class="mny-note">One-offs stay one-offs — this does not change what any week pays.</div>` : ''}
       </div>`;
   }
-  const d = mnyDepDraft || (mnyDepDraft = { amount: 20, from: MNY_FROM[0], giver: '' });
+  const d = mnyDepDraft || (mnyDepDraft = { amount: 20, from: MNY_FROM[0], giver: '', dayKey: todayKey() });
+  if (!d.dayKey) d.dayKey = todayKey();
+  // Which Sunday will decide it, when that is not the week it arrived in.
+  const elsewhere = (typeof mnyGiftDecidedElsewhere === 'function')
+    ? mnyGiftDecidedElsewhere(kid, d.dayKey) : null;
   return `<div class="mny-card">
       <div class="mny-label">🎁 Money from outside</div>
       <div class="mny-row"><span>How much</span>${mnyStepper('amount', d.amount, 'dep', 5)}</div>
@@ -498,6 +502,12 @@ function mnyDepositForm(wk, kid) {
       <div class="mny-label">Where it came from</div>
       <div class="mny-chiprow">${MNY_FROM.map(f =>
         `<button type="button" class="mny-chip ${d.from === f ? 'on' : ''}" onclick="mnyDepSet('from','${escapeJsAttr(f)}')">${escapeHtml(f)}</button>`).join('')}</div>
+      <label class="mny-field"><span>Which day</span>
+        <input type="date" value="${escapeAttr(d.dayKey || '')}" data-mny-action="dep-day"></label>
+      <div class="mny-note">The day it actually arrived. A red pocket comes at New
+        Year, not on a Sunday — and the money story reads by the day it came in.</div>
+      ${elsewhere ? `<div class="mny-note">That week is already settled, so this is
+        yours to decide at the meeting for <b>${escapeHtml(mnyShortDate(elsewhere))}</b>.</div>` : ''}
       <label class="mny-field"><span>Who gave it</span>
         <input type="text" maxlength="40" placeholder="Grandma, Uncle Ming…"
           value="${escapeAttr(d.giver || '')}" data-mny-action="dep-giver"></label>
@@ -1073,6 +1083,8 @@ function mnyDeleteComp(id) {
 }
 function mnySaveDep() {
   const d = mnyDepDraft; if (!d) return;
+  /* The week is derived from the gift's own day inside mnyAddDeposit, so the
+     week passed here is only the fallback for a draft with no date. */
   const saved = mnyAddDeposit(mnyMeetingKid(), mnyWeekKeyMeeting(), d);
   if (!saved) { showToast('Put in an amount first'); return; }
   mnyDepOpen = false; mnyDepDraft = null;

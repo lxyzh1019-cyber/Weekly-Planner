@@ -5580,6 +5580,176 @@ function findChromium() {
     return problems.length ? problems : true;
   });
 
+  /* ── A GIFT HAS A DATE, AND TWO QUESTIONS ─────────────────────────
+     `mnyAddDeposit` hardcoded `dayKey: todayKey()` and NO FORM ANYWHERE offered
+     a date, so a birthday recorded a fortnight later sat in the wrong month of
+     her history. Worse, the week came from whatever week the PLANNER happened
+     to be showing — and a gift landing in a committed week called
+     `mnyReopenWeek`, which returns false for exactly that case, so the gift
+     credited her cash and then belonged to no week's split at all, silently.
+
+     Two fields, two questions: `dayKey` is when it came, `weekKey` is which
+     Sunday decides where it goes. */
+  checks.aGiftHasADate = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jenn', c = state.shared.chore;
+    const pd = getProfData(kid);
+    const savedDeps = (pd.deposits || []).slice();
+    const savedEvents = (pd.events || []).slice();
+    const savedPlans = JSON.parse(JSON.stringify(c.weekPlans || {}));
+    try {
+      pd.deposits = [];
+      // A birthday three weeks ago, recorded today.
+      const back = formatDayKey(todayKey()); back.setDate(back.getDate() - 21);
+      const birthday = ctDateToKey(back);
+      const itsWeek = ctWeekKeyForDate(birthday);
+
+      const g = mnyAddDeposit(kid, ctWeekKey, {
+        amount: 50, from: 'Birthday money', giver: 'Grandma', dayKey: birthday });
+      if (!g) { problems.push('the gift was not recorded'); return problems; }
+      if (g.dayKey !== birthday) problems.push('the gift lost its own date: ' + g.dayKey);
+      if (g.weekKey !== itsWeek) problems.push('an open week did not decide it: ' + g.weekKey);
+      // It reads in the month it arrived, which is the whole point.
+      const flow = evFlow(kid, birthday, birthday);
+      if (!(flow.sources.gift >= 50)) {
+        problems.push('the gift is not on the flow for the day it arrived');
+      }
+
+      // ── Now the same gift into a SETTLED week.
+      pd.deposits = [];
+      if (!c.weekPlans) c.weekPlans = {};
+      if (!c.weekPlans[itsWeek]) c.weekPlans[itsWeek] = {};
+      c.weekPlans[itsWeek][kid] = { planId: 'balanced', committedAt: syncNow() };
+      if (!mnyIsCommitted(itsWeek, kid)) problems.push('the fixture did not settle the week');
+
+      const g2 = mnyAddDeposit(kid, ctWeekKey, {
+        amount: 20, from: 'A gift', dayKey: birthday });
+      if (!g2) { problems.push('a gift into a settled week was refused outright'); return problems; }
+      if (g2.dayKey !== birthday) problems.push('it lost its date to protect a settled week');
+      if (g2.weekKey === itsWeek) problems.push('a settled week was given something to decide');
+      if (mnyIsCommitted(g2.weekKey, kid)) problems.push('it was handed to another settled week');
+      // And the app can say so rather than leaving a parent to find out.
+      if (!mnyGiftDecidedElsewhere(kid, birthday)) {
+        problems.push('nothing says the decision moved to another week');
+      }
+      // The settled week is still settled — nothing reopened it.
+      if (!mnyIsCommitted(itsWeek, kid)) problems.push('recording a gift reopened a settled week');
+
+      // ── No caller regression: a gift with no date is still today's week.
+      pd.deposits = [];
+      const plain = mnyAddDeposit(kid, ctWeekKey, { amount: 5, from: 'A gift' });
+      if (!plain || plain.dayKey !== todayKey()) {
+        problems.push('an undated gift no longer falls back to today');
+      }
+      evShadowDrift(kid).forEach(d => problems.push('after dating gifts — ' + d));
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      pd.deposits = savedDeps;
+      pd.events = savedEvents;
+      c.weekPlans = savedPlans;
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── A CORRECTION IS A REVERSAL, NEVER A SILENT EDIT ──────────────
+     Neither a gift nor a meet could be edited at all: a typo meant
+     delete-and-retype, which for a gift debited the wallet and re-credited it
+     and left two unexplained rows, and for a meet minted a new id — breaking
+     the link to its block and making the planned meet read as unrecorded again.
+
+     The wallet must move by the DIFFERENCE only, and both the mistake and its
+     correction must stay readable. */
+  checks.aCorrectionIsAReversal = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', wk = ctWeekKey;
+    const pd = getProfData(kid);
+    const savedDeps = (pd.deposits || []).slice();
+    const savedComps = (pd.competitions || []).slice();
+    const savedEvents = (pd.events || []).slice();
+    const keys = mrWeekDayKeys(wk);
+    const savedBlocks = keys.map(k => (getDayBlocks(k, kid) || []).slice());
+    try {
+      pd.deposits = []; pd.competitions = [];
+      keys.forEach(k => setDayBlocks(k, [], kid));
+
+      /* ── A gift typed as $50 that was really $30.
+         Drift is measured as a DELTA, not as absolute agreement: earlier checks
+         in this suite set `ensureWallet(kid).cash` by hand to seed a fixture,
+         which no writer can mirror, so jess's stream and wallet are already
+         apart before this runs. What matters is that a correction moves both by
+         the same amount — which is exactly what the first attempt got wrong,
+         reversing the whole original while the wallet moved by the difference. */
+      const cash0 = mnyCash(kid);
+      const stream0 = evBalance(kid, 'cash');
+      const g = mnyAddDeposit(kid, wk, { amount: 50, from: 'Birthday money', giver: 'Grandma' });
+      if (mnyCash(kid) !== money2(cash0 + 50)) problems.push('the gift did not credit 50');
+      mnyEditDeposit(kid, g.id, { amount: 30 });
+      if (mnyCash(kid) !== money2(cash0 + 30)) {
+        problems.push('correcting 50 to 30 left ' + mnyCash(kid) + ', not ' + money2(cash0 + 30));
+      }
+      if (money2(evBalance(kid, 'cash') - stream0) !== 30) {
+        problems.push('the stream moved ' + money2(evBalance(kid, 'cash') - stream0)
+          + ' where the wallet moved 30');
+      }
+      // The mistake is still readable — the original row is not rewritten.
+      const fifty = evList(kid).filter(e => e && e.ref === g.id && money2(e.amount) === 50);
+      if (!fifty.length) problems.push('the $50 that was recorded is no longer in the history');
+      const corrected = evList(kid).some(e => e && e.ref === g.id && e.kind === 'correction');
+      if (!corrected) problems.push('the correction itself is not on the record');
+
+      /* Removing it takes back what is actually there, and — because the whole
+         gift is still in hand — MARKS the original as reversed. A gift already
+         spent would give back only what is left and would not claim to be a
+         reversal, which is why this is asserted here and not on the edit. */
+      mnyRemoveDeposit(kid, g.id);
+      if (mnyCash(kid) !== cash0) {
+        problems.push('removing the corrected gift left ' + mnyCash(kid) + ', not ' + cash0);
+      }
+      if (money2(evBalance(kid, 'cash') - stream0) !== 0) {
+        problems.push('the stream did not come back with the wallet');
+      }
+      if (!evList(kid).some(e => e && e.reverses)) {
+        problems.push('taking a whole gift back did not mark the original as reversed');
+      }
+
+      // ── A meet recorded with the wrong points, on the wrong day.
+      const sat = keys[5], sun = keys[6];
+      const meet = mrAddCompetition(kid, { dayKey: sat, sport: 'swim', name: 'City Meet', points: 3 });
+      const firstAward = money2(meet.awarded);
+      const blockId = meet.blockId;
+      if (!blockId) problems.push('the meet was not linked to a block');
+
+      const fixed = mrUpdateCompetition(kid, meet.id, { points: 9, dayKey: sun, name: 'City Open' });
+      if (!fixed) { problems.push('the meet could not be corrected'); return problems; }
+      if (fixed.id !== meet.id) problems.push('correcting a meet minted a new id');
+      if (money2(fixed.awarded) === firstAward) problems.push('the award was not re-scored');
+      if (fixed.dayKey !== sun) problems.push('the date did not move');
+      // The block moved with it — a face left behind is a second meet nobody held.
+      const onOld = (getDayBlocks(sat, kid) || []).filter(blockIsCompetition).length;
+      const onNew = (getDayBlocks(sun, kid) || []).find(b => b.compId === meet.id);
+      if (onOld !== 0) problems.push('a block was left behind on the old day');
+      if (!onNew) problems.push('the block did not follow the meet to its new day');
+      if (onNew && onNew.compName !== 'City Open') problems.push('the block kept the old name');
+      // And it still reads as recorded, not as a meet waiting for a result.
+      if (mmUnrecordedCompetitions(wk, kid).some(p => p.dayKey === sun)) {
+        problems.push('a corrected meet reads as unrecorded');
+      }
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      pd.deposits = savedDeps;
+      pd.competitions = savedComps;
+      pd.events = savedEvents;
+      keys.forEach((k, i) => setDayBlocks(k, savedBlocks[i], kid));
+    }
+    return problems.length ? problems : true;
+  });
+
   /* ── A MEET IS ONE FACT WITH TWO FACES ────────────────────────────
      A competition is a record of what it was worth AND a block on the calendar,
      and either side may be created first. They carry each other's id now, which
@@ -9693,6 +9863,13 @@ function findChromium() {
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey;
     mrEnsureEarnings(kid, wk).overrides = {};
+    /* savingGoalEndToEnd settles this same week for this same child and never
+       undoes it, and a settled week's split has already run — so a gift dated
+       into it is now decided at the NEXT open meeting instead of belonging
+       nowhere. This check is about the hub printing the pool's figure rather
+       than the net, so it needs a week that can still take one. */
+    const wasPlan = ((state.shared.chore.weekPlans || {})[wk] || {})[kid];
+    if (wasPlan) delete (state.shared.chore.weekPlans[wk] || {})[kid];
     ['dishes', 'mop', 'vacuum'].forEach((c, i) => mrSetChoreGrade(kid, wk, i, c, 3));
     mnyAddDeposit(kid, wk, { amount: 50, from: 'Birthday money' });
 
@@ -9710,7 +9887,8 @@ function findChromium() {
     const hidesNet = !txt.includes(seg(mrWeekBreakdown(wk, kid).net));
 
     mnyRemoveDeposit(kid, (mnyDepositsForWeek(kid, wk)[0] || {}).id);
-    return giftMatters && showsPool && hidesNet;
+    if (wasPlan) state.shared.chore.weekPlans[wk][kid] = wasPlan;
+    return (giftMatters && showsPool && hidesNet) || [{ giftMatters, showsPool, hidesNet }];
   });
 
   /* The pool must not reserve a loan payment that has already been made.

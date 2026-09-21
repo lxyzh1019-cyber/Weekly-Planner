@@ -2004,6 +2004,57 @@ was a card in Setup that a parent had no reason to open. The catch-up banner now
 carries the older weeks and the sweep. Still a tap, still previewed, still moves
 no money until `mnyRunDefaultSweep` confirms.
 
+## A gift has a date, and a correction is not an edit
+
+**`dayKey` is when it came; `weekKey` is which Sunday decides where it goes.**
+Two questions, and a gift needs both answered separately.
+
+`mnyAddDeposit` hardcoded `dayKey: todayKey()` and **no form anywhere offered a
+date**, so a birthday recorded a fortnight later sat in the wrong month of her
+history. Worse, the week came from whatever week the PLANNER happened to be
+showing, and a gift landing in a committed week called `mnyReopenWeek` — which
+returns `false` for exactly that case. The gift credited her cash and then
+belonged to **no week's split at all**, silently.
+
+`mnyGiftWeekFor` is the one owner: the week follows the day, and a settled week
+hands the decision to the next still-open one, which both forms say out loud.
+A caller that passes no `dayKey` still gets today's week, so nothing that
+already worked changed.
+
+**`mnyWeekOfDay` exists because two functions name different Mondays.**
+`ctWeekKeyForDate` goes through `ctMondayOf`, which reads the device's raw
+clock; `ctWeekKey` comes from `getWeekStart`, which goes through the app's
+timezone. This file already records that those disagree for part of every day.
+A gift filed under the raw-clock Monday while every money surface reads the
+planner's would be invisible in its own week — so for today the planner's name
+wins, and only an older day takes the date-walking path.
+
+**The wallet and the stream move by the SAME amount, always.** The first attempt
+at `mnyEditDeposit` reversed the original event in full and then moved the
+wallet by the difference — two different figures, so the derived balance fell
+behind the stored one by the whole gift, on every correction. A full reversal is
+not what an edit *is*: $50 corrected to $30 is a twenty-dollar adjustment, not a
+fifty-dollar undo followed by a thirty-dollar re-gift. The original row stays
+exactly as written, which is what keeps the mistake readable; the correction
+sits beside it saying what changed.
+
+**A removal cannot be `evReverse` either, and the floor is why.**
+`moneyTakeBackCash` floors at zero, so a gift already spent gives back only what
+is there — while a reversal copies the original's amount. Removing a spent gift
+through `evReverse` would debit the stream by more than the wallet could give
+back, forever. It goes through `moneyTakeBackCash`, which mirrors what actually
+left, and carries `reverses` **only when the whole gift came back**; when the
+floor bit it is a partial correction and does not claim otherwise.
+
+**`mrUpdateCompetition` keeps the id and re-scores.** There was no edit path at
+all, so a wrong figure meant delete-and-re-add — which minted a new id, broke
+the link to the block, and made the planned meet read as unrecorded again.
+`awarded` is frozen at entry precisely so a later price change cannot restate
+it, so an edit is a new entry of the same fact and must re-score; mutating
+`points` in place would leave the record saying one thing and its money another.
+Moving the date moves the block with it — a face left behind on the old Saturday
+is a second meet nobody held.
+
 ## The money stream — a flow, not a balance
 
 `js/40-stream.js`. **Money is stored as MOVEMENTS and every balance is derived

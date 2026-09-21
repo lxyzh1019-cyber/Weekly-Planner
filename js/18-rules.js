@@ -1265,6 +1265,61 @@ function mrTagForSport(sport) {
   return hit ? hit.id : null;
 }
 
+/* ── CORRECTING A MEET ─────────────────────────────────────────────
+   There was no edit path, so a wrong figure meant delete-and-re-add — which
+   minted a new id, broke the link to the block, and made the planned meet read
+   as unrecorded again.
+
+   `awarded` is RE-SCORED under the rules live on the meet's (possibly new)
+   date, not left standing: the figure is frozen at entry precisely so a later
+   price change cannot restate it, and an edit is a new entry of the same fact.
+   Mutating `points` in place without re-scoring would leave the record saying
+   one thing and its money saying another.
+
+   The id survives, so the block stays linked. Moving the date moves the block
+   with it — a meet is one fact with two faces, and a face that stayed behind on
+   the old Saturday would be a second meet nobody held. */
+function mrUpdateCompetition(kid, id, fields) {
+  if (!isParent()) { showToast('A grown-up records results 🔒'); return null; }
+  const e = mrCompetitions(kid).find(c => c && c.id === id);
+  if (!e) return null;
+  const f = fields || {};
+  const wasDay = e.dayKey;
+
+  if (f.dayKey) e.dayKey = f.dayKey;
+  if (f.sport != null) e.sport = f.sport;
+  if (f.name != null) e.name = String(f.name).trim();
+  if (f.points != null) e.points = Number(f.points) || 0;
+  if (f.placement) e.placement = f.placement;
+  if (f.danceItems) e.danceItems = f.danceItems;
+  if (f.qualified != null) e.qualified = !!f.qualified;
+  if (f.provincial != null) e.provincial = !!f.provincial;
+  if (f.personalBest != null) e.personalBest = !!f.personalBest;
+  e.awarded = mrScoreCompetition(e, mrRulesFor(e.dayKey));
+  markItemUpdated(e);
+
+  /* The block follows. A moved date takes the block to the new day; a new name
+     renames it; a changed sport re-tags it. Each one is what a parent means by
+     "I got that wrong", and leaving any of them behind splits the pair. */
+  const moved = String(wasDay) !== String(e.dayKey);
+  if (moved && wasDay) {
+    const old = (getDayBlocks(wasDay, kid) || []).slice();
+    const keep = old.filter(b => !(b && b.compId === e.id));
+    if (keep.length !== old.length) setDayBlocks(wasDay, keep, kid);
+    e.blockId = null;
+  }
+  const block = mrPlaceCompetitionBlock(kid, e);
+  if (block) {
+    e.blockId = block.id;
+    if (f.name != null) block.compName = e.name ? String(e.name).slice(0, 40) : null;
+    if (f.sport != null) block.tag = mrTagForSport(e.sport);
+    markItemUpdated(block);
+    setDayBlocks(e.dayKey, getDayBlocks(e.dayKey, kid), kid);
+  }
+  saveAll();
+  return e;
+}
+
 function mrDeleteCompetition(kid, id) {
   if (!isParent()) { showToast('A grown-up records results 🔒'); return; }
   const p = getProfData(kid);

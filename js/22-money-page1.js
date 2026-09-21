@@ -550,17 +550,29 @@ async function mnyPromptGift(kid) {
   if (!from) return;
 
   const giver = await showPrompt('Who gave it? (you can leave this blank)',
-    { value: '', okLabel: 'Save it' });
+    { value: '', okLabel: 'Next' });
   if (giver === null) return;
 
+  /* The day it ARRIVED, which is not always the day it is written down. A
+     birthday remembered a fortnight later belonged in the wrong month of her
+     history until this existed, because `mnyAddDeposit` hardcoded today and no
+     form offered anything else. */
+  const dayKey = ((await showPrompt('Which day did it come?',
+    { value: todayKey(), type: 'date', okLabel: 'Save it' })) || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) { showToast('Pick a day'); return; }
+
   const wk = (typeof mnyWeekKey === 'function') ? mnyWeekKey() : ctThisWeekKey();
-  const d = mnyAddDeposit(who, wk, { amount, from, giver });
+  const d = mnyAddDeposit(who, wk, { amount, from, giver, dayKey });
   if (!d) { showToast('Nothing was recorded'); return; }
   mnySetGiftsOpen(true);
   mnyRenderMyMoney();
+  /* Say where it will be decided when that is not where it arrived, rather
+     than letting a parent find out by it being missing from the week. */
+  const elsewhere = (typeof mnyGiftDecidedElsewhere === 'function')
+    ? mnyGiftDecidedElsewhere(who, dayKey) : null;
   showToast(d.pendingApproval
     ? `Asked a grown-up about ${mnyMoney(amount)} 🎁`
-    : `${mnyMoney(amount)} added 🎁`);
+    : `${mnyMoney(amount)} added 🎁${elsewhere ? ` · decided ${mnyShortDate(elsewhere)}` : ''}`);
 }
 
 function mnyGiftsCard(kid) {
@@ -872,6 +884,15 @@ function mnyHandleInput(ev) {
   {
     const g = ev.target.closest('[data-mny-action="dep-giver"]');
     if (g) { if (mnyDepDraft) mnyDepDraft.giver = g.value; return; }
+    /* The date DOES re-render, unlike the giver above: changing it can change
+       which Sunday decides the gift, and that sentence is on the card. A caret
+       is not at risk in a date input the way it is in a text one. */
+    const dk = ev.target.closest('[data-mny-action="dep-day"]');
+    if (dk) {
+      if (mnyDepDraft) mnyDepDraft.dayKey = dk.value || todayKey();
+      if (typeof renderMeetingMode === 'function') renderMeetingMode();
+      return;
+    }
   }
   const el = ev.target.closest('[data-mny-action]');
   if (!el) return;
