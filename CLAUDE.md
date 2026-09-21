@@ -1300,6 +1300,56 @@ rescale the same figure twice. `progress.xp2` holds the new scale and, when it i
 absent, the answer is **derived** from the legacy `questXP` — the same answer
 whatever has run, however often, in any merge order.
 
+## The meeting is a SCREEN, not a pop-up
+
+It ran inside `familyMeetingOverlay`, a `.sheet` — a box floating over the page
+with its own scrollbar. A Sunday sitting is the **longest task in this app**:
+two children, a week of days, a reflection each and a money split. Inside a
+sheet that meant scrolling a small window up and down the whole way through,
+which is the owner's own report of using it. **A task that takes twenty minutes
+is not a dialog.**
+
+It is `screen-meeting` now and `showScreen` opens it. That is not a second
+dialog mechanism growing beside `openSheet`/`closeSheet` — it is **one fewer**.
+The sheets that remain are what a sheet should be: short, one question,
+answered and gone.
+
+**Three owners, which is why the switch was a one-place change.** Nineteen call
+sites across seven files each spelled out their own
+`document.getElementById('familyMeetingOverlay').classList.contains('open')` —
+the six-copies defect this file keeps recording, and exactly what would have
+made this a nineteen-place edit with nineteen chances to miss one.
+
+| Question | Function |
+|---|---|
+| Is the meeting showing? | `mmIsOpen()` |
+| Open it | `mmShow()` |
+| Close it | `mmHide()` |
+
+**`mmHide` returns to where the sitting came from.** As a sheet that was free —
+closing revealed whatever had been behind it — and a screen has to remember, so
+`mmShow` records the active screen in `mmCameFrom` (device-local; which screen
+someone is on is not the family's data, and every state write is a full-document
+upload). It never records the meeting as its own origin: `mmShow` is called
+again by every path that re-enters a sitting already open, and a self-reference
+would trap the Close control on this screen.
+
+**`closeSheet` stopped carrying one caller's knowledge.** It held a special case
+for this one id — refresh the parent hub when the meeting closes — and that is
+`mmHide`'s now. A general mechanism should not know about one of its callers.
+
+**The layout is unchanged, and that is why the move was cheap.** The meeting was
+already a flex column with `.mm-body` as its one scroller and the head and foot
+as real flex children taking layout space (never sticky, which floats a band
+over a card). It only had to stop being 88% of the viewport inside a floating
+box and start being `100dvh` of the screen. `theMeetingKeepsItsHeadAndFeet`
+asserts the same properties against `.mm-screen`.
+
+The kid nav and the parent bar both hide themselves here without any change:
+`TD_NAV_SCREENS` does not list `screen-meeting`, and `parentRenderNav` shows
+only on `screen-parent`. `applyMeetingLock` keys on `mmHasReturn()` rather than
+on the overlay, so it was unaffected too.
+
 ## The meeting
 
 **A return context, reused unchanged by Meeting V2.** `mmReturn` records

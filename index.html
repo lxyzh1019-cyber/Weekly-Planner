@@ -408,10 +408,13 @@
 </div>
 
 <!-- Weekly family meeting overlay -->
-<div class="overlay" id="familyMeetingOverlay" onclick="overlayClick(event,'familyMeetingOverlay')">
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="fmSheetTitle">
-    <div class="sheet-handle"></div>
-    <h3 id="fmSheetTitle">🧑‍🧑‍🧒 Weekly family meeting</h3>
+<!-- 🧑‍🧑‍🧒 Weekly family meeting — a SCREEN, not a sheet.
+     A Sunday sitting is the longest task in this app: two children, a week of
+     days, a reflection each and a money split. Inside a floating sheet that
+     meant scrolling a small window up and down the whole way through. -->
+<div class="screen" id="screen-meeting">
+  <div class="mm-screen">
+    <h2 class="mm-title">🧑‍🧑‍🧒 Weekly family meeting</h2>
     <div id="familyMeetingBody"></div>
   </div>
 </div>

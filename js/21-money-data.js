@@ -966,8 +966,7 @@ function mnyOverrideBanner(kid, weekKey, channel) {
 function mnyShowTheChange(kid, channel) {
   if (typeof mnySetMeetKid === 'function') mnySetMeetKid(kid);
   mnyExpandRow = channel;
-  const overlay = document.getElementById('familyMeetingOverlay');
-  if (!overlay || !overlay.classList.contains('open')) {
+  if (!(typeof mmIsOpen === 'function' && mmIsOpen())) {
     if (typeof openFamilyMeeting === 'function') openFamilyMeeting();
   }
   if (typeof mmGoStep === 'function') mmGoStep(3);
@@ -1531,8 +1530,7 @@ function mnyGoTab(id) {
     return;
   }
   if (typeof openFamilyMeeting !== 'function') return;
-  const already = document.getElementById('familyMeetingOverlay');
-  if (!already || !already.classList.contains('open')) openFamilyMeeting();
+  if (!(typeof mmIsOpen === 'function' && mmIsOpen())) openFamilyMeeting();
   mmGoStep(id === 'grow' ? 3 : 4);
 }
 
@@ -1549,8 +1547,7 @@ function mnyGoTab(id) {
    meeting pages still explain themselves if she arrives from elsewhere. */
 function mnyTabsFor() {
   const parentish = (typeof isParent === 'function' && isParent()) ||
-                    (typeof mmStep !== 'undefined' && document.getElementById('familyMeetingOverlay') &&
-                     document.getElementById('familyMeetingOverlay').classList.contains('open'));
+                    (typeof mmIsOpen === 'function' && mmIsOpen());
   if (parentish) return MNY_TABS;
   return MNY_TABS.filter(t => t.who === 'kid' || t.who === 'optional');
 }

@@ -955,9 +955,10 @@ function showToastCard(title, bodyHtml, conceptId) {
   const more = el.querySelector('#mnyConceptMore');
   if (more) more.addEventListener('click', () => {
     close();
-    // The meeting runs in an overlay; leaving it open over the school page
-    // would strand her behind a scrim she cannot see past.
-    if (typeof closeSheet === 'function') closeSheet('familyMeetingOverlay');
+    /* Money school is a screen and so is the meeting now, so navigating there
+       leaves the meeting behind on its own. It used to be a sheet, and leaving
+       it open over the school page stranded her behind a scrim she could not
+       see past — which is one of the reasons the meeting stopped being one. */
     mnyOpenSchool(mnyViewKid(), conceptId);
   });
 }

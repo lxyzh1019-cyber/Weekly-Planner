@@ -4287,13 +4287,13 @@ function findChromium() {
   checks.settleOnlyOpensTheMeeting = await page.evaluate(() => {
     const before = JSON.stringify(state.shared.chore.finalizedWeeks || {});
     document.querySelector('[data-cp-action="settle"]').click();
-    const opened = document.getElementById('familyMeetingOverlay').classList.contains('open');
+    const opened = mmIsOpen();
     // Settle is a run-the-meeting button, so it also asks about weeks nobody
     // settled (mmMaybeAskCatchUp). Answer it — a live .overlay is fixed/inset-0
     // at z-index 300, so leaving one up puts an invisible sheet of glass over
     // every hit-test that follows, which is what broke the 44px kid audit.
     _closeAppDialog(null);
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     return opened && JSON.stringify(state.shared.chore.finalizedWeeks || {}) === before;
   });
   // The planner panel schedules a chore onto the day, and takes it off again.
@@ -4536,10 +4536,10 @@ function findChromium() {
     const finalBefore = JSON.stringify(state.shared.chore.finalizedWeeks || {});
     setParentTab('chores'); cpRenderChoreTab();
     document.querySelector('[data-cp-action="settle"]').click();
-    step.meetingOpens = document.getElementById('familyMeetingOverlay').classList.contains('open');
+    step.meetingOpens = mmIsOpen();
     step.nothingSettledYet = JSON.stringify(state.shared.chore.finalizedWeeks || {}) === finalBefore;
     _closeAppDialog(null);   // settle asks about unsettled weeks too — see above
-    closeSheet('familyMeetingOverlay');
+    mmHide();
 
     // Leave the week as we found it.
     mrSetChoreGrade(kid, wk, day, chore, 0);
@@ -5449,7 +5449,7 @@ function findChromium() {
       && mnySavedTotal(kid) === before.saved
       && !mnyIsCommitted(wk, kid);
 
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     return fiveSteps && gated && confirmed && poolIsHonest && allToLoan
         && blockedNoAnswer && moved && notHeldYet && reversed;
   });
@@ -6754,7 +6754,7 @@ function findChromium() {
     const paceUsable = pace.weeksLeft > 0 && pace.neededPerWeek > 0
                     && Math.abs(pace.neededPerWeek * pace.weeksLeft - 100) < 1;
 
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     pd.savingGoals = [];
     return kidCanCreate && hasBucket && moved && reversed && paceUsable;
   });
@@ -6818,7 +6818,7 @@ function findChromium() {
     const onEarned = body.querySelectorAll('.mny-tab').length === 5;
     mmGoStep(4);
     const onDecide = body.querySelectorAll('.mny-tab').length === 5;
-    closeSheet('familyMeetingOverlay');
+    mmHide();
 
     // And it navigates: tapping 5 from page 1 lands on Money school.
     mnyOpenMyMoney('jess');
@@ -6835,7 +6835,7 @@ function findChromium() {
     mnyGoTab('rules');
     const stayedPut = !document.getElementById('screen-parent').classList.contains('active');
     mnyGoTab('grow');
-    const noMeeting = !document.getElementById('familyMeetingOverlay').classList.contains('open');
+    const noMeeting = !mmIsOpen();
     return stayedPut && noMeeting;
   });
 
@@ -6967,7 +6967,7 @@ function findChromium() {
     mmToggleItem(kid, 2, 'chore', 'vacuum');         // and it is reversible
     const ungraded = mrGetChoreGrade(kid, wk, 2, 'vacuum') === 0;
 
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     setDayBlocks(dayKey, [], kid);
     return bothKinds && graded && after > before && shown && ungraded;
   });
@@ -6993,7 +6993,7 @@ function findChromium() {
       && document.activeElement.selectionStart === 3;
     const draftKept = mnyCompDraft.name === 'Winter Invit';
     mnyToggleComp();
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     return keptWhileTyping && restored && draftKept;
   });
 
@@ -7006,7 +7006,7 @@ function findChromium() {
     if (!tab) return false;
     tab.click();
     const landed = document.getElementById('screen-moneyschool').classList.contains('active');
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     return landed;
   });
 
@@ -7121,7 +7121,7 @@ function findChromium() {
     // Half-done must not be recorded, and must not read as finished.
     const notHeld = !(c.meetingsHeld && c.meetingsHeld[wk]);
     const noCelebration = !body().includes('🎉 Finish meeting');
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     return neitherDone && namesJenn && jessTicks && notHeld && noCelebration;
   });
 
@@ -7145,7 +7145,7 @@ function findChromium() {
     openFamilyMeeting(); mmGoStep(1); mmSelectDay(2);
     const inMeeting = document.getElementById('familyMeetingBody').textContent
       .includes('no longer decide it');
-    closeSheet('familyMeetingOverlay');
+    mmHide();
 
     // The portal, not openChoreTab — that renders the KID frame for everyone
     // (round 1 moved the parent's half of the week into js/27-chore-parent.js).
@@ -7344,7 +7344,7 @@ function findChromium() {
     mmGoStep(4);
     const offStep4 = !document.getElementById('familyMeetingBody').textContent
       .includes('Before we start');
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     return onStep1 && offStep4;
   });
 
@@ -7403,7 +7403,7 @@ function findChromium() {
     mnySetOverride(kid, wk, 'chores', 99, 'graded_wrong');
     mnyShowTheChange(kid, 'chores');
     const toTheChange = mmStep === 3 && mnyExpandRow === 'chores';
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     e.overrides = {};
 
     // Her "waiting for Mom" chip → the first day something is waiting on.
@@ -9175,7 +9175,7 @@ function findChromium() {
 
     openFamilyMeeting(); mnySetMeetKid(kid); mmGoStep(3);
     const atMeeting = firstVal('#familyMeetingBody');
-    closeSheet('familyMeetingOverlay');
+    mmHide();
 
     // The portal renders one section at a time; the strip lives in 'week'.
     showScreen('parent'); renderParentHome(); mnySetParentSection('week');
@@ -9258,7 +9258,7 @@ function findChromium() {
            .every(s => !ctGetMandatory(past, 1, s, kid));
     const routinesDontPayChores = mrWeekBreakdown(past, kid).chorePaid === choresAfterChore;
 
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     e.chores = {}; e.claims = {};
     c.programStartDate = startBefore;
     ctSetCurrentWeekFromPlanner();
@@ -9707,7 +9707,7 @@ function findChromium() {
       const row = document.getElementById('familyMeetingBody').querySelectorAll('.mm-drow')[2];
       if (!row || !row.querySelector('.mm-drow-body')) bad.push('a day row does not open its detail');
     }
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     window.showConfirm = wasConfirm;
     ['jenn', 'jess'].forEach((k, i) => setDayBlocks(day0, hadBlocks[i], k));
     state.shared.parentDayConfirm = before;
@@ -10041,7 +10041,7 @@ function findChromium() {
     // them a fourth time.
     const handsOff = !!document.querySelector('#familyMeetingBody [data-mm-action="openweek"]')
       && body.includes('not here');
-    closeSheet('familyMeetingOverlay');
+    mmHide();
 
     mrWeekDayKeys(src).forEach(k => setDayBlocks(k, [], 'jenn'));
     mrWeekDayKeys(gap).forEach(k => setDayBlocks(k, [], 'jenn'));
@@ -10089,7 +10089,7 @@ function findChromium() {
        together as "still open", which is how a family that had met twice was
        told it had missed eight weeks. */
     const shows = body.includes('Last settled') && body.includes('2 earlier weeks not yet opened');
-    closeSheet('familyMeetingOverlay');
+    mmHide();
 
     const dlgOpen = () => {
       const ov = document.getElementById('appDialogOverlay');
@@ -10099,7 +10099,7 @@ function findChromium() {
     mmCatchUpAsked = false;
     openFamilyMeeting();
     const quietOnDeepLink = !dlgOpen();
-    closeSheet('familyMeetingOverlay');
+    mmHide();
 
     // The deliberate one asks, and taking the offer moves the meeting.
     mmCatchUpAsked = false;
@@ -10113,7 +10113,7 @@ function findChromium() {
     // …and it is one ask per load, not one per open.
     openFamilyMeetingAsk();
     const askedOnce = !dlgOpen();
-    closeSheet('familyMeetingOverlay');
+    mmHide();
 
     // Caught up → no question at all.
     ctWeekKey = ctThisWeekKey();
@@ -10121,7 +10121,7 @@ function findChromium() {
     mmCatchUpAsked = false;
     openFamilyMeetingAsk();
     const quietWhenCaughtUp = !dlgOpen();
-    closeSheet('familyMeetingOverlay');
+    mmHide();
 
     c.meetingsHeld = heldBefore; c.meetingsMet = metBefore;
     c.programStartDate = progBefore;
@@ -12150,7 +12150,7 @@ function findChromium() {
       }
       const both = document.querySelector('#familyMeetingBody [data-mm-action="confirmday"][data-day="0"]');
       if (!both || !/Both/.test(both.textContent)) bad.push('the meeting does not label the both-children control');
-      closeSheet('familyMeetingOverlay');
+      mmHide();
     } finally {
       window.showConfirm = wasConfirm;
       setDayBlocks(day, beforeJ, 'jenn');
@@ -12263,7 +12263,7 @@ function findChromium() {
       state.shared.chore.reflections = hadRefl;
       getProfData('jenn').todos = hadTodos;
       reflDraft = null;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -12340,7 +12340,7 @@ function findChromium() {
     } finally {
       state.shared.chore.reflections = hadRefl;
       reflDraft = null;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -12414,7 +12414,7 @@ function findChromium() {
       state.shared.chore.reflections = hadRefl;
       state.shared.chore.weeksClosed = hadClosed;
       reflDraft = null;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -12478,7 +12478,7 @@ function findChromium() {
       if (/Copy this week/i.test(txt)) bad.push('step 5 offers to copy the week again');
     } finally {
       state.shared.chore.reflections = hadRefl;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -12638,7 +12638,7 @@ function findChromium() {
       window.saveAll = wasSave;
       state.shared.chore.reflections = hadRefl;
       reflDraft = null;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -13262,7 +13262,7 @@ function findChromium() {
       renderMeetingMode();
 
       /* ── The offer is on the row, with all three answers ── */
-      const offer = document.querySelector('#familyMeetingOverlay .mm-drow-offer');
+      const offer = document.querySelector('#screen-meeting .mm-drow-offer');
       if (!offer) bad.push('an unconfirmed day row carries no offer');
       const actions = offer
         ? Array.from(offer.querySelectorAll('[data-mm-action]')).map(b => b.getAttribute('data-mm-action'))
@@ -13279,7 +13279,7 @@ function findChromium() {
 
       /* ── The control is enabled for `unconfirmed`, refused for `running` ── */
       const cell = document.querySelector(
-        `#familyMeetingOverlay .mm-drow-kid[data-kid="jenn"][data-day="${dayIdx}"]`);
+        `#screen-meeting .mm-drow-kid[data-kid="jenn"][data-day="${dayIdx}"]`);
       if (cell && cell.disabled) bad.push('an unconfirmed day is still a hard refusal');
       if (cell && !(cell.getAttribute('title') || '').length) {
         bad.push('the enabled control does not say why it is offering anything');
@@ -13287,13 +13287,13 @@ function findChromium() {
 
       /* ── STEP 1 AND STEP 2 BOTH REACH THE WEEK, on a PAST week ── */
       const wkBtns = document.querySelectorAll(
-        '#familyMeetingOverlay [data-mm-action="openweek"]');
+        '#screen-meeting [data-mm-action="openweek"]');
       if (wkBtns.length < 2) {
         bad.push(`step 1 offers ${wkBtns.length} open-week buttons, expected one per child`);
       }
       mmGoStep(2);
       const wkBtns2 = document.querySelectorAll(
-        '#familyMeetingOverlay [data-mm-action="openweek"]');
+        '#screen-meeting [data-mm-action="openweek"]');
       if (wkBtns2.length < 2) {
         bad.push(`step 2 offers ${wkBtns2.length} open-week buttons on a past week`);
       }
@@ -13329,7 +13329,7 @@ function findChromium() {
       bad.push('threw: ' + e.message);
     } finally {
       window.showConfirm = wasConfirm;
-      try { closeSheet('familyMeetingOverlay'); } catch (e) {}
+      try { mmHide(); } catch (e) {}
       setDayBlocks(past, beforePast, 'jenn');
       setDayBlocks(today, beforeToday, 'jenn');
       state.shared.parentDayConfirm = store;
@@ -13403,7 +13403,7 @@ function findChromium() {
       if (rows.length !== 1) bad.push(`the meeting offered ${rows.length} routine rows, expected 1`);
       mmSelectDay(schoolIdx);
       openFamilyMeeting(); mmGoStep(1); renderMeetingMode();
-      const footer = document.querySelector('#familyMeetingOverlay .mm-routine-all');
+      const footer = document.querySelector('#screen-meeting .mm-routine-all');
       if (footer && /three/i.test(footer.textContent)) {
         bad.push(`the footer still says three: "${footer.textContent.trim()}"`);
       }
@@ -13422,7 +13422,7 @@ function findChromium() {
     } catch (e) {
       bad.push('threw: ' + e.message);
     } finally {
-      try { closeSheet('familyMeetingOverlay'); } catch (e) {}
+      try { mmHide(); } catch (e) {}
       keys.forEach((k, i) => setDayBlocks(k, saved[i], 'jenn'));
       profile = wasProfile;
     }
@@ -13994,7 +13994,7 @@ function findChromium() {
     } finally {
       setDayBlocks(today, before, 'jenn');
       state.shared.parentDayConfirm = store;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -14114,7 +14114,7 @@ function findChromium() {
       state.shared.chore.reflections = hadRefl;
       state.shared.parentDayConfirm = store;
       reflDraft = null;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -14187,7 +14187,7 @@ function findChromium() {
     } finally {
       state.shared.chore.reflections = hadRefl;
       reflDraft = null;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -14375,7 +14375,7 @@ function findChromium() {
       state.shared.chore.reflections = hadRefl;
       getProfData('jenn').todos = hadTodos;
       reflDraft = null;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -14455,7 +14455,7 @@ function findChromium() {
       state.shared.chore.reflections = hadRefl;
       state.shared.parentDayConfirm = store;
       reflDraft = null;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -14538,7 +14538,7 @@ function findChromium() {
       state.shared.chore.reflections = hadRefl;
       state.shared.parentDayConfirm = store;
       reflDraft = null;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -14704,7 +14704,7 @@ function findChromium() {
       if (isWeekClosed(now)) bad.push('the week started out closed');
       mmCloseWeekNow();
       if (isWeekClosed(now)) bad.push('the week closed without both girls being reviewed and settled');
-      closeSheet('familyMeetingOverlay');
+      mmHide();
     } finally {
       ctSetCurrentWeekFromPlanner();
       profile = 'jenn';
@@ -14766,7 +14766,7 @@ function findChromium() {
       renderMeetingMode();
       const after = document.getElementById('familyMeetingBody').textContent.replace(/\s+/g, ' ');
       if (after !== withoutLegacy) bad.push('the evidence still reads the retired chore-group store');
-      closeSheet('familyMeetingOverlay');
+      mmHide();
     } finally {
       keys.forEach((k, i) => setDayBlocks(k, before[i], kid));
       e.chores = JSON.parse(hadChores); e.claims = JSON.parse(hadClaims);
@@ -14914,7 +14914,7 @@ function findChromium() {
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     try {
       openFamilyMeeting(); mmGoStep(3);
-      const sheet = document.querySelector('#familyMeetingOverlay .sheet');
+      const sheet = document.querySelector('#screen-meeting .mm-screen');
       const head = document.querySelector('#familyMeetingBody .mm-head');
       const nav = document.querySelector('#familyMeetingBody .mm-nav');
       if (!head) bad.push('the week and step header is not its own band');
@@ -14929,11 +14929,11 @@ function findChromium() {
         }
       });
       const sheetPos = sheet ? getComputedStyle(sheet) : null;
-      if (sheetPos && sheetPos.display !== 'flex') bad.push('the meeting sheet is not a flex column');
+      if (sheetPos && sheetPos.display !== 'flex') bad.push('the meeting screen is not a flex column');
 
       // One scroller. A second one inside the sheet is how a flick on an iPad
       // comes to move the wrong thing.
-      const scrollers = [...document.querySelectorAll('#familyMeetingOverlay *')].filter(el => {
+      const scrollers = [...document.querySelectorAll('#screen-meeting *')].filter(el => {
         const o = getComputedStyle(el).overflowY;
         return (o === 'auto' || o === 'scroll') && el.scrollHeight > el.clientHeight + 4;
       });
@@ -14946,7 +14946,7 @@ function findChromium() {
         bad.push('the meeting scrolls something other than .mm-body');
       }
       if (sheet && sheet.scrollHeight > sheet.clientHeight + 4) {
-        bad.push('the sheet itself scrolls — it is meant to be a bounded column');
+        bad.push('the meeting screen itself scrolls — it is meant to be a bounded column');
       }
 
       /* At the top, the middle and the bottom of the longest step, neither band
@@ -14994,7 +14994,7 @@ function findChromium() {
         }
         if (after) after.scrollTop = 0;
       }
-      closeSheet('familyMeetingOverlay');
+      mmHide();
     } finally {
       profile = wasProfile;
     }
@@ -15115,11 +15115,14 @@ function findChromium() {
     const bare = toggles.filter(t => !/role="switch"/.test(t) || !/tabindex="0"/.test(t) || !/aria-checked=/.test(t));
     if (bare.length) bad.push(`${bare.length} of ${toggles.length} toggles carry no switch semantics in the markup`);
     const overlays = html.match(/<div class="overlay[^"]*" id="[^"]+"/g) || [];
-    /* 20 since the Record sheet (js/41-record.js) landed. The count is stated
-       rather than derived on purpose: a NEW overlay is a new dialog mechanism
-       unless it goes through openSheet/closeSheet, which own focus and Escape,
-       so one appearing unannounced is the thing worth being told about. */
-    if (overlays.length !== 20) bad.push(`${overlays.length} static overlays, expected 20`);
+    /* 19: up one for the Record sheet (js/41-record.js), then down one when the
+       weekly meeting stopped being a sheet and became `screen-meeting`. The
+       count is stated rather than derived on purpose: a NEW overlay is a new
+       dialog mechanism unless it goes through openSheet/closeSheet, which own
+       focus and Escape, so one appearing unannounced is worth being told about.
+       A DEPARTING one is worth being told about too — this number going down is
+       how you find out a dialog was replaced by something else. */
+    if (overlays.length !== 19) bad.push(`${overlays.length} static overlays, expected 19`);
     if (count(/role="tabpanel"/g) !== 5) bad.push(`${count(/role="tabpanel"/g)} tabpanels in the file, want 5 (one per tab)`);
     if (count(/<h4>✅ To-do<\/h4>/g)) bad.push('the To-do heading still skips from h2 to h4');
     checks.theMarkupSaysWhatThingsAre = bad.length === 0 || bad;

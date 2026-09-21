@@ -681,8 +681,7 @@ function mergeRemoteState(remote) {
    focus, so an incoming sync can't yank a parent's cursor out of a field
    mid-meeting. */
 function refreshCurrentScreen() {
-  const meeting = document.getElementById('familyMeetingOverlay');
-  if (meeting && meeting.classList.contains('open') && typeof renderMeetingMode === 'function') {
+  if (typeof mmIsOpen === 'function' && mmIsOpen() && typeof renderMeetingMode === 'function') {
     renderMeetingMode();
   }
   const active = document.querySelector('.screen.active');

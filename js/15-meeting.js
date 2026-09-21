@@ -35,6 +35,62 @@ let mmExpressWeek = null;   // week key while the catch-up screen is open
 let mmExpressMoney = true;  // tick 1 — record the money
 let mmExpressMet = false;   // tick 2 — we talked about this week together
 
+/* ── The meeting is a SCREEN, not a pop-up ────────────────────────
+   It ran inside `familyMeetingOverlay`, a `.sheet` — and a sheet is a box
+   floating over the page with its own scrollbar. A Sunday sitting is the
+   longest task in this app: two children, a week of days, a reflection each
+   and a money split. Inside a sheet that meant scrolling up and down a small
+   window all the way through it, which is the owner's own report of what using
+   it is like. A task that takes twenty minutes is not a dialog.
+
+   It is `screen-meeting` now, and `showScreen` is what opens it. That is
+   NOT a second dialog mechanism growing beside openSheet/closeSheet — it is
+   one fewer. The sheets that remain are what they should be: short, one
+   question, answered and gone.
+
+   ── Three owners, so the switch was a one-place change ──
+
+   Nineteen call sites across seven files asked their own version of "is the
+   meeting showing" — `document.getElementById('familyMeetingOverlay')` and
+   `.classList.contains('open')`, spelled out each time. That is the six-copies
+   defect this repo keeps recording, and it is also exactly what would have made
+   this move a nineteen-place edit with nineteen chances to miss one. Ask these;
+   do not re-derive them. */
+function mmIsOpen() {
+  const scr = document.getElementById('screen-meeting');
+  return !!(scr && scr.classList.contains('active'));
+}
+
+/* Where the sitting was opened FROM, so closing it puts a parent back rather
+   than somewhere plausible. As a sheet this was free — closing revealed
+   whatever had been behind it — and a screen has to remember. It is
+   device-local and deliberately not state: which screen someone was on is not
+   the family's data, and every state write is a full-document upload. */
+let mmCameFrom = 'parent';
+function mmShow() {
+  if (!mmIsOpen()) {
+    const active = document.querySelector('.screen.active');
+    /* Never record the meeting as its own origin — mmShow is called again by
+       every path that re-enters a sitting already open, and a self-reference
+       would trap the Close button on this screen. */
+    if (active && active.id && active.id !== 'screen-meeting') {
+      mmCameFrom = active.id.replace(/^screen-/, '');
+    }
+  }
+  if (typeof showScreen === 'function') showScreen('meeting');
+}
+/* Closing returns to whatever the sitting came from, and refreshes the parent
+   hub — that last part used to live inside `closeSheet` as a special case for
+   this one id, which is the kind of thing that makes a general mechanism carry
+   one caller's knowledge. It belongs here. */
+function mmHide() {
+  if (typeof showScreen === 'function') showScreen(mmCameFrom || 'parent');
+  const sp = document.getElementById('screen-parent');
+  if (sp && sp.classList.contains('active') && typeof renderParentHome === 'function') {
+    renderParentHome();
+  }
+}
+
 function openFamilyMeeting() {
   if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
   ctEnsureShared();
@@ -42,7 +98,7 @@ function openFamilyMeeting() {
   mmClearReturn();        // a fresh sitting has nowhere to go back to
   mmExpressWeek = null;   // the full sitting, not the catch-up run
   renderMeetingMode();
-  openSheet('familyMeetingOverlay');
+  mmShow();
 }
 
 // Day-confirm in the meeting persists to the real parent day-confirm store
@@ -198,7 +254,7 @@ function mmCloseMeeting() {
   // Nothing to come back to once the sitting is over, so the week and day
   // screens get their Hub button and their switchers back.
   mmClearReturn();
-  closeSheet('familyMeetingOverlay');
+  mmHide();
   const hub = document.getElementById('meetingHub');
   if (hub && document.getElementById('screen-parent')?.classList.contains('active')) renderMeetingHub();
 }
@@ -341,8 +397,8 @@ let mmReturn = null;
    One owner, so the next layout change moves one selector. Falls back to the
    sheet for any state where the body has not been rendered yet. */
 function mmScroller() {
-  return document.querySelector('#familyMeetingOverlay .mm-body')
-      || document.querySelector('#familyMeetingOverlay .sheet');
+  return document.querySelector('#screen-meeting .mm-body')
+      || document.getElementById('screen-meeting');
 }
 
 function mmCaptureReturn(kid, dayIdx) {
@@ -374,8 +430,7 @@ function mmReturnToMeeting() {
   mmSelectedDay = r.selectedDay;
   if (typeof mnySetMeetKid === 'function') mnySetMeetKid(r.child);
   showScreen('parent');
-  const overlay = document.getElementById('familyMeetingOverlay');
-  if (!overlay || !overlay.classList.contains('open')) openSheet('familyMeetingOverlay');
+  if (!mmIsOpen()) mmShow();
   mmStep = Math.max(1, Math.min(MM_STEPS.length, r.step || 1));
   mmMaxStep = Math.max(mmMaxStep, mmStep);
   renderMeetingMode();
@@ -388,7 +443,7 @@ function mmReturnToMeeting() {
 function mmOpenWeekForBlocks(kid) {
   const wk = mmWeekKey();
   mmCaptureReturn(kid);
-  closeSheet('familyMeetingOverlay');
+  mmHide();
   weekOffset = computeWeekOffsetForDayKey(wk);
   parentView(kid);
 }
@@ -400,7 +455,7 @@ function mmOpenDayForBlocks(kid, dayIdx) {
   const keys = mrWeekDayKeys(wk);
   const dayKey = keys[dayIdx] || keys[0];
   mmCaptureReturn(kid, dayIdx);
-  closeSheet('familyMeetingOverlay');
+  mmHide();
   weekOffset = computeWeekOffsetForDayKey(wk);
   parentViewing = kid;
   currentDayKey = dayKey;
@@ -707,8 +762,7 @@ function mmGoToWeek(wk) {
   mmClearReturn();
   mmStep = 1; mmMaxStep = 1; mmSelectedDay = null; mmUndo = null; mmAddChoreFor = null;
   if (typeof mnyDraft !== 'undefined') mnyDraft = null;
-  const overlay = document.getElementById('familyMeetingOverlay');
-  if (!overlay || !overlay.classList.contains('open')) openSheet('familyMeetingOverlay');
+  if (!mmIsOpen()) mmShow();
   renderMeetingMode();
 }
 
@@ -1415,7 +1469,7 @@ function mmRenderQuarterly() {
 }
 function mmDoQuarterlyReview() {
   mrMarkQuarterReviewed();
-  closeSheet('familyMeetingOverlay');
+  mmHide();
   openPocketMoney(ctParentKid, 'setup');
 }
 function mmSkipQuarterlyReview() {
@@ -1753,7 +1807,7 @@ function mmOpenNextWeek() {
   nextMon.setDate(nextMon.getDate() + 7);
   const next = dateToLocalKey(nextMon);
   mmClearReturn();
-  closeSheet('familyMeetingOverlay');
+  mmHide();
   weekOffset = computeWeekOffsetForDayKey(next);
   showScreen('week');
   renderWeek();

@@ -1521,16 +1521,32 @@
      scroll position. Still ONE scroller — nesting a second is what makes a
      flick move the wrong surface on a tablet.
 
-     Negative horizontal margins still let each band span the sheet's 1.2rem
-     padding so nothing shows through at the edges. */
-  #familyMeetingOverlay .sheet {
+     Negative horizontal margins still let each band span the 1.2rem padding so
+     nothing shows through at the edges.
+
+     ── It is a SCREEN now, not a sheet ──
+     The column is unchanged and it is the reason the move was cheap: the
+     meeting already laid itself out as a flex column with one scroller, so it
+     only had to stop being 88% of the viewport inside a floating box and start
+     being the whole of it. A Sunday sitting is the longest task in this app,
+     and a small window you scroll up and down is the wrong container for it. */
+  .mm-screen {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    /* dvh so iPad Safari's shrinking toolbar cannot push the footer out of
-       reach; vh first for anything that does not know dvh. */
-    max-height: 88vh;
-    max-height: 88dvh;
+    padding: 1.2rem;
+    /* The whole viewport, not a fraction of it. dvh so iPad Safari's shrinking
+       toolbar cannot push the footer out of reach; vh first for anything that
+       does not know dvh. */
+    height: 100vh;
+    height: 100dvh;
+  }
+  /* The meeting names itself once, at the top, and then gets out of the way —
+     it used to be a sheet heading, which is the one thing a dialog must have
+     and a screen mostly does not need shouting. */
+  .mm-title {
+    flex: 0 0 auto;
+    margin: 0 0 0.6rem; font-size: max(15px, 1.05rem);
   }
   #familyMeetingBody {
     flex: 1 1 auto;
@@ -6105,14 +6121,14 @@
   #screen-mymoney,
   #screen-moneystory,
   #screen-moneyschool,
-  #familyMeetingOverlay {
+  #screen-meeting {
     --fs-scale: 1.2;
   }
   /* A few fixed-size chips would clip their label at 1.2x — let them grow. */
   #screen-parent .ck-key, #screen-chore .ck-key,
-  #familyMeetingOverlay .mny-tab-tag, #screen-mymoney .mny-tab-tag,
+  #screen-meeting .mny-tab-tag, #screen-mymoney .mny-tab-tag,
   #screen-moneyschool .mny-tab-tag,
-  #familyMeetingOverlay .cp-gbtn, #screen-chore .cp-gbtn {
+  #screen-meeting .cp-gbtn, #screen-chore .cp-gbtn {
     white-space: normal;
     min-height: auto;
     height: auto;
