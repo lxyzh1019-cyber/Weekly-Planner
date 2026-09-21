@@ -8971,16 +8971,46 @@ function findChromium() {
        the tick routes through completeQuest rather than writing a flag itself,
        and for that it needs a block that actually earns. */
     const xpBefore = getQuestXP('jenn');
+    const readBlock = () => (getDayBlocks(key, 'jenn') || []).find(b => b.id === 'td-q1');
     const blast = document.querySelector('#tdWrap [data-td-action="blast"][data-td-block="td-q1"]');
+    const before = readBlock();
     if (!blast) { bad.push('no 🎯 on a quest card'); }
-    else {
+    else if (!before) { bad.push('the block this check blasts is not on the day'); }
+    else if (before.completed) {
+      /* Named rather than silently tolerated. If something earlier in the suite
+         left this block done, the assertions below would pass without the tap
+         proving anything — which is the shape CLAUDE.md keeps recording. */
+      bad.push('td-q1 was already completed before the tap, so the tap proves nothing');
+    } else {
+      const card = blast.closest('.quest-card');
       blast.click();
-      // The blast is an animation: projectile 300ms, burst 240ms, then the
-      // completion. Assert after it lands, not before.
-      await new Promise(r => setTimeout(r, 900));
-      const blk = (getDayBlocks(key, 'jenn') || []).find(b => b.id === 'td-q1');
-      if (!blk || !blk.completed) bad.push('🎯 did not complete the block');
-      if (getQuestXP('jenn') <= xpBefore) bad.push('🎯 completed without awarding XP');
+      /* WAIT FOR THE CONDITION, NOT FOR A DURATION. This was a flat 900ms
+         against a chain that costs 540 (projectile 300, burst 240) — fine on a
+         laptop, and it went red on a CI runner while passing locally. A test
+         that reports a problem according to how busy the machine is cannot be
+         trusted either way: it is the same shape as the fixed 3pm window this
+         check's own comment above already had to fix.
+
+         Polling is not a weaker assertion. It still fails if the completion
+         never lands; it only stops failing when the completion is merely late,
+         and it says WHICH of those happened. */
+      let waited = 0;
+      while (waited < 5000 && !(readBlock() || {}).completed) {
+        await new Promise(r => setTimeout(r, 50));
+        waited += 50;
+      }
+      const blk = readBlock();
+      if (!blk || !blk.completed) {
+        /* blastQuest's one silent no-op is a card already carrying
+           `quest-blasting` — it returns without completing. Say so, because
+           "did not complete" on its own sent a previous investigation looking
+           at timing when the cause may be a stuck class from an earlier tap. */
+        bad.push('🎯 did not complete the block after ' + waited + 'ms · card classes: '
+          + (card ? card.className : 'no card') );
+      }
+      if (getQuestXP('jenn') <= xpBefore) {
+        bad.push('🎯 completed without awarding XP (' + xpBefore + ' → ' + getQuestXP('jenn') + ')');
+      }
     }
 
     // Tapping the card body is still a hand-off to the planner, not a write.
