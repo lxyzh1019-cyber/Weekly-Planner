@@ -506,7 +506,11 @@ async function mnyRunDefaultSweep() {
     w.kids.forEach(kid => {
       // The guard, re-read at write time rather than trusted from the plan.
       if (c.finalizedWeeks[w.wk][kid] != null) return;
-      moneyAddCash(kid, MNY_DEFAULT_WEEK);
+      moneyAddCash(kid, MNY_DEFAULT_WEEK, {
+        kind: 'settle', from: 'earned', dayKey: w.wk, weekKey: w.wk, ref: w.wk,
+        note: 'Week of ' + w.wk + ' — nobody met, the default' });
+      evMirror(kid, { kind: 'settle', amount: 0, dayKey: w.wk, weekKey: w.wk, ref: w.wk,
+                      note: 'Week of ' + w.wk + ' — settled at the default' });
       c.finalizedWeeks[w.wk][kid] = MNY_DEFAULT_WEEK;
       c.moneyLedger[w.wk][kid] = {
         at: Date.now(), handEntered: true, defaulted: true, updatedAt: syncNow(),
@@ -566,9 +570,48 @@ function mnyStartDateCard() {
     </div>`;
 }
 
+/* ── The money stream, and what setting it up would do ──
+   Stage 1 of the money redesign (js/40-stream.js). The stream records every
+   movement — where a dollar came from, where it went — and derives every
+   balance from that, instead of the app keeping one `wallet.cash` number that
+   eight different functions had to remember to update.
+
+   Nothing on any screen reads it yet. This card exists so the one-time set-up
+   is a thing a parent SEES before it happens: the preview is computed by
+   `evMigrationPlan`, which writes nothing, and the button runs exactly it.
+   Money is never moved by this — the opening line is what she already has, so
+   every derived balance comes out equal to the one on screen today. */
+function mnyStreamCard() {
+  const plans = (typeof evMigrationPlan === 'function') ? evMigrationPlan() : [];
+  const pending = plans.filter(p => !p.alreadyDone);
+  const drift = ['jenn', 'jess'].reduce((all, k) =>
+    all.concat((typeof evShadowDrift === 'function' ? evShadowDrift(k) : [])
+      .map(d => mnyKidName(k) + ' — ' + d)), []);
+  return `<div class="mny-card">
+      <div class="mny-week-head"><span class="mny-label">🔀 Where the money went</span></div>
+      <div class="mny-note">Every movement of money, recorded one by one, so
+        every total can be worked out from it instead of being remembered.</div>
+      ${pending.length ? `
+        ${pending.map(p => `<div class="mny-row">
+            <span>${escapeHtml(mnyKidName(p.kid))} — ${p.weeks} settled week${p.weeks === 1 ? '' : 's'},
+              ${p.gifts} gift${p.gifts === 1 ? '' : 's'}</span>
+            <b>${mnyMoney(p.opening.cash)} already had</b>
+          </div>`).join('')}
+        <button type="button" class="mny-btn wide" data-mnyp-action="migrate"
+          >Set it up — ${pending.reduce((n, p) => n + p.rows.length, 0)} movements from what is on record</button>
+        <div class="mny-note">Shown before anything is written, and it moves no
+          money: it reads the weeks already settled and the gifts already
+          recorded, and opens each pot at exactly what it holds today.</div>`
+      : `<div class="mny-note mny-gap">✅ Set up — every movement is on record.</div>`}
+      ${drift.length
+        ? `<div class="mny-note warn">These do not agree yet: ${escapeHtml(drift.join(' · '))}</div>`
+        : `<div class="mny-note">Both ways of counting agree.</div>`}
+    </div>`;
+}
+
 function mnyHistoryEditor(kid) {
   const rows = mnyLedgerRows(kid);
-  return `${mnyStartDateCard()}<div class="mny-card">
+  return `${mnyStreamCard()}${mnyStartDateCard()}<div class="mny-card">
       <div class="mny-week-head"><span class="mny-label">📖 Weeks on record</span><b>${rows.length}</b></div>
       <button type="button" class="mny-btn wide" data-mnyp-action="addweek">＋ Add a week that happened before this</button>
       <div class="mny-note">Each tap steps one week further back from the earliest week on record.</div>
@@ -747,6 +790,32 @@ function mnyParentClick(ev) {
   if (a === 'leddel')  { mnyDeleteLedgerWeek(kid, id); mnyRenderRulesTab(); return; }
   if (a === 'addweek') { mnyAddMissedWeek(kid); mnyRenderRulesTab(); return; }
   if (a === 'sweepdefault') { mnyRunDefaultSweep(); return; }
+  if (a === 'migrate')      { mnyRunStreamSetup(); return; }
+}
+
+/* Writes the stream's opening record, after saying what it will do. Separate
+   from `evRunMigration` (js/40-stream.js) for the reason every writer in this
+   app is: that one owns the decision and writes nothing a preview did not
+   show, this one owns the conversation with the parent. */
+async function mnyRunStreamSetup() {
+  if (!isParent()) { showToast('A grown-up sets this up 🔒'); return; }
+  const plans = evMigrationPlan();
+  const rows = plans.reduce((n, p) => n + p.rows.length, 0);
+  if (!rows) { showToast('Already set up ✅'); return; }
+  const lines = plans.filter(p => !p.alreadyDone).map(p =>
+    `${mnyKidName(p.kid)}: ${p.weeks} settled week${p.weeks === 1 ? '' : 's'}, ` +
+    `${p.gifts} gift${p.gifts === 1 ? '' : 's'}, opening ${mnyMoney(p.opening.cash)} in hand`);
+  const ok = await showConfirm(
+    `Record ${rows} movements from what is already on file?\n\n${lines.join('\n')}\n\n` +
+    `No money moves — every total stays exactly as it reads today.`,
+    { okLabel: 'Set it up', cancelLabel: 'Not now' });
+  if (!ok) return;
+  const res = evRunMigration();
+  const left = ['jenn', 'jess'].reduce((all, k) => all.concat(evShadowDrift(k)), []);
+  showToast(left.length
+    ? `Recorded ${res.written} — but ${left.length} total${left.length === 1 ? '' : 's'} disagree`
+    : `✅ Recorded ${res.written} movements — every total agrees`);
+  mnyRenderRulesTab();
 }
 
 /* Both stores, together. They gate different things — moneyModelStartWeek

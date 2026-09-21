@@ -280,6 +280,17 @@ function mnySimCatchUp(kid, opts) {
       const term = (Number(h.termMonths) || 12) / 12;
       const payout = money2(value * (1 + (Number(h.rateAnnual) || 0) * term));
       w.cash = money2(w.cash + payout);
+      /* The whole payout comes back, principal and the interest it was promised
+         — so the stream says both: what was locked returns from `locked`, and
+         the extra is new money from `interest`. Booking the lot against
+         `locked` would derive a negative locked balance over time. */
+      evMirror(kid, { kind: 'move', from: 'locked', to: 'cash', amount: money2(value),
+                      ref: h.id, note: 'Unlocked ' + (h.name || 'locked money') });
+      if (money2(payout - value) > 0) {
+        evMirror(kid, { kind: 'interest', from: 'interest', to: 'cash',
+                        amount: money2(payout - value), ref: h.id,
+                        note: 'Interest on ' + (h.name || 'locked money') });
+      }
       matured.push({ id: h.id, name: h.name, amount: value, payout });
       mnyRemoveHolding(kid, h.id);
       moved = true;
@@ -298,6 +309,7 @@ function mnySimCatchUp(kid, opts) {
         h.units = 1;
         h.priceNow = money2(mnyHoldingValue(h) + add);
         interest = money2(interest + add);
+        evMirrorValueChange(kid, h.kind, add, { ref: h.id, note: 'Interest on ' + (h.name || 'her savings') });
         moved = true;
       }
     } else if (h.kind === 'stock' && h.ticker) {
@@ -305,7 +317,10 @@ function mnySimCatchUp(kid, opts) {
       // as it goes up, which is the entire point of holding one.
       const price = mnyPriceForMonth(h.ticker, today);
       if (price != null && money2(price) !== money2(h.priceNow)) {
+        const was = mnyHoldingValue(h);
         h.priceNow = money2(price);
+        evMirrorValueChange(kid, h.kind, money2(mnyHoldingValue(h) - was),
+                            { ref: h.id, note: (h.name || 'A company') + ' moved' });
         moved = true;
       }
     }
@@ -419,8 +434,14 @@ function mnyEditHolding(kid, holdingId, field, value) {
   const h = mnyEnsureHoldings(kid).find(x => x.id === holdingId);
   if (!h) return false;
   const num = ['units', 'priceNow', 'costBasis', 'rateAnnual'];
+  /* A parent keeping a holding truthful by hand is a real change in what she
+     has. Mirrored like any other, or the stream would derive a balance that
+     disagrees with the screen the moment a number is corrected. */
+  const was = mnyHoldingValue(h);
   h[field] = num.includes(field) ? Math.max(0, Number(value) || 0) : value;
   h.updatedAt = syncNow();
+  evMirrorValueChange(kid, h.kind, money2(mnyHoldingValue(h) - was),
+                      { kind: 'correction', ref: h.id, note: 'Corrected ' + (h.name || 'a holding') });
   saveAll();
   return true;
 }
@@ -616,6 +637,31 @@ function mnyRecentSavingRate(kid) {
    It records how much and where from. It does NOT record where it goes: that
    is decided on page 3 along with everything else in the pool.
    ════════════════════════════════════════════════════════════════ */
+/* How a gift is NAMED on the stream and on the flow diagram. "$50 · gift" says
+   nothing a child can hold on to; "Birthday money from Grandma" is the thing
+   she remembers, and `giver` exists precisely because `from` is a category and
+   never a person. One owner, because the movement, the ribbon and the month
+   card all print it and three copies would drift. */
+function mnyGiftLabel(d) {
+  const from = String((d && d.from) || 'A gift');
+  const giver = String((d && d.giver) || '').trim();
+  return giver ? from + ' from ' + giver : from;
+}
+/* The stream fields a gift movement carries, wherever it is credited. Dated to
+   the gift's OWN day, not to today — a red pocket arrives at New Year, and a
+   flow that files it under the month somebody typed it in is a flow that lies
+   about when her money came in. */
+function mnyGiftMirror(d) {
+  /* `to` is named explicitly even though a gift always lands in cash: the
+     migration adds these rows up itself to work out an opening balance, and an
+     absent destination reads there as "went nowhere" — which put every gift on
+     the stream twice over. A movement says both ends, always. */
+  return { kind: 'gift', from: 'gift', to: 'cash',
+           dayKey: (d && d.dayKey) || todayKey(),
+           weekKey: (d && d.weekKey) || null, ref: (d && d.id) || null,
+           note: mnyGiftLabel(d) };
+}
+
 function mnyEnsureDeposits(kid) {
   const p = getProfData(kid);
   if (!Array.isArray(p.deposits)) p.deposits = [];
@@ -655,7 +701,7 @@ function mnyAddDeposit(kid, weekKey, fields) {
     d.pendingApproval = true;
   } else {
     // A grown-up's own entry needs no approval and lands at once.
-    moneyAddCash(kid, d.amount);
+    moneyAddCash(kid, d.amount, mnyGiftMirror(d));
     d.appliedAt = Date.now();
   }
   mnyEnsureDeposits(kid).push(d);
@@ -671,7 +717,7 @@ function mnyApproveDeposit(kid, depositId) {
   const d = mnyEnsureDeposits(kid).find(x => x.id === depositId);
   if (!d || !d.pendingApproval) return false;
   delete d.pendingApproval;
-  if (!d.appliedAt) { moneyAddCash(kid, d.amount); d.appliedAt = Date.now(); }
+  if (!d.appliedAt) { moneyAddCash(kid, d.amount, mnyGiftMirror(d)); d.appliedAt = Date.now(); }
   markItemUpdated(d);
   mnyReopenWeek(kid, d.weekKey);
   saveAll();
@@ -687,7 +733,15 @@ function mnyRemoveDeposit(kid, depositId) {
   /* If it already reached the wallet, taking the record away has to take the
      money with it. A removal that left the cash behind would be a gift that
      exists only as a number nobody can account for. */
-  if (gone.appliedAt) moneyTakeBackCash(kid, gone.amount);
+  if (gone.appliedAt) {
+    /* Labels only. `mnyGiftMirror` describes a gift ARRIVING, and handing the
+       whole of it to a function that records money leaving is how a debit came
+       to be written as cash → cash. What a removal needs to say is which gift
+       and when — never which way the money went. */
+    moneyTakeBackCash(kid, gone.amount, {
+      kind: 'correction', ref: gone.id, dayKey: todayKey(),
+      note: 'Gift removed — ' + mnyGiftLabel(gone) });
+  }
   ensureTombstones()['dep:' + gone.id] = Date.now();
   if (gone.weekKey) mnyReopenWeek(kid, gone.weekKey);
   saveAll();

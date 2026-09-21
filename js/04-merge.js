@@ -442,6 +442,19 @@ function mergeProfileState(localProfile, remoteProfile, profName) {
   merged.honesty      = mergeArrayById(lp.honesty,      rp.honesty,      'hon:');
   // Money from outside — birthday money, a gift. Append-only, like the others.
   merged.deposits = mergeArrayById(lp.deposits, rp.deposits, 'dep:');
+  /* ── The money stream (js/40-stream.js) ──
+     Every movement of money as its own record: where it came from, where it
+     went, when. Balances are DERIVED from this, never stored, so the union by
+     id is what makes two devices agree about how much a child has — neither
+     can change what the other wrote, so the merged stream is simply both.
+
+     Append-only by contract: a correction is a reversing event, never an edit
+     (evReverse), which is why newest-wins per id never has to arbitrate
+     anything real here. A movement genuinely removed carries an 'ev:'
+     tombstone so it stays removed, exactly like deposits above — without it a
+     correction would undo itself on the next sync, which is money appearing
+     from nowhere. */
+  merged.events = mergeArrayById(lp.events, rp.events, 'ev:');
   // What she is saving for. A kid can add one on either device, so these union
   // by id; a goal she deleted stays deleted via its 'sgoal:' tombstone.
   merged.savingGoals = mergeArrayById(lp.savingGoals, rp.savingGoals, 'sgoal:');

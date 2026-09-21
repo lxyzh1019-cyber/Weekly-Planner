@@ -1126,7 +1126,7 @@ function mnyDoCommit() {
        into the wallet through the commit — that would be the approval gate
        working on one screen and not on the other. It waits. */
     if (dep.pendingApproval) return;
-    moneyAddCash(kid, dep.amount);
+    moneyAddCash(kid, dep.amount, mnyGiftMirror(dep));
     dep.appliedAt = Date.now();
     dep.updatedAt = syncNow();
   });
@@ -1150,6 +1150,9 @@ function mnyDoCommit() {
     const pay = money2(Math.min(amt, w.cash, mnyCashToClear(kid, debt)));
     if (!(pay > 0)) return;
     w.cash = money2(w.cash - pay);
+    evMirror(kid, { kind: 'loan', from: 'cash', to: 'loan:' + debt.id, amount: pay,
+                    ref: debt.id, weekKey: wk,
+                    note: 'Off ' + (debt.name || 'her loan') + ' — her choice' });
     const rec = loanRecordPayment(kid, pay, 'early', debt.id);
     toLoan = money2(toLoan + pay);
     if (rec) parts.push(`${debt.name} −$${pay.toFixed(2)} (cleared $${rec.credited.toFixed(2)})`);
@@ -1170,6 +1173,11 @@ function mnyDoCommit() {
   });
   // Spending leaves it exactly where it is: cash in the wallet is money she can
   // spend. The record of the decision is the plan and the ledger line below.
+  /* Spending leaves the cash where it is, so nothing in the wallet moves — but
+     the DECISION is the whole point of this screen, and a flow with no "spent"
+     ribbon would teach that money only ever goes into pots. Recorded as
+     cash → spent; the wallet catches up when she actually spends it, which the
+     stream will own outright once `wallet.cash` is retired. */
   if (money2(split.spend) > 0) parts.push(`🛍️ to spend $${money2(split.spend).toFixed(2)}`);
   if (money2(split.gic) > 0) moneyOpenGIC(kid, money2(split.gic), 12);
   if (money2(split.stock) > 0) mnyBuyChosenFund(kid, money2(split.stock));
@@ -1221,6 +1229,8 @@ function mnyBuyChosenFund(kid, dollars) {
   const amt = money2(Math.min(dollars, w.cash));
   if (!(amt > 0)) return;
   w.cash = money2(w.cash - amt);
+  evMirror(kid, { kind: 'invest', from: 'cash', to: 'invest', amount: amt,
+                  note: fund.label });
   const held = mnyHoldingsOfKind(kid, 'stock').find(h => h.fundId === fund.id);
   if (held) {
     held.units = 1;

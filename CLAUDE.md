@@ -1901,6 +1901,98 @@ four segments, which counted to four on Christmas week as readily as on a term
 Tuesday and is exactly why the 9am band stood for so long. They assert the axis
 matches the day it claims to describe.
 
+## The money stream — a flow, not a balance
+
+`js/40-stream.js`. **Money is stored as MOVEMENTS and every balance is derived
+from them.** This is Stage 1 of the money redesign and the thing the rest of it
+rests on.
+
+What it replaces: `wallet.cash` was one number written by **eight** separate
+functions — `js/14-money.js`'s six, the loan's four paths, the maturity payout,
+the meeting's commit — and not one of them recorded *why*. So "where did the $50
+go" had no answer anywhere in the app, and a stored total that eight writers have
+to keep right is a total that goes wrong. It is also the wrong lesson: a child
+watching a total learns to watch a total.
+
+Every event moves an amount **from** somewhere **to** somewhere:
+
+| | |
+|---|---|
+| **sources** (outside → in) | `earned` · `gift` · `prize` · `borrowed` · `interest` · `typed` · `opening` |
+| **homes** (inside) | `cash` · `ready` · `locked` · `invest` |
+| **sinks** (in → outside) | `spent` · `fine` · `loan:<debtId>` · `returned` |
+
+A home's balance is what arrived minus what left. That is the whole engine, and
+it is why `tests/stream.test.js` can state the invariant at all — *opening + Σin
+− Σout === what is in hand* — over a thousand randomly generated histories, on
+two devices, in any arrival order. A balance system cannot say that about
+itself.
+
+**A caller may LABEL a movement; it may never REDIRECT one.** Every writer
+applies the fields it owns — which pot the money left, which it arrived in, how
+much — **after** the caller's `opts`, so they always win. Spread the other way
+round and `mnyRemoveDeposit` passing the gift's own mirror fields turned a debit
+from her cash into `gift → returned`, and then into `cash → cash`: the wallet
+dropped $50 and the stream did not, silently, forever. Both were caught by
+`theMoneyStreamAgreesWithTheWallet` on its first two runs, which is exactly what
+that check is for.
+
+**A marker is a ZERO-AMOUNT event, not a kind of event.** `settle` names both
+the dollars a week paid and the fact that it was settled, so deciding markerhood
+by `kind` nulled the from/to on every settlement and credited nothing. The
+amount decides; `EV_MARKER_KINDS` only says which zero-amount rows are
+legitimate. A week settled at $0 still has to be answerable as settled, which is
+the reason markers exist.
+
+**A movement says both ends, always.** `mnyGiftMirror` named no destination and
+the migration's own arithmetic read that as "went nowhere", which put every gift
+on the stream twice over.
+
+**Shadow mode, and what licenses retiring the old stores.** Nothing on any
+screen reads the stream yet. `evMirror` is called beside every existing writer,
+`wallet.cash` is still what the app displays, and `evShadowDrift(kid)` returns
+the **findings** — never a bare boolean — for every pot where the two disagree.
+`theMoneyStreamAgreesWithTheWallet` drives the real writers (a settlement, a
+gift, money aside and back, a lock, a company bought and revalued, a gift taken
+back) and checks drift after *every* step, including before anything has
+happened: a base case that agrees is what would otherwise hide a sign error in
+every case after it. The old stores are retired in Stage 2, only after that
+drift has been zero on real household data.
+
+**The migration reconstructs history, then plugs the gap.** `evMigrationPlan`
+reads the frozen `moneyLedger` and the applied `deposits`, dates each row to the
+day it happened, and *then* computes the opening balance per home as
+`stored − everything reconstructed`. That order is the trick: the derived
+balance equals the stored balance **by construction**, on any household however
+incomplete its history, rather than by hoping the reconstruction is exhaustive.
+Whatever the old stores cannot account for lands in one honest line a child can
+read — *What she already had* — instead of as a drift nobody can see. A negative
+gap is written as money leaving, the same way a holding losing value is.
+
+It is **read-only and idempotent**: `evMigrationPlan` writes nothing, so the
+preview a parent approves is literally what runs, and every row carries a
+derived id (`evMigId`) so a second run — or two devices that then sync — produces
+one copy of each. It re-prices **nothing**; the weeks the legacy branch
+mispriced are repaired in Stage 2, under each week's own rules, with their own
+preview.
+
+**Merge decision:** `profile.events` is `mergeArrayById(..., 'ev:')` in
+`mergeProfileState` — a union by id with its own tombstone scope. Append-only by
+contract, so newest-wins per id never has to arbitrate anything real: a
+correction is a **reversing event** (`evReverse`), never an edit. Without the
+tombstone a correction would undo itself on the next sync, which is money
+appearing from nowhere.
+
+**Pure core, app wrapper.** `evBalanceOf`, `evFlowOf`, `evSpanOf`, `evMonthsOf`,
+`evTypicalMonthOf` take an array and return numbers, with a `module.exports`
+guard; the `kid`-taking wrappers just fetch the array. Same split and same
+reason as `bufferClip` — a calculation reachable only from a browser is one no
+unit test can hold, and the money layer has been burned by exactly that twice.
+
+**A typical month divides by the months that PASSED**, not by the months that
+happen to hold events — the same mistake `mrYearToDate` makes with settled
+weeks, deliberately not repeated: a quiet summer must not read as a good one.
+
 ## Money: a start date, a default, and gifts
 
 **The system has a beginning, and it is the family's.** `moneyModelStartWeek`

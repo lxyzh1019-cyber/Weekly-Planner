@@ -1843,6 +1843,15 @@ function commitKidWeek(wk, kid, opts) {
       const prelim = ctWeekMoney(wk, kid);
       w.cash = money2(w.cash + prelim);
       c.finalizedWeeks[wk][kid] = prelim;
+      /* The stream's record of the settlement (js/40-stream.js). The dollars and
+         the fact are two events on purpose: a week settled at $0 still has to be
+         answerable as settled, and a marker is the only row that survives a
+         quiet week. This is what will replace `finalizedWeeks`, `committedAt`
+         and `meetingsHeld` — three stored flags with three writers that could
+         and did disagree — once shadow mode has proved the balances agree. */
+      if (prelim > 0) evSettleLines(kid, wk, prelim, newModel);
+      evMirror(kid, { kind: 'settle', amount: 0, dayKey: wk, weekKey: wk, ref: wk,
+                      note: 'Week of ' + wk + ' settled' });
       if (prelim > 0) parts.push(`${name} +$${prelim.toFixed(2)}`);
     }
     // XP is computed all week but only credited here — awarding it on render

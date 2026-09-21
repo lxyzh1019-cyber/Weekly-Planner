@@ -5493,6 +5493,130 @@ function findChromium() {
         && blockedNoAnswer && moved && notHeldYet && reversed;
   });
 
+  /* ── THE MONEY STREAM AGREES WITH THE WALLET ──────────────────────
+     js/40-stream.js records every movement of money — where it came from and
+     where it went — and derives every balance from those, instead of trusting
+     one stored `wallet.cash` that eight separate functions had to remember to
+     update. Stage 1 runs it in SHADOW: both are written, nothing on screen
+     reads the stream yet, and this is the check that licenses retiring the
+     stored number.
+
+     It drives the REAL writers — a settlement, a gift, money into savings, a
+     loan payment, a company bought and sold — and then asks whether the two
+     ways of counting arrive at the same figure. `evShadowDrift` returns the
+     findings rather than a boolean, so a failure says WHICH pot drifted and by
+     how much; a bare `true` here would be a check that reports a problem and
+     returns success, which is the exact shape CLAUDE.md records twice. */
+  checks.theMoneyStreamAgreesWithTheWallet = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jenn', wk = ctWeekKey, c = state.shared.chore;
+    ['meetingsHeld', 'finalizedWeeks', 'moneyLedger', 'weekConfirms', 'weekPlans', 'xpAwardedWeeks']
+      .forEach(m => { if (c[m]) delete c[m][wk]; });
+    const pd = getProfData(kid);
+    pd.deposits = []; pd.competitions = []; pd.honesty = []; pd.holdings = [];
+    pd.events = [];                     // a clean stream, so drift is this test's
+    delete pd.debts;
+    ensureWallet(kid).cash = 0;
+    mrEnsureEarnings(kid, wk).overrides = {};
+
+    const problems = [];
+    const drift = (where) => {
+      const found = evShadowDrift(kid);
+      if (found.length) problems.push(where + ': ' + found.join(', '));
+    };
+
+    // An empty stream and an empty wallet already agree — the base case, and
+    // the one that would hide a sign error in every case after it.
+    drift('at the start');
+
+    // 1 · money arrives: a settled week and a birthday gift on their own days.
+    //     Four chores, not two: the first two each week are free by the rules,
+    //     so a two-chore week pays nothing and would prove nothing here.
+    ['dishes', 'mop', 'vacuum', 'bins'].forEach((ch, i) => mrSetChoreGrade(kid, wk, i, ch, 3));
+    mnyAddDeposit(kid, wk, { amount: 50, from: 'Birthday money', giver: 'Grandma' });
+    commitKidWeek(wk, kid);
+    drift('after a week was settled and a gift arrived');
+
+    // 2 · money moves between pots, and out to a company and back.
+    const cash = mnyCash(kid);
+    if (cash > 20) {
+      moneyDeposit(kid, 10);            // cash → kept ready
+      drift('after putting money aside');
+      moneyWithdraw(kid, 4);            // and back again
+      drift('after taking some of it back');
+      moneyOpenGIC(kid, 5, 12);         // cash → locked away
+      drift('after locking money away');
+      mnyBuyChosenFund(kid, 5);         // cash → a company
+      drift('after buying into a company');
+      const held = mnyHoldingsOfKind(kid, 'stock')[0];
+      if (held) {
+        mnyEditHolding(kid, held.id, 'priceNow', money2(money2(held.priceNow) + 3));
+        drift('after the company went up');
+        mnyEditHolding(kid, held.id, 'priceNow', money2(Math.max(0, money2(held.priceNow) - 7)));
+        drift('after the company went down');
+      }
+    } else {
+      problems.push('the seeded week earned too little to move anything: ' + cash);
+    }
+
+    // 3 · a gift taken back takes its money with it.
+    const gift = (pd.deposits || [])[0];
+    if (gift) { mnyRemoveDeposit(kid, gift.id); drift('after a gift was taken back'); }
+    else problems.push('the gift was not recorded at all');
+
+    // 4 · and the stream can say what the wallet never could: where it came
+    //     from, where it went, and that a settled week is a settled week.
+    const flow = evFlow(kid, null, null);
+    if (!(flow.sources.earned > 0)) problems.push('nothing is recorded as earned');
+    if (!(flow.dests.ready > 0)) problems.push('money put aside is not on the flow');
+    if (!evWeekIsSettled(kid, wk)) problems.push('the settled week is not on the stream');
+    // Every dollar in hand is accounted for by what came in and what went out.
+    if (money2(flow.inTotal - flow.outTotal) !== evWorth(kid)) {
+      problems.push('in minus out does not equal what she has: '
+        + money2(flow.inTotal - flow.outTotal) + ' vs ' + evWorth(kid));
+    }
+
+    return problems.length ? problems : true;
+  });
+
+  /* Setting the stream up on a household that already has months of history
+     must leave every total EXACTLY as it reads today — it records where money
+     went, it does not move any. And running it twice must change nothing,
+     because two devices will each run it and then sync. */
+  checks.settingUpTheStreamMovesNoMoney = await page.evaluate(() => {
+    profile = 'parent'; ctParentKid = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess';
+    const pd = getProfData(kid);
+    pd.events = [];
+    const before = { cash: mnyCash(kid), ready: mnySavedTotal(kid),
+                     locked: mnyLockedTotal(kid), invest: mnyInvestedTotal(kid) };
+
+    const plan = evMigrationPlanFor(kid);
+    const previewed = plan.rows.length;
+    const res = evRunMigration();
+    const after = { cash: mnyCash(kid), ready: mnySavedTotal(kid),
+                    locked: mnyLockedTotal(kid), invest: mnyInvestedTotal(kid) };
+
+    const problems = [];
+    Object.keys(before).forEach(h => {
+      if (before[h] !== after[h]) problems.push(h + ' moved: ' + before[h] + ' → ' + after[h]);
+    });
+    // The whole point: what the stream derives now equals what the app stores.
+    evShadowDrift(kid).forEach(d => problems.push('after setting up — ' + d));
+    // The preview is what ran, not an estimate of it.
+    if (res.written < previewed) {
+      problems.push('preview said ' + previewed + ', wrote ' + res.written);
+    }
+    // Idempotent: a second run has nothing left to do.
+    const second = evRunMigration();
+    if (second.written !== 0) problems.push('running it twice wrote ' + second.written + ' more');
+    evShadowDrift(kid).forEach(d => problems.push('after running twice — ' + d));
+
+    return problems.length ? problems : true;
+  });
+
   // The schedule draws on the POOL, not on her chores. A week where she earned
   // nothing but was given $50 still covers the loan payment — which is what a
   // cash pool means, and the opposite of what tagging inflows would do.

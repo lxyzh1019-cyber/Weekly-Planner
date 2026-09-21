@@ -1083,5 +1083,71 @@ function sync(a, b) {
     ipad.state.profiles.jenn.weeks[wed].length === 0);
 }
 
+
+/* ── THE MONEY STREAM, on two devices ──────────────────────────────
+   js/40-stream.js stores money as MOVEMENTS and derives every balance, which
+   is only safe if two devices that each recorded a movement offline end up
+   agreeing about the total. A union by id is what makes that true: neither
+   device can change what the other wrote, so the merged stream is simply both
+   of them and the derived balance follows.
+
+   This is the check that licenses retiring `wallet.cash`. A one-device check
+   would prove nothing here — CLAUDE.md records two occasions where it did. */
+{
+  const stream = require('../js/40-stream.js');
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+
+  // Both girls' streams start from the same migrated opening balance, then each
+  // device records a different movement while offline.
+  const opening = { id: 'ev-open', at: 1, dayKey: '2026-09-01', kind: 'open',
+                    from: 'opening', to: 'cash', amount: 50, updatedAt: 1 };
+  on(ipad,  st => { st.profiles.jenn.events = [opening,
+    { id: 'ev-meet', at: 20, dayKey: '2026-09-12', kind: 'settle',
+      from: 'prize', to: 'cash', amount: 21, updatedAt: 20 }]; });
+  on(phone, st => { st.profiles.jenn.events = [opening,
+    { id: 'ev-gift', at: 30, dayKey: '2026-09-13', kind: 'gift',
+      from: 'gift', to: 'cash', amount: 10, updatedAt: 30 }]; });
+  sync(ipad, phone);
+
+  const evOf = d => d.state.profiles.jenn.events;
+  check('two devices, two movements — the stream holds both',
+    evOf(ipad).length === 3 && evOf(phone).length === 3);
+
+  // The point of the whole redesign: the DERIVED balance agrees on both sides.
+  check('two devices derive the same balance from the merged stream',
+    stream.evBalanceOf(evOf(ipad), 'cash') === 81 &&
+    stream.evBalanceOf(evOf(phone), 'cash') === 81);
+
+  // Merging again must not double-count — the union is by id, so a second
+  // snapshot of the same document is a no-op. A balance system cannot promise
+  // this; an append-only stream can.
+  sync(ipad, phone);
+  check('re-merging the same stream changes no balance',
+    evOf(ipad).length === 3 && stream.evBalanceOf(evOf(ipad), 'cash') === 81);
+}
+
+/* A movement deleted on one device must not come back from the other — the
+   same 'ev:' tombstone scope every other append-only record uses. Without it
+   a correction would silently undo itself on the next sync, which is money
+   appearing from nowhere. */
+{
+  const stream = require('../js/40-stream.js');
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  const gift = { id: 'ev-g1', at: 10, dayKey: '2026-09-10', kind: 'gift',
+                 from: 'gift', to: 'cash', amount: 40, updatedAt: 10 };
+  on(ipad,  st => { st.profiles.jenn.events = [gift]; });
+  on(phone, st => { st.profiles.jenn.events = [gift]; });
+  // The iPad removes it (a gift recorded by mistake) and tombstones it.
+  on(ipad, st => {
+    st.profiles.jenn.events = [];
+    api.tombstoneIds('ev:', ['ev-g1']);
+  });
+  sync(ipad, phone);
+  check('a deleted movement does not come back on the other device',
+    ipad.state.profiles.jenn.events.length === 0 &&
+    phone.state.profiles.jenn.events.length === 0 &&
+    stream.evBalanceOf(phone.state.profiles.jenn.events, 'cash') === 0);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
