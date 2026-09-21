@@ -359,6 +359,7 @@ function cpCompetition() {
     return `<div class="cp-applied">
       <span class="cp-plan-name">${escapeHtml(c.name || c.sport)}<span class="ck-item-due">${escapeHtml(c.sport)} · ${MONTH_SHORT[d.getMonth()]} ${d.getDate()} · ${escapeHtml(bits.join(' · ') || '—')}</span></span>
       <span class="ck-green">${ckMoney(c.awarded || 0)}</span>
+      <button type="button" class="ck-navbtn" data-ct-action="edit-comp" data-comp-id="${escapeAttr(c.id)}" aria-label="Correct this result">✎</button>
       <button type="button" class="ck-navbtn" data-ct-action="del-comp" data-comp-id="${escapeAttr(c.id)}" aria-label="Remove result">×</button>
     </div>`;
   }).join('') : '<div class="ck-sub">No results this week.</div>';

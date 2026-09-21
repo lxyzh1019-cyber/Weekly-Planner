@@ -558,8 +558,12 @@ function ctHandleWrapClick(e) {
   else if (a === 'learn-minus') ctBumpLearning(el.dataset.itemId, -1);
   else if (a === 'sunday-check') ctRunSundayCheck();
   else if (a === 'toggle-sick') ctToggleSickDay(+el.dataset.day);
-  else if (a === 'add-comp') ctPromptCompetition();
-  else if (a === 'del-comp') ctRemoveCompetition(el.dataset.compId);
+  /* The Record sheet (js/41-record.js) replaced ctPromptCompetition's chain of
+     eleven sequential prompts. Same writer, one screen, and the answers stay
+     visible while they are given. */
+  else if (a === 'add-comp')  { openRecordSheet({ kind: 'meet', kid: ctActiveKid(), dayKey: ctWeekInfo().keys[ctDay] }); }
+  else if (a === 'edit-comp') { openRecordSheet({ kind: 'meet', kid: ctActiveKid(), id: el.dataset.compId }); }
+  else if (a === 'del-comp')  { ctRemoveCompetition(el.dataset.compId); }
   else if (a === 'box-item') ctPromptBoxItem();
   else if (a === 'release-box') ctReleaseBox(el.dataset.boxId);
   else if (a === 'add-fine') ctPromptFine();
@@ -622,51 +626,6 @@ async function ctRunSundayCheck() {
   showToast(voided ? `🔍 ${voided} voided — unpaid and to do again` : '🔍 All checked — all paid');
 }
 
-async function ctPromptCompetition() {
-  if (!isParent()) return;
-  const kid = ctActiveKid();
-  const sport = ((await showPrompt('Which sport? swim / skate / dance', { value: 'swim' })) || '').trim().toLowerCase();
-  if (!['swim', 'skate', 'dance'].includes(sport)) { showToast('Pick swim, skate or dance'); return; }
-
-  // Name and date first. The award is frozen against the rules live on the
-  // date, so a meet entered late has to carry the day it actually happened —
-  // defaulting to whichever day the tab was showing would price it wrong.
-  const name = ((await showPrompt('Which meet or competition?\n(e.g. "Winter Invitational")', { value: '' })) || '').trim();
-  if (!name) { showToast('Give it a name so it can be checked later'); return; }
-  const dayKey = ((await showPrompt('What date was it?', { value: ctWeekInfo().keys[ctDay], type: 'date' })) || '').trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) { showToast('Pick a date'); return; }
-
-  const entry = { sport, name, dayKey };
-  if (sport === 'dance') {
-    entry.danceItems = {
-      silver: parseInt(await showPrompt('How many Silver items?', { value: '0', type: 'number' }), 10) || 0,
-      gold:   parseInt(await showPrompt('How many Gold items?',   { value: '0', type: 'number' }), 10) || 0,
-    };
-    entry.danceItems.allGold = await showConfirm('All Gold?', { okLabel: 'Yes' });
-  } else {
-    entry.points = parseInt(await showPrompt('Points scored?', { value: '0', type: 'number' }), 10) || 0;
-    if (sport === 'swim') {
-      entry.qualified = await showConfirm('Qualified for Provincials?', { okLabel: 'Yes' });
-      entry.provincial = await showConfirm('Was this meet Provincials?', { okLabel: 'Yes' });
-    } else {
-      entry.placement = {
-        group:   parseInt(await showPrompt('Placement in her group (1/2/3, 0 for none)', { value: '0', type: 'number' }), 10) || 0,
-        overall: parseInt(await showPrompt('Placement overall (1/2/3, 0 for none)', { value: '0', type: 'number' }), 10) || 0,
-      };
-    }
-  }
-  entry.personalBest = await showConfirm('Was it a personal best?', { okLabel: 'Yes' });
-  const saved = mrAddCompetition(kid, entry);
-  renderChoreTab();
-  if (!saved) return;
-  // A result pays in the week it happened, so one dated outside the week on
-  // screen correctly won't appear on this card. Say so rather than letting it
-  // look like the entry vanished.
-  const inThisWeek = ctWeekInfo().keys.includes(dayKey);
-  showToast(inThisWeek
-    ? `🏆 ${name} recorded — $${Number(saved.awarded).toFixed(2)}`
-    : `🏆 ${name} recorded — $${Number(saved.awarded).toFixed(2)} · counts in the week of ${dayKey}`);
-}
 function ctRemoveCompetition(id) { mrDeleteCompetition(ctActiveKid(), id); renderChoreTab(); }
 
 async function ctPromptBoxItem() {

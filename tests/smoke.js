@@ -4776,9 +4776,20 @@ function findChromium() {
      it says what they are, and cutting them would mean a card that does not
      name its own activity. So the variant carries its own number and the bare
      screen keeps the 200. Tighten this whenever the real figure drops. */
+  /* ── 2026-09-21, screen-mymoney 200 → 204, owner's call ──
+     The wallet card grew its Move door (`mnyMoveDoor`, js/22-money-page1.js).
+     Until Stage 3 the only way a dollar left cash was the Sunday split, so a
+     gift that arrived on a Tuesday sat there whatever anybody wanted — and a
+     door that exists only on the parent's rules page is a door a child does
+     not have. Four words buy a control that was not there, which is the same
+     call as the 2026-08-10 raise: where a word buys something not misleading,
+     the word wins. Tighten it whenever the real number drops.
+
+     The owner has asked for the 200-word budget to be removed everywhere; that
+     is its own change, to the rule and not to one number. */
   const WORD_BUDGET = { 'screen-today': 200, 'screen-week': 200,
                         'screen-week/planned': 208,
-                        'screen-mymoney': 200, 'screen-chore': 261 };
+                        'screen-mymoney': 204, 'screen-chore': 261 };
   const KID_SCREENS = [
     // Today is held to the full 200 with no ratchet: it was built to these rules
     // rather than measured against them afterwards, which was the point of
@@ -5690,6 +5701,154 @@ function findChromium() {
       pd.events = savedEvents;
       ensureWallet(kid).cash = savedCash;
       if (savedDebts) pd.debts = savedDebts;
+      const rr = mrRules();
+      if (rr.school) rr.school.unlockStage = savedUnlock;
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── EVERY RECORD HAS ONE DOOR ────────────────────────────────────
+     Five facts, five entry roads, none of them complete and three of them
+     chains of sequential prompt dialogs — eleven of them for a meet result.
+     A prompt chain is the worst shape a form can have: you cannot see what you
+     already answered, you cannot change it, and backing out of the last one
+     throws away all of it.
+
+     What this asserts is that the sheet REACHES EVERY WRITER — not that it
+     renders. A door that opens onto nothing is exactly the defect
+     `aLegacyRoutineCarryIsOfferedAgain` records: the app said "Attached ✅" and
+     no to-do existed, and the check of the day asserted the FIELD rather than
+     the consequence, so it passed green over a complete no-op. */
+  checks.everyRecordHasOneDoor = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jenn', wk = ctWeekKey;
+    const pd = getProfData(kid);
+    const savedDeps = (pd.deposits || []).slice();
+    const savedComps = (pd.competitions || []).slice();
+    const savedFines = (pd.fines || []).slice();
+    const savedEvents = (pd.events || []).slice();
+    const savedHold = (pd.holdings || []).slice();
+    const savedReq = (pd.moveRequests || []).slice();
+    const savedCash = ensureWallet(kid).cash;
+    /* The grade this check records is real money in a real week, so the week's
+       earnings go back exactly as they were. Thirty checks run after this one
+       and every money figure they read is the same week. */
+    const savedEarn = JSON.parse(JSON.stringify(mrEnsureEarnings(kid, wk)));
+    const keys = mrWeekDayKeys(wk);
+    const savedBlocks = keys.map(k => (getDayBlocks(k, kid) || []).slice());
+    const r = mrRules();
+    const savedUnlock = JSON.parse(JSON.stringify((r.school || {}).unlockStage || {}));
+    try {
+      pd.deposits = []; pd.competitions = []; pd.fines = [];
+      pd.holdings = []; pd.moveRequests = [];
+      keys.forEach(k => setDayBlocks(k, [], kid));
+      ensureWallet(kid).cash = 100;
+      if (!r.school) r.school = {};
+      r.school.unlockStage = Object.assign({}, savedUnlock, { [kid]: 4 });
+
+      // ── The sheet asks which record this is when nobody has said.
+      openRecordSheet({ kid });
+      if (!rcDraft) { problems.push('the sheet did not open'); return problems; }
+      if (rcDraft.kind) problems.push('it chose a record for a parent who had not');
+      const shown = document.getElementById('recordBody').innerHTML;
+      RC_KINDS.forEach(k => {
+        if (shown.indexOf('data-rc-id="' + k.id + '"') < 0) {
+          problems.push('a parent is not offered ' + k.id);
+        }
+      });
+
+      // ── 🏆 a meet, which also has to place its block (the Stage 3 join).
+      const satKey = keys[5];
+      openRecordSheet({ kind: 'meet', kid, dayKey: satKey });
+      Object.assign(rcDraft, { name: 'Winter Invitational', sport: 'swim', points: 12 });
+      rcSave();
+      const comp = mrCompetitions(kid).find(c => c && c.name === 'Winter Invitational');
+      if (!comp) problems.push('the meet never reached mrAddCompetition');
+      else {
+        if (comp.dayKey !== satKey) problems.push('the meet lost the day it was given');
+        const block = (getDayBlocks(satKey, kid) || []).find(b => b && b.compId === comp.id);
+        if (!block) problems.push('recording a meet drew no block on the calendar');
+      }
+      if (rcDraft) problems.push('the sheet stayed open after recording');
+
+      // Correcting it goes through the SAME door, keeping the id.
+      if (comp) {
+        openRecordSheet({ kind: 'meet', kid, id: comp.id });
+        if (rcDraft.name !== 'Winter Invitational') problems.push('the correction form did not load the meet');
+        rcDraft.points = 20;
+        rcSave();
+        const again = mrCompetitions(kid).filter(c => c && c.name === 'Winter Invitational');
+        if (again.length !== 1) problems.push('correcting a meet made a second one');
+        else if (again[0].points !== 20) problems.push('the correction was not saved');
+      }
+
+      // ── 🎁 a gift.
+      openRecordSheet({ kind: 'gift', kid });
+      Object.assign(rcDraft, { amount: 25, from: 'Birthday money', giver: 'Grandma' });
+      rcSave();
+      if (!mnyEnsureDeposits(kid).some(d => d && money2(d.amount) === 25)) {
+        problems.push('the gift never reached mnyAddDeposit');
+      }
+
+      // ── 📦 a fine, from the week's own catalog.
+      const fineItems = ((mrRulesForWeek(wk).fines) || {}).items || [];
+      if (fineItems.length) {
+        openRecordSheet({ kind: 'fine', kid, dayKey: keys[0] });
+        rcDraft.fineId = fineItems[0].id;
+        rcSave();
+        if (!mrFines(kid).some(f => f && f.itemId === fineItems[0].id)) {
+          problems.push('the fine never reached mrAddFine');
+        }
+      }
+
+      // ── 🧹 a chore grade.
+      const pool = mrChoresForDay(kid, wk, 0);
+      if (pool.rows.length) {
+        const choreId = pool.rows[0].row.id;
+        openRecordSheet({ kind: 'chore', kid, dayKey: keys[0] });
+        Object.assign(rcDraft, { choreId, grade: 2 });
+        rcSave();
+        if (mrGetChoreGrade(kid, wk, 0, choreId) !== 2) {
+          problems.push('the grade never reached mrSetChoreGrade');
+        }
+      }
+
+      // ── 🔀 a move.
+      const ready0 = mnySavedTotal(kid);
+      openRecordSheet({ kind: 'move', kid });
+      Object.assign(rcDraft, { moveFrom: 'cash', moveTo: 'ready', amount: 15, why: 'my bike' });
+      rcSave();
+      if (mnySavedTotal(kid) !== money2(ready0 + 15)) problems.push('the move never reached mnyMoveMoney');
+
+      // ── A child gets the two that are hers, and none of the three that are a
+      //    grown-up's judgement about her week.
+      profile = 'jenn';
+      const hers = rcKindsFor().map(k => k.id).sort().join(',');
+      if (hers !== 'gift,move') problems.push('a child is offered ' + hers);
+      openRecordSheet({ kind: 'move', kid });
+      Object.assign(rcDraft, { moveFrom: 'cash', moveTo: 'ready', amount: 5, why: 'saving' });
+      const beforeAsk = mnySavedTotal(kid);
+      rcSave();
+      if (mnySavedTotal(kid) !== beforeAsk) problems.push("a child's move moved money without asking");
+      if (mnyPendingMoves(kid).length !== 1) problems.push("a child's move did not wait for a grown-up");
+      profile = 'parent';
+
+      // ── The prompt chains are GONE, not merely bypassed. A retired chain left
+      //    reachable is a second entry road with different rules.
+      if (typeof ctPromptCompetition !== 'undefined') problems.push('ctPromptCompetition is still here');
+      if (typeof mnyPromptGift !== 'undefined') problems.push('mnyPromptGift is still here');
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      if (typeof closeRecordSheet === 'function') closeRecordSheet();
+      profile = 'parent';
+      pd.deposits = savedDeps; pd.competitions = savedComps; pd.fines = savedFines;
+      pd.events = savedEvents; pd.holdings = savedHold; pd.moveRequests = savedReq;
+      ensureWallet(kid).cash = savedCash;
+      getProfData(kid).earnings[wk] = savedEarn;
+      keys.forEach((k, i) => setDayBlocks(k, savedBlocks[i], kid));
       const rr = mrRules();
       if (rr.school) rr.school.unlockStage = savedUnlock;
     }
@@ -14846,7 +15005,11 @@ function findChromium() {
     const bare = toggles.filter(t => !/role="switch"/.test(t) || !/tabindex="0"/.test(t) || !/aria-checked=/.test(t));
     if (bare.length) bad.push(`${bare.length} of ${toggles.length} toggles carry no switch semantics in the markup`);
     const overlays = html.match(/<div class="overlay[^"]*" id="[^"]+"/g) || [];
-    if (overlays.length !== 19) bad.push(`${overlays.length} static overlays, expected 19`);
+    /* 20 since the Record sheet (js/41-record.js) landed. The count is stated
+       rather than derived on purpose: a NEW overlay is a new dialog mechanism
+       unless it goes through openSheet/closeSheet, which own focus and Escape,
+       so one appearing unannounced is the thing worth being told about. */
+    if (overlays.length !== 20) bad.push(`${overlays.length} static overlays, expected 20`);
     if (count(/role="tabpanel"/g) !== 5) bad.push(`${count(/role="tabpanel"/g)} tabpanels in the file, want 5 (one per tab)`);
     if (count(/<h4>✅ To-do<\/h4>/g)) bad.push('the To-do heading still skips from h2 to h4');
     checks.theMarkupSaysWhatThingsAre = bad.length === 0 || bad;

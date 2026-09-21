@@ -6934,3 +6934,67 @@
 .cf-version-what { flex: 1 1 8rem; font-size: max(13px, 0.95rem); line-height: 1.35; }
 .cf-version-when { font-size: max(13px, 0.82rem); opacity: 0.8; }
 .cf-pick { min-height: 44px; margin-top: auto; }
+
+/* ── The Record sheet (js/41-record.js) ──
+   One door for a chore grade, a meet, a gift, a fine and a move. Chips and
+   fields rather than a chain of prompt dialogs: everything answered so far
+   stays on screen, and every answer can be changed before it is recorded.
+
+   Every tappable thing here clears 44px and every label clears the 13px kid
+   floor — the gift and move forms are kid-facing. */
+.rc-chiprow { display: flex; flex-wrap: wrap; gap: var(--space-1, 0.35rem); }
+.rc-kinds { margin-bottom: var(--space-2, 0.6rem); }
+.rc-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 0.1rem;
+  min-height: 44px; padding: 0.4rem 0.7rem;
+  border: 2px solid var(--ink); border-radius: 999px;
+  background: var(--bg2); color: var(--ink);
+  font-size: max(13px, 0.9rem); font-weight: 700; line-height: 1.2;
+  cursor: pointer;
+}
+.rc-chip.on { background: var(--ink); color: var(--paper); }
+.rc-chip small { font-size: max(13px, 0.78rem); font-weight: 600; opacity: 0.85; }
+/* Shut, not hidden: a pot Money school has not opened yet is still something
+   she can see she is working towards. The refusal beside the button says when. */
+.rc-chip.shut { opacity: 0.55; border-style: dashed; }
+
+.rc-row {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: var(--space-1, 0.4rem);
+  margin: var(--space-2, 0.6rem) 0;
+}
+.rc-lab { flex: 0 0 8rem; font-size: max(13px, 0.9rem); font-weight: 800; }
+.rc-input {
+  flex: 1 1 8rem; min-height: 44px;
+  padding: 0.4rem 0.6rem;
+  border: 2px solid var(--ink); border-radius: var(--radius-sm, 10px);
+  background: var(--paper); color: var(--ink);
+  font: inherit; font-size: max(15px, 1rem);
+}
+.rc-toggle {
+  min-height: 44px; padding: 0.4rem 0.8rem;
+  border: 2px solid var(--ink); border-radius: 999px;
+  background: var(--bg2); color: var(--ink);
+  font-size: max(13px, 0.9rem); font-weight: 700; cursor: pointer;
+}
+.rc-toggle.on { background: var(--ink); color: var(--paper); }
+.rc-note { margin: var(--space-2, 0.6rem) 0; font-size: max(13px, 0.88rem); line-height: 1.4; opacity: 0.9; }
+/* A refusal is never decoration: it is the sentence that says what to change. */
+.rc-no { color: var(--accent-strong); opacity: 1; font-weight: 700; }
+.rc-foot { display: flex; flex-wrap: wrap; gap: var(--space-1, 0.4rem); margin-top: var(--space-3, 0.8rem); }
+.rc-btn {
+  flex: 1 1 8rem; min-height: 44px;
+  border: 2px solid var(--ink); border-radius: var(--radius-sm, 10px);
+  background: var(--bg2); color: var(--ink);
+  font-size: max(15px, 1rem); font-weight: 800; cursor: pointer;
+}
+.rc-btn.primary { background: var(--ink); color: var(--paper); }
+
+/* Now counts and routes; this is the one control on it that opens a door. */
+.pn-record {
+  width: 100%; min-height: 44px; margin-top: var(--space-2, 0.6rem);
+  border: 2px dashed var(--ink); border-radius: var(--radius-sm, 10px);
+  background: transparent; color: var(--ink);
+  font-size: max(15px, 1rem); font-weight: 800; cursor: pointer;
+}

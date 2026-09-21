@@ -324,9 +324,12 @@ Kid-facing copy is a product surface, not filler. The rules:
   is not banned, it starts collapsed — `mnyPricesOpen`, `ckPrivsOpen` and
   `weekGlanceOpen` are the pattern: closed by default, remembered in
   `localStorage` (never synced state — every state write is a full-document
-  upload). `screen-chore` is on a **ratchet** (276) rather than the 200 target: it
+  upload). `screen-chore` is on a **ratchet** (261) rather than the 200 target: it
   must not grow, tighten it whenever the real number drops, and the target stays
-  written down.
+  written down. `screen-week/planned` (208) and `screen-mymoney` (204) carry
+  their own, each raised once with a dated reason in `tests/smoke.js`. The
+  numbers live there, not here: two places stating one budget is how they come
+  apart, and this line said 276 for a month after the real ceiling reached 261.
 
 ## Navigation
 
@@ -2054,6 +2057,78 @@ it, so an edit is a new entry of the same fact and must re-score; mutating
 `points` in place would leave the record saying one thing and its money another.
 Moving the date moves the block with it — a face left behind on the old Saturday
 is a second meet nobody held.
+
+## The Record sheet — one door, five records
+
+`js/41-record.js`, with a static `recordOverlay` in `index.html` (chrome in
+HTML, body filled by JS — the `familyMeetingOverlay` pattern), opened by
+`openRecordSheet({ kind, kid, dayKey, id })` through `openSheet`/`closeSheet`,
+which own focus and Escape. **Do not add a second dialog mechanism beside
+them.**
+
+**Five facts had five entry roads and none of them met.** A meet could only be
+recorded inside the Sunday meeting or through `ctPromptCompetition`'s chain of
+**eleven sequential prompts**; a gift went through `mnyPromptGift`'s four; a
+fine was a numbered list typed into a prompt box; a chore grade was reachable
+only from the chore tab, on the week and day that tab happened to be showing;
+a move had no door at all until Stage 3 built one.
+
+**A prompt chain is the worst shape a form can have.** You cannot see what you
+have already answered, you cannot change an earlier answer, and abandoning it
+halfway leaves nothing. Every one of these is four to six fields on one screen,
+which is what this sheet is.
+
+**It owns no rules.** Every row calls the function that already owned that
+write — the same contract Today keeps, *call an owner, never contain one*:
+
+| Record | Writes through |
+|---|---|
+| 🧹 a chore grade | `mrSetChoreGrade` |
+| 🏆 a meet result | `mrAddCompetition` / `mrUpdateCompetition` |
+| 🎁 a gift | `mnyAddDeposit` / `mnyEditDeposit` |
+| 📦 a fine | `mrAddFine` |
+| 🔀 a move | `mnyMoveMoney` / `mnyRequestMove` |
+
+Each branch validates only what the **owner cannot** — that a name was left
+empty on a form the owner never saw. Everything else, every gate included, is
+the owner's.
+
+**The draft is module-level, and that is load-bearing.** `rcRender` writes
+`innerHTML`, so a re-render per keystroke would throw away the caret and every
+other field. Answers live in `rcDraft` and the DOM is drawn FROM it — the same
+shape `mmCaptureUiState` uses inside the meeting. **Typing never re-renders**;
+only a change that alters what the form ASKS does: the day (which week's rules
+apply, and which chores exist on it) and the two pots on a move (whether it is
+refused).
+
+**A child gets two of the five, and both as proposals** — a gift she was given
+and a move between her own pots. `mnyAddDeposit` and `mnyRequestMove` already
+carry the propose/approve gate, so the sheet adds no rule of its own; it just
+does not offer her the three that are a grown-up's judgement about her week.
+`rcSaveLabel` is what says so: the button reads *Ask a grown-up* rather than
+*Save*, because a button that says less than it knows is how a child learns the
+app is not telling her things.
+
+**The tables are read, never restated.** `CP_GRADES` is the parent grader's own
+four grades and `mrRulesForWeek(...).fines.items` is the week's own catalog —
+two tables of grades is how the wording on two screens comes apart, and a fine
+entered against an old day must be the amount that was live then.
+
+**Retired by it:** `ctPromptCompetition` and `mnyPromptGift`, deleted rather
+than left unreachable — a retired chain still callable is a second entry road
+with different rules. `ctRemoveCompetition` stays: removing is not recording.
+The meeting's inline competition and deposit **cards stay** too; they are where
+the conversation happens on a Sunday, and they call the same writers.
+
+**Correcting goes through the same door.** A parent taps a gift row or a meet
+row to open the sheet on that record, carrying its id — so a typo is a
+correction rather than the delete-and-retype that debited the wallet,
+re-credited it, and left two rows nobody could explain.
+
+Entry points: parent **Now** (a dashed ✍️ that routes, because Now counts and
+routes and never decides), the parent **Money rules** head, **meeting step 3**,
+the kid's **gift** and **competition** cards, and the wallet card's
+`mnyMoveDoor` — one door whose label changes with the role, never two.
 
 ## Money can move between Sundays
 

@@ -73,6 +73,7 @@ function mnyRenderRulesTab() {
      sections — three rows before a single number. */
   wrap.innerHTML =
       `${mnyPageHead('⚙️ Money rules', 'The only page that changes a number', [
+          { action: 'record-any', label: '✍️ Record something' },
           { action: 'tourpar', label: '? How this page works' },
         ], { back: false })}
        <div class="mny-effect">

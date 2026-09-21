@@ -208,7 +208,8 @@ function pnRenderNow() {
      stop. The row is the notification; the catch-up screen is where the work
      happens; the meeting hub still lists the weeks. */
   wrap.innerHTML = `<div class="pn-cols">
-      <div><p class="pn-cap">Waiting on you</p>${pnQueueCard()}</div>
+      <div><p class="pn-cap">Waiting on you</p>${pnQueueCard()}
+        <button type="button" class="pn-record" data-pn-action="record">✍️ Record something</button></div>
       <div><p class="pn-cap">This week</p>${pnWeekRail()}</div>
     </div>`;
   // The count on the tab itself, so a parent sees there is work without opening.
@@ -234,6 +235,9 @@ function pnHandleClick(e) {
   if (a === 'grade')    { setParentTab('chores'); return; }
   if (a === 'approve')  { setParentTab('tasks'); return; }
   if (a === 'notes')    { setParentTab('review'); return; }
+  /* Now COUNTS and ROUTES; it never decides. This opens the sheet with no kind
+     chosen, because which record it is is the first thing the sheet asks. */
+  if (a === 'record')   { openRecordSheet({ kid: parentViewing }); return; }
   if (a === 'moves')    {
     /* Point the portal at the child who asked, and at the section that shows
        what she has — answering a move with another child's balances on screen

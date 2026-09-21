@@ -94,7 +94,8 @@ function mnyRenderEarned(wk) {
   mnySimCatchUp(kid);          // the world moves whether or not we met last week
 
   const confirmed = mnyIsConfirmed(wk, kid);
-  return `${mnyPageHead('💪 What I earned', 'Agree the week before anything moves', [], { back: false })}
+  return `${mnyPageHead('💪 What I earned', 'Agree the week before anything moves',
+      isParent() ? [{ action: 'record-any', label: '✍️ Record something' }] : [], { back: false })}
     ${mnyTabBar('grow')}
     ${mnyKidTabs()}
     ${mnyStrip(wk, kid, 0)}
