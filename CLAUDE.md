@@ -299,8 +299,15 @@ Kid-facing copy is a product surface, not filler. The rules:
   state, a grace token, and partial-progress celebration.
 - Money is a financial-literacy lesson, not a payment for being good.
 - Cross-sibling data is collaboration, never a leaderboard, in kid views.
-- **Budget: aim for ≤200 visible words per kid screen.** Anything longer is
-  reference material and belongs behind a disclosure toggle.
+- **There is no word budget.** There was one — a hard ≤200 visible words per
+  kid screen, enforced by `kidScreensMeetTheHouseRules` — and the owner removed
+  it, because of what it actually bought. It did not produce brevity; it pushed
+  real explanation behind disclosure toggles, where a nine-year-old does not go
+  looking. A screen with something worth saying says it.
+  That is not licence to pad. Every rule above still holds, and they are
+  judgement — which is exactly what a word count was standing in for and could
+  never measure. Ask whether a sentence earns its place, not whether the screen
+  has run out of allowance.
 
 ## UI rules
 
@@ -320,16 +327,15 @@ Kid-facing copy is a product surface, not filler. The rules:
   below 13px, but most are print, dark-mode or parent surfaces where the kid floor
   does not apply — the floor is a scoped block at the end of `css/app.css` listing
   only what actually rendered too small.
-- **≤200 visible words per kid screen** in its default state. Reference material
-  is not banned, it starts collapsed — `mnyPricesOpen`, `ckPrivsOpen` and
-  `weekGlanceOpen` are the pattern: closed by default, remembered in
-  `localStorage` (never synced state — every state write is a full-document
-  upload). `screen-chore` is on a **ratchet** (261) rather than the 200 target: it
-  must not grow, tighten it whenever the real number drops, and the target stays
-  written down. `screen-week/planned` (208) and `screen-mymoney` (204) carry
-  their own, each raised once with a dated reason in `tests/smoke.js`. The
-  numbers live there, not here: two places stating one budget is how they come
-  apart, and this line said 276 for a month after the real ceiling reached 261.
+- **No word budget** — see *Writing for children*. The count and its per-screen
+  ratchets are gone from `tests/smoke.js`; the 44px and 13px floors stay,
+  because reach and legibility are not editorial taste.
+  **A disclosure toggle is still the right shape for reference material** —
+  `mnyPricesOpen`, `ckPrivsOpen`, `weekGlanceOpen` and `tdExtrasOpen` are the
+  pattern: closed by default, remembered in `localStorage` (never synced state —
+  every state write is a full-document upload). What changed is the reason. It
+  is now a judgement about what a child came to the screen for, not a way of
+  getting under a number, so a thing worth reading may lead rather than hide.
 
 ## Navigation
 
@@ -808,17 +814,16 @@ the first, and a child has no way to tell which one is lying — so grading and
 settling still belong to the chore and money screens, and nothing on Today moves
 money.
 
-Today measures **97 words** against the 200 on the audit's seeded day — one
-running block, a break, a get-ready column, a clash and a free stretch, with both
-folds open. It has read as high as 129 on the same fixture: the figure moves with
-whatever the jobs and money cards happen to hold when the sweep reaches them, so
-re-measure rather than trusting the number written here. Today
-is also held to the **200-word budget with no ratchet**, which is why the
-vibe, to-do, goals, sticker and note panels ship collapsed behind one
-`localStorage` flag (`tdExtrasOpen`), and why finished blocks fold away behind
-`tdExtrasOpen`'s sibling `tdEarlierOpen`. Reference material starts closed. The
-budget bites: an explanation on 💰 My money went in at 21 words over and had to
-come down to three.
+Today's vibe, to-do, goals, sticker and note panels ship collapsed behind one
+`localStorage` flag (`tdExtrasOpen`), and finished blocks fold away behind its
+sibling `tdEarlierOpen`. That was originally the word budget biting — Today was
+built to a 200-word cap and measured 97 on the audit's seeded day. **The cap is
+gone and the folds stay**, because they were right for a better reason than the
+number: a child opens Today to find out what she is doing next, and everything
+behind those folds is something else. Where that reasoning does NOT hold, a fold
+is now the wrong answer — an explanation on 💰 My money was once cut from
+twenty-four words to three to fit, and that was the budget making the screen
+worse.
 
 **Today leads with what is next.** The list splits at `tdNowMin()` — upcoming in
 time order, then everything finished under a closed "earlier today" fold. In

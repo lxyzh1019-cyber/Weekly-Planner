@@ -4648,18 +4648,20 @@ function findChromium() {
       return r.width > 0 && r.height > 0;
     };
 
-    // A word has a letter in it. Bare numbers — a calendar's dates, a dollar
-    // figure, a tally — are what the screen is FOR, not text to wade through, and
-    // counting them would make a date grid look like a wall of prose.
-    let words = 0;
-    const walk = document.createTreeWalker(scr, NodeFilter.SHOW_TEXT);
-    let n;
-    while ((n = walk.nextNode())) {
-      const p = n.parentElement;
-      if (!p || !visible(p) || p.closest('[hidden]')) continue;
-      const t = (n.textContent || '').trim();
-      if (t) words += t.split(/\s+/).filter(w => /[A-Za-z]/.test(w)).length;
-    }
+    /* The WORD COUNT is gone, at the owner's instruction, and the counting code
+       with it. It was a hard cap of 200 visible words per kid screen, and what
+       it actually bought was not brevity: it pushed real explanation behind
+       disclosure toggles, where a nine-year-old does not go looking. A screen
+       that has something worth saying now says it.
+
+       What it does NOT license is padding. The editorial rules in CLAUDE.md
+       still hold — lead with autonomy, no performance-identity framing, money
+       is a lesson and not a payment — and those are judgement, which is what a
+       word count was standing in for and could never actually measure.
+
+       The 44px target floor and the 13px font floor stay. Those are reach and
+       legibility on a child's hands and eyes, not editorial taste, and nothing
+       about the budget coming off touches them. */
 
     // The week card's done-tick sits at a card corner, so a 44px hit area there
     // would swallow the tap that opens the day. Exempted deliberately, by name,
@@ -4724,72 +4726,13 @@ function findChromium() {
       }
     });
 
-    return { screen: screenId, words, small, minFont: Math.round(minFont * 100) / 100, minWhere };
+    return { screen: screenId, small, minFont: Math.round(minFont * 100) / 100, minWhere };
   }, screenId);
 
-  /* Word budgets. Three screens meet the 200 the house rules ask for. The chore
-     screen does not, and the honest number is here rather than a quietly relaxed
-     rule: it came down from 346 (the audit's measurement) to ~275 by collapsing
-     the privilege ladder and the XP explainer, and the rest is instructional copy
-     a nine-year-old plausibly still needs — "tap twice if nobody had to ask",
-     "only whole bundles pay". Deciding which of those she can do without is a
-     product call and the Today-first rebuild's job, not a CSS pass.
-
-     So this is a ratchet, not an exemption: the ceiling is what it currently
-     measures, it fails the build if it grows, and the 200 target stays written
-     down as the thing the rebuild has to hit. Tighten it whenever the real number
-     comes down — 346 at the audit, 280 after the disclosures, 276 once the
-     duplicate shortcut rows went.
-
-     ── 2026-08-10, 276 → 277, owner's call ──
-     The budget is a soft floor, not a hard one: where a word buys a number that
-     is not misleading, the word wins. This one did. The chore rail was capped
-     "Your week" over b.net, which excludes money from outside — labelled as the
-     week's total it disagreed with "Money that came in" on My money every time
-     one of them was given something. "Earned this week" costs one word and says
-     what the number actually is.
-
-     Raising it stays a recorded decision with a date and a reason, never a quiet
-     bump, and the check stays in place. The 200 target is unchanged.
-
-     ── 2026-08-19, 277 → 261, tightened ──
-     The routines section's instruction line ("Tap when it's done · all three
-     closed counts the day toward the routine bonus") went, and a one-tap "all 3
-     done" button above the three routines went in — which is the same sentence
-     as a control you can press. A ratchet is tightened whenever the real number
-     comes down: 346 at the audit, 280 after the disclosures, 276 once the
-     duplicate shortcut rows went, 277 for the honest earnings label, 261 now. */
-  /* ── 2026-08-31, screen-week/planned added at 208, owner's call ──
-     Day Blocks was the week's default, so this audit measured THAT and the Full
-     layout was never held to the budget at all. The week opens on Full now, and
-     the first honest measurement was 242.
-
-     Most of that came out: three hint lines under the Goals / To-do /
-     Achievements headings that restated the headings, three empty states that
-     restated the ＋ button beside them, and a signature label that said "sign
-     your week" directly above a button saying "Sign this week". The screen
-     itself now measures 200 or under at every width, with no ratchet.
-
-     What is left over sits on the SEEDED row, and it is the seeded blocks
-     themselves — Morning Routine, School Day, a skating session and their
-     detail lines. Those words are the plan, not chrome: a week with things on
-     it says what they are, and cutting them would mean a card that does not
-     name its own activity. So the variant carries its own number and the bare
-     screen keeps the 200. Tighten this whenever the real figure drops. */
-  /* ── 2026-09-21, screen-mymoney 200 → 204, owner's call ──
-     The wallet card grew its Move door (`mnyMoveDoor`, js/22-money-page1.js).
-     Until Stage 3 the only way a dollar left cash was the Sunday split, so a
-     gift that arrived on a Tuesday sat there whatever anybody wanted — and a
-     door that exists only on the parent's rules page is a door a child does
-     not have. Four words buy a control that was not there, which is the same
-     call as the 2026-08-10 raise: where a word buys something not misleading,
-     the word wins. Tighten it whenever the real number drops.
-
-     The owner has asked for the 200-word budget to be removed everywhere; that
-     is its own change, to the rule and not to one number. */
-  const WORD_BUDGET = { 'screen-today': 200, 'screen-week': 200,
-                        'screen-week/planned': 208,
-                        'screen-mymoney': 204, 'screen-chore': 261 };
+  /* The per-screen word budgets (WORD_BUDGET) lived here, with a dated note
+     for every time one was raised or tightened. They went with the count
+     itself — see the kidStandards comment above. The history is in git; the
+     rule is not in force. */
   const KID_SCREENS = [
     // Today is held to the full 200 with no ratchet: it was built to these rules
     // rather than measured against them afterwards, which was the point of
@@ -4941,10 +4884,6 @@ function findChromium() {
       await page.evaluate(`(${nav.toString()})()`);
       await page.waitForTimeout(200);
       const r = await kidStandards(id);
-      /* Keyed by the row's LABEL where it has one, so a seeded variant can
-         carry its own number: the words a plan puts on the screen are not the
-         same thing as the chrome around it. */
-      const budget = WORD_BUDGET[label || id] || WORD_BUDGET[id] || 200;
       const problems = [];
       if (r.error) problems.push(r.error);
       // Sideways scroll is the failure a screenshot needs a human to notice and
@@ -4961,7 +4900,6 @@ function findChromium() {
       }, id);
       if (overflow.body > w + 1) problems.push(`page scrolls sideways (${overflow.body} > ${w})`);
       if (overflow.worst.right > w + 1) problems.push(`.${overflow.worst.cls} runs to ${Math.round(overflow.worst.right)} (past ${w})`);
-      if (r.words > budget) problems.push(`${r.words} words (max ${budget}${budget !== 200 ? ', ratchet — target is 200' : ''})`);
       if (r.small && r.small.length) problems.push(`${r.small.length} target(s) under 44px: ${r.small.slice(0, 6).join(', ')}`);
       if (r.minFont < 13) problems.push(`font ${r.minFont}px on .${r.minWhere} (min 13)`);
       if (problems.length) kidFindings.push(`${label || id}@${w}: ${problems.join(' | ')}`);
