@@ -4821,6 +4821,18 @@ function findChromium() {
     }, 'screen-today/extras'],
     ['screen-chore',   () => { openChoreTab(); ckSelectDay(2); }],
     ['screen-mymoney', () => { mnyOpenMyMoney('jenn'); }],
+    /* The money story is a KID screen and was never in this audit, which is how
+       it could have shipped the Flow's 26px-wide month columns with no floor
+       enforced on them. Seeded, because an empty story draws no strip and no
+       ribbons and would pass this audit by having nothing on it. */
+    ['screen-moneystory', () => {
+      const pd = getProfData('jenn');
+      if (!(pd.events || []).length) {
+        evAdd('jenn', { kind: 'in', from: 'earned', to: 'cash', amount: 40, dayKey: todayKey() });
+        evAdd('jenn', { kind: 'out', from: 'cash', to: 'spent', amount: 12, dayKey: todayKey() });
+      }
+      mnyOpenStory();
+    }],
   ];
   // Four real devices, not two. The plan asked for these and the branch that
   // changed nearly every layout only ever checked a phone and a desktop-ish
@@ -5526,6 +5538,136 @@ function findChromium() {
         + money2(flow.inTotal - flow.outTotal) + ' vs ' + evWorth(kid));
     }
 
+    return problems.length ? problems : true;
+  });
+
+  /* ── THE FLOW SAYS WHERE IT WENT ──────────────────────────────────
+     Stage 1 stored movements instead of balances FOR THIS SCREEN, and until
+     now nothing read them: `evFlow`, `evMonths` and `evTypicalMonth` were
+     unit-tested and had no caller. A calculation with no reader is a
+     calculation nobody finds out is wrong.
+
+     The owner's instruction is the thing to hold here: *I do not want the kids
+     to see the end money, they need to understand the cash flow.* So this
+     asserts what the screen LEADS with, not only that it renders — a screen
+     whose first figure is a balance has quietly become the thing it replaced,
+     and nothing else in the suite would notice. */
+  checks.theFlowSaysWhereItWent = await page.evaluate(() => {
+    const problems = [];
+    profile = 'jenn'; parentViewing = 'jenn';
+    const kid = 'jenn';
+    const pd = getProfData(kid);
+    const savedEvents = (pd.events || []).slice();
+    const savedPeriod = flPeriod, savedMonth = flMonth;
+    try {
+      /* Three months, with the middle one EMPTY on purpose — a gap is a fact
+         the strip has to keep, and a month silently dropped from a chart reads
+         as a month that did not happen. */
+      const today = todayKey();
+      const [yy, mm] = today.split('-').map(Number);
+      const back = (n) => {
+        let y = yy, m = mm - n;
+        while (m < 1) { m += 12; y -= 1; }
+        return y + '-' + String(m).padStart(2, '0');
+      };
+      const m0 = back(2), m2 = back(0);
+      pd.events = [];
+      evAdd(kid, { kind: 'in', from: 'earned', to: 'cash', amount: 40, dayKey: m0 + '-10' });
+      evAdd(kid, { kind: 'in', from: 'gift',   to: 'cash', amount: 50, dayKey: m0 + '-20' });
+      evAdd(kid, { kind: 'out', from: 'cash', to: 'spent', amount: 12, dayKey: m0 + '-25' });
+      evAdd(kid, { kind: 'in', from: 'earned', to: 'cash', amount: 20, dayKey: m2 + '-05' });
+      evAdd(kid, { kind: 'ready', from: 'cash', to: 'ready', amount: 30, dayKey: m2 + '-06' });
+
+      mnyOpenStory();
+      const host = document.getElementById('mnyStoryWrap');
+      const text = () => host.innerText;
+
+      // ── It does NOT lead with a balance.
+      const storyEl = host.querySelector('.fl-story');
+      if (!storyEl) { problems.push('the flow did not render'); return problems; }
+      const lead = storyEl.innerText;
+      if (!/came in/.test(lead)) problems.push('the flow does not lead with what came in: ' + lead);
+      if (lead.indexOf('came in') > lead.indexOf('You have')) {
+        problems.push('the balance is said before the movement — the one thing this screen must not do');
+      }
+
+      // ── This month: 20 in, 30 put away, nothing out.
+      flPeriod = 'month'; flMonth = m2; mnyRenderStory();
+      if (!/\$20\.00/.test(text())) problems.push('this month does not name the $20 that came in');
+      if (!/Kept ready/.test(text())) problems.push('money moved to kept-ready is not drawn as somewhere it went');
+
+      // ── All of it: every ribbon, across all three months.
+      flPeriod = 'all'; mnyRenderStory();
+      const all = text();
+      ['Jobs and routines', 'Gifts', 'Spent', 'Kept ready'].forEach(l => {
+        if (all.indexOf(l) < 0) problems.push('"' + l + '" is missing from the whole story');
+      });
+      if (!/\$60\.00/.test(all)) problems.push('jobs across all months do not total $60');
+      if (!/\$12\.00/.test(all)) problems.push('what was spent is not shown');
+
+      // ── The figure left is a BALANCE, not in minus out.
+      const flow = evFlow(kid);
+      const leftShown = (host.querySelector('.fl-left') || {}).innerText || '';
+      if (leftShown.indexOf(mnyMoney(flow.inHand)) < 0) {
+        problems.push('the left figure is not the cash balance: ' + leftShown);
+      }
+      if (money2(flow.inHand) === money2(flow.inTotal - flow.outTotal)) {
+        // Only a warning shape: with this fixture they must differ, because 30
+        // went to kept-ready, which is not "out".
+        problems.push('left equals in minus out — allocations are being counted as money gone');
+      }
+
+      // ── A typical month divides by months ELAPSED, empty ones included.
+      flPeriod = 'typical'; mnyRenderStory();
+      const typ = evTypicalMonth(kid);
+      if (typ.months < 3) problems.push('the typical month skipped the empty month: ' + typ.months);
+      if (money2(typ.sources.earned) !== money2(60 / typ.months)) {
+        problems.push('the typical month is not the total over months elapsed');
+      }
+
+      // ── The strip keeps the empty month, and is a picker.
+      const cols = [...host.querySelectorAll('.fl-col')];
+      if (cols.length < 3) problems.push('the history strip shows ' + cols.length + ' months, not 3');
+      if (!host.querySelector('.fl-col.empty')) problems.push('the empty month was dropped from the strip');
+      const target = cols.find(c => c.getAttribute('data-fl-month') === m0);
+      if (!target) { problems.push('the oldest month is not on the strip'); return problems; }
+      target.click();
+      if (flPeriod !== 'month' || flMonth !== m0) {
+        problems.push('tapping a month did not select it');
+      }
+      if (!/\$50\.00/.test(host.innerText)) problems.push('selecting that month did not show its gift');
+
+      /* ── The settled-week list is still there, UNDER it, and drawn.
+         Two assertions rather than one, because they fail for different
+         reasons: rendered-at-all (the Flow replaced it instead of leading it)
+         and has-a-box (it is in the markup but the Flow above it has collapsed
+         or clipped it, which reads to a child exactly like it being gone).
+
+         Written against innerHTML plus a measured rect rather than innerText.
+         innerText answers "what does this element read as", which for a long
+         screen is a rendering question this assertion never wanted to ask —
+         it reported the card missing while the card was present and correct. */
+      const weekCard = [...host.querySelectorAll('.mny-card')]
+        .find(c => c.innerHTML.indexOf('Week by week') >= 0);
+      if (!weekCard) {
+        problems.push('the settled-week record was lost when the flow went in');
+      } else {
+        const r = weekCard.getBoundingClientRect();
+        if (!(r.width > 0 && r.height > 0)) {
+          problems.push('the settled-week card is in the markup but draws nothing: '
+            + Math.round(r.width) + '×' + Math.round(r.height));
+        }
+        const flowCard = host.querySelector('.fl-story');
+        if (flowCard && flowCard.getBoundingClientRect().top > r.top) {
+          problems.push('the settled weeks are drawn ABOVE the flow — the narrower answer leads');
+        }
+      }
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      pd.events = savedEvents;
+      flPeriod = savedPeriod; flMonth = savedMonth;
+    }
     return problems.length ? problems : true;
   });
 

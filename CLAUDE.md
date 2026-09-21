@@ -2195,6 +2195,72 @@ Requests are `profile.moveRequests`, `mergeArrayById(..., 'mvq:')` in
 `moneyCanTransact` is called by two functions and **none of the primitives check
 `isParent()` themselves**, so `mnyMoveMoney` carries that gate explicitly.
 
+## The Flow — the screen the stream was stored for
+
+`js/42-flow.js`, at the head of `screen-moneystory`. Stage 1 stored movements
+instead of balances **for this screen**, and until Stage 4 nothing read them:
+`evFlow`, `evMonths` and `evTypicalMonth` were unit-tested and had no caller.
+A calculation with no reader is a calculation nobody finds out is wrong.
+
+**It does not lead with a total, and that is the whole design.** The owner's
+instruction, in their words: *I do not want the kids to see the end money, they
+need to understand the cash flow — they earn, they spend, they save, they have
+left.* A child watching a total learns to watch a total: it goes up, which is
+good, and down, which is bad, and she learns nothing about why either happened.
+So `flStory` says what came in, what went out, what was put away and what is
+left, **in that order, in one sentence, before any bar is drawn** — the
+movement is the headline and the balance is its consequence.
+`theFlowSaysWhereItWent` asserts the ORDER, not merely that both appear: a
+screen whose first figure is a balance has quietly become the thing it
+replaced, and nothing else in the suite would notice.
+
+`mnyWalletCard` still leads with *Everything I have*, unchanged and correct.
+That is the page where she checks a figure before deciding something; this is
+the page where she finds out how it got there. Two questions, two screens.
+
+**It owns no arithmetic.** Every number comes from the pure functions in
+`js/40-stream.js`. This file arranges and labels; it never sums a movement
+itself. A second place deciding what "came in" means is a second place that can
+disagree with the first.
+
+**"Left" is a balance, never in-minus-out.** She may have had money before the
+span started, and putting $30 into kept-ready is not money gone. The screen
+says so out loud rather than leaving a child to do arithmetic that does not
+come out.
+
+**Each group scales to its own biggest ribbon, not to a grand total.** One
+scale across "in" and "out" draws a $2 fine as an invisible sliver beside $40
+of jobs — the one row she most needs to see. The two group totals are what
+compare the halves.
+
+**Three periods, and the third is the honest one.** *This month* · *All of it* ·
+*A typical month*, which `evTypicalMonth` divides by the months that have
+**elapsed**, empty ones included. Dividing by months holding events turns a
+quiet summer into a good one — the same mistake `mrYearToDate` makes with
+settled weeks, deliberately not repeated.
+
+**The history strip keeps its empty months.** One 44px column per calendar
+month, oldest left, stacked by where that month's money came from, scrolling
+sideways rather than wrapping — a wrapped timeline stops being a timeline. An
+empty month is drawn as a dashed empty frame: a gap is a fact, and a month
+dropped from a chart reads as a month that did not happen. Tapping a column
+selects **both** the month and the period, because selecting a month while the
+screen still reads "all of it" is a control that appears to do nothing.
+
+**The Flow leads and the settled weeks follow.** The week list reads the frozen
+`moneyLedger`, so it can only show weeks a meeting settled — a gift on a
+Tuesday, a spend, a move between pots are all invisible to it. Leading with the
+narrower answer is how a child comes to believe the money she was given is not
+part of her money story. Both stay: the ledger rows are the week-by-week record
+a parent checks a meeting against, and the Flow cannot replace a record of what
+each settlement paid.
+
+`screen-moneystory` joined `KID_SCREENS` in the same change. It is a kid screen
+and was never in that audit, which is how the strip's 26px columns could have
+shipped with no 44px floor enforced on them — the row seeds two events first,
+because an empty story draws no strip and no ribbons and would pass the audit
+by having nothing on it.
+
 ## The money stream — a flow, not a balance
 
 `js/40-stream.js`. **Money is stored as MOVEMENTS and every balance is derived

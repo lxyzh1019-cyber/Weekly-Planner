@@ -58,6 +58,12 @@ window.addEventListener('pagehide', flushPush);
   // familyMeetingBody renders the same mnyTabBar/mnyAskBtn markup as the
   // standalone money pages, so without this binding tabs 4 (Money rules) and
   // 5 (Money school) — and every `?` button — were inert inside the meeting.
+  /* The Flow's period chips and month strip (js/42-flow.js). Its own listener
+     rather than a branch inside mnyHandleClick: the Flow owns no money and
+     asks the stream nothing that page does, and one handler answering for two
+     surfaces is how their behaviour drifts. */
+  const story = document.getElementById('mnyStoryWrap');
+  if (story) story.addEventListener('click', flHandleClick);
   ['mnyPage1Wrap','mnyStoryWrap','mnySchoolWrap','familyMeetingBody'].forEach(id => {
     const wrap = document.getElementById(id);
     if (!wrap) return;
