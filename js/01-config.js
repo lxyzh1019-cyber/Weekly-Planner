@@ -412,6 +412,23 @@ function activityMatchesFilter(act, filterId) {
   return activitySub(act).cat === filterId;
 }
 
+/* ── What a competition day looks like when the app places one ──────
+   A meet recorded from the Record sheet places its own block, and these are the
+   shape it arrives in. Named here rather than inlined at the call site because
+   they are a FAMILY'S ROUTINE, not an implementation detail: eight in the
+   morning to three in the afternoon, half an hour in the car each way, an hour
+   of warming up. A parent moves any of it on the block afterwards.
+
+   Deliberately NOT `DEFAULT_BUFFER_MIN`/`DEFAULT_WARMUP_MIN` (15 and 20): those
+   are the defaults for an ordinary training session, and a competition is the
+   one day of the sport where the travel is longer and the warm-up is most of
+   the morning. Using the training numbers here would quietly say a meet is a
+   Tuesday practice. */
+const COMP_BLOCK_START = 8 * 60;          // 8:00am
+const COMP_BLOCK_DUR = 7 * 60;            // through to 3:00pm
+const COMP_TRAVEL_MIN = 30;               // each leg, both legs on
+const COMP_WARMUP_MIN = 60;               // before it starts
+
 /* Training tags + sport-specific starter objectives. Each topic carries its
    own icon and background colour so a Skating block reads differently from a
    Swimming or Dryland one at a glance, not just by its text label. */

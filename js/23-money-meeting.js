@@ -242,7 +242,26 @@ function mnyWeekEnd(wk) {
    that date, because a second place that decides what money moves is a second
    place that can disagree with the first. When no competition was planned, the
    form is exactly what it was — an empty name to type into. */
-const MM_COMP_SPORT_FROM_TAG = { swimming: 'swim', skating: 'skate' };
+/* Tag → sport. The inverse lives in js/18-rules.js as `mrTagForSport`.
+   `dryland` and `general` are absent on purpose: neither names a sport the
+   rulebook can score, so a block tagged with one yields null and the form ASKS
+   rather than guessing. It used to yield null too — but `mmSeedCompDraft`'s
+   base then silently made it 'swim', so a dance meet and a dryland session both
+   arrived pre-filled as swimming. */
+const MM_COMP_SPORT_FROM_TAG = { swimming: 'swim', skating: 'skate', dance: 'dance' };
+/* What a planned block says its sport is, or null when nothing can say. A
+   custom sport the family added — dance, gymnastics, diving — resolves by its
+   own id or name, the same way mrTagForSport goes the other way. */
+function mmSportForTag(tag) {
+  const direct = MM_COMP_SPORT_FROM_TAG[String(tag)];
+  if (direct) return direct;
+  const known = ['swim', 'skate', 'dance'];
+  const want = String(tag || '').trim().toLowerCase();
+  if (known.includes(want)) return want;
+  const topic = (typeof getTrainingTopic === 'function') ? getTrainingTopic(tag) : null;
+  const name = String((topic && topic.name) || '').toLowerCase();
+  return known.find(k => name.includes(k)) || null;
+}
 
 function mmPlannedCompetitions(wk, kid) {
   const out = [];
@@ -254,7 +273,8 @@ function mmPlannedCompetitions(wk, kid) {
       // one; neither is a name a parent typed, so neither is offered as one.
       const name = (b.compName || '').trim()
         || (/^(Competition|.+ Comp\.)$/.test(disp.name) ? '' : disp.name);
-      out.push({ dayKey, name, sport: MM_COMP_SPORT_FROM_TAG[b.tag] || null,
+      out.push({ dayKey, name, sport: mmSportForTag(b.tag),
+                 blockId: b.id || null, compId: b.compId || null,
                  startMin: b.startMin || 0, icon: disp.icon });
     });
   });
@@ -273,15 +293,41 @@ function mmPlannedCompetitions(wk, kid) {
 function mmCompKey(dayKey, name) {
   return String(dayKey) + '|' + String(name || '').trim().toLowerCase();
 }
+/* ── THE JOIN, BY ID FIRST ──
+   `mmCompKey` is a day plus a lowercased name, and BOTH SIDES ARE MUTABLE. A
+   parent who fixes a spelling while recording the result leaves the planned
+   meet permanently unrecorded — and an unrecorded planned meet DISABLES THE
+   CONFIRM BAR, so the week cannot settle and nothing on screen says why.
+
+   A meet and its block now carry each other's id (`mrPlaceCompetitionBlock`,
+   js/18-rules.js), so the first question asked is the one that cannot drift.
+   The name match stays as the fallback, because every meet already on file
+   carries no id at all — derived, never migrated, the same reasoning as `xp2`
+   and the per-leg buffers. */
 function mmUnrecordedCompetitions(wk, kid) {
   const inWeek = mrCompetitions(kid)
     .filter(c => String(c.dayKey) >= wk && String(c.dayKey) <= mnyWeekEnd(wk));
+  const doneBlockIds = new Set(inWeek.map(c => c.blockId).filter(Boolean));
+  const doneCompIds = new Set(inWeek.map(c => c.id).filter(Boolean));
   const done = new Set(inWeek.map(c => mmCompKey(c.dayKey, c.name)));
   const daysWithUnnamed = new Set(inWeek.filter(c => !String(c.name || '').trim())
     .map(c => String(c.dayKey)));
-  return mmPlannedCompetitions(wk, kid).filter(p =>
-    !done.has(mmCompKey(p.dayKey, p.name))
-    && !(!String(p.name || '').trim() && daysWithUnnamed.has(String(p.dayKey))));
+  return mmPlannedCompetitions(wk, kid).filter(p => {
+    /* `p.compId` is what carries the ordinary case: recording a result ADOPTS
+       the planned block (mrPlaceCompetitionBlock), so the block itself knows it
+       has been answered and no name is consulted at all. That single line is
+       what unjams the corrected spelling.
+
+       The two id tests above it are the two-device case, and are not
+       redundant: a record can arrive from the phone carrying `blockId` before
+       the iPad's copy of the block has merged and been stamped. Asking from
+       both ends means the meet reads as recorded whichever half lands first. */
+    if (p.blockId && doneBlockIds.has(p.blockId)) return false;
+    if (p.compId && doneCompIds.has(p.compId)) return false;
+    if (p.compId) return false;
+    return !done.has(mmCompKey(p.dayKey, p.name))
+      && !(!String(p.name || '').trim() && daysWithUnnamed.has(String(p.dayKey)));
+  });
 }
 
 /* Fill a fresh draft from the plan when the plan has something to say. */
@@ -290,10 +336,16 @@ function mmSeedCompDraft(wk, kid) {
                  provincial: false, group: 0, overall: 0, silver: 0, gold: 0, allGold: false };
   const from = mmUnrecordedCompetitions(wk, kid)[0];
   if (!from) return base;
+  /* `blockId` rides along so saving LINKS the record to the very block it was
+     seeded from — which is what makes correcting the name here safe. `sport`
+     still falls back to the base only when the plan genuinely could not say;
+     that fallback used to swallow every dance meet and every dryland block,
+     because the tag map knew only swimming and skating. */
   return Object.assign(base, {
     dayKey: from.dayKey,
     name: from.name,
     sport: from.sport || base.sport,
+    blockId: from.blockId || null,
     fromPlan: true,
   });
 }
@@ -930,6 +982,7 @@ function mnyOpenCompForPlanned(dayKey) {
     mnyCompDraft.dayKey = hit.dayKey;
     mnyCompDraft.name = hit.name;
     if (hit.sport) mnyCompDraft.sport = hit.sport;
+    mnyCompDraft.blockId = hit.blockId || null;
     mnyCompDraft.fromPlan = true;
   }
   renderMeetingMode();
@@ -1000,6 +1053,7 @@ function mnySaveComp() {
   const kid = mnyMeetingKid();
   const saved = mrAddCompetition(kid, {
     sport: d.sport, name: d.name, dayKey: d.dayKey, points: d.points,
+    blockId: d.blockId || null,
     qualified: d.qualified, provincial: d.provincial,
     placement: { group: d.group || undefined, overall: d.overall || undefined },
     danceItems: { silver: d.silver, gold: d.gold, allGold: d.allGold },

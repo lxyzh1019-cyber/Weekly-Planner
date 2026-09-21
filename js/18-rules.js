@@ -1161,18 +1161,127 @@ function mrAddCompetition(kid, entry) {
     points: Number(entry.points) || 0, placement: entry.placement || {},
     qualified: !!entry.qualified, provincial: !!entry.provincial,
     danceItems: entry.danceItems || {}, personalBest: !!entry.personalBest,
+    /* Which block on the calendar this meet IS. Carried so the planned/recorded
+       join cannot be broken by renaming either side — see
+       mmUnrecordedCompetitions (js/23-money-meeting.js). Null is fine and
+       normal: every meet recorded before the link existed has none, and the
+       name match still answers for those. */
+    blockId: entry.blockId || null,
     updatedAt: syncNow(),
   };
   e.awarded = mrScoreCompetition(e, mrRulesFor(e.dayKey));   // frozen at entry
   mrCompetitions(kid).push(e);
+  /* The other face. A meet recorded on a day with no competition block places
+     one; a meet seeded FROM a block adopts that block rather than drawing a
+     second 🏆 on the same afternoon. Either way the plan and the money agree
+     about what happened, which is the whole point of the pair. */
+  const block = mrPlaceCompetitionBlock(kid, e);
+  if (block && block.id) e.blockId = block.id;
   saveAll();
   return e;
 }
+/* ── THE BLOCK A MEET PLACES, AND THE LINK BACK ────────────────────
+   A competition is ONE FACT with TWO FACES: the record that says what it was
+   worth, and the block that says it is on the calendar. Either side may be
+   created first, and from here on they carry each other's id — `comp.blockId`
+   and `block.compId` — so the join survives a parent correcting a spelling.
+
+   Why not `placeBlock`: it writes to the global `currentDayKey` for the ACTIVE
+   PROFILE only, so it cannot put a block on Jenn's Saturday while a parent is
+   standing on Jess's Tuesday. This follows `cpSchedule` (js/27-chore-parent.js)
+   — build the block by hand, then `setDayBlocks(dayKey, blocks, kid)`.
+
+   Returns the block, or the one already linked. Idempotent: a meet whose block
+   exists never gets a second one. */
+function mrPlaceCompetitionBlock(kid, comp) {
+  if (!comp || !comp.dayKey) return null;
+  const blocks = (getDayBlocks(comp.dayKey, kid) || []).slice();
+  const already = blocks.find(b => b && b.compId === comp.id);
+  if (already) return already;
+  /* An unlinked competition block already on that day is THIS meet's block —
+     a parent planned it, then recorded the result. Adopt it rather than drawing
+     a second 🏆 on the same day, which is what a naive create would do. */
+  const orphan = blocks.find(b =>
+    b && !b.compId && typeof blockIsCompetition === 'function' && blockIsCompetition(b));
+  if (orphan) {
+    orphan.compId = comp.id;
+    if (comp.name) orphan.compName = String(comp.name).slice(0, 40);
+    markItemUpdated(orphan);
+    setDayBlocks(comp.dayKey, blocks, kid);
+    return orphan;
+  }
+  const block = {
+    id: 'cb-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+    actId: 'competition',
+    compId: comp.id,
+    compName: comp.name ? String(comp.name).slice(0, 40) : null,
+    tag: mrTagForSport(comp.sport),
+    startMin: COMP_BLOCK_START,
+    durationMin: COMP_BLOCK_DUR,
+    objectives: [], note: '', gearState: {}, checklistState: {},
+    parentPinned: true, confirmed: false,
+    // Both legs, explicitly. The symmetric pair is what every reader falls back
+    // to, and the per-leg fields are what the edit sheet writes — saying both
+    // means the block reads the same before and after anyone opens it.
+    travelBuffer: true, travelBufMin: COMP_TRAVEL_MIN,
+    travelTo: true, travelToMin: COMP_TRAVEL_MIN,
+    travelHome: true, travelHomeMin: COMP_TRAVEL_MIN,
+    warmupBuffer: true, warmupBufMin: COMP_WARMUP_MIN,
+    createdAt: syncNow(), updatedAt: syncNow(),
+  };
+  blocks.push(block);
+  setDayBlocks(comp.dayKey, blocks, kid);
+  return block;
+}
+
+/* The block a meet is linked to, wherever it is. Reads only. */
+function mrCompetitionBlock(kid, comp) {
+  if (!comp || !comp.dayKey) return null;
+  return (getDayBlocks(comp.dayKey, kid) || []).find(b => b && b.compId === comp.id) || null;
+}
+
+/* Sport → training tag, the inverse of MM_COMP_SPORT_FROM_TAG. One owner per
+   direction, so a sport added to one shows up as a missing row in the other
+   rather than as a silent null.
+
+   `dance` is deliberately absent from the right-hand side: TRAINING_TAGS ships
+   skating, swimming, dryland and general, and dance exists only if the family
+   added it as a custom sport. So the tag is RESOLVED rather than asserted —
+   `mrTagForSport` returns a tag only when one really exists, and null
+   otherwise. Writing `dance: 'dance'` here would put an unresolvable tag on the
+   block, and `getTrainingTopic` lands an unknown tag on "General": a dance meet
+   would quietly render as 🏃 Training. */
+const MR_TAG_FOR_SPORT = { swim: 'swimming', skate: 'skating' };
+function mrTagForSport(sport) {
+  const direct = MR_TAG_FOR_SPORT[String(sport)];
+  if (direct) return direct;
+  // A custom sport whose id or name matches — how a family that added dance,
+  // gymnastics or diving gets its own tag on a meet it recorded.
+  const want = String(sport || '').trim().toLowerCase();
+  if (!want) return null;
+  const all = (typeof getTrainingTags === 'function') ? getTrainingTags() : [];
+  const hit = all.find(t => t && (String(t.id).toLowerCase() === want
+    || String(t.name || '').toLowerCase() === want));
+  return hit ? hit.id : null;
+}
+
 function mrDeleteCompetition(kid, id) {
   if (!isParent()) { showToast('A grown-up records results 🔒'); return; }
   const p = getProfData(kid);
+  const gone = mrCompetitions(kid).find(c => c.id === id);
   p.competitions = mrCompetitions(kid).filter(c => c.id !== id);
   tombstoneIds('comp:', [id]);
+  /* The block STAYS — it is the plan, and removing a result does not mean the
+     meet did not happen. Only the link goes, so the day reads as a competition
+     nobody has recorded a result for yet, which is exactly what it now is. */
+  if (gone && gone.dayKey) {
+    const blocks = (getDayBlocks(gone.dayKey, kid) || []).slice();
+    let touched = false;
+    blocks.forEach(b => {
+      if (b && b.compId === id) { delete b.compId; markItemUpdated(b); touched = true; }
+    });
+    if (touched) setDayBlocks(gone.dayKey, blocks, kid);
+  }
   saveAll();
 }
 function mrCompetitionWeek(weekKey, kid) {

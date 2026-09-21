@@ -5580,6 +5580,103 @@ function findChromium() {
     return problems.length ? problems : true;
   });
 
+  /* ── A MEET IS ONE FACT WITH TWO FACES ────────────────────────────
+     A competition is a record of what it was worth AND a block on the calendar,
+     and either side may be created first. They carry each other's id now, which
+     is what makes the pair survive an edit.
+
+     The defect this closes: the planned/recorded join was `dayKey` plus the
+     LOWERCASED NAME, and both sides are mutable. A parent who fixed a spelling
+     while recording the result left the planned meet permanently unrecorded —
+     and an unrecorded planned meet DISABLES THE CONFIRM BAR, so the week could
+     not settle and nothing on screen said why. */
+  checks.aMeetIsOneFactWithTwoFaces = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jenn', wk = ctWeekKey;
+    const pd = getProfData(kid);
+    const savedComps = (pd.competitions || []).slice();
+    const keys = mrWeekDayKeys(wk);
+    const satKey = keys[5];
+    const savedBlocks = keys.map(k => (getDayBlocks(k, kid) || []).slice());
+    try {
+      pd.competitions = [];
+      keys.forEach(k => setDayBlocks(k, [], kid));
+
+      // ── Record → block. A result on a day with nothing planned places one.
+      const meet = mrAddCompetition(kid, {
+        dayKey: satKey, sport: 'swim', name: 'Regional meet', points: 8 });
+      if (!meet) { problems.push('the meet was not recorded at all'); return problems; }
+      const block = (getDayBlocks(satKey, kid) || []).find(b => b.compId === meet.id);
+      if (!block) problems.push('recording a meet placed no block on its day');
+      else {
+        if (block.startMin !== COMP_BLOCK_START) problems.push('the block does not start at 8am: ' + block.startMin);
+        if (block.durationMin !== COMP_BLOCK_DUR) problems.push('the block is not 8am–3pm: ' + block.durationMin);
+        // Both legs and the warm-up, per side — the readers ask by side.
+        if (getTravelBufMin(block, 'pre') !== COMP_TRAVEL_MIN) problems.push('no travel out');
+        if (getTravelBufMin(block, 'post') !== COMP_TRAVEL_MIN) problems.push('no travel home');
+        if (getWarmupBufMin(block) !== COMP_WARMUP_MIN) problems.push('no warm-up');
+        if (block.tag !== 'swimming') problems.push('the block was not tagged with its sport: ' + block.tag);
+        if (meet.blockId !== block.id) problems.push('the record does not name its block');
+      }
+      // It reads as recorded, not as a meet still waiting for a result.
+      if (mmUnrecordedCompetitions(wk, kid).some(p => p.dayKey === satKey)) {
+        problems.push('a meet with a result still reads as unrecorded');
+      }
+
+      // ── Recording twice on one day does not draw two 🏆.
+      const before = (getDayBlocks(satKey, kid) || []).filter(blockIsCompetition).length;
+      mrAddCompetition(kid, { dayKey: satKey, sport: 'swim', name: 'Regional meet', points: 8 });
+      const after = (getDayBlocks(satKey, kid) || []).filter(blockIsCompetition).length;
+      if (after !== before + 1) {
+        problems.push('a second meet on one day drew ' + (after - before) + ' blocks, not 1');
+      }
+
+      // ── Block → record, and THE CORRECTED SPELLING. A planned block is
+      //    offered; recording it under a fixed name must still satisfy it.
+      pd.competitions = [];
+      keys.forEach(k => setDayBlocks(k, [], kid));
+      const planned = {
+        id: 'cb-test-1', actId: 'competition', compName: 'Wnter Invitatonal',
+        tag: 'skating', startMin: COMP_BLOCK_START, durationMin: COMP_BLOCK_DUR,
+        objectives: [], checklistState: {}, gearState: {},
+      };
+      setDayBlocks(satKey, [planned], kid);
+      const offered = mmUnrecordedCompetitions(wk, kid);
+      const row = offered.find(p => p.dayKey === satKey);
+      if (!row) problems.push('a planned meet was not offered for recording');
+      else {
+        if (row.blockId !== 'cb-test-1') problems.push('the offer throws the block id away');
+        if (row.sport !== 'skate') problems.push('a skating block did not resolve to skate: ' + row.sport);
+        // Record it with the spelling CORRECTED — the case that used to jam.
+        mrAddCompetition(kid, { dayKey: satKey, sport: 'skate',
+                                name: 'Winter Invitational', points: 3,
+                                blockId: row.blockId });
+        if (mmUnrecordedCompetitions(wk, kid).some(p => p.dayKey === satKey)) {
+          problems.push('correcting the spelling left the planned meet unrecorded for ever');
+        }
+        // And the name the join could not survive really did change.
+        if (mmCompKey(satKey, 'Wnter Invitatonal') === mmCompKey(satKey, 'Winter Invitational')) {
+          problems.push('the fixture did not actually change the name');
+        }
+      }
+
+      // ── Deleting the result keeps the block: the meet still happened.
+      const rec = mrCompetitions(kid).find(c => c.dayKey === satKey);
+      if (rec) mrDeleteCompetition(kid, rec.id);
+      const stillThere = (getDayBlocks(satKey, kid) || []).find(b => b.id === 'cb-test-1');
+      if (!stillThere) problems.push('deleting a result deleted the meet from the calendar');
+      else if (stillThere.compId) problems.push('the block still claims a record that is gone');
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      pd.competitions = savedComps;
+      keys.forEach((k, i) => setDayBlocks(k, savedBlocks[i], kid));
+    }
+    return problems.length ? problems : true;
+  });
+
   /* ── THE SYSTEM DID NOT BEGIN TODAY ───────────────────────────────
      Three stores answered "when did this family start", and every one of them
      SEEDED ITSELF to the current Monday the first time anything read it. On a
