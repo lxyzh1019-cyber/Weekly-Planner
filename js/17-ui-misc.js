@@ -220,12 +220,11 @@ function closeSheet(id) {
   const wasOpen = ov.classList.contains('open');
   ov.classList.remove('open');
   if (wasOpen && ov.contains(document.activeElement)) sheetFocusBack(ov); else ov._opener = null;
-  // The meeting is the only surface that confirms days / records the week, so
-  // refresh the parent dashboard's read-only hub whenever the meeting closes.
-  if (id === 'familyMeetingOverlay') {
-    const sp = document.getElementById('screen-parent');
-    if (sp && sp.classList.contains('active')) renderParentHome();
-  }
+  /* The meeting used to be a sheet, and this function carried a special case
+     for that one id — refresh the parent hub when it closed. The meeting is a
+     screen now (js/15-meeting.js) and `mmHide` owns that refresh, which is
+     where it always belonged: a general mechanism should not hold one caller's
+     knowledge. */
 }
 function overlayClick(e, id) { if (e.target.classList.contains('overlay')) closeSheet(id); }
 function toggleRepeat(id) {

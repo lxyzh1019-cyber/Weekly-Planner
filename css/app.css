@@ -1521,16 +1521,32 @@
      scroll position. Still ONE scroller — nesting a second is what makes a
      flick move the wrong surface on a tablet.
 
-     Negative horizontal margins still let each band span the sheet's 1.2rem
-     padding so nothing shows through at the edges. */
-  #familyMeetingOverlay .sheet {
+     Negative horizontal margins still let each band span the 1.2rem padding so
+     nothing shows through at the edges.
+
+     ── It is a SCREEN now, not a sheet ──
+     The column is unchanged and it is the reason the move was cheap: the
+     meeting already laid itself out as a flex column with one scroller, so it
+     only had to stop being 88% of the viewport inside a floating box and start
+     being the whole of it. A Sunday sitting is the longest task in this app,
+     and a small window you scroll up and down is the wrong container for it. */
+  .mm-screen {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    /* dvh so iPad Safari's shrinking toolbar cannot push the footer out of
-       reach; vh first for anything that does not know dvh. */
-    max-height: 88vh;
-    max-height: 88dvh;
+    padding: 1.2rem;
+    /* The whole viewport, not a fraction of it. dvh so iPad Safari's shrinking
+       toolbar cannot push the footer out of reach; vh first for anything that
+       does not know dvh. */
+    height: 100vh;
+    height: 100dvh;
+  }
+  /* The meeting names itself once, at the top, and then gets out of the way —
+     it used to be a sheet heading, which is the one thing a dialog must have
+     and a screen mostly does not need shouting. */
+  .mm-title {
+    flex: 0 0 auto;
+    margin: 0 0 0.6rem; font-size: max(15px, 1.05rem);
   }
   #familyMeetingBody {
     flex: 1 1 auto;
@@ -6105,14 +6121,14 @@
   #screen-mymoney,
   #screen-moneystory,
   #screen-moneyschool,
-  #familyMeetingOverlay {
+  #screen-meeting {
     --fs-scale: 1.2;
   }
   /* A few fixed-size chips would clip their label at 1.2x — let them grow. */
   #screen-parent .ck-key, #screen-chore .ck-key,
-  #familyMeetingOverlay .mny-tab-tag, #screen-mymoney .mny-tab-tag,
+  #screen-meeting .mny-tab-tag, #screen-mymoney .mny-tab-tag,
   #screen-moneyschool .mny-tab-tag,
-  #familyMeetingOverlay .cp-gbtn, #screen-chore .cp-gbtn {
+  #screen-meeting .cp-gbtn, #screen-chore .cp-gbtn {
     white-space: normal;
     min-height: auto;
     height: auto;
@@ -6997,4 +7013,91 @@
   border: 2px dashed var(--ink); border-radius: var(--radius-sm, 10px);
   background: transparent; color: var(--ink);
   font-size: max(15px, 1rem); font-weight: 800; cursor: pointer;
+}
+
+/* ── The Flow (js/42-flow.js) ──
+   Money as something that MOVES: what came in, where it went, what is left.
+   Deliberately NOT a big total — a child watching a total learns to watch a
+   total. The sentence leads, the ribbons explain it, the strip puts it in a
+   year.
+
+   Every hue here matches the pot it names on 💰 My money. Kid surface, so the
+   44px and 13px floors apply throughout. */
+.fl-chiprow { display: flex; flex-wrap: wrap; gap: var(--space-1, 0.35rem); margin-bottom: var(--space-2, 0.6rem); }
+.fl-chip {
+  min-height: 44px; padding: 0.4rem 0.8rem;
+  border: 2px solid var(--ink); border-radius: 999px;
+  background: var(--bg2); color: var(--ink);
+  font-size: max(15px, 0.95rem); font-weight: 700; cursor: pointer;
+}
+.fl-chip.on { background: var(--ink); color: var(--paper); }
+
+/* The headline is a sentence, at reading size. */
+.fl-story {
+  margin: 0 0 var(--space-3, 0.8rem);
+  font-size: max(15px, 1.05rem); line-height: 1.5; font-weight: 600;
+}
+.fl-group { margin-bottom: var(--space-3, 0.8rem); }
+.fl-cap {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem;
+  margin-bottom: var(--space-1, 0.35rem);
+  font-size: max(15px, 1rem); font-weight: 800;
+}
+/* Label, bar, amount on one line at every width — the label and the figure
+   hold their space and the track takes what is left, so a bar never squeezes
+   the number it is explaining off the screen. */
+.fl-row { display: flex; align-items: center; gap: var(--space-1, 0.4rem); min-height: 32px; }
+.fl-row-name { flex: 0 0 8.5rem; font-size: max(13px, 0.9rem); }
+.fl-track { flex: 1 1 3rem; height: 14px; border-radius: 999px; background: var(--bg2); overflow: hidden; }
+.fl-bar { display: block; height: 100%; border-radius: 999px; }
+.fl-row-amt { flex: 0 0 4.5rem; text-align: right; font-size: max(13px, 0.92rem); }
+
+/* What is left is a consequence, so it is drawn as the foot of the story and
+   not as its headline. */
+.fl-left {
+  display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;
+  padding: var(--space-2, 0.6rem);
+  border: 2px solid var(--ink); border-radius: var(--radius-sm, 10px);
+  background: var(--bg2);
+  font-size: max(15px, 1.05rem); font-weight: 800;
+}
+.fl-note { margin-top: var(--space-1, 0.4rem); font-size: max(13px, 0.85rem); line-height: 1.4; opacity: 0.85; }
+.fl-empty { font-size: max(15px, 0.95rem); line-height: 1.45; }
+
+/* The history strip. One column per month, oldest left, scrolling sideways on
+   a phone rather than wrapping — a wrapped timeline stops being a timeline. */
+.fl-strip-wrap { margin-top: var(--space-2, 0.6rem); }
+.fl-strip {
+  display: flex; align-items: flex-end; gap: 2px;
+  overflow-x: auto; overscroll-behavior-x: contain;
+  padding-bottom: 0.25rem;
+}
+.fl-col {
+  flex: 0 0 auto; width: 44px; min-height: 44px;
+  display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
+  padding: 0; border: 2px solid transparent; border-radius: var(--radius-sm, 10px);
+  background: transparent; cursor: pointer;
+}
+.fl-col.on { border-color: var(--ink); background: var(--bg2); }
+/* A month with nothing in it keeps its column and shows an empty frame: a gap
+   is a fact, and a month dropped from a chart reads as a month that did not
+   happen. */
+.fl-col.empty .fl-stack { border-style: dashed; opacity: 0.6; }
+.fl-stack {
+  display: flex; flex-direction: column-reverse; justify-content: flex-start;
+  width: 26px; height: 84px;
+  border: 1px solid var(--ink); border-radius: 4px;
+  background: var(--paper); overflow: hidden;
+}
+.fl-seg { display: block; width: 100%; }
+.fl-col-name { font-size: max(13px, 0.78rem); font-weight: 700; }
+
+/* The one control in the app that moves real money. It sits in the meeting's
+   footer rather than somewhere in the middle of a long panel — always visible,
+   always in the same place — so it is marked as the consequential thing it is
+   rather than looking like another Next. */
+.mm-nav .mm-commit {
+  border-width: 3px;
+  box-shadow: var(--shadow-sm, 0 2px 0 var(--ink));
+  font-weight: 900;
 }

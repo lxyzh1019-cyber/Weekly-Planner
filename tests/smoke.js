@@ -4287,13 +4287,13 @@ function findChromium() {
   checks.settleOnlyOpensTheMeeting = await page.evaluate(() => {
     const before = JSON.stringify(state.shared.chore.finalizedWeeks || {});
     document.querySelector('[data-cp-action="settle"]').click();
-    const opened = document.getElementById('familyMeetingOverlay').classList.contains('open');
+    const opened = mmIsOpen();
     // Settle is a run-the-meeting button, so it also asks about weeks nobody
     // settled (mmMaybeAskCatchUp). Answer it — a live .overlay is fixed/inset-0
     // at z-index 300, so leaving one up puts an invisible sheet of glass over
     // every hit-test that follows, which is what broke the 44px kid audit.
     _closeAppDialog(null);
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     return opened && JSON.stringify(state.shared.chore.finalizedWeeks || {}) === before;
   });
   // The planner panel schedules a chore onto the day, and takes it off again.
@@ -4536,10 +4536,10 @@ function findChromium() {
     const finalBefore = JSON.stringify(state.shared.chore.finalizedWeeks || {});
     setParentTab('chores'); cpRenderChoreTab();
     document.querySelector('[data-cp-action="settle"]').click();
-    step.meetingOpens = document.getElementById('familyMeetingOverlay').classList.contains('open');
+    step.meetingOpens = mmIsOpen();
     step.nothingSettledYet = JSON.stringify(state.shared.chore.finalizedWeeks || {}) === finalBefore;
     _closeAppDialog(null);   // settle asks about unsettled weeks too — see above
-    closeSheet('familyMeetingOverlay');
+    mmHide();
 
     // Leave the week as we found it.
     mrSetChoreGrade(kid, wk, day, chore, 0);
@@ -4648,18 +4648,20 @@ function findChromium() {
       return r.width > 0 && r.height > 0;
     };
 
-    // A word has a letter in it. Bare numbers — a calendar's dates, a dollar
-    // figure, a tally — are what the screen is FOR, not text to wade through, and
-    // counting them would make a date grid look like a wall of prose.
-    let words = 0;
-    const walk = document.createTreeWalker(scr, NodeFilter.SHOW_TEXT);
-    let n;
-    while ((n = walk.nextNode())) {
-      const p = n.parentElement;
-      if (!p || !visible(p) || p.closest('[hidden]')) continue;
-      const t = (n.textContent || '').trim();
-      if (t) words += t.split(/\s+/).filter(w => /[A-Za-z]/.test(w)).length;
-    }
+    /* The WORD COUNT is gone, at the owner's instruction, and the counting code
+       with it. It was a hard cap of 200 visible words per kid screen, and what
+       it actually bought was not brevity: it pushed real explanation behind
+       disclosure toggles, where a nine-year-old does not go looking. A screen
+       that has something worth saying now says it.
+
+       What it does NOT license is padding. The editorial rules in CLAUDE.md
+       still hold — lead with autonomy, no performance-identity framing, money
+       is a lesson and not a payment — and those are judgement, which is what a
+       word count was standing in for and could never actually measure.
+
+       The 44px target floor and the 13px font floor stay. Those are reach and
+       legibility on a child's hands and eyes, not editorial taste, and nothing
+       about the budget coming off touches them. */
 
     // The week card's done-tick sits at a card corner, so a 44px hit area there
     // would swallow the tap that opens the day. Exempted deliberately, by name,
@@ -4724,72 +4726,13 @@ function findChromium() {
       }
     });
 
-    return { screen: screenId, words, small, minFont: Math.round(minFont * 100) / 100, minWhere };
+    return { screen: screenId, small, minFont: Math.round(minFont * 100) / 100, minWhere };
   }, screenId);
 
-  /* Word budgets. Three screens meet the 200 the house rules ask for. The chore
-     screen does not, and the honest number is here rather than a quietly relaxed
-     rule: it came down from 346 (the audit's measurement) to ~275 by collapsing
-     the privilege ladder and the XP explainer, and the rest is instructional copy
-     a nine-year-old plausibly still needs — "tap twice if nobody had to ask",
-     "only whole bundles pay". Deciding which of those she can do without is a
-     product call and the Today-first rebuild's job, not a CSS pass.
-
-     So this is a ratchet, not an exemption: the ceiling is what it currently
-     measures, it fails the build if it grows, and the 200 target stays written
-     down as the thing the rebuild has to hit. Tighten it whenever the real number
-     comes down — 346 at the audit, 280 after the disclosures, 276 once the
-     duplicate shortcut rows went.
-
-     ── 2026-08-10, 276 → 277, owner's call ──
-     The budget is a soft floor, not a hard one: where a word buys a number that
-     is not misleading, the word wins. This one did. The chore rail was capped
-     "Your week" over b.net, which excludes money from outside — labelled as the
-     week's total it disagreed with "Money that came in" on My money every time
-     one of them was given something. "Earned this week" costs one word and says
-     what the number actually is.
-
-     Raising it stays a recorded decision with a date and a reason, never a quiet
-     bump, and the check stays in place. The 200 target is unchanged.
-
-     ── 2026-08-19, 277 → 261, tightened ──
-     The routines section's instruction line ("Tap when it's done · all three
-     closed counts the day toward the routine bonus") went, and a one-tap "all 3
-     done" button above the three routines went in — which is the same sentence
-     as a control you can press. A ratchet is tightened whenever the real number
-     comes down: 346 at the audit, 280 after the disclosures, 276 once the
-     duplicate shortcut rows went, 277 for the honest earnings label, 261 now. */
-  /* ── 2026-08-31, screen-week/planned added at 208, owner's call ──
-     Day Blocks was the week's default, so this audit measured THAT and the Full
-     layout was never held to the budget at all. The week opens on Full now, and
-     the first honest measurement was 242.
-
-     Most of that came out: three hint lines under the Goals / To-do /
-     Achievements headings that restated the headings, three empty states that
-     restated the ＋ button beside them, and a signature label that said "sign
-     your week" directly above a button saying "Sign this week". The screen
-     itself now measures 200 or under at every width, with no ratchet.
-
-     What is left over sits on the SEEDED row, and it is the seeded blocks
-     themselves — Morning Routine, School Day, a skating session and their
-     detail lines. Those words are the plan, not chrome: a week with things on
-     it says what they are, and cutting them would mean a card that does not
-     name its own activity. So the variant carries its own number and the bare
-     screen keeps the 200. Tighten this whenever the real figure drops. */
-  /* ── 2026-09-21, screen-mymoney 200 → 204, owner's call ──
-     The wallet card grew its Move door (`mnyMoveDoor`, js/22-money-page1.js).
-     Until Stage 3 the only way a dollar left cash was the Sunday split, so a
-     gift that arrived on a Tuesday sat there whatever anybody wanted — and a
-     door that exists only on the parent's rules page is a door a child does
-     not have. Four words buy a control that was not there, which is the same
-     call as the 2026-08-10 raise: where a word buys something not misleading,
-     the word wins. Tighten it whenever the real number drops.
-
-     The owner has asked for the 200-word budget to be removed everywhere; that
-     is its own change, to the rule and not to one number. */
-  const WORD_BUDGET = { 'screen-today': 200, 'screen-week': 200,
-                        'screen-week/planned': 208,
-                        'screen-mymoney': 204, 'screen-chore': 261 };
+  /* The per-screen word budgets (WORD_BUDGET) lived here, with a dated note
+     for every time one was raised or tightened. They went with the count
+     itself — see the kidStandards comment above. The history is in git; the
+     rule is not in force. */
   const KID_SCREENS = [
     // Today is held to the full 200 with no ratchet: it was built to these rules
     // rather than measured against them afterwards, which was the point of
@@ -4878,6 +4821,18 @@ function findChromium() {
     }, 'screen-today/extras'],
     ['screen-chore',   () => { openChoreTab(); ckSelectDay(2); }],
     ['screen-mymoney', () => { mnyOpenMyMoney('jenn'); }],
+    /* The money story is a KID screen and was never in this audit, which is how
+       it could have shipped the Flow's 26px-wide month columns with no floor
+       enforced on them. Seeded, because an empty story draws no strip and no
+       ribbons and would pass this audit by having nothing on it. */
+    ['screen-moneystory', () => {
+      const pd = getProfData('jenn');
+      if (!(pd.events || []).length) {
+        evAdd('jenn', { kind: 'in', from: 'earned', to: 'cash', amount: 40, dayKey: todayKey() });
+        evAdd('jenn', { kind: 'out', from: 'cash', to: 'spent', amount: 12, dayKey: todayKey() });
+      }
+      mnyOpenStory();
+    }],
   ];
   // Four real devices, not two. The plan asked for these and the branch that
   // changed nearly every layout only ever checked a phone and a desktop-ish
@@ -4941,10 +4896,6 @@ function findChromium() {
       await page.evaluate(`(${nav.toString()})()`);
       await page.waitForTimeout(200);
       const r = await kidStandards(id);
-      /* Keyed by the row's LABEL where it has one, so a seeded variant can
-         carry its own number: the words a plan puts on the screen are not the
-         same thing as the chrome around it. */
-      const budget = WORD_BUDGET[label || id] || WORD_BUDGET[id] || 200;
       const problems = [];
       if (r.error) problems.push(r.error);
       // Sideways scroll is the failure a screenshot needs a human to notice and
@@ -4961,7 +4912,6 @@ function findChromium() {
       }, id);
       if (overflow.body > w + 1) problems.push(`page scrolls sideways (${overflow.body} > ${w})`);
       if (overflow.worst.right > w + 1) problems.push(`.${overflow.worst.cls} runs to ${Math.round(overflow.worst.right)} (past ${w})`);
-      if (r.words > budget) problems.push(`${r.words} words (max ${budget}${budget !== 200 ? ', ratchet — target is 200' : ''})`);
       if (r.small && r.small.length) problems.push(`${r.small.length} target(s) under 44px: ${r.small.slice(0, 6).join(', ')}`);
       if (r.minFont < 13) problems.push(`font ${r.minFont}px on .${r.minWhere} (min 13)`);
       if (problems.length) kidFindings.push(`${label || id}@${w}: ${problems.join(' | ')}`);
@@ -5444,7 +5394,9 @@ function findChromium() {
 
     openFamilyMeeting();
     mnySetMeetKid(kid);
-    const fiveSteps = MM_STEPS.length === 5;
+    /* The shape, by the ids it is made of rather than by a count — a length
+       check passes for any three steps, including three wrong ones. */
+    const threeSteps = MM_STEPS.map(x => x.id).join(',') === 'week,money,close';
 
     // Money from outside is entered at the meeting, with her in the room. It
     // carries no destination — it joins the pool like every other dollar.
@@ -5499,9 +5451,26 @@ function findChromium() {
       && mnySavedTotal(kid) === before.saved
       && !mnyIsCommitted(wk, kid);
 
-    closeSheet('familyMeetingOverlay');
-    return fiveSteps && gated && confirmed && poolIsHonest && allToLoan
-        && blockedNoAnswer && moved && notHeldYet && reversed;
+    mmHide();
+
+    /* Findings, not a bare false. This is the longest end-to-end in the suite —
+       nine named facts about a week's money moving — and every one of them was
+       collapsed into a single boolean, so a failure said "the money flow broke"
+       and nothing about which part. */
+    const problems = [];
+    if (!threeSteps) problems.push('the meeting is not week · money · close — it is ' + MM_STEPS.map(x => x.id).join(', '));
+    if (!gated) problems.push('the split is not locked behind agreeing the week');
+    if (!confirmed) problems.push('agreeing the week did not record it as confirmed');
+    if (!poolIsHonest) problems.push('the pool does not add up: a $50 gift should join the same pool as everything else and be hers to decide about');
+    if (!allToLoan) problems.push('the all-to-the-loan plan did not send the whole pool at the loan');
+    if (!blockedNoAnswer) problems.push('the commit was not blocked while her question was unanswered');
+    if (!moved) problems.push('committing did not move the money as the plan said: paid '
+      + before.paid + ' → ' + after.paid + ', cash ' + before.cash + ' → ' + after.cash
+      + ', saved ' + before.saved + ' → ' + after.saved
+      + ', committed ' + mnyIsCommitted(wk, kid) + ', arrears ' + mnyDebts(kid)[0].arrears);
+    if (!notHeldYet) problems.push('one child settling marked the whole meeting held — her sister has not decided');
+    if (!reversed) problems.push('undo did not put every pot back where it was');
+    return problems.length ? problems : true;
   });
 
   /* ── THE MONEY STREAM AGREES WITH THE WALLET ──────────────────────
@@ -5588,6 +5557,260 @@ function findChromium() {
         + money2(flow.inTotal - flow.outTotal) + ' vs ' + evWorth(kid));
     }
 
+    return problems.length ? problems : true;
+  });
+
+  /* ── THE FOUR HOUSE RULES ─────────────────────────────────────────
+     Homework earns XP and not dollars · a behaviour fine is a conversation and
+     not a deduction · one grace day a week in the routine streak · the pace
+     figure divides by the weeks that PASSED.
+
+     Each is a rule the family agreed, and each is the kind of change that goes
+     wrong quietly: a channel that stops paying, a deduction that stops
+     deducting, a streak that gets easier, a denominator that changes. The
+     calibration tools hold the money; this holds the behaviour. */
+  checks.theFourHouseRulesHold = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jenn', wk = ctWeekKey;
+    const pd = getProfData(kid);
+    const savedFines = (pd.fines || []).slice();
+    const savedEarn = JSON.parse(JSON.stringify(mrEnsureEarnings(kid, wk)));
+    /* The routine marks are a TOGGLE store and this check rewrites a whole
+       week of them. Left behind they break blankPastWeekCanBeMadeUp thirty
+       checks later — which is exactly how the streak fixture bit once already. */
+    const savedMand = JSON.parse(JSON.stringify(getProfData(kid).chore.mandatoryByWeek[wk] || {}));
+    const keys = mrWeekDayKeys(wk);
+    try {
+      // ── 1 · Homework earns XP, not dollars.
+      const learn = ((mrRulesForWeek(wk) || {}).learning || {}).items || [];
+      const paid = learn.filter(i => !i.xpOnly && Number(i.amount) > 0);
+      if (paid.length) {
+        problems.push('homework still pays money: ' + paid.map(i => i.id).join(', '));
+      }
+      mrSetLearning(kid, wk, 0, 'math', 6);          // two bundles of 3 pages
+      const b = mrWeekBreakdown(wk, kid);
+      if (money2(b.learnPaid) !== 0) problems.push('a homework bundle paid ' + b.learnPaid);
+      if (!(b.learning.xpLevels > 0)) problems.push('a homework bundle earned no XP either — it should still count');
+
+      // ── 2 · Twice is a conversation; the third time costs.
+      const rich = [9, 9, 9, 9, 9, 9, 9];       // earnings high, so the daily floor never bites
+      const fineItems = ((mrRulesForWeek(wk) || {}).fines || {}).items || [];
+      const talk = fineItems.find(i => Number(i.freeRepeats) > 0);
+      const money = fineItems.find(i => !Number(i.freeRepeats) && Number(i.amount) > 0);
+      if (!talk) { problems.push('no behaviour fine is forgiven the first two times'); }
+      if (!money) { problems.push('every fine became forgivable — the Sunday Box repeat should cost from the first'); }
+      if (talk) {
+        const charge = (n) => {
+          pd.fines = [];
+          for (let i = 0; i < n; i++) mrAddFine(kid, talk.id, keys[i % 7]);
+          return money2(mrFinesWeek(wk, kid, rich).total);
+        };
+        if (charge(1) !== 0) problems.push('a first slip cost money');
+        if (charge(2) !== 0) problems.push('a second cost money');
+        if (charge(3) !== money2(talk.amount)) {
+          problems.push('the third cost ' + charge(3) + ', not ' + talk.amount);
+        }
+        if (charge(4) !== money2(talk.amount * 2)) {
+          problems.push('the fourth did not cost another ' + talk.amount);
+        }
+        // Recorded every time, forgiven or not — the record is the point.
+        if (mrFines(kid).length !== 4) problems.push('only ' + mrFines(kid).length + ' of 4 were recorded');
+
+        /* And she is told, in her own tab, what it is and what happens next —
+           a rule a child finds out about by being charged is a rule she was
+           never given a chance to keep. */
+        pd.fines = [];
+        mrAddFine(kid, talk.id, keys[1]);
+        mrAddFine(kid, talk.id, keys[2]);
+        const ev = reflEvidence(wk, kid, 'needsWork');
+        const row = ev.find(e => String(e.id).indexOf('fine_') === 0);
+        if (!row) problems.push('the incident is recorded but never reaches her reflection');
+        else if (!/cost/.test(row.text)) {
+          problems.push('her reflection does not say what happens next: ' + row.text);
+        }
+      }
+      if (money) {
+        pd.fines = [];
+        mrAddFine(kid, money.id, keys[1]);
+        if (!(money2(mrFinesWeek(wk, kid, rich).total) > 0)) {
+          problems.push('the Sunday Box repeat stopped costing anything');
+        }
+      }
+      pd.fines = [];
+
+      // ── 3 · One grace day, and only one.
+      const streak = (mrRulesForWeek(wk) || {}).streak || {};
+      if (Number(streak.graceDays) !== 1) problems.push('the streak grants ' + streak.graceDays + ' grace days, not 1');
+      /* ctSetMandatory(weekKey, dayIdx, session, kid, value) — the kid comes
+         BEFORE the value, and getting that round the wrong way silently writes
+         a routine mark for a child called `true`. */
+      const setWeek = (pattern) => {
+        getProfData(kid).chore.mandatoryByWeek[wk] = {};
+        pattern.forEach((keptDay, d) => {
+          mrRoutineSessionsFor(wk, kid, d).forEach(sess => ctSetMandatory(wk, d, sess, kid, keptDay));
+        });
+      };
+      // Six kept with one miss in the middle: the grace carries the run across
+      // it, and the day itself is NOT credited — so this is 6, not 7.
+      setWeek([true, true, true, false, true, true, true]);
+      const oneMiss = mrStreakWeek(wk, kid);
+      if (oneMiss.days !== 6) problems.push('one miss gave a run of ' + oneMiss.days + ', not 6');
+      // Two misses: the grace is spent on the first, the second ends the run.
+      setWeek([true, true, false, true, true, false, true]);
+      const twoMiss = mrStreakWeek(wk, kid);
+      if (twoMiss.days >= 6) problems.push('two misses still gave a run of ' + twoMiss.days);
+      // A clean week is still seven — grace must not inflate the top tier.
+      setWeek([true, true, true, true, true, true, true]);
+      const clean = mrStreakWeek(wk, kid);
+      if (clean.days !== 7) problems.push('a clean week reads ' + clean.days + ', not 7');
+
+      // ── 4 · The pace divides by the weeks that PASSED.
+      const ytd = mrYearToDate(kid);
+      if (typeof ytd.weeksElapsed !== 'number') problems.push('the pace does not report weeks elapsed');
+      else if (ytd.weeksElapsed < ytd.weeks) {
+        problems.push('weeks elapsed (' + ytd.weeksElapsed + ') is fewer than weeks settled (' + ytd.weeks + ')');
+      }
+      if (typeof mrWeeksElapsed !== 'function') problems.push('there is no one owner of weeks elapsed');
+      else if (!(mrWeeksElapsed() > 0)) problems.push('weeks elapsed came out ' + mrWeeksElapsed());
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      pd.fines = savedFines;
+      getProfData(kid).earnings[wk] = savedEarn;
+      getProfData(kid).chore.mandatoryByWeek[wk] = savedMand;
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── THE FLOW SAYS WHERE IT WENT ──────────────────────────────────
+     Stage 1 stored movements instead of balances FOR THIS SCREEN, and until
+     now nothing read them: `evFlow`, `evMonths` and `evTypicalMonth` were
+     unit-tested and had no caller. A calculation with no reader is a
+     calculation nobody finds out is wrong.
+
+     The owner's instruction is the thing to hold here: *I do not want the kids
+     to see the end money, they need to understand the cash flow.* So this
+     asserts what the screen LEADS with, not only that it renders — a screen
+     whose first figure is a balance has quietly become the thing it replaced,
+     and nothing else in the suite would notice. */
+  checks.theFlowSaysWhereItWent = await page.evaluate(() => {
+    const problems = [];
+    profile = 'jenn'; parentViewing = 'jenn';
+    const kid = 'jenn';
+    const pd = getProfData(kid);
+    const savedEvents = (pd.events || []).slice();
+    const savedPeriod = flPeriod, savedMonth = flMonth;
+    try {
+      /* Three months, with the middle one EMPTY on purpose — a gap is a fact
+         the strip has to keep, and a month silently dropped from a chart reads
+         as a month that did not happen. */
+      const today = todayKey();
+      const [yy, mm] = today.split('-').map(Number);
+      const back = (n) => {
+        let y = yy, m = mm - n;
+        while (m < 1) { m += 12; y -= 1; }
+        return y + '-' + String(m).padStart(2, '0');
+      };
+      const m0 = back(2), m2 = back(0);
+      pd.events = [];
+      evAdd(kid, { kind: 'in', from: 'earned', to: 'cash', amount: 40, dayKey: m0 + '-10' });
+      evAdd(kid, { kind: 'in', from: 'gift',   to: 'cash', amount: 50, dayKey: m0 + '-20' });
+      evAdd(kid, { kind: 'out', from: 'cash', to: 'spent', amount: 12, dayKey: m0 + '-25' });
+      evAdd(kid, { kind: 'in', from: 'earned', to: 'cash', amount: 20, dayKey: m2 + '-05' });
+      evAdd(kid, { kind: 'ready', from: 'cash', to: 'ready', amount: 30, dayKey: m2 + '-06' });
+
+      mnyOpenStory();
+      const host = document.getElementById('mnyStoryWrap');
+      const text = () => host.innerText;
+
+      // ── It does NOT lead with a balance.
+      const storyEl = host.querySelector('.fl-story');
+      if (!storyEl) { problems.push('the flow did not render'); return problems; }
+      const lead = storyEl.innerText;
+      if (!/came in/.test(lead)) problems.push('the flow does not lead with what came in: ' + lead);
+      if (lead.indexOf('came in') > lead.indexOf('You have')) {
+        problems.push('the balance is said before the movement — the one thing this screen must not do');
+      }
+
+      // ── This month: 20 in, 30 put away, nothing out.
+      flPeriod = 'month'; flMonth = m2; mnyRenderStory();
+      if (!/\$20\.00/.test(text())) problems.push('this month does not name the $20 that came in');
+      if (!/Kept ready/.test(text())) problems.push('money moved to kept-ready is not drawn as somewhere it went');
+
+      // ── All of it: every ribbon, across all three months.
+      flPeriod = 'all'; mnyRenderStory();
+      const all = text();
+      ['Jobs and routines', 'Gifts', 'Spent', 'Kept ready'].forEach(l => {
+        if (all.indexOf(l) < 0) problems.push('"' + l + '" is missing from the whole story');
+      });
+      if (!/\$60\.00/.test(all)) problems.push('jobs across all months do not total $60');
+      if (!/\$12\.00/.test(all)) problems.push('what was spent is not shown');
+
+      // ── The figure left is a BALANCE, not in minus out.
+      const flow = evFlow(kid);
+      const leftShown = (host.querySelector('.fl-left') || {}).innerText || '';
+      if (leftShown.indexOf(mnyMoney(flow.inHand)) < 0) {
+        problems.push('the left figure is not the cash balance: ' + leftShown);
+      }
+      if (money2(flow.inHand) === money2(flow.inTotal - flow.outTotal)) {
+        // Only a warning shape: with this fixture they must differ, because 30
+        // went to kept-ready, which is not "out".
+        problems.push('left equals in minus out — allocations are being counted as money gone');
+      }
+
+      // ── A typical month divides by months ELAPSED, empty ones included.
+      flPeriod = 'typical'; mnyRenderStory();
+      const typ = evTypicalMonth(kid);
+      if (typ.months < 3) problems.push('the typical month skipped the empty month: ' + typ.months);
+      if (money2(typ.sources.earned) !== money2(60 / typ.months)) {
+        problems.push('the typical month is not the total over months elapsed');
+      }
+
+      // ── The strip keeps the empty month, and is a picker.
+      const cols = [...host.querySelectorAll('.fl-col')];
+      if (cols.length < 3) problems.push('the history strip shows ' + cols.length + ' months, not 3');
+      if (!host.querySelector('.fl-col.empty')) problems.push('the empty month was dropped from the strip');
+      const target = cols.find(c => c.getAttribute('data-fl-month') === m0);
+      if (!target) { problems.push('the oldest month is not on the strip'); return problems; }
+      target.click();
+      if (flPeriod !== 'month' || flMonth !== m0) {
+        problems.push('tapping a month did not select it');
+      }
+      if (!/\$50\.00/.test(host.innerText)) problems.push('selecting that month did not show its gift');
+
+      /* ── The settled-week list is still there, UNDER it, and drawn.
+         Two assertions rather than one, because they fail for different
+         reasons: rendered-at-all (the Flow replaced it instead of leading it)
+         and has-a-box (it is in the markup but the Flow above it has collapsed
+         or clipped it, which reads to a child exactly like it being gone).
+
+         Written against innerHTML plus a measured rect rather than innerText.
+         innerText answers "what does this element read as", which for a long
+         screen is a rendering question this assertion never wanted to ask —
+         it reported the card missing while the card was present and correct. */
+      const weekCard = [...host.querySelectorAll('.mny-card')]
+        .find(c => c.innerHTML.indexOf('Week by week') >= 0);
+      if (!weekCard) {
+        problems.push('the settled-week record was lost when the flow went in');
+      } else {
+        const r = weekCard.getBoundingClientRect();
+        if (!(r.width > 0 && r.height > 0)) {
+          problems.push('the settled-week card is in the markup but draws nothing: '
+            + Math.round(r.width) + '×' + Math.round(r.height));
+        }
+        const flowCard = host.querySelector('.fl-story');
+        if (flowCard && flowCard.getBoundingClientRect().top > r.top) {
+          problems.push('the settled weeks are drawn ABOVE the flow — the narrower answer leads');
+        }
+      }
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      pd.events = savedEvents;
+      flPeriod = savedPeriod; flMonth = savedMonth;
+    }
     return problems.length ? problems : true;
   });
 
@@ -6674,7 +6897,7 @@ function findChromium() {
     const paceUsable = pace.weeksLeft > 0 && pace.neededPerWeek > 0
                     && Math.abs(pace.neededPerWeek * pace.weeksLeft - 100) < 1;
 
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     pd.savingGoals = [];
     return kidCanCreate && hasBucket && moved && reversed && paceUsable;
   });
@@ -6738,13 +6961,27 @@ function findChromium() {
     const onEarned = body.querySelectorAll('.mny-tab').length === 5;
     mmGoStep(4);
     const onDecide = body.querySelectorAll('.mny-tab').length === 5;
-    closeSheet('familyMeetingOverlay');
+    mmHide();
 
     // And it navigates: tapping 5 from page 1 lands on Money school.
     mnyOpenMyMoney('jess');
     mnyGoTab('school');
     const navigates = document.getElementById('screen-moneyschool').classList.contains('active');
-    return onMoney && onStory && onSchool && onRules && onEarned && onDecide && navigates;
+
+    /* Findings, not a bare false. Every name below was already computed and
+       already meant something, and `return a && b && c` threw all of it away —
+       so a failure said only which check broke, and finding out which surface
+       had lost its bar cost a whole extra run of this suite. */
+    const problems = [];
+    if (!onMoney)  problems.push('💰 My money has no five-page bar, or none of its tabs is marked current');
+    if (!onStory)  problems.push('🌊 My money story has no five-page bar');
+    if (!onSchool) problems.push('🎓 Money school has no five-page bar');
+    if (!onRules)  problems.push("the parent's Money rules page is missing its section rail, or does not say which rule version is in effect");
+    if (!onEarned) problems.push('the meeting\'s money screen does not carry the bar exactly once — it draws '
+      + document.getElementById('familyMeetingBody').querySelectorAll('.mny-tab').length + ' tabs');
+    if (!onDecide) problems.push('arriving at the split through the legacy step 4 loses the bar');
+    if (!navigates) problems.push('tapping Money school on the bar does not reach it');
+    return problems.length ? problems : true;
   });
 
   // A kid tapping a grown-up's page is told what it is, not silently refused —
@@ -6755,7 +6992,7 @@ function findChromium() {
     mnyGoTab('rules');
     const stayedPut = !document.getElementById('screen-parent').classList.contains('active');
     mnyGoTab('grow');
-    const noMeeting = !document.getElementById('familyMeetingOverlay').classList.contains('open');
+    const noMeeting = !mmIsOpen();
     return stayedPut && noMeeting;
   });
 
@@ -6887,7 +7124,7 @@ function findChromium() {
     mmToggleItem(kid, 2, 'chore', 'vacuum');         // and it is reversible
     const ungraded = mrGetChoreGrade(kid, wk, 2, 'vacuum') === 0;
 
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     setDayBlocks(dayKey, [], kid);
     return bothKinds && graded && after > before && shown && ungraded;
   });
@@ -6913,7 +7150,7 @@ function findChromium() {
       && document.activeElement.selectionStart === 3;
     const draftKept = mnyCompDraft.name === 'Winter Invit';
     mnyToggleComp();
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     return keptWhileTyping && restored && draftKept;
   });
 
@@ -6926,7 +7163,7 @@ function findChromium() {
     if (!tab) return false;
     tab.click();
     const landed = document.getElementById('screen-moneyschool').classList.contains('active');
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     return landed;
   });
 
@@ -7041,7 +7278,7 @@ function findChromium() {
     // Half-done must not be recorded, and must not read as finished.
     const notHeld = !(c.meetingsHeld && c.meetingsHeld[wk]);
     const noCelebration = !body().includes('🎉 Finish meeting');
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     return neitherDone && namesJenn && jessTicks && notHeld && noCelebration;
   });
 
@@ -7065,7 +7302,7 @@ function findChromium() {
     openFamilyMeeting(); mmGoStep(1); mmSelectDay(2);
     const inMeeting = document.getElementById('familyMeetingBody').textContent
       .includes('no longer decide it');
-    closeSheet('familyMeetingOverlay');
+    mmHide();
 
     // The portal, not openChoreTab — that renders the KID frame for everyone
     // (round 1 moved the parent's half of the week into js/27-chore-parent.js).
@@ -7264,7 +7501,7 @@ function findChromium() {
     mmGoStep(4);
     const offStep4 = !document.getElementById('familyMeetingBody').textContent
       .includes('Before we start');
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     return onStep1 && offStep4;
   });
 
@@ -7322,8 +7559,11 @@ function findChromium() {
     mrSetChoreGrade(kid, wk, 2, 'vacuum', 3);
     mnySetOverride(kid, wk, 'chores', 99, 'graded_wrong');
     mnyShowTheChange(kid, 'chores');
-    const toTheChange = mmStep === 3 && mnyExpandRow === 'chores';
-    closeSheet('familyMeetingOverlay');
+    /* By ID, not by position. `mmStep === 3` meant "what I earned" while the
+       meeting had five steps and meant "Close" the moment it had three — the
+       same defect the app's own MM_LEGACY_STEP exists to stop. */
+    const toTheChange = mmStepId() === 'money' && mnyExpandRow === 'chores';
+    mmHide();
     e.overrides = {};
 
     // Her "waiting for Mom" chip → the first day something is waiting on.
@@ -7345,7 +7585,15 @@ function findChromium() {
       && document.querySelectorAll('#kidTrainingChecks .checklist-item').length === TRAINING_CHECKS.length;
     closeSheet('kidTrainingOverlay');
     setDayBlocks(dk, [], 'jenn');
-    return toTheChange && toWaiting && toSheet;
+
+    /* Findings, not a bare false: three unrelated affordances in one check, and
+       "false" named none of them. */
+    const problems = [];
+    if (!toTheChange) problems.push('"See the change" on an override notice does not reach the money screen with that row open — landed on '
+      + mmStepId() + ', row ' + String(mnyExpandRow));
+    if (!toWaiting) problems.push('her "waiting for Mom" chip does not jump to the first day something is waiting on — landed on day ' + ctDay + ', not 4');
+    if (!toSheet) problems.push('the training chip on a short block does not open the sheet with all four checks on it');
+    return problems.length ? problems : true;
   });
 
   // ── Durability (Branch 1) ────────────────────────────────────────────────
@@ -8891,16 +9139,46 @@ function findChromium() {
        the tick routes through completeQuest rather than writing a flag itself,
        and for that it needs a block that actually earns. */
     const xpBefore = getQuestXP('jenn');
+    const readBlock = () => (getDayBlocks(key, 'jenn') || []).find(b => b.id === 'td-q1');
     const blast = document.querySelector('#tdWrap [data-td-action="blast"][data-td-block="td-q1"]');
+    const before = readBlock();
     if (!blast) { bad.push('no 🎯 on a quest card'); }
-    else {
+    else if (!before) { bad.push('the block this check blasts is not on the day'); }
+    else if (before.completed) {
+      /* Named rather than silently tolerated. If something earlier in the suite
+         left this block done, the assertions below would pass without the tap
+         proving anything — which is the shape CLAUDE.md keeps recording. */
+      bad.push('td-q1 was already completed before the tap, so the tap proves nothing');
+    } else {
+      const card = blast.closest('.quest-card');
       blast.click();
-      // The blast is an animation: projectile 300ms, burst 240ms, then the
-      // completion. Assert after it lands, not before.
-      await new Promise(r => setTimeout(r, 900));
-      const blk = (getDayBlocks(key, 'jenn') || []).find(b => b.id === 'td-q1');
-      if (!blk || !blk.completed) bad.push('🎯 did not complete the block');
-      if (getQuestXP('jenn') <= xpBefore) bad.push('🎯 completed without awarding XP');
+      /* WAIT FOR THE CONDITION, NOT FOR A DURATION. This was a flat 900ms
+         against a chain that costs 540 (projectile 300, burst 240) — fine on a
+         laptop, and it went red on a CI runner while passing locally. A test
+         that reports a problem according to how busy the machine is cannot be
+         trusted either way: it is the same shape as the fixed 3pm window this
+         check's own comment above already had to fix.
+
+         Polling is not a weaker assertion. It still fails if the completion
+         never lands; it only stops failing when the completion is merely late,
+         and it says WHICH of those happened. */
+      let waited = 0;
+      while (waited < 5000 && !(readBlock() || {}).completed) {
+        await new Promise(r => setTimeout(r, 50));
+        waited += 50;
+      }
+      const blk = readBlock();
+      if (!blk || !blk.completed) {
+        /* blastQuest's one silent no-op is a card already carrying
+           `quest-blasting` — it returns without completing. Say so, because
+           "did not complete" on its own sent a previous investigation looking
+           at timing when the cause may be a stuck class from an earlier tap. */
+        bad.push('🎯 did not complete the block after ' + waited + 'ms · card classes: '
+          + (card ? card.className : 'no card') );
+      }
+      if (getQuestXP('jenn') <= xpBefore) {
+        bad.push('🎯 completed without awarding XP (' + xpBefore + ' → ' + getQuestXP('jenn') + ')');
+      }
     }
 
     // Tapping the card body is still a hand-off to the planner, not a write.
@@ -9065,7 +9343,7 @@ function findChromium() {
 
     openFamilyMeeting(); mnySetMeetKid(kid); mmGoStep(3);
     const atMeeting = firstVal('#familyMeetingBody');
-    closeSheet('familyMeetingOverlay');
+    mmHide();
 
     // The portal renders one section at a time; the strip lives in 'week'.
     showScreen('parent'); renderParentHome(); mnySetParentSection('week');
@@ -9148,7 +9426,7 @@ function findChromium() {
            .every(s => !ctGetMandatory(past, 1, s, kid));
     const routinesDontPayChores = mrWeekBreakdown(past, kid).chorePaid === choresAfterChore;
 
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     e.chores = {}; e.claims = {};
     c.programStartDate = startBefore;
     ctSetCurrentWeekFromPlanner();
@@ -9597,7 +9875,7 @@ function findChromium() {
       const row = document.getElementById('familyMeetingBody').querySelectorAll('.mm-drow')[2];
       if (!row || !row.querySelector('.mm-drow-body')) bad.push('a day row does not open its detail');
     }
-    closeSheet('familyMeetingOverlay');
+    mmHide();
     window.showConfirm = wasConfirm;
     ['jenn', 'jess'].forEach((k, i) => setDayBlocks(day0, hadBlocks[i], k));
     state.shared.parentDayConfirm = before;
@@ -9931,7 +10209,7 @@ function findChromium() {
     // them a fourth time.
     const handsOff = !!document.querySelector('#familyMeetingBody [data-mm-action="openweek"]')
       && body.includes('not here');
-    closeSheet('familyMeetingOverlay');
+    mmHide();
 
     mrWeekDayKeys(src).forEach(k => setDayBlocks(k, [], 'jenn'));
     mrWeekDayKeys(gap).forEach(k => setDayBlocks(k, [], 'jenn'));
@@ -9979,7 +10257,7 @@ function findChromium() {
        together as "still open", which is how a family that had met twice was
        told it had missed eight weeks. */
     const shows = body.includes('Last settled') && body.includes('2 earlier weeks not yet opened');
-    closeSheet('familyMeetingOverlay');
+    mmHide();
 
     const dlgOpen = () => {
       const ov = document.getElementById('appDialogOverlay');
@@ -9989,7 +10267,7 @@ function findChromium() {
     mmCatchUpAsked = false;
     openFamilyMeeting();
     const quietOnDeepLink = !dlgOpen();
-    closeSheet('familyMeetingOverlay');
+    mmHide();
 
     // The deliberate one asks, and taking the offer moves the meeting.
     mmCatchUpAsked = false;
@@ -10003,7 +10281,7 @@ function findChromium() {
     // …and it is one ask per load, not one per open.
     openFamilyMeetingAsk();
     const askedOnce = !dlgOpen();
-    closeSheet('familyMeetingOverlay');
+    mmHide();
 
     // Caught up → no question at all.
     ctWeekKey = ctThisWeekKey();
@@ -10011,7 +10289,7 @@ function findChromium() {
     mmCatchUpAsked = false;
     openFamilyMeetingAsk();
     const quietWhenCaughtUp = !dlgOpen();
-    closeSheet('familyMeetingOverlay');
+    mmHide();
 
     c.meetingsHeld = heldBefore; c.meetingsMet = metBefore;
     c.programStartDate = progBefore;
@@ -12040,7 +12318,7 @@ function findChromium() {
       }
       const both = document.querySelector('#familyMeetingBody [data-mm-action="confirmday"][data-day="0"]');
       if (!both || !/Both/.test(both.textContent)) bad.push('the meeting does not label the both-children control');
-      closeSheet('familyMeetingOverlay');
+      mmHide();
     } finally {
       window.showConfirm = wasConfirm;
       setDayBlocks(day, beforeJ, 'jenn');
@@ -12153,7 +12431,7 @@ function findChromium() {
       state.shared.chore.reflections = hadRefl;
       getProfData('jenn').todos = hadTodos;
       reflDraft = null;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -12230,7 +12508,7 @@ function findChromium() {
     } finally {
       state.shared.chore.reflections = hadRefl;
       reflDraft = null;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -12304,7 +12582,7 @@ function findChromium() {
       state.shared.chore.reflections = hadRefl;
       state.shared.chore.weeksClosed = hadClosed;
       reflDraft = null;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -12368,7 +12646,7 @@ function findChromium() {
       if (/Copy this week/i.test(txt)) bad.push('step 5 offers to copy the week again');
     } finally {
       state.shared.chore.reflections = hadRefl;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -12528,7 +12806,7 @@ function findChromium() {
       window.saveAll = wasSave;
       state.shared.chore.reflections = hadRefl;
       reflDraft = null;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -13152,7 +13430,7 @@ function findChromium() {
       renderMeetingMode();
 
       /* ── The offer is on the row, with all three answers ── */
-      const offer = document.querySelector('#familyMeetingOverlay .mm-drow-offer');
+      const offer = document.querySelector('#screen-meeting .mm-drow-offer');
       if (!offer) bad.push('an unconfirmed day row carries no offer');
       const actions = offer
         ? Array.from(offer.querySelectorAll('[data-mm-action]')).map(b => b.getAttribute('data-mm-action'))
@@ -13169,7 +13447,7 @@ function findChromium() {
 
       /* ── The control is enabled for `unconfirmed`, refused for `running` ── */
       const cell = document.querySelector(
-        `#familyMeetingOverlay .mm-drow-kid[data-kid="jenn"][data-day="${dayIdx}"]`);
+        `#screen-meeting .mm-drow-kid[data-kid="jenn"][data-day="${dayIdx}"]`);
       if (cell && cell.disabled) bad.push('an unconfirmed day is still a hard refusal');
       if (cell && !(cell.getAttribute('title') || '').length) {
         bad.push('the enabled control does not say why it is offering anything');
@@ -13177,13 +13455,13 @@ function findChromium() {
 
       /* ── STEP 1 AND STEP 2 BOTH REACH THE WEEK, on a PAST week ── */
       const wkBtns = document.querySelectorAll(
-        '#familyMeetingOverlay [data-mm-action="openweek"]');
+        '#screen-meeting [data-mm-action="openweek"]');
       if (wkBtns.length < 2) {
         bad.push(`step 1 offers ${wkBtns.length} open-week buttons, expected one per child`);
       }
       mmGoStep(2);
       const wkBtns2 = document.querySelectorAll(
-        '#familyMeetingOverlay [data-mm-action="openweek"]');
+        '#screen-meeting [data-mm-action="openweek"]');
       if (wkBtns2.length < 2) {
         bad.push(`step 2 offers ${wkBtns2.length} open-week buttons on a past week`);
       }
@@ -13219,7 +13497,7 @@ function findChromium() {
       bad.push('threw: ' + e.message);
     } finally {
       window.showConfirm = wasConfirm;
-      try { closeSheet('familyMeetingOverlay'); } catch (e) {}
+      try { mmHide(); } catch (e) {}
       setDayBlocks(past, beforePast, 'jenn');
       setDayBlocks(today, beforeToday, 'jenn');
       state.shared.parentDayConfirm = store;
@@ -13293,7 +13571,7 @@ function findChromium() {
       if (rows.length !== 1) bad.push(`the meeting offered ${rows.length} routine rows, expected 1`);
       mmSelectDay(schoolIdx);
       openFamilyMeeting(); mmGoStep(1); renderMeetingMode();
-      const footer = document.querySelector('#familyMeetingOverlay .mm-routine-all');
+      const footer = document.querySelector('#screen-meeting .mm-routine-all');
       if (footer && /three/i.test(footer.textContent)) {
         bad.push(`the footer still says three: "${footer.textContent.trim()}"`);
       }
@@ -13312,7 +13590,7 @@ function findChromium() {
     } catch (e) {
       bad.push('threw: ' + e.message);
     } finally {
-      try { closeSheet('familyMeetingOverlay'); } catch (e) {}
+      try { mmHide(); } catch (e) {}
       keys.forEach((k, i) => setDayBlocks(k, saved[i], 'jenn'));
       profile = wasProfile;
     }
@@ -13537,6 +13815,23 @@ function findChromium() {
       const reachable = new Set(mmUnsettledWeeks(8).map(u => u.wk));
       if (plan.weeks.some(w => reachable.has(w.wk))) {
         bad.push('the sweep reached a week the catch-up list can still settle');
+      }
+      /* ── THE $3 DEFAULT IS BACKFILL, NEVER A FLOOR ──
+         It was agreed for weeks that had already gone by before the family
+         switched to earning and spending. Going forward a quiet week pays what
+         she earned, which may be nothing, and that is the system working — a
+         guaranteed $3 for a week nobody sat down for would pay better than a
+         quiet week actually lived, and would teach the opposite of the thing
+         this whole redesign is for.
+
+         `mnyDefaultSweepPlan` walks BACKWARDS from one week beyond the reach,
+         so this holds today. It is asserted because the failure would be
+         silent and generous: money appearing in a child's wallet for a week
+         she is still living. */
+      const thisWk = ctThisWeekKey();
+      const forward = plan.weeks.filter(w => String(w.wk) >= String(thisWk));
+      if (forward.length) {
+        bad.push('the sweep would credit the current or a future week: ' + forward.map(w => w.wk).join(', '));
       }
 
       const expect = plan.total;
@@ -13884,7 +14179,7 @@ function findChromium() {
     } finally {
       setDayBlocks(today, before, 'jenn');
       state.shared.parentDayConfirm = store;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -14004,7 +14299,7 @@ function findChromium() {
       state.shared.chore.reflections = hadRefl;
       state.shared.parentDayConfirm = store;
       reflDraft = null;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -14077,7 +14372,7 @@ function findChromium() {
     } finally {
       state.shared.chore.reflections = hadRefl;
       reflDraft = null;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -14265,7 +14560,7 @@ function findChromium() {
       state.shared.chore.reflections = hadRefl;
       getProfData('jenn').todos = hadTodos;
       reflDraft = null;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -14345,7 +14640,7 @@ function findChromium() {
       state.shared.chore.reflections = hadRefl;
       state.shared.parentDayConfirm = store;
       reflDraft = null;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -14428,7 +14723,7 @@ function findChromium() {
       state.shared.chore.reflections = hadRefl;
       state.shared.parentDayConfirm = store;
       reflDraft = null;
-      closeSheet('familyMeetingOverlay');
+      mmHide();
       profile = wasProfile;
     }
     return bad.length === 0 || bad;
@@ -14594,7 +14889,7 @@ function findChromium() {
       if (isWeekClosed(now)) bad.push('the week started out closed');
       mmCloseWeekNow();
       if (isWeekClosed(now)) bad.push('the week closed without both girls being reviewed and settled');
-      closeSheet('familyMeetingOverlay');
+      mmHide();
     } finally {
       ctSetCurrentWeekFromPlanner();
       profile = 'jenn';
@@ -14656,7 +14951,7 @@ function findChromium() {
       renderMeetingMode();
       const after = document.getElementById('familyMeetingBody').textContent.replace(/\s+/g, ' ');
       if (after !== withoutLegacy) bad.push('the evidence still reads the retired chore-group store');
-      closeSheet('familyMeetingOverlay');
+      mmHide();
     } finally {
       keys.forEach((k, i) => setDayBlocks(k, before[i], kid));
       e.chores = JSON.parse(hadChores); e.claims = JSON.parse(hadClaims);
@@ -14804,7 +15099,7 @@ function findChromium() {
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     try {
       openFamilyMeeting(); mmGoStep(3);
-      const sheet = document.querySelector('#familyMeetingOverlay .sheet');
+      const sheet = document.querySelector('#screen-meeting .mm-screen');
       const head = document.querySelector('#familyMeetingBody .mm-head');
       const nav = document.querySelector('#familyMeetingBody .mm-nav');
       if (!head) bad.push('the week and step header is not its own band');
@@ -14819,11 +15114,11 @@ function findChromium() {
         }
       });
       const sheetPos = sheet ? getComputedStyle(sheet) : null;
-      if (sheetPos && sheetPos.display !== 'flex') bad.push('the meeting sheet is not a flex column');
+      if (sheetPos && sheetPos.display !== 'flex') bad.push('the meeting screen is not a flex column');
 
       // One scroller. A second one inside the sheet is how a flick on an iPad
       // comes to move the wrong thing.
-      const scrollers = [...document.querySelectorAll('#familyMeetingOverlay *')].filter(el => {
+      const scrollers = [...document.querySelectorAll('#screen-meeting *')].filter(el => {
         const o = getComputedStyle(el).overflowY;
         return (o === 'auto' || o === 'scroll') && el.scrollHeight > el.clientHeight + 4;
       });
@@ -14836,7 +15131,7 @@ function findChromium() {
         bad.push('the meeting scrolls something other than .mm-body');
       }
       if (sheet && sheet.scrollHeight > sheet.clientHeight + 4) {
-        bad.push('the sheet itself scrolls — it is meant to be a bounded column');
+        bad.push('the meeting screen itself scrolls — it is meant to be a bounded column');
       }
 
       /* At the top, the middle and the bottom of the longest step, neither band
@@ -14884,7 +15179,7 @@ function findChromium() {
         }
         if (after) after.scrollTop = 0;
       }
-      closeSheet('familyMeetingOverlay');
+      mmHide();
     } finally {
       profile = wasProfile;
     }
@@ -15005,11 +15300,14 @@ function findChromium() {
     const bare = toggles.filter(t => !/role="switch"/.test(t) || !/tabindex="0"/.test(t) || !/aria-checked=/.test(t));
     if (bare.length) bad.push(`${bare.length} of ${toggles.length} toggles carry no switch semantics in the markup`);
     const overlays = html.match(/<div class="overlay[^"]*" id="[^"]+"/g) || [];
-    /* 20 since the Record sheet (js/41-record.js) landed. The count is stated
-       rather than derived on purpose: a NEW overlay is a new dialog mechanism
-       unless it goes through openSheet/closeSheet, which own focus and Escape,
-       so one appearing unannounced is the thing worth being told about. */
-    if (overlays.length !== 20) bad.push(`${overlays.length} static overlays, expected 20`);
+    /* 19: up one for the Record sheet (js/41-record.js), then down one when the
+       weekly meeting stopped being a sheet and became `screen-meeting`. The
+       count is stated rather than derived on purpose: a NEW overlay is a new
+       dialog mechanism unless it goes through openSheet/closeSheet, which own
+       focus and Escape, so one appearing unannounced is worth being told about.
+       A DEPARTING one is worth being told about too — this number going down is
+       how you find out a dialog was replaced by something else. */
+    if (overlays.length !== 19) bad.push(`${overlays.length} static overlays, expected 19`);
     if (count(/role="tabpanel"/g) !== 5) bad.push(`${count(/role="tabpanel"/g)} tabpanels in the file, want 5 (one per tab)`);
     if (count(/<h4>✅ To-do<\/h4>/g)) bad.push('the To-do heading still skips from h2 to h4');
     checks.theMarkupSaysWhatThingsAre = bad.length === 0 || bad;

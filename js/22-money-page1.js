@@ -686,17 +686,32 @@ function mnyLedgerRows(kid) {
     .map(wk => Object.assign({ weekKey: wk }, led[wk][kid]));
 }
 
+/* The Flow leads this screen and the settled weeks follow it (js/42-flow.js).
+
+   The order is the point. The week list reads the FROZEN LEDGER, so it can
+   only show weeks a meeting settled — a gift that arrived on a Tuesday, a
+   spend, a move between pots are all invisible to it. The Flow reads the
+   stream, which holds every one of them. Leading with the narrower answer is
+   how a child comes to believe the money she was given is not part of her
+   money story.
+
+   Both stay: the ledger rows are the week-by-week record a parent checks
+   against a meeting, and the Flow cannot replace a record of what each
+   settlement paid. */
 function mnyRenderStory() {
   const wrap = document.getElementById('mnyStoryWrap');
   if (!wrap) return;
   const kid = mnyViewKid();
   const all = mnyLedgerRows(kid);
+  const flow = (typeof flRenderFlow === 'function') ? flRenderFlow(kid) : '';
 
   if (!all.length) {
-    wrap.innerHTML = `${mnyPageHead('📖 My money story', '', [], { back: 'backmoney' })}
+    wrap.innerHTML = `${mnyPageHead('🌊 My money story', '', [], { back: 'backmoney' })}
       ${mnyTabBar('money')}
-      <div class="mny-card"><div class="mny-label">📖 My money story</div>
-      <div class="mny-note">Nothing here yet. Every Sunday you settle a week, it gets written down here — what came in, where it went, and how much of your loan was left.</div></div>`;
+      ${flow}
+      <div class="mny-card"><div class="mny-label">📖 Week by week</div>
+      <div class="mny-note">Every Sunday you settle a week, it gets written down here — what came in, where it went, and how much of your loan was left. Nothing settled yet.</div></div>`;
+    if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
     return;
   }
 
@@ -724,10 +739,11 @@ function mnyRenderStory() {
     + sum('competition') + sum('outside'));
 
   wrap.innerHTML =
-      `${mnyPageHead('📖 My money story', 'Every week you have settled', [], { back: 'backmoney' })}
+      `${mnyPageHead('🌊 My money story', 'Where it comes from and where it goes', [], { back: 'backmoney' })}
        ${mnyTabBar('money')}
+       ${flow}
        <div class="mny-card">
-         <div class="mny-label">📖 My money story</div>
+         <div class="mny-label">📖 Week by week</div>
          <div class="mny-chiprow">${modeBtns}</div>
          ${monthNav}
          <div class="mny-rows">
@@ -939,9 +955,10 @@ function showToastCard(title, bodyHtml, conceptId) {
   const more = el.querySelector('#mnyConceptMore');
   if (more) more.addEventListener('click', () => {
     close();
-    // The meeting runs in an overlay; leaving it open over the school page
-    // would strand her behind a scrim she cannot see past.
-    if (typeof closeSheet === 'function') closeSheet('familyMeetingOverlay');
+    /* Money school is a screen and so is the meeting now, so navigating there
+       leaves the meeting behind on its own. It used to be a sheet, and leaving
+       it open over the school page stranded her behind a scrim she could not
+       see past — which is one of the reasons the meeting stopped being one. */
     mnyOpenSchool(mnyViewKid(), conceptId);
   });
 }

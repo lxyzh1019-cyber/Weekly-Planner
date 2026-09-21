@@ -14,7 +14,42 @@
    grown-ups do in it. "Celebrate" was step 2 and only ever showed the child a
    list the app had written about her; it is a reflection now — she answers, and
    the week's evidence sits underneath. */
-const MM_STEPS = ['Check the week', 'Reflect', 'What I earned', 'What I do with it', 'Close & plan'];
+/* ── THREE STEPS, AND THEY HAVE IDS ──────────────────────────────
+   It was five: Check the week · Reflect · What I earned · What I do with it ·
+   Close & plan. Eight weeks went unsettled, and the reason was never that any
+   one step is hard — it is that five of them is the wrong shape for a Sunday
+   with two children in the room. Three of the five merged in pairs that were
+   always about the same thing:
+
+   | The week  | what happened, and what she made of it (was 1 + 2) |
+   | The money | what it came to, and where it goes (was 3 + 4)     |
+   | Close     | (was 5)                                            |
+
+   ── The numbers were POSITIONS, and 46 call sites held them ──
+
+   `mmGoStep(3)` appeared eleven times, `mmGoStep(4)` eight, and so on across
+   the app and the suite. Renumbering would have silently re-pointed every one
+   of them at a different screen — the same defect as `groupDef` returning
+   `ACTIVITY_GROUPS[4]` because daily happened to be the fifth row.
+
+   So a step has an ID, `mmGoTo(id)` is how to reach one, and `mmGoStep(n)`
+   translates the legacy numbering through `MM_LEGACY_STEP`. Every existing
+   caller keeps meaning what it meant: "go to what I earned" still lands on the
+   money, because that is what 3 was. Nothing was renumbered and nothing had to
+   be found. */
+const MM_STEPS = [
+  { id: 'week',  label: 'The week' },
+  { id: 'money', label: 'The money' },
+  { id: 'close', label: 'Close' },
+];
+/* Old number → new id. Read at the boundary only; nothing downstream knows
+   these numbers ever existed. */
+const MM_LEGACY_STEP = { 1: 'week', 2: 'week', 3: 'money', 4: 'money', 5: 'close' };
+function mmStepIndex(id) {
+  const i = MM_STEPS.findIndex(x => x.id === id);
+  return i < 0 ? 0 : i;
+}
+function mmStepId() { return (MM_STEPS[mmStep - 1] || MM_STEPS[0]).id; }
 let mmStep = 1;
 let mmSelectedDay = null;
 let mmUndo = null;
@@ -35,6 +70,62 @@ let mmExpressWeek = null;   // week key while the catch-up screen is open
 let mmExpressMoney = true;  // tick 1 — record the money
 let mmExpressMet = false;   // tick 2 — we talked about this week together
 
+/* ── The meeting is a SCREEN, not a pop-up ────────────────────────
+   It ran inside `familyMeetingOverlay`, a `.sheet` — and a sheet is a box
+   floating over the page with its own scrollbar. A Sunday sitting is the
+   longest task in this app: two children, a week of days, a reflection each
+   and a money split. Inside a sheet that meant scrolling up and down a small
+   window all the way through it, which is the owner's own report of what using
+   it is like. A task that takes twenty minutes is not a dialog.
+
+   It is `screen-meeting` now, and `showScreen` is what opens it. That is
+   NOT a second dialog mechanism growing beside openSheet/closeSheet — it is
+   one fewer. The sheets that remain are what they should be: short, one
+   question, answered and gone.
+
+   ── Three owners, so the switch was a one-place change ──
+
+   Nineteen call sites across seven files asked their own version of "is the
+   meeting showing" — `document.getElementById('familyMeetingOverlay')` and
+   `.classList.contains('open')`, spelled out each time. That is the six-copies
+   defect this repo keeps recording, and it is also exactly what would have made
+   this move a nineteen-place edit with nineteen chances to miss one. Ask these;
+   do not re-derive them. */
+function mmIsOpen() {
+  const scr = document.getElementById('screen-meeting');
+  return !!(scr && scr.classList.contains('active'));
+}
+
+/* Where the sitting was opened FROM, so closing it puts a parent back rather
+   than somewhere plausible. As a sheet this was free — closing revealed
+   whatever had been behind it — and a screen has to remember. It is
+   device-local and deliberately not state: which screen someone was on is not
+   the family's data, and every state write is a full-document upload. */
+let mmCameFrom = 'parent';
+function mmShow() {
+  if (!mmIsOpen()) {
+    const active = document.querySelector('.screen.active');
+    /* Never record the meeting as its own origin — mmShow is called again by
+       every path that re-enters a sitting already open, and a self-reference
+       would trap the Close button on this screen. */
+    if (active && active.id && active.id !== 'screen-meeting') {
+      mmCameFrom = active.id.replace(/^screen-/, '');
+    }
+  }
+  if (typeof showScreen === 'function') showScreen('meeting');
+}
+/* Closing returns to whatever the sitting came from, and refreshes the parent
+   hub — that last part used to live inside `closeSheet` as a special case for
+   this one id, which is the kind of thing that makes a general mechanism carry
+   one caller's knowledge. It belongs here. */
+function mmHide() {
+  if (typeof showScreen === 'function') showScreen(mmCameFrom || 'parent');
+  const sp = document.getElementById('screen-parent');
+  if (sp && sp.classList.contains('active') && typeof renderParentHome === 'function') {
+    renderParentHome();
+  }
+}
+
 function openFamilyMeeting() {
   if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
   ctEnsureShared();
@@ -42,7 +133,7 @@ function openFamilyMeeting() {
   mmClearReturn();        // a fresh sitting has nowhere to go back to
   mmExpressWeek = null;   // the full sitting, not the catch-up run
   renderMeetingMode();
-  openSheet('familyMeetingOverlay');
+  mmShow();
 }
 
 // Day-confirm in the meeting persists to the real parent day-confirm store
@@ -170,16 +261,41 @@ async function mmToggleConfirmDay(d) {
   renderMeetingMode();
 }
 /* How far this sitting actually got. "We met" means the family reviewed the
-   week together, and the honest evidence for that is reaching step 3 — Review,
-   Celebrate, then agreeing what was earned. Steps 1-2 alone is opening the
-   sheet and looking at it. Reset whenever the meeting points at a new week. */
+   week together, and the honest evidence is reaching THE MONEY — having gone
+   through the week and sat down in front of what it came to. Opening the
+   meeting and looking at the first screen is not a meeting.
+
+   Held as an index into MM_STEPS rather than as the literal 3 it used to be:
+   that number was the position of "What I earned" in a five-row list, and it
+   would have quietly come to mean "Close" the moment the list changed length.
+   Reset whenever the meeting points at a new week. */
 let mmMaxStep = 1;
 function mmGoStep(n) {
   /* Leaving a step is a natural place to write the reflection through. Every
      tap in step 2 edits a device-local draft rather than uploading the whole
      family document — see reflCommitDraft (js/37-reflection.js). */
   if (typeof reflCommitDraft === 'function') reflCommitDraft();
-  mmStep = Math.max(1, Math.min(MM_STEPS.length, n));
+  /* `n` is the OLD five-step numbering, and this is the one place that knows
+     it. Translating here rather than renumbering 46 call sites is what keeps
+     `mmGoStep(3)` meaning "what she earned" now that what she earned shares a
+     screen with what she does with it.
+
+     Getting this wrong once already cost a crash: the first cut of the
+     three-step meeting clamped `n` straight into the new list, so `mmGoStep(2)`
+     — every caller meaning "the reflection" — silently landed on the money.
+     That is the position-not-id defect this file's own comment above warns
+     about, committed while writing the warning. */
+  mmGoTo(MM_LEGACY_STEP[Math.max(1, Math.min(5, Number(n) || 1))] || 'week');
+}
+
+/* The way to name a step, and what everything inside the meeting uses. */
+function mmGoTo(id) { mmGoIndex(mmStepIndex(id) + 1); }
+
+/* 1-based index into MM_STEPS — the stepper and the ◀ ▶ nav, which are talking
+   about the three steps that exist rather than the five that used to. */
+function mmGoIndex(i) {
+  if (typeof reflCommitDraft === 'function') reflCommitDraft();
+  mmStep = Math.max(1, Math.min(MM_STEPS.length, i));
   mmMaxStep = Math.max(mmMaxStep, mmStep);
   renderMeetingMode();
 }
@@ -193,12 +309,12 @@ function mmCloseMeeting() {
   if (typeof reflCommitDraft === 'function') reflCommitDraft();
   // mmMaxStep never leaves 1 in catch-up mode, so this cannot fire there — a
   // week closed from the catch-up screen is only "met" if that box was ticked.
-  if (mmMaxStep >= 3 && isParent() && !mmIsSettled(wk)) mmMarkWeekMet(wk);
+  if (mmMaxStep >= mmStepIndex('money') + 1 && isParent() && !mmIsSettled(wk)) mmMarkWeekMet(wk);
   mmExpressWeek = null;
   // Nothing to come back to once the sitting is over, so the week and day
   // screens get their Hub button and their switchers back.
   mmClearReturn();
-  closeSheet('familyMeetingOverlay');
+  mmHide();
   const hub = document.getElementById('meetingHub');
   if (hub && document.getElementById('screen-parent')?.classList.contains('active')) renderMeetingHub();
 }
@@ -341,8 +457,8 @@ let mmReturn = null;
    One owner, so the next layout change moves one selector. Falls back to the
    sheet for any state where the body has not been rendered yet. */
 function mmScroller() {
-  return document.querySelector('#familyMeetingOverlay .mm-body')
-      || document.querySelector('#familyMeetingOverlay .sheet');
+  return document.querySelector('#screen-meeting .mm-body')
+      || document.getElementById('screen-meeting');
 }
 
 function mmCaptureReturn(kid, dayIdx) {
@@ -374,8 +490,7 @@ function mmReturnToMeeting() {
   mmSelectedDay = r.selectedDay;
   if (typeof mnySetMeetKid === 'function') mnySetMeetKid(r.child);
   showScreen('parent');
-  const overlay = document.getElementById('familyMeetingOverlay');
-  if (!overlay || !overlay.classList.contains('open')) openSheet('familyMeetingOverlay');
+  if (!mmIsOpen()) mmShow();
   mmStep = Math.max(1, Math.min(MM_STEPS.length, r.step || 1));
   mmMaxStep = Math.max(mmMaxStep, mmStep);
   renderMeetingMode();
@@ -388,7 +503,7 @@ function mmReturnToMeeting() {
 function mmOpenWeekForBlocks(kid) {
   const wk = mmWeekKey();
   mmCaptureReturn(kid);
-  closeSheet('familyMeetingOverlay');
+  mmHide();
   weekOffset = computeWeekOffsetForDayKey(wk);
   parentView(kid);
 }
@@ -400,7 +515,7 @@ function mmOpenDayForBlocks(kid, dayIdx) {
   const keys = mrWeekDayKeys(wk);
   const dayKey = keys[dayIdx] || keys[0];
   mmCaptureReturn(kid, dayIdx);
-  closeSheet('familyMeetingOverlay');
+  mmHide();
   weekOffset = computeWeekOffsetForDayKey(wk);
   parentViewing = kid;
   currentDayKey = dayKey;
@@ -707,8 +822,7 @@ function mmGoToWeek(wk) {
   mmClearReturn();
   mmStep = 1; mmMaxStep = 1; mmSelectedDay = null; mmUndo = null; mmAddChoreFor = null;
   if (typeof mnyDraft !== 'undefined') mnyDraft = null;
-  const overlay = document.getElementById('familyMeetingOverlay');
-  if (!overlay || !overlay.classList.contains('open')) openSheet('familyMeetingOverlay');
+  if (!mmIsOpen()) mmShow();
   renderMeetingMode();
 }
 
@@ -822,10 +936,10 @@ function renderMeetingMode() {
   ctPrepareRead();
   const wk = ctWeekKey || ctThisWeekKey();
   const held = !!(state.shared.chore.meetingsHeld && state.shared.chore.meetingsHeld[wk]);
-  const stepper = MM_STEPS.map((label, i) => {
+  const stepper = MM_STEPS.map((st, i) => {
     const n = i + 1;
     const cls = n === mmStep ? 'mm-step-cur' : (n < mmStep ? 'mm-step-done' : 'mm-step-up');
-    return `<button type="button" class="mm-step ${cls}" onclick="mmGoStep(${n})">${n}·${label}</button>`;
+    return `<button type="button" class="mm-step ${cls}" onclick="mmGoIndex(${n})">${n}·${escapeHtml(st.label)}</button>`;
   }).join('');
 
   // Catch-up mode replaces the stepper entirely: a week nobody is going to
@@ -838,17 +952,44 @@ function renderMeetingMode() {
     return;
   }
 
+  /* Each screen is the two panels that were always about one thing. They are
+     concatenated rather than merged: mmRenderReview, mmRenderReflect,
+     mnyRenderEarned and mnyRenderDecide each still own exactly what they owned,
+     and a step is now a list of them. Rewriting four renderers into two would
+     have been four chances to lose a rule that only one of them knew. */
+  const id = mmStepId();
   let body;
-  if (mmStep === 1) body = mmRenderReview(wk);
-  else if (mmStep === 2) body = mmRenderReflect(wk);
-  else if (mmStep === 3) body = mnyRenderEarned(wk);
-  else if (mmStep === 4) body = mnyRenderDecide(wk);
+  if (id === 'week') body = mmRenderReview(wk) + mmRenderReflect(wk);
+  else if (id === 'money') {
+    /* ONE set of chrome for the screen, then the two panels bare. Each used to
+       draw its own page head, five-page bar and kid tabs, which stacked two
+       identical navs on the screen that exists to be less to wade through. */
+    body = `${mnyPageHead('💰 The money', 'Agree it, then decide where it goes',
+        isParent() ? [{ action: 'record-any', label: '✍️ Record something' }] : [], { back: false })}
+      ${mnyTabBar('grow')}${mnyKidTabs()}`
+      + mnyRenderEarned(wk, { chrome: false })
+      + mnyRenderDecide(wk, { chrome: false });
+  }
   else body = mmRenderPlan(wk);
 
-  const back = mmStep > 1 ? `<button type="button" class="pill-btn" onclick="mmGoStep(${mmStep - 1})">◀ Back</button>` : `<span></span>`;
-  const next = mmStep < MM_STEPS.length
-    ? `<button type="button" class="btn-confirm" onclick="mmGoStep(${mmStep + 1})">Next ▶</button>`
-    : mmFinishButtons(wk);
+  const back = mmStep > 1 ? `<button type="button" class="pill-btn" onclick="mmGoIndex(${mmStep - 1})">◀ Back</button>` : `<span></span>`;
+  /* THE MONEY STEP'S FOOTER IS THE COMMIT, not a Next.
+
+     It used to be a bar somewhere in the middle of a long scrolling panel, and
+     the owner's report was that it is not placed well — which on this screen is
+     not a matter of taste. It is the one control in the app that moves real
+     money, and a control you have to go looking for is one that gets missed on
+     a Sunday and one that gets pressed by accident while scrolling past it.
+
+     In the footer it is always visible, always in the same place, and it says
+     what it will do or why it cannot. It is STILL a separate gated act — the
+     merge of "what I earned" and "what I do with it" onto one screen does not
+     make scrolling to the bottom a commit. */
+  const next = (id === 'money')
+    ? mmMoneyFooter(wk)
+    : (mmStep < MM_STEPS.length
+        ? `<button type="button" class="btn-confirm" onclick="mmGoIndex(${mmStep + 1})">Next ▶</button>`
+        : mmFinishButtons(wk));
 
   /* One scroller — the sheet — with the week-and-step header pinned to its top
      and Back/Next/Finish pinned to its bottom. A five-step sitting spends most
@@ -1415,7 +1556,7 @@ function mmRenderQuarterly() {
 }
 function mmDoQuarterlyReview() {
   mrMarkQuarterReviewed();
-  closeSheet('familyMeetingOverlay');
+  mmHide();
   openPocketMoney(ctParentKid, 'setup');
 }
 function mmSkipQuarterlyReview() {
@@ -1753,7 +1894,7 @@ function mmOpenNextWeek() {
   nextMon.setDate(nextMon.getDate() + 7);
   const next = dateToLocalKey(nextMon);
   mmClearReturn();
-  closeSheet('familyMeetingOverlay');
+  mmHide();
   weekOffset = computeWeekOffsetForDayKey(next);
   showScreen('week');
   renderWeek();
@@ -1804,6 +1945,49 @@ function mmSettledStrip(wk) {
 }
 /* What the last button should say. A family genuinely might stop halfway and
    come back, so this names the gap rather than refusing — and keeps a way out. */
+/* ── THE MONEY STEP'S FOOTER ──────────────────────────────────────
+   The one control in the app that moves real money, put where it cannot be
+   missed and cannot be hit by accident.
+
+   It is deliberately NOT a Next. "What I earned" and "what I do with it" share
+   a screen now, and that merge must not turn scrolling to the bottom into a
+   commit — so the footer names the act, refuses with the reason when the split
+   does not add up, and only becomes a way onwards once the money has actually
+   moved.
+
+   Every refusal comes from `mnyCommitRefusal` (js/23-money-meeting.js), the
+   same one the panel above prints. A footer with its own copy of that rule is
+   how you get a button offering to commit while the panel says it cannot. */
+function mmMoneyFooter(wk) {
+  const kid = mnyMeetingKid();
+  const other = kid === 'jenn' ? 'jess' : 'jenn';
+  const nextStep = `<button type="button" class="btn-confirm" onclick="mmGoTo('close')">Next ▶</button>`;
+
+  // The week has to be agreed before a split means anything — the same gate
+  // mnyRenderDecide puts over the whole panel, said on the button too.
+  if (typeof mnyIsConfirmed === 'function' && !mnyIsConfirmed(wk, kid)) {
+    return `<button type="button" class="btn-confirm" disabled>Agree ${escapeHtml(mnyKidName(kid))}'s week first</button>`;
+  }
+  if (typeof mnyIsCommitted === 'function' && mnyIsCommitted(wk, kid)) {
+    /* Done for this child. If the other one is still open the honest next move
+       is her, not the close screen — a sitting that skips a child is how a week
+       comes to be half-settled with nothing saying so. */
+    if (typeof mnyIsCommitted === 'function' && !mnyIsCommitted(wk, other)) {
+      return `<button type="button" class="btn-confirm"
+        onclick="mnySetMeetKid('${escapeJsAttr(other)}')">${escapeHtml(mnyKidName(other))}'s money ▶</button>`;
+    }
+    return nextStep;
+  }
+  const draft = mnyEnsureDraft(wk, kid);
+  const pool = mnyPool(wk, kid);
+  const blocked = mnyCommitRefusal(draft, pool);
+  if (blocked) {
+    return `<button type="button" class="btn-confirm" disabled>${escapeHtml(blocked)}</button>`;
+  }
+  return `<button type="button" class="btn-confirm mm-commit" onclick="mnyDoCommit()">
+      Move ${escapeHtml(mnyKidName(kid))}'s ${mnyMoney(mnySplitTotal(draft.split))}</button>`;
+}
+
 function mmFinishButtons(wk) {
   if (mmAllSettled(wk)) {
     return `<button type="button" class="btn-confirm" onclick="mmCloseMeeting()">🎉 Finish meeting</button>`;

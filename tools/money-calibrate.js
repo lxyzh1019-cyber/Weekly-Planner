@@ -115,13 +115,24 @@ function competitionPaid(comp) {
   return { paid: money2(total) };
 }
 
-/* Fines. `perDay` is a 7-long count. Floored at what that day earned. */
+/* The week's fines, modelled as REPEATS OF ONE BEHAVIOUR — which is what the
+   free-repeat rule is about. `perDay` is how many happened each day; the first
+   `freeRepeats` of them in the week are forgiven and the rest cost.
+
+   Modelling them as one item rather than as several is the harsher reading and
+   the right one for a calibration: spread across four different items they
+   would all fall inside their own free two and the channel would price at zero,
+   which would tell us nothing about what a fine can do to a week. */
 function finesApplied(perDay, dayEarnings) {
   const cfg = R.fines || {};
-  const each = ((cfg.items || [])[0] || {}).amount || 1;
-  let total = 0;
+  const item = (cfg.items || [])[0] || {};
+  const each = Number(item.amount) || 1;
+  const free = Number(item.freeRepeats) || 0;
+  let seen = 0, total = 0;
   for (let d = 0; d < 7; d++) {
-    const raw = (Number(perDay[d]) || 0) * each;
+    const n = Number(perDay[d]) || 0;
+    let raw = 0;
+    for (let i = 0; i < n; i++) { seen++; if (seen > free) raw += each; }
     const earned = dayEarnings[d] != null ? dayEarnings[d] : 0;
     total += cfg.dailyFloorZero ? Math.min(raw, earned) : raw;
   }

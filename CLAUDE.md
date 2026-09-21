@@ -96,6 +96,18 @@ as passes. Same shape as the `|| break` bug above: a test that reports a problem
 and returns success. If you add a check, return `true` or the findings, never a
 bare truthy value.
 
+**And never a bare `false` either.** Around fifty checks end
+`return thisThing && thatThing && theOther;`, where every one of those names was
+already computed and already meant something — and all of it is thrown away, so
+a failure says which check broke and nothing about why. That is not
+hypothetical: one change to the meeting broke three of them at once and finding
+out which sub-condition was false cost an extra full run of the suite *per
+check*, at eight to ten minutes each. `meetingMoneyFlowEndToEnd`,
+`tabBarOnEveryMoneySurface` and `newAffordancesActuallyNavigate` are converted;
+the rest are the same shape and the same fix — build a `problems` array, push a
+sentence naming the surface and the expectation, `return problems.length ?
+problems : true`.
+
 `tests/check-globals.js` enforces the one-declaration-per-name rule above,
 covering `function`, `async function` and top-level `let`/`const`/`var`
 (including the comma-separated form) — a duplicate `let` is a load-time
@@ -299,8 +311,15 @@ Kid-facing copy is a product surface, not filler. The rules:
   state, a grace token, and partial-progress celebration.
 - Money is a financial-literacy lesson, not a payment for being good.
 - Cross-sibling data is collaboration, never a leaderboard, in kid views.
-- **Budget: aim for ≤200 visible words per kid screen.** Anything longer is
-  reference material and belongs behind a disclosure toggle.
+- **There is no word budget.** There was one — a hard ≤200 visible words per
+  kid screen, enforced by `kidScreensMeetTheHouseRules` — and the owner removed
+  it, because of what it actually bought. It did not produce brevity; it pushed
+  real explanation behind disclosure toggles, where a nine-year-old does not go
+  looking. A screen with something worth saying says it.
+  That is not licence to pad. Every rule above still holds, and they are
+  judgement — which is exactly what a word count was standing in for and could
+  never measure. Ask whether a sentence earns its place, not whether the screen
+  has run out of allowance.
 
 ## UI rules
 
@@ -320,16 +339,15 @@ Kid-facing copy is a product surface, not filler. The rules:
   below 13px, but most are print, dark-mode or parent surfaces where the kid floor
   does not apply — the floor is a scoped block at the end of `css/app.css` listing
   only what actually rendered too small.
-- **≤200 visible words per kid screen** in its default state. Reference material
-  is not banned, it starts collapsed — `mnyPricesOpen`, `ckPrivsOpen` and
-  `weekGlanceOpen` are the pattern: closed by default, remembered in
-  `localStorage` (never synced state — every state write is a full-document
-  upload). `screen-chore` is on a **ratchet** (261) rather than the 200 target: it
-  must not grow, tighten it whenever the real number drops, and the target stays
-  written down. `screen-week/planned` (208) and `screen-mymoney` (204) carry
-  their own, each raised once with a dated reason in `tests/smoke.js`. The
-  numbers live there, not here: two places stating one budget is how they come
-  apart, and this line said 276 for a month after the real ceiling reached 261.
+- **No word budget** — see *Writing for children*. The count and its per-screen
+  ratchets are gone from `tests/smoke.js`; the 44px and 13px floors stay,
+  because reach and legibility are not editorial taste.
+  **A disclosure toggle is still the right shape for reference material** —
+  `mnyPricesOpen`, `ckPrivsOpen`, `weekGlanceOpen` and `tdExtrasOpen` are the
+  pattern: closed by default, remembered in `localStorage` (never synced state —
+  every state write is a full-document upload). What changed is the reason. It
+  is now a judgement about what a child came to the screen for, not a way of
+  getting under a number, so a thing worth reading may lead rather than hide.
 
 ## Navigation
 
@@ -808,17 +826,16 @@ the first, and a child has no way to tell which one is lying — so grading and
 settling still belong to the chore and money screens, and nothing on Today moves
 money.
 
-Today measures **97 words** against the 200 on the audit's seeded day — one
-running block, a break, a get-ready column, a clash and a free stretch, with both
-folds open. It has read as high as 129 on the same fixture: the figure moves with
-whatever the jobs and money cards happen to hold when the sweep reaches them, so
-re-measure rather than trusting the number written here. Today
-is also held to the **200-word budget with no ratchet**, which is why the
-vibe, to-do, goals, sticker and note panels ship collapsed behind one
-`localStorage` flag (`tdExtrasOpen`), and why finished blocks fold away behind
-`tdExtrasOpen`'s sibling `tdEarlierOpen`. Reference material starts closed. The
-budget bites: an explanation on 💰 My money went in at 21 words over and had to
-come down to three.
+Today's vibe, to-do, goals, sticker and note panels ship collapsed behind one
+`localStorage` flag (`tdExtrasOpen`), and finished blocks fold away behind its
+sibling `tdEarlierOpen`. That was originally the word budget biting — Today was
+built to a 200-word cap and measured 97 on the audit's seeded day. **The cap is
+gone and the folds stay**, because they were right for a better reason than the
+number: a child opens Today to find out what she is doing next, and everything
+behind those folds is something else. Where that reasoning does NOT hold, a fold
+is now the wrong answer — an explanation on 💰 My money was once cut from
+twenty-four words to three to fit, and that was the budget making the screen
+worse.
 
 **Today leads with what is next.** The list splits at `tdNowMin()` — upcoming in
 time order, then everything finished under a closed "earlier today" fold. In
@@ -1294,6 +1311,127 @@ cache could push an un-rescaled total over a rescaled one, or two devices could
 rescale the same figure twice. `progress.xp2` holds the new scale and, when it is
 absent, the answer is **derived** from the legacy `questXP` — the same answer
 whatever has run, however often, in any merge order.
+
+## Three steps, and they have IDS
+
+It was five — *Check the week · Reflect · What I earned · What I do with it ·
+Close & plan*. Eight weeks went unsettled, and the reason was never that any
+one step is hard: **five is the wrong shape for a Sunday with two children in
+the room.** Three of the five merged in pairs that were always about the same
+thing.
+
+| Step | Was |
+|---|---|
+| **The week** | what happened, and what she made of it (1 + 2) |
+| **The money** | what it came to, and where it goes (3 + 4) |
+| **Close** | (5) |
+
+**The numbers were POSITIONS, and 46 call sites held them.** `mmGoStep(3)`
+appeared eleven times, `mmGoStep(4)` eight, across the app and the suite.
+Renumbering would have silently re-pointed every one at a different screen —
+the same defect as `groupDef` returning `ACTIVITY_GROUPS[4]` because daily
+happened to be the fifth row.
+
+So a step has an **id**, and three functions keep the two numberings apart:
+
+| | |
+|---|---|
+| `mmGoTo(id)` | name a step — what everything inside the meeting uses |
+| `mmGoIndex(i)` | 1-based into `MM_STEPS` — the stepper and the ◀ ▶ nav |
+| `mmGoStep(n)` | the **legacy five**, translated through `MM_LEGACY_STEP` |
+
+`mmGoStep` is the only place that knows the old numbering, so every existing
+caller keeps meaning what it meant: "go to what she earned" still lands on the
+money. **Getting this wrong once cost a crash** — the first cut clamped `n`
+straight into the new list, so `mmGoStep(2)`, every caller meaning *the
+reflection*, silently landed on the money. That is the position-not-id defect
+committed while writing the warning about it.
+
+`mmMaxStep` is compared against `mmStepIndex('money') + 1` rather than the
+literal `3` it used to be: that number was the position of "What I earned" in a
+five-row list and would have come to mean "Close" the moment the list changed
+length.
+
+**A step is a list of panels, not a rewrite.** `mmRenderReview`,
+`mmRenderReflect`, `mnyRenderEarned` and `mnyRenderDecide` each still own
+exactly what they owned; a step concatenates them. Rewriting four renderers
+into two would have been four chances to lose a rule only one of them knew.
+
+**One set of chrome per screen.** Each money panel drew its own page head,
+five-page bar and kid tabs, so merging them stacked **two identical five-tab
+navs** on the screen whose whole purpose is to be less to wade through — the
+six-button-shortcut-row defect again. `opts.chrome === false` drops a panel's
+head in favour of a section heading, and the step renders the bar once. A
+chrome flag is not a second renderer.
+
+**THE MONEY STEP'S FOOTER IS THE COMMIT, not a Next.** `mmMoneyFooter` owns it.
+The commit was a bar somewhere in the middle of a long scrolling panel, and on
+this screen that is not a matter of taste: it is the one control in the app that
+moves real money, and one you have to go looking for is one that gets missed on
+a Sunday and one that gets pressed while scrolling past it. In the footer it is
+always visible, always in the same place, and it says what it will do or why it
+cannot.
+
+It is **still a separate gated act**: putting "what I earned" and "what I do
+with it" on one screen must not make scrolling to the bottom a commit. The
+footer only becomes a way onwards once the money has actually moved — and when
+the other child is still undecided it offers *her*, because a sitting that skips
+a child is how a week comes to be half-settled with nothing saying so.
+
+**`mnyCommitRefusal` is the one owner of why a split cannot commit.** Two things
+ask it now — the panel where the plan is edited, and the footer button — and two
+copies of a rule about moving money has a worst case worth naming: a button
+offering to commit while the panel above it says it cannot.
+
+## The meeting is a SCREEN, not a pop-up
+
+It ran inside `familyMeetingOverlay`, a `.sheet` — a box floating over the page
+with its own scrollbar. A Sunday sitting is the **longest task in this app**:
+two children, a week of days, a reflection each and a money split. Inside a
+sheet that meant scrolling a small window up and down the whole way through,
+which is the owner's own report of using it. **A task that takes twenty minutes
+is not a dialog.**
+
+It is `screen-meeting` now and `showScreen` opens it. That is not a second
+dialog mechanism growing beside `openSheet`/`closeSheet` — it is **one fewer**.
+The sheets that remain are what a sheet should be: short, one question,
+answered and gone.
+
+**Three owners, which is why the switch was a one-place change.** Nineteen call
+sites across seven files each spelled out their own
+`document.getElementById('familyMeetingOverlay').classList.contains('open')` —
+the six-copies defect this file keeps recording, and exactly what would have
+made this a nineteen-place edit with nineteen chances to miss one.
+
+| Question | Function |
+|---|---|
+| Is the meeting showing? | `mmIsOpen()` |
+| Open it | `mmShow()` |
+| Close it | `mmHide()` |
+
+**`mmHide` returns to where the sitting came from.** As a sheet that was free —
+closing revealed whatever had been behind it — and a screen has to remember, so
+`mmShow` records the active screen in `mmCameFrom` (device-local; which screen
+someone is on is not the family's data, and every state write is a full-document
+upload). It never records the meeting as its own origin: `mmShow` is called
+again by every path that re-enters a sitting already open, and a self-reference
+would trap the Close control on this screen.
+
+**`closeSheet` stopped carrying one caller's knowledge.** It held a special case
+for this one id — refresh the parent hub when the meeting closes — and that is
+`mmHide`'s now. A general mechanism should not know about one of its callers.
+
+**The layout is unchanged, and that is why the move was cheap.** The meeting was
+already a flex column with `.mm-body` as its one scroller and the head and foot
+as real flex children taking layout space (never sticky, which floats a band
+over a card). It only had to stop being 88% of the viewport inside a floating
+box and start being `100dvh` of the screen. `theMeetingKeepsItsHeadAndFeet`
+asserts the same properties against `.mm-screen`.
+
+The kid nav and the parent bar both hide themselves here without any change:
+`TD_NAV_SCREENS` does not list `screen-meeting`, and `parentRenderNav` shows
+only on `screen-parent`. `applyMeetingLock` keys on `mmHasReturn()` rather than
+on the overlay, so it was unaffected too.
 
 ## The meeting
 
@@ -2190,6 +2328,72 @@ Requests are `profile.moveRequests`, `mergeArrayById(..., 'mvq:')` in
 `moneyCanTransact` is called by two functions and **none of the primitives check
 `isParent()` themselves**, so `mnyMoveMoney` carries that gate explicitly.
 
+## The Flow — the screen the stream was stored for
+
+`js/42-flow.js`, at the head of `screen-moneystory`. Stage 1 stored movements
+instead of balances **for this screen**, and until Stage 4 nothing read them:
+`evFlow`, `evMonths` and `evTypicalMonth` were unit-tested and had no caller.
+A calculation with no reader is a calculation nobody finds out is wrong.
+
+**It does not lead with a total, and that is the whole design.** The owner's
+instruction, in their words: *I do not want the kids to see the end money, they
+need to understand the cash flow — they earn, they spend, they save, they have
+left.* A child watching a total learns to watch a total: it goes up, which is
+good, and down, which is bad, and she learns nothing about why either happened.
+So `flStory` says what came in, what went out, what was put away and what is
+left, **in that order, in one sentence, before any bar is drawn** — the
+movement is the headline and the balance is its consequence.
+`theFlowSaysWhereItWent` asserts the ORDER, not merely that both appear: a
+screen whose first figure is a balance has quietly become the thing it
+replaced, and nothing else in the suite would notice.
+
+`mnyWalletCard` still leads with *Everything I have*, unchanged and correct.
+That is the page where she checks a figure before deciding something; this is
+the page where she finds out how it got there. Two questions, two screens.
+
+**It owns no arithmetic.** Every number comes from the pure functions in
+`js/40-stream.js`. This file arranges and labels; it never sums a movement
+itself. A second place deciding what "came in" means is a second place that can
+disagree with the first.
+
+**"Left" is a balance, never in-minus-out.** She may have had money before the
+span started, and putting $30 into kept-ready is not money gone. The screen
+says so out loud rather than leaving a child to do arithmetic that does not
+come out.
+
+**Each group scales to its own biggest ribbon, not to a grand total.** One
+scale across "in" and "out" draws a $2 fine as an invisible sliver beside $40
+of jobs — the one row she most needs to see. The two group totals are what
+compare the halves.
+
+**Three periods, and the third is the honest one.** *This month* · *All of it* ·
+*A typical month*, which `evTypicalMonth` divides by the months that have
+**elapsed**, empty ones included. Dividing by months holding events turns a
+quiet summer into a good one — the same mistake `mrYearToDate` makes with
+settled weeks, deliberately not repeated.
+
+**The history strip keeps its empty months.** One 44px column per calendar
+month, oldest left, stacked by where that month's money came from, scrolling
+sideways rather than wrapping — a wrapped timeline stops being a timeline. An
+empty month is drawn as a dashed empty frame: a gap is a fact, and a month
+dropped from a chart reads as a month that did not happen. Tapping a column
+selects **both** the month and the period, because selecting a month while the
+screen still reads "all of it" is a control that appears to do nothing.
+
+**The Flow leads and the settled weeks follow.** The week list reads the frozen
+`moneyLedger`, so it can only show weeks a meeting settled — a gift on a
+Tuesday, a spend, a move between pots are all invisible to it. Leading with the
+narrower answer is how a child comes to believe the money she was given is not
+part of her money story. Both stay: the ledger rows are the week-by-week record
+a parent checks a meeting against, and the Flow cannot replace a record of what
+each settlement paid.
+
+`screen-moneystory` joined `KID_SCREENS` in the same change. It is a kid screen
+and was never in that audit, which is how the strip's 26px columns could have
+shipped with no 44px floor enforced on them — the row seeds two events first,
+because an empty story draws no strip and no ribbons and would pass the audit
+by having nothing on it.
+
 ## The money stream — a flow, not a balance
 
 `js/40-stream.js`. **Money is stored as MOVEMENTS and every balance is derived
@@ -2337,6 +2541,115 @@ It also settles a number that is easy to get wrong: **routines are worth at most
 $3 per child per week.** They pay nothing directly, and the $1 weekly goal bonus
 is on the LEGACY branch of `ctWeekMoney` and is never added in the current
 model. The streak is the whole routine channel.
+
+## The four house rules — 2026-09-21
+
+Four rules the family agreed, each landed in `MR_DEFAULT_RULES` and read
+through `mrRulesForWeek`, so **a week already lived keeps the rules that were
+live when it was lived**. Nothing is retroactive; that is the owner's own
+constraint and it is what effective-dated rule versions are for.
+
+**1 · Homework earns XP, not dollars.** All four `learning` items are `xpOnly`
+now. Homework is her own work, not a job the household is paying to have done —
+the whole reason this app prices chores is that a chore is a share of running a
+home somebody would otherwise have to do. Paying for homework teaches that
+learning is something you do for money. The work still **counts**:
+`mrWeekBreakdown` credits XP on an `xpOnly` line, the Sunday check still
+applies, the hours charts are unchanged. Only the dollars stop.
+
+**2 · Twice is a conversation; the third time costs.** `freeRepeats: 2` on
+tone, borrowing, screens and being asked twice. Every occurrence is **recorded**
+— `mrAddFine` writes it the day it happened, unchanged — and the first two in a
+week take no money. The **third and every one after it** costs its amount.
+`reflEvidence` offers the forgiven ones in her reflection's **Needs work** tab,
+named individually rather than counted ("3 things this week" reads as a score
+and says nothing she can act on), and it offers the incident and never an
+answer, which is the rule the whole reflection is built on.
+
+Not a pure conversation, and not a flat fine either. A first slip is something
+to talk about: charging a child a dollar for how she spoke to her sister prices
+the relationship, and buys the wrong lesson twice over — she can afford to be
+unkind after a good week, and a bad week compounds. But a pattern is a
+different fact from a slip, and a rule with no consequence at all is one a
+nine-year-old correctly reads as no rule.
+
+**Per item, per week.** Three *different* slips is three conversations; it is
+one behaviour repeating that this is about. The count is per WEEK, so two on one
+Tuesday are still the week's first two — a bad Tuesday is not three Tuesdays.
+
+**The free repeats cannot be decided a day at a time.** Monday's is free because
+it is the first and Friday's is charged because it is the third, so
+`mrFinesWeek` makes one pass over the whole week sorted by day then `at`, marks
+which occurrences are chargeable, and only then applies the daily floor.
+
+**`mrFineStanding` is the one owner of the count**, asked by the reflection so
+it can say what happens next — a rule a child finds out about by being charged
+is a rule she was never given a chance to keep. Two counts of the same thing is
+how two screens come to disagree.
+
+**`box_repeat` keeps its dollar from the first.** It is not about character: a
+thing was left out, it was boxed, and it was left out again in the same week.
+It **is** the repeat, so free repeats on top would count the same forgiveness
+twice.
+
+**The calibration asserts the threshold directly.** None of the three modelled
+weeks holds three of the same behaviour — which is the point of the rule and
+also means the week models cannot exercise it, and a rule the calibration never
+reaches is a rule it is not calibrating.
+
+**3 · One grace day a week.** `streak.graceDays: 1`. An off day is a valid
+state, and a streak with no rest state is the all-or-nothing shape *Writing for
+children* forbids. The grace carries the run **across** a miss without crediting
+the day — so six kept days with one miss reads 6, not 7, and a clean week still
+means seven. A second miss ends the run. Read from the rules and defaulted to 0,
+so an older rule version prices its week exactly as it did.
+
+**4 · The pace divides by the weeks that PASSED.** `mrYearToDate` divided by
+the number of weeks with a **finalised record**, which is the defect behind "she
+was paid $1 this month and it says she is on track": a family that settles its
+good weeks and lets the quiet ones slide reads as though every week were good,
+because the quiet ones are not in the denominator at all. It was arithmetic on a
+self-selected sample. `mrWeeksElapsed()` is the one owner, counting from
+`mrStartWeek()` — derived, not seeded — and an unsettled week now counts as a
+week that paid nothing, which is what it is. This file recorded it as a known
+defect before it was fixed.
+
+### The gap this opened, and whose it is
+
+Homework was carrying about **half the economy**. With it gone and the chore
+rates left where they were — the owner's decision, asked and answered — an
+ordinary week goes **$21 → $11**, a quiet week **$3 → $0**, and a realistic term
+reaches **51%** of Jenn's $1000 target instead of ~100%.
+
+`tests/money.test.js` asserts that 51% rather than the old 85–115% band. The
+assertion was **not deleted and not widened to whatever passes today** — either
+would turn the one check measuring the economy against the family's own stated
+aim into decoration. It asserts the real figure, so the guard still fires on
+unintended drift, and it says out loud that the target is now an aim rather than
+a description.
+
+**That gap is the family's to close, not the code's:** raise the chore rates
+(`tools/money-calibrate.js` says exactly where they land — $6/$4/$2 with a $9
+cap and one free chore reaches 111%), or lower the targets to what the rates
+pay.
+
+**Read that 51% correctly.** It is the projection from a modelled TERM — five
+ordinary weeks, two quiet, one strong — not from a ceiling. The rates are not
+incapable of reaching the target: the daily cap allows **$21 a week from chores
+alone** ($15 after the two free), the streak adds $3, and competition points are
+**uncapped** with a $20 qualifying bonus. The `strong` fixture is $24 because it
+models one chore a day and a six-point meet that did not qualify, so the cap
+never bites. What 51% says is that the term SHAPE does not reach the target,
+which is a different and much smaller claim than "she cannot earn it".
+
+**The $3 default is backfill, never a floor.** `mnyDefaultSweepPlan` starts one
+week beyond the catch-up reach and walks BACKWARDS, so it can never touch the
+current week or the last eight: it credits weeks that had already gone by, not
+weeks being lived. Going forward a quiet week pays what she earned, which may
+be nothing, and that is the earn-and-spend system working.
+`theDefaultSweepCreditsOldWeeksOnce` asserts it cannot reach the current week or
+a future one, because that failure would be silent and generous — money
+appearing for a week she is still living.
 
 ## Known trip hazards
 
