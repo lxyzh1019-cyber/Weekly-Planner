@@ -1,3 +1,9 @@
 node_modules/
 tests/node_modules/
 tests/out/
+
+# Working-rules bundle: track .claude/, but not its per-session state
+!.claude/
+.claude/state/
+__pycache__/
+*.pyc
