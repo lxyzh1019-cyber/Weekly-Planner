@@ -99,7 +99,7 @@ not the PIN.
   `lastGradeSeen` watermark, and a recount of derived progress from the merged
   weeks rather than either side's copy. It has 50 unit tests exercising the real
   shipped functions (`npm run test:merge`). Treat it as load-bearing and frozen;
-  see `CLAUDE.md`.
+  see `ARCHITECTURE.md`.
 - **Remaining real caveats on that surface:**
   - Merge arbitration timestamps come from each device's own `Date.now()`, so a
     device with a wrong clock can win an exchange it should have lost.

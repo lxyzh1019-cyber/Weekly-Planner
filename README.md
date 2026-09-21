@@ -23,8 +23,10 @@ npm run test:smoke  # boots the app in headless Chromium; screenshots in tests/o
 `/opt/pw-browsers` or `~/.cache/ms-playwright` (install with
 `npx playwright install chromium`); otherwise set `SMOKE_CHROMIUM=/path/to/chrome`.
 
-See `CLAUDE.md` for the architectural constraints these checks protect, and
-`tests/README.md` for what the smoke suite covers.
+See `ARCHITECTURE.md` for the architectural constraints these checks protect, and
+`tests/README.md` for what the smoke suite covers. `CLAUDE.md` holds the global
+working rules for agent sessions; `tests/replay-hooks.sh` verifies the hooks in
+`.claude/hooks/` that enforce them.
 
 ## Firebase / Firestore sync setup
 
