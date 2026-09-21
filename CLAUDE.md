@@ -2557,18 +2557,45 @@ learning is something you do for money. The work still **counts**:
 `mrWeekBreakdown` credits XP on an `xpOnly` line, the Sunday check still
 applies, the hours charts are unchanged. Only the dollars stop.
 
-**2 · A behaviour fine is a conversation, not a deduction.** `reflectOnly: true`
-on tone, borrowing, screens and being asked twice. `mrAddFine` records them
-exactly as before, dated to the day; `mrFinesWeek` charges them nothing; and
-`reflEvidence` offers them in her reflection's **Needs work** tab, named
-individually rather than counted — "3 things this week" reads as a score and
-says nothing she can act on. It offers the incident and never an answer, which
-is the rule the whole reflection is built on.
+**2 · Twice is a conversation; the third time costs.** `freeRepeats: 2` on
+tone, borrowing, screens and being asked twice. Every occurrence is **recorded**
+— `mrAddFine` writes it the day it happened, unchanged — and the first two in a
+week take no money. The **third and every one after it** costs its amount.
+`reflEvidence` offers the forgiven ones in her reflection's **Needs work** tab,
+named individually rather than counted ("3 things this week" reads as a score
+and says nothing she can act on), and it offers the incident and never an
+answer, which is the rule the whole reflection is built on.
 
-**`box_repeat` keeps its dollar, deliberately.** It is not about character: a
+Not a pure conversation, and not a flat fine either. A first slip is something
+to talk about: charging a child a dollar for how she spoke to her sister prices
+the relationship, and buys the wrong lesson twice over — she can afford to be
+unkind after a good week, and a bad week compounds. But a pattern is a
+different fact from a slip, and a rule with no consequence at all is one a
+nine-year-old correctly reads as no rule.
+
+**Per item, per week.** Three *different* slips is three conversations; it is
+one behaviour repeating that this is about. The count is per WEEK, so two on one
+Tuesday are still the week's first two — a bad Tuesday is not three Tuesdays.
+
+**The free repeats cannot be decided a day at a time.** Monday's is free because
+it is the first and Friday's is charged because it is the third, so
+`mrFinesWeek` makes one pass over the whole week sorted by day then `at`, marks
+which occurrences are chargeable, and only then applies the daily floor.
+
+**`mrFineStanding` is the one owner of the count**, asked by the reflection so
+it can say what happens next — a rule a child finds out about by being charged
+is a rule she was never given a chance to keep. Two counts of the same thing is
+how two screens come to disagree.
+
+**`box_repeat` keeps its dollar from the first.** It is not about character: a
 thing was left out, it was boxed, and it was left out again in the same week.
-The Sunday Box is a property mechanism with its own redemption job and the fine
-is the second half of it.
+It **is** the repeat, so free repeats on top would count the same forgiveness
+twice.
+
+**The calibration asserts the threshold directly.** None of the three modelled
+weeks holds three of the same behaviour — which is the point of the rule and
+also means the week models cannot exercise it, and a rule the calibration never
+reaches is a rule it is not calibrating.
 
 **3 · One grace day a week.** `streak.graceDays: 1`. An off day is a valid
 state, and a streak with no rest state is the all-or-nothing shape *Writing for
@@ -2604,8 +2631,25 @@ a description.
 **That gap is the family's to close, not the code's:** raise the chore rates
 (`tools/money-calibrate.js` says exactly where they land — $6/$4/$2 with a $9
 cap and one free chore reaches 111%), or lower the targets to what the rates
-pay. Until one of those happens, every surface that says "on track" is measuring
-against a figure these rates cannot reach.
+pay.
+
+**Read that 51% correctly.** It is the projection from a modelled TERM — five
+ordinary weeks, two quiet, one strong — not from a ceiling. The rates are not
+incapable of reaching the target: the daily cap allows **$21 a week from chores
+alone** ($15 after the two free), the streak adds $3, and competition points are
+**uncapped** with a $20 qualifying bonus. The `strong` fixture is $24 because it
+models one chore a day and a six-point meet that did not qualify, so the cap
+never bites. What 51% says is that the term SHAPE does not reach the target,
+which is a different and much smaller claim than "she cannot earn it".
+
+**The $3 default is backfill, never a floor.** `mnyDefaultSweepPlan` starts one
+week beyond the catch-up reach and walks BACKWARDS, so it can never touch the
+current week or the last eight: it credits weeks that had already gone by, not
+weeks being lived. Going forward a quiet week pays what she earned, which may
+be nothing, and that is the earn-and-spend system working.
+`theDefaultSweepCreditsOldWeeksOnce` asserts it cannot reach the current week or
+a future one, because that failure would be silent and generous — money
+appearing for a week she is still living.
 
 ## Known trip hazards
 

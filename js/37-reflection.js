@@ -342,30 +342,33 @@ function reflEvidence(wk, kid, tab) {
     if (owed) {
       add('chores_short', `${owed} family chore${owed === 1 ? '' : 's'} still to do.`);
     }
-    /* ── A BEHAVIOUR FINE IS A CONVERSATION, NOT A DEDUCTION ──
-       `reflectOnly` items (js/18-rules.js) are recorded the day they happen and
-       take no money. This is where they land instead: named, in her own tab,
-       as something to talk about.
+    /* ── TWICE IS A CONVERSATION; THE THIRD TIME COSTS ──
+       An item with `freeRepeats` (js/18-rules.js) is recorded every time and
+       forgiven the first two in a week. This is where the forgiven ones land:
+       named, in her own tab, as something to talk about.
 
        It offers the incident and NEVER an answer — nothing on this screen
        selects one for her, which is the rule the whole reflection is built on.
        Named individually rather than counted, because "3 things this week"
        reads as a score and says nothing she can do anything about; "being asked
-       twice, twice" is a thing a nine-year-old can actually think about. */
-    if (typeof mrFines === 'function' && typeof mrRulesForWeek === 'function') {
-      const byId = {};
-      (((mrRulesForWeek(wk) || {}).fines || {}).items || []).forEach(i => { byId[i.id] = i; });
-      const tally = {};
-      mrFines(kid)
-        .filter(f => f && (info.keys || []).includes(f.dayKey))
-        .forEach(f => {
-          const item = byId[f.itemId];
-          if (!item || !item.reflectOnly) return;   // a real fine is money, and says so elsewhere
-          tally[f.itemId] = (tally[f.itemId] || 0) + 1;
-        });
-      Object.keys(tally).forEach(id => {
-        const n = tally[id];
-        add('fine_' + id, `${byId[id].label}${n > 1 ? ` — ${n} times this week` : ''}.`);
+       twice, twice" is a thing a nine-year-old can actually think about.
+
+       And it SAYS WHAT HAPPENS NEXT, once — a rule a child finds out about by
+       being charged is a rule she was never given a chance to keep. It reads
+       as what it is (the next one costs), never as a threat and never as a
+       tally of what she owes. `mrFineStanding` is the one owner of that count;
+       this screen does not do its own arithmetic about money. */
+    if (typeof mrFines === 'function' && typeof mrFineStanding === 'function') {
+      const items = ((mrRulesForWeek(wk) || {}).fines || {}).items || [];
+      items.forEach(item => {
+        if (!Number(item.freeRepeats)) return;   // a straight fine is money, and says so elsewhere
+        const st = mrFineStanding(wk, kid, item.id);
+        if (!st.count) return;
+        const times = st.count > 1 ? ` — ${st.count} times this week` : '';
+        const next = st.nextCosts
+          ? ` From here each one costs ${mnyMoney(st.nextCosts)}.`
+          : (st.freeLeft === 1 ? ' One more and they start costing.' : '');
+        add('fine_' + item.id, `${item.label}${times}.${next}`);
       });
     }
     let missed = 0;

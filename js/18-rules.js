@@ -125,28 +125,35 @@ const MR_DEFAULT_RULES = {
     repeatFineId: 'box_repeat',
   },
 
-  /* ── A BEHAVIOUR FINE IS A CONVERSATION, NOT A DEDUCTION ──
-     `reflectOnly: true` on the four behaviour items. They are still RECORDED —
-     `mrAddFine` writes them exactly as before, the day they happened, and the
-     meeting still lists them — but they take no money. They surface in the
-     reflection's *Needs work* tab instead, as something to talk about.
+  /* ── TWICE IS A CONVERSATION; THE THIRD TIME COSTS ──
+     `freeRepeats: 2` on the four behaviour items. Every occurrence is RECORDED
+     — `mrAddFine` writes it the day it happened, and the meeting and the
+     reflection both list it — and the first two in a week take no money. The
+     THIRD and every one after it costs its amount.
 
-     The reasoning is the one this app is built on: money here is a
-     financial-literacy lesson, not a payment for being good. Charging a child
-     a dollar for how she spoke to her sister prices the relationship, and it
-     buys the wrong lesson twice over — she can afford to be unkind if she has
-     had a good week, and a bad week compounds.
+     Not a pure conversation, and not a flat fine either. A first slip is
+     something to talk about: charging a child a dollar for how she spoke to her
+     sister prices the relationship, and it buys the wrong lesson twice over —
+     she can afford to be unkind if she has had a good week, and a bad week
+     compounds. But a pattern is a different fact from a slip, and a rule with
+     no consequence at all is one a nine-year-old reads correctly as no rule.
+     Three times in one week is a pattern.
 
-     `box_repeat` KEEPS its dollar, deliberately. It is not about character: a
-     thing was left out, it was boxed, and it was left out again in the same
-     week. The Sunday Box is a property mechanism with its own redemption job,
-     and the fine is the second half of it. */
+     PER ITEM, PER WEEK, which is the same shape the Sunday Box already uses:
+     `box_repeat` is about the SAME thing left out twice. Three different slips
+     in a week is three conversations, not a fine — it is one behaviour
+     repeating that this is about.
+
+     `box_repeat` keeps its dollar from the first, deliberately. It is not about
+     character: a thing was left out, it was boxed, and it was left out again in
+     the same week. It IS the repeat, so a free repeat on top would be counting
+     the same forgiveness twice. */
   fines: {
     items: [
-      { id: 'tone',        label: 'How you speak to each other, or to us', amount: 0, reflectOnly: true },
-      { id: 'borrow',      label: "Taking your sister's things without asking", amount: 0, reflectOnly: true },
-      { id: 'screens',     label: 'Screens past the agreed limit', amount: 0, reflectOnly: true },
-      { id: 'asked_twice', label: 'Being asked twice', amount: 0, reflectOnly: true },
+      { id: 'tone',        label: 'How you speak to each other, or to us', amount: 1, freeRepeats: 2 },
+      { id: 'borrow',      label: "Taking your sister's things without asking", amount: 1, freeRepeats: 2 },
+      { id: 'screens',     label: 'Screens past the agreed limit', amount: 1, freeRepeats: 2 },
+      { id: 'asked_twice', label: 'Being asked twice', amount: 1, freeRepeats: 2 },
       { id: 'box_repeat',  label: 'Something left out for the second time this week', amount: 1 },
     ],
     dailyFloorZero: true,   // fines can zero a day, never create debt
@@ -1482,28 +1489,68 @@ function mrReleaseBoxForMeeting(kid) {
 function mrFinesWeek(weekKey, kid, dayEarnings) {
   const r = mrRulesForWeek(weekKey);
   const cfg = r.fines || {};
-  /* A reflect-only item is RECORDED and charged nothing — it is something to
-     talk about in the reflection, not a deduction. The fallback for an id the
-     catalog has never heard of stays $1, because an unknown fine is a fine
-     somebody meant to charge; only an item the rules explicitly mark as a
-     conversation is free. */
+  /* The catalog. The fallback for an id the catalog has never heard of stays
+     $1 and no free repeats, because an unknown fine is one somebody meant to
+     charge; only an item the rules explicitly forgive is forgiven. */
   const byId = {};
-  (cfg.items || []).forEach(i => { byId[i.id] = i.reflectOnly ? 0 : (Number(i.amount) || 0); });
+  (cfg.items || []).forEach(i => { byId[i.id] = i; });
   const mon = formatDayKey(weekKey);
   const keys = [];
   for (let i = 0; i < 7; i++) { const d = new Date(mon); d.setDate(mon.getDate() + i); keys.push(ctDateToKey(d)); }
+
+  /* ── FREE REPEATS ARE COUNTED ACROSS THE WEEK, IN ORDER ──
+     `freeRepeats: 2` means the first two of THAT item in THIS week cost
+     nothing and the third onwards costs. So the charge cannot be decided one
+     day at a time: Monday's slip is free because it is the first, and
+     Friday's is charged because it is the third, and only a pass over the
+     whole week in order knows which is which.
+
+     Sorted by day and then by `at`, so two on one day resolve in the order
+     they happened — and identically on every device, which a `Date.now()`
+     tie-break alone would not guarantee. */
+  const seen = {};
+  const chargeable = {};                       // fine id → dollars it actually costs
+  mrFines(kid)
+    .filter(f => f && keys.includes(f.dayKey))
+    .slice()
+    .sort((a, b) => String(a.dayKey).localeCompare(String(b.dayKey))
+                 || (Number(a.at) || 0) - (Number(b.at) || 0)
+                 || String(a.id).localeCompare(String(b.id)))
+    .forEach(f => {
+      const item = byId[f.itemId];
+      const amount = item ? (Number(item.amount) || 0) : 1;
+      const free = item ? (Number(item.freeRepeats) || 0) : 0;
+      const n = (seen[f.itemId] = (seen[f.itemId] || 0) + 1);
+      chargeable[f.id] = (n > free) ? amount : 0;
+    });
 
   let total = 0;
   const perDay = [];
   keys.forEach((k, d) => {
     const raw = mrFines(kid).filter(f => f.dayKey === k)
-      .reduce((s, f) => s + (byId[f.itemId] != null ? byId[f.itemId] : 1), 0);
+      .reduce((s, f) => s + (chargeable[f.id] || 0), 0);
     const earned = (dayEarnings && dayEarnings[d] != null) ? dayEarnings[d] : 0;
     const applied = cfg.dailyFloorZero ? Math.min(raw, earned) : raw;
     total += applied;
     perDay.push({ dayIdx: d, raw: money2(raw), applied: money2(applied) });
   });
   return { total: money2(total), perDay };
+}
+
+/* How many times this item has been recorded for this child this week, and
+   what the next one would cost. One owner, because the reflection says it to a
+   child and the meeting says it to a parent, and two counts of the same thing
+   is how the two screens come to disagree. */
+function mrFineStanding(weekKey, kid, itemId) {
+  const cfg = (mrRulesForWeek(weekKey) || {}).fines || {};
+  const item = (cfg.items || []).find(i => i.id === itemId);
+  const keys = mrWeekDayKeys(weekKey);
+  const count = mrFines(kid).filter(f => f && f.itemId === itemId && keys.includes(f.dayKey)).length;
+  const free = item ? (Number(item.freeRepeats) || 0) : 0;
+  const amount = item ? (Number(item.amount) || 0) : 1;
+  return { count, free, amount, freeLeft: Math.max(0, free - count),
+           charged: Math.max(0, count - free) * amount,
+           nextCosts: count >= free ? amount : 0 };
 }
 
 /* Honesty ladder: warning → that channel's week → choice privileges. The step

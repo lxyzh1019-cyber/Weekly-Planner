@@ -5594,32 +5594,49 @@ function findChromium() {
       if (money2(b.learnPaid) !== 0) problems.push('a homework bundle paid ' + b.learnPaid);
       if (!(b.learning.xpLevels > 0)) problems.push('a homework bundle earned no XP either — it should still count');
 
-      // ── 2 · A behaviour fine records, and takes nothing.
+      // ── 2 · Twice is a conversation; the third time costs.
+      const rich = [9, 9, 9, 9, 9, 9, 9];       // earnings high, so the daily floor never bites
       const fineItems = ((mrRulesForWeek(wk) || {}).fines || {}).items || [];
-      const talk = fineItems.find(i => i.reflectOnly);
-      const money = fineItems.find(i => !i.reflectOnly && Number(i.amount) > 0);
-      if (!talk) { problems.push('no fine is marked as a conversation'); }
-      if (!money) { problems.push('every fine became a conversation — the Sunday Box repeat should still cost'); }
+      const talk = fineItems.find(i => Number(i.freeRepeats) > 0);
+      const money = fineItems.find(i => !Number(i.freeRepeats) && Number(i.amount) > 0);
+      if (!talk) { problems.push('no behaviour fine is forgiven the first two times'); }
+      if (!money) { problems.push('every fine became forgivable — the Sunday Box repeat should cost from the first'); }
       if (talk) {
+        const charge = (n) => {
+          pd.fines = [];
+          for (let i = 0; i < n; i++) mrAddFine(kid, talk.id, keys[i % 7]);
+          return money2(mrFinesWeek(wk, kid, rich).total);
+        };
+        if (charge(1) !== 0) problems.push('a first slip cost money');
+        if (charge(2) !== 0) problems.push('a second cost money');
+        if (charge(3) !== money2(talk.amount)) {
+          problems.push('the third cost ' + charge(3) + ', not ' + talk.amount);
+        }
+        if (charge(4) !== money2(talk.amount * 2)) {
+          problems.push('the fourth did not cost another ' + talk.amount);
+        }
+        // Recorded every time, forgiven or not — the record is the point.
+        if (mrFines(kid).length !== 4) problems.push('only ' + mrFines(kid).length + ' of 4 were recorded');
+
+        /* And she is told, in her own tab, what it is and what happens next —
+           a rule a child finds out about by being charged is a rule she was
+           never given a chance to keep. */
         pd.fines = [];
         mrAddFine(kid, talk.id, keys[1]);
-        if (!mrFines(kid).length) problems.push('a behaviour fine was not recorded at all');
-        const charged = mrFinesWeek(wk, kid, [9, 9, 9, 9, 9, 9, 9]).total;
-        if (money2(charged) !== 0) problems.push('a behaviour fine still took ' + charged);
-        // And it is what she is asked about, in her own words, in her own tab.
+        mrAddFine(kid, talk.id, keys[2]);
         const ev = reflEvidence(wk, kid, 'needsWork');
-        if (!ev.some(e => String(e.id).indexOf('fine_') === 0)) {
-          problems.push('the incident is recorded but never reaches her reflection');
-        }
-        if (ev.some(e => /\$/.test(e.text))) {
-          problems.push('the reflection is quoting a dollar figure at her about it');
+        const row = ev.find(e => String(e.id).indexOf('fine_') === 0);
+        if (!row) problems.push('the incident is recorded but never reaches her reflection');
+        else if (!/cost/.test(row.text)) {
+          problems.push('her reflection does not say what happens next: ' + row.text);
         }
       }
       if (money) {
         pd.fines = [];
         mrAddFine(kid, money.id, keys[1]);
-        const charged = mrFinesWeek(wk, kid, [9, 9, 9, 9, 9, 9, 9]).total;
-        if (!(money2(charged) > 0)) problems.push('the Sunday Box repeat stopped costing anything');
+        if (!(money2(mrFinesWeek(wk, kid, rich).total) > 0)) {
+          problems.push('the Sunday Box repeat stopped costing anything');
+        }
       }
       pd.fines = [];
 
@@ -13798,6 +13815,23 @@ function findChromium() {
       const reachable = new Set(mmUnsettledWeeks(8).map(u => u.wk));
       if (plan.weeks.some(w => reachable.has(w.wk))) {
         bad.push('the sweep reached a week the catch-up list can still settle');
+      }
+      /* ── THE $3 DEFAULT IS BACKFILL, NEVER A FLOOR ──
+         It was agreed for weeks that had already gone by before the family
+         switched to earning and spending. Going forward a quiet week pays what
+         she earned, which may be nothing, and that is the system working — a
+         guaranteed $3 for a week nobody sat down for would pay better than a
+         quiet week actually lived, and would teach the opposite of the thing
+         this whole redesign is for.
+
+         `mnyDefaultSweepPlan` walks BACKWARDS from one week beyond the reach,
+         so this holds today. It is asserted because the failure would be
+         silent and generous: money appearing in a child's wallet for a week
+         she is still living. */
+      const thisWk = ctThisWeekKey();
+      const forward = plan.weeks.filter(w => String(w.wk) >= String(thisWk));
+      if (forward.length) {
+        bad.push('the sweep would credit the current or a future week: ' + forward.map(w => w.wk).join(', '));
       }
 
       const expect = plan.total;

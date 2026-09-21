@@ -50,6 +50,44 @@ check('the streak pays the highest tier only, never the sum',
 check('a fine can never create debt',
   (R.fines || {}).dailyFloorZero === true, `read ${(R.fines || {}).dailyFloorZero}`);
 
+/* ── Twice is a conversation; the third time costs ───────────────────
+   Asserted directly rather than through a week fixture. None of the three
+   modelled weeks has three of the same behaviour in it — which is the point of
+   the rule and also means the week models cannot exercise it. A rule the
+   calibration never reaches is a rule the calibration is not calibrating.
+
+   Earnings are handed in high so the daily floor never bites; what is under
+   test here is the threshold, and `a fine can never create debt` above is what
+   holds the floor. */
+const rich = [9, 9, 9, 9, 9, 9, 9];
+const behaviour = ((R.fines || {}).items || []).find(i => Number(i.freeRepeats) > 0);
+check('a behaviour fine is forgiven twice in a week',
+  behaviour && Number(behaviour.freeRepeats) === 2,
+  `read ${behaviour && behaviour.freeRepeats}`);
+check('one slip costs nothing', cal.finesApplied([1, 0, 0, 0, 0, 0, 0], rich).total === 0,
+  `read ${cal.finesApplied([1, 0, 0, 0, 0, 0, 0], rich).total}`);
+check('twice costs nothing', cal.finesApplied([1, 0, 1, 0, 0, 0, 0], rich).total === 0,
+  `read ${cal.finesApplied([1, 0, 1, 0, 0, 0, 0], rich).total}`);
+check('the third time costs $1', cal.finesApplied([1, 0, 1, 0, 1, 0, 0], rich).total === 1,
+  `read ${cal.finesApplied([1, 0, 1, 0, 1, 0, 0], rich).total}`);
+check('the fourth costs another $1', cal.finesApplied([1, 1, 1, 1, 0, 0, 0], rich).total === 2,
+  `read ${cal.finesApplied([1, 1, 1, 1, 0, 0, 0], rich).total}`);
+/* Two on one day still resolve as the first two of the week, not as a repeat
+   of each other — the count is per WEEK, and a bad Tuesday is not three
+   Tuesdays. */
+check('two in one day are still the week\'s first two',
+  cal.finesApplied([2, 0, 0, 0, 0, 0, 0], rich).total === 0,
+  `read ${cal.finesApplied([2, 0, 0, 0, 0, 0, 0], rich).total}`);
+check('three in one day costs once',
+  cal.finesApplied([3, 0, 0, 0, 0, 0, 0], rich).total === 1,
+  `read ${cal.finesApplied([3, 0, 0, 0, 0, 0, 0], rich).total}`);
+/* The Sunday Box repeat is not forgiven: it IS the repeat, so a free repeat on
+   top would be counting the same forgiveness twice. */
+const box = ((R.fines || {}).items || []).find(i => i.id === 'box_repeat');
+check('the Sunday Box repeat costs from the first',
+  box && !Number(box.freeRepeats) && Number(box.amount) === 1,
+  `read ${box && JSON.stringify({ free: box.freeRepeats, amount: box.amount })}`);
+
 /* ── The routine ceiling ─────────────────────────────────────────────
    The number most easily got wrong, and the one the planned/simple routine
    change moves. Routines pay NOTHING directly: in the current model
