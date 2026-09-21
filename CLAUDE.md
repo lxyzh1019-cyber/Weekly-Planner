@@ -2542,6 +2542,71 @@ $3 per child per week.** They pay nothing directly, and the $1 weekly goal bonus
 is on the LEGACY branch of `ctWeekMoney` and is never added in the current
 model. The streak is the whole routine channel.
 
+## The four house rules — 2026-09-21
+
+Four rules the family agreed, each landed in `MR_DEFAULT_RULES` and read
+through `mrRulesForWeek`, so **a week already lived keeps the rules that were
+live when it was lived**. Nothing is retroactive; that is the owner's own
+constraint and it is what effective-dated rule versions are for.
+
+**1 · Homework earns XP, not dollars.** All four `learning` items are `xpOnly`
+now. Homework is her own work, not a job the household is paying to have done —
+the whole reason this app prices chores is that a chore is a share of running a
+home somebody would otherwise have to do. Paying for homework teaches that
+learning is something you do for money. The work still **counts**:
+`mrWeekBreakdown` credits XP on an `xpOnly` line, the Sunday check still
+applies, the hours charts are unchanged. Only the dollars stop.
+
+**2 · A behaviour fine is a conversation, not a deduction.** `reflectOnly: true`
+on tone, borrowing, screens and being asked twice. `mrAddFine` records them
+exactly as before, dated to the day; `mrFinesWeek` charges them nothing; and
+`reflEvidence` offers them in her reflection's **Needs work** tab, named
+individually rather than counted — "3 things this week" reads as a score and
+says nothing she can act on. It offers the incident and never an answer, which
+is the rule the whole reflection is built on.
+
+**`box_repeat` keeps its dollar, deliberately.** It is not about character: a
+thing was left out, it was boxed, and it was left out again in the same week.
+The Sunday Box is a property mechanism with its own redemption job and the fine
+is the second half of it.
+
+**3 · One grace day a week.** `streak.graceDays: 1`. An off day is a valid
+state, and a streak with no rest state is the all-or-nothing shape *Writing for
+children* forbids. The grace carries the run **across** a miss without crediting
+the day — so six kept days with one miss reads 6, not 7, and a clean week still
+means seven. A second miss ends the run. Read from the rules and defaulted to 0,
+so an older rule version prices its week exactly as it did.
+
+**4 · The pace divides by the weeks that PASSED.** `mrYearToDate` divided by
+the number of weeks with a **finalised record**, which is the defect behind "she
+was paid $1 this month and it says she is on track": a family that settles its
+good weeks and lets the quiet ones slide reads as though every week were good,
+because the quiet ones are not in the denominator at all. It was arithmetic on a
+self-selected sample. `mrWeeksElapsed()` is the one owner, counting from
+`mrStartWeek()` — derived, not seeded — and an unsettled week now counts as a
+week that paid nothing, which is what it is. This file recorded it as a known
+defect before it was fixed.
+
+### The gap this opened, and whose it is
+
+Homework was carrying about **half the economy**. With it gone and the chore
+rates left where they were — the owner's decision, asked and answered — an
+ordinary week goes **$21 → $11**, a quiet week **$3 → $0**, and a realistic term
+reaches **51%** of Jenn's $1000 target instead of ~100%.
+
+`tests/money.test.js` asserts that 51% rather than the old 85–115% band. The
+assertion was **not deleted and not widened to whatever passes today** — either
+would turn the one check measuring the economy against the family's own stated
+aim into decoration. It asserts the real figure, so the guard still fires on
+unintended drift, and it says out loud that the target is now an aim rather than
+a description.
+
+**That gap is the family's to close, not the code's:** raise the chore rates
+(`tools/money-calibrate.js` says exactly where they land — $6/$4/$2 with a $9
+cap and one free chore reaches 111%), or lower the targets to what the rates
+pay. Until one of those happens, every surface that says "on track" is measuring
+against a figure these rates cannot reach.
+
 ## Known trip hazards
 
 - Firebase config lives in **`js/03-sync.js:8`**, not `index.html`. Older docs

@@ -72,22 +72,39 @@ const MR_DEFAULT_RULES = {
     freeChoresPerWeek: 2,   // kid-picked, unpaid, deducted BEFORE the daily cap
   },
 
+  /* ── HOMEWORK EARNS XP, NOT DOLLARS ──
+     All four are `xpOnly` now. Homework is not a job the household is paying
+     to have done — it is her own work, and the whole reason this app prices
+     chores is that a chore is a share of running a home that somebody would
+     otherwise have to do. Paying for homework teaches that learning is
+     something you do for money, which is the opposite of what the money side
+     of this app is for.
+
+     They still COUNT: `mrWeekBreakdown` credits XP for an xpOnly line, so the
+     work is recorded, the Sunday check still applies, and the hours charts are
+     unchanged. What stops is the dollars. */
   learning: {
     items: [
-      { id: 'math',        label: 'Math homework', unit: 'pages', perUnit: 3,  amount: 2 },
-      { id: 'handwriting', label: 'Handwriting',   unit: 'pages', perUnit: 5,  amount: 2 },
-      { id: 'chinese',     label: 'Chinese',       unit: 'words', perUnit: 10, amount: 1 },
-      // The learning app is XP-only: it is the one channel whose units are
-      // trivially farmable, so it never pays dollars.
+      { id: 'math',        label: 'Math homework', unit: 'pages', perUnit: 3,  amount: 0, xpOnly: true },
+      { id: 'handwriting', label: 'Handwriting',   unit: 'pages', perUnit: 5,  amount: 0, xpOnly: true },
+      { id: 'chinese',     label: 'Chinese',       unit: 'words', perUnit: 10, amount: 0, xpOnly: true },
+      // The learning app was always XP-only: its units are trivially farmable.
       { id: 'app',     label: 'Learning game level',  unit: 'levels', perUnit: 1, amount: 0, xpOnly: true },
     ],
     sundayCheckCount: 3,    // Mom picks 3 at random; a miss unpays and re-queues it
     newMaterialOnly: true,
   },
 
-  // Highest tier only — 7 clean days pays $3, NOT $1+$2+$3.
+  /* Highest tier only — 7 clean days pays $3, NOT $1+$2+$3.
+
+     ── ONE GRACE DAY A WEEK ──
+     `graceDays: 1`. An off day is a valid state (see *Writing for children*),
+     and a streak with no rest state is the all-or-nothing shape this app is
+     not allowed to build. One missed day no longer ends the run; a second
+     does. It is deliberately not a free pass at the top tier either — seven
+     clean days still means seven, because the grace is spent on the miss. */
   streak: { tiers: [{ days: 3, bonus: 1 }, { days: 5, bonus: 2 }, { days: 7, bonus: 3 }],
-            highestOnly: true, resetsOn: 'sunday' },
+            highestOnly: true, resetsOn: 'sunday', graceDays: 1 },
 
   competition: {
     // No caps on points, by decision — the dance test is the one exception.
@@ -108,12 +125,28 @@ const MR_DEFAULT_RULES = {
     repeatFineId: 'box_repeat',
   },
 
+  /* ── A BEHAVIOUR FINE IS A CONVERSATION, NOT A DEDUCTION ──
+     `reflectOnly: true` on the four behaviour items. They are still RECORDED —
+     `mrAddFine` writes them exactly as before, the day they happened, and the
+     meeting still lists them — but they take no money. They surface in the
+     reflection's *Needs work* tab instead, as something to talk about.
+
+     The reasoning is the one this app is built on: money here is a
+     financial-literacy lesson, not a payment for being good. Charging a child
+     a dollar for how she spoke to her sister prices the relationship, and it
+     buys the wrong lesson twice over — she can afford to be unkind if she has
+     had a good week, and a bad week compounds.
+
+     `box_repeat` KEEPS its dollar, deliberately. It is not about character: a
+     thing was left out, it was boxed, and it was left out again in the same
+     week. The Sunday Box is a property mechanism with its own redemption job,
+     and the fine is the second half of it. */
   fines: {
     items: [
-      { id: 'tone',        label: 'How you speak to each other, or to us', amount: 1 },
-      { id: 'borrow',      label: "Taking your sister's things without asking", amount: 1 },
-      { id: 'screens',     label: 'Screens past the agreed limit', amount: 1 },
-      { id: 'asked_twice', label: 'Being asked twice', amount: 1 },
+      { id: 'tone',        label: 'How you speak to each other, or to us', amount: 0, reflectOnly: true },
+      { id: 'borrow',      label: "Taking your sister's things without asking", amount: 0, reflectOnly: true },
+      { id: 'screens',     label: 'Screens past the agreed limit', amount: 0, reflectOnly: true },
+      { id: 'asked_twice', label: 'Being asked twice', amount: 0, reflectOnly: true },
       { id: 'box_repeat',  label: 'Something left out for the second time this week', amount: 1 },
     ],
     dailyFloorZero: true,   // fines can zero a day, never create debt
@@ -1091,6 +1124,15 @@ function mrStreakDayDone(weekKey, kid, dayIdx) {
 function mrStreakWeek(weekKey, kid) {
   const r = mrRulesForWeek(weekKey);
   const tiers = ((r.streak || {}).tiers || []).slice().sort((a, b) => a.days - b.days);
+  /* ── ONE GRACE DAY ──
+     An off day is a valid state, and a streak with no rest state is the
+     all-or-nothing shape this app is not allowed to build. A missed day spends
+     the week's grace instead of ending the run; the next one ends it.
+
+     Read from the rules and defaulted to 0, so a week priced under an older
+     rule version is unaffected — `mrRulesForWeek` resolves that version, and a
+     week lived before the grace existed keeps the run it actually had. */
+  let grace = Math.max(0, Number((r.streak || {}).graceDays) || 0);
   let run = 0, best = 0;
   for (let d = 0; d < 7; d++) {
     if (mrIsSick(kid, weekKey, d)) continue;              // paused, not broken
@@ -1103,6 +1145,12 @@ function mrStreakWeek(weekKey, kid) {
     // guard, not a behaviour — and it stops `[].every()` paying for an empty day.
     if (!asked.length) continue;
     if (asked.every(s => ctGetMandatory(weekKey, d, s, kid))) { run++; best = Math.max(best, run); }
+    else if (grace > 0) {
+      /* The grace carries the run ACROSS the miss without counting the day.
+         Crediting the day instead would pay for a routine nobody kept, and
+         seven clean days would stop meaning seven. */
+      grace--;
+    }
     else run = 0;
   }
   let bonus = 0, tier = 0;
@@ -1434,8 +1482,13 @@ function mrReleaseBoxForMeeting(kid) {
 function mrFinesWeek(weekKey, kid, dayEarnings) {
   const r = mrRulesForWeek(weekKey);
   const cfg = r.fines || {};
+  /* A reflect-only item is RECORDED and charged nothing — it is something to
+     talk about in the reflection, not a deduction. The fallback for an id the
+     catalog has never heard of stays $1, because an unknown fine is a fine
+     somebody meant to charge; only an item the rules explicitly mark as a
+     conversation is free. */
   const byId = {};
-  (cfg.items || []).forEach(i => { byId[i.id] = Number(i.amount) || 0; });
+  (cfg.items || []).forEach(i => { byId[i.id] = i.reflectOnly ? 0 : (Number(i.amount) || 0); });
   const mon = formatDayKey(weekKey);
   const keys = [];
   for (let i = 0; i < 7; i++) { const d = new Date(mon); d.setDate(mon.getDate() + i); keys.push(ctDateToKey(d)); }
@@ -1750,11 +1803,45 @@ function mrYearToDate(kid) {
     channels.competition += b.compPaid;
     channels.fines       += b.fines.total;
   });
+  /* ── DIVIDE BY THE WEEKS THAT PASSED, NOT THE WEEKS THAT WERE SETTLED ──
+
+     This divided by `weeks.length` — the number of weeks with a finalised
+     record — which is the defect behind "she was paid $1 this month and it says
+     she is on track". A family that settles its good weeks and lets the quiet
+     ones slide reads as though every week were a good one, because the quiet
+     ones are not in the denominator at all. The projection was arithmetic on a
+     self-selected sample.
+
+     It counts the weeks the family has actually been going, from `mrStartWeek`
+     — which is DERIVED from the earliest week with anything in it rather than
+     seeded to today (see *One clock*), so it cannot be gamed by a device that
+     first ran this build in September. An unsettled week counts as a week that
+     paid nothing, which is what it is.
+
+     Same correction as `evTypicalMonthOf`, which divides by months elapsed for
+     exactly this reason. CLAUDE.md recorded this one as a known defect before
+     it was fixed; it is fixed now. */
   const target = mrTargetFor(kid);
-  const weeksCounted = weeks.length || 1;
+  const elapsed = mrWeeksElapsed();
+  const weeksCounted = Math.max(elapsed, weeks.length, 1);
   const projected = money2((paidTotal / weeksCounted) * 52);
-  return { weeks: weeks.length, paidTotal: money2(paidTotal), channels, target, projected,
+  return { weeks: weeks.length, weeksElapsed: elapsed,
+           paidTotal: money2(paidTotal), channels, target, projected,
            pctOfTarget: target ? Math.round((projected / target) * 100) : 0 };
+}
+
+/* How many weeks this family has been running, counting the current one.
+   One owner, because the pace figure and anything else that wants a true
+   denominator must not each work it out. Never zero. */
+function mrWeeksElapsed() {
+  const start = (typeof mrStartWeek === 'function') ? mrStartWeek() : null;
+  if (!start) return 1;
+  const a = formatDayKey(start), b = formatDayKey(ctThisWeekKey());
+  if (!a || !b) return 1;
+  const weeks = Math.floor((b - a) / (7 * 24 * 3600 * 1000)) + 1;
+  // A clock skewed backwards, or a start date a parent typed into the future,
+  // must not make the denominator zero or negative and invert the figure.
+  return weeks > 0 ? weeks : 1;
 }
 
 /* Inert in the browser; lets tests/rules.test.js exercise the pure helpers. */

@@ -68,9 +68,21 @@ const quiet = cal.weekMoney(cal.WEEKS.quiet);
 const ordinary = cal.weekMoney(cal.WEEKS.ordinary);
 const strong = cal.weekMoney(cal.WEEKS.strong);
 
-check('a quiet week nets $3', quiet.net === 3, `read ${quiet.net}`);
-check('an ordinary week nets $21', ordinary.net === 21, `read ${ordinary.net}`);
-check('a strong week nets $42', strong.net === 42, `read ${strong.net}`);
+/* ── 2026-09-21: homework stopped paying, and the rates stayed ──
+   All four learning items are `xpOnly` now (js/18-rules.js): homework is her
+   own work, not a job the household is paying to have done. That took about
+   half the economy with it — $21 → $11 on an ordinary week — and the owner's
+   decision was to KEEP THE EXISTING CHORE RATES rather than move the money
+   into chores to compensate.
+
+   So these figures are lower on purpose. They are still locked, and still
+   locked for the original reason: change a price and they move, and the
+   failure is the prompt to re-run tools/money-calibrate.js and decide whether
+   the new shape is wanted. */
+check('a quiet week nets $0 — both chores are free and homework pays nothing now',
+  quiet.net === 0, `read ${quiet.net}`);
+check('an ordinary week nets $11', ordinary.net === 11, `read ${ordinary.net}`);
+check('a strong week nets $24', strong.net === 24, `read ${strong.net}`);
 
 check('a quiet week reaches no streak tier', quiet.streak.bonus === 0, `read ${quiet.streak.bonus}`);
 check('an ordinary week reaches the 5-day tier', ordinary.streak.tier === 5, `read ${ordinary.streak.tier}`);
@@ -92,20 +104,34 @@ const byKind = { quiet, ordinary, strong };
 const termTotal = Math.round(TERM.reduce((s, k) => s + byKind[k].net, 0) * 100) / 100;
 const annual = Math.round((termTotal / TERM.length) * 52 * 100) / 100;
 
-check('a realistic eight-week term totals $153', termTotal === 153, `read ${termTotal}`);
+check('a realistic eight-week term totals $79', termTotal === 79, `read ${termTotal}`);
 
 const jennTarget = Number(((R.targets || {}).jenn || {}).annual) || 0;
 const jessTarget = Number(((R.targets || {}).jess || {}).annual) || 0;
 check('Jenn\'s annual target is $1000', jennTarget === 1000, `read ${jennTarget}`);
 check('Jess\'s annual target is $800', jessTarget === 800, `read ${jessTarget}`);
 
-/* The calibration itself: a realistic term should land NEAR the older child's
-   target, not wildly over or under it. This is the check that would have
-   caught the first set of XP values levelling a child every half-week, applied
-   to money. */
+/* ── The gap between what the rates pay and what the targets ask ──
+
+   This used to assert that a realistic term lands within 85–115% of Jenn's
+   annual target, and it held. It does not any more: homework stopped paying,
+   the chore rates were deliberately left where they were, and the two numbers
+   no longer describe the same thing. The term reaches about half.
+
+   The assertion is NOT deleted and NOT widened to whatever passes today —
+   either would turn the one check that measures the economy against the
+   family's own stated aim into decoration. It asserts the real figure instead,
+   so the guard still fires on any unintended drift, and it says out loud that
+   the target is now an aim rather than a description.
+
+   THIS IS A REAL GAP AND IT IS THE FAMILY'S TO CLOSE, not the code's: raise
+   the chore rates (tools/money-calibrate.js will tell you exactly where they
+   land), or lower the targets to what the rates actually pay. Until one of
+   those happens, every surface that says "on track" is measuring against a
+   figure these rates cannot reach. */
 const pctOfJenn = Math.round((annual / jennTarget) * 100);
-check('a realistic term lands within 85-115% of Jenn\'s annual target',
-  pctOfJenn >= 85 && pctOfJenn <= 115, `reached ${pctOfJenn}%`);
+check('a realistic term reaches 51% of Jenn\'s annual target — the rates and the target disagree, on purpose, for now',
+  pctOfJenn === 51, `reached ${pctOfJenn}%`);
 
 console.log('');
 console.log(`${pass} passed, ${fails.length} failed`);

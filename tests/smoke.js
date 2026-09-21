@@ -5560,6 +5560,113 @@ function findChromium() {
     return problems.length ? problems : true;
   });
 
+  /* ── THE FOUR HOUSE RULES ─────────────────────────────────────────
+     Homework earns XP and not dollars · a behaviour fine is a conversation and
+     not a deduction · one grace day a week in the routine streak · the pace
+     figure divides by the weeks that PASSED.
+
+     Each is a rule the family agreed, and each is the kind of change that goes
+     wrong quietly: a channel that stops paying, a deduction that stops
+     deducting, a streak that gets easier, a denominator that changes. The
+     calibration tools hold the money; this holds the behaviour. */
+  checks.theFourHouseRulesHold = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jenn', wk = ctWeekKey;
+    const pd = getProfData(kid);
+    const savedFines = (pd.fines || []).slice();
+    const savedEarn = JSON.parse(JSON.stringify(mrEnsureEarnings(kid, wk)));
+    /* The routine marks are a TOGGLE store and this check rewrites a whole
+       week of them. Left behind they break blankPastWeekCanBeMadeUp thirty
+       checks later — which is exactly how the streak fixture bit once already. */
+    const savedMand = JSON.parse(JSON.stringify(getProfData(kid).chore.mandatoryByWeek[wk] || {}));
+    const keys = mrWeekDayKeys(wk);
+    try {
+      // ── 1 · Homework earns XP, not dollars.
+      const learn = ((mrRulesForWeek(wk) || {}).learning || {}).items || [];
+      const paid = learn.filter(i => !i.xpOnly && Number(i.amount) > 0);
+      if (paid.length) {
+        problems.push('homework still pays money: ' + paid.map(i => i.id).join(', '));
+      }
+      mrSetLearning(kid, wk, 0, 'math', 6);          // two bundles of 3 pages
+      const b = mrWeekBreakdown(wk, kid);
+      if (money2(b.learnPaid) !== 0) problems.push('a homework bundle paid ' + b.learnPaid);
+      if (!(b.learning.xpLevels > 0)) problems.push('a homework bundle earned no XP either — it should still count');
+
+      // ── 2 · A behaviour fine records, and takes nothing.
+      const fineItems = ((mrRulesForWeek(wk) || {}).fines || {}).items || [];
+      const talk = fineItems.find(i => i.reflectOnly);
+      const money = fineItems.find(i => !i.reflectOnly && Number(i.amount) > 0);
+      if (!talk) { problems.push('no fine is marked as a conversation'); }
+      if (!money) { problems.push('every fine became a conversation — the Sunday Box repeat should still cost'); }
+      if (talk) {
+        pd.fines = [];
+        mrAddFine(kid, talk.id, keys[1]);
+        if (!mrFines(kid).length) problems.push('a behaviour fine was not recorded at all');
+        const charged = mrFinesWeek(wk, kid, [9, 9, 9, 9, 9, 9, 9]).total;
+        if (money2(charged) !== 0) problems.push('a behaviour fine still took ' + charged);
+        // And it is what she is asked about, in her own words, in her own tab.
+        const ev = reflEvidence(wk, kid, 'needsWork');
+        if (!ev.some(e => String(e.id).indexOf('fine_') === 0)) {
+          problems.push('the incident is recorded but never reaches her reflection');
+        }
+        if (ev.some(e => /\$/.test(e.text))) {
+          problems.push('the reflection is quoting a dollar figure at her about it');
+        }
+      }
+      if (money) {
+        pd.fines = [];
+        mrAddFine(kid, money.id, keys[1]);
+        const charged = mrFinesWeek(wk, kid, [9, 9, 9, 9, 9, 9, 9]).total;
+        if (!(money2(charged) > 0)) problems.push('the Sunday Box repeat stopped costing anything');
+      }
+      pd.fines = [];
+
+      // ── 3 · One grace day, and only one.
+      const streak = (mrRulesForWeek(wk) || {}).streak || {};
+      if (Number(streak.graceDays) !== 1) problems.push('the streak grants ' + streak.graceDays + ' grace days, not 1');
+      /* ctSetMandatory(weekKey, dayIdx, session, kid, value) — the kid comes
+         BEFORE the value, and getting that round the wrong way silently writes
+         a routine mark for a child called `true`. */
+      const setWeek = (pattern) => {
+        getProfData(kid).chore.mandatoryByWeek[wk] = {};
+        pattern.forEach((keptDay, d) => {
+          mrRoutineSessionsFor(wk, kid, d).forEach(sess => ctSetMandatory(wk, d, sess, kid, keptDay));
+        });
+      };
+      // Six kept with one miss in the middle: the grace carries the run across
+      // it, and the day itself is NOT credited — so this is 6, not 7.
+      setWeek([true, true, true, false, true, true, true]);
+      const oneMiss = mrStreakWeek(wk, kid);
+      if (oneMiss.days !== 6) problems.push('one miss gave a run of ' + oneMiss.days + ', not 6');
+      // Two misses: the grace is spent on the first, the second ends the run.
+      setWeek([true, true, false, true, true, false, true]);
+      const twoMiss = mrStreakWeek(wk, kid);
+      if (twoMiss.days >= 6) problems.push('two misses still gave a run of ' + twoMiss.days);
+      // A clean week is still seven — grace must not inflate the top tier.
+      setWeek([true, true, true, true, true, true, true]);
+      const clean = mrStreakWeek(wk, kid);
+      if (clean.days !== 7) problems.push('a clean week reads ' + clean.days + ', not 7');
+
+      // ── 4 · The pace divides by the weeks that PASSED.
+      const ytd = mrYearToDate(kid);
+      if (typeof ytd.weeksElapsed !== 'number') problems.push('the pace does not report weeks elapsed');
+      else if (ytd.weeksElapsed < ytd.weeks) {
+        problems.push('weeks elapsed (' + ytd.weeksElapsed + ') is fewer than weeks settled (' + ytd.weeks + ')');
+      }
+      if (typeof mrWeeksElapsed !== 'function') problems.push('there is no one owner of weeks elapsed');
+      else if (!(mrWeeksElapsed() > 0)) problems.push('weeks elapsed came out ' + mrWeeksElapsed());
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      pd.fines = savedFines;
+      getProfData(kid).earnings[wk] = savedEarn;
+      getProfData(kid).chore.mandatoryByWeek[wk] = savedMand;
+    }
+    return problems.length ? problems : true;
+  });
+
   /* ── THE FLOW SAYS WHERE IT WENT ──────────────────────────────────
      Stage 1 stored movements instead of balances FOR THIS SCREEN, and until
      now nothing read them: `evFlow`, `evMonths` and `evTypicalMonth` were

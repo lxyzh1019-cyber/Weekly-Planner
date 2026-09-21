@@ -342,6 +342,32 @@ function reflEvidence(wk, kid, tab) {
     if (owed) {
       add('chores_short', `${owed} family chore${owed === 1 ? '' : 's'} still to do.`);
     }
+    /* ── A BEHAVIOUR FINE IS A CONVERSATION, NOT A DEDUCTION ──
+       `reflectOnly` items (js/18-rules.js) are recorded the day they happen and
+       take no money. This is where they land instead: named, in her own tab,
+       as something to talk about.
+
+       It offers the incident and NEVER an answer — nothing on this screen
+       selects one for her, which is the rule the whole reflection is built on.
+       Named individually rather than counted, because "3 things this week"
+       reads as a score and says nothing she can do anything about; "being asked
+       twice, twice" is a thing a nine-year-old can actually think about. */
+    if (typeof mrFines === 'function' && typeof mrRulesForWeek === 'function') {
+      const byId = {};
+      (((mrRulesForWeek(wk) || {}).fines || {}).items || []).forEach(i => { byId[i.id] = i; });
+      const tally = {};
+      mrFines(kid)
+        .filter(f => f && (info.keys || []).includes(f.dayKey))
+        .forEach(f => {
+          const item = byId[f.itemId];
+          if (!item || !item.reflectOnly) return;   // a real fine is money, and says so elsewhere
+          tally[f.itemId] = (tally[f.itemId] || 0) + 1;
+        });
+      Object.keys(tally).forEach(id => {
+        const n = tally[id];
+        add('fine_' + id, `${byId[id].label}${n > 1 ? ` — ${n} times this week` : ''}.`);
+      });
+    }
     let missed = 0;
     (info.keys || []).forEach(key => {
       (getDayBlocksForProfile(key, kid) || []).forEach(b => {
