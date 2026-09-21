@@ -4759,46 +4759,15 @@
   }
   .mission-clear-btn:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 var(--ink); }
 
-  /* The Quest Board's pocket-money disclosure lived here. Today's own money
-     card is the kid-facing summary now, and 💰 My money owns the detail. */
-  .qmp-total { font-weight: 800; font-size: 1.15rem; margin-bottom: 0.5rem; }
-  .qmp-total b { background: var(--accent-yellow); border-radius: 8px; padding: 2px 8px; }
-  .qmp-breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-bottom: 0.55rem; }
-  .qmp-tile {
-    border: 1.5px solid var(--ink); border-radius: 10px; padding: 0.4rem 0.55rem;
-    display: flex; flex-direction: column; gap: 1px; background: var(--bg);
-  }
-  .qmp-open {
-    width: 100%; border: 2px solid var(--ink); border-radius: 10px; background: var(--accent-green);
-    box-shadow: 2px 2px 0 var(--ink); padding: 0.45rem; font-weight: 800; cursor: pointer;
-  }
-  /* ═══════ 3a: "How I earn" — one money page ═══════ */
-  .hm-earn { border: 2px solid var(--ink); border-radius: 12px; background: #fff9e9; padding: 8px 12px; margin-bottom: 8px; }
-  .hm-earn-top { display: flex; align-items: baseline; gap: 8px; }
-  .hm-earn-label { font-family: 'Gochi Hand', cursive; font-size: 1.15rem; }
-  .hm-earn-amt { margin-left: auto; font-family: 'Gochi Hand', cursive; font-size: 1.35rem; color: var(--accent-strong, #c14a24); }
-  .hm-bar { position: relative; height: 16px; border: 2px solid var(--ink); border-radius: 9px; overflow: hidden; background: var(--paper-card, #fffdf5); margin: 6px 0 5px; }
-  .hm-bar-fill { position: absolute; inset: 0; background: var(--accent-yellow, #ffd166); border-radius: 0; }
-  .hm-bar-tick { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #c9bda6; }
-  .hm-earn-note { font-size: calc(0.8rem * var(--fs-scale, 1)); color: var(--ink-light, #5a4d41); }
-  .hm-rules { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
-  .hm-rule { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center; border: 2px solid var(--ink); border-radius: 11px; padding: 6px 9px; background: rgba(255,255,255,0.7); }
-  .hm-rule-icon { font-size: 1.15rem; text-align: center; }
-  .hm-rule-text { font-size: calc(0.86rem * var(--fs-scale, 1)); line-height: 1.25; min-width: 0; }
-  .hm-rule-text i { font-style: italic; opacity: 0.85; }
-  .hm-rule-chip { font-size: calc(0.78rem * var(--fs-scale, 1)); font-weight: 800; border: 2px solid var(--ink); border-radius: 9px; padding: 1px 8px; white-space: nowrap; }
-  .hm-rule-chip.chip-green { background: #95d5b2; }
-  .hm-rule-chip.chip-yellow { background: var(--accent-yellow, #ffd166); }
-  .hm-rule-chip.chip-plain { background: var(--paper-card, #fffdf5); }
-  .hm-wallet { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px; }
-  .hm-wtile { border: 2px solid var(--ink); border-radius: 11px; padding: 6px 4px; text-align: center; }
-  .hm-wtile.w-cash { background: #fff9e9; }
-  .hm-wtile.w-savings { background: #eaf6ef; }
-  .hm-wtile.w-gic { background: #eef3fb; }
-  .hm-wtile.w-stocks { background: #f6effa; }
-  .hm-wtile-label { font-size: calc(0.76rem * var(--fs-scale, 1)); color: var(--ink-light, #5a4d41); }
-  .hm-wtile-amt { font-family: 'Gochi Hand', cursive; font-size: 1.1rem; }
-  .hm-wtile-note { font-size: calc(0.66rem * var(--fs-scale, 1)); color: #6b5d4f; line-height: 1.1; }
+  /* The Quest Board's pocket-money disclosure lived here, and its rules went
+     with the retired "how I earn" card for weeks under the old $6-cap group
+     model. Today's own money card is the kid-facing summary now, and 💰 My
+     money owns the detail. */
+  /* The 3a "How I earn" card drew its own earnings bar, rule chips and wallet
+     tiles here. It was the LEGACY half of that card — the one for weeks priced
+     under the retired $6-cap group model — and it went when the two money
+     models became one. 💰 My money's own tiles are the wallet a child reads
+     now, and they are what walletTilesReadTheRealSavings holds. */
 
   /* Money a week has earned that the meeting has not yet paid out. Not a
      warning — it is hers, it is simply still on the table. */

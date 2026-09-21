@@ -47,11 +47,7 @@ function ctrRow(wk, kid) {
              competition: Number(L.competition) || 0, fines: Number(L.fines) || 0,
              xp: Number(L.xp) || 0, frozen: true, has: true };
   }
-  const has = mrUsesNewModel(wk) ? ctWeekHasData(wk, kid) || ctWeekMoney(wk, kid) > 0 : ctWeekMoney(wk, kid) > 0;
-  if (!mrUsesNewModel(wk)) {
-    return { total: ctWeekMoney(wk, kid), chores: 0, learning: 0, streak: 0,
-             competition: 0, fines: 0, xp: 0, frozen: false, legacy: true, has };
-  }
+  const has = ctWeekHasData(wk, kid) || ctWeekMoney(wk, kid) > 0;
   const b = mrWeekBreakdown(wk, kid);
   return { total: b.net, chores: b.chorePaid, learning: b.learnPaid,
            streak: b.streakBonus, competition: b.compPaid, fines: b.fines.total,

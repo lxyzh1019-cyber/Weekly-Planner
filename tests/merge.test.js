@@ -1149,5 +1149,38 @@ function sync(a, b) {
     stream.evBalanceOf(phone.state.profiles.jenn.events, 'cash') === 0);
 }
 
+
+/* ── WHERE THE RECORD BEGINS, on two devices ───────────────────────
+   One scalar decides how far back the meeting reaches and which weeks are in
+   the system at all. deepMergeObj lets a remote scalar win, so without an
+   explicit decision a device still holding an older idea of the start date
+   pushes it back over a parent's choice and the whole backlog falls out of
+   reach — which is the defect that started this redesign, arriving by a
+   different door. */
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  // The phone carries what an old build seeded: unstamped, and wrong.
+  on(phone, st => { st.shared.chore.programStartDate = '2026-09-21'; });
+  // A parent sets the real one on the iPad, which stamps it.
+  on(ipad, st => {
+    st.shared.chore.programStartDate = '2026-01-05';
+    st.shared.chore.programStartDateAt = 5000;
+  });
+  sync(ipad, phone);
+  check('a parent\'s start date beats a stale device\'s seeded one',
+    ipad.state.shared.chore.programStartDate === '2026-01-05' &&
+    phone.state.shared.chore.programStartDate === '2026-01-05');
+
+  // And the other direction: a LATER deliberate change wins over the earlier one.
+  on(phone, st => {
+    st.shared.chore.programStartDate = '2025-08-25';
+    st.shared.chore.programStartDateAt = 9000;
+  });
+  sync(ipad, phone);
+  check('the newer of two deliberate choices is the one that survives',
+    ipad.state.shared.chore.programStartDate === '2025-08-25' &&
+    phone.state.shared.chore.programStartDate === '2025-08-25');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

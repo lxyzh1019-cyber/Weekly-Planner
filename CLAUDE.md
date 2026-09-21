@@ -1901,6 +1901,109 @@ four segments, which counted to four on Christmas week as readily as on a term
 Tuesday and is exactly why the 9am band stood for so long. They assert the axis
 matches the day it claims to describe.
 
+## One clock — the system did not begin today
+
+**There is one date, `state.shared.chore.programStartDate`, it is DERIVED when
+nobody has set it, and it is never written by being read.** `mrStartWeek()`
+(`js/18-rules.js`) is the one owner.
+
+Three stores used to answer three versions of this question —
+`programStartDate`, `moneyModelStartWeek`, `routineRuleStartWeek` — and every
+one of them **self-seeded to the current Monday** the first time anything read
+it. On a device that first ran a given build in September, that made every week
+before September a different kind of week:
+
+- priced by the retired group-payout formula, so graded chores and the routine
+  streak paid **nothing** in all of them;
+- meeting step 3 swapped wholesale for the legacy confirm screen, so the
+  competition form and the gift form were **not on the page**, with nothing to
+  say why;
+- `mmCatchUpFloor` was the later of two of them, so the catch-up list reached
+  **one week** and the $3 default sweep found **none at all** and said so;
+- and the routine streak asked for three routines on every day of every week,
+  so Labour Day and both weekend days broke the run.
+
+"Unset" was being read as "the system began today", which is the one thing it
+cannot mean for a family that has been running for months.
+
+**Deriving rather than seeding is the load-bearing half.** `mrDerivedStartWeek`
+reads the earliest week with anything in it — the money ledger, finalised
+weeks, group payouts, meetings held, each child's stream and each child's
+placed blocks — and **writes nothing**. So it costs no sync, it cannot be frozen
+wrong by whichever device happened to look first, and it moves back on its own
+the moment an older week arrives from another device. A parent can still say the
+family began earlier (Setup › Weeks on record), and that is the only way a
+household whose real beginning predates anything on file can say so.
+
+This exact derivation was tried once as the **catch-up floor** and removed,
+because there it suppressed genuinely open weeks whenever the first record
+happened to be recent. As a **default start** it errs the other way: against a
+seed of "today" it can only ever reach further back.
+
+**Merge decision:** `programStartDate` is arbitrated newest-stamp-wins against
+`programStartDateAt` in `mergeSharedChore`, the same shape as `goalsByWeek`. An
+**unstamped** value counts as 0 deliberately — it can only have come from a
+build that seeded this, and a deliberate choice must always beat a seed. Without
+it `deepMergeObj` lets a remote scalar win and a stale device pushes its own
+idea straight back, putting the whole backlog out of reach again.
+
+`moneyModelStartWeek` and `routineRuleStartWeek` are retired but **not deleted**:
+a delete inside `state.shared.chore` cannot propagate (`deepMergeObj` iterates
+the keys the remote has), so tidying them would churn the document on every sync
+to no effect. Same reasoning as the retired `unlockedActs`.
+
+## One money model, for every week
+
+`mrUsesNewModel` is **gone**, and with it the legacy branch of `ctWeekMoney`,
+the legacy step 3 and step 4, `buildHowIEarnCardLegacy` and its CSS,
+`ctGroupEarned`, and the `newModel` skip in `commitKidWeek` that took the ledger
+freeze, the XP credit, the arrears, the loan transfer and the Sunday Box with it.
+
+The reasoning for having two models was right — history must not move when the
+family switches to graded chores — but the **mechanism was never what made that
+true**. Two other things do, and both are still here:
+
+- a settled week is a **frozen ledger** and is never recomputed at all;
+- a price edit lands as an **effective-dated rule version** (`mrVersionForDate`),
+  so an old week still prices under the rules that were live when it was lived.
+
+`moneySnapshots` still comes first in `ctWeekMoney`: weeks frozen at the
+original migration are a record, not a calculation. `ctWeekIsPreSystem` is the
+one owner of that question, and it is what now decides whether the chore tab
+draws the retired board — the honest test, where `mrUsesNewModel` sent every
+past week there and left a child with no chore rows and nothing to claim.
+
+## The repair — weeks the retired branch mispriced
+
+`evRepairPlan` / `evRunRepair` (`js/40-stream.js`), previewed on the parent's
+Money page. Four rules, each load-bearing:
+
+1. **Each week prices under ITS OWN rules.** `mrWeekBreakdown` resolves that
+   week's effective-dated rule version, so a price edited last month cannot
+   restate a week from March. Repairing is not re-pricing under today's
+   rulebook, and that difference is the whole reason a parent can agree to it.
+2. **It only ever ADDS.** A week the old branch happened to pay *more* for keeps
+   what it paid. Money already in a child's hand is hers.
+3. **A week frozen at the original migration is never touched.**
+4. **Idempotent by a derived id**, because two devices will each run it and then
+   sync.
+
+The frozen ledger is corrected alongside the wallet and stamped `repricedAt`, or
+the money story and `mrYearToDate` would keep quoting the figure the retired
+branch produced while the wallet said something else — which is the
+two-answers-to-one-question defect this file keeps recording.
+
+**A defaulted week says so.** `defaulted` was written and read nowhere, so a
+week credited at the flat default because nobody sat down read as "typed in" —
+the same label as a week a parent entered from memory. They are different facts
+and the history says which, alongside "re-priced".
+
+**The $3 default is offered where the backlog is.** `mmUnsettledWeeks` stops at
+eight, so anything older was invisible there AND unsettleable — the only door
+was a card in Setup that a parent had no reason to open. The catch-up banner now
+carries the older weeks and the sweep. Still a tap, still previewed, still moves
+no money until `mnyRunDefaultSweep` confirms.
+
 ## The money stream — a flow, not a balance
 
 `js/40-stream.js`. **Money is stored as MOVEMENTS and every balance is derived

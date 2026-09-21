@@ -543,8 +543,8 @@ async function mnyRunDefaultSweep() {
 function mnyStartDateCard() {
   ctEnsureShared();
   const c = state.shared.chore;
-  const model = String(mrModelStartWeek());
-  const program = c.programStartDate ? String(c.programStartDate) : model;
+  const program = String(mrStartWeek());
+  const derived = !c.programStartDate;
   const floor = (typeof mmCatchUpFloor === 'function') ? mmCatchUpFloor() : model;
   const pending = mnyDefaultSweepPlan();
   return `<div class="mny-card">
@@ -552,7 +552,9 @@ function mnyStartDateCard() {
       <label class="mny-field"><span>First week</span>
         <input type="date" value="${escapeAttr(program)}" data-mnyp-action="startweek"></label>
       <div class="mny-note">The meeting looks back to the Monday of this week and no further.
-        Currently ${escapeHtml(mnyShortDate(floor))}.</div>
+        Currently ${escapeHtml(mnyShortDate(floor))}.${derived
+          ? ` Worked out from the earliest week on file — set it if the family started before that.`
+          : ''}</div>
       ${pending.weeks.length ? `
         <div class="mny-week-head mny-gap"><span class="mny-label">🕰 Weeks nobody sat down for</span>
           <b>${mnyMoney(pending.total)}</b></div>
@@ -609,9 +611,66 @@ function mnyStreamCard() {
     </div>`;
 }
 
+/* ── Weeks the retired branch short-changed ──
+   Until the two money models became one, which model a week used was decided by
+   a store that seeded itself to the current Monday — so on any device running a
+   new build every week the family had lived was priced by the retired formula,
+   and graded chores, the routine streak and a recorded competition all paid
+   nothing in all of them. `finalizedWeeks[wk][kid] == null` then refused to
+   credit them ever again.
+
+   `evRepairPlan` (js/40-stream.js) reads only. Each week is re-priced under ITS
+   OWN rules, never today's, and the repair only ever adds — a week the old
+   branch happened to pay more for keeps what it paid. */
+function mnyRepairCard() {
+  const plans = (typeof evRepairPlan === 'function') ? evRepairPlan() : [];
+  const total = money2(plans.reduce((n, p) => n + p.total, 0));
+  const weeks = plans.reduce((n, p) => n + p.weeks.length, 0);
+  if (!weeks) {
+    return `<div class="mny-card">
+        <div class="mny-week-head"><span class="mny-label">🩹 Weeks that were short</span></div>
+        <div class="mny-note">✅ Nothing owed — every settled week matches what its own rules say.</div>
+      </div>`;
+  }
+  return `<div class="mny-card">
+      <div class="mny-week-head"><span class="mny-label">🩹 Weeks that were short</span>
+        <b>${mnyMoney(total)}</b></div>
+      <div class="mny-note">These were settled while two money models were live, and were
+        priced by the retired one — so graded chores, the routine streak and any
+        competition in them paid nothing. Each is re-priced under <b>its own</b> rules.</div>
+      ${plans.filter(p => p.weeks.length).map(p => p.weeks.slice(0, 10).map(w => `
+        <div class="mny-row">
+          <span>${escapeHtml(mnyKidName(p.kid))} — week of ${escapeHtml(mnyShortDate(w.wk))}${w.why ? `<br><span class="mny-note">${escapeHtml(w.why)}</span>` : ''}</span>
+          <b>${mnyMoney(w.was)} → ${mnyMoney(w.should)}</b>
+        </div>`).join('')).join('')}
+      <button type="button" class="mny-btn wide" data-mnyp-action="repair"
+        >Pay the ${mnyMoney(total)} they were short, across ${weeks} week${weeks === 1 ? '' : 's'}</button>
+      <div class="mny-note">Shown before anything moves, and it only ever adds:
+        a week that was paid more than its rules say keeps what it paid.</div>
+    </div>`;
+}
+
+async function mnyRunRepair() {
+  if (!isParent()) { showToast('A grown-up settles the weeks 🔒'); return; }
+  const plans = evRepairPlan();
+  const total = money2(plans.reduce((n, p) => n + p.total, 0));
+  const weeks = plans.reduce((n, p) => n + p.weeks.length, 0);
+  if (!weeks) { showToast('Nothing owed ✅'); return; }
+  const lines = plans.filter(p => p.weeks.length).map(p =>
+    `${mnyKidName(p.kid)}: ${mnyMoney(p.total)} across ${p.weeks.length} week${p.weeks.length === 1 ? '' : 's'}`);
+  const ok = await showConfirm(
+    `Pay ${mnyMoney(total)} that ${weeks} settled week${weeks === 1 ? ' was' : 's were'} short?\n\n` +
+    `${lines.join('\n')}\n\nEach week is re-priced under its own rules, and nothing is ever taken away.`,
+    { okLabel: 'Pay it', cancelLabel: 'Not now' });
+  if (!ok) return;
+  const res = evRunRepair();
+  showToast(`✅ ${mnyMoney(res.credited)} across ${res.weeks} week${res.weeks === 1 ? '' : 's'}`);
+  mnyRenderRulesTab();
+}
+
 function mnyHistoryEditor(kid) {
   const rows = mnyLedgerRows(kid);
-  return `${mnyStreamCard()}${mnyStartDateCard()}<div class="mny-card">
+  return `${mnyStreamCard()}${mnyRepairCard()}${mnyStartDateCard()}<div class="mny-card">
       <div class="mny-week-head"><span class="mny-label">📖 Weeks on record</span><b>${rows.length}</b></div>
       <button type="button" class="mny-btn wide" data-mnyp-action="addweek">＋ Add a week that happened before this</button>
       <div class="mny-note">Each tap steps one week further back from the earliest week on record.</div>
@@ -629,7 +688,12 @@ function mnyHistoryEditor(kid) {
       const gap = money2(inTotal - money2(r.fines) - outTotal);
       return `<div class="mny-card">
           <div class="mny-week-head">
-            <span class="mny-label">Week of ${escapeHtml(mnyShortDate(r.weekKey))}${r.handEntered ? ' · typed in' : (r.weeksLate ? ' · settled ' + r.weeksLate + 'wk late' : '')}</span>
+            <span class="mny-label">Week of ${escapeHtml(mnyShortDate(r.weekKey))}${
+              /* `defaulted` was written and read nowhere, so a week credited at
+                 the flat default because nobody sat down read as "typed in" —
+                 the same label as a week a parent entered from memory. They are
+                 different facts and the history has to say which. */
+              r.defaulted ? ' · nobody met' : (r.repricedAt ? ' · re-priced' : (r.handEntered ? ' · typed in' : (r.weeksLate ? ' · settled ' + r.weeksLate + 'wk late' : '')))}</span>
             <b>${mnyMoney(r.net)}</b>
           </div>
           ${r.handEntered ? `<div class="mny-rows">
@@ -791,6 +855,7 @@ function mnyParentClick(ev) {
   if (a === 'addweek') { mnyAddMissedWeek(kid); mnyRenderRulesTab(); return; }
   if (a === 'sweepdefault') { mnyRunDefaultSweep(); return; }
   if (a === 'migrate')      { mnyRunStreamSetup(); return; }
+  if (a === 'repair')       { mnyRunRepair(); return; }
 }
 
 /* Writes the stream's opening record, after saying what it will do. Separate
@@ -818,11 +883,18 @@ async function mnyRunStreamSetup() {
   mnyRenderRulesTab();
 }
 
-/* Both stores, together. They gate different things — moneyModelStartWeek
-   decides which money model a week uses, programStartDate anchors the rules and
-   the chore rotation — but mmCatchUpFloor is max() of the two, so setting only
-   one leaves the look-back where it was. Normalised to the MONDAY of whatever
-   date was typed, because every week key in this app is a Monday. */
+/* ONE date now. There used to be two — `programStartDate` and
+   `moneyModelStartWeek` — gating different things and both self-seeding to the
+   current Monday, so a household running for months was told its record began
+   this week and its whole backlog fell out of reach. `mrStartWeek`
+   (js/18-rules.js) derives it from the earliest week on file when nobody has
+   set it; this is how a family says their real beginning was earlier still.
+
+   Stamped, because `deepMergeObj` lets a REMOTE SCALAR WIN: without a stamp a
+   device still holding its own older idea of the start date would push it
+   straight back over a parent's choice, silently. `mergeSharedChore` arbitrates
+   the pair newest-wins. Normalised to the MONDAY of whatever date was typed,
+   because every week key in this app is a Monday. */
 function mnySetStartWeek(value) {
   if (!isParent()) { showToast('A grown-up sets this 🔒'); return; }
   if (!value) return;
@@ -832,7 +904,13 @@ function mnySetStartWeek(value) {
   ctEnsureShared();
   const c = state.shared.chore;
   c.programStartDate = wk;
-  c.moneyModelStartWeek = wk;
+  c.programStartDateAt = syncNow();
+  /* `moneyModelStartWeek` and `routineRuleStartWeek` are retired but NOT
+     deleted. A delete inside state.shared.chore cannot propagate — deepMergeObj
+     iterates the keys the remote has, so the next snapshot puts them straight
+     back — and tidying them would churn the document on every sync to no
+     effect. Nothing reads them any more; a stored copy is left where it lies,
+     the same reasoning as the retired `unlockedActs`. */
   saveAll();
   mnyRenderRulesTab();
   showToast('Pocket money starts the week of ' + mnyShortDate(wk));

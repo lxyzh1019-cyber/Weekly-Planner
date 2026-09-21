@@ -662,3 +662,129 @@ function evRunMigration() {
   if (written) saveAll();
   return { written, plans };
 }
+
+/* ════════════════════════════════════════════════════════════════
+   THE REPAIR — weeks the retired branch mispriced
+
+   Until Stage 2 there were two money models, and which one a week used was
+   decided by a store that seeded itself to the current Monday. On any device
+   running a new build that made EVERY week the family had lived a "legacy"
+   week: graded chores and the routine streak paid nothing in all of them, a
+   competition recorded in one of them never reached the wallet, and
+   `finalizedWeeks[wk][kid] == null` then refused to ever credit it again.
+
+   That is how a $21 meet came to sit in a week settled at $0 with no way to
+   collect it, and how a child who kept every routine was paid $1.
+
+   This finds those weeks and credits the DIFFERENCE, once.
+
+   Four rules, each load-bearing:
+
+   1. **Each week prices under ITS OWN rules.** `mrWeekBreakdown` resolves the
+      effective-dated rule version for that week (`mrVersionForDate`), so a
+      price edited last month cannot restate a week from March. Repairing is
+      not the same as re-pricing under today's rulebook, and the difference is
+      the whole reason a parent can agree to it.
+
+   2. **It only ever ADDS.** A week the old branch happened to pay MORE for —
+      a group payout under the $6 cap — keeps what it paid. Money already in a
+      child's hand is hers; a correction that reached into her wallet would
+      teach her the opposite of what this system is for.
+
+   3. **A week frozen at the ORIGINAL migration is never touched.** Those
+      predate the chore pool entirely, so there is nothing to re-price and
+      `ctWeekIsPreSystem` says so.
+
+   4. **Idempotent, by a derived id.** Two devices can each run it, then sync,
+      and the week is repaired once.
+   ════════════════════════════════════════════════════════════════ */
+
+/* What one week is worth under its own rules, ignoring what was actually paid.
+   Read-only. Returns null when the question does not apply. */
+function evRepriceWeek(kid, weekKey) {
+  if (typeof ctWeekIsPreSystem === 'function' && ctWeekIsPreSystem(weekKey, kid)) return null;
+  if (typeof mrWeekBreakdown !== 'function') return null;
+  try { return mrWeekBreakdown(weekKey, kid); } catch (err) { return null; }
+}
+
+/* Every settled week that was short-changed, for one child. Writes nothing. */
+function evRepairPlanFor(kid) {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  const fin = c.finalizedWeeks || {};
+  const have = {};
+  evEnsure(kid).forEach(e => { if (e && e.id) have[e.id] = true; });
+
+  const weeks = [];
+  Object.keys(fin).sort().forEach(wk => {
+    const credited = (fin[wk] || {})[kid];
+    if (credited == null) return;                 // never settled — nothing to repair
+    const id = evMigId(kid, [wk, 'repair']);
+    if (have[id]) return;                         // already repaired
+    const b = evRepriceWeek(kid, wk);
+    if (!b) return;
+    const should = money2(b.net);
+    const was = money2(credited);
+    const gap = money2(should - was);
+    if (!(gap > 0)) return;                       // only ever adds — see rule 2
+    weeks.push({
+      wk, id, was, should, gap,
+      // Named, so the preview can say WHY rather than just showing a number.
+      why: [
+        b.chorePaid > 0 ? `chores ${mnyMoney(b.chorePaid)}` : '',
+        b.streakBonus > 0 ? `routines ${mnyMoney(b.streakBonus)} (${b.streak.days} clean days)` : '',
+        b.compPaid > 0 ? `competitions ${mnyMoney(b.compPaid)}` : '',
+        b.learnPaid > 0 ? `learning ${mnyMoney(b.learnPaid)}` : '',
+      ].filter(Boolean).join(' · '),
+    });
+  });
+  return { kid, weeks, total: money2(weeks.reduce((s, w) => s + w.gap, 0)) };
+}
+
+function evRepairPlan() { return ['jenn', 'jess'].map(evRepairPlanFor); }
+
+/* Credit the difference. One event per week, carrying the derived id that makes
+   a second run a no-op, and the frozen ledger is corrected alongside so the
+   money story and `mrYearToDate` agree with the wallet rather than with the
+   figure the retired branch produced. */
+function evRunRepair() {
+  if (!isParent()) { showToast('A grown-up settles the weeks 🔒'); return null; }
+  ctEnsureShared();
+  const c = state.shared.chore;
+  const plans = evRepairPlan();
+  let credited = 0, weeks = 0;
+  plans.forEach(plan => {
+    plan.weeks.forEach(w => {
+      /* The wallet first, through the one writer that moves cash, so the stream
+         line and the balance can never disagree about this. */
+      moneyAddCash(plan.kid, w.gap, {
+        kind: 'settle', from: 'earned', dayKey: w.wk, weekKey: w.wk, ref: w.wk,
+        id: w.id, note: 'Week of ' + w.wk + ' — re-priced under its own rules',
+      });
+      c.finalizedWeeks[w.wk][plan.kid] = money2(w.should);
+      /* The frozen ledger is a record of what was AGREED, so it is corrected
+         rather than rebuilt: the week's own lines are re-read under its own
+         rules, and the correction is stamped so the history says it happened
+         instead of quietly reading as though it always had. */
+      const led = ((c.moneyLedger || {})[w.wk] || {})[plan.kid];
+      const b = evRepriceWeek(plan.kid, w.wk);
+      if (led && b) {
+        led.chores = money2(b.chorePaid);
+        led.learning = money2(b.learnPaid);
+        led.streak = money2(b.streakBonus);
+        led.streakDays = b.streak.days || 0;
+        led.competition = money2(b.compPaid);
+        led.fines = money2(b.fines.total);
+        led.gross = money2(money2(b.chorePaid) + money2(b.learnPaid)
+                         + money2(b.streakBonus) + money2(b.compPaid));
+        led.net = money2(b.net);
+        led.repricedAt = syncNow();
+        led.updatedAt = syncNow();
+      }
+      credited = money2(credited + w.gap);
+      weeks++;
+    });
+  });
+  if (weeks) saveAll();
+  return { weeks, credited, plans };
+}

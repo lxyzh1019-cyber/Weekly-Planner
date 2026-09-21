@@ -4328,12 +4328,12 @@ function findChromium() {
   // empty chart proves only that nothing threw.
   await page.evaluate(() => {
     const cur = ctMondayOf(formatDayKey(ctWeekKey));
-    // Weeks before moneyModelStartWeek resolve through the RETIRED model and
-    // correctly show nothing here. Walk the start back so this window is all
-    // new-model weeks — i.e. a family two months into the current rules.
+    // One money model for every week now, so nothing has to be walked back for
+    // these bars to draw. The start date still has to cover the window, or the
+    // weeks sit before the family's own record.
     const back = new Date(cur); back.setDate(cur.getDate() - 8 * 7);
     ctEnsureShared();
-    state.shared.chore.moneyModelStartWeek = ctDateToKey(back);
+    state.shared.chore.programStartDate = ctDateToKey(back);
     for (let i = 1; i < 8; i++) {
       const d = new Date(cur); d.setDate(cur.getDate() - i * 7);
       const wk = ctDateToKey(d);
@@ -5580,6 +5580,212 @@ function findChromium() {
     return problems.length ? problems : true;
   });
 
+  /* ── THE SYSTEM DID NOT BEGIN TODAY ───────────────────────────────
+     Three stores answered "when did this family start", and every one of them
+     SEEDED ITSELF to the current Monday the first time anything read it. On a
+     device that first ran a build in September that made every earlier week a
+     different kind of week: priced by a retired formula, its competition and
+     gift forms absent from the meeting, and out of reach of both the catch-up
+     list and the default sweep. "Unset" was being read as "the system began
+     today", which is the one thing it cannot mean.
+
+     One store now, DERIVED from the earliest week on file and never written —
+     so it costs no sync, cannot be frozen wrong by whichever device looked
+     first, and moves back on its own when an older week arrives. */
+  checks.theSystemDidNotBeginToday = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const c = state.shared.chore;
+    const savedProgram = c.programStartDate, savedAt = c.programStartDateAt;
+    const savedLedger = c.moneyLedger, savedFin = c.finalizedWeeks;
+    try {
+      // A household with three months of history and nobody having set a date.
+      delete c.programStartDate; delete c.programStartDateAt;
+      const back = (n) => {
+        const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - n * 7);
+        return ctDateToKey(d);
+      };
+      c.moneyLedger = {}; c.moneyLedger[back(12)] = { jenn: { net: 5 } };
+      c.finalizedWeeks = {}; c.finalizedWeeks[back(12)] = { jenn: 5 };
+
+      const derived = mrStartWeek();
+      if (derived !== back(12)) {
+        problems.push('derived start is ' + derived + ', not the earliest week on file ' + back(12));
+      }
+      // Derived, not written: nothing may be stored by having asked.
+      if (c.programStartDate) problems.push('asking for the start date wrote one');
+      // And the backlog is reachable because of it.
+      if (mmCatchUpFloor() !== back(12)) {
+        problems.push('the catch-up floor is ' + mmCatchUpFloor() + ', not the start');
+      }
+      // A parent can still say the family began earlier, and that is stamped —
+      // without a stamp a stale device pushes its own idea straight back.
+      mnySetStartWeek(back(30));
+      if (String(mrStartWeek()) !== back(30)) problems.push('a parent could not set the start date');
+      if (!c.programStartDateAt) problems.push('the parent\'s choice was not stamped');
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      c.programStartDate = savedProgram; c.programStartDateAt = savedAt;
+      if (savedProgram === undefined) delete c.programStartDate;
+      if (savedAt === undefined) delete c.programStartDateAt;
+      c.moneyLedger = savedLedger; c.finalizedWeeks = savedFin;
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── A FULL WEEK OF ROUTINES PAYS THE FULL STREAK ─────────────────
+     The defect this whole redesign started from, asserted on its own fixture.
+
+     Mon 7 Sep 2026 is Labour Day. Under the held-back rule the money asked for
+     three routines on every day of that week, so Monday, Saturday and Sunday
+     each wanted an after-school routine no plan contained — the longest clean
+     run came to four days instead of seven, and a child who kept every routine
+     she was asked for was paid the 3-day step, $1 instead of $3, with her own
+     week grid reading 7/7 beside it.
+
+     Seeded rather than assumed: the week has to actually open on a day with no
+     school, or the check proves nothing about the case it is named for. */
+  checks.aFullWeekOfRoutinesPaysTheFullStreak = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead();
+    const kid = 'jenn';
+    // Walk back to a week whose Monday is a no-school day — a holiday Monday.
+    let wk = null;
+    for (let i = 1; i <= 60; i++) {
+      const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - i * 7);
+      const key = ctDateToKey(d);
+      if (!isSchoolDay(key)) { wk = key; break; }
+    }
+    if (!wk) return ['no holiday Monday within a year to test on'];
+    const keys = mrWeekDayKeys(wk);
+    const saved = keys.map(k => (getDayBlocks(k, kid) || []).slice());
+    /* The routine marks go back too, not just the blocks. Leaving a week fully
+       ticked made `blankPastWeekCanBeMadeUp` fail thirty checks later, because
+       `mmToggleAllRoutines` is a TOGGLE and an already-clean day turns OFF. A
+       check that leaves state behind is a check that breaks its neighbours. */
+    const savedMarks = [];
+    for (let d = 0; d < 7; d++) {
+      savedMarks.push(CT_SESSIONS.map(sn => !!ctGetMandatory(wk, d, sn, kid)));
+    }
+    try {
+      keys.forEach(k => setDayBlocks(k, [], kid));
+      // She keeps every routine each day ASKED her for — nothing more.
+      for (let d = 0; d < 7; d++) {
+        CT_SESSIONS.forEach(sn => ctSetMandatory(wk, d, sn, kid, false));
+        routineSessionsForDay(kid, wk, d).forEach(sn => ctSetMandatory(wk, d, sn, kid, true));
+      }
+      const streak = mrStreakWeek(wk, kid);
+      if (streak.days !== 7) {
+        problems.push('a week of kept routines counts ' + streak.days + ' clean days, not 7');
+      }
+      const top = MR_DEFAULT_RULES.streak.tiers.reduce((a, b) => (b.days > a.days ? b : a));
+      if (money2(streak.bonus) !== money2(top.bonus)) {
+        problems.push('it pays ' + mnyMoney(streak.bonus) + ', not the top tier ' + mnyMoney(top.bonus));
+      }
+      // The half that made it invisible: the screen and the money must ask the
+      // same question of the same day, on the holiday Monday itself.
+      const shown = routineSessionsForDay(kid, wk, 0).length;
+      const priced = mrRoutineSessionsFor(wk, kid, 0).length;
+      if (shown !== priced) {
+        problems.push('on the holiday Monday the screen asks ' + shown + ' and the money asks ' + priced);
+      }
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      keys.forEach((k, i) => setDayBlocks(k, saved[i], kid));
+      for (let d = 0; d < 7; d++) {
+        CT_SESSIONS.forEach((sn, i) => ctSetMandatory(wk, d, sn, kid, savedMarks[d][i]));
+      }
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── A WEEK THE RETIRED BRANCH SHORT-CHANGED IS PAID, ONCE ────────
+     A competition recorded in a week that settled under the retired formula
+     reached the wallet as $0, and `finalizedWeeks[wk][kid] == null` then
+     refused to credit it ever again — which is how $21 of prize money came to
+     sit in a settled week with no way to collect it.
+
+     The repair re-prices each week under ITS OWN rules, only ever adds, and is
+     idempotent, because two devices will each run it and then sync. */
+  checks.aShortChangedWeekIsPaidOnce = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jess', c = state.shared.chore;
+    const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - 21);
+    const wk = ctDateToKey(mon);
+    const pd = getProfData(kid);
+    const savedComp = (pd.competitions || []).slice();
+    const savedEvents = (pd.events || []).slice();
+    const savedFin = JSON.parse(JSON.stringify(c.finalizedWeeks || {}));
+    const savedLed = JSON.parse(JSON.stringify(c.moneyLedger || {}));
+    const savedProgram = c.programStartDate;
+    try {
+      c.programStartDate = wk;
+      pd.competitions = [];
+      // A real meet in that week, scored at entry — 21 points, $1 a point.
+      mrAddCompetition(kid, { dayKey: mrWeekDayKeys(wk)[5], sport: 'swim',
+                              name: 'Regional meet', points: 21 });
+      const worth = money2(mrWeekBreakdown(wk, kid).net);
+      if (!(worth >= 21)) problems.push('the seeded meet is only worth ' + worth);
+
+      // The week as the retired branch left it: settled, and paid nothing.
+      if (!c.finalizedWeeks[wk]) c.finalizedWeeks[wk] = {};
+      c.finalizedWeeks[wk][kid] = 0;
+      if (!c.moneyLedger[wk]) c.moneyLedger[wk] = {};
+      c.moneyLedger[wk][kid] = { at: Date.now(), chores: 0, learning: 0, streak: 0,
+                                 competition: 0, fines: 0, gross: 0, net: 0 };
+
+      const plan = evRepairPlanFor(kid);
+      const row = plan.weeks.find(w => w.wk === wk);
+      if (!row) problems.push('the short-changed week is not in the plan');
+      else if (money2(row.gap) !== worth) problems.push('the plan offers ' + row.gap + ', not ' + worth);
+
+      const before = mnyCash(kid);
+      const streamBefore = evBalance(kid, 'cash');
+      evRunRepair();
+      const after = mnyCash(kid);
+      if (money2(after - before) !== worth) {
+        problems.push('the wallet moved ' + money2(after - before) + ', not ' + worth);
+      }
+      // The frozen ledger has to agree with the wallet, or the money story and
+      // the year total keep quoting the figure the retired branch produced.
+      const led = c.moneyLedger[wk][kid];
+      if (money2(led.competition) !== money2(mrWeekBreakdown(wk, kid).compPaid)) {
+        problems.push('the ledger still says competition ' + led.competition);
+      }
+      if (!led.repricedAt) problems.push('the correction is not on the record');
+
+      // Twice must be once: two devices will each run this and then sync.
+      const second = evRunRepair();
+      if (second.weeks !== 0) problems.push('running it twice repaired ' + second.weeks + ' more');
+      if (mnyCash(kid) !== after) problems.push('running it twice moved the wallet again');
+      /* The repair's own movement has to reach the stream. Measured as a DELTA,
+         not as absolute agreement: earlier checks in this suite set
+         `ensureWallet(kid).cash` by hand to seed a fixture, which no writer can
+         mirror, so jess's stream and wallet are already apart by then. What
+         matters here is that the repair moved both by the same amount. */
+      const streamMoved = money2(evBalance(kid, 'cash') - streamBefore);
+      if (streamMoved !== worth) {
+        problems.push('the stream recorded ' + streamMoved + ' where the wallet moved ' + worth);
+      }
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      pd.competitions = savedComp;
+      pd.events = savedEvents;
+      c.finalizedWeeks = savedFin;
+      c.moneyLedger = savedLed;
+      c.programStartDate = savedProgram;
+      if (savedProgram === undefined) delete c.programStartDate;
+    }
+    return problems.length ? problems : true;
+  });
+
   /* Setting the stream up on a household that already has months of history
      must leave every total EXACTLY as it reads today — it records where money
      went, it does not move any. And running it twice must change nothing,
@@ -6247,8 +6453,7 @@ function findChromium() {
   checks.oneCurrentWeekEverywhere = await page.evaluate(() => {
     const planner = dateToLocalKey(getWeekStart(0));
     return ctThisWeekKey() === planner
-        && mnyWeekKey() === (ctWeekKey || planner)
-        && mrUsesNewModel(planner);
+        && mnyWeekKey() === (ctWeekKey || planner);
   });
 
   /* ══════════════════════════════════════════════════════════════
@@ -8346,11 +8551,11 @@ function findChromium() {
     profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jenn', c = state.shared.chore;
-    const startBefore = c.moneyModelStartWeek;
+    const startBefore = c.programStartDate;
     const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - 14);
     const past = ctDateToKey(mon);
-    // The model has to cover the week, or step 4 says "nothing to decide".
-    c.moneyModelStartWeek = past;
+    // The family's record has to reach the week, or it is before they began.
+    c.programStartDate = past;
     // Exactly what a fortnight nobody opened the app in leaves behind.
     const e = mrEnsureEarnings(kid, past);
     e.chores = {}; e.claims = {}; e.overrides = {};
@@ -8403,7 +8608,7 @@ function findChromium() {
 
     closeSheet('familyMeetingOverlay');
     e.chores = {}; e.claims = {};
-    c.moneyModelStartWeek = startBefore;
+    c.programStartDate = startBefore;
     ctSetCurrentWeekFromPlanner();
     return (onPastWeek && labelled && noChores && canAdd && picker && nowListed
             && paid && allThree && routinesDontPayChores) || [{ onPastWeek, labelled,
@@ -8422,12 +8627,11 @@ function findChromium() {
     const c = state.shared.chore;
     const heldBefore = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
     const metBefore = JSON.parse(JSON.stringify(c.meetingsMet || {}));
-    const startBefore = c.moneyModelStartWeek, progBefore = c.programStartDate;
+    const progBefore = c.programStartDate;
     const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - 21);
     // A family three weeks in. Both floors, because the look-back stops at
     // whichever is later — a week before the family existed is not a week
     // they missed.
-    c.moneyModelStartWeek = ctDateToKey(mon);
     c.programStartDate = ctDateToKey(mon);
 
     c.meetingsHeld = {}; c.meetingsMet = {};
@@ -8447,12 +8651,13 @@ function findChromium() {
     // A way in, not a telling-off: the copy must not scold a busy fortnight.
     if (!hub.textContent.includes('Nothing expires')) bad.push('the copy scolds instead of offering');
 
-    // Weeks before the money model began are a dead end — never offered.
-    c.moneyModelStartWeek = ctThisWeekKey();
-    if (mmUnsettledWeeks(8).length !== 0) bad.push('weeks before the money model started are still offered');
+    // Weeks before the family's own record began are a dead end — never
+    // offered. One date decides this now; it used to be the later of two.
+    c.programStartDate = ctThisWeekKey();
+    if (mmUnsettledWeeks(8).length !== 0) bad.push('weeks before the record began are still offered');
 
     c.meetingsHeld = heldBefore; c.meetingsMet = metBefore;
-    c.moneyModelStartWeek = startBefore; c.programStartDate = progBefore;
+    c.programStartDate = progBefore;
     return bad.length === 0 || bad;
   });
 
@@ -8470,9 +8675,9 @@ function findChromium() {
     const c = state.shared.chore;
     const heldBefore = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
     const metBefore = JSON.parse(JSON.stringify(c.meetingsMet || {}));
-    const startBefore = c.moneyModelStartWeek, progBefore = c.programStartDate;
+    const progBefore = c.programStartDate;
     const back = n => { const m = formatDayKey(ctThisWeekKey()); m.setDate(m.getDate() - n * 7); return ctDateToKey(m); };
-    c.moneyModelStartWeek = back(3); c.programStartDate = back(3);
+    c.programStartDate = back(3);
     c.meetingsHeld = {}; c.meetingsMet = {};
 
     // Two of the three were actually met. They must stop being nagged about…
@@ -8501,7 +8706,7 @@ function findChromium() {
     if (mmUnopenedWeeks(8).length !== 0) bad.push('ticking off the last unopened week did not take it off the list');
 
     c.meetingsHeld = heldBefore; c.meetingsMet = metBefore;
-    c.moneyModelStartWeek = startBefore; c.programStartDate = progBefore;
+    c.programStartDate = progBefore;
     renderParentHome();
     return bad.length === 0 || bad;
   });
@@ -9024,9 +9229,9 @@ function findChromium() {
     const c = state.shared.chore;
     const heldBefore = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
     const metBefore = JSON.parse(JSON.stringify(c.meetingsMet || {}));
-    const startBefore = c.moneyModelStartWeek, progBefore = c.programStartDate;
+    const progBefore = c.programStartDate;
     const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - 8 * 7);
-    c.moneyModelStartWeek = ctDateToKey(mon); c.programStartDate = ctDateToKey(mon);
+    c.programStartDate = ctDateToKey(mon);
     c.meetingsHeld = {}; c.meetingsMet = {};
 
     const open = mmUnsettledWeeks(8).length;
@@ -9040,7 +9245,7 @@ function findChromium() {
     if (!/nobody has opened/.test(host.textContent)) bad.push('the caption stopped saying how many are open');
 
     c.meetingsHeld = heldBefore; c.meetingsMet = metBefore;
-    c.moneyModelStartWeek = startBefore; c.programStartDate = progBefore;
+    c.programStartDate = progBefore;
     return bad.length === 0 || bad;
   });
 
@@ -9208,15 +9413,14 @@ function findChromium() {
     const c = state.shared.chore;
     const heldBefore = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
     const metBefore = JSON.parse(JSON.stringify(c.meetingsMet || {}));
-    const startBefore = c.moneyModelStartWeek, progBefore = c.programStartDate;
+    const progBefore = c.programStartDate;
     const askedBefore = mmCatchUpAsked;
     const back = (n) => {
       const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - n * 7);
       return ctDateToKey(d);
     };
-    // Both floors: the look-back stops at whichever is later, because a week
+    // One floor: the look-back stops at the family's own start, because a week
     // before the family existed is not a week they missed.
-    c.moneyModelStartWeek = back(3);
     c.programStartDate = back(3);
     // Settled three weeks ago and nothing since: two weeks open behind us.
     c.meetingsHeld = {}; c.meetingsHeld[back(3)] = true;
@@ -9268,7 +9472,7 @@ function findChromium() {
     closeSheet('familyMeetingOverlay');
 
     c.meetingsHeld = heldBefore; c.meetingsMet = metBefore;
-    c.moneyModelStartWeek = startBefore; c.programStartDate = progBefore;
+    c.programStartDate = progBefore;
     mmCatchUpAsked = askedBefore;
     ctSetCurrentWeekFromPlanner();
     return (lastIs && shows && quietOnDeepLink && asked && movedToGap && askedOnce
@@ -9494,33 +9698,38 @@ function findChromium() {
     return threeCells && mineShown && cardSaysThisMonth && payZero && cardSaysPaid;
   });
 
-  /* The quest wallet strip must read the accessors, not the legacy wallet field
-     that mnyEnsureHoldings zeroes on migration — it showed Savings $0.00 while
-     the money page showed the real figure.
+  /* The wallet tiles must read the ACCESSORS, not the legacy `wallet.savings`
+     field that `mnyEnsureHoldings` zeroes on migration — that field showed
+     Savings $0.00 while the money page showed the real figure.
 
-     Driven directly rather than through renderQuestBoard: this strip lives in
-     buildHowIEarnCardLegacy, which only renders for weeks before the rulebook
-     model, so the board on a current week never reaches it. Calling the real
-     shipped function is the honest way to cover a legacy-only surface.
+     This used to drive `buildHowIEarnCardLegacy`, which only rendered for weeks
+     before the rulebook model. There is one model now and that card is gone, so
+     it asserts the same fact on the surface a child actually opens. Worth
+     keeping pointed at a live screen for its own sake: while the only reference
+     to those class names was this test's own regex, `check-dead-css` read them
+     as referenced and the rules outlived the markup.
 
      Asserting the number alone would pass on unmigrated data, so assert the old
      field really is empty by then — that is what makes it a regression test. */
-  checks.questStripReadsTheRealSavings = await page.evaluate(() => {
+  checks.walletTilesReadTheRealSavings = await page.evaluate(() => {
     profile = 'jess'; parentViewing = 'jess';
     ctPrepareRead();
-    const kid = 'jess', wk = ctThisWeekKey();
+    const kid = 'jess';
     const pd = getProfData(kid);
     delete pd.holdings;
     pd.wallet = { cash: 42.20, savings: 180, gics: [], holdings: {}, lastMeetingWeek: null };
 
-    const html = buildHowIEarnCardLegacy(kid, wk);
+    const html = mnyWalletCard(kid).replace(/\s+/g, ' ');
     const legacyZeroed = money2(getProfData(kid).wallet.savings) === 0;
     const migrated = mnySavedTotal(kid) === 180;
-    // The savings tile, and only it, must carry the real figure.
-    const tile = /class="hm-wtile w-savings">.*?hm-wtile-amt">([^<]+)</.exec(
-      html.replace(/\s+/g, ' '));
+    // The kept-ready tile, and only it, must carry the real figure.
+    const tile = /Kept ready.*?mny-tile-val">([^<]+)</.exec(html);
     const shows = !!tile && tile[1].trim() === '$180.00';
-    return shows && legacyZeroed && migrated;
+    const problems = [];
+    if (!shows) problems.push('the kept-ready tile reads ' + (tile ? tile[1].trim() : 'nothing'));
+    if (!legacyZeroed) problems.push('the legacy wallet.savings field was not zeroed');
+    if (!migrated) problems.push('mnySavedTotal reads ' + mnySavedTotal(kid) + ', not 180');
+    return problems.length ? problems : true;
   });
 
   /* ── Today ───────────────────────────────────────────────────────────────
@@ -12560,21 +12769,33 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
-  /* …AND A WEEK LIVED UNDER THE OLD RULE IS NOT RE-PRICED.
-     Requiring fewer routines makes a clean day easier, which makes a streak
-     tier easier, which is more money. That is the right answer going forward
-     and the wrong one backwards: an unsettled week from July re-prices from the
-     live plan, so applying it to the whole backlog would quietly pay more for
-     weeks already lived. The rule SHOWS everywhere and PRICES only from
-     mrRoutineRuleStartWeek on. */
-  checks.theRoutineRuleDoesNotRepriceOldWeeks = await page.evaluate(() => {
+  /* …AND EVERY WEEK IS PRICED BY IT, INCLUDING THE ONES ALREADY LIVED.
+     This check used to assert the opposite, and the opposite was the defect.
+
+     The rule was held back behind `routineRuleStartWeek` so that requiring
+     fewer routines could not quietly pay more for weeks already lived. The
+     reasoning was sound; the mechanism was not. That store SEEDED ITSELF to
+     the current Monday, so on any device running a new build it held back the
+     rule for every week the family had ever lived — and the money then asked
+     for three routines a day on days no plan contained one.
+
+     The exact cost, which is where this whole redesign started: the week of
+     Mon 7 Sep 2026 opens on Labour Day, so Monday, Saturday and Sunday each
+     wanted an after-school routine that was never planned. The longest clean
+     run came to four days instead of seven, the streak paid the 3-day step —
+     $1 instead of $3 — and her own week grid read 7/7 beside it with nothing
+     anywhere to say why.
+
+     So: an off day asks for two routines, and keeping both makes the day clean
+     for the MONEY as well as on the screen, in a week from any time. */
+  checks.theRoutineRulePricesEveryWeekAlike = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'parent'; parentViewing = 'jenn';
     ctPrepareRead();
-    const startWk = mrRoutineRuleStartWeek();
-    const oldMon = formatDayKey(startWk);
-    oldMon.setDate(oldMon.getDate() - 28);
+    // A week well before anything this family has on file.
+    const oldMon = formatDayKey(ctThisWeekKey());
+    oldMon.setDate(oldMon.getDate() - 28 * 7);
     const oldWk = ctDateToKey(oldMon);
     const keys = mrWeekDayKeys(oldWk);
     const offIdx = keys.findIndex(k => !isSchoolDay(k));
@@ -12583,23 +12804,21 @@ function findChromium() {
     try {
       if (offIdx < 0) { bad.push('no off day in the sample old week'); return bad; }
       keys.forEach(k => setDayBlocks(k, [], 'jenn'));
-      // Under the new rule an off day asks two; under the old one it asked three.
       CT_SESSIONS.forEach(sn => ctSetMandatory(oldWk, offIdx, sn, 'jenn', false));
-      const two = routineSessionsForDay('jenn', oldWk, offIdx);
-      two.forEach(sn => ctSetMandatory(oldWk, offIdx, sn, 'jenn', true));
+      const asked = routineSessionsForDay('jenn', oldWk, offIdx);
+      asked.forEach(sn => ctSetMandatory(oldWk, offIdx, sn, 'jenn', true));
 
-      // The DISPLAY follows the new rule on every week…
-      if (two.length !== 2) bad.push('an old off day does not SHOW the new two-routine ask');
-      if (mmReviewRows('jenn', offIdx).filter(r => r.kind === 'routine').length === 3
-          && ctWeekKey === oldWk) {
-        bad.push('the meeting shows three rows on an old off day');
+      // A day with no school asks for two, on screen and in the money alike.
+      if (asked.length !== 2) bad.push('an off day does not ask for two routines');
+      if (!mrStreakDayDone(oldWk, 'jenn', offIdx)) {
+        bad.push('keeping every routine an old off day asked for is not a clean day');
       }
-      // …but the MONEY still asks what it asked then, so nothing re-prices.
-      if (mrStreakDayDone(oldWk, 'jenn', offIdx)) {
-        bad.push('an old week was re-priced under the new rule');
-      }
-      if (String(oldWk) >= String(startWk)) {
-        bad.push('the sample week was not actually before the rule start');
+      // And the money side asks the same question the screen does — one owner,
+      // so a parent ticking everything offered can never watch the streak sit
+      // still with nothing to explain it.
+      const moneyAsked = mrRoutineSessionsFor(oldWk, 'jenn', offIdx);
+      if (moneyAsked.length !== asked.length) {
+        bad.push('the money asks for ' + moneyAsked.length + ' where the screen shows ' + asked.length);
       }
     } catch (e) {
       bad.push('threw: ' + e.message);
@@ -12751,7 +12970,6 @@ function findChromium() {
     const savedLedger = JSON.parse(JSON.stringify(c.moneyLedger || {}));
     const savedHeld = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
     const savedProgram = c.programStartDate;
-    const savedModel = c.moneyModelStartWeek;
     const cashBefore = { jenn: ensureWallet('jenn').cash, jess: ensureWallet('jess').cash };
     try {
       window.showConfirm = async () => true;
@@ -12759,7 +12977,7 @@ function findChromium() {
       const mon = formatDayKey(ctThisWeekKey());
       mon.setDate(mon.getDate() - 16 * 7);
       const start = ctDateToKey(mon);
-      c.programStartDate = start; c.moneyModelStartWeek = start;
+      c.programStartDate = start;
       c.finalizedWeeks = {}; c.moneyLedger = {}; c.meetingsHeld = {};
 
       const plan = mnyDefaultSweepPlan();
@@ -12796,7 +13014,7 @@ function findChromium() {
     } finally {
       window.showConfirm = wasConfirm;
       c.finalizedWeeks = savedFinal; c.moneyLedger = savedLedger; c.meetingsHeld = savedHeld;
-      c.programStartDate = savedProgram; c.moneyModelStartWeek = savedModel;
+      c.programStartDate = savedProgram;
       ensureWallet('jenn').cash = cashBefore.jenn;
       ensureWallet('jess').cash = cashBefore.jess;
       profile = wasProfile;

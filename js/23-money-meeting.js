@@ -86,7 +86,11 @@ function mnyStrip(wk, kid, liveIdx) {
    ════════════════════════════════════════════════════════════════ */
 function mnyRenderEarned(wk) {
   const kid = mnyMeetingKid();
-  if (!mrUsesNewModel(wk)) return mmRenderConfirm(wk, false);
+  /* This used to swap the WHOLE of step 3 for the legacy confirm screen on any
+     week before `moneyModelStartWeek` — which, on a freshly-seeded clock, was
+     every week the family had lived. The competition form and the gift form
+     were simply not on the page, with nothing to say why. One model now, so
+     step 3 is step 3 for every week. */
   mnySimCatchUp(kid);          // the world moves whether or not we met last week
 
   const confirmed = mnyIsConfirmed(wk, kid);
@@ -534,10 +538,6 @@ function mnyReturnsCard(kid) {
 function mnyRenderDecide(wk) {
   const kid = mnyMeetingKid();
   mnySimCatchUp(kid);
-  if (!mrUsesNewModel(wk)) {
-    return `<div class="mm-h">🤝 What I do with it</div>
-      <div class="ct-meta">This week was earned under the old group model, which paid as the chores were done. There is nothing to decide.</div>`;
-  }
   const head = `${mnyPageHead('🤝 What I do with it', 'Decide once, for every dollar', [], { back: false })}
     ${mnyTabBar('where')}${mnyKidTabs()}`;
 

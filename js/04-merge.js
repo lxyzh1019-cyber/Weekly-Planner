@@ -293,6 +293,27 @@ function mergeSharedChore(localChore, remoteChore) {
   // Groups: union by id so concurrent adds both survive; newest edit wins;
   // a delete recorded as a 'grp:' tombstone stays deleted instead of resurrecting.
   out.groups = mergeArrayById(lc.groups, rc.groups, 'grp:');
+  /* ── Where the family's record begins ──
+     `programStartDate` is one scalar that decides how far back the meeting can
+     reach and which weeks are in the system at all, and `deepMergeObj` lets a
+     REMOTE scalar win — so a device still holding its own older idea of it
+     would push that straight back over a parent's choice, silently, and the
+     backlog would fall out of reach again.
+
+     Arbitrated newest-stamp-wins, the same shape as goalsByWeek above. An
+     UNSTAMPED value counts as 0 on purpose: it can only have come from an old
+     build that seeded this to whatever Monday it first ran on, and a deliberate
+     choice must always beat a seed. */
+  {
+    const lAt = Number(lc.programStartDateAt) || 0;
+    const rAt = Number(rc.programStartDateAt) || 0;
+    if (lAt || rAt) {
+      const src = rAt > lAt ? rc : lc;
+      out.programStartDateAt = Math.max(lAt, rAt);
+      if (src.programStartDate) out.programStartDate = src.programStartDate;
+      else delete out.programStartDate;
+    }
+  }
   // Weekly goals: the strictly-newer side takes that whole week, so an edit that
   // lowers or clears a goal wins over a stale copy (a plain union can't express
   // a removal). A tie / unstamped week keeps the deep-merged union already in out.

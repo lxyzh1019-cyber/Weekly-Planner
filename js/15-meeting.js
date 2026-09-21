@@ -467,13 +467,7 @@ function mmMarkWeekMet(wk, opts) {
    recent, which is the same class of wrongness as the bug this is fixing —
    the count disagreeing with what the family actually did. programStartDate is
    already the honest answer to "when did this family start". */
-function mmCatchUpFloor() {
-  ctEnsureShared();
-  const c = state.shared.chore;
-  const model = String(mrModelStartWeek());
-  const program = c.programStartDate ? String(c.programStartDate) : '';
-  return program > model ? program : model;
-}
+function mmCatchUpFloor() { return mrStartWeek(); }
 
 /* Weeks behind us and what state each is in, most recent first:
      'none'    nobody opened it   → the only state worth offering
@@ -610,7 +604,8 @@ function mmRenderExpress(wk) {
    week is still there rather than that something was missed. */
 function mmCatchUpBanner() {
   const list = mmUnsettledWeeks(8);
-  if (!list.length) return '';
+  const older = (typeof mnyDefaultSweepPlan === 'function') ? mnyDefaultSweepPlan() : { weeks: [], total: 0 };
+  if (!list.length && !older.weeks.length) return '';
   const unopened = mmUnopenedWeeks(8).length;
   const met = list.length - unopened;
   /* Each row says which kind of open it is, and offers the action that fits.
@@ -642,14 +637,29 @@ function mmCatchUpBanner() {
          <button type="button" class="mm-catchup-go" data-mm-catch="all">Work through them ›</button>
        </div>`
     : '';
+  /* ── Weeks older than this list can reach ──
+     mmUnsettledWeeks stops at eight, so anything older was invisible here AND
+     unsettleable: the only door to it was a card in Setup › Weeks on record
+     that a parent had no reason to open, so a household with a real backlog was
+     simply told nothing. The flat default belongs where the backlog is already
+     being looked at. It is still a tap, still previewed, and it still moves no
+     money until mnyRunDefaultSweep's own confirmation. */
+  const sweep = older.weeks.length
+    ? `<div class="mm-catchup-row mm-catchup-more">
+         <span class="mm-catchup-wk">${older.weeks.length} week${older.weeks.length === 1 ? '' : 's'} further back</span>
+         <span class="mm-catchup-late">too old to settle on real numbers</span>
+         <button type="button" class="mm-catchup-go" data-mm-catch="sweep">${escapeHtml(mnyMoney(older.total))} at the default ›</button>
+       </div>`
+    : '';
   const cap = [
     unopened ? `${unopened} week${unopened === 1 ? '' : 's'} nobody has opened` : '',
     met ? `${met} met but not paid out` : '',
+    older.weeks.length ? `${older.weeks.length} further back` : '',
   ].filter(Boolean).join(' · ');
   return `<div class="mm-catchup">
       <div class="mm-catchup-cap">🕰️ ${escapeHtml(cap)}.
         Nothing expires — open one whenever you get to it, or tick off one you already did.</div>
-      ${rows}${more}</div>`;
+      ${rows}${more}${sweep}</div>`;
 }
 
 /* One delegated listener for the rows above, bound in js/99-main.js. Data
@@ -660,6 +670,10 @@ function mmHandleCatchUpClick(e) {
   if (!el) return;
   const wk = el.getAttribute('data-mm-week');
   const what = el.getAttribute('data-mm-catch');
+  if (what === 'sweep') {
+    if (typeof mnyRunDefaultSweep === 'function') mnyRunDefaultSweep();
+    return;
+  }
   if (what === 'met') {
     if (mmMarkWeekMet(wk)) {
       renderMeetingHub();
@@ -1347,11 +1361,10 @@ function mmRenderConfirm(wk, held) {
   } else {
     action = `<button type="button" class="btn-confirm" onclick="mmConfirmAndRecord()">✅ Confirm &amp; record the week</button>`;
   }
-  const newModel = (typeof mrUsesNewModel === 'function') && mrUsesNewModel(wk);
   // Show what recording is about to do, per kid, BEFORE it happens — the loan
   // transfer and XP credit are irreversible-feeling to a kid, so they should
   // never be a surprise that only shows up in a toast afterwards.
-  const preview = newModel ? ['jenn','jess'].map(kid => {
+  const preview = ['jenn','jess'].map(kid => {
     const b = mrWeekBreakdown(wk, kid);
     const xp = mrXpForWeek(wk, kid).total;
     // What the schedule actually asks for today — the deposit before the
@@ -1372,10 +1385,8 @@ function mmRenderConfirm(wk, held) {
     if (b.compPaid) bits.push(`competition $${b.compPaid.toFixed(2)}`);
     if (b.fines.total) bits.push(`fines −$${b.fines.total.toFixed(2)}`);
     return `<div class="ct-meta">${CT_PROFILE_ICON[kid]} ${bits.join(' · ') || 'nothing earned'}${xp ? ` · +${xp} XP` : ''}${due ? ` · ${escapeHtml(dueLabel)} −$${due.toFixed(2)}` : ''}</div>`;
-  }).join('') : '';
-  const explain = newModel
-    ? `This <b>confirms</b> the week. Recording credits each kid's total to cash, credits XP, opens the Sunday Box, adds a month of interest and pays out anything locked away that has reached its date. The loan payment and any overdue interest move <b>once a month</b>, not every Sunday.`
-    : `This <b>confirms</b> the week — it doesn't "pay". Group chore money already fired sticky as chores were done; recording credits each kid's total (max $${CT_MONEY_CAP}) to cash, adds a month of interest and pays out anything locked away that has reached its date.`;
+  }).join('');
+  const explain = `This <b>confirms</b> the week. Recording credits each kid's total to cash, credits XP, opens the Sunday Box, adds a month of interest and pays out anything locked away that has reached its date. The loan payment and any overdue interest move <b>once a month</b>, not every Sunday.`;
   return `<div class="mm-h">Confirm &amp; record</div>
     <div class="ct-meta">${explain}</div>
     <div class="mm-pay">${rows}</div>${preview}${mmRenderQuarterly()}${action}`;
@@ -1759,11 +1770,14 @@ function mmKidSettled(wk, kid) {
   return {
     kid,
     name: kid === 'jenn' ? 'Jenn' : 'Jess',
-    // A week earned under the retired group model has nothing to agree or
-    // decide, so it counts as settled rather than blocking the meeting forever.
-    old: !mrUsesNewModel(wk),
-    agreed: !mrUsesNewModel(wk) || mnyIsConfirmed(wk, kid),
-    decided: !mrUsesNewModel(wk) || mnyIsCommitted(wk, kid),
+    /* `old` was "earned under the retired group model", which counted such a
+       week as settled so it could not block the meeting forever. There is one
+       model now and every week has something to agree and decide, so nothing
+       is waved through — the field stays, always false, because the settle
+       strip and mmRenderExpress both read it. */
+    old: false,
+    agreed: mnyIsConfirmed(wk, kid),
+    decided: mnyIsCommitted(wk, kid),
   };
 }
 function mmAllSettled(wk) {
@@ -1829,7 +1843,6 @@ function commitKidWeek(wk, kid, opts) {
   if (!c.moneyLedger) c.moneyLedger = {};
   if (!c.moneyLedger[wk]) c.moneyLedger[wk] = {};
   const parts = [];
-  const newModel = (typeof mrUsesNewModel === 'function') && mrUsesNewModel(wk);
   {
     const w = ensureWallet(kid);
     const name = kid === 'jenn' ? 'Jenn' : 'Jess';
@@ -1837,8 +1850,7 @@ function commitKidWeek(wk, kid, opts) {
     // would read today's rules and today's grades, so a price edit or a late
     // regrade would silently rewrite what a past week said it paid. History has
     // to be a record, not a recomputation.
-    const ledger = (newModel && c.moneyLedger[wk][kid] == null)
-      ? mrFreezeWeekLedger(wk, kid) : null;
+    const ledger = (c.moneyLedger[wk][kid] == null) ? mrFreezeWeekLedger(wk, kid) : null;
     if (c.finalizedWeeks[wk][kid] == null) {
       const prelim = ctWeekMoney(wk, kid);
       w.cash = money2(w.cash + prelim);
@@ -1849,7 +1861,7 @@ function commitKidWeek(wk, kid, opts) {
          quiet week. This is what will replace `finalizedWeeks`, `committedAt`
          and `meetingsHeld` — three stored flags with three writers that could
          and did disagree — once shadow mode has proved the balances agree. */
-      if (prelim > 0) evSettleLines(kid, wk, prelim, newModel);
+      if (prelim > 0) evSettleLines(kid, wk, prelim, true);
       evMirror(kid, { kind: 'settle', amount: 0, dayKey: wk, weekKey: wk, ref: wk,
                       note: 'Week of ' + wk + ' settled' });
       if (prelim > 0) parts.push(`${name} +$${prelim.toFixed(2)}`);
@@ -1857,7 +1869,7 @@ function commitKidWeek(wk, kid, opts) {
     // XP is computed all week but only credited here — awarding it on render
     // would multiply it by however many times the screen redrew. Idempotent
     // per week, so re-recording can't double-award.
-    if (newModel) {
+    {
       const xp = mrCreditWeekXp(wk, kid);
       if (xp > 0) parts.push(`${name} +${xp} XP`);
       // A month of overdue interest, then the scheduled transfer. Interest is

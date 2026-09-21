@@ -30,10 +30,11 @@ function ctDateToKey(date) {
    its week from getWeekStart(), which goes through the app's timezone
    (APP_TIMEZONE). On a device whose clock sits in a different zone the two
    disagree for part of every day — and at a week boundary they name *different
-   Mondays*. That is not cosmetic: mrUsesNewModel compares the planner's week
-   against a start week recorded by the raw-clock path, so on a Sunday evening
-   the chore tab decided the current week predated the money model and silently
-   fell back to the retired group board — no chore rows, nothing to claim.
+   Mondays*. That is not cosmetic: a week key recorded by the raw-clock path and
+   compared against the planner's own names a different week for part of every
+   day — which is how the chore tab once came to decide, on a Sunday evening,
+   that the current week predated the money system, and fall back to the retired
+   board with no chore rows and nothing to claim.
 
    One derivation, shared by both, so they cannot drift. */
 function ctThisMonday() { return getWeekStart(0); }
@@ -42,7 +43,10 @@ function ctEnsureShared() {
   if (!state.shared) state.shared = {};
   if (!state.shared.chore) state.shared.chore = {};
   const c = state.shared.chore;
-  if (!c.programStartDate) c.programStartDate = ctThisWeekKey();
+  /* programStartDate is NOT seeded here any more. Seeding it to today is how a
+     household that had been running for months came to be told its record
+     began this week — see mrStartWeek (js/18-rules.js), which derives it from
+     the earliest thing on file and writes nothing. */
   if (!c.goalsByWeek) c.goalsByWeek = {};
   if (!c.goalsUpdatedAtByWeek) c.goalsUpdatedAtByWeek = {}; // per-week goal edit ts → conflict-aware sync merge
   if (!c.goalBonusByWeek) c.goalBonusByWeek = {};
@@ -343,36 +347,38 @@ function ctWeekHasData(weekKey, kid) {
   }
   return false;
 }
-// Uncapped sum of fired group payouts (dollar amount frozen at fire time).
-function ctGroupEarned(weekKey, kid) {
-  ctEnsureShared();
-  const wk = state.shared.chore.groupPayoutsFired[weekKey] || {};
-  let sum = 0;
-  for (const gid of Object.keys(wk)) {
-    const e = wk[gid][kid];
-    if (!e) continue;
-    if (e === true) { const g = ctGroupById(gid); sum += g ? (Number(g.valueDollars) || 0) : 0; }
-    else sum += Number(e.total) || 0;
-  }
-  return sum;
-}
-/* The single computation every money surface reads. Weeks are resolved against
-   the model that was live when they were earned:
+/* The single computation every money surface reads. ONE model, for every week.
 
-   - Before mrModelStartWeek: the legacy formula (chore groups pay, $6 cap).
-     Those weeks are history and must not move just because the family switched
-     to graded chores.
-   - From mrModelStartWeek on: the rulebook model — routines are unpaid, graded
-     household chores are the paid channel, and there is no weekly total cap. */
+   There used to be two. Weeks before `moneyModelStartWeek` were priced by the
+   retired group-payout formula — chore groups pay, $6 weekly cap — on the
+   reasoning that history must not move when the family switches to graded
+   chores. The reasoning was right and the mechanism was wrong: that store
+   seeded itself to the current Monday, so on any device running a new build
+   EVERY week the family had lived became a "legacy" week, and graded chores
+   and the routine streak paid nothing in all of them.
+
+   What actually protects history is two other things, both still here: a
+   settled week is a FROZEN LEDGER and is never recomputed at all, and a price
+   edit lands as an effective-dated rule version (mrVersionForDate), so an old
+   week still prices under the rules that were live when it was lived. The
+   model gate was never what made that true.
+
+   `moneySnapshots` stays ahead of everything: weeks frozen at the original
+   migration are a record, not a calculation. */
+/* A week frozen at the original migration — earned before this system existed.
+   One owner, because `ctWeekMoney` skips it, the chore tab renders the retired
+   board for it, and the money card names it, and three copies of "is this week
+   from before?" is exactly the drift CLAUDE.md keeps recording. */
+function ctWeekIsPreSystem(weekKey, kid) {
+  ctEnsureShared();
+  const snap = state.shared.chore.moneySnapshots[weekKey];
+  return !!(snap && snap[kid] != null);
+}
 function ctWeekMoney(weekKey, kid) {
   ctEnsureShared();
   const snap = state.shared.chore.moneySnapshots[weekKey];
   if (snap && snap[kid] != null) return snap[kid];   // historical week frozen at migration
-  if (typeof mrUsesNewModel === 'function' && mrUsesNewModel(weekKey)) {
-    return mrWeekMoney(weekKey, kid);
-  }
-  const goalBonus = ctGetGoalBonus(weekKey, kid) ? 1 : 0;
-  return Math.min(CT_MONEY_CAP, ctGroupEarned(weekKey, kid) + goalBonus);
+  return mrWeekMoney(weekKey, kid);
 }
 /* Clean routine days this week — the routine half of a goal. */
 function ctRoutineDaysDone(weekKey, kid) {
@@ -435,7 +441,7 @@ function ctCelebrateGroupPayouts(fired, hostId) {
   // Under the rulebook model routines are tracked but pay nothing, so the
   // group value must not be announced as money — ctWeekMoney ignores it, and
   // promising a kid $2 she never receives is worse than saying nothing.
-  showToast(mrUsesNewModel(ctWeekKey)
+  showToast(true
     ? `✅ ${label} complete!`
     : `💰 ${label} complete! +$${total.toFixed(2)}`);
   if (typeof spawnQuestSparkles === 'function') spawnQuestSparkles(hostId || 'screen-chore');
@@ -973,7 +979,7 @@ function ctRenderMoneyCard(kid) {
   const name = kid === 'jenn' ? 'Jenn' : 'Jess';
   const money = ctWeekMoney(ctWeekKey, kid);
   const snap = c.moneySnapshots[ctWeekKey];
-  const newModel = mrUsesNewModel(ctWeekKey);
+  const newModel = !ctWeekIsPreSystem(ctWeekKey, kid);
   let body;
   if (snap && snap[kid] != null) {
     body = `<div class="ct-meta">Earned before the new money system.</div>`;
@@ -1224,7 +1230,7 @@ function ctApplyLegacyPayloadToState(parsed) {
     ctEnsureProfile(p);
   });
   // Use startDate from legacy payload, or fall back to programStartDate
-  const anchor = startDate || state.shared.chore.programStartDate || ctThisWeekKey();
+  const anchor = startDate || mrStartWeek();
   const anchorDate = formatDayKey(anchor);
   for (let w = 1; w <= 8; w++) {
     const weekMon = new Date(anchorDate); weekMon.setDate(anchorDate.getDate() + (w-1)*7);
@@ -1363,9 +1369,13 @@ function renderChoreTab() {
   // (js/27-chore-parent.js), so this is the kid frame for everyone — a parent
   // opening it is asking "what does she see", which is worth being able to do.
   //
-  // Weeks earned under the retired group model have no chore pool to read, so
-  // they keep the old board rather than rendering an empty redesign.
-  wrap.innerHTML = mrUsesNewModel(ctWeekKey) ? ckRenderKidTab(kid) : `
+  /* Weeks frozen at the ORIGINAL migration have no chore pool to read, so they
+     keep the old board rather than rendering an empty redesign. This used to
+     ask `mrUsesNewModel`, which on a self-seeded clock sent every past week
+     here — no chore rows, nothing to claim. `moneySnapshots` is the honest
+     test: it names the weeks that genuinely predate the chore pool, and it is
+     what `ctWeekMoney` already checks before anything else. */
+  wrap.innerHTML = !ctWeekIsPreSystem(ctWeekKey, kid) ? ckRenderKidTab(kid) : `
     <div class="chore-grid">
       ${ctRenderWeekControls()}
       ${ctRenderWeekMatrix(kid)}

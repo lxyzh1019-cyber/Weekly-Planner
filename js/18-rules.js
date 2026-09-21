@@ -249,7 +249,7 @@ function mrEnsure() {
     const now = Date.now();
     mr.versions.push({
       id: mrNewId('mrv-'),
-      effectiveFrom: c.programStartDate || ctThisWeekKey(),
+      effectiveFrom: mrStartWeek(),
       createdAt: now, updatedAt: now, createdBy: 'parent',
       reason: MR_DEFAULT_REASON,
       note: 'Rulebook v2 — starting template.',
@@ -416,49 +416,88 @@ function mrApplyCap(amount, cap) {
      PERSONAL chore   — mandatory, unpaid; XP only when done unasked.
    ════════════════════════════════════════════════════════════════ */
 
-/* The week the new model takes over. Weeks before it keep the old
-   group-payout formula, so switching the family to graded chores can't
-   restate money that was already earned under the old rules. Set once, to the
-   Monday of whichever week the app first runs the new code. */
-function mrModelStartWeek() {
+/* ── WHERE THE RECORD BEGINS — derived, never seeded to today ──────
+   Three stores used to answer three versions of this question — `programStartDate`,
+   `moneyModelStartWeek`, `routineRuleStartWeek` — and every one of them
+   SELF-SEEDED to the current Monday the first time anything read it. On a
+   device that first ran a given build in September, that made every week before
+   September a different kind of week: priced under a retired formula, its
+   competition form absent from the meeting, its chores and routine streak worth
+   nothing, and unreachable by both the catch-up list and the default sweep.
+   "Unset" was being read as "the system began today", which is the one thing it
+   cannot mean for a family that has been running for months.
+
+   One store now, and it is DERIVED when nobody has set it: the earliest week
+   anything was recorded in. Deriving rather than seeding is the load-bearing
+   half — it writes nothing, so it costs no sync, it cannot be frozen wrong by
+   whichever device happened to look first, and it moves back on its own the
+   moment an older week arrives from another device.
+
+   A parent can say otherwise (Setup › Weeks on record). That is the only way a
+   household whose real beginning predates anything on file can say so, and it
+   is why this is a date on a screen rather than a constant in a public repo. */
+function mrStartWeek() {
   ctEnsureShared();
   const c = state.shared.chore;
-  if (!c.moneyModelStartWeek) c.moneyModelStartWeek = ctThisWeekKey();
-  return c.moneyModelStartWeek;
+  if (c.programStartDate) return String(c.programStartDate);
+  return mrDerivedStartWeek();
 }
-/* ── When the per-day routine rule starts PRICING ──────────────────
-   routineSessionsForDay changes which routines a day asks for, and a day that
-   asks for fewer is easier to keep clean, which makes a streak tier easier to
-   reach. That is the right answer going forward and the wrong one backwards:
-   an unsettled week from July re-prices from the live plan, so applying it to
-   the whole backlog would quietly pay more for weeks already lived — on top of
-   the default sweep that is about to credit those same weeks.
 
-   So the rule SHOWS everywhere and PRICES only from here on. Seeded to the
-   current Monday on first read, exactly like mrModelStartWeek above, so no
-   date is hardcoded and a family that starts later gets their own.
+/* The earliest week with any evidence in it, across every store that records
+   one. Reads only. Returns this week when the family genuinely has no history,
+   which is the one case where "it starts now" is the truth.
 
-   Every other surface asks routineSessionsForDay directly and is unaffected:
-   nothing on screen lies, only the money is held still. */
-function mrRoutineRuleStartWeek() {
-  ctEnsureShared();
-  const c = state.shared.chore;
-  if (!c.routineRuleStartWeek) c.routineRuleStartWeek = ctThisWeekKey();
-  return c.routineRuleStartWeek;
+   This was tried once as the CATCH-UP FLOOR and removed, because there it
+   suppressed genuinely open weeks whenever the first record happened to be
+   recent. As a DEFAULT START it errs the other way: against a seed of "today"
+   it can only ever reach further back, never less far, and a parent who needs
+   it earlier still can type one. */
+function mrDerivedStartWeek() {
+  const c = (state.shared || {}).chore || {};
+  let best = null;
+  const seen = (key) => {
+    if (!key) return;
+    const wk = (typeof ctWeekKeyForDate === 'function') ? ctWeekKeyForDate(key) : key;
+    if (wk && (!best || String(wk) < String(best))) best = String(wk);
+  };
+  const firstKeyOf = (obj) => {
+    const keys = Object.keys(obj || {});
+    if (keys.length) seen(keys.sort()[0]);
+  };
+  firstKeyOf(c.moneyLedger);
+  firstKeyOf(c.finalizedWeeks);
+  firstKeyOf(c.groupPayoutsFired);
+  firstKeyOf(c.meetingsHeld);
+  ['jenn', 'jess'].forEach(kid => {
+    const p = (state.profiles || {})[kid] || {};
+    // The money stream, and the plan itself: a family that planned a week in
+    // June began in June, whether or not anyone settled it.
+    if (Array.isArray(p.events) && p.events.length) {
+      seen(p.events.map(e => (e && e.dayKey) || '').filter(Boolean).sort()[0]);
+    }
+    firstKeyOf(p.weeks);
+  });
+  return best || ctThisWeekKey();
 }
 
 /* THE routine question, money side. mrStreakDayDone and mrStreakWeek both ask
    it, so the sessions a clean day requires and the days the streak is allowed
-   to count cannot disagree about the same week. */
+   to count cannot disagree about the same week.
+
+   No start-week gate any more. It used to fall back to CT_SESSIONS — all three
+   routines every day — for any week before `routineRuleStartWeek`, which on a
+   freshly-seeded clock meant every week the family had ever lived. The cost was
+   exact and is the defect that began this redesign: the week of Mon 7 Sep 2026
+   opens on Labour Day, so Monday, Saturday and Sunday each asked for an
+   after-school routine that no plan contained, the longest clean run came to
+   four days instead of seven, and a child who kept every routine she was asked
+   for was paid the 3-day step — $1 instead of $3 — with her own week grid
+   showing 7/7 beside it and nothing anywhere to say why. */
 function mrRoutineSessionsFor(weekKey, kid, dayIdx) {
   if (typeof routineSessionsForDay !== 'function') return CT_SESSIONS;
-  if (String(weekKey) < String(mrRoutineRuleStartWeek())) return CT_SESSIONS;
   return routineSessionsForDay(kid, weekKey, dayIdx);
 }
 
-function mrUsesNewModel(weekKey) {
-  return String(weekKey || '') >= mrModelStartWeek();   // 'YYYY-MM-DD' compares chronologically
-}
 /* How many weeks back this week is — 0 for the current one.
    Lives here rather than in the meeting because two different things need it
    and neither owns it: the frozen ledger stamps how late a week was settled,
@@ -1319,7 +1358,6 @@ function mrHonestyEffect(kid, weekKey) {
 function mrLosesChoices(kid, weekKey) {
   const wk = weekKey || (typeof ctWeekKey !== 'undefined' && ctWeekKey)
              || ctThisWeekKey();
-  if (!mrUsesNewModel(wk)) return false;
   return !!mrHonestyEffect(kid, wk).losesChoices;
 }
 
@@ -1541,7 +1579,6 @@ function mrYearToDate(kid) {
   const channels = { chores: 0, learning: 0, streak: 0, competition: 0, fines: 0 };
   weeks.forEach(wk => {
     paidTotal += Number(fin[wk][kid]) || 0;
-    if (!mrUsesNewModel(wk)) return;                 // legacy weeks have no channel split
     const b = mrWeekBreakdown(wk, kid);
     channels.chores      += b.chorePaid;
     channels.learning    += b.learnPaid;

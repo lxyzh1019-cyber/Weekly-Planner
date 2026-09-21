@@ -205,96 +205,12 @@ function mnyQuestSummary(kid, wk) {
 /* 3a — "How I earn": one kid-readable card that gathers every money rule and
    the wallet in one place. Display-only — reads existing chore/money state.
 
-   Weeks under the rulebook model read from the rules, so a price edited on the
-   Pocket Money setup tab shows up here immediately and this card can never go
-   stale against it. Weeks before the switch keep the legacy card, because
-   those weeks really were earned under the $6-cap group model. */
+   Every week reads from the rules, so a price edited on the Pocket Money setup
+   tab shows up here immediately and this card can never go stale against it.
+   There used to be a second, legacy card for weeks before the model switch;
+   there is one model now, and `buildHowIEarnCardLegacy` went with it. */
 function buildHowIEarnCard(kid, wk) {
-  if (typeof mrUsesNewModel === 'function' && mrUsesNewModel(wk)) {
-    return mnyQuestSummary(kid, wk);
-  }
-  return buildHowIEarnCardLegacy(kid, wk);
-}
-
-function buildHowIEarnCardLegacy(kid, wk) {
-  const cap = CT_MONEY_CAP;
-  const earned = ctGroupEarned(wk, kid);                    // fired chore money (sticky)
-  const goalBonusEarned = ctGetGoalBonus(wk, kid) ? 1 : 0;
-  const weekMoney = ctWeekMoney(wk, kid);                   // min(cap, earned + bonus)
-  const goals = ctGetWeekGoals(wk);
-  const goal = goals[kid];                                  // points target or null
-  const pts = ctMandatoryPoints(wk, kid) + ctOptionalPoints(wk, kid);
-  const goalPending = !!goal && !goalBonusEarned;
-  const fillPct = Math.max(0, Math.min(100, weekMoney / cap * 100));
-  const tickPct = Math.max(0, Math.min(100, (Math.min(cap, earned + goalBonusEarned + (goalPending ? 1 : 0))) / cap * 100));
-
-  // Top earnings card + progress bar to the weekly cap.
-  const capNote = [];
-  if (earned > 0) capNote.push(`$${earned.toFixed(2)} chores ✓`);
-  if (goalBonusEarned) capNote.push(`+$1.00 goal ✓`);
-  else if (goalPending) {
-    const target = ctGoalPoints(goal);
-    capNote.push(`goal bonus +$1.00 still open${target != null ? ` (${pts}/${target} pts)` : (goal ? ` (${ctGoalLabel(goal)})` : '')}`);
-  }
-  const earnCard =
-      `<div class="hm-earn">`
-    +   `<div class="hm-earn-top"><span class="hm-earn-label">This week so far</span><span class="hm-earn-amt">$${weekMoney.toFixed(2)}</span></div>`
-    +   `<div class="hm-bar"><div class="hm-bar-fill" style="width:${fillPct}%"></div><div class="hm-bar-tick" style="left:${tickPct}%"></div></div>`
-    +   `<div class="hm-earn-note">of $${cap.toFixed(2)} max${capNote.length ? ' · ' + capNote.join(' · ') : ''}</div>`
-    + `</div>`;
-
-  // Rule cards — one per weekly chore group, then goal / sticky / meeting.
-  const rule = (icon, name, text, chip, chipCls) =>
-      `<div class="hm-rule"><span class="hm-rule-icon">${icon}</span>`
-    +   `<span class="hm-rule-text"><b>${escapeHtml(name)}</b> — ${text}</span>`
-    +   `<span class="hm-rule-chip ${chipCls||''}">${chip}</span></div>`;
-
-  let rules = '';
-  ctGroupsForKid(kid).filter(g => g.cadence !== 'daily').forEach(g => {
-    const ids = g.choreIds || [];
-    const m = ids.length;
-    const n = ids.filter(c => [0,1,2,3,4,5,6].some(d => ctGetOptional(wk, d, kid, c))).length;
-    const fired = ctGroupFiredWeekly(wk, g.id, kid);
-    const val = (Number(g.valueDollars) || 0).toFixed(2);
-    rules += rule(g.icon || '🧹', g.name || 'Chore crew',
-      `all ${m} done sometime this week → $${val} <i>all or nothing</i>`,
-      fired ? `${m}/${m} ✓ $${val}` : `${n}/${m}`,
-      fired ? 'chip-green' : '');
-  });
-  rules += rule('🎯', 'Week goal',
-    `routine + chore points reach your goal → $1.00 bonus`,
-    goalBonusEarned ? '✓ $1.00'
-      : (goal ? (ctGoalPoints(goal) != null ? `${pts}/${ctGoalPoints(goal)} pts` : ctGoalLabel(goal)) : 'set a goal'),
-    goalBonusEarned ? 'chip-green' : 'chip-yellow');
-  rules += rule('🔒', 'Once earned, yours',
-    `unchecking never takes money back`, 'sticky', 'chip-plain');
-  rules += rule('🤝', 'Family meeting',
-    `confirms the week (max $${cap.toFixed(2)}) & moves the money world one month`, 'Sunday', 'chip-plain');
-
-  // Wallet strip.
-  const w = ensureWallet(kid);
-  const wtile = (label, val, note, cls) =>
-      `<div class="hm-wtile ${cls}"><div class="hm-wtile-label">${label}</div>`
-    +   `<div class="hm-wtile-amt">$${money2(val).toFixed(2)}</div>`
-    +   `<div class="hm-wtile-note">${note}</div></div>`;
-  const wallet =
-      `<div class="hm-wallet">`
-    +   wtile('Cash', w.cash, 'spend or save', 'w-cash')
-    // savingsTotal, not w.savings: the legacy field is zeroed once holdings are
-    // migrated (mnyEnsureHoldings), so reading it showed $0.00 here while the
-    // money page showed the real figure. The other tiles already read through
-    // the accessors.
-    +   wtile('Savings', savingsTotal(kid), 'earns interest', 'w-savings')
-    +   wtile('GIC', gicTotal(kid), 'locked, grows more', 'w-gic')
-    +   wtile('Stocks', portfolioValue(kid), 'goes up & down', 'w-stocks')
-    + `</div>`;
-
-  // Bank & Invest is a parent surface — kids see their balances here but the
-  // bank screen itself only opens from parent mode.
-  const bankBtn = isParent()
-    ? `<button type="button" class="qmp-open" onclick="mnyOpenMyMoney('${escapeJsAttr(kid)}')">Open My money ›</button>`
-    : '';
-  return earnCard + `<div class="hm-rules">${rules}</div>` + wallet + bankBtn;
+  return mnyQuestSummary(kid, wk);
 }
 
 /* Week-topbar money button. Both roles land on 💰 My money — a parent looking

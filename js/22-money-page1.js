@@ -281,7 +281,7 @@ function mnyUnpaidWeeks(kid, max) {
   for (let i = 0; i <= (max || 8); i++) {
     const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - i * 7);
     const wk = ctDateToKey(mon);
-    if (String(wk) < String(mrModelStartWeek())) break;
+    if (String(wk) < String(mrStartWeek())) break;
     if ((fin[wk] || {})[kid] != null) continue;          // already credited
     const amount = money2(ctWeekMoney(wk, kid));
     if (amount <= 0) continue;
