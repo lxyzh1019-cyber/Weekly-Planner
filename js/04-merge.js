@@ -476,6 +476,19 @@ function mergeProfileState(localProfile, remoteProfile, profName) {
      correction would undo itself on the next sync, which is money appearing
      from nowhere. */
   merged.events = mergeArrayById(lp.events, rp.events, 'ev:');
+  /* ── What she asked a grown-up for ──
+     A move between her own pots that a child proposed. Deliberately NOT a
+     stream event: the stream records money that MOVED, and a request has moved
+     nothing — putting one there would make every balance derived from it wrong
+     until somebody said no.
+
+     Union by id with its own tombstone scope, like every other append-only
+     record here. The answer is an EDIT to the record (`approvedAt` /
+     `rejectedAt`), so newest-wins per id is what carries a parent answering on
+     the phone through to the iPad; without the tombstone a withdrawn request
+     comes back on the next snapshot and a parent is asked the same question
+     for ever. */
+  merged.moveRequests = mergeArrayById(lp.moveRequests, rp.moveRequests, 'mvq:');
   // What she is saving for. A kid can add one on either device, so these union
   // by id; a goal she deleted stays deleted via its 'sgoal:' tombstone.
   merged.savingGoals = mergeArrayById(lp.savingGoals, rp.savingGoals, 'sgoal:');

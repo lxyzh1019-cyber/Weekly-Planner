@@ -5580,6 +5580,122 @@ function findChromium() {
     return problems.length ? problems : true;
   });
 
+  /* ── MONEY CAN MOVE BETWEEN SUNDAYS ──────────────────────────────
+     Until now the ONLY way a dollar left cash was the Sunday split. The two
+     doors that existed went one way — kept-ready back to cash, a company back
+     to cash — and both were buried on the parent's Money rules page. So a gift
+     that arrived on a Tuesday sat in cash until the following Sunday whatever
+     anybody wanted, which is the "$50 with nowhere to go" that started this.
+
+     The gates matter more than the movement: Money school opens the pots as the
+     loan comes down, and a sheet that moved money into a pot she has not
+     reached would make the whole ladder decorative. */
+  checks.moneyCanMoveOutsideAMeeting = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const kid = 'jenn', pd = getProfData(kid);
+    const savedHold = (pd.holdings || []).slice();
+    const savedReq = (pd.moveRequests || []).slice();
+    const savedEvents = (pd.events || []).slice();
+    const savedDebts = pd.debts ? JSON.parse(JSON.stringify(pd.debts)) : null;
+    /* The seeded cash is an UNMIRRORED write, so it is drift this check makes
+       and must take away with it: `aGiftHasADate`, thirty checks later, reads
+       `evShadowDrift` absolutely and would otherwise report this fixture's
+       leftovers as a defect in dating a gift. */
+    const savedCash = ensureWallet(kid).cash;
+    const r = mrRules();
+    const savedUnlock = JSON.parse(JSON.stringify((r.school || {}).unlockStage || {}));
+    try {
+      pd.holdings = []; pd.moveRequests = [];
+      ensureWallet(kid).cash = 100;
+      // Money school fully open, so the movement itself is what is measured.
+      if (!r.school) r.school = {};
+      r.school.unlockStage = Object.assign({}, savedUnlock, { [kid]: 4 });
+
+      const cash0 = mnyCash(kid);
+      const stream0 = evBalance(kid, 'cash');
+
+      // ── cash → kept ready → cash, both ways, both mirrored.
+      if (!mnyMoveMoney(kid, 'cash', 'ready', 25)) problems.push('cash to kept-ready was refused');
+      if (mnySavedTotal(kid) !== 25) problems.push('kept ready holds ' + mnySavedTotal(kid) + ', not 25');
+      if (mnyCash(kid) !== money2(cash0 - 25)) problems.push('cash did not go down by 25');
+      if (!mnyMoveMoney(kid, 'ready', 'cash', 10)) problems.push('kept-ready back to cash was refused');
+      if (mnySavedTotal(kid) !== 15) problems.push('kept ready holds ' + mnySavedTotal(kid) + ', not 15');
+      // Stream and wallet moved together — the whole contract of Stage 1.
+      if (money2(evBalance(kid, 'cash') - stream0) !== money2(mnyCash(kid) - cash0)) {
+        problems.push('the stream and the wallet disagree about the move');
+      }
+      // Every movement is NAMED, which is what the old one-way doors never did.
+      const moves = evList(kid).filter(e => e && e.kind === 'move' && e.note);
+      if (!moves.length) problems.push('a move reached the stream with nothing said about it');
+
+      // ── The refusals a child must be told, not silently denied.
+      if (!mnyMoveRefusal(kid, 'cash', 'cash', 5)) problems.push('moving money to where it already is was allowed');
+      if (!mnyMoveRefusal(kid, 'cash', 'ready', 0)) problems.push('a zero move was allowed');
+      if (!mnyMoveRefusal(kid, 'cash', 'ready', 99999)) problems.push('she could move money she does not have');
+      if (!mnyMoveRefusal(kid, 'locked', 'cash', 5)) problems.push('locked money came out early');
+
+      // ── The Money-school gate, with the ladder back where it starts.
+      r.school.unlockStage = Object.assign({}, savedUnlock, { [kid]: 0 });
+      if (typeof mnyTotalPrincipal === 'function' && mnyTotalPrincipal(kid) > 0) {
+        const gated = mnyMoveRefusal(kid, 'cash', 'invest', 5);
+        if (!gated) problems.push('companies were open before Money school opened them');
+        else if (!/Opens at/.test(gated)) problems.push('the refusal does not say when it opens: ' + gated);
+        if (mnyMoveMoney(kid, 'cash', 'invest', 5)) problems.push('the gate greyed the row but the move still ran');
+      }
+      r.school.unlockStage = Object.assign({}, savedUnlock, { [kid]: 4 });
+
+      // ── She proposes; it waits; a grown-up says yes.
+      profile = 'jenn';
+      const req = mnyRequestMove(kid, 'cash', 'ready', 5, 'for my bike');
+      if (!req) { problems.push('a child could not ask'); return problems; }
+      if (mnyPendingMoves(kid).length !== 1) problems.push('the request is not waiting');
+      /* A request nobody can answer is worse than one that cannot be made, so
+         the answering surface has to exist BEFORE the asking one. Both halves:
+         a grown-up is told, and the control to answer is on the page. */
+      profile = 'parent';
+      const qrow = pnQueueRows().find(r => r.action === 'moves');
+      if (!qrow) problems.push('a waiting move is not in the Waiting-on-you queue');
+      else if (!/5/.test(qrow.sub)) problems.push('the queue row does not say how much: ' + qrow.sub);
+      const card = mnyMoveRequestsCard(kid);
+      if (!/data-mnyp-action="mvok"/.test(card) || !/data-mnyp-action="mvno"/.test(card)) {
+        problems.push('the money page offers no way to answer the request');
+      }
+      if (!/for my bike/.test(card)) problems.push('the card drops her reason for asking');
+      profile = 'jenn';
+      const heldReady = mnySavedTotal(kid);
+      if (mnyMoveMoney(kid, 'cash', 'ready', 5)) problems.push('a child moved money without asking');
+      if (mnySavedTotal(kid) !== heldReady) problems.push('a refused move moved money anyway');
+
+      profile = 'parent';
+      if (!mnyApproveMove(kid, req.id)) problems.push('a grown-up could not approve it');
+      if (mnySavedTotal(kid) !== money2(heldReady + 5)) problems.push('approving moved nothing');
+      if (mnyPendingMoves(kid).length !== 0) problems.push('an answered request is still waiting');
+      // Twice is once: two devices will each see the row.
+      if (mnyApproveMove(kid, req.id)) problems.push('approving twice moved the money twice');
+
+      // A refusal is an answer, and stays readable.
+      const no = mnyRequestMove(kid, 'cash', 'ready', 5, 'again');
+      mnyRejectMove(kid, no.id, 'we talked about it');
+      const kept = mnyEnsureMoveRequests(kid).find(x => x.id === no.id);
+      if (!kept || !kept.rejectedAt) problems.push('a refused request was thrown away rather than answered');
+      if (mnyPendingMoves(kid).length !== 0) problems.push('a refused request is still waiting');
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      profile = 'parent';
+      pd.holdings = savedHold;
+      pd.moveRequests = savedReq;
+      pd.events = savedEvents;
+      ensureWallet(kid).cash = savedCash;
+      if (savedDebts) pd.debts = savedDebts;
+      const rr = mrRules();
+      if (rr.school) rr.school.unlockStage = savedUnlock;
+    }
+    return problems.length ? problems : true;
+  });
+
   /* ── A GIFT HAS A DATE, AND TWO QUESTIONS ─────────────────────────
      `mnyAddDeposit` hardcoded `dayKey: todayKey()` and NO FORM ANYWHERE offered
      a date, so a birthday recorded a fortnight later sat in the wrong month of

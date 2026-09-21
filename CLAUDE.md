@@ -2055,6 +2055,66 @@ it, so an edit is a new entry of the same fact and must re-score; mutating
 Moving the date moves the block with it — a face left behind on the old Saturday
 is a second meet nobody held.
 
+## Money can move between Sundays
+
+**Until Stage 3 the only door out of cash was the Sunday split.** The two that
+existed went one way — kept-ready back to cash, a company back to cash — and
+both were buried on the parent's Money rules page. So a $50 birthday gift that
+arrived on a Tuesday sat in cash until the following Sunday whatever anybody
+wanted, which is the "nowhere to put it" this redesign started from.
+
+**`mnyMoveMoney(kid, from, to, amount, opts)` is THE one writer** (`js/40-stream.js`),
+and it owns no arithmetic: it routes to the primitives that already own each
+movement — `moneyDeposit`, `moneyWithdraw`, `moneyOpenGIC`, `mnyBuyChosenFund`,
+`moneySellStock`. Three of those took no `opts`, so a movement through them
+could not be labelled; they take one now, with the structural fields still
+applied **after** it per the Stage-1 rule — a caller may label a movement, never
+redirect one.
+
+**Pots do not touch; money goes through cash.** `ready → locked` and
+`ready → invest` are a withdrawal and then a purchase, **two recorded
+movements**, because that is what actually happens. One movement pretending the
+pots are adjacent is a row the flow cannot explain. `invest → cash` converts
+dollars to shares newest-holding-first, once, beside the only caller that needs
+it — `moneySellStock` takes shares and everything else on this surface is
+dollars.
+
+**The stage gates are not optional.** Every destination is checked with
+`mnyIsOpen` against `MNY_BUCKETS` — the same predicate `mnySplitFor` uses when
+it sends a locked bucket's share to the debt instead. `evHomeNeed` maps a home
+to its bucket rather than restating the percentages: two tables naming one gate
+is how they come to disagree. A sheet that could put money in a pot Money
+school has not opened would make the whole ladder decorative. And the gate must
+block the **action**, not just grey the row — a `disabled` attribute is a hint
+to the pointer, not a rule.
+
+**A refusal is a SENTENCE, not a false.** `mnyMoveRefusal` returns the words or
+`null`, so a row can be greyed *and say why beside it*. Locked money is the one
+refusal that is a lesson rather than a limit: it comes back on its own date
+(`mnySimCatchUp`), and letting it out early teaches the opposite of what locking
+it away is for.
+
+**A child proposes; a grown-up approves.** A proposal is **not a movement**, so
+it must never be a stream event — the stream records money that moved, and a
+request on it would make every derived balance wrong until somebody said no.
+Requests are `profile.moveRequests`, `mergeArrayById(..., 'mvq:')` in
+`mergeProfileState`, with their own two-device check.
+
+- **`mnyRequestMove` refuses for the same reasons a parent's move would**, in
+  the same sentence, so a child is never told to ask about something a grown-up
+  could not do either.
+- **The move runs at APPROVAL, never pre-authorised at the ask.** What she had
+  on Tuesday is not what she has on Sunday, so `mnyApproveMove` re-checks every
+  refusal against the wallet as it is now, and stamps `approvedAt` only once the
+  money actually moved. Approving twice moves nothing — two devices will each
+  see the row.
+- **A rejection is kept, not deleted.** "We talked about it and decided not to"
+  is a real answer, and a child should see her request was answered rather than
+  find it simply gone.
+
+`moneyCanTransact` is called by two functions and **none of the primitives check
+`isParent()` themselves**, so `mnyMoveMoney` carries that gate explicitly.
+
 ## The money stream — a flow, not a balance
 
 `js/40-stream.js`. **Money is stored as MOVEMENTS and every balance is derived
@@ -2176,8 +2236,9 @@ has no bearing on which door it leaves by. What changed:
 - **Sports scholarship** and **Academic scholarship** as categories, kept apart
   from the competition channel so a grandparent's cheque never reads as prize
   money the rules produced;
-- recorded **any time and credited at once**, always dated today into the
-  current week — back-dating would reopen a week whose split has already run;
+- recorded **any time and credited at once**, and **dated** — see *A gift has
+  a date* above. It was dated today into whatever week the planner was showing,
+  which is the defect that section exists to record;
 - a **parent gate**, which `mnyAddDeposit` never had. That was safe only while
   it lived behind the meeting; on a kid-visible page that credits immediately
   its absence would let a child hand herself any sum. A child now PROPOSES one

@@ -788,3 +788,188 @@ function evRunRepair() {
   if (weeks) saveAll();
   return { weeks, credited, plans };
 }
+
+/* ════════════════════════════════════════════════════════════════
+   MOVING MONEY BETWEEN HER OWN POTS
+
+   Until now the ONLY way a dollar moved out of cash was the Sunday split. The
+   two doors that existed went one way — kept-ready back to cash, a company back
+   to cash — and both were buried on the parent's Money rules page. So a gift
+   that arrived on a Tuesday sat in cash until the following Sunday whatever
+   anybody wanted, which is the "$50 with nowhere to go" this redesign started
+   from.
+
+   ── One writer ──
+
+   `mnyMoveMoney` routes to the primitives that already own each movement
+   (js/14-money.js). It contains no arithmetic of its own: a second place that
+   decides what a move does is a second place that can disagree with the first.
+
+   ── The stage gates are not optional ──
+
+   Money school opens the pots as the loan comes down — keep-ready at 30% paid
+   off, locking away at 60%, companies at 90% — and `mnySplitFor` sends a locked
+   bucket's share to the debt rather than into the bucket. A sheet that moved
+   money into a pot Money school has not opened would make the whole ladder
+   decorative, so every destination is checked with the SAME predicate the
+   Sunday split uses.
+
+   ── A child proposes; a grown-up approves ──
+
+   A proposal is NOT a movement, so it must not be an event: the stream is a
+   record of money that moved, and putting a request on it would make every
+   balance derived from it wrong until somebody said no. Requests live in
+   `profile.moveRequests` with their own merge decision.
+   ════════════════════════════════════════════════════════════════ */
+
+/* Which Money-school stage each home sits behind. `cash` is always open — it is
+   where money arrives — and the other three mirror MNY_BUCKETS exactly, because
+   two tables naming the same gate is how they come to disagree. */
+function evHomeNeed(home) {
+  const byKey = { ready: 'ready', locked: 'gic', invest: 'stock' };
+  const key = byKey[String(home)];
+  if (!key) return 0;                              // cash, and anything unknown
+  const b = (typeof MNY_BUCKETS !== 'undefined')
+    ? MNY_BUCKETS.find(x => x.key === key) : null;
+  return b ? (Number(b.need) || 0) : 0;
+}
+
+/* Can this child put money here yet? One predicate, shared with the split. */
+function evHomeOpen(kid, home) {
+  if (typeof mnyIsOpen !== 'function') return true;
+  return mnyIsOpen(kid, evHomeNeed(home));
+}
+
+/* What is actually in a home right now, read through the accessor that already
+   owned that figure rather than from the stream — Stage 1 is still shadow, so
+   the wallet is what a move must not overdraw. */
+function evHomeBalance(kid, home) {
+  if (home === 'cash') return mnyCash(kid);
+  if (home === 'ready') return mnySavedTotal(kid);
+  if (home === 'locked') return mnyLockedTotal(kid);
+  if (home === 'invest') return mnyInvestedTotal(kid);
+  return 0;
+}
+
+/* Why a move cannot happen, as a sentence, or null when it can. Returned rather
+   than toasted so the sheet can grey a row and SAY why beside it — a disabled
+   control with no reason is a control a child works around. */
+function mnyMoveRefusal(kid, from, to, amount) {
+  const amt = money2(amount);
+  if (!evIsHome(from) || !evIsHome(to)) return 'That is not somewhere money lives.';
+  if (from === to) return 'That is already where it is.';
+  if (!(amt > 0)) return 'How much?';
+  if (!evHomeOpen(kid, to)) {
+    return (typeof mnyNeedLabel === 'function') ? mnyNeedLabel(evHomeNeed(to)) : 'Not open yet.';
+  }
+  const have = evHomeBalance(kid, from);
+  if (amt > money2(have)) {
+    return 'There is only ' + mnyMoney(have) + ' there.';
+  }
+  /* Locked money is locked. It pays out on its own date (mnySimCatchUp), and a
+     sheet that let it out early would be teaching the opposite of what locking
+     it away is for. */
+  if (from === 'locked') return 'Locked money comes back on its own date.';
+  return null;
+}
+
+/* THE one writer. Returns true when money moved. */
+function mnyMoveMoney(kid, from, to, amount, opts) {
+  if (!isParent()) { showToast('A grown-up moves the money 🔒'); return false; }
+  const refusal = mnyMoveRefusal(kid, from, to, amount);
+  if (refusal) { showToast(refusal); return false; }
+  const amt = money2(amount);
+  const label = Object.assign({ kind: 'move', note: 'Moved by a grown-up' }, opts || {});
+
+  if (from === 'cash' && to === 'ready') return moneyDeposit(kid, amt, label);
+  if (from === 'ready' && to === 'cash') return moneyWithdraw(kid, amt, label);
+  if (from === 'cash' && to === 'locked') return moneyOpenGIC(kid, amt, 12, label);
+  if (from === 'cash' && to === 'invest') {
+    const before = mnyInvestedTotal(kid);
+    mnyBuyChosenFund(kid, amt, label);
+    return mnyInvestedTotal(kid) > before;
+  }
+  if (from === 'invest' && to === 'cash') {
+    /* Sell enough of what she holds to raise the amount asked for, newest
+       holding first. `moneySellStock` takes SHARES, not dollars, so the
+       conversion happens here — once, beside the only caller that needs it. */
+    let left = amt;
+    mnyHoldingsOfKind(kid, 'stock').slice().reverse().forEach(h => {
+      if (!(left > 0)) return;
+      const price = money2(h.priceNow);
+      if (!(price > 0)) return;
+      const worth = mnyHoldingValue(h);
+      const take = money2(Math.min(worth, left));
+      if (!(take > 0)) return;
+      if (moneySellStock(kid, h.id, take / price, label)) left = money2(left - take);
+    });
+    return left < amt;
+  }
+  /* ready → locked, ready → invest and the rest go through cash, because that
+     is what actually happens: money comes out of one pot and into another. Two
+     movements, both recorded, rather than one that pretends the pots touch. */
+  if (from === 'ready' && (to === 'locked' || to === 'invest')) {
+    if (!moneyWithdraw(kid, amt, label)) return false;
+    return mnyMoveMoney(kid, 'cash', to, amt, opts);
+  }
+  showToast('That move is not one the app knows.');
+  return false;
+}
+
+/* ── REQUESTS ──────────────────────────────────────────────────────
+   What a child asks for, waiting on a grown-up. Never a stream event: the
+   stream records money that MOVED, and a request has moved nothing. */
+function mnyEnsureMoveRequests(kid) {
+  const p = getProfData(kid);
+  if (!Array.isArray(p.moveRequests)) p.moveRequests = [];
+  return p.moveRequests;
+}
+function mnyPendingMoves(kid) {
+  return mnyEnsureMoveRequests(kid).filter(r => r && !r.approvedAt && !r.rejectedAt);
+}
+
+/* She asks. Refused for the same reasons a parent's move would be, so a child
+   is never told "ask a grown-up" about something a grown-up could not do
+   either — and the reason is the same sentence, not a second opinion. */
+function mnyRequestMove(kid, from, to, amount, note) {
+  const refusal = mnyMoveRefusal(kid, from, to, amount);
+  if (refusal) { showToast(refusal); return null; }
+  const r = {
+    id: mrNewId('mvq-'), from: String(from), to: String(to), amount: money2(amount),
+    note: String(note || '').slice(0, 80),
+    dayKey: todayKey(), askedBy: (typeof activeProfile === 'function') ? activeProfile() : kid,
+    createdAt: syncNow(), updatedAt: syncNow(),
+  };
+  mnyEnsureMoveRequests(kid).push(r);
+  saveAll();
+  return r;
+}
+
+/* A grown-up says yes. The move runs HERE rather than being pre-authorised at
+   the ask: what she had on Tuesday is not what she has on Sunday, so the
+   refusals are re-checked against the wallet as it is now. */
+function mnyApproveMove(kid, requestId) {
+  if (!isParent()) { showToast('A grown-up approves this 🔒'); return false; }
+  const r = mnyEnsureMoveRequests(kid).find(x => x && x.id === requestId);
+  if (!r || r.approvedAt || r.rejectedAt) return false;
+  const ok = mnyMoveMoney(kid, r.from, r.to, r.amount, {
+    kind: 'move', ref: r.id, note: 'She asked, a grown-up said yes' });
+  if (!ok) return false;
+  r.approvedAt = syncNow();
+  markItemUpdated(r);
+  saveAll();
+  return true;
+}
+function mnyRejectMove(kid, requestId, why) {
+  if (!isParent()) { showToast('A grown-up answers this 🔒'); return false; }
+  const r = mnyEnsureMoveRequests(kid).find(x => x && x.id === requestId);
+  if (!r || r.approvedAt || r.rejectedAt) return false;
+  /* Kept, not deleted. "We talked about it and decided not to" is a real answer
+     and a child should be able to see it was answered rather than find her
+     request simply gone. */
+  r.rejectedAt = syncNow();
+  r.why = String(why || '').slice(0, 80);
+  markItemUpdated(r);
+  saveAll();
+  return true;
+}

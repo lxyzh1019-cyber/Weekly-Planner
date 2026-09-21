@@ -114,6 +114,17 @@ function pnQueueRows() {
       sub: `${who.icon} ${who.name} added “${first.task.name}”`,
     });
   }
+  const moves = ['jenn', 'jess'].flatMap(k =>
+    (typeof mnyPendingMoves === 'function' ? mnyPendingMoves(k) : []).map(r => ({ kid: k, r })));
+  if (moves.length) {
+    const first = moves[0];
+    const who = kidLabel(first.kid);
+    rows.push({
+      icon: '🔀', action: 'moves', cta: 'Answer ›',
+      title: `${moves.length} move${moves.length === 1 ? '' : 's'} she has asked about`,
+      sub: `${who.icon} ${who.name} · ${mnyMoney(first.r.amount)} to ${mnyHomeLabel(first.r.to).toLowerCase()}`,
+    });
+  }
   const notes = pnNoteKids();
   if (notes.length) {
     rows.push({
@@ -223,6 +234,20 @@ function pnHandleClick(e) {
   if (a === 'grade')    { setParentTab('chores'); return; }
   if (a === 'approve')  { setParentTab('tasks'); return; }
   if (a === 'notes')    { setParentTab('review'); return; }
+  if (a === 'moves')    {
+    /* Point the portal at the child who asked, and at the section that shows
+       what she has — answering a move with another child's balances on screen
+       is how the wrong pot gets opened. */
+    const first = ['jenn', 'jess'].find(k =>
+      typeof mnyPendingMoves === 'function' && mnyPendingMoves(k).length);
+    /* Section first: setParentScope re-renders the tab it is standing on, so
+       setting it afterwards would paint the money page twice — and in this app
+       a render can trigger a full-document write. */
+    if (typeof mnySetParentSection === 'function') mnyParentSection = 'holdings';
+    if (first) setParentScope(first);
+    setParentTab('money');
+    return;
+  }
   if (a === 'meeting')  { openFamilyMeetingAsk(); return; }
   if (a === 'fullweek') { parentView(parentViewing); return; }
   if (a === 'day')      { openFamilyMeetingAt(1, Number(el.getAttribute('data-day'))); return; }

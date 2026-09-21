@@ -1182,5 +1182,45 @@ function sync(a, b) {
     phone.state.shared.chore.programStartDate === '2025-08-25');
 }
 
+
+/* ── WHAT SHE ASKED FOR, on two devices ────────────────────────────
+   A move request is NOT a stream event: the stream records money that moved,
+   and a request has moved nothing. It is its own append-only record, and a
+   child asking on the iPad while a parent answers on the phone is the ordinary
+   case, not the exotic one. */
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  on(ipad,  st => { st.profiles.jenn.moveRequests = [
+    { id: 'mvq-1', from: 'cash', to: 'ready', amount: 10, updatedAt: 10 }]; });
+  on(phone, st => { st.profiles.jenn.moveRequests = [
+    { id: 'mvq-2', from: 'cash', to: 'ready', amount: 5, updatedAt: 20 }]; });
+  sync(ipad, phone);
+  check('two devices, two requests — both survive',
+    ipad.state.profiles.jenn.moveRequests.length === 2 &&
+    phone.state.profiles.jenn.moveRequests.length === 2);
+
+  // A parent answering on one device must be what the other sees. The answer is
+  // an edit to the record, so newest-wins per id is what carries it.
+  on(phone, st => {
+    const r = st.profiles.jenn.moveRequests.find(x => x.id === 'mvq-1');
+    r.approvedAt = 100; r.updatedAt = 100;
+  });
+  sync(ipad, phone);
+  const onIpad = ipad.state.profiles.jenn.moveRequests.find(r => r.id === 'mvq-1');
+  check('an answer given on one device is the answer on both',
+    !!onIpad && onIpad.approvedAt === 100);
+
+  // And a request withdrawn stays withdrawn — without the tombstone it comes
+  // back on the next snapshot and a parent is asked the same question forever.
+  on(ipad, st => {
+    st.profiles.jenn.moveRequests = st.profiles.jenn.moveRequests.filter(r => r.id !== 'mvq-2');
+    api.tombstoneIds('mvq:', ['mvq-2']);
+  });
+  sync(ipad, phone);
+  check('a withdrawn request does not come back from the other device',
+    ipad.state.profiles.jenn.moveRequests.length === 1 &&
+    phone.state.profiles.jenn.moveRequests.length === 1);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

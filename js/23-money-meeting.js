@@ -1287,16 +1287,16 @@ function mnyDoCommit() {
 /* Buy whichever fund the rules currently name. A fixed menu, never a text box
    (see MNY_FUNDS) — and the two blended options are not real tickers, so they
    are held as their own record rather than pretending to be a company. */
-function mnyBuyChosenFund(kid, dollars) {
+function mnyBuyChosenFund(kid, dollars, opts) {
   const fundId = ((mrRules().investing || {}).fund) || 'index';
   const fund = MNY_FUNDS.find(f => f.id === fundId) || MNY_FUNDS[0];
-  if (fund.ticker) { moneyBuyStock(kid, fund.ticker, dollars); return; }
+  if (fund.ticker) { moneyBuyStock(kid, fund.ticker, dollars, opts); return; }
   const w = ensureWallet(kid);
   const amt = money2(Math.min(dollars, w.cash));
   if (!(amt > 0)) return;
   w.cash = money2(w.cash - amt);
-  evMirror(kid, { kind: 'invest', from: 'cash', to: 'invest', amount: amt,
-                  note: fund.label });
+  evMirror(kid, Object.assign({ kind: 'invest', note: fund.label },
+                              opts || {}, { from: 'cash', to: 'invest', amount: amt }));
   const held = mnyHoldingsOfKind(kid, 'stock').find(h => h.fundId === fund.id);
   if (held) {
     held.units = 1;

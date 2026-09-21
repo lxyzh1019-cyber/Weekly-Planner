@@ -155,7 +155,7 @@ function moneyWithdraw(kid, amount, opts) {         // kept ready → cash (two-
   evMirror(kid, Object.assign({ kind: 'move' }, opts || {}, { from: 'ready', to: 'cash', amount: money2(took) }));
   saveAll(); return true;
 }
-function moneyOpenGIC(kid, amount, termMonths) {   // cash → locked away
+function moneyOpenGIC(kid, amount, termMonths, opts) {   // cash → locked away
   const w = ensureWallet(kid); amount = money2(Math.min(amount, w.cash));
   const term = termMonths || 12;
   if (amount <= 0 || ![3, 6, 12].includes(term)) return false;
@@ -167,11 +167,11 @@ function moneyOpenGIC(kid, amount, termMonths) {   // cash → locked away
   mnyAddHolding(kid, { kind: 'gic', name: 'Locked away for a year', units: 1,
                        priceNow: amount, costBasis: amount, rateAnnual: rate,
                        termMonths: term, maturesOn: ctDateToKey(matures) });
-  evMirror(kid, { kind: 'locked', from: 'cash', to: 'locked', amount,
-                  note: term + '-month lock' });
+  evMirror(kid, Object.assign({ kind: 'locked', note: term + '-month lock' },
+                              opts || {}, { from: 'cash', to: 'locked', amount }));
   saveAll(); return true;
 }
-function moneyBuyStock(kid, ticker, dollars) {     // cash → a bit of a company
+function moneyBuyStock(kid, ticker, dollars, opts) {     // cash → a bit of a company
   const w = ensureWallet(kid); dollars = money2(Math.min(dollars, w.cash));
   if (dollars <= 0 || !STOCKS_2023[ticker]) return false;
   const price = stockPrice(ticker);
@@ -186,11 +186,11 @@ function moneyBuyStock(kid, ticker, dollars) {     // cash → a bit of a compan
     mnyAddHolding(kid, { kind: 'stock', name: STOCKS_2023[ticker].name, ticker,
                          units: dollars / price, priceNow: money2(price), costBasis: dollars });
   }
-  evMirror(kid, { kind: 'invest', from: 'cash', to: 'invest', amount: dollars,
-                  note: STOCKS_2023[ticker].name });
+  evMirror(kid, Object.assign({ kind: 'invest', note: STOCKS_2023[ticker].name },
+                              opts || {}, { from: 'cash', to: 'invest', amount: dollars }));
   saveAll(); return true;
 }
-function moneySellStock(kid, ref, shares) {        // a bit of a company → cash
+function moneySellStock(kid, ref, shares, opts) {        // a bit of a company → cash
   // `ref` is a holding id or a ticker: a company a parent typed in by hand has
   // no ticker, and it must be as sellable as one from the price table.
   const w = ensureWallet(kid);
@@ -211,8 +211,8 @@ function moneySellStock(kid, ref, shares) {        // a bit of a company → cas
   /* Proceeds, not cost. A company sold for more than it cost brings back more
      than went in, and the difference is real money the stream has to carry or
      the derived balance falls behind the stored one by exactly the gain. */
-  evMirror(kid, { kind: 'move', from: 'invest', to: 'cash', amount: proceeds,
-                  note: 'Sold ' + (held.name || 'a company') });
+  evMirror(kid, Object.assign({ kind: 'move', note: 'Sold ' + (held.name || 'a company') },
+                              opts || {}, { from: 'invest', to: 'cash', amount: proceeds }));
   saveAll(); return true;
 }
 
@@ -226,7 +226,13 @@ function moneyAdvanceMonth(kid) {
   return { interest: r.interest, matured: r.matured };
 }
 
-/* Kids may look at what they own on 💰 My money; every function that moves it
+/* These three took no `opts` until Move money needed one, so a movement they
+   made could not be LABELLED — the stream got "Sold a company" and never which
+   sheet asked for it or why. Structural fields (from, to, amount) are still
+   applied last, so a caller can name a movement and never redirect one; that
+   rule cost two silent defects in Stage 1 and is not relaxed here.
+
+   Kids may look at what they own on 💰 My money; every function that moves it
    is parent-only. This is the guard the old bank screen enforced, kept because
    the commit path and the rules page both still lean on it. */
 function moneyCanTransact() {

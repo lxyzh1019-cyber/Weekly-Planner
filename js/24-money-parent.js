@@ -329,6 +329,46 @@ function mnyDebtEditor(kid) {
    One record per holding, kept truthful by hand. There is no market
    simulation: a share is worth what this page says it is worth, which is both
    simpler to explain and closer to how it actually works. */
+/* ── What she has asked to move ──
+   A request is an ASK, not a movement (js/40-stream.js) — the money does not
+   leave cash until this is answered, and it is re-checked against the wallet as
+   it stands now rather than as it stood when she asked.
+
+   The approval surface ships BEFORE the door she proposes through, deliberately:
+   a request that could be made and never answered is worse than one that cannot
+   yet be made. */
+function mnyMoveRequestsCard(kid) {
+  const pend = (typeof mnyPendingMoves === 'function') ? mnyPendingMoves(kid) : [];
+  if (!pend.length) return '';
+  const rows = pend.map(r => {
+    const why = (typeof mnyMoveRefusal === 'function')
+      ? mnyMoveRefusal(kid, r.from, r.to, r.amount) : null;
+    return `<div class="mny-card">
+        <div class="mny-week-head">
+          <span class="mny-label">${mnyMoney(r.amount)} · ${escapeHtml(mnyHomeLabel(r.from))} → ${escapeHtml(mnyHomeLabel(r.to))}</span>
+          <span class="mny-label">${escapeHtml(r.dayKey || '')}</span>
+        </div>
+        ${r.note ? `<div class="mny-note">“${escapeHtml(r.note)}”</div>` : ''}
+        ${why ? `<div class="mny-note">Cannot happen right now — ${escapeHtml(why)}</div>` : ''}
+        <div class="mny-chiprow">
+          <button type="button" class="mny-btn primary" data-mnyp-action="mvok" data-mnyp-id="${escapeAttr(r.id)}"${why ? ' disabled' : ''}>Yes, move it</button>
+          <button type="button" class="mny-btn" data-mnyp-action="mvno" data-mnyp-id="${escapeAttr(r.id)}">Not this time</button>
+        </div>
+      </div>`;
+  }).join('');
+  return `<div class="mny-card">
+      <div class="mny-label">🔀 ${pend.length} thing${pend.length === 1 ? '' : 's'} she has asked to move</div>
+      <div class="mny-note">Nothing has moved yet. Saying yes moves it now, at today's balances.</div>
+    </div>${rows}`;
+}
+
+/* One name per home, so the queue row, the card and any sheet say the same
+   words about the same pot. */
+function mnyHomeLabel(home) {
+  return ({ cash: 'Cash', ready: 'Kept ready', locked: 'Locked away', invest: 'In companies' })[String(home)]
+    || String(home);
+}
+
 function mnyHoldingsEditor(kid) {
   const holdings = mnyHoldings(kid);
   const r = mnyReturns(kid);
@@ -370,7 +410,8 @@ function mnyHoldingsEditor(kid) {
   const funds = MNY_FUNDS.map(f =>
     `<button type="button" class="mny-chip ${((mrRules().investing || {}).fund === f.id) ? 'on' : ''}" data-mnyp-action="fund" data-mnyp-id="${f.id}">${escapeHtml(f.label)}</button>`).join('');
 
-  return `<div class="mny-card">
+  return `${mnyMoveRequestsCard(kid)}
+    <div class="mny-card">
       <div class="mny-label">📈 What she owns</div>
       <div class="mny-rows">
         <div class="mny-row"><span>Cash</span><b>${mnyMoney(mnyCash(kid))}</b></div>
@@ -825,6 +866,12 @@ function mnyParentClick(ev) {
   }
   if (a === 'holddel')  { mnyRemoveHolding(kid, id); mnyRenderRulesTab(); return; }
   if (a === 'saved2cash') { mnyAskMoveSavedToCash(kid); return; }
+  if (a === 'mvok') { if (mnyApproveMove(kid, id)) showToast('Moved 🔀'); mnyRenderRulesTab(); return; }
+  if (a === 'mvno') {
+    showPrompt('Why not, in a few words? She will see it.', { value: 'We talked about it' })
+      .then(v => { if (v == null) return; mnyRejectMove(kid, id, v); mnyRenderRulesTab(); });
+    return;
+  }
   if (a === 'holdsell')   { mnyAskSellHolding(kid, id); return; }
   if (a === 'holdkind') { mnyEditHolding(kid, id, 'kind', el.getAttribute('data-mnyp-k')); mnyRenderRulesTab(); return; }
   if (a === 'hold') {
