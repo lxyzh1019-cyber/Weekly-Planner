@@ -7091,3 +7091,13 @@
 }
 .fl-seg { display: block; width: 100%; }
 .fl-col-name { font-size: max(13px, 0.78rem); font-weight: 700; }
+
+/* The one control in the app that moves real money. It sits in the meeting's
+   footer rather than somewhere in the middle of a long panel — always visible,
+   always in the same place — so it is marked as the consequential thing it is
+   rather than looking like another Next. */
+.mm-nav .mm-commit {
+  border-width: 3px;
+  box-shadow: var(--shadow-sm, 0 2px 0 var(--ink));
+  font-weight: 900;
+}

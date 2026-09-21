@@ -84,7 +84,18 @@ function mnyStrip(wk, kid, liveIdx) {
 /* ════════════════════════════════════════════════════════════════
    STEP 3 · WHAT I EARNED
    ════════════════════════════════════════════════════════════════ */
-function mnyRenderEarned(wk) {
+/* `opts.chrome === false` drops the page head, the five-page bar and the kid
+   tabs — the caller is stacking this panel with another and owns them.
+
+   That option exists because the meeting's three-screen shape puts "what I
+   earned" and "what I do with it" on ONE screen, and each panel was rendering
+   its own nav: two identical five-tab bars, one above the other, on a screen
+   whose whole purpose was to be less to wade through. Exactly the defect
+   CLAUDE.md records about the six-button shortcut row that sat in three
+   topbars. The panels are otherwise untouched — a chrome flag is not a second
+   renderer. */
+function mnyRenderEarned(wk, opts) {
+  const chrome = !(opts && opts.chrome === false);
   const kid = mnyMeetingKid();
   /* This used to swap the WHOLE of step 3 for the legacy confirm screen on any
      week before `moneyModelStartWeek` — which, on a freshly-seeded clock, was
@@ -94,10 +105,12 @@ function mnyRenderEarned(wk) {
   mnySimCatchUp(kid);          // the world moves whether or not we met last week
 
   const confirmed = mnyIsConfirmed(wk, kid);
-  return `${mnyPageHead('💪 What I earned', 'Agree the week before anything moves',
-      isParent() ? [{ action: 'record-any', label: '✍️ Record something' }] : [], { back: false })}
-    ${mnyTabBar('grow')}
-    ${mnyKidTabs()}
+  return `${chrome
+      ? `${mnyPageHead('💪 What I earned', 'Agree the week before anything moves',
+          isParent() ? [{ action: 'record-any', label: '✍️ Record something' }] : [], { back: false })}
+         ${mnyTabBar('grow')}
+         ${mnyKidTabs()}`
+      : `<div class="mm-h">💪 What ${escapeHtml(mnyKidName(kid))} earned</div>`}
     ${mnyStrip(wk, kid, 0)}
     ${mmRenderQuarterly()}
     <div class="mny-cols two">
@@ -598,11 +611,14 @@ function mnyReturnsCard(kid) {
 /* ════════════════════════════════════════════════════════════════
    STEP 4 · WHAT I DO WITH IT
    ════════════════════════════════════════════════════════════════ */
-function mnyRenderDecide(wk) {
+function mnyRenderDecide(wk, opts) {
+  const chrome = !(opts && opts.chrome === false);
   const kid = mnyMeetingKid();
   mnySimCatchUp(kid);
-  const head = `${mnyPageHead('🤝 What I do with it', 'Decide once, for every dollar', [], { back: false })}
-    ${mnyTabBar('where')}${mnyKidTabs()}`;
+  const head = chrome
+    ? `${mnyPageHead('🤝 What I do with it', 'Decide once, for every dollar', [], { back: false })}
+       ${mnyTabBar('where')}${mnyKidTabs()}`
+    : `<div class="mm-h">🤝 What ${escapeHtml(mnyKidName(kid))} does with it</div>`;
 
   // The gate covers the WHOLE step, not one column: deciding what to do with a
   // number nobody has agreed to is not a decision, it is a guess.
@@ -934,22 +950,36 @@ function mnyReflectCard(draft) {
     </div>`;
 }
 
+/* Why this split cannot be committed yet, as a sentence, or null when it can.
+
+   ONE OWNER, because two things ask it now: the panel says it where the plan
+   is being edited, and the meeting's footer says it on the button itself
+   (mmMoneyFooter, js/15-meeting.js). Two copies of a rule about moving money is
+   the defect this repo keeps recording — and the failure mode here is the worst
+   kind, a button that offers to commit while the panel above it says it cannot. */
+function mnyCommitRefusal(draft, pool) {
+  const left = money2(pool.mine - mnySplitTotal(draft.split));
+  if (!draft.reflect) return 'Answer the question first';
+  if (left < -0.005) return 'That is more than you have';
+  if (left > 0.005) return `${mnyMoney(left)} still has no job`;
+  if (money2(draft.split.stock) > pool.stockCap) return 'Too much into one company';
+  if (money2(draft.split.spend) > pool.spendCap) return `Spending is capped at ${mnyMoney(pool.spendCap)}`;
+  return null;
+}
+
+/* What the plan comes to, and what is standing in the way. It carried the
+   commit BUTTON until the meeting became three screens; the button lives in the
+   footer now, where it is always visible instead of somewhere in the middle of
+   a long panel. This bar still says the figure and the reason, because that is
+   where a parent is looking while they change a number. */
 function mnyCommitBar(wk, kid, draft, pool) {
   const spent = mnySplitTotal(draft.split);
-  const left = money2(pool.mine - spent);
-  const overStock = money2(draft.split.stock) > pool.stockCap;
-  const overSpend = money2(draft.split.spend) > pool.spendCap;
-  let blocked = '';
-  if (!draft.reflect) blocked = 'Answer the question first';
-  else if (left < -0.005) blocked = 'That is more than you have';
-  else if (left > 0.005) blocked = `${mnyMoney(left)} still has no job`;
-  else if (overStock) blocked = 'Too much into one company';
-  else if (overSpend) blocked = `Spending is capped at ${mnyMoney(pool.spendCap)}`;
+  const blocked = mnyCommitRefusal(draft, pool);
   return `<div class="mny-confirmbar">
       <span><b>${mnyMoney(spent)}</b> to move</span>
-      ${blocked
-        ? `<button type="button" class="mny-btn" disabled>${escapeHtml(blocked)}</button>`
-        : `<button type="button" class="mny-btn primary" onclick="mnyDoCommit()">Done — move my money</button>`}
+      <span class="mny-note">${blocked
+        ? escapeHtml(blocked)
+        : 'Ready — the button at the bottom of the screen moves it.'}</span>
     </div>`;
 }
 

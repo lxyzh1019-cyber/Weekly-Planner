@@ -96,6 +96,18 @@ as passes. Same shape as the `|| break` bug above: a test that reports a problem
 and returns success. If you add a check, return `true` or the findings, never a
 bare truthy value.
 
+**And never a bare `false` either.** Around fifty checks end
+`return thisThing && thatThing && theOther;`, where every one of those names was
+already computed and already meant something — and all of it is thrown away, so
+a failure says which check broke and nothing about why. That is not
+hypothetical: one change to the meeting broke three of them at once and finding
+out which sub-condition was false cost an extra full run of the suite *per
+check*, at eight to ten minutes each. `meetingMoneyFlowEndToEnd`,
+`tabBarOnEveryMoneySurface` and `newAffordancesActuallyNavigate` are converted;
+the rest are the same shape and the same fix — build a `problems` array, push a
+sentence naming the surface and the expectation, `return problems.length ?
+problems : true`.
+
 `tests/check-globals.js` enforces the one-declaration-per-name rule above,
 covering `function`, `async function` and top-level `let`/`const`/`var`
 (including the comma-separated form) — a duplicate `let` is a load-time
@@ -1299,6 +1311,77 @@ cache could push an un-rescaled total over a rescaled one, or two devices could
 rescale the same figure twice. `progress.xp2` holds the new scale and, when it is
 absent, the answer is **derived** from the legacy `questXP` — the same answer
 whatever has run, however often, in any merge order.
+
+## Three steps, and they have IDS
+
+It was five — *Check the week · Reflect · What I earned · What I do with it ·
+Close & plan*. Eight weeks went unsettled, and the reason was never that any
+one step is hard: **five is the wrong shape for a Sunday with two children in
+the room.** Three of the five merged in pairs that were always about the same
+thing.
+
+| Step | Was |
+|---|---|
+| **The week** | what happened, and what she made of it (1 + 2) |
+| **The money** | what it came to, and where it goes (3 + 4) |
+| **Close** | (5) |
+
+**The numbers were POSITIONS, and 46 call sites held them.** `mmGoStep(3)`
+appeared eleven times, `mmGoStep(4)` eight, across the app and the suite.
+Renumbering would have silently re-pointed every one at a different screen —
+the same defect as `groupDef` returning `ACTIVITY_GROUPS[4]` because daily
+happened to be the fifth row.
+
+So a step has an **id**, and three functions keep the two numberings apart:
+
+| | |
+|---|---|
+| `mmGoTo(id)` | name a step — what everything inside the meeting uses |
+| `mmGoIndex(i)` | 1-based into `MM_STEPS` — the stepper and the ◀ ▶ nav |
+| `mmGoStep(n)` | the **legacy five**, translated through `MM_LEGACY_STEP` |
+
+`mmGoStep` is the only place that knows the old numbering, so every existing
+caller keeps meaning what it meant: "go to what she earned" still lands on the
+money. **Getting this wrong once cost a crash** — the first cut clamped `n`
+straight into the new list, so `mmGoStep(2)`, every caller meaning *the
+reflection*, silently landed on the money. That is the position-not-id defect
+committed while writing the warning about it.
+
+`mmMaxStep` is compared against `mmStepIndex('money') + 1` rather than the
+literal `3` it used to be: that number was the position of "What I earned" in a
+five-row list and would have come to mean "Close" the moment the list changed
+length.
+
+**A step is a list of panels, not a rewrite.** `mmRenderReview`,
+`mmRenderReflect`, `mnyRenderEarned` and `mnyRenderDecide` each still own
+exactly what they owned; a step concatenates them. Rewriting four renderers
+into two would have been four chances to lose a rule only one of them knew.
+
+**One set of chrome per screen.** Each money panel drew its own page head,
+five-page bar and kid tabs, so merging them stacked **two identical five-tab
+navs** on the screen whose whole purpose is to be less to wade through — the
+six-button-shortcut-row defect again. `opts.chrome === false` drops a panel's
+head in favour of a section heading, and the step renders the bar once. A
+chrome flag is not a second renderer.
+
+**THE MONEY STEP'S FOOTER IS THE COMMIT, not a Next.** `mmMoneyFooter` owns it.
+The commit was a bar somewhere in the middle of a long scrolling panel, and on
+this screen that is not a matter of taste: it is the one control in the app that
+moves real money, and one you have to go looking for is one that gets missed on
+a Sunday and one that gets pressed while scrolling past it. In the footer it is
+always visible, always in the same place, and it says what it will do or why it
+cannot.
+
+It is **still a separate gated act**: putting "what I earned" and "what I do
+with it" on one screen must not make scrolling to the bottom a commit. The
+footer only becomes a way onwards once the money has actually moved — and when
+the other child is still undecided it offers *her*, because a sitting that skips
+a child is how a week comes to be half-settled with nothing saying so.
+
+**`mnyCommitRefusal` is the one owner of why a split cannot commit.** Two things
+ask it now — the panel where the plan is edited, and the footer button — and two
+copies of a rule about moving money has a worst case worth naming: a button
+offering to commit while the panel above it says it cannot.
 
 ## The meeting is a SCREEN, not a pop-up
 

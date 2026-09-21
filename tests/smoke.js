@@ -5394,7 +5394,9 @@ function findChromium() {
 
     openFamilyMeeting();
     mnySetMeetKid(kid);
-    const fiveSteps = MM_STEPS.length === 5;
+    /* The shape, by the ids it is made of rather than by a count — a length
+       check passes for any three steps, including three wrong ones. */
+    const threeSteps = MM_STEPS.map(x => x.id).join(',') === 'week,money,close';
 
     // Money from outside is entered at the meeting, with her in the room. It
     // carries no destination — it joins the pool like every other dollar.
@@ -5450,8 +5452,25 @@ function findChromium() {
       && !mnyIsCommitted(wk, kid);
 
     mmHide();
-    return fiveSteps && gated && confirmed && poolIsHonest && allToLoan
-        && blockedNoAnswer && moved && notHeldYet && reversed;
+
+    /* Findings, not a bare false. This is the longest end-to-end in the suite —
+       nine named facts about a week's money moving — and every one of them was
+       collapsed into a single boolean, so a failure said "the money flow broke"
+       and nothing about which part. */
+    const problems = [];
+    if (!threeSteps) problems.push('the meeting is not week · money · close — it is ' + MM_STEPS.map(x => x.id).join(', '));
+    if (!gated) problems.push('the split is not locked behind agreeing the week');
+    if (!confirmed) problems.push('agreeing the week did not record it as confirmed');
+    if (!poolIsHonest) problems.push('the pool does not add up: a $50 gift should join the same pool as everything else and be hers to decide about');
+    if (!allToLoan) problems.push('the all-to-the-loan plan did not send the whole pool at the loan');
+    if (!blockedNoAnswer) problems.push('the commit was not blocked while her question was unanswered');
+    if (!moved) problems.push('committing did not move the money as the plan said: paid '
+      + before.paid + ' → ' + after.paid + ', cash ' + before.cash + ' → ' + after.cash
+      + ', saved ' + before.saved + ' → ' + after.saved
+      + ', committed ' + mnyIsCommitted(wk, kid) + ', arrears ' + mnyDebts(kid)[0].arrears);
+    if (!notHeldYet) problems.push('one child settling marked the whole meeting held — her sister has not decided');
+    if (!reversed) problems.push('undo did not put every pot back where it was');
+    return problems.length ? problems : true;
   });
 
   /* ── THE MONEY STREAM AGREES WITH THE WALLET ──────────────────────
@@ -6824,7 +6843,21 @@ function findChromium() {
     mnyOpenMyMoney('jess');
     mnyGoTab('school');
     const navigates = document.getElementById('screen-moneyschool').classList.contains('active');
-    return onMoney && onStory && onSchool && onRules && onEarned && onDecide && navigates;
+
+    /* Findings, not a bare false. Every name below was already computed and
+       already meant something, and `return a && b && c` threw all of it away —
+       so a failure said only which check broke, and finding out which surface
+       had lost its bar cost a whole extra run of this suite. */
+    const problems = [];
+    if (!onMoney)  problems.push('💰 My money has no five-page bar, or none of its tabs is marked current');
+    if (!onStory)  problems.push('🌊 My money story has no five-page bar');
+    if (!onSchool) problems.push('🎓 Money school has no five-page bar');
+    if (!onRules)  problems.push("the parent's Money rules page is missing its section rail, or does not say which rule version is in effect");
+    if (!onEarned) problems.push('the meeting\'s money screen does not carry the bar exactly once — it draws '
+      + document.getElementById('familyMeetingBody').querySelectorAll('.mny-tab').length + ' tabs');
+    if (!onDecide) problems.push('arriving at the split through the legacy step 4 loses the bar');
+    if (!navigates) problems.push('tapping Money school on the bar does not reach it');
+    return problems.length ? problems : true;
   });
 
   // A kid tapping a grown-up's page is told what it is, not silently refused —
@@ -7402,7 +7435,10 @@ function findChromium() {
     mrSetChoreGrade(kid, wk, 2, 'vacuum', 3);
     mnySetOverride(kid, wk, 'chores', 99, 'graded_wrong');
     mnyShowTheChange(kid, 'chores');
-    const toTheChange = mmStep === 3 && mnyExpandRow === 'chores';
+    /* By ID, not by position. `mmStep === 3` meant "what I earned" while the
+       meeting had five steps and meant "Close" the moment it had three — the
+       same defect the app's own MM_LEGACY_STEP exists to stop. */
+    const toTheChange = mmStepId() === 'money' && mnyExpandRow === 'chores';
     mmHide();
     e.overrides = {};
 
@@ -7425,7 +7461,15 @@ function findChromium() {
       && document.querySelectorAll('#kidTrainingChecks .checklist-item').length === TRAINING_CHECKS.length;
     closeSheet('kidTrainingOverlay');
     setDayBlocks(dk, [], 'jenn');
-    return toTheChange && toWaiting && toSheet;
+
+    /* Findings, not a bare false: three unrelated affordances in one check, and
+       "false" named none of them. */
+    const problems = [];
+    if (!toTheChange) problems.push('"See the change" on an override notice does not reach the money screen with that row open — landed on '
+      + mmStepId() + ', row ' + String(mnyExpandRow));
+    if (!toWaiting) problems.push('her "waiting for Mom" chip does not jump to the first day something is waiting on — landed on day ' + ctDay + ', not 4');
+    if (!toSheet) problems.push('the training chip on a short block does not open the sheet with all four checks on it');
+    return problems.length ? problems : true;
   });
 
   // ── Durability (Branch 1) ────────────────────────────────────────────────
