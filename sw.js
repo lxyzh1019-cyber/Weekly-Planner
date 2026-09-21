@@ -1,9 +1,17 @@
 /* Weekly-Planner — service worker.
 
-   The shell (this page, its stylesheet, the 41 scripts, the icons) is kept in
-   one cache so the installed app opens without signal: the planner's data is
+   The shell (this page, its stylesheet, every script, the icons) is kept in one
+   cache so the installed app opens without signal: the planner's data is
    already on the device, and a browser error page was the one thing standing
    between a child and it.
+
+   A SCRIPT MISSING FROM THIS LIST IS INVISIBLE UNTIL THE DEVICE IS OFFLINE.
+   js/40-stream.js shipped without being added here: online, network-first
+   fetched it and nothing looked wrong; offline, every other script came from
+   cache, that one 404'd, and every ev* function was undefined — so moneyAddCash
+   and every other wallet writer threw on the first tap. The count in this
+   comment used to be a number ("the 41 scripts") and was already wrong, which
+   is why it no longer is one.
 
    NETWORK FIRST, cache as the fallback. GitHub Pages caches aggressively and
    there is no build step to stamp script tags, so a cache-first worker would
@@ -18,7 +26,7 @@
    touched: Firestore keeps its own offline story (js/03-sync.js) and a worker
    in the middle of it would be a second cache disagreeing with the first. */
 
-const SW_VERSION = '2026-09-16a';
+const SW_VERSION = '2026-09-21a';
 const CACHE = 'wp-shell-' + SW_VERSION;
 
 const SHELL = [
@@ -65,6 +73,7 @@ const SHELL = [
   './js/37-reflection.js',
   './js/38-conflicts.js',
   './js/39-block-drag.js',
+  './js/40-stream.js',
   './js/99-main.js',
   './assets/icons/apple-touch-icon.png',
   './assets/icons/favicon-16.png',

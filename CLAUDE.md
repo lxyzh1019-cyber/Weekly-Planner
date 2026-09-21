@@ -74,8 +74,8 @@ npm run test:smoke          # screenshots land in tests/out/
 ```
 
 `npm run check` runs `tests/check-syntax.js`, `tests/check-globals.js`,
-`tests/check-shared-merge.js`, `tests/check-escaping.js`, `tests/check-dead-css.js`
-and `tests/check-dead-ids.js` (an `id` in `index.html` that nothing reads — the
+`tests/check-shared-merge.js`, `tests/check-escaping.js`, `tests/check-dead-css.js`,
+`tests/check-dead-ids.js` and `tests/check-sw-shell.js` (an `id` in `index.html` that nothing reads — the
 same blind spot as dead CSS, with runtime-built prefixes discovered from the
 source rather than listed by hand). **Do not go back to the old shell loop** —
 
@@ -2167,6 +2167,19 @@ model. The streak is the whole routine channel.
   and the shell it holds only answers offline — but **bump `SW_VERSION` on every
   deploy that changes a shell file**, or an installed device keeps the old
   offline copy. There is no build step to do it for you.
+
+  `tests/check-sw-shell.js` (in `npm run check`) is what makes that enforceable.
+  `index.html`'s script tags and `sw.js`'s `SHELL` are two hand-written lists
+  that have to agree and nothing made them — the same shape as the
+  `package.json`/`ci.yml` split. **A script in one and not the other is
+  invisible until the device is offline**, because the worker is network-first:
+  online it is fetched and nothing looks wrong. Not hypothetical —
+  `js/40-stream.js` shipped that way, and offline every `ev*` function was
+  undefined, so `moneyAddCash` and with it every gift, settlement and loan
+  payment threw on the first tap. The guard also fails the build when a branch
+  changes a shell file and never touches `sw.js`, reading the working tree as
+  well as the committed diff so the warning arrives before the commit rather
+  than after it.
 - Toggles (`.buffer-toggle`, `.repeat-toggle`) and the 19 overlays carry their
   ARIA **statically** in `index.html`; `enhanceNonButtonClickables`
   (`js/99-main.js`) only keeps `aria-checked` in step with `.on`. Focus and
