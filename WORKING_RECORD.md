@@ -5,14 +5,14 @@ Single working record for this repository. Updated by the main session at the en
 ## Approved baseline
 - 2026-09-21, branch `Rules-v2`: install working-rules bundle v2.1 into the repo root, verify with `tests/replay-hooks.sh`, commit and push. Given as a direct instruction rather than a Plan vN — the session predates the plan gate, which loads only from `main`.
 - 2026-09-21, in-session decision (asked and answered): `CLAUDE.md` is **split**, not overwritten. Bundle global rules take the `CLAUDE.md` filename; this repo's architecture doc moves to `ARCHITECTURE.md`.
+- **2026-09-22, Plan v7 approved** — the Grandma rule rebuilt to the owner's test (from a start week the owner enters and saves as a dated rule; weeks OUTSIDE the 8-week review window; NO family meeting record — `meetingsMet` or `meetingsHeld`; $3; one rule replaces the old "nobody sat down for" sweep) (B5, B7); competitions paid on top (B6), widened by the owner after approval to EVERY settled week: "a settled week should not block a late competition". My money rebuilt around the pool as the owner designed it — inlet (pay), outlet (loan payment, spending), dashed investment loop — with the four pot tiles and NO added-up total; earn · spend · invest · cash; price list, "what paying it opens" and saving goal as pop-ups; competition calendar and gifts as cards AND from the inlet (C1, C2). The pool picture comes from Claude Design, from my brief (C8). The Zones mockup board is retired.
 - **2026-09-22, Plan v6 approved** — adds: iPad Pro 11″ landscape as the main interface; one week/month target card (opens on the week, never stored, switches itself to the month once the weekly target is reached; on Today the toggle sits on top and drives came in / went out / put away and the target); unlock gates 20/30/40% from one threshold table, parent-tunable (S4); Money school balanced on iPad; "💧 My cash pool" titled and kept separate from the target card; a what-I-have / what-I-owe line chart (C6) and paired in/out month columns (C7); S2 pot-opening moment, S3 visible build stamp. PR B (B1–B4 + S2–S4) has a 1 Oct deadline. S1 withdrawn.
 - **2026-09-22, Plan v5 approved** — "Money system: stop the bleeding, the Grandma rule, then the pool". Branch `claude/happy-bardeen-1xalni` from `main` @ `f4d1db5`. Sequence: Step 0 (this record) → PR A → PR B → C0 mockup → owner sign-off → PR C. Value-engineering items VE-1…VE-14 accepted; VE-11 (weekly/monthly) un-deferred at the owner's request; VE-3, VE-7, VE-9, VE-10 deferred with reasons. Full plan: `/root/.claude/plans/1-one-kid-completed-quizzical-kitten.md` (session-local).
 
 ## Pending
-- PR B committed on PR #92 — must be merged and deployed before 1 Oct.
-- Owner's choice: the proposal (earn · spend & save · owe) or the current My money — gates PR C.
-- C0 mockup — updating for v6 (pool title, toggle drives the Today card, chart).
-- PR #92 CI on `79b543b`.
+- B5–B7 (Grandma rule rebuilt; late competitions paid into any settled week) — with opus-worker. Until it lands, the owner must NOT press "Credit it" in the Grandma section.
+- PR #92 (PR A + PR B + B5–B7) must be merged and deployed before 1 Oct.
+- C8 Claude Design brief → owner runs Claude Design → owner signs off the pool picture → gates PR C.
 - PR [#91](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/91) — **merged** to `main` (`f4d1db5`).
 
 ## Request ledger
@@ -32,7 +32,7 @@ Single working record for this repository. Updated by the main session at the en
 | 12 | R2 2026-09-22 | "Compare to your promises in the original plan" | done | 9 load-bearing promises graded: 3 Guaranteed, 2 Checked, 1 Assumed, 3 Broken. |
 | 13 | R2 2026-09-22 | "My Money and Money school duplicate — propose a layout, or combine" | open → PR C | Decided: rebalance three pages, don't merge. Mockup v5 shows it at iPad landscape. |
 | 14 | R2 2026-09-22 | "Where is the cash pool? You promised" | open → PR C | Admitted not delivered: the Flow's "left" is cash only. Pool on both My money and the story. |
-| 15 | R2 2026-09-22 | Grandma rule: $3/week from a chosen start date to 30 May | open → PR B | Only weeks with no record at all. Extends the existing sweep card (VE-4). |
+| 15 | R2 2026-09-22 | Grandma rule: $3/week from a chosen start date to 30 May | **superseded by #43** | Only weeks with no record at all. Extends the existing sweep card (VE-4). |
 | 16 | R2 2026-09-22 | "Different colour per revision in the plan; no `<…>` tags" | done | Fenced `diff` blocks + Rev-N labels; `<span>` does not render in this terminal. |
 | 17 | R2 2026-09-22 | Today's money card: option A with changes — weekly flow, weekly target; weekly/monthly | open → PR C | No grand total, no sparkline. Pair vs toggle decided at the mockup. |
 | 18 | R2 2026-09-22 | "If I change the sports loan, does the system recalculate?" | done | Forward figures derive live; `paid`/`payments` and settled weeks are frozen. |
@@ -55,14 +55,20 @@ Single working record for this repository. Updated by the main session at the en
 | 35 | R2 2026-09-22 | "I did not see the cash pool — where does it go? Do not mix those two" | done (mockup) → PR C | It was the untitled "This week's money" card; now "💧 My cash pool". Kept separate from the target card on My money. |
 | 36 | R2 2026-09-22 | "A line chart to show her asset and debt, or other charts that make sense" | done (mockup) → PR C | v6 C6: what I have (stream balances) vs what I owe (loan by payment date), one $ axis, palette validated (CVD ΔE 16.8). C7: in vs out columns per month. |
 | 37 | R2 2026-09-22 | "My money and Money school still don't work well, but I can't tell the details" | done (critique) | Core cause: doing (My money) and learning (Money school) on different pages; no "start here"; Money school a drawer of five unrelated things; the one decision a kid can make is the least visible thing; three pages, two tabs. |
-| 38 | R2 2026-09-22 | Money school as a pop-up card on each My money tile? → "Yes, mock it" | done (mockup) → awaiting owner choice | Proposal board `Zones.dc.html`: My money by earn · spend & save · owe; ideas as tile pop-ups (one short thought, never scrolls); ladder on the loan; what-money-buys on the goal; price list a section, not a pop-up. Revisits Rev-1's "three pages, not merged" at the owner's request. |
+| 38 | R2 2026-09-22 | Money school as a pop-up card on each My money tile? → "Yes, mock it" | done (mockup) → **superseded by #40–#42** | Proposal board `Zones.dc.html`: My money by earn · spend & save · owe; ideas as tile pop-ups (one short thought, never scrolls); ladder on the loan; what-money-buys on the goal; price list a section, not a pop-up. Revisits Rev-1's "three pages, not merged" at the owner's request. |
+| 39 | R3 2026-09-22 | "The drift away from my original cash pool design — a pool; income is the inlet, the mortgage the outlet, investment a dashed loop back into the pool" | open → PR C (C1, C8) | Picture by Claude Design from my brief (owner's choice). |
+| 40 | R3 2026-09-22 | "My money has too many tiles — chores, what paying it opens, saving goal as pop-ups; the core is earn, spending, invest, cash" | open → PR C (C2) | ≤ 6 cards on iPad. |
+| 41 | R3 2026-09-22 | "Where is the competition calendar, gifts section?" → "both" | open → PR C (C2) | Cards AND opened from the pool's inlet. They are live in the app today (`mnyCompetitionCard`, `mnyGiftsCard`); the Zones mockup had dropped them. |
+| 42 | R3 2026-09-22 | "Everything I have with the small tiles is clearer"; "end total means adding all the categories together — not my goal" | open → PR C (C1) | Four pot tiles back; NO summed total; "Where it is now" table dropped. |
+| 43 | R3 2026-09-22 | Grandma rule: "any week not in the 8-week review window and with no family meeting record gets $3"; "I will input the start week"; "does not close the door to the competition" | open → B5–B7 on #92 | Replaces #15. PR B had built the wrong test (money records, to 30 May). **Correction on record.** |
+| 44 | R3 2026-09-22 | "A settled week should not block a late competition" + "a settled week only discusses routine, fine, chore money and how the money is spent; it does not block the competition and gift" | open → B6 on #92 | Widens B6 from defaulted weeks to every settled week; a late meet follows the existing late-gift pattern (cash on its own date, split at the next meeting); gifts get a test. Same class as the "$21 meet in a $0 week" the repair fixed for legacy weeks only. |
 
 ## Hotspot counter
 | Area / feature | Fix rounds | Recurrences | Last symptom | Rewrite-vs-repair reviewed? |
 |---|---|---|---|---|
 | Rules/governance install | 1 | 0 | — (first round) | n/a |
 | `CLAUDE.md` filename collision | 1 | 0 | Bundle and repo both claim the root `CLAUDE.md`; different documents | yes — resolved by split, not patch |
-| **Pocket money** (stream, rules, meeting, money pages) | **3** — PR #89, PR #90, R2 (PR A) | **1** — a click handler keyed on an attribute its host never listens for (`data-pm-action` then `data-mny-action` on `#mnyRulesWrap`) | House rules never reached a stored rulebook; two dead buttons; `[object Object]`. PR A review found two more, both older than PR A: the change log drawn twice, and the move form redrawing on every keystroke. Both fixed in PR A, test first. | **yes — 2026-09-22, repair** (below) |
+| **Pocket money** (stream, rules, meeting, money pages) | **4** — PR #89, PR #90, R2 (PR A), R3 (B5–B7) | **2** — (i) a click handler keyed on an attribute its host never listens for; (ii) **a settled week blocks competition money** — the "$21 meet in a $0 week" (repaired for legacy weeks only), again for Grandma weeks and, per the owner, any settled week | House rules never reached a stored rulebook; two dead buttons; `[object Object]`. PR A review found two more, both older than PR A: the change log drawn twice, and the move form redrawing on every keystroke. Both fixed in PR A, test first. | **yes — 2026-09-22, repair** (below) |
 Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → no further patch until the comparison is presented.
 
 ### Rewrite vs repair — pocket money, 2026-09-22
@@ -90,6 +96,8 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → n
 
 **Decision: repair**, with the structural guards above so causes 1, 3 and 5 cannot recur silently.
 
+**Addendum, R3 2026-09-22 — second recurrence (settled week blocks a competition).** Shared cause: "settled" (`finalizedWeeks[wk][kid] != null`) was used as "closed to all money", and each fix covered one settling path (the repair: legacy weeks). Structural option chosen (B6): ONE owner function reconciles a settled week's competitions whenever a competition owner (`mrAdd/Update/DeleteCompetition`) changes one, for every settling path, keeping `finalizedWeeks` and the ledger in step so the repair cannot pay the same meet twice. Rewrite not warranted: the cause is one missing reconciliation, not the stream or the ledger. Decision unchanged: repair.
+
 ## Deliverable ledger
 | Deliverable | State | Evidence |
 |---|---|---|
@@ -107,7 +115,9 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → n
 | Plan v5 PR A — stop the bleeding (A1–A12, + A13/A14 checker fixes) | COMPLETE | `79b543b` on draft PR #92; `npm test` green in the main session's own run (check 8/8 · merge 112 · buffers 9 · stream 31 · cleanup · xp 28 · money 33 · smoke 321); every fix's check failed on the old code first (worker evidence) |
 | Plan v6 PR B — Grandma rule, star level relabel, August banner, gates 20/30/40 (B4), S2 pot-opening moment, S3 build stamp, S4 tunable gates | COMPLETE | main session's own `npm test`: check 8/8 · merge 112 · buffers 9 · stream 31 · cleanup · xp 28 · money 33 · smoke 344 (click sweep 384 controls); new checks each shown failing on a deliberate break; G1+G2 follow-ups: the Grandma rule counts MONEY records only (owner's definition) |
 | Plan v6 C0 — clickable mockup for sign-off (now v5 of the canvas: iPad landscape, toggle card, cash pool titled, have/owe chart, paired month columns) | COMPLETE — awaiting owner sign-off | Design canvas https://claude.ai/artifact/3fYy6KiQMcSissRGBvnG6d (private); started ahead of PR B because sign-off is the long pole — content unchanged |
-| Plan v6 PR C — the pool, three pages, the target card, the have/owe chart | NOT STARTED | Blocked on C0 sign-off |
+| Plan v7 B5–B7 — Grandma rule to the owner's test; late competitions paid into any settled week; start week saved as a dated rule | NOT STARTED → in progress (opus-worker) | — |
+| Plan v7 C8 — Claude Design brief for the pool | COMPLETE — awaiting owner review | `docs/design/cash-pool-brief.md`; one assumption flagged to owner: fines drawn as a thin outlet stream |
+| Plan v7 PR C — the pool (C1), My money as earn · spend · invest · cash (C2), Today card + toggle (C3/C4), have/owe chart (C6), month columns (C7) | NOT STARTED | Blocked on the owner's sign-off of the Claude Design picture |
 | `routing_guard_mode: enforce` | NOT STARTED | Blocked on `tests/test-routing-hook.md`, which must run in a session where the hooks are live (i.e. after merge to `main`). |
 
 ## Checks and evidence
