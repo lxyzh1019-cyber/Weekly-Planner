@@ -41,6 +41,7 @@ Single working record for this repository. Updated by the main session at the en
 | 25 | R2 2026-09-22 | "Did you check all the buttons?" | done | ~387 controls clicked, both roles, 0 throws. Two dead buttons found. |
 | 26 | R2 2026-09-22 | Value engineering on scope and plan | done | VE-1…14; all accepted; VE-11 un-deferred. |
 | 27 | R2 2026-09-22 | Dance is really a skating level exam; add skating star level | open → PR B | Owner confirmed silver/gold matches the star tests ⇒ relabel, scorer unchanged. |
+| 28 | R2 2026-09-22 | "The main interface should be iPad Pro 11 inch landscape" | done (mockup) → PR C | Mockup redrawn at 1194×834 in the app's own landscape columns (My money 340·1fr·348, Money school 340·1fr·320, Today 1.42:1 with money in the side column). Phone kept as a secondary row. PR C designs and checks landscape first. |
 
 ## Hotspot counter
 | Area / feature | Fix rounds | Recurrences | Last symptom | Rewrite-vs-repair reviewed? |
