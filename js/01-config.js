@@ -4,6 +4,11 @@
    DATA MODEL
 ════════════════════════════════════════════════════════════════ */
 const LS_KEY = 'weeklyplanner-v3';
+/* The build, shown on the parent portal's App landing so a grown-up can read
+   which code a device is running. The page cannot read sw.js, so this is a
+   second copy of SW_VERSION — and tests/check-sw-shell.js fails the build when
+   the two differ. Bump both together, on every deploy that changes a shell file. */
+const APP_BUILD = '2026-09-22d';
 const TOTAL_SLOTS = 60;           // 6AM → 9PM = 15 hrs × 4 (legacy, used for some %s)
 const START_HOUR  = 6;
 const END_HOUR    = 22;

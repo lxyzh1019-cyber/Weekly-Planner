@@ -1626,7 +1626,8 @@ would land on.
 `mmTakeUndoSnapshot` ran once per child, so settling Jess overwrote the picture
 taken before Jenn; undo put Jess back, left Jenn's money moved, and printed
 "nothing was recorded". It is idempotent per week now, and the message says what
-actually happened.
+actually happened. It is withdrawn once money moves after the commit — see
+"Plan v8 B8–B10" below.
 
 **Celebrate reads live sources only.** It counted chores through `ctGetOptional`
 — `optionalByWeek`, the retired chore-group store — so a week of real graded work
@@ -1762,6 +1763,21 @@ is the failure a restructure produces.
 **The boundary test decides where anything new goes:** *does changing this alter
 what the girls are asked to do, or what it is worth?* Yes → **Setup**. No →
 **App**. Change history sits in Setup, next to the things it logs.
+
+**Change history is its own Money rules section** (`changes` in
+`MNY_PARENT_SECTIONS`), and Setup › 🕰️ Change history opens it. It used to land
+on the week ledger while the real log sat at the bottom of Lessons.
+`changeHistoryIsItsOwnSection` holds both halves and asserts the log is drawn in
+exactly one section (it was under Lessons and Loans); 📖 Week history keeps its
+name and its ledger.
+
+**A log line is words, never a stringified object.** `mrLogSummary(from, to)`
+(`js/18-rules.js`) is the one summariser: a list of records with ids reads
+"Added 🧦 Match the socks · Removed … · Changed …", any other non-scalar reads as
+a size. `mrLogAppend` stores that from now on, and `mnyChangeHistory` passes any
+non-scalar it finds through the same function — entries already on the family's
+devices hold whole `chorePool` arrays, which printed fifteen `[object Object]`
+for one chore added.
 
 **`parentScope` is not `parentViewing`.** The switcher has a **Both** state, but
 that value must never reach `parentViewing`: 27 places read that global and most
@@ -2147,8 +2163,10 @@ and the history says which, alongside "re-priced".
 **The $3 default is offered where the backlog is.** `mmUnsettledWeeks` stops at
 eight, so anything older was invisible there AND unsettleable — the only door
 was a card in Setup that a parent had no reason to open. The catch-up banner now
-carries the older weeks and the sweep. Still a tap, still previewed, still moves
-no money until `mnyRunDefaultSweep` confirms.
+carries the older weeks — "N weeks left the review window", the Grandma rule's
+own plan from the start week saved in its section, or a pointer to that section
+when none is saved. Still a tap, still previewed, still moves no money until
+`mnyRunDefaultSweep` confirms.
 
 ## A gift has a date, and a correction is not an edit
 
@@ -2242,7 +2260,12 @@ other field. Answers live in `rcDraft` and the DOM is drawn FROM it — the same
 shape `mmCaptureUiState` uses inside the meeting. **Typing never re-renders**;
 only a change that alters what the form ASKS does: the day (which week's rules
 apply, and which chores exist on it) and the two pots on a move (whether it is
-refused).
+refused). The amount changes the refusal too, and it is said on the save
+button, so a keystroke there updates **only the button**, in place
+(`rcSyncSave`), from the same `rcSaveState` that `rcRender` draws it with. It
+used to redraw the whole sheet per digit, which on an iPad closed the keyboard
+after every digit; `typingAnAmountKeepsTheCaret` types with real key events and
+asserts the input node and its focus survive.
 
 **A child gets two of the five, and both as proposals** — a gift she was given
 and a move between her own pots. `mnyAddDeposit` and `mnyRequestMove` already
@@ -2273,6 +2296,19 @@ routes and never decides), the parent **Money rules** head, **meeting step 3**,
 the kid's **gift** and **competition** cards, and the wallet card's
 `mnyMoveDoor` — one door whose label changes with the role, never two.
 
+**`MNY_CLICK_HOSTS` (`js/22-money-page1.js`) is the one list of containers
+`mnyHandleClick` is bound to**, and `js/99-main.js` binds from it. The Money
+rules head's ✍️ and "? How this page works" were dead for as long as the page
+existed: they carry `data-mny-action`, and the hand-written list in
+`99-main.js` never included `#mnyRulesWrap`. `everyMoneyActionHasAListener`
+renders every money surface and fails on any `data-mny-action` outside a listed
+host; `everyMoneyControlClicksClean` presses every money control, one at a time
+from a restored snapshot, and fails on any exception, sync or async.
+
+**A refused move says why on the save button**, before the tap, in
+`mnyMoveRefusal`'s own sentence; the destination defaults to the first pot
+other than the source that is open to her (`rcDefaultMoveTo`).
+
 ## Money can move between Sundays
 
 **Until Stage 3 the only door out of cash was the Sunday split.** The two that
@@ -2297,11 +2333,27 @@ dollars to shares newest-holding-first, once, beside the only caller that needs
 it — `moneySellStock` takes shares and everything else on this surface is
 dollars.
 
+**One route decision.** `MNY_MOVE_ROUTES` / `mnyMoveRoute(from, to)` is the
+only answer to "can money go this way", and both `mnyMoveRefusal` and
+`mnyMoveMoney` read it — so a pair the writer cannot route is always refused
+with a sentence, and there is no "move the app does not know" left to reach.
+`invest → ready|locked` passed the refusal and then fell off the end of the
+writer, and a child could file that request and nobody could approve it. They
+now go through cash (`mnyMoveViaCash`), which moves on **only what the first
+leg actually raised**, measured on the wallet — a sale can raise less than
+asked, and cash she already had is not part of the move.
+`everyMoveEitherMovesOrSaysWhy` walks all sixteen ordered pairs.
+
+**No loan is every pot open.** `mnyPaidPct` returns **100** when nothing is
+owed; 0 pinned a debt-free child at stage 0 with every pot shut. Anything that
+would then say "paid off" checks the principal itself — the ladder card reads
+"Nothing to pay back, so everything is open".
+
 **The stage gates are not optional.** Every destination is checked with
 `mnyIsOpen` against `MNY_BUCKETS` — the same predicate `mnySplitFor` uses when
 it sends a locked bucket's share to the debt instead. `evHomeNeed` maps a home
-to its bucket rather than restating the percentages: two tables naming one gate
-is how they come to disagree. A sheet that could put money in a pot Money
+to its bucket's **stage id** rather than restating a percentage: two tables
+naming one gate is how they come to disagree (see *The gates* below). A sheet that could put money in a pot Money
 school has not opened would make the whole ladder decorative. And the gate must
 block the **action**, not just grey the row — a `disabled` attribute is a hint
 to the pointer, not a rule.
@@ -2368,8 +2420,19 @@ come out.
 
 **Each group scales to its own biggest ribbon, not to a grand total.** One
 scale across "in" and "out" draws a $2 fine as an invisible sliver beside $40
-of jobs — the one row she most needs to see. The two group totals are what
-compare the halves.
+of jobs — the one row she most needs to see. The group totals are what compare
+the halves.
+
+**Every caption is the sum of the bars under it.** Three groups: ⬇️ what came
+in (`inTotal`), ➡️ what went out (`outTotal` — spent, fine, loan, given back,
+and any other key that left, such as a company losing value), and 🌱 put away to
+grow (`savedTotal` — ready, locked, invest). There was one "Where it went"
+caption over bars that included pot-to-pot moves its total left out — observed
+live as $0.00 above a $30.00 bar — and `returned` was counted and never drawn.
+`savedTotal` is computed in `evFlowOf` / `evTypicalMonthOf` (unit-tested in
+`tests/stream.test.js`), so the Flow still sums nothing;
+`theFlowCaptionsEqualTheirBars` checks each caption against its rows on every
+period.
 
 **Three periods, and the third is the honest one.** *This month* · *All of it* ·
 *A typical month*, which `evTypicalMonth` divides by the months that have
@@ -2502,8 +2565,10 @@ ship a household's date in a public repo.
 
 **Weeks older than the catch-up reach get a flat default.** `mmUnsettledWeeks`
 looks back eight weeks and stops, so anything older is invisible AND
-unsettleable. `mnyRunDefaultSweep` credits `MNY_DEFAULT_WEEK` per child for each
-un-met week beyond that reach, and three things make it safe: it is idempotent
+unsettleable. `mnyRunDefaultSweep` credits the Grandma rule's amount per child
+(`MNY_DEFAULT_WEEK` until a parent saves another) for each week beyond that reach
+with no family meeting record, from the start week the family saved — see *Plan
+v6 PR B* below for the rule — and three things make it safe: it is idempotent
 through the **same** `finalizedWeeks[wk][kid] == null` guard `commitKidWeek`
 uses, so two devices in any merge order credit once; it previews every week and
 the total before moving anything; and the ledger row is marked `defaulted` so
@@ -2617,7 +2682,29 @@ because the quiet ones are not in the denominator at all. It was arithmetic on a
 self-selected sample. `mrWeeksElapsed()` is the one owner, counting from
 `mrStartWeek()` — derived, not seeded — and an unsettled week now counts as a
 week that paid nothing, which is what it is. This file recorded it as a known
-defect before it was fixed.
+defect before it was fixed. `theFourHouseRulesHold` asserts the denominator
+itself — ten weeks elapsed, two settled, the pace divides by ten — because its
+earlier assertions all still passed with `/ weeks.length` put back.
+
+### A rulebook already on file
+
+The rules landed in `MR_DEFAULT_RULES`, and `mrEnsure` seeds that only when a
+household has **no** versions — so a family with a stored rulebook never
+received the first three. Copying the template over is not the fix: the
+rulebook also holds the family's own chore pool, prices, caps and targets.
+
+`mrHouseRulesPending()` lists only the fields the rules change, resolving each
+item **by id** in the rules live today (never by position — a stored order can
+differ) and emitting only what still differs. The parent Money rules page
+previews every change and one tap applies them through `mrApplyEdits`, dated
+from this week's Monday (`ctThisWeekKey`, the key `mrRulesForWeek` resolves a
+week by); a version dated later this week is joined on its own date, and a
+future-scheduled one blocks with a sentence rather than being dragged forward.
+Every log line carries `MR_HOUSE_RULES_NOTE`, and `mrHouseRulesApplied` reads
+that off the log — so the card never comes back, even after a parent
+deliberately reverts one of the rules, and a second device finds nothing to do.
+No new state key. `theHouseRulesReachAStoredRulebook` seeds an August rulebook
+with the old prices, a custom pool and a reordered list.
 
 ### The gap this opened, and whose it is
 
@@ -2640,9 +2727,12 @@ pay.
 
 **Read that 51% correctly.** It is the projection from a modelled TERM — five
 ordinary weeks, two quiet, one strong — not from a ceiling. The rates are not
-incapable of reaching the target: the daily cap allows **$21 a week from chores
-alone** ($15 after the two free), the streak adds $3, and competition points are
-**uncapped** with a $20 qualifying bonus. The `strong` fixture is $24 because it
+incapable of reaching the target. Measured with `tools/money-calibrate.js`, a week
+with **no meet** and all seven routine days kept pays **$18** at one top-grade chore
+a day, **$21** at two and **$24** at three — the daily cap allows $21 from chores,
+the two free ones are absorbed once she does more than one a day, and the streak adds
+$3. Competition points are **uncapped** on top, with a $20 qualifying bonus. (This
+line used to say "$15 after the two free", which is only true at one chore a day.) The `strong` fixture is $24 because it
 models one chore a day and a six-point meet that did not qualify, so the cap
 never bites. What 51% says is that the term SHAPE does not reach the target,
 which is a different and much smaller claim than "she cannot earn it".
@@ -2655,6 +2745,188 @@ be nothing, and that is the earn-and-spend system working.
 `theDefaultSweepCreditsOldWeeksOnce` asserts it cannot reach the current week or
 a future one, because that failure would be silent and generous — money
 appearing for a week she is still living.
+
+## Plan v6 PR B — the Grandma rule, the loan season, the gates (2026-09-22)
+
+**👵 The Grandma rule is the owner's test, and there is only one.** The owner,
+in their words: *"I have 8 weeks review window, any week that does not in this 8
+weeks review windows and no family meeting record get $3 default pocket money"*
+and *"I will input the start week … this does not close the door to enter the
+competition."* So `mnyDefaultSweepPlan()` / `mnyRunDefaultSweep()`
+(`js/24-money-parent.js`) credit a child's week when it is on or after the saved
+start week, OUTSIDE the review window (no newer than this week minus
+`MNY_CATCHUP_REACH + 1`, the reach `mmUnsettledWeeks` has), has **no family
+meeting record** (neither `meetingsMet` nor `meetingsHeld` — `mnyWeekHadMeeting`
+reads the two maps without ensuring either), and is not already credited
+(`finalizedWeeks[wk][kid] == null`). Chores, fines, gifts and overrides in the
+week do **not** stop it — a week with no meeting never had its chores settled.
+PR B's money-record filter (`mnyWeekHasAnyRecord`, `MNY_WEEK_RECORD_STORES`)
+and its to-date (`mnyLastMay30`) were the wrong test and are deleted; so is the
+second, "nobody met" criterion the hub's default sweep used. The hub offers the
+same plan. Preview, confirm (which counts the weeks that "had a family meeting")
+and the write-time re-check of both guards are unchanged in shape. New rows carry
+`defaulted: true, defaultReason: 'grandma'`; rows an older build wrote with
+`'default'` still read "nobody met" on Week history and "Nobody sat down for this
+week" on her story. A meet already on file for the week is paid **on top**, as
+its own `prize` line ("…, week of … — on top of the Grandma rule"): the row's
+`competition` is that total and its gross/net and `finalizedWeeks` are
+amount + competition. Her story's flat segment is `gross − competition`, so the
+meet is drawn once.
+
+**The start week and amount are a dated rule, entered once.**
+`grandma.from` / `grandma.amount` in the rulebook, written only through
+`mrApplyEdits` by the section's Save button (`mnySaveGrandmaRule`), so each is a
+logged scalar line in 🕰️ Change history. `mnyGrandmaRule()` reads the NEWEST
+version (the rule names which old weeks the flat amount reaches and prices no
+week of its own) and a save joins a version already scheduled ahead rather than
+dragging its prices forward. A rulebook without it falls back to
+`mrStartWeek()` and `MNY_DEFAULT_WEEK` and reports `saved: false`, and nothing
+is credited until a start week is saved: the section shows no credit button and
+the hub row points to 👵 Grandma rule instead (`data-mm-catch="grandma"`). The
+form is a module draft (`mnyGrandmaDraft`) until Save, so typing writes nothing;
+there is no to-date. No new synced key — the rulebook already syncs.
+
+**A defaulted week is priced by its rule, so the repair leaves it alone.**
+`evRepairPlanFor` skips a ledger row marked `defaulted`: re-pricing a Grandma
+week to its chores would pay on top of the flat amount the owner chose. Its meets
+belong to the late-meet owner below.
+
+**🌟 "Skating star level" is a relabel of `dance`.** The sport id, the rule key
+`competition.dance` and `mrScoreCompetition` are unchanged, so every stored
+result reads under the new name. `mnySportLabel` / `mnySportIcon` are the words
+wherever a recorded meet is shown (including the parent chore page, which used
+to print the raw id). The Record sheet offers it by name because a skating block
+seeds a skating competition. `danceReadsAsSkatingStarLevel` holds every money
+surface to it — money surfaces only; the activity catalog may have real dance.
+
+**🎿 The loan season is worked out, never stored.** `pnLoanSeason()`
+(`js/32-parent-now.js`) is a row at the top of Now from 1 Aug to 30 Sep, unless a
+debt has `createdAt` on or after 1 Jul that year. No reminder key, no dismissal.
+It routes to Money rules › Loans and decides nothing. Debts that existed before
+`createdAt` did (added 2026-07-28) were stamped on their first read after it, so
+on this family's devices the row most likely stays hidden in 2026 and first
+shows on 1 Aug 2027 — the season it is for.
+
+**The gates.** `MNY_STAGES` carries ids (`start · ready · locked · stock · mix`)
+and no numbers. `MNY_BUCKETS`, `MNY_PLANS` and `MNY_CONCEPTS` name a `stage`;
+`mnyIsOpen(kid, stageId)` compares ladder positions, so a pot, its lesson and
+its ladder row are one answer. `mnyStagePct(stageId)` is the one reader of a
+gate's number: `mrRules().school.stagePct` first, then `MR_DEFAULT_RULES` per
+key (**20 / 30 / 40 / 100**; the first stage is always 0). A stored rulebook
+without the field is not migrated. Money rules › Lessons has three steppers
+that queue `school.stagePct.*` through the pending list and `mrApplyEdits`, so a
+change is a dated, logged version; `mnyStagePctRefusal` refuses a broken order
+(ready ≤ locked ≤ stock ≤ 100) with a sentence at the stepper **and** in
+`mnySavePending`. The override (`school.unlockStage`) is unchanged.
+`theGatesComeFromOneTable` sweeps 0–100% and compares ladder row, pot (split and
+move gate), lesson card and chip, and each pot against its own lesson.
+
+**🔓 A pot opening is a moment.** On her own My money, `mnyStageOpenedCard`
+shows one card when her stage is above the stage last acknowledged on this
+device (`localStorage`, `wp_mny_stage_seen_<kid>`, every access in try/catch,
+never synced). It names the pots and shows each new idea's what / why / watch
+through `mnyConceptCard` — never restated. First sight records the current stage
+silently; a stage that drops is recorded silently too. A grown-up sees nothing.
+
+**The build stamp.** `APP_BUILD` (`js/01-config.js`) is shown on the parent
+portal's App landing. `tests/check-sw-shell.js` fails when it differs from
+`SW_VERSION` — **bump both together**.
+
+## A settled week does not block a meet — Plan v7 (2026-09-22)
+
+The owner: *"a settled week only discusses routine, fine, chore money, and how
+the money is spent (the split); a settled week does not block the competition
+and gift."* Settling closes a week's chores, routines, fines and split. It does
+not close its meets or its gifts.
+
+It used to close its meets. The meeting's commit was the only thing that paid a
+meet, and `finalizedWeeks[wk][kid] == null` refuses a second commit, so a meet
+entered for a week already settled — at a meeting, by the Grandma rule, by the
+repair — was never paid. **The gift pattern is the fix**: `mnyLateCompSync`
+(`js/21-money-data.js`) moves her cash at once, as its own `latecomp` line on the
+meet's own date ("…, week of … — paid after the week was settled", or "— on top
+of the Grandma rule" in a Grandma week), and files the line to the next
+still-open week (`mnyGiftWeekFor`), whose `mnyPool` counts it (`lateComp`, from
+`mnyLateCompTotal`) — so where it goes is decided at the next meeting, exactly
+like a gift. The Record sheet and the meeting's competition form say what the
+gift form says, from one string, `MNY_SETTLED_WEEK_SENTENCE`.
+
+**One owner, called, never contained.** `mrAddCompetition`,
+`mrUpdateCompetition` and `mrDeleteCompetition` call it through a `typeof` guard;
+a meet moved between weeks is two changes, out of one and into the other. A week
+that is **not** settled is left exactly as it was: the meeting pays its meets,
+and nothing is paid early.
+
+**The settled week is kept in step**, and that is what stops the repair paying
+the same meet twice: its ledger `competition`, `gross`, `net` and
+`finalizedWeeks` move with every late payment, and `finalizedWeeks` is what
+`evRepairPlanFor` measures a week against.
+
+**Why it cannot pay twice.** A week whose ledger row's competition figure is the
+plain sum of its meets is synced by **total**: `mrCompetitionWeek(wk,kid).paid −
+led.competition` moves and the row is brought to the new total, so a second run
+finds nothing and a meet that arrived from another device is caught up by the
+next run. The event id is the week, the kid, the row's `lateSeq` and the two
+totals — two devices making the same correction from the same row write the same
+id, and the stream's union by id keeps one; an id already on the stream means
+only the row missed it. `lateSeq` stops add → delete → add from colliding with
+its own first time. A week settled with **no ledger row** (legacy, migrated) or
+whose competition figure was overridden at the table is synced **per change**:
+the meet's award after the write minus before, keyed on the meet's id and the
+write (`add`, `del`, or its opId) — nothing is guessed from a total. A week whose
+competition channel the honesty rule voided stays void.
+`aLateMeetPaidOnTwoDevicesIsPaidOnce` runs both devices through the real
+`mergeRemoteState`.
+
+**A gift into a Grandma week had the same hole.** `mnyGiftWeekFor` asked only
+whether the week's split was committed, and the Grandma rule commits no plan, so
+a gift dated into a Grandma week was filed under that week — which no meeting
+will ever sit for. `mnyWeekSettled` (committed **or** credited) is the question
+now, so it is decided at the next open meeting like any other.
+
+## Plan v8 B8–B10 — Undo, older weeks' meets, a $3 week's record (2026-09-22)
+
+**B8 · The meeting's Undo is withdrawn once money moves after it.**
+`mmUndoRecord` puts wallets, debts, holdings, deposits and the week's records
+back wholesale, so money that moved after the commit — a late meet
+(`mnyLateCompSync`), a gift, a move, an approval, a payment synced from the
+other device — was wiped from the wallet while its line stayed on the stream,
+and a re-commit paid the meet twice. The choke point is **the stream**: every
+movement lands on `profile.events`, written here through `evAdd` or merged in
+by id from the other device. `mmTakeUndoSnapshot` keeps the id of every money
+event on both girls' streams (`seen`); `mmUndoHeld()` drops the undo when any
+money event is not among them, and keeps the reason in `mmUndoGone`. The
+commit's own movements are claimed by an explicit bracket, not by timing: each
+commit (`mnyDoCommit`, `mmConfirmAndRecord`) asks `mmUndoHeld()` before it
+writes anything and calls `mmUndoSeal()` when it is done, so both girls
+committed one after the other keep the undo. The snapshot catches both girls up
+(`mnySimCatchUp`) before the picture, so the second girl's interest is in it
+rather than a movement between two commits. A withdrawn undo stays withdrawn
+for that week in that sitting. Where the button was, the meeting says
+`MM_UNDO_GONE_SENTENCE` — "Undo is gone — money moved after this meeting;
+correct the item itself." — with what moved. The undo itself still does not
+reverse the stream lines of the commit it undoes; that is unchanged.
+
+**B9 · Older weeks' unpaid meets are caught up, once.** The repair card gains
+"🏆 Meets never paid" (`mnyUnpaidMeetsPlan`, js/21): settled weeks with a
+ledger row the sync treats by total (`mnyLateCompByTotal` — the one predicate
+`mnyLateCompSync` also reads) whose meets are worth more than the row says was
+paid. Positive gaps only; nothing is taken back. Weeks with no ledger row, and
+weeks the repair itself lists (it re-prices meets with the rest of the week),
+stay with the repair, so the two lists never offer the same dollars. Previewed
+in the same card (shown even when the repair has nothing), confirmed through
+`showConfirm`, and paid by `mnyPayUnpaidMeets` through `mnyLateCompSync`'s
+no-change mode — so a second tap pays nothing.
+
+**B10 · A $3 week's record stays true to its money.** A `defaulted` row's
+money is already in her wallet and `finalizedWeeks` says the same figure, so
+`mnyEditLedger` and `mnyDeleteLedgerWeek` refuse it with a sentence (they used
+to change the record alone, and an edit recomputed gross from the channels,
+dropping the flat amount). Week history shows it as "👵 Grandma rule $3 + meets
+$X" or "No meeting — default $3 + meets $X" from the row's own figures, with no
+steppers and no remove button. Its meets correct through the meet itself (B6).
+Grandma rows still carry `handEntered`; `defaulted` is read first. Hand-typed
+rows without `defaulted` keep the editor unchanged.
 
 ## Known trip hazards
 
@@ -2671,7 +2943,8 @@ appearing for a week she is still living.
   cache: it is **network-first** so being online always gets the deployed code,
   and the shell it holds only answers offline — but **bump `SW_VERSION` on every
   deploy that changes a shell file**, or an installed device keeps the old
-  offline copy. There is no build step to do it for you.
+  offline copy. Bump `APP_BUILD` (`js/01-config.js`) to the same value: it is the
+  stamp a parent reads on App, and the shell check fails when they differ. There is no build step to do it for you.
 
   `tests/check-sw-shell.js` (in `npm run check`) is what makes that enforceable.
   `index.html`'s script tags and `sw.js`'s `SHELL` are two hand-written lists

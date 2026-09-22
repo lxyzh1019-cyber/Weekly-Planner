@@ -110,6 +110,19 @@ if (!version) {
   }
 }
 
+// ── 4 · the visible build stamp names the same build ──
+// The parent portal shows APP_BUILD (js/01-config.js) so a grown-up can tell
+// which code a device is running. The page cannot read sw.js, so the stamp is
+// a second copy of SW_VERSION; two copies nothing compares is a stamp that
+// reads "new" on a device serving the old offline shell.
+const config = fs.readFileSync(path.join(ROOT, 'js', '01-config.js'), 'utf8');
+const build = (config.match(/const APP_BUILD = '([^']+)'/) || [])[1];
+if (!build) {
+  problems.push('js/01-config.js has no APP_BUILD — the parent portal has no build stamp to show');
+} else if (version && build !== version) {
+  problems.push(`APP_BUILD is '${build}' and SW_VERSION is '${version}' — bump them together`);
+}
+
 if (problems.length) {
   console.error(`FAIL  ${problems.length} offline-shell problem(s):\n`);
   problems.forEach(p => console.error('  ' + p));
@@ -117,4 +130,4 @@ if (problems.length) {
   console.error('the first time a child opens the app without signal.');
   process.exit(1);
 }
-console.log(`OK  ${inShell.length} scripts, all loaded and all cached (SW_VERSION ${version})`);
+console.log(`OK  ${inShell.length} scripts, all loaded and all cached (SW_VERSION ${version} = APP_BUILD)`);

@@ -74,6 +74,9 @@ function pnWaitingCount() {
    approval, which is older than a note. */
 function pnQueueRows() {
   const rows = [];
+  /* Top of the list: it has a deadline the season sets, not the backlog. */
+  const season = pnLoanSeason();
+  if (season) rows.push(season);
   const back = pnBacklog();
   if (back.length) {
     const unopened = mmUnopenedWeeks(8).length;
@@ -134,6 +137,33 @@ function pnQueueRows() {
     });
   }
   return rows;
+}
+
+/* ── The loan season ──
+   A new sports loan is set up every autumn, and recording it lowers her
+   paid-off share — and with it her Money school stage, which can shut pots she
+   has been using. Worked out from the date and the debts and NOTHING ELSE: no
+   stored reminder, no dismissal flag. It shows from 1 Aug to 30 Sep of any
+   year and goes by itself once a loan has been recorded on or after 1 Jul of
+   that year (`createdAt`, stamped on every debt by mnyNormalizeDebt).
+
+   Now counts and routes: the row opens Money rules › Loans and decides
+   nothing. Returns null when it should not show. */
+function pnLoanSeason() {
+  const today = String(todayKey());
+  const y = today.slice(0, 4);
+  if (today < y + '-08-01' || today > y + '-09-30') return null;
+  const since = formatDayKey(y + '-07-01').getTime();
+  const recorded = ['jenn', 'jess'].some(kid =>
+    (typeof mnyDebts === 'function' ? mnyDebts(kid) : [])
+      .some(d => d && (Number(d.createdAt) || 0) >= since));
+  if (recorded) return null;
+  return {
+    icon: '🎿', action: 'loans', cta: 'Loans ›', go: true,
+    title: 'Time to set up next season’s sports loan',
+    sub: 'Recording the new loan lowers her paid-off share, and so her stage — '
+      + '“Open a stage early” in Money rules › Lessons keeps her pots open.',
+  };
 }
 
 /* A card must never render blank. An empty queue is the good case and should
@@ -249,6 +279,12 @@ function pnHandleClick(e) {
        a render can trigger a full-document write. */
     if (typeof mnySetParentSection === 'function') mnyParentSection = 'holdings';
     if (first) setParentScope(first);
+    setParentTab('money');
+    return;
+  }
+  if (a === 'loans') {
+    /* Section first, for the same reason as 'moves' above. */
+    if (typeof mnySetParentSection === 'function') mnyParentSection = 'debts';
     setParentTab('money');
     return;
   }

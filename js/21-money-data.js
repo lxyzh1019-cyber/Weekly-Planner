@@ -29,41 +29,48 @@
 
 /* ── Money school: what opens when ──
    Keyed to the share of everything she owes that has been paid off, so the
-   lessons arrive as the debt comes down rather than on a calendar. */
+   lessons arrive as the debt comes down rather than on a calendar.
+
+   THE STAGE IS THE ONE OWNER OF A GATE. Each stage has an id; its number lives
+   in the rulebook (`school.stagePct`, js/18-rules.js) and is read only through
+   `mnyStagePct`. MNY_BUCKETS, MNY_PLANS and MNY_CONCEPTS name a STAGE and never
+   a number. They used to carry their own copies (30 / 60 / 90 in three tables)
+   and nothing made them agree, so a pot, its lesson and the ladder row could
+   each have said something different about the same moment. */
 const MNY_STAGES = [
-  { pct: 0,   icon: '🎿', title: 'What I owe, and what I keep' },
-  { pct: 30,  icon: '💵', title: 'Keeping money ready' },
-  { pct: 60,  icon: '🔒', title: 'Locking money away' },
-  { pct: 90,  icon: '📈', title: 'Trying it with stocks' },
-  { pct: 100, icon: '🧩', title: 'Building my own mix' },
+  { id: 'start',  icon: '🎿', title: 'What I owe, and what I keep' },
+  { id: 'ready',  icon: '💵', title: 'Keeping money ready' },
+  { id: 'locked', icon: '🔒', title: 'Locking money away' },
+  { id: 'stock',  icon: '📈', title: 'Trying it with stocks' },
+  { id: 'mix',    icon: '🧩', title: 'Building my own mix' },
 ];
 
-/* Where money can go on a Sunday. `need` is the stage that opens it.
+/* Where money can go on a Sunday. `stage` is the MNY_STAGES id that opens it.
    `loan` is special: there is one row per debt, built at render time. */
 const MNY_BUCKETS = [
-  { key: 'loan',  icon: '🎿', label: 'Pay off',        need: 0,  tint: '#eaf6ef' },
+  { key: 'loan',  icon: '🎿', label: 'Pay off',        stage: 'start', tint: '#eaf6ef' },
   // Spending is a real answer to "what do I do with it", and a system that
   // only ever offers ways to defer teaches deferring, not choosing. Open from
   // the first week — but capped at a fifth, so a whole week can never vanish
   // into one afternoon.
-  { key: 'spend', icon: '🛍️', label: 'Spend it',       need: 0,  tint: '#fff0f0' },
-  { key: 'ready', icon: '💵', label: 'Keep it ready',  need: 30, tint: '#fff9e9' },
-  { key: 'gic',   icon: '🔒', label: 'Lock it away for a year', need: 60, tint: '#eef3fb' },
-  { key: 'stock', icon: '📈', label: 'Buy a bit of a company',  need: 90, tint: '#f6effa' },
+  { key: 'spend', icon: '🛍️', label: 'Spend it',       stage: 'start', tint: '#fff0f0' },
+  { key: 'ready', icon: '💵', label: 'Keep it ready',  stage: 'ready', tint: '#fff9e9' },
+  { key: 'gic',   icon: '🔒', label: 'Lock it away for a year', stage: 'locked', tint: '#eef3fb' },
+  { key: 'stock', icon: '📈', label: 'Buy a bit of a company',  stage: 'stock', tint: '#f6effa' },
 ];
 
 /* The ready-made plans. Fractions of what is hers to choose. */
 const MNY_PLANS = [
-  { id: 'debt',     icon: '🎿', label: 'Pay off my loan first', need: 0,   split: { loan: 1 } },
-  { id: 'ready',    icon: '💵', label: 'Keep some ready',       need: 30,  split: { loan: 0.4, ready: 0.6 } },
-  { id: 'balanced', icon: '⚖️', label: 'A bit of everything',   need: 60,  split: { loan: 0.4, ready: 0.3, gic: 0.3 } },
-  { id: 'grow',     icon: '📈', label: 'Grow it more',          need: 90,  split: { loan: 0.3, ready: 0.1, gic: 0.2, stock: 0.4 } },
-  { id: 'last',     icon: '🔁', label: 'Same as last week',     need: 0,   split: null },
+  { id: 'debt',     icon: '🎿', label: 'Pay off my loan first', stage: 'start',  split: { loan: 1 } },
+  { id: 'ready',    icon: '💵', label: 'Keep some ready',       stage: 'ready',  split: { loan: 0.4, ready: 0.6 } },
+  { id: 'balanced', icon: '⚖️', label: 'A bit of everything',   stage: 'locked', split: { loan: 0.4, ready: 0.3, gic: 0.3 } },
+  { id: 'grow',     icon: '📈', label: 'Grow it more',          stage: 'stock',  split: { loan: 0.3, ready: 0.1, gic: 0.2, stock: 0.4 } },
+  { id: 'last',     icon: '🔁', label: 'Same as last week',     stage: 'start',  split: null },
   /* Not a stage-gated idea — it is manual entry, and the "or set every number
      yourself" steppers directly below this card are open at every stage. A
      locked card sitting above the unlocked control that does the same thing is
      just a lie about what the screen can do. */
-  { id: 'own',      icon: '🧩', label: "I'll choose every number myself", need: 0, split: null, own: true },
+  { id: 'own',      icon: '🧩', label: "I'll choose every number myself", stage: 'start', split: null, own: true },
 ];
 
 /* Investing is a fixed menu — no typing in a ticker. A nine-year-old picking a
@@ -133,60 +140,58 @@ const MNY_CHECKS = [
   { id: 'c7', label: 'Any price change saved with a reason' },
 ];
 
+/* The things nobody is paid for that no rule sets. The one that a rule DOES
+   set — how many household chores a week are free — is written from the live
+   rules by `mnyWorkListsCard`, so a parent changing it changes this page too.
+   What PAYS is not a list here at all any more: it said homework paid after
+   homework stopped paying, and Money school now shows the live price list. */
 const MNY_UNPAID = [
   'Your routines, morning and night',
   'Making your bed and tidying your room',
   'Packing your school bag and your sports gear',
-  'The first two household chores each week',
   'Being kind to your sister',
 ];
-const MNY_PAID = [
-  'Household chores after your first two',
-  'Math pages, handwriting pages, Chinese words',
-  'A full week of clean routine days',
-  'Competition days',
-];
 
-/* The eight ideas Money school teaches, in the order they open. `need` is the
-   stage; the debt card names the real debt at render time. */
+/* The ideas Money school teaches, in the order they open. `stage` is the
+   MNY_STAGES id that opens it; the debt card names the real debt at render time. */
 const MNY_CONCEPTS = [
   /* {debt} is filled in with the real name from her debt record, so this reads
      as being about her week rather than about money in general. */
-  { id: 'debt', icon: '🎿', title: 'Owing money', need: 0,
+  { id: 'debt', icon: '🎿', title: 'Owing money', stage: 'start',
     what: 'We paid for {debt} up front, and you pay us back a bit at a time.',
     why: 'You got it straight away instead of waiting years to save up for it.',
     risk: 'Until {debt} is paid off, part of every week is already spoken for.' },
-  { id: 'cash', icon: '💵', title: 'Cash', need: 0,
+  { id: 'cash', icon: '💵', title: 'Cash', stage: 'start',
     what: 'Money you can use today, sitting in your wallet.',
     why: 'It is ready the moment you need it.',
     risk: 'It does not grow at all while it sits there.' },
-  { id: 'spend', icon: '🛍️', title: 'Spending some of it', need: 0,
+  { id: 'spend', icon: '🛍️', title: 'Spending some of it', stage: 'start',
     what: 'Money you decide to actually use, on something you want.',
     why: 'Money is for something. Choosing what, and living with the choice, is the whole skill.',
     risk: 'It is gone once it is spent, and it never comes back as more. That is why only a fifth of a week can go here.',
     whyLabel: 'The good side', riskLabel: 'The other side' },
-  { id: 'extra', icon: '⚡', title: 'Paying early', need: 0,
+  { id: 'extra', icon: '⚡', title: 'Paying early', stage: 'start',
     what: 'Paying more off {debt} than you have to, before it is due.',
     why: 'You earn a bonus for it, and {debt} is gone sooner.',
     risk: 'That money has gone into {debt} — you cannot get it back out.',
     whyLabel: 'The good side', riskLabel: 'The other side' },
-  { id: 'ready', icon: '🏦', title: 'Keeping money ready', need: 30,
+  { id: 'ready', icon: '🏦', title: 'Keeping money ready', stage: 'ready',
     what: 'Money set aside that you can still get back whenever you want.',
     why: 'When something goes wrong, you are not stuck.',
     risk: 'It grows very slowly — a little bit each year.' },
-  { id: 'save', icon: '💰', title: 'Interest', need: 30,
+  { id: 'save', icon: '💰', title: 'Interest', stage: 'ready',
     what: 'The bank pays you a small amount each year for keeping money there.',
     why: 'Money you leave alone quietly makes a bit more money.',
     risk: 'It is small. It will not make you rich on its own.' },
-  { id: 'gic', icon: '🔒', title: 'Locking money away for a year', need: 60,
+  { id: 'gic', icon: '🔒', title: 'Locking money away for a year', stage: 'locked',
     what: 'You promise not to touch it for a year, and the bank pays you more.',
     why: 'More than just keeping it ready, and the amount is promised.',
     risk: 'You really cannot touch it. Not even if you change your mind.' },
-  { id: 'stock', icon: '📈', title: 'Owning a bit of a company', need: 90,
+  { id: 'stock', icon: '📈', title: 'Owning a bit of a company', stage: 'stock',
     what: 'You buy a small piece of a real company.',
     why: 'If the company does well, your piece is worth more.',
     risk: 'It can go down too. In 2023 one of these fell by a third in six months.' },
-  { id: 'mix', icon: '🧩', title: 'Not putting it all in one place', need: 100,
+  { id: 'mix', icon: '🧩', title: 'Not putting it all in one place', stage: 'mix',
     what: 'Splitting your money so it is not all doing the same job.',
     why: 'If one part has a bad year, the others carry you.',
     risk: 'You will never make as much as if you had guessed right and put it all in one.' },
@@ -680,7 +685,7 @@ function mnyGiftMirror(d) {
    belonged to no week's split at all, silently. */
 function mnyGiftWeekFor(kid, dayKey) {
   const from = mnyWeekOfDay(dayKey);
-  if (!mnyIsCommitted(from, kid)) return from;
+  if (!mnyWeekSettled(from, kid)) return from;
   /* Walk forward to the first week that can still decide it. Bounded by a year
      rather than `while (true)`: a wrong device clock must not spin. Landing on
      the current week is the honest floor — a week that has not happened cannot
@@ -689,9 +694,21 @@ function mnyGiftWeekFor(kid, dayKey) {
   for (let i = 0; i < 53; i++) {
     d.setDate(d.getDate() + 7);
     const wk = ctDateToKey(d);
-    if (!mnyIsCommitted(wk, kid)) return wk;
+    if (!mnyWeekSettled(wk, kid)) return wk;
   }
   return mnyWeekKey();
+}
+
+/* Has this child's week been SETTLED — can its split no longer decide
+   anything? Committed at a meeting (`mnyIsCommitted`), or credited some other
+   way: the Grandma rule, the repair, an express catch-up. Those write
+   `finalizedWeeks` and never a committed plan, so asking about the plan alone
+   filed a gift dated into a Grandma week under that week — a week no meeting
+   will ever sit for, so its split was never offered anywhere. */
+function mnyWeekSettled(weekKey, kid) {
+  ctEnsureShared();
+  const fin = ((state.shared.chore.finalizedWeeks || {})[weekKey] || {})[kid];
+  return fin != null || mnyIsCommitted(weekKey, kid);
 }
 
 /* Which week a day belongs to, named the way the PLANNER names it.
@@ -717,6 +734,181 @@ function mnyGiftDecidedElsewhere(kid, dayKey) {
   const arrived = mnyWeekOfDay(dayKey);
   const decides = mnyGiftWeekFor(kid, dayKey);
   return String(arrived) === String(decides) ? null : decides;
+}
+/* What a form says when that happens — a gift or a meet, the same words,
+   because it is the same mechanism. */
+const MNY_SETTLED_WEEK_SENTENCE = 'That week is already settled, so it arrives on its own date and you will decide where it goes at the next meeting.';
+
+/* Rule 1 of mnyLateCompSync (below) as one question — a ledger row whose
+   competition channel is neither voided nor edited at the table — so the list
+   of older weeks' unpaid meets (mnyUnpaidMeetsPlanFor) can never pick a
+   different set of weeks than the sync it pays through. */
+function mnyLateCompByTotal(led) {
+  return !!led && (led.voided || []).indexOf('competition') < 0
+    && (led.edited || []).indexOf('comp') < 0;
+}
+
+/* ── A MEET FOR A WEEK ALREADY SETTLED — the gift pattern ────────────
+   The owner: "a settled week only discusses routine, fine, chore money, and
+   how the money is spent (the split); a settled week does not block the
+   competition and gift." Settling closes a week's chores, routines, fines and
+   split. It does not close its meets.
+
+   It used to. The meeting's commit was the only thing that ever paid a meet,
+   and `finalizedWeeks[wk][kid] == null` refuses a second commit — so a meet
+   entered for a week already settled (at a meeting, by the Grandma rule, by
+   the repair) sat on file and was never paid. The trap the repair describes
+   in js/40-stream.js, from the other side.
+
+   So a meet added, corrected or deleted for a settled week moves her cash at
+   once, as its own labelled line on the meet's own date, exactly as a gift
+   dated into a settled week does. WHERE it goes is decided at the next
+   still-open meeting: the line is filed to that week (`mnyGiftWeekFor`) and
+   `mnyPool` counts it there (`mnyLateCompTotal`).
+
+   The settled week's own record is kept in step — its ledger competition,
+   gross and net, and `finalizedWeeks`. That is not bookkeeping for its own
+   sake: finalizedWeeks is what `evRepairPlanFor` measures a week's worth
+   against, and left stale the repair would pay the same meet again as a gap.
+
+   ONE owner, called by the three competition writers in js/18-rules.js through
+   a typeof guard, and callable again with no change to catch a week up. A week
+   that is NOT settled is left alone: the meeting's commit pays its meets, as
+   it always has, and nothing is paid early.
+
+   ── Why it cannot pay twice ──
+   1. The week has a ledger row whose competition figure is the plain sum of
+      its meets — a meeting, the Grandma rule, the repair. The row says what
+      has been paid for meets; `mrCompetitionWeek` says what they are worth
+      now; the DIFFERENCE moves and the row is brought to the new total. A
+      second run finds nothing to do, and a meet that arrived from another
+      device is caught up by the next run instead of being lost. The event id
+      is the week, the kid, the row's count of late corrections (`lateSeq`) and
+      the two totals — so two devices making the same correction from the same
+      row write the SAME id, and the stream's union by id keeps one. An id
+      already on the stream means the money moved and only the row missed it:
+      the row catches up and nothing moves. `lateSeq` is what stops a real
+      repeat (add, delete, add again) from colliding with its own first time.
+   2. No ledger row (a legacy or migrated week), or a competition figure a
+      grown-up overrode at the table: there is no honest total to compare, so
+      nothing is guessed from totals. The CHANGE is paid — this meet's award
+      after the write minus before, from the owner that made the write — keyed
+      on the meet's own id and that write ('add', 'del', or the opId
+      markItemUpdated stamped), so one write is paid once. finalizedWeeks moves
+      by the same amount.
+   A week whose competition channel the honesty rule voided stays void.
+
+   `change` is { comp, before, after, op, wasDayKey } from the writer, or
+   nothing to re-run a week. A meet moved to another week is two changes:
+   out of the old week, into the new. */
+function mnyLateCompSync(kid, dayKey, change) {
+  if (!kid || !dayKey) return 0;
+  const ch = change || null;
+  const wk = mnyWeekOfDay(dayKey);
+  if (ch && ch.wasDayKey && mnyWeekOfDay(ch.wasDayKey) !== wk) {
+    const out = mnyLateCompSync(kid, ch.wasDayKey, { comp: ch.comp, before: ch.before, after: 0, op: ch.op });
+    return money2(out + mnyLateCompSync(kid, dayKey, { comp: ch.comp, before: 0, after: ch.after, op: ch.op }));
+  }
+  ctEnsureShared();
+  const c = state.shared.chore;
+  const fin = (c.finalizedWeeks || {})[wk];
+  if (!fin || fin[kid] == null) return 0;
+  const led = ((c.moneyLedger || {})[wk] || {})[kid] || null;
+  if (led && (led.voided || []).indexOf('competition') >= 0) return 0;
+  const byTotal = mnyLateCompByTotal(led);
+  const comp = (ch && ch.comp) || null;
+  let delta, id, target = 0;
+  if (byTotal) {
+    const have = money2(led.competition);
+    target = mrCompetitionWeek(wk, kid).paid;
+    delta = money2(target - have);
+    id = 'ev-latecomp-' + kid + '-' + wk + '-' + (Number(led.lateSeq) || 0) + '-' + have + '-' + target;
+  } else {
+    if (!comp) return 0;
+    delta = money2((Number(ch.after) || 0) - (Number(ch.before) || 0));
+    id = 'ev-latecomp-' + kid + '-' + wk + '-' + comp.id + '-' + (ch.op || 'edit');
+  }
+  if (!delta) return 0;
+  if (!evList(kid).some(e => e && e.id === id)) {
+    const name = comp ? (comp.name || mnySportLabel(comp.sport)) : 'Competitions';
+    const tail = delta < 0 ? 'taken back after the week was settled'
+      : ((led && led.defaulted && led.defaultReason === 'grandma') ? 'on top of the Grandma rule'
+                                                                   : 'paid after the week was settled');
+    const common = { kind: 'latecomp', id, ref: comp ? comp.id : wk,
+                     weekKey: mnyGiftWeekFor(kid, (comp && comp.dayKey) || wk),
+                     note: name + ', week of ' + mnyShortDate(wk) + ' — ' + tail };
+    if (delta > 0) moneyAddCash(kid, delta, Object.assign({ from: 'prize', dayKey: (comp && comp.dayKey) || wk }, common));
+    else moneyTakeBackCash(kid, money2(-delta), Object.assign({ dayKey: todayKey() }, common));
+  }
+  if (led) {
+    led.competition = byTotal ? target : money2(money2(led.competition) + delta);
+    led.gross = money2(money2(led.gross) + delta);
+    led.net = money2(money2(led.net) + delta);
+    if (byTotal) led.lateSeq = (Number(led.lateSeq) || 0) + 1;
+    led.updatedAt = syncNow();
+  }
+  fin[kid] = money2((Number(fin[kid]) || 0) + delta);
+  if (typeof ctStampWeekState === 'function') ctStampWeekState(wk);
+  saveAll();
+  return delta;
+}
+
+/* What late meets brought into (or took out of) the pool this week decides:
+   the `latecomp` lines filed to it. Read off the stream, which holds each one
+   once by id however many devices wrote it. */
+function mnyLateCompTotal(kid, weekKey) {
+  if (typeof evList !== 'function') return 0;
+  return money2(evList(kid).reduce((s, e) => {
+    if (!e || e.kind !== 'latecomp' || e.weekKey !== weekKey) return s;
+    if (e.to === 'cash') return s + (Number(e.amount) || 0);
+    if (e.from === 'cash') return s - (Number(e.amount) || 0);
+    return s;
+  }, 0));
+}
+
+/* ── Older weeks whose meets were never paid — caught up once ──────
+   mnyLateCompSync pays a meet the moment it is written into a settled week.
+   A meet already on file when its week was settled by something that did not
+   pay meets — an older build's default, or a meet that arrived from the other
+   device after — has no write left to trigger it, and sits unpaid.
+
+   So this LISTS them, for a parent to see before anything moves: every
+   settled week whose ledger row the sync treats by total (mnyLateCompByTotal)
+   and whose meets are worth more than the row says was paid for them. Only a
+   positive gap is listed or paid — like the repair's rule 2, old history is
+   never taken back. A week with no ledger row stays with the repair, and so
+   does a week the repair itself lists: it re-prices the whole week, meets
+   included, and the two lists must never offer the same dollars twice.
+   Reads only. */
+function mnyUnpaidMeetsPlanFor(kid) {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  const fin = c.finalizedWeeks || {};
+  const repair = (typeof evRepairPlanFor === 'function') ? evRepairPlanFor(kid).weeks.map(w => w.wk) : [];
+  const weeks = [];
+  Object.keys(fin).sort().forEach(wk => {
+    if ((fin[wk] || {})[kid] == null) return;
+    const led = ((c.moneyLedger || {})[wk] || {})[kid] || null;
+    if (!mnyLateCompByTotal(led) || repair.indexOf(wk) >= 0) return;
+    const cw = mrCompetitionWeek(wk, kid);
+    const gap = money2(cw.paid - money2(led.competition));
+    if (!(gap > 0)) return;
+    weeks.push({ wk, gap, names: cw.entries.map(e => e.name || mnySportLabel(e.sport)) });
+  });
+  return { kid, weeks, total: money2(weeks.reduce((s, w) => s + w.gap, 0)) };
+}
+function mnyUnpaidMeetsPlan() { return ['jenn', 'jess'].map(mnyUnpaidMeetsPlanFor); }
+/* Pays through the sync's own no-change mode, never around it: it brings each
+   row to its total, so a second run — here, on a re-tap, or on the other
+   device — finds nothing to pay. The plan is re-read here rather than handed
+   in, so a week that stopped owing since the preview pays nothing. */
+function mnyPayUnpaidMeets() {
+  let paid = 0, weeks = 0;
+  mnyUnpaidMeetsPlan().forEach(p => p.weeks.forEach(w => {
+    const moved = mnyLateCompSync(p.kid, w.wk);
+    if (moved > 0) { paid = money2(paid + moved); weeks++; }
+  }));
+  return { paid, weeks };
 }
 
 function mnyEnsureDeposits(kid) {
@@ -1167,7 +1359,11 @@ function mnyDueThisWeek(kid, weekKey) {
 function mnyPool(weekKey, kid) {
   const b = mrWeekBreakdown(weekKey, kid);
   const deposits = mnyDepositTotal(kid, weekKey);
-  const cameIn = money2(b.net + deposits);
+  /* A meet paid after its own week was settled is already in her cash, like a
+     gift; this is the meeting that decides where it goes. A correction down
+     can make it negative, and the pool never is. */
+  const lateComp = mnyLateCompTotal(kid, weekKey);
+  const cameIn = money2(Math.max(0, b.net + deposits + lateComp));
   // The schedule draws on the whole pool, like any real payment does.
   const due = mnyDueThisWeek(kid, weekKey);
   const dueTotal = money2(due.reduce((s, d) => s + money2(d.amount), 0));
@@ -1175,7 +1371,7 @@ function mnyPool(weekKey, kid) {
   const mustPay = money2(Math.min(dueTotal, cameIn));
   const mine = money2(Math.max(0, cameIn - mustPay));
   return {
-    breakdown: b, deposits, cameIn, mustPay, mine, due,
+    breakdown: b, deposits, lateComp, cameIn, mustPay, mine, due,
     scheduledPay: scheduledTotal,
     // What the family agreed NOT to pay this month. It does not vanish — the
     // debt still carries it, and arrears still apply.
@@ -1233,7 +1429,7 @@ function mnySplitFor(weekKey, kid, planId, own) {
       // A bucket she has not reached yet takes nothing, whatever the plan says.
       // Its share falls back to paying the debt down, which is always open.
       const bucket = MNY_BUCKETS.find(b => b.key === k);
-      if (bucket && !mnyIsOpen(kid, bucket.need)) {
+      if (bucket && !mnyIsOpen(kid, bucket.stage)) {
         const first = debts[0];
         if (first) out['loan:' + first.id] = money2(out['loan:' + first.id] + dollars);
         else out.ready = money2(out.ready + dollars);
@@ -1398,19 +1594,37 @@ function mnyUnlockOverride(kid) {
   const r = mrRules();
   return Number(((r.school || {}).unlockStage || {})[kid]) || 0;
 }
+/* ── THE GATE'S NUMBER — one reader ──
+   The share of all debt paid off that opens a stage. The live rulebook first
+   (`school.stagePct`), then MR_DEFAULT_RULES per key — so a rulebook stored
+   before the field existed, or one that holds only some of the stages, gets
+   the defaults for the rest without anything being migrated. The first stage
+   is 0 whatever is stored: something has to be open with nothing paid. */
+function mnyStagePct(stageId, rules) {
+  const i = mnyStageIndexOf(stageId);
+  if (i === 0) return 0;
+  if (i < 0) return 100;                          // an unknown stage opens last, never first
+  const live = (((rules || mrRules()).school || {}).stagePct || {})[stageId];
+  const fallback = ((MR_DEFAULT_RULES.school || {}).stagePct || {})[stageId];
+  const n = Number(live != null && live !== '' ? live : fallback);
+  return isFinite(n) ? Math.max(0, Math.min(100, n)) : 100;
+}
+function mnyStageIndexOf(stageId) { return MNY_STAGES.findIndex(s => s.id === stageId); }
 function mnyStageIndex(kid) {
   const pct = mnyPaidPct(kid);
+  const r = mrRules();
   let idx = 0;
-  MNY_STAGES.forEach((s, i) => { if (pct >= s.pct) idx = i; });
+  MNY_STAGES.forEach((s, i) => { if (pct >= mnyStagePct(s.id, r)) idx = i; });
   return Math.min(MNY_STAGES.length - 1, Math.max(idx, mnyUnlockOverride(kid)));
 }
 function mnyStage(kid) { return MNY_STAGES[mnyStageIndex(kid)]; }
-/* Is a thing needing `need` percent open yet? */
-function mnyIsOpen(kid, need) {
-  const ceiling = MNY_STAGES[mnyStageIndex(kid)].pct;
-  return (Number(need) || 0) <= ceiling;
+/* Is a thing behind this STAGE open yet? Compared by position on the ladder,
+   never by percent, so a pot, its lesson and its ladder row are one answer. */
+function mnyIsOpen(kid, stageId) {
+  const i = mnyStageIndexOf(stageId);
+  return i >= 0 && i <= mnyStageIndex(kid);
 }
-function mnyNeedLabel(need) { return 'Opens at ' + (Number(need) || 0) + '% paid off'; }
+function mnyNeedLabel(stageId) { return 'Opens at ' + mnyStagePct(stageId) + '% paid off'; }
 
 /* The concept card, with the real debt named in it. */
 function mnyConceptCard(id, kid) {
@@ -1420,8 +1634,8 @@ function mnyConceptCard(id, kid) {
   const naming = names.length ? names.join(' and ') : 'your loan';
   const swap = (s) => String(s || '').replace(/\{debt\}/g, naming);
   return {
-    id: c.id, icon: c.icon, title: c.title, need: c.need,
-    open: mnyIsOpen(kid, c.need),
+    id: c.id, icon: c.icon, title: c.title, stage: c.stage,
+    open: mnyIsOpen(kid, c.stage),
     what: swap(c.what), why: swap(c.why), risk: swap(c.risk),
     whyLabel: c.whyLabel || 'Why it helps', riskLabel: c.riskLabel || 'What to watch',
   };

@@ -59,13 +59,17 @@ const RC_KINDS = [
   { id: 'move',  icon: '🔀', label: 'Move money',       kid: true },
 ];
 
-/* The four sports the scoring rules know. `mrTagForSport` (js/18-rules.js)
+/* The sports the scoring rules know. `mrTagForSport` (js/18-rules.js)
    resolves a custom sport's activity tag and returns null rather than guessing,
-   which is why this list is short and the form asks. */
+   which is why this list is short and the form asks.
+
+   `dance` is the SKATING STAR LEVEL test, offered by name: a skating block on
+   the calendar seeds a skating COMPETITION, so a star test is only ever chosen
+   here, on purpose. The id and the scorer are unchanged — a relabel. */
 const RC_SPORTS = [
   { id: 'swim',  label: '🏊 Swimming' },
   { id: 'skate', label: '⛸️ Skating' },
-  { id: 'dance', label: '💃 Dance' },
+  { id: 'dance', label: '🌟 Skating star level' },
 ];
 
 const RC_HOMES = ['cash', 'ready', 'locked', 'invest'];
@@ -101,6 +105,7 @@ function openRecordSheet(opts) {
     fineId: '',
     moveFrom: 'cash', moveTo: 'ready', why: '',
   };
+  rcDraft.moveTo = rcDefaultMoveTo(kid, rcDraft.moveFrom);
   if (o.id && o.kind === 'meet') rcLoadMeet();
   if (o.id && o.kind === 'gift') rcLoadGift();
   openSheet('recordOverlay');
@@ -126,6 +131,16 @@ function rcLoadGift() {
     amount: money2(d.amount), from: d.from || MNY_FROM[0],
     giver: d.giver || '', dayKey: d.dayKey || todayKey(),
   });
+}
+
+/* Where a move goes unless she says otherwise: the first pot OTHER than the
+   source that is open to her. It was always 'ready', so for a child whose
+   ladder has not opened kept-ready the form opened on a refusal, and moving
+   out of kept-ready opened on "that is already where it is". Cash is always
+   open; 'ready' stays the fallback so a form with nothing open still says why. */
+function rcDefaultMoveTo(kid, from) {
+  const open = RC_HOMES.find(h => h !== from && (h === 'cash' || evHomeOpen(kid, h)));
+  return open || 'ready';
 }
 
 /* Which records this person may make. A child gets the two that are hers to
@@ -163,13 +178,43 @@ function rcRender() {
       fine: rcFineForm, move: rcMoveForm,
     }[rcDraft.kind];
     body = parts ? parts() : '';
+    const sv = rcSaveState();
     foot = `<div class="rc-foot">
-        <button type="button" class="rc-btn primary" data-rc-action="save">${escapeHtml(rcSaveLabel())}</button>
+        <button type="button" class="rc-btn ${sv.cls}" data-rc-action="save"${sv.disabled ? ' disabled' : ''}>${escapeHtml(sv.text)}</button>
         <button type="button" class="rc-btn" data-rc-action="close">Not now</button>
       </div>`;
   }
   host.innerHTML = `<div class="rc-chiprow rc-kinds">${chips}</div>${who}${body}${foot}`;
   if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(host);
+}
+
+/* The save button's text, class and whether it can be pressed — ONE answer,
+   read by `rcRender` when it draws the button and by `rcSyncSave` when typing
+   updates it in place, so the two can never disagree.
+
+   A refused move says WHY on the button itself, before the tap — the same
+   sentence the owner would refuse with, from mnyMoveRefusal. The owner still
+   refuses on its own; `disabled` is the hint, not the rule. */
+function rcSaveState() {
+  const refused = rcDraft.kind === 'move'
+    ? mnyMoveRefusal(rcDraft.kid, rcDraft.moveFrom, rcDraft.moveTo, rcDraft.amount) : null;
+  return refused
+    ? { text: refused, cls: 'rc-no', disabled: true }
+    : { text: rcSaveLabel(), cls: 'primary', disabled: false };
+}
+
+/* Typing never re-renders (see the draft note at the top): `innerHTML` would
+   replace the input she is typing in and drop the focus — on an iPad the
+   keyboard closes after every digit. So a keystroke that changes what the
+   button says updates the button, and only the button. */
+function rcSyncSave() {
+  const b = document.querySelector('#recordBody [data-rc-action="save"]');
+  if (!b || !rcDraft) return;
+  const sv = rcSaveState();
+  if (b.textContent !== sv.text) b.textContent = sv.text;
+  b.classList.toggle('rc-no', sv.cls === 'rc-no');
+  b.classList.toggle('primary', sv.cls === 'primary');
+  b.disabled = sv.disabled;
 }
 
 /* The button says what pressing it DOES. "Save" on a screen that is about to
@@ -250,7 +295,10 @@ function rcMeetForm() {
     <div class="rc-row"><span class="rc-lab">Which sport</span><span class="rc-chiprow">${sports}</span></div>
     ${scoring}
     ${rcDraft.sport ? `<div class="rc-chiprow">${rcToggle('A personal best', 'pb', rcDraft.personalBest)}</div>` : ''}
-    ${linked}`;
+    ${linked}
+    ${/* A settled week does not block a meet: paid on its own date, split at
+         the next meeting — the same mechanism, and so the same words, as a gift. */''}
+    ${mnyGiftDecidedElsewhere(rcDraft.kid, rcDraft.dayKey) ? `<p class="rc-note">${escapeHtml(MNY_SETTLED_WEEK_SENTENCE)}</p>` : ''}`;
 }
 
 /* ── 🎁 Money she was given ── */
@@ -266,10 +314,7 @@ function rcGiftForm() {
     ${rcField('Which day it came', 'day', rcDraft.dayKey, 'date')}
     <div class="rc-row"><span class="rc-lab">What kind</span><span class="rc-chiprow">${kinds}</span></div>
     ${rcField('Who from', 'giver', rcDraft.giver, 'text', ' placeholder="Grandma"')}
-    ${elsewhere
-      ? `<p class="rc-note">That week is already settled, so it arrives on its own date and
-         you will decide where it goes at the next meeting.</p>`
-      : ''}
+    ${elsewhere ? `<p class="rc-note">${escapeHtml(MNY_SETTLED_WEEK_SENTENCE)}</p>` : ''}
     ${isParent() ? '' : `<p class="rc-note">A grown-up says yes before it reaches your money.</p>`}`;
 }
 
@@ -298,12 +343,12 @@ function rcMoveForm() {
       data-rc-action="${action}" data-rc-id="${h}">${escapeHtml(mnyHomeLabel(h))}
       <small>${mnyMoney(evHomeBalance(rcDraft.kid, h))}</small></button>`;
   }).join('');
-  const why = mnyMoveRefusal(rcDraft.kid, rcDraft.moveFrom, rcDraft.moveTo, rcDraft.amount);
+  // Why a move is refused is said on the save button (rcRender), in the
+  // owner's own sentence, rather than in a second paragraph beside it.
   return `<div class="rc-row"><span class="rc-lab">Out of</span><span class="rc-chiprow">${pot('mfrom', rcDraft.moveFrom)}</span></div>
     <div class="rc-row"><span class="rc-lab">Into</span><span class="rc-chiprow">${pot('mto', rcDraft.moveTo)}</span></div>
     ${rcField('How much', 'amount', rcDraft.amount, 'number', ' min="0" step="0.01"')}
     ${rcField('What for', 'why', rcDraft.why, 'text', ' placeholder="Saving for my bike"')}
-    ${why ? `<p class="rc-note rc-no">${escapeHtml(why)}</p>` : ''}
     ${isParent() ? '' : `<p class="rc-note">Nothing moves until a grown-up says yes.</p>`}`;
 }
 
@@ -311,7 +356,8 @@ function rcMoveForm() {
    Typing NEVER re-renders: the caret would be thrown away by `innerHTML` on
    every keystroke. Only the three fields that change what the form ASKS redraw
    it — the day (which week's rules apply, and which chores exist), and the two
-   pots (whether the move is refused). */
+   pots (whether the move is refused). The amount, which also decides whether a
+   move is refused, updates the save button in place (`rcSyncSave`). */
 function rcHandleInput(e) {
   const el = e.target.closest('[data-rc-action]');
   if (!el || !rcDraft || el.tagName !== 'INPUT') return;
@@ -328,8 +374,9 @@ function rcHandleInput(e) {
   if (a === 'gold')         { rcDraft.gold = num(); return; }
   if (a === 'amount') {
     rcDraft.amount = money2(num());
-    // The move form SHOWS its refusal, and the refusal depends on the amount.
-    if (rcDraft.kind === 'move') rcRender();
+    // The move's refusal depends on the amount, and it is said on the save
+    // button — so the button follows the typing, in place. The form does not.
+    rcSyncSave();
   }
 }
 
@@ -341,13 +388,24 @@ function rcHandleClick(e) {
   if (a === 'close') { closeRecordSheet(); return; }
   if (a === 'save')  { rcSave(); return; }
   if (a === 'kind')  { rcDraft.kind = id; rcDraft.id = null; rcRender(); return; }
-  if (a === 'kid')   { rcDraft.kid = id; rcRender(); return; }
+  if (a === 'kid') {
+    rcDraft.kid = id;
+    // Her sister's ladder may not have opened the pot this one had picked.
+    if (rcDraft.moveTo !== 'cash' && !evHomeOpen(id, rcDraft.moveTo)) rcDraft.moveTo = rcDefaultMoveTo(id, rcDraft.moveFrom);
+    rcRender();
+    return;
+  }
   if (a === 'sport') { rcDraft.sport = id; rcRender(); return; }
   if (a === 'chore') { rcDraft.choreId = id; rcRender(); return; }
   if (a === 'grade') { rcDraft.grade = Number(id); rcRender(); return; }
   if (a === 'fine')  { rcDraft.fineId = id; rcRender(); return; }
   if (a === 'from')  { rcDraft.from = id; rcRender(); return; }
-  if (a === 'mfrom') { rcDraft.moveFrom = id; rcRender(); return; }
+  if (a === 'mfrom') {
+    rcDraft.moveFrom = id;
+    if (rcDraft.moveTo === id) rcDraft.moveTo = rcDefaultMoveTo(rcDraft.kid, id);
+    rcRender();
+    return;
+  }
   if (a === 'mto')   { rcDraft.moveTo = id; rcRender(); return; }
   if (a === 'allgold')   { rcDraft.allGold = !rcDraft.allGold; rcRender(); return; }
   if (a === 'qualified') { rcDraft.qualified = !rcDraft.qualified; rcRender(); return; }

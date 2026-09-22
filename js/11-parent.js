@@ -49,7 +49,9 @@ const PARENT_LANDINGS = {
     { panel: 'rules',    icon: '⭐', title: 'Level-up',            sub: 'What earns a star on an activity' },
     { panel: 'copyweek', icon: '📋', title: 'Copy a plan',         sub: 'Put a week — or one day — onto another, or onto her sister’s' },
     { panel: 'money',    icon: '🕰️', title: 'Change history',      sub: 'Every version of the rules, when it took effect, and why',
-      section: 'history' },
+      section: 'changes' },
+    { panel: 'money',    icon: '👵', title: 'Grandma rule',        sub: 'A flat amount for each empty week before we started counting',
+      section: 'grandma' },
   ],
   app: [
     { panel: 'access',   icon: '🔒', title: 'Access',          sub: 'The parent PIN that everything here sits behind' },
@@ -107,7 +109,12 @@ function parentRenderLanding(destId) {
         <span class="pn-sub">${escapeHtml(r.sub)}</span></span>
       <span class="pn-chev" aria-hidden="true">›</span>
     </button>`).join('');
-  wrap.innerHTML = `<p class="pn-cap">${escapeHtml(dest.label || '')}</p><div class="pn-card">${rows}</div>`;
+  /* The build this device is running, on the App landing only. GitHub Pages
+     and the service worker both cache, so "is the iPad on the new code?" has
+     to be answerable by reading the page. APP_BUILD (js/01-config.js) and
+     sw.js's SW_VERSION are held equal by tests/check-sw-shell.js. */
+  const build = destId === 'app' ? `<p class="pn-note">Build ${escapeHtml(APP_BUILD)}</p>` : '';
+  wrap.innerHTML = `<p class="pn-cap">${escapeHtml(dest.label || '')}</p><div class="pn-card">${rows}</div>${build}`;
 }
 
 /* One switcher, in the top bar, replacing the three that each drew their own. */

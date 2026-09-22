@@ -42,6 +42,14 @@ const MNY_PARENT_SECTIONS = [
   { id: 'holdings', label: '📈 What she owns' },
   { id: 'lessons',  label: '🎓 Lessons' },
   { id: 'history',  label: '📖 Week history' },
+  /* The flat amount for the weeks before the family started counting. It was
+     the "Weeks nobody sat down for" card inside Week history; it is its own
+     section now, with dates and an amount a parent chooses. */
+  { id: 'grandma',  label: '👵 Grandma rule' },
+  /* The log of rule changes, on its own. It was drawn at the bottom of
+     Lessons, and Setup › 🕰️ Change history landed on the WEEK LEDGER — so the
+     one row named for it opened everything except it. */
+  { id: 'changes',  label: '🕰️ Change history' },
 ];
 
 function mnyParentKid() { return (parentViewing === 'jenn' || parentViewing === 'jess') ? parentViewing : 'jess'; }
@@ -54,7 +62,7 @@ function mnyRenderRulesTab() {
   const kid = mnyParentKid();
   const v = mrLatestVersion();
 
-  /* A rail rather than a chip row: six sections read as a list of places, and
+  /* A rail rather than a chip row: seven sections read as a list of places, and
      the one you are in stays visible while you scroll the one you opened. */
   const nav = MNY_PARENT_SECTIONS.map(s =>
     `<button type="button" class="mny-rail-item ${mnyParentSection === s.id ? 'on' : ''}" data-mnyp-action="section" data-mnyp-id="${s.id}">${escapeHtml(s.label)}</button>`).join('');
@@ -65,6 +73,8 @@ function mnyRenderRulesTab() {
   else if (mnyParentSection === 'debts') body = mnyDebtEditor(kid);
   else if (mnyParentSection === 'holdings') body = mnyHoldingsEditor(kid);
   else if (mnyParentSection === 'lessons') body = mnyLessonEditor(kid);
+  else if (mnyParentSection === 'changes') body = mnyChangeHistory();
+  else if (mnyParentSection === 'grandma') body = mnyGrandmaCard();
   else body = mnyHistoryEditor(kid);
 
   /* mnyTabBar is gone from here. It is the girls' own five-page wayfinding
@@ -81,6 +91,7 @@ function mnyRenderRulesTab() {
          <span class="mny-effect-since">In effect since <b>${escapeHtml((v && v.effectiveFrom) || '—')}</b> · ${escapeHtml(mrReasonLabel(v && v.reason))}</span>
        </div>
        ${mnyPendingBar()}
+       ${mnyHouseRulesCard()}
        <div class="mny-rail-wrap">
          <nav class="mny-rail" aria-label="Money rules sections">${nav}</nav>
          <div class="mny-rail-body">
@@ -90,6 +101,46 @@ function mnyRenderRulesTab() {
        </div>
        ${mnyTargetsFooter()}`;
   if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
+}
+
+/* ── The four house rules, when this household's rulebook lacks them ──
+   `mrHouseRulesPending` (js/18-rules.js) lists what is still missing, found by
+   item id in the rules live today; this card shows every change before one
+   tap applies it through `mrApplyEdits`. Parent-only because the whole page
+   is, and gone for good once applied — see `mrHouseRulesApplied`. */
+function mnyHouseRulesCard() {
+  if (!isParent() || mrHouseRulesApplied()) return '';
+  const pending = mrHouseRulesPending();
+  if (!pending.length) return '';
+  const from = mrHouseRulesFrom();
+  const said = (field, v) => {
+    if (field === 'amount') return mnyMoney(Number(v) || 0);
+    if (field === 'xpOnly') return v === true ? 'XP only' : 'pays money';
+    if (field === 'freeRepeats') return (Number(v) || 0) ? (Number(v) + ' free a week') : 'costs from the first';
+    if (field === 'graceDays') return (Number(v) || 0) + ' grace day' + ((Number(v) || 0) === 1 ? '' : 's') + ' a week';
+    return v == null ? '—' : String(v);
+  };
+  const rows = pending.map(p => `<div class="mny-row"><span>${escapeHtml(p.item)} — ${escapeHtml(MR_HOUSE_RULES_FIELDS[p.field] || p.field)}</span>
+      <b>${escapeHtml(said(p.field, p.from))} → ${escapeHtml(said(p.field, p.value))}</b></div>`).join('');
+  return `<div class="mny-card mny-pending">
+      <div class="mny-week-head"><span class="mny-label">🏠 The four house rules are not in this rulebook yet</span></div>
+      <div class="mny-note">On 21 Sep the family agreed four rules: homework earns XP, not dollars; tone,
+        taking her sister's things, screens and being asked twice are free the first two times in a week;
+        one grace day a week on the routine streak; and the year's pace divides by the weeks that passed.
+        The fourth is already how the app counts. The rulebook on this household's devices was written
+        before the other three, so they are not in force.</div>
+      <div class="mny-rows">${rows}</div>
+      ${from ? `<div class="mny-note">Takes effect from Monday ${escapeHtml(mnyShortDate(from))}: this week and every
+          week after it price under these, and every week before keeps the prices it was lived under.
+          Nothing already earned is re-priced. Only the rows above change — the chore pool, prices, caps and
+          targets stay exactly as they are.</div>
+        <button type="button" class="mny-btn primary wide" data-mnyp-action="houserules"
+          >Put ${pending.length === 1 ? 'this change' : 'these ' + pending.length + ' changes'} into the rulebook</button>
+        <div class="mny-note">Recorded in 🕰️ Change history as “${escapeHtml(MR_HOUSE_RULES_NOTE)}”. Once it is
+          in, this card does not come back — changing one of these later is your decision, and it stays.</div>`
+      : `<div class="mny-note">A rules change is already scheduled for ${escapeHtml(mnyShortDate((mrLatestVersion() || {}).effectiveFrom))}.
+          These can go in once it has started, so they are not dated in front of it.</div>`}
+    </div>`;
 }
 
 /* ── The pending bar ──
@@ -127,6 +178,13 @@ function mnyQueueEdit(path, value, label) {
 }
 function mnySavePending() {
   if (!mnyPending.length) return;
+  /* The gates' order is refused HERE, in the handler, as well as at each
+     stepper: a pending list can also be built by a stale tap or a second
+     device's rules arriving underneath it. */
+  if (mnyPending.some(p => String(p.path).indexOf('school.stagePct.') === 0)) {
+    const why = mnyStagePctRefusal();
+    if (why) { showToast(why); return; }
+  }
   const version = mrApplyEdits(mnyPending.map(p => ({ path: p.path, value: p.value, label: p.label })),
     { reason: mnyPendingReason, effectiveFrom: mnyPendingFrom || todayKey() });
   const n = mnyPending.length;
@@ -183,9 +241,12 @@ function mnyRulePrices() {
       ${num('Swim — qualifying bonus', 'competition.swim.qualifyBonus', (cp.swim || {}).qualifyBonus, 5)}
       ${num('Swim — per point at Provincials', 'competition.swim.provincialPerPoint', (cp.swim || {}).provincialPerPoint)}
       ${num('Skating — per point', 'competition.skate.perPoint', (cp.skate || {}).perPoint)}
-      ${num('Dance — per Silver item', 'competition.dance.silverPerItem', (cp.dance || {}).silverPerItem)}
-      ${num('Dance — per Gold item', 'competition.dance.goldPerItem', (cp.dance || {}).goldPerItem)}
-      ${num('Dance — most for one test', 'competition.dance.testCap', (cp.dance || {}).testCap, 5)}
+      ${/* "Skating star level" is what the family calls it; the rule key and the
+            sport id stay `dance`, because stored results and every rule version
+            already on the devices name it that. A relabel, not a new sport. */''}
+      ${num('Skating star level — per Silver item', 'competition.dance.silverPerItem', (cp.dance || {}).silverPerItem)}
+      ${num('Skating star level — per Gold item', 'competition.dance.goldPerItem', (cp.dance || {}).goldPerItem)}
+      ${num('Skating star level — most for one test', 'competition.dance.testCap', (cp.dance || {}).testCap, 5)}
     </div>`);
 
   const fines = (r.fines || {}).items || [];
@@ -210,7 +271,7 @@ function mnyRulePrices() {
 
   return `<div class="mny-card">
       <label class="mny-field"><span>Find a price</span>
-        <input type="search" value="${escapeAttr(mnyRuleSearch)}" placeholder="streak, dance, cap…" data-mnyp-action="search"></label>
+        <input type="search" value="${escapeAttr(mnyRuleSearch)}" placeholder="streak, star level, cap…" data-mnyp-action="search"></label>
     </div>${cards.join('')}`;
 }
 
@@ -322,8 +383,7 @@ function mnyDebtEditor(kid) {
     <div class="mny-card">
       <button type="button" class="mny-btn wide" data-mnyp-action="debtadd">＋ Add another loan</button>
       <div class="mny-note">Extra money goes to whichever loan pays the biggest bonus first — that is where a dollar clears the most.</div>
-    </div>
-    ${mnyChangeHistory()}`;
+    </div>`;
 }
 
 /* ── What she owns ──
@@ -434,28 +494,82 @@ function mnyHoldingsEditor(kid) {
 }
 
 /* ── Lessons ──
-   Which stage she is at, and the override for when the conversation gets
-   somewhere before the loan does. */
+   Which stage she is at, the override for when the conversation gets
+   somewhere before the loan does, and the three gates themselves.
+
+   The gates are rule values (`school.stagePct`), so a change goes through the
+   pending list and `mrApplyEdits` like any price: dated, logged, one version.
+   The ORDER is checked in the handler (`mnyStagePctRefusal`), not only in the
+   markup — a stepper that could put "lock it away" before "keep it ready"
+   would open a pot whose lesson is still shut. */
+const MNY_TUNABLE_STAGES = ['ready', 'locked', 'stock'];
+/* A gate as it will be once the pending list is saved: the queued value if
+   there is one, the live rule otherwise. */
+function mnyStagePctShown(stageId) {
+  const p = mnyPending.find(x => x.path === 'school.stagePct.' + stageId);
+  return p ? Number(p.value) : mnyStagePct(stageId);
+}
+/* Why a set of gates cannot be saved, as a sentence, or null. `values` holds
+   ready / locked / stock; anything missing reads as it will be once saved. */
+function mnyStagePctRefusal(values) {
+  const v = {};
+  MNY_TUNABLE_STAGES.forEach(id => {
+    v[id] = Number((values && values[id] != null) ? values[id] : mnyStagePctShown(id));
+  });
+  const name = (id) => (MNY_STAGES.find(s => s.id === id) || {}).title || id;
+  for (const id of MNY_TUNABLE_STAGES) {
+    if (!isFinite(v[id]) || v[id] < 0 || v[id] > 100) {
+      return `${name(id)} has to open somewhere between 0% and 100% paid off.`;
+    }
+  }
+  for (let i = 1; i < MNY_TUNABLE_STAGES.length; i++) {
+    const a = MNY_TUNABLE_STAGES[i - 1], b = MNY_TUNABLE_STAGES[i];
+    if (v[a] > v[b]) {
+      return `${name(a)} (${v[a]}%) cannot open after ${name(b).toLowerCase()} (${v[b]}%) — each stage opens no later than the one after it.`;
+    }
+  }
+  return null;
+}
+
 function mnyLessonEditor(kid) {
   const idx = mnyStageIndex(kid);
   const pct = mnyPaidPct(kid);
   const override = mnyUnlockOverride(kid);
+  const gate = (id) => {
+    const s = MNY_STAGES.find(x => x.id === id);
+    const path = 'school.stagePct.' + id;
+    const changed = mnyPending.some(x => x.path === path);
+    return `<div class="mny-row${changed ? ' changed' : ''}"><span>${s.icon} ${escapeHtml(s.title)}</span>
+        <span class="mny-stepgrp">
+          <button type="button" class="mny-step" data-mnyp-action="stagepct" data-mnyp-id="${id}" data-mnyp-d="-5" aria-label="Open it sooner">−</button>
+          <b>${mnyStagePctShown(id)}%</b>
+          <button type="button" class="mny-step" data-mnyp-action="stagepct" data-mnyp-id="${id}" data-mnyp-d="5" aria-label="Open it later">+</button>
+        </span></div>`;
+  };
   return `<div class="mny-card">
       <div class="mny-label">🎓 Where she is</div>
       <div class="mny-progress"><div class="mny-progress-fill green" style="width:${pct}%"></div></div>
-      <div class="mny-goal-row">${pct}% of everything she owes is paid off</div>
+      <div class="mny-goal-row">${mnyTotalPrincipal(kid) > 0
+        ? `${pct}% of everything she owes is paid off`
+        : 'She has no loan, so every stage is open'}</div>
       <div class="mny-rows">
         ${MNY_STAGES.map((s, i) => `<div class="mny-row${i === idx ? ' total' : ''}">
             <span>${s.icon} ${escapeHtml(s.title)}</span>
-            <b>${i < idx ? 'open' : (i === idx ? 'here now' : (pct >= s.pct ? 'open' : '🔒 ' + s.pct + '%'))}</b>
+            <b>${i < idx ? 'open' : (i === idx ? 'here now' : '🔒 ' + mnyStagePct(s.id) + '%')}</b>
           </div>`).join('')}
       </div>
       <div class="mny-label" style="margin-top:0.5rem">Open a stage early</div>
       <div class="mny-chiprow">${MNY_STAGES.map((s, i) =>
-        `<button type="button" class="mny-chip ${override === i ? 'on' : ''}" data-mnyp-action="unlock" data-mnyp-i="${i}">${s.icon} ${i === 0 ? 'no override' : s.pct + '%'}</button>`).join('')}</div>
+        `<button type="button" class="mny-chip ${override === i ? 'on' : ''}" data-mnyp-action="unlock" data-mnyp-i="${i}">${s.icon} ${i === 0 ? 'no override' : mnyStagePct(s.id) + '%'}</button>`).join('')}</div>
       <div class="mny-note">Use this when you have had the conversation and she is ready for it before the loan says so. It only ever opens things — it cannot close one she has reached.</div>
     </div>
-    ${mnyChangeHistory()}`;
+    <div class="mny-card">
+      <div class="mny-label">🚪 When each stage opens — share of all loans paid off, for both girls</div>
+      <div class="mny-rows">${MNY_TUNABLE_STAGES.map(gate).join('')}</div>
+      <div class="mny-note">These are rules like any price: a change waits in the list above until you save it,
+        and it is dated and kept in 🕰️ Change history. Each stage has to open no later than the one after it.
+        ${escapeHtml((MNY_STAGES[MNY_STAGES.length - 1] || {}).title || '')} stays at ${mnyStagePct('mix')}%.</div>
+    </div>`;
 }
 
 function mnyChangeHistory() {
@@ -465,10 +579,17 @@ function mnyChangeHistory() {
         <span class="mny-label">📋 Change history</span><span>${mnyHistoryOpen ? 'Less ▾' : 'More ▸'}</span>
       </button>
       <div class="mny-rows">
-        ${entries.length ? entries.map(e => `<div class="mny-row">
+        ${entries.length ? entries.map(e => {
+            /* A non-scalar goes through the same summariser mrLogAppend uses —
+               entries already on the family's devices hold whole arrays, and
+               String() of one is "[object Object]" per record. */
+            const said = e.summary || mrLogSummary(e.from, e.to);
+            return `<div class="mny-row">
             <span>${escapeHtml(e.note || e.path)} · ${escapeHtml(mrReasonLabel(e.reason))} · ${escapeHtml(mnyShortDate(toDayKeyInZone(new Date(e.at))))}</span>
-            <b>${escapeHtml(e.from == null ? '—' : String(e.from))} → ${escapeHtml(e.to == null ? '—' : String(e.to))}</b>
-          </div>`).join('') : `<div class="mny-note">No changes yet — the starting template is still in effect.</div>`}
+            <b>${said != null ? escapeHtml(said)
+              : `${escapeHtml(e.from == null ? '—' : String(e.from))} → ${escapeHtml(e.to == null ? '—' : String(e.to))}`}</b>
+          </div>`;
+          }).join('') : `<div class="mny-note">No changes yet — the starting template is still in effect.</div>`}
       </div>
     </div>`;
 }
@@ -477,63 +598,133 @@ function mnyChangeHistory() {
    The frozen ledger, and a way to type in the weeks that happened before the
    app did. Hand-entered rows are marked as such: a week somebody typed from
    memory is not the same evidence as a week the app watched happen. */
-/* ── The default for a week nobody sat down for ─────────────────────
+/* ── 👵 The Grandma rule — the flat amount for a week nobody sat down for ──
    mmUnsettledWeeks looks back eight weeks and stops, so weeks older than that
    are invisible AND unsettleable: the catch-up list cannot show them and there
    is no other door. They sit unsettled forever, and the money for them is
    simply never credited.
 
-   A flat default per child clears them. Deliberately NOT applied to weeks the
-   catch-up list can still reach — those still hold real chore and routine data
-   and should be settled on their own numbers, which is the whole point of the
-   catch-up list. */
+   The owner's rule, in their words: "I have 8 weeks review window, any week
+   that does not in this 8 weeks review windows and no family meeting record
+   get $3 default pocket money." And: "I will input the start week … this does
+   not close the door to enter the competition."
+
+   So ONE test, and it is theirs. A week gets the flat amount for a child when
+     · it is on or after the start week the family entered,
+     · it is OUTSIDE the eight-week review window — no newer than this week
+       minus MNY_CATCHUP_REACH + 1, the same reach mmUnsettledWeeks has,
+     · it has no family meeting record — neither `meetingsMet` (we sat down)
+       nor `meetingsHeld` (the money moved), the two facts mmIsMet and
+       mmIsSettled read,
+     · and her week is not already credited (`finalizedWeeks[wk][kid]`).
+   Chores, fines, gifts and overrides in the week do NOT stop it: a week with
+   no meeting never had its chores settled, which is exactly the week this is
+   for. A meet already on file is paid ON TOP, because a settled week does not
+   close its meets (js/21-money-data.js, `mnyLateCompSync`).
+
+   There used to be two sweeps with two tests — "no meeting held" for the
+   hub's default and "no money record at all" between two typed dates for this
+   one. That is gone: the hub offers this plan, from the rule saved here. */
 const MNY_DEFAULT_WEEK = 3;
 const MNY_CATCHUP_REACH = 8;
 
-/* Read-only, so the card can show the total and the weeks BEFORE anything
-   moves. Sixteen weeks is a real amount of money and it must never arrive as a
-   surprise — the same shape as Copy a plan, which shows its work first. */
+/* The start week and amount, ENTERED ONCE and kept as a dated rule
+   (`grandma.from` / `grandma.amount`, written through `mrApplyEdits`, logged
+   in 🕰️ Change history like any price). Read from the NEWEST version rather
+   than the one live today: this rule prices no week of its own — it names
+   which old weeks the flat amount reaches — so the latest answer a parent gave
+   is the answer, even when it was filed into a version scheduled ahead. A
+   rulebook without it falls back to the family's first week on file and
+   MNY_DEFAULT_WEEK, and says it is not saved: the hub will not offer a credit
+   from a start week nobody entered. */
+function mnyGrandmaRule() {
+  const v = mrLatestVersion();
+  const g = ((v && v.rules) || {}).grandma || {};
+  const saved = /^\d{4}-\d{2}-\d{2}$/.test(String(g.from || ''));
+  const amount = (g.amount != null) ? money2(Math.max(0, Number(g.amount) || 0)) : MNY_DEFAULT_WEEK;
+  return { from: saved ? String(g.from) : String(mrStartWeek()), amount, saved };
+}
+
+/* Read-only, so the card and the hub can show the total and the weeks BEFORE
+   anything moves. Sixteen weeks is a real amount of money and it must never
+   arrive as a surprise — the same shape as Copy a plan, which shows its work
+   first. Never reaches the current week, a future one, or the eight the
+   catch-up list still settles on real numbers: it walks backwards from one
+   week beyond that reach, so the $3 is backfill, never a floor. */
 function mnyDefaultSweepPlan() {
   ctEnsureShared();
   const c = state.shared.chore;
-  const floor = (typeof mmCatchUpFloor === 'function') ? String(mmCatchUpFloor()) : null;
-  const weeks = [];
-  if (!floor) return { weeks, total: 0 };
-  /* Start one week BEYOND the catch-up reach and walk back to the floor. */
-  const mon = formatDayKey(ctThisWeekKey());
-  mon.setDate(mon.getDate() - (MNY_CATCHUP_REACH + 1) * 7);
+  const rule = mnyGrandmaRule();
+  const amount = rule.amount;
+  const out = { weeks: [], total: 0, perKid: { jenn: 0, jess: 0 }, comp: { jenn: 0, jess: 0 },
+                skipped: 0, amount, from: null, latest: null, saved: rule.saved };
+  const latest = formatDayKey(ctThisWeekKey());
+  latest.setDate(latest.getDate() - (MNY_CATCHUP_REACH + 1) * 7);
+  out.latest = ctDateToKey(latest);
+  const floor = String(ctWeekKeyForDate(rule.from));
+  out.from = floor;
+  if (!(amount > 0)) return out;
+  const mon = new Date(latest);
   for (let i = 0; i < 260; i++) {
     const wk = ctDateToKey(mon);
     if (String(wk) < floor) break;
-    if (!((c.meetingsHeld || {})[wk])) {
-      const kids = ['jenn', 'jess'].filter(k =>
-        ((c.finalizedWeeks || {})[wk] || {})[k] == null);
-      if (kids.length) weeks.push({ wk, kids, amount: MNY_DEFAULT_WEEK * kids.length });
+    if (mnyWeekHadMeeting(wk)) out.skipped++;
+    else {
+      const kids = ['jenn', 'jess'].filter(k => ((c.finalizedWeeks || {})[wk] || {})[k] == null);
+      if (kids.length) {
+        const comp = {};
+        kids.forEach(k => {
+          comp[k] = mrCompetitionWeek(wk, k).paid;
+          out.perKid[k] = money2(out.perKid[k] + amount + comp[k]);
+          out.comp[k] = money2(out.comp[k] + comp[k]);
+        });
+        out.weeks.push({ wk, kids, comp, amount: money2(kids.reduce((s, k) => s + amount + comp[k], 0)) });
+      }
     }
     mon.setDate(mon.getDate() - 7);
   }
-  return { weeks, total: money2(weeks.reduce((s, w) => s + w.amount, 0)) };
+  out.total = money2(out.weeks.reduce((s, w) => s + w.amount, 0));
+  return out;
+}
+/* A family meeting record, of either kind. Read straight off the two maps so
+   asking writes nothing (mmIsMet would create `meetingsMet` to answer). */
+function mnyWeekHadMeeting(wk) {
+  const c = state.shared.chore;
+  return !!((c.meetingsMet || {})[wk] || (c.meetingsHeld || {})[wk]);
 }
 
 /* The writer. Idempotent through the SAME guard commitKidWeek already uses —
    finalizedWeeks[wk][kid] == null is the has-been-credited test — so this can
-   run twice, on two devices, in any merge order, and credit once.
+   run twice, on two devices, in any merge order, and credit once. The guard
+   and the meeting test are read again at write time rather than trusted from
+   the plan.
 
-   A defaulted week is LABELLED, not disguised: the ledger row carries its own
-   mark so the money story can say "no meeting was held, the default applied"
-   rather than presenting $3 as a week's earnings. It also carries handEntered,
-   because mnyEditLedger refuses any row without it and a defaulted row must
-   stay correctable by the same door. */
+   A defaulted week is LABELLED, not disguised: the ledger row carries
+   `defaulted` and `defaultReason: 'grandma'` so the money story says so rather
+   than presenting $3 as a week's earnings. Rows an older build wrote with
+   `defaultReason: 'default'` still read "nobody met". It also carries
+   handEntered, as every row an older build wrote did, but `defaulted` is read
+   first: mnyEditLedger and mnyDeleteLedgerWeek refuse a defaulted row, whose
+   money is already in her wallet — its meets correct through the meet.
+
+   The meets on file are paid in the same settlement, as their own line — the
+   flat amount is `earned`, the meets are `prize` — so the ledger's
+   competition figure is what `mnyLateCompSync` later compares against. */
 async function mnyRunDefaultSweep() {
   if (!isParent()) { showToast('A grown-up settles the weeks 🔒'); return; }
   const plan = mnyDefaultSweepPlan();
-  if (!plan.weeks.length) { showToast('No un-met weeks older than the catch-up window'); return; }
+  if (!plan.saved) { showToast('Enter the start week first — Money rules › 👵 Grandma rule'); return; }
+  if (!plan.weeks.length) { showToast('No weeks outside the review window need it — nothing to credit'); return; }
+  const span = `${mnyShortDate(plan.weeks[plan.weeks.length - 1].wk)} to ${mnyShortDate(plan.weeks[0].wk)}`;
+  const comps = money2(plan.comp.jenn + plan.comp.jess);
+  const sk = plan.skipped;
   const ok = await showConfirm(
-    `Credit ${mnyMoney(plan.total)} across ${plan.weeks.length} week`
-    + `${plan.weeks.length === 1 ? '' : 's'} nobody sat down for?\n\n`
-    + `${mnyMoney(MNY_DEFAULT_WEEK)} per child per week, from `
-    + `${mnyShortDate(plan.weeks[plan.weeks.length - 1].wk)} to ${mnyShortDate(plan.weeks[0].wk)}.\n\n`
-    + `Weeks the catch-up list can still reach are left alone — settle those on their real numbers.`,
+    `Credit ${mnyMoney(plan.total)} under the Grandma rule?\n\n`
+    + ['jenn', 'jess'].map(k => `${mnyKidName(k)}: ${mnyMoney(plan.perKid[k])}`).join(' · ')
+    + `\n\n${mnyMoney(plan.amount)} per child for each week with no family meeting, ${span}`
+    + (comps > 0 ? `, and ${mnyMoney(comps)} of meets already on file in those weeks on top.` : '.')
+    + (sk ? `\n\n${sk} week${sk === 1 ? '' : 's'} had a family meeting and ${sk === 1 ? 'is' : 'are'} left alone.` : '')
+    + `\n\nThe last ${MNY_CATCHUP_REACH} weeks are left to the catch-up list.`,
     { okLabel: 'Credit it', cancelLabel: 'Not now' });
   if (!ok) return;
 
@@ -543,25 +734,36 @@ async function mnyRunDefaultSweep() {
   if (!c.finalizedWeeks) c.finalizedWeeks = {};
   let credited = 0, moved = 0;
   plan.weeks.forEach(w => {
+    if (mnyWeekHadMeeting(w.wk)) return;
     if (!c.moneyLedger[w.wk]) c.moneyLedger[w.wk] = {};
     if (!c.finalizedWeeks[w.wk]) c.finalizedWeeks[w.wk] = {};
     w.kids.forEach(kid => {
       // The guard, re-read at write time rather than trusted from the plan.
       if (c.finalizedWeeks[w.wk][kid] != null) return;
-      moneyAddCash(kid, MNY_DEFAULT_WEEK, {
+      const cw = mrCompetitionWeek(w.wk, kid);
+      const comp = cw.paid;
+      const pay = money2(plan.amount + comp);
+      moneyAddCash(kid, plan.amount, {
         kind: 'settle', from: 'earned', dayKey: w.wk, weekKey: w.wk, ref: w.wk,
-        note: 'Week of ' + w.wk + ' — nobody met, the default' });
+        note: 'Week of ' + w.wk + ' — Grandma rule' });
+      if (comp > 0) {
+        const names = cw.entries.map(e => e.name || mnySportLabel(e.sport)).join(', ');
+        moneyAddCash(kid, comp, {
+          kind: 'settle', from: 'prize', dayKey: w.wk, weekKey: w.wk, ref: w.wk,
+          note: names + ', week of ' + mnyShortDate(w.wk) + ' — on top of the Grandma rule' });
+      }
       evMirror(kid, { kind: 'settle', amount: 0, dayKey: w.wk, weekKey: w.wk, ref: w.wk,
-                      note: 'Week of ' + w.wk + ' — settled at the default' });
-      c.finalizedWeeks[w.wk][kid] = MNY_DEFAULT_WEEK;
+                      note: 'Week of ' + w.wk + ' — settled under the Grandma rule' });
+      c.finalizedWeeks[w.wk][kid] = pay;
       c.moneyLedger[w.wk][kid] = {
-        at: Date.now(), handEntered: true, defaulted: true, updatedAt: syncNow(),
-        chores: 0, learning: 0, streak: 0, competition: 0, fines: 0, outside: 0,
+        at: Date.now(), handEntered: true, defaulted: true, defaultReason: 'grandma',
+        updatedAt: syncNow(),
+        chores: 0, learning: 0, streak: 0, competition: comp, fines: 0, outside: 0,
         ready: 0, gic: 0, stock: 0, debtExtra: 0,
-        gross: MNY_DEFAULT_WEEK, net: MNY_DEFAULT_WEEK,
+        gross: pay, net: pay,
         xp: 0, boxReleased: 0, loan: null,
       };
-      credited += MNY_DEFAULT_WEEK;
+      credited = money2(credited + pay);
       moved++;
     });
     if (typeof ctStampWeekState === 'function') ctStampWeekState(w.wk);
@@ -571,6 +773,85 @@ async function mnyRunDefaultSweep() {
   showToast(moved
     ? `Credited ${mnyMoney(credited)} across ${plan.weeks.length} week${plan.weeks.length === 1 ? '' : 's'}`
     : 'Those weeks were already credited');
+}
+
+/* ── 👵 The Grandma rule's section ──
+   The start week and the amount are asked once and SAVED as a rule; the
+   preview and the credit read the saved rule, never the form. The form is a
+   module draft until Save, so typing a date writes nothing. There is no
+   to-date: the review window is the upper end, whatever the date. */
+let mnyGrandmaDraft = null;   // { from, amount } — the form, until Save
+function mnyGrandmaForm() {
+  if (!mnyGrandmaDraft) {
+    const r = mnyGrandmaRule();
+    mnyGrandmaDraft = { from: r.from, amount: r.amount };
+  }
+  return mnyGrandmaDraft;
+}
+/* One dated rule version, logged a line per field. Dated today — or joined to
+   a version already scheduled ahead, because `mrApplyEdits` clones the NEWEST
+   version, and a version dated today built from a scheduled one would drag
+   its prices forward. The start week is stored as its Monday, the key every
+   week in this app has. */
+function mnySaveGrandmaRule() {
+  if (!isParent()) { showToast('A grown-up sets this 🔒'); return; }
+  const f = mnyGrandmaForm();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(f.from || ''))) { showToast('Pick the start week first'); return; }
+  const latest = mrLatestVersion();
+  const from = (latest && latest.effectiveFrom > todayKey()) ? latest.effectiveFrom : todayKey();
+  const v = mrApplyEdits([
+    { path: 'grandma.from', value: String(ctWeekKeyForDate(f.from)), label: '👵 Grandma rule — starts the week of' },
+    { path: 'grandma.amount', value: money2(Math.max(0, Number(f.amount) || 0)), label: '👵 Grandma rule — each child, each week' },
+  ], { reason: MR_DEFAULT_REASON, effectiveFrom: from });
+  mnyGrandmaDraft = null;
+  mnyRenderRulesTab();
+  showToast(v ? '👵 Saved — the Grandma rule starts the week of ' + mnyShortDate(mnyGrandmaRule().from) : 'Nothing changed');
+}
+function mnyGrandmaCard() {
+  const f = mnyGrandmaForm();
+  const rule = mnyGrandmaRule();
+  const plan = mnyDefaultSweepPlan();
+  const n = plan.weeks.length;
+  const changed = !rule.saved || String(ctWeekKeyForDate(f.from)) !== rule.from || money2(f.amount) !== rule.amount;
+  const perKid = ['jenn', 'jess'].map(k => {
+    const weeks = plan.weeks.filter(w => w.kids.indexOf(k) >= 0).length;
+    return `<div class="mny-row"><span>${CT_PROFILE_ICON[k]} ${mnyKidName(k)} — ${weeks} week${weeks === 1 ? '' : 's'}${
+        plan.comp[k] > 0 ? ` · ${mnyMoney(plan.comp[k])} of meets on top` : ''}</span>
+      <b>${mnyMoney(plan.perKid[k])}</b></div>`;
+  }).join('');
+  const rows = plan.weeks.slice(0, 8).map(w => `<div class="mny-row"><span>Week of ${escapeHtml(mnyShortDate(w.wk))}
+      · ${escapeHtml(w.kids.map(mnyKidName).join(' and '))}</span><b>${mnyMoney(w.amount)}</b></div>`).join('');
+  const sk = plan.skipped;
+  return `<div class="mny-card">
+      <div class="mny-week-head"><span class="mny-label">👵 Grandma rule</span>
+        <b>${mnyMoney(plan.total)}</b></div>
+      <div class="mny-note">Every week from the start week that is outside the review window and had <b>no family
+        meeting</b> gets the same flat amount for each girl. Chores, fines and gifts in the week do not stop it. A meet
+        already on file for that week is paid on top — and a meet entered later is still paid.</div>
+      <label class="mny-field"><span>Starts the week of</span>
+        <input type="date" value="${escapeAttr(f.from)}" data-mnyp-action="gmfrom"></label>
+      <div class="mny-row"><span>Each child, each week</span>
+        <span class="mny-stepgrp">
+          <button type="button" class="mny-step" data-mnyp-action="gmamt" data-mnyp-d="-0.5" aria-label="Less">−</button>
+          <b>${mnyMoney(f.amount)}</b>
+          <button type="button" class="mny-step" data-mnyp-action="gmamt" data-mnyp-d="0.5" aria-label="More">+</button>
+        </span></div>
+      <button type="button" class="mny-btn${changed ? ' primary' : ''} wide" data-mnyp-action="gmsave"
+        >${rule.saved ? (changed ? 'Save the change' : 'Saved ✓') : 'Save the start week'}</button>
+      <div class="mny-note">${rule.saved
+        ? `Saved: from the week of ${escapeHtml(mnyShortDate(rule.from))}, ${mnyMoney(rule.amount)} a week. A change is dated and kept in 🕰️ Change history.`
+        : 'Not saved yet — nothing below can be credited until the start week is.'}</div>
+      <div class="mny-note">The last ${MNY_CATCHUP_REACH} weeks are left to the catch-up list — the newest week this can credit is the week of ${escapeHtml(mnyShortDate(plan.latest))}.</div>
+      <div class="mny-rows">${perKid}</div>
+      ${sk ? `<div class="mny-note">${sk} week${sk === 1 ? '' : 's'} had a family meeting — left alone.</div>` : ''}
+      ${n ? `${rows}
+        ${n > 8 ? `<div class="mny-note">…and ${n - 8} more.</div>` : ''}
+        ${rule.saved ? `<button type="button" class="mny-btn primary wide" data-mnyp-action="grandma"
+          >Credit ${mnyMoney(plan.total)} across ${n} week${n === 1 ? '' : 's'}</button>
+        <div class="mny-note">Shown before anything moves, and asked once more before it does. Run it again and it
+          finds nothing new: a week it credited is a settled week.</div>` : ''}`
+      : `<div class="mny-note mny-gap">No weeks outside the review window need it — nothing to credit.</div>`}
+    </div>`;
 }
 
 /* ── When the pocket money system starts, and the backlog before it ──
@@ -587,8 +868,9 @@ function mnyStartDateCard() {
   const c = state.shared.chore;
   const program = String(mrStartWeek());
   const derived = !c.programStartDate;
-  const floor = (typeof mmCatchUpFloor === 'function') ? mmCatchUpFloor() : model;
-  const pending = mnyDefaultSweepPlan();
+  const floor = (typeof mmCatchUpFloor === 'function') ? mmCatchUpFloor() : program;
+  /* The flat default for weeks nobody sat down for used to sit here. It is the
+     👵 Grandma rule section now, where a parent chooses its dates. */
   return `<div class="mny-card">
       <div class="mny-week-head"><span class="mny-label">📅 When pocket money started</span></div>
       <label class="mny-field"><span>First week</span>
@@ -597,20 +879,7 @@ function mnyStartDateCard() {
         Currently ${escapeHtml(mnyShortDate(floor))}.${derived
           ? ` Worked out from the earliest week on file — set it if the family started before that.`
           : ''}</div>
-      ${pending.weeks.length ? `
-        <div class="mny-week-head mny-gap"><span class="mny-label">🕰 Weeks nobody sat down for</span>
-          <b>${mnyMoney(pending.total)}</b></div>
-        <div class="mny-note">${pending.weeks.length} week${pending.weeks.length === 1 ? '' : 's'}
-          older than the eight the catch-up list can reach, so ${pending.weeks.length === 1 ? 'it' : 'they'}
-          cannot be settled on real numbers any more.
-          ${mnyMoney(MNY_DEFAULT_WEEK)} each, per child, is the default.</div>
-        ${pending.weeks.slice(0, 8).map(w => `<div class="mny-row"><span>Week of ${escapeHtml(mnyShortDate(w.wk))}</span>
-          <b>${mnyMoney(w.amount)}</b></div>`).join('')}
-        ${pending.weeks.length > 8 ? `<div class="mny-note">…and ${pending.weeks.length - 8} more.</div>` : ''}
-        <button type="button" class="mny-btn wide" data-mnyp-action="sweepdefault"
-          >Credit ${mnyMoney(pending.total)} across ${pending.weeks.length} week${pending.weeks.length === 1 ? '' : 's'}</button>
-        <div class="mny-note">Shown before anything moves. Weeks the catch-up list can still reach are left alone — those still hold real chore and routine data and should be settled on their own numbers.</div>`
-      : `<div class="mny-note mny-gap">No un-met weeks older than the catch-up window.</div>`}
+      <div class="mny-note">A flat amount for the weeks before that is the 👵 Grandma rule, its own section.</div>
     </div>`;
 }
 
@@ -668,10 +937,11 @@ function mnyRepairCard() {
   const plans = (typeof evRepairPlan === 'function') ? evRepairPlan() : [];
   const total = money2(plans.reduce((n, p) => n + p.total, 0));
   const weeks = plans.reduce((n, p) => n + p.weeks.length, 0);
+  const meets = mnyUnpaidMeetsList();
   if (!weeks) {
     return `<div class="mny-card">
         <div class="mny-week-head"><span class="mny-label">🩹 Weeks that were short</span></div>
-        <div class="mny-note">✅ Nothing owed — every settled week matches what its own rules say.</div>
+        ${meets || `<div class="mny-note">✅ Nothing owed — every settled week matches what its own rules say.</div>`}
       </div>`;
   }
   return `<div class="mny-card">
@@ -689,7 +959,48 @@ function mnyRepairCard() {
         >Pay the ${mnyMoney(total)} they were short, across ${weeks} week${weeks === 1 ? '' : 's'}</button>
       <div class="mny-note">Shown before anything moves, and it only ever adds:
         a week that was paid more than its rules say keeps what it paid.</div>
+      ${meets}
     </div>`;
+}
+
+/* The repair card's second list: settled weeks whose meets were never paid
+   (mnyUnpaidMeetsPlan, js/21-money-data.js). Its own button and its own
+   confirm, in the same card and the same shape as the repair's, because it is
+   the same kind of promise — previewed, only ever adds, pays once. Empty when
+   there is nothing, so the card reads exactly as it did. */
+function mnyUnpaidMeetsList() {
+  const plans = (typeof mnyUnpaidMeetsPlan === 'function') ? mnyUnpaidMeetsPlan() : [];
+  const total = money2(plans.reduce((n, p) => n + p.total, 0));
+  const weeks = plans.reduce((n, p) => n + p.weeks.length, 0);
+  if (!weeks) return '';
+  return `<div class="mny-week-head"><span class="mny-label">🏆 Meets never paid</span><b>${mnyMoney(total)}</b></div>
+      <div class="mny-note">These weeks are settled and their meets are on file, but what the
+        meets are worth was never paid. Each week is brought up to its meets — nothing is taken back.</div>
+      ${plans.filter(p => p.weeks.length).map(p => p.weeks.slice(0, 10).map(w => `
+        <div class="mny-row">
+          <span>${escapeHtml(mnyKidName(p.kid))} — week of ${escapeHtml(mnyShortDate(w.wk))}<br><span class="mny-note">${escapeHtml(w.names.join(', '))}</span></span>
+          <b>${mnyMoney(w.gap)}</b>
+        </div>`).join('')).join('')}
+      <button type="button" class="mny-btn wide" data-mnyp-action="paymeets"
+        >Pay the ${mnyMoney(total)} these meets never got, across ${weeks} week${weeks === 1 ? '' : 's'}</button>`;
+}
+
+async function mnyRunPayMeets() {
+  if (!isParent()) { showToast('A grown-up settles the weeks 🔒'); return; }
+  const plans = mnyUnpaidMeetsPlan();
+  const total = money2(plans.reduce((n, p) => n + p.total, 0));
+  const weeks = plans.reduce((n, p) => n + p.weeks.length, 0);
+  if (!weeks) { showToast('Every meet is paid ✅'); return; }
+  const lines = plans.filter(p => p.weeks.length).map(p =>
+    `${mnyKidName(p.kid)}: ${mnyMoney(p.total)} across ${p.weeks.length} week${p.weeks.length === 1 ? '' : 's'}`);
+  const ok = await showConfirm(
+    `Pay ${mnyMoney(total)} for meets ${weeks} settled week${weeks === 1 ? ' never' : 's never'} paid?\n\n` +
+    `${lines.join('\n')}\n\nEach week is brought up to what its meets are worth, and nothing is ever taken back.`,
+    { okLabel: 'Pay it', cancelLabel: 'Not now' });
+  if (!ok) return;
+  const res = mnyPayUnpaidMeets();
+  showToast(`✅ ${mnyMoney(res.paid)} across ${res.weeks} week${res.weeks === 1 ? '' : 's'}`);
+  mnyRenderRulesTab();
 }
 
 async function mnyRunRepair() {
@@ -735,10 +1046,10 @@ function mnyHistoryEditor(kid) {
                  the flat default because nobody sat down read as "typed in" —
                  the same label as a week a parent entered from memory. They are
                  different facts and the history has to say which. */
-              r.defaulted ? ' · nobody met' : (r.repricedAt ? ' · re-priced' : (r.handEntered ? ' · typed in' : (r.weeksLate ? ' · settled ' + r.weeksLate + 'wk late' : '')))}</span>
+              r.defaulted ? (r.defaultReason === 'grandma' ? ' · Grandma rule' : ' · nobody met') : (r.repricedAt ? ' · re-priced' : (r.handEntered ? ' · typed in' : (r.weeksLate ? ' · settled ' + r.weeksLate + 'wk late' : '')))}</span>
             <b>${mnyMoney(r.net)}</b>
           </div>
-          ${r.handEntered ? `<div class="mny-rows">
+          ${r.defaulted ? mnyDefaultedWeekRows(r) : r.handEntered ? `<div class="mny-rows">
               ${f('Jobs', 'chores', 1)}${f('Learning', 'learning', 1)}${f('Routines', 'streak', 1)}
               ${f('Competitions', 'competition', 5)}${f('From outside', 'outside', 5)}${f('Taken off', 'fines', 1)}
               ${f('Kept ready', 'ready', 1)}${f('Locked away', 'gic', 5)}${f('Into companies', 'stock', 1)}
@@ -891,6 +1202,15 @@ function mnyParentClick(ev) {
   }
   if (a === 'fund')   { mnyQueueEdit('investing.fund', id, 'What her investing money buys'); return; }
   if (a === 'unlock') { mnyQueueEdit('school.unlockStage.' + kid, Number(el.getAttribute('data-mnyp-i')), 'Open a lesson stage early'); return; }
+  if (a === 'stagepct') {
+    if (MNY_TUNABLE_STAGES.indexOf(id) < 0) return;
+    const next = Math.max(0, Math.min(100, mnyStagePctShown(id) + Number(el.getAttribute('data-mnyp-d'))));
+    const why = mnyStagePctRefusal({ [id]: next });
+    if (why) { showToast(why); return; }
+    const s = MNY_STAGES.find(x => x.id === id);
+    mnyQueueEdit('school.stagePct.' + id, next, s.title + ' opens at (% paid off)');
+    return;
+  }
 
   if (a === 'led') {
     const f = el.getAttribute('data-mnyp-f');
@@ -901,9 +1221,23 @@ function mnyParentClick(ev) {
   }
   if (a === 'leddel')  { mnyDeleteLedgerWeek(kid, id); mnyRenderRulesTab(); return; }
   if (a === 'addweek') { mnyAddMissedWeek(kid); mnyRenderRulesTab(); return; }
-  if (a === 'sweepdefault') { mnyRunDefaultSweep(); return; }
+  // The credit reads the SAVED rule, never the form; Save is what writes it.
+  if (a === 'grandma') { mnyRunDefaultSweep(); return; }
+  if (a === 'gmsave')  { mnySaveGrandmaRule(); return; }
+  if (a === 'gmamt') {
+    const f = mnyGrandmaForm();
+    f.amount = Math.max(0, money2(f.amount + Number(el.getAttribute('data-mnyp-d'))));
+    mnyRenderRulesTab();
+    return;
+  }
   if (a === 'migrate')      { mnyRunStreamSetup(); return; }
   if (a === 'repair')       { mnyRunRepair(); return; }
+  if (a === 'paymeets')     { mnyRunPayMeets(); return; }
+  if (a === 'houserules') {
+    if (mrApplyHouseRules()) showToast('✅ The four house rules are in the rulebook');
+    mnyRenderRulesTab();
+    return;
+  }
 }
 
 /* Writes the stream's opening record, after saying what it will do. Separate
@@ -974,6 +1308,15 @@ function mnyParentInput(ev) {
   if (a === 'search') { mnyRuleSearch = el.value; mnyRenderRulesTab(); return; }
   if (a === 'from')   { mnyPendingFrom = el.value; return; }
   if (a === 'startweek') { mnySetStartWeek(el.value); return; }
+  /* The Grandma rule's start week: kept in the draft on every keystroke, drawn
+     again only once the date is committed, so typing a date is never
+     interrupted. Nothing is stored until Save. */
+  if (a === 'gmfrom') {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(el.value)) return;
+    mnyGrandmaForm().from = el.value;
+    if (ev.type === 'change') mnyRenderRulesTab();
+    return;
+  }
   if (a === 'debtname') { mnyEditDebt(kid, id, 'name', el.value); return; }
   if (a === 'debtitem') { mnyEditDebt(kid, id, 'item', el.value); return; }
   if (a === 'debtdue')  { mnyEditDebt(kid, id, 'downPaymentDue', el.value); return; }
@@ -1006,9 +1349,31 @@ function mnyAddMissedWeek(kid) {
   saveAll();
   showToast('Added the week of ' + mnyShortDate(wk));
 }
+/* ── A $3 week's record stays true to its money ──
+   A `defaulted` row is the record of money the rule already put in her wallet,
+   and finalizedWeeks says the same figure. Editing a field or removing the row
+   touched the record alone — the wallet kept the money and the week stayed
+   settled — and an edit also recomputed gross from the channels, which drops
+   the flat amount (it sits in no channel). Two answers to one question, the
+   defect this repo keeps recording. So a defaulted row is refused by BOTH
+   writers, not only hidden in the editor: its meets correct through the meet
+   itself (mnyLateCompSync keeps the row in step), and its flat amount is the
+   rule's. Hand-typed rows without `defaulted` keep the editor as they were. */
+function mnyDefaultedRowRefusal(row) {
+  return `That week was credited by ${row.defaultReason === 'grandma' ? 'the Grandma rule' : 'the flat default'}, and the money is already in her wallet — it is not edited here. To correct a meet, change the meet itself.`;
+}
+function mnyDefaultedWeekRows(r) {
+  const flat = money2(money2(r.gross) - money2(r.competition));
+  const label = r.defaultReason === 'grandma' ? '👵 Grandma rule' : 'No meeting — default';
+  return `<div class="mny-rows">
+      <div class="mny-row"><span>${label} ${mnyMoney(flat)} + meets ${mnyMoney(r.competition)}</span><b>${mnyMoney(r.net)}</b></div>
+    </div>
+    <div class="mny-note">Credited by the rule and already in her wallet, so it is not edited here. A meet is corrected through the meet itself, and this week follows it.</div>`;
+}
 function mnyEditLedger(kid, wk, field, delta) {
   ctEnsureShared();
   const row = ((state.shared.chore.moneyLedger || {})[wk] || {})[kid];
+  if (row && row.defaulted) { showToast(mnyDefaultedRowRefusal(row)); return; }
   // A settled week is frozen. It is a record of what was agreed, and editing it
   // after the fact would make every history in the app un-trustable.
   if (!row || !row.handEntered) { showToast('That week was settled at a meeting — it cannot be edited'); return; }
@@ -1022,6 +1387,7 @@ function mnyDeleteLedgerWeek(kid, wk) {
   ctEnsureShared();
   const led = state.shared.chore.moneyLedger || {};
   const row = (led[wk] || {})[kid];
+  if (row && row.defaulted) { showToast(mnyDefaultedRowRefusal(row)); return; }
   if (!row || !row.handEntered) { showToast('Only weeks you typed in can be removed'); return; }
   delete led[wk][kid];
   saveAll();

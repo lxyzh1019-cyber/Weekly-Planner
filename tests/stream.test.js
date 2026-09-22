@@ -68,6 +68,23 @@ function ev(dayKey, from, to, amount, kind) {
 
   check('what she has altogether is the pots added up',
     s.evWorthOf(list) === 120 ? true : String(s.evWorthOf(list)));
+
+  /* The Flow draws two groups under "where it went", and each caption must be
+     the sum of the bars under it. `outTotal` is what LEFT (fine, loan, spent);
+     `savedTotal` is what was put away to grow. The screen sums nothing itself,
+     so both are owned here — the caption that read "$0.00" above a $30 bar
+     was a caption computed from one set of rows sitting above another. */
+  check('what went out is exactly the rows that left',
+    f.outTotal === money2(f.dests.fine + f.dests.loan + f.dests.spent)
+      ? true : `outTotal ${f.outTotal}`);
+  check('what was put away to grow is its own total, not part of what went out',
+    f.savedTotal === 30 ? true : `savedTotal ${f.savedTotal}`);
+
+  // A typical month carries both, divided by the months that passed.
+  const typ = s.evTypicalMonthOf(list, '2026-08', '2026-09');
+  check('a typical month says what was put away, too',
+    typ.savedTotal === 15 && typ.outTotal === money2(typ.dests.fine + typ.dests.loan + typ.dests.spent)
+      ? true : JSON.stringify({ savedTotal: typ.savedTotal, outTotal: typ.outTotal, dests: typ.dests }));
 }
 
 // ── Moving money back out of a pot ────────────────────────────────
