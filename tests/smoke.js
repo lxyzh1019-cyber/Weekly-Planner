@@ -6620,7 +6620,7 @@ function findChromium() {
       // No loan is every pot open, and nobody is told she paid one off.
       mnyDebts('jenn').forEach(d => { d.principal = 0; d.paid = 0; });
       if (mnyPaidPct('jenn') !== 100) problems.push('nothing owed reads as ' + mnyPaidPct('jenn') + '% paid');
-      if (!mnyIsOpen('jenn', 90)) problems.push('a child with no loan has pots shut');
+      if (!mnyIsOpen('jenn', 'stock') || !mnyIsOpen('jenn', 'mix')) problems.push('a child with no loan has pots shut');
       mnyRenderSchool();
       if (/paid off/i.test(document.getElementById('mnySchoolWrap').querySelector('.mny-goal-row').textContent)) {
         problems.push('Money school tells a child with no loan she paid it off');
@@ -7241,11 +7241,11 @@ function findChromium() {
     const kid = 'jess', wk = ctWeekKey;
     const stage = mnyStageIndex(kid);
     mnyEnsureDraft(wk, kid);
-    mnyPickPlan('grow');                                 // needs 90% paid off
+    mnyPickPlan('grow');                                 // needs the 'stock' stage
     const refused = mnyDraft.planId !== 'grow';
     // and a preset's share of a locked bucket falls back to the debt
     const split = mnySplitFor(wk, kid, 'balanced');
-    const lockedGotNothing = !mnyIsOpen(kid, 60) ? money2(split.gic) === 0 : true;
+    const lockedGotNothing = !mnyIsOpen(kid, 'locked') ? money2(split.gic) === 0 : true;
     return stage < 3 && refused && lockedGotNothing;
   });
 
@@ -7327,14 +7327,14 @@ function findChromium() {
     const kid = 'jess', pd = getProfData(kid);
     delete pd.debts;
     const d = mnyDebts(kid)[0];
-    d.name = 'Ski loan'; d.paid = 280;                 // 35% of $800
+    d.name = 'Ski loan'; d.paid = 200;                 // 25% of $800 — past the 20% gate, short of 30%
     mnyOpenSchool(kid);
     const txt = () => document.getElementById('mnySchoolWrap').textContent;
     const namesHerDebt = txt().includes('Ski loan');
-    const atStage1 = mnyStageIndex(kid) === 1 && mnyPaidPct(kid) === 35;
+    const atStage1 = mnyStageIndex(kid) === 1 && mnyPaidPct(kid) === 25;
 
-    mnySchoolConcept = 'stock'; mnyRenderSchool();     // needs 90%
-    const lockedExplains = txt().includes('Opens at 90%')
+    mnySchoolConcept = 'stock'; mnyRenderSchool();     // the 'stock' stage, 40% by default
+    const lockedExplains = txt().includes('Opens at 40%')
       && /Pay off .* more and this one opens/.test(txt())
       && !txt().includes('buy a small piece');         // the body stays shut
 
@@ -7342,7 +7342,7 @@ function findChromium() {
     mrApplyEdits([{ path: 'school.unlockStage.jess', value: 4 }], { reason: 'family_meeting' });
     mnyRenderSchool();
     const unlockEarly = txt().includes('buy a small piece')
-      && mnyIsOpen(kid, 90);
+      && mnyIsOpen(kid, 'stock');
     mrApplyEdits([{ path: 'school.unlockStage.jess', value: 0 }], { reason: 'correct_error' });
     mnySchoolConcept = 'debt';
     delete pd.debts;
@@ -7831,15 +7831,15 @@ function findChromium() {
   // Spending is a real answer, open from week one, capped at a fifth.
   checks.spendingIsAnOptionAndCapped = await page.evaluate(() => {
     const kid = 'jess', wk = ctWeekKey;
-    const openFromTheStart = MNY_BUCKETS.find(b => b.key === 'spend').need === 0;
+    const openFromTheStart = MNY_BUCKETS.find(b => b.key === 'spend').stage === 'start';
     const inTheSplit = mnySplitFor(wk, kid, 'own').spend !== undefined;
     const pool = mnyPool(wk, kid);
     const capped = pool.spendCap === money2(pool.mine * 0.2);
     const explained = !!mnyConceptById('spend');
     // "Choose every number myself" is manual entry, not a stage-gated idea: the
     // steppers that do the same job sit unlocked directly beneath it.
-    const ownReachable = MNY_PLANS.find(p => p.id === 'own').need === 0
-      && mnyIsOpen(kid, MNY_PLANS.find(p => p.id === 'own').need);
+    const ownReachable = MNY_PLANS.find(p => p.id === 'own').stage === 'start'
+      && mnyIsOpen(kid, MNY_PLANS.find(p => p.id === 'own').stage);
     return openFromTheStart && inTheSplit && capped && explained && ownReachable;
   });
 
@@ -14484,6 +14484,544 @@ function findChromium() {
     }
     return bad.length === 0 || bad;
   });
+
+  /* ── PR B checks (Plan v6) ── begin
+     Each check snapshots the whole state and puts it back, so the checks after
+     it see the fixture exactly as it was. */
+
+  /* 👵 THE GRANDMA RULE — ONLY WEEKS WITH NO RECORD AT ALL, CREDITED ONCE.
+     `mnyWeekHasAnyRecord` is the one owner of "was any MONEY recorded for her
+     this week". It is checked STORE BY STORE: one record in one store, and
+     that store — and only that store — must be what it reports. A store it
+     forgot would let the Grandma rule pay a flat amount on top of a week's own
+     numbers. Then the rule itself: the preview lists exactly the empty weeks
+     and counts the rest as skipped, running it twice credits once, the rows
+     read "Grandma rule", and no typed date reaches this week or a later one. */
+  checks.theGrandmaRuleCreditsOnlyEmptyWeeksOnce = await page.evaluate(async () => {
+    const bad = [];
+    const snap = JSON.stringify(state);
+    const put = () => { const s = JSON.parse(snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s); };
+    const was = { profile, parentViewing, showConfirm: window.showConfirm, section: mnyParentSection, draft: mnyGrandmaDraft };
+    try {
+      profile = 'parent'; parentViewing = 'jenn';
+      ctPrepareRead();
+      const W = '2025-01-06';                       // a Monday long before anything on file
+      const day = (n) => { const d = formatDayKey(W); d.setDate(d.getDate() + n); return ctDateToKey(d); };
+      const P = (k) => getProfData(k);
+      const C = () => state.shared.chore;
+      /* MONEY records only — the owner: "skips any week already settled AND any
+         week holding real graded chores, meets or gifts". One fixture per KEPT
+         store; each must block the week on its own. */
+      const seed = {
+        finalizedWeeks:   () => { C().finalizedWeeks = { [W]: { jenn: 4 } }; },
+        moneyLedger:      () => { C().moneyLedger = { [W]: { jenn: { net: 1 } } }; },
+        moneySnapshots:   () => { C().moneySnapshots = { [W]: { jenn: 2 } }; },
+        groupPayoutsFired:() => { C().groupPayoutsFired = { [W]: { g1: { jenn: { weekly: true, total: 1 } } } }; },
+        meetingsHeld:     () => { C().meetingsHeld = { [W]: true }; },
+        earnings:         () => { P('jenn').earnings = { [W]: { chores: { 0: { bins: 3 } } } }; },
+        competitions:     () => { P('jenn').competitions = [{ id: 'c1', dayKey: day(5), sport: 'swim' }]; },
+        fines:            () => { P('jenn').fines = [{ id: 'f1', dayKey: day(3), itemId: 'tone' }]; },
+        deposits:         () => { P('jenn').deposits = [{ id: 'd1', weekKey: W, dayKey: day(1), amount: 20 }]; },
+        events:           () => { P('jenn').events = [{ id: 'e1', dayKey: day(6), amount: 1 }]; },
+      };
+      const FAMILY = ['meetingsHeld'];
+      const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+      if (!eq(mnyWeekRecordStores(W, 'jenn'), []) || !eq(mnyWeekRecordStores(W, 'jess'), [])) {
+        bad.push('the fixture week is not empty to begin with: ' + mnyWeekRecordStores(W, 'jenn').join(', '));
+      }
+      MNY_WEEK_RECORD_STORES.forEach(store => {
+        put(); profile = 'parent';
+        if (!seed[store]) { bad.push('no fixture for the store "' + store + '" — this check cannot vouch for it'); return; }
+        seed[store]();
+        const got = mnyWeekRecordStores(W, 'jenn');
+        if (!eq(got, [store])) bad.push(`a record in ${store} read as [${got.join(', ')}]`);
+        const sis = mnyWeekRecordStores(W, 'jess');
+        const want = FAMILY.indexOf(store) >= 0 ? [store] : [];
+        if (!eq(sis, want)) bad.push(`a record of Jenn's in ${store} read as her sister's too: [${sis.join(', ')}]`);
+      });
+      // Every money-bearing part of the earnings map blocks on its own.
+      [['learning', { 0: { reading: 2 } }], ['overrides', { chores: { value: 4, reason: 'fixing', at: 1 } }]].forEach(([k, v]) => {
+        put(); profile = 'parent';
+        P('jenn').earnings = { [W]: { [k]: v } };
+        if (!eq(mnyWeekRecordStores(W, 'jenn'), ['earnings'])) bad.push(`earnings.${k} did not count as a money record`);
+      });
+      Object.keys(seed).forEach(k => { if (MNY_WEEK_RECORD_STORES.indexOf(k) < 0) bad.push('the fixture names a store the owner does not list: ' + k); });
+      // Things that are NOT records.
+      put(); profile = 'parent';
+      mrEnsureEarnings('jenn', W);                               // an empty week, opened by a read
+      P('jenn').weeks = Object.assign({}, P('jenn').weeks, { [day(1)]: [{ id: 'p', actId: 'piano' }] });   // only planned
+      P('jenn').earnings[W].missing = ['learning'];
+      if (mnyWeekHasAnyRecord(W, 'jenn')) bad.push('a planned block, an empty earnings map or a "missing" list counted as a record: ' + mnyWeekRecordStores(W, 'jenn').join(', '));
+      /* A week she lived in the PLANNER — blocks ticked done, a block a grown-up
+         confirmed — but where nothing was recorded money-wise is exactly the
+         week the Grandma rule is for. The owner: "skips any week already
+         settled AND any week holding real graded chores, meets or gifts". */
+      put(); profile = 'parent';
+      P('jenn').weeks = Object.assign({}, P('jenn').weeks, {
+        [day(1)]: [{ id: 'd1', actId: 'piano', completed: true }],
+        [day(3)]: [{ id: 'd3', actId: 'training', confirmed: true }],
+      });
+      if (mnyWeekHasAnyRecord(W, 'jenn')) bad.push('a week holding only ticked or confirmed planner blocks counted as a record: ' + mnyWeekRecordStores(W, 'jenn').join(', '));
+      const ticked = mnyDefaultSweepPlan({ reason: 'grandma', from: W, to: W, amount: 3 });
+      if (!ticked.weeks.some(w => w.wk === W && w.kids.indexOf('jenn') >= 0)) bad.push('the Grandma rule would not credit a week holding only ticked planner blocks');
+      /* A week holding ONLY what is deliberately not a money record — XP, a
+         reflection, a closed week, a day review, a plan and its confirm, goals,
+         routine ticks, ticked blocks, her note, the sitting-down mark, a boxed
+         item, a move she asked for, and the non-money parts of earnings — IS
+         credited, for both girls. */
+      put(); profile = 'parent';
+      ['jenn', 'jess'].forEach(k => {
+        const p = P(k);
+        p.progress = Object.assign({}, p.progress, { xpByWeek: { [W]: 40 } });
+        p.weekFeedback = { [W]: 'Busy week' };
+        p.chore = Object.assign({}, p.chore, { mandatoryByWeek: { [W]: { 0: { morning: true } } }, optionalByWeek: { [W]: { 1: { Bins: true } } } });
+        p.weeks = Object.assign({}, p.weeks, { [day(2)]: [{ id: 'z' + k, actId: 'piano', completed: true, confirmed: true }] });
+        p.boxItems = [{ id: 'bx' + k, dayKey: day(4), label: 'shoe' }];
+        p.moveRequests = [{ id: 'mv' + k, dayKey: day(0), amount: 1 }];
+        p.earnings = { [W]: { claims: { 0: { bins: 3 } }, attitude: { 0: { self: 4 } }, personal: { 0: { bed: 'done' } }, sick: { 2: true }, missing: ['learning'] } };
+      });
+      Object.assign(C(), {
+        xpAwardedWeeks: { [W]: { jenn: 10, jess: 10 } },
+        reflections: { [W]: { jenn: { went: 'a' }, jess: { went: 'b' } } },
+        weeksClosed: { [W]: { at: 1 } },
+        weekPlans: { [W]: { jenn: { planId: 'debt' }, jess: { planId: 'debt' } } },
+        weekConfirms: { [W]: { jenn: { at: 1 }, jess: { at: 1 } } },
+        goalsByWeek: { [W]: { jenn: 'Read', jess: 'Swim' } },
+        goalBonusByWeek: { [W]: { jenn: true, jess: true } },
+        meetingsMet: { [W]: true },
+      });
+      state.shared.parentDayConfirm = { jenn: { [day(1)]: true }, jess: { [day(1)]: true } };
+      ['jenn', 'jess'].forEach(k => {
+        if (mnyWeekHasAnyRecord(W, k)) bad.push(`a week holding only non-money marks counted as a record for ${mnyKidName(k)}: ${mnyWeekRecordStores(W, k).join(', ')}`);
+      });
+      const marks = mnyDefaultSweepPlan({ reason: 'grandma', from: W, to: W, amount: 3 });
+      const credited = ((marks.weeks.find(w => w.wk === W) || {}).kids || []).join(',');
+      if (credited !== 'jenn,jess') bad.push('the Grandma rule would not credit a week holding only non-money marks: [' + credited + ']');
+
+      /* The rule itself, over twelve weeks with records in three of them. */
+      put(); profile = 'parent';
+      const c = C();
+      c.finalizedWeeks = {}; c.moneyLedger = {}; c.meetingsHeld = {};
+      const from = '2025-01-06', to = '2025-03-30';               // 12 Mondays: 6 Jan … 24 Mar
+      const wkN = (n) => { const d = formatDayKey(from); d.setDate(d.getDate() + 7 * n); return ctDateToKey(d); };
+      P('jenn').fines = [{ id: 'f9', dayKey: wkN(2), itemId: 'tone' }];         // Jenn only
+      c.meetingsHeld = { [wkN(5)]: true };                                        // both
+      P('jess').deposits = [{ id: 'd9', weekKey: wkN(7), dayKey: wkN(7), amount: 5 }]; // Jess only
+      const plan = mnyDefaultSweepPlan({ reason: 'grandma', from, to, amount: 3 });
+      const jennWeeks = plan.weeks.filter(w => w.kids.indexOf('jenn') >= 0).map(w => w.wk);
+      const jessWeeks = plan.weeks.filter(w => w.kids.indexOf('jess') >= 0).map(w => w.wk);
+      if (jennWeeks.length !== 10 || jennWeeks.indexOf(wkN(2)) >= 0 || jennWeeks.indexOf(wkN(5)) >= 0) bad.push('Jenn\'s weeks are not exactly the empty ones: ' + jennWeeks.join(', '));
+      if (jessWeeks.length !== 10 || jessWeeks.indexOf(wkN(7)) >= 0 || jessWeeks.indexOf(wkN(5)) >= 0) bad.push('Jess\'s weeks are not exactly the empty ones: ' + jessWeeks.join(', '));
+      if (plan.skipped.jenn !== 2 || plan.skipped.jess !== 2) bad.push(`skipped ${plan.skipped.jenn}/${plan.skipped.jess}, expected 2/2`);
+      if (plan.perKid.jenn !== 30 || plan.perKid.jess !== 30 || plan.total !== 60) bad.push(`totals ${plan.perKid.jenn}/${plan.perKid.jess}/${plan.total}, expected 30/30/60`);
+
+      // The card previews it, and names the skipped weeks.
+      mnyGrandmaDraft = { from, to, amount: 3 };
+      showScreen('parent'); setParentTab('money'); mnyParentSection = 'grandma'; mnyRenderRulesTab();
+      const cardTxt = document.getElementById('mnyRulesWrap').textContent.replace(/\s+/g, ' ');
+      if (!/Grandma rule/.test(cardTxt) || !/2 skipped, they hold records/.test(cardTxt) || !/\$60\.00/.test(cardTxt)) {
+        bad.push('the Grandma card does not preview the total and the skipped weeks: ' + cardTxt.slice(0, 200));
+      }
+      // Only in its own section: Week history no longer carries the sweep.
+      mnyParentSection = 'history'; mnyRenderRulesTab();
+      if (/Weeks nobody sat down for|Grandma rule —/.test(document.getElementById('mnyRulesWrap').textContent)) bad.push('Week history still carries the sweep card');
+
+      window.showConfirm = async () => true;
+      const before = { jenn: ensureWallet('jenn').cash, jess: ensureWallet('jess').cash };
+      await mnyRunDefaultSweep({ reason: 'grandma', from, to, amount: 3 });
+      const moved = money2((ensureWallet('jenn').cash - before.jenn) + (ensureWallet('jess').cash - before.jess));
+      if (moved !== 60) bad.push(`it credited ${moved}, the preview said 60`);
+      const row = (c.moneyLedger[wkN(0)] || {}).jenn;
+      if (!row || !row.defaulted || row.defaultReason !== 'grandma' || !row.handEntered) bad.push('a Grandma row is not labelled: ' + JSON.stringify(row));
+      if ((c.moneyLedger[wkN(2)] || {}).jenn) bad.push('a week with a fine in it was credited');
+      await mnyRunDefaultSweep({ reason: 'grandma', from, to, amount: 3 });
+      const again = money2((ensureWallet('jenn').cash - before.jenn) + (ensureWallet('jess').cash - before.jess));
+      if (again !== 60) bad.push('a second run credited again: ' + again);
+
+      // Both histories say "Grandma rule", never "nobody met".
+      mnyParentSection = 'history'; mnyRenderRulesTab();
+      const hist = document.getElementById('mnyRulesWrap').textContent;
+      if (!/Grandma rule/.test(hist)) bad.push('the parent week history does not say "Grandma rule"');
+      profile = 'jenn'; mnyOpenStory();
+      const story = document.getElementById('mnyStoryWrap').textContent;
+      if (!/Grandma rule/.test(story)) bad.push('her money story does not say "Grandma rule"');
+      profile = 'parent';
+
+      // Whatever dates are typed, never this week, a later one, or the catch-up reach.
+      const next = formatDayKey(ctThisWeekKey()); next.setDate(next.getDate() + 400);
+      const wide = mnyDefaultSweepPlan({ reason: 'grandma', from: '2024-01-01', to: ctDateToKey(next), amount: 3 });
+      const thisWk = ctThisWeekKey();
+      const reach = new Set(mmUnsettledWeeks(8).map(u => u.wk));
+      if (wide.weeks.some(w => String(w.wk) >= String(thisWk))) bad.push('a typed future date reached this week or later');
+      if (wide.weeks.some(w => reach.has(w.wk))) bad.push('a typed date reached a week the catch-up list still settles');
+      if (!(String(wide.latest) < String(thisWk))) bad.push('the newest week it may name is not in the past: ' + wide.latest);
+
+      // Defaults, and nothing stored.
+      mnyGrandmaDraft = null;
+      const f = mnyGrandmaForm();
+      if (f.from !== String(mrStartWeek()) || f.to !== mnyLastMay30(todayKey()) || f.amount !== MNY_DEFAULT_WEEK) bad.push('the form defaults are wrong: ' + JSON.stringify(f));
+      if (mnyLastMay30('2026-09-22') !== '2026-05-30' || mnyLastMay30('2026-05-29') !== '2025-05-30' || mnyLastMay30('2026-05-30') !== '2026-05-30') bad.push('"the most recent 30 May" is worked out wrong');
+      mnyParentSection = 'grandma'; mnyRenderRulesTab();
+      const stateBefore = JSON.stringify(state);
+      const inp = document.querySelector('#mnyRulesWrap [data-mnyp-action="gmfrom"]');
+      if (!inp) bad.push('the Grandma card has no from-date field');
+      else { inp.value = '2025-02-03'; inp.dispatchEvent(new Event('change', { bubbles: true })); }
+      document.querySelector('#mnyRulesWrap [data-mnyp-action="gmamt"][data-mnyp-d="0.5"]').click();
+      if (mnyGrandmaDraft.from !== '2025-02-03' || mnyGrandmaDraft.amount !== 3.5) bad.push('the form does not follow what was typed: ' + JSON.stringify(mnyGrandmaDraft));
+      if (JSON.stringify(state) !== stateBefore) bad.push('typing into the Grandma form wrote to the synced state');
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      window.showConfirm = was.showConfirm;
+      put();
+      profile = was.profile; parentViewing = was.parentViewing; mnyParentSection = was.section; mnyGrandmaDraft = was.draft;
+      saveLocal();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* 🌟 DANCE IS "SKATING STAR LEVEL" ON EVERY MONEY SURFACE.
+     A relabel: the rule key `competition.dance`, the sport id and the scorer
+     are unchanged, so a result already recorded reads under the new name.
+     Scoped to money surfaces — the activity catalog may hold a real dance
+     class, and that is not this. Reads what a person reads: text, and the
+     placeholder / aria-label / title attributes. */
+  checks.danceReadsAsSkatingStarLevel = await page.evaluate(() => {
+    const bad = [];
+    const snap = JSON.stringify(state);
+    const put = () => { const s = JSON.parse(snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s); };
+    const was = { profile, parentViewing, section: mnyParentSection, compOpen: mnyCompOpen, compDraft: mnyCompDraft,
+                  mnyKid, prices: mnyPricesOpen() };
+    const read = (el) => el ? [el.textContent].concat([...el.querySelectorAll('[placeholder],[aria-label],[title]')]
+      .map(x => [x.getAttribute('placeholder'), x.getAttribute('aria-label'), x.getAttribute('title')].join(' '))).join(' ') : '';
+    const html = (h) => { const d = document.createElement('div'); d.innerHTML = h; return d; };
+    const noDance = (name, el) => {
+      const t = read(el);
+      if (!el) bad.push(name + ': not rendered');
+      else if (/dance/i.test(t)) bad.push(name + ' says "' + (t.match(/.{0,30}dance.{0,30}/i) || [''])[0].trim() + '"');
+    };
+    try {
+      profile = 'parent'; parentViewing = 'jenn'; mnyKid = 'jenn';
+      ctPrepareRead();
+      if (!ctWeekKey) ctSetCurrentWeekFromPlanner();
+      const wk = ctWeekKey || ctThisWeekKey();
+      // A result recorded as the old sport id, this month.
+      const e = mrAddCompetition('jenn', { dayKey: todayKey(), sport: 'dance', name: '', danceItems: { silver: 2, gold: 1 } });
+      if (!e || e.sport !== 'dance') bad.push('the sport id is no longer `dance`');
+      if (e && e.awarded !== mrScoreCompetition({ sport: 'dance', dayKey: e.dayKey, danceItems: { silver: 2, gold: 1 } })) bad.push('the scorer moved');
+      showScreen('parent'); setParentTab('money');
+      MNY_PARENT_SECTIONS.forEach(sec => { mnyParentSection = sec.id; mnyRenderRulesTab(); noDance('Money rules › ' + sec.label, document.getElementById('mnyRulesWrap')); });
+      mnyParentSection = 'prices'; mnyRenderRulesTab();
+      if (!/Skating star level — per Silver item/.test(document.getElementById('mnyRulesWrap').textContent)) bad.push('the price editor does not name "Skating star level"');
+      noDance('the kid price list', html(pmPriceCards(mrRules())));
+      if (!/Skating star level/.test(html(pmPriceCards(mrRules())).textContent)) bad.push('the kid price list does not name "Skating star level"');
+      noDance('the recorded meet on the parent chore page', html(cpCompetition()));
+      mnyCompOpen = false;
+      const listed = html(mnyCompetitionForm(wk, 'jenn'));
+      noDance('the meeting\'s recorded results', listed);
+      if (!/Skating star level/.test(listed.textContent)) bad.push('a recorded star test does not read "Skating star level" at the meeting');
+      mnyCompOpen = true; mnyCompDraft = Object.assign(mmSeedCompDraft(wk, 'jenn'), { sport: 'dance' });
+      const form = html(mnyCompetitionForm(wk, 'jenn'));
+      noDance('the meeting\'s competition form', form);
+      if (!/Skating star level/.test(form.textContent)) bad.push('the meeting form does not offer "Skating star level"');
+      openRecordSheet({ kind: 'meet', kid: 'jenn', sport: 'dance' });
+      const sheet = document.getElementById('recordOverlay');
+      noDance('the Record sheet', sheet);
+      if (!sheet.querySelector('[data-rc-action="sport"][data-rc-id="dance"]') || !/Skating star level/.test(sheet.textContent)) bad.push('the Record sheet does not offer "Skating star level" by name');
+      closeRecordSheet();
+      profile = 'jenn';
+      mnySetPricesOpen(true);
+      mnyOpenMyMoney('jenn');
+      noDance('My money', document.getElementById('mnyPage1Wrap'));
+      mnyOpenStory();
+      noDance('My money story', document.getElementById('mnyStoryWrap'));
+      mnyOpenSchool('jenn');
+      noDance('Money school', document.getElementById('mnySchoolWrap'));
+    } catch (err) {
+      bad.push('threw: ' + err.message);
+    } finally {
+      if (typeof rcDraft !== 'undefined' && rcDraft) closeRecordSheet();
+      put();
+      profile = was.profile; parentViewing = was.parentViewing; mnyParentSection = was.section;
+      mnyCompOpen = was.compOpen; mnyCompDraft = was.compDraft; mnyKid = was.mnyKid; mnySetPricesOpen(was.prices);
+      saveLocal();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* 🎿 THE LOAN-SEASON ROW ON NOW — from the date, nothing stored.
+     `todayKey` is the app's one clock; it is stubbed here, which is the clock
+     `pnLoanSeason` reads. 31 Jul hidden · 1 Aug shown · 30 Sep shown · 1 Oct
+     hidden · hidden once a loan is recorded on or after 1 Jul. */
+  checks.theLoanSeasonRowFollowsTheCalendar = await page.evaluate(() => {
+    const bad = [];
+    const snap = JSON.stringify(state);
+    const put = () => { const s = JSON.parse(snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s); };
+    const was = { profile, todayKey: window.todayKey, section: mnyParentSection };
+    const at = (day) => { window.todayKey = () => day; return pnLoanSeason(); };
+    try {
+      profile = 'parent';
+      const old = formatDayKey('2025-06-01').getTime();
+      ['jenn', 'jess'].forEach(k => mnyDebts(k).forEach(d => { d.createdAt = old; }));
+      const stored = JSON.stringify(state);
+      if (at('2026-07-31')) bad.push('shown on 31 Jul');
+      if (!at('2026-08-01')) bad.push('hidden on 1 Aug');
+      if (!at('2026-09-30')) bad.push('hidden on 30 Sep');
+      if (at('2026-10-01')) bad.push('shown on 1 Oct');
+      if (!at('2027-08-15')) bad.push('hidden in August of another year');
+      if (JSON.stringify(state) !== stored) bad.push('working it out wrote to the synced state');
+      const row = at('2026-08-01') || {};
+      if (!/stage/.test(row.sub || '') || !/Open a stage early/.test(row.sub || '') || !/sports loan/.test(row.title || '')) bad.push('the row does not say what recording a loan does: ' + JSON.stringify(row));
+      // Drawn on Now, and it routes to Money rules › Loans.
+      showScreen('parent'); setParentTab('now'); pnRenderNow();
+      const btn = document.querySelector('#pnWrap [data-pn-action="loans"]');
+      if (!btn) bad.push('the row is not on Now on 1 Aug');
+      else { btn.click(); if (!(parentTab === 'money' && mnyParentSection === 'debts')) bad.push('it did not open Money rules › Loans'); }
+      // A loan recorded before 1 Jul does not count; one on or after does.
+      mnyDebts('jess').push(mnyNormalizeDebt({ id: 'debt-june', name: 'June', principal: 10, createdAt: formatDayKey('2026-06-30').getTime() }));
+      if (!at('2026-08-01')) bad.push('a loan from 30 Jun hid the row');
+      mnyDebts('jess').push(mnyNormalizeDebt({ id: 'debt-july', name: 'July', principal: 10, createdAt: formatDayKey('2026-07-01').getTime() }));
+      if (at('2026-08-01')) bad.push('still shown after a loan was recorded on 1 Jul');
+      if (at('2026-09-30')) bad.push('still shown on 30 Sep after a loan was recorded');
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      window.todayKey = was.todayKey;
+      put();
+      profile = was.profile; mnyParentSection = was.section;
+      saveLocal();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* 🚪 THE GATES — ONE TABLE, AND EVERY SURFACE AGREES AT EVERY PERCENT.
+     (a) Paid-off share swept 0 → 100: for every stage, the ladder row in Money
+         school, the pots behind it (the move gate and the Sunday split's gate)
+         and the lessons behind it (the concept card and its chip) must say the
+         same thing — and it must be the table's answer: ready 20 · locked 30 ·
+         stock 40 · mix 100.
+     (b) The 1 Oct fixture: $300 of $1,000 and $240 of $800 both open Keep it
+         ready and Lock it away, and not Buy a bit of a company.
+     (c) A stepper in Money rules › Lessons lands as a dated, logged rule version
+         and moves the gate; a save that breaks the order is refused in the
+         handler with a sentence.
+     Plus: a stored rulebook without `stagePct` reads the defaults and is not
+     migrated, and the parent override still opens stages. */
+  checks.theGatesComeFromOneTable = await page.evaluate(() => {
+    const bad = [];
+    const snap = JSON.stringify(state);
+    const put = () => { const s = JSON.parse(snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s); };
+    const was = { profile, parentViewing, section: mnyParentSection, toast: window.showToast, school: mnySchoolConcept };
+    const toasts = [];
+    const html = (h) => { const d = document.createElement('div'); d.innerHTML = h; return d; };
+    const oneDebt = (kid, principal, paid) => {
+      const p = getProfData(kid); delete p.debts;
+      const d = mnyDebts(kid)[0]; d.principal = principal; d.paid = paid;
+    };
+    const HOME = { ready: 'ready', gic: 'locked', stock: 'invest' };
+    try {
+      profile = 'parent'; parentViewing = 'jess';
+      window.showToast = (m) => { toasts.push(String(m)); };
+      const r = mrRules();
+      r.school = Object.assign({}, r.school, { unlockStage: { jenn: 0, jess: 0 } });
+      const want = { start: 0, ready: 20, locked: 30, stock: 40, mix: 100 };
+      MNY_STAGES.forEach(s => { if (mnyStagePct(s.id) !== want[s.id]) bad.push(`${s.id} opens at ${mnyStagePct(s.id)}%, the table says ${want[s.id]}%`); });
+      [MNY_BUCKETS, MNY_PLANS, MNY_CONCEPTS].forEach((t, ti) => t.forEach(x => {
+        if (mnyStageIndexOf(x.stage) < 0) bad.push(`${['a pot', 'a plan', 'a lesson'][ti]} (${x.key || x.id}) names no stage: ${x.stage}`);
+        if ('need' in x) bad.push(`${x.key || x.id} still carries its own number`);
+      }));
+      // (a)
+      const kid = 'jess';
+      for (let pct = 0; pct <= 100; pct++) {
+        oneDebt(kid, 1000, pct * 10);
+        const idx = mnyStageIndex(kid);
+        // The row's verdict is its <b>; the title itself may carry a 🔒 icon.
+        const ladder = [...html(mnyLadderCard(kid, mnyPaidPct(kid), idx)).querySelectorAll('.mny-rows .mny-row')]
+          .map(row => !/🔒/.test((row.querySelector('b') || {}).textContent || ''));
+        const chips = {};
+        html(mnyConceptPanel(kid)).querySelectorAll('[data-mny-concept]').forEach(ch => {
+          chips[ch.getAttribute('data-mny-concept')] = !ch.classList.contains('locked');
+        });
+        MNY_STAGES.forEach((s, i) => {
+          const expect = pct >= want[s.id];
+          const says = { ladder: ladder[i] };
+          MNY_BUCKETS.filter(b => b.stage === s.id).forEach(b => {
+            says['pot ' + b.key] = mnyIsOpen(kid, b.stage);
+            if (HOME[b.key]) says['move to ' + HOME[b.key]] = evHomeOpen(kid, HOME[b.key]);
+          });
+          MNY_CONCEPTS.filter(c => c.stage === s.id).forEach(c => {
+            says['lesson ' + c.id] = mnyConceptCard(c.id, kid).open;
+            says['chip ' + c.id] = chips[c.id];
+          });
+          const wrong = Object.keys(says).filter(k => says[k] !== expect);
+          if (wrong.length && bad.length < 12) bad.push(`at ${pct}% the ${s.id} stage should be ${expect ? 'open' : 'shut'}; ${wrong.join(', ')} disagree`);
+        });
+        // Each pot against the lesson its "?" opens (MNY_ASK): a pot naming the
+        // wrong stage agrees with its own stage's ladder row and still
+        // disagrees with the idea that explains it.
+        MNY_BUCKETS.forEach(b => {
+          const lesson = MNY_ASK[b.key] && mnyConceptCard(MNY_ASK[b.key], kid);
+          if (lesson && lesson.open !== mnyIsOpen(kid, b.stage) && bad.length < 12) {
+            bad.push(`at ${pct}% the pot "${b.label}" is ${mnyIsOpen(kid, b.stage) ? 'open' : 'shut'} and its lesson is not`);
+          }
+        });
+      }
+      // (b)
+      [['jenn', 1000, 300], ['jess', 800, 240]].forEach(([k, principal, paid]) => {
+        oneDebt(k, principal, paid);
+        const open = { ready: evHomeOpen(k, 'ready'), locked: evHomeOpen(k, 'locked'), invest: evHomeOpen(k, 'invest') };
+        if (!open.ready || !open.locked || open.invest) bad.push(`1 Oct, ${mnyKidName(k)} at $${paid} of $${principal}: ${JSON.stringify(open)}`);
+      });
+      // A rulebook stored before the field existed: defaults, and no migration.
+      const live = mrRules();
+      const hadPct = live.school.stagePct;
+      delete live.school.stagePct;
+      if (mnyStagePct('ready') !== 20 || mnyStagePct('locked') !== 30 || mnyStagePct('stock') !== 40 || mnyStagePct('mix') !== 100) bad.push('a rulebook without stagePct does not read the defaults');
+      oneDebt('jenn', 1000, 300); mnyStageIndex('jenn');
+      if ('stagePct' in mrRules().school) bad.push('reading the gates migrated the stored rulebook');
+      live.school.stagePct = hadPct;
+      // The override still opens a stage, and only opens.
+      oneDebt('jenn', 1000, 0);
+      live.school.unlockStage = { jenn: 3, jess: 0 };
+      if (!mnyIsOpen('jenn', 'stock') || mnyIsOpen('jenn', 'mix')) bad.push('the parent override no longer opens stages');
+      live.school.unlockStage = { jenn: 0, jess: 0 };
+      // (c)
+      oneDebt('jess', 1000, 250);                                         // 25%: ready is open at 20
+      if (!mnyIsOpen('jess', 'ready')) bad.push('25% should open Keep it ready at the default gates');
+      showScreen('parent'); setParentTab('money'); mnyParentSection = 'lessons'; mnyPending = []; mnyRenderRulesTab();
+      const logBefore = mrLogEntries().length;
+      const plus = (id) => document.querySelector(`#mnyRulesWrap [data-mnyp-action="stagepct"][data-mnyp-id="${id}"][data-mnyp-d="5"]`);
+      if (!plus('ready')) bad.push('Lessons has no gate steppers');
+      else {
+        plus('ready').click(); plus('ready').click();                    // 20 → 30
+        const p = mnyPending.find(x => x.path === 'school.stagePct.ready');
+        if (!p || p.value !== 30) bad.push('the stepper did not queue ready at 30: ' + JSON.stringify(mnyPending));
+        toasts.length = 0;
+        plus('ready').click();                                            // 35 > locked 30: refused
+        if ((mnyPending.find(x => x.path === 'school.stagePct.ready') || {}).value !== 30) bad.push('a stepper put ready after locked');
+        if (!toasts.some(t => /cannot open after/.test(t))) bad.push('the refused step said nothing: ' + toasts.join(' | '));
+        document.querySelector('#mnyRulesWrap [data-mnyp-action="save"]').click();
+        if (mnyStagePct('ready') !== 30) bad.push('the saved gate did not take: ready is ' + mnyStagePct('ready'));
+        const logged = mrLogEntries().filter(x => x.path === 'school.stagePct.ready');
+        if (mrLogEntries().length <= logBefore || !logged.length || !logged[0].versionId || !logged[0].effectiveFrom) bad.push('the change is not a dated, logged rule version');
+        if (mnyIsOpen('jess', 'ready')) bad.push('the gate did not move: 25% still opens Keep it ready at a 30% gate');
+        // The save handler refuses a broken order however the list was built.
+        const vBefore = JSON.stringify(mrLatestVersion().rules.school);
+        toasts.length = 0;
+        mnyPending = [{ path: 'school.stagePct.stock', value: 10, label: 'x' }];
+        mnyRenderRulesTab();
+        document.querySelector('#mnyRulesWrap [data-mnyp-action="save"]').click();
+        if (JSON.stringify(mrLatestVersion().rules.school) !== vBefore) bad.push('the save handler let stock open before ready');
+        if (!toasts.some(t => /cannot open after/.test(t))) bad.push('the refused save said nothing: ' + toasts.join(' | '));
+      }
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      window.showToast = was.toast;
+      mnyPending = []; mnyPendingFrom = null;
+      put();
+      profile = was.profile; parentViewing = was.parentViewing; mnyParentSection = was.section; mnySchoolConcept = was.school;
+      saveLocal();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* 🔓 A MOMENT WHEN A POT OPENS — on her own My money, remembered per device.
+     seen=0, stage rises to 2 → one card naming both new pots and each new
+     idea's what / why / what-to-watch from MNY_CONCEPTS; "Got it" → gone;
+     drawn again (a fresh read of localStorage) → still gone; a first-ever
+     load at stage 2 → no card; a grown-up viewing her page → no card and
+     nothing recorded; storage that throws → the page still draws. */
+  checks.aPotOpeningIsAMoment = await page.evaluate(() => {
+    const bad = [];
+    const snap = JSON.stringify(state);
+    const put = () => { const s = JSON.parse(snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s); };
+    const KEY = MNY_STAGE_SEEN_LS_PREFIX + 'jenn';
+    const lsBefore = localStorage.getItem(KEY);
+    const was = { profile, mnyKid, getItem: Storage.prototype.getItem };
+    const card = () => document.querySelector('#mnyPage1Wrap [data-mny-action="stage-seen"]');
+    const cardText = () => { const b = card(); return b ? b.closest('.mny-card').textContent : ''; };
+    const setDebt = (paid) => { const p = getProfData('jenn'); delete p.debts; const d = mnyDebts('jenn')[0]; d.principal = 1000; d.paid = paid; };
+    try {
+      const r = mrRules();
+      r.school = Object.assign({}, r.school, { unlockStage: { jenn: 0, jess: 0 } });
+      profile = 'jenn';
+      setDebt(0);
+      localStorage.setItem(KEY, '0');
+      setDebt(300);                                                      // 30% → stage 2 (locked)
+      if (mnyStageIndex('jenn') !== 2) bad.push('the fixture is not at stage 2: ' + mnyStageIndex('jenn'));
+      mnyOpenMyMoney('jenn');
+      if (!card()) bad.push('no card when her stage rose from 0 to 2');
+      const t = cardText();
+      ['Keep it ready', 'Lock it away for a year'].forEach(p => { if (t.indexOf(p) < 0) bad.push('the card does not name ' + p); });
+      if (/Buy a bit of a company/.test(t)) bad.push('the card names a pot that is still shut');
+      ['ready', 'save', 'gic'].forEach(id => {
+        const c = mnyConceptCard(id, 'jenn');
+        [c.what, c.why, c.risk].forEach(line => { if (t.indexOf(line) < 0) bad.push(`the card leaves out ${id}: "${line.slice(0, 40)}"`); });
+      });
+      if (card()) card().click();
+      if (card()) bad.push('"Got it" did not close the card');
+      if (localStorage.getItem(KEY) !== '2') bad.push('"Got it" did not record stage 2: ' + localStorage.getItem(KEY));
+      mnyRenderMyMoney();
+      if (card()) bad.push('the card came back on the next drawing');
+      // First sight at stage 2: silent.
+      localStorage.removeItem(KEY);
+      mnyRenderMyMoney();
+      if (card()) bad.push('a first-ever load announced a pot opened long ago');
+      if (localStorage.getItem(KEY) !== '2') bad.push('the first sight did not record the current stage');
+      // A grown-up looking at her page: no card, nothing recorded.
+      localStorage.setItem(KEY, '0');
+      profile = 'parent'; mnyKid = 'jenn';
+      mnyOpenMyMoney('jenn');
+      if (card()) bad.push('a grown-up viewing her page was shown her card');
+      if (localStorage.getItem(KEY) !== '0') bad.push('a grown-up viewing her page changed what she has seen');
+      // Storage that throws for this key: the page still draws, with no card.
+      // (Scoped to the key this card owns; other toggles on the page read
+      // storage their own way.)
+      profile = 'jenn';
+      Storage.prototype.getItem = function (k) {
+        if (String(k).indexOf(MNY_STAGE_SEEN_LS_PREFIX) === 0) throw new Error('blocked');
+        return was.getItem.call(this, k);
+      };
+      try { mnyRenderMyMoney(); } catch (e) { bad.push('My money threw when storage is blocked: ' + e.message); }
+      Storage.prototype.getItem = was.getItem;
+      if (!document.getElementById('mnyPage1Wrap').textContent.trim()) bad.push('My money drew nothing with storage blocked');
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      Storage.prototype.getItem = was.getItem;
+      if (lsBefore == null) localStorage.removeItem(KEY); else localStorage.setItem(KEY, lsBefore);
+      put();
+      profile = was.profile; mnyKid = was.mnyKid;
+      saveLocal();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* 🏷 THE BUILD STAMP — on the parent portal's App landing, from APP_BUILD.
+     tests/check-sw-shell.js holds APP_BUILD equal to sw.js's SW_VERSION; this
+     holds the page to showing it, to a grown-up only. */
+  checks.theAppLandingShowsTheBuild = await page.evaluate(() => {
+    const bad = [];
+    const was = { profile };
+    try {
+      if (!/^\d{4}-\d{2}-\d{2}[a-z]?$/.test(APP_BUILD)) bad.push('APP_BUILD does not read as a dated build: ' + APP_BUILD);
+      profile = 'parent';
+      showScreen('parent'); setParentTab('app');
+      const app = document.getElementById('ptab-app-wrap');
+      if (!app || app.textContent.indexOf('Build ' + APP_BUILD) < 0) bad.push('the App landing does not show "Build ' + APP_BUILD + '"');
+      setParentTab('setup');
+      const setup = document.getElementById('ptab-setup-wrap');
+      if (setup && /Build \d/.test(setup.textContent)) bad.push('the stamp leaked onto the Setup landing');
+      if (!(PARENT_LANDINGS.setup || []).some(r2 => r2.section === 'grandma' && /Grandma rule/.test(r2.title))) bad.push('Setup has no row for the Grandma rule');
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      profile = was.profile;
+    }
+    return bad.length ? bad : true;
+  });
+  /* ── PR B checks ── end */
 
   /* SETTLED MONEY CANNOT BE TAKEN BACK, AND NOTHING MAY CLAIM IT CAN.
      A week's money is committed at the meeting and there is genuinely no way

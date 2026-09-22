@@ -56,7 +56,7 @@ Deriving the full app manifest from `ARCHITECTURE.md` is an open item in `WORKIN
 ## App — Pocket money (manifested 2026-09-22)
 
 Derived from `ARCHITECTURE.md` and checked against the code at `f4d1db5`;
-updated for Plan v5 PR A (2026-09-22). **This section is authoritative for the
+updated for Plan v5 PR A and Plan v6 PR B (2026-09-22). **This section is authoritative for the
 money area**; the rest of the app still checks against `ARCHITECTURE.md`. Items
 marked ⚠ are known defects still open — listed so a regression table can show
 them changing on purpose.
@@ -79,6 +79,8 @@ them changing on purpose.
 - The rules change log stores readable values: `mrLogSummary` describes a list of records by id ("Added 🧦 Match the socks"); the history passes older stored arrays through the same summariser.
 - The repair only ever adds, prices each week under its own rules, never touches a migration-frozen week, and is idempotent.
 - The $3 default is backfill only: it never reaches the current week or the eight the catch-up list covers.
+- 👵 The Grandma rule is the same engine (`mnyDefaultSweepPlan` / `mnyRunDefaultSweep` with `reason: 'grandma'`): a parent's from-date (default `mrStartWeek()`), to-date (default the most recent 30 May) and amount (default $3), held in a module draft and never stored. It credits only weeks with **no record at all** for that child (`mnyWeekHasAnyRecord`, one owner, **money records only** per the owner's definition — settled weeks, graded chores, meets, gifts, fines, the money stream — listed in `MNY_WEEK_RECORD_STORES`; planner blocks, routine ticks, XP, notes, reflections, goals, plans, closed/met/reviewed marks, the Sunday Box and move requests are deliberately not records), previews weeks, per-child totals and how many were skipped, confirms through the app dialog, never reaches the current week, a later one or the catch-up eight whatever is typed, and credits once. Rows carry `defaulted` + `defaultReason`; Week history and her money story say "Grandma rule". Its own Money rules section and Setup row; it left Week history.
+- The hub catch-up banner's default sweep runs through the same engine, unchanged.
 
 ### Recording
 - One Record sheet, five records, each written through its owner: chore grade `mrSetChoreGrade`, meet `mrAddCompetition`/`mrUpdateCompetition`, gift `mnyAddDeposit`/`mnyEditDeposit`, fine `mrAddFine`, move `mnyMoveMoney`/`mnyRequestMove`.
@@ -111,12 +113,17 @@ them changing on purpose.
 - Money school shows the live price list (`pmPriceCards`) in the same closed-by-default disclosure and remembered toggle as My money; "Just part of being here" stays, its free-chores line read from `chores.freeChoresPerWeek`.
 - `pmPriceCards` is read-only; its unhandled edit mode is gone.
 - Every kid money screen holds the 44px target and 13px type floors.
+- 🔓 When her stage rises, My money (her own view only) shows one card naming the pots that opened and each new idea's what / why / what-to-watch from `MNY_CONCEPTS`; "Got it" records the stage in `localStorage` per child, per device (try/catch, never synced). First sight records silently; a grown-up viewing sees nothing.
+- 🌟 "Skating star level" is how every money surface names the `dance` sport — price editor, kid price list, meeting form, Record sheet, recorded meets. Sport id, rule key and scorer unchanged.
 
 ### Parent money pages
-- Money rules has seven sections, 🕰️ Change history among them; steppers queue as pending edits and save as one version with a reason and an effective date.
+- Money rules has eight sections, 🕰️ Change history and 👵 Grandma rule among them; steppers queue as pending edits and save as one version with a reason and an effective date.
 - Setup › 🕰️ Change history opens the Change history section (the rules log), the one section that draws it; 📖 Week history keeps the week ledger; Lessons and Loans no longer carry the log.
 - Loan edits never touch `paid` or `payments`; balance, pace, payoff date and the weekly amount due are derived on every render.
-- The Money school ladder opens at 30 / 60 / 90% of all debt paid; a parent override can only open a stage, never close one.
+- The Money school ladder opens at **20 / 30 / 40 / 100%** of all debt paid (ready · locked · stock · mix), from ONE table: `MNY_STAGES` has ids, pots / plans / lessons name a stage, and `mnyStagePct` reads `school.stagePct` with per-key defaults (no migration). A parent override can only open a stage, never close one.
+- Money rules › Lessons has three gate steppers (ready / locked / stock) that save as a dated rule version; a save that breaks ready ≤ locked ≤ stock ≤ 100 is refused with a sentence in the handler.
+- 🎿 Parent Now shows a loan-season row 1 Aug – 30 Sep unless a debt was created on or after 1 Jul that year; derived from the date, nothing stored, routes to Money rules › Loans.
+- The parent portal's App landing shows "Build <APP_BUILD>"; `tests/check-sw-shell.js` fails when `APP_BUILD` ≠ `SW_VERSION`.
 - The "? How this page works" button on Money rules opens the parent tour.
 - A permanent click sweep (`everyMoneyControlClicksClean`) presses every money control on every money surface and fails on any exception.
 

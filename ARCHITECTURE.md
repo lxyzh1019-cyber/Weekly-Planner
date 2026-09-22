@@ -2349,8 +2349,8 @@ would then say "paid off" checks the principal itself — the ladder card reads
 **The stage gates are not optional.** Every destination is checked with
 `mnyIsOpen` against `MNY_BUCKETS` — the same predicate `mnySplitFor` uses when
 it sends a locked bucket's share to the debt instead. `evHomeNeed` maps a home
-to its bucket rather than restating the percentages: two tables naming one gate
-is how they come to disagree. A sheet that could put money in a pot Money
+to its bucket's **stage id** rather than restating a percentage: two tables
+naming one gate is how they come to disagree (see *The gates* below). A sheet that could put money in a pot Money
 school has not opened would make the whole ladder decorative. And the gate must
 block the **action**, not just grey the row — a `disabled` attribute is a hint
 to the pointer, not a rule.
@@ -2741,6 +2741,76 @@ be nothing, and that is the earn-and-spend system working.
 a future one, because that failure would be silent and generous — money
 appearing for a week she is still living.
 
+## Plan v6 PR B — the Grandma rule, the loan season, the gates (2026-09-22)
+
+**👵 The Grandma rule is the default sweep with a parent's dates.** One engine:
+`mnyDefaultSweepPlan(opts)` / `mnyRunDefaultSweep(opts)`. With no options it is
+the hub catch-up banner's sweep, unchanged. With `{ reason: 'grandma', from, to,
+amount }` it credits only weeks with **no money record at all** for that child and
+counts the rest as skipped. `mnyWeekHasAnyRecord(wk, kid)` (`js/21-money-data.js`)
+is the one owner of that question, and it counts **money records only**, per the
+owner: "skips any week already settled AND any week holding real graded chores,
+meets or gifts". `MNY_WEEK_RECORD_STORES`: settled (`finalizedWeeks`,
+`moneyLedger`, `moneySnapshots`, `groupPayoutsFired`, `meetingsHeld`), graded
+chores (earnings' `chores` / `learning` / `overrides`), competitions, gifts,
+fines and the money stream. Planner blocks (even ticked or confirmed), routine
+ticks (a streak is money only once a week is settled, and the ledger catches
+that), XP, notes, reflections, goals, plans and confirms, `meetingsMet`,
+`weeksClosed`, day reviews, the Sunday Box and move requests are deliberately
+not records — a week lived in the app with no money recorded is the week the
+rule exists for. It reads without ensuring, so asking writes nothing. The form is a module draft
+(`mnyGrandmaDraft`) and is never stored; defaults are `mrStartWeek()` → the most
+recent 30 May → `MNY_DEFAULT_WEEK`. Whatever dates are typed, the newest week
+either path may name is one beyond the catch-up reach — never this week, a
+later one, or a week the catch-up list still settles. Idempotent through the
+same `finalizedWeeks[wk][kid] == null` guard. Rows carry `defaulted: true` and
+`defaultReason: 'grandma' | 'default'`; Week history and her money story say
+"Grandma rule" or "nobody met" from it, and the story's bar shows the flat
+amount instead of "Nothing came in". Its own Money rules section and Setup row;
+it left Week history. `theGrandmaRuleCreditsOnlyEmptyWeeksOnce` seeds one
+record per store and asserts each is found alone.
+
+**🌟 "Skating star level" is a relabel of `dance`.** The sport id, the rule key
+`competition.dance` and `mrScoreCompetition` are unchanged, so every stored
+result reads under the new name. `mnySportLabel` / `mnySportIcon` are the words
+wherever a recorded meet is shown (including the parent chore page, which used
+to print the raw id). The Record sheet offers it by name because a skating block
+seeds a skating competition. `danceReadsAsSkatingStarLevel` holds every money
+surface to it — money surfaces only; the activity catalog may have real dance.
+
+**🎿 The loan season is worked out, never stored.** `pnLoanSeason()`
+(`js/32-parent-now.js`) is a row at the top of Now from 1 Aug to 30 Sep, unless a
+debt has `createdAt` on or after 1 Jul that year. No reminder key, no dismissal.
+It routes to Money rules › Loans and decides nothing. Debts that existed before
+`createdAt` did (added 2026-07-28) were stamped on their first read after it, so
+on this family's devices the row most likely stays hidden in 2026 and first
+shows on 1 Aug 2027 — the season it is for.
+
+**The gates.** `MNY_STAGES` carries ids (`start · ready · locked · stock · mix`)
+and no numbers. `MNY_BUCKETS`, `MNY_PLANS` and `MNY_CONCEPTS` name a `stage`;
+`mnyIsOpen(kid, stageId)` compares ladder positions, so a pot, its lesson and
+its ladder row are one answer. `mnyStagePct(stageId)` is the one reader of a
+gate's number: `mrRules().school.stagePct` first, then `MR_DEFAULT_RULES` per
+key (**20 / 30 / 40 / 100**; the first stage is always 0). A stored rulebook
+without the field is not migrated. Money rules › Lessons has three steppers
+that queue `school.stagePct.*` through the pending list and `mrApplyEdits`, so a
+change is a dated, logged version; `mnyStagePctRefusal` refuses a broken order
+(ready ≤ locked ≤ stock ≤ 100) with a sentence at the stepper **and** in
+`mnySavePending`. The override (`school.unlockStage`) is unchanged.
+`theGatesComeFromOneTable` sweeps 0–100% and compares ladder row, pot (split and
+move gate), lesson card and chip, and each pot against its own lesson.
+
+**🔓 A pot opening is a moment.** On her own My money, `mnyStageOpenedCard`
+shows one card when her stage is above the stage last acknowledged on this
+device (`localStorage`, `wp_mny_stage_seen_<kid>`, every access in try/catch,
+never synced). It names the pots and shows each new idea's what / why / watch
+through `mnyConceptCard` — never restated. First sight records the current stage
+silently; a stage that drops is recorded silently too. A grown-up sees nothing.
+
+**The build stamp.** `APP_BUILD` (`js/01-config.js`) is shown on the parent
+portal's App landing. `tests/check-sw-shell.js` fails when it differs from
+`SW_VERSION` — **bump both together**.
+
 ## Known trip hazards
 
 - Firebase config lives in **`js/03-sync.js:8`**, not `index.html`. Older docs
@@ -2756,7 +2826,8 @@ appearing for a week she is still living.
   cache: it is **network-first** so being online always gets the deployed code,
   and the shell it holds only answers offline — but **bump `SW_VERSION` on every
   deploy that changes a shell file**, or an installed device keeps the old
-  offline copy. There is no build step to do it for you.
+  offline copy. Bump `APP_BUILD` (`js/01-config.js`) to the same value: it is the
+  stamp a parent reads on App, and the shell check fails when they differ. There is no build step to do it for you.
 
   `tests/check-sw-shell.js` (in `npm run check`) is what makes that enforceable.
   `index.html`'s script tags and `sw.js`'s `SHELL` are two hand-written lists

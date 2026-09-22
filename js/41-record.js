@@ -59,13 +59,17 @@ const RC_KINDS = [
   { id: 'move',  icon: '🔀', label: 'Move money',       kid: true },
 ];
 
-/* The four sports the scoring rules know. `mrTagForSport` (js/18-rules.js)
+/* The sports the scoring rules know. `mrTagForSport` (js/18-rules.js)
    resolves a custom sport's activity tag and returns null rather than guessing,
-   which is why this list is short and the form asks. */
+   which is why this list is short and the form asks.
+
+   `dance` is the SKATING STAR LEVEL test, offered by name: a skating block on
+   the calendar seeds a skating COMPETITION, so a star test is only ever chosen
+   here, on purpose. The id and the scorer are unchanged — a relabel. */
 const RC_SPORTS = [
   { id: 'swim',  label: '🏊 Swimming' },
   { id: 'skate', label: '⛸️ Skating' },
-  { id: 'dance', label: '💃 Dance' },
+  { id: 'dance', label: '🌟 Skating star level' },
 ];
 
 const RC_HOMES = ['cash', 'ready', 'locked', 'invest'];

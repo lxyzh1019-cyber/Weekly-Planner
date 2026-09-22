@@ -9,7 +9,8 @@ Single working record for this repository. Updated by the main session at the en
 - **2026-09-22, Plan v5 approved** — "Money system: stop the bleeding, the Grandma rule, then the pool". Branch `claude/happy-bardeen-1xalni` from `main` @ `f4d1db5`. Sequence: Step 0 (this record) → PR A → PR B → C0 mockup → owner sign-off → PR C. Value-engineering items VE-1…VE-14 accepted; VE-11 (weekly/monthly) un-deferred at the owner's request; VE-3, VE-7, VE-9, VE-10 deferred with reasons. Full plan: `/root/.claude/plans/1-one-kid-completed-quizzical-kitten.md` (session-local).
 
 ## Pending
-- PR B (B1–B4 + S2/S3/S4) — delegated to `opus-worker`; must be live before 1 Oct.
+- PR B committed on PR #92 — must be merged and deployed before 1 Oct.
+- Owner's choice: the proposal (earn · spend & save · owe) or the current My money — gates PR C.
 - C0 mockup — updating for v6 (pool title, toggle drives the Today card, chart).
 - PR #92 CI on `79b543b`.
 - PR [#91](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/91) — **merged** to `main` (`f4d1db5`).
@@ -104,7 +105,7 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → n
 | `FEATURES.md` — **app** feature manifest | PARTIAL | Money area manifested 2026-09-22 (Step 0). Everything else still checks against `ARCHITECTURE.md` — open question 1. |
 | Plan v5 Step 0 — rewrite-vs-repair comparison, hotspot row, records | COMPLETE | This file; `FEATURES.md` money section |
 | Plan v5 PR A — stop the bleeding (A1–A12, + A13/A14 checker fixes) | COMPLETE | `79b543b` on draft PR #92; `npm test` green in the main session's own run (check 8/8 · merge 112 · buffers 9 · stream 31 · cleanup · xp 28 · money 33 · smoke 321); every fix's check failed on the old code first (worker evidence) |
-| Plan v6 PR B — Grandma rule, star level relabel, August banner, gates 20/30/40 (B4), S2 pot-opening moment, S3 build stamp, S4 tunable gates | PARTIAL — built (worker: npm test green, smoke 344); under main-session review; follow-up G1 sent (planner blocks are not "records" — the owner's definition is money records) | deadline 1 Oct |
+| Plan v6 PR B — Grandma rule, star level relabel, August banner, gates 20/30/40 (B4), S2 pot-opening moment, S3 build stamp, S4 tunable gates | COMPLETE | main session's own `npm test`: check 8/8 · merge 112 · buffers 9 · stream 31 · cleanup · xp 28 · money 33 · smoke 344 (click sweep 384 controls); new checks each shown failing on a deliberate break; G1+G2 follow-ups: the Grandma rule counts MONEY records only (owner's definition) |
 | Plan v6 C0 — clickable mockup for sign-off (now v5 of the canvas: iPad landscape, toggle card, cash pool titled, have/owe chart, paired month columns) | COMPLETE — awaiting owner sign-off | Design canvas https://claude.ai/artifact/3fYy6KiQMcSissRGBvnG6d (private); started ahead of PR B because sign-off is the long pole — content unchanged |
 | Plan v6 PR C — the pool, three pages, the target card, the have/owe chart | NOT STARTED | Blocked on C0 sign-off |
 | `routing_guard_mode: enforce` | NOT STARTED | Blocked on `tests/test-routing-hook.md`, which must run in a session where the hooks are live (i.e. after merge to `main`). |

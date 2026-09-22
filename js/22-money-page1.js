@@ -61,6 +61,59 @@ function mnyPricesOpen() {
 function mnySetPricesOpen(open) {
   try { localStorage.setItem(MNY_PRICES_LS_KEY, open ? '1' : '0'); } catch (e) {}
 }
+/* ── A moment when a pot opens ──
+   When her stage rises, the pots and ideas it opens used to appear without a
+   word: a button that was locked on Sunday simply was not on Monday. The first
+   time she opens 💰 My money after that, one card says what opened and shows
+   each new idea's what / why / what-to-watch, read from MNY_CONCEPTS through
+   `mnyConceptCard` — never restated, so the card and Money school cannot say
+   two things.
+
+   Remembered PER DEVICE, per child, in localStorage and never in synced state:
+   it is a view acknowledgement, and every state write is a full-document
+   upload. Every read and write is in try/catch — a private window or cleared
+   storage must still draw the page. The FIRST sight records the current stage
+   silently, so a pot opened months ago is never announced as new; a stage that
+   comes back DOWN (a new loan) is recorded silently too, so reaching it again
+   is announced again. A grown-up looking at her page sees nothing and changes
+   nothing. */
+const MNY_STAGE_SEEN_LS_PREFIX = 'wp_mny_stage_seen_';
+function mnyStageSeen(kid) {
+  try {
+    const v = localStorage.getItem(MNY_STAGE_SEEN_LS_PREFIX + kid);
+    if (v == null || v === '') return null;
+    const n = Number(v);
+    return isFinite(n) ? n : null;
+  } catch (e) { return null; }
+}
+function mnySetStageSeen(kid, idx) {
+  try { localStorage.setItem(MNY_STAGE_SEEN_LS_PREFIX + kid, String(idx)); } catch (e) {}
+}
+function mnyStageOpenedCard(kid) {
+  if (isParent()) return '';
+  const now = mnyStageIndex(kid);
+  const seen = mnyStageSeen(kid);
+  if (seen == null || now < seen) { mnySetStageSeen(kid, now); return ''; }
+  if (now === seen) return '';
+  const fresh = (stage) => { const i = mnyStageIndexOf(stage); return i > seen && i <= now; };
+  const pots = MNY_BUCKETS.filter(b => fresh(b.stage));
+  const ideas = MNY_CONCEPTS.filter(c => fresh(c.stage)).map(c => mnyConceptCard(c.id, kid)).filter(Boolean);
+  const potLine = pots.length
+    ? `<div class="mny-rows">${pots.map(b => `<div class="mny-row"><span>${b.icon} ${escapeHtml(b.label)}</span><b>open now</b></div>`).join('')}</div>`
+    : '';
+  return `<div class="mny-card">
+      <div class="mny-label">🔓 Something new just opened for your money</div>
+      <div class="mny-note">From now on you can choose ${pots.length === 1 ? 'this' : 'these'} too.
+        Here is what ${ideas.length === 1 ? 'it is' : 'each one is'}, why people use it, and what to watch.</div>
+      ${potLine}
+      ${ideas.map(c => `<div class="mny-sub">${escapeHtml(c.icon + ' ' + c.title)}</div>
+        <p>${escapeHtml(c.what)}</p>
+        <div class="mny-sub">${escapeHtml(c.whyLabel)}</div><p>${escapeHtml(c.why)}</p>
+        <div class="mny-sub">${escapeHtml(c.riskLabel)}</div><p>${escapeHtml(c.risk)}</p>`).join('')}
+      <button type="button" class="mny-btn primary wide" data-mny-action="stage-seen" data-mny-stage="${now}">Got it</button>
+    </div>`;
+}
+
 let mnyStoryMode = 'week';    // the money story: 'week' | 'month'
 let mnyStoryMonth = null;     // 'YYYY-MM'
 let mnyGoalFormOpen = false;  // the new-goal form on My money
@@ -189,6 +242,7 @@ function mnyRenderMyMoney() {
           { action: 'tourkid',  label: '? How this page works' },
         ], { kidSwitch: true })}
        ${mnyTabBar('money')}
+       ${mnyStageOpenedCard(kid)}
        <div class="mny-cols page1">
          <div class="mny-col">
            ${mnyTodayCard(kid, wk)}
@@ -631,8 +685,12 @@ function mnyCompetitionCard(kid) {
       <div class="mny-note">We never talk about money before or during a competition. That is a promise, not a rule.</div>
     </div>`;
 }
-function mnySportIcon(s) { return { swim: '🏊', skate: '⛸️', dance: '💃' }[s] || '🏆'; }
-function mnySportLabel(s) { return { swim: 'Swim meet', skate: 'Skating', dance: 'Dance test' }[s] || 'Competition'; }
+/* The sport id `dance` is the skating star level test — silver and gold items
+   are the star test's own marks. Only the words changed: the id, the rule key
+   and the scorer did not, so every result already recorded reads under the
+   name the family uses. */
+function mnySportIcon(s) { return { swim: '🏊', skate: '⛸️', dance: '🌟' }[s] || '🏆'; }
+function mnySportLabel(s) { return { swim: 'Swim meet', skate: 'Skating', dance: 'Skating star level' }[s] || 'Competition'; }
 
 /* The two ways out of this page. */
 function mnyLinksCard(kid) {
@@ -736,7 +794,8 @@ function mnyRenderStory() {
      "From outside" as a row — so every gift was under-reported in the one
      figure that claims to be everything that came in. */
   const inTotal = money2(sum('chores') + sum('learning') + sum('streak')
-    + sum('competition') + sum('outside'));
+    + sum('competition') + sum('outside')
+    + rows.reduce((s, r) => s + (r.defaulted ? money2(r.gross) : 0), 0));
 
   wrap.innerHTML =
       `${mnyPageHead('🌊 My money story', 'Where it comes from and where it goes', [], { back: 'backmoney' })}
@@ -771,6 +830,10 @@ function mnyStoryWeek(kid, r) {
     { label: 'Clean days',   value: r.streak,      color: '#ffd166' },
     { label: 'Competitions', value: r.competition, color: '#ff9eb5' },
     { label: 'From outside', value: r.outside,     color: '#c9a6e8' },
+    /* A week credited at a flat amount carries it in no channel, so without
+       this row its bar read "Nothing came in" beside a total of $3. */
+    { label: r.defaultReason === 'grandma' ? 'Grandma rule' : 'A flat amount',
+      value: r.defaulted ? r.gross : 0, color: '#b5ead7' },
   ]);
   inBar.fines = money2(r.fines);
   const plan = r.plan || {};
@@ -791,6 +854,9 @@ function mnyStoryWeek(kid, r) {
       ${/* A week agreed weeks after it ended was put together from what everyone
             remembered. She is entitled to know which of her weeks those are —
             same honesty as the parent side marking a typed-in week. */''}
+      ${r.defaulted ? `<div class="mny-note">${r.defaultReason === 'grandma'
+          ? '👵 Grandma rule — before we started counting, every week got the same amount.'
+          : '🕰️ Nobody sat down for this week, so it got a flat amount.'}</div>` : ''}
       ${r.weeksLate ? `<div class="mny-note">🕰️ Agreed ${r.weeksLate} week${r.weeksLate > 1 ? 's' : ''} after this one finished, from what everyone remembered.</div>` : ''}
       ${edited ? `<div class="mny-note">${edited} thing${edited > 1 ? 's were' : ' was'} changed at the meeting${r.editReason ? ' — ' + escapeHtml(mnyReasonLabel(r.editReason)) : ''}.</div>` : ''}
       <div class="mny-sub">Came in</div>
@@ -841,6 +907,11 @@ function mnyHandleClick(ev) {
   if (a === 'comp-zero') {
     mnyRecordCompZero(mnyMeetingKid(), el.getAttribute('data-daykey'),
       el.getAttribute('data-name'), el.getAttribute('data-sport'));
+    return;
+  }
+  if (a === 'stage-seen') {
+    mnySetStageSeen(mnyViewKid(), Number(el.getAttribute('data-mny-stage')) || 0);
+    mnyRenderMyMoney();
     return;
   }
   if (a === 'kid')     { mnySetKid(el.getAttribute('data-mny-kid')); return; }
@@ -940,7 +1011,7 @@ function mnyShowConcept(id) {
     ? `<p>${escapeHtml(c.what)}</p>
        <div class="mny-sub">${escapeHtml(c.whyLabel)}</div><p>${escapeHtml(c.why)}</p>
        <div class="mny-sub">${escapeHtml(c.riskLabel)}</div><p>${escapeHtml(c.risk)}</p>`
-    : `<p>🔒 ${escapeHtml(mnyNeedLabel(c.need))}.</p>`;
+    : `<p>🔒 ${escapeHtml(mnyNeedLabel(c.stage))}.</p>`;
   // Every `?` in the system can hand off to the page that teaches the idea
   // properly, so a question asked anywhere lands somewhere that answers it.
   showToastCard(`${c.icon} ${c.title}`, body, c.id);

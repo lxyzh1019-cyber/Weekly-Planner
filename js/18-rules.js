@@ -249,8 +249,17 @@ const MR_DEFAULT_RULES = {
   },
 
   /* Money school opens as the debt comes down. A parent can float a kid to a
-     later stage when the conversation gets there before the loan does. */
-  school: { unlockStage: { jenn: 0, jess: 0 } },
+     later stage when the conversation gets there before the loan does.
+
+     `stagePct` is the ONE place a gate's number lives: the share of all debt
+     paid off that opens each stage of MNY_STAGES (js/21-money-data.js), read
+     through `mnyStagePct`. Pots, lessons and plans name a stage, never a
+     number. A stored rulebook written before this field existed has none, and
+     `mnyStagePct` falls back to these per key — it is not migrated. Tuned in
+     Money rules › Lessons as a dated rule version like any price. The first
+     stage is always 0 and is not listed. */
+  school: { unlockStage: { jenn: 0, jess: 0 },
+            stagePct: { ready: 20, locked: 30, stock: 40, mix: 100 } },
 
   sickPausesEverything: true,
   reviewCadence: 'quarterly',

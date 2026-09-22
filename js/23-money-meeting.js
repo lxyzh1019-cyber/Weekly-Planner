@@ -426,7 +426,7 @@ function mnyCompetitionForm(wk, kid) {
     danceItems: { silver: d.silver, gold: d.gold, allGold: d.allGold },
   }, mrRulesFor(d.dayKey));
 
-  const sportChips = [['swim', '🏊 Swim'], ['skate', '⛸️ Skating'], ['dance', '💃 Dance']].map(([id, label]) =>
+  const sportChips = [['swim', '🏊 Swim'], ['skate', '⛸️ Skating'], ['dance', '🌟 Skating star level']].map(([id, label]) =>
     `<button type="button" class="mny-chip ${d.sport === id ? 'on' : ''}" onclick="mnyCompSet('sport','${escapeJsAttr(id)}')">${label}</button>`).join('');
 
   let detail = '';
@@ -844,12 +844,12 @@ function mnyBucketRows(kid, split) {
 /* Everything that lets her change the plan, behind one button. */
 function mnyChangePlanCards(wk, kid, draft, pool) {
   const cards = MNY_PLANS.map(p => {
-    const open = mnyIsOpen(kid, p.need);
+    const open = mnyIsOpen(kid, p.stage);
     return `<button type="button" class="mny-plan ${draft.planId === p.id ? 'on' : ''}" ${open ? '' : 'disabled'}
       onclick="mnyPickPlan('${escapeJsAttr(p.id)}')">
       <span class="mny-plan-icon">${p.icon}</span>
       <span>${escapeHtml(p.label)}</span>
-      ${open ? '' : `<small>🔒 ${escapeHtml(mnyNeedLabel(p.need))}</small>`}
+      ${open ? '' : `<small>🔒 ${escapeHtml(mnyNeedLabel(p.stage))}</small>`}
     </button>`;
   }).join('');
 
@@ -862,8 +862,8 @@ function mnyChangePlanCards(wk, kid, draft, pool) {
         ${mnyBucketStepper('goal:' + g.id, draft.split['goal:' + g.id])}</div>`;
     }).join('')
     + MNY_BUCKETS.filter(b => b.key !== 'loan').map(b => {
-      const open = mnyIsOpen(kid, b.need);
-      return `<div class="mny-row"><span>${b.icon} ${escapeHtml(b.label)}${open ? '' : ' 🔒 ' + mnyNeedLabel(b.need)}</span>
+      const open = mnyIsOpen(kid, b.stage);
+      return `<div class="mny-row"><span>${b.icon} ${escapeHtml(b.label)}${open ? '' : ' 🔒 ' + mnyNeedLabel(b.stage)}</span>
         ${open ? mnyBucketStepper(b.key, draft.split[b.key]) : '<b>—</b>'}</div>`;
     }).join('');
 
@@ -908,7 +908,7 @@ function mnyChangePlanCards(wk, kid, draft, pool) {
       }).join('')}</div>
       <div class="mny-note">${escapeHtml(doors.map(d => d.note)[3])}</div>
     </div>
-    ${mnyIsOpen(kid, 90) ? mnyStockChart() : ''}`;
+    ${mnyIsOpen(kid, 'stock') ? mnyStockChart() : ''}`;
 }
 function mnyBucketStepper(key, value) {
   return `<span class="mny-stepgrp">
@@ -1137,7 +1137,7 @@ function mnyPickPlan(id) {
   const plan = MNY_PLANS.find(p => p.id === id);
   // The card is already disabled, but the gate belongs on the action too: a
   // lesson that can be skipped by a stale click is not a lesson.
-  if (!plan || !mnyIsOpen(d.kid, plan.need)) { showToast(`🔒 ${mnyNeedLabel(plan ? plan.need : 0)}`); return; }
+  if (!plan || !mnyIsOpen(d.kid, plan.stage)) { showToast(`🔒 ${mnyNeedLabel(plan ? plan.stage : 'mix')}`); return; }
   d.planId = id;
   d.split = mnySplitFor(d.wk, d.kid, id, d.own);
   renderMeetingMode();
@@ -1157,7 +1157,7 @@ function mnyPickReflect(id) {
   if (d.planId === 'own') { renderMeetingMode(); return; }
   const chip = MNY_REFLECT.chips.find(c => c.id === id);
   if (chip && chip.planId) {
-    const open = mnyIsOpen(d.kid, (MNY_PLANS.find(p => p.id === chip.planId) || {}).need || 0);
+    const open = mnyIsOpen(d.kid, (MNY_PLANS.find(p => p.id === chip.planId) || {}).stage);
     if (open) {
       d.planId = chip.planId;
       d.split = mnySplitFor(d.wk, d.kid, chip.planId, d.own);

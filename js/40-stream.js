@@ -828,8 +828,8 @@ function evRunRepair() {
 
    ── The stage gates are not optional ──
 
-   Money school opens the pots as the loan comes down — keep-ready at 30% paid
-   off, locking away at 60%, companies at 90% — and `mnySplitFor` sends a locked
+   Money school opens the pots as the loan comes down — keep-ready, then
+   locking away, then companies, at the gates `mnyStagePct` reads — and `mnySplitFor` sends a locked
    bucket's share to the debt rather than into the bucket. A sheet that moved
    money into a pot Money school has not opened would make the whole ladder
    decorative, so every destination is checked with the SAME predicate the
@@ -843,16 +843,17 @@ function evRunRepair() {
    `profile.moveRequests` with their own merge decision.
    ════════════════════════════════════════════════════════════════ */
 
-/* Which Money-school stage each home sits behind. `cash` is always open — it is
-   where money arrives — and the other three mirror MNY_BUCKETS exactly, because
-   two tables naming the same gate is how they come to disagree. */
+/* Which Money-school stage each home sits behind — a MNY_STAGES id, never a
+   percent. `cash` is always open — it is where money arrives — and the other
+   three read MNY_BUCKETS exactly, because two tables naming the same gate is
+   how they come to disagree. */
 function evHomeNeed(home) {
   const byKey = { ready: 'ready', locked: 'gic', invest: 'stock' };
   const key = byKey[String(home)];
-  if (!key) return 0;                              // cash, and anything unknown
+  if (!key) return 'start';                        // cash, and anything unknown
   const b = (typeof MNY_BUCKETS !== 'undefined')
     ? MNY_BUCKETS.find(x => x.key === key) : null;
-  return b ? (Number(b.need) || 0) : 0;
+  return b ? b.stage : 'start';
 }
 
 /* Can this child put money here yet? One predicate, shared with the split. */

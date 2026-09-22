@@ -29,41 +29,48 @@
 
 /* ── Money school: what opens when ──
    Keyed to the share of everything she owes that has been paid off, so the
-   lessons arrive as the debt comes down rather than on a calendar. */
+   lessons arrive as the debt comes down rather than on a calendar.
+
+   THE STAGE IS THE ONE OWNER OF A GATE. Each stage has an id; its number lives
+   in the rulebook (`school.stagePct`, js/18-rules.js) and is read only through
+   `mnyStagePct`. MNY_BUCKETS, MNY_PLANS and MNY_CONCEPTS name a STAGE and never
+   a number. They used to carry their own copies (30 / 60 / 90 in three tables)
+   and nothing made them agree, so a pot, its lesson and the ladder row could
+   each have said something different about the same moment. */
 const MNY_STAGES = [
-  { pct: 0,   icon: '🎿', title: 'What I owe, and what I keep' },
-  { pct: 30,  icon: '💵', title: 'Keeping money ready' },
-  { pct: 60,  icon: '🔒', title: 'Locking money away' },
-  { pct: 90,  icon: '📈', title: 'Trying it with stocks' },
-  { pct: 100, icon: '🧩', title: 'Building my own mix' },
+  { id: 'start',  icon: '🎿', title: 'What I owe, and what I keep' },
+  { id: 'ready',  icon: '💵', title: 'Keeping money ready' },
+  { id: 'locked', icon: '🔒', title: 'Locking money away' },
+  { id: 'stock',  icon: '📈', title: 'Trying it with stocks' },
+  { id: 'mix',    icon: '🧩', title: 'Building my own mix' },
 ];
 
-/* Where money can go on a Sunday. `need` is the stage that opens it.
+/* Where money can go on a Sunday. `stage` is the MNY_STAGES id that opens it.
    `loan` is special: there is one row per debt, built at render time. */
 const MNY_BUCKETS = [
-  { key: 'loan',  icon: '🎿', label: 'Pay off',        need: 0,  tint: '#eaf6ef' },
+  { key: 'loan',  icon: '🎿', label: 'Pay off',        stage: 'start', tint: '#eaf6ef' },
   // Spending is a real answer to "what do I do with it", and a system that
   // only ever offers ways to defer teaches deferring, not choosing. Open from
   // the first week — but capped at a fifth, so a whole week can never vanish
   // into one afternoon.
-  { key: 'spend', icon: '🛍️', label: 'Spend it',       need: 0,  tint: '#fff0f0' },
-  { key: 'ready', icon: '💵', label: 'Keep it ready',  need: 30, tint: '#fff9e9' },
-  { key: 'gic',   icon: '🔒', label: 'Lock it away for a year', need: 60, tint: '#eef3fb' },
-  { key: 'stock', icon: '📈', label: 'Buy a bit of a company',  need: 90, tint: '#f6effa' },
+  { key: 'spend', icon: '🛍️', label: 'Spend it',       stage: 'start', tint: '#fff0f0' },
+  { key: 'ready', icon: '💵', label: 'Keep it ready',  stage: 'ready', tint: '#fff9e9' },
+  { key: 'gic',   icon: '🔒', label: 'Lock it away for a year', stage: 'locked', tint: '#eef3fb' },
+  { key: 'stock', icon: '📈', label: 'Buy a bit of a company',  stage: 'stock', tint: '#f6effa' },
 ];
 
 /* The ready-made plans. Fractions of what is hers to choose. */
 const MNY_PLANS = [
-  { id: 'debt',     icon: '🎿', label: 'Pay off my loan first', need: 0,   split: { loan: 1 } },
-  { id: 'ready',    icon: '💵', label: 'Keep some ready',       need: 30,  split: { loan: 0.4, ready: 0.6 } },
-  { id: 'balanced', icon: '⚖️', label: 'A bit of everything',   need: 60,  split: { loan: 0.4, ready: 0.3, gic: 0.3 } },
-  { id: 'grow',     icon: '📈', label: 'Grow it more',          need: 90,  split: { loan: 0.3, ready: 0.1, gic: 0.2, stock: 0.4 } },
-  { id: 'last',     icon: '🔁', label: 'Same as last week',     need: 0,   split: null },
+  { id: 'debt',     icon: '🎿', label: 'Pay off my loan first', stage: 'start',  split: { loan: 1 } },
+  { id: 'ready',    icon: '💵', label: 'Keep some ready',       stage: 'ready',  split: { loan: 0.4, ready: 0.6 } },
+  { id: 'balanced', icon: '⚖️', label: 'A bit of everything',   stage: 'locked', split: { loan: 0.4, ready: 0.3, gic: 0.3 } },
+  { id: 'grow',     icon: '📈', label: 'Grow it more',          stage: 'stock',  split: { loan: 0.3, ready: 0.1, gic: 0.2, stock: 0.4 } },
+  { id: 'last',     icon: '🔁', label: 'Same as last week',     stage: 'start',  split: null },
   /* Not a stage-gated idea — it is manual entry, and the "or set every number
      yourself" steppers directly below this card are open at every stage. A
      locked card sitting above the unlocked control that does the same thing is
      just a lie about what the screen can do. */
-  { id: 'own',      icon: '🧩', label: "I'll choose every number myself", need: 0, split: null, own: true },
+  { id: 'own',      icon: '🧩', label: "I'll choose every number myself", stage: 'start', split: null, own: true },
 ];
 
 /* Investing is a fixed menu — no typing in a ticker. A nine-year-old picking a
@@ -145,46 +152,46 @@ const MNY_UNPAID = [
   'Being kind to your sister',
 ];
 
-/* The eight ideas Money school teaches, in the order they open. `need` is the
-   stage; the debt card names the real debt at render time. */
+/* The ideas Money school teaches, in the order they open. `stage` is the
+   MNY_STAGES id that opens it; the debt card names the real debt at render time. */
 const MNY_CONCEPTS = [
   /* {debt} is filled in with the real name from her debt record, so this reads
      as being about her week rather than about money in general. */
-  { id: 'debt', icon: '🎿', title: 'Owing money', need: 0,
+  { id: 'debt', icon: '🎿', title: 'Owing money', stage: 'start',
     what: 'We paid for {debt} up front, and you pay us back a bit at a time.',
     why: 'You got it straight away instead of waiting years to save up for it.',
     risk: 'Until {debt} is paid off, part of every week is already spoken for.' },
-  { id: 'cash', icon: '💵', title: 'Cash', need: 0,
+  { id: 'cash', icon: '💵', title: 'Cash', stage: 'start',
     what: 'Money you can use today, sitting in your wallet.',
     why: 'It is ready the moment you need it.',
     risk: 'It does not grow at all while it sits there.' },
-  { id: 'spend', icon: '🛍️', title: 'Spending some of it', need: 0,
+  { id: 'spend', icon: '🛍️', title: 'Spending some of it', stage: 'start',
     what: 'Money you decide to actually use, on something you want.',
     why: 'Money is for something. Choosing what, and living with the choice, is the whole skill.',
     risk: 'It is gone once it is spent, and it never comes back as more. That is why only a fifth of a week can go here.',
     whyLabel: 'The good side', riskLabel: 'The other side' },
-  { id: 'extra', icon: '⚡', title: 'Paying early', need: 0,
+  { id: 'extra', icon: '⚡', title: 'Paying early', stage: 'start',
     what: 'Paying more off {debt} than you have to, before it is due.',
     why: 'You earn a bonus for it, and {debt} is gone sooner.',
     risk: 'That money has gone into {debt} — you cannot get it back out.',
     whyLabel: 'The good side', riskLabel: 'The other side' },
-  { id: 'ready', icon: '🏦', title: 'Keeping money ready', need: 30,
+  { id: 'ready', icon: '🏦', title: 'Keeping money ready', stage: 'ready',
     what: 'Money set aside that you can still get back whenever you want.',
     why: 'When something goes wrong, you are not stuck.',
     risk: 'It grows very slowly — a little bit each year.' },
-  { id: 'save', icon: '💰', title: 'Interest', need: 30,
+  { id: 'save', icon: '💰', title: 'Interest', stage: 'ready',
     what: 'The bank pays you a small amount each year for keeping money there.',
     why: 'Money you leave alone quietly makes a bit more money.',
     risk: 'It is small. It will not make you rich on its own.' },
-  { id: 'gic', icon: '🔒', title: 'Locking money away for a year', need: 60,
+  { id: 'gic', icon: '🔒', title: 'Locking money away for a year', stage: 'locked',
     what: 'You promise not to touch it for a year, and the bank pays you more.',
     why: 'More than just keeping it ready, and the amount is promised.',
     risk: 'You really cannot touch it. Not even if you change your mind.' },
-  { id: 'stock', icon: '📈', title: 'Owning a bit of a company', need: 90,
+  { id: 'stock', icon: '📈', title: 'Owning a bit of a company', stage: 'stock',
     what: 'You buy a small piece of a real company.',
     why: 'If the company does well, your piece is worth more.',
     risk: 'It can go down too. In 2023 one of these fell by a third in six months.' },
-  { id: 'mix', icon: '🧩', title: 'Not putting it all in one place', need: 100,
+  { id: 'mix', icon: '🧩', title: 'Not putting it all in one place', stage: 'mix',
     what: 'Splitting your money so it is not all doing the same job.',
     why: 'If one part has a bad year, the others carry you.',
     risk: 'You will never make as much as if you had guessed right and put it all in one.' },
@@ -1231,7 +1238,7 @@ function mnySplitFor(weekKey, kid, planId, own) {
       // A bucket she has not reached yet takes nothing, whatever the plan says.
       // Its share falls back to paying the debt down, which is always open.
       const bucket = MNY_BUCKETS.find(b => b.key === k);
-      if (bucket && !mnyIsOpen(kid, bucket.need)) {
+      if (bucket && !mnyIsOpen(kid, bucket.stage)) {
         const first = debts[0];
         if (first) out['loan:' + first.id] = money2(out['loan:' + first.id] + dollars);
         else out.ready = money2(out.ready + dollars);
@@ -1396,19 +1403,37 @@ function mnyUnlockOverride(kid) {
   const r = mrRules();
   return Number(((r.school || {}).unlockStage || {})[kid]) || 0;
 }
+/* ── THE GATE'S NUMBER — one reader ──
+   The share of all debt paid off that opens a stage. The live rulebook first
+   (`school.stagePct`), then MR_DEFAULT_RULES per key — so a rulebook stored
+   before the field existed, or one that holds only some of the stages, gets
+   the defaults for the rest without anything being migrated. The first stage
+   is 0 whatever is stored: something has to be open with nothing paid. */
+function mnyStagePct(stageId, rules) {
+  const i = mnyStageIndexOf(stageId);
+  if (i === 0) return 0;
+  if (i < 0) return 100;                          // an unknown stage opens last, never first
+  const live = (((rules || mrRules()).school || {}).stagePct || {})[stageId];
+  const fallback = ((MR_DEFAULT_RULES.school || {}).stagePct || {})[stageId];
+  const n = Number(live != null && live !== '' ? live : fallback);
+  return isFinite(n) ? Math.max(0, Math.min(100, n)) : 100;
+}
+function mnyStageIndexOf(stageId) { return MNY_STAGES.findIndex(s => s.id === stageId); }
 function mnyStageIndex(kid) {
   const pct = mnyPaidPct(kid);
+  const r = mrRules();
   let idx = 0;
-  MNY_STAGES.forEach((s, i) => { if (pct >= s.pct) idx = i; });
+  MNY_STAGES.forEach((s, i) => { if (pct >= mnyStagePct(s.id, r)) idx = i; });
   return Math.min(MNY_STAGES.length - 1, Math.max(idx, mnyUnlockOverride(kid)));
 }
 function mnyStage(kid) { return MNY_STAGES[mnyStageIndex(kid)]; }
-/* Is a thing needing `need` percent open yet? */
-function mnyIsOpen(kid, need) {
-  const ceiling = MNY_STAGES[mnyStageIndex(kid)].pct;
-  return (Number(need) || 0) <= ceiling;
+/* Is a thing behind this STAGE open yet? Compared by position on the ladder,
+   never by percent, so a pot, its lesson and its ladder row are one answer. */
+function mnyIsOpen(kid, stageId) {
+  const i = mnyStageIndexOf(stageId);
+  return i >= 0 && i <= mnyStageIndex(kid);
 }
-function mnyNeedLabel(need) { return 'Opens at ' + (Number(need) || 0) + '% paid off'; }
+function mnyNeedLabel(stageId) { return 'Opens at ' + mnyStagePct(stageId) + '% paid off'; }
 
 /* The concept card, with the real debt named in it. */
 function mnyConceptCard(id, kid) {
@@ -1418,8 +1443,8 @@ function mnyConceptCard(id, kid) {
   const naming = names.length ? names.join(' and ') : 'your loan';
   const swap = (s) => String(s || '').replace(/\{debt\}/g, naming);
   return {
-    id: c.id, icon: c.icon, title: c.title, need: c.need,
-    open: mnyIsOpen(kid, c.need),
+    id: c.id, icon: c.icon, title: c.title, stage: c.stage,
+    open: mnyIsOpen(kid, c.stage),
     what: swap(c.what), why: swap(c.why), risk: swap(c.risk),
     whyLabel: c.whyLabel || 'Why it helps', riskLabel: c.riskLabel || 'What to watch',
   };
@@ -1620,6 +1645,82 @@ function mnyShortDate(dayKey) {
 function mnyWeekKey() {
   if (typeof ctWeekKey !== 'undefined' && ctWeekKey) return ctWeekKey;
   return ctThisWeekKey();
+}
+
+/* ── Does this week hold ANY money record for this child? ──
+   One owner, asked by the Grandma rule (`mnyDefaultSweepPlan`, js/24), which
+   may only credit a week in which no money was recorded for her. A week with
+   money in it has its own numbers, and a flat amount on top would pay twice.
+
+   MONEY RECORDS ONLY, per the owner's definition: "skips any week already
+   settled AND any week holding real graded chores, meets or gifts."
+   Read WITHOUT creating anything — no mrEnsureEarnings here, which would
+   write empty maps into a document that uploads whole on every change.
+
+   Counted (MNY_WEEK_RECORD_STORES):
+     settled — finalizedWeeks · moneyLedger · moneySnapshots (her row);
+       groupPayoutsFired (her row under any group, the retired payouts);
+       meetingsHeld (the money moved at the meeting — family-wide);
+     graded chores — earnings: a chore grade, a priced learning count, or a
+       meeting override of a channel;
+     meets — competitions; gifts — deposits; fines — fines;
+     and the money stream itself — events (dated or filed to the week).
+
+   Deliberately NOT counted, because none of it is money:
+     planner blocks, planned, ticked done or confirmed — a week lived in the
+       planner with nothing recorded money-wise is the week the rule exists
+       for; routine ticks (mandatory/optionalByWeek) — a streak only becomes
+       money when a week is settled, and a settled week is caught by the
+       ledger; XP (xpByWeek, xpAwardedWeeks); her note (weekFeedback);
+       reflections; goals (goalsByWeek, and goalBonusByWeek, a met-it flag the
+       retired board priced — credited dollars are in the ledger); the plan and
+       its confirm (weekPlans, weekConfirms); the sitting-down mark
+       (meetingsMet); weeksClosed; days a grown-up reviewed (parentDayConfirm);
+       the Sunday Box (boxItems — a repeat's fine is in `fines`); a move she
+       asked for (moveRequests — a proposal, not a movement); and earnings'
+       claims, attitude, personal chores, sick days and `missing`.
+   Stamps (updatedAtByWeek and friends) say when, not what.
+   `mnyWeekRecordStores` says which counted stores hold something, so a check
+   can walk the list store by store. */
+const MNY_WEEK_RECORD_STORES = [
+  'finalizedWeeks', 'moneyLedger', 'moneySnapshots', 'groupPayoutsFired', 'meetingsHeld',
+  'earnings', 'competitions', 'fines', 'deposits', 'events',
+];
+/* The parts of a week's earnings map that price money. */
+const MNY_EARNINGS_MONEY_KEYS = ['chores', 'learning', 'overrides'];
+function mnyWeekRecordStores(weekKey, kid) {
+  const wk = String(weekKey || '');
+  const c = (state.shared || {}).chore || {};
+  const p = (state.profiles || {})[kid] || {};
+  const mon = formatDayKey(wk);
+  const days = [];
+  for (let i = 0; i < 7; i++) { const d = new Date(mon); d.setDate(mon.getDate() + i); days.push(ctDateToKey(d)); }
+  const inWeek = (dk) => !!dk && days.indexOf(String(dk)) >= 0;
+  const any = (o) => {                               // a truthy leaf anywhere
+    if (o == null) return false;
+    if (typeof o !== 'object') return !!o;
+    return Object.keys(o).some(k => any(o[k]));
+  };
+  const row = (map) => ((map || {})[wk] || {})[kid];
+  const dated = (a) => (Array.isArray(a) ? a : []).some(x => x && (x.weekKey === wk || inWeek(x.dayKey)));
+  const earn = (p.earnings || {})[wk] || {};
+  const hit = {
+    finalizedWeeks: row(c.finalizedWeeks) != null,
+    moneyLedger: row(c.moneyLedger) != null,
+    moneySnapshots: row(c.moneySnapshots) != null,
+    groupPayoutsFired: Object.keys((c.groupPayoutsFired || {})[wk] || {})
+      .some(g => ((c.groupPayoutsFired[wk] || {})[g] || {})[kid] != null),
+    meetingsHeld: !!(c.meetingsHeld || {})[wk],
+    earnings: MNY_EARNINGS_MONEY_KEYS.some(k => any(earn[k])),
+    competitions: dated(p.competitions),
+    fines: dated(p.fines),
+    deposits: dated(p.deposits),
+    events: dated(p.events),
+  };
+  return MNY_WEEK_RECORD_STORES.filter(k => hit[k]);
+}
+function mnyWeekHasAnyRecord(weekKey, kid) {
+  return mnyWeekRecordStores(weekKey, kid).length > 0;
 }
 
 // Inert in the browser; lets tests run these helpers in Node.

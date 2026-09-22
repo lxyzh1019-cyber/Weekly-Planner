@@ -61,13 +61,13 @@ function mnyLadderCard(kid, pct, idx) {
   const principal = mnyTotalPrincipal(kid);
   const next = MNY_STAGES[idx + 1];
   const toNext = next && principal > 0
-    ? money2(Math.max(0, (next.pct / 100) * principal - mnyTotalPaid(kid))) : 0;
+    ? money2(Math.max(0, (mnyStagePct(next.id) / 100) * principal - mnyTotalPaid(kid))) : 0;
 
   const rows = MNY_STAGES.map((s, i) => {
     const open = i <= idx;
     return `<div class="mny-row${i === idx ? ' total' : ''}${open ? '' : ' dim'}">
         <span>${s.icon} ${escapeHtml(s.title)}</span>
-        <b>${i === idx ? 'you are here' : (open ? 'open' : '🔒 ' + s.pct + '%')}</b>
+        <b>${i === idx ? 'you are here' : (open ? 'open' : '🔒 ' + mnyStagePct(s.id) + '%')}</b>
       </div>`;
   }).join('');
 
@@ -94,19 +94,19 @@ function mnyConceptPanel(kid) {
      dead button with no idea why; tapping it says what opens it, which is the
      only useful thing a locked lesson has to offer. */
   const chips = MNY_CONCEPTS.map(c => {
-    const open = mnyIsOpen(kid, c.need);
+    const open = mnyIsOpen(kid, c.stage);
     return `<button type="button" class="mny-chip ${mnySchoolConcept === c.id ? 'on' : ''}${open ? '' : ' locked'}"
       data-mny-action="concept" data-mny-concept="${c.id}">
       ${c.icon} ${escapeHtml(c.title)}${open ? '' : ' 🔒'}</button>`;
   }).join('');
 
   const c = mnyConceptCard(mnySchoolConcept, kid);
-  const toGo = money2(Math.max(0, (c.need / 100) * mnyTotalPrincipal(kid) - mnyTotalPaid(kid)));
+  const toGo = money2(Math.max(0, (mnyStagePct(c.stage) / 100) * mnyTotalPrincipal(kid) - mnyTotalPaid(kid)));
   const body = c.open
     ? `<div class="mny-sub">What it is</div><p>${escapeHtml(c.what)}</p>
        <div class="mny-sub">${escapeHtml(c.whyLabel)}</div><p>${escapeHtml(c.why)}</p>
        <div class="mny-sub">${escapeHtml(c.riskLabel)}</div><p>${escapeHtml(c.risk)}</p>`
-    : `<p>🔒 ${escapeHtml(mnyNeedLabel(c.need))}.</p>
+    : `<p>🔒 ${escapeHtml(mnyNeedLabel(c.stage))}.</p>
        ${toGo > 0 ? `<p>Pay off <b>${mnyMoney(toGo)}</b> more and this one opens.</p>` : ''}
        <p>It is not a secret — it is just easier to understand once you have money that could go either way.</p>`;
 
