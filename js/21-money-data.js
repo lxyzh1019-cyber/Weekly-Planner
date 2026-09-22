@@ -739,6 +739,15 @@ function mnyGiftDecidedElsewhere(kid, dayKey) {
    because it is the same mechanism. */
 const MNY_SETTLED_WEEK_SENTENCE = 'That week is already settled, so it arrives on its own date and you will decide where it goes at the next meeting.';
 
+/* Rule 1 of mnyLateCompSync (below) as one question — a ledger row whose
+   competition channel is neither voided nor edited at the table — so the list
+   of older weeks' unpaid meets (mnyUnpaidMeetsPlanFor) can never pick a
+   different set of weeks than the sync it pays through. */
+function mnyLateCompByTotal(led) {
+  return !!led && (led.voided || []).indexOf('competition') < 0
+    && (led.edited || []).indexOf('comp') < 0;
+}
+
 /* ── A MEET FOR A WEEK ALREADY SETTLED — the gift pattern ────────────
    The owner: "a settled week only discusses routine, fine, chore money, and
    how the money is spent (the split); a settled week does not block the
@@ -806,7 +815,7 @@ function mnyLateCompSync(kid, dayKey, change) {
   if (!fin || fin[kid] == null) return 0;
   const led = ((c.moneyLedger || {})[wk] || {})[kid] || null;
   if (led && (led.voided || []).indexOf('competition') >= 0) return 0;
-  const byTotal = !!led && (led.edited || []).indexOf('comp') < 0;
+  const byTotal = mnyLateCompByTotal(led);
   const comp = (ch && ch.comp) || null;
   let delta, id, target = 0;
   if (byTotal) {
@@ -855,6 +864,51 @@ function mnyLateCompTotal(kid, weekKey) {
     if (e.from === 'cash') return s - (Number(e.amount) || 0);
     return s;
   }, 0));
+}
+
+/* ── Older weeks whose meets were never paid — caught up once ──────
+   mnyLateCompSync pays a meet the moment it is written into a settled week.
+   A meet already on file when its week was settled by something that did not
+   pay meets — an older build's default, or a meet that arrived from the other
+   device after — has no write left to trigger it, and sits unpaid.
+
+   So this LISTS them, for a parent to see before anything moves: every
+   settled week whose ledger row the sync treats by total (mnyLateCompByTotal)
+   and whose meets are worth more than the row says was paid for them. Only a
+   positive gap is listed or paid — like the repair's rule 2, old history is
+   never taken back. A week with no ledger row stays with the repair, and so
+   does a week the repair itself lists: it re-prices the whole week, meets
+   included, and the two lists must never offer the same dollars twice.
+   Reads only. */
+function mnyUnpaidMeetsPlanFor(kid) {
+  ctEnsureShared();
+  const c = state.shared.chore;
+  const fin = c.finalizedWeeks || {};
+  const repair = (typeof evRepairPlanFor === 'function') ? evRepairPlanFor(kid).weeks.map(w => w.wk) : [];
+  const weeks = [];
+  Object.keys(fin).sort().forEach(wk => {
+    if ((fin[wk] || {})[kid] == null) return;
+    const led = ((c.moneyLedger || {})[wk] || {})[kid] || null;
+    if (!mnyLateCompByTotal(led) || repair.indexOf(wk) >= 0) return;
+    const cw = mrCompetitionWeek(wk, kid);
+    const gap = money2(cw.paid - money2(led.competition));
+    if (!(gap > 0)) return;
+    weeks.push({ wk, gap, names: cw.entries.map(e => e.name || mnySportLabel(e.sport)) });
+  });
+  return { kid, weeks, total: money2(weeks.reduce((s, w) => s + w.gap, 0)) };
+}
+function mnyUnpaidMeetsPlan() { return ['jenn', 'jess'].map(mnyUnpaidMeetsPlanFor); }
+/* Pays through the sync's own no-change mode, never around it: it brings each
+   row to its total, so a second run — here, on a re-tap, or on the other
+   device — finds nothing to pay. The plan is re-read here rather than handed
+   in, so a week that stopped owing since the preview pays nothing. */
+function mnyPayUnpaidMeets() {
+  let paid = 0, weeks = 0;
+  mnyUnpaidMeetsPlan().forEach(p => p.weeks.forEach(w => {
+    const moved = mnyLateCompSync(p.kid, w.wk);
+    if (moved > 0) { paid = money2(paid + moved); weeks++; }
+  }));
+  return { paid, weeks };
 }
 
 function mnyEnsureDeposits(kid) {

@@ -994,7 +994,11 @@ function mnyCommittedCard(wk, kid) {
       <div class="mny-label">Done for this week</div>
       <div class="mny-today-big">The money has moved. ${escapeHtml(plan.label || '')}</div>
       ${mnyBarHtml(out, { empty: '' })}
-      ${mmUndo ? `<button type="button" class="mny-btn wide" onclick="mmUndoRecord()">↩️ Undo this meeting — puts both girls back</button>` : ''}
+      ${/* Asked, not read: mmUndoHeld drops an undo that money moving after
+            the meeting has made unsafe, and the note takes the button's place. */''}
+      ${mmUndoHeld() ? `<button type="button" class="mny-btn wide" onclick="mmUndoRecord()">↩️ Undo this meeting — puts both girls back</button>`
+        : (mmUndoGone && mmUndoGone.wk === wk
+          ? `<div class="mny-note">${escapeHtml(MM_UNDO_GONE_SENTENCE)} (${escapeHtml(mmUndoGone.why)})</div>` : '')}
     </div>`;
 }
 
@@ -1206,6 +1210,12 @@ function mnyDoCommit() {
   if (!d || !mnyIsConfirmed(wk, kid) || mnyIsCommitted(wk, kid)) return;
   if (!isParent()) { showToast('A grown-up moves the money 🔒'); return; }
 
+  /* The start of the commit's bracket (js/15-meeting.js, mmUndoHeld): money
+     that moved since the previous girl's commit withdraws the undo HERE,
+     before this commit writes anything; mmUndoSeal at the end claims what
+     this one moved as the meeting's own. */
+  mmUndoHeld();
+
   // Catch the world up first: interest earned and prices moved since the last
   // meeting are part of this week, and the ledger has to record them.
   mnySimCatchUp(kid);
@@ -1312,6 +1322,7 @@ function mnyDoCommit() {
 
   // 5 · the shared half of the meeting, once BOTH kids are settled.
   if (['jenn', 'jess'].every(k => mnyIsCommitted(wk, k))) commitMeetingShared(wk);
+  mmUndoSeal();
 
   saveAll();
   mnyDraft = null; mnyPlanOpen = false;

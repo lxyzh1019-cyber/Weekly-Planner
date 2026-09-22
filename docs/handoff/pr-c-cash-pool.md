@@ -142,6 +142,17 @@ The current cards in js/22-money-page1.js are:
 - The Flow's caption must equal its bars. PR A fixed exactly this defect; do not reintroduce it.
 - Settling a week closes chores, routines, fines and the split. It never closes competitions or gifts (B6).
 
+## 5b. Prerequisite found before handoff — fix FIRST
+
+A legitimate meeting **Undo** (`mmUndoRecord`, js/15-meeting.js) puts the wallet, the ledger and
+`finalizedWeeks` back, but it leaves the commit's own lines in the money stream (`profile.events`,
+written by `evMirror` in js/40-stream.js with fresh ids). A re-commit then adds a second set, so the
+**stream over-counts** while the wallet is right. `evShadowDrift(kid)` shows the gap.
+
+Every PR C figure reads from the stream, so fix this first: test first, and make the Undo reverse
+exactly the stream lines its commit wrote. This existed before B8. B8 only stops the Undo once other
+money has moved.
+
 ## 6. Acceptance checks
 
 - It matches the signed-off Claude Design picture at 1194 × 834, and the phone stack is sane.
@@ -158,6 +169,7 @@ The current cards in js/22-money-page1.js are:
 
 ## 7. First three things to do
 
+0. Fix the Undo/stream prerequisite in §5b (small, test first) — the pool must not read a double-counted stream.
 1. Ask the owner for the signed-off Claude Design result: the link or file, and the one variant chosen.
 2. Read `ARCHITECTURE.md`'s money sections and `FEATURES.md`'s money manifest. Then present
    **Plan v1 — PR C** with success criteria from section 6, awaiting approval.

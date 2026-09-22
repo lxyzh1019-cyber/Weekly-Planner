@@ -56,7 +56,7 @@ Deriving the full app manifest from `ARCHITECTURE.md` is an open item in `WORKIN
 ## App — Pocket money (manifested 2026-09-22)
 
 Derived from `ARCHITECTURE.md` and checked against the code at `f4d1db5`;
-updated for Plan v5 PR A, Plan v6 PR B and Plan v7 B5–B7 (2026-09-22). **This section is authoritative for the
+updated for Plan v5 PR A, Plan v6 PR B, Plan v7 B5–B7 and Plan v8 B8–B10 (2026-09-22). **This section is authoritative for the
 money area**; the rest of the app still checks against `ARCHITECTURE.md`. Items
 marked ⚠ are known defects still open — listed so a regression table can show
 them changing on purpose.
@@ -78,6 +78,7 @@ them changing on purpose.
 - The year's-pace denominator is asserted directly (weeks elapsed, not weeks settled).
 - The rules change log stores readable values: `mrLogSummary` describes a list of records by id ("Added 🧦 Match the socks"); the history passes older stored arrays through the same summariser.
 - The repair only ever adds, prices each week under its own rules, never touches a migration-frozen week, and is idempotent.
+- 🏆 The repair card's second list, "Meets never paid" (`mnyUnpaidMeetsPlan` / `mnyPayUnpaidMeets`): settled weeks with a ledger row the late-meet sync treats by total (`mnyLateCompByTotal`, shared with `mnyLateCompSync`) whose meets are worth more than the row says — each week, its meet names and the amount. Positive gaps only, never takes back; weeks with no ledger row or already on the repair's list stay with the repair. Shown even when the repair has nothing; previewed and confirmed like the repair; one tap pays through `mnyLateCompSync`'s no-change mode, so a second tap pays nothing. (Plan v8 B9)
 - The $3 default is backfill only: it never reaches the current week or the eight the catch-up list covers.
 - 👵 The Grandma rule is the owner's test and the only default sweep (`mnyDefaultSweepPlan` / `mnyRunDefaultSweep`): a child's week gets the rule's amount when it is on or after the saved start week, outside the 8-week review window, has no family meeting record (`meetingsMet` or `meetingsHeld`) and is not already credited. Chores, fines, gifts and overrides in the week do not stop it. A meet already on file is paid on top as its own line; the row's `competition` is that total and gross/net/`finalizedWeeks` are amount + competition. Previewed (weeks, per-child totals, how many weeks had a family meeting), confirmed through the app dialog, guards re-checked at write time, never reaches the current week, a later one or the catch-up eight, credits once. New rows carry `defaulted` + `defaultReason: 'grandma'`; older `'default'` rows still read "nobody met". Week history and her money story say "Grandma rule"; the story's flat segment excludes the meet so it is drawn once. Its own Money rules section and Setup row. (Plan v7 B5 — replaced PR B's money-record filter and to-date, both deleted.)
 - 👵 The start week and amount are a dated rule, `grandma.from` / `grandma.amount`, entered once through the section's Save button and `mrApplyEdits`, logged as readable scalar lines in 🕰️ Change history. `mnyGrandmaRule()` reads the newest version; without it the rule falls back to `mrStartWeek()` and $3 and is "not saved", and nothing is credited until a start week is saved. The form is a draft until Save; there is no to-date; it says the last 8 weeks are left to the catch-up list. No new synced key. (Plan v7 B7)
@@ -108,6 +109,7 @@ them changing on purpose.
 - Three steps with ids — The week · The money · Close; `mmGoStep` translates the legacy five.
 - The money step's footer is the commit, and never a Next; `mnyCommitRefusal` is the one owner of why a split cannot commit. When one child is decided, it offers the other.
 - One undo snapshot per week.
+- ↩️ The Undo is withdrawn once money moves after the commit: the snapshot keeps the id of every money event on both girls' streams, and `mmUndoHeld()` drops it when any other money event is on either stream — written here (late meet, gift, move, approval) or merged from the other device — keeping the reason in `mmUndoGone`. The commit's own movements, for both girls one after the other, keep it (explicit bracket: `mmUndoHeld()` before a commit writes, `mmUndoSeal()` after). Both girls are caught up before the picture. In the button's place the meeting says "Undo is gone — money moved after this meeting; correct the item itself." with what moved; a stale button refuses. Withdrawn stays withdrawn for that week in that sitting. (Plan v8 B8)
 
 ### Kid money pages
 - 💰 My money, 📖 My money story, 🎓 Money school, joined by the five-page bar (a child sees pages 1 and 5).
@@ -123,6 +125,7 @@ them changing on purpose.
 ### Parent money pages
 - Money rules has eight sections, 🕰️ Change history and 👵 Grandma rule among them; steppers queue as pending edits and save as one version with a reason and an effective date.
 - Setup › 🕰️ Change history opens the Change history section (the rules log), the one section that draws it; 📖 Week history keeps the week ledger; Lessons and Loans no longer carry the log.
+- 📖 Week history: a `defaulted` row reads "👵 Grandma rule $3 + meets $X" (or "No meeting — default $3 + meets $X" for `defaultReason:'default'`) from its own figures, with no steppers and no remove button; `mnyEditLedger` and `mnyDeleteLedgerWeek` refuse it with a sentence and change nothing (its money is already in her wallet; its meets correct through the meet). Hand-typed rows without `defaulted` keep the editor unchanged. (Plan v8 B10)
 - Loan edits never touch `paid` or `payments`; balance, pace, payoff date and the weekly amount due are derived on every render.
 - The Money school ladder opens at **20 / 30 / 40 / 100%** of all debt paid (ready · locked · stock · mix), from ONE table: `MNY_STAGES` has ids, pots / plans / lessons name a stage, and `mnyStagePct` reads `school.stagePct` with per-key defaults (no migration). A parent override can only open a stage, never close one.
 - Money rules › Lessons has three gate steppers (ready / locked / stock) that save as a dated rule version; a save that breaks ready ≤ locked ≤ stock ≤ 100 is refused with a sentence in the handler.

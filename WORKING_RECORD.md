@@ -12,8 +12,9 @@ Single working record for this repository. Updated by the main session at the en
 
 ## Pending
 - B5–B7 committed on #92. Owner: save the start week in Money rules › 👵 Grandma rule, then preview before crediting.
-- B8–B10 with opus-worker (closes the known limits below); then #92 description + ready for review; owner merges before 1 Oct.
-- Known limits (B6), being closed by B8–B10: older 'default' rows holding unpaid meets are caught up only when a meet in that week is next touched; `mnyEditLedger` recomputes gross on a defaulted row without the flat amount (pre-existing); meeting Undo after a late meet then re-commit could pay it twice (session-only).
+- #92 description updated + ready for review; owner merges before 1 Oct and checks the iPad stamp reads 2026-09-22d.
+- **Found in passing (pre-existing, not fixed):** a legitimate meeting Undo puts the wallet back but leaves the commit's lines in the money stream, so a re-commit double-counts in the stream (the wallet is right; `evShadowDrift` shows the gap). PR C reads every figure from the stream, so this must be fixed before PR C — listed in the handoff.
+- Closed by B8–B10 (was): older 'default' rows holding unpaid meets are caught up only when a meet in that week is next touched; `mnyEditLedger` recomputes gross on a defaulted row without the flat amount (pre-existing); meeting Undo after a late meet then re-commit could pay it twice (session-only).
 - PR #92 (PR A + PR B + B5–B7) must be merged and deployed before 1 Oct.
 - C8 Claude Design brief → owner runs Claude Design → owner signs off the pool picture → gates PR C.
 - PR [#91](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/91) — **merged** to `main` (`f4d1db5`).
@@ -65,7 +66,7 @@ Single working record for this repository. Updated by the main session at the en
 | 42 | R3 2026-09-22 | "Everything I have with the small tiles is clearer"; "end total means adding all the categories together — not my goal" | open → PR C (C1) | Four pot tiles back; NO summed total; "Where it is now" table dropped. |
 | 43 | R3 2026-09-22 | Grandma rule: "any week not in the 8-week review window and with no family meeting record gets $3"; "I will input the start week"; "does not close the door to the competition" | done → B5–B7 | Replaces #15. PR B had built the wrong test (money records, to 30 May). **Correction on record.** |
 | 44 | R3 2026-09-22 | "A settled week should not block a late competition" + "a settled week only discusses routine, fine, chore money and how the money is spent; it does not block the competition and gift" | done → B6 | Widens B6 from defaulted weeks to every settled week; a late meet follows the existing late-gift pattern (cash on its own date, split at the next meeting); gifts get a test. Same class as the "$21 meet in a $0 week" the repair fixed for legacy weeks only. |
-| 45 | R3 2026-09-22 | "Fix all the three known limits, need your suggestion" | open → B8–B10 on #92 | Undo withdrawn after later money moves (class fix); unpaid-meets catch-up, adds only; defaulted rows read-only. |
+| 45 | R3 2026-09-22 | "Fix all the three known limits, need your suggestion" | done → B8–B10 | Undo withdrawn after later money moves (class fix); unpaid-meets catch-up, adds only; defaulted rows read-only. |
 | 46 | R3 2026-09-22 | Fines in the pool: "you are right, thin stream flowing out of the pool" | done | Brief already says so; decision recorded. |
 | 47 | R3 2026-09-22 | "Leave the cash pool out from this PR with a handoff document to pick it up later" | done | `docs/handoff/pr-c-cash-pool.md`. |
 
@@ -123,7 +124,7 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → n
 | Plan v6 C0 — clickable mockup for sign-off (now v5 of the canvas: iPad landscape, toggle card, cash pool titled, have/owe chart, paired month columns) | COMPLETE — awaiting owner sign-off | Design canvas https://claude.ai/artifact/3fYy6KiQMcSissRGBvnG6d (private); started ahead of PR B because sign-off is the long pole — content unchanged |
 | Plan v7 B5–B7 — Grandma rule to the owner's test; late competitions paid into any settled week; start week saved as a dated rule | COMPLETE | main session's own `npm test`: check 8/8 · merge 112 · buffers 9 · stream 31 · cleanup · xp 28 · money 33 · smoke all; 10 new checks each shown failing on 17771e2 (worker evidence); build `2026-09-22c`. Repair now skips defaulted weeks (consequence of the flat rule). |
 | Plan v7 C8 — Claude Design brief for the pool | COMPLETE — awaiting owner review | `docs/design/cash-pool-brief.md`; fines as a thin outflow — confirmed by the owner |
-| Plan v8 B8–B10 — close the three known limits | NOT STARTED → in progress (opus-worker) | — |
+| Plan v8 B8–B10 — close the three known limits | COMPLETE | main session's own `npm test` exit 0: check 8/8 (SW_VERSION 2026-09-22d = APP_BUILD) · merge 112 · buffers 9 · stream 31 · cleanup · xp 28 · money 33 · smoke ALL PASSED; 3 new checks each failed on 1fbc426 (worker evidence) |
 | Plan v8 PR C handoff document | COMPLETE | `docs/handoff/pr-c-cash-pool.md`; every code name cited checked by grep |
 | Plan v7 PR C (not in #92) — the pool (C1), My money as earn · spend · invest · cash (C2), Today card + toggle (C3/C4), have/owe chart (C6), month columns (C7) | NOT STARTED | Blocked on the owner's sign-off of the Claude Design picture |
 | `routing_guard_mode: enforce` | NOT STARTED | Blocked on `tests/test-routing-hook.md`, which must run in a session where the hooks are live (i.e. after merge to `main`). |
@@ -138,6 +139,8 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → n
 - 2026-09-22 Chart palette validated with the dataviz validator against #fffdf5: all six checks pass (CVD ΔE 16.8, normal-vision 22.3, contrast ≥ 3:1).
 
 - 2026-09-22 B5–B7, main session's own run: `npm test` exit 0 — check 8/8 (SW_VERSION 2026-09-22c = APP_BUILD) · merge 112 · buffers 9 · stream 31 · cleanup · xp 28 · money 33 · smoke ALL PASSED.
+
+- 2026-09-22 B8–B10, main session's own run: `npm test` exit 0 — check 8/8 (2026-09-22d) · merge 112 · buffers 9 · stream 31 · cleanup · xp 28 · money 33 · smoke ALL PASSED.
 
 ## Open questions / blockers
 1. **`FEATURES.md` app manifest is unfilled.** The bundle ships it as a template. A real manifest for this app has to be derived from `ARCHITECTURE.md` (~2700 lines) and would be a task of its own; inventing one quickly would produce a manifest that regression tables are checked against but that is itself wrong — worse than an empty one. Recommend a dedicated round.

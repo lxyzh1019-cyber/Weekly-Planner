@@ -14474,7 +14474,9 @@ function findChromium() {
       const row = (c.moneyLedger[plan.weeks[0].wk] || {}).jenn;
       if (!row) bad.push('no ledger row was written for a defaulted week');
       if (row && !row.defaulted) bad.push('a defaulted week is not marked as one');
-      if (row && !row.handEntered) bad.push('a defaulted row cannot be corrected by mnyEditLedger');
+      // Still marked handEntered, as older rows are; `defaulted` is what keeps it
+      // out of the hand editor (Plan v8 B10, aDefaultedWeekIsNotEditedByHand).
+      if (row && !row.handEntered) bad.push('a defaulted row is no longer marked handEntered');
 
       // Idempotent: running it again credits nothing.
       await mnyRunDefaultSweep();
@@ -15418,6 +15420,234 @@ function findChromium() {
     }
     return bad.length ? bad : true;
   });
+  /* ── Plan v8 B8–B10 — the meeting's Undo, older weeks' unpaid meets, and a
+     $3 week's record ── begin
+     Each check snapshots the whole state and puts it back. */
+
+  /* (B8) MEETING UNDO CAN NO LONGER PAY TWICE. The Undo restores wallets,
+     debts, holdings and the week's records wholesale, so any money that moved
+     AFTER the commit — a late meet, a gift — was wiped from the wallet while
+     its stream line stayed, and a re-commit paid the meet again. Once anything
+     moves money after the commit, the Undo is withdrawn and the meeting says
+     why. The commits themselves, for both girls in one sitting, keep it. */
+  checks.moneyMovedAfterTheMeetingWithdrawsTheUndo = await page.evaluate(() => {
+    const bad = [];
+    const snap = JSON.stringify(state);
+    const put = (json) => { const s = JSON.parse(json || snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s); };
+    const hasGone = typeof mmUndoGone !== 'undefined';
+    const was = { profile, parentViewing, undo: mmUndo, gone: hasGone ? mmUndoGone : null, draft: mnyDraft,
+                  meetKid: mnyMeetKid, wk: ctWeekKey, step: mmStep };
+    const GONE = 'Undo is gone — money moved after this meeting; correct the item itself.';
+    try {
+      profile = 'parent'; parentViewing = 'jenn';
+      ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+      const wk = ctWeekKey;
+      const c = state.shared.chore;
+      ['finalizedWeeks', 'xpAwardedWeeks', 'moneyLedger', 'weekPlans', 'weekConfirms', 'meetingsHeld', 'meetingsMet']
+        .forEach(k => { if (c[k]) delete c[k][wk]; });
+      ['jenn', 'jess'].forEach(k => { const p = getProfData(k); p.competitions = []; p.deposits = []; ensureWallet(k).cash = 50; });
+      const sitting = () => {
+        mmUndo = null; if (hasGone) mmUndoGone = null;
+        ['jenn', 'jess'].forEach(k => mnyConfirmWeek(wk, k, 'a grown-up'));
+      };
+      const commit = (kid) => { mnySetMeetKid(kid); mmStep = 2; mnyDraft = null; mnyRenderDecide(wk); mnyDoCommit(); };
+      const card = (kid) => { const h = document.createElement('div'); h.innerHTML = mnyCommittedCard(wk, kid); return h; };
+      const undoBtn = (h) => [...h.querySelectorAll('button')].find(b => /mmUndoRecord/.test(b.getAttribute('onclick') || ''));
+      const cashLine = (kid) => evBalanceOf(evList(kid), 'cash');
+
+      // 1 · Both girls, one after the other: the undo taken before the first is kept.
+      const fresh = JSON.stringify(state);
+      sitting();
+      commit('jenn');
+      const first = mmUndo;
+      if (!first) bad.push('committing Jenn took no undo snapshot');
+      commit('jess');
+      if (!isChildMoneyCommitted('jess', wk)) bad.push('fixture: Jess did not settle');
+      if (!first || mmUndo !== first) bad.push('committing the second girl dropped or replaced the undo');
+      if (!undoBtn(card('jess'))) bad.push('after both commits the Undo button is not offered');
+
+      // 2 · A late meet for the settled week: paid once, and the undo is withdrawn.
+      const cash0 = mnyCash('jenn'), line0 = cashLine('jenn');
+      const led0 = money2((c.moneyLedger[wk] || {}).jenn ? c.moneyLedger[wk].jenn.competition : NaN);
+      const fin0 = money2((c.finalizedWeeks[wk] || {}).jenn);
+      mrAddCompetition('jenn', { dayKey: mrWeekDayKeys(wk)[0], sport: 'skate', name: 'Late Invitational', points: 21 });
+      const paid = money2(mnyCash('jenn') - cash0);
+      if (paid !== 21) bad.push('fixture: the late meet paid ' + paid + ', expected 21');
+      const h = card('jenn');
+      if (undoBtn(h)) bad.push('after a late meet the Undo button is still offered');
+      if (h.textContent.replace(/\s+/g, ' ').indexOf(GONE) < 0) bad.push('the meeting does not say the Undo is gone: ' + h.textContent.replace(/\s+/g, ' ').slice(0, 200));
+      if (mmUndo) bad.push('mmUndo is still held after money moved');
+      mmUndoRecord();                                  // a stale button, pressed anyway
+      if (money2(mnyCash('jenn') - cash0) !== 21) bad.push('the Undo still ran and took the wallet to ' + mnyCash('jenn'));
+      if (!isChildMoneyCommitted('jenn', wk)) bad.push('the Undo still un-settled her week');
+      const streamMoved = money2(cashLine('jenn') - line0);
+      const led = (c.moneyLedger[wk] || {}).jenn || {};
+      if (streamMoved !== 21) bad.push('the stream moved ' + streamMoved + ' while the wallet moved 21');
+      if (money2(led.competition - led0) !== 21) bad.push('the ledger competition moved ' + money2(led.competition - led0) + ', expected 21');
+      if (money2(c.finalizedWeeks[wk].jenn - fin0) !== 21) bad.push('finalizedWeeks moved ' + money2(c.finalizedWeeks[wk].jenn - fin0) + ', expected 21');
+
+      // 3 · A gift after the commit withdraws it too.
+      put(fresh);
+      sitting();
+      commit('jenn');
+      if (!mmUndo) bad.push('fixture: no undo after committing Jenn');
+      const g = mnyAddDeposit('jenn', wk, { amount: 20, from: MNY_FROM[0], giver: 'Grandma', dayKey: todayKey() });
+      if (!g) bad.push('fixture: the gift was refused');
+      const h2 = card('jenn');
+      if (undoBtn(h2)) bad.push('after a gift the Undo button is still offered');
+      if (h2.textContent.replace(/\s+/g, ' ').indexOf(GONE) < 0) bad.push('after a gift the meeting does not say the Undo is gone');
+      // The next girl's commit does not bring a picture back that cannot put both girls back.
+      commit('jess');
+      if (mmUndo) bad.push('committing Jess after the Undo was withdrawn took a new one');
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      put();
+      profile = was.profile; parentViewing = was.parentViewing; mmUndo = was.undo; if (hasGone) mmUndoGone = was.gone;
+      mnyDraft = was.draft; mnyMeetKid = was.meetKid; ctWeekKey = was.wk; mmStep = was.step;
+      saveLocal();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* (B9) OLDER WEEKS' UNPAID MEETS ARE CAUGHT UP, ONCE. A settled week whose
+     ledger row is synced by total (competition not edited at the table, not
+     voided) and whose meets are worth more than the row says is listed under
+     "🏆 Meets never paid" in the repair card, previewed, and paid by one tap
+     through mnyLateCompSync — so a second tap pays nothing. A week whose gap is
+     negative is not listed and loses nothing; the card shows even when the
+     repair itself has nothing to do. */
+  checks.olderWeeksUnpaidMeetsArePaidOnce = await page.evaluate(async () => {
+    const bad = [];
+    const snap = JSON.stringify(state);
+    const put = () => { const s = JSON.parse(snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s); };
+    const was = { profile, parentViewing, showConfirm: window.showConfirm, section: mnyParentSection };
+    try {
+      profile = 'parent'; parentViewing = 'jenn';
+      ctPrepareRead();
+      const back = (n) => { const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - 7 * n); return ctDateToKey(d); };
+      const c = state.shared.chore;
+      Object.assign(c, { finalizedWeeks: {}, moneyLedger: {}, meetingsHeld: {}, meetingsMet: {}, weekPlans: {},
+                         programStartDate: back(30), programStartDateAt: syncNow() });
+      ['jenn', 'jess'].forEach(k => { const p = getProfData(k); p.competitions = []; p.fines = []; p.deposits = []; p.earnings = {}; ensureWallet(k).cash = 500; });
+      const row = (comp, gross) => ({ at: 1, handEntered: true, defaulted: true, defaultReason: 'grandma', updatedAt: 1,
+        chores: 0, learning: 0, streak: 0, competition: comp, fines: 0, outside: 0, ready: 0, gic: 0, stock: 0, debtExtra: 0,
+        gross, net: gross, xp: 0, boxReleased: 0, loan: null });
+      const meet = (id, wk, name, awarded) => getProfData('jenn').competitions.push({ id, dayKey: mrWeekDayKeys(wk)[5], sport: 'skate',
+        name, points: awarded, placement: {}, awarded, updatedAt: syncNow() });
+      // A $3 week credited before meets were paid on top: the meet is on file, the row says 0.
+      const W = back(15);
+      c.finalizedWeeks[W] = { jenn: 3 }; c.moneyLedger[W] = { jenn: row(0, 3) };
+      meet('comp-unpaid', W, 'Winter Invitational', 21);
+      // A week whose row already says MORE than its meets are worth: never taken back.
+      const N = back(16);
+      c.finalizedWeeks[N] = { jenn: 33 }; c.moneyLedger[N] = { jenn: row(30, 33) };
+      meet('comp-over', N, 'Autumn Cup', 10);
+      const cash0 = mnyCash('jenn');
+      window.showConfirm = async () => true;
+      if (evRepairPlan().some(p => p.weeks.length)) bad.push('fixture: the repair has something of its own to do');
+      showScreen('parent'); setParentTab('money'); mnyParentSection = 'history'; mnyRenderRulesTab();
+      let wrap = document.getElementById('mnyRulesWrap');
+      let txt = wrap.textContent.replace(/\s+/g, ' ');
+      if (txt.indexOf('Meets never paid') < 0) bad.push('the repair card has no "Meets never paid" list: ' + txt.slice(0, 300));
+      if (txt.indexOf('Winter Invitational') < 0 || txt.indexOf(mnyShortDate(W)) < 0 || txt.indexOf('$21.00') < 0) bad.push('the list does not show the week, the meet and $21');
+      if (txt.indexOf('Autumn Cup') >= 0) bad.push('a week whose row already says more than its meets is listed');
+      if (money2(mnyCash('jenn') - cash0) !== 0) bad.push('showing the list moved money');
+      const btn = wrap.querySelector('[data-mnyp-action="paymeets"]');
+      if (!btn) bad.push('there is no button to pay the unpaid meets');
+      else { btn.click(); await new Promise(r => setTimeout(r, 50)); }
+      if (money2(mnyCash('jenn') - cash0) !== 21) bad.push('one tap paid ' + money2(mnyCash('jenn') - cash0) + ', expected 21');
+      const led = c.moneyLedger[W].jenn;
+      if (led.competition !== 21 || led.net !== 24 || c.finalizedWeeks[W].jenn !== 24) bad.push('after paying the week reads ' + JSON.stringify({ competition: led.competition, net: led.net, fin: c.finalizedWeeks[W].jenn }));
+      if (typeof mnyRunPayMeets === 'function') await mnyRunPayMeets();
+      wrap = document.getElementById('mnyRulesWrap');
+      const again = wrap.querySelector('[data-mnyp-action="paymeets"]');
+      if (again) { again.click(); await new Promise(r => setTimeout(r, 50)); }
+      if (money2(mnyCash('jenn') - cash0) !== 21) bad.push('a second tap paid again: ' + money2(mnyCash('jenn') - cash0));
+      if (wrap.textContent.indexOf('Winter Invitational') >= 0 && again) bad.push('the paid week is still listed');
+      const ln = c.moneyLedger[N].jenn;
+      if (ln.competition !== 30 || ln.net !== 33 || c.finalizedWeeks[N].jenn !== 33) bad.push('the over-paid week lost something: ' + JSON.stringify({ competition: ln.competition, net: ln.net, fin: c.finalizedWeeks[N].jenn }));
+      if (evRepairPlanFor('jenn').weeks.some(w => w.wk === W)) bad.push('the repair would pay the same meet again');
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      window.showConfirm = was.showConfirm;
+      put();
+      profile = was.profile; parentViewing = was.parentViewing; mnyParentSection = was.section;
+      saveLocal();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* (B10) A $3 WEEK'S RECORD STAYS TRUE TO ITS MONEY. A `defaulted` row cannot
+     be edited field by field or deleted — the wallet keeps the money and
+     finalizedWeeks stays set, so either change would leave the record saying
+     something the money does not. It reads as the rule and its meets; a
+     hand-typed row keeps the editor exactly as before. */
+  checks.aDefaultedWeekIsNotEditedByHand = await page.evaluate(async () => {
+    const bad = [];
+    const snap = JSON.stringify(state);
+    const put = () => { const s = JSON.parse(snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s); };
+    const was = { profile, parentViewing, section: mnyParentSection, toast: window.showToast };
+    try {
+      profile = 'parent'; parentViewing = 'jenn';
+      ctPrepareRead();
+      const back = (n) => { const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - 7 * n); return ctDateToKey(d); };
+      const c = state.shared.chore;
+      Object.assign(c, { finalizedWeeks: {}, moneyLedger: {}, meetingsHeld: {}, meetingsMet: {}, weekPlans: {},
+                         programStartDate: back(30), programStartDateAt: syncNow() });
+      const row = (reason, comp, gross) => ({ at: 1, handEntered: true, defaulted: true, defaultReason: reason, updatedAt: 1,
+        chores: 0, learning: 0, streak: 0, competition: comp, fines: 0, outside: 0, ready: 0, gic: 0, stock: 0, debtExtra: 0,
+        gross, net: gross, xp: 0, boxReleased: 0, loan: null });
+      const G = back(15), D = back(25);
+      c.finalizedWeeks[G] = { jenn: 24 }; c.moneyLedger[G] = { jenn: row('grandma', 21, 24) };
+      c.finalizedWeeks[D] = { jenn: 3 };  c.moneyLedger[D] = { jenn: row('default', 0, 3) };
+      const toasts = [];
+      window.showToast = (m) => { toasts.push(String(m)); };
+      const before = JSON.stringify(c.moneyLedger[G]) + JSON.stringify(c.finalizedWeeks);
+      mnyEditLedger('jenn', G, 'chores', 1);
+      mnyEditLedger('jenn', G, 'competition', -5);
+      mnyDeleteLedgerWeek('jenn', G);
+      if (JSON.stringify(c.moneyLedger[G]) + JSON.stringify(c.finalizedWeeks) !== before) bad.push('editing or deleting a Grandma row changed it: ' + JSON.stringify(c.moneyLedger[G]));
+      if (toasts.length < 3 || !toasts.every(t => /Grandma rule/.test(t) && /meet/.test(t))) bad.push('the refusals do not say why: ' + JSON.stringify(toasts));
+      const beforeD = JSON.stringify(c.moneyLedger[D]);
+      mnyEditLedger('jenn', D, 'chores', 1); mnyDeleteLedgerWeek('jenn', D);
+      if (JSON.stringify(c.moneyLedger[D]) !== beforeD) bad.push('an older "default" row was edited or deleted');
+      window.showToast = was.toast;
+      // A hand-typed week keeps the editor exactly as before.
+      mnyAddMissedWeek('jenn');
+      const T = Object.keys(c.moneyLedger).filter(wk => (c.moneyLedger[wk] || {}).jenn && c.moneyLedger[wk].jenn.handEntered && !c.moneyLedger[wk].jenn.defaulted)[0];
+      if (!T) bad.push('fixture: no hand-typed week');
+      showScreen('parent'); setParentTab('money'); mnyParentSection = 'history'; mnyRenderRulesTab();
+      const wrap = document.getElementById('mnyRulesWrap');
+      const txt = wrap.textContent.replace(/\s+/g, ' ');
+      if (!/Grandma rule \$3\.00 \+ meets \$21\.00/.test(txt)) bad.push('the Grandma week does not read "Grandma rule $3 + meets $21": ' + txt.slice(0, 400));
+      if (!/No meeting — default \$3\.00 \+ meets \$0\.00/.test(txt)) bad.push('the older default week does not read "No meeting — default $3 + meets $0"');
+      [G, D].forEach(wk => {
+        if (wrap.querySelector(`[data-mnyp-action="led"][data-mnyp-id="${wk}"]`)) bad.push('week ' + wk + ' still has steppers');
+        if (wrap.querySelector(`[data-mnyp-action="leddel"][data-mnyp-id="${wk}"]`)) bad.push('week ' + wk + ' can still be removed');
+      });
+      if (T) {
+        if (!wrap.querySelector(`[data-mnyp-action="led"][data-mnyp-id="${T}"]`)) bad.push('the hand-typed week lost its steppers');
+        const del = wrap.querySelector(`[data-mnyp-action="leddel"][data-mnyp-id="${T}"]`);
+        if (!del) bad.push('the hand-typed week lost its remove button');
+        mnyEditLedger('jenn', T, 'chores', 1);
+        const t = c.moneyLedger[T].jenn;
+        if (t.chores !== 1 || t.gross !== 1 || t.net !== 1) bad.push('the hand-typed week no longer edits: ' + JSON.stringify({ chores: t.chores, gross: t.gross, net: t.net }));
+        mnyDeleteLedgerWeek('jenn', T);
+        if ((c.moneyLedger[T] || {}).jenn) bad.push('the hand-typed week can no longer be removed');
+      }
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      window.showToast = was.toast;
+      put();
+      profile = was.profile; parentViewing = was.parentViewing; mnyParentSection = was.section;
+      saveLocal();
+    }
+    return bad.length ? bad : true;
+  });
+  /* ── Plan v8 B8–B10 ── end */
   /* ── PR B checks ── end */
 
   /* SETTLED MONEY CANNOT BE TAKEN BACK, AND NOTHING MAY CLAIM IT CAN.

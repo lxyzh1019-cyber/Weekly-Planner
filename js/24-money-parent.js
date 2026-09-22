@@ -703,8 +703,9 @@ function mnyWeekHadMeeting(wk) {
    `defaulted` and `defaultReason: 'grandma'` so the money story says so rather
    than presenting $3 as a week's earnings. Rows an older build wrote with
    `defaultReason: 'default'` still read "nobody met". It also carries
-   handEntered, because mnyEditLedger refuses any row without it and a
-   defaulted row must stay correctable by the same door.
+   handEntered, as every row an older build wrote did, but `defaulted` is read
+   first: mnyEditLedger and mnyDeleteLedgerWeek refuse a defaulted row, whose
+   money is already in her wallet — its meets correct through the meet.
 
    The meets on file are paid in the same settlement, as their own line — the
    flat amount is `earned`, the meets are `prize` — so the ledger's
@@ -936,10 +937,11 @@ function mnyRepairCard() {
   const plans = (typeof evRepairPlan === 'function') ? evRepairPlan() : [];
   const total = money2(plans.reduce((n, p) => n + p.total, 0));
   const weeks = plans.reduce((n, p) => n + p.weeks.length, 0);
+  const meets = mnyUnpaidMeetsList();
   if (!weeks) {
     return `<div class="mny-card">
         <div class="mny-week-head"><span class="mny-label">🩹 Weeks that were short</span></div>
-        <div class="mny-note">✅ Nothing owed — every settled week matches what its own rules say.</div>
+        ${meets || `<div class="mny-note">✅ Nothing owed — every settled week matches what its own rules say.</div>`}
       </div>`;
   }
   return `<div class="mny-card">
@@ -957,7 +959,48 @@ function mnyRepairCard() {
         >Pay the ${mnyMoney(total)} they were short, across ${weeks} week${weeks === 1 ? '' : 's'}</button>
       <div class="mny-note">Shown before anything moves, and it only ever adds:
         a week that was paid more than its rules say keeps what it paid.</div>
+      ${meets}
     </div>`;
+}
+
+/* The repair card's second list: settled weeks whose meets were never paid
+   (mnyUnpaidMeetsPlan, js/21-money-data.js). Its own button and its own
+   confirm, in the same card and the same shape as the repair's, because it is
+   the same kind of promise — previewed, only ever adds, pays once. Empty when
+   there is nothing, so the card reads exactly as it did. */
+function mnyUnpaidMeetsList() {
+  const plans = (typeof mnyUnpaidMeetsPlan === 'function') ? mnyUnpaidMeetsPlan() : [];
+  const total = money2(plans.reduce((n, p) => n + p.total, 0));
+  const weeks = plans.reduce((n, p) => n + p.weeks.length, 0);
+  if (!weeks) return '';
+  return `<div class="mny-week-head"><span class="mny-label">🏆 Meets never paid</span><b>${mnyMoney(total)}</b></div>
+      <div class="mny-note">These weeks are settled and their meets are on file, but what the
+        meets are worth was never paid. Each week is brought up to its meets — nothing is taken back.</div>
+      ${plans.filter(p => p.weeks.length).map(p => p.weeks.slice(0, 10).map(w => `
+        <div class="mny-row">
+          <span>${escapeHtml(mnyKidName(p.kid))} — week of ${escapeHtml(mnyShortDate(w.wk))}<br><span class="mny-note">${escapeHtml(w.names.join(', '))}</span></span>
+          <b>${mnyMoney(w.gap)}</b>
+        </div>`).join('')).join('')}
+      <button type="button" class="mny-btn wide" data-mnyp-action="paymeets"
+        >Pay the ${mnyMoney(total)} these meets never got, across ${weeks} week${weeks === 1 ? '' : 's'}</button>`;
+}
+
+async function mnyRunPayMeets() {
+  if (!isParent()) { showToast('A grown-up settles the weeks 🔒'); return; }
+  const plans = mnyUnpaidMeetsPlan();
+  const total = money2(plans.reduce((n, p) => n + p.total, 0));
+  const weeks = plans.reduce((n, p) => n + p.weeks.length, 0);
+  if (!weeks) { showToast('Every meet is paid ✅'); return; }
+  const lines = plans.filter(p => p.weeks.length).map(p =>
+    `${mnyKidName(p.kid)}: ${mnyMoney(p.total)} across ${p.weeks.length} week${p.weeks.length === 1 ? '' : 's'}`);
+  const ok = await showConfirm(
+    `Pay ${mnyMoney(total)} for meets ${weeks} settled week${weeks === 1 ? ' never' : 's never'} paid?\n\n` +
+    `${lines.join('\n')}\n\nEach week is brought up to what its meets are worth, and nothing is ever taken back.`,
+    { okLabel: 'Pay it', cancelLabel: 'Not now' });
+  if (!ok) return;
+  const res = mnyPayUnpaidMeets();
+  showToast(`✅ ${mnyMoney(res.paid)} across ${res.weeks} week${res.weeks === 1 ? '' : 's'}`);
+  mnyRenderRulesTab();
 }
 
 async function mnyRunRepair() {
@@ -1006,7 +1049,7 @@ function mnyHistoryEditor(kid) {
               r.defaulted ? (r.defaultReason === 'grandma' ? ' · Grandma rule' : ' · nobody met') : (r.repricedAt ? ' · re-priced' : (r.handEntered ? ' · typed in' : (r.weeksLate ? ' · settled ' + r.weeksLate + 'wk late' : '')))}</span>
             <b>${mnyMoney(r.net)}</b>
           </div>
-          ${r.handEntered ? `<div class="mny-rows">
+          ${r.defaulted ? mnyDefaultedWeekRows(r) : r.handEntered ? `<div class="mny-rows">
               ${f('Jobs', 'chores', 1)}${f('Learning', 'learning', 1)}${f('Routines', 'streak', 1)}
               ${f('Competitions', 'competition', 5)}${f('From outside', 'outside', 5)}${f('Taken off', 'fines', 1)}
               ${f('Kept ready', 'ready', 1)}${f('Locked away', 'gic', 5)}${f('Into companies', 'stock', 1)}
@@ -1189,6 +1232,7 @@ function mnyParentClick(ev) {
   }
   if (a === 'migrate')      { mnyRunStreamSetup(); return; }
   if (a === 'repair')       { mnyRunRepair(); return; }
+  if (a === 'paymeets')     { mnyRunPayMeets(); return; }
   if (a === 'houserules') {
     if (mrApplyHouseRules()) showToast('✅ The four house rules are in the rulebook');
     mnyRenderRulesTab();
@@ -1305,9 +1349,31 @@ function mnyAddMissedWeek(kid) {
   saveAll();
   showToast('Added the week of ' + mnyShortDate(wk));
 }
+/* ── A $3 week's record stays true to its money ──
+   A `defaulted` row is the record of money the rule already put in her wallet,
+   and finalizedWeeks says the same figure. Editing a field or removing the row
+   touched the record alone — the wallet kept the money and the week stayed
+   settled — and an edit also recomputed gross from the channels, which drops
+   the flat amount (it sits in no channel). Two answers to one question, the
+   defect this repo keeps recording. So a defaulted row is refused by BOTH
+   writers, not only hidden in the editor: its meets correct through the meet
+   itself (mnyLateCompSync keeps the row in step), and its flat amount is the
+   rule's. Hand-typed rows without `defaulted` keep the editor as they were. */
+function mnyDefaultedRowRefusal(row) {
+  return `That week was credited by ${row.defaultReason === 'grandma' ? 'the Grandma rule' : 'the flat default'}, and the money is already in her wallet — it is not edited here. To correct a meet, change the meet itself.`;
+}
+function mnyDefaultedWeekRows(r) {
+  const flat = money2(money2(r.gross) - money2(r.competition));
+  const label = r.defaultReason === 'grandma' ? '👵 Grandma rule' : 'No meeting — default';
+  return `<div class="mny-rows">
+      <div class="mny-row"><span>${label} ${mnyMoney(flat)} + meets ${mnyMoney(r.competition)}</span><b>${mnyMoney(r.net)}</b></div>
+    </div>
+    <div class="mny-note">Credited by the rule and already in her wallet, so it is not edited here. A meet is corrected through the meet itself, and this week follows it.</div>`;
+}
 function mnyEditLedger(kid, wk, field, delta) {
   ctEnsureShared();
   const row = ((state.shared.chore.moneyLedger || {})[wk] || {})[kid];
+  if (row && row.defaulted) { showToast(mnyDefaultedRowRefusal(row)); return; }
   // A settled week is frozen. It is a record of what was agreed, and editing it
   // after the fact would make every history in the app un-trustable.
   if (!row || !row.handEntered) { showToast('That week was settled at a meeting — it cannot be edited'); return; }
@@ -1321,6 +1387,7 @@ function mnyDeleteLedgerWeek(kid, wk) {
   ctEnsureShared();
   const led = state.shared.chore.moneyLedger || {};
   const row = (led[wk] || {})[kid];
+  if (row && row.defaulted) { showToast(mnyDefaultedRowRefusal(row)); return; }
   if (!row || !row.handEntered) { showToast('Only weeks you typed in can be removed'); return; }
   delete led[wk][kid];
   saveAll();

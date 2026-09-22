@@ -1626,7 +1626,8 @@ would land on.
 `mmTakeUndoSnapshot` ran once per child, so settling Jess overwrote the picture
 taken before Jenn; undo put Jess back, left Jenn's money moved, and printed
 "nothing was recorded". It is idempotent per week now, and the message says what
-actually happened.
+actually happened. It is withdrawn once money moves after the commit — see
+"Plan v8 B8–B10" below.
 
 **Celebrate reads live sources only.** It counted chores through `ctGetOptional`
 — `optionalByWeek`, the retired chore-group store — so a week of real graded work
@@ -2882,6 +2883,50 @@ whether the week's split was committed, and the Grandma rule commits no plan, so
 a gift dated into a Grandma week was filed under that week — which no meeting
 will ever sit for. `mnyWeekSettled` (committed **or** credited) is the question
 now, so it is decided at the next open meeting like any other.
+
+## Plan v8 B8–B10 — Undo, older weeks' meets, a $3 week's record (2026-09-22)
+
+**B8 · The meeting's Undo is withdrawn once money moves after it.**
+`mmUndoRecord` puts wallets, debts, holdings, deposits and the week's records
+back wholesale, so money that moved after the commit — a late meet
+(`mnyLateCompSync`), a gift, a move, an approval, a payment synced from the
+other device — was wiped from the wallet while its line stayed on the stream,
+and a re-commit paid the meet twice. The choke point is **the stream**: every
+movement lands on `profile.events`, written here through `evAdd` or merged in
+by id from the other device. `mmTakeUndoSnapshot` keeps the id of every money
+event on both girls' streams (`seen`); `mmUndoHeld()` drops the undo when any
+money event is not among them, and keeps the reason in `mmUndoGone`. The
+commit's own movements are claimed by an explicit bracket, not by timing: each
+commit (`mnyDoCommit`, `mmConfirmAndRecord`) asks `mmUndoHeld()` before it
+writes anything and calls `mmUndoSeal()` when it is done, so both girls
+committed one after the other keep the undo. The snapshot catches both girls up
+(`mnySimCatchUp`) before the picture, so the second girl's interest is in it
+rather than a movement between two commits. A withdrawn undo stays withdrawn
+for that week in that sitting. Where the button was, the meeting says
+`MM_UNDO_GONE_SENTENCE` — "Undo is gone — money moved after this meeting;
+correct the item itself." — with what moved. The undo itself still does not
+reverse the stream lines of the commit it undoes; that is unchanged.
+
+**B9 · Older weeks' unpaid meets are caught up, once.** The repair card gains
+"🏆 Meets never paid" (`mnyUnpaidMeetsPlan`, js/21): settled weeks with a
+ledger row the sync treats by total (`mnyLateCompByTotal` — the one predicate
+`mnyLateCompSync` also reads) whose meets are worth more than the row says was
+paid. Positive gaps only; nothing is taken back. Weeks with no ledger row, and
+weeks the repair itself lists (it re-prices meets with the rest of the week),
+stay with the repair, so the two lists never offer the same dollars. Previewed
+in the same card (shown even when the repair has nothing), confirmed through
+`showConfirm`, and paid by `mnyPayUnpaidMeets` through `mnyLateCompSync`'s
+no-change mode — so a second tap pays nothing.
+
+**B10 · A $3 week's record stays true to its money.** A `defaulted` row's
+money is already in her wallet and `finalizedWeeks` says the same figure, so
+`mnyEditLedger` and `mnyDeleteLedgerWeek` refuse it with a sentence (they used
+to change the record alone, and an edit recomputed gross from the channels,
+dropping the flat amount). Week history shows it as "👵 Grandma rule $3 + meets
+$X" or "No meeting — default $3 + meets $X" from the row's own figures, with no
+steppers and no remove button. Its meets correct through the meet itself (B6).
+Grandma rows still carry `handEntered`; `defaulted` is read first. Hand-typed
+rows without `defaulted` keep the editor unchanged.
 
 ## Known trip hazards
 
