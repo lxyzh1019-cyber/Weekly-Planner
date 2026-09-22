@@ -29,7 +29,7 @@ Single working record for this repository. Updated by the main session at the en
 | 10 | R1 2026-09-21 | Raised in-session: architecture doc must survive the install | done | User chose "Split". See Approved baseline. |
 | 11 | R2 2026-09-22 | "Validate the handoff" (a second session's audit of PR #90) | done | 11 claims checked in code; 4 corrected (prose not literals; wallet fields still read by a migration; a geometric order check does exist; the editor does exist). |
 | 12 | R2 2026-09-22 | "Compare to your promises in the original plan" | done | 9 load-bearing promises graded: 3 Guaranteed, 2 Checked, 1 Assumed, 3 Broken. |
-| 13 | R2 2026-09-22 | "My Money and Money school duplicate — propose a layout, or combine" | open → PR C | Decided: rebalance three pages, don't merge. |
+| 13 | R2 2026-09-22 | "My Money and Money school duplicate — propose a layout, or combine" | open → PR C | Decided: rebalance three pages, don't merge. Mockup v5 shows it at iPad landscape. |
 | 14 | R2 2026-09-22 | "Where is the cash pool? You promised" | open → PR C | Admitted not delivered: the Flow's "left" is cash only. Pool on both My money and the story. |
 | 15 | R2 2026-09-22 | Grandma rule: $3/week from a chosen start date to 30 May | open → PR B | Only weeks with no record at all. Extends the existing sweep card (VE-4). |
 | 16 | R2 2026-09-22 | "Different colour per revision in the plan; no `<…>` tags" | done | Fenced `diff` blocks + Rev-N labels; `<span>` does not render in this terminal. |
@@ -50,13 +50,16 @@ Single working record for this repository. Updated by the main session at the en
 | 31 | R2 2026-09-22 | Money school's middle column too tall | done (mockup) → PR C | Price list split across middle + right on iPad. |
 | 32 | R2 2026-09-22 | "Anything else that will benefit us?" → S2 pot-opening moment, S3 build stamp, S4 tunable gates | S2/S3/S4 accepted → v6 | S1 withdrawn (see #33). |
 | 33 | R2 2026-09-22 | "Why did you say the weekly pay is $11 again? We solved this" | done — **correction** | I restated the calibration's invented "ordinary" week as fact. Real no-meet ceiling via the calculator: $18 / $21 / $24 at 1 / 2 / 3 top-grade chores a day. `ARCHITECTURE.md`'s "$15 after the two free" corrected in the same change. |
+| 34 | R2 2026-09-22 | Today's money card: the toggle must drive came in / went out / put away too, and sit on top of the card | done (mockup) → PR C | v6 C4. Figures and target always describe the same period. |
+| 35 | R2 2026-09-22 | "I did not see the cash pool — where does it go? Do not mix those two" | done (mockup) → PR C | It was the untitled "This week's money" card; now "💧 My cash pool". Kept separate from the target card on My money. |
+| 36 | R2 2026-09-22 | "A line chart to show her asset and debt, or other charts that make sense" | done (mockup) → PR C | v6 C6: what I have (stream balances) vs what I owe (loan by payment date), one $ axis, palette validated (CVD ΔE 16.8). C7: in vs out columns per month. |
 
 ## Hotspot counter
 | Area / feature | Fix rounds | Recurrences | Last symptom | Rewrite-vs-repair reviewed? |
 |---|---|---|---|---|
 | Rules/governance install | 1 | 0 | — (first round) | n/a |
 | `CLAUDE.md` filename collision | 1 | 0 | Bundle and repo both claim the root `CLAUDE.md`; different documents | yes — resolved by split, not patch |
-| **Pocket money** (stream, rules, meeting, money pages) | **3** — PR #89, PR #90, R2 | **1** — a click handler keyed on an attribute its host never listens for (`data-pm-action` then `data-mny-action` on `#mnyRulesWrap`) | House rules never reached a stored rulebook; two dead buttons; `[object Object]` in the change log | **yes — 2026-09-22, repair** (below) |
+| **Pocket money** (stream, rules, meeting, money pages) | **3** — PR #89, PR #90, R2 (PR A) | **1** — a click handler keyed on an attribute its host never listens for (`data-pm-action` then `data-mny-action` on `#mnyRulesWrap`) | House rules never reached a stored rulebook; two dead buttons; `[object Object]`. PR A review found two more, both older than PR A: the change log drawn twice, and the move form redrawing on every keystroke. Both fixed in PR A, test first. | **yes — 2026-09-22, repair** (below) |
 Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → no further patch until the comparison is presented.
 
 ### Rewrite vs repair — pocket money, 2026-09-22
@@ -100,8 +103,8 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → n
 | Plan v5 Step 0 — rewrite-vs-repair comparison, hotspot row, records | COMPLETE | This file; `FEATURES.md` money section |
 | Plan v5 PR A — stop the bleeding (A1–A12, + A13/A14 checker fixes) | COMPLETE | `79b543b` on draft PR #92; `npm test` green in the main session's own run (check 8/8 · merge 112 · buffers 9 · stream 31 · cleanup · xp 28 · money 33 · smoke 321); every fix's check failed on the old code first (worker evidence) |
 | Plan v6 PR B — Grandma rule, star level relabel, August banner, gates 20/30/40 (B4), S2 pot-opening moment, S3 build stamp, S4 tunable gates | PARTIAL — in progress with `opus-worker` | deadline 1 Oct |
-| Plan v5 C0 — clickable mockup for sign-off | COMPLETE — awaiting owner sign-off | Design canvas https://claude.ai/artifact/3fYy6KiQMcSissRGBvnG6d (private); started ahead of PR B because sign-off is the long pole — content unchanged |
-| Plan v5 PR C — the pool and three pages | NOT STARTED | Blocked on C0 sign-off |
+| Plan v6 C0 — clickable mockup for sign-off (now v5 of the canvas: iPad landscape, toggle card, cash pool titled, have/owe chart, paired month columns) | COMPLETE — awaiting owner sign-off | Design canvas https://claude.ai/artifact/3fYy6KiQMcSissRGBvnG6d (private); started ahead of PR B because sign-off is the long pole — content unchanged |
+| Plan v6 PR C — the pool, three pages, the target card, the have/owe chart | NOT STARTED | Blocked on C0 sign-off |
 | `routing_guard_mode: enforce` | NOT STARTED | Blocked on `tests/test-routing-hook.md`, which must run in a session where the hooks are live (i.e. after merge to `main`). |
 
 ## Checks and evidence
@@ -110,7 +113,8 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → n
 - 2026-09-21 `npm run test:smoke` → **not run** this round. Justified: no `js/`, `css/`, `index.html` or `sw.js` file was touched. The only non-governance edits were two prose lines in `README.md` and `SECURITY_TODO.md`.
 - 2026-09-21 Hooks verified live by observation: `record-guard.py` blocked this very turn for an incomplete record, which is the intended behaviour and the first real-session evidence that the Stop hooks fire.
 - 2026-09-22 Headless Chromium, `main` @ `f4d1db5`, Firebase blocked: every money surface rendered at 430px; **~387 controls clicked** as parent and as child with state restored between clicks — **0 throws, 0 page errors**. Two dead buttons confirmed by watching `#recordOverlay` never gain `open`; `[object Object]` reproduced at **15** occurrences from one `coApply`; Flow caption observed at **$0.00 above a $30.00 bar**.
-- 2026-09-22 No npm suite run this round — no source file changed.
+- 2026-09-22 PR A, main session's own run: `npm test` all green — check 8/8 · merge 112 · buffers 9 · stream 31 · cleanup · xp 28 · money 33 · smoke 321 (click sweep 357 controls ≈38 s). CI on PR #92: *Syntax, globals, merge tests* ✓ and *Headless smoke test* ✓.
+- 2026-09-22 Chart palette validated with the dataviz validator against #fffdf5: all six checks pass (CVD ΔE 16.8, normal-vision 22.3, contrast ≥ 3:1).
 
 ## Open questions / blockers
 1. **`FEATURES.md` app manifest is unfilled.** The bundle ships it as a template. A real manifest for this app has to be derived from `ARCHITECTURE.md` (~2700 lines) and would be a task of its own; inventing one quickly would produce a manifest that regression tables are checked against but that is itself wrong — worse than an empty one. Recommend a dedicated round.
