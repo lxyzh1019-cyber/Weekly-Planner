@@ -89,9 +89,9 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → n
 | `FEATURES.md` — governance surface | COMPLETE | bundle-introduced features listed |
 | `FEATURES.md` — **app** feature manifest | PARTIAL | Money area manifested 2026-09-22 (Step 0). Everything else still checks against `ARCHITECTURE.md` — open question 1. |
 | Plan v5 Step 0 — rewrite-vs-repair comparison, hotspot row, records | COMPLETE | This file; `FEATURES.md` money section |
-| Plan v5 PR A — stop the bleeding (A1–A12) | NOT STARTED | |
+| Plan v5 PR A — stop the bleeding (A1–A12) | PARTIAL — in progress with `opus-worker` | |
 | Plan v5 PR B — Grandma rule, star level relabel, August banner | NOT STARTED | |
-| Plan v5 C0 — clickable mockup for sign-off | NOT STARTED | |
+| Plan v5 C0 — clickable mockup for sign-off | COMPLETE — awaiting owner sign-off | Design canvas https://claude.ai/artifact/3fYy6KiQMcSissRGBvnG6d (private); started ahead of PR B because sign-off is the long pole — content unchanged |
 | Plan v5 PR C — the pool and three pages | NOT STARTED | Blocked on C0 sign-off |
 | `routing_guard_mode: enforce` | NOT STARTED | Blocked on `tests/test-routing-hook.md`, which must run in a session where the hooks are live (i.e. after merge to `main`). |
 
