@@ -1021,7 +1021,8 @@ function openEditSheet(blockId) {
   if (ethIn)  { ethIn.value = String(editState.travelHomeMin); ethIn.disabled = !editState.travelHome; }
   if (eraTog) eraTog.checked = !!editState.readyAfter;
   if (eraIn)  { eraIn.value = String(editState.readyAfterMin); eraIn.disabled = !editState.readyAfter; }
-  if (act.isTraining) {
+  // Watching is not training: no warm-up to set, no kit to pack.
+  if (act.isTraining && !blockIsWatching(block)) {
     editWarmup.style.display = 'flex';
     editWarmup.classList.toggle('on', !!editState.warmupBuffer);
     editGearWrap.style.display = 'block';
@@ -1067,6 +1068,18 @@ function openEditSheet(blockId) {
     inviteBtn.disabled = alreadyInvited;
   } else {
     ssWrap.style.display = 'none';
+  }
+
+  /* 👀 Invite my sister to watch — kid AND parent, unlike the Sister Sync
+     share above. Only on a competition, and blockIsCompetition answers false
+     for a watch block, so a block that is already somebody else's meet cannot
+     be passed on again. */
+  const watchBtn = document.getElementById('watchSisterBtn');
+  if (watchBtn) {
+    const me = activeProfile();
+    const canWatch = (me === 'jenn' || me === 'jess') && blockIsCompetition(block);
+    watchBtn.style.display = canWatch ? 'block' : 'none';
+    watchBtn.textContent = `👀 Invite ${me === 'jenn' ? 'Jess' : 'Jenn'} to watch`;
   }
 
   openSheet('editOverlay');

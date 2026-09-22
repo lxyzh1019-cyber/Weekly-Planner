@@ -685,6 +685,55 @@ off the plan (`mmPlannedCompetitions`, `js/23-money-meeting.js`) instead of
 asking for it twice; it takes facts only — which meet, which day, which sport —
 and `mrScoreCompetition` still decides what the result is worth.
 
+**WATCHING IS NOT COMPETING, and `blockIsCompetition` is the one seam that says
+so.** A sister can be invited to come and watch a meet, and the danger is the
+invite mechanism itself: `acceptInvite` (`js/10-social.js`) copies `actId`
+verbatim, and `competition` is a plain default activity carrying
+`isCompetition`, so the watcher's block simply **was** a competition to every
+reader in the app. She would have been listed by `mmPlannedCompetitions` and
+chased at Sunday's meeting for a result she never swam — and an unrecorded
+planned meet **disables the confirm bar**, so the week could not settle and
+nothing on screen would say why; and `mrPlaceCompetitionBlock`'s orphan
+adoption (`js/18-rules.js`) would have taken her watch block as the meet's own,
+`compId` and all, which is the link to the money tab.
+
+`blockIsCompetition(b)` (`js/08-day-view.js`) returns **false** when
+`blockIsWatching(b)`. That is a deliberate narrowing, not an oversight to
+simplify away: it is the single test all five competition surfaces funnel
+through, so one line makes a watch block invisible to every one of them at
+once, in the direction that is **safe by default** — the next surface that asks
+this question is right without being told. A watch block therefore earns no
+competition score and no competition money, structurally rather than by
+discipline.
+
+Three things still have to know, and they are named rather than left to
+inference. `blockDisplayName` reads `act.isCompetition` rather than
+`blockIsCompetition`, so it is the one place that still asks directly — it
+prints **`👀 Watching — <meet>`**, falling back to what the block is when
+nobody named the meet, because a card reading "Winter Invitational" on the
+watcher's Saturday claims the meet is hers. `renderTrainingChecks` and
+`renderTrainingGearChecklist` return empty for a watch block: the four checks
+are a review of a session you took part in, and a watcher packs no skates.
+Buffers split — **travel stays, warm-up goes**: she really does go to the rink,
+and she is not competing.
+
+`sendInvite(block, to, opts)` carries `watch`, `compName` and `tag`; the
+two-argument call sites are unchanged, and **the plain invite path in
+`acceptInvite` is untouched** — it is the one mechanism that already puts an
+event on both calendars and this is not about it. `👀 Invite my sister to
+watch` sits outside `#sisterSyncWrap`, which is parent-only, because asking
+your sister to come and watch you compete is a child's own decision; it shows
+only when `blockIsCompetition(block)`, so a watch block cannot be passed on
+again as a meet.
+
+**A watch block still counts as ordinary planned time.** `computeWeekTotals`
+does not filter it out, deliberately: a Saturday she really spent at the rink
+must not read as free. What it does not do is earn.
+
+`aWatchedMeetIsNeverChasedForAResult` and `aWatchInviteNamesTheMeet`
+(`tests/smoke.js`) hold both halves — the first is the one that makes the
+feature safe and is worth more than the rest of it.
+
 Drawn to scale means the row has to **add up to a day**. It is one nowrap flex row
 of percentages with nothing able to shrink, so anything that oversubscribes it
 pushes the last cell straight through the edge of its column. Two things do:

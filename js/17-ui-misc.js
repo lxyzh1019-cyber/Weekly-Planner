@@ -511,6 +511,22 @@ function setSisterDetailsVisibleGlobal(next) {
   saveAll();
   if (document.querySelector('#screen-sync.active')) renderSync();
 }
+/* Ask your sister to come and watch you compete.
+
+   Goes through sendInvite rather than repeating it: the inline copy in
+   inviteSisterFromEdit below predates the options argument and is already one
+   duplication of that mechanism too many — a third would be the six-copies
+   defect ARCHITECTURE.md records. sendInvite reads activeProfile(), so this
+   works from the parent portal as well as from a kid's own screen. */
+async function inviteSisterToWatch() {
+  if (!editingBlockId) return;
+  const blk = (getDayBlocks(currentDayKey) || []).find(b => b.id === editingBlockId);
+  if (!blk) return;
+  const me = activeProfile();
+  if (me !== 'jenn' && me !== 'jess') return;
+  await sendInvite(blk, me === 'jenn' ? 'jess' : 'jenn', { watch: true });
+}
+
 async function inviteSisterFromEdit() {
   if (!editingBlockId) return;
   const blocks = getDayBlocks(currentDayKey);

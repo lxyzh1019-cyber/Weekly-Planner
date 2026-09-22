@@ -6533,6 +6533,191 @@ function findChromium() {
     return problems.length ? problems : true;
   });
 
+  /* ── WATCHING IS NOT COMPETING ────────────────────────────────────
+     A sister can be invited to WATCH a meet, and the danger is the invite
+     mechanism itself: acceptInvite copies actId verbatim, and `competition` is
+     a plain default activity carrying isCompetition — so the watcher's block
+     WAS a competition. mmPlannedCompetitions would have chased her at Sunday's
+     meeting for a result she never swam, and mrPlaceCompetitionBlock's orphan
+     adoption would have handed her watch block to the meet as its own.
+
+     The guard is one seam: blockIsCompetition returns false for a watching
+     block, so all five production callers go quiet at once, in the direction
+     that is safe by default. This check is the reason that narrowing exists —
+     it is worth more than the rest of the feature. */
+  checks.aWatchedMeetIsNeverChasedForAResult = await page.evaluate(async () => {
+    const problems = [];
+    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
+    const wasOffset = weekOffset;
+    const wasInvites = state.shared.invites;
+    const keys = getDayKeys(0);
+    const satKey = keys[5];
+    const savedJenn = keys.map(k => getDayBlocks(k, 'jenn'));
+    const savedJess = keys.map(k => getDayBlocks(k, 'jess'));
+    const jessComps = getProfData('jess').competitions;
+    try {
+      state.shared.invites = [];
+      keys.forEach(k => { setDayBlocks(k, [], 'jenn'); setDayBlocks(k, [], 'jess'); });
+      getProfData('jess').competitions = [];
+
+      // Jenn's meet, with a name a parent typed.
+      const meetBlock = {
+        id: 'cb-watch-src', actId: 'competition', compName: 'Winter Invitational',
+        tag: 'skating', startMin: COMP_BLOCK_START, durationMin: COMP_BLOCK_DUR,
+        objectives: [], checklistState: {}, gearState: {},
+        travelBuffer: true, travelBufMin: 15, warmupBuffer: true, warmupBufMin: 20,
+      };
+      setDayBlocks(satKey, [meetBlock], 'jenn');
+
+      // Jenn invites Jess to WATCH. Through the real door, dialog and all.
+      profile = 'jenn'; currentDayKey = satKey;
+      const p1 = sendInvite(meetBlock, 'jess', { watch: true });
+      await new Promise(r => setTimeout(r, 40));
+      const ok = document.getElementById('appDialogOkBtn');
+      if (!ok) { problems.push('inviting a sister to watch did not ask first'); return problems; }
+      /* The dialog has to name the MEET. "Share 🏆 Competition" is every meet
+         this season, and a child agreeing to a Saturday deserves to know which. */
+      const dlgText = (document.getElementById('appDialogMsg') || {}).textContent || '';
+      if (!/Winter Invitational/.test(dlgText)) {
+        problems.push(`the watch invite does not name the meet: "${dlgText.trim().slice(0, 120)}"`);
+      }
+      ok.click();
+      await p1;
+
+      const inv = (state.shared.invites || []).find(i => i && i.to === 'jess');
+      if (!inv) { problems.push('no invite reached Jess'); return problems; }
+      if (!inv.watch) problems.push('the invite does not say it is an invitation to watch');
+
+      profile = 'jess';
+      acceptInvite(inv.id);
+      const watchBlock = (getDayBlocks(satKey, 'jess') || [])[0];
+      if (!watchBlock) { problems.push('accepting the watch invite put nothing on Jess’s day'); return problems; }
+      if (!watchBlock.watching) problems.push('the accepted block does not carry watching: true');
+      if (watchBlock.compName !== 'Winter Invitational') {
+        problems.push(`the watcher's block does not carry the meet's name: "${watchBlock.compName}"`);
+      }
+
+      // ── The seam itself.
+      if (typeof blockIsWatching !== 'function') {
+        problems.push('blockIsWatching is not declared — nothing owns the question');
+      } else if (!blockIsWatching(watchBlock)) {
+        problems.push('blockIsWatching says the watch block is not a watch block');
+      }
+      if (blockIsCompetition(watchBlock)) {
+        problems.push('blockIsCompetition says a watch block IS a competition — every competition surface will treat Jess as a competitor');
+      }
+      if (!blockIsCompetition(meetBlock)) {
+        problems.push('the narrowing went too far: Jenn’s own meet stopped being a competition');
+      }
+
+      // ── She is never listed, so never scored and never paid.
+      const wk = ctThisWeekKey();
+      if (mmPlannedCompetitions(wk, 'jess').some(p => p.blockId === watchBlock.id)) {
+        problems.push('the meeting lists Jess’s watch block as a competition she planned');
+      }
+      if (mmUnrecordedCompetitions(wk, 'jess').some(p => p.blockId === watchBlock.id)) {
+        problems.push('Jess is chased at the meeting for the result of a meet she watched');
+      }
+      if (!mmPlannedCompetitions(wk, 'jenn').some(p => p.blockId === meetBlock.id)) {
+        problems.push('Jenn’s own meet fell out of the meeting');
+      }
+
+      // ── And the orphan adoption does not take it.
+      const comp = { id: 'comp-watch-test', dayKey: satKey, name: 'Winter Invitational', sport: 'skate' };
+      const placed = mrPlaceCompetitionBlock('jess', comp);
+      if (placed && placed.id === watchBlock.id) {
+        problems.push('recording a meet adopted Jess’s watch block as the meet’s own — she is now the competitor');
+      }
+      if (watchBlock.compId) {
+        problems.push('the watch block was given a compId, which is the link to the money tab');
+      }
+
+      // ── No competition money for her: nothing was ever recorded against it.
+      if (mrCompetitions('jess').some(c => c && c.blockId === watchBlock.id)) {
+        problems.push('a competition result is filed against Jess’s watch block');
+      }
+
+      // ── And the block stops claiming a trophy.
+      const head = buildBlockTrainingChecks(watchBlock).textContent || '';
+      if (/🏆/.test(head)) {
+        problems.push(`the watch block still says "${head.trim().slice(0, 40)}" — it calls her a competitor on her own calendar`);
+      }
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      state.shared.invites = wasInvites;
+      getProfData('jess').competitions = jessComps;
+      keys.forEach((k, i) => { setDayBlocks(k, savedJenn[i], 'jenn'); setDayBlocks(k, savedJess[i], 'jess'); });
+      profile = wasProfile; parentViewing = wasViewing;
+      currentDayKey = wasDayKey; weekOffset = wasOffset;
+      closeSheet('editOverlay');
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── A WATCH BLOCK SAYS WHAT IT IS ────────────────────────────────
+     Safety is the previous check; this is whether the thing is legible. A card
+     reading "Winter Invitational" on Jess's Saturday claims the meet is hers.
+     And a watcher does not warm up and does not pack a skater's kit — she does
+     still travel there, which is the one buffer that stays. */
+  checks.aWatchInviteNamesTheMeet = await page.evaluate(() => {
+    const problems = [];
+    const wasProfile = profile;
+    const keys = getDayKeys(0);
+    const satKey = keys[5];
+    const saved = getDayBlocks(satKey, 'jess');
+    try {
+      const watchBlock = {
+        id: 'cb-watch-card', actId: 'competition', compName: 'Winter Invitational',
+        watching: true, tag: 'skating', startMin: COMP_BLOCK_START, durationMin: 180,
+        objectives: [], note: '', checklistState: {}, gearState: {},
+        travelBuffer: true, travelBufMin: 15,
+      };
+      setDayBlocks(satKey, [watchBlock], 'jess');
+      profile = 'jess';
+
+      const disp = blockDisplayName(watchBlock, 'jess', satKey);
+      if (!/watching/i.test(disp.name)) {
+        problems.push(`the watcher's card reads "${disp.name}" — it names the meet as if she were in it`);
+      }
+      if (!/Winter Invitational/.test(disp.name)) {
+        problems.push(`the watcher's card does not say which meet: "${disp.name}"`);
+      }
+      // …and an unnamed meet still reads sensibly rather than "Watching — ".
+      const unnamed = { ...watchBlock, id: 'cb-watch-noname', compName: '' };
+      const dispU = blockDisplayName(unnamed, 'jess');
+      if (!/watching/i.test(dispU.name) || /—\s*$/.test(dispU.name.trim())) {
+        problems.push(`an unnamed meet gives the watcher "${dispU.name}"`);
+      }
+
+      // ── Travel stays, warm-up goes.
+      if (!watchBlock.travelBuffer) problems.push('the watch block has no travel time — she does go to the rink');
+      if (watchBlock.warmupBuffer) problems.push('the watch block carries a warm-up — she is not competing');
+
+      // ── No gear list, no training checks.
+      renderTrainingChecks('kidTrainingChecks', watchBlock);
+      const checksWrap = document.getElementById('kidTrainingChecks');
+      if (checksWrap && checksWrap.children.length) {
+        problems.push(`a watcher is given ${checksWrap.children.length} training checks to answer about somebody else's session`);
+      }
+      renderTrainingGearChecklist('kidTrainingGear', watchBlock, watchBlock.tag, false, true);
+      const gearWrap = document.getElementById('kidTrainingGear');
+      if (gearWrap && gearWrap.children.length) {
+        problems.push(`a watcher is given a skater's packing list (${gearWrap.children.length} items)`);
+      }
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      setDayBlocks(satKey, saved, 'jess');
+      profile = wasProfile;
+      ['kidTrainingChecks', 'kidTrainingGear'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '';
+      });
+    }
+    return problems.length ? problems : true;
+  });
+
   /* ── THE SYSTEM DID NOT BEGIN TODAY ───────────────────────────────
      Three stores answered "when did this family start", and every one of them
      SEEDED ITSELF to the current Monday the first time anything read it. On a

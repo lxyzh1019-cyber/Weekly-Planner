@@ -70,6 +70,18 @@ to be a complete manifest:
 - **The meeting lock is scoped and releasable.** `applyMeetingLock` (`js/11-parent.js`) hides only `MEETING_LOCK_BADGES` (`weekProfileBadge`, `dayProfileBadge`) plus `#parentWeekActions .pb-switch`, never every `.profile-badge` in the document; `locked` is `isParent() && mmHasReturn()`; and `renderWeek`/`openDay` call it **outside** their `isParent()` branches so a child's own render puts the control back.
 - Held by `everyProfileBadgeSwitchesProfile` in `tests/smoke.js` — it activates each badge and asserts the switcher opens, and asserts the lock both engages for a parent mid-meeting and lifts for a child.
 
+### A sister can be invited to watch (manifested 2026-09-22)
+- A **`watching: true`** flag on the block is what makes it a watch block, on any competition block, not only a scored meet. `blockIsWatching(b)` (`js/08-day-view.js`) is the one owner of the question.
+- **`blockIsCompetition(b)` returns `false` when the block is watching.** This is the single seam all five competition surfaces funnel through, and the narrowing is deliberate and load-bearing — do not simplify it away. It is what guarantees, structurally: never listed by `mmPlannedCompetitions`, never chased by `mmUnrecordedCompetitions`, never adopted by `mrPlaceCompetitionBlock`'s orphan branch, never given a `compId`, and so **no competition score, no competition money, no money-tab link**.
+- `blockDisplayName` reads `act.isCompetition` directly, so it keeps working and prints **`👀 Watching — <meet>`**, falling back to what the block is when no `compName` was typed.
+- `renderTrainingChecks` and `renderTrainingGearChecklist` render nothing for a watch block; `renderBlockPixel`'s `isTrainingBlock` excludes it, so no on-block checks or chip; the edit sheet hides the warm-up toggle and the gear list.
+- **Buffers: travel kept, warm-up dropped.** She goes to the rink; she is not competing.
+- `sendInvite(block, to, opts)` takes an options argument; `opts.watch` puts `watch`, `compName` and `tag` on the invite. Both existing two-argument call sites are unchanged. The sender is `activeProfile()`, so an invite from the parent portal is recorded as the child's.
+- `acceptInvite` writes `watching`, `compName`, `tag`, the travel buffer and the note **only** on the watch branch; the plain invite path is unchanged.
+- **👀 Invite my sister to watch** (`#watchSisterBtn`) sits outside `#sisterSyncWrap` so it is available to kid **and** parent, and shows only when `blockIsCompetition(block)`. The confirm dialog names the meet.
+- A watch block **still counts as ordinary planned time** in `computeWeekTotals` — a Saturday spent at the rink is not free time.
+- Held by `aWatchedMeetIsNeverChasedForAResult` and `aWatchInviteNamesTheMeet` in `tests/smoke.js`.
+
 Deriving the full app manifest from `ARCHITECTURE.md` is an open item in `WORKING_RECORD.md`.
 
 ## Regression table format (paste at the end of every edit)

@@ -1000,7 +1000,9 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey)
   // (84px). Rather than lower the threshold and bring back the overflow, a
   // shorter block gets one tappable line instead of five — same store, opens
   // the sheet where all four have room.
-  const isTrainingBlock = !isBuffer && act.isTraining;
+  // A watch block is somebody else's session, so it carries neither the four
+  // checks nor the chip that stands in for them on a short block.
+  const isTrainingBlock = !isBuffer && act.isTraining && !blockIsWatching(b);
   const showTrainingChecks = isTrainingBlock && blockTierAtLeast(tier, 'full');
   const showTrainingChip = isTrainingBlock && !showTrainingChecks && blockTierAtLeast(tier, 'detail');
   // For a multi-chore House-Chore block, show the tagged chores in the name.
@@ -1324,9 +1326,37 @@ function getTrainingGearPresets(tag, isComp) {
   return [];
 }
 
-/* Does this placed block represent a Competition (vs a Training session)? */
+/* Is this block somebody going to WATCH, rather than to take part?
+   One owner for the question, so no surface re-derives it from `b.watching`. */
+function blockIsWatching(b) {
+  return !!(b && b.watching);
+}
+
+/* Does this placed block represent a Competition (vs a Training session)?
+
+   THE `watching` NARROWING IS LOAD-BEARING — do not "simplify" it away.
+   A sister invited to watch a meet gets a block through acceptInvite, which
+   copies actId verbatim, and `competition` is a plain default activity carrying
+   isCompetition — so her block WAS a competition to every reader in the app.
+   This function is the single seam all five of them funnel through:
+
+     mmPlannedCompetitions (js/23-money-meeting.js) — she would be listed at
+       Sunday's meeting and chased for the result of a meet she never swam, and
+       an unrecorded planned meet DISABLES THE CONFIRM BAR, so the week could
+       not settle and nothing on screen would say why;
+     mrPlaceCompetitionBlock's orphan adoption (js/18-rules.js) — recording the
+       meet would have adopted HER block as the meet's own, compId and all,
+       which is the link to the money tab;
+     the three training-check headers below — they would call her a competitor
+       on her own calendar.
+
+   Narrowing here rather than adding a `!b.watching` at each of those is the
+   difference between a rule and an instruction to remember: the next surface
+   that asks this question is safe by default. Watching earns no competition
+   score and no competition money, and that is why. */
 function blockIsCompetition(b) {
   if (!b) return false;
+  if (blockIsWatching(b)) return false;
   if (b.actId === 'competition') return true;
   const act = findActivity(b.actId);
   return !!(act && act.isCompetition);
@@ -1337,6 +1367,10 @@ function blockIsCompetition(b) {
 function renderTrainingChecks(containerId, block) {
   const wrap = document.getElementById(containerId);
   if (!wrap) return;
+  /* Guarded HERE rather than at each of the three call sites: the four checks
+     are a review of a session you took part in, and a watcher has no session
+     to review. One seam, same reasoning as blockIsCompetition above. */
+  if (blockIsWatching(block)) { wrap.innerHTML = ''; return; }
   if (!block.trainingCheck) block.trainingCheck = {};
   wrap.innerHTML = '';
   TRAINING_CHECKS.forEach(c => {
@@ -1360,6 +1394,10 @@ function renderTrainingChecks(containerId, block) {
 function renderTrainingGearChecklist(containerId, stateObj, tag, persist, isComp) {
   const wrap = document.getElementById(containerId);
   if (!wrap) return;
+  /* A watcher packs no skates. `stateObj` is the block on the kid sheet and the
+     edit draft on the edit sheet, and both carry `watching`; the training
+     placement draft (js/09-sheets.js) never does, so it is unaffected. */
+  if (blockIsWatching(stateObj)) { wrap.innerHTML = ''; return; }
   const items = getTrainingGearPresets(tag, isComp);
   wrap.innerHTML = '';
   if (!items.length) {

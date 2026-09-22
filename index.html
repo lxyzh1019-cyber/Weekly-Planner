@@ -1117,6 +1117,13 @@
       <button class="pill-btn" id="inviteSisterBtn" style="display:none;width:100%;margin-top:0.4rem" onclick="inviteSisterFromEdit()">💌 Invite your sister</button>
     </div>
 
+    <!-- Outside #sisterSyncWrap on purpose: that block is parent-only, and
+         asking your sister to come and watch you compete is a child's own
+         decision. Shown only on a competition block, and blockIsCompetition
+         already answers false for a watch block, so a watch block cannot be
+         re-shared as a meet. -->
+    <button class="pill-btn" id="watchSisterBtn" style="display:none;width:100%;margin-top:0.4rem" onclick="inviteSisterToWatch()">👀 Invite my sister to watch</button>
+
     <div id="parentPinWrap" style="display:none">
       <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="pinToggle" onclick="togglePin()">
         <div class="toggle-track"><div class="toggle-knob"></div></div>
