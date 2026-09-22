@@ -10,6 +10,8 @@ Single working record for this repository. Updated by the main session at the en
 
 ## Pending
 - PR [#91](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/91) **merged** 2026-09-21 as `f4d1db5`. (This line previously said "awaiting the owner's merge" — corrected 2026-09-22.)
+- **PR [#93](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/93) — draft, open, awaiting the owner's review and merge.** Branch `claude/inspiring-gauss-232zww` pushed 2026-09-22 with commits `504cea2`, `b4b62dd`, `d3fb2b6`, `684eb2c`, `c811cda`.
+- **Awaiting the owner's scope decision** (Plan v5): §4 repeat-invite guard + kid share from the edit sheet; VE 1 visible build stamp; VE 2 `SMOKE_ONLY` filter; VE 3 `check-dead-actions.js`; optional §5 💌 notice on Today; tier-2 click sweep. Recommended: 1–4. None built.
 - All pocket-money items are **open but not in this round**. See `HANDOFF-pocket-money.md` §12 for the order they should be taken in.
 
 ## Request ledger
@@ -45,6 +47,8 @@ Single working record for this repository. Updated by the main session at the en
 | 28 | R2 2026-09-22 | "Integrate sister invite into the Today tab; I don't see importance in keeping Sister Sync as a separate tab unless you find something I missed" | **proposed, not approved** | Found what was missed: the 💌 inbox is the **only** place an invite can be accepted — retire the tab and invites become send-only. It also carries the both-free overlap, the side-by-side day and Challenges (`state.shared.challenges`, own merge decision). Recommended moving the inbox to Today first. Plan v5 §5. |
 | 29 | R2 2026-09-22 | "Value engineering on the scope and the execution plan" | **done (review), build not approved** | Six items. Top two: **no visible build stamp exists**, so the owner's own deploy rule is unsatisfiable on this app; and `tests/smoke.js` (15,936 lines, 312 checks) has **no filter**, so every iteration is a full 8–10 min run. Plan v5, Rev 7. |
 | 30 | R2 2026-09-22 | "Is it reasonable to test all the buttons and check the logic, except money?" | **answered** | Yes, in three tiers. Tier 1 done read-only this turn: **170 `onclick` targets, 0 missing; 177 delegated actions across 13 prefixes, 0 without a handler** (3 scanner hits verified false positives). Tiers 2 and 3 proposed, not approved. |
+| 31 | R2 2026-09-22 | "They do use Sister Sync" | done | Answers VE item 4. **Retiring `#screen-sync` is off the table.** §5 shrinks from moving the invites inbox onto Today (which would now mean two inboxes for one list) to an optional one-line 💌 notice on Today that opens Sister Sync. §4 becomes more valuable, not less — the gaps it fixes are hitting a feature in use. |
+| 32 | R2 2026-09-22 | Implied by the approved Plan v4: push and open a draft PR | done | Pushed `claude/inspiring-gauss-232zww`; draft PR #93 opened. Push was taken under Plan v4's standing approval and to secure five verified commits held only in an ephemeral container — no new build work was started without approval. |
 
 ## Hotspot counter
 | Area / feature | Fix rounds | Recurrences | Last symptom | Rewrite-vs-repair reviewed? |
@@ -54,6 +58,7 @@ Single working record for this repository. Updated by the main session at the en
 | **Pocket money** | **3** | **1** | Kid Money tab still shows pre-house-rules prices; Move-money destinations all greyed; categories renamed away from the family's vocabulary | **NO — and the rule now BLOCKS the next patch.** PR #89 (Stages 1–3), PR #90 (Stages 4–6), this round. The comparison is the first deliverable in the handoff chat; `HANDOFF-pocket-money.md` §1 names the shared cause (three key-spaces for one idea: `EV_HOMES` / `MNY_BUCKETS` / `MNY_HOLDING_KINDS`). |
 | Week-view school offer | 1 | 0 | Offer only below a ~700px grid once anything is booked | n/a — first fix round; cause is a host deleted with the Day Blocks tab |
 | Profile badge | 1 | 0 | Three inert `<div class="profile-badge">` with a false `aria-label` | n/a — first fix round |
+| Sister Sync invites | 1 | 0 | Stage 3 built the watch invite on `sendInvite`/`acceptInvite`; the proposed §4 repeat-invite guard would be round 2 on the same two functions | n/a — watch: one more round makes 3 if anything else lands here |
 Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → no further patch until the comparison is presented.
 
 ## Deliverable ledger
@@ -75,7 +80,9 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → n
 | Stage 1b — one host only, above the grid | COMPLETE | `b4b62dd`. 314/314; `check-dead-ids` 374 → **373**, which is the removed host. |
 | Stage 2 — profile badges switch profile | COMPLETE | `d3fb2b6`. Repro failed with 7 findings; then **315/315**. |
 | Stage 3 — watch a sister compete | COMPLETE | `684eb2c`. Repro failed with 15 findings, incl. the orphan adoption and the meeting chase firing against live code; then **317/317**. |
-| §4 repeat invite · §5 inbox on Today · VE items · tier-2 click sweep | NOT STARTED | **Awaiting the owner's scope decision** — proposed in Plan v5, not approved. |
+| Push + draft PR #93 | COMPLETE | Branch pushed; [PR #93](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/93) open as draft. |
+| §4 repeat invite · §5 Today notice (optional, Rev 8) · VE 1–3 · tier-2 click sweep | NOT STARTED | **Awaiting the owner's scope decision** — Plan v5, not approved. |
+| Real-device verification | NOT STARTED | Blocked by design: no visible build stamp exists (VE 1). Until one ships, "deployed" cannot be verified on the iPad. |
 | Tier-3 logic review of non-money screens | NOT STARTED | Proposed as its own read-only round after this PR merges. |
 
 ## Checks and evidence
