@@ -2722,9 +2722,12 @@ pay.
 
 **Read that 51% correctly.** It is the projection from a modelled TERM — five
 ordinary weeks, two quiet, one strong — not from a ceiling. The rates are not
-incapable of reaching the target: the daily cap allows **$21 a week from chores
-alone** ($15 after the two free), the streak adds $3, and competition points are
-**uncapped** with a $20 qualifying bonus. The `strong` fixture is $24 because it
+incapable of reaching the target. Measured with `tools/money-calibrate.js`, a week
+with **no meet** and all seven routine days kept pays **$18** at one top-grade chore
+a day, **$21** at two and **$24** at three — the daily cap allows $21 from chores,
+the two free ones are absorbed once she does more than one a day, and the streak adds
+$3. Competition points are **uncapped** on top, with a $20 qualifying bonus. (This
+line used to say "$15 after the two free", which is only true at one chore a day.) The `strong` fixture is $24 because it
 models one chore a day and a six-point meet that did not qualify, so the cap
 never bites. What 51% says is that the term SHAPE does not reach the target,
 which is a different and much smaller claim than "she cannot earn it".

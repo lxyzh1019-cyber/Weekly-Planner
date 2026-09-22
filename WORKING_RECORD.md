@@ -8,7 +8,8 @@ Single working record for this repository. Updated by the main session at the en
 - **2026-09-22, Plan v5 approved** — "Money system: stop the bleeding, the Grandma rule, then the pool". Branch `claude/happy-bardeen-1xalni` from `main` @ `f4d1db5`. Sequence: Step 0 (this record) → PR A → PR B → C0 mockup → owner sign-off → PR C. Value-engineering items VE-1…VE-14 accepted; VE-11 (weekly/monthly) un-deferred at the owner's request; VE-3, VE-7, VE-9, VE-10 deferred with reasons. Full plan: `/root/.claude/plans/1-one-kid-completed-quizzical-kitten.md` (session-local).
 
 ## Pending
-- PR A (stop the bleeding) — next, delegated to `opus-worker`.
+- Plan v6 — awaiting owner approval (toggle rule, gates 20/30/40, Money school layout, S2–S4).
+- PR #92 CI on `79b543b`.
 - PR [#91](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/91) — **merged** to `main` (`f4d1db5`).
 
 ## Request ledger
@@ -42,6 +43,11 @@ Single working record for this repository. Updated by the main session at the en
 | 26 | R2 2026-09-22 | Value engineering on scope and plan | done | VE-1…14; all accepted; VE-11 un-deferred. |
 | 27 | R2 2026-09-22 | Dance is really a skating level exam; add skating star level | open → PR B | Owner confirmed silver/gold matches the star tests ⇒ relabel, scorer unchanged. |
 | 28 | R2 2026-09-22 | "The main interface should be iPad Pro 11 inch landscape" | done (mockup) → PR C | Mockup redrawn at 1194×834 in the app's own landscape columns (My money 340·1fr·348, Money school 340·1fr·320, Today 1.42:1 with money in the side column). Phone kept as a secondary row. PR C designs and checks landscape first. |
+| 29 | R2 2026-09-22 | Today's money card: add the week/month toggle; default to the week every open; switch to the month once the weekly target is exceeded | open → PR C (v6) | Never stored. "Exceeded" read as reached (≥) — flagged to owner. One card shared with My money. |
+| 30 | R2 2026-09-22 | Lower the unlock gates to 20 / 30 / 40% | open → PR B (v6) | One threshold table; "Building my own mix" assumed to stay 100%. The 1 Oct deposit is exactly 30% for both girls. |
+| 31 | R2 2026-09-22 | Money school's middle column too tall | done (mockup) → PR C | Price list split across middle + right on iPad. |
+| 32 | R2 2026-09-22 | "Anything else that will benefit us?" → S2 pot-opening moment, S3 build stamp, S4 tunable gates | S2/S3/S4 accepted → v6 | S1 withdrawn (see #33). |
+| 33 | R2 2026-09-22 | "Why did you say the weekly pay is $11 again? We solved this" | done — **correction** | I restated the calibration's invented "ordinary" week as fact. Real no-meet ceiling via the calculator: $18 / $21 / $24 at 1 / 2 / 3 top-grade chores a day. `ARCHITECTURE.md`'s "$15 after the two free" corrected in the same change. |
 
 ## Hotspot counter
 | Area / feature | Fix rounds | Recurrences | Last symptom | Rewrite-vs-repair reviewed? |
@@ -90,7 +96,7 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → n
 | `FEATURES.md` — governance surface | COMPLETE | bundle-introduced features listed |
 | `FEATURES.md` — **app** feature manifest | PARTIAL | Money area manifested 2026-09-22 (Step 0). Everything else still checks against `ARCHITECTURE.md` — open question 1. |
 | Plan v5 Step 0 — rewrite-vs-repair comparison, hotspot row, records | COMPLETE | This file; `FEATURES.md` money section |
-| Plan v5 PR A — stop the bleeding (A1–A12) | PARTIAL — in progress with `opus-worker` | |
+| Plan v5 PR A — stop the bleeding (A1–A12, + A13/A14 checker fixes) | COMPLETE | `79b543b` on draft PR #92; `npm test` green in the main session's own run (check 8/8 · merge 112 · buffers 9 · stream 31 · cleanup · xp 28 · money 33 · smoke 321); every fix's check failed on the old code first (worker evidence) |
 | Plan v5 PR B — Grandma rule, star level relabel, August banner | NOT STARTED | |
 | Plan v5 C0 — clickable mockup for sign-off | COMPLETE — awaiting owner sign-off | Design canvas https://claude.ai/artifact/3fYy6KiQMcSissRGBvnG6d (private); started ahead of PR B because sign-off is the long pole — content unchanged |
 | Plan v5 PR C — the pool and three pages | NOT STARTED | Blocked on C0 sign-off |
