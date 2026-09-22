@@ -41,6 +41,10 @@ Single working record for this repository. Updated by the main session at the en
 | 24 | R2 2026-09-22 | "Where is the cash pool?" | **answered, deferred** | **There is no family cash pool** and no function sums across both kids. "One pool" means fungible inflows per kid. PR #89 answered this with the Flow screen, shipped as 📖 My money story. Handoff §5. |
 | 25 | R2 2026-09-22 | "Separate this into two sections — plan the others here, hand off the pocket money" | done | Plan v4 covers #11/#12/#13 only; `HANDOFF-pocket-money.md` (427 lines) carries #15–#24. |
 | 26 | R2 2026-09-22 | "I do not need the add school day banner in two places — keep it above the calendar only" | done | Narrows Plan v4 §1 mid-implementation (**Rev 4**). Stage 1 shipped two hosts and was green; Stage 1b retires the below-grid `#weekSchoolBanner` so the top host is the only one. Folded in two defects the worker flagged: `addSchoolDayToDay` now filters through `schoolDaysToOffer` (a stale chip could write a duplicate card), and the confirm reads "Add it" for one day. |
+| 27 | R2 2026-09-22 | "Fix the repeat invite for the sister invite, and brief me where is the best place to send the invite for a regular block like game time" | **proposed, not approved** | Three gaps found: `sendInvite` has no duplicate guard, `acceptInvite` has no status guard (a double-tap writes two blocks), and `invitedTo` conflates share and watch. Briefing given: the edit sheet, opened to kids — today a child can only invite from the Sister Sync screen. Plan v5 §4. |
+| 28 | R2 2026-09-22 | "Integrate sister invite into the Today tab; I don't see importance in keeping Sister Sync as a separate tab unless you find something I missed" | **proposed, not approved** | Found what was missed: the 💌 inbox is the **only** place an invite can be accepted — retire the tab and invites become send-only. It also carries the both-free overlap, the side-by-side day and Challenges (`state.shared.challenges`, own merge decision). Recommended moving the inbox to Today first. Plan v5 §5. |
+| 29 | R2 2026-09-22 | "Value engineering on the scope and the execution plan" | **done (review), build not approved** | Six items. Top two: **no visible build stamp exists**, so the owner's own deploy rule is unsatisfiable on this app; and `tests/smoke.js` (15,936 lines, 312 checks) has **no filter**, so every iteration is a full 8–10 min run. Plan v5, Rev 7. |
+| 30 | R2 2026-09-22 | "Is it reasonable to test all the buttons and check the logic, except money?" | **answered** | Yes, in three tiers. Tier 1 done read-only this turn: **170 `onclick` targets, 0 missing; 177 delegated actions across 13 prefixes, 0 without a handler** (3 scanner hits verified false positives). Tiers 2 and 3 proposed, not approved. |
 
 ## Hotspot counter
 | Area / feature | Fix rounds | Recurrences | Last symptom | Rewrite-vs-repair reviewed? |
@@ -68,16 +72,22 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → n
 | **PR #90 promise audit** | COMPLETE | 15 promises verified against HEAD: 13 delivered, 2 partial, 3 weak tests. `HANDOFF-pocket-money.md` §0 and §11. |
 | **`HANDOFF-pocket-money.md`** | COMPLETE | 427 lines at repo root; 12 sections; ten pocket-money requests (#15–#24) carried with file:line evidence |
 | Stage 1 — school-day offer above the grid | COMPLETE (amended) | Repro failed first at **311/314**, then **314/314 exit 0**. `check` 8/8 · merge 112/112 · buffers 9/9 · stream 28/28 · cleanup pass · xp 28/28 · money 33/33. |
-| Stage 1b — one host only, above the grid | IN PROGRESS | Owner's narrowing (#26). Retires `#weekSchoolBanner`; re-points the part-planned smoke arm; adds an assertion that the id is gone. |
-| Stage 2 — profile badges switch profile | NOT STARTED | Blocked on Stage 1 being green |
-| Stage 3 — watch a sister compete | NOT STARTED | Blocked on Stage 2 being green |
+| Stage 1b — one host only, above the grid | COMPLETE | `b4b62dd`. 314/314; `check-dead-ids` 374 → **373**, which is the removed host. |
+| Stage 2 — profile badges switch profile | COMPLETE | `d3fb2b6`. Repro failed with 7 findings; then **315/315**. |
+| Stage 3 — watch a sister compete | COMPLETE | `684eb2c`. Repro failed with 15 findings, incl. the orphan adoption and the meeting chase firing against live code; then **317/317**. |
+| §4 repeat invite · §5 inbox on Today · VE items · tier-2 click sweep | NOT STARTED | **Awaiting the owner's scope decision** — proposed in Plan v5, not approved. |
+| Tier-3 logic review of non-money screens | NOT STARTED | Proposed as its own read-only round after this PR merges. |
 
 ## Checks and evidence
 - 2026-09-21 `bash tests/replay-hooks.sh` → **passed=14 failed=0**; `.claude/hooks/config.json` confirmed restored to `routing_guard_mode: "observe"`, `.claude/state/` empty.
 - 2026-09-21 `npm run check` → **green**: 43 files pass `node --check`; 1943 top-level declarations, no duplicates; 16 `state.shared` keys all with a merge decision; escaping lint clean; 1379 CSS classes and 373 ids all referenced; 43 scripts all loaded and cached, SW_VERSION `2026-09-21c`.
 - 2026-09-22 **read-only audit round, no app file changed.** Five parallel investigations over `js/`, `index.html`, `css/app.css`, `tests/`, the root `.md` files, and git history back to `437f79a`. Findings are in `HANDOFF-pocket-money.md` and Plan v4.
 - 2026-09-22 **Stage 1 verified.** Failing repro first: `theSchoolOfferIsAboveTheWeekGrid` + two others failed at **311/314**, naming the missing host. After the fix **314/314, exit 0, errors: []**. Also `npm run check` 8/8 (1945 declarations no duplicates, 1380 CSS classes and 374 ids all referenced, `SW_VERSION 2026-09-22a`), merge 112/112, buffers 9/9, stream 28/28, cleanup pass, xp 28/28, money 33/33. `npm run check` re-run green by the main session independently.
-- 2026-09-22 Stage 1b / 2 / 3 verification: **pending.** Same gate before any push.
+- 2026-09-22 **Stage 1b verified** — 314/314; `check` 8/8, 373 ids.
+- 2026-09-22 **Stage 2 verified** — repro failed with 7 named findings, one of them the app stating its own meeting-lock defect; then 315/315, `check` 8/8, 1946 declarations. An intermediate run proved that scoping `applyMeetingLock`'s selector alone could not release the lock.
+- 2026-09-22 **Stage 3 verified** — repro failed with 15 findings; then 317/317, `check` 8/8, 1948 declarations, 374 ids (one new, `#watchSisterBtn`).
+- 2026-09-22 **Read-only dead-control scan** — 170 distinct `onclick` targets, all declared (one hit, `stopPropagation`, is `event.stopPropagation()`); 177 delegated `data-*-action` values across 13 prefixes, 3 scanner hits all verified handled via `closest('[data-…-action="…"]')`. The scan also **under**-reports: it cannot see the known-dead `pm-action="edit"` branch, because `'edit'` is handled by another prefix. A real guard must parse per prefix.
+- 2026-09-22 **Build stamp check** — `SW_VERSION` exists only in `sw.js`, is never posted to the page, and nothing renders a version. **No deploy stamp exists to read.**
 - **Not verified on a live URL or a real device.** Everything so far is headless Chromium at 390×844; no deploy stamp has been read, so nothing is claimed as deployed.
 
 ## Open questions / blockers
