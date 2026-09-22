@@ -544,10 +544,20 @@ function findChromium() {
     const schoolKeys = keys.filter(k => isSchoolDay(k));
 
     weekOffset = wk;
-    goWeek(); renderWeek();
-    const tip = (document.getElementById('weekCoachTip') || {}).textContent || '';
-    if (!new RegExp(`Add ${schoolKeys.length} school day`).test(tip)) {
-      bad.push(`a blank term week does not offer its ${schoolKeys.length} school days: "${tip.slice(0, 120)}"`);
+    goWeek(); setWeekView('full'); renderWeek();
+    /* The blank-week coach tip above the grid used to carry a 🏫 button of its
+       own, and this arm read it there. It does not any more: the coach tip's
+       copy only ever appeared on a WHOLLY blank week and the stale-calendar
+       branch pre-empted it, so it was the one copy that vanished the moment a
+       block landed. The offer above the grid is #weekSchoolBannerTop now, on
+       the same condition as the below-grid copy, so the assertion moves rather
+       than going away — a blank term week must still SAY it has school days
+       missing, above the grid, in the same words. */
+    const topOffer = document.getElementById('weekSchoolBannerTop');
+    if (!topOffer || topOffer.style.display === 'none') {
+      bad.push(`a blank term week does not offer its ${schoolKeys.length} school days above the grid`);
+    } else if (!new RegExp(`${schoolKeys.length} school day`).test(topOffer.textContent)) {
+      bad.push(`the offer above the grid does not name the ${schoolKeys.length} missing school days: "${topOffer.textContent.trim().slice(0, 120)}"`);
     }
 
     // Nothing is written until it is confirmed.
@@ -602,15 +612,27 @@ function findChromium() {
       bad.push('a day that already has its School Day was offered another');
     }
 
-    // And it is its own banner, not a line inside the blank-week offer.
+    /* And it is its own banner, not a line inside the blank-week offer — which
+       is the whole point of this arm: a PART-planned week must still surface
+       the school days it is missing. It used to read #weekSchoolBanner, the
+       copy at the bottom of .weekly-full-wrap. That host is retired at the
+       owner's instruction — one offer, above the grid — so the assertion moves
+       to the surviving host rather than going away. */
     keys.forEach(k => setDayBlocks(k, [], 'jenn'));
     setDayBlocks(schoolKeys[0], [{ id: 'sd-keep2', actId: 'breakfast', startMin: 7 * 60, durationMin: 30 }], 'jenn');
     goWeek(); setWeekView('full'); renderWeek();
-    const sb = document.getElementById('weekSchoolBanner');
+    const sb = document.getElementById('weekSchoolBannerTop');
     if (!sb || sb.style.display === 'none') {
       bad.push('a part-planned week does not surface its missing school days');
     } else if (!/school day/.test(sb.textContent)) {
       bad.push(`the school banner says "${sb.textContent.trim().slice(0, 80)}"`);
+    }
+    /* And there is exactly ONE of it. The below-grid host is gone from the
+       markup, not merely undrawn: leaving it there is how somebody reinstates
+       the second copy by reflex, and check-dead-ids.js would fail on an id
+       nothing reads anyway. */
+    if (document.getElementById('weekSchoolBanner')) {
+      bad.push('#weekSchoolBanner is back in the document — the offer is meant to appear above the grid and nowhere else');
     }
 
     // And a week months out is not offered at all.
@@ -622,6 +644,172 @@ function findChromium() {
     weekOffset = wasOffset; profile = wasProfile;
     goWeek(); renderWeek();
     return bad.length === 0 || bad;
+  });
+
+  /* A TO-DO THAT ONLY SHOWS BELOW THE GRID IS A TO-DO NOBODY SEES. The offer to
+     add the missing School Day cards had two hosts and lost one — #tgSchoolBanner
+     went with the Day Blocks tab — leaving only the copy inside .weekly-full-wrap,
+     which sits after about 691px of grid (960 minutes at 0.72px/min) plus the
+     colour key and the streak. On a 390x844 phone that is a screen and a half
+     below the fold. The coach-tip copy above the grid was not a substitute: it
+     needed the whole week blank, so booking one block anywhere took the offer off
+     the visible page entirely, on exactly the weeks somebody is planning.
+     The below-grid copy is now retired at the owner's instruction and
+     #weekSchoolBannerTop is the one host; this measures where it lands.
+     Measured at a real phone viewport rather than read off the markup — "above
+     the grid" is a fact about two rectangles, not about DOM order. */
+  await page.setViewportSize({ width: 390, height: 844 });
+  checks.theSchoolOfferIsAboveTheWeekGrid = await page.evaluate(() => {
+    const problems = [];
+    const wasOffset = weekOffset, wasProfile = profile, wasView = weekView;
+    profile = 'jenn';
+    let wk = null;
+    for (let w = 0; w < SCHOOL_FILL_HORIZON_WEEKS; w++) {
+      if (getDayKeys(w).some(k => isSchoolDay(k))) { wk = w; break; }
+    }
+    if (wk == null) {
+      profile = wasProfile;
+      problems.push('no week inside SCHOOL_FILL_HORIZON_WEEKS has a school day, so the offer above the grid cannot be measured');
+      return problems;
+    }
+    const keys = getDayKeys(wk);
+    const restore = keys.map(k => [k, getDayBlocks(k, 'jenn')]);
+    const schoolKeys = keys.filter(k => isSchoolDay(k));
+
+    /* PART-PLANNED, which is the case the lost host was the only one serving:
+       one non-school block on one day, every school card still missing. */
+    keys.forEach(k => setDayBlocks(k, [], 'jenn'));
+    setDayBlocks(keys[0], [{ id: 'sd-above-grid', actId: 'breakfast', startMin: 7 * 60, durationMin: 30 }], 'jenn');
+
+    weekOffset = wk;
+    goWeek(); setWeekView('full'); renderWeek();
+
+    const top = document.getElementById('weekSchoolBannerTop');
+    const grid = document.getElementById('weeklyFullGrid');
+    if (!top) {
+      problems.push('#weekSchoolBannerTop does not exist — the week grid has no offer to add its missing School Day cards above it');
+    } else if (getComputedStyle(top).display === 'none' || !top.getBoundingClientRect().height) {
+      problems.push(`a part-planned week missing ${schoolKeys.length} School Day cards leaves #weekSchoolBannerTop hidden`);
+    } else if (!/school day/i.test(top.textContent)) {
+      problems.push(`#weekSchoolBannerTop is shown but does not name the offer: "${top.textContent.trim().slice(0, 80)}"`);
+    } else if (top.getBoundingClientRect().top >= grid.getBoundingClientRect().top) {
+      problems.push('#weekSchoolBannerTop is not above #weeklyFullGrid — the offer still sits below the grid it is about');
+    }
+
+    /* The preview tab is read-only, and renderSchoolDayBanner is only ever
+       called from renderFullWeek — so without an explicit hide the top host
+       keeps whatever it last said, on a surface where nothing can be added. */
+    setWeekView('preview');
+    const onPreview = document.getElementById('weekSchoolBannerTop');
+    if (onPreview && getComputedStyle(onPreview).display !== 'none') {
+      problems.push('the school-day offer is still drawn over the read-only print preview, where nothing can be added');
+    }
+    setWeekView('full');
+
+    restore.forEach(([k, blocks]) => setDayBlocks(k, blocks, 'jenn'));
+    weekOffset = wasOffset; profile = wasProfile;
+    setWeekView(wasView); goWeek(); renderWeek();
+    return problems.length ? problems : true;
+  });
+  await page.setViewportSize({ width: 900, height: 1100 });
+
+  /* ONE DAY IS A REAL ANSWER. The offer could only ever be taken whole — "Add
+     them", every missing school day at once — which is wrong for the week that
+     actually has a gap in it: a PD day the family is away for, a Thursday the
+     child is at her grandmother's. A chip per offered day makes the smallest
+     true answer available, and with a single day left the chip IS the action,
+     so no bulk button is drawn beside it. Asserted for a kid profile and again
+     for a parent viewing that kid, because activeProfile() is what decides
+     whose week is written and a parent looking at Jenn must write Jenn's. */
+  checks.oneSchoolDayCanBeAddedOnItsOwn = await page.evaluate(async () => {
+    const problems = [];
+    const wasOffset = weekOffset, wasProfile = profile, wasViewing = parentViewing;
+    let wk = null;
+    for (let w = 0; w < SCHOOL_FILL_HORIZON_WEEKS; w++) {
+      if (getDayKeys(w).some(k => isSchoolDay(k))) { wk = w; break; }
+    }
+    if (wk == null) {
+      problems.push('no week inside SCHOOL_FILL_HORIZON_WEEKS has a school day, so a single-day add cannot be told apart from adding all of them');
+      return problems;
+    }
+    const keys = getDayKeys(wk);
+    const restore = keys.map(k => [k, getDayBlocks(k, 'jenn')]);
+    weekOffset = wk;
+
+    const arm = async (label) => {
+      const kid = activeProfile();
+      keys.forEach(k => setDayBlocks(k, [], kid));
+      setDayBlocks(keys[0], [{ id: 'one-sd-keep', actId: 'breakfast', startMin: 7 * 60, durationMin: 30 }], kid);
+      goWeek(); setWeekView('full'); renderWeek();
+
+      const offered = schoolDaysToOffer(keys, kid);
+      const host = () => document.getElementById('weekSchoolBannerTop');
+      const banner = host();
+      if (!banner || getComputedStyle(banner).display === 'none') {
+        problems.push(`${label}: the week grid's school-day offer is not shown at all, so ${kid}'s ${offered.length} missing cards cannot be added`);
+        return;
+      }
+      if (offered.length < 2) {
+        problems.push(`${label}: the fixture week offers only ${offered.length} school day, so adding one on its own cannot be distinguished from adding them all`);
+        return;
+      }
+      let chips = [...banner.querySelectorAll('.wsb-day')];
+      if (chips.length !== offered.length) {
+        problems.push(`${label}: the offer draws ${chips.length} day chips for ${offered.length} school days missing their card`);
+        return;
+      }
+
+      const target = offered[0], others = offered.slice(1);
+      chips[0].click();
+      await new Promise(r => setTimeout(r, 40));
+      const ok = document.getElementById('appDialogOkBtn');
+      if (!ok) {
+        problems.push(`${label}: tapping one day's chip wrote without asking first`);
+        return;
+      }
+      ok.click();
+      await new Promise(r => setTimeout(r, 80));
+
+      const wrote = (getDayBlocks(target, kid) || []).filter(b => b && b.actId === 'school_day');
+      if (wrote.length !== 1) {
+        problems.push(`${label}: tapping ${target}'s chip put ${wrote.length} school_day blocks on that day, and one chip is one day`);
+      }
+      const strays = others.filter(k => (getDayBlocks(k, kid) || []).some(b => b && b.actId === 'school_day'));
+      if (strays.length) {
+        problems.push(`${label}: tapping ${target}'s chip also wrote a School Day to ${strays.join(', ')}, which nobody asked for`);
+      }
+
+      renderWeek();
+      const after = host();
+      chips = after ? [...after.querySelectorAll('.wsb-day')] : [];
+      const gone = DAY_SHORT[(formatDayKey(target).getDay() + 6) % 7];
+      if (chips.some(c => c.textContent.trim() === gone)) {
+        problems.push(`${label}: ${gone} is still offered a School Day card after one landed on it`);
+      }
+      if (chips.length !== others.length) {
+        problems.push(`${label}: ${chips.length} day chips remain, but ${others.length} school days are still missing their card`);
+      }
+      const bulk = after ? [...after.querySelectorAll('button')].filter(b => !b.classList.contains('wsb-day')) : [];
+      if (others.length > 1 && !bulk.length) {
+        problems.push(`${label}: ${others.length} days are still missing their card and there is no way to add them all at once`);
+      }
+      if (others.length === 1 && bulk.length) {
+        problems.push(`${label}: one offered day still draws a bulk "add all" button beside the chip that already is that action`);
+      }
+    };
+
+    profile = 'jenn'; parentViewing = wasViewing;
+    await arm('as Jenn');
+    /* Same arm as a grown-up looking at Jenn's week. activeProfile() returns
+       parentViewing, so this should already hold — the point is to pin it, the
+       way every other write on this screen is pinned for the portal. */
+    profile = 'parent'; parentViewing = 'jenn';
+    await arm('as a parent viewing Jenn');
+
+    restore.forEach(([k, blocks]) => setDayBlocks(k, blocks, 'jenn'));
+    weekOffset = wasOffset; profile = wasProfile; parentViewing = wasViewing;
+    goWeek(); renderWeek();
+    return problems.length ? problems : true;
   });
 
   /* Weekly view: Y-axis sideband + hour lines + slot tint bands. These belong to

@@ -287,6 +287,15 @@
   </header>
   <p class="kid-coach-tip" id="weekCoachTip" style="display:none;margin:0.35rem 0.75rem 0"></p>
 
+  <!-- The offer to add the missing School Day cards, above the grid it is about,
+       and the only place it appears. It is a to-do, and it used to sit at the
+       bottom of .weekly-full-wrap: after about 691px of grid (960 minutes at
+       0.72px/min) plus the colour key and the streak, which on a phone is a
+       screen and a half below the fold. A to-do nobody sees is not a to-do.
+       (A copy under the 🧱 Day Blocks tab, #tgSchoolBanner, went with that tab —
+       which is how the offer came to live only below the fold.) -->
+  <div class="week-todo-banner" id="weekSchoolBannerTop" style="display:none"></div>
+
   <!-- The compact week view lived here, with #weekGrid and #weekLegend. It was
        the original third week layout and had been unreachable for a long time:
        the tabs only ever set 'full' or 'timegrid'. #weekLegend went with it —
@@ -308,7 +317,10 @@
            than being retired with the tab. -->
       <div class="tg-streak" id="weekStreak"></div>
       <div class="week-todo-banner" id="weekFamilyBanner" style="display:none"></div>
-      <div class="week-todo-banner" id="weekSchoolBanner" style="display:none"></div>
+      <!-- #weekSchoolBanner stood here. The offer to add the missing School Day
+           cards is a to-do, and a to-do under a 691px grid is a to-do nobody
+           sees, so it moved above the grid it is about (#weekSchoolBannerTop,
+           under #weekCoachTip) and there is one of it. -->
       <div class="week-conflict-banner" id="weekConflictBanner" style="display:none"></div>
       <div class="week-signature" id="weekSignatureBar"></div>
     </div>

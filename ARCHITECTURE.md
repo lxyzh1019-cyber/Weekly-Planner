@@ -629,7 +629,10 @@ place that already does it.
 **The week has two tabs, and only one of them is a week you can plan.** Full is
 what the screen opens on: the cards, the quick-complete `.wf-card-check` ticks,
 the planning controls and the three banners — including the offer to add missing
-School Day cards, which is a mutation and so can only live there. The second tab
+School Day cards, which is a mutation and so can only live there. (That offer is
+drawn ABOVE the grid, from `#weekSchoolBannerTop`, which is a sibling of
+`#weekFull` rather than part of it — so `setWeekView` has to hide it on the
+preview explicitly. See *The school calendar* below.) The second tab
 is a read-only preview of the printed sheet, and it is a second **host** for
 `renderPrintSheet` (`js/16-print.js`), never a second copy of it: that function
 takes `(host, { weekOffset, profile, window })` and sets `--print-slot` on the
@@ -2014,12 +2017,46 @@ asks whether the school **card** is missing, not whether the day is empty. It
 used to ask the second, and only on a wholly blank week, so one breakfast on a
 Monday disqualified that Monday from ever getting its school card.
 
-`renderSchoolDayBanner` owns it, as its own banner beside the family-chores one,
+`renderSchoolDayBanner` owns it, as its own banner,
 inside `SCHOOL_FILL_HORIZON_WEEKS` (3). One School Day block each on one
 confirm, not the whole template, and they arrive with **travel and get-ready on**
 (see the buffer defaults below). Past that horizon there is no offer: a term is
 40-odd weeks, and materialising all of it would write hundreds of blocks into a
 document that uploads whole on every change.
+
+**A TO-DO BELOW THE GRID IS A TO-DO NOBODY SEES, so it is drawn above it — and
+in one place.** The banner was `#weekSchoolBanner`, at the bottom of
+`.weekly-full-wrap` after about 691px of grid (960 minutes at 0.72px/min) plus
+the colour key and the streak, which on a 390×844 phone is a screen and a half
+under the fold. The blank-week coach tip carried a second copy and was the wrong
+one to rely on — it needed the whole week blank, so it vanished the moment a
+block landed, and the stale-calendar branch pre-empted it. `#tgSchoolBanner`
+under the retired 🧱 Day Blocks tab was the other host, and losing it with the
+tab is how the offer came to live only below the fold.
+
+`#weekSchoolBannerTop`, a **sibling** of `#weekFull` directly under
+`#weekCoachTip`, is now the only host. `#weekSchoolBanner` is gone from the
+markup — not merely undrawn, because an id nothing reads fails
+`tests/check-dead-ids.js`, and a host left in place is a host somebody reinstates
+by reflex. `renderSchoolDayBanner` keeps its `bannerId` parameter, which costs
+nothing and is how the host stayed swappable, and its default names the real
+host so a bare call cannot become a silent no-op. Because the host is outside
+`#weekFull`, `setWeekView` has to hide it explicitly on the read-only preview —
+`renderSchoolDayBanner` is called only from `renderFullWeek`, so nothing else
+would.
+
+**One writer, two doors.** `commitSchoolDays(dayKeys, p)` (`js/07-week-view.js`)
+is the only place a School Day card is written from this offer: the confirm
+wording, the block shape, the single `saveAll()` and the toast. Both doors
+resolve their days through `schoolDaysToOffer` first —
+`addSchoolDaysToWeek(mondayKey)` for the week, `addSchoolDayToDay(dayKey)` for
+one — so a chip that is stale because another device already added that card
+becomes the "already has one" toast rather than a second School Day on the same
+day. The banner draws a `.wsb-day` chip per offered day beside the count, and
+the bulk `Add all N` only when there is more than one — with a single day left
+the chip **is** the action. The smallest true answer has to be available: a week
+whose Thursday is a PD day the family is away for must not have to refuse the
+other four school days to say so.
 
 **Importing** (`js/35-school-calendar.js`) reads a `.ics` file or URL. It is a
 hand-written parser because there is no build step and the CSP allows no
@@ -2041,7 +2078,11 @@ is never told the app's data is out of date; she cannot act on it.
 yields and asserts the published total (177 for K-8) — a mistyped date moves that
 number, which is the point. `everyWeekViewFollowsTheSchoolCalendar`,
 `schoolHoursAreTheParentsToSet`, `aBlankWeekOffersItsSchoolDays` and
-`anIcsFileBecomesDaysOffOnlyAfterReview` hold the rest. Note what
+`anIcsFileBecomesDaysOffOnlyAfterReview` hold the rest.
+`theSchoolOfferIsAboveTheWeekGrid` measures the two rectangles at 390×844 on a
+**part-planned** week — "above the grid" is a fact about geometry, not about DOM
+order — and `oneSchoolDayCanBeAddedOnItsOwn` holds the chips, as a kid and as a
+parent viewing that kid. Note what
 `weekSideband`/`printSideband` used to be: an assertion that there were exactly
 four segments, which counted to four on Christmas week as readily as on a term
 Tuesday and is exactly why the 9am band stood for so long. They assert the axis

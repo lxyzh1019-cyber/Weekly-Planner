@@ -1,4 +1,4 @@
-# FEATURES — Weekly-Planner — manifest v1 — confirmed 2026-09-21
+# FEATURES — Weekly-Planner — manifest v2 — confirmed 2026-09-22
 
 Locked features of the current version. Every edit is checked against this list and ends with a regression table. Update this file in the same change that alters a feature. Over-list rather than under-list.
 
@@ -50,6 +50,17 @@ to be a complete manifest:
 - Three escaping helpers chosen by context, enforced by `tests/check-escaping.js`.
 - Verification gate before any push: `npm run check`, `npm run test:merge`, `npm run test:xp`, `npm run test:money`, `npm run test:smoke`.
 - `SW_VERSION` must be bumped on any deploy changing a shell file, enforced by `tests/check-sw-shell.js`.
+
+### Week screen — the school-day offer (manifested 2026-09-22)
+- School days are **offered, never assumed**, and the question is whether the school **card** is missing, not whether the day is empty — `schoolDaysToOffer` (`js/07-week-view.js`).
+- The offer is limited to `SCHOOL_FILL_HORIZON_WEEKS` (3) weeks ahead — `schoolOfferInHorizon`.
+- **It appears in ONE place, above the grid** — `#weekSchoolBannerTop`, a sibling of `#weekFull` directly under `#weekCoachTip`. A to-do below a ~691px grid is a to-do nobody sees. `renderSchoolDayBanner(bannerId = 'weekSchoolBannerTop')` draws it, called once from `renderFullWeek`; the `bannerId` parameter stays so the host is swappable, but only one host exists.
+- `#weekSchoolBanner` (the old below-grid host, inside `.weekly-full-wrap`) is **absent from `index.html`**, not merely undrawn — an id nothing reads fails `tests/check-dead-ids.js`, and a host left in place is a host somebody reinstates.
+- `setWeekView('preview')` hides `#weekSchoolBannerTop` explicitly, because it sits outside `#weekFull` and the renderer runs only from `renderFullWeek`.
+- The banner names the count, draws a `.wsb-day` chip per offered day, and draws the bulk `Add all N` **only when more than one day is offered**.
+- **One writer**: `commitSchoolDays(dayKeys, p)` owns the confirm copy (its `okLabel` is `Add it` for one day, `Add them` for more), the block shape (travel + get-ready on, not completed, not confirmed), the single `saveAll()` and the toast. `addSchoolDaysToWeek(mondayKey)` and `addSchoolDayToDay(dayKey)` are its two doors, and **both filter through `schoolDaysToOffer` first** so a stale chip cannot write a duplicate School Day.
+- The blank-week coach tip (`weekEmptyOffer`) carries **no** school button — the banner covers the blank week from the same position.
+- Held by `theSchoolOfferIsAboveTheWeekGrid`, `oneSchoolDayCanBeAddedOnItsOwn` and `aBlankWeekOffersItsSchoolDays` in `tests/smoke.js`.
 
 Deriving the full app manifest from `ARCHITECTURE.md` is an open item in `WORKING_RECORD.md`.
 

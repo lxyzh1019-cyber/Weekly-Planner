@@ -13,6 +13,12 @@ function setWeekView(v) {
   document.getElementById('viewTabPrintPreview').classList.toggle('active', weekView === 'preview');
   document.getElementById('weekFull').style.display = weekView === 'full' ? 'flex' : 'none';
   document.getElementById('weekPrintPreview').style.display = weekView === 'preview' ? 'flex' : 'none';
+  /* The school-day offer above the grid is a SIBLING of #weekFull, so hiding
+     the Full view does not take it with it — and renderSchoolDayBanner is only
+     ever called from renderFullWeek, so without this it would keep whatever it
+     last said over a read-only print preview where nothing can be added. */
+  const schoolTop = document.getElementById('weekSchoolBannerTop');
+  if (schoolTop && weekView === 'preview') schoolTop.style.display = 'none';
   renderWeek();
 }
 function changeWeek(d) { weekOffset += d; renderWeek(); }
@@ -184,14 +190,18 @@ function schoolOfferInHorizon(keys) {
   return off >= 0 && off < SCHOOL_FILL_HORIZON_WEEKS;
 }
 
-/* Names the days before it writes anything, the way the parent portal's copy
+/* ── ONE writer for the School Day card, whichever door it came through ──
+   Names the days before it writes anything, the way the parent portal's copy
    preview does. One School Day block per day — not the whole school-day
    template, which would also invent a piano lesson and a bedtime routine
-   nobody asked for. */
-async function addSchoolDaysToWeek(mondayKey) {
-  const p = activeProfile();
-  const keys = mrWeekDayKeys(mondayKey);
-  const days = schoolDaysToOffer(keys, p);
+   nobody asked for.
+
+   The whole week's missing days and a single day are the same write, so they
+   are the same function: the confirm wording, the block shape, the one
+   saveAll() and the toast all live here and nowhere else. Two copies of this
+   is the six-copies defect ARCHITECTURE.md already records — a card placed
+   from a chip must be identical to one placed from "Add all". */
+async function commitSchoolDays(days, p = activeProfile()) {
   if (!days.length) { showToast('Every school day this week already has one'); return; }
   const names = days.map(k => DAY_LONG[(formatDayKey(k).getDay() + 6) % 7]);
   const h = schoolHours();
@@ -200,7 +210,9 @@ async function addSchoolDaysToWeek(mondayKey) {
     `Add School Day to ${names.length} day${names.length === 1 ? '' : 's'} — ${names.join(', ')}?\n\n`
     + `${when}, from the school calendar, with travel and get-ready time on. Nothing `
     + 'else is added, and a day that already has a School Day on it is left alone.',
-    { okLabel: 'Add them', cancelLabel: 'Not now' });
+    // "Add them" for one day was the last word in here that did not agree with
+    // the count the sentence above it already got right.
+    { okLabel: days.length === 1 ? 'Add it' : 'Add them', cancelLabel: 'Not now' });
   if (!ok) return;
   days.forEach(k => {
     const arr = getDayBlocksForProfile(k, p) || [];
@@ -224,18 +236,39 @@ async function addSchoolDaysToWeek(mondayKey) {
   showToast(`🏫 Added ${days.length} school day${days.length === 1 ? '' : 's'} — now build round them`);
 }
 
+/* The whole week's missing days, from the "Add all" control. */
+async function addSchoolDaysToWeek(mondayKey) {
+  const p = activeProfile();
+  const keys = mrWeekDayKeys(mondayKey);
+  return commitSchoolDays(schoolDaysToOffer(keys, p), p);
+}
+
+/* One day, from its own chip. The smallest true answer: a PD day the family is
+   away for, or a Thursday at her grandmother's, is not a reason to refuse the
+   other four.
+
+   Filtered through schoolDaysToOffer rather than written straight, because the
+   chip on screen is only as fresh as the last render: another device adding
+   that day's card, or a sync arriving mid-tap, would otherwise make this a
+   SECOND School Day on the same day. schoolDaysToOffer already answers both
+   halves — is it a school day, and does it still lack its card — so a stale
+   chip becomes the "already has one" toast instead of a duplicate block. */
+async function addSchoolDayToDay(dayKey) {
+  const p = activeProfile();
+  return commitSchoolDays(schoolDaysToOffer([dayKey], p), p);
+}
+
 function weekEmptyOffer(keys) {
   const p = activeProfile();
   const plan = `<button class="wins-btn" onclick="goPlanWeek('${escapeJsAttr(keys[0])}')">✏️ Start planning</button>`;
-  /* Offered on a blank week only — which is exactly "the new week you are
-     planning" — so it cannot become a thing that nags every time a week is
-     half full. */
-  const schoolDays = schoolOfferInHorizon(keys) ? schoolDaysToOffer(keys, p) : [];
-  const school = schoolDays.length
-    ? ` <button class="wins-btn" onclick="addSchoolDaysToWeek('${escapeJsAttr(keys[0])}')">🏫 Add ${schoolDays.length} school day${schoolDays.length === 1 ? '' : 's'}</button>`
-    : '';
+  /* The 🏫 offer used to be a button here too, and this was the copy that could
+     not be relied on: it needed the whole week blank, it needed keys[6] to be
+     today or later, and the stale-calendar branch above pre-empted it — so it
+     went away the moment one block landed, which is when somebody is actually
+     planning. #weekSchoolBannerTop now stands in the same place above the grid,
+     in the same words, and is the one place the offer appears. */
   if (keys[6] >= todayKey()) {
-    return `📝 <b>This week is empty.</b> Pick a day and put the first thing in — you can move it later. ${plan}${school}`;
+    return `📝 <b>This week is empty.</b> Pick a day and put the first thing in — you can move it later. ${plan}`;
   }
   const src = nearestPlannedWeek(keys[0], p, 8);
   const copy = src
@@ -969,7 +1002,9 @@ function renderFullWeek(keys) {
   // ── Week-level conflict summary banner (shown above the grid) ──
   renderWeekConflictBanner(keys);
   renderFamilyChoreBanner('weekFamilyBanner');
-  renderSchoolDayBanner('weekSchoolBanner');
+  /* Above the grid, and only there — it is a to-do, and the bottom of
+     .weekly-full-wrap is 691px of grid below the fold (index.html says why). */
+  renderSchoolDayBanner('weekSchoolBannerTop');
   renderWeekStreak(keys);
   renderWeekLegend();
 
@@ -1603,11 +1638,17 @@ function renderWeekConflictBanner(keys, bannerId = 'weekConflictBanner') {
 /* ── School days that have no card yet ────────────────────────────
    Its own banner rather than a line inside the blank-week offer, because it is
    not about the week being blank. It follows the same rules as the family
-   chores banner beside it: THIS week and the next two only (materialising a
-   40-week term would write hundreds of blocks into a document that uploads
-   whole on every change), and it disappears the moment every school day has
-   its card, so it is a to-do and never a scoreboard. */
-function renderSchoolDayBanner(bannerId = 'weekSchoolBanner') {
+   chores banner: THIS week and the next two only (materialising a 40-week term
+   would write hundreds of blocks into a document that uploads whole on every
+   change), and it disappears the moment every school day has its card, so it is
+   a to-do and never a scoreboard.
+
+   It is drawn ABOVE the grid, and in one place. It used to sit at the bottom of
+   .weekly-full-wrap, under 691px of grid plus the colour key and the streak,
+   which on a phone is a screen and a half below the fold — and a to-do nobody
+   sees is not a to-do. `bannerId` stays a parameter because that is how the host
+   stayed swappable and it costs nothing, but there is only one host now. */
+function renderSchoolDayBanner(bannerId = 'weekSchoolBannerTop') {
   const banner = document.getElementById(bannerId);
   if (!banner) return;
   const hide = () => { banner.style.display = 'none'; banner.innerHTML = ''; };
@@ -1617,15 +1658,26 @@ function renderSchoolDayBanner(bannerId = 'weekSchoolBanner') {
   if (!schoolOfferInHorizon(keys)) return hide();
   const days = schoolDaysToOffer(keys, p);
   if (!days.length) return hide();
-  const names = days.map(k => DAY_SHORT[(formatDayKey(k).getDay() + 6) % 7]);
   banner.style.display = 'flex';
-  /* One line, and the times live in the confirm dialog where they are actually
-     being agreed to — the kid screens have a 200-word budget and this banner
-     is a to-do, not a description of the school day. */
+  /* One line that wraps, and the times live in the confirm dialog where they
+     are actually being agreed to — this banner is a to-do, not a description of
+     the school day.
+
+     A day per chip rather than one all-or-nothing button: the week with a gap
+     in it is the week this is for, and refusing four school days because the
+     fifth is a PD day the family is away for is the offer being useless at
+     exactly the moment it matters. With one day left the chip IS the action, so
+     no bulk button is drawn beside it. */
+  const chips = days.map(k =>
+    `<button type="button" class="wsb-day" onclick="addSchoolDayToDay('${escapeJsAttr(k)}')">`
+    + `${escapeHtml(DAY_SHORT[(formatDayKey(k).getDay() + 6) % 7])}</button>`).join('');
+  const all = days.length > 1
+    ? `<button type="button" class="wins-btn" onclick="addSchoolDaysToWeek('${escapeJsAttr(keys[0])}')">Add all ${days.length}</button>`
+    : '';
   banner.innerHTML =
     `<span class="wcb-icon">🏫</span>`
-    + `<span>${days.length} school day${days.length === 1 ? '' : 's'} not on the plan: ${escapeHtml(names.join(', '))}</span>`
-    + `<button type="button" class="wins-btn" onclick="addSchoolDaysToWeek('${escapeJsAttr(keys[0])}')">Add ${days.length === 1 ? 'it' : 'them'}</button>`;
+    + `<span>${days.length} school day${days.length === 1 ? '' : 's'} not on the plan</span>`
+    + chips + all;
 }
 
 function renderFamilyChoreBanner(bannerId = 'weekFamilyBanner') {
