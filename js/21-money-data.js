@@ -133,18 +133,16 @@ const MNY_CHECKS = [
   { id: 'c7', label: 'Any price change saved with a reason' },
 ];
 
+/* The things nobody is paid for that no rule sets. The one that a rule DOES
+   set — how many household chores a week are free — is written from the live
+   rules by `mnyWorkListsCard`, so a parent changing it changes this page too.
+   What PAYS is not a list here at all any more: it said homework paid after
+   homework stopped paying, and Money school now shows the live price list. */
 const MNY_UNPAID = [
   'Your routines, morning and night',
   'Making your bed and tidying your room',
   'Packing your school bag and your sports gear',
-  'The first two household chores each week',
   'Being kind to your sister',
-];
-const MNY_PAID = [
-  'Household chores after your first two',
-  'Math pages, handwriting pages, Chinese words',
-  'A full week of clean routine days',
-  'Competition days',
 ];
 
 /* The eight ideas Money school teaches, in the order they open. `need` is the

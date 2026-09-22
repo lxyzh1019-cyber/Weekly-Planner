@@ -49,7 +49,7 @@ const PARENT_LANDINGS = {
     { panel: 'rules',    icon: '⭐', title: 'Level-up',            sub: 'What earns a star on an activity' },
     { panel: 'copyweek', icon: '📋', title: 'Copy a plan',         sub: 'Put a week — or one day — onto another, or onto her sister’s' },
     { panel: 'money',    icon: '🕰️', title: 'Change history',      sub: 'Every version of the rules, when it took effect, and why',
-      section: 'history' },
+      section: 'changes' },
   ],
   app: [
     { panel: 'access',   icon: '🔒', title: 'Access',          sub: 'The parent PIN that everything here sits behind' },

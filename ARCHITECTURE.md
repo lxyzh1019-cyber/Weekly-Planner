@@ -1763,6 +1763,21 @@ is the failure a restructure produces.
 what the girls are asked to do, or what it is worth?* Yes → **Setup**. No →
 **App**. Change history sits in Setup, next to the things it logs.
 
+**Change history is its own Money rules section** (`changes` in
+`MNY_PARENT_SECTIONS`), and Setup › 🕰️ Change history opens it. It used to land
+on the week ledger while the real log sat at the bottom of Lessons.
+`changeHistoryIsItsOwnSection` holds both halves and asserts the log is drawn in
+exactly one section (it was under Lessons and Loans); 📖 Week history keeps its
+name and its ledger.
+
+**A log line is words, never a stringified object.** `mrLogSummary(from, to)`
+(`js/18-rules.js`) is the one summariser: a list of records with ids reads
+"Added 🧦 Match the socks · Removed … · Changed …", any other non-scalar reads as
+a size. `mrLogAppend` stores that from now on, and `mnyChangeHistory` passes any
+non-scalar it finds through the same function — entries already on the family's
+devices hold whole `chorePool` arrays, which printed fifteen `[object Object]`
+for one chore added.
+
 **`parentScope` is not `parentViewing`.** The switcher has a **Both** state, but
 that value must never reach `parentViewing`: 27 places read that global and most
 are outside the portal — `activeProfile`, the week view, block grading, the quest
@@ -2242,7 +2257,12 @@ other field. Answers live in `rcDraft` and the DOM is drawn FROM it — the same
 shape `mmCaptureUiState` uses inside the meeting. **Typing never re-renders**;
 only a change that alters what the form ASKS does: the day (which week's rules
 apply, and which chores exist on it) and the two pots on a move (whether it is
-refused).
+refused). The amount changes the refusal too, and it is said on the save
+button, so a keystroke there updates **only the button**, in place
+(`rcSyncSave`), from the same `rcSaveState` that `rcRender` draws it with. It
+used to redraw the whole sheet per digit, which on an iPad closed the keyboard
+after every digit; `typingAnAmountKeepsTheCaret` types with real key events and
+asserts the input node and its focus survive.
 
 **A child gets two of the five, and both as proposals** — a gift she was given
 and a move between her own pots. `mnyAddDeposit` and `mnyRequestMove` already
@@ -2273,6 +2293,19 @@ routes and never decides), the parent **Money rules** head, **meeting step 3**,
 the kid's **gift** and **competition** cards, and the wallet card's
 `mnyMoveDoor` — one door whose label changes with the role, never two.
 
+**`MNY_CLICK_HOSTS` (`js/22-money-page1.js`) is the one list of containers
+`mnyHandleClick` is bound to**, and `js/99-main.js` binds from it. The Money
+rules head's ✍️ and "? How this page works" were dead for as long as the page
+existed: they carry `data-mny-action`, and the hand-written list in
+`99-main.js` never included `#mnyRulesWrap`. `everyMoneyActionHasAListener`
+renders every money surface and fails on any `data-mny-action` outside a listed
+host; `everyMoneyControlClicksClean` presses every money control, one at a time
+from a restored snapshot, and fails on any exception, sync or async.
+
+**A refused move says why on the save button**, before the tap, in
+`mnyMoveRefusal`'s own sentence; the destination defaults to the first pot
+other than the source that is open to her (`rcDefaultMoveTo`).
+
 ## Money can move between Sundays
 
 **Until Stage 3 the only door out of cash was the Sunday split.** The two that
@@ -2296,6 +2329,22 @@ pots are adjacent is a row the flow cannot explain. `invest → cash` converts
 dollars to shares newest-holding-first, once, beside the only caller that needs
 it — `moneySellStock` takes shares and everything else on this surface is
 dollars.
+
+**One route decision.** `MNY_MOVE_ROUTES` / `mnyMoveRoute(from, to)` is the
+only answer to "can money go this way", and both `mnyMoveRefusal` and
+`mnyMoveMoney` read it — so a pair the writer cannot route is always refused
+with a sentence, and there is no "move the app does not know" left to reach.
+`invest → ready|locked` passed the refusal and then fell off the end of the
+writer, and a child could file that request and nobody could approve it. They
+now go through cash (`mnyMoveViaCash`), which moves on **only what the first
+leg actually raised**, measured on the wallet — a sale can raise less than
+asked, and cash she already had is not part of the move.
+`everyMoveEitherMovesOrSaysWhy` walks all sixteen ordered pairs.
+
+**No loan is every pot open.** `mnyPaidPct` returns **100** when nothing is
+owed; 0 pinned a debt-free child at stage 0 with every pot shut. Anything that
+would then say "paid off" checks the principal itself — the ladder card reads
+"Nothing to pay back, so everything is open".
 
 **The stage gates are not optional.** Every destination is checked with
 `mnyIsOpen` against `MNY_BUCKETS` — the same predicate `mnySplitFor` uses when
@@ -2368,8 +2417,19 @@ come out.
 
 **Each group scales to its own biggest ribbon, not to a grand total.** One
 scale across "in" and "out" draws a $2 fine as an invisible sliver beside $40
-of jobs — the one row she most needs to see. The two group totals are what
-compare the halves.
+of jobs — the one row she most needs to see. The group totals are what compare
+the halves.
+
+**Every caption is the sum of the bars under it.** Three groups: ⬇️ what came
+in (`inTotal`), ➡️ what went out (`outTotal` — spent, fine, loan, given back,
+and any other key that left, such as a company losing value), and 🌱 put away to
+grow (`savedTotal` — ready, locked, invest). There was one "Where it went"
+caption over bars that included pot-to-pot moves its total left out — observed
+live as $0.00 above a $30.00 bar — and `returned` was counted and never drawn.
+`savedTotal` is computed in `evFlowOf` / `evTypicalMonthOf` (unit-tested in
+`tests/stream.test.js`), so the Flow still sums nothing;
+`theFlowCaptionsEqualTheirBars` checks each caption against its rows on every
+period.
 
 **Three periods, and the third is the honest one.** *This month* · *All of it* ·
 *A typical month*, which `evTypicalMonth` divides by the months that have
@@ -2617,7 +2677,29 @@ because the quiet ones are not in the denominator at all. It was arithmetic on a
 self-selected sample. `mrWeeksElapsed()` is the one owner, counting from
 `mrStartWeek()` — derived, not seeded — and an unsettled week now counts as a
 week that paid nothing, which is what it is. This file recorded it as a known
-defect before it was fixed.
+defect before it was fixed. `theFourHouseRulesHold` asserts the denominator
+itself — ten weeks elapsed, two settled, the pace divides by ten — because its
+earlier assertions all still passed with `/ weeks.length` put back.
+
+### A rulebook already on file
+
+The rules landed in `MR_DEFAULT_RULES`, and `mrEnsure` seeds that only when a
+household has **no** versions — so a family with a stored rulebook never
+received the first three. Copying the template over is not the fix: the
+rulebook also holds the family's own chore pool, prices, caps and targets.
+
+`mrHouseRulesPending()` lists only the fields the rules change, resolving each
+item **by id** in the rules live today (never by position — a stored order can
+differ) and emitting only what still differs. The parent Money rules page
+previews every change and one tap applies them through `mrApplyEdits`, dated
+from this week's Monday (`ctThisWeekKey`, the key `mrRulesForWeek` resolves a
+week by); a version dated later this week is joined on its own date, and a
+future-scheduled one blocks with a sentence rather than being dragged forward.
+Every log line carries `MR_HOUSE_RULES_NOTE`, and `mrHouseRulesApplied` reads
+that off the log — so the card never comes back, even after a parent
+deliberately reverts one of the rules, and a second device finds nothing to do.
+No new state key. `theHouseRulesReachAStoredRulebook` seeds an August rulebook
+with the old prices, a custom pool and a reordered list.
 
 ### The gap this opened, and whose it is
 

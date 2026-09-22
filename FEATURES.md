@@ -55,10 +55,11 @@ Deriving the full app manifest from `ARCHITECTURE.md` is an open item in `WORKIN
 
 ## App — Pocket money (manifested 2026-09-22)
 
-Derived from `ARCHITECTURE.md` and checked against the code at `f4d1db5`. **This
-section is authoritative for the money area**; the rest of the app still checks
-against `ARCHITECTURE.md`. Items marked ⚠ are known defects scheduled in Plan v5 —
-listed so a regression table can show them changing on purpose.
+Derived from `ARCHITECTURE.md` and checked against the code at `f4d1db5`;
+updated for Plan v5 PR A (2026-09-22). **This section is authoritative for the
+money area**; the rest of the app still checks against `ARCHITECTURE.md`. Items
+marked ⚠ are known defects still open — listed so a regression table can show
+them changing on purpose.
 
 ### The stream and balances
 - Money is stored as movements in `profile.events`; balances are derived from them. `evShadowDrift` reports any pot where derived and stored disagree, on the parent page.
@@ -73,7 +74,9 @@ listed so a regression table can show them changing on purpose.
 - Settled weeks are frozen in `moneyLedger` and never recomputed.
 - `mrStartWeek()` is derived from the earliest week on file and never written by being read.
 - Four house rules (2026-09-21): homework earns XP, not dollars; tone, borrowing, screens and asked-twice are free the first two times a week; one grace day a week on the streak; the year's pace divides by weeks elapsed.
-- ⚠ The first three house rules exist only in `MR_DEFAULT_RULES`, so a household with a stored rulebook does not receive them.
+- A household with a stored rulebook gets the house rules through a parent-only card on Money rules: `mrHouseRulesPending` lists only the missing fields, resolved by item id against today's rules; one tap applies them through `mrApplyEdits` from this week's Monday; the family's chore pool, prices, caps and targets are untouched; nothing lived is re-priced. The card never returns once applied (a log marker, `MR_HOUSE_RULES_NOTE`), even after a deliberate revert, and a second device finds nothing to do.
+- The year's-pace denominator is asserted directly (weeks elapsed, not weeks settled).
+- The rules change log stores readable values: `mrLogSummary` describes a list of records by id ("Added 🧦 Match the socks"); the history passes older stored arrays through the same summariser.
 - The repair only ever adds, prices each week under its own rules, never touches a migration-frozen week, and is idempotent.
 - The $3 default is backfill only: it never reaches the current week or the eight the catch-up list covers.
 
@@ -82,13 +85,17 @@ listed so a regression table can show them changing on purpose.
 - A child records two of the five — a gift and a move — and both only as proposals; the button says "Ask a grown-up".
 - A gift has a `dayKey` (when it came) and a `weekKey` (which Sunday decides it); a settled week hands the decision to the next open one. An edit moves the wallet by the difference, never reverse-and-reapply.
 - A meet and its calendar block carry each other's id.
-- ⚠ Record-sheet entry points: five documented; the parent Money rules head is dead.
+- Record-sheet entry points, all live — parent Now, the parent Money rules head, meeting step 3, the kid's gift and competition cards, the wallet card's move door.
+- `MNY_CLICK_HOSTS` is the one list of containers `mnyHandleClick` is bound to; every rendered `data-mny-action` sits under one of them.
+- A refused move says why on the Record sheet's save button before the tap; the destination defaults to the first open pot other than the source.
+- Typing never re-renders the Record sheet: typing an amount updates only the save button in place (`rcSyncSave`, from the same `rcSaveState` `rcRender` uses), so the input keeps its focus.
 
 ### Moving money
 - `mnyMoveMoney` is the one writer and owns no arithmetic. Pots never touch: a move between two pots goes through cash as two movements.
 - Every destination is stage-gated through `mnyIsOpen`; a refusal is a sentence shown beside the control, not a bare false.
 - A child proposes, a grown-up approves, and the move runs at approval against the wallet as it is then. Approving twice moves nothing; a rejection is kept.
-- ⚠ `invest → ready` and `invest → locked` pass the refusal check and then fail; a child can file one that can never be approved.
+- One route decision, `mnyMoveRoute`, read by both `mnyMoveRefusal` and `mnyMoveMoney`: every ordered pair of homes either moves or is refused with a sentence. `invest → ready|locked` go through cash and move only what the sale raised.
+- No loan is 100% paid: every pot is open to a child who owes nothing, and nothing tells her she paid a loan off.
 
 ### The meeting
 - The meeting is a full screen (`screen-meeting`), opened and closed only through `mmIsOpen` / `mmShow` / `mmHide`, returning to where it came from.
@@ -99,16 +106,19 @@ listed so a regression table can show them changing on purpose.
 ### Kid money pages
 - 💰 My money, 📖 My money story, 🎓 Money school, joined by the five-page bar (a child sees pages 1 and 5).
 - The Flow leads My money story with a sentence — came in, went out, went to grow, left — before any bar, and never leads with a total. "Left" is a balance, not in-minus-out. Each group scales to its own largest row. Three periods, with a typical month dividing by months elapsed. Empty months are kept in the history strip.
+- The Flow draws three groups — came in, went out (spent, fine, loan, given back, and anything else that left), put away to grow — and each caption equals the sum of its bars. `savedTotal` comes from `evFlowOf`; the Flow sums nothing.
+- Kid rule copy is generated from the live rules: the fines card (free repeats, "every time" for the box repeat) and the streak card (grace day); with those rules at 0 the old words return.
+- Money school shows the live price list (`pmPriceCards`) in the same closed-by-default disclosure and remembered toggle as My money; "Just part of being here" stays, its free-chores line read from `chores.freeChoresPerWeek`.
+- `pmPriceCards` is read-only; its unhandled edit mode is gone.
 - Every kid money screen holds the 44px target and 13px type floors.
-- ⚠ The Flow's "Where it went" caption excludes pot-to-pot moves that its bars include; money taken back has no row.
-- ⚠ Money school restates prices as literals, including homework as paid work.
 
 ### Parent money pages
-- Money rules has six sections; steppers queue as pending edits and save as one version with a reason and an effective date.
+- Money rules has seven sections, 🕰️ Change history among them; steppers queue as pending edits and save as one version with a reason and an effective date.
+- Setup › 🕰️ Change history opens the Change history section (the rules log), the one section that draws it; 📖 Week history keeps the week ledger; Lessons and Loans no longer carry the log.
 - Loan edits never touch `paid` or `payments`; balance, pace, payoff date and the weekly amount due are derived on every render.
 - The Money school ladder opens at 30 / 60 / 90% of all debt paid; a parent override can only open a stage, never close one.
-- ⚠ The rules change log is rendered under Lessons; Setup → Change history lands on the week ledger; a chore-pool edit logs `[object Object]`.
-- ⚠ The "? How this page works" button on Money rules is dead.
+- The "? How this page works" button on Money rules opens the parent tour.
+- A permanent click sweep (`everyMoneyControlClicksClean`) presses every money control on every money surface and fails on any exception.
 
 ## Regression table format (paste at the end of every edit)
 | Feature | v<old> → v<new> | Note |

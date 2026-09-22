@@ -77,7 +77,10 @@ function mnyLadderCard(kid, pct, idx) {
       <div class="mny-progress"><div class="mny-progress-fill green" style="width:${pct}%"></div></div>
       <div class="mny-goal-row">${owed > 0
         ? `${mnyMoney(owed)} still to go`
-        : `All paid off. Everything is open.`}</div>
+        /* No loan is not a loan paid off. `mnyPaidPct` reads 100 for a child
+           who owes nothing, which opens every pot — but "paid off" would be
+           celebrating something that never happened. */
+        : (principal > 0 ? `All paid off. Everything is open.` : `Nothing to pay back, so everything is open.`)}</div>
       <div class="mny-rows">${rows}</div>
       ${next && toNext > 0
         ? `<div class="mny-note">Pay off <b>${mnyMoney(toNext)}</b> more and <b>${escapeHtml(next.icon + ' ' + next.title)}</b> opens.</div>`
@@ -132,16 +135,24 @@ function mnyBuysCard() {
 }
 
 /* The line the whole rulebook rests on: some things are paid for and most
-   things are not, and knowing which is which is the point. */
+   things are not, and knowing which is which is the point.
+
+   "Just part of being here" is a lesson and stays as one. Its one line a rule
+   decides — how many household chores a week are free — is written from the
+   live rules. What PAYS is the live price list itself, in the same closed-by-
+   default card and the same remembered toggle My money uses: the literal list
+   that stood here still said homework paid after it stopped paying. */
 function mnyWorkListsCard() {
+  const free = Math.max(0, Math.round(Number((mrRules().chores || {}).freeChoresPerWeek) || 0));
+  const words = ['', 'first', 'first two', 'first three', 'first four', 'first five', 'first six', 'first seven'];
+  const freeLine = free > 0
+    ? `The ${words[free] || 'first ' + free} household chore${free === 1 ? '' : 's'} each week`
+    : '';
+  const lines = MNY_UNPAID.concat(freeLine ? [freeLine] : []);
   return `<div class="mny-card">
       <div class="mny-label">Just part of being here</div>
-      <div class="mny-rows">${MNY_UNPAID.map(t => `<div class="mny-row"><span>${escapeHtml(t)}</span></div>`).join('')}</div>
+      <div class="mny-rows">${lines.map(t => `<div class="mny-row"><span>${escapeHtml(t)}</span></div>`).join('')}</div>
       <div class="mny-note">Nobody gets paid for these. They are what living in a family looks like.</div>
     </div>
-    <div class="mny-card">
-      <div class="mny-label">Extra work — this pays</div>
-      <div class="mny-rows">${MNY_PAID.map(t => `<div class="mny-row"><span>${escapeHtml(t)}</span></div>`).join('')}</div>
-      <button type="button" class="mny-btn wide" data-mny-action="prices">💷 See what each one pays</button>
-    </div>`;
+    ${mnyPricesCard(mnyWeekKey())}`;
 }

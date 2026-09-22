@@ -18,7 +18,7 @@
 
 **Routines. Personal chores. Two household chores.** That's the floor. None of it earns money, and none of it is optional.
 
-**Miss a routine and your streak starts over.** That's the cost. Nothing else happens.
+**Miss a routine and that day doesn't count toward your streak.** One missed day a week won't break the run; a second one starts it over. That's the cost. Nothing else happens.
 
 **Genuinely sick — actually in bed, not at school — pauses everything.** Streaks hold, chores aren't expected, nothing counts against you. Being unwell is not a discipline problem.
 
@@ -45,16 +45,18 @@ Maximum **$3 per day.** Anything past that earns **XP instead of money** *(Part 
 
 ### LEARNING
 
-| Task | Requirement | Pay |
+**Homework earns XP, not money.** It's your own work, not a job for the house — so it still counts, it's still checked on Sunday, and it still goes on your record. It just isn't paid in dollars.
+
+| Task | Requirement | Earns |
 |---|---|---|
-| Math homework | 3 pages of +/−/×/÷ — neat, correct | **$2** |
-| Handwriting | 5 pages of characters, letters, or numbers | **$2** |
-| Chinese | 10 new words or characters you actually know | **$1** |
+| Math homework | 3 pages of +/−/×/÷ — neat, correct | **XP only** *(Part 6)* |
+| Handwriting | 5 pages of characters, letters, or numbers | **XP only** *(Part 6)* |
+| Chinese | 10 new words or characters you actually know | **XP only** *(Part 6)* |
 | Learning game / app | Clear a level | **XP only** *(Part 6)* |
 
-**It has to be new material** — work you didn't already know how to do. Not to standard? Redo it, then it pays.
+**It has to be new material** — work you didn't already know how to do. Not to standard? Redo it, then it counts.
 
-**Every Sunday Mom picks 3 things at random from your week and asks you.** Can't answer → that one is unpaid and you do it again. Ten words you still know on Sunday are worth more than fifty you forgot by Thursday.
+**Every Sunday Mom picks 3 things at random from your week and asks you.** Can't answer → that one doesn't count and you do it again. Ten words you still know on Sunday are worth more than fifty you forgot by Thursday.
 
 **Who decides: Mom.**
 
@@ -66,7 +68,7 @@ Maximum **$3 per day.** Anything past that earns **XP instead of money** *(Part 
 
 Counted **by day**. **Highest one only** — they don't add together.
 
-Miss a day and the run starts over, but **your best run of the week is the one that pays.** Four clean days, a miss, then two more still pays the 3-day tier — one bad Wednesday doesn't wipe out the week. Resets every Sunday.
+**One missed day a week won't break your run** — the run carries across it, but that day doesn't count as a clean one. So six clean days and one miss is a run of 6, and a full 7 still means seven. **Miss a second day and the run starts over**, but **your best run of the week is the one that pays.** Resets every Sunday.
 
 **Who decides: your own card, checked Sunday.**
 
@@ -152,12 +154,19 @@ The job gets **written down and ticked off** when you get the thing back, so "I'
 
 ### Fines — −$1 each
 
+**The first two times in a week are a conversation, not a fine.** Every one is written down, and we talk about it. **From the third time in the same week, each one costs −$1.** Twice is a slip. Three times is a pattern.
+
 | |
 |---|
 | How you speak to each other, or to us — tone included |
 | Taking your sister's things without asking |
 | Screens past the agreed limit |
 | Being asked twice |
+
+**This one costs −$1 every time** — it already is the repeat:
+
+| |
+|---|
 | Something left out for the second time in a week |
 
 **A day never goes below $0.** Fines can take away what you earned that day — they can't put you in debt. **No single bad day wipes out a good week.**

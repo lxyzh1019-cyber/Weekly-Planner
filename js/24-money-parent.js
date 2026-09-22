@@ -42,6 +42,10 @@ const MNY_PARENT_SECTIONS = [
   { id: 'holdings', label: '📈 What she owns' },
   { id: 'lessons',  label: '🎓 Lessons' },
   { id: 'history',  label: '📖 Week history' },
+  /* The log of rule changes, on its own. It was drawn at the bottom of
+     Lessons, and Setup › 🕰️ Change history landed on the WEEK LEDGER — so the
+     one row named for it opened everything except it. */
+  { id: 'changes',  label: '🕰️ Change history' },
 ];
 
 function mnyParentKid() { return (parentViewing === 'jenn' || parentViewing === 'jess') ? parentViewing : 'jess'; }
@@ -54,7 +58,7 @@ function mnyRenderRulesTab() {
   const kid = mnyParentKid();
   const v = mrLatestVersion();
 
-  /* A rail rather than a chip row: six sections read as a list of places, and
+  /* A rail rather than a chip row: seven sections read as a list of places, and
      the one you are in stays visible while you scroll the one you opened. */
   const nav = MNY_PARENT_SECTIONS.map(s =>
     `<button type="button" class="mny-rail-item ${mnyParentSection === s.id ? 'on' : ''}" data-mnyp-action="section" data-mnyp-id="${s.id}">${escapeHtml(s.label)}</button>`).join('');
@@ -65,6 +69,7 @@ function mnyRenderRulesTab() {
   else if (mnyParentSection === 'debts') body = mnyDebtEditor(kid);
   else if (mnyParentSection === 'holdings') body = mnyHoldingsEditor(kid);
   else if (mnyParentSection === 'lessons') body = mnyLessonEditor(kid);
+  else if (mnyParentSection === 'changes') body = mnyChangeHistory();
   else body = mnyHistoryEditor(kid);
 
   /* mnyTabBar is gone from here. It is the girls' own five-page wayfinding
@@ -81,6 +86,7 @@ function mnyRenderRulesTab() {
          <span class="mny-effect-since">In effect since <b>${escapeHtml((v && v.effectiveFrom) || '—')}</b> · ${escapeHtml(mrReasonLabel(v && v.reason))}</span>
        </div>
        ${mnyPendingBar()}
+       ${mnyHouseRulesCard()}
        <div class="mny-rail-wrap">
          <nav class="mny-rail" aria-label="Money rules sections">${nav}</nav>
          <div class="mny-rail-body">
@@ -90,6 +96,46 @@ function mnyRenderRulesTab() {
        </div>
        ${mnyTargetsFooter()}`;
   if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
+}
+
+/* ── The four house rules, when this household's rulebook lacks them ──
+   `mrHouseRulesPending` (js/18-rules.js) lists what is still missing, found by
+   item id in the rules live today; this card shows every change before one
+   tap applies it through `mrApplyEdits`. Parent-only because the whole page
+   is, and gone for good once applied — see `mrHouseRulesApplied`. */
+function mnyHouseRulesCard() {
+  if (!isParent() || mrHouseRulesApplied()) return '';
+  const pending = mrHouseRulesPending();
+  if (!pending.length) return '';
+  const from = mrHouseRulesFrom();
+  const said = (field, v) => {
+    if (field === 'amount') return mnyMoney(Number(v) || 0);
+    if (field === 'xpOnly') return v === true ? 'XP only' : 'pays money';
+    if (field === 'freeRepeats') return (Number(v) || 0) ? (Number(v) + ' free a week') : 'costs from the first';
+    if (field === 'graceDays') return (Number(v) || 0) + ' grace day' + ((Number(v) || 0) === 1 ? '' : 's') + ' a week';
+    return v == null ? '—' : String(v);
+  };
+  const rows = pending.map(p => `<div class="mny-row"><span>${escapeHtml(p.item)} — ${escapeHtml(MR_HOUSE_RULES_FIELDS[p.field] || p.field)}</span>
+      <b>${escapeHtml(said(p.field, p.from))} → ${escapeHtml(said(p.field, p.value))}</b></div>`).join('');
+  return `<div class="mny-card mny-pending">
+      <div class="mny-week-head"><span class="mny-label">🏠 The four house rules are not in this rulebook yet</span></div>
+      <div class="mny-note">On 21 Sep the family agreed four rules: homework earns XP, not dollars; tone,
+        taking her sister's things, screens and being asked twice are free the first two times in a week;
+        one grace day a week on the routine streak; and the year's pace divides by the weeks that passed.
+        The fourth is already how the app counts. The rulebook on this household's devices was written
+        before the other three, so they are not in force.</div>
+      <div class="mny-rows">${rows}</div>
+      ${from ? `<div class="mny-note">Takes effect from Monday ${escapeHtml(mnyShortDate(from))}: this week and every
+          week after it price under these, and every week before keeps the prices it was lived under.
+          Nothing already earned is re-priced. Only the rows above change — the chore pool, prices, caps and
+          targets stay exactly as they are.</div>
+        <button type="button" class="mny-btn primary wide" data-mnyp-action="houserules"
+          >Put ${pending.length === 1 ? 'this change' : 'these ' + pending.length + ' changes'} into the rulebook</button>
+        <div class="mny-note">Recorded in 🕰️ Change history as “${escapeHtml(MR_HOUSE_RULES_NOTE)}”. Once it is
+          in, this card does not come back — changing one of these later is your decision, and it stays.</div>`
+      : `<div class="mny-note">A rules change is already scheduled for ${escapeHtml(mnyShortDate((mrLatestVersion() || {}).effectiveFrom))}.
+          These can go in once it has started, so they are not dated in front of it.</div>`}
+    </div>`;
 }
 
 /* ── The pending bar ──
@@ -322,8 +368,7 @@ function mnyDebtEditor(kid) {
     <div class="mny-card">
       <button type="button" class="mny-btn wide" data-mnyp-action="debtadd">＋ Add another loan</button>
       <div class="mny-note">Extra money goes to whichever loan pays the biggest bonus first — that is where a dollar clears the most.</div>
-    </div>
-    ${mnyChangeHistory()}`;
+    </div>`;
 }
 
 /* ── What she owns ──
@@ -443,7 +488,9 @@ function mnyLessonEditor(kid) {
   return `<div class="mny-card">
       <div class="mny-label">🎓 Where she is</div>
       <div class="mny-progress"><div class="mny-progress-fill green" style="width:${pct}%"></div></div>
-      <div class="mny-goal-row">${pct}% of everything she owes is paid off</div>
+      <div class="mny-goal-row">${mnyTotalPrincipal(kid) > 0
+        ? `${pct}% of everything she owes is paid off`
+        : 'She has no loan, so every stage is open'}</div>
       <div class="mny-rows">
         ${MNY_STAGES.map((s, i) => `<div class="mny-row${i === idx ? ' total' : ''}">
             <span>${s.icon} ${escapeHtml(s.title)}</span>
@@ -454,8 +501,7 @@ function mnyLessonEditor(kid) {
       <div class="mny-chiprow">${MNY_STAGES.map((s, i) =>
         `<button type="button" class="mny-chip ${override === i ? 'on' : ''}" data-mnyp-action="unlock" data-mnyp-i="${i}">${s.icon} ${i === 0 ? 'no override' : s.pct + '%'}</button>`).join('')}</div>
       <div class="mny-note">Use this when you have had the conversation and she is ready for it before the loan says so. It only ever opens things — it cannot close one she has reached.</div>
-    </div>
-    ${mnyChangeHistory()}`;
+    </div>`;
 }
 
 function mnyChangeHistory() {
@@ -465,10 +511,17 @@ function mnyChangeHistory() {
         <span class="mny-label">📋 Change history</span><span>${mnyHistoryOpen ? 'Less ▾' : 'More ▸'}</span>
       </button>
       <div class="mny-rows">
-        ${entries.length ? entries.map(e => `<div class="mny-row">
+        ${entries.length ? entries.map(e => {
+            /* A non-scalar goes through the same summariser mrLogAppend uses —
+               entries already on the family's devices hold whole arrays, and
+               String() of one is "[object Object]" per record. */
+            const said = e.summary || mrLogSummary(e.from, e.to);
+            return `<div class="mny-row">
             <span>${escapeHtml(e.note || e.path)} · ${escapeHtml(mrReasonLabel(e.reason))} · ${escapeHtml(mnyShortDate(toDayKeyInZone(new Date(e.at))))}</span>
-            <b>${escapeHtml(e.from == null ? '—' : String(e.from))} → ${escapeHtml(e.to == null ? '—' : String(e.to))}</b>
-          </div>`).join('') : `<div class="mny-note">No changes yet — the starting template is still in effect.</div>`}
+            <b>${said != null ? escapeHtml(said)
+              : `${escapeHtml(e.from == null ? '—' : String(e.from))} → ${escapeHtml(e.to == null ? '—' : String(e.to))}`}</b>
+          </div>`;
+          }).join('') : `<div class="mny-note">No changes yet — the starting template is still in effect.</div>`}
       </div>
     </div>`;
 }
@@ -904,6 +957,11 @@ function mnyParentClick(ev) {
   if (a === 'sweepdefault') { mnyRunDefaultSweep(); return; }
   if (a === 'migrate')      { mnyRunStreamSetup(); return; }
   if (a === 'repair')       { mnyRunRepair(); return; }
+  if (a === 'houserules') {
+    if (mrApplyHouseRules()) showToast('✅ The four house rules are in the rulebook');
+    mnyRenderRulesTab();
+    return;
+  }
 }
 
 /* Writes the stream's opening record, after saying what it will do. Separate

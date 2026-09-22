@@ -809,6 +809,14 @@ function mnyStoryWeek(kid, r) {
    user-entered is interpolated into an inline handler — actions ride on data
    attributes and are looked up here.
    ════════════════════════════════════════════════════════════════ */
+/* Every container mnyHandleClick is bound to, in ONE list. 99-main.js binds
+   from it and the smoke suite asserts every rendered `data-mny-action` sits
+   under one of these. It used to be a literal in 99-main.js that nobody had
+   to keep in step with the pages — so the parent's Money rules page, which
+   renders `record-any` and `tourpar` into #mnyRulesWrap, had two buttons
+   that did nothing at all. */
+const MNY_CLICK_HOSTS = ['mnyPage1Wrap', 'mnyStoryWrap', 'mnySchoolWrap', 'familyMeetingBody', 'mnyRulesWrap'];
+
 function mnyHandleClick(ev) {
   const el = ev.target.closest('[data-mny-action]');
   if (!el) return;
@@ -823,8 +831,12 @@ function mnyHandleClick(ev) {
   if (a === 'meet-add')  { openRecordSheet({ kind: 'meet', kid: mnyViewKid() }); return; }
   if (a === 'meet-edit') { openRecordSheet({ kind: 'meet', kid: mnyViewKid(), id: el.getAttribute('data-mny-comp') }); return; }
   if (a === 'move-ask')  { openRecordSheet({ kind: 'move', kid: mnyViewKid() }); return; }
-  /* No kind chosen: which record this is is the first thing the sheet asks. */
-  if (a === 'record-any') { openRecordSheet({ kid: mnyViewKid() }); return; }
+  /* No kind chosen: which record this is is the first thing the sheet asks.
+     On Money rules the child on screen is the parent page's, not mnyKid. */
+  if (a === 'record-any') {
+    openRecordSheet({ kid: el.closest('#mnyRulesWrap') ? mnyParentKid() : mnyViewKid() });
+    return;
+  }
   if (a === 'comp-from-plan') { mnyOpenCompForPlanned(el.getAttribute('data-daykey')); return; }
   if (a === 'comp-zero') {
     mnyRecordCompZero(mnyMeetingKid(), el.getAttribute('data-daykey'),
@@ -840,12 +852,12 @@ function mnyHandleClick(ev) {
   if (a === 'backplanner') { goWeek(); return; }
   if (a === 'tourpar') { mnyOpenTour('parent'); return; }
   if (a === 'prices') {
-    // From Money school this is a link to the price list rather than a toggle
-    // on a card that is not on screen.
-    if (!document.getElementById('screen-mymoney').classList.contains('active')) {
-      mnySetPricesOpen(true); mnyOpenMyMoney(mnyViewKid()); return;
-    }
-    mnySetPricesOpen(!mnyPricesOpen()); mnyRenderMyMoney(); return;
+    /* One toggle, one remembered choice, on both pages that carry the price
+       list — My money and Money school. */
+    mnySetPricesOpen(!mnyPricesOpen());
+    const school = document.getElementById('screen-moneyschool');
+    if (school && school.classList.contains('active')) mnyRenderSchool(); else mnyRenderMyMoney();
+    return;
   }
   if (a === 'ask')     { mnyShowConcept(el.getAttribute('data-mny-concept')); return; }
   if (a === 'concept') { mnySchoolConcept = el.getAttribute('data-mny-concept'); mnyRenderSchool(); return; }

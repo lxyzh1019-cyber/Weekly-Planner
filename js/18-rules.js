@@ -359,8 +359,58 @@ function mrSetPath(obj, path, value) {
 function mrLogAppend(entry) {
   const mr = mrEnsure();
   const id = entry.id || mrNewId('mrl-');
-  mr.log[id] = { id, at: Date.now(), by: 'parent', ...entry };
+  const e = { id, at: Date.now(), by: 'parent', ...entry };
+  /* A value that is not a scalar is stored as WORDS. `coApply` logs the whole
+     chore pool as one edit, and storing the array meant the history printed
+     it with String() — fifteen "[object Object]" for one chore added. The
+     summary says what changed; `from`/`to` keep a short readable size. */
+  const summary = mrLogSummary(e.from, e.to);
+  if (summary != null) {
+    e.summary = summary;
+    e.from = mrLogValueText(e.from);
+    e.to = mrLogValueText(e.to);
+  }
+  mr.log[id] = e;
   return mr.log[id];
+}
+
+/* ── What a log line SAYS ──
+   ONE summariser, used at both ends: `mrLogAppend` stores its words from now
+   on, and the history passes any non-scalar it finds through it too — because
+   entries already on the family's devices hold whole arrays, and they will
+   keep holding them. Returns null for a scalar change, which the history
+   prints as `from → to` exactly as before. */
+function mrLogIsScalar(v) { return v == null || typeof v !== 'object'; }
+function mrLogValueText(v) {
+  if (mrLogIsScalar(v)) return v;
+  if (Array.isArray(v)) return v.length + (v.length === 1 ? ' item' : ' items');
+  const n = Object.keys(v).length;
+  return n + (n === 1 ? ' setting' : ' settings');
+}
+function mrLogRecordName(r) {
+  return ((r.icon ? r.icon + ' ' : '') + (r.label || r.name || r.id || '')).trim();
+}
+function mrLogSummary(from, to) {
+  if (mrLogIsScalar(from) && mrLogIsScalar(to)) return null;
+  // A list of records with ids (the chore pool, a fine list) is described by
+  // id: what arrived, what left, and what was edited in place.
+  const records = (v) => (v == null ? [] : (Array.isArray(v)
+    && v.every(x => x && typeof x === 'object' && x.id != null) ? v : null));
+  const a = records(from), b = records(to);
+  if (a && b) {
+    const was = new Map(a.map(x => [String(x.id), x]));
+    const now = new Map(b.map(x => [String(x.id), x]));
+    const bits = [];
+    b.forEach(x => { if (!was.has(String(x.id))) bits.push('Added ' + mrLogRecordName(x)); });
+    a.forEach(x => { if (!now.has(String(x.id))) bits.push('Removed ' + mrLogRecordName(x)); });
+    b.forEach(x => {
+      const o = was.get(String(x.id));
+      if (o && JSON.stringify(o) !== JSON.stringify(x)) bits.push('Changed ' + mrLogRecordName(x));
+    });
+    return bits.length ? bits.join(' · ') : 'No change';
+  }
+  const show = (v) => (v == null ? '—' : String(mrLogValueText(v)));
+  return show(from) + ' → ' + show(to);
 }
 function mrLogEntries() {
   return Object.values(mrEnsure().log).sort((a, b) => (b.at || 0) - (a.at || 0));
@@ -432,6 +482,101 @@ function mrApplyEdits(changes, { reason, note, effectiveFrom } = {}) {
   }));
   saveAll();
   return version;
+}
+
+/* ── THE FOUR HOUSE RULES, FOR A RULEBOOK ALREADY ON FILE ──────────
+   The rules of 21 Sep landed in MR_DEFAULT_RULES, and `mrEnsure` seeds that
+   template only when a household has NO versions — so a family with a rulebook
+   already on its devices never received them. Copying the template over would
+   be worse: the rulebook also holds the family's own chore pool, prices, caps
+   and targets, and a wholesale copy resets every one.
+
+   So this names the few fields the rules change, finds each item BY ITS ID in
+   the rulebook live today — never by position, because a stored rulebook's
+   order need not be the shipped one, and this codebase has resolved rule rows
+   by position twice — and lists only what still differs. The parent page shows
+   the list and applies it through `mrApplyEdits`, the one versioned writer.
+
+   Applied once. A marker in the change log hides the card for good, so a
+   parent who later decides to take a grace day away is making a decision the
+   app then respects, not missing an update it keeps offering. */
+const MR_HOUSE_RULES_NOTE = 'The four house rules (21 Sep)';
+const MR_HOUSE_RULES = [
+  { list: 'learning.items', ids: ['math', 'handwriting', 'chinese', 'app'], set: { amount: 0, xpOnly: true } },
+  { list: 'fines.items', ids: ['tone', 'borrow', 'screens', 'asked_twice'], set: { freeRepeats: 2 } },
+  { path: 'streak.graceDays', value: 1, item: 'Routine streak' },
+];
+const MR_HOUSE_RULES_FIELDS = {
+  amount: 'dollars', xpOnly: 'XP only', freeRepeats: 'free times a week', graceDays: 'grace days a week',
+};
+
+/* What is still missing from TODAY's rules, as [{path, value, from, label,
+   item, field}]. Pure read; empty when there is nothing to do. */
+function mrHouseRulesPending() {
+  const r = mrRules();
+  const same = (cur, v) => (typeof v === 'boolean'
+    ? cur === v : (cur != null && cur !== '' && Number(cur) === v));
+  const out = [];
+  MR_HOUSE_RULES.forEach(rule => {
+    if (rule.path) {
+      const cur = mrGetPath(r, rule.path);
+      const field = rule.path.split('.').pop();
+      if (!same(cur, rule.value)) {
+        out.push({ path: rule.path, value: rule.value, from: cur, item: rule.item, field,
+          label: MR_HOUSE_RULES_NOTE + ' — ' + rule.item + ': ' + MR_HOUSE_RULES_FIELDS[field] });
+      }
+      return;
+    }
+    const items = mrGetPath(r, rule.list) || [];
+    rule.ids.forEach(id => {
+      const i = items.findIndex(it => it && it.id === id);
+      if (i < 0) return;                   // the family removed it — nothing to change
+      const name = items[i].label || id;
+      Object.keys(rule.set).forEach(field => {
+        const cur = items[i][field];
+        if (same(cur, rule.set[field])) return;
+        out.push({ path: rule.list + '.' + i + '.' + field, value: rule.set[field], from: cur,
+          item: name, field,
+          label: MR_HOUSE_RULES_NOTE + ' — ' + name + ': ' + MR_HOUSE_RULES_FIELDS[field] });
+      });
+    });
+  });
+  return out;
+}
+
+/* Has this household ever applied them? Read off the log, which every device
+   receives — so a second device finds nothing to do. No new state key. */
+function mrHouseRulesApplied() {
+  return mrLogEntries().some(e => String((e && e.note) || '').indexOf(MR_HOUSE_RULES_NOTE) === 0);
+}
+
+/* The date they take effect: the Monday of this week — the key
+   `mrRulesForWeek` resolves a week by, so this week prices under them and
+   every week before keeps what it was lived under.
+
+   `mrApplyEdits` clones the LATEST version, so a version dated after that
+   Monday changes the answer. Dated later this week, the house rules join it
+   on its own date — applying them earlier would leave that later version
+   without them. Dated in the FUTURE, nothing can go in yet without either
+   dragging that scheduled change forward or leaving it without the house
+   rules, so this returns null and the card says so. */
+function mrHouseRulesFrom() {
+  const monday = ctThisWeekKey();
+  const latest = mrLatestVersion();
+  const at = latest ? String(latest.effectiveFrom || '') : '';
+  if (!at || at <= monday) return monday;
+  return at <= todayKey() ? at : null;
+}
+
+function mrApplyHouseRules() {
+  if (!isParent()) { showToast('Only parents can change the money rules 🔒'); return null; }
+  if (mrHouseRulesApplied()) return null;
+  const changes = mrHouseRulesPending();
+  if (!changes.length) return null;
+  const from = mrHouseRulesFrom();
+  if (!from) { showToast('A rules change is already scheduled — these can go in once it starts'); return null; }
+  return mrApplyEdits(changes.map(c => ({ path: c.path, value: c.value, label: c.label })),
+    { reason: MR_DEFAULT_REASON, note: MR_HOUSE_RULES_NOTE, effectiveFrom: from });
 }
 
 /* ── Shared read helpers ── */

@@ -2387,10 +2387,18 @@ function findChromium() {
         && txt.includes('Cash') && txt.includes('Locked away');
   });
   // The rules editor is not on a kid's page at all — there is nothing to hide.
+  // pmPriceCards has no edit mode any more: its ✏️ buttons (data-pm-action)
+  // had no handler anywhere and its only caller passed `false`, so the mode
+  // was deleted rather than hidden. What is asserted is that no rule-editing
+  // control of either kind can reach her page, and that the mode stays gone.
   checks.kidHasNoRulesOnHerPage = await page.evaluate(() => {
-    const txt = document.getElementById('mnyPage1Wrap').textContent;
-    return !document.getElementById('mnyPage1Wrap').querySelector('[data-pm-action="edit"]')
-        && !txt.includes('Rules &');
+    const problems = [];
+    const wrap = document.getElementById('mnyPage1Wrap');
+    if (wrap.querySelector('[data-pm-action], [data-mnyp-action]')) problems.push('a rule-editing control is on her page');
+    if (wrap.textContent.includes('Rules &')) problems.push('the old "Rules &" editor heading is on her page');
+    if (pmPriceCards.length !== 1) problems.push('pmPriceCards takes ' + pmPriceCards.length + ' arguments — the editable mode is back');
+    if (/data-pm-action/.test(pmPriceCards(mrRules()))) problems.push('the price list draws an edit button nothing handles');
+    return problems.length ? problems : true;
   });
   // A kid can walk to her own history and back without a grown-up.
   checks.kidCanReadHerStory = await page.evaluate(() => {
@@ -5674,12 +5682,170 @@ function findChromium() {
       }
       if (typeof mrWeeksElapsed !== 'function') problems.push('there is no one owner of weeks elapsed');
       else if (!(mrWeeksElapsed() > 0)) problems.push('weeks elapsed came out ' + mrWeeksElapsed());
+
+      /* The DENOMINATOR, asserted rather than its neighbours. Everything above
+         would still pass with `paidTotal / weeks.length` put back — "elapsed is
+         at least settled" and "elapsed is positive" are both true of the old
+         formula's inputs. So: ten weeks gone, two of them settled, and the pace
+         must divide by ten. Anything else is the self-selected sample this rule
+         exists to end. */
+      {
+        const c = state.shared.chore;
+        const savedStart = c.programStartDate, savedStartAt = c.programStartDateAt;
+        const savedFin = JSON.parse(JSON.stringify(c.finalizedWeeks || {}));
+        try {
+          const mon = formatDayKey(ctThisWeekKey());
+          mon.setDate(mon.getDate() - 9 * 7);
+          c.programStartDate = ctDateToKey(mon); c.programStartDateAt = syncNow();
+          if (!c.finalizedWeeks) c.finalizedWeeks = {};
+          Object.keys(c.finalizedWeeks).forEach(w => { if (c.finalizedWeeks[w]) delete c.finalizedWeeks[w][kid]; });
+          [1, 2].forEach(n => {
+            const d = formatDayKey(c.programStartDate); d.setDate(d.getDate() + n * 7);
+            const w = ctDateToKey(d);
+            if (!c.finalizedWeeks[w]) c.finalizedWeeks[w] = {};
+            c.finalizedWeeks[w][kid] = 10;
+          });
+          const y = mrYearToDate(kid);
+          const elapsed = mrWeeksElapsed();
+          const byElapsed = money2((20 / elapsed) * 52), bySettled = money2((20 / 2) * 52);
+          if (elapsed !== 10) problems.push('ten weeks since the start read as ' + elapsed + ' elapsed');
+          if (y.weeks !== 2) problems.push('two settled weeks read as ' + y.weeks);
+          if (byElapsed === bySettled) problems.push('the fixture cannot tell the two denominators apart');
+          if (y.projected !== byElapsed) {
+            problems.push('the pace is ' + y.projected + ': $20 over ' + elapsed + ' weeks is ' + byElapsed
+              + (y.projected === bySettled ? ' — it divided by the 2 SETTLED weeks' : ''));
+          }
+        } finally {
+          c.programStartDate = savedStart; c.programStartDateAt = savedStartAt;
+          if (savedStart === undefined) delete c.programStartDate;
+          if (savedStartAt === undefined) delete c.programStartDateAt;
+          c.finalizedWeeks = savedFin;
+        }
+      }
     } catch (e) {
       problems.push('threw: ' + e.message);
     } finally {
       pd.fines = savedFines;
       getProfData(kid).earnings[wk] = savedEarn;
       getProfData(kid).chore.mandatoryByWeek[wk] = savedMand;
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── THE HOUSE RULES REACH A STORED RULEBOOK ──────────────────────
+     The four rules of 21 Sep landed in MR_DEFAULT_RULES, and mrEnsure seeds
+     that template only when there are NO versions — so a household with a
+     rulebook already on file never received them. Every check above reads a
+     fresh test profile, which is exactly the one household that did.
+
+     This seeds the household that matters: an August rulebook with the old
+     prices, no free repeats, no grace day, the items in a different ORDER from
+     the shipped one (this codebase has resolved rule rows by position twice),
+     an item of the family's own in each list, and a chore pool of their own.
+     Then it asserts the consequence, not the card: today's rules carry the
+     change, August still prices homework at $2, the pool is untouched, the
+     card goes, and a second tap makes nothing. */
+  checks.theHouseRulesReachAStoredRulebook = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const snap = JSON.stringify(state);
+    const savedSection = mnyParentSection;
+    try {
+      const mr = mrEnsure();
+      const old = mrDeepCopy(MR_DEFAULT_RULES);
+      const learn = (id) => old.learning.items.find(i => i.id === id);
+      Object.assign(learn('math'), { amount: 2 });            delete learn('math').xpOnly;
+      Object.assign(learn('handwriting'), { amount: 2 });     delete learn('handwriting').xpOnly;
+      Object.assign(learn('chinese'), { amount: 1 });         delete learn('chinese').xpOnly;
+      // Their own order, with an item of their own at the front of each list.
+      old.learning.items = [
+        { id: 'piano', label: 'Piano practice', unit: 'sessions', perUnit: 1, amount: 1 },
+        learn('chinese'), learn('app'), learn('math'), learn('handwriting'),
+      ];
+      old.fines.items.forEach(f => { delete f.freeRepeats; });
+      const fine = (id) => old.fines.items.find(f => f.id === id);
+      old.fines.items = [
+        fine('box_repeat'),
+        { id: 'late_bed', label: 'Up after lights out', amount: 1 },
+        fine('screens'), fine('tone'), fine('asked_twice'), fine('borrow'),
+      ];
+      delete old.streak.graceDays;
+      const pool = [
+        { id: 'socks', icon: '🧦', label: 'Match the socks', deadline: 'before bed', due: '8pm', who: 'both', lane: 'chores' },
+        { id: 'dishes', icon: '🍴', label: 'Dishes', deadline: 'after dinner', due: '7:30pm', who: 'jess', lane: 'chores' },
+      ];
+      old.chorePool = pool;
+      mr.versions = [{ id: 'mrv-august', effectiveFrom: '2026-08-03', createdAt: 1, updatedAt: 1,
+        createdBy: 'parent', reason: 'family_meeting', note: 'Our rulebook', rules: old }];
+      mr.log = {};
+
+      const pending = (typeof mrHouseRulesPending === 'function') ? mrHouseRulesPending() : null;
+      if (!pending) { problems.push('there is no way to ask which house rules are missing'); return problems; }
+      if (pending.length !== 11) {
+        problems.push(pending.length + ' changes listed, expected 11: ' + pending.map(p => p.path).join(', '));
+      }
+      // Resolved by id against THIS rulebook: math is at index 3 here, not 0.
+      if (!pending.some(p => p.path === 'learning.items.3.amount' && p.value === 0)) {
+        problems.push('math was not found by its id');
+      }
+      if (pending.some(p => /^learning\.items\.0\./.test(p.path))) problems.push('the family\'s own piano item would be changed');
+      if (pending.some(p => /^fines\.items\.[01]\./.test(p.path))) problems.push('the box repeat or the family\'s own fine would be forgiven');
+
+      showScreen('parent'); mnyParentSection = 'prices'; setParentTab('money'); mnyRenderRulesTab();
+      const wrap = document.getElementById('mnyRulesWrap');
+      const btn = wrap.querySelector('[data-mnyp-action="houserules"]');
+      if (!btn) { problems.push('the Money rules page does not offer the house rules'); return problems; }
+      const card = btn.closest('.mny-card');
+      const said = card ? card.textContent : '';
+      if (!/Math homework/.test(said) || !/\$2\.00/.test(said)) problems.push('the card does not preview math going from $2.00: ' + said.slice(0, 200));
+      if (!/Being asked twice/.test(said)) problems.push('the card does not name the fines it changes');
+      if (/\[object |undefined|NaN/.test(said)) problems.push('the preview prints a broken value');
+      btn.click();
+
+      const r = mrRules();
+      const now = (id) => (r.learning.items.find(i => i.id === id) || {});
+      ['math', 'handwriting', 'chinese'].forEach(id => {
+        if (now(id).amount !== 0 || now(id).xpOnly !== true) problems.push(id + ' still pays: ' + JSON.stringify(now(id)));
+      });
+      if (now('piano').amount !== 1) problems.push('the family\'s own piano item was re-priced');
+      const f = (id) => (r.fines.items.find(x => x.id === id) || {});
+      ['tone', 'borrow', 'screens', 'asked_twice'].forEach(id => {
+        if (f(id).freeRepeats !== 2) problems.push(id + ' is not free the first two times');
+      });
+      if (Number(f('box_repeat').freeRepeats) > 0) problems.push('the box repeat became forgivable');
+      if (Number(f('late_bed').freeRepeats) > 0) problems.push('the family\'s own fine became forgivable');
+      if (Number((r.streak || {}).graceDays) !== 1) problems.push('no grace day today');
+      const aug = (mrRulesForWeek('2026-08-10').learning.items.find(i => i.id === 'math') || {});
+      if (aug.amount !== 2) problems.push('an August week now prices math at ' + aug.amount + ' — a lived week was re-priced');
+      if (JSON.stringify(r.chorePool) !== JSON.stringify(pool)) problems.push('the family\'s chore pool changed');
+      const v = mrLatestVersion();
+      if (!v || v.effectiveFrom !== ctThisWeekKey()) problems.push('the change is not dated from this Monday: ' + (v && v.effectiveFrom));
+
+      mnyRenderRulesTab();
+      if (wrap.querySelector('[data-mnyp-action="houserules"]')) problems.push('the card is still there after applying');
+      const versions = mrVersions().length;
+      mrApplyHouseRules();
+      if (mrVersions().length !== versions) problems.push('applying twice made another version');
+
+      // A parent who later chooses to take the grace day away is making a
+      // decision, not missing an update: the card must not come back to nag.
+      mrApplyEdits([{ path: 'streak.graceDays', value: 0, label: 'Grace days' }], { effectiveFrom: todayKey() });
+      mnyRenderRulesTab();
+      if (wrap.querySelector('[data-mnyp-action="houserules"]')) problems.push('a deliberate revert brought the card back');
+
+      // And a child sees none of it.
+      profile = 'jenn';
+      mnyRenderRulesTab();
+      if (wrap.querySelector('[data-mnyp-action="houserules"]')) problems.push('a child was offered the house rules');
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      const s = JSON.parse(snap);
+      Object.keys(state).forEach(k => { delete state[k]; });
+      Object.assign(state, s);
+      profile = 'parent';
+      mnyParentSection = savedSection;
     }
     return problems.length ? problems : true;
   });
@@ -5814,6 +5980,63 @@ function findChromium() {
     return problems.length ? problems : true;
   });
 
+  /* ── EVERY CAPTION EQUALS THE BARS UNDER IT ──────────────────────
+     Observed on the family's own phone: "➡️ Where it went $0.00" above a
+     $30.00 bar. The caption was `outTotal`, which leaves pot-to-pot moves out
+     on purpose, and the bars under it were drawn from `dests`, which puts them
+     in — so a child who did the reading the screen asks of her found that the
+     number and the picture disagreed. And money taken back (`returned`) was in
+     the caption and had no bar at all.
+
+     Asserted per group, on every period, as arithmetic on what is DRAWN: a
+     caption whose figure is not the sum of its own rows is a caption a
+     nine-year-old can check and find wrong. */
+  checks.theFlowCaptionsEqualTheirBars = await page.evaluate(() => {
+    const problems = [];
+    profile = 'jenn'; parentViewing = 'jenn';
+    const kid = 'jenn';
+    const pd = getProfData(kid);
+    const savedEvents = (pd.events || []).slice();
+    const savedPeriod = flPeriod, savedMonth = flMonth;
+    const amt = (el) => Number(String(el ? el.textContent : '').replace(/[^0-9.\-]/g, '')) || 0;
+    try {
+      const m = todayKey().slice(0, 7);
+      pd.events = [];
+      evAdd(kid, { kind: 'in',  from: 'earned', to: 'cash',     amount: 40, dayKey: m + '-02' });
+      evAdd(kid, { kind: 'in',  from: 'gift',   to: 'cash',     amount: 10, dayKey: m + '-03' });
+      evAdd(kid, { kind: 'move', from: 'cash',  to: 'ready',    amount: 30, dayKey: m + '-04' });
+      evAdd(kid, { kind: 'out', from: 'cash',   to: 'spent',    amount: 5,  dayKey: m + '-05' });
+      evAdd(kid, { kind: 'fine', from: 'cash',  to: 'fine',     amount: 2,  dayKey: m + '-06' });
+      evAdd(kid, { kind: 'gift', from: 'cash',  to: 'returned', amount: 3,  dayKey: m + '-07' });
+      // A company that lost value: money leaving a pot to no sink the old
+      // caption knew how to draw either.
+      evAdd(kid, { kind: 'move', from: 'cash',  to: 'invest',   amount: 4,  dayKey: m + '-08' });
+      evAdd(kid, { kind: 'interest', from: 'invest', to: 'interest', amount: 1, dayKey: m + '-09' });
+      const host = document.getElementById('mnyStoryWrap');
+      ['month', 'all', 'typical'].forEach(p => {
+        flPeriod = p; flMonth = m;
+        mnyOpenStory();
+        const groups = [...host.querySelectorAll('.fl-group')];
+        if (groups.length < 3) problems.push(p + ': ' + groups.length + ' groups drawn, expected in / out / grow');
+        groups.forEach(g => {
+          const cap = g.querySelector('.fl-cap');
+          const said = amt(cap && cap.querySelector('b'));
+          const rows = [...g.querySelectorAll('.fl-row-amt')].reduce((s, b) => money2(s + amt(b)), 0);
+          if (money2(said) !== money2(rows)) {
+            problems.push(p + ': "' + (cap ? cap.textContent.trim() : '?') + '" sits above bars totalling $' + rows.toFixed(2));
+          }
+        });
+        if (p !== 'typical' && !/Given back/.test(host.innerText)) problems.push(p + ': money given back has no bar');
+      });
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      pd.events = savedEvents;
+      flPeriod = savedPeriod; flMonth = savedMonth;
+    }
+    return problems.length ? problems : true;
+  });
+
   /* ── MONEY CAN MOVE BETWEEN SUNDAYS ──────────────────────────────
      Until now the ONLY way a dollar left cash was the Sunday split. The two
      doors that existed went one way — kept-ready back to cash, a company back
@@ -5926,6 +6149,81 @@ function findChromium() {
       if (savedDebts) pd.debts = savedDebts;
       const rr = mrRules();
       if (rr.school) rr.school.unlockStage = savedUnlock;
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── EVERY MOVE EITHER MOVES OR SAYS WHY ──────────────────────────
+     `invest → ready` passed mnyMoveRefusal and then fell off the end of
+     mnyMoveMoney into "That move is not one the app knows" — so a child could
+     FILE that request, and it could never be approved. Two functions each held
+     half of the answer to "can money go this way", and they disagreed.
+
+     Every ordered pair of homes, with every pot open and holding money: either
+     the refusal says why in a sentence, or the move runs. Nothing may reach
+     the writer's fallback. And a sale that feeds another pot moves only what
+     the sale raised — cash she already had is not part of the move. */
+  checks.everyMoveEitherMovesOrSaysWhy = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
+    const kid = 'jenn';
+    const snap = JSON.stringify(state);
+    const wasToast = window.showToast;
+    const toasts = [];
+    const restore = () => {
+      const s = JSON.parse(snap);
+      Object.keys(state).forEach(k => { delete state[k]; });
+      Object.assign(state, s);
+    };
+    const fund = () => {
+      restore();
+      const pd = getProfData(kid);
+      pd.holdings = []; pd.moveRequests = [];
+      mrRules().school = Object.assign({}, mrRules().school, { unlockStage: { jenn: MNY_STAGES.length - 1, jess: 0 } });
+      moneyAddCash(kid, 200, { from: 'gift', note: 'fixture' });
+      mnyMoveMoney(kid, 'cash', 'ready', 40);
+      mnyMoveMoney(kid, 'cash', 'locked', 40);
+      mnyMoveMoney(kid, 'cash', 'invest', 40);
+    };
+    try {
+      window.showToast = (m) => { toasts.push(String(m)); };
+      const homes = ['cash', 'ready', 'locked', 'invest'];
+      homes.forEach(from => homes.forEach(to => {
+        fund();
+        toasts.length = 0;
+        const why = mnyMoveRefusal(kid, from, to, 5);
+        if (why) {
+          if (typeof why !== 'string' || why.length < 5) problems.push(`${from} → ${to}: refused without a sentence (${JSON.stringify(why)})`);
+          return;
+        }
+        const cash0 = mnyCash(kid), worth0 = mnyEverything(kid);
+        const moved = mnyMoveMoney(kid, from, to, 5);
+        if (!moved) {
+          problems.push(`${from} → ${to}: allowed, then did not move — ${toasts.join(' / ') || 'no reason given'}`);
+          return;
+        }
+        if (toasts.some(t => /not one the app knows/.test(t))) problems.push(`${from} → ${to}: reached the fallback`);
+        if (Math.abs(money2(mnyEverything(kid)) - money2(worth0)) > 0.011) {
+          problems.push(`${from} → ${to}: everything she has went from ${worth0} to ${mnyEverything(kid)}`);
+        }
+        if (from !== 'cash' && to !== 'cash' && money2(mnyCash(kid)) !== money2(cash0)) {
+          problems.push(`${from} → ${to}: cash she already had moved too (${cash0} → ${mnyCash(kid)})`);
+        }
+      }));
+
+      /* The request a child could file and nobody could approve. */
+      fund();
+      profile = 'jenn';
+      const req = mnyRequestMove(kid, 'invest', 'ready', 5, 'fixture');
+      profile = 'parent';
+      if (!req) problems.push('a child could not ask to move company money to kept-ready');
+      else if (!mnyApproveMove(kid, req.id)) problems.push('a grown-up could not approve company money to kept-ready');
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      window.showToast = wasToast;
+      restore();
+      profile = 'parent';
     }
     return problems.length ? problems : true;
   });
@@ -6077,6 +6375,326 @@ function findChromium() {
     }
     return problems.length ? problems : true;
   });
+
+  /* ── EVERY MONEY BUTTON HAS SOMEBODY LISTENING ────────────────────
+     "✍️ Record something" and "? How this page works" on the parent's Money
+     rules page did nothing at all. They carry `data-mny-action`, and
+     mnyHandleClick was bound to a hand-written list of four wraps in
+     99-main.js that did not include #mnyRulesWrap — whose own handler reads
+     `data-mnyp-action`. Two lists that had to agree, and nothing made them.
+
+     This renders every surface that draws money controls and asserts that
+     each `data-mny-action` sits under a host in MNY_CLICK_HOSTS, the one list
+     99-main.js binds from. Then it clicks the two that were dead. */
+  checks.everyMoneyActionHasAListener = await page.evaluate(() => {
+    const problems = [];
+    const snap = JSON.stringify(state);
+    const savedSection = mnyParentSection;
+    const hosts = (typeof MNY_CLICK_HOSTS !== 'undefined') ? MNY_CLICK_HOSTS : null;
+    if (!hosts) problems.push('there is no one list of the hosts mnyHandleClick is bound to');
+    const bound = hosts || ['mnyPage1Wrap', 'mnyStoryWrap', 'mnySchoolWrap', 'familyMeetingBody'];
+    const seen = new Set();
+    const sweep = (surface) => {
+      document.querySelectorAll('[data-mny-action]').forEach(el => {
+        const name = el.getAttribute('data-mny-action') + ' "'
+          + el.textContent.trim().replace(/\s+/g, ' ').slice(0, 40) + '"';
+        if (el.hasAttribute('data-mnyp-action') && !seen.has('both ' + name)) {
+          seen.add('both ' + name);
+          problems.push(surface + ': ' + name + ' carries both data-mny-action and data-mnyp-action');
+        }
+        if (bound.some(id => { const h = document.getElementById(id); return h && h.contains(el); })) return;
+        if (seen.has(name)) return;
+        seen.add(name);
+        problems.push(surface + ': ' + name + ' sits under no host mnyHandleClick is bound to');
+      });
+    };
+    try {
+      profile = 'jenn'; parentViewing = 'jenn';
+      mnyOpenMyMoney('jenn'); sweep('My money (child)');
+      mnyOpenStory(); sweep('My money story (child)');
+      mnyOpenSchool('jenn'); sweep('Money school (child)');
+      profile = 'parent'; ctParentKid = 'jenn';
+      mnyOpenMyMoney('jenn'); sweep('My money (parent)');
+      mnyOpenStory(); sweep('My money story (parent)');
+      mnyOpenSchool('jenn'); sweep('Money school (parent)');
+      openFamilyMeeting(); mnySetMeetKid('jenn'); mmGoStep(3); sweep('the meeting money step');
+      mmHide();
+      showScreen('parent'); setParentTab('money');
+      MNY_PARENT_SECTIONS.forEach(s => {
+        mnyParentSection = s.id; mnyRenderRulesTab(); sweep('Money rules › ' + s.label);
+      });
+      RC_KINDS.forEach(k => {
+        openRecordSheet({ kind: k.id, kid: 'jenn' }); sweep('Record › ' + k.label); closeRecordSheet();
+      });
+
+      // The two that were dead, by clicking them.
+      mnyParentSection = 'prices'; mnyRenderRulesTab();
+      const wrap = document.getElementById('mnyRulesWrap');
+      const rec = wrap.querySelector('[data-mny-action="record-any"]');
+      if (!rec) problems.push('Money rules has no ✍️ Record something');
+      else {
+        rec.click();
+        if (!document.getElementById('recordOverlay').classList.contains('open')) {
+          problems.push('✍️ Record something on Money rules opened nothing');
+        }
+        closeRecordSheet();
+      }
+      const tour = wrap.querySelector('[data-mny-action="tourpar"]');
+      if (!tour) problems.push('Money rules has no ? How this page works');
+      else {
+        tour.click();
+        if (!document.getElementById('mnyTour') || mnyTourWho !== 'parent') {
+          problems.push('? How this page works on Money rules opened nothing');
+        }
+        mnyCloseTour();
+      }
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      const s = JSON.parse(snap);
+      Object.keys(state).forEach(k => { delete state[k]; });
+      Object.assign(state, s);
+      mnyParentSection = savedSection;
+      profile = 'parent';
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── A CHORE EDIT READS AS A CHANGE ───────────────────────────────
+     `coApply` logs a rule edit whose value is the whole `chorePool` array, and
+     the change history printed `String(e.from)` — so adding one chore put a row
+     of fifteen "[object Object]" on a parent's screen. Fixed at both ends: the
+     log stores a readable value from now on, AND the history reads an entry
+     already stored on a device with whole arrays in it, because the family's
+     devices hold those and will keep holding them. */
+  checks.aChoreEditReadsAsAChange = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; parentViewing = 'jenn'; ctParentKid = 'jenn';
+    ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+    const snap = JSON.stringify(state);
+    const savedSection = mnyParentSection, savedOpen = mnyHistoryOpen, savedDraft = coDraft;
+    try {
+      const mr = mrEnsure();
+      mr.log = {};
+      const before = mrDeepCopy(mrRulesForWeek(ctWeekKey).chorePool || []);
+      // Written before the fix: the whole array, on both sides.
+      mr.log['mrl-legacy'] = { id: 'mrl-legacy', at: Date.now() - 60000, by: 'parent', path: 'chorePool',
+        from: before,
+        to: before.concat([{ id: 'recycling', icon: '♻️', label: 'Recycling out', lane: 'chores', who: 'both' }]),
+        reason: 'family_meeting', note: 'Chore pool' };
+      coDraft = { icon: '🧦', label: 'Match the socks', due: '17:30', who: 'both', lane: 'chores' };
+      coAdd();
+
+      showScreen('parent'); mnyParentSection = 'changes'; mnyHistoryOpen = true;
+      setParentTab('money'); mnyRenderRulesTab();
+      const wrap = document.getElementById('mnyRulesWrap');
+      const broken = (wrap.textContent.match(/\[object /g) || []).length;
+      if (broken) problems.push(broken + ' "[object Object]" on the change history');
+      const rowsNaming = (re) => [...wrap.querySelectorAll('.mny-row')].filter(r => re.test(r.textContent));
+      const socks = rowsNaming(/Match the socks/);
+      if (socks.length !== 1) problems.push(socks.length + ' history rows name the chore just added, expected 1');
+      else if (!/Added/.test(socks[0].textContent)) problems.push('the row does not say it was added: ' + socks[0].textContent.trim());
+      const legacy = rowsNaming(/Recycling out/);
+      if (legacy.length !== 1 || !/Added/.test(legacy[0].textContent)) {
+        problems.push('an entry stored before the fix still does not read: '
+          + (legacy[0] ? legacy[0].textContent.trim() : 'no row'));
+      }
+      const stored = mrLogEntries().find(e => e.path === 'chorePool' && e.id !== 'mrl-legacy');
+      if (!stored) problems.push('adding a chore logged nothing');
+      else if (typeof stored.from === 'object' && stored.from !== null
+            || typeof stored.to === 'object' && stored.to !== null) {
+        problems.push('the log still stores the whole pool as its value');
+      }
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      const s = JSON.parse(snap);
+      Object.keys(state).forEach(k => { delete state[k]; });
+      Object.assign(state, s);
+      mnyParentSection = savedSection; mnyHistoryOpen = savedOpen; coDraft = savedDraft;
+      profile = 'parent';
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── CHANGE HISTORY IS THE CHANGE HISTORY ─────────────────────────
+     Setup › 🕰️ Change history landed on the WEEK LEDGER, and the real log of
+     rule changes was drawn at the bottom of Lessons, where nobody looking for
+     "what did we change and when" would think to scroll. A landing that opens
+     somewhere other than what it names is a landing a parent stops trusting. */
+  checks.changeHistoryIsItsOwnSection = await page.evaluate(() => {
+    const problems = [];
+    profile = 'parent'; parentViewing = 'jenn';
+    const savedSection = mnyParentSection;
+    try {
+      const sec = MNY_PARENT_SECTIONS.find(s => /Change history/.test(s.label));
+      if (!sec) problems.push('Money rules has no Change history section');
+      const land = (PARENT_LANDINGS.setup || []).find(r => /Change history/.test(r.title));
+      if (!land) problems.push('Setup offers no Change history row');
+      else if (!sec || land.section !== sec.id) problems.push('Setup › Change history opens "' + land.section + '"');
+      showScreen('parent'); setParentDest('setup');
+      const row = document.querySelector('#ptab-setup-wrap [data-parent-section]');
+      if (!row) problems.push('the Setup landing draws no row that names a section');
+      else {
+        row.click();
+        const wrap = document.getElementById('mnyRulesWrap');
+        if (!wrap.querySelector('[data-mnyp-action="hist"]')) problems.push('Setup › Change history does not open the log of rule changes');
+        if (/Weeks on record/.test(wrap.textContent)) problems.push('Setup › Change history still opens the week ledger');
+      }
+      /* One log, one place. It was drawn under Lessons AND under Loans; every
+         section is rendered and the log must appear in exactly one of them. */
+      const drawnIn = MNY_PARENT_SECTIONS.filter(sc => {
+        mnyParentSection = sc.id; mnyRenderRulesTab();
+        return document.querySelectorAll('#mnyRulesWrap [data-mnyp-action="hist"]').length > 0;
+      }).map(sc => sc.id);
+      if (drawnIn.length !== 1 || drawnIn[0] !== 'changes') {
+        problems.push('the change log is drawn in ' + (drawnIn.join(', ') || 'no section') + ' — it belongs only in changes');
+      }
+      const weeks = MNY_PARENT_SECTIONS.find(s => s.id === 'history');
+      if (!weeks || weeks.label !== '📖 Week history') problems.push('📖 Week history lost its name');
+      mnyParentSection = 'history'; mnyRenderRulesTab();
+      if (!/Weeks on record/.test(document.getElementById('mnyRulesWrap').textContent)) problems.push('📖 Week history lost the week ledger');
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      mnyParentSection = savedSection;
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── THE KID PAGES SAY WHAT THE RULES SAY ─────────────────────────
+     Three places a child reads a rule were written as literals, and each went
+     on saying the old rule after the rules changed: the fines card ("the
+     second time that week… it costs") after four fines became free twice a
+     week, the streak card ("miss a day and the run starts over") after the
+     grace day, and Money school's "Extra work — this pays", which still listed
+     homework after homework stopped paying. And a child with no loan was held
+     at stage 0 — every pot shut — because "nothing owed" read as 0% paid.
+
+     Asserted against the LIVE rules both ways round: with the house rules the
+     words say so, and with them taken out the words are the old ones. */
+  checks.theKidPagesSayWhatTheRulesSay = await page.evaluate(() => {
+    const problems = [];
+    profile = 'jenn'; parentViewing = 'jenn';
+    const snap = JSON.stringify(state);
+    let prices = null;
+    try { prices = localStorage.getItem(MNY_PRICES_LS_KEY); } catch (e) {}
+    try {
+      const r = mrRules();
+      const words = (rules) => { const d = document.createElement('div'); d.innerHTML = pmPriceCards(rules); return d.textContent; };
+      const now = words(r);
+      if (!/first two times in a week/.test(now)) problems.push('the fines card does not say the first two times are a talk');
+      if (!/from the third time/.test(now)) problems.push('a forgiven fine does not say when it starts to cost');
+      if (!/every time/.test(now)) problems.push('the box repeat does not say it costs every time');
+      if (!/One missed day a week won't break your run/.test(now)) problems.push('the streak card does not mention the grace day');
+      const old = mrDeepCopy(r);
+      old.fines.items.forEach(f => { delete f.freeRepeats; });
+      old.streak.graceDays = 0;
+      const was = words(old);
+      if (!/Box first, fine on repeat — the second time that week, it's boxed and it costs\./.test(was)) problems.push('with no free repeats the fines card lost its old words');
+      if (/from the third time|every time/.test(was)) problems.push('with no free repeats the fines still carry a when');
+      if (!/Miss a day and the run starts over/.test(was)) problems.push('with no grace day the streak card lost its old words');
+
+      // Money school: the live price list, in the same disclosure as My money.
+      mnySetPricesOpen(false);
+      mnyOpenSchool('jenn');
+      const school = document.getElementById('mnySchoolWrap');
+      if (/Math pages, handwriting pages|Extra work — this pays/.test(school.textContent)) problems.push('Money school still restates what pays');
+      if (/See what each one pays/.test(school.textContent)) problems.push('Money school still sends her away to see the prices');
+      if (!/Just part of being here/.test(school.textContent)) problems.push('the "Just part of being here" lesson went');
+      const toggle = school.querySelector('[data-mny-action="prices"]');
+      if (!toggle) problems.push('Money school has no price list');
+      else {
+        toggle.click();
+        if (!document.getElementById('screen-moneyschool').classList.contains('active')) problems.push('opening the prices left Money school');
+        const open = document.getElementById('mnySchoolWrap').textContent;
+        if (!/XP only/.test(open)) problems.push('the price list in Money school does not say homework is XP only');
+        if (!mnyPricesOpen()) problems.push('Money school did not use the price list\'s remembered toggle');
+      }
+      r.chores.freeChoresPerWeek = 1;
+      mnyRenderSchool();
+      if (!/The first household chore each week/.test(document.getElementById('mnySchoolWrap').textContent)) {
+        problems.push('the free-chores line does not follow the live rule');
+      }
+
+      // No loan is every pot open, and nobody is told she paid one off.
+      mnyDebts('jenn').forEach(d => { d.principal = 0; d.paid = 0; });
+      if (mnyPaidPct('jenn') !== 100) problems.push('nothing owed reads as ' + mnyPaidPct('jenn') + '% paid');
+      if (!mnyIsOpen('jenn', 90)) problems.push('a child with no loan has pots shut');
+      mnyRenderSchool();
+      if (/paid off/i.test(document.getElementById('mnySchoolWrap').querySelector('.mny-goal-row').textContent)) {
+        problems.push('Money school tells a child with no loan she paid it off');
+      }
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      const s = JSON.parse(snap);
+      Object.keys(state).forEach(k => { delete state[k]; });
+      Object.assign(state, s);
+      try { if (prices == null) localStorage.removeItem(MNY_PRICES_LS_KEY); else localStorage.setItem(MNY_PRICES_LS_KEY, prices); } catch (e) {}
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── TYPING AN AMOUNT KEEPS THE CARET ─────────────────────────────
+     ARCHITECTURE.md: "Typing never re-renders; only a change that alters what
+     the form ASKS does." The move form broke that — every digit of the amount
+     redrew the whole sheet, `innerHTML` replaced the input, and focus dropped:
+     on an iPad the keyboard closed after each digit and "15" took two taps.
+     Driven with REAL key events, because a script setting `.value` never sees
+     focus move. The save button still has to change as she types — it says
+     why a move is refused — so that is asserted too, on the same input node. */
+  checks.typingAnAmountKeepsTheCaret = await (async () => {
+    const problems = [];
+    await page.evaluate(() => {
+      window.__caretSnap = JSON.stringify(state);
+      profile = 'parent'; parentViewing = 'jenn';
+      showScreen('parent');
+      openRecordSheet({ kind: 'move', kid: 'jenn' });
+      const inp = document.querySelector('#recordBody input[data-rc-action="amount"]');
+      inp.__caretProbe = true;
+      inp.focus(); inp.select();
+    });
+    const same = () => page.evaluate(() => {
+      const a = document.activeElement;
+      const inp = document.querySelector('#recordBody input[data-rc-action="amount"]');
+      return { focused: !!(a && a.__caretProbe), sameNode: !!(inp && inp.__caretProbe), value: inp ? inp.value : null };
+    });
+    try {
+      for (const k of ['1', '5']) {
+        await page.keyboard.type(k);
+        const r = await same();
+        if (!r.sameNode) problems.push('typing "' + k + '" replaced the amount input');
+        if (!r.focused) problems.push('typing "' + k + '" took the focus off the amount input');
+      }
+      const typed = await same();
+      if (typed.value !== '15') problems.push('the amount reads "' + typed.value + '" after typing 1 then 5');
+      await page.keyboard.press('Backspace'); await page.keyboard.press('Backspace');
+      await page.keyboard.type('99999');
+      const after = await same();
+      if (!after.sameNode || !after.focused) problems.push('typing a large amount replaced or blurred the input');
+      const btn = await page.evaluate(() => {
+        const b = document.querySelector('#recordBody [data-rc-action="save"]');
+        return { text: b ? b.textContent.trim() : null, disabled: !!(b && b.disabled),
+          why: mnyMoveRefusal(rcDraft.kid, rcDraft.moveFrom, rcDraft.moveTo, rcDraft.amount), amount: rcDraft.amount };
+      });
+      if (btn.amount !== 99999) problems.push('the draft holds ' + btn.amount + ', not 99999');
+      if (!btn.why) problems.push('the fixture let a move of 99999 through');
+      else if (btn.text !== btn.why) problems.push('the save button reads "' + btn.text + '", not the refusal "' + btn.why + '"');
+      if (!btn.disabled) problems.push('a refused move left the save button enabled');
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      await page.evaluate(() => {
+        if (rcDraft) closeRecordSheet();
+        const s = JSON.parse(window.__caretSnap);
+        Object.keys(state).forEach(k => { delete state[k]; });
+        Object.assign(state, s);
+        delete window.__caretSnap;
+      });
+    }
+    return problems.length ? problems : true;
+  })();
 
   /* ── A GIFT HAS A DATE, AND TWO QUESTIONS ─────────────────────────
      `mnyAddDeposit` hardcoded `dayKey: todayKey()` and NO FORM ANYWHERE offered
@@ -15398,6 +16016,176 @@ function findChromium() {
     });
     return bad.length === 0 || bad;
   });
+
+  /* ── EVERY MONEY CONTROL CAN BE PRESSED ───────────────────────────
+     Two buttons on the parent's Money rules page were dead for as long as the
+     page existed, and a whole class of move could be filed and never answered.
+     Every check in this file drove the FUNCTIONS; none pressed the buttons, so a
+     button wired to nothing — or to something that throws — was invisible.
+
+     This presses every one. Each money surface is rendered as the person who
+     uses it (the three kid pages as a child; every Money rules section, the
+     meeting's money step and all five Record forms as a grown-up; the two
+     Record forms a child is offered, as a child). Every button and every
+     data-action control is clicked ONE AT A TIME, with `state`, the device's
+     view preferences and the surface's own module state put back from a
+     snapshot and the surface drawn afresh before each, so a click is measured
+     against the page a person would actually have in front of them — not
+     against the wreckage of the click before it.
+
+     The app's dialogs are stubbed to answer "no", so nothing a confirm guards
+     is ever committed. A failure is any exception, thrown during the click or
+     afterwards from a promise, named by surface and by the control's label.
+     No fixed sleeps: two macrotask turns after each click is what lets a
+     promise-chained handler finish, and nothing here waits on a clock.
+
+     Exceptions are caught HERE, from `pageerror`, not by a listener in the
+     page: over file:// Chrome mutes a script's errors to "Script error." and
+     does not fire `unhandledrejection` at all. Before each control the page
+     names it with a console.debug line; the protocol delivers console lines
+     and exceptions in the order the page produced them, so every error
+     arrives between two names and is filed under the right one. (A binding
+     the page awaited did the same at ~16ms a round trip — a fifth of the
+     budget, spent on bookkeeping.) */
+  const moneySweep = { at: null, found: [], started: Date.now() };
+  const MONEY_SWEEP_AT = 'money-sweep-at:';
+  const moneySweepConsole = (m) => {
+    const t = m.text();
+    if (t.indexOf(MONEY_SWEEP_AT) === 0) moneySweep.at = t.slice(MONEY_SWEEP_AT.length) || null;
+  };
+  const moneySweepError = (e) => {
+    if (moneySweep.at) moneySweep.found.push(moneySweep.at + ': threw ' + ((e && e.message) || e));
+  };
+  page.on('console', moneySweepConsole);
+  page.on('pageerror', moneySweepError);
+  checks.everyMoneyControlClicksClean = await page.evaluate(async () => {
+    const problems = [];
+    const t0 = performance.now();
+    const at = (label) => { console.debug('money-sweep-at:' + (label || '')); };
+    const snapState = JSON.stringify(state);
+    const snapLS = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k !== LS_KEY) snapLS[k] = localStorage.getItem(k);
+    }
+    const was = {
+      profile, parentViewing, parentScope, ctParentKid, mnyKid, mnyParentSection, mnyMeetKid,
+      _appDialog: window._appDialog, showChoice: window.showChoice, open: window.open,
+    };
+    let current = 'before any click';
+    window._appDialog = (o) => Promise.resolve(o && o.kind === 'prompt' ? null : false);
+    window.showChoice = () => Promise.resolve(null);
+    window.open = () => null;
+
+    const restore = () => {
+      if (document.getElementById('mnyTour')) mnyCloseTour();
+      const card = document.getElementById('mnyConceptCard');
+      if (card) card.remove();
+      if (rcDraft) closeRecordSheet();
+      document.querySelectorAll('.overlay.open').forEach(ov => closeSheet(ov.id));
+      if (mmIsOpen()) mmHide();
+      const s = JSON.parse(snapState);
+      Object.keys(state).forEach(k => { delete state[k]; });
+      Object.assign(state, s);
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k !== LS_KEY && !(k in snapLS)) localStorage.removeItem(k);
+      }
+      Object.entries(snapLS).forEach(([k, v]) => { if (localStorage.getItem(k) !== v) localStorage.setItem(k, v); });
+      mnyPending = []; mnyPendingFrom = null; mnyPendingReason = MR_DEFAULT_REASON;
+      mnyRuleSearch = ''; mnyHistoryOpen = false;
+      flPeriod = 'month'; flMonth = null;
+      mnyGoalFormOpen = false; mnyStoryMode = 'week'; mnySchoolConcept = 'debt';
+      // The meeting's money drafts, as mnySetMeetKid('jenn') would leave them —
+      // set here rather than by calling it, which would draw the meeting a
+      // third time per click and put this sweep past its budget.
+      mnyMeetKid = 'jenn'; mnyExpandRow = null; mnyCompDraft = null;
+      mnyDepDraft = null; mnyDraft = null; mnyDoorAmt = null;
+    };
+    const as = (who) => {
+      profile = who; parentViewing = 'jenn'; ctParentKid = 'jenn'; mnyKid = 'jenn';
+      if (who === 'parent') parentScope = 'jenn';
+    };
+    /* Drawn afresh every time; the portal around it is only re-entered when a
+       click has left it, because re-entering it is most of what a click costs. */
+    const rules = () => {
+      const sp = document.getElementById('screen-parent');
+      if (!(sp && sp.classList.contains('active') && parentTab === 'money')) { showScreen('parent'); setParentTab('money'); }
+      mnyRenderRulesTab();
+    };
+    const surfaces = [
+      { name: 'My money (child)', as: 'jenn', host: 'mnyPage1Wrap', open: () => mnyOpenMyMoney('jenn') },
+      { name: 'My money story (child)', as: 'jenn', host: 'mnyStoryWrap', open: () => mnyOpenStory() },
+      { name: 'Money school (child)', as: 'jenn', host: 'mnySchoolWrap', open: () => mnyOpenSchool('jenn') },
+      ...MNY_PARENT_SECTIONS.map(sec => ({ name: 'Money rules › ' + sec.label, as: 'parent', host: 'mnyRulesWrap',
+        open: () => { mnyParentSection = sec.id; rules(); } })),
+      { name: 'Meeting › the money', as: 'parent', host: 'screen-meeting',
+        open: () => { openFamilyMeeting(); mmGoStep(3); } },
+      ...RC_KINDS.map(k => ({ name: 'Record › ' + k.label + ' (grown-up)', as: 'parent', host: 'recordOverlay',
+        open: () => openRecordSheet({ kind: k.id, kid: 'jenn' }) })),
+      ...RC_KINDS.filter(k => k.kid).map(k => ({ name: 'Record › ' + k.label + ' (child)', as: 'jenn', host: 'recordOverlay',
+        open: () => openRecordSheet({ kind: k.id, kid: 'jenn' }) })),
+    ];
+    const SEL = 'button, [data-mny-action], [data-mnyp-action], [data-rc-action]';
+    const text = (el) => (el.textContent || '').trim().replace(/\s+/g, ' ');
+    const sig = (el) => [el.tagName, el.getAttribute('data-mny-action'), el.getAttribute('data-mnyp-action'),
+      el.getAttribute('data-rc-action'), el.getAttribute('data-mnyp-id'), el.getAttribute('data-rc-id'),
+      el.getAttribute('data-mnyp-path'), el.getAttribute('data-mnyp-d'), el.getAttribute('onclick'),
+      text(el).slice(0, 60)].join('|');
+    const label = (el) => (el.getAttribute('aria-label') || text(el) || el.getAttribute('placeholder')
+      || el.getAttribute('data-mny-action') || el.getAttribute('data-mnyp-action')
+      || el.getAttribute('data-rc-action') || el.tagName).slice(0, 50);
+    const tick = () => new Promise(r => setTimeout(r, 0));
+    let clicked = 0;
+    try {
+      for (const s of surfaces) {
+        restore(); as(s.as);
+        current = s.name + ' (opening it)';
+        at(current);
+        try { s.open(); } catch (e) { problems.push(current + ': threw ' + e.message); continue; }
+        const host0 = document.getElementById(s.host);
+        const found = host0 ? [...host0.querySelectorAll(SEL)] : [];
+        const sigs = found.map(sig), labels = found.map(label);
+        if (!sigs.length) { problems.push(s.name + ': rendered no controls at all'); continue; }
+        for (let i = 0; i < sigs.length; i++) {
+          restore(); as(s.as);
+          current = s.name + ' › "' + labels[i] + '"';
+          at(current);
+          try { s.open(); } catch (e) { problems.push(s.name + ' (opening it): threw ' + e.message); break; }
+          const els = [...document.getElementById(s.host).querySelectorAll(SEL)];
+          let el = els[i];
+          if (!el || sig(el) !== sigs[i]) el = els.find(x => sig(x) === sigs[i]);
+          if (!el) { problems.push(s.name + ': a control was not there on a second drawing — ' + sigs[i]); continue; }
+          try { el.click(); } catch (e) { problems.push(current + ': threw ' + e.message); }
+          await tick(); await tick();
+          clicked++;
+        }
+      }
+      if (clicked < 100) problems.push('only ' + clicked + ' controls were pressed — the sweep is not reaching the surfaces');
+    } catch (e) {
+      problems.push(current + ': the sweep itself threw ' + e.message);
+    } finally {
+      current = 'after the sweep';
+      at(current);
+      restore();
+      at(null);
+      window._appDialog = was._appDialog; window.showChoice = was.showChoice; window.open = was.open;
+      profile = was.profile; parentViewing = was.parentViewing; parentScope = was.parentScope;
+      ctParentKid = was.ctParentKid; mnyKid = was.mnyKid; mnyParentSection = was.mnyParentSection;
+      mnyMeetKid = was.mnyMeetKid;
+      saveLocal();
+      window.__moneySweep = { clicked, ms: Math.round(performance.now() - t0) };
+    }
+    return problems.length ? problems : true;
+  });
+  page.off('pageerror', moneySweepError);
+  page.off('console', moneySweepConsole);
+  if (moneySweep.found.length) {
+    checks.everyMoneyControlClicksClean = (Array.isArray(checks.everyMoneyControlClicksClean)
+      ? checks.everyMoneyControlClicksClean : []).concat(moneySweep.found);
+  }
+  console.log('money click sweep: ' + JSON.stringify(await page.evaluate(() => window.__moneySweep))
+    + ', ' + (Date.now() - moneySweep.started) + 'ms wall');
 
   checks.noConsoleErrors = errors.length === 0;
 

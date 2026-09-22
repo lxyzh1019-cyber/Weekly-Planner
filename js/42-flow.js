@@ -62,10 +62,16 @@ const FL_PERIODS = [
   { id: 'typical', label: 'A typical month' },
 ];
 
-/* Where money went, in the order a child should read it: what she chose to put
-   away first, then what left for good. `loan` is last because paying a debt
-   down is neither saving nor spending and reads oddly beside either. */
-const FL_DEST_ORDER = ['ready', 'locked', 'invest', 'spent', 'fine', 'loan'];
+/* Where money went, as TWO groups, each under a caption that is the sum of
+   its own bars. There was one — "➡️ Where it went $outTotal" — above bars
+   drawn from every destination, and `outTotal` deliberately leaves out money
+   moved between her own pots: observed live as "$0.00" above a $30.00 bar.
+
+   Out: what left for good — spent, a fine, a loan paid back, a gift given
+   back (`returned` was counted in the total and never drawn). `loan` sits
+   after the other two because paying a debt down reads oddly beside either.
+   Grow: what she put away, in the order she is taught the pots. */
+const FL_OUT_DESTS = ['spent', 'fine', 'loan', 'returned'];
 const FL_SAVED_DESTS = ['ready', 'locked', 'invest'];
 
 /* One hue per ribbon, matched to the pots they name on 💰 My money so the two
@@ -122,7 +128,7 @@ function flMonthShort(m) {
    Said in words before anything is drawn, because a bar chart answers "how
    much of each" and a child's first question is "what happened". */
 function flStory(flow, periodWords) {
-  const saved = money2(FL_SAVED_DESTS.reduce((s, k) => s + money2(flow.dests[k] || 0), 0));
+  const saved = money2(flow.savedTotal);
   const out = money2(flow.outTotal);
   const bits = [];
   bits.push(`${mnyMoney(flow.inTotal)} came in`);
@@ -160,8 +166,8 @@ function flSourceRows(flow) {
     return { icon: l.icon, label: l.label, value: flow.sources[k] || 0, colour: flColour(k) };
   }));
 }
-function flDestRows(flow) {
-  return flRibbonRows(FL_DEST_ORDER.map(k => {
+function flDestRows(flow, keys) {
+  return flRibbonRows(keys.map(k => {
     const l = flDestLabel(k);
     return { icon: l.icon, label: l.label, value: flow.dests[k] || 0, colour: flColour(k) };
   }));
@@ -215,13 +221,18 @@ function flRenderFlow(kid) {
        data-fl-action="period" data-fl-id="${p.id}">${escapeHtml(p.label)}</button>`).join('');
 
   const inRows = flSourceRows(flow);
-  const outRows = flDestRows(flow);
+  /* Every key `outTotal` counted is drawn: the four named ones first, then
+     anything else that left — a company losing value, the migration's
+     negative opening. Undrawn, those made the caption bigger than its bars. */
+  const outRows = flDestRows(flow, FL_OUT_DESTS.concat(Object.keys(flow.dests)
+    .filter(k => !evIsHome(k) && FL_OUT_DESTS.indexOf(k) < 0)));
+  const growRows = flDestRows(flow, FL_SAVED_DESTS);
 
   /* Nothing recorded is a real state and it has TWO causes that need different
      answers: a family that has not run the set-up yet, and a child who simply
      has not earned anything in the month she is looking at. Saying "nothing
      here" for both would send a parent looking for a bug in the second case. */
-  if (!inRows && !outRows) {
+  if (!inRows && !outRows && !growRows) {
     const anyAtAll = (typeof evList === 'function') && evList(kid).length > 0;
     return `<div class="mny-card">
         <div class="mny-label">🌊 Where your money goes</div>
@@ -243,8 +254,13 @@ function flRenderFlow(kid) {
       </div>
 
       <div class="fl-group">
-        <div class="fl-cap">➡️ Where it went <b>${mnyMoney(flow.outTotal)}</b></div>
-        ${outRows || '<div class="fl-empty">None of it has gone anywhere yet — it is all still cash.</div>'}
+        <div class="fl-cap">➡️ What went out <b>${mnyMoney(flow.outTotal)}</b></div>
+        ${outRows || '<div class="fl-empty">Nothing went out.</div>'}
+      </div>
+
+      <div class="fl-group">
+        <div class="fl-cap">🌱 Put away to grow <b>${mnyMoney(flow.savedTotal)}</b></div>
+        ${growRows || '<div class="fl-empty">Nothing was put away — it is all still cash.</div>'}
       </div>
 
       <div class="fl-left">
