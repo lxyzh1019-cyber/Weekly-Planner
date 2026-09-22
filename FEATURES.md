@@ -62,6 +62,14 @@ to be a complete manifest:
 - The blank-week coach tip (`weekEmptyOffer`) carries **no** school button — the banner covers the blank week from the same position.
 - Held by `theSchoolOfferIsAboveTheWeekGrid`, `oneSchoolDayCanBeAddedOnItsOwn` and `aBlankWeekOffersItsSchoolDays` in `tests/smoke.js`.
 
+### The profile badge switches profile (manifested 2026-09-22)
+- **All five** profile badges are real controls: `#todayProfileBadge`, `#weekProfileBadge`, `#dayProfileBadge`, `#choreProfileBadge`, `#syncProfileBadge` are each `<button class="profile-badge" onclick="openProfileSwitcher()" aria-label="Switch profile">`. Three of them (Today, chores, Sister Sync) were inert `<div>`s.
+- `openProfileSwitcher` (`js/06-quests.js`) is the one switcher; every badge is a call site for it.
+- Every badge **prints who is on screen**, a parent included. Today's says `👨‍👩‍👧‍👦 Parent (Jenn|Jess)` for a grown-up, the same shape the chore tab uses.
+- **Nothing is announced as a control that is not one.** `enhanceAccessibility` (`js/99-main.js`) injects `aria-label` only on a `.profile-badge` that is a `<button>`/`<a>`, carries `[onclick]`, or has `role="button"` — matching how `enhanceNonButtonClickables` beside it already filtered.
+- **The meeting lock is scoped and releasable.** `applyMeetingLock` (`js/11-parent.js`) hides only `MEETING_LOCK_BADGES` (`weekProfileBadge`, `dayProfileBadge`) plus `#parentWeekActions .pb-switch`, never every `.profile-badge` in the document; `locked` is `isParent() && mmHasReturn()`; and `renderWeek`/`openDay` call it **outside** their `isParent()` branches so a child's own render puts the control back.
+- Held by `everyProfileBadgeSwitchesProfile` in `tests/smoke.js` — it activates each badge and asserts the switcher opens, and asserts the lock both engages for a parent mid-meeting and lifts for a child.
+
 Deriving the full app manifest from `ARCHITECTURE.md` is an open item in `WORKING_RECORD.md`.
 
 ## Regression table format (paste at the end of every edit)

@@ -88,8 +88,10 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   if (isParent()) {
     document.getElementById('parentBackDay').innerHTML = parentBannerBackButton();
     renderParentBanners();
-    applyMeetingLock();
   }
+  /* Outside the isParent() branch on purpose — see the note on applyMeetingLock
+     in js/11-parent.js. A child's render is what lifts the lock. */
+  applyMeetingLock();
 
   document.getElementById('dayProfileBadge').textContent =
     isParent() ? (parentViewing==='jenn'?'🐥 (P)':'🦊 (P)') :

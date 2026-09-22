@@ -785,7 +785,17 @@ function tdRenderToday() {
       .toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
   }
   const badge = document.getElementById('todayProfileBadge');
-  if (badge) badge.textContent = kid === 'jenn' ? '🐥 Jenn' : kid === 'jess' ? '🦊 Jess' : '';
+  /* Alone among the five, this badge said nothing about a grown-up: a parent
+     viewing Jenn got Jenn's own badge, with no sign anybody else was looking,
+     and an unset profile got an empty string — a control with nothing on it,
+     which matters more now the badge is a real button. Same shape and wording
+     as the chore tab's (js/13-chores.js) rather than new copy. `kid` is
+     activeProfile(), so for a parent it is already whoever is being viewed. */
+  if (badge) {
+    badge.textContent = isParent()
+      ? `👨‍👩‍👧‍👦 Parent (${kid === 'jenn' ? 'Jenn' : 'Jess'})`
+      : (kid === 'jenn' ? '🐥 Jenn' : kid === 'jess' ? '🦊 Jess' : '');
+  }
   if (!kid || kid === 'parent') {
     wrap.innerHTML = `<div class="td-card"><div class="td-cap">Today</div>
       <div class="td-empty">Pick a profile to see the day.</div></div>`;

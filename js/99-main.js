@@ -272,7 +272,21 @@ function applyIconButtonAriaLabels(root = document) {
 function enhanceAccessibility(root = document) {
   enhanceNonButtonClickables(root);
   applyIconButtonAriaLabels(root);
+  /* Only a badge that can actually be PRESSED gets told it is a control.
+     This pass used to label every .profile-badge, filter-free, which is how
+     three inert <div>s — Today, the chore tab, Sister Sync — came to be
+     announced to a screen reader as "Open profile selector" with no role, no
+     focus and no handler, while css/app.css gave them cursor:pointer and a
+     44px box. enhanceNonButtonClickables above already filters on [onclick];
+     this one did not, and the label is the half a screen reader reads out.
+     All five badges are real buttons now, so this changes nothing today — it
+     is here so the next inert badge somebody adds cannot re-tell the lie.
+     A <button> is included because an empty one still needs a name. */
   root.querySelectorAll('.profile-badge').forEach((badge) => {
+    const tag = (badge.tagName || '').toLowerCase();
+    const isControl = tag === 'button' || tag === 'a'
+      || badge.hasAttribute('onclick') || badge.getAttribute('role') === 'button';
+    if (!isControl) return;
     if (!badge.getAttribute('aria-label')) badge.setAttribute('aria-label', 'Open profile selector');
   });
   root.querySelectorAll('.mascot-close').forEach((closeBtn) => {

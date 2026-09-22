@@ -863,6 +863,22 @@ say which one they are.
 - Never white text on the pastel category colors (all fail contrast).
 - Use the app's `.sheet` / `appDialog` patterns, not native `confirm()`/`prompt()`.
 
+**IF IT LOOKS LIKE A CONTROL AND IS ANNOUNCED AS ONE, IT HAS TO BE ONE.** Three
+of the five `.profile-badge`s — Today, the chore tab, Sister Sync — were bare
+`<div>`s with no handler, while the week's and the day's were buttons calling
+`openProfileSwitcher()`. The app told the user it was a button in three separate
+ways and then did nothing: `css/app.css` gave it `cursor: pointer` and a 44px
+box, and `enhanceAccessibility` (`js/99-main.js`) injected
+`aria-label="Open profile selector"` on **every** `.profile-badge` with no
+`[onclick]` filter — while `enhanceNonButtonClickables`, three lines above it,
+did filter, so the dead badges got a label and no role, no focus and no
+keyboard. All five are `<button class="profile-badge" onclick="…"
+aria-label="Switch profile">` now, and the aria pass only labels a badge that
+has a click path, so the next inert one cannot re-tell the lie.
+`everyProfileBadgeSwitchesProfile` asserts it by **activating** each badge and
+watching for `#profileSwitchOverlay`: a control can carry every attribute on the
+list and still open nothing.
+
 ## One answer per question — `js/36-status.js`
 
 Six screens each worked out "is this done?" for themselves, and the copies had
@@ -1438,8 +1454,8 @@ asserts the same properties against `.mm-screen`.
 
 The kid nav and the parent bar both hide themselves here without any change:
 `TD_NAV_SCREENS` does not list `screen-meeting`, and `parentRenderNav` shows
-only on `screen-parent`. `applyMeetingLock` keys on `mmHasReturn()` rather than
-on the overlay, so it was unaffected too.
+only on `screen-parent`. `applyMeetingLock` keys on the return context rather
+than on the overlay, so it was unaffected too.
 
 ## The meeting
 
@@ -1450,6 +1466,19 @@ to weekly meeting" while one is waiting and "◀ Hub" otherwise. `applyMeetingLo
 **hides the Hub link and both child switchers** while a sitting is open: three
 controls that each silently abandoned the meeting is worse than one that says
 where it goes.
+
+**A lock that cannot be lifted is not a lock, it is damage.** Two things were
+wrong with it. It swept the whole document for `.profile-badge`, so a sitting on
+the week screen also hid the switcher on Today, the chore tab and Sister Sync —
+four screens it is not about; it names `MEETING_LOCK_BADGES`
+(`weekProfileBadge`, `dayProfileBadge`) by id now. And `locked` was
+`mmHasReturn()` alone while both call sites sat inside `if (isParent())`, so
+nothing ever ran it with the lock off: start a meeting, look at the week, switch
+to a kid, and every badge stayed hidden for the rest of the session on all five
+screens. `locked` is `isParent() && mmHasReturn()`, and `renderWeek` and
+`openDay` call it **outside** their `isParent()` branches, so a child's own
+render is what puts the control back. `mmClearReturn()` only nulls the variable
+— it un-hides nothing, and never could.
 
 **A day refused only for `unconfirmed` is the one refusal a SITTING may talk its
 way past.** `mmOverridableRefusal` names it: blocks nobody answered, which is

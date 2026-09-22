@@ -7734,6 +7734,149 @@ function findChromium() {
     return seedIntact && stacked && newestWins && pastIntact && stillTwo;
   });
 
+  /* THE BADGE THAT SAYS IT IS A BUTTON AND IS NOT ONE. Three of the five
+     profile badges were bare <div>s with no handler — Today, the chore tab and
+     Sister Sync — while the week's and the day's were real buttons calling
+     openProfileSwitcher(). Worse than merely inert: js/99-main.js labels EVERY
+     .profile-badge `aria-label="Open profile selector"` with no [onclick]
+     filter, while the role/keyboard pass beside it does filter — and
+     css/app.css gives them cursor:pointer and a 44px box. So the app announced
+     a control to a screen reader, drew one, sized one for a thumb, and then did
+     nothing when it was pressed.
+
+     Asserted by ACTIVATING it, never by reading its markup: a badge can carry
+     every attribute on the list and still open nothing.
+
+     Arm 2 is about the other half — a lock that can be applied and never
+     lifted is the same defect wearing a different hat. */
+  checks.everyProfileBadgeSwitchesProfile = await page.evaluate(() => {
+    const problems = [];
+    const wasProfile = profile, wasViewing = parentViewing, wasParentKid = ctParentKid;
+    const wasOffset = weekOffset, wasSyncDay = syncDayIdx, wasDayKey = currentDayKey;
+    const wasReturn = mmReturn;
+    try {
+      const overlay = () => document.getElementById('profileSwitchOverlay');
+      const shown = (el) => {
+        if (!el || el.hidden) return false;
+        const s = getComputedStyle(el);
+        if (s.display === 'none' || s.visibility === 'hidden') return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      };
+
+      /* ── Arm 1: every badge is a control, and it opens the switcher ── */
+      const screens = [
+        ['Today',       'todayProfileBadge', () => goToday()],
+        ['the week',    'weekProfileBadge',  () => { goWeek(); renderWeek(); }],
+        ['the day',     'dayProfileBadge',   () => openDay(getDayKeys(weekOffset)[0], 0)],
+        ['the chores',  'choreProfileBadge', () => openChoreTab()],
+        ['Sister Sync', 'syncProfileBadge',  () => openSisterSync()],
+      ];
+      for (const [label, id, nav] of screens) {
+        profile = 'jenn';
+        nav();
+        const badge = document.getElementById(id);
+        if (!badge) { problems.push(`${label}: #${id} is not in the document`); continue; }
+        if (!shown(badge)) {
+          problems.push(`${label}: the profile badge #${id} is not visible, so a child cannot reach the switcher from this screen`);
+          continue;
+        }
+        const tag = (badge.tagName || '').toLowerCase();
+        const hasClickPath = tag === 'button' || badge.hasAttribute('onclick')
+          || (badge.getAttribute('role') === 'button' && badge.hasAttribute('tabindex'));
+        if (!hasClickPath) {
+          problems.push(`${label}: the profile badge #${id} is a <${tag}> with no onclick and no role=button + tabindex — it is announced and styled as a control with no way to press it`);
+        }
+        closeSheet('profileSwitchOverlay');
+        badge.click();
+        if (!overlay().classList.contains('open')) {
+          problems.push(`${label}: tapping the profile badge #${id} did not open the profile switcher`);
+        }
+        closeSheet('profileSwitchOverlay');
+      }
+
+      /* And nothing is ANNOUNCED as a control that is not one. The aria pass in
+         js/99-main.js used to label every .profile-badge with no [onclick]
+         filter, so a screen reader was told three <div>s opened the profile
+         selector. That is the half of this defect a sighted test cannot see. */
+      const lying = [...document.querySelectorAll('.profile-badge')].filter(b => {
+        const tag = (b.tagName || '').toLowerCase();
+        const isControl = tag === 'button' || tag === 'a'
+          || b.hasAttribute('onclick') || b.getAttribute('role') === 'button';
+        return !isControl && b.hasAttribute('aria-label');
+      }).map(b => '#' + (b.id || '(unnamed)'));
+      if (lying.length) {
+        problems.push(`${lying.join(', ')} carries an aria-label but has no click path — announced to a screen reader as a control that does nothing`);
+      }
+
+      /* ── Arm 2: the meeting lock ENGAGES, and then it lets go ──
+         applyMeetingLock hides the switchers a parent must not press mid-
+         sitting. Two things were wrong. It swept the whole document, so a
+         sitting on the week screen hid the badge on Today, the chore tab and
+         Sister Sync as well. And `locked` was mmHasReturn() alone while both
+         call sites sat inside `if (isParent())`, so nothing ever ran it with
+         locked === false: start a meeting, look at the week, switch to a kid,
+         and the switcher was gone for the rest of the session — a kid's own
+         renderWeek() would have re-hidden it anyway, because locked ignored
+         who was asking. mmClearReturn() only nulls the variable; it un-hides
+         nothing.
+
+         The state is set directly rather than through mmCaptureReturn, which
+         commits a reflection draft as a side effect.
+
+         The release is checked on the screens a child actually reaches, in the
+         order she reaches them — switch, land on Today, then open the week and
+         the day. A badge on a screen nobody has rendered is not a control
+         anybody can be denied; a badge still hidden after its own screen has
+         been drawn is. */
+      profile = 'parent'; parentViewing = 'jenn'; ctParentKid = 'jenn';
+      mmReturn = { source: 'weekly-meeting', weekKey: ctThisWeekKey(), step: 1,
+                   child: 'jenn', selectedDay: 0, scrollTop: 0 };
+      if (!mmHasReturn()) {
+        problems.push('the meeting-return state could not be set, so the lock on the profile badges cannot be tested');
+      } else {
+        const hiddenNow = () => [...document.querySelectorAll('.profile-badge')]
+          .filter(b => b.hidden).map(b => '#' + (b.id || '(unnamed)'));
+
+        // It has to engage, or there is nothing to release.
+        goWeek(); renderWeek();
+        const locked = hiddenNow();
+        if (!locked.includes('#weekProfileBadge')) {
+          problems.push('a waiting meeting did not hide the week profile switcher — a parent can press it and silently lose the sitting');
+        }
+        // …and only the two switchers the lock is about.
+        const overreach = locked.filter(id => id !== '#weekProfileBadge' && id !== '#dayProfileBadge');
+        if (overreach.length) {
+          problems.push(`a meeting on the week screen also hid ${overreach.join(', ')} — the lock is about the week and day switchers, not every badge in the app`);
+        }
+
+        // Switch to a kid, the way selectProfile does it: land on Today.
+        profile = 'jenn';
+        goToday();
+        const onToday = hiddenNow().filter(id => id === '#todayProfileBadge');
+        if (onToday.length) {
+          problems.push('a child landing on Today after a meeting has no profile switcher — the lock reached a screen it is not about');
+        }
+        // Then the two screens the lock IS about.
+        goWeek(); renderWeek();
+        openDay(getDayKeys(weekOffset)[0], 0);
+        const stuck = hiddenNow();
+        if (stuck.length) {
+          problems.push(`a meeting left ${stuck.join(', ')} hidden for a child after her own screens were drawn — the lock is applied and never lifted, so the switcher does not come back`);
+        }
+      }
+    } finally {
+      mmReturn = wasReturn;
+      profile = wasProfile; parentViewing = wasViewing; ctParentKid = wasParentKid;
+      weekOffset = wasOffset; syncDayIdx = wasSyncDay; currentDayKey = wasDayKey;
+      closeSheet('profileSwitchOverlay');
+      document.querySelectorAll('.profile-badge').forEach(b => { b.hidden = false; });
+      document.body.classList.remove('meeting-return-pending');
+      goToday();
+    }
+    return problems.length ? problems : true;
+  });
+
   // The one-line wirings behind the new affordances — each is a place a tap
   // can silently stop going anywhere.
   checks.newAffordancesActuallyNavigate = await page.evaluate(() => {

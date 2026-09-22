@@ -342,10 +342,13 @@ function renderWeek() {
     // this rather than leaving a control that quietly discards your place.
     document.getElementById('parentWeekActions').innerHTML =
       `<button type="button" class="btn-icon no-print pb-switch" onclick="parentSwitchView()">Switch</button>`;
-    applyMeetingLock();
   } else {
     parentBanner.style.display = 'none';
   }
+  /* Outside the isParent() branch on purpose. While it was inside, nothing ever
+     called this with the lock OFF, so a sitting hid the switcher and a child's
+     render had no way to put it back. */
+  applyMeetingLock();
 
   const p = activeProfile();
   document.getElementById('weekProfileBadge').textContent =
