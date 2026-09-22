@@ -53,6 +53,63 @@ to be a complete manifest:
 
 Deriving the full app manifest from `ARCHITECTURE.md` is an open item in `WORKING_RECORD.md`.
 
+## App — Pocket money (manifested 2026-09-22)
+
+Derived from `ARCHITECTURE.md` and checked against the code at `f4d1db5`. **This
+section is authoritative for the money area**; the rest of the app still checks
+against `ARCHITECTURE.md`. Items marked ⚠ are known defects scheduled in Plan v5 —
+listed so a regression table can show them changing on purpose.
+
+### The stream and balances
+- Money is stored as movements in `profile.events`; balances are derived from them. `evShadowDrift` reports any pot where derived and stored disagree, on the parent page.
+- Every wallet writer mirrors into the stream. A caller may **label** a movement and never **redirect** one: structural fields are applied after `opts`.
+- A correction is a reversing event, never an edit. `profile.events` merges by id with its own `ev:` tombstone scope.
+- The migration is read-only until run, idempotent by derived id, and re-prices nothing.
+- ⚠ No screen reads a derived balance yet; every "Everything I have" still reads the stored wallet.
+
+### Rules
+- Rules are effective-dated versions; `mrVersionForDate` resolves the version live on a date, so a lived week keeps the rules it was lived under.
+- `mrApplyEdits` is the only versioned writer. Each change logs a line per field with a reason.
+- Settled weeks are frozen in `moneyLedger` and never recomputed.
+- `mrStartWeek()` is derived from the earliest week on file and never written by being read.
+- Four house rules (2026-09-21): homework earns XP, not dollars; tone, borrowing, screens and asked-twice are free the first two times a week; one grace day a week on the streak; the year's pace divides by weeks elapsed.
+- ⚠ The first three house rules exist only in `MR_DEFAULT_RULES`, so a household with a stored rulebook does not receive them.
+- The repair only ever adds, prices each week under its own rules, never touches a migration-frozen week, and is idempotent.
+- The $3 default is backfill only: it never reaches the current week or the eight the catch-up list covers.
+
+### Recording
+- One Record sheet, five records, each written through its owner: chore grade `mrSetChoreGrade`, meet `mrAddCompetition`/`mrUpdateCompetition`, gift `mnyAddDeposit`/`mnyEditDeposit`, fine `mrAddFine`, move `mnyMoveMoney`/`mnyRequestMove`.
+- A child records two of the five — a gift and a move — and both only as proposals; the button says "Ask a grown-up".
+- A gift has a `dayKey` (when it came) and a `weekKey` (which Sunday decides it); a settled week hands the decision to the next open one. An edit moves the wallet by the difference, never reverse-and-reapply.
+- A meet and its calendar block carry each other's id.
+- ⚠ Record-sheet entry points: five documented; the parent Money rules head is dead.
+
+### Moving money
+- `mnyMoveMoney` is the one writer and owns no arithmetic. Pots never touch: a move between two pots goes through cash as two movements.
+- Every destination is stage-gated through `mnyIsOpen`; a refusal is a sentence shown beside the control, not a bare false.
+- A child proposes, a grown-up approves, and the move runs at approval against the wallet as it is then. Approving twice moves nothing; a rejection is kept.
+- ⚠ `invest → ready` and `invest → locked` pass the refusal check and then fail; a child can file one that can never be approved.
+
+### The meeting
+- The meeting is a full screen (`screen-meeting`), opened and closed only through `mmIsOpen` / `mmShow` / `mmHide`, returning to where it came from.
+- Three steps with ids — The week · The money · Close; `mmGoStep` translates the legacy five.
+- The money step's footer is the commit, and never a Next; `mnyCommitRefusal` is the one owner of why a split cannot commit. When one child is decided, it offers the other.
+- One undo snapshot per week.
+
+### Kid money pages
+- 💰 My money, 📖 My money story, 🎓 Money school, joined by the five-page bar (a child sees pages 1 and 5).
+- The Flow leads My money story with a sentence — came in, went out, went to grow, left — before any bar, and never leads with a total. "Left" is a balance, not in-minus-out. Each group scales to its own largest row. Three periods, with a typical month dividing by months elapsed. Empty months are kept in the history strip.
+- Every kid money screen holds the 44px target and 13px type floors.
+- ⚠ The Flow's "Where it went" caption excludes pot-to-pot moves that its bars include; money taken back has no row.
+- ⚠ Money school restates prices as literals, including homework as paid work.
+
+### Parent money pages
+- Money rules has six sections; steppers queue as pending edits and save as one version with a reason and an effective date.
+- Loan edits never touch `paid` or `payments`; balance, pace, payoff date and the weekly amount due are derived on every render.
+- The Money school ladder opens at 30 / 60 / 90% of all debt paid; a parent override can only open a stage, never close one.
+- ⚠ The rules change log is rendered under Lessons; Setup → Change history lands on the week ledger; a chore-pool edit logs `[object Object]`.
+- ⚠ The "? How this page works" button on Money rules is dead.
+
 ## Regression table format (paste at the end of every edit)
 | Feature | v<old> → v<new> | Note |
 |---|---|---|
