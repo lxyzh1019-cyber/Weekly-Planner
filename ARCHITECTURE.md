@@ -2162,8 +2162,10 @@ and the history says which, alongside "re-priced".
 **The $3 default is offered where the backlog is.** `mmUnsettledWeeks` stops at
 eight, so anything older was invisible there AND unsettleable — the only door
 was a card in Setup that a parent had no reason to open. The catch-up banner now
-carries the older weeks and the sweep. Still a tap, still previewed, still moves
-no money until `mnyRunDefaultSweep` confirms.
+carries the older weeks — "N weeks left the review window", the Grandma rule's
+own plan from the start week saved in its section, or a pointer to that section
+when none is saved. Still a tap, still previewed, still moves no money until
+`mnyRunDefaultSweep` confirms.
 
 ## A gift has a date, and a correction is not an edit
 
@@ -2562,8 +2564,10 @@ ship a household's date in a public repo.
 
 **Weeks older than the catch-up reach get a flat default.** `mmUnsettledWeeks`
 looks back eight weeks and stops, so anything older is invisible AND
-unsettleable. `mnyRunDefaultSweep` credits `MNY_DEFAULT_WEEK` per child for each
-un-met week beyond that reach, and three things make it safe: it is idempotent
+unsettleable. `mnyRunDefaultSweep` credits the Grandma rule's amount per child
+(`MNY_DEFAULT_WEEK` until a parent saves another) for each week beyond that reach
+with no family meeting record, from the start week the family saved — see *Plan
+v6 PR B* below for the rule — and three things make it safe: it is idempotent
 through the **same** `finalizedWeeks[wk][kid] == null` guard `commitKidWeek`
 uses, so two devices in any merge order credit once; it previews every week and
 the total before moving anything; and the ledger row is marked `defaulted` so
@@ -2743,32 +2747,48 @@ appearing for a week she is still living.
 
 ## Plan v6 PR B — the Grandma rule, the loan season, the gates (2026-09-22)
 
-**👵 The Grandma rule is the default sweep with a parent's dates.** One engine:
-`mnyDefaultSweepPlan(opts)` / `mnyRunDefaultSweep(opts)`. With no options it is
-the hub catch-up banner's sweep, unchanged. With `{ reason: 'grandma', from, to,
-amount }` it credits only weeks with **no money record at all** for that child and
-counts the rest as skipped. `mnyWeekHasAnyRecord(wk, kid)` (`js/21-money-data.js`)
-is the one owner of that question, and it counts **money records only**, per the
-owner: "skips any week already settled AND any week holding real graded chores,
-meets or gifts". `MNY_WEEK_RECORD_STORES`: settled (`finalizedWeeks`,
-`moneyLedger`, `moneySnapshots`, `groupPayoutsFired`, `meetingsHeld`), graded
-chores (earnings' `chores` / `learning` / `overrides`), competitions, gifts,
-fines and the money stream. Planner blocks (even ticked or confirmed), routine
-ticks (a streak is money only once a week is settled, and the ledger catches
-that), XP, notes, reflections, goals, plans and confirms, `meetingsMet`,
-`weeksClosed`, day reviews, the Sunday Box and move requests are deliberately
-not records — a week lived in the app with no money recorded is the week the
-rule exists for. It reads without ensuring, so asking writes nothing. The form is a module draft
-(`mnyGrandmaDraft`) and is never stored; defaults are `mrStartWeek()` → the most
-recent 30 May → `MNY_DEFAULT_WEEK`. Whatever dates are typed, the newest week
-either path may name is one beyond the catch-up reach — never this week, a
-later one, or a week the catch-up list still settles. Idempotent through the
-same `finalizedWeeks[wk][kid] == null` guard. Rows carry `defaulted: true` and
-`defaultReason: 'grandma' | 'default'`; Week history and her money story say
-"Grandma rule" or "nobody met" from it, and the story's bar shows the flat
-amount instead of "Nothing came in". Its own Money rules section and Setup row;
-it left Week history. `theGrandmaRuleCreditsOnlyEmptyWeeksOnce` seeds one
-record per store and asserts each is found alone.
+**👵 The Grandma rule is the owner's test, and there is only one.** The owner,
+in their words: *"I have 8 weeks review window, any week that does not in this 8
+weeks review windows and no family meeting record get $3 default pocket money"*
+and *"I will input the start week … this does not close the door to enter the
+competition."* So `mnyDefaultSweepPlan()` / `mnyRunDefaultSweep()`
+(`js/24-money-parent.js`) credit a child's week when it is on or after the saved
+start week, OUTSIDE the review window (no newer than this week minus
+`MNY_CATCHUP_REACH + 1`, the reach `mmUnsettledWeeks` has), has **no family
+meeting record** (neither `meetingsMet` nor `meetingsHeld` — `mnyWeekHadMeeting`
+reads the two maps without ensuring either), and is not already credited
+(`finalizedWeeks[wk][kid] == null`). Chores, fines, gifts and overrides in the
+week do **not** stop it — a week with no meeting never had its chores settled.
+PR B's money-record filter (`mnyWeekHasAnyRecord`, `MNY_WEEK_RECORD_STORES`)
+and its to-date (`mnyLastMay30`) were the wrong test and are deleted; so is the
+second, "nobody met" criterion the hub's default sweep used. The hub offers the
+same plan. Preview, confirm (which counts the weeks that "had a family meeting")
+and the write-time re-check of both guards are unchanged in shape. New rows carry
+`defaulted: true, defaultReason: 'grandma'`; rows an older build wrote with
+`'default'` still read "nobody met" on Week history and "Nobody sat down for this
+week" on her story. A meet already on file for the week is paid **on top**, as
+its own `prize` line ("…, week of … — on top of the Grandma rule"): the row's
+`competition` is that total and its gross/net and `finalizedWeeks` are
+amount + competition. Her story's flat segment is `gross − competition`, so the
+meet is drawn once.
+
+**The start week and amount are a dated rule, entered once.**
+`grandma.from` / `grandma.amount` in the rulebook, written only through
+`mrApplyEdits` by the section's Save button (`mnySaveGrandmaRule`), so each is a
+logged scalar line in 🕰️ Change history. `mnyGrandmaRule()` reads the NEWEST
+version (the rule names which old weeks the flat amount reaches and prices no
+week of its own) and a save joins a version already scheduled ahead rather than
+dragging its prices forward. A rulebook without it falls back to
+`mrStartWeek()` and `MNY_DEFAULT_WEEK` and reports `saved: false`, and nothing
+is credited until a start week is saved: the section shows no credit button and
+the hub row points to 👵 Grandma rule instead (`data-mm-catch="grandma"`). The
+form is a module draft (`mnyGrandmaDraft`) until Save, so typing writes nothing;
+there is no to-date. No new synced key — the rulebook already syncs.
+
+**A defaulted week is priced by its rule, so the repair leaves it alone.**
+`evRepairPlanFor` skips a ledger row marked `defaulted`: re-pricing a Grandma
+week to its chores would pay on top of the flat amount the owner chose. Its meets
+belong to the late-meet owner below.
 
 **🌟 "Skating star level" is a relabel of `dance`.** The sport id, the rule key
 `competition.dance` and `mrScoreCompetition` are unchanged, so every stored
@@ -2810,6 +2830,58 @@ silently; a stage that drops is recorded silently too. A grown-up sees nothing.
 **The build stamp.** `APP_BUILD` (`js/01-config.js`) is shown on the parent
 portal's App landing. `tests/check-sw-shell.js` fails when it differs from
 `SW_VERSION` — **bump both together**.
+
+## A settled week does not block a meet — Plan v7 (2026-09-22)
+
+The owner: *"a settled week only discusses routine, fine, chore money, and how
+the money is spent (the split); a settled week does not block the competition
+and gift."* Settling closes a week's chores, routines, fines and split. It does
+not close its meets or its gifts.
+
+It used to close its meets. The meeting's commit was the only thing that paid a
+meet, and `finalizedWeeks[wk][kid] == null` refuses a second commit, so a meet
+entered for a week already settled — at a meeting, by the Grandma rule, by the
+repair — was never paid. **The gift pattern is the fix**: `mnyLateCompSync`
+(`js/21-money-data.js`) moves her cash at once, as its own `latecomp` line on the
+meet's own date ("…, week of … — paid after the week was settled", or "— on top
+of the Grandma rule" in a Grandma week), and files the line to the next
+still-open week (`mnyGiftWeekFor`), whose `mnyPool` counts it (`lateComp`, from
+`mnyLateCompTotal`) — so where it goes is decided at the next meeting, exactly
+like a gift. The Record sheet and the meeting's competition form say what the
+gift form says, from one string, `MNY_SETTLED_WEEK_SENTENCE`.
+
+**One owner, called, never contained.** `mrAddCompetition`,
+`mrUpdateCompetition` and `mrDeleteCompetition` call it through a `typeof` guard;
+a meet moved between weeks is two changes, out of one and into the other. A week
+that is **not** settled is left exactly as it was: the meeting pays its meets,
+and nothing is paid early.
+
+**The settled week is kept in step**, and that is what stops the repair paying
+the same meet twice: its ledger `competition`, `gross`, `net` and
+`finalizedWeeks` move with every late payment, and `finalizedWeeks` is what
+`evRepairPlanFor` measures a week against.
+
+**Why it cannot pay twice.** A week whose ledger row's competition figure is the
+plain sum of its meets is synced by **total**: `mrCompetitionWeek(wk,kid).paid −
+led.competition` moves and the row is brought to the new total, so a second run
+finds nothing and a meet that arrived from another device is caught up by the
+next run. The event id is the week, the kid, the row's `lateSeq` and the two
+totals — two devices making the same correction from the same row write the same
+id, and the stream's union by id keeps one; an id already on the stream means
+only the row missed it. `lateSeq` stops add → delete → add from colliding with
+its own first time. A week settled with **no ledger row** (legacy, migrated) or
+whose competition figure was overridden at the table is synced **per change**:
+the meet's award after the write minus before, keyed on the meet's id and the
+write (`add`, `del`, or its opId) — nothing is guessed from a total. A week whose
+competition channel the honesty rule voided stays void.
+`aLateMeetPaidOnTwoDevicesIsPaidOnce` runs both devices through the real
+`mergeRemoteState`.
+
+**A gift into a Grandma week had the same hole.** `mnyGiftWeekFor` asked only
+whether the week's split was committed, and the Grandma rule commits no plan, so
+a gift dated into a Grandma week was filed under that week — which no meeting
+will ever sit for. `mnyWeekSettled` (committed **or** credited) is the question
+now, so it is decided at the next open meeting like any other.
 
 ## Known trip hazards
 

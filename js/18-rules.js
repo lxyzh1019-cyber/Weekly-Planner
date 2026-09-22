@@ -1386,6 +1386,12 @@ function mrAddCompetition(kid, entry) {
      about what happened, which is the whole point of the pair. */
   const block = mrPlaceCompetitionBlock(kid, e);
   if (block && block.id) e.blockId = block.id;
+  /* A settled week does not block a meet: one entered for it is paid now, the
+     meeting that would have paid it having been and gone. js/21 owns that, and
+     leaves a week that is not settled exactly as it was. */
+  if (typeof mnyLateCompSync === 'function') {
+    mnyLateCompSync(kid, e.dayKey, { comp: e, before: 0, after: e.awarded, op: 'add' });
+  }
   saveAll();
   return e;
 }
@@ -1494,6 +1500,7 @@ function mrUpdateCompetition(kid, id, fields) {
   if (!e) return null;
   const f = fields || {};
   const wasDay = e.dayKey;
+  const wasAwarded = Number(e.awarded) || 0;
 
   if (f.dayKey) e.dayKey = f.dayKey;
   if (f.sport != null) e.sport = f.sport;
@@ -1525,6 +1532,12 @@ function mrUpdateCompetition(kid, id, fields) {
     markItemUpdated(block);
     setDayBlocks(e.dayKey, getDayBlocks(e.dayKey, kid), kid);
   }
+  /* A correction in a settled week moves the difference; a meet moved to
+     another week takes its money out of one and into the other. */
+  if (typeof mnyLateCompSync === 'function') {
+    mnyLateCompSync(kid, e.dayKey, { comp: e, wasDayKey: wasDay, before: wasAwarded,
+                                     after: e.awarded, op: e.opId });
+  }
   saveAll();
   return e;
 }
@@ -1545,6 +1558,10 @@ function mrDeleteCompetition(kid, id) {
       if (b && b.compId === id) { delete b.compId; markItemUpdated(b); touched = true; }
     });
     if (touched) setDayBlocks(gone.dayKey, blocks, kid);
+  }
+  // Deleting a meet from a settled week takes back what it paid.
+  if (gone && gone.dayKey && typeof mnyLateCompSync === 'function') {
+    mnyLateCompSync(kid, gone.dayKey, { comp: gone, before: Number(gone.awarded) || 0, after: 0, op: 'del' });
   }
   saveAll();
 }

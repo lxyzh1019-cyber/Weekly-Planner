@@ -11038,9 +11038,13 @@ function findChromium() {
        undoes it, and a settled week's split has already run — so a gift dated
        into it is now decided at the NEXT open meeting instead of belonging
        nowhere. This check is about the hub printing the pool's figure rather
-       than the net, so it needs a week that can still take one. */
+       than the net, so it needs a week that can still take one. A week is
+       settled when its split is committed OR its money was credited
+       (`mnyWeekSettled`, Plan v7), so both are set aside for the check. */
     const wasPlan = ((state.shared.chore.weekPlans || {})[wk] || {})[kid];
     if (wasPlan) delete (state.shared.chore.weekPlans[wk] || {})[kid];
+    const wasFin = ((state.shared.chore.finalizedWeeks || {})[wk] || {})[kid];
+    if (wasFin != null) delete state.shared.chore.finalizedWeeks[wk][kid];
     ['dishes', 'mop', 'vacuum'].forEach((c, i) => mrSetChoreGrade(kid, wk, i, c, 3));
     mnyAddDeposit(kid, wk, { amount: 50, from: 'Birthday money' });
 
@@ -11059,6 +11063,7 @@ function findChromium() {
 
     mnyRemoveDeposit(kid, (mnyDepositsForWeek(kid, wk)[0] || {}).id);
     if (wasPlan) state.shared.chore.weekPlans[wk][kid] = wasPlan;
+    if (wasFin != null) state.shared.chore.finalizedWeeks[wk][kid] = wasFin;
     return (giftMatters && showsPool && hidesNet) || [{ giftMatters, showsPool, hidesNet }];
   });
 
@@ -14416,6 +14421,8 @@ function findChromium() {
     const savedLedger = JSON.parse(JSON.stringify(c.moneyLedger || {}));
     const savedHeld = JSON.parse(JSON.stringify(c.meetingsHeld || {}));
     const savedProgram = c.programStartDate;
+    const savedRules = JSON.stringify(c.moneyRules || null);
+    const savedMet = JSON.parse(JSON.stringify(c.meetingsMet || {}));
     const cashBefore = { jenn: ensureWallet('jenn').cash, jess: ensureWallet('jess').cash };
     try {
       window.showConfirm = async () => true;
@@ -14424,7 +14431,11 @@ function findChromium() {
       mon.setDate(mon.getDate() - 16 * 7);
       const start = ctDateToKey(mon);
       c.programStartDate = start;
-      c.finalizedWeeks = {}; c.moneyLedger = {}; c.meetingsHeld = {};
+      c.finalizedWeeks = {}; c.moneyLedger = {}; c.meetingsHeld = {}; c.meetingsMet = {};
+      /* ONE rule now (Plan v7 B5): the hub's sweep IS the Grandma rule, read
+         from the start week a parent saved. Without one it credits nothing. */
+      mrApplyEdits([{ path: 'grandma.from', value: start }, { path: 'grandma.amount', value: 3 }],
+                   { effectiveFrom: todayKey() });
 
       const plan = mnyDefaultSweepPlan();
       if (!plan.weeks.length) { bad.push('no weeks were found beyond the catch-up reach'); return bad; }
@@ -14477,7 +14488,10 @@ function findChromium() {
     } finally {
       window.showConfirm = wasConfirm;
       c.finalizedWeeks = savedFinal; c.moneyLedger = savedLedger; c.meetingsHeld = savedHeld;
+      c.meetingsMet = savedMet;
       c.programStartDate = savedProgram;
+      c.moneyRules = JSON.parse(savedRules) || undefined;
+      if (!c.moneyRules) delete c.moneyRules;
       ensureWallet('jenn').cash = cashBefore.jenn;
       ensureWallet('jess').cash = cashBefore.jess;
       profile = wasProfile;
@@ -14489,15 +14503,15 @@ function findChromium() {
      Each check snapshots the whole state and puts it back, so the checks after
      it see the fixture exactly as it was. */
 
-  /* 👵 THE GRANDMA RULE — ONLY WEEKS WITH NO RECORD AT ALL, CREDITED ONCE.
-     `mnyWeekHasAnyRecord` is the one owner of "was any MONEY recorded for her
-     this week". It is checked STORE BY STORE: one record in one store, and
-     that store — and only that store — must be what it reports. A store it
-     forgot would let the Grandma rule pay a flat amount on top of a week's own
-     numbers. Then the rule itself: the preview lists exactly the empty weeks
-     and counts the rest as skipped, running it twice credits once, the rows
-     read "Grandma rule", and no typed date reaches this week or a later one. */
-  checks.theGrandmaRuleCreditsOnlyEmptyWeeksOnce = await page.evaluate(async () => {
+  /* ── Plan v7 B5–B7 — the Grandma rule is the owner's test, a settled week
+     does not block a meet, and the start week is a dated rule ──
+     These replace `theGrandmaRuleCreditsOnlyEmptyWeeksOnce`, which asserted
+     the rule the owner has since corrected: a money-record filter
+     (`mnyWeekHasAnyRecord`) and a to-date. The requirement changed; the
+     checks follow it. Each one snapshots the whole state and puts it back. */
+
+  /* (a) THE OWNER'S TEST — outside the review window, no family meeting. */
+  checks.grandmaListsTheWeeksWithNoMeetingOutsideTheWindow = await page.evaluate(async () => {
     const bad = [];
     const snap = JSON.stringify(state);
     const put = () => { const s = JSON.parse(snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s); };
@@ -14505,170 +14519,553 @@ function findChromium() {
     try {
       profile = 'parent'; parentViewing = 'jenn';
       ctPrepareRead();
-      const W = '2025-01-06';                       // a Monday long before anything on file
-      const day = (n) => { const d = formatDayKey(W); d.setDate(d.getDate() + n); return ctDateToKey(d); };
-      const P = (k) => getProfData(k);
-      const C = () => state.shared.chore;
-      /* MONEY records only — the owner: "skips any week already settled AND any
-         week holding real graded chores, meets or gifts". One fixture per KEPT
-         store; each must block the week on its own. */
-      const seed = {
-        finalizedWeeks:   () => { C().finalizedWeeks = { [W]: { jenn: 4 } }; },
-        moneyLedger:      () => { C().moneyLedger = { [W]: { jenn: { net: 1 } } }; },
-        moneySnapshots:   () => { C().moneySnapshots = { [W]: { jenn: 2 } }; },
-        groupPayoutsFired:() => { C().groupPayoutsFired = { [W]: { g1: { jenn: { weekly: true, total: 1 } } } }; },
-        meetingsHeld:     () => { C().meetingsHeld = { [W]: true }; },
-        earnings:         () => { P('jenn').earnings = { [W]: { chores: { 0: { bins: 3 } } } }; },
-        competitions:     () => { P('jenn').competitions = [{ id: 'c1', dayKey: day(5), sport: 'swim' }]; },
-        fines:            () => { P('jenn').fines = [{ id: 'f1', dayKey: day(3), itemId: 'tone' }]; },
-        deposits:         () => { P('jenn').deposits = [{ id: 'd1', weekKey: W, dayKey: day(1), amount: 20 }]; },
-        events:           () => { P('jenn').events = [{ id: 'e1', dayKey: day(6), amount: 1 }]; },
-      };
-      const FAMILY = ['meetingsHeld'];
-      const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-      if (!eq(mnyWeekRecordStores(W, 'jenn'), []) || !eq(mnyWeekRecordStores(W, 'jess'), [])) {
-        bad.push('the fixture week is not empty to begin with: ' + mnyWeekRecordStores(W, 'jenn').join(', '));
-      }
-      MNY_WEEK_RECORD_STORES.forEach(store => {
-        put(); profile = 'parent';
-        if (!seed[store]) { bad.push('no fixture for the store "' + store + '" — this check cannot vouch for it'); return; }
-        seed[store]();
-        const got = mnyWeekRecordStores(W, 'jenn');
-        if (!eq(got, [store])) bad.push(`a record in ${store} read as [${got.join(', ')}]`);
-        const sis = mnyWeekRecordStores(W, 'jess');
-        const want = FAMILY.indexOf(store) >= 0 ? [store] : [];
-        if (!eq(sis, want)) bad.push(`a record of Jenn's in ${store} read as her sister's too: [${sis.join(', ')}]`);
-      });
-      // Every money-bearing part of the earnings map blocks on its own.
-      [['learning', { 0: { reading: 2 } }], ['overrides', { chores: { value: 4, reason: 'fixing', at: 1 } }]].forEach(([k, v]) => {
-        put(); profile = 'parent';
-        P('jenn').earnings = { [W]: { [k]: v } };
-        if (!eq(mnyWeekRecordStores(W, 'jenn'), ['earnings'])) bad.push(`earnings.${k} did not count as a money record`);
-      });
-      Object.keys(seed).forEach(k => { if (MNY_WEEK_RECORD_STORES.indexOf(k) < 0) bad.push('the fixture names a store the owner does not list: ' + k); });
-      // Things that are NOT records.
-      put(); profile = 'parent';
-      mrEnsureEarnings('jenn', W);                               // an empty week, opened by a read
-      P('jenn').weeks = Object.assign({}, P('jenn').weeks, { [day(1)]: [{ id: 'p', actId: 'piano' }] });   // only planned
-      P('jenn').earnings[W].missing = ['learning'];
-      if (mnyWeekHasAnyRecord(W, 'jenn')) bad.push('a planned block, an empty earnings map or a "missing" list counted as a record: ' + mnyWeekRecordStores(W, 'jenn').join(', '));
-      /* A week she lived in the PLANNER — blocks ticked done, a block a grown-up
-         confirmed — but where nothing was recorded money-wise is exactly the
-         week the Grandma rule is for. The owner: "skips any week already
-         settled AND any week holding real graded chores, meets or gifts". */
-      put(); profile = 'parent';
-      P('jenn').weeks = Object.assign({}, P('jenn').weeks, {
-        [day(1)]: [{ id: 'd1', actId: 'piano', completed: true }],
-        [day(3)]: [{ id: 'd3', actId: 'training', confirmed: true }],
-      });
-      if (mnyWeekHasAnyRecord(W, 'jenn')) bad.push('a week holding only ticked or confirmed planner blocks counted as a record: ' + mnyWeekRecordStores(W, 'jenn').join(', '));
-      const ticked = mnyDefaultSweepPlan({ reason: 'grandma', from: W, to: W, amount: 3 });
-      if (!ticked.weeks.some(w => w.wk === W && w.kids.indexOf('jenn') >= 0)) bad.push('the Grandma rule would not credit a week holding only ticked planner blocks');
-      /* A week holding ONLY what is deliberately not a money record — XP, a
-         reflection, a closed week, a day review, a plan and its confirm, goals,
-         routine ticks, ticked blocks, her note, the sitting-down mark, a boxed
-         item, a move she asked for, and the non-money parts of earnings — IS
-         credited, for both girls. */
-      put(); profile = 'parent';
+      const back = (n) => { const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - 7 * n); return ctDateToKey(d); };
+      const c = state.shared.chore;
+      Object.assign(c, { finalizedWeeks: {}, moneyLedger: {}, meetingsHeld: {}, meetingsMet: {}, weekPlans: {},
+                         programStartDate: back(30), programStartDateAt: syncNow() });
+      ['jenn', 'jess'].forEach(k => { const p = getProfData(k); p.competitions = []; p.fines = []; p.deposits = []; p.earnings = {}; });
+      // The owner enters the start week once; the family's own start is earlier still.
+      mrApplyEdits([{ path: 'grandma.from', value: back(20) }, { path: 'grandma.amount', value: 3 }], { effectiveFrom: todayKey() });
+      c.meetingsMet[back(10)] = { at: 1, by: 'a grown-up' };                  // sat down, money never moved
+      c.meetingsHeld[back(11)] = true;                                          // settled at a meeting
+      c.meetingsMet[back(4)] = { at: 1, by: 'a grown-up' };                   // inside the window anyway
+      getProfData('jenn').earnings = { [back(12)]: { chores: { 0: { bins: 3 } } } };            // chores only
+      getProfData('jess').fines = [{ id: 'fx', dayKey: mrWeekDayKeys(back(13))[2], itemId: 'tone' }];   // a fine only
+      getProfData('jenn').deposits = [{ id: 'dx', weekKey: back(14), dayKey: mrWeekDayKeys(back(14))[1], amount: 20, appliedAt: 1 }];
+      const plan = mnyDefaultSweepPlan();
+      const want = [];
+      for (let n = 9; n <= 20; n++) if (n !== 10 && n !== 11) want.push(back(n));
+      want.sort();
       ['jenn', 'jess'].forEach(k => {
-        const p = P(k);
-        p.progress = Object.assign({}, p.progress, { xpByWeek: { [W]: 40 } });
-        p.weekFeedback = { [W]: 'Busy week' };
-        p.chore = Object.assign({}, p.chore, { mandatoryByWeek: { [W]: { 0: { morning: true } } }, optionalByWeek: { [W]: { 1: { Bins: true } } } });
-        p.weeks = Object.assign({}, p.weeks, { [day(2)]: [{ id: 'z' + k, actId: 'piano', completed: true, confirmed: true }] });
-        p.boxItems = [{ id: 'bx' + k, dayKey: day(4), label: 'shoe' }];
-        p.moveRequests = [{ id: 'mv' + k, dayKey: day(0), amount: 1 }];
-        p.earnings = { [W]: { claims: { 0: { bins: 3 } }, attitude: { 0: { self: 4 } }, personal: { 0: { bed: 'done' } }, sick: { 2: true }, missing: ['learning'] } };
+        const got = plan.weeks.filter(w => w.kids.indexOf(k) >= 0).map(w => w.wk).sort();
+        if (JSON.stringify(got) !== JSON.stringify(want)) bad.push(`${k}: listed [${got.join(', ')}], expected [${want.join(', ')}]`);
       });
-      Object.assign(C(), {
-        xpAwardedWeeks: { [W]: { jenn: 10, jess: 10 } },
-        reflections: { [W]: { jenn: { went: 'a' }, jess: { went: 'b' } } },
-        weeksClosed: { [W]: { at: 1 } },
-        weekPlans: { [W]: { jenn: { planId: 'debt' }, jess: { planId: 'debt' } } },
-        weekConfirms: { [W]: { jenn: { at: 1 }, jess: { at: 1 } } },
-        goalsByWeek: { [W]: { jenn: 'Read', jess: 'Swim' } },
-        goalBonusByWeek: { [W]: { jenn: true, jess: true } },
-        meetingsMet: { [W]: true },
+      [12, 13, 14].forEach(n => {
+        if (!plan.weeks.some(w => w.wk === back(n))) bad.push('a week holding only chores, a fine or a gift was left out: ' + back(n));
       });
-      state.shared.parentDayConfirm = { jenn: { [day(1)]: true }, jess: { [day(1)]: true } };
-      ['jenn', 'jess'].forEach(k => {
-        if (mnyWeekHasAnyRecord(W, k)) bad.push(`a week holding only non-money marks counted as a record for ${mnyKidName(k)}: ${mnyWeekRecordStores(W, k).join(', ')}`);
-      });
-      const marks = mnyDefaultSweepPlan({ reason: 'grandma', from: W, to: W, amount: 3 });
-      const credited = ((marks.weeks.find(w => w.wk === W) || {}).kids || []).join(',');
-      if (credited !== 'jenn,jess') bad.push('the Grandma rule would not credit a week holding only non-money marks: [' + credited + ']');
-
-      /* The rule itself, over twelve weeks with records in three of them. */
-      put(); profile = 'parent';
-      const c = C();
-      c.finalizedWeeks = {}; c.moneyLedger = {}; c.meetingsHeld = {};
-      const from = '2025-01-06', to = '2025-03-30';               // 12 Mondays: 6 Jan … 24 Mar
-      const wkN = (n) => { const d = formatDayKey(from); d.setDate(d.getDate() + 7 * n); return ctDateToKey(d); };
-      P('jenn').fines = [{ id: 'f9', dayKey: wkN(2), itemId: 'tone' }];         // Jenn only
-      c.meetingsHeld = { [wkN(5)]: true };                                        // both
-      P('jess').deposits = [{ id: 'd9', weekKey: wkN(7), dayKey: wkN(7), amount: 5 }]; // Jess only
-      const plan = mnyDefaultSweepPlan({ reason: 'grandma', from, to, amount: 3 });
-      const jennWeeks = plan.weeks.filter(w => w.kids.indexOf('jenn') >= 0).map(w => w.wk);
-      const jessWeeks = plan.weeks.filter(w => w.kids.indexOf('jess') >= 0).map(w => w.wk);
-      if (jennWeeks.length !== 10 || jennWeeks.indexOf(wkN(2)) >= 0 || jennWeeks.indexOf(wkN(5)) >= 0) bad.push('Jenn\'s weeks are not exactly the empty ones: ' + jennWeeks.join(', '));
-      if (jessWeeks.length !== 10 || jessWeeks.indexOf(wkN(7)) >= 0 || jessWeeks.indexOf(wkN(5)) >= 0) bad.push('Jess\'s weeks are not exactly the empty ones: ' + jessWeeks.join(', '));
-      if (plan.skipped.jenn !== 2 || plan.skipped.jess !== 2) bad.push(`skipped ${plan.skipped.jenn}/${plan.skipped.jess}, expected 2/2`);
-      if (plan.perKid.jenn !== 30 || plan.perKid.jess !== 30 || plan.total !== 60) bad.push(`totals ${plan.perKid.jenn}/${plan.perKid.jess}/${plan.total}, expected 30/30/60`);
-
-      // The card previews it, and names the skipped weeks.
-      mnyGrandmaDraft = { from, to, amount: 3 };
+      if (plan.skipped !== 2) bad.push('skipped should be the 2 weeks that had a family meeting, read ' + JSON.stringify(plan.skipped));
+      if (plan.total !== 60) bad.push('total ' + plan.total + ', expected 60 (10 weeks × 2 girls × $3)');
       showScreen('parent'); setParentTab('money'); mnyParentSection = 'grandma'; mnyRenderRulesTab();
-      const cardTxt = document.getElementById('mnyRulesWrap').textContent.replace(/\s+/g, ' ');
-      if (!/Grandma rule/.test(cardTxt) || !/2 skipped, they hold records/.test(cardTxt) || !/\$60\.00/.test(cardTxt)) {
-        bad.push('the Grandma card does not preview the total and the skipped weeks: ' + cardTxt.slice(0, 200));
-      }
-      // Only in its own section: Week history no longer carries the sweep.
-      mnyParentSection = 'history'; mnyRenderRulesTab();
-      if (/Weeks nobody sat down for|Grandma rule —/.test(document.getElementById('mnyRulesWrap').textContent)) bad.push('Week history still carries the sweep card');
+      const txt = document.getElementById('mnyRulesWrap').textContent.replace(/\s+/g, ' ');
+      if (!/2 weeks had a family meeting/.test(txt)) bad.push('the preview does not say the skipped weeks had a family meeting: ' + txt.slice(0, 300));
+      if (/hold records|no record at all/.test(txt)) bad.push('the preview still describes the old money-record test');
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      window.showConfirm = was.showConfirm;
+      put();
+      profile = was.profile; parentViewing = was.parentViewing; mnyParentSection = was.section; mnyGrandmaDraft = was.draft;
+      saveLocal();
+    }
+    return bad.length ? bad : true;
+  });
 
+  /* (b) RUNNING IT TWICE CREDITS ONCE, and the confirm names the skipped weeks. */
+  checks.grandmaCreditsOnce = await page.evaluate(async () => {
+    const bad = [];
+    const snap = JSON.stringify(state);
+    const put = () => { const s = JSON.parse(snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s); };
+    const was = { profile, parentViewing, showConfirm: window.showConfirm, section: mnyParentSection, draft: mnyGrandmaDraft };
+    try {
+      profile = 'parent'; parentViewing = 'jenn';
+      ctPrepareRead();
+      const back = (n) => { const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - 7 * n); return ctDateToKey(d); };
+      const c = state.shared.chore;
+      Object.assign(c, { finalizedWeeks: {}, moneyLedger: {}, meetingsHeld: {}, meetingsMet: {}, weekPlans: {},
+                         programStartDate: back(30), programStartDateAt: syncNow() });
+      ['jenn', 'jess'].forEach(k => { const p = getProfData(k); p.competitions = []; p.fines = []; p.deposits = []; p.earnings = {}; ensureWallet(k).cash = 500; });
+      mrApplyEdits([{ path: 'grandma.from', value: back(12) }, { path: 'grandma.amount', value: 3 }], { effectiveFrom: todayKey() });
+      c.meetingsMet[back(10)] = { at: 1, by: 'a grown-up' };
+      let asked = '';
+      window.showConfirm = async (m) => { if (!asked) asked = String(m); return true; };
+      const before = money2(mnyCash('jenn') + mnyCash('jess'));
+      const plan = mnyDefaultSweepPlan();
+      if (plan.total !== 18) bad.push('the preview says ' + plan.total + ', expected 18 (weeks 9, 11 and 12 × 2 × $3)');
+      await mnyRunDefaultSweep();
+      await mnyRunDefaultSweep();
+      const moved = money2(mnyCash('jenn') + mnyCash('jess') - before);
+      if (moved !== 18) bad.push('two runs credited ' + moved + ', expected 18 once');
+      if (!/1 week had a family meeting/.test(asked)) bad.push('the confirm does not say the skipped week had a family meeting: ' + asked);
+      [9, 11, 12].forEach(n => ['jenn', 'jess'].forEach(k => {
+        const r = (c.moneyLedger[back(n)] || {})[k];
+        if (!r || !r.defaulted || r.defaultReason !== 'grandma' || !r.handEntered) bad.push(`week ${back(n)} ${k}: not a labelled Grandma row — ${JSON.stringify(r)}`);
+        if (((c.finalizedWeeks[back(n)] || {})[k]) !== 3) bad.push(`week ${back(n)} ${k}: finalized at ${JSON.stringify((c.finalizedWeeks[back(n)] || {})[k])}, expected 3`);
+      }));
+      if ((c.moneyLedger[back(10)] || {}).jenn) bad.push('a week with a family meeting was credited');
+      /* A Grandma week is priced by the rule, flat. Chores or an override in it
+         do not stop the rule — so the repair must not then re-price the week
+         to its chore value on top of the flat amount. */
+      getProfData('jenn').earnings = { [back(12)]: { overrides: { chores: { value: 10, reason: 'correct_error', at: 1 } } } };
+      if (!(mrWeekBreakdown(back(12), 'jenn').net >= 10)) bad.push('fixture: the override did not price the week');
+      if (evRepairPlanFor('jenn').weeks.some(w => w.wk === back(12))) bad.push('the repair would re-price a Grandma week to its chores');
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      window.showConfirm = was.showConfirm;
+      put();
+      profile = was.profile; parentViewing = was.parentViewing; mnyParentSection = was.section; mnyGrandmaDraft = was.draft;
+      saveLocal();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* (c) A MEET ALREADY ON FILE IS PAID ON TOP of the flat amount. */
+  checks.grandmaPaysAMeetOnTop = await page.evaluate(async () => {
+    const bad = [];
+    const snap = JSON.stringify(state);
+    const put = () => { const s = JSON.parse(snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s); };
+    const was = { profile, parentViewing, showConfirm: window.showConfirm, section: mnyParentSection, draft: mnyGrandmaDraft };
+    try {
+      profile = 'parent'; parentViewing = 'jenn';
+      ctPrepareRead();
+      const back = (n) => { const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - 7 * n); return ctDateToKey(d); };
+      const c = state.shared.chore;
+      Object.assign(c, { finalizedWeeks: {}, moneyLedger: {}, meetingsHeld: {}, meetingsMet: {}, weekPlans: {},
+                         programStartDate: back(30), programStartDateAt: syncNow() });
+      ['jenn', 'jess'].forEach(k => { const p = getProfData(k); p.competitions = []; p.fines = []; p.deposits = []; p.earnings = {}; ensureWallet(k).cash = 500; });
+      mrApplyEdits([{ path: 'grandma.from', value: back(12) }, { path: 'grandma.amount', value: 3 }], { effectiveFrom: todayKey() });
       window.showConfirm = async () => true;
-      const before = { jenn: ensureWallet('jenn').cash, jess: ensureWallet('jess').cash };
-      await mnyRunDefaultSweep({ reason: 'grandma', from, to, amount: 3 });
-      const moved = money2((ensureWallet('jenn').cash - before.jenn) + (ensureWallet('jess').cash - before.jess));
-      if (moved !== 60) bad.push(`it credited ${moved}, the preview said 60`);
-      const row = (c.moneyLedger[wkN(0)] || {}).jenn;
-      if (!row || !row.defaulted || row.defaultReason !== 'grandma' || !row.handEntered) bad.push('a Grandma row is not labelled: ' + JSON.stringify(row));
-      if ((c.moneyLedger[wkN(2)] || {}).jenn) bad.push('a week with a fine in it was credited');
-      await mnyRunDefaultSweep({ reason: 'grandma', from, to, amount: 3 });
-      const again = money2((ensureWallet('jenn').cash - before.jenn) + (ensureWallet('jess').cash - before.jess));
-      if (again !== 60) bad.push('a second run credited again: ' + again);
+      const W = back(12);
+      const cash0 = mnyCash('jenn');
+      const e = mrAddCompetition('jenn', { dayKey: mrWeekDayKeys(W)[5], sport: 'skate', name: 'Winter Invitational', points: 21 });
+      if (!e || e.awarded !== 21) bad.push('fixture: the meet is worth ' + (e && e.awarded) + ', expected 21');
+      if (mnyCash('jenn') !== cash0) bad.push('a meet in a week not yet settled was paid early');
+      const plan = mnyDefaultSweepPlan();
+      const row = plan.weeks.find(w => w.wk === W);
+      if (!row || money2(row.amount) !== 27) bad.push('the preview row for the meet week is ' + JSON.stringify(row) + ', expected $27 ($24 Jenn + $3 Jess)');
+      if (plan.perKid.jenn !== 33) bad.push('Jenn\'s preview is ' + plan.perKid.jenn + ', expected 33 (4 weeks × $3 + $21)');
+      await mnyRunDefaultSweep();
+      if (money2(mnyCash('jenn') - cash0) !== 33) bad.push('Jenn was credited ' + money2(mnyCash('jenn') - cash0) + ', expected 33');
+      const led = (c.moneyLedger[W] || {}).jenn || {};
+      if (led.competition !== 21 || led.gross !== 24 || led.net !== 24) bad.push('the ledger row reads ' + JSON.stringify({ competition: led.competition, gross: led.gross, net: led.net }) + ', expected 21 / 24 / 24');
+      if ((c.finalizedWeeks[W] || {}).jenn !== 24) bad.push('finalizedWeeks reads ' + (c.finalizedWeeks[W] || {}).jenn + ', expected 24');
+      const line = evList('jenn').find(ev => ev.amount === 21 && /Winter Invitational/.test(ev.note || ''));
+      if (!line || !/on top of the Grandma rule/.test(line.note)) bad.push('the stream line does not say the meet was paid on top of the Grandma rule: ' + JSON.stringify(line));
+      if (evRepairPlanFor('jenn').weeks.some(w => w.wk === W)) bad.push('the repair would pay the same meet again');
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      window.showConfirm = was.showConfirm;
+      put();
+      profile = was.profile; parentViewing = was.parentViewing; mnyParentSection = was.section; mnyGrandmaDraft = was.draft;
+      saveLocal();
+    }
+    return bad.length ? bad : true;
+  });
 
-      // Both histories say "Grandma rule", never "nobody met".
-      mnyParentSection = 'history'; mnyRenderRulesTab();
+  /* (d) A MEET ADDED AFTER DEFAULTING is paid once, split at the next meeting,
+     and deleting it takes it back. */
+  checks.aLateMeetInADefaultedWeekIsPaidOnce = await page.evaluate(async () => {
+    const bad = [];
+    const snap = JSON.stringify(state);
+    const put = () => { const s = JSON.parse(snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s); };
+    const was = { profile, parentViewing, showConfirm: window.showConfirm, section: mnyParentSection, draft: mnyGrandmaDraft };
+    try {
+      profile = 'parent'; parentViewing = 'jenn';
+      ctPrepareRead();
+      const back = (n) => { const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - 7 * n); return ctDateToKey(d); };
+      const c = state.shared.chore;
+      Object.assign(c, { finalizedWeeks: {}, moneyLedger: {}, meetingsHeld: {}, meetingsMet: {}, weekPlans: {},
+                         programStartDate: back(30), programStartDateAt: syncNow() });
+      ['jenn', 'jess'].forEach(k => { const p = getProfData(k); p.competitions = []; p.fines = []; p.deposits = []; p.earnings = {}; ensureWallet(k).cash = 500; });
+      mrApplyEdits([{ path: 'grandma.from', value: back(12) }, { path: 'grandma.amount', value: 3 }], { effectiveFrom: todayKey() });
+      window.showConfirm = async () => true;
+      await mnyRunDefaultSweep();
+      const W = back(12);
+      if ((c.finalizedWeeks[W] || {}).jenn !== 3) bad.push('fixture: the week was not defaulted');
+      const cash0 = mnyCash('jenn');
+      const e = mrAddCompetition('jenn', { dayKey: mrWeekDayKeys(W)[5], sport: 'skate', name: 'Winter Invitational', points: 21 });
+      if (money2(mnyCash('jenn') - cash0) !== 21) bad.push('adding the meet paid ' + money2(mnyCash('jenn') - cash0) + ', expected 21');
+      if (typeof mnyLateCompSync !== 'function') bad.push('there is no owner to run the sync again');
+      else { mnyLateCompSync('jenn', W); mnyLateCompSync('jenn', W); }
+      if (money2(mnyCash('jenn') - cash0) !== 21) bad.push('running the sync twice paid again: ' + money2(mnyCash('jenn') - cash0));
+      const led = (c.moneyLedger[W] || {}).jenn || {};
+      if (led.competition !== 21 || led.gross !== 24 || led.net !== 24) bad.push('the ledger row reads ' + JSON.stringify({ competition: led.competition, gross: led.gross, net: led.net }));
+      if ((c.finalizedWeeks[W] || {}).jenn !== 24) bad.push('finalizedWeeks reads ' + (c.finalizedWeeks[W] || {}).jenn + ', expected 24');
+      const lines = evList('jenn').filter(ev => ev.amount === 21 && /Winter Invitational/.test(ev.note || ''));
+      if (lines.length !== 1 || !/on top of the Grandma rule/.test(lines[0].note) || lines[0].dayKey !== e.dayKey) bad.push('expected one line on the meet\'s own date saying "on top of the Grandma rule": ' + JSON.stringify(lines));
+      if (evRepairPlanFor('jenn').weeks.some(w => w.wk === W)) bad.push('the repair would pay the same meet again');
+      // Its split is decided at the next meeting: the first week not yet settled.
+      const pool = mnyPool(back(8), 'jenn');
+      if (pool.lateComp !== 21) bad.push('the next open week\'s pool does not carry the late meet: ' + pool.lateComp);
+      mrDeleteCompetition('jenn', e.id);
+      if (money2(mnyCash('jenn') - cash0) !== 0) bad.push('deleting it left ' + money2(mnyCash('jenn') - cash0) + ' behind');
+      const led2 = (c.moneyLedger[W] || {}).jenn || {};
+      if (led2.competition !== 0 || led2.net !== 3 || (c.finalizedWeeks[W] || {}).jenn !== 3) bad.push('after the delete the week reads ' + JSON.stringify({ competition: led2.competition, net: led2.net, fin: (c.finalizedWeeks[W] || {}).jenn }));
+      if (typeof mnyLateCompSync === 'function') mnyLateCompSync('jenn', W);
+      if (money2(mnyCash('jenn') - cash0) !== 0) bad.push('a sync after the delete moved money again');
+      if (mnyPool(back(8), 'jenn').lateComp !== 0) bad.push('the next pool still carries a meet that was taken back');
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      window.showConfirm = was.showConfirm;
+      put();
+      profile = was.profile; parentViewing = was.parentViewing; mnyParentSection = was.section; mnyGrandmaDraft = was.draft;
+      saveLocal();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* (e) MOVING A MEET BETWEEN TWO DEFAULTED WEEKS MOVES THE MONEY. */
+  checks.aMovedMeetMovesItsMoney = await page.evaluate(async () => {
+    const bad = [];
+    const snap = JSON.stringify(state);
+    const put = () => { const s = JSON.parse(snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s); };
+    const was = { profile, parentViewing, showConfirm: window.showConfirm, section: mnyParentSection, draft: mnyGrandmaDraft };
+    try {
+      profile = 'parent'; parentViewing = 'jenn';
+      ctPrepareRead();
+      const back = (n) => { const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - 7 * n); return ctDateToKey(d); };
+      const c = state.shared.chore;
+      Object.assign(c, { finalizedWeeks: {}, moneyLedger: {}, meetingsHeld: {}, meetingsMet: {}, weekPlans: {},
+                         programStartDate: back(30), programStartDateAt: syncNow() });
+      ['jenn', 'jess'].forEach(k => { const p = getProfData(k); p.competitions = []; p.fines = []; p.deposits = []; p.earnings = {}; ensureWallet(k).cash = 500; });
+      mrApplyEdits([{ path: 'grandma.from', value: back(12) }, { path: 'grandma.amount', value: 3 }], { effectiveFrom: todayKey() });
+      window.showConfirm = async () => true;
+      await mnyRunDefaultSweep();
+      const A = back(12), B = back(11);
+      const cash0 = mnyCash('jenn');
+      const e = mrAddCompetition('jenn', { dayKey: mrWeekDayKeys(A)[5], sport: 'skate', name: 'Winter Invitational', points: 21 });
+      mrUpdateCompetition('jenn', e.id, { dayKey: mrWeekDayKeys(B)[5] });
+      if (money2(mnyCash('jenn') - cash0) !== 21) bad.push('after the move she holds ' + money2(mnyCash('jenn') - cash0) + ' extra, expected 21');
+      const la = (c.moneyLedger[A] || {}).jenn || {}, lb = (c.moneyLedger[B] || {}).jenn || {};
+      if (la.competition !== 0 || la.net !== 3 || (c.finalizedWeeks[A] || {}).jenn !== 3) bad.push('the week it left reads ' + JSON.stringify({ competition: la.competition, net: la.net, fin: (c.finalizedWeeks[A] || {}).jenn }));
+      if (lb.competition !== 21 || lb.net !== 24 || (c.finalizedWeeks[B] || {}).jenn !== 24) bad.push('the week it arrived in reads ' + JSON.stringify({ competition: lb.competition, net: lb.net, fin: (c.finalizedWeeks[B] || {}).jenn }));
+      const plan = evRepairPlanFor('jenn');
+      if (plan.weeks.some(w => w.wk === A || w.wk === B)) bad.push('the repair sees a gap after the move');
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      window.showConfirm = was.showConfirm;
+      put();
+      profile = was.profile; parentViewing = was.parentViewing; mnyParentSection = was.section; mnyGrandmaDraft = was.draft;
+      saveLocal();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* (f') A WEEK SETTLED AT A MEETING does not block a late meet — and the
+     meet it already paid is never paid twice. Plus a settled week with no
+     ledger row (paid per change), the forms' wording, and the unsettled
+     control (today's behaviour). */
+  checks.aSettledWeekDoesNotBlockALateMeet = await page.evaluate(async () => {
+    const bad = [];
+    const snap = JSON.stringify(state);
+    const put = () => { const s = JSON.parse(snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s); };
+    const was = { profile, parentViewing, showConfirm: window.showConfirm, section: mnyParentSection, draft: mnyGrandmaDraft,
+                  compOpen: mnyCompOpen, compDraft: mnyCompDraft };
+    try {
+      profile = 'parent'; parentViewing = 'jenn';
+      ctPrepareRead();
+      const back = (n) => { const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - 7 * n); return ctDateToKey(d); };
+      const c = state.shared.chore;
+      Object.assign(c, { finalizedWeeks: {}, moneyLedger: {}, meetingsHeld: {}, meetingsMet: {}, weekPlans: {},
+                         programStartDate: back(30), programStartDateAt: syncNow() });
+      ['jenn', 'jess'].forEach(k => { const p = getProfData(k); p.competitions = []; p.fines = []; p.deposits = []; p.earnings = {}; ensureWallet(k).cash = 500; });
+      const W = back(20);
+      const fall = mrAddCompetition('jenn', { dayKey: mrWeekDayKeys(W)[5], sport: 'skate', name: 'Fall Classic', points: 10 });
+      const cash0 = mnyCash('jenn');
+      // Settled at the table: the ledger frozen, the week paid, the split committed.
+      c.moneyLedger[W] = { jenn: mrFreezeWeekLedger(W, 'jenn') };
+      c.finalizedWeeks[W] = { jenn: ctWeekMoney(W, 'jenn') };
+      c.meetingsHeld[W] = true;
+      c.weekPlans[W] = { jenn: { planId: 'ready', committedAt: syncNow() } };
+      if (c.finalizedWeeks[W].jenn !== 10 || c.moneyLedger[W].jenn.competition !== 10) bad.push('fixture: the meeting week did not settle at $10');
+      const moved = () => money2(mnyCash('jenn') - cash0);
+      const late = mrAddCompetition('jenn', { dayKey: mrWeekDayKeys(W)[6], sport: 'skate', name: 'Winter Invitational', points: 21 });
+      if (moved() !== 21) bad.push('a second $21 meet paid ' + moved());
+      if (typeof mnyLateCompSync === 'function') { mnyLateCompSync('jenn', W); mnyLateCompSync('jenn', W); }
+      if (moved() !== 21) bad.push('running the sync twice paid again: ' + moved());
+      const led = c.moneyLedger[W].jenn;
+      if (led.competition !== 31 || led.net !== 31 || c.finalizedWeeks[W].jenn !== 31) bad.push('after the late meet the week reads ' + JSON.stringify({ competition: led.competition, net: led.net, fin: c.finalizedWeeks[W].jenn }));
+      const line = evList('jenn').find(ev => ev.amount === 21 && /Winter Invitational/.test(ev.note || ''));
+      if (!line || !/paid after the week was settled/.test(line.note) || /Grandma/.test(line.note)) bad.push('the stream line reads ' + JSON.stringify(line && line.note));
+      if (evRepairPlanFor('jenn').weeks.some(w => w.wk === W)) bad.push('the repair would pay the late meet a second time');
+      mrUpdateCompetition('jenn', late.id, { points: 15 });
+      if (moved() !== 15) bad.push('correcting it to $15 left ' + moved() + ', expected 15');
+      mrDeleteCompetition('jenn', late.id);
+      if (moved() !== 0) bad.push('deleting it left ' + moved() + ', expected 0 — the original $10 must never be paid twice');
+      if (c.moneyLedger[W].jenn.competition !== 10 || c.finalizedWeeks[W].jenn !== 10) bad.push('after the delete the week reads ' + JSON.stringify({ competition: c.moneyLedger[W].jenn.competition, fin: c.finalizedWeeks[W].jenn }));
+      if (!fall || !getProfData('jenn').competitions.some(x => x.id === fall.id)) bad.push('fixture: the original meet went missing');
+
+      /* A week settled with NO ledger row (legacy, migrated): paid per change,
+         keyed on the meet's own id, never guessed from totals. */
+      const L = back(25);
+      c.finalizedWeeks[L] = { jenn: 0 };
+      const cashL = mnyCash('jenn');
+      const old = mrAddCompetition('jenn', { dayKey: mrWeekDayKeys(L)[5], sport: 'skate', name: 'Old Meet', points: 21 });
+      if (money2(mnyCash('jenn') - cashL) !== 21 || c.finalizedWeeks[L].jenn !== 21) bad.push('a legacy settled week: adding paid ' + money2(mnyCash('jenn') - cashL) + ', finalized ' + c.finalizedWeeks[L].jenn);
+      if (typeof mnyLateCompSync === 'function') mnyLateCompSync('jenn', L);
+      mrUpdateCompetition('jenn', old.id, { points: 15 });
+      if (money2(mnyCash('jenn') - cashL) !== 15 || c.finalizedWeeks[L].jenn !== 15) bad.push('a legacy settled week: correcting left ' + money2(mnyCash('jenn') - cashL) + ', finalized ' + c.finalizedWeeks[L].jenn);
+      if (evRepairPlanFor('jenn').weeks.some(w => w.wk === L)) bad.push('the repair sees a gap in the legacy week');
+      mrDeleteCompetition('jenn', old.id);
+      if (money2(mnyCash('jenn') - cashL) !== 0 || c.finalizedWeeks[L].jenn !== 0) bad.push('a legacy settled week: deleting left ' + money2(mnyCash('jenn') - cashL));
+      if ((c.moneyLedger[L] || {}).jenn) bad.push('the legacy week grew a ledger row it never had');
+
+      // The forms say what a gift says.
+      const SAID = /That week is already settled, so it arrives on its own date and you will decide where it goes at the next meeting/;
+      openRecordSheet({ kind: 'meet', kid: 'jenn', dayKey: mrWeekDayKeys(W)[2] });
+      const rc = document.getElementById('recordOverlay').textContent.replace(/\s+/g, ' ');
+      closeRecordSheet();
+      if (!SAID.test(rc)) bad.push('the Record sheet does not say a meet for a settled week arrives on its own date');
+      mnyCompOpen = true; mnyCompDraft = { sport: 'skate', name: 'x', dayKey: mrWeekDayKeys(W)[2], points: 3 };
+      const host = document.createElement('div'); host.innerHTML = mnyCompetitionForm(W, 'jenn');
+      if (!SAID.test(host.textContent.replace(/\s+/g, ' '))) bad.push('the meeting\'s competition form does not say it either');
+
+      // A week that is NOT settled keeps today's behaviour: nothing is paid early.
+      const cash1 = mnyCash('jenn');
+      mrAddCompetition('jenn', { dayKey: mrWeekDayKeys(back(2))[5], sport: 'skate', name: 'Spring Open', points: 7 });
+      if (mnyCash('jenn') !== cash1) bad.push('a meet in a week not yet settled was paid early');
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      window.showConfirm = was.showConfirm;
+      put();
+      profile = was.profile; parentViewing = was.parentViewing; mnyParentSection = was.section; mnyGrandmaDraft = was.draft;
+      mnyCompOpen = was.compOpen; mnyCompDraft = was.compDraft;
+      saveLocal();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* TWO DEVICES, ONE MEET. A meet sits unpaid in a settled week (it arrived
+     from a device that recorded it before the week was settled there). Both
+     devices catch the week up from the same state, then merge through the
+     real mergeRemoteState: the derived id is the same on both, so the stream
+     keeps one line, the wallet moves once, and a later run finds nothing. */
+  checks.aLateMeetPaidOnTwoDevicesIsPaidOnce = await page.evaluate(async () => {
+    const bad = [];
+    const snap = JSON.stringify(state);
+    const put = (json) => { const s = JSON.parse(json); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s); };
+    const was = { profile, parentViewing, showConfirm: window.showConfirm, section: mnyParentSection, draft: mnyGrandmaDraft };
+    try {
+      profile = 'parent'; parentViewing = 'jenn';
+      ctPrepareRead();
+      const back = (n) => { const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - 7 * n); return ctDateToKey(d); };
+      const c = state.shared.chore;
+      Object.assign(c, { finalizedWeeks: {}, moneyLedger: {}, meetingsHeld: {}, meetingsMet: {}, weekPlans: {},
+                         programStartDate: back(30), programStartDateAt: syncNow() });
+      ['jenn', 'jess'].forEach(k => { const p = getProfData(k); p.competitions = []; p.fines = []; p.deposits = []; p.earnings = {}; ensureWallet(k).cash = 500; });
+      const W = back(20);
+      mrAddCompetition('jenn', { dayKey: mrWeekDayKeys(W)[5], sport: 'skate', name: 'Fall Classic', points: 10 });
+      c.moneyLedger[W] = { jenn: mrFreezeWeekLedger(W, 'jenn') };
+      c.finalizedWeeks[W] = { jenn: 10 };
+      // The late meet, on file but not yet paid — straight into the store, as a merge would bring it.
+      getProfData('jenn').competitions.push({ id: 'comp-two-dev', dayKey: mrWeekDayKeys(W)[6], sport: 'skate',
+        name: 'Winter Invitational', points: 21, placement: {}, awarded: 21, updatedAt: syncNow() });
+      const X = JSON.stringify(state);
+      const cash0 = mnyCash('jenn');
+      if (typeof mnyLateCompSync !== 'function') { bad.push('there is no owner to run the sync'); return bad; }
+      mnyLateCompSync('jenn', W);                                   // device A
+      const A = JSON.parse(JSON.stringify(state));
+      put(X);                                                       // device B, from the same state
+      mnyLateCompSync('jenn', W);
+      mergeRemoteState(A);                                          // A's snapshot reaches B
+      const lines = evList('jenn').filter(e => String(e.id || '').indexOf('ev-latecomp-jenn-' + W + '-') === 0);
+      if (lines.length !== 1) bad.push('after the merge the stream holds ' + lines.length + ' late-meet lines, expected 1');
+      if (money2(mnyCash('jenn') - cash0) !== 21) bad.push('after the merge she holds ' + money2(mnyCash('jenn') - cash0) + ' extra, expected 21');
+      const led = state.shared.chore.moneyLedger[W].jenn;
+      if (led.competition !== 31 || state.shared.chore.finalizedWeeks[W].jenn !== 31) bad.push('after the merge the week reads ' + JSON.stringify({ competition: led.competition, fin: state.shared.chore.finalizedWeeks[W].jenn }));
+      mnyLateCompSync('jenn', W);
+      if (money2(mnyCash('jenn') - cash0) !== 21) bad.push('a run after the merge paid again');
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      window.showConfirm = was.showConfirm;
+      put(snap);
+      profile = was.profile; parentViewing = was.parentViewing; mnyParentSection = was.section; mnyGrandmaDraft = was.draft;
+      saveLocal();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* A GIFT DATED INTO A SETTLED WEEK reaches her cash once and is decided at
+     the next meeting — a meeting-settled week and a Grandma-defaulted one. */
+  checks.aGiftIntoASettledWeekIsDecidedAtTheNextMeeting = await page.evaluate(async () => {
+    const bad = [];
+    const snap = JSON.stringify(state);
+    const put = () => { const s = JSON.parse(snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s); };
+    const was = { profile, parentViewing, showConfirm: window.showConfirm, section: mnyParentSection, draft: mnyGrandmaDraft };
+    try {
+      profile = 'parent'; parentViewing = 'jenn';
+      ctPrepareRead();
+      const back = (n) => { const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - 7 * n); return ctDateToKey(d); };
+      const c = state.shared.chore;
+      Object.assign(c, { finalizedWeeks: {}, moneyLedger: {}, meetingsHeld: {}, meetingsMet: {}, weekPlans: {},
+                         programStartDate: back(30), programStartDateAt: syncNow() });
+      ['jenn', 'jess'].forEach(k => { const p = getProfData(k); p.competitions = []; p.fines = []; p.deposits = []; p.earnings = {}; ensureWallet(k).cash = 500; });
+      mrApplyEdits([{ path: 'grandma.from', value: back(9) }, { path: 'grandma.amount', value: 3 }], { effectiveFrom: todayKey() });
+      window.showConfirm = async () => true;
+      await mnyRunDefaultSweep();
+      const M = back(3);
+      c.finalizedWeeks[M] = { jenn: 0 }; c.meetingsHeld[M] = true;
+      c.weekPlans[M] = { jenn: { planId: 'ready', committedAt: syncNow() } };
+      [['a Grandma-defaulted week', back(9), back(8)], ['a meeting-settled week', M, back(2)]].forEach(([what, wk, next]) => {
+        const cash0 = mnyCash('jenn');
+        const g = mnyAddDeposit('jenn', wk, { amount: 20, from: MNY_FROM[0], giver: 'Grandma', dayKey: mrWeekDayKeys(wk)[2] });
+        if (!g) { bad.push(what + ': the gift was refused'); return; }
+        if (money2(mnyCash('jenn') - cash0) !== 20) bad.push(what + ': she received ' + money2(mnyCash('jenn') - cash0) + ', expected 20 once');
+        if (!g.appliedAt) bad.push(what + ': the gift is not marked applied, so the next commit would credit it again');
+        if (g.weekKey !== next) bad.push(`${what}: decided at ${g.weekKey}, expected the next open week ${next}`);
+        if (!(mnyPool(next, 'jenn').deposits >= 20)) bad.push(what + ': the next meeting\'s pool does not offer it');
+        if (mnyGiftDecidedElsewhere('jenn', g.dayKey) !== next) bad.push(what + ': the forms would not say it is decided elsewhere');
+      });
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      window.showConfirm = was.showConfirm;
+      put();
+      profile = was.profile; parentViewing = was.parentViewing; mnyParentSection = was.section; mnyGrandmaDraft = was.draft;
+      saveLocal();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* 👵 THE GRANDMA RULE READS AS ITSELF, WHEREVER IT IS SHOWN, AND NEVER
+     REACHES THE WINDOW. Rows it writes say "Grandma rule" on both histories;
+     rows an older build wrote with defaultReason 'default' still say "nobody
+     met"; a meet paid on top is counted once on her story's bar; the section
+     is its own and Week history no longer carries it; and whatever start week
+     is saved, it never names this week, a later one, or a week the catch-up
+     list still settles. */
+  checks.theGrandmaRuleReadsAsItselfEverywhere = await page.evaluate(async () => {
+    const bad = [];
+    const snap = JSON.stringify(state);
+    const put = () => { const s = JSON.parse(snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s); };
+    const was = { profile, parentViewing, showConfirm: window.showConfirm, section: mnyParentSection, draft: mnyGrandmaDraft };
+    try {
+      profile = 'parent'; parentViewing = 'jenn';
+      ctPrepareRead();
+      const back = (n) => { const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - 7 * n); return ctDateToKey(d); };
+      const c = state.shared.chore;
+      Object.assign(c, { finalizedWeeks: {}, moneyLedger: {}, meetingsHeld: {}, meetingsMet: {}, weekPlans: {},
+                         programStartDate: back(30), programStartDateAt: syncNow() });
+      ['jenn', 'jess'].forEach(k => { const p = getProfData(k); p.competitions = []; p.fines = []; p.deposits = []; p.earnings = {}; ensureWallet(k).cash = 500; });
+      mrApplyEdits([{ path: 'grandma.from', value: back(10) }, { path: 'grandma.amount', value: 3 }], { effectiveFrom: todayKey() });
+      window.showConfirm = async () => true;
+      mrAddCompetition('jenn', { dayKey: mrWeekDayKeys(back(10))[5], sport: 'skate', name: 'Winter Invitational', points: 21 });
+      await mnyRunDefaultSweep();
+      // A row an older build wrote: the default sweep, "nobody met".
+      c.finalizedWeeks[back(25)] = { jenn: 3 };
+      c.moneyLedger[back(25)] = { jenn: { at: 1, handEntered: true, defaulted: true, defaultReason: 'default', updatedAt: 1,
+        chores: 0, learning: 0, streak: 0, competition: 0, fines: 0, outside: 0, ready: 0, gic: 0, stock: 0, debtExtra: 0,
+        gross: 3, net: 3, xp: 0, boxReleased: 0, loan: null } };
+      showScreen('parent'); setParentTab('money'); mnyParentSection = 'history'; mnyRenderRulesTab();
       const hist = document.getElementById('mnyRulesWrap').textContent;
+      if (/Grandma rule —|Weeks nobody sat down for|Credit \$/.test(hist)) bad.push('Week history still carries the sweep');
       if (!/Grandma rule/.test(hist)) bad.push('the parent week history does not say "Grandma rule"');
+      if (!/nobody met/.test(hist)) bad.push('an older "default" row no longer reads "nobody met"');
       profile = 'jenn'; mnyOpenStory();
       const story = document.getElementById('mnyStoryWrap').textContent;
       if (!/Grandma rule/.test(story)) bad.push('her money story does not say "Grandma rule"');
+      if (!/Nobody sat down for this week/.test(story)) bad.push('her money story reads an older "default" row wrongly');
       profile = 'parent';
-
-      // Whatever dates are typed, never this week, a later one, or the catch-up reach.
-      const next = formatDayKey(ctThisWeekKey()); next.setDate(next.getDate() + 400);
-      const wide = mnyDefaultSweepPlan({ reason: 'grandma', from: '2024-01-01', to: ctDateToKey(next), amount: 3 });
+      const row = Object.assign({ weekKey: back(10) }, c.moneyLedger[back(10)].jenn);
+      const bar = document.createElement('div'); bar.innerHTML = mnyStoryWeek('jenn', row);
+      const segs = [...bar.querySelectorAll('.mny-seg')].map(x => x.getAttribute('title'));
+      if (segs.indexOf('Grandma rule $3.00') < 0 || segs.indexOf('Competitions $21.00') < 0) bad.push('the story bar does not show $3 Grandma rule and $21 competitions, once each: ' + segs.join(' | '));
+      // Whatever start week is saved, never this week, a later one, or the review window.
       const thisWk = ctThisWeekKey();
       const reach = new Set(mmUnsettledWeeks(8).map(u => u.wk));
-      if (wide.weeks.some(w => String(w.wk) >= String(thisWk))) bad.push('a typed future date reached this week or later');
-      if (wide.weeks.some(w => reach.has(w.wk))) bad.push('a typed date reached a week the catch-up list still settles');
-      if (!(String(wide.latest) < String(thisWk))) bad.push('the newest week it may name is not in the past: ' + wide.latest);
+      [back(200), back(9), back(3), ctDateToKey(new Date(formatDayKey(thisWk).getTime() + 400 * 864e5))].forEach(from => {
+        mrApplyEdits([{ path: 'grandma.from', value: String(ctWeekKeyForDate(from)) }], { effectiveFrom: todayKey() });
+        const p = mnyDefaultSweepPlan();
+        if (p.weeks.some(w => String(w.wk) >= String(thisWk))) bad.push('from ' + from + ': reached this week or later');
+        if (p.weeks.some(w => reach.has(w.wk))) bad.push('from ' + from + ': reached a week the catch-up list still settles');
+        if (!(String(p.latest) < String(thisWk))) bad.push('the newest week it may name is not in the past: ' + p.latest);
+      });
+      if (Object.keys(PARENT_LANDINGS).length && !(PARENT_LANDINGS.setup || []).some(r2 => r2.section === 'grandma')) bad.push('Setup has no row for the Grandma rule');
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      window.showConfirm = was.showConfirm;
+      put();
+      profile = was.profile; parentViewing = was.parentViewing; mnyParentSection = was.section; mnyGrandmaDraft = was.draft;
+      saveLocal();
+    }
+    return bad.length ? bad : true;
+  });
 
-      // Defaults, and nothing stored.
+  /* (g) THE START WEEK AND AMOUNT ARE A DATED RULE, entered once. */
+  checks.theGrandmaRuleIsSavedAsADatedRule = await page.evaluate(async () => {
+    const bad = [];
+    const snap = JSON.stringify(state);
+    const put = () => { const s = JSON.parse(snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s); };
+    const was = { profile, parentViewing, showConfirm: window.showConfirm, section: mnyParentSection, draft: mnyGrandmaDraft };
+    try {
+      profile = 'parent'; parentViewing = 'jenn';
+      ctPrepareRead();
+      const back = (n) => { const d = formatDayKey(ctThisWeekKey()); d.setDate(d.getDate() - 7 * n); return ctDateToKey(d); };
+      const c = state.shared.chore;
+      Object.assign(c, { finalizedWeeks: {}, moneyLedger: {}, meetingsHeld: {}, meetingsMet: {}, weekPlans: {},
+                         programStartDate: back(20), programStartDateAt: syncNow() });
+      ['jenn', 'jess'].forEach(k => { const p = getProfData(k); p.competitions = []; p.fines = []; p.deposits = []; p.earnings = {}; ensureWallet(k).cash = 500; });
+      mrVersions().forEach(v => { if (v.rules) delete v.rules.grandma; });
       mnyGrandmaDraft = null;
-      const f = mnyGrandmaForm();
-      if (f.from !== String(mrStartWeek()) || f.to !== mnyLastMay30(todayKey()) || f.amount !== MNY_DEFAULT_WEEK) bad.push('the form defaults are wrong: ' + JSON.stringify(f));
-      if (mnyLastMay30('2026-09-22') !== '2026-05-30' || mnyLastMay30('2026-05-29') !== '2025-05-30' || mnyLastMay30('2026-05-30') !== '2026-05-30') bad.push('"the most recent 30 May" is worked out wrong');
-      mnyParentSection = 'grandma'; mnyRenderRulesTab();
+      // A rulebook without it falls back.
+      if (typeof mnyGrandmaRule !== 'function') bad.push('there is no reader for the saved Grandma rule');
+      else {
+        const r = mnyGrandmaRule();
+        if (r.saved || r.from !== String(mrStartWeek()) || r.amount !== 3) bad.push('the fallback reads ' + JSON.stringify(r));
+      }
+      // The hub points to the Grandma section until a start week is saved.
+      const host = document.createElement('div');
+      host.innerHTML = mmCatchUpBanner();
+      const go = host.querySelector('[data-mm-catch="grandma"]');
+      if (!go) bad.push('with no saved start week the hub does not point to the Grandma section');
+      if (host.querySelector('[data-mm-catch="sweep"]')) bad.push('the hub offers to credit before a start week is saved');
+      if (go) {
+        mnyParentSection = 'prices';
+        mmHandleCatchUpClick({ target: go });
+        if (mnyParentSection !== 'grandma') bad.push('the hub\'s pointer does not open the Grandma section');
+      }
+      // The form: a start week, an amount, Save — and no to-date.
+      showScreen('parent'); setParentTab('money'); mnyParentSection = 'grandma'; mnyRenderRulesTab();
+      let wrap = document.getElementById('mnyRulesWrap');
+      if (wrap.querySelector('[data-mnyp-action="gmto"]')) bad.push('the form still has a to-date');
+      if (!/last 8 weeks/i.test(wrap.textContent)) bad.push('the form does not say the last 8 weeks are left to the catch-up list');
       const stateBefore = JSON.stringify(state);
-      const inp = document.querySelector('#mnyRulesWrap [data-mnyp-action="gmfrom"]');
-      if (!inp) bad.push('the Grandma card has no from-date field');
-      else { inp.value = '2025-02-03'; inp.dispatchEvent(new Event('change', { bubbles: true })); }
-      document.querySelector('#mnyRulesWrap [data-mnyp-action="gmamt"][data-mnyp-d="0.5"]').click();
-      if (mnyGrandmaDraft.from !== '2025-02-03' || mnyGrandmaDraft.amount !== 3.5) bad.push('the form does not follow what was typed: ' + JSON.stringify(mnyGrandmaDraft));
-      if (JSON.stringify(state) !== stateBefore) bad.push('typing into the Grandma form wrote to the synced state');
+      const inp = wrap.querySelector('[data-mnyp-action="gmfrom"]');
+      if (!inp) bad.push('the form has no start week');
+      else { inp.value = mrWeekDayKeys(back(15))[2]; inp.dispatchEvent(new Event('change', { bubbles: true })); }
+      wrap = document.getElementById('mnyRulesWrap');
+      const up = wrap.querySelector('[data-mnyp-action="gmamt"][data-mnyp-d="0.5"]');
+      if (up) up.click();
+      if (JSON.stringify(state) !== stateBefore) bad.push('typing into the form wrote to the synced state before Save');
+      wrap = document.getElementById('mnyRulesWrap');
+      const save = wrap.querySelector('[data-mnyp-action="gmsave"]');
+      if (!save) bad.push('the form has no Save button');
+      else save.click();
+      const g = ((mrLatestVersion() || {}).rules || {}).grandma || {};
+      if (g.from !== back(15) || g.amount !== 3.5) bad.push('the rulebook holds ' + JSON.stringify(g) + ', expected the Monday ' + back(15) + ' and 3.5');
+      if (typeof mnyGrandmaRule === 'function') {
+        const r = mnyGrandmaRule();
+        if (!r.saved || r.from !== back(15) || r.amount !== 3.5) bad.push('the saved rule reads back as ' + JSON.stringify(r));
+      }
+      const logged = mrLogEntries().filter(e => /^grandma\./.test(String(e.path)));
+      if (logged.length !== 2) bad.push('expected two dated log lines, found ' + logged.length);
+      // Another rule edit clones it forward rather than dropping it.
+      mrApplyEdits([{ path: 'chores.dailyCap', value: 4 }], { effectiveFrom: todayKey() });
+      if ((((mrLatestVersion() || {}).rules || {}).grandma || {}).amount !== 3.5) bad.push('another rule edit dropped the Grandma rule');
+      mnyParentSection = 'changes'; mnyRenderRulesTab();
+      const log = document.getElementById('mnyRulesWrap').textContent;
+      if (/\[object Object\]/.test(log)) bad.push('the change history prints [object Object]');
+      if (!/Grandma rule/.test(log)) bad.push('the change history does not name the Grandma rule');
+      // The hub now offers one tap, through the same confirm, never automatic.
+      host.innerHTML = mmCatchUpBanner();
+      const sweep = host.querySelector('[data-mm-catch="sweep"]');
+      if (!sweep) bad.push('with a saved start week the hub does not offer the credit');
+      else {
+        if (!/left the review window/.test(host.textContent) || !/\$3\.50 each/.test(sweep.textContent)) bad.push('the hub offer reads: ' + host.textContent.replace(/\s+/g, ' '));
+        let asked = 0;
+        window.showConfirm = async () => { asked++; return false; };
+        const before = money2(mnyCash('jenn') + mnyCash('jess'));
+        mmHandleCatchUpClick({ target: sweep });
+        await new Promise(r => setTimeout(r, 30));
+        if (asked !== 1) bad.push('the hub tap did not go through the confirm');
+        if (money2(mnyCash('jenn') + mnyCash('jess')) !== before) bad.push('declining the confirm still moved money');
+      }
     } catch (e) {
       bad.push('threw: ' + e.message);
     } finally {

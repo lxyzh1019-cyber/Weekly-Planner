@@ -685,7 +685,7 @@ function mnyGiftMirror(d) {
    belonged to no week's split at all, silently. */
 function mnyGiftWeekFor(kid, dayKey) {
   const from = mnyWeekOfDay(dayKey);
-  if (!mnyIsCommitted(from, kid)) return from;
+  if (!mnyWeekSettled(from, kid)) return from;
   /* Walk forward to the first week that can still decide it. Bounded by a year
      rather than `while (true)`: a wrong device clock must not spin. Landing on
      the current week is the honest floor — a week that has not happened cannot
@@ -694,9 +694,21 @@ function mnyGiftWeekFor(kid, dayKey) {
   for (let i = 0; i < 53; i++) {
     d.setDate(d.getDate() + 7);
     const wk = ctDateToKey(d);
-    if (!mnyIsCommitted(wk, kid)) return wk;
+    if (!mnyWeekSettled(wk, kid)) return wk;
   }
   return mnyWeekKey();
+}
+
+/* Has this child's week been SETTLED — can its split no longer decide
+   anything? Committed at a meeting (`mnyIsCommitted`), or credited some other
+   way: the Grandma rule, the repair, an express catch-up. Those write
+   `finalizedWeeks` and never a committed plan, so asking about the plan alone
+   filed a gift dated into a Grandma week under that week — a week no meeting
+   will ever sit for, so its split was never offered anywhere. */
+function mnyWeekSettled(weekKey, kid) {
+  ctEnsureShared();
+  const fin = ((state.shared.chore.finalizedWeeks || {})[weekKey] || {})[kid];
+  return fin != null || mnyIsCommitted(weekKey, kid);
 }
 
 /* Which week a day belongs to, named the way the PLANNER names it.
@@ -722,6 +734,127 @@ function mnyGiftDecidedElsewhere(kid, dayKey) {
   const arrived = mnyWeekOfDay(dayKey);
   const decides = mnyGiftWeekFor(kid, dayKey);
   return String(arrived) === String(decides) ? null : decides;
+}
+/* What a form says when that happens — a gift or a meet, the same words,
+   because it is the same mechanism. */
+const MNY_SETTLED_WEEK_SENTENCE = 'That week is already settled, so it arrives on its own date and you will decide where it goes at the next meeting.';
+
+/* ── A MEET FOR A WEEK ALREADY SETTLED — the gift pattern ────────────
+   The owner: "a settled week only discusses routine, fine, chore money, and
+   how the money is spent (the split); a settled week does not block the
+   competition and gift." Settling closes a week's chores, routines, fines and
+   split. It does not close its meets.
+
+   It used to. The meeting's commit was the only thing that ever paid a meet,
+   and `finalizedWeeks[wk][kid] == null` refuses a second commit — so a meet
+   entered for a week already settled (at a meeting, by the Grandma rule, by
+   the repair) sat on file and was never paid. The trap the repair describes
+   in js/40-stream.js, from the other side.
+
+   So a meet added, corrected or deleted for a settled week moves her cash at
+   once, as its own labelled line on the meet's own date, exactly as a gift
+   dated into a settled week does. WHERE it goes is decided at the next
+   still-open meeting: the line is filed to that week (`mnyGiftWeekFor`) and
+   `mnyPool` counts it there (`mnyLateCompTotal`).
+
+   The settled week's own record is kept in step — its ledger competition,
+   gross and net, and `finalizedWeeks`. That is not bookkeeping for its own
+   sake: finalizedWeeks is what `evRepairPlanFor` measures a week's worth
+   against, and left stale the repair would pay the same meet again as a gap.
+
+   ONE owner, called by the three competition writers in js/18-rules.js through
+   a typeof guard, and callable again with no change to catch a week up. A week
+   that is NOT settled is left alone: the meeting's commit pays its meets, as
+   it always has, and nothing is paid early.
+
+   ── Why it cannot pay twice ──
+   1. The week has a ledger row whose competition figure is the plain sum of
+      its meets — a meeting, the Grandma rule, the repair. The row says what
+      has been paid for meets; `mrCompetitionWeek` says what they are worth
+      now; the DIFFERENCE moves and the row is brought to the new total. A
+      second run finds nothing to do, and a meet that arrived from another
+      device is caught up by the next run instead of being lost. The event id
+      is the week, the kid, the row's count of late corrections (`lateSeq`) and
+      the two totals — so two devices making the same correction from the same
+      row write the SAME id, and the stream's union by id keeps one. An id
+      already on the stream means the money moved and only the row missed it:
+      the row catches up and nothing moves. `lateSeq` is what stops a real
+      repeat (add, delete, add again) from colliding with its own first time.
+   2. No ledger row (a legacy or migrated week), or a competition figure a
+      grown-up overrode at the table: there is no honest total to compare, so
+      nothing is guessed from totals. The CHANGE is paid — this meet's award
+      after the write minus before, from the owner that made the write — keyed
+      on the meet's own id and that write ('add', 'del', or the opId
+      markItemUpdated stamped), so one write is paid once. finalizedWeeks moves
+      by the same amount.
+   A week whose competition channel the honesty rule voided stays void.
+
+   `change` is { comp, before, after, op, wasDayKey } from the writer, or
+   nothing to re-run a week. A meet moved to another week is two changes:
+   out of the old week, into the new. */
+function mnyLateCompSync(kid, dayKey, change) {
+  if (!kid || !dayKey) return 0;
+  const ch = change || null;
+  const wk = mnyWeekOfDay(dayKey);
+  if (ch && ch.wasDayKey && mnyWeekOfDay(ch.wasDayKey) !== wk) {
+    const out = mnyLateCompSync(kid, ch.wasDayKey, { comp: ch.comp, before: ch.before, after: 0, op: ch.op });
+    return money2(out + mnyLateCompSync(kid, dayKey, { comp: ch.comp, before: 0, after: ch.after, op: ch.op }));
+  }
+  ctEnsureShared();
+  const c = state.shared.chore;
+  const fin = (c.finalizedWeeks || {})[wk];
+  if (!fin || fin[kid] == null) return 0;
+  const led = ((c.moneyLedger || {})[wk] || {})[kid] || null;
+  if (led && (led.voided || []).indexOf('competition') >= 0) return 0;
+  const byTotal = !!led && (led.edited || []).indexOf('comp') < 0;
+  const comp = (ch && ch.comp) || null;
+  let delta, id, target = 0;
+  if (byTotal) {
+    const have = money2(led.competition);
+    target = mrCompetitionWeek(wk, kid).paid;
+    delta = money2(target - have);
+    id = 'ev-latecomp-' + kid + '-' + wk + '-' + (Number(led.lateSeq) || 0) + '-' + have + '-' + target;
+  } else {
+    if (!comp) return 0;
+    delta = money2((Number(ch.after) || 0) - (Number(ch.before) || 0));
+    id = 'ev-latecomp-' + kid + '-' + wk + '-' + comp.id + '-' + (ch.op || 'edit');
+  }
+  if (!delta) return 0;
+  if (!evList(kid).some(e => e && e.id === id)) {
+    const name = comp ? (comp.name || mnySportLabel(comp.sport)) : 'Competitions';
+    const tail = delta < 0 ? 'taken back after the week was settled'
+      : ((led && led.defaulted && led.defaultReason === 'grandma') ? 'on top of the Grandma rule'
+                                                                   : 'paid after the week was settled');
+    const common = { kind: 'latecomp', id, ref: comp ? comp.id : wk,
+                     weekKey: mnyGiftWeekFor(kid, (comp && comp.dayKey) || wk),
+                     note: name + ', week of ' + mnyShortDate(wk) + ' — ' + tail };
+    if (delta > 0) moneyAddCash(kid, delta, Object.assign({ from: 'prize', dayKey: (comp && comp.dayKey) || wk }, common));
+    else moneyTakeBackCash(kid, money2(-delta), Object.assign({ dayKey: todayKey() }, common));
+  }
+  if (led) {
+    led.competition = byTotal ? target : money2(money2(led.competition) + delta);
+    led.gross = money2(money2(led.gross) + delta);
+    led.net = money2(money2(led.net) + delta);
+    if (byTotal) led.lateSeq = (Number(led.lateSeq) || 0) + 1;
+    led.updatedAt = syncNow();
+  }
+  fin[kid] = money2((Number(fin[kid]) || 0) + delta);
+  if (typeof ctStampWeekState === 'function') ctStampWeekState(wk);
+  saveAll();
+  return delta;
+}
+
+/* What late meets brought into (or took out of) the pool this week decides:
+   the `latecomp` lines filed to it. Read off the stream, which holds each one
+   once by id however many devices wrote it. */
+function mnyLateCompTotal(kid, weekKey) {
+  if (typeof evList !== 'function') return 0;
+  return money2(evList(kid).reduce((s, e) => {
+    if (!e || e.kind !== 'latecomp' || e.weekKey !== weekKey) return s;
+    if (e.to === 'cash') return s + (Number(e.amount) || 0);
+    if (e.from === 'cash') return s - (Number(e.amount) || 0);
+    return s;
+  }, 0));
 }
 
 function mnyEnsureDeposits(kid) {
@@ -1172,7 +1305,11 @@ function mnyDueThisWeek(kid, weekKey) {
 function mnyPool(weekKey, kid) {
   const b = mrWeekBreakdown(weekKey, kid);
   const deposits = mnyDepositTotal(kid, weekKey);
-  const cameIn = money2(b.net + deposits);
+  /* A meet paid after its own week was settled is already in her cash, like a
+     gift; this is the meeting that decides where it goes. A correction down
+     can make it negative, and the pool never is. */
+  const lateComp = mnyLateCompTotal(kid, weekKey);
+  const cameIn = money2(Math.max(0, b.net + deposits + lateComp));
   // The schedule draws on the whole pool, like any real payment does.
   const due = mnyDueThisWeek(kid, weekKey);
   const dueTotal = money2(due.reduce((s, d) => s + money2(d.amount), 0));
@@ -1180,7 +1317,7 @@ function mnyPool(weekKey, kid) {
   const mustPay = money2(Math.min(dueTotal, cameIn));
   const mine = money2(Math.max(0, cameIn - mustPay));
   return {
-    breakdown: b, deposits, cameIn, mustPay, mine, due,
+    breakdown: b, deposits, lateComp, cameIn, mustPay, mine, due,
     scheduledPay: scheduledTotal,
     // What the family agreed NOT to pay this month. It does not vanish — the
     // debt still carries it, and arrears still apply.
@@ -1645,82 +1782,6 @@ function mnyShortDate(dayKey) {
 function mnyWeekKey() {
   if (typeof ctWeekKey !== 'undefined' && ctWeekKey) return ctWeekKey;
   return ctThisWeekKey();
-}
-
-/* ── Does this week hold ANY money record for this child? ──
-   One owner, asked by the Grandma rule (`mnyDefaultSweepPlan`, js/24), which
-   may only credit a week in which no money was recorded for her. A week with
-   money in it has its own numbers, and a flat amount on top would pay twice.
-
-   MONEY RECORDS ONLY, per the owner's definition: "skips any week already
-   settled AND any week holding real graded chores, meets or gifts."
-   Read WITHOUT creating anything — no mrEnsureEarnings here, which would
-   write empty maps into a document that uploads whole on every change.
-
-   Counted (MNY_WEEK_RECORD_STORES):
-     settled — finalizedWeeks · moneyLedger · moneySnapshots (her row);
-       groupPayoutsFired (her row under any group, the retired payouts);
-       meetingsHeld (the money moved at the meeting — family-wide);
-     graded chores — earnings: a chore grade, a priced learning count, or a
-       meeting override of a channel;
-     meets — competitions; gifts — deposits; fines — fines;
-     and the money stream itself — events (dated or filed to the week).
-
-   Deliberately NOT counted, because none of it is money:
-     planner blocks, planned, ticked done or confirmed — a week lived in the
-       planner with nothing recorded money-wise is the week the rule exists
-       for; routine ticks (mandatory/optionalByWeek) — a streak only becomes
-       money when a week is settled, and a settled week is caught by the
-       ledger; XP (xpByWeek, xpAwardedWeeks); her note (weekFeedback);
-       reflections; goals (goalsByWeek, and goalBonusByWeek, a met-it flag the
-       retired board priced — credited dollars are in the ledger); the plan and
-       its confirm (weekPlans, weekConfirms); the sitting-down mark
-       (meetingsMet); weeksClosed; days a grown-up reviewed (parentDayConfirm);
-       the Sunday Box (boxItems — a repeat's fine is in `fines`); a move she
-       asked for (moveRequests — a proposal, not a movement); and earnings'
-       claims, attitude, personal chores, sick days and `missing`.
-   Stamps (updatedAtByWeek and friends) say when, not what.
-   `mnyWeekRecordStores` says which counted stores hold something, so a check
-   can walk the list store by store. */
-const MNY_WEEK_RECORD_STORES = [
-  'finalizedWeeks', 'moneyLedger', 'moneySnapshots', 'groupPayoutsFired', 'meetingsHeld',
-  'earnings', 'competitions', 'fines', 'deposits', 'events',
-];
-/* The parts of a week's earnings map that price money. */
-const MNY_EARNINGS_MONEY_KEYS = ['chores', 'learning', 'overrides'];
-function mnyWeekRecordStores(weekKey, kid) {
-  const wk = String(weekKey || '');
-  const c = (state.shared || {}).chore || {};
-  const p = (state.profiles || {})[kid] || {};
-  const mon = formatDayKey(wk);
-  const days = [];
-  for (let i = 0; i < 7; i++) { const d = new Date(mon); d.setDate(mon.getDate() + i); days.push(ctDateToKey(d)); }
-  const inWeek = (dk) => !!dk && days.indexOf(String(dk)) >= 0;
-  const any = (o) => {                               // a truthy leaf anywhere
-    if (o == null) return false;
-    if (typeof o !== 'object') return !!o;
-    return Object.keys(o).some(k => any(o[k]));
-  };
-  const row = (map) => ((map || {})[wk] || {})[kid];
-  const dated = (a) => (Array.isArray(a) ? a : []).some(x => x && (x.weekKey === wk || inWeek(x.dayKey)));
-  const earn = (p.earnings || {})[wk] || {};
-  const hit = {
-    finalizedWeeks: row(c.finalizedWeeks) != null,
-    moneyLedger: row(c.moneyLedger) != null,
-    moneySnapshots: row(c.moneySnapshots) != null,
-    groupPayoutsFired: Object.keys((c.groupPayoutsFired || {})[wk] || {})
-      .some(g => ((c.groupPayoutsFired[wk] || {})[g] || {})[kid] != null),
-    meetingsHeld: !!(c.meetingsHeld || {})[wk],
-    earnings: MNY_EARNINGS_MONEY_KEYS.some(k => any(earn[k])),
-    competitions: dated(p.competitions),
-    fines: dated(p.fines),
-    deposits: dated(p.deposits),
-    events: dated(p.events),
-  };
-  return MNY_WEEK_RECORD_STORES.filter(k => hit[k]);
-}
-function mnyWeekHasAnyRecord(weekKey, kid) {
-  return mnyWeekRecordStores(weekKey, kid).length > 0;
 }
 
 // Inert in the browser; lets tests run these helpers in Node.

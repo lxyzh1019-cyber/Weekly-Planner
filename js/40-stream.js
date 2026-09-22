@@ -740,6 +740,11 @@ function evRepairPlanFor(kid) {
   Object.keys(fin).sort().forEach(wk => {
     const credited = (fin[wk] || {})[kid];
     if (credited == null) return;                 // never settled — nothing to repair
+    /* A defaulted week was priced by a rule, flat, not by the retired branch —
+       and the Grandma rule credits weeks whatever chores are in them, so
+       re-pricing one to its chores would pay on top of the rule. Its meets are
+       `mnyLateCompSync`'s, which keeps its ledger in step (js/21). */
+    if ((((c.moneyLedger || {})[wk] || {})[kid] || {}).defaulted) return;
     const id = evMigId(kid, [wk, 'repair']);
     if (have[id]) return;                         // already repaired
     const b = evRepriceWeek(kid, wk);

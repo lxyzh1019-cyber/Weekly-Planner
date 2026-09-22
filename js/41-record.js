@@ -295,7 +295,10 @@ function rcMeetForm() {
     <div class="rc-row"><span class="rc-lab">Which sport</span><span class="rc-chiprow">${sports}</span></div>
     ${scoring}
     ${rcDraft.sport ? `<div class="rc-chiprow">${rcToggle('A personal best', 'pb', rcDraft.personalBest)}</div>` : ''}
-    ${linked}`;
+    ${linked}
+    ${/* A settled week does not block a meet: paid on its own date, split at
+         the next meeting — the same mechanism, and so the same words, as a gift. */''}
+    ${mnyGiftDecidedElsewhere(rcDraft.kid, rcDraft.dayKey) ? `<p class="rc-note">${escapeHtml(MNY_SETTLED_WEEK_SENTENCE)}</p>` : ''}`;
 }
 
 /* ── 🎁 Money she was given ── */
@@ -311,10 +314,7 @@ function rcGiftForm() {
     ${rcField('Which day it came', 'day', rcDraft.dayKey, 'date')}
     <div class="rc-row"><span class="rc-lab">What kind</span><span class="rc-chiprow">${kinds}</span></div>
     ${rcField('Who from', 'giver', rcDraft.giver, 'text', ' placeholder="Grandma"')}
-    ${elsewhere
-      ? `<p class="rc-note">That week is already settled, so it arrives on its own date and
-         you will decide where it goes at the next meeting.</p>`
-      : ''}
+    ${elsewhere ? `<p class="rc-note">${escapeHtml(MNY_SETTLED_WEEK_SENTENCE)}</p>` : ''}
     ${isParent() ? '' : `<p class="rc-note">A grown-up says yes before it reaches your money.</p>`}`;
 }
 

@@ -473,6 +473,8 @@ function mnyCompetitionForm(wk, kid) {
       ${d.sport !== 'dance' ? `<div class="mny-row"><span>Points</span>${mnyStepper('points', d.points, 'comp')}</div>` : ''}
       ${detail}
       <div class="mny-row total"><span>That comes to</span><b>${mnyMoney(preview)}</b></div>
+      ${/* A settled week does not block a meet — the gift's words, because it is the gift's mechanism. */''}
+      ${mnyGiftDecidedElsewhere(kid, d.dayKey) ? `<div class="mny-note">${escapeHtml(MNY_SETTLED_WEEK_SENTENCE)}</div>` : ''}
       <div class="mny-chiprow">
         <button type="button" class="mny-btn primary" onclick="mnySaveComp()">Save it</button>
         <button type="button" class="mny-btn" onclick="mnyToggleComp()">Cancel</button>
@@ -715,6 +717,8 @@ function mnyPoolCard(wk, kid, pool) {
       <div class="mny-rows">
         <div class="mny-row"><span>Money that came in</span><b>${mnyMoney(pool.cameIn)}</b></div>
         ${pool.deposits > 0 ? `<div class="mny-row"><span class="mny-sub-row">…including 🎁 ${mnyMoney(pool.deposits)} from outside</span></div>` : ''}
+        ${pool.lateComp > 0 ? `<div class="mny-row"><span class="mny-sub-row">…including 🏆 ${mnyMoney(pool.lateComp)} from a meet whose week was already settled</span></div>`
+          : (pool.lateComp < 0 ? `<div class="mny-row"><span class="mny-sub-row">…less 🏆 ${mnyMoney(-pool.lateComp)} taken back from a meet whose week was already settled</span></div>` : '')}
         ${due.map(payRow).join('')}
         <div class="mny-row total"><span>Mine to choose</span><b>${mnyMoney(pool.mine)}</b></div>
       </div>

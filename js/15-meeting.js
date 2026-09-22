@@ -719,7 +719,7 @@ function mmRenderExpress(wk) {
    week is still there rather than that something was missed. */
 function mmCatchUpBanner() {
   const list = mmUnsettledWeeks(8);
-  const older = (typeof mnyDefaultSweepPlan === 'function') ? mnyDefaultSweepPlan() : { weeks: [], total: 0 };
+  const older = (typeof mnyDefaultSweepPlan === 'function') ? mnyDefaultSweepPlan() : { weeks: [], total: 0, saved: false };
   if (!list.length && !older.weeks.length) return '';
   const unopened = mmUnopenedWeeks(8).length;
   const met = list.length - unopened;
@@ -756,20 +756,29 @@ function mmCatchUpBanner() {
      mmUnsettledWeeks stops at eight, so anything older was invisible here AND
      unsettleable: the only door to it was a card in Setup › Weeks on record
      that a parent had no reason to open, so a household with a real backlog was
-     simply told nothing. The flat default belongs where the backlog is already
-     being looked at. It is still a tap, still previewed, and it still moves no
-     money until mnyRunDefaultSweep's own confirmation. */
-  const sweep = older.weeks.length
-    ? `<div class="mm-catchup-row mm-catchup-more">
-         <span class="mm-catchup-wk">${older.weeks.length} week${older.weeks.length === 1 ? '' : 's'} further back</span>
-         <span class="mm-catchup-late">too old to settle on real numbers</span>
-         <button type="button" class="mm-catchup-go" data-mm-catch="sweep">${escapeHtml(mnyMoney(older.total))} at the default ›</button>
-       </div>`
-    : '';
+     simply told nothing. The Grandma rule belongs where the backlog is already
+     being looked at — the SAME plan as its own section, from the start week
+     saved there (js/24-money-parent.js). One tap, previewed, and it moves no
+     money until mnyRunDefaultSweep's own confirmation; never automatic. With
+     no start week saved there is nothing to offer yet, so the row points to
+     the section where it is entered. */
+  const n = older.weeks.length;
+  const sweep = !n ? ''
+    : older.saved
+      ? `<div class="mm-catchup-row mm-catchup-more">
+           <span class="mm-catchup-wk">${n} week${n === 1 ? '' : 's'} left the review window</span>
+           <span class="mm-catchup-late">no family meeting — the Grandma rule</span>
+           <button type="button" class="mm-catchup-go" data-mm-catch="sweep">Credit ${escapeHtml(mnyMoney(older.amount))} each ›</button>
+         </div>`
+      : `<div class="mm-catchup-row mm-catchup-more">
+           <span class="mm-catchup-wk">${n} week${n === 1 ? '' : 's'} left the review window</span>
+           <span class="mm-catchup-late">enter the Grandma rule's start week first</span>
+           <button type="button" class="mm-catchup-go" data-mm-catch="grandma">👵 Grandma rule ›</button>
+         </div>`;
   const cap = [
     unopened ? `${unopened} week${unopened === 1 ? '' : 's'} nobody has opened` : '',
     met ? `${met} met but not paid out` : '',
-    older.weeks.length ? `${older.weeks.length} further back` : '',
+    n ? `${n} further back` : '',
   ].filter(Boolean).join(' · ');
   return `<div class="mm-catchup">
       <div class="mm-catchup-cap">🕰️ ${escapeHtml(cap)}.
@@ -787,6 +796,11 @@ function mmHandleCatchUpClick(e) {
   const what = el.getAttribute('data-mm-catch');
   if (what === 'sweep') {
     if (typeof mnyRunDefaultSweep === 'function') mnyRunDefaultSweep();
+    return;
+  }
+  if (what === 'grandma') {
+    mnyParentSection = 'grandma';
+    setParentTab('money');
     return;
   }
   if (what === 'met') {
