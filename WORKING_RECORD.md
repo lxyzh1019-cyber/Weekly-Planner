@@ -5,10 +5,12 @@ Single working record for this repository. Updated by the main session at the en
 ## Approved baseline
 - 2026-09-21, branch `Rules-v2`: install working-rules bundle v2.1 into the repo root, verify with `tests/replay-hooks.sh`, commit and push. Given as a direct instruction rather than a Plan vN — the session predates the plan gate, which loads only from `main`.
 - 2026-09-21, in-session decision (asked and answered): `CLAUDE.md` is **split**, not overwritten. Bundle global rules take the `CLAUDE.md` filename; this repo's architecture doc moves to `ARCHITECTURE.md`.
+- **2026-09-22, Plan v6 approved** — adds: iPad Pro 11″ landscape as the main interface; one week/month target card (opens on the week, never stored, switches itself to the month once the weekly target is reached; on Today the toggle sits on top and drives came in / went out / put away and the target); unlock gates 20/30/40% from one threshold table, parent-tunable (S4); Money school balanced on iPad; "💧 My cash pool" titled and kept separate from the target card; a what-I-have / what-I-owe line chart (C6) and paired in/out month columns (C7); S2 pot-opening moment, S3 visible build stamp. PR B (B1–B4 + S2–S4) has a 1 Oct deadline. S1 withdrawn.
 - **2026-09-22, Plan v5 approved** — "Money system: stop the bleeding, the Grandma rule, then the pool". Branch `claude/happy-bardeen-1xalni` from `main` @ `f4d1db5`. Sequence: Step 0 (this record) → PR A → PR B → C0 mockup → owner sign-off → PR C. Value-engineering items VE-1…VE-14 accepted; VE-11 (weekly/monthly) un-deferred at the owner's request; VE-3, VE-7, VE-9, VE-10 deferred with reasons. Full plan: `/root/.claude/plans/1-one-kid-completed-quizzical-kitten.md` (session-local).
 
 ## Pending
-- Plan v6 — awaiting owner approval (toggle rule, gates 20/30/40, Money school layout, S2–S4).
+- PR B (B1–B4 + S2/S3/S4) — delegated to `opus-worker`; must be live before 1 Oct.
+- C0 mockup — updating for v6 (pool title, toggle drives the Today card, chart).
 - PR #92 CI on `79b543b`.
 - PR [#91](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/91) — **merged** to `main` (`f4d1db5`).
 
@@ -97,7 +99,7 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → n
 | `FEATURES.md` — **app** feature manifest | PARTIAL | Money area manifested 2026-09-22 (Step 0). Everything else still checks against `ARCHITECTURE.md` — open question 1. |
 | Plan v5 Step 0 — rewrite-vs-repair comparison, hotspot row, records | COMPLETE | This file; `FEATURES.md` money section |
 | Plan v5 PR A — stop the bleeding (A1–A12, + A13/A14 checker fixes) | COMPLETE | `79b543b` on draft PR #92; `npm test` green in the main session's own run (check 8/8 · merge 112 · buffers 9 · stream 31 · cleanup · xp 28 · money 33 · smoke 321); every fix's check failed on the old code first (worker evidence) |
-| Plan v5 PR B — Grandma rule, star level relabel, August banner | NOT STARTED | |
+| Plan v6 PR B — Grandma rule, star level relabel, August banner, gates 20/30/40 (B4), S2 pot-opening moment, S3 build stamp, S4 tunable gates | PARTIAL — in progress with `opus-worker` | deadline 1 Oct |
 | Plan v5 C0 — clickable mockup for sign-off | COMPLETE — awaiting owner sign-off | Design canvas https://claude.ai/artifact/3fYy6KiQMcSissRGBvnG6d (private); started ahead of PR B because sign-off is the long pole — content unchanged |
 | Plan v5 PR C — the pool and three pages | NOT STARTED | Blocked on C0 sign-off |
 | `routing_guard_mode: enforce` | NOT STARTED | Blocked on `tests/test-routing-hook.md`, which must run in a session where the hooks are live (i.e. after merge to `main`). |
