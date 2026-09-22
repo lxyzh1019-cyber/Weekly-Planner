@@ -5,9 +5,12 @@ Single working record for this repository. Updated by the main session at the en
 ## Approved baseline
 - 2026-09-21, branch `Rules-v2`: install working-rules bundle v2.1 into the repo root, verify with `tests/replay-hooks.sh`, commit and push. Given as a direct instruction rather than a Plan vN — the session predates the plan gate, which loads only from `main`.
 - 2026-09-21, in-session decision (asked and answered): `CLAUDE.md` is **split**, not overwritten. Bundle global rules take the `CLAUDE.md` filename; this repo's architecture doc moves to `ARCHITECTURE.md`.
+- 2026-09-22, branch `claude/inspiring-gauss-232zww`: **Plan v4 approved** — "The non-money half, plus the pocket-money handoff". Three staged commits (school-day offer · profile badges · watch a sister compete), one draft PR. All pocket-money work is deferred to `HANDOFF-pocket-money.md` and a separate chat, at the owner's instruction.
+- 2026-09-22, owner's four decisions on record (AskUserQuestion): a kid may **propose** a meet (deferred to the handoff); **Dance** comes out of the competition categories and **skating star level** goes in, with an editable category table (deferred); watch/accompany is built by **extending Sister Sync invites** with a `watching` flag on the competition block, no competition reward, no money-tab link; delivery is **one branch, staged commits, one PR**.
 
 ## Pending
-- None. PR [#91](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/91) is open against `main` and awaiting the owner's merge.
+- PR [#91](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/91) **merged** 2026-09-21 as `f4d1db5`. (This line previously said "awaiting the owner's merge" — corrected 2026-09-22.)
+- All pocket-money items are **open but not in this round**. See `HANDOFF-pocket-money.md` §12 for the order they should be taken in.
 
 ## Request ledger
 | # | Round/date | Requirement (user's words, short) | Status | Note |
@@ -22,12 +25,31 @@ Single working record for this repository. Updated by the main session at the en
 | 8 | R1 2026-09-21 | "Then commit and push to rules-v2" | done | Commit `59dfc1d`, pushed to `Rules-v2`. |
 | 9 | R1 2026-09-21 | Implied by #3: bundle `README.md` to root | **intentionally not done** | Bundle README is the install guide; absent from its own "Where the files land" table and from the user's enumeration. Overwriting the project README would have lost it. Flagged. |
 | 10 | R1 2026-09-21 | Raised in-session: architecture doc must survive the install | done | User chose "Split". See Approved baseline. |
+| 11 | R2 2026-09-22 | "I could quickly add school block on the weekly view, the feature got dropped" | in progress | **Confirmed regression.** `93caf9c` deleted the second host `#tgSchoolBanner` with the Day Blocks tab. Stage 1 restores it as `#weekSchoolBannerTop` and adds per-day chips. |
+| 12 | R2 2026-09-22 | "Today tab, the profile picture top right does not let you switch profile" | in progress | **Confirmed bug, and it is three screens** — Today, Chores, Sister Sync are inert `<div>`s. Stage 2. Owner raised one; the whole scope was checked per his standing instruction. |
+| 13 | R2 2026-09-22 | "Add competition day watch/accompany feature" | in progress | Stage 3. Owner chose: extend Sister Sync, `watching` flag on the block, no reward, no money link. |
+| 14 | R2 2026-09-22 | "The add school days banner shows above AND below on an empty week; only below when something is booked — reconsider your proposal" | done | Owner's correction **invalidated Plan v1's fix**, which would have deleted the above-the-fold copy. Plan v2 reversed it to a second host. |
+| 15 | R2 2026-09-22 | "Competition cannot be added in the Money tab under Jenn/Jess" | **deferred to handoff** | **Working as designed** — four deliberate gates, `ARCHITECTURE.md:2247`. Owner chose to add a propose path. Handoff §9. |
+| 16 | R2 2026-09-22 | "Old rules still showing on the Money tab, against the previous PR" | **deferred to handoff** | **Confirmed regression**, root cause worse than the symptom: no migration for saved rulebooks. Handoff §7 + §8 D3. |
+| 17 | R2 2026-09-22 | "Jenn shows 0 cash, Jess shows $50 — why" | **deferred to handoff** | **Not a bug.** No seeded or default balance exists anywhere in `js/`. Handoff §10 carries the iPad steps to confirm. |
+| 18 | R2 2026-09-22 | "Remove the Dance category (it is a skating level exam); add skating star level; I need edit ability in Money rules" | **deferred to handoff** | Amounts are already editable; the **rows** are not. Handoff §2. |
+| 19 | R2 2026-09-22 | "Check every promise you made in PR90 — a lot are not delivered" | **done (audit), fixes deferred** | Audited 15 promises: **13 delivered, 2 partial, 3 tests that would not fail on regression.** The premise did not hold; the real problem is delivered-but-unreachable. Handoff §0 and §11. |
+| 20 | R2 2026-09-22 | "Gifts need to be editable — date and money, parent approves the change" | **deferred to handoff** | A parent CAN edit both. Three date bugs found; a kid has **no** edit-proposal path. Handoff §6. |
+| 21 | R2 2026-09-22 | "Money rule is not editable in parent portal" | **deferred to handoff** | **Editor exists and is wired** — Setup → 💰 Money rules. A mid-session claim that no rules editor was ever built was **wrong and is corrected on record**. Handoff §2. |
+| 22 | R2 2026-09-22 | "Move money into category all greyed out, why? And the category is not correct" | **deferred to handoff** | By design: the 30/60/90 unlock ladder keyed to loan-paid %. Root cause worth changing — `mnyPaidPct` returns 0 when a kid has **no loan**, pinning her at stage 0 forever. Historical category list recovered from `437f79a`. Handoff §3 + §4. |
+| 23 | R2 2026-09-22 | "Duplicated information between My money and Money school" | **deferred to handoff** | 7 overlaps; 6 cosmetic, **1 real defect** (`MNY_PAID`/`MNY_UNPAID` hardcode a parent-editable count). Handoff §8. |
+| 24 | R2 2026-09-22 | "Where is the cash pool?" | **answered, deferred** | **There is no family cash pool** and no function sums across both kids. "One pool" means fungible inflows per kid. PR #89 answered this with the Flow screen, shipped as 📖 My money story. Handoff §5. |
+| 25 | R2 2026-09-22 | "Separate this into two sections — plan the others here, hand off the pocket money" | done | Plan v4 covers #11/#12/#13 only; `HANDOFF-pocket-money.md` (427 lines) carries #15–#24. |
+| 26 | R2 2026-09-22 | "I do not need the add school day banner in two places — keep it above the calendar only" | done | Narrows Plan v4 §1 mid-implementation (**Rev 4**). Stage 1 shipped two hosts and was green; Stage 1b retires the below-grid `#weekSchoolBanner` so the top host is the only one. Folded in two defects the worker flagged: `addSchoolDayToDay` now filters through `schoolDaysToOffer` (a stale chip could write a duplicate card), and the confirm reads "Add it" for one day. |
 
 ## Hotspot counter
 | Area / feature | Fix rounds | Recurrences | Last symptom | Rewrite-vs-repair reviewed? |
 |---|---|---|---|---|
 | Rules/governance install | 1 | 0 | — (first round) | n/a |
 | `CLAUDE.md` filename collision | 1 | 0 | Bundle and repo both claim the root `CLAUDE.md`; different documents | yes — resolved by split, not patch |
+| **Pocket money** | **3** | **1** | Kid Money tab still shows pre-house-rules prices; Move-money destinations all greyed; categories renamed away from the family's vocabulary | **NO — and the rule now BLOCKS the next patch.** PR #89 (Stages 1–3), PR #90 (Stages 4–6), this round. The comparison is the first deliverable in the handoff chat; `HANDOFF-pocket-money.md` §1 names the shared cause (three key-spaces for one idea: `EV_HOMES` / `MNY_BUCKETS` / `MNY_HOLDING_KINDS`). |
+| Week-view school offer | 1 | 0 | Offer only below a ~700px grid once anything is booked | n/a — first fix round; cause is a host deleted with the Day Blocks tab |
+| Profile badge | 1 | 0 | Three inert `<div class="profile-badge">` with a false `aria-label` | n/a — first fix round |
 Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → no further patch until the comparison is presented.
 
 ## Deliverable ledger
@@ -39,20 +61,28 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → n
 | `docs/HZ-skill-trigger-tuning.md` | COMPLETE | Committed; `docs/CLAUDE.review-rev2.md` deleted per install procedure |
 | `tests/replay-hooks.sh`, `tests/test-routing-hook.md` | COMPLETE | `passed=14 failed=0` |
 | `.gitignore` — track `.claude/`, ignore state + pycache | COMPLETE | `git status` clean of `.pyc` |
-| Zip removed | COMPLETE | `working-rules-bundle-v2 (2).zip` deleted in `59dfc1d` |
 | `WORKING_RECORD.md` filled for this repo | COMPLETE | this file |
 | `FEATURES.md` — governance surface | COMPLETE | bundle-introduced features listed |
-| `FEATURES.md` — **app** feature manifest | NOT STARTED | Open question 1 below. No app feature changed this round, so nothing is yet at risk. |
-| `routing_guard_mode: enforce` | NOT STARTED | Blocked on `tests/test-routing-hook.md`, which must run in a session where the hooks are live (i.e. after merge to `main`). |
+| `FEATURES.md` — **app** feature manifest | NOT STARTED | Open question 1 below. Still unfilled; Stage 1–3 regression tables are checked against `ARCHITECTURE.md` directly, as the manifest's own scope note instructs. |
+| `routing_guard_mode: enforce` | NOT STARTED | Blocked on `tests/test-routing-hook.md`. |
+| **PR #90 promise audit** | COMPLETE | 15 promises verified against HEAD: 13 delivered, 2 partial, 3 weak tests. `HANDOFF-pocket-money.md` §0 and §11. |
+| **`HANDOFF-pocket-money.md`** | COMPLETE | 427 lines at repo root; 12 sections; ten pocket-money requests (#15–#24) carried with file:line evidence |
+| Stage 1 — school-day offer above the grid | COMPLETE (amended) | Repro failed first at **311/314**, then **314/314 exit 0**. `check` 8/8 · merge 112/112 · buffers 9/9 · stream 28/28 · cleanup pass · xp 28/28 · money 33/33. |
+| Stage 1b — one host only, above the grid | IN PROGRESS | Owner's narrowing (#26). Retires `#weekSchoolBanner`; re-points the part-planned smoke arm; adds an assertion that the id is gone. |
+| Stage 2 — profile badges switch profile | NOT STARTED | Blocked on Stage 1 being green |
+| Stage 3 — watch a sister compete | NOT STARTED | Blocked on Stage 2 being green |
 
 ## Checks and evidence
 - 2026-09-21 `bash tests/replay-hooks.sh` → **passed=14 failed=0**; `.claude/hooks/config.json` confirmed restored to `routing_guard_mode: "observe"`, `.claude/state/` empty.
-- 2026-09-21 `npm run check` → **green**: 43 files pass `node --check`; 1943 top-level declarations, no duplicates; 16 `state.shared` keys all with a merge decision (14 arbitrated, 2 declared LWW); escaping lint clean; 1379 CSS classes and 373 ids all referenced; 7 test suites all run by `npm test` and CI; 43 scripts all loaded and cached, SW_VERSION `2026-09-21c`.
-- 2026-09-21 `npm run test:smoke` → **not run** this round. Justified: no `js/`, `css/`, `index.html` or `sw.js` file was touched. The only non-governance edits were two prose lines in `README.md` and `SECURITY_TODO.md`.
-- 2026-09-21 Hooks verified live by observation: `record-guard.py` blocked this very turn for an incomplete record, which is the intended behaviour and the first real-session evidence that the Stop hooks fire.
+- 2026-09-21 `npm run check` → **green**: 43 files pass `node --check`; 1943 top-level declarations, no duplicates; 16 `state.shared` keys all with a merge decision; escaping lint clean; 1379 CSS classes and 373 ids all referenced; 43 scripts all loaded and cached, SW_VERSION `2026-09-21c`.
+- 2026-09-22 **read-only audit round, no app file changed.** Five parallel investigations over `js/`, `index.html`, `css/app.css`, `tests/`, the root `.md` files, and git history back to `437f79a`. Findings are in `HANDOFF-pocket-money.md` and Plan v4.
+- 2026-09-22 **Stage 1 verified.** Failing repro first: `theSchoolOfferIsAboveTheWeekGrid` + two others failed at **311/314**, naming the missing host. After the fix **314/314, exit 0, errors: []**. Also `npm run check` 8/8 (1945 declarations no duplicates, 1380 CSS classes and 374 ids all referenced, `SW_VERSION 2026-09-22a`), merge 112/112, buffers 9/9, stream 28/28, cleanup pass, xp 28/28, money 33/33. `npm run check` re-run green by the main session independently.
+- 2026-09-22 Stage 1b / 2 / 3 verification: **pending.** Same gate before any push.
+- **Not verified on a live URL or a real device.** Everything so far is headless Chromium at 390×844; no deploy stamp has been read, so nothing is claimed as deployed.
 
 ## Open questions / blockers
-1. **`FEATURES.md` app manifest is unfilled.** The bundle ships it as a template. A real manifest for this app has to be derived from `ARCHITECTURE.md` (~2700 lines) and would be a task of its own; inventing one quickly would produce a manifest that regression tables are checked against but that is itself wrong — worse than an empty one. Recommend a dedicated round.
-2. **`routing_guard_mode` is `observe`.** Per the bundle README, run `tests/test-routing-hook.md` to learn which hook-input fields identify a subagent before switching to `enforce`. Cannot be done from the installing session — hooks load at session start.
-3. **Hooks govern sessions that start after merge to `main`.** PR #91 must merge before any of this applies to normal work.
-4. **Assumption on record:** `docs/CLAUDE.review-rev1.md` in the request was read as `rev2`. If a rev1 was genuinely expected to exist, the bundle is missing it.
+1. **`FEATURES.md` app manifest is unfilled.** The bundle ships it as a template. A real manifest has to be derived from `ARCHITECTURE.md` (~2700 lines) and is a task of its own; inventing one quickly would produce a manifest that regression tables are checked against but that is itself wrong. Recommend a dedicated round.
+2. **`routing_guard_mode` is `observe`.** Per the bundle README, run `tests/test-routing-hook.md` to learn which hook-input fields identify a subagent before switching to `enforce`.
+3. **The pocket-money hotspot rule is live.** Three fix rounds on the money area means the next money patch is not allowed until a rewrite-vs-repair comparison is presented. That is the first item in the handoff chat, not a patch.
+4. **One assumption carried into Stage 3 rather than asked:** a watching block earns no competition score and no competition money (guaranteed structurally by `blockIsCompetition` returning false for it) but still counts as ordinary planned time in the week charts. Excluding it from those too is a one-line filter, and would make a Saturday spent at the rink read as free. Flagged to the owner in Plan v4 §3.
+5. **Correction on record:** mid-session this assistant stated that no rules-editor commit existed across PRs #89 and #90, inferred from commit titles. That was wrong — a complete effective-dated editor exists at Setup → 💰 Money rules. Recorded here because the wrong claim reached the owner.
