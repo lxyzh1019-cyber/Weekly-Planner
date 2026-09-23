@@ -107,7 +107,10 @@ function parentRenderLanding(destId) {
         <span class="pn-sub">${escapeHtml(r.sub)}</span></span>
       <span class="pn-chev" aria-hidden="true">›</span>
     </button>`).join('');
-  wrap.innerHTML = `<p class="pn-cap">${escapeHtml(dest.label || '')}</p><div class="pn-card">${rows}</div>`;
+  /* App is the shelf for "which version is this": the build this device loaded
+     (BUILD, js/01-config.js), under the list. */
+  const build = destId === 'app' ? `<p class="app-build">Build ${escapeHtml(BUILD)}</p>` : '';
+  wrap.innerHTML = `<p class="pn-cap">${escapeHtml(dest.label || '')}</p><div class="pn-card">${rows}</div>${build}`;
 }
 
 /* One switcher, in the top bar, replacing the three that each drew their own. */

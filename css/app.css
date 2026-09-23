@@ -6910,6 +6910,14 @@
     font-size: max(13px, calc(0.9rem * var(--fs-scale, 1)));
     font-weight: 700; text-align: center; line-height: 1.15;
   }
+  /* The build number, under the More tiles and under the portal's App list.
+     A label for a grown-up, not a control — quiet, but held to the 13px floor
+     because the More sheet is reached from a kid screen. */
+  .app-build {
+    margin: var(--space-3, 0.8rem) 0 0;
+    font-size: max(13px, calc(0.82rem * var(--fs-scale, 1)));
+    color: var(--ink-light); text-align: center;
+  }
 
   /* Print must never carry the nav. */
   @media print { .kid-nav { display: none !important; } body.has-kid-nav { padding-bottom: 0; } }

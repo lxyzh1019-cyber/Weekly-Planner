@@ -110,6 +110,21 @@ if (!version) {
   }
 }
 
+// ── 4 · the page's BUILD is the worker's SW_VERSION ──
+// BUILD (js/01-config.js) is what a screen prints so a grown-up can read which
+// build a device is running. Two numbers that must agree with nothing checking
+// them drift, and a stamp that disagrees with the cache it came from is worse
+// than no stamp. Same string match as SW_VERSION above.
+const config = fs.readFileSync(path.join(ROOT, 'js', '01-config.js'), 'utf8');
+const build = (config.match(/const BUILD = '([^']+)'/) || [])[1];
+if (!build) {
+  problems.push("js/01-config.js has no BUILD — the page has no build number to show (const BUILD = '<same as SW_VERSION>';)");
+} else if (version && build !== version) {
+  problems.push(
+    `BUILD in js/01-config.js is '${build}' but SW_VERSION in sw.js is '${version}' — `
+    + 'set both to the same value; a device shows BUILD as the build it is running');
+}
+
 if (problems.length) {
   console.error(`FAIL  ${problems.length} offline-shell problem(s):\n`);
   problems.forEach(p => console.error('  ' + p));

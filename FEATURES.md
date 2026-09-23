@@ -1,4 +1,4 @@
-# FEATURES — Weekly-Planner — manifest v2 — confirmed 2026-09-22
+# FEATURES — Weekly-Planner — manifest v3 — 2026-09-23 (v2 confirmed 2026-09-22)
 
 Locked features of the current version. Every edit is checked against this list and ends with a regression table. Update this file in the same change that alters a feature. Over-list rather than under-list.
 
@@ -51,6 +51,12 @@ to be a complete manifest:
 - Three escaping helpers chosen by context, enforced by `tests/check-escaping.js`.
 - Verification gate before any push: `npm run check`, `npm run test:merge`, `npm run test:xp`, `npm run test:money`, `npm run test:smoke`.
 - `SW_VERSION` must be bumped on any deploy changing a shell file, enforced by `tests/check-sw-shell.js`.
+
+### The build number is on the page (manifested 2026-09-23)
+- `const BUILD` in `js/01-config.js` is the page's copy of `SW_VERSION` (`sw.js`). **One number with a check:** `tests/check-sw-shell.js` fails `npm run check` when `BUILD !== SW_VERSION` (or `BUILD` is missing), naming both values and saying to set them equal. Bump both together.
+- Printed as `Build <BUILD>` (class `.app-build`, `escapeHtml`, 13px floor, not a control) in **two** places: under the tiles of the Today More sheet (`tdOpenMore`, `js/31-today.js`) — **bottom nav → More** — and under the list on the parent portal's App landing only (`parentRenderLanding('app')`, `js/11-parent.js`) — **Parent → PIN → ⚙️ App**. Setup's landing does not carry it.
+- Because `js/01-config.js` is a cached shell file, the number shown is what that device loaded, offline copy included.
+- Held by `theBuildNumberIsOnThePage` in `tests/smoke.js` (both surfaces show `BUILD`, `BUILD` non-empty, the More line ≥13px, Setup does not show it).
 
 ### Week screen — the school-day offer (manifested 2026-09-22)
 - School days are **offered, never assumed**, and the question is whether the school **card** is missing, not whether the day is empty — `schoolDaysToOffer` (`js/07-week-view.js`).

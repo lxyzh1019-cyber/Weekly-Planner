@@ -2814,6 +2814,20 @@ appearing for a week she is still living.
   changes a shell file and never touches `sw.js`, reading the working tree as
   well as the committed diff so the warning arrives before the commit rather
   than after it.
+
+  **`BUILD` (`js/01-config.js`) is the page's copy of `SW_VERSION`, and it is
+  how you tell which build a device is running.** `SW_VERSION` lives only inside
+  the worker and was never shown anywhere, so an installed iPad could not say
+  which build it had — and "deployed" cannot be claimed without reading a stamp
+  on the page. `BUILD` is printed as `Build <value>` under the tiles of the Today
+  **More** sheet (bottom nav → More) and under the list on the parent portal's
+  **App** landing (Parent → PIN → ⚙️ App). `js/01-config.js` is itself a cached
+  shell file, so the number on screen is what THAT device loaded, offline copy
+  included — no `postMessage` round-trip to the worker is needed to know it.
+  `tests/check-sw-shell.js` fails the build when `BUILD !== SW_VERSION`, so it
+  is one number with a check rather than two that drift: **bump both
+  together.** `theBuildNumberIsOnThePage` in `tests/smoke.js` holds both
+  surfaces.
 - Toggles (`.buffer-toggle`, `.repeat-toggle`) and the 19 overlays carry their
   ARIA **statically** in `index.html`; `enhanceNonButtonClickables`
   (`js/99-main.js`) only keeps `aria-checked` in step with `.on`. Focus and

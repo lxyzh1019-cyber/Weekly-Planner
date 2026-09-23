@@ -15944,6 +15944,52 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  // The build number is on the page. The service worker answers offline from a
+  // cached shell, so a device can run an old build for a long time, and "which
+  // one is this?" had no answer anywhere a parent could read it. BUILD
+  // (js/01-config.js) is the page's copy of SW_VERSION — tests/check-sw-shell.js
+  // holds the two equal — and it is shown in two places: under the tiles of the
+  // Today More sheet, and under the list on the parent portal's App landing.
+  if (want('theBuildNumberIsOnThePage')) checks.theBuildNumberIsOnThePage = await page.evaluate(() => {
+    const problems = [];
+    const build = (typeof BUILD === 'string') ? BUILD.trim() : '';
+    if (!build) problems.push('BUILD is not declared as a non-empty string — there is no build number for a screen to show');
+    const click = (sel) => { const el = document.querySelector(sel); if (el) el.click(); return !!el; };
+
+    // 1 · Today → bottom nav → More → the line under the tiles.
+    profile = 'jenn'; parentViewing = 'jenn';
+    goToday();
+    if (!click('#kidNav [data-td-nav="more"]')) problems.push('the kid nav has no More button');
+    const sheet = document.querySelector('#tdMoreOverlay .td-more-sheet');
+    if (!sheet) {
+      problems.push('the More sheet did not open');
+    } else {
+      const line = sheet.querySelector('.td-more-grid ~ *');
+      const text = line ? line.textContent : '';
+      if (!build || !text.includes(build)) problems.push(`the More sheet has no line under the tiles naming build ${build || '(none)'} — found "${text.trim()}"`);
+      // The sheet is reached from a kid screen, so the kid 13px floor applies.
+      if (line && parseFloat(getComputedStyle(line).fontSize) < 13) problems.push(`the More sheet's build line is ${getComputedStyle(line).fontSize}, under the 13px floor`);
+    }
+    document.getElementById('tdMoreOverlay')?.classList.remove('open');
+
+    // 2 · Parent Mode → App → the line under the list.
+    profile = 'parent'; showScreen('parent'); renderParentHome();
+    if (!click('#pdestbtn-app')) problems.push('the portal has no App destination');
+    const wrap = document.getElementById('ptab-app-wrap');
+    const card = wrap && wrap.querySelector('.pn-card');
+    const after = card && card.nextElementSibling;
+    const appText = after ? after.textContent : '';
+    if (!card) problems.push('the App landing drew no list');
+    else if (!build || !appText.includes(build)) problems.push(`the App landing has no line under the list naming build ${build || '(none)'} — found "${appText.trim()}"`);
+    // Only App carries it: Setup is the other landing and says nothing about builds.
+    setParentDest('setup');
+    const setupWrap = document.getElementById('ptab-setup-wrap');
+    if (build && setupWrap && setupWrap.textContent.includes(build)) problems.push('the Setup landing shows the build number too — it belongs on App only');
+
+    profile = 'jenn'; goToday();
+    return problems.length ? problems : true;
+  });
+
   checks.noConsoleErrors = errors.length === 0;
 
   // A check passes only by being exactly true.
