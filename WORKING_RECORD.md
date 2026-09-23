@@ -10,7 +10,7 @@ Single working record for this repository. Updated by the main session at the en
 
 ## Pending
 - PR [#91](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/91) **merged** 2026-09-21 as `f4d1db5`. (This line previously said "awaiting the owner's merge" — corrected 2026-09-22.)
-- **PR [#93](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/93) — draft, open, awaiting the owner's review and merge.** Last code change: the #34 wrong-day fix, then `main` (PR #92) merged in (#35), build 2026-09-23b. Description updated 2026-09-23 to include both. Final gate on the merged head: `npm run check` OK, smoke 347/347.
+- **PR [#93](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/93) — draft, open, awaiting the owner's review and merge.** Last code change: the #34 wrong-day fix, then `main` (PR #92) merged in (#35), build 2026-09-23b. Description updated 2026-09-23 to include both. Final gate on the merged head: `npm run check` OK, smoke 347/347. **GitHub CI green on `2d013ac`** (2026-09-23): "Syntax, globals, merge tests" ✅ and "Headless smoke test" ✅. Mergeable, no conflict.
 - **After merge, the owner's one step:** open Today → ⋯ More on the iPad and read **Build 2026-09-23b**. That is the only way to claim "deployed" under the rules; nothing has been read on the live URL yet.
 - **Approved (#33), done:** 4a `SMOKE_ONLY` ✅ `126506a` · 4b build number ✅ `a03f1c2` · 4c dead-button check ✅ `46c7306` · 4d repeat-invite guard ✅ `718bb84` · 4e 💌 note on Today ✅ `a25f8ec`. **All five complete.**
 - **Approved (#34), done:** the Sister Sync wrong-day fix (Open questions 6, now closed). Build **2026-09-23b** — after merge, that is the number to read on the iPad, not 23a.
