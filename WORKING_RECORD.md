@@ -10,8 +10,10 @@ Single working record for this repository. Updated by the main session at the en
 
 ## Pending
 - PR [#91](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/91) **merged** 2026-09-21 as `f4d1db5`. (This line previously said "awaiting the owner's merge" — corrected 2026-09-22.)
-- **PR [#93](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/93) — draft, open, awaiting the owner's review and merge.** Branch `claude/inspiring-gauss-232zww` pushed 2026-09-22 with commits `504cea2`, `b4b62dd`, `d3fb2b6`, `684eb2c`, `c811cda`.
-- **Approved (#33), in progress:** 4a `SMOKE_ONLY` ✅ `126506a` · 4b build number ✅ `a03f1c2` · 4c dead-button check ✅ `46c7306` · 4d repeat-invite guard ✅ `718bb84` · 4e 💌 note on Today ✅ `a25f8ec`. **All five complete.**
+- **PR [#93](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/93) — draft, open, awaiting the owner's review and merge.** Twelve commits, head `6bb5b22`, all pushed. Title and description rewritten 2026-09-23 to cover all eight stages. Final gate on the head: `npm run check` 9/9, smoke 320/320.
+- **After merge, the owner's one step:** open Today → ⋯ More on the iPad and read **Build 2026-09-23a**. That is the only way to claim "deployed" under the rules; nothing has been read on the live URL yet.
+- **Approved (#33), done:** 4a `SMOKE_ONLY` ✅ `126506a` · 4b build number ✅ `a03f1c2` · 4c dead-button check ✅ `46c7306` · 4d repeat-invite guard ✅ `718bb84` · 4e 💌 note on Today ✅ `a25f8ec`. **All five complete.**
+- **Awaiting the owner's yes/no:** the Sister Sync wrong-day fix (Open questions 6). Asked 2026-09-23; recommended repair.
 - **Found in 4d, NOT approved, raised to the owner:** Sister Sync invites can be dated on the wrong day — see Open questions 6.
 - **Not approved, proposed for its own round:** tier-2 click sweep; tier-3 logic review of non-money screens.
 - All pocket-money items are **open but not in this round**. See `HANDOFF-pocket-money.md` §12 for the order they should be taken in.
