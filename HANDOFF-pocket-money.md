@@ -405,6 +405,17 @@ equality, not a widened band.
 
 ---
 
+## 11b · A possible 13px-floor breach on a money screen — a lead, not a finding
+
+Found 2026-09-23 while building the non-money work. Run as part of a
+`SMOKE_ONLY` subset, `kidScreensMeetTheHouseRules` reported
+**`font 11.9px on .mny-tab-tag`** on a money screen. In the full suite it
+passes. The checks share one page, so the two runs reach that screen in
+different states — and it is not yet known which state is the one a child
+sees. Worth ten minutes: open the money screens at 390px in each state and
+measure `.mny-tab-tag` directly. If it can render under 13px, the full suite
+is passing it by accident.
+
 ## 12 · Suggested order for the new chat
 
 1. **The rewrite-vs-repair comparison** (§1) — governance requires it before any
