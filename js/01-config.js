@@ -5,13 +5,16 @@
 ════════════════════════════════════════════════════════════════ */
 const LS_KEY = 'weeklyplanner-v3';
 
-/* Which build this device is running. The page's copy of SW_VERSION in sw.js,
-   and it must equal it — tests/check-sw-shell.js fails the build when the two
-   differ, so bump them together. This file is part of the cached shell, so what
-   a screen prints is what THIS device loaded, offline copy included. Shown under
-   the tiles of the Today More sheet and under the list on the parent portal's
-   App landing, which is where a grown-up reads it on an iPad with no console. */
-const BUILD = '2026-09-23b';
+/* Which build this device is running — the one visible build stamp. It is the
+   page's copy of SW_VERSION in sw.js (the page cannot read sw.js), and
+   tests/check-sw-shell.js fails the build when the two differ, so bump them
+   together on every deploy that changes a shell file. This file is part of the
+   cached shell, so what a screen prints is what THIS device loaded, offline copy
+   included. Shown in two places, both as "Build <APP_BUILD>": under the tiles of
+   the Today More sheet (js/31-today.js) and under the list on the parent
+   portal's App landing (js/11-parent.js), which is where a grown-up reads it on
+   an iPad with no console. */
+const APP_BUILD = '2026-09-23b';
 const TOTAL_SLOTS = 60;           // 6AM → 9PM = 15 hrs × 4 (legacy, used for some %s)
 const START_HOUR  = 6;
 const END_HOUR    = 22;

@@ -38,7 +38,7 @@ directly, not against this file.
 - `tests/test-routing-hook.md` is the cloud procedure for learning which hook-input fields mark a subagent — run before switching `routing_guard_mode` to `enforce`.
 - `docs/HZ-skill-trigger-tuning.md` is the skill-trigger tuning procedure.
 - **Smoke subset for iteration (added 2026-09-22):** `SMOKE_ONLY=checkA,checkB npm run test:smoke` runs only the named checks. Every check statement in `tests/smoke.js` carries an `if (want('name'))` prefix naming its own check; `noConsoleErrors` is the one unguarded check and always runs. The check names are read from the file itself, not a hand list. A subset **is never the gate**: an unknown name exits 1 naming it; a named check that records nothing is a failure; the last line is `PARTIAL RUN (SMOKE_ONLY): N of M checks — not a pass of the suite` and never `ALL SMOKE CHECKS PASSED`; it refuses to run when `CI` is set. With `SMOKE_ONLY` unset or empty the suite runs every check, pass rule `v !== true`, final line unchanged. Documented in `ARCHITECTURE.md` (Verification) and `tests/README.md`.
-- **Dead-action guard (added 2026-09-23):** `tests/check-dead-actions.js`, in `npm run check` (the ninth check) and listed in `ARCHITECTURE.md` (Verification) and `tests/README.md`. Fails on (1) an `onclick` in `index.html` or a `js/` template calling a function not declared at top level in `js/` (method calls and browser globals excluded; a runtime callee `${fn}(…)` is counted, not checked), and (2) a `data-P-action="V"` not handled by prefix P's own dispatcher — the selector `[data-P-action="V"]`, or V compared/keyed inside a top-level function reading `dataset.<p>Action` / `'data-P-action'` or one it hands the action variable to. A prefix nothing reads fails, naming every value. Runtime-built values are resolved from literals in the `${…}` or at the drawing function's call sites; the rest are counted. The reverse (a compared value no markup emits) **warns** and does not fail. `EXEMPT` names `pm/edit` (unreachable branch in `pmPriceCards`; removal belongs to `HANDOFF-pocket-money.md` §2) and **self-expires**: when nothing emits the value, the check fails until the entry is deleted.
+- **Dead-action guard (added 2026-09-23):** `tests/check-dead-actions.js`, in `npm run check` (the ninth check) and listed in `ARCHITECTURE.md` (Verification) and `tests/README.md`. Fails on (1) an `onclick` in `index.html` or a `js/` template calling a function not declared at top level in `js/` (method calls and browser globals excluded; a runtime callee `${fn}(…)` is counted, not checked), and (2) a `data-P-action="V"` not handled by prefix P's own dispatcher — the selector `[data-P-action="V"]`, or V compared/keyed inside a top-level function reading `dataset.<p>Action` / `'data-P-action'` or one it hands the action variable to. A prefix nothing reads fails, naming every value. Runtime-built values are resolved from literals in the `${…}` or at the drawing function's call sites; the rest are counted. The reverse (a compared value no markup emits) **warns** and does not fail. `EXEMPT` is **empty** since the 2026-09-23 merge of `main`: its one entry, `pm/edit` (unreachable branch in `pmPriceCards`), self-expired when PR #92 removed that edit mode, and was deleted as designed. The mechanism stays: an entry **self-expires** — when nothing emits the value, the check fails until the entry is deleted.
 
 ## App features — not yet manifested
 Authority for app behaviour remains `ARCHITECTURE.md`. Its load-bearing rules,
@@ -54,10 +54,11 @@ to be a complete manifest:
 - `SW_VERSION` must be bumped on any deploy changing a shell file, enforced by `tests/check-sw-shell.js`.
 
 ### The build number is on the page (manifested 2026-09-23)
-- `const BUILD` in `js/01-config.js` is the page's copy of `SW_VERSION` (`sw.js`). **One number with a check:** `tests/check-sw-shell.js` fails `npm run check` when `BUILD !== SW_VERSION` (or `BUILD` is missing), naming both values and saying to set them equal. Bump both together.
-- Printed as `Build <BUILD>` (class `.app-build`, `escapeHtml`, 13px floor, not a control) in **two** places: under the tiles of the Today More sheet (`tdOpenMore`, `js/31-today.js`) — **bottom nav → More** — and under the list on the parent portal's App landing only (`parentRenderLanding('app')`, `js/11-parent.js`) — **Parent → PIN → ⚙️ App**. Setup's landing does not carry it.
+- `const APP_BUILD` in `js/01-config.js` is the page's copy of `SW_VERSION` (`sw.js`). **One number with a check:** `tests/check-sw-shell.js` fails `npm run check` when `APP_BUILD !== SW_VERSION` (or `APP_BUILD` is missing), naming both values and saying to set them equal. Bump both together.
+- Printed as `Build <APP_BUILD>` (class `.app-build`, `escapeHtml`, 13px floor, not a control) in **two** places: under the tiles of the Today More sheet (`tdOpenMore`, `js/31-today.js`) — **bottom nav → More** — and under the list on the parent portal's App landing only (`parentRenderLanding('app')`, `js/11-parent.js`) — **Parent → PIN → ⚙️ App**. Setup's landing does not carry it.
 - Because `js/01-config.js` is a cached shell file, the number shown is what that device loaded, offline copy included.
-- Held by `theBuildNumberIsOnThePage` in `tests/smoke.js` (both surfaces show `BUILD`, `BUILD` non-empty, the More line ≥13px, Setup does not show it).
+- Held by `theBuildNumberIsOnThePage` in `tests/smoke.js` (both surfaces show `APP_BUILD`, `APP_BUILD` non-empty, the More line ≥13px, Setup does not show it, `APP_BUILD` matches `YYYY-MM-DD[a-z]`, Setup keeps its 👵 Grandma rule row). It absorbed PR #92's `theAppLandingShowsTheBuild`, which no longer exists.
+- **Consolidated 2026-09-23 (build 2026-09-23b)** when `main` (PR #92) was merged in: PR #92 had built a parallel stamp (`APP_BUILD`, App landing only). Now one constant `APP_BUILD`, one class `.app-build`, one `check-sw-shell.js` section, one smoke check, same two screens. `BUILD` no longer exists.
 
 ### Week screen — the school-day offer (manifested 2026-09-22)
 - School days are **offered, never assumed**, and the question is whether the school **card** is missing, not whether the day is empty — `schoolDaysToOffer` (`js/07-week-view.js`).
@@ -115,6 +116,87 @@ to be a complete manifest:
 - Held by `anInviteWaitingShowsOnToday` in `tests/smoke.js` (run at 390×844).
 
 Deriving the full app manifest from `ARCHITECTURE.md` is an open item in `WORKING_RECORD.md`.
+
+## App — Pocket money (manifested 2026-09-22)
+
+Derived from `ARCHITECTURE.md` and checked against the code at `f4d1db5`;
+updated for Plan v5 PR A, Plan v6 PR B, Plan v7 B5–B7 and Plan v8 B8–B10 (2026-09-22). **This section is authoritative for the
+money area**; the rest of the app still checks against `ARCHITECTURE.md`. Items
+marked ⚠ are known defects still open — listed so a regression table can show
+them changing on purpose.
+
+### The stream and balances
+- Money is stored as movements in `profile.events`; balances are derived from them. `evShadowDrift` reports any pot where derived and stored disagree, on the parent page.
+- Every wallet writer mirrors into the stream. A caller may **label** a movement and never **redirect** one: structural fields are applied after `opts`.
+- A correction is a reversing event, never an edit. `profile.events` merges by id with its own `ev:` tombstone scope.
+- The migration is read-only until run, idempotent by derived id, and re-prices nothing.
+- ⚠ No screen reads a derived balance yet; every "Everything I have" still reads the stored wallet.
+
+### Rules
+- Rules are effective-dated versions; `mrVersionForDate` resolves the version live on a date, so a lived week keeps the rules it was lived under.
+- `mrApplyEdits` is the only versioned writer. Each change logs a line per field with a reason.
+- Settled weeks are frozen in `moneyLedger` and never recomputed.
+- `mrStartWeek()` is derived from the earliest week on file and never written by being read.
+- Four house rules (2026-09-21): homework earns XP, not dollars; tone, borrowing, screens and asked-twice are free the first two times a week; one grace day a week on the streak; the year's pace divides by weeks elapsed.
+- A household with a stored rulebook gets the house rules through a parent-only card on Money rules: `mrHouseRulesPending` lists only the missing fields, resolved by item id against today's rules; one tap applies them through `mrApplyEdits` from this week's Monday; the family's chore pool, prices, caps and targets are untouched; nothing lived is re-priced. The card never returns once applied (a log marker, `MR_HOUSE_RULES_NOTE`), even after a deliberate revert, and a second device finds nothing to do.
+- The year's-pace denominator is asserted directly (weeks elapsed, not weeks settled).
+- The rules change log stores readable values: `mrLogSummary` describes a list of records by id ("Added 🧦 Match the socks"); the history passes older stored arrays through the same summariser.
+- The repair only ever adds, prices each week under its own rules, never touches a migration-frozen week, and is idempotent.
+- 🏆 The repair card's second list, "Meets never paid" (`mnyUnpaidMeetsPlan` / `mnyPayUnpaidMeets`): settled weeks with a ledger row the late-meet sync treats by total (`mnyLateCompByTotal`, shared with `mnyLateCompSync`) whose meets are worth more than the row says — each week, its meet names and the amount. Positive gaps only, never takes back; weeks with no ledger row or already on the repair's list stay with the repair. Shown even when the repair has nothing; previewed and confirmed like the repair; one tap pays through `mnyLateCompSync`'s no-change mode, so a second tap pays nothing. (Plan v8 B9)
+- The $3 default is backfill only: it never reaches the current week or the eight the catch-up list covers.
+- 👵 The Grandma rule is the owner's test and the only default sweep (`mnyDefaultSweepPlan` / `mnyRunDefaultSweep`): a child's week gets the rule's amount when it is on or after the saved start week, outside the 8-week review window, has no family meeting record (`meetingsMet` or `meetingsHeld`) and is not already credited. Chores, fines, gifts and overrides in the week do not stop it. A meet already on file is paid on top as its own line; the row's `competition` is that total and gross/net/`finalizedWeeks` are amount + competition. Previewed (weeks, per-child totals, how many weeks had a family meeting), confirmed through the app dialog, guards re-checked at write time, never reaches the current week, a later one or the catch-up eight, credits once. New rows carry `defaulted` + `defaultReason: 'grandma'`; older `'default'` rows still read "nobody met". Week history and her money story say "Grandma rule"; the story's flat segment excludes the meet so it is drawn once. Its own Money rules section and Setup row. (Plan v7 B5 — replaced PR B's money-record filter and to-date, both deleted.)
+- 👵 The start week and amount are a dated rule, `grandma.from` / `grandma.amount`, entered once through the section's Save button and `mrApplyEdits`, logged as readable scalar lines in 🕰️ Change history. `mnyGrandmaRule()` reads the newest version; without it the rule falls back to `mrStartWeek()` and $3 and is "not saved", and nothing is credited until a start week is saved. The form is a draft until Save; there is no to-date; it says the last 8 weeks are left to the catch-up list. No new synced key. (Plan v7 B7)
+- The hub catch-up banner offers the same plan from the saved rule — "N weeks left the review window — Credit $3 each" — one tap through the same confirm, never automatic; with no start week saved it points to Money rules › 👵 Grandma rule instead. (Plan v7 B7)
+- The repair (`evRepairPlanFor`) leaves a `defaulted` week alone: it was priced by its rule, and its meets belong to `mnyLateCompSync`. (Plan v7 B5)
+
+### Recording
+- One Record sheet, five records, each written through its owner: chore grade `mrSetChoreGrade`, meet `mrAddCompetition`/`mrUpdateCompetition`, gift `mnyAddDeposit`/`mnyEditDeposit`, fine `mrAddFine`, move `mnyMoveMoney`/`mnyRequestMove`.
+- A child records two of the five — a gift and a move — and both only as proposals; the button says "Ask a grown-up".
+- A gift has a `dayKey` (when it came) and a `weekKey` (which Sunday decides it); a settled week hands the decision to the next open one. An edit moves the wallet by the difference, never reverse-and-reapply.
+- A meet and its calendar block carry each other's id.
+- 🏆 A settled week does not block a meet (the gift pattern): a meet added, corrected or deleted for a week already settled — at a meeting, by the Grandma rule, by the repair — pays or takes back into cash at once as its own `latecomp` line on the meet's own date, filed to the next open week, whose meeting pool (`mnyPool().lateComp`) decides where it goes. One owner, `mnyLateCompSync`, called from `mrAddCompetition` / `mrUpdateCompetition` / `mrDeleteCompetition`; a moved meet is out of one week and into the other. The settled week's ledger competition/gross/net and `finalizedWeeks` stay in step, so the repair never pays it twice. Idempotent by derived id on one device, on a re-run, and across two devices that merge. A week not settled is unchanged: the meeting pays its meets. The Record sheet and the meeting's competition form say what the gift form says (`MNY_SETTLED_WEEK_SENTENCE`). (Plan v7 B6)
+- A gift dated into any settled week — meeting-settled or Grandma-defaulted (`mnyWeekSettled`) — reaches her cash once and is decided at the next open meeting. (Plan v7 B6)
+- Record-sheet entry points, all live — parent Now, the parent Money rules head, meeting step 3, the kid's gift and competition cards, the wallet card's move door.
+- `MNY_CLICK_HOSTS` is the one list of containers `mnyHandleClick` is bound to; every rendered `data-mny-action` sits under one of them.
+- A refused move says why on the Record sheet's save button before the tap; the destination defaults to the first open pot other than the source.
+- Typing never re-renders the Record sheet: typing an amount updates only the save button in place (`rcSyncSave`, from the same `rcSaveState` `rcRender` uses), so the input keeps its focus.
+
+### Moving money
+- `mnyMoveMoney` is the one writer and owns no arithmetic. Pots never touch: a move between two pots goes through cash as two movements.
+- Every destination is stage-gated through `mnyIsOpen`; a refusal is a sentence shown beside the control, not a bare false.
+- A child proposes, a grown-up approves, and the move runs at approval against the wallet as it is then. Approving twice moves nothing; a rejection is kept.
+- One route decision, `mnyMoveRoute`, read by both `mnyMoveRefusal` and `mnyMoveMoney`: every ordered pair of homes either moves or is refused with a sentence. `invest → ready|locked` go through cash and move only what the sale raised.
+- No loan is 100% paid: every pot is open to a child who owes nothing, and nothing tells her she paid a loan off.
+
+### The meeting
+- The meeting is a full screen (`screen-meeting`), opened and closed only through `mmIsOpen` / `mmShow` / `mmHide`, returning to where it came from.
+- Three steps with ids — The week · The money · Close; `mmGoStep` translates the legacy five.
+- The money step's footer is the commit, and never a Next; `mnyCommitRefusal` is the one owner of why a split cannot commit. When one child is decided, it offers the other.
+- One undo snapshot per week.
+- ↩️ The Undo is withdrawn once money moves after the commit: the snapshot keeps the id of every money event on both girls' streams, and `mmUndoHeld()` drops it when any other money event is on either stream — written here (late meet, gift, move, approval) or merged from the other device — keeping the reason in `mmUndoGone`. The commit's own movements, for both girls one after the other, keep it (explicit bracket: `mmUndoHeld()` before a commit writes, `mmUndoSeal()` after). Both girls are caught up before the picture. In the button's place the meeting says "Undo is gone — money moved after this meeting; correct the item itself." with what moved; a stale button refuses. Withdrawn stays withdrawn for that week in that sitting. (Plan v8 B8)
+
+### Kid money pages
+- 💰 My money, 📖 My money story, 🎓 Money school, joined by the five-page bar (a child sees pages 1 and 5).
+- The Flow leads My money story with a sentence — came in, went out, went to grow, left — before any bar, and never leads with a total. "Left" is a balance, not in-minus-out. Each group scales to its own largest row. Three periods, with a typical month dividing by months elapsed. Empty months are kept in the history strip.
+- The Flow draws three groups — came in, went out (spent, fine, loan, given back, and anything else that left), put away to grow — and each caption equals the sum of its bars. `savedTotal` comes from `evFlowOf`; the Flow sums nothing.
+- Kid rule copy is generated from the live rules: the fines card (free repeats, "every time" for the box repeat) and the streak card (grace day); with those rules at 0 the old words return.
+- Money school shows the live price list (`pmPriceCards`) in the same closed-by-default disclosure and remembered toggle as My money; "Just part of being here" stays, its free-chores line read from `chores.freeChoresPerWeek`.
+- `pmPriceCards` is read-only; its unhandled edit mode is gone.
+- Every kid money screen holds the 44px target and 13px type floors.
+- 🔓 When her stage rises, My money (her own view only) shows one card naming the pots that opened and each new idea's what / why / what-to-watch from `MNY_CONCEPTS`; "Got it" records the stage in `localStorage` per child, per device (try/catch, never synced). First sight records silently; a grown-up viewing sees nothing.
+- 🌟 "Skating star level" is how every money surface names the `dance` sport — price editor, kid price list, meeting form, Record sheet, recorded meets. Sport id, rule key and scorer unchanged.
+
+### Parent money pages
+- Money rules has eight sections, 🕰️ Change history and 👵 Grandma rule among them; steppers queue as pending edits and save as one version with a reason and an effective date.
+- Setup › 🕰️ Change history opens the Change history section (the rules log), the one section that draws it; 📖 Week history keeps the week ledger; Lessons and Loans no longer carry the log.
+- 📖 Week history: a `defaulted` row reads "👵 Grandma rule $3 + meets $X" (or "No meeting — default $3 + meets $X" for `defaultReason:'default'`) from its own figures, with no steppers and no remove button; `mnyEditLedger` and `mnyDeleteLedgerWeek` refuse it with a sentence and change nothing (its money is already in her wallet; its meets correct through the meet). Hand-typed rows without `defaulted` keep the editor unchanged. (Plan v8 B10)
+- Loan edits never touch `paid` or `payments`; balance, pace, payoff date and the weekly amount due are derived on every render.
+- The Money school ladder opens at **20 / 30 / 40 / 100%** of all debt paid (ready · locked · stock · mix), from ONE table: `MNY_STAGES` has ids, pots / plans / lessons name a stage, and `mnyStagePct` reads `school.stagePct` with per-key defaults (no migration). A parent override can only open a stage, never close one.
+- Money rules › Lessons has three gate steppers (ready / locked / stock) that save as a dated rule version; a save that breaks ready ≤ locked ≤ stock ≤ 100 is refused with a sentence in the handler.
+- 🎿 Parent Now shows a loan-season row 1 Aug – 30 Sep unless a debt was created on or after 1 Jul that year; derived from the date, nothing stored, routes to Money rules › Loans.
+- The parent portal's App landing and the Today More sheet show "Build <APP_BUILD>"; `tests/check-sw-shell.js` fails when `APP_BUILD` ≠ `SW_VERSION`. One mechanism — see "The build number is on the page" above.
+- The "? How this page works" button on Money rules opens the parent tour.
+- A permanent click sweep (`everyMoneyControlClicksClean`) presses every money control on every money surface and fails on any exception.
 
 ## Regression table format (paste at the end of every edit)
 | Feature | v<old> → v<new> | Note |

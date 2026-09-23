@@ -1557,7 +1557,7 @@ function tdOpenMore() {
             <span class="td-more-label">${escapeHtml(i.label)}</span>
           </button>`).join('')}
       </div>
-      <p class="app-build">Build ${escapeHtml(BUILD)}</p>
+      <p class="app-build">Build ${escapeHtml(APP_BUILD)}</p>
     </div>`;
   ov.classList.add('open');
 }

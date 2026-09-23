@@ -119,10 +119,15 @@ function mnyTotalPaid(kid) {
   return money2(mnyEnsureDebts(kid).reduce((s, d) => s + (Number(d.paid) || 0), 0));
 }
 /* How much of everything owed has been cleared, 0–100. Drives the Money school
-   ladder and every progress bar. */
+   ladder and every progress bar.
+
+   Nothing owed is 100, not 0. The ladder opens pots as the debt comes down, so
+   0 pinned a child with no loan at stage 0 forever — every pot shut, for want
+   of a debt she never had. Callers that would say "paid off" check the
+   principal themselves (the ladder card, the parent's Lessons). */
 function mnyPaidPct(kid) {
   const principal = mnyTotalPrincipal(kid);
-  if (!(principal > 0)) return 0;
+  if (!(principal > 0)) return 100;
   return Math.max(0, Math.min(100, Math.round((mnyTotalPaid(kid) / principal) * 100)));
 }
 /* The bonus already banked by paying early, across every debt. Read from the

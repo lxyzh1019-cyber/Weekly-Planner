@@ -53,6 +53,9 @@ function mmStepId() { return (MM_STEPS[mmStep - 1] || MM_STEPS[0]).id; }
 let mmStep = 1;
 let mmSelectedDay = null;
 let mmUndo = null;
+/* Why the meeting's Undo was withdrawn, for the week it was held for:
+   { wk, why }. Session-local like mmUndo itself — see mmUndoHeld. */
+let mmUndoGone = null;
 let mmAddChoreFor = null;   // "kid|dayIdx" whose add-a-chore picker is open
 let mmCatchUpAsked = false; // the catch-up question, asked once per page load
 
@@ -129,7 +132,7 @@ function mmHide() {
 function openFamilyMeeting() {
   if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
   ctEnsureShared();
-  mmStep = 1; mmMaxStep = 1; mmSelectedDay = null; mmUndo = null;
+  mmStep = 1; mmMaxStep = 1; mmSelectedDay = null; mmUndo = null; mmUndoGone = null;
   mmClearReturn();        // a fresh sitting has nowhere to go back to
   mmExpressWeek = null;   // the full sitting, not the catch-up run
   renderMeetingMode();
@@ -719,7 +722,7 @@ function mmRenderExpress(wk) {
    week is still there rather than that something was missed. */
 function mmCatchUpBanner() {
   const list = mmUnsettledWeeks(8);
-  const older = (typeof mnyDefaultSweepPlan === 'function') ? mnyDefaultSweepPlan() : { weeks: [], total: 0 };
+  const older = (typeof mnyDefaultSweepPlan === 'function') ? mnyDefaultSweepPlan() : { weeks: [], total: 0, saved: false };
   if (!list.length && !older.weeks.length) return '';
   const unopened = mmUnopenedWeeks(8).length;
   const met = list.length - unopened;
@@ -756,20 +759,29 @@ function mmCatchUpBanner() {
      mmUnsettledWeeks stops at eight, so anything older was invisible here AND
      unsettleable: the only door to it was a card in Setup › Weeks on record
      that a parent had no reason to open, so a household with a real backlog was
-     simply told nothing. The flat default belongs where the backlog is already
-     being looked at. It is still a tap, still previewed, and it still moves no
-     money until mnyRunDefaultSweep's own confirmation. */
-  const sweep = older.weeks.length
-    ? `<div class="mm-catchup-row mm-catchup-more">
-         <span class="mm-catchup-wk">${older.weeks.length} week${older.weeks.length === 1 ? '' : 's'} further back</span>
-         <span class="mm-catchup-late">too old to settle on real numbers</span>
-         <button type="button" class="mm-catchup-go" data-mm-catch="sweep">${escapeHtml(mnyMoney(older.total))} at the default ›</button>
-       </div>`
-    : '';
+     simply told nothing. The Grandma rule belongs where the backlog is already
+     being looked at — the SAME plan as its own section, from the start week
+     saved there (js/24-money-parent.js). One tap, previewed, and it moves no
+     money until mnyRunDefaultSweep's own confirmation; never automatic. With
+     no start week saved there is nothing to offer yet, so the row points to
+     the section where it is entered. */
+  const n = older.weeks.length;
+  const sweep = !n ? ''
+    : older.saved
+      ? `<div class="mm-catchup-row mm-catchup-more">
+           <span class="mm-catchup-wk">${n} week${n === 1 ? '' : 's'} left the review window</span>
+           <span class="mm-catchup-late">no family meeting — the Grandma rule</span>
+           <button type="button" class="mm-catchup-go" data-mm-catch="sweep">Credit ${escapeHtml(mnyMoney(older.amount))} each ›</button>
+         </div>`
+      : `<div class="mm-catchup-row mm-catchup-more">
+           <span class="mm-catchup-wk">${n} week${n === 1 ? '' : 's'} left the review window</span>
+           <span class="mm-catchup-late">enter the Grandma rule's start week first</span>
+           <button type="button" class="mm-catchup-go" data-mm-catch="grandma">👵 Grandma rule ›</button>
+         </div>`;
   const cap = [
     unopened ? `${unopened} week${unopened === 1 ? '' : 's'} nobody has opened` : '',
     met ? `${met} met but not paid out` : '',
-    older.weeks.length ? `${older.weeks.length} further back` : '',
+    n ? `${n} further back` : '',
   ].filter(Boolean).join(' · ');
   return `<div class="mm-catchup">
       <div class="mm-catchup-cap">🕰️ ${escapeHtml(cap)}.
@@ -787,6 +799,11 @@ function mmHandleCatchUpClick(e) {
   const what = el.getAttribute('data-mm-catch');
   if (what === 'sweep') {
     if (typeof mnyRunDefaultSweep === 'function') mnyRunDefaultSweep();
+    return;
+  }
+  if (what === 'grandma') {
+    mnyParentSection = 'grandma';
+    setParentTab('money');
     return;
   }
   if (what === 'met') {
@@ -820,7 +837,7 @@ function mmGoToWeek(wk) {
   // A context captured against another week would send the parent back to a
   // sitting that no longer exists.
   mmClearReturn();
-  mmStep = 1; mmMaxStep = 1; mmSelectedDay = null; mmUndo = null; mmAddChoreFor = null;
+  mmStep = 1; mmMaxStep = 1; mmSelectedDay = null; mmUndo = null; mmUndoGone = null; mmAddChoreFor = null;
   if (typeof mnyDraft !== 'undefined') mnyDraft = null;
   if (!mmIsOpen()) mmShow();
   renderMeetingMode();
@@ -1569,8 +1586,10 @@ function mmConfirmAndRecord() {
   const c = state.shared.chore;
   const wk = ctWeekKey || ctThisWeekKey();
   if (c.meetingsHeld && c.meetingsHeld[wk]) { showToast('Already recorded this week'); return; }
+  mmUndoHeld();              // money moved since an earlier commit? then the undo goes first
   mmTakeUndoSnapshot(wk);
   const parts = commitFamilyMeeting(wk);
+  mmUndoSeal();              // what the commit itself moved is not "after the meeting"
   renderMeetingMode();
   showToast(`💛 Recorded${parts.length ? ' · ' + parts.join(' · ') : ''}`);
 }
@@ -1589,6 +1608,18 @@ function mmConfirmAndRecord() {
 function mmTakeUndoSnapshot(wk) {
   // Already holding the pre-commit picture for this week — do not replace it.
   if (mmUndo && mmUndo.wk === wk) return;
+  /* Withdrawn for this week (mmUndoHeld): a picture taken now, before the
+     second girl, would be offered as "puts both girls back" while the first
+     girl's week and the money that moved after it stay where they are. */
+  if (mmUndoGone && mmUndoGone.wk === wk) return;
+  mmUndoGone = null;
+  /* Both girls brought to today BEFORE the picture. The meeting's own screens
+     catch a girl up when she is shown (mnyRenderEarned, mnyRenderDecide), so
+     the second girl's interest used to arrive after the first commit — a
+     movement after the meeting, which would withdraw the undo between two
+     commits of one sitting. Caught up here it is in the picture, it is not
+     reversed by the undo, and her screen's own catch-up finds nothing to do. */
+  if (typeof mnySimCatchUp === 'function') ['jenn', 'jess'].forEach(k => mnySimCatchUp(k));
   const c = state.shared.chore;
   // Snapshot everything the commit mutates so the undo can fully reverse it.
   // The commit now moves XP and the loan as well as the wallet, so the undo has
@@ -1638,10 +1669,70 @@ function mmTakeUndoSnapshot(wk) {
     // Which girls were already committed when the picture was taken. This is
     // what lets the message below be honest rather than assume.
     committedBefore: ['jenn', 'jess'].filter(k => isChildMoneyCommitted(k, wk)),
+    // Every movement already on either girl's stream — see mmUndoHeld.
+    seen: mmUndoMovementIds(),
   };
 }
+
+/* ── The Undo is withdrawn once money moves after the meeting ──────
+   mmUndoRecord puts wallets, debts, holdings, deposits and the week's records
+   back WHOLESALE. So anything that moved money after the commit — a late meet
+   (mnyLateCompSync), a gift, a move, an approval, a payment that arrived from
+   the other device — was wiped from the wallet while its line stayed on the
+   stream: the wallet and the stream disagreed, and committing the week again
+   paid the meet a second time.
+
+   Every one of those movements lands on the stream, whether this device wrote
+   it (evAdd) or the other one did (the merge unions `profile.events` by id).
+   So the stream is the one place that catches the whole class, and this asks
+   it rather than hooking each writer: the snapshot keeps the id of every
+   movement on both girls' streams, and any movement that is not one of them
+   means the undo would wipe something real. The undo is dropped, and the
+   reason kept so the meeting can say it.
+
+   The commit's OWN movements must not count, for either girl — both are
+   settled one after the other in one sitting and the second must keep the
+   undo. That is an explicit bracket, not timing: a commit asks this question
+   before it writes anything (so what moved in between is caught), and
+   `mmUndoSeal` adds what it wrote once it is done. A commit that throws
+   half-way is never sealed, and its movements then withdraw the undo — the
+   safe way round. A marker (a zero-amount row) moves nothing and is ignored. */
+const MM_UNDO_GONE_SENTENCE = 'Undo is gone — money moved after this meeting; correct the item itself.';
+function mmUndoMovementIds() {
+  const ids = {};
+  if (typeof evList !== 'function') return ids;
+  ['jenn', 'jess'].forEach(k => evList(k).forEach(e => {
+    if (e && e.id && money2(e.amount) > 0) ids[e.id] = true;
+  }));
+  return ids;
+}
+/* Is the undo still safe to offer? Drops it — and says why — when not. */
+function mmUndoHeld() {
+  if (!mmUndo) return false;
+  const seen = mmUndo.seen || {};
+  let moved = null;
+  ['jenn', 'jess'].some(k => (typeof evList === 'function' ? evList(k) : []).some(e => {
+    if (!e || !e.id || !(money2(e.amount) > 0) || seen[e.id]) return false;
+    moved = (k === 'jenn' ? 'Jenn' : 'Jess') + ': ' + (e.note || e.kind || 'money moved');
+    return true;
+  }));
+  if (!moved) return true;
+  mmUndoGone = { wk: mmUndo.wk, why: moved };
+  mmUndo = null;
+  return false;
+}
+/* The end of a commit: what it moved is part of the meeting, not after it. */
+function mmUndoSeal() {
+  if (mmUndo) mmUndo.seen = mmUndoMovementIds();
+}
+
 function mmUndoRecord() {
-  if (!mmUndo) return;
+  /* A button drawn before the money moved (or before the other device's
+     movement arrived) can still be pressed. It refuses, and says why. */
+  if (!mmUndoHeld()) {
+    if (mmUndoGone) { showToast(MM_UNDO_GONE_SENTENCE); renderMeetingMode(); }
+    return;
+  }
   const c = state.shared.chore; const wk = mmUndo.wk;
   ['jenn', 'jess'].forEach(kid => {
     const s = mmUndo[kid];

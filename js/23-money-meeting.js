@@ -426,7 +426,7 @@ function mnyCompetitionForm(wk, kid) {
     danceItems: { silver: d.silver, gold: d.gold, allGold: d.allGold },
   }, mrRulesFor(d.dayKey));
 
-  const sportChips = [['swim', '🏊 Swim'], ['skate', '⛸️ Skating'], ['dance', '💃 Dance']].map(([id, label]) =>
+  const sportChips = [['swim', '🏊 Swim'], ['skate', '⛸️ Skating'], ['dance', '🌟 Skating star level']].map(([id, label]) =>
     `<button type="button" class="mny-chip ${d.sport === id ? 'on' : ''}" onclick="mnyCompSet('sport','${escapeJsAttr(id)}')">${label}</button>`).join('');
 
   let detail = '';
@@ -473,6 +473,8 @@ function mnyCompetitionForm(wk, kid) {
       ${d.sport !== 'dance' ? `<div class="mny-row"><span>Points</span>${mnyStepper('points', d.points, 'comp')}</div>` : ''}
       ${detail}
       <div class="mny-row total"><span>That comes to</span><b>${mnyMoney(preview)}</b></div>
+      ${/* A settled week does not block a meet — the gift's words, because it is the gift's mechanism. */''}
+      ${mnyGiftDecidedElsewhere(kid, d.dayKey) ? `<div class="mny-note">${escapeHtml(MNY_SETTLED_WEEK_SENTENCE)}</div>` : ''}
       <div class="mny-chiprow">
         <button type="button" class="mny-btn primary" onclick="mnySaveComp()">Save it</button>
         <button type="button" class="mny-btn" onclick="mnyToggleComp()">Cancel</button>
@@ -715,6 +717,8 @@ function mnyPoolCard(wk, kid, pool) {
       <div class="mny-rows">
         <div class="mny-row"><span>Money that came in</span><b>${mnyMoney(pool.cameIn)}</b></div>
         ${pool.deposits > 0 ? `<div class="mny-row"><span class="mny-sub-row">…including 🎁 ${mnyMoney(pool.deposits)} from outside</span></div>` : ''}
+        ${pool.lateComp > 0 ? `<div class="mny-row"><span class="mny-sub-row">…including 🏆 ${mnyMoney(pool.lateComp)} from a meet whose week was already settled</span></div>`
+          : (pool.lateComp < 0 ? `<div class="mny-row"><span class="mny-sub-row">…less 🏆 ${mnyMoney(-pool.lateComp)} taken back from a meet whose week was already settled</span></div>` : '')}
         ${due.map(payRow).join('')}
         <div class="mny-row total"><span>Mine to choose</span><b>${mnyMoney(pool.mine)}</b></div>
       </div>
@@ -844,12 +848,12 @@ function mnyBucketRows(kid, split) {
 /* Everything that lets her change the plan, behind one button. */
 function mnyChangePlanCards(wk, kid, draft, pool) {
   const cards = MNY_PLANS.map(p => {
-    const open = mnyIsOpen(kid, p.need);
+    const open = mnyIsOpen(kid, p.stage);
     return `<button type="button" class="mny-plan ${draft.planId === p.id ? 'on' : ''}" ${open ? '' : 'disabled'}
       onclick="mnyPickPlan('${escapeJsAttr(p.id)}')">
       <span class="mny-plan-icon">${p.icon}</span>
       <span>${escapeHtml(p.label)}</span>
-      ${open ? '' : `<small>🔒 ${escapeHtml(mnyNeedLabel(p.need))}</small>`}
+      ${open ? '' : `<small>🔒 ${escapeHtml(mnyNeedLabel(p.stage))}</small>`}
     </button>`;
   }).join('');
 
@@ -862,8 +866,8 @@ function mnyChangePlanCards(wk, kid, draft, pool) {
         ${mnyBucketStepper('goal:' + g.id, draft.split['goal:' + g.id])}</div>`;
     }).join('')
     + MNY_BUCKETS.filter(b => b.key !== 'loan').map(b => {
-      const open = mnyIsOpen(kid, b.need);
-      return `<div class="mny-row"><span>${b.icon} ${escapeHtml(b.label)}${open ? '' : ' 🔒 ' + mnyNeedLabel(b.need)}</span>
+      const open = mnyIsOpen(kid, b.stage);
+      return `<div class="mny-row"><span>${b.icon} ${escapeHtml(b.label)}${open ? '' : ' 🔒 ' + mnyNeedLabel(b.stage)}</span>
         ${open ? mnyBucketStepper(b.key, draft.split[b.key]) : '<b>—</b>'}</div>`;
     }).join('');
 
@@ -908,7 +912,7 @@ function mnyChangePlanCards(wk, kid, draft, pool) {
       }).join('')}</div>
       <div class="mny-note">${escapeHtml(doors.map(d => d.note)[3])}</div>
     </div>
-    ${mnyIsOpen(kid, 90) ? mnyStockChart() : ''}`;
+    ${mnyIsOpen(kid, 'stock') ? mnyStockChart() : ''}`;
 }
 function mnyBucketStepper(key, value) {
   return `<span class="mny-stepgrp">
@@ -990,7 +994,11 @@ function mnyCommittedCard(wk, kid) {
       <div class="mny-label">Done for this week</div>
       <div class="mny-today-big">The money has moved. ${escapeHtml(plan.label || '')}</div>
       ${mnyBarHtml(out, { empty: '' })}
-      ${mmUndo ? `<button type="button" class="mny-btn wide" onclick="mmUndoRecord()">↩️ Undo this meeting — puts both girls back</button>` : ''}
+      ${/* Asked, not read: mmUndoHeld drops an undo that money moving after
+            the meeting has made unsafe, and the note takes the button's place. */''}
+      ${mmUndoHeld() ? `<button type="button" class="mny-btn wide" onclick="mmUndoRecord()">↩️ Undo this meeting — puts both girls back</button>`
+        : (mmUndoGone && mmUndoGone.wk === wk
+          ? `<div class="mny-note">${escapeHtml(MM_UNDO_GONE_SENTENCE)} (${escapeHtml(mmUndoGone.why)})</div>` : '')}
     </div>`;
 }
 
@@ -1137,7 +1145,7 @@ function mnyPickPlan(id) {
   const plan = MNY_PLANS.find(p => p.id === id);
   // The card is already disabled, but the gate belongs on the action too: a
   // lesson that can be skipped by a stale click is not a lesson.
-  if (!plan || !mnyIsOpen(d.kid, plan.need)) { showToast(`🔒 ${mnyNeedLabel(plan ? plan.need : 0)}`); return; }
+  if (!plan || !mnyIsOpen(d.kid, plan.stage)) { showToast(`🔒 ${mnyNeedLabel(plan ? plan.stage : 'mix')}`); return; }
   d.planId = id;
   d.split = mnySplitFor(d.wk, d.kid, id, d.own);
   renderMeetingMode();
@@ -1157,7 +1165,7 @@ function mnyPickReflect(id) {
   if (d.planId === 'own') { renderMeetingMode(); return; }
   const chip = MNY_REFLECT.chips.find(c => c.id === id);
   if (chip && chip.planId) {
-    const open = mnyIsOpen(d.kid, (MNY_PLANS.find(p => p.id === chip.planId) || {}).need || 0);
+    const open = mnyIsOpen(d.kid, (MNY_PLANS.find(p => p.id === chip.planId) || {}).stage);
     if (open) {
       d.planId = chip.planId;
       d.split = mnySplitFor(d.wk, d.kid, chip.planId, d.own);
@@ -1201,6 +1209,12 @@ function mnyDoCommit() {
   const d = mnyDraft;
   if (!d || !mnyIsConfirmed(wk, kid) || mnyIsCommitted(wk, kid)) return;
   if (!isParent()) { showToast('A grown-up moves the money 🔒'); return; }
+
+  /* The start of the commit's bracket (js/15-meeting.js, mmUndoHeld): money
+     that moved since the previous girl's commit withdraws the undo HERE,
+     before this commit writes anything; mmUndoSeal at the end claims what
+     this one moved as the meeting's own. */
+  mmUndoHeld();
 
   // Catch the world up first: interest earned and prices moved since the last
   // meeting are part of this week, and the ledger has to record them.
@@ -1308,6 +1322,7 @@ function mnyDoCommit() {
 
   // 5 · the shared half of the meeting, once BOTH kids are settled.
   if (['jenn', 'jess'].every(k => mnyIsCommitted(wk, k))) commitMeetingShared(wk);
+  mmUndoSeal();
 
   saveAll();
   mnyDraft = null; mnyPlanOpen = false;

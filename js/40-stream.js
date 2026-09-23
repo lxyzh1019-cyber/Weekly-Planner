@@ -93,6 +93,12 @@ const EV_DEST_LABELS = {
   loan:   { icon: '🎿', label: 'Paid back' },
   fine:   { icon: '📦', label: 'Taken off' },
   returned: { icon: '↩️', label: 'Given back' },
+  /* Two sources that also appear as destinations, when the movement runs the
+     other way: a holding that LOST value (`evMirrorValueChange`) and the
+     migration's negative opening gap. Both are in `outTotal`, so both are
+     drawn — a caption must equal the bars under it. */
+  interest: { icon: '📉', label: 'Lost value' },
+  opening:  { icon: '📖', label: 'Spent before the record began' },
 };
 
 /* Which home a holding record lives in. `mnyEnsureHoldings` keys its records by
@@ -198,9 +204,17 @@ function evFlowOf(events, from, to) {
       }
     }
   });
+  /* What was put AWAY TO GROW — every home ribbon, which is every dest key
+     that is not a sink. `outTotal` above is money that LEFT (spent, fine, a
+     loan, given back); an allocation between pots is neither, so it gets its
+     own total. The Flow draws the two as two groups and must sum nothing
+     itself: its caption "Where it went $0.00" once sat above a $30 bar,
+     because the caption was one of these and the bars were both. */
+  const savedTotal = Math.round(Object.keys(dests)
+    .filter(k => evIsHome(k)).reduce((s, k) => s + dests[k], 0) * 100) / 100;
   return {
     from: from || null, to: to || null,
-    sources, dests, inTotal, outTotal,
+    sources, dests, inTotal, outTotal, savedTotal,
     // What is in hand at the END of the span — a balance, so it reads the whole
     // history up to `to`, not just the span. "Left" is not "in minus out".
     inHand: evBalanceOf(events, 'cash', to),
@@ -246,17 +260,24 @@ function evTypicalMonthOf(events, firstMonth, lastMonth) {
     return out;
   };
   const sources = {}, dests = {};
-  let inTotal = 0, outTotal = 0;
+  let inTotal = 0;
   months.forEach(mo => {
     Object.keys(mo.sources).forEach(k => { sources[k] = (sources[k] || 0) + mo.sources[k]; });
     Object.keys(mo.dests).forEach(k => { dests[k] = (dests[k] || 0) + mo.dests[k]; });
-    inTotal += mo.inTotal; outTotal += mo.outTotal;
+    inTotal += mo.inTotal;
   });
+  const avgDests = avg(dests);
+  /* Both "where it went" totals are the sums of the averaged rows the screen
+     draws, so a caption equals its bars to the cent. Mathematically the same
+     as each total divided by `n`; only the rounding differs. */
+  const sumOf = (keep) => Math.round(Object.keys(avgDests).filter(keep)
+    .reduce((s, k) => s + avgDests[k], 0) * 100) / 100;
   return {
     months: n, typical: true,
-    sources: avg(sources), dests: avg(dests),
+    sources: avg(sources), dests: avgDests,
     inTotal: Math.round((inTotal / n) * 100) / 100,
-    outTotal: Math.round((outTotal / n) * 100) / 100,
+    outTotal: sumOf(k => !evIsHome(k)),
+    savedTotal: sumOf(k => evIsHome(k)),
     inHand: months.length ? months[months.length - 1].inHand : 0,
     count: months.reduce((s, mo) => s + mo.count, 0),
   };
@@ -719,6 +740,11 @@ function evRepairPlanFor(kid) {
   Object.keys(fin).sort().forEach(wk => {
     const credited = (fin[wk] || {})[kid];
     if (credited == null) return;                 // never settled — nothing to repair
+    /* A defaulted week was priced by a rule, flat, not by the retired branch —
+       and the Grandma rule credits weeks whatever chores are in them, so
+       re-pricing one to its chores would pay on top of the rule. Its meets are
+       `mnyLateCompSync`'s, which keeps its ledger in step (js/21). */
+    if ((((c.moneyLedger || {})[wk] || {})[kid] || {}).defaulted) return;
     const id = evMigId(kid, [wk, 'repair']);
     if (have[id]) return;                         // already repaired
     const b = evRepriceWeek(kid, wk);
@@ -807,8 +833,8 @@ function evRunRepair() {
 
    ── The stage gates are not optional ──
 
-   Money school opens the pots as the loan comes down — keep-ready at 30% paid
-   off, locking away at 60%, companies at 90% — and `mnySplitFor` sends a locked
+   Money school opens the pots as the loan comes down — keep-ready, then
+   locking away, then companies, at the gates `mnyStagePct` reads — and `mnySplitFor` sends a locked
    bucket's share to the debt rather than into the bucket. A sheet that moved
    money into a pot Money school has not opened would make the whole ladder
    decorative, so every destination is checked with the SAME predicate the
@@ -822,16 +848,17 @@ function evRunRepair() {
    `profile.moveRequests` with their own merge decision.
    ════════════════════════════════════════════════════════════════ */
 
-/* Which Money-school stage each home sits behind. `cash` is always open — it is
-   where money arrives — and the other three mirror MNY_BUCKETS exactly, because
-   two tables naming the same gate is how they come to disagree. */
+/* Which Money-school stage each home sits behind — a MNY_STAGES id, never a
+   percent. `cash` is always open — it is where money arrives — and the other
+   three read MNY_BUCKETS exactly, because two tables naming the same gate is
+   how they come to disagree. */
 function evHomeNeed(home) {
   const byKey = { ready: 'ready', locked: 'gic', invest: 'stock' };
   const key = byKey[String(home)];
-  if (!key) return 0;                              // cash, and anything unknown
+  if (!key) return 'start';                        // cash, and anything unknown
   const b = (typeof MNY_BUCKETS !== 'undefined')
     ? MNY_BUCKETS.find(x => x.key === key) : null;
-  return b ? (Number(b.need) || 0) : 0;
+  return b ? b.stage : 'start';
 }
 
 /* Can this child put money here yet? One predicate, shared with the split. */
@@ -866,33 +893,41 @@ function mnyMoveRefusal(kid, from, to, amount) {
   if (amt > money2(have)) {
     return 'There is only ' + mnyMoney(have) + ' there.';
   }
-  /* Locked money is locked. It pays out on its own date (mnySimCatchUp), and a
-     sheet that let it out early would be teaching the opposite of what locking
-     it away is for. */
-  if (from === 'locked') return 'Locked money comes back on its own date.';
+  /* The route is the last word. A pair the writer has no route for is refused
+     HERE, in a sentence — never allowed through to fail inside the writer,
+     which is how `invest → ready` passed this check, reached the end of
+     mnyMoveMoney and could be filed by a child and never approved. */
+  if (!mnyMoveRoute(from, to)) {
+    /* Locked money is locked. It pays out on its own date (mnySimCatchUp), and
+       a sheet that let it out early would be teaching the opposite of what
+       locking it away is for. */
+    return from === 'locked' ? 'Locked money comes back on its own date.' : 'Money cannot go that way.';
+  }
   return null;
 }
 
-/* THE one writer. Returns true when money moved. */
-function mnyMoveMoney(kid, from, to, amount, opts) {
-  if (!isParent()) { showToast('A grown-up moves the money 🔒'); return false; }
-  const refusal = mnyMoveRefusal(kid, from, to, amount);
-  if (refusal) { showToast(refusal); return false; }
-  const amt = money2(amount);
-  const label = Object.assign({ kind: 'move', note: 'Moved by a grown-up' }, opts || {});
+/* ── THE ROUTE — one decision, read by the refusal AND the writer ──
+   Every ordered pair of homes either has a route here or does not, and both
+   `mnyMoveRefusal` and `mnyMoveMoney` ask this one table. Before, the refusal
+   listed what to refuse and the writer listed what it could do, and the two
+   lists disagreed about `invest → ready|locked`.
 
-  if (from === 'cash' && to === 'ready') return moneyDeposit(kid, amt, label);
-  if (from === 'ready' && to === 'cash') return moneyWithdraw(kid, amt, label);
-  if (from === 'cash' && to === 'locked') return moneyOpenGIC(kid, amt, 12, label);
-  if (from === 'cash' && to === 'invest') {
+   Each route calls the primitive that already owns that movement; none does
+   arithmetic of its own. Pots never touch: a move between two pots is two
+   recorded movements through cash, because that is what actually happens. */
+const MNY_MOVE_ROUTES = {
+  'cash>ready':  (kid, amt, label) => moneyDeposit(kid, amt, label),
+  'ready>cash':  (kid, amt, label) => moneyWithdraw(kid, amt, label),
+  'cash>locked': (kid, amt, label) => moneyOpenGIC(kid, amt, 12, label),
+  'cash>invest': (kid, amt, label) => {
     const before = mnyInvestedTotal(kid);
     mnyBuyChosenFund(kid, amt, label);
     return mnyInvestedTotal(kid) > before;
-  }
-  if (from === 'invest' && to === 'cash') {
-    /* Sell enough of what she holds to raise the amount asked for, newest
-       holding first. `moneySellStock` takes SHARES, not dollars, so the
-       conversion happens here — once, beside the only caller that needs it. */
+  },
+  /* Sell enough of what she holds to raise the amount asked for, newest
+     holding first. `moneySellStock` takes SHARES, not dollars, so the
+     conversion happens here — once, beside the only route that needs it. */
+  'invest>cash': (kid, amt, label) => {
     let left = amt;
     mnyHoldingsOfKind(kid, 'stock').slice().reverse().forEach(h => {
       if (!(left > 0)) return;
@@ -904,16 +939,38 @@ function mnyMoveMoney(kid, from, to, amount, opts) {
       if (moneySellStock(kid, h.id, take / price, label)) left = money2(left - take);
     });
     return left < amt;
-  }
-  /* ready → locked, ready → invest and the rest go through cash, because that
-     is what actually happens: money comes out of one pot and into another. Two
-     movements, both recorded, rather than one that pretends the pots touch. */
-  if (from === 'ready' && (to === 'locked' || to === 'invest')) {
-    if (!moneyWithdraw(kid, amt, label)) return false;
-    return mnyMoveMoney(kid, 'cash', to, amt, opts);
-  }
-  showToast('That move is not one the app knows.');
-  return false;
+  },
+  'ready>locked':  (kid, amt, label, opts) => mnyMoveViaCash(kid, 'ready', 'locked', amt, label, opts),
+  'ready>invest':  (kid, amt, label, opts) => mnyMoveViaCash(kid, 'ready', 'invest', amt, label, opts),
+  'invest>ready':  (kid, amt, label, opts) => mnyMoveViaCash(kid, 'invest', 'ready', amt, label, opts),
+  'invest>locked': (kid, amt, label, opts) => mnyMoveViaCash(kid, 'invest', 'locked', amt, label, opts),
+};
+function mnyMoveRoute(from, to) {
+  return MNY_MOVE_ROUTES[String(from) + '>' + String(to)] || null;
+}
+
+/* Out of one pot into cash, then from cash into the other — and ONLY what the
+   first leg actually raised goes on. A sale sells newest-first and can raise
+   less than was asked; moving the full amount anyway would spend cash she
+   already had, which is not part of this move. Measured on the wallet, not
+   assumed from the request. */
+function mnyMoveViaCash(kid, from, to, amt, label, opts) {
+  const before = mnyCash(kid);
+  if (!MNY_MOVE_ROUTES[from + '>cash'](kid, amt, label)) return false;
+  const raised = money2(Math.min(amt, money2(mnyCash(kid) - before)));
+  if (!(raised > 0)) return false;
+  return mnyMoveMoney(kid, 'cash', to, raised, opts);
+}
+
+/* THE one writer. Returns true when money moved. */
+function mnyMoveMoney(kid, from, to, amount, opts) {
+  if (!isParent()) { showToast('A grown-up moves the money 🔒'); return false; }
+  const refusal = mnyMoveRefusal(kid, from, to, amount);
+  if (refusal) { showToast(refusal); return false; }
+  const label = Object.assign({ kind: 'move', note: 'Moved by a grown-up' }, opts || {});
+  // The refusal has already asked mnyMoveRoute; a pair with no route never
+  // reaches this line, so there is no "move the app does not know" left.
+  return mnyMoveRoute(from, to)(kid, money2(amount), label, opts);
 }
 
 /* ── REQUESTS ──────────────────────────────────────────────────────

@@ -64,7 +64,9 @@ window.addEventListener('pagehide', flushPush);
      surfaces is how their behaviour drifts. */
   const story = document.getElementById('mnyStoryWrap');
   if (story) story.addEventListener('click', flHandleClick);
-  ['mnyPage1Wrap','mnyStoryWrap','mnySchoolWrap','familyMeetingBody'].forEach(id => {
+  // MNY_CLICK_HOSTS (js/22-money-page1.js) is the one list: a page that
+  // renders data-mny-action into a container missing from it has dead buttons.
+  MNY_CLICK_HOSTS.forEach(id => {
     const wrap = document.getElementById(id);
     if (!wrap) return;
     wrap.addEventListener('click', mnyHandleClick);

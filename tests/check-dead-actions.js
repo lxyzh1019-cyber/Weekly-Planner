@@ -50,11 +50,11 @@ const ROOT = path.join(__dirname, '..');
 
 /* A known dead control, exempt BY NAME with its reason. An exemption expires:
    once the value is no longer emitted anywhere, this check fails and says to
-   delete the entry — an exemption that outlives its reason is a hole. */
-const EXEMPT = [
-  { prefix: 'pm', value: 'edit',
-    why: 'unreachable branch in pmPriceCards (editable=false at its only caller); removal belongs to HANDOFF-pocket-money.md §2' },
-];
+   delete the entry — an exemption that outlives its reason is a hole.
+   Entries are { prefix, value, why }. Empty: the one entry there was, pm/edit
+   (pmPriceCards' unreachable ✏️ branch), expired when that edit mode was
+   deleted outright on main (PR #92, "every money button works"). */
+const EXEMPT = [];
 
 // ── The lexer ─────────────────────────────────────────────────────────────
 // Returns two views of the source, the same length and with every newline in
