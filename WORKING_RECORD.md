@@ -54,6 +54,7 @@ Single working record for this repository. Updated by the main session at the en
 | 31 | R2 2026-09-22 | "They do use Sister Sync" | done | Answers VE item 4. **Retiring `#screen-sync` is off the table.** §5 shrinks from moving the invites inbox onto Today (which would now mean two inboxes for one list) to an optional one-line 💌 notice on Today that opens Sister Sync. §4 becomes more valuable, not less — the gaps it fixes are hitting a feature in use. |
 | 32 | R2 2026-09-22 | Implied by the approved Plan v4: push and open a draft PR | done | Pushed `claude/inspiring-gauss-232zww`; draft PR #93 opened. Push was taken under Plan v4's standing approval and to secure five verified commits held only in an ephemeral container — no new build work was started without approval. |
 | 33 | R3 2026-09-22 | "Regarding the decisions, I agree all 5." | done | **Approval** of Plan v5's five items: (1) repeat-invite guard + kid share from the block; (2) visible build number; (3) `SMOKE_ONLY`; (4) dead-button check; (5) 💌 note on Today. Built as stages 4a–4e, tooling first. |
+| 34 | R4 2026-09-23 | "Yes, fix the wrong day invite bug" | in progress | **Approval** of Open questions 6. Round 3 on Sister Sync invites; comparison in the hotspot counter (repair). Repro first: an invite sent from a Sister Sync day after visiting a different day view must be dated the Sync day. |
 
 ## Hotspot counter
 | Area / feature | Fix rounds | Recurrences | Last symptom | Rewrite-vs-repair reviewed? |
@@ -63,7 +64,15 @@ Single working record for this repository. Updated by the main session at the en
 | **Pocket money** | **3** | **1** | Kid Money tab still shows pre-house-rules prices; Move-money destinations all greyed; categories renamed away from the family's vocabulary | **NO — and the rule now BLOCKS the next patch.** PR #89 (Stages 1–3), PR #90 (Stages 4–6), this round. The comparison is the first deliverable in the handoff chat; `HANDOFF-pocket-money.md` §1 names the shared cause (three key-spaces for one idea: `EV_HOMES` / `MNY_BUCKETS` / `MNY_HOLDING_KINDS`). |
 | Week-view school offer | 1 | 0 | Offer only below a ~700px grid once anything is booked | n/a — first fix round; cause is a host deleted with the Day Blocks tab |
 | Profile badge | 1 | 0 | Three inert `<div class="profile-badge">` with a false `aria-label` | n/a — first fix round |
-| Sister Sync invites | **2** | 0 | Round 2 (4d): no duplicate guard in `sendInvite`, no status guard in `acceptInvite`, and a **second inline writer** (`inviteSisterFromEdit`) that bypassed `sendInvite` entirely | Not required at 2. **The next fix here makes 3 and triggers the comparison.** 4d reduces the surface to one writer, which is the structural answer. |
+| Sister Sync invites | **3** | 0 | Round 2 (4d): no duplicate guard in `sendInvite`, no status guard in `acceptInvite`, and a **second inline writer** (`inviteSisterFromEdit`) that bypassed `sendInvite` entirely. Round 3 (#34): `sendInvite` guessed the invite's day from globals (`currentDayKey \|\| syncDayIdx`) | **Yes — presented below, repair chosen.** |
+
+**Round-3 comparison — Sister Sync invites (2026-09-23, before #34's patch).**
+- *Shared cause across rounds 2 and 3:* the invite writer inferred facts its callers already knew — who sent it (round 2: a second writer with its own sender logic) and which day it is for (round 3: a global the Sync screen never sets). Same class: implicit context instead of an explicit argument.
+- *Consolidate/remove:* after 4d there is one writer and three doors (Sync mini-block, 💌 edit sheet, 👀 edit sheet). Nothing left to merge. The repair **removes** the global fallback line; the day becomes a required argument, and a missing day is refused rather than guessed.
+- *Rewrite option:* move invites into their own module with a block-reference model (`{profile, day, blockId}`) instead of copying fields. Rejected: it changes a `state.shared` shape (merge decision, migration of stored invites on both iPads) to fix a one-line inference bug.
+- *Simplicity / compatibility / migration:* repair touches `sendInvite`'s signature and its three callers; stored invites keep their shape; no migration. Existing wrong-dated invites are not rewritten — they cannot be told apart from correct ones.
+- *Rollback:* revert one commit. *Regression risk:* low — the edit-sheet doors already pass the right day (the block tap calls `focusDayColumn(ownDayKey)` first, `js/08-day-view.js:1079`); only the Sync door was wrong.
+- **Decision: repair.** Structural element: `sendInvite` no longer reads `currentDayKey`/`syncDayIdx` at all, so no future door can inherit the wrong day.
 Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → no further patch until the comparison is presented.
 
 ## Deliverable ledger
