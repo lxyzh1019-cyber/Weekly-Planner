@@ -1,4 +1,4 @@
-# FEATURES — Weekly-Planner — manifest v3 — 2026-09-23 (v2 confirmed 2026-09-22)
+# FEATURES — Weekly-Planner — manifest v4 — 2026-09-23 (v2 confirmed 2026-09-22)
 
 Locked features of the current version. Every edit is checked against this list and ends with a regression table. Update this file in the same change that alters a feature. Over-list rather than under-list.
 
@@ -38,6 +38,7 @@ directly, not against this file.
 - `tests/test-routing-hook.md` is the cloud procedure for learning which hook-input fields mark a subagent — run before switching `routing_guard_mode` to `enforce`.
 - `docs/HZ-skill-trigger-tuning.md` is the skill-trigger tuning procedure.
 - **Smoke subset for iteration (added 2026-09-22):** `SMOKE_ONLY=checkA,checkB npm run test:smoke` runs only the named checks. Every check statement in `tests/smoke.js` carries an `if (want('name'))` prefix naming its own check; `noConsoleErrors` is the one unguarded check and always runs. The check names are read from the file itself, not a hand list. A subset **is never the gate**: an unknown name exits 1 naming it; a named check that records nothing is a failure; the last line is `PARTIAL RUN (SMOKE_ONLY): N of M checks — not a pass of the suite` and never `ALL SMOKE CHECKS PASSED`; it refuses to run when `CI` is set. With `SMOKE_ONLY` unset or empty the suite runs every check, pass rule `v !== true`, final line unchanged. Documented in `ARCHITECTURE.md` (Verification) and `tests/README.md`.
+- **Dead-action guard (added 2026-09-23):** `tests/check-dead-actions.js`, in `npm run check` (the ninth check) and listed in `ARCHITECTURE.md` (Verification) and `tests/README.md`. Fails on (1) an `onclick` in `index.html` or a `js/` template calling a function not declared at top level in `js/` (method calls and browser globals excluded; a runtime callee `${fn}(…)` is counted, not checked), and (2) a `data-P-action="V"` not handled by prefix P's own dispatcher — the selector `[data-P-action="V"]`, or V compared/keyed inside a top-level function reading `dataset.<p>Action` / `'data-P-action'` or one it hands the action variable to. A prefix nothing reads fails, naming every value. Runtime-built values are resolved from literals in the `${…}` or at the drawing function's call sites; the rest are counted. The reverse (a compared value no markup emits) **warns** and does not fail. `EXEMPT` names `pm/edit` (unreachable branch in `pmPriceCards`; removal belongs to `HANDOFF-pocket-money.md` §2) and **self-expires**: when nothing emits the value, the check fails until the entry is deleted.
 
 ## App features — not yet manifested
 Authority for app behaviour remains `ARCHITECTURE.md`. Its load-bearing rules,

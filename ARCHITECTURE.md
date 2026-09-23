@@ -80,7 +80,7 @@ npm run test:smoke          # screenshots land in tests/out/
 
 `npm run check` runs `tests/check-syntax.js`, `tests/check-globals.js`,
 `tests/check-shared-merge.js`, `tests/check-escaping.js`, `tests/check-dead-css.js`,
-`tests/check-dead-ids.js` and `tests/check-sw-shell.js` (an `id` in `index.html` that nothing reads — the
+`tests/check-dead-ids.js`, `tests/check-dead-actions.js` and `tests/check-sw-shell.js` (an `id` in `index.html` that nothing reads — the
 same blind spot as dead CSS, with runtime-built prefixes discovered from the
 source rather than listed by hand). **Do not go back to the old shell loop** —
 
@@ -112,6 +112,22 @@ check*, at eight to ten minutes each. `meetingMoneyFlowEndToEnd`,
 the rest are the same shape and the same fix — build a `problems` array, push a
 sentence naming the surface and the expectation, `return problems.length ?
 problems : true`.
+
+**A control with no code behind it fails the build.** `tests/check-dead-actions.js`
+holds two rules. Every function an `onclick` calls — in `index.html` and in the
+templates in `js/` — must be declared at the top level of `js/`. And every
+`data-P-action="V"` must be handled by prefix **P's own** dispatcher: the
+selector `[data-P-action="V"]`, or `V` compared (`=== 'V'`, `case 'V'`, `'V':`,
+`['V']`) inside a top-level function that reads `dataset.<p>Action` or
+`'data-P-action'`, or one that function hands the action to. Scoped per prefix
+because "does 'V' appear anywhere" is wrong both ways — it passed a dead
+`data-pm-action="edit"` because another prefix handles an `'edit'`. Function
+extents come from a lexer that tells strings, templates, comments and regexes
+apart. A prefix nothing reads fails outright. A value compared in a reader that
+no markup emits is dead handler code, but a value may be built at runtime, so
+that is a **warning**, not a failure. The one known dead control, `pm/edit`, is
+exempt by name, and the exemption **expires**: once nothing emits it, the check
+fails until the entry is deleted.
 
 `tests/check-globals.js` enforces the one-declaration-per-name rule above,
 covering `function`, `async function` and top-level `let`/`const`/`var`
