@@ -94,6 +94,15 @@ the editor's card list, and the Record sheet's sport picker.
   (`js/22-money-page1.js:668`). `tests/smoke.js:2392` asserts the button is
   absent. If you ever tried to edit a price from the kid's 💷 *What things pay*
   card, this is why nothing happened. Delete the parameter and the branch.
+  **Delete it together with its exemption.** Since commit `46c7306`,
+  `tests/check-dead-actions.js` carries a named, **self-expiring** exemption
+  for `pm/edit`. Remove the branch and `npm run check` fails with *"the
+  exemption for pm/edit has expired … Delete it from EXEMPT"* — that is the
+  check doing its job, not a regression. One commit, both edits.
+- **Two dead handler branches in the parent money page.** The same check warns
+  (without failing) that `mnyp` compares `tab` and `kid`, but the page emits
+  `data-mny-action="tab"` / `"kid"`, never `data-mnyp-action`. Those two
+  `mnyp` branches can never run. Remove them in the same money round.
 - **Merge hazard.** `moneyRules.versions` merges by id (`js/04-merge.js:403-413`),
   so two devices each adding a version both survive. If both land on the same
   `effectiveFrom`, `mrVersionForDate` takes the last match, so the

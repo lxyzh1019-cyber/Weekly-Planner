@@ -11,7 +11,8 @@ Single working record for this repository. Updated by the main session at the en
 ## Pending
 - PR [#91](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/91) **merged** 2026-09-21 as `f4d1db5`. (This line previously said "awaiting the owner's merge" — corrected 2026-09-22.)
 - **PR [#93](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/93) — draft, open, awaiting the owner's review and merge.** Branch `claude/inspiring-gauss-232zww` pushed 2026-09-22 with commits `504cea2`, `b4b62dd`, `d3fb2b6`, `684eb2c`, `c811cda`.
-- **Awaiting the owner's scope decision** (Plan v5): §4 repeat-invite guard + kid share from the edit sheet; VE 1 visible build stamp; VE 2 `SMOKE_ONLY` filter; VE 3 `check-dead-actions.js`; optional §5 💌 notice on Today; tier-2 click sweep. Recommended: 1–4. None built.
+- **Approved (#33), in progress:** 4a `SMOKE_ONLY` ✅ `126506a` · 4b build number ✅ `a03f1c2` · 4c dead-button check ✅ `46c7306` · 4d repeat-invite guard (building) · 4e 💌 note on Today.
+- **Not approved, proposed for its own round:** tier-2 click sweep; tier-3 logic review of non-money screens.
 - All pocket-money items are **open but not in this round**. See `HANDOFF-pocket-money.md` §12 for the order they should be taken in.
 
 ## Request ledger
@@ -49,6 +50,7 @@ Single working record for this repository. Updated by the main session at the en
 | 30 | R2 2026-09-22 | "Is it reasonable to test all the buttons and check the logic, except money?" | **answered** | Yes, in three tiers. Tier 1 done read-only this turn: **170 `onclick` targets, 0 missing; 177 delegated actions across 13 prefixes, 0 without a handler** (3 scanner hits verified false positives). Tiers 2 and 3 proposed, not approved. |
 | 31 | R2 2026-09-22 | "They do use Sister Sync" | done | Answers VE item 4. **Retiring `#screen-sync` is off the table.** §5 shrinks from moving the invites inbox onto Today (which would now mean two inboxes for one list) to an optional one-line 💌 notice on Today that opens Sister Sync. §4 becomes more valuable, not less — the gaps it fixes are hitting a feature in use. |
 | 32 | R2 2026-09-22 | Implied by the approved Plan v4: push and open a draft PR | done | Pushed `claude/inspiring-gauss-232zww`; draft PR #93 opened. Push was taken under Plan v4's standing approval and to secure five verified commits held only in an ephemeral container — no new build work was started without approval. |
+| 33 | R3 2026-09-22 | "Regarding the decisions, I agree all 5." | in progress | **Approval** of Plan v5's five items: (1) repeat-invite guard + kid share from the block; (2) visible build number; (3) `SMOKE_ONLY`; (4) dead-button check; (5) 💌 note on Today. Built as stages 4a–4e, tooling first. |
 
 ## Hotspot counter
 | Area / feature | Fix rounds | Recurrences | Last symptom | Rewrite-vs-repair reviewed? |
@@ -58,7 +60,7 @@ Single working record for this repository. Updated by the main session at the en
 | **Pocket money** | **3** | **1** | Kid Money tab still shows pre-house-rules prices; Move-money destinations all greyed; categories renamed away from the family's vocabulary | **NO — and the rule now BLOCKS the next patch.** PR #89 (Stages 1–3), PR #90 (Stages 4–6), this round. The comparison is the first deliverable in the handoff chat; `HANDOFF-pocket-money.md` §1 names the shared cause (three key-spaces for one idea: `EV_HOMES` / `MNY_BUCKETS` / `MNY_HOLDING_KINDS`). |
 | Week-view school offer | 1 | 0 | Offer only below a ~700px grid once anything is booked | n/a — first fix round; cause is a host deleted with the Day Blocks tab |
 | Profile badge | 1 | 0 | Three inert `<div class="profile-badge">` with a false `aria-label` | n/a — first fix round |
-| Sister Sync invites | 1 | 0 | Stage 3 built the watch invite on `sendInvite`/`acceptInvite`; the proposed §4 repeat-invite guard would be round 2 on the same two functions | n/a — watch: one more round makes 3 if anything else lands here |
+| Sister Sync invites | **2** | 0 | Round 2 (4d): no duplicate guard in `sendInvite`, no status guard in `acceptInvite`, and a **second inline writer** (`inviteSisterFromEdit`) that bypassed `sendInvite` entirely | Not required at 2. **The next fix here makes 3 and triggers the comparison.** 4d reduces the surface to one writer, which is the structural answer. |
 Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → no further patch until the comparison is presented.
 
 ## Deliverable ledger
@@ -81,7 +83,12 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → n
 | Stage 2 — profile badges switch profile | COMPLETE | `d3fb2b6`. Repro failed with 7 findings; then **315/315**. |
 | Stage 3 — watch a sister compete | COMPLETE | `684eb2c`. Repro failed with 15 findings, incl. the orphan adoption and the meeting chase firing against live code; then **317/317**. |
 | Push + draft PR #93 | COMPLETE | Branch pushed; [PR #93](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/93) open as draft. |
-| §4 repeat invite · §5 Today notice (optional, Rev 8) · VE 1–3 · tier-2 click sweep | NOT STARTED | **Awaiting the owner's scope decision** — Plan v5, not approved. |
+| 4a `SMOKE_ONLY` subset filter | COMPLETE | `126506a`. Full run 317/317 unchanged; typo and CI misuse refused (exit 1); partial line never claims a pass. 32s subset vs 85–98s full. |
+| 4b Visible build number | COMPLETE | `a03f1c2`. `BUILD` = `SW_VERSION` = `2026-09-23a`, enforced by `check-sw-shell.js` (mismatch proven to fail). Smoke 318/318. |
+| 4c `check-dead-actions.js` | COMPLETE | `46c7306`. 9th check, 0.63s. Five planted failures caught. `pm/edit` exempted by name, self-expiring. |
+| 4d Repeat-invite guard + kid share | IN PROGRESS | Delegated; repro first. |
+| 4e 💌 note on Today | NOT STARTED | After 4d. |
+| 19 dead handler branches (warned by 4c) | OPEN — for tier-3 review | 12 in `ctHandleWrapClick` (chores — possibly a retired chore surface; check nothing was lost with it), `mm` openkidday, `co` num/export, `mnyp` tab/kid (money → handoff §2). Not removed: outside 4c's scope. |
 | Real-device verification | NOT STARTED | Blocked by design: no visible build stamp exists (VE 1). Until one ships, "deployed" cannot be verified on the iPad. |
 | Tier-3 logic review of non-money screens | NOT STARTED | Proposed as its own read-only round after this PR merges. |
 
@@ -95,6 +102,11 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → n
 - 2026-09-22 **Stage 3 verified** — repro failed with 15 findings; then 317/317, `check` 8/8, 1948 declarations, 374 ids (one new, `#watchSisterBtn`).
 - 2026-09-22 **Read-only dead-control scan** — 170 distinct `onclick` targets, all declared (one hit, `stopPropagation`, is `event.stopPropagation()`); 177 delegated `data-*-action` values across 13 prefixes, 3 scanner hits all verified handled via `closest('[data-…-action="…"]')`. The scan also **under**-reports: it cannot see the known-dead `pm-action="edit"` branch, because `'edit'` is handled by another prefix. A real guard must parse per prefix.
 - 2026-09-22 **Build stamp check** — `SW_VERSION` exists only in `sw.js`, is never posted to the page, and nothing renders a version. **No deploy stamp exists to read.**
+- 2026-09-22/23 **4a verified** — full smoke 317/317 (84.7s); subset 2 checks in 32s; `SMOKE_ONLY=noSuchCheck` exit 1; `CI=true SMOKE_ONLY=…` exit 1; deliberately broken check fails the subset, restored passes. Re-verified independently by the main session.
+- 2026-09-23 **4b verified** — `theBuildNumberIsOnThePage` failed first naming both missing lines; mismatch `2026-09-23b` vs `2026-09-23a` made `npm run check` exit 1; smoke 318/318 (111s). Tap paths walked in headless Chromium at iPad and phone sizes: kid — Today → ⋯ More → line under the tiles; parent — ⋯ More → Switch → Parent → PIN → ⚙️ App → line under the list.
+- 2026-09-23 **4c verified** — current tree: 265 onclick calls (167 functions), 199 actions across 13 prefixes, all handled, 1 exempted; 26 reverse warnings, 19 confirmed dead by hand. Planted: undeclared onclick, unhandled mny value, unread prefix, deleted exemption, expired exemption — each exit 1.
+- **Correction on record (1):** the claim that a full smoke run takes 8–10 minutes came from `ARCHITECTURE.md`'s text, not measurement. Measured: 85–111s. `SMOKE_ONLY` saves ~2.6×, not "to seconds" as first claimed.
+- **Correction on record (2):** the claim that an iPad "can keep running an old build for a long time" overstated it. `sw.js` is network-first: an online device fetches the deployed code (within GitHub Pages' few minutes of caching). The old build persists only offline. The build number is right in every case.
 - **Not verified on a live URL or a real device.** Everything so far is headless Chromium at 390×844; no deploy stamp has been read, so nothing is claimed as deployed.
 
 ## Open questions / blockers
