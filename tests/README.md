@@ -57,6 +57,15 @@ a Sunday goes badly.
 `~/.cache/ms-playwright` (`npx playwright install chromium`); elsewhere set
 `SMOKE_CHROMIUM=/path/to/chrome`.
 
+While working on a few checks, `SMOKE_ONLY=checkA,checkB npm run test:smoke`
+runs only those (and `noConsoleErrors`) in a fraction of the full run's time.
+It is for iteration only. The checks share one page, and a skipped check's
+body does not run, so a subset can pass or fail where the full run would not.
+That is why it names itself `PARTIAL RUN (SMOKE_ONLY): N of M checks — not a
+pass of the suite`, exits 1 on a name that matches no check, and refuses to run
+under CI. The full suite gates every push. Give a new check the same
+`if (want('name'))` prefix as its neighbours.
+
 ## CI
 
 `.github/workflows/ci.yml` runs all three on every pull request and on pushes to

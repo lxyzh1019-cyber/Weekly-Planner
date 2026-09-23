@@ -37,6 +37,7 @@ directly, not against this file.
 - `bash tests/replay-hooks.sh` replays synthetic inputs through every hook. **Expected: `passed=14 failed=0`.** It restores `routing_guard_mode` to `observe` and clears `.claude/state/*.jsonl` on exit.
 - `tests/test-routing-hook.md` is the cloud procedure for learning which hook-input fields mark a subagent — run before switching `routing_guard_mode` to `enforce`.
 - `docs/HZ-skill-trigger-tuning.md` is the skill-trigger tuning procedure.
+- **Smoke subset for iteration (added 2026-09-22):** `SMOKE_ONLY=checkA,checkB npm run test:smoke` runs only the named checks. Every check statement in `tests/smoke.js` carries an `if (want('name'))` prefix naming its own check; `noConsoleErrors` is the one unguarded check and always runs. The check names are read from the file itself, not a hand list. A subset **is never the gate**: an unknown name exits 1 naming it; a named check that records nothing is a failure; the last line is `PARTIAL RUN (SMOKE_ONLY): N of M checks — not a pass of the suite` and never `ALL SMOKE CHECKS PASSED`; it refuses to run when `CI` is set. With `SMOKE_ONLY` unset or empty the suite runs every check, pass rule `v !== true`, final line unchanged. Documented in `ARCHITECTURE.md` (Verification) and `tests/README.md`.
 
 ## App features — not yet manifested
 Authority for app behaviour remains `ARCHITECTURE.md`. Its load-bearing rules,

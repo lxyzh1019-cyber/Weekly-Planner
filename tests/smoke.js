@@ -74,6 +74,35 @@ function findChromium() {
 }
 
 (async () => {
+  /* SMOKE_ONLY=checkA,checkB — run a named subset while iterating.
+
+     The full suite is eight to ten minutes; iterating on one check should not
+     be. Every check statement is prefixed `if (want('name'))`, which skips that
+     one statement and nothing else, so the setup between checks still runs in
+     order. What it cannot keep is what a SKIPPED check's own body did to the
+     page, so a subset result is a hint, not a verdict — and the subset is never
+     the gate: it refuses to run under CI, a typo'd name exits 1 rather than
+     running nothing and passing, and it never prints ALL SMOKE CHECKS PASSED.
+
+     The names are read from this file, not listed by hand, so a new check is
+     selectable the moment it is written. noConsoleErrors has no guard: an error
+     raised by the checks being worked on is exactly what a subset must show. */
+  const ONLY = (process.env.SMOKE_ONLY || '').split(',').map(s => s.trim()).filter(Boolean);
+  const want = (name) => ONLY.length === 0 || ONLY.includes(name);
+  const ALL_CHECKS = [...fs.readFileSync(__filename, 'utf8')
+    .matchAll(/^\s*(?:if \(want\('[^']*'\)\) )?checks\.([A-Za-z0-9_$]+)\s*=(?!=)/gm)].map(m => m[1]);
+  if (ONLY.length) {
+    if (process.env.CI) {
+      console.error('SMOKE_ONLY is set under CI. A subset is for iterating locally; the full suite is the only thing CI may run, so this run is refused.');
+      process.exit(1);
+    }
+    const unknown = ONLY.filter(n => !ALL_CHECKS.includes(n));
+    if (unknown.length) {
+      console.error(`SMOKE_ONLY names no such check: ${unknown.join(', ')}`);
+      process.exit(1);
+    }
+  }
+
   const outDir = path.join(__dirname, 'out');
   fs.mkdirSync(outDir, { recursive: true });
   const shot = (name) => path.join(outDir, name + '.png');
@@ -179,7 +208,7 @@ function findChromium() {
      containers — only setWeekView does — so if the state default and the markup
      drift apart, the week boots showing one layout while rendering into another,
      and nothing else in this suite would notice. */
-  checks.weekOpensOnTheLayoutYouCanPlanIn = await page.evaluate(() => {
+  if (want('weekOpensOnTheLayoutYouCanPlanIn')) checks.weekOpensOnTheLayoutYouCanPlanIn = await page.evaluate(() => {
     const bad = [];
     if (weekView !== 'full') bad.push(`default weekView is '${weekView}', expected 'full'`);
     if (getComputedStyle(document.getElementById('weekFull')).display === 'none') {
@@ -209,7 +238,7 @@ function findChromium() {
      other and both were wrong on every holiday and all summer. The arithmetic
      assertion is the one that matters: the published calendar states 177
      instructional days for K-8, so if a date was mistyped the count moves. */
-  checks.schoolCalendarIsRight = await page.evaluate(() => {
+  if (want('schoolCalendarIsRight')) checks.schoolCalendarIsRight = await page.evaluate(() => {
     const bad = [];
     const iso = (d) => d.toISOString().slice(0, 10);
     // Template and band cannot disagree: both come from schoolHours(), which is
@@ -248,7 +277,7 @@ function findChromium() {
   });
 
   // The bands on the day itself follow that calendar rather than the weekday.
-  checks.dayBandsFollowTheCalendar = await page.evaluate(() => {
+  if (want('dayBandsFollowTheCalendar')) checks.dayBandsFollowTheCalendar = await page.evaluate(() => {
     const bad = [];
     const labels = () => [...document.querySelectorAll('#screen-day .tl-band-seg')].map(e => e.textContent);
     profile = 'jenn'; parentViewing = 'jenn';
@@ -293,7 +322,7 @@ function findChromium() {
      every day of July. Day Blocks was the third surface and drew nothing
      school-related at all; it is retired, and the preview that replaced it
      describes the week with one axis rather than seven bands. */
-  checks.everyWeekViewFollowsTheSchoolCalendar = await page.evaluate(() => {
+  if (want('everyWeekViewFollowsTheSchoolCalendar')) checks.everyWeekViewFollowsTheSchoolCalendar = await page.evaluate(() => {
     const bad = [];
     const wasOffset = weekOffset, wasView = weekView;
     const startPx = (el) => parseFloat(el.style.top) || 0;
@@ -367,7 +396,7 @@ function findChromium() {
      source — and the shipped calendar never knew about lunch recess at all.
      SCHOOL_TEMPLATE had to become schoolTemplate() for this: a const evaluated
      at load can only ever see the shipped fallback. */
-  checks.schoolHoursAreTheParentsToSet = await page.evaluate(() => {
+  if (want('schoolHoursAreTheParentsToSet')) checks.schoolHoursAreTheParentsToSet = await page.evaluate(() => {
     const bad = [];
     const before = state.shared.schoolCal;
     const shipped = schoolHours();
@@ -422,7 +451,7 @@ function findChromium() {
      escaped comma, an all-day span whose DTEND is exclusive, a fortnightly
      RRULE, an RRULE this deliberately does not understand, and a statutory
      holiday whose name contains none of the day-off keywords. */
-  checks.anIcsFileBecomesDaysOffOnlyAfterReview = await page.evaluate(() => {
+  if (want('anIcsFileBecomesDaysOffOnlyAfterReview')) checks.anIcsFileBecomesDaysOffOnlyAfterReview = await page.evaluate(() => {
     const bad = [];
     const wasCal = state.shared.schoolCal;
     const wasProfile = profile, wasViewing = parentViewing;
@@ -528,7 +557,7 @@ function findChromium() {
      front: a term is 40-odd weeks, and materialising all of it would write
      hundreds of blocks into a document that uploads whole on every change, to
      describe a Tuesday in May nobody is planning yet. */
-  checks.aBlankWeekOffersItsSchoolDays = await page.evaluate(async () => {
+  if (want('aBlankWeekOffersItsSchoolDays')) checks.aBlankWeekOffersItsSchoolDays = await page.evaluate(async () => {
     const bad = [];
     const wasOffset = weekOffset, wasProfile = profile;
     profile = 'jenn';
@@ -659,7 +688,7 @@ function findChromium() {
      Measured at a real phone viewport rather than read off the markup — "above
      the grid" is a fact about two rectangles, not about DOM order. */
   await page.setViewportSize({ width: 390, height: 844 });
-  checks.theSchoolOfferIsAboveTheWeekGrid = await page.evaluate(() => {
+  if (want('theSchoolOfferIsAboveTheWeekGrid')) checks.theSchoolOfferIsAboveTheWeekGrid = await page.evaluate(() => {
     const problems = [];
     const wasOffset = weekOffset, wasProfile = profile, wasView = weekView;
     profile = 'jenn';
@@ -721,7 +750,7 @@ function findChromium() {
      so no bulk button is drawn beside it. Asserted for a kid profile and again
      for a parent viewing that kid, because activeProfile() is what decides
      whose week is written and a parent looking at Jenn must write Jenn's. */
-  checks.oneSchoolDayCanBeAddedOnItsOwn = await page.evaluate(async () => {
+  if (want('oneSchoolDayCanBeAddedOnItsOwn')) checks.oneSchoolDayCanBeAddedOnItsOwn = await page.evaluate(async () => {
     const problems = [];
     const wasOffset = weekOffset, wasProfile = profile, wasViewing = parentViewing;
     let wk = null;
@@ -822,7 +851,7 @@ function findChromium() {
      9am–3pm — an hour later than the rest of the app — drawn on every week of
      the year. Counting segments is what let that stand: it asserted 4 and got 4,
      on Christmas week as readily as on a term Tuesday. */
-  checks.weekSideband = await page.evaluate(() => {
+  if (want('weekSideband')) checks.weekSideband = await page.evaluate(() => {
     const bad = [];
     setWeekView('full');
     const keys = getDayKeys(weekOffset);
@@ -842,14 +871,14 @@ function findChromium() {
     }
     return bad.length === 0 || bad;
   });
-  checks.weekHourLines = await page.evaluate(() =>
+  if (want('weekHourLines')) checks.weekHourLines = await page.evaluate(() =>
     document.querySelectorAll('.wf-day-col .hour-grid-line--hour').length > 0);
   /* THE SECOND TAB IS A READ-ONLY PREVIEW OF THE PRINTED SHEET.
      It renders the week and child the screen is already showing, through the
      SAME renderer the Print button uses, and exposes no way to change anything:
      the print markup carries no handlers at all, which is what makes read-only
      free to enforce rather than a promise. */
-  checks.theSecondWeekTabPreviewsThePrintedSheet = await page.evaluate(() => {
+  if (want('theSecondWeekTabPreviewsThePrintedSheet')) checks.theSecondWeekTabPreviewsThePrintedSheet = await page.evaluate(() => {
     const bad = [];
     goWeek(); setWeekView('preview'); renderWeek();
     const host = document.getElementById('weekPreviewSheet');
@@ -884,7 +913,7 @@ function findChromium() {
      about a third of an iPad's first screen before the plan itself began.
      Checked by geometry, not by markup: "they are in the same div" is satisfied
      by a div that wraps, and what matters is that they are on one line. */
-  checks.weekTopbarIsOneRow = await page.evaluate(() => {
+  if (want('weekTopbarIsOneRow')) checks.weekTopbarIsOneRow = await page.evaluate(() => {
     goWeek(); renderWeek();
     const bad = [];
     if (document.querySelector('#screen-week .week-topbar__row2')) {
@@ -909,7 +938,7 @@ function findChromium() {
      the clash warning are both summaries of the grid, and both used to render
      above it — so a child was told what her week added up to before she could
      see the week. Document order, in both views. */
-  checks.weekSummariesSitUnderThePlan = await page.evaluate(() => {
+  if (want('weekSummariesSitUnderThePlan')) checks.weekSummariesSitUnderThePlan = await page.evaluate(() => {
     const bad = [];
     const after = (a, b) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
     setWeekView('full'); renderWeek();
@@ -925,7 +954,7 @@ function findChromium() {
      over the grid moved the grid, reached its end, and stopped —
      overscroll-behavior: contain made sure nothing chained to the page — so the
      panels below could not be reached by scrolling over the grid at all. */
-  checks.weekScrollsAsOneSurface = await page.evaluate(() => {
+  if (want('weekScrollsAsOneSurface')) checks.weekScrollsAsOneSurface = await page.evaluate(() => {
     const bad = [];
     ['full', 'preview'].forEach(view => {
       setWeekView(view); renderWeek();
@@ -957,7 +986,7 @@ function findChromium() {
      Asserts the invariant rather than the pixel count: whatever the tick's
      size rule becomes, it may never exceed the block it belongs to, and a
      rendered block always says its own name. */
-  checks.aShortBlockStillSaysWhatItIs = await page.evaluate(() => {
+  if (want('aShortBlockStillSaysWhatItIs')) checks.aShortBlockStillSaysWhatItIs = await page.evaluate(() => {
     goWeek(); setWeekView('full');
     const kid = activeProfile();
     const key = getDayKeys(0)[2];
@@ -1014,7 +1043,7 @@ function findChromium() {
      table. A subgroup nothing lands in is a heading the picker can never draw,
      and an activity whose subgroup is not in the table would be filed under the
      neutral landing with nothing to say so. */
-  checks.everyActivityHasASubgroup = await page.evaluate(() => {
+  if (want('everyActivityHasASubgroup')) checks.everyActivityHasASubgroup = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'jenn';
@@ -1063,7 +1092,7 @@ function findChromium() {
      Rest, six under Fuel & Care — and the whole dialog jumped every time a chip
      was tapped, moving the chips themselves out from under her thumb. The chip
      row wrapped for the same reason. Both are fixed now; this measures it. */
-  checks.thePickerKeepsItsHeight = await page.evaluate(() => {
+  if (want('thePickerKeepsItsHeight')) checks.thePickerKeepsItsHeight = await page.evaluate(() => {
     const bad = [];
     const wasKey = currentDayKey;
     currentDayKey = getDayKeys(0)[0];
@@ -1111,7 +1140,7 @@ function findChromium() {
      trip in the same undifferentiated list as Breakfast. It RANKS rather than
      filters: the rest of the library follows underneath, because a picker that
      hides things is one she stops trusting. */
-  checks.thePickerLeadsWithWhatFitsTheTime = await page.evaluate(() => {
+  if (want('thePickerLeadsWithWhatFitsTheTime')) checks.thePickerLeadsWithWhatFitsTheTime = await page.evaluate(() => {
     const bad = [];
     const keys = getDayKeys(0);
     const schoolKey = keys.find(k => isSchoolDay(k));
@@ -1230,7 +1259,7 @@ function findChromium() {
      duration and nothing else — so an activity she invented for a Tuesday
      evening had no window, and with the picker now leading on what fits the
      moment she tapped it would sit permanently in "everything else". */
-  checks.aNewActivityStartsInTheCategoryItCameFrom = await page.evaluate(() => {
+  if (want('aNewActivityStartsInTheCategoryItCameFrom')) checks.aNewActivityStartsInTheCategoryItCameFrom = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'jenn';
@@ -1300,7 +1329,7 @@ function findChromium() {
      Day, the five appointments, Ballet, Swimming, Skating and the Explore
      outings all arrive with the buffer ON, and not one of them is isTraining.
      Every block that carried it by default was a block that could not edit it. */
-  checks.getReadyIsEditableOnAnythingThatCarriesIt = await page.evaluate(async () => {
+  if (want('getReadyIsEditableOnAnythingThatCarriesIt')) checks.getReadyIsEditableOnAnythingThatCarriesIt = await page.evaluate(async () => {
     const kid = activeProfile();
     const key = getDayKeys(0)[3];
     const had = (getDayBlocks(key) || []).slice();
@@ -1359,7 +1388,7 @@ function findChromium() {
      session. Touch the TRAVEL minutes on a swimming block and that stale number
      was copied into the block's get-ready and saved: a field with no visible
      control silently rewriting itself from another block's value. */
-  checks.changingTravelDoesNotRewriteGetReady = await page.evaluate(async () => {
+  if (want('changingTravelDoesNotRewriteGetReady')) checks.changingTravelDoesNotRewriteGetReady = await page.evaluate(async () => {
     const kid = activeProfile();
     const key = getDayKeys(0)[4];
     const had = (getDayBlocks(key) || []).slice();
@@ -1419,7 +1448,7 @@ function findChromium() {
      Geometry, not classes: it measures real rectangles, because a z-index or a
      clip that silently stopped applying is exactly the failure that still looks
      plausible in the DOM. */
-  checks.aBufferStripNeverCoversACard = await page.evaluate(() => {
+  if (want('aBufferStripNeverCoversACard')) checks.aBufferStripNeverCoversACard = await page.evaluate(() => {
     goWeek(); setWeekView('full');
     const kid = activeProfile();
     const key = getDayKeys(0)[2];
@@ -1542,7 +1571,7 @@ function findChromium() {
      What must hold is an ORDERING, not the presence of a heading — the previous
      check here asserted only that "Good for" existed, which was true throughout
      and is why this shipped. */
-  checks.theSuggestionsAnswerTheClock = await page.evaluate(() => {
+  if (want('theSuggestionsAnswerTheClock')) checks.theSuggestionsAnswerTheClock = await page.evaluate(() => {
     const bad = [];
     const keyFor = want => getDayKeys(0).find(k => isSchoolDay(k) === want);
     const namesIn = () => [...document.querySelectorAll('#slotPickerList .slot-pick-chip')]
@@ -1637,7 +1666,7 @@ function findChromium() {
      with nothing written to it — derived, never migrated, the same rule as xp2.
      And the clash arithmetic follows: a School Day with no drive home must stop
      being reported as running into whatever comes next. */
-  checks.aBlockCanGoStraightOnWithoutComingHome = await page.evaluate(() => {
+  if (want('aBlockCanGoStraightOnWithoutComingHome')) checks.aBlockCanGoStraightOnWithoutComingHome = await page.evaluate(() => {
     const bad = [];
 
     // (1) A legacy block — only the symmetric fields — is unchanged.
@@ -1746,7 +1775,7 @@ function findChromium() {
      that is the design working, not a defect. The floor applies to pairs that
      cross a category boundary; within one, all that is required is that they
      are not literally the same value. */
-  checks.everySubgroupTellsItselfApart = await page.evaluate(() => {
+  if (want('everySubgroupTellsItselfApart')) checks.everySubgroupTellsItselfApart = await page.evaluate(() => {
     const bad = [];
     /* 14 is the floor this palette clears with room (its worst cross-category
        pair is Arts vs Outings at 15.0) and is comfortably above the ~5 at which
@@ -1864,7 +1893,7 @@ function findChromium() {
      distinction the old check could not make: it searched the label text and
      the tooltips together, so an overflowing label and a fitted one read the
      same to it. */
-  checks.theStripStillSaysWhenToLeave = await page.evaluate(() => {
+  if (want('theStripStillSaysWhenToLeave')) checks.theStripStillSaysWhenToLeave = await page.evaluate(() => {
     goWeek(); setWeekView('full');
     const kid = activeProfile();
     const key = getDayKeys(0)[3];
@@ -1988,7 +2017,7 @@ function findChromium() {
      Held on the VOCABULARY and on the screens both, because one owner answering
      correctly proves nothing if a surface still writes its own ternary -- which
      is exactly the state this found. */
-  checks.theAfterBufferIsNotCalledGettingReady = await page.evaluate(() => {
+  if (want('theAfterBufferIsNotCalledGettingReady')) checks.theAfterBufferIsNotCalledGettingReady = await page.evaluate(() => {
     const bad = [];
     const seg = (side, kind) => ({
       side, kind, min: 15, icon: kind === 'travel' ? '🚗' : '👕',
@@ -2069,7 +2098,7 @@ function findChromium() {
      day the axis is describing. So the school columns of a term week say
      nothing, a Saturday inside one still speaks because it really is different,
      and a week that is all holiday says it once on the axis. */
-  checks.aZoneNameIsDrawnOnlyWhereItIsNews = await page.evaluate(() => {
+  if (want('aZoneNameIsDrawnOnlyWhereItIsNews')) checks.aZoneNameIsDrawnOnlyWhereItIsNews = await page.evaluate(() => {
     const bad = [];
     const wasOffset = weekOffset;
     const perCol = () => [...document.querySelectorAll('#weeklyFullGrid .wf-day-col')]
@@ -2131,7 +2160,7 @@ function findChromium() {
 
      Both cases here, on one fixture each: the Tuesday evening from the original
      screenshot, and the Wednesday from this one. */
-  checks.aFlooredCardNeverSitsOnTheOneBelowIt = await page.evaluate(() => {
+  if (want('aFlooredCardNeverSitsOnTheOneBelowIt')) checks.aFlooredCardNeverSitsOnTheOneBelowIt = await page.evaluate(() => {
     goWeek(); setWeekView('full');
     const kid = activeProfile();
     const key = getDayKeys(0)[1];
@@ -2217,7 +2246,7 @@ function findChromium() {
      The failure to guard against is not "the badge is missing" but "the two
      surfaces disagree", so this seeds one fixture and asserts the SAME number
      and the SAME partner name on both. */
-  checks.theDayViewSaysTheSameThingAboutAClash = await page.evaluate(() => {
+  if (want('theDayViewSaysTheSameThingAboutAClash')) checks.theDayViewSaysTheSameThingAboutAClash = await page.evaluate(() => {
     const kid = activeProfile();
     const key = getDayKeys(0)[4];
     const had = (getDayBlocks(key) || []).slice();
@@ -2294,7 +2323,7 @@ function findChromium() {
      drawn at full length still claimed minutes the next activity was using, and
      its centred label landed beneath a card where nobody could read it. Same
      owner, same answer: three surfaces, one rule. */
-  checks.theDayViewClipsItsBuffersTheSameWay = await page.evaluate(() => {
+  if (want('theDayViewClipsItsBuffersTheSameWay')) checks.theDayViewClipsItsBuffersTheSameWay = await page.evaluate(() => {
     const kid = activeProfile();
     const key = getDayKeys(0)[2];
     const had = (getDayBlocks(key) || []).slice();
@@ -2348,7 +2377,7 @@ function findChromium() {
      excluded — it is the one child that is meant to sit outside the flow. Same
      shape of assertion as aShortBlockStillSaysWhatItIs: whatever the row costs
      become, a card may never draw more than it can hold. */
-  checks.theStackedCardFitsWhatItDraws = await page.evaluate(() => {
+  if (want('theStackedCardFitsWhatItDraws')) checks.theStackedCardFitsWhatItDraws = await page.evaluate(() => {
     goWeek(); setWeekView('full');
     const kid = activeProfile();
     const key = getDayKeys(0)[2];
@@ -2414,7 +2443,7 @@ function findChromium() {
      a check that silently reads nothing would pass on an empty set. What
      matters is the rendered column anyway, not which rule produced it. */
   await page.setViewportSize({ width: 390, height: 844 });
-  checks.theWeekGridKeepsItsColumnFloor = await page.evaluate(() => {
+  if (want('theWeekGridKeepsItsColumnFloor')) checks.theWeekGridKeepsItsColumnFloor = await page.evaluate(() => {
     goWeek(); setWeekView('full');
     const kid = activeProfile();
     const key = getDayKeys(0)[2];
@@ -2456,7 +2485,7 @@ function findChromium() {
      once that element ran out there was nowhere left to go; pointerdown calls
      preventDefault, so the browser's own autoscroll was not there to take over
      either. Drives real pointer events rather than calling the handler. */
-  checks.middleDragFollowsTheCursorAndChains = await page.evaluate(() => {
+  if (want('middleDragFollowsTheCursorAndChains')) checks.middleDragFollowsTheCursorAndChains = await page.evaluate(() => {
     goWeek(); setWeekView('full'); renderWeek();
     const bad = [];
     const el = document.querySelector('.weekly-full-wrap');
@@ -2552,7 +2581,7 @@ function findChromium() {
      the shortcut row and the board are gone, so this now checks the two routes
      that survive — the nav and Today's own money card — and that neither has
      picked the old wording back up. */
-  checks.kidMoneyLabel = await page.evaluate(() => {
+  if (want('kidMoneyLabel')) checks.kidMoneyLabel = await page.evaluate(() => {
     const bad = [];
     profile = 'jenn'; goToday();
     const nav = document.querySelector('#kidNav [data-td-nav="money"]');
@@ -2567,7 +2596,7 @@ function findChromium() {
   });
   // The money button lands a kid on her own page, and that page shows the four
   // things she owns and what she still owes.
-  checks.kidCanOpenMyMoney = await page.evaluate(() => {
+  if (want('kidCanOpenMyMoney')) checks.kidCanOpenMyMoney = await page.evaluate(() => {
     openWeekMoney();
     const txt = document.getElementById('mnyPage1Wrap').textContent;
     return document.getElementById('screen-mymoney').classList.contains('active')
@@ -2575,20 +2604,20 @@ function findChromium() {
         && txt.includes('Cash') && txt.includes('Locked away');
   });
   // The rules editor is not on a kid's page at all — there is nothing to hide.
-  checks.kidHasNoRulesOnHerPage = await page.evaluate(() => {
+  if (want('kidHasNoRulesOnHerPage')) checks.kidHasNoRulesOnHerPage = await page.evaluate(() => {
     const txt = document.getElementById('mnyPage1Wrap').textContent;
     return !document.getElementById('mnyPage1Wrap').querySelector('[data-pm-action="edit"]')
         && !txt.includes('Rules &');
   });
   // A kid can walk to her own history and back without a grown-up.
-  checks.kidCanReadHerStory = await page.evaluate(() => {
+  if (want('kidCanReadHerStory')) checks.kidCanReadHerStory = await page.evaluate(() => {
     mnyOpenStory();
     return document.getElementById('screen-moneystory').classList.contains('active')
         && document.getElementById('mnyStoryWrap').textContent.includes('My money story');
   });
   // Kids may look at what they own, but the balances must not move when a kid
   // tries to transact.
-  checks.kidCannotTransact = await page.evaluate(() => {
+  if (want('kidCannotTransact')) checks.kidCannotTransact = await page.evaluate(() => {
     const kid = activeProfile();
     const wrap = document.getElementById('mnyPage1Wrap');
     // Her page has no control that moves money — not a disabled one, none.
@@ -2604,13 +2633,13 @@ function findChromium() {
     return noMovers && guarded && noDoor && cannotOverride;
   });
   // A kid editing a rule must be refused, leaving no new version or log entry.
-  checks.kidCannotEditRules = await page.evaluate(() => {
+  if (want('kidCannotEditRules')) checks.kidCannotEditRules = await page.evaluate(() => {
     const before = mrVersions().length;
     const res = mrApplyEdits([{ path: 'chores.dailyCap', value: 99 }], { reason: 'family_meeting' });
     return res === null && mrVersions().length === before && mrRules().chores.dailyCap !== 99;
   });
   // A kid must not be able to grade her own chores.
-  checks.kidCannotGradeChores = await page.evaluate(() => {
+  if (want('kidCannotGradeChores')) checks.kidCannotGradeChores = await page.evaluate(() => {
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = activeProfile();
     const before = mrGetChoreGrade(kid, ctWeekKey, 0, 'dishes');
@@ -2619,7 +2648,7 @@ function findChromium() {
   });
   // ── Redesign phase 1: claims, the pool↔planner seam, goal shapes ──
   // A kid CAN say how a chore went, and saying so moves no money.
-  checks.claimIsNotPayment = await page.evaluate(() => {
+  if (want('claimIsNotPayment')) checks.claimIsNotPayment = await page.evaluate(() => {
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = activeProfile(), wk = ctWeekKey;
     const before = mrWeekMoney(wk, kid);
@@ -2632,7 +2661,7 @@ function findChromium() {
   // Every check from here leaves the week as it found it, so a later one can
   // assert on the queue being empty and mean it.
   // A claim with no grade is what the parent queue is made of; grading clears it.
-  checks.gradingClearsTheQueue = await page.evaluate(() => {
+  if (want('gradingClearsTheQueue')) checks.gradingClearsTheQueue = await page.evaluate(() => {
     const kid = activeProfile(), wk = ctWeekKey;
     const queued = mrClaimQueue(wk, kid).some(q => q.choreId === 'dishes' && q.dayIdx === 0);
     const wasParent = profile;
@@ -2645,14 +2674,14 @@ function findChromium() {
     return queued && gone;
   });
   // A kid must not answer for her sister's week.
-  checks.kidCannotClaimForSister = await page.evaluate(() => {
+  if (want('kidCannotClaimForSister')) checks.kidCannotClaimForSister = await page.evaluate(() => {
     const other = activeProfile() === 'jenn' ? 'jess' : 'jenn';
     const before = mrGetClaim(other, ctWeekKey, 0, 'dishes');
     const ok = mrSetClaim(other, ctWeekKey, 0, 'dishes', 3);
     return ok === false && mrGetClaim(other, ctWeekKey, 0, 'dishes') === before;
   });
   // The planner owns the schedule: a chore is on a day only if a block tags it.
-  checks.plannerOwnsTheSchedule = await page.evaluate(() => {
+  if (want('plannerOwnsTheSchedule')) checks.plannerOwnsTheSchedule = await page.evaluate(() => {
     const kid = activeProfile(), wk = ctWeekKey;
     const keys = mrWeekDayKeys(wk);
     const has = (d) => mrChoresForDay(kid, wk, d).rows.some(r => r.row.id === 'dishes');
@@ -2665,7 +2694,7 @@ function findChromium() {
     return emptyBefore && onWed && notThu && !has(2);
   });
   // Legacy name tags still find their pool row; an unknown tag is reported, not dropped.
-  checks.legacyTagsStillResolve = await page.evaluate(() => {
+  if (want('legacyTagsStillResolve')) checks.legacyTagsStillResolve = await page.evaluate(() => {
     const wk = ctWeekKey;
     const byName = mrPoolRowForTag('Mop', wk);
     const byId = mrPoolRowForTag('mop', wk);
@@ -2674,7 +2703,7 @@ function findChromium() {
     return byName && byName.id === 'mop' && byId && byId.id === 'mop'
         && messy && messy.id === 'dishes' && unknown === null;
   });
-  checks.unknownTagIsSurfaced = await page.evaluate(() => {
+  if (want('unknownTagIsSurfaced')) checks.unknownTagIsSurfaced = await page.evaluate(() => {
     const kid = activeProfile(), wk = ctWeekKey;
     const keys = mrWeekDayKeys(wk);
     const before = getDayBlocks(keys[1], kid).slice();
@@ -2703,7 +2732,7 @@ function findChromium() {
   }, { fnSrc: fn.toString() });
 
   // A `who`-scoped row belongs to one kid even on a block they both see.
-  checks.whoScopesAPoolRow = await withPool(({ wk, original, edit, mrDeepCopy }) => {
+  if (want('whoScopesAPoolRow')) checks.whoScopesAPoolRow = await withPool(({ wk, original, edit, mrDeepCopy }) => {
     const keys = mrWeekDayKeys(wk);
     const jb = getDayBlocks(keys[4], 'jenn').slice(), kb = getDayBlocks(keys[4], 'jess').slice();
     const block = { id:'ct3', actId:'chores', startMin: 17*60, durationMin: 30, choreTags:['bins'], checklistState:{} };
@@ -2716,14 +2745,14 @@ function findChromium() {
     return j === true && k === false;
   });
   // Standing responsibilities need no block at all.
-  checks.standingLanesNeedNoBlock = await withPool(({ wk, original, edit, mrDeepCopy }) => {
+  if (want('standingLanesNeedNoBlock')) checks.standingLanesNeedNoBlock = await withPool(({ wk, original, edit, mrDeepCopy }) => {
     edit([...mrDeepCopy(original),
       { id:'water', label:'Water the plants', lane:'helping', who:'both', due:'18:00' }]);
     const row = mrChoresForDay('jenn', wk, 6).rows.find(r => r.row.id === 'water');
     return !!row && row.scheduled === false && row.row.lane === 'helping';
   });
   // A goal written as a bare number still fires the +$1 on the old rule.
-  checks.legacyGoalStillFires = await page.evaluate(() => {
+  if (want('legacyGoalStillFires')) checks.legacyGoalStillFires = await page.evaluate(() => {
     const kid = activeProfile(), wk = ctWeekKey;
     ctSetWeekGoals(wk, 1, null);                          // 1 point is reachable
     const g = ctGetWeekGoals(wk).jenn || ctGetWeekGoals(wk)[kid];
@@ -2737,13 +2766,13 @@ function findChromium() {
     return shape && fired === true;
   });
   // Due times are real clock times, and bedtime is a wall.
-  checks.dueTimesRespectBedtime = await page.evaluate(() =>
+  if (want('dueTimesRespectBedtime')) checks.dueTimesRespectBedtime = await page.evaluate(() =>
     mrDueIsValid('19:30') && mrDueIsValid('7:30pm') && mrDueIsValid('20:30')
     && !mrDueIsValid('21:00') && !mrDueIsValid('9:00pm') && !mrDueIsValid('teatime')
     && mrFormatClock(mrParseClock('19:30')) === '7:30pm');
 
   // Kids must not be able to record their own results, fines or honesty strikes.
-  checks.kidCannotSelfReport = await page.evaluate(() => {
+  if (want('kidCannotSelfReport')) checks.kidCannotSelfReport = await page.evaluate(() => {
     const kid = activeProfile();
     const comps = mrCompetitions(kid).length, fines = mrFines(kid).length;
     mrAddCompetition(kid, { sport:'swim', points: 99 });
@@ -2762,7 +2791,7 @@ function findChromium() {
      toggle to leave in the wrong state, and none of the "Today" rail that used
      to duplicate the Today screen. What must remain is the schedule and the
      activity tray — the two things you build a day with. */
-  checks.dayScreenIsPlanningOnly = await page.evaluate(() => {
+  if (want('dayScreenIsPlanningOnly')) checks.dayScreenIsPlanningOnly = await page.evaluate(() => {
     const gone = ['dayModeQuest', 'dayModeTimeline', 'dayQuest', 'dayNextUpBanner',
                   'dayLeftToggle'].filter(id => document.getElementById(id));
     const bad = [];
@@ -2787,7 +2816,7 @@ function findChromium() {
   /* One scroll surface. It used to be three nested ones — .day-workspace, then
      .day-center-lane, then .timeline-wrap — so on an iPad the schedule scrolled
      inside a box inside a page and a flick could move the wrong one. */
-  checks.dayScreenScrollsAsOneSurface = await page.evaluate(() => {
+  if (want('dayScreenScrollsAsOneSurface')) checks.dayScreenScrollsAsOneSurface = await page.evaluate(() => {
     const bad = [];
     const scroller = el => {
       const st = getComputedStyle(el);
@@ -2805,7 +2834,7 @@ function findChromium() {
      take the two-line layout, which needs ~46px — so "Breakfast" rendered with
      its own title sliced in half. Measures the real box, at every length a
      short block actually gets used at. */
-  checks.shortBlocksDoNotClipTheirName = await page.evaluate(() => {
+  if (want('shortBlocksDoNotClipTheirName')) checks.shortBlocksDoNotClipTheirName = await page.evaluate(() => {
     const bad = [];
     const key = getDayKeys(0)[4];
     const before = getDayBlocks(key, 'jenn');
@@ -2838,7 +2867,7 @@ function findChromium() {
   // day view deliberately serves fewer, whatever the stored preference says.
   await page.setViewportSize({ width: 1400, height: 1000 });
   await page.waitForTimeout(150);
-  checks.multiDayColumnsPlaceOnTheirOwnDay = await page.evaluate(() => {
+  if (want('multiDayColumnsPlaceOnTheirOwnDay')) checks.multiDayColumnsPlaceOnTheirOwnDay = await page.evaluate(() => {
     const bad = [];
     const keys = getDayKeys(0);
     const spanBefore = dayViewSpan();
@@ -2905,7 +2934,7 @@ function findChromium() {
     };
   });
 
-  checks.draggingABlockMovesItToTheTimeItWasDroppedAt = await page.evaluate(() => {
+  if (want('draggingABlockMovesItToTheTimeItWasDroppedAt')) checks.draggingABlockMovesItToTheTimeItWasDroppedAt = await page.evaluate(() => {
     const bad = [];
     profile = 'jenn'; parentViewing = 'jenn';
     const { key, undo } = seedDragDay();
@@ -2932,7 +2961,7 @@ function findChromium() {
      next sync — invisible on every screen, which is why it is asserted rather
      than trusted. baseOpId is the half that proves markItemUpdated ran rather
      than something merely touching updatedAt. */
-  checks.aDraggedBlockIsStampedSoAMergeCannotLoseIt = await page.evaluate(() => {
+  if (want('aDraggedBlockIsStampedSoAMergeCannotLoseIt')) checks.aDraggedBlockIsStampedSoAMergeCannotLoseIt = await page.evaluate(() => {
     const bad = [];
     const { key, undo } = seedDragDay();
     try {
@@ -2948,7 +2977,7 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
-  checks.resizingABlockChangesOnlyItsDuration = await page.evaluate(() => {
+  if (want('resizingABlockChangesOnlyItsDuration')) checks.resizingABlockChangesOnlyItsDuration = await page.evaluate(() => {
     const bad = [];
     const at = (id, k) => { const b = (getDayBlocks(k, 'jenn') || [])[0]; return b ? b[id] : null; };
 
@@ -2991,7 +3020,7 @@ function findChromium() {
      drag that wrote per pointermove would upload the family document eight
      times for one gesture. Counted, not trusted — the same discipline
      reflCommitDraft's check uses. */
-  checks.aDragWritesOnceAndOnlyOnDrop = await page.evaluate(() => {
+  if (want('aDragWritesOnceAndOnlyOnDrop')) checks.aDragWritesOnceAndOnlyOnDrop = await page.evaluate(() => {
     const bad = [];
     const { key, undo } = seedDragDay();
     const realSave = window.saveAll;
@@ -3009,7 +3038,7 @@ function findChromium() {
      DESCENDANT, and the handles are descendants. Nothing on the drag side would
      notice if that stopped being true, so it is asserted from both ends — a
      drag must not open the editor, and a still tap must still open it. */
-  checks.aDraggedBlockDoesNotAlsoOpenItsEditor = await page.evaluate(() => {
+  if (want('aDraggedBlockDoesNotAlsoOpenItsEditor')) checks.aDraggedBlockDoesNotAlsoOpenItsEditor = await page.evaluate(() => {
     const bad = [];
     const { key, undo } = seedDragDay();
     try {
@@ -3034,7 +3063,7 @@ function findChromium() {
      would leave nothing to tap, swallowing the gesture that opens it: the very
      failure .wf-card-check is exempted for. Asserted at every duration a short
      block is actually used at. */
-  checks.onlyBlocksWithRoomToSpareOfferDragHandles = await page.evaluate(() => {
+  if (want('onlyBlocksWithRoomToSpareOfferDragHandles')) checks.onlyBlocksWithRoomToSpareOfferDragHandles = await page.evaluate(() => {
     const bad = [];
     const key = getDayKeys(0)[3];
     const before = (getDayBlocks(key, 'jenn') || []).slice();
@@ -3081,7 +3110,7 @@ function findChromium() {
   /* A block a child may not move offers no grip at all. Refusing at the drop
      instead would be a control that lets her drag for two seconds and then
      announces it did nothing. */
-  checks.aPinnedBlockOffersNoGripToDragItBy = await page.evaluate(() => {
+  if (want('aPinnedBlockOffersNoGripToDragItBy')) checks.aPinnedBlockOffersNoGripToDragItBy = await page.evaluate(() => {
     const bad = [];
     const key = getDayKeys(0)[3];
     const before = (getDayBlocks(key, 'jenn') || []).slice();
@@ -3109,7 +3138,7 @@ function findChromium() {
      walks the DOM for scrollers) nor onlyTheScheduleScrollsOnTheDayScreen
      (which watches the document) can see a flick a handle swallowed, so the
      positions are measured across a real gesture. */
-  checks.theScheduleStaysTheOnlyThingThatScrollsWhileDragging = await page.evaluate(() => {
+  if (want('theScheduleStaysTheOnlyThingThatScrollsWhileDragging')) checks.theScheduleStaysTheOnlyThingThatScrollsWhileDragging = await page.evaluate(() => {
     const bad = [];
     const { key, undo } = seedDragDay();
     try {
@@ -3138,7 +3167,7 @@ function findChromium() {
      was dropped on. */
   await page.setViewportSize({ width: 1400, height: 1000 });
   await page.waitForTimeout(150);
-  checks.draggingAcrossColumnsWritesToTheColumnItWasDroppedOn = await page.evaluate(() => {
+  if (want('draggingAcrossColumnsWritesToTheColumnItWasDroppedOn')) checks.draggingAcrossColumnsWritesToTheColumnItWasDroppedOn = await page.evaluate(() => {
     const bad = [];
     profile = 'jenn'; parentViewing = 'jenn';
     const keys = getDayKeys(0);
@@ -3217,7 +3246,7 @@ function findChromium() {
   /* Off its own weekday a block is no longer one of the series' days, so the
      move says so and drops the repeat rather than leaving a record claiming a
      repeat it is not part of — which seriesExtendTo would later act on. */
-  checks.aRepeatDraggedToAnotherDayLeavesItsRepeat = await page.evaluate(async () => {
+  if (want('aRepeatDraggedToAnotherDayLeavesItsRepeat')) checks.aRepeatDraggedToAnotherDayLeavesItsRepeat = await page.evaluate(async () => {
     const bad = [];
     const keys = getDayKeys(0);
     const had = keys.slice(0, 3).map(k => (getDayBlocks(k, 'jenn') || []).slice());
@@ -3263,7 +3292,7 @@ function findChromium() {
      Recorded by placeBlock, not by pickFromSlot: picking only opens a sheet and
      a cancel is one tap away, so recording at pick time would have a category
      remembering something that never landed on a day. */
-  checks.aCategoryOffersWhatSheAddedFromItLastTime = await page.evaluate(() => {
+  if (want('aCategoryOffersWhatSheAddedFromItLastTime')) checks.aCategoryOffersWhatSheAddedFromItLastTime = await page.evaluate(() => {
     const bad = [];
     profile = 'jenn'; parentViewing = 'jenn';
     const key = getDayKeys(0)[3];
@@ -3363,7 +3392,7 @@ function findChromium() {
      achievementActivityId. A season comes back and an archive can be undone, so
      a memory is not deleted for pointing at something temporarily unavailable;
      it just does not get to reorder anything. */
-  checks.aRememberedActivityThatIsGoneDoesNotBreakItsCategory = await page.evaluate(() => {
+  if (want('aRememberedActivityThatIsGoneDoesNotBreakItsCategory')) checks.aRememberedActivityThatIsGoneDoesNotBreakItsCategory = await page.evaluate(() => {
     const bad = [];
     const seen = [];
     try {
@@ -3410,7 +3439,7 @@ function findChromium() {
      CLAUDE.md records that it shipped without its clamp and every check passed
      because no fixture had an overlap. So the overlap here is made BY A DRAG,
      the way a real one will be, rather than seeded straight into the record. */
-  checks.aDragThatCreatesAnOverlapDoesNotBreakTodaysRibbon = await page.evaluate(() => {
+  if (want('aDragThatCreatesAnOverlapDoesNotBreakTodaysRibbon')) checks.aDragThatCreatesAnOverlapDoesNotBreakTodaysRibbon = await page.evaluate(() => {
     const bad = [];
     profile = 'jenn'; parentViewing = 'jenn';
     const key = todayKey();
@@ -3459,7 +3488,7 @@ function findChromium() {
      1 day was 2px out from the canvas border. One day has no header, which is
      why nobody saw it. Measured at every column count, because that is the
      variable that broke it. */
-  checks.theHourLadderLinesUpWithTheSchedule = await page.evaluate(() => {
+  if (want('theHourLadderLinesUpWithTheSchedule')) checks.theHourLadderLinesUpWithTheSchedule = await page.evaluate(() => {
     const bad = [];
     const spanBefore = dayViewSpan();
     const keys = getDayKeys(0);
@@ -3517,7 +3546,7 @@ function findChromium() {
      tap lands, where a drag may be dropped — follows the canvas rather than the
      global. A gutter label hanging below its own canvas is the exact shape of
      the phase bug this file already records. */
-  checks.theDayEndsWhereTheDayEnds = await page.evaluate(() => {
+  if (want('theDayEndsWhereTheDayEnds')) checks.theDayEndsWhereTheDayEnds = await page.evaluate(() => {
     const kid = activeProfile();
     const key = getDayKeys(0)[2];
     const had = (getDayBlocks(key) || []).slice();
@@ -3607,7 +3636,7 @@ function findChromium() {
      page on purpose, so the one input that reached the document was the middle
      button, and it carried the topbar off screen. dayScreenScrollsAsOneSurface
      cannot see this: it only walks INSIDE #screen-day. */
-  checks.onlyTheScheduleScrollsOnTheDayScreen = await page.evaluate(() => {
+  if (want('onlyTheScheduleScrollsOnTheDayScreen')) checks.onlyTheScheduleScrollsOnTheDayScreen = await page.evaluate(() => {
     const bad = [];
     /* A DAY TALL ENOUGH TO SCROLL, seeded rather than assumed. This opened
        whatever the fixture happened to hold and relied on the canvas always
@@ -3665,7 +3694,7 @@ function findChromium() {
      Checked by stacking order rather than by eye, and each side asserted
      separately — a z-index that silently stopped applying is exactly the
      failure that would otherwise look fine. */
-  checks.noRuleIsDrawnAcrossACard = await page.evaluate(() => {
+  if (want('noRuleIsDrawnAcrossACard')) checks.noRuleIsDrawnAcrossACard = await page.evaluate(() => {
     const bad = [];
     const zOf = (el) => {
       for (let n = el; n && n !== document.body; n = n.parentElement) {
@@ -3786,7 +3815,7 @@ function findChromium() {
      a narrow viewport serves fewer without forgetting what was chosen. */
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(150);
-  checks.narrowScreensGetOneDay = await page.evaluate(() => {
+  if (want('narrowScreensGetOneDay')) checks.narrowScreensGetOneDay = await page.evaluate(() => {
     const bad = [];
     const spanBefore = dayViewSpan();
     setDayViewSpan(3);
@@ -3804,7 +3833,7 @@ function findChromium() {
      that look alike were two days built by hand. Clones must be fresh (no
      inherited completion or XP) and a replaced day must be tombstoned, or a
      merge from another device brings the old blocks straight back. */
-  checks.copyDayReplacesCleanly = await page.evaluate(() => {
+  if (want('copyDayReplacesCleanly')) checks.copyDayReplacesCleanly = await page.evaluate(() => {
     const bad = [];
     const keys = getDayKeys(0);
     const [src, dst] = [keys[0], keys[2]];
@@ -3833,7 +3862,7 @@ function findChromium() {
   await page.waitForTimeout(300);
   // Rest toggle lives in the Template sheet
   await page.evaluate(() => openTemplateSheet());
-  checks.restInTemplateSheet = await page.evaluate(() => {
+  if (want('restInTemplateSheet')) checks.restInTemplateSheet = await page.evaluate(() => {
     const btn = document.getElementById('restDayBtn');
     return !!btn && !!btn.closest('#templateOverlay');
   });
@@ -3842,7 +3871,7 @@ function findChromium() {
   // The week legend, for kids
   await page.evaluate(() => { goWeek(); setWeekView('full'); });
   await page.waitForTimeout(400);
-  checks.weekLegend = await page.evaluate(() => {
+  if (want('weekLegend')) checks.weekLegend = await page.evaluate(() => {
     const el = document.getElementById('weekLegend');
     return !!el && el.style.display !== 'none' && el.children.length >= 5;
   });
@@ -3861,15 +3890,15 @@ function findChromium() {
   await page.waitForTimeout(400);
 
   // The four frames of the redesign are all on screen.
-  checks.kidTabRenders = await page.evaluate(() =>
+  if (want('kidTabRenders')) checks.kidTabRenders = await page.evaluate(() =>
     !!document.querySelector('.ck-tab') && !!document.querySelector('.ck-rail')
     && document.querySelectorAll('.ck-day').length === 7
     && !!document.querySelector('.ck-bar'));
   // A kid's tab carries no grading control anywhere on it.
-  checks.kidTabHasNoGrading = await page.evaluate(() =>
+  if (want('kidTabHasNoGrading')) checks.kidTabHasNoGrading = await page.evaluate(() =>
     !document.querySelector('[data-ct-action="grade-chore"]'));
   // Layout C: the row is the tap target, and only the tapped row opens.
-  checks.tapOpensOneChoreOnly = await page.evaluate(() => {
+  if (want('tapOpensOneChoreOnly')) checks.tapOpensOneChoreOnly = await page.evaluate(() => {
     const row = document.querySelector('[data-ct-action="ck-chore-row"]');
     if (!row) return false;
     row.click();
@@ -3878,7 +3907,7 @@ function findChromium() {
   });
   await page.screenshot({ path: shot('kid_chore_day') });
   // Picking a word writes a claim, collapses the row, and moves no money.
-  checks.claimFromTheRow = await page.evaluate(() => {
+  if (want('claimFromTheRow')) checks.claimFromTheRow = await page.evaluate(() => {
     const kid = activeProfile(), wk = ctWeekKey;
     const before = mrWeekMoney(wk, kid);
     const btn = document.querySelector('[data-ct-action="ck-claim"][data-quality="3"]');
@@ -3890,7 +3919,7 @@ function findChromium() {
         && !!document.querySelector('.ck-chore-claimed');
   });
   // A graded chore is Mom's answer; the kid's row refuses to reopen it.
-  checks.gradedRowIsClosedToHer = await page.evaluate(() => {
+  if (want('gradedRowIsClosedToHer')) checks.gradedRowIsClosedToHer = await page.evaluate(() => {
     const kid = activeProfile(), wk = ctWeekKey;
     const wasProfile = profile;
     profile = 'parent'; mrSetChoreGrade(kid, wk, 2, 'dishes', 2); profile = wasProfile;
@@ -3903,7 +3932,7 @@ function findChromium() {
     return stillShut;
   });
   // The week grid is an input, and a day the planner skipped is inert.
-  checks.weekGridClaimsAndGreys = await page.evaluate(() => {
+  if (want('weekGridClaimsAndGreys')) checks.weekGridClaimsAndGreys = await page.evaluate(() => {
     ckSetView('week');
     const cells = document.querySelectorAll('[data-ct-action="ck-week-cell"]');
     const off = document.querySelectorAll('.ck-cell-off').length;
@@ -3918,7 +3947,7 @@ function findChromium() {
   await page.setViewportSize({ width: 1194, height: 834 });
   await page.evaluate(() => { ckSetView('day'); });
   await page.waitForTimeout(300);
-  checks.railSitsBesideAtIpad = await page.evaluate(() => {
+  if (want('railSitsBesideAtIpad')) checks.railSitsBesideAtIpad = await page.evaluate(() => {
     const main = document.querySelector('.ck-main').getBoundingClientRect();
     const rail = document.querySelector('.ck-rail').getBoundingClientRect();
     return rail.left >= main.right - 2 && rail.width > 200;
@@ -3927,7 +3956,7 @@ function findChromium() {
   await page.setViewportSize({ width: 900, height: 1100 });
   await page.waitForTimeout(200);
   // A day with nothing planned says so rather than showing an empty box.
-  checks.emptyDaySaysSo = await page.evaluate(() => {
+  if (want('emptyDaySaysSo')) checks.emptyDaySaysSo = await page.evaluate(() => {
     ckSelectDay(4);
     const txt = document.querySelector('.ck-main').textContent;
     ckSelectDay(2);
@@ -3938,7 +3967,7 @@ function findChromium() {
      sheet, which is a menu you have to know to open; the week is where you are
      when you want a paper copy. Both doors call openPrint, so this asserts the
      button exists on the week AND that it is the same call, not a second one. */
-  checks.printIsOnTheWeek = await page.evaluate(() => {
+  if (want('printIsOnTheWeek')) checks.printIsOnTheWeek = await page.evaluate(() => {
     goWeek();
     const bad = [];
     const btn = document.querySelector('#screen-week .week-print-btn');
@@ -3955,7 +3984,7 @@ function findChromium() {
   /* A training session had no custom-length field at all — the presets were the
      whole of it — and the two sheets that did have one clamped at 480 minutes,
      below the app's own 600-minute competition preset. The ceiling is the day. */
-  checks.durationsGoAsLongAsTheDay = await page.evaluate(() => {
+  if (want('durationsGoAsLongAsTheDay')) checks.durationsGoAsLongAsTheDay = await page.evaluate(() => {
     const bad = [];
     const keys = getDayKeys(0);
     currentDayKey = keys[1];
@@ -3983,7 +4012,7 @@ function findChromium() {
   /* A family takes up a sport the four built-in tags do not cover. It has to be
      addable, it has to render on a block, and retiring it must not rewrite the
      blocks that already name it. */
-  checks.aCustomSportCanBeAdded = await page.evaluate(() => {
+  if (want('aCustomSportCanBeAdded')) checks.aCustomSportCanBeAdded = await page.evaluate(() => {
     const bad = [];
     const wasParent = profile;
     profile = 'parent';
@@ -4014,7 +4043,7 @@ function findChromium() {
      stops and two years of piano goes with her. It archives now: the record
      stays so history still renders, the list loses it, and only the plan ahead
      is cleared. */
-  checks.retiringAnActivityKeepsItsHistory = await page.evaluate(async () => {
+  if (want('retiringAnActivityKeepsItsHistory')) checks.retiringAnActivityKeepsItsHistory = await page.evaluate(async () => {
     const bad = [];
     const wasProfile = profile;
     profile = 'parent'; parentViewing = 'jenn';
@@ -4080,7 +4109,7 @@ function findChromium() {
      custom activities were offered when creating one but had no filter chip, so
      anything filed there could only ever be found under "All"; "Routines" had a
      chip but was in neither select. One table drives the chips now. */
-  checks.everyCategoryIsReachable = await page.evaluate(() => {
+  if (want('everyCategoryIsReachable')) checks.everyCategoryIsReachable = await page.evaluate(() => {
     const bad = [];
     profile = 'jenn';
     /* A custom activity, because "Mine" is legitimately empty until the family
@@ -4160,11 +4189,11 @@ function findChromium() {
   // Print view: travel/get-ready buffers + time-of-day sideband
   await page.evaluate(() => { goWeek(); openPrint(); });
   await page.waitForTimeout(400);
-  checks.printBuffers = await page.evaluate(() =>
+  if (want('printBuffers')) checks.printBuffers = await page.evaluate(() =>
     document.querySelectorAll('.print-buffer').length >= 4);
   // Same for the printed axis, and for the same reason — it carried its own
   // copy of the 9am–3pm constants.
-  checks.printSideband = await page.evaluate(() => {
+  if (want('printSideband')) checks.printSideband = await page.evaluate(() => {
     const keys = getDayKeys(weekOffset);
     const axisKey = keys.find(k => isSchoolDay(k)) || null;
     const want = axisKey ? dayZoneSegments(axisKey).length : 1;
@@ -4177,7 +4206,7 @@ function findChromium() {
   await page.screenshot({ path: shot('print'), fullPage: true });
 
   // Series removal survives a stale remote merge
-  checks.seriesDeleteSticks = await page.evaluate(() => {
+  if (want('seriesDeleteSticks')) checks.seriesDeleteSticks = await page.evaluate(() => {
     const keys = getDayKeys(0);
     currentDayKey = keys[0];
     const src = getDayBlocks(keys[0]).find(b => b.id === 't3');
@@ -4194,7 +4223,7 @@ function findChromium() {
      — so nothing afterwards could say what the repeat was, and the date inputs
      were shown to a parent only (and on the activity sheet, only for the school
      category). Runs in a far-future week so it cannot disturb the seeded one. */
-  checks.aSeriesRemembersItsDatesAndFrequency = await page.evaluate(() => {
+  if (want('aSeriesRemembersItsDatesAndFrequency')) checks.aSeriesRemembersItsDatesAndFrequency = await page.evaluate(() => {
     const bad = [];
     const wasDay = currentDayKey, wasOffset = weekOffset, wasProfile = profile;
     profile = 'jenn';
@@ -4270,7 +4299,7 @@ function findChromium() {
      every surface, because three of them wrote their own answer rather than
      asking blockDisplayName — which is exactly how the Full week and the print
      sheet came to disagree with the day view. */
-  checks.aCompetitionCanCarryItsOwnName = await page.evaluate(() => {
+  if (want('aCompetitionCanCarryItsOwnName')) checks.aCompetitionCanCarryItsOwnName = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile, wasDay = currentDayKey;
     profile = 'jenn';
@@ -4336,7 +4365,7 @@ function findChromium() {
      nothing to tell a parent it had happened — while a new ACTIVITY had had an
      approval queue all along. She can still use it in the session she typed it
      for; what changed is that a parent gets to keep or drop it. */
-  checks.aNewExerciseWaitsForAGrownUp = await page.evaluate(async () => {
+  if (want('aNewExerciseWaitsForAGrownUp')) checks.aNewExerciseWaitsForAGrownUp = await page.evaluate(async () => {
     const bad = [];
     const wasProfile = profile, wasViewing = parentViewing;
     const before = (state.shared.customTasks || []).slice();
@@ -4438,13 +4467,13 @@ function findChromium() {
     cpDay = 2; cpRenderChoreTab();
   });
   await page.waitForTimeout(300);
-  checks.parentChoreTabRenders = await page.evaluate(() => {
+  if (want('parentChoreTabRenders')) checks.parentChoreTabRenders = await page.evaluate(() => {
     const panel = document.getElementById('ptab-chores');
     return !!panel && panel.hidden === false && !!document.querySelector('.cp-tab')
         && !!document.querySelector('[data-cp-action="settle"]');
   });
   // The queue shows her claim, ringed on the grade the claim matches.
-  checks.queueShowsTheClaim = await page.evaluate(() => {
+  if (want('queueShowsTheClaim')) checks.queueShowsTheClaim = await page.evaluate(() => {
     const ringed = document.querySelector('.cp-gbtn.agrees');
     return !!ringed && /waiting on you/i.test(document.querySelector('.cp-tab').textContent);
   });
@@ -4452,7 +4481,7 @@ function findChromium() {
   // Grading from the queue records the grade and clears the row out of it.
   // It does NOT necessarily pay: her first two chores of the week are free, so
   // asserting money moved on chore one would be asserting the wrong rule.
-  checks.gradeFromQueueClearsIt = await page.evaluate(() => {
+  if (want('gradeFromQueueClearsIt')) checks.gradeFromQueueClearsIt = await page.evaluate(() => {
     const btn = document.querySelector('[data-cp-action="grade"][data-chore-id="dishes"][data-day="2"][data-grade="3"]');
     if (!btn) return false;
     btn.click();
@@ -4460,7 +4489,7 @@ function findChromium() {
         && !mrClaimQueue(ctWeekKey, 'jenn').some(q => q.choreId === 'dishes' && q.dayIdx === 2);
   });
   // Past the free two, a grade does move the week's money.
-  checks.gradingPastTheFreeTwoPays = await page.evaluate(() => {
+  if (want('gradingPastTheFreeTwoPays')) checks.gradingPastTheFreeTwoPays = await page.evaluate(() => {
     const wk = ctWeekKey;
     mrSetChoreGrade('jenn', wk, 0, 'mop', 3);
     mrSetChoreGrade('jenn', wk, 0, 'vacuum', 3);
@@ -4472,7 +4501,7 @@ function findChromium() {
     return after > before;
   });
   // Settle opens the meeting rather than recording anything here.
-  checks.settleOnlyOpensTheMeeting = await page.evaluate(() => {
+  if (want('settleOnlyOpensTheMeeting')) checks.settleOnlyOpensTheMeeting = await page.evaluate(() => {
     const before = JSON.stringify(state.shared.chore.finalizedWeeks || {});
     document.querySelector('[data-cp-action="settle"]').click();
     const opened = mmIsOpen();
@@ -4485,7 +4514,7 @@ function findChromium() {
     return opened && JSON.stringify(state.shared.chore.finalizedWeeks || {}) === before;
   });
   // The planner panel schedules a chore onto the day, and takes it off again.
-  checks.parentSchedulesFromTheTab = await page.evaluate(() => {
+  if (want('parentSchedulesFromTheTab')) checks.parentSchedulesFromTheTab = await page.evaluate(() => {
     setParentTab('chores'); cpDay = 3; cpRenderChoreTab();
     const has = () => mrChoresForDay('jenn', ctWeekKey, 3).rows.some(r => r.row.id === 'mop');
     const wasOff = !has();
@@ -4495,7 +4524,7 @@ function findChromium() {
     return wasOff && nowOn && !has();
   });
   // The dual grid shows both girls on one row, and greys days nobody planned.
-  checks.dualGridStripesBothKids = await page.evaluate(() => {
+  if (want('dualGridStripesBothKids')) checks.dualGridStripesBothKids = await page.evaluate(() => {
     cpView = 'week'; cpRenderChoreTab();
     const pairs = document.querySelectorAll('.cp-cellpair');
     const off = document.querySelectorAll('.cp-stripe.off').length;
@@ -4536,14 +4565,14 @@ function findChromium() {
   });
   await page.evaluate(() => { setParentTab('trends'); ctrRenderTrends(); });
   await page.waitForTimeout(300);
-  checks.trendsRenders = await page.evaluate(() => {
+  if (want('trendsRenders')) checks.trendsRenders = await page.evaluate(() => {
     const p = document.getElementById('ptab-trends');
     return !!p && p.hidden === false && p.querySelectorAll('.ctr-svg').length === 2
         && p.querySelectorAll('.ctr-card').length === 2
         && !!p.querySelector('.ctr-heat-cell');
   });
   // Two panels, two scales — never one plot with two y-axes.
-  checks.noDualAxis = await page.evaluate(() => {
+  if (want('noDualAxis')) checks.noDualAxis = await page.evaluate(() => {
     const svgs = [...document.querySelectorAll('#ptab-trends .ctr-svg')];
     const bars = svgs[0].querySelectorAll('rect').length;
     const lines = svgs[1].querySelectorAll('polyline').length;
@@ -4553,11 +4582,11 @@ function findChromium() {
         && lines === 2 && bars >= 0;
   });
   // Identity is never colour-alone: a legend is present and cells carry numbers.
-  checks.trendsIdentityNotColourAlone = await page.evaluate(() =>
+  if (want('trendsIdentityNotColourAlone')) checks.trendsIdentityNotColourAlone = await page.evaluate(() =>
     document.querySelectorAll('#ptab-trends .ctr-legend-item').length === 2
     && [...document.querySelectorAll('#ptab-trends .ctr-heat-cell')].every(c => c.textContent.trim().length > 0));
   // The window pages back, and cannot page past now.
-  checks.trendsPagingIsBounded = await page.evaluate(() => {
+  if (want('trendsPagingIsBounded')) checks.trendsPagingIsBounded = await page.evaluate(() => {
     const title = () => document.querySelector('#ptab-trends .cp-title').textContent;
     const first = title();
     document.querySelector('[data-ctr-action="page"][data-delta="1"]').click();
@@ -4568,7 +4597,7 @@ function findChromium() {
     return moved && back && atNow;
   });
   // A settled week is read from its frozen ledger, not recomputed.
-  checks.trendsPrefersTheFrozenLedger = await page.evaluate(() => {
+  if (want('trendsPrefersTheFrozenLedger')) checks.trendsPrefersTheFrozenLedger = await page.evaluate(() => {
     ctEnsureShared();
     const wk = ctrWeeks()[0].key;
     const led = state.shared.chore.moneyLedger || (state.shared.chore.moneyLedger = {});
@@ -4579,7 +4608,7 @@ function findChromium() {
   });
   // No surface in the portal may print NaN, Infinity or [object Object] — those
   // are always a bug upstream, and money is the worst place to discover one.
-  checks.portalPrintsNoBrokenNumbers = await page.evaluate(() => {
+  if (want('portalPrintsNoBrokenNumbers')) checks.portalPrintsNoBrokenNumbers = await page.evaluate(() => {
     const bad = [];
     ['chores', 'trends'].forEach(tab => {
       setParentTab(tab);
@@ -4591,7 +4620,7 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
   // The read must not call a week still being lived a downturn.
-  checks.readIgnoresTheUnfinishedWeek = await page.evaluate(() => {
+  if (want('readIgnoresTheUnfinishedWeek')) checks.readIgnoresTheUnfinishedWeek = await page.evaluate(() => {
     const t = document.querySelector('#ptab-trends .cp-sect:last-child').textContent;
     return /still being lived/.test(t) && !/^\s*$/.test(t);
   });
@@ -4600,14 +4629,14 @@ function findChromium() {
   // ── Redesign phase 5: chore setup ──
   await page.evaluate(() => { setParentTab('options'); coRenderOptions(); });
   await page.waitForTimeout(300);
-  checks.optionsRenders = await page.evaluate(() => {
+  if (want('optionsRenders')) checks.optionsRenders = await page.evaluate(() => {
     const p = document.getElementById('ptab-options');
     return !!p && p.hidden === false && document.querySelectorAll('.co-row').length > 1
         && !!document.querySelector('[data-co-action="add"]');
   });
   // Adding a chore writes an effective-dated rule version, and it shows up in
   // the pool for the week on screen.
-  checks.addingAChoreIsAnAuditedRuleEdit = await page.evaluate(() => {
+  if (want('addingAChoreIsAnAuditedRuleEdit')) checks.addingAChoreIsAnAuditedRuleEdit = await page.evaluate(() => {
     const before = mrVersions().length, logBefore = mrLogEntries().length;
     coDraft = { label: 'Water the plants', due: '6:00pm', who: 'jess', lane: 'helping' };
     coRenderOptions();
@@ -4617,14 +4646,14 @@ function findChromium() {
         && mrLogEntries().length > logBefore && mrVersions().length >= before;
   });
   // Bedtime is a wall: a due time after it is refused, and the pool is unchanged.
-  checks.bedtimeIsAWall = await page.evaluate(() => {
+  if (want('bedtimeIsAWall')) checks.bedtimeIsAWall = await page.evaluate(() => {
     const row = mrPoolRows(ctWeekKey).find(p => p.label === 'Water the plants');
     coSetDue(row.id, '9:30pm');
     const after = mrPoolRows(ctWeekKey).find(p => p.id === row.id);
     return after.due === '6pm';
   });
   // A planner tag matching no pool row is surfaced here, and can be adopted.
-  checks.orphanTagsAreOfferedAFix = await page.evaluate(() => {
+  if (want('orphanTagsAreOfferedAFix')) checks.orphanTagsAreOfferedAFix = await page.evaluate(() => {
     const kid = 'jenn', dayKey = mrWeekDayKeys(ctWeekKey)[5];
     const before = (getDayBlocks(dayKey, kid) || []).slice();
     setDayBlocks(dayKey, [...before, { id:'orph', actId:'chores', startMin: 17*60,
@@ -4640,7 +4669,7 @@ function findChromium() {
     return listed && resolves;
   });
   // The two-part goal needs BOTH halves before the +$1 fires.
-  checks.bothGoalHalvesMustLand = await page.evaluate(() => {
+  if (want('bothGoalHalvesMustLand')) checks.bothGoalHalvesMustLand = await page.evaluate(() => {
     const wk = ctWeekKey, kid = 'jess';
     ctSetGoalBonus(wk, kid, false);
     ctSetWeekGoals(wk, null, { routineDays: 7, money: 0 });
@@ -4656,7 +4685,7 @@ function findChromium() {
   });
   // The planner's tag picker offers pool rows and writes their ids, so it can
   // no longer manufacture a tag that matches nothing.
-  checks.tagPickerWritesPoolIds = await page.evaluate(() => {
+  if (want('tagPickerWritesPoolIds')) checks.tagPickerWritesPoolIds = await page.evaluate(() => {
     profile = 'jenn'; selectProfile('jenn');
     currentDayKey = mrWeekDayKeys(ctWeekKey)[0];
     selectedActivity = getAllActivities('jenn').find(a => a.id === 'chores');
@@ -4680,7 +4709,7 @@ function findChromium() {
   // ── The whole redesign, as one journey ──
   // Each phase is checked in isolation above; this is the only check that the
   // pieces actually join up: plan it, claim it, grade it, see it, settle it.
-  checks.redesignEndToEnd = await page.evaluate(() => {
+  if (want('redesignEndToEnd')) checks.redesignEndToEnd = await page.evaluate(() => {
     const kid = 'jenn', wk = ctWeekKey, day = 3, chore = 'vacuum';
     const step = {};
     profile = 'parent'; parentViewing = kid; cpDay = day; cpView = 'day';
@@ -4743,7 +4772,7 @@ function findChromium() {
   // Every routine checklist item shows an icon, wherever it is ticked — from
   // the preset, from a parent's own, or guessed from the words when neither
   // exists. A blank where an icon belongs is the failure being guarded.
-  checks.routineItemsAlwaysHaveAnIcon = await page.evaluate(() => {
+  if (want('routineItemsAlwaysHaveAnIcon')) checks.routineItemsAlwaysHaveAnIcon = await page.evaluate(() => {
     const guessed = routineItemIcon({ text: 'Feed the dog' }) === '🐾'
                  && routineItemIcon({ text: 'Brush teeth' }) === '🪥'
                  && routineItemIcon({ text: 'Wash hands' }) === '🧼'
@@ -4756,7 +4785,7 @@ function findChromium() {
       .every(r => r.items.every(i => !!i.icon));
     return guessed && neverBlank && presets;
   });
-  checks.kidTabShowsRoutineIcons = await page.evaluate(() => {
+  if (want('kidTabShowsRoutineIcons')) checks.kidTabShowsRoutineIcons = await page.evaluate(() => {
     profile = 'jenn'; selectProfile('jenn');
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const keys = mrWeekDayKeys(ctWeekKey);
@@ -5105,7 +5134,7 @@ function findChromium() {
       if (problems.length) kidFindings.push(`${label || id}@${w}: ${problems.join(' | ')}`);
     }
   }
-  checks.kidScreensMeetTheHouseRules = kidFindings.length === 0 || kidFindings;
+  if (want('kidScreensMeetTheHouseRules')) checks.kidScreensMeetTheHouseRules = kidFindings.length === 0 || kidFindings;
 
   // Artifacts at the sizes this app is actually used at — phone, iPad both ways,
   // laptop. The assertions above are the gate; these are for a human deciding
@@ -5141,7 +5170,7 @@ function findChromium() {
   const kid393 = await phoneAudit(393, 852, 'kid@393');
   await page.screenshot({ path: shot('phone_kid') });
   const kid375 = await phoneAudit(375, 667, 'kid@375');
-  checks.kidTabFitsAPhone =
+  if (want('kidTabFitsAPhone')) checks.kidTabFitsAPhone =
     (kid393.overflow.length + kid393.small.length + kid375.overflow.length + kid375.small.length) === 0
     || [kid393, kid375];
 
@@ -5156,14 +5185,14 @@ function findChromium() {
     if (a.overflow.length || a.small.length) portal.push(a);
     if (tab === 'chores') await page.screenshot({ path: shot('phone_parent') });
   }
-  checks.portalFitsAPhone = portal.length === 0 || portal;
+  if (want('portalFitsAPhone')) checks.portalFitsAPhone = portal.length === 0 || portal;
   await page.setViewportSize({ width: 900, height: 1100 });
   await page.waitForTimeout(200);
 
   // Parent: the meeting commit moves wallet, XP and the loan together, so undo
   // has to reverse all three. A partial reverse would leave credited XP or a
   // loan payment standing against a week that was un-recorded.
-  checks.meetingUndoIsComplete = await page.evaluate(() => {
+  if (want('meetingUndoIsComplete')) checks.meetingUndoIsComplete = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const wk = ctWeekKey, kid = 'jess';
@@ -5187,7 +5216,7 @@ function findChromium() {
   });
   // The loan schedule is MONTHLY but the family meeting is WEEKLY. A second
   // run in the same calendar month must not charge the payment again.
-  checks.loanChargesOncePerMonth = await page.evaluate(() => {
+  if (want('loanChargesOncePerMonth')) checks.loanChargesOncePerMonth = await page.evaluate(() => {
     profile = 'parent';
     const kid = 'jenn';
     const l = loanState(kid);
@@ -5201,7 +5230,7 @@ function findChromium() {
 
   // Overdue interest is a MONTHLY rate; charging it at every meeting would be
   // four to five months of interest a month.
-  checks.arrearsInterestOncePerMonth = await page.evaluate(() => {
+  if (want('arrearsInterestOncePerMonth')) checks.arrearsInterestOncePerMonth = await page.evaluate(() => {
     const kid = 'jenn';
     const l = loanState(kid);
     l.arrears = 100; l.arrearsInterest = 0; l.lastInterestMonth = null;
@@ -5213,7 +5242,7 @@ function findChromium() {
 
   // The deposit is what the schedule asks for first; the monthly payments only
   // start once it is settled.
-  checks.downPaymentComesFirst = await page.evaluate(() => {
+  if (want('downPaymentComesFirst')) checks.downPaymentComesFirst = await page.evaluate(() => {
     const kid = 'jenn';
     const l = loanState(kid);
     l.paid = 0; l.downPaid = 0; l.arrears = 0; l.arrearsInterest = 0;
@@ -5230,12 +5259,12 @@ function findChromium() {
 
   // Nothing is owed before the deposit falls due — the pacing readout must not
   // report a kid as behind on a loan that hasn't started.
-  checks.nothingDueBeforeStart = await page.evaluate(() =>
+  if (want('nothingDueBeforeStart')) checks.nothingDueBeforeStart = await page.evaluate(() =>
     loanDueNow('jess', '2026-08-02').reason === 'not-started');
 
   // Free chores land on the LOWEST-paying work. Chronological order would mean
   // two sloppy chores on Monday earn more than two good ones.
-  checks.freeChoresTakeLowestPaying = await page.evaluate(() => {
+  if (want('freeChoresTakeLowestPaying')) checks.freeChoresTakeLowestPaying = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const wk = ctWeekKey, kid = 'jess';
@@ -5250,7 +5279,7 @@ function findChromium() {
 
   // Honesty step 3 withdraws the pick: the free slots flip to her highest-paying
   // chores, so losing the choice actually costs something.
-  checks.honestyStep3WithdrawsFreePick = await page.evaluate(() => {
+  if (want('honestyStep3WithdrawsFreePick')) checks.honestyStep3WithdrawsFreePick = await page.evaluate(() => {
     const wk = ctWeekKey, kid = 'jess';
     getProfData(kid).honesty = [];
     mrRecordHonesty(kid, 'chores'); mrRecordHonesty(kid, 'chores'); mrRecordHonesty(kid, 'chores');
@@ -5262,7 +5291,7 @@ function findChromium() {
   });
 
   // The box opens at the Sunday meeting, and the undo has to put it back.
-  checks.sundayBoxOpensAtMeeting = await page.evaluate(() => {
+  if (want('sundayBoxOpensAtMeeting')) checks.sundayBoxOpensAtMeeting = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const wk = ctWeekKey, kid = 'jess';
@@ -5280,7 +5309,7 @@ function findChromium() {
   // The honesty ladder resets weekly. Counted over a lifetime, a kid who had
   // three strikes ever was permanently at step 3 and could never earn her
   // choices back.
-  checks.honestyLadderResetsWeekly = await page.evaluate(() => {
+  if (want('honestyLadderResetsWeekly')) checks.honestyLadderResetsWeekly = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess';
@@ -5302,7 +5331,7 @@ function findChromium() {
 
   // The meeting freezes the breakdown, so a later price change cannot restate
   // what a past week paid.
-  checks.ledgerFreezesTheWeek = await page.evaluate(() => {
+  if (want('ledgerFreezesTheWeek')) checks.ledgerFreezesTheWeek = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const c = state.shared.chore, wk = ctWeekKey, kid = 'jess';
@@ -5328,7 +5357,7 @@ function findChromium() {
 
   // A competition carries the meet's own name and date, and is priced against
   // the rules live on that date rather than the day the tab was showing.
-  checks.competitionCarriesNameAndDate = await page.evaluate(() => {
+  if (want('competitionCarriesNameAndDate')) checks.competitionCarriesNameAndDate = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess';
     const kid = 'jess';
     getProfData(kid).competitions = [];
@@ -5340,7 +5369,7 @@ function findChromium() {
   });
 
   // The gated confirm cannot be accepted until the box is ticked.
-  checks.checkConfirmIsGated = await page.evaluate(async () => {
+  if (want('checkConfirmIsGated')) checks.checkConfirmIsGated = await page.evaluate(async () => {
     const p = showCheckConfirm('Give it back?', 'The job was done');
     await new Promise(r => setTimeout(r, 60));
     const ok = document.getElementById('appDialogOkBtn');
@@ -5358,21 +5387,21 @@ function findChromium() {
 
   // School books and homework are never boxed — the exempt list is enforced,
   // not just declared.
-  checks.boxExemptListIsRead = await page.evaluate(() => {
+  if (want('boxExemptListIsRead')) checks.boxExemptListIsRead = await page.evaluate(() => {
     const cfg = mrBoxCfg(mrRules());
     return Array.isArray(cfg.exempt) && cfg.exempt.length > 0
         && cfg.releaseDay === 'sunday' && cfg.redemptionJob === true;
   });
 
   // Hero tiers must outlast a season; six topped out at 500 XP.
-  checks.heroTiersReachTen = await page.evaluate(() =>
+  if (want('heroTiersReachTen')) checks.heroTiersReachTen = await page.evaluate(() =>
     HERO_TIERS.length >= 10 && heroTierForLevel(10).name.length > 0);
 
   /* ── The pocket-money system ── */
 
   // The single sports loan becomes debts[0] with every field carried across.
   // A migration that dropped `payments` would erase money the kid really paid.
-  checks.loanMigratesToDebtsIntact = await page.evaluate(() => {
+  if (want('loanMigratesToDebtsIntact')) checks.loanMigratesToDebtsIntact = await page.evaluate(() => {
     const kid = 'jenn';
     const pd = getProfData(kid);
     delete pd.debts;
@@ -5387,7 +5416,7 @@ function findChromium() {
 
   // Extra money goes to the debt where a dollar clears the most, not the one
   // that happens to be first in the list.
-  checks.extraPaysHighestBonusFirst = await page.evaluate(() => {
+  if (want('extraPaysHighestBonusFirst')) checks.extraPaysHighestBonusFirst = await page.evaluate(() => {
     profile = 'parent';
     const kid = 'jess';
     const pd = getProfData(kid);
@@ -5406,7 +5435,7 @@ function findChromium() {
   });
 
   // Renaming a debt must never reset progress — the whole point of the record.
-  checks.renamingADebtKeepsProgress = await page.evaluate(() => {
+  if (want('renamingADebtKeepsProgress')) checks.renamingADebtKeepsProgress = await page.evaluate(() => {
     profile = 'parent';
     const kid = 'jess';
     const pd = getProfData(kid);
@@ -5422,7 +5451,7 @@ function findChromium() {
 
   // A number changed at the meeting replaces the planner's figure everywhere,
   // keeps the original beside it, and reopens a week that was already agreed.
-  checks.overrideReopensTheWeek = await page.evaluate(() => {
+  if (want('overrideReopensTheWeek')) checks.overrideReopensTheWeek = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const wk = ctWeekKey, kid = 'jess';
@@ -5451,7 +5480,7 @@ function findChromium() {
 
   // A plan can never commit more than exists, and investing is capped at a
   // fifth of the week — a bad month should sting, not wipe out the year.
-  checks.planNeverOverspendsThePool = await page.evaluate(() => {
+  if (want('planNeverOverspendsThePool')) checks.planNeverOverspendsThePool = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const wk = ctWeekKey, kid = 'jess';
@@ -5470,7 +5499,7 @@ function findChromium() {
 
   // What she owns comes off one record per holding, so the four tiles on the
   // kid's page and the wallet can never disagree about the same dollar.
-  checks.holdingsAreOneSourceOfTruth = await page.evaluate(() => {
+  if (want('holdingsAreOneSourceOfTruth')) checks.holdingsAreOneSourceOfTruth = await page.evaluate(() => {
     const kid = 'jenn';
     const pd = getProfData(kid);
     delete pd.holdings;
@@ -5488,7 +5517,7 @@ function findChromium() {
   // back out left with the old pocket-money screen: moneyWithdraw and
   // moneySellStock kept working with nothing to call them. The parent's
   // holdings page is the door now, and it opens only for a grown-up.
-  checks.parentCanMoveSavedBackToCash = await page.evaluate(async () => {
+  if (want('parentCanMoveSavedBackToCash')) checks.parentCanMoveSavedBackToCash = await page.evaluate(async () => {
     const bad = [];
     const kid = 'jenn';
     profile = 'parent'; parentViewing = kid;
@@ -5536,7 +5565,7 @@ function findChromium() {
 
   // A split bumped past what clears a debt used to hand the difference to
   // nobody: the wallet lost it and the loan credited only what was owed.
-  checks.splitCannotOverpayADebt = await page.evaluate(() => {
+  if (want('splitCannotOverpayADebt')) checks.splitCannotOverpayADebt = await page.evaluate(() => {
     const bad = [];
     const kid = 'jess';
     profile = 'parent'; ctParentKid = kid;
@@ -5565,7 +5594,7 @@ function findChromium() {
   // The whole flow: agree the week, decide where it goes, watch it move, undo.
   // This is the one path that actually moves money, so it is checked end to end
   // rather than a piece at a time.
-  checks.meetingMoneyFlowEndToEnd = await page.evaluate(() => {
+  if (want('meetingMoneyFlowEndToEnd')) checks.meetingMoneyFlowEndToEnd = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey, c = state.shared.chore;
@@ -5675,7 +5704,7 @@ function findChromium() {
      findings rather than a boolean, so a failure says WHICH pot drifted and by
      how much; a bare `true` here would be a check that reports a problem and
      returns success, which is the exact shape CLAUDE.md records twice. */
-  checks.theMoneyStreamAgreesWithTheWallet = await page.evaluate(() => {
+  if (want('theMoneyStreamAgreesWithTheWallet')) checks.theMoneyStreamAgreesWithTheWallet = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jenn', wk = ctWeekKey, c = state.shared.chore;
@@ -5757,7 +5786,7 @@ function findChromium() {
      wrong quietly: a channel that stops paying, a deduction that stops
      deducting, a streak that gets easier, a denominator that changes. The
      calibration tools hold the money; this holds the behaviour. */
-  checks.theFourHouseRulesHold = await page.evaluate(() => {
+  if (want('theFourHouseRulesHold')) checks.theFourHouseRulesHold = await page.evaluate(() => {
     const problems = [];
     profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -5883,7 +5912,7 @@ function findChromium() {
      asserts what the screen LEADS with, not only that it renders — a screen
      whose first figure is a balance has quietly become the thing it replaced,
      and nothing else in the suite would notice. */
-  checks.theFlowSaysWhereItWent = await page.evaluate(() => {
+  if (want('theFlowSaysWhereItWent')) checks.theFlowSaysWhereItWent = await page.evaluate(() => {
     const problems = [];
     profile = 'jenn'; parentViewing = 'jenn';
     const kid = 'jenn';
@@ -6012,7 +6041,7 @@ function findChromium() {
      The gates matter more than the movement: Money school opens the pots as the
      loan comes down, and a sheet that moved money into a pot she has not
      reached would make the whole ladder decorative. */
-  checks.moneyCanMoveOutsideAMeeting = await page.evaluate(() => {
+  if (want('moneyCanMoveOutsideAMeeting')) checks.moneyCanMoveOutsideAMeeting = await page.evaluate(() => {
     const problems = [];
     profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -6130,7 +6159,7 @@ function findChromium() {
      `aLegacyRoutineCarryIsOfferedAgain` records: the app said "Attached ✅" and
      no to-do existed, and the check of the day asserted the FIELD rather than
      the consequence, so it passed green over a complete no-op. */
-  checks.everyRecordHasOneDoor = await page.evaluate(() => {
+  if (want('everyRecordHasOneDoor')) checks.everyRecordHasOneDoor = await page.evaluate(() => {
     const problems = [];
     profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -6276,7 +6305,7 @@ function findChromium() {
 
      Two fields, two questions: `dayKey` is when it came, `weekKey` is which
      Sunday decides where it goes. */
-  checks.aGiftHasADate = await page.evaluate(() => {
+  if (want('aGiftHasADate')) checks.aGiftHasADate = await page.evaluate(() => {
     const problems = [];
     profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -6348,7 +6377,7 @@ function findChromium() {
 
      The wallet must move by the DIFFERENCE only, and both the mistake and its
      correction must stay readable. */
-  checks.aCorrectionIsAReversal = await page.evaluate(() => {
+  if (want('aCorrectionIsAReversal')) checks.aCorrectionIsAReversal = await page.evaluate(() => {
     const problems = [];
     profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -6446,7 +6475,7 @@ function findChromium() {
      while recording the result left the planned meet permanently unrecorded —
      and an unrecorded planned meet DISABLES THE CONFIRM BAR, so the week could
      not settle and nothing on screen said why. */
-  checks.aMeetIsOneFactWithTwoFaces = await page.evaluate(() => {
+  if (want('aMeetIsOneFactWithTwoFaces')) checks.aMeetIsOneFactWithTwoFaces = await page.evaluate(() => {
     const problems = [];
     profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -6545,7 +6574,7 @@ function findChromium() {
      block, so all five production callers go quiet at once, in the direction
      that is safe by default. This check is the reason that narrowing exists —
      it is worth more than the rest of the feature. */
-  checks.aWatchedMeetIsNeverChasedForAResult = await page.evaluate(async () => {
+  if (want('aWatchedMeetIsNeverChasedForAResult')) checks.aWatchedMeetIsNeverChasedForAResult = await page.evaluate(async () => {
     const problems = [];
     const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
     const wasOffset = weekOffset;
@@ -6660,7 +6689,7 @@ function findChromium() {
      reading "Winter Invitational" on Jess's Saturday claims the meet is hers.
      And a watcher does not warm up and does not pack a skater's kit — she does
      still travel there, which is the one buffer that stays. */
-  checks.aWatchInviteNamesTheMeet = await page.evaluate(() => {
+  if (want('aWatchInviteNamesTheMeet')) checks.aWatchInviteNamesTheMeet = await page.evaluate(() => {
     const problems = [];
     const wasProfile = profile;
     const keys = getDayKeys(0);
@@ -6730,7 +6759,7 @@ function findChromium() {
      One store now, DERIVED from the earliest week on file and never written —
      so it costs no sync, cannot be frozen wrong by whichever device looked
      first, and moves back on its own when an older week arrives. */
-  checks.theSystemDidNotBeginToday = await page.evaluate(() => {
+  if (want('theSystemDidNotBeginToday')) checks.theSystemDidNotBeginToday = await page.evaluate(() => {
     const problems = [];
     profile = 'parent'; ctParentKid = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -6785,7 +6814,7 @@ function findChromium() {
 
      Seeded rather than assumed: the week has to actually open on a day with no
      school, or the check proves nothing about the case it is named for. */
-  checks.aFullWeekOfRoutinesPaysTheFullStreak = await page.evaluate(() => {
+  if (want('aFullWeekOfRoutinesPaysTheFullStreak')) checks.aFullWeekOfRoutinesPaysTheFullStreak = await page.evaluate(() => {
     const problems = [];
     profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead();
@@ -6849,7 +6878,7 @@ function findChromium() {
 
      The repair re-prices each week under ITS OWN rules, only ever adds, and is
      idempotent, because two devices will each run it and then sync. */
-  checks.aShortChangedWeekIsPaidOnce = await page.evaluate(() => {
+  if (want('aShortChangedWeekIsPaidOnce')) checks.aShortChangedWeekIsPaidOnce = await page.evaluate(() => {
     const problems = [];
     profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -6928,7 +6957,7 @@ function findChromium() {
      must leave every total EXACTLY as it reads today — it records where money
      went, it does not move any. And running it twice must change nothing,
      because two devices will each run it and then sync. */
-  checks.settingUpTheStreamMovesNoMoney = await page.evaluate(() => {
+  if (want('settingUpTheStreamMovesNoMoney')) checks.settingUpTheStreamMovesNoMoney = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess';
@@ -6964,7 +6993,7 @@ function findChromium() {
   // The schedule draws on the POOL, not on her chores. A week where she earned
   // nothing but was given $50 still covers the loan payment — which is what a
   // cash pool means, and the opposite of what tagging inflows would do.
-  checks.giftCanCoverAQuietWeek = await page.evaluate(() => {
+  if (want('giftCanCoverAQuietWeek')) checks.giftCanCoverAQuietWeek = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey, c = state.shared.chore;
@@ -6991,7 +7020,7 @@ function findChromium() {
 
   // A lesson that can be skipped by a stale click is not a lesson: a plan or a
   // bucket she has not reached yet takes nothing, however it is asked for.
-  checks.lockedPlansAndBucketsRefuse = await page.evaluate(() => {
+  if (want('lockedPlansAndBucketsRefuse')) checks.lockedPlansAndBucketsRefuse = await page.evaluate(() => {
     profile = 'parent';
     const kid = 'jess', wk = ctWeekKey;
     const stage = mnyStageIndex(kid);
@@ -7009,7 +7038,7 @@ function findChromium() {
   // Edits collect and save as ONE effective-dated change with one reason:
   // "we re-tuned five numbers on Sunday" is one decision, and logging it as
   // five versions makes the history unreadable. Nothing takes effect early.
-  checks.ruleEditsSaveAsOneChange = await page.evaluate(() => {
+  if (want('ruleEditsSaveAsOneChange')) checks.ruleEditsSaveAsOneChange = await page.evaluate(() => {
     profile = 'parent'; parentViewing = 'jess';
     showScreen('parent'); setParentTab('money'); mnyRenderRulesTab();
     mnyPending = [];
@@ -7030,7 +7059,7 @@ function findChromium() {
 
   // Renaming a debt reaches every surface she reads, and touches nothing she
   // has paid. This is the whole promise of keeping the debt as a record.
-  checks.debtRenameReachesEverySurface = await page.evaluate(() => {
+  if (want('debtRenameReachesEverySurface')) checks.debtRenameReachesEverySurface = await page.evaluate(() => {
     profile = 'parent'; parentViewing = 'jess';
     const kid = 'jess', pd = getProfData(kid);
     delete pd.debts;
@@ -7053,7 +7082,7 @@ function findChromium() {
 
   // A week settled at a meeting is frozen. A week typed in from memory is
   // marked as such and can be corrected — the two are different evidence.
-  checks.settledWeeksAreFrozenTypedOnesAreNot = await page.evaluate(() => {
+  if (want('settledWeeksAreFrozenTypedOnesAreNot')) checks.settledWeeksAreFrozenTypedOnesAreNot = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey, c = state.shared.chore;
@@ -7077,7 +7106,7 @@ function findChromium() {
 
   // The lessons arrive as the debt comes down, they name her actual debt, and
   // a locked one says what opens it rather than being a dead button.
-  checks.moneySchoolGatesAndNames = await page.evaluate(() => {
+  if (want('moneySchoolGatesAndNames')) checks.moneySchoolGatesAndNames = await page.evaluate(() => {
     profile = 'parent'; parentViewing = 'jess';
     const kid = 'jess', pd = getProfData(kid);
     delete pd.debts;
@@ -7107,7 +7136,7 @@ function findChromium() {
   // A price raised today shows on the kid's list straight away — it is what she
   // checks before deciding to go and do the bins. What she already earned this
   // week keeps the price that was live when she did it.
-  checks.priceChangeShowsButDoesNotRestate = await page.evaluate(() => {
+  if (want('priceChangeShowsButDoesNotRestate')) checks.priceChangeShowsButDoesNotRestate = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey;
@@ -7133,7 +7162,7 @@ function findChromium() {
   // Interest is for the days that actually passed, not for "one meeting". The
   // app can be shut for a month and still be right when it opens — and running
   // the catch-up twice in one day must not pay twice.
-  checks.interestAccruesOnRealDays = await page.evaluate(() => {
+  if (want('interestAccruesOnRealDays')) checks.interestAccruesOnRealDays = await page.evaluate(() => {
     const kid = 'jenn', pd = getProfData(kid);
     delete pd.holdings;
     pd.wallet = { cash: 0, savings: 0, gics: [], holdings: {}, lastMeetingWeek: null };
@@ -7150,7 +7179,7 @@ function findChromium() {
   });
 
   // Locked money ends by itself, on its real date — nobody has to remember.
-  checks.lockedMoneyMaturesOnItsDate = await page.evaluate(() => {
+  if (want('lockedMoneyMaturesOnItsDate')) checks.lockedMoneyMaturesOnItsDate = await page.evaluate(() => {
     const kid = 'jenn', pd = getProfData(kid);
     delete pd.holdings;
     ensureWallet(kid).cash = 0;
@@ -7170,7 +7199,7 @@ function findChromium() {
 
   // A real company's price moves with the calendar, and it goes down as often
   // as it goes up — which is the whole reason for holding one.
-  checks.sharePriceFollowsTheCalendar = await page.evaluate(() => {
+  if (want('sharePriceFollowsTheCalendar')) checks.sharePriceFollowsTheCalendar = await page.evaluate(() => {
     const kid = 'jenn', pd = getProfData(kid);
     delete pd.holdings;
     const h = mnyAddHolding(kid, { kind: 'stock', name: 'Tesla', ticker: 'TSLA',
@@ -7190,7 +7219,7 @@ function findChromium() {
 
   // Money made on its own is income: it belongs in the week's bar, and in the
   // ledger, or the bar does not add up to what she is worth now.
-  checks.passiveIncomeIsCountedAndBaselined = await page.evaluate(() => {
+  if (want('passiveIncomeIsCountedAndBaselined')) checks.passiveIncomeIsCountedAndBaselined = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey, pd = getProfData(kid);
@@ -7217,7 +7246,7 @@ function findChromium() {
   // A goal is the one thing in this system a kid makes herself, and the money
   // that goes toward it is real kept-ready money with a name on it — she can
   // still change her mind, which is what savings are for.
-  checks.savingGoalEndToEnd = await page.evaluate(() => {
+  if (want('savingGoalEndToEnd')) checks.savingGoalEndToEnd = await page.evaluate(() => {
     profile = 'jess'; parentViewing = 'jess';
     const kid = 'jess', pd = getProfData(kid);
     pd.savingGoals = [];
@@ -7279,7 +7308,7 @@ function findChromium() {
 
   // "$80" is a word; "dinner out for all of us" is a quantity. The anchor has
   // to read naturally, stay silent when it cannot, and follow the parent's list.
-  checks.buysLineReadsNaturally = await page.evaluate(() => {
+  if (want('buysLineReadsNaturally')) checks.buysLineReadsNaturally = await page.evaluate(() => {
     profile = 'parent';
     const forty = mnyBuysLine(45);
     const tiny = mnyBuysLine(2);                       // under the cheapest thing
@@ -7308,7 +7337,7 @@ function findChromium() {
      editing rates is not walking that path. It stays on all three kid pages and
      inside the meeting, which is where the invariant was actually earning its
      keep. */
-  checks.tabBarOnEveryMoneySurface = await page.evaluate(() => {
+  if (want('tabBarOnEveryMoneySurface')) checks.tabBarOnEveryMoneySurface = await page.evaluate(() => {
     profile = 'parent'; parentViewing = 'jess'; ctParentKid = 'jess';
     const bar = (id) => {
       const el = document.getElementById(id);
@@ -7359,7 +7388,7 @@ function findChromium() {
 
   // A kid tapping a grown-up's page is told what it is, not silently refused —
   // and is never dropped into a screen she cannot use.
-  checks.kidTabsExplainRatherThanRefuse = await page.evaluate(() => {
+  if (want('kidTabsExplainRatherThanRefuse')) checks.kidTabsExplainRatherThanRefuse = await page.evaluate(() => {
     profile = 'jess';
     mnyOpenMyMoney('jess');
     mnyGoTab('rules');
@@ -7371,7 +7400,7 @@ function findChromium() {
 
   // Last week's plan, ghosted under this week's — but only once there IS a last
   // week. A ghost of nothing is a puzzle, not a comparison.
-  checks.ghostBarOnlyWithHistory = await page.evaluate(() => {
+  if (want('ghostBarOnlyWithHistory')) checks.ghostBarOnlyWithHistory = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey, c = state.shared.chore;
@@ -7390,7 +7419,7 @@ function findChromium() {
 
   // The walkthrough opens from a ?, pages through, and closes — and is never
   // shown unasked.
-  checks.tourOpensPagesAndCloses = await page.evaluate(() => {
+  if (want('tourOpensPagesAndCloses')) checks.tourOpensPagesAndCloses = await page.evaluate(() => {
     profile = 'parent';
     mnyOpenMyMoney('jess');
     const unasked = !document.getElementById('mnyTour');
@@ -7419,7 +7448,7 @@ function findChromium() {
 
   // The planner is where a chore gets finished. Finishing it has to reach the
   // parent's queue, or the work is invisible to everyone who pays for it.
-  checks.plannerChoreReachesTheQueue = await page.evaluate(async () => {
+  if (want('plannerChoreReachesTheQueue')) checks.plannerChoreReachesTheQueue = await page.evaluate(async () => {
     profile = 'jess'; parentViewing = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey;
@@ -7460,7 +7489,7 @@ function findChromium() {
   // A parent's grade is what turns the claim into money — and the meeting's
   // step 1 and step 3 have to be reading the same record, which is exactly
   // what was broken.
-  checks.step1GradeReachesStep3 = await page.evaluate(() => {
+  if (want('step1GradeReachesStep3')) checks.step1GradeReachesStep3 = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey;
@@ -7503,7 +7532,7 @@ function findChromium() {
   });
 
   // Typing into the meeting must not throw the caret away on every letter.
-  checks.meetingKeepsFocusAndScroll = await page.evaluate(() => {
+  if (want('meetingKeepsFocusAndScroll')) checks.meetingKeepsFocusAndScroll = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     openFamilyMeeting(); mnySetMeetKid('jess'); mmGoStep(3);
@@ -7529,7 +7558,7 @@ function findChromium() {
 
   // Tabs 4 and 5 were dead inside the meeting: the delegated handler was only
   // bound to the standalone money pages.
-  checks.moneyTabsWorkInsideTheMeeting = await page.evaluate(() => {
+  if (want('moneyTabsWorkInsideTheMeeting')) checks.moneyTabsWorkInsideTheMeeting = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess';
     ctPrepareRead(); openFamilyMeeting(); mmGoStep(3);
     const tab = document.querySelector('#familyMeetingBody [data-mny-action="tab"][data-mny-tab="school"]');
@@ -7542,7 +7571,7 @@ function findChromium() {
 
   // Paying less than the schedule frees money now and costs arrears later. It
   // must never quietly forgive the difference.
-  checks.loanPaymentIsArguableNotForgiven = await page.evaluate(() => {
+  if (want('loanPaymentIsArguableNotForgiven')) checks.loanPaymentIsArguableNotForgiven = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey;
@@ -7584,7 +7613,7 @@ function findChromium() {
   });
 
   // Spending is a real answer, open from week one, capped at a fifth.
-  checks.spendingIsAnOptionAndCapped = await page.evaluate(() => {
+  if (want('spendingIsAnOptionAndCapped')) checks.spendingIsAnOptionAndCapped = await page.evaluate(() => {
     const kid = 'jess', wk = ctWeekKey;
     const openFromTheStart = MNY_BUCKETS.find(b => b.key === 'spend').need === 0;
     const inTheSplit = mnySplitFor(wk, kid, 'own').spend !== undefined;
@@ -7602,7 +7631,7 @@ function findChromium() {
      a week boundary named different Mondays — which made the chore tab decide
      the current week predated the money model and fall back to a board with no
      rows on it. */
-  checks.oneCurrentWeekEverywhere = await page.evaluate(() => {
+  if (want('oneCurrentWeekEverywhere')) checks.oneCurrentWeekEverywhere = await page.evaluate(() => {
     const planner = dateToLocalKey(getWeekStart(0));
     return ctThisWeekKey() === planner
         && mnyWeekKey() === (ctWeekKey || planner);
@@ -7616,7 +7645,7 @@ function findChromium() {
 
   // The week is only recorded when BOTH kids are settled, so the last step has
   // to say when one isn't rather than offering a celebration.
-  checks.meetingWontCelebrateHalfDone = await page.evaluate(() => {
+  if (want('meetingWontCelebrateHalfDone')) checks.meetingWontCelebrateHalfDone = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const wk = ctWeekKey, c = state.shared.chore;
@@ -7657,7 +7686,7 @@ function findChromium() {
 
   // An override wins, but the grades behind it must stop claiming to decide
   // anything — on BOTH surfaces that still show them.
-  checks.overrideIsFlaggedWhereverGradesShow = await page.evaluate(() => {
+  if (want('overrideIsFlaggedWhereverGradesShow')) checks.overrideIsFlaggedWhereverGradesShow = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey;
@@ -7692,7 +7721,7 @@ function findChromium() {
   });
 
   // Work she did that nobody planned has to be claimable — and still gated.
-  checks.unplannedChoreIsClaimable = await page.evaluate(async () => {
+  if (want('unplannedChoreIsClaimable')) checks.unplannedChoreIsClaimable = await page.evaluate(async () => {
     // openChoreClaimPrompt resolves a promise whose .then re-renders the chore
     // tab. A fixed delay that expires early lets that render land in the MIDDLE
     // of the next check — where it silently consumes the "newly answered"
@@ -7733,7 +7762,7 @@ function findChromium() {
 
   // Her half of the loop: what is with Mom, and what came back while she
   // wasn't looking — and the marker must survive the render that shows it.
-  checks.kidSeesWaitingAndAnswered = await page.evaluate(() => {
+  if (want('kidSeesWaitingAndAnswered')) checks.kidSeesWaitingAndAnswered = await page.evaluate(() => {
     const bad = [];
     profile = 'jess'; parentViewing = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -7781,7 +7810,7 @@ function findChromium() {
 
   // A 60-minute session is too short for the 2x2 grid but not too short to
   // review — it gets one line instead of none.
-  checks.trainingChecksScaleWithTheBlock = await page.evaluate(() => {
+  if (want('trainingChecksScaleWithTheBlock')) checks.trainingChecksScaleWithTheBlock = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     const k = getDayKeys(0)[1];
     setDayBlocks(k, [
@@ -7806,7 +7835,7 @@ function findChromium() {
      What must hold is that it does not come back and that Today is still the
      only place today's blocks are listed with ticks beside them — the invariant
      the board's removal was for. */
-  checks.thereIsExactlyOneListOfToday = await page.evaluate(() => {
+  if (want('thereIsExactlyOneListOfToday')) checks.thereIsExactlyOneListOfToday = await page.evaluate(() => {
     const bad = [];
     profile = 'jenn'; parentViewing = 'jenn';
     const key = todayKey();
@@ -7865,7 +7894,7 @@ function findChromium() {
 
   // "Before we start" is a pre-flight list; it used to render after the week
   // had already been agreed.
-  checks.readinessListComesBeforeTheReview = await page.evaluate(() => {
+  if (want('readinessListComesBeforeTheReview')) checks.readinessListComesBeforeTheReview = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess';
     ctPrepareRead();
     openFamilyMeeting(); mmGoStep(1);
@@ -7885,7 +7914,7 @@ function findChromium() {
      starts, which in a fresh smoke run means Mondays. That is how the bug it
      guards survived: six days a week the test agreed with a broken build. This
      one builds the precondition explicitly, so it fails every day or none. */
-  checks.earliestRuleVersionIsNeverRewritten = await page.evaluate(() => {
+  if (want('earliestRuleVersionIsNeverRewritten')) checks.earliestRuleVersionIsNeverRewritten = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess';
     ctPrepareRead();
     const mr = mrEnsure();
@@ -7934,7 +7963,7 @@ function findChromium() {
 
      Arm 2 is about the other half — a lock that can be applied and never
      lifted is the same defect wearing a different hat. */
-  checks.everyProfileBadgeSwitchesProfile = await page.evaluate(() => {
+  if (want('everyProfileBadgeSwitchesProfile')) checks.everyProfileBadgeSwitchesProfile = await page.evaluate(() => {
     const problems = [];
     const wasProfile = profile, wasViewing = parentViewing, wasParentKid = ctParentKid;
     const wasOffset = weekOffset, wasSyncDay = syncDayIdx, wasDayKey = currentDayKey;
@@ -8064,7 +8093,7 @@ function findChromium() {
 
   // The one-line wirings behind the new affordances — each is a place a tap
   // can silently stop going anywhere.
-  checks.newAffordancesActuallyNavigate = await page.evaluate(() => {
+  if (want('newAffordancesActuallyNavigate')) checks.newAffordancesActuallyNavigate = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey;
@@ -8117,7 +8146,7 @@ function findChromium() {
   // out every week, goal and progress record — the whole planner. These checks
   // exist because that failure is invisible: the file downloads, it is valid
   // JSON, and it looks like a backup right up until someone needs it.
-  checks.fullBackupCarriesTheWholePlanner = await page.evaluate(() => {
+  if (want('fullBackupCarriesTheWholePlanner')) checks.fullBackupCarriesTheWholePlanner = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     const dk = getDayKeys(0)[2];
     setDayBlocks(dk, [{ id: 'bk-blk', actId: 'training', startMin: 600,
@@ -8275,14 +8304,14 @@ function findChromium() {
       ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     }, exported.dk);
 
-    checks.restoreBringsBackWhatWasLost = problems.length === 0 || problems;
+    if (want('restoreBringsBackWhatWasLost')) checks.restoreBringsBackWhatWasLost = problems.length === 0 || problems;
   }
 
   // ctExportBackup also writes a .json with a top-level `profiles` key, but
   // each profile there holds only the chore slice. Importing one as a full
   // restore would swap real planner profiles for chore fragments, so it has to
   // be named and refused rather than half-applied.
-  checks.choreOnlyFileIsRefusedNotHalfApplied = await page.evaluate(() => {
+  if (want('choreOnlyFileIsRefusedNotHalfApplied')) checks.choreOnlyFileIsRefusedNotHalfApplied = await page.evaluate(() => {
     const choreFile = { version: 3, exportedAt: new Date().toISOString(),
                         goalsByWeek: {}, groups: [], moneySnapshots: {},
                         profiles: { jenn: {}, jess: {} } };
@@ -8307,7 +8336,7 @@ function findChromium() {
   // whole body below it — payload build, size measurement, set() — never runs.
   // fbDocRef is a plain mutable global, so a test double reaches the real path
   // with no refactor. Everything is restored afterwards.
-  checks.rapidEditsCoalesceIntoOneWrite = await page.evaluate(async () => {
+  if (want('rapidEditsCoalesceIntoOneWrite')) checks.rapidEditsCoalesceIntoOneWrite = await page.evaluate(async () => {
     const realRef = fbDocRef, realConn = fbConnected;
     const writes = [];
     fbDocRef = { set: (payload) => { writes.push(payload); return Promise.resolve(); } };
@@ -8340,7 +8369,7 @@ function findChromium() {
 
   // The 1 MiB ceiling is reached by growth, not by a bug, so the warning has to
   // arrive while there is still room to act.
-  checks.cloudSizeWarnsBeforeTheCeiling = await page.evaluate(() => {
+  if (want('cloudSizeWarnsBeforeTheCeiling')) checks.cloudSizeWarnsBeforeTheCeiling = await page.evaluate(() => {
     const ok = payloadHealth(200 * 1024);
     const warn = payloadHealth(750 * 1024);
     const crit = payloadHealth(950 * 1024);
@@ -8355,7 +8384,7 @@ function findChromium() {
   // The thresholds above are a pure function. This is the path that actually has
   // to work: a real state, grown the way a family grows one, pushed through the
   // real pushToFirebase, warning a parent before the document stops saving.
-  checks.aBigStateActuallyTripsTheWarning = await page.evaluate(async () => {
+  if (want('aBigStateActuallyTripsTheWarning')) checks.aBigStateActuallyTripsTheWarning = await page.evaluate(async () => {
     const realRef = fbDocRef, realConn = fbConnected;
     const realProfiles = JSON.parse(JSON.stringify(state.profiles));
     const realLevel = payloadWarnLevel, realBytes = lastPayloadBytes;
@@ -8428,7 +8457,7 @@ function findChromium() {
   await page.evaluate(() => {
     profile = 'parent'; showScreen('parent'); renderParentHome(); setParentTab('backup');
   });
-  checks.backupTabIsUsable = await page.evaluate(() => {
+  if (want('backupTabIsUsable')) checks.backupTabIsUsable = await page.evaluate(() => {
     const wrap = document.getElementById('bkWrap');
     const panel = document.getElementById('ptab-backup');
     if (!wrap || !panel || panel.hidden) return false;
@@ -8450,7 +8479,7 @@ function findChromium() {
   // escapeHtml was rewritten from "build a <div>, set textContent, read back
   // innerHTML" to a direct replace. That is a load-bearing security primitive,
   // so equivalence is asserted rather than assumed.
-  checks.escapingMatchesTheDomReference = await page.evaluate(() => {
+  if (want('escapingMatchesTheDomReference')) checks.escapingMatchesTheDomReference = await page.evaluate(() => {
     const reference = (str) => {                 // the old implementation
       if (str == null) return '';
       const d = document.createElement('div');
@@ -8534,13 +8563,13 @@ function findChromium() {
       closeSheet('editOverlay');
       goWeek();
     });
-    checks.escapingHoldsOnEverySurface = problems.length === 0 || problems;
+    if (want('escapingHoldsOnEverySurface')) checks.escapingHoldsOnEverySurface = problems.length === 0 || problems;
   }
 
   // Reference material is allowed to be long only because it starts collapsed —
   // which is a promise that it is still one tap away, and that the choice sticks.
   // The word budget alone would be satisfied by content that is simply unreachable.
-  checks.collapsedReferenceIsOneTapAway = await page.evaluate(async () => {
+  if (want('collapsedReferenceIsOneTapAway')) checks.collapsedReferenceIsOneTapAway = await page.evaluate(async () => {
     const problems = [];
     const words = (id) => {
       const scr = document.getElementById(id);
@@ -8587,7 +8616,7 @@ function findChromium() {
   // interpolated into inline onclick handlers — so an apostrophe in a note closed
   // the handler's string and the rest ran as JavaScript on tap. Both the id
   // generator and the render sites are fixed; this asserts both.
-  checks.hostileNamesCannotBecomeCode = await page.evaluate(async () => {
+  if (want('hostileNamesCannotBecomeCode')) checks.hostileNamesCannotBecomeCode = await page.evaluate(async () => {
     window.__xssFired = false;
     const payload = "',window.__xssFired=1,'";
     profile = 'jenn'; parentViewing = 'jenn';
@@ -8622,7 +8651,7 @@ function findChromium() {
 
   // Stamps written into state must come from server-corrected time, or the merge
   // layer arbitrates on whose clock is furthest ahead rather than who edited last.
-  checks.stampsUseServerCorrectedTime = await page.evaluate(() => {
+  if (want('stampsUseServerCorrectedTime')) checks.stampsUseServerCorrectedTime = await page.evaluate(() => {
     const saved = serverTimeOffsetMs, savedKnown = serverTimeKnown, savedStamps = ownWriteStamps.slice();
     let ok = true;
 
@@ -8765,14 +8794,14 @@ function findChromium() {
     } finally {
       server.close();
     }
-    checks.installsToTheHomeScreen = problems.length === 0 || problems;
+    if (want('installsToTheHomeScreen')) checks.installsToTheHomeScreen = problems.length === 0 || problems;
   }
 
   // ── Today (Branch 4) ─────────────────────────────────────────────────────
   // The whole claim of this screen is that a child can answer "what now?" and
   // act on it without entering the planner. So: does it name the current thing,
   // and does a tap reach the place that owns the action?
-  checks.todayAnswersWhatNow = await page.evaluate(() => {
+  if (want('todayAnswersWhatNow')) checks.todayAnswersWhatNow = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const dk = todayKey();
@@ -8823,7 +8852,7 @@ function findChromium() {
      block cards and ignores free-time ones. A free stretch between now and the
      next block legitimately sits above it: "you have an hour, then piano" is the
      order the afternoon actually happens in, and it is still not the past. */
-  checks.todayLeadsWithWhatIsNext = await page.evaluate(() => {
+  if (want('todayLeadsWithWhatIsNext')) checks.todayLeadsWithWhatIsNext = await page.evaluate(() => {
     const bad = [];
     profile = 'jenn'; parentViewing = 'jenn';
     const dk = todayKey();
@@ -8870,7 +8899,7 @@ function findChromium() {
      The clock is pinned so the fixture is the same at 6am and at 6pm: an
      unpinned "six blocks from now" drifts past END_MIN in the evening and the
      check would test a different day depending on when CI ran. */
-  checks.todayShowsThreeThingsAndFoldsTheRest = await page.evaluate(() => {
+  if (want('todayShowsThreeThingsAndFoldsTheRest')) checks.todayShowsThreeThingsAndFoldsTheRest = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     const bad = [];
     const key = todayKey();
@@ -8944,7 +8973,7 @@ function findChromium() {
      honest answer is "nothing until four, it is yours", and that is an item.
      It is presentation only: no id, nothing written, and tdQuestsToday still
      returns exactly the blocks the day contains. */
-  checks.todayNamesFreeTime = await page.evaluate(() => {
+  if (want('todayNamesFreeTime')) checks.todayNamesFreeTime = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     const bad = [];
     const key = todayKey();
@@ -9043,7 +9072,7 @@ function findChromium() {
      it. This asserts the number, the wording and the silence: the wording has to
      be the SAME STRINGS the week grid uses, because two screens that word "leave
      by" differently will eventually disagree about the time too. */
-  checks.todayTellsHerWhenToStartMoving = await page.evaluate(() => {
+  if (want('todayTellsHerWhenToStartMoving')) checks.todayTellsHerWhenToStartMoving = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     const bad = [];
     const key = todayKey();
@@ -9122,7 +9151,7 @@ function findChromium() {
      anything. getFamilyChoreStatus (js/36-status.js) keeps planned, fulfilled
      and waiting apart, and only a positive PARENT GRADE is fulfilled — a claim
      is the child's account of it and sits as `waiting` until it is answered. */
-  checks.familyChoreFloorIsFlaggedWhileItCanBeFixed = await page.evaluate(() => {
+  if (want('familyChoreFloorIsFlaggedWhileItCanBeFixed')) checks.familyChoreFloorIsFlaggedWhileItCanBeFixed = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const bad = [];
@@ -9228,7 +9257,7 @@ function findChromium() {
      (ck-warn) or exposure that has not happened yet (ck-risk) — never "you
      failed to do X". That is a house rule about a nine-year-old's screen, and a
      rule kept only in a comment is a rule one edit away from being lost. */
-  checks.familyChoreFlagIsForwardLookingNotBlame = await page.evaluate(() => {
+  if (want('familyChoreFlagIsForwardLookingNotBlame')) checks.familyChoreFlagIsForwardLookingNotBlame = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const bad = [];
@@ -9262,7 +9291,7 @@ function findChromium() {
      useless: the rest of that day is sleep. Drives the real render with the
      clock pinned, then puts Date back — a fake clock left installed would
      quietly poison every check after this one. */
-  checks.todayKnowsWhenTheDayIsOver = await page.evaluate(() => {
+  if (want('todayKnowsWhenTheDayIsOver')) checks.todayKnowsWhenTheDayIsOver = await page.evaluate(() => {
     const bad = [];
     profile = 'jenn'; parentViewing = 'jenn';
     const dk = todayKey();
@@ -9293,7 +9322,7 @@ function findChromium() {
      actually finished everything the card rendered nothing — the reward for
      finishing was an empty box. It must always say which of the three
      situations this is. */
-  checks.jobsCardIsNeverBlank = await page.evaluate(() => {
+  if (want('jobsCardIsNeverBlank')) checks.jobsCardIsNeverBlank = await page.evaluate(() => {
     const bad = [];
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead();
@@ -9320,7 +9349,7 @@ function findChromium() {
      that draws its own arithmetic is a second answer to "how much have I got".
      The sparkline stays away until there are enough settled weeks to mean
      something, so it is never a blank box. */
-  checks.todayMoneyChartMatchesTheAccessors = await page.evaluate(() => {
+  if (want('todayMoneyChartMatchesTheAccessors')) checks.todayMoneyChartMatchesTheAccessors = await page.evaluate(() => {
     const bad = [];
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead();
@@ -9358,7 +9387,7 @@ function findChromium() {
      belong to the chore and money screens, and a second place that decides them
      is a second place that can disagree. So the assertion narrows rather than
      disappears — the navigation rows still change screen and not state. */
-  checks.todayHandsOffRatherThanActing = await page.evaluate(() => {
+  if (want('todayHandsOffRatherThanActing')) checks.todayHandsOffRatherThanActing = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const wk = ctWeekKey, d = tdTodayIndex();
@@ -9393,7 +9422,7 @@ function findChromium() {
 
   // Today reads the same counts the chore screen does. If they can disagree, one
   // of them is lying to a child about whether Mum has answered.
-  checks.todayAgreesWithTheChoreScreen = await page.evaluate(() => {
+  if (want('todayAgreesWithTheChoreScreen')) checks.todayAgreesWithTheChoreScreen = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const wk = ctWeekKey, d = tdTodayIndex();
@@ -9480,7 +9509,7 @@ function findChromium() {
      the better information, so the loser is kept and this is where it is
      chosen between. What this drives is the real panel and the real writer —
      cfChoose, not a hand-written flag. */
-  checks.aConflictIsAParentsToDecideNotTheClocks = await page.evaluate(async () => {
+  if (want('aConflictIsAParentsToDecideNotTheClocks')) checks.aConflictIsAParentsToDecideNotTheClocks = await page.evaluate(async () => {
     const bad = [];
     profile = 'parent'; parentViewing = 'jenn';
     ctEnsureShared();
@@ -9552,7 +9581,7 @@ function findChromium() {
     return bad.length ? bad : true;
   });
 
-  checks.todayDoesNotCallAnUntickedDayDone = await page.evaluate(async () => {
+  if (want('todayDoesNotCallAnUntickedDayDone')) checks.todayDoesNotCallAnUntickedDayDone = await page.evaluate(async () => {
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const key = todayKey();
@@ -9599,7 +9628,7 @@ function findChromium() {
     return bad.length ? bad : true;
   });
 
-  checks.todayIsWhereTheDayGetsDone = await page.evaluate(async () => {
+  if (want('todayIsWhereTheDayGetsDone')) checks.todayIsWhereTheDayGetsDone = await page.evaluate(async () => {
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const key = todayKey();
@@ -9733,7 +9762,7 @@ function findChromium() {
   await page.waitForTimeout(150);
 
   // ── Today as the front door (Branch 5) ───────────────────────────────────
-  checks.todayIsTheFrontDoor = await page.evaluate(async () => {
+  if (want('todayIsTheFrontDoor')) checks.todayIsTheFrontDoor = await page.evaluate(async () => {
     /* Hero Mode used to decide the landing, and was eventually the only thing it
        decided; it is gone. A child lands on Today unconditionally now, and the
        key must not come back — a stale flag reviving an old landing screen is
@@ -9754,7 +9783,7 @@ function findChromium() {
 
   // The nav lives outside every #screen-*, so the kid-standards sweep cannot see
   // it. Checked here instead: it is a kid surface and the same rules apply.
-  checks.kidNavIsUsableAndScoped = await page.evaluate(() => {
+  if (want('kidNavIsUsableAndScoped')) checks.kidNavIsUsableAndScoped = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     goToday();
     const nav = document.getElementById('kidNav');
@@ -9785,7 +9814,7 @@ function findChromium() {
 
   // Every destination goes somewhere, and every route the app had before still
   // works — this stage adds a way to move around, it retires nothing.
-  checks.navReachesEverythingAndOldRoutesStillWork = await page.evaluate(() => {
+  if (want('navReachesEverythingAndOldRoutesStillWork')) checks.navReachesEverythingAndOldRoutesStillWork = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     const click = (sel) => { const el = document.querySelector(sel); if (el) el.click(); };
     const activeId = () => (document.querySelector('.screen.active') || {}).id;
@@ -9831,7 +9860,7 @@ function findChromium() {
 
      Comparing the FUNCTIONS would not have caught it — both were correct. So
      this compares rendered text on all three surfaces. */
-  checks.onePoolReadsTheSameOnEveryScreen = await page.evaluate(() => {
+  if (want('onePoolReadsTheSameOnEveryScreen')) checks.onePoolReadsTheSameOnEveryScreen = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey;
@@ -9883,7 +9912,7 @@ function findChromium() {
      The chore→money hand-off is the assertion that matters here (CLAUDE.md:
      when that join broke, every screen still rendered and only the numbers were
      wrong), so this checks mrWeekBreakdown, not just the row. */
-  checks.blankPastWeekCanBeMadeUp = await page.evaluate(() => {
+  if (want('blankPastWeekCanBeMadeUp')) checks.blankPastWeekCanBeMadeUp = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jenn', c = state.shared.chore;
@@ -9956,7 +9985,7 @@ function findChromium() {
      missed week showed at all was as a row without a tick in the 8-week trend.
      And mnyAddMissedWeek cannot reach a gap in the middle: it only ever steps
      back from the earliest week on record. */
-  checks.unsettledWeeksAreOfferedNotHidden = await page.evaluate(() => {
+  if (want('unsettledWeeksAreOfferedNotHidden')) checks.unsettledWeeksAreOfferedNotHidden = await page.evaluate(() => {
     const bad = [];
     profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -10004,7 +10033,7 @@ function findChromium() {
      saturating at its own ceiling. That is where the number 8 came from. The
      same press credits the money, which is why the wallet read $0.00 while the
      meeting showed real figures: one bug, seen from two ends. */
-  checks.meetingMetIsNotMeetingSettled = await page.evaluate(() => {
+  if (want('meetingMetIsNotMeetingSettled')) checks.meetingMetIsNotMeetingSettled = await page.evaluate(() => {
     const bad = [];
     profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -10053,7 +10082,7 @@ function findChromium() {
      person walking a checklist misses. So the §2 mapping is asserted rather
      than walked: every original panel is opened through the new nav and has to
      render something. */
-  checks.everyOldTabIsStillReachable = await page.evaluate(() => {
+  if (want('everyOldTabIsStillReachable')) checks.everyOldTabIsStillReachable = await page.evaluate(() => {
     const bad = [];
     profile = 'parent'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -10122,7 +10151,7 @@ function findChromium() {
      left alone unless a parent asked for it to be replaced, and a replaced day
      has to be tombstoned or a merge from another device brings the old blocks
      straight back and the parent ends up with two plans on one day. */
-  checks.copyingAWeekIsAPlanNotAClaim = await page.evaluate(async () => {
+  if (want('copyingAWeekIsAPlanNotAClaim')) checks.copyingAWeekIsAPlanNotAClaim = await page.evaluate(async () => {
     const bad = [];
     const wasProfile = profile, wasScope = parentScope, wasViewing = parentViewing;
     profile = 'parent'; parentViewing = 'jenn'; parentScope = 'jenn';
@@ -10220,7 +10249,7 @@ function findChromium() {
      cross-copied blocks on the next merge. Also checks the shallow-copy half:
      Object.assign shared the objectives array and the gear/check objects by
      reference until the next reload. */
-  checks.aCopiedPlanIsNotPartOfTheOriginalsSeries = await page.evaluate(() => {
+  if (want('aCopiedPlanIsNotPartOfTheOriginalsSeries')) checks.aCopiedPlanIsNotPartOfTheOriginalsSeries = await page.evaluate(() => {
     const bad = [];
     const keys = getDayKeys(0);
     const [src, dst] = [keys[0], keys[3]];
@@ -10272,7 +10301,7 @@ function findChromium() {
      The engine always could; only its callers were narrow. Cross-child stays
      parent-only: a copy REPLACES the destination day, so a child able to do it
      could overwrite her sister's week from her own screen. */
-  checks.copyingADayCrossesWeeksAndKids = await page.evaluate(() => {
+  if (want('copyingADayCrossesWeeksAndKids')) checks.copyingADayCrossesWeeksAndKids = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile, wasViewing = parentViewing;
     const thisWk = getDayKeys(0), lastWk = getDayKeys(-1);
@@ -10342,7 +10371,7 @@ function findChromium() {
   /* Step 1 confirms a day where the day is, not in a panel below a chart.
      Twenty-eight movements for a week where nothing was wrong is the friction
      this whole phase exists to remove, so it is worth an assertion. */
-  checks.everyDayConfirmsWhereItIs = await page.evaluate(async () => {
+  if (want('everyDayConfirmsWhereItIs')) checks.everyDayConfirmsWhereItIs = await page.evaluate(async () => {
     const bad = [];
     const wasConfirm = window.showConfirm;
     profile = 'parent'; parentViewing = 'jenn';
@@ -10401,7 +10430,7 @@ function findChromium() {
   /* One switcher, and it must not be able to hand the rest of the app a child
      that does not exist. parentViewing is read in 27 places outside this
      portal, every one of which assumes a real kid. */
-  checks.oneKidSwitcherThatCannotBreakTheRest = await page.evaluate(() => {
+  if (want('oneKidSwitcherThatCannotBreakTheRest')) checks.oneKidSwitcherThatCannotBreakTheRest = await page.evaluate(() => {
     const bad = [];
     profile = 'parent';
     showScreen('parent'); renderParentHome();
@@ -10448,7 +10477,7 @@ function findChromium() {
      and quietly disagrees with the queue itself, leaving a parent no way to
      tell which is lying. So each count is asserted against its owner, and the
      rows are asserted to link rather than to act. */
-  checks.nowCountsMatchTheirOwners = await page.evaluate(() => {
+  if (want('nowCountsMatchTheirOwners')) checks.nowCountsMatchTheirOwners = await page.evaluate(() => {
     const bad = [];
     profile = 'parent'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -10503,7 +10532,7 @@ function findChromium() {
      It also holds the two facts apart. Ticking "we talked about this week"
      alone must move nothing — that is mmMarkWeekMet's job, and it is not a
      settle. */
-  checks.catchUpCommitsThroughTheMeeting = await page.evaluate(() => {
+  if (want('catchUpCommitsThroughTheMeeting')) checks.catchUpCommitsThroughTheMeeting = await page.evaluate(() => {
     const bad = [];
     profile = 'parent'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -10558,7 +10587,7 @@ function findChromium() {
 
   /* The catch-up list is a way in, not a wall. Eight open weeks is eight rows
      of guilt; four and a count says the same thing. */
-  checks.theCatchUpListDoesNotGrowWithoutLimit = await page.evaluate(() => {
+  if (want('theCatchUpListDoesNotGrowWithoutLimit')) checks.theCatchUpListDoesNotGrowWithoutLimit = await page.evaluate(() => {
     const bad = [];
     profile = 'parent';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -10587,7 +10616,7 @@ function findChromium() {
 
   /* The readout whose absence made $0.00 look like data loss: a week that has
      been agreed but not paid out has to say so somewhere she will look. */
-  checks.agreedButUnpaidIsVisible = await page.evaluate(() => {
+  if (want('agreedButUnpaidIsVisible')) checks.agreedButUnpaidIsVisible = await page.evaluate(() => {
     const bad = [];
     profile = 'parent'; parentViewing = 'jenn'; mnyKid = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -10651,7 +10680,7 @@ function findChromium() {
      which is the wrong way round for the case that actually happens — and
      placing fourteen days one block at a time is the real reason the review
      never happens. */
-  checks.blankPastWeekCanBeFilledFromAnother = await page.evaluate(() => {
+  if (want('blankPastWeekCanBeFilledFromAnother')) checks.blankPastWeekCanBeFilledFromAnother = await page.evaluate(() => {
     // As the kid. activeProfile() must resolve to her, not to a parent view.
     profile = 'jenn'; parentViewing = 'jenn'; ctParentKid = 'jenn';
     ctPrepareRead();
@@ -10743,7 +10772,7 @@ function findChromium() {
      the hub strip, step 3 to show an override, the tab rail), and a question
      about another week on top of one of those is a question about something
      nobody asked for. */
-  checks.meetingSaysWhereYouLeftOff = await page.evaluate(async () => {
+  if (want('meetingSaysWhereYouLeftOff')) checks.meetingSaysWhereYouLeftOff = await page.evaluate(async () => {
     profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const c = state.shared.chore;
@@ -10820,7 +10849,7 @@ function findChromium() {
      once per meeting, so settling three missed weeks in one evening moved share
      prices three months — and a family that met fortnightly saw a different
      year of prices than one that met weekly, for the same year. */
-  checks.marketClockFollowsTheCalendar = await page.evaluate(() => {
+  if (want('marketClockFollowsTheCalendar')) checks.marketClockFollowsTheCalendar = await page.evaluate(() => {
     ctPrepareRead();
     const c = state.shared.chore;
     const cfg = bankConfig();
@@ -10842,7 +10871,7 @@ function findChromium() {
      The parent side already marked a hand-typed week "typed in" for exactly
      this reason; a late settlement is the same class of evidence, and both the
      kid's story and the parent's history have to say so. */
-  checks.lateSettlementIsOnTheRecord = await page.evaluate(() => {
+  if (want('lateSettlementIsOnTheRecord')) checks.lateSettlementIsOnTheRecord = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', c = state.shared.chore;
@@ -10879,7 +10908,7 @@ function findChromium() {
      Competition money is deliberately uncapped — the $3 daily chore cap must
      not touch it, which is the whole reason a meet is worth more than a week
      of bins. */
-  checks.competitionMoneyReachesThePool = await page.evaluate(() => {
+  if (want('competitionMoneyReachesThePool')) checks.competitionMoneyReachesThePool = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jenn', wk = ctWeekKey;
@@ -10927,7 +10956,7 @@ function findChromium() {
      The parent dashboard's "pocket money so far" read the earnings net, so a
      gift already sitting in the week was invisible right up until the meeting.
      Pinned against a week that HAS a gift in it, or it proves nothing. */
-  checks.pocketMoneySoFarIsThePoolsNumber = await page.evaluate(() => {
+  if (want('pocketMoneySoFarIsThePoolsNumber')) checks.pocketMoneySoFarIsThePoolsNumber = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey;
@@ -10967,7 +10996,7 @@ function findChromium() {
 
      THIS IS THE ONE POOL CHECK THAT MUST NOT RESET lastPaymentMonth. Every
      neighbour resets it at the top, which is precisely why the bug survived. */
-  checks.poolDoesNotReserveAPaymentAlreadyMade = await page.evaluate(() => {
+  if (want('poolDoesNotReserveAPaymentAlreadyMade')) checks.poolDoesNotReserveAPaymentAlreadyMade = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey;
@@ -11007,7 +11036,7 @@ function findChromium() {
   });
 
   /* What is actually hers reaches the kid, and the debt card agrees with it. */
-  checks.kidPageShowsWhatIsActuallyHers = await page.evaluate(() => {
+  if (want('kidPageShowsWhatIsActuallyHers')) checks.kidPageShowsWhatIsActuallyHers = await page.evaluate(() => {
     profile = 'parent'; ctParentKid = 'jess'; parentViewing = 'jess';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const kid = 'jess', wk = ctWeekKey;
@@ -11055,7 +11084,7 @@ function findChromium() {
 
      Asserting the number alone would pass on unmigrated data, so assert the old
      field really is empty by then — that is what makes it a regression test. */
-  checks.walletTilesReadTheRealSavings = await page.evaluate(() => {
+  if (want('walletTilesReadTheRealSavings')) checks.walletTilesReadTheRealSavings = await page.evaluate(() => {
     profile = 'jess'; parentViewing = 'jess';
     ctPrepareRead();
     const kid = 'jess';
@@ -11079,7 +11108,7 @@ function findChromium() {
   /* ── Today ───────────────────────────────────────────────────────────────
      What a job is worth, in both states. A flat price would be a lie once the
      daily cap is spent, so the check is only meaningful if it sees the flip. */
-  checks.todayShowsWhatAChoreWouldPay = await page.evaluate(() => {
+  if (want('todayShowsWhatAChoreWouldPay')) checks.todayShowsWhatAChoreWouldPay = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const wk = ctWeekKey, d = tdTodayIndex();
@@ -11127,7 +11156,7 @@ function findChromium() {
   /* Today's money row is a reader. Every figure on it must equal the accessor
      it came from, and the "still to earn" figure must equal the one My money
      prints — that is the same class of agreement as the pool check above. */
-  checks.todayMoneyRowMatchesMyMoney = await page.evaluate(() => {
+  if (want('todayMoneyRowMatchesMyMoney')) checks.todayMoneyRowMatchesMyMoney = await page.evaluate(() => {
     const bad = [];
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -11174,7 +11203,7 @@ function findChromium() {
 
      .td-plan, not [data-td-action="plan"]: every quest card's body carries that
      action too, so the bare attribute would match several things. */
-  checks.anEmptyDayOffersToBePlanned = await page.evaluate(() => {
+  if (want('anEmptyDayOffersToBePlanned')) checks.anEmptyDayOffersToBePlanned = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const key = todayKey();
@@ -11224,7 +11253,7 @@ function findChromium() {
 
      Also: every category leads with a per-day average, because a week total is
      not a number a nine-year-old can use without dividing it by seven. */
-  checks.glanceSeparatesSleepFromUnscheduled = await page.evaluate(() => {
+  if (want('glanceSeparatesSleepFromUnscheduled')) checks.glanceSeparatesSleepFromUnscheduled = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     const bad = [];
     const keys = getDayKeys(0);
@@ -11281,7 +11310,7 @@ function findChromium() {
      is answered, every explicit form still builds the date it was given, and the
      real Date goes back in a finally, because a fake clock left installed would
      poison every check after this one. */
-  checks.ageIsNeverAskedAndRollsOverInAugust = await page.evaluate(() => {
+  if (want('ageIsNeverAskedAndRollsOverInAugust')) checks.ageIsNeverAskedAndRollsOverInAugust = await page.evaluate(() => {
     const bad = [];
     const kid = 'jenn';
     const pd = getProfData(kid);
@@ -11353,7 +11382,7 @@ function findChromium() {
      getAllActivities()[0] and DEFAULT_ACTIVITIES[0] is Breakfast. Nobody chose
      that, and eating breakfast is not an achievement — it was alphabetical
      accident wearing the clothes of a decision. */
-  checks.achievementsStartUnassigned = await page.evaluate(() => {
+  if (want('achievementsStartUnassigned')) checks.achievementsStartUnassigned = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     const bad = [];
     const p = getProfData('jenn');
@@ -11391,7 +11420,7 @@ function findChromium() {
      had the same shape of bug one level along: it worked today out correctly on
      open but ctChangeWeek reset it to Monday, so paging a week and coming back
      left it on a day nobody was looking at. Both read the same helper now. */
-  checks.choreTabAndSisterSyncOpenOnToday = await page.evaluate(() => {
+  if (want('choreTabAndSisterSyncOpenOnToday')) checks.choreTabAndSisterSyncOpenOnToday = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
     const bad = [];
     const todayIdx = getDayKeys(0).indexOf(todayKey());
@@ -11427,7 +11456,7 @@ function findChromium() {
      one writes and hands each block to ckAfterRoutineChange, so
      ctAwardMandatoryFromRoutine still owns the award — Today's rule, applied
      here: call an owner, never contain one. */
-  checks.routinesCloseInOneTap = await page.evaluate(() => {
+  if (want('routinesCloseInOneTap')) checks.routinesCloseInOneTap = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
     const bad = [];
@@ -11495,7 +11524,7 @@ function findChromium() {
      break this check, and removing the fix always does. */
   await page.setViewportSize({ width: 1024, height: 768 });   // iPad landscape
   await page.waitForTimeout(150);
-  checks.kidScreensDoNotScrollOnATablet = await page.evaluate(() => {
+  if (want('kidScreensDoNotScrollOnATablet')) checks.kidScreensDoNotScrollOnATablet = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     ctPrepareRead();
     goToday();
@@ -11530,7 +11559,7 @@ function findChromium() {
      revert — it is six months of small edits each of which flattens one step.
      So: depth strictly decreases down the ladder, at every viewport, and only
      one thing is ever at the top of it. */
-  checks.todayShoutsAtWhatIsNextAndWhispersAtTheRest = await (async () => {
+  if (want('todayShoutsAtWhatIsNextAndWhispersAtTheRest')) checks.todayShoutsAtWhatIsNextAndWhispersAtTheRest = await (async () => {
     const findings = [];
     for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1440, 900], [900, 1100]]) {
       await page.setViewportSize({ width: w, height: h });
@@ -11599,7 +11628,7 @@ function findChromium() {
      the screen, filed under the wrong thing. This holds the placement, and holds
      the two names in agreement: the hero and the card below it must call one
      block by one name. */
-  checks.theNextBlockSaysWhenToLeave = await page.evaluate(() => {
+  if (want('theNextBlockSaysWhenToLeave')) checks.theNextBlockSaysWhenToLeave = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
     const bad = [];
     const key = todayKey();
@@ -11673,7 +11702,7 @@ function findChromium() {
      case, asserted rather than eyeballed: twenty blocks on a phone stay one row
      inside the viewport, because an overflow container is what puts content out
      of a child's reach on a tablet. */
-  checks.todayShowsTheShapeOfTheDay = await (async () => {
+  if (want('todayShowsTheShapeOfTheDay')) checks.todayShowsTheShapeOfTheDay = await (async () => {
     await page.setViewportSize({ width: 390, height: 844 });
     const bad = await page.evaluate(() => {
       profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
@@ -11923,7 +11952,7 @@ function findChromium() {
      place it appears and the only place it can be closed, and its button is the
      🎯 the cards below carry rather than a tick that could be mistaken for the
      one marking history. */
-  checks.theHeroIsTheOnlyPlaceTheRunningBlockAppears = await page.evaluate(() => {
+  if (want('theHeroIsTheOnlyPlaceTheRunningBlockAppears')) checks.theHeroIsTheOnlyPlaceTheRunningBlockAppears = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
     const out = [];
     const key = todayKey();
@@ -11990,7 +12019,7 @@ function findChromium() {
      the same fact drawn underneath so it can be glanced at. The bar is checked
      at two clock times because a bar that renders once and never moves looks
      identical to a working one in a single screenshot. */
-  checks.theHeroCountsDownTheBlockSheIsIn = await page.evaluate(() => {
+  if (want('theHeroCountsDownTheBlockSheIsIn')) checks.theHeroCountsDownTheBlockSheIsIn = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
     const out = [];
     const key = todayKey();
@@ -12044,7 +12073,7 @@ function findChromium() {
      thresholds have to meet exactly: under TD_FREE_MIN it is a break chip, from
      TD_FREE_MIN up it is the free-time card that already existed, and neither
      case may produce the other. */
-  checks.aShortGapReadsAsABreak = await page.evaluate(() => {
+  if (want('aShortGapReadsAsABreak')) checks.aShortGapReadsAsABreak = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
     const out = [];
     const key = todayKey();
@@ -12114,7 +12143,7 @@ function findChromium() {
      footnote on a folded card is exactly the case where it matters most — she
      is looking at the rest of the day, not the next hour — so .quest-time must
      compute identically on the --next card, a plain card and a quiet one. */
-  checks.aBlockYouTravelToStartsWhenYouStartGettingReady = await page.evaluate(() => {
+  if (want('aBlockYouTravelToStartsWhenYouStartGettingReady')) checks.aBlockYouTravelToStartsWhenYouStartGettingReady = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
     const out = [];
     const key = todayKey();
@@ -12216,7 +12245,7 @@ function findChromium() {
      because two screens flagging one problem two different ways is how a child
      learns to trust neither. Both blocks it names take the frame — a clash has
      two sides and blaming one of them is arbitrary. */
-  checks.todayFlagsAClashTheSameWayTheWeekDoes = await page.evaluate(() => {
+  if (want('todayFlagsAClashTheSameWayTheWeekDoes')) checks.todayFlagsAClashTheSameWayTheWeekDoes = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
     const out = [];
     const key = todayKey();
@@ -12298,7 +12327,7 @@ function findChromium() {
      position; if the number followed either, Block 2 would be a different block
      on the two screens — which is the drift the shared helper exists to stop,
      so both are asserted here against the same day. */
-  checks.repeatsAreNumberedWithinTheDay = await page.evaluate(() => {
+  if (want('repeatsAreNumberedWithinTheDay')) checks.repeatsAreNumberedWithinTheDay = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
     const out = [];
     const key = todayKey();
@@ -12375,7 +12404,7 @@ function findChromium() {
      A training block is the interesting case: Skating and Swimming are both cat
      'training' and must NOT be the same pink, so a formula that reached for the
      category first would collapse them together. */
-  checks.oneAnswerForWhatColourABlockIs = await page.evaluate(() => {
+  if (want('oneAnswerForWhatColourABlockIs')) checks.oneAnswerForWhatColourABlockIs = await page.evaluate(() => {
     const out = [];
     const skate = { id: 'c1', actId: 'training', tag: 'skating', startMin: 9 * 60, durationMin: 60 };
     const swim = { id: 'c2', actId: 'training', tag: 'swimming', startMin: 11 * 60, durationMin: 60 };
@@ -12423,7 +12452,7 @@ function findChromium() {
      both walk only #screen-today; move this node inside "to keep the markup
      together" and every viewport starts failing intermittently, depending on
      whether a six-second timer happened to be running when the sweep ran. */
-  checks.theUndoToastIsOutsideTheWordBudget = await page.evaluate(() => {
+  if (want('theUndoToastIsOutsideTheWordBudget')) checks.theUndoToastIsOutsideTheWordBudget = await page.evaluate(() => {
     const bad = [];
     const box = document.getElementById('undoToast');
     if (!box) return ['there is no undo toast'];
@@ -12440,7 +12469,7 @@ function findChromium() {
      rather than a behaviour — undo un-ticks the block and the level bar does not
      move, because a child who mis-tapped should not watch her level go
      backwards. Without this, the next reader "fixes" it. */
-  checks.undoPutsTheBlockBackButKeepsTheXp = await (async () => {
+  if (want('undoPutsTheBlockBackButKeepsTheXp')) checks.undoPutsTheBlockBackButKeepsTheXp = await (async () => {
     const setup = await page.evaluate(() => {
       profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
       const key = todayKey();
@@ -12527,7 +12556,7 @@ function findChromium() {
      This is the only check in the suite that runs in a second timezone. The
      whole rest of the run is pinned to Edmonton precisely so fixtures mean what
      they say, which also means nothing else here can see this class of bug. */
-  checks.theAppTellsFamilyTimeOnAnyDevice = await (async () => {
+  if (want('theAppTellsFamilyTimeOnAnyDevice')) checks.theAppTellsFamilyTimeOnAnyDevice = await (async () => {
     const away = await browser.newContext({ timezoneId: 'Pacific/Auckland' });
     const p2 = await away.newPage();
     for (const pattern of [
@@ -12592,7 +12621,7 @@ function findChromium() {
      spoke: ticking every item in Jenn's morning routine left the block reading
      not-done on Today, the week, the portal and the meeting. Then unticking one
      could not take anything back, because the day-level mark was sticky. */
-  checks.oneRoutineAnswerOnEveryScreen = await page.evaluate(() => {
+  if (want('oneRoutineAnswerOnEveryScreen')) checks.oneRoutineAnswerOnEveryScreen = await page.evaluate(() => {
     const bad = [];
     const kid = 'jenn';
     profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
@@ -12737,7 +12766,7 @@ function findChromium() {
      hidden on short blocks, and on a busy day nothing visible changed. It also
      repainted only the day timeline, and the meeting's day-confirm wrote BOTH
      girls from one press. */
-  checks.confirmingIsNotReviewing = await page.evaluate(async () => {
+  if (want('confirmingIsNotReviewing')) checks.confirmingIsNotReviewing = await page.evaluate(async () => {
     const bad = [];
     const wasConfirm = window.showConfirm;
     profile = 'parent'; parentViewing = 'jenn';
@@ -12857,7 +12886,7 @@ function findChromium() {
      The week it lands on is not "the one after the week on screen" — a meeting
      held six weeks late must not write into a week that has already happened,
      which is the defect that retired mmPlanNextWeek. */
-  checks.theActionCanBeCarriedIntoAPlan = await page.evaluate(async () => {
+  if (want('theActionCanBeCarriedIntoAPlan')) checks.theActionCanBeCarriedIntoAPlan = await page.evaluate(async () => {
     const bad = [];
     const wasProfile = profile;
     const wasConfirm = window.showConfirm;
@@ -12960,7 +12989,7 @@ function findChromium() {
      into a form. "Parent noticed" is a second account of the week, stored in
      its own field and labelled, because a grown-up's reading must never
      overwrite the child's. */
-  checks.theReflectionKeepsVoicesApart = await page.evaluate(() => {
+  if (want('theReflectionKeepsVoicesApart')) checks.theReflectionKeepsVoicesApart = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'parent'; parentViewing = 'jenn';
@@ -13035,7 +13064,7 @@ function findChromium() {
      The reflection has to match, or a parent can reopen step 2 on a settled
      week months later and change what a child said about it. Reopening the
      week is the way back in — the same door every other frozen fact uses. */
-  checks.aClosedWeeksReflectionCannotBeRewritten = await page.evaluate(() => {
+  if (want('aClosedWeeksReflectionCannotBeRewritten')) checks.aClosedWeeksReflectionCannotBeRewritten = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'parent'; parentViewing = 'jenn';
@@ -13112,7 +13141,7 @@ function findChromium() {
      forward — and it OWNS none of them: every figure is read through the
      accessor that already answers that question. A day that has not happened is
      not counted against her. */
-  checks.closingAWeekShowsWhatItStandsAt = await page.evaluate(() => {
+  if (want('closingAWeekShowsWhatItStandsAt')) checks.closingAWeekShowsWhatItStandsAt = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'parent'; parentViewing = 'jenn';
@@ -13182,7 +13211,7 @@ function findChromium() {
        · the parent's tick records the conversation and changes nothing else;
        · skipping is explicit and does not block the money;
        · a tap does not upload the whole family document. */
-  checks.theReflectionIsHerAnswer = await page.evaluate(async () => {
+  if (want('theReflectionIsHerAnswer')) checks.theReflectionIsHerAnswer = await page.evaluate(async () => {
     const bad = [];
     const wasProfile = profile;
     profile = 'parent'; parentViewing = 'jenn';
@@ -13339,7 +13368,7 @@ function findChromium() {
      time fields has to survive. Plus the write count: setDayBlocks saves on
      every call, so a per-card write would upload the whole family document once
      per card. */
-  checks.schoolHoursReconcileTheCardsAlreadyPlaced = await page.evaluate(async () => {
+  if (want('schoolHoursReconcileTheCardsAlreadyPlaced')) checks.schoolHoursReconcileTheCardsAlreadyPlaced = await page.evaluate(async () => {
     const bad = [];
     const wasProfile = profile;
     const wasCal = JSON.parse(JSON.stringify(state.shared.schoolCal || {}));
@@ -13450,7 +13479,7 @@ function findChromium() {
      The routine-streak checklist rewards are a different feature sharing the
      same prompt widget, and they stay; asserted here so a later tidy-up does
      not take them along by association. */
-  checks.noActivityHasToBeEarned = await page.evaluate(() => {
+  if (want('noActivityHasToBeEarned')) checks.noActivityHasToBeEarned = await page.evaluate(() => {
     const bad = [];
     /* The four Family Hero chores have since been ARCHIVED — they named four
        specific jobs the paid pool already holds, and mrChoreTagsForDay keys on
@@ -13559,7 +13588,7 @@ function findChromium() {
      flag on a built-in was read by nobody — the catalog rewrite is the first
      thing that needed it, and a rule that covers half a catalog is worse than
      no rule, because it reads as though it works. */
-  checks.theCatalogResolvesEveryBlockItEverNamed = await page.evaluate(() => {
+  if (want('theCatalogResolvesEveryBlockItEverNamed')) checks.theCatalogResolvesEveryBlockItEverNamed = await page.evaluate(() => {
     const bad = [];
     const RETIRED = [
       'acad_focus_sprint', 'acad_preview_power', 'acad_reading_star',
@@ -13610,7 +13639,7 @@ function findChromium() {
      suggested, and what a child is asked to aim at. A new row in the catalog
      that forgets one of them does not break anything loudly: it just files its
      hours under Daily, never gets suggested, and offers an empty goal sheet. */
-  checks.everyActivityKnowsWhatItIsFor = await page.evaluate(() => {
+  if (want('everyActivityKnowsWhatItIsFor')) checks.everyActivityKnowsWhatItIsFor = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'jenn';
@@ -13648,7 +13677,7 @@ function findChromium() {
      she can already use the activity — so the prompt must drop it rather than
      show an offer that cannot be accepted, which would wedge the widget for
      the checklist rewards queued behind it. */
-  checks.aLegacyActivityRewardDrainsAway = await page.evaluate(() => {
+  if (want('aLegacyActivityRewardDrainsAway')) checks.aLegacyActivityRewardDrainsAway = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'jenn';
@@ -13684,7 +13713,7 @@ function findChromium() {
 
      canReviewDay (js/36-status.js) is the one decision now, and this asserts
      both halves plus the sentence a refused control says. */
-  checks.aDayIsNotReviewableUntilItHasHappened = await page.evaluate(async () => {
+  if (want('aDayIsNotReviewableUntilItHasHappened')) checks.aDayIsNotReviewableUntilItHasHappened = await page.evaluate(async () => {
     const bad = [];
     const wasConfirm = window.showConfirm;
     profile = 'parent'; parentViewing = 'jenn';
@@ -13780,7 +13809,7 @@ function findChromium() {
 
      This asserts the third answer end to end: the plan survives, nothing reads
      as done, the money comes back, and the day becomes reviewable. */
-  checks.aSkippedBlockIsRecordedNotDeleted = await page.evaluate(async () => {
+  if (want('aSkippedBlockIsRecordedNotDeleted')) checks.aSkippedBlockIsRecordedNotDeleted = await page.evaluate(async () => {
     const bad = [];
     const wasProfile = profile;
     const wasConfirm = window.showConfirm;
@@ -13855,7 +13884,7 @@ function findChromium() {
      not leave its chore reading as fulfilled and paid — and a parent taking
      money back must be shown the figure before it moves, never discover it
      afterwards. */
-  checks.recordingNotDoneTakesTheMoneyBack = await page.evaluate(async () => {
+  if (want('recordingNotDoneTakesTheMoneyBack')) checks.recordingNotDoneTakesTheMoneyBack = await page.evaluate(async () => {
     const bad = [];
     const wasProfile = profile;
     const wasConfirm = window.showConfirm;
@@ -13922,7 +13951,7 @@ function findChromium() {
      The offer is inline on the row rather than a modal, because a three-button
      sheet would be a second dialog mechanism beside openSheet/closeSheet, which
      own focus and Escape. */
-  checks.theMeetingOffersAWayOutOfAnUnconfirmedDay = await page.evaluate(async () => {
+  if (want('theMeetingOffersAWayOutOfAnUnconfirmedDay')) checks.theMeetingOffersAWayOutOfAnUnconfirmedDay = await page.evaluate(async () => {
     const bad = [];
     const wasProfile = profile;
     const wasConfirm = window.showConfirm;
@@ -14032,7 +14061,7 @@ function findChromium() {
      does — three on a school day, two on a weekend or school-free day, because
      there is no after-school routine on a day with no school. Which kind of day
      it is comes from isSchoolDay, never from the day of the week. */
-  checks.onlyThePlannedRoutinesAreEvaluated = await page.evaluate(() => {
+  if (want('onlyThePlannedRoutinesAreEvaluated')) checks.onlyThePlannedRoutinesAreEvaluated = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'parent'; parentViewing = 'jenn';
@@ -14132,7 +14161,7 @@ function findChromium() {
 
      So: an off day asks for two routines, and keeping both makes the day clean
      for the MONEY as well as on the screen, in a week from any time. */
-  checks.theRoutineRulePricesEveryWeekAlike = await page.evaluate(() => {
+  if (want('theRoutineRulePricesEveryWeekAlike')) checks.theRoutineRulePricesEveryWeekAlike = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'parent'; parentViewing = 'jenn';
@@ -14177,7 +14206,7 @@ function findChromium() {
      A meet could be planned and then never recorded, and nothing asked. Worse,
      the answer was unsayable: $0 in the totals reads identically for "no meet",
      "a meet worth nothing", "a voided channel" and "an override to zero". */
-  checks.aPlannedCompetitionMustBeScored = await page.evaluate(() => {
+  if (want('aPlannedCompetitionMustBeScored')) checks.aPlannedCompetitionMustBeScored = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'parent'; parentViewing = 'jenn';
@@ -14237,7 +14266,7 @@ function findChromium() {
      check, which was safe only while it lived behind the meeting. Now that a
      gift credits the wallet the moment it is recorded, and can be recorded from
      a kid-visible page, its absence would let a child hand herself any sum. */
-  checks.aGiftFromAChildWaitsForAGrownUp = await page.evaluate(() => {
+  if (want('aGiftFromAChildWaitsForAGrownUp')) checks.aGiftFromAChildWaitsForAGrownUp = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -14303,7 +14332,7 @@ function findChromium() {
      are invisible AND unsettleable — they sit there forever and their money is
      never credited. A flat default clears them, and the guard that makes it
      safe is the one commitKidWeek already uses. */
-  checks.theDefaultSweepCreditsOldWeeksOnce = await page.evaluate(async () => {
+  if (want('theDefaultSweepCreditsOldWeeksOnce')) checks.theDefaultSweepCreditsOldWeeksOnce = await page.evaluate(async () => {
     const bad = [];
     const wasProfile = profile;
     const wasConfirm = window.showConfirm;
@@ -14398,7 +14427,7 @@ function findChromium() {
      move, not the day. A swim recorded as not done in a settled week costs
      nothing, and refusing it would make a whole week unrecordable to protect a
      grade that is not there. */
-  checks.settledMoneyCannotBeQuietlyTakenBack = await page.evaluate(async () => {
+  if (want('settledMoneyCannotBeQuietlyTakenBack')) checks.settledMoneyCannotBeQuietlyTakenBack = await page.evaluate(async () => {
     const bad = [];
     const wasProfile = profile;
     const wasConfirm = window.showConfirm;
@@ -14475,7 +14504,7 @@ function findChromium() {
 
      The second half is the one that matters: re-render with MORE rows and tap
      again. A positional scheme passes the first half and fails this. */
-  checks.theMeetingTapHitsTheRowItNames = await page.evaluate(() => {
+  if (want('theMeetingTapHitsTheRowItNames')) checks.theMeetingTapHitsTheRowItNames = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'parent'; parentViewing = 'jenn';
@@ -14580,7 +14609,7 @@ function findChromium() {
      A RING, never a fade: --missed was removed deliberately because an
      unconfirmed block must not be drawn as though the child failed it, and this
      is the opposite case — a fact a grown-up wrote down. */
-  checks.theNotDoneMarkerSurvivesEveryCardHeight = await page.evaluate(() => {
+  if (want('theNotDoneMarkerSurvivesEveryCardHeight')) checks.theNotDoneMarkerSurvivesEveryCardHeight = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'parent'; parentViewing = 'jenn';
@@ -14649,7 +14678,7 @@ function findChromium() {
      still in the pool counted six of six reviewable days and closed. The
      summary carried the SAME exclusion, so the figure a parent read agreed with
      the gate they pressed while both were wrong together. */
-  checks.aRunningDayHoldsTheWeekOpen = await page.evaluate(() => {
+  if (want('aRunningDayHoldsTheWeekOpen')) checks.aRunningDayHoldsTheWeekOpen = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'parent'; parentViewing = 'jenn';
@@ -14708,7 +14737,7 @@ function findChromium() {
      activities that have not been put on it yet. It stays reviewable, but only
      through an explicit "nothing else is planned", the way an empty day already
      asks before it is signed off blank. */
-  checks.todayIsNotReviewedByAccident = await page.evaluate(async () => {
+  if (want('todayIsNotReviewedByAccident')) checks.todayIsNotReviewedByAccident = await page.evaluate(async () => {
     const bad = [];
     const wasConfirm = window.showConfirm;
     const wasProfile = profile;
@@ -14768,7 +14797,7 @@ function findChromium() {
      reviewed and settled with neither child having been asked. Either she
      answered it or it was deliberately set aside — both are answers, and a
      blank record is neither. The money stays independent of it. */
-  checks.aBlankReflectionHoldsTheWeekOpen = await page.evaluate(() => {
+  if (want('aBlankReflectionHoldsTheWeekOpen')) checks.aBlankReflectionHoldsTheWeekOpen = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'parent'; parentViewing = 'jenn';
@@ -14827,7 +14856,7 @@ function findChromium() {
      record could reach 3/3 and still print "left unfinished on purpose", and
      the tick could be pressed against a blank record — which, now that closing
      the week counts it, would be a conversation recorded about nothing. */
-  checks.aReflectionCannotBeSkippedAndComplete = await page.evaluate(() => {
+  if (want('aReflectionCannotBeSkippedAndComplete')) checks.aReflectionCannotBeSkippedAndComplete = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'parent'; parentViewing = 'jenn';
@@ -14900,7 +14929,7 @@ function findChromium() {
      her she had failed at something she had not yet had the chance to do. And a
      chore she had DONE and claimed was reported as "still owed" while it sat in
      a parent's queue, which blames a child for somebody else's inbox. */
-  checks.evidenceCountsOnlyWhatHasEnded = await page.evaluate(() => {
+  if (want('evidenceCountsOnlyWhatHasEnded')) checks.evidenceCountsOnlyWhatHasEnded = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'parent'; parentViewing = 'jenn';
@@ -14963,7 +14992,7 @@ function findChromium() {
      rebuilt the label from the current answer list, so rewording an option
      would silently change what a reflection from six months ago appears to
      say. The stored words win; the live label is the fallback only. */
-  checks.aRecordedActionKeepsItsOwnWords = await page.evaluate(() => {
+  if (want('aRecordedActionKeepsItsOwnWords')) checks.aRecordedActionKeepsItsOwnWords = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'parent'; parentViewing = 'jenn';
@@ -15010,7 +15039,7 @@ function findChromium() {
 
      The legacy TO-DO shape is a different case and must not be swept up with
      it: that path set linkedBlockId and DID write a to-do. */
-  checks.aLegacyRoutineCarryIsOfferedAgain = await page.evaluate(async () => {
+  if (want('aLegacyRoutineCarryIsOfferedAgain')) checks.aLegacyRoutineCarryIsOfferedAgain = await page.evaluate(async () => {
     const bad = [];
     const wasProfile = profile;
     const wasConfirm = window.showConfirm;
@@ -15088,7 +15117,7 @@ function findChromium() {
      down, and the record would then say the reflection happened. A skipped
      reflection is exempt — there was nothing to talk about, and a skip must
      never be able to trap the family. */
-  checks.aWeekDoesNotCloseOnAConversationThatDidNotHappen = await page.evaluate(() => {
+  if (want('aWeekDoesNotCloseOnAConversationThatDidNotHappen')) checks.aWeekDoesNotCloseOnAConversationThatDidNotHappen = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'parent'; parentViewing = 'jenn';
@@ -15167,7 +15196,7 @@ function findChromium() {
      with today signed off through "nothing else today", a Tuesday satisfies the
      gate. Closing is reversible and does not touch the money, so this asks
      rather than refuses, and names the days still to come. */
-  checks.closingAWeekEarlyIsAnExplicitChoice = await page.evaluate(async () => {
+  if (want('closingAWeekEarlyIsAnExplicitChoice')) checks.closingAWeekEarlyIsAnExplicitChoice = await page.evaluate(async () => {
     const bad = [];
     const wasProfile = profile;
     const wasConfirm = window.showConfirm;
@@ -15253,7 +15282,7 @@ function findChromium() {
      createdAt and never updatedAt, and every edit path stamps updatedAt. Read,
      never migrated — achievements is an array and deepMergeObj treats an array
      as a scalar, so a cleanup written to the document could be pushed back. */
-  checks.aSeededAchievementIsNotAChoice = await page.evaluate(() => {
+  if (want('aSeededAchievementIsNotAChoice')) checks.aSeededAchievementIsNotAChoice = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'jenn';
@@ -15318,7 +15347,7 @@ function findChromium() {
   /* MEALS ARE NOT CHORES. cat:'daily' held breakfast, dinner, the house chore
      and four Family Hero tasks, and was labelled "🧹 Chores" on two screens and
      "🍽 Daily" on three. */
-  checks.mealsAreNotChores = await page.evaluate(() => {
+  if (want('mealsAreNotChores')) checks.mealsAreNotChores = await page.evaluate(() => {
     const bad = [];
     const want = {
       breakfast: 'daily', lunch: 'daily', dinner: 'daily', appt_medical: 'daily',
@@ -15368,7 +15397,7 @@ function findChromium() {
      week → next week" whatever week the meeting pointed at, and the copy ran
      off the CURRENT week — so a six-week-old sitting wrote its plan over the
      following historical week. */
-  checks.aPastWeekCannotPlanForward = await page.evaluate(() => {
+  if (want('aPastWeekCannotPlanForward')) checks.aPastWeekCannotPlanForward = await page.evaluate(() => {
     const bad = [];
     profile = 'parent'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -15418,7 +15447,7 @@ function findChromium() {
      comments in this repo say nothing reads. On a week of real graded work it
      reported zero, and it showed the preliminary money figure as though it had
      been recorded. */
-  checks.celebrationCountsWhatHappened = await page.evaluate(() => {
+  if (want('celebrationCountsWhatHappened')) checks.celebrationCountsWhatHappened = await page.evaluate(() => {
     const bad = [];
     const kid = 'jenn';
     profile = 'parent'; parentViewing = 'jenn';
@@ -15484,7 +15513,7 @@ function findChromium() {
      the state AFTER Jenn. Undo then put Jess back, left Jenn's money moved, and
      printed "nothing was recorded" — false, in the one direction the family had
      no way to notice. The snapshot is idempotent per week now. */
-  checks.undoReturnsBothChildren = await page.evaluate(() => {
+  if (want('undoReturnsBothChildren')) checks.undoReturnsBothChildren = await page.evaluate(() => {
     const bad = [];
     profile = 'parent'; parentViewing = 'jenn';
     ctPrepareRead(); ctSetCurrentWeekFromPlanner();
@@ -15550,7 +15579,7 @@ function findChromium() {
      ready time Today leads with — had nothing to compute from until somebody
      remembered the toggle. The default comes from the activity, because
      flipping it globally would put a car journey in front of Breakfast. */
-  checks.youTravelToTraining = await page.evaluate(() => {
+  if (want('youTravelToTraining')) checks.youTravelToTraining = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile, wasKey = currentDayKey;
     profile = 'jenn'; weekOffset = 0;
@@ -15608,7 +15637,7 @@ function findChromium() {
      sheet is a bounded flex column now and .mm-body is the only scroller, so
      this asserts the layering rather than just the pinning — at every scroll
      position, neither band may overlap a card. */
-  checks.theMeetingKeepsItsHeadAndFeet = await page.evaluate(() => {
+  if (want('theMeetingKeepsItsHeadAndFeet')) checks.theMeetingKeepsItsHeadAndFeet = await page.evaluate(() => {
     const bad = [];
     const wasProfile = profile;
     profile = 'parent'; parentViewing = 'jenn';
@@ -15707,7 +15736,7 @@ function findChromium() {
      named nothing. Asked of blockDisplayName, which is the one owner of what a
      block is called — tg2ShortLabel was the compressing form and went with the
      Day Blocks layout. */
-  checks.mealsAreNamedNotJustDrawn = await page.evaluate(() => {
+  if (want('mealsAreNamedNotJustDrawn')) checks.mealsAreNamedNotJustDrawn = await page.evaluate(() => {
     const bad = [];
     const want = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner' };
     Object.keys(want).forEach(id => {
@@ -15723,7 +15752,7 @@ function findChromium() {
      blocks was a level and a bowl of cereal was worth the same as a swim. There
      was no cap, and the meeting credited its weekly awards on top through a
      second path that knew nothing about the first. */
-  checks.dailyBlocksEarnNoXp = await page.evaluate(() => {
+  if (want('dailyBlocksEarnNoXp')) checks.dailyBlocksEarnNoXp = await page.evaluate(() => {
     const bad = [];
     const kid = 'jenn';
     profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
@@ -15826,10 +15855,10 @@ function findChromium() {
     if (overlays.length !== 19) bad.push(`${overlays.length} static overlays, expected 19`);
     if (count(/role="tabpanel"/g) !== 5) bad.push(`${count(/role="tabpanel"/g)} tabpanels in the file, want 5 (one per tab)`);
     if (count(/<h4>✅ To-do<\/h4>/g)) bad.push('the To-do heading still skips from h2 to h4');
-    checks.theMarkupSaysWhatThingsAre = bad.length === 0 || bad;
+    if (want('theMarkupSaysWhatThingsAre')) checks.theMarkupSaysWhatThingsAre = bad.length === 0 || bad;
   }
 
-  checks.sheetsAreDialogsYouCanLeave = await page.evaluate(async () => {
+  if (want('sheetsAreDialogsYouCanLeave')) checks.sheetsAreDialogsYouCanLeave = await page.evaluate(async () => {
     const bad = [];
     profile = 'jenn'; parentViewing = 'jenn';
     showScreen('week');
@@ -15878,7 +15907,7 @@ function findChromium() {
 
   // The portal's five destinations are tabs; the fifteen detail panels under
   // them are not, and a screen reader must not be told a tab exists for them.
-  checks.theParentPortalTellsATabFromARegion = await page.evaluate(() => {
+  if (want('theParentPortalTellsATabFromARegion')) checks.theParentPortalTellsATabFromARegion = await page.evaluate(() => {
     const bad = [];
     const tabs = [...document.querySelectorAll('[role="tab"]')];
     if (tabs.length !== 5) bad.push(`${tabs.length} tabs, expected 5`);
@@ -15903,7 +15932,7 @@ function findChromium() {
 
   // Every form control has a name a screen reader can say. Placeholder text
   // is not one: it vanishes the moment she types.
-  checks.everyControlHasAName = await page.evaluate(() => {
+  if (want('everyControlHasAName')) checks.everyControlHasAName = await page.evaluate(() => {
     const bad = [];
     document.querySelectorAll('input[id]:not([type=hidden]), select[id], textarea[id]').forEach(el => {
       const named = (el.getAttribute('aria-label') || '').trim()
@@ -15930,6 +15959,15 @@ function findChromium() {
   // bug in the syntax check: a test that reports a problem and returns success.
   const failed = Object.entries(checks).filter(([, v]) => v !== true).map(([k]) => k);
   console.log(JSON.stringify({ checks, errors }, null, 2));
+  if (ONLY.length) {
+    // A named check that recorded nothing is a failure, not a quiet skip.
+    const neverRan = ONLY.filter(n => !(n in checks));
+    if (failed.length) console.log(`FAILED: ${failed.join(', ')}`);
+    if (neverRan.length) console.log(`NEVER RAN: ${neverRan.join(', ')} (named in SMOKE_ONLY, no result recorded)`);
+    console.log(`PARTIAL RUN (SMOKE_ONLY): ${Object.keys(checks).length} of ${ALL_CHECKS.length} checks — not a pass of the suite`);
+    await browser.close();
+    process.exit(failed.length || neverRan.length ? 1 : 0);
+  }
   console.log(failed.length ? `FAILED: ${failed.join(', ')}` : 'ALL SMOKE CHECKS PASSED');
   await browser.close();
   process.exit(failed.length ? 1 : 0);

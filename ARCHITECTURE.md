@@ -122,6 +122,16 @@ covering `function`, `async function` and top-level `let`/`const`/`var`
 `~/.cache/ms-playwright` (`npx playwright install chromium`); elsewhere set
 `SMOKE_CHROMIUM=/path/to/chrome`.
 
+**Iterating on a few smoke checks:** `SMOKE_ONLY=checkA,checkB npm run test:smoke`
+runs just those (plus `noConsoleErrors`, which has no guard) in a fraction of the
+full run's time. Each check statement is prefixed `if (want('name'))`, so the setup
+between checks still runs — but a skipped check's own body does not, and the
+checks share one page, so a subset result is a hint, not a verdict. It is for
+iteration only and cannot stand in for the gate: an unknown name exits 1, the
+last line reads `PARTIAL RUN (SMOKE_ONLY): N of M checks — not a pass of the
+suite`, and it refuses to run at all when `CI` is set. The full suite gates every
+push. A new check gets the same prefix, with its own name in both places.
+
 CI (`.github/workflows/ci.yml`) runs all three on every pull request and pushes
 to `main`, plus nightly, and uploads the smoke screenshots as an artifact.
 
