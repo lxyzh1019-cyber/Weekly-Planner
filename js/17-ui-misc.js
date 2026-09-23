@@ -523,20 +523,21 @@ async function inviteSisterToWatch() {
   if (!blk) return;
   const me = activeProfile();
   if (me !== 'jenn' && me !== 'jess') return;
-  await sendInvite(blk, me === 'jenn' ? 'jess' : 'jenn', { watch: true });
+  await sendInvite(blk, me === 'jenn' ? 'jess' : 'jenn', currentDayKey, { watch: true });
 }
 
 /* 💌 Invite my sister — the same thing, same time. It used to build its own
    invite inline, beside sendInvite, so a guard in one door missed the other.
-   Now it is a door onto sendInvite and nothing more: sendInvite dates it from
-   currentDayKey (the day this sheet is editing) and stamps the 💌 badge on
-   activeProfile()'s own block. */
+   Now it is a door onto sendInvite and nothing more: it passes currentDayKey
+   (the day this sheet is editing — the block was just found there, and a tap
+   focuses its column first) as the invite's day, and sendInvite stamps the 💌
+   badge on activeProfile()'s own block. */
 async function inviteSisterFromEdit() {
   if (!editingBlockId) return;
   const blk = (getDayBlocks(currentDayKey) || []).find(b => b.id === editingBlockId);
   if (!blk) return;
   const me = activeProfile();
   if (me !== 'jenn' && me !== 'jess') return;
-  await sendInvite(blk, me === 'jenn' ? 'jess' : 'jenn');
+  await sendInvite(blk, me === 'jenn' ? 'jess' : 'jenn', currentDayKey);
 }
 

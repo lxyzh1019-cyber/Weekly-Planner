@@ -743,8 +743,8 @@ are a review of a session you took part in, and a watcher packs no skates.
 Buffers split — **travel stays, warm-up goes**: she really does go to the rink,
 and she is not competing.
 
-`sendInvite(block, to, opts)` carries `watch`, `compName` and `tag`; the
-two-argument call sites send a plain invite, and **the plain invite path in
+`sendInvite(block, to, day, opts)` carries `watch`, `compName` and `tag`; the
+call sites that pass no `opts` send a plain invite, and **the plain invite path in
 `acceptInvite` is untouched** — it is the one mechanism that already puts an
 event on both calendars and this is not about it. `👀 Invite my sister to
 watch` sits outside `#sisterSyncWrap`, which is parent-only, because asking
@@ -759,7 +759,11 @@ stamp — and neither asked whether one was already out, so a guard in either
 would have missed the other door. `sendInvite` is now the only code that
 creates an invite: the Sister Sync tap calls it, and `inviteSisterFromEdit` and
 `inviteSisterToWatch` only find the block, resolve `activeProfile()` and the
-sister, and call it. Do not build an invite anywhere else.
+sister, and call it. Do not build an invite anywhere else. **The invite's day
+comes from the caller** — Sister Sync passes the day it is showing, the edit
+sheet passes `currentDayKey` (the day it found the block on) — and `sendInvite`
+refuses without one; it never reads `currentDayKey` or `syncDayIdx` itself,
+because `currentDayKey` outlives the day view that set it.
 `sisterInviteFor(blockId, to, kind)` (`js/10-social.js`) returns the **live**
 invite — `pending` or `accepted` — from that block to that sister of that kind
 (`'watch'` when `inv.watch`, else `'share'`), or `null`. `sendInvite` refuses a

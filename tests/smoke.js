@@ -6600,7 +6600,7 @@ function findChromium() {
 
       // Jenn invites Jess to WATCH. Through the real door, dialog and all.
       profile = 'jenn'; currentDayKey = satKey;
-      const p1 = sendInvite(meetBlock, 'jess', { watch: true });
+      const p1 = sendInvite(meetBlock, 'jess', satKey, { watch: true });
       await new Promise(r => setTimeout(r, 40));
       const ok = document.getElementById('appDialogOkBtn');
       if (!ok) { problems.push('inviting a sister to watch did not ask first'); return problems; }
@@ -6938,6 +6938,83 @@ function findChromium() {
       keys.forEach((k, i) => { setDayBlocks(k, savedJenn[i], 'jenn'); setDayBlocks(k, savedJess[i], 'jess'); });
       profile = wasProfile; parentViewing = wasViewing;
       currentDayKey = wasDayKey; weekOffset = wasOffset; syncDayIdx = wasSyncIdx;
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── AN INVITE FROM SISTER SYNC IS DATED THE DAY ON SCREEN ────────
+     sendInvite dated every invite `currentDayKey || <the Sync day>`. But
+     currentDayKey is set by any visit to a day view and never cleared, so once
+     she had opened Monday, a tap on Thursday's block in Sister Sync asked
+     "Share … on Mon", was dated Monday, looked for the block on Monday to stamp
+     the 💌 badge (and missed), and on accept landed on her sister's Monday.
+
+     The day now comes from the caller: Sister Sync passes the day it is
+     showing, the edit sheet passes the day it is editing. */
+  if (want('anInviteFromSisterSyncIsDatedThatDay')) checks.anInviteFromSisterSyncIsDatedThatDay = await page.evaluate(async () => {
+    const problems = [];
+    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
+    const wasOffset = weekOffset, wasSyncIdx = syncDayIdx;
+    const wasInvites = state.shared.invites;
+    const wasScreen = (document.querySelector('.screen.active') || {}).id || 'screen-today';
+    const keys = getDayKeys(0);
+    const aIdx = 0, bIdx = 3;
+    const aKey = keys[aIdx], bKey = keys[bIdx];
+    const savedJenn = keys.map(k => getDayBlocks(k, 'jenn'));
+    const savedJess = keys.map(k => getDayBlocks(k, 'jess'));
+    try {
+      state.shared.invites = [];
+      keys.forEach(k => { setDayBlocks(k, [], 'jenn'); setDayBlocks(k, [], 'jess'); });
+      const reading = { id: 'syncday-read', actId: 'reading', startMin: 16 * 60, durationMin: 30,
+        objectives: [], checklistState: {}, gearState: {} };
+      setDayBlocks(bKey, [reading], 'jenn');
+
+      // A kid opens Monday's day view — this is what leaves currentDayKey behind.
+      profile = 'jenn'; weekOffset = 0;
+      openDay(aKey, aIdx);
+      if (currentDayKey !== aKey) problems.push(`opening ${aKey} left currentDayKey at ${currentDayKey} — the repro has no teeth`);
+
+      // …then goes to Sister Sync on Thursday and taps her own block there.
+      showScreen('sync');
+      syncDayIdx = bIdx;
+      renderSync();
+      const mini = [...document.querySelectorAll('#syncGrid .sync-day-col:first-child .sync-block-mini')]
+        .find(el => /Reading/.test(el.textContent || ''));
+      if (!mini) { problems.push('Sister Sync did not draw Jenn’s Thursday Reading block to tap'); return problems; }
+      mini.click();
+      await new Promise(r => setTimeout(r, 40));
+      const ok = document.getElementById('appDialogOkBtn');
+      if (!document.querySelector('#appDialogOverlay.open') || !ok) {
+        problems.push('the Sister Sync tap did not ask first');
+        return problems;
+      }
+      const dlgText = ((document.getElementById('appDialogMsg') || {}).textContent || '').trim();
+      if (!new RegExp('\\b' + DAY_SHORT[bIdx] + '\\b').test(dlgText) || new RegExp('\\b' + DAY_SHORT[aIdx] + '\\b').test(dlgText)) {
+        problems.push(`the confirm names the wrong day — expected ${DAY_SHORT[bIdx]}: "${dlgText.slice(0, 120)}"`);
+      }
+      ok.click();
+      await new Promise(r => setTimeout(r, 40));
+
+      const inv = (state.shared.invites || []).find(i => i && i.sourceBlockId === reading.id && i.to === 'jess');
+      if (!inv) { problems.push('no invite reached Jess'); return problems; }
+      if (inv.day !== bKey) problems.push(`the invite is dated ${inv.day}, the last day view opened — not ${bKey}, the day on the Sister Sync screen`);
+      const src = (getDayBlocks(bKey, 'jenn') || []).find(b => b.id === reading.id);
+      if (!src || !(src.invitedTo || []).includes('jess')) problems.push('the 💌 badge (invitedTo) did not land on Jenn’s Thursday block');
+
+      profile = 'jess';
+      acceptInvite(inv.id);
+      const onB = (getDayBlocks(bKey, 'jess') || []).filter(b => b.actId === 'reading');
+      const onA = (getDayBlocks(aKey, 'jess') || []).filter(b => b.actId === 'reading');
+      if (onB.length !== 1) problems.push(`accepting put ${onB.length} Reading blocks on Jess’s Thursday, not 1`);
+      if (onA.length) problems.push(`accepting put the Reading block on Jess’s Monday — the day Jenn last opened`);
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      state.shared.invites = wasInvites;
+      keys.forEach((k, i) => { setDayBlocks(k, savedJenn[i], 'jenn'); setDayBlocks(k, savedJess[i], 'jess'); });
+      profile = wasProfile; parentViewing = wasViewing;
+      currentDayKey = wasDayKey; weekOffset = wasOffset; syncDayIdx = wasSyncIdx;
+      showScreen(wasScreen.replace(/^screen-/, ''));
     }
     return problems.length ? problems : true;
   });

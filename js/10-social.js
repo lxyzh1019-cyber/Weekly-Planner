@@ -114,7 +114,7 @@ function renderSync() {
       if (isMe) {
         mini.style.cursor='pointer';
         mini.title = 'Tap to invite your sister';
-        mini.onclick = ()=>sendInvite(b, p==='jenn'?'jess':'jenn');
+        mini.onclick = ()=>sendInvite(b, p==='jenn'?'jess':'jenn', key);
       }
       col.appendChild(mini);
     });
@@ -146,12 +146,24 @@ function sisterInviteFor(blockId, to, kind) {
 
 /* `opts.watch` turns this into an invitation to COME AND WATCH rather than to
    do the same thing at the same time. Everything else is the existing
-   mechanism, untouched: a third argument that defaults to {} keeps both
-   two-argument call sites working exactly as they did.
+   mechanism, untouched: an options argument that defaults to {} leaves the
+   call sites that pass none sending a plain invite, exactly as before.
 
    THE ONE WRITER of an invite. Sister Sync's tap, the edit sheet's 💌 and its
-   👀 all come through here, so the duplicate guard below holds for every door. */
-async function sendInvite(block, to, opts = {}) {
+   👀 all come through here, so the duplicate guard below holds for every door.
+
+   `day` is the day the block is on, and the CALLER says which: Sister Sync
+   passes the day it is showing, the edit sheet the day it is editing. It used
+   to be read here as `currentDayKey || <the Sync day>`, but currentDayKey is
+   left behind by any day-view visit and never cleared — so a tap on
+   Thursday's block in Sister Sync, after Monday had been opened, was dated
+   Monday, missed the 💌 stamp and landed on her sister's Monday. No day, no
+   invite: it refuses rather than guess. */
+async function sendInvite(block, to, day, opts = {}) {
+  if (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    showToast('Could not tell which day this is — nothing was sent.');
+    return;
+  }
   const watch = !!opts.watch;
   /* WHOSE invite this is. It was `profile`, which is the literal switch
      position and reads 'parent' when a grown-up is looking at Jenn's day — so
@@ -179,7 +191,6 @@ async function sendInvite(block, to, opts = {}) {
     return;
   }
   const activityLabel = act ? `${act.icon} ${act.name}` : 'this activity';
-  const day = currentDayKey || getDayKeys(weekOffset)[syncDayIdx];
   const dayDate = formatDayKey(day);
   const dayIdx = (dayDate.getDay()+6)%7;
   /* The MEET, not just the activity. "Share 🏆 Competition" is every meet this
@@ -214,7 +225,7 @@ async function sendInvite(block, to, opts = {}) {
   }
   state.shared.invites = [...(state.shared.invites||[]), inv];
   // Stamp invitedTo on the source block so the inviter sees the 💌 badge on their own timeline.
-  // Find the block in its actual day store (it may not be currentDayKey in sync-screen flow).
+  // Find the block in its actual day store — the day the caller passed.
   const sourceProfile = from; // sender
   const blocks = ((state.profiles[sourceProfile]||{}).weeks||{})[day] || [];
   const src = blocks.find(b => b.id === block.id);
