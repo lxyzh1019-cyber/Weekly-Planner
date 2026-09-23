@@ -125,10 +125,32 @@ function renderSync() {
   renderInvites();
 }
 
+/* IS THERE ALREADY ONE OF THESE? The one owner of that question.
+
+   Returns the LIVE invite — pending or accepted — from this block to this
+   sister of this kind ('watch' when inv.watch, else 'share'), or null. A
+   declined invite is not live: plans change, and a no on Tuesday is not a no
+   for ever. The two kinds are separate questions, because asking her to come
+   and watch is not the same as asking her to do it too.
+
+   sendInvite refuses a live duplicate through this, and both edit-sheet
+   buttons read their sent-state from it. `invitedTo` on the block is the 💌
+   badge on the inviter's timeline and nothing else — it is a bare list of
+   names and cannot tell a share from a watch. */
+function sisterInviteFor(blockId, to, kind) {
+  return (state.shared.invites || []).find(inv => inv
+    && inv.sourceBlockId === blockId && inv.to === to
+    && (inv.watch ? 'watch' : 'share') === kind
+    && (inv.status === 'pending' || inv.status === 'accepted')) || null;
+}
+
 /* `opts.watch` turns this into an invitation to COME AND WATCH rather than to
    do the same thing at the same time. Everything else is the existing
    mechanism, untouched: a third argument that defaults to {} keeps both
-   two-argument call sites working exactly as they did. */
+   two-argument call sites working exactly as they did.
+
+   THE ONE WRITER of an invite. Sister Sync's tap, the edit sheet's 💌 and its
+   👀 all come through here, so the duplicate guard below holds for every door. */
 async function sendInvite(block, to, opts = {}) {
   const watch = !!opts.watch;
   /* WHOSE invite this is. It was `profile`, which is the literal switch
@@ -139,6 +161,17 @@ async function sendInvite(block, to, opts = {}) {
      Sync path (which is kid-only anyway) is unchanged. */
   const from = activeProfile();
   const sisterName = to==='jenn'?'Jenn':'Jess';
+  /* Refused before the dialog, so she is never asked to confirm something that
+     will not happen — and told which state it is in, not just "no". */
+  const already = sisterInviteFor(block.id, to, watch ? 'watch' : 'share');
+  if (already) {
+    showToast(already.status === 'accepted'
+      ? (watch ? `${sisterName} already said yes to watching — it's on her plan`
+               : `It's already on ${sisterName}'s plan`)
+      : (watch ? `${sisterName} is already invited to watch — she hasn't answered yet`
+               : `${sisterName} already has this invite — she hasn't answered yet`));
+    return;
+  }
   const act = findActivity(block.actId, from) || findActivity(block.actId);
   const receiverAct = findActivity(block.actId, to);
   if (!receiverAct) {
@@ -330,7 +363,10 @@ function deleteChallenge(id) {
 }
 function acceptInvite(id) {
   const inv = (state.shared.invites||[]).find(i=>i.id===id);
-  if (!inv) return;
+  /* Only a PENDING invite can be answered. A double-tap on ✅ Accept used to
+     push a second block onto her day. Anything else returns quietly, and the
+     list is redrawn so a stale row goes away. */
+  if (!inv || inv.status !== 'pending') { refreshInvitesUI(); return; }
   const receiverAct = findActivity(inv.actId, profile);
   if (!receiverAct) {
     inv.status = 'declined';
@@ -375,7 +411,8 @@ function acceptInvite(id) {
 }
 function declineInvite(id) {
   const inv = (state.shared.invites||[]).find(i=>i.id===id);
-  if (!inv) return;
+  // Same guard as acceptInvite: declining an accepted invite changes nothing.
+  if (!inv || inv.status !== 'pending') { refreshInvitesUI(); return; }
   inv.status = 'declined';
   markItemUpdated(inv);
   saveAll();

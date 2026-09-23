@@ -6747,6 +6747,201 @@ function findChromium() {
     return problems.length ? problems : true;
   });
 
+  /* ── AN INVITE CANNOT BE SENT, OR ACCEPTED, TWICE ─────────────────
+     There were two writers of an ordinary invite — sendInvite, and an inline
+     copy in inviteSisterFromEdit — and neither asked whether one was already
+     out. acceptInvite had no status guard, so a double-tap on ✅ Accept put two
+     blocks on her day. And the edit sheet's share button answered "sent?" from
+     `invitedTo`, which cannot tell a share from a watch.
+
+     One owner now: sendInvite is the only writer, sisterInviteFor answers
+     "is there already one of these", and each button asks about its own kind.
+     A declined invite may go again — a no on Tuesday is not a no for ever. */
+  if (want('anInviteCannotBeSentTwice')) checks.anInviteCannotBeSentTwice = await page.evaluate(async () => {
+    const problems = [];
+    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
+    const wasOffset = weekOffset, wasSyncIdx = syncDayIdx;
+    const wasInvites = state.shared.invites;
+    const keys = getDayKeys(0);
+    const wedKey = keys[2], friKey = keys[4], satKey = keys[5], sunKey = keys[6];
+    const savedJenn = keys.map(k => getDayBlocks(k, 'jenn'));
+    const savedJess = keys.map(k => getDayBlocks(k, 'jess'));
+    const settle = () => new Promise(r => setTimeout(r, 40));
+    const toastEl = () => document.getElementById('toast');
+    /* Run one door and say yes if it asks. Reports whether it asked and what
+       the toast said, so "refused" and "refused, and said why" are separate. */
+    const attempt = async (fn) => {
+      toastEl().textContent = '';
+      const p = fn();
+      await settle();
+      const asked = !!document.querySelector('#appDialogOverlay.open');
+      if (asked) document.getElementById('appDialogOkBtn').click();
+      await p;
+      return { asked, toast: (toastEl().textContent || '').trim() };
+    };
+    const invitesOf = (blockId, kind) => (state.shared.invites || []).filter(i =>
+      i && i.sourceBlockId === blockId && i.to === 'jess' && (kind === 'watch' ? !!i.watch : !i.watch));
+    const live = (arr) => arr.filter(i => i.status === 'pending' || i.status === 'accepted');
+    // Displayed inside the edit sheet: no ancestor below the overlay is display:none.
+    const shown = (id) => {
+      let el = document.getElementById(id);
+      if (!el) return false;
+      for (; el && el.id !== 'editOverlay'; el = el.parentElement) {
+        if (getComputedStyle(el).display === 'none') return false;
+      }
+      return true;
+    };
+    const openAs = (who, dayKey, blockId) => {
+      if (who === 'parent') { profile = 'parent'; parentViewing = 'jenn'; } else profile = who;
+      currentDayKey = dayKey;
+      openEditSheet(blockId);
+    };
+    const btn = (id) => document.getElementById(id) || {};
+    try {
+      state.shared.invites = [];
+      keys.forEach(k => { setDayBlocks(k, [], 'jenn'); setDayBlocks(k, [], 'jess'); });
+      const base = { objectives: [], checklistState: {}, gearState: {} };
+      const reading = { ...base, id: 'inv1-read', actId: 'reading', startMin: 16 * 60, durationMin: 30 };
+      const meetA = { ...base, id: 'inv1-meetA', actId: 'competition', compName: 'Spring Cup', tag: 'skating',
+        startMin: COMP_BLOCK_START, durationMin: COMP_BLOCK_DUR };
+      const meetB = { ...base, id: 'inv1-meetB', actId: 'competition', compName: 'Autumn Open', tag: 'skating',
+        startMin: COMP_BLOCK_START, durationMin: COMP_BLOCK_DUR };
+      const watchingBlk = { ...base, id: 'inv1-watching', actId: 'competition', compName: 'Fall Classic',
+        watching: true, tag: 'skating', startMin: COMP_BLOCK_START, durationMin: 180 };
+      setDayBlocks(wedKey, [reading], 'jenn');
+      setDayBlocks(friKey, [watchingBlk], 'jenn');
+      setDayBlocks(satKey, [meetA], 'jenn');
+      setDayBlocks(sunKey, [meetB], 'jenn');
+
+      // ── A kid sees the share button on an ordinary block; the public toggle stays a parent's.
+      openAs('jenn', wedKey, reading.id);
+      if (!shown('inviteSisterBtn')) problems.push('a kid does not see 💌 Invite on her own ordinary block — her only way is the Sister Sync screen');
+      if (shown('publicToggle')) problems.push('the public toggle is showing for a kid — it is parent-only');
+      if (btn('inviteSisterBtn').disabled) problems.push('the share button is disabled before anything was sent');
+
+      // ── Share twice from the edit sheet: one invite, and the second attempt says why.
+      const s1 = await attempt(() => inviteSisterFromEdit());
+      if (!s1.asked) problems.push('the first share from the edit sheet did not ask first');
+      const first = invitesOf(reading.id, 'share');
+      if (first.length !== 1) problems.push(`the first share from the edit sheet made ${first.length} invites, not 1`);
+      else {
+        if (first[0].day !== wedKey) problems.push(`the edit-sheet share was dated ${first[0].day}, not the day being edited (${wedKey})`);
+        if (first[0].from !== 'jenn') problems.push(`the edit-sheet share is from "${first[0].from}", not jenn`);
+      }
+      const src = (getDayBlocks(wedKey, 'jenn') || []).find(b => b.id === reading.id);
+      if (!src || !Array.isArray(src.invitedTo) || !src.invitedTo.includes('jess')) {
+        problems.push('the 💌 badge stamp (invitedTo) did not land on Jenn’s own block');
+      }
+      openAs('jenn', wedKey, reading.id);
+      if (!btn('inviteSisterBtn').disabled || !/sent/i.test(btn('inviteSisterBtn').textContent || '')) {
+        problems.push(`with a share out, the share button reads "${btn('inviteSisterBtn').textContent}" and is ${btn('inviteSisterBtn').disabled ? '' : 'not '}disabled`);
+      }
+      const s2 = await attempt(() => inviteSisterFromEdit());
+      if (invitesOf(reading.id, 'share').length !== 1) problems.push(`sharing twice from the edit sheet made ${invitesOf(reading.id, 'share').length} invites`);
+      if (s2.asked) problems.push('the second share asked her to confirm something that should be refused');
+      if (!/Jess/.test(s2.toast) || !/answer/i.test(s2.toast)) problems.push(`the second share did not say why: "${s2.toast}"`);
+
+      // ── The Sister Sync tap path refuses it too: one owner, not two.
+      profile = 'jenn'; weekOffset = 0; syncDayIdx = 2;
+      renderSync();
+      const mini = [...document.querySelectorAll('#syncGrid .sync-day-col:first-child .sync-block-mini')]
+        .find(el => /Reading/.test(el.textContent || ''));
+      if (!mini) problems.push('Sister Sync did not draw Jenn’s Reading block to tap');
+      else {
+        const s3 = await attempt(() => { mini.click(); });
+        if (invitesOf(reading.id, 'share').length !== 1) problems.push('the Sister Sync tap sent a second copy of an invite the edit sheet already sent');
+        if (s3.asked) problems.push('the Sister Sync tap asked to confirm a duplicate');
+        if (!/Jess/.test(s3.toast)) problems.push(`the Sister Sync tap was refused without saying why: "${s3.toast}"`);
+      }
+
+      // ── Share then watch on one meet: both allowed. The watch does not mark the share sent, nor the reverse.
+      openAs('jenn', satKey, meetA.id);
+      if (!shown('inviteSisterBtn')) problems.push('the share button is hidden on Jenn’s own meet');
+      const w1 = await attempt(() => inviteSisterFromEdit());
+      if (!w1.asked || invitesOf(meetA.id, 'share').length !== 1) problems.push('sharing her own meet was refused');
+      openAs('jenn', satKey, meetA.id);
+      if (btn('watchSisterBtn').disabled || /is invited/i.test(btn('watchSisterBtn').textContent || '')) {
+        problems.push(`a SHARE marked the watch button sent: "${btn('watchSisterBtn').textContent}"`);
+      }
+      const w2 = await attempt(() => inviteSisterToWatch());
+      if (!w2.asked || invitesOf(meetA.id, 'watch').length !== 1) problems.push('a watch invite was refused because a share of the same meet was out');
+      const w3 = await attempt(() => inviteSisterToWatch());
+      if (invitesOf(meetA.id, 'watch').length !== 1) problems.push(`inviting her to watch twice made ${invitesOf(meetA.id, 'watch').length} watch invites`);
+      if (w3.asked || !/Jess/.test(w3.toast)) problems.push(`the second watch invite was not refused with a reason: "${w3.toast}"`);
+      openAs('jenn', satKey, meetA.id);
+      if (!btn('watchSisterBtn').disabled || !/Jess is invited to watch/.test(btn('watchSisterBtn').textContent || '')) {
+        problems.push(`with a watch invite out, the watch button reads "${btn('watchSisterBtn').textContent}"`);
+      }
+
+      // ── Watch then share, from the PARENT portal: allowed, recorded as Jenn's, and kinds kept apart.
+      openAs('parent', sunKey, meetB.id);
+      if (!shown('inviteSisterBtn')) problems.push('a parent no longer sees the share button');
+      if (!shown('publicToggle')) problems.push('a parent no longer sees the public toggle');
+      const v1 = await attempt(() => inviteSisterToWatch());
+      if (!v1.asked || invitesOf(meetB.id, 'watch').length !== 1) problems.push('a watch invite from the parent portal was not sent');
+      openAs('parent', sunKey, meetB.id);
+      if (btn('inviteSisterBtn').disabled || /sent/i.test(btn('inviteSisterBtn').textContent || '')) {
+        problems.push(`a WATCH invite marked the share button sent: "${btn('inviteSisterBtn').textContent}"`);
+      }
+      const v2 = await attempt(() => inviteSisterFromEdit());
+      const bShare = invitesOf(meetB.id, 'share');
+      if (!v2.asked || bShare.length !== 1) problems.push('a share was refused because a watch invite of the same meet was out');
+      else if (bShare[0].from !== 'jenn' || bShare[0].day !== sunKey) {
+        problems.push(`the parent-portal share is from "${bShare[0].from}" on ${bShare[0].day}, not jenn on ${sunKey}`);
+      }
+      const srcB = (getDayBlocks(sunKey, 'jenn') || []).find(b => b.id === meetB.id);
+      if (!srcB || !(srcB.invitedTo || []).includes('jess')) problems.push('the parent-portal send did not stamp Jenn’s block');
+
+      // ── A watching block: no share button (it would clone her meet onto the competitor's calendar).
+      openAs('jenn', friKey, watchingBlk.id);
+      if (shown('inviteSisterBtn')) problems.push('the share button shows on a watching block — it would put somebody else’s meet on her calendar as a plain block');
+      if (shown('watchSisterBtn')) problems.push('the watch button shows on a watching block');
+
+      // ── Declined can go again.
+      profile = 'jess';
+      const pendingRead = invitesOf(reading.id, 'share').find(i => i.status === 'pending');
+      if (!pendingRead) problems.push('no pending Reading share for Jess to decline');
+      else {
+        declineInvite(pendingRead.id);
+        if (pendingRead.status !== 'declined') problems.push(`declining left the invite "${pendingRead.status}"`);
+        openAs('jenn', wedKey, reading.id);
+        if (btn('inviteSisterBtn').disabled) problems.push('after a decline the share button still says it was sent');
+        const d1 = await attempt(() => inviteSisterFromEdit());
+        if (!d1.asked || live(invitesOf(reading.id, 'share')).length !== 1) {
+          problems.push('after Jess declined, the share could not be sent again');
+        }
+      }
+
+      // ── Accepting twice leaves one block; declining an accepted invite changes nothing.
+      profile = 'jess';
+      const again = live(invitesOf(reading.id, 'share'))[0];
+      if (!again) problems.push('no re-sent share for Jess to accept');
+      else {
+        acceptInvite(again.id);
+        acceptInvite(again.id);
+        const hers = (getDayBlocks(wedKey, 'jess') || []).filter(b => b.actId === 'reading');
+        if (hers.length !== 1) problems.push(`accepting twice put ${hers.length} Reading blocks on Jess’s day`);
+        declineInvite(again.id);
+        if (again.status !== 'accepted') problems.push(`declining an accepted invite turned it "${again.status}"`);
+        if ((getDayBlocks(wedKey, 'jess') || []).filter(b => b.actId === 'reading').length !== hers.length) {
+          problems.push('declining an accepted invite changed Jess’s day');
+        }
+        const a2 = await attempt(() => { profile = 'jenn'; currentDayKey = wedKey; editingBlockId = reading.id; return inviteSisterFromEdit(); });
+        if (live(invitesOf(reading.id, 'share')).length !== 1) problems.push('an accepted share could be sent again');
+        if (a2.asked || !/plan/i.test(a2.toast)) problems.push(`re-sending an accepted share did not say it is already on her plan: "${a2.toast}"`);
+      }
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      closeSheet('editOverlay');
+      state.shared.invites = wasInvites;
+      keys.forEach((k, i) => { setDayBlocks(k, savedJenn[i], 'jenn'); setDayBlocks(k, savedJess[i], 'jess'); });
+      profile = wasProfile; parentViewing = wasViewing;
+      currentDayKey = wasDayKey; weekOffset = wasOffset; syncDayIdx = wasSyncIdx;
+    }
+    return problems.length ? problems : true;
+  });
+
   /* ── THE SYSTEM DID NOT BEGIN TODAY ───────────────────────────────
      Three stores answered "when did this family start", and every one of them
      SEEDED ITSELF to the current Monday the first time anything read it. On a

@@ -744,13 +744,44 @@ Buffers split — **travel stays, warm-up goes**: she really does go to the rink
 and she is not competing.
 
 `sendInvite(block, to, opts)` carries `watch`, `compName` and `tag`; the
-two-argument call sites are unchanged, and **the plain invite path in
+two-argument call sites send a plain invite, and **the plain invite path in
 `acceptInvite` is untouched** — it is the one mechanism that already puts an
 event on both calendars and this is not about it. `👀 Invite my sister to
 watch` sits outside `#sisterSyncWrap`, which is parent-only, because asking
 your sister to come and watch you compete is a child's own decision; it shows
 only when `blockIsCompetition(block)`, so a watch block cannot be passed on
 again as a meet.
+
+**An invite has ONE writer, and one owner of "is there already one?"** There
+were two writers of a plain invite — `sendInvite` and an inline copy in
+`inviteSisterFromEdit` (`js/17-ui-misc.js`) with its own confirm and its own
+stamp — and neither asked whether one was already out, so a guard in either
+would have missed the other door. `sendInvite` is now the only code that
+creates an invite: the Sister Sync tap calls it, and `inviteSisterFromEdit` and
+`inviteSisterToWatch` only find the block, resolve `activeProfile()` and the
+sister, and call it. Do not build an invite anywhere else.
+`sisterInviteFor(blockId, to, kind)` (`js/10-social.js`) returns the **live**
+invite — `pending` or `accepted` — from that block to that sister of that kind
+(`'watch'` when `inv.watch`, else `'share'`), or `null`. `sendInvite` refuses a
+live duplicate of the same kind **before** its confirm dialog, with a toast
+saying whether she hasn't answered yet or it is already on her plan; a
+**declined** invite may go again (a no on Tuesday is not a no for ever), and a
+share and a watch of the same block are different questions. `acceptInvite`
+and `declineInvite` act only on a `pending` invite — a double-tap on ✅ Accept
+used to put a second block on her day — and otherwise return quietly and
+redraw the list.
+
+Both edit-sheet buttons read their sent-state from `sisterInviteFor` **for
+their own kind**. `invitedTo` on the source block is a bare list of names that
+cannot tell a share from a watch; its one job is the 💌 badge on the inviter's
+own timeline, and it is not asked whether anything was sent. **`💌 Invite my
+sister` (`#inviteSisterBtn`) also sits outside `#sisterSyncWrap`**, so a child
+can share from the block as well as from the Sister Sync screen; it is hidden
+on a watching block (`blockIsWatching`), because sharing somebody else's meet
+as a plain invite would clone her competition block onto the competitor's own
+calendar. **The public toggle (`#publicToggle`) stays parent-only** — it is
+all `#sisterSyncWrap` now holds. `anInviteCannotBeSentTwice` (`tests/smoke.js`)
+holds all of it.
 
 **A watch block still counts as ordinary planned time.** `computeWeekTotals`
 does not filter it out, deliberately: a Saturday she really spent at the rink

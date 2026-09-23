@@ -1108,14 +1108,20 @@
       <p style="font-size:0.75rem;color:var(--ink-light);margin-top:0.3rem">Future edits or deletes won't affect the rest of the series.</p>
     </div>
 
-    <!-- Sister Sync: public visibility + invite -->
+    <!-- Sister Sync: public visibility — parent-only -->
     <div id="sisterSyncWrap" style="display:none">
       <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="publicToggle" onclick="togglePublic()">
         <div class="toggle-track"><div class="toggle-knob"></div></div>
         <span class="toggle-label">👯 Show details to your sister (Sister Sync)</span>
       </div>
-      <button class="pill-btn" id="inviteSisterBtn" style="display:none;width:100%;margin-top:0.4rem" onclick="inviteSisterFromEdit()">💌 Invite your sister</button>
     </div>
+
+    <!-- Outside #sisterSyncWrap on purpose, like #watchSisterBtn below: that
+         block is parent-only, and inviting your sister along is a child's own
+         decision — Sister Sync was her only other way. Hidden on a watching
+         block: passing somebody else's meet on as a plain invite would clone
+         her competition block onto the competitor's own calendar. -->
+    <button class="pill-btn" id="inviteSisterBtn" style="display:none;width:100%;margin-top:0.4rem" onclick="inviteSisterFromEdit()">💌 Invite my sister</button>
 
     <!-- Outside #sisterSyncWrap on purpose: that block is parent-only, and
          asking your sister to come and watch you compete is a child's own
