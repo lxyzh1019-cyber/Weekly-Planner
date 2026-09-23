@@ -783,6 +783,17 @@ calendar. **The public toggle (`#publicToggle`) stays parent-only** — it is
 all `#sisterSyncWrap` now holds. `anInviteCannotBeSentTwice` (`tests/smoke.js`)
 holds all of it.
 
+**One inbox, and Today signposts it.** The 💌 inbox is Sister Sync's
+(`renderInvites`), and accepting and declining stay there. Today carries a
+one-line note when an invite is waiting — a signpost, not a second inbox — and
+its filter and wording are the inbox's own: `invitesWaitingFor(p)` (to `p`,
+`pending`) and `inviteFacts(inv)` (who / what / day / time, with the inbox's
+fallbacks) in `js/10-social.js`, called by both surfaces so they cannot count or
+name an invite differently. **Kid only**: the inbox works on `profile`,
+`acceptInvite` writes to `profile`, and `openSisterSync` refuses a parent, so a
+parent-facing note would lead to a refusal. `anInviteWaitingShowsOnToday`
+holds it.
+
 **A watch block still counts as ordinary planned time.** `computeWeekTotals`
 does not filter it out, deliberately: a Saturday she really spent at the rink
 must not read as free. What it does not do is earn.
@@ -955,6 +966,18 @@ worse.
 time order, then everything finished under a closed "earlier today" fold. In
 `QUIET_HOURS` (9pm–7am, `js/01-config.js`) with nothing running, the NOW card
 reads as wind-down rather than "the rest of today is yours".
+
+**A waiting invite is named on Today, and the tap lands on it.** `tdInviteNote`
+draws one `.td-row` button in the day column, between the hero and "Coming up",
+so she meets it before her day's list: `💌 Jess invited you to 📚 Reading · Tue
+4:00pm`, `💌 Jess invited you to watch Winter Invitational · Sat`, or
+`💌 2 invites waiting — from Jess`. Nothing pending, no row. The tap
+(`data-td-action="invites"` → `tdOpenInvites`) opens Sister Sync and scrolls
+`#invitesSection` to just under the sticky topbar — the list is at the bottom
+of that screen, and landing at its top would be the school banner under a 700px
+grid again. It goes away on the next Today render after she answers: the nav's
+Today tab re-renders (`goToday`), and a snapshot from the other device does too
+(`refreshCurrentScreen`). There is no polling.
 
 **A card must never render blank.** "Jobs I can do" listed only what was still
 claimable, so the day a child finished everything her reward was an empty box —

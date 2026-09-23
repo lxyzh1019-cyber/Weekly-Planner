@@ -1,4 +1,4 @@
-# FEATURES — Weekly-Planner — manifest v5 — 2026-09-23 (v2 confirmed 2026-09-22)
+# FEATURES — Weekly-Planner — manifest v6 — 2026-09-23 (v2 confirmed 2026-09-22)
 
 Locked features of the current version. Every edit is checked against this list and ends with a regression table. Update this file in the same change that alters a feature. Over-list rather than under-list.
 
@@ -102,6 +102,16 @@ to be a complete manifest:
 - **`#inviteSisterBtn` sits outside `#sisterSyncWrap`** (like `#watchSisterBtn`), so a kid can share from the block, not only from the Sister Sync screen. It shows for kid and parent on any non-watching block and is **hidden on a watching block** (`blockIsWatching`) — sharing somebody else's meet as a plain invite would clone her competition block onto the competitor's calendar.
 - **`#publicToggle` stays parent-only** — `#sisterSyncWrap` now holds only it.
 - Held by `anInviteCannotBeSentTwice` in `tests/smoke.js`.
+
+### Today signposts a waiting invite (manifested 2026-09-23)
+- **One inbox.** Sister Sync's 💌 list (`renderInvites`) is where an invite is accepted or declined; Today only says one is waiting and takes her there.
+- **Shared filter and wording.** `invitesWaitingFor(p)` (invites to `p` with `status === 'pending'`) and `inviteFacts(inv)` (`from`, `subject`, `day`, `time` — plain text; a watch invite's subject is the meet, `compName` → activity name → `her competition`; a share's is `<icon> <name>`, else `an activity`) in `js/10-social.js`. Both `renderInvites` and Today's note call them. The inbox's visible wording is unchanged.
+- **`tdInviteNote`** (`js/31-today.js`) — **kid only** (`isParent()` → nothing: the inbox works on `profile` and `openSisterSync` refuses a parent). With nothing pending, no row at all.
+- One line: one share `💌 <Sister> invited you to <icon> <activity> · <Day> <time>`; one watch `💌 <Sister> invited you to watch <meet> · <Day>`; several `💌 N invites waiting — from <Sister>` (both names joined with "and" if ever two senders). Every value goes through `escapeHtml`.
+- A real control: a `<button class="td-row" data-td-action="invites">` (existing Today row styling, ≥44px), in the day column **between the hero and "Coming up"**, so she meets it before her day's list.
+- Tap → `tdOpenInvites`: `openSisterSync()` then scrolls `#invitesSection` (the invites heading + list, `index.html`) to just under the sticky topbar.
+- It disappears on the next Today render once nothing is pending — the nav's Today tab (`goToday`) and a remote snapshot (`refreshCurrentScreen`) both re-render. No polling.
+- Held by `anInviteWaitingShowsOnToday` in `tests/smoke.js` (run at 390×844).
 
 Deriving the full app manifest from `ARCHITECTURE.md` is an open item in `WORKING_RECORD.md`.
 

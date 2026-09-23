@@ -6942,6 +6942,141 @@ function findChromium() {
     return problems.length ? problems : true;
   });
 
+  /* ── AN INVITE WAITING SHOWS ON TODAY ─────────────────────────────
+     The 💌 inbox lives at the bottom of Sister Sync, and an invite sat there
+     unseen until somebody happened to open that tab. Today is the front door,
+     so it SAYS one is waiting and takes her to it — a signpost, not a second
+     inbox: accepting and declining stay where they were.
+
+     Kid-only, because the inbox is hers: renderInvites filters to `profile`,
+     acceptInvite writes to `profile`, and openSisterSync refuses a parent. A
+     parent row would lead to a refusal.
+
+     Measured at a phone viewport: the list sits under the grid and the
+     challenges, and landing at the top of that screen and making her scroll
+     for what the note promised is the school-banner failure again. */
+  await page.setViewportSize({ width: 390, height: 844 });
+  if (want('anInviteWaitingShowsOnToday')) checks.anInviteWaitingShowsOnToday = await page.evaluate(async () => {
+    const problems = [];
+    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
+    const wasOffset = weekOffset, wasSyncIdx = syncDayIdx;
+    const wasInvites = state.shared.invites;
+    const wasScreen = (document.querySelector('.screen.active') || {}).id || 'screen-today';
+    const keys = getDayKeys(0);
+    const tueKey = keys[1], satKey = keys[5];
+    const todayK = todayKey();
+    const savedJess = keys.map(k => getDayBlocks(k, 'jess'));
+    const savedJessToday = getDayBlocks(todayK, 'jess');
+    const note = () => document.querySelector('#tdWrap [data-td-action="invites"]');
+    const noteText = () => ((note() || {}).textContent || '').replace(/\s+/g, ' ').trim();
+    const inv = (id, extra) => Object.assign({
+      id, from: 'jenn', to: 'jess', actId: 'reading', day: tueKey,
+      startMin: 16 * 60, durationMin: 30, status: 'pending',
+      createdAt: syncNow(), sourceBlockId: 'src-' + id,
+    }, extra || {});
+    const onToday = (who, invites) => {
+      if (who === 'parent') { profile = 'parent'; parentViewing = 'jess'; } else profile = who;
+      state.shared.invites = invites;
+      goToday();
+    };
+    try {
+      // ── Nothing waiting: no note, not an empty placeholder.
+      onToday('jess', []);
+      if (note()) problems.push(`with no invite waiting, Today shows "${noteText()}"`);
+
+      // ── One share.
+      onToday('jess', [inv('inv-t-share')]);
+      if (!note()) problems.push('one pending share to Jess shows nothing on her Today');
+      else {
+        const t = noteText();
+        if (!/Jenn/.test(t)) problems.push(`the note does not say who invited her: "${t}"`);
+        if (!/Reading/.test(t)) problems.push(`the note does not name the activity: "${t}"`);
+        if (!t.includes(DAY_SHORT[1])) problems.push(`the note does not name the day (${DAY_SHORT[1]}): "${t}"`);
+        if (!t.includes(formatTimeFromMin(16 * 60))) problems.push(`the note does not say the time: "${t}"`);
+        const n = note();
+        if (n.tagName !== 'BUTTON') problems.push(`the note is a <${n.tagName.toLowerCase()}>, not a button`);
+        const r = n.getBoundingClientRect();
+        if (r.height < 44 || r.width < 44) problems.push(`the note's hit area is ${Math.round(r.width)}×${Math.round(r.height)} (min 44×44)`);
+        const small = [n, ...n.querySelectorAll('*')].filter(el => el.textContent.trim()
+          && parseFloat(getComputedStyle(el).fontSize) < 13);
+        if (small.length) problems.push(`the note has text under 13px (${getComputedStyle(small[0]).fontSize})`);
+        // Before her day's list, not buried under it.
+        const list = document.querySelector('#tdWrap .td-col--day .td-cap');
+        if (list && (list.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_PRECEDING) === 0) {
+          problems.push('the note comes after her day’s list, not before it');
+        }
+      }
+
+      // ── One watch: says watch, names the meet.
+      onToday('jess', [inv('inv-t-watch', { actId: 'competition', watch: true, compName: 'Winter Invitational', day: satKey, startMin: COMP_BLOCK_START })]);
+      if (!note()) problems.push('a pending watch invite shows nothing on Today');
+      else if (!/watch/i.test(noteText()) || !/Winter Invitational/.test(noteText())) {
+        problems.push(`a watch invite reads "${noteText()}" — it should say watch and name the meet`);
+      }
+
+      // ── Two: the count form.
+      onToday('jess', [inv('inv-t-a'), inv('inv-t-b', { day: satKey })]);
+      if (!/2 invites/.test(noteText()) || !/Jenn/.test(noteText())) problems.push(`two pending invites read "${noteText()}"`);
+
+      // ── Answered invites are not waiting.
+      onToday('jess', [inv('inv-t-dec', { status: 'declined' }), inv('inv-t-acc', { status: 'accepted' })]);
+      if (note()) problems.push(`a declined and an accepted invite still show "${noteText()}"`);
+
+      // ── A parent gets no note: the inbox is the child's and openSisterSync refuses a parent.
+      onToday('parent', [inv('inv-t-par')]);
+      if (note()) problems.push(`a parent viewing Jess is shown "${noteText()}" — it leads to a screen that refuses her`);
+
+      // ── Tap: Sister Sync, with the invites in view.
+      onToday('jess', [inv('inv-t-tap')]);
+      // Tall enough that the invites are below the fold unless something scrolls.
+      setDayBlocks(todayK, Array.from({ length: 12 }, (_, i) => ({
+        id: 'td-inv-fill-' + i, actId: 'reading', startMin: 7 * 60 + i * 60, durationMin: 30,
+        objectives: [], checklistState: {},
+      })), 'jess');
+      goToday();
+      window.scrollTo(0, 0);
+      if (!note()) problems.push('no note to tap');
+      else {
+        note().click();
+        await new Promise(r => setTimeout(r, 120));
+        const sync = document.getElementById('screen-sync');
+        if (!sync || !sync.classList.contains('active')) problems.push('tapping the note did not open Sister Sync');
+        const list = document.getElementById('invitesList');
+        const lr = list.getBoundingClientRect();
+        const bar = sync && sync.querySelector('.topbar');
+        const barBottom = bar ? bar.getBoundingClientRect().bottom : 0;
+        if (lr.top + window.scrollY < window.innerHeight) {
+          problems.push('fixture: the invites list was not below the fold, so the scroll is untested');
+        }
+        if (!(lr.top >= barBottom - 1 && lr.top < window.innerHeight)) {
+          problems.push(`after the tap the invites list is at ${Math.round(lr.top)}px (visible band ${Math.round(barBottom)}–${window.innerHeight}) — she has to scroll for what the note promised`);
+        }
+        // ── Accept in the inbox, come back: the note is gone.
+        const acceptBtn = [...list.querySelectorAll('button')].find(b => /Accept/.test(b.textContent));
+        if (!acceptBtn) problems.push('the inbox shows no Accept for the invite the note pointed at');
+        else {
+          acceptBtn.click();
+          const navToday = document.querySelector('[data-td-nav="today"]');
+          if (navToday) navToday.click(); else goToday();
+          if (!document.getElementById('screen-today').classList.contains('active')) problems.push('could not return to Today');
+          if (note()) problems.push(`after accepting, Today still shows "${noteText()}"`);
+        }
+      }
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      state.shared.invites = wasInvites;
+      keys.forEach((k, i) => setDayBlocks(k, savedJess[i], 'jess'));
+      setDayBlocks(todayK, savedJessToday, 'jess');
+      profile = wasProfile; parentViewing = wasViewing;
+      currentDayKey = wasDayKey; weekOffset = wasOffset; syncDayIdx = wasSyncIdx;
+      showScreen(wasScreen.replace(/^screen-/, ''));
+      window.scrollTo(0, 0);
+    }
+    return problems.length ? problems : true;
+  });
+  await page.setViewportSize({ width: 900, height: 1100 });
+
   /* ── THE SYSTEM DID NOT BEGIN TODAY ───────────────────────────────
      Three stores answered "when did this family start", and every one of them
      SEEDED ITSELF to the current Monday the first time anything read it. On a

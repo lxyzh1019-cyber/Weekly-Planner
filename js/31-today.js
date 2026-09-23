@@ -772,6 +772,53 @@ function tdBlockTag(n) {
   return n ? `<span class="td-blk">Block ${n}</span>` : '';
 }
 
+/* ── 💌 An invite is waiting ──
+   A SIGNPOST, not a second inbox. The inbox is Sister Sync's (renderInvites,
+   js/10-social.js) and accepting and declining stay there; an invite used to
+   wait unseen until somebody happened to open that tab, so the front door says
+   one is waiting and the tap takes her to it.
+
+   KID ONLY, and on purpose: the inbox is hers. renderInvites and acceptInvite
+   both work on `profile`, and openSisterSync refuses a parent outright ("View
+   each child separately") — a parent row would lead to a refusal.
+
+   invitesWaitingFor and inviteFacts are the inbox's own filter and wording, so
+   this line cannot count or name an invite differently from the list it points
+   at. Nothing pending, no row — never an empty placeholder. */
+function tdInviteNote() {
+  if (isParent()) return '';
+  const waiting = invitesWaitingFor(profile);
+  if (!waiting.length) return '';
+  let line;
+  if (waiting.length === 1) {
+    const f = inviteFacts(waiting[0]);
+    line = waiting[0].watch
+      ? `${f.from} invited you to watch ${f.subject} · ${f.day}`
+      : `${f.from} invited you to ${f.subject} · ${f.day} ${f.time}`;
+  } else {
+    const from = [...new Set(waiting.map(i => inviteFacts(i).from))].join(' and ');
+    line = `${waiting.length} invites waiting — from ${from}`;
+  }
+  return `<button type="button" class="td-row" data-td-action="invites">
+      <span class="td-row-icon">💌</span>
+      <span class="td-row-name">${escapeHtml(line)}</span>
+      <span class="td-row-go" aria-hidden="true">›</span>
+    </button>`;
+}
+/* Sister Sync, AT the invites. The list is at the bottom, under the grid and
+   the challenges; landing at the top and making her scroll for what the note
+   promised is the school banner under a 700px grid again. Scrolled after the
+   render, and clear of the sticky topbar. */
+function tdOpenInvites() {
+  openSisterSync();
+  const sync = document.getElementById('screen-sync');
+  const sec = document.getElementById('invitesSection');
+  if (!sync || !sync.classList.contains('active') || !sec) return;
+  const bar = sync.querySelector('.topbar');
+  const top = sec.getBoundingClientRect().top + window.scrollY - (bar ? bar.offsetHeight : 0);
+  window.scrollTo(0, Math.max(0, top));
+}
+
 function tdRenderToday() {
   const wrap = document.getElementById('tdWrap');
   if (!wrap) return;
@@ -1153,6 +1200,7 @@ function tdRenderToday() {
   wrap.innerHTML = `
     <div class="td-col td-col--day">
       <div class="${heroCls}">${nowHtml}</div>
+      ${tdInviteNote()}
       <div class="td-card">
         <div class="td-cap">Coming up</div>${questHtml}</div>
       ${planHtml}
@@ -1328,6 +1376,7 @@ function tdHandleClick(e) {
   if (a === 'fresh')   { openChoreTab(); ckGoFresh(); return; }
   if (a === 'earlier') { tdToggleEarlier(); return; }
   if (a === 'later')   { tdToggleLater(); return; }
+  if (a === 'invites') { tdOpenInvites(); return; }
   /* 'week' was here, for a button that repeated the nav's Week tab. The money
      branch stays: tdMoneyChart renders the whole money card as one
      data-td-action="money" button, so this is still a live action. */

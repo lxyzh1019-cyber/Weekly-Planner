@@ -291,32 +291,50 @@ function renderChallenges() {
   }
 }
 
+/* THE INBOX'S OWN QUESTION AND ITS OWN WORDS, shared with Today's 💌 note
+   (tdInviteNote, js/31-today.js) so the signpost and the inbox cannot drift:
+   the note counts exactly what this list shows, and names each invite with the
+   same who / what / day / time and the same fallbacks. */
+function invitesWaitingFor(p) {
+  return (state.shared.invites || []).filter(i => i && i.to === p && i.status === 'pending');
+}
+/* Plain text; each surface escapes it where it lands. A watch invite's subject
+   is the MEET, not the activity — accepting "Competition" and finding out on
+   Saturday that it is somebody else's is not an invitation anybody agreed to. */
+function inviteFacts(inv) {
+  const act = getAllActivities(inv.to, { includeArchived: true }).find(a => a.id === inv.actId);
+  const d = formatDayKey(inv.day);
+  return {
+    from: inv.from === 'jenn' ? 'Jenn' : 'Jess',
+    subject: inv.watch
+      ? ((inv.compName || '').trim() || (act?.name || 'her competition'))
+      : (act ? `${act.icon} ${act.name}` : 'an activity'),
+    day: DAY_SHORT[(d.getDay() + 6) % 7],
+    time: formatTimeFromMin(inv.startMin),
+  };
+}
+
 // Activity-sharing invites — task sharing, so they live under Sister Sync.
+// THE inbox: Today only signposts it (tdInviteNote); accept and decline live here.
 function renderInvites() {
   const inviteList = document.getElementById('invitesList');
   if (!inviteList) return;
   inviteList.innerHTML = '';
-  const myInvites = (state.shared.invites||[]).filter(i=>i.to===profile && i.status==='pending');
+  const myInvites = invitesWaitingFor(profile);
   if (!myInvites.length) {
     inviteList.innerHTML = '<p style="color:var(--ink-light);font-size:0.95rem">No invites right now. Tap one of your own activities above to invite your sister.</p>';
     return;
   }
-  const acts = getAllActivities(activeProfile(), { includeArchived: true });
   myInvites.forEach(inv=>{
-    const act = acts.find(a=>a.id===inv.actId);
-    const d = formatDayKey(inv.day);
-    const tStr = formatTimeFromMin(inv.startMin);
+    const f = inviteFacts(inv);
     const el = document.createElement('div');
     el.className = 'invite-item';
-    /* A watch invite says so, and names the meet. Accepting "Competition" and
-       finding out on Saturday that it is somebody else's is not an invitation
-       anybody agreed to. */
     const what = inv.watch
-      ? `👀 come and watch <b>${escapeHtml((inv.compName || '').trim() || (act?.name || 'her competition'))}</b>`
-      : `<b>${act?.icon} ${escapeHtml(act?.name)}</b>`;
+      ? `👀 come and watch <b>${escapeHtml(f.subject)}</b>`
+      : `<b>${escapeHtml(f.subject)}</b>`;
     el.innerHTML = `
-      <div>💌 <b>${inv.from==='jenn'?'Jenn':'Jess'}</b> invited you to<br>
-      ${what} on ${DAY_SHORT[(d.getDay()+6)%7]} at ${tStr}</div>
+      <div>💌 <b>${escapeHtml(f.from)}</b> invited you to<br>
+      ${what} on ${escapeHtml(f.day)} at ${escapeHtml(f.time)}</div>
       <div class="invite-actions">
         <button class="pill-btn" onclick="acceptInvite('${escapeJsAttr(inv.id)}')">✅ Accept</button>
         <button class="pill-btn" onclick="declineInvite('${escapeJsAttr(inv.id)}')">❌ Decline</button>
