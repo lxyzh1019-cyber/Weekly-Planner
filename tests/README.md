@@ -11,7 +11,7 @@ The three parts, individually:
 
 ```bash
 # 1. Syntax + global-scope checks (no dependencies)
-npm run check         # tests/check-*.js: syntax, globals, shared-merge, escaping, dead CSS, dead ids
+npm run check         # tests/check-*.js: syntax, globals, shared-merge, escaping, dead CSS, dead ids, dead actions
 
 # 2. Sync/merge unit tests (no dependencies, runs the real merge functions)
 npm run test:merge    # tests/merge.test.js — 90 assertions, must be 90/90
@@ -45,6 +45,13 @@ no `getElementById` in `js/`, no `for=` / `aria-*` back-reference, no `#id`
 rule in the stylesheet. Names built at runtime (`'ptab-' + panel`) are found by
 scanning the source for quoted prefixes and suffixes, not kept in a hand table.
 
+**`check-dead-actions.js`** fails on a control with no code behind it: an
+`onclick` calling a function nothing declares, or a `data-P-action` value that
+prefix P's own dispatcher never handles. It warns, without failing, on values a
+dispatcher compares against that no markup emits. Known dead controls are
+exempted by name in its `EXEMPT` list, and an exemption fails the build once
+its value is no longer emitted.
+
 **`smoke.js`** covers, among much else, the chore -> money hand-off: a chore
 finished in the planner reaching the parent's grading queue, and a grade given
 in the meeting's step 1 showing up as the same figure on step 3. Those two are
@@ -56,6 +63,15 @@ a Sunday goes badly.
 `/opt/pw-browsers` (Claude Code cloud environments have this pre-installed) or
 `~/.cache/ms-playwright` (`npx playwright install chromium`); elsewhere set
 `SMOKE_CHROMIUM=/path/to/chrome`.
+
+While working on a few checks, `SMOKE_ONLY=checkA,checkB npm run test:smoke`
+runs only those (and `noConsoleErrors`) in a fraction of the full run's time.
+It is for iteration only. The checks share one page, and a skipped check's
+body does not run, so a subset can pass or fail where the full run would not.
+That is why it names itself `PARTIAL RUN (SMOKE_ONLY): N of M checks — not a
+pass of the suite`, exits 1 on a name that matches no check, and refuses to run
+under CI. The full suite gates every push. Give a new check the same
+`if (want('name'))` prefix as its neighbours.
 
 ## CI
 

@@ -511,40 +511,33 @@ function setSisterDetailsVisibleGlobal(next) {
   saveAll();
   if (document.querySelector('#screen-sync.active')) renderSync();
 }
-async function inviteSisterFromEdit() {
+/* Ask your sister to come and watch you compete.
+
+   Goes through sendInvite rather than repeating it — sendInvite is the one
+   writer of an invite, and owns the duplicate guard. sendInvite reads
+   activeProfile(), so this works from the parent portal as well as from a
+   kid's own screen. */
+async function inviteSisterToWatch() {
   if (!editingBlockId) return;
-  const blocks = getDayBlocks(currentDayKey);
-  const blk = blocks.find(b=>b.id===editingBlockId);
+  const blk = (getDayBlocks(currentDayKey) || []).find(b => b.id === editingBlockId);
   if (!blk) return;
   const me = activeProfile();
   if (me !== 'jenn' && me !== 'jess') return;
-  const sister = me === 'jenn' ? 'jess' : 'jenn';
-  const sisterName = sister==='jenn'?'Jenn':'Jess';
-  const act = findActivity(blk.actId, me) || findActivity(blk.actId);
-  const activityLabel = act ? `${act.icon} ${act.name}` : 'this activity';
-  const dayDate = formatDayKey(currentDayKey);
-  const dayIdx = (dayDate.getDay()+6)%7;
-  const ok = await showConfirm(`Share ${activityLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(blk.startMin)} with ${sisterName}?`, { okLabel:'Share' });
-  if (!ok) return;
-  // Reuse existing sendInvite, but it expects currentDayKey/syncDayIdx context.
-  // Inline here for clarity:
-  const inv = {
-    id: 'inv-'+Date.now().toString(36),
-    from: me,
-    to: sister,
-    actId: blk.actId,
-    day: currentDayKey,
-    startMin: blk.startMin,
-    durationMin: blk.durationMin,
-    status: 'pending',
-    createdAt: syncNow(),
-    sourceBlockId: blk.id,
-  };
-  state.shared.invites = [...(state.shared.invites||[]), inv];
-  // Track on the block too
-  if (!Array.isArray(blk.invitedTo)) blk.invitedTo = [];
-  if (!blk.invitedTo.includes(sister)) blk.invitedTo.push(sister);
-  setDayBlocks(currentDayKey, blocks);
-  showToast(`Invite sent to ${sister==='jenn'?'Jenn':'Jess'} 💌`);
+  await sendInvite(blk, me === 'jenn' ? 'jess' : 'jenn', currentDayKey, { watch: true });
+}
+
+/* 💌 Invite my sister — the same thing, same time. It used to build its own
+   invite inline, beside sendInvite, so a guard in one door missed the other.
+   Now it is a door onto sendInvite and nothing more: it passes currentDayKey
+   (the day this sheet is editing — the block was just found there, and a tap
+   focuses its column first) as the invite's day, and sendInvite stamps the 💌
+   badge on activeProfile()'s own block. */
+async function inviteSisterFromEdit() {
+  if (!editingBlockId) return;
+  const blk = (getDayBlocks(currentDayKey) || []).find(b => b.id === editingBlockId);
+  if (!blk) return;
+  const me = activeProfile();
+  if (me !== 'jenn' && me !== 'jess') return;
+  await sendInvite(blk, me === 'jenn' ? 'jess' : 'jenn', currentDayKey);
 }
 

@@ -109,11 +109,12 @@ function parentRenderLanding(destId) {
         <span class="pn-sub">${escapeHtml(r.sub)}</span></span>
       <span class="pn-chev" aria-hidden="true">›</span>
     </button>`).join('');
-  /* The build this device is running, on the App landing only. GitHub Pages
-     and the service worker both cache, so "is the iPad on the new code?" has
-     to be answerable by reading the page. APP_BUILD (js/01-config.js) and
-     sw.js's SW_VERSION are held equal by tests/check-sw-shell.js. */
-  const build = destId === 'app' ? `<p class="pn-note">Build ${escapeHtml(APP_BUILD)}</p>` : '';
+  /* The build this device is running, on the App landing only (the Today More
+     sheet shows the same line). GitHub Pages and the service worker both cache,
+     so "is the iPad on the new code?" has to be answerable by reading the page.
+     APP_BUILD (js/01-config.js) and sw.js's SW_VERSION are held equal by
+     tests/check-sw-shell.js. */
+  const build = destId === 'app' ? `<p class="app-build">Build ${escapeHtml(APP_BUILD)}</p>` : '';
   wrap.innerHTML = `<p class="pn-cap">${escapeHtml(dest.label || '')}</p><div class="pn-card">${rows}</div>${build}`;
 }
 
@@ -1331,9 +1332,28 @@ function parentBannerBackButton() {
    sitting, so they are hidden rather than left there to be pressed — a control
    that loses your place without saying so is worse than no control. They come
    back the moment the meeting is finished or closed. */
+/* Two corrections, both about a lock that could be applied and never lifted.
+
+   It ran a DOCUMENT-WIDE querySelectorAll('.profile-badge'), so a sitting on
+   the week screen hid the switcher on Today, the chore tab and Sister Sync as
+   well — four screens the comment above is not about. It is the week's and the
+   day's switchers a parent must not press mid-meeting, so it names those two
+   by id.
+
+   And `locked` is now a fact about a PARENT mid-sitting. Both call sites used
+   to be inside `if (isParent())`, so nothing ever ran this with locked ===
+   false: start a meeting, look at the week, switch to a kid, and the badge was
+   gone for the rest of the session. mmClearReturn() only nulls the variable —
+   it un-hides nothing. The calls in renderWeek and openDay now run on every
+   render, and a child's render is what puts the control back. */
+const MEETING_LOCK_BADGES = ['weekProfileBadge', 'dayProfileBadge'];
 function applyMeetingLock() {
-  const locked = (typeof mmHasReturn === 'function') && mmHasReturn();
-  document.querySelectorAll('.profile-badge, #parentWeekActions .pb-switch')
+  const locked = isParent() && (typeof mmHasReturn === 'function') && mmHasReturn();
+  MEETING_LOCK_BADGES.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = locked;
+  });
+  document.querySelectorAll('#parentWeekActions .pb-switch')
     .forEach(el => { el.hidden = locked; });
   document.body.classList.toggle('meeting-return-pending', locked);
 }

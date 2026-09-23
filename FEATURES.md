@@ -1,4 +1,4 @@
-# FEATURES — Weekly-Planner — manifest v1 — confirmed 2026-09-21
+# FEATURES — Weekly-Planner — manifest v7 — 2026-09-23 (v2 confirmed 2026-09-22)
 
 Locked features of the current version. Every edit is checked against this list and ends with a regression table. Update this file in the same change that alters a feature. Over-list rather than under-list.
 
@@ -37,6 +37,8 @@ directly, not against this file.
 - `bash tests/replay-hooks.sh` replays synthetic inputs through every hook. **Expected: `passed=14 failed=0`.** It restores `routing_guard_mode` to `observe` and clears `.claude/state/*.jsonl` on exit.
 - `tests/test-routing-hook.md` is the cloud procedure for learning which hook-input fields mark a subagent — run before switching `routing_guard_mode` to `enforce`.
 - `docs/HZ-skill-trigger-tuning.md` is the skill-trigger tuning procedure.
+- **Smoke subset for iteration (added 2026-09-22):** `SMOKE_ONLY=checkA,checkB npm run test:smoke` runs only the named checks. Every check statement in `tests/smoke.js` carries an `if (want('name'))` prefix naming its own check; `noConsoleErrors` is the one unguarded check and always runs. The check names are read from the file itself, not a hand list. A subset **is never the gate**: an unknown name exits 1 naming it; a named check that records nothing is a failure; the last line is `PARTIAL RUN (SMOKE_ONLY): N of M checks — not a pass of the suite` and never `ALL SMOKE CHECKS PASSED`; it refuses to run when `CI` is set. With `SMOKE_ONLY` unset or empty the suite runs every check, pass rule `v !== true`, final line unchanged. Documented in `ARCHITECTURE.md` (Verification) and `tests/README.md`.
+- **Dead-action guard (added 2026-09-23):** `tests/check-dead-actions.js`, in `npm run check` (the ninth check) and listed in `ARCHITECTURE.md` (Verification) and `tests/README.md`. Fails on (1) an `onclick` in `index.html` or a `js/` template calling a function not declared at top level in `js/` (method calls and browser globals excluded; a runtime callee `${fn}(…)` is counted, not checked), and (2) a `data-P-action="V"` not handled by prefix P's own dispatcher — the selector `[data-P-action="V"]`, or V compared/keyed inside a top-level function reading `dataset.<p>Action` / `'data-P-action'` or one it hands the action variable to. A prefix nothing reads fails, naming every value. Runtime-built values are resolved from literals in the `${…}` or at the drawing function's call sites; the rest are counted. The reverse (a compared value no markup emits) **warns** and does not fail. `EXEMPT` is **empty** since the 2026-09-23 merge of `main`: its one entry, `pm/edit` (unreachable branch in `pmPriceCards`), self-expired when PR #92 removed that edit mode, and was deleted as designed. The mechanism stays: an entry **self-expires** — when nothing emits the value, the check fails until the entry is deleted.
 
 ## App features — not yet manifested
 Authority for app behaviour remains `ARCHITECTURE.md`. Its load-bearing rules,
@@ -50,6 +52,68 @@ to be a complete manifest:
 - Three escaping helpers chosen by context, enforced by `tests/check-escaping.js`.
 - Verification gate before any push: `npm run check`, `npm run test:merge`, `npm run test:xp`, `npm run test:money`, `npm run test:smoke`.
 - `SW_VERSION` must be bumped on any deploy changing a shell file, enforced by `tests/check-sw-shell.js`.
+
+### The build number is on the page (manifested 2026-09-23)
+- `const APP_BUILD` in `js/01-config.js` is the page's copy of `SW_VERSION` (`sw.js`). **One number with a check:** `tests/check-sw-shell.js` fails `npm run check` when `APP_BUILD !== SW_VERSION` (or `APP_BUILD` is missing), naming both values and saying to set them equal. Bump both together.
+- Printed as `Build <APP_BUILD>` (class `.app-build`, `escapeHtml`, 13px floor, not a control) in **two** places: under the tiles of the Today More sheet (`tdOpenMore`, `js/31-today.js`) — **bottom nav → More** — and under the list on the parent portal's App landing only (`parentRenderLanding('app')`, `js/11-parent.js`) — **Parent → PIN → ⚙️ App**. Setup's landing does not carry it.
+- Because `js/01-config.js` is a cached shell file, the number shown is what that device loaded, offline copy included.
+- Held by `theBuildNumberIsOnThePage` in `tests/smoke.js` (both surfaces show `APP_BUILD`, `APP_BUILD` non-empty, the More line ≥13px, Setup does not show it, `APP_BUILD` matches `YYYY-MM-DD[a-z]`, Setup keeps its 👵 Grandma rule row). It absorbed PR #92's `theAppLandingShowsTheBuild`, which no longer exists.
+- **Consolidated 2026-09-23 (build 2026-09-23b)** when `main` (PR #92) was merged in: PR #92 had built a parallel stamp (`APP_BUILD`, App landing only). Now one constant `APP_BUILD`, one class `.app-build`, one `check-sw-shell.js` section, one smoke check, same two screens. `BUILD` no longer exists.
+
+### Week screen — the school-day offer (manifested 2026-09-22)
+- School days are **offered, never assumed**, and the question is whether the school **card** is missing, not whether the day is empty — `schoolDaysToOffer` (`js/07-week-view.js`).
+- The offer is limited to `SCHOOL_FILL_HORIZON_WEEKS` (3) weeks ahead — `schoolOfferInHorizon`.
+- **It appears in ONE place, above the grid** — `#weekSchoolBannerTop`, a sibling of `#weekFull` directly under `#weekCoachTip`. A to-do below a ~691px grid is a to-do nobody sees. `renderSchoolDayBanner(bannerId = 'weekSchoolBannerTop')` draws it, called once from `renderFullWeek`; the `bannerId` parameter stays so the host is swappable, but only one host exists.
+- `#weekSchoolBanner` (the old below-grid host, inside `.weekly-full-wrap`) is **absent from `index.html`**, not merely undrawn — an id nothing reads fails `tests/check-dead-ids.js`, and a host left in place is a host somebody reinstates.
+- `setWeekView('preview')` hides `#weekSchoolBannerTop` explicitly, because it sits outside `#weekFull` and the renderer runs only from `renderFullWeek`.
+- The banner names the count, draws a `.wsb-day` chip per offered day, and draws the bulk `Add all N` **only when more than one day is offered**.
+- **One writer**: `commitSchoolDays(dayKeys, p)` owns the confirm copy (its `okLabel` is `Add it` for one day, `Add them` for more), the block shape (travel + get-ready on, not completed, not confirmed), the single `saveAll()` and the toast. `addSchoolDaysToWeek(mondayKey)` and `addSchoolDayToDay(dayKey)` are its two doors, and **both filter through `schoolDaysToOffer` first** so a stale chip cannot write a duplicate School Day.
+- The blank-week coach tip (`weekEmptyOffer`) carries **no** school button — the banner covers the blank week from the same position.
+- Held by `theSchoolOfferIsAboveTheWeekGrid`, `oneSchoolDayCanBeAddedOnItsOwn` and `aBlankWeekOffersItsSchoolDays` in `tests/smoke.js`.
+
+### The profile badge switches profile (manifested 2026-09-22)
+- **All five** profile badges are real controls: `#todayProfileBadge`, `#weekProfileBadge`, `#dayProfileBadge`, `#choreProfileBadge`, `#syncProfileBadge` are each `<button class="profile-badge" onclick="openProfileSwitcher()" aria-label="Switch profile">`. Three of them (Today, chores, Sister Sync) were inert `<div>`s.
+- `openProfileSwitcher` (`js/06-quests.js`) is the one switcher; every badge is a call site for it.
+- Every badge **prints who is on screen**, a parent included. Today's says `👨‍👩‍👧‍👦 Parent (Jenn|Jess)` for a grown-up, the same shape the chore tab uses.
+- **Nothing is announced as a control that is not one.** `enhanceAccessibility` (`js/99-main.js`) injects `aria-label` only on a `.profile-badge` that is a `<button>`/`<a>`, carries `[onclick]`, or has `role="button"` — matching how `enhanceNonButtonClickables` beside it already filtered.
+- **The meeting lock is scoped and releasable.** `applyMeetingLock` (`js/11-parent.js`) hides only `MEETING_LOCK_BADGES` (`weekProfileBadge`, `dayProfileBadge`) plus `#parentWeekActions .pb-switch`, never every `.profile-badge` in the document; `locked` is `isParent() && mmHasReturn()`; and `renderWeek`/`openDay` call it **outside** their `isParent()` branches so a child's own render puts the control back.
+- Held by `everyProfileBadgeSwitchesProfile` in `tests/smoke.js` — it activates each badge and asserts the switcher opens, and asserts the lock both engages for a parent mid-meeting and lifts for a child.
+
+### A sister can be invited to watch (manifested 2026-09-22)
+- A **`watching: true`** flag on the block is what makes it a watch block, on any competition block, not only a scored meet. `blockIsWatching(b)` (`js/08-day-view.js`) is the one owner of the question.
+- **`blockIsCompetition(b)` returns `false` when the block is watching.** This is the single seam all five competition surfaces funnel through, and the narrowing is deliberate and load-bearing — do not simplify it away. It is what guarantees, structurally: never listed by `mmPlannedCompetitions`, never chased by `mmUnrecordedCompetitions`, never adopted by `mrPlaceCompetitionBlock`'s orphan branch, never given a `compId`, and so **no competition score, no competition money, no money-tab link**.
+- `blockDisplayName` reads `act.isCompetition` directly, so it keeps working and prints **`👀 Watching — <meet>`**, falling back to what the block is when no `compName` was typed.
+- `renderTrainingChecks` and `renderTrainingGearChecklist` render nothing for a watch block; `renderBlockPixel`'s `isTrainingBlock` excludes it, so no on-block checks or chip; the edit sheet hides the warm-up toggle and the gear list.
+- **Buffers: travel kept, warm-up dropped.** She goes to the rink; she is not competing.
+- `sendInvite(block, to, day, opts)` takes an options argument; `opts.watch` puts `watch`, `compName` and `tag` on the invite. The call sites that pass no `opts` (Sister Sync's tap, the edit sheet's 💌) send a plain invite. The sender is `activeProfile()`, so an invite from the parent portal is recorded as the child's.
+- `acceptInvite` writes `watching`, `compName`, `tag`, the travel buffer and the note **only** on the watch branch; the plain invite path is unchanged.
+- **👀 Invite my sister to watch** (`#watchSisterBtn`) sits outside `#sisterSyncWrap` so it is available to kid **and** parent, and shows only when `blockIsCompetition(block)`. The confirm dialog names the meet. While a watch invite is live it reads `👀 <sister> is invited to watch` and is disabled (see the next section).
+- A watch block **still counts as ordinary planned time** in `computeWeekTotals` — a Saturday spent at the rink is not free time.
+- Held by `aWatchedMeetIsNeverChasedForAResult` and `aWatchInviteNamesTheMeet` in `tests/smoke.js`.
+
+### An invite has one writer and cannot be sent or accepted twice (manifested 2026-09-23)
+- **One writer.** `sendInvite(block, to, day, opts)` (`js/10-social.js`) is the only code that creates an invite. `inviteSisterFromEdit` and `inviteSisterToWatch` (`js/17-ui-misc.js`) are doors onto it — find the block, resolve `activeProfile()` and the sister, call `sendInvite`; the Sister Sync tap calls it directly. The edit sheet's former inline copy (its own invite object, confirm and stamp) is gone.
+- **The invite's day comes from the caller** (manifest v7, request #34): Sister Sync passes the day it is showing; the edit sheet passes `currentDayKey` (the day it found the block on). `sendInvite` refuses without a `YYYY-MM-DD` day — toast `Could not tell which day this is — nothing was sent.` — and never reads `currentDayKey` or `syncDayIdx` itself. Held by `anInviteFromSisterSyncIsDatedThatDay`.
+- `sendInvite` stamps `invitedTo` on `activeProfile()`'s own block — a parent-portal send is recorded as the child's and stamps the child's block.
+- **`sisterInviteFor(blockId, to, kind)`** is the one owner of "is there already one of these": the **live** invite (`pending` or `accepted`) with that `sourceBlockId` and `to`, of that kind (`'watch'` when `inv.watch`, else `'share'`), or `null`.
+- **`sendInvite` refuses a live duplicate of the same kind before the confirm dialog**, with a toast naming the state: pending — `<Sister> already has this invite — she hasn't answered yet` (watch: `<Sister> is already invited to watch — she hasn't answered yet`); accepted — `It's already on <Sister>'s plan` (watch: `<Sister> already said yes to watching — it's on her plan`). A **declined** invite may be sent again. A share and a watch of the same block are different kinds and both allowed.
+- Since the edit-sheet door now goes through `sendInvite`, a share of an activity the sister does not have is refused up front (`<Sister> cannot receive this activity yet.`) rather than sent and auto-declined on accept.
+- **`acceptInvite` and `declineInvite` act only on `status === 'pending'`**; anything else returns quietly and redraws the invite list (`refreshInvitesUI`), so a double-tap on ✅ Accept cannot put a second block on her day and declining an accepted invite changes nothing.
+- **Each edit-sheet button reads its own kind through `sisterInviteFor`.** Share: `💌 Invite <sister>` → `💌 Invite sent to <sister>` (disabled) while live. Watch: `👀 Invite <sister> to watch` → `👀 <sister> is invited to watch` (disabled) while live. A watch invite never marks the share button sent, nor the reverse.
+- `invitedTo` on the source block has one job: the 💌 badge on the inviter's own timeline (`js/08-day-view.js`). It is not asked whether an invite was sent.
+- **`#inviteSisterBtn` sits outside `#sisterSyncWrap`** (like `#watchSisterBtn`), so a kid can share from the block, not only from the Sister Sync screen. It shows for kid and parent on any non-watching block and is **hidden on a watching block** (`blockIsWatching`) — sharing somebody else's meet as a plain invite would clone her competition block onto the competitor's calendar.
+- **`#publicToggle` stays parent-only** — `#sisterSyncWrap` now holds only it.
+- Held by `anInviteCannotBeSentTwice` in `tests/smoke.js`.
+
+### Today signposts a waiting invite (manifested 2026-09-23)
+- **One inbox.** Sister Sync's 💌 list (`renderInvites`) is where an invite is accepted or declined; Today only says one is waiting and takes her there.
+- **Shared filter and wording.** `invitesWaitingFor(p)` (invites to `p` with `status === 'pending'`) and `inviteFacts(inv)` (`from`, `subject`, `day`, `time` — plain text; a watch invite's subject is the meet, `compName` → activity name → `her competition`; a share's is `<icon> <name>`, else `an activity`) in `js/10-social.js`. Both `renderInvites` and Today's note call them. The inbox's visible wording is unchanged.
+- **`tdInviteNote`** (`js/31-today.js`) — **kid only** (`isParent()` → nothing: the inbox works on `profile` and `openSisterSync` refuses a parent). With nothing pending, no row at all.
+- One line: one share `💌 <Sister> invited you to <icon> <activity> · <Day> <time>`; one watch `💌 <Sister> invited you to watch <meet> · <Day>`; several `💌 N invites waiting — from <Sister>` (both names joined with "and" if ever two senders). Every value goes through `escapeHtml`.
+- A real control: a `<button class="td-row" data-td-action="invites">` (existing Today row styling, ≥44px), in the day column **between the hero and "Coming up"**, so she meets it before her day's list.
+- Tap → `tdOpenInvites`: `openSisterSync()` then scrolls `#invitesSection` (the invites heading + list, `index.html`) to just under the sticky topbar.
+- It disappears on the next Today render once nothing is pending — the nav's Today tab (`goToday`) and a remote snapshot (`refreshCurrentScreen`) both re-render. No polling.
+- Held by `anInviteWaitingShowsOnToday` in `tests/smoke.js` (run at 390×844).
 
 Deriving the full app manifest from `ARCHITECTURE.md` is an open item in `WORKING_RECORD.md`.
 
@@ -130,7 +194,7 @@ them changing on purpose.
 - The Money school ladder opens at **20 / 30 / 40 / 100%** of all debt paid (ready · locked · stock · mix), from ONE table: `MNY_STAGES` has ids, pots / plans / lessons name a stage, and `mnyStagePct` reads `school.stagePct` with per-key defaults (no migration). A parent override can only open a stage, never close one.
 - Money rules › Lessons has three gate steppers (ready / locked / stock) that save as a dated rule version; a save that breaks ready ≤ locked ≤ stock ≤ 100 is refused with a sentence in the handler.
 - 🎿 Parent Now shows a loan-season row 1 Aug – 30 Sep unless a debt was created on or after 1 Jul that year; derived from the date, nothing stored, routes to Money rules › Loans.
-- The parent portal's App landing shows "Build <APP_BUILD>"; `tests/check-sw-shell.js` fails when `APP_BUILD` ≠ `SW_VERSION`.
+- The parent portal's App landing and the Today More sheet show "Build <APP_BUILD>"; `tests/check-sw-shell.js` fails when `APP_BUILD` ≠ `SW_VERSION`. One mechanism — see "The build number is on the page" above.
 - The "? How this page works" button on Money rules opens the parent tour.
 - A permanent click sweep (`everyMoneyControlClicksClean`) presses every money control on every money surface and fails on any exception.
 

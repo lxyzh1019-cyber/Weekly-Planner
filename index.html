@@ -138,7 +138,7 @@
          it reads the family's clock rather than the device's — the same reason
          theAppTellsFamilyTimeOnAnyDevice exists. -->
     <div class="topbar-date" id="tdTodayDate"></div>
-    <div class="profile-badge" id="todayProfileBadge"></div>
+    <button class="profile-badge" onclick="openProfileSwitcher()" id="todayProfileBadge" aria-label="Switch profile"></button>
   </header>
   <div id="tdWrap" class="td-wrap"></div>
 
@@ -287,6 +287,15 @@
   </header>
   <p class="kid-coach-tip" id="weekCoachTip" style="display:none;margin:0.35rem 0.75rem 0"></p>
 
+  <!-- The offer to add the missing School Day cards, above the grid it is about,
+       and the only place it appears. It is a to-do, and it used to sit at the
+       bottom of .weekly-full-wrap: after about 691px of grid (960 minutes at
+       0.72px/min) plus the colour key and the streak, which on a phone is a
+       screen and a half below the fold. A to-do nobody sees is not a to-do.
+       (A copy under the 🧱 Day Blocks tab, #tgSchoolBanner, went with that tab —
+       which is how the offer came to live only below the fold.) -->
+  <div class="week-todo-banner" id="weekSchoolBannerTop" style="display:none"></div>
+
   <!-- The compact week view lived here, with #weekGrid and #weekLegend. It was
        the original third week layout and had been unreachable for a long time:
        the tabs only ever set 'full' or 'timegrid'. #weekLegend went with it —
@@ -308,7 +317,10 @@
            than being retired with the tab. -->
       <div class="tg-streak" id="weekStreak"></div>
       <div class="week-todo-banner" id="weekFamilyBanner" style="display:none"></div>
-      <div class="week-todo-banner" id="weekSchoolBanner" style="display:none"></div>
+      <!-- #weekSchoolBanner stood here. The offer to add the missing School Day
+           cards is a to-do, and a to-do under a 691px grid is a to-do nobody
+           sees, so it moved above the grid it is about (#weekSchoolBannerTop,
+           under #weekCoachTip) and there is one of it. -->
       <div class="week-conflict-banner" id="weekConflictBanner" style="display:none"></div>
       <div class="week-signature" id="weekSignatureBar"></div>
     </div>
@@ -382,7 +394,7 @@
       <h2>Weekly Chore 🧹</h2>
     </div>
     <div class="topbar-actions">
-      <div class="profile-badge" id="choreProfileBadge"></div>
+      <button class="profile-badge" onclick="openProfileSwitcher()" id="choreProfileBadge" aria-label="Switch profile"></button>
     </div>
   </header>
   <div class="chore-wrap" id="choreWrap"></div>
@@ -507,7 +519,7 @@
       <button class="btn-icon" onclick="goWeek()">◀</button>
       <h2>Sister Sync 👯</h2>
     </div>
-    <div class="profile-badge" id="syncProfileBadge"></div>
+    <button class="profile-badge" onclick="openProfileSwitcher()" id="syncProfileBadge" aria-label="Switch profile"></button>
   </header>
 
   <div class="week-nav">
@@ -529,7 +541,8 @@
     <div id="challengesList"></div>
   </div>
 
-  <div style="padding: 0 0.8rem 1rem">
+  <!-- id: Today's 💌 note (tdOpenInvites) scrolls here, so she lands on the invites. -->
+  <div id="invitesSection" style="padding: 0 0.8rem 1rem">
     <h3 style="font-size:1.3rem;margin:1rem 0 0.5rem">💌 Invites</h3>
     <div id="invitesList"></div>
   </div>
@@ -1096,14 +1109,27 @@
       <p style="font-size:0.75rem;color:var(--ink-light);margin-top:0.3rem">Future edits or deletes won't affect the rest of the series.</p>
     </div>
 
-    <!-- Sister Sync: public visibility + invite -->
+    <!-- Sister Sync: public visibility — parent-only -->
     <div id="sisterSyncWrap" style="display:none">
       <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="publicToggle" onclick="togglePublic()">
         <div class="toggle-track"><div class="toggle-knob"></div></div>
         <span class="toggle-label">👯 Show details to your sister (Sister Sync)</span>
       </div>
-      <button class="pill-btn" id="inviteSisterBtn" style="display:none;width:100%;margin-top:0.4rem" onclick="inviteSisterFromEdit()">💌 Invite your sister</button>
     </div>
+
+    <!-- Outside #sisterSyncWrap on purpose, like #watchSisterBtn below: that
+         block is parent-only, and inviting your sister along is a child's own
+         decision — Sister Sync was her only other way. Hidden on a watching
+         block: passing somebody else's meet on as a plain invite would clone
+         her competition block onto the competitor's own calendar. -->
+    <button class="pill-btn" id="inviteSisterBtn" style="display:none;width:100%;margin-top:0.4rem" onclick="inviteSisterFromEdit()">💌 Invite my sister</button>
+
+    <!-- Outside #sisterSyncWrap on purpose: that block is parent-only, and
+         asking your sister to come and watch you compete is a child's own
+         decision. Shown only on a competition block, and blockIsCompetition
+         already answers false for a watch block, so a watch block cannot be
+         re-shared as a meet. -->
+    <button class="pill-btn" id="watchSisterBtn" style="display:none;width:100%;margin-top:0.4rem" onclick="inviteSisterToWatch()">👀 Invite my sister to watch</button>
 
     <div id="parentPinWrap" style="display:none">
       <div class="repeat-toggle" role="switch" tabindex="0" aria-checked="false" id="pinToggle" onclick="togglePin()">

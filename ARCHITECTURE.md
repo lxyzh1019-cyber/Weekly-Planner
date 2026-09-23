@@ -80,7 +80,7 @@ npm run test:smoke          # screenshots land in tests/out/
 
 `npm run check` runs `tests/check-syntax.js`, `tests/check-globals.js`,
 `tests/check-shared-merge.js`, `tests/check-escaping.js`, `tests/check-dead-css.js`,
-`tests/check-dead-ids.js` and `tests/check-sw-shell.js` (an `id` in `index.html` that nothing reads — the
+`tests/check-dead-ids.js`, `tests/check-dead-actions.js` and `tests/check-sw-shell.js` (an `id` in `index.html` that nothing reads — the
 same blind spot as dead CSS, with runtime-built prefixes discovered from the
 source rather than listed by hand). **Do not go back to the old shell loop** —
 
@@ -113,6 +113,22 @@ the rest are the same shape and the same fix — build a `problems` array, push 
 sentence naming the surface and the expectation, `return problems.length ?
 problems : true`.
 
+**A control with no code behind it fails the build.** `tests/check-dead-actions.js`
+holds two rules. Every function an `onclick` calls — in `index.html` and in the
+templates in `js/` — must be declared at the top level of `js/`. And every
+`data-P-action="V"` must be handled by prefix **P's own** dispatcher: the
+selector `[data-P-action="V"]`, or `V` compared (`=== 'V'`, `case 'V'`, `'V':`,
+`['V']`) inside a top-level function that reads `dataset.<p>Action` or
+`'data-P-action'`, or one that function hands the action to. Scoped per prefix
+because "does 'V' appear anywhere" is wrong both ways — it passed a dead
+`data-pm-action="edit"` because another prefix handles an `'edit'`. Function
+extents come from a lexer that tells strings, templates, comments and regexes
+apart. A prefix nothing reads fails outright. A value compared in a reader that
+no markup emits is dead handler code, but a value may be built at runtime, so
+that is a **warning**, not a failure. The one known dead control, `pm/edit`, is
+exempt by name, and the exemption **expires**: once nothing emits it, the check
+fails until the entry is deleted.
+
 `tests/check-globals.js` enforces the one-declaration-per-name rule above,
 covering `function`, `async function` and top-level `let`/`const`/`var`
 (including the comma-separated form) — a duplicate `let` is a load-time
@@ -121,6 +137,16 @@ covering `function`, `async function` and top-level `let`/`const`/`var`
 `smoke.js` auto-detects Chromium under `/opt/pw-browsers` or
 `~/.cache/ms-playwright` (`npx playwright install chromium`); elsewhere set
 `SMOKE_CHROMIUM=/path/to/chrome`.
+
+**Iterating on a few smoke checks:** `SMOKE_ONLY=checkA,checkB npm run test:smoke`
+runs just those (plus `noConsoleErrors`, which has no guard) in a fraction of the
+full run's time. Each check statement is prefixed `if (want('name'))`, so the setup
+between checks still runs — but a skipped check's own body does not, and the
+checks share one page, so a subset result is a hint, not a verdict. It is for
+iteration only and cannot stand in for the gate: an unknown name exits 1, the
+last line reads `PARTIAL RUN (SMOKE_ONLY): N of M checks — not a pass of the
+suite`, and it refuses to run at all when `CI` is set. The full suite gates every
+push. A new check gets the same prefix, with its own name in both places.
 
 CI (`.github/workflows/ci.yml`) runs all three on every pull request and pushes
 to `main`, plus nightly, and uploads the smoke screenshots as an artifact.
@@ -629,7 +655,10 @@ place that already does it.
 **The week has two tabs, and only one of them is a week you can plan.** Full is
 what the screen opens on: the cards, the quick-complete `.wf-card-check` ticks,
 the planning controls and the three banners — including the offer to add missing
-School Day cards, which is a mutation and so can only live there. The second tab
+School Day cards, which is a mutation and so can only live there. (That offer is
+drawn ABOVE the grid, from `#weekSchoolBannerTop`, which is a sibling of
+`#weekFull` rather than part of it — so `setWeekView` has to hide it on the
+preview explicitly. See *The school calendar* below.) The second tab
 is a read-only preview of the printed sheet, and it is a second **host** for
 `renderPrintSheet` (`js/16-print.js`), never a second copy of it: that function
 takes `(host, { weekOffset, profile, window })` and sets `--print-slot` on the
@@ -681,6 +710,101 @@ wrongly on the two you actually pin up. The weekly meeting then reads the meet
 off the plan (`mmPlannedCompetitions`, `js/23-money-meeting.js`) instead of
 asking for it twice; it takes facts only — which meet, which day, which sport —
 and `mrScoreCompetition` still decides what the result is worth.
+
+**WATCHING IS NOT COMPETING, and `blockIsCompetition` is the one seam that says
+so.** A sister can be invited to come and watch a meet, and the danger is the
+invite mechanism itself: `acceptInvite` (`js/10-social.js`) copies `actId`
+verbatim, and `competition` is a plain default activity carrying
+`isCompetition`, so the watcher's block simply **was** a competition to every
+reader in the app. She would have been listed by `mmPlannedCompetitions` and
+chased at Sunday's meeting for a result she never swam — and an unrecorded
+planned meet **disables the confirm bar**, so the week could not settle and
+nothing on screen would say why; and `mrPlaceCompetitionBlock`'s orphan
+adoption (`js/18-rules.js`) would have taken her watch block as the meet's own,
+`compId` and all, which is the link to the money tab.
+
+`blockIsCompetition(b)` (`js/08-day-view.js`) returns **false** when
+`blockIsWatching(b)`. That is a deliberate narrowing, not an oversight to
+simplify away: it is the single test all five competition surfaces funnel
+through, so one line makes a watch block invisible to every one of them at
+once, in the direction that is **safe by default** — the next surface that asks
+this question is right without being told. A watch block therefore earns no
+competition score and no competition money, structurally rather than by
+discipline.
+
+Three things still have to know, and they are named rather than left to
+inference. `blockDisplayName` reads `act.isCompetition` rather than
+`blockIsCompetition`, so it is the one place that still asks directly — it
+prints **`👀 Watching — <meet>`**, falling back to what the block is when
+nobody named the meet, because a card reading "Winter Invitational" on the
+watcher's Saturday claims the meet is hers. `renderTrainingChecks` and
+`renderTrainingGearChecklist` return empty for a watch block: the four checks
+are a review of a session you took part in, and a watcher packs no skates.
+Buffers split — **travel stays, warm-up goes**: she really does go to the rink,
+and she is not competing.
+
+`sendInvite(block, to, day, opts)` carries `watch`, `compName` and `tag`; the
+call sites that pass no `opts` send a plain invite, and **the plain invite path in
+`acceptInvite` is untouched** — it is the one mechanism that already puts an
+event on both calendars and this is not about it. `👀 Invite my sister to
+watch` sits outside `#sisterSyncWrap`, which is parent-only, because asking
+your sister to come and watch you compete is a child's own decision; it shows
+only when `blockIsCompetition(block)`, so a watch block cannot be passed on
+again as a meet.
+
+**An invite has ONE writer, and one owner of "is there already one?"** There
+were two writers of a plain invite — `sendInvite` and an inline copy in
+`inviteSisterFromEdit` (`js/17-ui-misc.js`) with its own confirm and its own
+stamp — and neither asked whether one was already out, so a guard in either
+would have missed the other door. `sendInvite` is now the only code that
+creates an invite: the Sister Sync tap calls it, and `inviteSisterFromEdit` and
+`inviteSisterToWatch` only find the block, resolve `activeProfile()` and the
+sister, and call it. Do not build an invite anywhere else. **The invite's day
+comes from the caller** — Sister Sync passes the day it is showing, the edit
+sheet passes `currentDayKey` (the day it found the block on) — and `sendInvite`
+refuses without one; it never reads `currentDayKey` or `syncDayIdx` itself,
+because `currentDayKey` outlives the day view that set it.
+`sisterInviteFor(blockId, to, kind)` (`js/10-social.js`) returns the **live**
+invite — `pending` or `accepted` — from that block to that sister of that kind
+(`'watch'` when `inv.watch`, else `'share'`), or `null`. `sendInvite` refuses a
+live duplicate of the same kind **before** its confirm dialog, with a toast
+saying whether she hasn't answered yet or it is already on her plan; a
+**declined** invite may go again (a no on Tuesday is not a no for ever), and a
+share and a watch of the same block are different questions. `acceptInvite`
+and `declineInvite` act only on a `pending` invite — a double-tap on ✅ Accept
+used to put a second block on her day — and otherwise return quietly and
+redraw the list.
+
+Both edit-sheet buttons read their sent-state from `sisterInviteFor` **for
+their own kind**. `invitedTo` on the source block is a bare list of names that
+cannot tell a share from a watch; its one job is the 💌 badge on the inviter's
+own timeline, and it is not asked whether anything was sent. **`💌 Invite my
+sister` (`#inviteSisterBtn`) also sits outside `#sisterSyncWrap`**, so a child
+can share from the block as well as from the Sister Sync screen; it is hidden
+on a watching block (`blockIsWatching`), because sharing somebody else's meet
+as a plain invite would clone her competition block onto the competitor's own
+calendar. **The public toggle (`#publicToggle`) stays parent-only** — it is
+all `#sisterSyncWrap` now holds. `anInviteCannotBeSentTwice` (`tests/smoke.js`)
+holds all of it.
+
+**One inbox, and Today signposts it.** The 💌 inbox is Sister Sync's
+(`renderInvites`), and accepting and declining stay there. Today carries a
+one-line note when an invite is waiting — a signpost, not a second inbox — and
+its filter and wording are the inbox's own: `invitesWaitingFor(p)` (to `p`,
+`pending`) and `inviteFacts(inv)` (who / what / day / time, with the inbox's
+fallbacks) in `js/10-social.js`, called by both surfaces so they cannot count or
+name an invite differently. **Kid only**: the inbox works on `profile`,
+`acceptInvite` writes to `profile`, and `openSisterSync` refuses a parent, so a
+parent-facing note would lead to a refusal. `anInviteWaitingShowsOnToday`
+holds it.
+
+**A watch block still counts as ordinary planned time.** `computeWeekTotals`
+does not filter it out, deliberately: a Saturday she really spent at the rink
+must not read as free. What it does not do is earn.
+
+`aWatchedMeetIsNeverChasedForAResult` and `aWatchInviteNamesTheMeet`
+(`tests/smoke.js`) hold both halves — the first is the one that makes the
+feature safe and is worth more than the rest of it.
 
 Drawn to scale means the row has to **add up to a day**. It is one nowrap flex row
 of percentages with nothing able to shrink, so anything that oversubscribes it
@@ -847,6 +971,18 @@ time order, then everything finished under a closed "earlier today" fold. In
 `QUIET_HOURS` (9pm–7am, `js/01-config.js`) with nothing running, the NOW card
 reads as wind-down rather than "the rest of today is yours".
 
+**A waiting invite is named on Today, and the tap lands on it.** `tdInviteNote`
+draws one `.td-row` button in the day column, between the hero and "Coming up",
+so she meets it before her day's list: `💌 Jess invited you to 📚 Reading · Tue
+4:00pm`, `💌 Jess invited you to watch Winter Invitational · Sat`, or
+`💌 2 invites waiting — from Jess`. Nothing pending, no row. The tap
+(`data-td-action="invites"` → `tdOpenInvites`) opens Sister Sync and scrolls
+`#invitesSection` to just under the sticky topbar — the list is at the bottom
+of that screen, and landing at its top would be the school banner under a 700px
+grid again. It goes away on the next Today render after she answers: the nav's
+Today tab re-renders (`goToday`), and a snapshot from the other device does too
+(`refreshCurrentScreen`). There is no polling.
+
 **A card must never render blank.** "Jobs I can do" listed only what was still
 claimable, so the day a child finished everything her reward was an empty box —
 and a week with no chore pool gave the same blank for a different reason.
@@ -859,6 +995,22 @@ say which one they are.
   contrast fix, don't undo it.
 - Never white text on the pastel category colors (all fail contrast).
 - Use the app's `.sheet` / `appDialog` patterns, not native `confirm()`/`prompt()`.
+
+**IF IT LOOKS LIKE A CONTROL AND IS ANNOUNCED AS ONE, IT HAS TO BE ONE.** Three
+of the five `.profile-badge`s — Today, the chore tab, Sister Sync — were bare
+`<div>`s with no handler, while the week's and the day's were buttons calling
+`openProfileSwitcher()`. The app told the user it was a button in three separate
+ways and then did nothing: `css/app.css` gave it `cursor: pointer` and a 44px
+box, and `enhanceAccessibility` (`js/99-main.js`) injected
+`aria-label="Open profile selector"` on **every** `.profile-badge` with no
+`[onclick]` filter — while `enhanceNonButtonClickables`, three lines above it,
+did filter, so the dead badges got a label and no role, no focus and no
+keyboard. All five are `<button class="profile-badge" onclick="…"
+aria-label="Switch profile">` now, and the aria pass only labels a badge that
+has a click path, so the next inert one cannot re-tell the lie.
+`everyProfileBadgeSwitchesProfile` asserts it by **activating** each badge and
+watching for `#profileSwitchOverlay`: a control can carry every attribute on the
+list and still open nothing.
 
 ## One answer per question — `js/36-status.js`
 
@@ -1435,8 +1587,8 @@ asserts the same properties against `.mm-screen`.
 
 The kid nav and the parent bar both hide themselves here without any change:
 `TD_NAV_SCREENS` does not list `screen-meeting`, and `parentRenderNav` shows
-only on `screen-parent`. `applyMeetingLock` keys on `mmHasReturn()` rather than
-on the overlay, so it was unaffected too.
+only on `screen-parent`. `applyMeetingLock` keys on the return context rather
+than on the overlay, so it was unaffected too.
 
 ## The meeting
 
@@ -1447,6 +1599,19 @@ to weekly meeting" while one is waiting and "◀ Hub" otherwise. `applyMeetingLo
 **hides the Hub link and both child switchers** while a sitting is open: three
 controls that each silently abandoned the meeting is worse than one that says
 where it goes.
+
+**A lock that cannot be lifted is not a lock, it is damage.** Two things were
+wrong with it. It swept the whole document for `.profile-badge`, so a sitting on
+the week screen also hid the switcher on Today, the chore tab and Sister Sync —
+four screens it is not about; it names `MEETING_LOCK_BADGES`
+(`weekProfileBadge`, `dayProfileBadge`) by id now. And `locked` was
+`mmHasReturn()` alone while both call sites sat inside `if (isParent())`, so
+nothing ever ran it with the lock off: start a meeting, look at the week, switch
+to a kid, and every badge stayed hidden for the rest of the session on all five
+screens. `locked` is `isParent() && mmHasReturn()`, and `renderWeek` and
+`openDay` call it **outside** their `isParent()` branches, so a child's own
+render is what puts the control back. `mmClearReturn()` only nulls the variable
+— it un-hides nothing, and never could.
 
 **A day refused only for `unconfirmed` is the one refusal a SITTING may talk its
 way past.** `mmOverridableRefusal` names it: blocks nobody answered, which is
@@ -2030,12 +2195,46 @@ asks whether the school **card** is missing, not whether the day is empty. It
 used to ask the second, and only on a wholly blank week, so one breakfast on a
 Monday disqualified that Monday from ever getting its school card.
 
-`renderSchoolDayBanner` owns it, as its own banner beside the family-chores one,
+`renderSchoolDayBanner` owns it, as its own banner,
 inside `SCHOOL_FILL_HORIZON_WEEKS` (3). One School Day block each on one
 confirm, not the whole template, and they arrive with **travel and get-ready on**
 (see the buffer defaults below). Past that horizon there is no offer: a term is
 40-odd weeks, and materialising all of it would write hundreds of blocks into a
 document that uploads whole on every change.
+
+**A TO-DO BELOW THE GRID IS A TO-DO NOBODY SEES, so it is drawn above it — and
+in one place.** The banner was `#weekSchoolBanner`, at the bottom of
+`.weekly-full-wrap` after about 691px of grid (960 minutes at 0.72px/min) plus
+the colour key and the streak, which on a 390×844 phone is a screen and a half
+under the fold. The blank-week coach tip carried a second copy and was the wrong
+one to rely on — it needed the whole week blank, so it vanished the moment a
+block landed, and the stale-calendar branch pre-empted it. `#tgSchoolBanner`
+under the retired 🧱 Day Blocks tab was the other host, and losing it with the
+tab is how the offer came to live only below the fold.
+
+`#weekSchoolBannerTop`, a **sibling** of `#weekFull` directly under
+`#weekCoachTip`, is now the only host. `#weekSchoolBanner` is gone from the
+markup — not merely undrawn, because an id nothing reads fails
+`tests/check-dead-ids.js`, and a host left in place is a host somebody reinstates
+by reflex. `renderSchoolDayBanner` keeps its `bannerId` parameter, which costs
+nothing and is how the host stayed swappable, and its default names the real
+host so a bare call cannot become a silent no-op. Because the host is outside
+`#weekFull`, `setWeekView` has to hide it explicitly on the read-only preview —
+`renderSchoolDayBanner` is called only from `renderFullWeek`, so nothing else
+would.
+
+**One writer, two doors.** `commitSchoolDays(dayKeys, p)` (`js/07-week-view.js`)
+is the only place a School Day card is written from this offer: the confirm
+wording, the block shape, the single `saveAll()` and the toast. Both doors
+resolve their days through `schoolDaysToOffer` first —
+`addSchoolDaysToWeek(mondayKey)` for the week, `addSchoolDayToDay(dayKey)` for
+one — so a chip that is stale because another device already added that card
+becomes the "already has one" toast rather than a second School Day on the same
+day. The banner draws a `.wsb-day` chip per offered day beside the count, and
+the bulk `Add all N` only when there is more than one — with a single day left
+the chip **is** the action. The smallest true answer has to be available: a week
+whose Thursday is a PD day the family is away for must not have to refuse the
+other four school days to say so.
 
 **Importing** (`js/35-school-calendar.js`) reads a `.ics` file or URL. It is a
 hand-written parser because there is no build step and the CSP allows no
@@ -2057,7 +2256,11 @@ is never told the app's data is out of date; she cannot act on it.
 yields and asserts the published total (177 for K-8) — a mistyped date moves that
 number, which is the point. `everyWeekViewFollowsTheSchoolCalendar`,
 `schoolHoursAreTheParentsToSet`, `aBlankWeekOffersItsSchoolDays` and
-`anIcsFileBecomesDaysOffOnlyAfterReview` hold the rest. Note what
+`anIcsFileBecomesDaysOffOnlyAfterReview` hold the rest.
+`theSchoolOfferIsAboveTheWeekGrid` measures the two rectangles at 390×844 on a
+**part-planned** week — "above the grid" is a fact about geometry, not about DOM
+order — and `oneSchoolDayCanBeAddedOnItsOwn` holds the chips, as a kid and as a
+parent viewing that kid. Note what
 `weekSideband`/`printSideband` used to be: an assertion that there were exactly
 four segments, which counted to four on Christmas week as readily as on a term
 Tuesday and is exactly why the 9am band stood for so long. They assert the axis
@@ -2829,8 +3032,9 @@ through `mnyConceptCard` — never restated. First sight records the current sta
 silently; a stage that drops is recorded silently too. A grown-up sees nothing.
 
 **The build stamp.** `APP_BUILD` (`js/01-config.js`) is shown on the parent
-portal's App landing. `tests/check-sw-shell.js` fails when it differs from
-`SW_VERSION` — **bump both together**.
+portal's App landing and under the tiles of the Today More sheet (the full
+description is under the service-worker rule below). `tests/check-sw-shell.js`
+fails when it differs from `SW_VERSION` — **bump both together**.
 
 ## A settled week does not block a meet — Plan v7 (2026-09-22)
 
@@ -2958,6 +3162,20 @@ rows without `defaulted` keep the editor unchanged.
   changes a shell file and never touches `sw.js`, reading the working tree as
   well as the committed diff so the warning arrives before the commit rather
   than after it.
+
+  **`APP_BUILD` (`js/01-config.js`) is the page's copy of `SW_VERSION`, and it is
+  how you tell which build a device is running.** `SW_VERSION` lives only inside
+  the worker and was never shown anywhere, so an installed iPad could not say
+  which build it had — and "deployed" cannot be claimed without reading a stamp
+  on the page. `APP_BUILD` is printed as `Build <value>` under the tiles of the Today
+  **More** sheet (bottom nav → More) and under the list on the parent portal's
+  **App** landing (Parent → PIN → ⚙️ App). `js/01-config.js` is itself a cached
+  shell file, so the number on screen is what THAT device loaded, offline copy
+  included — no `postMessage` round-trip to the worker is needed to know it.
+  `tests/check-sw-shell.js` fails the build when `APP_BUILD !== SW_VERSION`, so it
+  is one number with a check rather than two that drift: **bump both
+  together.** `theBuildNumberIsOnThePage` in `tests/smoke.js` holds both
+  surfaces.
 - Toggles (`.buffer-toggle`, `.repeat-toggle`) and the 19 overlays carry their
   ARIA **statically** in `index.html`; `enhanceNonButtonClickables`
   (`js/99-main.js`) only keeps `aria-checked` in step with `.on`. Focus and

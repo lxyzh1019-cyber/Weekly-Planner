@@ -1021,7 +1021,8 @@ function openEditSheet(blockId) {
   if (ethIn)  { ethIn.value = String(editState.travelHomeMin); ethIn.disabled = !editState.travelHome; }
   if (eraTog) eraTog.checked = !!editState.readyAfter;
   if (eraIn)  { eraIn.value = String(editState.readyAfterMin); eraIn.disabled = !editState.readyAfter; }
-  if (act.isTraining) {
+  // Watching is not training: no warm-up to set, no kit to pack.
+  if (act.isTraining && !blockIsWatching(block)) {
     editWarmup.style.display = 'flex';
     editWarmup.classList.toggle('on', !!editState.warmupBuffer);
     editGearWrap.style.display = 'block';
@@ -1052,21 +1053,46 @@ function openEditSheet(blockId) {
     ndWrap.classList.toggle('on', !!block.notDone);
   } else ppWrap.style.display = 'none';
 
-  // Sister Sync per-activity controls: parent-only
+  // Sister Sync public toggle: parent-only
   const ssWrap = document.getElementById('sisterSyncWrap');
   if (isParent()) {
     ssWrap.style.display = 'block';
     document.getElementById('publicToggle').classList.toggle('on', !!block.public);
-    const inviteBtn = document.getElementById('inviteSisterBtn');
-    const sister = parentViewing==='jenn' ? 'jess' : 'jenn';
-    const alreadyInvited = Array.isArray(block.invitedTo) && block.invitedTo.includes(sister);
-    inviteBtn.style.display = 'block';
-    inviteBtn.textContent = alreadyInvited
-      ? `💌 Invite sent to ${sister==='jenn'?'Jenn':'Jess'}`
-      : `💌 Invite your sister`;
-    inviteBtn.disabled = alreadyInvited;
   } else {
     ssWrap.style.display = 'none';
+  }
+
+  /* The two invite buttons — kid AND parent. Each asks sisterInviteFor about
+     its OWN kind, so a watch invite never marks the share button sent, and a
+     declined invite frees the button again. `invitedTo` is not asked: it is a
+     bare list of names and cannot tell a share from a watch. */
+  const me = activeProfile();
+  const isKid = me === 'jenn' || me === 'jess';
+  const sister = me === 'jenn' ? 'jess' : 'jenn';
+  const sisterName = sister === 'jenn' ? 'Jenn' : 'Jess';
+
+  /* 💌 share — any ordinary block, but NOT a watching one: passing somebody
+     else's meet on as a plain invite would clone her competition block onto
+     the competitor's own calendar. */
+  const inviteBtn = document.getElementById('inviteSisterBtn');
+  if (inviteBtn) {
+    const canShare = isKid && !blockIsWatching(block);
+    const shareOut = canShare && !!sisterInviteFor(block.id, sister, 'share');
+    inviteBtn.style.display = canShare ? 'block' : 'none';
+    inviteBtn.textContent = shareOut ? `💌 Invite sent to ${sisterName}` : `💌 Invite ${sisterName}`;
+    inviteBtn.disabled = shareOut;
+  }
+
+  /* 👀 watch — only on a competition, and blockIsCompetition answers false
+     for a watch block, so a block that is already somebody else's meet cannot
+     be passed on again. */
+  const watchBtn = document.getElementById('watchSisterBtn');
+  if (watchBtn) {
+    const canWatch = isKid && blockIsCompetition(block);
+    const watchOut = canWatch && !!sisterInviteFor(block.id, sister, 'watch');
+    watchBtn.style.display = canWatch ? 'block' : 'none';
+    watchBtn.textContent = watchOut ? `👀 ${sisterName} is invited to watch` : `👀 Invite ${sisterName} to watch`;
+    watchBtn.disabled = watchOut;
   }
 
   openSheet('editOverlay');

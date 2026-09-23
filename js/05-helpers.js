@@ -725,10 +725,18 @@ function blockDisplayName(b, p=activeProfile(), dayKey) {
      meet read "Skating Comp." and the one thing that told two of them apart
      lived only in a note. */
   const named = act.isCompetition && b && typeof b.compName === 'string' && b.compName.trim();
-  const name = named ? b.compName.trim()
+  /* A sister who came to WATCH is not in the meet, and her card must not say
+     she is. This reads act.isCompetition rather than blockIsCompetition — which
+     now answers false for a watch block on purpose — so it is the one surface
+     that still has to ask the question itself, and that is why it is asked
+     here first. A meet nobody named falls back to what the block is, so it
+     reads "👀 Watching — Skating Comp." rather than trailing off after a dash. */
+  const watching = b && b.watching;
+  const meetName = named ? b.compName.trim()
     : topic
       ? (act.isCompetition ? (topic.id === 'general' ? 'Competition' : topic.name + ' Comp.') : topic.name)
       : (act.name || 'Something');
+  const name = watching ? `👀 Watching — ${meetName}` : meetName;
   if (!dayKey) return { icon, name, n: 0, of: 1 };
   const key = blockGroupKey(b);
   const sameThing = (getDayBlocks(dayKey, p) || [])

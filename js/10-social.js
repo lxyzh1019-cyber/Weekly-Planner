@@ -114,7 +114,7 @@ function renderSync() {
       if (isMe) {
         mini.style.cursor='pointer';
         mini.title = 'Tap to invite your sister';
-        mini.onclick = ()=>sendInvite(b, p==='jenn'?'jess':'jenn');
+        mini.onclick = ()=>sendInvite(b, p==='jenn'?'jess':'jenn', key);
       }
       col.appendChild(mini);
     });
@@ -125,23 +125,90 @@ function renderSync() {
   renderInvites();
 }
 
-async function sendInvite(block, to) {
+/* IS THERE ALREADY ONE OF THESE? The one owner of that question.
+
+   Returns the LIVE invite — pending or accepted — from this block to this
+   sister of this kind ('watch' when inv.watch, else 'share'), or null. A
+   declined invite is not live: plans change, and a no on Tuesday is not a no
+   for ever. The two kinds are separate questions, because asking her to come
+   and watch is not the same as asking her to do it too.
+
+   sendInvite refuses a live duplicate through this, and both edit-sheet
+   buttons read their sent-state from it. `invitedTo` on the block is the 💌
+   badge on the inviter's timeline and nothing else — it is a bare list of
+   names and cannot tell a share from a watch. */
+function sisterInviteFor(blockId, to, kind) {
+  return (state.shared.invites || []).find(inv => inv
+    && inv.sourceBlockId === blockId && inv.to === to
+    && (inv.watch ? 'watch' : 'share') === kind
+    && (inv.status === 'pending' || inv.status === 'accepted')) || null;
+}
+
+/* `opts.watch` turns this into an invitation to COME AND WATCH rather than to
+   do the same thing at the same time. Everything else is the existing
+   mechanism, untouched: an options argument that defaults to {} leaves the
+   call sites that pass none sending a plain invite, exactly as before.
+
+   THE ONE WRITER of an invite. Sister Sync's tap, the edit sheet's 💌 and its
+   👀 all come through here, so the duplicate guard below holds for every door.
+
+   `day` is the day the block is on, and the CALLER says which: Sister Sync
+   passes the day it is showing, the edit sheet the day it is editing. It used
+   to be read here as `currentDayKey || <the Sync day>`, but currentDayKey is
+   left behind by any day-view visit and never cleared — so a tap on
+   Thursday's block in Sister Sync, after Monday had been opened, was dated
+   Monday, missed the 💌 stamp and landed on her sister's Monday. No day, no
+   invite: it refuses rather than guess. */
+async function sendInvite(block, to, day, opts = {}) {
+  if (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    showToast('Could not tell which day this is — nothing was sent.');
+    return;
+  }
+  const watch = !!opts.watch;
+  /* WHOSE invite this is. It was `profile`, which is the literal switch
+     position and reads 'parent' when a grown-up is looking at Jenn's day — so
+     an invite sent from the edit sheet in the parent portal would have been
+     recorded as coming from nobody. activeProfile() is the child whose plan
+     this is, and for a kid the two are the same value, so the existing Sister
+     Sync path (which is kid-only anyway) is unchanged. */
+  const from = activeProfile();
   const sisterName = to==='jenn'?'Jenn':'Jess';
-  const act = findActivity(block.actId, profile) || findActivity(block.actId);
+  /* Refused before the dialog, so she is never asked to confirm something that
+     will not happen — and told which state it is in, not just "no". */
+  const already = sisterInviteFor(block.id, to, watch ? 'watch' : 'share');
+  if (already) {
+    showToast(already.status === 'accepted'
+      ? (watch ? `${sisterName} already said yes to watching — it's on her plan`
+               : `It's already on ${sisterName}'s plan`)
+      : (watch ? `${sisterName} is already invited to watch — she hasn't answered yet`
+               : `${sisterName} already has this invite — she hasn't answered yet`));
+    return;
+  }
+  const act = findActivity(block.actId, from) || findActivity(block.actId);
   const receiverAct = findActivity(block.actId, to);
   if (!receiverAct) {
     showToast(`${sisterName} cannot receive this activity yet.`);
     return;
   }
   const activityLabel = act ? `${act.icon} ${act.name}` : 'this activity';
-  const day = currentDayKey || getDayKeys(weekOffset)[syncDayIdx];
   const dayDate = formatDayKey(day);
   const dayIdx = (dayDate.getDay()+6)%7;
-  const ok = await showConfirm(`Share ${activityLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(block.startMin)} with ${sisterName}?`, { okLabel:'Share' });
+  /* The MEET, not just the activity. "Share 🏆 Competition" is every meet this
+     season, and a child being asked to give up a Saturday deserves to know
+     which one. Falls back to whatever the card already calls it. */
+  const meetLabel = (block.compName && String(block.compName).trim())
+    || (typeof blockDisplayName === 'function' ? blockDisplayName(block, from).name : '')
+    || activityLabel;
+  const ok = await showConfirm(
+    watch
+      ? `Invite ${sisterName} to come and watch ${meetLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(block.startMin)}?\n\n`
+        + 'It goes on her plan as something she is watching. She earns nothing for it — it is your meet, not hers.'
+      : `Share ${activityLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(block.startMin)} with ${sisterName}?`,
+    { okLabel: watch ? 'Invite her' : 'Share' });
   if (!ok) return;
   const inv = {
     id: 'inv-'+Date.now().toString(36),
-    from: profile,
+    from,
     to,
     actId: block.actId,
     day,
@@ -151,10 +218,15 @@ async function sendInvite(block, to) {
     createdAt: syncNow(),
     sourceBlockId: block.id,
   };
+  if (watch) {
+    inv.watch = true;
+    inv.compName = (block.compName && String(block.compName).trim()) || null;
+    inv.tag = block.tag || null;
+  }
   state.shared.invites = [...(state.shared.invites||[]), inv];
   // Stamp invitedTo on the source block so the inviter sees the 💌 badge on their own timeline.
-  // Find the block in its actual day store (it may not be currentDayKey in sync-screen flow).
-  const sourceProfile = profile; // sender
+  // Find the block in its actual day store — the day the caller passed.
+  const sourceProfile = from; // sender
   const blocks = ((state.profiles[sourceProfile]||{}).weeks||{})[day] || [];
   const src = blocks.find(b => b.id === block.id);
   if (src) {
@@ -230,26 +302,50 @@ function renderChallenges() {
   }
 }
 
+/* THE INBOX'S OWN QUESTION AND ITS OWN WORDS, shared with Today's 💌 note
+   (tdInviteNote, js/31-today.js) so the signpost and the inbox cannot drift:
+   the note counts exactly what this list shows, and names each invite with the
+   same who / what / day / time and the same fallbacks. */
+function invitesWaitingFor(p) {
+  return (state.shared.invites || []).filter(i => i && i.to === p && i.status === 'pending');
+}
+/* Plain text; each surface escapes it where it lands. A watch invite's subject
+   is the MEET, not the activity — accepting "Competition" and finding out on
+   Saturday that it is somebody else's is not an invitation anybody agreed to. */
+function inviteFacts(inv) {
+  const act = getAllActivities(inv.to, { includeArchived: true }).find(a => a.id === inv.actId);
+  const d = formatDayKey(inv.day);
+  return {
+    from: inv.from === 'jenn' ? 'Jenn' : 'Jess',
+    subject: inv.watch
+      ? ((inv.compName || '').trim() || (act?.name || 'her competition'))
+      : (act ? `${act.icon} ${act.name}` : 'an activity'),
+    day: DAY_SHORT[(d.getDay() + 6) % 7],
+    time: formatTimeFromMin(inv.startMin),
+  };
+}
+
 // Activity-sharing invites — task sharing, so they live under Sister Sync.
+// THE inbox: Today only signposts it (tdInviteNote); accept and decline live here.
 function renderInvites() {
   const inviteList = document.getElementById('invitesList');
   if (!inviteList) return;
   inviteList.innerHTML = '';
-  const myInvites = (state.shared.invites||[]).filter(i=>i.to===profile && i.status==='pending');
+  const myInvites = invitesWaitingFor(profile);
   if (!myInvites.length) {
     inviteList.innerHTML = '<p style="color:var(--ink-light);font-size:0.95rem">No invites right now. Tap one of your own activities above to invite your sister.</p>';
     return;
   }
-  const acts = getAllActivities(activeProfile(), { includeArchived: true });
   myInvites.forEach(inv=>{
-    const act = acts.find(a=>a.id===inv.actId);
-    const d = formatDayKey(inv.day);
-    const tStr = formatTimeFromMin(inv.startMin);
+    const f = inviteFacts(inv);
     const el = document.createElement('div');
     el.className = 'invite-item';
+    const what = inv.watch
+      ? `👀 come and watch <b>${escapeHtml(f.subject)}</b>`
+      : `<b>${escapeHtml(f.subject)}</b>`;
     el.innerHTML = `
-      <div>💌 <b>${inv.from==='jenn'?'Jenn':'Jess'}</b> invited you to<br>
-      <b>${act?.icon} ${escapeHtml(act?.name)}</b> on ${DAY_SHORT[(d.getDay()+6)%7]} at ${tStr}</div>
+      <div>💌 <b>${escapeHtml(f.from)}</b> invited you to<br>
+      ${what} on ${escapeHtml(f.day)} at ${escapeHtml(f.time)}</div>
       <div class="invite-actions">
         <button class="pill-btn" onclick="acceptInvite('${escapeJsAttr(inv.id)}')">✅ Accept</button>
         <button class="pill-btn" onclick="declineInvite('${escapeJsAttr(inv.id)}')">❌ Decline</button>
@@ -296,7 +392,10 @@ function deleteChallenge(id) {
 }
 function acceptInvite(id) {
   const inv = (state.shared.invites||[]).find(i=>i.id===id);
-  if (!inv) return;
+  /* Only a PENDING invite can be answered. A double-tap on ✅ Accept used to
+     push a second block onto her day. Anything else returns quietly, and the
+     list is redrawn so a stale row goes away. */
+  if (!inv || inv.status !== 'pending') { refreshInvitesUI(); return; }
   const receiverAct = findActivity(inv.actId, profile);
   if (!receiverAct) {
     inv.status = 'declined';
@@ -310,19 +409,39 @@ function acceptInvite(id) {
   markItemUpdated(inv);
   // Place a matching block in this profile's schedule
   const blocks = getDayBlocks(inv.day, profile);
-  blocks.push({
+  const placed = {
     id: Date.now().toString(36)+Math.random().toString(36).slice(2,5),
     actId: inv.actId, startMin: inv.startMin, durationMin: inv.durationMin,
     colour: CAT_HEX.free, objectives:[], note:`With ${inv.from==='jenn'?'Jenn':'Jess'} 💕`, tag:null,
     checklistState: {}, travelBuffer: false,
-  });
+  };
+  /* A WATCH INVITE IS A DIFFERENT KIND OF BLOCK, and only this branch touches
+     it — the plain path above is the one mechanism that already puts an event
+     on both calendars and it stays exactly as it was.
+
+     `watching` is what makes blockIsCompetition answer false, which is the
+     whole guard: no result is ever asked of her, nothing is adopted as the
+     meet's own block, and nothing reaches the money tab. She keeps the meet's
+     name and tag so her card can say which meet it is, and she travels there —
+     but there is no warm-up, because she is not competing. */
+  if (inv.watch) {
+    placed.watching = true;
+    placed.compName = inv.compName || null;
+    placed.tag = inv.tag || null;
+    placed.note = `Watching ${inv.from==='jenn'?'Jenn':'Jess'} 👀`;
+    placed.travelBuffer = true;
+    placed.travelBufMin = DEFAULT_BUFFER_MIN;
+    placed.warmupBuffer = false;
+  }
+  blocks.push(placed);
   setDayBlocks(inv.day, blocks, profile);
   refreshInvitesUI();
   showToast('Added to your plan! 💕');
 }
 function declineInvite(id) {
   const inv = (state.shared.invites||[]).find(i=>i.id===id);
-  if (!inv) return;
+  // Same guard as acceptInvite: declining an accepted invite changes nothing.
+  if (!inv || inv.status !== 'pending') { refreshInvitesUI(); return; }
   inv.status = 'declined';
   markItemUpdated(inv);
   saveAll();
