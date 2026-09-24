@@ -8525,6 +8525,212 @@ function findChromium() {
     return problems.length ? problems : true;
   });
 
+  /* ── SISTER SYNC IS A TIMELINE ────────────────────────────────────
+     Sister Sync drew each block as a text chip with only its start time, so a
+     two-hour lesson and a ten-minute snack looked the same, and "you're both
+     free" ignored travel, getting ready and school — and looked the sister's
+     activities up in the wrong profile's list, so her own custom free time
+     counted as busy. Now it is one side-by-side timeline, to scale on one axis,
+     with a "both free" stripe between the columns; the sentence and the stripe
+     read one owner, syncBusyMinutes(profile, dayKey).
+
+     A school day is forced through the family's own calendar (restored after),
+     so this does not depend on the week the suite happens to run in. Measured
+     at a phone width, where the 13px floor is hardest to keep. */
+  await page.setViewportSize({ width: 390, height: 844 });
+  if (want('sisterSyncIsATimeline')) checks.sisterSyncIsATimeline = await page.evaluate(async () => {
+    const problems = [];
+    const unpin = pinClockToWeekday(0); // Monday: every later day of this week is ahead
+    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
+    const wasOffset = weekOffset, wasSyncIdx = syncDayIdx;
+    const wasInvites = state.shared.invites;
+    const hadCal = Object.prototype.hasOwnProperty.call(state.shared, 'schoolCal'), wasCal = state.shared.schoolCal;
+    const hadVis = Object.prototype.hasOwnProperty.call(state.shared, 'sisterVisibilityMode'), wasVis = state.shared.sisterVisibilityMode;
+    const jessPd = getProfData('jess');
+    const wasJessCustom = jessPd.customActivities;
+    const wasScreen = (document.querySelector('.screen.active') || {}).id || 'screen-today';
+    const keys = getDayKeys(0);
+    const savedJenn = keys.map(k => getDayBlocks(k, 'jenn'));
+    const savedJess = keys.map(k => getDayBlocks(k, 'jess'));
+    const base = { objectives: [], checklistState: {}, gearState: {} };
+    const rel = (h, m = 0) => h * 60 + m - START_MIN;
+    try {
+      state.shared.invites = [];
+      keys.forEach(k => { setDayBlocks(k, [], 'jenn'); setDayBlocks(k, [], 'jess'); });
+      // The whole week is term; school 8:30am–3:00pm on weekdays.
+      state.shared.schoolCal = { ...(wasCal || {}), termStart: keys[0], termEnd: keys[6], nextStart: '2999-12-31',
+        offDays: [], hours: { startMin: rel(8, 30), endMin: rel(15), days: [1, 2, 3, 4, 5] } };
+      const dIdx = [1, 2, 3, 4].find(i => isSchoolDay(keys[i]));
+      if (dIdx == null) { problems.push('fixture: no school day could be made this week'); return problems; }
+      const day = keys[dIdx];
+      // Busy for the stripe: the sister's details are on, but her block is private.
+      state.shared.sisterVisibilityMode = 'public';
+      jessPd.customActivities = [...(wasJessCustom || []),
+        { id: 'tl-fort', name: 'Fort building', icon: '🏰', cat: 'free', durationMin: 60 }];
+      // Jenn: Reading 4:00–5:30pm, 10m get-ready + 20m drive each side → busy 3:30–6:00pm.
+      const reading = { ...base, id: 'tl-read', actId: 'reading', startMin: 16 * 60, durationMin: 90,
+        travelBuffer: true, travelBufMin: 20, getReadyBuffer: true, getReadyBufMin: 10 };
+      // Jess: a private hour of piano at 4:00pm, and her OWN free activity 7–8pm.
+      const piano = { ...base, id: 'tl-piano', actId: 'piano', startMin: 16 * 60, durationMin: 60 };
+      const fort = { ...base, id: 'tl-fort-b', actId: 'tl-fort', startMin: 19 * 60, durationMin: 60 };
+      /* Jenn: a SHORT half hour of piano at 8:30pm, shared for another day and
+         dragged here since (sentInviteIds, as moveBlockToDay writes it) — the
+         case where a to-scale card is too small to tap or to say "Send again?". */
+      const otherDay = keys[(dIdx + 2) % 7];
+      state.shared.invites = [{ id: 'tl-inv-old', from: 'jenn', to: 'jess', status: 'pending', day: otherDay,
+        actId: 'piano', startMin: 20 * 60 + 30, durationMin: 30, sourceBlockId: 'tl-short-was' }];
+      const short = { ...base, id: 'tl-short', actId: 'piano', startMin: 20 * 60 + 30, durationMin: 30,
+        invitedTo: ['jess'], sentInviteIds: ['tl-inv-old'] };
+      setDayBlocks(day, [reading, short], 'jenn');
+      setDayBlocks(day, [piano, fort], 'jess');
+
+      profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
+      showScreen('sync'); syncDayIdx = dIdx; renderSync();
+      await new Promise(r => setTimeout(r, 60));
+
+      const px = typeof SYNC_PX_PER_MIN === 'number' ? SYNC_PX_PER_MIN : null;
+      if (!px) problems.push('Sister Sync has no timeline scale (SYNC_PX_PER_MIN) — it is still a list of chips');
+      const cols = [...document.querySelectorAll('#syncGrid .sync-day-col')];
+      if (cols.length !== 2) problems.push(`Sister Sync draws ${cols.length} sister columns, not 2`);
+      const first = document.querySelector('#syncGrid .sync-day-col:first-child');
+      if (!first || !/Jenn/.test(first.textContent || '')) problems.push('Jenn’s column is not the first one');
+      const jennCol = cols.find(c => /Jenn/.test((c.querySelector('h4') || {}).textContent || ''));
+      const jessCol = cols.find(c => /Jess/.test((c.querySelector('h4') || {}).textContent || ''));
+      const shapeIn = (col, re) => col && [...col.querySelectorAll('.sync-block, .sync-block-mini')].find(el => re.test(el.textContent || ''));
+      const readEl = shapeIn(jennCol, /Reading/);
+      const busyEl = shapeIn(jessCol, /Busy/);
+      const shortEl = shapeIn(jennCol, /Piano/);
+
+      // ── Her own blocks are the invite control: every one is a 44px-tall target.
+      const mine = [...document.querySelectorAll('#syncGrid .sync-block-mini')];
+      if (!mine.length) problems.push('none of Jenn’s blocks is drawn as a tappable .sync-block-mini');
+      const low = mine.filter(el => el.getBoundingClientRect().height < 43.5)
+        .map(el => `${(el.textContent || '').trim().slice(0, 16)}@${Math.round(el.getBoundingClientRect().height)}px`);
+      if (low.length) problems.push(`tap targets under 44px tall: ${low.join(', ')}`);
+      if (mine.some(el => el.closest('.sync-day-col') !== jennCol)) problems.push('a block in Jess’s column is drawn as Jenn’s tappable invite control');
+
+      // ── A moved shared block says so where she can see it, however short.
+      if (!shortEl) problems.push('Jenn’s short Piano block is not drawn');
+      else {
+        const box = shortEl.getBoundingClientRect();
+        const seen = [...shortEl.querySelectorAll('*')].some(el => {
+          const r = el.getBoundingClientRect(), s = getComputedStyle(el);
+          return /💌/.test(el.textContent || '') && /Send again/.test(el.textContent || '')
+            && s.visibility !== 'hidden' && r.width > 2 && r.height > 2
+            && r.top >= box.top - 0.5 && r.bottom <= box.bottom + 0.5;
+        });
+        if (!seen) problems.push('a short moved block does not show "💌 … Send again?" inside its visible card — it is clipped or missing');
+        if (!(shortEl.textContent || '').includes(inviteMovedWords(state.shared.invites[0], day, '💌'))) {
+          problems.push('the moved block lost the full "Sent for … — you moved it to … · Send again?" sentence');
+        }
+      }
+
+      // ── To scale, on one axis.
+      if (!readEl) problems.push('Jenn’s Reading is not drawn in her column');
+      if (!busyEl) problems.push('Jess’s private piano is not drawn as a Busy shape');
+      if (readEl && busyEl && px) {
+        const r1 = readEl.getBoundingClientRect(), r2 = busyEl.getBoundingClientRect();
+        if (Math.abs(r1.height - 90 * px) > 2) problems.push(`a 90-minute block is ${Math.round(r1.height)}px tall, expected ${Math.round(90 * px)}px`);
+        if (Math.abs(r2.height - 60 * px) > 2) problems.push(`a 60-minute Busy shape is ${Math.round(r2.height)}px tall, expected ${Math.round(60 * px)}px — busy time must keep its real height`);
+        if (Math.abs(r1.top - r2.top) > 1.5) problems.push(`two 4:00pm blocks sit at different heights (${Math.round(r1.top)} vs ${Math.round(r2.top)}) — the columns are not on one axis`);
+        const canvas = readEl.parentElement.getBoundingClientRect();
+        const want4pm = rel(16) * px;
+        if (Math.abs((r1.top - canvas.top) - want4pm) > 2) problems.push(`4:00pm is drawn ${Math.round(r1.top - canvas.top)}px down the day, expected ${Math.round(want4pm)}px`);
+      }
+
+      // ── Privacy: grey, says Busy, never names it.
+      if (busyEl) {
+        if (/Piano/.test(busyEl.textContent || '')) problems.push('Jess’s private block shows its name to her sister');
+        const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(getComputedStyle(busyEl).backgroundColor) || [];
+        if (!(m[1] && m[1] === m[2] && m[2] === m[3])) problems.push(`the Busy shape is not grey (${getComputedStyle(busyEl).backgroundColor})`);
+        if (busyEl.onclick) problems.push('a sister’s Busy shape can be tapped');
+      }
+
+      // ── One owner of busy time, each sister's own activities.
+      if (typeof syncBusyMinutes !== 'function') problems.push('there is no syncBusyMinutes(profile, dayKey)');
+      else {
+        const jb = syncBusyMinutes('jenn', day), sb = syncBusyMinutes('jess', day);
+        [[rel(10), 'school at 10:00am'], [rel(15, 35), 'getting ready at 3:35pm'], [rel(15, 50), 'the drive at 3:50pm'],
+         [rel(17), 'Reading at 5:00pm'], [rel(17, 55), 'getting home at 5:55pm']].forEach(([m, what]) => {
+          if (!jb[m]) problems.push(`syncBusyMinutes says Jenn is free during ${what}`);
+        });
+        if (jb[rel(18, 5)]) problems.push('syncBusyMinutes keeps Jenn busy after she is home');
+        if (sb[rel(19, 30)]) problems.push('Jess’s own custom free activity counts as busy — looked up in the wrong sister’s list');
+        if (!sb[rel(16, 30)]) problems.push('Jess’s private piano does not count as busy');
+      }
+
+      // ── The both-free stripe: green where neither is busy, nowhere else.
+      const track = document.querySelector('#syncGrid .sync-tl-stripe-track');
+      const segs = [...document.querySelectorAll('#syncGrid .sync-free-seg')];
+      if (!track || !segs.length || !px) problems.push('there is no both-free stripe between the columns');
+      else {
+        const t0 = track.getBoundingClientRect().top;
+        const runs = segs.map(el => {
+          const r = el.getBoundingClientRect();
+          return [Math.round((r.top - t0) / px), Math.round((r.bottom - t0) / px)];
+        });
+        const freeAt = (m) => runs.some(([a, b]) => m >= a && m < b);
+        [[rel(10), 'school hours'], [rel(15, 35), 'Jenn’s get-ready'], [rel(15, 50), 'Jenn’s drive'],
+         [rel(17, 50), 'Jenn’s drive home'], [rel(16, 30), 'both sisters’ 4pm']].forEach(([m, what]) => {
+          if (freeAt(m)) problems.push(`the both-free stripe is green during ${what}`);
+        });
+        [[rel(7), 'before school'], [rel(15, 15), 'after the bell'], [rel(19, 30), 'Jess’s own free activity'], [rel(21), 'the evening']].forEach(([m, what]) => {
+          if (!freeAt(m)) problems.push(`the both-free stripe is not green ${what}`);
+        });
+        if (freeAt(rel(20, 45))) problems.push('the both-free stripe is green during Jenn’s 8:30pm piano');
+        const total = runs.reduce((s, [a, b]) => s + (b - a), 0);
+        // 6:00–8:30, 3:00–3:30, 6:00–8:30pm and 9:00–10pm. The stripe is the
+        // real time: a card drawn taller to be tappable does not change it.
+        if (Math.abs(total - 390) > 2) problems.push(`the stripe shows ${total} free minutes, expected 390`);
+        const said = (document.querySelector('#syncOverlapWrap .sync-overlap b') || {}).textContent || '';
+        if (said !== fmtHrsMin(390)) problems.push(`the sentence says "${said}" free, the stripe ${fmtHrsMin(390)} — they read different owners`);
+      }
+
+      // ── No text under 13px on this screen at 390px, and nothing runs off the side.
+      let minFont = 99, where = '';
+      document.querySelectorAll('#screen-sync *').forEach(el => {
+        const s = getComputedStyle(el);
+        if (s.display === 'none' || s.visibility === 'hidden') return;
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        if (![...el.childNodes].some(c => c.nodeType === 3 && c.textContent.trim())) return;
+        const f = parseFloat(s.fontSize);
+        if (f < minFont) { minFont = f; where = (el.className || el.tagName).toString().slice(0, 40); }
+      });
+      if (minFont < 13) problems.push(`text at ${minFont}px on .${where} (the floor is 13px)`);
+      if (document.body.scrollWidth > window.innerWidth + 1) problems.push(`Sister Sync scrolls sideways at ${window.innerWidth}px (${document.body.scrollWidth})`);
+
+      // ── Tapping her own block still invites her sister, for the day shown.
+      if (readEl) {
+        readEl.click();
+        await new Promise(r => setTimeout(r, 40));
+        const ok = document.getElementById('appDialogOkBtn');
+        if (!document.querySelector('#appDialogOverlay.open') || !ok) problems.push('tapping her own block did not ask to invite her sister');
+        else {
+          ok.click();
+          await new Promise(r => setTimeout(r, 40));
+          const inv = (state.shared.invites || []).find(i => i && i.sourceBlockId === reading.id && i.to === 'jess');
+          if (!inv) problems.push('tapping her own block sent no invite');
+          else if (inv.day !== day) problems.push(`the invite is dated ${inv.day}, not the day shown (${day})`);
+        }
+      }
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      unpin();
+      state.shared.invites = wasInvites;
+      if (hadCal) state.shared.schoolCal = wasCal; else delete state.shared.schoolCal;
+      if (hadVis) state.shared.sisterVisibilityMode = wasVis; else delete state.shared.sisterVisibilityMode;
+      jessPd.customActivities = wasJessCustom;
+      keys.forEach((k, i) => { setDayBlocks(k, savedJenn[i], 'jenn'); setDayBlocks(k, savedJess[i], 'jess'); });
+      profile = wasProfile; parentViewing = wasViewing;
+      currentDayKey = wasDayKey; weekOffset = wasOffset; syncDayIdx = wasSyncIdx;
+      showScreen(wasScreen.replace(/^screen-/, ''));
+    }
+    return problems.length ? problems : true;
+  });
+  await page.setViewportSize({ width: 900, height: 1100 });
+
   /* ── THE SYSTEM DID NOT BEGIN TODAY ───────────────────────────────
      Three stores answered "when did this family start", and every one of them
      SEEDED ITSELF to the current Monday the first time anything read it. On a

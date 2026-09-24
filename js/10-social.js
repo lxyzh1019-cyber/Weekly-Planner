@@ -3,6 +3,20 @@
 /* ════════════════════════════════════════════════════════════════
    SISTER SYNC
 ════════════════════════════════════════════════════════════════ */
+/* The timeline's scale: 0.6px a minute, so the 6am–10pm day is 576px — one
+   screen on an iPad, a short scroll on a phone. A card shorter than
+   SYNC_CARD_MIN_PX (about 33 minutes) borrows the empty minutes above it
+   (wfCardBoxes), so its bottom edge — when it ends — stays true; your OWN
+   blocks, which are the tap that invites her, are floored at SYNC_TAP_MIN_PX
+   (44px, the house target) the same way. The start–end time is printed from
+   SYNC_TIME_ROOM_PX up, one SYNC_LINE_PX line more when a "💌 Send again?"
+   takes the second line. A sister's private block is SYNC_BUSY_GREY. */
+const SYNC_PX_PER_MIN = 0.6;
+const SYNC_CARD_MIN_PX = 20;
+const SYNC_TAP_MIN_PX = 44;
+const SYNC_TIME_ROOM_PX = 36;
+const SYNC_LINE_PX = 15;
+const SYNC_BUSY_GREY = '#cfcfcf';
 function openSisterSync() {
   if (isParent()) { showToast('View each child separately 👀'); return; }
   /* Today, not Monday. This opened on syncDayIdx = 0 unconditionally while the
@@ -23,44 +37,18 @@ function renderSync() {
   const d = formatDayKey(key);
   document.getElementById('syncDayLabel').textContent = `${DAY_LONG[syncDayIdx]}, ${MONTH_SHORT[d.getMonth()]} ${d.getDate()}`;
 
-  const jB = getDayBlocks(key, 'jenn');
-  const sB = getDayBlocks(key, 'jess');
-
-  // Overlaps — genuine "you're both free" time: any 15-min slot in the
-  // 6am–9pm window that is either unscheduled or a Free-category block for
-  // BOTH girls. (Previously it only counted explicit Free blocks, so two
-  // kids who simply left time open never saw an overlap.)
+  // Overlaps — genuine "you're both free" time: every minute of the 6am–10pm
+  // window that neither sister is busy, as syncBusyMinutes counts it (blocks,
+  // their travel and get-ready, school hours; free-category blocks are free).
+  // The stripe between the two columns draws the same runs.
   const overlapWrap = document.getElementById('syncOverlapWrap');
   overlapWrap.innerHTML = '';
-  const acts = getAllActivities(activeProfile(), { includeArchived: true });
-  const TOTAL = Math.round(DAY_MIN_SPAN / 15);
-  const busySlots = (blocks) => {
-    const busy = new Set();
-    blocks.forEach(b => {
-      const a = acts.find(x => x.id === b.actId);
-      if (a && a.cat === 'free') return;      // free time = still available to hang out
-      const s = Math.floor((b.startMin - START_MIN) / 15);
-      const e = Math.ceil((b.startMin - START_MIN + (b.durationMin || 0)) / 15);
-      for (let i = Math.max(0, s); i < Math.min(TOTAL, e); i++) busy.add(i);
-    });
-    return busy;
-  };
-  const jBusy = busySlots(jB), sBusy = busySlots(sB);
-  const freeSlots = [];
-  for (let i = 0; i < TOTAL; i++) if (!jBusy.has(i) && !sBusy.has(i)) freeSlots.push(i);
-  if (freeSlots.length) {
-    // Collapse contiguous slots into readable time ranges (show the first few).
-    const ranges = [];
-    let runStart = freeSlots[0], prev = freeSlots[0];
-    for (let k = 1; k <= freeSlots.length; k++) {
-      if (k < freeSlots.length && freeSlots[k] === prev + 1) { prev = freeSlots[k]; continue; }
-      ranges.push([runStart, prev + 1]);
-      if (k < freeSlots.length) { runStart = freeSlots[k]; prev = freeSlots[k]; }
-    }
+  const freeRuns = syncFreeRuns(syncBusyMinutes('jenn', key), syncBusyMinutes('jess', key));
+  const totalMin = freeRuns.reduce((sum, [a, b]) => sum + (b - a), 0);
+  if (totalMin) {
     // Only surface reasonably-sized windows (≥30 min) as hang-out suggestions.
-    const windows = ranges.filter(([a, b]) => (b - a) * 15 >= 30)
-      .map(([a, b]) => `${formatTimeFromMin(START_MIN + a*15)}–${formatTimeFromMin(START_MIN + b*15)}`);
-    const totalMin = freeSlots.length * 15;
+    const windows = freeRuns.filter(([a, b]) => b - a >= 30)
+      .map(([a, b]) => `${formatTimeFromMin(START_MIN + a)}–${formatTimeFromMin(START_MIN + b)}`);
     const overlap = document.createElement('div');
     overlap.className = 'sync-overlap';
     /* "today" was hardcoded, which was wrong on every day the arrows moved to
@@ -72,7 +60,7 @@ function renderSync() {
     overlapWrap.appendChild(overlap);
   }
 
-  // Side-by-side
+  // Side-by-side timeline
   const grid = document.getElementById('syncGrid');
   const showAll = sisterDetailsVisibleGlobal();
   const toggleWrap = document.createElement('div');
@@ -85,52 +73,243 @@ function renderSync() {
   `;
   toggleWrap.onclick = ()=>setSisterDetailsVisibleGlobal(!showAll);
   overlapWrap.appendChild(toggleWrap);
+  /* DOM order is Jenn, Jess, stripe, gutter, legend: the invite checks select
+     `#syncGrid .sync-day-col:first-child`, so Jenn's column is the grid's first
+     child, and css/app.css places the tracks as gutter | Jenn | stripe | Jess. */
   grid.innerHTML = '';
-  [['jenn','🐥 Jenn',jB], ['jess','🦊 Jess',sB]].forEach(([p, lbl, blocks])=>{
-    const col = document.createElement('div');
-    col.className = 'sync-day-col';
-    col.innerHTML = `<h4>${lbl}</h4>`;
-    if (!blocks.length) col.innerHTML += '<p style="font-size:0.8rem;color:var(--ink-light)">Nothing planned</p>';
-    const acts = getAllActivities(p, { includeArchived: true });
-    const isMe = (p === profile);
-    blocks.slice().sort((a,b)=>a.startMin-b.startMin).forEach(b=>{
-      const act = acts.find(a=>a.id===b.actId);
-      if (!act) return;
-      const tStr = formatTimeFromMin(b.startMin);
-      const mini = document.createElement('div');
-      mini.className = 'sync-block-mini';
-      // Sister's private blocks: show time+"Busy" only. Public blocks show details.
-      const showDetails = isMe || (showAll && !!b.public);
-      if (showDetails) {
-        // One owner, so a sister's day is not drawn in a retired hue.
-        mini.style.background = blockColour(b, p);
-        mini.style.color = '#fff';
-        mini.textContent = `${tStr} ${act.icon} ${act.name}`;
-      } else {
-        mini.style.background = '#cfcfcf';
-        mini.style.color = '#555';
-        mini.textContent = `${tStr} • Busy`;
-      }
-      if (isMe) {
-        /* Sent for another day and dragged since: say so, and the tap sends again. */
-        const sent = sisterInviteFor(b, p==='jenn'?'jess':'jenn', 'share', key);
-        if (sent && !inviteCoversDay(sent, key)) {
-          const moved = document.createElement('span');
-          moved.style.display = 'block';
-          moved.textContent = inviteMovedWords(sent, key, '💌');
-          mini.appendChild(moved);
-        }
-        mini.style.cursor='pointer';
-        mini.title = 'Tap to invite your sister';
-        mini.onclick = ()=>sendInvite(b, p==='jenn'?'jess':'jenn', key);
-      }
-      col.appendChild(mini);
-    });
-    grid.appendChild(col);
-  });
+  grid.appendChild(syncSisterColumn('jenn', '🐥 Jenn', key, showAll, 'left'));
+  grid.appendChild(syncSisterColumn('jess', '🦊 Jess', key, showAll, 'right'));
+  grid.appendChild(syncFreeStripe(freeRuns));
+  grid.appendChild(syncHourGutter());
+  const legend = document.createElement('p');
+  legend.className = 'sync-tl-legend';
+  legend.textContent = 'Green line in the middle: you’re both free. Striped: getting ready or travelling.';
+  grid.appendChild(legend);
 
   renderChallenges();
   renderInvites();
+}
+
+/* WHEN IS THIS SISTER BUSY — the one owner, read by the "both free" sentence
+   and the stripe between the columns.
+
+   Returns one boolean per minute of the drawn day (index 0 = START_MIN,
+   length DAY_MIN_SPAN). Busy is: each block, plus its travel, get-ready and
+   warm-up (wfBufferSegments — the strips the timeline draws), plus school
+   hours on a school day (dayZoneSegments, the shared school calendar, so both
+   girls have the same hours). A free-category block is not busy — free time is
+   time she can hang out — and neither are its buffers. The activity is looked
+   up in THIS sister's own list (findActivity(…, p)); the old count used the
+   active profile's list for both, so a sister's own custom free activity read
+   as busy. An activity nobody can name counts as busy. */
+function syncBusyMinutes(p, dayKey) {
+  const busy = new Array(DAY_MIN_SPAN).fill(false);
+  const mark = (from, to) => {
+    for (let m = Math.max(0, Math.floor(from)); m < Math.min(DAY_MIN_SPAN, Math.ceil(to)); m++) busy[m] = true;
+  };
+  getDayBlocks(dayKey, p).forEach(b => {
+    if (!b) return;
+    const act = findActivity(b.actId, p);
+    if (act && act.cat === 'free') return;
+    const rel = b.startMin - START_MIN;
+    mark(rel, rel + Math.max(0, b.durationMin || 0));
+    wfBufferSegments(b).forEach(seg => mark(seg.startRel, seg.endRel));
+  });
+  if (isSchoolDay(dayKey)) {
+    dayZoneSegments(dayKey).forEach(z => {
+      if (z.cls === 'tl-band-school' || z.cls === 'tl-band-lunch') mark(z.start, z.end);
+    });
+  }
+  return busy;
+}
+/* The runs of minutes neither is busy, as [start, end) offsets from START_MIN. */
+function syncFreeRuns(busyA, busyB) {
+  const runs = [];
+  let start = -1;
+  for (let m = 0; m <= DAY_MIN_SPAN; m++) {
+    const free = m < DAY_MIN_SPAN && !busyA[m] && !busyB[m];
+    if (free && start < 0) start = m;
+    if (!free && start >= 0) { runs.push([start, m]); start = -1; }
+  }
+  return runs;
+}
+/* "4:00–5:30pm", or "11:30am–1:00pm" across noon. */
+function syncTimeRange(startAbs, endAbs) {
+  const a = formatTimeFromMin(startAbs), z = formatTimeFromMin(endAbs);
+  return a.slice(-2) === z.slice(-2) ? `${a.slice(0, -2)}–${z}` : `${a}–${z}`;
+}
+
+/* One sister's column: school band, hour rules, buffer strips and blocks, to
+   scale. Built from the pure pieces rather than buildDayColumn/renderBlockPixel,
+   which are bound to the active profile. Privacy as before: a sister's block
+   shows its name only when it is hers, or when details are on and the block is
+   public; otherwise it is a grey "Busy" shape at its real height. Text on a
+   block is ink, never white on a pastel. */
+function syncSisterColumn(p, label, key, showAll, side) {
+  const px = SYNC_PX_PER_MIN;
+  const col = document.createElement('div');
+  col.className = 'sync-day-col sync-day-col--' + side;
+  const head = document.createElement('h4');
+  head.textContent = label;
+  col.appendChild(head);
+  const canvas = document.createElement('div');
+  canvas.className = 'sync-tl-canvas';
+  canvas.style.height = (DAY_MIN_SPAN * px) + 'px';
+  col.appendChild(canvas);
+
+  dayZoneSegments(key).forEach(z => {
+    if (z.cls !== 'tl-band-school' && z.cls !== 'tl-band-lunch') return;
+    const band = document.createElement('div');
+    band.className = 'wf-band ' + z.cls.replace('tl-band-', 'wf-band-');
+    band.style.top = (z.start * px) + 'px';
+    band.style.height = ((z.end - z.start) * px) + 'px';
+    band.title = z.label;
+    canvas.appendChild(band);
+    if ((z.end - z.start) * px >= 24) {
+      const lab = document.createElement('div');
+      lab.className = 'sync-tl-band-label';
+      lab.style.top = (z.start * px) + 'px';
+      lab.textContent = z.label;
+      canvas.appendChild(lab);
+    }
+  });
+  canvas.appendChild(buildHourGrid(px, DAY_MIN_SPAN, { cls: 'hour-grid--sync', layer: 'lines', halves: false }));
+
+  const blocks = getDayBlocks(key, p).filter(Boolean).slice().sort((a, b) => a.startMin - b.startMin);
+  if (!blocks.length) {
+    const empty = document.createElement('div');
+    empty.className = 'sync-tl-empty';
+    empty.textContent = 'Nothing planned';
+    canvas.appendChild(empty);
+  }
+  const isMe = p === profile;
+  const sister = p === 'jenn' ? 'jess' : 'jenn';
+  /* Your own blocks are the invite control, so their cards are at least
+     SYNC_TAP_MIN_PX tall — the house 44px target — grown by the same borrowing
+     from empty minutes, so the bottom edge and the printed start–end stay true
+     and a card that has nowhere to borrow splits the lane instead of covering
+     a neighbour. The sister's column is not tappable and stays at the drawing
+     floor. The both-free stripe always reads the real minutes. */
+  const boxes = wfCardBoxes(blocks, { pxPerMin: px, minPx: isMe ? SYNC_TAP_MIN_PX : SYNC_CARD_MIN_PX, gapPx: 2 });
+  const lanes = wfAssignColumns(blocks, { boxes, gapPx: 2 });
+  blocks.forEach(b => {
+    const act = findActivity(b.actId, p);
+    const showDetails = !!act && (isMe || (showAll && !!b.public));
+    const lane = lanes.get(b.id) || { col: 0, count: 1 };
+    const count = lane.count || 1;
+    const left = `calc(${lane.col * 100 / count}% + 1px)`;
+    const width = `calc(${100 / count}% - 2px)`;
+    const colour = showDetails ? blockColour(b, p) : SYNC_BUSY_GREY;
+    const dur = Math.max(0, b.durationMin || 0);
+    const when = syncTimeRange(b.startMin, b.startMin + dur);
+    const dn = showDetails ? blockDisplayName(b, p) : null;
+    const name = dn ? `${dn.icon} ${dn.name}` : 'Busy';
+
+    wfBufferSegments(b).forEach(seg => {
+      const top = Math.max(0, seg.startRel), bot = Math.min(DAY_MIN_SPAN, seg.endRel);
+      if (bot <= top) return;
+      const strip = document.createElement('div');
+      strip.className = `wf-travel wf-travel--${seg.kind} sync-tl-strip`;
+      strip.style.setProperty('--wf-travel-colour', colour);
+      strip.style.top = (top * px) + 'px';
+      strip.style.height = ((bot - top) * px) + 'px';
+      strip.style.left = left;
+      strip.style.width = width;
+      strip.title = showDetails ? `${bufferKindIcon(seg)} ${bufferKindLabel(seg)} ${seg.min}m` : 'Busy';
+      canvas.appendChild(strip);
+    });
+
+    const box = boxes.get(b.id) || { topPx: (b.startMin - START_MIN) * px, hPx: dur * px };
+    const tappable = isMe && !!act;
+    /* Sent for another day and dragged since: the tap sends again. */
+    const sent = tappable ? sisterInviteFor(b, sister, 'share', key) : null;
+    const moved = !!sent && !inviteCoversDay(sent, key);
+    const el = document.createElement('div');
+    // .sync-block-mini is YOUR tappable block and nothing else — the invite checks select it.
+    el.className = 'sync-block' + (showDetails ? '' : ' sync-block--busy') + (tappable ? ' sync-block-mini' : '');
+    el.style.top = box.topPx + 'px';
+    el.style.height = box.hPx + 'px';
+    el.style.left = left;
+    el.style.width = width;
+    if (showDetails) el.style.background = colour;
+    const nameEl = document.createElement('span');
+    nameEl.className = 'sync-block-name';
+    nameEl.textContent = name;
+    el.appendChild(nameEl);
+    /* A moved block always shows a one-line "💌 Send again?", right under the
+       name, so it is visible on the shortest (44px) card; the full sentence is
+       the block's text for a screen reader and its tooltip. */
+    if (moved) {
+      const flag = document.createElement('span');
+      flag.className = 'sync-block-flag';
+      flag.textContent = '💌 Send again?';
+      flag.setAttribute('aria-hidden', 'true');
+      el.appendChild(flag);
+    }
+    if (box.hPx >= SYNC_TIME_ROOM_PX + (moved ? SYNC_LINE_PX : 0)) {
+      const t = document.createElement('span');
+      t.className = 'sync-block-time';
+      t.textContent = when;
+      el.appendChild(t);
+    }
+    el.title = `${name} · ${when}`;
+    if (moved) {
+      const words = document.createElement('span');
+      words.className = 'sync-block-moved visually-hidden';
+      words.textContent = inviteMovedWords(sent, key, '💌');
+      el.appendChild(words);
+      el.title += ' · ' + words.textContent;
+    }
+    if (tappable) {
+      el.title += ' · Tap to invite your sister';
+      el.onclick = () => sendInvite(b, sister, key);
+    }
+    canvas.appendChild(el);
+  });
+  return col;
+}
+
+/* The thin stripe between the two columns: green wherever neither sister is
+   busy. The same runs the "both free" sentence counts. */
+function syncFreeStripe(freeRuns) {
+  const px = SYNC_PX_PER_MIN;
+  const wrap = document.createElement('div');
+  wrap.className = 'sync-tl-stripe';
+  const track = document.createElement('div');
+  track.className = 'sync-tl-stripe-track';
+  track.style.height = (DAY_MIN_SPAN * px) + 'px';
+  const words = freeRuns.map(([a, b]) => syncTimeRange(START_MIN + a, START_MIN + b));
+  track.setAttribute('role', 'img');
+  track.setAttribute('aria-label', words.length ? `Both free: ${words.join(', ')}` : 'No time when you are both free');
+  freeRuns.forEach(([a, b], i) => {
+    const seg = document.createElement('div');
+    seg.className = 'sync-free-seg';
+    seg.style.top = (a * px) + 'px';
+    seg.style.height = ((b - a) * px) + 'px';
+    seg.title = `Both free ${words[i]}`;
+    track.appendChild(seg);
+  });
+  wrap.appendChild(track);
+  return wrap;
+}
+
+/* The shared hour gutter, START_HOUR to END_HOUR. */
+function syncHourGutter() {
+  const px = SYNC_PX_PER_MIN;
+  const gutter = document.createElement('div');
+  gutter.className = 'sync-tl-gutter';
+  const track = document.createElement('div');
+  track.className = 'sync-tl-gutter-track';
+  track.style.height = (DAY_MIN_SPAN * px) + 'px';
+  for (let h = START_HOUR; h <= END_HOUR; h++) {
+    const lbl = document.createElement('div');
+    lbl.className = 'sync-tl-hour';
+    lbl.style.top = ((h * 60 - START_MIN) * px) + 'px';
+    lbl.textContent = `${((h + 11) % 12) + 1}${h >= 12 ? 'pm' : 'am'}`;
+    track.appendChild(lbl);
+  }
+  gutter.appendChild(track);
+  return gutter;
 }
 
 /* IS THERE ALREADY ONE OF THESE? The one owner of that question.

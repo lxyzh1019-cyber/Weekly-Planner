@@ -930,6 +930,80 @@ must not read as free. What it does not do is earn.
 (`tests/smoke.js`) hold both halves — the first is the one that makes the
 feature safe and is worth more than the rest of it.
 
+**Sister Sync is a timeline (stage 5e, 2026-09-24).** `renderSync`
+(`js/10-social.js`) draws the chosen day as one side-by-side timeline — 🐥 Jenn
+| 🦊 Jess, `START_HOUR`–`END_HOUR`, one shared hour gutter — at
+`SYNC_PX_PER_MIN` (0.6px a minute, 576px). It replaced two columns of text
+chips that showed only a start time. It is built from the pure pieces:
+`dayZoneSegments` (school and lunch recess as the zone band; the other tints
+are left off so nothing competes with the green stripe), `wfBufferSegments`
+(travel, get-ready and warm-up as hatched `.wf-travel` strips),
+`wfCardBoxes` / `wfAssignColumns` (sizes and lanes), `buildHourGrid`
+(`layer: 'lines'`), `blockColour(b, p)` and `blockDisplayName(b, p)` with the
+explicit sister. **Not** `buildDayColumn` or `renderBlockPixel`, which are bound
+to the active profile. Block text is ink, never white on a pastel.
+
+*What is busy has one owner: `syncBusyMinutes(profile, dayKey)`.* One boolean
+per minute of the drawn day (index 0 = `START_MIN`, length `DAY_MIN_SPAN`).
+Busy is:
+- each block;
+- plus everything `wfBufferSegments` gives it — travel, get-ready **and
+  warm-up** (she is at the venue);
+- plus school and lunch recess on a school day (`isSchoolDay`,
+  `dayZoneSegments` — the shared school calendar, so both girls have the same
+  hours).
+
+A **free-category block is not busy, and neither are its buffers**: free time
+is time she can hang out. A block whose **activity nobody can name counts as
+busy** and is drawn as a grey Busy shape. The activity is looked up in **that
+sister's own list** (`findActivity(b.actId, p)`). The old count used the
+active profile's list for both sisters, so a sister's own custom free activity
+read as busy. `syncFreeRuns` turns the two arrays into the minutes neither
+sister is busy. The "🎉 You're both free …" sentence (windows of 30 minutes or
+more) and the green both-free stripe between the columns both read those runs.
+They cannot disagree, and neither may count busy time any other way.
+
+*Privacy is unchanged.* A sister's block shows its name only when
+`isMe || (showAll && b.public)`. Otherwise it is a grey (`SYNC_BUSY_GREY`)
+**Busy** shape at its real height, and its strips say only "Busy".
+
+*Sizes.* Everything is to scale except the floor. A card shorter than its floor
+borrows the empty minutes **above** it (`wfCardBoxes`), so its bottom edge and
+its printed start–end stay true. Where there is nothing to borrow, the lane
+splits rather than covering a neighbour. The floor is `SYNC_CARD_MIN_PX` (20px)
+in the sister's column. **Your own blocks are the invite control, so their
+floor is `SYNC_TAP_MIN_PX` (44px), the house target.** The both-free stripe
+always reads real minutes, never card heights.
+
+*A shared block you dragged to another day* always shows `💌 Send again?` as a
+visible line under the name (`.sync-block-flag`). That fits on a 44px card. The
+full `inviteMovedWords` sentence is in the block's text (`.visually-hidden`)
+and its tooltip.
+
+*The DOM is part of the contract.* The invite checks (`anInviteCannotBeSentTwice`,
+`anInviteFromSisterSyncIsDatedThatDay`, `aMovedSharedBlockSaysSendAgain`)
+select `#syncGrid .sync-day-col:first-child .sync-block-mini` and read the
+activity name and the moved sentence from its text. So:
+- `#syncGrid` is the host;
+- its **first child is Jenn's `.sync-day-col`**, then Jess's, then the stripe,
+  the gutter and the legend (CSS places the tracks gutter | Jenn | stripe |
+  Jess);
+- every shape is a `.sync-block`, and **`.sync-block-mini` is only on your own
+  tappable blocks**.
+
+Tapping one calls `sendInvite(b, sister, dayShown)`, with the duplicate guard,
+the series choice and the moved line as above. Change any of these and those
+checks must be rewritten on purpose. `sisterSyncIsATimeline` holds the rest:
+- to scale on one axis;
+- a private block is a Busy shape of the right height;
+- the stripe excludes travel, get-ready, school and a short block;
+- a sister's own free activity is free;
+- the sentence and the stripe agree;
+- every `.sync-block-mini` is at least 44px tall;
+- the moved line is visible;
+- a tap invites her for that day;
+- no text under 13px at 390px.
+
 Drawn to scale means the row has to **add up to a day**. It is one nowrap flex row
 of percentages with nothing able to shrink, so anything that oversubscribes it
 pushes the last cell straight through the edge of its column. Two things do:
