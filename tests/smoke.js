@@ -10816,7 +10816,8 @@ function findChromium() {
     const nav = document.getElementById('kidNav');
     if (!nav || nav.hidden) return 'nav hidden on Today';
     const btns = [...nav.querySelectorAll('.kid-nav-btn')];
-    if (btns.length !== 4) return `expected 4 destinations, got ${btns.length}`;
+    // Five since 2026-09-24: Sister Sync became a tab (the owner's decision).
+    if (btns.length !== 5) return `expected 5 destinations, got ${btns.length}`;
     const bigEnough = btns.every(b => {
       const r = b.getBoundingClientRect();
       return r.height >= 44 && r.width >= 44;
@@ -10840,7 +10841,9 @@ function findChromium() {
   });
 
   // Every destination goes somewhere, and every route the app had before still
-  // works — this stage adds a way to move around, it retires nothing.
+  // works. (The More tiles for Sisters, Money story and Money school went on
+  // 2026-09-24; the screens they opened did not — see sisterSyncIsABottomTab
+  // and moreHasNoMoneySchool.)
   if (want('navReachesEverythingAndOldRoutesStillWork')) checks.navReachesEverythingAndOldRoutesStillWork = await page.evaluate(() => {
     profile = 'jenn'; parentViewing = 'jenn';
     const click = (sel) => { const el = document.querySelector(sel); if (el) el.click(); };
@@ -10851,6 +10854,8 @@ function findChromium() {
     const toWeek = activeId() === 'screen-week';
     click('#kidNav [data-td-nav="money"]');
     const toMoney = activeId() === 'screen-mymoney';
+    click('#kidNav [data-td-nav="sync"]');
+    const toSync = activeId() === 'screen-sync';
     click('#kidNav [data-td-nav="today"]');
     const backToToday = activeId() === 'screen-today';
 
@@ -10869,8 +10874,125 @@ function findChromium() {
     mnyOpenMyMoney('jenn'); const oldMoney = activeId() === 'screen-mymoney';
     openSisterSync();      const oldSync   = activeId() === 'screen-sync';
     goToday();
-    return toWeek && toMoney && backToToday && sheetOpen && toChores && sheetClosed
+    return toWeek && toMoney && toSync && backToToday && sheetOpen && toChores && sheetClosed
         && oldWeek && oldQuest && oldChore && oldMoney && oldSync;
+  });
+
+  /* Sister Sync is a bottom tab (the owner's decision, 2026-09-24). Its only
+     permanent door used to be ⋯ More → 👯 "Sisters", a label that did not match
+     the screen's own name. One destination, one door: the tab replaces the tile.
+     Measured at 375px, the narrowest phone the family uses, because five tabs
+     share that width and a wrapped or clipped label is the way this fails. */
+  if (want('sisterSyncIsABottomTab')) checks.sisterSyncIsABottomTab = await (async () => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.waitForTimeout(150);
+    const result = await page.evaluate(() => {
+      const problems = [];
+      const activeId = () => (document.querySelector('.screen.active') || {}).id;
+      profile = 'jenn'; parentViewing = 'jenn';
+      goToday();
+      const nav = document.getElementById('kidNav');
+      if (!nav || nav.hidden) return ['the kid nav is hidden on Today'];
+      const btns = [...nav.querySelectorAll('.kid-nav-btn')];
+      const order = btns.map(b => b.getAttribute('data-td-nav')).join(' · ');
+      if (btns.length !== 5) problems.push(`expected 5 tabs, got ${btns.length} (${order})`);
+      if (order !== 'today · week · money · sync · more') problems.push(`tab order is "${order}", expected "today · week · money · sync · more"`);
+
+      // Every tab: a 44px target, a 13px label on one line, nothing clipped.
+      const navBox = nav.getBoundingClientRect();
+      btns.forEach(b => {
+        const r = b.getBoundingClientRect();
+        const name = b.getAttribute('data-td-nav');
+        if (r.width < 44 || r.height < 44) problems.push(`the ${name} tab is ${Math.round(r.width)}×${Math.round(r.height)}, under 44px`);
+        const label = b.querySelector('.kid-nav-label');
+        if (!label) { problems.push(`the ${name} tab has no label`); return; }
+        const fs = parseFloat(getComputedStyle(label).fontSize);
+        if (fs < 13) problems.push(`the ${name} tab's label is ${fs}px, under the 13px floor`);
+        const lr = label.getBoundingClientRect();
+        if (label.scrollWidth > label.clientWidth + 1) problems.push(`the ${name} tab's label "${label.textContent}" is clipped (${label.scrollWidth}px in ${label.clientWidth}px)`);
+        if (lr.left < r.left - 1 || lr.right > r.right + 1) problems.push(`the ${name} tab's label "${label.textContent}" spills out of its tab`);
+        if (lr.height > fs * 1.8) problems.push(`the ${name} tab's label "${label.textContent}" wraps onto a second line (${Math.round(lr.height)}px tall)`);
+      });
+      // A taller bar than the body's clearance puts content underneath it.
+      const clearance = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+      if (navBox.height > clearance + 1) problems.push(`the nav is ${navBox.height}px tall, more than the ${clearance}px the body clears`);
+
+      const tab = nav.querySelector('[data-td-nav="sync"]');
+      if (!tab) {
+        problems.push('there is no Sister Sync tab');
+      } else {
+        const text = tab.querySelector('.kid-nav-label')?.textContent.trim();
+        if (text !== 'Sister Sync' && text !== 'Sisters') problems.push(`the tab reads "${text}", not "Sister Sync" (or the fallback "Sisters")`);
+        if (!tab.querySelector('.kid-nav-icon')?.textContent.includes('👯')) problems.push('the Sister Sync tab has no 👯 icon');
+        tab.click();
+        if (activeId() !== 'screen-sync') problems.push(`the tab lands on ${activeId()}, not screen-sync`);
+        const on = document.querySelector('#kidNav [data-td-nav="sync"]');
+        if (!on || on.getAttribute('aria-current') !== 'page') problems.push('on screen-sync the Sister Sync tab is not marked aria-current="page"');
+        const others = [...document.querySelectorAll('#kidNav [aria-current]')].filter(b => b.getAttribute('data-td-nav') !== 'sync');
+        if (others.length) problems.push('another tab is also marked current on screen-sync');
+      }
+
+      // More no longer carries a Sisters tile: one destination, one door.
+      goToday();
+      document.querySelector('#kidNav [data-td-nav="more"]')?.click();
+      const tiles = [...document.querySelectorAll('#tdMoreOverlay .td-more-tile')];
+      if (tiles.some(t => t.getAttribute('data-td-more') === 'sisters' || /Sister/.test(t.textContent))) problems.push('the More sheet still has a Sisters tile');
+      document.getElementById('tdMoreOverlay')?.classList.remove('open');
+
+      // A parent: no kid nav, and openSisterSync still refuses.
+      profile = 'parent'; showScreen('parent'); renderParentHome();
+      if (!document.getElementById('kidNav').hidden) problems.push('the kid nav shows for a parent in the portal');
+      openSisterSync();
+      if (activeId() === 'screen-sync') problems.push('a parent was let into Sister Sync');
+      if (!document.getElementById('kidNav').hidden) problems.push('the kid nav shows for a parent after trying Sister Sync');
+
+      profile = 'jenn'; parentViewing = 'jenn';
+      goToday();
+      return problems.length ? problems : true;
+    });
+    await page.setViewportSize({ width: 900, height: 1100 });
+    await page.waitForTimeout(150);
+    return result;
+  })();
+
+  /* More holds only what has no other home: 🧹 Chores and ◀ Switch, plus the
+     build number (theBuildNumberIsOnThePage). Money school and Money story both
+     belong to the Money tab and were a third and second door there; each is
+     still reached from Money — school from money tab 5 and My money's 🎓
+     button, story from My money's "More" card (mnyLinksCard). */
+  if (want('moreHasNoMoneySchool')) checks.moreHasNoMoneySchool = await page.evaluate(() => {
+    const problems = [];
+    const activeId = () => (document.querySelector('.screen.active') || {}).id;
+    profile = 'jenn'; parentViewing = 'jenn';
+    goToday();
+    document.querySelector('#kidNav [data-td-nav="more"]')?.click();
+    const tiles = [...document.querySelectorAll('#tdMoreOverlay .td-more-tile')];
+    const got = tiles.map(t => t.getAttribute('data-td-more')).join(' · ');
+    if (got !== 'chores · profile') problems.push(`the More tiles are "${got}", expected exactly "chores · profile" (Chores · Switch)`);
+    const labels = tiles.map(t => t.querySelector('.td-more-label')?.textContent.trim()).join(' · ');
+    if (labels !== 'Chores · Switch') problems.push(`the More tile labels are "${labels}", expected "Chores · Switch"`);
+    document.getElementById('tdMoreOverlay')?.classList.remove('open');
+
+    // Money school from money tab 5.
+    mnyOpenMyMoney('jenn');
+    const tab5 = document.querySelector('#mnyPage1Wrap [data-mny-action="tab"][data-mny-tab="school"]');
+    if (!tab5) problems.push('My money has no tab 5 (Money school) for a kid');
+    else { tab5.click(); if (activeId() !== 'screen-moneyschool') problems.push(`money tab 5 lands on ${activeId()}, not Money school`); }
+
+    // Money school and Money story from My money's own "More" card.
+    const linksCard = () => [...document.querySelectorAll('#mnyPage1Wrap .mny-card')]
+      .find(c => (c.querySelector('.mny-label')?.textContent || '').trim() === 'More');
+    mnyOpenMyMoney('jenn');
+    const school = linksCard()?.querySelector('[data-mny-action="school"]');
+    if (!school) problems.push("My money's More card has no 🎓 Money school button");
+    else { school.click(); if (activeId() !== 'screen-moneyschool') problems.push(`My money's 🎓 button lands on ${activeId()}, not Money school`); }
+    mnyOpenMyMoney('jenn');
+    const story = linksCard()?.querySelector('[data-mny-action="story"]');
+    if (!story) problems.push("My money's More card has no 📖 My money story button");
+    else { story.click(); if (activeId() !== 'screen-moneystory') problems.push(`My money's 📖 button lands on ${activeId()}, not Money story`); }
+
+    goToday();
+    return problems.length ? problems : true;
   });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => { profile = 'jenn'; goToday(); });

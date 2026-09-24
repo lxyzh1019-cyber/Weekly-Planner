@@ -383,10 +383,25 @@ Kid-facing copy is a product surface, not filler. The rules:
 ## Navigation
 
 **Today is the front door** (`js/31-today.js`). A child lands there and moves
-through one nav — **Today · Week · Money · More** — which is a single fixed
-element outside the screens, filled by `tdRenderNav`. Do not add a second nav row
-to a screen: the six-button shortcut row that used to sit in three different
-topbars is exactly how their labels drifted apart, and it is gone.
+through one nav — **Today · Week · Money · Sister Sync · More** — which is a
+single fixed element outside the screens, filled by `tdRenderNav`. Do not add a
+second nav row to a screen: the six-button shortcut row that used to sit in three
+different topbars is exactly how their labels drifted apart, and it is gone.
+
+**Five places, not four — the owner's decision of 2026-09-24.** Sister Sync
+(👯, `openSisterSync`, `screen-sync`) became a nav tab, the fourth of five,
+between Money and More. Its only permanent door had been ⋯ More → 👯 "Sisters", a label that did
+not match the screen's name. **One destination, one door:** the More tile went
+with the change, and so did the 🎓 Money school and 📖 Money story tiles, which
+were extra doors to pages the Money tab already reaches (Money school: money
+tab 5 and My money's 🎓 button; Money story: My money's 📖 button in
+`mnyLinksCard`). More now holds 🧹 Chores · ◀ Switch and the build number.
+`tests/check-dead-actions.js` cannot see `data-td-more`, so a More tile and its
+`tdGoMore` branch are added and removed by hand, together. The label is "Sister
+Sync" because it fits on one line at 375px in the app's font; the fallback, if
+it ever stops fitting, is "Sisters". A parent sees no change: the kid nav hides
+for a parent, and `openSisterSync` still refuses one. Held by
+`sisterSyncIsABottomTab`, `moreHasNoMoneySchool` and `kidNavIsUsableAndScoped`.
 
 **The hero owns the block she is in, and owns it alone.** The screen used to draw
 the running block twice — a NOW card saying "now · started 8:15am" with a green

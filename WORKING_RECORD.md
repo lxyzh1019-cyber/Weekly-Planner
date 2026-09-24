@@ -6,11 +6,13 @@ Single working record for this repository. Updated by the main session at the en
 - 2026-09-21, branch `Rules-v2`: install working-rules bundle v2.1 into the repo root, verify with `tests/replay-hooks.sh`, commit and push. Given as a direct instruction rather than a Plan vN — the session predates the plan gate, which loads only from `main`.
 - 2026-09-21, in-session decision (asked and answered): `CLAUDE.md` is **split**, not overwritten. Bundle global rules take the `CLAUDE.md` filename; this repo's architecture doc moves to `ARCHITECTURE.md`.
 - 2026-09-22, branch `claude/inspiring-gauss-232zww`: **Plan v4 approved** — "The non-money half, plus the pocket-money handoff". Three staged commits (school-day offer · profile badges · watch a sister compete), one draft PR. All pocket-money work is deferred to `HANDOFF-pocket-money.md` and a separate chat, at the owner's instruction.
+- **2026-09-24, R5: Plan v4 approved** (ExitPlanMode, local desktop session, branch `claude/charming-hawking-4f8mm1` from `main` @ `fa06ed5`) — "Sister Sync as a timeline tab, invites that carry travel and repeat, a lighter day toolbar, catching up on missed days, and Chores rebuilt in its new homes". Two draft PRs: PR 1 = 5a nav + More trim · 5b invite travel/get-ready, missed invites, add-anyway, Day-view accept on the same owners · 5c series invites, badge-leak fix, moved-block flag · 5e Sync timeline · 5f templates retired + copy-a-day preview, pins not copied for a child · 5g reflection on Today, day passed explicitly · 5h start-this-day-over. PR 2 (cut from PR 1's head) = 5d relocation map · C1 chore actions + catch-up · C2 chore views. C3 (retire the Chores screen) waits for the owner's per-row confirmation. Plan text: `~/.claude/plans/pasted-content-id-2333-plan-tingly-zebra.md` (v4, Rev 3).
+- 2026-09-24, R5 owner decisions (AskUserQuestion): Sister Sync = a bottom tab; invites copy the sender's travel and get-ready; repeating blocks ask "this day, or all?"; Chores features rebuilt in new homes, screen retired only after confirmation; Q1–Q4 built as described; a missed invite offers "add it anyway"; a shared block dragged to another day keeps its 💌 and is flagged "moved, send again?"; build in the local desktop session.
 - 2026-09-22, owner's four decisions on record (AskUserQuestion): a kid may **propose** a meet (deferred to the handoff); **Dance** comes out of the competition categories and **skating star level** goes in, with an editable category table (deferred); watch/accompany is built by **extending Sister Sync invites** with a `watching` flag on the competition block, no competition reward, no money-tab link; delivery is **one branch, staged commits, one PR**.
 
 ## Pending
 - PR [#91](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/91) **merged** 2026-09-21 as `f4d1db5`. (This line previously said "awaiting the owner's merge" — corrected 2026-09-22.)
-- **PR [#93](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/93) — draft, open, awaiting the owner's review and merge.** Last code change: the #34 wrong-day fix, then `main` (PR #92) merged in (#35), build 2026-09-23b. Description updated 2026-09-23 to include both. Final gate on the merged head: `npm run check` OK, smoke 347/347.
+- **PR [#93](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/93) — merged to `main` as `fa06ed5`** (corrected 2026-09-24; this line previously said "draft, open"). Original note: Last code change: the #34 wrong-day fix, then `main` (PR #92) merged in (#35), build 2026-09-23b. Description updated 2026-09-23 to include both. Final gate on the merged head: `npm run check` OK, smoke 347/347.
 - **After merge, the owner's one step:** open Today → ⋯ More on the iPad and read **Build 2026-09-23b**. That is the only way to claim "deployed" under the rules; nothing has been read on the live URL yet.
 - **Approved (#33), done:** 4a `SMOKE_ONLY` ✅ `126506a` · 4b build number ✅ `a03f1c2` · 4c dead-button check ✅ `46c7306` · 4d repeat-invite guard ✅ `718bb84` · 4e 💌 note on Today ✅ `a25f8ec`. **All five complete.**
 - **Approved (#34), done:** the Sister Sync wrong-day fix (Open questions 6, now closed). Build **2026-09-23b** — after merge, that is the number to read on the iPad, not 23a.
@@ -55,6 +57,14 @@ Single working record for this repository. Updated by the main session at the en
 | 33 | R3 2026-09-22 | "Regarding the decisions, I agree all 5." | done | **Approval** of Plan v5's five items: (1) repeat-invite guard + kid share from the block; (2) visible build number; (3) `SMOKE_ONLY`; (4) dead-button check; (5) 💌 note on Today. Built as stages 4a–4e, tooling first. |
 | 34 | R4 2026-09-23 | "Yes, fix the wrong day invite bug" | done | **Approval** of Open questions 6. Round 3 on Sister Sync invites; comparison in the hotspot counter (repair). `sendInvite(block, to, day, opts)` — the caller passes the day; the global fallback is gone; no day → refused. Build `2026-09-23b`. Evidence under Checks. |
 | 35 | R4 2026-09-23 | (harness) PR #93 went un-mergeable after PR #92 merged to `main` | done | Mandated remedy: merge `main` into the head (no rebase/force). 6 conflicts. Two parallel build stamps (`BUILD` here, `APP_BUILD` on `main`) **consolidated into one** — `APP_BUILD`, `.app-build`, one check, one smoke check, Today More + App landing. `check-dead-actions` `pm/edit` exemption self-expired (PR #92 removed the branch) and was deleted. No money file changed by this branch. |
+| 36 | R5 2026-09-24 | "Sister Sync as a bottom tab" | in progress | Owner's choice. Plan v4 §1, stage 5a. |
+| 37 | R5 2026-09-24 | "Money school / Money story belong to the Money tab" | in progress | Both More tiles removed; plan v4 §2, stage 5a. |
+| 38 | R5 2026-09-24 | "Invites carry the sender's travel and getting ready" | in progress | Round 4 on Sister Sync invites (comparison below). Plan v4 §3, stage 5b. Includes missed invites, "add it anyway", Day-view accept door on the same owners. |
+| 39 | R5 2026-09-24 | "Repeating blocks: this day, or all?" | in progress | Plan v4 §4, stage 5c. Badge leak fixed; dragged shared block keeps 💌 and says "moved, send again?" (owner). |
+| 40 | R5 2026-09-24 | "Sister Sync shows a timeline" | in progress | Plan v4 §6, stage 5e. |
+| 41 | R5 2026-09-24 | Q1–Q4: templates, copy-a-day preview, reflection on Today, clear day | in progress | Approved by the owner 2026-09-24. Stages 5f–5h. Rev 3 additions (child copies drop the pin; reflect sheet takes its day) approved with Plan v4. |
+| 42 | R5 2026-09-24 | "Build the existing chore features in the new locations; retire Chores only after I have confirmed everything" | in progress | PR 2: 5d map, C1, C2. C3 not in this round. |
+| 43 | R5 2026-09-24 | "Validate the plan; have you applied the changes; do I have to create the PR?" | done | Read-only check found 9 factual errors + 6 gaps in Plan v3; folded into Plan v4 (Rev 3). Nothing had been applied. PRs: this session opens drafts; merging is the owner's step. |
 
 ## Hotspot counter
 | Area / feature | Fix rounds | Recurrences | Last symptom | Rewrite-vs-repair reviewed? |
@@ -64,7 +74,7 @@ Single working record for this repository. Updated by the main session at the en
 | **Pocket money** (stream, rules, meeting, money pages) | **4** — PR #89, PR #90, R2 (PR A), R3 (B5–B7, then B8–B10 closing B6's own known limits in the same round — not a new round: no new symptom from the field) | **2** — (i) a click handler keyed on an attribute its host never listens for; (ii) **a settled week blocks competition money** — the "$21 meet in a $0 week" (repaired for legacy weeks only), again for Grandma weeks and, per the owner, any settled week | House rules never reached a stored rulebook; two dead buttons; `[object Object]`. PR A review found two more, both older than PR A: the change log drawn twice, and the move form redrawing on every keystroke. Both fixed in PR A, test first. | **yes — 2026-09-22, repair** (below) |
 | Week-view school offer | 1 | 0 | Offer only below a ~700px grid once anything is booked | n/a — first fix round; cause is a host deleted with the Day Blocks tab |
 | Profile badge | 1 | 0 | Three inert `<div class="profile-badge">` with a false `aria-label` | n/a — first fix round |
-| Sister Sync invites | **3** | 0 | Round 2 (4d): no duplicate guard in `sendInvite`, no status guard in `acceptInvite`, and a **second inline writer** (`inviteSisterFromEdit`) that bypassed `sendInvite` entirely. Round 3 (#34): `sendInvite` guessed the invite's day from globals (`currentDayKey \|\| syncDayIdx`) | **Yes — presented below, repair chosen.** |
+| Sister Sync invites | **4** | 0 | Round 4 (R5, 2026-09-24): an invite carries no travel/get-ready (watch = fixed 15/15); no expiry for a missed day; no series awareness; `invitedTo` leaks through 4 copy paths; a second accept door on the Day view re-implements the rules; a cross-day drag changes the block id under the invite. Round 2 (4d): no duplicate guard in `sendInvite`, no status guard in `acceptInvite`, and a **second inline writer** (`inviteSisterFromEdit`) that bypassed `sendInvite` entirely. Round 3 (#34): `sendInvite` guessed the invite's day from globals (`currentDayKey \|\| syncDayIdx`) | **Yes — round 3 and round 4 comparisons below, repair chosen both times.** |
 
 **Round-3 comparison — Sister Sync invites (2026-09-23, before #34's patch).**
 - *Shared cause across rounds 2 and 3:* the invite writer inferred facts its callers already knew — who sent it (round 2: a second writer with its own sender logic) and which day it is for (round 3: a global the Sync screen never sets). Same class: implicit context instead of an explicit argument.
@@ -73,6 +83,12 @@ Single working record for this repository. Updated by the main session at the en
 - *Simplicity / compatibility / migration:* repair touches `sendInvite`'s signature and its three callers; stored invites keep their shape; no migration. Existing wrong-dated invites are not rewritten — they cannot be told apart from correct ones.
 - *Rollback:* revert one commit. *Regression risk:* low — the edit-sheet doors already pass the right day (the block tap calls `focusDayColumn(ownDayKey)` first, `js/08-day-view.js:1079`); only the Sync door was wrong.
 - **Decision: repair.** Structural element: `sendInvite` no longer reads `currentDayKey`/`syncDayIdx` at all, so no future door can inherit the wrong day.
+
+**Round-4 comparison — Sister Sync invites (2026-09-24, Plan v4, before any patch).**
+- *Shared cause across rounds 2–4:* an invite is a hand-copied subset of a block; each round found a field or fact the copy left out or guessed (sender, day, buffers, series), plus a second accept door that re-implements the rules and a block whose id changes under the invite.
+- *Rewrite option:* invites reference the source block (`{profile, day, blockId}`). Rejected: the owner chose copy semantics; it changes a `state.shared` shape; it needs a migration on both iPads.
+- *Repair with structure:* `inviteSnapshot(block, dayKey)` owns what an invite carries; `inviteToBlock(inv, dayKey)` owns what accepting writes; `inviteAcceptable(inv)` owns whether it can be accepted now (both doors call it); buffers only via `getTravelBufMin`/`getGetReadyBufMin`; a field-by-field smoke check compares source and accepted block. No migration; old invites accept as before.
+- *Rollback:* each stage reverts as one commit. **Decision: repair.**
 
 Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → no further patch until the comparison is presented.
 
@@ -131,6 +147,20 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → n
 | 19 dead handler branches (warned by 4c) | OPEN — for tier-3 review | 12 in `ctHandleWrapClick` (chores — possibly a retired chore surface; check nothing was lost with it), `mm` openkidday, `co` num/export, `mnyp` tab/kid (money → handoff §2). Not removed: outside 4c's scope. |
 | Real-device verification | NOT STARTED | Blocked by design: no visible build stamp exists (VE 1). Until one ships, "deployed" cannot be verified on the iPad. |
 | Tier-3 logic review of non-money screens | NOT STARTED | Proposed as its own read-only round after this PR merges. |
+| **R5 / Plan v4 — PR 1** | | |
+| 5a Sister Sync bottom tab + More trim | COMPLETE | Worker model verified: Opus 5.5 (self-report; effort configured: high). New checks `sisterSyncIsABottomTab`, `moreHasNoMoneySchool` + updated `kidNavIsUsableAndScoped`/`navReachesEverythingAndOldRoutesStillWork` failed first (4 named failures), then pass. Worker gate: check 9/9 · merge 112 · buffers 9 · stream 31 · cleanup pass · xp 28 · money 33 · smoke ALL PASSED (349). Main session re-ran `check` 9/9 OK (SW_VERSION 2026-09-24a = APP_BUILD). Label "Sister Sync" fits at 375px in Patrick Hand; wraps to 2 lines in the fallback font (risk noted to owner). Build 2026-09-24a. |
+| 5b Invite travel/get-ready, missed invites, add anyway, Day-view door | NOT STARTED | |
+| 5c Series invites, badge leak, moved-block flag | NOT STARTED | |
+| 5e Sister Sync timeline | NOT STARTED | |
+| 5f Templates retired, copy-a-day preview, no child pins | NOT STARTED | |
+| 5g Reflection on Today, explicit day | NOT STARTED | |
+| 5h Start this day over | NOT STARTED | |
+| PR 1 push + draft PR | NOT STARTED | |
+| **R5 / Plan v4 — PR 2** | | |
+| 5d Chore relocation map (`docs/chore-relocation-map.md`) | NOT STARTED | |
+| C1 Chore actions + catch-up | NOT STARTED | |
+| C2 Chore views | NOT STARTED | |
+| PR 2 push + draft PR | NOT STARTED | |
 
 ## Checks and evidence
 - 2026-09-21 `bash tests/replay-hooks.sh` → **passed=14 failed=0**; `.claude/hooks/config.json` confirmed restored to `routing_guard_mode: "observe"`, `.claude/state/` empty.

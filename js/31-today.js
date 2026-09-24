@@ -1469,22 +1469,23 @@ function goToday() {
   tdRenderToday();
 }
 
-/* ── The four-destination nav ─────────────────────────────────────────────────
-   Today · Week · Money · More.
+/* ── The five-destination nav ─────────────────────────────────────────────────
+   Today · Week · Money · Sister Sync · More.
 
    One fixed element outside the screens rather than a copy of the same markup in
    each: six kid screens each carrying their own nav row is six places for the
    nav to drift, and the old topbar row proved it — the same five buttons were
    pasted into three screens with slightly different labels.
 
-   Every existing route still works and every old button still exists. This adds a
-   way to move between the four places that matter without retiring anything;
-   Branch 6 is where the duplicates go. */
+   A way to move between the five places that matter. Sister Sync became the
+   fifth on 2026-09-24 (the owner's decision); its More tile went with it, so
+   the tab is its one door. */
 const TD_NAV = [
-  { id: 'today', icon: '☀️', label: 'Today', screen: 'screen-today' },
-  { id: 'week',  icon: '📋', label: 'Week',  screen: 'screen-week' },
-  { id: 'money', icon: '💰', label: 'Money', screen: 'screen-mymoney' },
-  { id: 'more',  icon: '⋯',  label: 'More',  screen: null },
+  { id: 'today', icon: '☀️', label: 'Today',       screen: 'screen-today' },
+  { id: 'week',  icon: '📋', label: 'Week',        screen: 'screen-week' },
+  { id: 'money', icon: '💰', label: 'Money',       screen: 'screen-mymoney' },
+  { id: 'sync',  icon: '👯', label: 'Sister Sync', screen: 'screen-sync' },
+  { id: 'more',  icon: '⋯',  label: 'More',        screen: null },
 ];
 /* Screens that belong to a child. The nav is hidden everywhere else — a parent
    in the portal does not need a child's bottom bar, and the profile picker is
@@ -1513,7 +1514,7 @@ function tdRenderNav() {
   }).join('');
 }
 
-/* "More" is everything that is not one of the three. A sheet rather than a
+/* "More" is everything that is not one of the four. A sheet rather than a
    screen: it is a menu, and a menu you can dismiss beats a place you have to
    navigate back out of. */
 function tdOpenMore() {
@@ -1523,12 +1524,13 @@ function tdOpenMore() {
      the height, and every tile is still its own 44px target.
 
      Quests is gone with the Quest Board: it opened the fourth rendering of
-     today's list, and Today is the list. */
+     today's list, and Today is the list.
+
+     Sisters, Money story and Money school went on 2026-09-24: one destination,
+     one door. Sister Sync is a nav tab now; Money school is money tab 5 and My
+     money's 🎓 button, and Money story is My money's 📖 button. */
   const items = [
     { icon: '🧹', label: 'Chores',       go: 'chores' },
-    { icon: '👯', label: 'Sisters',      go: 'sisters' },
-    { icon: '📖', label: 'Money story',  go: 'story' },
-    { icon: '🎓', label: 'Money school', go: 'school' },
     /* Print was here. It has a button on the week topbar, which is the week it
        prints — a second door to it from a menu is a second label that can
        drift, and printing is not something you go looking for in "more". */
@@ -1563,9 +1565,6 @@ function tdOpenMore() {
 }
 function tdGoMore(where) {
   if (where === 'chores')  { openChoreTab(); return; }
-  if (where === 'sisters') { openSisterSync(); return; }
-  if (where === 'story')   { mnyOpenStory(); return; }
-  if (where === 'school')  { if (typeof mnyOpenSchool === 'function') mnyOpenSchool(); return; }
   if (where === 'profile') { goProfile(); return; }
 }
 function tdHandleNavClick(e) {
@@ -1577,5 +1576,6 @@ function tdHandleNavClick(e) {
   // openWeekMoney, not mnyOpenMyMoney directly: it resolves whose money page
   // this is, which is not always the active profile.
   if (d === 'money') { openWeekMoney(); return; }
+  if (d === 'sync')  { openSisterSync(); return; }
   if (d === 'more')  { tdOpenMore(); return; }
 }

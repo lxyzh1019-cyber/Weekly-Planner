@@ -6835,7 +6835,7 @@
     font: inherit; color: inherit; text-align: left; cursor: pointer;
   }
 
-  /* ── The four-destination kid nav ─────────────────────────────────────────
+  /* ── The five-destination kid nav ─────────────────────────────────────────
      Fixed to the bottom, because that is where a thumb is on a phone and where
      a child expects to switch places. Safe-area padding so it clears the iPhone
      home indicator; body gets matching bottom padding via .has-kid-nav so the

@@ -1,4 +1,4 @@
-# FEATURES — Weekly-Planner — manifest v7 — 2026-09-23 (v2 confirmed 2026-09-22)
+# FEATURES — Weekly-Planner — manifest v8 — 2026-09-24 (v2 confirmed 2026-09-22)
 
 Locked features of the current version. Every edit is checked against this list and ends with a regression table. Update this file in the same change that alters a feature. Over-list rather than under-list.
 
@@ -59,6 +59,14 @@ to be a complete manifest:
 - Because `js/01-config.js` is a cached shell file, the number shown is what that device loaded, offline copy included.
 - Held by `theBuildNumberIsOnThePage` in `tests/smoke.js` (both surfaces show `APP_BUILD`, `APP_BUILD` non-empty, the More line ≥13px, Setup does not show it, `APP_BUILD` matches `YYYY-MM-DD[a-z]`, Setup keeps its 👵 Grandma rule row). It absorbed PR #92's `theAppLandingShowsTheBuild`, which no longer exists.
 - **Consolidated 2026-09-23 (build 2026-09-23b)** when `main` (PR #92) was merged in: PR #92 had built a parallel stamp (`APP_BUILD`, App landing only). Now one constant `APP_BUILD`, one class `.app-build`, one `check-sw-shell.js` section, one smoke check, same two screens. `BUILD` no longer exists.
+
+### The kid nav has five places; More holds only what has no other home (manifested 2026-09-24, manifest v8)
+- **One nav, five places:** `TD_NAV` (`js/31-today.js`) is **Today · Week · Money · Sister Sync · More**, in that order: one fixed element (`#kidNav`) outside the screens, drawn by `tdRenderNav`. **No second nav row** on any screen (`ARCHITECTURE.md` › Navigation).
+- **👯 Sister Sync is a tab** (the owner's decision, 2026-09-24): `data-td-nav="sync"` → `openSisterSync()`, screen `screen-sync`, marked `aria-current="page"` (and `.on`) while Sister Sync is showing. Label **"Sister Sync"**: it fits on one line at 375px with the app's font (Patrick Hand), ≥44px target, 13px floor. The fallback label, if it ever stops fitting, is "Sisters".
+- The kid nav shows only on a child's screens (`TD_NAV_SCREENS`) and **never for a parent**; `openSisterSync` still refuses a parent. Parent: no change.
+- **One destination, one door.** The ⋯ More sheet (`tdOpenMore`) holds exactly **🧹 Chores · ◀ Switch**, then the build number (see next section). The 👯 Sisters, 📖 Money story and 🎓 Money school tiles and their `tdGoMore` branches (`'sisters'`, `'story'`, `'school'`) are gone. `check-dead-actions` cannot see `data-td-more`, so a tile and its branch are added or removed together, by hand.
+- Money school is still reached from money tab 5 (`data-mny-tab="school"`) and My money's 🎓 button; Money story from My money's 📖 button in `mnyLinksCard` (`data-mny-action="story"`).
+- Held by `sisterSyncIsABottomTab`, `moreHasNoMoneySchool`, `kidNavIsUsableAndScoped` (5 tabs) and `navReachesEverythingAndOldRoutesStillWork` (the sync tab lands on `screen-sync`) in `tests/smoke.js`.
 
 ### Week screen — the school-day offer (manifested 2026-09-22)
 - School days are **offered, never assumed**, and the question is whether the school **card** is missing, not whether the day is empty — `schoolDaysToOffer` (`js/07-week-view.js`).
