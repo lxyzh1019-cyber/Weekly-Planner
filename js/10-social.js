@@ -144,10 +144,132 @@ function sisterInviteFor(blockId, to, kind) {
     && (inv.status === 'pending' || inv.status === 'accepted')) || null;
 }
 
+/* WHAT AN INVITE CARRIES — the one owner.
+
+   An invite was a hand-copied subset of a block, and each round found a fact
+   the copy left out or guessed: the sender, the day, and then the buffers — a
+   share arrived with no drive and no get-ready, and a watch invite always gave
+   her 15 minutes each way however far away the meet was. Everything an invite
+   takes from its block is read here and nowhere else.
+
+   Buffers are read ONLY through the per-side readers (getTravelBufMin /
+   getGetReadyBufMin, js/03-sync.js), so a block that predates the two-leg split
+   carries the symmetric pair it has always drawn. Both objects are always
+   written, zeros included: their presence is how inviteToBlock tells an invite
+   carrying "no buffers" from one sent before this change. WARM-UP IS NEVER
+   CARRIED — it is training-only, and it is the sender's. Plain data inside
+   `state.shared.invites`, merged whole-record by mergeArrayById: no new key. */
+function inviteSnapshot(block, dayKey) {
+  const toMin = getTravelBufMin(block, 'pre'), homeMin = getTravelBufMin(block, 'post');
+  const beforeMin = getGetReadyBufMin(block, 'pre'), afterMin = getGetReadyBufMin(block, 'post');
+  return {
+    actId: block.actId,
+    day: dayKey,
+    startMin: block.startMin,
+    durationMin: block.durationMin,
+    sourceBlockId: block.id,
+    travel: { to: toMin > 0, toMin, home: homeMin > 0, homeMin },
+    ready: { before: beforeMin > 0, beforeMin, after: afterMin > 0, afterMin },
+  };
+}
+/* What she gets, in the words the edit sheet uses: "🚗 20m there · 25m home and
+   👕 15m to get ready". Plain text; '' when the invite carries no buffers. */
+function inviteBufferWords(inv) {
+  const t = inv.travel || {}, r = inv.ready || {};
+  const travel = [t.to ? `${fmtHrsMin(t.toMin)} there` : '', t.home ? `${fmtHrsMin(t.homeMin)} home` : '']
+    .filter(Boolean);
+  const ready = [r.before ? `👕 ${fmtHrsMin(r.beforeMin)} to get ready` : '',
+                 r.after ? `🧺 ${fmtHrsMin(r.afterMin)} to unpack` : ''].filter(Boolean);
+  return [travel.length ? '🚗 ' + travel.join(' · ') : '', ready.join(' · ')].filter(Boolean).join(' and ');
+}
+
+/* WHAT ACCEPTING WRITES — the one owner, for every accept door (the Sister Sync
+   inbox and the Day view's pending ghost, both through placeInvite). Puts the
+   block on `dayKey` for `profile` (the inbox is hers) and returns it.
+
+   Buffers are written the way the edit sheet writes them — master switch and
+   both legs spelled out — so her copy draws, clashes and edits exactly like the
+   sender's. A share gets the sender's drive, get-ready and unpack; a watch
+   block gets the MEET's own travel and get-ready, and never a warm-up.
+
+   An invite with no snapshot (sent before this change) is placed exactly as it
+   always was: a share with no buffers, a watch block with the fixed
+   DEFAULT_BUFFER_MIN each way. No migration.
+
+   A WATCH INVITE IS A DIFFERENT KIND OF BLOCK. `watching` is what makes
+   blockIsCompetition answer false, which is the whole guard: no result is
+   ever asked of her, nothing is adopted as the meet's own block, and nothing
+   reaches the money tab. She keeps the meet's name and tag so her card can
+   say which meet it is. */
+function inviteToBlock(inv, dayKey) {
+  const fromName = inv.from === 'jenn' ? 'Jenn' : 'Jess';
+  const placed = {
+    id: Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+    actId: inv.actId, startMin: inv.startMin, durationMin: inv.durationMin,
+    colour: CAT_HEX.free, objectives:[], note:`With ${fromName} 💕`, tag:null,
+    checklistState: {}, travelBuffer: false,
+  };
+  if (inv.watch) {
+    placed.watching = true;
+    placed.compName = inv.compName || null;
+    placed.tag = inv.tag || null;
+    placed.note = `Watching ${fromName} 👀`;
+    placed.warmupBuffer = false;
+  }
+  const t = inv.travel, r = inv.ready;
+  if (t && typeof t === 'object' && r && typeof r === 'object') {
+    // Values arrive off a shared document, so they are clamped like any typed figure.
+    if (t.to || t.home) {
+      const first = clampBufferMin(t.to ? t.toMin : t.homeMin);
+      placed.travelBuffer = true;
+      placed.travelBufMin = first;
+      placed.travelTo = !!t.to;
+      placed.travelToMin = t.to ? clampBufferMin(t.toMin) : first;
+      placed.travelHome = !!t.home;
+      placed.travelHomeMin = t.home ? clampBufferMin(t.homeMin) : first;
+    }
+    if (r.before || r.after) {
+      const first = clampBufferMin(r.before ? r.beforeMin : r.afterMin);
+      placed.getReadyBuffer = true;
+      placed.getReadyBufMin = first;
+      placed.readyBefore = !!r.before;
+      placed.readyBeforeMin = r.before ? clampBufferMin(r.beforeMin) : first;
+      placed.readyAfter = !!r.after;
+      placed.readyAfterMin = r.after ? clampBufferMin(r.afterMin) : first;
+    }
+  } else if (inv.watch) {
+    placed.travelBuffer = true;
+    placed.travelBufMin = DEFAULT_BUFFER_MIN;
+  }
+  const blocks = getDayBlocks(dayKey, profile);
+  blocks.push(placed);
+  setDayBlocks(dayKey, blocks, profile);
+  return placed;
+}
+
+/* HAS ITS DAY GONE? Derived from the date, like the rest of the app — nothing
+   is written, so there is no status to merge and no new shared state. A series
+   invite (its `series.dayKeys`) is missed only once its LAST day has gone. */
+function inviteLastDay(inv) {
+  const days = (inv && inv.series && Array.isArray(inv.series.dayKeys) && inv.series.dayKeys.length)
+    ? inv.series.dayKeys : [inv && inv.day];
+  return days.filter(d => typeof d === 'string').sort().pop() || null;
+}
+function inviteIsMissed(inv) {
+  const last = inviteLastDay(inv);
+  return !!last && last < todayKey();
+}
+/* CAN IT BE ACCEPTED NOW? Pending, and not missed. Both accept doors ask this
+   one question, so the Day view cannot drift from the inbox. A missed invite is
+   answered with 📌 Add it anyway (addInviteAnyway) or Decline, never Accept. */
+function inviteAcceptable(inv) {
+  return !!inv && inv.status === 'pending' && !inviteIsMissed(inv);
+}
+
 /* `opts.watch` turns this into an invitation to COME AND WATCH rather than to
-   do the same thing at the same time. Everything else is the existing
-   mechanism, untouched: an options argument that defaults to {} leaves the
-   call sites that pass none sending a plain invite, exactly as before.
+   do the same thing at the same time. An options argument that defaults to {}
+   leaves the call sites that pass none sending a plain invite. What either kind
+   carries from the block is inviteSnapshot's to say, not this function's.
 
    THE ONE WRITER of an invite. Sister Sync's tap, the edit sheet's 💌 and its
    👀 all come through here, so the duplicate guard below holds for every door.
@@ -199,24 +321,25 @@ async function sendInvite(block, to, day, opts = {}) {
   const meetLabel = (block.compName && String(block.compName).trim())
     || (typeof blockDisplayName === 'function' ? blockDisplayName(block, from).name : '')
     || activityLabel;
+  const carried = inviteSnapshot(block, day);
+  // Plain text: the dialog escapes it where it lands. No buffers, no sentence.
+  const gets = inviteBufferWords(carried);
   const ok = await showConfirm(
     watch
       ? `Invite ${sisterName} to come and watch ${meetLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(block.startMin)}?\n\n`
+        + (gets ? `She gets the same ${gets}.\n\n` : '')
         + 'It goes on her plan as something she is watching. She earns nothing for it — it is your meet, not hers.'
-      : `Share ${activityLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(block.startMin)} with ${sisterName}?`,
+      : `Share ${activityLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(block.startMin)} with ${sisterName}?`
+        + (gets ? ` She gets the same ${gets}.` : ''),
     { okLabel: watch ? 'Invite her' : 'Share' });
   if (!ok) return;
   const inv = {
     id: 'inv-'+Date.now().toString(36),
     from,
     to,
-    actId: block.actId,
-    day,
-    startMin: block.startMin,
-    durationMin: block.durationMin,
+    ...carried,
     status: 'pending',
     createdAt: syncNow(),
-    sourceBlockId: block.id,
   };
   if (watch) {
     inv.watch = true;
@@ -305,9 +428,18 @@ function renderChallenges() {
 /* THE INBOX'S OWN QUESTION AND ITS OWN WORDS, shared with Today's 💌 note
    (tdInviteNote, js/31-today.js) so the signpost and the inbox cannot drift:
    the note counts exactly what this list shows, and names each invite with the
-   same who / what / day / time and the same fallbacks. */
+   same who / what / day / time and the same fallbacks. A MISSED invite is not
+   waiting (inviteAcceptable), so the note never points at a day already gone. */
 function invitesWaitingFor(p) {
-  return (state.shared.invites || []).filter(i => i && i.to === p && i.status === 'pending');
+  return (state.shared.invites || []).filter(i => i && i.to === p && inviteAcceptable(i));
+}
+/* Pending invites to `p` whose day has passed — the inbox's small Missed group.
+   One from before this week drops out of the list so it cannot grow for ever;
+   it stays stored (invites are never deleted: no tombstone scope). */
+function invitesMissedFor(p) {
+  const weekStart = dateToLocalKey(getWeekStart(0));
+  return (state.shared.invites || []).filter(i => i && i.to === p && i.status === 'pending'
+    && inviteIsMissed(i) && inviteLastDay(i) >= weekStart);
 }
 /* Plain text; each surface escapes it where it lands. A watch invite's subject
    is the MEET, not the activity — accepting "Competition" and finding out on
@@ -332,7 +464,8 @@ function renderInvites() {
   if (!inviteList) return;
   inviteList.innerHTML = '';
   const myInvites = invitesWaitingFor(profile);
-  if (!myInvites.length) {
+  const missed = invitesMissedFor(profile);
+  if (!myInvites.length && !missed.length) {
     inviteList.innerHTML = '<p style="color:var(--ink-light);font-size:0.95rem">No invites right now. Tap one of your own activities above to invite your sister.</p>';
     return;
   }
@@ -348,6 +481,28 @@ function renderInvites() {
       ${what} on ${escapeHtml(f.day)} at ${escapeHtml(f.time)}</div>
       <div class="invite-actions">
         <button class="pill-btn" onclick="acceptInvite('${escapeJsAttr(inv.id)}')">✅ Accept</button>
+        <button class="pill-btn" onclick="declineInvite('${escapeJsAttr(inv.id)}')">❌ Decline</button>
+      </div>
+    `;
+    inviteList.appendChild(el);
+  });
+  /* MISSED: its day has gone, so there is no Accept. She may have gone anyway —
+     📌 puts it on that day through the same writer, unticked — or Decline
+     clears it. */
+  if (!missed.length) return;
+  const head = document.createElement('p');
+  head.style.cssText = 'color:var(--ink-light);font-size:0.95rem;margin:0.7rem 0 0.3rem';
+  head.textContent = 'Missed';
+  inviteList.appendChild(head);
+  missed.forEach(inv => {
+    const f = inviteFacts(inv);
+    const el = document.createElement('div');
+    el.className = 'invite-item';
+    const what = inv.watch ? `👀 watch <b>${escapeHtml(f.subject)}</b>` : `<b>${escapeHtml(f.subject)}</b>`;
+    el.innerHTML = `
+      <div>💌 <b>${escapeHtml(f.from)}</b> invited you to ${what} · ${escapeHtml(f.day)} — that day has passed</div>
+      <div class="invite-actions">
+        <button class="pill-btn" onclick="addInviteAnyway('${escapeJsAttr(inv.id)}')">📌 Add it to my ${escapeHtml(f.day)} anyway</button>
         <button class="pill-btn" onclick="declineInvite('${escapeJsAttr(inv.id)}')">❌ Decline</button>
       </div>
     `;
@@ -392,10 +547,26 @@ function deleteChallenge(id) {
 }
 function acceptInvite(id) {
   const inv = (state.shared.invites||[]).find(i=>i.id===id);
-  /* Only a PENDING invite can be answered. A double-tap on ✅ Accept used to
-     push a second block onto her day. Anything else returns quietly, and the
-     list is redrawn so a stale row goes away. */
-  if (!inv || inv.status !== 'pending') { refreshInvitesUI(); return; }
+  /* Only an invite that can be accepted NOW — pending, and its day not gone
+     (inviteAcceptable). A double-tap on ✅ Accept used to push a second block
+     onto her day, and a late tap put one on a day already past. Anything else
+     returns quietly, and the list is redrawn so a stale row goes away. */
+  if (!inviteAcceptable(inv)) { refreshInvitesUI(); return; }
+  placeInvite(inv, 'Added to your plan! 💕');
+}
+/* 📌 ADD IT ANYWAY — a missed invite she went to after all. The same writer as
+   Accept, onto that past day; the block arrives NOT ticked (whether she did it
+   is hers to tick, under the existing XP rules — placing it earns nothing), and
+   the invite reads accepted, so the sender's 💌 says it is on her plan. Only a
+   pending, missed invite: a second tap finds it accepted and adds nothing. */
+function addInviteAnyway(id) {
+  const inv = (state.shared.invites||[]).find(i=>i.id===id);
+  if (!inv || inv.status !== 'pending' || !inviteIsMissed(inv)) { refreshInvitesUI(); return; }
+  placeInvite(inv, 'Added to your plan 📌');
+}
+/* The shared tail of both: an activity she no longer has declines the invite
+   rather than placing a block she cannot open. */
+function placeInvite(inv, toast) {
   const receiverAct = findActivity(inv.actId, profile);
   if (!receiverAct) {
     inv.status = 'declined';
@@ -407,36 +578,9 @@ function acceptInvite(id) {
   }
   inv.status = 'accepted';
   markItemUpdated(inv);
-  // Place a matching block in this profile's schedule
-  const blocks = getDayBlocks(inv.day, profile);
-  const placed = {
-    id: Date.now().toString(36)+Math.random().toString(36).slice(2,5),
-    actId: inv.actId, startMin: inv.startMin, durationMin: inv.durationMin,
-    colour: CAT_HEX.free, objectives:[], note:`With ${inv.from==='jenn'?'Jenn':'Jess'} 💕`, tag:null,
-    checklistState: {}, travelBuffer: false,
-  };
-  /* A WATCH INVITE IS A DIFFERENT KIND OF BLOCK, and only this branch touches
-     it — the plain path above is the one mechanism that already puts an event
-     on both calendars and it stays exactly as it was.
-
-     `watching` is what makes blockIsCompetition answer false, which is the
-     whole guard: no result is ever asked of her, nothing is adopted as the
-     meet's own block, and nothing reaches the money tab. She keeps the meet's
-     name and tag so her card can say which meet it is, and she travels there —
-     but there is no warm-up, because she is not competing. */
-  if (inv.watch) {
-    placed.watching = true;
-    placed.compName = inv.compName || null;
-    placed.tag = inv.tag || null;
-    placed.note = `Watching ${inv.from==='jenn'?'Jenn':'Jess'} 👀`;
-    placed.travelBuffer = true;
-    placed.travelBufMin = DEFAULT_BUFFER_MIN;
-    placed.warmupBuffer = false;
-  }
-  blocks.push(placed);
-  setDayBlocks(inv.day, blocks, profile);
+  inviteToBlock(inv, inv.day);
   refreshInvitesUI();
-  showToast('Added to your plan! 💕');
+  showToast(toast);
 }
 function declineInvite(id) {
   const inv = (state.shared.invites||[]).find(i=>i.id===id);

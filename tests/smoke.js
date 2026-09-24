@@ -7182,6 +7182,64 @@ function findChromium() {
     return problems.length ? problems : true;
   });
 
+  /* ── INVITE FIXTURES, SHARED BY THE INVITE CHECKS ─────────────────
+     An invite whose day has passed is MISSED (inviteIsMissed), so an invite
+     check built on this week's days would pass or fail by weekday. Each one
+     pins the clock to a named weekday of this week for its own length and puts
+     it back in its `finally`. Only `new Date()` is pinned — at midday in the
+     family's zone, whatever the browser's own — and Date.now stays real, so
+     invite ids (`'inv-' + Date.now()`) stay unique.
+
+     inviteCarriedDiff is the field-by-field comparer, run on every accept door:
+     what an invite carries, read off the sender's block and off the block the
+     accept wrote. The reader list is the test's own, so a fact the invite drops
+     fails here; and the snapshot of her block must equal the snapshot of the
+     source, so a field added to inviteSnapshot that the accept writer forgets
+     fails too. Warm-up is never carried.
+
+     sendInviteSayingYes goes through the real door, dialog and all, and hands
+     back what the dialog said. */
+  await page.evaluate(() => {
+    window.pinClockToWeekday = (idx) => {
+      const RealDate = Date;
+      const [y, m, d] = getDayKeys(0)[idx].split('-').map(Number);
+      const when = new RealDate(RealDate.UTC(y, m - 1, d, 19, 0, 0)); // midday in Edmonton
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+      Date.prototype = RealDate.prototype;
+      Date.now = RealDate.now; Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+      return () => { Date = RealDate; };
+    };
+    window.inviteCarriedDiff = (src, placed, dayKey) => {
+      if (!placed) return ['no block was placed'];
+      const read = (b) => ({
+        actId: b.actId, startMin: b.startMin, durationMin: b.durationMin,
+        travelThere: getTravelBufMin(b, 'pre'), travelHome: getTravelBufMin(b, 'post'),
+        readyBefore: getGetReadyBufMin(b, 'pre'), readyAfter: getGetReadyBufMin(b, 'post'),
+      });
+      const a = read(src), b = read(placed), out = [];
+      Object.keys(a).forEach(k => { if (a[k] !== b[k]) out.push(`${k}: sender ${a[k]}, hers ${b[k]}`); });
+      if (getWarmupBufMin(placed)) out.push(`warm-up: hers is ${getWarmupBufMin(placed)}m — warm-up is never carried`);
+      if (typeof inviteSnapshot === 'function') {
+        const s1 = inviteSnapshot(src, dayKey), s2 = inviteSnapshot(placed, dayKey);
+        [...new Set([...Object.keys(s1), ...Object.keys(s2)])].filter(k => k !== 'sourceBlockId').forEach(k => {
+          if (JSON.stringify(s1[k]) !== JSON.stringify(s2[k])) {
+            out.push(`snapshot.${k}: sender ${JSON.stringify(s1[k])}, hers ${JSON.stringify(s2[k])}`);
+          }
+        });
+      }
+      return out;
+    };
+    window.sendInviteSayingYes = async (block, to, day, opts) => {
+      const p = sendInvite(block, to, day, opts);
+      await new Promise(r => setTimeout(r, 40));
+      const said = ((document.getElementById('appDialogMsg') || {}).textContent || '').trim();
+      const ok = document.getElementById('appDialogOkBtn');
+      if (document.querySelector('#appDialogOverlay.open') && ok) ok.click();
+      await p;
+      return said;
+    };
+  });
+
   /* ── WATCHING IS NOT COMPETING ────────────────────────────────────
      A sister can be invited to WATCH a meet, and the danger is the invite
      mechanism itself: acceptInvite copies actId verbatim, and `competition` is
@@ -7196,6 +7254,8 @@ function findChromium() {
      it is worth more than the rest of the feature. */
   if (want('aWatchedMeetIsNeverChasedForAResult')) checks.aWatchedMeetIsNeverChasedForAResult = await page.evaluate(async () => {
     const problems = [];
+    // Monday: every later day of this week is still ahead, so no invite here is missed (inviteIsMissed).
+    const unpin = pinClockToWeekday(0);
     const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
     const wasOffset = weekOffset;
     const wasInvites = state.shared.invites;
@@ -7294,6 +7354,7 @@ function findChromium() {
     } catch (e) {
       problems.push('threw: ' + e.message);
     } finally {
+      unpin();
       state.shared.invites = wasInvites;
       getProfData('jess').competitions = jessComps;
       keys.forEach((k, i) => { setDayBlocks(k, savedJenn[i], 'jenn'); setDayBlocks(k, savedJess[i], 'jess'); });
@@ -7379,6 +7440,8 @@ function findChromium() {
      A declined invite may go again — a no on Tuesday is not a no for ever. */
   if (want('anInviteCannotBeSentTwice')) checks.anInviteCannotBeSentTwice = await page.evaluate(async () => {
     const problems = [];
+    // Monday: every later day of this week is still ahead, so no invite here is missed (inviteIsMissed).
+    const unpin = pinClockToWeekday(0);
     const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
     const wasOffset = weekOffset, wasSyncIdx = syncDayIdx;
     const wasInvites = state.shared.invites;
@@ -7553,6 +7616,7 @@ function findChromium() {
     } catch (e) {
       problems.push('threw: ' + e.message);
     } finally {
+      unpin();
       closeSheet('editOverlay');
       state.shared.invites = wasInvites;
       keys.forEach((k, i) => { setDayBlocks(k, savedJenn[i], 'jenn'); setDayBlocks(k, savedJess[i], 'jess'); });
@@ -7573,6 +7637,8 @@ function findChromium() {
      showing, the edit sheet passes the day it is editing. */
   if (want('anInviteFromSisterSyncIsDatedThatDay')) checks.anInviteFromSisterSyncIsDatedThatDay = await page.evaluate(async () => {
     const problems = [];
+    // Monday: every later day of this week is still ahead, so no invite here is missed (inviteIsMissed).
+    const unpin = pinClockToWeekday(0);
     const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
     const wasOffset = weekOffset, wasSyncIdx = syncDayIdx;
     const wasInvites = state.shared.invites;
@@ -7630,6 +7696,7 @@ function findChromium() {
     } catch (e) {
       problems.push('threw: ' + e.message);
     } finally {
+      unpin();
       state.shared.invites = wasInvites;
       keys.forEach((k, i) => { setDayBlocks(k, savedJenn[i], 'jenn'); setDayBlocks(k, savedJess[i], 'jess'); });
       profile = wasProfile; parentViewing = wasViewing;
@@ -7655,6 +7722,8 @@ function findChromium() {
   await page.setViewportSize({ width: 390, height: 844 });
   if (want('anInviteWaitingShowsOnToday')) checks.anInviteWaitingShowsOnToday = await page.evaluate(async () => {
     const problems = [];
+    // Monday: every later day of this week is still ahead, so no invite here is missed (inviteIsMissed).
+    const unpin = pinClockToWeekday(0);
     const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
     const wasOffset = weekOffset, wasSyncIdx = syncDayIdx;
     const wasInvites = state.shared.invites;
@@ -7762,6 +7831,7 @@ function findChromium() {
     } catch (e) {
       problems.push('threw: ' + e.message);
     } finally {
+      unpin();
       state.shared.invites = wasInvites;
       keys.forEach((k, i) => setDayBlocks(k, savedJess[i], 'jess'));
       setDayBlocks(todayK, savedJessToday, 'jess');
@@ -7773,6 +7843,360 @@ function findChromium() {
     return problems.length ? problems : true;
   });
   await page.setViewportSize({ width: 900, height: 1100 });
+
+  /* ── AN INVITE CARRIES THE SENDER'S TRAVEL AND GET-READY ──────────
+     An invite was a hand-copied subset of a block, and the copy left the
+     buffers out: a share put NO travel and NO get-ready on her copy, and a
+     watch invite always gave her 15 minutes each way (DEFAULT_BUFFER_MIN), even
+     from a meet an hour's drive away. One owner now says what an invite
+     carries (inviteSnapshot) and one says what accepting writes
+     (inviteToBlock), both reading buffers through the per-side readers.
+
+     An invite sent before this change has no snapshot, and accepts exactly as
+     it always did — there is no migration. */
+  if (want('anInviteCarriesTheSendersTravelAndGetReady')) checks.anInviteCarriesTheSendersTravelAndGetReady = await page.evaluate(async () => {
+    const problems = [];
+    const unpin = pinClockToWeekday(0); // Monday: every other day of the week is still ahead
+    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
+    const wasInvites = state.shared.invites;
+    const keys = getDayKeys(0);
+    const savedJenn = keys.map(k => getDayBlocks(k, 'jenn'));
+    const savedJess = keys.map(k => getDayBlocks(k, 'jess'));
+    const hers = (day, pred) => (getDayBlocks(day, 'jess') || []).filter(pred);
+    const base = { objectives: [], checklistState: {}, gearState: {} };
+    try {
+      state.shared.invites = [];
+      keys.forEach(k => { setDayBlocks(k, [], 'jenn'); setDayBlocks(k, [], 'jess'); });
+
+      // ── A share: 20m there, 25m home, 15m to get ready, legs written the way
+      //    the edit sheet writes them. Warm-up is the sender's alone.
+      const swim = { ...base, id: 'carry-share', actId: 'reading', startMin: 16 * 60, durationMin: 60,
+        travelBuffer: true, travelBufMin: 20, travelTo: true, travelToMin: 20, travelHome: true, travelHomeMin: 25,
+        getReadyBuffer: true, getReadyBufMin: 15, readyBefore: true, readyBeforeMin: 15, readyAfter: false, readyAfterMin: 15,
+        warmupBuffer: true, warmupBufMin: 20 };
+      setDayBlocks(keys[1], [swim], 'jenn');
+      profile = 'jenn';
+      const said = await sendInviteSayingYes(swim, 'jess', keys[1]);
+      if (!said.includes('🚗 20m there · 25m home') || !said.includes('👕 15m to get ready')) {
+        problems.push(`the share's confirm does not say what she gets: "${said}"`);
+      }
+      const inv = (state.shared.invites || []).find(i => i && i.sourceBlockId === swim.id);
+      if (!inv) { problems.push('no invite was sent'); return problems; }
+      profile = 'jess';
+      acceptInvite(inv.id);
+      const got = hers(keys[1], b => b.actId === 'reading');
+      if (got.length !== 1) problems.push(`accepting the share put ${got.length} blocks on her Tuesday, not 1`);
+      else inviteCarriedDiff(swim, got[0], keys[1]).forEach(d => problems.push('share — ' + d));
+
+      // ── No buffers: the confirm says nothing about them.
+      const plain = { ...base, id: 'carry-plain', actId: 'reading', startMin: 10 * 60, durationMin: 30 };
+      setDayBlocks(keys[6], [plain], 'jenn');
+      profile = 'jenn';
+      const saidPlain = await sendInviteSayingYes(plain, 'jess', keys[6]);
+      if (/She gets|🚗|👕/.test(saidPlain)) problems.push(`a share with no buffers still talks about them: "${saidPlain}"`);
+
+      // ── A watch invite from a meet 30 minutes away each way: 30/30, the get-ready, no warm-up.
+      const meet = { ...base, id: 'carry-meet', actId: 'competition', compName: 'Harvest Cup', tag: 'skating',
+        startMin: COMP_BLOCK_START, durationMin: COMP_BLOCK_DUR,
+        travelBuffer: true, travelBufMin: 30, travelTo: true, travelToMin: 30, travelHome: true, travelHomeMin: 30,
+        getReadyBuffer: true, getReadyBufMin: 10, readyBefore: true, readyBeforeMin: 10, readyAfter: true, readyAfterMin: 10,
+        warmupBuffer: true, warmupBufMin: 20 };
+      setDayBlocks(keys[5], [meet], 'jenn');
+      profile = 'jenn';
+      const saidWatch = await sendInviteSayingYes(meet, 'jess', keys[5], { watch: true });
+      if (!saidWatch.includes('🚗 30m there · 30m home')) problems.push(`the watch confirm does not say what she gets: "${saidWatch}"`);
+      const winv = (state.shared.invites || []).find(i => i && i.sourceBlockId === meet.id && i.watch);
+      if (!winv) problems.push('no watch invite was sent');
+      else {
+        profile = 'jess';
+        acceptInvite(winv.id);
+        const w = hers(keys[5], b => b.watching);
+        if (w.length !== 1) problems.push(`accepting the watch invite put ${w.length} watch blocks on her Saturday, not 1`);
+        else {
+          const pre = getTravelBufMin(w[0], 'pre'), post = getTravelBufMin(w[0], 'post');
+          if (pre !== 30 || post !== 30) problems.push(`the watch block travels ${pre}/${post}, not the meet's own 30/30`);
+          if (w[0].warmupBuffer || getWarmupBufMin(w[0])) problems.push('the watch block carries a warm-up — she is not competing');
+          inviteCarriedDiff(meet, w[0], keys[5]).forEach(d => problems.push('watch — ' + d));
+        }
+      }
+
+      // ── Invites sent before this change (no snapshot) accept exactly as they did.
+      const old = (id, extra) => Object.assign({
+        id, from: 'jenn', to: 'jess', actId: 'reading', day: keys[4], startMin: 9 * 60, durationMin: 30,
+        status: 'pending', createdAt: syncNow(), sourceBlockId: 'src-' + id,
+      }, extra || {});
+      state.shared.invites = [...state.shared.invites, old('carry-old-share'),
+        old('carry-old-watch', { actId: 'competition', watch: true, compName: 'Old Meet', tag: 'skating',
+          day: keys[3], startMin: COMP_BLOCK_START, durationMin: COMP_BLOCK_DUR })];
+      profile = 'jess';
+      acceptInvite('carry-old-share');
+      acceptInvite('carry-old-watch');
+      const os = hers(keys[4], b => b.actId === 'reading');
+      if (os.length !== 1) problems.push(`an old share put ${os.length} blocks on her day, not 1`);
+      else if (os[0].travelBuffer || getTravelBufMin(os[0]) || getGetReadyBufMin(os[0])) {
+        problems.push('an old share (no snapshot) now arrives with buffers — it should arrive exactly as before, with none');
+      }
+      const ow = hers(keys[3], b => b.watching);
+      if (ow.length !== 1) problems.push(`an old watch invite put ${ow.length} watch blocks on her day, not 1`);
+      else {
+        if (!ow[0].travelBuffer || getTravelBufMin(ow[0], 'pre') !== DEFAULT_BUFFER_MIN || getTravelBufMin(ow[0], 'post') !== DEFAULT_BUFFER_MIN) {
+          problems.push(`an old watch invite travels ${getTravelBufMin(ow[0], 'pre')}/${getTravelBufMin(ow[0], 'post')}, not the ${DEFAULT_BUFFER_MIN}/${DEFAULT_BUFFER_MIN} it always had`);
+        }
+        if (getGetReadyBufMin(ow[0]) || ow[0].warmupBuffer) problems.push('an old watch invite now arrives with get-ready or warm-up');
+      }
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      state.shared.invites = wasInvites;
+      keys.forEach((k, i) => { setDayBlocks(k, savedJenn[i], 'jenn'); setDayBlocks(k, savedJess[i], 'jess'); });
+      profile = wasProfile; parentViewing = wasViewing; currentDayKey = wasDayKey;
+      unpin();
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── AN INVITE SHE DIDN'T SEE IN TIME IS MISSED, NOT WAITING ──────
+     Nothing expired. Two days late, Today's 💌 still said "invited you to
+     Reading · Wed" for a Wednesday already gone, and ✅ Accept put a block on
+     a past day. inviteIsMissed owns the question (its day — for a series, its
+     last day — is before today); it is derived from the date, so nothing is
+     written and there is nothing new to merge.
+
+     A missed invite is not waiting: no note on Today, and no Accept. The inbox
+     keeps it in a small Missed group with 📌 Add it … anyway (she went anyway,
+     so put it on the calendar — unticked, with the sender's buffers, and the
+     invite reads accepted) and Decline. One from before this week drops out
+     of the list, and is still stored: invites are never deleted.
+
+     Sections are separate cases on one pinned Thursday, so a later case can
+     sit beside them. */
+  if (want('aMissedInviteIsNotWaiting')) checks.aMissedInviteIsNotWaiting = await page.evaluate(async () => {
+    const problems = [];
+    const unpin = pinClockToWeekday(3); // Thursday: Wednesday was yesterday
+    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
+    const wasOffset = weekOffset, wasSyncIdx = syncDayIdx;
+    const wasInvites = state.shared.invites;
+    const wasScreen = (document.querySelector('.screen.active') || {}).id || 'screen-today';
+    const keys = getDayKeys(0);
+    const tueKey = keys[1], wedKey = keys[2];
+    const lastWeekKey = getDayKeys(-1)[3];
+    const savedJenn = keys.map(k => getDayBlocks(k, 'jenn'));
+    const savedJess = keys.map(k => getDayBlocks(k, 'jess'));
+    const hers = (day, pred) => (getDayBlocks(day, 'jess') || []).filter(pred || (() => true));
+    const inboxRows = () => [...document.querySelectorAll('#invitesList .invite-item')];
+    const rowFor = (dayIdx, name) => inboxRows().find(r => /that day has passed/.test(r.textContent)
+      && r.textContent.includes(name) && r.textContent.includes(DAY_SHORT[dayIdx]));
+    const buttonsOf = (row) => [...row.querySelectorAll('button')];
+    const base = { objectives: [], checklistState: {}, gearState: {} };
+    try {
+      state.shared.invites = [];
+      keys.forEach(k => { setDayBlocks(k, [], 'jenn'); setDayBlocks(k, [], 'jess'); });
+
+      // Yesterday's, with buffers; Tuesday's, to be declined; last week's, left pending.
+      const swim = { ...base, id: 'missed-share', actId: 'reading', startMin: 16 * 60, durationMin: 60,
+        travelBuffer: true, travelBufMin: 20, travelTo: true, travelToMin: 20, travelHome: true, travelHomeMin: 25,
+        getReadyBuffer: true, getReadyBufMin: 15, readyBefore: true, readyBeforeMin: 15, readyAfter: false, readyAfterMin: 15 };
+      const tue = { ...base, id: 'missed-tue', actId: 'reading', startMin: 18 * 60, durationMin: 30 };
+      setDayBlocks(wedKey, [swim], 'jenn');
+      setDayBlocks(tueKey, [tue], 'jenn');
+      profile = 'jenn';
+      await sendInviteSayingYes(swim, 'jess', wedKey);
+      await sendInviteSayingYes(tue, 'jess', tueKey);
+      const inv = (state.shared.invites || []).find(i => i && i.sourceBlockId === swim.id);
+      const inv2 = (state.shared.invites || []).find(i => i && i.sourceBlockId === tue.id);
+      if (!inv || !inv2) { problems.push('the two invites were not sent'); return problems; }
+      state.shared.invites = [...state.shared.invites, {
+        id: 'missed-lastweek', from: 'jenn', to: 'jess', actId: 'reading', day: lastWeekKey,
+        startMin: 9 * 60, durationMin: 30, status: 'pending', createdAt: syncNow(), sourceBlockId: 'src-missed-lastweek',
+      }];
+      profile = 'jess'; weekOffset = 0;
+
+      // ── Not waiting: Today's note never points at a missed invite.
+      if (invitesWaitingFor('jess').length) {
+        problems.push(`${invitesWaitingFor('jess').length} missed invites still count as waiting`);
+      }
+      goToday();
+      const note = document.querySelector('#tdWrap [data-td-action="invites"]');
+      if (note) problems.push(`Today still points at a missed invite: "${note.textContent.replace(/\s+/g, ' ').trim()}"`);
+
+      // ── The inbox: a Missed group, with no Accept.
+      openSisterSync();
+      const row = rowFor(2, 'Reading');
+      if (!row) {
+        problems.push(`the inbox does not show yesterday's invite as missed: "${(document.getElementById('invitesList') || {}).textContent.replace(/\s+/g, ' ').trim().slice(0, 200)}"`);
+      } else {
+        const labels = buttonsOf(row).map(b => b.textContent.trim());
+        if (labels.some(t => /Accept/.test(t))) problems.push(`a missed invite still offers Accept: ${labels.join(' | ')}`);
+        if (!labels.some(t => t.includes(`Add it to my ${DAY_SHORT[2]} anyway`))) problems.push(`a missed invite has no "📌 Add it to my ${DAY_SHORT[2]} anyway": ${labels.join(' | ')}`);
+        if (!labels.some(t => /Decline/.test(t))) problems.push(`a missed invite has no Decline: ${labels.join(' | ')}`);
+      }
+      if (inboxRows().length !== 2) problems.push(`the inbox lists ${inboxRows().length} invites — expected this week's two missed ones, and not last week's`);
+      if (!(state.shared.invites || []).some(i => i.id === 'missed-lastweek' && i.status === 'pending')) {
+        problems.push('last week\'s invite was changed or deleted — it only drops out of the list');
+      }
+
+      // ── The Accept door refuses a missed invite: only Add it anyway places it.
+      acceptInvite(inv.id);
+      if (hers(wedKey).length) problems.push('acceptInvite put a missed invite on her past day');
+      if (inv.status !== 'pending') problems.push(`acceptInvite on a missed invite turned it "${inv.status}"`);
+
+      // ── 📌 Add it anyway: on the past day, unticked, with the sender's buffers; the invite reads accepted.
+      const xpBefore = xpWeekTally('jess', xpWeekKeyFor(wedKey));
+      const add = rowFor(2, 'Reading') && buttonsOf(rowFor(2, 'Reading')).find(b => /anyway/.test(b.textContent));
+      if (!add) problems.push('no Add it anyway button to press');
+      else {
+        add.click();
+        const placed = hers(wedKey, b => b.actId === 'reading');
+        if (placed.length !== 1) problems.push(`Add it anyway put ${placed.length} blocks on her Wednesday, not 1`);
+        else {
+          if (placed[0].completed) problems.push('Add it anyway put the block on already ticked — whether she did it is hers to tick');
+          inviteCarriedDiff(swim, placed[0], wedKey).forEach(d => problems.push('add anyway — ' + d));
+        }
+        if (xpWeekTally('jess', xpWeekKeyFor(wedKey)) !== xpBefore) problems.push('placing a missed invite earned XP');
+        if (inv.status !== 'accepted') problems.push(`after Add it anyway the invite is "${inv.status}", not accepted`);
+        const live = sisterInviteFor(swim.id, 'jess', 'share');
+        if (!live || live.status !== 'accepted') problems.push('the sender does not see it as on her plan');
+        if (rowFor(2, 'Reading')) problems.push('the added invite is still in the Missed group');
+        // A second tap adds nothing.
+        if (typeof addInviteAnyway === 'function') addInviteAnyway(inv.id);
+        else problems.push('addInviteAnyway is not declared');
+        if (hers(wedKey).length !== 1) problems.push(`a second Add it anyway left ${hers(wedKey).length} blocks on her Wednesday`);
+      }
+
+      // ── Decline clears a missed invite she didn't go to.
+      const row2 = rowFor(1, 'Reading');
+      const dec = row2 && buttonsOf(row2).find(b => /Decline/.test(b.textContent));
+      if (!dec) problems.push('no Decline on Tuesday\'s missed invite');
+      else {
+        dec.click();
+        if (inv2.status !== 'declined') problems.push(`declining a missed invite left it "${inv2.status}"`);
+        if (rowFor(1, 'Reading')) problems.push('a declined missed invite is still listed');
+        if (hers(tueKey).length) problems.push('declining a missed invite put something on her Tuesday');
+      }
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      state.shared.invites = wasInvites;
+      keys.forEach((k, i) => { setDayBlocks(k, savedJenn[i], 'jenn'); setDayBlocks(k, savedJess[i], 'jess'); });
+      profile = wasProfile; parentViewing = wasViewing;
+      currentDayKey = wasDayKey; weekOffset = wasOffset; syncDayIdx = wasSyncIdx;
+      showScreen(wasScreen.replace(/^screen-/, ''));
+      unpin();
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── THE DAY VIEW'S ACCEPT FOLLOWS THE SAME RULES ─────────────────
+     An invite can be answered in two places: the Sister Sync inbox, and the
+     pending ghost on the Day view with its own buttons. The second door used to
+     re-implement the rules, so it could drift. Both now call the same owners —
+     inviteAcceptable and inviteToBlock — so on a past day the ghost offers no
+     ✅ Accept, only 📌 Add it anyway and Decline, and accepting from the Day
+     view writes exactly the block the inbox writes. */
+  if (want('theDayViewAcceptFollowsTheSameRules')) checks.theDayViewAcceptFollowsTheSameRules = await page.evaluate(async () => {
+    const problems = [];
+    const unpin = pinClockToWeekday(3); // Thursday
+    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
+    const wasOffset = weekOffset, wasSyncIdx = syncDayIdx;
+    const wasInvites = state.shared.invites;
+    const wasScreen = (document.querySelector('.screen.active') || {}).id || 'screen-today';
+    const keys = getDayKeys(0);
+    const wedKey = keys[2], friKey = keys[4];
+    const savedJenn = keys.map(k => getDayBlocks(k, 'jenn'));
+    const savedJess = keys.map(k => getDayBlocks(k, 'jess'));
+    const hers = (day) => (getDayBlocks(day, 'jess') || []).filter(b => b.actId === 'reading');
+    const ghostOn = (day) => document.querySelector(`#timeline .tl-col[data-day-key="${day}"] .placed-block.invitation`);
+    const labelsOf = (el) => [...el.querySelectorAll('button')].map(b => b.textContent.trim());
+    const SKIP = new Set(['id', 'opId', 'baseOpId', 'updatedAt']);
+    const sameBlock = (a, b) => {
+      const out = [];
+      [...new Set([...Object.keys(a), ...Object.keys(b)])].filter(k => !SKIP.has(k)).forEach(k => {
+        if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) out.push(`${k}: Day view ${JSON.stringify(a[k])}, inbox ${JSON.stringify(b[k])}`);
+      });
+      return out;
+    };
+    const base = { objectives: [], checklistState: {}, gearState: {} };
+    const legs = { travelBuffer: true, travelBufMin: 20, travelTo: true, travelToMin: 20, travelHome: true, travelHomeMin: 25,
+      getReadyBuffer: true, getReadyBufMin: 15, readyBefore: true, readyBeforeMin: 15, readyAfter: false, readyAfterMin: 15 };
+    try {
+      state.shared.invites = [];
+      keys.forEach(k => { setDayBlocks(k, [], 'jenn'); setDayBlocks(k, [], 'jess'); });
+      /* Mid-morning: her days are empty, and an empty day's canvas is drawn
+         6am–2pm (dayDrawnSpanMin), so an afternoon ghost would not be drawn. */
+      const past = { ...base, ...legs, id: 'dv-past', actId: 'reading', startMin: 10 * 60, durationMin: 60 };
+      const next = { ...base, ...legs, id: 'dv-next', actId: 'reading', startMin: 10 * 60, durationMin: 60 };
+      setDayBlocks(wedKey, [past], 'jenn');
+      setDayBlocks(friKey, [next], 'jenn');
+      profile = 'jenn';
+      await sendInviteSayingYes(past, 'jess', wedKey);
+      await sendInviteSayingYes(next, 'jess', friKey);
+      const invPast = (state.shared.invites || []).find(i => i && i.sourceBlockId === past.id);
+      const invNext = (state.shared.invites || []).find(i => i && i.sourceBlockId === next.id);
+      if (!invPast || !invNext) { problems.push('the invites were not sent'); return problems; }
+      // The same invite again, to answer through the inbox and compare.
+      const twin = { ...invNext, id: invNext.id + '-twin' };
+      state.shared.invites = [...state.shared.invites, twin];
+      profile = 'jess'; weekOffset = 0;
+
+      // ── A past day: no Accept, only Add it anyway and Decline.
+      openDay(wedKey, 2);
+      const g1 = ghostOn(wedKey);
+      if (!g1) problems.push('the Day view shows no pending ghost for yesterday\'s invite');
+      else {
+        const labels = labelsOf(g1);
+        if (labels.some(t => /Accept/.test(t))) problems.push(`on a past day the ghost still offers Accept: ${labels.join(' | ')}`);
+        if (!labels.some(t => /Add it anyway/.test(t))) problems.push(`on a past day the ghost has no Add it anyway: ${labels.join(' | ')}`);
+        if (!labels.some(t => /Decline/.test(t))) problems.push(`on a past day the ghost has no Decline: ${labels.join(' | ')}`);
+        const add = [...g1.querySelectorAll('button')].find(b => /Add it anyway/.test(b.textContent));
+        if (add) {
+          add.click();
+          const placed = hers(wedKey);
+          if (placed.length !== 1) problems.push(`Add it anyway from the Day view put ${placed.length} blocks on her Wednesday, not 1`);
+          else {
+            if (placed[0].completed) problems.push('Add it anyway from the Day view put the block on ticked');
+            inviteCarriedDiff(past, placed[0], wedKey).forEach(d => problems.push('Day view add anyway — ' + d));
+          }
+          if (invPast.status !== 'accepted') problems.push(`after Add it anyway from the Day view the invite is "${invPast.status}"`);
+          if (ghostOn(wedKey)) problems.push('the ghost is still drawn after Add it anyway');
+        }
+      }
+
+      // ── A day ahead: Accept from the Day view…
+      openDay(friKey, 4);
+      const g2 = ghostOn(friKey);
+      const acc = g2 && [...g2.querySelectorAll('button')].find(b => /Accept/.test(b.textContent));
+      if (!acc) { problems.push('the Day view offers no Accept for an invite on a day ahead'); return problems; }
+      acc.click();
+      const fromDay = hers(friKey);
+      if (fromDay.length !== 1) problems.push(`accepting from the Day view put ${fromDay.length} blocks on her Friday, not 1`);
+      const dayBlock = fromDay[0];
+      inviteCarriedDiff(next, dayBlock, friKey).forEach(d => problems.push('Day view accept — ' + d));
+
+      // …and the same invite through the inbox writes the same block.
+      setDayBlocks(friKey, [], 'jess');
+      openSisterSync();
+      const row = [...document.querySelectorAll('#invitesList .invite-item')]
+        .find(r => r.textContent.includes(DAY_SHORT[4]) && /Accept/.test(r.textContent));
+      const inboxAcc = row && [...row.querySelectorAll('button')].find(b => /Accept/.test(b.textContent));
+      if (!inboxAcc) problems.push('the inbox offers no Accept for the twin invite');
+      else {
+        inboxAcc.click();
+        const fromInbox = hers(friKey);
+        if (fromInbox.length !== 1) problems.push(`accepting from the inbox put ${fromInbox.length} blocks on her Friday, not 1`);
+        else if (dayBlock) sameBlock(dayBlock, fromInbox[0]).forEach(d => problems.push('the two doors differ — ' + d));
+      }
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      state.shared.invites = wasInvites;
+      keys.forEach((k, i) => { setDayBlocks(k, savedJenn[i], 'jenn'); setDayBlocks(k, savedJess[i], 'jess'); });
+      profile = wasProfile; parentViewing = wasViewing;
+      currentDayKey = wasDayKey; weekOffset = wasOffset; syncDayIdx = wasSyncIdx;
+      showScreen(wasScreen.replace(/^screen-/, ''));
+      unpin();
+    }
+    return problems.length ? problems : true;
+  });
 
   /* ── THE SYSTEM DID NOT BEGIN TODAY ───────────────────────────────
      Three stores answered "when did this family start", and every one of them

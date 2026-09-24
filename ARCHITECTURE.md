@@ -756,12 +756,15 @@ watcher's Saturday claims the meet is hers. `renderTrainingChecks` and
 `renderTrainingGearChecklist` return empty for a watch block: the four checks
 are a review of a session you took part in, and a watcher packs no skates.
 Buffers split — **travel stays, warm-up goes**: she really does go to the rink,
-and she is not competing.
+and she is not competing. Since 2026-09-24 the travel is the **meet's own**
+legs (and its get-ready), carried by the invite — see *What an invite carries*
+below; an invite sent before then still gives the fixed 15 each way.
 
 `sendInvite(block, to, day, opts)` carries `watch`, `compName` and `tag`; the
-call sites that pass no `opts` send a plain invite, and **the plain invite path in
-`acceptInvite` is untouched** — it is the one mechanism that already puts an
-event on both calendars and this is not about it. `👀 Invite my sister to
+call sites that pass no `opts` send a plain invite. **The plain invite path in
+`acceptInvite` is no longer untouched, on purpose** (the owner's decision,
+2026-09-24): both kinds now go through the owners in *What an invite carries*
+below, which is what gives a share the sender's travel and get-ready. `👀 Invite my sister to
 watch` sits outside `#sisterSyncWrap`, which is parent-only, because asking
 your sister to come and watch you compete is a child's own decision; it shows
 only when `blockIsCompetition(block)`, so a watch block cannot be passed on
@@ -785,10 +788,11 @@ invite — `pending` or `accepted` — from that block to that sister of that ki
 live duplicate of the same kind **before** its confirm dialog, with a toast
 saying whether she hasn't answered yet or it is already on her plan; a
 **declined** invite may go again (a no on Tuesday is not a no for ever), and a
-share and a watch of the same block are different questions. `acceptInvite`
-and `declineInvite` act only on a `pending` invite — a double-tap on ✅ Accept
-used to put a second block on her day — and otherwise return quietly and
-redraw the list.
+share and a watch of the same block are different questions. `declineInvite`
+acts only on a `pending` invite, and `acceptInvite` only on one
+`inviteAcceptable` says yes to (pending, and not missed — below) — a
+double-tap on ✅ Accept used to put a second block on her day — and otherwise
+they return quietly and redraw the list.
 
 Both edit-sheet buttons read their sent-state from `sisterInviteFor` **for
 their own kind**. `invitedTo` on the source block is a bare list of names that
@@ -802,16 +806,77 @@ calendar. **The public toggle (`#publicToggle`) stays parent-only** — it is
 all `#sisterSyncWrap` now holds. `anInviteCannotBeSentTwice` (`tests/smoke.js`)
 holds all of it.
 
+**What an invite carries, and what accepting writes — one owner each**
+(2026-09-24, Sister Sync invites hotspot round 4). An invite was a hand-copied
+subset of a block, and every fix round found a fact the copy left out or
+guessed: the sender, the day, then the buffers — a share arrived with no drive
+and no get-ready, and a watch block always got 15 minutes each way however far
+away the meet was. The repair, chosen over re-linking invites to their source
+block (copy semantics are the owner's choice, and a link would change a
+`state.shared` shape and need a migration on both iPads):
+
+- `inviteSnapshot(block, dayKey)` (`js/10-social.js`) owns **what an invite
+  carries**: `actId`, `day`, `startMin`, `durationMin`, `sourceBlockId`, and
+  `travel {to, toMin, home, homeMin}` / `ready {before, beforeMin, after,
+  afterMin}`, read **only** through `getTravelBufMin` / `getGetReadyBufMin` per
+  side. Both objects are always written, zeros included — their presence is how
+  an invite carrying "no buffers" is told from one sent before this change.
+  **Warm-up is never carried**: it is training-only, and the sender's.
+  `sendInvite` builds every invite from it, and its confirm says what she gets
+  (`… She gets the same 🚗 20m there · 25m home and 👕 15m to get ready.`; no
+  buffers, no sentence — plain text, escaped by the dialog).
+- `inviteToBlock(inv, dayKey)` owns **what accepting writes**: the block on
+  `dayKey` for `profile`, buffers written the way the edit sheet writes them
+  (master switch and both legs). A share gets the sender's drive, get-ready and
+  unpack; a watch block the meet's own travel and get-ready, warm-up off. An
+  invite with **no snapshot** (sent before 2026-09-24) is placed exactly as
+  before: a share with no buffers, a watch block with `DEFAULT_BUFFER_MIN` each
+  way. No migration.
+- `inviteIsMissed(inv)` owns **has its day gone**: its day — for a series,
+  the last of `series.dayKeys` — is before `todayKey()`. Derived from the date,
+  like the rest of the app: no status is written, so there is nothing new to
+  merge, and `js/04-merge.js` did not move.
+- `inviteAcceptable(inv)` owns **can it be accepted now**: pending and not
+  missed. **Both accept doors call it.**
+- A missed invite is answered with **📌 Add it anyway** (`addInviteAnyway`) or
+  Decline, never Accept: the same writer onto that past day, the block **not
+  ticked** (whether she did it is hers to tick, under the existing XP rules;
+  placing it earns nothing), and the invite `accepted`, so the sender sees it on
+  her plan. It acts only on a pending, missed invite, so a second tap adds
+  nothing. `acceptInvite` and `addInviteAnyway` share one tail
+  (`placeInvite`: the activity check, the status, `inviteToBlock`).
+
+Invites stay in `state.shared.invites`, merged whole-record by `mergeArrayById`
+with no tombstone scope — an invite is never deleted. Held by
+`anInviteCarriesTheSendersTravelAndGetReady` (with a field-by-field comparison
+of the source block and the accepted block — the snapshot of hers must equal
+the snapshot of the sender's, so a field added to the snapshot that the writer
+forgets fails a test), `aMissedInviteIsNotWaiting` and
+`theDayViewAcceptFollowsTheSameRules`. Invite checks pin the clock to a
+weekday (`pinClockToWeekday` in `tests/smoke.js`), because "missed" depends on
+the date.
+
 **One inbox, and Today signposts it.** The 💌 inbox is Sister Sync's
-(`renderInvites`), and accepting and declining stay there. Today carries a
-one-line note when an invite is waiting — a signpost, not a second inbox — and
-its filter and wording are the inbox's own: `invitesWaitingFor(p)` (to `p`,
-`pending`) and `inviteFacts(inv)` (who / what / day / time, with the inbox's
-fallbacks) in `js/10-social.js`, called by both surfaces so they cannot count or
-name an invite differently. **Kid only**: the inbox works on `profile`,
-`acceptInvite` writes to `profile`, and `openSisterSync` refuses a parent, so a
-parent-facing note would lead to a refusal. `anInviteWaitingShowsOnToday`
-holds it.
+(`renderInvites`). Today carries a one-line note when an invite is waiting — a
+signpost, not a second inbox — and its filter and wording are the inbox's own:
+`invitesWaitingFor(p)` (to `p`, `inviteAcceptable` — so a missed invite is
+never pointed at) and `inviteFacts(inv)` (who / what / day / time, with the
+inbox's fallbacks) in `js/10-social.js`, called by both surfaces so they cannot
+count or name an invite differently. Below the waiting ones, the inbox keeps a
+small **Missed** group (`invitesMissedFor(p)`): `💌 Jenn invited you to 📖
+Reading · Wed — that day has passed`, with **📌 Add it to my Wed anyway** and
+**Decline**, no Accept. A missed invite whose (last) day is before this week's
+Monday drops out of the list and stays stored.
+
+**There is a second accept door, on the same owners:** the pending ghost on the
+Day view (`renderPendingInvitesOnTimeline`, `js/08-day-view.js`). It shows ✅
+Accept / ❌ Ignore only when `inviteAcceptable` says so; on a day already gone
+it shows **📌 Add it anyway** and **❌ Decline** instead, and every button calls
+`acceptInvite` / `addInviteAnyway` / `declineInvite` — so it writes exactly the
+block the inbox writes. Do not give it rules of its own. **Kid only**: the
+inbox works on `profile`, `acceptInvite` writes to `profile`, the ghost is not
+drawn for a parent, and `openSisterSync` refuses a parent, so a parent-facing
+note would lead to a refusal. `anInviteWaitingShowsOnToday` holds the note.
 
 **A watch block still counts as ordinary planned time.** `computeWeekTotals`
 does not filter it out, deliberately: a Saturday she really spent at the rink
@@ -990,7 +1055,8 @@ reads as wind-down rather than "the rest of today is yours".
 draws one `.td-row` button in the day column, between the hero and "Coming up",
 so she meets it before her day's list: `💌 Jess invited you to 📚 Reading · Tue
 4:00pm`, `💌 Jess invited you to watch Winter Invitational · Sat`, or
-`💌 2 invites waiting — from Jess`. Nothing pending, no row. The tap
+`💌 2 invites waiting — from Jess`. Nothing waiting, no row — and a missed
+invite (its day gone) is not waiting, so it never gets one. The tap
 (`data-td-action="invites"` → `tdOpenInvites`) opens Sister Sync and scrolls
 `#invitesSection` to just under the sticky topbar — the list is at the bottom
 of that screen, and landing at its top would be the school banner under a 700px
