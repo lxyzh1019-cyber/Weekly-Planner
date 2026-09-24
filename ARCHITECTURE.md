@@ -782,10 +782,14 @@ comes from the caller** — Sister Sync passes the day it is showing, the edit
 sheet passes `currentDayKey` (the day it found the block on) — and `sendInvite`
 refuses without one; it never reads `currentDayKey` or `syncDayIdx` itself,
 because `currentDayKey` outlives the day view that set it.
-`sisterInviteFor(blockId, to, kind)` (`js/10-social.js`) returns the **live**
-invite — `pending` or `accepted` — from that block to that sister of that kind
-(`'watch'` when `inv.watch`, else `'share'`), or `null`. `sendInvite` refuses a
-live duplicate of the same kind **before** its confirm dialog, with a toast
+`sisterInviteFor(block, to, kind, dayKey)` (`js/10-social.js`) returns the
+**live** invite — `pending` or `accepted` — for that block to that sister of
+that kind (`'watch'` when `inv.watch`, else `'share'`), or `null`. An invite is
+*for* a block when it was sent from it, when it is a series invite whose
+`blockIds` include it, or when the block lists it in `sentInviteIds` (a
+cross-day drag — below); one covering `dayKey` is preferred.
+`sendInvite` refuses a live duplicate of the same kind that **covers the
+block's day** **before** its confirm dialog, with a toast
 saying whether she hasn't answered yet or it is already on her plan; a
 **declined** invite may go again (a no on Tuesday is not a no for ever), and a
 share and a watch of the same block are different questions. `declineInvite`
@@ -815,7 +819,7 @@ away the meet was. The repair, chosen over re-linking invites to their source
 block (copy semantics are the owner's choice, and a link would change a
 `state.shared` shape and need a migration on both iPads):
 
-- `inviteSnapshot(block, dayKey)` (`js/10-social.js`) owns **what an invite
+- `inviteSnapshot(block, dayKey, members)` (`js/10-social.js`) owns **what an invite
   carries**: `actId`, `day`, `startMin`, `durationMin`, `sourceBlockId`, and
   `travel {to, toMin, home, homeMin}` / `ready {before, beforeMin, after,
   afterMin}`, read **only** through `getTravelBufMin` / `getGetReadyBufMin` per
@@ -825,8 +829,8 @@ block (copy semantics are the owner's choice, and a link would change a
   `sendInvite` builds every invite from it, and its confirm says what she gets
   (`… She gets the same 🚗 20m there · 25m home and 👕 15m to get ready.`; no
   buffers, no sentence — plain text, escaped by the dialog).
-- `inviteToBlock(inv, dayKey)` owns **what accepting writes**: the block on
-  `dayKey` for `profile`, buffers written the way the edit sheet writes them
+- `inviteToBlock(inv, dayKeys)` owns **what accepting writes**: one block on
+  each of `dayKeys` for `profile`, with one `saveAll`, buffers written the way the edit sheet writes them
   (master switch and both legs). A share gets the sender's drive, get-ready and
   unpack; a watch block the meet's own travel and get-ready, warm-up off. An
   invite with **no snapshot** (sent before 2026-09-24) is placed exactly as
@@ -846,13 +850,53 @@ block (copy semantics are the owner's choice, and a link would change a
   nothing. `acceptInvite` and `addInviteAnyway` share one tail
   (`placeInvite`: the activity check, the status, `inviteToBlock`).
 
+**A repeating block asks "this day, or all?"** (2026-09-24, stage 5c). Repeats
+are real copies, and an invite from one of them reached one day. Sending from a
+block with a `seriesId` (a share — a watch invite is always one day) offers
+**Just Tue 29 Sep** or **Every Tuesday to 15 Dec (12)**, through `showChoice`.
+The count is the sender's real remaining copies from that day on
+(`inviteSeriesMembers`), less any already live with her. "All" is **one**
+invite: `inviteSnapshot(block, day, members)` adds `series {days, every, end,
+dayKeys[], blockIds[]}`, and `sendInvite` stamps `invitedTo` on every covered
+block. Accepting it gives her **her own series**: a fresh `seriesId`, never the
+sender's — the sender's "remove all" writes a shared `sr:` tombstone
+(`blockTombstoned`, `js/04-merge.js`) that would delete her copies too — and
+the same days, every-N and end, so her edit sheet shows it as a series. Only
+the days **from today on**; when some have gone, the accept asks **From 6 Oct
+(11)** or **Include the 1 that passed (12)**. A series is missed only after its
+last day, and 📌 Add it anyway on a missed series places all of its days.
+Time and buffers are the tapped block's for every day. Her ghost shows on each
+covered day (`inviteCoversDay`), and Today and the inbox read `📖 Reading ·
+every Tue (12)` (`inviteFacts` → `inviteSeriesShort`).
+
+**The 💌 is only where something was shared.** `weekCloneBlock`,
+`createSeriesFromBlock` and `seriesExtendTo` strip `invitedTo` and
+`sentInviteIds`, so a copy, a repeat or an extension of a shared block does not
+claim to be shared.
+
+**A dragged shared block says "Send again?"** (the owner's decision,
+2026-09-24). A cross-day drag re-ids the block (`moveBlockToDay`,
+`js/39-block-drag.js` — see its comment for why), so the invite lost it. The
+drag now **keeps** the 💌 and writes `sentInviteIds` (`inviteIdsForBlock`: the
+live invites it was sent under). `sisterInviteFor` still finds them, and one
+that no longer covers the block's day is **moved**: the edit sheet button and
+Sister Sync read `💌 Sent for Tue — you moved it to Thu · Send again?`
+(`inviteMovedWords`) and the button stays live. Sending again writes one new
+invite for the new day; the guard then matches there and refuses a second. The
+sister's old invite is not changed — if pending she can still answer it, and
+when its day passes it is missed. A same-day drag keeps the id and changes
+nothing. The `block.inviteId && !block.inviteAccepted` guard in
+`attachBlockDrag` is dead and left alone for a later round.
+
 Invites stay in `state.shared.invites`, merged whole-record by `mergeArrayById`
 with no tombstone scope — an invite is never deleted. Held by
 `anInviteCarriesTheSendersTravelAndGetReady` (with a field-by-field comparison
 of the source block and the accepted block — the snapshot of hers must equal
 the snapshot of the sender's, so a field added to the snapshot that the writer
-forgets fails a test), `aMissedInviteIsNotWaiting` and
-`theDayViewAcceptFollowsTheSameRules`. Invite checks pin the clock to a
+forgets fails a test), `aMissedInviteIsNotWaiting` (series accepted late
+included), `theDayViewAcceptFollowsTheSameRules`,
+`aSeriesInviteCoversEveryDayOrOne` and `aMovedSharedBlockSaysSendAgain`.
+Invite checks pin the clock to a
 weekday (`pinClockToWeekday` in `tests/smoke.js`), because "missed" depends on
 the date.
 

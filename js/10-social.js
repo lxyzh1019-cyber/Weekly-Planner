@@ -112,6 +112,14 @@ function renderSync() {
         mini.textContent = `${tStr} • Busy`;
       }
       if (isMe) {
+        /* Sent for another day and dragged since: say so, and the tap sends again. */
+        const sent = sisterInviteFor(b, p==='jenn'?'jess':'jenn', 'share', key);
+        if (sent && !inviteCoversDay(sent, key)) {
+          const moved = document.createElement('span');
+          moved.style.display = 'block';
+          moved.textContent = inviteMovedWords(sent, key, '💌');
+          mini.appendChild(moved);
+        }
         mini.style.cursor='pointer';
         mini.title = 'Tap to invite your sister';
         mini.onclick = ()=>sendInvite(b, p==='jenn'?'jess':'jenn', key);
@@ -133,15 +141,61 @@ function renderSync() {
    for ever. The two kinds are separate questions, because asking her to come
    and watch is not the same as asking her to do it too.
 
+   An invite is FOR a block when it was sent from it (`sourceBlockId`), when
+   it is a series invite whose `blockIds` include it — so neither a single
+   covered day nor a second "all" can double up — or when the block records it
+   in `sentInviteIds`, which a cross-day drag writes (moveBlockToDay gives the
+   block a new id; see inviteIdsForBlock).
+
+   `dayKey` is the day the block is on now. An invite that covers that day is
+   preferred; one that does not is MOVED — sent for another day, and the block
+   dragged since — and inviteCoversDay tells the caller which it got.
+   sendInvite refuses only a covering duplicate, so a moved block can be sent
+   again, once.
+
    sendInvite refuses a live duplicate through this, and both edit-sheet
    buttons read their sent-state from it. `invitedTo` on the block is the 💌
    badge on the inviter's timeline and nothing else — it is a bare list of
    names and cannot tell a share from a watch. */
-function sisterInviteFor(blockId, to, kind) {
-  return (state.shared.invites || []).find(inv => inv
-    && inv.sourceBlockId === blockId && inv.to === to
+function sisterInviteFor(block, to, kind, dayKey) {
+  const live = (state.shared.invites || []).filter(inv => inv && inv.to === to
     && (inv.watch ? 'watch' : 'share') === kind
-    && (inv.status === 'pending' || inv.status === 'accepted')) || null;
+    && (inv.status === 'pending' || inv.status === 'accepted')
+    && inviteIsForBlock(inv, block));
+  return live.find(inv => inviteCoversDay(inv, dayKey)) || live[0] || null;
+}
+function inviteIsForBlock(inv, block) {
+  if (!inv || !block) return false;
+  return inv.sourceBlockId === block.id
+    || !!(inv.series && Array.isArray(inv.series.blockIds) && inv.series.blockIds.includes(block.id))
+    || (Array.isArray(block.sentInviteIds) && block.sentInviteIds.includes(inv.id));
+}
+/* Every day an invite puts something on: a series invite's `dayKeys`, else its one day. */
+function inviteDays(inv) {
+  const days = (inv && inv.series && Array.isArray(inv.series.dayKeys) && inv.series.dayKeys.length)
+    ? inv.series.dayKeys : [inv && inv.day];
+  return days.filter(d => typeof d === 'string');
+}
+function inviteCoversDay(inv, dayKey) {
+  return inviteDays(inv).includes(dayKey);
+}
+/* The live invites a block was sent under — what a cross-day drag carries onto
+   the re-id'd block, so the guard and the "moved" line still find them. */
+function inviteIdsForBlock(block) {
+  return (state.shared.invites || []).filter(inv => inv
+    && (inv.status === 'pending' || inv.status === 'accepted') && inviteIsForBlock(inv, block)).map(inv => inv.id);
+}
+/* "💌 Sent for Tue — you moved it to Thu · Send again?" — the edit sheet and
+   Sister Sync say it in the same words. Plain text. */
+function inviteMovedWords(inv, dayKey, icon) {
+  const dayOf = (k) => DAY_SHORT[(formatDayKey(k).getDay() + 6) % 7];
+  return `${icon} Sent for ${dayOf(inv.day)} — you moved it to ${dayOf(dayKey)} · Send again?`;
+}
+/* "Tue 29 Sep" (withWeekday) or "29 Sep". */
+function inviteDateLabel(k, withWeekday) {
+  const d = formatDayKey(k);
+  const date = `${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`;
+  return withWeekday ? `${DAY_SHORT[(d.getDay() + 6) % 7]} ${date}` : date;
 }
 
 /* WHAT AN INVITE CARRIES — the one owner.
@@ -158,11 +212,16 @@ function sisterInviteFor(blockId, to, kind) {
    written, zeros included: their presence is how inviteToBlock tells an invite
    carrying "no buffers" from one sent before this change. WARM-UP IS NEVER
    CARRIED — it is training-only, and it is the sender's. Plain data inside
-   `state.shared.invites`, merged whole-record by mergeArrayById: no new key. */
-function inviteSnapshot(block, dayKey) {
+   `state.shared.invites`, merged whole-record by mergeArrayById: no new key.
+
+   `members` (from inviteSeriesMembers) makes it a SERIES invite: `series {days,
+   every, end, dayKeys[], blockIds[]}` — the repeat's weekdays and every-N, the
+   last covered day, and each covered day with the block on it. One invite, not
+   one per day. Time and buffers are the tapped block's, for every day. */
+function inviteSnapshot(block, dayKey, members) {
   const toMin = getTravelBufMin(block, 'pre'), homeMin = getTravelBufMin(block, 'post');
   const beforeMin = getGetReadyBufMin(block, 'pre'), afterMin = getGetReadyBufMin(block, 'post');
-  return {
+  const snap = {
     actId: block.actId,
     day: dayKey,
     startMin: block.startMin,
@@ -171,6 +230,30 @@ function inviteSnapshot(block, dayKey) {
     travel: { to: toMin > 0, toMin, home: homeMin > 0, homeMin },
     ready: { before: beforeMin > 0, beforeMin, after: afterMin > 0, afterMin },
   };
+  if (members && members.length) {
+    const days = (block.seriesDays && block.seriesDays.length)
+      ? block.seriesDays : members.map(m => (formatDayKey(m.dayKey).getDay() + 6) % 7);
+    snap.series = {
+      days: [...new Set(days)].sort((a, b) => a - b),
+      every: seriesEveryWeeks(block.seriesEvery),
+      end: members[members.length - 1].dayKey,
+      dayKeys: members.map(m => m.dayKey),
+      blockIds: members.map(m => m.block.id),
+    };
+  }
+  return snap;
+}
+/* The sender's copies of a repeat from `dayKey` on, oldest first — repeats are
+   real copies, so this is the real count. Within SERIES_MAX_BLOCKS. */
+function inviteSeriesMembers(block, dayKey, who) {
+  if (!block || !block.seriesId) return [];
+  const weeks = getProfData(who).weeks || {};
+  const out = [];
+  Object.keys(weeks).sort().forEach(k => {
+    if (k < dayKey) return;
+    (weeks[k] || []).forEach(b => { if (b && b.seriesId === block.seriesId) out.push({ dayKey: k, block: b }); });
+  });
+  return out.slice(0, SERIES_MAX_BLOCKS);
 }
 /* What she gets, in the words the edit sheet uses: "🚗 20m there · 25m home and
    👕 15m to get ready". Plain text; '' when the invite carries no buffers. */
@@ -184,8 +267,14 @@ function inviteBufferWords(inv) {
 }
 
 /* WHAT ACCEPTING WRITES — the one owner, for every accept door (the Sister Sync
-   inbox and the Day view's pending ghost, both through placeInvite). Puts the
-   block on `dayKey` for `profile` (the inbox is hers) and returns it.
+   inbox and the Day view's pending ghost, both through placeInvite). Puts one
+   block on each of `dayKeys` for `profile` (the inbox is hers), with ONE
+   saveAll, and returns them.
+
+   A SERIES INVITE BECOMES HER OWN SERIES: a fresh seriesId — never the
+   sender's, whose "remove all" writes a shared `sr:` tombstone that would
+   delete her copies too — and the same days, every-N and end, so her edit
+   sheet shows it as a series and can extend or remove it.
 
    Buffers are written the way the edit sheet writes them — master switch and
    both legs spelled out — so her copy draws, clashes and edits exactly like the
@@ -201,10 +290,29 @@ function inviteBufferWords(inv) {
    ever asked of her, nothing is adopted as the meet's own block, and nothing
    reaches the money tab. She keeps the meet's name and tag so her card can
    say which meet it is. */
-function inviteToBlock(inv, dayKey) {
+function inviteToBlock(inv, dayKeys) {
+  const seriesId = inv.series ? 'sr-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5) : null;
+  const profd = getProfData(profile);
+  if (!profd.weeks) profd.weeks = {};
+  const placedAll = dayKeys.slice(0, SERIES_MAX_BLOCKS).map((dayKey, i) => {
+    const placed = inviteBlockFor(inv, i);
+    if (seriesId) {
+      placed.seriesId = seriesId;
+      placed.seriesDays = (inv.series.days || []).slice();
+      placed.seriesEvery = seriesEveryWeeks(inv.series.every);
+      placed.seriesEnd = inv.series.end;
+    }
+    profd.weeks[dayKey] = (profd.weeks[dayKey] || []).concat([placed]);
+    return placed;
+  });
+  saveAll();
+  return placedAll;
+}
+/* One block of hers, built from the invite. `i` keeps ids apart within one accept. */
+function inviteBlockFor(inv, i) {
   const fromName = inv.from === 'jenn' ? 'Jenn' : 'Jess';
   const placed = {
-    id: Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+    id: Date.now().toString(36)+i.toString(36)+Math.random().toString(36).slice(2,5),
     actId: inv.actId, startMin: inv.startMin, durationMin: inv.durationMin,
     colour: CAT_HEX.free, objectives:[], note:`With ${fromName} 💕`, tag:null,
     checklistState: {}, travelBuffer: false,
@@ -241,9 +349,6 @@ function inviteToBlock(inv, dayKey) {
     placed.travelBuffer = true;
     placed.travelBufMin = DEFAULT_BUFFER_MIN;
   }
-  const blocks = getDayBlocks(dayKey, profile);
-  blocks.push(placed);
-  setDayBlocks(dayKey, blocks, profile);
   return placed;
 }
 
@@ -251,9 +356,7 @@ function inviteToBlock(inv, dayKey) {
    is written, so there is no status to merge and no new shared state. A series
    invite (its `series.dayKeys`) is missed only once its LAST day has gone. */
 function inviteLastDay(inv) {
-  const days = (inv && inv.series && Array.isArray(inv.series.dayKeys) && inv.series.dayKeys.length)
-    ? inv.series.dayKeys : [inv && inv.day];
-  return days.filter(d => typeof d === 'string').sort().pop() || null;
+  return inviteDays(inv).slice().sort().pop() || null;
 }
 function inviteIsMissed(inv) {
   const last = inviteLastDay(inv);
@@ -297,8 +400,8 @@ async function sendInvite(block, to, day, opts = {}) {
   const sisterName = to==='jenn'?'Jenn':'Jess';
   /* Refused before the dialog, so she is never asked to confirm something that
      will not happen — and told which state it is in, not just "no". */
-  const already = sisterInviteFor(block.id, to, watch ? 'watch' : 'share');
-  if (already) {
+  const already = sisterInviteFor(block, to, watch ? 'watch' : 'share', day);
+  if (already && inviteCoversDay(already, day)) {
     showToast(already.status === 'accepted'
       ? (watch ? `${sisterName} already said yes to watching — it's on her plan`
                : `It's already on ${sisterName}'s plan`)
@@ -321,18 +424,41 @@ async function sendInvite(block, to, day, opts = {}) {
   const meetLabel = (block.compName && String(block.compName).trim())
     || (typeof blockDisplayName === 'function' ? blockDisplayName(block, from).name : '')
     || activityLabel;
-  const carried = inviteSnapshot(block, day);
+  let carried = inviteSnapshot(block, day);
   // Plain text: the dialog escapes it where it lands. No buffers, no sentence.
   const gets = inviteBufferWords(carried);
-  const ok = await showConfirm(
-    watch
-      ? `Invite ${sisterName} to come and watch ${meetLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(block.startMin)}?\n\n`
-        + (gets ? `She gets the same ${gets}.\n\n` : '')
-        + 'It goes on her plan as something she is watching. She earns nothing for it — it is your meet, not hers.'
-      : `Share ${activityLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(block.startMin)} with ${sisterName}?`
+  /* A REPEAT ASKS "THIS DAY, OR ALL?" — the sender's real copies from this day
+     on, less any already live with her (the guard, per covered day), so the
+     count is what she would actually get. A watch invite is always one day. */
+  const members = (!watch && block.seriesId)
+    ? inviteSeriesMembers(block, day, from).filter(m => {
+        if (m.block.id === block.id) return true;
+        const live = sisterInviteFor(m.block, to, 'share', m.dayKey);
+        return !(live && inviteCoversDay(live, m.dayKey));
+      })
+    : [];
+  if (members.length > 1) {
+    const s = inviteSnapshot(block, day, members).series;
+    const names = s.days.map(i => DAY_LONG[i]).join(' and ');
+    const every = s.every > 1 ? `Every ${s.every} weeks on ${names}` : `Every ${names}`;
+    const pick = await showChoice(
+      `Share ${activityLabel} at ${formatTimeFromMin(block.startMin)} with ${sisterName}?`
         + (gets ? ` She gets the same ${gets}.` : ''),
-    { okLabel: watch ? 'Invite her' : 'Share' });
-  if (!ok) return;
+      [{ id: 'one', label: `Just ${inviteDateLabel(day, true)}` },
+       { id: 'all', label: `${every} to ${inviteDateLabel(s.end, false)} (${members.length})` }]);
+    if (!pick) return;
+    if (pick === 'all') carried = inviteSnapshot(block, day, members);
+  } else {
+    const ok = await showConfirm(
+      watch
+        ? `Invite ${sisterName} to come and watch ${meetLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(block.startMin)}?\n\n`
+          + (gets ? `She gets the same ${gets}.\n\n` : '')
+          + 'It goes on her plan as something she is watching. She earns nothing for it — it is your meet, not hers.'
+        : `Share ${activityLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(block.startMin)} with ${sisterName}?`
+          + (gets ? ` She gets the same ${gets}.` : ''),
+      { okLabel: watch ? 'Invite her' : 'Share' });
+    if (!ok) return;
+  }
   const inv = {
     id: 'inv-'+Date.now().toString(36),
     from,
@@ -347,15 +473,17 @@ async function sendInvite(block, to, day, opts = {}) {
     inv.tag = block.tag || null;
   }
   state.shared.invites = [...(state.shared.invites||[]), inv];
-  // Stamp invitedTo on the source block so the inviter sees the 💌 badge on their own timeline.
-  // Find the block in its actual day store — the day the caller passed.
-  const sourceProfile = from; // sender
-  const blocks = ((state.profiles[sourceProfile]||{}).weeks||{})[day] || [];
-  const src = blocks.find(b => b.id === block.id);
-  if (src) {
+  // Stamp invitedTo on the source block so the inviter sees the 💌 badge on their own timeline —
+  // each covered block, for a series. Found in its actual day store: the day the caller passed.
+  const senderWeeks = (state.profiles[from]||{}).weeks||{};
+  const covered = carried.series
+    ? carried.series.dayKeys.map((k, i) => [k, carried.series.blockIds[i]]) : [[day, block.id]];
+  covered.forEach(([k, id]) => {
+    const src = (senderWeeks[k] || []).find(b => b.id === id);
+    if (!src) return;
     if (!Array.isArray(src.invitedTo)) src.invitedTo = [];
     if (!src.invitedTo.includes(to)) src.invitedTo.push(to);
-  }
+  });
   saveAll();
   showToast(`Invite sent to ${to==='jenn'?'Jenn':'Jess'} 💌`);
 }
@@ -452,9 +580,17 @@ function inviteFacts(inv) {
     subject: inv.watch
       ? ((inv.compName || '').trim() || (act?.name || 'her competition'))
       : (act ? `${act.icon} ${act.name}` : 'an activity'),
-    day: DAY_SHORT[(d.getDay() + 6) % 7],
+    day: inv.series && Array.isArray(inv.series.dayKeys)
+      ? inviteSeriesShort(inv.series)
+      : DAY_SHORT[(d.getDay() + 6) % 7],
     time: formatTimeFromMin(inv.startMin),
   };
+}
+/* "every Tue (12)" — or "every Tue, every 2 weeks (6)". Plain text. */
+function inviteSeriesShort(series) {
+  const every = seriesEveryWeeks(series.every);
+  return `every ${(series.days || []).map(i => DAY_SHORT[i]).join(', ')}`
+    + `${every > 1 ? `, every ${every} weeks` : ''} (${series.dayKeys.length})`;
 }
 
 // Activity-sharing invites — task sharing, so they live under Sister Sync.
@@ -478,7 +614,7 @@ function renderInvites() {
       : `<b>${escapeHtml(f.subject)}</b>`;
     el.innerHTML = `
       <div>💌 <b>${escapeHtml(f.from)}</b> invited you to<br>
-      ${what} on ${escapeHtml(f.day)} at ${escapeHtml(f.time)}</div>
+      ${what} ${inv.series ? '·' : 'on'} ${escapeHtml(f.day)} at ${escapeHtml(f.time)}</div>
       <div class="invite-actions">
         <button class="pill-btn" onclick="acceptInvite('${escapeJsAttr(inv.id)}')">✅ Accept</button>
         <button class="pill-btn" onclick="declineInvite('${escapeJsAttr(inv.id)}')">❌ Decline</button>
@@ -500,9 +636,9 @@ function renderInvites() {
     el.className = 'invite-item';
     const what = inv.watch ? `👀 watch <b>${escapeHtml(f.subject)}</b>` : `<b>${escapeHtml(f.subject)}</b>`;
     el.innerHTML = `
-      <div>💌 <b>${escapeHtml(f.from)}</b> invited you to ${what} · ${escapeHtml(f.day)} — that day has passed</div>
+      <div>💌 <b>${escapeHtml(f.from)}</b> invited you to ${what} · ${escapeHtml(f.day)} — ${inv.series ? 'those days have' : 'that day has'} passed</div>
       <div class="invite-actions">
-        <button class="pill-btn" onclick="addInviteAnyway('${escapeJsAttr(inv.id)}')">📌 Add it to my ${escapeHtml(f.day)} anyway</button>
+        <button class="pill-btn" onclick="addInviteAnyway('${escapeJsAttr(inv.id)}')">📌 ${inv.series ? 'Add them to my plan' : `Add it to my ${escapeHtml(f.day)}`} anyway</button>
         <button class="pill-btn" onclick="declineInvite('${escapeJsAttr(inv.id)}')">❌ Decline</button>
       </div>
     `;
@@ -552,21 +688,39 @@ function acceptInvite(id) {
      onto her day, and a late tap put one on a day already past. Anything else
      returns quietly, and the list is redrawn so a stale row goes away. */
   if (!inviteAcceptable(inv)) { refreshInvitesUI(); return; }
-  placeInvite(inv, 'Added to your plan! 💕');
+  /* ONLY THE DAYS FROM TODAY ON — unless she says she went. A series accepted
+     after some of its days have gone asks: "From 6 Oct (11)" or "Include the 1
+     that passed (12)". A single invite that is acceptable is never in the past,
+     so it never asks. */
+  const days = inviteDays(inv);
+  const ahead = days.filter(k => k >= todayKey());
+  if (ahead.length === days.length) { placeInvite(inv, 'Added to your plan! 💕', days); return; }
+  const f = inviteFacts(inv);
+  const passed = days.length - ahead.length;
+  return showChoice(
+    `${f.from} invited you to ${f.subject} · ${f.day}. ${passed === 1 ? '1 of those days has' : `${passed} of those days have`} passed.`,
+    [{ id: 'ahead', label: `From ${inviteDateLabel(ahead[0], false)} (${ahead.length})` },
+     { id: 'all', label: `Include the ${passed} that passed (${days.length})` }])
+    .then(pick => {
+      // Asked again: the other device may have answered while the dialog was open.
+      if (!pick || !inviteAcceptable(inv)) { refreshInvitesUI(); return; }
+      placeInvite(inv, 'Added to your plan! 💕', pick === 'all' ? days : ahead);
+    });
 }
 /* 📌 ADD IT ANYWAY — a missed invite she went to after all. The same writer as
    Accept, onto that past day; the block arrives NOT ticked (whether she did it
    is hers to tick, under the existing XP rules — placing it earns nothing), and
    the invite reads accepted, so the sender's 💌 says it is on her plan. Only a
-   pending, missed invite: a second tap finds it accepted and adds nothing. */
+   pending, missed invite: a second tap finds it accepted and adds nothing. A
+   missed series puts every one of its days (they have all passed). */
 function addInviteAnyway(id) {
   const inv = (state.shared.invites||[]).find(i=>i.id===id);
   if (!inv || inv.status !== 'pending' || !inviteIsMissed(inv)) { refreshInvitesUI(); return; }
-  placeInvite(inv, 'Added to your plan 📌');
+  placeInvite(inv, 'Added to your plan 📌', inviteDays(inv));
 }
 /* The shared tail of both: an activity she no longer has declines the invite
    rather than placing a block she cannot open. */
-function placeInvite(inv, toast) {
+function placeInvite(inv, toast, dayKeys) {
   const receiverAct = findActivity(inv.actId, profile);
   if (!receiverAct) {
     inv.status = 'declined';
@@ -578,7 +732,7 @@ function placeInvite(inv, toast) {
   }
   inv.status = 'accepted';
   markItemUpdated(inv);
-  inviteToBlock(inv, inv.day);
+  inviteToBlock(inv, dayKeys);
   refreshInvitesUI();
   showToast(toast);
 }

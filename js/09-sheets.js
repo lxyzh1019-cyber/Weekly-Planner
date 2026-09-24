@@ -1074,12 +1074,17 @@ function openEditSheet(blockId) {
   /* 💌 share — any ordinary block, but NOT a watching one: passing somebody
      else's meet on as a plain invite would clone her competition block onto
      the competitor's own calendar. */
+  /* A live invite for another day means the block was dragged since it was
+     sent: say so, and leave the button live so she can send it again. */
   const inviteBtn = document.getElementById('inviteSisterBtn');
   if (inviteBtn) {
     const canShare = isKid && !blockIsWatching(block);
-    const shareOut = canShare && !!sisterInviteFor(block.id, sister, 'share');
+    const share = canShare ? sisterInviteFor(block, sister, 'share', currentDayKey) : null;
+    const shareMoved = !!share && !inviteCoversDay(share, currentDayKey);
+    const shareOut = !!share && !shareMoved;
     inviteBtn.style.display = canShare ? 'block' : 'none';
-    inviteBtn.textContent = shareOut ? `💌 Invite sent to ${sisterName}` : `💌 Invite ${sisterName}`;
+    inviteBtn.textContent = shareOut ? `💌 Invite sent to ${sisterName}`
+      : shareMoved ? inviteMovedWords(share, currentDayKey, '💌') : `💌 Invite ${sisterName}`;
     inviteBtn.disabled = shareOut;
   }
 
@@ -1089,9 +1094,12 @@ function openEditSheet(blockId) {
   const watchBtn = document.getElementById('watchSisterBtn');
   if (watchBtn) {
     const canWatch = isKid && blockIsCompetition(block);
-    const watchOut = canWatch && !!sisterInviteFor(block.id, sister, 'watch');
+    const watchInv = canWatch ? sisterInviteFor(block, sister, 'watch', currentDayKey) : null;
+    const watchMoved = !!watchInv && !inviteCoversDay(watchInv, currentDayKey);
+    const watchOut = !!watchInv && !watchMoved;
     watchBtn.style.display = canWatch ? 'block' : 'none';
-    watchBtn.textContent = watchOut ? `👀 ${sisterName} is invited to watch` : `👀 Invite ${sisterName} to watch`;
+    watchBtn.textContent = watchOut ? `👀 ${sisterName} is invited to watch`
+      : watchMoved ? inviteMovedWords(watchInv, currentDayKey, '👀') : `👀 Invite ${sisterName} to watch`;
     watchBtn.disabled = watchOut;
   }
 
@@ -1616,12 +1624,15 @@ function seriesExtendTo(seriesId, endKey, p = activeProfile()) {
     if (held.has(dayKey)) return;
     const arr = getDayBlocks(dayKey, p).slice();
     if (arr.some(b => b.seriesId === seriesId)) return;
-    arr.push(Object.assign({}, template, {
+    const added = Object.assign({}, template, {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
       checklistState: {}, gearState: {}, trainingCheck: {},
       completed: false, confirmed: false, xpAwarded: false,
       seriesEnd: endKey, createdAt: syncNow(), updatedAt: syncNow(),
-    }));
+    });
+    // The 💌 is for a block that was really shared, not for the weeks added after it.
+    delete added.invitedTo; delete added.sentInviteIds;
+    arr.push(added);
     setDayBlocks(dayKey, arr, p);
     out.added++;
   });
@@ -1697,6 +1708,8 @@ function createSeriesFromBlock(sourceBlock, repeatDays) {
       checklistState: {},
       seriesId,
     };
+    // A repeat of a shared block was never shared itself: no 💌 on the new days.
+    delete nb.invitedTo; delete nb.sentInviteIds;
     dayBlocks.push(nb);
     setDayBlocks(targetKey, dayBlocks);
     profd.activityCounts[sourceBlock.actId] = (profd.activityCounts[sourceBlock.actId]||0) + 1;

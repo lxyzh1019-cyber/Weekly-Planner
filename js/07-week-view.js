@@ -83,6 +83,8 @@ function weekCloneBlock(b) {
     createdAt: syncNow(), updatedAt: syncNow(),
   });
   delete c.seriesId;
+  // Nor was the copy shared: the 💌 badge and its invite link stay on the original.
+  delete c.invitedTo; delete c.sentInviteIds;
   if (Array.isArray(b.objectives)) c.objectives = b.objectives.slice();
   if (b.stopwatch) c.stopwatch = Object.assign({}, b.stopwatch, {
     elapsedSec: 0, running: false, startedAt: null,

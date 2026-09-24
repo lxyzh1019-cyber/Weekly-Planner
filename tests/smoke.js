@@ -7238,6 +7238,51 @@ function findChromium() {
       await p;
       return said;
     };
+    /* Runs one door and answers whatever it asks: the choice whose label
+       matches `pick` when it offers choices (the first choice if `pick` is
+       omitted), else OK. Reports whether it asked, the choices it offered and
+       the toast — so "refused" and "refused, and said why" stay separate. A
+       dialog with no matching choice is dismissed, so a missing choice fails
+       the check instead of hanging it. */
+    window.inviteAttempt = async (fn, pick) => {
+      const toast = document.getElementById('toast');
+      if (toast) toast.textContent = '';
+      const p = fn();
+      await new Promise(r => setTimeout(r, 40));
+      const asked = !!document.querySelector('#appDialogOverlay.open');
+      const choices = [...document.querySelectorAll('#appDialogOverlay.open .app-dialog-choice')];
+      const labels = choices.map(c => c.textContent.replace(/\s+/g, ' ').trim());
+      if (asked) {
+        if (choices.length) {
+          const c = pick ? choices.find(el => pick.test(el.textContent.replace(/\s+/g, ' ').trim())) : choices[0];
+          if (c) c.click(); else _closeAppDialog(null);
+        } else {
+          const ok = document.getElementById('appDialogOkBtn');
+          if (ok) ok.click(); else _closeAppDialog(null);
+        }
+      }
+      await p;
+      return { asked, labels, toast: ((toast || {}).textContent || '').trim() };
+    };
+    /* A repeating block on `who`'s calendar: weekday `dayIdx` for `weeks` weeks
+       from this one, stamped the way placeBlock stamps a series. */
+    window.inviteSeriesFixture = (who, id, dayIdx, weeks, extra) => {
+      const sid = 'sr-' + id;
+      const keys = Array.from({ length: weeks }, (_, w) => getDayKeys(w)[dayIdx]);
+      const ids = keys.map((_, w) => id + '-' + w);
+      keys.forEach((k, w) => setDayBlocks(k, [...getDayBlocks(k, who), Object.assign({
+        objectives: [], checklistState: {}, gearState: {},
+        actId: 'reading', startMin: 16 * 60, durationMin: 60,
+      }, extra || {}, {
+        id: ids[w], seriesId: sid, seriesDays: [dayIdx], seriesEvery: 1, seriesEnd: keys[keys.length - 1],
+      })], who));
+      const block = (w) => getDayBlocks(keys[w], who).find(b => b.id === ids[w]);
+      return { sid, keys, ids, block };
+    };
+    window.inviteDayLabel = (k) => {
+      const d = formatDayKey(k);
+      return `${DAY_SHORT[(d.getDay() + 6) % 7]} ${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`;
+    };
   });
 
   /* ── WATCHING IS NOT COMPETING ────────────────────────────────────
@@ -7980,8 +8025,10 @@ function findChromium() {
     const keys = getDayKeys(0);
     const tueKey = keys[1], wedKey = keys[2];
     const lastWeekKey = getDayKeys(-1)[3];
-    const savedJenn = keys.map(k => getDayBlocks(k, 'jenn'));
-    const savedJess = keys.map(k => getDayBlocks(k, 'jess'));
+    // The series cases reach two weeks ahead.
+    const touched = [0, 1, 2].flatMap(w => getDayKeys(w));
+    const savedJenn = touched.map(k => getDayBlocks(k, 'jenn'));
+    const savedJess = touched.map(k => getDayBlocks(k, 'jess'));
     const hers = (day, pred) => (getDayBlocks(day, 'jess') || []).filter(pred || (() => true));
     const inboxRows = () => [...document.querySelectorAll('#invitesList .invite-item')];
     const rowFor = (dayIdx, name) => inboxRows().find(r => /that day has passed/.test(r.textContent)
@@ -7990,7 +8037,7 @@ function findChromium() {
     const base = { objectives: [], checklistState: {}, gearState: {} };
     try {
       state.shared.invites = [];
-      keys.forEach(k => { setDayBlocks(k, [], 'jenn'); setDayBlocks(k, [], 'jess'); });
+      touched.forEach(k => { setDayBlocks(k, [], 'jenn'); setDayBlocks(k, [], 'jess'); });
 
       // Yesterday's, with buffers; Tuesday's, to be declined; last week's, left pending.
       const swim = { ...base, id: 'missed-share', actId: 'reading', startMin: 16 * 60, durationMin: 60,
@@ -8054,7 +8101,7 @@ function findChromium() {
         }
         if (xpWeekTally('jess', xpWeekKeyFor(wedKey)) !== xpBefore) problems.push('placing a missed invite earned XP');
         if (inv.status !== 'accepted') problems.push(`after Add it anyway the invite is "${inv.status}", not accepted`);
-        const live = sisterInviteFor(swim.id, 'jess', 'share');
+        const live = sisterInviteFor(swim, 'jess', 'share', wedKey);
         if (!live || live.status !== 'accepted') problems.push('the sender does not see it as on her plan');
         if (rowFor(2, 'Reading')) problems.push('the added invite is still in the Missed group');
         // A second tap adds nothing.
@@ -8073,11 +8120,58 @@ function findChromium() {
         if (rowFor(1, 'Reading')) problems.push('a declined missed invite is still listed');
         if (hers(tueKey).length) problems.push('declining a missed invite put something on her Tuesday');
       }
+
+      // ── A series accepted late: only the days from today on…
+      const sendAll = async (fx) => { profile = 'jenn'; await inviteAttempt(() => sendInvite(fx.block(0), 'jess', fx.keys[0]), /^Every/); profile = 'jess';
+        return (state.shared.invites || []).find(i => i && i.sourceBlockId === fx.ids[0]); };
+      const onHer = (fx) => fx.keys.map(k => hers(k, b => b.startMin === fx.block(0).startMin).length).join(',');
+      const late = inviteSeriesFixture('jenn', 'late-from', 1, 3, { startMin: 8 * 60 });   // this Tuesday has passed
+      const invLate = await sendAll(late);
+      if (!invLate || !invLate.series) problems.push('fixture: no series invite to accept late');
+      else {
+        if (!invitesWaitingFor('jess').includes(invLate)) problems.push('a series with days still ahead is not waiting');
+        const r = await inviteAttempt(() => acceptInvite(invLate.id), /^From/);
+        const fromLabel = `From ${inviteDayLabel(late.keys[1]).replace(/^\S+ /, '')} (2)`;
+        if (!r.labels.some(l => l.includes(fromLabel)) || !r.labels.some(l => l.includes('Include the 1 that passed (3)'))) {
+          problems.push(`accepting a series late offers ${JSON.stringify(r.labels)} — expected "${fromLabel}" and "Include the 1 that passed (3)"`);
+        }
+        if (onHer(late) !== '0,1,1') problems.push(`"from today on" put ${onHer(late)} blocks on her three Tuesdays, expected 0,1,1`);
+      }
+      // …and "include the passed days" places them too, unticked.
+      const incl = inviteSeriesFixture('jenn', 'late-incl', 1, 3, { startMin: 12 * 60 });
+      const invIncl = await sendAll(incl);
+      if (invIncl) {
+        await inviteAttempt(() => acceptInvite(invIncl.id), /^Include/);
+        if (onHer(incl) !== '1,1,1') problems.push(`"include the 1 that passed" put ${onHer(incl)} blocks on her three Tuesdays, expected 1,1,1`);
+        const passed = hers(incl.keys[0], b => b.startMin === 12 * 60)[0];
+        if (passed && passed.completed) problems.push('the passed Tuesday arrived ticked');
+      }
+      // A series whose every day has gone is missed: Add it anyway puts all of them, unticked.
+      const gone = inviteSeriesFixture('jenn', 'late-gone', 0, 1, { startMin: 19 * 60 });
+      setDayBlocks(tueKey, [...getDayBlocks(tueKey, 'jenn'), Object.assign({}, gone.block(0), { id: 'late-gone-tue' })], 'jenn');
+      getDayBlocks(keys[0], 'jenn').concat(getDayBlocks(tueKey, 'jenn')).forEach(b => { if (b.seriesId === gone.sid) b.seriesDays = [0, 1]; });
+      const invGone = await sendAll(gone);
+      if (!invGone || !invGone.series || invGone.series.dayKeys.length !== 2) problems.push(`fixture: the Mon+Tue series invite covers ${invGone && invGone.series ? invGone.series.dayKeys.length : 0} days, not 2`);
+      else {
+        if (!inviteIsMissed(invGone)) problems.push('a series whose last day has passed is not missed');
+        openSisterSync();
+        const row = inboxRows().find(r => /those days have passed/.test(r.textContent));
+        const add = row && buttonsOf(row).find(b => /anyway/.test(b.textContent));
+        if (!add) problems.push('a fully missed series has no Add it anyway in the inbox');
+        else {
+          add.click();
+          await new Promise(r => setTimeout(r, 40));
+          const got = [keys[0], tueKey].map(k => hers(k, b => b.startMin === 19 * 60));
+          if (got.map(g => g.length).join(',') !== '1,1') problems.push(`Add it anyway on a missed series put ${got.map(g => g.length)} blocks on Mon,Tue — expected 1,1`);
+          if (got.flat().some(b => b.completed)) problems.push('Add it anyway on a missed series put blocks on ticked');
+          if (invGone.status !== 'accepted') problems.push(`after Add it anyway the series invite is "${invGone.status}"`);
+        }
+      }
     } catch (e) {
       problems.push('threw: ' + e.message);
     } finally {
       state.shared.invites = wasInvites;
-      keys.forEach((k, i) => { setDayBlocks(k, savedJenn[i], 'jenn'); setDayBlocks(k, savedJess[i], 'jess'); });
+      touched.forEach((k, i) => { setDayBlocks(k, savedJenn[i], 'jenn'); setDayBlocks(k, savedJess[i], 'jess'); });
       profile = wasProfile; parentViewing = wasViewing;
       currentDayKey = wasDayKey; weekOffset = wasOffset; syncDayIdx = wasSyncIdx;
       showScreen(wasScreen.replace(/^screen-/, ''));
@@ -8194,6 +8288,239 @@ function findChromium() {
       currentDayKey = wasDayKey; weekOffset = wasOffset; syncDayIdx = wasSyncIdx;
       showScreen(wasScreen.replace(/^screen-/, ''));
       unpin();
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── A SERIES INVITE COVERS EVERY DAY, OR ONE ─────────────────────
+     Invites did not know about repeating blocks: a repeat is real copies, and a
+     share from one of them reached one day. Sending from a block with a
+     seriesId now asks "Just Tue 29 Sep" or "Every Tuesday to 15 Dec (12)" — the
+     count is the sender's real remaining copies — and "all" is ONE invite.
+     Accepting it gives her her OWN series (a fresh seriesId: the sender's
+     "remove all" writes a shared `sr:` tombstone that would otherwise delete
+     her copies), with the same days, frequency and end, so her edit sheet
+     shows it as a series. The duplicate guard sees a series invite on every
+     block it covers. And the 💌 badge appears only where something was shared:
+     copying, repeating or extending a shared block does not copy the badge. */
+  if (want('aSeriesInviteCoversEveryDayOrOne')) checks.aSeriesInviteCoversEveryDayOrOne = await page.evaluate(async () => {
+    const problems = [];
+    const unpin = pinClockToWeekday(0); // Monday: every covered day is ahead
+    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
+    const wasOffset = weekOffset, wasSyncIdx = syncDayIdx;
+    const wasInvites = state.shared.invites;
+    const wasTombs = JSON.parse(JSON.stringify(state.shared.tombstones || {}));
+    const wasScreen = (document.querySelector('.screen.active') || {}).id || 'screen-today';
+    const touched = [0, 1, 2, 3, 4].flatMap(w => getDayKeys(w));
+    const savedJenn = touched.map(k => getDayBlocks(k, 'jenn'));
+    const savedJess = touched.map(k => getDayBlocks(k, 'jess'));
+    const hers = (k) => (getDayBlocks(k, 'jess') || []).filter(b => b.actId === 'reading');
+    const ghostOn = (k) => document.querySelector(`#timeline .tl-col[data-day-key="${k}"] .placed-block.invitation`);
+    const toJess = () => (state.shared.invites || []).filter(i => i && i.to === 'jess');
+    const legs = { travelBuffer: true, travelBufMin: 20, travelTo: true, travelToMin: 20, travelHome: true, travelHomeMin: 25,
+      getReadyBuffer: true, getReadyBufMin: 15, readyBefore: true, readyBeforeMin: 15, readyAfter: false, readyAfterMin: 15 };
+    try {
+      state.shared.invites = [];
+      touched.forEach(k => { setDayBlocks(k, [], 'jenn'); setDayBlocks(k, [], 'jess'); });
+
+      // ── Just this day: one invite, one block.
+      const A = inviteSeriesFixture('jenn', 'srA', 1, 4, legs); // four Tuesdays
+      profile = 'jenn';
+      const just = await inviteAttempt(() => sendInvite(A.block(0), 'jess', A.keys[0]), /^Just/);
+      const endLabel = inviteDayLabel(A.keys[3]).replace(/^\S+ /, '');
+      if (!just.labels.some(l => l.includes('Just ' + inviteDayLabel(A.keys[0])))) {
+        problems.push(`no "Just ${inviteDayLabel(A.keys[0])}" choice: ${JSON.stringify(just.labels)}`);
+      }
+      if (!just.labels.some(l => l.includes(`Every Tuesday to ${endLabel} (4)`))) {
+        problems.push(`no "Every Tuesday to ${endLabel} (4)" choice: ${JSON.stringify(just.labels)}`);
+      }
+      const invJust = toJess().filter(i => A.ids.includes(i.sourceBlockId));
+      if (invJust.length !== 1 || invJust[0].series) problems.push(`"just this day" wrote ${invJust.length} invites${invJust[0] && invJust[0].series ? ', as a series' : ''}`);
+      profile = 'jess';
+      if (invJust[0]) acceptInvite(invJust[0].id);
+      const perTue = A.keys.map(k => hers(k).length).join(',');
+      if (perTue !== '1,0,0,0') problems.push(`"just this day" put ${perTue} blocks on her four Tuesdays, expected 1,0,0,0`);
+
+      // ── All: one invite covering every remaining copy, stamped on each.
+      // Mid-morning: an empty day is drawn 6am–2pm (dayDrawnSpanMin), and each ghost must be drawn.
+      const B = inviteSeriesFixture('jenn', 'srB', 3, 3, Object.assign({}, legs, { startMin: 10 * 60 })); // three Thursdays
+      profile = 'jenn';
+      await inviteAttempt(() => sendInvite(B.block(0), 'jess', B.keys[0]), /^Every/);
+      const invAll = toJess().filter(i => B.ids.includes(i.sourceBlockId));
+      const inv = invAll[0];
+      if (invAll.length !== 1) problems.push(`"all" wrote ${invAll.length} invites, not 1`);
+      if (!inv || !inv.series || JSON.stringify(inv.series.dayKeys) !== JSON.stringify(B.keys)
+          || JSON.stringify(inv.series.blockIds) !== JSON.stringify(B.ids)) {
+        problems.push(`the invite does not cover the three Thursdays: ${JSON.stringify(inv && inv.series)}`);
+      }
+      B.keys.forEach((k, w) => {
+        if (!((B.block(w) || {}).invitedTo || []).includes('jess')) problems.push(`Jenn's Thursday ${k} carries no 💌 stamp`);
+      });
+
+      // ── Where she sees it: a ghost on each covered day, and "every Thu (3)".
+      profile = 'jess';
+      if (inv) {
+        B.keys.forEach((k, w) => {
+          openDay(k, 3, null, w);
+          if (!ghostOn(k)) problems.push(`no pending ghost on her Thursday ${k}`);
+        });
+        weekOffset = 0;
+        const f = inviteFacts(inv);
+        if (!/every Thu \(3\)/.test(f.day)) problems.push(`the invite reads "${f.subject} · ${f.day}", expected "every Thu (3)"`);
+        goToday();
+        const note = document.querySelector('#tdWrap [data-td-action="invites"]');
+        if (!note || !/every Thu \(3\)/.test(note.textContent)) problems.push(`Today's note reads "${note ? note.textContent.replace(/\s+/g, ' ').trim() : ''}"`);
+
+        // ── Accepting: her own series, with the sender's buffers on every day.
+        await inviteAttempt(() => acceptInvite(inv.id));
+        const mine = B.keys.map(k => hers(k)[0]);
+        if (mine.some(b => !b)) problems.push(`accepting all put blocks on ${mine.filter(Boolean).length} of her 3 Thursdays`);
+        else {
+          if (new Set(mine.map(b => b.seriesId)).size !== 1 || !mine[0].seriesId) problems.push('her three Thursdays are not one series');
+          if (mine[0].seriesId === B.sid) problems.push('her series carries the sender\'s seriesId — the sender\'s "remove all" would delete it');
+          if (JSON.stringify(mine[0].seriesDays) !== '[3]' || seriesEveryWeeks(mine[0].seriesEvery) !== 1 || mine[0].seriesEnd !== B.keys[2]) {
+            problems.push(`her series does not say what it is: ${JSON.stringify({ days: mine[0].seriesDays, every: mine[0].seriesEvery, end: mine[0].seriesEnd })}`);
+          }
+          if (countSeriesBlocks(mine[0].seriesId) !== 3) problems.push(`her edit sheet would count ${countSeriesBlocks(mine[0].seriesId)} in her series, not 3`);
+          mine.forEach((b, w) => inviteCarriedDiff(B.block(w), b, B.keys[w]).forEach(d => problems.push(`all, week ${w + 1} — ${d}`)));
+        }
+      }
+
+      // ── Duplicates: neither a single covered day nor a second "all".
+      profile = 'jenn';
+      const n = toJess().length;
+      const d1 = await inviteAttempt(() => sendInvite(B.block(1), 'jess', B.keys[1]));
+      if (d1.asked || toJess().length !== n) problems.push('one day of a series already sent could be sent again');
+      const d2 = await inviteAttempt(() => sendInvite(B.block(0), 'jess', B.keys[0]), /^Every/);
+      if (d2.asked || toJess().length !== n) problems.push('a series already sent could be sent again');
+      if (!/Jess/.test(d2.toast)) problems.push(`the refused series send did not say why: "${d2.toast}"`);
+
+      // ── The sender's "remove all" leaves hers.
+      currentDayKey = B.keys[0];
+      deleteSeriesBlocks(B.sid);
+      if (!(state.shared.tombstones || {})['sr:' + B.sid]) problems.push('fixture: remove-all wrote no series tombstone');
+      const left = B.keys.map(k => hers(k)[0]).filter(Boolean);
+      if (left.length !== 3) problems.push(`after Jenn removed her series, Jess has ${left.length} of her 3 Thursdays`);
+      if (left.some(b => blockTombstoned(b))) problems.push('the sender\'s remove-all tombstones her copies');
+
+      // ── No 💌 badge after a copy, a repeat or an extension.
+      const shared = { objectives: [], checklistState: {}, gearState: {}, id: 'leak-src', actId: 'reading',
+        startMin: 12 * 60, durationMin: 30, invitedTo: ['jess'], sentInviteIds: ['inv-x'] };
+      const clone = weekCloneBlock(shared);
+      if ((clone.invitedTo || []).length || clone.sentInviteIds) problems.push('a copied block (weekCloneBlock) carries the 💌 badge');
+      const wedK = getDayKeys(0)[2], friK = getDayKeys(0)[4];
+      setDayBlocks(wedK, [Object.assign({}, shared)], 'jenn');
+      currentDayKey = wedK; weekOffset = 0;
+      createSeriesFromBlock(getDayBlocks(wedK, 'jenn')[0], [2, 4]);
+      const friCopy = getDayBlocks(friK, 'jenn').find(b => b.seriesId && b.seriesId === getDayBlocks(wedK, 'jenn')[0].seriesId);
+      if (!friCopy) problems.push('fixture: repeating the shared block made no Friday copy');
+      else if ((friCopy.invitedTo || []).length || friCopy.sentInviteIds) problems.push('repeating a shared block put the 💌 on the new day');
+      const newEnd = getDayKeys(4)[1];
+      seriesExtendTo(A.sid, newEnd, 'jenn');
+      const added = getDayBlocks(newEnd, 'jenn').find(b => b.seriesId === A.sid);
+      if (!(A.block(0).invitedTo || []).includes('jess')) problems.push('fixture: the shared Tuesday lost its own 💌');
+      if (!added) problems.push('fixture: extending the series added no week');
+      else if ((added.invitedTo || []).length) problems.push('extending a shared series copied the 💌 onto the new week');
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      unpin();
+      closeSheet('editOverlay');
+      state.shared.invites = wasInvites;
+      state.shared.tombstones = wasTombs;
+      touched.forEach((k, i) => { setDayBlocks(k, savedJenn[i], 'jenn'); setDayBlocks(k, savedJess[i], 'jess'); });
+      profile = wasProfile; parentViewing = wasViewing;
+      currentDayKey = wasDayKey; weekOffset = wasOffset; syncDayIdx = wasSyncIdx;
+      showScreen(wasScreen.replace(/^screen-/, ''));
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* ── A MOVED SHARED BLOCK SAYS "SEND AGAIN?" ──────────────────────
+     A cross-day drag gives the block a new id (moveBlockToDay), so the invite
+     lost it: the duplicate guard stopped matching and the sender had no way to
+     know her sister was still invited for the old day. The owner's decision:
+     the drag keeps the 💌 and records which invite it came from; the edit
+     sheet and Sister Sync say "💌 Sent for Tue — you moved it to Thu · Send
+     again?"; sending again writes one invite for the new day, after which the
+     guard matches there. The sister's old invite is not touched. A same-day
+     drag keeps the id and changes nothing. */
+  if (want('aMovedSharedBlockSaysSendAgain')) checks.aMovedSharedBlockSaysSendAgain = await page.evaluate(async () => {
+    const problems = [];
+    const unpin = pinClockToWeekday(0); // Monday
+    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
+    const wasOffset = weekOffset, wasSyncIdx = syncDayIdx, wasEditing = editingBlockId;
+    const wasInvites = state.shared.invites;
+    const wasTombs = JSON.parse(JSON.stringify(state.shared.tombstones || {})); // the drag tombstones the old id
+    const wasScreen = (document.querySelector('.screen.active') || {}).id || 'screen-today';
+    const keys = getDayKeys(0);
+    const tueKey = keys[1], wedKey = keys[2], thuKey = keys[3];
+    const savedJenn = keys.map(k => getDayBlocks(k, 'jenn'));
+    const savedJess = keys.map(k => getDayBlocks(k, 'jess'));
+    const shares = () => (state.shared.invites || []).filter(i => i && i.to === 'jess' && !i.watch);
+    const btn = () => document.getElementById('inviteSisterBtn') || {};
+    const base = { objectives: [], checklistState: {}, gearState: {} };
+    try {
+      state.shared.invites = [];
+      keys.forEach(k => { setDayBlocks(k, [], 'jenn'); setDayBlocks(k, [], 'jess'); });
+      profile = 'jenn'; weekOffset = 0;
+      const blk = { ...base, id: 'mv-src', actId: 'reading', startMin: 16 * 60, durationMin: 60 };
+      setDayBlocks(tueKey, [blk], 'jenn');
+      await sendInviteSayingYes(blk, 'jess', tueKey);
+      const first = shares()[0];
+      if (!first) { problems.push('fixture: the first invite was not sent'); return problems; }
+
+      // ── Drag it from Tuesday to Thursday.
+      moveBlockToDay(tueKey, thuKey, blk.id, { startMin: blk.startMin, durationMin: blk.durationMin });
+      const moved = getDayBlocks(thuKey, 'jenn')[0];
+      if (!moved || moved.id === blk.id) { problems.push('fixture: the drag did not move the block to Thursday with a new id'); return problems; }
+      if (!(moved.invitedTo || []).includes('jess')) problems.push('the drag dropped the 💌');
+      const expect = `💌 Sent for ${DAY_SHORT[1]} — you moved it to ${DAY_SHORT[3]} · Send again?`;
+      currentDayKey = thuKey; openEditSheet(moved.id);
+      if ((btn().textContent || '').trim() !== expect) problems.push(`after the move the share button reads "${(btn().textContent || '').trim()}", expected "${expect}"`);
+      if (btn().disabled) problems.push('after the move the share button is disabled — she cannot send again');
+      closeSheet('editOverlay');
+      showScreen('sync'); syncDayIdx = 3; renderSync();
+      const mini = [...document.querySelectorAll('#syncGrid .sync-day-col:first-child .sync-block-mini')]
+        .find(el => /Reading/.test(el.textContent || ''));
+      if (!mini || !mini.textContent.includes(expect)) problems.push(`Sister Sync does not say it moved: "${mini ? mini.textContent.trim() : '(no block)'}"`);
+
+      // ── Send again: one new invite, for Thursday. The sister's old one is untouched.
+      currentDayKey = thuKey; editingBlockId = moved.id;
+      const s1 = await inviteAttempt(() => inviteSisterFromEdit());
+      const onThu = shares().filter(i => i.day === thuKey);
+      if (!s1.asked || onThu.length !== 1 || shares().length !== 2) problems.push(`sending again wrote ${onThu.length} Thursday invites (${shares().length} in all) — expected 1 (2 in all)`);
+      else if (onThu[0].sourceBlockId !== moved.id) problems.push('the new invite does not point at the moved block');
+      if (first.status !== 'pending' || first.day !== tueKey) problems.push(`the sister's old invite was changed: ${first.status} on ${first.day}`);
+      const s2 = await inviteAttempt(() => inviteSisterFromEdit());
+      if (s2.asked || shares().length !== 2) problems.push('a second send for the new day was not refused');
+      openEditSheet(moved.id);
+      if (!btn().disabled || !/sent/i.test(btn().textContent || '')) problems.push(`once sent again, the button reads "${(btn().textContent || '').trim()}"`);
+      closeSheet('editOverlay');
+
+      // ── A same-day drag changes nothing.
+      const same = { ...base, id: 'mv-same', actId: 'reading', startMin: 10 * 60, durationMin: 30 };
+      setDayBlocks(wedKey, [same], 'jenn');
+      await sendInviteSayingYes(same, 'jess', wedKey);
+      const before = JSON.stringify(state.shared.invites);
+      moveBlockToDay(wedKey, wedKey, same.id, { startMin: 11 * 60, durationMin: 30 });
+      const after = getDayBlocks(wedKey, 'jenn')[0];
+      if (!after || after.id !== same.id) problems.push('a same-day drag changed the block\'s id');
+      if (after && after.sentInviteIds) problems.push('a same-day drag recorded a move');
+      if (JSON.stringify(state.shared.invites) !== before) problems.push('a same-day drag changed the invites');
+      currentDayKey = wedKey; openEditSheet(same.id);
+      if (!btn().disabled || !/sent/i.test(btn().textContent || '')) problems.push(`after a same-day drag the button reads "${(btn().textContent || '').trim()}"`);
+    } catch (e) {
+      problems.push('threw: ' + e.message);
+    } finally {
+      unpin();
+      closeSheet('editOverlay');
+      state.shared.invites = wasInvites;
+      state.shared.tombstones = wasTombs;
+      keys.forEach((k, i) => { setDayBlocks(k, savedJenn[i], 'jenn'); setDayBlocks(k, savedJess[i], 'jess'); });
+      profile = wasProfile; parentViewing = wasViewing; editingBlockId = wasEditing;
+      currentDayKey = wasDayKey; weekOffset = wasOffset; syncDayIdx = wasSyncIdx;
+      showScreen(wasScreen.replace(/^screen-/, ''));
     }
     return problems.length ? problems : true;
   });

@@ -593,8 +593,9 @@ function renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd, dayKey) {
   if (isParent()) return;
   const me = activeProfile();
   if (me !== 'jenn' && me !== 'jess') return;
+  // Every day it covers: a series invite draws its ghost on each of its days.
   const invites = (state.shared.invites || []).filter(i =>
-    i.to === me && i.status === 'pending' && i.day === forDay
+    i.to === me && i.status === 'pending' && inviteCoversDay(i, forDay)
   );
   if (!invites.length) return;
   const acts = getAllActivities(activeProfile(), { includeArchived: true });
@@ -633,8 +634,9 @@ function renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd, dayKey) {
   });
 }
 
-function acceptInviteFromTimeline(id) {
-  acceptInvite(id);
+// Awaited: a series with days already gone asks "from today, or include them?".
+async function acceptInviteFromTimeline(id) {
+  await acceptInvite(id);
   buildTimeline();
 }
 function addInviteAnywayFromTimeline(id) {

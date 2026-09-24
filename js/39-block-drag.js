@@ -231,6 +231,13 @@ function moveBlockToDay(srcKey, dstKey, blockId, patch) {
      already said so out loud and been agreed with. */
   ['seriesId', 'seriesDays', 'seriesEvery', 'seriesStart', 'seriesEnd']
     .forEach(k => { delete moved[k]; });
+  /* A SHARED BLOCK KEEPS ITS 💌 (the owner's decision, 2026-09-24) and records
+     the invites it was sent under, which name the old id. sisterInviteFor then
+     still finds them, and — since they are for another day — reads them as
+     MOVED: the edit sheet and Sister Sync offer "Send again?". */
+  const sentIds = inviteIdsForBlock(blk);
+  if (sentIds.length) moved.sentInviteIds = sentIds;
+  else delete moved.sentInviteIds;
   markItemUpdated(moved);
 
   /* The one store keyed by block id rather than carried on the record. Miss it
