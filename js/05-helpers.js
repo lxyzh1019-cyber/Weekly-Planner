@@ -897,7 +897,7 @@ function schoolHours() {
    computed it from schoolHours(), but the picker read the shipped 420 and so
    handed out a seven-hour card to a family whose day is 6h40. A top-level const
    cannot ask: js/01-config.js runs before there is any state to read, which is
-   why schoolTemplate() is a function too. */
+   why schoolHours() is a function too. */
 function activityDefaultDuration(act) {
   if (!act) return 60;
   if (act.id === 'school_day') {

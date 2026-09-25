@@ -2219,7 +2219,13 @@ function renderParentBanners() {
 }
 
 /* ════════════════════════════════════════════════════════════════
-   TEMPLATES / CLEAR
+   COPY A DAY / CLEAR
+   The 📋 sheet was "Start from a Template" — two hard-coded shapes (School Day,
+   Weekend) that replaced the whole day with no confirm, pinned and done blocks
+   included, and a child could press them. Copying a day she actually planned
+   does what they did, so they are retired (R5 §7 Q1) and the sheet is Copy a
+   day plus 😌 Rest. The opener and overlay keep their old names
+   (openTemplateSheet, #templateOverlay): renaming them is churn with no reader.
 ════════════════════════════════════════════════════════════════ */
 function openTemplateSheet() {
   copyDaySrcWeek = 0;
@@ -2247,9 +2253,15 @@ const COPY_DAY_WEEKS = [[-1, 'Last week'], [0, 'This week'], [1, 'Next week']];
    Three weeks, not one. "Make this Tuesday like last Tuesday" was the obvious
    thing to want and the one thing this sheet could not do; the engine
    (copyDayInto) always could. Three and no more: a stepper that walks the year
-   is a date picker, and this is a sheet a nine-year-old opens to fix one day. */
+   is a date picker, and this is a sheet a nine-year-old opens to fix one day.
+
+   Each row OPENS to list its blocks before anything is copied (R5 §7 Q2): a
+   count said how much, not what, and "is that the Tuesday with swimming?" was
+   answered only by copying it. The copy button lives inside the opened row, so
+   nobody copies a day they have not seen. */
 function renderCopyDayList() {
   renderCopyDayControls();
+  renderCopyDayNow();
   const wrap = document.getElementById('copyDayList');
   if (!wrap) return;
   wrap.innerHTML = '';
@@ -2259,17 +2271,34 @@ function renderCopyDayList() {
   let offered = 0;
   keys.forEach((k, i) => {
     if (k === currentDayKey && dstKid === srcKid) return;
-    const n = (getDayBlocks(k, srcKid) || []).length;
+    const blocks = getDayBlocks(k, srcKid) || [];
+    const n = blocks.length;
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'copy-day-row' + (n ? '' : ' empty');
     b.disabled = !n;
-    if (n) offered++;
     b.innerHTML = `<span class="cdr-day">${escapeHtml(DAY_LONG[i])}</span>
       <span class="cdr-count">${n ? `${n} thing${n === 1 ? '' : 's'}` : 'nothing planned'}</span>
-      ${n ? '<span class="cdr-go">Copy ›</span>' : ''}`;
-    if (n) b.onclick = () => confirmCopyDay(k, DAY_LONG[i], n);
+      ${n ? '<span class="cdr-go" aria-hidden="true">▸</span>' : ''}`;
     wrap.appendChild(b);
+    if (!n) return;
+    offered++;
+    const panel = document.createElement('div');
+    panel.className = 'cdr-panel';
+    panel.id = 'copyDayPanel' + i;
+    panel.hidden = true;
+    panel.innerHTML = copyDayBlockList(blocks, srcKid)
+      + `<button type="button" class="pill-btn cdr-copy">📋 Copy ${escapeHtml(DAY_LONG[i])} onto this day</button>`;
+    panel.querySelector('.cdr-copy').onclick = () => confirmCopyDay(k, DAY_LONG[i]);
+    b.setAttribute('aria-expanded', 'false');
+    b.setAttribute('aria-controls', panel.id);
+    b.onclick = () => {
+      const open = panel.hidden;
+      panel.hidden = !open;
+      b.setAttribute('aria-expanded', String(open));
+      b.querySelector('.cdr-go').textContent = open ? '▾' : '▸';
+    };
+    wrap.appendChild(panel);
   });
   /* A week with nothing in it says which week it is. Seven greyed rows read as
      "copying is broken" rather than "you did not plan that week". */
@@ -2281,6 +2310,37 @@ function renderCopyDayList() {
       : `Nothing was planned ${copyDaySrcWeek < 0 ? 'last' : 'next'} week.`;
     wrap.appendChild(p);
   }
+}
+
+/* "4:00–5:00pm 🏊 Swimming", plain text — each surface escapes it where it
+   lands. The same line in the rows, the top box and the confirm, so the three
+   cannot describe one block three ways. */
+function copyDayBlockLine(b, p) {
+  const d = blockDisplayName(b, p);
+  const start = b.startMin || 0;
+  return `${tdTimeRange(start, start + (b.durationMin || 0))} ${d.icon} ${d.name}`;
+}
+function copyDayBlockList(blocks, p, pinnedWord) {
+  const items = blocks.slice().sort((x, y) => (x.startMin || 0) - (y.startMin || 0))
+    .map(b => `<li>${escapeHtml(copyDayBlockLine(b, p))}${pinnedWord && b.parentPinned
+      ? ` <span class="cdr-pinned">📌 ${escapeHtml(pinnedWord)}</span>` : ''}</li>`);
+  return `<ul class="cdr-blocks">${items.join('')}</ul>`;
+}
+
+/* What is on the day being copied ONTO, at the top, so both days are in view
+   before either is chosen. Whose day follows the parent's sister toggle. A
+   pinned block says it stays: that is what copyDayPlan does with it. */
+function renderCopyDayNow() {
+  const box = document.getElementById('copyDayNow');
+  if (!box) return;
+  const dstKid = copyDayDestKid();
+  const cross = dstKid !== activeProfile();
+  const blocks = getDayBlocksForProfile(currentDayKey, dstKid) || [];
+  const day = DAY_LONG[(formatDayKey(currentDayKey).getDay() + 6) % 7];
+  const whose = cross ? `${kidLabel(dstKid).name}'s ${day}` : day;
+  box.innerHTML = blocks.length
+    ? `<p class="cdr-now-head">On ${escapeHtml(whose)} now:</p>${copyDayBlockList(blocks, dstKid, 'stays')}`
+    : `<p class="cdr-now-head">Nothing on ${escapeHtml(whose)} yet.</p>`;
 }
 
 /* Who the copy lands on. Always a real child, and always this one unless a
@@ -2324,18 +2384,24 @@ function copyDayHandleClick(e) {
   if (kid) { copyDayDstKid = kid.getAttribute('data-copyday-kid'); renderCopyDayList(); }
 }
 
-async function confirmCopyDay(srcKey, srcLabel, n) {
+/* The confirm names what goes and what stays, read from copyDayPlan — the same
+   decision copyDayInto carries out — rather than "what is on that day now will
+   be replaced", which was untrue of a pinned block once pins were kept. */
+async function confirmCopyDay(srcKey, srcLabel) {
   const srcKid = activeProfile();
   const dstKid = copyDayDestKid();
   const cross = dstKid !== srcKid;
-  const whose = cross ? ` onto ${kidLabel(dstKid).name}'s day` : '';
-  const had = (getDayBlocks(currentDayKey, dstKid) || []).length;
+  const whose = cross ? ` onto ${kidLabel(dstKid).name}'s day` : ' onto this day';
+  const plan = copyDayPlan(srcKey, currentDayKey, srcKid, dstKid);
+  const n = plan.copy.length;
   const thing = `${n} thing${n === 1 ? '' : 's'}`;
   const when = copyDaySrcWeek === 0 ? '' : copyDaySrcWeek < 0 ? ' last week' : ' next week';
-  const msg = had
-    ? `Copy ${srcLabel}${when}'s ${thing}${whose}? What is on that day now will be replaced.`
-    : `Copy ${srcLabel}${when}'s ${thing}${whose || ' onto this day'}?`;
-  const ok = await showConfirm(msg, { okLabel: 'Copy it', cancelLabel: 'Not now', danger: had > 0 });
+  const lines = (blocks) => blocks.slice().sort((x, y) => (x.startMin || 0) - (y.startMin || 0))
+    .map(b => copyDayBlockLine(b, dstKid)).join('\n');
+  let msg = `Copy ${srcLabel}${when}'s ${thing}${whose}?`;
+  if (plan.replace.length) msg += `\n\nThis replaces:\n${lines(plan.replace)}`;
+  if (plan.keep.length) msg += `\n\n📌 Pinned, so it stays:\n${lines(plan.keep)}`;
+  const ok = await showConfirm(msg, { okLabel: 'Copy it', cancelLabel: 'Not now', danger: plan.replace.length > 0 });
   if (!ok) return;
   const res = copyDayInto(srcKey, currentDayKey, srcKid, dstKid);
   closeSheet('templateOverlay');
@@ -2346,34 +2412,6 @@ async function confirmCopyDay(srcKey, srcLabel, n) {
   showToast(res.dropped
     ? `📋 Copied ${res.copied} — ${res.dropped} left behind, not on ${kidLabel(dstKid).name}'s list`
     : `📋 Copied ${res.copied} — now fix what's wrong`);
-}
-
-function applyTemplate(type) {
-  const tmpl = type==='school' ? schoolTemplate() : WEEKEND_TEMPLATE;
-  const acts = getAllActivities(activeProfile(), { includeArchived: true });
-  const blocks = tmpl.map(t=>{
-    const act = acts.find(a=>a.id===t.actId);
-    return {
-      id: Date.now().toString(36)+Math.random().toString(36).slice(2,5),
-      actId: t.actId,
-      startMin: START_MIN + t.startMin,
-      durationMin: t.durationMin,
-      // Subgroup first, for the same reason as the quick break in js/05-helpers.js.
-      colour: t.colour || (act && activitySub(act).hex) || CAT_HEX[act?.cat] || '#888',
-      objectives: t.objectives||[],
-      note: '',
-      tag: t.tag||null,
-      checklistState: {},
-      travelBuffer: false,
-    };
-  });
-  // The template REPLACES the day — tombstone the old blocks so they don't
-  // come back from another device on the next sync merge.
-  tombstoneBlockIds((getDayBlocks(currentDayKey) || []).map(b => b.id));
-  setDayBlocks(currentDayKey, blocks);
-  closeSheet('templateOverlay');
-  buildTimeline();
-  showToast(`${type==='school'?'🏫 School':'🌈 Weekend'} template applied!`);
 }
 
 async function clearDay() {

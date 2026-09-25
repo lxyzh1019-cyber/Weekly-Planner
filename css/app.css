@@ -5013,6 +5013,26 @@
   .cdr-day { font-size: calc(1.02rem * var(--fs-scale, 1)); font-weight: 800; flex: 0 0 auto; }
   .cdr-count { font-size: max(13px, calc(0.86rem * var(--fs-scale, 1))); color: var(--ink-muted); flex: 1 1 auto; }
   .cdr-go { font-size: max(13px, calc(0.88rem * var(--fs-scale, 1))); font-weight: 800; color: var(--accent-strong); flex: 0 0 auto; }
+  /* What each day holds, before it is copied (R5 §7 Q2). 15px: a child reads
+     these lines to decide. */
+  .copy-day-now {
+    padding: 0.4rem 0.7rem;
+    border: 2px dashed var(--ink-light);
+    border-radius: 12px;
+    margin-bottom: 0.2rem;
+  }
+  .cdr-now-head { margin: 0.1rem 0; font-size: max(15px, calc(0.95rem * var(--fs-scale, 1))); font-weight: 800; }
+  .cdr-panel { padding: 0.1rem 0.4rem 0.5rem; }
+  .cdr-panel[hidden] { display: none; }
+  .cdr-blocks { list-style: none; margin: 0.2rem 0 0.4rem; padding: 0; }
+  .cdr-blocks li {
+    font-size: max(15px, calc(0.95rem * var(--fs-scale, 1)));
+    line-height: 1.35;
+    padding: 0.1rem 0;
+    overflow-wrap: anywhere;
+  }
+  .cdr-pinned { font-weight: 800; color: var(--ink-muted); white-space: nowrap; }
+  .cdr-copy { width: 100%; min-height: 44px; font-size: max(15px, calc(1rem * var(--fs-scale, 1))); }
 
   /* Quick slot-picker sheet (tap an empty slot to add an activity) */
   .slot-picker-hint { color: var(--ink-light); font-size: calc(0.92rem * var(--fs-scale, 1)); margin: 0.1rem 0 0.5rem; }

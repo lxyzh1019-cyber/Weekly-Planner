@@ -240,15 +240,31 @@ function findChromium() {
      other and both were wrong on every holiday and all summer. The arithmetic
      assertion is the one that matters: the published calendar states 177
      instructional days for K-8, so if a date was mistyped the count moves. */
-  if (want('schoolCalendarIsRight')) checks.schoolCalendarIsRight = await page.evaluate(() => {
+  if (want('schoolCalendarIsRight')) checks.schoolCalendarIsRight = await page.evaluate(async () => {
     const bad = [];
     const iso = (d) => d.toISOString().slice(0, 10);
-    // Template and band cannot disagree: both come from schoolHours(), which is
-    // a function precisely so a parent's setting reaches both.
-    const tpl = schoolTemplate().find(b => b.actId === 'school_day');
-    if (!tpl || tpl.startMin !== schoolHours().startMin
-             || tpl.durationMin !== schoolHours().endMin - schoolHours().startMin)
-      bad.push('the school-day template no longer derives from schoolHours()');
+    // Card and band cannot disagree: both come from schoolHours(), which is a
+    // function precisely so a parent's setting reaches both. The School Day
+    // template that used to be asked here is retired (R5 §7 Q1); the card the
+    // school-day offer writes (commitSchoolDays) is the one that places it now.
+    // Place one School Day card through the real writer, answer its confirm,
+    // read the card back and put the day back as it was.
+    const placeCard = async (key) => {
+      const was = (getDayBlocksForProfile(key, 'jenn') || []).slice();
+      setDayBlocks(key, [], 'jenn');
+      const done = commitSchoolDays([key], 'jenn');
+      await new Promise(r => setTimeout(r, 20));
+      const ok = document.getElementById('appDialogOkBtn');
+      if (ok) ok.click();
+      await done;
+      const card = (getDayBlocksForProfile(key, 'jenn') || []).find(b => b.actId === 'school_day');
+      setDayBlocks(key, was, 'jenn');
+      return card;
+    };
+    const card = await placeCard('2026-09-08');
+    if (!card || card.startMin !== START_MIN + schoolHours().startMin
+              || card.durationMin !== schoolHours().endMin - schoolHours().startMin)
+      bad.push('the School Day card no longer derives from schoolHours()');
 
     // No weekend should ever appear in the holiday list — weekends are already
     // covered by SCHOOL_HOURS.days, and one there means a mistyped date.
@@ -397,8 +413,10 @@ function findChromium() {
      which meant a district's bell times could only be corrected by editing the
      source — and the shipped calendar never knew about lunch recess at all.
      SCHOOL_TEMPLATE had to become schoolTemplate() for this: a const evaluated
-     at load can only ever see the shipped fallback. */
-  if (want('schoolHoursAreTheParentsToSet')) checks.schoolHoursAreTheParentsToSet = await page.evaluate(() => {
+     at load can only ever see the shipped fallback. (The template is retired
+     since; the School Day card commitSchoolDays writes is what follows the
+     hours now.) */
+  if (want('schoolHoursAreTheParentsToSet')) checks.schoolHoursAreTheParentsToSet = await page.evaluate(async () => {
     const bad = [];
     const before = state.shared.schoolCal;
     const shipped = schoolHours();
@@ -407,9 +425,23 @@ function findChromium() {
     state.shared.schoolCal = { hours: { startMin: 150, endMin: 555, lunchStartMin: 330, lunchMin: 45 } };
     const h = schoolHours();
     if (h.startMin !== 150 || h.endMin !== 555) bad.push("the parent's hours are not what the app reads");
-    const tpl = schoolTemplate().find(t => t.actId === 'school_day');
-    if (!tpl || tpl.startMin !== 150 || tpl.durationMin !== 405) {
-      bad.push('the School Day template did not follow the hours');
+    // Place one School Day card through the real writer, answer its confirm,
+    // read the card back and put the day back as it was.
+    const placeCard = async (key) => {
+      const was = (getDayBlocksForProfile(key, 'jenn') || []).slice();
+      setDayBlocks(key, [], 'jenn');
+      const done = commitSchoolDays([key], 'jenn');
+      await new Promise(r => setTimeout(r, 20));
+      const ok = document.getElementById('appDialogOkBtn');
+      if (ok) ok.click();
+      await done;
+      const card = (getDayBlocksForProfile(key, 'jenn') || []).find(b => b.actId === 'school_day');
+      setDayBlocks(key, was, 'jenn');
+      return card;
+    };
+    const card = await placeCard('2026-09-08');
+    if (!card || card.startMin !== START_MIN + 150 || card.durationMin !== 405) {
+      bad.push('the School Day card did not follow the hours');
     }
     const termKey = (() => {
       for (let w = -20; w <= 40; w++) { const k = getDayKeys(w).find(isSchoolDay); if (k) return k; }
@@ -3870,7 +3902,7 @@ function findChromium() {
   });
   await page.evaluate(() => openDay(getDayKeys(0)[5], 5));
   await page.waitForTimeout(300);
-  // Rest toggle lives in the Template sheet
+  // Rest toggle lives in the 📋 sheet (Copy a day; it was the Template sheet)
   await page.evaluate(() => openTemplateSheet());
   if (want('restInTemplateSheet')) checks.restInTemplateSheet = await page.evaluate(() => {
     const btn = document.getElementById('restDayBtn');
@@ -12471,6 +12503,154 @@ function findChromium() {
     setDayBlocks(lastWk[1], [], 'jenn');
     profile = wasProfile; parentViewing = wasViewing;
     copyDaySrcWeek = 0; copyDayDstKid = null;
+    return bad.length === 0 || bad;
+  });
+
+  /* The two templates are retired (R5 §7 Q1). They were two hard-coded shapes,
+     nobody could save their own, and applying one replaced the whole day with
+     no confirm — done and parent-pinned blocks included, and a child could do
+     it. Copying a day does what they did, from a day she actually planned. The
+     📋 sheet is "Copy a day" now, and 😌 Rest stays on it. */
+  if (want('templatesAreGone')) checks.templatesAreGone = await page.evaluate(() => {
+    const bad = [];
+    if (typeof applyTemplate !== 'undefined') bad.push('applyTemplate still exists');
+    if (typeof schoolTemplate !== 'undefined') bad.push('schoolTemplate still exists');
+    if (typeof WEEKEND_TEMPLATE !== 'undefined') bad.push('WEEKEND_TEMPLATE still exists');
+    const ov = document.getElementById('templateOverlay');
+    if (!ov) return ['the 📋 sheet is gone'];
+    if (ov.querySelector('[onclick*="applyTemplate"]')) bad.push('a template button is still on the 📋 sheet');
+    // The sheet's own words, not the blocks it lists (a planned School Day is fine).
+    const own = ov.cloneNode(true);
+    own.querySelectorAll('#copyDayNow, #copyDayList').forEach(el => el.remove());
+    if (/School Day|Weekend|template/i.test(own.textContent)) bad.push('the 📋 sheet still talks about templates');
+    const title = (document.getElementById('templateSheetTitle') || {}).textContent || '';
+    if (!/Copy a day/.test(title)) bad.push(`the 📋 sheet is titled "${title.trim()}", not Copy a day`);
+    const rest = document.getElementById('restDayBtn');
+    if (!rest || !rest.closest('#templateOverlay')) bad.push('😌 Rest is no longer on the 📋 sheet');
+    const opener = document.querySelector('[onclick="openTemplateSheet()"]');
+    if (!opener) bad.push('the 📋 button is gone');
+    else if (/template/i.test((opener.getAttribute('aria-label') || '') + (opener.getAttribute('title') || ''))) {
+      bad.push('the 📋 button is still labelled as templates');
+    }
+    return bad.length === 0 || bad;
+  });
+
+  /* Copying a day shows both days (R5 §7 Q2): the top of the sheet lists what is
+     on this day now, each source row opens to list its blocks, and the confirm
+     names what will be replaced. A parent-pinned block on the target day is
+     KEPT, for everyone — removing one block already protected it, and a copy
+     did not. A source block the kept pin already covers is not copied a second
+     time, or "same as last Tuesday" doubles the pinned piano. */
+  if (want('copyADayShowsBothDays')) checks.copyADayShowsBothDays = await page.evaluate(async () => {
+    const bad = [];
+    const wasProfile = profile, wasViewing = parentViewing;
+    const wk = getDayKeys(0);
+    const [dst, src] = [wk[1], wk[3]];
+    const restore = [];
+    const seed = (key, kid, blocks) => {
+      restore.push([key, kid, getDayBlocksForProfile(key, kid)]);
+      setDayBlocks(key, blocks, kid);
+    };
+    const pin = { id: 'sb-pin', actId: 'piano', startMin: 1020, durationMin: 30, parentPinned: true };
+    seed(dst, 'jenn', [{ id: 'sb-old', actId: 'breakfast', startMin: 480, durationMin: 30 }, Object.assign({}, pin)]);
+    seed(src, 'jenn', [{ id: 'sb-din', actId: 'dinner', startMin: 1050, durationMin: 60 },
+                       { id: 'sb-srcpin', actId: 'piano', startMin: 1020, durationMin: 30, parentPinned: true }]);
+
+    profile = 'jenn';
+    openDay(dst, 1);
+    openTemplateSheet();
+    const now = document.getElementById('copyDayNow');
+    const nowText = now ? now.textContent : '';
+    if (!now) bad.push('the sheet does not show what is on this day now');
+    else {
+      if (!nowText.includes(tdTimeRange(480, 510)) || !nowText.includes('Breakfast')) {
+        bad.push(`this day's breakfast is not listed at the top (${nowText.trim()})`);
+      }
+      if (!nowText.includes('Piano Practice') || !nowText.includes('📌')) bad.push("this day's pinned piano is not listed as pinned");
+    }
+    const row = [...document.querySelectorAll('#copyDayList .copy-day-row')]
+      .find(r => /Thursday/.test(r.textContent));
+    if (!row) bad.push("Thursday's row is not offered");
+    else {
+      if (row.getAttribute('aria-expanded') !== 'false') bad.push('a source row does not start closed');
+      const panel = document.getElementById(row.getAttribute('aria-controls') || '');
+      if (!panel) bad.push('a source row names no panel to open');
+      else {
+        if (!panel.hidden) bad.push("Thursday's blocks show before the row is opened");
+        row.click();
+        if (row.getAttribute('aria-expanded') !== 'true' || panel.hidden) bad.push('tapping the row did not open it');
+        const t = panel.textContent;
+        if (!t.includes(`${tdTimeRange(1050, 1110)} 🍽 Dinner`)) bad.push(`Thursday's dinner is not listed as "time icon name" (${t.trim()})`);
+        if (!t.includes('Piano Practice')) bad.push("Thursday's piano is not listed");
+        const go = panel.querySelector('.cdr-copy');
+        if (!go) bad.push('an open row has no copy button');
+        else {
+          go.click();
+          await new Promise(r => setTimeout(r, 30));
+          const msg = (document.getElementById('appDialogMsg') || {}).textContent || '';
+          if (!msg.includes('Breakfast')) bad.push(`the confirm does not name the breakfast it replaces (${msg})`);
+          if (!/Piano Practice[^\n]*\n?[^\n]*/.test(msg) || !/stays|kept|keep/i.test(msg)) bad.push(`the confirm does not say the pinned piano stays (${msg})`);
+          const ok = document.getElementById('appDialogOkBtn');
+          if (ok) ok.click();
+          await new Promise(r => setTimeout(r, 30));
+        }
+      }
+    }
+    const after = getDayBlocksForProfile(dst, 'jenn') || [];
+    if (!after.some(b => b.id === 'sb-pin' && b.parentPinned)) bad.push('the pinned block on the target day was replaced');
+    if (after.some(b => b.id === 'sb-old')) bad.push('the unpinned breakfast was not replaced');
+    if (!(state.shared.tombstones || {})['sb-old']) bad.push('the replaced breakfast was not tombstoned');
+    if ((state.shared.tombstones || {})['sb-pin']) bad.push('the kept pin was tombstoned — a merge would delete it');
+    if (!after.some(b => b.actId === 'dinner')) bad.push("Thursday's dinner did not arrive");
+    const pianos = after.filter(b => b.actId === 'piano').length;
+    if (pianos !== 1) bad.push(`${pianos} pianos on the target day — the kept pin was copied over again`);
+
+    // For everyone: a parent's copy keeps the target's pin too.
+    profile = 'parent'; parentViewing = 'jenn';
+    setDayBlocks(dst, [{ id: 'sb-old2', actId: 'breakfast', startMin: 480, durationMin: 30 }, Object.assign({}, pin)], 'jenn');
+    copyDayInto(src, dst, 'jenn');
+    const byParent = getDayBlocksForProfile(dst, 'jenn') || [];
+    if (!byParent.some(b => b.id === 'sb-pin')) bad.push("a parent's copy replaced the pinned block");
+
+    closeSheet('templateOverlay');
+    restore.forEach(([key, kid, blocks]) => setDayBlocks(key, blocks, kid));
+    profile = wasProfile; parentViewing = wasViewing;
+    copyDaySrcWeek = 0; copyDayDstKid = null;
+    return bad.length === 0 || bad;
+  });
+
+  /* A child who copies a pinned day must not end up with pins she then cannot
+     remove (removeBlock and the drag both refuse a pinned block to a child). So a
+     child's copy arrives unpinned; a parent's keeps the pin. The rule lives in
+     weekCloneBlock, the one place that decides what a copy arrives as, so the
+     blank-week fill obeys it too. */
+  if (want('copyingADayNeverPinsForAChild')) checks.copyingADayNeverPinsForAChild = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile, wasViewing = parentViewing;
+    const wk = getDayKeys(0);
+    const [src, dst] = [wk[0], wk[2]];
+    const before = [[src, getDayBlocksForProfile(src, 'jenn')], [dst, getDayBlocksForProfile(dst, 'jenn')]];
+    setDayBlocks(src, [{ id: 'np-src', actId: 'piano', startMin: 1020, durationMin: 30, parentPinned: true }], 'jenn');
+
+    profile = 'jenn';
+    setDayBlocks(dst, [], 'jenn');
+    copyDayInto(src, dst, 'jenn');
+    const kidCopy = (getDayBlocksForProfile(dst, 'jenn') || [])[0];
+    if (!kidCopy) bad.push("nothing arrived on the child's copy");
+    else if (kidCopy.parentPinned) bad.push("a child's copy of a pinned day arrived pinned");
+    if (weekCloneBlock({ id: 'x', actId: 'piano', parentPinned: true }).parentPinned) {
+      bad.push('weekCloneBlock pins a copy a child made');
+    }
+
+    profile = 'parent'; parentViewing = 'jenn';
+    setDayBlocks(dst, [], 'jenn');
+    copyDayInto(src, dst, 'jenn');
+    const parentCopy = (getDayBlocksForProfile(dst, 'jenn') || [])[0];
+    if (!parentCopy) bad.push("nothing arrived on the parent's copy");
+    else if (!parentCopy.parentPinned) bad.push("a parent's copy lost the pin");
+
+    before.forEach(([k, blocks]) => setDayBlocks(k, blocks, 'jenn'));
+    profile = wasProfile; parentViewing = wasViewing;
     return bad.length === 0 || bad;
   });
 

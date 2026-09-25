@@ -571,7 +571,7 @@ function buildDayColumn(dayKey, canvasHeight, withHeader, drawnSpan) {
 }
 
 /* Make one column the day the topbar acts on. currentDayKey is what every
-   existing writer reads — placeBlock, setDayMood, clearDay, applyTemplate, the
+   existing writer reads — placeBlock, setDayMood, clearDay, the day copy, the
    edit sheet — so pointing it at the tapped column is the whole of what a
    multi-day view needs, rather than threading a day key through all of them. */
 function focusDayColumn(dayKey) {

@@ -486,7 +486,7 @@
            localStorage only — every synced write is a full-document upload. -->
       <div class="day-span-tabs" id="daySpanTabs" role="group" aria-label="How many days to show"></div>
       <div class="day-topbar-actions">
-        <button class="btn-icon" onclick="openTemplateSheet()" aria-label="Apply template" title="Templates and copying a day">📋</button>
+        <button class="btn-icon" onclick="openTemplateSheet()" aria-label="Copy a day" title="Copy a day, or rest">📋</button>
         <button class="btn-icon" onclick="openReflectSheet()" aria-label="Reflect on today">🌙</button>
         <button class="btn-icon day-clear-btn" onclick="clearDay()" aria-label="Clear this day" title="Clear this day">🗑</button>
         <button class="profile-badge" onclick="openProfileSwitcher()" id="dayProfileBadge" aria-label="Switch profile"></button>
@@ -1188,20 +1188,24 @@
      left to offer — every activity it listed is on the ordinary picker, opened
      from the slot the child just tapped. -->
 
-<!-- Template Sheet -->
+<!-- Copy a day (the 📋 sheet). It was "Start from a Template" with two
+     hard-coded shapes, School Day and Weekend; both are retired (R5 §7 Q1) —
+     copying a day you actually planned does what they did. The ids keep their
+     old names (templateOverlay, templateSheetTitle). -->
 <div class="overlay" id="templateOverlay" onclick="overlayClick(event,'templateOverlay')">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="templateSheetTitle">
     <div class="sheet-handle"></div>
-    <h3 id="templateSheetTitle">📋 Start from a Template</h3>
-    <p style="font-size:0.9rem;color:var(--ink-light);margin-bottom:0.8rem">This replaces your current plan for this day.</p>
-    <button class="pill-btn" style="width:100%;margin-bottom:0.5rem;font-size:1rem" onclick="applyTemplate('school')">🏫 School Day</button>
-    <button class="pill-btn" style="width:100%;font-size:1rem" onclick="applyTemplate('weekend')">🌈 Weekend</button>
+    <h3 id="templateSheetTitle">📋 Copy a day</h3>
+    <!-- What is on this day now, drawn by renderCopyDayNow, so both days are in
+         view before a copy is chosen. -->
+    <div id="copyDayNow" class="copy-day-now"></div>
     <!-- Copy a day you have already planned onto this one. A week rarely has
          seven different shapes: two Tuesdays that look alike were two Tuesdays
-         built by hand. Rows are built by renderCopyDayList so they can carry
-         each day's real block count, and the two toggles above them choose
-         which week to take from and — a parent only — whose day it lands on. -->
-    <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">Or copy a day you have already planned.</p>
+         built by hand. Rows are built by renderCopyDayList; each opens to list
+         its blocks, and the copy button is inside. The two toggles above them
+         choose which week to take from and — a parent only — whose day it
+         lands on. -->
+    <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">Pick a day to copy onto this one. Tap it to see what's on it.</p>
     <div class="copy-day-tabs" id="copyDayWeekTabs" role="group" aria-label="Which week to copy from"></div>
     <div class="copy-day-tabs" id="copyDayKidTabs" role="group" aria-label="Whose day to copy onto" hidden></div>
     <div id="copyDayList" class="copy-day-list"></div>

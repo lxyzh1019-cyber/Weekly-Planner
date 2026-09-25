@@ -2191,6 +2191,33 @@ REPLACES the destination. Unplaceable blocks are dropped through
 `placeableActivityIds` (`js/05-helpers.js` — one owner, shared with `pcw`) and
 the count of what was left behind is always said out loud.
 
+**The 📋 sheet is "Copy a day", and it shows both days before either is
+chosen** (R5 §7 Q1–Q2, 2026-09-24). The 🏫 School Day and 🌈 Weekend templates
+are retired — two hard-coded shapes that replaced the whole day with no confirm,
+done and pinned blocks included, and a child could press them. `applyTemplate`,
+`schoolTemplate()` and `WEEKEND_TEMPLATE` are gone; the sheet keeps 😌 Rest (and
+its old ids, `#templateOverlay` / `openTemplateSheet`). `#copyDayNow`
+(`renderCopyDayNow`) lists what is on the target day now, each source-day row
+opens to list its blocks as `4:00–5:00pm 🏊 Swimming` (`copyDayBlockLine`, one
+line shared by the rows, the top box and the confirm) with the copy button
+inside, and the confirm names what it replaces and what stays.
+
+**A parent-pinned block on the target day is kept, whoever copies.**
+`copyDayPlan(src, dst, srcP, dstP)` is the decision and only reads: `{ copy,
+replace, keep, dropped }`. Pinned target blocks are `keep` (never tombstoned); a
+source block the kept pin already covers — same `actId`, `tag` and `startMin` —
+is not copied again. The confirm reads the plan, and `copyDayInto` carries it
+out, so the two cannot disagree (the `pcwPlan` discipline).
+
+**A pin is a parent's, so only a parent's copy keeps it.** `weekCloneBlock`
+drops `parentPinned` when `!isParent()` — a child cannot move or remove a pinned
+block, so a pinned copy was a block she could never take back off. It is in the
+clone rule, not in a caller, so every path obeys it: the 📋 day copy (child →
+unpinned, parent → pinned), `fillWeekFromNearest` / `copyWeekInto` (same; it
+only fills a blank week, so there is no target pin to keep), and `pcwCommit`
+(parent-only, so pins kept — unchanged; its "replace" still replaces a pinned
+day, because the parent chose it in a preview).
+
 **A repeat is materialised, and it remembers what it is.** `seriesDayKeys`
 (`js/05-helpers.js`) is the one place that answers which days a repeat covers —
 days of the week, **every N weeks**, from a start date through an end date — and
@@ -2372,10 +2399,12 @@ or confirmed card never moves, a past day is not touched, only `startMin` and
 in **one** `saveAll()` — `setDayBlocks` saves on every call, so reconciling
 fourteen cards through it would upload the whole family document fourteen times.
 
-`SCHOOL_TEMPLATE` is now **`schoolTemplate()`**, and the change is load-bearing:
-a top-level `const` is evaluated when `js/01-config.js` runs, so it can only ever
-see the shipped fallback. Anything that wants the school-day shape has to ask at
-the moment it needs it.
+`SCHOOL_TEMPLATE` became **`schoolTemplate()`**, and the reason still holds
+though the template is retired (R5 §7 Q1): a top-level `const` is evaluated when
+`js/01-config.js` runs, so it can only ever see the shipped fallback. Anything
+that wants the school-day shape has to ask `schoolHours()` at the moment it
+needs it — `commitSchoolDays` does, and `schoolCalendarIsRight` /
+`schoolHoursAreTheParentsToSet` place a card through it to prove so.
 
 **Every surface draws the day from `dayZoneSegments`** (`js/08-day-view.js`) — the
 day view, the Full week and the print sheet. It had one caller for a long time
