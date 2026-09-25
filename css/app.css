@@ -5033,6 +5033,8 @@
   }
   .cdr-pinned { font-weight: 800; color: var(--ink-muted); white-space: nowrap; }
   .cdr-copy { width: 100%; min-height: 44px; font-size: max(15px, calc(1rem * var(--fs-scale, 1))); }
+  /* 🗑 Start this day over, last on the 📋 sheet (R5 §7 Q4). */
+  .day-over-btn { width: 100%; min-height: 44px; font-size: max(15px, calc(1rem * var(--fs-scale, 1))); }
 
   /* Quick slot-picker sheet (tap an empty slot to add an activity) */
   .slot-picker-hint { color: var(--ink-light); font-size: calc(0.92rem * var(--fs-scale, 1)); margin: 0.1rem 0 0.5rem; }

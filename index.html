@@ -488,7 +488,6 @@
       <div class="day-topbar-actions">
         <button class="btn-icon" onclick="openTemplateSheet()" aria-label="Copy a day" title="Copy a day, or rest">📋</button>
         <button class="btn-icon" onclick="openReflectSheet()" aria-label="Reflect on today">🌙</button>
-        <button class="btn-icon day-clear-btn" onclick="clearDay()" aria-label="Clear this day" title="Clear this day">🗑</button>
         <button class="profile-badge" onclick="openProfileSwitcher()" id="dayProfileBadge" aria-label="Switch profile"></button>
       </div>
     </div>
@@ -1211,6 +1210,11 @@
     <div id="copyDayList" class="copy-day-list"></div>
     <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">Taking today off? Rest days keep your streak safe.</p>
     <button class="pill-btn" style="width:100%;font-size:1rem" id="restDayBtn" onclick="toggleRestDay(currentDayKey)" aria-label="Mark rest day" title="Mark today a rest day">😌 Rest</button>
+    <!-- Start this day over (R5 §7 Q4). It was 🗑 on the Day view's top bar,
+         beside 📋 and 🌙, and it deleted done and parent-pinned blocks too.
+         Down here, last, it keeps them; clearDay's confirm lists what goes. -->
+    <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">A sick day, or a cancelled one? Done and pinned things stay.</p>
+    <button type="button" class="pill-btn day-over-btn" onclick="clearDay()">🗑 Start this day over</button>
   </div>
 </div>
 

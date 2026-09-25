@@ -2218,6 +2218,18 @@ only fills a blank week, so there is no target pin to keep), and `pcwCommit`
 (parent-only, so pins kept — unchanged; its "replace" still replaces a pinned
 day, because the parent chose it in a preview).
 
+**Clearing a day is "🗑 Start this day over", last on the 📋 sheet, and it keeps
+what is done, pinned or marked not done** (R5 §7 Q4, 2026-09-24). It was 🗑 on the Day view's top
+bar beside 📋 and 🌙 and took every block, done and parent-pinned included; the
+top-bar button is gone. `clearDay` (`js/09-sheets.js`, same name, still reads
+`currentDayKey`) keeps every block `dayBlockStays` answers true for —
+`completed`, `confirmed`, `parentPinned` or `isBlockNotDone` (a parent's "$0 ·
+didn't happen" money verdict; deleting it would erase that record) — tombstones
+the rest, and its confirm lists what goes and what stays (✅ / 📌 / 🚫) with
+`copyDayBlockLine`, then says there is no undo. There is deliberately **no undo**: the ids are tombstoned by the frozen
+merge layer, so an undo would mean re-adding blocks under new ids. A day with
+nothing to take off says so in a toast and asks nothing.
+
 **A repeat is materialised, and it remembers what it is.** `seriesDayKeys`
 (`js/05-helpers.js`) is the one place that answers which days a repeat covers —
 days of the week, **every N weeks**, from a start date through an end date — and

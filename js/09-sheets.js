@@ -2414,20 +2414,45 @@ async function confirmCopyDay(srcKey, srcLabel) {
     : `📋 Copied ${res.copied} — now fix what's wrong`);
 }
 
+/* 🗑 Start this day over — the last button on the 📋 sheet (R5 §7 Q4). It was
+   🗑 on the Day view's top bar and took EVERY block, done and parent-pinned
+   ones included. A done block is a record of what happened, a pin is a
+   parent's, and a block a parent marked not done (isBlockNotDone) is the
+   parent's "$0 · didn't happen" money verdict — deleting it would erase that
+   record. All three stay; everything else goes.
+
+   Name what goes, block by block, and what stays. There is no undo behind this
+   — the ids are tombstoned, so an undo would mean re-adding blocks under new
+   ids — which makes the dialog the whole safety net, and it has to say the true
+   thing. A day with nothing to take off says so and asks nothing. */
+function dayBlockStays(b) {
+  return !!(b && (b.completed || b.confirmed || b.parentPinned || isBlockNotDone(b)));
+}
 async function clearDay() {
-  /* Name what goes, and how much of it. "Clear all blocks for this day?" asks a
-     child to agree to something abstract; a count and a weekday are what make
-     someone stop. There is no undo behind this, so the dialog is the whole
-     safety net and it has to say the true thing. */
-  const doomed = getDayBlocks(currentDayKey) || [];
-  if (!doomed.length) { showToast('Nothing to clear on this day'); return; }
+  const all = getDayBlocks(currentDayKey) || [];
+  const doomed = all.filter(b => !dayBlockStays(b));
+  const kept = all.filter(dayBlockStays);
+  const p = activeProfile();
   const dayName = DAY_LONG[(formatDayKey(currentDayKey).getDay() + 6) % 7];
-  const msg = `This removes all ${doomed.length} thing${doomed.length === 1 ? '' : 's'} from ${dayName}.`;
-  if (!(await showConfirm(msg, { danger:true, okLabel:'Clear' }))) return;
+  if (!doomed.length) {
+    showToast(all.length
+      ? `Nothing to take off ${dayName} — what's there is done, pinned or marked not done`
+      : `Nothing on ${dayName} to start over`);
+    return;
+  }
+  const lines = (blocks) => blocks.slice().sort((x, y) => (x.startMin || 0) - (y.startMin || 0))
+    .map(b => `${b.parentPinned ? '📌' : isBlockNotDone(b) ? '🚫' : '✅'} ${copyDayBlockLine(b, p)}`).join('\n');
+  let msg = `Start ${dayName} over? This takes off:\n`
+    + doomed.slice().sort((x, y) => (x.startMin || 0) - (y.startMin || 0))
+      .map(b => copyDayBlockLine(b, p)).join('\n');
+  if (kept.length) msg += `\n\nDone, pinned and not-done things stay:\n${lines(kept)}`;
+  msg += '\n\nThere is no undo.';
+  if (!(await showConfirm(msg, { danger: true, okLabel: 'Start over', cancelLabel: 'Not now' }))) return;
   tombstoneBlockIds(doomed.map(b => b.id));
-  setDayBlocks(currentDayKey, []);
+  setDayBlocks(currentDayKey, kept);
+  closeSheet('templateOverlay');
   buildTimeline();
-  showToast('Day cleared 🗑');
+  showToast(kept.length ? `🗑 ${dayName} started over — ${kept.length} kept` : `🗑 ${dayName} started over`);
 }
 
 /* ════════════════════════════════════════════════════════════════

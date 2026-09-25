@@ -12654,6 +12654,83 @@ function findChromium() {
     return bad.length === 0 || bad;
   });
 
+  /* Clearing a day is kept for a sick day or a cancelled one, but made safer
+     (R5 §7 Q4). The 🗑 sat on the Day view's top bar beside 📋 and 🌙, deleted
+     done and parent-pinned blocks too, and has no undo (the ids are
+     tombstoned). It is now "🗑 Start this day over" at the bottom of the 📋
+     sheet: done and pinned blocks stay, the confirm lists what goes and what
+     stays, and a day with nothing to take off says so and changes nothing. */
+  /* A block a parent marked not done (isBlockNotDone) stays too: it is the
+     parent's "$0 · didn't happen" verdict, and deleting it erases that record. */
+  if (want('startingADayOverKeepsWhatIsDone')) checks.startingADayOverKeepsWhatIsDone = await page.evaluate(async () => {
+    const bad = [];
+    const wasProfile = profile, wasViewing = parentViewing;
+    const key = getDayKeys(0)[4];
+    const before = getDayBlocksForProfile(key, 'jenn');
+    const done = { id: 'so-done', actId: 'breakfast', startMin: 450, durationMin: 30, completed: true };
+    const pinned = { id: 'so-pin', actId: 'piano', startMin: 1020, durationMin: 30, parentPinned: true };
+    profile = 'jenn'; parentViewing = 'jenn';
+    // A parent's "didn't happen" is a money verdict, and a record like a done block.
+    const notDone = { id: 'so-nd', actId: 'relax', startMin: 1200, durationMin: 30, notDone: true };
+    setDayBlocks(key, [Object.assign({}, done), Object.assign({}, pinned), Object.assign({}, notDone),
+      { id: 'so-go', actId: 'dinner', startMin: 1050, durationMin: 60 },
+      { id: 'so-go2', actId: 'game_time', startMin: 960, durationMin: 45 }], 'jenn');
+    openDay(key, 4);
+
+    const bar = document.querySelector('#screen-day .day-topbar-actions');
+    if (!bar) bad.push('the Day view top bar is missing');
+    else if (bar.querySelector('[onclick="clearDay()"]') || /🗑/.test(bar.textContent)) {
+      bad.push('🗑 is still on the Day view top bar');
+    }
+
+    openTemplateSheet();
+    const btn = [...document.querySelectorAll('#templateOverlay button')].find(b => /Start this day over/.test(b.textContent));
+    if (!btn) bad.push('the 📋 sheet has no "🗑 Start this day over"');
+    else {
+      const r = btn.getBoundingClientRect();
+      if (r.height < 44) bad.push(`"Start this day over" is ${Math.round(r.height)}px tall, under the 44px target`);
+      btn.click();
+      await new Promise(res => setTimeout(res, 30));
+      const msg = (document.getElementById('appDialogMsg') || {}).textContent || '';
+      const [goes, stays = ''] = msg.split(/\n\n(?=[^\n]*stay)/i);
+      if (!goes.includes('Dinner') || !goes.includes('Game Time')) bad.push(`the confirm does not list what goes (${msg})`);
+      if (/Breakfast|Piano|Relaxation/.test(goes)) bad.push(`the confirm lists a done, pinned or not-done block as going (${msg})`);
+      if (!stays.includes('Breakfast') || !stays.includes('Piano Practice')) bad.push(`the confirm does not say what stays (${msg})`);
+      if (!/🚫[^\n]*Muscle Relaxation/.test(stays)) bad.push(`the confirm does not say the not-done block stays, marked 🚫 (${msg})`);
+      const ok = document.getElementById('appDialogOkBtn');
+      if (ok) ok.click();
+      await new Promise(res => setTimeout(res, 30));
+    }
+    const after = getDayBlocksForProfile(key, 'jenn') || [];
+    if (!after.some(b => b.id === 'so-done')) bad.push('a done block was removed');
+    if (!after.some(b => b.id === 'so-pin')) bad.push('a parent-pinned block was removed');
+    if (!after.some(b => b.id === 'so-nd' && b.notDone)) bad.push("a block a parent marked not done was removed — that erases the parent's record");
+    if (after.some(b => b.id === 'so-go' || b.id === 'so-go2')) bad.push('the blocks that should go are still there');
+    const ts = state.shared.tombstones || {};
+    if (!ts['so-go'] || !ts['so-go2']) bad.push('what went was not tombstoned — a merge would bring it back');
+    if (ts['so-done'] || ts['so-pin'] || ts['so-nd']) bad.push('a kept block was tombstoned — a merge would delete it');
+
+    // Nothing left to take off: say so, ask nothing, change nothing.
+    setDayBlocks(key, [Object.assign({}, done, { id: 'so-done2' }), Object.assign({}, pinned, { id: 'so-pin2' }),
+      Object.assign({}, notDone, { id: 'so-nd2' })], 'jenn');
+    const ov = document.getElementById('appDialogOverlay');
+    if (ov) ov.classList.remove('open');
+    const asked = clearDay();
+    await new Promise(res => setTimeout(res, 30));
+    if (document.getElementById('appDialogOverlay')?.classList.contains('open')) {
+      bad.push('a day with only done and pinned blocks still asked to start over');
+      _appDialogCancel();
+    }
+    await asked;
+    if (!/nothing/i.test(document.getElementById('toast').textContent)) bad.push('a day with nothing to take off did not say so');
+    if ((getDayBlocksForProfile(key, 'jenn') || []).length !== 3) bad.push('a day with nothing to take off was changed');
+
+    closeSheet('templateOverlay');
+    setDayBlocks(key, before, 'jenn');
+    profile = wasProfile; parentViewing = wasViewing;
+    return bad.length === 0 || bad;
+  });
+
   /* Step 1 confirms a day where the day is, not in a panel below a chart.
      Twenty-eight movements for a week where nothing was wrong is the friction
      this whole phase exists to remove, so it is worth an assertion. */
