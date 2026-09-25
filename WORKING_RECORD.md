@@ -158,7 +158,7 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → n
 | Ribbon now-marker overflow (found by the main session's PR 1 gate; not in Plan v4 — a pre-existing bug that blocked the gate) | COMPLETE | Main-session full gate at 19:02 failed `aDragThatCreatesAnOverlapDoesNotBreakTodaysRibbon` ("532px into 529px"); passed alone. Cause (worker, reproduced): `.td-rib-now`'s ▼ reaches 6.5px past its left, so in the span's last minute(s) it overflows (and at the first minute on the left); the check read the real clock and the fixture span ended 7:00pm. Fix: `tdRibNowLeft(pct)` clamps the marker inside the strip; the check now pins both ends every run. Failed first on HEAD's `js/31-today.js`, then passes; 4:00–8:30pm minute sweep clean. Reported to the owner as a scope addition. |
 | PR 1 push + draft PR | COMPLETE | Main-session full gate on `17887d2`: check 9/9 · merge 112 · buffers 9 · stream 31 · cleanup pass · xp 28 · money 33 · smoke 360/360 (exit 0). Pushed; draft [PR #94](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/94). Awaiting the owner's review and merge; then read Build 2026-09-24a on the iPad. |
 | **R5 / Plan v4 — PR 2** | | |
-| 5d Chore relocation map (`docs/chore-relocation-map.md`) | NOT STARTED | |
+| 5d Chore relocation map (`docs/chore-relocation-map.md`) | COMPLETE | Written by the main session (docs only); 16 rows to confirm (1–15, 19), 3 C3-only rows. |
 | C1 Chore actions + catch-up | NOT STARTED | |
 | C2 Chore views | NOT STARTED | |
 | PR 2 push + draft PR | NOT STARTED | |
