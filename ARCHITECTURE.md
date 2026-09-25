@@ -1014,6 +1014,19 @@ cell to the cursor so no minute is spent twice, then scales the segments back if
 they still come to more than 100. It shipped without either guard and every check
 passed: no fixture had two blocks that overlap. A screenshot found it.
 
+**The now-marker stays inside the strip, at both ends of the day.** It is
+absolutely placed at `left: <percent of the span>`, 3px wide, with a ▼ (`::before`)
+reaching 3.5px left of it and 6.5px from its left edge. In the last minute or two
+of the span the arrow poked past the strip's right edge (at the first minute, past
+its left) — so `aDragThatCreatesAnOverlapDoesNotBreakTodaysRibbon`, which read
+the real clock, passed all day and failed only for a run that reached it just
+before 7:00pm, the end of its fixture's span: 532px into 529px at 6:59pm
+(2026-09-24). `tdRibNowLeft(pct)` (`js/31-today.js`) returns
+`clamp(3.5px, pct%, calc(100% - 6.5px))`, and both the render and `tdTick`'s
+minute patch call it, so they cannot place the marker differently. The check now
+pins the clock to the span's first and last minute every run and measures the
+strip's overflow and the arrow's edges there.
+
 **The day screen scrolls as one surface, and that surface has to be BOUNDED.**
 It was three nested scrollers (`.day-workspace` → `.day-center-lane` →
 `.timeline-wrap`), which on an iPad meant a flick could move the wrong one.

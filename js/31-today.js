@@ -602,6 +602,19 @@ function tdRibbonSpan(blocks) {
   return { from, to: Math.max(to, from + 1) };
 }
 
+/* Where the now-marker sits, as a CSS `left`. The bar is 3px wide and its ▼
+   (::before) reaches 3.5px left of it and 6.5px from its left edge, so in the
+   last minute or two of the day's span a plain `left:<pct>%` pushed the arrow
+   past the strip's right edge (the overflow
+   aDragThatCreatesAnOverlapDoesNotBreakTodaysRibbon caught at 6:59pm: 532px
+   into 529px), and at its first minute the arrow poked out to the left. Clamped
+   so the marker and its arrow always stay inside the strip. One function, used
+   by the render and by tdTick's minute patch, so the two cannot place it
+   differently. */
+function tdRibNowLeft(pct) {
+  return `clamp(3.5px, ${pct.toFixed(2)}%, calc(100% - 6.5px))`;
+}
+
 function tdProgressRibbon(kid, blocks) {
   const total = blocks.length;
   if (!total) return tdQuestHero(kid, blocks);
@@ -685,7 +698,7 @@ function tdProgressRibbon(kid, blocks) {
      block and after the last one there is nothing for it to point at, and an
      arrow pinned to the edge would claim otherwise. */
   const marker = (now >= from && now <= to)
-    ? `<span class="td-rib-now" style="left:${pctOf(now).toFixed(2)}%"></span>`
+    ? `<span class="td-rib-now" style="left:${tdRibNowLeft(pctOf(now))}"></span>`
     : '';
   const mid = Math.round((from + to) / 2);
 
@@ -1509,7 +1522,7 @@ function tdTick() {
       const { from, to } = tdRibbonSpan(blocks);
       const now = tdNowMin();
       if (now >= from && now <= to) {
-        marker.style.left = ((now - from) / Math.max(1, to - from) * 100).toFixed(2) + '%';
+        marker.style.left = tdRibNowLeft((now - from) / Math.max(1, to - from) * 100);
       }
     }
   }

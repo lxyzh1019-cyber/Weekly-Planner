@@ -176,6 +176,10 @@ to be a complete manifest:
 - **Closing ritual unchanged** (still reads `currentDayKey`, still writes that day's mood from its picker); it now opens after a reflection only when the day reflected on is today and `currentDayKey` is today. `closeRitual` re-renders the current screen.
 - Held by `todayAsksHowTodayWent` (clock pinned; `currentDayKey` left on another day before each tap) and `todayIsWhereTheDayGetsDone` (asserts the Vibe card stays gone; it used to assert `#vibeMoods` was present).
 
+### Today's ribbon: the now-marker stays inside the strip (manifested 2026-09-24, follow-up to stage 5g)
+- The ribbon's now-marker (`.td-rib-now`, 3px bar with a ▼ `::before`) is placed by `tdRibNowLeft(pct)` (`js/31-today.js`) as `clamp(3.5px, pct%, calc(100% - 6.5px))`, used by both `tdProgressRibbon` and `tdTick`'s minute patch. In the span's last minute or two its arrow used to overflow the strip (532px into 529px at 6:59pm on the check's fixture); at the first minute the arrow poked out to the left. Shown only while now is inside the span (unchanged).
+- Held by `aDragThatCreatesAnOverlapDoesNotBreakTodaysRibbon`, which now also pins the clock to the span's first and last minute and checks the strip does not overflow and the arrow stays inside (it used to read only the real clock, so it failed only for a run crossing the span's end).
+
 Deriving the full app manifest from `ARCHITECTURE.md` is an open item in `WORKING_RECORD.md`.
 
 ## App — Pocket money (manifested 2026-09-22)

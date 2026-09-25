@@ -3516,6 +3516,43 @@ function findChromium() {
       if (strip.scrollWidth > strip.clientWidth + 1) {
         bad.push(`the ribbon overflows its own box (${strip.scrollWidth}px into ${strip.clientWidth}px)`);
       }
+
+      /* The now-marker at the two ends of the span. Measured above at whatever
+         minute the suite runs, which let this pass all day and fail only when
+         the run crossed 7:00pm — the very end of this fixture's span, where the
+         marker sat at left:100% and poked out of the strip. So both ends are
+         pinned here, every run: the minute the span starts and the minute it
+         ends. Only `new Date()` is pinned, and it is put back in `finally`. */
+      const { from, to } = tdRibbonSpan(tdQuestsToday('jenn'));
+      const RealDate = Date;
+      [from, to].forEach(min => {
+        const [y, m, d] = key.split('-').map(Number);
+        let t = RealDate.UTC(y, m - 1, d, 12, 0, 0);
+        for (let i = 0; i < 3; i++) {
+          const at = new RealDate(t);
+          const off = Math.round((RealDate.parse(toDayKeyInZone(at) + 'T00:00Z') - RealDate.parse(key + 'T00:00Z')) / 864e5);
+          t += (min - nowMinutesInZone(at) - off * 1440) * 60000;
+        }
+        Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(t); };
+        Date.prototype = RealDate.prototype;
+        Date.now = RealDate.now; Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+        try {
+          tdRenderToday();
+          const s = document.querySelector('#screen-today .td-rib-strip');
+          const mk = s && s.querySelector('.td-rib-now');
+          if (!mk) { bad.push(`no now-marker at ${formatTimeFromMin(min)}, inside the span`); return; }
+          const sb = s.getBoundingClientRect(), arrow = getComputedStyle(mk, '::before');
+          const mb = mk.getBoundingClientRect();
+          const arrowLeft = mb.left + parseFloat(arrow.left);
+          const arrowRight = arrowLeft + parseFloat(arrow.borderLeftWidth) + parseFloat(arrow.borderRightWidth);
+          if (s.scrollWidth > s.clientWidth + 1) {
+            bad.push(`at ${formatTimeFromMin(min)} the ribbon overflows its own box (${s.scrollWidth}px into ${s.clientWidth}px)`);
+          }
+          if (arrowLeft < sb.left - 0.5 || arrowRight > sb.right + 0.5) {
+            bad.push(`at ${formatTimeFromMin(min)} the now-marker's arrow pokes out of the strip (${arrowLeft.toFixed(1)}–${arrowRight.toFixed(1)} vs ${sb.left.toFixed(1)}–${sb.right.toFixed(1)})`);
+          }
+        } finally { Date = RealDate; }
+      });
     } finally {
       setDayBlocks(key, before, 'jenn');
       goToday();
