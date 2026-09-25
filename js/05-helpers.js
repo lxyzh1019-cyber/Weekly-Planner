@@ -1312,6 +1312,13 @@ function getDayKeys(offset=0) {
 }
 function formatDayKey(key) { const [y,m,d]=key.split('-'); return new Date(+y,+m-1,+d); }
 function todayKey() { return toDayKeyInZone(new Date()); }
+/* The day before `key`, as a key. Calendar arithmetic on local midnight, like
+   getDayKeys, so a daylight-saving night cannot skip or repeat a day. */
+function dayKeyBefore(key) {
+  const d = formatDayKey(key);
+  d.setDate(d.getDate() - 1);
+  return dateToLocalKey(d);
+}
 
 /* ── Age, never asked for ──
    The year of the most recent birthday-season rollover: this calendar year once

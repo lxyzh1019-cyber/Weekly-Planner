@@ -2230,6 +2230,48 @@ the rest, and its confirm lists what goes and what stays (✅ / 📌 / 🚫) wit
 merge layer, so an undo would mean re-adding blocks under new ids. A day with
 nothing to take off says so in a toast and asks nothing.
 
+**How a day went is asked on Today, and the reflect sheet is TOLD its day**
+(R5 §7 Q3, 2026-09-24). The day's mood (`profile.dayMoods`) had two doors — 🌙
+on the Day view's top bar and "Today's Vibe" folded away in Today's
+`#tdExtrasBody` — and both wrote `dayMoods[currentDayKey]`, the global behind the
+invite wrong-day bug (PR #93): it outlives the Day view that set it. Now:
+- `openReflectSheet(dayKey)` / `saveReflection(dayKey)` (`js/09-sheets.js`)
+  take the day as an argument and **never read `currentDayKey`**; no day, or a
+  day still to come, opens nothing. The Save button is bound to that day when
+  the sheet opens (`#reflectSaveBtn`). The title names the day through
+  `reflectDayQuestion(dayKey)`: "How was today?", "How was yesterday?", else
+  "How was Tuesday?". The per-block moods listed are that day's blocks.
+- **Today's 🌙 row** (`tdReflectRow` / `tdReflectAsk`, `js/31-today.js`, a
+  `.td-row` with `data-td-action="reflect"` and `data-td-day`, in the day
+  column under the invite note) decides which day to ask about: **today** in
+  the evening — from `TD_REFLECT_FROM_MIN` (8pm), or earlier once every block
+  today has ended (`blockHasEnded`) — while today has no mood; else
+  **yesterday** (`dayKeyBefore(todayKey())`, `js/05-helpers.js`), at any hour,
+  while it has no mood. **Only yesterday, never older**: a mood from three days
+  ago is a guess. When both are unanswered in the evening, **today goes first**
+  and yesterday returns once today is answered, until midnight. Answered and
+  still evening, it reads "Today felt 😄" and reopens the sheet to change it,
+  which the Vibe card allowed. `tdTickKey` includes what it asks, so the row
+  appears at 8pm on a screen left open. Shown to whoever is viewing Today, as
+  the Vibe card was.
+- **The 🌙 left the Day view's top bar** (it is 📋 · profile badge). A past
+  day is still reflected on from its own screen: its 📋 sheet shows **🌙 How was
+  Tuesday?** (`#reflectDayWrap` / `#reflectDayBtn`, `renderReflectDayButton`)
+  for a day before today only — today's door is on Today, and a future day has
+  nothing to look back on. The sheet captures the day when it opens and passes
+  it; the Day view's evening toast now points to Today.
+- **"Today's Vibe" is folded into the row**: the card, `renderVibe`,
+  `setDayMood`, `#vibeMoods`, `#vibeSubtext`, `.vibe-card` and `.vibe-title` are
+  gone. `.vibe-moods` / `.vibe-mood` stay (the sheet and the ritual). Today's
+  fold is now "To-dos and goals".
+- **The closing ritual is unchanged** — it still reads `currentDayKey` and
+  writes that day's mood from its own picker — but it now follows a reflection
+  only when the day reflected on is today and `currentDayKey` is today, so it
+  never says goodnight over yesterday or a past day.
+Held by `todayAsksHowTodayWent` (clock pinned to a local time on Thursday of
+this week; `currentDayKey` is left on another day before every tap) and
+`todayIsWhereTheDayGetsDone` (the Vibe card stays gone).
+
 **A repeat is materialised, and it remembers what it is.** `seriesDayKeys`
 (`js/05-helpers.js`) is the one place that answers which days a repeat covers —
 days of the week, **every N weeks**, from a start date through an end date — and

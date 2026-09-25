@@ -144,7 +144,7 @@
 
   <!-- Moved here off the day timeline's left rail, which was headed "Today" and
        printed the same "next up" sentence this screen already leads with. These
-       keep their original ids so renderVibe / renderDayGoalsTodos /
+       keep their original ids so renderDayGoalsTodos /
        maybeShowRewardPrompt work untouched — every screen is in the DOM at once,
        so those renderers find their elements wherever the markup lives.
        The day screen is now only for building a day; this is where one gets done. -->
@@ -169,13 +169,8 @@
          under one toggle keeps this screen inside its 200-word budget. -->
     <button type="button" class="td-fold-btn" id="tdExtrasBtn" onclick="tdToggleExtras()"></button>
     <div class="td-fold-body" id="tdExtrasBody" style="display:none">
-      <div class="vibe-card">
-        <div>
-          <div class="vibe-title">Today's Vibe</div>
-          <div style="font-size:0.92rem;color:#5a4d41" id="vibeSubtext">Set when the day's done</div>
-        </div>
-        <div class="vibe-moods" id="vibeMoods"></div>
-      </div>
+      <!-- "Today's Vibe" was here. It is folded into the 🌙 How was today? row
+           in the day column (tdReflectRow): one door for the day's mood. -->
       <div class="day-mini-panel">
         <div class="day-mini-panel__header">
           <h3>✅ To-do</h3>
@@ -486,8 +481,9 @@
            localStorage only — every synced write is a full-document upload. -->
       <div class="day-span-tabs" id="daySpanTabs" role="group" aria-label="How many days to show"></div>
       <div class="day-topbar-actions">
+        <!-- 🌙 sat here (R5 §7 Q3): today's mood is asked on Today, and a past
+             day is reflected on from its 📋 sheet. -->
         <button class="btn-icon" onclick="openTemplateSheet()" aria-label="Copy a day" title="Copy a day, or rest">📋</button>
-        <button class="btn-icon" onclick="openReflectSheet()" aria-label="Reflect on today">🌙</button>
         <button class="profile-badge" onclick="openProfileSwitcher()" id="dayProfileBadge" aria-label="Switch profile"></button>
       </div>
     </div>
@@ -1210,6 +1206,14 @@
     <div id="copyDayList" class="copy-day-list"></div>
     <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">Taking today off? Rest days keep your streak safe.</p>
     <button class="pill-btn" style="width:100%;font-size:1rem" id="restDayBtn" onclick="toggleRestDay(currentDayKey)" aria-label="Mark rest day" title="Mark today a rest day">😌 Rest</button>
+    <!-- Looking back on a past day (R5 §7 Q3). The 🌙 left the Day view's top
+         bar; today's mood is asked on Today. A past day keeps its door here, on
+         its own menu — renderReflectDayButton shows it for past days only and
+         passes the day to openReflectSheet. -->
+    <div id="reflectDayWrap" hidden>
+      <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">Looking back on this day?</p>
+      <button type="button" class="pill-btn reflect-day-btn" id="reflectDayBtn"></button>
+    </div>
     <!-- Start this day over (R5 §7 Q4). It was 🗑 on the Day view's top bar,
          beside 📋 and 🌙, and it deleted done and parent-pinned blocks too.
          Down here, last, it keeps them; clearDay's confirm lists what goes. -->
@@ -1389,16 +1393,18 @@
   </div>
 </div>
 
-<!-- End-of-day Reflect Sheet -->
+<!-- Reflect Sheet: one day's overall mood, then each block. The day is
+     openReflectSheet(dayKey)'s argument; the title names it ("How was
+     yesterday?") and the Save button is bound to it when the sheet opens. -->
 <div class="overlay" id="reflectOverlay" onclick="overlayClick(event,'reflectOverlay')">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="reflectSheetTitle">
     <div class="sheet-handle"></div>
-    <h3 id="reflectSheetTitle">🌙 Reflect on Today</h3>
+    <h3 id="reflectSheetTitle">🌙 How was today?</h3>
     <h4>Overall vibe</h4>
     <div class="vibe-moods" id="reflectOverallMoods" style="margin-bottom:1rem"></div>
     <h4>How did each block feel? <span style="font-weight:400;font-size:0.85rem">(optional)</span></h4>
     <div id="reflectBlockList"></div>
-    <button class="btn-confirm" onclick="saveReflection()">Save ✨</button>
+    <button class="btn-confirm" id="reflectSaveBtn">Save ✨</button>
   </div>
 </div>
 

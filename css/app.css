@@ -2322,18 +2322,8 @@
   /* Event-zone chips — secondary jump-to filter, kept small so the schedule
      stays the focus (All Day is the default). */
 
-  /* Vibe card (replaces Day Balance) */
-  .vibe-card {
-    background: var(--paper);
-    border-radius: 16px;
-    padding: 0.7rem 0.9rem;
-    margin: 0.3rem 0.8rem 0.5rem;
-    border: 2px solid var(--ink);
-    box-shadow: 2px 2px 0 var(--ink);
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 0.6rem;
-  }
-  .vibe-title { font-family:'Gochi Hand', cursive; font-size: 1.1rem; }
+  /* The mood dots: the reflect sheet and the closing ritual. The Vibe card
+     that also wore them on Today is folded into Today's 🌙 row (R5 §7 Q3). */
   .vibe-moods { display: flex; gap: 0.3rem; }
   .vibe-mood {
     width: 36px; height: 36px; border-radius: 50%;
@@ -2500,7 +2490,7 @@
     gap: 0.5rem;
   }
   .tl-col { position: relative; min-width: 0; }
-  /* The day the topbar's 📋 / 🌙 / 🗑 act on. Only marked when more than one day
+  /* The day the topbar's 📋 acts on. Only marked when more than one day
      is on screen — with one column there is nothing to distinguish it from.
      Two selectors because the header and the canvas are no longer nested:
      focusDayColumn marks both. */
@@ -5034,7 +5024,7 @@
   .cdr-pinned { font-weight: 800; color: var(--ink-muted); white-space: nowrap; }
   .cdr-copy { width: 100%; min-height: 44px; font-size: max(15px, calc(1rem * var(--fs-scale, 1))); }
   /* 🗑 Start this day over, last on the 📋 sheet (R5 §7 Q4). */
-  .day-over-btn { width: 100%; min-height: 44px; font-size: max(15px, calc(1rem * var(--fs-scale, 1))); }
+  .day-over-btn, .reflect-day-btn { width: 100%; min-height: 44px; font-size: max(15px, calc(1rem * var(--fs-scale, 1))); }
 
   /* Quick slot-picker sheet (tap an empty slot to add an activity) */
   .slot-picker-hint { color: var(--ink-light); font-size: calc(0.92rem * var(--fs-scale, 1)); margin: 0.1rem 0 0.5rem; }

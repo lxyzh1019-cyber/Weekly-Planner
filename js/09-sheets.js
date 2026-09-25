@@ -2231,8 +2231,25 @@ function openTemplateSheet() {
   copyDaySrcWeek = 0;
   copyDayDstKid = null;
   refreshRestDayButton();
+  renderReflectDayButton(currentDayKey);
   renderCopyDayList();
   openSheet('templateOverlay');
+}
+
+/* A past day is still reflected on from its own screen (R5 §7 Q3): the Day
+   view's 🌙 top-bar button is gone, and this sheet is the day's own menu. Past
+   days only — today's door is the 🌙 row on Today, and a day still to come has
+   nothing to look back on. The day is captured here, when the sheet opens, and
+   handed to openReflectSheet; the reflect sheet never reads currentDayKey. */
+function renderReflectDayButton(dayKey) {
+  const wrap = document.getElementById('reflectDayWrap');
+  const btn = document.getElementById('reflectDayBtn');
+  if (!wrap || !btn) return;
+  const past = !!dayKey && dayKey < todayKey();
+  wrap.hidden = !past;
+  if (!past) { btn.onclick = null; return; }
+  btn.textContent = '🌙 ' + reflectDayQuestion(dayKey);
+  btn.onclick = () => { closeSheet('templateOverlay'); openReflectSheet(dayKey); };
 }
 
 /* Which week the days on offer come from, and — for a parent only — whose day
@@ -2701,12 +2718,27 @@ function confirmCustomTask() {
 /* ════════════════════════════════════════════════════════════════
    END-OF-DAY REFLECTION + RITUAL
 ════════════════════════════════════════════════════════════════ */
-function openReflectSheet() {
-  const blocks = getDayBlocks(currentDayKey);
+/* The sheet is about ONE day, and the caller names it. It used to read the
+   global currentDayKey, the same global behind the invite wrong-day bug (PR
+   #93): the Day view sets it and it outlives that screen, so a mood could land
+   on whichever day was open last. Today's 🌙 row passes today or yesterday; a
+   past day's 📋 sheet passes that day. Neither this nor saveReflection reads
+   currentDayKey. No day, or a day still to come, opens nothing. */
+function reflectDayQuestion(dayKey) {
+  const today = todayKey();
+  if (dayKey === today) return 'How was today?';
+  if (dayKey === dayKeyBefore(today)) return 'How was yesterday?';
+  return `How was ${DAY_LONG[dayIdxOfKey(dayKey)]}?`;
+}
+function openReflectSheet(dayKey) {
+  if (!dayKey || dayKey > todayKey()) return;
+  document.getElementById('reflectSheetTitle').textContent = '🌙 ' + reflectDayQuestion(dayKey);
+  document.getElementById('reflectSaveBtn').onclick = () => saveReflection(dayKey);
+  const blocks = getDayBlocks(dayKey);
   // Overall
   const overallWrap = document.getElementById('reflectOverallMoods');
   overallWrap.innerHTML = '';
-  const curOverall = getProfData().dayMoods?.[currentDayKey];
+  const curOverall = getProfData().dayMoods?.[dayKey];
   MOODS.forEach(m=>{
     const el = document.createElement('div');
     el.className = 'vibe-mood'+(curOverall===m?' selected':'');
@@ -2724,7 +2756,7 @@ function openReflectSheet() {
   const listWrap = document.getElementById('reflectBlockList');
   listWrap.innerHTML = '';
   if (!blocks.length) {
-    listWrap.innerHTML = '<p style="color:var(--ink-light);font-size:0.9rem">No blocks today</p>';
+    listWrap.innerHTML = '<p style="color:var(--ink-light);font-size:0.9rem">Nothing was planned.</p>';
   } else {
     const acts = getAllActivities(activeProfile(), { includeArchived: true });
     blocks.forEach(b=>{
@@ -2758,18 +2790,21 @@ function openReflectSheet() {
   openSheet('reflectOverlay');
 }
 
-function saveReflection() {
+function saveReflection(dayKey) {
+  if (!dayKey) return;
   const overallEl = document.querySelector('#reflectOverallMoods .vibe-mood.selected');
   if (overallEl) {
     const p = getProfData();
     if (!p.dayMoods) p.dayMoods={};
-    p.dayMoods[currentDayKey] = overallEl.textContent;
+    p.dayMoods[dayKey] = overallEl.textContent;
     saveAll();
   }
   closeSheet('reflectOverlay');
-  renderVibe();
-  buildTimeline();
-  openClosingRitual();
+  refreshCurrentScreen();
+  /* The closing ritual is a goodnight to TODAY, and it reads currentDayKey
+     itself (left as it is). So it follows only a reflection on today, and only
+     when currentDayKey is today — never after yesterday's or a past day's. */
+  if (dayKey === todayKey() && currentDayKey === dayKey) openClosingRitual();
 }
 
 function openClosingRitual() {
@@ -2823,5 +2858,5 @@ function openClosingRitual() {
 
   document.getElementById('ritualScreen').classList.add('show');
 }
-function closeRitual() { document.getElementById('ritualScreen').classList.remove('show'); renderVibe(); }
+function closeRitual() { document.getElementById('ritualScreen').classList.remove('show'); refreshCurrentScreen(); }
 

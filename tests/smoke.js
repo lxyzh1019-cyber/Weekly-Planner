@@ -11398,8 +11398,8 @@ function findChromium() {
 
   /* Handing off, not re-implementing. Today is now where a day gets *done*, so
      it does write — but only by calling the function that already owned the
-     write (completeQuest for a tick, addQuickBreak for a break, setDayMood for a
-     mood). What it must still never do is grade a chore or move money: those
+     write (completeQuest for a tick, addQuickBreak for a break, the reflect sheet's
+     saveReflection for a mood). What it must still never do is grade a chore or move money: those
      belong to the chore and money screens, and a second place that decides them
      is a second place that can disagree. So the assertion narrows rather than
      disappears — the navigation rows still change screen and not state. */
@@ -11754,7 +11754,10 @@ function findChromium() {
     // The relocated panels are present, and the reference ones start collapsed
     // so they cost nothing against the word budget.
     goToday();
-    if (!document.getElementById('vibeMoods')) bad.push('the vibe picker did not come across');
+    /* The vibe picker was asserted here. It is folded into the 🌙 How was
+       today? row (R5 §7 Q3), held by todayAsksHowTodayWent, so the check is now
+       that the second door stays gone. */
+    if (document.getElementById('vibeMoods')) bad.push("Today's Vibe came back — the day's mood has one door, the 🌙 row");
     if (!document.getElementById('dayTodosList') || !document.getElementById('dayGoalsList')) bad.push('to-dos/goals did not come across');
     /* The two break buttons used to be asserted here. They are gone — a
        permanent row for something asked for a handful of times — so the check is
@@ -12728,6 +12731,183 @@ function findChromium() {
     closeSheet('templateOverlay');
     setDayBlocks(key, before, 'jenn');
     profile = wasProfile; parentViewing = wasViewing;
+    return bad.length === 0 || bad;
+  });
+
+  /* Reflection lives on Today (R5 §7 Q3). The day's mood had two doors — 🌙 on
+     the Day view's top bar and "Today's Vibe" folded away on Today — and the
+     reflect sheet read the global currentDayKey, the one behind the invite
+     wrong-day bug (PR #93): it outlives the day view that set it. Now:
+     - a 🌙 How was today? row on Today in the evening (from 8pm, or once her
+       last block has ended) opens the sheet for today;
+     - a morning with no mood for yesterday asks about yesterday, and only
+       yesterday — never an older day;
+     - evening with both unanswered asks about today first, then yesterday;
+     - the sheet takes its day as an argument and never reads currentDayKey,
+       proved by leaving currentDayKey on another day before every tap;
+     - no 🌙 on the Day view top bar and no Today's Vibe card; a past day is
+       still reflected on from its own screen, through its 📋 sheet.
+     The clock is pinned to a local time on Thursday of this week, so
+     "yesterday" (Wednesday) and "evening" do not depend on when this runs. */
+  if (want('todayAsksHowTodayWent')) checks.todayAsksHowTodayWent = await page.evaluate(async () => {
+    const bad = [];
+    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
+    const keys = getDayKeys(0);
+    const [mon, tue, wed, thu, fri] = keys;
+    const pd = getProfData('jenn');
+    const hadMoods = JSON.parse(JSON.stringify(pd.dayMoods || {}));
+    const hadBlocks = [thu, tue].map(k => [k, (getDayBlocksForProfile(k, 'jenn') || []).slice()]);
+    const pinAt = (dayKey, localMin) => {
+      const RealDate = Date;
+      const [y, m, d] = dayKey.split('-').map(Number);
+      let t = RealDate.UTC(y, m - 1, d, 12, 0, 0);
+      for (let i = 0; i < 3; i++) {
+        const at = new RealDate(t);
+        const dayOff = Math.round((RealDate.parse(toDayKeyInZone(at) + 'T00:00Z') - RealDate.parse(dayKey + 'T00:00Z')) / 864e5);
+        t += (localMin - nowMinutesInZone(at) - dayOff * 1440) * 60000;
+      }
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(t); };
+      Date.prototype = RealDate.prototype;
+      Date.now = RealDate.now; Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+      return () => { Date = RealDate; };
+    };
+    const row = () => document.querySelector('#tdWrap [data-td-action="reflect"]');
+    const sheetOpen = () => document.getElementById('reflectOverlay').classList.contains('open');
+    const title = () => document.getElementById('reflectSheetTitle').textContent;
+    // Leave the Day view on another day, then go to Today and tap — with
+    // currentDayKey still pointing somewhere else at the moment of the tap.
+    const tapRowFrom = (strayKey) => {
+      openDay(strayKey, keys.indexOf(strayKey));
+      goToday();
+      currentDayKey = strayKey;
+      const r = row();
+      if (r) r.click();
+      return r;
+    };
+    const answer = (mood) => {
+      const dot = [...document.querySelectorAll('#reflectOverallMoods .vibe-mood')].find(el => el.textContent === mood);
+      if (dot) dot.click();
+      const save = document.querySelector('#reflectOverlay .btn-confirm');
+      if (save) save.click();
+      if (document.getElementById('ritualScreen').classList.contains('show')) closeRitual();
+    };
+    let unpin = () => {};
+    try {
+      profile = 'jenn'; parentViewing = 'jenn';
+      pd.dayMoods = {};
+      // Thursday's last block ends at 5pm; Tuesday is a past day with one block.
+      setDayBlocks(thu, [{ id: 'rf-thu', actId: 'piano', startMin: 16 * 60, durationMin: 60 }], 'jenn');
+      setDayBlocks(tue, [{ id: 'rf-tue', actId: 'piano', startMin: 16 * 60, durationMin: 60 }], 'jenn');
+
+      // ── Morning, yesterday unanswered: asks about yesterday, writes Wednesday.
+      unpin = pinAt(thu, 9 * 60);
+      let r = tapRowFrom(mon);
+      if (!r) bad.push('a morning with no mood for yesterday shows no 🌙 row on Today');
+      else {
+        if (!/How was yesterday\?/.test(r.textContent)) bad.push(`the morning row reads "${r.textContent.trim()}", not "How was yesterday?"`);
+        const box = r.getBoundingClientRect();
+        if (box.height < 44) bad.push(`the 🌙 row is ${Math.round(box.height)}px tall, under 44px`);
+        // Words she reads to act: 15px. The ›, aria-hidden, is every Today
+        // row's chevron (.td-row-go), an affordance and not text; 13px floor.
+        const small = [r, ...r.querySelectorAll('*')].filter(el => el.textContent.trim()
+          && el.children.length === 0
+          && parseFloat(getComputedStyle(el).fontSize) < (el.getAttribute('aria-hidden') === 'true' ? 13 : 15));
+        if (!r.querySelector('.td-row-name')) bad.push('the 🌙 row has no .td-row-name text');
+        if (small.length) bad.push(`the 🌙 row has text under 15px (${getComputedStyle(small[0]).fontSize})`);
+        if (!sheetOpen()) bad.push('the yesterday row did not open the reflect sheet');
+        else {
+          if (!/How was yesterday\?/.test(title())) bad.push(`the sheet for yesterday is titled "${title()}"`);
+          answer('🙂');
+          if (pd.dayMoods[wed] !== '🙂') bad.push(`answering yesterday wrote ${JSON.stringify(pd.dayMoods)} — want ${wed}: 🙂`);
+          if (pd.dayMoods[mon] || pd.dayMoods[thu]) bad.push(`answering yesterday also wrote another day: ${JSON.stringify(pd.dayMoods)}`);
+        }
+      }
+      /* Once yesterday is answered, the morning asks nothing — and only
+         yesterday: Tuesday (planned, unanswered) is never asked about on a
+         Thursday. */
+      goToday();
+      if (row()) bad.push(`with yesterday answered and Tuesday not, a morning still shows "${row().textContent.trim()}"`);
+      unpin(); unpin = () => {};
+
+      // ── Evening (8:30pm), both today and yesterday unanswered: today first.
+      delete pd.dayMoods[wed];
+      unpin = pinAt(thu, 20 * 60 + 30);
+      r = tapRowFrom(tue);
+      if (!r) bad.push('the evening shows no 🌙 How was today? row on Today');
+      else {
+        if (!/How was today\?/.test(r.textContent)) bad.push(`the evening row reads "${r.textContent.trim()}", not "How was today?"`);
+        if (!sheetOpen()) bad.push('the evening row did not open the reflect sheet');
+        else {
+          if (!/How was today\?/.test(title())) bad.push(`the sheet for today is titled "${title()}"`);
+          answer('😄');
+          if (pd.dayMoods[thu] !== '😄') bad.push(`answering today wrote ${JSON.stringify(pd.dayMoods)} — want ${thu}: 😄`);
+          if (pd.dayMoods[tue]) bad.push(`answering today also wrote the day the Day view was left on (${tue})`);
+        }
+      }
+      // Then yesterday, still unanswered, gets its turn.
+      goToday();
+      if (!row() || !/How was yesterday\?/.test(row().textContent)) {
+        bad.push(`with today answered and yesterday not, the row reads "${row() ? row().textContent.trim() : '(none)'}"`);
+      }
+      unpin(); unpin = () => {};
+
+      // ── Before 8pm, once her last block has ended, it asks about today too.
+      pd.dayMoods = { [wed]: '🙂' };
+      unpin = pinAt(thu, 17 * 60 + 30);
+      goToday();
+      if (!row() || !/How was today\?/.test(row().textContent)) {
+        bad.push(`at 5:30pm with her last block over, the row reads "${row() ? row().textContent.trim() : '(none)'}"`);
+      }
+      unpin(); unpin = () => {};
+      unpin = pinAt(thu, 15 * 60);
+      goToday();
+      if (row()) bad.push(`at 3pm, before her last block, Today already asks "${row().textContent.trim()}"`);
+
+      // ── One door: Today's Vibe is gone.
+      if (document.getElementById('vibeMoods')) bad.push("Today's Vibe card is still on Today");
+
+      // ── The Day view: no 🌙 on its top bar; a past day reflects from its 📋 sheet.
+      openDay(thu, 3);
+      const bar = document.querySelector('#screen-day .day-topbar-actions');
+      if (!bar) bad.push('the Day view top bar is missing');
+      else if (/🌙/.test(bar.textContent) || bar.querySelector('[onclick^="openReflectSheet"]')) bad.push('🌙 is still on the Day view top bar');
+      const reflectBtn = () => [...document.querySelectorAll('#templateOverlay button')]
+        .find(b => /How was/.test(b.textContent) && b.offsetParent !== null);
+      openTemplateSheet();
+      if (reflectBtn()) bad.push("today's 📋 sheet offers a reflect button — today's door is on Today");
+      closeSheet('templateOverlay');
+      openDay(fri, 4);
+      openTemplateSheet();
+      if (reflectBtn()) bad.push("a future day's 📋 sheet offers a reflect button");
+      closeSheet('templateOverlay');
+      openDay(tue, 1);
+      openTemplateSheet();
+      const pb = reflectBtn();
+      if (!pb) bad.push("a past day's 📋 sheet has no 🌙 How was Tuesday?");
+      else {
+        if (!/How was Tuesday\?/.test(pb.textContent)) bad.push(`the past-day button reads "${pb.textContent.trim()}"`);
+        if (pb.getBoundingClientRect().height < 44) bad.push('the past-day reflect button is under 44px');
+        pb.click();
+        currentDayKey = mon;
+        if (!sheetOpen()) bad.push("the past day's reflect button did not open the sheet");
+        else {
+          if (!/How was Tuesday\?/.test(title())) bad.push(`the sheet for Tuesday is titled "${title()}"`);
+          answer('😐');
+          if (pd.dayMoods[tue] !== '😐') bad.push(`reflecting on Tuesday wrote ${JSON.stringify(pd.dayMoods)}`);
+          if (pd.dayMoods[mon]) bad.push('reflecting on Tuesday wrote the mood onto currentDayKey');
+        }
+      }
+    } catch (e) {
+      bad.push('threw: ' + (e && e.message));
+    } finally {
+      unpin();
+      ['reflectOverlay', 'templateOverlay'].forEach(id => { if (document.getElementById(id).classList.contains('open')) closeSheet(id); });
+      document.getElementById('ritualScreen').classList.remove('show');
+      pd.dayMoods = hadMoods;
+      hadBlocks.forEach(([k, b]) => setDayBlocks(k, b, 'jenn'));
+      profile = wasProfile; parentViewing = wasViewing; currentDayKey = wasDayKey;
+      goToday();
+    }
     return bad.length === 0 || bad;
   });
 

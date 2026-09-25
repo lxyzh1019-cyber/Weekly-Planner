@@ -103,7 +103,6 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
   renderDaySpanTabs();
   buildTimeline();
   bindDayTimelineCompactOnScroll();
-  renderVibe();
   renderDayGoalsTodos();
   maybeShowRewardPrompt();
   if (focusBlockId) {
@@ -112,10 +111,11 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
     focusBlockOnTimeline(focusBlockId);
   }
 
-  // Gentle reflect prompt if evening and day has blocks and no mood set
+  // Gentle reflect prompt if evening and day has blocks and no mood set. The 🌙
+  // left this screen's top bar (R5 §7 Q3); today's question is asked on Today.
   if (nowMinutesInZone() >= 20 * 60 && currentDayKey === todayKey() && getDayBlocks(key).length > 0) {
     const m = getProfData().dayMoods?.[key];
-    if (!m) showToast('💫 Tap 🌙 to reflect on today');
+    if (!m) showToast('🌙 How was today? Tell us on Today');
   }
 }
 
@@ -221,29 +221,10 @@ function navDay(delta) {
    The Before School / School / After School / Evening bands are a different
    thing entirely and are very much alive — see buildSideband. */
 
-/* Today's Vibe */
-function renderVibe() {
-  const wrap = document.getElementById('vibeMoods');
-  wrap.innerHTML = '';
-  const current = getProfData().dayMoods?.[currentDayKey];
-  MOODS.forEach(m=>{
-    const el = document.createElement('div');
-    el.className = 'vibe-mood'+(current===m?' selected':'');
-    el.textContent = m;
-    el.onclick = ()=>setDayMood(m);
-    wrap.appendChild(el);
-  });
-  document.getElementById('vibeSubtext').textContent =
-    current ? 'Today felt like...' : 'Tap at the end of your day';
-}
-function setDayMood(m) {
-  const p = getProfData();
-  if (!p.dayMoods) p.dayMoods={};
-  p.dayMoods[currentDayKey] = m;
-  saveAll();
-  renderVibe();
-  showToast('Mood saved '+m);
-}
+/* Today's Vibe (renderVibe / setDayMood) lived here: a mood picker folded away
+   on Today that wrote dayMoods[currentDayKey]. It is folded into Today's 🌙 How
+   was today? row (tdReflectRow, js/31-today.js), which opens the reflect sheet
+   with its day passed in (R5 §7 Q3) — one door for the day's mood. */
 
 /* Quest mode lived here — setDayViewMode, buildDayQuest, and before them
    Checklist mode. Three renderings of one day, each with its own completion
@@ -456,7 +437,7 @@ function buildDayColumn(dayKey, canvasHeight, withHeader, drawnSpan) {
     head.dataset.dayKey = dayKey;
     head.innerHTML = `<span class="tl-col-day">${escapeHtml(DAY_SHORT[dayIdxOfKey(dayKey)])}</span>
       <span class="tl-col-date">${d.getDate()}</span>`;
-    // Tapping the header makes that day the one the topbar's 📋 / 🌙 / 🗑 act on.
+    // Tapping the header makes that day the one the topbar's 📋 acts on.
     head.onclick = () => { focusDayColumn(dayKey); };
   }
 
@@ -571,7 +552,7 @@ function buildDayColumn(dayKey, canvasHeight, withHeader, drawnSpan) {
 }
 
 /* Make one column the day the topbar acts on. currentDayKey is what every
-   existing writer reads — placeBlock, setDayMood, clearDay, the day copy, the
+   existing writer reads — placeBlock, clearDay, the day copy, the
    edit sheet — so pointing it at the tapped column is the whole of what a
    multi-day view needs, rather than threading a day key through all of them. */
 function focusDayColumn(dayKey) {
@@ -585,7 +566,6 @@ function focusDayColumn(dayKey) {
     c.classList.toggle('tl-col--current', c.dataset.dayKey === dayKey));
   document.querySelectorAll('#timeline .tl-col-head').forEach(h =>
     h.classList.toggle('tl-col-head--current', h.dataset.dayKey === dayKey));
-  renderVibe();
 }
 
 function renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd, dayKey) {
