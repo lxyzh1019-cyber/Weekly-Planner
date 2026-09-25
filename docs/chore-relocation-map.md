@@ -7,7 +7,7 @@ How to confirm a row: do the thing in its **new home** on the iPad, then check t
 | ☐ | # | What the Chores screen does | New home | How to check it on the iPad |
 |---|---|---|---|---|
 | ☐ | 1 | Answer how a job went (On time / Late / Redo) | **Today** — tap a job row; it asks right there | Answer a job on Today; it shows answered on the Chores screen |
-| ☐ | 2 | ＋ I did something else | **Today**, under "Jobs I can do"; for an earlier day, inside **🕓 Catch up** | Add one for today, and one for two days ago via Catch up |
+| ☐ | 2 | ＋ I did something else | **Today**, under "Jobs I can do"; for an earlier day, inside **🕓 Catch up** | Add one for today, and one for two days ago via Catch up. **Known gap (C1):** Catch up only lists a past day that still has something unanswered, so an extra job on a fully answered past day still needs the Chores screen. C3 must close this before the screen goes. |
 | ☐ | 3 | Tick routine items; "all N done" | **Today** — the routine card opens to its items; earlier days in **🕓 Catch up** | Tick one item, then "all done" |
 | ☐ | 4 | Own things / Helping out | **Today** card | Tap it; the Chores screen shows the same |
 | ☐ | 5 | Training attitude 1–5 (her own) | **Today**, on the training block once it has ended; earlier days in **🕓 Catch up** | Rate a finished training |

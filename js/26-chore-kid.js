@@ -53,7 +53,12 @@ function ckRoutineItems(routineId, kid) {
 /* The day's routine blocks, as the planner placed them. Nothing appears here
    that the planner did not put on the day — the same rule the chores follow. */
 function ckRoutineBlocks(kid, dayIdx) {
-  const dayKey = mrWeekDayKeys(ctWeekKey)[dayIdx];
+  return ckRoutineBlocksOn(kid, mrWeekDayKeys(ctWeekKey)[dayIdx]);
+}
+/* The same reader for a day named by its key. Today and its catch-up card ask
+   about days this tab is not showing (R5 §5 C1), so the question takes the day
+   rather than reading ctWeekKey/ctDay — one reader, two callers. */
+function ckRoutineBlocksOn(kid, dayKey) {
   if (!dayKey) return [];
   return (getDayBlocks(dayKey, kid) || []).map(b => {
     const act = ckActFor(b, kid);
@@ -65,7 +70,9 @@ function ckRoutineBlocks(kid, dayIdx) {
   }).filter(Boolean);
 }
 function ckTrainingBlock(kid, dayIdx) {
-  const dayKey = mrWeekDayKeys(ctWeekKey)[dayIdx];
+  return ckTrainingBlockOn(kid, mrWeekDayKeys(ctWeekKey)[dayIdx]);
+}
+function ckTrainingBlockOn(kid, dayKey) {
   if (!dayKey) return null;
   const b = (getDayBlocks(dayKey, kid) || []).find(x => {
     const act = ckActFor(x, kid);
@@ -332,15 +339,21 @@ function ckRoutines(kid) {
 /* ── Your own things, and helping out ──
    Standing responsibilities: they need no planner block, they are never paid,
    and only "nobody had to ask" earns XP. */
-function ckOwnLanes(kid) {
-  const day = mrChoresForDay(kid, ctWeekKey, ctDay);
-  const r = mrRulesForWeek(ctWeekKey);
+/* Which items the two lanes hold on a day — read here and on Today, so the two
+   cannot list different things. */
+function ckOwnLaneItems(kid, weekKey, dayIdx) {
+  const day = mrChoresForDay(kid, weekKey, dayIdx);
+  const r = mrRulesForWeek(weekKey);
   const own = [
     ...(r.personalChores || []).map(c => ({ id: c.id, icon: c.icon || '⭐', label: c.label, due: '' })),
     ...day.rows.filter(x => x.row.lane === 'own').map(x => ({ id: x.row.id, icon: x.row.icon, label: x.row.label, due: mrDueLabel(x.row) })),
   ];
   const helping = day.rows.filter(x => x.row.lane === 'helping')
     .map(x => ({ id: x.row.id, icon: x.row.icon, label: x.row.label, due: mrDueLabel(x.row) }));
+  return { own, helping };
+}
+function ckOwnLanes(kid) {
+  const { own, helping } = ckOwnLaneItems(kid, ctWeekKey, ctDay);
 
   const lane = (label, note, items) => {
     if (!items.length) return '';
@@ -462,9 +475,14 @@ function ckChores(kid) {
    CLAIM, exactly like every other chore on this screen, and a parent still
    grades it before a cent moves. */
 function ckUnlistedChores(kid) {
-  const onToday = new Set(mrChoresForDay(kid, ctWeekKey, ctDay).rows.map(x => x.row.id));
-  return mrPoolRows(ctWeekKey).filter(row =>
-    row.lane === 'chores' && !onToday.has(row.id) && (row.who === 'both' || row.who === kid));
+  return ckUnlistedChoresFor(kid, ctWeekKey, ctDay);
+}
+/* The same list for any day: Today's "＋ I did something else" and the
+   catch-up card's, and the portal's on-her-behalf picker, read it too. */
+function ckUnlistedChoresFor(kid, weekKey, dayIdx) {
+  const onDay = new Set(mrChoresForDay(kid, weekKey, dayIdx).rows.map(x => x.row.id));
+  return mrPoolRows(weekKey).filter(row =>
+    row.lane === 'chores' && !onDay.has(row.id) && (row.who === 'both' || row.who === kid));
 }
 function ckSomethingElse(kid) {
   const left = ckUnlistedChores(kid);
@@ -837,15 +855,21 @@ function ckCycleWeekClaim(choreId, dayIdx) {
 /* Routine ticks write to the planner block, exactly as the day view does, so
    the two screens can never disagree about the same morning. */
 function ckToggleRoutineItem(blockId, itemId) {
-  const kid = ctActiveKid();
-  const dayKey = mrWeekDayKeys(ctWeekKey)[ctDay];
+  if (ckWriteRoutineItem(ctActiveKid(), mrWeekDayKeys(ctWeekKey)[ctDay], blockId, itemId)) renderChoreTab();
+}
+/* The writer behind it, for a named kid and day. Today and its catch-up card
+   tick through this very function (R5 §5 C1), so a morning ticked there and a
+   morning ticked here are one write, not two copies that could drift. Returns
+   whether anything was written; the caller repaints its own screen. */
+function ckWriteRoutineItem(kid, dayKey, blockId, itemId) {
   const blocks = getDayBlocks(dayKey, kid);
   const b = blocks.find(x => x.id === blockId);
-  if (!b) return;
+  if (!b) return false;
   if (!b.checklistState) b.checklistState = {};
   b.checklistState[itemId] = !b.checklistState[itemId];
   setDayBlocks(dayKey, blocks, kid);
-  ckAfterRoutineChange(b, dayKey, kid);
+  ckRoutineChanged(b, dayKey, kid);
+  return true;
 }
 function ckCloseRoutine(blockId) {
   const kid = ctActiveKid();
@@ -870,11 +894,15 @@ function ckCloseRoutine(blockId) {
    award. One write for the whole day: every mutation is a full-document upload,
    and this used to be three of them. */
 function ckCloseAllRoutines() {
-  const kid = ctActiveKid();
-  const dayKey = mrWeekDayKeys(ctWeekKey)[ctDay];
+  if (ckWriteAllRoutines(ctActiveKid(), mrWeekDayKeys(ctWeekKey)[ctDay])) renderChoreTab();
+}
+/* The writer behind the one-tap, for a named kid and day — Today's "all N
+   done" and the catch-up card's call it (R5 §5 C1). Returns whether the day had
+   a routine to write; the caller repaints. */
+function ckWriteAllRoutines(kid, dayKey) {
   const blocks = getDayBlocks(dayKey, kid);
-  const routines = ckRoutineBlocks(kid, ctDay);
-  if (!routines.length) return;
+  const routines = ckRoutineBlocksOn(kid, dayKey);
+  if (!routines.length) return false;
   const allOn = routines.every(r => r.total > 0 && r.done >= r.total);
   routines.forEach(({ block, items }) => {
     const b = blocks.find(x => x.id === block.id);
@@ -885,10 +913,16 @@ function ckCloseAllRoutines() {
   setDayBlocks(dayKey, blocks, kid);
   routines.forEach(({ block }) => {
     const b = blocks.find(x => x.id === block.id);
-    if (b) ckAfterRoutineChange(b, dayKey, kid);
+    if (b) ckRoutineChanged(b, dayKey, kid);
   });
+  return true;
 }
 function ckAfterRoutineChange(b, dayKey, kid) {
+  ckRoutineChanged(b, dayKey, kid);
+  renderChoreTab();
+}
+/* What follows every routine write, wherever it was made. */
+function ckRoutineChanged(b, dayKey, kid) {
   const act = ckActFor(b, kid);
   // The block's `completed` flag is a mirror of the checklist, never a second
   // opinion about it — so it is re-derived on every change, in both directions.
@@ -898,10 +932,15 @@ function ckAfterRoutineChange(b, dayKey, kid) {
   // screen can ever return to incomplete.
   if (act && act.routineId) ctSyncMandatoryFromRoutine(act.routineId, kid, dayKey, isRoutineCompleted(b, kid));
   saveAll();
-  renderChoreTab();
 }
 function ckRateSelf(dayIdx, n) {
-  const kid = ctActiveKid();
-  const cur = mrGetAttitude(kid, ctWeekKey, dayIdx).self;
-  if (mrSetAttitude(kid, ctWeekKey, dayIdx, 'self', cur === n ? 0 : n)) renderChoreTab();
+  if (ckRateSelfFor(ctActiveKid(), ctWeekKey, dayIdx, n)) renderChoreTab();
+}
+/* Her own rating for a named kid, week and day: the same number again takes it
+   back. Today, its catch-up card and the portal's on-her-behalf card rate
+   through this (R5 §5 C1); mrSetAttitude stays the one writer and keeps its
+   rule that a child rates only herself and never the parent's side. */
+function ckRateSelfFor(kid, weekKey, dayIdx, n) {
+  const cur = mrGetAttitude(kid, weekKey, dayIdx).self;
+  return mrSetAttitude(kid, weekKey, dayIdx, 'self', cur === n ? 0 : n);
 }

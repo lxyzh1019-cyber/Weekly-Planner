@@ -159,7 +159,7 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → n
 | PR 1 push + draft PR | COMPLETE | Main-session full gate on `17887d2`: check 9/9 · merge 112 · buffers 9 · stream 31 · cleanup pass · xp 28 · money 33 · smoke 360/360 (exit 0). Pushed; draft [PR #94](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/94). Awaiting the owner's review and merge; then read Build 2026-09-24a on the iPad. |
 | **R5 / Plan v4 — PR 2** | | |
 | 5d Chore relocation map (`docs/chore-relocation-map.md`) | COMPLETE | Written by the main session (docs only); 16 rows to confirm (1–15, 19), 3 C3-only rows. |
-| C1 Chore actions + catch-up | NOT STARTED | |
+| C1 Chore actions + catch-up | COMPLETE | Rows 1–8 and 19 built through the existing owners (routine/self-rating/own-things/learning writers split into kid+day-taking versions; the chore tab calls them unchanged). Today answers a job in place (no money moves); "＋ something else"; routine items; own-things card; training rating; ✨ clears on Today; 🕓 Catch up (this week + 8 before, never before the family start week, only weeks not settled per `mnyWeekSettled`); Parent › Now "On her behalf" (learning, claims, attitude, lanes; this week). `todayHandsOffRatherThanActing` rewritten on purpose; 10 new checks; all 11 failed first on HEAD, then pass; the 21 Chores-screen checks pass (one rewritten as approved). Worker gate: check 9/9 · merge 112 · buffers 9 · stream 31 · cleanup · xp 28 · money 33 · smoke 370/370. Build 2026-09-24b. Known gap for C3: an extra job on a fully answered past day still needs the Chores screen (noted in the map, row 2). |
 | C2 Chore views | NOT STARTED | |
 | PR 2 push + draft PR | NOT STARTED | |
 

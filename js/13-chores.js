@@ -534,9 +534,16 @@ function ctGradeChore(choreId, grade) {
 }
 function ctCyclePersonalChore(choreId) {
   const kid = isParent() ? ctParentKid : activeProfile();
-  const next = mrCyclePersonal(kid, ctWeekKey, ctDay, choreId);
+  ctCyclePersonalFor(kid, ctWeekKey, ctDay, choreId);
   renderChoreTab();
+}
+/* The caller path for a named kid, week and day — Today's Own things card and
+   the portal's on-her-behalf card cycle through it (R5 §5 C1), so the words and
+   the one writer (mrCyclePersonal) are the chore tab's own. */
+function ctCyclePersonalFor(kid, weekKey, dayIdx, choreId) {
+  const next = mrCyclePersonal(kid, weekKey, dayIdx, choreId);
   if (next === 'unasked') showToast('⭐ Done without being asked — that earns XP');
+  return next;
 }
 function ctHandleWrapClick(e) {
   const el = e.target.closest('[data-ct-action]');
@@ -592,11 +599,15 @@ function ctHandleWrapClick(e) {
 function ctActiveKid() { return isParent() ? ctParentKid : activeProfile(); }
 
 function ctBumpLearning(itemId, delta) {
-  if (!isParent()) { showToast('Mom logs the learning 🔒'); return; }
-  const kid = ctActiveKid();
-  const cur = mrGetLearning(kid, ctWeekKey, ctDay, itemId);
-  mrSetLearning(kid, ctWeekKey, ctDay, itemId, Math.max(0, cur + delta));
-  renderChoreTab();
+  if (ctBumpLearningFor(ctActiveKid(), ctWeekKey, ctDay, itemId, delta)) renderChoreTab();
+}
+/* Parent-only, for a named kid, week and day — Parent › Now logs learning
+   through this (R5 §5 C1). mrSetLearning stays the one writer. */
+function ctBumpLearningFor(kid, weekKey, dayIdx, itemId, delta) {
+  if (!isParent()) { showToast('Mom logs the learning 🔒'); return false; }
+  const cur = mrGetLearning(kid, weekKey, dayIdx, itemId);
+  mrSetLearning(kid, weekKey, dayIdx, itemId, Math.max(0, cur + delta));
+  return true;
 }
 function ctToggleSickDay(dayIdx) {
   mrToggleSick(ctActiveKid(), ctWeekKey, dayIdx);

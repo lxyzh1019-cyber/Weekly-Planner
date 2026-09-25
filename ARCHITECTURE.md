@@ -1159,12 +1159,91 @@ measurements, so changing the type invalidates it.
 Today **owns no data and no rules — but it does invoke them.** Every number it
 shows is read through the accessors the owning screen uses, and every write goes
 through the function that already owned that write: `completeQuest` for a tick
-(XP and sticker counting come with it), `addQuickBreak` for a break, `setDayMood`
-for a mood. **Call an owner; never contain one.** A second place that *decides*
+(XP and sticker counting come with it), `addQuickBreak` for a break, the reflect
+sheet's `saveReflection` for a mood, and since C1 (below) the chore tab's own
+writers for a job's answer, routine ticks, her own things and her training
+rating. **Call an owner; never contain one.** A second place that *decides*
 how a chore is graded or how money moves is a second place that can disagree with
 the first, and a child has no way to tell which one is lying — so grading and
 settling still belong to the chore and money screens, and nothing on Today moves
 money.
+
+**A child may create or update a claim; she never grades one, settles one, or
+moves money.** A claim is her account of a job (`mrSetClaim` →
+`earnings.claims`), kept apart from the grade a grown-up gives
+(`mrSetChoreGrade`, parent-only → `earnings.chores`); only a grade is paid, and
+only a settled week moves money. Every surface a child answers on — the chore
+tab, Today and its catch-up card, the Day view's claim prompt on a finished
+chore block — writes a claim and nothing else. `mrSetClaim` refuses a child
+answering for anyone but herself (`kid !== activeProfile()`); a parent may claim
+on her behalf ("she told us at the door"). This was written only in `PLAN.md`
+and a header comment in `js/31-today.js` until 2026-09-24 (R5 §5 C1). Known gap,
+not closed here: `mrSetClaim` has no lock for a week already settled, so a
+claim can still be written into one from the chore tab's week paging; the lock
+belongs to the pocket-money handoff, with a comparison first, because claims
+feed pay. Today's catch-up card offers only unsettled weeks.
+
+**Chores answered in their new homes (R5 §5 C1, 2026-09-24).** Every action
+the Chores screen had now has a home outside it, and each home calls the SAME
+function the Chores screen calls, so the two cannot disagree
+(`bothPlacesAgree` holds it both ways). The Chores screen, its More tile and its
+21 smoke checks stay unchanged until the owner has ticked every row of
+`docs/chore-relocation-map.md`; retiring it (C3) is a later round. To make "the
+same function" literal, the chore tab's writers were split into a parameterised
+core (named kid, week/day) and the chore tab's wrapper (its own kid, `ctWeekKey`
+/ `ctDay`, then `renderChoreTab`): `ckWriteRoutineItem` / `ckWriteAllRoutines`
+(+ `ckRoutineChanged`, the sync-and-award tail), `ckRateSelfFor`,
+`ctCyclePersonalFor`, `ctBumpLearningFor`, and the readers `ckRoutineBlocksOn`,
+`ckTrainingBlockOn`, `ckOwnLaneItems`, `ckUnlistedChoresFor`. Behaviour of the
+chore tab is unchanged.
+- **Row 1 — a job's answer, on Today.** A job row in "Jobs I can do" (paid
+  `chores` lane only; `tdJobsToday`) carries `data-td-chore` and asks in place:
+  `tdClaimJob` → `openChoreClaimPrompt` → `mrSetClaim`. The family-chores chip
+  (the same `data-td-action="chore"`, no chore) still opens the chore tab.
+- **Row 2 — ＋ I did something else**, under "Jobs I can do" for today and
+  inside the catch-up card for an earlier day (`tdElseBlock` →
+  `ckUnlistedChoresFor` → `tdClaimJob`).
+- **Row 3 — routines** (`tdRoutinesCard`): today's routine blocks, each opening
+  to its items, plus "all N done" — `ckWriteRoutineItem` / `ckWriteAllRoutines`,
+  so `ctSyncMandatoryFromRoutine` still owns the "kept" mark.
+- **Row 4 — own things / helping out** (`tdLanesCard`): `ctCyclePersonalFor` →
+  `mrCyclePersonal`, none → done → nobody asked (XP) → none. The standing lanes
+  left "Jobs I can do", which now holds only paid chores.
+- **Row 5 — her training rating** (`tdTrainingCard`): 1–5 once today's training
+  block has ended (`blockHasEnded`), `ckRateSelfFor` → `mrSetAttitude 'self'`;
+  Mum's rating is shown, never set.
+- **Row 6 — ✨ answered**: the ✨ chip (and an answered job row) opens "✨ Mum
+  answered" on Today (`tdShowAnswered` / `tdAnsweredCard`), capturing the list
+  and then calling `mrMarkGradesSeen` — the chore tab's own stamp — so ✨
+  clears from Today alone. A parent looking consumes nothing.
+- **Rows 7 and 8 — Parent › Now, "On her behalf"** (`pnAnswerCard`, see *The
+  parent portal*): per child, per day of this week up to today.
+- **Row 19 — 🕓 Catch up** (`tdCatchUpCard`), at the top of Today's day column:
+  every EARLIER day of an OPEN week with something unanswered — a planned
+  (`scheduled`) paid chore with no claim and no grade, a routine not closed, a
+  training not rated — oldest first, e.g. `Tue · 2 jobs · 1 routine`,
+  `Wed · training — how did you try?` (an earlier week's day reads
+  `Tue 15 Sep`). Tapping a day opens its answers in the card, one day at a time;
+  a day answered in full drops out and the card goes when nothing is left. It
+  writes nothing itself. **How far back:** this week and the 8 before it (the
+  family meeting's own catch-up window, `mmUnsettledWeeks(8)` — inside it a
+  claim can still become pay), never before `mmCatchUpFloor()`, and only weeks
+  not SETTLED for her — `mnyWeekSettled`: committed at a meeting
+  (`mnyIsCommitted`, `weekPlans[wk][kid].committedAt`) or credited another way
+  (Grandma rule, repair, express catch-up). Not today, not a day to come, not a
+  sick day, not a block recorded as not done. A day with nothing unanswered is
+  not listed, so "something else" for such a day still needs the chore tab
+  until C3 decides otherwise.
+- View state (open catch-up day, open picker, open routine, the ✨ list) is in
+  memory only; `goToday()` starts it closed.
+Held by `todayAnswersAJobInPlace`, `somethingElseWorksForAnyOpenDay`,
+`catchUpListsOnlyUnansweredDaysOfOpenWeeks`, `routinesTickFromToday`,
+`ownThingsFromToday`, `attitudeAfterTraining`, `answeredGradesClearFromToday`,
+`learningFromThePortal`, `parentAnswersForHerFromThePortal`, `bothPlacesAgree`
+and the rewritten `todayHandsOffRatherThanActing` (it asserted the hand-off; it
+now asserts that answering in place writes the claim and leaves grades, pay and
+cash untouched, and that the money card and plan button still navigate). All
+pin the clock (Thursday of this week) and run at 390×844.
 
 Today's vibe, to-do, goals, sticker and note panels ship collapsed behind one
 `localStorage` flag (`tdExtrasOpen`), and finished blocks fold away behind its
@@ -2178,6 +2257,19 @@ keeps `mmCloseMeeting` from marking a week met that was only recorded.
 the accessor the owning screen uses, and there is deliberately no control on it
 that grades, settles or approves. A second place that decides how a chore is
 graded is a second place that can disagree with the first.
+
+**One card on Now writes, and only her answers: "On her behalf"** (R5 §5 rows 7
+and 8, 2026-09-24; `pnAnswerCard` / `pnAnswerClick`, `js/32-parent-now.js`).
+Per child (its own Jenn / Jess toggle) and per day of this week up to today
+(days to come are disabled), a grown-up gives the child's own answers for her —
+a chore's claim (`openChoreClaimPrompt` → `mrSetClaim`, which lets a parent
+claim), "she did something else", her own things (`ctCyclePersonalFor`), her
+training rating (`ckRateSelfFor` → `mrSetAttitude 'self'`) — and logs learning,
+which only a grown-up does (`ctBumpLearningFor` → `mrSetLearning`, refused for a
+child). A graded chore shows as graded and is not reopened; grading stays in
+Chores and pay in the meeting; a week already settled for her
+(`mnyWeekSettled`) offers nothing. Held by `learningFromThePortal` and
+`parentAnswersForHerFromThePortal`.
 
 **Copying a plan shows its work first.** Setup › Copy a plan
 (`js/34-parent-copyweek.js`) does a whole week or a single day — a span toggle,
