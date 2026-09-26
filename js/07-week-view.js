@@ -400,6 +400,7 @@ function renderWeek() {
 
   renderGoalsTodos();
   renderWeekGlance(keys);
+  renderWeekChores(keys);
   renderWeekSignature(keys);
 
   const coachEl = document.getElementById('weekCoachTip');
@@ -584,6 +585,66 @@ function applyWeekGlanceOpen() {
   if (body) body.hidden = !open;
   if (caret) caret.textContent = open ? 'Hide ▾' : 'Show ▸';
   if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+/* ── 🧹 Chores this week (R5 §5 C2, row 14) ──────────────────────────────
+   The chore tab's week grid, as a REPORT on the week this tab is showing: each
+   routine kept or not on the days that asked for it, and each pool chore
+   graded ($), answered (?), still open (·) or not on the plan. The cells come
+   from ckWeekGridData — the grid's own reader — so the two cannot disagree.
+   Read-only: in the grid an open cell is a claim control, here it is a mark,
+   because answering an earlier day is Today's 🕓 Catch up card's job.
+   Not drawn for a week from before the chore pool (the chore tab shows the old
+   board there, and Parent › History reads it), or with nobody's week showing. */
+const WK_CHORES_LS_KEY = 'wp_week_chores_open';
+function weekChoresOpen() {
+  try { return localStorage.getItem(WK_CHORES_LS_KEY) === '1'; } catch (e) { return false; }
+}
+function toggleWeekChores() {
+  try { localStorage.setItem(WK_CHORES_LS_KEY, weekChoresOpen() ? '0' : '1'); } catch (e) {}
+  renderWeekChores(getDayKeys(weekOffset));
+}
+function renderWeekChores(keys) {
+  const host = document.getElementById('weekChores');
+  if (!host) return;
+  const kid = activeProfile();
+  const wk = keys && keys[0];
+  if ((kid !== 'jenn' && kid !== 'jess') || !wk || ctWeekIsPreSystem(wk, kid)) {
+    host.hidden = true; host.innerHTML = '';
+    return;
+  }
+  ctPrepareRead();
+  const open = weekChoresOpen();
+  let body = '';
+  if (open) {
+    const data = ckWeekGridData(kid, wk);
+    const cellCls = { na: 'wcr-cell wcr-cell--na', routine: 'wcr-cell', off: 'wcr-cell wcr-cell--off',
+                      graded: 'wcr-cell wcr-cell--done', claimed: 'wcr-cell wcr-cell--claimed', open: 'wcr-cell' };
+    const cell = c => {
+      const cls = (c.state === 'routine' && c.on) ? 'wcr-cell wcr-cell--done' : cellCls[c.state];
+      // The grid's titles speak to a cell she can tap; here nothing is tapped.
+      const title = c.state === 'open' ? 'not answered yet' : c.title;
+      return `<span class="${cls}"${title ? ` title="${escapeAttr(title)}"` : ''}>${escapeHtml(c.text)}</span>`;
+    };
+    const head = `<div class="wcr-head"><span></span>${data.head.map(h =>
+      `<span class="wcr-dh">${escapeHtml(h.dow)}<small>${escapeHtml(String(h.date))}</small></span>`).join('')}<span class="wcr-dh">week</span></div>`;
+    const lanes = data.lanes.map(l => `<div class="wcr-lane">${escapeHtml(l.label)}</div>`
+      + l.rows.map(row => `<div class="wcr-row"><span class="wcr-label"><span class="wcr-icon" aria-hidden="true">${escapeHtml(row.icon || '')}</span>${escapeHtml(row.name)}</span>${row.cells.map(cell).join('')}<span class="wcr-total">${escapeHtml(row.total)}</span></div>`).join('')).join('');
+    body = data.lanes.length
+      ? `<p class="wcr-sub">What was planned, what was answered and what Mum checked. To answer an earlier day, use 🕓 Catch up on Today.</p>
+         <div class="wcr-wrap"><div class="wcr-grid">${head}${lanes}</div></div>
+         <div class="wcr-legend"><span>✓ routine kept</span><span>$3 / $2 / $1 = chore checked</span><span>? = answered, not checked yet</span><span>· = not answered yet</span><span>grey = not on the plan</span></div>`
+      : `<p class="wcr-sub">No routines or chores on this week's plan.</p>`;
+  }
+  host.hidden = false;
+  host.innerHTML = `<div class="week-glance-header">
+      <button type="button" class="week-glance-toggle" id="weekChoresToggle" onclick="toggleWeekChores()"
+              aria-expanded="${open}" aria-controls="weekChoresBody">
+        <h3>🧹 Chores this week</h3>
+        <span class="week-glance-caret">${open ? 'Hide ▾' : 'Show ▸'}</span>
+      </button>
+    </div>
+    <div class="week-glance-body" id="weekChoresBody"${open ? '' : ' hidden'}>${body}</div>`;
 }
 
 // #6 Weekly wins recap — a celebratory look at what actually got done.

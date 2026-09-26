@@ -5,11 +5,15 @@
 // parent had to poll three tabs to find out whether anything wanted them.
 //
 // This screen answers that in one place, and it owns nothing. Every number is
-// read through the accessor the owning screen already uses, and every row is a
-// link to the screen that owns the work — Now counts and routes, it never
+// read through the accessor the owning screen already uses, and every queue row
+// is a link to the screen that owns the work — Now counts and routes, it never
 // decides. A second place that decides how a chore is graded or how money moves
 // is a second place that can disagree with the first, and a parent has no way
 // to tell which one is lying.
+//
+// One card writes (R5 §5 C1): "On her behalf" gives a child's own answers for
+// her — a claim, her own things, her training rating — and logs learning,
+// each through the chore tab's writer. It grades, settles and approves nothing.
 //
 // Declarations only; the delegated listener is bound in js/99-main.js.
 
@@ -225,6 +229,145 @@ function pnWeekRail() {
     </div>`;
 }
 
+/* ── On her behalf (R5 §5 rows 7 and 8, C1 — 2026-09-24) ─────────────────
+   "She told us at the door": on a busy week that is how a job gets recorded
+   when she never reached the iPad (the reason mrSetClaim lets a parent claim,
+   js/18-rules.js). This card is where a grown-up gives HER answers for her —
+   a chore's claim, her own things, her training rating — and logs learning,
+   which only a grown-up does. Per child and per day of this week, up to today.
+
+   Every control calls the writer the chore tab calls (openChoreClaimPrompt →
+   mrSetClaim, ctCyclePersonalFor → mrCyclePersonal, ckRateSelfFor →
+   mrSetAttitude 'self', ctBumpLearningFor → mrSetLearning). It still grades
+   nothing, settles nothing and approves nothing — grading stays in Chores and
+   pay in the meeting — and a week already settled for her offers nothing. */
+let pnAnswerKid = null;     // the child answered for; null → parentViewing
+let pnAnswerDay = null;     // day index of this week; null → today
+let pnAnswerElse = false;   // the "something else" picker open
+
+function pnAnswerTarget() {
+  const kid = pnAnswerKid || (parentViewing === 'jess' ? 'jess' : 'jenn');
+  const wk = ctThisWeekKey();
+  const keys = mrWeekDayKeys(wk);
+  const todayIdx = Math.max(0, keys.indexOf(todayKey()));
+  const d = (pnAnswerDay != null && pnAnswerDay <= todayIdx) ? pnAnswerDay : todayIdx;
+  return { kid, wk, d, todayIdx, dayKey: keys[d] };
+}
+function pnAnswerCard() {
+  const { kid, wk, d, todayIdx, dayKey } = pnAnswerTarget();
+  const kids = ['jenn', 'jess'].map(k => `<button type="button" class="pn-kidbtn${k === kid ? ' on' : ''}"
+      data-pn-action="answer-kid" data-kid="${k}" aria-pressed="${k === kid}">
+      ${CT_PROFILE_ICON[k]} ${k === 'jenn' ? 'Jenn' : 'Jess'}</button>`).join('');
+  const mon = formatDayKey(wk);
+  const days = [0, 1, 2, 3, 4, 5, 6].map(i => {
+    const date = new Date(mon); date.setDate(mon.getDate() + i);
+    return `<button type="button" class="pn-day${i === d ? ' on' : ''}" data-pn-action="answer-day" data-day="${i}"
+        aria-pressed="${i === d}"${i > todayIdx ? ' disabled' : ''}
+        aria-label="${escapeAttr(DAY_SHORT[i] + ' ' + date.getDate())}">
+        <span class="pn-day-dow">${DAY_SHORT[i]}</span>
+        <span class="pn-day-date">${date.getDate()}</span></button>`;
+  }).join('');
+  const head = `<div class="pn-answer-kids">${kids}</div><div class="pn-days">${days}</div>`;
+  if (mnyWeekSettled(wk, kid)) {
+    return `<div class="pn-card pn-answer">${head}
+      <p class="pn-note">This week is settled for her, so there is nothing more to answer here.</p></div>`;
+  }
+
+  // Her chores that day: answer the ones nobody has graded.
+  const jobs = mrChoresForDay(kid, wk, d).rows.filter(x => x.row.lane === 'chores').map(({ row }) => {
+    const g = mrGetChoreGrade(kid, wk, d, row.id), c = mrGetClaim(kid, wk, d, row.id);
+    const word = q => ((CK_QUALITY.find(x => x.g === q) || {}).word || '').toLowerCase();
+    if (g > 0) {
+      return `<div class="pn-row pn-static"><span class="pn-ico" aria-hidden="true">${escapeHtml(row.icon)}</span>
+        <span class="pn-text"><span class="pn-title">${escapeHtml(row.label)}</span>
+        <span class="pn-sub">${escapeHtml('graded — ' + word(g))}</span></span></div>`;
+    }
+    return `<button type="button" class="pn-row" data-pn-action="answer-claim" data-chore="${escapeAttr(row.id)}">
+      <span class="pn-ico" aria-hidden="true">${escapeHtml(row.icon)}</span>
+      <span class="pn-text"><span class="pn-title">${escapeHtml(row.label)}</span>
+        <span class="pn-sub">${escapeHtml(c ? 'she said ' + word(c) + ' — change it' : 'no answer yet')}</span></span>
+      <span class="pn-cta">${c ? 'Change' : 'Answer'} ›</span></button>`;
+  }).join('');
+  const left = ckUnlistedChoresFor(kid, wk, d);
+  const elseHtml = !left.length ? '' : !pnAnswerElse
+    ? `<button type="button" class="pn-row" data-pn-action="answer-else" aria-expanded="false">
+        <span class="pn-ico" aria-hidden="true">＋</span>
+        <span class="pn-text"><span class="pn-title">She did something else</span></span></button>`
+    : left.map(row => `<button type="button" class="pn-row" data-pn-action="answer-else-pick" data-chore="${escapeAttr(row.id)}">
+        <span class="pn-ico" aria-hidden="true">${escapeHtml(row.icon)}</span>
+        <span class="pn-text"><span class="pn-title">${escapeHtml(row.label)}</span></span>
+        <span class="pn-cta">Answer ›</span></button>`).join('')
+      + `<button type="button" class="pn-row" data-pn-action="answer-else" aria-expanded="true">
+        <span class="pn-text"><span class="pn-title">Never mind</span></span></button>`;
+
+  // Her own things and helping out.
+  const { own, helping } = ckOwnLaneItems(kid, wk, d);
+  const lanes = [...own, ...helping].map(i => {
+    const st = mrGetPersonal(kid, wk, d, i.id);
+    return `<button type="button" class="pn-row" data-pn-action="answer-personal" data-chore="${escapeAttr(i.id)}" aria-pressed="${!!st}">
+      <span class="pn-ico" aria-hidden="true">${escapeHtml(i.icon || '⭐')}</span>
+      <span class="pn-text"><span class="pn-title">${escapeHtml(i.label)}</span>
+        <span class="pn-sub">${st === 'unasked' ? 'done, nobody asked ⭐ (XP)' : st === 'done' ? 'done' : 'not yet'}</span></span></button>`;
+  }).join('');
+
+  // Her training rating, on a day that had training.
+  const t = ckTrainingBlockOn(kid, dayKey);
+  let training = '';
+  if (t) {
+    const a = mrGetAttitude(kid, wk, d);
+    training = `<p class="pn-answer-h">${escapeHtml((t.act && t.act.name) || 'Training')} — her own rating</p>
+      <div class="pn-rates">${[1, 2, 3, 4, 5].map(n => `<button type="button" class="pn-rate${a.self === n ? ' on' : ''}"
+        data-pn-action="answer-attitude" data-n="${n}" aria-pressed="${a.self === n}">${n}</button>`).join('')}</div>`;
+  }
+
+  // Learning — only a grown-up logs it.
+  const items = (mrRulesForWeek(wk).learning || {}).items || [];
+  const learning = items.map(it => {
+    const units = mrGetLearning(kid, wk, d, it.id);
+    return `<div class="pn-learn"><span class="pn-text"><span class="pn-title">${escapeHtml(it.label)}</span>
+        <span class="pn-sub">${units} ${escapeHtml(it.unit || '')}</span></span>
+      <button type="button" class="pn-step" data-pn-action="answer-learn" data-item="${escapeAttr(it.id)}" data-delta="-1"
+        aria-label="${escapeAttr('Less ' + it.label)}">−</button>
+      <button type="button" class="pn-step" data-pn-action="answer-learn" data-item="${escapeAttr(it.id)}" data-delta="1"
+        aria-label="${escapeAttr('More ' + it.label)}">+</button></div>`;
+  }).join('');
+
+  const section = (title, html) => html ? `<p class="pn-answer-h">${title}</p>${html}` : '';
+  return `<div class="pn-card pn-answer">${head}
+      ${section('Chores', jobs + elseHtml)}
+      ${section('Own things · helping out', lanes)}
+      ${training}
+      ${section('Learning', learning)}
+      <p class="pn-note">Her answers, given for her. Grading stays in Chores, and nothing is paid until the meeting.</p>
+    </div>`;
+}
+/* The writes, each through the chore tab's writer; then Now repaints. */
+function pnAnswerClick(a, el) {
+  if (!isParent()) return;
+  const { kid, wk, d, todayIdx } = pnAnswerTarget();
+  if (a === 'answer-kid')  { pnAnswerKid = el.getAttribute('data-kid') === 'jess' ? 'jess' : 'jenn'; pnAnswerElse = false; pnRenderNow(); return; }
+  if (a === 'answer-day')  {
+    const i = Number(el.getAttribute('data-day'));
+    if (i >= 0 && i <= todayIdx) { pnAnswerDay = i; pnAnswerElse = false; pnRenderNow(); }
+    return;
+  }
+  if (mnyWeekSettled(wk, kid)) return;
+  if (a === 'answer-else') { pnAnswerElse = !pnAnswerElse; pnRenderNow(); return; }
+  if (a === 'answer-claim' || a === 'answer-else-pick') {
+    const id = el.getAttribute('data-chore');
+    const row = mrPoolRow(id, wk);
+    if (!row || mrGetChoreGrade(kid, wk, d, id) > 0) return;
+    pnAnswerElse = false;
+    openChoreClaimPrompt(kid, wk, d, id, row.label).then(() => pnRenderNow());
+    return;
+  }
+  if (a === 'answer-personal') { ctCyclePersonalFor(kid, wk, d, el.getAttribute('data-chore')); pnRenderNow(); return; }
+  if (a === 'answer-attitude') { if (ckRateSelfFor(kid, wk, d, Number(el.getAttribute('data-n')) || 0)) pnRenderNow(); return; }
+  if (a === 'answer-learn') {
+    if (ctBumpLearningFor(kid, wk, d, el.getAttribute('data-item'), Number(el.getAttribute('data-delta')) || 0)) pnRenderNow();
+  }
+}
+
 function pnRenderNow() {
   const wrap = document.getElementById('pnWrap');
   if (!wrap) return;
@@ -239,7 +382,8 @@ function pnRenderNow() {
      happens; the meeting hub still lists the weeks. */
   wrap.innerHTML = `<div class="pn-cols">
       <div><p class="pn-cap">Waiting on you</p>${pnQueueCard()}
-        <button type="button" class="pn-record" data-pn-action="record">✍️ Record something</button></div>
+        <button type="button" class="pn-record" data-pn-action="record">✍️ Record something</button>
+        <p class="pn-cap pn-answer-cap">On her behalf — she told you at the door</p>${pnAnswerCard()}</div>
       <div><p class="pn-cap">This week</p>${pnWeekRail()}</div>
     </div>`;
   // The count on the tab itself, so a parent sees there is work without opening.
@@ -251,12 +395,18 @@ function pnRenderNow() {
   }
 }
 
-/* One delegated listener, bound in js/99-main.js. Every row routes to the
-   screen that owns the work rather than doing it here. */
+/* One delegated listener, bound in js/99-main.js. Every queue row routes to
+   the screen that owns the work rather than doing it here; the on-her-behalf
+   card's controls go to pnAnswerClick, which calls the chore tab's writers. */
 function pnHandleClick(e) {
   const el = e.target.closest('[data-pn-action]');
   if (!el) return;
   const a = el.getAttribute('data-pn-action');
+  // On her behalf (rows 7 and 8): the one place on Now that writes, and only
+  // through the chore tab's own writers — see pnAnswerCard.
+  if (a === 'answer-kid' || a === 'answer-day' || a === 'answer-else' || a === 'answer-claim'
+      || a === 'answer-else-pick' || a === 'answer-personal' || a === 'answer-attitude'
+      || a === 'answer-learn') { pnAnswerClick(a, el); return; }
   if (a === 'catchup') {
     const first = pnBacklog()[0];
     if (first) mmOpenExpress(first.wk);

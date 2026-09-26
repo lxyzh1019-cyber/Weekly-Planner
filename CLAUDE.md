@@ -19,9 +19,11 @@ status-vocabulary ownership rules.
 
 ## My Environment
 
-- Claude Code through the Windows desktop app, cloud sessions on GitHub repos only.
-- No local repo folders, no terminal, no Git Bash. I cannot run commands on my PC.
-- Changes reach a repo only through a cloud session or the GitHub web UI (upload, edit, pull request, merge).
+- Claude Code through the Windows desktop app, in two kinds of session:
+  - **Cloud** — a session on a GitHub repo, in a Linux container.
+  - **Local** — a session on the checkout at `D:\User\Heng Z\Documents\GitHub\Weekly-Planner` on my PC. Git Bash and `gh` (signed in) are available there, and the user-level `~/.claude/` exists.
+- I don't run commands myself; Claude runs them, in either kind of session. Anything I do by hand is through the GitHub web UI (review, merge) or on the iPads.
+- Changes reach a repo through a session's push and pull request, or the GitHub web UI.
 - Cloud sessions start from the default branch unless told otherwise; rules and hooks apply once they are on `main`.
 
 At session start, report the rules version loaded from this file (the header above) and the active branch. In Cloud there is no user-level `~/.claude/`; every governing file must be committed on the session branch: this file at the repository root, `.claude/settings.json`, `.claude/agents/opus-worker.md`, `.claude/hooks/`, `FEATURES.md`, `WORKING_RECORD.md`. Report any that are missing before dependent work.

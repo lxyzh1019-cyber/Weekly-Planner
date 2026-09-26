@@ -70,24 +70,62 @@ const PARENT_LANDINGS = {
    is why every part of both — the pager, the CSV, the cumulative line, the
    heatmap, the written read, the nine categories, the month view — comes across
    untouched. */
-let parentHistoryView = 'money';   // 'money' | 'time'
+/* A third view, 'before' (R5 §5 C2, row 15): the weeks from before the chore
+   pool (frozen in moneySnapshots), read-only — the board the chore tab draws
+   for them, without its clear-week, export and goal controls, which stay in
+   App › Backup and data. It has no panel of its own; it draws into this wrap,
+   and it is offered only when such a week exists for a child in scope. */
+let parentHistoryView = 'money';   // 'money' | 'time' | 'before'
+let parentPreWeek = null;          // the week open in the 'before' view
 const PARENT_HISTORY_VIEWS = [
   { id: 'money', label: '💰 Money', panel: 'trends',
     note: 'What each week actually paid. Weeks with no meeting held paid nothing — the gap is the finding, not missing data.' },
   { id: 'time',  label: '⏱️ Time and routines', panel: 'analysis',
     note: 'How much of what was planned actually got done, and the month at a glance.' },
+  { id: 'before', label: '🗂️ Before the new system', panel: null,
+    note: 'Weeks from before the chore list, as they were recorded: the goal, the routine and chore ticks, and what the week paid. Read only — to reset or save a copy of a week, use App › Backup and data.' },
 ];
 function setParentHistoryView(id) {
   parentHistoryView = id;
   setParentTab('history');
 }
+function parentHistoryKids() {
+  const k = parentScopeKid();
+  return k ? [k] : ['jenn', 'jess'];
+}
+/* Every week frozen at the original migration for a child in scope, newest
+   first. ctWeekIsPreSystem is the one owner of the question. */
+function parentPreSystemWeeks(kids) {
+  ctEnsureShared();
+  return Object.keys(state.shared.chore.moneySnapshots || {})
+    .filter(wk => /^\d{4}-\d{2}-\d{2}$/.test(wk) && kids.some(k => ctWeekIsPreSystem(wk, k)))
+    .sort().reverse();
+}
+function parentRenderPreSystem(kids) {
+  const weeks = parentPreSystemWeeks(kids);
+  if (!weeks.length) return '';
+  if (!weeks.includes(parentPreWeek)) parentPreWeek = weeks[0];
+  const thisYear = formatDayKey(todayKey()).getFullYear();
+  const chips = weeks.map(wk => {
+    const mon = formatDayKey(wk);
+    const label = `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()}${mon.getFullYear() === thisYear ? '' : ', ' + mon.getFullYear()}`;
+    const on = wk === parentPreWeek;
+    return `<button type="button" class="pill-btn${on ? ' active' : ''}" data-parent-preweek="${escapeAttr(wk)}" aria-pressed="${on}">${escapeHtml(label)}</button>`;
+  }).join('');
+  const boards = kids.filter(k => ctWeekIsPreSystem(parentPreWeek, k))
+    .map(k => ctPreSystemBoard(k, parentPreWeek)).join('');
+  return `<div class="pre-weeks">${chips}</div>${boards}`;
+}
 function parentRenderHistory() {
   const wrap = document.getElementById('ptab-history-wrap');
   if (!wrap) return;
-  const view = PARENT_HISTORY_VIEWS.find(v => v.id === parentHistoryView) || PARENT_HISTORY_VIEWS[0];
-  wrap.innerHTML = `<div class="pn-toggle">${PARENT_HISTORY_VIEWS.map(v =>
+  const kids = parentHistoryKids();
+  const views = PARENT_HISTORY_VIEWS.filter(v => v.id !== 'before' || parentPreSystemWeeks(kids).length);
+  const view = views.find(v => v.id === parentHistoryView) || views[0];
+  wrap.innerHTML = `<div class="pn-toggle">${views.map(v =>
       `<button type="button" class="pill-btn${v.id === view.id ? ' active' : ''}" data-parent-history="${v.id}">${escapeHtml(v.label)}</button>`).join('')}</div>
-    <p class="pn-note">${escapeHtml(view.note)}</p>`;
+    <p class="pn-note">${escapeHtml(view.note)}</p>
+    ${view.id === 'before' ? parentRenderPreSystem(kids) : ''}`;
   // The two halves live in their own panels; show the one this view names.
   PARENT_HISTORY_VIEWS.forEach(v => {
     const el = document.getElementById('ptab-' + v.panel);
@@ -184,6 +222,8 @@ function parentHandleNavClick(e) {
   if (scope) { setParentScope(scope.getAttribute('data-parent-scope')); return; }
   const hist = e.target.closest('[data-parent-history]');
   if (hist) { setParentHistoryView(hist.getAttribute('data-parent-history')); return; }
+  const preWeek = e.target.closest('[data-parent-preweek]');
+  if (preWeek) { parentPreWeek = preWeek.getAttribute('data-parent-preweek'); parentRenderHistory(); return; }
   const back = e.target.closest('[data-parent-back]');
   if (back) { setParentDest(parentDest); return; }
 }

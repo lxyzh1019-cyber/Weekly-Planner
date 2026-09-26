@@ -11,13 +11,15 @@
 //
 // It owns no data and no rules. Every number here is read through the same
 // accessors the other screens use (mrChoresForDay, mrWaitingCount, getDayBlocks,
-// getUnlockedRoutineRewards…), and every action hands off to the screen that
-// already owns it. That is deliberate: a second place that computes money or
-// grades a chore is a second place that can disagree with the first.
+// getUnlockedRoutineRewards…), and every action either calls the function that
+// already owns that write or hands off to the screen that owns it. That is
+// deliberate: a second place that computes money or grades a chore is a second
+// place that can disagree with the first.
 //
-// Invariants it must not break (see CLAUDE.md): a child may create or update a
-// claim, never grade or settle; nothing here moves money. Reached from the tab
-// bar and from the persistent nav, and it is where a child now lands.
+// Invariants it must not break (see ARCHITECTURE.md › Navigation, "A child may
+// create or update a claim"): a child may create or update a claim, never grade
+// or settle one; nothing here moves money. Reached from the tab bar and from the
+// persistent nav, and it is where a child now lands.
 //
 // Declarations only. Wiring is in js/99-main.js.
 
@@ -99,11 +101,15 @@ function tdCurrentAndNext(kid) {
    This returns the whole of today with each row's state, so the card can always
    say something true. Read through the accessors the chore screen uses
    (mrGetClaim / mrGetChoreGrade); nothing here decides anything. */
+/* Paid chores only (the `chores` lane): a job row asks how it went and files a
+   claim, and a claim belongs to a job that pays. The standing lanes — her own
+   things, helping out — are answered on their own card (tdLanesCard), the way
+   the chore tab splits them. */
 function tdJobsToday(kid) {
   const wk = ctThisWeekKey();
   const d = tdTodayIndex();
   if (d == null) return { rows: [], hasPool: false };
-  const { rows } = mrChoresForDay(kid, wk, d);
+  const rows = mrChoresForDay(kid, wk, d).rows.filter(r => r.row.lane === 'chores');
   return {
     hasPool: rows.length > 0,
     rows: rows.map(r => {
@@ -557,13 +563,66 @@ function tdQuestHero(kid, blocks) {
   const into = info.into;
   const pct = info.pct;
   const done = blocks.filter(b => isBlockCompleted(b, kid)).length;
+  /* R5 §5 C2, rows 9 and 10. The 🔥 streak is the chore tab header's own
+     reader (mrStreakWeek, this week) — the grace day and sick-day pause come
+     with it, so an off day never reads as a broken run here either. The level
+     is a button now: it opens "My level", the privileges ladder (tdOpenLevel).
+     Spans, not divs, because a <button> may only hold phrasing content. */
+  const streak = mrStreakWeek(ctThisWeekKey(), kid).days;
   return `<div class="dq-hero">
-      <div class="dq-hero-avatar">${tier.emoji}</div>
-      <div class="dq-hero-info">
-        <div class="dq-hero-title">Lv ${level} · ${escapeHtml(tier.name)}</div>
-        <div class="dq-xp-bar"><div class="dq-xp-fill" style="width:${pct}%"></div></div>
-        <div class="dq-hero-sub">${done}/${blocks.length} done · ${into}/${info.perLevel} XP</div>
-      </div>
+      <button type="button" class="dq-hero-level" data-td-action="level"
+        aria-label="${escapeAttr(`Level ${level}. See what XP buys`)}">
+        <span class="dq-hero-avatar" aria-hidden="true">${tier.emoji}</span>
+        <span class="dq-hero-info">
+          <span class="dq-hero-title">Lv ${level} · ${escapeHtml(tier.name)} <span class="dq-hero-go" aria-hidden="true">›</span></span>
+          <span class="dq-xp-bar"><span class="dq-xp-fill" style="width:${pct}%"></span></span>
+          <span class="dq-hero-sub">${done}/${blocks.length} done · ${into}/${info.perLevel} XP</span>
+        </span>
+      </button>
+      <span class="dq-hero-streak">🔥 ${streak ? `${streak} day streak` : 'no streak yet'}</span>
+    </div>`;
+}
+
+/* "My level" (R5 §5 C2, row 10): her level, XP and the whole privileges ladder
+   — mrPrivileges, the list the chore tab's rail draws — read-only. The sheet's
+   one control is Close. */
+function tdLevelSheet(kid) {
+  const wk = ctThisWeekKey();
+  const lv = mrXpLevelInfo(kid, wk);
+  const privs = mrPrivileges(kid, wk);
+  const rows = privs.map(p => `<div class="td-priv${p.unlocked ? ' on' : ''}">
+      <span class="td-priv-name">${escapeHtml(p.label)}</span>
+      <span class="td-priv-state">${p.unlocked ? 'yours' : `level ${escapeHtml(String(p.levelReq))}`}</span>
+    </div>`).join('');
+  return `<div class="td-level-now">Level ${escapeHtml(String(lv.level))}${lv.tier ? ` · ${escapeHtml(lv.tier)}` : ''}</div>
+    <div class="dq-xp-bar"><div class="dq-xp-fill" style="width:${lv.pct}%"></div></div>
+    <div class="td-sub">${escapeHtml(`${lv.xp} XP · ${lv.toNext} more to level ${lv.level + 1}`)}</div>
+    <div class="td-lane-name">What XP buys</div>
+    ${rows || '<div class="td-empty">Nothing on the list yet.</div>'}
+    <div class="td-sub">XP and dollars do not convert into each other. Money is what the work was worth; XP is what the habit was worth.</div>`;
+}
+function tdOpenLevel(kid) {
+  const body = document.getElementById('tdLevelBody');
+  if (!body || !kid || kid === 'parent') return;
+  body.innerHTML = tdLevelSheet(kid);
+  openSheet('tdLevelOverlay');
+}
+
+/* Open loops (R5 §5 C2, row 13): what is in the box and not back yet, the
+   chore tab's list and words (ckOpenLoops, ckLoopState). Read-only — a
+   grown-up boxes and releases, from the portal. Nothing in the box, no card. */
+function tdLoopsCard(kid) {
+  const boxed = ckOpenLoops(kid);
+  if (!boxed.length) return '';
+  const rows = boxed.map(b => `<div class="td-loop">
+      <span class="td-row-icon" aria-hidden="true">📦</span>
+      <span class="td-row-name">${escapeHtml(b.label)}</span>
+      <span class="td-loop-state${b.repeat ? ' td-loop-state--again' : ''}">${escapeHtml(ckLoopState(b))}</span>
+    </div>`).join('');
+  return `<div class="td-card td-loops">
+      <div class="td-cap">📦 Open loops</div>
+      <div class="td-sub">Back Sunday, or sooner for one unpaid job. Money only comes into it the second time the same thing happens in a week.</div>
+      ${rows}
     </div>`;
 }
 
@@ -703,9 +762,9 @@ function tdProgressRibbon(kid, blocks) {
   const mid = Math.round((from + to) / 2);
 
   /* The button wraps the strip only. tdQuestHero is a sibling inside the same
-     .td-ribbon container rather than a child of the button: it is a readout, it
-     contains block elements a <button> may not legally hold, and the level she
-     has reached is not a thing to tap. */
+     .td-ribbon container rather than a child of the button: a button inside a
+     button is not a thing a browser will build, and the hero carries its own —
+     the level, which opens "My level" (R5 §5 C2, row 10). */
   return `<div class="td-ribbon">
       <button type="button" class="td-rib-btn" data-td-action="plan"
         aria-label="${escapeAttr(done + ' of ' + total + ' done today. Open the day.')}">
@@ -860,6 +919,354 @@ function tdReflectRow(kid) {
       <span class="td-row-name">${escapeHtml(line)}</span>
       <span class="td-row-go" aria-hidden="true">›</span>
     </button>`;
+}
+
+/* ── Answering chores on Today (R5 §5, C1 — 2026-09-24) ─────────────────────
+   Every action the Chores screen had now has a home here, and each one calls
+   the SAME function the Chores screen calls, so the two places cannot disagree:
+     a job's answer        openChoreClaimPrompt → mrSetClaim   (row 1, 2)
+     routine items / all   ckWriteRoutineItem / ckWriteAllRoutines  (row 3)
+     own things            ctCyclePersonalFor → mrCyclePersonal (row 4)
+     her training rating   ckRateSelfFor → mrSetAttitude 'self' (row 5)
+     ✨ seen                mrMarkGradesSeen                      (row 6)
+   and the 🕓 Catch up card (row 19) is those same answers for an earlier day
+   of a week not yet settled. A child may create or update a claim; nothing
+   here grades, settles or moves money (ARCHITECTURE.md). The Chores screen
+   stays, unchanged, until the owner has confirmed every row of
+   docs/chore-relocation-map.md.
+
+   View state only, in memory: which catch-up day is open, which day's
+   "something else" picker is open, which of today's routines is open, and the
+   answers she opened ✨ to see. goToday() starts them all closed. */
+let tdCatchUpOpen = null;      // dayKey open in the catch-up card — one at a time
+let tdElseOpen = null;         // dayKey whose "＋ I did something else" picker is open
+let tdRoutineOpen = {};        // today's routine block id → open
+let tdAnsweredShown = null;    // [{dayIdx, choreId}] she opened ✨ to see
+
+/* The week and day index a day key belongs to, by calendar arithmetic on the
+   key itself — the planner's own naming (ctThisWeekKey is the same arithmetic
+   on today's key), never the device's raw clock. */
+function tdWeekDayOf(dayKey) {
+  const wk = ctWeekKeyForDate(dayKey);
+  return { wk, d: mrWeekDayKeys(wk).indexOf(dayKey) };
+}
+
+/* Row 1 / 2: how did the job go? The chore tab's own prompt and writer; a job
+   Mum has graded is hers, and is not reopened here either. */
+function tdClaimJob(dayKey, choreId) {
+  const kid = activeProfile();
+  const { wk, d } = tdWeekDayOf(dayKey);
+  const row = mrPoolRow(choreId, wk);
+  if (!row || d < 0) return;
+  if (mrGetChoreGrade(kid, wk, d, choreId) > 0) { showToast('Mum already checked this one ✓'); return; }
+  tdElseOpen = null;
+  openChoreClaimPrompt(kid, wk, d, choreId, row.label).then(() => tdRenderToday());
+}
+
+/* Row 2: "＋ I did something else …" for one day — the chore tab's list of pool
+   chores not on that day (ckUnlistedChoresFor), each filed as a claim through
+   tdClaimJob. `when` is "today" or "on Tue". */
+function tdElseBlock(kid, dayKey, when) {
+  const { wk, d } = tdWeekDayOf(dayKey);
+  if (d < 0) return '';
+  const left = ckUnlistedChoresFor(kid, wk, d);
+  if (!left.length) return '';
+  const day = escapeAttr(dayKey);
+  if (tdElseOpen !== dayKey) {
+    return `<button type="button" class="td-row td-else-btn" data-td-action="else" data-td-day="${day}" aria-expanded="false">
+        <span class="td-row-icon" aria-hidden="true">＋</span>
+        <span class="td-row-name">${escapeHtml('I did something else ' + when)}</span>
+      </button>`;
+  }
+  const rows = left.map(r => `<button type="button" class="td-row" data-td-action="else-pick"
+        data-td-day="${day}" data-td-chore="${escapeAttr(r.id)}">
+        <span class="td-row-icon" aria-hidden="true">${escapeHtml(r.icon)}</span>
+        <span class="td-row-name">${escapeHtml(r.label)}</span>
+        <span class="td-row-go" aria-hidden="true">›</span>
+      </button>`).join('');
+  return `<div class="td-else">
+      <div class="td-sub">Which one did you do? It goes to Mum the same way — she still decides what it was worth.</div>
+      ${rows}
+      <button type="button" class="td-fold-btn td-else-close" data-td-action="else" data-td-day="${day}" aria-expanded="true">Never mind ▾</button>
+    </div>`;
+}
+
+/* One routine's items as ticks. Every tick goes through ckWriteRoutineItem. */
+function tdRoutineItemRows(dayKey, r) {
+  const st = r.block.checklistState || {};
+  return r.items.map(i => {
+    const on = !!st[i.id];
+    return `<button type="button" class="td-item${on ? ' on' : ''}" role="checkbox" aria-checked="${on}"
+        data-td-action="routine-item" data-td-day="${escapeAttr(dayKey)}"
+        data-td-block="${escapeAttr(r.block.id)}" data-td-item="${escapeAttr(i.id)}">
+        <span class="td-check" aria-hidden="true">${on ? '✓' : ''}</span>
+        <span class="td-item-icon" aria-hidden="true">${escapeHtml(routineItemIcon(i))}</span>
+        <span class="td-item-name">${escapeHtml(i.text || '')}</span>
+      </button>`;
+  }).join('');
+}
+/* "all N done" for a day, through ckWriteAllRoutines — which toggles the day as
+   a unit, exactly as the chore tab's button does: anything open closes it all,
+   and only a fully closed day clears. */
+function tdRoutineAllButton(dayKey, routines) {
+  const n = routines.length;
+  const allDone = routines.every(r => r.total > 0 && r.done >= r.total);
+  const words = n === 1 ? (allDone ? 'all done ✓' : 'all done') : (allDone ? `all ${n} kept ✓` : `all ${n} done`);
+  return `<button type="button" class="td-fold-btn td-routine-all" data-td-action="routine-all"
+      data-td-day="${escapeAttr(dayKey)}" aria-pressed="${allDone}">${escapeHtml(words)}</button>`;
+}
+
+/* Row 3: today's routines, each opening to its items, with "all N done". Only
+   the routines the planner put on today, like the chore tab. */
+function tdRoutinesCard(kid) {
+  const today = todayKey();
+  const routines = ckRoutineBlocksOn(kid, today);
+  if (!routines.length) return '';
+  const body = routines.map(r => {
+    const open = !!tdRoutineOpen[r.block.id];
+    return `<button type="button" class="td-row td-routine-head" data-td-action="routine-open"
+        data-td-block="${escapeAttr(r.block.id)}" aria-expanded="${open}">
+        <span class="td-row-icon" aria-hidden="true">${escapeHtml(r.act.icon || '📋')}</span>
+        <span class="td-row-name">${escapeHtml(r.act.name || '')}</span>
+        <span class="td-row-go">${r.done}/${r.total} ${open ? '▾' : '▸'}</span>
+      </button>${open ? `<div class="td-items">${tdRoutineItemRows(today, r)}</div>` : ''}`;
+  }).join('');
+  return `<div class="td-card td-routines">
+      <div class="td-cap">Routines</div>
+      ${body}
+      ${tdRoutineAllButton(today, routines)}
+    </div>`;
+}
+
+/* Row 4: her own things and helping out, for today — the chore tab's lanes
+   (ckOwnLaneItems), each tap through ctCyclePersonalFor: none → done → nobody
+   asked (the XP) → none. Never money. */
+function tdLanesCard(kid) {
+  const wk = ctThisWeekKey(), d = tdTodayIndex();
+  if (d == null) return '';
+  const { own, helping } = ckOwnLaneItems(kid, wk, d);
+  if (!own.length && !helping.length) return '';
+  const lane = (title, items) => items.length ? `<div class="td-lane-name">${escapeHtml(title)}</div>` + items.map(i => {
+    const st = mrGetPersonal(kid, wk, d, i.id);
+    const mark = st === 'unasked' ? '⭐' : (st === 'done' ? '✓' : '');
+    const note = st === 'unasked' ? 'nobody asked ⭐' : (st === 'done' ? 'done' : '');
+    return `<button type="button" class="td-item${st ? ' on' : ''}" data-td-action="personal"
+        data-td-chore="${escapeAttr(i.id)}" aria-pressed="${!!st}">
+        <span class="td-check" aria-hidden="true">${mark}</span>
+        <span class="td-item-icon" aria-hidden="true">${escapeHtml(i.icon || '⭐')}</span>
+        <span class="td-item-name">${escapeHtml(i.label)}</span>
+        ${note ? `<span class="td-item-note">${escapeHtml(note)}</span>` : ''}
+      </button>`;
+  }).join('') : '';
+  return `<div class="td-card td-lanes">
+      <div class="td-cap">Own things · helping out</div>
+      <div class="td-sub">Tap when it's done. Tap twice if nobody had to ask — that's the XP.</div>
+      ${lane('Your own things', own)}${lane('Helping out', helping)}
+    </div>`;
+}
+
+/* Row 5: her own 1–5 for a training day, through ckRateSelfFor (tapping the
+   same number again takes it back, as on the chore tab). Mum's rating is shown,
+   never set, here. */
+function tdAttitudeRow(kid, wk, d, dayKey) {
+  const a = mrGetAttitude(kid, wk, d);
+  const btns = [1, 2, 3, 4, 5].map(n => `<button type="button" class="td-rate${a.self === n ? ' on' : ''}"
+      data-td-action="attitude" data-td-day="${escapeAttr(dayKey)}" data-td-n="${n}"
+      aria-pressed="${a.self === n}" aria-label="${n} out of 5">${n}</button>`).join('');
+  return `<div class="td-rates">${btns}</div>
+    <div class="td-sub">${a.parent ? `Mum said ${a.parent}. ` : ''}Your own rating — XP only, no money.</div>`;
+}
+/* On Today once today's training has ENDED (blockHasEnded) — a rating before
+   the session is a guess. Named after the block, the way its card is. */
+function tdTrainingCard(kid) {
+  const today = todayKey();
+  const t = ckTrainingBlockOn(kid, today);
+  if (!t || !blockHasEnded(t.block, today) || isBlockNotDone(t.block)) return '';
+  const d = tdTodayIndex();
+  if (d == null) return '';
+  const name = tdBlockLabel(t.block, kid).name;
+  return `<div class="td-card td-training">
+      <div class="td-cap">${escapeHtml(name)} — how did you try?</div>
+      ${tdAttitudeRow(kid, ctThisWeekKey(), d, today)}
+    </div>`;
+}
+
+/* ── Row 19: 🕓 Catch up ─────────────────────────────────────────────────
+   She does not open the iPad every day. An EARLIER day of an OPEN week with
+   something she has not answered — a planned job with no answer, a routine not
+   closed, a training not rated — is listed here, oldest first, and opens (one
+   day at a time) to the same answers Today gives for today.
+
+   How far back: this week and the TD_CATCHUP_WEEKS before it — the same eight
+   the family meeting's catch-up list covers (mmUnsettledWeeks), inside which a
+   claim can still become pay — never before the family's start week
+   (mmCatchUpFloor), and only weeks not yet SETTLED for her: mnyWeekSettled,
+   which is committed at a meeting (mnyIsCommitted — weekPlans[wk][kid].
+   committedAt) or credited another way (the Grandma rule, the repair, an
+   express catch-up). A settled week is never offered: a claim there would be
+   an answer nobody pays. (mrSetClaim itself has no settled-week lock; that
+   goes to the pocket-money handoff, so this card is careful instead.)
+   Not today (Today's own cards answer today), not a day still to come, not a
+   sick day, and not a block a grown-up recorded as not having happened. */
+const TD_CATCHUP_WEEKS = 8;
+function tdOpenWeeks(kid) {
+  const floor = String(mmCatchUpFloor());
+  const out = [];
+  for (let i = TD_CATCHUP_WEEKS; i >= 0; i--) {
+    const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - i * 7);
+    const wk = ctDateToKey(mon);
+    if (String(wk) < floor) continue;
+    if (mnyWeekSettled(wk, kid)) continue;
+    out.push(wk);
+  }
+  return out;   // oldest first
+}
+/* Reads only. Earnings are read (mrChoresForDay, mrIsSick, …) only for a day
+   that has blocks on it, so an empty old week is not given an empty record. */
+function tdCatchUpDays(kid) {
+  const today = todayKey();
+  const out = [];
+  tdOpenWeeks(kid).forEach(wk => {
+    mrWeekDayKeys(wk).forEach((dayKey, d) => {
+      if (dayKey >= today) return;
+      const blocks = getDayBlocks(dayKey, kid) || [];
+      if (!blocks.length || mrIsSick(kid, wk, d)) return;
+      const byId = new Map(blocks.map(b => [b.id, b]));
+      const jobs = !blocks.some(b => b.actId === 'chores') ? [] : mrChoresForDay(kid, wk, d).rows
+        .filter(x => x.scheduled && x.row.lane === 'chores'
+          && !(byId.get(x.blockId) && isBlockNotDone(byId.get(x.blockId)))
+          && !mrGetClaim(kid, wk, d, x.row.id) && !mrGetChoreGrade(kid, wk, d, x.row.id))
+        .map(x => x.row);
+      const routines = ckRoutineBlocksOn(kid, dayKey)
+        .filter(r => r.total > 0 && r.done < r.total && !isBlockNotDone(r.block));
+      const t = ckTrainingBlockOn(kid, dayKey);
+      const training = t && !isBlockNotDone(t.block) && !mrGetAttitude(kid, wk, d).self ? t : null;
+      if (!jobs.length && !routines.length && !training) return;
+      out.push({ dayKey, wk, d, jobs, routines, training });
+    });
+  });
+  return out;
+}
+/* "Tue" in this week; "Tue 15 Sep" in an earlier one, where "Tue" alone
+   would not say which. */
+function tdCatchUpDayName(day) {
+  if (day.wk === ctThisWeekKey()) return DAY_SHORT[day.d];
+  const dt = formatDayKey(day.dayKey);
+  return `${DAY_SHORT[day.d]} ${dt.getDate()} ${MONTH_SHORT[dt.getMonth()]}`;
+}
+/* `Tue · 2 jobs · 1 routine`, `Wed · training — how did you try?` */
+function tdCatchUpSummary(day) {
+  const parts = [];
+  if (day.jobs.length) parts.push(`${day.jobs.length} ${day.jobs.length === 1 ? 'job' : 'jobs'}`);
+  if (day.routines.length) parts.push(`${day.routines.length} ${day.routines.length === 1 ? 'routine' : 'routines'}`);
+  if (day.training) parts.push(parts.length ? 'training' : 'training — how did you try?');
+  return `${tdCatchUpDayName(day)} · ${parts.join(' · ')}`;
+}
+function tdCatchUpPanel(kid, day) {
+  const key = escapeAttr(day.dayKey);
+  const jobs = day.jobs.map(row => `<button type="button" class="td-row" data-td-action="claim"
+      data-td-day="${key}" data-td-chore="${escapeAttr(row.id)}">
+      <span class="td-row-icon" aria-hidden="true">${escapeHtml(row.icon)}</span>
+      <span class="td-row-name">${escapeHtml(row.label)}</span>
+      <span class="td-row-go">how did it go? ›</span>
+    </button>`).join('');
+  const routines = day.routines.length
+    ? day.routines.map(r => `<div class="td-lane-name">${escapeHtml((r.act.icon || '📋') + ' ' + (r.act.name || ''))} · ${r.done}/${r.total}</div>
+        <div class="td-items">${tdRoutineItemRows(day.dayKey, r)}</div>`).join('')
+      + tdRoutineAllButton(day.dayKey, ckRoutineBlocksOn(kid, day.dayKey))
+    : '';
+  const training = day.training
+    ? `<div class="td-lane-name">${escapeHtml(tdBlockLabel(day.training.block, kid).name)} — how did you try?</div>
+       ${tdAttitudeRow(kid, day.wk, day.d, day.dayKey)}`
+    : '';
+  return `<div class="td-catchup-panel">${jobs}${routines}${training}
+      ${tdElseBlock(kid, day.dayKey, 'on ' + DAY_SHORT[day.d])}</div>`;
+}
+/* The card itself. Writes nothing; nothing to catch up on, no card. */
+function tdCatchUpCard(kid) {
+  const days = tdCatchUpDays(kid);
+  if (!days.length) return '';
+  const rows = days.map(day => {
+    const open = day.dayKey === tdCatchUpOpen;
+    return `<button type="button" class="td-row td-catchup-day${open ? ' on' : ''}" data-td-action="catchup-day"
+        data-td-day="${escapeAttr(day.dayKey)}" aria-expanded="${open}">
+        <span class="td-row-name">${escapeHtml(tdCatchUpSummary(day))}</span>
+        <span class="td-row-go" aria-hidden="true">${open ? '▾' : '›'}</span>
+      </button>${open ? tdCatchUpPanel(kid, day) : ''}`;
+  }).join('');
+  return `<div class="td-card td-catchup">
+      <div class="td-catchup-title">🕓 Catch up</div>
+      <div class="td-sub">Earlier days still waiting for your answer. Tap one.</div>
+      ${rows}
+    </div>`;
+}
+
+/* ── C1b: "Add to an earlier day" (Plan v6, 2026-09-25) ──────────────────
+   Catch up lists only a day with something unanswered, so an extra job she did
+   on a day she had already answered in full had no door here. This is that
+   door: one collapsed row, under the catch-up card or on its own, listing the
+   EARLIER days of the same open weeks catch up reads (tdOpenWeeks — the same
+   window, floor and settled rule), newest first, each as the catch-up card's
+   own "＋ I did something else on Tue" (tdElseBlock → tdClaimJob →
+   openChoreClaimPrompt → mrSetClaim, the path the chore tab's ckPickElse
+   takes). A day catch up already lists is left to catch up, which carries the
+   same door; today has its own under "Jobs I can do". Writes nothing itself. */
+let tdEarlierElseOpen = false;
+function tdEarlierElseDays(kid) {
+  const today = todayKey();
+  const inCatchUp = new Set(tdCatchUpDays(kid).map(d => d.dayKey));
+  const out = [];
+  tdOpenWeeks(kid).forEach(wk => mrWeekDayKeys(wk).forEach((dayKey, d) => {
+    if (dayKey < today && !inCatchUp.has(dayKey)) out.push({ dayKey, wk, d });
+  }));
+  return out.reverse();   // newest first: yesterday is the likeliest
+}
+function tdEarlierElseRow(kid) {
+  const days = tdEarlierElseDays(kid);
+  if (!days.length) return '';
+  const open = tdEarlierElseOpen;
+  const list = open
+    ? `<div class="td-else-earlier-list">${days.map(day =>
+        tdElseBlock(kid, day.dayKey, 'on ' + tdCatchUpDayName(day))).join('')}</div>`
+    : '';
+  return `<button type="button" class="td-row td-else-btn td-else-earlier" data-td-action="else-earlier" aria-expanded="${open}">
+      <span class="td-row-icon" aria-hidden="true">＋</span>
+      <span class="td-row-name">Add to an earlier day</span>
+      <span class="td-row-go" aria-hidden="true">${open ? '▾' : '›'}</span>
+    </button>${list}`;
+}
+
+/* ── Row 6: what Mum answered, seen on Today ──
+   The ✨ chip used to send her to the chore tab, whose render stamps "seen".
+   Now the answers open here, and opening them is the look: mrMarkGradesSeen,
+   the chore tab's own stamp, after the list has been captured so it survives
+   the render that clears the chip. A grown-up looking never consumes her
+   markers — mrMarkGradesSeen refuses a parent itself. */
+function tdShowAnswered(kid) {
+  const wk = ctThisWeekKey();
+  tdAnsweredShown = mrNewlyGraded(kid, wk)
+    .sort((a, b) => a.dayIdx - b.dayIdx);
+  mrMarkGradesSeen(kid);
+}
+function tdAnsweredCard(kid) {
+  if (!tdAnsweredShown) return '';
+  const wk = ctThisWeekKey();
+  const rows = tdAnsweredShown.map(({ dayIdx, choreId }) => {
+    const g = mrGetChoreGrade(kid, wk, dayIdx, choreId);
+    if (!g) return '';
+    const row = mrPoolRow(choreId, wk);
+    const word = (CK_QUALITY.find(q => q.g === g) || {}).word || '';
+    return `<div class="td-answered-row">
+        <span class="td-row-icon" aria-hidden="true">${escapeHtml(row ? row.icon : '🧹')}</span>
+        <span class="td-row-name">${escapeHtml(DAY_SHORT[dayIdx] + ' · ' + (row ? row.label : choreId))}</span>
+        <span class="td-answered-word">${escapeHtml(word.toLowerCase())} ✓</span>
+      </div>`;
+  }).join('');
+  return `<div class="td-card td-answered">
+      <div class="td-cap">✨ Mum answered</div>
+      ${rows || '<div class="td-empty">Nothing new since you last looked.</div>'}
+      <button type="button" class="td-fold-btn td-answered-ok" data-td-action="answered-ok">Got it</button>
+    </div>`;
 }
 
 /* Sister Sync, AT the invites. The list is at the bottom, under the grid and
@@ -1080,10 +1487,11 @@ function tdRenderToday() {
       </div>`;
   }
 
-  // Chores she can answer for, each with what it would be worth. A tap opens the
-  // chore screen at today — the claim is made there, in the one place that owns
-  // it. The price is read from mrChoreWouldPay (js/18-rules.js), which owns
-  // chore pricing; nothing here works out what a chore pays.
+  // Chores she can answer for, each with what it would be worth. A tap asks how
+  // it went, right here, through the chore tab's own prompt and writer
+  // (tdClaimJob → openChoreClaimPrompt → mrSetClaim; R5 §5 row 1) — a claim, not
+  // a payment. The price is read from mrChoreWouldPay (js/18-rules.js), which
+  // owns chore pricing; nothing here works out what a chore pays.
   const pay = (d == null) ? null : mrChoreWouldPay(kid, wk, d);
   const payTag = pay
     ? (pay.capReached
@@ -1104,7 +1512,7 @@ function tdRenderToday() {
          that phrase was six of the screen's 200-word budget. The chevron keeps
          the visual affordance; aria-label keeps the spoken one. */
       return `<button type="button" class="td-row" data-td-action="chore"
-            aria-label="Do ${escapeAttr(j.row.label)}">
+            data-td-chore="${escapeAttr(j.row.id)}" aria-label="How did ${escapeAttr(j.row.label)} go?">
           <span class="td-row-icon">${jobIcon(j.row.id)}</span>
           <span class="td-row-name">${escapeHtml(j.row.label)}</span>
           ${payTag}
@@ -1122,9 +1530,11 @@ function tdRenderToday() {
         <span class="td-row-go">${done ? 'done' : 'with Mum'}</span>
       </button>`;
   }).join('');
-  const choreHtml = jobRows || (jobs.hasPool
+  const choreHtml = (jobRows || (jobs.hasPool
     ? `<div class="td-empty">All today's jobs are done ✓</div>`
-    : `<div class="td-empty">No jobs set up for this week yet.</div>`);
+    : `<div class="td-empty">No jobs set up for this week yet.</div>`))
+    // Row 2: work nobody planned still counts — filed as a claim, like any job.
+    + tdElseBlock(kid, todayKey(), 'today');
 
   /* Next at the top. The list ran in plain time order, so from mid-morning
      onward the thing she was about to do sat below a breakfast she had already
@@ -1255,20 +1665,31 @@ function tdRenderToday() {
 
      Source order is the phone order: the grid only reflows, so nothing here
      depends on the viewport being wide. */
+  /* Catch up sits at the very top: it only exists when an earlier day is still
+     waiting on her, and a card below the fold is a card she never answers.
+     The training rating joins the 🌙 row (both are "how did it go?"); the
+     routines and her own things sit with the jobs, as on the chore tab. */
   wrap.innerHTML = `
     <div class="td-col td-col--day">
+      ${tdCatchUpCard(kid)}
+      ${tdEarlierElseRow(kid)}
       <div class="${heroCls}">${nowHtml}</div>
       ${tdInviteNote()}
       ${tdReflectRow(kid)}
+      ${tdTrainingCard(kid)}
       <div class="td-card">
         <div class="td-cap">Coming up</div>${questHtml}</div>
       ${planHtml}
     </div>
     <div class="td-col td-col--side">
       ${loopHtml ? `<div class="td-chips">${loopHtml}</div>` : ''}
+      ${tdAnsweredCard(kid)}
       ${tdProgressRibbon(kid, quests)}
       <div class="td-card">
         <div class="td-cap">Jobs I can do</div>${choreHtml}</div>
+      ${tdRoutinesCard(kid)}
+      ${tdLanesCard(kid)}
+      ${tdLoopsCard(kid)}
       <div class="td-card">
         <div class="td-cap">My money</div>${moneyHtml}</div>
       <div class="td-say">${escapeHtml(tdEncouragement(kid))}</div>
@@ -1421,18 +1842,69 @@ function tdApplyExtras() {
 /* One delegated listener, bound once in js/99-main.js, so re-rendering cannot
    lose it and no user text is ever interpolated into an inline handler.
 
-   Today is now the screen where a day gets done, so 'blast' does change state —
-   but through completeQuest, the one function that already owned completion, XP
-   and sticker counting. Invoking the owner is the rule; containing a second copy
-   of it is what CLAUDE.md forbids. Everything else here still just navigates. */
+   Today is the screen where a day gets done, so several actions change state —
+   each through the function that already owned that write: completeQuest for
+   a 🎯 (XP and sticker counting come with it), and since C1 (R5 §5) the chore
+   tab's own writers for a job's answer, routine ticks, her own things and her
+   training rating (see "Answering chores on Today" above). Invoking the owner
+   is the rule; containing a second copy of it is what ARCHITECTURE.md forbids.
+   The rest still just navigates. */
 function tdHandleClick(e) {
   const el = e.target.closest('[data-td-action]');
   if (!el || el.disabled) return;
   const a = el.getAttribute('data-td-action');
   const d = tdTodayIndex();
-  if (a === 'chore')   { openChoreTab(); if (d != null) ckSelectDay(d); return; }
+  const day = el.getAttribute('data-td-day');
+  const kid = activeProfile();
+  /* A job row carries its chore and asks in place; the family chip (no chore)
+     still opens the chore tab, where a family chore gets planned. */
+  if (a === 'chore') {
+    const id = el.getAttribute('data-td-chore');
+    if (id) { tdClaimJob(todayKey(), id); return; }
+    openChoreTab(); if (d != null) ckSelectDay(d); return;
+  }
+  if (a === 'claim')      { tdClaimJob(day, el.getAttribute('data-td-chore')); return; }
+  if (a === 'else')       { tdElseOpen = tdElseOpen === day ? null : day; tdRenderToday(); return; }
+  if (a === 'else-earlier') { tdEarlierElseOpen = !tdEarlierElseOpen; tdElseOpen = null; tdRenderToday(); return; }
+  if (a === 'else-pick')  { tdClaimJob(day, el.getAttribute('data-td-chore')); return; }
+  if (a === 'catchup-day') {
+    tdCatchUpOpen = tdCatchUpOpen === day ? null : day;
+    tdElseOpen = null;
+    tdRenderToday();
+    return;
+  }
+  if (a === 'routine-open') {
+    const id = el.getAttribute('data-td-block');
+    tdRoutineOpen[id] = !tdRoutineOpen[id];
+    tdRenderToday();
+    return;
+  }
+  if (a === 'routine-item') {
+    if (ckWriteRoutineItem(kid, day, el.getAttribute('data-td-block'), el.getAttribute('data-td-item'))) tdRenderToday();
+    return;
+  }
+  if (a === 'routine-all') { if (ckWriteAllRoutines(kid, day)) tdRenderToday(); return; }
+  if (a === 'personal') {
+    if (d == null) return;
+    ctCyclePersonalFor(kid, ctThisWeekKey(), d, el.getAttribute('data-td-chore'));
+    tdRenderToday();
+    return;
+  }
+  if (a === 'attitude') {
+    const { wk, d: di } = tdWeekDayOf(day);
+    if (di >= 0 && ckRateSelfFor(kid, wk, di, Number(el.getAttribute('data-td-n')) || 0)) tdRenderToday();
+    return;
+  }
   if (a === 'waiting') { openChoreTab(); ckGoWaiting(); return; }
-  if (a === 'fresh')   { openChoreTab(); ckGoFresh(); return; }
+  // ✨ — what Mum answered, shown here; opening it is the look (row 6).
+  if (a === 'fresh') {
+    tdShowAnswered(kid);
+    if (!tdAnsweredShown.length) { tdAnsweredShown = null; showToast('Mum already checked this one ✓'); return; }
+    tdRenderToday();
+    return;
+  }
+  if (a === 'answered-ok') { tdAnsweredShown = null; tdRenderToday(); return; }
+  if (a === 'level')   { tdOpenLevel(kid); return; }
   if (a === 'earlier') { tdToggleEarlier(); return; }
   if (a === 'later')   { tdToggleLater(); return; }
   if (a === 'invites') { tdOpenInvites(); return; }
@@ -1529,6 +2001,9 @@ function tdTick() {
 }
 
 function goToday() {
+  // Arriving on Today starts its disclosures closed (see tdCatchUpOpen).
+  tdCatchUpOpen = null; tdElseOpen = null; tdRoutineOpen = {}; tdAnsweredShown = null;
+  tdEarlierElseOpen = false;
   showScreen('today');
   tdRenderToday();
 }

@@ -351,6 +351,14 @@
     <div class="week-glance-body" id="weekGlanceBody" hidden></div>
   </div>
 
+  <!-- 🧹 Chores this week: the chore tab's whole-week grid as a read-only
+       report (R5 §5 C2, row 14) — routines kept and each chore graded,
+       answered, open or not planned, per day. Answering an earlier day is
+       Today's 🕓 Catch up card's job, so nothing here is a control but the
+       toggle. Drawn by renderWeekChores (js/07-week-view.js); closed by
+       default and remembered, like the glance panel above. -->
+  <div class="week-glance week-chores" id="weekChores" hidden></div>
+
   <!-- Goals + Todos panel (side-by-side, below Full Week grid) -->
   <h2 class="sr-only">Week Tools</h2>
   <div class="gt-panel">
@@ -1405,6 +1413,18 @@
     <h4>How did each block feel? <span style="font-weight:400;font-size:0.85rem">(optional)</span></h4>
     <div id="reflectBlockList"></div>
     <button class="btn-confirm" id="reflectSaveBtn">Save ✨</button>
+  </div>
+</div>
+
+<!-- My level: tapping the level on Today's hero. Her level, XP and the whole
+     privileges ladder (mrPrivileges), filled by tdOpenLevel (js/31-today.js).
+     Read-only: Close is the one control. -->
+<div class="overlay" id="tdLevelOverlay" onclick="overlayClick(event,'tdLevelOverlay')">
+  <div class="sheet sheet--compact" role="dialog" aria-modal="true" aria-labelledby="tdLevelTitle">
+    <div class="sheet-handle"></div>
+    <h3 id="tdLevelTitle">⭐ My level</h3>
+    <div id="tdLevelBody"></div>
+    <button type="button" class="td-level-close" onclick="closeSheet('tdLevelOverlay')">Close</button>
   </div>
 </div>
 
