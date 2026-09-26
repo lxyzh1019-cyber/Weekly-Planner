@@ -254,7 +254,6 @@ function applyIconButtonAriaLabels(root = document) {
       '＋': 'Add',
       '🧹': 'Open Weekly Chore',
       '🎯': 'Open Challenges',
-      '👯': 'Open Sister Sync',
       '🖨': 'Print',
       '📋': 'Open Templates',
       '🌙': 'Open Reflection',

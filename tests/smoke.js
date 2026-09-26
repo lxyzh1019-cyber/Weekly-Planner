@@ -5178,6 +5178,15 @@ function findChromium() {
         profile = wasProfile;
       }
     }],
+    /* The Day view (Plan v7 item 2) was never in this sweep, and its pending
+       invite ghost — the second accept door — drew ✅ Accept / ❌ Ignore and
+       📌 Add it anyway / ❌ Decline as ~22px buttons in 11px type. Two rows:
+       today with a block and a waiting invite (Accept / Ignore), and yesterday
+       with a missed one (Add it anyway / Decline). Seeded, drawn, put back,
+       as the Sister Sync row does; the clock is pinned to midday so "today"
+       and "missed" do not depend on when the suite runs (seedDayAudit, below). */
+    ['screen-day', () => seedDayAudit(false), 'screen-day/invite'],
+    ['screen-day', () => seedDayAudit(true), 'screen-day/missed-invite'],
   ];
   // Four real devices, not two. The plan asked for these and the branch that
   // changed nearly every layout only ever checked a phone and a desktop-ish
@@ -5232,16 +5241,53 @@ function findChromium() {
         setDayBlocks(key, hadBlocks, kid);
       };
     };
+    /* The Day view rows: today (missed = false) with a block and a waiting
+       invite, or yesterday (missed = true) with one whose day has gone. Drawn
+       under a clock pinned to midday, then everything put back — the drawn
+       canvas stays on screen to be measured. A child, because the ghost is
+       drawn only for her (dayInviteGhosts). */
+    window.seedDayAudit = (missed) => {
+      const RealDate = Date;
+      const when = new RealDate(); when.setHours(12, 0, 0, 0);
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+      Date.prototype = RealDate.prototype;
+      Date.now = () => when.getTime(); Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+      const wasProfile = profile;
+      if (isParent()) profile = 'jenn';
+      const me = activeProfile();
+      const sis = me === 'jenn' ? 'jess' : 'jenn';
+      const key = missed ? dayKeyBefore(todayKey()) : todayKey();
+      const had = (getDayBlocks(key, me) || []).slice();
+      const hadInvites = state.shared.invites;
+      try {
+        setDayBlocks(key, [{ id: 'day-aud-a', actId: 'reading', startMin: 15 * 60, durationMin: 60 }], me);
+        state.shared.invites = [{ id: 'day-aud-inv', from: sis, to: me, status: 'pending', day: key,
+          actId: 'piano', startMin: 17 * 60, durationMin: 60, sourceBlockId: 'day-aud-src' }];
+        openDay(key, (formatDayKey(key).getDay() + 6) % 7);
+        /* The row's proof that it measured what it is for: a Day view with no
+           ghost on it measures clean for the ghost's buttons. */
+        const ghost = document.querySelector('#timeline .placed-block.invitation');
+        const want = missed ? /Add it anyway/ : /Accept/;
+        if (!ghost || !want.test(ghost.textContent)) return `the ${missed ? 'missed ' : ''}invite ghost was not drawn, so its buttons were not measured`;
+      } finally {
+        setDayBlocks(key, had, me);
+        state.shared.invites = hadInvites;
+        profile = wasProfile;
+        Date = RealDate;
+      }
+    };
   });
 
   const kidFindings = [];
   for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1440, 900], [900, 1100]]) {
     await page.setViewportSize({ width: w, height: h });
     for (const [id, nav, label] of KID_SCREENS) {
-      await page.evaluate(`(${nav.toString()})()`);
+      // A row's seed may return a sentence saying what it failed to put on screen.
+      const seeded = await page.evaluate(`(${nav.toString()})()`);
       await page.waitForTimeout(200);
       const r = await kidStandards(id);
       const problems = [];
+      if (typeof seeded === 'string') problems.push(seeded);
       if (r.error) problems.push(r.error);
       /* A screen that did not open measures as clean: every control on it is
          display:none, so none is "too small". openSisterSync refuses a parent,
@@ -14390,6 +14436,61 @@ function findChromium() {
       if (ghostOn(keys[4])) bad.push('a declined invite still draws a ghost');
       const span2 = canvasSpanMin(document.querySelector(`#timeline .tl-col[data-day-key="${keys[4]}"] .tl-canvas`));
       if (span2 !== DAY_MIN_TAIL_MIN) bad.push(`a declined 4pm invite still stretches the empty day to ${span2} minutes`);
+
+      /* Plan v7 item 2, the review's case: a ghost holding 44px buttons is
+         taller than a 30-minute invite, and it must never be drawn over a
+         block — the ✓ is her main action on the Day view. And one in the
+         day's last half-hour stays inside the canvas. Friday: a 30-minute
+         4pm invite, her 60-minute block right after it. Saturday: a 9:30pm
+         invite with a block ending right before it, so it has no empty
+         minutes to borrow either way. */
+      const hitsSelf = (el) => {
+        el.scrollIntoView({ block: 'center' });
+        const r = el.getBoundingClientRect();
+        const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        return [[cx, cy], [cx - 21, cy], [cx + 21, cy], [cx, cy - 21], [cx, cy + 21]].map(([x, y]) => {
+          const h = document.elementFromPoint(x, y);
+          return (h && (h === el || el.contains(h))) ? null
+            : `${Math.round(x)},${Math.round(y)} lands on ${h ? (h.id || h.className || h.tagName).toString().slice(0, 40) : 'nothing'}`;
+        });
+      };
+      state.shared.invites = [
+        inv('r7-g-short', keys[4], 16 * 60, { durationMin: 30 }),
+        inv('r7-g-late', keys[5], 21 * 60 + 30, { durationMin: 30 }),
+      ];
+      setDayBlocks(keys[4], [{ id: 'r7-g-after', actId: 'piano', startMin: 16 * 60 + 30, durationMin: 60 }], 'jess');
+      setDayBlocks(keys[5], [{ id: 'r7-g-before', actId: 'piano', startMin: 20 * 60 + 45, durationMin: 45 }], 'jess');
+      [[keys[4], 4, 'the 30-minute 4pm ghost', 'r7-g-after', 'the 4:30pm block'],
+       [keys[5], 5, 'the 9:30pm ghost', 'r7-g-before', 'the 8:45pm block']].forEach(([day, idx, what, blockId, blockWhat]) => {
+        openDay(day, idx);
+        /* A 🦉 message an earlier check raised (it hides itself after 9s)
+           floats over the bottom of the screen, where the day's last half-hour
+           is; a child taps its × first, and so does this. */
+        hideMascot();
+        const g = ghostOn(day);
+        if (!g) { bad.push(`${what} is not drawn`); return; }
+        const canvas = g.closest('.tl-canvas');
+        const gr = g.getBoundingClientRect(), cr = canvas.getBoundingClientRect();
+        if (gr.top < cr.top - 1 || gr.bottom > cr.bottom + 1) bad.push(`${what} runs outside the canvas (${Math.round(gr.top)}–${Math.round(gr.bottom)} in ${Math.round(cr.top)}–${Math.round(cr.bottom)})`);
+        [...g.querySelectorAll('button')].forEach(b => {
+          const r = b.getBoundingClientRect();
+          if (r.width < 44 || r.height < 44) bad.push(`${what}'s "${b.textContent.trim()}" is ${Math.round(r.width)}×${Math.round(r.height)}, under 44px`);
+          const miss = hitsSelf(b).filter(Boolean);
+          if (miss.length) bad.push(`${what}'s "${b.textContent.trim()}" is not hittable: ${miss[0]}`);
+        });
+        const blk = document.getElementById('block-' + blockId);
+        const tick = blk && blk.querySelector('.block-done-btn');
+        if (!tick) bad.push(`${blockWhat} has no ✓ drawn`);
+        else {
+          const miss = hitsSelf(tick).filter(Boolean);
+          if (miss.length) bad.push(`${blockWhat}'s ✓ is covered: ${miss[0]}`);
+        }
+        const br = blk && blk.getBoundingClientRect();
+        const gr2 = g.getBoundingClientRect();   // after the scrolls above, like br
+        if (br && gr2.left < br.right - 1 && br.left < gr2.right - 1 && gr2.top < br.bottom - 1 && br.top < gr2.bottom - 1) {
+          bad.push(`${what} is drawn over ${blockWhat}`);
+        }
+      });
     } catch (e) {
       bad.push('threw: ' + e.message);
     } finally {
@@ -14584,8 +14685,8 @@ function findChromium() {
      piece of text on them is measured against what is actually behind it:
      contrast at least 4.5:1, and never white text on a pastel. Sister Sync's
      timeline, the 📋 Copy a day sheet (a row open, and a parent's sister tabs),
-     Today's 🌙 row and Parent › Now. (Catch up and "On her behalf" are on
-     another branch and are not measured here.) */
+     Today's 🌙 row, Parent › Now (with "On her behalf") and, since Plan v7,
+     Today's 🕓 Catch up card with a day open. */
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.evaluate(() => {
     window.darkContrastFindings = (root, label) => {
@@ -14706,6 +14807,27 @@ function findChromium() {
       profile = 'parent'; parentViewing = 'jenn';
       showScreen('parent'); renderParentHome(); setParentTab('now');
       bad.push(...darkContrastFindings(document.getElementById('pnWrap'), 'Parent › Now'));
+
+      /* Today's 🕓 Catch up (Plan v7 item 5): an earlier day of this week with
+         an unanswered chore, opened, so its answers are measured with it. Its
+         own keep/restore (c1), because clearing the two weeks is how the card
+         is made to show exactly one day. */
+      const k = c1.keep('jenn');
+      try {
+        profile = 'jenn'; parentViewing = 'jenn';
+        ctPrepareRead();
+        k.clear();
+        setDayBlocks(mrWeekDayKeys(k.wk)[1], [{ id: 'r7-dk-cu', actId: 'chores', startMin: 17 * 60, durationMin: 30,
+          choreTags: ['mop'] }], 'jenn');
+        goToday();
+        const day = document.querySelector('#tdWrap .td-catchup [data-td-action="catchup-day"]');
+        if (day) day.click();
+        const cu = document.querySelector('#tdWrap .td-catchup');
+        if (cu && !cu.querySelector('.td-catchup-panel')) bad.push('🕓 Catch up: its day did not open, so its answers were not measured');
+        bad.push(...darkContrastFindings(cu, '🕓 Catch up'));
+      } finally {
+        k.restore();
+      }
     } catch (e) {
       bad.push('threw: ' + e.message);
     } finally {
@@ -14723,6 +14845,266 @@ function findChromium() {
     return bad.length ? bad : true;
   });
   await page.emulateMedia({ colorScheme: 'light' });
+
+  /* ── SMALL FIXES R7 (Plan v7, 2026-09-26) ────────────────────────────
+     Deferred small fixes, one check each, each written to fail on the code
+     before it. Item 2 (the Day view's invite buttons) is held by
+     kidScreensMeetTheHouseRules' Day view rows and item 5 (🕓 Catch up in dark
+     mode) by theR5ScreensReadInDarkMode, both above. Every check puts back
+     what it seeds, and pins the clock (Thursday of this week, midday in
+     Edmonton) because "today" is what each of them reads. */
+
+  /* Item 1 — the closing ritual said "You did 4 things today" for a day with
+     two of four ticked (it counted every block), and "Well done, Jess!" to a
+     grown-up looking at Jenn (it read the global profile, which is "parent"
+     there). It counts what is DONE — a routine by its checklist, like
+     everywhere else — and names the child whose day it is. */
+  if (want('theClosingRitualCountsWhatWasDone')) checks.theClosingRitualCountsWhatWasDone = await page.evaluate(() => {
+    const bad = [];
+    const unpin = pinClockToWeekday(3);
+    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
+    const key = todayKey();
+    const had = [['jenn', getDayBlocksForProfile(key, 'jenn')], ['jess', getDayBlocksForProfile(key, 'jess')]];
+    const shown = () => document.getElementById('ritualScreen').classList.contains('show');
+    const words = () => `${document.getElementById('ritualTitle').textContent} / ${document.getElementById('ritualSubtitle').textContent}`;
+    const day = (done) => [
+      { id: 'r7-rit-a', actId: 'piano', startMin: 8 * 60, durationMin: 30, completed: done > 0 },
+      { id: 'r7-rit-b', actId: 'reading', startMin: 9 * 60, durationMin: 30, completed: done > 1 },
+      { id: 'r7-rit-c', actId: 'piano', startMin: 16 * 60, durationMin: 30 },
+      { id: 'r7-rit-d', actId: 'reading', startMin: 17 * 60, durationMin: 30 },
+    ];
+    const ritual = () => { currentDayKey = key; openClosingRitual(); const w = words(); const s = shown(); closeRitual(); return [s, w]; };
+    try {
+      // A child: two of her four ticked.
+      setDayBlocks(key, day(2), 'jess');
+      profile = 'jess'; parentViewing = 'jess';
+      let [s, w] = ritual();
+      if (!s) bad.push("Jess's closing ritual did not open on a day with four blocks");
+      if (!/You did 2 things today/.test(w)) bad.push(`with 2 of 4 done, Jess's ritual reads "${w}"`);
+      if (!/Well done, Jess!/.test(w)) bad.push(`Jess's ritual is not addressed to Jess: "${w}"`);
+      // One done: singular.
+      setDayBlocks(key, day(1), 'jess');
+      [s, w] = ritual();
+      if (!/You did 1 thing today/.test(w)) bad.push(`with 1 of 4 done, Jess's ritual reads "${w}"`);
+      // None done yet: it never says "You did 0 things", and still opens.
+      setDayBlocks(key, day(0), 'jess');
+      [s, w] = ritual();
+      if (!s) bad.push('with nothing ticked, the ritual no longer opens');
+      if (/You did 0|You did \d/.test(w)) bad.push(`with nothing ticked, the ritual reads "${w}"`);
+      // A grown-up viewing Jenn: her count, her name — not the global profile's.
+      setDayBlocks(key, day(2), 'jenn');
+      setDayBlocks(key, day(0), 'jess');
+      profile = 'parent'; parentViewing = 'jenn';
+      [s, w] = ritual();
+      if (!/Well done, Jenn!/.test(w)) bad.push(`a grown-up viewing Jenn gets "${w}"`);
+      if (!/You did 2 things today/.test(w)) bad.push(`a grown-up viewing Jenn (2 of 4 done) gets "${w}"`);
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      document.getElementById('ritualScreen').classList.remove('show');
+      had.forEach(([p, blocks]) => setDayBlocks(key, blocks, p));
+      unpin();
+      profile = wasProfile; parentViewing = wasViewing; currentDayKey = wasDayKey;
+      goToday();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* Items 3 and 4 share a fixture: Jenn's Tuesday has a pinned 🎹 Piano at
+     4pm and an unpinned 🍽 dinner, and the 📋 sheet copies Thursday onto it.
+     copyOnto opens Thursday's row, presses its copy button and reports the
+     dialog it raised (null when none), cancelling it so nothing is copied;
+     copyOnto(true) presses OK instead. */
+  await page.evaluate(() => {
+    window.r7Copy = {
+      async copyOnto(ok) {
+        const row = [...document.querySelectorAll('#copyDayList .copy-day-row')].find(r => /Thursday/.test(r.textContent));
+        if (!row) return { error: 'Thursday is not offered on the 📋 sheet' };
+        if (row.getAttribute('aria-expanded') !== 'true') row.click();
+        const panel = document.getElementById(row.getAttribute('aria-controls') || '');
+        const btn = panel && panel.querySelector('.cdr-copy');
+        if (!btn) return { error: "Thursday's row has no copy button" };
+        const toastBefore = document.getElementById('toast').textContent;
+        document.getElementById('toast').textContent = '';
+        btn.click();
+        await new Promise(r => setTimeout(r, 60));
+        const open = !!document.querySelector('#appDialogOverlay.open');
+        const msg = open ? ((document.getElementById('appDialogMsg') || {}).textContent || '') : null;
+        if (open) {
+          if (ok) document.getElementById('appDialogOkBtn').click(); else _closeAppDialog(false);
+          await new Promise(r => setTimeout(r, 60));
+        }
+        const toast = document.getElementById('toast').textContent;
+        if (!toast) document.getElementById('toast').textContent = toastBefore;
+        return { msg, toast };
+      },
+    };
+  });
+
+  /* Item 3 — when nothing on the source day would be copied (here: Thursday's
+     one block is the 4pm Piano the kept pin already covers), the confirm
+     asked "Copy Thursday's 0 things onto this day?" and OK then REPLACED
+     Tuesday's dinner with nothing. Now there is no dialog: a toast says there
+     is nothing to copy and why, and Tuesday is untouched. */
+  if (want('copyingNothingSaysSoAndChangesNothing')) checks.copyingNothingSaysSoAndChangesNothing = await page.evaluate(async () => {
+    const bad = [];
+    const unpin = pinClockToWeekday(3);
+    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey, wasOffset = weekOffset;
+    const wk = getDayKeys(0);
+    const [dst, src] = [wk[1], wk[3]];
+    const saved = [[dst, getDayBlocksForProfile(dst, 'jenn')], [src, getDayBlocksForProfile(src, 'jenn')]];
+    const tombs = () => state.shared.tombstones || {};
+    try {
+      setDayBlocks(dst, [
+        { id: 'r7-cn-pin', actId: 'piano', startMin: 16 * 60, durationMin: 30, parentPinned: true },
+        { id: 'r7-cn-din', actId: 'dinner', startMin: 18 * 60, durationMin: 60 },
+      ], 'jenn');
+      setDayBlocks(src, [{ id: 'r7-cn-src', actId: 'piano', startMin: 16 * 60, durationMin: 30 }], 'jenn');
+      profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
+      openDay(dst, 1);
+      openTemplateSheet();
+      const r = await r7Copy.copyOnto(true);
+      if (r.error) bad.push(r.error);
+      else {
+        if (r.msg !== null) bad.push(`copying a day whose only block the pin already covers still asks: "${r.msg.replace(/\s+/g, ' ').slice(0, 120)}"`);
+        if (r.msg && /\b0 things\b/.test(r.msg)) bad.push('the confirm says "0 things"');
+        if (!/Nothing to copy/i.test(r.toast)) bad.push(`no toast says there is nothing to copy (toast: "${r.toast}")`);
+        else if (!/pinned/i.test(r.toast)) bad.push(`the toast does not say why — the pinned Piano is already there: "${r.toast}"`);
+      }
+      const now = (getDayBlocksForProfile(dst, 'jenn') || []).map(b => b.id).sort().join(',');
+      if (now !== 'r7-cn-din,r7-cn-pin') bad.push(`Tuesday changed: it holds [${now}], want the pin and the dinner`);
+      if (tombs()['r7-cn-din']) bad.push("Tuesday's dinner was tombstoned by a copy that copied nothing");
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      if (document.querySelector('#appDialogOverlay.open')) _closeAppDialog(false);
+      closeSheet('templateOverlay');
+      delete tombs()['r7-cn-din'];
+      saved.forEach(([k, blocks]) => setDayBlocks(k, blocks, 'jenn'));
+      unpin();
+      copyDaySrcWeek = 0; copyDayDstKid = null;
+      profile = wasProfile; parentViewing = wasViewing; currentDayKey = wasDayKey; weekOffset = wasOffset;
+      goToday();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* Item 4 — a copied block that lands across a kept pin used to go through
+     without a word: the confirm listed the pin under "stays" and said nothing
+     about the 🎹 Piano at 4:00 and the 📖 Reading copied in at 4:30 sitting on
+     top of each other. The confirm names each overlap now. What is copied,
+     replaced and kept is unchanged: OK still copies both of Thursday's blocks,
+     keeps the pin and replaces the dinner. */
+  if (want('aCopyNamesItsOverlapWithAKeptPin')) checks.aCopyNamesItsOverlapWithAKeptPin = await page.evaluate(async () => {
+    const bad = [];
+    const unpin = pinClockToWeekday(3);
+    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey, wasOffset = weekOffset;
+    const wk = getDayKeys(0);
+    const [dst, src] = [wk[1], wk[3]];
+    const saved = [[dst, getDayBlocksForProfile(dst, 'jenn')], [src, getDayBlocksForProfile(src, 'jenn')]];
+    const tombs = () => state.shared.tombstones || {};
+    const pin = { id: 'r7-ov-pin', actId: 'piano', startMin: 16 * 60, durationMin: 60, parentPinned: true };
+    const over = { id: 'r7-ov-read', actId: 'reading', startMin: 16 * 60 + 30, durationMin: 60 };
+    const clear = { id: 'r7-ov-late', actId: 'reading', startMin: 19 * 60, durationMin: 30 };
+    try {
+      setDayBlocks(dst, [pin, { id: 'r7-ov-din', actId: 'dinner', startMin: 18 * 60, durationMin: 60 }], 'jenn');
+      setDayBlocks(src, [over, clear], 'jenn');
+      profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
+      openDay(dst, 1);
+      openTemplateSheet();
+      const r = await r7Copy.copyOnto(false);
+      if (r.error) bad.push(r.error);
+      else if (r.msg === null) bad.push('copying Thursday onto a day with a pin raised no confirm');
+      else {
+        const m = r.msg;
+        const lineOver = copyDayBlockLine(over, 'jenn'), linePin = copyDayBlockLine(pin, 'jenn'), lineClear = copyDayBlockLine(clear, 'jenn');
+        const tail = m.slice(m.search(/overlap/i));
+        if (!/overlap/i.test(m)) bad.push(`the confirm does not name the overlap with the pin: "${m.replace(/\s+/g, ' ').slice(0, 160)}"`);
+        else {
+          if (!tail.includes(lineOver) || !tail.includes(linePin)) bad.push(`the overlap does not name both "${lineOver}" and "${linePin}": "${tail.replace(/\s+/g, ' ')}"`);
+          if (tail.includes(lineClear)) bad.push(`the overlap names "${lineClear}", which overlaps nothing`);
+        }
+        if (!/Copy Thursday's 2 things onto this day\?/.test(m)) bad.push(`the confirm's question changed: "${m.split('\n')[0]}"`);
+      }
+      // Cancelled: nothing moved.
+      if ((getDayBlocksForProfile(dst, 'jenn') || []).length !== 2) bad.push('cancelling the confirm changed Tuesday');
+      // OK: the copy itself is what it was — both copied, the pin kept, the dinner replaced.
+      const r2 = await r7Copy.copyOnto(true);
+      if (r2.error) bad.push(r2.error);
+      const after = getDayBlocksForProfile(dst, 'jenn') || [];
+      const has = (b) => after.some(x => x.actId === b.actId && x.startMin === b.startMin);
+      if (!after.some(b => b.id === pin.id && b.parentPinned)) bad.push('the pinned Piano did not stay');
+      if (!has(over) || !has(clear)) bad.push(`Thursday's two blocks were not both copied: [${after.map(b => b.actId + '@' + b.startMin).join(', ')}]`);
+      if (after.some(b => b.id === 'r7-ov-din') || !tombs()['r7-ov-din']) bad.push('the dinner was not replaced');
+      if (after.length !== 3) bad.push(`Tuesday holds ${after.length} blocks after the copy, want 3`);
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      if (document.querySelector('#appDialogOverlay.open')) _closeAppDialog(false);
+      closeSheet('templateOverlay');
+      delete tombs()['r7-ov-din'];
+      saved.forEach(([k, blocks]) => setDayBlocks(k, blocks, 'jenn'));
+      unpin();
+      copyDaySrcWeek = 0; copyDayDstKid = null;
+      profile = wasProfile; parentViewing = wasViewing; currentDayKey = wasDayKey; weekOffset = wasOffset;
+      goToday();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* Item 6 — "Sister Sync" fits its tab in Patrick Hand, but a device that
+     never got the web fonts (offline on first open, a blocked font host) draws
+     the fallback, and there it wrapped onto two lines at 375px. Measured in a
+     page whose font hosts are cut off, so it is the fallback on this machine
+     whatever it is; the label stays "Sister Sync" (the owner's choice), one
+     line, inside its tab, 13px or more, with every tab a 44px target. */
+  if (want('sisterSyncTabFitsInTheFallbackFont')) checks.sisterSyncTabFitsInTheFallbackFont = await (async () => {
+    const ctx = await browser.newContext({ viewport: { width: 375, height: 812 }, timezoneId: 'America/Edmonton' });
+    const p3 = await ctx.newPage();
+    for (const pattern of [
+      '**://firestore.googleapis.com/**', '**://*.firebaseio.com/**',
+      '**://www.gstatic.com/firebasejs/**', '**://identitytoolkit.googleapis.com/**',
+      '**://firebaseinstallations.googleapis.com/**',
+      '**://fonts.googleapis.com/**', '**://fonts.gstatic.com/**',
+    ]) await p3.route(pattern, r => r.abort());
+    try {
+      await p3.goto('file://' + path.join(__dirname, '..', 'index.html'));
+      await p3.waitForTimeout(1200);
+      const r = await p3.evaluate(async () => {
+        const problems = [];
+        profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+        goToday();
+        await document.fonts.ready;
+        const web = [...document.fonts].filter(f => /Patrick Hand|Nunito/.test(f.family) && f.status === 'loaded');
+        if (web.length) problems.push(`a web font loaded anyway (${web.map(f => f.family).join(', ')}) — this is not the fallback`);
+        const nav = document.getElementById('kidNav');
+        if (!nav || nav.hidden) return ['the kid nav is hidden on Today'];
+        [...nav.querySelectorAll('.kid-nav-btn')].forEach(b => {
+          const name = b.getAttribute('data-td-nav');
+          const r = b.getBoundingClientRect();
+          if (r.width < 44 || r.height < 44) problems.push(`the ${name} tab is ${Math.round(r.width)}×${Math.round(r.height)}, under 44px`);
+          const label = b.querySelector('.kid-nav-label');
+          if (!label) { problems.push(`the ${name} tab has no label`); return; }
+          const fs = parseFloat(getComputedStyle(label).fontSize);
+          const lr = label.getBoundingClientRect();
+          if (fs < 13) problems.push(`the ${name} tab's label is ${fs}px, under the 13px floor`);
+          if (lr.height > fs * 1.8) problems.push(`the ${name} tab's label "${label.textContent}" wraps onto a second line (${Math.round(lr.height)}px tall) in ${getComputedStyle(label).fontFamily}`);
+          if (label.scrollWidth > label.clientWidth + 1) problems.push(`the ${name} tab's label "${label.textContent}" is clipped (${label.scrollWidth}px in ${label.clientWidth}px)`);
+          if (lr.left < r.left - 1 || lr.right > r.right + 1) problems.push(`the ${name} tab's label "${label.textContent}" spills out of its tab`);
+        });
+        const sync = nav.querySelector('[data-td-nav="sync"] .kid-nav-label');
+        if (!sync || sync.textContent.trim() !== 'Sister Sync') problems.push(`the tab reads "${sync ? sync.textContent.trim() : '(none)'}", not "Sister Sync"`);
+        if (document.body.scrollWidth > window.innerWidth + 1) problems.push(`the page scrolls sideways (${document.body.scrollWidth})`);
+        return problems.length ? problems : true;
+      });
+      await p3.screenshot({ path: shot('r7_nav_fallback_font_375') });
+      return r;
+    } catch (e) {
+      return ['threw: ' + e.message];
+    } finally {
+      await ctx.close();
+    }
+  })();
 
   /* Step 1 confirms a day where the day is, not in a panel below a chart.
      Twenty-eight movements for a week where nothing was wrong is the friction

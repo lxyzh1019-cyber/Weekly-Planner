@@ -405,8 +405,6 @@ function attachBlockDrag(blockEl, block, dayKey) {
      the edit sheet, where a 15-minute change is a better control anyway. */
   const h = parseFloat(blockEl.style.height) || 0;
   if (h < BLOCK_STACK_MIN) return;
-  // Invitations are somebody else's block to answer, not this child's to move.
-  if (block.inviteId && !block.inviteAccepted) return;
   /* A pinned block simply offers no grip. Letting a child drag it for two
      seconds and refusing at the drop is a control announcing something it did
      not do. */

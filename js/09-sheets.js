@@ -2439,13 +2439,37 @@ async function confirmCopyDay(srcKey, srcLabel) {
   const whose = ' ' + copyDayOntoWords(dstKid);
   const plan = copyDayPlan(srcKey, currentDayKey, srcKid, dstKid);
   const n = plan.copy.length;
-  const thing = `${n} thing${n === 1 ? '' : 's'}`;
   const when = copyDaySrcWeek === 0 ? '' : copyDaySrcWeek < 0 ? ' last week' : ' next week';
+  /* Nothing would be copied — every block on the source day is already here
+     under a kept pin, or is not on the sister's list (Plan v7). It used to ask
+     "Copy Thursday's 0 things?", and OK then replaced this day with nothing.
+     Say so and change nothing, the way Start this day over does. */
+  if (!n) {
+    const total = (getDayBlocksForProfile(srcKey, srcKid) || []).length;
+    const covered = total - plan.dropped;
+    const why = [];
+    if (covered > 0) {
+      const who = covered < total ? `${covered} ${covered === 1 ? 'is' : 'are'}` : covered === 1 ? "it's" : `all ${covered} are`;
+      why.push(`${who} already here, pinned`);
+    }
+    if (plan.dropped) why.push(`${plan.dropped} ${plan.dropped === 1 ? "isn't" : "aren't"} on ${kidLabel(dstKid).name}'s list`);
+    showToast(`Nothing to copy from ${srcLabel}${when}${why.length ? ' — ' + why.join(', and ') : ''}`);
+    return;
+  }
+  const thing = `${n} thing${n === 1 ? '' : 's'}`;
   const lines = (blocks) => blocks.slice().sort((x, y) => (x.startMin || 0) - (y.startMin || 0))
     .map(b => copyDayBlockLine(b, dstKid)).join('\n');
+  /* A copied block that lands across a kept pin (Plan v7). Both stay — what is
+     copied and kept is copyDayPlan's decision, unchanged — so the confirm says
+     where they will sit on top of each other before she agrees. */
+  const endOf = (b) => (b.startMin || 0) + (b.durationMin || 0);
+  const overlaps = plan.copy.slice().sort((x, y) => (x.startMin || 0) - (y.startMin || 0))
+    .flatMap(c => plan.keep.filter(k => (c.startMin || 0) < endOf(k) && (k.startMin || 0) < endOf(c))
+      .map(k => `${copyDayBlockLine(c, dstKid)} overlaps 📌 ${copyDayBlockLine(k, dstKid)}`));
   let msg = `Copy ${srcLabel}${when}'s ${thing}${whose}?`;
   if (plan.replace.length) msg += `\n\nThis replaces:\n${lines(plan.replace)}`;
   if (plan.keep.length) msg += `\n\n📌 Pinned, so it stays:\n${lines(plan.keep)}`;
+  if (overlaps.length) msg += `\n\n⚠️ These would overlap a pinned one:\n${overlaps.join('\n')}`;
   const ok = await showConfirm(msg, { okLabel: 'Copy it', cancelLabel: 'Not now', danger: plan.replace.length > 0 });
   if (!ok) return;
   const res = copyDayInto(srcKey, currentDayKey, srcKid, dstKid);
@@ -2863,8 +2887,16 @@ function openClosingRitual() {
     stars.appendChild(s);
   }
 
-  document.getElementById('ritualTitle').textContent = `Well done, ${profile==='jenn'?'Jenn':'Jess'}!`;
-  document.getElementById('ritualSubtitle').textContent = `You did ${blocks.length} thing${blocks.length===1?'':'s'} today.`;
+  /* Whose day it is and what she DID (Plan v7): the child being viewed — the
+     global `profile` is "parent" for a grown-up, which named Jess to a parent
+     looking at Jenn — and the blocks done, a routine by its checklist
+     (isBlockCompleted), not every block planned. None done is said kindly. */
+  const kid = activeProfile();
+  const done = blocks.filter(b => isBlockCompleted(b, kid)).length;
+  document.getElementById('ritualTitle').textContent = `Well done, ${kidLabel(kid).name}!`;
+  document.getElementById('ritualSubtitle').textContent = done
+    ? `You did ${done} thing${done === 1 ? '' : 's'} today.`
+    : `Nothing ticked off today, and that's OK.`;
 
   // Mood picker in ritual
   const moodsWrap = document.getElementById('ritualMoods');
