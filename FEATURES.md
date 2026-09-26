@@ -26,7 +26,7 @@ directly, not against this file.
 - **plan-gate** (UserPromptSubmit) — injects the plan tier: full `Plan vN` at >2 bullets, micro-plan at 1–2, silent on chat.
 - **skill-router** (UserPromptSubmit) — injects skill invocations for keywords in `skill-router.json`.
 - **routing-guard** (PreToolUse on Edit/Write/MultiEdit/NotebookEdit) — logs every edit; in `enforce` mode denies non-governance edits not made by the executor subagent. **Currently `observe`.**
-- **record-guard** (Stop) — blocks a turn that changed non-governance files without updating `WORKING_RECORD.md` and producing a regression table. Governance-only edits are exempt.
+- **record-guard** (Stop) — blocks a turn that changed non-governance files without updating `WORKING_RECORD.md` and producing a regression table. Governance-only edits are exempt. The record counts as updated when an Edit/Write/MultiEdit/NotebookEdit targets it, or (added 2026-09-25) when a Bash call in the same turn visibly writes it: `sed -i`/`perl -i` on it, a `>`/`>>` redirection into it, `tee`/`cp`/`mv` with it as the last argument, or a python command naming it that calls `.write(`/`.write_text(` or `open(…, 'w'|'a')`. Reads (`cat`, `grep`, `sed -n`, `git add`/`diff`/`commit`) never count; any detector error falls back to the Edit/Write-only check. The regression-table requirement is unchanged.
 - **validation-line** (Stop) — blocks a final answer missing `Confidence: … · Status: …`.
 - `.claude/state/` holds per-session hook logs and is gitignored; `.claude/` itself is tracked.
 
@@ -34,7 +34,7 @@ directly, not against this file.
 - `.claude/skills/hz-guarantee-audit/` — grades an existing artifact (Guaranteed / Checked / Assumed / Broken) before answering a narrow question about it. Also uploadable to claude.ai → Settings → Capabilities → Skills.
 
 ## Governance — Verification
-- `bash tests/replay-hooks.sh` replays synthetic inputs through every hook. **Expected: `passed=14 failed=0`.** It restores `routing_guard_mode` to `observe` and clears `.claude/state/*.jsonl` on exit.
+- `bash tests/replay-hooks.sh` replays synthetic inputs through every hook. **Expected: `passed=16 failed=0`.** It restores `routing_guard_mode` to `observe` and clears `.claude/state/*.jsonl` on exit.
 - `tests/test-routing-hook.md` is the cloud procedure for learning which hook-input fields mark a subagent — run before switching `routing_guard_mode` to `enforce`.
 - `docs/HZ-skill-trigger-tuning.md` is the skill-trigger tuning procedure.
 - **Smoke subset for iteration (added 2026-09-22):** `SMOKE_ONLY=checkA,checkB npm run test:smoke` runs only the named checks. Every check statement in `tests/smoke.js` carries an `if (want('name'))` prefix naming its own check; `noConsoleErrors` is the one unguarded check and always runs. The check names are read from the file itself, not a hand list. A subset **is never the gate**: an unknown name exits 1 naming it; a named check that records nothing is a failure; the last line is `PARTIAL RUN (SMOKE_ONLY): N of M checks — not a pass of the suite` and never `ALL SMOKE CHECKS PASSED`; it refuses to run when `CI` is set. With `SMOKE_ONLY` unset or empty the suite runs every check, pass rule `v !== true`, final line unchanged. Documented in `ARCHITECTURE.md` (Verification) and `tests/README.md`.
@@ -195,6 +195,19 @@ to be a complete manifest:
 - Kid floors hold: every new Today control ≥44px, words she acts on 15px, nothing under 13px, no sideways scroll at 390px.
 - Held by `todayAnswersAJobInPlace`, `somethingElseWorksForAnyOpenDay`, `catchUpListsOnlyUnansweredDaysOfOpenWeeks`, `routinesTickFromToday`, `ownThingsFromToday`, `attitudeAfterTraining`, `answeredGradesClearFromToday`, `learningFromThePortal`, `parentAnswersForHerFromThePortal`, `bothPlacesAgree` and the rewritten `todayHandsOffRatherThanActing`, all clock-pinned (`c1.pin(3)`) at 390×844, with shared keep/restore fixtures (`c1`). Screenshots `c1_today_catchup_*`, `c1_parent_now_*`.
 - ⚠ Known, not changed here: `mrSetClaim` has no settled-week lock (→ pocket-money handoff); Today's own job rows do not check it either (parity with the chore tab). A past day with nothing unanswered is not in catch-up, so "something else" for it still needs the chore tab until C3.
+
+### Chores seen in their new homes — C2 (manifested 2026-09-25, R5 §5 rows 9–15, build stays 2026-09-24b)
+- **The Chores screen stays, unchanged and working** (its More tile, `#choreProfileBadge`, its 21 smoke checks). Nothing in `docs/chore-relocation-map.md` is ticked by Claude.
+- **Read-only, same readers.** No new writer of money, claims or XP; no new `state.shared` key; `js/04-merge.js` untouched. Chore-tab readers made week-parameterised, output unchanged: `ckCapBarFor` (wrapper `ckCapBar` removed — unused), `ckEarnBoard`, `ckEightWeeks`, `ckOpenLoops` + `ckLoopState`, `ckWeekGridData` (rendered by `ckWeekGrid`), `ctMatrixCellChecked(…, weekKey = ctWeekKey)`.
+- **Row 9** — Today's hero shows `🔥 N day streak` (`.dq-hero-streak`, `mrStreakWeek` this week; 0 → "no streak yet").
+- **Row 10** — the hero's level is a button (`.dq-hero-level`, `data-td-action="level"`, ≥44px) → `#tdLevelOverlay` "My level": level, tier, XP, the whole `mrPrivileges` ladder (`.td-priv`, "yours" / "level N"); Close (`.td-level-close`, 48px) is the one control.
+- **Row 11** — My money › **Earned this week** (`mnyEarnBoardCard`, `.mny-earnboard`, after the Today card): `ckEarnBoard` total, today's ceiling bar with keys, the "one more fine" and room lines, the ledger; no control.
+- **Row 12** — Money story › **Your last 8 weeks** (`mnyEightWeeksCard`, `.mny-weeks8`, between the Flow and Week by week): `ckEightWeeks`, bar titles identical to the rail's; best-week line; Week by week appears once.
+- **Row 13** — Today › **📦 Open loops** (`tdLoopsCard`, `.td-loops`, side column after Own things): unreleased boxed items with the chore tab's words; absent when the box is empty; no control.
+- **Row 14** — Week tab › **🧹 Chores this week** (`renderWeekChores`, host `#weekChores` in `index.html`, toggle `#weekChoresToggle` ≥44px, body `#weekChoresBody`): `ckWeekGridData` rows/cells for the tab's week, read-only, closed by default and remembered in `localStorage` (`wp_week_chores_open`), scrolls inside itself at 390px; hidden for a pre-system week or no child.
+- **Row 15** — Parent › History › **🗂️ Before the new system** (`PARENT_HISTORY_VIEWS` `before`, offered only when a week in `moneySnapshots` exists for a child in scope): week chips (`data-parent-preweek`, `parentPreWeek`, newest first), a board per child (`ctPreSystemBoard`, `.pre-board[data-kid]`): frozen money, paid-out state, goal, routine/chore matrix. No Clear week, Export or goal editing (App › Backup and data).
+- Kid floors hold on every new kid surface: nothing under 13px, targets ≥44px, no sideways page scroll at 390px.
+- Held by `streakAndPrivilegesOnToday`, `earningsBarOnMyMoney`, `eightWeekBarsOnMoneyStory`, `openLoopsOnToday`, `weekChoreReportOnWeek`, `preSystemWeekReadableInHistory` in `tests/smoke.js`, each comparing with the chore tab on one fixture, all clock-pinned (`c1.pin(3)`) at 390×844. Screenshots `c2_*_phone` / `c2_*_ipad_landscape`.
 
 Deriving the full app manifest from `ARCHITECTURE.md` is an open item in `WORKING_RECORD.md`.
 

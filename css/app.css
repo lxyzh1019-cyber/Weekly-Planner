@@ -7280,3 +7280,164 @@
   box-shadow: var(--shadow-sm, 0 2px 0 var(--ink));
   font-weight: 900;
 }
+
+/* ── Chores seen in their new homes — C2 (R5 §5 rows 9–15) ──────────────────
+   Read-only views of what the Chores screen shows, each drawn from that
+   screen's own reader. Kid surfaces (Today, My money, Money story, the Week
+   tab) hold the house floors: nothing under 13px, 44px on anything tapped,
+   ink on pale fills, never white on a pastel. */
+
+/* Rows 9 and 10 — Today's hero: the level is a button, the streak beside it. */
+.dq-hero-level {
+  flex: 1; min-width: 0; min-height: 44px;
+  display: flex; align-items: center; gap: 10px;
+  background: none; border: 0; padding: 0; margin: 0;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.dq-hero-level .dq-hero-avatar { flex: 0 0 auto; }
+.dq-hero-level .dq-hero-title,
+.dq-hero-level .dq-hero-sub,
+.dq-hero-level .dq-xp-bar { display: block; }
+.dq-hero-go { color: var(--accent-strong); font-weight: 900; }
+.dq-hero-streak {
+  flex: 0 0 auto; align-self: center;
+  font-size: max(13px, calc(0.85rem * var(--fs-scale, 1))); font-weight: 800;
+  border: 2px solid var(--ink); border-radius: 999px; background: #fff4db;
+  padding: 0.2rem 0.55rem; white-space: nowrap;
+}
+.td-level-now { font-size: max(15px, calc(1.05rem * var(--fs-scale, 1))); font-weight: 800; }
+.td-priv {
+  display: flex; align-items: center; gap: 0.6rem; min-height: 44px;
+  padding: 0.3rem 0.6rem; margin-top: 0.3rem;
+  border: 2px solid var(--ink); border-radius: var(--radius-sm, 12px); background: var(--paper);
+}
+.td-priv.on { background: #eef8f2; }
+.td-priv-name { flex: 1 1 auto; min-width: 0; font-size: max(15px, calc(0.98rem * var(--fs-scale, 1))); font-weight: 700; }
+.td-priv-state { flex: 0 0 auto; font-size: max(13px, calc(0.85rem * var(--fs-scale, 1))); font-weight: 800; color: var(--ink-light); }
+.td-priv.on .td-priv-state { color: #1f6b43; }
+.td-level-close {
+  width: 100%; min-height: 48px; margin-top: 0.8rem;
+  border: 2px solid var(--ink); border-radius: var(--radius-sm, 12px);
+  background: var(--bg); color: var(--ink); font: inherit;
+  font-size: max(15px, calc(1rem * var(--fs-scale, 1))); font-weight: 800; cursor: pointer;
+}
+
+/* Row 13 — Open loops on Today. */
+.td-loop {
+  display: flex; align-items: center; gap: 0.6rem; min-height: 44px;
+  padding: 0.35rem 0.5rem; margin-top: 0.3rem;
+  border: 2px solid var(--ink); border-radius: var(--radius-sm, 12px); background: var(--bg);
+}
+.td-loop-state {
+  flex: 0 0 auto; font-size: max(13px, calc(0.85rem * var(--fs-scale, 1))); font-weight: 800;
+  border: 1.5px solid var(--ink); border-radius: 999px; padding: 0.1rem 0.5rem; background: var(--paper);
+}
+.td-loop-state--again { background: #ffe1d6; color: #8a2f12; }
+
+/* Row 11 — Earned this week, on My money. */
+.mny-earn-total { font-size: 2rem; font-weight: 800; line-height: 1.15; }
+.mny-earn-barwrap { position: relative; margin-top: 0.4rem; }
+.mny-earn-bar {
+  display: flex; height: 20px; border: 2px solid var(--ink); border-radius: 99px;
+  overflow: hidden; background: #f0e8d5;
+}
+.mny-earn-seg { display: block; height: 100%; }
+.mny-earn-ceil {
+  position: absolute; top: -3px; bottom: -3px; width: 3px; background: var(--ink);
+  border-radius: 2px; transform: translateX(-50%);
+}
+.mny-earn-keys { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 0.45rem; }
+.mny-earn-key {
+  font-size: max(13px, calc(0.72rem * var(--fs-scale, 1))); font-weight: 800;
+  border: 1.5px solid var(--ink); border-radius: 99px; padding: 2px 8px;
+}
+.mny-earn-risk {
+  margin-top: 0.45rem; padding-top: 0.4rem; border-top: 2px dashed #e0d7c2;
+  font-size: max(13px, calc(0.8rem * var(--fs-scale, 1))); font-weight: 800; color: var(--accent-strong); line-height: 1.45;
+}
+.mny-earn-lines { display: flex; flex-direction: column; gap: 5px; margin-top: 0.6rem; }
+.mny-earn-line {
+  display: flex; align-items: center; gap: 8px; min-height: 44px;
+  border: 2px solid var(--ink); border-radius: 11px; background: var(--paper); padding: 4px 10px;
+}
+.mny-earn-line-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.mny-earn-line-name { font-size: max(15px, calc(0.85rem * var(--fs-scale, 1))); font-weight: 800; }
+.mny-earn-line-detail { font-size: max(13px, calc(0.72rem * var(--fs-scale, 1))); color: var(--ink-light); }
+.mny-earn-line-amt { flex: 0 0 auto; font-size: max(15px, calc(0.85rem * var(--fs-scale, 1))); font-weight: 800; color: #1f6b43; }
+.mny-earn-line-amt--fine { color: var(--accent-strong); }
+
+/* Row 12 — Your last 8 weeks, on Money story. */
+.mny-wk8-row { display: flex; align-items: flex-end; gap: 6px; height: 86px; margin-top: 0.5rem; }
+.mny-wk8-bar { flex: 1; min-width: 0; display: flex; align-items: flex-end; height: 100%; }
+.mny-wk8-fill {
+  display: block; width: 100%; background: #ffd166;
+  border: 1.5px solid var(--ink); border-radius: 4px 4px 0 0;
+}
+.mny-wk8-bar.now .mny-wk8-fill { background: #6fc292; }
+.mny-wk8-axis {
+  display: flex; justify-content: space-between; margin-top: 0.25rem;
+  font-size: max(13px, calc(0.72rem * var(--fs-scale, 1))); font-weight: 700; color: var(--ink-light);
+}
+
+/* Row 14 — Chores this week, on the Week tab. Scrolls inside itself at phone
+   width, like the chore tab's grid, so the page never goes sideways. */
+.week-chores { margin-top: 0.6rem; }
+.wcr-sub { font-size: max(13px, calc(0.85rem * var(--fs-scale, 1))); color: var(--ink-light); margin: 0 0 0.4rem; }
+.wcr-wrap { overflow-x: auto; }
+.wcr-grid { min-width: 520px; display: flex; flex-direction: column; gap: 3px; }
+.wcr-head, .wcr-row {
+  display: grid; grid-template-columns: 132px repeat(7, minmax(34px, 1fr)) 52px;
+  gap: 3px; align-items: center;
+}
+.wcr-dh { text-align: center; font-size: 13px; font-weight: 800; color: var(--ink-light); }
+.wcr-dh small { display: block; font-size: 13px; font-weight: 700; }
+.wcr-lane {
+  align-self: flex-start; margin-top: 0.4rem;
+  font-size: 13px; font-weight: 800; border: 1.5px solid var(--ink); border-radius: 99px;
+  background: #ffd166; color: var(--ink); padding: 1px 9px;
+}
+.wcr-label {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+  font-size: max(13px, calc(0.9rem * var(--fs-scale, 1))); font-weight: 800;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.wcr-icon { flex: none; }
+.wcr-cell {
+  height: 30px; display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--ink); border-radius: 8px; background: var(--paper);
+  color: #6b5d4f; font-size: 13px; font-weight: 800;
+}
+.wcr-cell--done { background: #6fc292; color: #143024; }
+.wcr-cell--claimed { background: #fff4db; color: #c14a24; box-shadow: inset 0 0 0 3px #ffd166; }
+.wcr-cell--na { border-style: dotted; border-color: #cfc6b4; color: #8a7b62; }
+.wcr-cell--off { background: #eae4d5; border-color: #c9bda6; }
+.wcr-total { text-align: right; font-size: 13px; font-weight: 800; }
+.wcr-legend {
+  display: flex; gap: 12px; flex-wrap: wrap; margin-top: 0.6rem;
+  font-size: 13px; font-weight: 700; color: var(--ink-light);
+}
+
+/* Row 15 — a week from before the new system, under Parent › History. */
+.pre-weeks { display: flex; gap: var(--space-2, 0.5rem); flex-wrap: wrap; margin: var(--space-2, 0.5rem) 0; }
+.pre-weeks .pill-btn { min-height: 44px; }
+.pre-board { margin-top: var(--space-3, 0.75rem); padding: 0.7rem 0.8rem; }
+.pre-title { font-size: max(15px, calc(1rem * var(--fs-scale, 1))); font-weight: 800; }
+.pre-money { font-size: 1.5rem; font-weight: 800; margin-top: 0.2rem; }
+.pre-meta { font-size: max(13px, calc(0.82rem * var(--fs-scale, 1))); font-weight: 600; color: var(--ink-light); }
+.pre-gridwrap { overflow-x: auto; margin-top: 0.5rem; }
+.pre-grid { min-width: 480px; display: flex; flex-direction: column; gap: 3px; }
+.pre-dayhead, .pre-row {
+  display: grid; grid-template-columns: 150px repeat(7, minmax(30px, 1fr)) 40px;
+  gap: 3px; align-items: center;
+}
+.pre-dh { text-align: center; font-size: 13px; font-weight: 800; color: var(--ink-light); }
+.pre-dh small { display: block; font-size: 13px; }
+.pre-section { margin-top: 0.4rem; font-size: 13px; font-weight: 800; color: var(--ink-light); }
+.pre-label { font-size: 13px; font-weight: 700; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pre-cell {
+  height: 28px; display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--ink); border-radius: 7px; background: var(--paper);
+  font-size: 13px; font-weight: 800; color: #8a7b62;
+}
+.pre-cell.on { background: #6fc292; color: #143024; }
+.pre-total { text-align: right; font-size: 13px; font-weight: 800; }

@@ -12217,6 +12217,337 @@ function findChromium() {
     return bad.length ? bad : true;
   });
 
+  /* ── C2: every chore VIEW has a home outside the Chores screen ────────────
+     R5 §5 rows 9–15. Each new home reads the SAME reader the Chores screen
+     reads, so each check below compares the new home with the chore tab on
+     one fixture, and asserts the new home is read-only. Still 390×844 and
+     clock-pinned (c1.pin(3)). */
+
+  /* Rows 9 and 10. The Today hero carries her 🔥 streak (mrStreakWeek, the
+     chore tab header's reader) and her level opens "My level": the privileges
+     ladder (mrPrivileges), read-only. */
+  if (want('streakAndPrivilegesOnToday')) checks.streakAndPrivilegesOnToday = await page.evaluate(() => {
+    const bad = [];
+    const unpin = c1.pin(3);
+    const k = c1.keep('jenn');
+    try {
+      profile = 'jenn'; parentViewing = 'jenn';
+      ctPrepareRead();
+      k.clear();
+      const wk = k.wk, keys = mrWeekDayKeys(wk);
+      // Mon–Wed kept in full, so the streak is more than a trivial 0.
+      [0, 1, 2].forEach(d => CT_SESSIONS.forEach(s => ctSetMandatory(wk, d, s, 'jenn', true)));
+      const days = mrStreakWeek(wk, 'jenn').days;
+      if (!(days > 0)) bad.push(`precondition: three kept days give a streak of ${days}`);
+
+      goToday();
+      const streak = document.querySelector('#tdWrap .dq-hero-streak');
+      if (!streak) bad.push('no 🔥 streak on the Today hero');
+      else if (!streak.textContent.includes(`${days} day streak`)) bad.push(`Today's streak reads "${streak.textContent.trim()}", want ${days} day streak`);
+      openChoreTab();
+      const chip = [...document.querySelectorAll('#choreWrap .ck-chip')].find(c => /day streak/.test(c.textContent));
+      const choreDays = chip ? (chip.querySelector('.ck-chip-big') || {}).textContent : null;
+      if (String(choreDays) !== String(days)) bad.push(`the chore tab says ${choreDays}, Today says ${days}`);
+
+      goToday();
+      const lv = document.querySelector('#tdWrap [data-td-action="level"]');
+      if (!lv) return bad.concat(['the level on Today cannot be tapped']);
+      const r = lv.getBoundingClientRect();
+      if (r.height < 44 || r.width < 44) bad.push(`the level control is ${Math.round(r.width)}×${Math.round(r.height)}`);
+      lv.click();
+      const sheet = document.querySelector('#tdLevelOverlay.open');
+      if (!sheet) return bad.concat(['tapping the level did not open My level']);
+      const info = mrXpLevelInfo('jenn');
+      if (!sheet.textContent.includes(`Level ${info.level}`)) bad.push(`My level does not say Level ${info.level}`);
+      const privs = mrPrivileges('jenn', wk);
+      if (!privs.length) bad.push('precondition: the rules carry no privileges');
+      const rows = [...sheet.querySelectorAll('.td-priv')];
+      if (rows.length !== privs.length) bad.push(`My level lists ${rows.length} privileges, the ladder has ${privs.length}`);
+      privs.forEach((p, i) => {
+        const row = rows[i];
+        if (!row || !row.textContent.includes(p.label)) { bad.push(`privilege ${i + 1} is not "${p.label}"`); return; }
+        const want = p.unlocked ? 'yours' : `level ${p.levelReq}`;
+        if (!row.textContent.includes(want)) bad.push(`"${p.label}" does not say "${want}"`);
+      });
+      // Read-only: the one control is Close.
+      const controls = [...sheet.querySelectorAll('button, input, select')];
+      if (controls.length !== 1 || !controls[0].classList.contains('td-level-close')) bad.push(`My level has ${controls.length} controls, want only Close`);
+      const tiny = [...sheet.querySelectorAll('*')].filter(el =>
+        [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(getComputedStyle(el).fontSize) < 13);
+      if (tiny.length) bad.push(`My level has text under 13px (.${tiny[0].className})`);
+      if (controls[0]) {
+        const cr = controls[0].getBoundingClientRect();
+        if (cr.height < 44) bad.push(`Close is ${Math.round(cr.height)}px tall`);
+        controls[0].click();
+      }
+      if (document.querySelector('#tdLevelOverlay.open')) bad.push('Close did not close My level');
+    } finally {
+      const ov = document.getElementById('tdLevelOverlay');
+      if (ov) ov.classList.remove('open');
+      unpin(); k.restore(); goToday();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* Row 11. My money shows the week the chore tab's rail shows: earned this
+     week (mrWeekBreakdown's net), today's ceiling bar with fines and what is
+     waiting, and the ledger — the same figures, read-only. */
+  if (want('earningsBarOnMyMoney')) checks.earningsBarOnMyMoney = await page.evaluate(() => {
+    const bad = [];
+    const unpin = c1.pin(3);
+    const k = c1.keep('jenn');
+    const p = getProfData('jenn');
+    const hadFines = JSON.parse(JSON.stringify(p.fines || []));
+    try {
+      profile = 'jenn'; parentViewing = 'jenn';
+      ctPrepareRead();
+      k.clear();
+      const wk = k.wk, keys = mrWeekDayKeys(wk);
+      setDayBlocks(keys[3], [{ id: 'eb-ch', actId: 'chores', startMin: 17 * 60, durationMin: 30, choreTags: ['dishes', 'mop', 'vacuum', 'bins'] }], 'jenn');
+      profile = 'parent';
+      ['dishes', 'mop', 'vacuum'].forEach(id => mrSetChoreGrade('jenn', wk, 3, id, 3));
+      const fine = (((mrRulesForWeek(wk).fines || {}).items) || [])[0];
+      // The house rules make the first `freeRepeats` of an item free, so record
+      // one past them: that one costs, and the ledger has a Fines line to match.
+      if (fine) for (let i = 0; i <= (Number(fine.freeRepeats) || 0); i++) mrAddFine('jenn', fine.id, keys[3]);
+      profile = 'jenn';
+      mrSetClaim('jenn', wk, 3, 'bins', 2);
+      const cash = mnyCash('jenn');
+
+      openChoreTab();
+      const rail = {
+        total: ((document.querySelector('#choreWrap .ck-rail-total') || {}).textContent || '').trim(),
+        keys: [...document.querySelectorAll('#choreWrap .ck-keys .ck-key')].map(e => e.textContent.trim()),
+        ledger: [...document.querySelectorAll('#choreWrap .ck-ledger-row')].map(e =>
+          [(e.querySelector('.ck-ledger-name') || {}).firstChild ? e.querySelector('.ck-ledger-name').firstChild.textContent.trim() : '',
+           ((e.querySelector('.ck-ledger-amt') || {}).textContent || '').trim()].join(' ')),
+        risk: ((document.querySelector('#choreWrap .ck-risk') || {}).textContent || '').trim(),
+      };
+      if (!rail.total) return ['precondition: the chore tab rail shows no total'];
+
+      mnyOpenMyMoney('jenn');
+      const card = document.querySelector('#mnyPage1Wrap .mny-earnboard');
+      if (!card) return bad.concat(['no "Earned this week" card on My money']);
+      const total = ((card.querySelector('.mny-earn-total') || {}).textContent || '').trim();
+      if (total !== rail.total) bad.push(`My money says ${total}, the chore tab says ${rail.total}`);
+      const keysNow = [...card.querySelectorAll('.mny-earn-key')].map(e => e.textContent.trim());
+      if (JSON.stringify(keysNow) !== JSON.stringify(rail.keys)) bad.push(`today's bar reads ${JSON.stringify(keysNow)}, the chore tab ${JSON.stringify(rail.keys)}`);
+      if (!card.querySelector('.mny-earn-bar .mny-earn-seg')) bad.push('the ceiling bar is not drawn');
+      if (!card.querySelector('.mny-earn-ceil')) bad.push('the ceiling mark is not drawn');
+      const ledgerNow = [...card.querySelectorAll('.mny-earn-line')].map(e =>
+        [((e.querySelector('.mny-earn-line-name') || {}).textContent || '').trim(),
+         ((e.querySelector('.mny-earn-line-amt') || {}).textContent || '').trim()].join(' '));
+      if (JSON.stringify(ledgerNow) !== JSON.stringify(rail.ledger)) bad.push(`the ledger reads ${JSON.stringify(ledgerNow)}, the chore tab ${JSON.stringify(rail.ledger)}`);
+      if (fine && !rail.ledger.some(l => /^Fines /.test(l))) bad.push('precondition: the fine is not in the chore tab ledger');
+      if (!card.textContent.includes(rail.risk)) bad.push('the "one more fine" line differs from the chore tab');
+      if (card.querySelector('button, input, select')) bad.push('the earnings card carries a control — it is a read-only view');
+      const tiny = [...card.querySelectorAll('*')].filter(el =>
+        [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(getComputedStyle(el).fontSize) < 13);
+      if (tiny.length) bad.push(`the earnings card has text under 13px (.${tiny[0].className})`);
+      if (document.body.scrollWidth > window.innerWidth + 1) bad.push('My money scrolls sideways at 390px');
+      if (mnyCash('jenn') !== cash) bad.push('showing earnings moved money');
+    } finally {
+      p.fines = hadFines;
+      unpin(); k.restore(); goToday();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* Row 12. Money story gains the chore tab's 8-week earnings bars (the rail's
+     "Your last 8 weeks"), the same weeks and figures; the past-weeks list that
+     was already there is not drawn twice. */
+  if (want('eightWeekBarsOnMoneyStory')) checks.eightWeekBarsOnMoneyStory = await page.evaluate(() => {
+    const bad = [];
+    const unpin = c1.pin(3);
+    const k = c1.keep('jenn');
+    try {
+      profile = 'jenn'; parentViewing = 'jenn';
+      ctPrepareRead();
+      k.clear();
+      // Four graded chores last week: two are free, two pay — a bar with height.
+      profile = 'parent';
+      ['dishes', 'mop', 'vacuum', 'bins'].forEach((id, i) => mrSetChoreGrade('jenn', k.lastWk, i, id, 3));
+      profile = 'jenn';
+      openChoreTab();
+      const rail = [...document.querySelectorAll('#choreWrap .ck-spark')].map(s => s.getAttribute('title'));
+      if (rail.length !== 8) return [`precondition: the chore tab rail draws ${rail.length} weeks`];
+      if (!(ctWeekMoney(k.lastWk, 'jenn') > 0)) bad.push('precondition: last week earned nothing');
+
+      mnyOpenStory();
+      const card = document.querySelector('#mnyStoryWrap .mny-weeks8');
+      if (!card) return bad.concat(['no 8-week bars on Money story']);
+      const bars = [...card.querySelectorAll('.mny-wk8-bar')].map(b => b.getAttribute('title'));
+      if (JSON.stringify(bars) !== JSON.stringify(rail)) bad.push(`Money story's weeks ${JSON.stringify(bars)} differ from the chore tab's ${JSON.stringify(rail)}`);
+      const tall = [...card.querySelectorAll('.mny-wk8-fill')].map(f => parseFloat(f.style.height) || 0);
+      if (!tall.some(h => h > 4)) bad.push('no bar has any height');
+      const lists = [...document.querySelectorAll('#mnyStoryWrap .mny-label')].filter(l => /Week by week/.test(l.textContent));
+      if (lists.length !== 1) bad.push(`the week-by-week list appears ${lists.length} times`);
+      if (card.querySelector('button, input, select')) bad.push('the 8-week bars carry a control');
+      const tiny = [...card.querySelectorAll('*')].filter(el =>
+        [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(getComputedStyle(el).fontSize) < 13);
+      if (tiny.length) bad.push(`the 8-week bars have text under 13px (.${tiny[0].className})`);
+      if (document.body.scrollWidth > window.innerWidth + 1) bad.push('Money story scrolls sideways at 390px');
+    } finally {
+      unpin(); k.restore(); goToday();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* Row 13. Open loops — what is in the box and not yet back — on Today, the
+     same items and words as the chore tab, read-only. */
+  if (want('openLoopsOnToday')) checks.openLoopsOnToday = await page.evaluate(() => {
+    const bad = [];
+    const unpin = c1.pin(3);
+    const k = c1.keep('jenn');
+    const p = getProfData('jenn');
+    const hadBox = JSON.parse(JSON.stringify(p.boxItems || []));
+    try {
+      profile = 'jenn'; parentViewing = 'jenn';
+      ctPrepareRead();
+      k.clear();
+      p.boxItems = [
+        { id: 'ol-1', label: 'Tablet', repeat: false, at: Date.now() },
+        { id: 'ol-2', label: 'Phone', repeat: true, at: Date.now() },
+        { id: 'ol-3', label: 'Old headphones', releasedAt: Date.now(), at: Date.now() },
+      ];
+      goToday();
+      const card = document.querySelector('#tdWrap .td-loops');
+      if (!card) return ['no Open loops card on Today with two things in the box'];
+      const rows = [...card.querySelectorAll('.td-loop')];
+      if (rows.length !== 2) bad.push(`Today lists ${rows.length} open loops, want 2`);
+      if (!card.textContent.includes('Tablet') || !card.textContent.includes('Phone')) bad.push('Today does not name what is in the box');
+      if (card.textContent.includes('Old headphones')) bad.push('a released item is still an open loop on Today');
+      const phone = rows.find(r => r.textContent.includes('Phone'));
+      if (!phone || !/again this week · −\$1/.test(phone.textContent)) bad.push('a repeat is not marked "again this week · −$1"');
+      if (card.querySelector('button, input, select')) bad.push('the open loops card carries a control');
+      openChoreTab();
+      const there = [...document.querySelectorAll('#choreWrap .ck-loop')].map(e => e.textContent.replace(/\s+/g, ' ').trim());
+      if (there.length !== rows.length) bad.push(`the chore tab lists ${there.length}, Today ${rows.length}`);
+      goToday();
+      p.boxItems = [];
+      goToday();
+      if (document.querySelector('#tdWrap .td-loops')) bad.push('an empty box still draws the card');
+    } finally {
+      p.boxItems = hadBox;
+      unpin(); k.restore(); goToday();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* Row 14. The chore week grid's whole-week REPORT on the Week tab: routines
+     kept per day, and per chore graded / answered / open / not planned — the
+     same cells as the chore tab's week grid, read-only (answering an earlier
+     day is the catch-up card's job). */
+  if (want('weekChoreReportOnWeek')) checks.weekChoreReportOnWeek = await page.evaluate(() => {
+    const bad = [];
+    const unpin = c1.pin(3);
+    const k = c1.keep('jenn');
+    const hadOpen = localStorage.getItem('wp_week_chores_open');
+    try {
+      profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
+      ctPrepareRead();
+      k.clear();
+      const wk = k.wk, keys = mrWeekDayKeys(wk);
+      const job = (id, tag) => [{ id, actId: 'chores', startMin: 17 * 60, durationMin: 30, choreTags: [tag] }];
+      setDayBlocks(keys[0], [{ id: 'wr-r', actId: 'routine_morning', startMin: 7 * 60, durationMin: 30 }], 'jenn');
+      ckWriteAllRoutines('jenn', keys[0]);
+      setDayBlocks(keys[1], job('wr-tue', 'mop'), 'jenn');
+      mrSetClaim('jenn', wk, 1, 'mop', 3);
+      setDayBlocks(keys[2], job('wr-wed', 'dishes'), 'jenn');
+      profile = 'parent'; mrSetChoreGrade('jenn', wk, 2, 'dishes', 3); profile = 'jenn';
+      setDayBlocks(keys[3], job('wr-thu', 'vacuum'), 'jenn');
+
+      const rowsOf = (sel, cellSel) => [...document.querySelectorAll(sel)].map(r =>
+        [...r.querySelectorAll(cellSel)].map(c => c.textContent.trim()).join('|'));
+      openChoreTab(); ckSetView('week');
+      const grid = rowsOf('#choreWrap .ck-grid-row:not(.ck-grid-head)', '.ck-grid-label, .ck-cell, .ck-grid-total');
+      ckSetView('day');
+      if (!grid.length) return ['precondition: the chore tab week grid is empty'];
+
+      goWeek(); renderWeek();
+      const toggle = document.getElementById('weekChoresToggle');
+      if (!toggle) return ['no "Chores this week" on the Week tab'];
+      if (toggle.getBoundingClientRect().height < 44) bad.push('the chores toggle is under 44px');
+      if (toggle.getAttribute('aria-expanded') !== 'true') toggle.click();
+      const body = document.getElementById('weekChoresBody');
+      if (!body || body.hidden) return bad.concat(['the chores report does not open']);
+      const report = rowsOf('#weekChoresBody .wcr-row', '.wcr-label, .wcr-cell, .wcr-total');
+      if (JSON.stringify(report) !== JSON.stringify(grid)) bad.push(`the Week report ${JSON.stringify(report)} differs from the chore tab's grid ${JSON.stringify(grid)}`);
+      if (body.querySelector('button, input, select')) bad.push('the Week report carries a control — answering is catch up\'s job');
+      const tiny = [...body.querySelectorAll('*')].filter(el =>
+        [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(getComputedStyle(el).fontSize) < 13);
+      if (tiny.length) bad.push(`the Week report has text under 13px (.${tiny[0].className})`);
+      if (document.body.scrollWidth > window.innerWidth + 1) bad.push('the Week report scrolls the page sideways at 390px');
+      // The choice to open it is remembered, like the glance panel.
+      renderWeek();
+      if (document.getElementById('weekChoresBody').hidden) bad.push('the open report did not survive a re-render');
+    } finally {
+      try { if (hadOpen === null) localStorage.removeItem('wp_week_chores_open'); else localStorage.setItem('wp_week_chores_open', hadOpen); } catch (e) {}
+      unpin(); k.restore(); goToday();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* Row 15. A week from before the chore pool (frozen in moneySnapshots) reads
+     under Parent › History: its money, its goal and its routine/chore matrix —
+     the chore tab's old board, read-only. No clear week, no export, no
+     editing; those stay in App › Backup and data. */
+  if (want('preSystemWeekReadableInHistory')) checks.preSystemWeekReadableInHistory = await page.evaluate(() => {
+    const bad = [];
+    const unpin = c1.pin(3);
+    const k = c1.keep('jenn');
+    ctEnsureShared();
+    const c = state.shared.chore;
+    const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - 70);
+    const oldWk = ctDateToKey(mon);
+    const copy = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
+    const had = { snap: copy(c.moneySnapshots[oldWk]), goals: copy(c.goalsByWeek[oldWk]), ctWeek: ctWeekKey, view: parentHistoryView, pre: parentPreWeek };
+    try {
+      c.moneySnapshots[oldWk] = { jenn: 4.5 };
+      c.goalsByWeek[oldWk] = { jenn: { points: 10 }, jess: null };
+      ctSetMandatory(oldWk, 1, 'Morning', 'jenn', true);
+      const chore = (ctMatrixRows('jenn').find(r => r.kind === 'optional') || {}).key;
+      if (chore) ctSetOptional(oldWk, 2, 'jenn', chore, true);
+
+      profile = 'parent'; parentViewing = 'jenn';
+      showScreen('parent'); renderParentHome(); setParentTab('history');
+      const before = document.querySelector('#ptab-history-wrap [data-parent-history="before"]');
+      if (!before) return ['no "Before the new system" view under Parent › History'];
+      before.click();
+      const pick = document.querySelector(`#ptab-history-wrap [data-parent-preweek="${oldWk}"]`);
+      if (!pick) return ['the pre-system week is not offered in History'];
+      pick.click();
+      const board = document.querySelector('#ptab-history-wrap .pre-board[data-kid="jenn"]');
+      if (!board) return ['no board for Jenn\'s pre-system week'];
+      const txt = board.textContent;
+      if (!txt.includes('$4.50')) bad.push('the board does not show the week\'s frozen $4.50');
+      if (!txt.includes(ctGoalLabel(ctGetWeekGoals(oldWk).jenn))) bad.push('the board does not show the week\'s goal');
+      const cell = (label, d) => {
+        const row = [...board.querySelectorAll('.pre-row')].find(r => (r.querySelector('.pre-label') || {}).textContent.includes(label));
+        return row ? (row.querySelectorAll('.pre-cell')[d] || {}).textContent : null;
+      };
+      if ((cell('Morning', 1) || '').trim() !== '✓') bad.push(`Morning on Tuesday reads "${cell('Morning', 1)}", want ✓`);
+      if ((cell('Morning', 0) || '').trim() === '✓') bad.push('Morning on Monday reads ✓ with no tick recorded');
+      if (chore && (cell(chore, 2) || '').trim() !== '✓') bad.push(`${chore} on Wednesday is not ticked on the board`);
+      if (board.querySelector('button, input, select, [onclick]')) bad.push('the pre-system board carries a control — it is read-only');
+      if (/Clear week|Export backup|Save goals/i.test(document.getElementById('ptab-history-wrap').textContent)) bad.push('History offers clear week, export or goal editing');
+      // The chore tab's old board says the same money.
+      ctParentKid = 'jenn'; openChoreTab(); ctWeekKey = oldWk; renderChoreTab();
+      const tabMoney = ((document.querySelector('#choreWrap .ct-money-total') || {}).textContent || '');
+      if (!tabMoney.includes('$4.50')) bad.push(`the chore tab's old board says "${tabMoney.trim()}"`);
+      // And the same ticks: Morning is ticked on Tuesday and not on Monday there too.
+      const tabCell = (d) => document.querySelector(`#choreWrap .cm-cell[data-ct-action="matrix-mandatory"][data-session="Morning"][data-day="${d}"]`);
+      if (!tabCell(1) || tabCell(1).getAttribute('aria-checked') !== 'true') bad.push("the chore tab's old board does not tick Morning on Tuesday — the fixture and the board disagree");
+      if (tabCell(0) && tabCell(0).getAttribute('aria-checked') === 'true') bad.push("the chore tab's old board ticks Morning on Monday");
+    } finally {
+      if (had.snap === undefined) delete c.moneySnapshots[oldWk]; else c.moneySnapshots[oldWk] = had.snap;
+      if (had.goals === undefined) delete c.goalsByWeek[oldWk]; else c.goalsByWeek[oldWk] = had.goals;
+      ctWeekKey = had.ctWeek; parentHistoryView = had.view; parentPreWeek = had.pre;
+      unpin(); k.restore(); goToday();
+    }
+    return bad.length ? bad : true;
+  });
+
   // Artifacts for a person: Today with catch up open, at phone and iPad
   // width, and Parent › Now with its on-her-behalf card.
   {
@@ -12253,6 +12584,73 @@ function findChromium() {
       });
       await page.waitForTimeout(150);
       await page.screenshot({ path: shot(`c1_parent_now_${label}`), fullPage: true });
+      await unseed();
+    }
+  }
+
+  // Artifacts for a person: each C2 home (R5 §5 rows 9–15) at phone and iPad
+  // width — Today's hero and open loops, My level, Earned this week on My money,
+  // the 8 weeks on Money story, the Week tab's chores report and Parent ›
+  // History › Before. Same clock pin and keep/restore as the checks.
+  {
+    const seed = () => page.evaluate(() => {
+      const unpin = c1.pin(3), k = c1.keep('jenn');
+      ctEnsureShared();
+      const c = state.shared.chore;
+      const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - 70);
+      const oldWk = ctDateToKey(mon);
+      const p = getProfData('jenn');
+      window.__c2shot = { unpin, k, oldWk, box: JSON.parse(JSON.stringify(p.boxItems || [])),
+        snap: c.moneySnapshots[oldWk], view: parentHistoryView, open: localStorage.getItem('wp_week_chores_open') };
+      profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
+      ctPrepareRead();
+      k.clear();
+      const keys = mrWeekDayKeys(k.wk);
+      [0, 1, 2].forEach(d => CT_SESSIONS.forEach(s => ctSetMandatory(k.wk, d, s, 'jenn', true)));
+      setDayBlocks(keys[1], [{ id: 's2-tue', actId: 'chores', startMin: 17 * 60, durationMin: 30, choreTags: ['mop'] }], 'jenn');
+      setDayBlocks(keys[3], [{ id: 's2-thu', actId: 'chores', startMin: 17 * 60, durationMin: 30, choreTags: ['dishes', 'mop', 'vacuum', 'bins'] }], 'jenn');
+      profile = 'parent';
+      ['dishes', 'mop', 'vacuum'].forEach(id => mrSetChoreGrade('jenn', k.wk, 3, id, 3));
+      ['dishes', 'mop', 'vacuum', 'bins'].forEach((id, i) => mrSetChoreGrade('jenn', k.lastWk, i, id, 3));
+      profile = 'jenn';
+      mrSetClaim('jenn', k.wk, 1, 'mop', 3);
+      mrSetClaim('jenn', k.wk, 3, 'bins', 2);
+      p.boxItems = [{ id: 's2-b1', label: 'Tablet', at: Date.now() }, { id: 's2-b2', label: 'Phone', repeat: true, at: Date.now() }];
+      c.moneySnapshots[oldWk] = { jenn: 4.5 };
+      ctSetMandatory(oldWk, 1, 'Morning', 'jenn', true);
+    });
+    const unseed = () => page.evaluate(() => {
+      const s = window.__c2shot;
+      if (!s) return;
+      const c = state.shared.chore;
+      if (s.snap === undefined) delete c.moneySnapshots[s.oldWk]; else c.moneySnapshots[s.oldWk] = s.snap;
+      getProfData('jenn').boxItems = s.box;
+      parentHistoryView = s.view;
+      try { if (s.open === null) localStorage.removeItem('wp_week_chores_open'); else localStorage.setItem('wp_week_chores_open', s.open); } catch (e) {}
+      const ov = document.getElementById('tdLevelOverlay'); if (ov) ov.classList.remove('open');
+      s.unpin(); s.k.restore(); window.__c2shot = null; goToday();
+    });
+    const home = async (name, label, go) => {
+      await page.evaluate(go);
+      await page.waitForTimeout(150);
+      await page.screenshot({ path: shot(`c2_${name}_${label}`), fullPage: true });
+    };
+    for (const [w, h, label] of [[390, 844, 'phone'], [1024, 768, 'ipad_landscape']]) {
+      await page.setViewportSize({ width: w, height: h });
+      await seed();
+      await home('today', label, () => { profile = 'jenn'; goToday(); window.scrollTo(0, 0); });
+      await home('my_level', label, () => { const b = document.querySelector('#tdWrap [data-td-action="level"]'); if (b) b.click(); });
+      await page.evaluate(() => { const ov = document.getElementById('tdLevelOverlay'); if (ov) ov.classList.remove('open'); });
+      await home('my_money', label, () => { openChoreTab(); mnyOpenMyMoney('jenn'); window.scrollTo(0, 0); });
+      await home('money_story', label, () => { mnyOpenStory(); window.scrollTo(0, 0); });
+      await home('week_chores', label, () => {
+        try { localStorage.setItem('wp_week_chores_open', '1'); } catch (e) {}
+        goWeek(); const el = document.getElementById('weekChores'); if (el) el.scrollIntoView();
+      });
+      await home('parent_history_before', label, () => {
+        profile = 'parent'; parentViewing = 'jenn';
+        showScreen('parent'); renderParentHome(); setParentHistoryView('before'); window.scrollTo(0, 0);
+      });
       await unseed();
     }
   }
@@ -20293,8 +20691,10 @@ function findChromium() {
        dialog mechanism unless it goes through openSheet/closeSheet, which own
        focus and Escape, so one appearing unannounced is worth being told about.
        A DEPARTING one is worth being told about too — this number going down is
-       how you find out a dialog was replaced by something else. */
-    if (overlays.length !== 19) bad.push(`${overlays.length} static overlays, expected 19`);
+       how you find out a dialog was replaced by something else.
+       20: up one for "My level" (#tdLevelOverlay, R5 §5 C2 row 10), which opens
+       through openSheet and closes through closeSheet like the rest. */
+    if (overlays.length !== 20) bad.push(`${overlays.length} static overlays, expected 20`);
     if (count(/role="tabpanel"/g) !== 5) bad.push(`${count(/role="tabpanel"/g)} tabpanels in the file, want 5 (one per tab)`);
     if (count(/<h4>✅ To-do<\/h4>/g)) bad.push('the To-do heading still skips from h2 to h4');
     if (want('theMarkupSaysWhatThingsAre')) checks.theMarkupSaysWhatThingsAre = bad.length === 0 || bad;

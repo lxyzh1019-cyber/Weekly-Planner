@@ -1245,6 +1245,59 @@ now asserts that answering in place writes the claim and leaves grades, pay and
 cash untouched, and that the money card and plan button still navigate). All
 pin the clock (Thursday of this week) and run at 390×844.
 
+**Chores seen in their new homes (R5 §5 C2, 2026-09-25).** Every VIEW the
+Chores screen had now has a home outside it too, and each is drawn from the
+chore tab's own reader, so the two cannot show different figures. All are
+read-only: C2 adds no writer of money, claims or XP, no `state.shared` key, and
+does not touch `js/04-merge.js`. The chore tab is unchanged in behaviour; to
+make "the same reader" literal a few of its readers now take a week (and day)
+instead of reading `ctWeekKey` / `ctDay`: `ckCapBarFor` (the old `ckCapBar`
+wrapper went, nothing else called it), `ckEarnBoard` (total, bar, ledger),
+`ckEightWeeks` (the eight bars and their titles), `ckOpenLoops` +
+`ckLoopState`, `ckWeekGridData` (the grid's cells; `ckWeekGrid` renders it),
+and `ctMatrixCellChecked(kid, day, row, weekKey = ctWeekKey)`.
+- **Row 9 — 🔥 streak on Today's hero** (`tdQuestHero`, `.dq-hero-streak`):
+  `mrStreakWeek(this week)`, the chore tab header's number, grace day and sick
+  pause included. Zero reads "no streak yet".
+- **Row 10 — My level**: the hero's level is a button (`.dq-hero-level`,
+  `data-td-action="level"`, ≥44px) opening `#tdLevelOverlay` (`tdOpenLevel` /
+  `tdLevelSheet`): level and tier and XP from `mrXpLevelInfo`, and the WHOLE
+  ladder from `mrPrivileges` — "yours" or "level N" per row. Close is its one
+  control.
+- **Row 11 — Earned this week on My money** (`mnyEarnBoardCard`, after the
+  Today card): `ckEarnBoard` for the page's week and today — total kept after
+  fines, today's ceiling bar (fines, kept, waiting, → XP) with its keys, the
+  "one more fine" line and the room line, and the ledger by channel. No bar
+  when today is not in the week showing.
+- **Row 12 — Your last 8 weeks on Money story** (`mnyEightWeeksCard`, between
+  the Flow and Week by week): `ckEightWeeks(this week)`, each bar titled
+  exactly as the rail's. The week-by-week list was already there and is not
+  repeated.
+- **Row 13 — Open loops on Today** (`tdLoopsCard`, side column after the
+  lanes): `ckOpenLoops` with `ckLoopState`'s words ("in the box" / "again this
+  week · −$1"); no card when the box is empty. Boxing and releasing stay with a
+  grown-up in the portal.
+- **Row 14 — 🧹 Chores this week on the Week tab** (`renderWeekChores`,
+  `#weekChores`, toggle `#weekChoresToggle`, body `#weekChoresBody`): the week
+  grid as a report from `ckWeekGridData` for the week the tab shows — the same
+  rows and cells, with no control but the toggle (answering an earlier day is
+  the catch-up card's job). Closed by default, remembered in `localStorage`
+  (`wp_week_chores_open`), scrolls inside itself at phone width. Not drawn for a
+  pre-system week.
+- **Row 15 — Parent › History › 🗂️ Before the new system**: a third history
+  view (`PARENT_HISTORY_VIEWS` `before`, offered only when a child in scope has
+  a week in `moneySnapshots`), a chip per week (`data-parent-preweek`,
+  `parentPreWeek`) and a board per child (`ctPreSystemBoard`, `js/13-chores.js`):
+  the week's frozen money, paid-out state, goal and routine/chore matrix, from
+  `ctWeekMoney`, `ctGetWeekGoals`, `ctMatrixRows` and `ctMatrixCellChecked`. No
+  Clear week, no Export, no goal editing — those stay in App › Backup and data
+  (and on the chore tab until C3).
+Held by `streakAndPrivilegesOnToday`, `earningsBarOnMyMoney`,
+`eightWeekBarsOnMoneyStory`, `openLoopsOnToday`, `weekChoreReportOnWeek` and
+`preSystemWeekReadableInHistory` — each compares its home with the chore tab on
+one fixture and asserts it carries no control; all pin the clock and run at
+390×844. Screenshots `c2_*` at phone and iPad width.
+
 Today's vibe, to-do, goals, sticker and note panels ship collapsed behind one
 `localStorage` flag (`tdExtrasOpen`), and finished blocks fold away behind its
 sibling `tdEarlierOpen`. That was originally the word budget biting — Today was

@@ -563,13 +563,66 @@ function tdQuestHero(kid, blocks) {
   const into = info.into;
   const pct = info.pct;
   const done = blocks.filter(b => isBlockCompleted(b, kid)).length;
+  /* R5 §5 C2, rows 9 and 10. The 🔥 streak is the chore tab header's own
+     reader (mrStreakWeek, this week) — the grace day and sick-day pause come
+     with it, so an off day never reads as a broken run here either. The level
+     is a button now: it opens "My level", the privileges ladder (tdOpenLevel).
+     Spans, not divs, because a <button> may only hold phrasing content. */
+  const streak = mrStreakWeek(ctThisWeekKey(), kid).days;
   return `<div class="dq-hero">
-      <div class="dq-hero-avatar">${tier.emoji}</div>
-      <div class="dq-hero-info">
-        <div class="dq-hero-title">Lv ${level} · ${escapeHtml(tier.name)}</div>
-        <div class="dq-xp-bar"><div class="dq-xp-fill" style="width:${pct}%"></div></div>
-        <div class="dq-hero-sub">${done}/${blocks.length} done · ${into}/${info.perLevel} XP</div>
-      </div>
+      <button type="button" class="dq-hero-level" data-td-action="level"
+        aria-label="${escapeAttr(`Level ${level}. See what XP buys`)}">
+        <span class="dq-hero-avatar" aria-hidden="true">${tier.emoji}</span>
+        <span class="dq-hero-info">
+          <span class="dq-hero-title">Lv ${level} · ${escapeHtml(tier.name)} <span class="dq-hero-go" aria-hidden="true">›</span></span>
+          <span class="dq-xp-bar"><span class="dq-xp-fill" style="width:${pct}%"></span></span>
+          <span class="dq-hero-sub">${done}/${blocks.length} done · ${into}/${info.perLevel} XP</span>
+        </span>
+      </button>
+      <span class="dq-hero-streak">🔥 ${streak ? `${streak} day streak` : 'no streak yet'}</span>
+    </div>`;
+}
+
+/* "My level" (R5 §5 C2, row 10): her level, XP and the whole privileges ladder
+   — mrPrivileges, the list the chore tab's rail draws — read-only. The sheet's
+   one control is Close. */
+function tdLevelSheet(kid) {
+  const wk = ctThisWeekKey();
+  const lv = mrXpLevelInfo(kid, wk);
+  const privs = mrPrivileges(kid, wk);
+  const rows = privs.map(p => `<div class="td-priv${p.unlocked ? ' on' : ''}">
+      <span class="td-priv-name">${escapeHtml(p.label)}</span>
+      <span class="td-priv-state">${p.unlocked ? 'yours' : `level ${escapeHtml(String(p.levelReq))}`}</span>
+    </div>`).join('');
+  return `<div class="td-level-now">Level ${escapeHtml(String(lv.level))}${lv.tier ? ` · ${escapeHtml(lv.tier)}` : ''}</div>
+    <div class="dq-xp-bar"><div class="dq-xp-fill" style="width:${lv.pct}%"></div></div>
+    <div class="td-sub">${escapeHtml(`${lv.xp} XP · ${lv.toNext} more to level ${lv.level + 1}`)}</div>
+    <div class="td-lane-name">What XP buys</div>
+    ${rows || '<div class="td-empty">Nothing on the list yet.</div>'}
+    <div class="td-sub">XP and dollars do not convert into each other. Money is what the work was worth; XP is what the habit was worth.</div>`;
+}
+function tdOpenLevel(kid) {
+  const body = document.getElementById('tdLevelBody');
+  if (!body || !kid || kid === 'parent') return;
+  body.innerHTML = tdLevelSheet(kid);
+  openSheet('tdLevelOverlay');
+}
+
+/* Open loops (R5 §5 C2, row 13): what is in the box and not back yet, the
+   chore tab's list and words (ckOpenLoops, ckLoopState). Read-only — a
+   grown-up boxes and releases, from the portal. Nothing in the box, no card. */
+function tdLoopsCard(kid) {
+  const boxed = ckOpenLoops(kid);
+  if (!boxed.length) return '';
+  const rows = boxed.map(b => `<div class="td-loop">
+      <span class="td-row-icon" aria-hidden="true">📦</span>
+      <span class="td-row-name">${escapeHtml(b.label)}</span>
+      <span class="td-loop-state${b.repeat ? ' td-loop-state--again' : ''}">${escapeHtml(ckLoopState(b))}</span>
+    </div>`).join('');
+  return `<div class="td-card td-loops">
+      <div class="td-cap">📦 Open loops</div>
+      <div class="td-sub">Back Sunday, or sooner for one unpaid job. Money only comes into it the second time the same thing happens in a week.</div>
+      ${rows}
     </div>`;
 }
 
@@ -709,9 +762,9 @@ function tdProgressRibbon(kid, blocks) {
   const mid = Math.round((from + to) / 2);
 
   /* The button wraps the strip only. tdQuestHero is a sibling inside the same
-     .td-ribbon container rather than a child of the button: it is a readout, it
-     contains block elements a <button> may not legally hold, and the level she
-     has reached is not a thing to tap. */
+     .td-ribbon container rather than a child of the button: a button inside a
+     button is not a thing a browser will build, and the hero carries its own —
+     the level, which opens "My level" (R5 §5 C2, row 10). */
   return `<div class="td-ribbon">
       <button type="button" class="td-rib-btn" data-td-action="plan"
         aria-label="${escapeAttr(done + ' of ' + total + ' done today. Open the day.')}">
@@ -1600,6 +1653,7 @@ function tdRenderToday() {
         <div class="td-cap">Jobs I can do</div>${choreHtml}</div>
       ${tdRoutinesCard(kid)}
       ${tdLanesCard(kid)}
+      ${tdLoopsCard(kid)}
       <div class="td-card">
         <div class="td-cap">My money</div>${moneyHtml}</div>
       <div class="td-say">${escapeHtml(tdEncouragement(kid))}</div>
@@ -1813,6 +1867,7 @@ function tdHandleClick(e) {
     return;
   }
   if (a === 'answered-ok') { tdAnsweredShown = null; tdRenderToday(); return; }
+  if (a === 'level')   { tdOpenLevel(kid); return; }
   if (a === 'earlier') { tdToggleEarlier(); return; }
   if (a === 'later')   { tdToggleLater(); return; }
   if (a === 'invites') { tdOpenInvites(); return; }
