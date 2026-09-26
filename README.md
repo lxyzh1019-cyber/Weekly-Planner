@@ -24,9 +24,11 @@ npm run test:smoke  # boots the app in headless Chromium; screenshots in tests/o
 `npx playwright install chromium`); otherwise set `SMOKE_CHROMIUM=/path/to/chrome`.
 
 See `ARCHITECTURE.md` for the architectural constraints these checks protect, and
-`tests/README.md` for what the smoke suite covers. `CLAUDE.md` holds the global
-working rules for agent sessions; `tests/replay-hooks.sh` verifies the hooks in
-`.claude/hooks/` that enforce them.
+`tests/README.md` for what the smoke suite covers. The working rules for agent
+sessions, and the hooks that enforce them, come centrally from `hz-claude-config`
+through `.claude/hz-loader.py` (the session-start hook); `CLAUDE.md` points to
+them. The only per-repo copies are `.claude/settings.json`, `.claude/hz-loader.py`
+and `.claude/agents/opus-worker.md`.
 
 ## Firebase / Firestore sync setup
 
