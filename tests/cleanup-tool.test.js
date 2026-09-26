@@ -13,6 +13,11 @@
 // which is never clicked here, and the Firebase hosts are blocked anyway. The
 // detection and removal functions are called directly through window.__cleanup.
 
+// UTC on every machine: set here, before anything reads a date, rather than as
+// a `TZ=UTC` prefix in package.json, which Windows' command shell rejects.
+// The browser launched below inherits it, as it inherited the prefix.
+process.env.TZ = 'UTC';
+
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -24,10 +29,12 @@ function findChromium() {
     process.env.PLAYWRIGHT_BROWSERS_PATH,
     '/opt/pw-browsers',
     path.join(os.homedir(), '.cache', 'ms-playwright'),
-    path.join(os.homedir(), 'Library', 'Caches', 'ms-playwright')
+    path.join(os.homedir(), 'Library', 'Caches', 'ms-playwright'),
+    process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'ms-playwright')
   ];
   const binaries = [['chrome-linux', 'chrome'], ['chrome-linux', 'headless_shell'],
-                    ['chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium']];
+                    ['chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'],
+                    ['chrome-win', 'chrome.exe'], ['chrome-win64', 'chrome.exe']];
   for (const root of roots) {
     if (!root || !fs.existsSync(root)) continue;
     for (const dir of fs.readdirSync(root)) {
@@ -37,6 +44,12 @@ function findChromium() {
         if (fs.existsSync(p)) return p;
       }
     }
+  }
+  // Last, an installed Google Chrome on Windows (same order as tests/smoke.js).
+  for (const base of [process.env.ProgramFiles, process.env['ProgramFiles(x86)'], process.env.LOCALAPPDATA]) {
+    if (!base) continue;
+    const p = path.join(base, 'Google', 'Chrome', 'Application', 'chrome.exe');
+    if (fs.existsSync(p)) return p;
   }
   return undefined;
 }

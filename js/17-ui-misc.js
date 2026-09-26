@@ -505,7 +505,17 @@ function sisterDetailsVisibleGlobal() {
   const vis = getSisterVisibilityState();
   return !vis.hideDetails;
 }
+/* What the household setting shows, in Sister Sync's read-only line (the
+   parent's choice in App › Profiles names the same two states). Only a block
+   marked public ever shows its name, so "public" is what it says. */
+function sisterDetailsWords(showAll) {
+  return showAll ? '👯 Sister details: Showing activities marked public'
+                 : '🙈 Sister details: Showing busy times only';
+}
+/* A household setting, so a grown-up's (Plan v6 C5): a child's call changes
+   nothing. The parent's door is paRenderProfiles (js/33-parent-app.js). */
 function setSisterDetailsVisibleGlobal(next) {
+  if (!isParent()) return;
   if (!state.shared) state.shared = {};
   state.shared.sisterVisibilityMode = next ? 'public' : 'busy-only';
   saveAll();

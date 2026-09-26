@@ -1657,26 +1657,46 @@ function seriesExtendTo(seriesId, endKey, p = activeProfile()) {
   return out;
 }
 
-/* Delete every block in series (optionally exclude one). */
+/* How many members of a series a parent pinned — the ones a child's "remove
+   all" leaves where they are (see deleteSeriesBlocks). */
+function seriesPinnedCount(seriesId) {
+  if (!seriesId) return 0;
+  let n = 0;
+  Object.values((getProfData().weeks) || {}).forEach(arr => {
+    (arr || []).forEach(b => { if (b && b.seriesId === seriesId && b.parentPinned) n++; });
+  });
+  return n;
+}
+
+/* Delete every block in series (optionally exclude one).
+
+   For a child, a parent-pinned member stays — the rule removeBlock already
+   applies to one pinned block (Plan v6 C4); a parent removes them all. The
+   series' own `sr:` tombstone deletes EVERY member on the next merge, a kept
+   pin included (blockTombstoned, js/04-merge.js), so it is written only when
+   the whole series went; otherwise only the removed ids are tombstoned, as
+   when one block is excepted. */
 function deleteSeriesBlocks(seriesId, exceptBlockId=null) {
   if (!seriesId) return 0;
+  const keepPins = !isParent();
   const weeks = (getProfData().weeks)||{};
-  let removed = 0;
+  let removed = 0, pinsKept = 0;
   const removedIds = [];
   Object.keys(weeks).forEach(dayKey=>{
     const arr = weeks[dayKey]||[];
     const kept = arr.filter(b => {
       if (b.seriesId !== seriesId) return true;
       if (b.id === exceptBlockId) return true;
+      if (keepPins && b.parentPinned) { pinsKept++; return true; }
       removed++;
       removedIds.push(b.id);
       return false;
     });
     if (kept.length !== arr.length) setDayBlocks(dayKey, kept);
   });
-  // Tombstone every removed id AND the series itself so the sync merge can't
-  // resurrect any member — even one this device never saw.
-  tombstoneBlockIds(removedIds.concat(exceptBlockId ? [] : ['sr:' + seriesId]));
+  // Tombstone every removed id AND — when nothing was kept — the series itself,
+  // so the sync merge can't resurrect any member, even one this device never saw.
+  tombstoneBlockIds(removedIds.concat(exceptBlockId || pinsKept ? [] : ['sr:' + seriesId]));
   if (removedIds.length) saveAll();
   return removed;
 }
@@ -2305,7 +2325,7 @@ function renderCopyDayList() {
     panel.id = 'copyDayPanel' + i;
     panel.hidden = true;
     panel.innerHTML = copyDayBlockList(blocks, srcKid)
-      + `<button type="button" class="pill-btn cdr-copy">📋 Copy ${escapeHtml(DAY_LONG[i])} onto this day</button>`;
+      + `<button type="button" class="pill-btn cdr-copy">📋 Copy ${escapeHtml(DAY_LONG[i])} ${escapeHtml(copyDayOntoWords(dstKid))}</button>`;
     panel.querySelector('.cdr-copy').onclick = () => confirmCopyDay(k, DAY_LONG[i]);
     b.setAttribute('aria-expanded', 'false');
     b.setAttribute('aria-controls', panel.id);
@@ -2360,6 +2380,15 @@ function renderCopyDayNow() {
     : `<p class="cdr-now-head">Nothing on ${escapeHtml(whose)} yet.</p>`;
 }
 
+/* Where a copy lands, in the button's and the confirm's words: "onto this
+   day" for her own day, "onto Jess's Tue" when a parent has picked the sister
+   (Plan v6 C8) — the one case where whose day it is matters most, and the
+   button used to say "this day" there too. Plain text. */
+function copyDayOntoWords(dstKid) {
+  if (dstKid === activeProfile()) return 'onto this day';
+  return `onto ${kidLabel(dstKid).name}'s ${DAY_SHORT[(formatDayKey(currentDayKey).getDay() + 6) % 7]}`;
+}
+
 /* Who the copy lands on. Always a real child, and always this one unless a
    parent has deliberately picked the sister. */
 function copyDayDestKid() {
@@ -2407,8 +2436,7 @@ function copyDayHandleClick(e) {
 async function confirmCopyDay(srcKey, srcLabel) {
   const srcKid = activeProfile();
   const dstKid = copyDayDestKid();
-  const cross = dstKid !== srcKid;
-  const whose = cross ? ` onto ${kidLabel(dstKid).name}'s day` : ' onto this day';
+  const whose = ' ' + copyDayOntoWords(dstKid);
   const plan = copyDayPlan(srcKey, currentDayKey, srcKid, dstKid);
   const n = plan.copy.length;
   const thing = `${n} thing${n === 1 ? '' : 's'}`;
@@ -2764,15 +2792,14 @@ function openReflectSheet(dayKey) {
       if (!act) return;
       const cur = getProfData().blockMoods?.[b.id];
       const row = document.createElement('div');
-      row.className = 'obj-item';
-      row.style.justifyContent = 'space-between';
+      // .refl-block-row wraps: her five 44px moods go under the name on a phone.
+      row.className = 'obj-item refl-block-row';
       row.innerHTML = `<span>${act.icon} ${escapeHtml(act.name)}</span>`;
       const moodPicker = document.createElement('div');
-      moodPicker.style.cssText='display:flex;gap:0.25rem';
+      moodPicker.className = 'refl-block-moods';
       MOODS.forEach(m=>{
         const dot = document.createElement('div');
         dot.className = 'vibe-mood'+(cur===m?' selected':'');
-        dot.style.cssText='width:28px;height:28px;font-size:0.95rem';
         dot.textContent = m;
         dot.onclick = ()=>{
           const p = getProfData(); if(!p.blockMoods) p.blockMoods={};

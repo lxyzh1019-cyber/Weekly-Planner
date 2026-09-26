@@ -52,8 +52,24 @@ function paRenderProfiles() {
         required payment, so by the boundary test it belongs there, not here.</p>
     </div>`;
   };
+  /* What each girl sees of her sister on Sister Sync — one household setting
+     (state.shared.sisterVisibilityMode), so it is changed here and not on the
+     girls' own screen, where either could flip it for both (Plan v6 C5). App,
+     not Setup: it changes nothing she is asked to do or what it is worth. The
+     per-block "👯 Show details to your sister" switch stays in the edit sheet. */
+  const showAll = sisterDetailsVisibleGlobal();
+  const vis = [['public', 'Activities marked public', showAll], ['busy-only', 'Busy times only', !showAll]];
   wrap.innerHTML = `<p class="pn-cap">Profiles</p>
-    <div class="pa-profiles">${card('jenn')}${card('jess')}</div>`;
+    <div class="pa-profiles">${card('jenn')}${card('jess')}</div>
+    <div class="pn-card pn-clear" style="margin-top:0.6rem">
+      <p class="pn-title">👯 What each sister sees on Sister Sync</p>
+      <p class="pn-sub">Her sister's day is always there. A block shows its name only when
+        "👯 Show details to your sister" is on in its edit sheet; everything else reads Busy.
+        Busy times only hides every name. The girls see this setting but cannot change it.</p>
+      <div class="pn-toggle" style="margin-top:0.6rem">${vis.map(([v, label, on]) =>
+        `<button type="button" class="pill-btn${on ? ' active' : ''}" data-pa-sister-vis="${v}"
+           aria-pressed="${on}">${escapeHtml(label)}</button>`).join('')}</div>
+    </div>`;
 }
 
 function paSetAge(kid, value) {
@@ -399,6 +415,12 @@ function paHandleClick(e) {
   if (pin) { changeParentPin(); return; }
   const scale = e.target.closest('[data-pa-scale]');
   if (scale) { paSetTextScale(scale.getAttribute('data-pa-scale')); return; }
+  const vis = e.target.closest('[data-pa-sister-vis]');
+  if (vis) {
+    setSisterDetailsVisibleGlobal(vis.getAttribute('data-pa-sister-vis') === 'public');
+    paRenderProfiles();
+    return;
+  }
 }
 function paHandleChange(e) {
   if (e.target.closest('[data-sc]')) { scHandleChange(e); return; }

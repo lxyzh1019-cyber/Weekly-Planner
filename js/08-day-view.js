@@ -385,7 +385,10 @@ function toggleDayViewEvening() {
 /* The drawn span, in minutes from START_MIN. Buffers count: a block that ends
    at six with half an hour of driving home after it needs its drive drawn, and
    bufferClip may trim that but never lengthens it, so the unclipped figure is
-   the safe ceiling. */
+   the safe ceiling. So does every pending invite ghost the canvas will draw
+   (dayInviteGhosts, the renderer's own list): an empty day was drawn 6am–2pm
+   whatever was waiting, so a 4pm invite's ghost — and its Accept — was not on
+   screen until the evening was opened (Plan v6 C3). */
 /* NOT dayViewSpan, which has meant the COLUMN COUNT since the 1/2/3-day view
    landed. Minutes, and named so. */
 function dayDrawnSpanMin(keys) {
@@ -397,6 +400,10 @@ function dayDrawnSpanMin(keys) {
       // The POST legs only: those are the minutes drawn after the block ends.
       const end = (b.startMin - START_MIN) + (b.durationMin || 0)
         + getTravelBufMin(b, 'post') + getGetReadyBufMin(b, 'post');
+      if (end > last) last = end;
+    });
+    dayInviteGhosts(key).forEach(inv => {
+      const end = (inv.startMin - START_MIN) + (inv.durationMin || 0);
       if (end > last) last = end;
     });
   });
@@ -568,15 +575,20 @@ function focusDayColumn(dayKey) {
     h.classList.toggle('tl-col-head--current', h.dataset.dayKey === dayKey));
 }
 
-function renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd, dayKey) {
-  const forDay = dayKey || currentDayKey;
-  if (isParent()) return;
+/* The pending invites the Day view draws as ghosts on one day — one list, read
+   by the renderer and by dayDrawnSpanMin, so the canvas is always tall enough
+   for what it draws. Kid only (the ghost's buttons answer for `profile`, and
+   a parent is never drawn one). Every day it covers: a series invite draws its
+   ghost on each of its days. */
+function dayInviteGhosts(dayKey) {
+  if (isParent()) return [];
   const me = activeProfile();
-  if (me !== 'jenn' && me !== 'jess') return;
-  // Every day it covers: a series invite draws its ghost on each of its days.
-  const invites = (state.shared.invites || []).filter(i =>
-    i.to === me && i.status === 'pending' && inviteCoversDay(i, forDay)
-  );
+  if (me !== 'jenn' && me !== 'jess') return [];
+  return (state.shared.invites || []).filter(i =>
+    i && i.to === me && i.status === 'pending' && inviteCoversDay(i, dayKey));
+}
+function renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd, dayKey) {
+  const invites = dayInviteGhosts(dayKey || currentDayKey);
   if (!invites.length) return;
   const acts = getAllActivities(activeProfile(), { includeArchived: true });
   invites.forEach(inv => {
@@ -2190,16 +2202,25 @@ async function removeBlock() {
     showToast('📌 Parent-pinned — ask a grown-up');
     return;
   }
-  // Series-aware: prompt to remove all if part of a series
+  /* Series-aware: prompt to remove all if part of a series. For a child the
+     parent-pinned copies stay — the rule just above, for one block — so the
+     question counts only what she can remove and says how many stay; with
+     nothing else to remove there is no question. A parent removes them all. */
   if (blk?.seriesId) {
     const siblings = countSeriesBlocks(blk.seriesId);
-    if (siblings > 1) {
-      const all = await showConfirm(`This block is part of a series of ${siblings}.\n\nOK = remove ALL in series\nCancel = remove only this one`, { okLabel:'Remove all', cancelLabel:'Only this' });
+    const pinned = isParent() ? 0 : seriesPinnedCount(blk.seriesId);
+    const removable = siblings - pinned;
+    if (removable > 1) {
+      const stay = pinned === 1 ? '1 is pinned by a grown-up and stays' : `${pinned} are pinned by a grown-up and stay`;
+      const msg = pinned
+        ? `This block is part of a series of ${siblings}.\n\n📌 ${stay}.\n\nOK = remove the other ${removable}\nCancel = remove only this one`
+        : `This block is part of a series of ${siblings}.\n\nOK = remove ALL in series\nCancel = remove only this one`;
+      const all = await showConfirm(msg, { okLabel: pinned ? `Remove ${removable}` : 'Remove all', cancelLabel:'Only this' });
       if (all) {
         deleteSeriesBlocks(blk.seriesId);
         closeSheet('editOverlay');
         buildTimeline();
-        showToast('Series removed 🗑');
+        showToast(pinned ? `Series removed 🗑 — 📌 ${pinned} pinned ${pinned === 1 ? 'stays' : 'stay'}` : 'Series removed 🗑');
         return;
       }
     }

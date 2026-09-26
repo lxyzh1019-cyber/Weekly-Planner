@@ -63,16 +63,16 @@ function renderSync() {
   // Side-by-side timeline
   const grid = document.getElementById('syncGrid');
   const showAll = sisterDetailsVisibleGlobal();
-  const toggleWrap = document.createElement('div');
-  toggleWrap.className = 'repeat-toggle';
-  toggleWrap.classList.toggle('on', showAll);
-  toggleWrap.style.marginBottom = '0.55rem';
-  toggleWrap.innerHTML = `
-    <div class="toggle-track"><div class="toggle-knob"></div></div>
-    <span class="toggle-label">${showAll ? '👯 Sister details: Showing all activities' : '🙈 Sister details: Busy slots only'}</span>
-  `;
-  toggleWrap.onclick = ()=>setSisterDetailsVisibleGlobal(!showAll);
-  overlapWrap.appendChild(toggleWrap);
+  /* The 👯 sister-details setting is the household's
+     (state.shared.sisterVisibilityMode), so it is a grown-up's to change, in
+     Parent › App › Profiles (Plan v6 C5). She still sees it — read-only, in
+     words that say what it shows. It was a switch either girl could flip for
+     both, and it read "Showing all activities" when only blocks marked public
+     ever showed their names. */
+  const visNote = document.createElement('p');
+  visNote.className = 'sync-vis-note';
+  visNote.textContent = `${sisterDetailsWords(showAll)} · a grown-up sets this`;
+  overlapWrap.appendChild(visNote);
   /* DOM order is Jenn, Jess, stripe, gutter, legend: the invite checks select
      `#syncGrid .sync-day-col:first-child`, so Jenn's column is the grid's first
      child, and css/app.css places the tracks as gutter | Jenn | stripe | Jess. */

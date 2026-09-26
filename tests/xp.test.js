@@ -8,6 +8,10 @@
 
    It reads the shipped source rather than importing the app — js/06-quests.js is
    a classic script full of DOM calls and cannot be required. */
+// UTC on every machine: set here, before anything reads a date, rather than as
+// a `TZ=UTC` prefix in package.json, which Windows' command shell rejects.
+// Child processes spawned below inherit it.
+process.env.TZ = 'UTC';
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');

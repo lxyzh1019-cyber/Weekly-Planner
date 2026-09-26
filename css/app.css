@@ -2334,6 +2334,15 @@
   }
   .vibe-mood:hover { transform: scale(1.15); }
   .vibe-mood.selected { background: var(--accent-yellow); transform: scale(1.2) rotate(-5deg); box-shadow: 2px 2px 0 var(--ink); }
+  /* The reflect sheet's moods are what she taps there: 44px, the day's and each
+     block's (Plan v6 C2 — they were 36px and 28px). The gap is wide enough for a
+     chosen dot's 1.2x to stay off its neighbour's target. Each block's row wraps
+     — the name, then the five moods under it on a phone — and the name is read
+     to act, so 15px. The closing ritual's and the edit sheet's dots are not
+     changed here. */
+  #reflectOverlay .vibe-moods, .refl-block-moods { display: flex; gap: 0.5rem; }
+  #reflectOverlay .vibe-mood { width: 44px; height: 44px; flex: 0 0 44px; }
+  .obj-item.refl-block-row { flex-wrap: wrap; justify-content: space-between; font-size: max(15px, calc(0.95rem * var(--fs-scale, 1))); }
 
   .day-controls {
     display: flex; gap: 0.5rem; padding: 0.15rem 0;
@@ -3588,11 +3597,17 @@
      Bottom of the screen, clear of the kid nav; .toast is at the top, so the
      two never overlap when a completion raises both. Dark ground on purpose:
      this is the one transient thing on the screen and it should not read as
-     another card. */
+     another card.
+     One layer UNDER every modal (--z-modal: sheets, scrims, the ? card), not
+     over them: it lives 6s, and a child who ticks on Today and then opens a
+     sheet (🌙 How was today?, My level) inside those 6s had the sheet's bottom
+     row — the moods she answers with — under this toast and its button. An
+     open sheet now covers it; closed again in time, Undo is still there.
+     Still above the kid nav (60) and the mascot (140/145). */
   .undo-toast {
     position: fixed; left: 50%; transform: translateX(-50%);
     bottom: calc(76px + env(safe-area-inset-bottom, 0));
-    z-index: var(--z-toast, 999);
+    z-index: calc(var(--z-modal, 300) - 1);
     display: flex; align-items: center; gap: 0.9rem;
     max-width: calc(100% - 2rem);
     background: var(--ink); color: var(--bg);
@@ -3987,7 +4002,10 @@
     border-radius: var(--radius-sm); cursor: pointer;
   }
   .pn-day.ok { background: var(--accent-green); border-color: var(--ink); }
-  .pn-day.now { background: var(--accent); border-color: var(--ink); color: #fff; }
+  /* Today's square: white on --accent (#ff7b54) was 2.6:1, under the 4.5:1
+     the dark-mode pass asks of every word (Plan v6 C7) — --accent-strong, the
+     portal's own "go" colour (.pn-cta.go), carries white at 4.9:1. */
+  .pn-day.now { background: var(--accent-strong); border-color: var(--ink); color: #fff; }
   /* On her behalf (R5 §5 C1): the chosen child and day, then her answers. */
   .pn-answer-cap { margin-top: var(--space-4); }
   .pn-answer { padding: var(--space-3); }
@@ -3998,7 +4016,9 @@
     background: var(--paper); border: 2px solid var(--paper-line); border-radius: var(--radius-sm); cursor: pointer;
   }
   .pn-kidbtn.on, .pn-day.on { background: var(--ink); border-color: var(--ink); color: var(--paper); }
-  .pn-day:disabled { opacity: 0.45; cursor: default; }
+  /* A day still to come is listed, not offered: dashed and in the lighter ink,
+     as Copy a day's empty rows (Plan v6 C7). Faded to 45% it read at 2.7:1. */
+  .pn-day:disabled { border-style: dashed; color: var(--ink-light); cursor: default; }
   .pn-answer-h {
     margin: var(--space-3) 0 var(--space-1); font-weight: 800;
     font-size: max(13px, calc(0.85rem * var(--fs-scale, 1))); color: var(--ink-light);
@@ -4198,6 +4218,12 @@
     margin: 0.5rem 0.6rem; border: 2px dashed var(--ink);
     font-weight: 700;
   }
+  /* The household's sister-details setting, read-only for her (Plan v6 C5) —
+     a grown-up changes it in Parent › App › Profiles. */
+  .sync-vis-note {
+    margin: 0 0.6rem 0.55rem; color: var(--ink-light);
+    font-size: max(15px, calc(0.95rem * var(--fs-scale, 1)));
+  }
 
   /* Challenges */
   .challenge-card {
@@ -4226,6 +4252,9 @@
     margin-bottom: 0.5rem; font-size: calc(0.95rem * var(--fs-scale, 1));
   }
   .invite-actions { display: flex; gap: 0.4rem; margin-top: 0.4rem; }
+  /* The inbox's answers are a child's taps: 44px, not .pill-btn's 38px. Found
+     when Sister Sync joined the kid-screen sweep (Plan v6 C6). */
+  .invite-actions .pill-btn { min-height: 44px; }
 
   /* ═══════════ PRINT ═══════════ */
   @media print {
@@ -5020,10 +5049,14 @@
     font-family: 'Patrick Hand', sans-serif;
     text-align: left;
   }
+  /* A day with nothing on it is listed, not offered: dashed, flat and in the
+     lighter ink. It was faded to 55% opacity, which put "Friday" at 1.4:1 —
+     a row she still reads to learn the day is empty (Plan v6 C7). */
   .copy-day-row.empty {
     border-style: dashed;
     box-shadow: none;
-    opacity: 0.55;
+    background: transparent;
+    color: var(--ink-light);
     cursor: default;
   }
   .cdr-day { font-size: calc(1.02rem * var(--fs-scale, 1)); font-weight: 800; flex: 0 0 auto; }
@@ -5049,8 +5082,9 @@
   }
   .cdr-pinned { font-weight: 800; color: var(--ink-muted); white-space: nowrap; }
   .cdr-copy { width: 100%; min-height: 44px; font-size: max(15px, calc(1rem * var(--fs-scale, 1))); }
-  /* 🗑 Start this day over, last on the 📋 sheet (R5 §7 Q4). */
-  .day-over-btn, .reflect-day-btn { width: 100%; min-height: 44px; font-size: max(15px, calc(1rem * var(--fs-scale, 1))); }
+  /* 🗑 Start this day over, last on the 📋 sheet (R5 §7 Q4), and 😌 Rest above
+     it — a 38px pill between two 44px buttons until R6 (Plan v6 C1). */
+  .day-over-btn, .reflect-day-btn, #restDayBtn { width: 100%; min-height: 44px; font-size: max(15px, calc(1rem * var(--fs-scale, 1))); }
 
   /* Quick slot-picker sheet (tap an empty slot to add an activity) */
   .slot-picker-hint { color: var(--ink-light); font-size: calc(0.92rem * var(--fs-scale, 1)); margin: 0.1rem 0 0.5rem; }
