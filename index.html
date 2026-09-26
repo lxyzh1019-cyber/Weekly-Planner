@@ -144,7 +144,7 @@
 
   <!-- Moved here off the day timeline's left rail, which was headed "Today" and
        printed the same "next up" sentence this screen already leads with. These
-       keep their original ids so renderVibe / renderDayGoalsTodos /
+       keep their original ids so renderDayGoalsTodos /
        maybeShowRewardPrompt work untouched — every screen is in the DOM at once,
        so those renderers find their elements wherever the markup lives.
        The day screen is now only for building a day; this is where one gets done. -->
@@ -169,13 +169,8 @@
          under one toggle keeps this screen inside its 200-word budget. -->
     <button type="button" class="td-fold-btn" id="tdExtrasBtn" onclick="tdToggleExtras()"></button>
     <div class="td-fold-body" id="tdExtrasBody" style="display:none">
-      <div class="vibe-card">
-        <div>
-          <div class="vibe-title">Today's Vibe</div>
-          <div style="font-size:0.92rem;color:#5a4d41" id="vibeSubtext">Set when the day's done</div>
-        </div>
-        <div class="vibe-moods" id="vibeMoods"></div>
-      </div>
+      <!-- "Today's Vibe" was here. It is folded into the 🌙 How was today? row
+           in the day column (tdReflectRow): one door for the day's mood. -->
       <div class="day-mini-panel">
         <div class="day-mini-panel__header">
           <h3>✅ To-do</h3>
@@ -486,9 +481,9 @@
            localStorage only — every synced write is a full-document upload. -->
       <div class="day-span-tabs" id="daySpanTabs" role="group" aria-label="How many days to show"></div>
       <div class="day-topbar-actions">
-        <button class="btn-icon" onclick="openTemplateSheet()" aria-label="Apply template" title="Templates and copying a day">📋</button>
-        <button class="btn-icon" onclick="openReflectSheet()" aria-label="Reflect on today">🌙</button>
-        <button class="btn-icon day-clear-btn" onclick="clearDay()" aria-label="Clear this day" title="Clear this day">🗑</button>
+        <!-- 🌙 sat here (R5 §7 Q3): today's mood is asked on Today, and a past
+             day is reflected on from its 📋 sheet. -->
+        <button class="btn-icon" onclick="openTemplateSheet()" aria-label="Copy a day" title="Copy a day, or rest">📋</button>
         <button class="profile-badge" onclick="openProfileSwitcher()" id="dayProfileBadge" aria-label="Switch profile"></button>
       </div>
     </div>
@@ -1188,25 +1183,42 @@
      left to offer — every activity it listed is on the ordinary picker, opened
      from the slot the child just tapped. -->
 
-<!-- Template Sheet -->
+<!-- Copy a day (the 📋 sheet). It was "Start from a Template" with two
+     hard-coded shapes, School Day and Weekend; both are retired (R5 §7 Q1) —
+     copying a day you actually planned does what they did. The ids keep their
+     old names (templateOverlay, templateSheetTitle). -->
 <div class="overlay" id="templateOverlay" onclick="overlayClick(event,'templateOverlay')">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="templateSheetTitle">
     <div class="sheet-handle"></div>
-    <h3 id="templateSheetTitle">📋 Start from a Template</h3>
-    <p style="font-size:0.9rem;color:var(--ink-light);margin-bottom:0.8rem">This replaces your current plan for this day.</p>
-    <button class="pill-btn" style="width:100%;margin-bottom:0.5rem;font-size:1rem" onclick="applyTemplate('school')">🏫 School Day</button>
-    <button class="pill-btn" style="width:100%;font-size:1rem" onclick="applyTemplate('weekend')">🌈 Weekend</button>
+    <h3 id="templateSheetTitle">📋 Copy a day</h3>
+    <!-- What is on this day now, drawn by renderCopyDayNow, so both days are in
+         view before a copy is chosen. -->
+    <div id="copyDayNow" class="copy-day-now"></div>
     <!-- Copy a day you have already planned onto this one. A week rarely has
          seven different shapes: two Tuesdays that look alike were two Tuesdays
-         built by hand. Rows are built by renderCopyDayList so they can carry
-         each day's real block count, and the two toggles above them choose
-         which week to take from and — a parent only — whose day it lands on. -->
-    <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">Or copy a day you have already planned.</p>
+         built by hand. Rows are built by renderCopyDayList; each opens to list
+         its blocks, and the copy button is inside. The two toggles above them
+         choose which week to take from and — a parent only — whose day it
+         lands on. -->
+    <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">Pick a day to copy onto this one. Tap it to see what's on it.</p>
     <div class="copy-day-tabs" id="copyDayWeekTabs" role="group" aria-label="Which week to copy from"></div>
     <div class="copy-day-tabs" id="copyDayKidTabs" role="group" aria-label="Whose day to copy onto" hidden></div>
     <div id="copyDayList" class="copy-day-list"></div>
     <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">Taking today off? Rest days keep your streak safe.</p>
     <button class="pill-btn" style="width:100%;font-size:1rem" id="restDayBtn" onclick="toggleRestDay(currentDayKey)" aria-label="Mark rest day" title="Mark today a rest day">😌 Rest</button>
+    <!-- Looking back on a past day (R5 §7 Q3). The 🌙 left the Day view's top
+         bar; today's mood is asked on Today. A past day keeps its door here, on
+         its own menu — renderReflectDayButton shows it for past days only and
+         passes the day to openReflectSheet. -->
+    <div id="reflectDayWrap" hidden>
+      <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">Looking back on this day?</p>
+      <button type="button" class="pill-btn reflect-day-btn" id="reflectDayBtn"></button>
+    </div>
+    <!-- Start this day over (R5 §7 Q4). It was 🗑 on the Day view's top bar,
+         beside 📋 and 🌙, and it deleted done and parent-pinned blocks too.
+         Down here, last, it keeps them; clearDay's confirm lists what goes. -->
+    <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">A sick day, or a cancelled one? Done and pinned things stay.</p>
+    <button type="button" class="pill-btn day-over-btn" onclick="clearDay()">🗑 Start this day over</button>
   </div>
 </div>
 
@@ -1381,16 +1393,18 @@
   </div>
 </div>
 
-<!-- End-of-day Reflect Sheet -->
+<!-- Reflect Sheet: one day's overall mood, then each block. The day is
+     openReflectSheet(dayKey)'s argument; the title names it ("How was
+     yesterday?") and the Save button is bound to it when the sheet opens. -->
 <div class="overlay" id="reflectOverlay" onclick="overlayClick(event,'reflectOverlay')">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="reflectSheetTitle">
     <div class="sheet-handle"></div>
-    <h3 id="reflectSheetTitle">🌙 Reflect on Today</h3>
+    <h3 id="reflectSheetTitle">🌙 How was today?</h3>
     <h4>Overall vibe</h4>
     <div class="vibe-moods" id="reflectOverallMoods" style="margin-bottom:1rem"></div>
     <h4>How did each block feel? <span style="font-weight:400;font-size:0.85rem">(optional)</span></h4>
     <div id="reflectBlockList"></div>
-    <button class="btn-confirm" onclick="saveReflection()">Save ✨</button>
+    <button class="btn-confirm" id="reflectSaveBtn">Save ✨</button>
   </div>
 </div>
 

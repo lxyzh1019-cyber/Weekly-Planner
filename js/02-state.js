@@ -26,7 +26,7 @@ let currentDayKey = null;
 /* The leftmost column of the day screen. currentDayKey is the day being edited
    — the two are the same at one column, and differ the moment a tap lands in
    another column of a 2- or 3-day view. Everything downstream (placeBlock,
-   setDayMood, clearDay, the edit sheet) still reads currentDayKey, which is why
+   clearDay, the edit sheet) still reads currentDayKey, which is why
    the anchor is a separate name rather than a redefinition of it. */
 let dayViewAnchorKey = null;
 let selectedActivity = null;

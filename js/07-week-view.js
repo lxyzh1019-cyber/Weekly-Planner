@@ -74,7 +74,14 @@ function nearestPlannedWeek(mondayKey, p, span) {
    shared their objectives array and their gear/check/stopwatch objects by
    reference until the next reload re-parsed the JSON — editing one edited both
    in memory, which is the kind of bug that only shows up on the device that
-   did the copy. */
+   did the copy.
+
+   A PIN IS A PARENT'S, SO ONLY A PARENT'S COPY KEEPS IT. removeBlock and the
+   drag both refuse a pinned block to a child, so a child who copied a pinned
+   day was handed blocks she could then neither move nor remove. Here rather
+   than in each caller because this is the one place that answers "what does a
+   copy arrive as": the day copy and the blank-week fill a child can reach both
+   come through here, and the parent portal's copy (parent-only) keeps its pins. */
 function weekCloneBlock(b) {
   const c = Object.assign({}, b, {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
@@ -83,6 +90,9 @@ function weekCloneBlock(b) {
     createdAt: syncNow(), updatedAt: syncNow(),
   });
   delete c.seriesId;
+  if (!isParent()) delete c.parentPinned;
+  // Nor was the copy shared: the 💌 badge and its invite link stay on the original.
+  delete c.invitedTo; delete c.sentInviteIds;
   if (Array.isArray(b.objectives)) c.objectives = b.objectives.slice();
   if (b.stopwatch) c.stopwatch = Object.assign({}, b.stopwatch, {
     elapsedSec: 0, running: false, startedAt: null,
@@ -120,19 +130,43 @@ function copyWeekInto(sourceMondayKey, targetMondayKey, p) {
    and says how many — a copy that silently dropped four blocks is how someone
    comes to believe a day is planned when it is not.
 
-   Returns { copied, dropped }. */
-function copyDayInto(srcDayKey, dstDayKey, srcP, dstP) {
+   A PARENT-PINNED BLOCK ON THE TARGET DAY STAYS, whoever copies. Removing one
+   block already protected a pin (removeBlock); a copy replaced it. A source
+   block that the kept pin already covers — same activity, topic and start — is
+   not copied again, or "same as last Tuesday" lands a second piano on top of
+   the pinned one.
+
+   copyDayPlan is the decision and only reads, so the 📋 sheet's confirm names
+   exactly what copyDayInto then does — the pcwPlan discipline.
+   Returns { copy, replace, keep, dropped }, the blocks themselves. */
+function copyDayPlan(srcDayKey, dstDayKey, srcP, dstP) {
   const to = dstP || srcP;
-  if (!srcDayKey || !dstDayKey) return { copied: 0, dropped: 0 };
-  if (srcDayKey === dstDayKey && to === srcP) return { copied: 0, dropped: 0 };
+  const none = { copy: [], replace: [], keep: [], dropped: 0 };
+  if (!srcDayKey || !dstDayKey) return none;
+  if (srcDayKey === dstDayKey && to === srcP) return none;
   const all = getDayBlocksForProfile(srcDayKey, srcP) || [];
   const canPlace = to === srcP ? null : placeableActivityIds(to);
-  const from = canPlace ? all.filter(b => !b.actId || canPlace.has(b.actId)) : all;
+  const usable = canPlace ? all.filter(b => !b.actId || canPlace.has(b.actId)) : all;
   const existing = getDayBlocksForProfile(dstDayKey, to) || [];
-  if (existing.length) tombstoneBlockIds(existing.map(b => b.id));
-  setDayBlocks(dstDayKey, from.map(b => weekCloneBlock(b)), to);
+  const keep = existing.filter(b => b.parentPinned);
+  const same = (a, b) => a.actId === b.actId && (a.tag || '') === (b.tag || '') && a.startMin === b.startMin;
+  return {
+    copy: usable.filter(b => !keep.some(k => same(k, b))),
+    replace: existing.filter(b => !b.parentPinned),
+    keep,
+    dropped: all.length - usable.length,
+  };
+}
+/* Returns { copied, dropped, kept }. */
+function copyDayInto(srcDayKey, dstDayKey, srcP, dstP) {
+  const to = dstP || srcP;
+  if (!srcDayKey || !dstDayKey) return { copied: 0, dropped: 0, kept: 0 };
+  if (srcDayKey === dstDayKey && to === srcP) return { copied: 0, dropped: 0, kept: 0 };
+  const plan = copyDayPlan(srcDayKey, dstDayKey, srcP, dstP);
+  if (plan.replace.length) tombstoneBlockIds(plan.replace.map(b => b.id));
+  setDayBlocks(dstDayKey, plan.keep.concat(plan.copy.map(b => weekCloneBlock(b))), to);
   saveAll();
-  return { copied: from.length, dropped: all.length - from.length };
+  return { copied: plan.copy.length, dropped: plan.dropped, kept: plan.keep.length };
 }
 
 function fillWeekFromNearest(mondayKey) {

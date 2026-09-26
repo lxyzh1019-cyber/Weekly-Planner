@@ -897,7 +897,7 @@ function schoolHours() {
    computed it from schoolHours(), but the picker read the shipped 420 and so
    handed out a seven-hour card to a family whose day is 6h40. A top-level const
    cannot ask: js/01-config.js runs before there is any state to read, which is
-   why schoolTemplate() is a function too. */
+   why schoolHours() is a function too. */
 function activityDefaultDuration(act) {
   if (!act) return 60;
   if (act.id === 'school_day') {
@@ -1312,6 +1312,13 @@ function getDayKeys(offset=0) {
 }
 function formatDayKey(key) { const [y,m,d]=key.split('-'); return new Date(+y,+m-1,+d); }
 function todayKey() { return toDayKeyInZone(new Date()); }
+/* The day before `key`, as a key. Calendar arithmetic on local midnight, like
+   getDayKeys, so a daylight-saving night cannot skip or repeat a day. */
+function dayKeyBefore(key) {
+  const d = formatDayKey(key);
+  d.setDate(d.getDate() - 1);
+  return dateToLocalKey(d);
+}
 
 /* ── Age, never asked for ──
    The year of the most recent birthday-season rollover: this calendar year once

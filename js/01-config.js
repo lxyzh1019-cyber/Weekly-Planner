@@ -14,7 +14,7 @@ const LS_KEY = 'weeklyplanner-v3';
    the Today More sheet (js/31-today.js) and under the list on the parent
    portal's App landing (js/11-parent.js), which is where a grown-up reads it on
    an iPad with no console. */
-const APP_BUILD = '2026-09-23b';
+const APP_BUILD = '2026-09-24a';
 const TOTAL_SLOTS = 60;           // 6AM → 9PM = 15 hrs × 4 (legacy, used for some %s)
 const START_HOUR  = 6;
 const END_HOUR    = 22;
@@ -870,8 +870,8 @@ const DEFAULT_ACTIVITIES = [
   /* ── Helping hands ─────────────────────────────────────────────
      30, not 60: the paid pool's rows run 15–30 minutes, so a 60-minute default
      drew every chore at twice its real length on the hours charts — and
-     schoolTemplate() was already placing this at 30, so the table and the
-     template disagreed with each other.
+     the School Day template (retired since) was already placing this at 30,
+     so the table and the template disagreed with each other.
 
      Family Hero is a CHORE, not a prize: whoever did the chore is the hero, and
      making the chore itself the reward said the opposite.
@@ -1048,40 +1048,5 @@ const NO_SCHOOL_DAYS = [
   '2027-05-21',                                            // staff learning day
   '2027-05-24',                                            // Victoria Day
   '2027-06-11',                                            // staff learning day
-];
-
-/* School day / weekend templates (minute-based from 6AM). The school block
-   derives from the school hours so it can never drift from the coloured band.
-
-   A FUNCTION, not a const, and that is the whole reason this changed: school
-   hours are something a parent sets now (schoolHours(), js/05-helpers.js), and
-   a const evaluated when this file loads can only ever see the shipped
-   fallback. Anything that wants the school-day shape has to ask at the moment
-   it needs it. */
-function schoolTemplate() {
-  const h = schoolHours();
-  return [
-    {actId:'routine_morning',   startMin: 60,  durationMin: 30},   // 7:00am
-    {actId:'breakfast',         startMin: 90,  durationMin: 30},   // 7:30am
-    {actId:'school_day',        startMin: h.startMin,
-                                durationMin: h.endMin - h.startMin},
-    {actId:'routine_afterschool',startMin: h.endMin, durationMin: 30},
-    {actId:'piano',             startMin: 570, durationMin: 60},   // 3:30pm
-    {actId:'dinner',            startMin: 690, durationMin: 60},   // 5:30pm
-    {actId:'chores',            startMin: 750, durationMin: 30},   // 6:30pm
-    {actId:'family',            startMin: 780, durationMin: 90},   // 7:00pm
-    {actId:'routine_evening',   startMin: 870, durationMin: 20},   // 8:30pm
-  ];
-}
-const WEEKEND_TEMPLATE = [
-  {actId:'routine_morning',   startMin: 120, durationMin: 30},   // 8:00am
-  {actId:'breakfast',         startMin: 150, durationMin: 30},   // 8:30am
-  {actId:'training',          startMin: 240, durationMin: 120, tag:'skating'},  // 10:00am
-  {actId:'lunch',             startMin: 390, durationMin: 30},   // 12:30pm
-  {actId:'relax',             startMin: 450, durationMin: 60},   // 1:30pm
-  {actId:'piano',             startMin: 540, durationMin: 60},   // 3:00pm
-  {actId:'dinner',            startMin: 690, durationMin: 60},   // 5:30pm
-  {actId:'family',            startMin: 780, durationMin: 120},  // 7:00pm
-  {actId:'routine_evening',   startMin: 870, durationMin: 20},   // 8:30pm
 ];
 

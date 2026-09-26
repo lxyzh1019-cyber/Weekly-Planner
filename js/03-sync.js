@@ -693,7 +693,7 @@ function refreshCurrentScreen() {
      node. The drag's own drop calls buildTimeline, so the deferred render is
      not lost. typeof, so 03 never hard-depends on 39. */
   else if (active.id === 'screen-day') {
-    if (!(typeof blockDragActive === 'function' && blockDragActive())) { buildTimeline(); renderVibe(); }
+    if (!(typeof blockDragActive === 'function' && blockDragActive())) buildTimeline();
   }
   else if (active.id === 'screen-chore') renderChoreTab();
   else if (active.id === 'screen-sync') renderSync();

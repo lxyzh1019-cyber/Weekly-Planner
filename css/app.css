@@ -2322,18 +2322,8 @@
   /* Event-zone chips — secondary jump-to filter, kept small so the schedule
      stays the focus (All Day is the default). */
 
-  /* Vibe card (replaces Day Balance) */
-  .vibe-card {
-    background: var(--paper);
-    border-radius: 16px;
-    padding: 0.7rem 0.9rem;
-    margin: 0.3rem 0.8rem 0.5rem;
-    border: 2px solid var(--ink);
-    box-shadow: 2px 2px 0 var(--ink);
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 0.6rem;
-  }
-  .vibe-title { font-family:'Gochi Hand', cursive; font-size: 1.1rem; }
+  /* The mood dots: the reflect sheet and the closing ritual. The Vibe card
+     that also wore them on Today is folded into Today's 🌙 row (R5 §7 Q3). */
   .vibe-moods { display: flex; gap: 0.3rem; }
   .vibe-mood {
     width: 36px; height: 36px; border-radius: 50%;
@@ -2500,7 +2490,7 @@
     gap: 0.5rem;
   }
   .tl-col { position: relative; min-width: 0; }
-  /* The day the topbar's 📋 / 🌙 / 🗑 act on. Only marked when more than one day
+  /* The day the topbar's 📋 acts on. Only marked when more than one day
      is on screen — with one column there is nothing to distinguish it from.
      Two selectors because the header and the canvas are no longer nested:
      focusDayColumn marks both. */
@@ -4103,21 +4093,78 @@
   }
   .feedback-empty { color: var(--ink-light); font-size: calc(0.92rem * var(--fs-scale, 1)); }
 
-  /* Sister Sync */
+  /* Sister Sync — one timeline, both sisters, one axis (js/10-social.js,
+     renderSync). The DOM order is Jenn, Jess, stripe, gutter, legend, because
+     the invite checks select `#syncGrid .sync-day-col:first-child`; the tracks
+     are placed here as gutter | Jenn | both-free stripe | Jess. The gutter and
+     the stripe start --sync-head down, so all four share one 6am line. Kid
+     screen: 13px floor, 15px for the name she reads to tap. */
   .sync-grid {
-    display: grid; grid-template-columns: repeat(2, 1fr);
-    gap: 0.6rem; padding: 0.6rem;
+    --sync-head: 2.2rem;
+    display: grid;
+    grid-template-columns: 2.6rem minmax(0, 1fr) 12px minmax(0, 1fr);
+    column-gap: 6px;
+    padding: 0.6rem 0.6rem 1rem;
+    /* The screen centres its children, which would shrink the grid to its
+       content; the width is stated so the two columns share the screen. */
+    width: 100%; max-width: 860px; margin: 0 auto; box-sizing: border-box;
   }
-  .sync-day-col {
-    background: var(--paper); border: 2px solid var(--ink); border-radius: 12px;
-    padding: 0.4rem; box-shadow: 2px 2px 0 var(--ink);
+  .sync-day-col { grid-row: 1; min-width: 0; }
+  .sync-day-col--left  { grid-column: 2; }
+  .sync-day-col--right { grid-column: 4; }
+  .sync-day-col h4 {
+    height: var(--sync-head); line-height: var(--sync-head); margin: 0;
+    font-size: 1.1rem; text-align: center;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .sync-day-col h4 { font-size: 1.1rem; margin-bottom: 0.3rem; }
-  .sync-block-mini {
-    background: var(--paper); border: 1.5px solid var(--ink);
-    border-radius: 8px; padding: 3px 6px; font-size: calc(0.7rem * var(--fs-scale, 1));
-    margin-bottom: 3px; font-family: 'Patrick Hand', sans-serif;
+  .sync-tl-canvas {
+    position: relative; isolation: isolate; overflow: hidden;
+    background: var(--paper); border-radius: 10px;
+    box-shadow: 0 0 0 2px var(--ink);
+  }
+  .sync-tl-gutter { grid-column: 1; grid-row: 1; padding-top: var(--sync-head); }
+  .sync-tl-gutter-track { position: relative; }
+  .sync-tl-hour {
+    position: absolute; right: 2px; transform: translateY(-50%);
+    font-size: max(13px, 0.82rem); line-height: 1; white-space: nowrap;
+    color: var(--ink-light);
+  }
+  .sync-tl-stripe { grid-column: 3; grid-row: 1; padding-top: var(--sync-head); }
+  .sync-tl-stripe-track {
+    position: relative; overflow: hidden; border-radius: 6px;
+    background: rgba(42,35,32,0.10);
+  }
+  .sync-free-seg { position: absolute; left: 0; right: 0; background: #2e9e5b; }
+  .sync-tl-band-label, .sync-tl-empty {
+    position: absolute; left: 0; right: 0; z-index: 1; pointer-events: none;
+    text-align: center; color: var(--ink-light);
+    font-size: max(13px, 0.82rem); line-height: 1.2; padding-top: 2px;
+  }
+  .sync-tl-empty { top: 4px; }
+  .hour-grid--sync { z-index: 0; }
+  .sync-tl-strip { z-index: 1; }
+  /* Every block shape is a .sync-block; only YOUR tappable ones are also
+     .sync-block-mini, floored at 44px tall (SYNC_TAP_MIN_PX). */
+  .sync-block {
+    position: absolute; box-sizing: border-box; z-index: 2; overflow: hidden;
+    border: 1.5px solid var(--ink); border-radius: 6px; padding: 0 4px;
+    font-family: 'Patrick Hand', sans-serif; line-height: 1.1;
     color: var(--ink);
+  }
+  .sync-block--busy { background: #cfcfcf; color: #474747; border-color: #8a8a8a; }
+  .sync-block-mini { cursor: pointer; }
+  .sync-block-name {
+    display: block; font-size: max(15px, 0.95rem);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sync-block-time, .sync-block-flag {
+    display: block; font-size: max(13px, 0.82rem);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sync-block-flag { font-weight: 700; }
+  .sync-tl-legend {
+    grid-column: 1 / -1; grid-row: 2; margin: 0.6rem 0 0;
+    font-size: max(13px, 0.85rem); color: var(--ink-light);
   }
   .sync-overlap {
     background: var(--accent-yellow);
@@ -4956,6 +5003,28 @@
   .cdr-day { font-size: calc(1.02rem * var(--fs-scale, 1)); font-weight: 800; flex: 0 0 auto; }
   .cdr-count { font-size: max(13px, calc(0.86rem * var(--fs-scale, 1))); color: var(--ink-muted); flex: 1 1 auto; }
   .cdr-go { font-size: max(13px, calc(0.88rem * var(--fs-scale, 1))); font-weight: 800; color: var(--accent-strong); flex: 0 0 auto; }
+  /* What each day holds, before it is copied (R5 §7 Q2). 15px: a child reads
+     these lines to decide. */
+  .copy-day-now {
+    padding: 0.4rem 0.7rem;
+    border: 2px dashed var(--ink-light);
+    border-radius: 12px;
+    margin-bottom: 0.2rem;
+  }
+  .cdr-now-head { margin: 0.1rem 0; font-size: max(15px, calc(0.95rem * var(--fs-scale, 1))); font-weight: 800; }
+  .cdr-panel { padding: 0.1rem 0.4rem 0.5rem; }
+  .cdr-panel[hidden] { display: none; }
+  .cdr-blocks { list-style: none; margin: 0.2rem 0 0.4rem; padding: 0; }
+  .cdr-blocks li {
+    font-size: max(15px, calc(0.95rem * var(--fs-scale, 1)));
+    line-height: 1.35;
+    padding: 0.1rem 0;
+    overflow-wrap: anywhere;
+  }
+  .cdr-pinned { font-weight: 800; color: var(--ink-muted); white-space: nowrap; }
+  .cdr-copy { width: 100%; min-height: 44px; font-size: max(15px, calc(1rem * var(--fs-scale, 1))); }
+  /* 🗑 Start this day over, last on the 📋 sheet (R5 §7 Q4). */
+  .day-over-btn, .reflect-day-btn { width: 100%; min-height: 44px; font-size: max(15px, calc(1rem * var(--fs-scale, 1))); }
 
   /* Quick slot-picker sheet (tap an empty slot to add an activity) */
   .slot-picker-hint { color: var(--ink-light); font-size: calc(0.92rem * var(--fs-scale, 1)); margin: 0.1rem 0 0.5rem; }
@@ -6835,7 +6904,7 @@
     font: inherit; color: inherit; text-align: left; cursor: pointer;
   }
 
-  /* ── The four-destination kid nav ─────────────────────────────────────────
+  /* ── The five-destination kid nav ─────────────────────────────────────────
      Fixed to the bottom, because that is where a thumb is on a phone and where
      a child expects to switch places. Safe-area padding so it clears the iPhone
      home indicator; body gets matching bottom padding via .has-kid-nav so the

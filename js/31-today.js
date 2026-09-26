@@ -602,6 +602,19 @@ function tdRibbonSpan(blocks) {
   return { from, to: Math.max(to, from + 1) };
 }
 
+/* Where the now-marker sits, as a CSS `left`. The bar is 3px wide and its ▼
+   (::before) reaches 3.5px left of it and 6.5px from its left edge, so in the
+   last minute or two of the day's span a plain `left:<pct>%` pushed the arrow
+   past the strip's right edge (the overflow
+   aDragThatCreatesAnOverlapDoesNotBreakTodaysRibbon caught at 6:59pm: 532px
+   into 529px), and at its first minute the arrow poked out to the left. Clamped
+   so the marker and its arrow always stay inside the strip. One function, used
+   by the render and by tdTick's minute patch, so the two cannot place it
+   differently. */
+function tdRibNowLeft(pct) {
+  return `clamp(3.5px, ${pct.toFixed(2)}%, calc(100% - 6.5px))`;
+}
+
 function tdProgressRibbon(kid, blocks) {
   const total = blocks.length;
   if (!total) return tdQuestHero(kid, blocks);
@@ -685,7 +698,7 @@ function tdProgressRibbon(kid, blocks) {
      block and after the last one there is nothing for it to point at, and an
      arrow pinned to the edge would claim otherwise. */
   const marker = (now >= from && now <= to)
-    ? `<span class="td-rib-now" style="left:${pctOf(now).toFixed(2)}%"></span>`
+    ? `<span class="td-rib-now" style="left:${tdRibNowLeft(pctOf(now))}"></span>`
     : '';
   const mid = Math.round((from + to) / 2);
 
@@ -805,6 +818,50 @@ function tdInviteNote() {
       <span class="td-row-go" aria-hidden="true">›</span>
     </button>`;
 }
+/* ── 🌙 How was today? ──
+   Reflection is about today, and Today is the front door (R5 §7 Q3). The day's
+   mood had two doors — 🌙 on the Day view's top bar and "Today's Vibe" folded
+   away down here — and both wrote whichever day currentDayKey held. Now one
+   row, in the day column, opening the reflect sheet with its day passed in.
+
+   Which day it asks about, in this order:
+   1. TODAY, in the evening — from TD_REFLECT_FROM_MIN (8pm), or earlier once
+      her last block today has ended (blockHasEnded, the owner of "has its time
+      passed?") — while today has no mood;
+   2. YESTERDAY, at any time of day, while it has no mood. Only yesterday: a
+      mood for three days ago is a guess, not a reflection. It stops at
+      midnight, when yesterday becomes the day before;
+   3. TODAY again, once answered, still in the evening: "Today felt 😄", so the
+      mood can be changed, which the Vibe card allowed.
+   Today goes first in the evening because it is the day she can still feel;
+   yesterday's row has been up all day and returns once today is answered.
+   Nothing to ask, no row. Shown to whoever is looking at Today, as the Vibe
+   card was; the sheet writes activeProfile()'s dayMoods. */
+const TD_REFLECT_FROM_MIN = 20 * 60;
+function tdReflectAsk(kid) {
+  const today = todayKey();
+  const moods = getProfData(kid).dayMoods || {};
+  const blocks = getDayBlocks(today, kid) || [];
+  const evening = tdNowMin() >= TD_REFLECT_FROM_MIN
+    || (blocks.length > 0 && blocks.every(b => blockHasEnded(b, today)));
+  if (evening && !moods[today]) return { dayKey: today, mood: null };
+  const yesterday = dayKeyBefore(today);
+  if (!moods[yesterday]) return { dayKey: yesterday, mood: null };
+  if (evening) return { dayKey: today, mood: moods[today] };
+  return null;
+}
+function tdReflectRow(kid) {
+  const ask = tdReflectAsk(kid);
+  if (!ask) return '';
+  const line = ask.mood ? `Today felt ${ask.mood}` : reflectDayQuestion(ask.dayKey);
+  return `<button type="button" class="td-row" data-td-action="reflect"
+      data-td-day="${escapeAttr(ask.dayKey)}"${ask.mood ? ' aria-label="Change how today felt"' : ''}>
+      <span class="td-row-icon">🌙</span>
+      <span class="td-row-name">${escapeHtml(line)}</span>
+      <span class="td-row-go" aria-hidden="true">›</span>
+    </button>`;
+}
+
 /* Sister Sync, AT the invites. The list is at the bottom, under the grid and
    the challenges; landing at the top and making her scroll for what the note
    promised is the school banner under a 700px grid again. Scrolled after the
@@ -849,11 +906,12 @@ function tdRenderToday() {
     return;
   }
   ctPrepareRead();
-  /* The panels moved off the day timeline — vibe, to-dos, goals, breaks — all
-     read the global currentDayKey, which the day screen owns and sets in
-     openDay. On Today that day is today, by definition. Point it here so a mood
-     set from this screen lands on today rather than on whichever day happened to
-     be open last. Any entry to the day screen sets it again. */
+  /* The panels moved off the day timeline — to-dos, goals, breaks — read the
+     global currentDayKey, which the day screen owns and sets in openDay. On
+     Today that day is today, by definition. Point it here so they are about
+     today rather than whichever day happened to be open last. Any entry to the
+     day screen sets it again. The 🌙 row does not rely on this: it passes its
+     day to openReflectSheet. */
   currentDayKey = todayKey();
   const wk = ctThisWeekKey();
   const d = tdTodayIndex();
@@ -1201,6 +1259,7 @@ function tdRenderToday() {
     <div class="td-col td-col--day">
       <div class="${heroCls}">${nowHtml}</div>
       ${tdInviteNote()}
+      ${tdReflectRow(kid)}
       <div class="td-card">
         <div class="td-cap">Coming up</div>${questHtml}</div>
       ${planHtml}
@@ -1220,7 +1279,6 @@ function tdRenderToday() {
      re-render and only need their own renderers run. Each is the function that
      already owned that data on the day screen — called, not reimplemented. */
   tdApplyExtras();
-  if (typeof renderVibe === 'function') renderVibe();
   if (typeof renderDayGoalsTodos === 'function') renderDayGoalsTodos();
   /* The sticker wall. Its renderer had no caller anywhere in the repo, so the
      shelf rendered empty wherever it was put — completing a block counted
@@ -1340,7 +1398,8 @@ function tdMoneySparkline(hist) {
     </span>`;
 }
 
-/* Vibe, to-dos and goals sit behind one toggle: they are reference panels, and
+/* To-dos and goals sit behind one toggle (the Vibe card that was here too is
+   folded into the 🌙 row — tdReflectRow): they are reference panels, and
    Today's 200-word budget is for what a child needs at a glance. Closed by
    default, remembered in localStorage — never synced state, because every state
    write is a full-document upload. */
@@ -1356,7 +1415,7 @@ function tdApplyExtras() {
   if (!body || !btn) return;
   const open = tdExtrasOpen();
   body.style.display = open ? '' : 'none';
-  btn.textContent = open ? 'Vibe, to-dos and goals ▾' : 'Vibe, to-dos and goals ▸';
+  btn.textContent = open ? 'To-dos and goals ▾' : 'To-dos and goals ▸';
 }
 
 /* One delegated listener, bound once in js/99-main.js, so re-rendering cannot
@@ -1377,6 +1436,8 @@ function tdHandleClick(e) {
   if (a === 'earlier') { tdToggleEarlier(); return; }
   if (a === 'later')   { tdToggleLater(); return; }
   if (a === 'invites') { tdOpenInvites(); return; }
+  // 🌙 — the reflect sheet, for the day the row names (today or yesterday).
+  if (a === 'reflect') { openReflectSheet(el.getAttribute('data-td-day')); return; }
   /* 'week' was here, for a button that repeated the nav's Week tab. The money
      branch stays: tdMoneyChart renders the whole money card as one
      data-td-action="money" button, so this is still a live action. */
@@ -1422,8 +1483,11 @@ function tdTickKey(kid) {
      cache saw an unchanged string — ticking a block changes neither what is
      running nor what is next — and the hero went on saying how many things were
      still open after she had closed one. */
+  /* And what the 🌙 row asks, so it appears at 8pm on a screen left open,
+     rather than on the next render that happens to come along. */
+  const ask = tdReflectAsk(kid);
   return [current ? current.id : '', next ? next.id : '', breakNow ? 'brk' : '',
-          String(openCount), todayKey()].join('|');
+          String(openCount), todayKey(), ask ? ask.dayKey + (ask.mood || '') : ''].join('|');
 }
 
 function tdTick() {
@@ -1458,7 +1522,7 @@ function tdTick() {
       const { from, to } = tdRibbonSpan(blocks);
       const now = tdNowMin();
       if (now >= from && now <= to) {
-        marker.style.left = ((now - from) / Math.max(1, to - from) * 100).toFixed(2) + '%';
+        marker.style.left = tdRibNowLeft((now - from) / Math.max(1, to - from) * 100);
       }
     }
   }
@@ -1469,22 +1533,23 @@ function goToday() {
   tdRenderToday();
 }
 
-/* ── The four-destination nav ─────────────────────────────────────────────────
-   Today · Week · Money · More.
+/* ── The five-destination nav ─────────────────────────────────────────────────
+   Today · Week · Money · Sister Sync · More.
 
    One fixed element outside the screens rather than a copy of the same markup in
    each: six kid screens each carrying their own nav row is six places for the
    nav to drift, and the old topbar row proved it — the same five buttons were
    pasted into three screens with slightly different labels.
 
-   Every existing route still works and every old button still exists. This adds a
-   way to move between the four places that matter without retiring anything;
-   Branch 6 is where the duplicates go. */
+   A way to move between the five places that matter. Sister Sync became the
+   fifth on 2026-09-24 (the owner's decision); its More tile went with it, so
+   the tab is its one door. */
 const TD_NAV = [
-  { id: 'today', icon: '☀️', label: 'Today', screen: 'screen-today' },
-  { id: 'week',  icon: '📋', label: 'Week',  screen: 'screen-week' },
-  { id: 'money', icon: '💰', label: 'Money', screen: 'screen-mymoney' },
-  { id: 'more',  icon: '⋯',  label: 'More',  screen: null },
+  { id: 'today', icon: '☀️', label: 'Today',       screen: 'screen-today' },
+  { id: 'week',  icon: '📋', label: 'Week',        screen: 'screen-week' },
+  { id: 'money', icon: '💰', label: 'Money',       screen: 'screen-mymoney' },
+  { id: 'sync',  icon: '👯', label: 'Sister Sync', screen: 'screen-sync' },
+  { id: 'more',  icon: '⋯',  label: 'More',        screen: null },
 ];
 /* Screens that belong to a child. The nav is hidden everywhere else — a parent
    in the portal does not need a child's bottom bar, and the profile picker is
@@ -1513,7 +1578,7 @@ function tdRenderNav() {
   }).join('');
 }
 
-/* "More" is everything that is not one of the three. A sheet rather than a
+/* "More" is everything that is not one of the four. A sheet rather than a
    screen: it is a menu, and a menu you can dismiss beats a place you have to
    navigate back out of. */
 function tdOpenMore() {
@@ -1523,12 +1588,13 @@ function tdOpenMore() {
      the height, and every tile is still its own 44px target.
 
      Quests is gone with the Quest Board: it opened the fourth rendering of
-     today's list, and Today is the list. */
+     today's list, and Today is the list.
+
+     Sisters, Money story and Money school went on 2026-09-24: one destination,
+     one door. Sister Sync is a nav tab now; Money school is money tab 5 and My
+     money's 🎓 button, and Money story is My money's 📖 button. */
   const items = [
     { icon: '🧹', label: 'Chores',       go: 'chores' },
-    { icon: '👯', label: 'Sisters',      go: 'sisters' },
-    { icon: '📖', label: 'Money story',  go: 'story' },
-    { icon: '🎓', label: 'Money school', go: 'school' },
     /* Print was here. It has a button on the week topbar, which is the week it
        prints — a second door to it from a menu is a second label that can
        drift, and printing is not something you go looking for in "more". */
@@ -1563,9 +1629,6 @@ function tdOpenMore() {
 }
 function tdGoMore(where) {
   if (where === 'chores')  { openChoreTab(); return; }
-  if (where === 'sisters') { openSisterSync(); return; }
-  if (where === 'story')   { mnyOpenStory(); return; }
-  if (where === 'school')  { if (typeof mnyOpenSchool === 'function') mnyOpenSchool(); return; }
   if (where === 'profile') { goProfile(); return; }
 }
 function tdHandleNavClick(e) {
@@ -1577,5 +1640,6 @@ function tdHandleNavClick(e) {
   // openWeekMoney, not mnyOpenMyMoney directly: it resolves whose money page
   // this is, which is not always the active profile.
   if (d === 'money') { openWeekMoney(); return; }
+  if (d === 'sync')  { openSisterSync(); return; }
   if (d === 'more')  { tdOpenMore(); return; }
 }

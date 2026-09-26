@@ -3,6 +3,20 @@
 /* ════════════════════════════════════════════════════════════════
    SISTER SYNC
 ════════════════════════════════════════════════════════════════ */
+/* The timeline's scale: 0.6px a minute, so the 6am–10pm day is 576px — one
+   screen on an iPad, a short scroll on a phone. A card shorter than
+   SYNC_CARD_MIN_PX (about 33 minutes) borrows the empty minutes above it
+   (wfCardBoxes), so its bottom edge — when it ends — stays true; your OWN
+   blocks, which are the tap that invites her, are floored at SYNC_TAP_MIN_PX
+   (44px, the house target) the same way. The start–end time is printed from
+   SYNC_TIME_ROOM_PX up, one SYNC_LINE_PX line more when a "💌 Send again?"
+   takes the second line. A sister's private block is SYNC_BUSY_GREY. */
+const SYNC_PX_PER_MIN = 0.6;
+const SYNC_CARD_MIN_PX = 20;
+const SYNC_TAP_MIN_PX = 44;
+const SYNC_TIME_ROOM_PX = 36;
+const SYNC_LINE_PX = 15;
+const SYNC_BUSY_GREY = '#cfcfcf';
 function openSisterSync() {
   if (isParent()) { showToast('View each child separately 👀'); return; }
   /* Today, not Monday. This opened on syncDayIdx = 0 unconditionally while the
@@ -23,44 +37,18 @@ function renderSync() {
   const d = formatDayKey(key);
   document.getElementById('syncDayLabel').textContent = `${DAY_LONG[syncDayIdx]}, ${MONTH_SHORT[d.getMonth()]} ${d.getDate()}`;
 
-  const jB = getDayBlocks(key, 'jenn');
-  const sB = getDayBlocks(key, 'jess');
-
-  // Overlaps — genuine "you're both free" time: any 15-min slot in the
-  // 6am–9pm window that is either unscheduled or a Free-category block for
-  // BOTH girls. (Previously it only counted explicit Free blocks, so two
-  // kids who simply left time open never saw an overlap.)
+  // Overlaps — genuine "you're both free" time: every minute of the 6am–10pm
+  // window that neither sister is busy, as syncBusyMinutes counts it (blocks,
+  // their travel and get-ready, school hours; free-category blocks are free).
+  // The stripe between the two columns draws the same runs.
   const overlapWrap = document.getElementById('syncOverlapWrap');
   overlapWrap.innerHTML = '';
-  const acts = getAllActivities(activeProfile(), { includeArchived: true });
-  const TOTAL = Math.round(DAY_MIN_SPAN / 15);
-  const busySlots = (blocks) => {
-    const busy = new Set();
-    blocks.forEach(b => {
-      const a = acts.find(x => x.id === b.actId);
-      if (a && a.cat === 'free') return;      // free time = still available to hang out
-      const s = Math.floor((b.startMin - START_MIN) / 15);
-      const e = Math.ceil((b.startMin - START_MIN + (b.durationMin || 0)) / 15);
-      for (let i = Math.max(0, s); i < Math.min(TOTAL, e); i++) busy.add(i);
-    });
-    return busy;
-  };
-  const jBusy = busySlots(jB), sBusy = busySlots(sB);
-  const freeSlots = [];
-  for (let i = 0; i < TOTAL; i++) if (!jBusy.has(i) && !sBusy.has(i)) freeSlots.push(i);
-  if (freeSlots.length) {
-    // Collapse contiguous slots into readable time ranges (show the first few).
-    const ranges = [];
-    let runStart = freeSlots[0], prev = freeSlots[0];
-    for (let k = 1; k <= freeSlots.length; k++) {
-      if (k < freeSlots.length && freeSlots[k] === prev + 1) { prev = freeSlots[k]; continue; }
-      ranges.push([runStart, prev + 1]);
-      if (k < freeSlots.length) { runStart = freeSlots[k]; prev = freeSlots[k]; }
-    }
+  const freeRuns = syncFreeRuns(syncBusyMinutes('jenn', key), syncBusyMinutes('jess', key));
+  const totalMin = freeRuns.reduce((sum, [a, b]) => sum + (b - a), 0);
+  if (totalMin) {
     // Only surface reasonably-sized windows (≥30 min) as hang-out suggestions.
-    const windows = ranges.filter(([a, b]) => (b - a) * 15 >= 30)
-      .map(([a, b]) => `${formatTimeFromMin(START_MIN + a*15)}–${formatTimeFromMin(START_MIN + b*15)}`);
-    const totalMin = freeSlots.length * 15;
+    const windows = freeRuns.filter(([a, b]) => b - a >= 30)
+      .map(([a, b]) => `${formatTimeFromMin(START_MIN + a)}–${formatTimeFromMin(START_MIN + b)}`);
     const overlap = document.createElement('div');
     overlap.className = 'sync-overlap';
     /* "today" was hardcoded, which was wrong on every day the arrows moved to
@@ -72,7 +60,7 @@ function renderSync() {
     overlapWrap.appendChild(overlap);
   }
 
-  // Side-by-side
+  // Side-by-side timeline
   const grid = document.getElementById('syncGrid');
   const showAll = sisterDetailsVisibleGlobal();
   const toggleWrap = document.createElement('div');
@@ -85,44 +73,243 @@ function renderSync() {
   `;
   toggleWrap.onclick = ()=>setSisterDetailsVisibleGlobal(!showAll);
   overlapWrap.appendChild(toggleWrap);
+  /* DOM order is Jenn, Jess, stripe, gutter, legend: the invite checks select
+     `#syncGrid .sync-day-col:first-child`, so Jenn's column is the grid's first
+     child, and css/app.css places the tracks as gutter | Jenn | stripe | Jess. */
   grid.innerHTML = '';
-  [['jenn','🐥 Jenn',jB], ['jess','🦊 Jess',sB]].forEach(([p, lbl, blocks])=>{
-    const col = document.createElement('div');
-    col.className = 'sync-day-col';
-    col.innerHTML = `<h4>${lbl}</h4>`;
-    if (!blocks.length) col.innerHTML += '<p style="font-size:0.8rem;color:var(--ink-light)">Nothing planned</p>';
-    const acts = getAllActivities(p, { includeArchived: true });
-    const isMe = (p === profile);
-    blocks.slice().sort((a,b)=>a.startMin-b.startMin).forEach(b=>{
-      const act = acts.find(a=>a.id===b.actId);
-      if (!act) return;
-      const tStr = formatTimeFromMin(b.startMin);
-      const mini = document.createElement('div');
-      mini.className = 'sync-block-mini';
-      // Sister's private blocks: show time+"Busy" only. Public blocks show details.
-      const showDetails = isMe || (showAll && !!b.public);
-      if (showDetails) {
-        // One owner, so a sister's day is not drawn in a retired hue.
-        mini.style.background = blockColour(b, p);
-        mini.style.color = '#fff';
-        mini.textContent = `${tStr} ${act.icon} ${act.name}`;
-      } else {
-        mini.style.background = '#cfcfcf';
-        mini.style.color = '#555';
-        mini.textContent = `${tStr} • Busy`;
-      }
-      if (isMe) {
-        mini.style.cursor='pointer';
-        mini.title = 'Tap to invite your sister';
-        mini.onclick = ()=>sendInvite(b, p==='jenn'?'jess':'jenn', key);
-      }
-      col.appendChild(mini);
-    });
-    grid.appendChild(col);
-  });
+  grid.appendChild(syncSisterColumn('jenn', '🐥 Jenn', key, showAll, 'left'));
+  grid.appendChild(syncSisterColumn('jess', '🦊 Jess', key, showAll, 'right'));
+  grid.appendChild(syncFreeStripe(freeRuns));
+  grid.appendChild(syncHourGutter());
+  const legend = document.createElement('p');
+  legend.className = 'sync-tl-legend';
+  legend.textContent = 'Green line in the middle: you’re both free. Striped: getting ready or travelling.';
+  grid.appendChild(legend);
 
   renderChallenges();
   renderInvites();
+}
+
+/* WHEN IS THIS SISTER BUSY — the one owner, read by the "both free" sentence
+   and the stripe between the columns.
+
+   Returns one boolean per minute of the drawn day (index 0 = START_MIN,
+   length DAY_MIN_SPAN). Busy is: each block, plus its travel, get-ready and
+   warm-up (wfBufferSegments — the strips the timeline draws), plus school
+   hours on a school day (dayZoneSegments, the shared school calendar, so both
+   girls have the same hours). A free-category block is not busy — free time is
+   time she can hang out — and neither are its buffers. The activity is looked
+   up in THIS sister's own list (findActivity(…, p)); the old count used the
+   active profile's list for both, so a sister's own custom free activity read
+   as busy. An activity nobody can name counts as busy. */
+function syncBusyMinutes(p, dayKey) {
+  const busy = new Array(DAY_MIN_SPAN).fill(false);
+  const mark = (from, to) => {
+    for (let m = Math.max(0, Math.floor(from)); m < Math.min(DAY_MIN_SPAN, Math.ceil(to)); m++) busy[m] = true;
+  };
+  getDayBlocks(dayKey, p).forEach(b => {
+    if (!b) return;
+    const act = findActivity(b.actId, p);
+    if (act && act.cat === 'free') return;
+    const rel = b.startMin - START_MIN;
+    mark(rel, rel + Math.max(0, b.durationMin || 0));
+    wfBufferSegments(b).forEach(seg => mark(seg.startRel, seg.endRel));
+  });
+  if (isSchoolDay(dayKey)) {
+    dayZoneSegments(dayKey).forEach(z => {
+      if (z.cls === 'tl-band-school' || z.cls === 'tl-band-lunch') mark(z.start, z.end);
+    });
+  }
+  return busy;
+}
+/* The runs of minutes neither is busy, as [start, end) offsets from START_MIN. */
+function syncFreeRuns(busyA, busyB) {
+  const runs = [];
+  let start = -1;
+  for (let m = 0; m <= DAY_MIN_SPAN; m++) {
+    const free = m < DAY_MIN_SPAN && !busyA[m] && !busyB[m];
+    if (free && start < 0) start = m;
+    if (!free && start >= 0) { runs.push([start, m]); start = -1; }
+  }
+  return runs;
+}
+/* "4:00–5:30pm", or "11:30am–1:00pm" across noon. */
+function syncTimeRange(startAbs, endAbs) {
+  const a = formatTimeFromMin(startAbs), z = formatTimeFromMin(endAbs);
+  return a.slice(-2) === z.slice(-2) ? `${a.slice(0, -2)}–${z}` : `${a}–${z}`;
+}
+
+/* One sister's column: school band, hour rules, buffer strips and blocks, to
+   scale. Built from the pure pieces rather than buildDayColumn/renderBlockPixel,
+   which are bound to the active profile. Privacy as before: a sister's block
+   shows its name only when it is hers, or when details are on and the block is
+   public; otherwise it is a grey "Busy" shape at its real height. Text on a
+   block is ink, never white on a pastel. */
+function syncSisterColumn(p, label, key, showAll, side) {
+  const px = SYNC_PX_PER_MIN;
+  const col = document.createElement('div');
+  col.className = 'sync-day-col sync-day-col--' + side;
+  const head = document.createElement('h4');
+  head.textContent = label;
+  col.appendChild(head);
+  const canvas = document.createElement('div');
+  canvas.className = 'sync-tl-canvas';
+  canvas.style.height = (DAY_MIN_SPAN * px) + 'px';
+  col.appendChild(canvas);
+
+  dayZoneSegments(key).forEach(z => {
+    if (z.cls !== 'tl-band-school' && z.cls !== 'tl-band-lunch') return;
+    const band = document.createElement('div');
+    band.className = 'wf-band ' + z.cls.replace('tl-band-', 'wf-band-');
+    band.style.top = (z.start * px) + 'px';
+    band.style.height = ((z.end - z.start) * px) + 'px';
+    band.title = z.label;
+    canvas.appendChild(band);
+    if ((z.end - z.start) * px >= 24) {
+      const lab = document.createElement('div');
+      lab.className = 'sync-tl-band-label';
+      lab.style.top = (z.start * px) + 'px';
+      lab.textContent = z.label;
+      canvas.appendChild(lab);
+    }
+  });
+  canvas.appendChild(buildHourGrid(px, DAY_MIN_SPAN, { cls: 'hour-grid--sync', layer: 'lines', halves: false }));
+
+  const blocks = getDayBlocks(key, p).filter(Boolean).slice().sort((a, b) => a.startMin - b.startMin);
+  if (!blocks.length) {
+    const empty = document.createElement('div');
+    empty.className = 'sync-tl-empty';
+    empty.textContent = 'Nothing planned';
+    canvas.appendChild(empty);
+  }
+  const isMe = p === profile;
+  const sister = p === 'jenn' ? 'jess' : 'jenn';
+  /* Your own blocks are the invite control, so their cards are at least
+     SYNC_TAP_MIN_PX tall — the house 44px target — grown by the same borrowing
+     from empty minutes, so the bottom edge and the printed start–end stay true
+     and a card that has nowhere to borrow splits the lane instead of covering
+     a neighbour. The sister's column is not tappable and stays at the drawing
+     floor. The both-free stripe always reads the real minutes. */
+  const boxes = wfCardBoxes(blocks, { pxPerMin: px, minPx: isMe ? SYNC_TAP_MIN_PX : SYNC_CARD_MIN_PX, gapPx: 2 });
+  const lanes = wfAssignColumns(blocks, { boxes, gapPx: 2 });
+  blocks.forEach(b => {
+    const act = findActivity(b.actId, p);
+    const showDetails = !!act && (isMe || (showAll && !!b.public));
+    const lane = lanes.get(b.id) || { col: 0, count: 1 };
+    const count = lane.count || 1;
+    const left = `calc(${lane.col * 100 / count}% + 1px)`;
+    const width = `calc(${100 / count}% - 2px)`;
+    const colour = showDetails ? blockColour(b, p) : SYNC_BUSY_GREY;
+    const dur = Math.max(0, b.durationMin || 0);
+    const when = syncTimeRange(b.startMin, b.startMin + dur);
+    const dn = showDetails ? blockDisplayName(b, p) : null;
+    const name = dn ? `${dn.icon} ${dn.name}` : 'Busy';
+
+    wfBufferSegments(b).forEach(seg => {
+      const top = Math.max(0, seg.startRel), bot = Math.min(DAY_MIN_SPAN, seg.endRel);
+      if (bot <= top) return;
+      const strip = document.createElement('div');
+      strip.className = `wf-travel wf-travel--${seg.kind} sync-tl-strip`;
+      strip.style.setProperty('--wf-travel-colour', colour);
+      strip.style.top = (top * px) + 'px';
+      strip.style.height = ((bot - top) * px) + 'px';
+      strip.style.left = left;
+      strip.style.width = width;
+      strip.title = showDetails ? `${bufferKindIcon(seg)} ${bufferKindLabel(seg)} ${seg.min}m` : 'Busy';
+      canvas.appendChild(strip);
+    });
+
+    const box = boxes.get(b.id) || { topPx: (b.startMin - START_MIN) * px, hPx: dur * px };
+    const tappable = isMe && !!act;
+    /* Sent for another day and dragged since: the tap sends again. */
+    const sent = tappable ? sisterInviteFor(b, sister, 'share', key) : null;
+    const moved = !!sent && !inviteCoversDay(sent, key);
+    const el = document.createElement('div');
+    // .sync-block-mini is YOUR tappable block and nothing else — the invite checks select it.
+    el.className = 'sync-block' + (showDetails ? '' : ' sync-block--busy') + (tappable ? ' sync-block-mini' : '');
+    el.style.top = box.topPx + 'px';
+    el.style.height = box.hPx + 'px';
+    el.style.left = left;
+    el.style.width = width;
+    if (showDetails) el.style.background = colour;
+    const nameEl = document.createElement('span');
+    nameEl.className = 'sync-block-name';
+    nameEl.textContent = name;
+    el.appendChild(nameEl);
+    /* A moved block always shows a one-line "💌 Send again?", right under the
+       name, so it is visible on the shortest (44px) card; the full sentence is
+       the block's text for a screen reader and its tooltip. */
+    if (moved) {
+      const flag = document.createElement('span');
+      flag.className = 'sync-block-flag';
+      flag.textContent = '💌 Send again?';
+      flag.setAttribute('aria-hidden', 'true');
+      el.appendChild(flag);
+    }
+    if (box.hPx >= SYNC_TIME_ROOM_PX + (moved ? SYNC_LINE_PX : 0)) {
+      const t = document.createElement('span');
+      t.className = 'sync-block-time';
+      t.textContent = when;
+      el.appendChild(t);
+    }
+    el.title = `${name} · ${when}`;
+    if (moved) {
+      const words = document.createElement('span');
+      words.className = 'sync-block-moved visually-hidden';
+      words.textContent = inviteMovedWords(sent, key, '💌');
+      el.appendChild(words);
+      el.title += ' · ' + words.textContent;
+    }
+    if (tappable) {
+      el.title += ' · Tap to invite your sister';
+      el.onclick = () => sendInvite(b, sister, key);
+    }
+    canvas.appendChild(el);
+  });
+  return col;
+}
+
+/* The thin stripe between the two columns: green wherever neither sister is
+   busy. The same runs the "both free" sentence counts. */
+function syncFreeStripe(freeRuns) {
+  const px = SYNC_PX_PER_MIN;
+  const wrap = document.createElement('div');
+  wrap.className = 'sync-tl-stripe';
+  const track = document.createElement('div');
+  track.className = 'sync-tl-stripe-track';
+  track.style.height = (DAY_MIN_SPAN * px) + 'px';
+  const words = freeRuns.map(([a, b]) => syncTimeRange(START_MIN + a, START_MIN + b));
+  track.setAttribute('role', 'img');
+  track.setAttribute('aria-label', words.length ? `Both free: ${words.join(', ')}` : 'No time when you are both free');
+  freeRuns.forEach(([a, b], i) => {
+    const seg = document.createElement('div');
+    seg.className = 'sync-free-seg';
+    seg.style.top = (a * px) + 'px';
+    seg.style.height = ((b - a) * px) + 'px';
+    seg.title = `Both free ${words[i]}`;
+    track.appendChild(seg);
+  });
+  wrap.appendChild(track);
+  return wrap;
+}
+
+/* The shared hour gutter, START_HOUR to END_HOUR. */
+function syncHourGutter() {
+  const px = SYNC_PX_PER_MIN;
+  const gutter = document.createElement('div');
+  gutter.className = 'sync-tl-gutter';
+  const track = document.createElement('div');
+  track.className = 'sync-tl-gutter-track';
+  track.style.height = (DAY_MIN_SPAN * px) + 'px';
+  for (let h = START_HOUR; h <= END_HOUR; h++) {
+    const lbl = document.createElement('div');
+    lbl.className = 'sync-tl-hour';
+    lbl.style.top = ((h * 60 - START_MIN) * px) + 'px';
+    lbl.textContent = `${((h + 11) % 12) + 1}${h >= 12 ? 'pm' : 'am'}`;
+    track.appendChild(lbl);
+  }
+  gutter.appendChild(track);
+  return gutter;
 }
 
 /* IS THERE ALREADY ONE OF THESE? The one owner of that question.
@@ -133,21 +320,238 @@ function renderSync() {
    for ever. The two kinds are separate questions, because asking her to come
    and watch is not the same as asking her to do it too.
 
+   An invite is FOR a block when it was sent from it (`sourceBlockId`), when
+   it is a series invite whose `blockIds` include it — so neither a single
+   covered day nor a second "all" can double up — or when the block records it
+   in `sentInviteIds`, which a cross-day drag writes (moveBlockToDay gives the
+   block a new id; see inviteIdsForBlock).
+
+   `dayKey` is the day the block is on now. An invite that covers that day is
+   preferred; one that does not is MOVED — sent for another day, and the block
+   dragged since — and inviteCoversDay tells the caller which it got.
+   sendInvite refuses only a covering duplicate, so a moved block can be sent
+   again, once.
+
    sendInvite refuses a live duplicate through this, and both edit-sheet
    buttons read their sent-state from it. `invitedTo` on the block is the 💌
    badge on the inviter's timeline and nothing else — it is a bare list of
    names and cannot tell a share from a watch. */
-function sisterInviteFor(blockId, to, kind) {
-  return (state.shared.invites || []).find(inv => inv
-    && inv.sourceBlockId === blockId && inv.to === to
+function sisterInviteFor(block, to, kind, dayKey) {
+  const live = (state.shared.invites || []).filter(inv => inv && inv.to === to
     && (inv.watch ? 'watch' : 'share') === kind
-    && (inv.status === 'pending' || inv.status === 'accepted')) || null;
+    && (inv.status === 'pending' || inv.status === 'accepted')
+    && inviteIsForBlock(inv, block));
+  return live.find(inv => inviteCoversDay(inv, dayKey)) || live[0] || null;
+}
+function inviteIsForBlock(inv, block) {
+  if (!inv || !block) return false;
+  return inv.sourceBlockId === block.id
+    || !!(inv.series && Array.isArray(inv.series.blockIds) && inv.series.blockIds.includes(block.id))
+    || (Array.isArray(block.sentInviteIds) && block.sentInviteIds.includes(inv.id));
+}
+/* Every day an invite puts something on: a series invite's `dayKeys`, else its one day. */
+function inviteDays(inv) {
+  const days = (inv && inv.series && Array.isArray(inv.series.dayKeys) && inv.series.dayKeys.length)
+    ? inv.series.dayKeys : [inv && inv.day];
+  return days.filter(d => typeof d === 'string');
+}
+function inviteCoversDay(inv, dayKey) {
+  return inviteDays(inv).includes(dayKey);
+}
+/* The live invites a block was sent under — what a cross-day drag carries onto
+   the re-id'd block, so the guard and the "moved" line still find them. */
+function inviteIdsForBlock(block) {
+  return (state.shared.invites || []).filter(inv => inv
+    && (inv.status === 'pending' || inv.status === 'accepted') && inviteIsForBlock(inv, block)).map(inv => inv.id);
+}
+/* "💌 Sent for Tue — you moved it to Thu · Send again?" — the edit sheet and
+   Sister Sync say it in the same words. Plain text. */
+function inviteMovedWords(inv, dayKey, icon) {
+  const dayOf = (k) => DAY_SHORT[(formatDayKey(k).getDay() + 6) % 7];
+  return `${icon} Sent for ${dayOf(inv.day)} — you moved it to ${dayOf(dayKey)} · Send again?`;
+}
+/* "Tue 29 Sep" (withWeekday) or "29 Sep". */
+function inviteDateLabel(k, withWeekday) {
+  const d = formatDayKey(k);
+  const date = `${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`;
+  return withWeekday ? `${DAY_SHORT[(d.getDay() + 6) % 7]} ${date}` : date;
+}
+
+/* WHAT AN INVITE CARRIES — the one owner.
+
+   An invite was a hand-copied subset of a block, and each round found a fact
+   the copy left out or guessed: the sender, the day, and then the buffers — a
+   share arrived with no drive and no get-ready, and a watch invite always gave
+   her 15 minutes each way however far away the meet was. Everything an invite
+   takes from its block is read here and nowhere else.
+
+   Buffers are read ONLY through the per-side readers (getTravelBufMin /
+   getGetReadyBufMin, js/03-sync.js), so a block that predates the two-leg split
+   carries the symmetric pair it has always drawn. Both objects are always
+   written, zeros included: their presence is how inviteToBlock tells an invite
+   carrying "no buffers" from one sent before this change. WARM-UP IS NEVER
+   CARRIED — it is training-only, and it is the sender's. Plain data inside
+   `state.shared.invites`, merged whole-record by mergeArrayById: no new key.
+
+   `members` (from inviteSeriesMembers) makes it a SERIES invite: `series {days,
+   every, end, dayKeys[], blockIds[]}` — the repeat's weekdays and every-N, the
+   last covered day, and each covered day with the block on it. One invite, not
+   one per day. Time and buffers are the tapped block's, for every day. */
+function inviteSnapshot(block, dayKey, members) {
+  const toMin = getTravelBufMin(block, 'pre'), homeMin = getTravelBufMin(block, 'post');
+  const beforeMin = getGetReadyBufMin(block, 'pre'), afterMin = getGetReadyBufMin(block, 'post');
+  const snap = {
+    actId: block.actId,
+    day: dayKey,
+    startMin: block.startMin,
+    durationMin: block.durationMin,
+    sourceBlockId: block.id,
+    travel: { to: toMin > 0, toMin, home: homeMin > 0, homeMin },
+    ready: { before: beforeMin > 0, beforeMin, after: afterMin > 0, afterMin },
+  };
+  if (members && members.length) {
+    const days = (block.seriesDays && block.seriesDays.length)
+      ? block.seriesDays : members.map(m => (formatDayKey(m.dayKey).getDay() + 6) % 7);
+    snap.series = {
+      days: [...new Set(days)].sort((a, b) => a - b),
+      every: seriesEveryWeeks(block.seriesEvery),
+      end: members[members.length - 1].dayKey,
+      dayKeys: members.map(m => m.dayKey),
+      blockIds: members.map(m => m.block.id),
+    };
+  }
+  return snap;
+}
+/* The sender's copies of a repeat from `dayKey` on, oldest first — repeats are
+   real copies, so this is the real count. Within SERIES_MAX_BLOCKS. */
+function inviteSeriesMembers(block, dayKey, who) {
+  if (!block || !block.seriesId) return [];
+  const weeks = getProfData(who).weeks || {};
+  const out = [];
+  Object.keys(weeks).sort().forEach(k => {
+    if (k < dayKey) return;
+    (weeks[k] || []).forEach(b => { if (b && b.seriesId === block.seriesId) out.push({ dayKey: k, block: b }); });
+  });
+  return out.slice(0, SERIES_MAX_BLOCKS);
+}
+/* What she gets, in the words the edit sheet uses: "🚗 20m there · 25m home and
+   👕 15m to get ready". Plain text; '' when the invite carries no buffers. */
+function inviteBufferWords(inv) {
+  const t = inv.travel || {}, r = inv.ready || {};
+  const travel = [t.to ? `${fmtHrsMin(t.toMin)} there` : '', t.home ? `${fmtHrsMin(t.homeMin)} home` : '']
+    .filter(Boolean);
+  const ready = [r.before ? `👕 ${fmtHrsMin(r.beforeMin)} to get ready` : '',
+                 r.after ? `🧺 ${fmtHrsMin(r.afterMin)} to unpack` : ''].filter(Boolean);
+  return [travel.length ? '🚗 ' + travel.join(' · ') : '', ready.join(' · ')].filter(Boolean).join(' and ');
+}
+
+/* WHAT ACCEPTING WRITES — the one owner, for every accept door (the Sister Sync
+   inbox and the Day view's pending ghost, both through placeInvite). Puts one
+   block on each of `dayKeys` for `profile` (the inbox is hers), with ONE
+   saveAll, and returns them.
+
+   A SERIES INVITE BECOMES HER OWN SERIES: a fresh seriesId — never the
+   sender's, whose "remove all" writes a shared `sr:` tombstone that would
+   delete her copies too — and the same days, every-N and end, so her edit
+   sheet shows it as a series and can extend or remove it.
+
+   Buffers are written the way the edit sheet writes them — master switch and
+   both legs spelled out — so her copy draws, clashes and edits exactly like the
+   sender's. A share gets the sender's drive, get-ready and unpack; a watch
+   block gets the MEET's own travel and get-ready, and never a warm-up.
+
+   An invite with no snapshot (sent before this change) is placed exactly as it
+   always was: a share with no buffers, a watch block with the fixed
+   DEFAULT_BUFFER_MIN each way. No migration.
+
+   A WATCH INVITE IS A DIFFERENT KIND OF BLOCK. `watching` is what makes
+   blockIsCompetition answer false, which is the whole guard: no result is
+   ever asked of her, nothing is adopted as the meet's own block, and nothing
+   reaches the money tab. She keeps the meet's name and tag so her card can
+   say which meet it is. */
+function inviteToBlock(inv, dayKeys) {
+  const seriesId = inv.series ? 'sr-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5) : null;
+  const profd = getProfData(profile);
+  if (!profd.weeks) profd.weeks = {};
+  const placedAll = dayKeys.slice(0, SERIES_MAX_BLOCKS).map((dayKey, i) => {
+    const placed = inviteBlockFor(inv, i);
+    if (seriesId) {
+      placed.seriesId = seriesId;
+      placed.seriesDays = (inv.series.days || []).slice();
+      placed.seriesEvery = seriesEveryWeeks(inv.series.every);
+      placed.seriesEnd = inv.series.end;
+    }
+    profd.weeks[dayKey] = (profd.weeks[dayKey] || []).concat([placed]);
+    return placed;
+  });
+  saveAll();
+  return placedAll;
+}
+/* One block of hers, built from the invite. `i` keeps ids apart within one accept. */
+function inviteBlockFor(inv, i) {
+  const fromName = inv.from === 'jenn' ? 'Jenn' : 'Jess';
+  const placed = {
+    id: Date.now().toString(36)+i.toString(36)+Math.random().toString(36).slice(2,5),
+    actId: inv.actId, startMin: inv.startMin, durationMin: inv.durationMin,
+    colour: CAT_HEX.free, objectives:[], note:`With ${fromName} 💕`, tag:null,
+    checklistState: {}, travelBuffer: false,
+  };
+  if (inv.watch) {
+    placed.watching = true;
+    placed.compName = inv.compName || null;
+    placed.tag = inv.tag || null;
+    placed.note = `Watching ${fromName} 👀`;
+    placed.warmupBuffer = false;
+  }
+  const t = inv.travel, r = inv.ready;
+  if (t && typeof t === 'object' && r && typeof r === 'object') {
+    // Values arrive off a shared document, so they are clamped like any typed figure.
+    if (t.to || t.home) {
+      const first = clampBufferMin(t.to ? t.toMin : t.homeMin);
+      placed.travelBuffer = true;
+      placed.travelBufMin = first;
+      placed.travelTo = !!t.to;
+      placed.travelToMin = t.to ? clampBufferMin(t.toMin) : first;
+      placed.travelHome = !!t.home;
+      placed.travelHomeMin = t.home ? clampBufferMin(t.homeMin) : first;
+    }
+    if (r.before || r.after) {
+      const first = clampBufferMin(r.before ? r.beforeMin : r.afterMin);
+      placed.getReadyBuffer = true;
+      placed.getReadyBufMin = first;
+      placed.readyBefore = !!r.before;
+      placed.readyBeforeMin = r.before ? clampBufferMin(r.beforeMin) : first;
+      placed.readyAfter = !!r.after;
+      placed.readyAfterMin = r.after ? clampBufferMin(r.afterMin) : first;
+    }
+  } else if (inv.watch) {
+    placed.travelBuffer = true;
+    placed.travelBufMin = DEFAULT_BUFFER_MIN;
+  }
+  return placed;
+}
+
+/* HAS ITS DAY GONE? Derived from the date, like the rest of the app — nothing
+   is written, so there is no status to merge and no new shared state. A series
+   invite (its `series.dayKeys`) is missed only once its LAST day has gone. */
+function inviteLastDay(inv) {
+  return inviteDays(inv).slice().sort().pop() || null;
+}
+function inviteIsMissed(inv) {
+  const last = inviteLastDay(inv);
+  return !!last && last < todayKey();
+}
+/* CAN IT BE ACCEPTED NOW? Pending, and not missed. Both accept doors ask this
+   one question, so the Day view cannot drift from the inbox. A missed invite is
+   answered with 📌 Add it anyway (addInviteAnyway) or Decline, never Accept. */
+function inviteAcceptable(inv) {
+  return !!inv && inv.status === 'pending' && !inviteIsMissed(inv);
 }
 
 /* `opts.watch` turns this into an invitation to COME AND WATCH rather than to
-   do the same thing at the same time. Everything else is the existing
-   mechanism, untouched: an options argument that defaults to {} leaves the
-   call sites that pass none sending a plain invite, exactly as before.
+   do the same thing at the same time. An options argument that defaults to {}
+   leaves the call sites that pass none sending a plain invite. What either kind
+   carries from the block is inviteSnapshot's to say, not this function's.
 
    THE ONE WRITER of an invite. Sister Sync's tap, the edit sheet's 💌 and its
    👀 all come through here, so the duplicate guard below holds for every door.
@@ -175,8 +579,8 @@ async function sendInvite(block, to, day, opts = {}) {
   const sisterName = to==='jenn'?'Jenn':'Jess';
   /* Refused before the dialog, so she is never asked to confirm something that
      will not happen — and told which state it is in, not just "no". */
-  const already = sisterInviteFor(block.id, to, watch ? 'watch' : 'share');
-  if (already) {
+  const already = sisterInviteFor(block, to, watch ? 'watch' : 'share', day);
+  if (already && inviteCoversDay(already, day)) {
     showToast(already.status === 'accepted'
       ? (watch ? `${sisterName} already said yes to watching — it's on her plan`
                : `It's already on ${sisterName}'s plan`)
@@ -199,24 +603,48 @@ async function sendInvite(block, to, day, opts = {}) {
   const meetLabel = (block.compName && String(block.compName).trim())
     || (typeof blockDisplayName === 'function' ? blockDisplayName(block, from).name : '')
     || activityLabel;
-  const ok = await showConfirm(
-    watch
-      ? `Invite ${sisterName} to come and watch ${meetLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(block.startMin)}?\n\n`
-        + 'It goes on her plan as something she is watching. She earns nothing for it — it is your meet, not hers.'
-      : `Share ${activityLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(block.startMin)} with ${sisterName}?`,
-    { okLabel: watch ? 'Invite her' : 'Share' });
-  if (!ok) return;
+  let carried = inviteSnapshot(block, day);
+  // Plain text: the dialog escapes it where it lands. No buffers, no sentence.
+  const gets = inviteBufferWords(carried);
+  /* A REPEAT ASKS "THIS DAY, OR ALL?" — the sender's real copies from this day
+     on, less any already live with her (the guard, per covered day), so the
+     count is what she would actually get. A watch invite is always one day. */
+  const members = (!watch && block.seriesId)
+    ? inviteSeriesMembers(block, day, from).filter(m => {
+        if (m.block.id === block.id) return true;
+        const live = sisterInviteFor(m.block, to, 'share', m.dayKey);
+        return !(live && inviteCoversDay(live, m.dayKey));
+      })
+    : [];
+  if (members.length > 1) {
+    const s = inviteSnapshot(block, day, members).series;
+    const names = s.days.map(i => DAY_LONG[i]).join(' and ');
+    const every = s.every > 1 ? `Every ${s.every} weeks on ${names}` : `Every ${names}`;
+    const pick = await showChoice(
+      `Share ${activityLabel} at ${formatTimeFromMin(block.startMin)} with ${sisterName}?`
+        + (gets ? ` She gets the same ${gets}.` : ''),
+      [{ id: 'one', label: `Just ${inviteDateLabel(day, true)}` },
+       { id: 'all', label: `${every} to ${inviteDateLabel(s.end, false)} (${members.length})` }]);
+    if (!pick) return;
+    if (pick === 'all') carried = inviteSnapshot(block, day, members);
+  } else {
+    const ok = await showConfirm(
+      watch
+        ? `Invite ${sisterName} to come and watch ${meetLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(block.startMin)}?\n\n`
+          + (gets ? `She gets the same ${gets}.\n\n` : '')
+          + 'It goes on her plan as something she is watching. She earns nothing for it — it is your meet, not hers.'
+        : `Share ${activityLabel} on ${DAY_SHORT[dayIdx]} at ${formatTimeFromMin(block.startMin)} with ${sisterName}?`
+          + (gets ? ` She gets the same ${gets}.` : ''),
+      { okLabel: watch ? 'Invite her' : 'Share' });
+    if (!ok) return;
+  }
   const inv = {
     id: 'inv-'+Date.now().toString(36),
     from,
     to,
-    actId: block.actId,
-    day,
-    startMin: block.startMin,
-    durationMin: block.durationMin,
+    ...carried,
     status: 'pending',
     createdAt: syncNow(),
-    sourceBlockId: block.id,
   };
   if (watch) {
     inv.watch = true;
@@ -224,15 +652,17 @@ async function sendInvite(block, to, day, opts = {}) {
     inv.tag = block.tag || null;
   }
   state.shared.invites = [...(state.shared.invites||[]), inv];
-  // Stamp invitedTo on the source block so the inviter sees the 💌 badge on their own timeline.
-  // Find the block in its actual day store — the day the caller passed.
-  const sourceProfile = from; // sender
-  const blocks = ((state.profiles[sourceProfile]||{}).weeks||{})[day] || [];
-  const src = blocks.find(b => b.id === block.id);
-  if (src) {
+  // Stamp invitedTo on the source block so the inviter sees the 💌 badge on their own timeline —
+  // each covered block, for a series. Found in its actual day store: the day the caller passed.
+  const senderWeeks = (state.profiles[from]||{}).weeks||{};
+  const covered = carried.series
+    ? carried.series.dayKeys.map((k, i) => [k, carried.series.blockIds[i]]) : [[day, block.id]];
+  covered.forEach(([k, id]) => {
+    const src = (senderWeeks[k] || []).find(b => b.id === id);
+    if (!src) return;
     if (!Array.isArray(src.invitedTo)) src.invitedTo = [];
     if (!src.invitedTo.includes(to)) src.invitedTo.push(to);
-  }
+  });
   saveAll();
   showToast(`Invite sent to ${to==='jenn'?'Jenn':'Jess'} 💌`);
 }
@@ -305,9 +735,18 @@ function renderChallenges() {
 /* THE INBOX'S OWN QUESTION AND ITS OWN WORDS, shared with Today's 💌 note
    (tdInviteNote, js/31-today.js) so the signpost and the inbox cannot drift:
    the note counts exactly what this list shows, and names each invite with the
-   same who / what / day / time and the same fallbacks. */
+   same who / what / day / time and the same fallbacks. A MISSED invite is not
+   waiting (inviteAcceptable), so the note never points at a day already gone. */
 function invitesWaitingFor(p) {
-  return (state.shared.invites || []).filter(i => i && i.to === p && i.status === 'pending');
+  return (state.shared.invites || []).filter(i => i && i.to === p && inviteAcceptable(i));
+}
+/* Pending invites to `p` whose day has passed — the inbox's small Missed group.
+   One from before this week drops out of the list so it cannot grow for ever;
+   it stays stored (invites are never deleted: no tombstone scope). */
+function invitesMissedFor(p) {
+  const weekStart = dateToLocalKey(getWeekStart(0));
+  return (state.shared.invites || []).filter(i => i && i.to === p && i.status === 'pending'
+    && inviteIsMissed(i) && inviteLastDay(i) >= weekStart);
 }
 /* Plain text; each surface escapes it where it lands. A watch invite's subject
    is the MEET, not the activity — accepting "Competition" and finding out on
@@ -320,9 +759,17 @@ function inviteFacts(inv) {
     subject: inv.watch
       ? ((inv.compName || '').trim() || (act?.name || 'her competition'))
       : (act ? `${act.icon} ${act.name}` : 'an activity'),
-    day: DAY_SHORT[(d.getDay() + 6) % 7],
+    day: inv.series && Array.isArray(inv.series.dayKeys)
+      ? inviteSeriesShort(inv.series)
+      : DAY_SHORT[(d.getDay() + 6) % 7],
     time: formatTimeFromMin(inv.startMin),
   };
+}
+/* "every Tue (12)" — or "every Tue, every 2 weeks (6)". Plain text. */
+function inviteSeriesShort(series) {
+  const every = seriesEveryWeeks(series.every);
+  return `every ${(series.days || []).map(i => DAY_SHORT[i]).join(', ')}`
+    + `${every > 1 ? `, every ${every} weeks` : ''} (${series.dayKeys.length})`;
 }
 
 // Activity-sharing invites — task sharing, so they live under Sister Sync.
@@ -332,7 +779,8 @@ function renderInvites() {
   if (!inviteList) return;
   inviteList.innerHTML = '';
   const myInvites = invitesWaitingFor(profile);
-  if (!myInvites.length) {
+  const missed = invitesMissedFor(profile);
+  if (!myInvites.length && !missed.length) {
     inviteList.innerHTML = '<p style="color:var(--ink-light);font-size:0.95rem">No invites right now. Tap one of your own activities above to invite your sister.</p>';
     return;
   }
@@ -345,9 +793,31 @@ function renderInvites() {
       : `<b>${escapeHtml(f.subject)}</b>`;
     el.innerHTML = `
       <div>💌 <b>${escapeHtml(f.from)}</b> invited you to<br>
-      ${what} on ${escapeHtml(f.day)} at ${escapeHtml(f.time)}</div>
+      ${what} ${inv.series ? '·' : 'on'} ${escapeHtml(f.day)} at ${escapeHtml(f.time)}</div>
       <div class="invite-actions">
         <button class="pill-btn" onclick="acceptInvite('${escapeJsAttr(inv.id)}')">✅ Accept</button>
+        <button class="pill-btn" onclick="declineInvite('${escapeJsAttr(inv.id)}')">❌ Decline</button>
+      </div>
+    `;
+    inviteList.appendChild(el);
+  });
+  /* MISSED: its day has gone, so there is no Accept. She may have gone anyway —
+     📌 puts it on that day through the same writer, unticked — or Decline
+     clears it. */
+  if (!missed.length) return;
+  const head = document.createElement('p');
+  head.style.cssText = 'color:var(--ink-light);font-size:0.95rem;margin:0.7rem 0 0.3rem';
+  head.textContent = 'Missed';
+  inviteList.appendChild(head);
+  missed.forEach(inv => {
+    const f = inviteFacts(inv);
+    const el = document.createElement('div');
+    el.className = 'invite-item';
+    const what = inv.watch ? `👀 watch <b>${escapeHtml(f.subject)}</b>` : `<b>${escapeHtml(f.subject)}</b>`;
+    el.innerHTML = `
+      <div>💌 <b>${escapeHtml(f.from)}</b> invited you to ${what} · ${escapeHtml(f.day)} — ${inv.series ? 'those days have' : 'that day has'} passed</div>
+      <div class="invite-actions">
+        <button class="pill-btn" onclick="addInviteAnyway('${escapeJsAttr(inv.id)}')">📌 ${inv.series ? 'Add them to my plan' : `Add it to my ${escapeHtml(f.day)}`} anyway</button>
         <button class="pill-btn" onclick="declineInvite('${escapeJsAttr(inv.id)}')">❌ Decline</button>
       </div>
     `;
@@ -392,10 +862,44 @@ function deleteChallenge(id) {
 }
 function acceptInvite(id) {
   const inv = (state.shared.invites||[]).find(i=>i.id===id);
-  /* Only a PENDING invite can be answered. A double-tap on ✅ Accept used to
-     push a second block onto her day. Anything else returns quietly, and the
-     list is redrawn so a stale row goes away. */
-  if (!inv || inv.status !== 'pending') { refreshInvitesUI(); return; }
+  /* Only an invite that can be accepted NOW — pending, and its day not gone
+     (inviteAcceptable). A double-tap on ✅ Accept used to push a second block
+     onto her day, and a late tap put one on a day already past. Anything else
+     returns quietly, and the list is redrawn so a stale row goes away. */
+  if (!inviteAcceptable(inv)) { refreshInvitesUI(); return; }
+  /* ONLY THE DAYS FROM TODAY ON — unless she says she went. A series accepted
+     after some of its days have gone asks: "From 6 Oct (11)" or "Include the 1
+     that passed (12)". A single invite that is acceptable is never in the past,
+     so it never asks. */
+  const days = inviteDays(inv);
+  const ahead = days.filter(k => k >= todayKey());
+  if (ahead.length === days.length) { placeInvite(inv, 'Added to your plan! 💕', days); return; }
+  const f = inviteFacts(inv);
+  const passed = days.length - ahead.length;
+  return showChoice(
+    `${f.from} invited you to ${f.subject} · ${f.day}. ${passed === 1 ? '1 of those days has' : `${passed} of those days have`} passed.`,
+    [{ id: 'ahead', label: `From ${inviteDateLabel(ahead[0], false)} (${ahead.length})` },
+     { id: 'all', label: `Include the ${passed} that passed (${days.length})` }])
+    .then(pick => {
+      // Asked again: the other device may have answered while the dialog was open.
+      if (!pick || !inviteAcceptable(inv)) { refreshInvitesUI(); return; }
+      placeInvite(inv, 'Added to your plan! 💕', pick === 'all' ? days : ahead);
+    });
+}
+/* 📌 ADD IT ANYWAY — a missed invite she went to after all. The same writer as
+   Accept, onto that past day; the block arrives NOT ticked (whether she did it
+   is hers to tick, under the existing XP rules — placing it earns nothing), and
+   the invite reads accepted, so the sender's 💌 says it is on her plan. Only a
+   pending, missed invite: a second tap finds it accepted and adds nothing. A
+   missed series puts every one of its days (they have all passed). */
+function addInviteAnyway(id) {
+  const inv = (state.shared.invites||[]).find(i=>i.id===id);
+  if (!inv || inv.status !== 'pending' || !inviteIsMissed(inv)) { refreshInvitesUI(); return; }
+  placeInvite(inv, 'Added to your plan 📌', inviteDays(inv));
+}
+/* The shared tail of both: an activity she no longer has declines the invite
+   rather than placing a block she cannot open. */
+function placeInvite(inv, toast, dayKeys) {
   const receiverAct = findActivity(inv.actId, profile);
   if (!receiverAct) {
     inv.status = 'declined';
@@ -407,36 +911,9 @@ function acceptInvite(id) {
   }
   inv.status = 'accepted';
   markItemUpdated(inv);
-  // Place a matching block in this profile's schedule
-  const blocks = getDayBlocks(inv.day, profile);
-  const placed = {
-    id: Date.now().toString(36)+Math.random().toString(36).slice(2,5),
-    actId: inv.actId, startMin: inv.startMin, durationMin: inv.durationMin,
-    colour: CAT_HEX.free, objectives:[], note:`With ${inv.from==='jenn'?'Jenn':'Jess'} 💕`, tag:null,
-    checklistState: {}, travelBuffer: false,
-  };
-  /* A WATCH INVITE IS A DIFFERENT KIND OF BLOCK, and only this branch touches
-     it — the plain path above is the one mechanism that already puts an event
-     on both calendars and it stays exactly as it was.
-
-     `watching` is what makes blockIsCompetition answer false, which is the
-     whole guard: no result is ever asked of her, nothing is adopted as the
-     meet's own block, and nothing reaches the money tab. She keeps the meet's
-     name and tag so her card can say which meet it is, and she travels there —
-     but there is no warm-up, because she is not competing. */
-  if (inv.watch) {
-    placed.watching = true;
-    placed.compName = inv.compName || null;
-    placed.tag = inv.tag || null;
-    placed.note = `Watching ${inv.from==='jenn'?'Jenn':'Jess'} 👀`;
-    placed.travelBuffer = true;
-    placed.travelBufMin = DEFAULT_BUFFER_MIN;
-    placed.warmupBuffer = false;
-  }
-  blocks.push(placed);
-  setDayBlocks(inv.day, blocks, profile);
+  inviteToBlock(inv, dayKeys);
   refreshInvitesUI();
-  showToast('Added to your plan! 💕');
+  showToast(toast);
 }
 function declineInvite(id) {
   const inv = (state.shared.invites||[]).find(i=>i.id===id);

@@ -383,10 +383,25 @@ Kid-facing copy is a product surface, not filler. The rules:
 ## Navigation
 
 **Today is the front door** (`js/31-today.js`). A child lands there and moves
-through one nav — **Today · Week · Money · More** — which is a single fixed
-element outside the screens, filled by `tdRenderNav`. Do not add a second nav row
-to a screen: the six-button shortcut row that used to sit in three different
-topbars is exactly how their labels drifted apart, and it is gone.
+through one nav — **Today · Week · Money · Sister Sync · More** — which is a
+single fixed element outside the screens, filled by `tdRenderNav`. Do not add a
+second nav row to a screen: the six-button shortcut row that used to sit in three
+different topbars is exactly how their labels drifted apart, and it is gone.
+
+**Five places, not four — the owner's decision of 2026-09-24.** Sister Sync
+(👯, `openSisterSync`, `screen-sync`) became a nav tab, the fourth of five,
+between Money and More. Its only permanent door had been ⋯ More → 👯 "Sisters", a label that did
+not match the screen's name. **One destination, one door:** the More tile went
+with the change, and so did the 🎓 Money school and 📖 Money story tiles, which
+were extra doors to pages the Money tab already reaches (Money school: money
+tab 5 and My money's 🎓 button; Money story: My money's 📖 button in
+`mnyLinksCard`). More now holds 🧹 Chores · ◀ Switch and the build number.
+`tests/check-dead-actions.js` cannot see `data-td-more`, so a More tile and its
+`tdGoMore` branch are added and removed by hand, together. The label is "Sister
+Sync" because it fits on one line at 375px in the app's font; the fallback, if
+it ever stops fitting, is "Sisters". A parent sees no change: the kid nav hides
+for a parent, and `openSisterSync` still refuses one. Held by
+`sisterSyncIsABottomTab`, `moreHasNoMoneySchool` and `kidNavIsUsableAndScoped`.
 
 **The hero owns the block she is in, and owns it alone.** The screen used to draw
 the running block twice — a NOW card saying "now · started 8:15am" with a green
@@ -741,12 +756,15 @@ watcher's Saturday claims the meet is hers. `renderTrainingChecks` and
 `renderTrainingGearChecklist` return empty for a watch block: the four checks
 are a review of a session you took part in, and a watcher packs no skates.
 Buffers split — **travel stays, warm-up goes**: she really does go to the rink,
-and she is not competing.
+and she is not competing. Since 2026-09-24 the travel is the **meet's own**
+legs (and its get-ready), carried by the invite — see *What an invite carries*
+below; an invite sent before then still gives the fixed 15 each way.
 
 `sendInvite(block, to, day, opts)` carries `watch`, `compName` and `tag`; the
-call sites that pass no `opts` send a plain invite, and **the plain invite path in
-`acceptInvite` is untouched** — it is the one mechanism that already puts an
-event on both calendars and this is not about it. `👀 Invite my sister to
+call sites that pass no `opts` send a plain invite. **The plain invite path in
+`acceptInvite` is no longer untouched, on purpose** (the owner's decision,
+2026-09-24): both kinds now go through the owners in *What an invite carries*
+below, which is what gives a share the sender's travel and get-ready. `👀 Invite my sister to
 watch` sits outside `#sisterSyncWrap`, which is parent-only, because asking
 your sister to come and watch you compete is a child's own decision; it shows
 only when `blockIsCompetition(block)`, so a watch block cannot be passed on
@@ -764,16 +782,21 @@ comes from the caller** — Sister Sync passes the day it is showing, the edit
 sheet passes `currentDayKey` (the day it found the block on) — and `sendInvite`
 refuses without one; it never reads `currentDayKey` or `syncDayIdx` itself,
 because `currentDayKey` outlives the day view that set it.
-`sisterInviteFor(blockId, to, kind)` (`js/10-social.js`) returns the **live**
-invite — `pending` or `accepted` — from that block to that sister of that kind
-(`'watch'` when `inv.watch`, else `'share'`), or `null`. `sendInvite` refuses a
-live duplicate of the same kind **before** its confirm dialog, with a toast
+`sisterInviteFor(block, to, kind, dayKey)` (`js/10-social.js`) returns the
+**live** invite — `pending` or `accepted` — for that block to that sister of
+that kind (`'watch'` when `inv.watch`, else `'share'`), or `null`. An invite is
+*for* a block when it was sent from it, when it is a series invite whose
+`blockIds` include it, or when the block lists it in `sentInviteIds` (a
+cross-day drag — below); one covering `dayKey` is preferred.
+`sendInvite` refuses a live duplicate of the same kind that **covers the
+block's day** **before** its confirm dialog, with a toast
 saying whether she hasn't answered yet or it is already on her plan; a
 **declined** invite may go again (a no on Tuesday is not a no for ever), and a
-share and a watch of the same block are different questions. `acceptInvite`
-and `declineInvite` act only on a `pending` invite — a double-tap on ✅ Accept
-used to put a second block on her day — and otherwise return quietly and
-redraw the list.
+share and a watch of the same block are different questions. `declineInvite`
+acts only on a `pending` invite, and `acceptInvite` only on one
+`inviteAcceptable` says yes to (pending, and not missed — below) — a
+double-tap on ✅ Accept used to put a second block on her day — and otherwise
+they return quietly and redraw the list.
 
 Both edit-sheet buttons read their sent-state from `sisterInviteFor` **for
 their own kind**. `invitedTo` on the source block is a bare list of names that
@@ -787,16 +810,117 @@ calendar. **The public toggle (`#publicToggle`) stays parent-only** — it is
 all `#sisterSyncWrap` now holds. `anInviteCannotBeSentTwice` (`tests/smoke.js`)
 holds all of it.
 
+**What an invite carries, and what accepting writes — one owner each**
+(2026-09-24, Sister Sync invites hotspot round 4). An invite was a hand-copied
+subset of a block, and every fix round found a fact the copy left out or
+guessed: the sender, the day, then the buffers — a share arrived with no drive
+and no get-ready, and a watch block always got 15 minutes each way however far
+away the meet was. The repair, chosen over re-linking invites to their source
+block (copy semantics are the owner's choice, and a link would change a
+`state.shared` shape and need a migration on both iPads):
+
+- `inviteSnapshot(block, dayKey, members)` (`js/10-social.js`) owns **what an invite
+  carries**: `actId`, `day`, `startMin`, `durationMin`, `sourceBlockId`, and
+  `travel {to, toMin, home, homeMin}` / `ready {before, beforeMin, after,
+  afterMin}`, read **only** through `getTravelBufMin` / `getGetReadyBufMin` per
+  side. Both objects are always written, zeros included — their presence is how
+  an invite carrying "no buffers" is told from one sent before this change.
+  **Warm-up is never carried**: it is training-only, and the sender's.
+  `sendInvite` builds every invite from it, and its confirm says what she gets
+  (`… She gets the same 🚗 20m there · 25m home and 👕 15m to get ready.`; no
+  buffers, no sentence — plain text, escaped by the dialog).
+- `inviteToBlock(inv, dayKeys)` owns **what accepting writes**: one block on
+  each of `dayKeys` for `profile`, with one `saveAll`, buffers written the way the edit sheet writes them
+  (master switch and both legs). A share gets the sender's drive, get-ready and
+  unpack; a watch block the meet's own travel and get-ready, warm-up off. An
+  invite with **no snapshot** (sent before 2026-09-24) is placed exactly as
+  before: a share with no buffers, a watch block with `DEFAULT_BUFFER_MIN` each
+  way. No migration.
+- `inviteIsMissed(inv)` owns **has its day gone**: its day — for a series,
+  the last of `series.dayKeys` — is before `todayKey()`. Derived from the date,
+  like the rest of the app: no status is written, so there is nothing new to
+  merge, and `js/04-merge.js` did not move.
+- `inviteAcceptable(inv)` owns **can it be accepted now**: pending and not
+  missed. **Both accept doors call it.**
+- A missed invite is answered with **📌 Add it anyway** (`addInviteAnyway`) or
+  Decline, never Accept: the same writer onto that past day, the block **not
+  ticked** (whether she did it is hers to tick, under the existing XP rules;
+  placing it earns nothing), and the invite `accepted`, so the sender sees it on
+  her plan. It acts only on a pending, missed invite, so a second tap adds
+  nothing. `acceptInvite` and `addInviteAnyway` share one tail
+  (`placeInvite`: the activity check, the status, `inviteToBlock`).
+
+**A repeating block asks "this day, or all?"** (2026-09-24, stage 5c). Repeats
+are real copies, and an invite from one of them reached one day. Sending from a
+block with a `seriesId` (a share — a watch invite is always one day) offers
+**Just Tue 29 Sep** or **Every Tuesday to 15 Dec (12)**, through `showChoice`.
+The count is the sender's real remaining copies from that day on
+(`inviteSeriesMembers`), less any already live with her. "All" is **one**
+invite: `inviteSnapshot(block, day, members)` adds `series {days, every, end,
+dayKeys[], blockIds[]}`, and `sendInvite` stamps `invitedTo` on every covered
+block. Accepting it gives her **her own series**: a fresh `seriesId`, never the
+sender's — the sender's "remove all" writes a shared `sr:` tombstone
+(`blockTombstoned`, `js/04-merge.js`) that would delete her copies too — and
+the same days, every-N and end, so her edit sheet shows it as a series. Only
+the days **from today on**; when some have gone, the accept asks **From 6 Oct
+(11)** or **Include the 1 that passed (12)**. A series is missed only after its
+last day, and 📌 Add it anyway on a missed series places all of its days.
+Time and buffers are the tapped block's for every day. Her ghost shows on each
+covered day (`inviteCoversDay`), and Today and the inbox read `📖 Reading ·
+every Tue (12)` (`inviteFacts` → `inviteSeriesShort`).
+
+**The 💌 is only where something was shared.** `weekCloneBlock`,
+`createSeriesFromBlock` and `seriesExtendTo` strip `invitedTo` and
+`sentInviteIds`, so a copy, a repeat or an extension of a shared block does not
+claim to be shared.
+
+**A dragged shared block says "Send again?"** (the owner's decision,
+2026-09-24). A cross-day drag re-ids the block (`moveBlockToDay`,
+`js/39-block-drag.js` — see its comment for why), so the invite lost it. The
+drag now **keeps** the 💌 and writes `sentInviteIds` (`inviteIdsForBlock`: the
+live invites it was sent under). `sisterInviteFor` still finds them, and one
+that no longer covers the block's day is **moved**: the edit sheet button and
+Sister Sync read `💌 Sent for Tue — you moved it to Thu · Send again?`
+(`inviteMovedWords`) and the button stays live. Sending again writes one new
+invite for the new day; the guard then matches there and refuses a second. The
+sister's old invite is not changed — if pending she can still answer it, and
+when its day passes it is missed. A same-day drag keeps the id and changes
+nothing. The `block.inviteId && !block.inviteAccepted` guard in
+`attachBlockDrag` is dead and left alone for a later round.
+
+Invites stay in `state.shared.invites`, merged whole-record by `mergeArrayById`
+with no tombstone scope — an invite is never deleted. Held by
+`anInviteCarriesTheSendersTravelAndGetReady` (with a field-by-field comparison
+of the source block and the accepted block — the snapshot of hers must equal
+the snapshot of the sender's, so a field added to the snapshot that the writer
+forgets fails a test), `aMissedInviteIsNotWaiting` (series accepted late
+included), `theDayViewAcceptFollowsTheSameRules`,
+`aSeriesInviteCoversEveryDayOrOne` and `aMovedSharedBlockSaysSendAgain`.
+Invite checks pin the clock to a
+weekday (`pinClockToWeekday` in `tests/smoke.js`), because "missed" depends on
+the date.
+
 **One inbox, and Today signposts it.** The 💌 inbox is Sister Sync's
-(`renderInvites`), and accepting and declining stay there. Today carries a
-one-line note when an invite is waiting — a signpost, not a second inbox — and
-its filter and wording are the inbox's own: `invitesWaitingFor(p)` (to `p`,
-`pending`) and `inviteFacts(inv)` (who / what / day / time, with the inbox's
-fallbacks) in `js/10-social.js`, called by both surfaces so they cannot count or
-name an invite differently. **Kid only**: the inbox works on `profile`,
-`acceptInvite` writes to `profile`, and `openSisterSync` refuses a parent, so a
-parent-facing note would lead to a refusal. `anInviteWaitingShowsOnToday`
-holds it.
+(`renderInvites`). Today carries a one-line note when an invite is waiting — a
+signpost, not a second inbox — and its filter and wording are the inbox's own:
+`invitesWaitingFor(p)` (to `p`, `inviteAcceptable` — so a missed invite is
+never pointed at) and `inviteFacts(inv)` (who / what / day / time, with the
+inbox's fallbacks) in `js/10-social.js`, called by both surfaces so they cannot
+count or name an invite differently. Below the waiting ones, the inbox keeps a
+small **Missed** group (`invitesMissedFor(p)`): `💌 Jenn invited you to 📖
+Reading · Wed — that day has passed`, with **📌 Add it to my Wed anyway** and
+**Decline**, no Accept. A missed invite whose (last) day is before this week's
+Monday drops out of the list and stays stored.
+
+**There is a second accept door, on the same owners:** the pending ghost on the
+Day view (`renderPendingInvitesOnTimeline`, `js/08-day-view.js`). It shows ✅
+Accept / ❌ Ignore only when `inviteAcceptable` says so; on a day already gone
+it shows **📌 Add it anyway** and **❌ Decline** instead, and every button calls
+`acceptInvite` / `addInviteAnyway` / `declineInvite` — so it writes exactly the
+block the inbox writes. Do not give it rules of its own. **Kid only**: the
+inbox works on `profile`, `acceptInvite` writes to `profile`, the ghost is not
+drawn for a parent, and `openSisterSync` refuses a parent, so a parent-facing
+note would lead to a refusal. `anInviteWaitingShowsOnToday` holds the note.
 
 **A watch block still counts as ordinary planned time.** `computeWeekTotals`
 does not filter it out, deliberately: a Saturday she really spent at the rink
@@ -805,6 +929,80 @@ must not read as free. What it does not do is earn.
 `aWatchedMeetIsNeverChasedForAResult` and `aWatchInviteNamesTheMeet`
 (`tests/smoke.js`) hold both halves — the first is the one that makes the
 feature safe and is worth more than the rest of it.
+
+**Sister Sync is a timeline (stage 5e, 2026-09-24).** `renderSync`
+(`js/10-social.js`) draws the chosen day as one side-by-side timeline — 🐥 Jenn
+| 🦊 Jess, `START_HOUR`–`END_HOUR`, one shared hour gutter — at
+`SYNC_PX_PER_MIN` (0.6px a minute, 576px). It replaced two columns of text
+chips that showed only a start time. It is built from the pure pieces:
+`dayZoneSegments` (school and lunch recess as the zone band; the other tints
+are left off so nothing competes with the green stripe), `wfBufferSegments`
+(travel, get-ready and warm-up as hatched `.wf-travel` strips),
+`wfCardBoxes` / `wfAssignColumns` (sizes and lanes), `buildHourGrid`
+(`layer: 'lines'`), `blockColour(b, p)` and `blockDisplayName(b, p)` with the
+explicit sister. **Not** `buildDayColumn` or `renderBlockPixel`, which are bound
+to the active profile. Block text is ink, never white on a pastel.
+
+*What is busy has one owner: `syncBusyMinutes(profile, dayKey)`.* One boolean
+per minute of the drawn day (index 0 = `START_MIN`, length `DAY_MIN_SPAN`).
+Busy is:
+- each block;
+- plus everything `wfBufferSegments` gives it — travel, get-ready **and
+  warm-up** (she is at the venue);
+- plus school and lunch recess on a school day (`isSchoolDay`,
+  `dayZoneSegments` — the shared school calendar, so both girls have the same
+  hours).
+
+A **free-category block is not busy, and neither are its buffers**: free time
+is time she can hang out. A block whose **activity nobody can name counts as
+busy** and is drawn as a grey Busy shape. The activity is looked up in **that
+sister's own list** (`findActivity(b.actId, p)`). The old count used the
+active profile's list for both sisters, so a sister's own custom free activity
+read as busy. `syncFreeRuns` turns the two arrays into the minutes neither
+sister is busy. The "🎉 You're both free …" sentence (windows of 30 minutes or
+more) and the green both-free stripe between the columns both read those runs.
+They cannot disagree, and neither may count busy time any other way.
+
+*Privacy is unchanged.* A sister's block shows its name only when
+`isMe || (showAll && b.public)`. Otherwise it is a grey (`SYNC_BUSY_GREY`)
+**Busy** shape at its real height, and its strips say only "Busy".
+
+*Sizes.* Everything is to scale except the floor. A card shorter than its floor
+borrows the empty minutes **above** it (`wfCardBoxes`), so its bottom edge and
+its printed start–end stay true. Where there is nothing to borrow, the lane
+splits rather than covering a neighbour. The floor is `SYNC_CARD_MIN_PX` (20px)
+in the sister's column. **Your own blocks are the invite control, so their
+floor is `SYNC_TAP_MIN_PX` (44px), the house target.** The both-free stripe
+always reads real minutes, never card heights.
+
+*A shared block you dragged to another day* always shows `💌 Send again?` as a
+visible line under the name (`.sync-block-flag`). That fits on a 44px card. The
+full `inviteMovedWords` sentence is in the block's text (`.visually-hidden`)
+and its tooltip.
+
+*The DOM is part of the contract.* The invite checks (`anInviteCannotBeSentTwice`,
+`anInviteFromSisterSyncIsDatedThatDay`, `aMovedSharedBlockSaysSendAgain`)
+select `#syncGrid .sync-day-col:first-child .sync-block-mini` and read the
+activity name and the moved sentence from its text. So:
+- `#syncGrid` is the host;
+- its **first child is Jenn's `.sync-day-col`**, then Jess's, then the stripe,
+  the gutter and the legend (CSS places the tracks gutter | Jenn | stripe |
+  Jess);
+- every shape is a `.sync-block`, and **`.sync-block-mini` is only on your own
+  tappable blocks**.
+
+Tapping one calls `sendInvite(b, sister, dayShown)`, with the duplicate guard,
+the series choice and the moved line as above. Change any of these and those
+checks must be rewritten on purpose. `sisterSyncIsATimeline` holds the rest:
+- to scale on one axis;
+- a private block is a Busy shape of the right height;
+- the stripe excludes travel, get-ready, school and a short block;
+- a sister's own free activity is free;
+- the sentence and the stripe agree;
+- every `.sync-block-mini` is at least 44px tall;
+- the moved line is visible;
+- a tap invites her for that day;
+- no text under 13px at 390px.
 
 Drawn to scale means the row has to **add up to a day**. It is one nowrap flex row
 of percentages with nothing able to shrink, so anything that oversubscribes it
@@ -815,6 +1013,19 @@ applied often enough overruns the row on its own. `tdProgressRibbon` clamps each
 cell to the cursor so no minute is spent twice, then scales the segments back if
 they still come to more than 100. It shipped without either guard and every check
 passed: no fixture had two blocks that overlap. A screenshot found it.
+
+**The now-marker stays inside the strip, at both ends of the day.** It is
+absolutely placed at `left: <percent of the span>`, 3px wide, with a ▼ (`::before`)
+reaching 3.5px left of it and 6.5px from its left edge. In the last minute or two
+of the span the arrow poked past the strip's right edge (at the first minute, past
+its left) — so `aDragThatCreatesAnOverlapDoesNotBreakTodaysRibbon`, which read
+the real clock, passed all day and failed only for a run that reached it just
+before 7:00pm, the end of its fixture's span: 532px into 529px at 6:59pm
+(2026-09-24). `tdRibNowLeft(pct)` (`js/31-today.js`) returns
+`clamp(3.5px, pct%, calc(100% - 6.5px))`, and both the render and `tdTick`'s
+minute patch call it, so they cannot place the marker differently. The check now
+pins the clock to the span's first and last minute every run and measures the
+strip's overflow and the arrow's edges there.
 
 **The day screen scrolls as one surface, and that surface has to be BOUNDED.**
 It was three nested scrollers (`.day-workspace` → `.day-center-lane` →
@@ -975,7 +1186,8 @@ reads as wind-down rather than "the rest of today is yours".
 draws one `.td-row` button in the day column, between the hero and "Coming up",
 so she meets it before her day's list: `💌 Jess invited you to 📚 Reading · Tue
 4:00pm`, `💌 Jess invited you to watch Winter Invitational · Sat`, or
-`💌 2 invites waiting — from Jess`. Nothing pending, no row. The tap
+`💌 2 invites waiting — from Jess`. Nothing waiting, no row — and a missed
+invite (its day gone) is not waiting, so it never gets one. The tap
 (`data-td-action="invites"` → `tdOpenInvites`) opens Sister Sync and scrolls
 `#invitesSection` to just under the sticky topbar — the list is at the bottom
 of that screen, and landing at its top would be the school banner under a 700px
@@ -1992,6 +2204,87 @@ REPLACES the destination. Unplaceable blocks are dropped through
 `placeableActivityIds` (`js/05-helpers.js` — one owner, shared with `pcw`) and
 the count of what was left behind is always said out loud.
 
+**The 📋 sheet is "Copy a day", and it shows both days before either is
+chosen** (R5 §7 Q1–Q2, 2026-09-24). The 🏫 School Day and 🌈 Weekend templates
+are retired — two hard-coded shapes that replaced the whole day with no confirm,
+done and pinned blocks included, and a child could press them. `applyTemplate`,
+`schoolTemplate()` and `WEEKEND_TEMPLATE` are gone; the sheet keeps 😌 Rest (and
+its old ids, `#templateOverlay` / `openTemplateSheet`). `#copyDayNow`
+(`renderCopyDayNow`) lists what is on the target day now, each source-day row
+opens to list its blocks as `4:00–5:00pm 🏊 Swimming` (`copyDayBlockLine`, one
+line shared by the rows, the top box and the confirm) with the copy button
+inside, and the confirm names what it replaces and what stays.
+
+**A parent-pinned block on the target day is kept, whoever copies.**
+`copyDayPlan(src, dst, srcP, dstP)` is the decision and only reads: `{ copy,
+replace, keep, dropped }`. Pinned target blocks are `keep` (never tombstoned); a
+source block the kept pin already covers — same `actId`, `tag` and `startMin` —
+is not copied again. The confirm reads the plan, and `copyDayInto` carries it
+out, so the two cannot disagree (the `pcwPlan` discipline).
+
+**A pin is a parent's, so only a parent's copy keeps it.** `weekCloneBlock`
+drops `parentPinned` when `!isParent()` — a child cannot move or remove a pinned
+block, so a pinned copy was a block she could never take back off. It is in the
+clone rule, not in a caller, so every path obeys it: the 📋 day copy (child →
+unpinned, parent → pinned), `fillWeekFromNearest` / `copyWeekInto` (same; it
+only fills a blank week, so there is no target pin to keep), and `pcwCommit`
+(parent-only, so pins kept — unchanged; its "replace" still replaces a pinned
+day, because the parent chose it in a preview).
+
+**Clearing a day is "🗑 Start this day over", last on the 📋 sheet, and it keeps
+what is done, pinned or marked not done** (R5 §7 Q4, 2026-09-24). It was 🗑 on the Day view's top
+bar beside 📋 and 🌙 and took every block, done and parent-pinned included; the
+top-bar button is gone. `clearDay` (`js/09-sheets.js`, same name, still reads
+`currentDayKey`) keeps every block `dayBlockStays` answers true for —
+`completed`, `confirmed`, `parentPinned` or `isBlockNotDone` (a parent's "$0 ·
+didn't happen" money verdict; deleting it would erase that record) — tombstones
+the rest, and its confirm lists what goes and what stays (✅ / 📌 / 🚫) with
+`copyDayBlockLine`, then says there is no undo. There is deliberately **no undo**: the ids are tombstoned by the frozen
+merge layer, so an undo would mean re-adding blocks under new ids. A day with
+nothing to take off says so in a toast and asks nothing.
+
+**How a day went is asked on Today, and the reflect sheet is TOLD its day**
+(R5 §7 Q3, 2026-09-24). The day's mood (`profile.dayMoods`) had two doors — 🌙
+on the Day view's top bar and "Today's Vibe" folded away in Today's
+`#tdExtrasBody` — and both wrote `dayMoods[currentDayKey]`, the global behind the
+invite wrong-day bug (PR #93): it outlives the Day view that set it. Now:
+- `openReflectSheet(dayKey)` / `saveReflection(dayKey)` (`js/09-sheets.js`)
+  take the day as an argument and **never read `currentDayKey`**; no day, or a
+  day still to come, opens nothing. The Save button is bound to that day when
+  the sheet opens (`#reflectSaveBtn`). The title names the day through
+  `reflectDayQuestion(dayKey)`: "How was today?", "How was yesterday?", else
+  "How was Tuesday?". The per-block moods listed are that day's blocks.
+- **Today's 🌙 row** (`tdReflectRow` / `tdReflectAsk`, `js/31-today.js`, a
+  `.td-row` with `data-td-action="reflect"` and `data-td-day`, in the day
+  column under the invite note) decides which day to ask about: **today** in
+  the evening — from `TD_REFLECT_FROM_MIN` (8pm), or earlier once every block
+  today has ended (`blockHasEnded`) — while today has no mood; else
+  **yesterday** (`dayKeyBefore(todayKey())`, `js/05-helpers.js`), at any hour,
+  while it has no mood. **Only yesterday, never older**: a mood from three days
+  ago is a guess. When both are unanswered in the evening, **today goes first**
+  and yesterday returns once today is answered, until midnight. Answered and
+  still evening, it reads "Today felt 😄" and reopens the sheet to change it,
+  which the Vibe card allowed. `tdTickKey` includes what it asks, so the row
+  appears at 8pm on a screen left open. Shown to whoever is viewing Today, as
+  the Vibe card was.
+- **The 🌙 left the Day view's top bar** (it is 📋 · profile badge). A past
+  day is still reflected on from its own screen: its 📋 sheet shows **🌙 How was
+  Tuesday?** (`#reflectDayWrap` / `#reflectDayBtn`, `renderReflectDayButton`)
+  for a day before today only — today's door is on Today, and a future day has
+  nothing to look back on. The sheet captures the day when it opens and passes
+  it; the Day view's evening toast now points to Today.
+- **"Today's Vibe" is folded into the row**: the card, `renderVibe`,
+  `setDayMood`, `#vibeMoods`, `#vibeSubtext`, `.vibe-card` and `.vibe-title` are
+  gone. `.vibe-moods` / `.vibe-mood` stay (the sheet and the ritual). Today's
+  fold is now "To-dos and goals".
+- **The closing ritual is unchanged** — it still reads `currentDayKey` and
+  writes that day's mood from its own picker — but it now follows a reflection
+  only when the day reflected on is today and `currentDayKey` is today, so it
+  never says goodnight over yesterday or a past day.
+Held by `todayAsksHowTodayWent` (clock pinned to a local time on Thursday of
+this week; `currentDayKey` is left on another day before every tap) and
+`todayIsWhereTheDayGetsDone` (the Vibe card stays gone).
+
 **A repeat is materialised, and it remembers what it is.** `seriesDayKeys`
 (`js/05-helpers.js`) is the one place that answers which days a repeat covers —
 days of the week, **every N weeks**, from a start date through an end date — and
@@ -2173,10 +2466,12 @@ or confirmed card never moves, a past day is not touched, only `startMin` and
 in **one** `saveAll()` — `setDayBlocks` saves on every call, so reconciling
 fourteen cards through it would upload the whole family document fourteen times.
 
-`SCHOOL_TEMPLATE` is now **`schoolTemplate()`**, and the change is load-bearing:
-a top-level `const` is evaluated when `js/01-config.js` runs, so it can only ever
-see the shipped fallback. Anything that wants the school-day shape has to ask at
-the moment it needs it.
+`SCHOOL_TEMPLATE` became **`schoolTemplate()`**, and the reason still holds
+though the template is retired (R5 §7 Q1): a top-level `const` is evaluated when
+`js/01-config.js` runs, so it can only ever see the shipped fallback. Anything
+that wants the school-day shape has to ask `schoolHours()` at the moment it
+needs it — `commitSchoolDays` does, and `schoolCalendarIsRight` /
+`schoolHoursAreTheParentsToSet` place a card through it to prove so.
 
 **Every surface draws the day from `dayZoneSegments`** (`js/08-day-view.js`) — the
 day view, the Full week and the print sheet. It had one caller for a long time
