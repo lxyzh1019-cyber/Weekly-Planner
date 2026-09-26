@@ -5140,6 +5140,44 @@ function findChromium() {
       }
       mnyOpenStory();
     }],
+    /* Sister Sync is a kid tab and was never in this sweep (Plan v6 C6): its
+       44px floor was held only for her own timeline blocks, by
+       sisterSyncIsATimeline. Seeded — both sisters' day, a waiting invite and a
+       missed one — so the timeline, the stripe and the 💌 inbox's buttons are
+       all on screen while it is measured; then put back, the same discipline
+       as screen-week. */
+    ['screen-sync', () => {
+      // openSisterSync refuses a parent, and the rows above leave one signed in.
+      const wasProfile = profile;
+      if (isParent()) profile = 'jenn';
+      const me = activeProfile();
+      const sis = me === 'jenn' ? 'jess' : 'jenn';
+      const key = todayKey();
+      const had = [[me, (getDayBlocks(key, me) || []).slice()], [sis, (getDayBlocks(key, sis) || []).slice()]];
+      const hadInvites = state.shared.invites;
+      try {
+        setDayBlocks(key, [
+          { id: 'sync-aud-a', actId: 'reading', startMin: 16 * 60, durationMin: 90,
+            travelBuffer: true, travelBufMin: 20, getReadyBuffer: true, getReadyBufMin: 10 },
+          { id: 'sync-aud-b', actId: 'piano', startMin: 19 * 60, durationMin: 15 },
+        ], me);
+        setDayBlocks(key, [
+          { id: 'sync-aud-c', actId: 'piano', startMin: 16 * 60, durationMin: 60, public: true },
+          { id: 'sync-aud-d', actId: 'dinner', startMin: 18 * 60, durationMin: 60 },
+        ], sis);
+        state.shared.invites = [
+          { id: 'sync-aud-inv', from: sis, to: me, status: 'pending', day: key,
+            actId: 'piano', startMin: 20 * 60, durationMin: 60, sourceBlockId: 'sync-aud-src' },
+          { id: 'sync-aud-old', from: sis, to: me, status: 'pending', day: dayKeyBefore(key),
+            actId: 'reading', startMin: 17 * 60, durationMin: 60, sourceBlockId: 'sync-aud-src2' },
+        ];
+        openSisterSync();
+      } finally {
+        had.forEach(([p, blocks]) => setDayBlocks(key, blocks, p));
+        state.shared.invites = hadInvites;
+        profile = wasProfile;
+      }
+    }],
   ];
   // Four real devices, not two. The plan asked for these and the branch that
   // changed nearly every layout only ever checked a phone and a desktop-ish
@@ -5205,6 +5243,12 @@ function findChromium() {
       const r = await kidStandards(id);
       const problems = [];
       if (r.error) problems.push(r.error);
+      /* A screen that did not open measures as clean: every control on it is
+         display:none, so none is "too small". openSisterSync refuses a parent,
+         for one — so each row must prove its screen was on show. */
+      if (!(await page.evaluate((sid) => document.getElementById(sid).classList.contains('active'), id))) {
+        problems.push('the screen was not on show, so nothing on it was measured');
+      }
       // Sideways scroll is the failure a screenshot needs a human to notice and
       // an assertion catches by itself: content pushed off the edge of a tablet
       // is simply unreachable, and nothing else here would report it.
@@ -12958,6 +13002,529 @@ function findChromium() {
     }
     return bad.length === 0 || bad;
   });
+
+  /* ── SMALL FIXES R6 (Plan v6 C, 2026-09-25) ──────────────────────────
+     One check per fix, each written to fail on the code before it. Measured at
+     a phone width, where the 44px target and the 13/15px floors are hardest to
+     keep. Every check puts back what it seeds.
+
+     pinClockToWeekday is put back first: the backup round-trip above reloads
+     the page, which drops every window helper installed before it. Same
+     definition as the invite checks' (midday in Edmonton on that weekday). */
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => {
+    window.pinClockToWeekday = (idx) => {
+      const RealDate = Date;
+      const [y, m, d] = getDayKeys(0)[idx].split('-').map(Number);
+      const when = new RealDate(RealDate.UTC(y, m - 1, d, 19, 0, 0));
+      Date = function (...a) { return a.length ? new RealDate(...a) : new RealDate(when); };
+      Date.prototype = RealDate.prototype;
+      Date.now = RealDate.now; Date.parse = RealDate.parse; Date.UTC = RealDate.UTC;
+      return () => { Date = RealDate; };
+    };
+  });
+
+  /* C1 — 😌 Rest on the 📋 sheet was a 38px pill beside two 44px buttons. */
+  if (want('restButtonIsA44pxTarget')) checks.restButtonIsA44pxTarget = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
+    try {
+      profile = 'jenn'; parentViewing = 'jenn';
+      openDay(getDayKeys(0)[2], 2);
+      openTemplateSheet();
+      const btn = document.getElementById('restDayBtn');
+      if (!btn) return ['😌 Rest is not on the 📋 sheet'];
+      const r = btn.getBoundingClientRect();
+      if (r.height < 44 || r.width < 44) bad.push(`😌 Rest is ${Math.round(r.width)}x${Math.round(r.height)}px, under 44px`);
+      const f = parseFloat(getComputedStyle(btn).fontSize);
+      if (f < 15) bad.push(`😌 Rest's label is ${f}px, under 15px`);
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      closeSheet('templateOverlay');
+      profile = wasProfile; parentViewing = wasViewing; currentDayKey = wasDayKey;
+      goToday();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* C2 — the reflect sheet's mood dots were 36px (the day) and 28px (each
+     block), a row of five small circles for a child's thumb. Each is a 44px
+     target now, hit where it is drawn, and no text on the sheet goes under its
+     floor: 13px anywhere, 15px for the block names she answers about. */
+  if (want('reflectMoodsAre44pxTargets')) checks.reflectMoodsAre44pxTargets = await page.evaluate(async () => {
+    const bad = [];
+    const wasProfile = profile, wasViewing = parentViewing;
+    const key = todayKey();
+    const had = (getDayBlocksForProfile(key, 'jenn') || []).slice();
+    try {
+      profile = 'jenn'; parentViewing = 'jenn';
+      setDayBlocks(key, [
+        { id: 'r6-mood-a', actId: 'piano', startMin: 16 * 60, durationMin: 60 },
+        { id: 'r6-mood-b', actId: 'reading', startMin: 18 * 60, durationMin: 30 },
+      ], 'jenn');
+      /* A 🏆 MISSION CLEAR an earlier check left up (z-index 9998, full screen)
+         covers every sheet, and a probe would measure it instead. A child taps
+         it away first; so does this. */
+      closeMissionClear();
+      openReflectSheet(key);
+      await new Promise(r => setTimeout(r, 400)); // the sheet slides up (0.3s)
+      const sheet = document.querySelector('#reflectOverlay .sheet');
+      const overall = [...document.querySelectorAll('#reflectOverallMoods .vibe-mood')];
+      const perBlock = [...document.querySelectorAll('#reflectBlockList .vibe-mood')];
+      if (overall.length !== 5) bad.push(`${overall.length} overall mood buttons, expected 5`);
+      if (perBlock.length !== 10) bad.push(`${perBlock.length} block mood buttons for 2 blocks, expected 10`);
+      const small = [];
+      [...overall, ...perBlock].forEach(el => {
+        el.scrollIntoView({ block: 'center' });
+        const r = el.getBoundingClientRect();
+        const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        // Which probe missed, and what it landed on, so a failure says why.
+        const miss = [[cx - 21, cy], [cx + 21, cy], [cx, cy - 21], [cx, cy + 21]].map(([x, y]) => {
+          const h = document.elementFromPoint(x, y);
+          return (!!h && (h === el || el.contains(h))) ? null
+            : `${Math.round(x)},${Math.round(y)} lands on ${h ? (h.id || h.className || h.tagName).toString().slice(0, 30) : 'nothing'}`;
+        }).filter(Boolean);
+        const hits = !miss.length;
+        if (r.width < 44 || r.height < 44 || !hits) {
+          const over = hits ? '' : ` — ${miss[0]}`;
+          small.push(`${el.closest('#reflectOverallMoods') ? 'overall' : 'block'} ${el.textContent}@${Math.round(r.width)}x${Math.round(r.height)}${hits ? '' : ' (not hit at 44px' + over + ')'}`);
+        }
+      });
+      if (small.length) bad.push(`mood buttons under a 44px target: ${small.slice(0, 6).join(', ')}`);
+      const sr = sheet.getBoundingClientRect();
+      [...document.querySelectorAll('#reflectBlockList .obj-item')].forEach(row => {
+        const rr = row.getBoundingClientRect();
+        if (rr.right > sr.right + 1) bad.push(`a block row runs to ${Math.round(rr.right)}px, past the sheet (${Math.round(sr.right)})`);
+      });
+      if (document.body.scrollWidth > window.innerWidth + 1) bad.push(`the page scrolls sideways (${document.body.scrollWidth})`);
+      // The floors: nothing under 13px; the block names she answers about, 15px.
+      let min = 99, where = '';
+      sheet.querySelectorAll('*').forEach(el => {
+        const s = getComputedStyle(el);
+        if (s.display === 'none' || s.visibility === 'hidden') return;
+        if (![...el.childNodes].some(c => c.nodeType === 3 && c.textContent.trim())) return;
+        const f = parseFloat(s.fontSize);
+        if (f < min) { min = f; where = (el.className || el.tagName).toString().slice(0, 30); }
+      });
+      if (min < 13) bad.push(`text at ${min}px on ${where} (floor 13px)`);
+      const names = [...document.querySelectorAll('#reflectBlockList .obj-item > span')];
+      if (names.length !== 2) bad.push(`${names.length} block names listed, expected 2`);
+      names.forEach(n => {
+        const f = parseFloat(getComputedStyle(n).fontSize);
+        if (f < 15) bad.push(`the block name "${n.textContent.trim()}" is ${f}px, under 15px`);
+      });
+      // Still works: tapping a block's mood records it.
+      const dot = perBlock.find(d => d.textContent === '🙂');
+      if (dot) {
+        dot.click();
+        if ((getProfData('jenn').blockMoods || {})['r6-mood-a'] !== '🙂') bad.push("tapping a block's 🙂 did not record it");
+      }
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      closeSheet('reflectOverlay');
+      const bm = getProfData('jenn').blockMoods || {};
+      delete bm['r6-mood-a']; delete bm['r6-mood-b'];
+      setDayBlocks(key, had, 'jenn');
+      profile = wasProfile; parentViewing = wasViewing;
+      goToday();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* C3 — a day with nothing planned was drawn 6am–2pm (dayDrawnSpanMin counted
+     blocks, not invites), so an afternoon invite's ghost on an empty day was
+     never drawn, and neither were its Accept / Add it anyway buttons. The drawn
+     span now stretches to take in every pending ghost the Day view will draw —
+     a series invite's covered days included — and the buttons are still the
+     inbox's (inviteAcceptable). A day with nothing on it and nothing waiting
+     keeps its 6am–2pm. */
+  if (want('anEmptyDayDrawsItsInviteGhost')) checks.anEmptyDayDrawsItsInviteGhost = await page.evaluate(() => {
+    const bad = [];
+    const unpin = pinClockToWeekday(3); // Thursday, midday
+    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey, wasOffset = weekOffset;
+    const wasInvites = state.shared.invites;
+    const wasShowAll = dayViewShowAll();
+    const keys = getDayKeys(0);
+    const savedJess = keys.map(k => getDayBlocks(k, 'jess'));
+    const ghostOn = (day) => document.querySelector(`#timeline .tl-col[data-day-key="${day}"] .placed-block.invitation`);
+    const labels = (el) => [...el.querySelectorAll('button')].map(b => b.textContent.trim()).join(' | ');
+    try {
+      keys.forEach(k => setDayBlocks(k, [], 'jess'));
+      setDayViewShowAll(false);
+      const inv = (id, day, startMin, extra) => Object.assign({ id, from: 'jenn', to: 'jess', status: 'pending',
+        day, actId: 'reading', startMin, durationMin: 60, sourceBlockId: id + '-src' }, extra || {});
+      state.shared.invites = [
+        // Friday, ahead: 4pm, on a day with nothing on it.
+        inv('r6-g-fri', keys[4], 16 * 60),
+        // A series on Saturday and Sunday at 5pm — each covered day is empty.
+        inv('r6-g-ser', keys[5], 17 * 60, { series: { days: [5, 6], every: 1, end: keys[6],
+          dayKeys: [keys[5], keys[6]], blockIds: ['r6-g-ser-a', 'r6-g-ser-b'] } }),
+        // Wednesday, already gone: 6pm, missed.
+        inv('r6-g-wed', keys[2], 18 * 60),
+      ];
+      profile = 'jess'; parentViewing = 'jess'; weekOffset = 0;
+      const cases = [
+        [keys[4], 4, 'Friday 4pm', /Accept/, /Ignore/],
+        [keys[5], 5, 'the series on Saturday 5pm', /Accept/, /Ignore/],
+        [keys[6], 6, 'the series on Sunday 5pm', /Accept/, /Ignore/],
+        [keys[2], 2, 'missed Wednesday 6pm', /Add it anyway/, /Decline/],
+      ];
+      cases.forEach(([day, idx, what, yes, no]) => {
+        openDay(day, idx);
+        const g = ghostOn(day);
+        if (!g) { bad.push(`the empty day's ghost for ${what} is not drawn`); return; }
+        const canvas = g.closest('.tl-canvas') || g.parentElement;
+        const gr = g.getBoundingClientRect(), cr = canvas.getBoundingClientRect();
+        if (gr.bottom > cr.bottom + 1 || gr.height < 30) bad.push(`the ghost for ${what} is cut off by the canvas (${Math.round(gr.bottom)} > ${Math.round(cr.bottom)})`);
+        const t = labels(g);
+        if (!yes.test(t) || !no.test(t)) bad.push(`the ghost for ${what} offers "${t}"`);
+        if (/Accept/.test(t) && /Add it anyway/.test(t)) bad.push(`the ghost for ${what} offers both Accept and Add it anyway`);
+      });
+      // Nothing planned and nothing waiting: still 6am–2pm.
+      openDay(keys[1], 1);
+      const span = canvasSpanMin(document.querySelector(`#timeline .tl-col[data-day-key="${keys[1]}"] .tl-canvas`));
+      if (span !== DAY_MIN_TAIL_MIN) bad.push(`an empty day with no invite is drawn for ${span} minutes, not ${DAY_MIN_TAIL_MIN}`);
+      // An invite she answered is not a ghost, and does not stretch the day.
+      state.shared.invites.forEach(i => { i.status = 'declined'; });
+      openDay(keys[4], 4);
+      if (ghostOn(keys[4])) bad.push('a declined invite still draws a ghost');
+      const span2 = canvasSpanMin(document.querySelector(`#timeline .tl-col[data-day-key="${keys[4]}"] .tl-canvas`));
+      if (span2 !== DAY_MIN_TAIL_MIN) bad.push(`a declined 4pm invite still stretches the empty day to ${span2} minutes`);
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      unpin();
+      state.shared.invites = wasInvites;
+      setDayViewShowAll(wasShowAll);
+      keys.forEach((k, i) => setDayBlocks(k, savedJess[i], 'jess'));
+      profile = wasProfile; parentViewing = wasViewing; currentDayKey = wasDayKey; weekOffset = wasOffset;
+      goToday();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* C4 — "Remove all in series" took the parent-pinned copies too, although a
+     child cannot remove one pinned block on its own (removeBlock refuses it).
+     Same rule now: for a child the pinned copies stay and the confirm says how
+     many; a parent may still remove them all. The series' own `sr:` tombstone
+     would delete every member on the next merge, kept pins included, so it is
+     written only when nothing was kept. */
+  if (want('removeAllInSeriesKeepsPins')) checks.removeAllInSeriesKeepsPins = await page.evaluate(async () => {
+    const bad = [];
+    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey, wasEditing = editingBlockId;
+    const keys = getDayKeys(0).slice(0, 4);
+    const saved = keys.map(k => getDayBlocksForProfile(k, 'jenn'));
+    const SID = 'sr-r6-pins';
+    const tombs = () => state.shared.tombstones || {};
+    const seed = () => keys.forEach((k, i) => setDayBlocks(k, [{ id: 'r6-sr-' + i, actId: 'piano',
+      startMin: 16 * 60, durationMin: 30, seriesId: SID, parentPinned: i === 1 || i === 2, createdAt: 1, updatedAt: 1 }], 'jenn'));
+    const left = () => keys.map(k => (getDayBlocksForProfile(k, 'jenn') || []).find(b => b.seriesId === SID)).filter(Boolean);
+    const removeFromMonday = async () => {
+      currentDayKey = keys[0]; editingBlockId = 'r6-sr-0';
+      const run = removeBlock();
+      await new Promise(r => setTimeout(r, 30));
+      const msg = (document.getElementById('appDialogMsg') || {}).textContent || '';
+      const ok = document.getElementById('appDialogOkBtn');
+      if (ok && document.querySelector('#appDialogOverlay.open')) ok.click();
+      await run;
+      return msg;
+    };
+    try {
+      // ── A child: the two pinned copies stay, and the confirm says so.
+      profile = 'jenn'; parentViewing = 'jenn';
+      seed();
+      const msg = await removeFromMonday();
+      if (!/2/.test(msg) || !/pinned/i.test(msg) || !/stay/i.test(msg)) bad.push(`a child's confirm does not say the 2 pinned copies stay: "${msg}"`);
+      const kept = left();
+      if (kept.length !== 2 || !kept.every(b => b.parentPinned)) {
+        bad.push(`after a child's "remove all" ${kept.length} members are left (${kept.map(b => b.id).join(', ')}), expected the 2 pinned`);
+      }
+      if (tombs()['sr:' + SID]) bad.push('a child\'s "remove all" wrote the series tombstone — the next merge deletes the kept pins');
+      if (!tombs()['r6-sr-0'] || !tombs()['r6-sr-3']) bad.push('the removed copies were not tombstoned');
+      if (tombs()['r6-sr-1'] || tombs()['r6-sr-2']) bad.push('a kept pinned copy was tombstoned');
+      const merged = mergeWeeks(getProfData('jenn').weeks, {});
+      const survive = keys.map(k => (merged[k] || []).find(b => b.seriesId === SID)).filter(Boolean).length;
+      if (survive !== 2) bad.push(`after a merge ${survive} pinned copies survive, expected 2`);
+      ['r6-sr-0', 'r6-sr-1', 'r6-sr-2', 'r6-sr-3', 'sr:' + SID].forEach(id => delete tombs()[id]);
+
+      // ── A parent may still remove them all.
+      profile = 'parent'; parentViewing = 'jenn';
+      seed();
+      const pmsg = await removeFromMonday();
+      if (/stay/i.test(pmsg)) bad.push(`a parent's confirm says something stays: "${pmsg}"`);
+      if (left().length) bad.push(`after a parent's "remove all" ${left().length} members are left`);
+      if (!tombs()['sr:' + SID]) bad.push('a parent\'s "remove all" did not tombstone the series');
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      ['r6-sr-0', 'r6-sr-1', 'r6-sr-2', 'r6-sr-3', 'sr:' + SID].forEach(id => delete tombs()[id]);
+      keys.forEach((k, i) => setDayBlocks(k, saved[i], 'jenn'));
+      profile = wasProfile; parentViewing = wasViewing; currentDayKey = wasDayKey; editingBlockId = wasEditing;
+      goToday();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* C5 — the 👯 sister-details switch on Sister Sync wrote a household setting
+     (state.shared.sisterVisibilityMode) that either girl could flip for both,
+     and its "Showing all activities" was not true: only blocks marked public
+     ever showed. A child now sees the setting and cannot change it; a parent
+     changes it in Parent › ⚙️ App › 👤 Profiles, where it says what it shows. */
+  if (want('sisterDetailsAreTheParentsToChange')) checks.sisterDetailsAreTheParentsToChange = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile, wasViewing = parentViewing, wasUnlocked = parentUnlockedThisSession;
+    const wasScreen = (document.querySelector('.screen.active') || {}).id || 'screen-today';
+    const hadVis = Object.prototype.hasOwnProperty.call(state.shared, 'sisterVisibilityMode'), wasVis = state.shared.sisterVisibilityMode;
+    const syncText = () => (document.getElementById('syncOverlapWrap') || {}).textContent || '';
+    try {
+      state.shared.sisterVisibilityMode = 'public';
+      profile = 'jenn'; parentViewing = 'jenn';
+      openSisterSync();
+      if (!/Showing activities marked public/.test(syncText())) bad.push(`a child's Sister Sync does not say "Showing activities marked public": "${syncText().trim().slice(0, 120)}"`);
+      if (/Showing all activities/.test(syncText())) bad.push('Sister Sync still says "Showing all activities"');
+      const wrap = document.getElementById('syncOverlapWrap');
+      // Tap whatever the setting is drawn as, once — a switch, a button, or a line.
+      const ctl = [...wrap.querySelectorAll('*')].find(el => typeof el.onclick === 'function' || el.matches('button, [role="switch"], [onclick]'));
+      if (ctl) ctl.click();
+      if (state.shared.sisterVisibilityMode !== 'public') bad.push(`a child's tap changed the household setting to "${state.shared.sisterVisibilityMode}"`);
+      setSisterDetailsVisibleGlobal(false);
+      if (state.shared.sisterVisibilityMode !== 'public') bad.push('the writer lets a child change the household setting');
+
+      // A parent changes it, in Parent › App › Profiles.
+      profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
+      showScreen('parent'); renderParentHome(); setParentTab('profiles');
+      const panel = document.getElementById('paProfilesWrap');
+      const pick = (v) => panel && panel.querySelector(`[data-pa-sister-vis="${v}"]`);
+      if (!pick('public') || !pick('busy-only')) bad.push('Parent › App › Profiles has no sister-details choice');
+      else {
+        if (!/activities marked public/i.test(panel.textContent)) bad.push('the parent choice does not say "activities marked public"');
+        pick('busy-only').click();
+        if (state.shared.sisterVisibilityMode !== 'busy-only') bad.push(`the parent's "busy only" wrote "${state.shared.sisterVisibilityMode}"`);
+        if (!(pick('busy-only') || {}).classList?.contains('active')) bad.push('the parent choice does not show busy only as chosen');
+        [pick('public'), pick('busy-only')].forEach(b => {
+          const r = b.getBoundingClientRect();
+          if (r.height < 44) bad.push(`a sister-details choice is ${Math.round(r.height)}px tall, under 44px`);
+        });
+      }
+      // The child sees the new setting, read-only.
+      profile = 'jenn'; parentViewing = 'jenn';
+      openSisterSync();
+      if (!/busy/i.test(syncText()) || /marked public/.test(syncText())) bad.push(`after a parent chose busy only, the child's Sister Sync reads "${syncText().trim().slice(0, 120)}"`);
+      // Back to public from the parent side.
+      profile = 'parent';
+      showScreen('parent'); renderParentHome(); setParentTab('profiles');
+      const back = document.querySelector('#paProfilesWrap [data-pa-sister-vis="public"]');
+      if (back) back.click();
+      if (state.shared.sisterVisibilityMode !== 'public') bad.push(`the parent's "marked public" wrote "${state.shared.sisterVisibilityMode}"`);
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      if (hadVis) state.shared.sisterVisibilityMode = wasVis; else delete state.shared.sisterVisibilityMode;
+      profile = wasProfile; parentViewing = wasViewing; parentUnlockedThisSession = wasUnlocked;
+      showScreen(wasScreen.replace(/^screen-/, ''));
+      goToday();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* C8 — the copy button said "onto this day" when a parent had picked the
+     sister's day, which is exactly when it matters whose day it lands on. It
+     names her day now ("onto Jess's Tue"); a child's own copy still says
+     "onto this day". */
+  if (want('copyADayNamesTheSistersDay')) checks.copyADayNamesTheSistersDay = await page.evaluate(() => {
+    const bad = [];
+    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
+    const wk = getDayKeys(0);
+    const [dst, src] = [wk[1], wk[3]];
+    const saved = [[dst, getDayBlocksForProfile(dst, 'jenn')], [src, getDayBlocksForProfile(src, 'jenn')]];
+    const copyBtn = () => {
+      const row = [...document.querySelectorAll('#copyDayList .copy-day-row')].find(r => /Thursday/.test(r.textContent));
+      if (!row) return null;
+      if (row.getAttribute('aria-expanded') !== 'true') row.click();
+      const panel = document.getElementById(row.getAttribute('aria-controls') || '');
+      return panel && panel.querySelector('.cdr-copy');
+    };
+    try {
+      setDayBlocks(src, [{ id: 'r6-cd-src', actId: 'piano', startMin: 16 * 60, durationMin: 30 }], 'jenn');
+      profile = 'parent'; parentViewing = 'jenn';
+      openDay(dst, 1);
+      openTemplateSheet();
+      copyDayHandleClick({ target: document.querySelector('#copyDayKidTabs [data-copyday-kid="jess"]') });
+      const b = copyBtn();
+      if (!b) bad.push("a parent sees no copy button for Thursday");
+      else {
+        const t = b.textContent.trim();
+        if (!/onto Jess's Tue/.test(t)) bad.push(`with Jess's day picked the button reads "${t}", not "… onto Jess's Tue"`);
+        if (/this day/.test(t)) bad.push(`with Jess's day picked the button still says "this day": "${t}"`);
+      }
+      // Her own day again: "onto this day".
+      copyDayHandleClick({ target: document.querySelector('#copyDayKidTabs [data-copyday-kid="jenn"]') });
+      const own = copyBtn();
+      if (!own || !/onto this day/.test(own.textContent)) bad.push(`a parent copying onto the same child's day reads "${own ? own.textContent.trim() : '(none)'}"`);
+      closeSheet('templateOverlay');
+      profile = 'jenn';
+      openDay(dst, 1);
+      openTemplateSheet();
+      const kid = copyBtn();
+      if (!kid || !/onto this day/.test(kid.textContent)) bad.push(`a child's copy button reads "${kid ? kid.textContent.trim() : '(none)'}"`);
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      closeSheet('templateOverlay');
+      saved.forEach(([k, blocks]) => setDayBlocks(k, blocks, 'jenn'));
+      copyDaySrcWeek = 0; copyDayDstKid = null;
+      profile = wasProfile; parentViewing = wasViewing; currentDayKey = wasDayKey;
+      goToday();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* C7 — dark mode. The screens changed in R5 are rendered with the device
+     asking for a dark scheme (prefers-color-scheme: dark, emulated), and every
+     piece of text on them is measured against what is actually behind it:
+     contrast at least 4.5:1, and never white text on a pastel. Sister Sync's
+     timeline, the 📋 Copy a day sheet (a row open, and a parent's sister tabs),
+     Today's 🌙 row and Parent › Now. (Catch up and "On her behalf" are on
+     another branch and are not measured here.) */
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.evaluate(() => {
+    window.darkContrastFindings = (root, label) => {
+      const out = [];
+      if (!root) return [`${label}: not on screen`];
+      const parse = (c) => {
+        const m = /rgba?\(([^)]+)\)/.exec(c || '');
+        if (!m) return null;
+        const p = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+        return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
+      };
+      const over = (top, under) => ({ r: top.r * top.a + under.r * (1 - top.a), g: top.g * top.a + under.g * (1 - top.a),
+        b: top.b * top.a + under.b * (1 - top.a), a: 1 });
+      const lum = ({ r, g, b }) => {
+        const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+        return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+      };
+      const bgBehind = (el) => {
+        const layers = [];
+        for (let e = el; e; e = e.parentElement) {
+          const c = parse(getComputedStyle(e).backgroundColor);
+          if (c && c.a > 0) { layers.push(c); if (c.a >= 1) break; }
+        }
+        let base = { r: 255, g: 255, b: 255, a: 1 };
+        for (let i = layers.length - 1; i >= 0; i--) base = over(layers[i], base);
+        return base;
+      };
+      const opacityOf = (el) => { let o = 1; for (let e = el; e; e = e.parentElement) o *= Number(getComputedStyle(e).opacity); return o; };
+      const hex = ({ r, g, b }) => '#' + [r, g, b].map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+      const seen = new Set();
+      [root, ...root.querySelectorAll('*')].forEach(el => {
+        const s = getComputedStyle(el);
+        if (s.display === 'none' || s.visibility === 'hidden') return;
+        if (el.closest('.visually-hidden')) return;
+        const r = el.getBoundingClientRect();
+        if (r.width < 2 || r.height < 2) return;
+        const text = [...el.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join('').trim();
+        if (!/[A-Za-z0-9]/.test(text)) return;   // emoji draw in their own colours
+        const bg = bgBehind(el);
+        const c = parse(s.color);
+        if (!c) return;
+        const fg = over({ ...c, a: c.a * opacityOf(el) }, bg);
+        const Lf = lum(fg), Lb = lum(bg);
+        const ratio = (Math.max(Lf, Lb) + 0.05) / (Math.min(Lf, Lb) + 0.05);
+        const name = `${label} .${(el.className || el.tagName).toString().trim().split(/\s+/)[0] || el.tagName} "${text.slice(0, 24)}"`;
+        const key = name + ratio.toFixed(1);
+        if (seen.has(key)) return;
+        seen.add(key);
+        if (lum(parse(s.color) || fg) > 0.8 && Lb > 0.35) out.push(`${name}: white text on a pastel (${hex(fg)} on ${hex(bg)})`);
+        else if (ratio < 4.5) out.push(`${name}: ${ratio.toFixed(2)}:1 (${hex(fg)} on ${hex(bg)})`);
+      });
+      return out;
+    };
+  });
+  if (want('theR5ScreensReadInDarkMode')) checks.theR5ScreensReadInDarkMode = await page.evaluate(async () => {
+    const bad = [];
+    // Overlays fade in and sheets slide up; measured mid-animation, every word reads as 1:1.
+    const settle = () => new Promise(r => setTimeout(r, 400));
+    if (!matchMedia('(prefers-color-scheme: dark)').matches) return ['the dark scheme was not emulated — nothing was measured'];
+    const unpin = pinClockToWeekday(3); // Thursday, midday
+    const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey, wasOffset = weekOffset;
+    const wasUnlocked = parentUnlockedThisSession, wasSyncIdx = syncDayIdx;
+    const wasInvites = state.shared.invites;
+    const hadVis = Object.prototype.hasOwnProperty.call(state.shared, 'sisterVisibilityMode'), wasVis = state.shared.sisterVisibilityMode;
+    const keys = getDayKeys(0);
+    const savedJenn = keys.map(k => getDayBlocks(k, 'jenn'));
+    const savedJess = keys.map(k => getDayBlocks(k, 'jess'));
+    const pd = getProfData('jenn');
+    const hadMoods = JSON.parse(JSON.stringify(pd.dayMoods || {}));
+    try {
+      state.shared.sisterVisibilityMode = 'public';
+      const thu = keys[3];
+      setDayBlocks(thu, [
+        { id: 'r6-dk-a', actId: 'reading', startMin: 16 * 60, durationMin: 90, public: true,
+          travelBuffer: true, travelBufMin: 20, getReadyBuffer: true, getReadyBufMin: 10 },
+        { id: 'r6-dk-b', actId: 'piano', startMin: 19 * 60, durationMin: 30 },
+      ], 'jenn');
+      setDayBlocks(thu, [
+        { id: 'r6-dk-c', actId: 'piano', startMin: 16 * 60, durationMin: 60, public: true },
+        { id: 'r6-dk-d', actId: 'dinner', startMin: 18 * 60, durationMin: 60 },
+      ], 'jess');
+      setDayBlocks(keys[1], [{ id: 'r6-dk-e', actId: 'dinner', startMin: 18 * 60, durationMin: 60 },
+        { id: 'r6-dk-f', actId: 'piano', startMin: 17 * 60, durationMin: 30, parentPinned: true }], 'jenn');
+      state.shared.invites = [{ id: 'r6-dk-inv', from: 'jess', to: 'jenn', status: 'pending', day: keys[4],
+        actId: 'piano', startMin: 16 * 60, durationMin: 60, sourceBlockId: 'r6-dk-src' }];
+
+      // Sister Sync's timeline, with the inbox under it.
+      profile = 'jenn'; parentViewing = 'jenn'; weekOffset = 0;
+      openSisterSync(); syncDayIdx = 3; renderSync();
+      bad.push(...darkContrastFindings(document.getElementById('screen-sync'), 'Sister Sync'));
+
+      // 📋 Copy a day — a child's, with Tuesday open.
+      openDay(thu, 3);
+      openTemplateSheet();
+      const row = [...document.querySelectorAll('#copyDayList .copy-day-row')].find(r => /Tuesday/.test(r.textContent));
+      if (row) row.click(); else bad.push('Copy a day: Tuesday is not offered');
+      await settle();
+      bad.push(...darkContrastFindings(document.querySelector('#templateOverlay .sheet'), 'Copy a day'));
+      closeSheet('templateOverlay');
+      // …and a parent's, with the sister tabs.
+      profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
+      openDay(thu, 3);
+      openTemplateSheet();
+      await settle();
+      bad.push(...darkContrastFindings(document.querySelector('#templateOverlay .sheet'), 'Copy a day (parent)'));
+      closeSheet('templateOverlay');
+      copyDayDstKid = null;
+
+      // Today's 🌙 row: yesterday has no mood, so it asks.
+      profile = 'jenn'; parentViewing = 'jenn';
+      pd.dayMoods = {};
+      goToday();
+      const moon = document.querySelector('#tdWrap [data-td-action="reflect"]');
+      if (!moon) bad.push("Today's 🌙 row: not on screen");
+      else bad.push(...darkContrastFindings(moon, "Today's 🌙 row"));
+
+      // Parent › Now.
+      profile = 'parent'; parentViewing = 'jenn';
+      showScreen('parent'); renderParentHome(); setParentTab('now');
+      bad.push(...darkContrastFindings(document.getElementById('pnWrap'), 'Parent › Now'));
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      unpin();
+      ['templateOverlay'].forEach(id => { if (document.getElementById(id).classList.contains('open')) closeSheet(id); });
+      state.shared.invites = wasInvites;
+      if (hadVis) state.shared.sisterVisibilityMode = wasVis; else delete state.shared.sisterVisibilityMode;
+      pd.dayMoods = hadMoods;
+      keys.forEach((k, i) => { setDayBlocks(k, savedJenn[i], 'jenn'); setDayBlocks(k, savedJess[i], 'jess'); });
+      profile = wasProfile; parentViewing = wasViewing; currentDayKey = wasDayKey; weekOffset = wasOffset;
+      parentUnlockedThisSession = wasUnlocked; syncDayIdx = wasSyncIdx;
+      copyDaySrcWeek = 0; copyDayDstKid = null;
+      goToday();
+    }
+    return bad.length ? bad : true;
+  });
+  await page.emulateMedia({ colorScheme: 'light' });
 
   /* Step 1 confirms a day where the day is, not in a panel below a chart.
      Twenty-eight movements for a week where nothing was wrong is the friction

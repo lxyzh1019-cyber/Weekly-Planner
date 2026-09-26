@@ -389,6 +389,11 @@ Kid-facing copy is a product surface, not filler. The rules:
   should. One documented exemption: `.wf-card-check`, whose size is set inline per
   block height and which sits at a card corner, where a 44px target would swallow
   the tap that opens the day.
+  **Sister Sync is in the sweep** (`screen-sync`, seeded with both sisters' day
+  and a waiting and a missed invite — Plan v6 C6), and **every row must prove
+  its screen was on show**: a screen that did not open measures clean, because
+  every control on it is `display:none`. (`openSisterSync` refuses a parent,
+  and the row did exactly that until the guard caught it.)
   Scope target rules to the **component**, not the screen: `.ck-navbtn` is both a
   kid's week arrow and the parent portal's, and screen-scoping it left the portal
   copy at 36×36.
@@ -994,6 +999,19 @@ They cannot disagree, and neither may count busy time any other way.
 `isMe || (showAll && b.public)`. Otherwise it is a grey (`SYNC_BUSY_GREY`)
 **Busy** shape at its real height, and its strips say only "Busy".
 
+*`showAll` is a grown-up's to change* (Plan v6 C5). It is the household
+setting `state.shared.sisterVisibilityMode` (`lww`, `js/04-merge.js`), and the
+switch on this screen let either girl flip it for both — while reading
+"Showing all activities" when only blocks marked public ever showed. Sister
+Sync now draws it as a read-only line (`.sync-vis-note`, `sisterDetailsWords`:
+"👯 Sister details: Showing activities marked public · a grown-up sets this", or
+"🙈 … Showing busy times only"). `setSisterDetailsVisibleGlobal` refuses a
+child. A parent changes it in **Parent › ⚙️ App › 👤 Profiles** (the card "👯
+What each sister sees on Sister Sync", `data-pa-sister-vis`): App, not Setup,
+by the boundary test, and not on Sister Sync because `openSisterSync` refuses a
+parent. The per-block "👯 Show details to your sister" switch stays in the edit
+sheet.
+
 *Sizes.* Everything is to scale except the floor. A card shorter than its floor
 borrows the empty minutes **above** it (`wfCardBoxes`), so its bottom edge and
 its printed start–end stay true. Where there is nothing to borrow, the lane
@@ -1076,7 +1094,9 @@ under that, so an evening whose last block ends at a quarter to nine showed an
 hour of empty grid and then most of a screen of nothing — and no trimming in JS
 could have taken either back. `dayDrawnSpanMin(keys)` (**not** `dayViewSpan`,
 which has meant the column count since the 1/2/3-day view landed) takes the last
-drawn edge across the visible columns, buffers included, adds
+drawn edge across the visible columns, buffers included — and every pending
+invite ghost the canvas will draw (`dayInviteGhosts(dayKey)`, the renderer's
+own list, Plan v6 C3) — adds
 `DAY_TAIL_SPARE_MIN` so there is somewhere to tap to put something later, floors
 at `DAY_MIN_TAIL_MIN` so a blank day is still a canvas you can plan on, and
 rounds to a **multiple of 15** because `buildSlotGrid` tiles the canvas in
@@ -2258,6 +2278,20 @@ only fills a blank week, so there is no target pin to keep), and `pcwCommit`
 (parent-only, so pins kept — unchanged; its "replace" still replaces a pinned
 day, because the parent chose it in a preview).
 
+**"Remove all in series" keeps a child's hands off pins too** (Plan v6 C4).
+`removeBlock` already refused one pinned block to a child; its "remove all"
+took the pinned copies anyway. `deleteSeriesBlocks` now leaves every
+`parentPinned` member when `!isParent()`, and the confirm counts what she can
+remove and says how many stay (`seriesPinnedCount`: "📌 2 are pinned by a
+grown-up and stay. OK = remove the other 3"); a parent still removes them all.
+The series' own `sr:` tombstone is written **only when nothing was kept** —
+`blockTombstoned` drops every member older than it on the next merge, a kept
+pin included — so a child's partial remove tombstones only the ids it took.
+
+**The copy button names whose day it lands on** (Plan v6 C8):
+`copyDayOntoWords(dstKid)` — "onto this day" for her own, "onto Jess's Tue" when
+a parent has picked the sister — used by the button and the confirm alike.
+
 **Clearing a day is "🗑 Start this day over", last on the 📋 sheet, and it keeps
 what is done, pinned or marked not done** (R5 §7 Q4, 2026-09-24). It was 🗑 on the Day view's top
 bar beside 📋 and 🌙 and took every block, done and parent-pinned included; the
@@ -2304,6 +2338,12 @@ invite wrong-day bug (PR #93): it outlives the Day view that set it. Now:
   `setDayMood`, `#vibeMoods`, `#vibeSubtext`, `.vibe-card` and `.vibe-title` are
   gone. `.vibe-moods` / `.vibe-mood` stay (the sheet and the ritual). Today's
   fold is now "To-dos and goals".
+- **The sheet's moods are 44px targets** (Plan v6 C2 — they were 36px for the
+  day and 28px, inline, for each block): `#reflectOverlay .vibe-mood`, with a
+  gap wide enough that a chosen dot's 1.2× stays off its neighbour. Each block's
+  row (`.refl-block-row`) wraps, so on a phone the name sits above its five
+  moods; the name is 15px. The ritual's and the edit sheet's dots are unchanged.
+  Held by `reflectMoodsAre44pxTargets`.
 - **The closing ritual is unchanged** — it still reads `currentDayKey` and
   writes that day's mood from its own picker — but it now follows a reflection
   only when the day reflected on is today and `currentDayKey` is today, so it
@@ -3453,6 +3493,44 @@ $X" or "No meeting — default $3 + meets $X" from the row's own figures, with n
 steppers and no remove button. Its meets correct through the meet itself (B6).
 Grandma rows still carry `handEntered`; `defaulted` is read first. Hand-typed
 rows without `defaulted` keep the editor unchanged.
+
+## Small fixes R6 — Plan v6 C (2026-09-25, build 2026-09-25a)
+
+Eight small fixes, each held by a smoke check that failed on the code before
+it. The rules they set are written in place above; this is the index.
+
+| # | What | Where the rule lives | Check |
+|---|---|---|---|
+| C1 | 😌 Rest on the 📋 sheet is a 44px target (it was 38px) | `#restDayBtn` joins `.day-over-btn, .reflect-day-btn` in `css/app.css` | `restButtonIsA44pxTarget` |
+| C2 | Reflect-sheet moods are 44px, day and blocks; block names 15px | "How a day went is asked on Today" | `reflectMoodsAre44pxTargets` |
+| C3 | An empty day's canvas stretches to its pending invite ghosts | "The day STOPS where the day stops" | `anEmptyDayDrawsItsInviteGhost` |
+| C4 | A child's "remove all in series" keeps pinned copies | "A pin is a parent's" | `removeAllInSeriesKeepsPins` |
+| C5 | 👯 Sister details is a grown-up's to change; kids see it | "Sister Sync is a timeline" › *showAll* | `sisterDetailsAreTheParentsToChange` |
+| C6 | Sister Sync is in the kid-screen sweep; each row proves its screen showed | UI rules | `kidScreensMeetTheHouseRules` |
+| C7 | The R5 screens read in dark mode | below | `theR5ScreensReadInDarkMode` |
+| C8 | The copy button names the sister's day | "A pin is a parent's" | `copyADayNamesTheSistersDay` |
+
+**Dark mode (C7).** There is no dark theme: `css/app.css` has three
+`prefers-color-scheme: dark` rules (the week's clash and to-do banners) and no
+`color-scheme` declaration, so a device set to dark renders these screens in
+their light colours. `theR5ScreensReadInDarkMode` emulates the dark scheme,
+asserts it took (`matchMedia`), and measures every piece of text on Sister
+Sync's timeline and inbox, the 📋 Copy a day sheet (a child's with a row open,
+and a parent's with the sister tabs), Today's 🌙 row and Parent › Now against
+what is actually behind it — background layers composited, opacity included —
+at **4.5:1, with no white text on a pastel**. Emoji-only text is skipped (it
+draws in its own colours); sheets are measured after their slide-in, because
+mid-animation every word reads 1:1. It found two things, both also true in
+light mode, and both fixed: the empty rows of Copy a day were faded to 55%
+opacity ("Friday" at 1.4:1 — now dashed and in `--ink-light`, not faded), and
+Parent › Now's today square was white on `--accent` (2.6:1 — now
+`--accent-strong`, the portal's own "go" colour, 4.9:1). Catch up and "On her
+behalf" are not on this branch and are not measured.
+
+**C6 found** the 💌 inbox's ✅ Accept / ❌ Decline / 📌 Add it anyway at
+`.pill-btn`'s 38px (`.invite-actions .pill-btn` is 44px now). Before the
+screen-on-show guard, the new Sister Sync row measured nothing: the sweep ran
+with a parent signed in and `openSisterSync` refused.
 
 ## Known trip hazards
 

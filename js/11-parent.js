@@ -55,7 +55,7 @@ const PARENT_LANDINGS = {
   ],
   app: [
     { panel: 'access',   icon: '🔒', title: 'Access',          sub: 'The parent PIN that everything here sits behind' },
-    { panel: 'profiles', icon: '👤', title: 'Profiles',        sub: 'Who the girls are, and their age' },
+    { panel: 'profiles', icon: '👤', title: 'Profiles',        sub: 'Who the girls are, their age, and what each sees of her sister' },
     { panel: 'prefs',    icon: '🎛️', title: 'Preferences',     sub: 'Reading size on grown-up screens' },
     { panel: 'school',   icon: '📅', title: 'School calendar', sub: 'Term dates and days off — replaced each August' },
     { panel: 'backup',   icon: '🗄️', title: 'Backup and data', sub: 'Export, restore, cloud size, and resetting a week' },
