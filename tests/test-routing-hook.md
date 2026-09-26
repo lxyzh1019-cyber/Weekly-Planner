@@ -3,7 +3,7 @@
 Goal: learn whether a PreToolUse hook can tell an `opus-worker` edit from a main-session edit, then switch the guard from `observe` to `enforce` only if it can.
 
 ## Step 0 — unit replay (in a cloud session)
-Ask the session to run `bash tests/replay-hooks.sh` — all 14 checks must pass. This proves the scripts parse and block correctly; it does not prove field names in real hook input.
+Ask the session to run `bash tests/replay-hooks.sh` — all 16 checks must pass. This proves the scripts parse and block correctly; it does not prove field names in real hook input.
 
 ## Step 1 — observe real input (cloud session on `main` after install; approve the plan so edits can run)
 1. `config.json` has `"routing_guard_mode": "observe"` (default).

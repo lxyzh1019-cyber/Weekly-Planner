@@ -246,6 +246,7 @@ function mnyRenderMyMoney() {
        <div class="mny-cols page1">
          <div class="mny-col">
            ${mnyTodayCard(kid, wk)}
+           ${mnyEarnBoardCard(kid, wk)}
            ${mnyWalletCard(kid)}
            ${mnyIncomeCard(kid, wk)}
            ${mnySavingGoalsCard(kid)}
@@ -312,6 +313,43 @@ function mnyTodayCard(kid, wk) {
       <div class="mny-note">${free > 0
         ? `${free} of your free jobs still to use this week. They are always your lowest-paying ones, so doing your best work first never costs you.`
         : `Your free jobs for this week are used up — everything else pays.`}</div>
+    </div>`;
+}
+
+/* ── Earned this week (R5 §5 C2, row 11) ──
+   The chore tab's earn board, on the page she opens to ask "what have I
+   earned": the week's total kept after fines, today's ceiling bar — fines
+   first, then what she kept, what is waiting for Mum, and anything past the
+   ceiling that turned into XP — and the ledger by channel. Every figure comes
+   from ckEarnBoard, the rail's own reader, so the two screens cannot disagree.
+   Read-only: nothing here claims, grades or moves money. Today's bar only when
+   today is in the week showing. */
+function mnyEarnBoardCard(kid, wk) {
+  const d = mrWeekDayKeys(wk).indexOf(todayKey());
+  const board = ckEarnBoard(kid, wk, Math.max(0, d));
+  const bar = board.bar;
+  const dayHtml = d < 0 ? '' : `
+      <div class="mny-sub">${escapeHtml(`${CT_DAYS[d]} · ${ckMoney(bar.cap)} ceiling`)}</div>
+      <div class="mny-earn-barwrap">
+        <div class="mny-earn-bar" role="img" aria-label="${escapeAttr(bar.keys.map(k => k.label).join(', '))}">${bar.segs.map(s =>
+          `<span class="mny-earn-seg" style="width:${s.w}%;background:${s.bg}" title="${escapeAttr(s.title)}"></span>`).join('')}</div>
+        <span class="mny-earn-ceil" style="left:${bar.ceilPct}%" title="${escapeAttr(`the ${ckMoney(bar.cap)} ceiling`)}"></span>
+      </div>
+      <div class="mny-earn-keys">${bar.keys.map(k =>
+        `<span class="mny-earn-key" style="background:${k.bg};color:${k.fg}">${escapeHtml(k.label)}</span>`).join('')}</div>
+      <div class="mny-earn-risk">${escapeHtml(bar.risk)}</div>
+      ${bar.room ? `<div class="mny-note">${escapeHtml(bar.room)}</div>` : ''}`;
+  const lines = board.ledger.map(l => `<div class="mny-earn-line">
+        <span class="mny-earn-line-text"><span class="mny-earn-line-name">${escapeHtml(l.name)}</span>
+          <span class="mny-earn-line-detail">${escapeHtml(l.detail)}</span></span>
+        <span class="mny-earn-line-amt${l.fg === 'ck-red' ? ' mny-earn-line-amt--fine' : ''}">${escapeHtml(l.amount)}</span>
+      </div>`).join('');
+  return `<div class="mny-card mny-earnboard">
+      <div class="mny-label">Earned this week</div>
+      <div class="mny-earn-total">${escapeHtml(ckMoney(board.net))}</div>
+      <div class="mny-note">kept after fines · a day never goes below $0</div>
+      ${dayHtml}
+      <div class="mny-earn-lines">${lines}</div>
     </div>`;
 }
 
@@ -756,17 +794,42 @@ function mnyLedgerRows(kid) {
    Both stay: the ledger rows are the week-by-week record a parent checks
    against a meeting, and the Flow cannot replace a record of what each
    settlement paid. */
+/* ── Your last 8 weeks (R5 §5 C2, row 12) ──
+   The chore tab rail's eight bars — what each week earned, this one still
+   going — from its own reader, ckEightWeeks, so the bars and their labels are
+   the rail's. Scaled to her own best week of the eight. It sits after the Flow
+   and before the week-by-week record, which lists settled weeks only and is
+   not repeated here. Read-only. */
+function mnyEightWeeksCard(kid) {
+  const { weeks, peak } = ckEightWeeks(kid, ctThisWeekKey());
+  const best = weeks.reduce((a, w) => (w.money > a.money ? w : a), weeks[0]);
+  const bars = weeks.map(w => `<span class="mny-wk8-bar${w.now ? ' now' : ''}" title="${escapeAttr(w.title)}">
+        <span class="mny-wk8-fill" style="height:${Math.max(4, Math.round(w.money / peak * 80))}px"></span>
+      </span>`).join('');
+  const first = weeks[0].d;
+  return `<div class="mny-card mny-weeks8">
+      <div class="mny-label">📊 Your last 8 weeks</div>
+      <div class="mny-wk8-row" role="img" aria-label="${escapeAttr(weeks.map(w => w.title).join('; '))}">${bars}</div>
+      <div class="mny-wk8-axis"><span>${escapeHtml(`${MONTH_SHORT[first.getMonth()]} ${first.getDate()}`)}</span><span>this week</span></div>
+      <div class="mny-note">${best.money > 0
+        ? escapeHtml(`Best of the eight: ${mnyMoney(best.money)}, the week of ${MONTH_SHORT[best.d.getMonth()]} ${best.d.getDate()}. This week is still going.`)
+        : 'Nothing earned in these eight weeks yet. This week is still going.'}</div>
+    </div>`;
+}
+
 function mnyRenderStory() {
   const wrap = document.getElementById('mnyStoryWrap');
   if (!wrap) return;
   const kid = mnyViewKid();
   const all = mnyLedgerRows(kid);
   const flow = (typeof flRenderFlow === 'function') ? flRenderFlow(kid) : '';
+  const weeks8 = mnyEightWeeksCard(kid);
 
   if (!all.length) {
     wrap.innerHTML = `${mnyPageHead('🌊 My money story', '', [], { back: 'backmoney' })}
       ${mnyTabBar('money')}
       ${flow}
+      ${weeks8}
       <div class="mny-card"><div class="mny-label">📖 Week by week</div>
       <div class="mny-note">Every Sunday you settle a week, it gets written down here — what came in, where it went, and how much of your loan was left. Nothing settled yet.</div></div>`;
     if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
@@ -801,6 +864,7 @@ function mnyRenderStory() {
       `${mnyPageHead('🌊 My money story', 'Where it comes from and where it goes', [], { back: 'backmoney' })}
        ${mnyTabBar('money')}
        ${flow}
+       ${weeks8}
        <div class="mny-card">
          <div class="mny-label">📖 Week by week</div>
          <div class="mny-chiprow">${modeBtns}</div>

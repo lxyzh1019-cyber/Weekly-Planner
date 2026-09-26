@@ -29,6 +29,18 @@ cat > "$T/gov.jsonl" <<'J'
 {"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/repo/CLAUDE.md"}}]}}
 {"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Updated.\n\nConfidence: High · Status: Checked"}]}}
 J
+cat > "$T/bashrecord.jsonl" <<'J'
+{"type":"user","message":{"role":"user","content":"fix the bug"}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/repo/js/app.js"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"sed -i 's/NOT STARTED/COMPLETE/' WORKING_RECORD.md"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Done.\n\nRegression table\n| Feature | Status |\n| login | kept |\n\nConfidence: Medium · Status: Checked"}]}}
+J
+cat > "$T/bashreadonly.jsonl" <<'J'
+{"type":"user","message":{"role":"user","content":"fix the bug"}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/repo/js/app.js"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"cat WORKING_RECORD.md"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Done.\n\nRegression table\n| Feature | Status |\n| login | kept |\n\nConfidence: Medium · Status: Checked"}]}}
+J
 
 # --- Stop: validation line
 o=$(echo "{\"transcript_path\":\"$T/ok.jsonl\",\"stop_hook_active\":false}" | python3 $H/validation-line.py); check "validation-line passes good line" "^$" "$o"
@@ -38,6 +50,8 @@ o=$(echo "{\"transcript_path\":\"$T/noline.jsonl\",\"stop_hook_active\":true}" |
 o=$(echo "{\"transcript_path\":\"$T/ok.jsonl\",\"stop_hook_active\":false}" | python3 $H/record-guard.py); check "record-guard passes complete turn" "^$" "$o"
 o=$(echo "{\"transcript_path\":\"$T/norecord.jsonl\",\"stop_hook_active\":false}" | python3 $H/record-guard.py); check "record-guard blocks missing record+table" "regression table" "$o"
 o=$(echo "{\"transcript_path\":\"$T/gov.jsonl\",\"stop_hook_active\":false}" | python3 $H/record-guard.py); check "record-guard exempts governance edits" "^$" "$o"
+o=$(echo "{\"transcript_path\":\"$T/bashrecord.jsonl\",\"stop_hook_active\":false}" | python3 $H/record-guard.py); check "record-guard counts a Bash write to the record" "^$" "$o"
+o=$(echo "{\"transcript_path\":\"$T/bashreadonly.jsonl\",\"stop_hook_active\":false}" | python3 $H/record-guard.py); check "record-guard ignores a Bash read of the record" "update WORKING_RECORD.md" "$o"
 # --- UserPromptSubmit: plan gate
 o=$(echo '{"prompt":"please:\n- add a button\n- fix colour\n- change the schema"}' | python3 $H/plan-gate.py); check "plan-gate full tier on 3 bullets" "Full 'Plan vN" "$o"
 o=$(echo '{"prompt":"- rename the label on the home tab"}' | python3 $H/plan-gate.py); check "plan-gate micro tier on 1 bullet" "Micro-plan" "$o"

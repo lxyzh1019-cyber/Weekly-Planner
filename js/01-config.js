@@ -14,7 +14,7 @@ const LS_KEY = 'weeklyplanner-v3';
    the Today More sheet (js/31-today.js) and under the list on the parent
    portal's App landing (js/11-parent.js), which is where a grown-up reads it on
    an iPad with no console. */
-const APP_BUILD = '2026-09-24a';
+const APP_BUILD = '2026-09-24b';
 const TOTAL_SLOTS = 60;           // 6AM → 9PM = 15 hrs × 4 (legacy, used for some %s)
 const START_HOUR  = 6;
 const END_HOUR    = 22;
