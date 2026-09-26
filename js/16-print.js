@@ -4,7 +4,7 @@
    PRINT VIEW
 ════════════════════════════════════════════════════════════════ */
 // Print display window — the start/end the parent chooses for what the
-// printout shows and totals over. Defaults to the app's 6am–9pm.
+// printout shows and totals over. Defaults to the app's 6am–10pm (START_HOUR–END_HOUR).
 let printWindow = { startHour: START_HOUR, endHour: END_HOUR };
 
 // AAP/NSF sleep guidance by age → the printout shows this as a required
@@ -138,7 +138,7 @@ function renderPrintSheet(host, opts) {
   const p = o.profile || activeProfile();
   const nameStr = p==='jenn'?'🐥 Jenn':'🦊 Jess';
 
-  // Chosen display window (defaults to 6am–9pm).
+  // Chosen display window (defaults to 6am–10pm).
   const winStartMin = win.startHour * 60;
   const winEndMin   = win.endHour * 60;
   const winSlots    = Math.round((winEndMin - winStartMin) / 15);

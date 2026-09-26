@@ -200,7 +200,6 @@ function coHandleClick(e) {
   if (a === 'adopt')  return coAdopt(el.dataset.tag);
   if (a === 'goal')   return coBumpGoal(el.dataset.kid, el.dataset.kind, +el.dataset.delta);
   if (a === 'num')    return coBumpNumber(el.dataset.path, +el.dataset.delta);
-  if (a === 'export') return ctExportBackup();
   if (a === 'clear')  return ctClearWeek().then(() => coRenderOptions());
 }
 /* Text inputs commit on change, not on every keystroke — a rule version per

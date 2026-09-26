@@ -1,7 +1,8 @@
   :root {
-    /* Print grid slot height (per 15-min slot). Sized so the full
-       6am–9pm week fits one A4/Letter landscape page. JS reads this
-       same value via getComputedStyle so the two never drift. */
+    /* Print grid slot height (per 15-min slot) — the default only.
+       renderPrintSheet (js/16-print.js) sets its own on the sheet's host,
+       sized so the chosen window (6am–10pm unless a parent narrows it)
+       fits one A4/Letter landscape page. */
     --print-slot: 11px;
     /* Paper / sticker aesthetic */
     --bg: #fef9ef;
@@ -430,10 +431,13 @@
     #screen-day .topbar.day-topbar.day-topbar--compact .day-topbar__row1 {
       gap: 0.38rem;
     }
+    /* Compact tightens the bar's padding and type, never its targets: the
+       house 44px floor holds on a scrolled Day view too (Plan v7 — found when
+       the Day view joined kidScreensMeetTheHouseRules; these were 34px). */
     #screen-day .topbar.day-topbar.day-topbar--compact .day-topbar-actions .btn-icon,
     #screen-day .topbar.day-topbar.day-topbar--compact .day-topbar-actions .profile-badge {
-      min-height: 34px;
-      min-width: 34px;
+      min-height: 44px;
+      min-width: 44px;
       font-size: calc(0.9rem * var(--fs-scale, 1));
     }
     #screen-day .topbar.day-topbar.day-topbar--compact .day-nav-center {
@@ -443,8 +447,8 @@
       font-size: 1.12rem;
     }
     #screen-day .topbar.day-topbar.day-topbar--compact .day-nav-arrow {
-      min-height: 30px;
-      min-width: 30px;
+      min-height: 44px;
+      min-width: 44px;
       padding: 0.16rem 0.44rem;
       font-size: calc(0.94rem * var(--fs-scale, 1));
     }
@@ -673,11 +677,13 @@
   /* Right-hand group of a plain .topbar (the chore screen), so a screen can
      carry an action next to its profile badge. */
   .topbar-actions { display: flex; gap: 0.5rem; align-items: center; }
+  /* 44px, the house floor (Plan v7 — this rule's 38px beat the kid floor's
+     bare .btn-icon on the Day view's 📋 until the Day view joined the sweep). */
   .day-topbar-actions .btn-icon {
     padding: 0.34rem 0.62rem;
     font-size: 1.16rem;
-    min-height: 38px;
-    min-width: 38px;
+    min-height: 44px;
+    min-width: 44px;
   }
   /* Rest-day toggle now lives inside the Template sheet */
   #restDayBtn.on {
@@ -2805,14 +2811,19 @@
     text-shadow: none !important;
     opacity: 0.95;
   }
-  .invitation-actions { display: flex; gap: 4px; margin-top: 2px; }
+  /* Her answer to the invite — ✅ Accept / ❌ Ignore, or 📌 Add it anyway /
+     ❌ Decline — so 44px targets in 15px type, like the inbox's (Plan v7).
+     They wrap under each other when the ghost is too narrow for both. */
+  .invitation-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
   .invitation-actions button {
-    font-size: calc(0.7rem * var(--fs-scale, 1)); padding: 2px 6px; border-radius: 8px;
+    font-size: max(15px, calc(0.7rem * var(--fs-scale, 1))); padding: 2px 8px; border-radius: 8px;
+    min-height: 44px; min-width: 44px;
     border: 2px solid var(--ink); background: var(--paper); cursor: pointer;
     font-family: 'Patrick Hand', sans-serif;
   }
   .placed-block .block-name { font-size: 1.04rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; line-height: 1.15; }
-  .placed-block .block-meta { font-size: calc(0.81rem * var(--fs-scale, 1)); opacity: 0.98; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; line-height: 1.15; }
+  /* 0.81rem is 12.96px: floored at the kid 13px (Plan v7, found by the Day view's sweep row). */
+  .placed-block .block-meta { font-size: max(13px, calc(0.81rem * var(--fs-scale, 1))); opacity: 0.98; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; line-height: 1.15; }
   .placed-block.travel-buf .block-meta {
     text-align: center;
     width: 100%;
@@ -2967,7 +2978,7 @@
   /* Quick-complete tick in the block corner */
   .block-done-btn {
     position: absolute;
-    top: 5px;
+    top: 6px;
     right: 6px;
     width: 32px;
     height: 32px;
@@ -2984,6 +2995,14 @@
     cursor: pointer;
     z-index: 14;
   }
+  /* The tick stays a 32px square to look at, and is a 44px target to hit
+     (Plan v7 — found when the Day view joined kidScreensMeetTheHouseRules):
+     the ARCHITECTURE.md › UI rules technique, an ::after reaching 6px past
+     its edge (-8px from inside its 2px border). It sits 6px in from the
+     block's top and right, so the grown target stays inside the block, which
+     clips its overflow; it covers the corner of the top resize strip, which
+     runs the rest of the block's width. */
+  .block-done-btn::after { content: ''; position: absolute; inset: -8px; }
   .block-done-btn:hover { background: rgba(255,255,255,0.95); transform: scale(1.08); }
   .block-done-btn.done { background: var(--accent-green); color: var(--ink); }
   /* On short/compact blocks there isn't room for both buttons — hide the tick
@@ -7049,8 +7068,14 @@
     min-height: calc(100dvh - 64px - env(safe-area-inset-bottom, 0));
   }
 
+  /* Each tab starts from its own label's width and the spare room is shared
+     out (flex-basis auto, labels on one line), rather than five equal fifths
+     (Plan v7). At 375px in the fallback sans-serif — a device that never got
+     Patrick Hand — "Sister Sync" needs ~72px and a fifth leaves it ~67px, so it
+     wrapped; the short labels give it the room. On a wide screen the tabs come
+     out near equal again. */
   .kid-nav-btn {
-    flex: 1 1 0; min-height: 56px; min-width: 44px;
+    flex: 1 1 auto; min-height: 56px; min-width: 44px;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
     background: none; border: 0; border-right: 2px solid var(--paper-line);
     color: var(--ink-light); font: inherit; cursor: pointer; padding: 0.3rem 0.2rem;
@@ -7059,6 +7084,7 @@
   .kid-nav-btn .kid-nav-icon { font-size: 1.25rem; line-height: 1; }
   .kid-nav-btn .kid-nav-label {
     font-size: calc(0.82rem * var(--fs-scale, 1)); font-weight: 800;
+    white-space: nowrap;
   }
   /* The current place is stated, not merely tinted — colour alone is not a signal
      a child reliably reads, and --accent is decorative only. */

@@ -85,7 +85,7 @@ Or individually:
 # 1. Syntax check every module + the duplicate-name guard
 npm run check
 
-# 2. Merge-layer unit tests (90 checks, must be 90/90)
+# 2. Merge-layer unit tests (112 checks, must be 112/112)
 npm run test:merge
 
 # 3. The calibrated XP values (see tools/xp-calibrate.js)
@@ -199,7 +199,7 @@ still rendered and only the numbers were wrong.
 
 `js/04-merge.js` implements conflict-aware sync: id-keyed unions, deletion
 tombstones (30-day pruning), deep object merge, per-week chore arbitration, and
-a forward-only `lastGradeSeen` watermark. It has 90 unit tests running the real
+a forward-only `lastGradeSeen` watermark. It has 112 unit tests running the real
 shipped functions.
 
 Do not refactor it for style. Change it only to fix a demonstrated sync bug, and
@@ -394,6 +394,18 @@ Kid-facing copy is a product surface, not filler. The rules:
   its screen was on show**: a screen that did not open measures clean, because
   every control on it is `display:none`. (`openSisterSync` refuses a parent,
   and the row did exactly that until the guard caught it.)
+  **So is the Day view** (Plan v7): two rows, `screen-day/invite` (today, a
+  block and a waiting invite's ghost) and `screen-day/missed-invite`
+  (yesterday, a missed one), seeded by `seedDayAudit` under a clock pinned to
+  midday. A row's seed may return a sentence, which the sweep reports — the
+  Day view rows say so when the ghost was not drawn. Joining found, besides the
+  ghost's buttons: the top bar's 📋 at 38px and, once scrolled into its
+  compact form, the ◀ ▶ arrows at 30px and 📋 / profile badge at 34px (all
+  44px now — compact tightens padding and type, never targets); the block's
+  ✓ tick at 32px (`.block-done-btn` keeps its 32px look, with an `::after`
+  reaching 6px past it for a 44px target, and sits 6px in from the block's
+  corner so the target stays inside the block's clip); and `.block-meta` at
+  12.96px (floored at 13px).
   Scope target rules to the **component**, not the screen: `.ck-navbtn` is both a
   kid's week arrow and the parent portal's, and screen-scoping it left the portal
   copy at 36×36.
@@ -430,8 +442,13 @@ tab 5 and My money's 🎓 button; Money story: My money's 📖 button in
 `mnyLinksCard`). More now holds 🧹 Chores · ◀ Switch and the build number.
 `tests/check-dead-actions.js` cannot see `data-td-more`, so a More tile and its
 `tdGoMore` branch are added and removed by hand, together. The label is "Sister
-Sync" because it fits on one line at 375px in the app's font; the fallback, if
-it ever stops fitting, is "Sisters". A parent sees no change: the kid nav hides
+Sync" because it fits on one line at 375px in the app's font — and, since Plan
+v7, in the fallback sans-serif a device draws when it never got the web fonts:
+each tab's width starts from its own label (`.kid-nav-btn` is `flex: 1 1 auto`,
+labels `white-space: nowrap`) and the spare room is shared, so the four short
+labels give "Sister Sync" the room a fifth did not (held by
+`sisterSyncTabFitsInTheFallbackFont`, which cuts the font hosts off). The
+fallback label, if it ever stops fitting, is "Sisters". A parent sees no change: the kid nav hides
 for a parent, and `openSisterSync` still refuses one. Held by
 `sisterSyncIsABottomTab`, `moreHasNoMoneySchool` and `kidNavIsUsableAndScoped`.
 
@@ -917,8 +934,8 @@ Sister Sync read `💌 Sent for Tue — you moved it to Thu · Send again?`
 invite for the new day; the guard then matches there and refuses a second. The
 sister's old invite is not changed — if pending she can still answer it, and
 when its day passes it is missed. A same-day drag keeps the id and changes
-nothing. The `block.inviteId && !block.inviteAccepted` guard in
-`attachBlockDrag` is dead and left alone for a later round.
+nothing. (`attachBlockDrag` had a `block.inviteId && !block.inviteAccepted`
+guard that nothing ever wrote the fields for; it was removed in Plan v7.)
 
 Invites stay in `state.shared.invites`, merged whole-record by `mergeArrayById`
 with no tombstone scope — an invite is never deleted. Held by
@@ -949,7 +966,13 @@ Day view (`renderPendingInvitesOnTimeline`, `js/08-day-view.js`). It shows ✅
 Accept / ❌ Ignore only when `inviteAcceptable` says so; on a day already gone
 it shows **📌 Add it anyway** and **❌ Decline** instead, and every button calls
 `acceptInvite` / `addInviteAnyway` / `declineInvite` — so it writes exactly the
-block the inbox writes. Do not give it rules of its own. **Kid only**: the
+block the inbox writes. Do not give it rules of its own. Its buttons are 44px
+targets in 15px type (Plan v7 — they were ~22px in 11px), wrapping under each
+other when the ghost is narrow; and the ghost is placed so it never covers a block (review of Plan v7): drawn at a floor that holds its buttons (`GHOST_FLOOR_ONE_ROW_PX` 100px alone, `GHOST_FLOOR_TWO_ROWS_PX` 150px when it shares a lane and its buttons wrap), it borrows EMPTY minutes above, then below (`dayGhostBox`, the `wfCardBoxes` rule), takes whatever else it needs inside the canvas (down to its end, then up), and shares the Day view's lane pass with the blocks (`dayLaneAssignments`, split out of `renderBlocksWithCollision`), so a ghost that still overlaps a block is drawn beside it, never on top of its ✓. Alone, a ghost has its column's full width (it used to sit in the right half). The Day view rows of
+`kidScreensMeetTheHouseRules` hold the targets; `anEmptyDayDrawsItsInviteGhost`
+holds the placement (a 30-minute invite with a block right after it: the
+block's ✓ and every ghost button hit where drawn; a 9:30pm ghost stays inside
+the canvas). **Kid only**: the
 inbox works on `profile`, `acceptInvite` writes to `profile`, the ghost is not
 drawn for a parent, and `openSisterSync` refuses a parent, so a parent-facing
 note would lead to a refusal. `anInviteWaitingShowsOnToday` holds the note.
@@ -2449,6 +2472,20 @@ pin included — so a child's partial remove tombstones only the ids it took.
 `copyDayOntoWords(dstKid)` — "onto this day" for her own, "onto Jess's Tue" when
 a parent has picked the sister — used by the button and the confirm alike.
 
+**Copying nothing asks nothing** (Plan v7). When `copyDayPlan` would copy no
+block — each one is already here under a kept pin, or is not on the sister's
+list — `confirmCopyDay` raises no dialog and changes nothing; a toast says why
+("Nothing to copy from Thursday — it's already here, pinned"). It used to ask
+"Copy Thursday's 0 things onto this day?", and OK then replaced the day's
+unpinned blocks with nothing. Held by `copyingNothingSaysSoAndChangesNothing`.
+
+**A copy that lands across a kept pin says so** (Plan v7). The confirm adds
+`⚠️ These would overlap a pinned one:` and one line per pair —
+`4:30–5:30pm 📖 Reading overlaps 📌 4:00–5:00pm 🎹 Piano Practice` — for every
+copied block whose time crosses a kept pin's (block times, not buffers). Words
+only: what is copied, replaced and kept is still `copyDayPlan`'s decision,
+unchanged, and both blocks stay. Held by `aCopyNamesItsOverlapWithAKeptPin`.
+
 **Clearing a day is "🗑 Start this day over", last on the 📋 sheet, and it keeps
 what is done, pinned or marked not done** (R5 §7 Q4, 2026-09-24). It was 🗑 on the Day view's top
 bar beside 📋 and 🌙 and took every block, done and parent-pinned included; the
@@ -2501,10 +2538,16 @@ invite wrong-day bug (PR #93): it outlives the Day view that set it. Now:
   row (`.refl-block-row`) wraps, so on a phone the name sits above its five
   moods; the name is 15px. The ritual's and the edit sheet's dots are unchanged.
   Held by `reflectMoodsAre44pxTargets`.
-- **The closing ritual is unchanged** — it still reads `currentDayKey` and
-  writes that day's mood from its own picker — but it now follows a reflection
-  only when the day reflected on is today and `currentDayKey` is today, so it
-  never says goodnight over yesterday or a past day.
+- **The closing ritual** still reads `currentDayKey` and writes that day's
+  mood from its own picker, and follows a reflection only when the day
+  reflected on is today and `currentDayKey` is today, so it never says
+  goodnight over yesterday or a past day. Since Plan v7 it **counts what is
+  done** — `isBlockCompleted` (a routine by its checklist), not every block
+  planned: "You did 2 things today", and with none done "Nothing ticked off
+  today, and that's OK." — and **names the child being viewed**
+  (`kidLabel(activeProfile())`), not the global `profile`, which is "parent"
+  for a grown-up and named Jess to a parent looking at Jenn. It still opens
+  for a day with any block on it. Held by `theClosingRitualCountsWhatWasDone`.
 Held by `todayAsksHowTodayWent` (clock pinned to a local time on Thursday of
 this week; `currentDayKey` is left on another day before every tap) and
 `todayIsWhereTheDayGetsDone` (the Vibe card stays gone).
@@ -3681,13 +3724,33 @@ mid-animation every word reads 1:1. It found two things, both also true in
 light mode, and both fixed: the empty rows of Copy a day were faded to 55%
 opacity ("Friday" at 1.4:1 — now dashed and in `--ink-light`, not faded), and
 Parent › Now's today square was white on `--accent` (2.6:1 — now
-`--accent-strong`, the portal's own "go" colour, 4.9:1). Catch up and "On her
-behalf" are not on this branch and are not measured.
+`--accent-strong`, the portal's own "go" colour, 4.9:1). "On her behalf" is
+measured with Parent › Now since the merge with `main`, and Today's 🕓 Catch up
+card (a day open) since Plan v7, which found nothing to fix there.
 
 **C6 found** the 💌 inbox's ✅ Accept / ❌ Decline / 📌 Add it anyway at
 `.pill-btn`'s 38px (`.invite-actions .pill-btn` is 44px now). Before the
 screen-on-show guard, the new Sister Sync row measured nothing: the sweep ran
 with a parent signed in and `openSisterSync` refused.
+
+## Small fixes R7 — Plan v7 (2026-09-26, build 2026-09-26a)
+
+Eight small deferred fixes, each held by a check that failed on the code
+before it — except item 5, whose check found nothing to fix and was shown to
+bite by a fault planted in a scratch run, and items 7 and 8, which change no
+behaviour and are held by a scripted grep. The rules are written in place
+above; this is the index.
+
+| # | What | Where the rule lives | Check |
+|---|---|---|---|
+| 1 | The closing ritual counts what is done and names the child being viewed | "How a day went is asked on Today" | `theClosingRitualCountsWhatWasDone` |
+| 2 | The Day view's invite buttons are 44px and the ghost never covers a block (lanes, empty minutes, inside the canvas); the Day view is in the sweep (which also found its top bar, ✓ tick and meta line) | UI rules; "There is a second accept door" | `kidScreensMeetTheHouseRules` (Day view rows), `anEmptyDayDrawsItsInviteGhost` |
+| 3 | Copy a day with nothing to copy says so and changes nothing | "Copying nothing asks nothing" | `copyingNothingSaysSoAndChangesNothing` |
+| 4 | The copy confirm names a copied block that overlaps a kept pin | "A copy that lands across a kept pin says so" | `aCopyNamesItsOverlapWithAKeptPin` |
+| 5 | 🕓 Catch up is in the dark-mode contrast check (nothing to fix; a low-contrast title planted in a scratch run failed it) | Small fixes R6 › Dark mode | `theR5ScreensReadInDarkMode` |
+| 6 | "Sister Sync" stays one line in the fallback font at 375px | Navigation, "Five places" | `sisterSyncTabFitsInTheFallbackFont` |
+| 7 | "90/90" → 112 here and in `tests/README.md`; the four stale "6am–9pm" comments (`js/08-day-view.js`, `js/16-print.js` ×2, `css/app.css`) say 6am–10pm | — | `grep -rn "6am.9pm" js css` finds nothing |
+| 8 | Dead code removed: the drag `inviteId` guard (`js/39-block-drag.js`), the orphan 👯 aria-label entry (`js/99-main.js`), the Chores options `export` branch (`js/29-chore-options.js`); the 12 dead chore-tab branches wait for C3 | — | grep; `check-dead-actions` reverse warnings 27 → 26 |
 
 ## Known trip hazards
 

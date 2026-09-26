@@ -508,7 +508,13 @@ function buildDayColumn(dayKey, canvasHeight, withHeader, drawnSpan) {
     blocks,
     acts: getAllActivities(isParent() ? parentViewing : activeProfile(), { includeArchived: true }),
   };
-  const colAssignments = renderBlocksWithCollision(canvas, visibleBlocks, zMinStart, clash, dayKey);
+  /* Pending invites from her sister are placed first and share the lane pass
+     with the blocks, so a ghost is drawn beside a block it overlaps, never on
+     top of it (Plan v7). */
+  const canvasPx = (zMinEnd - zMinStart) * PX_PER_MIN;
+  const ghosts = dayGhostItems(dayKey, visibleBlocks.map(b => ({ top: dayBlockDrawnTop(b), bot: dayBlockDrawnBot(b) })),
+    canvasPx, zMinStart, zMinEnd);
+  const colAssignments = renderBlocksWithCollision(canvas, visibleBlocks, zMinStart, clash, dayKey, ghosts, canvasPx);
 
   if (!blocks.length) {
     const emptyState = document.createElement('div');
@@ -529,8 +535,8 @@ function buildDayColumn(dayKey, canvasHeight, withHeader, drawnSpan) {
     renderTravelBuffers(canvas, b, zMinStart, zMinEnd, bufferConflicts.perBlock.get(b.id), slot.col, slot.count || 1, dayKey);
   });
 
-  // Pending invitations from sister — render as dashed-border blocks
-  renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd, dayKey);
+  // Pending invitations from sister — dashed-border ghosts, in their lanes
+  renderPendingInvitesOnTimeline(canvas, ghosts, colAssignments);
 
   /* Two layers, and only one of them rides over the cards.
 
@@ -587,24 +593,71 @@ function dayInviteGhosts(dayKey) {
   return (state.shared.invites || []).filter(i =>
     i && i.to === me && i.status === 'pending' && inviteCoversDay(i, dayKey));
 }
-function renderPendingInvitesOnTimeline(canvas, zMinStart, zMinEnd, dayKey) {
+/* How tall a ghost is drawn so it holds its answer (Plan v7): its 3px dashed
+   border and 5px padding each side, the name line (1.04rem × 1.15), the meta
+   line (13px × 1.15), the 1px gaps and the buttons' 2px margin, then its 44px
+   buttons — one row when the ghost has its column's width to itself, two when
+   it shares a lane (at half a phone's column they wrap). */
+const GHOST_FLOOR_ONE_ROW_PX = 100;
+const GHOST_FLOOR_TWO_ROWS_PX = 150;
+const GHOST_GAP_PX = 3;
+
+/* Where one ghost is drawn, in canvas px. Its own minutes, grown to floorPx by
+   borrowing EMPTY minutes — above first, so its end stays true, then below —
+   the way wfCardBoxes floors a card. What it cannot borrow it still takes,
+   inside the canvas (down to the canvas's end, then up), and the lane pass
+   (dayLaneAssignments) then puts it BESIDE whatever it overlaps, never on top
+   of it. `taken` is the drawn { top, bot } of each block on the canvas. Pure. */
+function dayGhostBox(inv, taken, floorPx, canvasPx, zMinStart) {
+  const natTop = Math.min(canvasPx, Math.max(0, (inv.startMin - START_MIN - zMinStart) * PX_PER_MIN));
+  const natH = Math.max(34, (inv.durationMin || 0) * PX_PER_MIN - 2);
+  const want = Math.min(canvasPx, Math.max(natH, floorPx));
+  let top = natTop, bot = Math.min(canvasPx, natTop + natH);
+  const need = () => want - (bot - top);
+  const above = taken.filter(t => t.top < natTop).reduce((m, t) => Math.max(m, t.bot), 0);
+  const below = taken.filter(t => t.top > natTop).reduce((m, t) => Math.min(m, t.top), canvasPx);
+  if (need() > 0) top -= Math.min(need(), Math.max(0, top - above - GHOST_GAP_PX));
+  if (need() > 0) bot += Math.min(need(), Math.max(0, below - bot - GHOST_GAP_PX));
+  if (need() > 0) bot += Math.min(need(), canvasPx - bot);
+  if (need() > 0) top -= Math.min(need(), top);
+  return { top, bot };
+}
+
+/* The ghosts one canvas draws, placed: { id, inv, act, top, bot }. Drawn at
+   the one-row floor; the lane pass redraws a ghost that has to share its lane
+   at the two-row floor. */
+function dayGhostItems(dayKey, taken, canvasPx, zMinStart, zMinEnd) {
   const invites = dayInviteGhosts(dayKey || currentDayKey);
-  if (!invites.length) return;
+  if (!invites.length) return [];
   const acts = getAllActivities(activeProfile(), { includeArchived: true });
+  const out = [];
   invites.forEach(inv => {
     const act = acts.find(a => a.id === inv.actId);
     if (!act) return;
     const bStart = inv.startMin - START_MIN;
     const bEnd   = bStart + inv.durationMin;
     if (bEnd <= zMinStart || bStart >= zMinEnd) return;
-    const top = Math.max(0, (bStart - zMinStart) * PX_PER_MIN);
-    const height = Math.max(34, inv.durationMin * PX_PER_MIN - 2);
+    out.push(Object.assign({ id: 'ghost:' + inv.id, inv, act },
+      dayGhostBox(inv, taken, GHOST_FLOOR_ONE_ROW_PX, canvasPx, zMinStart)));
+  });
+  return out;
+}
+
+/* Pending invitations from her sister, drawn as dashed ghosts in the lanes
+   dayLaneAssignments gave them: beside a block they overlap, never over it
+   (Plan v7 — a grown ghost used to sit on the next block's right half and its
+   ✓). Alone, a ghost has its column's full width. */
+function renderPendingInvitesOnTimeline(canvas, ghosts, lanes) {
+  (ghosts || []).forEach(g => {
+    const inv = g.inv, act = g.act;
+    const slot = lanes.get(g.id) || { col: 0, count: 1 };
+    const widthPct = 100 / (slot.count || 1);
     const el = document.createElement('div');
     el.className = 'placed-block invitation';
-    el.style.top = top + 'px';
-    el.style.height = height + 'px';
-    el.style.left = 'calc(50% + 2px)';
-    el.style.width = 'calc(50% - 4px)';
+    el.style.top = g.top + 'px';
+    el.style.height = (g.bot - g.top) + 'px';
+    el.style.left = `calc(${slot.col * widthPct}% + 2px)`;
+    el.style.width = `calc(${widthPct}% - 4px)`;
     const fromName = inv.from === 'jenn' ? 'Jenn' : 'Jess';
     /* THE SECOND ACCEPT DOOR, on the inbox's rules: inviteAcceptable decides
        whether ✅ Accept is offered at all, and on a day already gone the ghost
@@ -797,59 +850,81 @@ function paintZoneBands(canvas, dayKey, zMinStart, zMinEnd) {
    same column/width as the activity a buffer belongs to, instead of each
    buffer strip claiming the full lane width and sprawling under a
    side-by-side neighbour. */
-function renderBlocksWithCollision(canvas, blocks, zMinStart, clash, dayKey) {
+/* A block's drawn extent, IN PIXELS, not minutes — the same correction the
+   Full week needed. A block is floored at 22px, which at 1.4px/min is 16
+   minutes, so a ten-minute routine is drawn through whatever starts within a
+   quarter-hour of it while these start times say they are clear. */
+function dayBlockDrawnTop(b) { return (b.startMin - START_MIN) * PX_PER_MIN; }
+function dayBlockDrawnBot(b) { return dayBlockDrawnTop(b) + Math.max(22, (b.durationMin || 0) * PX_PER_MIN); }
+
+/* Greedy column packing over what is drawn: items { id, top, bot, dur } that
+   overlap get columns. Returns a Map of id -> {col, count}. The 4px epsilon
+   keeps a one-pixel graze between two long blocks from halving both for
+   nothing (the left/width calc leaves a 4px gap). Pure. */
+function dayLaneAssignments(items) {
   const assignments = new Map();
-  if (!blocks.length) return assignments;
-
-  // Build overlap groups
-  const sorted = blocks.slice().sort((a,b)=> (a.startMin - b.startMin) || (a.durationMin - b.durationMin));
-
-  /* IN PIXELS, not minutes — the same correction the Full week needed. A block
-     is floored at 22px, which at 1.4px/min is 16 minutes, so a ten-minute
-     routine is drawn through whatever starts within a quarter-hour of it while
-     these start times say they are clear. The 4px here is the horizontal gap
-     the left/width calc below leaves; epsPx keeps a one-pixel graze between two
-     long blocks from halving both for nothing. */
-  const drawnTop = b => (b.startMin - START_MIN) * PX_PER_MIN;
-  const drawnBot = b => drawnTop(b) + Math.max(22, (b.durationMin || 0) * PX_PER_MIN);
   const EPS_PX = 4;
-
-  // Group consecutively-overlapping blocks
+  const sorted = items.slice().sort((a, b) => (a.top - b.top) || (a.dur - b.dur));
+  // Group consecutively-overlapping items
   const groups = [];
-  sorted.forEach(b=>{
-    const bTop = drawnTop(b);
-    const bBot = drawnBot(b);
-    const g = groups.find(g=> g.end - bTop > EPS_PX);
+  sorted.forEach(it => {
+    const g = groups.find(g => g.end - it.top > EPS_PX);
     if (g) {
-      g.blocks.push(b);
-      g.end = Math.max(g.end, bBot);
+      g.items.push(it);
+      g.end = Math.max(g.end, it.bot);
     } else {
-      groups.push({ blocks:[b], end: bBot });
+      groups.push({ items: [it], end: it.bot });
     }
   });
-
-  groups.forEach(g=>{
-    // Within a group, assign each block to the lowest-indexed column that's free
+  groups.forEach(g => {
+    // Within a group, assign each item to the lowest-indexed column that's free
     const cols = []; // each col = {endPx}
-    g.blocks.forEach(b=>{
-      const bTop = drawnTop(b);
-      const bBot = drawnBot(b);
-      let colIdx = cols.findIndex(c => c.endPx - bTop <= EPS_PX);
+    g.items.forEach(it => {
+      let colIdx = cols.findIndex(c => c.endPx - it.top <= EPS_PX);
       if (colIdx === -1) {
         colIdx = cols.length;
-        cols.push({ endPx: bBot });
+        cols.push({ endPx: it.bot });
       } else {
-        cols[colIdx].endPx = bBot;
+        cols[colIdx].endPx = it.bot;
       }
-      assignments.set(b.id, { col: colIdx });
+      assignments.set(it.id, { col: colIdx });
     });
-    const colCount = cols.length;
+    g.items.forEach(it => { assignments.get(it.id).count = cols.length; });
+  });
+  return assignments;
+}
 
-    g.blocks.forEach(b=>{
-      const colIdx = assignments.get(b.id).col;
-      assignments.get(b.id).count = colCount;
-      renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey);
-    });
+/* Greedy column-packing collision: blocks that overlap get assigned to columns.
+   `clash` (optional) carries the day's whole clash finding — the affected Set,
+   the computeBufferConflicts result, the day's blocks and its activities — so a
+   block can say WHICH activity it runs into and BY HOW MUCH, not merely that
+   something is wrong. It used to be the Set alone, which is the whole reason
+   this surface could only draw a warning it could not explain.
+   Returns a Map of id -> {col, count} so the buffer pass below can reuse the
+   same column/width as the activity a buffer belongs to, instead of each
+   buffer strip claiming the full lane width and sprawling under a
+   side-by-side neighbour.
+
+   `ghosts` (dayGhostItems) take part in the packing and are drawn by
+   renderPendingInvitesOnTimeline from the same Map. A ghost that has to share
+   a lane is narrower, so its buttons wrap to two rows: it is re-placed at the
+   two-row floor and the packing is run once more (a taller ghost only ever
+   overlaps more, so it still shares). */
+function renderBlocksWithCollision(canvas, blocks, zMinStart, clash, dayKey, ghosts, canvasPx) {
+  const blockItems = blocks.map(b => ({ id: b.id, top: dayBlockDrawnTop(b), bot: dayBlockDrawnBot(b), dur: b.durationMin }));
+  const ghostItem = g => ({ id: g.id, top: g.top, bot: g.bot, dur: (g.bot - g.top) / PX_PER_MIN });
+  let assignments = dayLaneAssignments(blockItems.concat((ghosts || []).map(ghostItem)));
+  const shared = (ghosts || []).filter(g => (assignments.get(g.id) || {}).count > 1);
+  if (shared.length) {
+    const taken = blockItems.map(it => ({ top: it.top, bot: it.bot }));
+    shared.forEach(g => Object.assign(g, dayGhostBox(g.inv, taken, GHOST_FLOOR_TWO_ROWS_PX, canvasPx, zMinStart)));
+    assignments = dayLaneAssignments(blockItems.concat(ghosts.map(ghostItem)));
+  }
+  // Drawn group by group, in the order the packing met them, as before.
+  const byId = new Map(blocks.map(b => [b.id, b]));
+  assignments.forEach((slot, id) => {
+    const b = byId.get(id);
+    if (b) renderBlockPixel(canvas, b, zMinStart, slot.col, slot.count, clash, dayKey);
   });
   return assignments;
 }
@@ -867,7 +942,7 @@ function renderBlockPixel(canvas, b, zMinStart, colIdx, colCount, clash, dayKey)
   if (!act) return;
 
   // The day is always shown whole, so a block can only be clipped by running
-  // past the 6am-9pm canvas itself — the "continues" markers below still cover
+  // past the end of its canvas (6am to at most 10pm) — the "continues" markers below still cover
   // that. The zone filter that used to narrow this is gone.
   /* What THIS canvas was drawn to. It read the global, so on a trimmed canvas a
      block running past the end was neither clipped nor marked as continuing. */
