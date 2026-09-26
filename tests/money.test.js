@@ -14,6 +14,9 @@
    `checks.x = cond || [whatWentWrong]` returns a truthy ARRAY on failure, so a
    runner that tests truthiness counts a finding as a pass — see CLAUDE.md. The
    check() helper below takes a boolean and a detail string, never a value. */
+// UTC on every machine: set here, before anything reads a date, rather than as
+// a `TZ=UTC` prefix in package.json, which Windows' command shell rejects.
+process.env.TZ = 'UTC';
 const path = require('path');
 const { MR_DEFAULT_RULES } = require(path.join(__dirname, '..', 'js', '18-rules.js'));
 const cal = require(path.join(__dirname, '..', 'tools', 'money-calibrate.js'));

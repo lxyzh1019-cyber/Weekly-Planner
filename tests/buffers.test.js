@@ -9,6 +9,9 @@
 //
 // It runs the real shipped function, the way tests/merge.test.js does. Minutes
 // are absolute from midnight here, which is what every caller passes.
+// UTC on every machine: set here, before anything reads a date, rather than as
+// a `TZ=UTC` prefix in package.json, which Windows' command shell rejects.
+process.env.TZ = 'UTC';
 const { bufferClip } = require('../js/05-helpers.js');
 
 let pass = 0, fail = 0;

@@ -1,4 +1,4 @@
-# FEATURES — Weekly-Planner — manifest v8 — 2026-09-24 (v2 confirmed 2026-09-22)
+# FEATURES — Weekly-Planner — manifest v9 — 2026-09-25 (v2 confirmed 2026-09-22)
 
 Locked features of the current version. Every edit is checked against this list and ends with a regression table. Update this file in the same change that alters a feature. Over-list rather than under-list.
 
@@ -39,6 +39,7 @@ directly, not against this file.
 - `docs/HZ-skill-trigger-tuning.md` is the skill-trigger tuning procedure.
 - **Smoke subset for iteration (added 2026-09-22):** `SMOKE_ONLY=checkA,checkB npm run test:smoke` runs only the named checks. Every check statement in `tests/smoke.js` carries an `if (want('name'))` prefix naming its own check; `noConsoleErrors` is the one unguarded check and always runs. The check names are read from the file itself, not a hand list. A subset **is never the gate**: an unknown name exits 1 naming it; a named check that records nothing is a failure; the last line is `PARTIAL RUN (SMOKE_ONLY): N of M checks — not a pass of the suite` and never `ALL SMOKE CHECKS PASSED`; it refuses to run when `CI` is set. With `SMOKE_ONLY` unset or empty the suite runs every check, pass rule `v !== true`, final line unchanged. Documented in `ARCHITECTURE.md` (Verification) and `tests/README.md`.
 - **Dead-action guard (added 2026-09-23):** `tests/check-dead-actions.js`, in `npm run check` (the ninth check) and listed in `ARCHITECTURE.md` (Verification) and `tests/README.md`. Fails on (1) an `onclick` in `index.html` or a `js/` template calling a function not declared at top level in `js/` (method calls and browser globals excluded; a runtime callee `${fn}(…)` is counted, not checked), and (2) a `data-P-action="V"` not handled by prefix P's own dispatcher — the selector `[data-P-action="V"]`, or V compared/keyed inside a top-level function reading `dataset.<p>Action` / `'data-P-action'` or one it hands the action variable to. A prefix nothing reads fails, naming every value. Runtime-built values are resolved from literals in the `${…}` or at the drawing function's call sites; the rest are counted. The reverse (a compared value no markup emits) **warns** and does not fail. `EXEMPT` is **empty** since the 2026-09-23 merge of `main`: its one entry, `pm/edit` (unreachable branch in `pmPriceCards`), self-expired when PR #92 removed that edit mode, and was deleted as designed. The mechanism stays: an entry **self-expires** — when nothing emits the value, the check fails until the entry is deleted.
+- **The gate runs unchanged on Windows (added 2026-09-25, manifest v9, Plan v6 B):** `npm test` passes run directly in a Windows checkout, from Git Bash or `cmd`, with no environment variables and no LF copy of the tree. Three parts, each required: (1) `.gitattributes` = `* text=auto eol=lf`, so text files are LF on disk even under `core.autocrlf=true` (PNGs are detected as binary; no `binary` lines needed); (2) no `package.json` script has a `TZ=UTC` prefix — each Node suite (`merge`, `buffers`, `stream`, `cleanup-tool`, `xp`, `money`) sets `process.env.TZ = 'UTC'` as its first statement, before any `require` or date; (3) `tests/smoke.js` and `tests/cleanup-tool.test.js` look for a browser in `%LOCALAPPDATA%\ms-playwright` (`chrome-win`/`chrome-win64`) and then in an installed Google Chrome, **after** every existing location, so CI and cloud resolve as before. `SMOKE_CHROMIUM` still overrides all of it. Documented in `ARCHITECTURE.md` (Verification) and `tests/README.md`.
 
 ## App features — not yet manifested
 Authority for app behaviour remains `ARCHITECTURE.md`. Its load-bearing rules,
@@ -50,7 +51,7 @@ to be a complete manifest:
 - `js/04-merge.js` is frozen; changes need a demonstrated sync bug and a failing test written first.
 - Every `state.shared` key needs a merge decision, enforced by `tests/check-shared-merge.js`.
 - Three escaping helpers chosen by context, enforced by `tests/check-escaping.js`.
-- Verification gate before any push: `npm run check`, `npm run test:merge`, `npm run test:xp`, `npm run test:money`, `npm run test:smoke`.
+- Verification gate before any push: `npm run check`, `npm run test:merge`, `npm run test:xp`, `npm run test:money`, `npm run test:smoke`. Node suites run in UTC by setting it themselves (not by a `TZ=UTC` script prefix).
 - `SW_VERSION` must be bumped on any deploy changing a shell file, enforced by `tests/check-sw-shell.js`.
 
 ### The build number is on the page (manifested 2026-09-23)

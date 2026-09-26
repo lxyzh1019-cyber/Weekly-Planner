@@ -59,6 +59,26 @@ npm ci      # once
 npm test    # runs everything below, stops at the first failure
 ```
 
+**The same commands run unchanged on Windows** — Git Bash or `cmd`, no
+environment variables, no copy of the tree (added 2026-09-25):
+
+- `.gitattributes` (`* text=auto eol=lf`) checks text files out with LF even
+  where `core.autocrlf=true`. The static checks (`npm run check`) read the
+  source as LF; on a CRLF checkout `check-shared-merge.js` misreads merge
+  decisions and fails on a clean `main`.
+- No script carries a `TZ=UTC` prefix, which `cmd` (npm's default script shell
+  on Windows) rejects. Each Node suite sets `process.env.TZ = 'UTC'` as its first
+  statement instead (see "Node tests run under `TZ=UTC`" below).
+- `smoke.js` and `cleanup-tool.test.js` also find a browser in Windows'
+  Playwright root and in an installed Google Chrome (see below).
+
+An existing Windows checkout made before `.gitattributes` still has CRLF files
+on disk. Converting them in place (only files `git ls-files --eol` reports as
+`i/lf w/crlf`) makes them byte-identical to the index; `git status` then still
+lists them as modified until the index's recorded sizes are refreshed, which
+`git add -u` does without staging any change — run it only on a tree with no
+uncommitted work, or it stages that work too.
+
 Or individually:
 
 ```bash
@@ -135,8 +155,12 @@ covering `function`, `async function` and top-level `let`/`const`/`var`
 `SyntaxError` that per-file `node --check` cannot see.
 
 `smoke.js` auto-detects Chromium under `/opt/pw-browsers` or
-`~/.cache/ms-playwright` (`npx playwright install chromium`); elsewhere set
-`SMOKE_CHROMIUM=/path/to/chrome`.
+`~/.cache/ms-playwright` (`npx playwright install chromium`), then — after those,
+so CI and cloud resolve exactly as before — Windows' `%LOCALAPPDATA%\ms-playwright`
+(`chrome-win` / `chrome-win64`) and an installed Google Chrome (Program Files,
+Program Files (x86), `%LOCALAPPDATA%\Google\Chrome\Application`). Elsewhere set
+`SMOKE_CHROMIUM=/path/to/chrome`. `cleanup-tool.test.js` searches the same
+places in the same order.
 
 **Iterating on a few smoke checks:** `SMOKE_ONLY=checkA,checkB npm run test:smoke`
 runs just those (plus `noConsoleErrors`, which has no guard) in a fraction of the
@@ -296,7 +320,10 @@ and the eight checks that returned a truthy findings array).
 
 Node tests run under `TZ=UTC`, deliberately: the family is in Edmonton, so a
 date bug that only shows outside that zone must not be able to hide behind the
-developer's own clock.
+developer's own clock. Each suite sets `process.env.TZ = 'UTC'` as its first
+statement, before any `require` or date, so the zone holds however it is
+launched (Node applies a runtime `TZ` change, and child processes and the
+launched browser inherit it). A new Node suite starts with the same line.
 
 ## Escaping
 

@@ -53,12 +53,16 @@ function findChromium() {
     // browsers and no installer) has nothing to fall back to.
     path.join(os.homedir(), '.cache', 'ms-playwright'),
     // macOS default for the same install.
-    path.join(os.homedir(), 'Library', 'Caches', 'ms-playwright')
+    path.join(os.homedir(), 'Library', 'Caches', 'ms-playwright'),
+    // Windows default for the same install.
+    process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'ms-playwright')
   ];
   const binaries = [
     ['chrome-linux', 'chrome'],
     ['chrome-linux', 'headless_shell'],
-    ['chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium']
+    ['chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'],
+    ['chrome-win', 'chrome.exe'],
+    ['chrome-win64', 'chrome.exe']
   ];
   for (const root of roots) {
     if (!root || !fs.existsSync(root)) continue;
@@ -69,6 +73,13 @@ function findChromium() {
         if (fs.existsSync(p)) return p;
       }
     }
+  }
+  // Last, an installed Google Chrome on Windows, so a Windows machine runs the
+  // suite with no Playwright browser download and no SMOKE_CHROMIUM.
+  for (const base of [process.env.ProgramFiles, process.env['ProgramFiles(x86)'], process.env.LOCALAPPDATA]) {
+    if (!base) continue;
+    const p = path.join(base, 'Google', 'Chrome', 'Application', 'chrome.exe');
+    if (fs.existsSync(p)) return p;
   }
   return undefined; // fall back to playwright's own resolution
 }

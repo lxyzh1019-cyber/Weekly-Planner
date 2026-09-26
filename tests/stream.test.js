@@ -1,5 +1,5 @@
 // Weekly-Planner — the money stream (js/40-stream.js).
-// Run: TZ=UTC node tests/stream.test.js
+// Run: node tests/stream.test.js
 //
 // These hold the PROPERTY the redesign is built on, not just a few examples:
 //
@@ -14,9 +14,12 @@
 //
 // TZ=UTC deliberately, like every other Node suite here: the family is in
 // Edmonton, and a date bug that only shows outside that zone must not be able
-// to hide behind the developer's own clock.
+// to hide behind the developer's own clock. Set here, before anything reads a
+// date, rather than as a `TZ=UTC` prefix in package.json, which Windows'
+// command shell rejects.
+process.env.TZ = 'UTC';
 
-const s = require('../js/40-stream.js');
+const s =require('../js/40-stream.js');
 
 let pass = 0, fail = 0;
 function check(name, cond, detail) {

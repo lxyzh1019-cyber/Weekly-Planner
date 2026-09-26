@@ -3,7 +3,10 @@
 // They execute the REAL functions the app ships, so they catch regressions
 // in deletion tombstones, deep merges, and chore-week conflicts.
 // The functions read the app's global `state`, so install a fake one first.
-global.state = { shared: { tombstones: {} }, profiles: {} };
+// UTC on every machine: set here, before anything reads a date, rather than as
+// a `TZ=UTC` prefix in package.json, which Windows' command shell rejects.
+process.env.TZ = 'UTC';
+global.state ={ shared: { tombstones: {} }, profiles: {} };
 const state = global.state;
 const api = require('../js/04-merge.js');
 

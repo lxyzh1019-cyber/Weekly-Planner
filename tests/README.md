@@ -61,8 +61,9 @@ a Sunday goes badly.
 
 `smoke.js` needs a Chromium binary. It auto-detects Playwright browsers under
 `/opt/pw-browsers` (Claude Code cloud environments have this pre-installed) or
-`~/.cache/ms-playwright` (`npx playwright install chromium`); elsewhere set
-`SMOKE_CHROMIUM=/path/to/chrome`.
+`~/.cache/ms-playwright` (`npx playwright install chromium`), then on Windows
+under `%LOCALAPPDATA%\ms-playwright` or an installed Google Chrome; elsewhere
+set `SMOKE_CHROMIUM=/path/to/chrome`.
 
 While working on a few checks, `SMOKE_ONLY=checkA,checkB npm run test:smoke`
 runs only those (and `noConsoleErrors`) in a fraction of the full run's time.
