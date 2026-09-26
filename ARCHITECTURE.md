@@ -1232,11 +1232,23 @@ chore tab is unchanged.
   (`mnyIsCommitted`, `weekPlans[wk][kid].committedAt`) or credited another way
   (Grandma rule, repair, express catch-up). Not today, not a day to come, not a
   sick day, not a block recorded as not done. A day with nothing unanswered is
-  not listed, so "something else" for such a day still needs the chore tab
-  until C3 decides otherwise.
+  not listed; "something else" for such a day goes through the next row.
+- **C1b — ＋ Add to an earlier day** (`tdEarlierElseRow`, Plan v6,
+  2026-09-25): one collapsed row (`data-td-action="else-earlier"`,
+  `aria-expanded`, ≥44px, words 16px) directly under the catch-up card — or on
+  its own when catch up has nothing — shown only when an earlier day of an open
+  week exists. Opened, it lists those days newest first (`tdEarlierElseDays`:
+  `tdOpenWeeks`, so the same 8-week window, floor and `mnyWeekSettled` rule as
+  catch up; before today; minus days catch up already lists, which carry the
+  same door), each as "＋ I did something else on Tue" (`Tue 15 Sep` in an
+  earlier week) through `tdElseBlock` → `tdClaimJob` → `openChoreClaimPrompt` →
+  `mrSetClaim` — the owner the chore tab's `ckPickElse` uses. A claim on that
+  day and nothing else. Closed again by `goToday()`. This closes the C1 gap
+  noted in `docs/chore-relocation-map.md` row 2.
 - View state (open catch-up day, open picker, open routine, the ✨ list) is in
   memory only; `goToday()` starts it closed.
 Held by `todayAnswersAJobInPlace`, `somethingElseWorksForAnyOpenDay`,
+`somethingElseOnAFullyAnsweredEarlierDay` (C1b),
 `catchUpListsOnlyUnansweredDaysOfOpenWeeks`, `routinesTickFromToday`,
 `ownThingsFromToday`, `attitudeAfterTraining`, `answeredGradesClearFromToday`,
 `learningFromThePortal`, `parentAnswersForHerFromThePortal`, `bothPlacesAgree`

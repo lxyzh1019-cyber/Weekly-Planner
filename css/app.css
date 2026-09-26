@@ -7441,3 +7441,10 @@
 }
 .pre-cell.on { background: #6fc292; color: #143024; }
 .pre-total { text-align: right; font-size: 13px; font-weight: 800; }
+
+/* C1b — "Add to an earlier day" on Today: its days sit under the row, indented
+   like a catch-up panel, so the list reads as belonging to it. */
+.td-else-earlier-list {
+  margin: 0.1rem 0 0.4rem 0.3rem; padding-left: 0.5rem;
+  border-left: 3px dashed var(--ink-light);
+}

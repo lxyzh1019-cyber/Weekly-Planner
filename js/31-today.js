@@ -1201,6 +1201,41 @@ function tdCatchUpCard(kid) {
     </div>`;
 }
 
+/* ── C1b: "Add to an earlier day" (Plan v6, 2026-09-25) ──────────────────
+   Catch up lists only a day with something unanswered, so an extra job she did
+   on a day she had already answered in full had no door here. This is that
+   door: one collapsed row, under the catch-up card or on its own, listing the
+   EARLIER days of the same open weeks catch up reads (tdOpenWeeks — the same
+   window, floor and settled rule), newest first, each as the catch-up card's
+   own "＋ I did something else on Tue" (tdElseBlock → tdClaimJob →
+   openChoreClaimPrompt → mrSetClaim, the path the chore tab's ckPickElse
+   takes). A day catch up already lists is left to catch up, which carries the
+   same door; today has its own under "Jobs I can do". Writes nothing itself. */
+let tdEarlierElseOpen = false;
+function tdEarlierElseDays(kid) {
+  const today = todayKey();
+  const inCatchUp = new Set(tdCatchUpDays(kid).map(d => d.dayKey));
+  const out = [];
+  tdOpenWeeks(kid).forEach(wk => mrWeekDayKeys(wk).forEach((dayKey, d) => {
+    if (dayKey < today && !inCatchUp.has(dayKey)) out.push({ dayKey, wk, d });
+  }));
+  return out.reverse();   // newest first: yesterday is the likeliest
+}
+function tdEarlierElseRow(kid) {
+  const days = tdEarlierElseDays(kid);
+  if (!days.length) return '';
+  const open = tdEarlierElseOpen;
+  const list = open
+    ? `<div class="td-else-earlier-list">${days.map(day =>
+        tdElseBlock(kid, day.dayKey, 'on ' + tdCatchUpDayName(day))).join('')}</div>`
+    : '';
+  return `<button type="button" class="td-row td-else-btn td-else-earlier" data-td-action="else-earlier" aria-expanded="${open}">
+      <span class="td-row-icon" aria-hidden="true">＋</span>
+      <span class="td-row-name">Add to an earlier day</span>
+      <span class="td-row-go" aria-hidden="true">${open ? '▾' : '›'}</span>
+    </button>${list}`;
+}
+
 /* ── Row 6: what Mum answered, seen on Today ──
    The ✨ chip used to send her to the chore tab, whose render stamps "seen".
    Now the answers open here, and opening them is the look: mrMarkGradesSeen,
@@ -1637,6 +1672,7 @@ function tdRenderToday() {
   wrap.innerHTML = `
     <div class="td-col td-col--day">
       ${tdCatchUpCard(kid)}
+      ${tdEarlierElseRow(kid)}
       <div class="${heroCls}">${nowHtml}</div>
       ${tdInviteNote()}
       ${tdReflectRow(kid)}
@@ -1829,6 +1865,7 @@ function tdHandleClick(e) {
   }
   if (a === 'claim')      { tdClaimJob(day, el.getAttribute('data-td-chore')); return; }
   if (a === 'else')       { tdElseOpen = tdElseOpen === day ? null : day; tdRenderToday(); return; }
+  if (a === 'else-earlier') { tdEarlierElseOpen = !tdEarlierElseOpen; tdElseOpen = null; tdRenderToday(); return; }
   if (a === 'else-pick')  { tdClaimJob(day, el.getAttribute('data-td-chore')); return; }
   if (a === 'catchup-day') {
     tdCatchUpOpen = tdCatchUpOpen === day ? null : day;
@@ -1966,6 +2003,7 @@ function tdTick() {
 function goToday() {
   // Arriving on Today starts its disclosures closed (see tdCatchUpOpen).
   tdCatchUpOpen = null; tdElseOpen = null; tdRoutineOpen = {}; tdAnsweredShown = null;
+  tdEarlierElseOpen = false;
   showScreen('today');
   tdRenderToday();
 }

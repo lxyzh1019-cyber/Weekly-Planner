@@ -11718,6 +11718,76 @@ function findChromium() {
     return bad.length ? bad : true;
   });
 
+  /* C1b (Plan v6, 2026-09-25). Catch up lists only a past day with something
+     unanswered, so a job she did on a FULLY answered earlier day had no door on
+     Today. "Add to an earlier day" is that door: a collapsed row, shown on its
+     own when catch up has nothing, listing the earlier days of open weeks
+     (the same window and the same settled rule as catch up), each opening
+     "＋ I did something else on Tue" through the same owner — a claim, filed on
+     that day, and no money. A settled week's days are never offered. */
+  if (want('somethingElseOnAFullyAnsweredEarlierDay')) checks.somethingElseOnAFullyAnsweredEarlierDay = await page.evaluate(async () => {
+    const bad = [];
+    const unpin = c1.pin(3);
+    const k = c1.keep('jenn');
+    try {
+      profile = 'jenn'; parentViewing = 'jenn';
+      ctPrepareRead();
+      k.clear();
+      ctEnsureShared();
+      const c = state.shared.chore;
+      const wk = k.wk, keys = mrWeekDayKeys(wk), tue = keys[1], today = keys[3];
+      const lastTue = mrWeekDayKeys(k.lastWk)[1];
+      // Tuesday's one job is answered, so Tuesday is not catch up any more.
+      setDayBlocks(tue, [{ id: 'fa-tue', actId: 'chores', startMin: 17 * 60, durationMin: 30, choreTags: ['mop'] }], 'jenn');
+      mrSetClaim('jenn', wk, 1, 'mop', 3);
+      const cash = mnyCash('jenn'), paid = mrChoreWeek(wk, 'jenn').paid;
+
+      goToday();
+      if (document.querySelector(`#tdWrap [data-td-action="catchup-day"][data-td-day="${tue}"]`)) bad.push('precondition: a fully answered Tuesday is still in catch up');
+      const row = document.querySelector('#tdWrap [data-td-action="else-earlier"]');
+      if (!row) return bad.concat(['no "Add to an earlier day" row on Today with catch up empty']);
+      if (row.getAttribute('aria-expanded') !== 'false') bad.push('the earlier-day row does not start closed');
+      const r = row.getBoundingClientRect();
+      if (r.height < 44) bad.push(`the earlier-day row is ${Math.round(r.height)}px tall`);
+      const name = row.querySelector('.td-row-name') || row;
+      if (parseFloat(getComputedStyle(name).fontSize) < 15) bad.push(`the earlier-day row's words are ${getComputedStyle(name).fontSize}`);
+      if (document.querySelector('#tdWrap .td-else-earlier-list')) bad.push('the earlier days show before the row is opened');
+      row.click();
+      const list = document.querySelector('#tdWrap .td-else-earlier-list');
+      if (!list) return bad.concat(['opening the row lists no earlier days']);
+      if (list.querySelector(`[data-td-day="${today}"]`)) bad.push('today is offered as an earlier day');
+      if (!list.querySelector(`[data-td-action="else"][data-td-day="${lastTue}"]`)) bad.push('an unsettled last week is not offered');
+      const door = list.querySelector(`[data-td-action="else"][data-td-day="${tue}"]`);
+      if (!door) return bad.concat(['no "＋ I did something else on Tue" for the fully answered Tuesday']);
+      if (!new RegExp('something else on ' + DAY_SHORT[1], 'i').test(door.textContent)) bad.push(`Tuesday's door reads "${door.textContent.trim()}"`);
+      door.click();
+      const pick = document.querySelector(`#tdWrap .td-else-earlier-list [data-td-action="else-pick"][data-td-day="${tue}"][data-td-chore="dishes"]`);
+      if (!pick) bad.push('the picker does not offer Dishes for Tuesday');
+      else {
+        pick.click();
+        await c1.answer(0);
+        if (mrGetClaim('jenn', wk, 1, 'dishes') !== 3) bad.push(`the extra job did not land on Tuesday (claim ${mrGetClaim('jenn', wk, 1, 'dishes')})`);
+        if (mrGetClaim('jenn', wk, 3, 'dishes')) bad.push('the extra job landed on today instead');
+      }
+      if (mrChoreWeek(wk, 'jenn').paid !== paid) bad.push('an extra job was paid before any grade');
+      if (Object.keys(mrEnsureEarnings('jenn', wk).chores).some(dd => Object.keys(mrEnsureEarnings('jenn', wk).chores[dd] || {}).length)) bad.push('an extra job wrote a grade');
+      if (mnyCash('jenn') !== cash) bad.push('an extra job moved money');
+
+      // A settled week's days are never offered.
+      if (!c.weekPlans[k.lastWk]) c.weekPlans[k.lastWk] = {};
+      c.weekPlans[k.lastWk].jenn = { committedAt: syncNow() };
+      goToday();
+      const row2 = document.querySelector('#tdWrap [data-td-action="else-earlier"]');
+      if (row2) row2.click();
+      const list2 = document.querySelector('#tdWrap .td-else-earlier-list');
+      if (!list2) bad.push('the earlier-day list went away when only last week was settled');
+      else if (mrWeekDayKeys(k.lastWk).some(dk => list2.querySelector(`[data-td-day="${dk}"]`))) bad.push("a settled week's day is still offered");
+    } finally {
+      unpin(); k.restore(); goToday();
+    }
+    return bad.length ? bad : true;
+  });
+
   /* Row 19. 🕓 Catch up, at the top of Today, lists every EARLIER day of an OPEN
      week with something she has not answered, oldest first, one day open at a
      time. A settled week never appears (committed at a meeting, or credited
