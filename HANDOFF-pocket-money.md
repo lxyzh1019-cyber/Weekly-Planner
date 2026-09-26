@@ -9,6 +9,16 @@ categories, the rules table and the gift/move-money gaps.
 
 ---
 
+## 00 · Added 2026-09-25 (R6, Plan v6 A2) — take these FIRST, comparison before any patch
+
+Found during R5 (Plan v4, PRs #94 and PR 2) and deliberately not patched there, because each sits in the money area, where the hotspot rule is live (4 fix rounds, 2 recurrences — `WORKING_RECORD.md` › Hotspot counter). Present the rewrite-vs-repair comparison first, then patch.
+
+1. **A settled week can still be claimed.** `mrSetClaim` (`js/18-rules.js:977`) guards only `!isParent() && kid !== activeProfile()`; nothing refuses a week already settled at the family meeting. A child can page back through 8 past weeks on the Chores screen (`ck-history-pick`, `js/26-chore-kid.js:253-262`) and claim any ungraded chore in a settled week. Today's job rows (C1) don't check either, matching the Chores screen. Only 🕓 Catch up filters, through `mnyWeekSettled`. "Settled" in state: `weekPlans[wk][kid].committedAt` (`mnyIsCommitted`, `js/21-money-data.js:1232`); `mnyWeekSettled` also counts weeks credited another way. The structural option is the lock inside the writer, so no door can bypass it.
+2. **Own things / Helping out have no permission check.** `mrCyclePersonal` (`js/18-rules.js:806`) is the only writer of `e.personal[...]` and has no guard at all, unlike `mrSetClaim`. It moves XP, not money, but it lives in the rules file.
+3. **The money tab tag is under the 13px floor.** `.mny-tab-tag` (`css/app.css:5510`, `0.62rem`) renders at about 11.9px on the money screens. `kidScreensMeetTheHouseRules` flags it when run alone (`SMOKE_ONLY`), but not in the full run, so the check is order-dependent. Fix both the size and the check's blind spot.
+
+---
+
 ## 0 · Read this first — the premise did not hold
 
 The session began from "check every promise you made in PR #90, a lot were not
