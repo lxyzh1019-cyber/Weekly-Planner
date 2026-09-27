@@ -10245,6 +10245,125 @@ function findChromium() {
     return problems.length ? problems : true;
   });
 
+  /* ONE BADGE, ONE WORDING. The five badges were written out by hand, five
+     times, and had drifted: a parent viewing Jenn read `👨‍👩‍👧‍👦 Parent (Jenn)`
+     on Today and the chore tab, `🐥 Jenn (P)` on the week and `🐥 (P)` on the
+     day. The owner chose one wording; profileBadgeText (js/01-config.js) is the
+     one place it is built. Asserted on the text each screen actually draws. */
+  if (want('everyProfileBadgeSaysTheSameThing')) checks.everyProfileBadgeSaysTheSameThing = await page.evaluate(() => {
+    const problems = [];
+    const wasProfile = profile, wasViewing = parentViewing, wasParentKid = ctParentKid;
+    const wasOffset = weekOffset, wasSyncDay = syncDayIdx, wasDayKey = currentDayKey;
+    const wasReturn = mmReturn;
+    try {
+      mmReturn = null;
+      const screens = [
+        ['Today',       'todayProfileBadge', () => goToday()],
+        ['the week',    'weekProfileBadge',  () => { goWeek(); renderWeek(); }],
+        ['the day',     'dayProfileBadge',   () => openDay(getDayKeys(weekOffset)[0], 0)],
+        ['the chores',  'choreProfileBadge', () => openChoreTab()],
+        ['Sister Sync', 'syncProfileBadge',  () => openSisterSync()],
+      ];
+      const expect = (who, label, id, want) => {
+        const got = (document.getElementById(id) || {}).textContent;
+        if (got !== want) problems.push(`${who} on ${label}: #${id} reads ${JSON.stringify(got)}, expected ${JSON.stringify(want)}`);
+      };
+      const names = { jenn: 'Jenn', jess: 'Jess' };
+      const icons = { jenn: '🐥', jess: '🦊' };
+      for (const kid of ['jenn', 'jess']) {
+        // A parent viewing her — Sister Sync is a child's screen and refuses a parent.
+        for (const [label, id, nav] of screens.slice(0, 4)) {
+          profile = 'parent'; parentViewing = kid; ctParentKid = kid;
+          nav();
+          expect(`a parent viewing ${names[kid]}`, label, id, `👨‍👩‍👧‍👦 Parent (${names[kid]})`);
+        }
+        // The child herself, on all five.
+        for (const [label, id, nav] of screens) {
+          profile = kid;
+          nav();
+          expect(names[kid], label, id, `${icons[kid]} ${names[kid]}`);
+        }
+      }
+    } finally {
+      mmReturn = wasReturn;
+      profile = wasProfile; parentViewing = wasViewing; ctParentKid = wasParentKid;
+      weekOffset = wasOffset; syncDayIdx = wasSyncDay; currentDayKey = wasDayKey;
+      goToday();
+    }
+    return problems.length ? problems : true;
+  });
+
+  /* THE PARENT'S DAY BAR STAYS THE SIZE IT WAS. The one wording made the Day
+     badge `👨‍👩‍👧‍👦 Parent (Jenn)` where it had been `🐥 (P)`, and on one line
+     that no longer fit beside 📋: the pair dropped to a row of their own and
+     the bar R7 made compact grew ~52px on every phone and iPad portrait. The
+     budget is the bar's height with the old short text, measured live in the
+     same page (179px at 360/390, 75px at 768, 71px / 63px scrolled at 1024
+     when this was written), with 2px tolerance for sub-pixel rounding. The
+     badge must still show all of its text, stay 44px, and the child's own
+     badge must stay on one line. */
+  if (want('parentDayTopBarStaysCompact')) {
+    const wasViewport = page.viewportSize();
+    const findings = [];
+    for (const w of [360, 390, 768, 1024]) {
+      await page.setViewportSize({ width: w, height: 844 });
+      const r = await page.evaluate(() => {
+        const out = [];
+        const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
+        const wasReturn = mmReturn;
+        const bar = () => document.querySelector('#screen-day .topbar.day-topbar');
+        const badge = () => document.getElementById('dayProfileBadge');
+        const lines = (el) => {
+          const t = [...el.childNodes].find(n => n.nodeType === 3);
+          if (!t) return 0;
+          const rg = document.createRange(); rg.selectNodeContents(t);
+          return new Set([...rg.getClientRects()].filter(q => q.width > 0).map(q => Math.round(q.top))).size;
+        };
+        try {
+          mmReturn = null;
+          for (const compact of [false, true]) {
+            for (const kid of ['jenn', 'jess']) {
+              // The budget: the same bar with the old short badge in it.
+              profile = 'parent'; parentViewing = kid;
+              openDay(getDayKeys(weekOffset)[0], 0);
+              bar().classList.toggle('day-topbar--compact', compact);
+              const b = badge();
+              const text = b.textContent, cls = b.className;
+              b.textContent = kid === 'jenn' ? '🐥 (P)' : '🦊 (P)';
+              b.className = 'profile-badge';
+              const budget = bar().getBoundingClientRect().height;
+              b.textContent = text; b.className = cls;
+              const h = bar().getBoundingClientRect().height;
+              const br = b.getBoundingClientRect();
+              const cs = getComputedStyle(b);
+              const tag = `parent viewing ${kid}${compact ? ' (scrolled)' : ''}`;
+              if (h > budget + 2) out.push(`${tag}: the Day bar is ${Math.round(h)}px, over its ${Math.round(budget)}px budget`);
+              if (b.scrollWidth > b.clientWidth || b.scrollHeight > b.clientHeight) out.push(`${tag}: the badge text does not fit (${b.scrollWidth}x${b.scrollHeight} in ${b.clientWidth}x${b.clientHeight})`);
+              if (cs.textOverflow === 'ellipsis') out.push(`${tag}: the badge text is cut with an ellipsis`);
+              if (br.width < 44 || br.height < 44) out.push(`${tag}: the badge is ${Math.round(br.width)}x${Math.round(br.height)}, under 44px`);
+              if (lines(b) > 2) out.push(`${tag}: the badge runs to ${lines(b)} lines`);
+              if (document.documentElement.scrollWidth > window.innerWidth) out.push(`${tag}: the page scrolls sideways`);
+              // The child's own Day badge is short and stays one line.
+              profile = kid;
+              openDay(getDayKeys(weekOffset)[0], 0);
+              bar().classList.toggle('day-topbar--compact', compact);
+              if (lines(badge()) !== 1) out.push(`${kid}${compact ? ' (scrolled)' : ''}: her own Day badge wraps to ${lines(badge())} lines`);
+            }
+          }
+        } finally {
+          bar().classList.remove('day-topbar--compact');
+          mmReturn = wasReturn;
+          profile = wasProfile; parentViewing = wasViewing; currentDayKey = wasDayKey;
+          goToday();
+        }
+        return out;
+      });
+      r.forEach(p => findings.push(`@${w}: ${p}`));
+    }
+    await page.setViewportSize(wasViewport);
+    checks.parentDayTopBarStaysCompact = findings.length === 0 || findings;
+  }
+
   // The one-line wirings behind the new affordances — each is a place a tap
   // can silently stop going anywhere.
   if (want('newAffordancesActuallyNavigate')) checks.newAffordancesActuallyNavigate = await page.evaluate(() => {

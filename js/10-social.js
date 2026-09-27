@@ -31,7 +31,7 @@ function openSisterSync() {
 function changeSyncDay(d) { syncDayIdx = (syncDayIdx+d+7)%7; renderSync(); }
 
 function renderSync() {
-  document.getElementById('syncProfileBadge').textContent = profile==='jenn'?'🐥 Jenn':'🦊 Jess';
+  document.getElementById('syncProfileBadge').textContent = profileBadgeText(profile, false);
   const keys = getDayKeys(weekOffset);
   const key = keys[syncDayIdx];
   const d = formatDayKey(key);

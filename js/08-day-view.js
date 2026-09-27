@@ -93,9 +93,10 @@ function openDay(key, dayIdx, focusBlockId=null, weekOffsetOverride=null) {
      in js/11-parent.js. A child's render is what lifts the lock. */
   applyMeetingLock();
 
-  document.getElementById('dayProfileBadge').textContent =
-    isParent() ? (parentViewing==='jenn'?'🐥 (P)':'🦊 (P)') :
-    (profile==='jenn'?'🐥 Jenn':'🦊 Jess');
+  const dayBadge = document.getElementById('dayProfileBadge');
+  dayBadge.textContent = profileBadgeText(isParent() ? parentViewing : profile, isParent());
+  // Two short lines for a parent — see .profile-badge--parent in css/app.css.
+  dayBadge.classList.toggle('profile-badge--parent', isParent());
   document.getElementById('dayTitle').textContent = '';
   renderDayHeading();
 

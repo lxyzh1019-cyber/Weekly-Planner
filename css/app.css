@@ -685,6 +685,22 @@
     min-height: 44px;
     min-width: 44px;
   }
+  /* A parent's Day badge reads `👨‍👩‍👧‍👦 Parent (Jenn)` (profileBadgeText), not
+     the old `🐥 (P)`. On one line it no longer fit beside 📋, and the pair
+     dropped to a row of their own — ~52px more bar on every phone and iPad
+     portrait. So it wraps inside the badge to `👨‍👩‍👧‍👦 Parent` / `(Jenn)` in
+     smaller type, about the width the old text took. Two ids so it also
+     beats the scrolled (compact) rule's font-size. A child's badge is short,
+     carries no class, and is untouched. Held by parentDayTopBarStaysCompact. */
+  #screen-day .day-topbar-actions #dayProfileBadge.profile-badge--parent {
+    max-width: 7.2em;
+    justify-content: center;
+    text-align: center;
+    white-space: normal;
+    line-height: 1.1;
+    padding: 0.14rem 0.55rem;
+    font-size: calc(0.85rem * var(--fs-scale, 1));
+  }
   /* Rest-day toggle now lives inside the Template sheet */
   #restDayBtn.on {
     background: var(--cat-sleep);
