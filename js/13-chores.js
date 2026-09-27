@@ -1371,7 +1371,7 @@ function renderChoreTab() {
   const wrap = document.getElementById('choreWrap');
   if (!wrap) return;
   const badge = document.getElementById('choreProfileBadge');
-  if (badge) badge.textContent = isParent() ? `👨‍👩‍👧‍👦 Parent (${ctParentKid==='jenn'?'Jenn':'Jess'})` : (activeProfile()==='jenn' ? '🐥 Jenn' : '🦊 Jess');
+  if (badge) badge.textContent = profileBadgeText(isParent() ? ctParentKid : activeProfile(), isParent());
   const kid = isParent() ? ctParentKid : activeProfile();
   ctMaybeFireGoalBonus(ctWeekKey, 'jenn');
   ctMaybeFireGoalBonus(ctWeekKey, 'jess');

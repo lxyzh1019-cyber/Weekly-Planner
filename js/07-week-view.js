@@ -386,8 +386,7 @@ function renderWeek() {
 
   const p = activeProfile();
   document.getElementById('weekProfileBadge').textContent =
-    isParent() ? (parentViewing==='jenn'?'🐥 Jenn':'🦊 Jess')+' (P)' :
-    (p==='jenn'?'🐥 Jenn':'🦊 Jess');
+    profileBadgeText(isParent() ? parentViewing : p, isParent());
 
   const keys = getDayKeys(weekOffset);
   const mon = formatDayKey(keys[0]);

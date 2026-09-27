@@ -1,4 +1,4 @@
-# FEATURES — Weekly-Planner — manifest v11 — 2026-09-26, v10 + R8 hz-rules stub install (governance only) (v2 confirmed 2026-09-22)
+# FEATURES — Weekly-Planner — manifest v12 — 2026-09-26, v11 + one profile-badge wording (build 2026-09-26b) (v2 confirmed 2026-09-22)
 
 Locked features of the current version. Every edit is checked against this list and ends with a regression table. Update this file in the same change that alters a feature. Over-list rather than under-list.
 
@@ -81,13 +81,17 @@ to be a complete manifest:
 - The blank-week coach tip (`weekEmptyOffer`) carries **no** school button — the banner covers the blank week from the same position.
 - Held by `theSchoolOfferIsAboveTheWeekGrid`, `oneSchoolDayCanBeAddedOnItsOwn` and `aBlankWeekOffersItsSchoolDays` in `tests/smoke.js`.
 
-### The profile badge switches profile (manifested 2026-09-22)
+### The profile badge switches profile (manifested 2026-09-22; one wording, manifest v12, build 2026-09-26b)
 - **All five** profile badges are real controls: `#todayProfileBadge`, `#weekProfileBadge`, `#dayProfileBadge`, `#choreProfileBadge`, `#syncProfileBadge` are each `<button class="profile-badge" onclick="openProfileSwitcher()" aria-label="Switch profile">`. Three of them (Today, chores, Sister Sync) were inert `<div>`s.
 - `openProfileSwitcher` (`js/06-quests.js`) is the one switcher; every badge is a call site for it.
-- Every badge **prints who is on screen**, a parent included. Today's says `👨‍👩‍👧‍👦 Parent (Jenn|Jess)` for a grown-up, the same shape the chore tab uses.
+- Every badge **prints who is on screen**, a parent included, in **one wording** (changed manifest v12): `👨‍👩‍👧‍👦 Parent (Jenn)` / `👨‍👩‍👧‍👦 Parent (Jess)` for a grown-up viewing her, `🐥 Jenn` / `🦊 Jess` for the child herself. The week's `🐥 Jenn (P)` and the day's `🐥 (P)` are gone on purpose.
+- **One writer:** `profileBadgeText(kid, asParent)` (`js/01-config.js`, after `kidLabel`, built from `KID_LABEL`) makes the text for all five badges; no badge spells it out. Each screen keeps its own child: Today `activeProfile()`, week `parentViewing` / `activeProfile()`, day `parentViewing` / `profile`, chores `ctParentKid` / `activeProfile()`, Sister Sync `profile` (child only). A kid other than `'jenn'`/`'jess'` gives `''` — only reachable with no profile picked (a parent's viewed child is always one of the two), and Today already showed an empty badge then.
+- **The parent's Day badge is two short lines.** `openDay` puts `.profile-badge--parent` on `#dayProfileBadge` for a parent only; `css/app.css` (after `.day-topbar-actions .btn-icon`) wraps it to `👨‍👩‍👧‍👦 Parent` / `(Jenn)` at `0.85rem` × `--fs-scale`, `max-width: 7.2em`, so it takes about the width `🐥 (P)` did and the Day top bar keeps its R7 height (179px at 360–390, 75px at 768, 71/63px at 1024). The rule has two ids so it beats the scrolled (compact) rule's font-size. A child's Day badge has no class and is unchanged (one line). The wording is not shortened and the bar's order is unchanged.
 - **Nothing is announced as a control that is not one.** `enhanceAccessibility` (`js/99-main.js`) injects `aria-label` only on a `.profile-badge` that is a `<button>`/`<a>`, carries `[onclick]`, or has `role="button"` — matching how `enhanceNonButtonClickables` beside it already filtered.
 - **The meeting lock is scoped and releasable.** `applyMeetingLock` (`js/11-parent.js`) hides only `MEETING_LOCK_BADGES` (`weekProfileBadge`, `dayProfileBadge`) plus `#parentWeekActions .pb-switch`, never every `.profile-badge` in the document; `locked` is `isParent() && mmHasReturn()`; and `renderWeek`/`openDay` call it **outside** their `isParent()` branches so a child's own render puts the control back.
 - Held by `everyProfileBadgeSwitchesProfile` in `tests/smoke.js` — it activates each badge and asserts the switcher opens, and asserts the lock both engages for a parent mid-meeting and lifts for a child.
+- Held by `everyProfileBadgeSaysTheSameThing` (manifest v12) — a parent viewing Jenn, then Jess, on Today, week, day and chores reads exactly `👨‍👩‍👧‍👦 Parent (<Name>)`; each child on all five reads `🐥 Jenn` / `🦊 Jess`.
+- Held by `parentDayTopBarStaysCompact` (manifest v12) — a parent on the Day view at 360, 390, 768 and 1024px, scrolled and not: the bar is no taller than the same bar with the old `🐥 (P)` text (measured live, 2px tolerance), the badge shows all its text (no overflow, no ellipsis, at most two lines), is ≥44px both ways, no sideways scroll; the child's own Day badge stays one line.
 
 ### A sister can be invited to watch (manifested 2026-09-22)
 - A **`watching: true`** flag on the block is what makes it a watch block, on any competition block, not only a scored meet. `blockIsWatching(b)` (`js/08-day-view.js`) is the one owner of the question.
