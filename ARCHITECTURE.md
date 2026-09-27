@@ -1670,11 +1670,47 @@ knows. The measurements, all with `colourDistance` and WCAG luminance:
   ΔE00 1.6 of every wash the handoff drew, and it reaches a sport's colour or a
   hand-picked one where a table would not. Navy on every subgroup's wash ≥
   12.65:1, Pop's secondary text `#4d5575` ≥ 5.96:1.
-- `CAT_HEX` moved with them (sleep `#a78bfa`, school `#4aa3ff`, active `#fb8a2e`,
-  free `#4cc46a`, daily `#ffc83d`, custom `#ff7fa3`, training `#f2597d`, routine
-  `#3cc9b9`, appointment `#7fa5c4`; competition unchanged), and every value either
-  table gave up joined `RETIRED_SEEDED_HEXES`. The full old → new list with each
-  figure is in the stage-2 PR.
+- `CAT_HEX` moved with them (school `#4aa3ff`, active `#fb8a2e`, free `#4cc46a`,
+  daily `#ffc83d`, training `#f2597d`, routine `#3cc9b9`; sleep, custom,
+  appointment and competition as corrected in stage 2B-3 below), and every value
+  either table gave up joined `RETIRED_SEEDED_HEXES`. The full old → new list
+  with each figure is in the stage-2 PR.
+
+**The guard measures every colour a block can be DRAWN in, not only the twelve
+— Looks stage 2B-3 (2026-09-27).** `everySubgroupTellsItselfApart` compared the
+subgroups with each other only, and passed while the handoff's Sleep `#a78bfa`
+sat **1.9** from Arts and Skating `#9d85dd` **4.4** from it. A training block
+wears its SPORT's colour (`trainingBlockColour`), and `CAT_HEX` is the category
+fallback, the seeded default and `--cat-*`'s owner, so the check now takes 26
+colours — the 12 subgroups, the 10 `CAT_HEX` keys and the 4 built-in sports —
+each tagged with the category it draws for: a `CAT_HEX` key with the subgroup
+`activitySub` files that legacy `cat` under (sleep and custom → Play & Rest,
+active → Body, appointment → Fuel & Care), `competition` with the shipped
+Competition activity's (Body), every sport with Training's (Body). Every
+cross-category pair ≥ 14, navy ≥ 4.5:1 on every fill, navy and `#4d5575` ≥ 4.5:1
+on every wash. A category's colour against its own subgroup is the same idea
+(School and `CAT_HEX.school` are one hex) and is not floored. Six moved:
+
+| Colour | Was (stage 2) | Now | Why |
+|---|---|---|---|
+| `CAT_HEX.sleep` | `#a78bfa` | `#dcbcfd` | 1.9 from Arts. No lavender that vivid clears Arts by 14; the nearest that does is paler. Deviates from handoff §7's Sleep value — the alternative was moving Arts, a subgroup already seeded onto blocks |
+| `CAT_HEX.custom` | `#ff7fa3` | `#ff9eb5` | 9.0 from Training; back to main's value |
+| `CAT_HEX.appointment` | `#7fa5c4` | `#f0bf72` | 8.5 from School. Now sits on its own subgroup, Appointments, as school, daily, routine, free and training do |
+| `CAT_HEX.competition` | `#f4a340` | `#fc9005` | 9.2 from Appointments; a clearer orange |
+| Skating (sport) | `#9d85dd` | `#9c86aa` | 4.4 from Arts. A dusty violet: it keeps the purple; every violet bright enough to be brighter sits under 14 from Arts or Sleep |
+| Swimming (sport) | `#2f9fd0` | `#59f1ff` | 8.4 from Helping hands, 9.7 from School. The mid blues are full; no mid blue clears Helping hands, School and Language at once, so a pool aqua |
+
+Worst cross-category pair over all 26: **Swimming vs Routine 14.3** (the twelve
+subgroups alone: Helping hands vs Language 15.6, unchanged). Lowest navy on a
+fill: **Skating 4.74:1**. No allowlist — every pair that was under 14 on main
+clears 14 now. `CAT_HEX.appointment` and `CAT_HEX.competition` are read by
+nothing but `CAT_HEX_VALUES` today (an appointment draws its subgroup, a
+competition its sport); they are held to the floor anyway, because a value in
+this table is one render path away from being drawn. The retired hexes joined
+`RETIRED_SEEDED_HEXES`, and the retired sport colours `TRAINING_DEFAULT_HEXES`
+too — the smoke check places a skating block carrying `#8a6fd0` and `#9d85dd`
+and a swimming block carrying `#2f9fd0` and asserts each draws its sport's
+colour now.
 
 **`CAT_HEX.training` is a sentinel as well as a colour.** A training block whose
 `colour` equals it made no choice and draws its SPORT's colour

@@ -1822,9 +1822,10 @@ function findChromium() {
      are not literally the same value. */
   if (want('everySubgroupTellsItselfApart')) checks.everySubgroupTellsItselfApart = await page.evaluate(() => {
     const bad = [];
-    /* 14 is the floor this palette clears with room (its worst cross-category
-       pair is Helping hands vs Language at 15.6 since the stage-2 brightening; it
-       was Arts vs Outings at 15.0) and is comfortably above the ~5 at which
+    /* 14 is the floor this palette clears (its worst cross-category pair is
+       the Swimming sport vs Routine at 14.3 since Looks stage 2B-3; among the
+       twelve subgroups alone, Helping hands vs Language at 15.6 since the
+       stage-2 brightening; it was Arts vs Outings at 15.0) and is comfortably above the ~5 at which
        two colours stop being reliably distinguishable on a small card. Raising
        it is a design decision, not a bug fix — six categories over a pastel
        wheel that must all take dark ink is a genuinely tight budget. */
@@ -1838,15 +1839,40 @@ function findChromium() {
     for (let i = 0; i < subs.length; i++) {
       for (let j = i + 1; j < subs.length; j++) {
         const a = subs[i], b = subs[j];
-        const d = colourDistance(a.hex, b.hex);
-        if (a.cat === b.cat) {
-          if (a.hex.toLowerCase() === b.hex.toLowerCase()) {
-            bad.push(`${a.label} and ${b.label} are the same hex ${a.hex}`);
-          }
-          continue;
+        if (a.cat === b.cat && a.hex.toLowerCase() === b.hex.toLowerCase()) {
+          bad.push(`${a.label} and ${b.label} are the same hex ${a.hex}`);
         }
+      }
+    }
+
+    /* EVERY COLOUR A BLOCK CAN BE DRAWN IN, not only the twelve. A training
+       block wears its SPORT's colour (trainingBlockColour), and CAT_HEX is the
+       category fallback, the seeded default and --cat-*'s owner — so Sleep's
+       #a78bfa sat 1.9 from Arts and Skating 4.4 from it while this check, which
+       measured the subgroups with each other only, passed (Looks stage 2B-3).
+       Each is tagged with the category it draws for: a CAT_HEX key with the
+       subgroup activitySub files that legacy `cat` under, Competition with the
+       shipped Competition activity's, and every built-in sport with Training's.
+       A category's colour against its own subgroup is the same idea (School and
+       CAT_HEX.school are one hex), so only cross-category pairs are floored. */
+    const compAct = DEFAULT_ACTIVITIES.find(a => a.id === 'competition');
+    if (!compAct) bad.push('the shipped Competition activity is missing');
+    const drawn = subs.slice();
+    Object.keys(CAT_HEX).forEach(k => {
+      const cat = k === 'competition' ? activitySub(compAct).cat : activitySub({ cat: k }).cat;
+      drawn.push({ id: `cat-${k}`, label: `CAT_HEX.${k}`, hex: CAT_HEX[k], cat });
+    });
+    TRAINING_TAGS.forEach(t => {
+      drawn.push({ id: `sport-${t.id}`, label: `the ${t.name} sport`, hex: t.colour, cat: ACTIVITY_SUBS.training.cat });
+    });
+
+    for (let i = 0; i < drawn.length; i++) {
+      for (let j = i + 1; j < drawn.length; j++) {
+        const a = drawn[i], b = drawn[j];
+        if (a.cat === b.cat) continue;
+        const d = colourDistance(a.hex, b.hex);
         if (d < FLOOR) {
-          bad.push(`${a.label} (${a.cat}) and ${b.label} (${b.cat}) are ${d.toFixed(1)} apart, under ${FLOOR}`);
+          bad.push(`${a.label} ${a.hex} (${a.cat}) and ${b.label} ${b.hex} (${b.cat}) are ${d.toFixed(1)} apart, under ${FLOOR}`);
         }
       }
     }
@@ -1869,7 +1895,7 @@ function findChromium() {
       const x = lum(wash), y = lum(text);
       return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
     };
-    subs.forEach(sg => {
+    drawn.forEach(sg => {
       if (!isLightColour(sg.hex)) bad.push(`${sg.label} ${sg.hex} is too dark for ink`);
       const ratio = inkContrast(sg.hex);
       if (ratio < 4.5) bad.push(`${sg.label} ${sg.hex} gives ink only ${ratio.toFixed(2)}:1`);
@@ -1880,13 +1906,9 @@ function findChromium() {
       const mutedOnWash = onWash(wash, POP_MUTED);
       if (mutedOnWash < 4.5) bad.push(`${sg.label} wash ${wash} gives ${POP_MUTED} only ${mutedOnWash.toFixed(2)}:1`);
     });
-    /* The built-in sports too: a training block wears its sport's colour, not
+    /* The sports are in `drawn`: a training block wears its sport's colour, not
        its subgroup's (trainingBlockColour), and Skating shipped at 3.9:1 with
        the navy ink until thePopLookReadsEverywhere drew one (Looks stage 2B-2). */
-    TRAINING_TAGS.forEach(t => {
-      const ratio = inkContrast(t.colour);
-      if (ratio < 4.5) bad.push(`the ${t.name} sport ${t.colour} gives ink only ${ratio.toFixed(2)}:1`);
-    });
     /* The ink really is the stylesheet's: a copy of it in the maths was the
        defect this replaced (#2a2320 while the page drew navy). */
     const liveInk = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
@@ -1944,6 +1966,18 @@ function findChromium() {
         const got = blockColour(getDayBlocks(key, kid)[0], kid);
         if (String(got).toLowerCase() !== String(sport).toLowerCase()) {
           bad.push(`a skating block carrying the training default ${sentinel} draws ${got}, not the sport's ${sport}`);
+        }
+      });
+      /* A placement seeds its sport's colour onto the block, so a sport that
+         moved leaves its old colour on every block already placed: each must
+         draw the sport's colour now, not the one it replaced. */
+      [['skating', '#8a6fd0'], ['skating', '#9d85dd'], ['swimming', '#2f9fd0']].forEach(([tag, old]) => {
+        setDayBlocks(key, [{ id: 'pal-sport', actId: 'training', tag, startMin: 17 * 60,
+          durationMin: 60, colour: old }], kid);
+        const got = blockColour(getDayBlocks(key, kid)[0], kid);
+        const now = getTrainingTopic(tag).colour;
+        if (String(got).toLowerCase() !== String(now).toLowerCase()) {
+          bad.push(`a ${tag} block carrying its retired colour ${old} draws ${got}, not the sport's ${now}`);
         }
       });
       // …while a colour a person really picked is left alone.

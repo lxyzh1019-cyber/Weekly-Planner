@@ -51,20 +51,26 @@ const AGE_ROLLOVER_MONTH = 7;   // 0-based: August
    category's main subgroup below where one exists, and every value it replaced
    is in RETIRED_SEEDED_HEXES. css/app.css's `--cat-*` copy these for the few
    CSS rules that paint a category; this table owns them and
-   everySubgroupTellsItselfApart (tests/smoke.js) holds the two to agreement. */
+   everySubgroupTellsItselfApart (tests/smoke.js) holds the two to agreement.
+   That check also holds every value here 14 or more (CIEDE2000) from every
+   colour of ANOTHER category — Looks stage 2B-3 moved four that were not:
+   sleep #a78bfa sat 1.9 from Arts, so it went a paler lavender; custom went
+   back to #ff9eb5 (#ff7fa3 was 9.0 from Training); appointment now sits on
+   its own subgroup, Appointments (#7fa5c4 was 8.5 from School); competition
+   went a clearer orange (#f4a340 was 9.2 from Appointments). */
 const CAT_HEX = { /* look: category hexes are family data — seeded onto blocks, read by SEEDED_HEX_VALUES */
-  sleep:'#a78bfa', school:'#4aa3ff', active:'#fb8a2e',
-  free:'#4cc46a', daily:'#ffc83d', custom:'#ff7fa3', training:'#f2597d',
+  sleep:'#dcbcfd', school:'#4aa3ff', active:'#fb8a2e',
+  free:'#4cc46a', daily:'#ffc83d', custom:'#ff9eb5', training:'#f2597d',
   routine:'#3cc9b9',
   // Appointments: the dentist, the orthodontist, a parent-teacher meeting. A
   // fixed time somebody else set, which is what makes it its own category
   // rather than an "active" or a "daily" — you cannot move it, and a week that
   // has one is shaped around it. Muted on purpose: it is not a treat, and it is
   // not a chore either.
-  appointment:'#7fa5c4',
+  appointment:'#f0bf72',
   // Not a category — Competition is cat:'training' with isCompetition set. The
   // colour lives here so a competition block can be told apart at a glance.
-  competition:'#f4a340'
+  competition:'#fc9005'
 };
 
 /* THE TRAINING SENTINEL. A training block whose `colour` is one of these made
@@ -75,9 +81,10 @@ const CAT_HEX = { /* look: category hexes are family data — seeded onto blocks
    retired pink instead of its sport's colour. Skating's own old #8a6fd0 joined
    it when the sport moved to #9d85dd (Looks stage 2B-2: navy read 3.9:1 and
    white 4.0:1 on it), since a skating placement seeds its sport's colour onto
-   the block. Grows on every move and is never pruned, for the same reason as
-   RETIRED_SEEDED_HEXES. */
-const TRAINING_DEFAULT_HEXES = new Set([CAT_HEX.training, '#ef476f', '#8a6fd0'].map(h => h.toLowerCase())); /* look: retired training sentinel — matched against stored block colours */
+   the block — and #9d85dd and Swimming's #2f9fd0 joined it when those two
+   moved again in Looks stage 2B-3. Grows on every move and is never pruned,
+   for the same reason as RETIRED_SEEDED_HEXES. */
+const TRAINING_DEFAULT_HEXES = new Set([CAT_HEX.training, '#ef476f', '#8a6fd0', '#9d85dd', '#2f9fd0'].map(h => h.toLowerCase())); /* look: retired training sentinel — matched against stored block colours */
 
 /* The nine shipped defaults, frozen as a SET so blockColour can tell a colour
    somebody chose from one a placement copied out of this table. Every placement
@@ -320,6 +327,15 @@ const RETIRED_SEEDED_HEXES = [ /* look: retired seeded hexes are data — matche
   '#fb6f1c', // CAT_HEX.active
   '#ff9eb5', // CAT_HEX.custom
   '#8fa8b8', // CAT_HEX.appointment
+  // Looks stage 2B-3 (2026-09-27): the colours that sat under 14 from another
+  // category once the sports and CAT_HEX were measured too.
+  '#a78bfa', // CAT_HEX.sleep
+  '#ff7fa3', // CAT_HEX.custom (back to #ff9eb5, listed above and current again)
+  '#7fa5c4', // CAT_HEX.appointment
+  '#f4a340', // CAT_HEX.competition
+  '#8a6fd0', // the Skating sport (moved in 2B-2)
+  '#9d85dd', // the Skating sport
+  '#2f9fd0', // the Swimming sport
 ];
 /* Flattened once, because every lookup below is by subgroup id and walking six
    nested arrays on every block of every render is work nobody needs. */
@@ -480,12 +496,17 @@ const COMP_WARMUP_MIN = 60;               // before it starts
 /* Training tags + sport-specific starter objectives. Each topic carries its
    own icon and background colour so a Skating block reads differently from a
    Swimming or Dryland one at a glance, not just by its text label.
-   Each takes the navy ink at 4.5:1 or better (everySubgroupTellsItselfApart):
+   Each takes the navy ink at 4.5:1 or better and sits 14 or more (CIEDE2000)
+   from every colour of another category (everySubgroupTellsItselfApart):
    Skating moved #8a6fd0 → #9d85dd and General from the retired #ef476f to
-   CAT_HEX.training in Looks stage 2B-2. */
+   CAT_HEX.training in Looks stage 2B-2. In 2B-3 Skating went a dusty violet
+   (#9d85dd was 4.4 from Arts; no violet bright enough to be brighter clears
+   both Arts and Sleep) and Swimming a pool aqua (#2f9fd0 was 8.4 from Helping
+   hands and 9.7 from School — no mid blue clears Helping hands, School and
+   Language at once). */
 const TRAINING_TAGS = [ /* look: training tag colours are family data — a block's own colour */
-  { id:'skating',  label:'⛸ Skating',  name:'Skating',  icon:'⛸', colour:'#9d85dd' },
-  { id:'swimming', label:'🏊 Swimming', name:'Swimming', icon:'🏊', colour:'#2f9fd0' },
+  { id:'skating',  label:'⛸ Skating',  name:'Skating',  icon:'⛸', colour:'#9c86aa' },
+  { id:'swimming', label:'🏊 Swimming', name:'Swimming', icon:'🏊', colour:'#59f1ff' },
   { id:'dryland',  label:'💪 Dryland', name:'Dryland',  icon:'💪', colour:'#e08a3a' },
   { id:'general',  label:'🏃 General', name:'Training', icon:'🏃', colour:CAT_HEX.training },
 ];

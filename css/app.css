@@ -33,11 +33,11 @@
        everySubgroupTellsItselfApart (tests/smoke.js) fails when the two
        disagree. Only the ones something reads are kept (--cat-active,
        -training, -routine and -appointment were read by nothing). */
-    --cat-sleep:   #a78bfa;
+    --cat-sleep:   #dcbcfd;
     --cat-school:  #4aa3ff;
     --cat-free:    #4cc46a;
     --cat-daily:   #ffc83d;
-    --cat-custom:  #ff7fa3;
+    --cat-custom:  #ff9eb5;
 
     /* Kid colours (handoff §7): fill / strong / wash. White text goes ONLY on
        a -strong value — the fills fail it (Jenn 2.94:1, Jess 3.33:1). */
