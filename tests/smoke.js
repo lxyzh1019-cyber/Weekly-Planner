@@ -1880,6 +1880,13 @@ function findChromium() {
       const mutedOnWash = onWash(wash, POP_MUTED);
       if (mutedOnWash < 4.5) bad.push(`${sg.label} wash ${wash} gives ${POP_MUTED} only ${mutedOnWash.toFixed(2)}:1`);
     });
+    /* The built-in sports too: a training block wears its sport's colour, not
+       its subgroup's (trainingBlockColour), and Skating shipped at 3.9:1 with
+       the navy ink until thePopLookReadsEverywhere drew one (Looks stage 2B-2). */
+    TRAINING_TAGS.forEach(t => {
+      const ratio = inkContrast(t.colour);
+      if (ratio < 4.5) bad.push(`the ${t.name} sport ${t.colour} gives ink only ${ratio.toFixed(2)}:1`);
+    });
     /* The ink really is the stylesheet's: a copy of it in the maths was the
        defect this replaced (#2a2320 while the page drew navy). */
     const liveInk = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
@@ -5262,8 +5269,10 @@ function findChromium() {
      Later fold is opened for the same reason the extras row opens its
      disclosure: a panel behind display:none is a panel this audit skips.
 
-     Returns its own undo, so the caller reads seed → render → restore in order. */
-  await page.evaluate(() => {
+     Returns its own undo, so the caller reads seed → render → restore in order.
+     A function, so a check that runs after a page reload (thePopLookReadsEverywhere)
+     can put the seeds back on the page before it walks KID_SCREENS. */
+  const defineAuditSeeds = () => page.evaluate(() => {
     window.seedTodayAudit = () => {
       const kid = activeProfile();
       const key = todayKey();
@@ -5332,6 +5341,7 @@ function findChromium() {
       }
     };
   });
+  await defineAuditSeeds();
 
   const kidFindings = [];
   for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1440, 900], [900, 1100]]) {
@@ -14863,11 +14873,22 @@ function findChromium() {
      Today's 🕓 Catch up card with a day open. */
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.evaluate(() => {
-    window.darkContrastFindings = (root, label) => {
+    /* skip: a selector whose contents are not measured — thePopLookReadsEverywhere
+       passes '.print-sheet', the week's print preview, which draws the printed
+       sheet and so ignores the look (L12). */
+    window.darkContrastFindings = (root, label, skip) => {
       const out = [];
       if (!root) return [`${label}: not on screen`];
       const parse = (c) => {
         const m = /rgba?\(([^)]+)\)/.exec(c || '');
+        /* A color-mix() computes to `color(srgb r g b / a)` (0–1 channels), not
+           rgb(). Unread, that layer was skipped and the text was measured
+           against whatever was behind the mixed fill (Pop's filled cards). */
+        const s = /color\(srgb ([^)]+)\)/.exec(c || '');
+        if (s) {
+          const p = s[1].split(/[\s/]+/).filter(Boolean).map(Number);
+          return { r: p[0] * 255, g: p[1] * 255, b: p[2] * 255, a: p.length > 3 ? p[3] : 1 };
+        }
         if (!m) return null;
         const p = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
         return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
@@ -14895,6 +14916,7 @@ function findChromium() {
         const s = getComputedStyle(el);
         if (s.display === 'none' || s.visibility === 'hidden') return;
         if (el.closest('.visually-hidden')) return;
+        if (skip && el.closest(skip)) return;
         const r = el.getBoundingClientRect();
         if (r.width < 2 || r.height < 2) return;
         const text = [...el.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join('').trim();
@@ -15019,6 +15041,74 @@ function findChromium() {
     return bad.length ? bad : true;
   });
   await page.emulateMedia({ colorScheme: 'light' });
+
+  /* Looks stage 2 — the Pop look, read in light mode, everywhere a child (or a
+     grown-up) reads it. Pop fills the Now card with its block's colour, fills
+     block rows with their wash, turns the main buttons yellow and the today
+     markers navy, and makes the text 10% bigger; any of those can put text on
+     a colour it does not read on. So every KID_SCREENS row at the phone and the
+     iPad sizes, the five parent destinations, the ⋯ More sheet and the block
+     edit sheet are measured with darkContrastFindings' method (background
+     layers composited, opacity included; no dark emulation here): at least
+     4.5:1, and never white text on a pastel. Sheets are measured after their
+     slide-in, because mid-animation every word reads 1:1. */
+  if (want('thePopLookReadsEverywhere')) checks.thePopLookReadsEverywhere = await (async () => {
+    const bad = [];
+    const was = page.viewportSize();
+    const ev = async (label, fn, arg) => {
+      try { return await page.evaluate(fn, arg); } catch (e) { bad.push(`${label}: threw ${e.message}`); return undefined; }
+    };
+    await defineAuditSeeds();   // a page reload above dropped them
+    const look = await page.evaluate(() => document.documentElement.getAttribute('data-look'));
+    if (look !== 'pop') bad.push(`<html data-look> is "${look}", not "pop" — the Pop look was not what was measured`);
+    try {
+      for (const [w, h] of [[390, 844], [1194, 834]]) {
+        await page.setViewportSize({ width: w, height: h });
+        for (const [id, nav, label] of KID_SCREENS) {
+          const seeded = await ev(label || id, `(${nav.toString()})()`);
+          if (typeof seeded === 'string') bad.push(`${label || id}@${w}: ${seeded}`);
+          await page.waitForTimeout(250);
+          const found = await ev(label || id, ([sid, lab]) => {
+            const scr = document.getElementById(sid);
+            if (!scr || !scr.classList.contains('active')) return [`${lab}: the screen was not on show, so nothing on it was measured`];
+            return darkContrastFindings(scr, lab, '.print-sheet');
+          }, [id, `${label || id}@${w}`]);
+          if (found) bad.push(...found);
+        }
+        for (const dest of ['now', 'meeting', 'history', 'setup', 'app']) {
+          await ev(`parent ${dest}`, (d) => {
+            profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
+            showScreen('parent'); renderParentHome(); setParentDest(d); window.scrollTo(0, 0);
+          }, dest);
+          await page.waitForTimeout(250);
+          const found = await ev(`parent ${dest}`, (lab) => darkContrastFindings(document.getElementById('screen-parent'), lab), `Parent › ${dest}@${w}`);
+          if (found) bad.push(...found);
+        }
+        await ev('More', () => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); tdOpenMore(); });
+        await page.waitForTimeout(450);
+        const more = await ev('More', (lab) => darkContrastFindings(document.querySelector('#tdMoreOverlay .sheet'), lab), `⋯ More@${w}`);
+        if (more) bad.push(...more);
+        await ev('More close', () => { const ov = document.getElementById('tdMoreOverlay'); if (ov && ov.classList.contains('open')) closeSheet('tdMoreOverlay'); });
+        await ev('edit', () => {
+          profile = 'jenn'; parentViewing = 'jenn';
+          const k = todayKey();
+          window.__popHad = getDayBlocks(k, 'jenn');
+          setDayBlocks(k, [...window.__popHad.filter(b => b.id !== 'pop-edit'),
+            { id: 'pop-edit', actId: 'piano', startMin: 16 * 60, durationMin: 60, checklistState: {} }], 'jenn');
+          openDay(k, getDayKeys(0).indexOf(k)); openEditSheet('pop-edit');
+        });
+        await page.waitForTimeout(450);
+        const edit = await ev('edit', (lab) => darkContrastFindings(document.querySelector('#editOverlay .sheet'), lab), `block edit sheet@${w}`);
+        if (edit) bad.push(...edit);
+        await ev('edit close', () => { closeSheet('editOverlay'); setDayBlocks(todayKey(), window.__popHad, 'jenn'); });
+      }
+    } finally {
+      await ev('restore', () => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
+      if (was) await page.setViewportSize(was);
+      await page.waitForTimeout(200);
+    }
+    return bad.length ? bad : true;
+  })();
 
   /* ── SMALL FIXES R7 (Plan v7, 2026-09-26) ────────────────────────────
      Deferred small fixes, one check each, each written to fail on the code

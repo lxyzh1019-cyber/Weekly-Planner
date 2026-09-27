@@ -4,22 +4,21 @@
        sized so the chosen window (6am–10pm unless a parent narrows it)
        fits one A4/Letter landscape page. */
     --print-slot: 11px;
-    /* Paper / sticker aesthetic */
-    --bg: #fef9ef;
+    /* Paper / sticker aesthetic. The page (--bg), the card paper (--paper) and
+       the secondary text (--ink-light) are a look's: see the look block below. */
     --bg2: #fff4db;
-    --paper: #fffdf5;
     --paper-line: #e8dfc3;
     /* Navy, shared by both looks (docs/handoff/looks-calm-pop.md §7). The
        colour maths read this live — isLightColour / inkContrast in
        js/08-day-view.js — so it is the one value to change. */
     --ink: #1c2240;
-    --ink-light: #6b5d4f;
     --accent: #ff7b54;
-    /* Darker accent for text/UI that must meet WCAG AA: white-on-it = 4.9:1,
-       and it-as-text on cream paper = 4.8:1. Use for selected controls (white
-       label) and informational accent text; keep light --accent for decorative
-       fills and category identity. */
-    --accent-strong: #c14a24;
+    /* Darker accent for text/UI that must meet WCAG AA: white-on-it = 5.4:1,
+       and it-as-text on --bg2 = 4.9:1 (#c14a24 was 4.50 there, a hair under —
+       found by thePopLookReadsEverywhere, Looks stage 2). Use for selected
+       controls (white label) and informational accent text; keep light --accent
+       for decorative fills and category identity. */
+    --accent-strong: #b8441f;
     --accent-pink: #ff9eb5;
     --accent-blue: #6fb1fc;
     --accent-yellow: #ffd166;
@@ -48,6 +47,12 @@
     --jess: #3d8bfd;
     --jess-strong: #1a5fd0;
     --jess-wash: #e2edff;
+    /* "Today" markers are navy in both looks, not the kid colour (L9): the
+       Week's today column, the chore and money calendars' today cell, the day
+       cards' "today" tag. The kid colour stays on the avatar, the selected kid
+       pill and the XP bar. */
+    --today-mark: var(--ink);
+    --today-mark-ink: #fff;
     /* --day-landscape-chrome lived here: the day screen's chrome height, which
        its three rails each subtracted from the viewport. One scroller now. */
 
@@ -83,9 +88,9 @@
     --radius-lg:   18px;
     --radius-full: 999px;
 
-    --shadow-sm: 2px 2px 0 rgba(42,35,32,0.12);
-    --shadow-md: 3px 3px 0 rgba(42,35,32,0.15);
-    --shadow-lg: 0 4px 16px rgba(42,35,32,0.10);
+    --shadow-sm: 2px 2px 0 rgba(28,34,64,0.12);
+    --shadow-md: 3px 3px 0 rgba(28,34,64,0.15);
+    --shadow-lg: 0 4px 16px rgba(28,34,64,0.10);
 
     /* Semantic text color for date-range labels (was hardcoded #5a4d41) */
     --ink-muted: #5a4d41;
@@ -103,19 +108,11 @@
        today's value. They are named by ROLE, so a look can give each role
        its own value: one literal used in two roles is two tokens. */
 
-    /* Text scale: every absolute font-size is multiplied by it (text only —
-       boxes do not move). It composes with --fs-scale (Reading size). Print
-       resets it to 1 and its own sizes are not multiplied (L12). */
-    --text-scale: 1;
-
-    /* Fonts: each stack exactly as it was typed, so nothing renders differently. */
-    --font-body: 'Patrick Hand', 'Nunito', sans-serif;
-    --font-text: 'Patrick Hand', sans-serif;
-    --font-head: 'Gochi Hand', 'Caveat', cursive;
-    --font-display: 'Gochi Hand', cursive;
-    --font-round: 'Nunito', sans-serif;
-    --font-hand: 'Patrick Hand', cursive;
-    --font-script: 'Caveat', cursive;
+    /* The text scale (--text-scale) and the fonts (--font-*) are a look's —
+       see the look block below. Every absolute font-size multiplies the scale
+       (text only — boxes do not move; `var(--text-scale, 1)` where no look is
+       set) and composes with --fs-scale (Reading size). Print resets it to 1
+       and its own sizes are not multiplied (L12). */
 
     /* Surfaces: backgrounds of cards, rows, chips, washes and highlights */
     --surface-card: #fff;
@@ -128,7 +125,6 @@
     --surface-perf-track: #f3ecdc;
     --surface-plan-stripe: #d9cfb4;
     --surface-today: #fff0dc;
-    --surface-today-head: #ffd9a6;
     --surface-yellow-hover: #ffe08a;
     --surface-tab-on: #ffe9a8;
     --surface-chip-on: #b7e4c7;
@@ -170,8 +166,8 @@
     --surface-streak-soft: rgba(255,209,102,0.05);
     --surface-chip-done: rgba(149,213,178,0.55);
     --surface-muted-10: rgba(90,77,65,0.10);
-    --surface-ink-10: rgba(42,35,32,0.10);
-    --surface-ink-72: rgba(42,35,32,0.72);
+    --surface-ink-10: rgba(28,34,64,0.10);
+    --surface-ink-72: rgba(28,34,64,0.72);
     --surface-hover-dim: rgba(0,0,0,0.03);
     --surface-glass-14: rgba(255,255,255,0.14);
     --surface-glass-22: rgba(255,255,255,0.22);
@@ -186,14 +182,8 @@
     --surface-glass-92: rgba(255,255,255,0.92);
     --surface-glass-95: rgba(255,255,255,0.95);
 
-    /* Page decoration: the paper glow and notebook rule behind every screen */
-    --page-glow-yellow: rgba(255,209,102,0.15);
-    --page-glow-blue: rgba(111,177,252,0.12);
-    --page-glow-pink: rgba(255,158,181,0.08);
-    --page-rule: rgba(183,165,131,0.08);
-
     /* Overlay / scrim behind sheets */
-    --scrim: rgba(42,35,32,0.4);
+    --scrim: rgba(28,34,64,0.4);
 
     /* Text colours (beyond --ink / --ink-light / --ink-muted) */
     --ink-on-strong: #fff;
@@ -201,7 +191,9 @@
     --ink-on-dark-soft: rgba(255,255,255,0.85);
     --ink-accent-blue: #6fb1fc;
     --ink-on-blue: #10243d;
-    --ink-caption: #8a7f6d;
+    /* Was #8a7f6d: 3.2–3.9:1 on the cream it sits on (chore tab captions,
+       Parent › History tiles) — found by thePopLookReadsEverywhere. */
+    --ink-caption: #5d6582;
     --ink-na: #8a7b62;
     --ink-unplanned: #a89a82;
     --ink-faint: #b9ac95;
@@ -227,17 +219,17 @@
     --border-now-line: #e5484d;
     --border-placement-guide: rgba(255, 123, 84, 0.85);
     --border-glass-65: rgba(255,255,255,0.65);
-    --border-ink-3: rgba(42,35,32,0.03);
-    --border-ink-20: rgba(42,35,32,0.20);
-    --border-ink-35: rgba(42,35,32,0.35);
-    --border-ink-46: rgba(42,35,32,0.46);
+    --border-ink-3: rgba(28,34,64,0.03);
+    --border-ink-20: rgba(28,34,64,0.20);
+    --border-ink-35: rgba(28,34,64,0.35);
+    --border-ink-46: rgba(28,34,64,0.46);
 
     /* Shadow colours (the offsets stay in the rules; --shadow-sm/md/lg above are whole shadows) */
-    --shadow-ink-6: rgba(42,35,32,0.06);
-    --shadow-ink-12: rgba(42,35,32,0.12);
-    --shadow-ink-14: rgba(42,35,32,0.14);
-    --shadow-ink-15: rgba(42,35,32,0.15);
-    --shadow-ink-20: rgba(42,35,32,0.2);
+    --shadow-ink-6: rgba(28,34,64,0.06);
+    --shadow-ink-12: rgba(28,34,64,0.12);
+    --shadow-ink-14: rgba(28,34,64,0.14);
+    --shadow-ink-15: rgba(28,34,64,0.15);
+    --shadow-ink-20: rgba(28,34,64,0.2);
     --shadow-black-6: rgba(0,0,0,0.06);
     --shadow-black-8: rgba(0,0,0,0.08);
     --shadow-black-20: rgba(0,0,0,0.2);
@@ -253,7 +245,6 @@
     --shadow-accent-strong: #c14a24;
     --shadow-suggest: rgba(193,74,36,0.35);
     --shadow-focus-pulse: rgba(255,123,84,0.4);
-    --shadow-today-col: #ffb865;
 
     /* Status: clash, to-do, done, warn, danger, travel strips */
     --status-clash: #d6453a;
@@ -288,7 +279,8 @@
     --status-warn-ink: #8f2d15;
     --status-warn-wash: #fdeeea;
     --status-danger-hover: #f8d9d1;
-    --status-danger-ink: #dc2626;
+    /* Was #dc2626: 3.95:1 on --status-danger-wash (the edit sheet's 🗑 Remove). */
+    --status-danger-ink: #b91c1c;
     --status-danger-wash: #fee2e2;
     --status-danger-fill: #ef476f;
     --status-danger-text: #ef476f;
@@ -321,9 +313,7 @@
     --zone-lunch: #fdf0c4;
     --zone-free: #d8f0e1;
 
-    /* Kid and profile colours */
-    --kid-jenn-wash: #fff0f5;
-    --kid-jess-wash: #eef6ff;
+    /* Kid and profile colours (the kid washes are --jenn-wash / --jess-wash above) */
     --profile-parent-wash: #f3ecf9;
     --kid-jenn-mascot: #fff3e0;
     --kid-jenn-deco: #ff79a8;
@@ -359,26 +349,67 @@
     --print-font-head: 'Gochi Hand', cursive;
   }
 
+  /* ════ The looks (docs/handoff/looks-calm-pop.md §7) ════
+     A value that differs between looks lives here and ONLY here; everything
+     shared stays in :root above. Stage 3 adds the Calm block with the same
+     names, and tests/check-look-tokens.js then fails when either look is
+     missing one. <html data-look="pop"> is set statically in index.html.
+
+     Pop: style B with today's handwriting fonts, text 10% larger. */
+  :root[data-look="pop"] {
+    /* Text 10% larger than before (L7); the parent Reading size multiplies on top. */
+    --text-scale: 1.1;
+    /* Fonts: today's stacks exactly as they were typed. */
+    --font-body: 'Patrick Hand', 'Nunito', sans-serif;
+    --font-text: 'Patrick Hand', sans-serif;
+    --font-head: 'Gochi Hand', 'Caveat', cursive;
+    --font-display: 'Gochi Hand', cursive;
+    --font-round: 'Nunito', sans-serif;
+    --font-hand: 'Patrick Hand', cursive;
+    --font-script: 'Caveat', cursive;
+    /* Cream graph paper, lines every 26px; cards white; secondary text. */
+    --bg: #fff6e3;
+    --page-grid: #f1e5c8;
+    --paper: #ffffff;
+    --ink-light: #4d5575;
+    /* Hard navy shadows: cards 4px, rows and main buttons 3px, the Now card 7×8. */
+    --shadow-card: 4px 4px 0 var(--ink);
+    --shadow-row: 3px 3px 0 var(--ink);
+    --shadow-now: 7px 8px 0 var(--ink);
+    /* How much of the block's colour a surface wears (the example's knobs):
+       the Now card its full colour, a block row its wash, icon tiles none. */
+    --now-fill: 100%;
+    --row-fill: 100%;
+    --tile-fill: 0%;
+    /* Secondary text inside the filled Now card: navy, because the muted text
+       does not reach 4.5:1 on a block colour. */
+    --now-ink-soft: var(--ink);
+    /* Main buttons and the selected tab: yellow, navy text. */
+    --btn-main: #ffc83d;
+    --btn-main-ink: var(--ink);
+    --nav-on: #ffc83d;
+    /* The Now card's tick: a navy tile. Progress bar: navy on white. */
+    --tick-bg: var(--ink);
+    --tick-ink: #fff;
+    --bar-fill: var(--ink);
+    --bar-track: #fff;
+  }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
     font-family: var(--font-body);
     font-size: calc(19.5px * var(--text-scale, 1)); /* +15% for iPad-horizontal readability */
-    background: var(--bg);
+    /* Graph paper: the look's page colour with a grid line every 26px. It
+       replaced a paper glow and a notebook rule (body::before) in Looks stage 2. */
+    background-color: var(--bg);
     background-image:
-      radial-gradient(circle at 20% 10%, var(--page-glow-yellow) 0%, transparent 50%),
-      radial-gradient(circle at 80% 90%, var(--page-glow-blue) 0%, transparent 50%),
-      radial-gradient(circle at 50% 50%, var(--page-glow-pink) 0%, transparent 60%);
+      linear-gradient(var(--page-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--page-grid) 1px, transparent 1px);
+    background-size: 26px 26px;
     color: var(--ink);
     min-height: 100vh;
     overflow-x: hidden;
-  }
-
-  /* Notebook paper effect (subtle) */
-  body::before {
-    content:''; position: fixed; inset: 0; pointer-events:none; z-index:0;
-    background-image:
-      repeating-linear-gradient(0deg, transparent 0 27px, var(--page-rule) 27px 28px);
   }
 
   h1, h2, h3, h4 { font-family: var(--font-head); font-weight: 400; letter-spacing: 0.5px; }
@@ -420,8 +451,8 @@
   .profile-card:hover { transform: rotate(0) translateY(-8px) scale(1.04); box-shadow: 6px 10px 0 var(--shadow-ink-15); }
   .profile-card .avatar { font-size: calc(3.8rem * var(--text-scale, 1)); margin-bottom: 0.8rem; display:block; }
   .profile-card h2 { font-size: calc(2rem * var(--text-scale, 1)); }
-  .profile-card.jenn { background: var(--kid-jenn-wash); }
-  .profile-card.jess { background: var(--kid-jess-wash); }
+  .profile-card.jenn { background: var(--jenn-wash); }
+  .profile-card.jess { background: var(--jess-wash); }
   .profile-card.parent { background: var(--profile-parent-wash); }
 
   .profile-motto {
@@ -529,7 +560,9 @@
   .day-span-tab.active { background: var(--accent-strong); color: var(--ink-on-strong); }
   /* Chosen, but the viewport can only carry fewer — say so rather than
      silently disagreeing with the button that looks selected. */
-  .day-span-tab.unavailable { opacity: 0.4; }
+  /* Muted and struck through rather than faded: at 40% opacity the digit read
+     2.4:1 (thePopLookReadsEverywhere). */
+  .day-span-tab.unavailable { color: var(--ink-light); text-decoration: line-through; }
   /* The day topbar's second row lived here, along with the "Schedule" /
      "Activities" panel labels and the tray's bridge hint. The topbar is one row
      now and the panels it labelled are down to one, so a label naming it would
@@ -1171,7 +1204,7 @@
   .day-card.today::after {
     content:'today'; position:absolute; top: -8px; right: -4px;
     font-family: var(--font-script); font-size: calc(0.9rem * var(--fs-scale, 1) * var(--text-scale, 1));
-    background: var(--accent-strong); color:var(--ink-on-strong); padding: 1px 8px;
+    background: var(--today-mark); color:var(--today-mark-ink); padding: 1px 8px;
     border-radius: 10px; transform: rotate(5deg);
     border: 1.5px solid var(--ink);
   }
@@ -1217,7 +1250,7 @@
   }
   .pm-cell:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
   .pm-cell.empty { visibility: hidden; }
-  .pm-cell.today { outline: 3px dashed var(--accent); outline-offset: -5px; }
+  .pm-cell.today { outline: 3px dashed var(--today-mark); outline-offset: -5px; }
   .pm-cell-date { font-family: var(--font-display); font-size: calc(1.2rem * var(--text-scale, 1)); font-weight: 800; }
   .pm-cell-pct { font-size: calc(0.75rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink); font-weight: 700; text-align: right; }
   .pm-cell-mood { position: absolute; bottom: 4px; left: 4px; font-size: calc(1rem * var(--text-scale, 1)); }
@@ -1416,7 +1449,7 @@
     display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px 0;
   }
   .cm-dayhead small { font-weight: 700; opacity: 0.7; }
-  .cm-dayhead.cm-today { background: var(--accent-yellow); border: 2px solid var(--ink); border-radius: 8px; }
+  .cm-dayhead.cm-today { background: var(--today-mark); color: var(--today-mark-ink); border: 2px solid var(--ink); border-radius: 8px; }
   .cm-section {
     grid-column: 1 / -1; font-weight: 800; font-size: calc(0.72rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--accent-strong);
     text-transform: uppercase; letter-spacing: 0.6px;
@@ -2111,7 +2144,7 @@
     border: 2px solid var(--ink);
     border-radius: 14px;
     overflow: hidden;
-    box-shadow: 3px 3px 0 var(--ink);
+    box-shadow: var(--shadow-card);
   }
   /* On phones the 7 columns are too thin to read, so give them a floor and let
      this one view scroll sideways instead of squishing — .weekly-full-wrap is
@@ -2144,7 +2177,8 @@
   }
   .wf-day-header:last-child { border-right: none; }
   .wf-day-header:hover { background: var(--accent-yellow); }
-  .wf-day-header.today { background: var(--surface-today-head); }
+  .wf-day-header.today { background: var(--today-mark); }
+  .wf-day-header.today .wf-col-dow, .wf-day-header.today .wf-col-date { color: var(--today-mark-ink); }
   .wf-col-dow { font-size: calc(0.8rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; text-transform: uppercase; color: var(--ink); letter-spacing: 1.2px; }
   .wf-col-date { font-size: calc(1.35rem * var(--text-scale, 1)); font-weight: 800; font-family: var(--font-display); color: var(--ink); }
   /* Continuous single-column-per-day timeline: hour labels live in a slim
@@ -2173,7 +2207,7 @@
     overflow: hidden;
   }
   .wf-day-col:last-child { border-right: none; }
-  .wf-day-col.today { box-shadow: inset 0 0 0 2px var(--shadow-today-col); }
+  .wf-day-col.today { box-shadow: inset 0 0 0 2px var(--today-mark); }
   /* Left sideband: the day view's Before School / School / After School /
      Evening axis, rendered once for the whole week. */
   .wf-sideband {
@@ -2218,7 +2252,8 @@
     text-align: center; z-index: 1; pointer-events: none;
     font-size: calc(0.56rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; letter-spacing: 0.2px;
     text-transform: uppercase; line-height: 1;
-    color: var(--ink); opacity: 0.55; white-space: nowrap;
+    /* Quiet by colour, not by fading: --ink at 55% was 3.6:1. */
+    color: var(--ink-light); white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; padding: 1px 2px 0;
   }
   /* "Now" marker on today's column */
@@ -2307,7 +2342,7 @@
   .wf-card-sum {
     font-size: calc(0.62rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; line-height: 1.15;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    max-width: 100%; opacity: 0.92;
+    max-width: 100%;
   }
   .wf-card.light-bg { color: var(--ink); text-shadow: none; }
   /* Inline travel/get-ready tag on the card name (compact fallback) */
@@ -2531,7 +2566,12 @@
     cursor: pointer; padding: 0; text-shadow: none; z-index: 2;
   }
   .wf-card-check:hover { background: var(--surface-card); transform: scale(1.1); }
-  .wf-card--done { opacity: 0.6; }
+  /* Done reads as done without fading the words: the whole card at 60% put its
+     name at 2–3:1 on every fill (thePopLookReadsEverywhere). The fill is washed
+     toward white instead (an inset shadow paints over the inline background and
+     under the text), so the navy name reads BETTER, not worse. Only on a light
+     fill — a white-text card would lose contrast under a white wash. */
+  .wf-card--done.light-bg { box-shadow: inset 0 0 0 999px var(--surface-glass-45); }
   .wf-card--done .wf-card-name { text-decoration: line-through; }
   .wf-card--done .wf-card-check { background: var(--accent-green); color: var(--ink); }
   /* W4: even the shortest block keeps a tappable tick — never leave a rendered
@@ -3841,7 +3881,7 @@
   .day-pick-presets { display:flex; gap: 0.3rem; margin-bottom: 0.4rem; flex-wrap:wrap; }
 
   .btn-confirm {
-    width: 100%; background: var(--accent-strong); color: var(--ink-on-strong);
+    width: 100%; background: var(--btn-main); color: var(--btn-main-ink);
     border: 2px solid var(--ink); border-radius: 14px; padding: 0.85rem;
     font-size: calc(1.1rem * var(--text-scale, 1)); font-weight: 700; font-family: var(--font-display);
     cursor: pointer; box-shadow: 3px 3px 0 var(--ink);
@@ -4400,7 +4440,7 @@
   }
   .review-day:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
   .review-day.confirmed { background: var(--accent-green); }
-  .review-day.today { outline: 3px solid var(--accent-yellow); outline-offset: 1px; }
+  .review-day.today { outline: 3px solid var(--today-mark); outline-offset: 1px; }
   .review-day-dow { font-size: calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; text-transform: uppercase; }
   .review-day-date { font-size: calc(1.2rem * var(--text-scale, 1)); font-weight: 800; font-family: var(--font-display); line-height: 1; }
   .review-day-state { font-size: calc(0.72rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; }
@@ -4530,7 +4570,7 @@
   .challenge-card {
     background: var(--paper); border: 2px solid var(--ink); border-radius: 14px;
     padding: 0.7rem 0.9rem; margin-bottom: 0.5rem;
-    box-shadow: 3px 3px 0 var(--ink);
+    box-shadow: var(--shadow-card);
   }
   .challenge-title { font-family: var(--font-display); font-size: calc(1.2rem * var(--text-scale, 1)); margin-bottom: 0.2rem; }
   .challenge-progress {
@@ -4559,10 +4599,10 @@
 
   /* ═══════════ PRINT ═══════════ */
   @media print {
-    /* L12: print ignores the look's text scale. */
-    :root { --text-scale: 1; }
+    /* L12: print ignores the look's text scale. `:root[data-look]` so this
+       out-ranks the look block (same specificity, later in the file). */
+    :root, :root[data-look] { --text-scale: 1; }
     body { background: var(--print-paper); font-size: 10pt; }
-    body::before { display: none; }
     .screen:not(#screen-print) { display: none !important; }
     #screen-print { display: block !important; }
     .no-print { display: none !important; }
@@ -4992,10 +5032,14 @@
   .sticker-name { font-size: calc(0.66rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; color: var(--ink); margin-top: 0.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   @media (max-width: 380px) { .sticker-grid { grid-template-columns: repeat(3, 1fr); } }
   /* T3 — the working weight of the list. */
+  /* --cw is the block's wash (colourWash(blockColour)), set inline by
+     tdQuestCard; the look says how much of it the row wears (--row-fill: Pop
+     100%) and how much its icon tile does (--tile-fill: Pop 0%, white). */
   .quest-card {
     position: relative;
-    background: var(--surface-card); border: 2.5px solid var(--ink); border-radius: 18px;
-    box-shadow: 3px 3px 0 var(--ink);
+    background: color-mix(in srgb, var(--cw, var(--surface-card)) var(--row-fill), var(--surface-card));
+    border: 2.5px solid var(--ink); border-radius: 18px;
+    box-shadow: var(--shadow-row);
     padding: 0.9rem 1rem; display: flex; align-items: center; gap: 0.85rem;
     transition: transform 0.15s;
     cursor: pointer;
@@ -5005,7 +5049,8 @@
      list, shallower than the NOW card, and tinted so the rank reads even where
      the shadow falls off the edge of a narrow column. */
   .quest-card--next {
-    border-width: 3px; box-shadow: 5px 5px 0 var(--ink); background: var(--bg2);
+    border-width: 3px; box-shadow: 5px 5px 0 var(--ink);
+    background: color-mix(in srgb, var(--cw, var(--bg2)) var(--row-fill), var(--bg2));
   }
   .quest-card--next:active { box-shadow: 2px 2px 0 var(--ink); }
   /* T4 — what is folded away is reference, and reads like it. */
@@ -5026,7 +5071,8 @@
   .quest-card.quest-done .quest-card-name { text-decoration: line-through; }
   .quest-card-icon {
     font-size: calc(2rem * var(--text-scale, 1)); width: 52px; height: 52px;
-    background: var(--bg2); border: 2px solid var(--ink); border-radius: 14px;
+    background: color-mix(in srgb, var(--cw, var(--bg2)) var(--tile-fill), var(--surface-card));
+    border: 2px solid var(--ink); border-radius: 14px;
     display: flex; align-items: center; justify-content: center;
     box-shadow: 2px 2px 0 var(--ink); flex-shrink: 0;
   }
@@ -5116,7 +5162,7 @@
   }
   .td-now--conflict {
     outline: 3px solid var(--status-clash); outline-offset: 2px;
-    box-shadow: 7px 8px 0 var(--ink), 0 0 0 2px var(--status-clash-glow);
+    box-shadow: var(--shadow-now), 0 0 0 2px var(--status-clash-glow);
     overflow: visible; position: relative;
   }
   .quest-conflict-flag {
@@ -5134,10 +5180,10 @@
   }
 
   .quest-complete-btn {
-    background: var(--accent-green); border: 2.5px solid var(--ink); border-radius: 12px;
+    background: var(--tick-bg); border: 2.5px solid var(--ink); border-radius: 12px;
     box-shadow: 2px 2px 0 var(--ink);
     padding: 0.5rem 0.8rem; font-weight: 700; cursor: pointer;
-    font-size: calc(1.2rem * var(--text-scale, 1)); color: var(--ink); flex-shrink: 0;
+    font-size: calc(1.2rem * var(--text-scale, 1)); color: var(--tick-ink); flex-shrink: 0;
   }
   .quest-complete-btn:active { transform: translate(2px,2px); box-shadow: 0 0 0 var(--ink); }
   .quest-done-badge {
@@ -5532,16 +5578,20 @@
     --mny-outside: #c9a6e8;
     --mny-passive: #b8b0a2;
     --mny-fine: #e06666;
+    /* The same fine, as TEXT: #e06666 read 3.35:1 on white (My money's "Costs
+       added for paying late", found by thePopLookReadsEverywhere). The fill
+       (--mny-fine, the door's bar) is unchanged (L10). */
+    --mny-fine-ink: #b3352b;
     /* Money-page surfaces, text, lines and shadows (L10: today's values, per page) */
-    --mny-shadow-card: rgba(42, 35, 32, 0.10);
+    --mny-shadow-card: rgba(28, 34, 64, 0.10);
     --mny-surface-disabled: #f2ece0;
     --mny-surface-locked: #f7f2e6;
     --mny-cal-has: #ffe3ea;
     --mny-amber-fill: #ffe0a3;
     --mny-amber-ink: #7a4b00;
     --mny-amber-border: #7a4b00;
-    --mny-scrim: rgba(42, 35, 32, 0.58);
-    --mny-shadow-pop: rgba(42, 35, 32, 0.22);
+    --mny-scrim: rgba(28, 34, 64, 0.58);
+    --mny-shadow-pop: rgba(28, 34, 64, 0.22);
     /* Colours the money scripts write into markup (L10: today's values, per
        page, unchanged). My money, the Flow, the chore pay bar and the chore
        trends each keep their own names even where two values agree today —
@@ -5642,7 +5692,7 @@
   .mny-key i { width: 11px; height: 11px; border: 1.5px solid var(--ink); border-radius: 3px; display: inline-block; }
   .mny-key b { color: var(--ink); }
   /* Fines sit on their own line, never as a segment: a bar cannot run backwards. */
-  .mny-fineline { font-size: calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--mny-fine); font-weight: 700; margin-top: 0.3rem; }
+  .mny-fineline { font-size: calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--mny-fine-ink); font-weight: 700; margin-top: 0.3rem; }
 
   .mny-progress {
     height: 14px; border: 2.5px solid var(--ink); border-radius: 8px; overflow: hidden;
@@ -5660,7 +5710,7 @@
   .mny-row:last-child { border-bottom: 0; }
   .mny-row b { color: var(--accent-strong); white-space: nowrap; }
   .mny-row.total { border-top: 2px solid var(--ink); border-bottom: 0; padding-top: 0.35rem; font-weight: 700; }
-  .mny-row.warn b { color: var(--mny-fine); }
+  .mny-row.warn b { color: var(--mny-fine-ink); }
 
   .mny-debt-top { display: flex; justify-content: space-between; align-items: center; gap: 0.4rem; }
   .mny-debt-name { font-weight: 800; }
@@ -5676,7 +5726,7 @@
   }
   .mny-btn:hover { background: var(--bg2); }
   .mny-btn.wide { display: block; width: 100%; margin-top: 0.4rem; text-align: left; }
-  .mny-btn.primary { background: var(--accent-strong); color: var(--ink-on-strong); }
+  .mny-btn.primary { background: var(--btn-main); color: var(--btn-main-ink); }
   .mny-btn.primary:hover { filter: brightness(1.07); }
   .mny-btn[disabled] { background: var(--mny-surface-disabled); color: var(--ink-light); cursor: not-allowed; box-shadow: none; }
 
@@ -5716,7 +5766,7 @@
   }
   .mny-cal-cell.blank { border-color: transparent; }
   .mny-cal-cell.has { background: var(--mny-cal-has); border-color: var(--ink); }
-  .mny-cal-cell.today { outline: 2px solid var(--accent-strong); outline-offset: -2px; }
+  .mny-cal-cell.today { outline: 2px solid var(--today-mark); outline-offset: -2px; }
   .mny-cal-icon { font-size: calc(0.85rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
 
   /* The `?` card. Same chrome everywhere, so the answer always arrives the
@@ -5850,10 +5900,10 @@
   .mny-door-track i.pos { left: 50%; background: var(--mny-chores); }
   .mny-door-track i.neg { right: 50%; background: var(--mny-fine); }
   .mny-door b { font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--accent-strong); white-space: nowrap; }
-  .mny-door b.neg { color: var(--mny-fine); }
+  .mny-door b.neg { color: var(--mny-fine-ink); }
 
   .mny-spark { width: 100%; height: 60px; margin-top: 0.4rem; }
-  .mny-note.warn, .warn { color: var(--mny-fine); }
+  .mny-note.warn, .warn { color: var(--mny-fine-ink); }
 
   /* ── Money rules (parent) ── */
   /* A queued edit is visibly different from a saved one: nothing on this page
@@ -6047,7 +6097,7 @@
     color: var(--ck-ink); font-family: inherit; display: block;
   }
   .ck-day.sel { background: var(--accent-yellow); box-shadow: inset 0 0 0 3px var(--shadow-accent-strong); }
-  .ck-day.today:not(.sel) { box-shadow: inset 0 0 0 2px var(--shadow-accent-strong); }
+  .ck-day.today:not(.sel) { box-shadow: inset 0 0 0 2px var(--today-mark); }
   .ck-day-dow { display: block; text-align: center; font-size: calc(10px * var(--text-scale, 1)); font-weight: 800; letter-spacing: 0.6px; }
   .ck-day-date { display: block; text-align: center; font-size: calc(17px * var(--text-scale, 1)); font-weight: 700; line-height: 1.1; }
   .ck-dots { display: flex; gap: 5px; justify-content: center; margin-top: 5px; }
@@ -6923,7 +6973,7 @@
   .td-card {
     border: 2.5px solid var(--ink); border-radius: var(--radius, 18px);
     background: var(--paper); padding: 0.7rem 0.8rem;
-    box-shadow: 3px 3px 0 var(--ink);
+    box-shadow: var(--shadow-card);
   }
   .td-cap {
     font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800;
@@ -6933,11 +6983,19 @@
 
   /* T1. The one thing the screen is for — deliberately the biggest object on
      it, and the only one at this depth. */
+  /* --now-c is the running block's colour (blockColour), set inline by
+     renderToday; the look says how much of it the card wears (--now-fill:
+     Pop 100%). With no block running, or a colour navy does not read on, the
+     card is plain. Inside it the muted text becomes the look's --now-ink-soft
+     (Pop: navy), because the muted grey does not reach 4.5:1 on a fill. */
   .td-now {
-    display: block; background: var(--bg2);
+    display: block;
+    background: color-mix(in srgb, var(--now-c, var(--surface-card)) var(--now-fill), var(--surface-card));
     border-width: 3.5px; border-radius: 22px;
-    box-shadow: 7px 8px 0 var(--ink);
+    box-shadow: var(--shadow-now);
     padding: 0.9rem 1rem;
+    color: var(--ink);
+    --ink-light: var(--now-ink-soft);
   }
   .td-now-head { display: flex; align-items: center; gap: 0.9rem; }
   .td-now-line { flex: 1; min-width: 0; }
@@ -6955,7 +7013,7 @@
     display: flex; align-items: center; justify-content: center;
     font-size: calc(1.5rem * var(--text-scale, 1)); line-height: 1;
     border: 2.5px solid var(--ink); border-radius: 12px;
-    background: var(--accent-green); color: var(--ink);
+    background: var(--tick-bg); color: var(--tick-ink);
     box-shadow: 2px 2px 0 var(--ink); cursor: pointer;
     transition: transform 0.08s, box-shadow 0.08s;
   }
@@ -6969,12 +7027,12 @@
      and a second clock here is a second thing that can be wrong. */
   .td-now-bar {
     height: 14px; margin-top: 0.65rem;
-    background: var(--paper);
+    background: var(--bar-track);
     border: 2.5px solid var(--ink); border-radius: 999px; overflow: hidden;
   }
   .td-now-bar-fill {
     display: block; height: 100%;
-    background: var(--accent-green);
+    background: var(--bar-fill);
     transition: width 0.4s ease;
   }
   /* The bar animates a number, and a number does not need to slide to be read. */
@@ -7086,7 +7144,9 @@
      card when the day was empty, and separately a plain button in the static
      row below when it was not; it is a single .td-morebtn now, tinted so it
      reads as an invitation rather than another job. */
-  .td-plan { background: var(--bg2); }
+  .td-plan, .td-plan:hover {
+    background: var(--btn-main); color: var(--btn-main-ink); box-shadow: var(--shadow-row);
+  }
 
   /* ── Pocket money, as a picture ──
      This was three tiles of words and figures, which is a table — the slowest
@@ -7183,7 +7243,7 @@
     display: flex; flex-direction: column; gap: 0.45rem;
     border: 2.5px solid var(--ink); border-radius: var(--radius, 18px);
     background: var(--paper); padding: 0.2rem 0.8rem 0.7rem;
-    box-shadow: 3px 3px 0 var(--ink);
+    box-shadow: var(--shadow-card);
   }
   /* The strip is the tap target and opens the DAY SCREEN — the one surface that
      already draws today at absolute times with its breaks and free stretches,
@@ -7437,7 +7497,7 @@
   }
   /* The current place is stated, not merely tinted — colour alone is not a signal
      a child reliably reads, and --accent is decorative only. */
-  .kid-nav-btn.on { color: var(--ink); background: var(--bg2); }
+  .kid-nav-btn.on, .kid-nav-btn.on:hover { color: var(--ink); background: var(--nav-on); }
   .kid-nav-btn.on .kid-nav-label { text-decoration: underline; text-decoration-thickness: 2px; }
   .kid-nav-btn:hover { background: var(--bg2); }
 

@@ -531,7 +531,11 @@ function tdQuestCard(b, kid, isNext, clash) {
     : clash ? 'quest-card quest-card--conflict'
     : 'quest-card';
   if (done) clash = null;
-  return `<div class="${cls}">
+  /* The row wears its block's wash (Pop, docs/handoff/looks-calm-pop.md §7):
+     --cw is read by .quest-card; the look decides how much of it shows. */
+  const wash = colourWash(blockColour(b, kid));
+  const washStyle = /^#[0-9a-f]{6}$/i.test(wash) ? ` style="--cw:${wash}"` : '';
+  return `<div class="${cls}"${washStyle}>
       ${clash ? '<span class="quest-conflict-flag" aria-hidden="true">!</span>' : ''}
       <button type="button" class="dq-open" data-td-action="plan" data-td-block="${id}">
         ${tdTimeCol(b)}
@@ -1634,6 +1638,12 @@ function tdRenderToday() {
   const heroCls = (heroBlock && clashes.get(heroBlock.id))
     ? 'td-card td-now td-now--conflict'
     : 'td-card td-now';
+  /* The Now card wears the RUNNING block's colour (Pop fills it; --now-c is
+     read by .td-now). Only a block that is running now, and only a colour the
+     navy text reads on at 4.5:1 — a colour a grown-up picked off the sheet's
+     dots can be dark, and then the card stays plain rather than unreadable. */
+  const nowCol = current ? blockColour(current, kid) : '';
+  const heroStyle = nowCol && inkContrast(nowCol) >= 4.5 ? ` style="--now-c:${escapeAttr(nowCol)}"` : '';
 
   const moneyHtml = tdMoneyChart(kid, wk);
 
@@ -1667,7 +1677,7 @@ function tdRenderToday() {
     <div class="td-col td-col--day">
       ${tdCatchUpCard(kid)}
       ${tdEarlierElseRow(kid)}
-      <div class="${heroCls}">${nowHtml}</div>
+      <div class="${heroCls}"${heroStyle}>${nowHtml}</div>
       ${tdInviteNote()}
       ${tdReflectRow(kid)}
       ${tdTrainingCard(kid)}

@@ -1453,8 +1453,22 @@ say which one they are.
   looks exist, in every look block); data palettes and colour maths carry
   `/* look: reason */`; every absolute font-size multiplies `--text-scale`.
   `tests/check-look-tokens.js` enforces all three.
+- **The look block** (Looks stage 2B-2): a value that differs between looks —
+  the text scale, the fonts, the page, card paper and muted text, the card /
+  row / Now shadows, the fill knobs (`--now-fill`, `--row-fill`, `--tile-fill`),
+  the main button, the selected tab, the tick and the progress bar — lives
+  ONLY in `:root[data-look="pop"]` (Calm adds its block in Stage 3); shared
+  values stay in `:root`. `<html data-look="pop">` is static in `index.html`.
+  Print's `:root, :root[data-look] { --text-scale: 1 }` sits after the look
+  block so it out-ranks it (L12). The Now card wears the running block's colour
+  (`--now-c`, only when navy reads on it at 4.5:1) and Today's block rows their
+  wash (`--cw`, `colourWash`), both set inline. "Today" markers read
+  `--today-mark` (navy, L9). `thePopLookReadsEverywhere` holds every kid screen,
+  the five parent destinations, ⋯ More and the block edit sheet to 4.5:1 in
+  light mode, with no white text on a pastel.
 - `--accent` (`#ff7b54`) is decorative only. Anything with white text on it or
-  informational accent text uses `--accent-strong` (`#c14a24`) — this is the AA
+  informational accent text uses `--accent-strong` (`#b8441f`; `#c14a24` until
+  Looks stage 2B-2, which read 4.50:1 on `--bg2`) — this is the AA
   contrast fix, don't undo it.
 - Never white text on the pastel category colors (all fail contrast).
 - Use the app's `.sheet` / `appDialog` patterns, not native `confirm()`/`prompt()`.

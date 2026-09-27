@@ -54,8 +54,8 @@
 //    colour leaking through. With fewer than two looks this rule has nothing to
 //    compare and reports itself as dormant.
 //
-// 4. Text scale. A look may make text bigger or smaller (--text-scale, 1 in
-//    :root), so every font size with an absolute unit (px, rem, pt, pc, cm,
+// 4. Text scale. A look may make text bigger or smaller (--text-scale, set by
+//    the look block; `var(--text-scale, 1)` where none is), so every font size with an absolute unit (px, rem, pt, pc, cm,
 //    mm, in, Q) must multiply it: `calc(0.9rem * var(--text-scale, 1))`. One
 //    that does not is text that stays the old size in the new look. em, %,
 //    keywords and 0 follow their parent already and are not checked.
@@ -103,7 +103,7 @@ const EXEMPT = [
     file: 'index.html',
     match: '<meta name="theme-color"',
     why: 'the browser reads theme-color before any CSS loads, so it cannot be a var(); '
-       + 'it holds --bg\'s value, and the look sets it at runtime from Stage 2 on',
+       + 'it holds Pop\'s --bg value (manifest.json holds the same)',
   },
 ];
 

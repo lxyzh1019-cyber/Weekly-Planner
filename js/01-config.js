@@ -14,7 +14,7 @@ const LS_KEY = 'weeklyplanner-v3';
    the Today More sheet (js/31-today.js) and under the list on the parent
    portal's App landing (js/11-parent.js), which is where a grown-up reads it on
    an iPad with no console. */
-const APP_BUILD = '2026-09-27a';
+const APP_BUILD = '2026-09-27b';
 const TOTAL_SLOTS = 60;           // 6AM → 9PM = 15 hrs × 4 (legacy, used for some %s)
 const START_HOUR  = 6;
 const END_HOUR    = 22;
@@ -72,9 +72,12 @@ const CAT_HEX = { /* look: category hexes are family data — seeded onto blocks
    pills in js/09-sheets.js). It moved with CAT_HEX.training (#ef476f → #f2597d,
    Looks stage 2, 2026-09-27) and every training block placed before carries the
    old value — reading that as a choice would paint every skating session the
-   retired pink instead of its sport's colour. Grows on every move and is never
-   pruned, for the same reason as RETIRED_SEEDED_HEXES. */
-const TRAINING_DEFAULT_HEXES = new Set([CAT_HEX.training, '#ef476f'].map(h => h.toLowerCase())); /* look: retired training sentinel — matched against stored block colours */
+   retired pink instead of its sport's colour. Skating's own old #8a6fd0 joined
+   it when the sport moved to #9d85dd (Looks stage 2B-2: navy read 3.9:1 and
+   white 4.0:1 on it), since a skating placement seeds its sport's colour onto
+   the block. Grows on every move and is never pruned, for the same reason as
+   RETIRED_SEEDED_HEXES. */
+const TRAINING_DEFAULT_HEXES = new Set([CAT_HEX.training, '#ef476f', '#8a6fd0'].map(h => h.toLowerCase())); /* look: retired training sentinel — matched against stored block colours */
 
 /* The nine shipped defaults, frozen as a SET so blockColour can tell a colour
    somebody chose from one a placement copied out of this table. Every placement
@@ -476,12 +479,15 @@ const COMP_WARMUP_MIN = 60;               // before it starts
 
 /* Training tags + sport-specific starter objectives. Each topic carries its
    own icon and background colour so a Skating block reads differently from a
-   Swimming or Dryland one at a glance, not just by its text label. */
+   Swimming or Dryland one at a glance, not just by its text label.
+   Each takes the navy ink at 4.5:1 or better (everySubgroupTellsItselfApart):
+   Skating moved #8a6fd0 → #9d85dd and General from the retired #ef476f to
+   CAT_HEX.training in Looks stage 2B-2. */
 const TRAINING_TAGS = [ /* look: training tag colours are family data — a block's own colour */
-  { id:'skating',  label:'⛸ Skating',  name:'Skating',  icon:'⛸', colour:'#8a6fd0' },
+  { id:'skating',  label:'⛸ Skating',  name:'Skating',  icon:'⛸', colour:'#9d85dd' },
   { id:'swimming', label:'🏊 Swimming', name:'Swimming', icon:'🏊', colour:'#2f9fd0' },
   { id:'dryland',  label:'💪 Dryland', name:'Dryland',  icon:'💪', colour:'#e08a3a' },
-  { id:'general',  label:'🏃 General', name:'Training', icon:'🏃', colour:'#ef476f' },
+  { id:'general',  label:'🏃 General', name:'Training', icon:'🏃', colour:CAT_HEX.training },
 ];
 /* This list used to be the whole of it, which meant a sport the family took up
    — gymnastics — simply could not be entered: every training block had to be
