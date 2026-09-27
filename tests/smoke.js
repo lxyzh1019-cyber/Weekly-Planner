@@ -1487,7 +1487,7 @@ function findChromium() {
      (2) At 0.72px per minute a fifteen-minute strip is 10.8px tall, and the kid
      readability floor sets its text to 13.1px — so two stacked strips each
      printed a label through the other. A strip speaks only when a line fits
-     (WF_TRAVEL_TEXT_MIN_PX, a measurement), and a run of short same-side
+     (wfTravelTextMinPx, a measurement), and a run of short same-side
      segments merges into one band that can.
 
      Geometry, not classes: it measures real rectangles, because a z-index or a

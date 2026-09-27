@@ -2463,7 +2463,7 @@
      buffer band beginning on that boundary lands its time in exactly those
      pixels. While the strips were mute the clash could not be seen; restoring
      the clock times put two lines of text through each other, which is the
-     defect WF_TRAVEL_TEXT_MIN_PX exists to prevent in the first place.
+     defect wfTravelTextMinPx exists to prevent in the first place.
 
      The time wins, on a paper chip. The zone is still said by the band's tint
      and by the left axis, which names every stretch of the day in full; the

@@ -1118,8 +1118,7 @@ function renderFullWeek(keys) {
      20 is the `name` tier, so the shortest block the app allows can say what
      it is. */
   const WF_CARD_MIN_PX = 20;
-  /* What each row of a STACKED card actually costs, measured in the browser at
-     the sizes #screen-week ships rather than guessed. The old arithmetic
+  /* What each row of a STACKED card actually costs. The old arithmetic
      budgeted 58px for the four fixed rows and 20px a goal line; the real
      figures are 66 and 17, because the kid readability floor lifted
      .wf-card-time, -dur and -sum to 13.1px and nothing re-measured what fits.
@@ -1127,10 +1126,14 @@ function renderFullWeek(keys) {
      and the budget only ever counted one. Every stacked card had been
      overflowing its own box by 7-21px, which is how a training block's goals
      came to run straight through the duration underneath them.
-     theStackedCardFitsWhatItDraws (tests/smoke.js) is what keeps these
-     honest — they are measurements, so a font change invalidates them. */
-  const WF_ROW = { icon: 20, name1: 14, name2: 29, dur: 13, time: 13, sum: 15, gap: 2 };
-  const WF_NAME_ONE_LINE_CHARS = 13;
+
+     Those figures were then typed in by hand, so the next type change would
+     have broken them again. They are read from the page now: wfCardRowPx
+     takes each row's computed font-size x line-height off a probe card in
+     #screen-week, so a text scale, a look or a font that has not arrived yet
+     is already in them. theStackedCardFitsWhatItDraws (tests/smoke.js)
+     measures the drawn card against this budget. */
+  const WF_ROW = wfCardRowPx();
 
   /* What a card of this height can afford to stack, in priority order: the icon
      and name always, then the duration (the one thing the card's position and
@@ -1140,12 +1143,18 @@ function renderFullWeek(keys) {
   function wfStackPlan(pxHeight, name) {
     const fixed = WF_ROW.icon + WF_ROW.dur + 3 * WF_ROW.gap;
     /* Reserving two lines for a name that renders on one wastes a goal line on
-       every card, and "Skating" has never needed two. The estimate is crude —
-       a column is 95-129px and this type is ~7px a character — but it cannot
-       overflow, because a plan that says one line ALSO emits .wf-card--nameclamp,
-       which holds the name to one line whatever the estimate got wrong. A long
-       name a parent typed still gets its second line. */
-    const mightWrap = [...String(name || '')].length > WF_NAME_ONE_LINE_CHARS;
+       every card, and "Skating" has never needed two. The name is MEASURED in
+       the card name's own type against the text width of a one-lane card in
+       this grid's real column (dayColPx, below — read before any card is
+       planned). That used to be a character count, 13, from "a column is
+       95-129px and this type is ~7px a character"; the type is nearer 5.3px a
+       character, so it reserved a second line for names that never wrapped.
+       It still cannot overflow: a plan that says one line ALSO emits
+       .wf-card--nameclamp, which holds the name to one line whatever a lane
+       split does to the width. A long name a parent typed still gets its
+       second line. */
+    const nameLinePx = dayColPx - (3 + 2) - WF_ROW.chromeX;
+    const mightWrap = wfMeasureText(String(name || ''), WF_ROW.nameFont) > nameLinePx;
     const twoLine = mightWrap && (pxHeight - fixed - WF_ROW.name2) >= (WF_ROW.sum + WF_ROW.gap);
     const nameH = twoLine ? WF_ROW.name2 : WF_ROW.name1;
     let room = pxHeight - fixed - nameH;
@@ -1245,6 +1254,13 @@ function renderFullWeek(keys) {
   const measuredCol = headerEl ? headerEl.getBoundingClientRect().width : 0;
   const derivedCol = grid.clientWidth ? (grid.clientWidth - 58) / 7 : 0;
   const dayColPx = Math.round(measuredCol || derivedCol || 110);
+  /* The width a buffer strip is drawn in: the column's inside, unrounded.
+     A strip is `calc(100% - 5px)` of its .wf-day-col, which carries a 1px
+     dashed right border the header does not, so dayColPx overstates it by
+     about a pixel. That never mattered while label widths were over-estimated
+     by 10-20px; measured exactly (wfTextPx), a pixel is the difference
+     between a label that fits and one that overflows its strip. */
+  const stripColPx = (measuredCol || derivedCol || 110) - wfTypeMetrics().dayColEdgePx;
 
   // ── One continuous lane per day ──
   keys.forEach((key, ci) => {
@@ -1374,7 +1390,7 @@ function renderFullWeek(keys) {
       const widthCss = 'calc(' + (100 / colCount) + '% - ' + (gap + 2) + 'px)';
       /* How wide this strip will actually be, so a label can be refused for not
          fitting ACROSS as well as for not fitting down. A lane split halves it. */
-      const colPx = Math.max(40, dayColPx / colCount - (gap + 2));
+      const colPx = Math.max(40, stripColPx / colCount - (gap + 2));
       const preBufMin  = getTravelBufMin(b, 'pre') + getGetReadyBufMin(b, 'pre')
                        + getWarmupBufMin(b);
       const postBufMin = getTravelBufMin(b, 'post') + getGetReadyBufMin(b, 'post');
@@ -1419,7 +1435,7 @@ function renderFullWeek(keys) {
         };
         const segConflict = !!bc && (side === 'pre' ? bc.pre : bc.post);
         const anyMute = sideSegs.some(x =>
-          (Math.min(x.drawEndRel, DAY_MIN_SPAN) - Math.max(x.drawStartRel, 0)) * PX_PER_MIN < WF_TRAVEL_TEXT_MIN_PX);
+          (Math.min(x.drawEndRel, DAY_MIN_SPAN) - Math.max(x.drawStartRel, 0)) * PX_PER_MIN < wfTravelTextMinPx());
         if (anyMute && sideSegs.length > 1) {
           const bandS = Math.max(Math.min(...sideSegs.map(x => x.drawStartRel)), 0);
           const bandE = Math.min(Math.max(...sideSegs.map(x => x.drawEndRel)), DAY_MIN_SPAN);
@@ -1447,7 +1463,7 @@ function renderFullWeek(keys) {
        "🎒 AFTER SCHOOL" — and a buffer run that begins on that boundary lands
        its time in exactly those pixels. While the strips were mute nobody could
        see it; restoring the clock times put two lines of text through each
-       other, which is the defect WF_TRAVEL_TEXT_MIN_PX exists to prevent.
+       other, which is the defect wfTravelTextMinPx exists to prevent.
 
        The time wins. It is the one fact on this surface a parent acts on, and
        the zone is still said twice over — by the band's own tint, and by the
@@ -1456,7 +1472,7 @@ function renderFullWeek(keys) {
     if (bandLabels.length && spokenStrips.length) {
       bandLabels.forEach(lbl => {
         const top = Number(lbl.dataset.top) || 0;
-        const bottom = top + WF_BAND_LABEL_PX;
+        const bottom = top + wfBandLabelPx();
         const hit = spokenStrips.some(([a, z]) => top < z - 0.5 && bottom > a + 0.5);
         if (hit) lbl.remove();
       });
@@ -1809,62 +1825,200 @@ function renderFamilyChoreBanner(bannerId = 'weekFamilyBanner') {
     + `${n} still ${n === 1 ? 'needs' : 'need'} a day${waiting}</span>`;
 }
 
+/* ── THE WEEK GRID'S TYPE, READ FROM THE PAGE ──
+   Every fit decision on the Full week — may a strip speak, which form of a
+   label fits across, does a zone name collide with a strip, how many rows a
+   stacked card holds — needs to know how big this grid's text is. Those
+   answers used to be numbers measured once in a browser and typed in, each
+   with a comment saying a type change invalidates it. The text scale and the
+   looks change the type on purpose, and a web font that has not arrived yet
+   changes it by accident, so they are measured here instead:
+
+   - HEIGHTS come off a probe: one of each element this grid draws, built
+     inside #screen-week (so the kid readability floor and any look apply to
+     it exactly as to the real thing), read with getComputedStyle — font-size,
+     line-height, borders, padding, gap — and removed again before anything
+     can paint it. Computed style needs no layout, so it works while the
+     screen is hidden.
+   - WIDTHS are the text itself, measured with canvas measureText in the
+     computed font of the element that draws it. Same shaping engine as the
+     page: the two agree to a hundredth of a pixel, emoji included.
+
+   Both are cached (wfTypeCache, wfTextWidthCache) and thrown away together by
+   wfTypeInvalidate: js/99-main.js calls it when a web font finishes loading,
+   and a change of look or text scale calls it too. It re-renders the week if
+   the week is on screen and the type really did change. */
+let wfTypeCache = null;
+let wfTextWidthCache = new Map();
+let wfMeasureCtx = null;
+
+// The computed font of one element, as the canvas `font` shorthand plus its
+// letter-spacing (which the shorthand cannot carry).
+function wfFontSpec(style) {
+  return {
+    font: `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`,
+    ls: style.letterSpacing === 'normal' ? '0px' : style.letterSpacing,
+  };
+}
+
+// How wide `text` is in `spec`'s font, in CSS px. Cached per font and text.
+function wfMeasureText(text, spec) {
+  if (!text) return 0;
+  const key = spec.font + '|' + spec.ls + '|' + text;
+  let w = wfTextWidthCache.get(key);
+  if (w == null) {
+    if (!wfMeasureCtx) wfMeasureCtx = document.createElement('canvas').getContext('2d');
+    wfMeasureCtx.font = spec.font;
+    if ('letterSpacing' in wfMeasureCtx) wfMeasureCtx.letterSpacing = spec.ls;
+    w = wfMeasureCtx.measureText(text).width;
+    wfTextWidthCache.set(key, w);
+  }
+  return w;
+}
+
+/* Read everything the fit decisions need off one probe, once per type. */
+function wfTypeMetrics() {
+  if (wfTypeCache) return wfTypeCache;
+  const host = document.getElementById('weeklyFullGrid')
+    || document.getElementById('screen-week') || document.body;
+  const probe = document.createElement('div');
+  probe.setAttribute('aria-hidden', 'true');
+  probe.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none';
+  probe.innerHTML =
+      '<div class="wf-travel wf-travel--label"></div>'
+    + '<div class="wf-travel wf-travel--conflict"></div>'
+    + '<div class="wf-travel wf-travel--band wf-travel--conflict"><div class="wf-travel-band-label"></div></div>'
+    + '<div class="wf-band-label"></div><div class="wf-day-col"></div>'
+    + '<div class="wf-card wf-card--tall"><div class="wf-card-time"></div><div class="wf-card-icon"></div>'
+    + '<div class="wf-card-name"></div><div class="wf-card-sum"></div><div class="wf-card-dur"></div></div>';
+  host.appendChild(probe);
+  const st = sel => getComputedStyle(probe.querySelector(sel));
+  const px = v => parseFloat(v) || 0;
+  // One line of an element's text. Every rule here gives a number, but a
+  // `normal` would otherwise read as 0 and let everything "fit".
+  const lineOf = s => s.lineHeight === 'normal' ? px(s.fontSize) * 1.2 : px(s.lineHeight);
+  const edgesV = s => px(s.borderTopWidth) + px(s.borderBottomWidth) + px(s.paddingTop) + px(s.paddingBottom);
+  const bordersH = s => px(s.borderLeftWidth) + px(s.borderRightWidth);
+  const padsH = s => px(s.paddingLeft) + px(s.paddingRight);
+  const edgesH = s => bordersH(s) + padsH(s);
+  const strip = st('.wf-travel--label');
+  const clash = st('.wf-travel.wf-travel--conflict:not(.wf-travel--band)');
+  const band = st('.wf-travel--band');
+  const bandLabel = st('.wf-travel-band-label');
+  const zone = st('.wf-band-label');
+  const card = st('.wf-card--tall');
+  const name = st('.wf-card-name');
+  /* A stacked card's rows are whole pixels, rounded to the nearest, which is
+     how the hand measurements they replace were taken (a 13.12px line read
+     13, 14.43 read 14, 15.09 read 15). theStackedCardFitsWhatItDraws holds
+     the drawn card to this budget at every scale. */
+  const rowOf = s => Math.round(lineOf(s));
+  const nameLine = lineOf(name);
+  const nameMax = name.maxHeight === 'none' ? Infinity : px(name.maxHeight);
+  const m = {
+    /* A strip speaks when one line of its text fits inside its border — the
+       conflict strip's included, which is the thicker one. Rounded UP to a
+       whole pixel, as the hand-measured 17 was (13.12px of text + 2 x 1.5px
+       of conflict border = 16.1). A border is drawn in whole DEVICE pixels, so
+       on a 1x screen that 1.5px is 1 and the answer is 16; on the iPad it is 17. */
+    travelTextMinPx: Math.ceil(Math.max(lineOf(strip), lineOf(bandLabel))
+      + Math.max(px(strip.borderTopWidth) + px(strip.borderBottomWidth),
+                 px(clash.borderTopWidth) + px(clash.borderBottomWidth),
+                 px(band.borderTopWidth) + px(band.borderBottomWidth))),
+    // A zone name's line plus its own padding, rounded up (13.12 + 1 -> 15).
+    bandLabelPx: Math.ceil(lineOf(zone) + edgesV(zone)),
+    /* What a label loses across: the strip's (or band's) left and right
+       border, the conflict strip's included, and HALF the padding inside
+       it. The line is centred and clipped only at the border, so it may run
+       a pixel into the padding on each side and keep a pixel clear of the
+       dashed edge. Charging the whole padding silenced a 48.6px "🚗7:55" in
+       a 53px split lane in the fallback font, which takes the leave-by time
+       off the screen; charging none let a 109px label into a 112px column
+       it overflows. */
+    labelChromePx: Math.max(bordersH(strip) + padsH(strip) / 2,
+                            bordersH(clash) + padsH(clash) / 2,
+                            bordersH(band) + padsH(bandLabel) / 2),
+    labelFont: wfFontSpec(bandLabel),
+    // A day column's own left and right border, inside which its strips sit.
+    dayColEdgePx: bordersH(st('.wf-day-col')),
+    row: {
+      icon: rowOf(st('.wf-card--tall .wf-card-icon')),
+      name1: Math.round(nameLine),
+      name2: Math.round(Math.min(2 * nameLine, nameMax)),
+      dur: rowOf(st('.wf-card-dur')),
+      time: rowOf(st('.wf-card-time')),
+      sum: rowOf(st('.wf-card-sum')),
+      gap: Math.round(px(card.rowGap)),
+      chromeX: edgesH(card),
+      nameFont: wfFontSpec(name),
+    },
+  };
+  probe.remove();
+  /* What this type looked like when it was measured, so wfTypeInvalidate can
+     tell a font that actually changed these answers from one that did not.
+     The sample carries each kind of glyph the labels use. */
+  m.sig = JSON.stringify([m.travelTextMinPx, m.bandLabelPx, m.labelChromePx, m.row,
+    wfMeasureText('👕7:40 🏠→🚗7:55pm', m.labelFont), wfMeasureText('Skating Wq', m.row.nameFont)]);
+  wfTypeCache = m;
+  return m;
+}
+
+/* The type changed, or may have: a web font finished loading, the text scale
+   or the look was switched. Drops every cached measurement and, if the Full
+   week is on screen and the answers really are different now, draws it again.
+   This is the one call a look or scale change needs to make. */
+function wfTypeInvalidate() {
+  const before = wfTypeCache ? wfTypeCache.sig : null;
+  wfTypeCache = null;
+  wfTextWidthCache = new Map();
+  if (before == null) return;     // nothing was measured, so nothing drawn is stale
+  const screen = document.getElementById('screen-week');
+  if (!screen || !screen.classList.contains('active') || weekView === 'preview') return;
+  if (wfTypeMetrics().sig === before) return;
+  renderWeek();
+}
+
 /* THE MEASURED cost of one line of buffer-strip text, the way WF_ROW is the
    measured cost of a stacked card's rows. .wf-travel is 0.58rem in the base
    rule, but the kid readability floor at the end of css/app.css lifts
    #screen-week .wf-travel to 0.82rem = 13.12px at line-height 1, and the strip
-   is border-box with a 1px dashed border each side — 1.5px once it is a
-   conflict strip. 13.12 + 3 = 16.1, so 16 sits exactly on the edge and a
-   conflict strip fails it by a fraction. 17 is the first height at which every
-   strip can actually hold its own line.
+   is border-box with a dashed border each side, thicker on a conflict strip.
 
-   At the Full week's 0.72px per minute that is 24 minutes: a fifteen-minute
-   strip is mute and a thirty-minute band speaks. A type change invalidates this
-   number — aBufferStripNeverCoversACard and theStripStillSaysWhenToLeave
-   (tests/smoke.js) are what keep it honest. */
-const WF_TRAVEL_TEXT_MIN_PX = 17;
+   At the Full week's 0.72px per minute and today's type that is 16-17px, 22-24
+   minutes: a fifteen-minute strip is mute and a thirty-minute band speaks. It
+   follows the type (wfTypeMetrics); aBufferStripNeverCoversACard and
+   theStripStillSaysWhenToLeave (tests/smoke.js) measure the drawn strips. */
+function wfTravelTextMinPx() { return wfTypeMetrics().travelTextMinPx; }
 
 /* How tall a zone name is, for the overlap test that takes one down when a
-   buffer strip needs the same pixels. A MEASUREMENT, like the constant above:
-   .wf-band-label is 0.56rem lifted to the kid floor of 13.1px at line-height 1,
-   plus its 1px top padding. */
-const WF_BAND_LABEL_PX = 15;
+   buffer strip needs the same pixels: .wf-band-label's line (0.56rem lifted
+   to the kid floor of 13.1px at line-height 1) plus its 1px top padding.
+   Follows the type, like the strip height above. */
+function wfBandLabelPx() { return wfTypeMetrics().bandLabelPx; }
 
 /* -- HOW WIDE A LABEL WILL BE, BEFORE IT IS DRAWN --
-   A MEASUREMENT, like the two constants above, and it replaces the
-   `text.length * 6.6` this file used to budget with. That estimate charged
-   every character the same width, and a buffer label is mostly emoji: the car
-   plus "7:55am" is eight units and 65.6 real pixels -- 8.2 each -- while the
-   backpack plus " After school" is fifteen units and 100 -- 6.7 each. One
-   number was therefore wrong in BOTH directions and wrong by a third: it
-   refused labels that fitted, and it accepted labels that then ran off the
-   column edge, which is the whole failure the width cap exists to prevent.
+   The width of the box a buffer label needs: its text measured in
+   .wf-travel-band-label's own computed font (see wfTypeMetrics), plus the
+   strip's border and half its padding either side (labelChromePx says why),
+   because that is what has to fit in the column. Callers compare it with the
+   strip's full width.
 
-   Measured in .wf-travel-band-label's own type (0.82rem lifted to the 13.1px
-   kid floor): an emoji is about 21px, an arrow 12, a digit 7.3, a colon 4, a
-   letter 9.6. The LETTERS are rounded up, because over-estimating only refuses
-   a label that would have fitted while under-estimating draws one that does
-   not. The SPACE is charged 1 rather than its own 3.6: every space in a label
-   on this surface follows an emoji, whose advance already carries it, and
-   charging it in full is what put the two-figure form 4px over a phone column
-   it really fits in. A type change invalidates these
-   numbers exactly as it invalidates WF_TRAVEL_TEXT_MIN_PX, and
-   theStripStillSaysWhenToLeave (tests/smoke.js) measures the real elements
-   against what they were allowed to draw. */
+   It replaces two estimates. `text.length * 6.6` charged every character the
+   same, and a buffer label is mostly emoji, so it was wrong in both
+   directions. The per-glyph table after it (emoji 21, digit 7.3, letter 9.6
+   ...) was rounded up on purpose and ran 10-20px wide on every label, so
+   it refused forms that fitted — and it stopped being true the moment the
+   type changed. theStripStillSaysWhenToLeave (tests/smoke.js) measures the
+   real elements against what they were allowed to draw. */
 function wfTextPx(s) {
-  let px = 0;
-  for (const ch of String(s == null ? '' : s)) {
-    const cp = ch.codePointAt(0);
-    if (cp > 0xffff) px += 21;             // emoji
-    else if (cp > 0x7f) px += 12;          // arrows and other symbols
-    else if (ch >= '0' && ch <= '9') px += 7.3;
-    else if (ch >= 'a' && ch <= 'z') px += 9.6;
-    else if (ch >= 'A' && ch <= 'Z') px += 10.6;
-    else if (ch === ' ') px += 1;          // see the note above
-    else px += 4;                          // colon, brackets
-  }
-  return px;
+  const text = String(s == null ? '' : s);
+  if (!text) return 0;
+  const t = wfTypeMetrics();
+  return wfMeasureText(text, t.labelFont) + t.labelChromePx;
 }
+
+/* The stacked card's row heights, for wfStackPlan in renderFullWeek. */
+function wfCardRowPx() { return wfTypeMetrics().row; }
 
 /* Build one travel/get-ready buffer strip for the weekly view. Positioned in
    px within the zone cell, hugging the card it belongs to. Non-interactive so
@@ -1888,8 +2042,8 @@ function wfTravelStrip(topPx, hPx, leftCss, widthCss, seg, colour, conflict, max
      dashed border each side (1.5px on a conflict strip) — so at 0.72px per
      minute two stacked fifteen-minute strips, 10.8px each, both printed a label
      and both printed it through the other. That is the mess in the 7:45–8:10
-     slot of the screenshot this fixes. See WF_TRAVEL_TEXT_MIN_PX. */
-  let tier = hPx >= WF_TRAVEL_TEXT_MIN_PX ? 'long' : 'tiny';
+     slot of the screenshot this fixes. See wfTravelTextMinPx. */
+  let tier = hPx >= wfTravelTextMinPx() ? 'long' : 'tiny';
   if (maxTier && RANK[tier] > RANK[maxTier]) tier = maxTier;
   /* And height only answers one of the two questions. A column is 95–129px and
      "🚗 Leave by 7:40am (15m)" is about 168px of this type, so a strip tall
@@ -2094,7 +2248,7 @@ function wfBufferBand(topPx, hPx, leftCss, widthCss, segs, colour, conflict, col
      below that. Height is the other question and the band still answers it: a
      run too short for one line of this type keeps its hatches and says nothing,
      and the card's own inline tag then carries the fact. */
-  const full = hPx >= WF_TRAVEL_TEXT_MIN_PX ? wfSideTimeLabel(segs, colPx) : '';
+  const full = hPx >= wfTravelTextMinPx() ? wfSideTimeLabel(segs, colPx) : '';
   const fits = !!full;
   label.textContent = full;
   if (!fits) s.classList.add('wf-travel--mute');

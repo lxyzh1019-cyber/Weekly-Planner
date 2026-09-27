@@ -503,9 +503,12 @@ never describe different amounts of time. `wfBufferSegments` itself is
 **untouched** — Today's `tdPrepFor` reads it for "leave by 7:40", and that is
 still 7:40 whether or not the plan fits.
 
-`WF_TRAVEL_TEXT_MIN_PX` (17) is a **measurement**, like `WF_ROW`: 13.12px of
-text plus a 1.5px conflict border each side is 16.1, so 16 sits on the edge and
-17 is the first height that always holds a line. A strip under it keeps its
+`wfTravelTextMinPx()` is a **measurement**, like `WF_ROW`: one line of the
+strip's computed type plus its thickest (conflict) border top and bottom,
+rounded up — 13.12px + 2 x 1.5px = 16.1, so 17 on the iPad, and 16 on a 1x
+screen, where that border is drawn 1px. (It was the constant
+`WF_TRAVEL_TEXT_MIN_PX = 17` until the looks made the type change on purpose;
+see "The week grid measures its own type" below.) A strip under it keeps its
 hatch and its tooltip and says nothing; several short same-side segments merge
 into one **band** whose per-kind hatches stay as children and whose single label
 speaks for both. Height only answers one of the two questions — a column is
@@ -579,10 +582,10 @@ a PD day speaks, and a week that is all holiday says it once on the axis.
 own name at the top of each stretch — `🏫 SCHOOL`, `🎒 AFTER SCHOOL` — and a
 buffer run beginning on that boundary lands its time in exactly those pixels.
 Invisible while the strips were mute; two lines of text through each other the
-moment they spoke again, which is the defect `WF_TRAVEL_TEXT_MIN_PX` exists to
+moment they spoke again, which is the defect `wfTravelTextMinPx` exists to
 prevent. The **time wins**: it is the one figure on this surface a parent acts
 on, and the zone is still said twice over, by the band's tint and by the left
-axis. Pure arithmetic on inline pixel values (`WF_BAND_LABEL_PX`, another
+axis. Pure arithmetic on inline pixel values (`wfBandLabelPx()`, another
 measurement), so it costs no reflow. A screenshot found this — the suite was
 green.
 
@@ -600,7 +603,9 @@ than the mechanism: both figures visible in a full column, the leave-by one
 visible in a split lane with the other spelled out in a tooltip, at one lane and
 at two, without overflowing what draws them.
 
-**`wfTextPx` is how wide a label will be, and it is a MEASUREMENT.** It replaces
+**`wfTextPx` is how wide a label will be, and it is a MEASUREMENT.** (What
+follows is the glyph table it used to be; it now measures the text itself —
+see "The week grid measures its own type" below.) It replaced
 `text.length * 6.6`, which charged every character the same width — and a buffer
 label is mostly emoji, so `🚗 7:55am` is eight units and 65.6 real pixels (8.2
 each) while `🎒 After school` is fifteen and 100 (6.7 each). One number was
@@ -625,6 +630,29 @@ looks reasonable is exactly what ships wrong.
 `.wf-travel-band-label` is in the overflow sweep for the same reason: it is the
 element that actually carries a band's text, and while it was left out a label
 30px too wide for its column passed that sweep untouched.
+
+**The week grid measures its own type (Looks stage 2, L15).** The table above,
+`WF_TRAVEL_TEXT_MIN_PX`, `WF_BAND_LABEL_PX`, `WF_ROW` and
+`WF_NAME_ONE_LINE_CHARS` were all hand measurements of Patrick Hand at 13.1px,
+each with a comment saying a type change invalidates it — and the text scale and
+the looks change the type on purpose. `wfTypeMetrics` (`js/07-week-view.js`)
+now reads them off the page: one probe of each element this grid draws, built
+inside `#screen-week` so the kid floor and the look apply, read with
+`getComputedStyle` (no layout, so a hidden screen works) and removed at once.
+Widths are the text itself, `measureText` on one canvas in the element's
+computed font — it agrees with the DOM to a hundredth of a pixel, emoji
+included. A label's box is its text plus the strip's border and **half** its
+padding each side: the line is centred and clipped at the border, so it may use
+a pixel of padding; charging the whole padding silenced the leave-by time in a
+53px split lane in the fallback font. The strip's width is the day column's
+**inside** (`stripColPx`), because `.wf-day-col`'s own 1px border is a pixel an
+exact measurement notices. A stacked card's rows are whole pixels, rounded to the
+nearest as the hand values were, so at scale 1 they are exactly 20/14/29/13/13/15/2.
+A name reserves a second line only when its measured width is wider than a
+one-lane card's text width, not when it is over 13 characters.
+`wfTypeInvalidate()` drops every cached answer and redraws the week if it is on
+screen and the answers changed: `js/99-main.js` calls it on `document.fonts`
+`loadingdone` and `ready`, and a look or text-scale change calls it too.
 
 **The minutes that did not fit are drawn, not just described.** `.wf-overrun`
 lays the shortfall over the card it runs into at a quarter strength, exactly as
@@ -1212,7 +1240,8 @@ own title in half — 40px of block, 30px of content box, two lines needing 34.
 `detail` starts at 64px and a stacked card needs 66 before it draws a single
 goal line, so the ladder promoted cards into a layout they could not hold.
 `wfStackPlan` (`js/07-week-view.js`) is what decides the layout now, against
-`WF_ROW` — the **measured** cost of each row at the sizes this grid ships. The
+`WF_ROW` — the **measured** cost of each row in the type on screen
+(`wfCardRowPx`). The
 old arithmetic budgeted 58px for the four fixed rows and 20px a goal line; the
 real figures are 66 and 17, because the kid readability floor lifted
 `.wf-card-time`, `-dur` and `-sum` to 13.1px and nothing re-measured. On top of
@@ -1226,8 +1255,9 @@ start-time chip with whatever is left. A second line of name is bought only
 when the name is long enough to need it — and that estimate cannot overflow,
 because a plan that says one line also emits `.wf-card--nameclamp`, which holds
 it to one whatever the guess got wrong. `theStackedCardFitsWhatItDraws` measures
-in-flow children against the card's own height; `WF_ROW` is a set of
-measurements, so changing the type invalidates it.
+in-flow children against the card's own height; `WF_ROW` is read from the
+page's computed type, so it follows a type change (it failed at text scale 1.1
+while it was typed in).
 
 Today **owns no data and no rules — but it does invoke them.** Every number it
 shows is read through the accessors the owning screen uses, and every write goes
