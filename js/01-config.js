@@ -14,7 +14,7 @@ const LS_KEY = 'weeklyplanner-v3';
    the Today More sheet (js/31-today.js) and under the list on the parent
    portal's App landing (js/11-parent.js), which is where a grown-up reads it on
    an iPad with no console. */
-const APP_BUILD = '2026-09-26b';
+const APP_BUILD = '2026-09-27a';
 const TOTAL_SLOTS = 60;           // 6AM → 9PM = 15 hrs × 4 (legacy, used for some %s)
 const START_HOUR  = 6;
 const END_HOUR    = 22;
@@ -23,7 +23,7 @@ const END_MIN     = END_HOUR * 60;        // 1320
 const DAY_MIN_SPAN = END_MIN - START_MIN; // 960 min
 const PX_PER_MIN  = 1.4;                  // 1 min = 1.4px → 1 hr = 84px
 
-const COLOURS = ['#ff7b54','#ff9eb5','#ffd166','#95d5b2','#6fb1fc','#c3aed6','#ef476f','#8ecae6','#ffb4a2','#b5ead7'];
+const COLOURS = ['#ff7b54','#ff9eb5','#ffd166','#95d5b2','#6fb1fc','#c3aed6','#ef476f','#8ecae6','#ffb4a2','#b5ead7']; /* look: block colour picker palette — family data, stored on blocks */
 
 /* When a day has stopped being a day. Minutes from midnight, so the window
    wraps: 9pm to 7am. Today reads this to answer "what now" honestly at nine in
@@ -47,7 +47,7 @@ const AGE_ROLLOVER_MONTH = 7;   // 0-based: August
    ever read, which is worse than a duplicate that drifts, because a duplicate
    that drifts at least shows up on a screen. CAT_HEX below is what the app
    asks, and ACTIVITY_CATEGORIES is what owns the hues. */
-const CAT_HEX = {
+const CAT_HEX = { /* look: category hexes are family data — seeded onto blocks, read by SEEDED_HEX_VALUES */
   sleep:'#c3aed6', school:'#6fb1fc', active:'#fb6f1c',
   free:'#95d5b2', daily:'#ffd166', custom:'#ff9eb5', training:'#ef476f',
   routine:'#80cbc4',
@@ -136,7 +136,7 @@ function groupShort(id) { return groupDef(id).short; }
    blockColour uses for a block nothing resolves — same answer, same reason. */
 function groupHex(id) {
   const sub = Object.values(ACTIVITY_SUBS).find(sg => sg.group === id);
-  return (sub && sub.hex) || '#888';
+  return (sub && sub.hex) || '#888'; /* look: the unknown-block grey — compared and stored like block data */
 }
 
 /* Which group does this activity belong to?
@@ -224,7 +224,7 @@ function activityGroup(act) {
    entirely: chores are not a shade of rest. It stays a cyan rather than going
    warm, so Daily Rhythm still reads as one category — a light aqua and a deep
    cyan are obviously siblings, which is the whole point of having categories. */
-const ACTIVITY_CATEGORIES = [
+const ACTIVITY_CATEGORIES = [ /* look: subgroup hexes are family data — seeded onto blocks, measured by colourDistance */
   { id: 'rhythm', label: '🌅 Daily Rhythm', short: 'Rhythm', hex: '#8ad8d0', subs: [
     { id: 'routine',  label: '🌅 Routine',       hex: '#8ad8d0', group: 'routine' },
     /* Deep cyan, not a green. This was #9fd3b8, which sat 2.9 from Play in
@@ -275,7 +275,7 @@ const ACTIVITY_CATEGORIES = [
    Answering at read time is the only safe shape, the same reasoning as `xp2`
    and `achievementActivityId` — which means this list has to grow every time a
    hex moves, and must never be pruned. */
-const RETIRED_SEEDED_HEXES = [
+const RETIRED_SEEDED_HEXES = [ /* look: retired seeded hexes are data — matched against stored block colours */
   '#80cbc4', // routine, and Daily Rhythm's own hex
   '#9fd3b8', // helping hands
   '#b3a4f0', // arts
@@ -443,7 +443,7 @@ const COMP_WARMUP_MIN = 60;               // before it starts
 /* Training tags + sport-specific starter objectives. Each topic carries its
    own icon and background colour so a Skating block reads differently from a
    Swimming or Dryland one at a glance, not just by its text label. */
-const TRAINING_TAGS = [
+const TRAINING_TAGS = [ /* look: training tag colours are family data — a block's own colour */
   { id:'skating',  label:'⛸ Skating',  name:'Skating',  icon:'⛸', colour:'#8a6fd0' },
   { id:'swimming', label:'🏊 Swimming', name:'Swimming', icon:'🏊', colour:'#2f9fd0' },
   { id:'dryland',  label:'💪 Dryland', name:'Dryland',  icon:'💪', colour:'#e08a3a' },
@@ -495,7 +495,7 @@ function trainingBlockColour(b) {
    findActivity rather than getAllActivities: this colours a block that already
    exists, so an archived activity must still resolve. */
 function blockColour(b, kid) {
-  if (!b) return '#888';
+  if (!b) return '#888'; /* look: the unknown-block grey — block colour data */
   const act = findActivity(b.actId, kid);
   /* NOTHING ANSWERS TO THIS ID — an import, or a custom activity deleted on
      another device before the archive rule existed. Grey is the honest answer
@@ -503,7 +503,7 @@ function blockColour(b, kid) {
      is right for filing an hours total vaguely and wrong for colour. A block
      nobody can name drawn in Breakfast amber does not say "unknown", it says
      "breakfast". */
-  if (!act) return b.colour || '#888';
+  if (!act) return b.colour || '#888'; /* look: the unknown-block grey — block colour data */
   if (act.isTraining) return trainingBlockColour(b);
   /* THE SUBGROUP IS THE HUE. `cat` used to be, and nine flat values could not
      tell a piano lesson from a French lesson from a school day — all three came
@@ -516,7 +516,7 @@ function blockColour(b, kid) {
      the answer is derived on every read, which is the same answer in any merge
      order (see activitySub). */
   if (b.colour && !SEEDED_HEX_VALUES.has(String(b.colour).toLowerCase())) return b.colour;
-  return activitySub(act).hex || CAT_HEX[act.cat] || '#888';
+  return activitySub(act).hex || CAT_HEX[act.cat] || '#888'; /* look: the unknown-block grey — block colour data */
 }
 
 /* Figure skating: landing doubles, targeting double axel */

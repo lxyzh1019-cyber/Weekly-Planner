@@ -3,7 +3,7 @@
 /* ════════════════════════════════════════════════════════════════
    GOALS + TODOS PANEL
 ════════════════════════════════════════════════════════════════ */
-const GT_COLOURS = ['#ff7b54','#ffd166','#95d5b2','#6fb1fc','#c3aed6','#ff9eb5','#8ecae6','#b5ead7'];
+const GT_COLOURS = ['#ff7b54','#ffd166','#95d5b2','#6fb1fc','#c3aed6','#ff9eb5','#8ecae6','#b5ead7']; /* look: goal colours are family data — stored on each goal and matched by indexOf */
 
 function getCurrentWeekKey() {
   return dateToLocalKey(getWeekStart(weekOffset));

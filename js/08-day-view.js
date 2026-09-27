@@ -712,7 +712,7 @@ function isLightColour(col) {
   }
   const lin = c => { c /= 255; return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); };
   const L = 0.2126*lin(r) + 0.7152*lin(g) + 0.0722*lin(b);
-  const Link = 0.2126*lin(0x2a) + 0.7152*lin(0x23) + 0.0722*lin(0x20); // --ink #2a2320
+  const Link = 0.2126*lin(0x2a) + 0.7152*lin(0x23) + 0.0722*lin(0x20); /* look: colour maths — contrast against today's ink; Stage 2 reads the live ink */ // --ink #2a2320
   const contrastWithWhite = 1.05 / (L + 0.05);
   const contrastWithInk   = (L + 0.05) / (Link + 0.05);
   return contrastWithInk >= contrastWithWhite; // dark text is at least as readable

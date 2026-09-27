@@ -5533,6 +5533,65 @@
     --mny-amber-border: #7a4b00;
     --mny-scrim: rgba(42, 35, 32, 0.58);
     --mny-shadow-pop: rgba(42, 35, 32, 0.22);
+    /* Colours the money scripts write into markup (L10: today's values, per
+       page, unchanged). My money, the Flow, the chore pay bar and the chore
+       trends each keep their own names even where two values agree today —
+       choosing one set is the money redesign's job, done by changing values. */
+    /* My money story: a week credited at a flat amount (js/22-money-page1.js) */
+    --mny-flat: #b5ead7;
+    /* Where the money went — the outflow bars (js/21-money-data.js, js/22-money-page1.js) */
+    --mny-out-loan: #b8b0a2;
+    --mny-out-extra: #95d5b2;
+    --mny-out-goal: #ffb4a2;
+    --mny-out-spend: #ff9eb5;
+    --mny-out-ready: #ffd166;
+    --mny-out-locked: #6fb1fc;
+    --mny-out-stock: #c9a6e8;
+    /* The Sunday pots' tints (MNY_BUCKETS, js/21-money-data.js) */
+    --mny-pot-loan-tint: #eaf6ef;
+    --mny-pot-spend-tint: #fff0f0;
+    --mny-pot-ready-tint: #fff9e9;
+    --mny-pot-gic-tint: #eef3fb;
+    --mny-pot-stock-tint: #f6effa;
+    /* The "companies go down too" price line (js/23-money-meeting.js) */
+    --mny-spark-line: #c14a24;
+    /* The Flow's ribbons, one per source and destination (FL_COLOURS, js/42-flow.js) */
+    --mny-flow-earned: #95d5b2;
+    --mny-flow-prize: #ff9eb5;
+    --mny-flow-gift: #c9a6e8;
+    --mny-flow-borrowed: #f2b880;
+    --mny-flow-interest: #bdbdbd;
+    --mny-flow-typed: #d6d6d6;
+    --mny-flow-opening: #d6d6d6;
+    --mny-flow-ready: #6fb1fc;
+    --mny-flow-locked: #8ad8d0;
+    --mny-flow-invest: #b0a0ea;
+    --mny-flow-spent: #ffd166;
+    --mny-flow-fine: #e08e8e;
+    --mny-flow-loan: #f2b880;
+    --mny-flow-other: #bdbdbd;
+    /* Today's chore pay bar and its key (ckCapBarFor, js/26-chore-kid.js) */
+    --mny-earn-fined: #e05a3c;
+    --mny-earn-fined-ink: #fffdf5;
+    --mny-earn-kept: #6fc292;
+    --mny-earn-kept-ink: #143024;
+    --mny-earn-waiting: #ffd166;
+    --mny-earn-waiting-stripe: #fff4db;
+    --mny-earn-waiting-ink: #4a3a12;
+    --mny-earn-xp: #6fb1fc;
+    --mny-earn-xp-ink: #10243d;
+    /* The eight-week chore pay trends (js/28-chore-trends.js). The washes are
+       each kid's colour at alpha 0x22, as the card heads have always drawn it. */
+    --mny-trend-jenn: #cf8f22;
+    --mny-trend-jess: #3d7fd6;
+    --mny-trend-jenn-wash: #cf8f2222;
+    --mny-trend-jess-wash: #3d7fd622;
+    --mny-heat-1: #71c295;
+    --mny-heat-2: #48a271;
+    --mny-heat-3: #2b8054;
+    --mny-heat-4: #185235;
+    --mny-heat-ink: #1a2b20;
+    --mny-heat-ink-on-dark: #fffdf5;
   }
 
   /* Three columns on a tablet, one on a phone. The prototype was drawn for an

@@ -537,7 +537,7 @@ function renderWeekGlance(keys) {
   /* Unscheduled and overnight are two different facts and used to read as one.
      Unscheduled is awake time nobody has claimed; overnight is the 10pm–6am the
      window never covered. Saying both, on their own lines, is the fix. */
-  rows += row('🌤 Unscheduled', t.free, null, '#ffffff' /* safe: constant */);
+  rows += row('🌤 Unscheduled', t.free, null, 'var(--surface-card)' /* safe: constant */);
   rows += row('😴 Overnight', t.nightMin, '10pm–6am, not counted above', '#cbc3e3' /* safe: constant */);
 
   const sleep = recommendedSleep(age);

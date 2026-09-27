@@ -1217,7 +1217,7 @@ function addQuickBreak(durationMin) {
      blockColour keeps deriving it. Seeding from CAT_HEX wrote a hex the
      subgroup table does not own, which reads as a colour somebody chose and
      would freeze this block at the old hue on the next recolour. */
-  const colour = act ? (activitySub(act).hex || CAT_HEX[act.cat] || '#7fca79') : '#7fca79';
+  const colour = act ? (activitySub(act).hex || CAT_HEX[act.cat] || '#7fca79') : '#7fca79'; /* look: stored on the block as data; must stay a seeded hex (SEEDED_HEX_VALUES) */
   placeBlock('break_quick', start, durationMin, colour, [], 'Quick break', { travelBuffer: false });
   showToast(`Break added at ${formatTimeFromMin(start)} ✨`);
 }

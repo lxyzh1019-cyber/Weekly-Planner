@@ -436,7 +436,7 @@ function renderPendingApproval() {
     const card = document.createElement('div');
     card.className = 'challenge-card';
     card.innerHTML = `
-      <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· ${owner==='jenn'?'🐥 Jenn':'🦊 Jess'} added</span></div>
+      <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:0.7rem;color:var(--ink-light);font-family:var(--font-text)">· ${owner==='jenn'?'🐥 Jenn':'🦊 Jess'} added</span></div>
       <div style="font-size:0.85rem;color:var(--ink-light)">${(act.durationMin||60)} min · ${escapeHtml(activityCategory(act).short)} › ${escapeHtml(activitySub(act).label)}</div>
       <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
         <button class="btn-icon" style="padding:2px 8px;background:var(--accent-green)" onclick="approveKidActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✅ Approve</button>
@@ -489,7 +489,7 @@ function renderPendingTaskApproval() {
     card.className = 'challenge-card';
     card.innerHTML = `
       <div class="challenge-title">🎁 ${escapeHtml(mnyMoney(gift.amount))} · ${escapeHtml(gift.from || 'A gift')}
-        <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· ${escapeHtml(who.icon + ' ' + who.name)} says</span></div>
+        <span style="font-size:0.7rem;color:var(--ink-light);font-family:var(--font-text)">· ${escapeHtml(who.icon + ' ' + who.name)} says</span></div>
       <div style="font-size:0.85rem;color:var(--ink-light)">${gift.giver ? 'From ' + escapeHtml(gift.giver) + ' · ' : ''}${escapeHtml(mnyShortDate(gift.dayKey || gift.weekKey))}
         · nothing has moved yet</div>
       <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
@@ -505,7 +505,7 @@ function renderPendingTaskApproval() {
     card.className = 'challenge-card';
     card.innerHTML = `
       <div class="challenge-title">🏋️ ${escapeHtml(task.name)}${task.reps ? ` <span style="font-weight:700">(${escapeHtml(task.reps)})</span>` : ''}
-        <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· ${escapeHtml(who.icon + ' ' + who.name)} added</span></div>
+        <span style="font-size:0.7rem;color:var(--ink-light);font-family:var(--font-text)">· ${escapeHtml(who.icon + ' ' + who.name)} added</span></div>
       <div style="font-size:0.85rem;color:var(--ink-light)">${escapeHtml(sport ? sport.name : (task.sport || 'general'))}${task.notes ? ' · ' + escapeHtml(task.notes) : ''}</div>
       <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
         <button class="btn-icon" style="padding:2px 8px;background:var(--accent-green)" data-task-approve="${escapeAttr(task.id)}">✅ Approve</button>
@@ -694,7 +694,7 @@ function parentActivityCard(act, owner) {
                     : owner==='jenn'   ? '🐥 Jenn only'
                     : '🦊 Jess only';
   card.innerHTML = `
-    <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· ${escapeHtml(ownerLabel)}</span></div>
+    <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:0.7rem;color:var(--ink-light);font-family:var(--font-text)">· ${escapeHtml(ownerLabel)}</span></div>
     <div style="font-size:0.85rem;color:var(--ink-light)">${(act.durationMin||60)} min · ${escapeHtml(activityCategory(act).short)} › ${escapeHtml(activitySub(act).label)}</div>
     <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
       <button class="btn-icon" onclick="toggleShareActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')" style="padding:2px 8px" title="${owner==='shared'?'Move to single child':'Promote to shared'}">${owner==='shared'?'↩️ Unshare':'🔗 Share'}</button>
@@ -1090,7 +1090,7 @@ function renderRoutinesList() {
     const card = document.createElement('div');
     card.className = 'challenge-card';
     card.innerHTML = `
-      <div class="challenge-title">${tmpl.icon} ${escapeHtml(tmpl.title)} <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· built-in${isOverridden?' (edited)':''}</span></div>
+      <div class="challenge-title">${tmpl.icon} ${escapeHtml(tmpl.title)} <span style="font-size:0.7rem;color:var(--ink-light);font-family:var(--font-text)">· built-in${isOverridden?' (edited)':''}</span></div>
       <div style="font-size:0.85rem;color:var(--ink-light)">${tmpl.items.length} items</div>
       <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem">
         <button class="btn-icon" onclick="openEditBuiltInRoutine('${escapeJsAttr(id)}')" style="padding:2px 8px">✏️ Edit</button>
@@ -1500,9 +1500,9 @@ function pmDensityColor(pct) {
   if (pct === 0) return 'var(--paper)';
   // Gradient: light yellow → orange → red
   if (pct < 25) return '#fff3c4';
-  if (pct < 50) return '#ffe08a';
-  if (pct < 75) return '#ffa84a';
-  return '#ff7050';
+  if (pct < 50) return 'var(--surface-yellow-hover)';
+  if (pct < 75) return 'var(--surface-legend-warm)';
+  return 'var(--surface-legend-hot)';
 }
 
 /* Get blocks for a specific day key for an arbitrary profile (not just active) */

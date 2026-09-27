@@ -48,15 +48,15 @@ const MNY_STAGES = [
 /* Where money can go on a Sunday. `stage` is the MNY_STAGES id that opens it.
    `loan` is special: there is one row per debt, built at render time. */
 const MNY_BUCKETS = [
-  { key: 'loan',  icon: '🎿', label: 'Pay off',        stage: 'start', tint: '#eaf6ef' },
+  { key: 'loan',  icon: '🎿', label: 'Pay off',        stage: 'start', tint: 'var(--mny-pot-loan-tint)' },
   // Spending is a real answer to "what do I do with it", and a system that
   // only ever offers ways to defer teaches deferring, not choosing. Open from
   // the first week — but capped at a fifth, so a whole week can never vanish
   // into one afternoon.
-  { key: 'spend', icon: '🛍️', label: 'Spend it',       stage: 'start', tint: '#fff0f0' },
-  { key: 'ready', icon: '💵', label: 'Keep it ready',  stage: 'ready', tint: '#fff9e9' },
-  { key: 'gic',   icon: '🔒', label: 'Lock it away for a year', stage: 'locked', tint: '#eef3fb' },
-  { key: 'stock', icon: '📈', label: 'Buy a bit of a company',  stage: 'stock', tint: '#f6effa' },
+  { key: 'spend', icon: '🛍️', label: 'Spend it',       stage: 'start', tint: 'var(--mny-pot-spend-tint)' },
+  { key: 'ready', icon: '💵', label: 'Keep it ready',  stage: 'ready', tint: 'var(--mny-pot-ready-tint)' },
+  { key: 'gic',   icon: '🔒', label: 'Lock it away for a year', stage: 'locked', tint: 'var(--mny-pot-gic-tint)' },
+  { key: 'stock', icon: '📈', label: 'Buy a bit of a company',  stage: 'stock', tint: 'var(--mny-pot-stock-tint)' },
 ];
 
 /* The ready-made plans. Fractions of what is hers to choose. */
@@ -1545,12 +1545,12 @@ function mnyIncomeSegments(weekKey, kid) {
   const b = pool.breakdown;
   const passive = mnyPassiveSinceLastMeeting(kid);
   const out = mnySegments([
-    { label: 'Jobs',           value: b.chorePaid,    color: '#95d5b2' },
-    { label: 'Learning',       value: b.learnPaid,    color: '#6fb1fc' },
-    { label: 'Routines kept',  value: b.streakBonus,  color: '#ffd166' },
-    { label: 'Competitions',   value: b.compPaid,     color: '#ff9eb5' },
-    { label: 'From outside',   value: pool.deposits,  color: '#c9a6e8' },
-    { label: 'Made on its own', value: Math.max(0, passive), color: '#b8b0a2' },
+    { label: 'Jobs',           value: b.chorePaid,    color: 'var(--mny-chores)' },
+    { label: 'Learning',       value: b.learnPaid,    color: 'var(--mny-learning)' },
+    { label: 'Routines kept',  value: b.streakBonus,  color: 'var(--mny-streak)' },
+    { label: 'Competitions',   value: b.compPaid,     color: 'var(--mny-comp)' },
+    { label: 'From outside',   value: pool.deposits,  color: 'var(--mny-outside)' },
+    { label: 'Made on its own', value: Math.max(0, passive), color: 'var(--mny-passive)' },
   ]);
   out.fines = money2(b.fines.total);
   out.passive = passive;
@@ -1572,18 +1572,18 @@ function mnyIncomeSegments(weekKey, kid) {
 function mnyOutflowSegments(weekKey, kid, split) {
   const pool = mnyPool(weekKey, kid);
   const s = split || (mnyWeekPlan(weekKey, kid) || {}).split || {};
-  const rows = [{ label: 'My loan payment', value: pool.mustPay, color: '#b8b0a2' }];
+  const rows = [{ label: 'My loan payment', value: pool.mustPay, color: 'var(--mny-out-loan)' }];
   mnyDebtsByPriority(kid).forEach(d => {
-    rows.push({ label: 'Extra off ' + d.name, value: money2(s['loan:' + d.id]), color: '#95d5b2' });
+    rows.push({ label: 'Extra off ' + d.name, value: money2(s['loan:' + d.id]), color: 'var(--mny-out-extra)' });
   });
   mnyGoals(kid, true).forEach(g => {
     const v = money2(s['goal:' + g.id]);
-    if (v > 0) rows.push({ label: 'Toward ' + g.name, value: v, color: '#ffb4a2' });
+    if (v > 0) rows.push({ label: 'Toward ' + g.name, value: v, color: 'var(--mny-out-goal)' });
   });
-  rows.push({ label: 'Spent',        value: money2(s.spend), color: '#ff9eb5' });
-  rows.push({ label: 'Kept ready',   value: money2(s.ready), color: '#ffd166' });
-  rows.push({ label: 'Locked away',  value: money2(s.gic),   color: '#6fb1fc' });
-  rows.push({ label: 'Bit of a company', value: money2(s.stock), color: '#c9a6e8' });
+  rows.push({ label: 'Spent',        value: money2(s.spend), color: 'var(--mny-out-spend)' });
+  rows.push({ label: 'Kept ready',   value: money2(s.ready), color: 'var(--mny-out-ready)' });
+  rows.push({ label: 'Locked away',  value: money2(s.gic),   color: 'var(--mny-out-locked)' });
+  rows.push({ label: 'Bit of a company', value: money2(s.stock), color: 'var(--mny-out-stock)' });
   return mnySegments(rows);
 }
 

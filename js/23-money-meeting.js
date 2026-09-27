@@ -933,7 +933,7 @@ function mnyStockChart() {
   return `<div class="mny-card">
       <div class="mny-label">📈 Companies go down too</div>
       <svg viewBox="0 0 100 32" preserveAspectRatio="none" class="mny-spark" role="img" aria-label="One company's price through 2023">
-        <polyline points="${pts}" fill="none" stroke="#c14a24" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
+        <polyline points="${pts}" fill="none" style="stroke:var(--mny-spark-line)" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
       </svg>
       <div class="mny-note">This really happened, back in 2023. One company fell ${Math.abs(drop)}% in three months, then went back up. Nobody knew it would. ${mnyAskBtn('stock')}</div>
     </div>`;

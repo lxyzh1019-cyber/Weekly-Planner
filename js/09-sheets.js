@@ -71,7 +71,7 @@ function renderObjectivesList(containerId, stateObj, presets, myTasks, rerenderF
 
   if (myTasks.length) {
     const hdr = document.createElement('div');
-    hdr.style.cssText='font-family:Gochi Hand;font-size:1rem;color:var(--ink-light);margin-top:0.4rem';
+    hdr.style.cssText='font-family:var(--font-display);font-size:1rem;color:var(--ink-light);margin-top:0.4rem';
     hdr.textContent = 'From your library:';
     objWrap.appendChild(hdr);
     myTasks.forEach(t=>{
@@ -441,7 +441,7 @@ function renderStartTimePicker(containerId, curMin, onChange, onAfterRender) {
   hourRow.appendChild(prevH);
 
   const hourLabel = document.createElement('span');
-  hourLabel.style.cssText = 'font-family:Gochi Hand;font-size:1.1rem;min-width:60px;text-align:center';
+  hourLabel.style.cssText = 'font-family:var(--font-display);font-size:1.1rem;min-width:60px;text-align:center';
   const h12 = curH>12?curH-12:(curH===0?12:curH);
   hourLabel.textContent = `${h12}${curH>=12?'pm':'am'}`;
   hourRow.appendChild(hourLabel);

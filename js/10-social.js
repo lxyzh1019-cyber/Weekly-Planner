@@ -16,7 +16,7 @@ const SYNC_CARD_MIN_PX = 20;
 const SYNC_TAP_MIN_PX = 44;
 const SYNC_TIME_ROOM_PX = 36;
 const SYNC_LINE_PX = 15;
-const SYNC_BUSY_GREY = '#cfcfcf';
+const SYNC_BUSY_GREY = 'var(--surface-busy)';
 function openSisterSync() {
   if (isParent()) { showToast('View each child separately 👀'); return; }
   /* Today, not Monday. This opened on syncDayIdx = 0 unconditionally while the
