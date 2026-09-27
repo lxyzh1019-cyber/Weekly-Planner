@@ -1483,7 +1483,7 @@ function renderTrainingGearChecklist(containerId, stateObj, tag, persist, isComp
   const items = getTrainingGearPresets(tag, isComp);
   wrap.innerHTML = '';
   if (!items.length) {
-    wrap.innerHTML = '<p style="font-size:0.9rem;color:var(--ink-light)">No preset gear for this sport yet.</p>';
+    wrap.innerHTML = '<p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light)">No preset gear for this sport yet.</p>';
     return;
   }
   if (!stateObj.gearState) stateObj.gearState = {};
@@ -1676,7 +1676,7 @@ function openKidTrainingQuick(blockId) {
   const objEl = document.getElementById('kidTrainingObjectives');
   const lines = (b.objectives && b.objectives.length)
     ? b.objectives.map(o => `<div class="checklist-item" style="cursor:default;border-color:var(--accent)"><span class="checklist-text">🎯 ${escapeHtml(o)}</span></div>`).join('')
-    : '<p style="font-size:0.95rem;color:var(--ink-light)">No objectives listed yet — tap Edit to add some.</p>';
+    : '<p style="font-size:calc(0.95rem * var(--text-scale, 1));color:var(--ink-light)">No objectives listed yet — tap Edit to add some.</p>';
   objEl.innerHTML = lines;
   const swEl = document.getElementById('kidTrainingStopwatch');
   if (b.stopwatch && b.stopwatch.enabled) {

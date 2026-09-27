@@ -11,7 +11,7 @@ The three parts, individually:
 
 ```bash
 # 1. Syntax + global-scope checks (no dependencies)
-npm run check         # tests/check-*.js: syntax, globals, shared-merge, escaping, dead CSS, dead ids, dead actions
+npm run check         # tests/check-*.js: syntax, globals, shared-merge, escaping, look tokens, dead CSS, dead ids, dead actions
 
 # 2. Sync/merge unit tests (no dependencies, runs the real merge functions)
 npm run test:merge    # tests/merge.test.js — 112 assertions, must be 112/112
@@ -39,6 +39,15 @@ later-loaded file silently wins, and two top-level `let`/`const` of one name is 
 hard `SyntaxError` at load that per-file `node --check` cannot see. It covers
 `function`, `async function`, and `let`/`const`/`var` including the
 comma-separated form (`let a = null, b = null;`).
+
+**`check-look-tokens.js`** fails on a colour or font typed outside the shared
+values: a hex, `rgb()`/`hsl()` (in CSS also a named colour) or a font name,
+in `css/app.css` outside a `:root` / look token block, or in `js/*.js` / `index.html`;
+and on an absolute font size (px, rem, pt…) that does not multiply
+`--text-scale`. A look is only another set of values for the same names, so a
+typed value is a spot that stays in the old look. Data palettes, colour maths
+and print-sheet sizes (print ignores the look) stay with a
+`/* look: <reason> */` mark; once two looks exist, each must define every look token.
 
 **`check-dead-ids.js`** fails on an `id` in `index.html` that nothing reads —
 no `getElementById` in `js/`, no `for=` / `aria-*` back-reference, no `#id`

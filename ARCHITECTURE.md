@@ -99,7 +99,10 @@ npm run test:smoke          # screenshots land in tests/out/
 ```
 
 `npm run check` runs `tests/check-syntax.js`, `tests/check-globals.js`,
-`tests/check-shared-merge.js`, `tests/check-escaping.js`, `tests/check-dead-css.js`,
+`tests/check-shared-merge.js`, `tests/check-escaping.js`,
+`tests/check-look-tokens.js` (every colour and font reads a `:root` token and
+every absolute font size multiplies `--text-scale`, so a look reaches every
+spot), `tests/check-dead-css.js`,
 `tests/check-dead-ids.js`, `tests/check-dead-actions.js` and `tests/check-sw-shell.js` (an `id` in `index.html` that nothing reads — the
 same blind spot as dead CSS, with runtime-built prefixes discovered from the
 source rather than listed by hand). **Do not go back to the old shell loop** —
@@ -1416,6 +1419,10 @@ and a week with no chore pool gave the same blank for a different reason.
 say which one they are.
 - Use the design tokens in `css/app.css` (`--space-*`, `--text-*`,
   `--shadow-*`, `--radius-*`). Avoid new inline `style="…"`.
+- A colour or font is added or changed only as a token in `:root` (and, once
+  looks exist, in every look block); data palettes and colour maths carry
+  `/* look: reason */`; every absolute font-size multiplies `--text-scale`.
+  `tests/check-look-tokens.js` enforces all three.
 - `--accent` (`#ff7b54`) is decorative only. Anything with white text on it or
   informational accent text uses `--accent-strong` (`#c14a24`) — this is the AA
   contrast fix, don't undo it.

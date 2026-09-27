@@ -7,7 +7,7 @@
 // old look when the family switches — nobody sees it until a child does. So a
 // typed colour or font anywhere outside the shared value set fails the build.
 //
-// Three rules:
+// Four rules:
 //
 // 1. css/app.css. Comments are stripped first. Outside a TOKEN BLOCK no
 //    declaration may carry a colour literal — hex, rgb()/rgba(), hsl()/hsla(),
@@ -54,6 +54,19 @@
 //    colour leaking through. With fewer than two looks this rule has nothing to
 //    compare and reports itself as dormant.
 //
+// 4. Text scale. A look may make text bigger or smaller (--text-scale, 1 in
+//    :root), so every font size with an absolute unit (px, rem, pt, pc, cm,
+//    mm, in, Q) must multiply it: `calc(0.9rem * var(--text-scale, 1))`. One
+//    that does not is text that stays the old size in the new look. em, %,
+//    keywords and 0 follow their parent already and are not checked.
+//    Scanned: css/app.css `font-size` and `font` declarations outside token
+//    blocks and outside `@media print`; in js/*.js and index.html (comment text
+//    blanked, as in rule 2) `font-size:` in markup/cssText and
+//    `fontSize =` / `fontSize:` in DOM code. The print sheet ignores the look
+//    (L12), so its own sizes stay as typed and carry `/* look: <reason> */` on
+//    the same line — in css/app.css too, where that mark is read for this rule
+//    only. In js/html, (b) and EXEMPT work as in rule 2.
+//
 // What it knowingly does NOT catch:
 //   - Named colours in js/ and index.html (`color:white` in a template string).
 //     Words like `red` or `white` are everywhere in JS as data and prose; there
@@ -68,6 +81,9 @@
 //     before any CSS, so they cannot read a variable (theme-color is EXEMPT
 //     below; manifest.json is not scanned).
 //   - Other file types (sw.js, tools/, tests/) — they paint nothing.
+//   - A font size whose unit is added away from the assignment
+//     (`el.style.fontSize = size`, `size` built elsewhere), or a --token that
+//     holds an absolute size read by `font-size: var(--x)` (none do).
 // And one thing it can misread: a selector or anchor spelled only in hex
 // letters and standing alone (`'#add'`, `href="#bad"`) looks like a colour.
 // There were none when this was written; mark one with `/* look: not a colour */`.
@@ -102,6 +118,14 @@ const GENERIC_FAMILY = /\b(?:sans-serif|serif|cursive|monospace|fantasy|system-u
 // A font-family (CSS text) or fontFamily (DOM) set to something other than var()/inherit.
 const JS_FONT = /(?:font-family\s*:|fontFamily\s*(?:=(?!=)|:))\s*(?![\s'"`]*(?:var\(|inherit\b|\$\{))[^;]/g;
 const LOOK_MARK = /^\s*look:\s*([\s\S]*?)\s*$/;
+// Rule 4: an absolute length in a font size (a digit or `${…}` before the unit).
+const ABS_SIZE = /(?:\d|\})\s*(?:px|rem|pt|pc|cm|mm|in|q)\b/i;
+const SCALED = /--text-scale\b/;
+// font-size: in markup / cssText — the value runs to the next ; or quote.
+const JS_FONT_SIZE = /font-size\s*:\s*([^;"'`\n]*)/gi;
+// fontSize = / fontSize: in DOM code — the value runs to the end of the statement.
+const JS_FONT_SIZE_DOM = /fontSize\s*(?:=(?!=)|:)\s*([^;\n]*)/g;
+const ABS_SIZE_DOM = /(?:[\d}]|['"`])\s*(?:px|rem|pt|pc|cm|mm)\b/i;
 
 const problems = [];
 const lineOf = (src, offset) => { let n = 1; for (let i = 0; i < offset; i++) if (src.charCodeAt(i) === 10) n++; return n; };
@@ -126,6 +150,13 @@ function literalsInCssValue(value) {
 }
 
 const cssSrc = fs.readFileSync(path.join(ROOT, CSS_FILE), 'utf8');
+// Lines carrying `/* look: <reason> */` — read by rule 4 (text scale) only.
+const cssMarks = new Set();
+for (const m of cssSrc.matchAll(/\/\*([\s\S]*?)\*\//g)) {
+  const line = lineOf(cssSrc, m.index);
+  if (readMark(CSS_FILE, line, m[1])) cssMarks.add(line);
+}
+let unscaledKept = 0;
 // Strip comments, keeping every newline so offsets map to lines.
 const css = cssSrc.replace(/\/\*[\s\S]*?\*\//g, blank);
 const looks = new Map();          // look name → Set of custom properties
@@ -163,6 +194,13 @@ let cssDecls = 0, tokenBlocks = 0;
     }
     if (prop === 'font' && (/["']/.test(value) || GENERIC_FAMILY.test(value.replace(/var\([^)]*\)/g, '')))) {
       problems.push({ where, rule: 'css font', detail: ctx, fix: 'name the family with var(--font-…), not a font name' });
+    }
+    // Rule 4: an absolute font size multiplies --text-scale.
+    if ((prop === 'font-size' || prop === 'font') && !inToken && ABS_SIZE.test(value) && !SCALED.test(value)
+        && !stack.some(s => /^@media\s+(?:only\s+)?print\b/i.test(s))) {
+      if (cssMarks.has(lineOf(css, at))) unscaledKept++;
+      else problems.push({ where, rule: 'text scale', detail: ctx,
+        fix: 'write calc(<size> * var(--text-scale, 1)); a print-sheet-only size carries /* look: <reason> */ on its line' });
     }
   };
   for (let i = 0; i < css.length; i++) {
@@ -265,8 +303,22 @@ function scanLines(file, rawLines, textLines, marks, covered) {
     JS_FONT.lastIndex = 0;
     let f;
     while ((f = JS_FONT.exec(line))) found.push(line.slice(f.index, f.index + 40).trim());
-    if (!found.length) return;
     const n = idx + 1;
+    // Rule 4: absolute font sizes multiply --text-scale.
+    const sizes = [];
+    for (const [re, abs] of [[JS_FONT_SIZE, ABS_SIZE], [JS_FONT_SIZE_DOM, ABS_SIZE_DOM]]) {
+      re.lastIndex = 0;
+      let s;
+      while ((s = re.exec(line))) if (abs.test(s[1]) && !SCALED.test(s[1])) sizes.push(s[0].trim().slice(0, 50));
+    }
+    if (sizes.length) {
+      const ex = EXEMPT.find(x => x.file === file && rawLines[idx].includes(x.match));
+      if (marks.has(n) || covered.has(n)) unscaledKept += sizes.length;
+      else if (ex) { exemptHits.set(ex, exemptHits.get(ex) + 1); unscaledKept += sizes.length; }
+      else problems.push({ where: `${file}:${n}`, rule: 'text scale', detail: `${sizes.join(', ')}   ${rawLines[idx].trim().slice(0, 90)}`,
+        fix: 'write calc(<size> * var(--text-scale, 1)); a print-sheet-only size carries a trailing /* look: <reason> */' });
+    }
+    if (!found.length) return;
     if (marks.has(n) || covered.has(n)) { allowedLiterals += found.length; return; }
     const ex = EXEMPT.find(x => x.file === file && rawLines[idx].includes(x.match));
     if (ex) { exemptHits.set(ex, exemptHits.get(ex) + 1); allowedLiterals += found.length; return; }
@@ -352,14 +404,15 @@ if (looks.size < 2) {
 if (!problems.length) {
   console.log(`OK  ${cssDecls} css declarations checked, colours and fonts only in ${tokenBlocks} token block(s); `
     + `${scannedFiles} js/html file(s) clean — ${allowedLiterals} literal(s) kept by ${marksUsed} look: mark(s) `
-    + `(${tablesCovered} table(s)) and ${EXEMPT.length} exemption(s); ${looksNote}`);
+    + `(${tablesCovered} table(s)) and ${EXEMPT.length} exemption(s); every absolute font size multiplies --text-scale `
+    + `(${unscaledKept} print-only size(s) kept by look: marks); ${looksNote}`);
   process.exit(0);
 }
-console.error(`FAIL  ${problems.length} typed colour/font problem(s):\n`);
+console.error(`FAIL  ${problems.length} typed colour/font/size problem(s):\n`);
 for (const p of problems) {
   console.error(`  ${p.where}  [${p.rule}]`);
   console.error(`      ${p.detail}`);
   console.error(`      ${p.fix}\n`);
 }
-console.error('A colour or font typed outside the shared value set stays in the old look when the family switches.');
+console.error('A colour, font or unscaled font size typed outside the shared value set stays in the old look when the family switches.');
 process.exit(1);

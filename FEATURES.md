@@ -1,4 +1,4 @@
-# FEATURES — Weekly-Planner — manifest v12 — 2026-09-26, v11 + one profile-badge wording (build 2026-09-26b) (v2 confirmed 2026-09-22)
+# FEATURES — Weekly-Planner — manifest v13 — 2026-09-27, v12 + looks stage 1: shared look values, no visible change (build 2026-09-27a) (v2 confirmed 2026-09-22)
 
 Locked features of the current version. Every edit is checked against this list and ends with a regression table. Update this file in the same change that alters a feature. Over-list rather than under-list.
 
@@ -241,6 +241,16 @@ Each held by a check that fails on the code before it (run against a `git archiv
 - **7 — docs and comments:** merge-test count 112 in `ARCHITECTURE.md` (×2) and `tests/README.md`; the four "6am–9pm" comments read 6am–10pm (`css/app.css`'s print-slot note also says the JS sets the slot per host).
 - **8 — dead code removed:** the `block.inviteId && !block.inviteAccepted` guard (`attachBlockDrag`), the `'👯': 'Open Sister Sync'` entry of `applyIconButtonAriaLabels`' icon map (no button's text is a bare 👯), and `coHandleClick`'s `export` branch (no `data-co-action="export"` anywhere; `ctExportBackup` keeps its two `onclick` doors). `check-dead-actions` reverse warnings 27 → 26. The 12 dead chore-tab branches stay for C3.
 - Build `2026-09-26a` (`APP_BUILD` = `SW_VERSION`).
+
+### Looks stage 1 — every colour, font and text size reads a shared value (manifested 2026-09-27, Plan v7 Stage 1, build 2026-09-27a)
+No visible change; groundwork for the two looks (Pop and Calm, `docs/handoff/looks-calm-pop.md`).
+- **Shared value set.** `css/app.css`'s top `:root` holds role-named tokens (surface, page, scrim, text, border, shadow, status, dark, zone, kid, print) with today's values; the money `:root` holds the `--mny-*` tokens (My money, the Flow, the chore pay bar and trends, kept as separate sets with today's values — unifying them is the money redesign's). `--parent` is gone (it was never read).
+- **Fonts.** Seven font tokens keep every stack exactly (`--font-body`, `--font-text`, `--font-head`, `--font-display`, `--font-round`, `--font-hand`, `--font-script`); print has `--print-font-*`. Two inline fonts (`js/09-sheets.js`) now carry their token's fallback (`'Gochi Hand', cursive`) — identical whenever the web font loads.
+- **One text scale.** Every absolute font size in css, generated markup and `index.html` multiplies `--text-scale` (1 today), composing with `--fs-scale` (parent Reading size, unchanged). em/% sizes are not multiplied (they inherit it). Print ignores it (`@media print { :root { --text-scale: 1 } }`; print-sheet sizes marked).
+- **What keeps a typed colour:** family data palettes (`COLOURS`, `CAT_HEX`, `ACTIVITY_CATEGORIES`, `RETIRED_SEEDED_HEXES`, `TRAINING_TAGS`, `GT_COLOURS`, the seeded `#7fca79`, the unknown-block `#888`) and colour maths (`isLightColour`, `printTextColor`), each with a `/* look: reason */` mark; the `theme-color` meta (named exemption).
+- **Guard:** `tests/check-look-tokens.js` in `npm run check` — fails on a colour or font typed outside a token block (css, js, `index.html`; comments ignored), an empty `look:` reason, a stale exemption, an absolute font size that does not multiply `--text-scale`, and (once looks exist) a look block missing a token another look defines. Planted failures proven for each rule.
+- Proven invisible: static equivalence EQUAL 0 over 8,463 declarations; computed-style comparison against `main` over 94 capture points (every kid screen at 1194×834 and 390×844, the five parent destinations, four sheets, dark mode) — only non-visual rows (random sparkles) and the two font-fallback rows above.
+- Build `2026-09-27a` (`APP_BUILD` = `SW_VERSION`).
 
 Deriving the full app manifest from `ARCHITECTURE.md` is an open item in `WORKING_RECORD.md`.
 

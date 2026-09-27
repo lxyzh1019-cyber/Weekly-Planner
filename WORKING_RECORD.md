@@ -238,7 +238,7 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression (1 re
 | R10 commit + push + draft PR | COMPLETE | `209e9f6` on `claude/badges-record`, pushed; draft PR https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/100. This record line is committed after the PR opened. Status: draft PR open, not merged. After the owner merges it: "merged, not confirmed live" until Build 2026-09-26b is read on the iPad. |
 | **R11 / Plan v7 — two looks, Pop and Calm** (`claude/looks-calm-pop`, from `main` @ `72fd6eb`) | | |
 | Step 0 — handoff + example saved, R11 recorded | COMPLETE | `docs/handoff/looks-calm-pop.md` and `looks-example.html` byte-identical to the owner's files (`cmp`). |
-| Stage 1 — shared values, no visible change (PR 1) | NOT STARTED | |
+| Stage 1 — shared values, no visible change (PR 1) | COMPLETE (pending PR 1 merge) | **1A COMPLETE** `420f727` (worker Opus 5.5, self-report; effort configured: medium): `css/app.css` only — ~250 role-named `:root` tokens with today's values, 7 font tokens (every stack kept), every absolute `font-size` × `--text-scale` (print resets it to 1), `--parent` removed. Static equivalence **EQUAL 0** (8,463 declarations; planted 1/255, font-stack and ×1.1 faults caught); runtime computed-style comparison **DIFF 0** over 94 points / 24,421 elements (swap mode; tree mode's 6 rows are `Math.random` sparkles in `js/09-sheets.js:2883`, main vs main too); leftover-literal scan **0**. Main session re-ran static and literal scans: EQUAL 0, LITERALS 0. Suites merge/buffers/stream/cleanup/xp/money/smoke pass; `check-sw-shell` red until the build bump in 1B. Tools (not committed): scratchpad `looks\`. **1B + 1C COMPLETE** `f6b0dc1` (workers Opus 5.5, self-report): js markup/SVG/inline fonts on tokens; 59 `--mny-*` tokens (values unchanged; Flow and My money kept separate); data palettes and colour maths marked `/* look: reason */`; index.html's one typed colour → `--ink-muted`; `tests/check-look-tokens.js` in `npm run check` (10 planted failures exit 1, restore OK; looks-missing-token rule proven dormant-then-live with a planted pair); build **2026-09-27a**. Main session re-ran: check-look-tokens FAIL 2 (the two known literals), check-sw-shell OK, check-globals OK. Tree-mode runtime DIFF 13: 6 sparkles, 5 timing overlays (`#mascot`, `#missionClear`, differ between runs), and **2 accepted**: `sheet_edit_*` inline `font-family:Gochi Hand` now carries the token's `cursive` fallback — identical when the webfont loads, differs only offline. **1D COMPLETE** (worker Opus 5.5): `--surface-overnight`, `--surface-density-low`; 43 inline font sizes (index.html 19, js 24) × `--text-scale`; check rule 4 (absolute font size must multiply `--text-scale`; planted failures exit 1); ARCHITECTURE.md check list + token rule, tests/README.md. Tree-mode runtime DIFF 8 = 6 sparkles + the 2 accepted font-fallback rows. **Main-session gate:** `npm test` exit 0 — check 10/10 (look tokens OK: 3 token blocks, 67 literals kept by 15 `look:` marks, 1 exemption, 12 print-only sizes) · merge 112 · buffers 9 · stream 31 · cleanup · xp 28 · money 33 · ALL SMOKE CHECKS PASSED. Review pass vs `main`: no merge blockers (converted colour constants traced: `SYNC_BUSY_GREY`, `CTR_KID_*`, `flColour`, `pmDensityColor`, pot tints are render-only — never stored, never in colour maths). FEATURES.md v13. |
 | Stage 2 — Pop restyle, 12 subgroup colours, week-grid measuring (PR 2) | NOT STARTED | |
 | Stage 3 — Calm + kid and parent switches (PR 3) | NOT STARTED | |
 | Stage 4 — Calm on the parent portal, print unchanged (PR 4) | NOT STARTED | |
@@ -327,6 +327,22 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression (1 re
 |---|---|---|
 | Every `FEATURES.md` app and governance feature | kept | Docs and record only; no file under `js/`, `css/`, `index.html`, `sw.js` or `tests/` touched; no build stamp change. |
 | `docs/handoff/looks-calm-pop.md`, `docs/handoff/looks-example.html` | added | Owner's files, verbatim. |
+| Missing | none | |
+
+### Regression table — R11 Stage 1, shared look values (FEATURES v12 → v13)
+| Feature | v12 → v13 | Note |
+|---|---|---|
+| Every app feature in `FEATURES.md` and `ARCHITECTURE.md` | kept | No visible change: static EQUAL 0; computed-style comparison vs `main` at 94 points shows only random sparkles and the 2 rows below; `npm test` green |
+| Kid 44px targets, 13px/15px floors, Sister Sync one line at 375px and in the fallback font, parent Day badge | kept | Smoke checks pass; `--text-scale` = 1 |
+| Parent Reading size (`--fs-scale`), including its default quirk (open question 7) | kept | Untouched |
+| Print sheet and print preview | kept | Own `--print-*` tokens; sizes not scaled (L12) |
+| Money colours per page; Flow separate from My money | kept | Read from `--mny-*` tokens, values unchanged (L10) |
+| Activity palette, recolour guard, colour maths | kept | Values unchanged, marked `look:` |
+| Dark-mode banner rules, C7 contrast | kept | `--dark-*` tokens, same values |
+| Build number | kept | `2026-09-27a` (`APP_BUILD` = `SW_VERSION`) |
+| Shared value set, font tokens, `--text-scale`, `check-look-tokens.js` | added | |
+| Two inline `Gochi Hand` fonts' offline fallback | changed | Now `cursive` via `--font-display`; identical when the web font loads |
+| `--parent` | intentionally removed | Never read |
 | Missing | none | |
 
 ## Open questions / blockers

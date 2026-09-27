@@ -290,7 +290,7 @@ function renderPrintSheet(host, opts) {
           }
         }
         const titleCls = sumHtml ? '' : ' print-block--titleonly';
-        blockHtml += `<div class="print-block${titleCls}${hasConflict ? ' print-block--conflict' : ''}" style="background:${bg};color:${printTextColor(bg)};font-size:${titleFpt}pt;height:${bh}px">${checkbox}<div class="print-block-title">${hasConflict ? '⚠️ ' : ''}${pIcon} ${escapeHtml(pName)}</div>${sumHtml}</div>`;
+        blockHtml += `<div class="print-block${titleCls}${hasConflict ? ' print-block--conflict' : ''}" style="background:${bg};color:${printTextColor(bg)};font-size:${titleFpt}pt;height:${bh}px">${checkbox}<div class="print-block-title">${hasConflict ? '⚠️ ' : ''}${pIcon} ${escapeHtml(pName)}</div>${sumHtml}</div>`; /* look: print sheet ignores the look (L12) */
       });
       html += `<div class="print-cell${isHourStart?' print-hour-start':''}">${blockHtml}</div>`;
     });

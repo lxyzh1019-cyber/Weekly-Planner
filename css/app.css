@@ -152,6 +152,8 @@
     --surface-goal-fill: #48a271;
     --surface-legend-hot: #ff7050;
     --surface-legend-warm: #ffa84a;
+    --surface-density-low: #fff3c4;
+    --surface-overnight: #cbc3e3;
     --surface-ritual-top: #2a2345;
     --surface-ritual-bottom: #5e4b8b;
     --surface-empty-cream: rgba(255,250,235,0.95);
@@ -4586,8 +4588,8 @@
     text-align: center; margin-bottom: 0.2rem;
     border-bottom: 2px double var(--print-ink); padding-bottom: 0.12rem;
   }
-  .print-header h1 { font-family:var(--print-font-head); font-size: 1.25rem; line-height: 1.1; }
-  .print-subhead { font-size: 9pt; color: var(--print-subhead); font-weight: 700; margin-top: 2px; }
+  .print-header h1 { font-family:var(--print-font-head); font-size: 1.25rem; line-height: 1.1; } /* look: print sheet ignores the look (L12) */
+  .print-subhead { font-size: 9pt; color: var(--print-subhead); font-weight: 700; margin-top: 2px; } /* look: print sheet ignores the look (L12) */
   /* On-screen controls (never printed) */
   .print-controls {
     display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem 1.2rem;
@@ -4604,7 +4606,7 @@
   .print-ctrl-hint { font-size: calc(0.85rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-light); }
   /* Printed summary */
   .print-summary { margin-top: 0.7rem; padding-top: 0.4rem; border-top: 2px solid var(--print-ink); }
-  .print-sleep { margin-top: 0.45rem; font-size: 9.5pt; padding: 0.3rem 0.5rem; background: var(--print-sleep); border-radius: 8px; }
+  .print-sleep { margin-top: 0.45rem; font-size: 9.5pt; padding: 0.3rem 0.5rem; background: var(--print-sleep); border-radius: 8px; } /* look: print sheet ignores the look (L12) */
   @media print { .print-sleep { background: var(--print-sleep) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   .print-week-grid {
     display: grid;
@@ -4612,7 +4614,7 @@
        After School / Evening), mirroring the day view's left axis. */
     grid-template-columns: 14px 44px repeat(7, 1fr);
     border: 2px solid var(--print-ink);
-    font-size: 9pt;
+    font-size: 9pt; /* look: print sheet ignores the look (L12) */
     break-inside: avoid;
   }
   /* Time-of-day sideband cells + vertical label on each band's first slot */
@@ -4632,7 +4634,7 @@
     position: absolute; left: 0; top: 0; width: 100%;
     display: flex; align-items: center; justify-content: center;
     writing-mode: vertical-rl; text-orientation: mixed;
-    font-size: 6.5pt; font-weight: 800; letter-spacing: 0.5px;
+    font-size: 6.5pt; font-weight: 800; letter-spacing: 0.5px; /* look: print sheet ignores the look (L12) */
     color: var(--print-zone-label); white-space: nowrap; overflow: hidden;
     z-index: 1;
   }
@@ -4656,10 +4658,10 @@
   .print-cell { overflow: visible; padding: 0 2px; }
   .print-header-cell {
     background: var(--print-head-fill); font-weight: 700; text-align: center;
-    font-family: var(--print-font-head); font-size: 10pt;
+    font-family: var(--print-font-head); font-size: 10pt; /* look: print sheet ignores the look (L12) */
     min-height: 18px; overflow: hidden;
   }
-  .print-time-cell { font-size: 7.5pt; color: var(--print-time); text-align: center; font-weight: 700; }
+  .print-time-cell { font-size: 7.5pt; color: var(--print-time); text-align: center; font-weight: 700; } /* look: print sheet ignores the look (L12) */
   /* Hour boundaries get a heavier top border + darker, bigger label so the
      grid reads at a glance instead of requiring the tiny 15-min tick text
      to be parsed row by row. */
@@ -4667,7 +4669,7 @@
     border-top: 1.5px solid var(--print-ink);
   }
   .print-time-cell.print-hour-start {
-    font-size: 8.5pt;
+    font-size: 8.5pt; /* look: print sheet ignores the look (L12) */
     color: var(--print-black);
     font-weight: 800;
   }
@@ -4705,7 +4707,7 @@
       color-mix(in srgb, var(--print-buf-colour) 38%, var(--print-paper)) 0 3px,
       color-mix(in srgb, var(--print-buf-colour) 18%, var(--print-paper)) 3px 6px);
     color: color-mix(in srgb, var(--print-buf-colour) 75%, var(--print-black) 35%);
-    font-size: 6.5pt; font-weight: 700; line-height: 1;
+    font-size: 6.5pt; font-weight: 700; line-height: 1; /* look: print sheet ignores the look (L12) */
     display: flex; align-items: center; justify-content: center; gap: 2px;
     overflow: hidden; box-sizing: border-box; white-space: nowrap;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
@@ -4740,10 +4742,10 @@
   }
   .print-sig-block { display: flex; align-items: flex-end; gap: 6px; flex: 1; }
   .print-sig-block--date { flex: 0 0 150px; }
-  .print-sig-caption { font-size: 8pt; font-weight: 700; color: var(--print-caption); white-space: nowrap; }
+  .print-sig-caption { font-size: 8pt; font-weight: 700; color: var(--print-caption); white-space: nowrap; } /* look: print sheet ignores the look (L12) */
   .print-sig-line { flex: 1; border-bottom: 1px solid var(--print-black); min-height: 16px; position: relative; }
   .print-sig-name {
-    font-family: var(--print-font-head); font-size: 15pt; line-height: 1;
+    font-family: var(--print-font-head); font-size: 15pt; line-height: 1; /* look: print sheet ignores the look (L12) */
     position: absolute; left: 6px; bottom: 1px;
   }
 
