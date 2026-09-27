@@ -397,6 +397,26 @@ function colourDistance(hexA, hexB) {
     + Rt * (dCp / Sc) * (dHp / Sh));
 }
 
+/* ── A CATEGORY'S WASH ──
+   The pale tint a list row is filled with when it wears its category (Pop's
+   rows, docs/handoff/looks-calm-pop.md §7). ONE rule rather than a second
+   table of hexes: 18% of the fill mixed into white, in sRGB — the same as CSS
+   `color-mix(in srgb, <fill> 18%, white)`, and within a few units of each wash
+   the handoff drew. A rule reaches every colour a block can wear — twelve
+   subgroups, a sport's colour, one picked off the sheet's dots — where a table
+   would reach only the colours somebody remembered to list.
+   everySubgroupTellsItselfApart (tests/smoke.js) holds the ink and Pop's
+   secondary text to 4.5:1 on every subgroup's wash. `#rrggbb` in, `#rrggbb`
+   out; anything else comes back unchanged. */
+function colourWash(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+  if (!m) return hex;
+  return '#' + [0, 2, 4].map(i => {
+    const c = parseInt(m[1].substr(i, 2), 16);
+    return Math.round(255 - (255 - c) * 0.18).toString(16).padStart(2, '0');
+  }).join('');
+}
+
 /* ── How far a block is run INTO, and by what ──
    A clash has two sides: the block whose travel does not fit, and the block
    that travel runs into. `computeBufferConflicts` records the shortfall against

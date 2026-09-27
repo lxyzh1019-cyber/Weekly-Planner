@@ -134,7 +134,7 @@ function renderTrainingSheet() {
     b.textContent = t.label;
     b.onclick = ()=>{
       // Adopt the topic colour unless the user had picked a non-default custom one.
-      if (!ts.colour || ts.colour === CAT_HEX.training || allTags.some(x=>x.colour===ts.colour)) ts.colour = t.colour;
+      if (!ts.colour || TRAINING_DEFAULT_HEXES.has(String(ts.colour).toLowerCase()) || allTags.some(x=>x.colour===ts.colour)) ts.colour = t.colour;
       ts.tag=t.id; ts.objectives=[]; renderTrainingSheet();
     };
     tagWrap.appendChild(b);

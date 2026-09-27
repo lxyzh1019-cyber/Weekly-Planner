@@ -9,7 +9,10 @@
     --bg2: #fff4db;
     --paper: #fffdf5;
     --paper-line: #e8dfc3;
-    --ink: #2a2320;
+    /* Navy, shared by both looks (docs/handoff/looks-calm-pop.md §7). The
+       colour maths read this live — isLightColour / inkContrast in
+       js/08-day-view.js — so it is the one value to change. */
+    --ink: #1c2240;
     --ink-light: #6b5d4f;
     --accent: #ff7b54;
     /* Darker accent for text/UI that must meet WCAG AA: white-on-it = 4.9:1,
@@ -26,21 +29,25 @@
     --radius: 18px;
     /* --radius-sm defined once in the design-token scale below (8px). */
 
-    --cat-sleep:   #c3aed6;
-    --cat-school:  #6fb1fc;
-    --cat-active:  #fb6f1c;
-    --cat-free:    #7fca79;
-    --cat-daily:   #ffd166;
-    --cat-custom:  #ff9eb5;
-    --cat-training:#f2597d;
-    --cat-routine: #8ad8d0;
-    /* Appointments — muted slate-blue. Deliberately the quietest category:
-       an orthodontist visit is neither a treat nor a chore, and white text on
-       it fails contrast like every other pastel here, so blocks carry dark ink. */
-    --cat-appointment: #8fa8b8;
+    /* Category colours for the few CSS rules that paint one. CAT_HEX
+       (js/01-config.js) OWNS these — change it there and copy here;
+       everySubgroupTellsItselfApart (tests/smoke.js) fails when the two
+       disagree. Only the ones something reads are kept (--cat-active,
+       -training, -routine and -appointment were read by nothing). */
+    --cat-sleep:   #a78bfa;
+    --cat-school:  #4aa3ff;
+    --cat-free:    #4cc46a;
+    --cat-daily:   #ffc83d;
+    --cat-custom:  #ff7fa3;
 
-    --jenn: #ff9eb5;
-    --jess: #6fb1fc;
+    /* Kid colours (handoff §7): fill / strong / wash. White text goes ONLY on
+       a -strong value — the fills fail it (Jenn 2.94:1, Jess 3.33:1). */
+    --jenn: #ff5c8a;
+    --jenn-strong: #c81d5a;
+    --jenn-wash: #ffe4ec;
+    --jess: #3d8bfd;
+    --jess-strong: #1a5fd0;
+    --jess-wash: #e2edff;
     /* --day-landscape-chrome lived here: the day screen's chrome height, which
        its three rails each subtracted from the viewport. One scroller now. */
 
@@ -5582,12 +5589,8 @@
     --mny-earn-waiting-ink: #4a3a12;
     --mny-earn-xp: #6fb1fc;
     --mny-earn-xp-ink: #10243d;
-    /* The eight-week chore pay trends (js/28-chore-trends.js). The washes are
-       each kid's colour at alpha 0x22, as the card heads have always drawn it. */
-    --mny-trend-jenn: #cf8f22;
-    --mny-trend-jess: #3d7fd6;
-    --mny-trend-jenn-wash: #cf8f2222;
-    --mny-trend-jess-wash: #3d7fd622;
+    /* The eight-week chore pay trends draw in the kid colours (--jenn-strong,
+       --jess-strong, --jenn-wash, --jess-wash, top :root) since Looks stage 2. */
     --mny-heat-1: #71c295;
     --mny-heat-2: #48a271;
     --mny-heat-3: #2b8054;

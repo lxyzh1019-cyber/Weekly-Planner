@@ -47,20 +47,34 @@ const AGE_ROLLOVER_MONTH = 7;   // 0-based: August
    ever read, which is worse than a duplicate that drifts, because a duplicate
    that drifts at least shows up on a screen. CAT_HEX below is what the app
    asks, and ACTIVITY_CATEGORIES is what owns the hues. */
+/* Brighter, same hue (Looks stage 2, 2026-09-27): each value sits on its
+   category's main subgroup below where one exists, and every value it replaced
+   is in RETIRED_SEEDED_HEXES. css/app.css's `--cat-*` copy these for the few
+   CSS rules that paint a category; this table owns them and
+   everySubgroupTellsItselfApart (tests/smoke.js) holds the two to agreement. */
 const CAT_HEX = { /* look: category hexes are family data — seeded onto blocks, read by SEEDED_HEX_VALUES */
-  sleep:'#c3aed6', school:'#6fb1fc', active:'#fb6f1c',
-  free:'#95d5b2', daily:'#ffd166', custom:'#ff9eb5', training:'#ef476f',
-  routine:'#80cbc4',
+  sleep:'#a78bfa', school:'#4aa3ff', active:'#fb8a2e',
+  free:'#4cc46a', daily:'#ffc83d', custom:'#ff7fa3', training:'#f2597d',
+  routine:'#3cc9b9',
   // Appointments: the dentist, the orthodontist, a parent-teacher meeting. A
   // fixed time somebody else set, which is what makes it its own category
   // rather than an "active" or a "daily" — you cannot move it, and a week that
   // has one is shaped around it. Muted on purpose: it is not a treat, and it is
   // not a chore either.
-  appointment:'#8fa8b8',
+  appointment:'#7fa5c4',
   // Not a category — Competition is cat:'training' with isCompetition set. The
   // colour lives here so a competition block can be told apart at a glance.
   competition:'#f4a340'
 };
+
+/* THE TRAINING SENTINEL. A training block whose `colour` is one of these made
+   no choice: draw its sport's colour (trainingBlockColour below; the sport
+   pills in js/09-sheets.js). It moved with CAT_HEX.training (#ef476f → #f2597d,
+   Looks stage 2, 2026-09-27) and every training block placed before carries the
+   old value — reading that as a choice would paint every skating session the
+   retired pink instead of its sport's colour. Grows on every move and is never
+   pruned, for the same reason as RETIRED_SEEDED_HEXES. */
+const TRAINING_DEFAULT_HEXES = new Set([CAT_HEX.training, '#ef476f'].map(h => h.toLowerCase())); /* look: retired training sentinel — matched against stored block colours */
 
 /* The nine shipped defaults, frozen as a SET so blockColour can tell a colour
    somebody chose from one a placement copied out of this table. Every placement
@@ -201,22 +215,25 @@ function activityGroup(act) {
 
    Colours: a category picks the hue, a subgroup varies it. Every one is a
    pastel that takes dark ink — never white text on these, which all fail
-   contrast (CLAUDE.md, UI rules). Where a family already knows a colour it is
-   kept: Routine's teal, Meals' amber, School's blue, Training's pink and Play's
-   green are the shipped values unchanged. */
+   contrast (CLAUDE.md, UI rules). Every subgroup keeps the hue a family already
+   knows — Routine's teal, Meals' amber, School's blue, Training's pink, Play's
+   green, Outings' orchid — made brighter in Looks stage 2 (2026-09-27): each
+   category's main subgroup sits on the handoff's value (docs/handoff/
+   looks-calm-pop.md §7) and the rest were brightened around it, measured
+   against the navy ink. */
 /* ── MEASURE COLOUR DISTANCE THE WAY AN EYE DOES ──
    These were first separated with CIE76, which overstates the distance between
    saturated greens by roughly double: it scored Helping hands against Play at
    49 where CIEDE2000 says 19, and a palette that cleared every threshold on
    paper still had two DIFFERENT categories reading as one colour on an iPad.
-   `subgroupDistance` (js/05-helpers.js) is CIEDE2000, and
+   `colourDistance` (js/05-helpers.js) is CIEDE2000, and
    `everySubgroupTellsItselfApart` (tests/smoke.js) is what holds this table to
    it. If you move a hex, run the suite — the arithmetic disagrees with intuition
    in exactly the cases that matter.
 
    THE FIGURE THAT MATTERS IS THE WORST *CROSS*-CATEGORY PAIR. Two subgroups
    inside one category are MEANT to look related: Meals and Appointments are
-   both Fuel & Care and sit at 9.8, which is the design working. Two subgroups
+   both Fuel & Care and sit at 8.3, which is the design working. Two subgroups
    in different categories reading as one colour is the defect — and that pair
    used to be 2.9.
 
@@ -225,40 +242,40 @@ function activityGroup(act) {
    warm, so Daily Rhythm still reads as one category — a light aqua and a deep
    cyan are obviously siblings, which is the whole point of having categories. */
 const ACTIVITY_CATEGORIES = [ /* look: subgroup hexes are family data — seeded onto blocks, measured by colourDistance */
-  { id: 'rhythm', label: '🌅 Daily Rhythm', short: 'Rhythm', hex: '#8ad8d0', subs: [
-    { id: 'routine',  label: '🌅 Routine',       hex: '#8ad8d0', group: 'routine' },
+  { id: 'rhythm', label: '🌅 Daily Rhythm', short: 'Rhythm', hex: '#3cc9b9', subs: [
+    { id: 'routine',  label: '🌅 Routine',       hex: '#3cc9b9', group: 'routine' },
     /* Deep cyan, not a green. This was #9fd3b8, which sat 2.9 from Play in
        another category and 12.4 from its own sibling — the same colour to any
        eye, on two cards that mean opposite things. */
-    { id: 'helping',  label: '🧹 Helping hands', hex: '#229eb1', group: 'chores'  },
+    { id: 'helping',  label: '🧹 Helping hands', hex: '#00a2bc', group: 'chores'  },
   ]},
-  { id: 'fuel', label: '🍎 Fuel & Care', short: 'Fuel', hex: '#ffd166', subs: [
-    { id: 'meals',    label: '🍽 Meals',        hex: '#ffd166', group: 'daily' },
+  { id: 'fuel', label: '🍎 Fuel & Care', short: 'Fuel', hex: '#ffc83d', subs: [
+    { id: 'meals',    label: '🍽 Meals',        hex: '#ffc83d', group: 'daily' },
     /* Muted on purpose and kept apart from the meals: an appointment is a time
        somebody else set, it is not a treat, and it is not a chore either. */
-    { id: 'appts',    label: '🩺 Appointments', hex: '#e3c48f', group: 'daily' },
+    { id: 'appts',    label: '🩺 Appointments', hex: '#f0bf72', group: 'daily' },
   ]},
-  { id: 'brain', label: '🧠 Brain Construction', short: 'Brain', hex: '#6fb1fc', subs: [
-    { id: 'school',   label: '🏫 School',   hex: '#6fb1fc', group: 'brain' },
-    { id: 'language', label: '🗣 Language', hex: '#8ed0f0', group: 'brain' },
+  { id: 'brain', label: '🧠 Brain Construction', short: 'Brain', hex: '#4aa3ff', subs: [
+    { id: 'school',   label: '🏫 School',   hex: '#4aa3ff', group: 'brain' },
+    { id: 'language', label: '🗣 Language', hex: '#7dcdf7', group: 'brain' },
     // Nudged off #b3a4f0 to hold its distance from Outings' orchid.
-    { id: 'arts',     label: '🎨 Arts',     hex: '#b0a0ea', group: 'brain' },
+    { id: 'arts',     label: '🎨 Arts',     hex: '#a08ef5', group: 'brain' },
   ]},
   { id: 'body', label: '💪 Body Construction', short: 'Body', hex: '#f2597d', subs: [
     /* Lifted from #ef476f, which gave dark ink 4.27:1 — under the 4.5:1 the
        house contrast rule asks for, and the only value in the table that failed
-       it. This is 4.78:1. */
+       it. This is 4.81:1 against the navy ink (#1c2240). */
     { id: 'training', label: '🏋️ Training',          hex: '#f2597d', group: 'body' },
-    { id: 'move',     label: '🏊 Everyday movement', hex: '#ff9a76', group: 'move' },
+    { id: 'move',     label: '🏊 Everyday movement', hex: '#ff8a5c', group: 'move' },
   ]},
   /* Out of the greens altogether. Explore was #7fb3a0, a sage that sat between
      Routine's teal and Play's mint and was the reason all three blurred. */
-  { id: 'explore', label: '🧭 Explore', short: 'Explore', hex: '#d98ac8', subs: [
-    { id: 'outings',  label: '🧭 Outings', hex: '#d98ac8', group: 'explore' },
+  { id: 'explore', label: '🧭 Explore', short: 'Explore', hex: '#e37ad2', subs: [
+    { id: 'outings',  label: '🧭 Outings', hex: '#e37ad2', group: 'explore' },
   ]},
-  { id: 'play', label: '🎮 Play & Rest', short: 'Play', hex: '#7fca79', subs: [
-    { id: 'playtime', label: '🎮 Play',            hex: '#7fca79', group: 'free' },
-    { id: 'seasonal', label: '🌟 Seasonal treats', hex: '#cfe06b', group: 'free' },
+  { id: 'play', label: '🎮 Play & Rest', short: 'Play', hex: '#4cc46a', subs: [
+    { id: 'playtime', label: '🎮 Play',            hex: '#4cc46a', group: 'free' },
+    { id: 'seasonal', label: '🌟 Seasonal treats', hex: '#c6e03f', group: 'free' },
   ]},
 ];
 
@@ -283,6 +300,23 @@ const RETIRED_SEEDED_HEXES = [ /* look: retired seeded hexes are data — matche
   '#7fb3a0', // outings, and Explore's own hex
   '#95d5b2', // play, and Play & Rest's own hex
   '#c8e6a0', // seasonal treats
+  // Looks stage 2 (2026-09-27): brighter, same hue — the subgroups…
+  '#8ad8d0', // routine, and Daily Rhythm's own hex
+  '#229eb1', // helping hands
+  '#ffd166', // meals, Fuel & Care's own hex, and CAT_HEX.daily
+  '#e3c48f', // appointments
+  '#6fb1fc', // school, Brain Construction's own hex, and CAT_HEX.school
+  '#8ed0f0', // language
+  '#b0a0ea', // arts
+  '#ff9a76', // everyday movement
+  '#d98ac8', // outings, and Explore's own hex
+  '#7fca79', // play, and Play & Rest's own hex
+  '#cfe06b', // seasonal treats
+  // …and the CAT_HEX values they took with them.
+  '#c3aed6', // CAT_HEX.sleep
+  '#fb6f1c', // CAT_HEX.active
+  '#ff9eb5', // CAT_HEX.custom
+  '#8fa8b8', // CAT_HEX.appointment
 ];
 /* Flattened once, because every lookup below is by subgroup id and walking six
    nested arrays on every block of every render is work nobody needs. */
@@ -476,7 +510,7 @@ function getTrainingTopic(tag) {
 /* The background a training block should use: an explicit non-default custom
    colour wins; otherwise the topic colour (falls back to the training pink). */
 function trainingBlockColour(b) {
-  if (b.colour && b.colour !== CAT_HEX.training) return b.colour;
+  if (b.colour && !TRAINING_DEFAULT_HEXES.has(String(b.colour).toLowerCase())) return b.colour;
   return getTrainingTopic(b.tag).colour;
 }
 

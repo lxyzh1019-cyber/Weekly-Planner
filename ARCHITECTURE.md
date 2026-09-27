@@ -1626,14 +1626,70 @@ practice, and all three drew in the same blue.
 So `ACTIVITY_CATEGORIES` (`js/01-config.js`): **six categories, each holding one
 or more subgroups**, and every shipped activity names one with `sub:`.
 
-| Category | Subgroups (hue) |
+| Category | Subgroups (hue) — Looks stage 2, 2026-09-27 (was) |
 |---|---|
-| 🌅 Daily Rhythm | Routine `#8ad8d0` · Helping hands `#229eb1` |
-| 🍎 Fuel & Care | Meals `#ffd166` · Appointments `#e3c48f` |
-| 🧠 Brain Construction | School `#6fb1fc` · Language `#8ed0f0` · Arts `#b0a0ea` |
-| 💪 Body Construction | Training `#f2597d` · Everyday movement `#ff9a76` |
-| 🧭 Explore | Outings `#d98ac8` |
-| 🎮 Play & Rest | Play `#7fca79` · Seasonal treats `#cfe06b` |
+| 🌅 Daily Rhythm | Routine `#3cc9b9` (`#8ad8d0`) · Helping hands `#00a2bc` (`#229eb1`) |
+| 🍎 Fuel & Care | Meals `#ffc83d` (`#ffd166`) · Appointments `#f0bf72` (`#e3c48f`) |
+| 🧠 Brain Construction | School `#4aa3ff` (`#6fb1fc`) · Language `#7dcdf7` (`#8ed0f0`) · Arts `#a08ef5` (`#b0a0ea`) |
+| 💪 Body Construction | Training `#f2597d` (unchanged) · Everyday movement `#ff8a5c` (`#ff9a76`) |
+| 🧭 Explore | Outings `#e37ad2` (`#d98ac8`) |
+| 🎮 Play & Rest | Play `#4cc46a` (`#7fca79`) · Seasonal treats `#c6e03f` (`#cfe06b`) |
+
+**Brighter, same hue — Looks stage 2 (2026-09-27, owner: "derive all 12").**
+The two looks (docs/handoff/looks-calm-pop.md §7) want brighter category colours
+and a navy ink `#1c2240`. Every subgroup KEPT its hue (LCh hue moved at most 6°)
+and got brighter; each category's main subgroup sits on the handoff's value
+(School `#4aa3ff`, Training `#f2597d`, Meals `#ffc83d`, Routine `#3cc9b9`, Play
+`#4cc46a`). Outings stays orchid — the handoff's orange "Active/Explore"
+`#fb8a2e` is `CAT_HEX.active`'s, not a new hue for a subgroup a family already
+knows. The measurements, all with `colourDistance` and WCAG luminance:
+
+- **Worst cross-category pair 15.6** — Helping hands vs Language (was Arts vs
+  Outings at 15.0). Floor 14, unchanged. Helping hands moved least (ΔE00 2.4):
+  a deep cyan that must carry ink has almost no room to brighten, and the obvious
+  bluer step fell to 13.9 from Language.
+- **Navy on every fill ≥ 4.81:1** (Training, unchanged hex; it was 4.78 against
+  the old ink). The navy and the old brown ink have almost the same luminance
+  (0.0175 vs 0.0180), so every ink contrast in the app moves by under 1%.
+- **The wash** (`colourWash`, `js/05-helpers.js`) is a rule, not a table: 18% of
+  the fill mixed into white — `color-mix(in srgb, <fill> 18%, white)` — within
+  ΔE00 1.6 of every wash the handoff drew, and it reaches a sport's colour or a
+  hand-picked one where a table would not. Navy on every subgroup's wash ≥
+  12.65:1, Pop's secondary text `#4d5575` ≥ 5.96:1.
+- `CAT_HEX` moved with them (sleep `#a78bfa`, school `#4aa3ff`, active `#fb8a2e`,
+  free `#4cc46a`, daily `#ffc83d`, custom `#ff7fa3`, training `#f2597d`, routine
+  `#3cc9b9`, appointment `#7fa5c4`; competition unchanged), and every value either
+  table gave up joined `RETIRED_SEEDED_HEXES`. The full old → new list with each
+  figure is in the stage-2 PR.
+
+**`CAT_HEX.training` is a sentinel as well as a colour.** A training block whose
+`colour` equals it made no choice and draws its SPORT's colour
+(`trainingBlockColour`, and the sport pills in `js/09-sheets.js`). Moving it
+from `#ef476f` would have turned every training block already placed into a
+chosen `#ef476f` — every skating session the old pink instead of skating's
+purple. `TRAINING_DEFAULT_HEXES` holds the current and every retired sentinel
+and, like `RETIRED_SEEDED_HEXES`, only grows; the smoke check places a skating
+block carrying each and asserts it draws the sport's colour.
+
+**The ink follows the look.** `isLightColour` measured against a hard-coded
+`#2a2320`; it now asks `inkContrast` (`js/08-day-view.js`), which reads `--ink`
+off `:root` — cached per `<html data-look>`, so a look switch re-reads it with
+no invalidation hook to forget. `everySubgroupTellsItselfApart` measures with
+the same function and asserts it scores the live ink against itself at exactly
+1:1. `printTextColor` does not follow: print ignores the look.
+
+**`--cat-*` in the stylesheet are copies; `CAT_HEX` owns them.** Only the five
+something reads are kept (sleep, school, free, daily, custom — `--cat-free` had
+already drifted to Play's `#7fca79` while `CAT_HEX.free` said `#95d5b2`), and the
+smoke check fails when a copy disagrees with the table.
+
+**Kid colours** (§7): `--jenn` `#ff5c8a` / `--jenn-strong` `#c81d5a` /
+`--jenn-wash` `#ffe4ec`; `--jess` `#3d8bfd` / `--jess-strong` `#1a5fd0` /
+`--jess-wash` `#e2edff`. White text goes only on a `-strong` (5.56 / 5.85:1; the
+fills give white 2.94 / 3.33). The chore-pay trends draw each kid's series in
+her `-strong` (5.46 / 5.74:1 on the paper, where the fills would be under 3:1)
+and her card head in her wash — Jenn's line was amber `#cf8f22` until then; the
+four `--mny-trend-*` tokens are gone.
 
 **Measure colour distance the way an eye does — CIEDE2000, never CIE76.** The
 first separation of this table used CIE76, which overstates the distance between
@@ -1647,7 +1703,7 @@ check measures the same way the palette was chosen.
 
 **The figure that matters is the worst CROSS-category pair.** Two subgroups
 inside one category are *meant* to look related — Meals and Appointments are both
-Fuel & Care and sit at 9.8, which is the design working. Two subgroups in
+Fuel & Care and sit at 8.3 (9.8 before stage 2), which is the design working. Two subgroups in
 different categories reading as one colour is the defect, and that pair was
 **2.9**: Helping hands and Play, a chore and an afternoon of Minecraft, the same
 colour to any eye. The floor is 14 on cross-category pairs only; within a

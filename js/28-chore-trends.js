@@ -9,16 +9,17 @@
 //    two stacked panels here, sharing an x-axis, which keeps "each week, and the
 //    pile so far" without the dual-axis lie.
 // 2. The drawing's series colours (#ffd166 / #6fb1fc) fail the lightness band
-//    and sit under 3:1 on cream. These are the same two hues stepped deeper
-//    until they pass, so Jenn still reads amber and Jess still reads blue.
-//    Validated: adjacent ΔE 27.1 protan / 30.4 normal.
+//    and sit under 3:1 on cream. The series draw in each kid's STRONG colour
+//    (Looks stage 2, handoff §7): Jenn pink, Jess blue — the colours the kids
+//    wear everywhere else — at 5.46:1 and 5.74:1 on the paper, CIEDE2000 38.1
+//    apart. The kid FILLS would not pass (2.88:1 and 3.27:1). This was an amber
+//    for Jenn (#cf8f22) until then.
 
 let ctrOffset = 0;   // how many 8-week windows back from the current one
 
-const CTR_KID_COLOR = { jenn: 'var(--mny-trend-jenn)', jess: 'var(--mny-trend-jess)' };
-/* The card head's wash: each kid's colour at alpha 0x22, a value of its own
-   because a var() cannot take a hex alpha suffix. */
-const CTR_KID_WASH = { jenn: 'var(--mny-trend-jenn-wash)', jess: 'var(--mny-trend-jess-wash)' };
+const CTR_KID_COLOR = { jenn: 'var(--jenn-strong)', jess: 'var(--jess-strong)' };
+/* The card head's wash: each kid's own wash (handoff §7). */
+const CTR_KID_WASH = { jenn: 'var(--jenn-wash)', jess: 'var(--jess-wash)' };
 /* One hue, light→dark, four steps: validated monotone with visible gaps and a
    light end that clears the paper. Zero gets the paper itself — "nothing
    happened" should not look like the bottom of a scale. */

@@ -1816,14 +1816,15 @@ function findChromium() {
      table was chosen, rather than carrying its own copy.
 
      WHICH PAIRS COUNT. Two subgroups inside ONE category are meant to look
-     related — Meals and Appointments are both Fuel & Care and sit at 9.8, and
+     related — Meals and Appointments are both Fuel & Care and sit at 8.3, and
      that is the design working, not a defect. The floor applies to pairs that
      cross a category boundary; within one, all that is required is that they
      are not literally the same value. */
   if (want('everySubgroupTellsItselfApart')) checks.everySubgroupTellsItselfApart = await page.evaluate(() => {
     const bad = [];
     /* 14 is the floor this palette clears with room (its worst cross-category
-       pair is Arts vs Outings at 15.0) and is comfortably above the ~5 at which
+       pair is Helping hands vs Language at 15.6 since the stage-2 brightening; it
+       was Arts vs Outings at 15.0) and is comfortably above the ~5 at which
        two colours stop being reliably distinguishable on a small card. Raising
        it is a design decision, not a bug fix — six categories over a pastel
        wheel that must all take dark ink is a genuinely tight budget. */
@@ -1851,16 +1852,50 @@ function findChromium() {
     }
 
     /* Dark ink on every one of them, to AA. White text fails on all these
-       pastels (CLAUDE.md, UI rules), so a value too dark for ink has no legible
-       text at all — Training shipped at 4.27 until this check went in. */
+       fills (ARCHITECTURE.md, UI rules), so a value too dark for ink has no
+       legible text at all — Training shipped at 4.27 until this check went in.
+       The ink is the LIVE one (inkContrast reads --ink off :root), so a look
+       that moves the ink is measured with the ink it draws.
+
+       And the same on each fill's WASH (colourWash, the tint Pop's list rows
+       wear): the ink, and Pop's secondary text #4d5575, both to 4.5:1. */
+    const POP_MUTED = '#4d5575';
+    const onWash = (wash, text) => {
+      const lum = h => {
+        const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+        const v = [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16));
+        return 0.2126 * lin(v[0]) + 0.7152 * lin(v[1]) + 0.0722 * lin(v[2]);
+      };
+      const x = lum(wash), y = lum(text);
+      return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+    };
     subs.forEach(sg => {
       if (!isLightColour(sg.hex)) bad.push(`${sg.label} ${sg.hex} is too dark for ink`);
-      const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
-      const v = [1, 3, 5].map(i => parseInt(sg.hex.substr(i, 2), 16));
-      const L = 0.2126 * lin(v[0]) + 0.7152 * lin(v[1]) + 0.0722 * lin(v[2]);
-      const Link = 0.2126 * lin(0x2a) + 0.7152 * lin(0x23) + 0.0722 * lin(0x20);
-      const ratio = (L + 0.05) / (Link + 0.05);
+      const ratio = inkContrast(sg.hex);
       if (ratio < 4.5) bad.push(`${sg.label} ${sg.hex} gives ink only ${ratio.toFixed(2)}:1`);
+      const wash = colourWash(sg.hex);
+      if (!/^#[0-9a-f]{6}$/i.test(wash)) { bad.push(`${sg.label} has no wash (${wash})`); return; }
+      const inkOnWash = inkContrast(wash);
+      if (inkOnWash < 4.5) bad.push(`${sg.label} wash ${wash} gives ink only ${inkOnWash.toFixed(2)}:1`);
+      const mutedOnWash = onWash(wash, POP_MUTED);
+      if (mutedOnWash < 4.5) bad.push(`${sg.label} wash ${wash} gives ${POP_MUTED} only ${mutedOnWash.toFixed(2)}:1`);
+    });
+    /* The ink really is the stylesheet's: a copy of it in the maths was the
+       defect this replaced (#2a2320 while the page drew navy). */
+    const liveInk = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
+    const inkOnItself = inkContrast(liveInk);
+    if (!(Math.abs(inkOnItself - 1) < 1e-9)) {
+      bad.push(`inkContrast is not measuring against the live --ink ${liveInk} (it scores ${inkOnItself})`);
+    }
+
+    /* ONE OWNER for the category colours: css/app.css's --cat-* copy CAT_HEX
+       for the few CSS rules that paint one, and must say the same thing. */
+    const rootStyle = getComputedStyle(document.documentElement);
+    ['sleep', 'school', 'free', 'daily', 'custom'].forEach(k => {
+      const css = rootStyle.getPropertyValue(`--cat-${k}`).trim().toLowerCase();
+      if (css !== String(CAT_HEX[k]).toLowerCase()) {
+        bad.push(`--cat-${k} is ${css || '(unset)'} but CAT_HEX.${k} is ${CAT_HEX[k]}`);
+      }
     });
 
     /* EVERY RETIRED HEX IS STILL SEEDED. blockColour ignores b.colour only
@@ -1884,6 +1919,26 @@ function findChromium() {
       if (drew.toLowerCase() === '#9fd3b8') {
         bad.push('a block seeded with the retired Helping hands hue still wears it');
       }
+      // Every hue retired by the stage-2 brightening re-derives too.
+      [['chores', '#229eb1'], ['homework', '#6fb1fc'], ['homework', '#6FB1FC']].forEach(([actId, old]) => {
+        setDayBlocks(key, [{ id: 'pal-old2', actId, startMin: 17 * 60, durationMin: 30, colour: old }], kid);
+        const got = blockColour(getDayBlocks(key, kid)[0], kid);
+        if (got.toLowerCase() === old.toLowerCase()) {
+          bad.push(`a ${actId} block seeded with the retired ${old} still wears it`);
+        }
+      });
+      /* A training block carrying the OLD training sentinel (#ef476f, every
+         training block placed before CAT_HEX.training moved) still draws its
+         sport's colour rather than reading the old pink as a choice. */
+      const sport = getTrainingTopic('skating').colour;
+      ['#ef476f', CAT_HEX.training].forEach(sentinel => {
+        setDayBlocks(key, [{ id: 'pal-train', actId: 'training', tag: 'skating', startMin: 17 * 60,
+          durationMin: 60, colour: sentinel }], kid);
+        const got = blockColour(getDayBlocks(key, kid)[0], kid);
+        if (String(got).toLowerCase() !== String(sport).toLowerCase()) {
+          bad.push(`a skating block carrying the training default ${sentinel} draws ${got}, not the sport's ${sport}`);
+        }
+      });
       // …while a colour a person really picked is left alone.
       setDayBlocks(key, [{ id: 'pal-mine', actId: 'chores', startMin: 17 * 60,
         durationMin: 30, colour: '#123456' }], kid);
