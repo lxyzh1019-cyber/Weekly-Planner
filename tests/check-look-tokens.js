@@ -103,7 +103,8 @@ const EXEMPT = [
     file: 'index.html',
     match: '<meta name="theme-color"',
     why: 'the browser reads theme-color before any CSS loads, so it cannot be a var(); '
-       + 'it holds Pop\'s --bg value (manifest.json holds the same)',
+       + 'it holds the default look\'s (Pop\'s) --bg, as manifest.json does; applyLook '
+       + '(js/05-helpers.js) rewrites it from the live --bg whenever a look is applied',
   },
 ];
 

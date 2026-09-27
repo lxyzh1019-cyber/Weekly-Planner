@@ -2078,6 +2078,10 @@ function tdOpenMore() {
        prints — a second door to it from a menu is a second label that can
        drift, and printing is not something you go looking for in "more". */
     { icon: '◀',  label: 'Switch',       go: 'profile' },
+    /* Her look, per kid and per device (L4). The tile names the look it
+       switches TO; tdGoMore flips it and keeps this sheet open, so she sees
+       the whole app change behind it. */
+    { icon: '🎨', label: `${LOOK_NAMES[lookOther(lookStored(activeProfile()))]} look`, go: 'look' },
   ];
   let ov = document.getElementById('tdMoreOverlay');
   if (!ov) {
@@ -2088,8 +2092,10 @@ function tdOpenMore() {
       if (ev.target === ov) { ov.classList.remove('open'); return; }
       const b = ev.target.closest('[data-td-more]');
       if (!b) return;
-      ov.classList.remove('open');
-      tdGoMore(b.getAttribute('data-td-more'));
+      const go = b.getAttribute('data-td-more');
+      // The look tile leaves the sheet up: the change is what she came to see.
+      if (go !== 'look') ov.classList.remove('open');
+      tdGoMore(go);
     });
     document.body.appendChild(ov);
   }
@@ -2109,6 +2115,16 @@ function tdOpenMore() {
 function tdGoMore(where) {
   if (where === 'chores')  { openChoreTab(); return; }
   if (where === 'profile') { goProfile(); return; }
+  if (where === 'look') {
+    const kid = activeProfile();
+    if (kid !== 'jenn' && kid !== 'jess') return;
+    lookToggle(kid);
+    // Drawn again so the tile names the other look now; focus stays on it.
+    tdOpenMore();
+    const tile = document.querySelector('#tdMoreOverlay [data-td-more="look"]');
+    if (tile) tile.focus();
+    return;
+  }
 }
 function tdHandleNavClick(e) {
   const el = e.target.closest('[data-td-nav]');

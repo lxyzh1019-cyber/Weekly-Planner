@@ -1499,7 +1499,9 @@ function renderFullWeek(keys) {
 
       // Training topics carry their own icon + colour (skating/swimming/dryland).
       const topic = act.isTraining ? getTrainingTopic(b.tag) : null;
-      const bg = blockColour(b);
+      // The colour as this look draws it (lookBlockFill): the text colour below
+      // is chosen for this, not for the raw block colour.
+      const bg = lookBlockFill(blockColour(b));
       const dispIcon = topic ? topic.icon : act.icon;
       /* blockDisplayName (js/05-helpers.js) is the one owner of what a block is
          called. This wrote its own answer, which is why a competition that had
@@ -1976,6 +1978,22 @@ function wfTypeInvalidate() {
   if (!screen || !screen.classList.contains('active') || weekView === 'preview') return;
   if (wfTypeMetrics().sig === before) return;
   renderWeek();
+}
+
+/* THE FILL A FULL-WEEK CARD IS DRAWN IN. How much of its block's colour a card
+   wears is the look's --block-fill (Pop 100%: the colour itself; Calm 22%: the
+   category's tint, navy border). Worked out here rather than left to a CSS
+   color-mix because the card's text colour is chosen by isLightColour, and
+   that has to be asked about the colour actually drawn — a tint wants navy
+   text where its full colour might want white. Read once per look. */
+let wfBlockFillCache = null;
+function lookBlockFill(hex) {
+  const look = document.documentElement.getAttribute('data-look') || '';
+  if (!wfBlockFillCache || wfBlockFillCache.look !== look) {
+    const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--block-fill'));
+    wfBlockFillCache = { look, share: Number.isFinite(v) ? v / 100 : 1 };
+  }
+  return colourTint(hex, wfBlockFillCache.share);
 }
 
 /* THE MEASURED cost of one line of buffer-strip text, the way WF_ROW is the

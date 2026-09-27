@@ -214,6 +214,48 @@ function findChromium() {
 
   const checks = {};
 
+  /* ── Looks stage 3: the same check in both looks ──────────────────────
+     setLook puts one look on for everybody on this device the way the app
+     does it — each person's stored choice, then applyLook — so a check that
+     calls selectProfile part-way through stays in that look. It waits for
+     Calm's web fonts (injected on first use) so what is measured is the type a
+     child sees; clearLooks forgets every choice and goes back to Pop, which is
+     what the rest of the suite was written against.
+     inBothLooks runs one page.evaluate check in Pop and then Calm, and merges
+     the findings, each marked with its look. */
+  const setLook = (look) => page.evaluate(async (l) => {
+    ['jenn', 'jess', 'parent'].forEach(k => { try { localStorage.setItem('wp_look_' + k, l); } catch (e) {} });
+    applyLook(l);
+    if (l !== 'calm') return;
+    for (let i = 0; i < 50 && ![...document.fonts].some(f => /Lexend/.test(f.family)); i++) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+    await Promise.all(['16px Lexend', '600 16px Lexend', '700 16px "Baloo 2"', '800 16px "Baloo 2"']
+      .map(f => document.fonts.load(f).catch(() => null)));
+    await document.fonts.ready;
+  }, look);
+  const clearLooks = () => page.evaluate(() => {
+    ['jenn', 'jess', 'parent', 'last'].forEach(k => { try { localStorage.removeItem('wp_look_' + k); } catch (e) {} });
+    if (typeof applyLook === 'function') applyLook('pop');
+  });
+  const inBothLooks = async (fn, arg) => {
+    const out = [];
+    try {
+      for (const look of ['pop', 'calm']) {
+        let r;
+        try {
+          await setLook(look);
+          await page.waitForTimeout(150);
+          r = await page.evaluate(fn, arg);
+        } catch (e) { r = ['threw: ' + e.message]; }
+        if (r !== true) out.push(...(Array.isArray(r) ? r : [String(r)]).map(x => `[${look}] ${typeof x === 'string' ? x : JSON.stringify(x)}`));
+      }
+    } finally {
+      try { await clearLooks(); } catch (e) { out.push('could not put Pop back: ' + e.message); }
+    }
+    return out.length ? out : true;
+  };
+
   /* The week's default layout, asserted before anything here navigates. Three
      things have to agree and nothing enforces it at runtime: the initial value
      of weekView, which container index.html leaves visible, and which tab it
@@ -2034,7 +2076,8 @@ function findChromium() {
      distinction the old check could not make: it searched the label text and
      the tooltips together, so an overflowing label and a fitted one read the
      same to it. */
-  if (want('theStripStillSaysWhenToLeave')) checks.theStripStillSaysWhenToLeave = await page.evaluate(() => {
+  // In both looks (Looks stage 3): Calm's fonts change every width measured here.
+  if (want('theStripStillSaysWhenToLeave')) checks.theStripStillSaysWhenToLeave = await inBothLooks(() => {
     goWeek(); setWeekView('full');
     const kid = activeProfile();
     const key = getDayKeys(0)[3];
@@ -2518,7 +2561,8 @@ function findChromium() {
      excluded — it is the one child that is meant to sit outside the flow. Same
      shape of assertion as aShortBlockStillSaysWhatItIs: whatever the row costs
      become, a card may never draw more than it can hold. */
-  if (want('theStackedCardFitsWhatItDraws')) checks.theStackedCardFitsWhatItDraws = await page.evaluate(() => {
+  // In both looks (Looks stage 3): Calm's fonts change what a row costs.
+  if (want('theStackedCardFitsWhatItDraws')) checks.theStackedCardFitsWhatItDraws = await inBothLooks(() => {
     goWeek(); setWeekView('full');
     const kid = activeProfile();
     const key = getDayKeys(0)[2];
@@ -5377,42 +5421,49 @@ function findChromium() {
   });
   await defineAuditSeeds();
 
+  /* In both looks (Looks stage 3). Calm's fonts are wider than Pop's
+     handwriting at a smaller scale, so every width that fits in one has to be
+     measured in the other; and at 1194×834, the iPad this app lives on. */
   const kidFindings = [];
-  for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1440, 900], [900, 1100]]) {
-    await page.setViewportSize({ width: w, height: h });
-    for (const [id, nav, label] of KID_SCREENS) {
-      // A row's seed may return a sentence saying what it failed to put on screen.
-      const seeded = await page.evaluate(`(${nav.toString()})()`);
-      await page.waitForTimeout(200);
-      const r = await kidStandards(id);
-      const problems = [];
-      if (typeof seeded === 'string') problems.push(seeded);
-      if (r.error) problems.push(r.error);
-      /* A screen that did not open measures as clean: every control on it is
-         display:none, so none is "too small". openSisterSync refuses a parent,
-         for one — so each row must prove its screen was on show. */
-      if (!(await page.evaluate((sid) => document.getElementById(sid).classList.contains('active'), id))) {
-        problems.push('the screen was not on show, so nothing on it was measured');
+  for (const look of ['pop', 'calm']) {
+    try { await setLook(look); } catch (e) { kidFindings.push(`[${look}] the look could not be applied: ${e.message}`); continue; }
+    for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1194, 834], [1440, 900], [900, 1100]]) {
+      await page.setViewportSize({ width: w, height: h });
+      for (const [id, nav, label] of KID_SCREENS) {
+        // A row's seed may return a sentence saying what it failed to put on screen.
+        const seeded = await page.evaluate(`(${nav.toString()})()`);
+        await page.waitForTimeout(200);
+        const r = await kidStandards(id);
+        const problems = [];
+        if (typeof seeded === 'string') problems.push(seeded);
+        if (r.error) problems.push(r.error);
+        /* A screen that did not open measures as clean: every control on it is
+           display:none, so none is "too small". openSisterSync refuses a parent,
+           for one — so each row must prove its screen was on show. */
+        if (!(await page.evaluate((sid) => document.getElementById(sid).classList.contains('active'), id))) {
+          problems.push('the screen was not on show, so nothing on it was measured');
+        }
+        // Sideways scroll is the failure a screenshot needs a human to notice and
+        // an assertion catches by itself: content pushed off the edge of a tablet
+        // is simply unreachable, and nothing else here would report it.
+        const overflow = await page.evaluate((sid) => {
+          const scr = document.getElementById(sid);
+          const worst = [...scr.querySelectorAll('*')].reduce((acc, el) => {
+            if (el.closest('[style*="overflow"], .ck-gridwrap, .weekly-full-wrap, .tg-wrap')) return acc;
+            const r = el.getBoundingClientRect();
+            return (r.width && r.right > acc.right) ? { right: r.right, cls: String(el.className).slice(0, 24) } : acc;
+          }, { right: 0, cls: '' });
+          return { body: document.body.scrollWidth, worst };
+        }, id);
+        if (overflow.body > w + 1) problems.push(`page scrolls sideways (${overflow.body} > ${w})`);
+        if (overflow.worst.right > w + 1) problems.push(`.${overflow.worst.cls} runs to ${Math.round(overflow.worst.right)} (past ${w})`);
+        if (r.small && r.small.length) problems.push(`${r.small.length} target(s) under 44px: ${r.small.slice(0, 6).join(', ')}`);
+        if (r.minFont < 13) problems.push(`font ${r.minFont}px on .${r.minWhere} (min 13)`);
+        if (problems.length) kidFindings.push(`[${look}] ${label || id}@${w}: ${problems.join(' | ')}`);
       }
-      // Sideways scroll is the failure a screenshot needs a human to notice and
-      // an assertion catches by itself: content pushed off the edge of a tablet
-      // is simply unreachable, and nothing else here would report it.
-      const overflow = await page.evaluate((sid) => {
-        const scr = document.getElementById(sid);
-        const worst = [...scr.querySelectorAll('*')].reduce((acc, el) => {
-          if (el.closest('[style*="overflow"], .ck-gridwrap, .weekly-full-wrap, .tg-wrap')) return acc;
-          const r = el.getBoundingClientRect();
-          return (r.width && r.right > acc.right) ? { right: r.right, cls: String(el.className).slice(0, 24) } : acc;
-        }, { right: 0, cls: '' });
-        return { body: document.body.scrollWidth, worst };
-      }, id);
-      if (overflow.body > w + 1) problems.push(`page scrolls sideways (${overflow.body} > ${w})`);
-      if (overflow.worst.right > w + 1) problems.push(`.${overflow.worst.cls} runs to ${Math.round(overflow.worst.right)} (past ${w})`);
-      if (r.small && r.small.length) problems.push(`${r.small.length} target(s) under 44px: ${r.small.slice(0, 6).join(', ')}`);
-      if (r.minFont < 13) problems.push(`font ${r.minFont}px on .${r.minWhere} (min 13)`);
-      if (problems.length) kidFindings.push(`${label || id}@${w}: ${problems.join(' | ')}`);
     }
   }
+  await clearLooks();
   if (want('kidScreensMeetTheHouseRules')) checks.kidScreensMeetTheHouseRules = kidFindings.length === 0 || kidFindings;
 
   // Artifacts at the sizes this app is actually used at — phone, iPad both ways,
@@ -13491,8 +13542,9 @@ function findChromium() {
     return result;
   })();
 
-  /* More holds only what has no other home: 🧹 Chores and ◀ Switch, plus the
-     build number (theBuildNumberIsOnThePage). Money school and Money story both
+  /* More holds only what has no other home: 🧹 Chores and ◀ Switch, the 🎨
+     look tile (Looks stage 3, L4 — it names the look it switches to, Calm
+     from the default Pop), plus the build number (theBuildNumberIsOnThePage). Money school and Money story both
      belong to the Money tab and were a third and second door there; each is
      still reached from Money — school from money tab 5 and My money's 🎓
      button, story from My money's "More" card (mnyLinksCard). */
@@ -13504,9 +13556,9 @@ function findChromium() {
     document.querySelector('#kidNav [data-td-nav="more"]')?.click();
     const tiles = [...document.querySelectorAll('#tdMoreOverlay .td-more-tile')];
     const got = tiles.map(t => t.getAttribute('data-td-more')).join(' · ');
-    if (got !== 'chores · profile') problems.push(`the More tiles are "${got}", expected exactly "chores · profile" (Chores · Switch)`);
+    if (got !== 'chores · profile · look') problems.push(`the More tiles are "${got}", expected exactly "chores · profile · look" (Chores · Switch · 🎨)`);
     const labels = tiles.map(t => t.querySelector('.td-more-label')?.textContent.trim()).join(' · ');
-    if (labels !== 'Chores · Switch') problems.push(`the More tile labels are "${labels}", expected "Chores · Switch"`);
+    if (labels !== 'Chores · Switch · Calm look') problems.push(`the More tile labels are "${labels}", expected "Chores · Switch · Calm look"`);
     document.getElementById('tdMoreOverlay')?.classList.remove('open');
 
     // Money school from money tab 5.
@@ -15085,19 +15137,36 @@ function findChromium() {
      edit sheet are measured with darkContrastFindings' method (background
      layers composited, opacity included; no dark emulation here): at least
      4.5:1, and never white text on a pastel. Sheets are measured after their
-     slide-in, because mid-animation every word reads 1:1. */
-  if (want('thePopLookReadsEverywhere')) checks.thePopLookReadsEverywhere = await (async () => {
+     slide-in, because mid-animation every word reads 1:1.
+
+     Looks stage 3 made it take the look: the same walk runs in Calm (purple
+     buttons with white text, navy selected pills, tinted week blocks, new
+     fonts). Calm on the parent portal is Stage 4's, so there the five
+     destinations are measured and REPORTED (tests/out/look-calm-parent-findings.json
+     and the log) but do not fail this stage; every kid surface does. Each kid
+     screen, ⋯ More and the edit sheet are saved as look-<look>-<screen>-<width>.png,
+     the CI artifact a person compares the two looks in. */
+  const lookReadsEverywhere = async (look) => {
     const bad = [];
+    const parent = [];
     const was = page.viewportSize();
     const ev = async (label, fn, arg) => {
       try { return await page.evaluate(fn, arg); } catch (e) { bad.push(`${label}: threw ${e.message}`); return undefined; }
     };
+    const snap = async (name, w) => {
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: shot(`look-${look}-${name}-${w}`) });
+    };
     await defineAuditSeeds();   // a page reload above dropped them
-    const look = await page.evaluate(() => document.documentElement.getAttribute('data-look'));
-    if (look !== 'pop') bad.push(`<html data-look> is "${look}", not "pop" — the Pop look was not what was measured`);
+    try {
+      if (look === 'pop') await clearLooks(); else await setLook(look);
+    } catch (e) { bad.push(`the ${look} look could not be applied: ${e.message}`); return { bad, parent }; }
+    const on = await page.evaluate(() => document.documentElement.getAttribute('data-look'));
+    if (on !== look) bad.push(`<html data-look> is "${on}", not "${look}" — the ${look} look was not what was measured`);
     try {
       for (const [w, h] of [[390, 844], [1194, 834]]) {
         await page.setViewportSize({ width: w, height: h });
+        const names = new Set();
         for (const [id, nav, label] of KID_SCREENS) {
           const seeded = await ev(label || id, `(${nav.toString()})()`);
           if (typeof seeded === 'string') bad.push(`${label || id}@${w}: ${seeded}`);
@@ -15108,6 +15177,10 @@ function findChromium() {
             return darkContrastFindings(scr, lab, '.print-sheet');
           }, [id, `${label || id}@${w}`]);
           if (found) bad.push(...found);
+          let name = (label || id).replace(/^screen-/, '').replace(/[^a-z0-9]+/gi, '-');
+          while (names.has(name)) name += '-2';
+          names.add(name);
+          await snap(name, w);
         }
         for (const dest of ['now', 'meeting', 'history', 'setup', 'app']) {
           await ev(`parent ${dest}`, (d) => {
@@ -15116,12 +15189,13 @@ function findChromium() {
           }, dest);
           await page.waitForTimeout(250);
           const found = await ev(`parent ${dest}`, (lab) => darkContrastFindings(document.getElementById('screen-parent'), lab), `Parent › ${dest}@${w}`);
-          if (found) bad.push(...found);
+          if (found) (look === 'pop' ? bad : parent).push(...found);
         }
         await ev('More', () => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); tdOpenMore(); });
         await page.waitForTimeout(450);
         const more = await ev('More', (lab) => darkContrastFindings(document.querySelector('#tdMoreOverlay .sheet'), lab), `⋯ More@${w}`);
         if (more) bad.push(...more);
+        await page.screenshot({ path: shot(`look-${look}-more-${w}`) });
         await ev('More close', () => { const ov = document.getElementById('tdMoreOverlay'); if (ov && ov.classList.contains('open')) closeSheet('tdMoreOverlay'); });
         await ev('edit', () => {
           profile = 'jenn'; parentViewing = 'jenn';
@@ -15134,15 +15208,27 @@ function findChromium() {
         await page.waitForTimeout(450);
         const edit = await ev('edit', (lab) => darkContrastFindings(document.querySelector('#editOverlay .sheet'), lab), `block edit sheet@${w}`);
         if (edit) bad.push(...edit);
+        await page.screenshot({ path: shot(`look-${look}-edit-sheet-${w}`) });
         await ev('edit close', () => { closeSheet('editOverlay'); setDayBlocks(todayKey(), window.__popHad, 'jenn'); });
       }
     } finally {
+      try { await clearLooks(); } catch (e) { bad.push('could not put Pop back: ' + e.message); }
       await ev('restore', () => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
       if (was) await page.setViewportSize(was);
       await page.waitForTimeout(200);
     }
-    return bad.length ? bad : true;
-  })();
+    return { bad, parent };
+  };
+  if (want('thePopLookReadsEverywhere')) {
+    const r = await lookReadsEverywhere('pop');
+    checks.thePopLookReadsEverywhere = r.bad.length ? r.bad : true;
+  }
+  if (want('theCalmLookReadsOnEveryKidScreen')) {
+    const r = await lookReadsEverywhere('calm');
+    fs.writeFileSync(path.join(outDir, 'look-calm-parent-findings.json'), JSON.stringify(r.parent, null, 2));
+    if (r.parent.length) console.log(`Calm on the parent portal (Stage 4, reported, not failed): ${r.parent.length} finding(s)\n  ${r.parent.join('\n  ')}`);
+    checks.theCalmLookReadsOnEveryKidScreen = r.bad.length ? r.bad : true;
+  }
 
   /* ── SMALL FIXES R7 (Plan v7, 2026-09-26) ────────────────────────────
      Deferred small fixes, one check each, each written to fail on the code
@@ -15355,7 +15441,50 @@ function findChromium() {
      the fallback, and there it wrapped onto two lines at 375px. Measured in a
      page whose font hosts are cut off, so it is the fallback on this machine
      whatever it is; the label stays "Sister Sync" (the owner's choice), one
-     line, inside its tab, 13px or more, with every tab a 44px target. */
+     line, inside its tab, 13px or more, with every tab a 44px target.
+     Looks stage 3: in both looks' fallbacks — Calm's stacks end in the system
+     sans, which is what an offline device that never fetched Lexend draws.
+     navTabsFit is shared with sisterSyncFitsInBothLooksFonts below, which
+     measures the same in each look's own web fonts. */
+  const navTabsFit = async ({ look, fallback }) => {
+    const problems = [];
+    ['jenn', 'jess', 'parent'].forEach(k => { try { localStorage.setItem('wp_look_' + k, look); } catch (e) {} });
+    profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+    goToday();
+    const on = document.documentElement.getAttribute('data-look');
+    if (on !== look) problems.push(`the ${look} look is not on (data-look "${on}")`);
+    const re = look === 'calm' ? /Lexend|Baloo/ : /Patrick Hand|Nunito/;
+    const loaded = () => [...document.fonts].filter(f => re.test(f.family) && f.status === 'loaded');
+    if (!fallback) {
+      for (let i = 0; i < 50 && !loaded().length; i++) {
+        await Promise.all([...document.fonts].filter(f => re.test(f.family)).map(f => f.load().catch(() => null)));
+        if (!loaded().length) await new Promise(r => setTimeout(r, 100));
+      }
+    }
+    await document.fonts.ready;
+    const web = loaded();
+    if (fallback && web.length) problems.push(`a web font loaded anyway (${web.map(f => f.family).join(', ')}) — this is not the fallback`);
+    if (!fallback && !web.length) problems.push(`the ${look} look's web font never loaded, so its own type was not measured`);
+    const nav = document.getElementById('kidNav');
+    if (!nav || nav.hidden) return [...problems, 'the kid nav is hidden on Today'];
+    [...nav.querySelectorAll('.kid-nav-btn')].forEach(b => {
+      const name = b.getAttribute('data-td-nav');
+      const r = b.getBoundingClientRect();
+      if (r.width < 44 || r.height < 44) problems.push(`the ${name} tab is ${Math.round(r.width)}×${Math.round(r.height)}, under 44px`);
+      const label = b.querySelector('.kid-nav-label');
+      if (!label) { problems.push(`the ${name} tab has no label`); return; }
+      const fs = parseFloat(getComputedStyle(label).fontSize);
+      const lr = label.getBoundingClientRect();
+      if (fs < 13) problems.push(`the ${name} tab's label is ${fs}px, under the 13px floor`);
+      if (lr.height > fs * 1.8) problems.push(`the ${name} tab's label "${label.textContent}" wraps onto a second line (${Math.round(lr.height)}px tall) in ${getComputedStyle(label).fontFamily}`);
+      if (label.scrollWidth > label.clientWidth + 1) problems.push(`the ${name} tab's label "${label.textContent}" is clipped (${label.scrollWidth}px in ${label.clientWidth}px)`);
+      if (lr.left < r.left - 1 || lr.right > r.right + 1) problems.push(`the ${name} tab's label "${label.textContent}" spills out of its tab`);
+    });
+    const sync = nav.querySelector('[data-td-nav="sync"] .kid-nav-label');
+    if (!sync || sync.textContent.trim() !== 'Sister Sync') problems.push(`the tab reads "${sync ? sync.textContent.trim() : '(none)'}", not "Sister Sync"`);
+    if (document.body.scrollWidth > window.innerWidth + 1) problems.push(`the page scrolls sideways (${document.body.scrollWidth})`);
+    return problems.length ? problems : true;
+  };
   if (want('sisterSyncTabFitsInTheFallbackFont')) checks.sisterSyncTabFitsInTheFallbackFont = await (async () => {
     const ctx = await browser.newContext({ viewport: { width: 375, height: 812 }, timezoneId: 'America/Edmonton' });
     const p3 = await ctx.newPage();
@@ -15368,40 +15497,299 @@ function findChromium() {
     try {
       await p3.goto('file://' + path.join(__dirname, '..', 'index.html'));
       await p3.waitForTimeout(1200);
-      const r = await p3.evaluate(async () => {
-        const problems = [];
-        profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
-        goToday();
-        await document.fonts.ready;
-        const web = [...document.fonts].filter(f => /Patrick Hand|Nunito/.test(f.family) && f.status === 'loaded');
-        if (web.length) problems.push(`a web font loaded anyway (${web.map(f => f.family).join(', ')}) — this is not the fallback`);
-        const nav = document.getElementById('kidNav');
-        if (!nav || nav.hidden) return ['the kid nav is hidden on Today'];
-        [...nav.querySelectorAll('.kid-nav-btn')].forEach(b => {
-          const name = b.getAttribute('data-td-nav');
-          const r = b.getBoundingClientRect();
-          if (r.width < 44 || r.height < 44) problems.push(`the ${name} tab is ${Math.round(r.width)}×${Math.round(r.height)}, under 44px`);
-          const label = b.querySelector('.kid-nav-label');
-          if (!label) { problems.push(`the ${name} tab has no label`); return; }
-          const fs = parseFloat(getComputedStyle(label).fontSize);
-          const lr = label.getBoundingClientRect();
-          if (fs < 13) problems.push(`the ${name} tab's label is ${fs}px, under the 13px floor`);
-          if (lr.height > fs * 1.8) problems.push(`the ${name} tab's label "${label.textContent}" wraps onto a second line (${Math.round(lr.height)}px tall) in ${getComputedStyle(label).fontFamily}`);
-          if (label.scrollWidth > label.clientWidth + 1) problems.push(`the ${name} tab's label "${label.textContent}" is clipped (${label.scrollWidth}px in ${label.clientWidth}px)`);
-          if (lr.left < r.left - 1 || lr.right > r.right + 1) problems.push(`the ${name} tab's label "${label.textContent}" spills out of its tab`);
-        });
-        const sync = nav.querySelector('[data-td-nav="sync"] .kid-nav-label');
-        if (!sync || sync.textContent.trim() !== 'Sister Sync') problems.push(`the tab reads "${sync ? sync.textContent.trim() : '(none)'}", not "Sister Sync"`);
-        if (document.body.scrollWidth > window.innerWidth + 1) problems.push(`the page scrolls sideways (${document.body.scrollWidth})`);
-        return problems.length ? problems : true;
-      });
-      await p3.screenshot({ path: shot('r7_nav_fallback_font_375') });
-      return r;
+      const bad = [];
+      for (const look of ['pop', 'calm']) {
+        let r;
+        try { r = await p3.evaluate(navTabsFit, { look, fallback: true }); } catch (e) { r = ['threw: ' + e.message]; }
+        if (r !== true) bad.push(...r.map(x => `[${look}] ${x}`));
+        await p3.screenshot({ path: shot(look === 'pop' ? 'r7_nav_fallback_font_375' : 'look-calm-nav-fallback-font-375') });
+      }
+      return bad.length ? bad : true;
     } catch (e) {
       return ['threw: ' + e.message];
     } finally {
       await ctx.close();
     }
+  })();
+
+  /* Looks stage 3 — the same, in each look's own web fonts (Patrick Hand at
+     Pop's 1.1; Lexend at Calm's 1), at 375px. */
+  if (want('sisterSyncFitsInBothLooksFonts')) checks.sisterSyncFitsInBothLooksFonts = await (async () => {
+    const bad = [];
+    const was = page.viewportSize();
+    try {
+      await page.setViewportSize({ width: 375, height: 812 });
+      for (const look of ['pop', 'calm']) {
+        let r;
+        try { r = await page.evaluate(navTabsFit, { look, fallback: false }); } catch (e) { r = ['threw: ' + e.message]; }
+        if (r !== true) bad.push(...r.map(x => `[${look}] ${x}`));
+        await page.screenshot({ path: shot(`look-${look}-nav-375`) });
+      }
+    } finally {
+      await clearLooks();
+      await page.evaluate(() => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
+      if (was) await page.setViewportSize(was);
+    }
+    return bad.length ? bad : true;
+  })();
+
+  /* Looks stage 3 — the switches (docs/handoff/looks-calm-pop.md L4–L6).
+     A child flips her look from the 🎨 tile in ⋯ More, and the whole app is in
+     it at once: no reload (a marker left on window survives), the sheet still
+     up and its tile now naming the other look, the page, status-bar colour and
+     week blocks changed. It is hers, on this device: her key says so, her
+     sister's and the parent's are untouched, and switching to Jess shows
+     Jess's look. The parent's 🎨 in the portal header is on every destination,
+     a 44px target, and flips only the parent's. Everything is forgotten
+     again at the end. */
+  if (want('theLookFlipsWithNoReload')) checks.theLookFlipsWithNoReload = await (async () => {
+    const was = page.viewportSize();
+    await page.setViewportSize({ width: 1194, height: 834 });
+    try {
+      await clearLooks();
+      return await page.evaluate(async () => {
+        const bad = [];
+        const wait = (ms) => new Promise(r => setTimeout(r, ms));
+        const ls = (k) => { try { return localStorage.getItem('wp_look_' + k); } catch (e) { return 'unreadable'; } };
+        const look = () => document.documentElement.getAttribute('data-look');
+        const pageBg = () => getComputedStyle(document.body).backgroundColor;
+        const theme = () => (document.querySelector('meta[name="theme-color"]') || {}).content;
+        window.__lookNoReload = 'still here';
+        profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+        goWeek(); setWeekView('full');
+        const k = getDayKeys(0)[2];
+        const had = (getDayBlocks(k, 'jenn') || []).slice();
+        try {
+          setDayBlocks(k, [{ id: 'look-flip', actId: 'school_day', startMin: 9 * 60, durationMin: 120 }], 'jenn');
+          renderWeek();
+          const card = () => document.querySelector('#weeklyFullGrid .wf-card');
+          const popBg = pageBg(), popTheme = theme();
+          const popCard = card() && getComputedStyle(card()).backgroundColor;
+          if (look() !== 'pop') bad.push(`Jenn starts in "${look()}", not Pop (nothing stored = Pop, L6)`);
+          tdOpenMore();
+          await wait(300);
+          const tile = document.querySelector('#tdMoreOverlay [data-td-more="look"]');
+          if (!tile) return ['⋯ More has no 🎨 look tile'];
+          const tr = tile.getBoundingClientRect();
+          if (tr.width < 44 || tr.height < 44) bad.push(`the 🎨 tile is ${Math.round(tr.width)}×${Math.round(tr.height)}, under 44px`);
+          if (!/Calm look/.test(tile.textContent)) bad.push(`in Pop the tile reads "${tile.textContent.trim()}", not "Calm look"`);
+          tile.click();
+          // Instant: measured in the same task as the click, before any timer.
+          if (look() !== 'calm') bad.push(`after the tap the look is "${look()}", not "calm"`);
+          if (pageBg() === popBg) bad.push(`the page is still ${popBg} after the flip`);
+          await wait(200);
+          if (window.__lookNoReload !== 'still here') bad.push('the page reloaded');
+          const ov = document.getElementById('tdMoreOverlay');
+          if (!ov || !ov.classList.contains('open')) bad.push('⋯ More closed on the flip; it should stay up so she sees the change');
+          const tile2 = document.querySelector('#tdMoreOverlay [data-td-more="look"]');
+          if (!tile2 || !/Pop look/.test(tile2.textContent)) bad.push(`in Calm the tile reads "${tile2 ? tile2.textContent.trim() : '(gone)'}", not "Pop look"`);
+          if (theme() === popTheme || !/eef2f9/i.test(theme() || '')) bad.push(`theme-color is "${theme()}" in Calm, not the Calm page #eef2f9`);
+          const c = card();
+          if (!c) bad.push('the Full week drew no card');
+          else {
+            const cBg = getComputedStyle(c).backgroundColor;
+            if (cBg === popCard) bad.push(`the week block is still ${cBg} in Calm; Calm draws it in its tint`);
+            if (!c.classList.contains('light-bg')) bad.push('a tinted Calm week block does not take navy text (no light-bg): its text colour followed the raw colour, not the drawn one');
+          }
+          if (ls('jenn') !== 'calm') bad.push(`wp_look_jenn is "${ls('jenn')}", not "calm"`);
+          if (ls('last') !== 'calm') bad.push(`wp_look_last is "${ls('last')}", not "calm"`);
+          if (ls('jess') !== null) bad.push(`Jenn's flip wrote wp_look_jess ("${ls('jess')}")`);
+          if (ls('parent') !== null) bad.push(`Jenn's flip wrote wp_look_parent ("${ls('parent')}")`);
+          if (typeof state !== 'undefined' && JSON.stringify(state.shared || {}).includes('wp_look')) bad.push('a look reached synced state');
+          closeSheet('tdMoreOverlay');
+          // The other kid keeps her own (Pop); Jenn gets hers back.
+          selectProfile('jess'); goToday();
+          if (look() !== 'pop') bad.push(`Jess shows "${look()}" after Jenn chose Calm`);
+          selectProfile('jenn'); goToday();
+          if (look() !== 'calm') bad.push(`Jenn back again shows "${look()}", not her Calm`);
+          // The parent: own look, own switch, on every destination.
+          parentUnlockedThisSession = true;
+          await selectProfile('parent');
+          if (look() !== 'pop') bad.push(`the parent shows "${look()}" after Jenn chose Calm`);
+          for (const d of ['now', 'meeting', 'history', 'setup', 'app']) {
+            setParentDest(d);
+            const b = document.getElementById('parentLookBtn');
+            const r = b && b.getBoundingClientRect();
+            if (!b || !r.width) { bad.push(`Parent › ${d}: no 🎨 look button in the header`); continue; }
+            if (r.width < 44 || r.height < 44) bad.push(`Parent › ${d}: the 🎨 button is ${Math.round(r.width)}×${Math.round(r.height)}, under 44px`);
+          }
+          const pb = document.getElementById('parentLookBtn');
+          if (pb) {
+            if (!/Calm/.test(pb.textContent)) bad.push(`in Pop the parent's button reads "${pb.textContent.trim()}"`);
+            pb.click();
+            if (look() !== 'calm') bad.push(`the parent's button left the look "${look()}"`);
+            if (!/Pop/.test(pb.textContent)) bad.push(`in Calm the parent's button reads "${pb.textContent.trim()}", not the look it switches to`);
+            if (ls('parent') !== 'calm') bad.push(`wp_look_parent is "${ls('parent')}" after the parent's flip`);
+            if (ls('jess') !== null) bad.push(`the parent's flip wrote wp_look_jess ("${ls('jess')}")`);
+            pb.click();
+            if (look() !== 'pop' || ls('parent') !== 'pop' || ls('jenn') !== 'calm') bad.push(`flipping back: look "${look()}", parent "${ls('parent')}", jenn "${ls('jenn')}"`);
+          }
+        } finally {
+          setDayBlocks(k, had, 'jenn');
+          const ov = document.getElementById('tdMoreOverlay');
+          if (ov && ov.classList.contains('open')) closeSheet('tdMoreOverlay');
+        }
+        return bad.length ? bad : true;
+      });
+    } catch (e) {
+      return ['threw: ' + e.message];
+    } finally {
+      await clearLooks();
+      await page.evaluate(() => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
+      if (was) await page.setViewportSize(was);
+    }
+  })();
+
+  /* …and it survives a reload, per person, on this device. Its own browser
+     context (its own localStorage), so the main page's state is not reloaded
+     away. Jenn flips to Calm; after a reload the profile picker opens in the
+     look this device used last (Calm), Jess and the parent are still Pop and
+     Jenn is Calm. Then with storage throwing on every access the app still
+     boots and flips — it just defaults to Pop and forgets. */
+  if (want('theLookSurvivesAReload')) checks.theLookSurvivesAReload = await (async () => {
+    const ctx = await browser.newContext({ viewport: { width: 1194, height: 834 }, timezoneId: 'America/Edmonton' });
+    const p4 = await ctx.newPage();
+    const errs = [];
+    p4.on('pageerror', e => errs.push(String(e)));
+    for (const pattern of [
+      '**://firestore.googleapis.com/**', '**://*.firebaseio.com/**',
+      '**://www.gstatic.com/firebasejs/**', '**://identitytoolkit.googleapis.com/**',
+      '**://firebaseinstallations.googleapis.com/**',
+    ]) await p4.route(pattern, r => r.abort());
+    const bad = [];
+    try {
+      await p4.goto('file://' + path.join(__dirname, '..', 'index.html'));
+      await p4.waitForTimeout(800);
+      const first = await p4.evaluate(async () => {
+        const b = [];
+        if (document.documentElement.getAttribute('data-look') !== 'pop') b.push(`a fresh device opens in "${document.documentElement.getAttribute('data-look')}", not Pop`);
+        profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday();
+        tdOpenMore();
+        const tile = document.querySelector('#tdMoreOverlay [data-td-more="look"]');
+        if (!tile) return ['⋯ More has no 🎨 look tile'];
+        tile.click();
+        if (document.documentElement.getAttribute('data-look') !== 'calm') b.push('the tile did not flip Jenn to Calm');
+        return b;
+      });
+      bad.push(...first.map(x => `before reload: ${x}`));
+      await p4.reload();
+      await p4.waitForTimeout(800);
+      const after = await p4.evaluate(() => {
+        const b = [];
+        const look = () => document.documentElement.getAttribute('data-look');
+        if (!document.getElementById('screen-profile').classList.contains('active')) b.push('the app did not open on the profile picker');
+        if (look() !== 'calm') b.push(`the profile picker opened in "${look()}", not Calm (the look this device used last)`);
+        if (!/eef2f9/i.test((document.querySelector('meta[name="theme-color"]') || {}).content || '')) b.push('theme-color did not follow the picker into Calm');
+        selectProfile('jess'); goToday();
+        if (look() !== 'pop') b.push(`Jess shows "${look()}" after the reload`);
+        selectProfile('jenn'); goToday();
+        if (look() !== 'calm') b.push(`Jenn shows "${look()}" after the reload, not her Calm`);
+        parentUnlockedThisSession = true; selectProfile('parent');
+        if (look() !== 'pop') b.push(`the parent shows "${look()}" after the reload`);
+        return b;
+      });
+      bad.push(...after.map(x => `after reload: ${x}`));
+      // Storage that throws on the look's keys (private mode, blocked site data): boots, defaults, flips.
+      await p4.addInitScript(() => {
+        /* Only the look's keys: the rest of the app's storage is not what this
+           check is about, and some of it (week disclosures) reads bare. */
+        const get = Storage.prototype.getItem, set = Storage.prototype.setItem;
+        Storage.prototype.getItem = function (k) { if (/^wp_look_/.test(k)) throw new Error('storage blocked'); return get.call(this, k); };
+        Storage.prototype.setItem = function (k, v) { if (/^wp_look_/.test(k)) throw new Error('storage blocked'); return set.call(this, k, v); };
+      });
+      await p4.reload();
+      await p4.waitForTimeout(800);
+      const blocked = await p4.evaluate(() => {
+        const b = [];
+        const look = () => document.documentElement.getAttribute('data-look');
+        if (look() !== 'pop') b.push(`with storage blocked the app opens in "${look()}", not Pop`);
+        try {
+          profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+          if (look() !== 'pop') b.push(`with storage blocked Jenn shows "${look()}"`);
+          lookToggle('jenn');
+          if (look() !== 'calm') b.push(`with storage blocked the flip left "${look()}"`);
+        } catch (e) { b.push('with storage blocked a look call threw: ' + e.message); }
+        return b;
+      });
+      bad.push(...blocked.map(x => `storage blocked: ${x}`));
+      const own = errs.filter(e => !/firestore|firebase|storage blocked/i.test(e));
+      if (own.length) bad.push(`page errors: ${own.join(' | ')}`);
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      await ctx.close();
+    }
+    return bad.length ? bad : true;
+  })();
+
+  /* L3: switching keeps box geometry. Every main component — cards, the Now
+     card and its tick, block rows and their icon tiles, week blocks, the nav
+     tabs, the main button, pills, the ⋯ More tiles, the header icon buttons —
+     has the same border widths, padding and corner radii in both looks. The
+     fonts may make a box taller or wider; the box's own frame may not move.
+     Also proves the look really changed (the page colour), so it cannot pass
+     by measuring Pop twice. */
+  if (want('theLooksKeepTheSameBoxes')) checks.theLooksKeepTheSameBoxes = await (async () => {
+    const was = page.viewportSize();
+    await page.setViewportSize({ width: 1194, height: 834 });
+    await defineAuditSeeds();
+    const frames = () => page.evaluate(async () => {
+      const wait = (ms) => new Promise(r => setTimeout(r, ms));
+      const out = { page: getComputedStyle(document.body).backgroundColor, boxes: {} };
+      const props = ['borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+        'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+        'borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius'];
+      const take = (where, sels) => sels.forEach(sel => {
+        const el = document.querySelector(sel);
+        if (!el || !el.getBoundingClientRect().width) { out.boxes[`${where} ${sel}`] = 'not on screen'; return; }
+        const s = getComputedStyle(el);
+        out.boxes[`${where} ${sel}`] = props.map(p => `${p}=${s[p]}`).join(' ');
+      });
+      profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+      // Measured while the seeded day is on screen: putting it back re-draws Today empty.
+      const undo = seedTodayAudit(); goToday();
+      take('Today', ['#tdWrap .td-card', '#tdWrap .td-now', '#tdWrap .td-now-tick', '#tdWrap .td-now-bar',
+        '#tdWrap .quest-card', '#tdWrap .quest-card--next', '#tdWrap .quest-card-icon', '#tdWrap .quest-complete-btn',
+        '.td-plan', '#kidNav .kid-nav-btn', '#kidNav .kid-nav-btn.on']);
+      undo();
+      const k = getDayKeys(0)[2];
+      const had = (getDayBlocks(k, 'jenn') || []).slice();
+      setDayBlocks(k, [{ id: 'look-box', actId: 'school_day', startMin: 9 * 60, durationMin: 120 }], 'jenn');
+      goWeek(); setWeekView('full'); renderWeek();
+      take('Week', ['#weeklyFullGrid .wf-card', '.view-tab.active', '.view-tab:not(.active)', '.weekly-full']);
+      setDayBlocks(k, had, 'jenn');
+      mnyOpenMyMoney('jenn');
+      take('My money', ['#screen-mymoney .mny-card', '#screen-mymoney .mny-tab.on', '#screen-mymoney .mny-btn']);
+      goToday(); tdOpenMore(); await wait(350);
+      take('More', ['#tdMoreOverlay .sheet', '#tdMoreOverlay .td-more-tile']);
+      closeSheet('tdMoreOverlay');
+      parentUnlockedThisSession = true; selectProfile('parent');
+      take('Parent', ['#screen-parent .topbar .btn-icon', '#parentLookBtn']);
+      return out;
+    });
+    const bad = [];
+    try {
+      await clearLooks();
+      const pop = await frames();
+      await setLook('calm');
+      const calm = await frames();
+      if (pop.page === calm.page) bad.push(`the page is ${pop.page} in both looks — Calm was not what was measured`);
+      for (const [where, f] of Object.entries(pop.boxes)) {
+        if (f === 'not on screen') { bad.push(`${where}: not on screen in Pop, so not compared`); continue; }
+        if (calm.boxes[where] !== f) {
+          const a = f.split(' '), b = String(calm.boxes[where]).split(' ');
+          const diff = a.map((x, i) => x === b[i] ? null : `${x} → ${(b[i] || '?').split('=').pop()}`).filter(Boolean);
+          bad.push(`${where}: ${diff.join(', ') || calm.boxes[where]}`);
+        }
+      }
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      await clearLooks();
+      await page.evaluate(() => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
+      if (was) await page.setViewportSize(was);
+    }
+    return bad.length ? bad : true;
   })();
 
   /* Step 1 confirms a day where the day is, not in a panel below a chart.

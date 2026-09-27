@@ -563,6 +563,9 @@
     <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap">
       <div class="parent-scope" id="parentScopePills" aria-label="Which child"></div>
       <button class="btn-icon" onclick="changeParentPin()" title="Change parent PIN">🔒 PIN</button>
+      <!-- The parent's own look on this device (L5). applyLook writes the
+           label: the look it switches TO. -->
+      <button class="btn-icon" id="parentLookBtn" onclick="lookToggle('parent')" title="Switch to the Calm look" aria-label="Switch to the Calm look">🎨 Calm</button>
       <button class="btn-icon" onclick="goProfile()">Exit</button>
     </div>
   </header>

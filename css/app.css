@@ -4,9 +4,9 @@
        sized so the chosen window (6am–10pm unless a parent narrows it)
        fits one A4/Letter landscape page. */
     --print-slot: 11px;
-    /* Paper / sticker aesthetic. The page (--bg), the card paper (--paper) and
-       the secondary text (--ink-light) are a look's: see the look block below. */
-    --bg2: #fff4db;
+    /* Paper / sticker aesthetic. The page (--bg), the second paper (--bg2), the
+       card paper (--paper) and the secondary text (--ink-light) are a look's:
+       see the look blocks below. */
     --paper-line: #e8dfc3;
     /* Navy, shared by both looks (docs/handoff/looks-calm-pop.md §7). The
        colour maths read this live — isLightColour / inkContrast in
@@ -351,9 +351,10 @@
 
   /* ════ The looks (docs/handoff/looks-calm-pop.md §7) ════
      A value that differs between looks lives here and ONLY here; everything
-     shared stays in :root above. Stage 3 adds the Calm block with the same
-     names, and tests/check-look-tokens.js then fails when either look is
-     missing one. <html data-look="pop"> is set statically in index.html.
+     shared stays in :root above. Both blocks define the same names, and
+     tests/check-look-tokens.js fails when either look is missing one.
+     index.html ships <html data-look="pop">; applyLook (js/05-helpers.js) is
+     the one thing that changes it.
 
      Pop: style B with today's handwriting fonts, text 10% larger. */
   :root[data-look="pop"] {
@@ -367,9 +368,14 @@
     --font-round: 'Nunito', sans-serif;
     --font-hand: 'Patrick Hand', cursive;
     --font-script: 'Caveat', cursive;
-    /* Cream graph paper, lines every 26px; cards white; secondary text. */
+    /* Headings in the handwriting's one weight; figures as the font draws them. */
+    --head-weight: 400;
+    --num-variant: normal;
+    /* Cream graph paper, lines every 26px; the second paper cream; cards
+       white; secondary text. */
     --bg: #fff6e3;
     --page-grid: #f1e5c8;
+    --bg2: #fff4db;
     --paper: #ffffff;
     --ink-light: #4d5575;
     /* Hard navy shadows: cards 4px, rows and main buttons 3px, the Now card 7×8. */
@@ -377,21 +383,83 @@
     --shadow-row: 3px 3px 0 var(--ink);
     --shadow-now: 7px 8px 0 var(--ink);
     /* How much of the block's colour a surface wears (the example's knobs):
-       the Now card its full colour, a block row its wash, icon tiles none. */
+       the Now card its full colour, a block row its wash, icon tiles none,
+       a Full-week block its full colour (lookBlockFill, js/07-week-view.js). */
     --now-fill: 100%;
     --row-fill: 100%;
     --tile-fill: 0%;
+    --block-fill: 100%;
     /* Secondary text inside the filled Now card: navy, because the muted text
        does not reach 4.5:1 on a block colour. */
     --now-ink-soft: var(--ink);
-    /* Main buttons and the selected tab: yellow, navy text. */
+    /* Main buttons and the selected tab: yellow, navy text; the selected tab
+       has no ring. Selected pills: the strong accent, white text. */
     --btn-main: #ffc83d;
     --btn-main-ink: var(--ink);
     --nav-on: #ffc83d;
-    /* The Now card's tick: a navy tile. Progress bar: navy on white. */
+    --nav-on-ring: none;
+    --pill-on: var(--accent-strong);
+    --pill-on-ink: var(--ink-on-strong);
+    /* The Now card's tick: a navy tile. Progress bar: navy on white — none of
+       the running block's colour in it. */
     --tick-bg: var(--ink);
     --tick-ink: #fff;
-    --bar-fill: var(--ink);
+    --bar-cat: 0%;
+    --bar-track: #fff;
+  }
+
+  /* Calm: new fonts at today's size, cool graph paper, white cards and rows,
+     navy sticker borders at the same widths (L3), a purple main button. */
+  :root[data-look="calm"] {
+    --text-scale: 1;
+    /* Baloo 2 for headings and big figures; Lexend for text and numbers.
+       Loaded only when Calm is first applied (applyLook), from Google Fonts:
+       cross-origin and not in the offline shell, so each stack ends in the
+       system sans the device already has. The seven roles: body, text, hand
+       and round (running text, and Nunito's rounded sans) → Lexend; head,
+       display and script (headings, dates and big figures, the motto and the
+       "today" tag) → Baloo 2. */
+    --font-body: 'Lexend', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-text: 'Lexend', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-head: 'Baloo 2', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Baloo 2', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-round: 'Lexend', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-hand: 'Lexend', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-script: 'Baloo 2', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    /* Baloo 2 is loaded at 600/700/800; headings take 700. Tabular figures,
+       so times and amounts line up. */
+    --head-weight: 700;
+    --num-variant: tabular-nums;
+    /* Cool graph paper, lines every 26px; the second paper a cool tint. */
+    --bg: #eef2f9;
+    --page-grid: #dde3ee;
+    --bg2: #e6ecf7;
+    --paper: #ffffff;
+    --ink-light: #5a6380;
+    /* Today's hard shadows: cards 3px, rows 3px, the Now card 7×8. */
+    --shadow-card: 3px 3px 0 var(--ink);
+    --shadow-row: 3px 3px 0 var(--ink);
+    --shadow-now: 7px 8px 0 var(--ink);
+    /* White Now card and rows; the category shows on the icon tile (its
+       wash); Full-week blocks in the category's tint, navy border. */
+    --now-fill: 0%;
+    --row-fill: 0%;
+    --tile-fill: 100%;
+    --block-fill: 22%;
+    /* On the white Now card the secondary text is the look's own. */
+    --now-ink-soft: var(--ink-light);
+    /* Purple main button, white text. Selected tab: the page tint ringed in
+       navy (an inset ring, so no box moves). Selected pills: navy, white text. */
+    --btn-main: #5b4fd6;
+    --btn-main-ink: #fff;
+    --nav-on: #eef2f9;
+    --nav-on-ring: inset 0 0 0 2px var(--ink);
+    --pill-on: var(--ink);
+    --pill-on-ink: #fff;
+    /* Purple tick, white check. Progress bar in the running block's colour. */
+    --tick-bg: #5b4fd6;
+    --tick-ink: #fff;
+    --bar-cat: 100%;
     --bar-track: #fff;
   }
 
@@ -408,11 +476,13 @@
       linear-gradient(90deg, var(--page-grid) 1px, transparent 1px);
     background-size: 26px 26px;
     color: var(--ink);
+    /* Calm lines its figures up (tabular); Pop draws them as the font does. */
+    font-variant-numeric: var(--num-variant);
     min-height: 100vh;
     overflow-x: hidden;
   }
 
-  h1, h2, h3, h4 { font-family: var(--font-head); font-weight: 400; letter-spacing: 0.5px; }
+  h1, h2, h3, h4 { font-family: var(--font-head); font-weight: var(--head-weight); letter-spacing: 0.5px; }
 
   .screen { display: none; min-height: 100vh; position: relative; z-index: 1; }
   .screen.active { display: flex; flex-direction: column; }
@@ -557,7 +627,7 @@
     font-weight: 800;
     color: var(--ink);
   }
-  .day-span-tab.active { background: var(--accent-strong); color: var(--ink-on-strong); }
+  .day-span-tab.active { background: var(--pill-on); color: var(--pill-on-ink); }
   /* Chosen, but the viewport can only carry fewer — say so rather than
      silently disagreeing with the button that looks selected. */
   /* Muted and struck through rather than faded: at 40% opacity the digit read
@@ -1020,7 +1090,7 @@
     box-shadow: 2px 2px 0 var(--ink);
     min-height: 38px;
   }
-  .view-tab.active { background: var(--accent-strong); color: var(--ink-on-strong); }
+  .view-tab.active { background: var(--pill-on); color: var(--pill-on-ink); }
 
   /* Time-Grid weekly view: 7-column × hour-row grid that visualizes free time */
   .tg-wrap { padding: 0 0.5rem 0.5rem; overflow-x: auto; }
@@ -3435,7 +3505,7 @@
     display: inline-flex;
     align-items: center;
   }
-  .filter-chip.active { background: var(--accent-strong); color: var(--ink-on-strong); }
+  .filter-chip.active { background: var(--pill-on); color: var(--pill-on-ink); }
 
 
   /* ═══════════ OVERLAYS / SHEETS ═══════════ */
@@ -3798,7 +3868,7 @@
     min-height: 38px;
   }
   .pill-btn:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
-  .pill-btn.active { background: var(--accent-strong); color: var(--ink-on-strong); }
+  .pill-btn.active { background: var(--pill-on); color: var(--pill-on-ink); }
   /* "＋ Sport" beside the sport tags — dashed, so it reads as a way to add one
      rather than as a fifth sport. */
   .pill-btn--add { border-style: dashed; background: transparent; font-weight: 800; }
@@ -5735,7 +5805,7 @@
     min-height: 34px; border: 2px solid var(--ink); border-radius: 9px; background: var(--paper);
     color: var(--ink); font: inherit; font-size: calc(0.8rem * var(--fs-scale, 1) * var(--text-scale, 1)); padding: 0.25rem 0.6rem; cursor: pointer;
   }
-  .mny-chip.on { background: var(--accent-strong); color: var(--ink-on-strong); }
+  .mny-chip.on { background: var(--pill-on); color: var(--pill-on-ink); }
   .mny-chip[disabled] { background: var(--mny-surface-disabled); color: var(--ink-light); cursor: not-allowed; }
   .mny-ask {
     width: 22px; height: 22px; min-height: 22px; flex: 0 0 auto; padding: 0; line-height: 1;
@@ -5956,10 +6026,12 @@
     color: var(--ink); font: inherit; font-size: calc(0.85rem * var(--fs-scale, 1) * var(--text-scale, 1)); padding: 0.2rem 0.7rem; cursor: pointer;
   }
   .mny-tab:hover { filter: brightness(1.05); }
-  .mny-tab.on { background: var(--accent-strong); color: var(--ink-on-strong); cursor: default; }
+  .mny-tab.on { background: var(--pill-on); color: var(--pill-on-ink); cursor: default; }
   /* Who a page is for. A kid tapping the parent tab is not refused, she is
      told — a different and much better message. */
-  .mny-tab-tag { font-size: calc(0.62rem * var(--fs-scale, 1) * var(--text-scale, 1)); text-transform: uppercase; letter-spacing: 0.09em; opacity: 0.65; }
+  /* Floored at 13px: at Calm's text scale 1 the 0.62rem × 1.2 came to 11.9px
+     (kidScreensMeetTheHouseRules, Looks stage 3); Pop's 1.1 already cleared it. */
+  .mny-tab-tag { font-size: max(13px, calc(0.62rem * var(--fs-scale, 1) * var(--text-scale, 1))); text-transform: uppercase; letter-spacing: 0.09em; opacity: 0.65; }
   @media (max-width: 720px) {
     .mny-tab { font-size: calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1)); padding: 0.2rem 0.5rem; }
     .mny-tab-tag { display: none; }
@@ -7030,9 +7102,11 @@
     background: var(--bar-track);
     border: 2.5px solid var(--ink); border-radius: 999px; overflow: hidden;
   }
+  /* How much of the running block's colour (--now-c) the fill wears is the
+     look's --bar-cat (Pop 0%: navy; Calm 100%); with no block colour, navy. */
   .td-now-bar-fill {
     display: block; height: 100%;
-    background: var(--bar-fill);
+    background: color-mix(in srgb, var(--now-c, var(--ink)) var(--bar-cat), var(--ink));
     transition: width 0.4s ease;
   }
   /* The bar animates a number, and a number does not need to slide to be read. */
@@ -7497,7 +7571,7 @@
   }
   /* The current place is stated, not merely tinted — colour alone is not a signal
      a child reliably reads, and --accent is decorative only. */
-  .kid-nav-btn.on, .kid-nav-btn.on:hover { color: var(--ink); background: var(--nav-on); }
+  .kid-nav-btn.on, .kid-nav-btn.on:hover { color: var(--ink); background: var(--nav-on); box-shadow: var(--nav-on-ring); }
   .kid-nav-btn.on .kid-nav-label { text-decoration: underline; text-decoration-thickness: 2px; }
   .kid-nav-btn:hover { background: var(--bg2); }
 

@@ -6,6 +6,9 @@
 ════════════════════════════════════════════════════════════════ */
 loadLocal();
 initFirebase();
+// The profile picker opens in the look this device showed last (L6); index.html
+// ships Pop, which is also what a device with nothing stored gets.
+applyLook(lookStored('last'));
 showScreen('profile');
 // The shell is cached by sw.js so the installed app opens without signal. Only
 // over http(s): the smoke suite runs over file://, where a worker cannot exist.
