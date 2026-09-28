@@ -624,6 +624,15 @@
     overflow-x: hidden;
   }
 
+  /* One font everywhere (Looks stage 4C). The browser gives form controls its
+     own system font, so without this every button, field and menu with no
+     font-family of its own drew in it, in both looks (🔒 PIN, 🎨, Exit).
+     The browser's control font also resets the figures, so Calm's tabular
+     figures (--num-variant) are inherited too. Only these two: sizes, weights
+     and line heights set elsewhere stand.
+     everyTextUsesTheLooksFonts (tests/smoke.js) holds it. */
+  button, input, select, textarea { font-family: inherit; font-variant-numeric: inherit; }
+
   h1, h2, h3, h4 { font-family: var(--font-head); font-weight: var(--head-weight); letter-spacing: 0.5px; }
 
   .screen { display: none; min-height: 100vh; position: relative; z-index: 1; }

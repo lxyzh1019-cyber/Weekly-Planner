@@ -15326,6 +15326,177 @@ function findChromium() {
     checks.theCalmLookReadsEverywhere = r.bad.length ? r.bad : true;
   }
 
+  /* Looks stage 4C — one font everywhere (owner, 2026-09-27: "different font
+     ... PIN, CALM, Exit button on the parent portal"). No base rule gave
+     button / input / select / textarea the page font, so every control without
+     its own font-family drew in the browser's system font, in both looks.
+
+     Every visible text — an element's own text node, an input's value or
+     placeholder, a select's option, an SVG label, a ::before/::after string —
+     must draw in one of the look's own font stacks: the first family of its
+     computed font-family is the first family of one of the look block's
+     --font-* tokens. The tokens are read from the live page (the computed
+     style of <html> in that look), not listed here, so a look that changes
+     its fonts moves the check with it. Walked on every KID_SCREENS row, the five parent destinations,
+     the profile picker and the ⋯ More, block edit, 📋 Copy a day and 🌙
+     reflect sheets, at the phone and the iPad, in both looks.
+
+     Named exemptions, each for a reason:
+     - .print-sheet (the print sheet and the week's print preview) draws in
+       --print-font-*, because print ignores the look (printIgnoresTheLook).
+     - Emoji-only text whose computed stack starts with an emoji font: the
+       glyphs come from the emoji font whatever the stack says. None is set
+       today; the exemption is counted in the log so a new one is seen. */
+  const everyTextUsesTheLooksFonts = async () => {
+    const bad = [];
+    const was = page.viewportSize();
+    let exempted = 0;
+    const ev = async (label, fn, arg) => {
+      try { return await page.evaluate(fn, arg); } catch (e) { bad.push(`${label}: threw ${e.message}`); return undefined; }
+    };
+    await defineAuditSeeds();
+    await page.evaluate(() => {
+      window.lookFontFindings = (root, lab) => {
+        const look = document.documentElement.getAttribute('data-look');
+        const first = (stack) => String(stack || '').split(',')[0].trim().replace(/^["']|["']$/g, '').toLowerCase();
+        /* The page is a file:// document, so its style sheets' rules cannot be
+           read; the computed style of <html> lists every custom property and
+           resolves each to the active look's value. The --font-* names are the
+           look's fonts (css/app.css: the fonts are a look's, and
+           check-look-tokens holds both looks to the same names); --print-font-*
+           is print's own and does not match. */
+        const rootCs = getComputedStyle(document.documentElement);
+        const tokens = [...rootCs].filter(p => /^--font-/.test(p));
+        if (!tokens.length) return { found: [`no --font-* tokens on <html> in the ${look} look, so nothing could be checked`], exempt: 0 };
+        const allowed = new Set(tokens.map(t => first(rootCs.getPropertyValue(t))).filter(Boolean));
+        const EMOJI_FONT = /emoji/i;
+        const EMOJI_ONLY = /^[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}\u200d\ufe0f\u20e3\s]+$/u;
+        const found = new Map();
+        let exempt = 0;
+        /* The look's figures too (Stage 3: Calm lines its figures up with
+           tabular-nums, Pop draws them as the font does), read from the live
+           --num-variant. Named exemption: the four figure columns that are
+           tabular in BOTH looks by their own rule (.mm-xp-n, .co-tier-n,
+           .pn-n, .pcw-day-n) — figures stacked in a column line up in Pop too. */
+        const numVariant = rootCs.getPropertyValue('--num-variant').trim() || 'normal';
+        const OWN_TABULAR = '.mm-xp-n, .co-tier-n, .pn-n, .pcw-day-n';
+        const label = (el, text, where) => {
+          const cls = (el.getAttribute('class') || '').trim().split(/\s+/)[0];
+          const name = `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}${cls ? '.' + cls : ''}${where}`;
+          return `${name} "${text.replace(/\s+/g, ' ').slice(0, 24)}"`;
+        };
+        const judge = (el, cs, text, where) => {
+          if (cs.fontVariantNumeric !== numVariant && !el.closest(OWN_TABULAR)) {
+            const key = label(el, text, where) + ' figures';
+            if (!found.has(key)) found.set(key, `${cs.fontVariantNumeric}, not the look's ${numVariant}`);
+          }
+          const fam = first(cs.fontFamily);
+          if (allowed.has(fam)) return;
+          if (EMOJI_ONLY.test(text) && EMOJI_FONT.test(fam)) { exempt++; return; }
+          const key = label(el, text, where);
+          if (!found.has(key)) found.set(key, cs.fontFamily.split(',')[0].trim());
+        };
+        root.querySelectorAll('*').forEach(el => {
+          if (el.closest('.print-sheet')) return;
+          const cs = getComputedStyle(el);
+          if (cs.display === 'none' || cs.visibility === 'hidden') return;
+          const box = el.getBoundingClientRect();
+          if (!box.width || !box.height) return;
+          const tag = el.tagName;
+          let text = [...el.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join('').trim();
+          if (tag === 'INPUT' && !/^(checkbox|radio|range|color|hidden|file|image)$/i.test(el.type)) text = (el.value || el.placeholder || '').trim();
+          else if (tag === 'TEXTAREA') text = (el.value || el.placeholder || '').trim();
+          else if (tag === 'SELECT') text = (el.selectedOptions[0] ? el.selectedOptions[0].textContent : '').trim();
+          else if (tag === 'OPTION' || tag === 'STYLE' || tag === 'SCRIPT') text = '';
+          if (text) judge(el, cs, text, '');
+          for (const pseudo of ['::before', '::after']) {
+            const ps = getComputedStyle(el, pseudo);
+            const m = /^"(.*)"$/.exec(ps.content || '');
+            if (m && m[1].trim() && ps.display !== 'none') judge(el, ps, m[1].trim(), pseudo);
+          }
+        });
+        return { found: [...found].map(([k, f]) => `${k} in ${f}`), exempt };
+      };
+    });
+    const take = async (label, fn, arg) => {
+      const r = await ev(label, fn, arg);
+      if (!r) return;
+      exempted += r.exempt;
+      if (r.found.length) bad.push(`${label}: ${r.found.length} text(s) outside the look's fonts or figures: ${r.found.slice(0, 12).join(' · ')}${r.found.length > 12 ? ' …' : ''}`);
+    };
+    try {
+      for (const look of ['pop', 'calm']) {
+        try { if (look === 'pop') await clearLooks(); else await setLook(look); } catch (e) { bad.push(`the ${look} look could not be applied: ${e.message}`); continue; }
+        for (const [w, h] of [[390, 844], [1194, 834]]) {
+          await page.setViewportSize({ width: w, height: h });
+          const where = (s) => `[${look}] ${s}@${w}`;
+          for (const [id, nav, label] of KID_SCREENS) {
+            const seeded = await ev(where(label || id), `(${nav.toString()})()`);
+            if (typeof seeded === 'string') bad.push(`${where(label || id)}: ${seeded}`);
+            await page.waitForTimeout(200);
+            await take(where(label || id), ([sid, lab]) => {
+              const scr = document.getElementById(sid);
+              if (!scr || !scr.classList.contains('active')) return { found: [`the screen was not on show, so nothing on it was measured`], exempt: 0 };
+              return lookFontFindings(document.body, lab);
+            }, [id, where(label || id)]);
+          }
+          for (const dest of ['now', 'meeting', 'history', 'setup', 'app']) {
+            await ev(where(`Parent › ${dest}`), (d) => {
+              profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
+              showScreen('parent'); renderParentHome(); setParentDest(d);
+            }, dest);
+            await page.waitForTimeout(250);
+            await take(where(`Parent › ${dest}`), (lab) => {
+              if (!document.getElementById('screen-parent').classList.contains('active')) return { found: ['the portal was not on show, so nothing on it was measured'], exempt: 0 };
+              return lookFontFindings(document.body, lab);
+            }, where(`Parent › ${dest}`));
+          }
+          await ev(where('profile picker'), () => { showScreen('profile'); });
+          await page.waitForTimeout(250);
+          await take(where('profile picker'), (lab) => document.getElementById('screen-profile').classList.contains('active')
+            ? lookFontFindings(document.body, lab) : { found: ['the picker was not on show, so nothing on it was measured'], exempt: 0 }, where('profile picker'));
+          /* The sheets: each opened on Jenn's Today, measured after its
+             slide-in, then closed (and its seed put back). */
+          const sheets = [
+            ['⋯ More', 'tdMoreOverlay', () => { tdOpenMore(); }],
+            ['block edit', 'editOverlay', () => {
+              const k = todayKey();
+              window.__fontHad = getDayBlocks(k, 'jenn');
+              setDayBlocks(k, [...window.__fontHad.filter(b => b.id !== 'font-edit'),
+                { id: 'font-edit', actId: 'piano', startMin: 16 * 60, durationMin: 60, checklistState: {} }], 'jenn');
+              openDay(k, getDayKeys(0).indexOf(k)); openEditSheet('font-edit');
+            }],
+            ['📋 Copy a day', 'templateOverlay', () => { openDay(todayKey(), getDayKeys(0).indexOf(todayKey())); openTemplateSheet(); }],
+            ['🌙 reflect', 'reflectOverlay', () => { openReflectSheet(todayKey()); }],
+          ];
+          for (const [name, ov, open] of sheets) {
+            await ev(where(name), `(() => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); (${open.toString()})(); })()`);
+            await page.waitForTimeout(450);
+            await take(where(name), ([o, lab]) => {
+              const sheet = document.querySelector(`#${o}.open .sheet`);
+              return sheet ? lookFontFindings(sheet, lab) : { found: ['the sheet did not open, so nothing on it was measured'], exempt: 0 };
+            }, [ov, where(name)]);
+            await ev(`${where(name)} close`, (o) => {
+              if (document.getElementById(o).classList.contains('open')) closeSheet(o);
+              if (window.__fontHad) { setDayBlocks(todayKey(), window.__fontHad, 'jenn'); window.__fontHad = null; }
+            }, ov);
+          }
+        }
+      }
+    } finally {
+      try { await clearLooks(); } catch (e) { bad.push('could not put Pop back: ' + e.message); }
+      await ev('restore', () => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
+      if (was) await page.setViewportSize(was);
+      await page.waitForTimeout(200);
+    }
+    if (exempted) console.log(`everyTextUsesTheLooksFonts: ${exempted} emoji-only text(s) exempted (drawn in an emoji font)`);
+    return bad;
+  };
+  if (want('everyTextUsesTheLooksFonts')) {
+    const bad = await everyTextUsesTheLooksFonts();
+    checks.everyTextUsesTheLooksFonts = bad.length ? bad : true;
+  }
+
   /* ── SMALL FIXES R7 (Plan v7, 2026-09-26) ────────────────────────────
      Deferred small fixes, one check each, each written to fail on the code
      before it. Item 2 (the Day view's invite buttons) is held by
