@@ -1,4 +1,4 @@
-# FEATURES — Weekly-Planner — manifest v16 — 2026-09-27, v15 + looks stage 4: Calm everywhere, print ignores the look, one font everywhere (build 2026-09-27d) (v2 confirmed 2026-09-22)
+# FEATURES — Weekly-Planner — manifest v17 — 2026-09-27, v16 + looks stage 5: two looks closed out (build 2026-09-27e) (v2 confirmed 2026-09-22)
 
 Locked features of the current version. Every edit is checked against this list and ends with a regression table. Update this file in the same change that alters a feature. Over-list rather than under-list.
 
@@ -241,6 +241,14 @@ Each held by a check that fails on the code before it (run against a `git archiv
 - **7 — docs and comments:** merge-test count 112 in `ARCHITECTURE.md` (×2) and `tests/README.md`; the four "6am–9pm" comments read 6am–10pm (`css/app.css`'s print-slot note also says the JS sets the slot per host).
 - **8 — dead code removed:** the `block.inviteId && !block.inviteAccepted` guard (`attachBlockDrag`), the `'👯': 'Open Sister Sync'` entry of `applyIconButtonAriaLabels`' icon map (no button's text is a bare 👯), and `coHandleClick`'s `export` branch (no `data-co-action="export"` anywhere; `ctExportBackup` keeps its two `onclick` doors). `check-dead-actions` reverse warnings 27 → 26. The 12 dead chore-tab branches stay for C3.
 - Build `2026-09-26a` (`APP_BUILD` = `SW_VERSION`).
+
+### Two looks, Pop and Calm — summary (manifested 2026-09-27, Plan v8, stages 1–5, final build 2026-09-27e)
+The whole app (kid screens, parent portal, sheets and pop-ups) has two looks; print ignores them. Handoff: `docs/handoff/looks-calm-pop.md`; rules: `ARCHITECTURE.md` › UI rules › "Two looks (Pop and Calm)".
+- **Pop** (default): cream graph paper, navy ink, handwriting fonts (Gochi Hand / Patrick Hand) at 1.1× text, the Now card filled with the running activity's colour, rows in its wash, yellow main buttons. **Calm**: cool graph paper, Lexend / Baloo 2 (loaded on first use), white cards and rows, purple main button, navy selected pills. Same border widths and boxes in both.
+- **Switching:** a 🎨 tile in each kid's ⋯ More and a 🎨 button in the parent portal header; instant, remembered per person on this device (`wp_look_jenn`, `wp_look_jess`, `wp_look_parent`, `wp_look_last`), never synced. The profile picker uses the last look.
+- **Shared in both looks:** money colours, the activity palette (brighter, same hues), kid colours, warnings and to-do, print.
+- **Held by:** `check-look-tokens` (no typed colour/font/size outside tokens; both looks define the same names) and the smoke checks listed in the stage sections below.
+- Stage details: Looks stage 1 (shared values), 2 (Pop), 3 (Calm and switches), 4 (Calm everywhere, print, one font) below; stage 5 wrote the single `ARCHITECTURE.md` section, confirmed every `look:` mark and the one exemption are still needed (each removal fails the check), and set build `2026-09-27e`.
 
 ### Looks stage 1 — every colour, font and text size reads a shared value (manifested 2026-09-27, Plan v7 Stage 1, build 2026-09-27a)
 No visible change; groundwork for the two looks (Pop and Calm, `docs/handoff/looks-calm-pop.md`).

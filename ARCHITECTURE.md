@@ -427,6 +427,109 @@ Kid-facing copy is a product surface, not filler. The rules:
   is now a judgement about what a child came to the screen for, not a way of
   getting under a number, so a thing worth reading may lead rather than hide.
 
+### Two looks (Pop and Calm)
+
+Each kid and the parent pick a look: **Pop** (cream graph paper, handwriting
+fonts, text 10% larger) or **Calm** (cool page, Lexend and Baloo 2). A look is
+only a different set of VALUES for the same names. This is the one statement of
+how that holds; the design is `docs/handoff/looks-calm-pop.md`.
+
+- **Where values live.** `css/app.css`'s top `:root` holds what both looks
+  share; `:root[data-look="pop"]` and `:root[data-look="calm"]` hold what
+  differs, and both define exactly the same names (107 today).
+  `<html data-look="pop">` is the static starting value in `index.html`.
+- **A colour or font is added or changed only as a token** — in `:root` when it
+  is shared, in BOTH look blocks when it differs by look. Nothing outside a
+  token block types a colour or names a font. What must keep a typed hex — a
+  family data palette stored on blocks or goals (`COLOURS`, `CAT_HEX`,
+  `ACTIVITY_CATEGORIES`, `RETIRED_SEEDED_HEXES`, `TRAINING_DEFAULT_HEXES`,
+  `TRAINING_TAGS`, `GT_COLOURS`, the seeded `#7fca79`, the unknown-block
+  `#888`) or print's colour maths (`printTextColor`) — carries
+  `/* look: <reason> */` on its line, or once on the first line of its table.
+  The `theme-color` meta is the one named exemption: the browser reads it
+  before any CSS, so it holds Pop's `--bg` (as `manifest.json` does) and
+  `applyLook` rewrites it from the live `--bg`.
+- **Decoration differs by look; meaning does not.** A look may change the page,
+  paper, cards, shadows, fonts, heading weight, figures, text scale, accents,
+  main button, tick, selected tab and pill, time-of-day zones and the warm
+  surfaces. These stay shared, identical in both looks, because they are read
+  as meaning rather than style: **warnings** (`--status-warn-*`) and
+  waiting/to-do amber (`--status-todo-*`) — a warning must read as a warning
+  whichever look is on; **money** (`--mny-*`, `--mny-figure`, `--mny-bar*`; the
+  money redesign picks the one set, handoff D6); the **activity palette** and
+  its `--cat-*` copies (a block's colour is family data stored on the block);
+  **kid colours** (`--jenn*`, `--jess*` — who is who); the meaning colours
+  (clash, done, danger, now-line); the navy `--ink` the colour maths read live
+  (`inkContrast`, cached per `data-look`); dark-mode tokens; and **print**.
+  What script works out from a look is set inline and weighed by the look's
+  fill knobs (`--now-fill`, `--row-fill`, `--tile-fill`, `--block-fill`): the
+  Now card's `--now-c` (the running block's colour, only where navy reads on it
+  at 4.5:1), a Today row's `--cw` wash (`colourWash`), the Full week's block
+  fill (`lookBlockFill`).
+- **`applyLook(look)` (`js/05-helpers.js`) is the one way a look reaches the
+  screen.** It sets `<html data-look>`, loads Calm's fonts, writes
+  `wp_look_last`, sets `theme-color` from the live `--bg`, relabels the
+  parent's 🎨 button and, on a change, re-measures the week
+  (`wfTypeInvalidate`) and redraws the current screen — no reload. Nothing else
+  writes `data-look`. `lookToggle(who)` is behind the kid's 🎨 tile in ⋯ More
+  and the parent's `#parentLookBtn`.
+- **Stored per person, per device, never synced:** `localStorage`
+  `wp_look_jenn`, `wp_look_jess`, `wp_look_parent`, `wp_look_last`, every access
+  in try/catch (unreadable storage means Pop). Boot and the profile picker use
+  the last look; picking a kid applies hers; entering the portal applies the
+  parent's. A look is a device preference, not family state: it never goes
+  into `state` and needs no merge decision.
+- **Calm's fonts load on first use** — one injected Google Fonts
+  `<link id="lookCalmFonts">` (`display=swap`), not in the offline shell. Each
+  Calm stack ends in the system sans, which meets the floors offline, and the
+  `document.fonts` listeners in `js/99-main.js` re-measure the week when the
+  fonts arrive.
+- **`--text-scale` (Pop 1.1, Calm 1) multiplies every absolute font size** — in
+  css, generated markup and `index.html`: `calc(<size> * var(--text-scale, 1))`.
+  em and % inherit it; the parent Reading size (`--fs-scale`) multiplies on top.
+  Anything hand-measured against the type is measured on the page instead (see
+  *The week grid measures its own type* under Navigation), and a label Calm's
+  smaller type could take under 13px is floored with `max(13px, …)`.
+- **Print ignores the look.** `@media print { :root, :root[data-look] {
+  --text-scale: 1 } }` sits after the look blocks so it out-ranks them; the
+  print sheet reads its own `--print-*` tokens (font, figures, heading weight),
+  `printTextColor` does not follow the live ink, and print-sheet sizes carry
+  `/* look: print sheet ignores the look (L12) */`.
+- **Controls inherit the look's font:** `button, input, select, textarea {
+  font-family: inherit; font-variant-numeric: inherit; }`. Without it the
+  browser draws every control in the system font and drops Calm's tabular
+  figures. Only those two properties; sizes, weights and line heights set
+  elsewhere stand.
+- **`--accent` is decorative only** (Pop `#ff7b54`, Calm `#7b70e4`). White text
+  on it, selected controls and informational accent text use `--accent-strong`
+  (Pop `#b8441f`, Calm `#5b4fd6`; each ≥ 4.9:1 under white and as text on
+  `--bg2` — Pop's was `#c14a24`, 4.50:1, until Looks stage 2B-2). This is the
+  AA contrast fix; don't undo it.
+- **What holds it.** `tests/check-look-tokens.js` (`npm run check`): a typed
+  colour or font outside a token block, a `look:` mark with no reason, a stale
+  exemption, an absolute font size that does not multiply `--text-scale`, a
+  token one look defines and the other forgets. `tests/smoke.js`:
+  `thePopLookReadsEverywhere` / `theCalmLookReadsEverywhere` (every visible
+  text ≥ 4.5:1 on its composited background, no white on a pastel — every kid
+  screen at 390×844 and 1194×834, the five parent destinations, the picker,
+  ⋯ More and the block edit sheet); `theLooksKeepTheSameBoxes` (border widths,
+  padding and radii identical in both looks); `everyTextUsesTheLooksFonts`
+  (every visible text's first family is one of the look's `--font-*` tokens and
+  its figures match `--num-variant`, both looks); `printIgnoresTheLook` (every
+  computed style and box of the print sheet identical in Pop and Calm);
+  `warningsReadAsWarningsInBothLooks`; `todayAndSelectedDifferInBothLooks`
+  (Parent › Now, Chores' day chips); `everySubgroupTellsItselfApart` (the
+  palette against the live ink — see *Brighter, same hue*);
+  `theLookFlipsWithNoReload` and `theLookSurvivesAReload`; and the house-rules
+  sweeps (`kidScreensMeetTheHouseRules`, `parentScreensMeetTheHouseRules`) run
+  in both looks. Every kid screen is saved in both looks as
+  `tests/out/look-<look>-<screen>-<w>.png`.
+- **Ongoing cost.** Every screen change must pass these in BOTH looks — a fix
+  that reads in Pop can fail in Calm (smaller type, white rows, cool
+  surfaces). The checks cover colours, fonts, contrast, targets, text floors
+  and boxes; layout, and whether the two looks still feel different, still
+  need a look on the iPad.
+
 ## Navigation
 
 **Today is the front door** (`js/31-today.js`). A child lands there and moves
@@ -1449,27 +1552,11 @@ and a week with no chore pool gave the same blank for a different reason.
 say which one they are.
 - Use the design tokens in `css/app.css` (`--space-*`, `--text-*`,
   `--shadow-*`, `--radius-*`). Avoid new inline `style="…"`.
-- A colour or font is added or changed only as a token in `:root` (and, once
-  looks exist, in every look block); data palettes and colour maths carry
-  `/* look: reason */`; every absolute font-size multiplies `--text-scale`.
-  `tests/check-look-tokens.js` enforces all three.
-- **The look block** (Looks stage 2B-2): a value that differs between looks —
-  the text scale, the fonts, the page, card paper and muted text, the card /
-  row / Now shadows, the fill knobs (`--now-fill`, `--row-fill`, `--tile-fill`),
-  the main button, the selected tab, the tick and the progress bar — lives
-  ONLY in `:root[data-look="pop"]` (Calm adds its block in Stage 3); shared
-  values stay in `:root`. `<html data-look="pop">` is static in `index.html`.
-  Print's `:root, :root[data-look] { --text-scale: 1 }` sits after the look
-  block so it out-ranks it (L12). The Now card wears the running block's colour
-  (`--now-c`, only when navy reads on it at 4.5:1) and Today's block rows their
-  wash (`--cw`, `colourWash`), both set inline. "Today" markers read
-  `--today-mark` (navy, L9). `thePopLookReadsEverywhere` holds every kid screen,
-  the five parent destinations, ⋯ More and the block edit sheet to 4.5:1 in
-  light mode, with no white text on a pastel.
-- `--accent` (`#ff7b54`) is decorative only. Anything with white text on it or
-  informational accent text uses `--accent-strong` (`#b8441f`; `#c14a24` until
-  Looks stage 2B-2, which read 4.50:1 on `--bg2`) — this is the AA
-  contrast fix, don't undo it.
+- Colours, fonts, font sizes and `--accent` / `--accent-strong`: see
+  *Two looks (Pop and Calm)* under UI rules — the one statement of those rules.
+- "Today" markers read `--today-mark` (navy in both looks, L9); in Calm,
+  Parent › Now keeps today (white, navy frame) apart from the selected day
+  (navy fill) — `todayAndSelectedDifferInBothLooks`.
 - Never white text on the pastel category colors (all fail contrast).
 - Use the app's `.sheet` / `appDialog` patterns, not native `confirm()`/`prompt()`.
 

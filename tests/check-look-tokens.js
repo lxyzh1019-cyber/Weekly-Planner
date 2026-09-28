@@ -1,10 +1,10 @@
 // Weekly-Planner — look-token lint.
 //
-// Why this exists: the app is getting two looks (Pop and Calm, handoff L2/L11).
+// Why this exists: the app has two looks (Pop and Calm, handoff L2/L11).
 // A look is only a different set of VALUES for the same shared names, so every
 // colour and font the app paints must read one of those names. One typed-in
-// `#fff` or `font-family: 'Patrick Hand'` is a spot that silently stays in the
-// old look when the family switches — nobody sees it until a child does. So a
+// `#fff` or `font-family: 'Patrick Hand'` is a spot that silently stays in one
+// look when the family switches to the other — nobody sees it until a child does. So a
 // typed colour or font anywhere outside the shared value set fails the build.
 //
 // Four rules:
@@ -57,7 +57,7 @@
 // 4. Text scale. A look may make text bigger or smaller (--text-scale, set by
 //    the look block; `var(--text-scale, 1)` where none is), so every font size with an absolute unit (px, rem, pt, pc, cm,
 //    mm, in, Q) must multiply it: `calc(0.9rem * var(--text-scale, 1))`. One
-//    that does not is text that stays the old size in the new look. em, %,
+//    that does not is text that keeps one size in both looks. em, %,
 //    keywords and 0 follow their parent already and are not checked.
 //    Scanned: css/app.css `font-size` and `font` declarations outside token
 //    blocks and outside `@media print`; in js/*.js and index.html (comment text
@@ -415,5 +415,5 @@ for (const p of problems) {
   console.error(`      ${p.detail}`);
   console.error(`      ${p.fix}\n`);
 }
-console.error('A colour, font or unscaled font size typed outside the shared value set stays in the old look when the family switches.');
+console.error('A colour, font or unscaled font size typed outside the shared value set stays the same when the family switches looks.');
 process.exit(1);
