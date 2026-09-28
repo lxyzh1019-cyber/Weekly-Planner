@@ -99,7 +99,10 @@ npm run test:smoke          # screenshots land in tests/out/
 ```
 
 `npm run check` runs `tests/check-syntax.js`, `tests/check-globals.js`,
-`tests/check-shared-merge.js`, `tests/check-escaping.js`, `tests/check-dead-css.js`,
+`tests/check-shared-merge.js`, `tests/check-escaping.js`,
+`tests/check-look-tokens.js` (every colour and font reads a `:root` token and
+every absolute font size multiplies `--text-scale`, so a look reaches every
+spot), `tests/check-dead-css.js`,
 `tests/check-dead-ids.js`, `tests/check-dead-actions.js` and `tests/check-sw-shell.js` (an `id` in `index.html` that nothing reads — the
 same blind spot as dead CSS, with runtime-built prefixes discovered from the
 source rather than listed by hand). **Do not go back to the old shell loop** —
@@ -424,6 +427,109 @@ Kid-facing copy is a product surface, not filler. The rules:
   is now a judgement about what a child came to the screen for, not a way of
   getting under a number, so a thing worth reading may lead rather than hide.
 
+### Two looks (Pop and Calm)
+
+Each kid and the parent pick a look: **Pop** (cream graph paper, handwriting
+fonts, text 10% larger) or **Calm** (cool page, Lexend and Baloo 2). A look is
+only a different set of VALUES for the same names. This is the one statement of
+how that holds; the design is `docs/handoff/looks-calm-pop.md`.
+
+- **Where values live.** `css/app.css`'s top `:root` holds what both looks
+  share; `:root[data-look="pop"]` and `:root[data-look="calm"]` hold what
+  differs, and both define exactly the same names (107 today).
+  `<html data-look="pop">` is the static starting value in `index.html`.
+- **A colour or font is added or changed only as a token** — in `:root` when it
+  is shared, in BOTH look blocks when it differs by look. Nothing outside a
+  token block types a colour or names a font. What must keep a typed hex — a
+  family data palette stored on blocks or goals (`COLOURS`, `CAT_HEX`,
+  `ACTIVITY_CATEGORIES`, `RETIRED_SEEDED_HEXES`, `TRAINING_DEFAULT_HEXES`,
+  `TRAINING_TAGS`, `GT_COLOURS`, the seeded `#7fca79`, the unknown-block
+  `#888`) or print's colour maths (`printTextColor`) — carries
+  `/* look: <reason> */` on its line, or once on the first line of its table.
+  The `theme-color` meta is the one named exemption: the browser reads it
+  before any CSS, so it holds Pop's `--bg` (as `manifest.json` does) and
+  `applyLook` rewrites it from the live `--bg`.
+- **Decoration differs by look; meaning does not.** A look may change the page,
+  paper, cards, shadows, fonts, heading weight, figures, text scale, accents,
+  main button, tick, selected tab and pill, time-of-day zones and the warm
+  surfaces. These stay shared, identical in both looks, because they are read
+  as meaning rather than style: **warnings** (`--status-warn-*`) and
+  waiting/to-do amber (`--status-todo-*`) — a warning must read as a warning
+  whichever look is on; **money** (`--mny-*`, `--mny-figure`, `--mny-bar*`; the
+  money redesign picks the one set, handoff D6); the **activity palette** and
+  its `--cat-*` copies (a block's colour is family data stored on the block);
+  **kid colours** (`--jenn*`, `--jess*` — who is who); the meaning colours
+  (clash, done, danger, now-line); the navy `--ink` the colour maths read live
+  (`inkContrast`, cached per `data-look`); dark-mode tokens; and **print**.
+  What script works out from a look is set inline and weighed by the look's
+  fill knobs (`--now-fill`, `--row-fill`, `--tile-fill`, `--block-fill`): the
+  Now card's `--now-c` (the running block's colour, only where navy reads on it
+  at 4.5:1), a Today row's `--cw` wash (`colourWash`), the Full week's block
+  fill (`lookBlockFill`).
+- **`applyLook(look)` (`js/05-helpers.js`) is the one way a look reaches the
+  screen.** It sets `<html data-look>`, loads Calm's fonts, writes
+  `wp_look_last`, sets `theme-color` from the live `--bg`, relabels the
+  parent's 🎨 button and, on a change, re-measures the week
+  (`wfTypeInvalidate`) and redraws the current screen — no reload. Nothing else
+  writes `data-look`. `lookToggle(who)` is behind the kid's 🎨 tile in ⋯ More
+  and the parent's `#parentLookBtn`.
+- **Stored per person, per device, never synced:** `localStorage`
+  `wp_look_jenn`, `wp_look_jess`, `wp_look_parent`, `wp_look_last`, every access
+  in try/catch (unreadable storage means Pop). Boot and the profile picker use
+  the last look; picking a kid applies hers; entering the portal applies the
+  parent's. A look is a device preference, not family state: it never goes
+  into `state` and needs no merge decision.
+- **Calm's fonts load on first use** — one injected Google Fonts
+  `<link id="lookCalmFonts">` (`display=swap`), not in the offline shell. Each
+  Calm stack ends in the system sans, which meets the floors offline, and the
+  `document.fonts` listeners in `js/99-main.js` re-measure the week when the
+  fonts arrive.
+- **`--text-scale` (Pop 1.1, Calm 1) multiplies every absolute font size** — in
+  css, generated markup and `index.html`: `calc(<size> * var(--text-scale, 1))`.
+  em and % inherit it; the parent Reading size (`--fs-scale`) multiplies on top.
+  Anything hand-measured against the type is measured on the page instead (see
+  *The week grid measures its own type* under Navigation), and a label Calm's
+  smaller type could take under 13px is floored with `max(13px, …)`.
+- **Print ignores the look.** `@media print { :root, :root[data-look] {
+  --text-scale: 1 } }` sits after the look blocks so it out-ranks them; the
+  print sheet reads its own `--print-*` tokens (font, figures, heading weight),
+  `printTextColor` does not follow the live ink, and print-sheet sizes carry
+  `/* look: print sheet ignores the look (L12) */`.
+- **Controls inherit the look's font:** `button, input, select, textarea {
+  font-family: inherit; font-variant-numeric: inherit; }`. Without it the
+  browser draws every control in the system font and drops Calm's tabular
+  figures. Only those two properties; sizes, weights and line heights set
+  elsewhere stand.
+- **`--accent` is decorative only** (Pop `#ff7b54`, Calm `#7b70e4`). White text
+  on it, selected controls and informational accent text use `--accent-strong`
+  (Pop `#b8441f`, Calm `#5b4fd6`; each ≥ 4.9:1 under white and as text on
+  `--bg2` — Pop's was `#c14a24`, 4.50:1, until Looks stage 2B-2). This is the
+  AA contrast fix; don't undo it.
+- **What holds it.** `tests/check-look-tokens.js` (`npm run check`): a typed
+  colour or font outside a token block, a `look:` mark with no reason, a stale
+  exemption, an absolute font size that does not multiply `--text-scale`, a
+  token one look defines and the other forgets. `tests/smoke.js`:
+  `thePopLookReadsEverywhere` / `theCalmLookReadsEverywhere` (every visible
+  text ≥ 4.5:1 on its composited background, no white on a pastel — every kid
+  screen at 390×844 and 1194×834, the five parent destinations, the picker,
+  ⋯ More and the block edit sheet); `theLooksKeepTheSameBoxes` (border widths,
+  padding and radii identical in both looks); `everyTextUsesTheLooksFonts`
+  (every visible text's first family is one of the look's `--font-*` tokens and
+  its figures match `--num-variant`, both looks); `printIgnoresTheLook` (every
+  computed style and box of the print sheet identical in Pop and Calm);
+  `warningsReadAsWarningsInBothLooks`; `todayAndSelectedDifferInBothLooks`
+  (Parent › Now, Chores' day chips); `everySubgroupTellsItselfApart` (the
+  palette against the live ink — see *Brighter, same hue*);
+  `theLookFlipsWithNoReload` and `theLookSurvivesAReload`; and the house-rules
+  sweeps (`kidScreensMeetTheHouseRules`, `parentScreensMeetTheHouseRules`) run
+  in both looks. Every kid screen is saved in both looks as
+  `tests/out/look-<look>-<screen>-<w>.png`.
+- **Ongoing cost.** Every screen change must pass these in BOTH looks — a fix
+  that reads in Pop can fail in Calm (smaller type, white rows, cool
+  surfaces). The checks cover colours, fonts, contrast, targets, text floors
+  and boxes; layout, and whether the two looks still feel different, still
+  need a look on the iPad.
+
 ## Navigation
 
 **Today is the front door** (`js/31-today.js`). A child lands there and moves
@@ -500,9 +606,12 @@ never describe different amounts of time. `wfBufferSegments` itself is
 **untouched** — Today's `tdPrepFor` reads it for "leave by 7:40", and that is
 still 7:40 whether or not the plan fits.
 
-`WF_TRAVEL_TEXT_MIN_PX` (17) is a **measurement**, like `WF_ROW`: 13.12px of
-text plus a 1.5px conflict border each side is 16.1, so 16 sits on the edge and
-17 is the first height that always holds a line. A strip under it keeps its
+`wfTravelTextMinPx()` is a **measurement**, like `WF_ROW`: one line of the
+strip's computed type plus its thickest (conflict) border top and bottom,
+rounded up — 13.12px + 2 x 1.5px = 16.1, so 17 on the iPad, and 16 on a 1x
+screen, where that border is drawn 1px. (It was the constant
+`WF_TRAVEL_TEXT_MIN_PX = 17` until the looks made the type change on purpose;
+see "The week grid measures its own type" below.) A strip under it keeps its
 hatch and its tooltip and says nothing; several short same-side segments merge
 into one **band** whose per-kind hatches stay as children and whose single label
 speaks for both. Height only answers one of the two questions — a column is
@@ -576,10 +685,10 @@ a PD day speaks, and a week that is all holiday says it once on the axis.
 own name at the top of each stretch — `🏫 SCHOOL`, `🎒 AFTER SCHOOL` — and a
 buffer run beginning on that boundary lands its time in exactly those pixels.
 Invisible while the strips were mute; two lines of text through each other the
-moment they spoke again, which is the defect `WF_TRAVEL_TEXT_MIN_PX` exists to
+moment they spoke again, which is the defect `wfTravelTextMinPx` exists to
 prevent. The **time wins**: it is the one figure on this surface a parent acts
 on, and the zone is still said twice over, by the band's tint and by the left
-axis. Pure arithmetic on inline pixel values (`WF_BAND_LABEL_PX`, another
+axis. Pure arithmetic on inline pixel values (`wfBandLabelPx()`, another
 measurement), so it costs no reflow. A screenshot found this — the suite was
 green.
 
@@ -597,7 +706,9 @@ than the mechanism: both figures visible in a full column, the leave-by one
 visible in a split lane with the other spelled out in a tooltip, at one lane and
 at two, without overflowing what draws them.
 
-**`wfTextPx` is how wide a label will be, and it is a MEASUREMENT.** It replaces
+**`wfTextPx` is how wide a label will be, and it is a MEASUREMENT.** (What
+follows is the glyph table it used to be; it now measures the text itself —
+see "The week grid measures its own type" below.) It replaced
 `text.length * 6.6`, which charged every character the same width — and a buffer
 label is mostly emoji, so `🚗 7:55am` is eight units and 65.6 real pixels (8.2
 each) while `🎒 After school` is fifteen and 100 (6.7 each). One number was
@@ -622,6 +733,29 @@ looks reasonable is exactly what ships wrong.
 `.wf-travel-band-label` is in the overflow sweep for the same reason: it is the
 element that actually carries a band's text, and while it was left out a label
 30px too wide for its column passed that sweep untouched.
+
+**The week grid measures its own type (Looks stage 2, L15).** The table above,
+`WF_TRAVEL_TEXT_MIN_PX`, `WF_BAND_LABEL_PX`, `WF_ROW` and
+`WF_NAME_ONE_LINE_CHARS` were all hand measurements of Patrick Hand at 13.1px,
+each with a comment saying a type change invalidates it — and the text scale and
+the looks change the type on purpose. `wfTypeMetrics` (`js/07-week-view.js`)
+now reads them off the page: one probe of each element this grid draws, built
+inside `#screen-week` so the kid floor and the look apply, read with
+`getComputedStyle` (no layout, so a hidden screen works) and removed at once.
+Widths are the text itself, `measureText` on one canvas in the element's
+computed font — it agrees with the DOM to a hundredth of a pixel, emoji
+included. A label's box is its text plus the strip's border and **half** its
+padding each side: the line is centred and clipped at the border, so it may use
+a pixel of padding; charging the whole padding silenced the leave-by time in a
+53px split lane in the fallback font. The strip's width is the day column's
+**inside** (`stripColPx`), because `.wf-day-col`'s own 1px border is a pixel an
+exact measurement notices. A stacked card's rows are whole pixels, rounded to the
+nearest as the hand values were, so at scale 1 they are exactly 20/14/29/13/13/15/2.
+A name reserves a second line only when its measured width is wider than a
+one-lane card's text width, not when it is over 13 characters.
+`wfTypeInvalidate()` drops every cached answer and redraws the week if it is on
+screen and the answers changed: `js/99-main.js` calls it on `document.fonts`
+`loadingdone` and `ready`, and a look or text-scale change calls it too.
 
 **The minutes that did not fit are drawn, not just described.** `.wf-overrun`
 lays the shortfall over the card it runs into at a quarter strength, exactly as
@@ -1209,7 +1343,8 @@ own title in half — 40px of block, 30px of content box, two lines needing 34.
 `detail` starts at 64px and a stacked card needs 66 before it draws a single
 goal line, so the ladder promoted cards into a layout they could not hold.
 `wfStackPlan` (`js/07-week-view.js`) is what decides the layout now, against
-`WF_ROW` — the **measured** cost of each row at the sizes this grid ships. The
+`WF_ROW` — the **measured** cost of each row in the type on screen
+(`wfCardRowPx`). The
 old arithmetic budgeted 58px for the four fixed rows and 20px a goal line; the
 real figures are 66 and 17, because the kid readability floor lifted
 `.wf-card-time`, `-dur` and `-sum` to 13.1px and nothing re-measured. On top of
@@ -1223,8 +1358,9 @@ start-time chip with whatever is left. A second line of name is bought only
 when the name is long enough to need it — and that estimate cannot overflow,
 because a plan that says one line also emits `.wf-card--nameclamp`, which holds
 it to one whatever the guess got wrong. `theStackedCardFitsWhatItDraws` measures
-in-flow children against the card's own height; `WF_ROW` is a set of
-measurements, so changing the type invalidates it.
+in-flow children against the card's own height; `WF_ROW` is read from the
+page's computed type, so it follows a type change (it failed at text scale 1.1
+while it was typed in).
 
 Today **owns no data and no rules — but it does invoke them.** Every number it
 shows is read through the accessors the owning screen uses, and every write goes
@@ -1288,30 +1424,34 @@ chore tab is unchanged.
   clears from Today alone. A parent looking consumes nothing.
 - **Rows 7 and 8 — Parent › Now, "On her behalf"** (`pnAnswerCard`, see *The
   parent portal*): per child, per day of this week up to today.
-- **Row 19 — 🕓 Catch up** (`tdCatchUpCard`), at the top of Today's day column:
-  every EARLIER day of an OPEN week with something unanswered — a planned
+- **Row 19 — 🕓 Catch up** (`tdCatchUpCard`), in Today's day column directly
+  after the ✏️ Modify my plan button (R12, owner 2026-09-27: "just below Modify
+  my plan" — today's schedule leads, the earlier days follow it as a group):
+  every EARLIER day of THIS week with something unanswered — a planned
   (`scheduled`) paid chore with no claim and no grade, a routine not closed, a
   training not rated — oldest first, e.g. `Tue · 2 jobs · 1 routine`,
-  `Wed · training — how did you try?` (an earlier week's day reads
-  `Tue 15 Sep`). Tapping a day opens its answers in the card, one day at a time;
-  a day answered in full drops out and the card goes when nothing is left. It
-  writes nothing itself. **How far back:** this week and the 8 before it (the
-  family meeting's own catch-up window, `mmUnsettledWeeks(8)` — inside it a
-  claim can still become pay), never before `mmCatchUpFloor()`, and only weeks
-  not SETTLED for her — `mnyWeekSettled`: committed at a meeting
-  (`mnyIsCommitted`, `weekPlans[wk][kid].committedAt`) or credited another way
-  (Grandma rule, repair, express catch-up). Not today, not a day to come, not a
-  sick day, not a block recorded as not done. A day with nothing unanswered is
-  not listed; "something else" for such a day goes through the next row.
+  `Wed · training — how did you try?`. Tapping a day opens its answers in the
+  card, one day at a time; a day answered in full drops out and the card goes
+  when nothing is left. It writes nothing itself. **How far back:** this week
+  only (`tdOpenWeeks`; R12 — it reached this week and the 8 before it until
+  2026-09-27, which the owner found too much). Older unsettled weeks are the
+  family meeting's catch-up list (`mmUnsettledWeeks(8)`), unchanged. Never
+  before `mmCatchUpFloor()`, and not once this week is SETTLED for her —
+  `mnyWeekSettled`: committed at a meeting (`mnyIsCommitted`,
+  `weekPlans[wk][kid].committedAt`) or credited another way (Grandma rule,
+  repair, express catch-up). Not today, not a day to come, not a sick day, not a
+  block recorded as not done. On a Monday there is no earlier day, so no card.
+  A day with nothing unanswered is not listed; "something else" for such a day
+  goes through the next row.
 - **C1b — ＋ Add to an earlier day** (`tdEarlierElseRow`, Plan v6,
   2026-09-25): one collapsed row (`data-td-action="else-earlier"`,
   `aria-expanded`, ≥44px, words 16px) directly under the catch-up card — or on
-  its own when catch up has nothing — shown only when an earlier day of an open
-  week exists. Opened, it lists those days newest first (`tdEarlierElseDays`:
-  `tdOpenWeeks`, so the same 8-week window, floor and `mnyWeekSettled` rule as
-  catch up; before today; minus days catch up already lists, which carry the
-  same door), each as "＋ I did something else on Tue" (`Tue 15 Sep` in an
-  earlier week) through `tdElseBlock` → `tdClaimJob` → `openChoreClaimPrompt` →
+  its own, directly after ✏️ Modify my plan, when catch up has nothing — shown
+  only when an earlier day of this (unsettled) week exists. Opened, it lists
+  those days newest first (`tdEarlierElseDays`: `tdOpenWeeks`, so this week
+  only, the same floor and `mnyWeekSettled` rule as catch up; before today;
+  minus days catch up already lists, which carry the same door), each as
+  "＋ I did something else on Tue" through `tdElseBlock` → `tdClaimJob` → `openChoreClaimPrompt` →
   `mrSetClaim` — the owner the chore tab's `ckPickElse` uses. A claim on that
   day and nothing else. Closed again by `goToday()`. This closes the C1 gap
   noted in `docs/chore-relocation-map.md` row 2.
@@ -1416,9 +1556,11 @@ and a week with no chore pool gave the same blank for a different reason.
 say which one they are.
 - Use the design tokens in `css/app.css` (`--space-*`, `--text-*`,
   `--shadow-*`, `--radius-*`). Avoid new inline `style="…"`.
-- `--accent` (`#ff7b54`) is decorative only. Anything with white text on it or
-  informational accent text uses `--accent-strong` (`#c14a24`) — this is the AA
-  contrast fix, don't undo it.
+- Colours, fonts, font sizes and `--accent` / `--accent-strong`: see
+  *Two looks (Pop and Calm)* under UI rules — the one statement of those rules.
+- "Today" markers read `--today-mark` (navy in both looks, L9); in Calm,
+  Parent › Now keeps today (white, navy frame) apart from the selected day
+  (navy fill) — `todayAndSelectedDifferInBothLooks`.
 - Never white text on the pastel category colors (all fail contrast).
 - Use the app's `.sheet` / `appDialog` patterns, not native `confirm()`/`prompt()`.
 
@@ -1589,14 +1731,106 @@ practice, and all three drew in the same blue.
 So `ACTIVITY_CATEGORIES` (`js/01-config.js`): **six categories, each holding one
 or more subgroups**, and every shipped activity names one with `sub:`.
 
-| Category | Subgroups (hue) |
+| Category | Subgroups (hue) — Looks stage 2, 2026-09-27 (was) |
 |---|---|
-| 🌅 Daily Rhythm | Routine `#8ad8d0` · Helping hands `#229eb1` |
-| 🍎 Fuel & Care | Meals `#ffd166` · Appointments `#e3c48f` |
-| 🧠 Brain Construction | School `#6fb1fc` · Language `#8ed0f0` · Arts `#b0a0ea` |
-| 💪 Body Construction | Training `#f2597d` · Everyday movement `#ff9a76` |
-| 🧭 Explore | Outings `#d98ac8` |
-| 🎮 Play & Rest | Play `#7fca79` · Seasonal treats `#cfe06b` |
+| 🌅 Daily Rhythm | Routine `#3cc9b9` (`#8ad8d0`) · Helping hands `#00a2bc` (`#229eb1`) |
+| 🍎 Fuel & Care | Meals `#ffc83d` (`#ffd166`) · Appointments `#f0bf72` (`#e3c48f`) |
+| 🧠 Brain Construction | School `#4aa3ff` (`#6fb1fc`) · Language `#7dcdf7` (`#8ed0f0`) · Arts `#a08ef5` (`#b0a0ea`) |
+| 💪 Body Construction | Training `#f2597d` (unchanged) · Everyday movement `#ff8a5c` (`#ff9a76`) |
+| 🧭 Explore | Outings `#e37ad2` (`#d98ac8`) |
+| 🎮 Play & Rest | Play `#4cc46a` (`#7fca79`) · Seasonal treats `#c6e03f` (`#cfe06b`) |
+
+**Brighter, same hue — Looks stage 2 (2026-09-27, owner: "derive all 12").**
+The two looks (docs/handoff/looks-calm-pop.md §7) want brighter category colours
+and a navy ink `#1c2240`. Every subgroup KEPT its hue (LCh hue moved at most 6°)
+and got brighter; each category's main subgroup sits on the handoff's value
+(School `#4aa3ff`, Training `#f2597d`, Meals `#ffc83d`, Routine `#3cc9b9`, Play
+`#4cc46a`). Outings stays orchid — the handoff's orange "Active/Explore"
+`#fb8a2e` is `CAT_HEX.active`'s, not a new hue for a subgroup a family already
+knows. The measurements, all with `colourDistance` and WCAG luminance:
+
+- **Worst cross-category pair 15.6** — Helping hands vs Language (was Arts vs
+  Outings at 15.0). Floor 14, unchanged. Helping hands moved least (ΔE00 2.4):
+  a deep cyan that must carry ink has almost no room to brighten, and the obvious
+  bluer step fell to 13.9 from Language.
+- **Navy on every fill ≥ 4.81:1** (Training, unchanged hex; it was 4.78 against
+  the old ink). The navy and the old brown ink have almost the same luminance
+  (0.0175 vs 0.0180), so every ink contrast in the app moves by under 1%.
+- **The wash** (`colourWash`, `js/05-helpers.js`) is a rule, not a table: 18% of
+  the fill mixed into white — `color-mix(in srgb, <fill> 18%, white)` — within
+  ΔE00 1.6 of every wash the handoff drew, and it reaches a sport's colour or a
+  hand-picked one where a table would not. Navy on every subgroup's wash ≥
+  12.65:1, Pop's secondary text `#4d5575` ≥ 5.96:1.
+- `CAT_HEX` moved with them (school `#4aa3ff`, active `#fb8a2e`, free `#4cc46a`,
+  daily `#ffc83d`, training `#f2597d`, routine `#3cc9b9`; sleep, custom,
+  appointment and competition as corrected in stage 2B-3 below), and every value
+  either table gave up joined `RETIRED_SEEDED_HEXES`. The full old → new list
+  with each figure is in the stage-2 PR.
+
+**The guard measures every colour a block can be DRAWN in, not only the twelve
+— Looks stage 2B-3 (2026-09-27).** `everySubgroupTellsItselfApart` compared the
+subgroups with each other only, and passed while the handoff's Sleep `#a78bfa`
+sat **1.9** from Arts and Skating `#9d85dd` **4.4** from it. A training block
+wears its SPORT's colour (`trainingBlockColour`), and `CAT_HEX` is the category
+fallback, the seeded default and `--cat-*`'s owner, so the check now takes 26
+colours — the 12 subgroups, the 10 `CAT_HEX` keys and the 4 built-in sports —
+each tagged with the category it draws for: a `CAT_HEX` key with the subgroup
+`activitySub` files that legacy `cat` under (sleep and custom → Play & Rest,
+active → Body, appointment → Fuel & Care), `competition` with the shipped
+Competition activity's (Body), every sport with Training's (Body). Every
+cross-category pair ≥ 14, navy ≥ 4.5:1 on every fill, navy and `#4d5575` ≥ 4.5:1
+on every wash. A category's colour against its own subgroup is the same idea
+(School and `CAT_HEX.school` are one hex) and is not floored. Six moved:
+
+| Colour | Was (stage 2) | Now | Why |
+|---|---|---|---|
+| `CAT_HEX.sleep` | `#a78bfa` | `#dcbcfd` | 1.9 from Arts. No lavender that vivid clears Arts by 14; the nearest that does is paler. Deviates from handoff §7's Sleep value — the alternative was moving Arts, a subgroup already seeded onto blocks |
+| `CAT_HEX.custom` | `#ff7fa3` | `#ff9eb5` | 9.0 from Training; back to main's value |
+| `CAT_HEX.appointment` | `#7fa5c4` | `#f0bf72` | 8.5 from School. Now sits on its own subgroup, Appointments, as school, daily, routine, free and training do |
+| `CAT_HEX.competition` | `#f4a340` | `#fc9005` | 9.2 from Appointments; a clearer orange |
+| Skating (sport) | `#9d85dd` | `#9c86aa` | 4.4 from Arts. A dusty violet: it keeps the purple; every violet bright enough to be brighter sits under 14 from Arts or Sleep |
+| Swimming (sport) | `#2f9fd0` | `#59f1ff` | 8.4 from Helping hands, 9.7 from School. The mid blues are full; no mid blue clears Helping hands, School and Language at once, so a pool aqua |
+
+Worst cross-category pair over all 26: **Swimming vs Routine 14.3** (the twelve
+subgroups alone: Helping hands vs Language 15.6, unchanged). Lowest navy on a
+fill: **Skating 4.74:1**. No allowlist — every pair that was under 14 on main
+clears 14 now. `CAT_HEX.appointment` and `CAT_HEX.competition` are read by
+nothing but `CAT_HEX_VALUES` today (an appointment draws its subgroup, a
+competition its sport); they are held to the floor anyway, because a value in
+this table is one render path away from being drawn. The retired hexes joined
+`RETIRED_SEEDED_HEXES`, and the retired sport colours `TRAINING_DEFAULT_HEXES`
+too — the smoke check places a skating block carrying `#8a6fd0` and `#9d85dd`
+and a swimming block carrying `#2f9fd0` and asserts each draws its sport's
+colour now.
+
+**`CAT_HEX.training` is a sentinel as well as a colour.** A training block whose
+`colour` equals it made no choice and draws its SPORT's colour
+(`trainingBlockColour`, and the sport pills in `js/09-sheets.js`). Moving it
+from `#ef476f` would have turned every training block already placed into a
+chosen `#ef476f` — every skating session the old pink instead of skating's
+purple. `TRAINING_DEFAULT_HEXES` holds the current and every retired sentinel
+and, like `RETIRED_SEEDED_HEXES`, only grows; the smoke check places a skating
+block carrying each and asserts it draws the sport's colour.
+
+**The ink follows the look.** `isLightColour` measured against a hard-coded
+`#2a2320`; it now asks `inkContrast` (`js/08-day-view.js`), which reads `--ink`
+off `:root` — cached per `<html data-look>`, so a look switch re-reads it with
+no invalidation hook to forget. `everySubgroupTellsItselfApart` measures with
+the same function and asserts it scores the live ink against itself at exactly
+1:1. `printTextColor` does not follow: print ignores the look.
+
+**`--cat-*` in the stylesheet are copies; `CAT_HEX` owns them.** Only the five
+something reads are kept (sleep, school, free, daily, custom — `--cat-free` had
+already drifted to Play's `#7fca79` while `CAT_HEX.free` said `#95d5b2`), and the
+smoke check fails when a copy disagrees with the table.
+
+**Kid colours** (§7): `--jenn` `#ff5c8a` / `--jenn-strong` `#c81d5a` /
+`--jenn-wash` `#ffe4ec`; `--jess` `#3d8bfd` / `--jess-strong` `#1a5fd0` /
+`--jess-wash` `#e2edff`. White text goes only on a `-strong` (5.56 / 5.85:1; the
+fills give white 2.94 / 3.33). The chore-pay trends draw each kid's series in
+her `-strong` (5.46 / 5.74:1 on the paper, where the fills would be under 3:1)
+and her card head in her wash — Jenn's line was amber `#cf8f22` until then; the
+four `--mny-trend-*` tokens are gone.
 
 **Measure colour distance the way an eye does — CIEDE2000, never CIE76.** The
 first separation of this table used CIE76, which overstates the distance between
@@ -1610,7 +1844,7 @@ check measures the same way the palette was chosen.
 
 **The figure that matters is the worst CROSS-category pair.** Two subgroups
 inside one category are *meant* to look related — Meals and Appointments are both
-Fuel & Care and sit at 9.8, which is the design working. Two subgroups in
+Fuel & Care and sit at 8.3 (9.8 before stage 2), which is the design working. Two subgroups in
 different categories reading as one colour is the defect, and that pair was
 **2.9**: Helping hands and Play, a chore and an afternoon of Minecraft, the same
 colour to any eye. The floor is 14 on cross-category pairs only; within a

@@ -889,26 +889,26 @@ function mnyStoryMonthLabel(m) {
    have paid. */
 function mnyStoryWeek(kid, r) {
   const inBar = mnySegments([
-    { label: 'Jobs',         value: r.chores,      color: '#95d5b2' },
-    { label: 'Learning',     value: r.learning,    color: '#6fb1fc' },
-    { label: 'Clean days',   value: r.streak,      color: '#ffd166' },
-    { label: 'Competitions', value: r.competition, color: '#ff9eb5' },
-    { label: 'From outside', value: r.outside,     color: '#c9a6e8' },
+    { label: 'Jobs',         value: r.chores,      color: 'var(--mny-chores)' },
+    { label: 'Learning',     value: r.learning,    color: 'var(--mny-learning)' },
+    { label: 'Clean days',   value: r.streak,      color: 'var(--mny-streak)' },
+    { label: 'Competitions', value: r.competition, color: 'var(--mny-comp)' },
+    { label: 'From outside', value: r.outside,     color: 'var(--mny-outside)' },
     /* A week credited at a flat amount carries it in no channel, so without
        this row its bar read "Nothing came in" beside a total of $3. A meet
        paid on top is already the Competitions segment, so it is not counted
        here a second time. */
     { label: r.defaultReason === 'grandma' ? 'Grandma rule' : 'A flat amount',
-      value: r.defaulted ? money2(money2(r.gross) - money2(r.competition)) : 0, color: '#b5ead7' },
+      value: r.defaulted ? money2(money2(r.gross) - money2(r.competition)) : 0, color: 'var(--mny-flat)' },
   ]);
   inBar.fines = money2(r.fines);
   const plan = r.plan || {};
   const outBar = mnySegments([
-    { label: 'Loan payment', value: (r.loan || {}).paid, color: '#b8b0a2' },
-    { label: 'Paid off early', value: r.debtExtra,       color: '#95d5b2' },
-    { label: 'Kept ready',   value: r.ready,             color: '#ffd166' },
-    { label: 'Locked away',  value: r.gic,               color: '#6fb1fc' },
-    { label: 'Into companies', value: r.stock,           color: '#c9a6e8' },
+    { label: 'Loan payment', value: (r.loan || {}).paid, color: 'var(--mny-out-loan)' },
+    { label: 'Paid off early', value: r.debtExtra,       color: 'var(--mny-out-extra)' },
+    { label: 'Kept ready',   value: r.ready,             color: 'var(--mny-out-ready)' },
+    { label: 'Locked away',  value: r.gic,               color: 'var(--mny-out-locked)' },
+    { label: 'Into companies', value: r.stock,           color: 'var(--mny-out-stock)' },
   ]);
   const edited = (r.edited || []).length;
   return `<div class="mny-card">

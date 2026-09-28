@@ -7,7 +7,7 @@ How to confirm a row: do the thing in its **new home** on the iPad, then check t
 | ☐ | # | What the Chores screen does | New home | How to check it on the iPad |
 |---|---|---|---|---|
 | ☐ | 1 | Answer how a job went (On time / Late / Redo) | **Today** — tap a job row; it asks right there | Answer a job on Today; it shows answered on the Chores screen |
-| ☐ | 2 | ＋ I did something else | **Today**, under "Jobs I can do"; for an earlier day, inside **🕓 Catch up** | Add one for today, and one for two days ago via Catch up. **Known gap (C1), closed by C1b (2026-09-25):** Catch up only lists a past day that still has something unanswered; for a fully answered past day, use **＋ Add to an earlier day** under Catch up on Today (it shows on its own when Catch up is empty), pick the day, then "＋ I did something else on Tue". |
+| ☐ | 2 | ＋ I did something else | **Today**, under "Jobs I can do"; for an earlier day of this week, inside **🕓 Catch up** (under ✏️ Modify my plan) | Add one for today, and one for two days ago via Catch up. **Known gap (C1), closed by C1b (2026-09-25):** Catch up only lists a past day that still has something unanswered; for a fully answered past day, use **＋ Add to an earlier day** directly under Catch up on Today (it shows on its own under ✏️ Modify my plan when Catch up is empty), pick the day, then "＋ I did something else on Tue". Both reach this week only (R12, 2026-09-27); an older week is the family meeting's catch-up list. |
 | ☐ | 3 | Tick routine items; "all N done" | **Today** — the routine card opens to its items; earlier days in **🕓 Catch up** | Tick one item, then "all done" |
 | ☐ | 4 | Own things / Helping out | **Today** card | Tap it; the Chores screen shows the same |
 | ☐ | 5 | Training attitude 1–5 (her own) | **Today**, on the training block once it has ended; earlier days in **🕓 Catch up** | Rate a finished training |
@@ -24,6 +24,6 @@ How to confirm a row: do the thing in its **new home** on the iPad, then check t
 | — | 16 | Portal actions via `ctHandleWrapClick` | **Stays** in the portal | (no change to confirm) |
 | — | 17 | 12 dead handler branches, `#choreGroupOverlay` | Removed in C3 | (C3) |
 | — | 18 | `#choreProfileBadge`, nav entry, 3 refresh hooks + `openChoreTab`, 21 smoke checks | Go with the screen in C3; checks ported | (C3) |
-| ☐ | 19 | **New — 🕓 Catch up** on missed days | **Today**, top card when an earlier day of an unsettled week has something unanswered; one day at a time, oldest first | Skip a day, come back: Catch up offers it; a settled week never appears |
+| ☐ | 19 | **New — 🕓 Catch up** on missed days | **Today**, directly under ✏️ Modify my plan, when an earlier day of THIS week (not yet settled) has something unanswered; one day at a time, oldest first (R12, 2026-09-27: this week only) | Skip a day, come back later the same week: Catch up offers it under Modify my plan; last week's days and a settled week never appear |
 
 Rows 16–18 are removals or no-ops for C3; there is nothing to confirm there.

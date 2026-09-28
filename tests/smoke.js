@@ -214,6 +214,48 @@ function findChromium() {
 
   const checks = {};
 
+  /* ── Looks stage 3: the same check in both looks ──────────────────────
+     setLook puts one look on for everybody on this device the way the app
+     does it — each person's stored choice, then applyLook — so a check that
+     calls selectProfile part-way through stays in that look. It waits for
+     Calm's web fonts (injected on first use) so what is measured is the type a
+     child sees; clearLooks forgets every choice and goes back to Pop, which is
+     what the rest of the suite was written against.
+     inBothLooks runs one page.evaluate check in Pop and then Calm, and merges
+     the findings, each marked with its look. */
+  const setLook = (look) => page.evaluate(async (l) => {
+    ['jenn', 'jess', 'parent'].forEach(k => { try { localStorage.setItem('wp_look_' + k, l); } catch (e) {} });
+    applyLook(l);
+    if (l !== 'calm') return;
+    for (let i = 0; i < 50 && ![...document.fonts].some(f => /Lexend/.test(f.family)); i++) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+    await Promise.all(['16px Lexend', '600 16px Lexend', '700 16px "Baloo 2"', '800 16px "Baloo 2"']
+      .map(f => document.fonts.load(f).catch(() => null)));
+    await document.fonts.ready;
+  }, look);
+  const clearLooks = () => page.evaluate(() => {
+    ['jenn', 'jess', 'parent', 'last'].forEach(k => { try { localStorage.removeItem('wp_look_' + k); } catch (e) {} });
+    if (typeof applyLook === 'function') applyLook('pop');
+  });
+  const inBothLooks = async (fn, arg) => {
+    const out = [];
+    try {
+      for (const look of ['pop', 'calm']) {
+        let r;
+        try {
+          await setLook(look);
+          await page.waitForTimeout(150);
+          r = await page.evaluate(fn, arg);
+        } catch (e) { r = ['threw: ' + e.message]; }
+        if (r !== true) out.push(...(Array.isArray(r) ? r : [String(r)]).map(x => `[${look}] ${typeof x === 'string' ? x : JSON.stringify(x)}`));
+      }
+    } finally {
+      try { await clearLooks(); } catch (e) { out.push('could not put Pop back: ' + e.message); }
+    }
+    return out.length ? out : true;
+  };
+
   /* The week's default layout, asserted before anything here navigates. Three
      things have to agree and nothing enforces it at runtime: the initial value
      of weekView, which container index.html leaves visible, and which tab it
@@ -1487,7 +1529,7 @@ function findChromium() {
      (2) At 0.72px per minute a fifteen-minute strip is 10.8px tall, and the kid
      readability floor sets its text to 13.1px — so two stacked strips each
      printed a label through the other. A strip speaks only when a line fits
-     (WF_TRAVEL_TEXT_MIN_PX, a measurement), and a run of short same-side
+     (wfTravelTextMinPx, a measurement), and a run of short same-side
      segments merges into one band that can.
 
      Geometry, not classes: it measures real rectangles, because a z-index or a
@@ -1816,14 +1858,16 @@ function findChromium() {
      table was chosen, rather than carrying its own copy.
 
      WHICH PAIRS COUNT. Two subgroups inside ONE category are meant to look
-     related — Meals and Appointments are both Fuel & Care and sit at 9.8, and
+     related — Meals and Appointments are both Fuel & Care and sit at 8.3, and
      that is the design working, not a defect. The floor applies to pairs that
      cross a category boundary; within one, all that is required is that they
      are not literally the same value. */
   if (want('everySubgroupTellsItselfApart')) checks.everySubgroupTellsItselfApart = await page.evaluate(() => {
     const bad = [];
-    /* 14 is the floor this palette clears with room (its worst cross-category
-       pair is Arts vs Outings at 15.0) and is comfortably above the ~5 at which
+    /* 14 is the floor this palette clears (its worst cross-category pair is
+       the Swimming sport vs Routine at 14.3 since Looks stage 2B-3; among the
+       twelve subgroups alone, Helping hands vs Language at 15.6 since the
+       stage-2 brightening; it was Arts vs Outings at 15.0) and is comfortably above the ~5 at which
        two colours stop being reliably distinguishable on a small card. Raising
        it is a design decision, not a bug fix — six categories over a pastel
        wheel that must all take dark ink is a genuinely tight budget. */
@@ -1837,30 +1881,92 @@ function findChromium() {
     for (let i = 0; i < subs.length; i++) {
       for (let j = i + 1; j < subs.length; j++) {
         const a = subs[i], b = subs[j];
-        const d = colourDistance(a.hex, b.hex);
-        if (a.cat === b.cat) {
-          if (a.hex.toLowerCase() === b.hex.toLowerCase()) {
-            bad.push(`${a.label} and ${b.label} are the same hex ${a.hex}`);
-          }
-          continue;
+        if (a.cat === b.cat && a.hex.toLowerCase() === b.hex.toLowerCase()) {
+          bad.push(`${a.label} and ${b.label} are the same hex ${a.hex}`);
         }
+      }
+    }
+
+    /* EVERY COLOUR A BLOCK CAN BE DRAWN IN, not only the twelve. A training
+       block wears its SPORT's colour (trainingBlockColour), and CAT_HEX is the
+       category fallback, the seeded default and --cat-*'s owner — so Sleep's
+       #a78bfa sat 1.9 from Arts and Skating 4.4 from it while this check, which
+       measured the subgroups with each other only, passed (Looks stage 2B-3).
+       Each is tagged with the category it draws for: a CAT_HEX key with the
+       subgroup activitySub files that legacy `cat` under, Competition with the
+       shipped Competition activity's, and every built-in sport with Training's.
+       A category's colour against its own subgroup is the same idea (School and
+       CAT_HEX.school are one hex), so only cross-category pairs are floored. */
+    const compAct = DEFAULT_ACTIVITIES.find(a => a.id === 'competition');
+    if (!compAct) bad.push('the shipped Competition activity is missing');
+    const drawn = subs.slice();
+    Object.keys(CAT_HEX).forEach(k => {
+      const cat = k === 'competition' ? activitySub(compAct).cat : activitySub({ cat: k }).cat;
+      drawn.push({ id: `cat-${k}`, label: `CAT_HEX.${k}`, hex: CAT_HEX[k], cat });
+    });
+    TRAINING_TAGS.forEach(t => {
+      drawn.push({ id: `sport-${t.id}`, label: `the ${t.name} sport`, hex: t.colour, cat: ACTIVITY_SUBS.training.cat });
+    });
+
+    for (let i = 0; i < drawn.length; i++) {
+      for (let j = i + 1; j < drawn.length; j++) {
+        const a = drawn[i], b = drawn[j];
+        if (a.cat === b.cat) continue;
+        const d = colourDistance(a.hex, b.hex);
         if (d < FLOOR) {
-          bad.push(`${a.label} (${a.cat}) and ${b.label} (${b.cat}) are ${d.toFixed(1)} apart, under ${FLOOR}`);
+          bad.push(`${a.label} ${a.hex} (${a.cat}) and ${b.label} ${b.hex} (${b.cat}) are ${d.toFixed(1)} apart, under ${FLOOR}`);
         }
       }
     }
 
     /* Dark ink on every one of them, to AA. White text fails on all these
-       pastels (CLAUDE.md, UI rules), so a value too dark for ink has no legible
-       text at all — Training shipped at 4.27 until this check went in. */
-    subs.forEach(sg => {
+       fills (ARCHITECTURE.md, UI rules), so a value too dark for ink has no
+       legible text at all — Training shipped at 4.27 until this check went in.
+       The ink is the LIVE one (inkContrast reads --ink off :root), so a look
+       that moves the ink is measured with the ink it draws.
+
+       And the same on each fill's WASH (colourWash, the tint Pop's list rows
+       wear): the ink, and Pop's secondary text #4d5575, both to 4.5:1. */
+    const POP_MUTED = '#4d5575';
+    const onWash = (wash, text) => {
+      const lum = h => {
+        const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+        const v = [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16));
+        return 0.2126 * lin(v[0]) + 0.7152 * lin(v[1]) + 0.0722 * lin(v[2]);
+      };
+      const x = lum(wash), y = lum(text);
+      return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+    };
+    drawn.forEach(sg => {
       if (!isLightColour(sg.hex)) bad.push(`${sg.label} ${sg.hex} is too dark for ink`);
-      const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
-      const v = [1, 3, 5].map(i => parseInt(sg.hex.substr(i, 2), 16));
-      const L = 0.2126 * lin(v[0]) + 0.7152 * lin(v[1]) + 0.0722 * lin(v[2]);
-      const Link = 0.2126 * lin(0x2a) + 0.7152 * lin(0x23) + 0.0722 * lin(0x20);
-      const ratio = (L + 0.05) / (Link + 0.05);
+      const ratio = inkContrast(sg.hex);
       if (ratio < 4.5) bad.push(`${sg.label} ${sg.hex} gives ink only ${ratio.toFixed(2)}:1`);
+      const wash = colourWash(sg.hex);
+      if (!/^#[0-9a-f]{6}$/i.test(wash)) { bad.push(`${sg.label} has no wash (${wash})`); return; }
+      const inkOnWash = inkContrast(wash);
+      if (inkOnWash < 4.5) bad.push(`${sg.label} wash ${wash} gives ink only ${inkOnWash.toFixed(2)}:1`);
+      const mutedOnWash = onWash(wash, POP_MUTED);
+      if (mutedOnWash < 4.5) bad.push(`${sg.label} wash ${wash} gives ${POP_MUTED} only ${mutedOnWash.toFixed(2)}:1`);
+    });
+    /* The sports are in `drawn`: a training block wears its sport's colour, not
+       its subgroup's (trainingBlockColour), and Skating shipped at 3.9:1 with
+       the navy ink until thePopLookReadsEverywhere drew one (Looks stage 2B-2). */
+    /* The ink really is the stylesheet's: a copy of it in the maths was the
+       defect this replaced (#2a2320 while the page drew navy). */
+    const liveInk = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
+    const inkOnItself = inkContrast(liveInk);
+    if (!(Math.abs(inkOnItself - 1) < 1e-9)) {
+      bad.push(`inkContrast is not measuring against the live --ink ${liveInk} (it scores ${inkOnItself})`);
+    }
+
+    /* ONE OWNER for the category colours: css/app.css's --cat-* copy CAT_HEX
+       for the few CSS rules that paint one, and must say the same thing. */
+    const rootStyle = getComputedStyle(document.documentElement);
+    ['sleep', 'school', 'free', 'daily', 'custom'].forEach(k => {
+      const css = rootStyle.getPropertyValue(`--cat-${k}`).trim().toLowerCase();
+      if (css !== String(CAT_HEX[k]).toLowerCase()) {
+        bad.push(`--cat-${k} is ${css || '(unset)'} but CAT_HEX.${k} is ${CAT_HEX[k]}`);
+      }
     });
 
     /* EVERY RETIRED HEX IS STILL SEEDED. blockColour ignores b.colour only
@@ -1884,6 +1990,38 @@ function findChromium() {
       if (drew.toLowerCase() === '#9fd3b8') {
         bad.push('a block seeded with the retired Helping hands hue still wears it');
       }
+      // Every hue retired by the stage-2 brightening re-derives too.
+      [['chores', '#229eb1'], ['homework', '#6fb1fc'], ['homework', '#6FB1FC']].forEach(([actId, old]) => {
+        setDayBlocks(key, [{ id: 'pal-old2', actId, startMin: 17 * 60, durationMin: 30, colour: old }], kid);
+        const got = blockColour(getDayBlocks(key, kid)[0], kid);
+        if (got.toLowerCase() === old.toLowerCase()) {
+          bad.push(`a ${actId} block seeded with the retired ${old} still wears it`);
+        }
+      });
+      /* A training block carrying the OLD training sentinel (#ef476f, every
+         training block placed before CAT_HEX.training moved) still draws its
+         sport's colour rather than reading the old pink as a choice. */
+      const sport = getTrainingTopic('skating').colour;
+      ['#ef476f', CAT_HEX.training].forEach(sentinel => {
+        setDayBlocks(key, [{ id: 'pal-train', actId: 'training', tag: 'skating', startMin: 17 * 60,
+          durationMin: 60, colour: sentinel }], kid);
+        const got = blockColour(getDayBlocks(key, kid)[0], kid);
+        if (String(got).toLowerCase() !== String(sport).toLowerCase()) {
+          bad.push(`a skating block carrying the training default ${sentinel} draws ${got}, not the sport's ${sport}`);
+        }
+      });
+      /* A placement seeds its sport's colour onto the block, so a sport that
+         moved leaves its old colour on every block already placed: each must
+         draw the sport's colour now, not the one it replaced. */
+      [['skating', '#8a6fd0'], ['skating', '#9d85dd'], ['swimming', '#2f9fd0']].forEach(([tag, old]) => {
+        setDayBlocks(key, [{ id: 'pal-sport', actId: 'training', tag, startMin: 17 * 60,
+          durationMin: 60, colour: old }], kid);
+        const got = blockColour(getDayBlocks(key, kid)[0], kid);
+        const now = getTrainingTopic(tag).colour;
+        if (String(got).toLowerCase() !== String(now).toLowerCase()) {
+          bad.push(`a ${tag} block carrying its retired colour ${old} draws ${got}, not the sport's ${now}`);
+        }
+      });
       // …while a colour a person really picked is left alone.
       setDayBlocks(key, [{ id: 'pal-mine', actId: 'chores', startMin: 17 * 60,
         durationMin: 30, colour: '#123456' }], kid);
@@ -1938,7 +2076,8 @@ function findChromium() {
      distinction the old check could not make: it searched the label text and
      the tooltips together, so an overflowing label and a fitted one read the
      same to it. */
-  if (want('theStripStillSaysWhenToLeave')) checks.theStripStillSaysWhenToLeave = await page.evaluate(() => {
+  // In both looks (Looks stage 3): Calm's fonts change every width measured here.
+  if (want('theStripStillSaysWhenToLeave')) checks.theStripStillSaysWhenToLeave = await inBothLooks(() => {
     goWeek(); setWeekView('full');
     const kid = activeProfile();
     const key = getDayKeys(0)[3];
@@ -2422,7 +2561,8 @@ function findChromium() {
      excluded — it is the one child that is meant to sit outside the flow. Same
      shape of assertion as aShortBlockStillSaysWhatItIs: whatever the row costs
      become, a card may never draw more than it can hold. */
-  if (want('theStackedCardFitsWhatItDraws')) checks.theStackedCardFitsWhatItDraws = await page.evaluate(() => {
+  // In both looks (Looks stage 3): Calm's fonts change what a row costs.
+  if (want('theStackedCardFitsWhatItDraws')) checks.theStackedCardFitsWhatItDraws = await inBothLooks(() => {
     goWeek(); setWeekView('full');
     const kid = activeProfile();
     const key = getDayKeys(0)[2];
@@ -5207,8 +5347,10 @@ function findChromium() {
      Later fold is opened for the same reason the extras row opens its
      disclosure: a panel behind display:none is a panel this audit skips.
 
-     Returns its own undo, so the caller reads seed → render → restore in order. */
-  await page.evaluate(() => {
+     Returns its own undo, so the caller reads seed → render → restore in order.
+     A function, so a check that runs after a page reload (thePopLookReadsEverywhere)
+     can put the seeds back on the page before it walks KID_SCREENS. */
+  const defineAuditSeeds = () => page.evaluate(() => {
     window.seedTodayAudit = () => {
       const kid = activeProfile();
       const key = todayKey();
@@ -5277,44 +5419,128 @@ function findChromium() {
       }
     };
   });
+  await defineAuditSeeds();
 
+  /* In both looks (Looks stage 3). Calm's fonts are wider than Pop's
+     handwriting at a smaller scale, so every width that fits in one has to be
+     measured in the other; and at 1194×834, the iPad this app lives on. */
   const kidFindings = [];
-  for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1440, 900], [900, 1100]]) {
-    await page.setViewportSize({ width: w, height: h });
-    for (const [id, nav, label] of KID_SCREENS) {
-      // A row's seed may return a sentence saying what it failed to put on screen.
-      const seeded = await page.evaluate(`(${nav.toString()})()`);
-      await page.waitForTimeout(200);
-      const r = await kidStandards(id);
-      const problems = [];
-      if (typeof seeded === 'string') problems.push(seeded);
-      if (r.error) problems.push(r.error);
-      /* A screen that did not open measures as clean: every control on it is
-         display:none, so none is "too small". openSisterSync refuses a parent,
-         for one — so each row must prove its screen was on show. */
-      if (!(await page.evaluate((sid) => document.getElementById(sid).classList.contains('active'), id))) {
-        problems.push('the screen was not on show, so nothing on it was measured');
+  for (const look of ['pop', 'calm']) {
+    try { await setLook(look); } catch (e) { kidFindings.push(`[${look}] the look could not be applied: ${e.message}`); continue; }
+    for (const [w, h] of [[390, 844], [768, 1024], [1024, 768], [1194, 834], [1440, 900], [900, 1100]]) {
+      await page.setViewportSize({ width: w, height: h });
+      for (const [id, nav, label] of KID_SCREENS) {
+        // A row's seed may return a sentence saying what it failed to put on screen.
+        const seeded = await page.evaluate(`(${nav.toString()})()`);
+        await page.waitForTimeout(200);
+        const r = await kidStandards(id);
+        const problems = [];
+        if (typeof seeded === 'string') problems.push(seeded);
+        if (r.error) problems.push(r.error);
+        /* A screen that did not open measures as clean: every control on it is
+           display:none, so none is "too small". openSisterSync refuses a parent,
+           for one — so each row must prove its screen was on show. */
+        if (!(await page.evaluate((sid) => document.getElementById(sid).classList.contains('active'), id))) {
+          problems.push('the screen was not on show, so nothing on it was measured');
+        }
+        // Sideways scroll is the failure a screenshot needs a human to notice and
+        // an assertion catches by itself: content pushed off the edge of a tablet
+        // is simply unreachable, and nothing else here would report it.
+        const overflow = await page.evaluate((sid) => {
+          const scr = document.getElementById(sid);
+          const worst = [...scr.querySelectorAll('*')].reduce((acc, el) => {
+            if (el.closest('[style*="overflow"], .ck-gridwrap, .weekly-full-wrap, .tg-wrap')) return acc;
+            const r = el.getBoundingClientRect();
+            return (r.width && r.right > acc.right) ? { right: r.right, cls: String(el.className).slice(0, 24) } : acc;
+          }, { right: 0, cls: '' });
+          return { body: document.body.scrollWidth, worst };
+        }, id);
+        if (overflow.body > w + 1) problems.push(`page scrolls sideways (${overflow.body} > ${w})`);
+        if (overflow.worst.right > w + 1) problems.push(`.${overflow.worst.cls} runs to ${Math.round(overflow.worst.right)} (past ${w})`);
+        if (r.small && r.small.length) problems.push(`${r.small.length} target(s) under 44px: ${r.small.slice(0, 6).join(', ')}`);
+        if (r.minFont < 13) problems.push(`font ${r.minFont}px on .${r.minWhere} (min 13)`);
+        if (problems.length) kidFindings.push(`[${look}] ${label || id}@${w}: ${problems.join(' | ')}`);
       }
-      // Sideways scroll is the failure a screenshot needs a human to notice and
-      // an assertion catches by itself: content pushed off the edge of a tablet
-      // is simply unreachable, and nothing else here would report it.
-      const overflow = await page.evaluate((sid) => {
-        const scr = document.getElementById(sid);
-        const worst = [...scr.querySelectorAll('*')].reduce((acc, el) => {
-          if (el.closest('[style*="overflow"], .ck-gridwrap, .weekly-full-wrap, .tg-wrap')) return acc;
-          const r = el.getBoundingClientRect();
-          return (r.width && r.right > acc.right) ? { right: r.right, cls: String(el.className).slice(0, 24) } : acc;
-        }, { right: 0, cls: '' });
-        return { body: document.body.scrollWidth, worst };
-      }, id);
-      if (overflow.body > w + 1) problems.push(`page scrolls sideways (${overflow.body} > ${w})`);
-      if (overflow.worst.right > w + 1) problems.push(`.${overflow.worst.cls} runs to ${Math.round(overflow.worst.right)} (past ${w})`);
-      if (r.small && r.small.length) problems.push(`${r.small.length} target(s) under 44px: ${r.small.slice(0, 6).join(', ')}`);
-      if (r.minFont < 13) problems.push(`font ${r.minFont}px on .${r.minWhere} (min 13)`);
-      if (problems.length) kidFindings.push(`${label || id}@${w}: ${problems.join(' | ')}`);
     }
   }
+  await clearLooks();
   if (want('kidScreensMeetTheHouseRules')) checks.kidScreensMeetTheHouseRules = kidFindings.length === 0 || kidFindings;
+
+  /* Looks stage 4 — the parent portal's five destinations and the profile
+     picker, in both looks, at the phone and the iPad. The parent's Reading
+     size is left at its default (it multiplies on top of the look).
+
+     - 44px targets everywhere: a house rule on every screen (CLAUDE.md →
+       ARCHITECTURE.md, UI rules), probed with kidStandards' hit test. The five
+       destination tabs were 41px in Pop and 38px in Calm until this check.
+     - Text: the picker is a child's screen, so nothing on it under 13px in
+       either look. The portal's small print predates the looks — History's
+       chart axes and tile captions, the meeting's day counts — and the kid
+       floor was never applied there (ARCHITECTURE.md, UI rules); raising it
+       would change Pop, which this stage keeps. So on the portal a look may not
+       PUSH text under 13px: a Calm label under 13px fails unless the same
+       label (screen, width, class, text) is under 13px in Pop too. Those that
+       are under in both are listed in the log, not failed.
+     - Nothing runs past the side of the screen. */
+  const parentFindings = [], parentSmallPrint = new Set();
+  {
+    const popSize = {};
+    for (const look of ['pop', 'calm']) {
+      try { await setLook(look); } catch (e) { parentFindings.push(`[${look}] the look could not be applied: ${e.message}`); continue; }
+      for (const [w, h] of [[390, 844], [1194, 834]]) {
+        await page.setViewportSize({ width: w, height: h });
+        for (const dest of ['picker', 'now', 'meeting', 'history', 'setup', 'app']) {
+          const sid = dest === 'picker' ? 'screen-profile' : 'screen-parent';
+          const where = `[${look}] ${dest === 'picker' ? 'profile picker' : 'Parent › ' + dest}@${w}`;
+          await page.evaluate((d) => {
+            if (d === 'picker') { showScreen('profile'); return; }
+            profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
+            showScreen('parent'); renderParentHome(); setParentDest(d);
+          }, dest);
+          await page.waitForTimeout(250);
+          if (!(await page.evaluate((s) => document.getElementById(s).classList.contains('active'), sid))) {
+            parentFindings.push(`${where}: the screen was not on show, so nothing on it was measured`);
+            continue;
+          }
+          const r = await kidStandards(sid);
+          const problems = [];
+          if (r.small && r.small.length) problems.push(`${r.small.length} target(s) under 44px: ${r.small.slice(0, 6).join(', ')}`);
+          const m = await page.evaluate((s) => {
+            const texts = {};
+            document.getElementById(s).querySelectorAll('*').forEach(el => {
+              const cs = getComputedStyle(el);
+              if (cs.display === 'none' || cs.visibility === 'hidden') return;
+              const box = el.getBoundingClientRect();
+              if (!box.width || !box.height) return;
+              const text = [...el.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join('').trim();
+              if (!text) return;
+              const key = `.${(el.getAttribute('class') || el.tagName).trim().split(/\s+/)[0]} "${text.slice(0, 20)}"`;
+              const px = parseFloat(cs.fontSize);
+              if (!(key in texts) || px < texts[key]) texts[key] = px;
+            });
+            return { texts, body: document.body.scrollWidth };
+          }, sid);
+          if (m.body > w + 1) problems.push(`page scrolls sideways (${m.body} > ${w})`);
+          const under = [];
+          for (const [key, px] of Object.entries(m.texts)) {
+            const id = `${dest}@${w} ${key}`;
+            if (look === 'pop') popSize[id] = px;
+            if (px >= 13) continue;
+            const inPopToo = dest !== 'picker' && (look === 'pop' || (id in popSize && popSize[id] < 13));
+            if (inPopToo) parentSmallPrint.add(`${dest}@${w} ${key}`);
+            else under.push(`${key} ${Math.round(px * 100) / 100}px${look === 'calm' && id in popSize ? ` (${Math.round(popSize[id] * 100) / 100}px in Pop)` : ''}`);
+          }
+          if (under.length) problems.push(`${under.length} text(s) under 13px: ${under.slice(0, 6).join(', ')}`);
+          if (problems.length) parentFindings.push(`${where}: ${problems.join(' | ')}`);
+        }
+      }
+    }
+    await clearLooks();
+    await page.evaluate(() => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
+    await page.setViewportSize({ width: 900, height: 1100 });
+    if (parentSmallPrint.size) console.log(`Parent portal small print under 13px in both looks (predates the looks; listed, not failed): ${parentSmallPrint.size}\n  ${[...parentSmallPrint].slice(0, 40).join('\n  ')}`);
+  }
+  if (want('parentScreensMeetTheHouseRules')) checks.parentScreensMeetTheHouseRules = parentFindings.length === 0 || parentFindings;
 
   // Artifacts at the sizes this app is actually used at — phone, iPad both ways,
   // laptop. The assertions above are the gate; these are for a human deciding
@@ -10305,61 +10531,67 @@ function findChromium() {
   if (want('parentDayTopBarStaysCompact')) {
     const wasViewport = page.viewportSize();
     const findings = [];
-    for (const w of [360, 390, 768, 1024]) {
-      await page.setViewportSize({ width: w, height: 844 });
-      const r = await page.evaluate(() => {
-        const out = [];
-        const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
-        const wasReturn = mmReturn;
-        const bar = () => document.querySelector('#screen-day .topbar.day-topbar');
-        const badge = () => document.getElementById('dayProfileBadge');
-        const lines = (el) => {
-          const t = [...el.childNodes].find(n => n.nodeType === 3);
-          if (!t) return 0;
-          const rg = document.createRange(); rg.selectNodeContents(t);
-          return new Set([...rg.getClientRects()].filter(q => q.width > 0).map(q => Math.round(q.top))).size;
-        };
-        try {
-          mmReturn = null;
-          for (const compact of [false, true]) {
-            for (const kid of ['jenn', 'jess']) {
-              // The budget: the same bar with the old short badge in it.
-              profile = 'parent'; parentViewing = kid;
-              openDay(getDayKeys(weekOffset)[0], 0);
-              bar().classList.toggle('day-topbar--compact', compact);
-              const b = badge();
-              const text = b.textContent, cls = b.className;
-              b.textContent = kid === 'jenn' ? '🐥 (P)' : '🦊 (P)';
-              b.className = 'profile-badge';
-              const budget = bar().getBoundingClientRect().height;
-              b.textContent = text; b.className = cls;
-              const h = bar().getBoundingClientRect().height;
-              const br = b.getBoundingClientRect();
-              const cs = getComputedStyle(b);
-              const tag = `parent viewing ${kid}${compact ? ' (scrolled)' : ''}`;
-              if (h > budget + 2) out.push(`${tag}: the Day bar is ${Math.round(h)}px, over its ${Math.round(budget)}px budget`);
-              if (b.scrollWidth > b.clientWidth || b.scrollHeight > b.clientHeight) out.push(`${tag}: the badge text does not fit (${b.scrollWidth}x${b.scrollHeight} in ${b.clientWidth}x${b.clientHeight})`);
-              if (cs.textOverflow === 'ellipsis') out.push(`${tag}: the badge text is cut with an ellipsis`);
-              if (br.width < 44 || br.height < 44) out.push(`${tag}: the badge is ${Math.round(br.width)}x${Math.round(br.height)}, under 44px`);
-              if (lines(b) > 2) out.push(`${tag}: the badge runs to ${lines(b)} lines`);
-              if (document.documentElement.scrollWidth > window.innerWidth) out.push(`${tag}: the page scrolls sideways`);
-              // The child's own Day badge is short and stays one line.
-              profile = kid;
-              openDay(getDayKeys(weekOffset)[0], 0);
-              bar().classList.toggle('day-topbar--compact', compact);
-              if (lines(badge()) !== 1) out.push(`${kid}${compact ? ' (scrolled)' : ''}: her own Day badge wraps to ${lines(badge())} lines`);
+    /* In both looks (Looks stage 4): Calm's fonts are wider than Pop's handwriting,
+       so the badge and its budget are measured in each. */
+    for (const look of ['pop', 'calm']) {
+      await setLook(look);
+      for (const w of [360, 390, 768, 1024]) {
+        await page.setViewportSize({ width: w, height: 844 });
+        const r = await page.evaluate(() => {
+          const out = [];
+          const wasProfile = profile, wasViewing = parentViewing, wasDayKey = currentDayKey;
+          const wasReturn = mmReturn;
+          const bar = () => document.querySelector('#screen-day .topbar.day-topbar');
+          const badge = () => document.getElementById('dayProfileBadge');
+          const lines = (el) => {
+            const t = [...el.childNodes].find(n => n.nodeType === 3);
+            if (!t) return 0;
+            const rg = document.createRange(); rg.selectNodeContents(t);
+            return new Set([...rg.getClientRects()].filter(q => q.width > 0).map(q => Math.round(q.top))).size;
+          };
+          try {
+            mmReturn = null;
+            for (const compact of [false, true]) {
+              for (const kid of ['jenn', 'jess']) {
+                // The budget: the same bar with the old short badge in it.
+                profile = 'parent'; parentViewing = kid;
+                openDay(getDayKeys(weekOffset)[0], 0);
+                bar().classList.toggle('day-topbar--compact', compact);
+                const b = badge();
+                const text = b.textContent, cls = b.className;
+                b.textContent = kid === 'jenn' ? '🐥 (P)' : '🦊 (P)';
+                b.className = 'profile-badge';
+                const budget = bar().getBoundingClientRect().height;
+                b.textContent = text; b.className = cls;
+                const h = bar().getBoundingClientRect().height;
+                const br = b.getBoundingClientRect();
+                const cs = getComputedStyle(b);
+                const tag = `parent viewing ${kid}${compact ? ' (scrolled)' : ''}`;
+                if (h > budget + 2) out.push(`${tag}: the Day bar is ${Math.round(h)}px, over its ${Math.round(budget)}px budget`);
+                if (b.scrollWidth > b.clientWidth || b.scrollHeight > b.clientHeight) out.push(`${tag}: the badge text does not fit (${b.scrollWidth}x${b.scrollHeight} in ${b.clientWidth}x${b.clientHeight})`);
+                if (cs.textOverflow === 'ellipsis') out.push(`${tag}: the badge text is cut with an ellipsis`);
+                if (br.width < 44 || br.height < 44) out.push(`${tag}: the badge is ${Math.round(br.width)}x${Math.round(br.height)}, under 44px`);
+                if (lines(b) > 2) out.push(`${tag}: the badge runs to ${lines(b)} lines`);
+                if (document.documentElement.scrollWidth > window.innerWidth) out.push(`${tag}: the page scrolls sideways`);
+                // The child's own Day badge is short and stays one line.
+                profile = kid;
+                openDay(getDayKeys(weekOffset)[0], 0);
+                bar().classList.toggle('day-topbar--compact', compact);
+                if (lines(badge()) !== 1) out.push(`${kid}${compact ? ' (scrolled)' : ''}: her own Day badge wraps to ${lines(badge())} lines`);
+              }
             }
+          } finally {
+            bar().classList.remove('day-topbar--compact');
+            mmReturn = wasReturn;
+            profile = wasProfile; parentViewing = wasViewing; currentDayKey = wasDayKey;
+            goToday();
           }
-        } finally {
-          bar().classList.remove('day-topbar--compact');
-          mmReturn = wasReturn;
-          profile = wasProfile; parentViewing = wasViewing; currentDayKey = wasDayKey;
-          goToday();
-        }
-        return out;
-      });
-      r.forEach(p => findings.push(`@${w}: ${p}`));
+          return out;
+        });
+        r.forEach(p => findings.push(`[${look}] @${w}: ${p}`));
+      }
     }
+    await clearLooks();
     await page.setViewportSize(wasViewport);
     checks.parentDayTopBarStaysCompact = findings.length === 0 || findings;
   }
@@ -11670,6 +11902,26 @@ function findChromium() {
   await page.evaluate(() => {
     const copy = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
     const pause = (ms) => new Promise(r => setTimeout(r, ms));
+    /* R12 (owner 2026-09-27): 🕓 Catch up, then "＋ Add to an earlier day", sit
+       directly after the ✏️ Modify my plan button in Today's day column. [] when
+       they do; otherwise what is wrong. */
+    window.catchUpPlacementFindings = () => {
+      const bad = [];
+      const col = document.querySelector('#tdWrap .td-col--day');
+      const plan = col && col.querySelector('.td-plan');
+      const planBox = plan && plan.closest('.td-more');
+      const card = document.querySelector('#tdWrap .td-catchup');
+      const row = document.querySelector('#tdWrap [data-td-action="else-earlier"]');
+      if (!planBox || planBox.parentElement !== col) return ['no ✏️ plan button of its own in the day column'];
+      if (!card && !row) return ['neither the catch-up card nor the earlier-day row is on Today'];
+      const first = card || row;
+      const say = (el) => (el ? `${el.tagName.toLowerCase()}.${[...el.classList].join('.')}` : 'nothing');
+      if (planBox.nextElementSibling !== first) {
+        bad.push(`the ${card ? 'catch-up card' : 'earlier-day row'} is not directly after ✏️ Modify my plan (after it: ${say(planBox.nextElementSibling)}; before the card: ${say(first.previousElementSibling)})`);
+      }
+      if (card && row && card.nextElementSibling !== row) bad.push(`the earlier-day row is not directly after the catch-up card (after it: ${say(card.nextElementSibling)})`);
+      return bad;
+    };
     window.c1 = {
       pin(idx) {
         const RealDate = Date;
@@ -11941,10 +12193,12 @@ function findChromium() {
   /* C1b (Plan v6, 2026-09-25). Catch up lists only a past day with something
      unanswered, so a job she did on a FULLY answered earlier day had no door on
      Today. "Add to an earlier day" is that door: a collapsed row, shown on its
-     own when catch up has nothing, listing the earlier days of open weeks
-     (the same window and the same settled rule as catch up), each opening
+     own when catch up has nothing, listing the earlier days of THIS week (the
+     same reach and the same settled rule as catch up — R12, 2026-09-27, when
+     the reach became this week only, on purpose), each opening
      "＋ I did something else on Tue" through the same owner — a claim, filed on
-     that day, and no money. A settled week's days are never offered. */
+     that day, and no money. Last week's days and a settled week's are never
+     offered. */
   if (want('somethingElseOnAFullyAnsweredEarlierDay')) checks.somethingElseOnAFullyAnsweredEarlierDay = await page.evaluate(async () => {
     const bad = [];
     const unpin = c1.pin(3);
@@ -11966,6 +12220,7 @@ function findChromium() {
       if (document.querySelector(`#tdWrap [data-td-action="catchup-day"][data-td-day="${tue}"]`)) bad.push('precondition: a fully answered Tuesday is still in catch up');
       const row = document.querySelector('#tdWrap [data-td-action="else-earlier"]');
       if (!row) return bad.concat(['no "Add to an earlier day" row on Today with catch up empty']);
+      bad.push(...catchUpPlacementFindings());
       if (row.getAttribute('aria-expanded') !== 'false') bad.push('the earlier-day row does not start closed');
       const r = row.getBoundingClientRect();
       if (r.height < 44) bad.push(`the earlier-day row is ${Math.round(r.height)}px tall`);
@@ -11976,7 +12231,10 @@ function findChromium() {
       const list = document.querySelector('#tdWrap .td-else-earlier-list');
       if (!list) return bad.concat(['opening the row lists no earlier days']);
       if (list.querySelector(`[data-td-day="${today}"]`)) bad.push('today is offered as an earlier day');
-      if (!list.querySelector(`[data-td-action="else"][data-td-day="${lastTue}"]`)) bad.push('an unsettled last week is not offered');
+      if (list.querySelector(`[data-td-day="${lastTue}"]`)) bad.push('a day of last week is offered (this week only)');
+      const offered = [...list.querySelectorAll('[data-td-action="else"]')].map(b => b.getAttribute('data-td-day'));
+      const wantDays = [keys[2], keys[1], keys[0]];
+      if (JSON.stringify(offered) !== JSON.stringify(wantDays)) bad.push(`the earlier days offered are ${JSON.stringify(offered)}, want this week's ${JSON.stringify(wantDays)} (newest first)`);
       const door = list.querySelector(`[data-td-action="else"][data-td-day="${tue}"]`);
       if (!door) return bad.concat(['no "＋ I did something else on Tue" for the fully answered Tuesday']);
       if (!new RegExp('something else on ' + DAY_SHORT[1], 'i').test(door.textContent)) bad.push(`Tuesday's door reads "${door.textContent.trim()}"`);
@@ -11993,27 +12251,73 @@ function findChromium() {
       if (Object.keys(mrEnsureEarnings('jenn', wk).chores).some(dd => Object.keys(mrEnsureEarnings('jenn', wk).chores[dd] || {}).length)) bad.push('an extra job wrote a grade');
       if (mnyCash('jenn') !== cash) bad.push('an extra job moved money');
 
-      // A settled week's days are never offered.
-      if (!c.weekPlans[k.lastWk]) c.weekPlans[k.lastWk] = {};
-      c.weekPlans[k.lastWk].jenn = { committedAt: syncNow() };
+      // A settled week's days are never offered: this week settled, no row at all.
+      if (!c.weekPlans[wk]) c.weekPlans[wk] = {};
+      c.weekPlans[wk].jenn = { committedAt: syncNow() };
       goToday();
-      const row2 = document.querySelector('#tdWrap [data-td-action="else-earlier"]');
-      if (row2) row2.click();
-      const list2 = document.querySelector('#tdWrap .td-else-earlier-list');
-      if (!list2) bad.push('the earlier-day list went away when only last week was settled');
-      else if (mrWeekDayKeys(k.lastWk).some(dk => list2.querySelector(`[data-td-day="${dk}"]`))) bad.push("a settled week's day is still offered");
+      if (document.querySelector('#tdWrap [data-td-action="else-earlier"]')) bad.push("the earlier-day row is still offered once this week is settled");
     } finally {
       unpin(); k.restore(); goToday();
     }
     return bad.length ? bad : true;
   });
 
-  /* Row 19. 🕓 Catch up, at the top of Today, lists every EARLIER day of an OPEN
-     week with something she has not answered, oldest first, one day open at a
-     time. A settled week never appears (committed at a meeting, or credited
-     another way); today and days still to come are not "catch up"; a day
-     answered in full drops out, and the card goes when nothing is left. It
-     writes nothing itself. */
+  /* R12 (Plan v1, owner 2026-09-27: "too much for 8 weeks"; reach "This week
+     only"). With an unanswered day LAST week and one earlier THIS week, catch up
+     offers only this week's, and "＋ Add to an earlier day" lists only this
+     week's earlier days. On a Monday there is no earlier day this week, so
+     neither shows — even with last week's day still unanswered. */
+  if (want('catchUpReachesThisWeekOnly')) checks.catchUpReachesThisWeekOnly = await page.evaluate(async () => {
+    const bad = [];
+    let unpin = c1.pin(3);
+    const k = c1.keep('jenn');
+    try {
+      profile = 'jenn'; parentViewing = 'jenn';
+      ctPrepareRead();
+      k.clear();
+      const wk = k.wk, keys = mrWeekDayKeys(wk), lastKeys = mrWeekDayKeys(k.lastWk);
+      const job = (id, tag) => [{ id, actId: 'chores', startMin: 17 * 60, durationMin: 30, choreTags: [tag] }];
+      setDayBlocks(lastKeys[4], job('r12-lfri', 'mop'), 'jenn');   // last week, unanswered, unsettled
+      setDayBlocks(keys[1], job('r12-tue', 'dishes'), 'jenn');     // earlier this week, unanswered
+
+      if (JSON.stringify(tdOpenWeeks('jenn')) !== JSON.stringify([wk])) bad.push(`tdOpenWeeks is ${JSON.stringify(tdOpenWeeks('jenn'))}, want only this week ${JSON.stringify([wk])}`);
+      goToday();
+      const listed = [...document.querySelectorAll('#tdWrap .td-catchup [data-td-action="catchup-day"]')].map(b => b.getAttribute('data-td-day'));
+      if (listed.includes(lastKeys[4])) bad.push('an unanswered day LAST week is listed in catch up');
+      if (!listed.includes(keys[1])) bad.push(`an unanswered day earlier THIS week (Tue ${keys[1]}) is not listed in catch up (listed ${JSON.stringify(listed)})`);
+      const tueBtn = document.querySelector(`#tdWrap .td-catchup [data-td-action="catchup-day"][data-td-day="${keys[1]}"]`);
+      if (tueBtn && /\d/.test(tueBtn.querySelector('.td-row-name').textContent.split('·')[0])) bad.push(`this week's day is named with a date: "${tueBtn.textContent.trim()}"`);
+      const row = document.querySelector('#tdWrap [data-td-action="else-earlier"]');
+      if (!row) bad.push('no "Add to an earlier day" row with Mon and Wed of this week not in catch up');
+      else {
+        row.click();
+        const offered = [...document.querySelectorAll('#tdWrap .td-else-earlier-list [data-td-action="else"]')].map(b => b.getAttribute('data-td-day'));
+        const want = [keys[2], keys[0]];
+        if (JSON.stringify(offered) !== JSON.stringify(want)) bad.push(`"Add to an earlier day" offers ${JSON.stringify(offered)}, want this week's earlier days not in catch up ${JSON.stringify(want)}`);
+        if (lastKeys.some(dk => document.querySelector(`#tdWrap [data-td-day="${dk}"]`))) bad.push('a day of last week is offered somewhere on Today');
+      }
+
+      // Monday: nothing earlier this week, so no card and no row.
+      unpin(); unpin = c1.pin(0);
+      goToday();
+      if (document.querySelector('#tdWrap .td-catchup')) bad.push('a catch-up card shows on Monday');
+      if (document.querySelector('#tdWrap [data-td-action="else-earlier"]')) bad.push('"Add to an earlier day" shows on Monday');
+    } finally {
+      unpin(); k.restore(); goToday();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* Row 19. 🕓 Catch up lists every EARLIER day of THIS week with something she
+     has not answered, oldest first, one day open at a time. REWRITTEN ON PURPOSE
+     in R12 (Plan v1, owner 2026-09-27: "too much for 8 weeks"; "placed below
+     today schedule, just below Modify my plan"): it used to reach this week and
+     the 8 before it and sit above the hero. Now an unanswered day LAST week is
+     not listed, and the card (then "＋ Add to an earlier day") comes directly
+     after the ✏️ Modify my plan button in the day column. A settled week never
+     appears (committed at a meeting, or credited another way); today and days
+     still to come are not "catch up"; a day answered in full drops out, and the
+     card goes when nothing is left. It writes nothing itself. */
   if (want('catchUpListsOnlyUnansweredDaysOfOpenWeeks')) checks.catchUpListsOnlyUnansweredDaysOfOpenWeeks = await page.evaluate(async () => {
     const bad = [];
     const unpin = c1.pin(3);
@@ -12030,20 +12334,20 @@ function findChromium() {
       setDayBlocks(keys[1], job('cu-tue', 'mop'), 'jenn');         // unanswered — listed
       setDayBlocks(keys[3], job('cu-thu', 'vacuum'), 'jenn');      // today — Today's own card
       setDayBlocks(keys[4], job('cu-fri', 'laundry'), 'jenn');     // still to come — not listed
-      setDayBlocks(lastKeys[4], job('cu-lfri', 'mop'), 'jenn');    // last week, unsettled — listed first
+      setDayBlocks(lastKeys[4], job('cu-lfri', 'mop'), 'jenn');    // last week, unsettled — NOT listed (this week only)
 
       const listed = () => [...document.querySelectorAll('#tdWrap .td-catchup [data-td-action="catchup-day"]')]
         .map(b => b.getAttribute('data-td-day'));
       goToday();
       const card = document.querySelector('#tdWrap .td-catchup');
       if (!card) return ['no 🕓 Catch up card with an unanswered chore on Tuesday'];
-      const expected = [lastKeys[4], keys[1]];
-      if (JSON.stringify(listed()) !== JSON.stringify(expected)) bad.push(`catch up lists ${JSON.stringify(listed())}, want ${JSON.stringify(expected)} (oldest first; not answered Mon, today, or Fri to come)`);
+      const expected = [keys[1]];
+      if (JSON.stringify(listed()) !== JSON.stringify(expected)) bad.push(`catch up lists ${JSON.stringify(listed())}, want ${JSON.stringify(expected)} (this week only; not answered Mon, today, Fri to come, or last week)`);
+      if (listed().includes(lastKeys[4])) bad.push('an unanswered day LAST week is listed in catch up (this week only)');
       const tueBtn = card.querySelector(`[data-td-action="catchup-day"][data-td-day="${keys[1]}"]`);
       if (tueBtn && !tueBtn.textContent.includes(`${DAY_SHORT[1]} · 1 job`)) bad.push(`Tuesday reads "${tueBtn.textContent.trim()}", want "${DAY_SHORT[1]} · 1 job"`);
-      // At the top of Today: above the hero.
-      const hero = document.querySelector('#tdWrap .td-now');
-      if (hero && !(card.compareDocumentPosition(hero) & Node.DOCUMENT_POSITION_FOLLOWING)) bad.push('the catch-up card is not above the hero');
+      // Directly after ✏️ Modify my plan in the day column, then the earlier-day row.
+      bad.push(...catchUpPlacementFindings());
 
       // One day at a time.
       const open = (key) => {
@@ -12068,19 +12372,22 @@ function findChromium() {
       if (tiny.length) bad.push(`catch-up text under 13px: .${tiny[0].className} ${getComputedStyle(tiny[0]).fontSize}`);
       if (document.body.scrollWidth > window.innerWidth + 1) bad.push('the catch-up card scrolls the page sideways at 390px');
 
-      // A settled week never appears: committed at the meeting…
+      // A settled week never appears — this week, the only one catch up reaches:
+      // committed at the meeting…
       const c = state.shared.chore;
-      if (!c.weekPlans[lastWk]) c.weekPlans[lastWk] = {};
-      c.weekPlans[lastWk].jenn = { committedAt: syncNow() };
+      if (!c.weekPlans[wk]) c.weekPlans[wk] = {};
+      c.weekPlans[wk].jenn = { committedAt: syncNow() };
       goToday();
-      if (listed().includes(lastKeys[4])) bad.push('a week committed at the meeting is still offered in catch up');
+      if (listed().includes(keys[1])) bad.push('a week committed at the meeting is still offered in catch up');
+      delete c.weekPlans[wk].jenn;
       // …or credited another way (the Grandma rule, the repair, an express catch-up).
-      delete c.weekPlans[lastWk].jenn;
       if (!c.finalizedWeeks) c.finalizedWeeks = {};
-      if (!c.finalizedWeeks[lastWk]) c.finalizedWeeks[lastWk] = {};
-      c.finalizedWeeks[lastWk].jenn = 3;
+      if (!c.finalizedWeeks[wk]) c.finalizedWeeks[wk] = {};
+      c.finalizedWeeks[wk].jenn = 3;
       goToday();
-      if (listed().includes(lastKeys[4])) bad.push('a week credited outside a meeting is still offered in catch up');
+      if (listed().includes(keys[1])) bad.push('a week credited outside a meeting is still offered in catch up');
+      delete c.finalizedWeeks[wk].jenn;
+      goToday();
 
       // Answering the last thing on the last day empties the card.
       open(keys[1]);
@@ -13392,8 +13699,9 @@ function findChromium() {
     return result;
   })();
 
-  /* More holds only what has no other home: 🧹 Chores and ◀ Switch, plus the
-     build number (theBuildNumberIsOnThePage). Money school and Money story both
+  /* More holds only what has no other home: 🧹 Chores and ◀ Switch, the 🎨
+     look tile (Looks stage 3, L4 — it names the look it switches to, Calm
+     from the default Pop), plus the build number (theBuildNumberIsOnThePage). Money school and Money story both
      belong to the Money tab and were a third and second door there; each is
      still reached from Money — school from money tab 5 and My money's 🎓
      button, story from My money's "More" card (mnyLinksCard). */
@@ -13405,9 +13713,9 @@ function findChromium() {
     document.querySelector('#kidNav [data-td-nav="more"]')?.click();
     const tiles = [...document.querySelectorAll('#tdMoreOverlay .td-more-tile')];
     const got = tiles.map(t => t.getAttribute('data-td-more')).join(' · ');
-    if (got !== 'chores · profile') problems.push(`the More tiles are "${got}", expected exactly "chores · profile" (Chores · Switch)`);
+    if (got !== 'chores · profile · look') problems.push(`the More tiles are "${got}", expected exactly "chores · profile · look" (Chores · Switch · 🎨)`);
     const labels = tiles.map(t => t.querySelector('.td-more-label')?.textContent.trim()).join(' · ');
-    if (labels !== 'Chores · Switch') problems.push(`the More tile labels are "${labels}", expected "Chores · Switch"`);
+    if (labels !== 'Chores · Switch · Calm look') problems.push(`the More tile labels are "${labels}", expected "Chores · Switch · Calm look"`);
     document.getElementById('tdMoreOverlay')?.classList.remove('open');
 
     // Money school from money tab 5.
@@ -14808,11 +15116,22 @@ function findChromium() {
      Today's 🕓 Catch up card with a day open. */
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.evaluate(() => {
-    window.darkContrastFindings = (root, label) => {
+    /* skip: a selector whose contents are not measured — thePopLookReadsEverywhere
+       passes '.print-sheet', the week's print preview, which draws the printed
+       sheet and so ignores the look (L12). */
+    window.darkContrastFindings = (root, label, skip) => {
       const out = [];
       if (!root) return [`${label}: not on screen`];
       const parse = (c) => {
         const m = /rgba?\(([^)]+)\)/.exec(c || '');
+        /* A color-mix() computes to `color(srgb r g b / a)` (0–1 channels), not
+           rgb(). Unread, that layer was skipped and the text was measured
+           against whatever was behind the mixed fill (Pop's filled cards). */
+        const s = /color\(srgb ([^)]+)\)/.exec(c || '');
+        if (s) {
+          const p = s[1].split(/[\s/]+/).filter(Boolean).map(Number);
+          return { r: p[0] * 255, g: p[1] * 255, b: p[2] * 255, a: p.length > 3 ? p[3] : 1 };
+        }
         if (!m) return null;
         const p = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
         return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
@@ -14840,6 +15159,7 @@ function findChromium() {
         const s = getComputedStyle(el);
         if (s.display === 'none' || s.visibility === 'hidden') return;
         if (el.closest('.visually-hidden')) return;
+        if (skip && el.closest(skip)) return;
         const r = el.getBoundingClientRect();
         if (r.width < 2 || r.height < 2) return;
         const text = [...el.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join('').trim();
@@ -14964,6 +15284,336 @@ function findChromium() {
     return bad.length ? bad : true;
   });
   await page.emulateMedia({ colorScheme: 'light' });
+
+  /* Looks stage 2 — the Pop look, read in light mode, everywhere a child (or a
+     grown-up) reads it. Pop fills the Now card with its block's colour, fills
+     block rows with their wash, turns the main buttons yellow and the today
+     markers navy, and makes the text 10% bigger; any of those can put text on
+     a colour it does not read on. So every KID_SCREENS row at the phone and the
+     iPad sizes, the five parent destinations, the ⋯ More sheet and the block
+     edit sheet are measured with darkContrastFindings' method (background
+     layers composited, opacity included; no dark emulation here): at least
+     4.5:1, and never white text on a pastel. Sheets are measured after their
+     slide-in, because mid-animation every word reads 1:1.
+
+     Looks stage 3 made it take the look: the same walk runs in Calm (purple
+     buttons with white text, navy selected pills, tinted week blocks, new
+     fonts). Looks stage 4 put Calm on the parent portal, so the five
+     destinations (with the phone's bottom bar where it shows) and the profile
+     picker fail in both looks now, where Stage 3 only reported them. Each kid
+     screen, parent destination, the picker, ⋯ More and the edit sheet are
+     saved as look-<look>-<screen>-<width>.png, the CI artifact a person
+     compares the two looks in. */
+  const lookReadsEverywhere = async (look) => {
+    const bad = [];
+    const was = page.viewportSize();
+    const ev = async (label, fn, arg) => {
+      try { return await page.evaluate(fn, arg); } catch (e) { bad.push(`${label}: threw ${e.message}`); return undefined; }
+    };
+    const snap = async (name, w) => {
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: shot(`look-${look}-${name}-${w}`) });
+    };
+    await defineAuditSeeds();   // a page reload above dropped them
+    try {
+      if (look === 'pop') await clearLooks(); else await setLook(look);
+    } catch (e) { bad.push(`the ${look} look could not be applied: ${e.message}`); return { bad }; }
+    const on = await page.evaluate(() => document.documentElement.getAttribute('data-look'));
+    if (on !== look) bad.push(`<html data-look> is "${on}", not "${look}" — the ${look} look was not what was measured`);
+    try {
+      for (const [w, h] of [[390, 844], [1194, 834]]) {
+        await page.setViewportSize({ width: w, height: h });
+        const names = new Set();
+        for (const [id, nav, label] of KID_SCREENS) {
+          const seeded = await ev(label || id, `(${nav.toString()})()`);
+          if (typeof seeded === 'string') bad.push(`${label || id}@${w}: ${seeded}`);
+          await page.waitForTimeout(250);
+          const found = await ev(label || id, ([sid, lab]) => {
+            const scr = document.getElementById(sid);
+            if (!scr || !scr.classList.contains('active')) return [`${lab}: the screen was not on show, so nothing on it was measured`];
+            return darkContrastFindings(scr, lab, '.print-sheet');
+          }, [id, `${label || id}@${w}`]);
+          if (found) bad.push(...found);
+          let name = (label || id).replace(/^screen-/, '').replace(/[^a-z0-9]+/gi, '-');
+          while (names.has(name)) name += '-2';
+          names.add(name);
+          await snap(name, w);
+        }
+        /* R12 (2026-09-27): Today with a missed day this week — 🕓 Catch up open
+           under ✏️ Modify my plan, "＋ Add to an earlier day" after it. Measured
+           for contrast, 44px controls, 13px words, no sideways scroll and its
+           place, in this look at this width. */
+        const cu = await ev(`Today catch-up@${w}`, (lab) => {
+          window.__lookCu = { unpin: c1.pin(3), k: c1.keep('jenn') };
+          profile = 'jenn'; parentViewing = 'jenn';
+          ctPrepareRead();
+          window.__lookCu.k.clear();
+          const keys = mrWeekDayKeys(ctThisWeekKey());
+          setDayBlocks(keys[1], [{ id: 'lk-cu', actId: 'chores', startMin: 17 * 60, durationMin: 30, choreTags: ['mop', 'dishes'] },
+                                 { id: 'lk-cu-r', actId: 'routine_morning', startMin: 7 * 60, durationMin: 30 }], 'jenn');
+          setDayBlocks(keys[3], [{ id: 'lk-cu-t', actId: 'piano', startMin: 16 * 60, durationMin: 60 }], 'jenn');
+          goToday();
+          const day = document.querySelector(`#tdWrap .td-catchup [data-td-action="catchup-day"][data-td-day="${keys[1]}"]`);
+          if (!day) return [`${lab}: no catch-up day to measure`];
+          day.click();
+          const card = document.querySelector('#tdWrap .td-catchup');
+          const row = document.querySelector('#tdWrap [data-td-action="else-earlier"]');
+          const out = [...catchUpPlacementFindings().map(f => `${lab}: ${f}`), ...darkContrastFindings(card, lab)];
+          if (!card.querySelector('.td-catchup-panel')) out.push(`${lab}: the day did not open`);
+          if (row) out.push(...darkContrastFindings(row, `${lab} earlier-day row`));
+          const btns = [...card.querySelectorAll('button'), ...(row ? [row] : [])];
+          const small = btns.filter(b => { const r = b.getBoundingClientRect(); return r.height < 44 || r.width < 44; });
+          if (small.length) out.push(`${lab}: ${small.length} control(s) under 44px: ${small[0].className} ${Math.round(small[0].getBoundingClientRect().height)}px`);
+          const tiny = [card, ...(row ? [row] : [])].flatMap(el => [el, ...el.querySelectorAll('*')]).filter(el =>
+            [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(getComputedStyle(el).fontSize) < 13);
+          if (tiny.length) out.push(`${lab}: text under 13px: .${tiny[0].className} ${getComputedStyle(tiny[0]).fontSize}`);
+          if (document.body.scrollWidth > window.innerWidth + 1) out.push(`${lab}: the page scrolls sideways`);
+          // The picture: the day folded again, ✏️ Modify my plan near the top, the group under it.
+          const again = document.querySelector(`#tdWrap .td-catchup [data-td-action="catchup-day"][data-td-day="${keys[1]}"]`);
+          if (again) again.click();
+          const plan = document.querySelector('#tdWrap .td-col--day .td-plan');
+          if (plan) window.scrollTo(0, Math.max(0, plan.getBoundingClientRect().top + window.scrollY - 140));
+          return out;
+        }, `Today catch-up@${w}`);
+        if (cu) bad.push(...cu);
+        await page.waitForTimeout(250);
+        await page.screenshot({ path: shot(`look-${look}-today-catchup-${w}`) });
+        await ev('Today catch-up restore', () => {
+          if (!window.__lookCu) return;
+          window.__lookCu.unpin(); window.__lookCu.k.restore(); window.__lookCu = null; goToday();
+        });
+        for (const dest of ['now', 'meeting', 'history', 'setup', 'app']) {
+          await ev(`parent ${dest}`, (d) => {
+            profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
+            showScreen('parent'); renderParentHome(); setParentDest(d); window.scrollTo(0, 0);
+          }, dest);
+          await page.waitForTimeout(250);
+          const found = await ev(`parent ${dest}`, (lab) => {
+            if (!document.getElementById('screen-parent').classList.contains('active')) return [`${lab}: the portal was not on show, so nothing on it was measured`];
+            const nav = document.getElementById('parentNav');
+            return [...darkContrastFindings(document.getElementById('screen-parent'), lab),
+              ...(nav && !nav.hidden ? darkContrastFindings(nav, `${lab} bottom bar`) : [])];
+          }, `Parent › ${dest}@${w}`);
+          if (found) bad.push(...found);
+          await snap(`parent-${dest}`, w);
+        }
+        // The profile picker: the first thing anyone sees, in the device's last look.
+        await ev('picker', () => { showScreen('profile'); window.scrollTo(0, 0); });
+        await page.waitForTimeout(250);
+        const picker = await ev('picker', (lab) => {
+          const scr = document.getElementById('screen-profile');
+          if (!scr.classList.contains('active')) return [`${lab}: the picker was not on show, so nothing on it was measured`];
+          return darkContrastFindings(scr, lab);
+        }, `profile picker@${w}`);
+        if (picker) bad.push(...picker);
+        await snap('picker', w);
+        await ev('More', () => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); tdOpenMore(); });
+        await page.waitForTimeout(450);
+        const more = await ev('More', (lab) => darkContrastFindings(document.querySelector('#tdMoreOverlay .sheet'), lab), `⋯ More@${w}`);
+        if (more) bad.push(...more);
+        await page.screenshot({ path: shot(`look-${look}-more-${w}`) });
+        await ev('More close', () => { const ov = document.getElementById('tdMoreOverlay'); if (ov && ov.classList.contains('open')) closeSheet('tdMoreOverlay'); });
+        await ev('edit', () => {
+          profile = 'jenn'; parentViewing = 'jenn';
+          const k = todayKey();
+          window.__popHad = getDayBlocks(k, 'jenn');
+          setDayBlocks(k, [...window.__popHad.filter(b => b.id !== 'pop-edit'),
+            { id: 'pop-edit', actId: 'piano', startMin: 16 * 60, durationMin: 60, checklistState: {} }], 'jenn');
+          openDay(k, getDayKeys(0).indexOf(k)); openEditSheet('pop-edit');
+        });
+        await page.waitForTimeout(450);
+        const edit = await ev('edit', (lab) => darkContrastFindings(document.querySelector('#editOverlay .sheet'), lab), `block edit sheet@${w}`);
+        if (edit) bad.push(...edit);
+        await page.screenshot({ path: shot(`look-${look}-edit-sheet-${w}`) });
+        await ev('edit close', () => { closeSheet('editOverlay'); setDayBlocks(todayKey(), window.__popHad, 'jenn'); });
+      }
+    } finally {
+      try { await clearLooks(); } catch (e) { bad.push('could not put Pop back: ' + e.message); }
+      await ev('restore', () => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
+      if (was) await page.setViewportSize(was);
+      await page.waitForTimeout(200);
+    }
+    return { bad };
+  };
+  if (want('thePopLookReadsEverywhere')) {
+    const r = await lookReadsEverywhere('pop');
+    checks.thePopLookReadsEverywhere = r.bad.length ? r.bad : true;
+  }
+  if (want('theCalmLookReadsEverywhere')) {
+    const r = await lookReadsEverywhere('calm');
+    checks.theCalmLookReadsEverywhere = r.bad.length ? r.bad : true;
+  }
+
+  /* Looks stage 4C — one font everywhere (owner, 2026-09-27: "different font
+     ... PIN, CALM, Exit button on the parent portal"). No base rule gave
+     button / input / select / textarea the page font, so every control without
+     its own font-family drew in the browser's system font, in both looks.
+
+     Every visible text — an element's own text node, an input's value or
+     placeholder, a select's option, an SVG label, a ::before/::after string —
+     must draw in one of the look's own font stacks: the first family of its
+     computed font-family is the first family of one of the look block's
+     --font-* tokens. The tokens are read from the live page (the computed
+     style of <html> in that look), not listed here, so a look that changes
+     its fonts moves the check with it. Walked on every KID_SCREENS row, the five parent destinations,
+     the profile picker and the ⋯ More, block edit, 📋 Copy a day and 🌙
+     reflect sheets, at the phone and the iPad, in both looks.
+
+     Named exemptions, each for a reason:
+     - .print-sheet (the print sheet and the week's print preview) draws in
+       --print-font-*, because print ignores the look (printIgnoresTheLook).
+     - Emoji-only text whose computed stack starts with an emoji font: the
+       glyphs come from the emoji font whatever the stack says. None is set
+       today; the exemption is counted in the log so a new one is seen. */
+  const everyTextUsesTheLooksFonts = async () => {
+    const bad = [];
+    const was = page.viewportSize();
+    let exempted = 0;
+    const ev = async (label, fn, arg) => {
+      try { return await page.evaluate(fn, arg); } catch (e) { bad.push(`${label}: threw ${e.message}`); return undefined; }
+    };
+    await defineAuditSeeds();
+    await page.evaluate(() => {
+      window.lookFontFindings = (root, lab) => {
+        const look = document.documentElement.getAttribute('data-look');
+        const first = (stack) => String(stack || '').split(',')[0].trim().replace(/^["']|["']$/g, '').toLowerCase();
+        /* The page is a file:// document, so its style sheets' rules cannot be
+           read; the computed style of <html> lists every custom property and
+           resolves each to the active look's value. The --font-* names are the
+           look's fonts (css/app.css: the fonts are a look's, and
+           check-look-tokens holds both looks to the same names); --print-font-*
+           is print's own and does not match. */
+        const rootCs = getComputedStyle(document.documentElement);
+        const tokens = [...rootCs].filter(p => /^--font-/.test(p));
+        if (!tokens.length) return { found: [`no --font-* tokens on <html> in the ${look} look, so nothing could be checked`], exempt: 0 };
+        const allowed = new Set(tokens.map(t => first(rootCs.getPropertyValue(t))).filter(Boolean));
+        const EMOJI_FONT = /emoji/i;
+        const EMOJI_ONLY = /^[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}\u200d\ufe0f\u20e3\s]+$/u;
+        const found = new Map();
+        let exempt = 0;
+        /* The look's figures too (Stage 3: Calm lines its figures up with
+           tabular-nums, Pop draws them as the font does), read from the live
+           --num-variant. Named exemption: the four figure columns that are
+           tabular in BOTH looks by their own rule (.mm-xp-n, .co-tier-n,
+           .pn-n, .pcw-day-n) — figures stacked in a column line up in Pop too. */
+        const numVariant = rootCs.getPropertyValue('--num-variant').trim() || 'normal';
+        const OWN_TABULAR = '.mm-xp-n, .co-tier-n, .pn-n, .pcw-day-n';
+        const label = (el, text, where) => {
+          const cls = (el.getAttribute('class') || '').trim().split(/\s+/)[0];
+          const name = `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}${cls ? '.' + cls : ''}${where}`;
+          return `${name} "${text.replace(/\s+/g, ' ').slice(0, 24)}"`;
+        };
+        const judge = (el, cs, text, where) => {
+          if (cs.fontVariantNumeric !== numVariant && !el.closest(OWN_TABULAR)) {
+            const key = label(el, text, where) + ' figures';
+            if (!found.has(key)) found.set(key, `${cs.fontVariantNumeric}, not the look's ${numVariant}`);
+          }
+          const fam = first(cs.fontFamily);
+          if (allowed.has(fam)) return;
+          if (EMOJI_ONLY.test(text) && EMOJI_FONT.test(fam)) { exempt++; return; }
+          const key = label(el, text, where);
+          if (!found.has(key)) found.set(key, cs.fontFamily.split(',')[0].trim());
+        };
+        root.querySelectorAll('*').forEach(el => {
+          if (el.closest('.print-sheet')) return;
+          const cs = getComputedStyle(el);
+          if (cs.display === 'none' || cs.visibility === 'hidden') return;
+          const box = el.getBoundingClientRect();
+          if (!box.width || !box.height) return;
+          const tag = el.tagName;
+          let text = [...el.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent).join('').trim();
+          if (tag === 'INPUT' && !/^(checkbox|radio|range|color|hidden|file|image)$/i.test(el.type)) text = (el.value || el.placeholder || '').trim();
+          else if (tag === 'TEXTAREA') text = (el.value || el.placeholder || '').trim();
+          else if (tag === 'SELECT') text = (el.selectedOptions[0] ? el.selectedOptions[0].textContent : '').trim();
+          else if (tag === 'OPTION' || tag === 'STYLE' || tag === 'SCRIPT') text = '';
+          if (text) judge(el, cs, text, '');
+          for (const pseudo of ['::before', '::after']) {
+            const ps = getComputedStyle(el, pseudo);
+            const m = /^"(.*)"$/.exec(ps.content || '');
+            if (m && m[1].trim() && ps.display !== 'none') judge(el, ps, m[1].trim(), pseudo);
+          }
+        });
+        return { found: [...found].map(([k, f]) => `${k} in ${f}`), exempt };
+      };
+    });
+    const take = async (label, fn, arg) => {
+      const r = await ev(label, fn, arg);
+      if (!r) return;
+      exempted += r.exempt;
+      if (r.found.length) bad.push(`${label}: ${r.found.length} text(s) outside the look's fonts or figures: ${r.found.slice(0, 12).join(' · ')}${r.found.length > 12 ? ' …' : ''}`);
+    };
+    try {
+      for (const look of ['pop', 'calm']) {
+        try { if (look === 'pop') await clearLooks(); else await setLook(look); } catch (e) { bad.push(`the ${look} look could not be applied: ${e.message}`); continue; }
+        for (const [w, h] of [[390, 844], [1194, 834]]) {
+          await page.setViewportSize({ width: w, height: h });
+          const where = (s) => `[${look}] ${s}@${w}`;
+          for (const [id, nav, label] of KID_SCREENS) {
+            const seeded = await ev(where(label || id), `(${nav.toString()})()`);
+            if (typeof seeded === 'string') bad.push(`${where(label || id)}: ${seeded}`);
+            await page.waitForTimeout(200);
+            await take(where(label || id), ([sid, lab]) => {
+              const scr = document.getElementById(sid);
+              if (!scr || !scr.classList.contains('active')) return { found: [`the screen was not on show, so nothing on it was measured`], exempt: 0 };
+              return lookFontFindings(document.body, lab);
+            }, [id, where(label || id)]);
+          }
+          for (const dest of ['now', 'meeting', 'history', 'setup', 'app']) {
+            await ev(where(`Parent › ${dest}`), (d) => {
+              profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
+              showScreen('parent'); renderParentHome(); setParentDest(d);
+            }, dest);
+            await page.waitForTimeout(250);
+            await take(where(`Parent › ${dest}`), (lab) => {
+              if (!document.getElementById('screen-parent').classList.contains('active')) return { found: ['the portal was not on show, so nothing on it was measured'], exempt: 0 };
+              return lookFontFindings(document.body, lab);
+            }, where(`Parent › ${dest}`));
+          }
+          await ev(where('profile picker'), () => { showScreen('profile'); });
+          await page.waitForTimeout(250);
+          await take(where('profile picker'), (lab) => document.getElementById('screen-profile').classList.contains('active')
+            ? lookFontFindings(document.body, lab) : { found: ['the picker was not on show, so nothing on it was measured'], exempt: 0 }, where('profile picker'));
+          /* The sheets: each opened on Jenn's Today, measured after its
+             slide-in, then closed (and its seed put back). */
+          const sheets = [
+            ['⋯ More', 'tdMoreOverlay', () => { tdOpenMore(); }],
+            ['block edit', 'editOverlay', () => {
+              const k = todayKey();
+              window.__fontHad = getDayBlocks(k, 'jenn');
+              setDayBlocks(k, [...window.__fontHad.filter(b => b.id !== 'font-edit'),
+                { id: 'font-edit', actId: 'piano', startMin: 16 * 60, durationMin: 60, checklistState: {} }], 'jenn');
+              openDay(k, getDayKeys(0).indexOf(k)); openEditSheet('font-edit');
+            }],
+            ['📋 Copy a day', 'templateOverlay', () => { openDay(todayKey(), getDayKeys(0).indexOf(todayKey())); openTemplateSheet(); }],
+            ['🌙 reflect', 'reflectOverlay', () => { openReflectSheet(todayKey()); }],
+          ];
+          for (const [name, ov, open] of sheets) {
+            await ev(where(name), `(() => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); (${open.toString()})(); })()`);
+            await page.waitForTimeout(450);
+            await take(where(name), ([o, lab]) => {
+              const sheet = document.querySelector(`#${o}.open .sheet`);
+              return sheet ? lookFontFindings(sheet, lab) : { found: ['the sheet did not open, so nothing on it was measured'], exempt: 0 };
+            }, [ov, where(name)]);
+            await ev(`${where(name)} close`, (o) => {
+              if (document.getElementById(o).classList.contains('open')) closeSheet(o);
+              if (window.__fontHad) { setDayBlocks(todayKey(), window.__fontHad, 'jenn'); window.__fontHad = null; }
+            }, ov);
+          }
+        }
+      }
+    } finally {
+      try { await clearLooks(); } catch (e) { bad.push('could not put Pop back: ' + e.message); }
+      await ev('restore', () => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
+      if (was) await page.setViewportSize(was);
+      await page.waitForTimeout(200);
+    }
+    if (exempted) console.log(`everyTextUsesTheLooksFonts: ${exempted} emoji-only text(s) exempted (drawn in an emoji font)`);
+    return bad;
+  };
+  if (want('everyTextUsesTheLooksFonts')) {
+    const bad = await everyTextUsesTheLooksFonts();
+    checks.everyTextUsesTheLooksFonts = bad.length ? bad : true;
+  }
 
   /* ── SMALL FIXES R7 (Plan v7, 2026-09-26) ────────────────────────────
      Deferred small fixes, one check each, each written to fail on the code
@@ -15176,7 +15826,50 @@ function findChromium() {
      the fallback, and there it wrapped onto two lines at 375px. Measured in a
      page whose font hosts are cut off, so it is the fallback on this machine
      whatever it is; the label stays "Sister Sync" (the owner's choice), one
-     line, inside its tab, 13px or more, with every tab a 44px target. */
+     line, inside its tab, 13px or more, with every tab a 44px target.
+     Looks stage 3: in both looks' fallbacks — Calm's stacks end in the system
+     sans, which is what an offline device that never fetched Lexend draws.
+     navTabsFit is shared with sisterSyncFitsInBothLooksFonts below, which
+     measures the same in each look's own web fonts. */
+  const navTabsFit = async ({ look, fallback }) => {
+    const problems = [];
+    ['jenn', 'jess', 'parent'].forEach(k => { try { localStorage.setItem('wp_look_' + k, look); } catch (e) {} });
+    profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+    goToday();
+    const on = document.documentElement.getAttribute('data-look');
+    if (on !== look) problems.push(`the ${look} look is not on (data-look "${on}")`);
+    const re = look === 'calm' ? /Lexend|Baloo/ : /Patrick Hand|Nunito/;
+    const loaded = () => [...document.fonts].filter(f => re.test(f.family) && f.status === 'loaded');
+    if (!fallback) {
+      for (let i = 0; i < 50 && !loaded().length; i++) {
+        await Promise.all([...document.fonts].filter(f => re.test(f.family)).map(f => f.load().catch(() => null)));
+        if (!loaded().length) await new Promise(r => setTimeout(r, 100));
+      }
+    }
+    await document.fonts.ready;
+    const web = loaded();
+    if (fallback && web.length) problems.push(`a web font loaded anyway (${web.map(f => f.family).join(', ')}) — this is not the fallback`);
+    if (!fallback && !web.length) problems.push(`the ${look} look's web font never loaded, so its own type was not measured`);
+    const nav = document.getElementById('kidNav');
+    if (!nav || nav.hidden) return [...problems, 'the kid nav is hidden on Today'];
+    [...nav.querySelectorAll('.kid-nav-btn')].forEach(b => {
+      const name = b.getAttribute('data-td-nav');
+      const r = b.getBoundingClientRect();
+      if (r.width < 44 || r.height < 44) problems.push(`the ${name} tab is ${Math.round(r.width)}×${Math.round(r.height)}, under 44px`);
+      const label = b.querySelector('.kid-nav-label');
+      if (!label) { problems.push(`the ${name} tab has no label`); return; }
+      const fs = parseFloat(getComputedStyle(label).fontSize);
+      const lr = label.getBoundingClientRect();
+      if (fs < 13) problems.push(`the ${name} tab's label is ${fs}px, under the 13px floor`);
+      if (lr.height > fs * 1.8) problems.push(`the ${name} tab's label "${label.textContent}" wraps onto a second line (${Math.round(lr.height)}px tall) in ${getComputedStyle(label).fontFamily}`);
+      if (label.scrollWidth > label.clientWidth + 1) problems.push(`the ${name} tab's label "${label.textContent}" is clipped (${label.scrollWidth}px in ${label.clientWidth}px)`);
+      if (lr.left < r.left - 1 || lr.right > r.right + 1) problems.push(`the ${name} tab's label "${label.textContent}" spills out of its tab`);
+    });
+    const sync = nav.querySelector('[data-td-nav="sync"] .kid-nav-label');
+    if (!sync || sync.textContent.trim() !== 'Sister Sync') problems.push(`the tab reads "${sync ? sync.textContent.trim() : '(none)'}", not "Sister Sync"`);
+    if (document.body.scrollWidth > window.innerWidth + 1) problems.push(`the page scrolls sideways (${document.body.scrollWidth})`);
+    return problems.length ? problems : true;
+  };
   if (want('sisterSyncTabFitsInTheFallbackFont')) checks.sisterSyncTabFitsInTheFallbackFont = await (async () => {
     const ctx = await browser.newContext({ viewport: { width: 375, height: 812 }, timezoneId: 'America/Edmonton' });
     const p3 = await ctx.newPage();
@@ -15189,40 +15882,506 @@ function findChromium() {
     try {
       await p3.goto('file://' + path.join(__dirname, '..', 'index.html'));
       await p3.waitForTimeout(1200);
-      const r = await p3.evaluate(async () => {
-        const problems = [];
-        profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
-        goToday();
-        await document.fonts.ready;
-        const web = [...document.fonts].filter(f => /Patrick Hand|Nunito/.test(f.family) && f.status === 'loaded');
-        if (web.length) problems.push(`a web font loaded anyway (${web.map(f => f.family).join(', ')}) — this is not the fallback`);
-        const nav = document.getElementById('kidNav');
-        if (!nav || nav.hidden) return ['the kid nav is hidden on Today'];
-        [...nav.querySelectorAll('.kid-nav-btn')].forEach(b => {
-          const name = b.getAttribute('data-td-nav');
-          const r = b.getBoundingClientRect();
-          if (r.width < 44 || r.height < 44) problems.push(`the ${name} tab is ${Math.round(r.width)}×${Math.round(r.height)}, under 44px`);
-          const label = b.querySelector('.kid-nav-label');
-          if (!label) { problems.push(`the ${name} tab has no label`); return; }
-          const fs = parseFloat(getComputedStyle(label).fontSize);
-          const lr = label.getBoundingClientRect();
-          if (fs < 13) problems.push(`the ${name} tab's label is ${fs}px, under the 13px floor`);
-          if (lr.height > fs * 1.8) problems.push(`the ${name} tab's label "${label.textContent}" wraps onto a second line (${Math.round(lr.height)}px tall) in ${getComputedStyle(label).fontFamily}`);
-          if (label.scrollWidth > label.clientWidth + 1) problems.push(`the ${name} tab's label "${label.textContent}" is clipped (${label.scrollWidth}px in ${label.clientWidth}px)`);
-          if (lr.left < r.left - 1 || lr.right > r.right + 1) problems.push(`the ${name} tab's label "${label.textContent}" spills out of its tab`);
-        });
-        const sync = nav.querySelector('[data-td-nav="sync"] .kid-nav-label');
-        if (!sync || sync.textContent.trim() !== 'Sister Sync') problems.push(`the tab reads "${sync ? sync.textContent.trim() : '(none)'}", not "Sister Sync"`);
-        if (document.body.scrollWidth > window.innerWidth + 1) problems.push(`the page scrolls sideways (${document.body.scrollWidth})`);
-        return problems.length ? problems : true;
-      });
-      await p3.screenshot({ path: shot('r7_nav_fallback_font_375') });
-      return r;
+      const bad = [];
+      for (const look of ['pop', 'calm']) {
+        let r;
+        try { r = await p3.evaluate(navTabsFit, { look, fallback: true }); } catch (e) { r = ['threw: ' + e.message]; }
+        if (r !== true) bad.push(...r.map(x => `[${look}] ${x}`));
+        await p3.screenshot({ path: shot(look === 'pop' ? 'r7_nav_fallback_font_375' : 'look-calm-nav-fallback-font-375') });
+      }
+      return bad.length ? bad : true;
     } catch (e) {
       return ['threw: ' + e.message];
     } finally {
       await ctx.close();
     }
+  })();
+
+  /* Looks stage 3 — the same, in each look's own web fonts (Patrick Hand at
+     Pop's 1.1; Lexend at Calm's 1), at 375px. */
+  if (want('sisterSyncFitsInBothLooksFonts')) checks.sisterSyncFitsInBothLooksFonts = await (async () => {
+    const bad = [];
+    const was = page.viewportSize();
+    try {
+      await page.setViewportSize({ width: 375, height: 812 });
+      for (const look of ['pop', 'calm']) {
+        let r;
+        try { r = await page.evaluate(navTabsFit, { look, fallback: false }); } catch (e) { r = ['threw: ' + e.message]; }
+        if (r !== true) bad.push(...r.map(x => `[${look}] ${x}`));
+        await page.screenshot({ path: shot(`look-${look}-nav-375`) });
+      }
+    } finally {
+      await clearLooks();
+      await page.evaluate(() => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
+      if (was) await page.setViewportSize(was);
+    }
+    return bad.length ? bad : true;
+  })();
+
+  /* Looks stage 3 — the switches (docs/handoff/looks-calm-pop.md L4–L6).
+     A child flips her look from the 🎨 tile in ⋯ More, and the whole app is in
+     it at once: no reload (a marker left on window survives), the sheet still
+     up and its tile now naming the other look, the page, status-bar colour and
+     week blocks changed. It is hers, on this device: her key says so, her
+     sister's and the parent's are untouched, and switching to Jess shows
+     Jess's look. The parent's 🎨 in the portal header is on every destination,
+     a 44px target, and flips only the parent's. Everything is forgotten
+     again at the end. */
+  if (want('theLookFlipsWithNoReload')) checks.theLookFlipsWithNoReload = await (async () => {
+    const was = page.viewportSize();
+    await page.setViewportSize({ width: 1194, height: 834 });
+    try {
+      await clearLooks();
+      return await page.evaluate(async () => {
+        const bad = [];
+        const wait = (ms) => new Promise(r => setTimeout(r, ms));
+        const ls = (k) => { try { return localStorage.getItem('wp_look_' + k); } catch (e) { return 'unreadable'; } };
+        const look = () => document.documentElement.getAttribute('data-look');
+        const pageBg = () => getComputedStyle(document.body).backgroundColor;
+        const theme = () => (document.querySelector('meta[name="theme-color"]') || {}).content;
+        window.__lookNoReload = 'still here';
+        profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+        goWeek(); setWeekView('full');
+        const k = getDayKeys(0)[2];
+        const had = (getDayBlocks(k, 'jenn') || []).slice();
+        try {
+          setDayBlocks(k, [{ id: 'look-flip', actId: 'school_day', startMin: 9 * 60, durationMin: 120 }], 'jenn');
+          renderWeek();
+          const card = () => document.querySelector('#weeklyFullGrid .wf-card');
+          const popBg = pageBg(), popTheme = theme();
+          const popCard = card() && getComputedStyle(card()).backgroundColor;
+          if (look() !== 'pop') bad.push(`Jenn starts in "${look()}", not Pop (nothing stored = Pop, L6)`);
+          tdOpenMore();
+          await wait(300);
+          const tile = document.querySelector('#tdMoreOverlay [data-td-more="look"]');
+          if (!tile) return ['⋯ More has no 🎨 look tile'];
+          const tr = tile.getBoundingClientRect();
+          if (tr.width < 44 || tr.height < 44) bad.push(`the 🎨 tile is ${Math.round(tr.width)}×${Math.round(tr.height)}, under 44px`);
+          if (!/Calm look/.test(tile.textContent)) bad.push(`in Pop the tile reads "${tile.textContent.trim()}", not "Calm look"`);
+          tile.click();
+          // Instant: measured in the same task as the click, before any timer.
+          if (look() !== 'calm') bad.push(`after the tap the look is "${look()}", not "calm"`);
+          if (pageBg() === popBg) bad.push(`the page is still ${popBg} after the flip`);
+          await wait(200);
+          if (window.__lookNoReload !== 'still here') bad.push('the page reloaded');
+          const ov = document.getElementById('tdMoreOverlay');
+          if (!ov || !ov.classList.contains('open')) bad.push('⋯ More closed on the flip; it should stay up so she sees the change');
+          const tile2 = document.querySelector('#tdMoreOverlay [data-td-more="look"]');
+          if (!tile2 || !/Pop look/.test(tile2.textContent)) bad.push(`in Calm the tile reads "${tile2 ? tile2.textContent.trim() : '(gone)'}", not "Pop look"`);
+          if (theme() === popTheme || !/eef2f9/i.test(theme() || '')) bad.push(`theme-color is "${theme()}" in Calm, not the Calm page #eef2f9`);
+          const c = card();
+          if (!c) bad.push('the Full week drew no card');
+          else {
+            const cBg = getComputedStyle(c).backgroundColor;
+            if (cBg === popCard) bad.push(`the week block is still ${cBg} in Calm; Calm draws it in its tint`);
+            if (!c.classList.contains('light-bg')) bad.push('a tinted Calm week block does not take navy text (no light-bg): its text colour followed the raw colour, not the drawn one');
+          }
+          if (ls('jenn') !== 'calm') bad.push(`wp_look_jenn is "${ls('jenn')}", not "calm"`);
+          if (ls('last') !== 'calm') bad.push(`wp_look_last is "${ls('last')}", not "calm"`);
+          if (ls('jess') !== null) bad.push(`Jenn's flip wrote wp_look_jess ("${ls('jess')}")`);
+          if (ls('parent') !== null) bad.push(`Jenn's flip wrote wp_look_parent ("${ls('parent')}")`);
+          if (typeof state !== 'undefined' && JSON.stringify(state.shared || {}).includes('wp_look')) bad.push('a look reached synced state');
+          closeSheet('tdMoreOverlay');
+          // The other kid keeps her own (Pop); Jenn gets hers back.
+          selectProfile('jess'); goToday();
+          if (look() !== 'pop') bad.push(`Jess shows "${look()}" after Jenn chose Calm`);
+          selectProfile('jenn'); goToday();
+          if (look() !== 'calm') bad.push(`Jenn back again shows "${look()}", not her Calm`);
+          // The parent: own look, own switch, on every destination.
+          parentUnlockedThisSession = true;
+          await selectProfile('parent');
+          if (look() !== 'pop') bad.push(`the parent shows "${look()}" after Jenn chose Calm`);
+          for (const d of ['now', 'meeting', 'history', 'setup', 'app']) {
+            setParentDest(d);
+            const b = document.getElementById('parentLookBtn');
+            const r = b && b.getBoundingClientRect();
+            if (!b || !r.width) { bad.push(`Parent › ${d}: no 🎨 look button in the header`); continue; }
+            if (r.width < 44 || r.height < 44) bad.push(`Parent › ${d}: the 🎨 button is ${Math.round(r.width)}×${Math.round(r.height)}, under 44px`);
+          }
+          const pb = document.getElementById('parentLookBtn');
+          if (pb) {
+            if (!/Calm/.test(pb.textContent)) bad.push(`in Pop the parent's button reads "${pb.textContent.trim()}"`);
+            pb.click();
+            if (look() !== 'calm') bad.push(`the parent's button left the look "${look()}"`);
+            if (!/Pop/.test(pb.textContent)) bad.push(`in Calm the parent's button reads "${pb.textContent.trim()}", not the look it switches to`);
+            if (ls('parent') !== 'calm') bad.push(`wp_look_parent is "${ls('parent')}" after the parent's flip`);
+            if (ls('jess') !== null) bad.push(`the parent's flip wrote wp_look_jess ("${ls('jess')}")`);
+            pb.click();
+            if (look() !== 'pop' || ls('parent') !== 'pop' || ls('jenn') !== 'calm') bad.push(`flipping back: look "${look()}", parent "${ls('parent')}", jenn "${ls('jenn')}"`);
+          }
+        } finally {
+          setDayBlocks(k, had, 'jenn');
+          const ov = document.getElementById('tdMoreOverlay');
+          if (ov && ov.classList.contains('open')) closeSheet('tdMoreOverlay');
+        }
+        return bad.length ? bad : true;
+      });
+    } catch (e) {
+      return ['threw: ' + e.message];
+    } finally {
+      await clearLooks();
+      await page.evaluate(() => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
+      if (was) await page.setViewportSize(was);
+    }
+  })();
+
+  /* …and it survives a reload, per person, on this device. Its own browser
+     context (its own localStorage), so the main page's state is not reloaded
+     away. Jenn flips to Calm; after a reload the profile picker opens in the
+     look this device used last (Calm), Jess and the parent are still Pop and
+     Jenn is Calm. Then with storage throwing on every access the app still
+     boots and flips — it just defaults to Pop and forgets. */
+  if (want('theLookSurvivesAReload')) checks.theLookSurvivesAReload = await (async () => {
+    const ctx = await browser.newContext({ viewport: { width: 1194, height: 834 }, timezoneId: 'America/Edmonton' });
+    const p4 = await ctx.newPage();
+    const errs = [];
+    p4.on('pageerror', e => errs.push(String(e)));
+    for (const pattern of [
+      '**://firestore.googleapis.com/**', '**://*.firebaseio.com/**',
+      '**://www.gstatic.com/firebasejs/**', '**://identitytoolkit.googleapis.com/**',
+      '**://firebaseinstallations.googleapis.com/**',
+    ]) await p4.route(pattern, r => r.abort());
+    const bad = [];
+    try {
+      await p4.goto('file://' + path.join(__dirname, '..', 'index.html'));
+      await p4.waitForTimeout(800);
+      const first = await p4.evaluate(async () => {
+        const b = [];
+        if (document.documentElement.getAttribute('data-look') !== 'pop') b.push(`a fresh device opens in "${document.documentElement.getAttribute('data-look')}", not Pop`);
+        profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday();
+        tdOpenMore();
+        const tile = document.querySelector('#tdMoreOverlay [data-td-more="look"]');
+        if (!tile) return ['⋯ More has no 🎨 look tile'];
+        tile.click();
+        if (document.documentElement.getAttribute('data-look') !== 'calm') b.push('the tile did not flip Jenn to Calm');
+        return b;
+      });
+      bad.push(...first.map(x => `before reload: ${x}`));
+      await p4.reload();
+      await p4.waitForTimeout(800);
+      const after = await p4.evaluate(() => {
+        const b = [];
+        const look = () => document.documentElement.getAttribute('data-look');
+        if (!document.getElementById('screen-profile').classList.contains('active')) b.push('the app did not open on the profile picker');
+        if (look() !== 'calm') b.push(`the profile picker opened in "${look()}", not Calm (the look this device used last)`);
+        if (!/eef2f9/i.test((document.querySelector('meta[name="theme-color"]') || {}).content || '')) b.push('theme-color did not follow the picker into Calm');
+        selectProfile('jess'); goToday();
+        if (look() !== 'pop') b.push(`Jess shows "${look()}" after the reload`);
+        selectProfile('jenn'); goToday();
+        if (look() !== 'calm') b.push(`Jenn shows "${look()}" after the reload, not her Calm`);
+        parentUnlockedThisSession = true; selectProfile('parent');
+        if (look() !== 'pop') b.push(`the parent shows "${look()}" after the reload`);
+        return b;
+      });
+      bad.push(...after.map(x => `after reload: ${x}`));
+      // Storage that throws on the look's keys (private mode, blocked site data): boots, defaults, flips.
+      await p4.addInitScript(() => {
+        /* Only the look's keys: the rest of the app's storage is not what this
+           check is about, and some of it (week disclosures) reads bare. */
+        const get = Storage.prototype.getItem, set = Storage.prototype.setItem;
+        Storage.prototype.getItem = function (k) { if (/^wp_look_/.test(k)) throw new Error('storage blocked'); return get.call(this, k); };
+        Storage.prototype.setItem = function (k, v) { if (/^wp_look_/.test(k)) throw new Error('storage blocked'); return set.call(this, k, v); };
+      });
+      await p4.reload();
+      await p4.waitForTimeout(800);
+      const blocked = await p4.evaluate(() => {
+        const b = [];
+        const look = () => document.documentElement.getAttribute('data-look');
+        if (look() !== 'pop') b.push(`with storage blocked the app opens in "${look()}", not Pop`);
+        try {
+          profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+          if (look() !== 'pop') b.push(`with storage blocked Jenn shows "${look()}"`);
+          lookToggle('jenn');
+          if (look() !== 'calm') b.push(`with storage blocked the flip left "${look()}"`);
+        } catch (e) { b.push('with storage blocked a look call threw: ' + e.message); }
+        return b;
+      });
+      bad.push(...blocked.map(x => `storage blocked: ${x}`));
+      const own = errs.filter(e => !/firestore|firebase|storage blocked/i.test(e));
+      if (own.length) bad.push(`page errors: ${own.join(' | ')}`);
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      await ctx.close();
+    }
+    return bad.length ? bad : true;
+  })();
+
+  /* L3: switching keeps box geometry. Every main component — cards, the Now
+     card and its tick, block rows and their icon tiles, week blocks, the nav
+     tabs, the main button, pills, the ⋯ More tiles, the header icon buttons —
+     has the same border widths, padding and corner radii in both looks. The
+     fonts may make a box taller or wider; the box's own frame may not move.
+     Also proves the look really changed (the page colour), so it cannot pass
+     by measuring Pop twice. */
+  if (want('theLooksKeepTheSameBoxes')) checks.theLooksKeepTheSameBoxes = await (async () => {
+    const was = page.viewportSize();
+    await page.setViewportSize({ width: 1194, height: 834 });
+    await defineAuditSeeds();
+    const frames = () => page.evaluate(async () => {
+      const wait = (ms) => new Promise(r => setTimeout(r, ms));
+      const out = { page: getComputedStyle(document.body).backgroundColor, boxes: {} };
+      const props = ['borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+        'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+        'borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius'];
+      const take = (where, sels) => sels.forEach(sel => {
+        const el = document.querySelector(sel);
+        if (!el || !el.getBoundingClientRect().width) { out.boxes[`${where} ${sel}`] = 'not on screen'; return; }
+        const s = getComputedStyle(el);
+        out.boxes[`${where} ${sel}`] = props.map(p => `${p}=${s[p]}`).join(' ');
+      });
+      profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+      // Measured while the seeded day is on screen: putting it back re-draws Today empty.
+      const undo = seedTodayAudit(); goToday();
+      take('Today', ['#tdWrap .td-card', '#tdWrap .td-now', '#tdWrap .td-now-tick', '#tdWrap .td-now-bar',
+        '#tdWrap .quest-card', '#tdWrap .quest-card--next', '#tdWrap .quest-card-icon', '#tdWrap .quest-complete-btn',
+        '.td-plan', '#kidNav .kid-nav-btn', '#kidNav .kid-nav-btn.on']);
+      undo();
+      const k = getDayKeys(0)[2];
+      const had = (getDayBlocks(k, 'jenn') || []).slice();
+      setDayBlocks(k, [{ id: 'look-box', actId: 'school_day', startMin: 9 * 60, durationMin: 120 }], 'jenn');
+      goWeek(); setWeekView('full'); renderWeek();
+      take('Week', ['#weeklyFullGrid .wf-card', '.view-tab.active', '.view-tab:not(.active)', '.weekly-full']);
+      setDayBlocks(k, had, 'jenn');
+      mnyOpenMyMoney('jenn');
+      take('My money', ['#screen-mymoney .mny-card', '#screen-mymoney .mny-tab.on', '#screen-mymoney .mny-btn']);
+      goToday(); tdOpenMore(); await wait(350);
+      take('More', ['#tdMoreOverlay .sheet', '#tdMoreOverlay .td-more-tile']);
+      closeSheet('tdMoreOverlay');
+      parentUnlockedThisSession = true; selectProfile('parent');
+      take('Parent', ['#screen-parent .topbar .btn-icon', '#parentLookBtn']);
+      /* Looks stage 4: the portal's own components, on its destinations, and
+         the picker a parent comes in through. */
+      parentViewing = 'jenn'; setParentDest('now');
+      take('Parent › Now', ['#screen-parent .parent-banner', '#screen-parent .parent-tab:not(.active)',
+        '#screen-parent .parent-tab.active', '#parentScopePills .pill-btn.active', '#parentScopePills .pill-btn:not(.active)',
+        '#pnWrap .pn-card', '#pnWrap .pn-day', '#pnWrap .pn-day.now', '#pnWrap .pn-day.on', '#pnWrap .pn-kidbtn.on',
+        '#screen-parent .btn-confirm']);
+      setParentDest('setup');
+      take('Parent › Setup', ['#screen-parent .pn-card', '#screen-parent .pn-row']);
+      const wasHistoryView = parentHistoryView;
+      setParentHistoryView('money');   // the view a parent lands on; an earlier check may have left another
+      take('Parent › History', ['#screen-parent [data-parent-history].active', '#screen-parent [data-parent-history]:not(.active)', '#screen-parent .ctr-tile']);
+      parentHistoryView = wasHistoryView;
+      setParentDest('meeting');
+      take('Parent › Meeting', ['#screen-parent .review-day', '#screen-parent .hub-status']);
+      openFamilyMeeting(); await wait(350);
+      take('Family meeting', ['#screen-meeting .mm-step:not(.mm-step-cur)', '#screen-meeting .mm-step-cur',
+        '#screen-meeting .mm-drow', '#screen-meeting .mm-nav']);
+      showScreen('profile');
+      take('Profile picker', ['#screen-profile .profile-card', '#screen-profile .profile-card.parent']);
+      return out;
+    });
+    const bad = [];
+    try {
+      await clearLooks();
+      const pop = await frames();
+      await setLook('calm');
+      const calm = await frames();
+      if (pop.page === calm.page) bad.push(`the page is ${pop.page} in both looks — Calm was not what was measured`);
+      for (const [where, f] of Object.entries(pop.boxes)) {
+        if (f === 'not on screen') { bad.push(`${where}: not on screen in Pop, so not compared`); continue; }
+        if (calm.boxes[where] !== f) {
+          const a = f.split(' '), b = String(calm.boxes[where]).split(' ');
+          const diff = a.map((x, i) => x === b[i] ? null : `${x} → ${(b[i] || '?').split('=').pop()}`).filter(Boolean);
+          bad.push(`${where}: ${diff.join(', ') || calm.boxes[where]}`);
+        }
+      }
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      await clearLooks();
+      await page.evaluate(() => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
+      if (was) await page.setViewportSize(was);
+    }
+    return bad.length ? bad : true;
+  })();
+
+  /* L12: print ignores the look. The week's print sheet, rendered with print
+     media emulated, has the same computed style on every element — every
+     standard CSS property, plus its box — whichever look is set. html, body
+     and #screen-print are included, because what they pass down (a font, a
+     number style, a heading weight) prints. Seeded with a week that draws
+     blocks, a travel leg, a clash and a sleep line, so the sheet has more
+     than empty cells on it; put back after. Also proves Calm was really on
+     (a look token differs), so it cannot pass by measuring Pop twice. */
+  if (want('printIgnoresTheLook')) checks.printIgnoresTheLook = await (async () => {
+    const bad = [];
+    const dump = () => page.evaluate(() => {
+      // What prints: html, body, and every element of the print screen that
+      // draws a box in print (a .no-print control, display:none, prints nothing).
+      const els = [document.documentElement, document.body,
+        ...[...document.querySelectorAll('#screen-print, #screen-print *')].filter(el => el.getClientRects().length > 0)];
+      const names = [...getComputedStyle(document.body)].filter(n => !n.startsWith('--'));
+      const rows = els.map((el, i) => {
+        const s = getComputedStyle(el);
+        const r = el.getBoundingClientRect();
+        const cls = (el.getAttribute('class') || '').trim().split(/\s+/)[0];
+        return { key: `${i} ${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}${cls ? '.' + cls : ''}`,
+          box: [r.x, r.y, r.width, r.height].map(v => Math.round(v * 100) / 100).join(','),
+          style: names.map(n => s.getPropertyValue(n)) };
+      });
+      return { names, rows, bg: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
+        look: document.documentElement.getAttribute('data-look') };
+    });
+    const keys = await page.evaluate(() => getDayKeys(0));
+    const had = await page.evaluate((ks) => ks.map(k => getDayBlocks(k, 'jenn')), keys);
+    try {
+      await page.evaluate((ks) => {
+        profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn');
+        setDayBlocks(ks[1], [
+          { id: 'pr-a', actId: 'school_day', startMin: 9 * 60, durationMin: 6 * 60 },
+          { id: 'pr-b', actId: 'training', tag: 'skating', startMin: 17 * 60, durationMin: 90,
+            travelBuffer: true, travelBufMin: 20, getReadyBuffer: true, getReadyBufMin: 10 },
+          { id: 'pr-c', actId: 'piano', startMin: 17 * 60 + 30, durationMin: 30 },
+        ], 'jenn');
+        setDayBlocks(ks[3], [{ id: 'pr-d', actId: 'dinner', startMin: 18 * 60, durationMin: 60 }], 'jenn');
+        goWeek(); openPrint();
+      }, keys);
+      await page.emulateMedia({ media: 'print' });
+      await clearLooks();
+      await page.evaluate(() => renderPrintSheet());
+      const pop = await dump();
+      await setLook('calm');
+      await page.evaluate(() => renderPrintSheet());
+      const calm = await dump();
+      if (pop.look !== 'pop' || calm.look !== 'calm') bad.push(`measured "${pop.look}" then "${calm.look}", not Pop then Calm`);
+      if (pop.bg === calm.bg) bad.push(`--bg is ${pop.bg} in both — Calm was not what was measured`);
+      if (pop.rows.length < 50) bad.push(`the print sheet has only ${pop.rows.length} elements — nothing was drawn to compare`);
+      if (pop.rows.length !== calm.rows.length) bad.push(`${pop.rows.length} elements in Pop, ${calm.rows.length} in Calm`);
+      else {
+        const diffs = [];
+        pop.rows.forEach((a, i) => {
+          const b = calm.rows[i];
+          if (a.key !== b.key) { diffs.push(`${a.key} is ${b.key} in Calm`); return; }
+          if (a.box !== b.box) diffs.push(`${a.key} box ${a.box} → ${b.box}`);
+          a.style.forEach((v, j) => { if (v !== b.style[j]) diffs.push(`${a.key} ${pop.names[j]}: ${v} → ${b.style[j]}`); });
+        });
+        if (diffs.length) bad.push(`${diffs.length} computed value(s) differ between the looks in print: ${diffs.slice(0, 12).join(' | ')}`);
+      }
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      await page.emulateMedia({ media: 'screen' });
+      await clearLooks();
+      await page.evaluate(({ ks, had }) => { ks.forEach((k, i) => setDayBlocks(k, had[i], 'jenn')); goToday(); }, { ks: keys, had });
+    }
+    return bad.length ? bad : true;
+  })();
+
+  /* Looks stage 4 part B: a warning reads as a warning in either look. Stage 4
+     made the warm accents a look's (Calm lavender and purple), and the rules
+     that mean "warn", "act soon", "at risk", "refused", "will be replaced",
+     "time to move" or "waiting" read them — so in Calm Backup's nearly-full
+     meter turned lavender and its critical state purple, the main button's
+     colour. Each rule below is a meaning, not decoration: it must compute to
+     today's (Pop's) colour in both looks. Drawn on elements made for the
+     check, so every rule is reached whatever the seeded data shows. */
+  if (want('warningsReadAsWarningsInBothLooks')) checks.warningsReadAsWarningsInBothLooks = await (async () => {
+    const bad = [];
+    const WARN = [
+      // [label, tag, classes, property, today's (Pop) value]
+      ['Backup meter nearly full', 'div', 'bk-meter-fill warn', 'backgroundColor', 'rgb(255, 209, 102)'],
+      ['Backup meter critical', 'div', 'bk-meter-fill critical', 'backgroundColor', 'rgb(184, 68, 31)'],
+      ['chore exposure line', 'div', 'ck-risk', 'color', 'rgb(184, 68, 31)'],
+      ['My money exposure line', 'div', 'mny-earn-risk', 'color', 'rgb(184, 68, 31)'],
+      ['school calendar ran out', 'div', 'pa-stale', 'borderTopColor', 'rgb(184, 68, 31)'],
+      ['Record refusal', 'p', 'rc-no', 'color', 'rgb(184, 68, 31)'],
+      ['chore money capped', 'div', 'ct-cap-note', 'color', 'rgb(184, 68, 31)'],
+      ['Copy a week "replace"', 'span', 'pcw-tag-replace', 'color', 'rgb(184, 68, 31)'],
+      ['money total overridden', 'div', 'mny-override-note', 'borderTopColor', 'rgb(184, 68, 31)'],
+      ['Today "be moving by" strip', 'div', 'td-now-prep', 'borderTopColor', 'rgb(184, 68, 31)'],
+      ['Today "time to get moving"', 'div', 'td-now-move td-now-move--now', 'color', 'rgb(184, 68, 31)'],
+      ['week under-planned banner', 'div', 'week-todo-banner week-todo-banner--warn', 'borderTopColor', 'rgb(201, 138, 30)'],
+      ['week under-planned banner text', 'div', 'week-todo-banner week-todo-banner--warn', 'color', 'rgb(107, 71, 8)'],
+      ['week under-planned banner shadow', 'div', 'week-todo-banner week-todo-banner--warn', 'boxShadow', 'rgba(201, 138, 30, 0.35) 3px 3px 0px 0px'],
+      ['Today family chip (waiting)', 'div', 'td-chip-family', 'borderTopColor', 'rgb(201, 138, 30)'],
+      ['Today catch-up card (waiting)', 'div', 'td-catchup', 'borderTopColor', 'rgb(201, 138, 30)'],
+    ];
+    const read = () => page.evaluate((rows) => {
+      const host = document.createElement('div');
+      host.id = 'warnProbe';
+      document.body.appendChild(host);
+      try {
+        return rows.map(([, tag, cls, prop]) => {
+          const el = document.createElement(tag);
+          el.className = cls;
+          el.textContent = 'x';
+          host.appendChild(el);
+          return getComputedStyle(el)[prop];
+        });
+      } finally { host.remove(); }
+    }, WARN);
+    try {
+      await clearLooks();
+      const pop = await read();
+      await setLook('calm');
+      const on = await page.evaluate(() => document.documentElement.getAttribute('data-look'));
+      if (on !== 'calm') bad.push(`<html data-look> is "${on}" — Calm was not what was measured`);
+      const calm = await read();
+      WARN.forEach(([label, , , prop, want], i) => {
+        if (pop[i] !== want) bad.push(`Pop ${label} ${prop} is ${pop[i]}, not today's ${want}`);
+        if (calm[i] !== want) bad.push(`Calm ${label} ${prop} is ${calm[i]}, not the warning's ${want}`);
+      });
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      await clearLooks();
+    }
+    return bad.length ? bad : true;
+  })();
+
+  /* Looks stage 4 part B: "today" and "selected" are told apart in either
+     look. Parent › Now draws this week twice — the rail marks today, the
+     "on her behalf" strip marks the chosen day, which starts as today. In
+     Calm both were a navy square with white text (today navy by L9, the
+     selected pill navy since Stage 3), so a parent could not tell which
+     square was chosen. Selected is the filled one; today is navy by frame in
+     Calm (L9) and keeps its own fill in Pop. Chores' day strip (.ck-day) is
+     the other place a today mark and a selection share a row. */
+  if (want('todayAndSelectedDifferInBothLooks')) checks.todayAndSelectedDifferInBothLooks = await (async () => {
+    const bad = [];
+    const NAVY = 'rgb(28, 34, 64)';
+    const read = () => page.evaluate(() => {
+      profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
+      pnAnswerKid = null; pnAnswerDay = null;
+      showScreen('parent'); renderParentHome(); setParentDest('now');
+      const sig = (el) => {
+        if (!el) return null;
+        const s = getComputedStyle(el);
+        return { bg: s.backgroundColor, ink: s.color, ring: s.boxShadow, edge: s.borderTopColor };
+      };
+      const now = sig(document.querySelector('#pnWrap .pn-day.now'));
+      const on = sig(document.querySelector('#pnWrap .pn-day.on'));
+      const host = document.createElement('div');
+      host.className = 'ck-daystrip';
+      host.innerHTML = '<button class="ck-day sel">1</button><button class="ck-day today">2</button>';
+      document.body.appendChild(host);
+      const ckSel = sig(host.children[0]), ckToday = sig(host.children[1]);
+      host.remove();
+      return { now, on, ckSel, ckToday };
+    });
+    try {
+      for (const look of ['pop', 'calm']) {
+        if (look === 'pop') await clearLooks(); else await setLook(look);
+        await page.waitForTimeout(150);
+        const r = await read();
+        if (!r.now) { bad.push(`${look}: Parent › Now drew no today square (.pn-day.now), so nothing was compared`); continue; }
+        if (!r.on) { bad.push(`${look}: Parent › Now drew no selected day (.pn-day.on), so nothing was compared`); continue; }
+        if (r.now.bg === r.on.bg) bad.push(`${look}: Parent › Now's today square and selected day share the fill ${r.now.bg}`);
+        if (r.ckSel.bg === r.ckToday.bg) bad.push(`${look}: Chores' selected day and today share the fill ${r.ckSel.bg}`);
+        // L9: in Calm today's mark is navy (Pop's rail square keeps its own colour).
+        if (look === 'calm' && ![r.now.bg, r.now.ring, r.now.edge].some(v => String(v).includes(NAVY))) {
+          bad.push(`calm: Parent › Now's today square carries no navy (L9): ${JSON.stringify(r.now)}`);
+        }
+      }
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      await clearLooks();
+      await page.evaluate(() => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
+    }
+    return bad.length ? bad : true;
   })();
 
   /* Step 1 confirms a day where the day is, not in a panel below a chart.

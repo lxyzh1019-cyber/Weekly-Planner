@@ -77,13 +77,17 @@ const FL_SAVED_DESTS = ['ready', 'locked', 'invest'];
 /* One hue per ribbon, matched to the pots they name on 💰 My money so the two
    screens cannot be telling a child about different things. */
 const FL_COLOURS = {
-  earned: '#95d5b2', prize: '#ff9eb5', gift: '#c9a6e8', borrowed: '#f2b880',
-  interest: '#bdbdbd', typed: '#d6d6d6', opening: '#d6d6d6',
-  ready: '#6fb1fc', locked: '#8ad8d0', invest: '#b0a0ea',
-  spent: '#ffd166', fine: '#e08e8e', loan: '#f2b880',
+  earned: 'var(--mny-flow-earned)', prize: 'var(--mny-flow-prize)',
+  gift: 'var(--mny-flow-gift)', borrowed: 'var(--mny-flow-borrowed)',
+  interest: 'var(--mny-flow-interest)', typed: 'var(--mny-flow-typed)',
+  opening: 'var(--mny-flow-opening)',
+  ready: 'var(--mny-flow-ready)', locked: 'var(--mny-flow-locked)',
+  invest: 'var(--mny-flow-invest)',
+  spent: 'var(--mny-flow-spent)', fine: 'var(--mny-flow-fine)',
+  loan: 'var(--mny-flow-loan)',
 };
 
-function flColour(key) { return FL_COLOURS[String(key)] || '#bdbdbd'; }
+function flColour(key) { return FL_COLOURS[String(key)] || 'var(--mny-flow-other)'; }
 function flSourceLabel(key) { return EV_SOURCE_LABELS[key] || { icon: '💰', label: String(key) }; }
 function flDestLabel(key) { return EV_DEST_LABELS[key] || { icon: '💰', label: String(key) }; }
 

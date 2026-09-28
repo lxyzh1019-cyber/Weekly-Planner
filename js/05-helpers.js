@@ -397,6 +397,35 @@ function colourDistance(hexA, hexB) {
     + Rt * (dCp / Sc) * (dHp / Sh));
 }
 
+/* ── A CATEGORY'S WASH ──
+   The pale tint a list row is filled with when it wears its category (Pop's
+   rows, docs/handoff/looks-calm-pop.md §7). ONE rule rather than a second
+   table of hexes: 18% of the fill mixed into white, in sRGB — the same as CSS
+   `color-mix(in srgb, <fill> 18%, white)`, and within a few units of each wash
+   the handoff drew. A rule reaches every colour a block can wear — twelve
+   subgroups, a sport's colour, one picked off the sheet's dots — where a table
+   would reach only the colours somebody remembered to list.
+   everySubgroupTellsItselfApart (tests/smoke.js) holds the ink and Pop's
+   secondary text to 4.5:1 on every subgroup's wash. `#rrggbb` in, `#rrggbb`
+   out; anything else comes back unchanged. */
+function colourWash(hex) { return colourTint(hex, 0.18); }
+
+/* `share` (0–1) of a colour mixed into white, in sRGB — CSS
+   `color-mix(in srgb, <hex> share, white)` worked out here, because the colour
+   maths (isLightColour) has to read the colour that is actually DRAWN. The
+   wash above is share 0.18; a Full-week block wears the look's --block-fill
+   (lookBlockFill, js/07-week-view.js). A share of 1 or more is the colour
+   itself, returned exactly as given. */
+function colourTint(hex, share) {
+  if (!(share < 1)) return hex;
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+  if (!m) return hex;
+  return '#' + [0, 2, 4].map(i => {
+    const c = parseInt(m[1].substr(i, 2), 16);
+    return Math.round(255 - (255 - c) * share).toString(16).padStart(2, '0');
+  }).join('');
+}
+
 /* ── How far a block is run INTO, and by what ──
    A clash has two sides: the block whose travel does not fit, and the block
    that travel runs into. `computeBufferConflicts` records the shortfall against
@@ -1217,7 +1246,7 @@ function addQuickBreak(durationMin) {
      blockColour keeps deriving it. Seeding from CAT_HEX wrote a hex the
      subgroup table does not own, which reads as a colour somebody chose and
      would freeze this block at the old hue on the next recolour. */
-  const colour = act ? (activitySub(act).hex || CAT_HEX[act.cat] || '#7fca79') : '#7fca79';
+  const colour = act ? (activitySub(act).hex || CAT_HEX[act.cat] || '#7fca79') : '#7fca79'; /* look: stored on the block as data; must stay a seeded hex (SEEDED_HEX_VALUES) */
   placeBlock('break_quick', start, durationMin, colour, [], 'Quick break', { travelBuffer: false });
   showToast(`Break added at ${formatTimeFromMin(start)} ✨`);
 }
@@ -1440,6 +1469,88 @@ let parentUnlockedThisSession = false;
    cleared on boot (js/99-main.js) so it does not linger on the girls' devices.
    HERO_TIERS and the XP ladder are a different feature and are untouched. */
 
+/* ════════════════════════════════════════════════════════════════
+   LOOKS — Pop and Calm (docs/handoff/looks-calm-pop.md L4–L7)
+   The two looks differ only in the values of css/app.css's two
+   `:root[data-look="…"]` blocks; which one shows is the `data-look` on
+   <html>, and applyLook is the one thing that sets it.
+
+   Remembered per person, per device: wp_look_jenn, wp_look_jess,
+   wp_look_parent, plus wp_look_last (the look this device showed last, which
+   the profile picker opens in). localStorage and never synced state — every
+   state write uploads the whole document, and Jenn's choice on the iPad is not
+   Jess's, or the phone's. Storage can be missing or throw (private mode); then
+   every read answers Pop (L6) and the app works the same, it just forgets. */
+const LOOKS = ['pop', 'calm'];
+const LOOK_DEFAULT = 'pop';
+const LOOK_LS_PREFIX = 'wp_look_';
+const LOOK_NAMES = { pop: 'Pop', calm: 'Calm' };
+/* Calm's fonts, fetched the first time Calm is applied and never for a device
+   that stays on Pop. Cross-origin, so sw.js does not keep them: offline the
+   stacks' system sans draws Calm (tests: sisterSyncTabFitsInTheFallbackFont). */
+const LOOK_CALM_FONTS_URL = 'https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Lexend:wght@400;500;600&display=swap';
+
+/* who: 'jenn' | 'jess' | 'parent' | 'last'. */
+function lookStored(who) {
+  try {
+    const v = localStorage.getItem(LOOK_LS_PREFIX + who);
+    return LOOKS.includes(v) ? v : LOOK_DEFAULT;
+  } catch (e) { return LOOK_DEFAULT; }
+}
+function lookStore(who, look) {
+  try { localStorage.setItem(LOOK_LS_PREFIX + who, look); } catch (e) {}
+}
+function lookOther(look) { return look === 'calm' ? 'pop' : 'calm'; }
+
+function lookLoadCalmFonts() {
+  if (document.getElementById('lookCalmFonts')) return;
+  const link = document.createElement('link');
+  link.id = 'lookCalmFonts';
+  link.rel = 'stylesheet';
+  link.href = LOOK_CALM_FONTS_URL;
+  document.head.appendChild(link);
+}
+
+/* THE one way a look is put on screen. Instant, no reload: the values are CSS,
+   so the attribute alone repaints everything drawn from them. What is WORKED
+   OUT in script from the look is redone here — the Full week's measured type
+   (wfTypeInvalidate; the fonts arriving later re-measure through the
+   document.fonts listeners in js/99-main.js) and its block fills
+   (lookBlockFill), by drawing the screen on show again. The status bar follows
+   the page colour (theme-color), and the parent's header button says which
+   look it switches to. */
+function applyLook(look) {
+  if (!LOOKS.includes(look)) look = LOOK_DEFAULT;
+  const root = document.documentElement;
+  const changed = root.getAttribute('data-look') !== look;
+  if (look === 'calm') lookLoadCalmFonts();
+  root.setAttribute('data-look', look);
+  lookStore('last', look);
+  const page = getComputedStyle(root).getPropertyValue('--bg').trim();
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta && page) meta.setAttribute('content', page);
+  const btn = document.getElementById('parentLookBtn');
+  if (btn) {
+    const to = LOOK_NAMES[lookOther(look)];
+    btn.textContent = `🎨 ${to}`;
+    btn.setAttribute('aria-label', `Switch to the ${to} look`);
+    btn.title = `Switch to the ${to} look`;
+  }
+  if (!changed) return;
+  wfTypeInvalidate();
+  refreshCurrentScreen();
+}
+
+/* Flip one person's look on this device and show it. who: 'jenn' | 'jess' |
+   'parent' — the kid's 🎨 tile in ⋯ More (tdGoMore) and the parent's 🎨 in
+   the portal header. */
+function lookToggle(who) {
+  const next = lookOther(lookStored(who));
+  lookStore(who, next);
+  applyLook(next);
+  return next;
+}
+
 async function selectProfile(p) {
   if (p === 'parent' && !parentUnlockedThisSession) {
     const pin = ((await showPrompt('Enter parent PIN 🔒', { type:'password' })) || '').trim();
@@ -1449,6 +1560,10 @@ async function selectProfile(p) {
     }
     parentUnlockedThisSession = true;
   }
+  /* Her look, or the parent's (L4, L5). Applied before `profile` changes, so a
+     re-draw it causes is of the screen still on show, as it stands; the
+     navigation below then draws the new one. */
+  applyLook(lookStored(p));
   profile = p;
   if (p === 'parent') {
     parentViewing = 'jenn';

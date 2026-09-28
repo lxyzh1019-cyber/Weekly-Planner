@@ -16,7 +16,7 @@ const SYNC_CARD_MIN_PX = 20;
 const SYNC_TAP_MIN_PX = 44;
 const SYNC_TIME_ROOM_PX = 36;
 const SYNC_LINE_PX = 15;
-const SYNC_BUSY_GREY = '#cfcfcf';
+const SYNC_BUSY_GREY = 'var(--surface-busy)';
 function openSisterSync() {
   if (isParent()) { showToast('View each child separately 👀'); return; }
   /* Today, not Monday. This opened on syncDayIdx = 0 unconditionally while the
@@ -699,7 +699,7 @@ function renderChallenges() {
   const weekStart = dateToLocalKey(getWeekStart(weekOffset));
   const challenges = (state.shared.challenges||[]).filter(c=>c.weekStart===weekStart);
   if (!challenges.length) {
-    list.innerHTML = '<p style="color:var(--ink-light);font-size:0.95rem">No goals yet. Tap ＋ to add one!</p>';
+    list.innerHTML = '<p style="color:var(--ink-light);font-size:calc(0.95rem * var(--text-scale, 1))">No goals yet. Tap ＋ to add one!</p>';
   } else {
     challenges.forEach(c=>{
       const card = document.createElement('div');
@@ -781,7 +781,7 @@ function renderInvites() {
   const myInvites = invitesWaitingFor(profile);
   const missed = invitesMissedFor(profile);
   if (!myInvites.length && !missed.length) {
-    inviteList.innerHTML = '<p style="color:var(--ink-light);font-size:0.95rem">No invites right now. Tap one of your own activities above to invite your sister.</p>';
+    inviteList.innerHTML = '<p style="color:var(--ink-light);font-size:calc(0.95rem * var(--text-scale, 1))">No invites right now. Tap one of your own activities above to invite your sister.</p>';
     return;
   }
   myInvites.forEach(inv=>{
@@ -806,7 +806,7 @@ function renderInvites() {
      clears it. */
   if (!missed.length) return;
   const head = document.createElement('p');
-  head.style.cssText = 'color:var(--ink-light);font-size:0.95rem;margin:0.7rem 0 0.3rem';
+  head.style.cssText = 'color:var(--ink-light);font-size:calc(0.95rem * var(--text-scale, 1));margin:0.7rem 0 0.3rem';
   head.textContent = 'Missed';
   inviteList.appendChild(head);
   missed.forEach(inv => {

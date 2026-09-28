@@ -14,7 +14,7 @@ const LS_KEY = 'weeklyplanner-v3';
    the Today More sheet (js/31-today.js) and under the list on the parent
    portal's App landing (js/11-parent.js), which is where a grown-up reads it on
    an iPad with no console. */
-const APP_BUILD = '2026-09-26b';
+const APP_BUILD = '2026-09-27f';
 const TOTAL_SLOTS = 60;           // 6AM → 9PM = 15 hrs × 4 (legacy, used for some %s)
 const START_HOUR  = 6;
 const END_HOUR    = 22;
@@ -23,7 +23,7 @@ const END_MIN     = END_HOUR * 60;        // 1320
 const DAY_MIN_SPAN = END_MIN - START_MIN; // 960 min
 const PX_PER_MIN  = 1.4;                  // 1 min = 1.4px → 1 hr = 84px
 
-const COLOURS = ['#ff7b54','#ff9eb5','#ffd166','#95d5b2','#6fb1fc','#c3aed6','#ef476f','#8ecae6','#ffb4a2','#b5ead7'];
+const COLOURS = ['#ff7b54','#ff9eb5','#ffd166','#95d5b2','#6fb1fc','#c3aed6','#ef476f','#8ecae6','#ffb4a2','#b5ead7']; /* look: block colour picker palette — family data, stored on blocks */
 
 /* When a day has stopped being a day. Minutes from midnight, so the window
    wraps: 9pm to 7am. Today reads this to answer "what now" honestly at nine in
@@ -47,20 +47,44 @@ const AGE_ROLLOVER_MONTH = 7;   // 0-based: August
    ever read, which is worse than a duplicate that drifts, because a duplicate
    that drifts at least shows up on a screen. CAT_HEX below is what the app
    asks, and ACTIVITY_CATEGORIES is what owns the hues. */
-const CAT_HEX = {
-  sleep:'#c3aed6', school:'#6fb1fc', active:'#fb6f1c',
-  free:'#95d5b2', daily:'#ffd166', custom:'#ff9eb5', training:'#ef476f',
-  routine:'#80cbc4',
+/* Brighter, same hue (Looks stage 2, 2026-09-27): each value sits on its
+   category's main subgroup below where one exists, and every value it replaced
+   is in RETIRED_SEEDED_HEXES. css/app.css's `--cat-*` copy these for the few
+   CSS rules that paint a category; this table owns them and
+   everySubgroupTellsItselfApart (tests/smoke.js) holds the two to agreement.
+   That check also holds every value here 14 or more (CIEDE2000) from every
+   colour of ANOTHER category — Looks stage 2B-3 moved four that were not:
+   sleep #a78bfa sat 1.9 from Arts, so it went a paler lavender; custom went
+   back to #ff9eb5 (#ff7fa3 was 9.0 from Training); appointment now sits on
+   its own subgroup, Appointments (#7fa5c4 was 8.5 from School); competition
+   went a clearer orange (#f4a340 was 9.2 from Appointments). */
+const CAT_HEX = { /* look: category hexes are family data — seeded onto blocks, read by SEEDED_HEX_VALUES */
+  sleep:'#dcbcfd', school:'#4aa3ff', active:'#fb8a2e',
+  free:'#4cc46a', daily:'#ffc83d', custom:'#ff9eb5', training:'#f2597d',
+  routine:'#3cc9b9',
   // Appointments: the dentist, the orthodontist, a parent-teacher meeting. A
   // fixed time somebody else set, which is what makes it its own category
   // rather than an "active" or a "daily" — you cannot move it, and a week that
   // has one is shaped around it. Muted on purpose: it is not a treat, and it is
   // not a chore either.
-  appointment:'#8fa8b8',
+  appointment:'#f0bf72',
   // Not a category — Competition is cat:'training' with isCompetition set. The
   // colour lives here so a competition block can be told apart at a glance.
-  competition:'#f4a340'
+  competition:'#fc9005'
 };
+
+/* THE TRAINING SENTINEL. A training block whose `colour` is one of these made
+   no choice: draw its sport's colour (trainingBlockColour below; the sport
+   pills in js/09-sheets.js). It moved with CAT_HEX.training (#ef476f → #f2597d,
+   Looks stage 2, 2026-09-27) and every training block placed before carries the
+   old value — reading that as a choice would paint every skating session the
+   retired pink instead of its sport's colour. Skating's own old #8a6fd0 joined
+   it when the sport moved to #9d85dd (Looks stage 2B-2: navy read 3.9:1 and
+   white 4.0:1 on it), since a skating placement seeds its sport's colour onto
+   the block — and #9d85dd and Swimming's #2f9fd0 joined it when those two
+   moved again in Looks stage 2B-3. Grows on every move and is never pruned,
+   for the same reason as RETIRED_SEEDED_HEXES. */
+const TRAINING_DEFAULT_HEXES = new Set([CAT_HEX.training, '#ef476f', '#8a6fd0', '#9d85dd', '#2f9fd0'].map(h => h.toLowerCase())); /* look: retired training sentinel — matched against stored block colours */
 
 /* The nine shipped defaults, frozen as a SET so blockColour can tell a colour
    somebody chose from one a placement copied out of this table. Every placement
@@ -136,7 +160,7 @@ function groupShort(id) { return groupDef(id).short; }
    blockColour uses for a block nothing resolves — same answer, same reason. */
 function groupHex(id) {
   const sub = Object.values(ACTIVITY_SUBS).find(sg => sg.group === id);
-  return (sub && sub.hex) || '#888';
+  return (sub && sub.hex) || '#888'; /* look: the unknown-block grey — compared and stored like block data */
 }
 
 /* Which group does this activity belong to?
@@ -201,22 +225,25 @@ function activityGroup(act) {
 
    Colours: a category picks the hue, a subgroup varies it. Every one is a
    pastel that takes dark ink — never white text on these, which all fail
-   contrast (CLAUDE.md, UI rules). Where a family already knows a colour it is
-   kept: Routine's teal, Meals' amber, School's blue, Training's pink and Play's
-   green are the shipped values unchanged. */
+   contrast (CLAUDE.md, UI rules). Every subgroup keeps the hue a family already
+   knows — Routine's teal, Meals' amber, School's blue, Training's pink, Play's
+   green, Outings' orchid — made brighter in Looks stage 2 (2026-09-27): each
+   category's main subgroup sits on the handoff's value (docs/handoff/
+   looks-calm-pop.md §7) and the rest were brightened around it, measured
+   against the navy ink. */
 /* ── MEASURE COLOUR DISTANCE THE WAY AN EYE DOES ──
    These were first separated with CIE76, which overstates the distance between
    saturated greens by roughly double: it scored Helping hands against Play at
    49 where CIEDE2000 says 19, and a palette that cleared every threshold on
    paper still had two DIFFERENT categories reading as one colour on an iPad.
-   `subgroupDistance` (js/05-helpers.js) is CIEDE2000, and
+   `colourDistance` (js/05-helpers.js) is CIEDE2000, and
    `everySubgroupTellsItselfApart` (tests/smoke.js) is what holds this table to
    it. If you move a hex, run the suite — the arithmetic disagrees with intuition
    in exactly the cases that matter.
 
    THE FIGURE THAT MATTERS IS THE WORST *CROSS*-CATEGORY PAIR. Two subgroups
    inside one category are MEANT to look related: Meals and Appointments are
-   both Fuel & Care and sit at 9.8, which is the design working. Two subgroups
+   both Fuel & Care and sit at 8.3, which is the design working. Two subgroups
    in different categories reading as one colour is the defect — and that pair
    used to be 2.9.
 
@@ -224,41 +251,41 @@ function activityGroup(act) {
    entirely: chores are not a shade of rest. It stays a cyan rather than going
    warm, so Daily Rhythm still reads as one category — a light aqua and a deep
    cyan are obviously siblings, which is the whole point of having categories. */
-const ACTIVITY_CATEGORIES = [
-  { id: 'rhythm', label: '🌅 Daily Rhythm', short: 'Rhythm', hex: '#8ad8d0', subs: [
-    { id: 'routine',  label: '🌅 Routine',       hex: '#8ad8d0', group: 'routine' },
+const ACTIVITY_CATEGORIES = [ /* look: subgroup hexes are family data — seeded onto blocks, measured by colourDistance */
+  { id: 'rhythm', label: '🌅 Daily Rhythm', short: 'Rhythm', hex: '#3cc9b9', subs: [
+    { id: 'routine',  label: '🌅 Routine',       hex: '#3cc9b9', group: 'routine' },
     /* Deep cyan, not a green. This was #9fd3b8, which sat 2.9 from Play in
        another category and 12.4 from its own sibling — the same colour to any
        eye, on two cards that mean opposite things. */
-    { id: 'helping',  label: '🧹 Helping hands', hex: '#229eb1', group: 'chores'  },
+    { id: 'helping',  label: '🧹 Helping hands', hex: '#00a2bc', group: 'chores'  },
   ]},
-  { id: 'fuel', label: '🍎 Fuel & Care', short: 'Fuel', hex: '#ffd166', subs: [
-    { id: 'meals',    label: '🍽 Meals',        hex: '#ffd166', group: 'daily' },
+  { id: 'fuel', label: '🍎 Fuel & Care', short: 'Fuel', hex: '#ffc83d', subs: [
+    { id: 'meals',    label: '🍽 Meals',        hex: '#ffc83d', group: 'daily' },
     /* Muted on purpose and kept apart from the meals: an appointment is a time
        somebody else set, it is not a treat, and it is not a chore either. */
-    { id: 'appts',    label: '🩺 Appointments', hex: '#e3c48f', group: 'daily' },
+    { id: 'appts',    label: '🩺 Appointments', hex: '#f0bf72', group: 'daily' },
   ]},
-  { id: 'brain', label: '🧠 Brain Construction', short: 'Brain', hex: '#6fb1fc', subs: [
-    { id: 'school',   label: '🏫 School',   hex: '#6fb1fc', group: 'brain' },
-    { id: 'language', label: '🗣 Language', hex: '#8ed0f0', group: 'brain' },
+  { id: 'brain', label: '🧠 Brain Construction', short: 'Brain', hex: '#4aa3ff', subs: [
+    { id: 'school',   label: '🏫 School',   hex: '#4aa3ff', group: 'brain' },
+    { id: 'language', label: '🗣 Language', hex: '#7dcdf7', group: 'brain' },
     // Nudged off #b3a4f0 to hold its distance from Outings' orchid.
-    { id: 'arts',     label: '🎨 Arts',     hex: '#b0a0ea', group: 'brain' },
+    { id: 'arts',     label: '🎨 Arts',     hex: '#a08ef5', group: 'brain' },
   ]},
   { id: 'body', label: '💪 Body Construction', short: 'Body', hex: '#f2597d', subs: [
     /* Lifted from #ef476f, which gave dark ink 4.27:1 — under the 4.5:1 the
        house contrast rule asks for, and the only value in the table that failed
-       it. This is 4.78:1. */
+       it. This is 4.81:1 against the navy ink (#1c2240). */
     { id: 'training', label: '🏋️ Training',          hex: '#f2597d', group: 'body' },
-    { id: 'move',     label: '🏊 Everyday movement', hex: '#ff9a76', group: 'move' },
+    { id: 'move',     label: '🏊 Everyday movement', hex: '#ff8a5c', group: 'move' },
   ]},
   /* Out of the greens altogether. Explore was #7fb3a0, a sage that sat between
      Routine's teal and Play's mint and was the reason all three blurred. */
-  { id: 'explore', label: '🧭 Explore', short: 'Explore', hex: '#d98ac8', subs: [
-    { id: 'outings',  label: '🧭 Outings', hex: '#d98ac8', group: 'explore' },
+  { id: 'explore', label: '🧭 Explore', short: 'Explore', hex: '#e37ad2', subs: [
+    { id: 'outings',  label: '🧭 Outings', hex: '#e37ad2', group: 'explore' },
   ]},
-  { id: 'play', label: '🎮 Play & Rest', short: 'Play', hex: '#7fca79', subs: [
-    { id: 'playtime', label: '🎮 Play',            hex: '#7fca79', group: 'free' },
-    { id: 'seasonal', label: '🌟 Seasonal treats', hex: '#cfe06b', group: 'free' },
+  { id: 'play', label: '🎮 Play & Rest', short: 'Play', hex: '#4cc46a', subs: [
+    { id: 'playtime', label: '🎮 Play',            hex: '#4cc46a', group: 'free' },
+    { id: 'seasonal', label: '🌟 Seasonal treats', hex: '#c6e03f', group: 'free' },
   ]},
 ];
 
@@ -275,7 +302,7 @@ const ACTIVITY_CATEGORIES = [
    Answering at read time is the only safe shape, the same reasoning as `xp2`
    and `achievementActivityId` — which means this list has to grow every time a
    hex moves, and must never be pruned. */
-const RETIRED_SEEDED_HEXES = [
+const RETIRED_SEEDED_HEXES = [ /* look: retired seeded hexes are data — matched against stored block colours */
   '#80cbc4', // routine, and Daily Rhythm's own hex
   '#9fd3b8', // helping hands
   '#b3a4f0', // arts
@@ -283,6 +310,32 @@ const RETIRED_SEEDED_HEXES = [
   '#7fb3a0', // outings, and Explore's own hex
   '#95d5b2', // play, and Play & Rest's own hex
   '#c8e6a0', // seasonal treats
+  // Looks stage 2 (2026-09-27): brighter, same hue — the subgroups…
+  '#8ad8d0', // routine, and Daily Rhythm's own hex
+  '#229eb1', // helping hands
+  '#ffd166', // meals, Fuel & Care's own hex, and CAT_HEX.daily
+  '#e3c48f', // appointments
+  '#6fb1fc', // school, Brain Construction's own hex, and CAT_HEX.school
+  '#8ed0f0', // language
+  '#b0a0ea', // arts
+  '#ff9a76', // everyday movement
+  '#d98ac8', // outings, and Explore's own hex
+  '#7fca79', // play, and Play & Rest's own hex
+  '#cfe06b', // seasonal treats
+  // …and the CAT_HEX values they took with them.
+  '#c3aed6', // CAT_HEX.sleep
+  '#fb6f1c', // CAT_HEX.active
+  '#ff9eb5', // CAT_HEX.custom
+  '#8fa8b8', // CAT_HEX.appointment
+  // Looks stage 2B-3 (2026-09-27): the colours that sat under 14 from another
+  // category once the sports and CAT_HEX were measured too.
+  '#a78bfa', // CAT_HEX.sleep
+  '#ff7fa3', // CAT_HEX.custom (back to #ff9eb5, listed above and current again)
+  '#7fa5c4', // CAT_HEX.appointment
+  '#f4a340', // CAT_HEX.competition
+  '#8a6fd0', // the Skating sport (moved in 2B-2)
+  '#9d85dd', // the Skating sport
+  '#2f9fd0', // the Swimming sport
 ];
 /* Flattened once, because every lookup below is by subgroup id and walking six
    nested arrays on every block of every render is work nobody needs. */
@@ -442,12 +495,20 @@ const COMP_WARMUP_MIN = 60;               // before it starts
 
 /* Training tags + sport-specific starter objectives. Each topic carries its
    own icon and background colour so a Skating block reads differently from a
-   Swimming or Dryland one at a glance, not just by its text label. */
-const TRAINING_TAGS = [
-  { id:'skating',  label:'⛸ Skating',  name:'Skating',  icon:'⛸', colour:'#8a6fd0' },
-  { id:'swimming', label:'🏊 Swimming', name:'Swimming', icon:'🏊', colour:'#2f9fd0' },
+   Swimming or Dryland one at a glance, not just by its text label.
+   Each takes the navy ink at 4.5:1 or better and sits 14 or more (CIEDE2000)
+   from every colour of another category (everySubgroupTellsItselfApart):
+   Skating moved #8a6fd0 → #9d85dd and General from the retired #ef476f to
+   CAT_HEX.training in Looks stage 2B-2. In 2B-3 Skating went a dusty violet
+   (#9d85dd was 4.4 from Arts; no violet bright enough to be brighter clears
+   both Arts and Sleep) and Swimming a pool aqua (#2f9fd0 was 8.4 from Helping
+   hands and 9.7 from School — no mid blue clears Helping hands, School and
+   Language at once). */
+const TRAINING_TAGS = [ /* look: training tag colours are family data — a block's own colour */
+  { id:'skating',  label:'⛸ Skating',  name:'Skating',  icon:'⛸', colour:'#9c86aa' },
+  { id:'swimming', label:'🏊 Swimming', name:'Swimming', icon:'🏊', colour:'#59f1ff' },
   { id:'dryland',  label:'💪 Dryland', name:'Dryland',  icon:'💪', colour:'#e08a3a' },
-  { id:'general',  label:'🏃 General', name:'Training', icon:'🏃', colour:'#ef476f' },
+  { id:'general',  label:'🏃 General', name:'Training', icon:'🏃', colour:CAT_HEX.training },
 ];
 /* This list used to be the whole of it, which meant a sport the family took up
    — gymnastics — simply could not be entered: every training block had to be
@@ -476,7 +537,7 @@ function getTrainingTopic(tag) {
 /* The background a training block should use: an explicit non-default custom
    colour wins; otherwise the topic colour (falls back to the training pink). */
 function trainingBlockColour(b) {
-  if (b.colour && b.colour !== CAT_HEX.training) return b.colour;
+  if (b.colour && !TRAINING_DEFAULT_HEXES.has(String(b.colour).toLowerCase())) return b.colour;
   return getTrainingTopic(b.tag).colour;
 }
 
@@ -495,7 +556,7 @@ function trainingBlockColour(b) {
    findActivity rather than getAllActivities: this colours a block that already
    exists, so an archived activity must still resolve. */
 function blockColour(b, kid) {
-  if (!b) return '#888';
+  if (!b) return '#888'; /* look: the unknown-block grey — block colour data */
   const act = findActivity(b.actId, kid);
   /* NOTHING ANSWERS TO THIS ID — an import, or a custom activity deleted on
      another device before the archive rule existed. Grey is the honest answer
@@ -503,7 +564,7 @@ function blockColour(b, kid) {
      is right for filing an hours total vaguely and wrong for colour. A block
      nobody can name drawn in Breakfast amber does not say "unknown", it says
      "breakfast". */
-  if (!act) return b.colour || '#888';
+  if (!act) return b.colour || '#888'; /* look: the unknown-block grey — block colour data */
   if (act.isTraining) return trainingBlockColour(b);
   /* THE SUBGROUP IS THE HUE. `cat` used to be, and nine flat values could not
      tell a piano lesson from a French lesson from a school day — all three came
@@ -516,7 +577,7 @@ function blockColour(b, kid) {
      the answer is derived on every read, which is the same answer in any merge
      order (see activitySub). */
   if (b.colour && !SEEDED_HEX_VALUES.has(String(b.colour).toLowerCase())) return b.colour;
-  return activitySub(act).hex || CAT_HEX[act.cat] || '#888';
+  return activitySub(act).hex || CAT_HEX[act.cat] || '#888'; /* look: the unknown-block grey — block colour data */
 }
 
 /* Figure skating: landing doubles, targeting double axel */

@@ -6,6 +6,9 @@
 ════════════════════════════════════════════════════════════════ */
 loadLocal();
 initFirebase();
+// The profile picker opens in the look this device showed last (L6); index.html
+// ships Pop, which is also what a device with nothing stored gets.
+applyLook(lookStored('last'));
 showScreen('profile');
 // The shell is cached by sw.js so the installed app opens without signal. Only
 // over http(s): the smoke suite runs over file://, where a worker cannot exist.
@@ -32,6 +35,13 @@ document.addEventListener('visibilitychange', () => {
 // screen on show. A render is not a mutation — nothing here writes to Firestore.
 setInterval(() => { try { tdTick(); } catch (e) { console.error('tdTick failed', e); } }, TD_TICK_MS);
 window.addEventListener('pagehide', flushPush);
+// The Full week measures its labels in the type actually on screen
+// (wfTypeMetrics, js/07-week-view.js). The web fonts arrive after the first
+// render, so each finished load re-measures, and re-draws the week if it is up.
+if (document.fonts) {
+  document.fonts.addEventListener('loadingdone', wfTypeInvalidate);
+  document.fonts.ready.then(wfTypeInvalidate);
+}
 // Chore tab uses event delegation on #choreWrap (survives innerHTML re-renders).
 (function(){
   const wrap = document.getElementById('choreWrap');

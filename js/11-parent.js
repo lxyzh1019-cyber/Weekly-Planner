@@ -436,8 +436,8 @@ function renderPendingApproval() {
     const card = document.createElement('div');
     card.className = 'challenge-card';
     card.innerHTML = `
-      <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· ${owner==='jenn'?'🐥 Jenn':'🦊 Jess'} added</span></div>
-      <div style="font-size:0.85rem;color:var(--ink-light)">${(act.durationMin||60)} min · ${escapeHtml(activityCategory(act).short)} › ${escapeHtml(activitySub(act).label)}</div>
+      <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:calc(0.7rem * var(--text-scale, 1));color:var(--ink-light);font-family:var(--font-text)">· ${owner==='jenn'?'🐥 Jenn':'🦊 Jess'} added</span></div>
+      <div style="font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">${(act.durationMin||60)} min · ${escapeHtml(activityCategory(act).short)} › ${escapeHtml(activitySub(act).label)}</div>
       <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
         <button class="btn-icon" style="padding:2px 8px;background:var(--accent-green)" onclick="approveKidActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✅ Approve</button>
         <button class="btn-icon" style="padding:2px 8px" onclick="openParentActivityEditor('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')">✏️ Modify</button>
@@ -489,8 +489,8 @@ function renderPendingTaskApproval() {
     card.className = 'challenge-card';
     card.innerHTML = `
       <div class="challenge-title">🎁 ${escapeHtml(mnyMoney(gift.amount))} · ${escapeHtml(gift.from || 'A gift')}
-        <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· ${escapeHtml(who.icon + ' ' + who.name)} says</span></div>
-      <div style="font-size:0.85rem;color:var(--ink-light)">${gift.giver ? 'From ' + escapeHtml(gift.giver) + ' · ' : ''}${escapeHtml(mnyShortDate(gift.dayKey || gift.weekKey))}
+        <span style="font-size:calc(0.7rem * var(--text-scale, 1));color:var(--ink-light);font-family:var(--font-text)">· ${escapeHtml(who.icon + ' ' + who.name)} says</span></div>
+      <div style="font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">${gift.giver ? 'From ' + escapeHtml(gift.giver) + ' · ' : ''}${escapeHtml(mnyShortDate(gift.dayKey || gift.weekKey))}
         · nothing has moved yet</div>
       <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
         <button class="btn-icon" style="padding:2px 8px;background:var(--accent-green)" data-gift-approve="${escapeAttr(gift.id)}" data-gift-kid="${escapeAttr(owner)}">✅ Approve</button>
@@ -505,8 +505,8 @@ function renderPendingTaskApproval() {
     card.className = 'challenge-card';
     card.innerHTML = `
       <div class="challenge-title">🏋️ ${escapeHtml(task.name)}${task.reps ? ` <span style="font-weight:700">(${escapeHtml(task.reps)})</span>` : ''}
-        <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· ${escapeHtml(who.icon + ' ' + who.name)} added</span></div>
-      <div style="font-size:0.85rem;color:var(--ink-light)">${escapeHtml(sport ? sport.name : (task.sport || 'general'))}${task.notes ? ' · ' + escapeHtml(task.notes) : ''}</div>
+        <span style="font-size:calc(0.7rem * var(--text-scale, 1));color:var(--ink-light);font-family:var(--font-text)">· ${escapeHtml(who.icon + ' ' + who.name)} added</span></div>
+      <div style="font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">${escapeHtml(sport ? sport.name : (task.sport || 'general'))}${task.notes ? ' · ' + escapeHtml(task.notes) : ''}</div>
       <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
         <button class="btn-icon" style="padding:2px 8px;background:var(--accent-green)" data-task-approve="${escapeAttr(task.id)}">✅ Approve</button>
         <button class="btn-icon" style="padding:2px 8px" data-task-reject="${escapeAttr(task.id)}">🗑 Reject</button>
@@ -694,8 +694,8 @@ function parentActivityCard(act, owner) {
                     : owner==='jenn'   ? '🐥 Jenn only'
                     : '🦊 Jess only';
   card.innerHTML = `
-    <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· ${escapeHtml(ownerLabel)}</span></div>
-    <div style="font-size:0.85rem;color:var(--ink-light)">${(act.durationMin||60)} min · ${escapeHtml(activityCategory(act).short)} › ${escapeHtml(activitySub(act).label)}</div>
+    <div class="challenge-title">${act.icon||'⭐'} ${escapeHtml(act.name)} <span style="font-size:calc(0.7rem * var(--text-scale, 1));color:var(--ink-light);font-family:var(--font-text)">· ${escapeHtml(ownerLabel)}</span></div>
+    <div style="font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">${(act.durationMin||60)} min · ${escapeHtml(activityCategory(act).short)} › ${escapeHtml(activitySub(act).label)}</div>
     <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
       <button class="btn-icon" onclick="toggleShareActivity('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')" style="padding:2px 8px" title="${owner==='shared'?'Move to single child':'Promote to shared'}">${owner==='shared'?'↩️ Unshare':'🔗 Share'}</button>
       <button class="btn-icon" onclick="openParentActivityEditor('${escapeJsAttr(owner)}','${escapeJsAttr(act.id)}')" style="padding:2px 8px">✏️ Edit</button>
@@ -1090,8 +1090,8 @@ function renderRoutinesList() {
     const card = document.createElement('div');
     card.className = 'challenge-card';
     card.innerHTML = `
-      <div class="challenge-title">${tmpl.icon} ${escapeHtml(tmpl.title)} <span style="font-size:0.7rem;color:var(--ink-light);font-family:'Patrick Hand'">· built-in${isOverridden?' (edited)':''}</span></div>
-      <div style="font-size:0.85rem;color:var(--ink-light)">${tmpl.items.length} items</div>
+      <div class="challenge-title">${tmpl.icon} ${escapeHtml(tmpl.title)} <span style="font-size:calc(0.7rem * var(--text-scale, 1));color:var(--ink-light);font-family:var(--font-text)">· built-in${isOverridden?' (edited)':''}</span></div>
+      <div style="font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">${tmpl.items.length} items</div>
       <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem">
         <button class="btn-icon" onclick="openEditBuiltInRoutine('${escapeJsAttr(id)}')" style="padding:2px 8px">✏️ Edit</button>
         ${isOverridden ? `<button class="btn-icon" onclick="resetBuiltInRoutine('${escapeJsAttr(id)}')" style="padding:2px 8px" title="Reset to default">↩️ Reset</button>` : ''}
@@ -1106,7 +1106,7 @@ function renderRoutinesList() {
     card.className = 'challenge-card';
     card.innerHTML = `
       <div class="challenge-title">${r.icon||'📋'} ${escapeHtml(r.title)}</div>
-      <div style="font-size:0.85rem;color:var(--ink-light)">${r.items.length} items</div>
+      <div style="font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">${r.items.length} items</div>
       <div style="display:flex;justify-content:flex-end;gap:0.4rem;margin-top:0.4rem">
         <button class="btn-icon" onclick="openEditRoutine('${escapeJsAttr(r.id)}')" style="padding:2px 8px">✏️ Edit</button>
         <button class="btn-icon" onclick="deleteRoutine('${escapeJsAttr(r.id)}')" style="padding:2px 8px">🗑</button>
@@ -1499,10 +1499,10 @@ function renderParentMonthly() {
 function pmDensityColor(pct) {
   if (pct === 0) return 'var(--paper)';
   // Gradient: light yellow → orange → red
-  if (pct < 25) return '#fff3c4';
-  if (pct < 50) return '#ffe08a';
-  if (pct < 75) return '#ffa84a';
-  return '#ff7050';
+  if (pct < 25) return 'var(--surface-density-low)';
+  if (pct < 50) return 'var(--surface-yellow-hover)';
+  if (pct < 75) return 'var(--surface-legend-warm)';
+  return 'var(--surface-legend-hot)';
 }
 
 /* Get blocks for a specific day key for an arbitrary profile (not just active) */
@@ -1538,7 +1538,7 @@ function renderLevelRules() {
   list.innerHTML = '';
   const rules = state.shared.levelRules || [];
   if (!rules.length) {
-    list.innerHTML = '<p style="color:var(--ink-light);font-size:0.9rem">No rules yet</p>';
+    list.innerHTML = '<p style="color:var(--ink-light);font-size:calc(0.9rem * var(--text-scale, 1))">No rules yet</p>';
     return;
   }
   const acts = [...DEFAULT_ACTIVITIES, ...SEASONAL_ACTIVITIES];
@@ -1548,7 +1548,7 @@ function renderLevelRules() {
     card.className = 'challenge-card';
     card.innerHTML = `
       <div class="challenge-title">${r.newIcon||act?.icon||''} ${escapeHtml(r.name||'Level Up')}</div>
-      <div style="font-size:0.88rem;color:var(--ink-light)">
+      <div style="font-size:calc(0.88rem * var(--text-scale, 1));color:var(--ink-light)">
         ${act?.icon||''} ${escapeHtml(act?.name||r.activityId)} → level up after <b>${r.target} ${r.type==='count'?'times':'hours'}</b>
       </div>
       <div style="display:flex;justify-content:flex-end;margin-top:0.4rem">

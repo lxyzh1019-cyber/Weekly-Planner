@@ -531,7 +531,11 @@ function tdQuestCard(b, kid, isNext, clash) {
     : clash ? 'quest-card quest-card--conflict'
     : 'quest-card';
   if (done) clash = null;
-  return `<div class="${cls}">
+  /* The row wears its block's wash (Pop, docs/handoff/looks-calm-pop.md §7):
+     --cw is read by .quest-card; the look decides how much of it shows. */
+  const wash = colourWash(blockColour(b, kid));
+  const washStyle = /^#[0-9a-f]{6}$/i.test(wash) ? ` style="--cw:${wash}"` : '';
+  return `<div class="${cls}"${washStyle}>
       ${clash ? '<span class="quest-conflict-flag" aria-hidden="true">!</span>' : ''}
       <button type="button" class="dq-open" data-td-action="plan" data-td-block="${id}">
         ${tdTimeCol(b)}
@@ -1092,15 +1096,15 @@ function tdTrainingCard(kid) {
 }
 
 /* ── Row 19: 🕓 Catch up ─────────────────────────────────────────────────
-   She does not open the iPad every day. An EARLIER day of an OPEN week with
+   She does not open the iPad every day. An EARLIER day of THIS week with
    something she has not answered — a planned job with no answer, a routine not
    closed, a training not rated — is listed here, oldest first, and opens (one
    day at a time) to the same answers Today gives for today.
 
-   How far back: this week and the TD_CATCHUP_WEEKS before it — the same eight
-   the family meeting's catch-up list covers (mmUnsettledWeeks), inside which a
-   claim can still become pay — never before the family's start week
-   (mmCatchUpFloor), and only weeks not yet SETTLED for her: mnyWeekSettled,
+   How far back: this week only (R12, owner 2026-09-27: eight weeks back was
+   "too much"). Older weeks are the family meeting's own catch-up list
+   (mmUnsettledWeeks), which is unchanged. Never before the family's start week
+   (mmCatchUpFloor), and not once the week is SETTLED for her: mnyWeekSettled,
    which is committed at a meeting (mnyIsCommitted — weekPlans[wk][kid].
    committedAt) or credited another way (the Grandma rule, the repair, an
    express catch-up). A settled week is never offered: a claim there would be
@@ -1108,18 +1112,10 @@ function tdTrainingCard(kid) {
    goes to the pocket-money handoff, so this card is careful instead.)
    Not today (Today's own cards answer today), not a day still to come, not a
    sick day, and not a block a grown-up recorded as not having happened. */
-const TD_CATCHUP_WEEKS = 8;
 function tdOpenWeeks(kid) {
-  const floor = String(mmCatchUpFloor());
-  const out = [];
-  for (let i = TD_CATCHUP_WEEKS; i >= 0; i--) {
-    const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - i * 7);
-    const wk = ctDateToKey(mon);
-    if (String(wk) < floor) continue;
-    if (mnyWeekSettled(wk, kid)) continue;
-    out.push(wk);
-  }
-  return out;   // oldest first
+  const wk = ctThisWeekKey();
+  if (String(wk) < String(mmCatchUpFloor()) || mnyWeekSettled(wk, kid)) return [];
+  return [wk];
 }
 /* Reads only. Earnings are read (mrChoresForDay, mrIsSick, …) only for a day
    that has blocks on it, so an empty old week is not given an empty record. */
@@ -1147,20 +1143,13 @@ function tdCatchUpDays(kid) {
   });
   return out;
 }
-/* "Tue" in this week; "Tue 15 Sep" in an earlier one, where "Tue" alone
-   would not say which. */
-function tdCatchUpDayName(day) {
-  if (day.wk === ctThisWeekKey()) return DAY_SHORT[day.d];
-  const dt = formatDayKey(day.dayKey);
-  return `${DAY_SHORT[day.d]} ${dt.getDate()} ${MONTH_SHORT[dt.getMonth()]}`;
-}
 /* `Tue · 2 jobs · 1 routine`, `Wed · training — how did you try?` */
 function tdCatchUpSummary(day) {
   const parts = [];
   if (day.jobs.length) parts.push(`${day.jobs.length} ${day.jobs.length === 1 ? 'job' : 'jobs'}`);
   if (day.routines.length) parts.push(`${day.routines.length} ${day.routines.length === 1 ? 'routine' : 'routines'}`);
   if (day.training) parts.push(parts.length ? 'training' : 'training — how did you try?');
-  return `${tdCatchUpDayName(day)} · ${parts.join(' · ')}`;
+  return `${DAY_SHORT[day.d]} · ${parts.join(' · ')}`;
 }
 function tdCatchUpPanel(kid, day) {
   const key = escapeAttr(day.dayKey);
@@ -1205,8 +1194,8 @@ function tdCatchUpCard(kid) {
    Catch up lists only a day with something unanswered, so an extra job she did
    on a day she had already answered in full had no door here. This is that
    door: one collapsed row, under the catch-up card or on its own, listing the
-   EARLIER days of the same open weeks catch up reads (tdOpenWeeks — the same
-   window, floor and settled rule), newest first, each as the catch-up card's
+   EARLIER days of the week catch up reads (tdOpenWeeks — this week only, the
+   same floor and settled rule), newest first, each as the catch-up card's
    own "＋ I did something else on Tue" (tdElseBlock → tdClaimJob →
    openChoreClaimPrompt → mrSetClaim, the path the chore tab's ckPickElse
    takes). A day catch up already lists is left to catch up, which carries the
@@ -1227,7 +1216,7 @@ function tdEarlierElseRow(kid) {
   const open = tdEarlierElseOpen;
   const list = open
     ? `<div class="td-else-earlier-list">${days.map(day =>
-        tdElseBlock(kid, day.dayKey, 'on ' + tdCatchUpDayName(day))).join('')}</div>`
+        tdElseBlock(kid, day.dayKey, 'on ' + DAY_SHORT[day.d])).join('')}</div>`
     : '';
   return `<button type="button" class="td-row td-else-btn td-else-earlier" data-td-action="else-earlier" aria-expanded="${open}">
       <span class="td-row-icon" aria-hidden="true">＋</span>
@@ -1336,7 +1325,7 @@ function tdRenderToday() {
   let prepHtml = '';
   if (prep) {
     const late = tdNowMin() >= prep.moveByMin;
-    /* The strip is bordered and set in --accent-strong because leaving on time
+    /* The strip is bordered and set in --status-warn-strong because leaving on time
        is the one thing on this screen that stops being possible if she reads it
        late. It sits under NEXT rather than inside the current block's text,
        which is where it used to be: tdPrepFor has always been asked about the
@@ -1634,6 +1623,12 @@ function tdRenderToday() {
   const heroCls = (heroBlock && clashes.get(heroBlock.id))
     ? 'td-card td-now td-now--conflict'
     : 'td-card td-now';
+  /* The Now card wears the RUNNING block's colour (Pop fills it; --now-c is
+     read by .td-now). Only a block that is running now, and only a colour the
+     navy text reads on at 4.5:1 — a colour a grown-up picked off the sheet's
+     dots can be dark, and then the card stays plain rather than unreadable. */
+  const nowCol = current ? blockColour(current, kid) : '';
+  const heroStyle = nowCol && inkContrast(nowCol) >= 4.5 ? ` style="--now-c:${escapeAttr(nowCol)}"` : '';
 
   const moneyHtml = tdMoneyChart(kid, wk);
 
@@ -1659,21 +1654,23 @@ function tdRenderToday() {
 
      Source order is the phone order: the grid only reflows, so nothing here
      depends on the viewport being wide. */
-  /* Catch up sits at the very top: it only exists when an earlier day is still
-     waiting on her, and a card below the fold is a card she never answers.
-     The training rating joins the 🌙 row (both are "how did it go?"); the
-     routines and her own things sit with the jobs, as on the chore tab. */
+  /* Catch up (then "＋ Add to an earlier day") comes directly under ✏️ Modify
+     my plan: the owner placed it there (R12, 2026-09-27), so today's schedule
+     leads and the earlier days of this week follow it, as a group, where the
+     day's own plan ends. The training rating joins the 🌙 row (both are "how
+     did it go?"); the routines and her own things sit with the jobs, as on the
+     chore tab. */
   wrap.innerHTML = `
     <div class="td-col td-col--day">
-      ${tdCatchUpCard(kid)}
-      ${tdEarlierElseRow(kid)}
-      <div class="${heroCls}">${nowHtml}</div>
+      <div class="${heroCls}"${heroStyle}>${nowHtml}</div>
       ${tdInviteNote()}
       ${tdReflectRow(kid)}
       ${tdTrainingCard(kid)}
       <div class="td-card">
         <div class="td-cap">Coming up</div>${questHtml}</div>
       ${planHtml}
+      ${tdCatchUpCard(kid)}
+      ${tdEarlierElseRow(kid)}
     </div>
     <div class="td-col td-col--side">
       ${loopHtml ? `<div class="td-chips">${loopHtml}</div>` : ''}
@@ -2068,6 +2065,10 @@ function tdOpenMore() {
        prints — a second door to it from a menu is a second label that can
        drift, and printing is not something you go looking for in "more". */
     { icon: '◀',  label: 'Switch',       go: 'profile' },
+    /* Her look, per kid and per device (L4). The tile names the look it
+       switches TO; tdGoMore flips it and keeps this sheet open, so she sees
+       the whole app change behind it. */
+    { icon: '🎨', label: `${LOOK_NAMES[lookOther(lookStored(activeProfile()))]} look`, go: 'look' },
   ];
   let ov = document.getElementById('tdMoreOverlay');
   if (!ov) {
@@ -2078,8 +2079,10 @@ function tdOpenMore() {
       if (ev.target === ov) { ov.classList.remove('open'); return; }
       const b = ev.target.closest('[data-td-more]');
       if (!b) return;
-      ov.classList.remove('open');
-      tdGoMore(b.getAttribute('data-td-more'));
+      const go = b.getAttribute('data-td-more');
+      // The look tile leaves the sheet up: the change is what she came to see.
+      if (go !== 'look') ov.classList.remove('open');
+      tdGoMore(go);
     });
     document.body.appendChild(ov);
   }
@@ -2099,6 +2102,16 @@ function tdOpenMore() {
 function tdGoMore(where) {
   if (where === 'chores')  { openChoreTab(); return; }
   if (where === 'profile') { goProfile(); return; }
+  if (where === 'look') {
+    const kid = activeProfile();
+    if (kid !== 'jenn' && kid !== 'jess') return;
+    lookToggle(kid);
+    // Drawn again so the tile names the other look now; focus stays on it.
+    tdOpenMore();
+    const tile = document.querySelector('#tdMoreOverlay [data-td-more="look"]');
+    if (tile) tile.focus();
+    return;
+  }
 }
 function tdHandleNavClick(e) {
   const el = e.target.closest('[data-td-nav]');

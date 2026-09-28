@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-look="pop">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,7 +12,7 @@
      The icons were already in the repo at the right sizes; only the manifest
      was missing. --meta theme-color matches --bg so the status bar blends. -->
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#fef9ef">
+<meta name="theme-color" content="#fff6e3">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Planner">
@@ -69,7 +69,7 @@
   <h2 id="ritualTitle">Goodnight!</h2>
   <p id="ritualSubtitle"></p>
   <div class="ritual-blocks" id="ritualBlocks"></div>
-  <p style="font-size:0.95rem;opacity:0.7;margin-top:0.5rem">How was your day?</p>
+  <p style="font-size:calc(0.95rem * var(--text-scale, 1));opacity:0.7;margin-top:0.5rem">How was your day?</p>
   <div class="vibe-moods" style="margin-top:0.6rem" id="ritualMoods"></div>
   <button onclick="closeRitual()">Sleep Tight ⭐</button>
 </div>
@@ -109,7 +109,7 @@
       Remember: you're in charge of your own day. Be kind to yourself, try things, and enjoy the week.
     </div>
   </div>
-  <p style="position:absolute;bottom:1rem;color:var(--ink-light);font-size:0.8rem">
+  <p style="position:absolute;bottom:1rem;color:var(--ink-light);font-size:max(13px, calc(0.8rem * var(--text-scale, 1)))">
     <span id="fbStatus">⚙️ Connecting...</span>
     <br><span id="syncPendingMsg" role="status" aria-live="polite" class="sync-pending-msg"></span>
     <br><span id="syncDebugMsg" class="sync-debug-msg"></span>
@@ -537,16 +537,16 @@
   <!-- Challenges now live here under Sisters — friendly weekly goals you race on. -->
   <div style="padding: 0 0.8rem 0.4rem">
     <div style="display:flex;align-items:center;justify-content:space-between;margin:1rem 0 0.3rem">
-      <h3 style="font-size:1.3rem;margin:0">🎯 Our Challenges</h3>
+      <h3 style="font-size:calc(1.3rem * var(--text-scale, 1));margin:0">🎯 Our Challenges</h3>
       <button class="btn-icon" onclick="openNewChallenge()" aria-label="Add challenge">＋</button>
     </div>
-    <p style="color:var(--ink-light);font-size:0.85rem;margin:0 0 0.6rem">Friendly weekly goals you both race on.</p>
+    <p style="color:var(--ink-light);font-size:calc(0.85rem * var(--text-scale, 1));margin:0 0 0.6rem">Friendly weekly goals you both race on.</p>
     <div id="challengesList"></div>
   </div>
 
   <!-- id: Today's 💌 note (tdOpenInvites) scrolls here, so she lands on the invites. -->
   <div id="invitesSection" style="padding: 0 0.8rem 1rem">
-    <h3 style="font-size:1.3rem;margin:1rem 0 0.5rem">💌 Invites</h3>
+    <h3 style="font-size:calc(1.3rem * var(--text-scale, 1));margin:1rem 0 0.5rem">💌 Invites</h3>
     <div id="invitesList"></div>
   </div>
 </div>
@@ -563,6 +563,9 @@
     <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap">
       <div class="parent-scope" id="parentScopePills" aria-label="Which child"></div>
       <button class="btn-icon" onclick="changeParentPin()" title="Change parent PIN">🔒 PIN</button>
+      <!-- The parent's own look on this device (L5). applyLook writes the
+           label: the look it switches TO. -->
+      <button class="btn-icon" id="parentLookBtn" onclick="lookToggle('parent')" title="Switch to the Calm look" aria-label="Switch to the Calm look">🎨 Calm</button>
       <button class="btn-icon" onclick="goProfile()">Exit</button>
     </div>
   </header>
@@ -748,7 +751,7 @@
     <button class="btn-icon" onclick="changeParentMonth(1)">▶</button>
   </div>
 
-  <div style="padding:0 0.8rem 0.4rem;font-size:0.85rem;color:var(--ink-light)">
+  <div style="padding:0 0.8rem 0.4rem;font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">
     Color shows how much each day is <b>planned</b> — not how much was completed. Tap a day to open it.
   </div>
 
@@ -825,7 +828,7 @@
     <h4>COLOUR</h4>
     <div class="colour-picker" id="trainingColourPicker"></div>
 
-    <h4>OBJECTIVES <span style="font-weight:400;font-size:0.85rem;color:var(--ink-light)">(optional)</span></h4>
+    <h4>OBJECTIVES <span style="font-weight:400;font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">(optional)</span></h4>
     <div class="objectives-list" id="objectivesList"></div>
     <button class="pill-btn" style="margin-bottom:0.8rem" onclick="openCustomTask()">＋ Add custom task</button>
 
@@ -927,7 +930,7 @@
       <h4>CHORE TYPE</h4>
       <div class="sheet-row" id="choreTypePicker"></div>
     </div>
-    <h4>GOAL / OBJECTIVES <span style="font-weight:400;font-size:0.85rem;color:var(--ink-light)">(optional)</span></h4>
+    <h4>GOAL / OBJECTIVES <span style="font-weight:400;font-size:calc(0.85rem * var(--text-scale, 1));color:var(--ink-light)">(optional)</span></h4>
     <div class="objectives-list" id="activityObjectivesList"></div>
     <button class="pill-btn" style="margin-bottom:0.8rem" onclick="openCustomTask('activity')">＋ Add custom goal</button>
     <h4>NOTE</h4>
@@ -1012,7 +1015,7 @@
       <h4>OBJECTIVES</h4>
       <div id="editObjectivesView" style="margin-bottom:0.8rem"></div>
       <div id="editObjectivesEditWrap" style="display:none">
-        <label style="font-size:0.95rem;font-weight:700;color:#5a4d41">Edit your goals (one per line)</label>
+        <label style="font-size:calc(0.95rem * var(--text-scale, 1));font-weight:700;color:var(--ink-muted)">Edit your goals (one per line)</label>
         <textarea class="note-input" id="editObjectivesInput" aria-label="Objectives" rows="4" placeholder="e.g. 10 good jumps&#10;2 run-throughs"></textarea>
       </div>
     </div>
@@ -1109,7 +1112,7 @@
         <button type="button" class="pill-btn" onclick="applySeriesUntil()">Update</button>
       </div>
       <button class="pill-btn" style="width:100%" onclick="detachFromSeries()">✂️ Detach from series</button>
-      <p style="font-size:0.75rem;color:var(--ink-light);margin-top:0.3rem">Future edits or deletes won't affect the rest of the series.</p>
+      <p style="font-size:calc(0.75rem * var(--text-scale, 1));color:var(--ink-light);margin-top:0.3rem">Future edits or deletes won't affect the rest of the series.</p>
     </div>
 
     <!-- Sister Sync: public visibility — parent-only -->
@@ -1173,7 +1176,7 @@
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="kidTrainingTitle">
     <div class="sheet-handle"></div>
     <h3 id="kidTrainingTitle"></h3>
-    <p style="font-size:0.92rem;color:var(--ink-light);margin:0 0 0.5rem">Your plan for this session:</p>
+    <p style="font-size:calc(0.92rem * var(--text-scale, 1));color:var(--ink-light);margin:0 0 0.5rem">Your plan for this session:</p>
     <div id="kidTrainingObjectives"></div>
     <div class="kid-run-stopwatch" id="kidTrainingStopwatch" style="display:none"></div>
     <h4 style="margin-top:0.75rem">HOW IT WENT</h4>
@@ -1208,24 +1211,24 @@
          its blocks, and the copy button is inside. The two toggles above them
          choose which week to take from and — a parent only — whose day it
          lands on. -->
-    <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">Pick a day to copy onto this one. Tap it to see what's on it.</p>
+    <p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light);margin:0.8rem 0 0.4rem">Pick a day to copy onto this one. Tap it to see what's on it.</p>
     <div class="copy-day-tabs" id="copyDayWeekTabs" role="group" aria-label="Which week to copy from"></div>
     <div class="copy-day-tabs" id="copyDayKidTabs" role="group" aria-label="Whose day to copy onto" hidden></div>
     <div id="copyDayList" class="copy-day-list"></div>
-    <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">Taking today off? Rest days keep your streak safe.</p>
-    <button class="pill-btn" style="width:100%;font-size:1rem" id="restDayBtn" onclick="toggleRestDay(currentDayKey)" aria-label="Mark rest day" title="Mark today a rest day">😌 Rest</button>
+    <p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light);margin:0.8rem 0 0.4rem">Taking today off? Rest days keep your streak safe.</p>
+    <button class="pill-btn" style="width:100%;font-size:calc(1rem * var(--text-scale, 1))" id="restDayBtn" onclick="toggleRestDay(currentDayKey)" aria-label="Mark rest day" title="Mark today a rest day">😌 Rest</button>
     <!-- Looking back on a past day (R5 §7 Q3). The 🌙 left the Day view's top
          bar; today's mood is asked on Today. A past day keeps its door here, on
          its own menu — renderReflectDayButton shows it for past days only and
          passes the day to openReflectSheet. -->
     <div id="reflectDayWrap" hidden>
-      <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">Looking back on this day?</p>
+      <p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light);margin:0.8rem 0 0.4rem">Looking back on this day?</p>
       <button type="button" class="pill-btn reflect-day-btn" id="reflectDayBtn"></button>
     </div>
     <!-- Start this day over (R5 §7 Q4). It was 🗑 on the Day view's top bar,
          beside 📋 and 🌙, and it deleted done and parent-pinned blocks too.
          Down here, last, it keeps them; clearDay's confirm lists what goes. -->
-    <p style="font-size:0.9rem;color:var(--ink-light);margin:0.8rem 0 0.4rem">A sick day, or a cancelled one? Done and pinned things stay.</p>
+    <p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light);margin:0.8rem 0 0.4rem">A sick day, or a cancelled one? Done and pinned things stay.</p>
     <button type="button" class="pill-btn day-over-btn" onclick="clearDay()">🗑 Start this day over</button>
   </div>
 </div>
@@ -1375,7 +1378,7 @@
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="customTaskSheetTitle">
     <div class="sheet-handle"></div>
     <h3 id="customTaskSheetTitle">➕ Custom Training Task</h3>
-    <p style="font-size:0.88rem;color:var(--ink-light);margin-bottom:0.5rem">Saved to your library for reuse.</p>
+    <p style="font-size:calc(0.88rem * var(--text-scale, 1));color:var(--ink-light);margin-bottom:0.5rem">Saved to your library for reuse.</p>
     <div class="custom-builder">
       <label>Task name (e.g. Backstroke drill)</label>
       <input type="text" id="taskName" placeholder="e.g. 50m Freestyle" aria-label="Training task name">
@@ -1410,7 +1413,7 @@
     <h3 id="reflectSheetTitle">🌙 How was today?</h3>
     <h4>Overall vibe</h4>
     <div class="vibe-moods" id="reflectOverallMoods" style="margin-bottom:1rem"></div>
-    <h4>How did each block feel? <span style="font-weight:400;font-size:0.85rem">(optional)</span></h4>
+    <h4>How did each block feel? <span style="font-weight:400;font-size:calc(0.85rem * var(--text-scale, 1))">(optional)</span></h4>
     <div id="reflectBlockList"></div>
     <button class="btn-confirm" id="reflectSaveBtn">Save ✨</button>
   </div>
@@ -1520,7 +1523,7 @@
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rbHeading">
     <div class="sheet-handle"></div>
     <h3 id="rbHeading">🌅 New Custom Routine</h3>
-    <p style="font-size:0.88rem;color:var(--ink-light);margin-bottom:0.5rem">Add a checklist routine both girls can use.</p>
+    <p style="font-size:calc(0.88rem * var(--text-scale, 1));color:var(--ink-light);margin-bottom:0.5rem">Add a checklist routine both girls can use.</p>
     <div class="custom-builder">
       <div class="row">
         <div style="flex:3">

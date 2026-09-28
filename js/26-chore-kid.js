@@ -113,17 +113,17 @@ function ckCapBarFor(kid, weekKey, dayIdx) {
   const pct = v => Math.max(0, Math.min(100, v / span * 100));
 
   const segs = [];
-  if (fined)   segs.push({ w: pct(fined),   bg: '#e05a3c', title: `${ckMoney(fined)} in fines, taken first` });
-  if (kept)    segs.push({ w: pct(kept),    bg: '#6fc292', title: `${ckMoney(kept)} kept` });
-  if (pending) segs.push({ w: pct(pending), bg: 'repeating-linear-gradient(45deg,#ffd166 0 7px,#fff4db 7px 14px)', title: `${ckMoney(pending)} claimed, waiting` });
-  if (over)    segs.push({ w: pct(over),    bg: '#6fb1fc', title: `${ckMoney(over)} turned into XP` });
+  if (fined)   segs.push({ w: pct(fined),   bg: 'var(--mny-earn-fined)', title: `${ckMoney(fined)} in fines, taken first` });
+  if (kept)    segs.push({ w: pct(kept),    bg: 'var(--mny-earn-kept)', title: `${ckMoney(kept)} kept` });
+  if (pending) segs.push({ w: pct(pending), bg: 'repeating-linear-gradient(45deg,var(--mny-earn-waiting) 0 7px,var(--mny-earn-waiting-stripe) 7px 14px)', title: `${ckMoney(pending)} claimed, waiting` });
+  if (over)    segs.push({ w: pct(over),    bg: 'var(--mny-earn-xp)', title: `${ckMoney(over)} turned into XP` });
 
   const keys = [];
-  if (fined)   keys.push({ label: `−${ckMoney(fined)} fines, taken first`, bg: '#e05a3c', fg: '#fffdf5' });
-  if (kept)    keys.push({ label: `${ckMoney(kept)} kept`, bg: '#6fc292', fg: '#143024' });
-  if (pending) keys.push({ label: `${ckMoney(pending)} waiting`, bg: '#ffd166', fg: '#4a3a12' });
-  if (over)    keys.push({ label: `${ckMoney(over)} → XP`, bg: '#6fb1fc', fg: '#10243d' });
-  if (!keys.length) keys.push({ label: 'nothing yet today', bg: '#fffdf5', fg: '#6b5d4f' });
+  if (fined)   keys.push({ label: `−${ckMoney(fined)} fines, taken first`, bg: 'var(--mny-earn-fined)', fg: 'var(--mny-earn-fined-ink)' });
+  if (kept)    keys.push({ label: `${ckMoney(kept)} kept`, bg: 'var(--mny-earn-kept)', fg: 'var(--mny-earn-kept-ink)' });
+  if (pending) keys.push({ label: `${ckMoney(pending)} waiting`, bg: 'var(--mny-earn-waiting)', fg: 'var(--mny-earn-waiting-ink)' });
+  if (over)    keys.push({ label: `${ckMoney(over)} → XP`, bg: 'var(--mny-earn-xp)', fg: 'var(--mny-earn-xp-ink)' });
+  if (!keys.length) keys.push({ label: 'nothing yet today', bg: 'var(--paper)', fg: 'var(--ink-light)' });
 
   // What the next fine would actually cost her — the exposure line.
   const fineAmt = Number((((r.fines || {}).items || [])[0] || {}).amount) || 1;

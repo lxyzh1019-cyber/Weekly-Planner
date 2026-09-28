@@ -9,17 +9,21 @@
 //    two stacked panels here, sharing an x-axis, which keeps "each week, and the
 //    pile so far" without the dual-axis lie.
 // 2. The drawing's series colours (#ffd166 / #6fb1fc) fail the lightness band
-//    and sit under 3:1 on cream. These are the same two hues stepped deeper
-//    until they pass, so Jenn still reads amber and Jess still reads blue.
-//    Validated: adjacent ΔE 27.1 protan / 30.4 normal.
+//    and sit under 3:1 on cream. The series draw in each kid's STRONG colour
+//    (Looks stage 2, handoff §7): Jenn pink, Jess blue — the colours the kids
+//    wear everywhere else — at 5.46:1 and 5.74:1 on the paper, CIEDE2000 38.1
+//    apart. The kid FILLS would not pass (2.88:1 and 3.27:1). This was an amber
+//    for Jenn (#cf8f22) until then.
 
 let ctrOffset = 0;   // how many 8-week windows back from the current one
 
-const CTR_KID_COLOR = { jenn: '#cf8f22', jess: '#3d7fd6' };
+const CTR_KID_COLOR = { jenn: 'var(--jenn-strong)', jess: 'var(--jess-strong)' };
+/* The card head's wash: each kid's own wash (handoff §7). */
+const CTR_KID_WASH = { jenn: 'var(--jenn-wash)', jess: 'var(--jess-wash)' };
 /* One hue, light→dark, four steps: validated monotone with visible gaps and a
    light end that clears the paper. Zero gets the paper itself — "nothing
    happened" should not look like the bottom of a scale. */
-const CTR_HEAT = ['#71c295', '#48a271', '#2b8054', '#185235'];
+const CTR_HEAT = ['var(--mny-heat-1)', 'var(--mny-heat-2)', 'var(--mny-heat-3)', 'var(--mny-heat-4)'];
 
 /* The eight weeks in the window, oldest first. */
 function ctrWeeks() {
@@ -86,7 +90,7 @@ function ctrCards(d) {
     const pct = target > 0 ? Math.min(100, Math.round(ytd / target * 100)) : 0;
     const tile = (label, v) => `<div class="ctr-tile"><div class="ctr-tile-cap">${label}</div><div class="ctr-tile-v">${v}</div></div>`;
     return `<div class="ctr-card">
-      <div class="ctr-card-head" style="background:${CTR_KID_COLOR[k]}22">
+      <div class="ctr-card-head" style="background:${CTR_KID_WASH[k]}">
         <span class="ctr-card-icon">${CT_PROFILE_ICON[k]}</span>
         <span class="ctr-card-name">${k === 'jenn' ? 'Jenn' : 'Jess'}</span>
         <span class="ck-spacer"></span>
@@ -121,7 +125,7 @@ function ctrBars(d) {
   let grid = '', ticks = '';
   for (let i = 0; i <= 4; i++) {
     const v = peak / 4 * i, yy = y(v);
-    grid += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" stroke="#e8dfc3" stroke-width="1"/>`;
+    grid += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" style="stroke:var(--paper-line)" stroke-width="1"/>`;
     ticks += `<text x="${padL - 6}" y="${yy + 3}" text-anchor="end" class="ctr-tick">${ckMoney(v)}</text>`;
   }
   let bars = '', labels = '';
@@ -133,7 +137,7 @@ function ctrBars(d) {
       const x = cx - bw - 1 + j * (bw + 2);   // 2px paper gap between the pair
       if (h > 0) {
         bars += `<rect x="${x}" y="${y(r.total)}" width="${bw}" height="${h}" rx="4"
-          fill="${CTR_KID_COLOR[k]}" stroke="#2a2320" stroke-width="2">
+          style="fill:${CTR_KID_COLOR[k]};stroke:var(--ink)" stroke-width="2">
           <title>${k === 'jenn' ? 'Jenn' : 'Jess'} · week of ${escapeHtml(w.label)}: ${ckMoney(r.total)}${r.frozen ? ' (settled)' : ''}</title></rect>`;
       }
     });
@@ -142,7 +146,7 @@ function ctrBars(d) {
   return `<svg viewBox="0 0 ${W} ${H}" class="ctr-svg" role="img"
       aria-label="What each of the last ${CT_SUMMARY_WEEKS} weeks paid, Jenn and Jess side by side">
     ${grid}${ticks}
-    <line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" stroke="#2a2320" stroke-width="2"/>
+    <line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" style="stroke:var(--ink)" stroke-width="2"/>
     ${bars}${labels}</svg>`;
 }
 
@@ -159,7 +163,7 @@ function ctrLines(d) {
   let grid = '', ticks = '';
   for (let i = 0; i <= 3; i++) {
     const v = peak / 3 * i, yy = y(v);
-    grid += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" stroke="#e8dfc3" stroke-width="1"/>`;
+    grid += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" style="stroke:var(--paper-line)" stroke-width="1"/>`;
     ticks += `<text x="${padL - 6}" y="${yy + 3}" text-anchor="end" class="ctr-tick">${ckMoney(v)}</text>`;
   }
   // Two lines that finish close together would stack their end labels on top
@@ -175,16 +179,16 @@ function ctrLines(d) {
   let lines = '', dots = '', ends = '';
   ['jenn', 'jess'].forEach(k => {
     const pts = d.rows[k].map((r, i) => `${padL + step * i},${y(r.cum)}`).join(' ');
-    lines += `<polyline points="${pts}" fill="none" stroke="${CTR_KID_COLOR[k]}" stroke-width="2"
+    lines += `<polyline points="${pts}" fill="none" style="stroke:${CTR_KID_COLOR[k]}" stroke-width="2"
       stroke-linejoin="round" stroke-linecap="round"/>`;
     d.rows[k].forEach((r, i) => {
-      dots += `<circle cx="${padL + step * i}" cy="${y(r.cum)}" r="4" fill="${CTR_KID_COLOR[k]}"
-        stroke="#fffdf5" stroke-width="2"><title>${k === 'jenn' ? 'Jenn' : 'Jess'} by ${escapeHtml(r.week.label)}: ${ckMoney(r.cum)}</title></circle>`;
+      dots += `<circle cx="${padL + step * i}" cy="${y(r.cum)}" r="4"
+        style="fill:${CTR_KID_COLOR[k]};stroke:var(--paper)" stroke-width="2"><title>${k === 'jenn' ? 'Jenn' : 'Jess'} by ${escapeHtml(r.week.label)}: ${ckMoney(r.cum)}</title></circle>`;
     });
     // The label wears ink; a small mark beside it carries identity. Colouring
     // the text itself would make the value legible only to colour.
     const last = d.rows[k][d.rows[k].length - 1];
-    ends += `<circle cx="${padL + plotW + 10}" cy="${endY[k]}" r="3.5" fill="${CTR_KID_COLOR[k]}" stroke="#2a2320" stroke-width="1"/>`
+    ends += `<circle cx="${padL + plotW + 10}" cy="${endY[k]}" r="3.5" style="fill:${CTR_KID_COLOR[k]};stroke:var(--ink)" stroke-width="1"/>`
           + `<text x="${padL + plotW + 17}" y="${endY[k] + 4}" class="ctr-endlab">${ckMoney(last.cum)}</text>`;
   });
   let labels = '';
@@ -194,7 +198,7 @@ function ctrLines(d) {
   return `<svg viewBox="0 0 ${W} ${H}" class="ctr-svg" role="img"
       aria-label="The running total across the last ${CT_SUMMARY_WEEKS} weeks, Jenn and Jess">
     ${grid}${ticks}
-    <line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" stroke="#2a2320" stroke-width="2"/>
+    <line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" style="stroke:var(--ink)" stroke-width="2"/>
     ${lines}${dots}${ends}${labels}</svg>`;
 }
 
@@ -223,7 +227,7 @@ function ctrHeat(d, kid) {
       // Zero is paper, not the bottom of the ramp: nothing happened should not
       // look like a little of something.
       const bg = v <= 0 ? 'var(--paper)' : CTR_HEAT[Math.min(CTR_HEAT.length - 1, Math.floor(v / peak * CTR_HEAT.length))];
-      const fg = v <= 0 ? '#b9ac95' : (v / peak > 0.55 ? '#fffdf5' : '#1a2b20');
+      const fg = v <= 0 ? 'var(--ink-faint)' : (v / peak > 0.55 ? 'var(--mny-heat-ink-on-dark)' : 'var(--mny-heat-ink)');
       return `<div class="ctr-heat-cell" style="background:${bg};color:${fg}"
         title="${escapeAttr(c.label)} · week of ${escapeHtml(r.week.label)}: ${ckMoney(v)}">${v > 0 ? ckMoney(v) : '·'}</div>`;
     }).join('');

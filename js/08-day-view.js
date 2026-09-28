@@ -694,13 +694,12 @@ function declineInviteFromTimeline(id) {
   buildTimeline();
 }
 
-/* Returns true when a background is better paired with DARK (ink) text than
-   with white. Uses WCAG relative-luminance contrast rather than a raw luma
-   threshold, so mid-tone pastels (e.g. the teal #80cbc4 routine colour) get
-   readable dark text instead of low-contrast white. */
-function isLightColour(col) {
-  if (!col) return false;
+/* WCAG relative luminance of a `#rgb`, `#rrggbb` or `rgb()/rgba()` colour, or
+   null for anything else (a var(), a name). */
+function colourLuminance(col) {
+  if (!col) return null;
   let r, g, b, m;
+  col = String(col).trim();
   if ((m = col.match(/^#([0-9a-f]{6})$/i))) {
     r = parseInt(m[1].substr(0,2),16); g = parseInt(m[1].substr(2,2),16); b = parseInt(m[1].substr(4,2),16);
   } else if ((m = col.match(/^#([0-9a-f]{3})$/i))) {
@@ -708,14 +707,49 @@ function isLightColour(col) {
   } else if ((m = col.match(/^rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)/i))) {
     r = +m[1]; g = +m[2]; b = +m[3];
   } else {
-    return false;
+    return null;
   }
   const lin = c => { c /= 255; return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); };
-  const L = 0.2126*lin(r) + 0.7152*lin(g) + 0.0722*lin(b);
-  const Link = 0.2126*lin(0x2a) + 0.7152*lin(0x23) + 0.0722*lin(0x20); // --ink #2a2320
+  return 0.2126*lin(r) + 0.7152*lin(g) + 0.0722*lin(b);
+}
+
+/* THE INK FOLLOWS THE LOOK. Contrast is measured against the `--ink` the page
+   is actually painting with, read off :root, never a copy of it — a copy was
+   #2a2320 while the stylesheet moved to navy, and every "is this light enough
+   for ink" answer would then have been about a colour nobody draws. Read once
+   per look: the cache is keyed on <html data-look>, so switching looks
+   re-reads it and nothing has to remember to invalidate it. The print sheet
+   does not ask this (printTextColor, js/16-print.js — print ignores the look). */
+let inkLuminanceCache = null;
+function inkLuminance() {
+  const look = document.documentElement.getAttribute('data-look') || '';
+  if (inkLuminanceCache && inkLuminanceCache.look === look) return inkLuminanceCache.L;
+  const L = colourLuminance(getComputedStyle(document.documentElement).getPropertyValue('--ink'));
+  /* No stylesheet yet (or an ink this parser cannot read): answer as if the ink
+     were black, and do not cache, so the first real read wins. */
+  if (L == null) return 0;
+  inkLuminanceCache = { look, L };
+  return L;
+}
+
+/* Contrast ratio (WCAG, 1–21) of a colour against the live ink, or 0 when the
+   colour cannot be read. */
+function inkContrast(col) {
+  const L = colourLuminance(col);
+  if (L == null) return 0;
+  const Link = inkLuminance();
+  return (Math.max(L, Link) + 0.05) / (Math.min(L, Link) + 0.05);
+}
+
+/* Returns true when a background is better paired with DARK (ink) text than
+   with white. Uses WCAG relative-luminance contrast rather than a raw luma
+   threshold, so mid-tone fills (e.g. Helping hands' deep cyan) get readable
+   dark text instead of low-contrast white. */
+function isLightColour(col) {
+  const L = colourLuminance(col);
+  if (L == null) return false;
   const contrastWithWhite = 1.05 / (L + 0.05);
-  const contrastWithInk   = (L + 0.05) / (Link + 0.05);
-  return contrastWithInk >= contrastWithWhite; // dark text is at least as readable
+  return inkContrast(col) >= contrastWithWhite; // dark text is at least as readable
 }
 
 /* ────────────────────────────────────────────────────────────────
@@ -1483,7 +1517,7 @@ function renderTrainingGearChecklist(containerId, stateObj, tag, persist, isComp
   const items = getTrainingGearPresets(tag, isComp);
   wrap.innerHTML = '';
   if (!items.length) {
-    wrap.innerHTML = '<p style="font-size:0.9rem;color:var(--ink-light)">No preset gear for this sport yet.</p>';
+    wrap.innerHTML = '<p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light)">No preset gear for this sport yet.</p>';
     return;
   }
   if (!stateObj.gearState) stateObj.gearState = {};
@@ -1676,7 +1710,7 @@ function openKidTrainingQuick(blockId) {
   const objEl = document.getElementById('kidTrainingObjectives');
   const lines = (b.objectives && b.objectives.length)
     ? b.objectives.map(o => `<div class="checklist-item" style="cursor:default;border-color:var(--accent)"><span class="checklist-text">🎯 ${escapeHtml(o)}</span></div>`).join('')
-    : '<p style="font-size:0.95rem;color:var(--ink-light)">No objectives listed yet — tap Edit to add some.</p>';
+    : '<p style="font-size:calc(0.95rem * var(--text-scale, 1));color:var(--ink-light)">No objectives listed yet — tap Edit to add some.</p>';
   objEl.innerHTML = lines;
   const swEl = document.getElementById('kidTrainingStopwatch');
   if (b.stopwatch && b.stopwatch.enabled) {

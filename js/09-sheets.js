@@ -71,7 +71,7 @@ function renderObjectivesList(containerId, stateObj, presets, myTasks, rerenderF
 
   if (myTasks.length) {
     const hdr = document.createElement('div');
-    hdr.style.cssText='font-family:Gochi Hand;font-size:1rem;color:var(--ink-light);margin-top:0.4rem';
+    hdr.style.cssText='font-family:var(--font-display);font-size:calc(1rem * var(--text-scale, 1));color:var(--ink-light);margin-top:0.4rem';
     hdr.textContent = 'From your library:';
     objWrap.appendChild(hdr);
     myTasks.forEach(t=>{
@@ -134,7 +134,7 @@ function renderTrainingSheet() {
     b.textContent = t.label;
     b.onclick = ()=>{
       // Adopt the topic colour unless the user had picked a non-default custom one.
-      if (!ts.colour || ts.colour === CAT_HEX.training || allTags.some(x=>x.colour===ts.colour)) ts.colour = t.colour;
+      if (!ts.colour || TRAINING_DEFAULT_HEXES.has(String(ts.colour).toLowerCase()) || allTags.some(x=>x.colour===ts.colour)) ts.colour = t.colour;
       ts.tag=t.id; ts.objectives=[]; renderTrainingSheet();
     };
     tagWrap.appendChild(b);
@@ -441,7 +441,7 @@ function renderStartTimePicker(containerId, curMin, onChange, onAfterRender) {
   hourRow.appendChild(prevH);
 
   const hourLabel = document.createElement('span');
-  hourLabel.style.cssText = 'font-family:Gochi Hand;font-size:1.1rem;min-width:60px;text-align:center';
+  hourLabel.style.cssText = 'font-family:var(--font-display);font-size:calc(1.1rem * var(--text-scale, 1));min-width:60px;text-align:center';
   const h12 = curH>12?curH-12:(curH===0?12:curH);
   hourLabel.textContent = `${h12}${curH>=12?'pm':'am'}`;
   hourRow.appendChild(hourLabel);
@@ -943,8 +943,8 @@ function openEditSheet(blockId) {
   objWrap.style.display = 'block';
   const list = Array.isArray(block.objectives) ? block.objectives : [];
   document.getElementById('editObjectivesView').innerHTML = list.length
-    ? list.map(o=>`<div style="font-size:0.9rem;padding:0.3rem 0;border-bottom:1px dashed var(--paper-line)">🎯 ${escapeHtml(o)}</div>`).join('')
-    : '<p style="font-size:0.9rem;color:var(--ink-light)">No objectives yet — add some below.</p>';
+    ? list.map(o=>`<div style="font-size:calc(0.9rem * var(--text-scale, 1));padding:0.3rem 0;border-bottom:1px dashed var(--paper-line)">🎯 ${escapeHtml(o)}</div>`).join('')
+    : '<p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light)">No objectives yet — add some below.</p>';
   objInput.value = list.join('\n');
   if (isParent()) objEditWrap.style.display = 'block';
   else if (block.parentPinned) objEditWrap.style.display = 'none';
@@ -1135,7 +1135,7 @@ function renderChecklist(block, act, listContainerId, options) {
   const skipAdd = !!(options && options.skipAdd);
   listWrap.innerHTML = '';
   if (!tmpl?.items?.length && !getKidExtras(act.routineId).length && !getUnlockedRoutineRewards(act.routineId).length) {
-    listWrap.innerHTML = '<p style="font-size:0.9rem;color:var(--ink-light)">No items in this routine</p>';
+    listWrap.innerHTML = '<p style="font-size:calc(0.9rem * var(--text-scale, 1));color:var(--ink-light)">No items in this routine</p>';
     return;
   }
   if (!block.checklistState) block.checklistState = {};
@@ -2808,7 +2808,7 @@ function openReflectSheet(dayKey) {
   const listWrap = document.getElementById('reflectBlockList');
   listWrap.innerHTML = '';
   if (!blocks.length) {
-    listWrap.innerHTML = '<p style="color:var(--ink-light);font-size:0.9rem">Nothing was planned.</p>';
+    listWrap.innerHTML = '<p style="color:var(--ink-light);font-size:calc(0.9rem * var(--text-scale, 1))">Nothing was planned.</p>';
   } else {
     const acts = getAllActivities(activeProfile(), { includeArchived: true });
     blocks.forEach(b=>{

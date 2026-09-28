@@ -68,12 +68,12 @@ function openPrint() {
 // readable on every colour — and on a black & white printer, where each
 // colour prints as its matching shade of grey, the same choice still holds.
 function printTextColor(hex) {
-  if (!hex || hex[0] !== '#') return '#1a1a1a';
+  if (!hex || hex[0] !== '#') return '#1a1a1a'; /* look: colour maths — printTextColor picks ink by luminance */
   let h = hex.slice(1);
   if (h.length === 3) h = h.split('').map(c=>c+c).join('');
   const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
   const L = (0.299*r + 0.587*g + 0.114*b) / 255;
-  return L > 0.6 ? '#1a1a1a' : '#fff';
+  return L > 0.6 ? '#1a1a1a' : '#fff'; /* look: colour maths — printTextColor picks ink by luminance */
 }
 
 // Proportional title size: taller blocks (which have the room) get larger
@@ -290,7 +290,7 @@ function renderPrintSheet(host, opts) {
           }
         }
         const titleCls = sumHtml ? '' : ' print-block--titleonly';
-        blockHtml += `<div class="print-block${titleCls}${hasConflict ? ' print-block--conflict' : ''}" style="background:${bg};color:${printTextColor(bg)};font-size:${titleFpt}pt;height:${bh}px">${checkbox}<div class="print-block-title">${hasConflict ? '⚠️ ' : ''}${pIcon} ${escapeHtml(pName)}</div>${sumHtml}</div>`;
+        blockHtml += `<div class="print-block${titleCls}${hasConflict ? ' print-block--conflict' : ''}" style="background:${bg};color:${printTextColor(bg)};font-size:${titleFpt}pt;height:${bh}px">${checkbox}<div class="print-block-title">${hasConflict ? '⚠️ ' : ''}${pIcon} ${escapeHtml(pName)}</div>${sumHtml}</div>`; /* look: print sheet ignores the look (L12) */
       });
       html += `<div class="print-cell${isHourStart?' print-hour-start':''}">${blockHtml}</div>`;
     });
