@@ -1340,7 +1340,7 @@ function tdRenderToday() {
   let prepHtml = '';
   if (prep) {
     const late = tdNowMin() >= prep.moveByMin;
-    /* The strip is bordered and set in --accent-strong because leaving on time
+    /* The strip is bordered and set in --status-warn-strong because leaving on time
        is the one thing on this screen that stops being possible if she reads it
        late. It sits under NEXT rather than inside the current block's text,
        which is where it used to be: tdPrepFor has always been asked about the

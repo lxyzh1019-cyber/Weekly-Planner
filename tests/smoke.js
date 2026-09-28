@@ -15980,6 +15980,121 @@ function findChromium() {
     return bad.length ? bad : true;
   })();
 
+  /* Looks stage 4 part B: a warning reads as a warning in either look. Stage 4
+     made the warm accents a look's (Calm lavender and purple), and the rules
+     that mean "warn", "act soon", "at risk", "refused", "will be replaced",
+     "time to move" or "waiting" read them — so in Calm Backup's nearly-full
+     meter turned lavender and its critical state purple, the main button's
+     colour. Each rule below is a meaning, not decoration: it must compute to
+     today's (Pop's) colour in both looks. Drawn on elements made for the
+     check, so every rule is reached whatever the seeded data shows. */
+  if (want('warningsReadAsWarningsInBothLooks')) checks.warningsReadAsWarningsInBothLooks = await (async () => {
+    const bad = [];
+    const WARN = [
+      // [label, tag, classes, property, today's (Pop) value]
+      ['Backup meter nearly full', 'div', 'bk-meter-fill warn', 'backgroundColor', 'rgb(255, 209, 102)'],
+      ['Backup meter critical', 'div', 'bk-meter-fill critical', 'backgroundColor', 'rgb(184, 68, 31)'],
+      ['chore exposure line', 'div', 'ck-risk', 'color', 'rgb(184, 68, 31)'],
+      ['My money exposure line', 'div', 'mny-earn-risk', 'color', 'rgb(184, 68, 31)'],
+      ['school calendar ran out', 'div', 'pa-stale', 'borderTopColor', 'rgb(184, 68, 31)'],
+      ['Record refusal', 'p', 'rc-no', 'color', 'rgb(184, 68, 31)'],
+      ['chore money capped', 'div', 'ct-cap-note', 'color', 'rgb(184, 68, 31)'],
+      ['Copy a week "replace"', 'span', 'pcw-tag-replace', 'color', 'rgb(184, 68, 31)'],
+      ['money total overridden', 'div', 'mny-override-note', 'borderTopColor', 'rgb(184, 68, 31)'],
+      ['Today "be moving by" strip', 'div', 'td-now-prep', 'borderTopColor', 'rgb(184, 68, 31)'],
+      ['Today "time to get moving"', 'div', 'td-now-move td-now-move--now', 'color', 'rgb(184, 68, 31)'],
+      ['week under-planned banner', 'div', 'week-todo-banner week-todo-banner--warn', 'borderTopColor', 'rgb(201, 138, 30)'],
+      ['week under-planned banner text', 'div', 'week-todo-banner week-todo-banner--warn', 'color', 'rgb(107, 71, 8)'],
+      ['week under-planned banner shadow', 'div', 'week-todo-banner week-todo-banner--warn', 'boxShadow', 'rgba(201, 138, 30, 0.35) 3px 3px 0px 0px'],
+      ['Today family chip (waiting)', 'div', 'td-chip-family', 'borderTopColor', 'rgb(201, 138, 30)'],
+      ['Today catch-up card (waiting)', 'div', 'td-catchup', 'borderTopColor', 'rgb(201, 138, 30)'],
+    ];
+    const read = () => page.evaluate((rows) => {
+      const host = document.createElement('div');
+      host.id = 'warnProbe';
+      document.body.appendChild(host);
+      try {
+        return rows.map(([, tag, cls, prop]) => {
+          const el = document.createElement(tag);
+          el.className = cls;
+          el.textContent = 'x';
+          host.appendChild(el);
+          return getComputedStyle(el)[prop];
+        });
+      } finally { host.remove(); }
+    }, WARN);
+    try {
+      await clearLooks();
+      const pop = await read();
+      await setLook('calm');
+      const on = await page.evaluate(() => document.documentElement.getAttribute('data-look'));
+      if (on !== 'calm') bad.push(`<html data-look> is "${on}" — Calm was not what was measured`);
+      const calm = await read();
+      WARN.forEach(([label, , , prop, want], i) => {
+        if (pop[i] !== want) bad.push(`Pop ${label} ${prop} is ${pop[i]}, not today's ${want}`);
+        if (calm[i] !== want) bad.push(`Calm ${label} ${prop} is ${calm[i]}, not the warning's ${want}`);
+      });
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      await clearLooks();
+    }
+    return bad.length ? bad : true;
+  })();
+
+  /* Looks stage 4 part B: "today" and "selected" are told apart in either
+     look. Parent › Now draws this week twice — the rail marks today, the
+     "on her behalf" strip marks the chosen day, which starts as today. In
+     Calm both were a navy square with white text (today navy by L9, the
+     selected pill navy since Stage 3), so a parent could not tell which
+     square was chosen. Selected is the filled one; today is navy by frame in
+     Calm (L9) and keeps its own fill in Pop. Chores' day strip (.ck-day) is
+     the other place a today mark and a selection share a row. */
+  if (want('todayAndSelectedDifferInBothLooks')) checks.todayAndSelectedDifferInBothLooks = await (async () => {
+    const bad = [];
+    const NAVY = 'rgb(28, 34, 64)';
+    const read = () => page.evaluate(() => {
+      profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';
+      pnAnswerKid = null; pnAnswerDay = null;
+      showScreen('parent'); renderParentHome(); setParentDest('now');
+      const sig = (el) => {
+        if (!el) return null;
+        const s = getComputedStyle(el);
+        return { bg: s.backgroundColor, ink: s.color, ring: s.boxShadow, edge: s.borderTopColor };
+      };
+      const now = sig(document.querySelector('#pnWrap .pn-day.now'));
+      const on = sig(document.querySelector('#pnWrap .pn-day.on'));
+      const host = document.createElement('div');
+      host.className = 'ck-daystrip';
+      host.innerHTML = '<button class="ck-day sel">1</button><button class="ck-day today">2</button>';
+      document.body.appendChild(host);
+      const ckSel = sig(host.children[0]), ckToday = sig(host.children[1]);
+      host.remove();
+      return { now, on, ckSel, ckToday };
+    });
+    try {
+      for (const look of ['pop', 'calm']) {
+        if (look === 'pop') await clearLooks(); else await setLook(look);
+        await page.waitForTimeout(150);
+        const r = await read();
+        if (!r.now) { bad.push(`${look}: Parent › Now drew no today square (.pn-day.now), so nothing was compared`); continue; }
+        if (!r.on) { bad.push(`${look}: Parent › Now drew no selected day (.pn-day.on), so nothing was compared`); continue; }
+        if (r.now.bg === r.on.bg) bad.push(`${look}: Parent › Now's today square and selected day share the fill ${r.now.bg}`);
+        if (r.ckSel.bg === r.ckToday.bg) bad.push(`${look}: Chores' selected day and today share the fill ${r.ckSel.bg}`);
+        // L9: in Calm today's mark is navy (Pop's rail square keeps its own colour).
+        if (look === 'calm' && ![r.now.bg, r.now.ring, r.now.edge].some(v => String(v).includes(NAVY))) {
+          bad.push(`calm: Parent › Now's today square carries no navy (L9): ${JSON.stringify(r.now)}`);
+        }
+      }
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      await clearLooks();
+      await page.evaluate(() => { profile = 'jenn'; parentViewing = 'jenn'; selectProfile('jenn'); goToday(); });
+    }
+    return bad.length ? bad : true;
+  })();
+
   /* Step 1 confirms a day where the day is, not in a panel below a chart.
      Twenty-eight movements for a week where nothing was wrong is the friction
      this whole phase exists to remove, so it is worth an assertion. */
