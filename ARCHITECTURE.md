@@ -1424,30 +1424,34 @@ chore tab is unchanged.
   clears from Today alone. A parent looking consumes nothing.
 - **Rows 7 and 8 — Parent › Now, "On her behalf"** (`pnAnswerCard`, see *The
   parent portal*): per child, per day of this week up to today.
-- **Row 19 — 🕓 Catch up** (`tdCatchUpCard`), at the top of Today's day column:
-  every EARLIER day of an OPEN week with something unanswered — a planned
+- **Row 19 — 🕓 Catch up** (`tdCatchUpCard`), in Today's day column directly
+  after the ✏️ Modify my plan button (R12, owner 2026-09-27: "just below Modify
+  my plan" — today's schedule leads, the earlier days follow it as a group):
+  every EARLIER day of THIS week with something unanswered — a planned
   (`scheduled`) paid chore with no claim and no grade, a routine not closed, a
   training not rated — oldest first, e.g. `Tue · 2 jobs · 1 routine`,
-  `Wed · training — how did you try?` (an earlier week's day reads
-  `Tue 15 Sep`). Tapping a day opens its answers in the card, one day at a time;
-  a day answered in full drops out and the card goes when nothing is left. It
-  writes nothing itself. **How far back:** this week and the 8 before it (the
-  family meeting's own catch-up window, `mmUnsettledWeeks(8)` — inside it a
-  claim can still become pay), never before `mmCatchUpFloor()`, and only weeks
-  not SETTLED for her — `mnyWeekSettled`: committed at a meeting
-  (`mnyIsCommitted`, `weekPlans[wk][kid].committedAt`) or credited another way
-  (Grandma rule, repair, express catch-up). Not today, not a day to come, not a
-  sick day, not a block recorded as not done. A day with nothing unanswered is
-  not listed; "something else" for such a day goes through the next row.
+  `Wed · training — how did you try?`. Tapping a day opens its answers in the
+  card, one day at a time; a day answered in full drops out and the card goes
+  when nothing is left. It writes nothing itself. **How far back:** this week
+  only (`tdOpenWeeks`; R12 — it reached this week and the 8 before it until
+  2026-09-27, which the owner found too much). Older unsettled weeks are the
+  family meeting's catch-up list (`mmUnsettledWeeks(8)`), unchanged. Never
+  before `mmCatchUpFloor()`, and not once this week is SETTLED for her —
+  `mnyWeekSettled`: committed at a meeting (`mnyIsCommitted`,
+  `weekPlans[wk][kid].committedAt`) or credited another way (Grandma rule,
+  repair, express catch-up). Not today, not a day to come, not a sick day, not a
+  block recorded as not done. On a Monday there is no earlier day, so no card.
+  A day with nothing unanswered is not listed; "something else" for such a day
+  goes through the next row.
 - **C1b — ＋ Add to an earlier day** (`tdEarlierElseRow`, Plan v6,
   2026-09-25): one collapsed row (`data-td-action="else-earlier"`,
   `aria-expanded`, ≥44px, words 16px) directly under the catch-up card — or on
-  its own when catch up has nothing — shown only when an earlier day of an open
-  week exists. Opened, it lists those days newest first (`tdEarlierElseDays`:
-  `tdOpenWeeks`, so the same 8-week window, floor and `mnyWeekSettled` rule as
-  catch up; before today; minus days catch up already lists, which carry the
-  same door), each as "＋ I did something else on Tue" (`Tue 15 Sep` in an
-  earlier week) through `tdElseBlock` → `tdClaimJob` → `openChoreClaimPrompt` →
+  its own, directly after ✏️ Modify my plan, when catch up has nothing — shown
+  only when an earlier day of this (unsettled) week exists. Opened, it lists
+  those days newest first (`tdEarlierElseDays`: `tdOpenWeeks`, so this week
+  only, the same floor and `mnyWeekSettled` rule as catch up; before today;
+  minus days catch up already lists, which carry the same door), each as
+  "＋ I did something else on Tue" through `tdElseBlock` → `tdClaimJob` → `openChoreClaimPrompt` →
   `mrSetClaim` — the owner the chore tab's `ckPickElse` uses. A claim on that
   day and nothing else. Closed again by `goToday()`. This closes the C1 gap
   noted in `docs/chore-relocation-map.md` row 2.

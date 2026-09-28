@@ -11902,6 +11902,26 @@ function findChromium() {
   await page.evaluate(() => {
     const copy = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
     const pause = (ms) => new Promise(r => setTimeout(r, ms));
+    /* R12 (owner 2026-09-27): 🕓 Catch up, then "＋ Add to an earlier day", sit
+       directly after the ✏️ Modify my plan button in Today's day column. [] when
+       they do; otherwise what is wrong. */
+    window.catchUpPlacementFindings = () => {
+      const bad = [];
+      const col = document.querySelector('#tdWrap .td-col--day');
+      const plan = col && col.querySelector('.td-plan');
+      const planBox = plan && plan.closest('.td-more');
+      const card = document.querySelector('#tdWrap .td-catchup');
+      const row = document.querySelector('#tdWrap [data-td-action="else-earlier"]');
+      if (!planBox || planBox.parentElement !== col) return ['no ✏️ plan button of its own in the day column'];
+      if (!card && !row) return ['neither the catch-up card nor the earlier-day row is on Today'];
+      const first = card || row;
+      const say = (el) => (el ? `${el.tagName.toLowerCase()}.${[...el.classList].join('.')}` : 'nothing');
+      if (planBox.nextElementSibling !== first) {
+        bad.push(`the ${card ? 'catch-up card' : 'earlier-day row'} is not directly after ✏️ Modify my plan (after it: ${say(planBox.nextElementSibling)}; before the card: ${say(first.previousElementSibling)})`);
+      }
+      if (card && row && card.nextElementSibling !== row) bad.push(`the earlier-day row is not directly after the catch-up card (after it: ${say(card.nextElementSibling)})`);
+      return bad;
+    };
     window.c1 = {
       pin(idx) {
         const RealDate = Date;
@@ -12173,10 +12193,12 @@ function findChromium() {
   /* C1b (Plan v6, 2026-09-25). Catch up lists only a past day with something
      unanswered, so a job she did on a FULLY answered earlier day had no door on
      Today. "Add to an earlier day" is that door: a collapsed row, shown on its
-     own when catch up has nothing, listing the earlier days of open weeks
-     (the same window and the same settled rule as catch up), each opening
+     own when catch up has nothing, listing the earlier days of THIS week (the
+     same reach and the same settled rule as catch up — R12, 2026-09-27, when
+     the reach became this week only, on purpose), each opening
      "＋ I did something else on Tue" through the same owner — a claim, filed on
-     that day, and no money. A settled week's days are never offered. */
+     that day, and no money. Last week's days and a settled week's are never
+     offered. */
   if (want('somethingElseOnAFullyAnsweredEarlierDay')) checks.somethingElseOnAFullyAnsweredEarlierDay = await page.evaluate(async () => {
     const bad = [];
     const unpin = c1.pin(3);
@@ -12198,6 +12220,7 @@ function findChromium() {
       if (document.querySelector(`#tdWrap [data-td-action="catchup-day"][data-td-day="${tue}"]`)) bad.push('precondition: a fully answered Tuesday is still in catch up');
       const row = document.querySelector('#tdWrap [data-td-action="else-earlier"]');
       if (!row) return bad.concat(['no "Add to an earlier day" row on Today with catch up empty']);
+      bad.push(...catchUpPlacementFindings());
       if (row.getAttribute('aria-expanded') !== 'false') bad.push('the earlier-day row does not start closed');
       const r = row.getBoundingClientRect();
       if (r.height < 44) bad.push(`the earlier-day row is ${Math.round(r.height)}px tall`);
@@ -12208,7 +12231,10 @@ function findChromium() {
       const list = document.querySelector('#tdWrap .td-else-earlier-list');
       if (!list) return bad.concat(['opening the row lists no earlier days']);
       if (list.querySelector(`[data-td-day="${today}"]`)) bad.push('today is offered as an earlier day');
-      if (!list.querySelector(`[data-td-action="else"][data-td-day="${lastTue}"]`)) bad.push('an unsettled last week is not offered');
+      if (list.querySelector(`[data-td-day="${lastTue}"]`)) bad.push('a day of last week is offered (this week only)');
+      const offered = [...list.querySelectorAll('[data-td-action="else"]')].map(b => b.getAttribute('data-td-day'));
+      const wantDays = [keys[2], keys[1], keys[0]];
+      if (JSON.stringify(offered) !== JSON.stringify(wantDays)) bad.push(`the earlier days offered are ${JSON.stringify(offered)}, want this week's ${JSON.stringify(wantDays)} (newest first)`);
       const door = list.querySelector(`[data-td-action="else"][data-td-day="${tue}"]`);
       if (!door) return bad.concat(['no "＋ I did something else on Tue" for the fully answered Tuesday']);
       if (!new RegExp('something else on ' + DAY_SHORT[1], 'i').test(door.textContent)) bad.push(`Tuesday's door reads "${door.textContent.trim()}"`);
@@ -12225,27 +12251,73 @@ function findChromium() {
       if (Object.keys(mrEnsureEarnings('jenn', wk).chores).some(dd => Object.keys(mrEnsureEarnings('jenn', wk).chores[dd] || {}).length)) bad.push('an extra job wrote a grade');
       if (mnyCash('jenn') !== cash) bad.push('an extra job moved money');
 
-      // A settled week's days are never offered.
-      if (!c.weekPlans[k.lastWk]) c.weekPlans[k.lastWk] = {};
-      c.weekPlans[k.lastWk].jenn = { committedAt: syncNow() };
+      // A settled week's days are never offered: this week settled, no row at all.
+      if (!c.weekPlans[wk]) c.weekPlans[wk] = {};
+      c.weekPlans[wk].jenn = { committedAt: syncNow() };
       goToday();
-      const row2 = document.querySelector('#tdWrap [data-td-action="else-earlier"]');
-      if (row2) row2.click();
-      const list2 = document.querySelector('#tdWrap .td-else-earlier-list');
-      if (!list2) bad.push('the earlier-day list went away when only last week was settled');
-      else if (mrWeekDayKeys(k.lastWk).some(dk => list2.querySelector(`[data-td-day="${dk}"]`))) bad.push("a settled week's day is still offered");
+      if (document.querySelector('#tdWrap [data-td-action="else-earlier"]')) bad.push("the earlier-day row is still offered once this week is settled");
     } finally {
       unpin(); k.restore(); goToday();
     }
     return bad.length ? bad : true;
   });
 
-  /* Row 19. 🕓 Catch up, at the top of Today, lists every EARLIER day of an OPEN
-     week with something she has not answered, oldest first, one day open at a
-     time. A settled week never appears (committed at a meeting, or credited
-     another way); today and days still to come are not "catch up"; a day
-     answered in full drops out, and the card goes when nothing is left. It
-     writes nothing itself. */
+  /* R12 (Plan v1, owner 2026-09-27: "too much for 8 weeks"; reach "This week
+     only"). With an unanswered day LAST week and one earlier THIS week, catch up
+     offers only this week's, and "＋ Add to an earlier day" lists only this
+     week's earlier days. On a Monday there is no earlier day this week, so
+     neither shows — even with last week's day still unanswered. */
+  if (want('catchUpReachesThisWeekOnly')) checks.catchUpReachesThisWeekOnly = await page.evaluate(async () => {
+    const bad = [];
+    let unpin = c1.pin(3);
+    const k = c1.keep('jenn');
+    try {
+      profile = 'jenn'; parentViewing = 'jenn';
+      ctPrepareRead();
+      k.clear();
+      const wk = k.wk, keys = mrWeekDayKeys(wk), lastKeys = mrWeekDayKeys(k.lastWk);
+      const job = (id, tag) => [{ id, actId: 'chores', startMin: 17 * 60, durationMin: 30, choreTags: [tag] }];
+      setDayBlocks(lastKeys[4], job('r12-lfri', 'mop'), 'jenn');   // last week, unanswered, unsettled
+      setDayBlocks(keys[1], job('r12-tue', 'dishes'), 'jenn');     // earlier this week, unanswered
+
+      if (JSON.stringify(tdOpenWeeks('jenn')) !== JSON.stringify([wk])) bad.push(`tdOpenWeeks is ${JSON.stringify(tdOpenWeeks('jenn'))}, want only this week ${JSON.stringify([wk])}`);
+      goToday();
+      const listed = [...document.querySelectorAll('#tdWrap .td-catchup [data-td-action="catchup-day"]')].map(b => b.getAttribute('data-td-day'));
+      if (listed.includes(lastKeys[4])) bad.push('an unanswered day LAST week is listed in catch up');
+      if (!listed.includes(keys[1])) bad.push(`an unanswered day earlier THIS week (Tue ${keys[1]}) is not listed in catch up (listed ${JSON.stringify(listed)})`);
+      const tueBtn = document.querySelector(`#tdWrap .td-catchup [data-td-action="catchup-day"][data-td-day="${keys[1]}"]`);
+      if (tueBtn && /\d/.test(tueBtn.querySelector('.td-row-name').textContent.split('·')[0])) bad.push(`this week's day is named with a date: "${tueBtn.textContent.trim()}"`);
+      const row = document.querySelector('#tdWrap [data-td-action="else-earlier"]');
+      if (!row) bad.push('no "Add to an earlier day" row with Mon and Wed of this week not in catch up');
+      else {
+        row.click();
+        const offered = [...document.querySelectorAll('#tdWrap .td-else-earlier-list [data-td-action="else"]')].map(b => b.getAttribute('data-td-day'));
+        const want = [keys[2], keys[0]];
+        if (JSON.stringify(offered) !== JSON.stringify(want)) bad.push(`"Add to an earlier day" offers ${JSON.stringify(offered)}, want this week's earlier days not in catch up ${JSON.stringify(want)}`);
+        if (lastKeys.some(dk => document.querySelector(`#tdWrap [data-td-day="${dk}"]`))) bad.push('a day of last week is offered somewhere on Today');
+      }
+
+      // Monday: nothing earlier this week, so no card and no row.
+      unpin(); unpin = c1.pin(0);
+      goToday();
+      if (document.querySelector('#tdWrap .td-catchup')) bad.push('a catch-up card shows on Monday');
+      if (document.querySelector('#tdWrap [data-td-action="else-earlier"]')) bad.push('"Add to an earlier day" shows on Monday');
+    } finally {
+      unpin(); k.restore(); goToday();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* Row 19. 🕓 Catch up lists every EARLIER day of THIS week with something she
+     has not answered, oldest first, one day open at a time. REWRITTEN ON PURPOSE
+     in R12 (Plan v1, owner 2026-09-27: "too much for 8 weeks"; "placed below
+     today schedule, just below Modify my plan"): it used to reach this week and
+     the 8 before it and sit above the hero. Now an unanswered day LAST week is
+     not listed, and the card (then "＋ Add to an earlier day") comes directly
+     after the ✏️ Modify my plan button in the day column. A settled week never
+     appears (committed at a meeting, or credited another way); today and days
+     still to come are not "catch up"; a day answered in full drops out, and the
+     card goes when nothing is left. It writes nothing itself. */
   if (want('catchUpListsOnlyUnansweredDaysOfOpenWeeks')) checks.catchUpListsOnlyUnansweredDaysOfOpenWeeks = await page.evaluate(async () => {
     const bad = [];
     const unpin = c1.pin(3);
@@ -12262,20 +12334,20 @@ function findChromium() {
       setDayBlocks(keys[1], job('cu-tue', 'mop'), 'jenn');         // unanswered — listed
       setDayBlocks(keys[3], job('cu-thu', 'vacuum'), 'jenn');      // today — Today's own card
       setDayBlocks(keys[4], job('cu-fri', 'laundry'), 'jenn');     // still to come — not listed
-      setDayBlocks(lastKeys[4], job('cu-lfri', 'mop'), 'jenn');    // last week, unsettled — listed first
+      setDayBlocks(lastKeys[4], job('cu-lfri', 'mop'), 'jenn');    // last week, unsettled — NOT listed (this week only)
 
       const listed = () => [...document.querySelectorAll('#tdWrap .td-catchup [data-td-action="catchup-day"]')]
         .map(b => b.getAttribute('data-td-day'));
       goToday();
       const card = document.querySelector('#tdWrap .td-catchup');
       if (!card) return ['no 🕓 Catch up card with an unanswered chore on Tuesday'];
-      const expected = [lastKeys[4], keys[1]];
-      if (JSON.stringify(listed()) !== JSON.stringify(expected)) bad.push(`catch up lists ${JSON.stringify(listed())}, want ${JSON.stringify(expected)} (oldest first; not answered Mon, today, or Fri to come)`);
+      const expected = [keys[1]];
+      if (JSON.stringify(listed()) !== JSON.stringify(expected)) bad.push(`catch up lists ${JSON.stringify(listed())}, want ${JSON.stringify(expected)} (this week only; not answered Mon, today, Fri to come, or last week)`);
+      if (listed().includes(lastKeys[4])) bad.push('an unanswered day LAST week is listed in catch up (this week only)');
       const tueBtn = card.querySelector(`[data-td-action="catchup-day"][data-td-day="${keys[1]}"]`);
       if (tueBtn && !tueBtn.textContent.includes(`${DAY_SHORT[1]} · 1 job`)) bad.push(`Tuesday reads "${tueBtn.textContent.trim()}", want "${DAY_SHORT[1]} · 1 job"`);
-      // At the top of Today: above the hero.
-      const hero = document.querySelector('#tdWrap .td-now');
-      if (hero && !(card.compareDocumentPosition(hero) & Node.DOCUMENT_POSITION_FOLLOWING)) bad.push('the catch-up card is not above the hero');
+      // Directly after ✏️ Modify my plan in the day column, then the earlier-day row.
+      bad.push(...catchUpPlacementFindings());
 
       // One day at a time.
       const open = (key) => {
@@ -12300,19 +12372,22 @@ function findChromium() {
       if (tiny.length) bad.push(`catch-up text under 13px: .${tiny[0].className} ${getComputedStyle(tiny[0]).fontSize}`);
       if (document.body.scrollWidth > window.innerWidth + 1) bad.push('the catch-up card scrolls the page sideways at 390px');
 
-      // A settled week never appears: committed at the meeting…
+      // A settled week never appears — this week, the only one catch up reaches:
+      // committed at the meeting…
       const c = state.shared.chore;
-      if (!c.weekPlans[lastWk]) c.weekPlans[lastWk] = {};
-      c.weekPlans[lastWk].jenn = { committedAt: syncNow() };
+      if (!c.weekPlans[wk]) c.weekPlans[wk] = {};
+      c.weekPlans[wk].jenn = { committedAt: syncNow() };
       goToday();
-      if (listed().includes(lastKeys[4])) bad.push('a week committed at the meeting is still offered in catch up');
+      if (listed().includes(keys[1])) bad.push('a week committed at the meeting is still offered in catch up');
+      delete c.weekPlans[wk].jenn;
       // …or credited another way (the Grandma rule, the repair, an express catch-up).
-      delete c.weekPlans[lastWk].jenn;
       if (!c.finalizedWeeks) c.finalizedWeeks = {};
-      if (!c.finalizedWeeks[lastWk]) c.finalizedWeeks[lastWk] = {};
-      c.finalizedWeeks[lastWk].jenn = 3;
+      if (!c.finalizedWeeks[wk]) c.finalizedWeeks[wk] = {};
+      c.finalizedWeeks[wk].jenn = 3;
       goToday();
-      if (listed().includes(lastKeys[4])) bad.push('a week credited outside a meeting is still offered in catch up');
+      if (listed().includes(keys[1])) bad.push('a week credited outside a meeting is still offered in catch up');
+      delete c.finalizedWeeks[wk].jenn;
+      goToday();
 
       // Answering the last thing on the last day empties the card.
       open(keys[1]);
@@ -15264,6 +15339,49 @@ function findChromium() {
           names.add(name);
           await snap(name, w);
         }
+        /* R12 (2026-09-27): Today with a missed day this week — 🕓 Catch up open
+           under ✏️ Modify my plan, "＋ Add to an earlier day" after it. Measured
+           for contrast, 44px controls, 13px words, no sideways scroll and its
+           place, in this look at this width. */
+        const cu = await ev(`Today catch-up@${w}`, (lab) => {
+          window.__lookCu = { unpin: c1.pin(3), k: c1.keep('jenn') };
+          profile = 'jenn'; parentViewing = 'jenn';
+          ctPrepareRead();
+          window.__lookCu.k.clear();
+          const keys = mrWeekDayKeys(ctThisWeekKey());
+          setDayBlocks(keys[1], [{ id: 'lk-cu', actId: 'chores', startMin: 17 * 60, durationMin: 30, choreTags: ['mop', 'dishes'] },
+                                 { id: 'lk-cu-r', actId: 'routine_morning', startMin: 7 * 60, durationMin: 30 }], 'jenn');
+          setDayBlocks(keys[3], [{ id: 'lk-cu-t', actId: 'piano', startMin: 16 * 60, durationMin: 60 }], 'jenn');
+          goToday();
+          const day = document.querySelector(`#tdWrap .td-catchup [data-td-action="catchup-day"][data-td-day="${keys[1]}"]`);
+          if (!day) return [`${lab}: no catch-up day to measure`];
+          day.click();
+          const card = document.querySelector('#tdWrap .td-catchup');
+          const row = document.querySelector('#tdWrap [data-td-action="else-earlier"]');
+          const out = [...catchUpPlacementFindings().map(f => `${lab}: ${f}`), ...darkContrastFindings(card, lab)];
+          if (!card.querySelector('.td-catchup-panel')) out.push(`${lab}: the day did not open`);
+          if (row) out.push(...darkContrastFindings(row, `${lab} earlier-day row`));
+          const btns = [...card.querySelectorAll('button'), ...(row ? [row] : [])];
+          const small = btns.filter(b => { const r = b.getBoundingClientRect(); return r.height < 44 || r.width < 44; });
+          if (small.length) out.push(`${lab}: ${small.length} control(s) under 44px: ${small[0].className} ${Math.round(small[0].getBoundingClientRect().height)}px`);
+          const tiny = [card, ...(row ? [row] : [])].flatMap(el => [el, ...el.querySelectorAll('*')]).filter(el =>
+            [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(getComputedStyle(el).fontSize) < 13);
+          if (tiny.length) out.push(`${lab}: text under 13px: .${tiny[0].className} ${getComputedStyle(tiny[0]).fontSize}`);
+          if (document.body.scrollWidth > window.innerWidth + 1) out.push(`${lab}: the page scrolls sideways`);
+          // The picture: the day folded again, ✏️ Modify my plan near the top, the group under it.
+          const again = document.querySelector(`#tdWrap .td-catchup [data-td-action="catchup-day"][data-td-day="${keys[1]}"]`);
+          if (again) again.click();
+          const plan = document.querySelector('#tdWrap .td-col--day .td-plan');
+          if (plan) window.scrollTo(0, Math.max(0, plan.getBoundingClientRect().top + window.scrollY - 140));
+          return out;
+        }, `Today catch-up@${w}`);
+        if (cu) bad.push(...cu);
+        await page.waitForTimeout(250);
+        await page.screenshot({ path: shot(`look-${look}-today-catchup-${w}`) });
+        await ev('Today catch-up restore', () => {
+          if (!window.__lookCu) return;
+          window.__lookCu.unpin(); window.__lookCu.k.restore(); window.__lookCu = null; goToday();
+        });
         for (const dest of ['now', 'meeting', 'history', 'setup', 'app']) {
           await ev(`parent ${dest}`, (d) => {
             profile = 'parent'; parentUnlockedThisSession = true; parentViewing = 'jenn';

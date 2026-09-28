@@ -1096,15 +1096,15 @@ function tdTrainingCard(kid) {
 }
 
 /* ── Row 19: 🕓 Catch up ─────────────────────────────────────────────────
-   She does not open the iPad every day. An EARLIER day of an OPEN week with
+   She does not open the iPad every day. An EARLIER day of THIS week with
    something she has not answered — a planned job with no answer, a routine not
    closed, a training not rated — is listed here, oldest first, and opens (one
    day at a time) to the same answers Today gives for today.
 
-   How far back: this week and the TD_CATCHUP_WEEKS before it — the same eight
-   the family meeting's catch-up list covers (mmUnsettledWeeks), inside which a
-   claim can still become pay — never before the family's start week
-   (mmCatchUpFloor), and only weeks not yet SETTLED for her: mnyWeekSettled,
+   How far back: this week only (R12, owner 2026-09-27: eight weeks back was
+   "too much"). Older weeks are the family meeting's own catch-up list
+   (mmUnsettledWeeks), which is unchanged. Never before the family's start week
+   (mmCatchUpFloor), and not once the week is SETTLED for her: mnyWeekSettled,
    which is committed at a meeting (mnyIsCommitted — weekPlans[wk][kid].
    committedAt) or credited another way (the Grandma rule, the repair, an
    express catch-up). A settled week is never offered: a claim there would be
@@ -1112,18 +1112,10 @@ function tdTrainingCard(kid) {
    goes to the pocket-money handoff, so this card is careful instead.)
    Not today (Today's own cards answer today), not a day still to come, not a
    sick day, and not a block a grown-up recorded as not having happened. */
-const TD_CATCHUP_WEEKS = 8;
 function tdOpenWeeks(kid) {
-  const floor = String(mmCatchUpFloor());
-  const out = [];
-  for (let i = TD_CATCHUP_WEEKS; i >= 0; i--) {
-    const mon = formatDayKey(ctThisWeekKey()); mon.setDate(mon.getDate() - i * 7);
-    const wk = ctDateToKey(mon);
-    if (String(wk) < floor) continue;
-    if (mnyWeekSettled(wk, kid)) continue;
-    out.push(wk);
-  }
-  return out;   // oldest first
+  const wk = ctThisWeekKey();
+  if (String(wk) < String(mmCatchUpFloor()) || mnyWeekSettled(wk, kid)) return [];
+  return [wk];
 }
 /* Reads only. Earnings are read (mrChoresForDay, mrIsSick, …) only for a day
    that has blocks on it, so an empty old week is not given an empty record. */
@@ -1151,20 +1143,13 @@ function tdCatchUpDays(kid) {
   });
   return out;
 }
-/* "Tue" in this week; "Tue 15 Sep" in an earlier one, where "Tue" alone
-   would not say which. */
-function tdCatchUpDayName(day) {
-  if (day.wk === ctThisWeekKey()) return DAY_SHORT[day.d];
-  const dt = formatDayKey(day.dayKey);
-  return `${DAY_SHORT[day.d]} ${dt.getDate()} ${MONTH_SHORT[dt.getMonth()]}`;
-}
 /* `Tue · 2 jobs · 1 routine`, `Wed · training — how did you try?` */
 function tdCatchUpSummary(day) {
   const parts = [];
   if (day.jobs.length) parts.push(`${day.jobs.length} ${day.jobs.length === 1 ? 'job' : 'jobs'}`);
   if (day.routines.length) parts.push(`${day.routines.length} ${day.routines.length === 1 ? 'routine' : 'routines'}`);
   if (day.training) parts.push(parts.length ? 'training' : 'training — how did you try?');
-  return `${tdCatchUpDayName(day)} · ${parts.join(' · ')}`;
+  return `${DAY_SHORT[day.d]} · ${parts.join(' · ')}`;
 }
 function tdCatchUpPanel(kid, day) {
   const key = escapeAttr(day.dayKey);
@@ -1209,8 +1194,8 @@ function tdCatchUpCard(kid) {
    Catch up lists only a day with something unanswered, so an extra job she did
    on a day she had already answered in full had no door here. This is that
    door: one collapsed row, under the catch-up card or on its own, listing the
-   EARLIER days of the same open weeks catch up reads (tdOpenWeeks — the same
-   window, floor and settled rule), newest first, each as the catch-up card's
+   EARLIER days of the week catch up reads (tdOpenWeeks — this week only, the
+   same floor and settled rule), newest first, each as the catch-up card's
    own "＋ I did something else on Tue" (tdElseBlock → tdClaimJob →
    openChoreClaimPrompt → mrSetClaim, the path the chore tab's ckPickElse
    takes). A day catch up already lists is left to catch up, which carries the
@@ -1231,7 +1216,7 @@ function tdEarlierElseRow(kid) {
   const open = tdEarlierElseOpen;
   const list = open
     ? `<div class="td-else-earlier-list">${days.map(day =>
-        tdElseBlock(kid, day.dayKey, 'on ' + tdCatchUpDayName(day))).join('')}</div>`
+        tdElseBlock(kid, day.dayKey, 'on ' + DAY_SHORT[day.d])).join('')}</div>`
     : '';
   return `<button type="button" class="td-row td-else-btn td-else-earlier" data-td-action="else-earlier" aria-expanded="${open}">
       <span class="td-row-icon" aria-hidden="true">＋</span>
@@ -1669,14 +1654,14 @@ function tdRenderToday() {
 
      Source order is the phone order: the grid only reflows, so nothing here
      depends on the viewport being wide. */
-  /* Catch up sits at the very top: it only exists when an earlier day is still
-     waiting on her, and a card below the fold is a card she never answers.
-     The training rating joins the 🌙 row (both are "how did it go?"); the
-     routines and her own things sit with the jobs, as on the chore tab. */
+  /* Catch up (then "＋ Add to an earlier day") comes directly under ✏️ Modify
+     my plan: the owner placed it there (R12, 2026-09-27), so today's schedule
+     leads and the earlier days of this week follow it, as a group, where the
+     day's own plan ends. The training rating joins the 🌙 row (both are "how
+     did it go?"); the routines and her own things sit with the jobs, as on the
+     chore tab. */
   wrap.innerHTML = `
     <div class="td-col td-col--day">
-      ${tdCatchUpCard(kid)}
-      ${tdEarlierElseRow(kid)}
       <div class="${heroCls}"${heroStyle}>${nowHtml}</div>
       ${tdInviteNote()}
       ${tdReflectRow(kid)}
@@ -1684,6 +1669,8 @@ function tdRenderToday() {
       <div class="td-card">
         <div class="td-cap">Coming up</div>${questHtml}</div>
       ${planHtml}
+      ${tdCatchUpCard(kid)}
+      ${tdEarlierElseRow(kid)}
     </div>
     <div class="td-col td-col--side">
       ${loopHtml ? `<div class="td-chips">${loopHtml}</div>` : ''}
