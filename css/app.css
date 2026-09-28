@@ -5,25 +5,22 @@
        fits one A4/Letter landscape page. */
     --print-slot: 11px;
     /* Paper / sticker aesthetic. The page (--bg), the second paper (--bg2), the
-       card paper (--paper) and the secondary text (--ink-light) are a look's:
-       see the look blocks below. */
-    --paper-line: #e8dfc3;
+       card paper (--paper), the secondary text (--ink-light), the lines
+       (--paper-line) and the warm accents (--accent, --accent-strong,
+       --accent-yellow, --accent-purple) are a look's: see the look blocks below. */
     /* Navy, shared by both looks (docs/handoff/looks-calm-pop.md §7). The
        colour maths read this live — isLightColour / inkContrast in
        js/08-day-view.js — so it is the one value to change. */
     --ink: #1c2240;
-    --accent: #ff7b54;
-    /* Darker accent for text/UI that must meet WCAG AA: white-on-it = 5.4:1,
-       and it-as-text on --bg2 = 4.9:1 (#c14a24 was 4.50 there, a hair under —
-       found by thePopLookReadsEverywhere, Looks stage 2). Use for selected
-       controls (white label) and informational accent text; keep light --accent
-       for decorative fills and category identity. */
-    --accent-strong: #b8441f;
+    /* --accent-strong (a look's) is the darker accent for text/UI that must
+       meet WCAG AA: Pop's #b8441f is 5.4:1 under white and 4.9:1 as text on
+       --bg2 (#c14a24 was 4.50 there — found by thePopLookReadsEverywhere,
+       Looks stage 2); Calm's #5b4fd6 is 5.9:1 and 5.0:1. Use it for selected
+       controls (white label) and informational accent text; keep light
+       --accent for decorative fills. */
     --accent-pink: #ff9eb5;
     --accent-blue: #6fb1fc;
-    --accent-yellow: #ffd166;
     --accent-green: #95d5b2;
-    --accent-purple: #c3aed6;
 
     --radius: 18px;
     /* --radius-sm defined once in the design-token scale below (8px). */
@@ -92,8 +89,8 @@
     --shadow-md: 3px 3px 0 rgba(28,34,64,0.15);
     --shadow-lg: 0 4px 16px rgba(28,34,64,0.10);
 
-    /* Semantic text color for date-range labels (was hardcoded #5a4d41) */
-    --ink-muted: #5a4d41;
+    /* --ink-muted, the date-range labels' text (was hardcoded #5a4d41), is a
+       look's since Looks stage 4. */
 
     /* Z-index scale */
     --z-base:     1;
@@ -116,17 +113,6 @@
 
     /* Surfaces: backgrounds of cards, rows, chips, washes and highlights */
     --surface-card: #fff;
-    --surface-warm: #fff9e9;
-    --surface-todo: #fdf6ef;
-    --surface-track: #f0e8d5;
-    --surface-off: #eae4d5;
-    --surface-future: #f6f0e1;
-    --surface-locked: #f3efe3;
-    --surface-perf-track: #f3ecdc;
-    --surface-plan-stripe: #d9cfb4;
-    --surface-today: #fff0dc;
-    --surface-yellow-hover: #ffe08a;
-    --surface-tab-on: #ffe9a8;
     --surface-chip-on: #b7e4c7;
     --surface-aloud-on: #e7f3ff;
     --surface-carry-done: #d8f3dc;
@@ -135,37 +121,15 @@
     --surface-quest-done: #e8f5e9;
     --surface-training: #eef4ff;
     --surface-tip: #e8f7ff;
-    --surface-tip-warm: #fff9e6;
-    --surface-review-tip: #fff2d6;
-    --surface-reward: #ffe3ef;
-    --surface-sticker-got: #fff6d6;
-    --surface-invite: #fff0f5;
-    --surface-invite-stripe: #ffe3ec;
-    --surface-profile-glow: #ffe8d6;
-    --surface-guide-label: #fff8e6;
-    --surface-refl-card: #fff8e7;
-    --surface-catchup: #fff8e8;
-    --surface-tile: #fff9ee;
-    --surface-kid-item: #fffbe6;
-    --surface-note: #fffbe9;
     --surface-sleep: #f3eefb;
-    --surface-inverted-block: #d4ccb8;
     --surface-busy: #cfcfcf;
     --surface-sync-free: #2e9e5b;
     --surface-goal-fill: #48a271;
-    --surface-legend-hot: #ff7050;
-    --surface-legend-warm: #ffa84a;
-    --surface-density-low: #fff3c4;
     --surface-overnight: #cbc3e3;
     --surface-ritual-top: #2a2345;
     --surface-ritual-bottom: #5e4b8b;
-    --surface-empty-cream: rgba(255,250,235,0.95);
     --surface-empty-blue: rgba(231,243,255,0.92);
-    --surface-mini-head: rgba(255, 248, 230, 0.85);
-    --surface-streak: rgba(255,209,102,0.25);
-    --surface-streak-soft: rgba(255,209,102,0.05);
     --surface-chip-done: rgba(149,213,178,0.55);
-    --surface-muted-10: rgba(90,77,65,0.10);
     --surface-ink-10: rgba(28,34,64,0.10);
     --surface-ink-72: rgba(28,34,64,0.72);
     --surface-hover-dim: rgba(0,0,0,0.03);
@@ -187,37 +151,23 @@
 
     /* Text colours (beyond --ink / --ink-light / --ink-muted) */
     --ink-on-strong: #fff;
-    --ink-on-strong-cream: #fffdf5;
     --ink-on-dark-soft: rgba(255,255,255,0.85);
     --ink-accent-blue: #6fb1fc;
     --ink-on-blue: #10243d;
     /* Was #8a7f6d: 3.2–3.9:1 on the cream it sits on (chore tab captions,
        Parent › History tiles) — found by thePopLookReadsEverywhere. */
     --ink-caption: #5d6582;
-    --ink-na: #8a7b62;
-    --ink-unplanned: #a89a82;
-    --ink-faint: #b9ac95;
-    --ink-future: #c9bda6;
     --ink-grey: #8a8a8a;
     --ink-busy: #474747;
-    --ink-lane-note: #4a3a2c;
-    --ink-motto: #4b3f35;
-    --ink-hint: #5f5041;
     --ink-bedtime: #6a5acd;
     --ink-pay: #2f7d55;
 
     /* Borders, outlines and divider lines (colour only; widths stay in the rules, L3) */
     --border-on-strong: #fff;
-    --border-soft: #c9bda6;
-    --border-muted: #d9cfb4;
-    --border-warm: #e0d7c2;
-    --border-item: #e8dfc9;
-    --border-na: #cfc6b4;
     --border-grey: #8a8a8a;
     --border-accent-strong: #c14a24;
     --border-refl-done: #2f8f84;
     --border-now-line: #e5484d;
-    --border-placement-guide: rgba(255, 123, 84, 0.85);
     --border-glass-65: rgba(255,255,255,0.65);
     --border-ink-3: rgba(28,34,64,0.03);
     --border-ink-20: rgba(28,34,64,0.20);
@@ -238,13 +188,8 @@
     --shadow-black-40: rgba(0,0,0,0.4);
     --shadow-white-40: rgba(255,255,255,0.4);
     --shadow-white-85: rgba(255,255,255,0.85);
-    --shadow-highlight: #ffd166;
-    --shadow-quest-hit: rgba(255,209,102,0.7);
     --shadow-fresh: #95d5b2;
     --shadow-place-pulse: rgba(149,213,178,0.42);
-    --shadow-accent-strong: #c14a24;
-    --shadow-suggest: rgba(193,74,36,0.35);
-    --shadow-focus-pulse: rgba(255,123,84,0.4);
 
     /* Status: clash, to-do, done, warn, danger, travel strips */
     --status-clash: #d6453a;
@@ -262,10 +207,6 @@
     --status-clash-glow: rgba(214,69,58,0.25);
     --status-clash-glow-strong: rgba(214,69,58,0.35);
     --status-clash-glow-none: rgba(214,69,58,0);
-    --status-todo-border: #c98a1e;
-    --status-todo-ink: #6b4708;
-    --status-todo-glow: rgba(201,138,30,0.25);
-    --status-todo-glow-strong: rgba(201,138,30,0.35);
     --status-done: #6fc292;
     --status-done-border: #2f7d55;
     --status-done-strong: #2f7d55;
@@ -273,7 +214,6 @@
     --status-done-text: #1f6b43;
     --status-done-wash: #eef8f2;
     --status-quest-done-ink: #2e7d32;
-    --status-notdone-fill: #ece7e3;
     --status-miss: #e05a3c;
     --status-amber: #8a5a00;
     --status-warn-ink: #8f2d15;
@@ -292,7 +232,6 @@
     --status-now-dot: #e5484d;
     --status-warmup-stripe: rgba(244,163,64,0.5);
     --status-warmup-stripe-soft: rgba(244,163,64,0.2);
-    --travel-default: #5a4d41;
     --travel-edge-shade: black;
     --travel-ink-shade: black;
 
@@ -306,22 +245,15 @@
     --dark-todo-border: #d9a33d;
 
     /* Zones: the time-of-day bands of the week and day grids */
-    --zone-before: #fff4db;
     --zone-school: #d7eafe;
-    --zone-after: #ffe1d0;
     --zone-evening: #e8dcf2;
-    --zone-lunch: #fdf0c4;
     --zone-free: #d8f0e1;
 
     /* Kid and profile colours (the kid washes are --jenn-wash / --jess-wash above) */
     --profile-parent-wash: #f3ecf9;
-    --kid-jenn-mascot: #fff3e0;
     --kid-jenn-deco: #ff79a8;
     --kid-jess-mascot: #e3eef9;
     --kid-jess-deco: #4f8de0;
-    --mytime-surface: #fff8e1;
-    --mytime-paper: #fffdf5;
-    --mytime-glow: rgba(255,209,102,0.3);
     --mytime-jess-surface: #e3f0ff;
     --mytime-jess-glow: rgba(111,177,252,0.3);
 
@@ -347,6 +279,10 @@
     --print-zone-free: #d8f0e1;
     --print-font-text: 'Patrick Hand', sans-serif;
     --print-font-head: 'Gochi Hand', cursive;
+    /* A heading's weight and the figures' style are a look's on screen (--head-weight,
+       --num-variant); the printed sheet keeps Pop's, as it printed before the looks. */
+    --print-head-weight: 400;
+    --print-num-variant: normal;
   }
 
   /* ════ The looks (docs/handoff/looks-calm-pop.md §7) ════
@@ -406,6 +342,99 @@
     --tick-ink: #fff;
     --bar-cat: 0%;
     --bar-track: #fff;
+    /* ── Stage 4: every warm value that was shared is a look's. ──
+       Pop keeps each exactly as it was. */
+    /* Accents: the decorative accent, the readable accent (headings, checks,
+       main-ish buttons), the highlight fill, the Parent Mode strip. */
+    --accent: #ff7b54;
+    --accent-strong: #b8441f;
+    --accent-yellow: #ffd166;
+    --accent-purple: #c3aed6;
+    /* Lines and borders that were cream or beige. */
+    --paper-line: #e8dfc3;
+    --border-soft: #c9bda6;
+    --border-muted: #d9cfb4;
+    --border-warm: #e0d7c2;
+    --border-item: #e8dfc9;
+    --border-na: #cfc6b4;
+    --border-placement-guide: rgba(255, 123, 84, 0.85);
+    /* Text colours that were brown or warm grey; the cream "white" on strong fills. */
+    --ink-muted: #5a4d41;
+    --ink-on-strong-cream: #fffdf5;
+    --ink-na: #8a7b62;
+    --ink-unplanned: #a89a82;
+    --ink-faint: #b9ac95;
+    --ink-future: #c9bda6;
+    --ink-lane-note: #4a3a2c;
+    --ink-motto: #4b3f35;
+    --ink-hint: #5f5041;
+    /* Surfaces that were cream, peach or pink: cards, tips, washes, tracks, the
+       profile picker's glow, the Sunday review's two stops. */
+    --surface-warm: #fff9e9;
+    --surface-todo: #fdf6ef;
+    --surface-track: #f0e8d5;
+    --surface-off: #eae4d5;
+    --surface-future: #f6f0e1;
+    --surface-locked: #f3efe3;
+    --surface-perf-track: #f3ecdc;
+    --surface-plan-stripe: #d9cfb4;
+    --surface-today: #fff0dc;
+    --surface-yellow-hover: #ffe08a;
+    --surface-tab-on: #ffe9a8;
+    --surface-tip-warm: #fff9e6;
+    --surface-review-tip: #fff2d6;
+    --surface-reward: #ffe3ef;
+    --surface-sticker-got: #fff6d6;
+    --surface-invite: #fff0f5;
+    --surface-invite-stripe: #ffe3ec;
+    --surface-profile-glow: #ffe8d6;
+    --surface-guide-label: #fff8e6;
+    --surface-refl-card: #fff8e7;
+    --surface-catchup: #fff8e8;
+    --surface-tile: #fff9ee;
+    --surface-kid-item: #fffbe6;
+    --surface-note: #fffbe9;
+    --surface-inverted-block: #d4ccb8;
+    --surface-empty-cream: rgba(255,250,235,0.95);
+    --surface-mini-head: rgba(255, 248, 230, 0.85);
+    --surface-streak: rgba(255,209,102,0.25);
+    --surface-streak-soft: rgba(255,209,102,0.05);
+    --surface-muted-10: rgba(90,77,65,0.10);
+    /* The Parent density map's scale, low to high (with --surface-tip-warm and
+       --surface-yellow-hover, its first two stops). */
+    --surface-legend-hot: #ff7050;
+    --surface-legend-warm: #ffa84a;
+    --surface-density-low: #fff3c4;
+    /* Highlight rings and pulses. */
+    --shadow-highlight: #ffd166;
+    --shadow-quest-hit: rgba(255,209,102,0.7);
+    --shadow-accent-strong: #c14a24;
+    --shadow-suggest: rgba(193,74,36,0.35);
+    --shadow-focus-pulse: rgba(255,123,84,0.4);
+    /* "Waiting / to do" (the week's school-day bar, the Catch-up card), the
+       neutral "not done" fill and the default travel strip. */
+    --status-todo-border: #c98a1e;
+    --status-todo-ink: #6b4708;
+    --status-todo-glow: rgba(201,138,30,0.25);
+    --status-todo-glow-strong: rgba(201,138,30,0.35);
+    --status-notdone-fill: #ece7e3;
+    --travel-default: #5a4d41;
+    /* Time-of-day bands (school, evening and free are cool and shared). */
+    --zone-before: #fff4db;
+    --zone-after: #ffe1d0;
+    --zone-lunch: #fdf0c4;
+    /* Jenn's mascot and "my time" card. */
+    --kid-jenn-mascot: #fff3e0;
+    --mytime-surface: #fff8e1;
+    --mytime-paper: #fffdf5;
+    --mytime-glow: rgba(255,209,102,0.3);
+    /* Selected tabs (the portal's five, Copy a day's sister tabs, the chore
+       lanes): Pop yellow with navy text, Calm navy with white. */
+    --tab-on: var(--accent-yellow);
+    --tab-on-ink: var(--ink);
+    /* The meeting charts' two girls: Pop yellow and orange, Calm the kid colours. */
+    --series-jenn: var(--accent-yellow);
+    --series-jess: var(--accent);
   }
 
   /* Calm: new fonts at today's size, cool graph paper, white cards and rows,
@@ -461,6 +490,101 @@
     --tick-ink: #fff;
     --bar-cat: 100%;
     --bar-track: #fff;
+    /* ── Stage 4: every warm value that was shared is a look's. ──
+       Calm's cool counterparts, from its palette: page #eef2f9, --bg2 #e6ecf7,
+       muted #5a6380, purple #5b4fd6. Greys and lines keep Pop's luminance with a
+       cool hue, so every contrast stays where it was. */
+    /* Accents: the decorative accent, the readable accent (headings, checks,
+       main-ish buttons), the highlight fill, the Parent Mode strip. */
+    --accent: #7b70e4;
+    --accent-strong: #5b4fd6;
+    --accent-yellow: #cdc7f8;
+    --accent-purple: #dedaf8;
+    /* Lines and borders that were cream or beige. */
+    --paper-line: #dadfeb;
+    --border-soft: #b6bed3;
+    --border-muted: #c8d0e1;
+    --border-warm: #d1d8e6;
+    --border-item: #dadfeb;
+    --border-na: #bfc7d9;
+    --border-placement-guide: rgba(91,79,214,0.85);
+    /* Text colours that were brown or warm grey; the cream "white" on strong fills. */
+    --ink-muted: #465065;
+    --ink-on-strong-cream: #ffffff;
+    --ink-na: #727d96;
+    --ink-unplanned: #939baf;
+    --ink-faint: #a7aebe;
+    --ink-future: #b7bfcf;
+    --ink-lane-note: #353d4f;
+    --ink-motto: #394155;
+    --ink-hint: #495269;
+    /* Surfaces that were cream, peach or pink: cards, tips, washes, tracks, the
+       profile picker's glow, the Sunday review's two stops. */
+    --surface-warm: #f4f6fc;
+    --surface-todo: #f4f6fc;
+    --surface-track: #e4e9f2;
+    --surface-off: #e0e5ee;
+    --surface-future: #eef1f8;
+    --surface-locked: #eceff6;
+    --surface-perf-track: #e9ecf5;
+    --surface-plan-stripe: #c8d0e1;
+    --surface-today: #e9e6fb;
+    --surface-yellow-hover: #d6d1fa;
+    --surface-tab-on: #e3dffb;
+    --surface-tip-warm: #f4f6fc;
+    --surface-review-tip: #eceafc;
+    --surface-reward: #e2eafa;
+    --surface-sticker-got: #eceafc;
+    --surface-invite: #f1effd;
+    --surface-invite-stripe: #e3dffb;
+    --surface-profile-glow: #dde3f3;
+    --surface-guide-label: #f4f6fc;
+    --surface-refl-card: #f4f6fc;
+    --surface-catchup: #f4f6fc;
+    --surface-tile: #f5f7fc;
+    --surface-kid-item: #f5f7fc;
+    --surface-note: #f5f7fc;
+    --surface-inverted-block: #c6ccdd;
+    --surface-empty-cream: rgba(244,246,252,0.95);
+    --surface-mini-head: rgba(238,242,249,0.85);
+    --surface-streak: rgba(205,199,248,0.35);
+    --surface-streak-soft: rgba(205,199,248,0.08);
+    --surface-muted-10: rgba(70,80,101,0.10);
+    /* The Parent density map's scale, low to high (with --surface-tip-warm and
+       --surface-yellow-hover, its first two stops). */
+    --surface-legend-hot: #8e83ea;
+    --surface-legend-warm: #b3aaf3;
+    --surface-density-low: #e9e6fc;
+    /* Highlight rings and pulses. */
+    --shadow-highlight: #8e83ea;
+    --shadow-quest-hit: rgba(142,131,234,0.7);
+    --shadow-accent-strong: #5b4fd6;
+    --shadow-suggest: rgba(91,79,214,0.35);
+    --shadow-focus-pulse: rgba(91,79,214,0.4);
+    /* "Waiting / to do" (the week's school-day bar, the Catch-up card), the
+       neutral "not done" fill and the default travel strip. */
+    --status-todo-border: #5b4fd6;
+    --status-todo-ink: #3f33b0;
+    --status-todo-glow: rgba(91,79,214,0.25);
+    --status-todo-glow-strong: rgba(91,79,214,0.35);
+    --status-notdone-fill: #e5e7ee;
+    --travel-default: #465065;
+    /* Time-of-day bands (school, evening and free are cool and shared). */
+    --zone-before: #eef1f7;
+    --zone-after: #e2e3f8;
+    --zone-lunch: #e9ecf3;
+    /* Jenn's mascot and "my time" card. */
+    --kid-jenn-mascot: #ffe4ec;
+    --mytime-surface: #ffeef3;
+    --mytime-paper: #ffffff;
+    --mytime-glow: rgba(255,92,138,0.25);
+    /* Selected tabs (the portal's five, Copy a day's sister tabs, the chore
+       lanes): Pop yellow with navy text, Calm navy with white. */
+    --tab-on: var(--ink);
+    --tab-on-ink: #fff;
+    /* The meeting charts' two girls: Pop yellow and orange, Calm the kid colours. */
+    --series-jenn: var(--jenn);
+    --series-jess: var(--jess);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -962,7 +1086,8 @@
   .sync-dot.syncing { background: var(--accent-yellow); animation: pulse 1s infinite; }
   .sync-pending-msg {
     margin-top: 0.35rem;
-    font-size: calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1));
+    /* max(): Calm's type put it at 12.5px on the picker (Looks stage 4). */
+    font-size: max(13px, calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1)));
     color: var(--ink-light);
     min-height: 1.1rem;
   }
@@ -1503,7 +1628,7 @@
     border: 2px solid var(--ink); border-radius: 999px; padding: 3px 12px; cursor: pointer;
     background: var(--paper-card, var(--paper)); color: var(--ink);
   }
-  .cm-pill.active { background: var(--accent-strong); color: var(--ink-on-strong-cream); }
+  .cm-pill.active { background: var(--pill-on); color: var(--ink-on-strong-cream); }
   .cm-pill:disabled { opacity: 0.5; cursor: default; }
   .cm-money-chip {
     margin-left: auto; font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; color: var(--ink);
@@ -1609,8 +1734,8 @@
   .cm-footer { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
   .cm-footer-summary { font-size: calc(0.86rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; }
   .cm-spark { display: flex; align-items: flex-end; gap: 3px; height: 26px; margin-left: auto; }
-  .cm-spark-bar { width: 12px; background: var(--accent-yellow); border: 1.5px solid var(--ink); border-radius: 3px 3px 0 0; min-height: 4px; }
-  .cm-spark-bar.cm-spark-now { background: var(--accent); }
+  .cm-spark-bar { width: 12px; background: var(--mny-bar); border: 1.5px solid var(--ink); border-radius: 3px 3px 0 0; min-height: 4px; }
+  .cm-spark-bar.cm-spark-now { background: var(--mny-bar-now); }
   /* ═══════ 2c/1b/2b: Meeting Mode ═══════ */
   .mm-stepper { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
   .mm-step {
@@ -1618,7 +1743,7 @@
     border: 2px solid var(--ink); border-radius: 999px; padding: 3px 10px; cursor: pointer;
     background: var(--paper-card, var(--paper)); color: var(--ink);
   }
-  .mm-step-cur { background: var(--accent-strong); color: var(--ink-on-strong-cream); }
+  .mm-step-cur { background: var(--pill-on); color: var(--ink-on-strong-cream); }
   .mm-step-done { background: var(--accent-green); }
   .mm-h { font-family: var(--font-display); font-size: calc(1.25rem * var(--text-scale, 1)); margin: 2px 0 8px; }
   .mm-h-sub { font-size: calc(1.05rem * var(--text-scale, 1)); margin-top: 12px; }
@@ -1626,8 +1751,8 @@
   .mm-legend { display: flex; gap: 12px; align-items: center; font-size: calc(0.8rem * var(--fs-scale, 1) * var(--text-scale, 1)); margin-bottom: 6px; flex-wrap: wrap; }
   .mm-legend .mm-sw { display: inline-block; width: 12px; height: 12px; border: 1.5px solid var(--ink); border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
   .mm-legend-note { color: var(--ink-light); }
-  .mm-bar-j { background: var(--accent-yellow); }
-  .mm-bar-s { background: var(--accent); }
+  .mm-bar-j { background: var(--series-jenn); }
+  .mm-bar-s { background: var(--series-jess); }
   .mm-bar { width: 40%; max-width: 18px; min-height: 2px; border: 2px solid var(--ink); border-bottom: 0; border-radius: 5px 5px 0 0; }
   .mm-detail { border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px; margin: 8px 0; background: var(--paper-card, var(--paper)); }
   .mm-detail-cols { display: grid; grid-template-columns: 1fr 2px 1fr; gap: 8px; }
@@ -1998,7 +2123,7 @@
     font-family: var(--font-text); font-weight: 700;
     font-size: calc(1rem * var(--fs-scale, 1) * var(--text-scale, 1));
   }
-  .refl-kid.on { background: var(--accent-strong); color: var(--ink-on-strong); }
+  .refl-kid.on { background: var(--pill-on); color: var(--ink-on-strong); }
   .refl-kid-n { font-size: calc(0.86rem * var(--fs-scale, 1) * var(--text-scale, 1)); opacity: 0.85; }
   .refl-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
   .refl-tab {
@@ -2138,7 +2263,7 @@
     white-space: nowrap;
   }
   /* Money identity = amber; paid = green (color law) */
-  .ct-money-badge { background: var(--accent-yellow); }
+  .ct-money-badge { background: var(--mny-bar); }
   .chore-card.paid { background: color-mix(in srgb, var(--accent-green) 22%, var(--paper)); border-color: var(--accent-green); }
   .ct-money-total { font-family: var(--font-display); font-size: calc(2rem * var(--text-scale, 1)); font-weight: 800; color: var(--ink); margin: 0.1rem 0 0.4rem; }
   .ct-money-cap { font-family: var(--font-round); font-size: calc(0.85rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; color: var(--ink-muted); }
@@ -3947,7 +4072,7 @@
     font-family: var(--font-text);
     box-shadow: 2px 2px 0 var(--ink);
   }
-  .day-pick.active { background: var(--accent-strong); color: var(--ink-on-strong); }
+  .day-pick.active { background: var(--pill-on); color: var(--ink-on-strong); }
   .day-pick-presets { display:flex; gap: 0.3rem; margin-bottom: 0.4rem; flex-wrap:wrap; }
 
   .btn-confirm {
@@ -4197,11 +4322,16 @@
   }
   .parent-tab {
     background: var(--paper); border: 2px solid var(--ink); border-radius: 12px 12px 0 0;
+    /* 44px, the house floor: they were 41px in Pop and 38px in Calm's
+       smaller type (parentScreensMeetTheHouseRules, Looks stage 4). */
+    min-height: 44px;
     padding: 0.4rem 0.75rem; font-family: var(--font-text);
     font-size: calc(0.98rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; cursor: pointer; color: var(--ink);
   }
-  .parent-tab.active { background: var(--accent-yellow); box-shadow: 2px -2px 0 var(--ink); }
   .parent-tab:hover { background: var(--accent-yellow); }
+  /* The selected destination: Pop yellow, Calm navy with white text. Hovered
+     too, or Calm's hover fill would sit under the white label. */
+  .parent-tab.active, .parent-tab.active:hover { background: var(--tab-on); color: var(--tab-on-ink); box-shadow: 2px -2px 0 var(--ink); }
   .parent-panel { padding: 0.8rem 1rem 2.5rem; }
   .parent-panel[hidden] { display: none; }
   .parent-h3 { font-size: calc(1.25rem * var(--text-scale, 1)); margin: 1rem 0 0.4rem; }
@@ -4256,7 +4386,7 @@
     border: 2px solid transparent; border-radius: var(--radius-sm); cursor: pointer;
   }
   .mny-rail-item:hover { background: var(--bg2); }
-  .mny-rail-item.on { background: var(--accent-strong); border-color: var(--ink); color: var(--ink-on-strong); }
+  .mny-rail-item.on { background: var(--pill-on); border-color: var(--ink); color: var(--ink-on-strong); }
   .mny-rail-body { min-width: 0; }
   /* Below the tablet the rail lies down into a scrolling strip — still one row
      of navigation, not two. */
@@ -4416,7 +4546,7 @@
   /* Today's square: white on --accent (#ff7b54) was 2.6:1, under the 4.5:1
      the dark-mode pass asks of every word (Plan v6 C7) — --accent-strong, the
      portal's own "go" colour (.pn-cta.go), carries white at 4.9:1. */
-  .pn-day.now { background: var(--accent-strong); border-color: var(--ink); color: var(--ink-on-strong); }
+  .pn-day.now { background: var(--pill-on); border-color: var(--ink); color: var(--ink-on-strong); }
   /* On her behalf (R5 §5 C1): the chosen child and day, then her answers. */
   .pn-answer-cap { margin-top: var(--space-4); }
   .pn-answer { padding: var(--space-3); }
@@ -4511,7 +4641,7 @@
   .review-day:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
   .review-day.confirmed { background: var(--accent-green); }
   .review-day.today { outline: 3px solid var(--today-mark); outline-offset: 1px; }
-  .review-day-dow { font-size: calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; text-transform: uppercase; }
+  .review-day-dow { font-size: max(13px, calc(0.78rem * var(--fs-scale, 1) * var(--text-scale, 1))); font-weight: 800; text-transform: uppercase; }
   .review-day-date { font-size: calc(1.2rem * var(--text-scale, 1)); font-weight: 800; font-family: var(--font-display); line-height: 1; }
   .review-day-state { font-size: calc(0.72rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700; }
   .review-day-count { font-size: calc(0.68rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-light); }
@@ -4672,7 +4802,9 @@
     /* L12: print ignores the look's text scale. `:root[data-look]` so this
        out-ranks the look block (same specificity, later in the file). */
     :root, :root[data-look] { --text-scale: 1; }
-    body { background: var(--print-paper); font-size: 10pt; }
+    /* The page's font and number style are a look's and every printed word
+       inherits them: print sets its own (found by printIgnoresTheLook, Looks stage 4). */
+    body { background: var(--print-paper); font-size: 10pt; font-family: var(--print-font-text); font-variant-numeric: var(--print-num-variant); }
     .screen:not(#screen-print) { display: none !important; }
     #screen-print { display: block !important; }
     .no-print { display: none !important; }
@@ -4705,7 +4837,7 @@
     text-align: center; margin-bottom: 0.2rem;
     border-bottom: 2px double var(--print-ink); padding-bottom: 0.12rem;
   }
-  .print-header h1 { font-family:var(--print-font-head); font-size: 1.25rem; line-height: 1.1; } /* look: print sheet ignores the look (L12) */
+  .print-header h1 { font-family:var(--print-font-head); font-weight: var(--print-head-weight); font-size: 1.25rem; line-height: 1.1; } /* look: print sheet ignores the look (L12) */
   .print-subhead { font-size: 9pt; color: var(--print-subhead); font-weight: 700; margin-top: 2px; } /* look: print sheet ignores the look (L12) */
   /* On-screen controls (never printed) */
   .print-controls {
@@ -5445,7 +5577,8 @@
     cursor: pointer;
   }
   .copy-day-tab.active {
-    background: var(--accent-yellow);
+    background: var(--tab-on);
+    color: var(--tab-on-ink);
     font-weight: 800;
     box-shadow: 2px 2px 0 var(--ink);
   }
@@ -5652,6 +5785,13 @@
        added for paying late", found by thePopLookReadsEverywhere). The fill
        (--mny-fine, the door's bar) is unchanged (L10). */
     --mny-fine-ink: #b3352b;
+    /* Every dollar figure's one accent, and the money charts' bars (the eight
+       weeks, goal progress, the chore money sparkline and its "now" bar, the
+       money badge). They read the app's warm accents until Looks stage 4 made
+       those a look's; the money keeps today's colours in both looks (L10). */
+    --mny-figure: #b8441f;
+    --mny-bar: #ffd166;
+    --mny-bar-now: #ff7b54;
     /* Money-page surfaces, text, lines and shadows (L10: today's values, per page) */
     --mny-shadow-card: rgba(28, 34, 64, 0.10);
     --mny-surface-disabled: #f2ece0;
@@ -5739,14 +5879,14 @@
   .mny-sub { font-size: calc(0.72rem * var(--fs-scale, 1) * var(--text-scale, 1)); letter-spacing: 0.05em; text-transform: uppercase;
              color: var(--ink-light); font-weight: 700; margin-top: 0.5rem; }
   .mny-note { font-size: calc(0.8rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-light); margin-top: 0.4rem; line-height: 1.4; }
-  .mny-total { font-size: calc(2rem * var(--text-scale, 1)); font-weight: 800; color: var(--accent-strong); line-height: 1.15; }
+  .mny-total { font-size: calc(2rem * var(--text-scale, 1)); font-weight: 800; color: var(--mny-figure); line-height: 1.15; }
   .mny-total.sm { font-size: calc(1.35rem * var(--text-scale, 1)); }
   .mny-today-big { font-size: calc(1rem * var(--text-scale, 1)); margin-top: 0.2rem; line-height: 1.45; }
 
   .mny-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; margin-top: 0.5rem; }
   .mny-tile { border: 2px solid var(--ink); border-radius: 10px; background: var(--bg); padding: 0.4rem 0.5rem; }
   .mny-tile-top { font-size: calc(0.75rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-light); display: flex; align-items: center; gap: 0.25rem; }
-  .mny-tile-val { font-size: calc(1.05rem * var(--text-scale, 1)); font-weight: 800; color: var(--accent-strong); }
+  .mny-tile-val { font-size: calc(1.05rem * var(--text-scale, 1)); font-weight: 800; color: var(--mny-figure); }
 
   /* The stacked bar. Segments carry a hard divider so two similar colours
      never blur into one block. */
@@ -5768,7 +5908,7 @@
     height: 14px; border: 2.5px solid var(--ink); border-radius: 8px; overflow: hidden;
     background: var(--bg); margin: 0.4rem 0 0.3rem;
   }
-  .mny-progress-fill { height: 100%; background: var(--accent-yellow); }
+  .mny-progress-fill { height: 100%; background: var(--mny-bar); }
   .mny-progress-fill.green { background: var(--mny-chores); }
   .mny-goal-row { font-size: calc(0.85rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
 
@@ -5778,14 +5918,14 @@
     font-size: calc(0.83rem * var(--fs-scale, 1) * var(--text-scale, 1)); padding: 0.22rem 0; border-bottom: 1px dashed var(--paper-line);
   }
   .mny-row:last-child { border-bottom: 0; }
-  .mny-row b { color: var(--accent-strong); white-space: nowrap; }
+  .mny-row b { color: var(--mny-figure); white-space: nowrap; }
   .mny-row.total { border-top: 2px solid var(--ink); border-bottom: 0; padding-top: 0.35rem; font-weight: 700; }
   .mny-row.warn b { color: var(--mny-fine-ink); }
 
   .mny-debt-top { display: flex; justify-content: space-between; align-items: center; gap: 0.4rem; }
   .mny-debt-name { font-weight: 800; }
   .mny-week-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
-  .mny-week-head b { color: var(--accent-strong); font-size: calc(1.1rem * var(--text-scale, 1)); }
+  .mny-week-head b { color: var(--mny-figure); font-size: calc(1.1rem * var(--text-scale, 1)); }
 
   /* Buttons and chips. Touch targets stay at 44px — these pages get used by a
      nine-year-old on a tablet, standing up. */
@@ -5865,7 +6005,7 @@
     padding: 0.4rem 0.55rem; min-width: 0;
   }
   .mny-strip-cell.on { background: var(--bg2); box-shadow: 2px 3px 0 var(--shadow-ink-12); }
-  .mny-strip-val { font-size: calc(1.15rem * var(--text-scale, 1)); font-weight: 800; color: var(--accent-strong); }
+  .mny-strip-val { font-size: calc(1.15rem * var(--text-scale, 1)); font-weight: 800; color: var(--mny-figure); }
   .mny-strip-arrow { align-self: center; color: var(--ink-light); font-weight: 800; }
   /* ── Stacked by default, three across only where there is room ──
      Three cells across is a wide-CONTAINER shape, not a wide-screen one, and
@@ -5899,7 +6039,7 @@
   }
   .mny-mag { opacity: 0.45; font-size: 0.8em; }
   .mny-erow-right { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.15rem; }
-  .mny-erow-right b { color: var(--accent-strong); }
+  .mny-erow-right b { color: var(--mny-figure); }
   .mny-was { color: var(--ink-light); font-weight: 400; }
   /* Where a number came from. "From the planner" and "Changed by a grown-up"
      are different claims, and a kid is entitled to know which she is looking at. */
@@ -5934,7 +6074,7 @@
     padding: 0.5rem 0.7rem; margin-top: 0.6rem;
     box-shadow: 2px 3px 0 var(--shadow-ink-12);
   }
-  .mny-confirmbar b { color: var(--accent-strong); font-size: calc(1.1rem * var(--text-scale, 1)); }
+  .mny-confirmbar b { color: var(--mny-figure); font-size: calc(1.1rem * var(--text-scale, 1)); }
   .mny-card.locked { background: var(--mny-surface-locked); }
 
   .mny-checks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.3rem; margin-top: 0.4rem; }
@@ -5949,7 +6089,7 @@
     color: var(--ink); font: inherit; font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1)); text-align: left; padding: 0.45rem 0.55rem;
     cursor: pointer;
   }
-  .mny-plan.on { background: var(--accent-strong); color: var(--ink-on-strong); }
+  .mny-plan.on { background: var(--pill-on); color: var(--ink-on-strong); }
   .mny-plan[disabled] { background: var(--mny-surface-disabled); color: var(--ink-light); cursor: not-allowed; }
   .mny-plan small { font-size: calc(0.68rem * var(--fs-scale, 1) * var(--text-scale, 1)); opacity: 0.85; }
   .mny-plan-icon { font-size: calc(1.1rem * var(--text-scale, 1)); }
@@ -5969,7 +6109,7 @@
   .mny-door-track i { position: absolute; top: 0; bottom: 0; display: block; }
   .mny-door-track i.pos { left: 50%; background: var(--mny-chores); }
   .mny-door-track i.neg { right: 50%; background: var(--mny-fine); }
-  .mny-door b { font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--accent-strong); white-space: nowrap; }
+  .mny-door b { font-size: calc(0.82rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--mny-figure); white-space: nowrap; }
   .mny-door b.neg { color: var(--mny-fine-ink); }
 
   .mny-spark { width: 100%; height: 60px; margin-top: 0.4rem; }
@@ -6106,7 +6246,7 @@
   }
   .ck-green { color: var(--ck-green-ink); }
   .ck-amber { color: var(--ck-amber); }
-  .ck-red   { color: var(--accent-strong); }
+  .ck-red   { color: var(--mny-figure); }
   .ck-blue  { color: var(--ink-accent-blue); }
   .ck-spacer { flex: 1; }
 
@@ -6124,7 +6264,7 @@
   .ck-navbtn {
     width: 21px; height: 21px; padding: 0; line-height: 1;
     border: 2px solid var(--ck-ink); border-radius: 7px; background: var(--ck-paper);
-    color: var(--ck-ink); font-family: inherit; font-size: calc(12px * var(--text-scale, 1)); font-weight: 900; cursor: pointer;
+    color: var(--ck-ink); font-family: inherit; font-size: max(13px, calc(12px * var(--text-scale, 1))); font-weight: 900; cursor: pointer;
   }
   .ck-navbtn:hover { background: var(--accent-yellow); }
   .ck-chip {
@@ -6159,7 +6299,7 @@
   .ck-segbtn.on { background: var(--accent-yellow); }
   .ck-btn {
     border: 2px solid var(--ck-ink); border-radius: 11px; background: var(--ck-paper); color: var(--ck-ink);
-    font-family: inherit; font-size: calc(12.5px * var(--text-scale, 1)); font-weight: 800; padding: 8px 15px; cursor: pointer;
+    font-family: inherit; font-size: max(13px, calc(12.5px * var(--text-scale, 1))); font-weight: 800; padding: 8px 15px; cursor: pointer;
   }
   .ck-btn.on, .ck-btn:hover { background: var(--accent-yellow); }
   .ck-daystrip { display: flex; gap: 6px; }
@@ -6197,7 +6337,7 @@
   .ck-sect-head { display: flex; align-items: center; gap: 8px; }
   .ck-h2 { font-family: var(--font-display); font-size: calc(21px * var(--text-scale, 1)); line-height: 1.1; }
   .ck-h2row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-  .ck-sub { font-size: calc(12px * var(--text-scale, 1)); font-weight: 700; color: var(--ink-light); line-height: 1.5; }
+  .ck-sub { font-size: max(13px, calc(12px * var(--text-scale, 1))); font-weight: 700; color: var(--ink-light); line-height: 1.5; }
   .ck-note { font-size: calc(12px * var(--text-scale, 1)); font-weight: 700; color: var(--ink-light); margin-top: 2px; }
   .ck-card { background: var(--ck-paper); border: 2px solid var(--ck-ink); border-radius: 12px; padding: 9px 11px 10px; }
   .ck-empty {
@@ -6652,7 +6792,7 @@
   .ctr-heat { min-width: 620px; display: flex; flex-direction: column; gap: 3px; }
   .ctr-heat-row { display: grid; grid-template-columns: 150px repeat(8, minmax(40px, 1fr)); gap: 3px; align-items: center; }
   .ctr-heat-head { margin-bottom: 0.15rem; }
-  .ctr-heat-label { font-size: calc(0.75rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .ctr-heat-label { font-size: max(13px, calc(0.75rem * var(--fs-scale, 1) * var(--text-scale, 1))); font-weight: 800; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .ctr-heat-cell {
     height: 28px; display: flex; align-items: center; justify-content: center;
     border: 1.5px solid var(--ink); border-radius: 6px; font-size: calc(0.7rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800;
@@ -6682,7 +6822,7 @@
   .co-lane:first-child, .co-who:first-child { border-radius: 7px 0 0 7px; }
   .co-lane:last-child, .co-who:last-child { border-radius: 0 7px 7px 0; }
   .co-lane + .co-lane, .co-who + .co-who { border-left-width: 0; }
-  .co-lane.on { background: var(--accent-yellow); }
+  .co-lane.on { background: var(--tab-on); color: var(--tab-on-ink); }
   .co-who.on { background: var(--accent-blue); color: var(--ink-on-blue); }
   .co-goalrow { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.45rem; }
   .co-goallab { font-size: calc(0.72rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; color: var(--ink-light); }
@@ -7243,7 +7383,7 @@
   .td-money-owing {
     font-size: calc(0.88rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 700;
     /* --accent is decorative only; informational accent text uses the AA fix. */
-    color: var(--accent-strong);
+    color: var(--mny-figure);
   }
   .td-bar {
     display: flex; width: 100%; height: 16px;
@@ -7286,7 +7426,7 @@
   .td-money-earn-amt {
     margin-left: auto;
     font-size: calc(max(15px, calc(1.15rem * var(--fs-scale, 1))) * var(--text-scale, 1));
-    font-weight: 800; color: var(--accent-strong);
+    font-weight: 800; color: var(--mny-figure);
   }
   /* How the total has moved, once there are enough settled weeks for a line to
      mean anything. Decorative — every figure it draws is already in the key. */
@@ -7907,13 +8047,13 @@
 .mny-earn-line-name { font-size: calc(max(15px, calc(0.85rem * var(--fs-scale, 1))) * var(--text-scale, 1)); font-weight: 800; }
 .mny-earn-line-detail { font-size: calc(max(13px, calc(0.72rem * var(--fs-scale, 1))) * var(--text-scale, 1)); color: var(--ink-light); }
 .mny-earn-line-amt { flex: 0 0 auto; font-size: calc(max(15px, calc(0.85rem * var(--fs-scale, 1))) * var(--text-scale, 1)); font-weight: 800; color: var(--status-done-text); }
-.mny-earn-line-amt--fine { color: var(--accent-strong); }
+.mny-earn-line-amt--fine { color: var(--mny-figure); }
 
 /* Row 12 — Your last 8 weeks, on Money story. */
 .mny-wk8-row { display: flex; align-items: flex-end; gap: 6px; height: 86px; margin-top: 0.5rem; }
 .mny-wk8-bar { flex: 1; min-width: 0; display: flex; align-items: flex-end; height: 100%; }
 .mny-wk8-fill {
-  display: block; width: 100%; background: var(--accent-yellow);
+  display: block; width: 100%; background: var(--mny-bar);
   border: 1.5px solid var(--ink); border-radius: 4px 4px 0 0;
 }
 .mny-wk8-bar.now .mny-wk8-fill { background: var(--status-done); }
