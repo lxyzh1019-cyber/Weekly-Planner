@@ -1,5 +1,4 @@
 {
-  "model": "opus",
   "permissions": {
     "defaultMode": "plan",
     "deny": [
@@ -46,7 +45,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|Agent|Task|WebFetch",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|Agent|Task|WebFetch|mcp__.*",
         "hooks": [
           {
             "type": "command",
