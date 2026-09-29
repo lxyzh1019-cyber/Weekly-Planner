@@ -27,8 +27,9 @@ See `ARCHITECTURE.md` for the architectural constraints these checks protect, an
 `tests/README.md` for what the smoke suite covers. The working rules for agent
 sessions, and the hooks that enforce them, come centrally from `hz-claude-config`
 through `.claude/hz-loader.py` (the session-start hook); `CLAUDE.md` points to
-them. The only per-repo copies are `.claude/settings.json`, `.claude/hz-loader.py`
-and `.claude/agents/opus-worker.md`.
+them. The only per-repo copies are `.claude/settings.json`, `.claude/hz-loader.py`,
+`.claude/agents/opus-worker.md` and `.claude/agents/sonnet-worker.md`
+(the fourth added R13, 2026-09-29).
 
 ## Firebase / Firestore sync setup
 
