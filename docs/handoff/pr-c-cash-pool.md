@@ -1,3 +1,5 @@
+> **Superseded 2026-10-03** by the Sunday v15 redesign (owner decision D5, `WORKING_RECORD.md` #87; plan `docs/handoff/plan-v3-sunday-v15.md`). Nothing here is built. Kept as history.
+
 # Handoff — PR C: My money built around the cash pool
 
 **Written:** 2026-09-22, at the end of the session that shipped PR #92 (money PR A, PR B, B5–B10).
