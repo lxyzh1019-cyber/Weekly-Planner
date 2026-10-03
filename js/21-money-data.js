@@ -282,7 +282,8 @@ function mnySimCatchUp(kid, opts) {
     // it was promised for the term. It is the one holding that ends by itself.
     if (h.kind === 'gic' && h.maturesOn && String(h.maturesOn) <= String(today)) {
       const value = mnyHoldingValue(h);
-      const term = (Number(h.termMonths) || 12) / 12;
+      // A Sunday v15 lock is counted in weeks; a year-long one in months.
+      const term = (Number(h.termWeeks) > 0) ? Number(h.termWeeks) / 52 : (Number(h.termMonths) || 12) / 12;
       const payout = money2(value * (1 + (Number(h.rateAnnual) || 0) * term));
       w.cash = money2(w.cash + payout);
       /* The whole payout comes back, principal and the interest it was promised
@@ -397,13 +398,24 @@ function mnyHoldingValue(h) { return money2((Number(h.units) || 0) * money2(h.pr
 function mnyKindTotal(kid, kind) {
   return money2(mnyHoldingsOfKind(kid, kind).reduce((s, h) => s + mnyHoldingValue(h), 0));
 }
-function mnySavedTotal(kid) { return mnyKindTotal(kid, 'savings'); }
+/* 🏦 Savings is the plain Savings-kind holdings. The 🎯 goal jar is a
+   Savings-kind holding too (same stream home, `ready`) but it is kept for one
+   thing, so it is NOT what Savings can spend, move or cover a loan from —
+   `mnyGoalHolding` is its one reader. `mnyReadyHomeTotal` is both together:
+   what the stream's `ready` home holds. */
+function mnyIsGoalHolding(h) { return !!(h && h.goalId); }
+function mnySavedTotal(kid) {
+  return money2(mnyHoldingsOfKind(kid, 'savings').filter(h => !mnyIsGoalHolding(h))
+    .reduce((s, h) => s + mnyHoldingValue(h), 0));
+}
+function mnyReadyHomeTotal(kid) { return mnyKindTotal(kid, 'savings'); }
 function mnyLockedTotal(kid) { return mnyKindTotal(kid, 'gic'); }
 function mnyInvestedTotal(kid) { return mnyKindTotal(kid, 'stock'); }
 function mnyCash(kid) { return money2(ensureWallet(kid).cash); }
 /* Everything she has, in one number. */
 function mnyEverything(kid) {
-  return money2(mnyCash(kid) + mnySavedTotal(kid) + mnyLockedTotal(kid) + mnyInvestedTotal(kid));
+  // The goal jar counts in what she owns (mnyReadyHomeTotal includes it).
+  return money2(mnyCash(kid) + mnyReadyHomeTotal(kid) + mnyLockedTotal(kid) + mnyInvestedTotal(kid));
 }
 
 /* ── What is still on the table today ──
@@ -465,7 +477,7 @@ function mnyRemoveHolding(kid, holdingId) {
 function mnyAddToSaved(kid, amount) {
   const amt = money2(amount);
   if (!(amt > 0)) return false;
-  const existing = mnyHoldingsOfKind(kid, 'savings')[0];
+  const existing = mnyHoldingsOfKind(kid, 'savings').filter(h => !mnyIsGoalHolding(h))[0];
   if (existing) {
     existing.units = 1;
     existing.priceNow = money2(mnyHoldingValue(existing) + amt);
@@ -483,7 +495,7 @@ function mnyTakeFromSaved(kid, amount) {
   let left = money2(amount);
   if (!(left > 0)) return 0;
   let took = 0;
-  mnyHoldingsOfKind(kid, 'savings').forEach(h => {
+  mnyHoldingsOfKind(kid, 'savings').filter(h => !mnyIsGoalHolding(h)).forEach(h => {
     if (!(left > 0)) return;
     const have = mnyHoldingValue(h);
     const take = money2(Math.min(have, left));
@@ -580,12 +592,88 @@ function mnyCompleteGoal(kid, id) {
   if (!isParent()) { showToast('Tell a grown-up — they will mark it 🎉'); return false; }
   const g = mnyGoalById(kid, id);
   if (!g || g.done) return false;
-  mnyTakeFromSaved(kid, Math.min(money2(g.saved), mnySavedTotal(kid)));
+  /* The money for it is in its goal jar when it has one; anything recorded
+     beyond the jar comes out of Savings as before. */
+  const jar = mnyEnsureHoldings(kid).find(h => h.kind === 'savings' && h.goalId === g.id);
+  const fromJar = jar ? mnyHoldingValue(jar) : 0;
+  if (jar) mnyRemoveHolding(kid, jar.id);
+  const rest = money2(Math.max(0, money2(g.saved) - fromJar));
+  if (rest > 0) mnyTakeFromSaved(kid, Math.min(rest, mnySavedTotal(kid)));
   g.done = true;
   g.doneAt = Date.now();
   g.updatedAt = syncNow();
   saveAll();
   return true;
+}
+
+/* ── 🎯 THE GOAL JAR (Plan v3 §B, §I) ─────────────────────────────
+   Its own jar: a Savings-kind holding `{kind:'savings', goalId, rateAnnual:0}`
+   tied to the active goal — it counts in what she owns and earns nothing, and
+   it is not Savings (mnySavedTotal / mnyTakeFromSaved leave it out). Same
+   stream home as Savings (`ready`), so filling it from Savings or emptying it
+   back is no stream line at all.
+
+   The active goal is the newest one not done. The holding's id is derived
+   from the goal's (`goal-hold-<goalId>`), so two devices that each create it
+   create ONE record. A goal that already had money set aside (`saved > 0`)
+   from before the jar existed gets its jar on first read, filled from Savings
+   up to what is there — idempotent by that id. */
+function mnyActiveGoal(kid) {
+  const open = mnyGoals(kid);
+  if (!open.length) return null;
+  return open.slice().sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0))[0];
+}
+function mnyGoalHoldingId(goalId) { return 'goal-hold-' + goalId; }
+function mnyGoalHolding(kid) {
+  const g = mnyActiveGoal(kid);
+  if (!g) return null;
+  const list = mnyEnsureHoldings(kid);
+  const have = list.find(h => h.kind === 'savings' && h.goalId === g.id);
+  if (have) return have;
+  const took = money2(g.saved) > 0 ? mnyTakeFromSaved(kid, Math.min(money2(g.saved), mnySavedTotal(kid))) : 0;
+  return mnyAddHolding(kid, { id: mnyGoalHoldingId(g.id), kind: 'savings', goalId: g.id,
+    name: '🎯 ' + (g.name || 'My goal'), units: 1, priceNow: money2(took), costBasis: money2(took),
+    rateAnnual: 0 });
+}
+/* Money into the jar, holding-level (the stream line is the caller's — see
+   moneyDepositGoal). The goal's `saved` moves with it. */
+function mnyAddToGoal(kid, amount) {
+  const amt = money2(amount);
+  if (!(amt > 0)) return false;
+  const h = mnyGoalHolding(kid);
+  if (!h) return false;
+  h.units = 1;
+  h.priceNow = money2(mnyHoldingValue(h) + amt);
+  h.costBasis = money2(money2(h.costBasis) + amt);
+  h.updatedAt = syncNow();
+  const g = mnyGoalById(kid, h.goalId);
+  if (g) { g.saved = money2(money2(g.saved) + amt); g.updatedAt = syncNow(); }
+  saveAll();
+  return true;
+}
+/* A new goal takes over the jar (a 'goal' request answered yes). The old goal
+   is marked done; what is in its jar either MOVES to the new goal
+   (`keep:'move'`) or goes back to Savings (`keep:'ready'`). Same stream home
+   either way, so nothing is written to the stream. Returns the new goal. */
+function mnySwitchGoal(kid, fields, keep) {
+  const prev = mnyActiveGoal(kid);
+  const jar = prev ? mnyGoalHolding(kid) : null;
+  const inJar = jar ? mnyHoldingValue(jar) : 0;
+  const g = mnyAddGoal(kid, Object.assign({}, fields || {}, { saved: 0 }));
+  if (!g) return null;
+  if (prev) { prev.done = true; prev.doneAt = Date.now(); prev.replacedBy = g.id; markItemUpdated(prev); }
+  if (jar) mnyRemoveHolding(kid, jar.id);
+  if (inJar > 0 && keep !== 'ready') {
+    g.saved = money2(inJar);
+    mnyAddHolding(kid, { id: mnyGoalHoldingId(g.id), kind: 'savings', goalId: g.id,
+      name: '🎯 ' + (g.name || 'My goal'), units: 1, priceNow: money2(inJar), costBasis: money2(inJar),
+      rateAnnual: 0 });
+  } else if (inJar > 0) {
+    mnyAddToSaved(kid, inJar);
+  }
+  g.updatedAt = syncNow();
+  saveAll();
+  return g;
 }
 
 /* Am I going to make it? Answered in dollars per week, because "you need 34%
@@ -1086,7 +1174,9 @@ function mnyRemoveDeposit(kid, depositId) {
 /* Waiting on a grown-up. Read by the gifts section and by the parent's pending
    list, the same shape pendingApprovalActs and pendingApprovalTasks have. */
 function mnyPendingDeposits(kid) {
-  return mnyEnsureDeposits(kid).filter(d => d && d.pendingApproval);
+  // A proposal a grown-up said no to stays on record (she sees "not this
+  // time") but is no longer waiting, and never reaches her money.
+  return mnyEnsureDeposits(kid).filter(d => d && d.pendingApproval && !d.rejectedAt);
 }
 /* What actually came in. A gift a child has PROPOSED is not money yet — nobody
    has agreed it — so it is left out of the pool and out of the caps the pool
@@ -1379,8 +1469,9 @@ function mnyPool(weekKey, kid) {
     // Investing is capped at a fifth of the week: a bad month should sting,
     // not wipe out everything she earned.
     stockCap: money2(mine * 0.2),
-    // Spending is capped the same way — see MNY_BUCKETS 'spend'.
-    spendCap: money2(mine * 0.2),
+    // Spending is capped by the week's rule (`spend.capPct`, 20 by default) —
+    // see MNY_BUCKETS 'spend'.
+    spendCap: money2(mine * (Number(mrRuleOr(mrRulesForWeek(weekKey), 'spend.capPct')) || 0) / 100),
   };
 }
 

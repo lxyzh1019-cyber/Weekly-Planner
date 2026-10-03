@@ -293,5 +293,66 @@ function ev(dayKey, from, to, amount, kind) {
       ? true : 'mapping wrong');
 }
 
+// ── Redo / Undo takes the commit's own lines back off the stream ─────
+// Plan v3 §E "Undo fix" (docs/handoff/pr-c-cash-pool.md §5b). The meeting's
+// undo put the wallet back but LEFT the commit's stream lines, so signing the
+// week again wrote them a second time: the stream said she was paid twice and
+// the wallet said once. The commit never happened, so its lines are not
+// reversed (a reversal is a correction to something that did happen) — they
+// are removed, exactly the ones written between the snapshot and the seal,
+// and nothing else.
+{
+  const base = [
+    ev('2026-09-01', 'opening', 'cash', 20, 'open'),
+    ev('2026-09-03', 'gift', 'cash', 10, 'gift'),
+  ];
+  const snapIds = s.evIdsOf(base);
+  // The commit writes its lines.
+  const commit = () => [
+    ev('2026-09-28', 'earned', 'cash', 12, 'settle'),
+    ev('2026-09-28', 'prize', 'cash', 6, 'settle'),
+    ev('2026-09-28', 'cash', 'loan:loan', 3.23, 'loan'),
+    { id: 'm' + (++seq), at: seq, dayKey: '2026-09-28', kind: 'settle', amount: 0, from: null, to: null },
+  ];
+  let list = base.concat(commit());
+  const written = s.evWrittenSince(list, snapIds);
+  check('the lines a commit wrote are exactly the ones not in the snapshot',
+    written.length === 4 ? true : written);
+  const once = s.evBalanceOf(list, 'cash');
+  // Undo: take those lines off; sign again.
+  list = s.evWithout(list, written);
+  check('undo leaves the stream exactly as it was at the snapshot',
+    JSON.stringify(list.map(e => e.id)) === JSON.stringify(base.map(e => e.id)) ? true : list.map(e => e.id));
+  list = list.concat(commit());
+  check('signing again after an undo does not double-count the stream',
+    s.evBalanceOf(list, 'cash') === once ? true : s.evBalanceOf(list, 'cash') + ' vs ' + once);
+  check('the week reads settled once, not twice',
+    list.filter(e => e.kind === 'settle' && !(e.amount > 0)).length === 1);
+  // A line that arrived before the snapshot is never taken by an undo.
+  check('an undo never takes a line from before the snapshot',
+    s.evWrittenSince(base, snapIds).length === 0);
+}
+
+// ── The interest line on a loan and an advance keep the invariant ────
+// Interest added to her wall moves no money of hers (interest → loan:<id>):
+// it is drawn as a row, and every pot still equals opening + in − out. An
+// advance is cash she already spent, written as cash → spent.
+{
+  const list = [
+    ev('2026-09-01', 'opening', 'cash', 30, 'open'),
+    ev('2026-09-28', 'earned', 'cash', 20, 'settle'),
+    ev('2026-09-28', 'cash', 'spent', 2, 'spend'),           // ⏪ drawn in advance
+    ev('2026-09-28', 'interest', 'loan:loan', 0.54, 'interest'), // the wall grew
+    ev('2026-09-28', 'cash', 'loan:loan', 3.23, 'loan'),
+  ];
+  const f = s.evFlowOf(list);
+  const cash = s.evBalanceOf(list, 'cash');
+  check('advance and interest lines keep opening + in − out === in hand',
+    money2(f.inTotal - f.outTotal) === cash && cash === money2(30 + 20 - 2 - 3.23)
+      ? true : JSON.stringify({ in: f.inTotal, out: f.outTotal, cash }));
+  check('interest added to the wall is not money that left her pots',
+    !f.dests.interest ? true : JSON.stringify(f.dests));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

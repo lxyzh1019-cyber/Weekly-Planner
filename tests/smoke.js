@@ -21140,8 +21140,9 @@ function findChromium() {
      (a) Paid-off share swept 0 → 100: for every stage, the ladder row in Money
          school, the pots behind it (the move gate and the Sunday split's gate)
          and the lessons behind it (the concept card and its chip) must say the
-         same thing — and it must be the table's answer: ready 20 · locked 30 ·
-         stock 40 · mix 100.
+         same thing — and it must be the table's answer: ready 0 · locked 30 ·
+         stock 40 · mix 100. (Savings is always open — Sunday v15, approved
+         deviation #8; it was 20.)
      (b) The 1 Oct fixture: $300 of $1,000 and $240 of $800 both open Keep it
          ready and Lock it away, and not Buy a bit of a company.
      (c) A stepper in Money rules › Lessons lands as a dated, logged rule version
@@ -21166,7 +21167,7 @@ function findChromium() {
       window.showToast = (m) => { toasts.push(String(m)); };
       const r = mrRules();
       r.school = Object.assign({}, r.school, { unlockStage: { jenn: 0, jess: 0 } });
-      const want = { start: 0, ready: 20, locked: 30, stock: 40, mix: 100 };
+      const want = { start: 0, ready: 0, locked: 30, stock: 40, mix: 100 };
       MNY_STAGES.forEach(s => { if (mnyStagePct(s.id) !== want[s.id]) bad.push(`${s.id} opens at ${mnyStagePct(s.id)}%, the table says ${want[s.id]}%`); });
       [MNY_BUCKETS, MNY_PLANS, MNY_CONCEPTS].forEach((t, ti) => t.forEach(x => {
         if (mnyStageIndexOf(x.stage) < 0) bad.push(`${['a pot', 'a plan', 'a lesson'][ti]} (${x.key || x.id}) names no stage: ${x.stage}`);
@@ -21218,7 +21219,7 @@ function findChromium() {
       const live = mrRules();
       const hadPct = live.school.stagePct;
       delete live.school.stagePct;
-      if (mnyStagePct('ready') !== 20 || mnyStagePct('locked') !== 30 || mnyStagePct('stock') !== 40 || mnyStagePct('mix') !== 100) bad.push('a rulebook without stagePct does not read the defaults');
+      if (mnyStagePct('ready') !== 0 || mnyStagePct('locked') !== 30 || mnyStagePct('stock') !== 40 || mnyStagePct('mix') !== 100) bad.push('a rulebook without stagePct does not read the defaults');
       oneDebt('jenn', 1000, 300); mnyStageIndex('jenn');
       if ('stagePct' in mrRules().school) bad.push('reading the gates migrated the stored rulebook');
       live.school.stagePct = hadPct;
@@ -21229,13 +21230,13 @@ function findChromium() {
       live.school.unlockStage = { jenn: 0, jess: 0 };
       // (c)
       oneDebt('jess', 1000, 250);                                         // 25%: ready is open at 20
-      if (!mnyIsOpen('jess', 'ready')) bad.push('25% should open Keep it ready at the default gates');
+      if (!mnyIsOpen('jess', 'ready')) bad.push('Savings should be open at the default gates');
       showScreen('parent'); setParentTab('money'); mnyParentSection = 'lessons'; mnyPending = []; mnyRenderRulesTab();
       const logBefore = mrLogEntries().length;
       const plus = (id) => document.querySelector(`#mnyRulesWrap [data-mnyp-action="stagepct"][data-mnyp-id="${id}"][data-mnyp-d="5"]`);
       if (!plus('ready')) bad.push('Lessons has no gate steppers');
       else {
-        plus('ready').click(); plus('ready').click();                    // 20 → 30
+        for (let i = 0; i < 6; i++) plus('ready').click();               // 0 → 30
         const p = mnyPending.find(x => x.path === 'school.stagePct.ready');
         if (!p || p.value !== 30) bad.push('the stepper did not queue ready at 30: ' + JSON.stringify(mnyPending));
         toasts.length = 0;
@@ -22729,6 +22730,337 @@ function findChromium() {
       profile = 'jenn';
     }
     return bad.length === 0 || bad;
+  });
+
+  /* UNDO DOES NOT DOUBLE-COUNT THE STREAM (Plan v3 §E, Undo fix).
+     The meeting's Undo put the wallet back and left the commit's stream lines
+     standing, so signing the week again wrote them a second time: the stream
+     said she was paid twice, the wallet said once. The undo now takes exactly
+     the lines written between its snapshot and its seal back off the stream
+     (removed and tombstoned — the commit never happened, so nothing is
+     "reversed"). (a) through the meeting as it runs today; (b) the per-girl
+     ↺ Redo the Sunday ritual will call: her lines go, her sister's stay. */
+  if (want('undoDoesNotDoubleCountTheStream')) checks.undoDoesNotDoubleCountTheStream = await page.evaluate(() => {
+    const bad = [];
+    const snap = JSON.stringify(state);
+    const was = { profile, parentViewing, undo: mmUndo, gone: mmUndoGone, kid: mmUndoKid, kidGone: mmUndoKidGone };
+    try {
+      profile = 'parent'; parentViewing = 'jenn';
+      ctPrepareRead(); ctSetCurrentWeekFromPlanner();
+      const wk = ctWeekKey;
+      const c = state.shared.chore;
+      ['finalizedWeeks', 'xpAwardedWeeks', 'moneyLedger', 'weekPlans', 'weekConfirms',
+       'meetingsHeld', 'meetingsMet'].forEach(k => { if (c[k]) delete c[k][wk]; });
+      mmUndo = null; mmUndoGone = null; mmUndoKid = {}; mmUndoKidGone = {};
+      // Something to settle, so the commit writes real lines.
+      ['jenn', 'jess'].forEach(k => {
+        mnyConfirmWeek(wk, k, 'a grown-up');
+        moneyAddCash(k, 7, { kind: 'gift', from: 'gift', note: 'fixture' });
+      });
+      const look = k => ({ cash: money2(ensureWallet(k).cash), stream: evBalance(k, 'cash'),
+                           ids: evList(k).map(e => e.id).join(','),
+                           settled: evList(k).filter(e => e.kind === 'settle' && e.weekKey === wk && !(money2(e.amount) > 0)).length });
+      // (a) the meeting's Undo, as it runs today
+      const before = look('jenn');
+      mnySetMeetKid('jenn'); mmStep = 4; mnyDraft = null; mnyRenderDecide(wk);
+      mnyDoCommit();
+      const once = look('jenn');
+      if (!isChildMoneyCommitted('jenn', wk)) bad.push('fixture: committing Jenn did not settle her week');
+      // Earlier checks may have left this week's markers on her stream; count ours.
+      if (once.settled !== before.settled + 1) bad.push('fixture: the commit wrote ' + (once.settled - before.settled) + ' settle markers');
+      mmUndoRecord();
+      const back = look('jenn');
+      if (back.cash !== before.cash) bad.push(`the undo put her wallet at ${back.cash}, expected ${before.cash}`);
+      if (back.stream !== before.stream) bad.push(`the undo left the stream's cash at ${back.stream}, expected ${before.stream} — the commit's lines are still on it`);
+      if (back.ids !== before.ids) bad.push('the undo did not leave her stream exactly as it was before the commit');
+      mnySetMeetKid('jenn'); mmStep = 4; mnyDraft = null; mnyRenderDecide(wk);
+      mnyDoCommit();
+      const twice = look('jenn');
+      const dWallet = money2(twice.cash - before.cash), dStream = money2(twice.stream - before.stream);
+      if (dWallet !== dStream) bad.push(`signing again moved the wallet ${dWallet} and the stream ${dStream} — double-counted`);
+      if (dStream !== money2(once.stream - before.stream)) bad.push(`signing again moved the stream ${dStream}, the first time ${money2(once.stream - before.stream)}`);
+      if (twice.settled !== before.settled + 1) bad.push('the week reads settled ' + (twice.settled - before.settled) + ' more times on her stream, expected once');
+      mmUndoRecord();
+
+      // (b) ↺ Redo one girl: Jenn then Jess sign, each in her own bracket.
+      mmUndo = null; mmUndoGone = null;
+      const sign = (k) => {
+        mmUndoHeld(k); mmTakeUndoSnapshot(wk, k);
+        commitKidWeek(wk, k);
+        mnySavePlan(wk, k, { planId: 'sunday', committedAt: syncNow() });
+        if (!c.meetingsHeld) c.meetingsHeld = {};
+        c.meetingsHeld[wk] = true;
+        mmUndoSeal(k);
+      };
+      const jennBefore = look('jenn'), jessBefore = look('jess');
+      sign('jenn'); sign('jess');
+      const jessSigned = look('jess');
+      if (!mmUndoRecord('jenn')) bad.push('↺ Redo for Jenn refused');
+      const jennBack = look('jenn'), jessAfter = look('jess');
+      if (jennBack.cash !== jennBefore.cash || jennBack.stream !== jennBefore.stream || jennBack.ids !== jennBefore.ids) {
+        bad.push(`Jenn's redo left wallet ${jennBack.cash} (was ${jennBefore.cash}) and stream ${jennBack.stream} (was ${jennBefore.stream})`);
+      }
+      if (isChildMoneyCommitted('jenn', wk)) bad.push('Jenn still reads signed after her redo');
+      if (!isChildMoneyCommitted('jess', wk)) bad.push("Jenn's redo un-signed Jess");
+      if (jessAfter.ids !== jessSigned.ids || jessAfter.cash !== jessSigned.cash) bad.push("Jenn's redo touched Jess's money or stream");
+      if (!((c.meetingsHeld || {})[wk])) bad.push('the week stopped reading recorded while Jess is still signed');
+      if (!((c.moneyLedger || {})[wk] || {}).jess || ((c.moneyLedger || {})[wk] || {}).jenn) bad.push("the ledger rows did not follow: Jess's kept, Jenn's gone");
+      if (jessBefore.ids === jessSigned.ids) bad.push('fixture: Jess signing wrote nothing');
+    } catch (e) {
+      bad.push('threw: ' + e.message);
+    } finally {
+      const s = JSON.parse(snap);
+      Object.keys(state).forEach(k => { delete state[k]; });
+      Object.assign(state, s);
+      profile = was.profile; parentViewing = was.parentViewing;
+      mmUndo = was.undo; mmUndoGone = was.gone; mmUndoKid = was.kid; mmUndoKidGone = was.kidGone;
+      mnyDraft = null;
+      saveLocal();
+    }
+    return bad.length ? bad : true;
+  });
+
+  /* SUNDAY v15, STAGE 1 — EVERY NEW DATA OWNER DOES ITS ONE JOB (Plan v3 §B–§D).
+     No screen reads these yet (Stages 2–4 build them), so this drives the
+     owners directly in the real app: the ⛸️ assistant-job channel through the
+     week's breakdown and frozen ledger; a result's Dad-checked figure; the
+     loan's must-pay oldest first, the shortfall carried, extra at the bonus,
+     interest every 4th Sunday; a 4-week lock maturing on its Saturday; the 🎯
+     goal jar kept apart from Savings; the 📉 dip once a week; every kind of
+     request routed to its owner; expected money; the club's payout tally; the
+     Sunday rules reaching a stored rulebook; the spend cap from its rule. The
+     stream and the wallet must move by the same amount throughout. */
+  if (want('sundayDataOwnersHold')) checks.sundayDataOwnersHold = await page.evaluate(() => {
+    const bad = [];
+    const snap = JSON.stringify(state);
+    const was = { profile, parentViewing, toast: window.showToast };
+    const toasts = [];
+    const kid = 'jess';
+    const streamCash = () => evBalance(kid, 'cash');
+    const walletCash = () => money2(ensureWallet(kid).cash);
+    try {
+      profile = 'parent'; parentViewing = kid;
+      window.showToast = (m) => { toasts.push(String(m)); };
+      const wk = ctThisWeekKey();
+      const days = mrWeekDayKeys(wk);
+
+      // (1) ⛸️ The assistant job.
+      const aj = (id, extra) => Object.assign({ id, actId: 'assistant_job', startMin: 17 * 60, durationMin: 90 }, extra || {});
+      setDayBlocks(days[0], [...(getDayBlocks(days[0], kid) || []), aj('aj-1', { completed: true })], kid);
+      setDayBlocks(days[2], [...(getDayBlocks(days[2], kid) || []), aj('aj-2')], kid);
+      setDayBlocks(days[3], [...(getDayBlocks(days[3], kid) || []), aj('aj-3', { notDone: true })], kid);
+      const rate = mrRuleOr(mrRulesForWeek(wk), 'sessions.perSession');
+      let sw = mrSessionsWeek(wk, kid);
+      const att = id => (sw.sessions.find(x => x.blockId === id) || {}).attended;
+      if (sw.sessions.length !== 3) bad.push('sessions: expected 3 assistant-job blocks, found ' + sw.sessions.length);
+      if (att('aj-1') !== true || att('aj-2') !== null || att('aj-3') !== false) bad.push('sessions: unanswered did not default from the block (✓ / ? / ✗): ' + JSON.stringify(sw.sessions));
+      if (sw.paid !== money2(rate)) bad.push('sessions: one attended should pay ' + rate + ', paid ' + sw.paid);
+      mrSetSessionAttendance(kid, wk, 'aj-2', true);
+      sw = mrSessionsWeek(wk, kid);
+      if (sw.paid !== money2(2 * rate)) bad.push('sessions: an answered ✓ did not pay');
+      mrSetSessionAttendance(kid, wk, 'aj-1', false);
+      sw = mrSessionsWeek(wk, kid);
+      if (att('aj-1') !== false || sw.paid !== money2(rate)) bad.push('sessions: an answer did not beat the block\'s own tick');
+      const b = mrWeekBreakdown(wk, kid);
+      if (b.sessionsPaid !== money2(rate) || b.original.sessions !== money2(rate)) bad.push('breakdown: sessions not in the week: ' + b.sessionsPaid);
+      if (money2(b.gross - b.chorePaid - b.learnPaid - b.streakBonus - b.compPaid) !== money2(rate)) bad.push('breakdown: sessions not in gross');
+      mrEnsureEarnings(kid, wk).overrides.sessions = { value: 2, reason: 'agreed', at: 1 };
+      const b2 = mrWeekBreakdown(wk, kid);
+      if (b2.sessionsPaid !== 2 || b2.original.sessions !== money2(rate)) bad.push('breakdown: the sessions override was not applied beside its original');
+      delete mrEnsureEarnings(kid, wk).overrides.sessions;
+      const led = mrFreezeWeekLedger(wk, kid);
+      if (led.sessions !== 1 || led.sessionsPaid !== money2(rate)) bad.push('ledger: sessions not frozen: ' + JSON.stringify([led.sessions, led.sessionsPaid]));
+      profile = kid;
+      if (mrSetSessionAttendance(kid, wk, 'aj-2', false) !== false) bad.push('sessions: a child could mark her own attendance');
+      profile = 'parent';
+
+      // (2) A result, checked against the sheet, with Dad's figure beside it.
+      const compBefore = mrCompetitionWeek(wk, kid).paid;
+      const comp = mrAddCompetition(kid, { dayKey: days[5], sport: 'swim', name: 'Time trial', points: 10,
+        races: [{ ev: '50 Free', time: '0:41.8', pts: 6 }, { ev: '50 Back', time: '0:49.2', pts: 4 }],
+        awardedOverride: { value: 12, by: 'Dad' } });
+      if (!comp || comp.races.length !== 2 || comp.awarded !== mrScoreCompetition(comp)) bad.push('competition: races or the rule award not kept');
+      if (!comp.awardedOverride || comp.awardedOverride.value !== 12 || comp.awardedOverride.by !== 'Dad') bad.push('competition: Dad\'s figure not kept beside her entry');
+      if (money2(mrCompetitionWeek(wk, kid).paid - compBefore) !== 12) bad.push('competition: the week does not pay Dad\'s figure');
+
+      // (3) The loan: must-pay oldest first, shortfall carried, extra at the bonus.
+      const p = getProfData(kid);
+      p.debts = [
+        { id: 'd-new', name: 'Skates', principal: 300, paid: 0, monthly: 26, createdAt: 2, bonusRate: 10, payments: [] },
+        { id: 'd-old', name: 'Swim club', principal: 500, paid: 100, monthly: 52, createdAt: 1, bonusRate: 10, payments: [] }];
+      mnyEnsureDebts(kid);
+      const dOld = mnyDebtById(kid, 'd-old'), dNew = mnyDebtById(kid, 'd-new');
+      if (mnyWeeklyDue(dOld) !== 12 || mnyWeeklyDue(dNew) !== 6) bad.push('loan: weekly must-pay is not monthly × 12 ÷ 52');
+      if (mnyMustPay(kid) !== 18) bad.push('loan: must-pay across debts is ' + mnyMustPay(kid));
+      ensureWallet(kid).cash = 0; moneyAddCash(kid, 10, { kind: 'gift', from: 'gift', note: 'fixture' });
+      const gapLoan = money2(walletCash() - streamCash());
+      const r1 = mnyLoanSundayPayment(kid, wk, { extra: 0 });
+      if (r1.paid !== 10 || dOld.paid !== 110 || dNew.paid !== 0) bad.push('loan: not paid oldest first: ' + JSON.stringify([r1.paid, dOld.paid, dNew.paid]));
+      if (dOld.arrears !== 2 || dNew.arrears !== 6 || r1.shortfall !== 8) bad.push('loan: the shortfall was not carried: ' + JSON.stringify([dOld.arrears, dNew.arrears, r1.shortfall]));
+      if (!mnyLoanSundayPayment(kid, wk, { extra: 5 }).already) bad.push('loan: a second payment in the same week was taken');
+      if (mnyMustPay(kid) !== 26) bad.push('loan: next must-pay should carry the arrears: ' + mnyMustPay(kid));
+      const wk2 = ctDateToKey(new Date(formatDayKey(wk).getTime() + 7 * 864e5));
+      moneyAddCash(kid, 30, { kind: 'gift', from: 'gift', note: 'fixture' });
+      const r2 = mnyLoanSundayPayment(kid, wk2, { extra: 4 });
+      if (r2.paid !== 26 || dOld.arrears !== 0 || dNew.arrears !== 0) bad.push('loan: the arrears were not paid first next Sunday');
+      if (r2.extra !== 4 || money2(dOld.paid) !== money2(110 + 14 + 4.4)) bad.push('loan: extra did not count at 1 + bonus on the oldest: ' + dOld.paid);
+      if (money2(walletCash() - streamCash()) !== gapLoan) bad.push('loan: the wallet and the stream moved apart');
+      // Interest every 4th Sunday, on the principal still owed, once per Sunday.
+      const owedOld = money2(dOld.principal - dOld.paid);
+      const ivals = [0, 1, 2, 3].map(i => {
+        const w = ctDateToKey(new Date(formatDayKey(wk).getTime() + (i + 2) * 7 * 864e5));
+        const got = loanAccrueBalanceInterest(kid, w);
+        loanAccrueBalanceInterest(kid, w);              // the same Sunday again: nothing
+        return got;
+      });
+      const wantInt = money2(owedOld * mrRuleOr(mrRules(), 'loan.ratePct') / 100 * 4 / 52);
+      if (ivals[0] || ivals[1] || ivals[2] || !(ivals[3] > 0)) bad.push('interest: not exactly on the 4th Sunday: ' + JSON.stringify(ivals));
+      if (money2(dOld.arrearsInterest) !== wantInt) bad.push(`interest: ${dOld.arrearsInterest} added, expected ${wantInt}`);
+      if (!evList(kid).some(e => e.kind === 'interest' && e.to === 'loan:d-old')) bad.push('interest: no stream line says the wall grew');
+
+      // (4) 🔒 Locked away for 4 weeks.
+      moneyAddCash(kid, 20, { kind: 'gift', from: 'gift', note: 'fixture' });
+      const gapLock = money2(walletCash() - streamCash());
+      moneyOpenGIC(kid, 5, { weeks: 4 }, { weekKey: wk });
+      const lock = mnyHoldingsOfKind(kid, 'gic').find(h => h.termWeeks === 4);
+      const sat = sdLockMaturesOn(wk, 4);
+      if (!lock || lock.maturesOn !== sat || formatDayKey(sat).getDay() !== 6) bad.push('lock: not back on the Saturday before the 4th-next Sunday: ' + (lock && lock.maturesOn));
+      if (!lock || lock.rateAnnual !== mrRuleOr(mrRulesForWeek(wk), 'pots.rates.gic') / 100) bad.push('lock: the rate is not pots.rates.gic');
+      const cashBefore = walletCash();
+      mnySimCatchUp(kid, { dayKey: sat });
+      const back = money2(walletCash() - cashBefore);
+      if (back !== money2(5 * (1 + 0.04 * 4 / 52))) bad.push('lock: came back as ' + back);
+      if (money2(walletCash() - streamCash()) !== gapLock) bad.push('lock: the wallet and the stream moved apart');
+
+      // (5) 🎯 The goal jar.
+      p.savingGoals = [{ id: 'g-1', name: 'Book set', icon: '📚', target: 50, saved: 8, done: false, createdAt: 1, updatedAt: 1 }];
+      p.holdings = (p.holdings || []).filter(h => h.kind !== 'savings');
+      mnyAddHolding(kid, { id: 'save-' + kid, kind: 'savings', name: 'Money kept ready', units: 1, priceNow: 20, costBasis: 20 });
+      const jar = mnyGoalHolding(kid);
+      if (!jar || mnyHoldingValue(jar) !== 8 || jar.id !== 'goal-hold-g-1' || jar.rateAnnual !== 0) bad.push('goal jar: first read did not move the $8 into its own jar');
+      mnyGoalHolding(kid);
+      if (mnyHoldingsOfKind(kid, 'savings').filter(h => h.goalId).length !== 1) bad.push('goal jar: a second read made a second jar');
+      if (mnySavedTotal(kid) !== 12 || mnyReadyHomeTotal(kid) !== 20) bad.push('goal jar: Savings should leave the jar out: ' + mnySavedTotal(kid));
+      if (mnyTakeFromSaved(kid, 50) !== 12 || mnyHoldingValue(mnyGoalHolding(kid)) !== 8) bad.push('goal jar: taking from Savings reached into the jar');
+      moneyAddCash(kid, 5, { kind: 'gift', from: 'gift', note: 'fixture' });
+      const gapJar = money2(walletCash() - streamCash());
+      moneyDepositGoal(kid, 5);
+      if (mnyHoldingValue(mnyGoalHolding(kid)) !== 13 || mnyGoalById(kid, 'g-1').saved !== 13) bad.push('goal jar: a deposit did not land in the jar and its goal');
+      if (money2(walletCash() - streamCash()) !== gapJar) bad.push('goal jar: the wallet and the stream moved apart');
+      if (evShadowDrift(kid).some(f => /^ready/.test(f)) && !evShadowDrift(kid).length) bad.push('goal jar: drift');
+      const g2 = mnySwitchGoal(kid, { name: 'Bike', icon: '🚲', target: 100 }, 'move');
+      if (!g2 || !mnyGoalById(kid, 'g-1').done || mnyHoldingValue(mnyGoalHolding(kid)) !== 13 || mnyGoalHolding(kid).goalId !== g2.id) bad.push('goal jar: a new goal did not take the jar with it');
+      const savedBefore = mnySavedTotal(kid);
+      const g3 = mnySwitchGoal(kid, { name: 'Skates', icon: '⛸️', target: 80 }, 'ready');
+      if (!g3 || mnySavedTotal(kid) !== money2(savedBefore + 13) || mnyHoldingValue(mnyGoalHolding(kid)) !== 0) bad.push('goal jar: "put it in Savings" did not move the jar to Savings');
+
+      // (6) 📉 The dip, once a week.
+      mnyAddHolding(kid, { kind: 'stock', name: 'A fund', units: 1, priceNow: 50, costBasis: 50 });
+      const lost = mnyRevalueStock(kid, -2, { weekKey: wk });
+      const again = mnyRevalueStock(kid, -2, { weekKey: wk });
+      if (lost !== -1 || again !== 0) bad.push('dip: expected −$1 once a week, got ' + lost + ' then ' + again);
+      if (!evList(kid).some(e => e.from === 'invest' && e.to === 'interest' && e.amount === 1)) bad.push('dip: not written as a holding losing value');
+
+      // (7) Ask Dad: every kind lands on its owner.
+      mrAddFine(kid, 'tone', days[1]);
+      const fine = mrFines(kid)[mrFines(kid).length - 1];
+      profile = kid;
+      const qAdv = mnyAddRequest(kid, { kind: 'adv', amount: 3, day: 'Wed', why: 'book fair' });
+      toasts.length = 0;
+      const qAdv2 = mnyAddRequest(kid, { kind: 'adv', amount: 3 });
+      if (!qAdv || qAdv2 || !toasts.some(t => /up to \$5\.00 a week — \$2\.00 left/.test(t))) bad.push('requests: the advance maximum was not held with a sentence: ' + toasts.join(' | '));
+      const qDis = mnyAddRequest(kid, { kind: 'dispute', fineId: fine.id, why: 'it was not me' });
+      const qGoal = mnyAddRequest(kid, { kind: 'goal', name: 'Guards', icon: '🛼', target: 35, keep: 'move' });
+      const qComp = mnyAddRequest(kid, { kind: 'comp', sport: 'swim', name: 'Club trial', dayKey: days[6],
+        races: [{ ev: '50 Free', pts: 3 }] });
+      const qSkip = mnyAddRequest(kid, { kind: 'skip', blockId: 'aj-3', dayKey: days[3] });
+      const qMove = mnyAddRequest(kid, { kind: 'move', from: 'ready', to: 'cash', amount: 1 });
+      const qGift = mnyAddRequest(kid, { kind: 'gift', amount: 20, giver: 'Uncle Mike' });
+      const qOpen = mnyAddRequest(kid, { kind: 'adv', amount: 1 });
+      if (mnyAnswerRequest(kid, qAdv.id, 'yes') !== false) bad.push('requests: a child answered her own request');
+      if (!mnyWithdrawRequest(kid, qOpen.id) || mnyEnsureRequests(kid).some(r => r.id === qOpen.id) || !state.shared.tombstones['req:' + qOpen.id]) bad.push('requests: a withdrawn request is not gone and tombstoned');
+      profile = 'parent';
+      const view = mnyRequestsFor(kid);
+      const stores = new Set(view.map(v => v.store));
+      if (!['requests', 'moveRequests', 'deposits'].every(x => stores.has(x)) || view.some(v => !v.text || !v.icon)) bad.push('requests: the one reader does not show all three stores with words: ' + JSON.stringify(view.map(v => [v.store, v.kind, v.text])));
+      if (!view.every(v => v.open)) bad.push('requests: unanswered questions should all read open');
+      const cash0 = walletCash();
+      mnyAnswerRequest(kid, qAdv.id, 'yes');
+      if (walletCash() !== cash0) bad.push('requests: approving an advance moved money');
+      mnyAnswerRequest(kid, qDis.id, 'yes');
+      if (mrFines(kid).some(f => f.id === fine.id)) bad.push('requests: a disputed fine said yes to is still on record');
+      mnyAnswerRequest(kid, qGoal.id, 'yes');
+      if ((mnyActiveGoal(kid) || {}).name !== 'Guards') bad.push('requests: the new goal is not the active goal');
+      const compN = mrCompetitions(kid).length;
+      mnyAnswerRequest(kid, qComp.id, 'yes', { pay: 5 });
+      const newComp = mrCompetitions(kid)[mrCompetitions(kid).length - 1];
+      if (mrCompetitions(kid).length !== compN + 1 || newComp.points !== 3 || !newComp.awardedOverride || newComp.awardedOverride.value !== 5) bad.push('requests: the result did not land with Dad\'s figure beside it');
+      mnyAnswerRequest(kid, qSkip.id, 'yes');
+      if ((mrEnsureEarnings(kid, wk).sessions || {})['aj-3'] !== false) bad.push('requests: a skip said yes to did not mark the session missed');
+      mnyAnswerRequest(kid, qMove.id, 'talk');
+      const mvRow = mnyRequestsFor(kid).find(v => v.id === qMove.id);
+      if (!mvRow || mvRow.status !== 'talk' || !mvRow.open) bad.push('requests: "let\'s talk" on a move is not open and talking');
+      mnyAnswerRequest(kid, qGift.id, 'no');
+      if (mnyPendingDeposits(kid).some(d => d.id === qGift.id) || (mnyRequestsFor(kid).find(v => v.id === qGift.id) || {}).status !== 'no') bad.push('requests: a gift said no to still waits, or reads otherwise');
+      if (mnyAnswerRequest(kid, qAdv.id, 'no') !== false) bad.push('requests: a yes was answered again');
+
+      // (8) 🎁 Expected money.
+      const ex = mnyAddExpected(kid, { month: '2026-12', label: '🎄 Christmas', amount: 20 });
+      mnyEditExpected(kid, ex.id, { amount: 25 });
+      if (mnyEnsureExpected(kid)[0].amount !== 25) bad.push('expected: an edit did not take');
+      mnyRemoveExpected(kid, ex.id);
+      if (mnyEnsureExpected(kid).length || !state.shared.tombstones['exp:' + ex.id]) bad.push('expected: a removal is not tombstoned');
+
+      // (9) 🧾 The club owes Dad.
+      const L = state.shared.chore.moneyLedger || (state.shared.chore.moneyLedger = {});
+      L['2026-01-05'] = Object.assign({}, L['2026-01-05'], { [kid]: { sessions: 2, sessionsPaid: 12 } });
+      L['2026-01-12'] = Object.assign({}, L['2026-01-12'], { [kid]: { sessions: 1, sessionsPaid: 6 } });
+      const owes0 = mnyClubOwes(kid);
+      mnySetClubPaid(kid, '2026-01-05');
+      const owes1 = mnyClubOwes(kid);
+      if (money2(owes0.amount - owes1.amount) !== 12 || owes0.sessions - owes1.sessions !== 2 || owes1.since !== '2026-01-05') bad.push('club: the payout date did not move the tally: ' + JSON.stringify([owes0, owes1]));
+      if (!mrLogEntries().some(e => e.path === 'clubPaidThrough.' + kid)) bad.push('club: no change-log line');
+      profile = kid;
+      if (mnySetClubPaid(kid, '2026-01-12') !== false) bad.push('club: a child recorded the payout');
+      profile = 'parent';
+
+      // (10) The Sunday rules reach a stored rulebook, and the readers fall back.
+      const mr = mrEnsure();
+      const old = mrDeepCopy(MR_DEFAULT_RULES);
+      ['sessions', 'advance', 'spend', 'pots', 'words', 'market'].forEach(k => { delete old[k]; });
+      delete old.loan.ratePct; delete old.loan.interestEverySundays; delete old.loan.extraBonusPct;
+      old.loan.earlyPaymentBonusPct = 15;
+      old.school.stagePct.ready = 20;
+      old.words = { jenn: 2 };
+      mr.versions = [{ id: 'mrv-old', effectiveFrom: '2026-08-03', createdAt: 1, updatedAt: 1, createdBy: 'parent', reason: 'family_meeting', note: 'Ours', rules: old }];
+      mr.log = {};
+      const filled = mrSundayRules(wk);
+      if (filled.sessions.perSession !== 6 || filled.pots.rates.gic !== 4 || filled.loan.extraBonusPct !== 15) bad.push('rules: a stored rulebook does not read the defaults per key');
+      if ('sessions' in mrRules()) bad.push('rules: reading them wrote to the stored rulebook');
+      const pend = mrSundayRulesPending();
+      const at = path => pend.find(x => x.path === path);
+      if (!at('sessions.perSession') || !at('school.stagePct.ready') || at('school.stagePct.ready').value !== 0) bad.push('rules: the pending list misses a path');
+      if (at('words.jenn')) bad.push('rules: the family\'s own words stage would be overwritten');
+      if (!at('loan.extraBonusPct') || at('loan.extraBonusPct').value !== 15) bad.push('rules: the bonus did not carry the family\'s own figure');
+      mrApplySundayRules();
+      const now = mrRules();
+      if (now.sessions.perSession !== 6 || now.school.stagePct.ready !== 0 || now.words.jenn !== 2) bad.push('rules: applying did not land as one version keeping their own values');
+      if (mrRulesForWeek('2026-08-10').school.stagePct.ready !== 20) bad.push('rules: a lived week was re-priced');
+      if (mrVersions().length !== 2 || mrApplySundayRules() !== null) bad.push('rules: applying twice made another version');
+      // The spend cap comes from its rule.
+      now.spend.capPct = 50;
+      const pool = mnyPool(wk, kid);
+      if (pool.spendCap !== money2(pool.mine * 0.5)) bad.push('pool: spend cap ignores spend.capPct');
+    } catch (e) {
+      bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n').slice(1, 3).join(' '));
+    } finally {
+      const s = JSON.parse(snap);
+      Object.keys(state).forEach(k => { delete state[k]; });
+      Object.assign(state, s);
+      profile = was.profile; parentViewing = was.parentViewing; window.showToast = was.toast;
+      saveLocal();
+    }
+    return bad.length ? bad : true;
   });
 
   /* YOU TRAVEL TO TRAINING, AND THE PLANNER SHOULD KNOW.

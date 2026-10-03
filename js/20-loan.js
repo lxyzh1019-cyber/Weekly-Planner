@@ -35,6 +35,14 @@
    ════════════════════════════════════════════════════════════════ */
 
 function loanRules(dayKey) { return (mrRulesFor(dayKey || todayKey()).loan) || {}; }
+/* The bonus on extra money, frozen onto a debt when it is created. Sunday v15
+   names it `loan.extraBonusPct`; a rulebook stored before that still carries
+   `earlyPaymentBonusPct`, which is the same figure under its old name. */
+function loanExtraBonusPct(loan) {
+  const r = loan || {};
+  const v = (r.extraBonusPct != null) ? r.extraBonusPct : r.earlyPaymentBonusPct;
+  return Number(v) || 0;
+}
 
 /* The debt each kid starts with. Deliberately generic: the real name is data a
    parent types on the Money rules page, and every string that shows it
@@ -82,7 +90,7 @@ function mnyEnsureDebts(kid) {
       monthly: Number((r.monthly || {})[kid]) || 0,
       months: Number(r.months) || 0,
       arrearsRatePct: Number(r.arrearsRatePct) || 0,
-      bonusRate: Number(r.earlyPaymentBonusPct) || 0,
+      bonusRate: loanExtraBonusPct(r),
       paid: old.paid, payments: Array.isArray(old.payments) ? old.payments : [],
       arrears: old.arrears, arrearsInterest: old.arrearsInterest, downPaid: old.downPaid,
       lastPaymentMonth: old.lastPaymentMonth || null,
@@ -147,7 +155,7 @@ function mnyAddDebt(kid, fields) {
   const r = loanRules();
   const d = mnyNormalizeDebt({
     arrearsRatePct: Number(r.arrearsRatePct) || 0,
-    bonusRate: Number(r.earlyPaymentBonusPct) || 0,
+    bonusRate: loanExtraBonusPct(r),
     ...(fields || {}),
   });
   mnyEnsureDebts(kid).push(d);
@@ -457,6 +465,132 @@ function mnySundayTransferAll(kid, choice, opts) {
       return loanSundayTransfer(kid, choice, Object.assign({}, o, { debtId: d.id, cap }));
     })
     .filter(r => r && r.status !== 'cleared' && r.status !== 'not-started' && r.status !== 'nothing-due');
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SUNDAY v15 LOAN TERMS (Plan v3 §D, owner decision D4)
+
+   Every Sunday the loan takes its MUST-PAY first: each debt's monthly figure
+   × 12 ÷ 52, plus whatever was still owed from last week (`arrears`), capped
+   at what is owed. Paid oldest debt first (`createdAt`). When there is not
+   enough, she pays what there is and the rest is carried in `arrears` to
+   next Sunday — with NO interest on it. Extra money pays oldest first too, and
+   each $1 counts as 1 + the debt's bonus. Interest is `loan.ratePct` a year
+   on what is still owed, added every `loan.interestEverySundays` Sundays.
+
+   `loanSundayTransfer`, `mnySundayTransferAll` and `loanAccrueArrears`
+   above are still what the current meeting runs; the new sign sequence
+   switches to these in Stage 4 and retires them there.
+   ════════════════════════════════════════════════════════════════ */
+
+/* One debt's weekly must-pay, before arrears: monthly × 12 ÷ 52. */
+function mnyWeeklyDue(debt) {
+  return money2((Number(debt && debt.monthly) || 0) * 12 / 52);
+}
+/* Debts still owing something, oldest first — the order a Sunday pays them
+   in. Ties (two debts created in the same instant) keep their list order. */
+function mnyOpenDebtsOldestFirst(kid) {
+  return mnyEnsureDebts(kid)
+    .map((d, i) => ({ d, i }))
+    .filter(x => loanBalance(kid, x.d.id) > 0)
+    .sort((a, b) => ((Number(a.d.createdAt) || 0) - (Number(b.d.createdAt) || 0)) || (a.i - b.i))
+    .map(x => x.d);
+}
+/* What one debt asks for this Sunday: its weekly figure plus what is still
+   owed from last week, never more than the debt itself. */
+function mnyDebtDueThisSunday(kid, debt) {
+  return money2(Math.min(loanBalance(kid, debt.id),
+    mnyWeeklyDue(debt) + money2(debt.arrears)));
+}
+/* What this Sunday must take before she chooses anything, across every debt —
+   the red dashed line on her pile. */
+function mnyMustPay(kid) {
+  return money2(mnyOpenDebtsOldestFirst(kid).reduce((s, d) => s + mnyDebtDueThisSunday(kid, d), 0));
+}
+
+/* The Sunday payment: must-pay first (oldest debt first, `scheduled`, no
+   bonus), then `opts.extra` dollars of extra (oldest first, `early`, with
+   the bonus). Moves only cash she has. What the must-pay could not cover is
+   carried in each debt's `arrears`, with no interest. Once a week: a second
+   call for the same week moves nothing. Returns what happened. */
+function mnyLoanSundayPayment(kid, weekKey, opts) {
+  const o = opts || {};
+  const wk = weekKey || ctThisWeekKey();
+  const debts = mnyOpenDebtsOldestFirst(kid);
+  const out = { must: 0, paid: 0, shortfall: 0, extra: 0, extraCredited: 0, each: [] };
+  if (mnyEnsureDebts(kid).some(d => d.lastSundayPaidWeek === wk)) return Object.assign(out, { already: true });
+  const w = ensureWallet(kid);
+  debts.forEach(d => {
+    const due = mnyDebtDueThisSunday(kid, d);
+    const pay = money2(Math.min(due, Math.max(0, w.cash)));
+    out.must = money2(out.must + due);
+    if (pay > 0) {
+      w.cash = money2(w.cash - pay);
+      evMirror(kid, { kind: 'loan', from: 'cash', to: 'loan:' + d.id, amount: pay, ref: d.id,
+                      weekKey: wk, note: (d.name || 'Loan') + ' — must pay' });
+      loanRecordPayment(kid, pay, 'scheduled', d.id);
+    }
+    // Whatever the must-pay could not cover is still owed next Sunday.
+    d.arrears = money2(Math.max(0, due - pay));
+    out.paid = money2(out.paid + pay);
+    out.each.push({ debtId: d.id, name: d.name, due, paid: pay, carried: d.arrears });
+  });
+  out.shortfall = money2(Math.max(0, out.must - out.paid));
+  let extra = money2(Math.min(Math.max(0, Number(o.extra) || 0), Math.max(0, w.cash)));
+  mnyOpenDebtsOldestFirst(kid).forEach(d => {
+    if (!(extra > 0)) return;
+    const bonus = (Number(d.bonusRate) || 0) / 100;
+    const owedPrincipal = Math.max(0, money2(d.principal) - money2(d.paid));
+    // Enough to clear it — interest first, then principal at the bonus rate —
+    // and never a cent more, because an overpayment would leave her cash.
+    const clears = money2(money2(d.arrearsInterest) + Math.ceil((owedPrincipal / (1 + bonus)) * 100) / 100);
+    const pay = money2(Math.min(extra, clears));
+    if (!(pay > 0)) return;
+    w.cash = money2(w.cash - pay);
+    evMirror(kid, { kind: 'loan', from: 'cash', to: 'loan:' + d.id, amount: pay, ref: d.id,
+                    weekKey: wk, note: 'Extra off ' + (d.name || 'her loan') });
+    const rec = loanRecordPayment(kid, pay, 'early', d.id);
+    extra = money2(extra - pay);
+    out.extra = money2(out.extra + pay);
+    out.extraCredited = money2(out.extraCredited + money2(((rec && rec.credited) || 0) + ((rec && rec.toInterest) || 0)));
+  });
+  mnyEnsureDebts(kid).forEach(d => { d.lastSundayPaidWeek = wk; });
+  saveAll();
+  return out;
+}
+
+/* Interest every N Sundays (`loan.interestEverySundays`, at
+   `loan.ratePct` a year), counted per debt in `sundaysSinceInterest` and
+   stamped with the week so a second call for the same Sunday does nothing.
+   On the principal still owed, never on interest already added (the loan's
+   `simpleInterest` rule), into the `arrearsInterest` bucket the loan already
+   shows. The stream gets a line from `interest` to the debt: no home moves —
+   she has not paid it — but the row says the wall grew and why. Returns the
+   interest added across every debt. */
+function loanAccrueBalanceInterest(kid, weekKey) {
+  const wk = weekKey || ctThisWeekKey();
+  const rules = mrRulesForWeek(wk);
+  const ratePct = Number(mrRuleOr(rules, 'loan.ratePct')) || 0;
+  const every = Math.max(1, Number(mrRuleOr(rules, 'loan.interestEverySundays')) || 1);
+  let total = 0;
+  mnyEnsureDebts(kid).forEach(d => {
+    if (d.lastInterestSunday === wk) return;
+    d.lastInterestSunday = wk;
+    if (!(loanBalance(kid, d.id) > 0)) { d.sundaysSinceInterest = 0; return; }
+    d.sundaysSinceInterest = (Number(d.sundaysSinceInterest) || 0) + 1;
+    if (d.sundaysSinceInterest < every) return;
+    d.sundaysSinceInterest = 0;
+    const owedPrincipal = Math.max(0, money2(d.principal) - money2(d.paid));
+    const interest = money2(owedPrincipal * ratePct / 100 * every / 52);
+    if (!(interest > 0)) return;
+    d.arrearsInterest = money2(money2(d.arrearsInterest) + interest);
+    d.lastInterestAdded = interest;
+    evMirror(kid, { kind: 'interest', from: 'interest', to: 'loan:' + d.id, amount: interest,
+                    ref: d.id, weekKey: wk, note: 'Interest added to ' + (d.name || 'her loan') });
+    total = money2(total + interest);
+  });
+  saveAll();
+  return total;
 }
 
 /* Pay extra, any amount — this is the one that earns the 10%.

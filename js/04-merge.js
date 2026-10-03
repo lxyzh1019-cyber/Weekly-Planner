@@ -314,6 +314,34 @@ function mergeSharedChore(localChore, remoteChore) {
       else delete out.programStartDate;
     }
   }
+  /* ── The club's payout, one date per kid ──
+     // lww: clubPaidThrough — one date per kid; the newer value counts.
+     The club pays the assistant job twice a year and Dad advances it weekly;
+     `clubPaidThrough[kid]` is the last week the club has paid for. deepMergeObj
+     lets the REMOTE leaf win, so a device still holding the older date would
+     push it back over a payout just recorded. Arbitrated per kid on its own
+     stamp (`clubPaidThroughAt`), newest wins — a deliberate correction to an
+     earlier week is a newer write and counts. Two unstamped values keep the
+     later week, which is the only order a payout record can move in. */
+  {
+    const lp2 = lc.clubPaidThrough || {}, rp2 = rc.clubPaidThrough || {};
+    const la = lc.clubPaidThroughAt || {}, ra = rc.clubPaidThroughAt || {};
+    const kids = new Set([...Object.keys(lp2), ...Object.keys(rp2)]);
+    if (kids.size) {
+      out.clubPaidThrough = {};
+      out.clubPaidThroughAt = {};
+      kids.forEach(kid => {
+        const l = Number(la[kid]) || 0, r = Number(ra[kid]) || 0;
+        let pick;
+        if (lp2[kid] == null) pick = 'r';
+        else if (rp2[kid] == null) pick = 'l';
+        else if (l !== r) pick = r > l ? 'r' : 'l';
+        else pick = String(rp2[kid]) > String(lp2[kid]) ? 'r' : 'l';
+        out.clubPaidThrough[kid] = pick === 'r' ? rp2[kid] : lp2[kid];
+        out.clubPaidThroughAt[kid] = Math.max(l, r);
+      });
+    }
+  }
   // Weekly goals: the strictly-newer side takes that whole week, so an edit that
   // lowers or clears a goal wins over a stale copy (a plain union can't express
   // a removal). A tie / unstamped week keeps the deep-merged union already in out.
@@ -489,6 +517,16 @@ function mergeProfileState(localProfile, remoteProfile, profName) {
      comes back on the next snapshot and a parent is asked the same question
      for ever. */
   merged.moveRequests = mergeArrayById(lp.moveRequests, rp.moveRequests, 'mvq:');
+  /* ── Sunday v15: what she asked Dad, and the money the family expects ──
+     `requests` is the kid's queue (a result, a new goal, drawing early, a
+     session she cannot make, a fine she disputes) — the same reasoning as
+     moveRequests above: an answer is an EDIT, so newest-wins per id carries a
+     parent answering on the phone through to the iPad, and a 'req:' tombstone
+     keeps a withdrawn request gone. `expected` is the Grown-ups list of money
+     coming (Christmas, New Year), edited in place; 'exp:' keeps a removed row
+     removed. Neither is a stream event: nothing has moved. */
+  merged.requests = mergeArrayById(lp.requests, rp.requests, 'req:');
+  merged.expected = mergeArrayById(lp.expected, rp.expected, 'exp:');
   // What she is saving for. A kid can add one on either device, so these union
   // by id; a goal she deleted stays deleted via its 'sgoal:' tombstone.
   merged.savingGoals = mergeArrayById(lp.savingGoals, rp.savingGoals, 'sgoal:');

@@ -295,6 +295,28 @@ function evSettledWeeksOf(events) {
   return out;
 }
 
+/* ── What a commit wrote, so an undo can take exactly that back ──
+   Plan v3 §E (Undo fix). The meeting's undo restores her wallet, debts and
+   holdings from a snapshot; the commit's stream lines have to go with them or
+   signing again writes them twice. They are REMOVED (and tombstoned), not
+   reversed: `evReverse` corrects something that happened, and an undone
+   commit did not. "Exactly" is the snapshot's ids against the stream at the
+   seal — every event, markers included, so the week no longer reads settled. */
+function evIdsOf(events) {
+  const ids = {};
+  (events || []).forEach(e => { if (e && e.id) ids[e.id] = true; });
+  return ids;
+}
+function evWrittenSince(events, baseIds) {
+  const seen = baseIds || {};
+  return (events || []).filter(e => e && e.id && !seen[e.id]).map(e => e.id);
+}
+function evWithout(events, ids) {
+  const gone = {};
+  (ids || []).forEach(id => { gone[id] = true; });
+  return (events || []).filter(e => !(e && gone[e.id]));
+}
+
 /* ── The app-facing wrappers ───────────────────────────────────────
    These read one child's stream off her profile. Everything above is pure. */
 
@@ -442,7 +464,9 @@ function evSettleLines(kid, weekKey, net, newModel) {
                                               note: 'Week of ' + weekKey }));
     return;
   }
-  const work = money2(money2(b.chorePaid) + money2(b.learnPaid) + money2(b.streakBonus));
+  // ⛸️ The assistant job is work like the chores, so it is in this ribbon.
+  const work = money2(money2(b.chorePaid) + money2(b.learnPaid) + money2(b.streakBonus)
+                      + money2(b.sessionsPaid));
   const prize = money2(b.compPaid);
   const gross = money2(work + prize);
   if (work > 0) {
@@ -483,7 +507,7 @@ function evShadowDrift(kid) {
   const found = [];
   const pairs = [
     ['cash',   evBalance(kid, 'cash'),   mnyCash(kid)],
-    ['ready',  evBalance(kid, 'ready'),  mnySavedTotal(kid)],
+    ['ready',  evBalance(kid, 'ready'),  mnyReadyHomeTotal(kid)],
     ['locked', evBalance(kid, 'locked'), mnyLockedTotal(kid)],
     ['invest', evBalance(kid, 'invest'), mnyInvestedTotal(kid)],
   ];
@@ -502,7 +526,7 @@ if (typeof module !== 'undefined' && module.exports) {
     EV_HOME_FOR_HOLDING, evHomeForHolding,
     evIsHome, evIsLoan, evIsSink, evDestKey,
     evSpanOf, evBalanceOf, evWorthOf, evFlowOf, evMonthsOf, evTypicalMonthOf,
-    evSettledWeeksOf,
+    evSettledWeeksOf, evIdsOf, evWrittenSince, evWithout,
   };
 }
 
@@ -637,7 +661,7 @@ function evMigrationPlanFor(kid) {
     // Events already on the stream count too, or a second run would re-open.
     return money2(n + evBalanceOf(evEnsure(kid), home));
   };
-  const stored = { cash: mnyCash(kid), ready: mnySavedTotal(kid),
+  const stored = { cash: mnyCash(kid), ready: mnyReadyHomeTotal(kid),
                    locked: mnyLockedTotal(kid), invest: mnyInvestedTotal(kid) };
   const firstDay = rows.map(r => r.dayKey).sort()[0] || todayKey();
   const openDay = evDayBefore(firstDay);
@@ -761,6 +785,7 @@ function evRepairPlanFor(kid) {
         b.streakBonus > 0 ? `routines ${mnyMoney(b.streakBonus)} (${b.streak.days} clean days)` : '',
         b.compPaid > 0 ? `competitions ${mnyMoney(b.compPaid)}` : '',
         b.learnPaid > 0 ? `learning ${mnyMoney(b.learnPaid)}` : '',
+        b.sessionsPaid > 0 ? `club sessions ${mnyMoney(b.sessionsPaid)}` : '',
       ].filter(Boolean).join(' · '),
     });
   });
@@ -800,9 +825,11 @@ function evRunRepair() {
         led.streak = money2(b.streakBonus);
         led.streakDays = b.streak.days || 0;
         led.competition = money2(b.compPaid);
+        led.sessions = (b.sessions && b.sessions.attended) || 0;
+        led.sessionsPaid = money2(b.sessionsPaid);
         led.fines = money2(b.fines.total);
         led.gross = money2(money2(b.chorePaid) + money2(b.learnPaid)
-                         + money2(b.streakBonus) + money2(b.compPaid));
+                         + money2(b.streakBonus) + money2(b.compPaid) + money2(b.sessionsPaid));
         led.net = money2(b.net);
         led.repricedAt = syncNow();
         led.updatedAt = syncNow();

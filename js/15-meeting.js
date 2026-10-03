@@ -56,6 +56,13 @@ let mmUndo = null;
 /* Why the meeting's Undo was withdrawn, for the week it was held for:
    { wk, why }. Session-local like mmUndo itself — see mmUndoHeld. */
 let mmUndoGone = null;
+/* ↺ Redo, one girl at a time (Plan v3 §A, §E — Rev 2). Per-kid snapshots,
+   taken at her sign and sealed when it is done: { [kid]: {wk, …} }, and why
+   one was withdrawn: { [kid]: {wk, why} }. Session-local like mmUndo. The
+   meeting-wide `mmUndo` above stays what the current meeting uses until the
+   Sunday ritual switches to these (Stage 4). */
+let mmUndoKid = {};
+let mmUndoKidGone = {};
 let mmAddChoreFor = null;   // "kid|dayIdx" whose add-a-chore picker is open
 let mmCatchUpAsked = false; // the catch-up question, asked once per page load
 
@@ -133,6 +140,7 @@ function openFamilyMeeting() {
   if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
   ctEnsureShared();
   mmStep = 1; mmMaxStep = 1; mmSelectedDay = null; mmUndo = null; mmUndoGone = null;
+  mmUndoKid = {}; mmUndoKidGone = {};
   mmClearReturn();        // a fresh sitting has nowhere to go back to
   mmExpressWeek = null;   // the full sitting, not the catch-up run
   renderMeetingMode();
@@ -838,6 +846,7 @@ function mmGoToWeek(wk) {
   // sitting that no longer exists.
   mmClearReturn();
   mmStep = 1; mmMaxStep = 1; mmSelectedDay = null; mmUndo = null; mmUndoGone = null; mmAddChoreFor = null;
+  mmUndoKid = {}; mmUndoKidGone = {};
   if (typeof mnyDraft !== 'undefined') mnyDraft = null;
   if (!mmIsOpen()) mmShow();
   renderMeetingMode();
@@ -1605,7 +1614,8 @@ function mmConfirmAndRecord() {
    So it is idempotent per week now. The first commit of a week takes the
    picture; every later one leaves it alone, and mmUndoRecord winds the whole
    sitting back to before either girl was settled. */
-function mmTakeUndoSnapshot(wk) {
+function mmTakeUndoSnapshot(wk, kid) {
+  if (kid) return mmTakeKidUndoSnapshot(wk, kid);
   // Already holding the pre-commit picture for this week — do not replace it.
   if (mmUndo && mmUndo.wk === wk) return;
   /* Withdrawn for this week (mmUndoHeld): a picture taken now, before the
@@ -1625,30 +1635,7 @@ function mmTakeUndoSnapshot(wk) {
   // The commit now moves XP and the loan as well as the wallet, so the undo has
   // to carry all of it — a partial reverse would leave credited XP or a loan
   // payment standing against a week that was un-recorded.
-  const snap = kid => JSON.parse(JSON.stringify({
-    wallet: ensureWallet(kid),
-    // Every debt, every holding and every deposit the commit can touch. A kid
-    // can owe for more than one thing, so snapshotting only the first debt
-    // would leave the others paid down against a week that was un-recorded.
-    debts: (typeof mnyDebts === 'function') ? mnyDebts(kid) : null,
-    holdings: (typeof mnyHoldings === 'function') ? mnyHoldings(kid) : null,
-    deposits: (typeof mnyEnsureDeposits === 'function') ? mnyEnsureDeposits(kid) : null,
-    // Goal progress moves with the money, so it has to come back with it.
-    savingGoals: (typeof mnyEnsureGoals === 'function') ? mnyEnsureGoals(kid) : null,
-    /* Both XP fields AND the week's tally. Restoring the total without the
-       tally would leave the cap thinking the week's allowance was already
-       spent, so a re-record after an undo would credit nothing. */
-    xp: (typeof getQuestXP === 'function') ? getQuestXP(kid) : ((getProfData(kid).progress || {}).questXP || 0),
-    xpLegacy: (getProfData(kid).progress || {}).questXP || 0,
-    xpByWeek: JSON.parse(JSON.stringify((getProfData(kid).progress || {}).xpByWeek || {})),
-    // The meeting also empties the box, so undo has to put it back.
-    boxItems: (typeof mrBoxItems === 'function') ? mrBoxItems(kid) : null,
-    /* The "made on its own since the last meeting" baseline needs no field of
-       its own: mnyStampPassiveBaseline writes valueAtLastMeeting onto each
-       holding, and `holdings` above is a deep copy, so restoring it restores
-       the baseline with it. Worth saying out loud — it is not obvious, and an
-       undo that missed it would swallow a stretch of interest for good. */
-  }));
+  const snap = kid => JSON.parse(JSON.stringify(mmUndoKidState(kid)));
   mmUndo = {
     wk,
     jenn: snap('jenn'),
@@ -1671,6 +1658,98 @@ function mmTakeUndoSnapshot(wk) {
     committedBefore: ['jenn', 'jess'].filter(k => isChildMoneyCommitted(k, wk)),
     // Every movement already on either girl's stream — see mmUndoHeld.
     seen: mmUndoMovementIds(),
+    /* Every event id on each girl's stream at the picture, and the ones the
+       commits wrote since (filled by mmUndoSeal). The undo takes exactly those
+       back off the stream — see evWrittenSince (js/40-stream.js). */
+    streamIds: { jenn: mmStreamIdsOf('jenn'), jess: mmStreamIdsOf('jess') },
+    written: { jenn: [], jess: [] },
+  };
+}
+
+/* Everything one girl's commit can change in HER profile — the part of the
+   picture the meeting-wide and the per-kid undo share. */
+function mmUndoKidState(kid) {
+  return {
+    wallet: ensureWallet(kid),
+    // Every debt, every holding and every deposit the commit can touch. A kid
+    // can owe for more than one thing, so snapshotting only the first debt
+    // would leave the others paid down against a week that was un-recorded.
+    debts: (typeof mnyDebts === 'function') ? mnyDebts(kid) : null,
+    holdings: (typeof mnyHoldings === 'function') ? mnyHoldings(kid) : null,
+    deposits: (typeof mnyEnsureDeposits === 'function') ? mnyEnsureDeposits(kid) : null,
+    // Goal progress moves with the money, so it has to come back with it.
+    savingGoals: (typeof mnyEnsureGoals === 'function') ? mnyEnsureGoals(kid) : null,
+    /* Both XP fields AND the week's tally. Restoring the total without the
+       tally would leave the cap thinking the week's allowance was already
+       spent, so a re-record after an undo would credit nothing. */
+    xp: (typeof getQuestXP === 'function') ? getQuestXP(kid) : ((getProfData(kid).progress || {}).questXP || 0),
+    xpLegacy: (getProfData(kid).progress || {}).questXP || 0,
+    xpByWeek: JSON.parse(JSON.stringify((getProfData(kid).progress || {}).xpByWeek || {})),
+    // The meeting also empties the box, so undo has to put it back.
+    boxItems: (typeof mrBoxItems === 'function') ? mrBoxItems(kid) : null,
+    /* The "made on its own since the last meeting" baseline needs no field of
+       its own: mnyStampPassiveBaseline writes valueAtLastMeeting onto each
+       holding, and `holdings` above is a deep copy, so restoring it restores
+       the baseline with it. Worth saying out loud — it is not obvious, and an
+       undo that missed it would swallow a stretch of interest for good. */
+    // Sunday v15: her questions to a grown-up are stamped `appliedWeek` at
+    // sign, so they come back with everything else.
+    requests: (typeof mnyEnsureRequests === 'function') ? mnyEnsureRequests(kid) : null,
+  };
+}
+function mmStreamIdsOf(kid) {
+  return (typeof evIdsOf === 'function' && typeof evList === 'function') ? evIdsOf(evList(kid)) : {};
+}
+/* Put one girl's profile back from a picture taken by mmUndoKidState. */
+function mmRestoreKidState(kid, s) {
+  const pd = getProfData(kid);
+  pd.wallet = s.wallet;
+  if (s.debts) pd.debts = s.debts;
+  if (s.holdings) pd.holdings = s.holdings;
+  if (s.deposits) pd.deposits = s.deposits;
+  if (s.savingGoals) pd.savingGoals = s.savingGoals;
+  if (s.boxItems) pd.boxItems = s.boxItems;
+  if (s.requests) pd.requests = s.requests;
+  if (!pd.progress) pd.progress = {};
+  pd.progress.xp2 = s.xp;
+  pd.progress.questXP = s.xpLegacy;
+  pd.progress.xpByWeek = s.xpByWeek;
+}
+/* Take a commit's own stream lines back off her stream — removed and
+   tombstoned, never reversed: the commit did not happen. */
+function mmTakeBackStreamLines(kid, ids) {
+  if (!ids || !ids.length || typeof evWithout !== 'function') return 0;
+  const pd = getProfData(kid);
+  const before = (pd.events || []).length;
+  pd.events = evWithout(pd.events || [], ids);
+  tombstoneIds('ev:', ids);
+  return before - pd.events.length;
+}
+
+/* ── ↺ Redo: one girl's own snapshot (Plan v3 §A, §E) ──────────────
+   Taken at her sign, after the money moved since any earlier commit was asked
+   about (mmUndoHeld). Holds her profile, her row of each week map, and every
+   event id on her stream, so mmUndoRecord(kid) can return HER and leave her
+   sister's signing exactly as it is. Idempotent per kid per week. */
+function mmTakeKidUndoSnapshot(wk, kid) {
+  const had = mmUndoKid[kid];
+  if (had && had.wk === wk) return;
+  const gone = mmUndoKidGone[kid];
+  if (gone && gone.wk === wk) return;
+  delete mmUndoKidGone[kid];
+  if (typeof mnySimCatchUp === 'function') mnySimCatchUp(kid);
+  const c = state.shared.chore;
+  const row = (map) => (c[map] && c[map][wk] && Object.prototype.hasOwnProperty.call(c[map][wk], kid))
+    ? { has: true, value: JSON.parse(JSON.stringify(c[map][wk][kid])) } : { has: false };
+  mmUndoKid[kid] = {
+    wk, kid,
+    state: JSON.parse(JSON.stringify(mmUndoKidState(kid))),
+    rows: { finalizedWeeks: row('finalizedWeeks'), xpAwardedWeeks: row('xpAwardedWeeks'),
+            moneyLedger: row('moneyLedger'), weekPlans: row('weekPlans'), weekConfirms: row('weekConfirms') },
+    committedBefore: isChildMoneyCommitted(kid, wk),
+    streamIds: mmStreamIdsOf(kid),
+    seen: mmUndoMovementIds([kid]),
+    written: [],
   };
 }
 
@@ -1698,16 +1777,29 @@ function mmTakeUndoSnapshot(wk) {
    half-way is never sealed, and its movements then withdraw the undo — the
    safe way round. A marker (a zero-amount row) moves nothing and is ignored. */
 const MM_UNDO_GONE_SENTENCE = 'Undo is gone — money moved after this meeting; correct the item itself.';
-function mmUndoMovementIds() {
+function mmUndoMovementIds(kids) {
   const ids = {};
   if (typeof evList !== 'function') return ids;
-  ['jenn', 'jess'].forEach(k => evList(k).forEach(e => {
+  (kids || ['jenn', 'jess']).forEach(k => evList(k).forEach(e => {
     if (e && e.id && money2(e.amount) > 0) ids[e.id] = true;
   }));
   return ids;
 }
-/* Is the undo still safe to offer? Drops it — and says why — when not. */
-function mmUndoHeld() {
+/* Is the undo still safe to offer? Drops it — and says why — when not.
+   With a kid: her own ↺ Redo, asked of her own stream only — money moved
+   after HER sign withdraws HER redo, and her sister's is untouched. */
+function mmUndoHeld(kid) {
+  if (kid) {
+    const u = mmUndoKid[kid];
+    if (!u) return false;
+    const seen = u.seen || {};
+    const moved = (typeof evList === 'function' ? evList(kid) : []).find(e =>
+      e && e.id && money2(e.amount) > 0 && !seen[e.id]);
+    if (!moved) return true;
+    mmUndoKidGone[kid] = { wk: u.wk, why: (moved.note || moved.kind || 'money moved') };
+    delete mmUndoKid[kid];
+    return false;
+  }
   if (!mmUndo) return false;
   const seen = mmUndo.seen || {};
   let moved = null;
@@ -1721,12 +1813,25 @@ function mmUndoHeld() {
   mmUndo = null;
   return false;
 }
-/* The end of a commit: what it moved is part of the meeting, not after it. */
-function mmUndoSeal() {
-  if (mmUndo) mmUndo.seen = mmUndoMovementIds();
+/* The end of a commit: what it moved is part of the meeting, not after it —
+   and it is exactly what an undo takes back off the stream (`written`). */
+function mmUndoSeal(kid) {
+  if (kid) {
+    const u = mmUndoKid[kid];
+    if (!u) return;
+    u.seen = mmUndoMovementIds([kid]);
+    u.written = (typeof evWrittenSince === 'function') ? evWrittenSince(evList(kid), u.streamIds) : [];
+    return;
+  }
+  if (!mmUndo) return;
+  mmUndo.seen = mmUndoMovementIds();
+  if (mmUndo.streamIds && typeof evWrittenSince === 'function') {
+    ['jenn', 'jess'].forEach(k => { mmUndo.written[k] = evWrittenSince(evList(k), mmUndo.streamIds[k]); });
+  }
 }
 
-function mmUndoRecord() {
+function mmUndoRecord(kid) {
+  if (kid) return mmUndoKidRecord(kid);
   /* A button drawn before the money moved (or before the other device's
      movement arrived) can still be pressed. It refuses, and says why. */
   if (!mmUndoHeld()) {
@@ -1735,18 +1840,11 @@ function mmUndoRecord() {
   }
   const c = state.shared.chore; const wk = mmUndo.wk;
   ['jenn', 'jess'].forEach(kid => {
-    const s = mmUndo[kid];
-    const pd = getProfData(kid);
-    pd.wallet = s.wallet;
-    if (s.debts) pd.debts = s.debts;
-    if (s.holdings) pd.holdings = s.holdings;
-    if (s.deposits) pd.deposits = s.deposits;
-    if (s.savingGoals) pd.savingGoals = s.savingGoals;
-    if (s.boxItems) pd.boxItems = s.boxItems;
-    if (!pd.progress) pd.progress = {};
-    pd.progress.xp2 = s.xp;
-    pd.progress.questXP = s.xpLegacy;
-    pd.progress.xpByWeek = s.xpByWeek;
+    mmRestoreKidState(kid, mmUndo[kid]);
+    /* The commits' own lines go too (Plan v3 §E, Undo fix): the wallet went
+       back, so a stream still carrying them would pay the week twice the
+       moment it is signed again. */
+    mmTakeBackStreamLines(kid, (mmUndo.written || {})[kid]);
   });
   bankConfig().marketMonth = mmUndo.marketMonth;
   // safe-delete: ctStampWeekState(wk) at the end of this function
@@ -1798,6 +1896,43 @@ function mmUndoRecord() {
   showToast(wasClean
     ? '↩️ Undone — nothing was recorded for either girl'
     : '↩️ Undone — both girls are back where they were before this meeting');
+}
+
+/* ↺ Redo for one girl. Her profile, her row of every week map and her
+   commit's stream lines go back; her sister's signing is not touched. The
+   week reads "recorded" (`meetingsHeld`) only while a girl is still signed,
+   and "we sat down" (`meetingsMet`) is left as it is. */
+function mmUndoKidRecord(kid) {
+  if (!mmUndoHeld(kid)) {
+    const g = mmUndoKidGone[kid];
+    if (g) showToast(MM_UNDO_GONE_SENTENCE);
+    return false;
+  }
+  const u = mmUndoKid[kid];
+  const c = state.shared.chore; const wk = u.wk;
+  mmRestoreKidState(kid, u.state);
+  mmTakeBackStreamLines(kid, u.written);
+  Object.keys(u.rows).forEach(map => {
+    const r = u.rows[map];
+    if (r.has) {
+      if (!c[map]) c[map] = {};
+      if (!c[map][wk]) c[map][wk] = {};
+      c[map][wk][kid] = r.value;
+    } else if (c[map] && c[map][wk]) {
+      // safe-delete: ctStampWeekState(wk) below hands the week over whole
+      delete c[map][wk][kid];
+    }
+  });
+  const sister = kid === 'jenn' ? 'jess' : 'jenn';
+  if (c.meetingsHeld && !isChildMoneyCommitted(sister, wk) && !u.committedBefore) {
+    // safe-delete: ctStampWeekState(wk) below hands the week over whole
+    delete c.meetingsHeld[wk];
+  }
+  if (typeof mnyDraft !== 'undefined') mnyDraft = null;
+  ctStampWeekState(wk);
+  delete mmUndoKid[kid];
+  saveAll();
+  return true;
 }
 
 /* ── Where is this week, relative to now? ─────────────────────────

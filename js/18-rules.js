@@ -216,7 +216,40 @@ const MR_DEFAULT_RULES = {
     simpleInterest: true,       // never charge interest on accrued interest
     earlyPaymentBonusPct: 10,   // any early payment, any size: $100 clears $110
     shortfallChoices: ['pay_available', 'pay_nothing', 'cover_from_savings'],
+    /* ── Sunday v15 loan terms (owner decision D4, 2026-10-03) ──
+       Must-pay is the monthly figure × 12 ÷ 52 every Sunday; interest is
+       `ratePct` a year on what is still owed, added every
+       `interestEverySundays` Sundays; each $1 of extra counts as
+       1 + extraBonusPct/100. A shortfall is carried in `arrears` with no
+       interest on it. `downPayment*`, `arrearsRatePct` and `months` above
+       stay for the weeks lived under them and are no longer read by the
+       Sunday flow (a lived week keeps its rules). */
+    ratePct: 1,
+    interestEverySundays: 4,
+    extraBonusPct: 10,
   },
+
+  /* ── SUNDAY v15 (Plan v3 §C) — every rate, cap and gate the ritual reads ──
+     Read through `mrRulesForWeek` like any price, so a change saved on
+     Grown-ups starts next Sunday and a lived week keeps what it had. A
+     rulebook stored before these existed reads these defaults per key
+     (`mrSundayRules`) and receives them as an appended version through
+     `mrSundayRulesPending` / `mrApplySundayRules` — never a rewrite. */
+  // ⛸️ The assistant job: dollars per club session she attended.
+  sessions: { perSession: 6 },
+  // ⏪ Most she can draw before Sunday, a week.
+  advance: { maxPerWeek: 5 },
+  // 👛 Cash out is capped at this share of her share (replaces mnyPool's 0.2).
+  spend: { capPct: 20 },
+  /* 🌱 The pots. `safety` is the 🛟 line Savings keeps before locking or
+     buying companies; `lockWeeks` is how long 🔒 Locked away holds money;
+     `rates` are % a year — the rate source for the Sunday flow (the old
+     `bank.savingsRate` / `gicRates` stay for holdings opened under them). */
+  pots: { safety: 10, lockWeeks: 4, rates: { ready: 1.5, gic: 4, stock: 7 } },
+  // 📚 The words each girl is shown: 1 earn·save·owe · 2 +income·interest·cash flow · 3 +assets·debt·net worth.
+  words: { jenn: 1, jess: 1 },
+  // 📉 "Companies dip" practice: % a holding loses once on a Sunday (0 = off).
+  market: { wobblePct: 0 },
 
   /* What she can put money into. A fixed menu, never a text box: choosing a
      company by name is the lesson, and a search field is a casino. */
@@ -258,8 +291,11 @@ const MR_DEFAULT_RULES = {
      `mnyStagePct` falls back to these per key — it is not migrated. Tuned in
      Money rules › Lessons as a dated rule version like any price. The first
      stage is always 0 and is not listed. */
+  /* Savings is ALWAYS open (Plan v3 deviation #8, owner-approved
+     2026-10-03): `ready` is 0, which still satisfies the order rule
+     ready ≤ locked ≤ stock ≤ 100 that `mnyStagePctRefusal` enforces. */
   school: { unlockStage: { jenn: 0, jess: 0 },
-            stagePct: { ready: 20, locked: 30, stock: 40, mix: 100 } },
+            stagePct: { ready: 0, locked: 30, stock: 40, mix: 100 } },
 
   sickPausesEverything: true,
   reviewCadence: 'quarterly',
@@ -588,6 +624,96 @@ function mrApplyHouseRules() {
     { reason: MR_DEFAULT_REASON, note: MR_HOUSE_RULES_NOTE, effectiveFrom: from });
 }
 
+/* ── SUNDAY v15 RULES, FOR A RULEBOOK ALREADY ON FILE (Plan v3 §C, §I) ──
+   The same mechanism as the house rules above, with its own marker, because a
+   household that already applied the house rules must still receive these.
+   Every path below is NEW except one: a stored rulebook gets each new path
+   only where it is ABSENT (a family's own figure is never overwritten), and
+   `school.stagePct.ready` goes to 0 wherever it still differs — Savings is
+   always open (approved deviation #8). Appended as one dated version through
+   `mrApplyEdits`; nothing lived is re-priced. Until it is applied the readers
+   below fall back to MR_DEFAULT_RULES per key, so nothing waits on the card. */
+const MR_SUNDAY_RULES_NOTE = 'Sunday v15 money rules (3 Oct)';
+const MR_SUNDAY_RULES = [
+  { path: 'sessions.perSession',        item: '⛸️ Assistant job', field: 'dollars a session' },
+  { path: 'advance.maxPerWeek',         item: '⏪ Drawn in advance', field: 'most a week' },
+  { path: 'spend.capPct',               item: '💵 Cash out', field: '% of her share' },
+  { path: 'loan.ratePct',               item: '🧱 Loan', field: 'interest % a year' },
+  { path: 'loan.interestEverySundays',  item: '🧱 Loan', field: 'Sundays between interest' },
+  { path: 'loan.extraBonusPct',         item: '🧱 Loan', field: 'bonus % on extra', carry: 'loan.earlyPaymentBonusPct' },
+  { path: 'pots.safety',                item: '🛟 Safety', field: 'dollars kept in Savings' },
+  { path: 'pots.lockWeeks',             item: '🔒 Locked away', field: 'weeks' },
+  { path: 'pots.rates.ready',           item: '🏦 Savings', field: '% a year' },
+  { path: 'pots.rates.gic',             item: '🔒 Locked away', field: '% a year' },
+  { path: 'pots.rates.stock',           item: '📈 Companies', field: '% a year' },
+  { path: 'school.stagePct.ready',      item: '🏦 Savings', field: 'opens at % paid', always: true },
+  { path: 'words.jenn',                 item: '📚 Jenn', field: 'words stage' },
+  { path: 'words.jess',                 item: '📚 Jess', field: 'words stage' },
+  { path: 'market.wobblePct',           item: '📉 Companies dip', field: '% on a Sunday' },
+];
+
+/* What a stored rulebook still lacks, as [{path, value, from, label, item,
+   field}]. Pure read; empty when there is nothing to do. */
+function mrSundayRulesPending() {
+  const r = mrRules();
+  const out = [];
+  MR_SUNDAY_RULES.forEach(rule => {
+    const cur = mrGetPath(r, rule.path);
+    const dflt = mrGetPath(MR_DEFAULT_RULES, rule.path);
+    if (rule.always) {
+      if (cur == null || Number(cur) === Number(dflt)) return;   // absent reads the default already
+    } else if (cur != null) {
+      return;                                                    // the family's own figure stays
+    }
+    const carried = rule.carry ? mrGetPath(r, rule.carry) : null;
+    const value = (carried != null && isFinite(Number(carried))) ? Number(carried) : dflt;
+    out.push({ path: rule.path, value, from: cur, item: rule.item, field: rule.field,
+      label: MR_SUNDAY_RULES_NOTE + ' — ' + rule.item + ': ' + rule.field });
+  });
+  return out;
+}
+/* Applied once, read off the log like the house rules — no new state key. */
+function mrSundayRulesApplied() {
+  return mrLogEntries().some(e => String((e && e.note) || '').indexOf(MR_SUNDAY_RULES_NOTE) === 0);
+}
+function mrApplySundayRules() {
+  if (!isParent()) { showToast('Only parents can change the money rules 🔒'); return null; }
+  if (mrSundayRulesApplied()) return null;
+  const changes = mrSundayRulesPending();
+  if (!changes.length) return null;
+  const from = mrHouseRulesFrom();
+  if (!from) { showToast('A rules change is already scheduled — these can go in once it starts'); return null; }
+  return mrApplyEdits(changes.map(c => ({ path: c.path, value: c.value, label: c.label })),
+    { reason: MR_DEFAULT_REASON, note: MR_SUNDAY_RULES_NOTE, effectiveFrom: from });
+}
+
+/* A rule value, or the shipped default for that path when the stored version
+   predates it — the per-key fallback `mnyStagePct` already uses. */
+function mrRuleOr(rules, path) {
+  const v = mrGetPath(rules || {}, path);
+  if (v != null) return v;
+  if (path === 'loan.extraBonusPct') {
+    const old = mrGetPath(rules || {}, 'loan.earlyPaymentBonusPct');
+    if (old != null) return old;
+  }
+  return mrGetPath(MR_DEFAULT_RULES, path);
+}
+/* The week's rules with every Sunday v15 path filled in — what the pure core
+   (js/43-sunday-core.js) is handed, so it never reads a literal. A copy: the
+   stored version is never written by being read. */
+function mrSundayRules(weekKey) {
+  const r = mrDeepCopy(mrRulesForWeek(weekKey || ctThisWeekKey()) || MR_DEFAULT_RULES);
+  MR_SUNDAY_RULES.forEach(rule => {
+    if (mrGetPath(r, rule.path) == null) mrSetPath(r, rule.path, mrRuleOr(r, rule.path));
+  });
+  // The other gates read per key too, like mnyStagePct.
+  ['locked', 'stock', 'mix'].forEach(k => {
+    const path = 'school.stagePct.' + k;
+    if (mrGetPath(r, path) == null) mrSetPath(r, path, mrGetPath(MR_DEFAULT_RULES, path));
+  });
+  return r;
+}
+
 /* ── Shared read helpers ── */
 function mrTargetFor(kid) {
   return Number(((mrRules().targets || {})[kid] || {}).annual) || 0;
@@ -719,6 +845,7 @@ function mrEnsureEarnings(kid, weekKey) {
   if (!e.learning) e.learning = {};   // filled in by a later step
   if (!e.sick) e.sick = {};           // {[dayIdx]: true} — pauses everything
   if (!e.overrides) e.overrides = {}; // {[channel]: {value, reason, at}} — set at the meeting
+  if (!e.sessions) e.sessions = {};   // {[blockId]: true|false} — club attendance, a grown-up's answer
   if (!Array.isArray(e.missing)) e.missing = [];   // channels the planner has nothing for
   if (!p.earningsUpdatedAtByWeek) p.earningsUpdatedAtByWeek = {};
   return e;
@@ -1370,6 +1497,12 @@ function mrAddCompetition(kid, entry) {
     points: Number(entry.points) || 0, placement: entry.placement || {},
     qualified: !!entry.qualified, provincial: !!entry.provincial,
     danceItems: entry.danceItems || {}, personalBest: !!entry.personalBest,
+    /* The official sheet's detail, race by race ({ev, time, pts}), when she
+       told it from the Tell-a-result sheet. Detail only — `points` is still
+       what is scored. */
+    races: Array.isArray(entry.races) ? entry.races.map(r => ({
+      ev: String((r && r.ev) || '').slice(0, 40), time: String((r && r.time) || '').slice(0, 20),
+      pts: Number(r && r.pts) || 0 })) : [],
     /* Which block on the calendar this meet IS. Carried so the planned/recorded
        join cannot be broken by renaming either side — see
        mmUnrecordedCompetitions (js/23-money-meeting.js). Null is fine and
@@ -1379,6 +1512,14 @@ function mrAddCompetition(kid, entry) {
     updatedAt: syncNow(),
   };
   e.awarded = mrScoreCompetition(e, mrRulesFor(e.dayKey));   // frozen at entry
+  /* Dad's own figure, checked against the published sheet on the Approve card
+     (Plan v3 §B, deviation #7). Kept BESIDE the rule's award, never instead of
+     it, with who and when — the record shows both. */
+  if (entry.awardedOverride && isFinite(Number(entry.awardedOverride.value))) {
+    e.awardedOverride = { value: money2(Math.max(0, Number(entry.awardedOverride.value))),
+                          by: entry.awardedOverride.by || 'a grown-up',
+                          at: entry.awardedOverride.at || syncNow() };
+  }
   mrCompetitions(kid).push(e);
   /* The other face. A meet recorded on a day with no competition block places
      one; a meet seeded FROM a block adopts that block rather than drawing a
@@ -1390,7 +1531,7 @@ function mrAddCompetition(kid, entry) {
      meeting that would have paid it having been and gone. js/21 owns that, and
      leaves a week that is not settled exactly as it was. */
   if (typeof mnyLateCompSync === 'function') {
-    mnyLateCompSync(kid, e.dayKey, { comp: e, before: 0, after: e.awarded, op: 'add' });
+    mnyLateCompSync(kid, e.dayKey, { comp: e, before: 0, after: mrCompAward(e), op: 'add' });
   }
   saveAll();
   return e;
@@ -1500,7 +1641,7 @@ function mrUpdateCompetition(kid, id, fields) {
   if (!e) return null;
   const f = fields || {};
   const wasDay = e.dayKey;
-  const wasAwarded = Number(e.awarded) || 0;
+  const wasAwarded = mrCompAward(e);
 
   if (f.dayKey) e.dayKey = f.dayKey;
   if (f.sport != null) e.sport = f.sport;
@@ -1511,6 +1652,16 @@ function mrUpdateCompetition(kid, id, fields) {
   if (f.qualified != null) e.qualified = !!f.qualified;
   if (f.provincial != null) e.provincial = !!f.provincial;
   if (f.personalBest != null) e.personalBest = !!f.personalBest;
+  if (Array.isArray(f.races)) {
+    e.races = f.races.map(r => ({ ev: String((r && r.ev) || '').slice(0, 40),
+      time: String((r && r.time) || '').slice(0, 20), pts: Number(r && r.pts) || 0 }));
+  }
+  // Dad's checked figure (the Approve card's − / +), or null to drop it.
+  if (f.awardedOverride === null) delete e.awardedOverride;
+  else if (f.awardedOverride && isFinite(Number(f.awardedOverride.value))) {
+    e.awardedOverride = { value: money2(Math.max(0, Number(f.awardedOverride.value))),
+                          by: f.awardedOverride.by || 'a grown-up', at: f.awardedOverride.at || syncNow() };
+  }
   e.awarded = mrScoreCompetition(e, mrRulesFor(e.dayKey));
   markItemUpdated(e);
 
@@ -1536,7 +1687,7 @@ function mrUpdateCompetition(kid, id, fields) {
      another week takes its money out of one and into the other. */
   if (typeof mnyLateCompSync === 'function') {
     mnyLateCompSync(kid, e.dayKey, { comp: e, wasDayKey: wasDay, before: wasAwarded,
-                                     after: e.awarded, op: e.opId });
+                                     after: mrCompAward(e), op: e.opId });
   }
   saveAll();
   return e;
@@ -1561,9 +1712,18 @@ function mrDeleteCompetition(kid, id) {
   }
   // Deleting a meet from a settled week takes back what it paid.
   if (gone && gone.dayKey && typeof mnyLateCompSync === 'function') {
-    mnyLateCompSync(kid, gone.dayKey, { comp: gone, before: Number(gone.awarded) || 0, after: 0, op: 'del' });
+    mnyLateCompSync(kid, gone.dayKey, { comp: gone, before: mrCompAward(gone), after: 0, op: 'del' });
   }
   saveAll();
+}
+/* What a meet pays: Dad's figure when he stepped it on the Approve card,
+   otherwise the rule's award frozen at entry. The one answer — the week's pay,
+   the late-meet sync and the record all ask this. */
+function mrCompAward(c) {
+  if (!c) return 0;
+  const o = c.awardedOverride;
+  if (o && o.value != null && isFinite(Number(o.value))) return money2(Number(o.value));
+  return money2(Number(c.awarded) || 0);
 }
 function mrCompetitionWeek(weekKey, kid) {
   const info = { keys: [] };
@@ -1571,10 +1731,65 @@ function mrCompetitionWeek(weekKey, kid) {
   for (let i = 0; i < 7; i++) { const d = new Date(mon); d.setDate(mon.getDate() + i); info.keys.push(ctDateToKey(d)); }
   const inWeek = mrCompetitions(kid).filter(c => info.keys.includes(c.dayKey));
   return {
-    paid: money2(inWeek.reduce((s, c) => s + (Number(c.awarded) || 0), 0)),
+    paid: money2(inWeek.reduce((s, c) => s + mrCompAward(c), 0)),
     entries: inWeek,
     personalBests: inWeek.filter(c => c.personalBest).length,
   };
+}
+
+/* ── ⛸️ THE ASSISTANT JOB — club sessions (Plan v3 §B, owner decision D1) ──
+   The club pays the assistant job twice a year and Dad advances it every
+   Sunday, so it is a weekly channel like chores: `rules.sessions.perSession`
+   for each session she ATTENDED. A missed one pays $0 — it is not a fine.
+
+   Sessions are the week's `isPaidSession` blocks (the planner's ⛸️ Assistant
+   job, or one a grown-up placed). Attendance is a grown-up's answer, kept in
+   the week's earnings record (`earnings[wk].sessions[blockId]`) so it merges
+   with the week; unanswered, it defaults from the block itself — ticked done
+   is attended, a grown-up's "did not happen" is missed, anything else is "?"
+   and pays nothing until somebody answers. */
+function mrSessionsWeek(weekKey, kid) {
+  const e = mrEnsureEarnings(kid, weekKey);
+  const answers = e.sessions || {};
+  const sessions = [];
+  /* Which activities pay, asked ONCE: mrWeekBreakdown runs on every money
+     render, and findActivity rebuilds the whole activity list per call. */
+  const paidActs = {};
+  ((typeof getAllActivities === 'function') ? getAllActivities(kid, { includeArchived: true }) : [])
+    .forEach(a => { if (a && a.isPaidSession) paidActs[a.id] = a; });
+  mrWeekDayKeys(weekKey).forEach(dayKey => {
+    (getDayBlocks(dayKey, kid) || []).forEach(b => {
+      if (!b || !paidActs[b.actId] || (typeof blockIsWatching === 'function' && blockIsWatching(b))) return;
+      const act = paidActs[b.actId];
+      const answered = Object.prototype.hasOwnProperty.call(answers, b.id) && answers[b.id] != null;
+      let attended = null;
+      if (answered) attended = answers[b.id] === true;
+      else if (typeof isBlockCompleted === 'function' && isBlockCompleted(b, kid)) attended = true;
+      else if (typeof isBlockNotDone === 'function' && isBlockNotDone(b)) attended = false;
+      sessions.push({ blockId: b.id, dayKey, name: (act && act.name) || 'Assistant job',
+                      startMin: Number(b.startMin) || 0, attended, answered });
+    });
+  });
+  sessions.sort((a, b) => (a.dayKey < b.dayKey ? -1 : a.dayKey > b.dayKey ? 1 : a.startMin - b.startMin));
+  const rate = Number(mrRuleOr(mrRulesForWeek(weekKey), 'sessions.perSession')) || 0;
+  const attended = sessions.filter(x => x.attended === true).length;
+  return { sessions, attended, open: sessions.filter(x => x.attended == null).length,
+           rate: money2(rate), paid: money2(attended * rate) };
+}
+/* A grown-up's answer: she was there (true), she was not (false), or clear it
+   (null) so the block's own state decides again. Stamped like a grade, so the
+   newer copy of the week wins on the other device. */
+function mrSetSessionAttendance(kid, weekKey, blockId, attended) {
+  if (!isParent()) { showToast('A grown-up marks the club sessions 🔒'); return false; }
+  if (!blockId) return false;
+  const e = mrEnsureEarnings(kid, weekKey);
+  if (attended == null) delete e.sessions[blockId];
+  else e.sessions[blockId] = attended === true;
+  if (!e.sessionsAt) e.sessionsAt = {};
+  e.sessionsAt[blockId] = syncNow();
+  mrStampEarnings(kid, weekKey);
+  saveAll();
+  return true;
 }
 
 /* The box config. Rule versions saved before the box moved to Sunday still
@@ -1803,6 +2018,7 @@ function mrWeekBreakdown(weekKey, kid) {
   const learning = mrLearningWeek(weekKey, kid);
   const streak = mrStreakWeek(weekKey, kid);
   const comp = mrCompetitionWeek(weekKey, kid);
+  const sessions = mrSessionsWeek(weekKey, kid);
   const honesty = mrHonestyEffect(kid, weekKey);
 
   // A step-2 honesty strike zeroes the channel it was claimed on.
@@ -1825,19 +2041,22 @@ function mrWeekBreakdown(weekKey, kid) {
   const ov = e.overrides || {};
   const original = { chores: money2(chorePaid), learning: money2(learnPaid),
                      streak: money2(streak.bonus), comp: money2(compPaid),
+                     sessions: money2(sessions.paid),
                      fines: money2(fines.total) };
+  let sessionsPaid = sessions.paid;
   let streakBonus = streak.bonus;
   let finesTotal = fines.total;
   if (ov.chores)   chorePaid  = money2(ov.chores.value);
   if (ov.learning) learnPaid  = money2(ov.learning.value);
   if (ov.streak)   streakBonus = money2(ov.streak.value);
   if (ov.comp)     compPaid   = money2(ov.comp.value);
+  if (ov.sessions) sessionsPaid = money2(ov.sessions.value);
   if (ov.fines)    finesTotal = money2(ov.fines.value);
 
-  const gross = money2(chorePaid + learnPaid + streakBonus + compPaid);
+  const gross = money2(chorePaid + learnPaid + streakBonus + compPaid + sessionsPaid);
   const net = money2(Math.max(0, gross - finesTotal));
-  return { chores, learning, streak, comp, honesty, gross, net,
-           chorePaid, learnPaid, compPaid,
+  return { chores, learning, streak, comp, sessions, honesty, gross, net,
+           chorePaid, learnPaid, compPaid, sessionsPaid: money2(sessionsPaid),
            streakBonus, overrides: ov, original,
            fines: Object.assign({}, fines, { total: money2(finesTotal) }) };
 }
@@ -1871,6 +2090,10 @@ function mrFreezeWeekLedger(weekKey, kid) {
     streakDays: b.streak.days || 0,
     streak: money2(b.streakBonus),
     competition: money2(b.compPaid),
+    // ⛸️ The assistant job: how many sessions paid and what the week paid for
+    // them (after any override) — the club-owes tally reads these.
+    sessions: (b.sessions && b.sessions.attended) || 0,
+    sessionsPaid: money2(b.sessionsPaid),
     fines: money2(b.fines.total),
     voided: Object.keys(b.honesty.voidedChannels || {}),
     honestyStrikes: b.honesty.strikes || 0,
@@ -2011,7 +2234,7 @@ function mrYearToDate(kid) {
   const fin = state.shared.chore.finalizedWeeks || {};
   const weeks = Object.keys(fin).filter(wk => fin[wk] && fin[wk][kid] != null).sort();
   let paidTotal = 0;
-  const channels = { chores: 0, learning: 0, streak: 0, competition: 0, fines: 0 };
+  const channels = { chores: 0, learning: 0, streak: 0, competition: 0, sessions: 0, fines: 0 };
   weeks.forEach(wk => {
     paidTotal += Number(fin[wk][kid]) || 0;
     const b = mrWeekBreakdown(wk, kid);
@@ -2019,6 +2242,7 @@ function mrYearToDate(kid) {
     channels.learning    += b.learnPaid;
     channels.streak      += b.streakBonus;
     channels.competition += b.compPaid;
+    channels.sessions    += b.sessionsPaid;
     channels.fines       += b.fines.total;
   });
   /* ── DIVIDE BY THE WEEKS THAT PASSED, NOT THE WEEKS THAT WERE SETTLED ──

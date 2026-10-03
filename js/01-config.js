@@ -14,7 +14,7 @@ const LS_KEY = 'weeklyplanner-v3';
    the Today More sheet (js/31-today.js) and under the list on the parent
    portal's App landing (js/11-parent.js), which is where a grown-up reads it on
    an iPad with no console. */
-const APP_BUILD = '2026-09-27f';
+const APP_BUILD = '2026-10-03a';
 const TOTAL_SLOTS = 60;           // 6AM → 9PM = 15 hrs × 4 (legacy, used for some %s)
 const START_HOUR  = 6;
 const END_HOUR    = 22;
@@ -884,6 +884,12 @@ const DEFAULT_ACTIVITIES = [
   { id:'training', sub:'training',         name:'Training',         icon:'🏋️', cat:'training', durationMin:120, isTraining:true, travels:true, warmsUp:true, suitableTime:['after-school','weekend'] },
   { id:'competition', sub:'training',      name:'Competition',      icon:'🏆', cat:'training', durationMin:480, isTraining:true, isCompetition:true, travels:true, warmsUp:true, suitableTime:['weekend'] },
   { id:'body_maintenance', sub:'training', name:'Body Maintenance', icon:'⛹️', cat:'training', durationMin:30, isTraining:true, suitableTime:['evening','weekend'] },
+  /* ⛸️ Helping at the club — a PAID session (Plan v3 §B, owner decision D1).
+     `isPaidSession` is what puts a block of it in the week's assistant-job
+     channel (`mrSessionsWeek`, js/18-rules.js): she is paid
+     `rules.sessions.perSession` for each one she attended, and a missed one
+     pays $0 — it is not a fine. */
+  { id:'assistant_job', sub:'training', name:'Assistant job', icon:'⛸️', cat:'training', durationMin:90, isTraining:true, isPaidSession:true, travels:true, suitableTime:['after-school','weekend'] },
 
   /* ── Everyday movement ─────────────────────────────────────────
      Hers, not a coach's. Swimming and Skating exist here AS WELL AS the

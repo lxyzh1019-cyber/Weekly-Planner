@@ -115,6 +115,16 @@ function competitionPaid(comp) {
   return { paid: money2(total) };
 }
 
+/* ⛸️ The assistant job (Sunday v15). Mirrors mrSessionsWeek: each session she
+   ATTENDED pays rules.sessions.perSession; a missed one pays nothing. The
+   three modelled weeks hold 0 sessions on purpose — the pinned figures in
+   tests/money.test.js predate the channel and must not move. */
+function sessionsPaid(attended) {
+  const rate = Number((R.sessions || {}).perSession) || 0;
+  const n = Math.max(0, Math.floor(Number(attended) || 0));
+  return { attended: n, rate: money2(rate), paid: money2(n * rate) };
+}
+
 /* The week's fines, modelled as REPEATS OF ONE BEHAVIOUR — which is what the
    free-repeat rule is about. `perDay` is how many happened each day; the first
    `freeRepeats` of them in the week are forgiven and the rest cost.
@@ -151,6 +161,7 @@ const WEEKS = {
     clean: [false, true, true, false, false, false, false],
     sick: [false, false, false, false, false, false, false],
     comp: null,
+    sessions: 0,
     fines: [0, 1, 0, 0, 1, 0, 0],
   },
   ordinary: {
@@ -161,6 +172,7 @@ const WEEKS = {
     clean: [true, true, true, true, true, false, false],
     sick: [false, false, false, false, false, false, false],
     comp: null,
+    sessions: 0,
     fines: [0, 0, 1, 0, 0, 0, 0],
   },
   strong: {
@@ -172,6 +184,7 @@ const WEEKS = {
     clean: [true, true, true, true, true, true, true],
     sick: [false, false, false, false, false, false, false],
     comp: { points: 6, qualified: false },
+    sessions: 0,
     fines: [0, 0, 0, 0, 0, 0, 0],
   },
 };
@@ -181,10 +194,11 @@ function weekMoney(w) {
   const le = learningPaid(w.learning);
   const st = streakPaid(w.clean, w.sick);
   const co = competitionPaid(w.comp);
+  const se = sessionsPaid(w.sessions);
   const fi = finesApplied(w.fines, ch.days);
-  const gross = money2(ch.paid + le.paid + st.bonus + co.paid);
+  const gross = money2(ch.paid + le.paid + st.bonus + co.paid + se.paid);
   const net = money2(Math.max(0, gross - fi.total));
-  return { chores: ch, learning: le, streak: st, comp: co, fines: fi, gross, net };
+  return { chores: ch, learning: le, streak: st, comp: co, sessions: se, fines: fi, gross, net };
 }
 
 /* ── Report ───────────────────────────────────────────────────────
@@ -217,6 +231,7 @@ function report() {
     console.log(`   streak       ${usd(m.streak.bonus).padStart(7)}   (longest run ${m.streak.days} days`
       + `${m.streak.tier ? `, ${m.streak.tier}-day tier` : ', no tier reached'})`);
     console.log(`   competition  ${usd(m.comp.paid).padStart(7)}`);
+    console.log(`   club job     ${usd(m.sessions.paid).padStart(7)}   (${m.sessions.attended} sessions × ${usd(m.sessions.rate)})`);
     console.log(`   fines       -${usd(m.fines.total).padStart(7)}`);
     console.log(`   ─────────────────────`);
     console.log(`   net          ${usd(m.net).padStart(7)}`);
@@ -253,4 +268,4 @@ function report() {
 if (require.main === module) report();
 
 module.exports = { weekMoney, WEEKS, report,
-  choresPaid, learningPaid, streakPaid, competitionPaid, finesApplied };
+  choresPaid, learningPaid, streakPaid, competitionPaid, sessionsPaid, finesApplied };
