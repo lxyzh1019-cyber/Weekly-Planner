@@ -6341,19 +6341,34 @@ function findChromium() {
           mrRoutineSessionsFor(wk, kid, d).forEach(sess => ctSetMandatory(wk, d, sess, kid, keptDay));
         });
       };
-      // Six kept with one miss in the middle: the grace carries the run across
-      // it, and the day itself is NOT credited — so this is 6, not 7.
+      /* Plan v5 Deviation 30: the forgiving day COUNTS (`graceCounts`), so six
+         kept with one miss in the middle is a 7-day run and pays the top
+         tier. A rule version without the field is a week lived before it:
+         there the grace carries the run across the miss WITHOUT crediting the
+         day, so the same week reads 6. */
+      if ((mrRulesForWeek(wk).streak || {}).graceCounts !== true) problems.push('this week does not count the forgiving day');
       setWeek([true, true, true, false, true, true, true]);
       const oneMiss = mrStreakWeek(wk, kid);
-      if (oneMiss.days !== 6) problems.push('one miss gave a run of ' + oneMiss.days + ', not 6');
-      // Two misses: the grace is spent on the first, the second ends the run.
+      const top = (MR_DEFAULT_RULES.streak.tiers || []).reduce((a, b) => (b.days > a.days ? b : a));
+      if (oneMiss.days !== 7 || money2(oneMiss.bonus) !== money2(top.bonus)) problems.push('6 kept + the forgiving day gave ' + JSON.stringify(oneMiss) + ', not a 7-day run at the top tier');
+      const liveStreak = mrRulesForWeek(wk).streak;
+      const hadCounts = liveStreak.graceCounts;
+      delete liveStreak.graceCounts;
+      try {
+        const lived = mrStreakWeek(wk, kid);
+        if (lived.days !== 6) problems.push('a week lived before Deviation 30 gave a run of ' + lived.days + ', not 6');
+      } finally { liveStreak.graceCounts = hadCounts; }
+      // Two misses: the forgiving day covers one, the second ends the run.
       setWeek([true, true, false, true, true, false, true]);
       const twoMiss = mrStreakWeek(wk, kid);
       if (twoMiss.days >= 6) problems.push('two misses still gave a run of ' + twoMiss.days);
-      // A clean week is still seven — grace must not inflate the top tier.
+      // A clean week is seven; the forgiving day never makes it more.
       setWeek([true, true, true, true, true, true, true]);
       const clean = mrStreakWeek(wk, kid);
       if (clean.days !== 7) problems.push('a clean week reads ' + clean.days + ', not 7');
+      // Nothing kept is no run, forgiving day or not.
+      setWeek([false, false, false, false, false, false, false]);
+      if (mrStreakWeek(wk, kid).days !== 0) problems.push('a week with nothing kept reads a run of ' + mrStreakWeek(wk, kid).days);
 
       // ── 4 · The pace divides by the weeks that PASSED.
       const ytd = mrYearToDate(kid);
@@ -21238,9 +21253,9 @@ function findChromium() {
      (a) Paid-off share swept 0 → 100: for every stage, the ladder row in Money
          school, the pots behind it (the move gate and the Sunday split's gate)
          and the lessons behind it (the concept card and its chip) must say the
-         same thing — and it must be the table's answer: ready 0 · locked 30 ·
-         stock 40 · mix 100. (Savings is always open — Sunday v15, approved
-         deviation #8; it was 20.)
+         same thing — and it must be the table's answer: ready 20 · locked 30 ·
+         stock 40 · mix 100. (Plan v5 Deviation 8: Savings opens at 20% again;
+         Stage 1 had it at 0.)
      (b) The 1 Oct fixture: $300 of $1,000 and $240 of $800 both open Keep it
          ready and Lock it away, and not Buy a bit of a company.
      (c) A stepper in Money rules › Lessons lands as a dated, logged rule version
@@ -21265,7 +21280,7 @@ function findChromium() {
       window.showToast = (m) => { toasts.push(String(m)); };
       const r = mrRules();
       r.school = Object.assign({}, r.school, { unlockStage: { jenn: 0, jess: 0 } });
-      const want = { start: 0, ready: 0, locked: 30, stock: 40, mix: 100 };
+      const want = { start: 0, ready: 20, locked: 30, stock: 40, mix: 100 };
       MNY_STAGES.forEach(s => { if (mnyStagePct(s.id) !== want[s.id]) bad.push(`${s.id} opens at ${mnyStagePct(s.id)}%, the table says ${want[s.id]}%`); });
       [MNY_BUCKETS, MNY_PLANS, MNY_CONCEPTS].forEach((t, ti) => t.forEach(x => {
         if (mnyStageIndexOf(x.stage) < 0) bad.push(`${['a pot', 'a plan', 'a lesson'][ti]} (${x.key || x.id}) names no stage: ${x.stage}`);
@@ -21317,7 +21332,7 @@ function findChromium() {
       const live = mrRules();
       const hadPct = live.school.stagePct;
       delete live.school.stagePct;
-      if (mnyStagePct('ready') !== 0 || mnyStagePct('locked') !== 30 || mnyStagePct('stock') !== 40 || mnyStagePct('mix') !== 100) bad.push('a rulebook without stagePct does not read the defaults');
+      if (mnyStagePct('ready') !== 20 || mnyStagePct('locked') !== 30 || mnyStagePct('stock') !== 40 || mnyStagePct('mix') !== 100) bad.push('a rulebook without stagePct does not read the defaults');
       oneDebt('jenn', 1000, 300); mnyStageIndex('jenn');
       if ('stagePct' in mrRules().school) bad.push('reading the gates migrated the stored rulebook');
       live.school.stagePct = hadPct;
@@ -21328,13 +21343,13 @@ function findChromium() {
       live.school.unlockStage = { jenn: 0, jess: 0 };
       // (c)
       oneDebt('jess', 1000, 250);                                         // 25%: ready is open at 20
-      if (!mnyIsOpen('jess', 'ready')) bad.push('Savings should be open at the default gates');
+      if (!mnyIsOpen('jess', 'ready')) bad.push('25% should open Keep it ready at the default gates');
       showScreen('parent'); setParentTab('money'); mnyParentSection = 'lessons'; mnyPending = []; mnyRenderRulesTab();
       const logBefore = mrLogEntries().length;
       const plus = (id) => document.querySelector(`#mnyRulesWrap [data-mnyp-action="stagepct"][data-mnyp-id="${id}"][data-mnyp-d="5"]`);
       if (!plus('ready')) bad.push('Lessons has no gate steppers');
       else {
-        for (let i = 0; i < 6; i++) plus('ready').click();               // 0 → 30
+        plus('ready').click(); plus('ready').click();                    // 20 → 30
         const p = mnyPending.find(x => x.path === 'school.stagePct.ready');
         if (!p || p.value !== 30) bad.push('the stepper did not queue ready at 30: ' + JSON.stringify(mnyPending));
         toasts.length = 0;
@@ -23148,6 +23163,7 @@ function findChromium() {
       delete old.loan.ratePct; delete old.loan.interestEverySundays; delete old.loan.extraBonusPct;
       old.loan.earlyPaymentBonusPct = 15;
       old.school.stagePct.ready = 20;
+      delete old.streak.graceCounts;                  // a rulebook from before Deviation 30
       old.words = { jenn: 2 };
       mr.versions = [{ id: 'mrv-old', effectiveFrom: '2026-08-03', createdAt: 1, updatedAt: 1, createdBy: 'parent', reason: 'family_meeting', note: 'Ours', rules: old }];
       mr.log = {};
@@ -23156,18 +23172,42 @@ function findChromium() {
       if ('sessions' in mrRules()) bad.push('rules: reading them wrote to the stored rulebook');
       const pend = mrSundayRulesPending();
       const at = path => pend.find(x => x.path === path);
-      if (!at('sessions.perSession') || !at('school.stagePct.ready') || at('school.stagePct.ready').value !== 0) bad.push('rules: the pending list misses a path');
+      if (!at('sessions.perSession') || !at('streak.graceCounts') || at('streak.graceCounts').value !== true) bad.push('rules: the pending list misses a path');
+      if (at('school.stagePct.ready')) bad.push('rules: the family\'s own Savings gate would be changed');
+      if (filled.streak.graceCounts !== false) bad.push('rules: a rulebook without graceCounts must read false, read ' + filled.streak.graceCounts);
       if (at('words.jenn')) bad.push('rules: the family\'s own words stage would be overwritten');
       if (!at('loan.extraBonusPct') || at('loan.extraBonusPct').value !== 15) bad.push('rules: the bonus did not carry the family\'s own figure');
       mrApplySundayRules();
       const now = mrRules();
-      if (now.sessions.perSession !== 6 || now.school.stagePct.ready !== 0 || now.words.jenn !== 2) bad.push('rules: applying did not land as one version keeping their own values');
-      if (mrRulesForWeek('2026-08-10').school.stagePct.ready !== 20) bad.push('rules: a lived week was re-priced');
+      if (now.sessions.perSession !== 6 || now.school.stagePct.ready !== 20 || now.streak.graceCounts !== true || now.words.jenn !== 2) bad.push('rules: applying did not land as one version keeping their own values');
+      if (mrRulesForWeek('2026-08-10').school.stagePct.ready !== 20 || 'graceCounts' in mrRulesForWeek('2026-08-10').streak) bad.push('rules: a lived week was re-priced');
       if (mrVersions().length !== 2 || mrApplySundayRules() !== null) bad.push('rules: applying twice made another version');
       // The spend cap comes from its rule.
       now.spend.capPct = 50;
       const pool = mnyPool(wk, kid);
       if (pool.spendCap !== money2(pool.mine * 0.5)) bad.push('pool: spend cap ignores spend.capPct');
+      /* (10b) A household that applied the FIRST Sunday card (ready → 0, no
+         graceCounts) gets ready back to 20 and the forgiving day through the
+         same card, once; a 0 the family chose is left alone. */
+      const first = mrDeepCopy(MR_DEFAULT_RULES);
+      first.school.stagePct.ready = 0; delete first.streak.graceCounts;
+      mr.versions = [{ id: 'mrv-first', effectiveFrom: '2026-08-03', createdAt: 1, updatedAt: 1, createdBy: 'parent', reason: 'family_meeting', note: 'Ours', rules: first }];
+      mr.log = { a: { id: 'a', at: 5, versionId: 'mrv-first', effectiveFrom: '2026-08-03', path: 'school.stagePct.ready', from: 20, to: 0,
+                      reason: 'family_meeting', note: MR_SUNDAY_RULES_FIRST_NOTE + ' — 🏦 Savings: opens at % paid' },
+                 b: { id: 'b', at: 6, versionId: 'mrv-first', effectiveFrom: '2026-08-03', path: 'sessions.perSession', from: null, to: 6,
+                      reason: 'family_meeting', note: MR_SUNDAY_RULES_FIRST_NOTE + ' — ⛸️ Assistant job: dollars a session' } };
+      if (mrSundayRulesApplied()) bad.push('rules: the first card\'s marker hides the corrections');
+      const fix = mrSundayRulesPending();
+      const fixAt = path => fix.find(x => x.path === path);
+      if (fix.length !== 2 || !fixAt('school.stagePct.ready') || fixAt('school.stagePct.ready').value !== 20 || !fixAt('streak.graceCounts')) bad.push('rules: the corrections are not exactly Savings → 20 and the forgiving day: ' + JSON.stringify(fix));
+      mrApplySundayRules();
+      if (mrRules().school.stagePct.ready !== 20 || mrRules().streak.graceCounts !== true) bad.push('rules: the corrections did not land');
+      if (mrRulesForWeek('2026-08-10').school.stagePct.ready !== 0) bad.push('rules: the corrections re-priced a lived week');
+      if (mrSundayRulesPending().length || mrApplySundayRules() !== null || mrVersions().length !== 2) bad.push('rules: the corrections are not idempotent');
+      // The same 0, set by the family on Money rules › Lessons: theirs to keep.
+      mr.versions = [{ id: 'mrv-own', effectiveFrom: '2026-08-03', createdAt: 1, updatedAt: 1, createdBy: 'parent', reason: 'family_meeting', note: 'Ours', rules: first }];
+      mr.log = { a: { id: 'a', at: 5, versionId: 'mrv-own', effectiveFrom: '2026-08-03', path: 'school.stagePct.ready', from: 20, to: 0, reason: 'family_meeting', note: 'Keep it ready opens at (% paid off)' } };
+      if (mrSundayRulesPending().some(x => x.path === 'school.stagePct.ready')) bad.push('rules: a Savings gate the family chose would be overwritten');
     } catch (e) {
       bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n').slice(1, 3).join(' '));
     } finally {
@@ -23449,10 +23489,18 @@ function findChromium() {
     await guSetup();
     checks.grownupsFinesLogEvenWhenFree = await page.evaluate(() => {
       const bad = [];
+      // Thursday of this week: Mon–Thu can be chosen, Fri–Sun have not happened.
+      const unpin = c1.pin(3);
       try {
         const kid = 'jess', days = mrWeekDayKeys(ctThisWeekKey());
         getProfData(kid).fines = mrFines(kid).filter(f => days.indexOf(f.dayKey) < 0);
         const wrap = guOpen('fines');
+        // Plan v5 Deviation 23: the Day row, today chosen first, the days to come disabled.
+        const dayBtn = (i) => wrap.querySelector(`[data-mnyp-action="gufnday"][data-mnyp-id="${i}"]`);
+        if (!dayBtn(3) || !dayBtn(3).classList.contains('on')) bad.push('the Day row does not start on today (Thursday)');
+        if ([0, 1, 2, 3].some(i => !dayBtn(i) || dayBtn(i).disabled) || [4, 5, 6].some(i => !dayBtn(i) || !dayBtn(i).disabled)) bad.push('Mon–Thu should be open and Fri–Sun disabled: ' + [0, 1, 2, 3, 4, 5, 6].map(i => dayBtn(i) && dayBtn(i).disabled).join(','));
+        dayBtn(5).click();
+        if (guFine().dayIdx !== 3) bad.push('a day still to come could be chosen: ' + guFine().dayIdx);
         guPress('[data-mnyp-action="gufnkid"][data-mnyp-id="jess"]');
         guPress('[data-mnyp-action="gufnitem"][data-mnyp-id="tone"]');
         guPress('[data-mnyp-action="gufnday"][data-mnyp-id="1"]');
@@ -23471,10 +23519,16 @@ function findChromium() {
         if (!/2 of 2 free · the next one costs \$1/.test(wrap.textContent)) bad.push('the standing does not say the next one costs $1');
         const see = wrap.querySelector('.gu-side').textContent.replace(/\s+/g, ' ');
         if (!/What she sees on Sunday/.test(see) || !/Jess · 📦 Fines\s*−\$1\.00/.test(see) || !/Mom logged/.test(see)) bad.push('the right pane does not say what she sees: ' + see);
+        // Back-dated to Monday, entered last: it is the week's first, so Tue is
+        // the second free one and Wed and Thu cost (mrFinesWeek: day, then at).
+        guPress('[data-mnyp-action="gufnday"][data-mnyp-id="0"]');
+        guPress('[data-mnyp-action="gufnsave"]');
+        const rows2 = [...wrap.querySelectorAll('.gu-tint--jess .gu-finerow')].map(r => r.textContent.replace(/\s+/g, ' '));
+        if (rows2.length !== 4 || !/^Mon/.test(rows2[0]) || !/free/.test(rows2[0]) || !/free/.test(rows2[1]) || !/−\$1\.00/.test(rows2[2]) || !/−\$1\.00/.test(rows2[3])) bad.push('a back-dated Monday fine is not the week\'s first free one: ' + JSON.stringify(rows2));
         const id = mrFines(kid).find(f => days.indexOf(f.dayKey) >= 0).id;
         guPress(`[data-mnyp-action="gufinedel"][data-mnyp-id="${id}"]`);
         if (mrFines(kid).some(f => f.id === id) || !state.shared.tombstones['fine:' + id]) bad.push('✕ did not remove the fine for good');
-      } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); }
+      } catch (e) { bad.push('threw: ' + e.message + ' @ ' + String(e.stack || '').split('\n')[1]); } finally { unpin(); }
       return bad.length ? bad : true;
     });
     await guTeardown();
@@ -23527,6 +23581,10 @@ function findChromium() {
         });
         if (!/Changes start next Sunday\. The girls see what changed\./.test(text)) bad.push('the strap line is not the prototype\'s');
         const rowOf = (label) => [...wrap.querySelectorAll('.gu-rule')].find(r => r.textContent.indexOf(label) >= 0);
+        // Plan v5 Rev 4: the forgiving day in the routine row's "she" line, and the Savings gate back at 20%.
+        const routine = rowOf('Routine · 7 days in a row'), savings = rowOf('Savings opens at');
+        if (!routine || !/6 with a forgiving day = \$3/.test(routine.textContent)) bad.push('the routine row does not say 6 with a forgiving day = $3: ' + (routine && routine.textContent));
+        if (!savings || !/20%/.test(savings.textContent) || !/of loan paid/.test(savings.textContent)) bad.push('no "Savings opens at 20% of loan paid" row: ' + (savings && savings.textContent));
         rowOf('Chores · per graded day').querySelector('[data-mnyp-d="0.5"]').click();
         const chore = rowOf('Chores · per graded day');
         if (!/\$3\.50/.test(chore.textContent) || !/ · was \$3/.test(chore.textContent) || !chore.querySelector('.gu-ruleval.changed')) bad.push('a stepped rule does not show its new value and "was"');

@@ -55,7 +55,9 @@ const GU_WORDS_STAGE = { 1: 'earn · save · owe', 2: '+ income · interest · c
 const GU_RULE_DEFS = [
   ['🧹 Earning', 'green', [
     ['chores.dailyCap', 'Chores · per graded day', '$', 0.5, v => `“${guMoney$(v)} for a day done right”`],
-    [R => 'streak.tiers.' + guTierIndex(R, 7) + '.bonus', 'Routine · 7 days in a row', '$', 1, v => `“${guMoney$(v)} bonus for a full week”`],
+    // Plan v5 Deviation 30: the forgiving day, said from the rules (sdStreakForgiving).
+    [R => 'streak.tiers.' + guTierIndex(R, 7) + '.bonus', 'Routine · 7 days in a row', '$', 1,
+      (v, R) => `“${guMoney$(v)} bonus for a full week”${sdStreakForgiving(R) ? ' · ' + sdStreakForgiving(R) : ''}`],
     [R => 'fines.items.' + guItemIndex(R, 'box_repeat') + '.amount', 'Box fine · left out twice in a week', '$', 0.25, v => `“the 🐰 takes ${guMoney$(v)}”`]]],
   ['🏆 Competitions', 'jenn', [
     ['competition.swim.perPoint', 'Swim · per point', '$', 0.5],
@@ -74,6 +76,9 @@ const GU_RULE_DEFS = [
     ['loan.extraBonusPct', 'Bonus on extra wall money', '%', 5, v => `“$1 extra counts as $${(1 + v / 100).toFixed(2)}”`],
     ['loan.ratePct', 'Loan interest', '%', 0.5, (v, R) => `a year · added every ${Number(mrRuleOr(R, 'loan.interestEverySundays')) || 4} Sundays`]]],
   ['🌱 Pots', 'jess', [
+    // Plan v5 Deviation 8: Savings opens at 20% (the prototype's "Kept ready
+    // opens at", named as the handoff names the pot).
+    ['school.stagePct.ready', 'Savings opens at', '%', 5, () => 'of loan paid'],
     ['school.stagePct.locked', 'Locked away opens at', '%', 5, () => 'of loan paid'],
     ['school.stagePct.stock', 'Companies opens at', '%', 5, () => 'of loan paid'],
     ['pots.rates.ready', 'Kept ready pays', '%', 0.5, () => 'a year'],
@@ -157,8 +162,8 @@ function guRender(tab) {
 function guHead(title, strap) {
   return `<div class="gu-head"><h2 class="gu-title">${escapeHtml(title)}</h2><span class="gu-strap">${escapeHtml(strap)}</span></div>`;
 }
-function guOpt(label, on, action, attrs) {
-  return `<button type="button" class="gu-opt${on ? ' on' : ''}" data-mnyp-action="${action}"${attrs || ''}>${escapeHtml(label)}</button>`;
+function guOpt(label, on, action, attrs, off) {
+  return `<button type="button" class="gu-opt${on ? ' on' : ''}" data-mnyp-action="${action}"${attrs || ''}${off ? ' disabled aria-disabled="true"' : ''}>${escapeHtml(label)}</button>`;
 }
 function guVal(label) { return `<span class="gu-opt gu-optval">${escapeHtml(label)}</span>`; }
 function guFormRow(q, opts) {
@@ -475,13 +480,23 @@ function guPlaceOneOff() {
   return b;
 }
 
-/* ════════════ 📦 FINES (deviation #2: the app's catalog) ════════════ */
+/* ════════════ 📦 FINES (deviation #2: the app's catalog) ════════════
+   Plan v5 Deviation 23: a Day row, Mon–Sun of this week, today chosen first
+   and the days still to come disabled — each fine is attached to its day.
+   A back-dated one is placed by `mrFinesWeek` (day, then `at`), so the free
+   repeats and the standing stay right. */
 function guFineItems() { return ((mrRulesForWeek(ctThisWeekKey()).fines) || {}).items || []; }
+// Today's place in this week (Mon 0 … Sun 6); the last day it may be.
+function guTodayIdx() {
+  const i = mrWeekDayKeys(ctThisWeekKey()).indexOf(todayKey());
+  return i < 0 ? 6 : i;
+}
 function guFine() {
   if (!guFineDraft) {
-    const today = mrWeekDayKeys(ctThisWeekKey()).indexOf(todayKey());
-    guFineDraft = { kid: 'jenn', itemId: (guFineItems()[0] || {}).id || '', dayIdx: today < 0 ? 6 : today, who: 'Dad' };
+    guFineDraft = { kid: 'jenn', itemId: (guFineItems()[0] || {}).id || '', dayIdx: guTodayIdx(), who: 'Dad' };
   }
+  // A draft kept from an earlier day never points past today.
+  if (guFineDraft.dayIdx > guTodayIdx()) guFineDraft.dayIdx = guTodayIdx();
   return guFineDraft;
 }
 /* "1 of 2 free · the next one costs $1" — mrFineStanding's numbers, said. */
@@ -525,7 +540,7 @@ function guFinesMain() {
       <div class="gu-cardhead"><span class="gu-cardtitle">➕ Log a fine</span><b class="gu-fig gu-fig--fine">${escapeHtml(next)}</b></div>
       ${guFormRow('For', GU_KIDS.map(k => guOpt(mnyKidName(k), f.kid === k, 'gufnkid', ` data-mnyp-id="${k}"`)).join(''))}
       ${guFormRow('What', items.map(it => guOpt(it.label, f.itemId === it.id, 'gufnitem', ` data-mnyp-id="${escapeAttr(it.id)}"`)).join(''))}
-      ${guFormRow('Day', GU_DAY_NAMES.map((d, i) => guOpt(d, f.dayIdx === i, 'gufnday', ` data-mnyp-id="${i}"`)).join(''))}
+      ${guFormRow('Day', GU_DAY_NAMES.map((d, i) => guOpt(d, f.dayIdx === i, 'gufnday', ` data-mnyp-id="${i}"`, i > guTodayIdx())).join(''))}
       ${guFormRow('Logged by', ['Mom', 'Dad'].map(w => guOpt(w, f.who === w, 'gufnwho', ` data-mnyp-id="${w}"`)).join(''))}
       <div class="gu-line">${escapeHtml(mnyKidName(f.kid))} · ${escapeHtml(guFineLabel(f.itemId))}: ${escapeHtml(guStandingLine(st))}</div>
       <div class="gu-remind">Log every one, even a free one. The free ones are still on her record, and she sees each one on Sunday.</div>
@@ -635,14 +650,16 @@ function guRulesMain() {
     <div class="gu-cards2 gu-rulegrid">${sections}</div>`;
 }
 /* A rulebook stored before Sunday v15 lacks the new paths; this offers them
-   as one appended version (mrApplySundayRules), the house rules' way. */
+   as one appended version (mrApplySundayRules), the house rules' way. A yes /
+   no rule (the forgiving day) reads as a word, not "true". */
+function guRuleWord(v) { return v == null ? '—' : v === true ? 'yes' : v === false ? 'no' : String(v); }
 function guSundayRulesCard() {
   if (mrSundayRulesApplied()) return '';
   const pending = mrSundayRulesPending();
   if (!pending.length) return '';
   return `<div class="gu-card gu-plain">
       <div class="gu-cardtitle">☀️ The Sunday rules are not in this rulebook yet</div>
-      ${pending.map(p => `<div class="gu-kv"><span>${escapeHtml(p.item)} — ${escapeHtml(p.field)}</span><b>${escapeHtml(p.from == null ? '—' : String(p.from))} → ${escapeHtml(String(p.value))}</b></div>`).join('')}
+      ${pending.map(p => `<div class="gu-kv"><span>${escapeHtml(p.item)} — ${escapeHtml(p.field)}</span><b>${escapeHtml(guRuleWord(p.from))} → ${escapeHtml(guRuleWord(p.value))}</b></div>`).join('')}
       <div class="gu-line">Added as one dated change from this week's Monday. Nothing already lived is re-priced, and the family's own figures stay.</div>
       <button type="button" class="gu-save ready" data-mnyp-action="gusundayrules">Put ${pending.length === 1 ? 'it' : 'them'} into the rulebook</button>
     </div>`;
@@ -757,7 +774,7 @@ function guAction(a, el) {
   // 📦 Fines
   } else if (a === 'gufnkid') { guFine().kid = id;
   } else if (a === 'gufnitem') { guFine().itemId = id;
-  } else if (a === 'gufnday') { guFine().dayIdx = Math.max(0, Math.min(6, Number(id) || 0));
+  } else if (a === 'gufnday') { guFine().dayIdx = Math.max(0, Math.min(guTodayIdx(), Number(id) || 0));
   } else if (a === 'gufnwho') { guFine().who = id === 'Mom' ? 'Mom' : 'Dad';
   } else if (a === 'gufnsave') { guLogFine();
   } else if (a === 'gufinedel') { mrRemoveFine(kid, id);

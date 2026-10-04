@@ -146,8 +146,15 @@ function pmStreakNote(streak) {
   if (!grace) {
     return `<b>Highest one only</b> — they don't add up. Miss a day and the run starts over, but <b>your best run of the week</b> is what pays. Resets Sunday.`;
   }
+  /* Plan v5 Deviation 30: with `graceCounts` the forgiving day counts as a
+     kept day (6 kept + the forgiving day is a full week). */
+  const counts = streak.graceCounts === true;
   const days = grace === 1
-    ? `One missed day a week won't break your run — it just doesn't count as a day. Miss a second and the run starts over`
-    : `Up to ${pmCountWord(grace)} missed days a week won't break your run — they just don't count as days. Miss one more and the run starts over`;
+    ? (counts
+      ? `One missed day a week won't break your run — it's your forgiving day, and it counts as a day kept. Miss a second and the run starts over`
+      : `One missed day a week won't break your run — it just doesn't count as a day. Miss a second and the run starts over`)
+    : (counts
+      ? `Up to ${pmCountWord(grace)} missed days a week won't break your run — they're forgiving days, and they count as days kept. Miss one more and the run starts over`
+      : `Up to ${pmCountWord(grace)} missed days a week won't break your run — they just don't count as days. Miss one more and the run starts over`);
   return `<b>Highest one only</b> — they don't add up. ${days}, and <b>your best run of the week</b> is what pays. Resets Sunday.`;
 }

@@ -7,12 +7,15 @@
 // and assert, every single week,
 //
 //   · In = Out to the cent;
-//   · the cents go to Savings and are never more than $0.99;
+//   · the cents are never more than $0.99 and go to Savings — or, below the
+//     🏦 Savings gate, on the loan as extra with the goal jar's overflow
+//     (Plan v5 Deviation 8);
 //   · the loan is never negative and never overpaid;
 //   · interest is added exactly every 4th Sunday;
 //   · a lock comes back on the Saturday before the 4th-next Sunday;
 //   · the goal jar never passes its goal — the rest goes to Savings;
-//   · 🔒 Locked away and 📈 Companies open at 30 / 40 % paid and never re-lock;
+//   · 🏦 Savings, 🔒 Locked away and 📈 Companies open at 20 / 30 / 40 % paid
+//     and never re-lock;
 //   · cash out never passes its cap and an advance never passes its maximum;
 //   · the passbook shares add to exactly 100, with "<1%" for a tiny one —
 //
@@ -46,12 +49,15 @@ check('the Sunday rules are in the shipped rulebook (Plan v3 §C)',
   && R.loan.ratePct === 1 && R.loan.interestEverySundays === 4 && R.loan.extraBonusPct === 10
   && R.pots.safety === 10 && R.pots.lockWeeks === 4
   && R.pots.rates.ready === 1.5 && R.pots.rates.gic === 4 && R.pots.rates.stock === 7
-  && R.school.stagePct.ready === 0 && R.school.stagePct.locked === 30 && R.school.stagePct.stock === 40
+  && R.school.stagePct.ready === 20 && R.school.stagePct.locked === 30 && R.school.stagePct.stock === 40
   && R.words.jenn === 1 && R.words.jess === 1 && R.market.wobblePct === 0
     ? true : 'a §C path is missing or has the wrong default');
-check('Savings is always open: its gate is 0 and the order rule still holds',
-  R.school.stagePct.ready <= R.school.stagePct.locked && R.school.stagePct.locked <= R.school.stagePct.stock
+check('Savings opens at 20% paid (Plan v5 Deviation 8) and the order rule holds',
+  R.school.stagePct.ready === 20
+  && R.school.stagePct.ready <= R.school.stagePct.locked && R.school.stagePct.locked <= R.school.stagePct.stock
   && R.school.stagePct.stock <= 100);
+check('the forgiving day counts (Plan v5 Deviation 30)',
+  R.streak.graceDays === 1 && R.streak.graceCounts === true);
 
 /* ── A seeded random source, so a failure is reproducible ── */
 function rng(seed) {
@@ -62,8 +68,14 @@ function rng(seed) {
 const pick = (rand, list) => list[Math.floor(rand() * list.length)];
 const between = (rand, lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));
 
-/* The two girls as the prototype drew them (Sunday v15 KIDS). */
+/* The two girls as the prototype drew them (Sunday v15 KIDS), plus a third
+   start below the 🏦 Savings gate (10% paid) so every run also crosses 20%. */
 function startOf(kid) {
+  if (kid === 'low') {
+    return { weekKey: '2026-09-28', week: 0, loan: { principal: 600, paid: 60, interest: 0, arrears: 0, weekly: r2(40 * 12 / 52) },
+      pots: { ready: 0, goal: 4, gic: 0, stock: 0 }, locks: [],
+      goal: { name: 'Swim goggles', target: 12 }, histCat: [], stickers: [], sinceInterest: 0, advOwed: 0 };
+  }
   return kid === 'jenn'
     ? { weekKey: '2026-09-28', week: 0, loan: { principal: 1000, paid: 300, interest: 0, arrears: 0, weekly: r2(70 * 12 / 52) },
         pots: { ready: 12, goal: 8, gic: 5, stock: 0 }, locks: [{ amount: 5, back: 1 }],
@@ -118,13 +130,13 @@ function placeAll(rand, w) {
 /* ── 8–20 Sundays, both girls, every invariant every week ── */
 {
   const bad = [];
-  let weeksRun = 0, interestWeeks = 0, locksBack = 0, crossedSeen = {}, presetsLocked = 0;
+  let weeksRun = 0, interestWeeks = 0, locksBack = 0, crossedSeen = {}, presetsLocked = 0, shutWeeks = 0, overSeen = 0;
   for (let seed = 1; seed <= 60 && bad.length < 12; seed++) {
-    ['jenn', 'jess'].forEach(kid => {
-      const rand = rng(seed * 7919 + (kid === 'jenn' ? 1 : 2));
+    ['jenn', 'jess', 'low'].forEach(kid => {
+      const rand = rng(seed * 7919 + ({ jenn: 1, jess: 2, low: 3 })[kid]);
       const N = 8 + (seed % 13);                      // 8 … 20 Sundays
       let st = startOf(kid);
-      const wasOpen = { gic: false, stock: false };
+      const wasOpen = { ready: false, gic: false, stock: false };
       for (let i = 0; i < N && bad.length < 12; i++) {
         const tag = `${kid} seed ${seed} Sunday ${i + 1}`;
         const lines = incomeFor(rand, st);
@@ -158,9 +170,22 @@ function placeAll(rand, w) {
         const sg = res.signed;
         // In = Out
         if (!res.check.ok) bad.push(`${tag}: In ${res.check.in} ≠ Out ${res.check.out}`);
-        // Cents
+        // Cents: to Savings above the gate; below it, with the jar's overflow,
+        // on the loan as extra — and Savings takes nothing but a spill.
         if (!(sg.cents >= 0 && sg.cents <= 0.99)) bad.push(`${tag}: cents ${sg.cents}`);
-        if (r2(sg.ready - (w.alloc.ready || 0) - sg.spill - sg.cents) < -0.001) bad.push(`${tag}: the cents did not reach Savings`);
+        const readyOpen0 = s.sdIsOpen('ready', w, R);
+        if (readyOpen0) {
+          if (r2(sg.ready - (w.alloc.ready || 0) - sg.spill - sg.cents) < -0.001) bad.push(`${tag}: the cents did not reach Savings`);
+          if (sg.overToLoan !== 0) bad.push(`${tag}: ${sg.overToLoan} went on the loan with Savings open`);
+        } else {
+          shutWeeks++;
+          if (w.alloc.ready) bad.push(`${tag}: $${w.alloc.ready} placed in Savings below its gate`);
+          if (sg.ready !== sg.spill) bad.push(`${tag}: Savings took ${sg.ready} below its gate (spill ${sg.spill})`);
+          const over = r2(sg.cents + Math.max(0, (w.alloc.goal || 0) - sg.goal));
+          if (sg.overToLoan !== over) bad.push(`${tag}: cents + overflow ${over}, on the loan ${sg.overToLoan}`);
+          if (sg.overToLoan > 0) overSeen++;
+          if (P.centsTo !== 'extra') bad.push(`${tag}: the pile says the cents go to ${P.centsTo}`);
+        }
         // Loan never negative, never overpaid
         const L = res.after.loan;
         if (s.sdLeft(L) < 0 || L.paid > L.principal + 0.001) bad.push(`${tag}: loan ${JSON.stringify(L)}`);
@@ -181,9 +206,9 @@ function placeAll(rand, w) {
         const pc = s.sdPercents(shares, tot);
         if (tot > 0 && pc.reduce((a, v) => a + v, 0) !== 100) bad.push(`${tag}: shares ${pc} of ${tot}`);
         pc.forEach((p, j) => { if (p === 0 && shares[j] > 0 && s.sdPercentLabel(p, shares[j]) !== '<1%') bad.push(`${tag}: a tiny share is not "<1%"`); });
-        // Gates: open at 30 / 40 % paid, and never re-lock
+        // Gates: open at 20 / 30 / 40 % paid, and never re-lock
         const pct = s.sdPaidPct(L);
-        ['gic', 'stock'].forEach(k => {
+        ['ready', 'gic', 'stock'].forEach(k => {
           const open = s.sdIsOpen(k, { loan: L }, R);
           const gate = R.school.stagePct[s.SD_GATE_STAGE[k]];
           if (open !== (pct >= gate)) bad.push(`${tag}: ${k} open=${open} at ${pct}% (gate ${gate})`);
@@ -211,9 +236,10 @@ function placeAll(rand, w) {
   }
   check('8–20 Sundays, both girls: every invariant held every week',
     bad.length === 0 ? true : bad.slice(0, 12).join(' | '));
-  check('the runs really ran (weeks, interest, locks coming back, a gate crossed)',
-    weeksRun > 1000 && interestWeeks > 200 && locksBack > 20 && Object.keys(crossedSeen).length >= 1
-      ? true : JSON.stringify({ weeksRun, interestWeeks, locksBack, crossedSeen, presetsLocked }));
+  check('the runs really ran (weeks, interest, locks coming back, gates crossed, weeks below 20%)',
+    weeksRun > 1500 && interestWeeks > 300 && locksBack > 20 && crossedSeen.ready && Object.keys(crossedSeen).length >= 2
+    && shutWeeks > 50 && overSeen > 20
+      ? true : JSON.stringify({ weeksRun, interestWeeks, locksBack, crossedSeen, presetsLocked, shutWeeks, overSeen }));
 }
 
 /* ── Edge cases from the handoff (§7.2) ── */
@@ -407,7 +433,7 @@ function fill(w, k) {
   const w2 = weekOf({ loan: { principal: 1000, paid: 300, interest: 0, arrears: 0, weekly: 16.15 }, pots: { ready: 4, goal: 0, gic: 0, stock: 0 } });
   check('at 30% it opens — once 🛟 Savings is filled', s.sdCanPlace('gic', w2, R).why === '🛟 fill Savings to $10 first');
   check('📈 Companies waits for 40%', s.sdCanPlace('stock', w2, R).why === '🔒 opens at 40% paid');
-  check('Savings, the wall and cash out are always open',
+  check('at 25% paid Savings is open; the wall and cash out always are',
     ['ready', 'extra', 'spend'].every(k => s.sdCanPlace(k, w, R).ok));
   const pre = s.sdPresets(w, R);
   check('"⚖️ Watch it grow" is locked under 30% and says the gate', pre[2].locked && pre[2].label === '⚖️ Watch it grow 🔒30%');
@@ -415,6 +441,64 @@ function fill(w, k) {
   const res = s.sdSign(fill(fresh, 'extra'), R);
   check('crossing 30% is the milestone', res.ok && res.crossed === 'gic' ? true : res.crossed);
   check('no loan at all: every pot is open', s.sdIsOpen('stock', { loan: { principal: 0, paid: 0 } }, R));
+}
+
+/* ── Below the 🏦 Savings gate (Plan v5 Deviation 8) ──
+   At 15% paid Savings is shut with the rule's number; the wall and cash out
+   are open; the goal jar does not ask for a 🛟 line there is no Savings to
+   fill; the cents and the jar's overflow go on the loan as extra, counted at
+   1 + bonus; crossing 20% is a milestone. */
+{
+  const low = { principal: 1000, paid: 150, interest: 0, arrears: 0, weekly: 16.15 };
+  const lines = [{ key: 'jobs', label: '🧹 Chores', amount: 15 }, { key: 'streak', label: '🔥 Routine streak', amount: 3 },
+                 { key: 'pa', label: '⛸️ Assistant job', amount: 12 }, { key: 'ret', label: '💹 My pots earned', amount: 0.4 }];
+  const w = weekOf({ loan: low, lines, pots: { ready: 0, goal: 30, gic: 0, stock: 0 } });
+  check('🏦 Savings is shut below 20% paid, with the rule’s number',
+    s.sdCanPlace('ready', w, R).why === '🔒 opens at 20% paid' && !s.sdIsOpen('ready', w, R));
+  check('below 20%: the wall and cash out are open, and the goal jar asks no 🛟 line',
+    ['extra', 'spend', 'goal'].every(k => s.sdCanPlace(k, w, R).ok) ? true : JSON.stringify(['extra', 'spend', 'goal'].map(k => s.sdCanPlace(k, w, R))));
+  const P = s.sdPile(w, R);
+  check('below 20%: the pile says the cents go on the loan', P.centsTo === 'extra' && P.cents > 0 ? true : JSON.stringify(P));
+  const alloc = { goal: 10, extra: P.hers - 10 };
+  const res = s.sdSign(Object.assign({}, w, { alloc }), R);
+  const b = R.loan.extraBonusPct / 100;
+  const over = r2(P.cents + 5);                     // the jar takes $5 of the $10
+  check('below 20%: the cents and the jar’s overflow go on the loan as extra',
+    res.ok && res.signed.goal === 5 && res.signed.overToLoan === over && res.signed.ready === 0
+    && res.after.pots.ready === 0 && res.after.pots.goal === 35 && res.check.ok
+      ? true : JSON.stringify({ sg: res.signed, pots: res.after && res.after.pots }));
+  check('below 20%: that extra is counted at 1 + bonus',
+    res.after.loan.paid === r2(150 + P.minNow + (alloc.extra + over) * (1 + b)) && res.signed.extra === r2(alloc.extra + over)
+      ? true : JSON.stringify({ paid: res.after.loan.paid, want: r2(150 + P.minNow + (alloc.extra + over) * (1 + b)) }));
+  const pre = s.sdPresets(w, R).find(p => p.id === 'saving');
+  check('below 20%: "🎯 For my goal" sends the jar’s overflow to the wall, not Savings',
+    pre && !pre.alloc.ready && pre.alloc.goal === 5 && r2(pre.alloc.goal + pre.alloc.extra) === P.hers ? true : JSON.stringify(pre));
+  const f = s.sdForecast(res, Object.assign({}, w, { alloc }), R, 4);
+  check('below 20%: the forecast puts a full jar’s overflow on the loan',
+    f.toReady === 0 && f.overLoan > 0 && /goes on the 🧱 loan/.test(f.fwNote) ? true : JSON.stringify([f.toReady, f.overLoan, f.fwNote]));
+  const near = weekOf({ loan: { principal: 1000, paid: 190, interest: 0, arrears: 0, weekly: 16.15 } });
+  const crossed = s.sdSign(fill(near, 'extra'), R);
+  check('crossing 20% is the milestone', crossed.ok && crossed.crossed === 'ready' ? true : crossed.crossed);
+  const at20 = weekOf({ loan: { principal: 1000, paid: 200, interest: 0, arrears: 0, weekly: 16.15 }, lines });
+  const P20 = s.sdPile(at20, R);
+  const res20 = s.sdSign(fill(at20, 'extra'), R);
+  check('at 20% the cents go to Savings again and nothing extra goes on the loan',
+    P20.centsTo === 'ready' && res20.signed.overToLoan === 0 && res20.signed.ready === P20.cents ? true : JSON.stringify(res20.signed));
+}
+
+/* ── 🔥 The routine clue (Plan v5 Deviation 30) ── */
+{
+  check('the clue line: 7 days = $3 · 6 with a forgiving day = $3',
+    s.sdStreakClue(R) === '7 days = $3 · 6 with a forgiving day = $3' ? true : s.sdStreakClue(R));
+  const old = JSON.parse(JSON.stringify(R)); delete old.streak.graceCounts;
+  check('a week lived before the rule: 6 with a forgiving day = $2',
+    s.sdStreakClue(old) === '7 days = $3 · 6 with a forgiving day = $2' ? true : s.sdStreakClue(old));
+  const none = JSON.parse(JSON.stringify(R)); none.streak.graceDays = 0;
+  check('no forgiving day: the clue is the top tier only', s.sdStreakClue(none) === '7 days = $3' ? true : s.sdStreakClue(none));
+  const clues = s.sdClues(R);
+  check('Sunday’s four clues read the rules',
+    clues.length === 4 && clues[0].v === '$3 a day · $6 a session' && clues[1].k === '🔥 Routine'
+    && clues[1].v === '7 days = $3 · 6 with a forgiving day = $3' ? true : JSON.stringify(clues));
 }
 
 /* ── The prototype's own words, at the default rules ── */

@@ -101,10 +101,18 @@ const MR_DEFAULT_RULES = {
      `graceDays: 1`. An off day is a valid state (see *Writing for children*),
      and a streak with no rest state is the all-or-nothing shape this app is
      not allowed to build. One missed day no longer ends the run; a second
-     does. It is deliberately not a free pass at the top tier either — seven
-     clean days still means seven, because the grace is spent on the miss. */
+     does.
+
+     ── THE FORGIVING DAY COUNTS (Plan v5 Deviation 30, owner 2026-10-03) ──
+     `graceCounts: true`: the forgiven day counts as a kept day, so 7 kept
+     days, or 6 kept plus the one forgiving day, pays the 7-day tier ($3). A
+     second miss still ends the run. "Forgiving day" is the word she reads;
+     "grace" stays in code. A rule version without the field reads false —
+     the grace then carries the run across the miss WITHOUT counting it (six
+     kept with one miss reads 6) — so a week lived before this rule keeps the
+     pay it had. Delivered to a stored rulebook by `mrSundayRulesPending`. */
   streak: { tiers: [{ days: 3, bonus: 1 }, { days: 5, bonus: 2 }, { days: 7, bonus: 3 }],
-            highestOnly: true, resetsOn: 'sunday', graceDays: 1 },
+            highestOnly: true, resetsOn: 'sunday', graceDays: 1, graceCounts: true },
 
   competition: {
     // No caps on points, by decision — the dance test is the one exception.
@@ -291,11 +299,13 @@ const MR_DEFAULT_RULES = {
      `mnyStagePct` falls back to these per key — it is not migrated. Tuned in
      Money rules › Lessons as a dated rule version like any price. The first
      stage is always 0 and is not listed. */
-  /* Savings is ALWAYS open (Plan v3 deviation #8, owner-approved
-     2026-10-03): `ready` is 0, which still satisfies the order rule
-     ready ≤ locked ≤ stock ≤ 100 that `mnyStagePctRefusal` enforces. */
+  /* 🏦 Savings opens at 20% of the loan paid (Plan v5 Deviation 8, the
+     owner's correction of 2026-10-03; Stage 1 had it always open at 0).
+     Below that gate the Sunday core puts leftover cents and goal-jar overflow
+     on the loan as extra (js/43). Order rule ready ≤ locked ≤ stock ≤ 100,
+     enforced by `mnyStagePctRefusal`. */
   school: { unlockStage: { jenn: 0, jess: 0 },
-            stagePct: { ready: 0, locked: 30, stock: 40, mix: 100 } },
+            stagePct: { ready: 20, locked: 30, stock: 40, mix: 100 } },
 
   sickPausesEverything: true,
   reviewCadence: 'quarterly',
@@ -629,13 +639,29 @@ function mrApplyHouseRules() {
 /* ── SUNDAY v15 RULES, FOR A RULEBOOK ALREADY ON FILE (Plan v3 §C, §I) ──
    The same mechanism as the house rules above, with its own marker, because a
    household that already applied the house rules must still receive these.
-   Every path below is NEW except one: a stored rulebook gets each new path
-   only where it is ABSENT (a family's own figure is never overwritten), and
-   `school.stagePct.ready` goes to 0 wherever it still differs — Savings is
-   always open (approved deviation #8). Appended as one dated version through
+   A stored rulebook gets each path below only where it is ABSENT (a family's
+   own figure is never overwritten). Appended as one dated version through
    `mrApplyEdits`; nothing lived is re-priced. Until it is applied the readers
-   below fall back to MR_DEFAULT_RULES per key, so nothing waits on the card. */
-const MR_SUNDAY_RULES_NOTE = 'Sunday v15 money rules (3 Oct)';
+   below fall back to MR_DEFAULT_RULES per key, so nothing waits on the card.
+
+   Plan v5 Rev 4 corrected two of them, and the marker moved with it so a
+   household that applied the first card is offered the corrections through
+   this same card, once:
+   · 🏦 `school.stagePct.ready` is 20 again (Deviation 8). The first card set
+     it to 0. It goes back to 20 only where the 0 is the FIRST card's own
+     doing — the newest log line for the path carries MR_SUNDAY_RULES_FIRST_NOTE
+     — so a family that chose 0 on purpose keeps it. Clamped to the family's
+     own `locked` gate so the order rule still holds.
+   · 🔥 `streak.graceCounts` (Deviation 30) arrives where absent. An absent
+     value reads FALSE (`absentIs`), never the shipped true: a week lived
+     before the rule keeps its pay, so `mrSundayRules` fills false, not the
+     default.
+   Idempotent three ways: applied once (the new marker on the log hides the
+   card for good, on every device); the list is empty once applied (both
+   values then match); and the restore needs the first card's 0 to still be
+   the newest word on that path. */
+const MR_SUNDAY_RULES_FIRST_NOTE = 'Sunday v15 money rules (3 Oct)';
+const MR_SUNDAY_RULES_NOTE = 'Sunday v15 rules, corrected (3 Oct)';
 const MR_SUNDAY_RULES = [
   { path: 'sessions.perSession',        item: '⛸️ Assistant job', field: 'dollars a session' },
   { path: 'advance.maxPerWeek',         item: '⏪ Drawn in advance', field: 'most a week' },
@@ -648,11 +674,19 @@ const MR_SUNDAY_RULES = [
   { path: 'pots.rates.ready',           item: '🏦 Savings', field: '% a year' },
   { path: 'pots.rates.gic',             item: '🔒 Locked away', field: '% a year' },
   { path: 'pots.rates.stock',           item: '📈 Companies', field: '% a year' },
-  { path: 'school.stagePct.ready',      item: '🏦 Savings', field: 'opens at % paid', always: true },
+  { path: 'school.stagePct.ready',      item: '🏦 Savings', field: 'opens at % paid', restoreFrom: 0 },
+  { path: 'streak.graceCounts',         item: '🔥 Routine streak', field: 'forgiving day counts as kept', absentIs: false },
   { path: 'words.jenn',                 item: '📚 Jenn', field: 'words stage' },
   { path: 'words.jess',                 item: '📚 Jess', field: 'words stage' },
   { path: 'market.wobblePct',           item: '📉 Companies dip', field: '% on a Sunday' },
 ];
+
+/* Did the FIRST Sunday card write this path's current value? The newest log
+   line for the path says who last set it. */
+function mrSundayFirstCardSet(path) {
+  const last = mrLogEntries().find(e => e && e.path === path);
+  return !!last && String(last.note || '').indexOf(MR_SUNDAY_RULES_FIRST_NOTE) === 0;
+}
 
 /* What a stored rulebook still lacks, as [{path, value, from, label, item,
    field}]. Pure read; empty when there is nothing to do. */
@@ -662,13 +696,20 @@ function mrSundayRulesPending() {
   MR_SUNDAY_RULES.forEach(rule => {
     const cur = mrGetPath(r, rule.path);
     const dflt = mrGetPath(MR_DEFAULT_RULES, rule.path);
-    if (rule.always) {
-      if (cur == null || Number(cur) === Number(dflt)) return;   // absent reads the default already
+    let value = dflt;
+    if ('restoreFrom' in rule) {
+      // Absent reads the default already; anything but the first card's own
+      // value is the family's.
+      if (cur == null || Number(cur) !== rule.restoreFrom || !mrSundayFirstCardSet(rule.path)) return;
+      const locked = mrGetPath(r, 'school.stagePct.locked');
+      if (locked != null && isFinite(Number(locked))) value = Math.min(Number(dflt), Number(locked));
+      if (Number(value) === Number(cur)) return;
     } else if (cur != null) {
       return;                                                    // the family's own figure stays
+    } else {
+      const carried = rule.carry ? mrGetPath(r, rule.carry) : null;
+      if (carried != null && isFinite(Number(carried))) value = Number(carried);
     }
-    const carried = rule.carry ? mrGetPath(r, rule.carry) : null;
-    const value = (carried != null && isFinite(Number(carried))) ? Number(carried) : dflt;
     out.push({ path: rule.path, value, from: cur, item: rule.item, field: rule.field,
       label: MR_SUNDAY_RULES_NOTE + ' — ' + rule.item + ': ' + rule.field });
   });
@@ -706,7 +747,9 @@ function mrRuleOr(rules, path) {
 function mrSundayRules(weekKey) {
   const r = mrDeepCopy(mrRulesForWeek(weekKey || ctThisWeekKey()) || MR_DEFAULT_RULES);
   MR_SUNDAY_RULES.forEach(rule => {
-    if (mrGetPath(r, rule.path) == null) mrSetPath(r, rule.path, mrRuleOr(r, rule.path));
+    if (mrGetPath(r, rule.path) != null) return;
+    // `absentIs`: a version without the rule was lived without it.
+    mrSetPath(r, rule.path, 'absentIs' in rule ? rule.absentIs : mrRuleOr(r, rule.path));
   });
   // The other gates read per key too, like mnyStagePct.
   ['locked', 'stock', 'mix'].forEach(k => {
@@ -1427,7 +1470,8 @@ function mrStreakDayDone(weekKey, kid, dayIdx) {
 }
 function mrStreakWeek(weekKey, kid) {
   const r = mrRulesForWeek(weekKey);
-  const tiers = ((r.streak || {}).tiers || []).slice().sort((a, b) => a.days - b.days);
+  const st = r.streak || {};
+  const tiers = (st.tiers || []).slice().sort((a, b) => a.days - b.days);
   /* ── ONE GRACE DAY ──
      An off day is a valid state, and a streak with no rest state is the
      all-or-nothing shape this app is not allowed to build. A missed day spends
@@ -1436,8 +1480,13 @@ function mrStreakWeek(weekKey, kid) {
      Read from the rules and defaulted to 0, so a week priced under an older
      rule version is unaffected — `mrRulesForWeek` resolves that version, and a
      week lived before the grace existed keeps the run it actually had. */
-  let grace = Math.max(0, Number((r.streak || {}).graceDays) || 0);
-  let run = 0, best = 0;
+  const grace = Math.max(0, Number(st.graceDays) || 0);
+  /* ── THE FORGIVING DAY COUNTS (Plan v5 Deviation 30) ──
+     `graceCounts` is read from THIS week's rules and is false when absent, so
+     a week lived before the rule keeps the pay it had. */
+  const counts = st.graceCounts === true;
+  // The week's countable days, in order: true kept, false missed.
+  const marks = [];
   for (let d = 0; d < 7; d++) {
     if (mrIsSick(kid, weekKey, d)) continue;              // paused, not broken
     /* Asked ONCE per day and reused. Going through mrStreakDayDone here would
@@ -1448,14 +1497,31 @@ function mrStreakWeek(weekKey, kid) {
     // nothing was missed. Under the day-type default this cannot arise; it is a
     // guard, not a behaviour — and it stops `[].every()` paying for an empty day.
     if (!asked.length) continue;
-    if (asked.every(s => ctGetMandatory(weekKey, d, s, kid))) { run++; best = Math.max(best, run); }
-    else if (grace > 0) {
-      /* The grace carries the run ACROSS the miss without counting the day.
-         Crediting the day instead would pay for a routine nobody kept, and
-         seven clean days would stop meaning seven. */
-      grace--;
+    marks.push(asked.every(s => ctGetMandatory(weekKey, d, s, kid)));
+  }
+  let best = 0;
+  if (counts) {
+    /* The forgiven day counts as kept: the run is the longest stretch holding
+       no more misses than the grace allows, every day in it counted. Measured
+       over every stretch, not spent on the first miss — a Monday miss must not
+       use up the forgiving day a Thursday miss needed. A week with nothing
+       kept has no run to forgive into. */
+    let lo = 0, missed = 0;
+    for (let hi = 0; hi < marks.length; hi++) {
+      if (!marks[hi]) missed++;
+      while (missed > grace) { if (!marks[lo]) missed--; lo++; }
+      best = Math.max(best, hi - lo + 1);
     }
-    else run = 0;
+    if (!marks.some(Boolean)) best = 0;
+  } else {
+    let left = grace, run = 0;
+    marks.forEach(kept => {
+      if (kept) { run++; best = Math.max(best, run); }
+      /* The grace carries the run ACROSS the miss without counting the day —
+         the rule before Deviation 30, kept for the weeks lived under it. */
+      else if (left > 0) left--;
+      else run = 0;
+    });
   }
   let bonus = 0, tier = 0;
   tiers.forEach(t => { if (best >= t.days) { bonus = Number(t.bonus) || 0; tier = t.days; } });

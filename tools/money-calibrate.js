@@ -26,7 +26,11 @@
      · the first freeChoresPerWeek chores are unpaid, and they are the CHEAPEST
        ones, which is her best arrangement (mrChoreWeek ranks them that way)
      · the daily cap bites per day, not per week
-     · the streak pays the LONGEST run at the HIGHEST tier only, never the sum
+     · the streak pays the LONGEST run at the HIGHEST tier only, never the sum,
+       with the week's grace day read from the rules: `streak.graceDays`, and
+       `streak.graceCounts` (Plan v5 Deviation 30) — the forgiving day counts
+       as kept, so 6 kept + the forgiving day is a 7-day run. Mirrors
+       mrStreakWeek (js/18) both ways
      · fines are floored at what that day actually earned, so a fine cannot
        create debt
      · routines pay NOTHING directly. In the new model ctWeekMoney returns
@@ -92,13 +96,36 @@ function learningPaid(units) {
 }
 
 /* Streak. `cleanDays` is a 7-long boolean array; `sick` pauses rather than
-   breaks. Longest run, highest tier only. */
-function streakPaid(cleanDays, sick) {
-  const tiers = ((R.streak || {}).tiers || []).slice().sort((a, b) => a.days - b.days);
-  let run = 0, best = 0;
+   breaks. Longest run, highest tier only. The grace day is read from the
+   rules, as mrStreakWeek reads it: with `graceCounts` the longest stretch
+   holding no more misses than `graceDays`, every day in it counted (nothing
+   kept, no run); without it the grace carries the run across a miss without
+   counting the day. `rules` defaults to the shipped rulebook. */
+function streakPaid(cleanDays, sick, rules) {
+  const st = (rules || R).streak || {};
+  const tiers = (st.tiers || []).slice().sort((a, b) => a.days - b.days);
+  const grace = Math.max(0, Number(st.graceDays) || 0);
+  const marks = [];
   for (let d = 0; d < 7; d++) {
     if (sick && sick[d]) continue;
-    if (cleanDays[d]) { run++; best = Math.max(best, run); } else run = 0;
+    marks.push(!!cleanDays[d]);
+  }
+  let best = 0;
+  if (st.graceCounts === true) {
+    let lo = 0, missed = 0;
+    for (let hi = 0; hi < marks.length; hi++) {
+      if (!marks[hi]) missed++;
+      while (missed > grace) { if (!marks[lo]) missed--; lo++; }
+      best = Math.max(best, hi - lo + 1);
+    }
+    if (!marks.some(Boolean)) best = 0;
+  } else {
+    let left = grace, run = 0;
+    marks.forEach(kept => {
+      if (kept) { run++; best = Math.max(best, run); }
+      else if (left > 0) left--;
+      else run = 0;
+    });
   }
   let bonus = 0, tier = 0;
   tiers.forEach(t => { if (best >= t.days) { bonus = Number(t.bonus) || 0; tier = t.days; } });
@@ -211,7 +238,8 @@ function report() {
   console.log(`chores: grade 3 ${usd(cfg.grade[3])} · 2 ${usd(cfg.grade[2])} · 1 ${usd(cfg.grade[1])}`
     + ` · cap ${usd(cfg.dailyCap)}/day · first ${cfg.freeChoresPerWeek} free`);
   console.log('streak: ' + ((R.streak || {}).tiers || [])
-    .map(t => `${t.days}d ${usd(t.bonus)}`).join(' · ') + ' · highest tier only');
+    .map(t => `${t.days}d ${usd(t.bonus)}`).join(' · ') + ' · highest tier only'
+    + ` · ${Number((R.streak || {}).graceDays) || 0} forgiving day${(R.streak || {}).graceCounts === true ? ', counted as kept' : ', not counted'}`);
   console.log('learning: ' + ((R.learning || {}).items || [])
     .filter(i => !i.xpOnly).map(i => `${i.id} ${usd(i.amount)}/${i.perUnit}${i.unit}`).join(' · '));
   console.log('routines pay nothing directly — the streak IS the routine channel');

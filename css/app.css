@@ -8319,6 +8319,9 @@
   background: var(--mny-v15-paper); color: var(--mny-v15-ink); font: inherit; font-size: calc(1rem * var(--fs-scale, 1) * var(--text-scale, 1));
 }
 .gu-opt.on { background: var(--mny-v15-teal); color: var(--mny-v15-white); }
+/* A day still to come (📦 Fines › Day, Plan v5 Deviation 23): dashed and not
+   tappable; the ink stays full so the label still reads. */
+.gu-opt:disabled { border-style: dashed; cursor: not-allowed; }
 .gu-optval { display: inline-flex; align-items: center; justify-content: center; background: var(--mny-v15-amber); cursor: default; }
 .gu-afford { gap: 4px; padding: 10px 14px; }
 .gu-afford--ok { background: var(--mny-v15-green); }

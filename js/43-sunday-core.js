@@ -49,8 +49,9 @@ const SD_STEADY_KEYS = ['jobs', 'streak', 'pa'];
 const SD_BONUS_KEYS = ['comp', 'gifts', 'ret'];
 const SD_ALLOC_KEYS = ['extra', 'ready', 'goal', 'gic', 'stock', 'spend', 'adv'];
 const SD_POT_KEYS = ['ready', 'goal', 'gic', 'stock'];
-// Which school gate opens each pot (school.stagePct.<stage>). Savings: always.
-const SD_GATE_STAGE = { gic: 'locked', stock: 'stock' };
+// Which school gate opens each pot (school.stagePct.<stage>). 🏦 Savings
+// opens at 20% paid (Plan v5 Deviation 8); the goal jar has no gate.
+const SD_GATE_STAGE = { ready: 'ready', gic: 'locked', stock: 'stock' };
 // The three starts on step 3 (prototype REFLECT).
 const SD_PRESETS = [
   { id: 'sooner', label: '🧱 Loan sooner', split: { extra: 1 } },
@@ -198,8 +199,9 @@ function sdLoanInterest(loan, sundaysSince, rules) {
 /* ── Step 2 · the pile ─────────────────────────────────────────────
    Payday + what she took from her bank; ⏪ the advance comes off first (it is
    already spent), then the 📌 must-pay; what is left in whole dollars is hers
-   to place, and the cents go to Savings. Short of the must-pay, the loan
-   takes what there is and the rest is carried, with no interest. */
+   to place, and the cents go to Savings — or, below the 🏦 Savings gate, on
+   the loan as extra (`centsTo`). Short of the must-pay, the loan takes what
+   there is and the rest is carried, with no interest. */
 function sdMatured(w) {
   if (w && w.matured != null) return sdR2(w.matured);
   const wk = Number((w || {}).week) || 0;
@@ -225,15 +227,18 @@ function sdPile(w, rules) {
   return {
     income, payday: income.payday, matured, pullTot, total, weekly, mustPay, minNow,
     shortfall: sdR2(mustPay - minNow), advW, advTaken, advCarried: sdR2(advW - advTaken),
-    hers, cents, tp: sdR2(total - advTaken), placed, pile: sdR2(hers - placed),
+    hers, cents, centsTo: sdIsOpen('ready', x, rules) ? 'ready' : 'extra',
+    tp: sdR2(total - advTaken), placed, pile: sdR2(hers - placed),
   };
 }
 function sdHers(w, rules) { return sdPile(w, rules).hers; }
 
 /* ── Step 3 · may she put money here? ──
-   Loan extra, cash out, Savings: always. The goal jar and the two growing
-   pots need 🛟 Savings filled to the safety line first; 🔒 Locked away and
-   📈 Companies open as the loan is paid (school.stagePct). */
+   Loan extra and cash out: always. 🏦 Savings, 🔒 Locked away and
+   📈 Companies open as the loan is paid (school.stagePct: 20 / 30 / 40). The
+   goal jar and the two growing pots need 🛟 Savings filled to the safety line
+   first — except the goal jar while Savings is still shut: there is no
+   Savings to fill yet, so the 🛟 line cannot be asked of her. */
 function sdSafeOk(w, rules) {
   const x = w || {};
   return sdR2(((x.pots || {}).ready || 0) - ((x.pull || {}).ready || 0) + sdAlloc(x.alloc).ready)
@@ -245,12 +250,16 @@ function sdIsOpen(k, w, rules) {
   return sdPaidPct((w || {}).loan) >= sdRule(rules, 'school.stagePct.' + stage);
 }
 function sdCanPlace(k, w, rules) {
-  if (k === 'extra' || k === 'spend' || k === 'adv' || k === 'ready') return { ok: true, why: null };
+  if (k === 'extra' || k === 'spend' || k === 'adv') return { ok: true, why: null };
   const fill = `🛟 fill Savings to $${sdRule(rules, 'pots.safety')} first`;
-  if (k === 'goal') return sdSafeOk(w, rules) ? { ok: true, why: null } : { ok: false, why: fill };
+  if (k === 'goal') {
+    if (!sdIsOpen('ready', w, rules)) return { ok: true, why: null };
+    return sdSafeOk(w, rules) ? { ok: true, why: null } : { ok: false, why: fill };
+  }
   if (!sdIsOpen(k, w, rules)) {
     return { ok: false, why: `🔒 opens at ${sdRule(rules, 'school.stagePct.' + SD_GATE_STAGE[k])}% paid` };
   }
+  if (k === 'ready') return { ok: true, why: null };
   return sdSafeOk(w, rules) ? { ok: true, why: null } : { ok: false, why: fill };
 }
 
@@ -316,34 +325,36 @@ function sdSetAdvance(w, d, rules) {
 
 /* The three starts (prototype applyReflect). Savings is filled to the 🛟 line
    before anything goes to the jar or the growing pots; the jar never takes
-   more than its goal needs (the rest goes to Savings); a pot that is not open
-   sends its share to the wall. Whatever is left over goes to the wall. */
+   more than its goal needs (the rest goes to Savings, or to the wall while
+   Savings is shut); a pot that is not open sends its share to the wall.
+   Whatever is left over goes to the wall. */
 function sdPresets(w, rules) {
   const x = w || {};
   const P = sdPile(x, rules);
   const H = P.hers;
   const pots = Object.assign({ ready: 0, goal: 0, gic: 0, stock: 0 }, x.pots || {});
   const safety = sdRule(rules, 'pots.safety');
+  const readyOpen = sdIsOpen('ready', x, rules);
   return SD_PRESETS.map(r => {
     const locked = !!(r.stage && !sdIsOpen(r.stage, x, rules));
     const label = r.label + (locked ? ` 🔒${sdRule(rules, 'school.stagePct.' + SD_GATE_STAGE[r.stage])}%` : '');
     if (locked) return { id: r.id, label, locked, alloc: null };
     const a = sdZero();
     let used = 0;
-    let fill = Math.max(0, Math.ceil(sdR2(safety - (pots.ready - ((x.pull || {}).ready || 0)))));
+    let fill = readyOpen ? Math.max(0, Math.ceil(sdR2(safety - (pots.ready - ((x.pull || {}).ready || 0))))) : 0;
     Object.keys(r.split).forEach(k => {
       let v = Math.floor(H * r.split[k]);
       if (k === 'goal') {
         const target = x.goal ? Number(x.goal.target) || 0 : 0;
         const cap = Math.max(0, Math.ceil(sdR2(target - pots.goal)));
         const over = Math.max(0, v - cap - fill);
-        if (over) { a.ready += over; used += over; v -= over; }
+        if (over) { a[readyOpen ? 'ready' : 'extra'] += over; used += over; v -= over; }
       }
       if (k === 'goal' || k === 'gic' || k === 'stock') {
         const f = Math.min(fill, v); a.ready += f; used += f; fill -= f; v -= f;
       }
       // Judged against the preset's own allocation so far — Savings filled above.
-      if (k !== 'goal' && k !== 'ready' && !sdCanPlace(k, Object.assign({}, x, { alloc: a }), rules).ok) {
+      if (k !== 'goal' && !sdCanPlace(k, Object.assign({}, x, { alloc: a }), rules).ok) {
         a.extra += v; used += v; return;
       }
       a[k] += v; used += v;
@@ -379,7 +390,9 @@ function sdCheckInOut(sg) {
    ("place $X first") or if In ≠ Out. The loan takes interest first, then the
    must-pay, then extra at 1 + bonus; extra beyond what clears the loan spills
    to Savings (🎉). The goal jar never passes its goal; the rest goes to
-   Savings. */
+   Savings. Below the 🏦 Savings gate (judged on the loan before this
+   Sunday), the leftover cents and the jar's overflow go on the loan as extra
+   instead, counted at 1 + bonus like any extra (`overToLoan`). */
 function sdSign(w, rules) {
   const x = w || {};
   const P = sdPile(x, rules);
@@ -392,6 +405,16 @@ function sdSign(w, rules) {
   const week = Number(x.week) || 0;
   const left0 = sdLeft(loan);
 
+  // The goal jar first: what it cannot take is overflow.
+  const target = x.goal ? Number(x.goal.target) || 0 : 0;
+  const goalRoom = target > 0 ? Math.max(0, sdR2(target - pots.goal)) : a.goal;
+  const toGoal = sdR2(Math.min(a.goal, goalRoom));
+  const goalOver = sdR2(a.goal - toGoal);
+  // Savings shut: the cents and the overflow go on the wall as extra.
+  const readyOpen = sdIsOpen('ready', x, rules);
+  const overToLoan = readyOpen ? 0 : sdR2(P.cents + goalOver);
+  const extraIn = sdR2(a.extra + overToLoan);
+
   // The loan: interest first, then principal; extra only up to what clears it.
   let interest = sdR2(loan.interest);
   const mustToInt = sdR2(Math.min(interest, P.minNow));
@@ -400,8 +423,8 @@ function sdSign(w, rules) {
   const mustToPrin = sdR2(Math.min(owed0, P.minNow - mustToInt));
   const owed1 = sdR2(owed0 - mustToPrin);
   const extraNeed = sdR2(interest + sdCeilCent(owed1 / (1 + b)));
-  const extraUsed = sdR2(Math.min(a.extra, extraNeed));
-  const spill = sdR2(a.extra - extraUsed);
+  const extraUsed = sdR2(Math.min(extraIn, extraNeed));
+  const spill = sdR2(extraIn - extraUsed);
   const extraToInt = sdR2(Math.min(interest, extraUsed));
   interest = sdR2(interest - extraToInt);
   const extraToPrin = sdR2(Math.min(owed1, (extraUsed - extraToInt) * (1 + b)));
@@ -412,19 +435,16 @@ function sdSign(w, rules) {
   const nl = sdLeft(loanAfter);
   const pay = sdR2(left0 - nl);             // what came off the wall
 
-  // The milestone: a gate crossed by THIS payment (Savings never had one).
+  // The milestone: a gate crossed by THIS payment (🏦 Savings at 20% too).
   const pctBefore = sdPaidPct(loan), pctAfter = sdPaidPct(loanAfter);
   const crossed = Object.keys(SD_GATE_STAGE).find(k => {
     const g = sdRule(rules, 'school.stagePct.' + SD_GATE_STAGE[k]);
     return pctBefore < g && pctAfter >= g;
   }) || null;
 
-  // The pots after.
-  const target = x.goal ? Number(x.goal.target) || 0 : 0;
-  const goalRoom = target > 0 ? Math.max(0, sdR2(target - pots.goal)) : a.goal;
-  const toGoal = sdR2(Math.min(a.goal, goalRoom));
-  const goalOver = sdR2(a.goal - toGoal);
-  const readyIn = sdR2(a.ready + P.cents + goalOver + spill);
+  // The pots after. A spill only happens when the loan is cleared — every
+  // gate is open then, so it always lands in Savings.
+  const readyIn = sdR2(a.ready + spill + (readyOpen ? sdR2(P.cents + goalOver) : 0));
   const potsAfter = {
     ready: sdR2(pots.ready - pull.ready + readyIn),
     goal: sdR2(pots.goal + toGoal),
@@ -443,7 +463,7 @@ function sdSign(w, rules) {
     inSteady: P.income.steady, inBonus: P.income.bonus, outFine: P.income.fine,
     inBank: P.pullTot, pullReady: pull.ready,
     loanCash: sdR2(P.minNow + extraUsed), goal: toGoal, hist, week: week + 1,
-    pay, extra: extraUsed, spill, ready: readyIn, gic: a.gic, stock: a.stock,
+    pay, extra: extraUsed, overToLoan, spill, ready: readyIn, gic: a.gic, stock: a.stock,
     wallet, adv: P.advTaken, advCarried: P.advCarried, guess: x.guess == null ? null : x.guess,
     payday: P.payday, hers: P.hers, minW: P.minNow, mustPay: P.mustPay, shortfall: P.shortfall,
     cents: P.cents, lines, free: weekly > 0 ? week + 1 + Math.ceil(nl / weekly) : Infinity,
@@ -550,7 +570,8 @@ function sdVerdicts(res, w, rules) {
 /* ── 🔮 "If every week is like this": 1 week, 1 month, 5 months ──
    nW is 1, 4 or 20 Sundays. Prototype fwLoan / fwSave: the wall now vs my
    plan (with interest), and what each pot would hold — the goal jar earns
-   none, a full goal sends the rest to Savings, and so does a paid-off loan. */
+   none, a full goal sends the rest to Savings (on the wall as extra while
+   Savings is shut), and a paid-off loan sends its payments to Savings. */
 function sdForecast(res, w, rules, nW) {
   const sg = res.signed, after = res.after, x = w || {};
   const m = sdMoney, n = Number(nW) || 4;
@@ -559,24 +580,29 @@ function sdForecast(res, w, rules, nW) {
   const b = sdBonusRate(rules), irate = sdRule(rules, 'loan.ratePct') / 100;
   const perP = wk + sg.extra * (1 + b);
   const left = after.left;
-  const leftP = sdR2(Math.max(0, left * (1 + irate * n / 52) - perP * n));
+  const gT = x.goal ? Number(x.goal.target) || 0 : 0;
+  const gName = x.goal ? String(x.goal.name || '') : 'Goal';
+  // The jar's overflow over n weeks; below the Savings gate it is wall extra.
+  const gBal = after.pots.goal || 0, gPut = sdR2((sg.goal || 0) * n);
+  const goalOver = gT > 0 && gBal + gPut > gT ? sdR2(gBal + gPut - gT) : 0;
+  const readyOpen = sdIsOpen('ready', Object.assign({}, x, { loan: after.loan }), rules);
+  const overLoan = readyOpen ? 0 : goalOver;
+  const leftP = sdR2(Math.max(0, left * (1 + irate * n / 52) - perP * n - overLoan * (1 + b)));
   const mxL = Math.max(1, left);
   const fwLoan = [['now', left], ['my plan', leftP]].map(([k, v]) => ({ k, value: v, v: m(v), w: v / mxL * 100 }));
   const fwAssume = sg.extra ? `paying ${m(wk)} + my ${m(sg.extra)} extra each week` : `paying ${m(wk)} each week, no extra`;
   const fwFree = left <= 0 ? '🎉 done' : leftP <= 0
     ? `🎉 paid off within ${n === 1 ? 'a week' : n === 4 ? 'a month' : '5 months'}`
     : `free by ${sdMonthYear(x.weekKey, perP > 0 ? Math.ceil(left / perP) : Infinity)}`;
-  const gT = x.goal ? Number(x.goal.target) || 0 : 0;
-  const gName = x.goal ? String(x.goal.name || '') : 'Goal';
-  let toReady = 0;
+  const toReady = readyOpen ? goalOver : 0;
   const rows = [['ready', '🏦 Savings'], ['goal', '🎯 ' + gName], ['gic', '🔒 Locked'], ['stock', '📈 Companies']].map(([k, name]) => {
     const bal = after.pots[k] || 0;
     let put = sdR2((sg[k] || 0) * n);
-    if (k === 'goal' && gT > 0 && bal + put > gT) { toReady = sdR2(bal + put - gT); put = sdR2(Math.max(0, gT - bal)); }
+    if (k === 'goal' && goalOver) put = sdR2(Math.max(0, gT - bal));
     const earn = sdR2((bal + put / 2) * sdRate(rules, k) * n / 52);
-    return { k, name, bal, put, earn, locked: (k === 'gic' || k === 'stock') && !sdIsOpen(k, Object.assign({}, x, { loan: after.loan }), rules) };
+    return { k, name, bal, put, earn, locked: !sdIsOpen(k, Object.assign({}, x, { loan: after.loan }), rules) };
   });
-  const loanSpill = sdR2(Math.max(0, perP * n - left * (1 + irate * n / 52)));
+  const loanSpill = sdR2(Math.max(0, perP * n + overLoan * (1 + b) - left * (1 + irate * n / 52)));
   rows[0].put = sdR2(rows[0].put + toReady + loanSpill);
   rows[0].earn = sdR2((rows[0].bal + rows[0].put / 2) * sdRate(rules, 'ready') * n / 52);
   const mk = v => v >= 100 ? '$' + Math.round(v) : m(v).replace('.00', '');
@@ -588,8 +614,8 @@ function sdForecast(res, w, rules, nW) {
   return {
     weeks: n, fwEarn: m(earnW), fwTimes: n === 1 ? 'same again next week' : `× ${n} weeks, I'd earn`,
     fwEarnT: m(sdR2(earnW * n)), fwLoan, leftPlan: leftP, fwAssume, fwFree, fwSave,
-    fwPutT: '+' + mk(pT), fwEarnI: '+' + m(eT), fwThenT: mk(tT), toReady, loanSpill,
-    fwNote: `🎯 The goal jar earns no interest. It waits for what I'm buying.${toReady ? ` Goal full → ${mk(toReady)} goes to 🏦 Savings.` : ''}${loanSpill ? ` Loan done → ${mk(loanSpill)} of payments goes to 🏦 Savings.` : ''}`,
+    fwPutT: '+' + mk(pT), fwEarnI: '+' + m(eT), fwThenT: mk(tT), toReady, overLoan, loanSpill,
+    fwNote: `🎯 The goal jar earns no interest. It waits for what I'm buying.${toReady ? ` Goal full → ${mk(toReady)} goes to 🏦 Savings.` : ''}${overLoan ? ` Goal full → ${mk(overLoan)} goes on the 🧱 loan.` : ''}${loanSpill ? ` Loan done → ${mk(loanSpill)} of payments goes to 🏦 Savings.` : ''}`,
   };
 }
 
@@ -599,6 +625,41 @@ function sdNewGoal(pots, goal, keep) {
   const p = Object.assign({ ready: 0, goal: 0, gic: 0, stock: 0 }, pots || {});
   if (keep === 'ready') { p.ready = sdR2(p.ready + p.goal); p.goal = 0; }
   return { pots: p, goal: { name: (goal || {}).name || '', target: Number((goal || {}).target) || 0 } };
+}
+
+/* ── 🔥 The routine streak, said (Sunday's clue line, the Grown-ups "she"
+   line) ── "7 days = $3 · 6 with a forgiving day = $3" at the default rules
+   (Plan v5 Deviation 30: the forgiving day counts as kept). Read from the
+   rules: without `graceCounts` the six-day run pays the tier it reaches
+   ("= $2", the prototype's words); with no grace day the second half goes.
+   "Forgiving day" is her word; "grace" stays in code. */
+function sdWhole$(v) { const n = sdR2(v); return '$' + (n % 1 ? n.toFixed(2) : String(n)); }
+function sdStreakForgiving(rules) {
+  const st = (rules || {}).streak || {};
+  const tiers = (st.tiers || []).slice().sort((a, b) => a.days - b.days);
+  const top = tiers[tiers.length - 1];
+  if (!top || !(Number(st.graceDays) > 0)) return '';
+  const six = Number(top.days) - 1;
+  const pay = st.graceCounts === true ? Number(top.bonus) || 0
+    : tiers.reduce((p, t) => (Number(t.days) <= six ? Number(t.bonus) || 0 : p), 0);
+  return `${six} with a forgiving day = ${sdWhole$(pay)}`;
+}
+function sdStreakClue(rules) {
+  const tiers = ((((rules || {}).streak || {}).tiers) || []).slice().sort((a, b) => a.days - b.days);
+  const top = tiers[tiers.length - 1];
+  if (!top) return '';
+  const tail = sdStreakForgiving(rules);
+  return `${top.days} days = ${sdWhole$(top.bonus)}${tail ? ' · ' + tail : ''}`;
+}
+/* Sunday's four clues beside "How much came in" (prototype `clues`), each
+   figure read from the rules. */
+function sdClues(rules) {
+  return [
+    ['🧹 Chores · ⛸️ job', `${sdWhole$(sdRule(rules, 'chores.dailyCap'))} a day · ${sdWhole$(sdRule(rules, 'sessions.perSession'))} a session`],
+    ['🔥 Routine', sdStreakClue(rules)],
+    ['🏆 Meets', 'points + placing'],
+    ['🎁 Gifts', 'only after Dad says yes'],
+  ].map(([k, v]) => ({ k, v }));
 }
 
 /* ── ⚙️ Grown-ups › Rules: what a change would do (prototype week/freeBy) ──
@@ -652,6 +713,7 @@ if (typeof module !== 'undefined' && module.exports) {
     sdCapWords, sdPercents, sdPercentLabel, sdBuysOf, sdIncome, sdWeekCat, sdSessionsLine,
     sdLeft, sdPaidPct, sdMustPay, sdLoanInterest, sdMatured, sdPile, sdHers, sdSafeOk, sdIsOpen,
     sdCanPlace, sdPlace, sdSetPull, sdSetAdvance, sdPresets, sdStickersFor, sdCheckInOut, sdSign,
-    sdVerdicts, sdForecast, sdNewGoal, sdImpactWeek, sdImpactWeekly, sdImpact,
+    sdVerdicts, sdForecast, sdNewGoal, sdWhole$, sdStreakForgiving, sdStreakClue, sdClues,
+    sdImpactWeek, sdImpactWeekly, sdImpact,
   };
 }
