@@ -2567,10 +2567,13 @@ New user-created Claude skills for this ecosystem use the `HZ-` prefix
 existing conventions: `ct*` for chore-tracker functions, `mny*` for money,
 `wf-*` for the Full week grid, `wpp-*` for the week's print preview.
 
-## The parent portal is five destinations
+## The parent portal is six destinations
 
-`Now · Meeting · History · Setup · App`, declared in `PARENT_DESTS`
-(`js/11-parent.js`). It was ten flat tabs in a wrapping row, which on a phone
+`Now · Meeting · History · Money · Setup · App`, declared in `PARENT_DESTS`
+(`js/11-parent.js`). 💰 Money became its own destination in Plan v9 §N
+(Stage 6d, "Header space"); it was Setup › Money rules. The header is one
+row (`.parent-bar`): 🔒 Parent ▾ (`parentMenuToggle` — PIN, the look's
+`#parentLookBtn`, Exit), the destinations, the day, ⚙️ App, the switcher. It was ten flat tabs in a wrapping row, which on a phone
 was three lines and no order worth learning.
 
 **One panel renders at a time.** `renderParentHome()` used to call all ten panel
@@ -4068,6 +4071,36 @@ still measures the result. A name on those screens is never cut with "…":
 the old ellipsis rules wrap instead, and smoke `noLabelIsCutOnTheMoneyScreens`
 fails on any ellipsis-truncated element there at 1194 (seeded My money, her
 sheets, Sunday's four steps, Grown-ups' six tabs, both looks).
+
+## Stage 6d — the approved redesigns (Plan v9 §N, build 2026-10-04b)
+
+- **Questions are answered on Parent › Now** (Deviation 36). Now draws
+  Grown-ups' own cards (`guQueue` / `guApproveCard`, js/46) on the one reader
+  and the one answerer; their `data-mnyp-action` taps go to `mnyParentClick`,
+  bound on `#pnWrap` as well as `#mnyRulesWrap`, and `mnyRenderRulesTab`
+  redraws Now while Now is on screen. Now still decides nothing of its own.
+  Its Jenn · Jess · Both and By girl / By kind toggles are device-local
+  (`wp_now_scope`, `wp_now_groupby`, try/catch), separate from the portal's
+  `parentScope`.
+- **No cash account** (Deviation 37). `wallet.cash` is unchanged and still
+  joins her Sunday pile; screens show it only as "📥 Waiting for Sunday"
+  above $0, never as a place. Savings is drawn with her goal jars inside it;
+  the jars stay `goalId` holdings (`mnyGoalHolding` is still their reader).
+- **`agreed {value, by, at}`** (Deviation 41) is the one new data field, on a
+  request record in its own store (`req:`, `mvq:`, `dep:`). It rides the
+  whole-record merge; tests/merge.test.js proves it two-device and the merge
+  layer did not change. The pure core writes it (`sdWithAgreed`) and agrees it
+  (`sdAgreeInto`: the owner's field takes the agreed figure, `agreed.asked`
+  keeps what she asked), so every owner keeps reading its own field.
+- **A calendar day adds through the planner's own sheet** (Deviation 39):
+  My money never places a block; `mnyCalDay` opens the day
+  (`openDayFromWeekCard`) and `pickFromSlot('competition')`.
+- **Weeks reads, never stores**: a Sunday's record is the frozen ledger row
+  plus the records that week used (fines, requests by `appliedWeek`,
+  overrides read without `mnyOverrides`' ensure). The saving line is the
+  core's `sdSavingLine`; "typical week" is `guSteady`, the Commitments reader.
+- "Dad" is "parents" in every on-screen sentence (Deviation 38); stored
+  `by` values and the fines' "Logged by Mom / Dad" stay.
 
 ## Known trip hazards
 

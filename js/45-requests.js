@@ -105,7 +105,7 @@ function mnyAddRequest(kid, fields) {
       || (!r.blockId && !x.blockId && String(x.dayKey) === String(r.dayKey)
           && String(x.name || '').trim().toLowerCase() === r.name.toLowerCase());
     if (mnyEnsureRequests(kid).some(x => x && x.kind === 'comp' && x.status !== 'no' && same(x))) {
-      showToast('Dad already has this one.'); return null;
+      showToast('My parents already have this one.'); return null;
     }
   } else if (kind === 'goal') {
     Object.assign(r, { name: String(f.name || '').trim().slice(0, 40), icon: f.icon || '🎯',
@@ -200,6 +200,9 @@ function mnyRequestsFor(kid) {
       answeredAt: Number(r.answeredAt || r.approvedAt || r.rejectedAt || r.talkAt
         || (store === 'deposits' && !r.pendingApproval ? r.appliedAt : 0)) || 0,
       weekKey: r.weekKey || null,
+      // 💬 Agreed at the meeting (Deviation 41): the figure, and what she asked.
+      agreed: r.agreed ? money2(r.agreed.value) : null,
+      asked: r.agreed && r.agreed.asked != null ? money2(r.agreed.asked) : null,
       record: r,
     });
   };
@@ -232,9 +235,26 @@ function mnyRequestsFor(kid) {
    different from what the rules pay, it is kept beside her entry. */
 function mnyAnswerRequest(kid, id, answer, opts) {
   if (!isParent()) { showToast('A grown-up answers this 🔒'); return false; }
-  const o = opts || {};
+  const o = Object.assign({}, opts || {});
   if (['yes', 'no', 'talk'].indexOf(answer) < 0) return false;
   const by = o.by || 'a grown-up';
+  /* ✓ Agree at the Sunday meeting (Plan v9 §N, Deviation 41): a yes with
+     the agreed figure. A result's goes in as a parent's figure (`pay` →
+     `awardedOverride`); every other kind's owner reads its own field, which
+     takes the agreed figure here, with what she asked kept beside it. */
+  if (answer === 'yes' && o.agreed) {
+    const found = mnyRequestRecord(kid, id);
+    const ag = found && found.rec.agreed;
+    if (!found || !ag) { showToast('Set the agreed amount first.'); return false; }
+    const field = mnyAgreedField(found.store, found.rec);
+    if (field === 'pay') {
+      if (ag.asked == null) ag.asked = money2(found.rec.pay != null ? found.rec.pay : guCompCalc(found.rec).amt);
+      o.pay = ag.value;
+    } else if (field) {
+      sdAgreeInto(found.rec, field, syncNow());
+    }
+    markItemUpdated(found.rec);
+  }
 
   const mv = mnyEnsureMoveRequests(kid).find(r => r && r.id === id);
   if (mv) {
@@ -319,6 +339,46 @@ function mnySetRequestPay(kid, id, value) {
   if (!r || r.kind !== 'comp' || r.status === 'yes') return false;
   r.pay = money2(Math.max(0, Number(value) || 0));
   markItemUpdated(r);
+  saveAll();
+  return true;
+}
+
+/* ── 💬 To talk about on Sunday: the agreed amount (Plan v9 §N, Deviation 41) ──
+   A question answered "💬 Talk first" waits for the meeting. There, in
+   "Parents answer first", a parent steps an agreed figure with − / + and
+   then ✓ Agree (a yes through `mnyAnswerRequest` with `{ agreed: true }`) or
+   "Not this time". The figure is `agreed {value, by, at}` on the record in
+   its own store — written by the core's `sdWithAgreed`, so it merges with
+   the record (tests/merge.test.js). A skip or a dispute has no amount, so it
+   has no agreed figure: ✓ / ✗ only. */
+function mnyRequestRecord(kid, id) {
+  const mv = mnyEnsureMoveRequests(kid).find(r => r && r.id === id);
+  if (mv) return { store: 'moveRequests', rec: mv };
+  const dep = mnyEnsureDeposits(kid).find(d => d && d.id === id);
+  if (dep) return { store: 'deposits', rec: dep };
+  const r = mnyEnsureRequests(kid).find(x => x && x.id === id);
+  return r ? { store: 'requests', rec: r } : null;
+}
+// Which field the owner reads for this kind's amount; 'pay' for a result; null: no amount.
+function mnyAgreedField(store, rec) {
+  if (store !== 'requests') return 'amount';
+  return { comp: 'pay', adv: 'amount', goal: 'target' }[rec && rec.kind] || null;
+}
+// What she asked for, in dollars — kept once a figure was agreed (`agreed.asked`).
+function mnyRequestAsked(store, rec) {
+  if (!rec) return 0;
+  if (rec.agreed && rec.agreed.asked != null) return money2(rec.agreed.asked);
+  const f = mnyAgreedField(store, rec);
+  if (f === 'pay') return money2(rec.pay != null ? rec.pay : guCompCalc(rec).amt);
+  return f ? money2(rec[f]) : 0;
+}
+function mnySetRequestAgreed(kid, id, value) {
+  if (!isParent()) { showToast('A grown-up answers this 🔒'); return false; }
+  const found = mnyRequestRecord(kid, id);
+  if (!found || !mnyAgreedField(found.store, found.rec)) return false;
+  if (mnyRequestStatusOf(found.store, found.rec) !== 'talk') return false;
+  sdWithAgreed(found.rec, value, 'a grown-up', syncNow());
+  markItemUpdated(found.rec);
   saveAll();
   return true;
 }
@@ -521,8 +581,8 @@ const RQ_GOAL_ICONS = ['🎒', '⛸️', '🛼', '🏊', '📚', '🎧', '🎨',
 const RQ_MOVE_WHY = ['Something I want to buy', 'Saving for my goal', 'Loan gone sooner', 'Want it to grow'];
 const RQ_SKIP_WHY = ['🤒 Sick', '📚 School thing', '🚗 Family trip', 'Something else'];
 const RQ_ADV_WHY = ['School book fair', 'Snack with friends', 'A gift for someone', 'Something else'];
-const RQ_TITLES = { result: '🏆 Tell Dad a result', club: '⛸️ My club sessions', goal: '🎯 A new saving goal',
-                    adv: '⏪ Draw in advance', list: '⏳ Everything I asked Dad',
+const RQ_TITLES = { result: '🏆 Tell parents a result', club: '⛸️ My club sessions', goal: '🎯 A new saving goal',
+                    adv: '⏪ Draw in advance', list: '⏳ Everything I asked parents',
                     move: '🔀 Move money', cash: '💵 Cash out', dep: '🏦 Put cash in',
                     gift: '🎁 I was given something', prices: '💷 What things pay' };
 const RQ_GIFT_CHIPS = [5, 10, 20, 50];
@@ -680,9 +740,9 @@ function rqResultBody(kid, d) {
     const on = !!(p && !p.custom && p.blockId === x.blockId);
     const can = x.st === 'open';
     const sub = x.st === 'done' ? `${rqDayLabel(x.dayKey)} · ✓ recorded ${rqDollars(x.award)}`
-      : x.st === 'sent' ? `${rqDayLabel(x.dayKey)} · ⏳ sent to Dad`
+      : x.st === 'sent' ? `${rqDayLabel(x.dayKey)} · ⏳ sent to parents`
       : x.st === 'soon' ? `${rqDayLabel(x.dayKey)} · coming up` : `${rqDayLabel(x.dayKey)} · no result yet`;
-    const why = can ? '' : (x.st === 'done' ? 'Dad already has this one.' : x.st === 'sent' ? 'Already sent to Dad.' : 'Not yet — it is still coming up.');
+    const why = can ? '' : (x.st === 'done' ? 'My parents already have this one.' : x.st === 'sent' ? 'Already sent to parents.' : 'Not yet — it is still coming up.');
     return `<button type="button" class="rq-meet ${'rq-meet--' + x.st}${on ? ' on' : ''}" data-mny-action="rq-pick" data-mny-id="${escapeAttr(x.blockId || '')}"${can ? '' : ` aria-disabled="true" data-mny-why="${escapeAttr(why)}"`}><span class="rq-meet-ico">${x.icon}</span><span class="rq-meet-name">${escapeHtml(x.title)}</span><span class="rq-meet-sub">${escapeHtml(sub)}</span></button>`;
   }).join('') || `<div class="rq-empty">Nothing on my planner in the last 4 weeks.</div>`;
   const custom = !!(p && p.custom);
@@ -699,7 +759,7 @@ function rqResultBody(kid, d) {
   if (custom) {
     left += `<input class="rq-input" type="text" value="${escapeAttr(p.name || '')}" placeholder="what it was called" data-mny-action="rq-name" aria-label="What it was called">
       <div class="rq-opts rq-two">${rqOpt('🏊 Swim', p.sport === 'swim', 'rq-sport', ' data-mny-id="swim"')}${rqOpt('⛸️ Skating', p.sport === 'skate', 'rq-sport', ' data-mny-id="skate"')}</div>
-      <div class="rq-warn">Dad adds it to the planner when he says yes, so the name matches next time.</div>`;
+      <div class="rq-warn">A parent adds it to the planner on a yes, so the name matches next time.</div>`;
   }
   left += `</div>`;
   let right = `<div class="rq-col">`;
@@ -748,7 +808,7 @@ function rqMoveState(kid, d) {
   const lockWeeks = Number(mrRuleOr(mrRules(), 'pots.lockWeeks')) || 4;
   if (d.mode === 'dep') {
     const ready = !!d.to;
-    const preview = d.to ? `I bring $${amt} of cash to Dad on Sunday. It goes into ${rqHomeShort(d.to)}${d.to === 'ready' ? ' and earns a little' : d.to === 'wall' ? ` and counts as ${mnyMoney(amt * (1 + bonus / 100))}` : ''}.` : 'Where should the cash go?';
+    const preview = d.to ? `I bring $${amt} of cash to my parents on Sunday. It goes into ${rqHomeShort(d.to)}${d.to === 'ready' ? ' and earns a little' : d.to === 'wall' ? ` and counts as ${mnyMoney(amt * (1 + bonus / 100))}` : ''}.` : 'Where should the cash go?';
     return { ready, preview, amt, max, need: 'Where should the cash go?' };
   }
   const to = d.mode === 'cash' ? 'cash' : d.to;
@@ -758,10 +818,10 @@ function rqMoveState(kid, d) {
   const preview = max < 1 ? 'Nothing to take out of there yet.'
     : refusal ? refusal
     : !ready ? 'Pick the details and why.'
-    : to === 'cash' ? `Dad hands me $${amt} in real cash on Sunday. It leaves the bank — no more interest.`
+    : to === 'cash' ? `A parent hands me $${amt} in real cash on Sunday. It leaves the bank — no more interest.`
     : to === 'locked' ? `$${amt} locked for ${lockWeeks} weeks, back on a Saturday with a little extra.`
     : to === 'wall' ? `$${amt} counts as ${mnyMoney(amt * (1 + bonus / 100))} off my wall. It can’t come back.`
-    : to === 'invest' ? `$${amt} could go up or down. Dad talks it through first.`
+    : to === 'invest' ? `$${amt} could go up or down. A parent talks it through first.`
     : `$${amt} goes back where I can reach it.`;
   return { ready, preview, amt, max, need: max < 1 ? 'Nothing to take out of there yet.' : (refusal || 'Pick the details and why.') };
 }
@@ -800,7 +860,7 @@ function rqAdvState(kid, d) {
   const amt = Math.min(d.amt || 1, Math.max(1, left));
   const ready = !!(d.why && left >= 1);
   const preview = left < 1 ? `I already drew ${rqDollars(used)} in advance this week. That's the most.`
-    : `Dad gives me $${amt} cash now and I spend it before Sunday. On payday it shows under ➖ Taken off, so my pile is $${amt} smaller.`;
+    : `A parent gives me $${amt} cash now and I spend it before Sunday. On payday it shows under ➖ Taken off, so my pile is $${amt} smaller.`;
   return { ready, preview, amt, left, need: left < 1 ? preview : 'What is it for?' };
 }
 function rqAdvBody(kid, d) {
@@ -825,7 +885,7 @@ function rqGoalState(kid, d) {
   const start = d.keep === 'ready' ? 0 : jar.saved;
   const wks = Math.ceil(Math.max(0, price - start) / 3);
   const preview = !ready ? 'Type what I want to buy, then pick a price.'
-    : `${d.icon} ${name} · $${price}. ${start ? `I start with ${mnyMoney(start)}. ` : ''}At $3 a Sunday that's about ${wks} Sundays. Dad says yes, then my jar switches.`;
+    : `${d.icon} ${name} · $${price}. ${start ? `I start with ${mnyMoney(start)}. ` : ''}At $3 a Sunday that's about ${wks} Sundays. A parent says yes, then my jar switches.`;
   return { ready, preview, need: 'What do I want to buy?' };
 }
 function rqGoalBody(kid, d) {
@@ -845,7 +905,7 @@ function rqClubState(kid, d) {
   const sw = mrSessionsWeek(ctThisWeekKey(), kid);
   const s = sw.sessions.find(x => x.blockId === d.blockId);
   const ready = !!(s && d.why);
-  const preview = s ? `If Dad says yes, ${rqDayLabel(s.dayKey)} shows as missed on Sunday. A missed session pays $0. It is not a fine.`
+  const preview = s ? `If a parent says yes, ${rqDayLabel(s.dayKey)} shows as missed on Sunday. A missed session pays $0. It is not a fine.`
     : sw.sessions.length ? `Each session I go to pays ${rqDollars(sw.rate)} on Sunday.` : 'No club sessions on my planner this week.';
   return { ready, preview, need: s ? 'Why?' : 'Which one can’t I make?' };
 }
@@ -877,7 +937,7 @@ function rqGiftState(kid, d) {
   const ready = amt > 0 && !!d.from;
   const when = d.dayKey === todayKey() ? 'today' : rqDayLabel(d.dayKey);
   const preview = !ready ? 'How much was it?'
-    : `${rqDollars(amt)} · ${d.from}${giver ? ' from ' + giver : ''} · ${when}. Dad says yes, then it goes into my payday on Sunday.`;
+    : `${rqDollars(amt)} · ${d.from}${giver ? ' from ' + giver : ''} · ${when}. A parent says yes, then it goes into my payday on Sunday.`;
   return { ready, preview, need: 'How much was it?' };
 }
 function rqGiftBody(kid, d) {
@@ -902,12 +962,14 @@ function rqPricesBody() {
 function rqStatusText(q) {
   const r = q.record || {};
   if (q.status === 'yes') {
-    return ({ goal: '✓ starts Sunday', skip: '✓ marked missed',
+    const said = ({ goal: '✓ starts Sunday', skip: '✓ marked missed',
       move: r.to === 'cash' ? '✓ cash on Sunday' : r.to === 'wall' ? (r.appliedWeek ? '✓ on the wall' : '✓ on the wall on Sunday') : '✓ moved',
       adv: '✓ cash given · off Sunday', deposit: '✓ in the bank' })[q.kind] || '✓ in Sunday’s payday';
+    // 💬 Agreed at the meeting (Deviation 41): what she asked, and what was agreed.
+    return q.agreed != null && q.asked != null ? `${said} · agreed ${mnyShort$(q.agreed)} (asked ${mnyShort$(q.asked)})` : said;
   }
   if (q.status === 'no') return '✗ not this time';
-  if (q.status === 'talk') return '💬 Dad wants to talk';
+  if (q.status === 'talk') return '💬 to talk about on Sunday';
   return '⏳ waiting';
 }
 function rqListBody(kid) {
@@ -922,7 +984,7 @@ function rqPreviewAndFoot() {
   return `<div class="rq-preview" data-rq-preview>${escapeHtml(st.preview || '')}</div>
     <div class="rq-foot">
       <button type="button" class="rq-notnow" data-mny-action="rq-close">Not now</button>
-      <button type="button" class="rq-send${st.ready ? ' ready' : ''}" data-mny-action="rq-send">Send to Dad →</button>
+      <button type="button" class="rq-send${st.ready ? ' ready' : ''}" data-mny-action="rq-send">Send to parents →</button>
     </div>`;
 }
 
@@ -933,7 +995,7 @@ function rqRender() {
   const title = document.getElementById('rqSheetTitle');
   // The result sheet's line sits beside its title, on one line (M8-2).
   if (title) title.innerHTML = escapeHtml(d.kind === 'move' ? RQ_TITLES[d.mode] : RQ_TITLES[d.kind])
-    + (d.kind === 'result' ? ' <span class="rq-titlesub">The official results sheet decides. Dad checks it before anything pays.</span>' : '');
+    + (d.kind === 'result' ? ' <span class="rq-titlesub">The official results sheet decides. A parent checks it before anything pays.</span>' : '');
   const sheet = host.closest('.sheet');
   if (sheet) sheet.setAttribute('data-rq-kind', d.kind);
   let body;
@@ -1086,7 +1148,7 @@ function rqSend() {
       text: `Can’t make ${s ? rqDayLabel(s.dayKey) : 'a session'} · ${d.why}` });
   }
   if (!rec) return;
-  showToast('Sent to Dad ✋');
+  showToast('Sent to parents ✋');
   rqClose();
   if (typeof rcRefreshSurfaces === 'function') rcRefreshSurfaces();
 }

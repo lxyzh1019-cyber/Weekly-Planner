@@ -43,8 +43,10 @@
    sheet's: typing never re-renders.
    ════════════════════════════════════════════════════════════════ */
 
+/* ✅ Approve left this bar for Parent › Now ("Waiting for you", Plan v9 §N,
+   Deviation 36); the cards and the queue it drew are still here and Now
+   draws them (guQueue, guApproveCard). */
 const GU_TABS = [
-  { id: 'approve', label: '✅ Approve' },
   { id: 'commit', label: '➕ Commitments' },
   { id: 'fines', label: '📦 Fines' },
   { id: 'expect', label: '🎁 Expected' },
@@ -146,7 +148,7 @@ let guFineDraft = null;     // { kid, itemId, dayIdx, who }
 let guOneOffDraft = null;   // { kid, dayIdx, startMin }
 let guRuleReason = 'grownups';  // ⚙️ Rules save card's reason chip
 let guOvOpen = {};          // ✅ This Sunday: whose "✏️ Change a line" is open
-let guWeeksKid = 'jenn';    // 📒 Weeks: whose weeks
+let guWeeksKid = 'jenn';    // 📒 Weeks: whose typed-in week is open for fixing
 let guWeekOpen = null;      // 📒 Weeks: the typed-in week open for fixing
 let guRuleSearch = '';      // 🔎 Find a price — the box's text, kept across redraws
 let guSheet = null;         // the open fix sheet: { kind: 'loan'|'owns'|'log', kid, id }
@@ -213,21 +215,23 @@ function guFreeBy(left, perWeek) {
    `data-mny-action`, read by mnyHandleClick (#mnyRulesWrap is one of
    MNY_CLICK_HOSTS); the tabs follow. */
 function guTabBar() {
-  const cur = guIsTab(mnyParentSection) ? mnyParentSection : 'approve';
-  const n = guWaitingCount();
-  return `<div class="gu-tabs" role="group" aria-label="Grown-ups">
-      <span class="gu-tools"><button type="button" class="gu-btn gu-record" data-mny-action="record-any">✍️ Record</button><button type="button" class="gu-btn" data-mny-action="tourpar" aria-label="How this page works">?</button></span>
+  const cur = guIsTab(mnyParentSection) ? mnyParentSection : 'commit';
+  return `<div class="gu-tabs" role="group" aria-label="Money">
       ${GU_TABS.map(t =>
-    `<button type="button" class="gu-tab${cur === t.id ? ' on' : ''}" aria-pressed="${cur === t.id}" data-mnyp-action="gutab" data-mnyp-id="${t.id}">${escapeHtml(t.id === 'approve' ? `✅ Approve (${n})` : t.label)}</button>`).join('')}</div>`;
+    `<button type="button" class="gu-tab${cur === t.id ? ' on' : ''}" aria-pressed="${cur === t.id}" data-mnyp-action="gutab" data-mnyp-id="${t.id}">${escapeHtml(t.label)}</button>`).join('')}
+      <span class="gu-tools"><button type="button" class="gu-btn gu-record" data-mny-action="record-any">✍️ Record</button><button type="button" class="gu-btn" data-mny-action="tourpar" aria-label="How this page works">?</button></span></div>`;
 }
 
 /* The whole tab: the prototype's two columns, the main one and its pane. */
 function guRender(tab) {
   const parts = {
-    approve: [guApproveMain, guApproveSide], commit: [guCommitMain, guCommitSide],
+    commit: [guCommitMain, guCommitSide],
     fines: [guFinesMain, guFinesSide], expect: [guExpectMain, guExpectSide], rules: [guRulesMain, guRulesSide],
-    weeks: [guWeeksMain, guWeeksSide],
-  }[tab] || [guApproveMain, guApproveSide];
+  }[tab] || [guCommitMain, guCommitSide];
+  if (tab === 'weeks') return `${guTabBar()}<div class="gu-weeks2">${guWeeksMain()}</div>`;
+  if (tab === 'rules') {
+    return `${guTabBar()}<div class="gu-grid gu-grid--rules"><nav class="gu-ruleindex" aria-label="Rule groups">${guRuleIndex()}</nav><div class="gu-main">${parts[0]()}</div><div class="gu-side">${parts[1]()}</div><div class="gu-savestrip">${guSaveStrip()}</div></div>`;
+  }
   return `${guTabBar()}<div class="gu-grid gu-grid--${tab}"><div class="gu-main">${parts[0]()}</div><div class="gu-side">${parts[1]()}</div></div>`;
 }
 function guHead(title, strap) {
@@ -343,32 +347,6 @@ function guApproveCard(q) {
       ${buttons}${done}
     </div>`;
 }
-function guApproveMain() {
-  const queue = guQueue();
-  return `${guHead('✅ Waiting for you', 'Nothing pays until it passes here.')}
-    <div class="gu-cards2">${queue.map(guApproveCard).join('')}</div>
-    ${queue.length ? '' : `<div class="gu-empty">Nothing waiting. When they tap 🏆 or 🔀 on My money, it lands here.</div>`}`;
-}
-/* "This Sunday", per girl: what still waits, what a yes adds to her payday,
-   and what moves. Yes answers Sunday has not used (requests), or answered
-   this week (a move or cash from home moves at the yes). */
-function guSundayCard(kid) {
-  const monday = formatDayKey(ctThisWeekKey()).getTime();
-  const mine = mnyRequestsFor(kid);
-  const wait = mine.filter(q => q.open).length;
-  const yes = mine.filter(q => q.status === 'yes'
-    && (q.store === 'requests' ? !q.applied : (q.answeredAt || 0) >= monday));
-  const adds = money2(yes.filter(q => ['move', 'adv', 'deposit', 'skip', 'goal'].indexOf(q.kind) < 0)
-    .reduce((a, q) => a + guCardValues(Object.assign({ kid }, q)).amt, 0));
-  const moves = yes.filter(q => ['move', 'adv', 'deposit'].indexOf(q.kind) >= 0).map(q => q.text);
-  return `<div class="gu-card gu-sun ${wait ? 'gu-sun--wait' : 'gu-sun--ok'}">
-      <div class="gu-cardhead"><span class="gu-cardtitle">${escapeHtml(mnyKidName(kid))}</span>
-        <span class="gu-sun-status">${wait ? `⏳ ${wait} to answer` : '✓ payday can open'}</span></div>
-      <div class="gu-sun-adds">${adds ? `+${guMoney$(adds)} added to her payday` : 'Nothing added on top of chores.'}</div>
-      <div class="gu-sun-moves">${escapeHtml(moves.length ? moves.join(' · ') : 'No moves.')}</div>
-      ${guOverrideRows(kid)}
-    </div>`;
-}
 /* ✏️ This week's lines, changed by a grown-up with a reason (Plan v5 §K:
    one state, two doors, one writer). The same steppers and reason chips as
    Sunday's Payday ✏️ (js/44), on the same owner: `mnySetOverride` /
@@ -403,29 +381,6 @@ function guStepOverride(kid, ch, d) {
   const cur = { chores: b.chorePaid, learning: b.learnPaid, streak: b.streakBonus, sessions: b.sessionsPaid, comp: b.compPaid, fines: b.fines.total }[ch];
   if (cur == null) return;
   mnySetOverride(kid, wk, ch, Math.max(0, money2(cur + d)), mnyWeekReason(kid, wk));
-}
-
-/* 👛 What she owns, per girl (Plan v5 §L G3): cash, Savings, each goal jar
-   (with "✓ She bought it" once it is full), Locked away with the day each
-   comes back, Companies — and ✏️ Fix what she owns for a correction. */
-function guOwnsCard(kid) {
-  const jars = mnyGoalsNearestFirst(kid).map(g => {
-    const saved = mnyGoalJarValue(kid, g);
-    const full = mnyGoalPace(kid, Object.assign({}, g, { saved })).reached;
-    return `<div class="gu-kv"><span>${escapeHtml((g.icon || '🎯') + ' ' + g.name)} <span class="gu-line">of ${escapeHtml(guMoney$(g.target))}</span></span><b>${escapeHtml(mnyMoney(saved))}</b></div>
-      ${full ? `<button type="button" class="gu-btn gu-bought" data-mnyp-action="guboughtit" data-mnyp-kid="${kid}" data-mnyp-id="${escapeAttr(g.id)}">✓ She bought it</button>` : ''}`;
-  }).join('');
-  const locks = mnyHoldingsOfKind(kid, 'gic').map(h =>
-    `<div class="gu-kv"><span>🔒 Locked away${h.maturesOn ? ' · back ' + escapeHtml(mnyShortDate(h.maturesOn)) : ''}</span><b>${escapeHtml(mnyMoney(mnyHoldingValue(h)))}</b></div>`).join('');
-  return `<div class="gu-card gu-owns ${'gu-tint--' + kid}">
-      <div class="gu-cardhead"><span class="gu-cardtitle">${escapeHtml(mnyKidName(kid))} owns</span><b class="gu-fig">${escapeHtml(mnyMoney(mnyEverything(kid)))}</b></div>
-      <div class="gu-kv"><span>💵 Cash</span><b>${escapeHtml(mnyMoney(mnyCash(kid)))}</b></div>
-      <div class="gu-kv"><span>🏦 Savings</span><b>${escapeHtml(mnyMoney(mnySavedTotal(kid)))}</b></div>
-      ${jars}
-      ${locks || `<div class="gu-kv"><span>🔒 Locked away</span><b>${escapeHtml(mnyMoney(0))}</b></div>`}
-      <div class="gu-kv"><span>📈 Companies</span><b>${escapeHtml(mnyMoney(mnyInvestedTotal(kid)))}</b></div>
-      <button type="button" class="gu-btn" data-mnyp-action="gufixowns" data-mnyp-kid="${kid}">✏️ Fix what she owns</button>
-    </div>`;
 }
 
 /* 👴 The Grandfather rule's preview and credit (Plan v5 §K), while weeks
@@ -496,15 +451,12 @@ function guMeetsCard() {
     </div>`;
 }
 function guWobblePct() { return Number(mrRuleOr(mrRules(), 'market.wobblePct')) || 0; }
-function guApproveSide() {
+/* 📉 Market wobble — a setting, so it lives on ⚙️ Rules › 🌱 Pots (Plan v9
+   §M 5b: the Approve side pane is gone). On or off for this Sunday. */
+function guWobbleCard() {
   const on = guWobblePct() > 0;
   const pct = on ? guWobblePct() : 2;
-  return `<div class="gu-sidehead">This Sunday</div>
-    ${GU_KIDS.map(guSundayCard).join('')}
-    <div class="gu-sidehead">What she owns</div>
-    ${GU_KIDS.map(guOwnsCard).join('')}
-    ${guGrandfatherCreditCard()}${guStreamCard()}${guRepairCard()}${guMeetsCard()}
-    <div class="gu-card gu-wobble">
+  return `<div class="gu-wobble">
       <div class="gu-cardhead"><span class="gu-cardtitle">📉 Market wobble</span>
         <button type="button" class="gu-toggle${on ? ' on' : ''}" aria-pressed="${on}" data-mnyp-action="guwobble">${on ? 'On this week' : 'Off'}</button></div>
       <div class="gu-line">${on ? `Companies show −${pct}% this Sunday. Ask her: “Do you sell, or wait?”`
@@ -662,11 +614,11 @@ function guClubCard() {
   const rows = GU_KIDS.map(kid => {
     const o = mnyClubOwes(kid);
     const since = o.since ? 'since ' + mnyShortDate(o.since) : 'so far';
-    return `<div class="gu-clubrow"><span>${guKidChip(kid)} Club owes Dad <b>${mnyMoney(o.amount)}</b> · ${o.sessions} session${o.sessions === 1 ? '' : 's'} ${escapeHtml(since)}</span>
+    return `<div class="gu-clubrow"><span>${guKidChip(kid)} Club owes us <b>${mnyMoney(o.amount)}</b> · ${o.sessions} session${o.sessions === 1 ? '' : 's'} ${escapeHtml(since)}</span>
       <button type="button" class="gu-btn" data-mnyp-action="guclubpaid" data-mnyp-kid="${kid}"${o.weeks ? '' : ' aria-disabled="true"'}>✓ Club paid</button></div>`;
   }).join('');
   return `<div class="gu-card gu-club"><div class="gu-cardtitle">🧾 Club owes</div>${rows}
-    <div class="gu-line">The club pays the assistant job twice a year; Dad pays her every Sunday. Nothing in her money moves when the club pays.</div></div>`;
+    <div class="gu-line">The club pays the assistant job twice a year; we pay her every Sunday. Nothing in her money moves when the club pays.</div></div>`;
 }
 function guClubPaid(kid) {
   const rows = mnyLedgerRows(kid);
@@ -906,7 +858,8 @@ function guPotsExtra(R) {
       </div>`;
   }).join('');
   return `<div class="gu-line">What 📈 Companies buys</div><div class="gu-opts">${funds}</div>${ladder}
-    <div class="gu-line">Open early only ever opens: it cannot close a pot she has reached.</div>`;
+    <div class="gu-line">Open early only ever opens: it cannot close a pot she has reached.</div>
+    ${guWobbleCard()}`;
 }
 /* 👴 The Grandfather rule's settings (Plan v5 §K; on screen only — data keys
    stay `grandma.*`): the start week and the amount, saved once as a dated
@@ -943,36 +896,135 @@ function guQuarterlyCard() {
       <button type="button" class="gu-btn" data-mnyp-action="guquarter">✓ Reviewed — no change needed</button>
     </div>`;
 }
+/* ⚙️ Rules — one screen (Plan v9 §M 5b "Rules", approved as drawn): an
+   index on the left (🔎 Find a price, then every group with a one-line
+   summary and a red count of its unsaved changes), the chosen group's rows
+   in the middle (one sentence of what it is for; a changed number shows
+   "· was …"), "What this changes" and "👀 What the girls will see on
+   Sunday" on the right, and the save strip along the bottom. Groups beyond
+   the rule cards: 👴 Grandfather rule, 📌 One-time settings (only the cards
+   still due; "due" in the index) and 📝 Rule changes (the last 5, see all).
+   `guRuleSec` says which group is open; Find a price shows the matching rows
+   of every group at once, in place (`guApplyRuleSearch`). */
+let guRuleSec = 0;          // ⚙️ Rules: the open group (index into guRuleSections())
+let guRuleThisWeek = false; // ⚙️ Rules: "start this week instead" ticked
+const GU_RULE_PURPOSE = {
+  '🧹 Earning': 'What a chore day and a routine streak pay. She sees these on Today.',
+  '🏆 Competitions': 'What a result pays. The official results sheet decides the points.',
+  '🧱 Loan': 'What she pays back each month, and what paying early counts for.',
+  '🌱 Pots': 'When each pot opens (share of the loan paid) and what it pays.',
+  '👛 Spending': 'How much she may cash out on Sunday, and draw before it.',
+  '📚 Words': 'Which money words Sunday uses with each girl.',
+  '📘 Learning': 'What learning pays, and how many items are spot-checked on Sunday.',
+  '📦 Fines': 'What each fine costs. Every one is logged, even a free one.',
+  '🎯 Targets': 'What each girl aims to earn in a year. Sunday shows her pace.',
+  '🛒 What money buys': 'The prices Sunday turns a big number into.',
+};
+/* "Chores $3/$2/$1 · cap $3 · 2 free" — each group's line in the index. */
+function guRuleSummary(title, R) {
+  const g = (p) => mrRuleOr(R, p);
+  const d = (p) => guMoney$(Number(g(p)) || 0);
+  const t = String(title);
+  if (t.indexOf('Earning') >= 0) return `Chores ${d('chores.grade.3')}/${d('chores.grade.2')}/${d('chores.grade.1')} · cap ${d('chores.dailyCap')} · ${Number(g('chores.freeChoresPerWeek')) || 0} free`;
+  if (t.indexOf('Competitions') >= 0) return `Swim ${d('competition.swim.perPoint')}/pt · Skate 1st ${d('competition.skate.placement.group.1')} · Silver ${d('competition.dance.silverPerItem')}`;
+  if (t.indexOf('Loan') >= 0) return `Jenn ${d('loan.monthly.jenn')} · Jess ${d('loan.monthly.jess')} a month · bonus ${Number(g('loan.extraBonusPct')) || 0}%`;
+  if (t.indexOf('Pots') >= 0) return `Open at ${g('school.stagePct.ready')}%/${g('school.stagePct.locked')}%/${g('school.stagePct.stock')}% · pay ${g('pots.rates.ready')}%/${g('pots.rates.gic')}%/${g('pots.rates.stock')}%`;
+  if (t.indexOf('Spending') >= 0) return `Cash out ≤ ${g('spend.capPct')}% · draw ahead ≤ ${d('advance.maxPerWeek')}`;
+  if (t.indexOf('Words') >= 0) return `Jenn Stage ${g('words.jenn')} · Jess Stage ${g('words.jess')}`;
+  if (t.indexOf('Learning') >= 0) {
+    const items = (((R || {}).learning || {}).items) || [];
+    return `${Number(g('learning.sundayCheckCount')) || 0} items checked a week · ${items.filter(i => i && i.xpOnly).length} XP, not dollars`;
+  }
+  if (t.indexOf('Fines') >= 0) {
+    const items = (((R || {}).fines || {}).items) || [];
+    return `${items.length} kinds · ${guMoney$(Number((items[0] || {}).amount) || 0)} each · ${Number((items[0] || {}).freeRepeats) || 0} free a week`;
+  }
+  if (t.indexOf('Targets') >= 0) return `Jenn ${d('targets.jenn.annual')} · Jess ${d('targets.jess.annual')} a year`;
+  if (t.indexOf('buys') >= 0) {
+    const items = (((R || {}).buys || {}).items) || [];
+    return `${items.length} prices${items[0] ? ` · ${items[0].label} ${guMoney$(items[0].amount)}` : ''}`;
+  }
+  return '';
+}
+/* Every group the index lists: the rule cards, then the three others. */
+function guRuleSections() {
+  const R = guPendingRules();
+  const rows = guRuleRows();
+  const once = [mnyHouseRulesCard(), guSundayRulesCard(), guMoneyWeekCard(), guQuarterlyCard()].join('');
+  const log = guRuleLog();
+  return rows.map(sec => ({ kind: 'rules', title: sec.title, sec,
+      line: guRuleSummary(sec.title, R),
+      changed: mnyPending.filter(p => sec.rows.some(r => r.path === p.path)).length }))
+    .concat([
+      { kind: 'gf', title: '👴 Grandfather rule', line: (() => { const r = mnyGrandmaRule(); return r.saved ? `${guMoney$(r.amount)} a week each · from ${mnyShortDate(r.from)}` : 'not set up yet'; })() },
+      { kind: 'once', title: '📌 One-time settings', line: once ? 'something to put in the rulebook' : `started ${mnyShortDate(String(mrStartWeek()))}`, due: !!once, html: once },
+      { kind: 'log', title: '📝 Rule changes', line: log[0] ? `Last: ${mnyShortDate(toDayKeyInZone(new Date(log[0].at)))} · ${log[0].note || log[0].path}` : 'none yet', log },
+    ]);
+}
+/* Open a group by its kind ('gf', 'once', 'log') — Setup's 🕰️ Change history
+   and 👴 Grandfather rule rows land on theirs. */
+function guRuleOpenGroup(kind) {
+  const i = guRuleSections().findIndex(s => s.kind === kind);
+  if (i >= 0) { guRuleSec = i; guRuleSearch = ''; }
+}
+function guRuleIndex() {
+  const secs = guRuleSections();
+  const cur = Math.max(0, Math.min(secs.length - 1, guRuleSec));
+  return `<label class="gu-q gu-search-label" for="guRuleSearch">🔎 Find a price or rule</label>
+    <input class="gu-input" id="guRuleSearch" type="search" value="${escapeAttr(guRuleSearch)}" placeholder="Find a price or rule…" data-mnyp-action="gurulesearch" autocomplete="off">
+    ${secs.map((s, i) => `<button type="button" class="gu-idx${i === cur ? ' on' : ''}" aria-pressed="${i === cur}" data-mnyp-action="gurulesec" data-mnyp-id="${i}">
+        <span class="gu-idx-title">${escapeHtml(s.title)}${s.changed ? `<span class="gu-idx-n">${s.changed}</span>` : ''}${s.due ? '<span class="gu-idx-due">due</span>' : ''}</span>
+        <span class="gu-idx-line">${escapeHtml(s.line)}</span></button>`).join('')}`;
+}
+function guRuleRowHtml(r, saved, R) {
+  const was = Number(mrGetPath(saved, r.path)) || 0, now = Number(mrGetPath(R, r.path)) || 0;
+  const ch = was !== now;
+  const she = (r.she ? r.she(now, R) : '');
+  const attrs = ` data-mnyp-path="${escapeAttr(r.path)}" data-mnyp-label="${escapeAttr(r.label)}"`;
+  return `<div class="gu-rule${ch ? ' changed' : ''}"><div class="gu-rule-words"><span>${escapeHtml(r.label)}</span><span class="gu-she">${escapeHtml(she)}</span></div>
+      <span class="gu-pair"><button type="button" class="gu-step" data-mnyp-action="gurule" data-mnyp-d="${-r.step}"${attrs} aria-label="Less">−</button>
+      <span class="gu-rulevalbox"><b class="gu-ruleval${ch ? ' changed' : ''}">${escapeHtml(guFmt(r.unit, now))}</b>${ch ? `<span class="gu-was">was ${escapeHtml(guFmt(r.unit, was))}</span>` : ''}</span>
+      <button type="button" class="gu-step" data-mnyp-action="gurule" data-mnyp-d="${r.step}"${attrs} aria-label="More">+</button></span></div>`;
+}
 function guRulesMain() {
   const saved = guSavedRules(), R = guPendingRules();
-  const sections = guRuleRows().map(sec => `<div class="gu-card gu-rulesec ${'gu-tint--' + sec.tint}">
-      <div class="gu-cardtitle">${escapeHtml(sec.title)}</div>
-      ${sec.rows.map(r => {
-        const was = Number(mrGetPath(saved, r.path)) || 0, now = Number(mrGetPath(R, r.path)) || 0;
-        const ch = was !== now;
-        const she = (r.she ? r.she(now, R) : '') + (ch ? ` · was ${guFmt(r.unit, was)}` : '');
-        const attrs = ` data-mnyp-path="${escapeAttr(r.path)}" data-mnyp-label="${escapeAttr(r.label)}"`;
-        return `<div class="gu-rule"><div class="gu-rule-words"><span>${escapeHtml(r.label)}</span><span class="gu-she">${escapeHtml(she)}</span></div>
-          <span class="gu-pair"><button type="button" class="gu-step" data-mnyp-action="gurule" data-mnyp-d="${-r.step}"${attrs} aria-label="Less">−</button>
-          <b class="gu-ruleval${ch ? ' changed' : ''}">${escapeHtml(guFmt(r.unit, now))}</b>
-          <button type="button" class="gu-step" data-mnyp-action="gurule" data-mnyp-d="${r.step}"${attrs} aria-label="More">+</button></span></div>`;
-      }).join('')}
-      ${sec.extra ? sec.extra(R) : ''}
-    </div>`).join('');
-  return `${guHead('⚙️ Money rules', 'Changes start next Sunday. The girls see what changed.')}
-    ${mnyHouseRulesCard()}${guSundayRulesCard()}${guMoneyWeekCard()}${guQuarterlyCard()}
-    <div class="gu-card gu-plain gu-search"><label class="gu-q" for="guRuleSearch">🔎 Find a price</label>
-      <input class="gu-input" id="guRuleSearch" type="search" value="${escapeAttr(guRuleSearch)}" placeholder="streak, star level, cap…" data-mnyp-action="gurulesearch" autocomplete="off"></div>
-    <div class="gu-cards2 gu-rulegrid">${sections}${guGrandfatherCard()}</div>`;
+  const secs = guRuleSections();
+  const cur = Math.max(0, Math.min(secs.length - 1, guRuleSec));
+  const body = secs.map((s, i) => {
+    const head = `<div class="gu-cardtitle">${escapeHtml(s.title)}</div>`;
+    let inner = '';
+    if (s.kind === 'rules') {
+      inner = `${head}<div class="gu-line gu-purpose">${escapeHtml(GU_RULE_PURPOSE[s.title] || '')}</div>
+        ${s.sec.rows.map(r => guRuleRowHtml(r, saved, R)).join('')}${s.sec.extra ? s.sec.extra(R) : ''}`;
+    } else if (s.kind === 'gf') {
+      inner = guGrandfatherCard();
+    } else if (s.kind === 'once') {
+      inner = `${head}${s.html || `<div class="gu-line">Nothing to put in the rulebook. Pocket money started ${escapeHtml(mnyShortDate(String(mrStartWeek())))}; set it on 👴 Grandfather rule.</div>`}`;
+    } else {
+      inner = `${head}<div class="gu-line gu-purpose">The last 5 changes, with the reason given.</div>
+        ${s.log.slice(0, 5).map(guLogLine).join('') || '<div class="gu-log">No changes yet.</div>'}
+        ${s.log.length > 5 ? `<button type="button" class="gu-btn" data-mnyp-action="gulogall">See all ${s.log.length} ▸</button>` : ''}`;
+    }
+    const cls = s.kind === 'rules' ? `gu-card gu-rulesec ${'gu-tint--' + s.sec.tint}` : s.kind === 'gf' ? 'gu-rulesec gu-rulesec--gf' : 'gu-card gu-rulesec gu-plain';
+    return `<div class="${cls}" data-gu-sec="${i}"${i === cur ? '' : ' hidden'}>${inner}</div>`;
+  }).join('');
+  return `<div class="gu-rulegrid">${body}</div>`;
 }
-/* 🔎 Find a price (owner's review G6-12, back from 📖 More): typing hides
-   the rule rows that do not match, in place — the tab is never redrawn, so
-   the box keeps its caret. A section whose title matches shows every row. */
+/* 🔎 Find a price (G6-12): with words in the box, every group's matching
+   rows show at once, in place — the tab is never redrawn, so the box keeps
+   its caret; empty, only the open group shows. A group whose title matches
+   shows every row. */
 function guApplyRuleSearch(root) {
   const q = String(guRuleSearch || '').trim().toLowerCase();
-  (root || document).querySelectorAll('.gu-rulegrid .gu-rulesec').forEach(sec => {
+  const cur = String(Math.max(0, guRuleSec));
+  (root || document).querySelectorAll('.gu-rulegrid > .gu-rulesec').forEach(sec => {
+    if (!q) {
+      sec.hidden = sec.getAttribute('data-gu-sec') !== cur;
+      sec.querySelectorAll('.gu-rule').forEach(row => { row.hidden = false; });
+      return;
+    }
     const title = ((sec.querySelector('.gu-cardtitle') || {}).textContent || '').toLowerCase();
-    const whole = !q || title.indexOf(q) >= 0;
+    const whole = title.indexOf(q) >= 0;
     let any = whole;
     sec.querySelectorAll('.gu-rule').forEach(row => {
       const hit = whole || row.textContent.toLowerCase().indexOf(q) >= 0;
@@ -1046,28 +1098,43 @@ function guRulesSide() {
     const a = `${guMoney$(ytd)} of ${guMoney$(was)}`, b = `${guMoney$(ytd)} of ${guMoney$(now)}`;
     k.rows.push({ k: 'This year vs target', v: a === b ? a : `${a} → ${b}`, changed: a !== b });
   });
-  const changed = mnyPending.filter(p => JSON.stringify(mrGetPath(saved, p.path)) !== JSON.stringify(p.value));
+  const changed = guRuleChanges(saved);
+  const sees = changed.map(p => {
+    const d = guRuleRowFor(p.path);
+    return `“${d ? d.label : p.label}: now ${d ? guFmt(d.unit, p.value) : String(p.value)} (was ${d ? guFmt(d.unit, mrGetPath(saved, p.path)) : String(mrGetPath(saved, p.path))})”`;
+  });
+  return `<div class="gu-sidehead">What this changes</div>
+    <div class="gu-line gu-purpose">${changed.length ? 'Before → after, for a typical week.' : 'Change a number to see what it does.'}</div>
+    ${impact.map(k => `<div class="gu-card gu-impact ${'gu-tint--' + k.kid}"><div class="gu-cardtitle">${escapeHtml(mnyKidName(k.kid))}</div>
+      ${k.rows.map(r => `<div class="gu-kv${r.changed ? ' changed' : ''}"><span>${escapeHtml(r.k)}</span><b>${escapeHtml(r.v)}</b></div>`).join('')}</div>`).join('')}
+    <div class="gu-card gu-sees">
+      <div class="gu-cardtitle">👀 What the girls will see on Sunday</div>
+      <div class="gu-line">${escapeHtml(sees.length ? sees.join(' · ') : 'Nothing new — no changes yet.')}</div>
+    </div>`;
+}
+/* The pending list, less anything that is back at its saved value. */
+function guRuleChanges(saved) {
+  return mnyPending.filter(p => JSON.stringify(mrGetPath(saved || guSavedRules(), p.path)) !== JSON.stringify(p.value));
+}
+/* The save strip along the bottom (as drawn): what changed, why (reason
+   chips), ↺ Undo, "start this week instead" and Save · starts next Sunday. */
+function guSaveStrip() {
+  const saved = guSavedRules();
+  const changed = guRuleChanges(saved);
   const said = (p) => {
     const d = guRuleRowFor(p.path);
     return `${d ? d.label : p.label} ${d ? guFmt(d.unit, mrGetPath(saved, p.path)) : String(mrGetPath(saved, p.path))} → ${d ? guFmt(d.unit, p.value) : String(p.value)}`;
   };
-  const log = guRuleLog();
-  return `<div class="gu-sidehead">What this changes</div>
-    ${impact.map(k => `<div class="gu-card gu-impact"><div class="gu-cardtitle">${escapeHtml(mnyKidName(k.kid))}</div>
-      ${k.rows.map(r => `<div class="gu-kv${r.changed ? ' changed' : ''}"><span>${escapeHtml(r.k)}</span><b>${escapeHtml(r.v)}</b></div>`).join('')}</div>`).join('')}
-    <div class="gu-card gu-saverules">
-      <div class="gu-line">${escapeHtml(changed.length ? `${changed.length} change${changed.length === 1 ? '' : 's'}: ${changed.map(said).join(' · ')}` : 'No changes yet. Tap − or + on any rule.')}</div>
+  return `<div class="gu-card gu-saverules${changed.length ? ' gu-saverules--on' : ''}">
+      <div class="gu-line"><b>${escapeHtml(changed.length ? `${changed.length} change${changed.length === 1 ? '' : 's'}:` : 'No changes yet.')}</b> ${escapeHtml(changed.length ? changed.map(said).join(' · ') : 'Tap − or + on any rule. The girls see what changed on their next Sunday.')}</div>
       <div class="gu-opts gu-reasons"><span class="gu-line">Why:</span>${MR_REASONS.map(r =>
         guOpt(r.label, guRuleReason === r.id, 'gureason', ` data-mnyp-id="${escapeAttr(r.id)}"`)).join('')}</div>
       <div class="gu-saverow">
         <button type="button" class="gu-btn" data-mnyp-action="gurulediscard">↺ Undo</button>
+        <button type="button" class="gu-check-toggle${guRuleThisWeek ? ' on' : ''}" role="checkbox" aria-checked="${guRuleThisWeek}" data-mnyp-action="guthisweek"><span class="gu-box" aria-hidden="true">${guRuleThisWeek ? '✓' : ''}</span>start this week instead</button>
+        <span class="gu-line">weeks already signed keep their rules</span>
         <button type="button" class="gu-save${changed.length ? ' ready' : ''}" data-mnyp-action="gurulesave">Save · starts next Sunday</button>
       </div>
-      <button type="button" class="gu-btn gu-thisweek" data-mnyp-action="gurulesnow">Start this week instead</button>
-      <div class="gu-line">This week instead prices this week too — for a correction. Weeks already signed keep their rules.</div>
-      <div class="gu-cardtitle gu-logtitle">📝 Rule changes</div>
-      ${log.slice(0, 5).map(guLogLine).join('') || '<div class="gu-log">No changes yet.</div>'}
-      ${log.length > 5 ? `<button type="button" class="gu-btn" data-mnyp-action="gulogall">See all ${log.length} ▸</button>` : ''}
     </div>`;
 }
 function guStepRule(el) {
@@ -1090,6 +1157,7 @@ function guStepRule(el) {
    "Start this week instead" dates it from this week's Monday — the house
    rules' date, refused while a later change is already scheduled. */
 function guSaveRules(thisWeek) {
+  if (thisWeek == null) thisWeek = guRuleThisWeek;
   if (!mnyPending.length) { showToast('No changes yet. Tap − or + on any rule.'); return; }
   const from = thisWeek ? mrHouseRulesFrom() : guNextMonday();
   if (!from) { showToast('A rules change is already scheduled — this one can start this week once that one has.'); return; }
@@ -1099,13 +1167,20 @@ function guSaveRules(thisWeek) {
   mnyPendingReason = MR_DEFAULT_REASON;
 }
 
-/* ════════════ 📒 WEEKS (Plan v5 Deviation 16, §K) ════════════
-   Her past Sundays in the passbook's style (`mnyPassbookRow`, js/22): came
-   in, then the wall, saved and cash. A week the app watched happen is frozen;
-   a 👴 Grandfather week is read-only (its money is already in her wallet —
-   `mnyEditLedger` / `mnyDeleteLedgerWeek` refuse it); a week typed in from
-   memory is marked ✏️ and opens its fields to fix, or to remove. "Add a week
-   that happened before this" steps one week back per tap (`mnyAddMissedWeek`). */
+/* ════════════ 📒 WEEKS (Plan v5 Deviation 16, §K; Plan v9 §M 5b / §N) ════════════
+   Both girls side by side, as the owner asked (G7-2). On top a summary per
+   girl — earned this year (and against her target), loan left, a typical
+   week (`guSteady`, the same 4-Sunday average Commitments' affordability
+   reads), whether the loan payments are on track, and a saving line (the
+   core's `sdSavingLine` over her last 4 Sundays). Then every Sunday, newest
+   on top, one row per Sunday with each girl's cell in the passbook's style
+   (`mnyPassbookRow`): what came in, the bar of where it went, and a tag —
+   ✓ signed (frozen) · ✏️ typed in (✏️ Fix) · 👴 Grandfather rule
+   (read-only: its money is already in her wallet). Tapping a Sunday opens
+   that week's whole record for both girls (`guWeekRecord`), read from the
+   frozen ledger row and the records that week used — no store of its own.
+   ＋ Add a week before … sits under each girl (`mnyAddMissedWeek`). */
+let guWeekDay = null;       // 📒 Weeks: the Sunday open in full (a week key)
 function guWeekTag(r) {
   if (r.defaulted) return r.defaultReason === 'grandma' ? '👴 Grandfather rule' : 'nobody met';
   if (r.repricedAt) return 're-priced';
@@ -1129,45 +1204,167 @@ function guTypedWeekFields(kid, r) {
       <button type="button" class="gu-btn" data-mnyp-action="guleddel" data-mnyp-kid="${kid}" data-mnyp-id="${escapeAttr(r.weekKey)}">Remove this week</button>
     </div>`;
 }
-function guWeeksMain() {
-  const kid = guWeeksKid;
-  const rows = mnyLedgerRows(kid);
-  const head = `<div class="mv2-bookgrid mv2-bookhead"><span>Sunday</span><span>💰 in</span><span>wall</span><span>saved</span><span>cash</span></div>`;
-  const list = rows.map(r => {
-    const p = mnyPassbookRow(r);
-    const open = guWeekOpen === r.weekKey && r.handEntered && !r.defaulted;
-    const line = r.defaulted
-      ? `<div class="gu-line">${escapeHtml(r.defaultReason === 'grandma' ? '👴 Grandfather rule' : 'No meeting — default')} ${escapeHtml(mnyMoney(money2(money2(r.gross) - money2(r.competition))))} + meets ${escapeHtml(mnyMoney(r.competition))} · already in her wallet, so it is not edited here; a meet is corrected through the meet.</div>`
-      : '';
-    return `<div class="gu-weekrow${r.defaulted ? ' gu-weekrow--gf' : ''}">
-        <div class="mv2-bookgrid"><span class="mv2-bookdate">${escapeHtml(mnyDayMonth(p.sunday))}</span>
-          <b class="mv2-bookin">${escapeHtml(mnyBook$(p.inAmt))}</b><b>${escapeHtml(mnyBook$(p.wall))}</b><b>${escapeHtml(mnyBook$(p.saved))}</b><b>${escapeHtml(mnyBook$(p.cash))}</b></div>
-        <div class="gu-weektag"><span class="gu-line">${escapeHtml(guWeekTag(r))}</span>${r.handEntered && !r.defaulted
-          ? `<button type="button" class="gu-btn" aria-expanded="${open}" data-mnyp-action="guweekopen" data-mnyp-kid="${kid}" data-mnyp-id="${escapeAttr(r.weekKey)}">${open ? 'Done' : '✏️ Fix'}</button>` : ''}</div>
-        ${line}${open ? guTypedWeekFields(kid, r) : ''}
-      </div>`;
-  }).join('');
-  return `${guHead('📒 Past weeks', 'Every Sunday on record. A week typed from memory can be fixed here.')}
-    <div class="gu-opts">${GU_KIDS.map(k => guOpt(mnyKidName(k), kid === k, 'guweekskid', ` data-mnyp-id="${k}"`)).join('')}</div>
-    <div class="gu-card gu-weeks">
-      ${rows.length ? head + list : '<div class="gu-line">No Sundays on record yet.</div>'}
-      <button type="button" class="gu-btn" data-mnyp-action="guaddweek" data-mnyp-kid="${kid}">＋ Add a week that happened before this</button>
-      <div class="gu-line">Each tap steps one week further back from the earliest week on record.</div>
+/* The summary per girl (§N "Weeks"). */
+function guWeeksSummary(kid) {
+  const y = mrYearToDate(kid);
+  const R = mrSundayRules(ctThisWeekKey());
+  const target = Number(mrRuleOr(R, 'targets.' + kid + '.annual')) || y.target || 0;
+  const left = mnyTotalOwing(kid);
+  const owed = money2(mnyEnsureDebts(kid).reduce((a, d) => a + (loanBalance(kid, d.id) > 0 ? money2(d.arrears) : 0), 0));
+  const rows = mnyLedgerRows(kid).slice(0, 4).map(mnyPassbookRow);
+  const line = sdSavingLine(rows, left > 0, R);
+  const kv = (k, v, cls) => `<div class="gu-kv${cls ? ' ' + cls : ''}"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`;
+  return `<div class="gu-card gu-weeksum ${'gu-tint--' + kid}">
+      <div class="gu-cardhead"><span class="gu-cardtitle">${escapeHtml(mnyKidName(kid))}</span></div>
+      ${kv('Earned this year', target > 0 ? `${guMoney$(y.paidTotal)} of ${guMoney$(target)} · ${Math.round(y.paidTotal / target * 100)}%` : guMoney$(y.paidTotal))}
+      ${kv('Loan left', guMoney$(left))}
+      ${kv('Typical week', guMoney$(guSteady(kid)))}
+      ${kv('Loan payments', left <= 0 ? '✓ nothing owed' : owed > 0 ? `📌 ${guMoney$(owed)} still owed` : '✓ on track', owed > 0 ? 'gu-warnline' : '')}
+      <div class="gu-line gu-saveline">${escapeHtml(line.word
+        ? `Saving: ${line.word} — ${line.pct}% of her last ${line.sundays} Sunday${line.sundays === 1 ? '' : 's'} went to Savings, goal jars, Locked away and Companies${line.extra ? '. ' + line.extra.charAt(0).toUpperCase() + line.extra.slice(1) : ''}.`
+        : 'Saving: no signed Sundays yet.')}</div>
     </div>`;
 }
-function guWeeksSide() {
-  const kids = GU_KIDS.map(kid => {
-    const rows = mnyLedgerRows(kid);
+/* One girl's cell for one Sunday in the list. */
+function guWeekCell(kid, r) {
+  if (!r) return `<div class="gu-weekcell gu-weekcell--none ${'gu-tint--' + kid}"><span class="gu-line">—</span></div>`;
+  const p = mnyPassbookRow(r);
+  const open = guWeekOpen === r.weekKey && guWeeksKid === kid && r.handEntered && !r.defaulted;
+  const tag = guWeekTag(r);
+  const fixable = r.handEntered && !r.defaulted;
+  const parts = r.defaulted ? `cash ${mnyMoney(p.cash || money2(money2(r.gross)))}`
+    : `wall ${mnyMoney(p.wall)} · saved ${mnyMoney(p.saved)} · cash ${mnyMoney(p.cash)}`;
+  return `<div class="gu-weekcell ${'gu-tint--' + kid}${r.defaulted ? ' gu-weekrow--gf' : ''}">
+      <div class="gu-weekcell-top"><b class="gu-weekin">${escapeHtml(mnyMoney(p.inAmt))}</b>
+        <span class="mv2-bookbar mv2-bookbar--out gu-weekbar"><i class="mv2-sw--wall" style="flex:${p.wall} 0 0"></i><i class="mv2-sw--saved" style="flex:${p.saved} 0 0"></i><i class="mv2-sw--cash" style="flex:${r.defaulted ? Math.max(1, p.cash) : p.cash} 0 0"></i></span>
+        <span class="gu-weektagchip">${escapeHtml(tag)}</span>
+        ${fixable ? `<button type="button" class="gu-btn" aria-expanded="${open}" data-mnyp-action="guweekopen" data-mnyp-kid="${kid}" data-mnyp-id="${escapeAttr(r.weekKey)}">${open ? 'Done' : '✏️ Fix'}</button>` : ''}</div>
+      <div class="gu-line">${escapeHtml(parts)}</div>
+      ${r.defaulted ? `<div class="gu-line">${escapeHtml(r.defaultReason === 'grandma' ? '👴 Grandfather rule' : 'No meeting — default')} ${escapeHtml(mnyMoney(money2(money2(r.gross) - money2(r.competition))))} + meets ${escapeHtml(mnyMoney(r.competition))} · already in her wallet, so it is not edited here; a meet is corrected through the meet.</div>` : ''}
+      ${open ? guTypedWeekFields(kid, r) : ''}
+    </div>`;
+}
+function guWeeksMain() {
+  const rowsBy = {};
+  GU_KIDS.forEach(k => { rowsBy[k] = {}; mnyLedgerRows(k).forEach(r => { rowsBy[k][r.weekKey] = r; }); });
+  const weeks = Array.from(new Set(GU_KIDS.flatMap(k => Object.keys(rowsBy[k])))).sort().reverse();
+  const list = weeks.map(wk => {
+    const on = guWeekDay === wk;
+    return `<div class="gu-weekline${on ? ' on' : ''}">
+        <button type="button" class="gu-weekday" data-mnyp-action="guweekday" data-mnyp-id="${escapeAttr(wk)}" aria-expanded="${on}">${escapeHtml(mnyDayMonth(sdSundayOf(wk)))}</button>
+        ${GU_KIDS.map(k => guWeekCell(k, rowsBy[k][wk])).join('')}
+      </div>
+      ${on ? `<div class="gu-weekdetail">${GU_KIDS.map(k => guWeekRecord(k, wk, rowsBy[k][wk])).join('')}</div>` : ''}`;
+  }).join('');
+  const earliest = (k) => { const ks = Object.keys(rowsBy[k]).sort(); return ks[0] || ctThisWeekKey(); };
+  const foot = GU_KIDS.map(k => {
+    const rows = Object.values(rowsBy[k]);
+    const signed = rows.filter(r => !r.handEntered && !r.defaulted).length;
     const typed = rows.filter(r => r.handEntered && !r.defaulted).length;
     const gf = rows.filter(r => r.defaulted).length;
-    return `<div class="gu-card ${'gu-tint--' + kid}"><div class="gu-cardhead"><span class="gu-cardtitle">${escapeHtml(mnyKidName(kid))}</span><b class="gu-fig">${rows.length} Sunday${rows.length === 1 ? '' : 's'}</b></div>
-      <span class="gu-line">${typed} typed in · ${gf} under the 👴 Grandfather rule</span></div>`;
+    const tot = money2(rows.reduce((a, r) => a + mnyPassbookRow(r).inAmt, 0));
+    return `<div class="gu-weekcell ${'gu-tint--' + k}"><b>${escapeHtml(guMoney$(tot))}</b> <span class="gu-line">${signed} signed · ${typed} typed in · ${gf} Grandfather</span></div>`;
   }).join('');
-  return `<div class="gu-sidehead">How a week gets here</div>${kids}
-    <div class="gu-card gu-plain gu-stack">
-      <span>✓ Signed on Sunday: frozen, the record of what was agreed.</span>
-      <span>✏️ Typed in: a week from before the app, from memory — it can be fixed or removed.</span>
-      <span>👴 Grandfather rule: credited by the rule; its money is already in her wallet.</span>
+  return `${guHead('📒 Past weeks', 'Both girls, lined up by Sunday. Signed weeks are frozen; typed-in weeks can be fixed. Tap a Sunday for the whole record.')}
+    <div class="gu-cards2">${GU_KIDS.map(guWeeksSummary).join('')}</div>
+    <div class="gu-weekkey"><span><i class="mv2-sw mv2-sw--wall"></i>to the wall</span><span><i class="mv2-sw mv2-sw--saved"></i>saved</span><span><i class="mv2-sw mv2-sw--cash"></i>cash</span>
+      <span>✓ signed on Sunday, frozen · ✏️ typed in from memory, fixable · 👴 Grandfather flat rule, read-only</span></div>
+    <div class="gu-card gu-weeks">
+      <div class="gu-weekline gu-weekhead"><span>Sunday</span>${GU_KIDS.map(k => `<span>${guKidChip(k)} in · where it went</span>`).join('')}</div>
+      ${weeks.length ? list : '<div class="gu-line">No Sundays on record yet.</div>'}
+      <div class="gu-weekline"><span></span>${GU_KIDS.map(k => `<button type="button" class="gu-btn gu-addweek" data-mnyp-action="guaddweek" data-mnyp-kid="${k}">＋ Add a week before ${escapeHtml(mnyDayMonth(sdSundayOf(earliest(k))))}</button>`).join('')}</div>
+      <div class="gu-weekline gu-weekfoot"><b>${weeks.length} Sunday${weeks.length === 1 ? '' : 's'}</b>${foot}</div>
+    </div>`;
+}
+/* One girl's whole record of one Sunday (§N "Weeks", tapping a Sunday):
+   every Payday line with its working, the fines with their item and day,
+   money drawn early, a grown-up's changes with the reason, the loan (must
+   pay, extra and what it counted, interest added), where every dollar went,
+   the stickers, the verdict, her answer, who signed and when, and the rules
+   version. A row from before the ledger kept these keeps what it kept. */
+function guWeekRecord(kid, wk, r) {
+  const head = `<div class="gu-cardhead"><span class="gu-cardtitle">${escapeHtml(mnyKidName(kid))} · Sunday ${escapeHtml(mnyDayMonth(sdSundayOf(wk)))}</span></div>`;
+  if (!r) return `<div class="gu-card gu-record ${'gu-tint--' + kid}">${head}<div class="gu-line">No Sunday on record for this week.</div></div>`;
+  const kv = (k, v, sub) => `<div class="gu-kv"><span>${escapeHtml(k)}${sub ? `<span class="gu-she">${escapeHtml(sub)}</span>` : ''}</span><b>${escapeHtml(v)}</b></div>`;
+  const sec = (title, html) => html ? `<div class="gu-rec-sec"><div class="gu-rec-title">${escapeHtml(title)}</div>${html}</div>` : '';
+  const m = (v) => mnyMoney(Number(v) || 0);
+  const kept = r.sunday || r.days || r.choresRaw != null;
+  if (r.defaulted || !kept) {
+    const what = r.defaulted ? (r.defaultReason === 'grandma' ? '👴 Grandfather rule' : 'No meeting — default') : (r.handEntered ? '✏️ Typed in from memory' : 'Settled before the full record was kept');
+    return `<div class="gu-card gu-record ${'gu-tint--' + kid}">${head}<div class="gu-line">${escapeHtml(what)} — earned only.</div>
+      ${kv('Came in', m(mnyPassbookRow(r).inAmt))}${kv('Loan paid', m((r.loan || {}).paid))}${kv('Saved', m(mnyPassbookRow(r).saved))}${kv('Cash', m(r.spend))}</div>`;
+  }
+  const days = Array.isArray(r.days) ? r.days : [];
+  const inDays = (k) => days.length ? days.indexOf(k) >= 0 : String(ctWeekKeyForDate(k)) === String(wk);
+  // 💪 Payday, with the working each line kept.
+  const comps = mrCompetitions(kid).filter(c => c && (String(ctWeekKeyForDate(c.dayKey)) === String(wk)));
+  const deps = mnyDepositsForWeek(kid, wk).filter(d => d && !d.pendingApproval && !d.rejectedAt);
+  const payday = [
+    kv('🧹 Chores', m(r.chores), `${days.length || 7} days · ${r.freeChores || 0} free${r.overflowChores ? ` · ${r.overflowChores} past the cap (XP)` : ''}${r.choresRaw != null && money2(r.choresRaw) !== money2(r.chores) ? ` · graded ${m(r.choresRaw)}` : ''}`),
+    Number(r.learning) ? kv('📘 Learning', m(r.learning)) : '',
+    kv('🔥 Routine', m(r.streak), `${r.streakDays || 0} days kept`),
+    kv('⛸️ Club job', m(r.sessionsPaid), `${r.sessions || 0} session${r.sessions === 1 ? '' : 's'} attended`),
+    kv('🏆 Prizes', m(r.competition), comps.map(c => `${c.name || mnySportLabel(c.sport)} · ${Number(c.points) || 0} pts${(c.placement || {}).group ? ` · group ${rqOrd(c.placement.group)}` : ''} · ${guMoney$(mrCompAward(c))}${c.awardedOverride ? ' (a parent made it ' + guMoney$(c.awardedOverride.value) + ')' : ''}`).join(' | ')),
+    kv('🎁 Given', m(r.deposits != null ? r.deposits : r.outside), deps.map(d => `${d.giver || d.from || 'a gift'} ${guMoney$(d.amount)}`).join(' · ')),
+    kv('🌱 Money made', m(Math.max(0, Number(r.passive) || 0))),
+  ].join('');
+  const fines = mrFines(kid).filter(f => f && inDays(f.dayKey))
+    .map(f => kv(`📦 ${guFineLabel(f.itemId)}`, '', `${guDayName(f.dayKey)} ${mnyDayMonth(f.dayKey)}${f.who ? ' · ' + f.who : ''}`)).join('');
+  const advs = mnyEnsureRequests(kid).filter(q => q && q.kind === 'adv' && q.appliedWeek === wk)
+    .map(q => kv(`⏪ ${q.why || 'Drawn early'}`, m(q.appliedAmount != null ? q.appliedAmount : q.amount),
+      q.agreed && q.agreed.asked != null ? `asked ${guMoney$(q.agreed.asked)} · agreed ${guMoney$(q.agreed.value)}` : '')).join('');
+  const agreed = mnyRequestsFor(kid).filter(q => q.applied && q.record.appliedWeek === wk && q.asked != null && q.kind !== 'adv')
+    .map(q => kv(`💬 ${q.icon} ${q.text}`, `agreed ${guMoney$(q.agreed)}`, `asked ${guMoney$(q.asked)}`)).join('');
+  const ov = ((getProfData(kid).earnings || {})[wk] || {}).overrides || {};
+  const edits = Object.keys(ov).map(ch => kv(`✏️ ${ch}`, m((ov[ch] || {}).value), `${mnyReasonLabel((ov[ch] || {}).reason)} · a grown-up`)).join('');
+  const L = r.loan || {};
+  const bonus = Number(mrRuleOr(mrRulesForWeek(wk), 'loan.extraBonusPct')) || 0;
+  const loan = [
+    L.must != null ? kv('📌 Must pay', m(L.must), Number(L.shortfall) ? `${m(L.shortfall)} still owed after` : '') : '',
+    kv('🧱 Paid', m(L.paid)),
+    Number(r.extra) ? kv('🧱 Extra', m(r.extra), `counted ${m(L.extraCredited != null ? L.extraCredited : r.extra * (1 + bonus / 100))}`) : '',
+    Number(L.interest) ? kv('🟥 Interest added', m(L.interest)) : '',
+  ].join('');
+  const goalsHtml = Object.keys(r.goals || {}).map(id => {
+    const g = (getProfData(kid).savingGoals || []).find(x => x && x.id === id);
+    return kv(`🎯 ${g ? (g.icon || '') + ' ' + g.name : 'Goal jar'}`, m(r.goals[id]));
+  }).join('');
+  const went = [
+    kv('🧱 Loan wall', m(money2((Number(L.paid) || 0) + (Number(r.extra) || 0)))),
+    kv('🏦 Savings', m(r.ready), Number(r.cents) ? `with ${m(r.cents)} of change` : ''),
+    goalsHtml || (Number(r.goal) ? kv('🎯 Goal jars', m(r.goal)) : ''),
+    Number(r.gic) ? kv('🔒 Locked away', m(r.gic)) : '',
+    Number(r.stock) ? kv('📈 Companies', m(r.stock)) : '',
+    kv('💵 Cash out', m(r.cashOut != null ? r.cashOut : r.spend)),
+  ].join('');
+  const stickers = sdStickersFor({ extra: Number(r.extra) || 0, ready: Number(r.ready) || 0, gic: Number(r.gic) || 0, stock: Number(r.stock) || 0,
+    wallet: Number(r.spend) || 0, guess: r.guess != null ? Number(r.guess) : null, payday: Number(r.payday) || 0 })
+    .map(id => (SD_STICKERS.find(s => s[0] === id) || [])[1] || '').join(' ');
+  let verdict = '';
+  if (r.sunday && r.sunday.signed) {
+    try {
+      const res = { signed: r.sunday.signed, after: Object.assign({}, r.sunday.after) };
+      const v = sdVerdicts(res, Object.assign({}, r.sunday.w, { alloc: {} }), mrSundayRules(wk));
+      verdict = [v.income && v.income.head, v.strategy && (v.strategy.head + ' — ' + v.strategy.why)].filter(Boolean)
+        .map(x => `<div class="gu-line">${escapeHtml(x)}</div>`).join('');
+    } catch (e) { verdict = ''; }
+  }
+  const plan = (mnyEnsureWeekMaps().weekPlans[wk] || {})[kid] || {};
+  const pid = plan.reflect || plan.presetId;
+  const chip = pid ? MNY_REFLECT.chips.find(x => x.id === pid) : null;
+  const answer = chip ? chip.label : (plan.reflect || (plan.planId === 'sunday' ? 'She placed it herself, box by box.' : ''));
+  const signedAt = r.updatedAt || r.at;
+  return `<div class="gu-card gu-record ${'gu-tint--' + kid}">${head}
+      ${sec('💪 Payday', payday)}
+      ${sec('➖ Taken off', (Number(r.fines) ? kv('📦 Fines', '−' + m(r.fines)) : '') + fines + (Number(r.advance) ? kv('⏪ Drawn early', '−' + m(r.advance)) : '') + advs)}
+      ${sec('✏️ Changed by a grown-up', edits + (r.editReason && !edits ? kv('✏️ Lines changed', (r.edited || []).join(', '), mnyReasonLabel(r.editReason)) : ''))}
+      ${sec('💬 Agreed at the meeting', agreed)}
+      ${sec('🧱 Loan', loan)}
+      ${sec('Where every dollar went', went)}
+      ${stickers ? sec('⭐ Stickers', `<div class="gu-line">${escapeHtml(stickers)}</div>`) : ''}
+      ${sec('Verdict', verdict)}
+      ${answer ? sec('💬 Her answer', `<div class="gu-line">${escapeHtml(MNY_REFLECT.question)} “${escapeHtml(answer)}”${r.guess != null ? escapeHtml(` · she guessed $${r.guess}`) : ''}</div>`) : ''}
+      <div class="gu-line gu-rec-foot">${escapeHtml(`Signed by ${r.confirmedBy || 'a grown-up'}${signedAt ? ' · ' + new Date(signedAt).toLocaleString('en-US', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : ''} · rules ${r.rulesVersion || '—'}${r.rulesEffectiveFrom ? ' (from ' + mnyShortDate(r.rulesEffectiveFrom) + ')' : ''}`)}</div>
     </div>`;
 }
 
@@ -1352,8 +1549,9 @@ function guAction(a, el) {
   // ⚙️ Rules
   } else if (a === 'gurule') { guStepRule(el); return;
   } else if (a === 'gurulediscard') { mnyPending = []; mnyPendingFrom = null;
-  } else if (a === 'gurulesave') { guSaveRules(false); return;
-  } else if (a === 'gurulesnow') { guSaveRules(true); return;
+  } else if (a === 'gurulesave') { guSaveRules(); if (!mnyPending.length && guRuleThisWeek) { guRuleThisWeek = false; mnyRenderRulesTab(); } return;
+  } else if (a === 'guthisweek') { guRuleThisWeek = !guRuleThisWeek;
+  } else if (a === 'gurulesec') { guRuleSec = Math.max(0, Number(id) || 0); guRuleSearch = '';
   } else if (a === 'gureason') { guRuleReason = MR_REASONS.some(r => r.id === id) ? id : 'grownups';
   } else if (a === 'gulogall') { guOpenSheet('log'); return;
   } else if (a === 'gufund') { mnyQueueEdit('investing.fund', id, 'What her investing money buys'); return;
@@ -1364,8 +1562,8 @@ function guAction(a, el) {
   } else if (a === 'gumoneyweek') {
     if (mrApplyMoneyWeekRule()) showToast('✅ The money week is in the rulebook');
   // 📒 Weeks
-  } else if (a === 'guweekskid') { guWeeksKid = id === 'jess' ? 'jess' : 'jenn'; guWeekOpen = null;
-  } else if (a === 'guweekopen') { guWeekOpen = guWeekOpen === id ? null : id;
+  } else if (a === 'guweekday') { guWeekDay = guWeekDay === id ? null : id;
+  } else if (a === 'guweekopen') { const same = guWeekOpen === id && guWeeksKid === kid; guWeeksKid = kid === 'jess' ? 'jess' : 'jenn'; guWeekOpen = same ? null : id;
   } else if (a === 'guled') { mnyEditLedger(kid, id, el.getAttribute('data-mnyp-f'), d);
   } else if (a === 'guleddel') { mnyDeleteLedgerWeek(kid, id); guWeekOpen = null;
   } else if (a === 'guaddweek') { mnyAddMissedWeek(kid);

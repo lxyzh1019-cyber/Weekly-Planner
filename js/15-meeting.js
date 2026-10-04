@@ -1013,7 +1013,9 @@ function renderMeetingMode() {
   const host = document.getElementById('familyMeetingBody');
   const restore = mmCaptureUiState(host);
   host.innerHTML =
-    `<div class="mm-head">${mmWeekBar(wk)}<div class="mm-stepper">${stepper}</div></div>`
+    /* One row (Plan v9 §N "Header space"): the meeting's name, the week and
+       its three steps; the screen's own title hides while this row shows. */
+    `<div class="mm-head mm-head--one"><h2 class="mm-head-title">🧑‍🧑‍🧒 Family meeting</h2>${mmWeekBar(wk)}<div class="mm-stepper">${stepper}</div></div>`
     + `<div class="mm-body">${body}</div>`
     + `<div class="mm-nav">${back}${next}</div>`;
   restore();

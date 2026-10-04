@@ -267,9 +267,9 @@ function flRenderFlow(kid) {
         ${growRows || '<div class="fl-empty">Nothing was put away — it is all still cash.</div>'}
       </div>
 
-      <div class="fl-left">
-        <span>💵 Left as cash, right now</span><b>${mnyMoney(flow.inHand)}</b>
-      </div>
+      ${flow.inHand > 0 ? `<div class="fl-left">
+        <span>📥 Waiting for Sunday, right now</span><b>${mnyMoney(flow.inHand)}</b>
+      </div>` : ''}
       <div class="fl-note">This last number is not what came in take away what went out —
       you had money before this ${flPeriod === 'all' ? 'story' : 'month'} started, and that counts too.</div>
     </div>

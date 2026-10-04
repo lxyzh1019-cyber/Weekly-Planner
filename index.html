@@ -448,7 +448,7 @@
      Chrome here, body filled by JS, the recordOverlay pattern. -->
 <div class="overlay" id="requestOverlay" onclick="overlayClick(event,'requestOverlay')">
   <div class="sheet rq-sheet" role="dialog" aria-modal="true" aria-labelledby="rqSheetTitle">
-    <h3 id="rqSheetTitle">✋ Ask Dad</h3>
+    <h3 id="rqSheetTitle">✋ Ask parents</h3>
     <div id="requestBody"></div>
   </div>
 </div>
@@ -457,7 +457,7 @@
      Chrome here, body filled by JS, the recordOverlay pattern. -->
 <div class="overlay" id="sundayOverlay" onclick="overlayClick(event,'sundayOverlay')">
   <div class="sheet sd-sheet" role="dialog" aria-modal="true" aria-labelledby="sdSheetTitle">
-    <h3 id="sdSheetTitle">🗣️ Dad's card</h3>
+    <h3 id="sdSheetTitle">🗣️ Parent's card</h3>
     <div id="sundayBody"></div>
   </div>
 </div>
@@ -465,6 +465,16 @@
 <!-- ✏️ Grown-ups' fix sheets — fix a loan row, fix what she owns, every rule
      change (js/46-grownups.js). Chrome here, body filled by JS, the
      recordOverlay pattern; its controls are data-mnyp-action. -->
+<!-- 🚪 "She told me…" (Parent › Now, Plan v9 §N): the On-her-behalf card in a
+     sheet. Body filled by pnRenderToldSheet (js/32-parent-now.js); its
+     data-pn-action controls go to pnHandleClick (js/99-main.js). -->
+<div class="overlay" id="pnToldOverlay" onclick="overlayClick(event,'pnToldOverlay')">
+  <div class="sheet pn-told-sheet" role="dialog" aria-modal="true" aria-labelledby="pnToldTitle">
+    <h3 id="pnToldTitle">🚪 She told me… — on her behalf</h3>
+    <div id="pnToldBody"></div>
+  </div>
+</div>
+
 <div class="overlay" id="grownupsOverlay" onclick="overlayClick(event,'grownupsOverlay')">
   <div class="sheet gu-sheet" role="dialog" aria-modal="true" aria-labelledby="guSheetTitle">
     <h3 id="guSheetTitle">✏️ Fix</h3>
@@ -584,22 +594,20 @@
      SCREEN: PARENT HOME
 ════════════════════════════════════════════════════════ -->
 <div class="screen" id="screen-parent">
-  <div class="parent-banner">👨‍👩‍👧‍👦 Parent Mode</div>
-  <header class="topbar">
-    <div class="topbar-left">
-      <h2>Parent Dashboard</h2>
+  <!-- One row (Plan v9 §N "Header space"): 🔒 Parent ▾ (PIN, the look, Exit
+       inside it), the six destinations, the day, then who is shown. The
+       purple row itself says this is Parent mode; the tabs say where. -->
+  <header class="parent-bar">
+    <div class="parent-menu">
+      <button type="button" class="parent-menu-btn" id="parentMenuBtn" aria-expanded="false" aria-controls="parentMenu" onclick="parentMenuToggle()">🔒 Parent ▾</button>
+      <div class="parent-menu-pop" id="parentMenu" hidden>
+        <button class="btn-icon" onclick="parentMenuToggle(false);changeParentPin()" title="Change parent PIN">🔒 PIN</button>
+        <!-- The parent's own look on this device (L5). applyLook writes the
+             label: the look it switches TO. -->
+        <button class="btn-icon" id="parentLookBtn" onclick="lookToggle('parent')" title="Switch to the Calm look" aria-label="Switch to the Calm look">🎨 Calm</button>
+        <button class="btn-icon" onclick="parentMenuToggle(false);goProfile()">Exit to the girls</button>
+      </div>
     </div>
-    <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap">
-      <div class="parent-scope" id="parentScopePills" aria-label="Which child"></div>
-      <button class="btn-icon" onclick="changeParentPin()" title="Change parent PIN">🔒 PIN</button>
-      <!-- The parent's own look on this device (L5). applyLook writes the
-           label: the look it switches TO. -->
-      <button class="btn-icon" id="parentLookBtn" onclick="lookToggle('parent')" title="Switch to the Calm look" aria-label="Switch to the Calm look">🎨 Calm</button>
-      <button class="btn-icon" onclick="goProfile()">Exit</button>
-    </div>
-  </header>
-
-  <div style="padding:0.8rem 1rem 0">
     <div class="parent-tabs" role="tablist" aria-label="Parent sections">
       <button class="parent-tab active" role="tab" id="pdestbtn-now" data-pdest="now"
         aria-selected="true" aria-controls="ptab-now" tabindex="0"
@@ -610,15 +618,20 @@
       <button class="parent-tab" role="tab" id="pdestbtn-history" data-pdest="history"
         aria-selected="false" aria-controls="ptab-history" tabindex="-1"
         data-parent-dest="history">📊 History</button>
-      <button class="parent-tab parent-tab-right" role="tab" id="pdestbtn-setup" data-pdest="setup"
+      <button class="parent-tab" role="tab" id="pdestbtn-money" data-pdest="money"
+        aria-selected="false" aria-controls="ptab-money" tabindex="-1"
+        data-parent-dest="money">💰 Money</button>
+      <button class="parent-tab" role="tab" id="pdestbtn-setup" data-pdest="setup"
         aria-selected="false" aria-controls="ptab-setup" tabindex="-1"
         data-parent-dest="setup">📋 Setup</button>
+      <span class="parent-date" id="parentDate" aria-hidden="true"></span>
       <button class="parent-tab" role="tab" id="pdestbtn-app" data-pdest="app"
         aria-selected="false" aria-controls="ptab-app" tabindex="-1"
-        data-parent-dest="app">⚙️ App</button>
+        data-parent-dest="app" aria-label="App">⚙️</button>
     </div>
-    <div class="parent-back" id="parentBack" hidden></div>
-  </div>
+    <div class="parent-scope" id="parentScopePills" aria-label="Which child"></div>
+  </header>
+  <div class="parent-back" id="parentBack" hidden></div>
 
   <!-- Two devices saved different versions of one record. Above the panels, so
        it is on every destination rather than only the one that can fix it. It
@@ -730,7 +743,7 @@
   <!-- TAB: Level-Up Rules -->
   <!-- TAB: Money rules — everything a grown-up can change about the money
        system, in one place. Every save is effective-dated and logged. -->
-  <div class="parent-panel" id="ptab-money" role="region" aria-label="Money rules" hidden>
+  <div class="parent-panel" id="ptab-money" role="tabpanel" aria-labelledby="pdestbtn-money" hidden>
     <div class="chore-wrap" id="mnyRulesWrap"></div>
   </div>
 

@@ -631,5 +631,39 @@ function fill(w, k) {
     keysOf(r18.mrMoneyDaysPure('2026-10-05', isSun, oldRow)) === '2026-10-05');
 }
 
+/* ── 📒 Weeks: the saving line (Plan v9 §N, 10% / 50%) ── */
+{
+  const row = (wall, saved, cash) => ({ wall, saved, cash });
+  const L = (rows, open) => s.sdSavingLine(rows, open, R);
+  check('saving line: under 10% is "a little"', L([row(10, 0.5, 9.5)], false).word === 'a little');
+  check('saving line: exactly 10% is "steady"', L([row(5, 2, 13)], false).word === 'steady' && L([row(5, 2, 13)], false).pct === 10);
+  check('saving line: exactly 50% is "steady"', L([row(5, 10, 5)], false).word === 'steady');
+  check('saving line: over 50% is "a lot"', L([row(4, 11, 5)], false).word === 'a lot');
+  check('saving line: "a lot" with a loan open says what extra counts, from the rules',
+    L([row(4, 11, 5)], true).extra === 'extra on the loan counts $1.10 per $1' ? true : L([row(4, 11, 5)], true).extra);
+  const R2 = JSON.parse(JSON.stringify(R)); R2.loan.extraBonusPct = 25;
+  check('saving line: the bonus is read from loan.extraBonusPct, not a literal',
+    s.sdSavingLine([row(4, 11, 5)], true, R2).extra === 'extra on the loan counts $1.25 per $1');
+  check('saving line: no loan open, no extra line', L([row(4, 11, 5)], false).extra === '');
+  check('saving line: "steady" never adds the loan line', L([row(5, 5, 10)], true).extra === '');
+  check('saving line: only the last 4 Sundays count',
+    L([row(10, 0, 10), row(10, 0, 10), row(10, 0, 10), row(10, 0, 10), row(0, 100, 0)], false).word === 'a little');
+  check('saving line: shares across Sundays, not an average of shares',
+    L([row(0, 9, 1), row(90, 0, 0)], false).pct === 9);
+  check('saving line: nothing placed yet says nothing', L([], true).word === null && L([row(0, 0, 0)], true).pct === null);
+}
+/* ── 💬 The agreed amount (Plan v9 §N, Deviation 41) ── */
+{
+  const r = { id: 'req-x', amount: 5, updatedAt: 1 };
+  s.sdWithAgreed(r, -3, 'a grown-up', 50);
+  check('agreed: never below $0, stamped with who and when', r.agreed.value === 0 && r.agreed.by === 'a grown-up' && r.updatedAt === 50);
+  s.sdWithAgreed(r, 3.456, 'a grown-up', 60);
+  s.sdAgreeInto(r, 'amount', 70);
+  check('agreed: agreeing puts the figure in the owner\'s field and keeps what she asked',
+    r.amount === 3.46 && r.agreed.asked === 5 && r.agreed.value === 3.46 && r.updatedAt === 70);
+  s.sdWithAgreed(r, 4, 'a grown-up', 80);
+  check('agreed: a later step keeps what she first asked', r.agreed.asked === 5);
+}
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach(f => console.log('  - ' + f)); process.exit(1); }

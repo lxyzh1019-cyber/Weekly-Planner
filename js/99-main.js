@@ -163,6 +163,12 @@ if (document.fonts) {
   // and the container holds the listener.
   const now = document.getElementById('pnWrap');
   if (now) now.addEventListener('click', pnHandleClick);
+  /* ✅ Waiting for you on Now carries Grown-ups' own answer cards
+     (data-mnyp-action, Plan v9 §N): the Money tab's handler, here too. */
+  if (now) now.addEventListener('click', mnyParentClick);
+  // 🚪 "She told me…": the On-her-behalf card in its sheet.
+  const told = document.getElementById('pnToldBody');
+  if (told) told.addEventListener('click', pnHandleClick);
   // Copy a week: the pickers and the preview are rebuilt on every change, so
   // the wrap holds the listener rather than the buttons.
   const copyweek = document.getElementById('pcwWrap');

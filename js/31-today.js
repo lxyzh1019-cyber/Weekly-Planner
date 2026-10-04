@@ -1717,7 +1717,8 @@ function tdRenderToday() {
    mnyTotalOwing are the same accessors My money uses, so the two can never
    disagree; the row taps through to that page, and nothing here moves money. */
 const TD_MONEY_SEGMENTS = [
-  { key: 'cash',   label: 'Cash',       colour: 'var(--cat-daily)' },
+  // Not an account (Plan v9 Deviation 37): money that came in between Sundays, shown only while there is some.
+  { key: 'cash',   label: '📥 Waiting for Sunday', colour: 'var(--cat-daily)' },
   { key: 'saved',  label: 'Savings',    colour: 'var(--cat-free)' },
   { key: 'locked', label: 'Locked away', colour: 'var(--cat-school)' },
   { key: 'stock',  label: 'Companies',  colour: 'var(--cat-custom)' },

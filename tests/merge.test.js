@@ -1374,5 +1374,57 @@ function sync(a, b) {
     gI.length === 2 && gP.length === 2 && gI.find(g => g.id === 'goal-1').saved === 13);
 }
 
+/* ══ Plan v9 §N (Deviation 41) — 💬 Talk first carries an AGREED amount ═════
+   A request a grown-up wants to talk about goes to the Sunday meeting, where a
+   parent steps an agreed amount with − / + and then agrees. `agreed {value,
+   by, at}` is the one new field, written by the core's `sdWithAgreed` on a
+   record in whichever of the three stores holds it (requests `req:`,
+   moveRequests `mvq:`, deposits `dep:`). Each store merges a record whole by
+   its stamp, so the field must ride that: stepped on the iPad it is the
+   figure on the phone, and two devices stepping it converge on the newer.
+   Written BEFORE the writer existed, so it was seen to fail first. */
+{
+  const core = require('../js/43-sunday-core.js');
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  on(ipad, st => {
+    st.profiles.jenn.requests = [{ id: 'req-a', kind: 'adv', status: 'talk', amount: 5, askedAt: 10, updatedAt: 10 }];
+    st.profiles.jenn.moveRequests = [{ id: 'mvq-a', from: 'ready', to: 'cash', amount: 8, talkAt: 11, updatedAt: 11 }];
+    st.profiles.jenn.deposits = [{ id: 'dep-a', amount: 20, pendingApproval: true, addedBy: 'jenn', talkAt: 12, updatedAt: 12 }];
+  });
+  sync(ipad, phone);
+  // At the meeting, on the iPad: a parent sets the agreed amount on each.
+  on(ipad, st => {
+    core.sdWithAgreed(st.profiles.jenn.requests[0], 3, 'a grown-up', 100);
+    core.sdWithAgreed(st.profiles.jenn.moveRequests[0], 6, 'a grown-up', 101);
+    core.sdWithAgreed(st.profiles.jenn.deposits[0], 15, 'a grown-up', 102);
+  });
+  sync(ipad, phone);
+  const pj = phone.state.profiles.jenn;
+  const ag = (x) => (x && x.agreed) || {};
+  check('agreed: set on the iPad, the phone has it on a request, a move and a deposit',
+    ag(pj.requests[0]).value === 3 && ag(pj.moveRequests[0]).value === 6 && ag(pj.deposits[0]).value === 15
+    && ag(pj.requests[0]).by === 'a grown-up' && ag(pj.deposits[0]).at === 102);
+  check('agreed: what she asked is left as she asked it',
+    pj.requests[0].amount === 5 && pj.moveRequests[0].amount === 8 && pj.deposits[0].amount === 20);
+  // Both devices step it while apart; the newer step is the agreed figure on both.
+  on(ipad,  st => { core.sdWithAgreed(st.profiles.jenn.requests[0], 4, 'a grown-up', 200); });
+  on(phone, st => { core.sdWithAgreed(st.profiles.jenn.requests[0], 2, 'a grown-up', 300); });
+  sync(ipad, phone);
+  check('agreed: two devices stepping it converge on the newer figure',
+    ag(ipad.state.profiles.jenn.requests[0]).value === 2 && ag(phone.state.profiles.jenn.requests[0]).value === 2);
+  // Her own copy, older, arriving later does not take the agreed figure away.
+  const stale = JSON.parse(JSON.stringify(phone.state));
+  stale.profiles.jenn.moveRequests[0] = { id: 'mvq-a', from: 'ready', to: 'cash', amount: 8, talkAt: 11, updatedAt: 11 };
+  receive(ipad, stale);
+  check('agreed: an older copy of the record does not take the agreed figure away',
+    ag(ipad.state.profiles.jenn.moveRequests[0]).value === 6);
+  // Agreeing: the effect field takes the agreed figure and what she asked is kept beside it.
+  on(ipad, st => { core.sdAgreeInto(st.profiles.jenn.moveRequests[0], 'amount', 400); });
+  sync(ipad, phone);
+  const mv = phone.state.profiles.jenn.moveRequests[0];
+  check('agreed: once agreed the record carries asked and agreed, on both devices',
+    mv.amount === 6 && ag(mv).asked === 8 && ag(mv).value === 6);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

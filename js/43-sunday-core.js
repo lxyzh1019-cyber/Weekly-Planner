@@ -670,7 +670,7 @@ function sdClues(rules) {
     ['🧹 Chores · ⛸️ job', `${sdWhole$(sdRule(rules, 'chores.dailyCap'))} a day · ${sdWhole$(sdRule(rules, 'sessions.perSession'))} a session`],
     ['🔥 Routine', sdStreakClue(rules)],
     ['🏆 Meets', 'points + placing'],
-    ['🎁 Gifts', 'only after Dad says yes'],
+    ['🎁 Gifts', 'only after a parent says yes'],
   ].map(([k, v]) => ({ k, v }));
 }
 
@@ -717,6 +717,51 @@ function sdImpact(saved, pending, kids, weekKey) {
   });
 }
 
+/* ── 💬 Talk first → the agreed amount (Plan v9 §N, Deviation 41) ──
+   A question a grown-up wants to talk about waits for the Sunday meeting,
+   where a parent steps an agreed figure with − / + and then agrees. The one
+   new field is `agreed {value, by, at}` on the record in whichever store
+   holds it (requests, moveRequests, deposits); the stamp is the record's own,
+   so it rides each store's whole-record merge (tests/merge.test.js).
+   `sdWithAgreed` writes the figure (never below $0). `sdAgreeInto` is the
+   agreeing: the field the owner reads (an advance's or a move's `amount`, a
+   gift's `amount`, a goal's `target`) takes the agreed figure, and what she
+   asked is kept beside it as `agreed.asked`, so the record shows both. */
+function sdWithAgreed(rec, value, by, at) {
+  if (!rec) return rec;
+  const prev = rec.agreed || {};
+  rec.agreed = { value: sdR2(Math.max(0, Number(value) || 0)), by: String(by || 'a grown-up'), at: Number(at) || 0 };
+  if (prev.asked != null) rec.agreed.asked = prev.asked;
+  rec.updatedAt = Number(at) || rec.updatedAt;
+  return rec;
+}
+function sdAgreeInto(rec, field, at) {
+  if (!rec || !rec.agreed || !field) return rec;
+  if (rec.agreed.asked == null) rec.agreed.asked = sdR2(rec[field]);
+  rec[field] = sdR2(rec.agreed.value);
+  rec.updatedAt = Number(at) || rec.updatedAt;
+  return rec;
+}
+
+/* ── 📒 Weeks: the saving line (Plan v9 §N, owner answer 2 of 🟧 Rev 7) ──
+   Over her last 4 Sundays (frozen ledger rows): the share of the money she
+   placed that went to 🏦 Savings, 🎯 goal jars, 🔒 Locked away and
+   📈 Companies — "a little" under 10%, "steady" from 10% to 50%, "a lot" over
+   50%. With "a lot" and a loan still open, the line adds what extra on the
+   loan counts, from `loan.extraBonusPct` ("$1.10 per $1" at the default).
+   `rows`: [{ wall, saved, cash }] — the passbook's three places per Sunday. */
+function sdSavingLine(rows, loanOpen, rules) {
+  const list = (rows || []).slice(0, 4);
+  const saved = sdR2(list.reduce((a, r) => a + (Number(r && r.saved) || 0), 0));
+  const placed = sdR2(list.reduce((a, r) => a + (Number(r && r.wall) || 0) + (Number(r && r.saved) || 0) + (Number(r && r.cash) || 0), 0));
+  if (!list.length || !(placed > 0)) return { pct: null, word: null, sundays: list.length, extra: '' };
+  const pct = Math.round(saved / placed * 1000) / 10;
+  const word = pct < 10 ? 'a little' : pct > 50 ? 'a lot' : 'steady';
+  const extra = (word === 'a lot' && loanOpen)
+    ? `extra on the loan counts ${sdWhole$(1 + sdBonusRate(rules))} per $1` : '';
+  return { pct, word, sundays: list.length, extra };
+}
+
 // Inert in the browser; lets tests/sunday.test.js hold the pure core in Node.
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -726,6 +771,6 @@ if (typeof module !== 'undefined' && module.exports) {
     sdLeft, sdPaidPct, sdMustPay, sdLoanInterest, sdMatured, sdPile, sdHers, sdSafeOk, sdIsOpen,
     sdCanPlace, sdPlace, sdSetPull, sdSetAdvance, sdPresets, sdStickersFor, sdCheckInOut, sdSign,
     sdVerdicts, sdForecast, sdNewGoal, sdWhole$, sdStreakForgiving, sdStreakClue, sdClues,
-    sdImpactWeek, sdImpactWeekly, sdImpact,
+    sdImpactWeek, sdImpactWeekly, sdImpact, sdWithAgreed, sdAgreeInto, sdSavingLine,
   };
 }

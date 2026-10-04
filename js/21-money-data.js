@@ -158,7 +158,7 @@ const MNY_CONCEPTS = [
   /* {debt} is filled in with the real name from her debt record, so this reads
      as being about her week rather than about money in general. */
   { id: 'debt', icon: '🧱', title: 'My loan', stage: 'start',
-    what: 'Dad paid for {debt} now, so I did not have to wait. I pay it back a bit every week.',
+    what: 'My parents paid for {debt} now, so I did not have to wait. I pay it back a bit every week.',
     why: 'I get to do what I love now, not years from now.',
     risk: 'It costs: interest every {every} Sundays, and the payment comes first every week, even a bad week. Each extra $1 counts as {bonus1}.',
     cn: '贷款：现在就能做想做的事，不用等；代价是利息，而且每周必须先还。' },
@@ -1785,7 +1785,9 @@ function mnyTabsFor() {
   if (parentish) return MNY_TABS;
   return MNY_TABS.filter(t => t.who === 'kid' || t.who === 'optional');
 }
-function mnyTabBar(cur) {
+function mnyTabBar(cur, opts) {
+  // `compact`: the one-row head (My money, §N) draws the names without numbers, as the mockup does.
+  const compact = !!(opts && opts.compact);
   const tabs = mnyTabsFor();
   // Numbering comes from the full table, so "1" and "5" mean the same thing to a
   // kid and a parent looking at the same system.
@@ -1795,7 +1797,7 @@ function mnyTabBar(cur) {
     const n = MNY_TABS.indexOf(t) + 1;
     return `<button type="button" class="mny-tab${sel ? ' on' : ''}"${sel ? ' aria-current="page"' : ''}
         data-mny-action="tab" data-mny-tab="${t.id}">
-        <span>${n} ${t.icon} ${escapeHtml(t.label)}</span>
+        <span>${compact ? '' : n + ' '}${t.icon} ${escapeHtml(t.label)}</span>
         ${t.who === 'kid' || t.who === 'optional' ? '' : `<span class="mny-tab-tag">${escapeHtml(t.who)}</span>`}
       </button>`;
   }).join('')}</nav>`;
@@ -1808,29 +1810,29 @@ function mnyTabBar(cur) {
 const MNY_TOURS = {
   kid: [
     { icon: '💰', title: 'This page is yours', where: 'The whole screen',
-      body: 'Everything here is yours to look at any time, without asking. Nothing on this page can take money away from you — a number only changes on Sunday, with Dad sitting next to you, or when he says yes to something you asked.' },
+      body: 'Everything here is yours to look at any time, without asking. Nothing on this page can take money away from you — a number only changes on Sunday, with a parent sitting next to you, or when your parents say yes to something you asked.' },
     { icon: '☀️', title: 'How long until Sunday', where: 'Top card',
       body: 'Seven circles, one for each day. Each shows what your chores have earned so far, and the line under them says about how much that is. On Sunday you guess the total together.' },
-    { icon: '🏦', title: 'The four places your money sits', where: 'Everything I have',
-      body: 'Cash you can spend, Savings, money Locked away for 4 weeks, and money in Companies. Add the four together and that is everything you have. A place that is not open yet says when it opens. Tap any ? to find out what it is.' },
+    { icon: '🏦', title: 'The three places your money sits', where: 'Everything I have',
+      body: 'Savings (your goal jars are inside it), money Locked away for 4 weeks, and money in Companies. Add them together and that is everything you have. Money that came in since Sunday shows as 📥 Waiting for Sunday until you choose where it goes. A place that is not open yet says when it opens. Tap any ? to find out what it is.' },
     { icon: '🎯', title: 'What you are saving for', where: 'Goal jars',
-      body: 'Each goal is its own jar. It shows how full it is, the day you want it by, and about how much a week that takes. ✏️ New goal asks Dad.' },
+      body: 'Each goal is its own jar. It shows how full it is, the day you want it by, and about how much a week that takes. ✏️ New goal asks your parents.' },
     { icon: '🧱', title: 'Your loan wall', where: 'Loan wall',
-      body: 'One hundred bricks. Each one you fill is a bit more paid back, and the flags show where Savings, Locked away and Companies open.' },
+      body: 'One hundred bricks. Each one you fill is a bit more paid back. The big numbers say how much is left and when it is paid off; 📋 My loans shows each one.' },
     { icon: '📒', title: 'Your last four Sundays', where: 'Passbook',
-      body: 'What came in each Sunday and where it went: to the wall, saved, or cash. "All my Sundays" opens your whole money story.' },
+      body: 'What came in each Sunday — earned, given, made, and taken off — and where it went: to the wall, saved, or cash. Tap a Sunday for its numbers. 📖 opens your whole money story.' },
   ],
   parent: [
     { icon: '⚙️', title: 'The only page that changes a number', where: 'The whole screen',
-      body: 'Answers to her questions, the loans, fines, expected money, every price and past weeks all live here. Her own pages only read from this one — nothing on them can be edited by a kid.' },
-    { icon: '✅', title: 'Answer first', where: '✅ Approve',
-      body: 'Every question she asked waits here, and nothing pays until it passes. Beside it: this Sunday for each girl (change a line, with a reason), what she owns (✏️ Fix what she owns), and anything older that still needs crediting.' },
+      body: 'The loans, fines, expected money, every price and past weeks all live here; her questions are answered on Now. Her own pages only read from these — nothing on them can be edited by a kid.' },
+    { icon: '✅', title: 'Answer first', where: 'Now › Waiting for you',
+      body: 'Every question she asked waits on Now, and nothing pays until it passes. Beside it: this Sunday for each girl (change a line, with a reason), what they own (✏️ Fix), and 🔧 Tidy-up when something older needs crediting. 💬 Talk first saves it for the Sunday meeting.' },
     { icon: '🧱', title: 'The loans', where: '➕ Commitments',
       body: 'Each row on her wall, with what borrowing has cost so far and by payoff, and the bonus she has earned. Tap a row to fix its name or numbers — a correction is dated and never touches what she has paid.' },
     { icon: '🗓', title: 'Weeks arrive two ways', where: '📒 Weeks',
-      body: 'Signing on Sunday writes a week by itself and freezes it. For a week that happened before the app, "Add a week" steps back one week per tap so you can type it in.' },
+      body: 'Both girls side by side, with a summary on top. Signing on Sunday writes a week by itself and freezes it — tap a Sunday for its whole record. For a week that happened before the app, "Add a week" steps back one week per tap so you can type it in.' },
     { icon: '💾', title: 'Nothing saves until you say so', where: '⚙️ Rules',
-      body: 'Steps collect and save as one dated change with one reason, from next Sunday — or this week, for a correction. ↺ Undo throws them away; 📝 Rule changes keeps every one.' },
+      body: 'Pick a group on the left. Steps collect in the strip at the bottom and save as one dated change with one reason, from next Sunday — or this week, for a correction. ↺ Undo throws them away; 📝 Rule changes keeps every one.' },
   ],
 };
 

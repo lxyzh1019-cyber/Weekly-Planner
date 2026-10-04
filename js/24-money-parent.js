@@ -34,7 +34,7 @@ let mnyPendingFrom = null;  // effective date; defaults to today
 /* Where Grown-ups is standing: one of its tabs (GU_TABS, js/46-grownups.js).
    The 📖 More tab and its eight sections are retired (Sunday v15 Stage 4b);
    every route that named a section names the tab its contents moved to. */
-let mnyParentSection = 'approve';
+let mnyParentSection = 'commit';
 
 function mnyParentKid() { return (parentViewing === 'jenn' || parentViewing === 'jess') ? parentViewing : 'jess'; }
 
@@ -44,10 +44,14 @@ function mnyRenderRulesTab() {
   const wrap = document.getElementById('mnyRulesWrap');
   if (!wrap) return;
   if (!isParent()) { wrap.innerHTML = `<div class="mny-card"><div class="mny-note">Parents only 🔒</div></div>`; return; }
-  if (!guIsTab(mnyParentSection)) mnyParentSection = 'approve';
+  if (!guIsTab(mnyParentSection)) mnyParentSection = 'commit';
   wrap.innerHTML = `<div class="gu">${guRender(mnyParentSection)}</div>`;
   if (mnyParentSection === 'rules' && guRuleSearch) guApplyRuleSearch(wrap);   // 🔎 kept across a redraw
   if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
+  /* Grown-ups' answer cards and tidy-up runners also sit on Parent › Now
+     (Plan v9 §N): every writer that redraws this tab redraws Now too while
+     Now is the panel on screen. */
+  if (typeof parentTab !== 'undefined' && parentTab === 'now' && typeof pnRenderNow === 'function') pnRenderNow();
 }
 
 /* ── The four house rules, when this household's rulebook lacks them ──
