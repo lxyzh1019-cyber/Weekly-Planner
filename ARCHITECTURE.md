@@ -544,8 +544,9 @@ between Money and More. Its only permanent door had been ⋯ More → 👯 "Sist
 not match the screen's name. **One destination, one door:** the More tile went
 with the change, and so did the 🎓 Money school and 📖 Money story tiles, which
 were extra doors to pages the Money tab already reaches (Money school: money
-tab 5 and My money's 🎓 button; Money story: My money's 📖 button in
-`mnyLinksCard`). More now holds 🧹 Chores · ◀ Switch and the build number.
+tab 5 and every '?' explainer's "📚 Take me to Money school"; Money story: My
+money's 📖 head button and the passbook's "all my Sundays ▸" — Sunday v15
+Stage 3 retired the `mnyLinksCard` that held them). More now holds 🧹 Chores · ◀ Switch and the build number.
 `tests/check-dead-actions.js` cannot see `data-td-more`, so a More tile and its
 `tdGoMore` branch are added and removed by hand, together. The label is "Sister
 Sync" because it fits on one line at 375px in the app's font — and, since Plan
@@ -1486,8 +1487,9 @@ and `ctMatrixCellChecked(kid, day, row, weekKey = ctWeekKey)`.
   `tdLevelSheet`): level and tier and XP from `mrXpLevelInfo`, and the WHOLE
   ladder from `mrPrivileges` — "yours" or "level N" per row. Close is its one
   control.
-- **Row 11 — Earned this week on My money** (`mnyEarnBoardCard`, after the
-  Today card): `ckEarnBoard` for the page's week and today — total kept after
+- **Row 11 — Earned this week on My money** (`mnyEarnBoardCard` — **retired in
+  Sunday v15 Stage 3**, Plan v5 §K: My Money v2's ☀️ countdown and "This week"
+  card answer it; the chore tab's rail keeps the board), after the Today card: `ckEarnBoard` for the page's week and today — total kept after
   fines, today's ceiling bar (fines, kept, waiting, → XP) with its keys, the
   "one more fine" line and the room line, and the ledger by channel. No bar
   when today is not in the week showing.
@@ -3820,8 +3822,10 @@ change is a dated, logged version; `mnyStagePctRefusal` refuses a broken order
 `theGatesComeFromOneTable` sweeps 0–100% and compares ladder row, pot (split and
 move gate), lesson card and chip, and each pot against its own lesson.
 
-**🔓 A pot opening is a moment.** On her own My money, `mnyStageOpenedCard`
-shows one card when her stage is above the stage last acknowledged on this
+**🔓 A pot opening is a moment.** *(Retired in Sunday v15 Stage 3: the Sunday
+milestone — "🔓 20% paid back! Savings is open", Plan v5 Deviation 33 — says it
+at the moment it happens, and the card would have said it twice.)* On her own My money, `mnyStageOpenedCard`
+showed one card when her stage is above the stage last acknowledged on this
 device (`localStorage`, `wp_mny_stage_seen_<kid>`, every access in try/catch,
 never synced). It names the pots and shows each new idea's what / why / watch
 through `mnyConceptCard` — never restated. First sight records the current stage

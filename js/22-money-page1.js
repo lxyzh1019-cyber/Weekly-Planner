@@ -1,123 +1,60 @@
 // Weekly-Planner — 💰 My money: the one money page that belongs to the kid.
 // Classic script, global scope — declarations only (see MODULARIZATION_PLAN.md).
 /* ════════════════════════════════════════════════════════════════
-   PAGE 1 · MY MONEY
+   PAGE 1 · MY MONEY — My Money v2 (Sunday v15, Plan v5 §L)
 
    Every other money screen in this app is something that happens TO her — a
    grading, a meeting, a rule. This one is hers, and it is the only one she can
    open any day of the week without a grown-up.
 
-   It answers four questions, in the order a nine-year-old actually asks them:
+   It is the owner's prototype (docs/handoff/sunday-v15/My Money v2 Screen),
+   joined to what the app already had where the owner picked "merge" or "keep
+   today's" (Plan v5 §L M1–M10):
 
-     What can I still earn today?
-     How much do I have altogether?
-     Where did this week's money come from?
-     How much of my loan is left?
+     today's head and tab bar (M1) ·
+     ☀️ how long until Sunday, seven day circles, what is still to come (M2) ·
+     ⏳ what she asked Dad (the prototype's chips) ·
+     🧱 the loan wall with today's key facts (M5) ·
+     Everything I have — today's card, the handoff's names, each shut place
+       saying when it opens (M3) ·
+     🎯 a jar for every goal, with its date and what a week it takes (M4) ·
+     the four "ask Dad" buttons ·
+     This week — where this week's money is coming from (M7) · 🎁 Gifts (M9)
+     — and, on the right, 📒 the passbook of the last four Sundays (M7),
+     the month's calendar with 📅 Coming up under it (M6), and ⭐ stickers.
 
-   Nothing here is editable. That is the point: a page you cannot break is a
-   page you will open. Everything that changes a number lives on the meeting
-   pages or the parent portal.
-
-   The composition bar REPLACES the old earned-this-week total rather than
-   joining it. Adding a chart beside a number would have made this the densest
-   screen in the app; the bar says everything the number said and also says
-   where it came from.
+   Nothing here moves money. Every button opens a sheet that ASKS (js/45),
+   and every '?' explains (M10). A grown-up looking at her page reads the same
+   page; where a grown-up records directly (a result, a move, a gift) the
+   button opens the Record sheet instead (js/41) — one writer, two doors.
    ════════════════════════════════════════════════════════════════ */
 
 let mnyKid = 'jess';          // which kid a parent is looking at
 let mnyCalMonth = null;       // 'YYYY-MM' for the competition calendar
-/* The price list used to be open by default, on the reasoning that "on page 1
-   the price list IS the middle column, and a column holding one collapsed button
-   is a column holding nothing". That is true on a wide screen and false on a
-   phone: there is no middle column at 390px, so it became 428 words of pay
-   policy standing between a nine-year-old and the number she opened the page to
-   see — most of the screen's whole word budget, spent on reference.
-
-   First attempt kept it open on wide screens, on the reasoning that the column
-   argument still holds there. Running the word-budget sweep at tablet-landscape
-   and desktop killed that: it put this page at 564 words on exactly the iPad a
-   child uses, which is the thing the budget exists to prevent. The budget is
-   about how much there is to read, and a wider screen does not make 564 words
-   less to read. Closed by default everywhere; her choice is remembered.
-
-   Stored in localStorage rather than synced state — it is a per-device view
-   preference, and every state write is a full-document upload. Same idiom as
-   HERO_MODE_LS_KEY in js/05-helpers.js. */
 /* Gifts: what came in, from whom, when. Collapsed by default and remembered
-   per device, the mnyPricesOpen pattern — page 1 is held to the 200-word kid
-   budget and a list of past gifts is reference material, not something she has
-   to read to act. localStorage, never synced state: every state write is a
-   full-document upload and this is a view preference. */
+   per device — a list of past gifts is reference, not news (ARCHITECTURE.md:
+   a disclosure toggle is the right shape for reference material).
+   localStorage, never synced state: every state write is a full-document
+   upload and this is a view preference. */
 const MNY_GIFTS_LS_KEY = 'wp_mny_gifts_open';
-function mnyGiftsOpen() { return localStorage.getItem(MNY_GIFTS_LS_KEY) === '1'; }
+function mnyGiftsOpen() { try { return localStorage.getItem(MNY_GIFTS_LS_KEY) === '1'; } catch (e) { return false; } }
 function mnySetGiftsOpen(open) {
   try { localStorage.setItem(MNY_GIFTS_LS_KEY, open ? '1' : '0'); } catch (e) {}
 }
 
+/* The price list's remembered toggle — Money school's card (`mnyPricesCard`)
+   still carries it. My money opens the same list in a sheet from the ☀️ card
+   ("💷 what things pay ▸"). */
 const MNY_PRICES_LS_KEY = 'wp_mny_prices_open';
 function mnyPricesOpen() {
-  return localStorage.getItem(MNY_PRICES_LS_KEY) === '1';
+  try { return localStorage.getItem(MNY_PRICES_LS_KEY) === '1'; } catch (e) { return false; }
 }
 function mnySetPricesOpen(open) {
   try { localStorage.setItem(MNY_PRICES_LS_KEY, open ? '1' : '0'); } catch (e) {}
 }
-/* ── A moment when a pot opens ──
-   When her stage rises, the pots and ideas it opens used to appear without a
-   word: a button that was locked on Sunday simply was not on Monday. The first
-   time she opens 💰 My money after that, one card says what opened and shows
-   each new idea's what / why / what-to-watch, read from MNY_CONCEPTS through
-   `mnyConceptCard` — never restated, so the card and Money school cannot say
-   two things.
-
-   Remembered PER DEVICE, per child, in localStorage and never in synced state:
-   it is a view acknowledgement, and every state write is a full-document
-   upload. Every read and write is in try/catch — a private window or cleared
-   storage must still draw the page. The FIRST sight records the current stage
-   silently, so a pot opened months ago is never announced as new; a stage that
-   comes back DOWN (a new loan) is recorded silently too, so reaching it again
-   is announced again. A grown-up looking at her page sees nothing and changes
-   nothing. */
-const MNY_STAGE_SEEN_LS_PREFIX = 'wp_mny_stage_seen_';
-function mnyStageSeen(kid) {
-  try {
-    const v = localStorage.getItem(MNY_STAGE_SEEN_LS_PREFIX + kid);
-    if (v == null || v === '') return null;
-    const n = Number(v);
-    return isFinite(n) ? n : null;
-  } catch (e) { return null; }
-}
-function mnySetStageSeen(kid, idx) {
-  try { localStorage.setItem(MNY_STAGE_SEEN_LS_PREFIX + kid, String(idx)); } catch (e) {}
-}
-function mnyStageOpenedCard(kid) {
-  if (isParent()) return '';
-  const now = mnyStageIndex(kid);
-  const seen = mnyStageSeen(kid);
-  if (seen == null || now < seen) { mnySetStageSeen(kid, now); return ''; }
-  if (now === seen) return '';
-  const fresh = (stage) => { const i = mnyStageIndexOf(stage); return i > seen && i <= now; };
-  const pots = MNY_BUCKETS.filter(b => fresh(b.stage));
-  const ideas = MNY_CONCEPTS.filter(c => fresh(c.stage)).map(c => mnyConceptCard(c.id, kid)).filter(Boolean);
-  const potLine = pots.length
-    ? `<div class="mny-rows">${pots.map(b => `<div class="mny-row"><span>${b.icon} ${escapeHtml(b.label)}</span><b>open now</b></div>`).join('')}</div>`
-    : '';
-  return `<div class="mny-card">
-      <div class="mny-label">🔓 Something new just opened for your money</div>
-      <div class="mny-note">From now on you can choose ${pots.length === 1 ? 'this' : 'these'} too.
-        Here is what ${ideas.length === 1 ? 'it is' : 'each one is'}, why people use it, and what to watch.</div>
-      ${potLine}
-      ${ideas.map(c => `<div class="mny-sub">${escapeHtml(c.icon + ' ' + c.title)}</div>
-        <p>${escapeHtml(c.what)}</p>
-        <div class="mny-sub">${escapeHtml(c.whyLabel)}</div><p>${escapeHtml(c.why)}</p>
-        <div class="mny-sub">${escapeHtml(c.riskLabel)}</div><p>${escapeHtml(c.risk)}</p>`).join('')}
-      <button type="button" class="mny-btn primary wide" data-mny-action="stage-seen" data-mny-stage="${now}">Got it</button>
-    </div>`;
-}
 
 let mnyStoryMode = 'week';    // the money story: 'week' | 'month'
 let mnyStoryMonth = null;     // 'YYYY-MM'
-let mnyGoalFormOpen = false;  // the new-goal form on My money
-let mnyGoalDraft = { name: '', icon: '🎯', target: 50, targetDate: '' };
 
 /* Kids see their own money. A parent sees whichever kid is selected. */
 function mnyViewKid() {
@@ -226,12 +163,13 @@ function mnyDrawTour() {
 
 /* ════════════════════════════════════════════════════════════════
    THE PAGE
+   On the iPad (1194 × 834) two columns as drawn — the main column and a
+   350px one on the right; under 768px one column, main first (Plan v3 D8).
    ════════════════════════════════════════════════════════════════ */
 function mnyRenderMyMoney() {
   const wrap = document.getElementById('mnyPage1Wrap');
   if (!wrap) return;
   const kid = mnyViewKid();
-  const wk = mnyWeekKey();
   // Bring the world up to today before drawing it. The app can be shut for
   // three weeks; the interest still happened.
   mnySimCatchUp(kid);
@@ -242,24 +180,27 @@ function mnyRenderMyMoney() {
           { action: 'tourkid',  label: '? How this page works' },
         ], { kidSwitch: true })}
        ${mnyTabBar('money')}
-       ${mnyStageOpenedCard(kid)}
-       <div class="mny-cols page1">
-         <div class="mny-col">
-           ${mnyTodayCard(kid, wk)}
-           ${mnyEarnBoardCard(kid, wk)}
-           ${mnyWalletCard(kid)}
-           ${mnyIncomeCard(kid, wk)}
-           ${mnySavingGoalsCard(kid)}
-           ${mnyGoalCard(kid)}
+       <div class="mv2">
+         <div class="mv2-main">
+           ${mnyCountdownCard(kid)}
+           ${mnyAskedDadRow(kid)}
+           <div class="mv2-pair">
+             ${mnyLoanWallCard(kid)}
+             <div class="mv2-stack">
+               ${mnyEverythingCard(kid)}
+               ${mnyGoalJarsCard(kid)}
+             </div>
+           </div>
+           ${mnyActionButtons(kid)}
+           <div class="mv2-pair mv2-pair--even">
+             ${mnyThisWeekCard(kid, mnyWeekKey())}
+             ${mnyGiftsCard(kid)}
+           </div>
          </div>
-         <div class="mny-col">
-           ${mnyPricesCard(wk)}
-         </div>
-         <div class="mny-col">
-           ${mnyDebtCards(kid, wk)}
-           ${mnyCompetitionCard(kid)}
-           ${mnyGiftsCard(kid)}
-           ${mnyLinksCard(kid)}
+         <div class="mv2-side">
+           ${mnyPassbookCard(kid)}
+           ${mnyCalendarCard(kid)}
+           ${mnyStickersCard(kid)}
          </div>
        </div>`;
   if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
@@ -294,77 +235,83 @@ function mnyPageHead(title, strap, buttons, opts) {
     </div>`;
 }
 
-/* What is still on the table today. The daily cap is a real number to a kid —
-   "I can still earn $2.00" is a reason to go and do the bins. */
-function mnyTodayCard(kid, wk) {
-  // One reader, shared with Today — see mnyEarnLeftToday in js/21-money-data.js.
-  const t = mnyEarnLeftToday(kid, wk);
-  const done = t.done, left = t.left, free = t.freeLeft;
-
-  const line = (left == null)
-    ? `You have earned ${mnyMoney(done)} today.`
-    : (left > 0
-        ? `You can still earn <b>${mnyMoney(left)}</b> today.`
-        : `That is everything for today — ${mnyMoney(done)}. Extra jobs now earn <b>XP</b>.`);
-
-  return `<div class="mny-card mny-today">
-      <div class="mny-label">Today</div>
-      <div class="mny-today-big">${line}</div>
-      <div class="mny-note">${free > 0
-        ? `${free} of your free jobs still to use this week. They are always your lowest-paying ones, so doing your best work first never costs you.`
-        : `Your free jobs for this week are used up — everything else pays.`}</div>
-    </div>`;
+/* "$3" for whole dollars, "$2.50" otherwise — the prototype's money on a
+   small label. */
+function mnyShort$(v) { const n = money2(v); return (n < 0 ? '−$' : '$') + (Math.abs(n) % 1 ? Math.abs(n).toFixed(2) : String(Math.abs(n))); }
+/* The passbook's figures: "$140" from $100 up, "$16.15" below (prototype `mk`). */
+function mnyBook$(v) { const n = money2(v); return n >= 100 ? '$' + Math.round(n) : mnyMoney(n); }
+/* "27 Sep" — how the passbook and Coming up name a day. */
+function mnyDayMonth(dayKey) {
+  const d = formatDayKey(dayKey);
+  return d.getDate() + ' ' + MONTH_SHORT[d.getMonth()];
+}
+/* "Sat 24 Oct" */
+function mnyDayLabel(dayKey) {
+  return formatDayKey(dayKey).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
-/* ── Earned this week (R5 §5 C2, row 11) ──
-   The chore tab's earn board, on the page she opens to ask "what have I
-   earned": the week's total kept after fines, today's ceiling bar — fines
-   first, then what she kept, what is waiting for Mum, and anything past the
-   ceiling that turned into XP — and the ledger by channel. Every figure comes
-   from ckEarnBoard, the rail's own reader, so the two screens cannot disagree.
-   Read-only: nothing here claims, grades or moves money. Today's bar only when
-   today is in the week showing. */
-function mnyEarnBoardCard(kid, wk) {
-  const d = mrWeekDayKeys(wk).indexOf(todayKey());
-  const board = ckEarnBoard(kid, wk, Math.max(0, d));
-  const bar = board.bar;
-  const dayHtml = d < 0 ? '' : `
-      <div class="mny-sub">${escapeHtml(`${CT_DAYS[d]} · ${ckMoney(bar.cap)} ceiling`)}</div>
-      <div class="mny-earn-barwrap">
-        <div class="mny-earn-bar" role="img" aria-label="${escapeAttr(bar.keys.map(k => k.label).join(', '))}">${bar.segs.map(s =>
-          `<span class="mny-earn-seg" style="width:${s.w}%;background:${s.bg}" title="${escapeAttr(s.title)}"></span>`).join('')}</div>
-        <span class="mny-earn-ceil" style="left:${bar.ceilPct}%" title="${escapeAttr(`the ${ckMoney(bar.cap)} ceiling`)}"></span>
+/* ── ☀️ HOW LONG UNTIL SUNDAY (M2) ──
+   The prototype's card: the days to Sunday, and one circle a day — what the
+   chores earned that day (the real grades, `mrChoreWeek`), ✓ for a full day,
+   ½ for part of one, · for nothing; days still ahead dashed and empty. The
+   line under it: about what the chores have come to so far, and how many
+   days of routine are kept (`mrStreakWeek`, where an unfinished day is never
+   the forgiving one — Plan v5 Deviation 32). Below, section K's dashed line
+   for weeks not settled yet, and the price list one tap away. */
+function mnyCountdownData(kid) {
+  const wk = ctThisWeekKey();
+  const today = String(todayKey());
+  const keys = mrWeekDayKeys(wk);
+  const dow = Math.max(0, keys.indexOf(today));
+  const toSun = 6 - dow;
+  const chores = mrChoreWeek(wk, kid);
+  const cap = money2((mrRulesForWeek(wk).chores || {}).dailyCap);
+  const letters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  let soFar = 0;
+  const days = keys.map((k, i) => {
+    const past = i <= dow;
+    const paid = money2((chores.days[i] || {}).paid);
+    if (past) soFar = money2(soFar + paid);
+    return {
+      d: letters[i], dayKey: k, past, paid,
+      mark: !past ? '' : (cap > 0 && paid >= cap ? '✓' : paid > 0 ? '½' : '·'),
+      chore: !past ? '' : (paid > 0 ? mnyShort$(paid) : '—'),
+    };
+  });
+  return {
+    wk, dow, toSun, days, soFar,
+    routineDays: (mrStreakWeek(wk, kid) || {}).days || 0,
+    label: toSun === 0 ? 'Sunday is today!' : `Sunday in ${toSun} day${toSun === 1 ? '' : 's'}`,
+    unpaid: mnyUnpaidRows(kid),
+  };
+}
+function mnyCountdownCard(kid) {
+  const c = mnyCountdownData(kid);
+  const unpaidTotal = money2(c.unpaid.reduce((a, r) => a + r.amount, 0));
+  return `<div class="mv2-card mv2-sun">
+      <div class="mv2-sun-head">
+        <span class="mv2-sun-title">☀️ ${escapeHtml(c.label)}</span>
+        <span class="mv2-sun-sub">payday guessing game, together on the iPad</span>
       </div>
-      <div class="mny-earn-keys">${bar.keys.map(k =>
-        `<span class="mny-earn-key" style="background:${k.bg};color:${k.fg}">${escapeHtml(k.label)}</span>`).join('')}</div>
-      <div class="mny-earn-risk">${escapeHtml(bar.risk)}</div>
-      ${bar.room ? `<div class="mny-note">${escapeHtml(bar.room)}</div>` : ''}`;
-  const lines = board.ledger.map(l => `<div class="mny-earn-line">
-        <span class="mny-earn-line-text"><span class="mny-earn-line-name">${escapeHtml(l.name)}</span>
-          <span class="mny-earn-line-detail">${escapeHtml(l.detail)}</span></span>
-        <span class="mny-earn-line-amt${l.fg === 'ck-red' ? ' mny-earn-line-amt--fine' : ''}">${escapeHtml(l.amount)}</span>
-      </div>`).join('');
-  return `<div class="mny-card mny-earnboard">
-      <div class="mny-label">Earned this week</div>
-      <div class="mny-earn-total">${escapeHtml(ckMoney(board.net))}</div>
-      <div class="mny-note">kept after fines · a day never goes below $0</div>
-      ${dayHtml}
-      <div class="mny-earn-lines">${lines}</div>
+      <div class="mv2-sun-week">
+        <div class="mv2-days" role="list">${c.days.map(d => `<div class="mv2-day${d.past ? '' : ' ahead'}" role="listitem" aria-label="${escapeAttr(d.dayKey + (d.past ? ' · chores ' + (d.paid > 0 ? mnyMoney(d.paid) : 'nothing') : ' · still ahead'))}">
+            <span>${d.d}</span><span class="mv2-dot${d.past ? (d.paid > 0 ? ' paid' : ' none') : ''}">${d.mark}</span><span>${escapeHtml(d.chore)}</span>
+          </div>`).join('')}</div>
+        <div class="mv2-sun-sofar">🧹 about ${escapeHtml(mnyMoney(c.soFar))} of chores so far${c.routineDays ? ` · 🔥 ${c.routineDays} routine day${c.routineDays === 1 ? '' : 's'} kept` : ''}. The guess is on Sunday.</div>
+      </div>
+      <div class="mv2-sun-foot">
+        ${c.unpaid.length ? `<span class="mv2-still" title="${escapeAttr(c.unpaid.length + ' week' + (c.unpaid.length === 1 ? '' : 's') + ' not settled yet')}">${escapeHtml(mnyMoney(unpaidTotal))} still to come · ${c.unpaid.length} week${c.unpaid.length === 1 ? '' : 's'} not settled yet</span>` : '<span></span>'}
+        <button type="button" class="mv2-link" data-mny-action="prices-sheet">💷 what things pay ▸</button>
+      </div>
     </div>`;
 }
 
-/* Everything she has, and the four places it can be. */
-/* ── Agreed, but not paid out ──
-   The gap that made $0.00 look like data loss. A week's money only reaches the
-   wallet when step 4 of the meeting commits it (commitKidWeek, js/15-meeting.js);
-   step 3 shows ctWeekMoney, which is a live preliminary figure. A family that
-   agreed the numbers and stopped there saw real amounts at the table and zero
-   on this page, with nothing anywhere naming the difference.
-
-   Reads the same two sources the meeting does — ctWeekMoney for what a week
-   comes to, finalizedWeeks for what has actually been credited — and moves
-   nothing itself. Parent-facing detail on a kid's page is fine here: the number
-   is hers, and "it is coming" is the honest answer to where it went. */
+/* ── What "still to come" actually means, in one place ──
+   Every uncredited week from the last eight, read from the same two sources
+   the meeting does — `ctWeekMoney` for what a week comes to, `finalizedWeeks`
+   for what has been credited — and moving nothing itself. The week running
+   now is not waiting for anything (it is still being earned; the ☀️ circles
+   own it), so it counts only once a grown-up has agreed it. */
 function mnyUnpaidWeeks(kid, max) {
   ctEnsureShared();
   const c = state.shared.chore;
@@ -381,18 +328,6 @@ function mnyUnpaidWeeks(kid, max) {
   }
   return out;
 }
-/* ── What "still to come" actually means, in one place ──
-   mnyUnpaidWeeks returns every uncredited week INCLUDING the one running now,
-   because "which weeks have not been paid out" is a different question from
-   "how much is waiting for her". The week in progress is not waiting for
-   anything — it is still being earned, and mnyEarnLeftToday already owns that
-   number. Counting it here would show the same dollar twice on one page.
-
-   That predicate lived inline in mnyUnpaidNote and nowhere else, so nothing
-   could check the figure without writing the predicate out a second time — and
-   the smoke check that tried summed the unfiltered rows instead, reporting the
-   page as wrong for four weeks when the page was right. One reader, one owner:
-   the same reason mnyEarnLeftToday was pulled out of mnyTodayCard. */
 function mnyUnpaidRows(kid) {
   return mnyUnpaidWeeks(kid, 8).filter(r => r.weeksAgo > 0 || r.agreed);
 }
@@ -400,327 +335,385 @@ function mnyUnpaidTotal(kid) {
   return money2(mnyUnpaidRows(kid).reduce((a, r) => a + r.amount, 0));
 }
 
-function mnyUnpaidNote(kid) {
-  const rows = mnyUnpaidRows(kid);
-  if (!rows.length) return '';
-  const total = mnyUnpaidTotal(kid);
-  const n = rows.length;
-  /* Three words and a figure, and it took two goes to get there: the first
-     version of this explanation cost 21 words and put the page 21 over the
-     200-word kid budget, the second was still one over. That is the budget
-     doing its job. "Still to come" is the whole message — it is hers, it has
-     not arrived. Where it is and why is the meeting's business, and the meeting
-     is where it moves. The week count lives in the title, which costs nothing
-     visible and is there for a grown-up who asks. */
-  return `<div class="mny-unpaid" title="${escapeAttr(n + ' week' + (n === 1 ? '' : 's') + ' not settled yet')}">
-      <span class="mny-unpaid-amt">${escapeHtml(mnyMoney(total))} still to come</span>
+/* ── ⏳ ASKED DAD (the prototype's chips) ──
+   Her two newest questions with their answers in her words, from the ONE
+   reader (`mnyRequestsFor`), and "see all" opening the list sheet. */
+function mnyAskedDadRow(kid) {
+  const mine = mnyRequestsFor(kid);
+  const chip = (q) => `<div class="mv2-chip ${'mv2-chip--' + (q.status || 'open')}"><span class="mv2-chip-text">${escapeHtml(q.icon + ' ' + q.text)}</span><b>${escapeHtml(rqStatusText(q))}</b></div>`;
+  return `<div class="mv2-asked">
+      <span class="mv2-asked-title">⏳ Asked Dad</span>
+      ${mine.slice(-2).map(chip).join('')}
+      ${mine.length > 2 ? `<button type="button" class="mv2-seeall" data-mny-action="asked-all">+${mine.length - 2} more · see all</button>` : ''}
+      ${mine.length ? '' : '<span class="mv2-asked-none">nothing waiting</span>'}
     </div>`;
 }
 
-function mnyWalletCard(kid) {
-  const tiles = [
-    { k: 'cash',  icon: '💵', label: 'Cash',        value: mnyCash(kid),          ask: 'cash' },
-    { k: 'save',  icon: '🏦', label: 'Kept ready',  value: mnySavedTotal(kid),    ask: 'ready' },
-    { k: 'gic',   icon: '🔒', label: 'Locked away', value: mnyLockedTotal(kid),   ask: 'gic' },
-    { k: 'stock', icon: '📈', label: 'In companies', value: mnyInvestedTotal(kid), ask: 'stock' },
-  ];
-  return `<div class="mny-card">
-      <div class="mny-label">Everything I have</div>
-      <div class="mny-total">${mnyMoney(mnyEverything(kid))}</div>
-      ${mnyBuysNote(mnyEverything(kid))}
-      ${mnyUnpaidNote(kid)}
-      <div class="mny-tiles">
-        ${tiles.map(t => `<div class="mny-tile">
-            <div class="mny-tile-top">${t.icon} ${escapeHtml(t.label)} ${mnyAskBtn(t.ask)}</div>
-            <div class="mny-tile-val">${mnyMoney(t.value)}</div>
+/* ── 🧱 MY LOAN WALL (M5: the prototype's wall + today's key facts) ──
+   A hundred bricks, each a hundredth of everything borrowed, filled as it is
+   paid; the 🏦 🔒 📈 flags stand where the rules open Savings, Locked away
+   and Companies (`mnyStagePct`), green once open; one bar per row, oldest
+   first; the interest line; then what matters most, large — how much is left
+   and when it is paid off — and the rest smaller: each month, the early bonus
+   earned, the cost of borrowing so far, and late costs (red, only above $0).
+   Every figure from `mnyLoanFacts` (js/20). */
+function mnyLoanWallCard(kid) {
+  const f = mnyLoanFacts(kid);
+  if (!(f.principal > 0)) {
+    return `<div class="mv2-card mv2-wall">
+        <div class="mv2-cardhead"><span class="mv2-title">🧱 My loan wall</span>${mnyAskBtn('debt')}</div>
+        <div class="mv2-line">Nothing to pay back, so every place for money is open.</div>
+      </div>`;
+  }
+  const brick = f.principal / 100;
+  const bricks = Array.from({ length: 100 }, (_, i) => {
+    const fill = Math.max(0, Math.min(1, (f.paid - i * brick) / brick));
+    return `<span class="mv2-brick${fill >= 1 ? ' full' : ''}"><i style="width:${Math.round(fill * 100)}%"></i></span>`;
+  }).join('');
+  const flags = [['ready', '🏦', 'Savings'], ['locked', '🔒', 'Locked away'], ['stock', '📈', 'Companies']].map(([id, icon, name]) => {
+    const at = mnyStagePct(id);
+    const open = mnyIsOpen(kid, id);
+    return `<span class="mv2-flag${open ? ' open' : ''}" style="left:${at}%" title="${escapeAttr(name + (open ? ' is open' : ' opens at ' + at + '% paid'))}">${icon}</span>`;
+  }).join('');
+  const pct = f.principal > 0 ? (f.paid / f.principal) * 100 : 100;
+  const rows = f.rows.map(r => `<div class="mv2-loanrow">
+      <span class="mv2-loanrow-name">${escapeHtml(r.icon + ' ' + r.name)}</span>
+      <span class="mv2-bar"><i style="width:${Math.round(r.paidPct)}%"></i></span>
+      <b>${r.left <= 0.005 ? '✓ done' : escapeHtml(mnyMoney(r.left))}</b>
+    </div>`).join('');
+  const freeBy = f.left <= 0 ? 'Paid off 🎉'
+    : f.freeBy ? formatDayKey(f.freeBy).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—';
+  return `<div class="mv2-card mv2-wall">
+      <div class="mv2-cardhead"><span class="mv2-title">🧱 My loan wall</span>${mnyAskBtn('debt')}<b class="mv2-left">${escapeHtml(mnyMoney(f.left))} left</b></div>
+      <div class="mv2-bricks" role="img" aria-label="${escapeAttr(Math.round(pct) + '% of the loan paid back')}">${bricks}</div>
+      <div class="mv2-flags">${flags}</div>
+      <div class="mv2-row2"><span>${Math.round(pct)}% paid</span><span>${escapeHtml(mnyMoney(f.weekly))} a week</span></div>
+      <div class="mv2-loanrows">${rows}</div>
+      ${f.lastInterest > 0 ? `<div class="mv2-int">🟥 +${escapeHtml(mnyMoney(f.lastInterest))} interest added last time (${f.ratePct}% a year)</div>` : ''}
+      ${f.lateCosts > 0 ? `<div class="mv2-late">Late costs added: ${escapeHtml(mnyMoney(f.lateCosts))}</div>` : ''}
+      <div class="mv2-keyfacts">
+        <div class="mv2-bigfact"><span>Paid off by</span><b>${escapeHtml(freeBy)}</b></div>
+        <div class="mv2-facts">
+          <span>Each month <b>${escapeHtml(mnyMoney(f.monthly))}</b></span>
+          <span>Early bonus earned <b>${escapeHtml(mnyMoney(f.bonus))}</b></span>
+          <span>Cost of borrowing so far <b>${escapeHtml(mnyMoney(f.interestAdded))}</b></span>
+          <span${f.lateCosts > 0 ? ' class="mv2-late"' : ''}>Late costs <b>${escapeHtml(mnyMoney(f.lateCosts))}</b></span>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ── EVERYTHING I HAVE (M3: today's card, the handoff's names) ──
+   The total and the four places it can be, each with its '?'. A place not
+   open yet says when it opens ("🔒 opens at 30% paid"); what is already in
+   it still shows. The total counts the goal jars too (`mnyEverything`), so
+   they are named under the tiles. */
+function mnyEverythingParts(kid) {
+  const jars = money2(mnyReadyHomeTotal(kid) - mnySavedTotal(kid));
+  return {
+    total: mnyEverything(kid), jars,
+    tiles: [
+      { k: 'cash',  icon: '💵', label: 'Cash',        value: mnyCash(kid),          ask: 'cash',  stage: 'start' },
+      { k: 'ready', icon: '🏦', label: 'Savings',     value: mnySavedTotal(kid),    ask: 'ready', stage: 'ready' },
+      { k: 'gic',   icon: '🔒', label: 'Locked away', value: mnyLockedTotal(kid),   ask: 'gic',   stage: 'locked' },
+      { k: 'stock', icon: '📈', label: 'Companies',   value: mnyInvestedTotal(kid), ask: 'stock', stage: 'stock' },
+    ].map(t => Object.assign(t, { open: mnyIsOpen(kid, t.stage), gate: mnyStagePct(t.stage) })),
+  };
+}
+function mnyEverythingCard(kid) {
+  const p = mnyEverythingParts(kid);
+  return `<div class="mv2-card mv2-have">
+      <div class="mv2-cardhead"><span class="mv2-title">Everything I have</span></div>
+      <div class="mv2-total">${escapeHtml(mnyMoney(p.total))}</div>
+      ${mnyBuysNote(p.total)}
+      <div class="mv2-tiles">
+        ${p.tiles.map(t => `<div class="mv2-tile${t.open ? '' : ' shut'}" data-mny-tile="${t.k}">
+            <div class="mv2-tile-top">${t.icon} ${escapeHtml(t.label)} ${mnyAskBtn(t.ask)}</div>
+            <div class="mv2-tile-val">${escapeHtml(mnyMoney(t.value))}</div>
+            ${t.open ? '' : `<div class="mv2-tile-gate">🔒 opens at ${t.gate}% paid</div>`}
           </div>`).join('')}
       </div>
-      ${mnyMoveDoor(kid)}
+      ${p.jars > 0 ? `<div class="mv2-line">🎯 In my goal jars: <b>${escapeHtml(mnyMoney(p.jars))}</b> (counted in the total)</div>` : ''}
     </div>`;
 }
 
-/* The door out of cash, on the page where she can SEE what is in each pot.
-   Until Stage 3 there was none: a dollar left cash on a Sunday or not at all,
-   so a gift that arrived on a Tuesday sat there whatever anybody wanted.
-
-   Both roles get the same door and the sheet decides what pressing it does —
-   a grown-up moves it, a child asks. Two doors with two labels would be two
-   places to keep in step. */
-function mnyMoveDoor(kid) {
-  const waiting = (typeof mnyPendingMoves === 'function') ? mnyPendingMoves(kid).length : 0;
-  return `<button type="button" class="mny-btn wide" data-mny-action="move-ask">🔀 ${
-    isParent() ? 'Move money between these' : 'Ask to move some'}</button>
-    ${waiting ? `<div class="mny-note">${waiting} ${waiting === 1 ? 'move is' : 'moves are'} waiting for a grown-up.</div>` : ''}`;
-}
-
-/* ── What she is saving for ──
-   The one card on this page she fills in herself. A goal is earmarked
-   kept-ready money, so the dollars are really hers and she could change her
-   mind; what the goal adds is a name, a date, and a straight answer to "am I
-   going to make it?" — in dollars per week, because that is the only form of
-   the answer anyone can act on. */
-function mnySavingGoalsCard(kid) {
-  const goals = mnyGoals(kid);
-  const rows = goals.map(g => {
-    const pace = mnyGoalPace(kid, g);
-    const pct = money2(g.target) > 0
-      ? Math.max(0, Math.min(100, Math.round((money2(g.saved) / money2(g.target)) * 100))) : 0;
+/* ── 🎯 MY GOAL JARS (M4: several goals, each the prototype's jar) ──
+   Nearest date first (`mnyGoalsNearestFirst`, the order Sunday's 🎯 box asks
+   in). Each jar: how full, saved of what it costs, and today's answer to "am
+   I going to make it?" — about how much a week by the date (`mnyGoalPace`).
+   A jar is shut while Savings is (Plan v5 Deviation 31). ✏️ New goal asks Dad
+   (the Stage 2 sheet); a question already asked shows under the heading. */
+function mnyGoalJarsCard(kid) {
+  const goals = mnyGoalsNearestFirst(kid);
+  const shut = mnyGoalJarRefusal(kid);
+  const asked = mnyEnsureRequests(kid)
+    .filter(r => r && r.kind === 'goal' && !r.appliedWeek && r.status !== 'no').slice(-1)[0];
+  const askedLine = asked ? (asked.status === 'yes'
+      ? `✓ Dad said yes: ${asked.icon || '🎯'} ${asked.name} starts Sunday`
+      : `⏳ asked Dad: ${asked.icon || '🎯'} ${asked.name} · ${mnyShort$(asked.target)}`) : '';
+  const jar = (g) => {
+    const saved = mnyGoalJarValue(kid, g);
+    const target = money2(g.target);
+    const pct = target > 0 ? Math.max(0, Math.min(100, (saved / target) * 100)) : 0;
+    const pace = mnyGoalPace(kid, Object.assign({}, g, { saved }));
     let line;
     if (pace.reached) {
       line = isParent()
-        ? `<button type="button" class="mny-btn wide primary" data-mny-action="goaldone" data-mny-goal="${escapeAttr(g.id)}">🎉 She got it — take it out</button>`
-        : `<div class="mny-note"><b>You made it!</b> Tell a grown-up.</div>`;
+        ? `<button type="button" class="mv2-btn" data-mny-action="goaldone" data-mny-goal="${escapeAttr(g.id)}">🎉 She got it — take it out</button>`
+        : `<div class="mv2-goal-line">🎉 Saved! Tell a grown-up.</div>`;
+    } else if (shut) {
+      line = `<div class="mv2-goal-line">${escapeHtml(shut)}</div>`;
     } else if (pace.late) {
-      line = `<div class="mny-note">The day has passed and there is ${mnyMoney(pace.left)} to go. Move the date, or keep going.</div>`;
+      line = `<div class="mv2-goal-line">The day has passed and there is ${escapeHtml(mnyMoney(pace.left))} to go. Move the date, or keep going.</div>`;
     } else if (pace.neededPerWeek != null) {
-      // A goal made this morning has no history to be behind on. Telling a kid
-      // she is already failing at something she just decided to want is the
-      // fastest way to make her stop setting goals.
-      line = `<div class="mny-note">${(pace.onPace || !pace.hasHistory)
-        ? `Put away <b>${mnyMoney(pace.neededPerWeek)}</b> a week and you make it.`
-        : `You need <b>${mnyMoney(pace.neededPerWeek)}</b> a week now. Lately you have been putting away ${mnyMoney(pace.recent)}.`}</div>`;
+      line = `<div class="mv2-goal-line">about ${escapeHtml(mnyMoney(pace.neededPerWeek))} a week to make it by ${escapeHtml(mnyShortDate(g.targetDate))}</div>`;
     } else {
-      line = `<div class="mny-note">${mnyMoney(pace.left)} to go. Give it a day and I can tell you how much a week.</div>`;
+      line = `<div class="mv2-goal-line">${escapeHtml(mnyMoney(pace.left))} to go · its own jar · earns nothing</div>`;
     }
-    return `<div class="mny-goalrow">
-        <div class="mny-week-head">
-          <span>${escapeHtml(g.icon)} <b>${escapeHtml(g.name)}</b></span>
-          <button type="button" class="mny-step" data-mny-action="goaldel" data-mny-goal="${escapeAttr(g.id)}" aria-label="Remove this goal">✕</button>
+    return `<div class="mv2-jar${shut ? ' shut' : ''}">
+        <span class="mv2-jarpic" aria-hidden="true"><i style="height:${Math.round(pct)}%"></i></span>
+        <div class="mv2-jarbody">
+          <div class="mv2-jarname">${escapeHtml((g.icon || '🎯') + ' ' + g.name)}</div>
+          <div class="mv2-jarfig"><b>${escapeHtml(mnyMoney(saved))}</b><span>of ${escapeHtml(mnyMoney(target))}${g.targetDate ? ' · by ' + escapeHtml(mnyShortDate(g.targetDate)) : ''}</span></div>
+          ${line}
         </div>
-        <div class="mny-progress"><div class="mny-progress-fill" style="width:${pct}%"></div></div>
-        <div class="mny-goal-row">${mnyMoney(g.saved)} of ${mnyMoney(g.target)}${g.targetDate ? ' · by ' + mnyShortDate(g.targetDate) : ''}</div>
-        ${mnyBuysNote(g.target)}
-        ${line}
       </div>`;
-  }).join('');
-
-  const form = mnyGoalFormOpen ? mnyGoalForm() : '';
-  return `<div class="mny-card">
-      <div class="mny-week-head">
-        <span class="mny-label">🎯 What I'm saving for</span>
-        <button type="button" class="mny-chip ${mnyGoalFormOpen ? 'on' : ''}" data-mny-action="goalform">${mnyGoalFormOpen ? 'Cancel' : '＋ New goal'}</button>
-      </div>
-      ${form}
-      ${goals.length ? rows : (mnyGoalFormOpen ? '' : `<div class="mny-note">Nothing yet. Pick something you want and I will work out how much a week it takes.</div>`)}
+  };
+  return `<div class="mv2-card mv2-goals">
+      <div class="mv2-cardhead"><span class="mv2-title">🎯 My goal jars</span>${mnyAskBtn('goal')}
+        <button type="button" class="mv2-btn mv2-newgoal" data-mny-action="goal-new">✏️ New goal</button></div>
+      ${askedLine ? `<div class="mv2-goal-asked">${escapeHtml(askedLine)}</div>` : ''}
+      ${goals.length ? goals.map(jar).join('') : `<div class="mv2-line">No goal yet. ✏️ New goal asks Dad for one.</div>`}
     </div>`;
 }
 
-function mnyGoalForm() {
-  const d = mnyGoalDraft;
-  return `<div class="mny-goalform">
-      <label class="mny-field"><span>What is it?</span>
-        <input type="text" value="${escapeAttr(d.name)}" data-mny-action="goalname" placeholder="A new bike"></label>
-      <div class="mny-chiprow">${MNY_GOAL_ICONS.map(ic =>
-        `<button type="button" class="mny-chip ${d.icon === ic ? 'on' : ''}" data-mny-action="goalicon" data-mny-icon="${escapeAttr(ic)}">${ic}</button>`).join('')}</div>
-      <div class="mny-row"><span>How much does it cost?</span>
-        <span class="mny-stepgrp">
-          <button type="button" class="mny-step" data-mny-action="goalamt" data-mny-d="-5" aria-label="Less">−</button>
-          <b>${mnyMoney(d.target)}</b>
-          <button type="button" class="mny-step" data-mny-action="goalamt" data-mny-d="5" aria-label="More">+</button>
-        </span></div>
-      <div class="mny-chiprow">${MNY_GOAL_CHIPS.map(v =>
-        `<button type="button" class="mny-chip ${d.target === v ? 'on' : ''}" data-mny-action="goalamtset" data-mny-v="${v}">$${v}</button>`).join('')}</div>
-      ${mnyBuysNote(d.target)}
-      <label class="mny-field"><span>When do you want it by?</span>
-        <input type="date" value="${escapeAttr(d.targetDate)}" data-mny-action="goaldate"></label>
-      <button type="button" class="mny-btn wide primary" data-mny-action="goalsave">Save my goal</button>
+/* ── THE FOUR "ASK DAD" BUTTONS (as drawn) ──
+   A child's open the Stage 2 sheets (js/45). A grown-up records a result or
+   a move directly (the Record sheet), and can file a club or advance question
+   on her behalf through the same sheets. */
+function mnyActionButtons(kid) {
+  const wk = ctThisWeekKey();
+  const rules = mrRulesForWeek(wk);
+  const rate = money2(Number(mrRuleOr(rules, 'sessions.perSession')) || 0);
+  const asked = mnyEnsureRequests(kid).filter(r => r && r.kind === 'skip' && r.weekKey === wk && r.status !== 'no').length;
+  const max = money2(Number(mrRuleOr(rules, 'advance.maxPerWeek')) || 0);
+  const left = Math.floor(money2(Math.max(0, max - mnyAdvanceUsed(kid, wk))) + 1e-9);
+  const btn = (action, cls, label, sub) =>
+    `<button type="button" class="mv2-act ${cls}" data-mny-action="${action}">${escapeHtml(label)}<span>${escapeHtml(sub)}</span></button>`;
+  return `<div class="mv2-actions">
+      ${btn('act-result', 'mv2-act--result', '🏆 Tell a result', 'from my planner')}
+      ${btn('act-club', 'mv2-act--club', '⛸️ Club sessions', asked ? `${asked} asked · ${mnyShort$(rate)} each I go to` : `${mnyShort$(rate)} each I go to`)}
+      ${btn('act-move', 'mv2-act--move', '🔀 Move · 💵 Cash', 'move · cash out · put in')}
+      ${btn('act-adv', 'mv2-act--adv', '⏪ Draw in advance', left ? `up to $${left} · spent before Sunday` : 'used up this week')}
     </div>`;
 }
 
-/* ── Where this week's money came from, and what of it is hers ──
-   This card used to headline the bar's own total under the label "Money that
-   came in this week" — the same phrase the meeting uses for pool.cameIn, which
-   is a different number: the bar counts fines separately and includes holding
-   growth, the pool takes fines off and excludes growth. Two screens, one
-   phrase, two figures, and a child finding out on Sunday which one was real.
-
-   The phrase now belongs to the pool, which is the one that means spendable
-   cash. There is no headline here at all: the bar's legend already prints every
-   segment in dollars, so removing it leaves nothing that COULD disagree with
-   the picture — which is what the old headline was for.
-
-   The strip underneath is the meeting's own component (mnyStrip), not a copy.
-   A second renderer of came-in → must-pay → mine is how the labels drifted
-   apart in the first place. */
-function mnyIncomeCard(kid, wk) {
+/* ── THIS WEEK (M7: today's card) ──
+   Where this week's money is coming from so far, and the strip under it —
+   the meeting's own component (`mnyStrip`), not a copy. The bar's legend
+   prints every segment in dollars, so there is no headline to disagree with
+   the picture (the phrase "money that came in" belongs to the pool). */
+function mnyThisWeekCard(kid, wk) {
   const data = mnyIncomeSegments(wk, kid);
-  return `<div class="mny-card">
-      <div class="mny-label">Where this week's money came from</div>
+  return `<div class="mv2-card mv2-week">
+      <div class="mv2-cardhead"><span class="mv2-title">This week</span></div>
+      <div class="mv2-line">Where this week's money is coming from so far</div>
       ${mnyBarHtml(data, { empty: 'Nothing yet — the week has just started' })}
       ${data.passive > 0
-        ? `<div class="mny-note">${mnyMoney(data.passive)} of that your money made by itself. It is not cash yet. ${mnyAskBtn('save')}</div>`
+        ? `<div class="mny-note">${mnyMoney(data.passive)} of that my money made by itself. It is not cash yet. ${mnyAskBtn('save')}</div>`
         : (data.passive < 0
-          ? `<div class="mny-note warn">Your companies are worth ${mnyMoney(-data.passive)} less than last Sunday. That happens — it can go back up. ${mnyAskBtn('stock')}</div>`
+          ? `<div class="mny-note warn">My companies are worth ${mnyMoney(-data.passive)} less than last Sunday. That happens — it can go back up. ${mnyAskBtn('stock')}</div>`
           : '')}
       ${mnyStrip(wk, kid, -1)}
     </div>`;
 }
 
-/* The year. A target only means something next to how the year is actually
-   going, so the pace line is not optional. */
-function mnyGoalCard(kid) {
-  const ytd = mrYearToDate(kid);
-  const target = mrTargetFor(kid);
-  if (!target) return '';
-  const pct = Math.max(0, Math.min(100, Math.round((ytd.paidTotal / target) * 100)));
-  const projected = money2(ytd.projected);
-  // A pace needs weeks behind it. Projecting "$0.00 for the year" off a kid who
-  // simply has not had her first Sunday yet is not encouragement, it is a lie.
-  const pace = !(ytd.paidTotal > 0)
-    ? `Your first settled Sunday starts this off.`
-    : (projected >= target
-        ? `At this rate you finish the year around <b>${mnyMoney(projected)}</b> — ahead of your goal.`
-        : `At this rate you finish the year around <b>${mnyMoney(projected)}</b>. Your goal is ${mnyMoney(target)}.`);
-  return `<div class="mny-card">
-      <div class="mny-label">My year</div>
-      <div class="mny-goal-row"><b>${mnyMoney(ytd.paidTotal)}</b> of ${mnyMoney(target)}</div>
-      <div class="mny-progress"><div class="mny-progress-fill" style="width:${pct}%"></div></div>
-      <div class="mny-note">${pace}</div>
-    </div>`;
-}
-
-/* One card per debt. The name and the icon are data a parent typed — every
-   string that shows them interpolates, so nothing here says "ski". */
-function mnyDebtCards(kid, wk) {
-  const debts = mnyDebts(kid);
-  if (!debts.length) return '';
-  /* "Each month" is the agreement; it is not what this week is taking. Read the
-     week's real claim through the same function the pool uses, so the card and
-     the strip above it cannot disagree — and so a month already paid says so
-     rather than leaving a child to wonder why her loan payment reads $0.00. */
-  const dueById = {};
-  mnyDueThisWeek(kid, wk).forEach(x => { dueById[x.debt.id] = x; });
-  return debts.map(d => {
-    const owedNow = dueById[d.id];
-    const owing = loanBalance(kid, d.id);
-    const principal = money2(d.principal);
-    const pct = principal > 0 ? Math.max(0, Math.min(100, Math.round((money2(d.paid) / principal) * 100))) : 0;
-    const pace = loanPacing(kid, d.id);
-    const free = loanFreeDate(kid, d.id, 0);
-    const bonus = mnyBonusEarned(kid, d.id);
-    const cleared = owing <= 0;
-    return `<div class="mny-card mny-debt">
-        <div class="mny-debt-top">
-          <span class="mny-debt-name">${escapeHtml(d.icon)} ${escapeHtml(d.name)}</span>
-          ${mnyAskBtn('debt')}
-        </div>
-        ${cleared
-          ? `<div class="mny-today-big">Paid off. All of it. 🎉</div>`
-          : `<div class="mny-progress"><div class="mny-progress-fill green" style="width:${pct}%"></div></div>
-             <div class="mny-goal-row">${pct}% paid off · <b>${mnyMoney(owing)}</b> still to go</div>
-             <div class="mny-rows">
-               <div class="mny-row"><span>Each month</span><b>${mnyMoney(d.monthly)}</b></div>
-               ${owedNow
-                 ? `<div class="mny-row"><span>This month</span><b>−${mnyMoney(owedNow.amount).slice(1)}</b></div>`
-                 : `<div class="mny-row"><span>This month</span><b>Paid ✓</b></div>`}
-               <div class="mny-row"><span>Paid off by</span><b>${free.date ? mnyShortDate(free.date) : '—'}</b></div>
-               ${bonus > 0 ? `<div class="mny-row"><span>Extra I earned by paying early</span><b>${mnyMoney(bonus)}</b></div>` : ''}
-               ${d.arrearsInterest > 0 ? `<div class="mny-row warn"><span>Costs added for paying late</span><b>${mnyMoney(d.arrearsInterest)}</b></div>` : ''}
-             </div>
-             ${pace ? `<div class="mny-note">${pace.status === 'on-pace'
-               ? 'You are on track.'
-               : `You are ${mnyMoney(pace.behindBy)} behind where the plan says you should be.`}</div>` : ''}`}
-      </div>`;
-  }).join('');
-}
-
-/* Competition days, as a month she can actually point at. */
-/* ── Gifts she has been given ──────────────────────────────────────
-   The record side of "money from outside". Entry lives here AND in the meeting,
-   both through mnyAddDeposit, so there is one writer and two doors — the same
-   shape as a fine, and not the "six copies" defect, which was six places each
-   deciding the answer.
-
-   The form renders only for a parent. A child sees the section and can PROPOSE
-   one; it credits nothing until a grown-up approves it. That is what keeps
-   "entered with her in the room" true while closing the hole immediate
-   crediting would otherwise open on a kid-visible page. */
-/* Three questions in sequence, each a real one, rather than a second inline
-   form beside the meeting's. Sequential is the house idiom for this
-   (claimChoresFromBlock makes the same call): overlapping dialogs are a
-   pile-up, one after another is a conversation.
-
-   Both roles use this. mnyAddDeposit decides what happens with the answer —
-   a grown-up's entry credits at once, a child's waits for approval — so this
-   asks the same three things either way and holds no rule of its own. */
-/* `mnyPromptGift` is gone. It asked four questions in four sequential dialogs
-   — how much, what kind, who from, which day — with no way to see or change an
-   earlier answer and nothing kept if you backed out of the fourth. The Record
-   sheet (js/41-record.js) asks the same four on one screen, through the same
-   writer. */
-
+/* ── 🎁 GIFTS (M9: today's card, the prototype's look) ──
+   What came in, from whom, when — and "I was given something", which for her
+   opens the gift sheet (a question for Dad, js/45) and for a grown-up the
+   Record sheet, which records it at once. A grown-up taps a row to correct it
+   through the sheet that recorded it. */
 function mnyGiftsCard(kid) {
   const all = (typeof mnyEnsureDeposits === 'function') ? mnyEnsureDeposits(kid) : [];
-  if (!all.length && !isParent()) return '';
   const open = mnyGiftsOpen();
   const recent = all.slice().sort((a, b) =>
     String(b.dayKey || '').localeCompare(String(a.dayKey || ''))).slice(0, 10);
-  const waiting = all.filter(d => d.pendingApproval).length;
-  /* A parent taps a row to CORRECT it, through the same sheet that recorded it.
-     A typo used to mean delete-and-retype, which debited the wallet and
-     re-credited it and left two rows nobody could explain. */
+  const waiting = all.filter(d => d.pendingApproval && !d.rejectedAt).length;
   const rows = recent.map(d => {
     const inner = `<span>🎁 ${escapeHtml(d.from || 'A gift')}${d.giver ? ' · from ' + escapeHtml(d.giver) : ''}
-        <small class="mny-note">${escapeHtml(mnyShortDate(d.dayKey || d.weekKey))}${
-          d.pendingApproval ? ' · waiting for a grown-up' : ''}</small></span>
-      <b>${mnyMoney(d.amount)}</b>`;
+        <small>${escapeHtml(mnyShortDate(d.dayKey || d.weekKey))}${
+          d.rejectedAt ? ' · not this time' : d.pendingApproval ? ' · waiting for a grown-up' : ''}</small></span>
+      <b>${escapeHtml(mnyMoney(d.amount))}</b>`;
     return isParent()
-      ? `<button type="button" class="mny-row mny-row--tap" data-mny-action="gift-edit"
+      ? `<button type="button" class="mv2-giftrow mv2-giftrow--tap" data-mny-action="gift-edit"
            data-mny-dep="${escapeAttr(d.id)}">${inner}</button>`
-      : `<div class="mny-row">${inner}</div>`;
+      : `<div class="mv2-giftrow">${inner}</div>`;
   }).join('');
-  return `<div class="mny-card">
-      <button type="button" class="mny-acc" data-mny-action="gifts" aria-expanded="${open}">
-        <span class="mny-label">🎁 Gifts${waiting ? ` · ${waiting} waiting` : ''}</span>
+  return `<div class="mv2-card mv2-gifts">
+      <button type="button" class="mv2-acc" data-mny-action="gifts" aria-expanded="${open}">
+        <span class="mv2-title">🎁 Gifts${waiting ? ` · ${waiting} waiting` : ''}</span>
         <span>${open ? 'Hide ▾' : 'Show ▸'}</span>
       </button>
-      ${open ? (rows || `<div class="mny-note">No gifts recorded yet.</div>`) : ''}
-      ${open ? `<button type="button" class="mny-btn wide" data-mny-action="gift-add"
-        >${isParent() ? '＋ Record a gift' : '＋ I was given something'}</button>` : ''}
+      ${open ? (rows || `<div class="mv2-line">No gifts recorded yet.</div>`) : ''}
+      <button type="button" class="mv2-btn mv2-giftadd" data-mny-action="gift-add">${isParent() ? '＋ Record a gift' : '🎁 I was given something'}</button>
     </div>`;
 }
 
-function mnyCompetitionCard(kid) {
+/* ── 📒 MY PASSBOOK (M7: the prototype's passbook) ──
+   The last four Sundays from the frozen ledger (`moneyLedger`), newest first:
+   what came in, and where it went — to the wall, saved, or cash — with a bar
+   under each row, a = Total row, and a note with the dates, the average a
+   week, how much was steady and how much bonus, and the shares (largest
+   remainder, "<1%" for a share that is not nothing). The income bar uses the
+   approved groups (Plan v5 §L S1): 💪 Money I earned · 🎁 Money I was given ·
+   🌱 Money my money made. A row from before the split (a flat or hand-typed
+   week) shows what came in only. */
+function mnyPassbookRow(r) {
+  const n = (v) => money2(Number(v) || 0);
+  const given = n(r.deposits != null ? r.deposits : r.outside);
+  const earned = n(r.net);
+  const made = Math.max(0, n(r.passive));
+  const steady = n(r.chores) + n(r.learning) + n(r.streak) + n(r.sessionsPaid);
+  const split = !r.defaulted && (steady + n(r.competition) + given + made) > 0;
+  const wall = money2(n((r.loan || {}).paid) + n(r.extra != null ? r.extra : r.debtExtra));
+  const saved = money2(n(r.ready) + n(r.goal) + n(r.gic) + n(r.stock));
+  const cash = n(r.spend);
+  return {
+    weekKey: r.weekKey, sunday: sdSundayOf(r.weekKey), inAmt: money2(earned + given),
+    earned, given, made, split, wall, saved, cash,
+    steady: money2(steady), bonus: money2(n(r.competition) + given + made),
+  };
+}
+function mnyPassbookData(kid) {
+  const all = mnyLedgerRows(kid).map(mnyPassbookRow);
+  const last4 = all.slice(0, 4);
+  const sum = (k) => money2(last4.reduce((a, r) => a + r[k], 0));
+  const t = { inAmt: sum('inAmt'), earned: sum('earned'), given: sum('given'), made: sum('made'),
+              wall: sum('wall'), saved: sum('saved'), cash: sum('cash'),
+              steady: money2(last4.filter(r => r.split).reduce((a, r) => a + r.steady, 0)),
+              bonus: money2(last4.filter(r => r.split).reduce((a, r) => a + r.bonus, 0)),
+              split: last4.some(r => r.split) };
+  const placed = money2(t.wall + t.saved + t.cash);
+  const shares = sdPercents([t.wall, t.saved, t.cash], placed);
+  const sb = money2(t.steady + t.bonus);
+  const steadyPct = sb > 0 ? Math.round(t.steady / sb * 100) : null;
+  return { all, last4, total: t, shares, placed, steadyPct };
+}
+function mnyPassbookCard(kid) {
+  const p = mnyPassbookData(kid);
+  const sw = (cls) => `<i class="mv2-sw ${cls}"></i>`;
+  const key = `<div class="mv2-bookkey"><span><b>💰 in</b> ${sw('mv2-sw--earned')}earned ${sw('mv2-sw--given')}given ${sw('mv2-sw--made')}made</span><span><b>went to</b> ${sw('mv2-sw--wall')}wall ${sw('mv2-sw--saved')}saved ${sw('mv2-sw--cash')}cash</span></div>`;
+  const bars = (r, show) => `${show ? `<span class="mv2-bookbar mv2-bookbar--in"><i class="mv2-sw--earned" style="flex:${r.earned} 0 0"></i><i class="mv2-sw--given" style="flex:${r.given} 0 0"></i><i class="mv2-sw--made" style="flex:${r.made} 0 0"></i></span>` : '<span></span>'}<span class="mv2-bookbar mv2-bookbar--out"><i class="mv2-sw--wall" style="flex:${r.wall} 0 0"></i><i class="mv2-sw--saved" style="flex:${r.saved} 0 0"></i><i class="mv2-sw--cash" style="flex:${r.cash} 0 0"></i></span>`;
+  if (!p.last4.length) {
+    return `<div class="mv2-card mv2-book">
+        <div class="mv2-cardhead"><span class="mv2-title">📒 My passbook</span></div>
+        ${key}
+        <div class="mv2-line">Every Sunday I sign gets written here — what came in, and where it went.</div>
+        <button type="button" class="mv2-link" data-mny-action="story">all my Sundays ▸</button>
+      </div>`;
+  }
+  const head = `<div class="mv2-bookgrid mv2-bookhead"><span>Sunday</span><span>💰 in</span><span>${sw('mv2-sw--wall')}wall</span><span>${sw('mv2-sw--saved')}saved</span><span>${sw('mv2-sw--cash')}cash</span></div>`;
+  const rows = p.last4.map((r, i) => `<div class="mv2-bookgrid mv2-bookrow${i === 0 ? ' latest' : ''}" data-mny-week="${escapeAttr(r.weekKey)}">
+      <span class="mv2-bookdate">${escapeHtml(mnyDayMonth(r.sunday))}</span>
+      <b class="mv2-bookin">${escapeHtml(mnyBook$(r.inAmt))}</b><b>${escapeHtml(mnyBook$(r.wall))}</b><b>${escapeHtml(mnyBook$(r.saved))}</b><b>${escapeHtml(mnyBook$(r.cash))}</b>
+      ${bars(r, r.split)}
+    </div>`).join('');
+  const t = p.total;
+  const pf = (i, v) => sdPercentLabel(p.shares[i], v);
+  const first = p.last4[p.last4.length - 1], last = p.last4[0], n = p.last4.length;
+  const note = `These ${n} Sunday${n === 1 ? '' : 's'} (${mnyDayMonth(first.sunday)} – ${mnyDayMonth(last.sunday)}): I earned ${mnyBook$(t.inAmt)}, about ${mnyBook$(t.inAmt / n)} a week${p.steadyPct != null ? ` (${p.steadyPct}% steady · ${100 - p.steadyPct}% bonus)` : ''}.${p.placed > 0 ? ` Of what I placed, ${pf(0, t.wall)} to the wall · ${pf(1, t.saved)} saved · ${pf(2, t.cash)} cash.` : ''}`;
+  return `<div class="mv2-card mv2-book">
+      <div class="mv2-cardhead"><span class="mv2-title">📒 My passbook</span></div>
+      ${key}
+      ${head}
+      ${rows}
+      <div class="mv2-bookgrid mv2-booktotal"><b>= Total</b><b class="mv2-bookin">${escapeHtml(mnyBook$(t.inAmt))}</b><b>${escapeHtml(mnyBook$(t.wall))}</b><b>${escapeHtml(mnyBook$(t.saved))}</b><b>${escapeHtml(mnyBook$(t.cash))}</b>${bars(t, t.split)}</div>
+      <div class="mv2-booknote">${escapeHtml(note)}</div>
+      <div class="mv2-bookfoot"><span class="mv2-bookline">${escapeHtml(`${mnyKidName(kid)} ✓ · ${p.all.length} Sunday${p.all.length === 1 ? '' : 's'} signed${p.all.length > 4 ? ' · showing the latest 4' : ''}`)}</span>
+        <button type="button" class="mv2-link" data-mny-action="story">all my Sundays ▸</button></div>
+    </div>`;
+}
+
+/* ── THE MONTH'S CALENDAR + 📅 COMING UP (M6: merged) ──
+   Today's calendar, Monday first: a recorded result shows its sport and
+   "✓ $18" on its day; a meet on her planner with no result yet shows dashed —
+   and once its day has come, tapping it opens 🏆 Tell a result for that meet
+   (a grown-up: the Record sheet); money Dad expects this month (Stage 1
+   `expected` — a month, not a day) sits under the month's name. Under it,
+   the prototype's 📅 Coming up: this month's results with what they paid,
+   the meets still to come, and the money Dad expects in the months ahead. */
+function mnyCalendarData(kid, month) {
+  const recorded = mrCompetitions(kid).filter(c => c && String(c.dayKey || '').slice(0, 7) === month);
+  const planned = rqPlannedInMonth(kid, month).filter(p => p.st !== 'done');
+  const expected = mnyEnsureExpected(kid).filter(e => e && e.month === month);
+  return { recorded, planned, expected };
+}
+function mnyComingUp(kid) {
+  const today = String(todayKey());
+  const month = today.slice(0, 7);
+  const out = [];
+  mrCompetitions(kid).filter(c => c && String(c.dayKey || '').slice(0, 7) === month)
+    .sort((a, b) => (a.dayKey < b.dayKey ? -1 : 1))
+    .forEach(c => out.push({ kind: 'done', icon: mnySportIcon(c.sport), name: c.name || mnySportLabel(c.sport),
+      when: `${mnyDayLabel(c.dayKey)} · ✓ ${mnyShort$(mrCompAward(c))}` }));
+  const months = [0, 1, 2].map(i => { const d = formatDayKey(month + '-01'); d.setMonth(d.getMonth() + i); return ctDateToKey(d).slice(0, 7); });
+  months.forEach(m => rqPlannedInMonth(kid, m).filter(p => p.st === 'soon')
+    .forEach(p => out.push({ kind: 'soon', icon: p.icon, name: p.title, when: mnyDayLabel(p.dayKey) })));
+  mnyEnsureExpected(kid).filter(e => e && e.month >= month && !/🏆|🏊|⛸️/.test(e.label || ''))
+    .sort((a, b) => (a.month < b.month ? -1 : 1))
+    .forEach(e => out.push({ kind: 'expect', icon: '', name: e.label,
+      when: `${MONTH_SHORT[Number(e.month.slice(5, 7)) - 1]} · Dad expects ~${mnyShort$(e.amount)}` }));
+  return out.slice(0, 6);
+}
+function mnyCalendarCard(kid) {
   const month = mnyCalMonth || String(todayKey()).slice(0, 7);
-  const entries = mrCompetitions(kid).filter(c => String(c.dayKey || '').slice(0, 7) === month);
   const [y, m] = month.split('-').map(Number);
   const first = new Date(y, m - 1, 1);
   const days = new Date(y, m, 0).getDate();
   const lead = (first.getDay() + 6) % 7;            // Monday-first, like the planner
+  const cal = mnyCalendarData(kid, month);
+  const today = String(todayKey());
   const byDay = {};
-  entries.forEach(c => { byDay[Number(String(c.dayKey).slice(8, 10))] = c; });
-  const total = money2(entries.reduce((s, c) => s + money2(c.awarded), 0));
-
+  const slot = (d) => (byDay[d] = byDay[d] || {});
+  cal.recorded.forEach(c => { slot(Number(String(c.dayKey).slice(8, 10))).rec = c; });
+  cal.planned.forEach(p => { const d = Number(String(p.dayKey).slice(8, 10)); if (!slot(d).rec) slot(d).plan = p; });
+  const total = money2(cal.recorded.reduce((s, c) => s + mrCompAward(c), 0));
   let cells = '';
-  for (let i = 0; i < lead; i++) cells += `<span class="mny-cal-cell blank"></span>`;
+  for (let i = 0; i < lead; i++) cells += `<span class="mv2-cal-cell blank"></span>`;
   for (let d = 1; d <= days; d++) {
-    const c = byDay[d];
-    cells += `<span class="mny-cal-cell${c ? ' has' : ''}${todayKey() === month + '-' + String(d).padStart(2, '0') ? ' today' : ''}">
-        ${c ? `<span class="mny-cal-icon">${escapeHtml(mnySportIcon(c.sport))}</span>` : d}
-      </span>`;
+    const key = month + '-' + String(d).padStart(2, '0');
+    const hit = byDay[d] || {};
+    const isToday = key === today ? ' today' : '';
+    if (hit.rec) {
+      cells += `<span class="mv2-cal-cell rec${isToday}" title="${escapeAttr((hit.rec.name || mnySportLabel(hit.rec.sport)) + ' · ✓ ' + mnyMoney(mrCompAward(hit.rec)))}"><span class="mv2-cal-icon">${escapeHtml(mnySportIcon(hit.rec.sport))}</span><small>✓ ${escapeHtml(mnyShort$(mrCompAward(hit.rec)))}</small></span>`;
+    } else if (hit.plan) {
+      const p = hit.plan;
+      const can = p.st === 'open';
+      cells += can
+        ? `<button type="button" class="mv2-cal-cell plan open${isToday}" data-mny-action="cal-meet" data-mny-id="${escapeAttr(p.blockId || '')}" data-daykey="${escapeAttr(p.dayKey)}" aria-label="${escapeAttr('🏆 Tell a result for ' + p.title)}"><span class="mv2-cal-icon">${escapeHtml(p.icon)}</span><small>${d}</small></button>`
+        : `<span class="mv2-cal-cell plan${isToday}" title="${escapeAttr(p.title + (p.st === 'sent' ? ' · sent to Dad' : ' · coming up'))}"><span class="mv2-cal-icon">${escapeHtml(p.icon)}</span><small>${d}</small></span>`;
+    } else {
+      cells += `<span class="mv2-cal-cell${isToday}">${d}</span>`;
+    }
   }
   const label = ['January','February','March','April','May','June','July','August','September','October','November','December'][m - 1] + ' ' + y;
-
-  return `<div class="mny-card mny-comp">
-      <div class="mny-month-nav">
-        <button type="button" class="mny-step" data-mny-action="cal" data-mny-dir="-1" aria-label="Previous month">‹</button>
-        <span class="mny-label">🏆 ${escapeHtml(label)}</span>
-        <button type="button" class="mny-step" data-mny-action="cal" data-mny-dir="1" aria-label="Next month">›</button>
+  const coming = mnyComingUp(kid);
+  return `<div class="mv2-card mv2-cal">
+      <div class="mv2-month-nav">
+        <button type="button" class="mv2-step" data-mny-action="cal" data-mny-dir="-1" aria-label="Previous month">‹</button>
+        <span class="mv2-title">🏆 ${escapeHtml(label)}</span>
+        <button type="button" class="mv2-step" data-mny-action="cal" data-mny-dir="1" aria-label="Next month">›</button>
       </div>
-      <div class="mny-dow">${['M','T','W','T','F','S','S'].map(d => `<span>${d}</span>`).join('')}</div>
-      <div class="mny-cal">${cells}</div>
-      ${entries.length
-        ? `<div class="mny-rows">${entries.sort((a, b) => a.dayKey < b.dayKey ? -1 : 1).map(c => {
-             const inner = `<span>${mnySportIcon(c.sport)} ${escapeHtml(c.name || mnySportLabel(c.sport))} · ${mnyShortDate(c.dayKey)}</span><b>${mnyMoney(c.awarded)}</b>`;
-             return isParent()
-               ? `<button type="button" class="mny-row mny-row--tap" data-mny-action="meet-edit"
-                    data-mny-comp="${escapeAttr(c.id)}">${inner}</button>`
-               : `<div class="mny-row">${inner}</div>`;
-           }).join('')}</div>
-           <div class="mny-row total"><span>This month</span><b>${mnyMoney(total)}</b></div>`
-        : `<div class="mny-note">No competition days this month.</div>`}
-      ${isParent() ? `<button type="button" class="mny-btn wide" data-mny-action="meet-add">＋ Record a meet result</button>` : ''}
-      <div class="mny-note">We never talk about money before or during a competition. That is a promise, not a rule.</div>
+      ${cal.expected.length ? `<div class="mv2-expect">${cal.expected.map(e => `<span>${escapeHtml(e.label)} · Dad expects ~${escapeHtml(mnyShort$(e.amount))}</span>`).join('')}</div>` : ''}
+      <div class="mv2-dow">${['M','T','W','T','F','S','S'].map(x => `<span>${x}</span>`).join('')}</div>
+      <div class="mv2-calgrid">${cells}</div>
+      <div class="mv2-row2"><span>This month's results</span><b>${escapeHtml(mnyMoney(total))}</b></div>
+      <div class="mv2-coming">
+        <div class="mv2-title mv2-title--sm">📅 Coming up</div>
+        ${coming.length ? coming.map(c => `<div class="mv2-comingrow ${'mv2-comingrow--' + c.kind}"><span>${escapeHtml((c.icon ? c.icon + ' ' : '') + c.name)}</span><span>${escapeHtml(c.when)}</span></div>`).join('')
+          : '<div class="mv2-line">Nothing on the calendar yet.</div>'}
+      </div>
+      <div class="mv2-line">We never talk about money before or during a competition. That is a promise, not a rule.</div>
     </div>`;
 }
 /* The sport id `dance` is the skating star level test — silver and gold items
@@ -730,27 +723,35 @@ function mnyCompetitionCard(kid) {
 function mnySportIcon(s) { return { swim: '🏊', skate: '⛸️', dance: '🌟' }[s] || '🏆'; }
 function mnySportLabel(s) { return { swim: 'Swim meet', skate: 'Skating', dance: 'Skating star level' }[s] || 'Competition'; }
 
-/* The two ways out of this page. */
-function mnyLinksCard(kid) {
-  const stage = mnyStage(kid);
-  return `<div class="mny-card">
-      <div class="mny-label">More</div>
-      <button type="button" class="mny-btn wide" data-mny-action="story">📖 My money story</button>
-      <button type="button" class="mny-btn wide" data-mny-action="school">🎓 Money school</button>
-      <div class="mny-note">You are on <b>${escapeHtml(stage.icon + ' ' + stage.title)}</b>. The next lesson opens as your loan comes down.</div>
+/* ── ⭐ STICKERS (as drawn) ──
+   Derived, never stored: each signed week's ledger row through the core's
+   `sdStickersFor` (the same rule Sunday uses), every sticker she has ever
+   earned lit, the rest a dashed ❔. */
+function mnyStickersFor(kid) {
+  const got = new Set();
+  mnyLedgerRows(kid).forEach(r => {
+    sdStickersFor({
+      extra: Number(r.extra != null ? r.extra : r.debtExtra) || 0,
+      ready: Number(r.ready) || 0, gic: Number(r.gic) || 0, stock: Number(r.stock) || 0,
+      wallet: Number(r.spend) || 0,
+      guess: r.guess != null ? Number(r.guess) : null, payday: Number(r.payday) || 0,
+    }).forEach(id => got.add(id));
+  });
+  return SD_STICKERS.map(([id, icon, name]) => ({ id, icon, name, got: got.has(id) }));
+}
+function mnyStickersCard(kid) {
+  return `<div class="mv2-card mv2-stickers">
+      <span class="mv2-title">⭐ Stickers</span>
+      <div class="mv2-stickrow">${mnyStickersFor(kid).map(s =>
+        `<span class="mv2-sticker${s.got ? ' got' : ''}" title="${escapeAttr(s.name)}" aria-label="${escapeAttr(s.name + (s.got ? '' : ' — not yet'))}">${s.got ? s.icon : '❔'}</span>`).join('')}</div>
     </div>`;
 }
 
-/* What everything pays, straight from the rules — so a price a parent changed
-   this morning is right here this afternoon. Collapsed by default: this is
-   reference, not news. */
+/* What everything pays, straight from the rules — Money school's copy of the
+   list (My money opens the same list in a sheet). Collapsed by default: this
+   is reference, not news. TODAY's prices; what was already earned this week
+   keeps the price live when it was done, and the note says so. */
 function mnyPricesCard(wk) {
-  /* TODAY's prices, not the week's. This is the list she checks before deciding
-     whether to go and do the bins — it has to answer "what will I get for this
-     if I do it now". The week's earnings are still computed against the rules
-     that were live when each day happened (mrRulesForWeek), so a price raised
-     mid-week shows up here immediately without restating what she already
-     earned; the note says so when the two differ. */
   const r = mrRules();
   const weekRules = mrRulesForWeek(wk);
   const changedMidWeek = JSON.stringify(r) !== JSON.stringify(weekRules);
@@ -906,9 +907,9 @@ function mnyStoryWeek(kid, r) {
   const outBar = mnySegments([
     { label: 'Loan payment', value: (r.loan || {}).paid, color: 'var(--mny-out-loan)' },
     { label: 'Paid off early', value: r.debtExtra,       color: 'var(--mny-out-extra)' },
-    { label: 'Kept ready',   value: r.ready,             color: 'var(--mny-out-ready)' },
+    { label: 'Savings',      value: r.ready,             color: 'var(--mny-out-ready)' },
     { label: 'Locked away',  value: r.gic,               color: 'var(--mny-out-locked)' },
-    { label: 'Into companies', value: r.stock,           color: 'var(--mny-out-stock)' },
+    { label: 'Companies',    value: r.stock,             color: 'var(--mny-out-stock)' },
   ]);
   const edited = (r.edited || []).length;
   return `<div class="mny-card">
@@ -962,11 +963,43 @@ function mnyHandleClick(ev) {
      form; "no criteria met" is the one-tap answer that writes a real record
      worth nothing — a different fact from no record at all. */
   if (a === 'gifts') { mnySetGiftsOpen(!mnyGiftsOpen()); mnyRenderMyMoney(); return; }
-  if (a === 'gift-add')  { openRecordSheet({ kind: 'gift', kid: mnyViewKid() }); return; }
+  /* My money's doors (My Money v2). A child's open her request sheets
+     (js/45) — each one ASKS. A grown-up records a result, a move or a gift
+     directly on the Record sheet (js/41), and files a club or advance
+     question on her behalf through the same sheets. */
+  if (a === 'gift-add') {
+    if (isParent()) openRecordSheet({ kind: 'gift', kid: mnyViewKid() });
+    else mnyOpenRequestSheet('gift', { kid: mnyViewKid() });
+    return;
+  }
   if (a === 'gift-edit') { openRecordSheet({ kind: 'gift', kid: mnyViewKid(), id: el.getAttribute('data-mny-dep') }); return; }
-  if (a === 'meet-add')  { openRecordSheet({ kind: 'meet', kid: mnyViewKid() }); return; }
-  if (a === 'meet-edit') { openRecordSheet({ kind: 'meet', kid: mnyViewKid(), id: el.getAttribute('data-mny-comp') }); return; }
-  if (a === 'move-ask')  { openRecordSheet({ kind: 'move', kid: mnyViewKid() }); return; }
+  if (a === 'act-result') {
+    if (isParent()) openRecordSheet({ kind: 'meet', kid: mnyViewKid() });
+    else mnyOpenRequestSheet('result', { kid: mnyViewKid() });
+    return;
+  }
+  if (a === 'act-move') {
+    if (isParent()) openRecordSheet({ kind: 'move', kid: mnyViewKid() });
+    else mnyOpenRequestSheet('move', { kid: mnyViewKid() });
+    return;
+  }
+  if (a === 'act-club') { mnyOpenRequestSheet('club', { kid: mnyViewKid() }); return; }
+  if (a === 'act-adv')  { mnyOpenRequestSheet('adv', { kid: mnyViewKid() }); return; }
+  if (a === 'goal-new') { mnyOpenRequestSheet('goal', { kid: mnyViewKid() }); return; }
+  if (a === 'asked-all') { mnyOpenRequestSheet('list', { kid: mnyViewKid() }); return; }
+  if (a === 'prices-sheet') { mnyOpenRequestSheet('prices', { kid: mnyViewKid() }); return; }
+  // A planned meet on the calendar whose day has come: 🏆 Tell a result for it.
+  if (a === 'cal-meet') {
+    const kid = mnyViewKid(), dayKey = el.getAttribute('data-daykey');
+    const blockId = el.getAttribute('data-mny-id');
+    if (isParent()) {
+      const p = rqPlannedInMonth(kid, String(dayKey).slice(0, 7)).find(x => x.blockId === blockId) || {};
+      openRecordSheet({ kind: 'meet', kid, dayKey, name: p.title || '', sport: p.sport || '' });
+    } else {
+      mnyOpenRequestSheet('result', { kid, blockId, dayKey });
+    }
+    return;
+  }
   /* No kind chosen: which record this is is the first thing the sheet asks.
      On Money rules the child on screen is the parent page's, not mnyKid. */
   if (a === 'record-any') {
@@ -979,25 +1012,18 @@ function mnyHandleClick(ev) {
       el.getAttribute('data-name'), el.getAttribute('data-sport'));
     return;
   }
-  if (a === 'stage-seen') {
-    mnySetStageSeen(mnyViewKid(), Number(el.getAttribute('data-mny-stage')) || 0);
-    mnyRenderMyMoney();
-    return;
-  }
   if (a === 'kid')     { mnySetKid(el.getAttribute('data-mny-kid')); return; }
   if (a === 'story')   { mnyOpenStory(); return; }
-  if (a === 'school')  { if (typeof mnyOpenSchool === 'function') mnyOpenSchool(mnyViewKid()); return; }
   if (a === 'tab')     { mnyGoTab(el.getAttribute('data-mny-tab')); return; }
   if (a === 'tourkid') { mnyOpenTour('kid'); return; }
   if (a === 'backmoney')   { mnyOpenMyMoney(mnyViewKid()); return; }
+  if (a === 'backschool')  { mnySchoolBack(); return; }
   if (a === 'backplanner') { goWeek(); return; }
   if (a === 'tourpar') { mnyOpenTour('parent'); return; }
   if (a === 'prices') {
-    /* One toggle, one remembered choice, on both pages that carry the price
-       list — My money and Money school. */
+    // Money school's price list keeps its remembered toggle.
     mnySetPricesOpen(!mnyPricesOpen());
-    const school = document.getElementById('screen-moneyschool');
-    if (school && school.classList.contains('active')) mnyRenderSchool(); else mnyRenderMyMoney();
+    mnyRenderSchool();
     return;
   }
   if (a === 'ask')     { mnyShowConcept(el.getAttribute('data-mny-concept')); return; }
@@ -1010,29 +1036,7 @@ function mnyHandleClick(ev) {
     mnyRenderMyMoney();
     return;
   }
-  // ── Saving goals: hers to create, hers to drop ──
-  if (a === 'goalform') {
-    mnyGoalFormOpen = !mnyGoalFormOpen;
-    if (mnyGoalFormOpen) mnyGoalDraft = { name: '', icon: '🎯', target: 50, targetDate: '' };
-    mnyRenderMyMoney();
-    return;
-  }
-  if (a === 'goalicon')   { mnyGoalDraft.icon = el.getAttribute('data-mny-icon'); mnyRenderMyMoney(); return; }
-  if (a === 'goalamt')    { mnyGoalDraft.target = Math.max(1, money2(mnyGoalDraft.target + Number(el.getAttribute('data-mny-d')))); mnyRenderMyMoney(); return; }
-  if (a === 'goalamtset') { mnyGoalDraft.target = Number(el.getAttribute('data-mny-v')); mnyRenderMyMoney(); return; }
-  if (a === 'goalsave') {
-    const d = mnyGoalDraft;
-    const g = mnyAddGoal(mnyViewKid(), {
-      name: String(d.name || '').trim() || 'Something I want',
-      icon: d.icon, target: d.target, targetDate: d.targetDate,
-    });
-    if (!g) { showToast('Put in how much it costs first'); return; }
-    mnyGoalFormOpen = false;
-    showToast(`${g.icon} Saved — ${mnyMoney(g.target)} to go`);
-    mnyRenderMyMoney();
-    return;
-  }
-  if (a === 'goaldel')  { mnyRemoveGoal(mnyViewKid(), el.getAttribute('data-mny-goal')); mnyRenderMyMoney(); return; }
+  // 🎉 A goal reached is a grown-up's moment: the jar empties into the thing.
   if (a === 'goaldone') {
     if (mnyCompleteGoal(mnyViewKid(), el.getAttribute('data-mny-goal'))) showToast('🎉 Got it!');
     mnyRenderMyMoney();
@@ -1048,8 +1052,8 @@ function mnyHandleClick(ev) {
   }
 }
 
-/* Typed fields in the goal form. Kept out of mnyHandleClick and off re-render:
-   redrawing the card on every keystroke would take the caret with it. */
+/* Typed fields. Kept out of mnyHandleClick and off re-render: redrawing on
+   every keystroke would take the caret with it. */
 function mnyHandleInput(ev) {
   {
     const g = ev.target.closest('[data-mny-action="dep-giver"]');
@@ -1068,51 +1072,49 @@ function mnyHandleInput(ev) {
   if (!el) return;
   const a = el.getAttribute('data-mny-action');
   if (a.indexOf('rq-') === 0) { rqHandleInput(a, el); return; }
-  if (a === 'goalname') { mnyGoalDraft.name = el.value; return; }
-  if (a === 'goaldate') { mnyGoalDraft.targetDate = el.value; mnyRenderMyMoney(); return; }
 }
 
-/* The concept card. Locked ideas show what opens them rather than the body —
-   a lesson arriving before the thing it explains is just noise. */
+/* ── THE '?' EXPLAINER (Plan v5 §L M10: the prototype's idea card) ──
+   What / Why / Watch and the Chinese line, read from MNY_CONCEPTS through
+   `mnyConceptCard` (the one statement of each idea, the same Money school
+   shows), plus "📚 Take me to Money school", which opens Money school at that
+   idea and remembers where to come back to (`mnySchoolReturn`, device-local).
+   An idea not open for her yet still explains itself — the prototype has no
+   locks here — and says when it opens. */
 function mnyShowConcept(id) {
   const kid = mnyViewKid();
   const c = mnyConceptCard(id, kid);
   if (!c) return;
-  const body = c.open
-    ? `<p>${escapeHtml(c.what)}</p>
-       <div class="mny-sub">${escapeHtml(c.whyLabel)}</div><p>${escapeHtml(c.why)}</p>
-       <div class="mny-sub">${escapeHtml(c.riskLabel)}</div><p>${escapeHtml(c.risk)}</p>`
-    : `<p>🔒 ${escapeHtml(mnyNeedLabel(c.stage))}.</p>`;
-  // Every `?` in the system can hand off to the page that teaches the idea
-  // properly, so a question asked anywhere lands somewhere that answers it.
-  showToastCard(`${c.icon} ${c.title}`, body, c.id);
-}
-
-/* A plain dismissible card. Uses the app's sheet chrome if it is available and
-   falls back to a toast, so a `?` always answers something. */
-function showToastCard(title, bodyHtml, conceptId) {
   const existing = document.getElementById('mnyConceptCard');
   if (existing) existing.remove();
   const el = document.createElement('div');
   el.id = 'mnyConceptCard';
   el.className = 'mny-concept-scrim';
-  el.innerHTML = `<div class="mny-concept" role="dialog" aria-modal="true" aria-label="${escapeAttr(title)}">
-      <div class="mny-concept-title">${escapeHtml(title)}</div>
-      <div class="mny-concept-body">${bodyHtml}</div>
-      ${conceptId ? `<button type="button" class="mny-btn wide" id="mnyConceptMore">🎓 Take me to Money school</button>` : ''}
-      <button type="button" class="mny-btn wide" id="mnyConceptClose">Got it</button>
+  el.innerHTML = `<div class="mny-concept mv2-idea" role="dialog" aria-modal="true" aria-label="${escapeAttr(c.icon + ' ' + c.title)}">
+      <div class="mv2-idea-title">${escapeHtml(c.icon + ' ' + c.title)}</div>
+      <div class="mv2-idea-grid">
+        <b class="mv2-idea-what">What</b><span>${escapeHtml(c.what)}</span>
+        <b class="mv2-idea-why">Why</b><span>${escapeHtml(c.why)}</span>
+        <b class="mv2-idea-watch">Watch</b><span>${escapeHtml(c.risk)}</span>
+      </div>
+      ${c.cn ? `<div class="mv2-idea-cn" lang="zh">${escapeHtml(c.cn)}</div>` : ''}
+      ${c.open ? '' : `<div class="mv2-idea-lock">🔒 ${escapeHtml(mnyNeedLabel(c.stage))}.</div>`}
+      <div class="mv2-idea-foot">
+        <button type="button" class="mv2-btn" id="mnyConceptMore">📚 Take me to Money school</button>
+        <button type="button" class="mv2-btn mv2-btn--go" id="mnyConceptClose">Got it</button>
+      </div>
     </div>`;
   document.body.appendChild(el);
   const close = () => el.remove();
   el.addEventListener('click', e => { if (e.target === el) close(); });
   el.querySelector('#mnyConceptClose').addEventListener('click', close);
-  const more = el.querySelector('#mnyConceptMore');
-  if (more) more.addEventListener('click', () => {
+  el.querySelector('#mnyConceptMore').addEventListener('click', () => {
     close();
-    /* Money school is a screen and so is the meeting now, so navigating there
-       leaves the meeting behind on its own. It used to be a sheet, and leaving
-       it open over the school page stranded her behind a scrim she could not
-       see past — which is one of the reasons the meeting stopped being one. */
-    mnyOpenSchool(mnyViewKid(), conceptId);
+    /* Money school is a screen and so is the meeting, so navigating there
+       leaves the page behind on its own; ◀ in Money school comes back. A
+       sheet would strand her behind a scrim she could not see past. */
+    const fromMoney = document.getElementById('screen-mymoney') &&
+      document.getElementById('screen-mymoney').classList.contains('active');
+    mnyOpenSchool(kid, c.id, fromMoney ? { from: 'mymoney', scrollY: window.scrollY || 0 } : null);
   });
 }

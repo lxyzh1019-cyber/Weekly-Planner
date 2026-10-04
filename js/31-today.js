@@ -1704,8 +1704,8 @@ function tdRenderToday() {
    Still to earn $1.50" — which is a table, and a table is the slowest way to
    answer "how am I doing". Two pictures instead:
 
-   A stacked bar for where her money IS right now (cash · kept ready · locked ·
-   invested), because the shape of that bar is the whole financial-literacy
+   A stacked bar for where her money IS right now (cash · Savings · locked away ·
+   Companies), because the shape of that bar is the whole financial-literacy
    lesson — a bar that is all cash looks different from one that is mostly
    saved, and she can see which is which without reading a number.
 
@@ -1718,9 +1718,9 @@ function tdRenderToday() {
    disagree; the row taps through to that page, and nothing here moves money. */
 const TD_MONEY_SEGMENTS = [
   { key: 'cash',   label: 'Cash',       colour: 'var(--cat-daily)' },
-  { key: 'saved',  label: 'Kept ready', colour: 'var(--cat-free)' },
-  { key: 'locked', label: 'Locked',     colour: 'var(--cat-school)' },
-  { key: 'stock',  label: 'Invested',   colour: 'var(--cat-custom)' },
+  { key: 'saved',  label: 'Savings',    colour: 'var(--cat-free)' },
+  { key: 'locked', label: 'Locked away', colour: 'var(--cat-school)' },
+  { key: 'stock',  label: 'Companies',  colour: 'var(--cat-custom)' },
 ];
 
 /* Everything she has, per pot. */

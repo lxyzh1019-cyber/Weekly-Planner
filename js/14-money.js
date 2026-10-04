@@ -205,15 +205,20 @@ function moneyOpenGIC(kid, amount, termMonths, opts) {   // cash → locked away
 /* 🎯 Cash into the goal jar: the same movement as `moneyDeposit` on the
    stream (cash → ready — the jar is a Savings-kind holding), kept apart from
    plain Savings by its own holding (`mnyGoalHolding`), and the goal's
-   `saved` moves with it. */
+   `saved` moves with it. `opts.goalId` picks which goal's jar (several goals,
+   Plan v5 §L M4); without it, the newest goal's. Refused while Savings is shut
+   (Plan v5 Deviation 31 — `mnyGoalJarRefusal`). */
 function moneyDepositGoal(kid, amount, opts) {
   const w = ensureWallet(kid); amount = money2(Math.min(amount, w.cash));
   if (amount <= 0) return false;
-  const h = mnyGoalHolding(kid);
+  if (mnyGoalJarRefusal(kid)) return false;
+  const goalId = opts && opts.goalId;
+  const h = goalId ? mnyGoalJarFor(kid, goalId) : mnyGoalHolding(kid);
   if (!h) return false;
   w.cash = money2(w.cash - amount);
-  mnyAddToGoal(kid, amount);
-  evMirror(kid, Object.assign({ kind: 'ready', note: 'Into the goal jar' }, opts || {},
+  mnyAddToGoal(kid, amount, h.goalId);
+  const label = Object.assign({}, opts || {}); delete label.goalId;   // a choice, not a stream field
+  evMirror(kid, Object.assign({ kind: 'ready', note: 'Into the goal jar' }, label,
                               { from: 'cash', to: 'ready', amount }));
   saveAll(); return true;
 }

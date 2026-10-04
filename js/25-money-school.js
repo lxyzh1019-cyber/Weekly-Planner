@@ -26,12 +26,29 @@
    ════════════════════════════════════════════════════════════════ */
 
 let mnySchoolConcept = 'debt';
+/* Where Money school's ◀ goes back to (Plan v5 §L M10: "📚 Take me to Money
+   school" and back to the same page). Module state on this device only —
+   never in `state`, which every write uploads whole. `{ screen, scrollY }`;
+   null means the default, My money. */
+let mnySchoolReturn = null;
 
-function mnyOpenSchool(kid, conceptId) {
+function mnyOpenSchool(kid, conceptId, opts) {
   if (isParent() && (kid === 'jenn' || kid === 'jess')) mnyKid = kid;
   if (conceptId) mnySchoolConcept = conceptId;
+  const from = opts && opts.from;
+  mnySchoolReturn = from ? { screen: String(from), scrollY: Number(opts.scrollY) || 0 } : null;
   showScreen('moneyschool');
   mnyRenderSchool();
+}
+/* ◀ from Money school: back where the explainer was opened, at the same
+   place on the page. Anything else, and the default, is My money. */
+function mnySchoolBack() {
+  const back = mnySchoolReturn;
+  mnySchoolReturn = null;
+  mnyOpenMyMoney(mnyViewKid());
+  if (back && back.screen === 'mymoney' && back.scrollY > 0) {
+    try { window.scrollTo(0, back.scrollY); } catch (e) {}
+  }
 }
 
 function mnyRenderSchool() {
@@ -44,7 +61,7 @@ function mnyRenderSchool() {
   if (!mnyConceptById(mnySchoolConcept)) mnySchoolConcept = 'debt';
 
   wrap.innerHTML =
-      `${mnyPageHead('🎓 Money school', 'Why any of it works this way', [], { back: 'backmoney' })}
+      `${mnyPageHead('🎓 Money school', 'Why any of it works this way', [], { back: 'backschool' })}
        ${mnyTabBar('school')}
        <div class="mny-cols school">
          <div class="mny-col">${mnyLadderCard(kid, pct, idx)}</div>

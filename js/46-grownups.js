@@ -221,7 +221,7 @@ function guCardValues(q) {
       ? `${r.icon || '🎯'} ${r.name} · ${guMoney$(r.target)}. ${r.keep === 'ready' ? 'Money in her old jar goes to Savings.' : 'Money in her old jar moves to the new goal.'} The jar earns no interest.`
     : q.kind === 'comp' ? `${r.custom ? 'Not on the planner yet. ' : ''}${cc.line}${r.pay != null && money2(r.pay) !== money2(cc.amt) ? ` You made it ${guMoney$(r.pay)}.` : ''}`
     : q.kind === 'gift' ? 'Gifts go straight into her payday once you say yes.'
-    : q.kind === 'move' ? `Her reason: “${r.note || '—'}”.${to === 'locked' ? ` Locked for ${Number(mrRuleOr(rules, 'pots.lockWeeks')) || 4} weeks once moved.` : to === 'cash' ? ' Hand her the cash on Sunday. It leaves the bank.' : ''}`
+    : q.kind === 'move' ? `Her reason: “${r.note || '—'}”.${to === 'locked' ? ` Locked for ${Number(mrRuleOr(rules, 'pots.lockWeeks')) || 4} weeks once moved.` : to === 'cash' ? ' Hand her the cash on Sunday. It leaves the bank.' : to === 'wall' ? ` Nothing moves now: on Sunday it goes on her wall as extra, each $1 counting ${guMoney$(1 + (Number(mrRuleOr(rules, 'loan.extraBonusPct')) || 0) / 100)}.` : ''}`
     : q.kind === 'deposit' ? 'Cash from home goes into the bank. Count it with her on Sunday.'
     : q.kind === 'adv' ? `Cash now; it comes off Sunday’s payday. Her limit is ${guMoney$(mrRuleOr(rules, 'advance.maxPerWeek'))} a week.`
     : q.kind === 'skip' ? 'Yes marks it missed on Sunday. It pays $0. It is not a fine.'
@@ -236,10 +236,10 @@ function guCardValues(q) {
     : q.kind === 'skip' ? '🔎 Let the coach know'
     : '🔎 Whose was it, and what does she say happened?';
   const yesLabel = q.kind === 'goal' ? '✓ Set it' : q.kind === 'deposit' ? '✓ Got the cash' : q.kind === 'adv' ? '✓ Give her the cash'
-    : q.kind === 'move' ? (to === 'cash' ? '✓ Hand it over' : '✓ Move it') : q.kind === 'dispute' ? '✓ Give it back'
+    : q.kind === 'move' ? (to === 'cash' ? '✓ Hand it over' : to === 'wall' ? '✓ On the wall Sunday' : '✓ Move it') : q.kind === 'dispute' ? '✓ Give it back'
     : q.kind === 'skip' ? '✓ OK, mark missed' : '✓ Yes, pay it';
   const after = q.status === 'yes'
-    ? (q.kind === 'goal' ? 'jar switches Sunday' : q.kind === 'adv' ? 'comes off Sunday' : q.kind === 'move' ? 'moves before Sunday' : 'in Sunday’s payday')
+    ? (q.kind === 'goal' ? 'jar switches Sunday' : q.kind === 'adv' ? 'comes off Sunday' : q.kind === 'move' ? (to === 'wall' ? 'on the wall Sunday' : 'moves before Sunday') : 'in Sunday’s payday')
     : q.status === 'talk' ? 'still blocks payday' : 'she sees “not this time”';
   return { amt, ruleAmt, rulesLine, check, yesLabel, after,
            amtLabel: q.kind === 'skip' ? '⛸️' : guMoney$(amt),

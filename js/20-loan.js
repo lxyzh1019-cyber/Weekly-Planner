@@ -536,7 +536,23 @@ function mnyLoanSundayPayment(kid, weekKey, opts) {
     out.each.push({ debtId: d.id, name: d.name, due, paid: pay, carried: d.arrears });
   });
   out.shortfall = money2(Math.max(0, out.must - out.paid));
-  let extra = money2(Math.min(Math.max(0, Number(o.extra) || 0), Math.max(0, w.cash)));
+  const ex = mnyLoanPayExtra(kid, o.extra, wk);
+  out.extra = ex.extra;
+  out.extraCredited = ex.extraCredited;
+  mnyEnsureDebts(kid).forEach(d => { d.lastSundayPaidWeek = wk; });
+  saveAll();
+  return out;
+}
+
+/* Extra off the wall: up to `amount` of her cash, oldest debt first, each
+   dollar `early` with that debt's bonus, never an overpayment. The one
+   writer of extra — Sunday's payment above and a 🧱 Loan wall move she asked
+   for (mnyApplyApprovedWallMoves, js/40) both pay through it. Returns
+   {extra: dollars paid, extraCredited: what they cleared}. */
+function mnyLoanPayExtra(kid, amount, weekKey, note) {
+  const w = ensureWallet(kid);
+  const out = { extra: 0, extraCredited: 0 };
+  let extra = money2(Math.min(Math.max(0, Number(amount) || 0), Math.max(0, w.cash)));
   mnyOpenDebtsOldestFirst(kid).forEach(d => {
     if (!(extra > 0)) return;
     const bonus = (Number(d.bonusRate) || 0) / 100;
@@ -548,15 +564,69 @@ function mnyLoanSundayPayment(kid, weekKey, opts) {
     if (!(pay > 0)) return;
     w.cash = money2(w.cash - pay);
     evMirror(kid, { kind: 'loan', from: 'cash', to: 'loan:' + d.id, amount: pay, ref: d.id,
-                    weekKey: wk, note: 'Extra off ' + (d.name || 'her loan') });
+                    weekKey: weekKey || ctThisWeekKey(), note: note || ('Extra off ' + (d.name || 'her loan')) });
     const rec = loanRecordPayment(kid, pay, 'early', d.id);
     extra = money2(extra - pay);
     out.extra = money2(out.extra + pay);
     out.extraCredited = money2(out.extraCredited + money2(((rec && rec.credited) || 0) + ((rec && rec.toInterest) || 0)));
   });
-  mnyEnsureDebts(kid).forEach(d => { d.lastSundayPaidWeek = wk; });
   saveAll();
   return out;
+}
+
+/* ── 🧱 THE WALL'S KEY FACTS (Plan v5 §L M5 / G2) — read only ──
+   Per debt and in total: what was borrowed, paid, left; the weekly must-pay;
+   when it is free at that pace; the early bonus earned; the cost of
+   borrowing so far (interest added — the `interest → loan:<id>` stream lines
+   `loanAccrueBalanceInterest` writes, net of any reversal) and the last
+   interest added; and LATE COSTS — what the retired monthly arrears charge
+   put on the debt, i.e. everything charged into `arrearsInterest` (what is
+   there now plus what payments already settled) that was not balance
+   interest. Nothing here is stored; every figure is derived. */
+function mnyLoanFacts(kid) {
+  const events = (typeof evList === 'function') ? evList(kid) : [];
+  const rows = mnyEnsureDebts(kid).map(d => {
+    const node = 'loan:' + d.id;
+    const interestAdded = money2(Math.max(0, events.reduce((s, e) => {
+      if (!e) return s;
+      if (e.from === 'interest' && e.to === node) return s + money2(e.amount);
+      if (e.from === node && e.to === 'interest') return s - money2(e.amount);
+      return s;
+    }, 0)));
+    const charged = money2(money2(d.arrearsInterest)
+      + (d.payments || []).reduce((t, p) => t + money2(p.toInterest), 0));
+    const principal = money2(d.principal);
+    const left = loanBalance(kid, d.id);
+    return {
+      debt: d, id: d.id, name: d.name, icon: d.icon, principal,
+      paid: money2(d.paid), left, weekly: left > 0 ? mnyWeeklyDue(d) : 0,
+      monthly: money2(d.monthly),
+      bonus: mnyBonusEarned(kid, d.id),
+      interestAdded, lastInterest: money2(d.lastInterestAdded),
+      lateCosts: money2(Math.max(0, charged - interestAdded)),
+      paidPct: principal > 0 ? Math.max(0, Math.min(100, (money2(d.paid) / principal) * 100)) : 100,
+      createdAt: Number(d.createdAt) || 0,
+    };
+  });
+  const sum = (k) => money2(rows.reduce((s, r) => s + money2(r[k]), 0));
+  const left = sum('left');
+  const weekly = sum('weekly');
+  const weeksLeft = (left > 0 && weekly > 0) ? Math.ceil(left / weekly) : (left > 0 ? null : 0);
+  let freeBy = null;
+  if (weeksLeft != null) {
+    const d = formatDayKey(sdSundayOf(ctThisWeekKey()));
+    d.setDate(d.getDate() + weeksLeft * 7);
+    freeBy = ctDateToKey(d);
+  }
+  const rate = Number(mrRuleOr(mrRules(), 'loan.ratePct')) || 0;
+  return {
+    rows: rows.slice().sort((a, b) => (a.createdAt - b.createdAt)),
+    principal: sum('principal'), paid: sum('paid'), left, weekly,
+    monthly: money2(rows.filter(r => r.left > 0).reduce((s, r) => s + r.monthly, 0)),
+    bonus: sum('bonus'), interestAdded: sum('interestAdded'), lateCosts: sum('lateCosts'),
+    lastInterest: sum('lastInterest'), ratePct: rate,
+    paidPct: mnyPaidPct(kid), weeksLeft, freeBy,
+  };
 }
 
 /* Interest every N Sundays (`loan.interestEverySundays`, at

@@ -1485,9 +1485,19 @@ function mrStreakWeek(weekKey, kid) {
      `graceCounts` is read from THIS week's rules and is false when absent, so
      a week lived before the rule keeps the pay it had. */
   const counts = st.graceCounts === true;
+  /* ── AN UNFINISHED DAY IS NEVER FORGIVEN (Plan v5 Deviation 32) ──
+     In a week not yet settled, a day still ahead has not happened, and today
+     is not over until its routine is done — neither is kept, and neither is
+     missed, so the live run stops at the first of them. Otherwise a Wednesday
+     not done yet read as "forgiven" and the count ran a day ahead of her. A
+     settled week is read whole, exactly as before. */
+  const today = (typeof todayKey === 'function') ? String(todayKey()) : null;
+  const live = !!today && !(typeof mnyWeekSettled === 'function' && mnyWeekSettled(weekKey, kid));
+  const dayKeys = live ? mrWeekDayKeys(weekKey) : [];
   // The week's countable days, in order: true kept, false missed.
   const marks = [];
   for (let d = 0; d < 7; d++) {
+    if (live && String(dayKeys[d]) > today) break;         // still ahead
     if (mrIsSick(kid, weekKey, d)) continue;              // paused, not broken
     /* Asked ONCE per day and reused. Going through mrStreakDayDone here would
        resolve the same day's sessions a second time, and this loop already sits
@@ -1497,7 +1507,9 @@ function mrStreakWeek(weekKey, kid) {
     // nothing was missed. Under the day-type default this cannot arise; it is a
     // guard, not a behaviour — and it stops `[].every()` paying for an empty day.
     if (!asked.length) continue;
-    marks.push(asked.every(s => ctGetMandatory(weekKey, d, s, kid)));
+    const kept = asked.every(s => ctGetMandatory(weekKey, d, s, kid));
+    if (live && !kept && String(dayKeys[d]) === today) break;   // today, not done yet
+    marks.push(kept);
   }
   let best = 0;
   if (counts) {

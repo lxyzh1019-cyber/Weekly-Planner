@@ -5180,6 +5180,59 @@ function findChromium() {
      for every time one was raised or tightened. They went with the count
      itself — see the kidStandards comment above. The history is in git; the
      rule is not in force. */
+  /* mv2Seed(kid): My Money v2 with something in every card, for the sweep
+     rows and the Stage 3 checks. The caller snapshots and restores state.
+     Kept as source and defined before each use: a reload (the looks
+     checks reload the page) drops anything put on window. */
+  const MV2_SEED_SRC = `window.mv2Seed = ${((kid) => {
+      const was = profile, wasToast = window.showToast;
+      window.showToast = () => {};
+      try {
+        profile = 'parent';
+        const p = getProfData(kid);
+        const wk = ctThisWeekKey(), days = mrWeekDayKeys(wk);
+        delete p.debts;
+        const d0 = mnyDebts(kid)[0];
+        Object.assign(d0, { name: 'Skates & boots', icon: '⛸️', principal: 600, paid: 220, monthly: 40, createdAt: 1,
+          arrears: 0, arrearsInterest: 0, payments: [], bonusRate: 10, lastInterestAdded: 0, downPayment: 0, downPaid: 0 });
+        const d1 = mnyAddDebt(kid, { name: 'Fall season entries', icon: '🏆', principal: 400, monthly: 30 });
+        if (d1) { d1.paid = 90; d1.createdAt = 2; d1.lastInterestAdded = 0.92; d1.arrearsInterest = 0.92; d1.bonusRate = 10; }
+        ensureWallet(kid).cash = 0; p.holdings = []; p.events = [];
+        moneyAddCash(kid, 40, { kind: 'gift', from: 'gift', note: 'seed' });
+        moneyDeposit(kid, 12);
+        moneyOpenGIC(kid, 5, { weeks: 4 });
+        p.savingGoals = [];
+        const g1 = mnyAddGoal(kid, { name: 'New skate guards', icon: '🛼', target: 35, targetDate: days[6] });
+        mnyAddGoal(kid, { name: 'Book set', icon: '📚', target: 50 });
+        moneyDepositGoal(kid, 8, { goalId: g1.id });
+        ctEnsureShared();
+        const c = state.shared.chore; c.moneyLedger = c.moneyLedger || {};
+        [[30, 16.15, 10, 3.85], [42, 20, 15, 7], [28, 16.15, 8, 3.85], [40, 18, 14, 8], [20, 10, 6, 4]].forEach((r, i) => {
+          const dd = formatDayKey(wk); dd.setDate(dd.getDate() - 7 * (i + 1));
+          const k = ctDateToKey(dd);
+          c.moneyLedger[k] = c.moneyLedger[k] || {};
+          c.moneyLedger[k][kid] = { at: 1, chores: r[0] - 9, learning: 0, streak: 3, competition: 0, sessionsPaid: 6, sessions: 1,
+            fines: 0, outside: 0, gross: r[0], net: r[0], loan: { paid: r[1] }, debtExtra: 0, ready: r[2], gic: 0, stock: 0, spend: r[3], xp: 0 };
+        });
+        p.requests = []; p.moveRequests = [];
+        p.deposits = (p.deposits || []).filter(x => !x.addedBy);
+        profile = kid;
+        mnyAddRequest(kid, { kind: 'gift', amount: 20, from: 'Birthday money', giver: 'Uncle Mike' });
+        mnyAddRequest(kid, { kind: 'adv', amount: 2, why: 'school book fair' });
+        mnyAddRequest(kid, { kind: 'goal', name: 'Skate bag', icon: '🎒', target: 30 });
+        profile = 'parent';
+        p.expected = [];
+        const nm = formatDayKey(String(todayKey()).slice(0, 8) + '01'); nm.setMonth(nm.getMonth() + 1);
+        mnyAddExpected(kid, { month: ctDateToKey(nm).slice(0, 7), label: '🎄 Christmas', amount: 20 });
+        const meetDay = String(todayKey());     // in this month, and its day has come
+        setDayBlocks(meetDay, [...(getDayBlocks(meetDay, kid) || []).filter(b => b.id !== 'mv2-meet'),
+          { id: 'mv2-meet', actId: 'competition', tag: 'skating', compName: 'Fall Classic', startMin: 8 * 60, durationMin: 240 }], kid);
+      } catch (e) { return 'mv2Seed threw: ' + e.message; }
+      finally { profile = was; window.showToast = wasToast; }
+      mnyOpenMyMoney(kid);
+      return undefined;
+    }).toString()};`;
+  await page.evaluate(MV2_SEED_SRC);
   const KID_SCREENS = [
     // Today is held to the full 200 with no ratchet: it was built to these rules
     // rather than measured against them afterwards, which was the point of
@@ -5268,6 +5321,19 @@ function findChromium() {
     }, 'screen-today/extras'],
     ['screen-chore',   () => { openChoreTab(); ckSelectDay(2); }],
     ['screen-mymoney', () => { mnyOpenMyMoney('jenn'); }],
+    /* My Money v2 with something in every card (Sunday v15 Stage 3): a loan of
+       two rows, Savings, a lock, two goal jars, four Sundays in the passbook,
+       questions for Dad, a planned meet, money Dad expects. Seeded, drawn,
+       and the state put back straight away. */
+    ['screen-mymoney', `() => {
+      ${MV2_SEED_SRC}
+      const snap = JSON.stringify(state);
+      const said = window.mv2Seed('jenn');
+      /* Drawn; now put the data back at once, so no later row or check reads
+         the fixture (the DOM keeps what was drawn, which is what is measured). */
+      const sn = JSON.parse(snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, sn); saveLocal();
+      return said;
+    }`, 'screen-mymoney/seeded'],
     /* The money story is a KID screen and was never in this audit, which is how
        it could have shipped the Flow's 26px-wide month columns with no floor
        enforced on them. Seeded, because an empty story draws no strip and no
@@ -5336,7 +5402,7 @@ function findChromium() {
      to extend. The result sheet is drawn with a swim meet picked, so the race
      rows are on screen. */
   const KID_SHEETS = [
-    ...['result', 'club', 'move', 'adv', 'goal', 'list'].map(kind => ['requestOverlay', `() => {
+    ...['result', 'club', 'move', 'adv', 'goal', 'list', 'gift', 'prices'].map(kind => ['requestOverlay', `() => {
       if (isParent()) profile = 'jenn';
       const me = activeProfile();
       mnyOpenMyMoney(me);
@@ -5348,6 +5414,14 @@ function findChromium() {
       }
       if (!document.getElementById('requestOverlay').classList.contains('open')) return 'the ${kind} sheet did not open';
     }`, 'sheet/' + kind]),
+    /* The '?' explainer (Plan v5 §L M10) over My money — the prototype's idea
+       card with "📚 Take me to Money school". */
+    ['mnyConceptCard', `() => {
+      if (isParent()) profile = 'jenn';
+      mnyOpenMyMoney(activeProfile());
+      mnyShowConcept('gic');
+      if (!document.getElementById('mnyConceptCard')) return 'the explainer did not open';
+    }`, 'sheet/idea'],
   ];
   // Four real devices, not two. The plan asked for these and the branch that
   // changed nearly every layout only ever checked a phone and a desktop-ish
@@ -5454,8 +5528,13 @@ function findChromium() {
         // The request sheets are measured at the phone and the iPad only.
         const isSheet = String(label || '').indexOf('sheet/') === 0;
         if (isSheet && w !== 390 && w !== 1194) continue;
-        // A sheet left open by the row before would cover the next screen.
-        await page.evaluate(() => { const o = document.getElementById('requestOverlay'); if (o && o.classList.contains('open')) rqClose(); });
+        // A sheet left open by the row before would cover the next screen; a
+        // seeded row's state is put back before the next one draws.
+        await page.evaluate(() => {
+          const o = document.getElementById('requestOverlay'); if (o && o.classList.contains('open')) rqClose();
+          const idea = document.getElementById('mnyConceptCard'); if (idea) idea.remove();
+          if (window.__mv2Snap) { const sn = JSON.parse(window.__mv2Snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, sn); window.__mv2Snap = null; saveLocal(); }
+        });
         // A row's seed may return a sentence saying what it failed to put on screen.
         const seeded = await page.evaluate(`(${nav.toString()})()`);
         await page.waitForTimeout(200);
@@ -5467,7 +5546,8 @@ function findChromium() {
            display:none, so none is "too small". openSisterSync refuses a parent,
            for one — so each row must prove its screen was on show. */
         if (!(await page.evaluate((sid) => { const el = document.getElementById(sid);
-            return el.classList.contains('active') || (el.classList.contains('overlay') && el.classList.contains('open')); }, id))) {
+            return !!el && (el.classList.contains('active') || (el.classList.contains('overlay') && el.classList.contains('open'))
+              || el.classList.contains('mny-concept-scrim')); }, id))) {
           problems.push('the screen was not on show, so nothing on it was measured');
         }
         // Sideways scroll is the failure a screenshot needs a human to notice and
@@ -5490,7 +5570,11 @@ function findChromium() {
       }
     }
   }
-  await page.evaluate(() => { const o = document.getElementById('requestOverlay'); if (o && o.classList.contains('open')) rqClose(); });
+  await page.evaluate(() => {
+    const o = document.getElementById('requestOverlay'); if (o && o.classList.contains('open')) rqClose();
+    const idea = document.getElementById('mnyConceptCard'); if (idea) idea.remove();
+    if (window.__mv2Snap) { const sn = JSON.parse(window.__mv2Snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, sn); window.__mv2Snap = null; saveLocal(); }
+  });
   await clearLooks();
   if (want('kidScreensMeetTheHouseRules')) checks.kidScreensMeetTheHouseRules = kidFindings.length === 0 || kidFindings;
 
@@ -6347,6 +6431,17 @@ function findChromium() {
          there the grace carries the run across the miss WITHOUT crediting the
          day, so the same week reads 6. */
       if ((mrRulesForWeek(wk).streak || {}).graceCounts !== true) problems.push('this week does not count the forgiving day');
+      /* Read as a week that is OVER: the clock stands on the Monday after it.
+         Mid-week the live run stops at today (Plan v5 Deviation 32 — an
+         unfinished day is never forgiven; anUnfinishedDayIsNeverForgiven holds
+         that), which is not what these whole-week patterns are about. */
+      const RealDateHR = Date;
+      const afterHR = formatDayKey(wk); afterHR.setDate(afterHR.getDate() + 7);
+      const whenHR = new RealDateHR(RealDateHR.UTC(afterHR.getFullYear(), afterHR.getMonth(), afterHR.getDate(), 19, 0, 0));
+      Date = function (...a) { return a.length ? new RealDateHR(...a) : new RealDateHR(whenHR); };
+      Date.prototype = RealDateHR.prototype;
+      Date.now = RealDateHR.now; Date.parse = RealDateHR.parse; Date.UTC = RealDateHR.UTC;
+      try {
       setWeek([true, true, true, false, true, true, true]);
       const oneMiss = mrStreakWeek(wk, kid);
       const top = (MR_DEFAULT_RULES.streak.tiers || []).reduce((a, b) => (b.days > a.days ? b : a));
@@ -6369,6 +6464,7 @@ function findChromium() {
       // Nothing kept is no run, forgiving day or not.
       setWeek([false, false, false, false, false, false, false]);
       if (mrStreakWeek(wk, kid).days !== 0) problems.push('a week with nothing kept reads a run of ' + mrStreakWeek(wk, kid).days);
+      } finally { Date = RealDateHR; }
 
       // ── 4 · The pace divides by the weeks that PASSED.
       const ytd = mrYearToDate(kid);
@@ -6599,12 +6695,12 @@ function findChromium() {
       // ── This month: 20 in, 30 put away, nothing out.
       flPeriod = 'month'; flMonth = m2; mnyRenderStory();
       if (!/\$20\.00/.test(text())) problems.push('this month does not name the $20 that came in');
-      if (!/Kept ready/.test(text())) problems.push('money moved to kept-ready is not drawn as somewhere it went');
+      if (!/Savings/.test(text())) problems.push('money moved to Savings is not drawn as somewhere it went');
 
       // ── All of it: every ribbon, across all three months.
       flPeriod = 'all'; mnyRenderStory();
       const all = text();
-      ['Jobs and routines', 'Gifts', 'Spent', 'Kept ready'].forEach(l => {
+      ['Jobs and routines', 'Gifts', 'Spent', 'Savings'].forEach(l => {
         if (all.indexOf(l) < 0) problems.push('"' + l + '" is missing from the whole story');
       });
       if (!/\$60\.00/.test(all)) problems.push('jobs across all months do not total $60');
@@ -9627,10 +9723,12 @@ function findChromium() {
     const earnedBefore = mrWeekBreakdown(wk, kid).chorePaid;
     const wasPaying = mrRules().chores.grade[3];
     mrApplyEdits([{ path: 'chores.grade.3', value: wasPaying + 1 }], { reason: 'family_meeting' });
+    // My Money v2: the price list opens in a sheet from the ☀️ card.
     mnyOpenMyMoney(kid);
-    mnySetPricesOpen(true); mnyRenderMyMoney();
-    const txt = document.getElementById('mnyPage1Wrap').textContent;
+    document.querySelector('#mnyPage1Wrap [data-mny-action="prices-sheet"]').click();
+    const txt = document.getElementById('requestBody').textContent;
     const showsNewPrice = txt.includes('$' + (wasPaying + 1).toFixed(2));
+    rqClose();
     // Whether the week restates depends on when the edit takes effect; what
     // must never happen is a past week silently moving.
     const pastWeek = '2020-01-06';
@@ -11193,7 +11291,7 @@ function findChromium() {
       return (scr.innerText || '').split(/\s+/).filter(w => /[A-Za-z]/.test(w)).length;
     };
     const cases = [
-      ['screen-mymoney', () => mnyOpenMyMoney('jenn'), '[data-mny-action="prices"]'],
+      ['screen-mymoney', () => mnyOpenMyMoney('jenn'), '[data-mny-action="gifts"]'],
       ['screen-chore',   () => { openChoreTab(); ckSelectDay(2); }, '[data-ct-action="ck-privs"]'],
       ['screen-week',    () => { goWeek(); renderWeek(); }, '#weekGlance .week-glance-toggle'],
     ];
@@ -12998,70 +13096,6 @@ function findChromium() {
     return bad.length ? bad : true;
   });
 
-  /* Row 11. My money shows the week the chore tab's rail shows: earned this
-     week (mrWeekBreakdown's net), today's ceiling bar with fines and what is
-     waiting, and the ledger — the same figures, read-only. */
-  if (want('earningsBarOnMyMoney')) checks.earningsBarOnMyMoney = await page.evaluate(() => {
-    const bad = [];
-    const unpin = c1.pin(3);
-    const k = c1.keep('jenn');
-    const p = getProfData('jenn');
-    const hadFines = JSON.parse(JSON.stringify(p.fines || []));
-    try {
-      profile = 'jenn'; parentViewing = 'jenn';
-      ctPrepareRead();
-      k.clear();
-      const wk = k.wk, keys = mrWeekDayKeys(wk);
-      setDayBlocks(keys[3], [{ id: 'eb-ch', actId: 'chores', startMin: 17 * 60, durationMin: 30, choreTags: ['dishes', 'mop', 'vacuum', 'bins'] }], 'jenn');
-      profile = 'parent';
-      ['dishes', 'mop', 'vacuum'].forEach(id => mrSetChoreGrade('jenn', wk, 3, id, 3));
-      const fine = (((mrRulesForWeek(wk).fines || {}).items) || [])[0];
-      // The house rules make the first `freeRepeats` of an item free, so record
-      // one past them: that one costs, and the ledger has a Fines line to match.
-      if (fine) for (let i = 0; i <= (Number(fine.freeRepeats) || 0); i++) mrAddFine('jenn', fine.id, keys[3]);
-      profile = 'jenn';
-      mrSetClaim('jenn', wk, 3, 'bins', 2);
-      const cash = mnyCash('jenn');
-
-      openChoreTab();
-      const rail = {
-        total: ((document.querySelector('#choreWrap .ck-rail-total') || {}).textContent || '').trim(),
-        keys: [...document.querySelectorAll('#choreWrap .ck-keys .ck-key')].map(e => e.textContent.trim()),
-        ledger: [...document.querySelectorAll('#choreWrap .ck-ledger-row')].map(e =>
-          [(e.querySelector('.ck-ledger-name') || {}).firstChild ? e.querySelector('.ck-ledger-name').firstChild.textContent.trim() : '',
-           ((e.querySelector('.ck-ledger-amt') || {}).textContent || '').trim()].join(' ')),
-        risk: ((document.querySelector('#choreWrap .ck-risk') || {}).textContent || '').trim(),
-      };
-      if (!rail.total) return ['precondition: the chore tab rail shows no total'];
-
-      mnyOpenMyMoney('jenn');
-      const card = document.querySelector('#mnyPage1Wrap .mny-earnboard');
-      if (!card) return bad.concat(['no "Earned this week" card on My money']);
-      const total = ((card.querySelector('.mny-earn-total') || {}).textContent || '').trim();
-      if (total !== rail.total) bad.push(`My money says ${total}, the chore tab says ${rail.total}`);
-      const keysNow = [...card.querySelectorAll('.mny-earn-key')].map(e => e.textContent.trim());
-      if (JSON.stringify(keysNow) !== JSON.stringify(rail.keys)) bad.push(`today's bar reads ${JSON.stringify(keysNow)}, the chore tab ${JSON.stringify(rail.keys)}`);
-      if (!card.querySelector('.mny-earn-bar .mny-earn-seg')) bad.push('the ceiling bar is not drawn');
-      if (!card.querySelector('.mny-earn-ceil')) bad.push('the ceiling mark is not drawn');
-      const ledgerNow = [...card.querySelectorAll('.mny-earn-line')].map(e =>
-        [((e.querySelector('.mny-earn-line-name') || {}).textContent || '').trim(),
-         ((e.querySelector('.mny-earn-line-amt') || {}).textContent || '').trim()].join(' '));
-      if (JSON.stringify(ledgerNow) !== JSON.stringify(rail.ledger)) bad.push(`the ledger reads ${JSON.stringify(ledgerNow)}, the chore tab ${JSON.stringify(rail.ledger)}`);
-      if (fine && !rail.ledger.some(l => /^Fines /.test(l))) bad.push('precondition: the fine is not in the chore tab ledger');
-      if (!card.textContent.includes(rail.risk)) bad.push('the "one more fine" line differs from the chore tab');
-      if (card.querySelector('button, input, select')) bad.push('the earnings card carries a control — it is a read-only view');
-      const tiny = [...card.querySelectorAll('*')].filter(el =>
-        [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(getComputedStyle(el).fontSize) < 13);
-      if (tiny.length) bad.push(`the earnings card has text under 13px (.${tiny[0].className})`);
-      if (document.body.scrollWidth > window.innerWidth + 1) bad.push('My money scrolls sideways at 390px');
-      if (mnyCash('jenn') !== cash) bad.push('showing earnings moved money');
-    } finally {
-      p.fines = hadFines;
-      unpin(); k.restore(); goToday();
-    }
-    return bad.length ? bad : true;
-  });
-
   /* Row 12. Money story gains the chore tab's 8-week earnings bars (the rail's
      "Your last 8 weeks"), the same weeks and figures; the past-weeks list that
      was already there is not drawn twice. */
@@ -13815,8 +13849,9 @@ function findChromium() {
      look tile (Looks stage 3, L4 — it names the look it switches to, Calm
      from the default Pop), plus the build number (theBuildNumberIsOnThePage). Money school and Money story both
      belong to the Money tab and were a third and second door there; each is
-     still reached from Money — school from money tab 5 and My money's 🎓
-     button, story from My money's "More" card (mnyLinksCard). */
+     still reached from Money — school from money tab 5 and every '?'
+     explainer's "📚 Take me to Money school", story from My money's 📖 and
+     the passbook's "all my Sundays ▸". */
   if (want('moreHasNoMoneySchool')) checks.moreHasNoMoneySchool = await page.evaluate(() => {
     const problems = [];
     const activeId = () => (document.querySelector('.screen.active') || {}).id;
@@ -13836,17 +13871,16 @@ function findChromium() {
     if (!tab5) problems.push('My money has no tab 5 (Money school) for a kid');
     else { tab5.click(); if (activeId() !== 'screen-moneyschool') problems.push(`money tab 5 lands on ${activeId()}, not Money school`); }
 
-    // Money school and Money story from My money's own "More" card.
-    const linksCard = () => [...document.querySelectorAll('#mnyPage1Wrap .mny-card')]
-      .find(c => (c.querySelector('.mny-label')?.textContent || '').trim() === 'More');
+    // Money story from My money's head (📖) and the passbook's "all my
+    // Sundays ▸" (My Money v2 retired the "More" links card, Plan v5 §K).
     mnyOpenMyMoney('jenn');
-    const school = linksCard()?.querySelector('[data-mny-action="school"]');
-    if (!school) problems.push("My money's More card has no 🎓 Money school button");
-    else { school.click(); if (activeId() !== 'screen-moneyschool') problems.push(`My money's 🎓 button lands on ${activeId()}, not Money school`); }
-    mnyOpenMyMoney('jenn');
-    const story = linksCard()?.querySelector('[data-mny-action="story"]');
-    if (!story) problems.push("My money's More card has no 📖 My money story button");
+    const story = document.querySelector('#mnyPage1Wrap .mny-head [data-mny-action="story"]');
+    if (!story) problems.push("My money's head has no 📖 My money story button");
     else { story.click(); if (activeId() !== 'screen-moneystory') problems.push(`My money's 📖 button lands on ${activeId()}, not Money story`); }
+    mnyOpenMyMoney('jenn');
+    const all = document.querySelector('#mnyPage1Wrap .mv2-book [data-mny-action="story"]');
+    if (!all) problems.push('the passbook has no "all my Sundays ▸"');
+    else { all.click(); if (activeId() !== 'screen-moneystory') problems.push(`"all my Sundays ▸" lands on ${activeId()}, not Money story`); }
 
     goToday();
     return problems.length ? problems : true;
@@ -16256,7 +16290,7 @@ function findChromium() {
       take('Week', ['#weeklyFullGrid .wf-card', '.view-tab.active', '.view-tab:not(.active)', '.weekly-full']);
       setDayBlocks(k, had, 'jenn');
       mnyOpenMyMoney('jenn');
-      take('My money', ['#screen-mymoney .mny-card', '#screen-mymoney .mny-tab.on', '#screen-mymoney .mny-btn']);
+      take('My money', ['#screen-mymoney .mv2-card', '#screen-mymoney .mny-tab.on', '#screen-mymoney .mny-btn', '#screen-mymoney .mv2-act']);
       goToday(); tdOpenMore(); await wait(350);
       take('More', ['#tdMoreOverlay .sheet', '#tdMoreOverlay .td-more-tile']);
       closeSheet('tdMoreOverlay');
@@ -16396,7 +16430,7 @@ function findChromium() {
       ['Backup meter nearly full', 'div', 'bk-meter-fill warn', 'backgroundColor', 'rgb(255, 209, 102)'],
       ['Backup meter critical', 'div', 'bk-meter-fill critical', 'backgroundColor', 'rgb(184, 68, 31)'],
       ['chore exposure line', 'div', 'ck-risk', 'color', 'rgb(184, 68, 31)'],
-      ['My money exposure line', 'div', 'mny-earn-risk', 'color', 'rgb(184, 68, 31)'],
+      ['My money late costs', 'div', 'mv2-late', 'color', 'rgb(184, 68, 31)'],
       ['school calendar ran out', 'div', 'pa-stale', 'borderTopColor', 'rgb(184, 68, 31)'],
       ['Record refusal', 'p', 'rc-no', 'color', 'rgb(184, 68, 31)'],
       ['chore money capped', 'div', 'ct-cap-note', 'color', 'rgb(184, 68, 31)'],
@@ -17187,11 +17221,9 @@ function findChromium() {
     const cells = [...document.querySelectorAll('#mnyPage1Wrap .mny-strip-cell')];
     const threeCells = cells.length === 3;
     const mineShown = cells[2] && cells[2].textContent.includes(mnyMoney(mnyPool(wk, kid).mine));
-    const dueNow = mnyDueThisWeek(kid, wk)[0];
     const txt = () => document.getElementById('mnyPage1Wrap').textContent;
-    const cardSaysThisMonth = !!dueNow
-      && txt().includes('This month')
-      && txt().includes(mnyMoney(dueNow.amount).slice(1));
+    // My Money v2: the loan wall (its "left") replaced the per-debt cards.
+    const wallSaysLeft = txt().includes(mnyMoney(mnyLoanFacts(kid).left) + ' left');
 
     // Stamp the month: the strip's middle cell and the debt card must flip
     // together, or one of them is telling her something the other denies.
@@ -17199,10 +17231,14 @@ function findChromium() {
     mnyRenderMyMoney();
     const cells2 = [...document.querySelectorAll('#mnyPage1Wrap .mny-strip-cell')];
     const payZero = cells2[1] && cells2[1].textContent.includes(mnyMoney(0));
-    const cardSaysPaid = txt().includes('Paid ✓');
 
     delete pd.debts;
-    return threeCells && mineShown && cardSaysThisMonth && payZero && cardSaysPaid;
+    const problems = [];
+    if (!threeCells) problems.push('the strip does not have three cells');
+    if (!mineShown) problems.push('"mine to choose" is not the pool\'s figure');
+    if (!wallSaysLeft) problems.push('the loan wall does not say what is left');
+    if (!payZero) problems.push('a month already paid still asks for a payment');
+    return problems.length ? problems : true;
   });
 
   /* The wallet tiles must read the ACCESSORS, not the legacy `wallet.savings`
@@ -17226,14 +17262,14 @@ function findChromium() {
     delete pd.holdings;
     pd.wallet = { cash: 42.20, savings: 180, gics: [], holdings: {}, lastMeetingWeek: null };
 
-    const html = mnyWalletCard(kid).replace(/\s+/g, ' ');
+    const html = mnyEverythingCard(kid).replace(/\s+/g, ' ');
     const legacyZeroed = money2(getProfData(kid).wallet.savings) === 0;
     const migrated = mnySavedTotal(kid) === 180;
-    // The kept-ready tile, and only it, must carry the real figure.
-    const tile = /Kept ready.*?mny-tile-val">([^<]+)</.exec(html);
+    // The Savings tile, and only it, must carry the real figure.
+    const tile = /data-mny-tile="ready".*?mv2-tile-val">([^<]+)</.exec(html);
     const shows = !!tile && tile[1].trim() === '$180.00';
     const problems = [];
-    if (!shows) problems.push('the kept-ready tile reads ' + (tile ? tile[1].trim() : 'nothing'));
+    if (!shows) problems.push('the Savings tile reads ' + (tile ? tile[1].trim() : 'nothing'));
     if (!legacyZeroed) problems.push('the legacy wallet.savings field was not zeroed');
     if (!migrated) problems.push('mnySavedTotal reads ' + mnySavedTotal(kid) + ', not 180');
     return problems.length ? problems : true;
@@ -21382,77 +21418,6 @@ function findChromium() {
     return bad.length ? bad : true;
   });
 
-  /* 🔓 A MOMENT WHEN A POT OPENS — on her own My money, remembered per device.
-     seen=0, stage rises to 2 → one card naming both new pots and each new
-     idea's what / why / what-to-watch from MNY_CONCEPTS; "Got it" → gone;
-     drawn again (a fresh read of localStorage) → still gone; a first-ever
-     load at stage 2 → no card; a grown-up viewing her page → no card and
-     nothing recorded; storage that throws → the page still draws. */
-  if (want('aPotOpeningIsAMoment')) checks.aPotOpeningIsAMoment = await page.evaluate(() => {
-    const bad = [];
-    const snap = JSON.stringify(state);
-    const put = () => { const s = JSON.parse(snap); Object.keys(state).forEach(k => { delete state[k]; }); Object.assign(state, s); };
-    const KEY = MNY_STAGE_SEEN_LS_PREFIX + 'jenn';
-    const lsBefore = localStorage.getItem(KEY);
-    const was = { profile, mnyKid, getItem: Storage.prototype.getItem };
-    const card = () => document.querySelector('#mnyPage1Wrap [data-mny-action="stage-seen"]');
-    const cardText = () => { const b = card(); return b ? b.closest('.mny-card').textContent : ''; };
-    const setDebt = (paid) => { const p = getProfData('jenn'); delete p.debts; const d = mnyDebts('jenn')[0]; d.principal = 1000; d.paid = paid; };
-    try {
-      const r = mrRules();
-      r.school = Object.assign({}, r.school, { unlockStage: { jenn: 0, jess: 0 } });
-      profile = 'jenn';
-      setDebt(0);
-      localStorage.setItem(KEY, '0');
-      setDebt(300);                                                      // 30% → stage 2 (locked)
-      if (mnyStageIndex('jenn') !== 2) bad.push('the fixture is not at stage 2: ' + mnyStageIndex('jenn'));
-      mnyOpenMyMoney('jenn');
-      if (!card()) bad.push('no card when her stage rose from 0 to 2');
-      const t = cardText();
-      ['Keep it ready', 'Lock it away for a year'].forEach(p => { if (t.indexOf(p) < 0) bad.push('the card does not name ' + p); });
-      if (/Buy a bit of a company/.test(t)) bad.push('the card names a pot that is still shut');
-      ['ready', 'save', 'gic'].forEach(id => {
-        const c = mnyConceptCard(id, 'jenn');
-        [c.what, c.why, c.risk].forEach(line => { if (t.indexOf(line) < 0) bad.push(`the card leaves out ${id}: "${line.slice(0, 40)}"`); });
-      });
-      if (card()) card().click();
-      if (card()) bad.push('"Got it" did not close the card');
-      if (localStorage.getItem(KEY) !== '2') bad.push('"Got it" did not record stage 2: ' + localStorage.getItem(KEY));
-      mnyRenderMyMoney();
-      if (card()) bad.push('the card came back on the next drawing');
-      // First sight at stage 2: silent.
-      localStorage.removeItem(KEY);
-      mnyRenderMyMoney();
-      if (card()) bad.push('a first-ever load announced a pot opened long ago');
-      if (localStorage.getItem(KEY) !== '2') bad.push('the first sight did not record the current stage');
-      // A grown-up looking at her page: no card, nothing recorded.
-      localStorage.setItem(KEY, '0');
-      profile = 'parent'; mnyKid = 'jenn';
-      mnyOpenMyMoney('jenn');
-      if (card()) bad.push('a grown-up viewing her page was shown her card');
-      if (localStorage.getItem(KEY) !== '0') bad.push('a grown-up viewing her page changed what she has seen');
-      // Storage that throws for this key: the page still draws, with no card.
-      // (Scoped to the key this card owns; other toggles on the page read
-      // storage their own way.)
-      profile = 'jenn';
-      Storage.prototype.getItem = function (k) {
-        if (String(k).indexOf(MNY_STAGE_SEEN_LS_PREFIX) === 0) throw new Error('blocked');
-        return was.getItem.call(this, k);
-      };
-      try { mnyRenderMyMoney(); } catch (e) { bad.push('My money threw when storage is blocked: ' + e.message); }
-      Storage.prototype.getItem = was.getItem;
-      if (!document.getElementById('mnyPage1Wrap').textContent.trim()) bad.push('My money drew nothing with storage blocked');
-    } catch (e) {
-      bad.push('threw: ' + e.message);
-    } finally {
-      Storage.prototype.getItem = was.getItem;
-      if (lsBefore == null) localStorage.removeItem(KEY); else localStorage.setItem(KEY, lsBefore);
-      put();
-      profile = was.profile; mnyKid = was.mnyKid;
-      saveLocal();
-    }
-    return bad.length ? bad : true;
-  });
 
   /* ── Plan v8 B8–B10 — the meeting's Undo, older weeks' unpaid meets, and a
      $3 week's record ── begin
@@ -23067,7 +23032,13 @@ function findChromium() {
       if (mnyTakeFromSaved(kid, 50) !== 12 || mnyHoldingValue(mnyGoalHolding(kid)) !== 8) bad.push('goal jar: taking from Savings reached into the jar');
       moneyAddCash(kid, 5, { kind: 'gift', from: 'gift', note: 'fixture' });
       const gapJar = money2(walletCash() - streamCash());
+      /* Plan v5 Deviation 31: a jar waits for Savings. Shut, the deposit is
+         refused; opened (here by the per-kid "open early" override), it lands. */
+      const rS = mrRules(), hadSchool = rS.school;
+      if (!mnyIsOpen(kid, 'ready') && moneyDepositGoal(kid, 5) !== false) bad.push('goal jar: a deposit went in while Savings was shut');
+      rS.school = Object.assign({}, rS.school, { unlockStage: Object.assign({}, (rS.school || {}).unlockStage, { [kid]: 1 }) });
       moneyDepositGoal(kid, 5);
+      rS.school = hadSchool;
       if (mnyHoldingValue(mnyGoalHolding(kid)) !== 13 || mnyGoalById(kid, 'g-1').saved !== 13) bad.push('goal jar: a deposit did not land in the jar and its goal');
       if (money2(walletCash() - streamCash()) !== gapJar) bad.push('goal jar: the wallet and the stream moved apart');
       if (evShadowDrift(kid).some(f => /^ready/.test(f)) && !evShadowDrift(kid).length) bad.push('goal jar: drift');
@@ -23790,6 +23761,416 @@ function findChromium() {
     await guTeardown();
   }
 
+  /* ── SUNDAY v15 STAGE 3 — MY MONEY v2 (js/22-money-page1.js) ──────── */
+
+  /* Plan v5 Deviation 32: an unfinished day — today before its routine is
+     done, or any day still ahead — is never the forgiving day. Mid-week the
+     live run counts only the days that have happened; a day that already
+     passed unkept is forgiven as before; a week already over is unchanged. */
+  if (want('anUnfinishedDayIsNeverForgiven')) {
+    await guSetup();
+    checks.anUnfinishedDayIsNeverForgiven = await page.evaluate(() => {
+      const bad = [];
+      const kid = 'jenn', wk = getDayKeys(0)[0];
+      const setWeek = (week, pattern) => {
+        getProfData(kid).chore.mandatoryByWeek[week] = {};
+        pattern.forEach((kept, d) => {
+          mrRoutineSessionsFor(week, kid, d).forEach(s => ctSetMandatory(week, d, s, kid, kept));
+        });
+      };
+      const unpin = pinClockToWeekday(2);            // Wednesday
+      try {
+        if (!(getProfData(kid).chore.mandatoryByWeek)) getProfData(kid).chore.mandatoryByWeek = {};
+        // Mon and Tue kept; Wednesday (today) not done yet; the rest ahead.
+        setWeek(wk, [true, true, false, false, false, false, false]);
+        const mid = mrStreakWeek(wk, kid);
+        if (mid.days !== 2) bad.push('Mon + Tue kept, Wednesday unfinished reads ' + mid.days + ' days, not 2 — an unfinished day was forgiven');
+        // Today done: three.
+        setWeek(wk, [true, true, true, false, false, false, false]);
+        if (mrStreakWeek(wk, kid).days !== 3) bad.push('Mon–Wed kept reads ' + mrStreakWeek(wk, kid).days + ', not 3');
+        // A day that already passed unkept IS forgiven: Mon, (Tue missed), Wed = 3.
+        setWeek(wk, [true, false, true, false, false, false, false]);
+        if (mrStreakWeek(wk, kid).days !== 3) bad.push('Mon kept, Tue missed, Wed kept reads ' + mrStreakWeek(wk, kid).days + ', not 3 — a past miss should be forgiven');
+        // Last week is over: the same pattern there still forgives one miss.
+        const lastD = formatDayKey(wk); lastD.setDate(lastD.getDate() - 7);
+        const last = ctDateToKey(lastD);
+        if (!getProfData(kid).chore.mandatoryByWeek) getProfData(kid).chore.mandatoryByWeek = {};
+        setWeek(last, [true, true, true, false, true, true, true]);
+        if (mrStreakWeek(last, kid).days !== 7) bad.push('a finished week with one miss reads ' + mrStreakWeek(last, kid).days + ', not 7');
+      } catch (e) { bad.push('threw: ' + e.message); }
+      finally { unpin(); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+
+  /* 📒 The passbook: the last four Sundays from the frozen ledger, newest
+     first, a = Total row that adds them, "showing the latest 4" when there
+     are more, a flat week with no income bar, and "all my Sundays ▸" opening
+     the money story. */
+  if (want('passbookShowsTheLastFourSundays')) {
+    await guSetup(); await page.evaluate(MV2_SEED_SRC);
+    checks.passbookShowsTheLastFourSundays = await page.evaluate(() => {
+      const bad = [];
+      try {
+        const kid = 'jenn';
+        const seeded = mv2Seed(kid);
+        if (seeded) bad.push(seeded);
+        const keys = mnyLedgerRows(kid).map(r => r.weekKey);
+        if (keys.length < 5) bad.push('precondition: fewer than 5 ledger rows: ' + keys.length);
+        // A flat (Grandma rule) week: earned only, no income bar.
+        state.shared.chore.moneyLedger[keys[2]][kid].defaulted = true;
+        mnyOpenMyMoney(kid);
+        const rows = [...document.querySelectorAll('#mnyPage1Wrap .mv2-bookrow')];
+        if (rows.length !== 4) bad.push('the passbook shows ' + rows.length + ' rows, not 4');
+        const shown = rows.map(r => r.getAttribute('data-mny-week'));
+        if (JSON.stringify(shown) !== JSON.stringify(keys.slice(0, 4))) bad.push('not the newest four, newest first: ' + JSON.stringify(shown));
+        if (rows[0] && !rows[0].classList.contains('latest')) bad.push('the newest Sunday is not marked');
+        if (rows[0] && rows[0].querySelector('.mv2-bookdate').textContent.trim() !== mnyDayMonth(sdSundayOf(keys[0]))) bad.push('a row is not named by its Sunday: ' + rows[0].querySelector('.mv2-bookdate').textContent);
+        if (rows[2] && rows[2].querySelector('.mv2-bookbar--in')) bad.push('a flat week draws an income bar');
+        if (rows[1] && !rows[1].querySelector('.mv2-bookbar--in')) bad.push('a split week draws no income bar');
+        const data = mnyPassbookData(kid);
+        const sumIn = money2(data.last4.reduce((a, r) => a + r.inAmt, 0));
+        const total = document.querySelector('#mnyPage1Wrap .mv2-booktotal .mv2-bookin');
+        if (!total || total.textContent.trim() !== mnyBook$(sumIn)) bad.push('= Total is not the four rows added: ' + (total && total.textContent));
+        const foot = (document.querySelector('#mnyPage1Wrap .mv2-bookline') || {}).textContent || '';
+        if (!/5 Sundays signed · showing the latest 4/.test(foot)) bad.push('the foot does not say 5 signed, showing 4: ' + foot);
+        const note = (document.querySelector('#mnyPage1Wrap .mv2-booknote') || {}).textContent || '';
+        if (!/a week/.test(note) || !/steady/.test(note) || !/to the wall/.test(note)) bad.push('the note lacks the average, the steady share or the shares: ' + note);
+        const key = (document.querySelector('#mnyPage1Wrap .mv2-bookkey') || {}).textContent || '';
+        if (!/earned/.test(key) || !/given/.test(key) || !/made/.test(key) || !document.querySelector('#mnyPage1Wrap .mv2-bookkey .mv2-sw--wall')) bad.push('the key line is not the income groups and the swatches: ' + key);
+        const all = document.querySelector('#mnyPage1Wrap .mv2-book [data-mny-action="story"]');
+        if (!all) bad.push('no "all my Sundays ▸"');
+        else { all.click(); if (!document.getElementById('screen-moneystory').classList.contains('active')) bad.push('"all my Sundays ▸" did not open the money story'); }
+      } catch (e) { bad.push('threw: ' + e.message); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+  /* The shares of what she placed add to exactly 100 (largest remainder), and
+     a share that rounds to nothing but is not nothing says "<1%". */
+  if (want('passbookSharesSumToOneHundred')) {
+    await guSetup(); await page.evaluate(MV2_SEED_SRC);
+    checks.passbookSharesSumToOneHundred = await page.evaluate(() => {
+      const bad = [];
+      try {
+        const kid = 'jenn';
+        mv2Seed(kid);
+        const c = state.shared.chore;
+        const keys = mnyLedgerRows(kid).map(r => r.weekKey);
+        // Thirds that do not divide evenly, then a sliver of cash.
+        [[10, 10, 10], [10, 10, 10], [10, 10, 10], [10, 10, 10]].forEach((v, i) => {
+          Object.assign(c.moneyLedger[keys[i]][kid], { loan: { paid: v[0] }, debtExtra: 0, ready: v[1], gic: 0, stock: 0, spend: v[2] });
+        });
+        let d = mnyPassbookData(kid);
+        if (d.shares.reduce((a, b) => a + b, 0) !== 100) bad.push('thirds add to ' + d.shares.reduce((a, b) => a + b, 0));
+        Object.assign(c.moneyLedger[keys[0]][kid], { loan: { paid: 999 }, ready: 300, spend: 0.5 });
+        [1, 2, 3].forEach(i => Object.assign(c.moneyLedger[keys[i]][kid], { loan: { paid: 0 }, ready: 0, spend: 0 }));
+        d = mnyPassbookData(kid);
+        if (d.shares.reduce((a, b) => a + b, 0) !== 100) bad.push('a sliver of cash makes ' + d.shares.reduce((a, b) => a + b, 0));
+        mnyOpenMyMoney(kid);
+        const note = (document.querySelector('#mnyPage1Wrap .mv2-booknote') || {}).textContent || '';
+        if (!/<1% cash/.test(note)) bad.push('a cash share that is not nothing does not say "<1%": ' + note);
+        const pcts = [...note.matchAll(/(?<![<\d])(\d+)% (?:to the wall|saved|cash)/g)].map(m => Number(m[1]));
+        if (pcts.reduce((a, b) => a + b, 0) !== 100) bad.push('the note\'s shares add to ' + pcts.reduce((a, b) => a + b, 0) + ': ' + note);
+      } catch (e) { bad.push('threw: ' + e.message); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+  /* 🧱 The wall is the debts: 100 bricks filled by what is paid, the amount
+     left, a row per debt oldest first, the gate flags where the rules put
+     them, and late costs in red only when there are any. */
+  if (want('loanWallMatchesTheDebts')) {
+    await guSetup(); await page.evaluate(MV2_SEED_SRC);
+    checks.loanWallMatchesTheDebts = await page.evaluate(() => {
+      const bad = [];
+      try {
+        const kid = 'jenn';
+        mv2Seed(kid);
+        const f = mnyLoanFacts(kid);
+        const W = () => document.querySelector('#mnyPage1Wrap .mv2-wall');
+        const left = money2(mnyDebts(kid).reduce((a, d) => a + loanBalance(kid, d.id), 0));
+        if (f.left !== left) bad.push(`facts say ${f.left} left, the debts ${left}`);
+        if (W().querySelectorAll('.mv2-brick').length !== 100) bad.push('not 100 bricks: ' + W().querySelectorAll('.mv2-brick').length);
+        const full = W().querySelectorAll('.mv2-brick.full').length;
+        const want = Math.floor(mnyTotalPaid(kid) / mnyTotalPrincipal(kid) * 100);
+        if (full !== want) bad.push(`${full} full bricks, ${want} paid`);
+        if (!W().querySelector('.mv2-left').textContent.includes(mnyMoney(left))) bad.push('the wall does not say ' + mnyMoney(left) + ' left');
+        const names = [...W().querySelectorAll('.mv2-loanrow-name')].map(e => e.textContent.trim());
+        if (JSON.stringify(names) !== JSON.stringify(['⛸️ Skates & boots', '🏆 Fall season entries'])) bad.push('rows are not one per debt, oldest first: ' + JSON.stringify(names));
+        const flags = [...W().querySelectorAll('.mv2-flag')].map(e => e.style.left);
+        const gates = ['ready', 'locked', 'stock'].map(id => mnyStagePct(id) + '%');
+        if (JSON.stringify(flags) !== JSON.stringify(gates)) bad.push('flags at ' + JSON.stringify(flags) + ', gates at ' + JSON.stringify(gates));
+        if (!W().querySelector('.mv2-flag.open') || W().querySelectorAll('.mv2-flag.open').length !== ['ready', 'locked', 'stock'].filter(id => mnyIsOpen(kid, id)).length) bad.push('the open flags are not the open places');
+        if (!/Paid off by/.test(W().textContent) || !/Each month/.test(W().textContent) || !/Early bonus earned/.test(W().textContent)) bad.push('the key facts are missing');
+        // $0.92 charged and no interest line on the stream: a late cost, in red.
+        if (f.lateCosts !== 0.92 || !W().querySelector('div.mv2-late')) bad.push('a late cost of $0.92 is not shown in red: ' + f.lateCosts);
+        if (!/interest added last time/.test(W().textContent)) bad.push('the interest line is missing');
+        // The same $0.92 as balance interest (its stream line): no late cost.
+        const d1 = mnyDebts(kid).find(d => d.name === 'Fall season entries');
+        evAdd(kid, { kind: 'interest', from: 'interest', to: 'loan:' + d1.id, amount: 0.92, ref: d1.id, note: 'test' });
+        mnyRenderMyMoney();
+        if (mnyLoanFacts(kid).lateCosts !== 0 || W().querySelector('div.mv2-late')) bad.push('balance interest was counted as a late cost');
+        if (mnyLoanFacts(kid).interestAdded !== 0.92) bad.push('the cost of borrowing is not the interest added');
+      } catch (e) { bad.push('threw: ' + e.message); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+  /* Everything I have is what she holds: the total, the four places under the
+     handoff's names, the goal jars named under them, and a shut place saying
+     when it opens. */
+  if (want('everythingIHaveMatchesTheHoldings')) {
+    await guSetup(); await page.evaluate(MV2_SEED_SRC);
+    checks.everythingIHaveMatchesTheHoldings = await page.evaluate(() => {
+      const bad = [];
+      try {
+        const kid = 'jenn';
+        mv2Seed(kid);
+        const card = () => document.querySelector('#mnyPage1Wrap .mv2-have');
+        const val = (k) => (card().querySelector(`[data-mny-tile="${k}"] .mv2-tile-val`) || {}).textContent;
+        if (card().querySelector('.mv2-total').textContent.trim() !== mnyMoney(mnyEverything(kid))) bad.push('the total is not everything she has');
+        if (val('cash') !== mnyMoney(mnyCash(kid))) bad.push('Cash tile ' + val('cash'));
+        if (val('ready') !== mnyMoney(mnySavedTotal(kid))) bad.push('Savings tile ' + val('ready'));
+        if (val('gic') !== mnyMoney(mnyLockedTotal(kid))) bad.push('Locked away tile ' + val('gic'));
+        if (val('stock') !== mnyMoney(mnyInvestedTotal(kid))) bad.push('Companies tile ' + val('stock'));
+        const jars = money2(mnyReadyHomeTotal(kid) - mnySavedTotal(kid));
+        if (jars !== 8 || !card().textContent.includes(mnyMoney(8))) bad.push('the $8 in the goal jar is not named: ' + jars);
+        if (money2(mnyCash(kid) + mnySavedTotal(kid) + mnyLockedTotal(kid) + mnyInvestedTotal(kid) + jars) !== mnyEverything(kid)) bad.push('the tiles and the jars do not add to the total');
+        const t = card().textContent;
+        ['Cash', 'Savings', 'Locked away', 'Companies'].forEach(n => { if (!t.includes(n)) bad.push('no ' + n + ' tile'); });
+        if (/Kept ready|In companies/.test(document.getElementById('mnyPage1Wrap').textContent)) bad.push('an old name is on her page');
+        if (card().querySelectorAll('.mny-ask').length !== 4) bad.push('not a ? on every tile');
+        // 31% paid: Companies (40%) shut, saying when it opens.
+        const stock = card().querySelector('[data-mny-tile="stock"]');
+        if (!stock.classList.contains('shut') || !/🔒 opens at 40% paid/.test(stock.textContent)) bad.push('a shut Companies does not say when it opens: ' + stock.textContent.trim());
+        if (card().querySelector('[data-mny-tile="ready"]').classList.contains('shut')) bad.push('Savings reads shut at 31% paid');
+      } catch (e) { bad.push('threw: ' + e.message); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+  /* Goal jars wait for Savings (Plan v5 Deviation 31): below the Savings gate
+     no money goes into a jar through the owners, the jar says why, and above
+     it a deposit lands in the jar it names. Jars come nearest date first. */
+  if (want('goalJarsWaitForSavings')) {
+    await guSetup(); await page.evaluate(MV2_SEED_SRC);
+    checks.goalJarsWaitForSavings = await page.evaluate(() => {
+      const bad = [];
+      try {
+        const kid = 'jenn';
+        mv2Seed(kid);
+        const p = getProfData(kid);
+        const goals = mnyGoals(kid);
+        const dated = goals.find(g => g.targetDate), undated = goals.find(g => !g.targetDate);
+        const order = mnyGoalsNearestFirst(kid).map(g => g.id);
+        if (order[0] !== dated.id || order[1] !== undated.id) bad.push('a dated goal does not come first');
+        const names = [...document.querySelectorAll('#mnyPage1Wrap .mv2-jarname')].map(e => e.textContent);
+        if (names.length !== 2 || !/skate guards/.test(names[0])) bad.push('the jars are not drawn nearest date first: ' + JSON.stringify(names));
+        if (!/a week to make it by/.test(document.querySelector('#mnyPage1Wrap .mv2-goals').textContent)) bad.push('a dated jar does not say what a week makes it');
+        // Shut: nothing paid.
+        mnyDebts(kid).forEach(d => { d.paid = 0; });
+        if (mnyIsOpen(kid, 'ready')) bad.push('precondition: Savings still open at 0%');
+        const cash = mnyCash(kid), jar = mnyGoalJarValue(kid, dated);
+        if (moneyDepositGoal(kid, 3, { goalId: dated.id }) !== false) bad.push('moneyDepositGoal filled a jar while Savings is shut');
+        if (mnyAddToGoal(kid, 3, dated.id) !== false) bad.push('mnyAddToGoal filled a jar while Savings is shut');
+        if (mnyCash(kid) !== cash || mnyGoalJarValue(kid, dated) !== jar) bad.push('money moved while the jar was shut');
+        mnyRenderMyMoney();
+        const jarEls = [...document.querySelectorAll('#mnyPage1Wrap .mv2-jar')];
+        if (!jarEls.length || !jarEls.every(j => j.classList.contains('shut')) || !/Goal jars open with Savings, at 20% paid off/.test(document.querySelector('#mnyPage1Wrap .mv2-goals').textContent)) bad.push('a shut jar does not say it waits for Savings');
+        // Open: 25% paid; a deposit lands in the jar it names, not the newest.
+        mnyDebts(kid)[0].paid = 250;
+        if (!mnyIsOpen(kid, 'ready')) bad.push('precondition: Savings shut at 25%');
+        const before = mnyGoalJarValue(kid, undated);
+        if (!moneyDepositGoal(kid, 3, { goalId: undated.id })) bad.push('a deposit was refused with Savings open');
+        if (mnyGoalJarValue(kid, undated) !== money2(before + 3)) bad.push('the deposit did not land in the jar it named');
+        if (mnyGoalJarValue(kid, dated) !== jar) bad.push('the deposit reached another jar');
+        if (p.events.some(e => e && e.goalId)) bad.push('the jar choice leaked onto the stream');
+        // ✏️ New goal opens the goal sheet, which now asks when by.
+        profile = kid; mnyRenderMyMoney();
+        document.querySelector('#mnyPage1Wrap [data-mny-action="goal-new"]').click();
+        if (!document.getElementById('requestOverlay').classList.contains('open') || rqDraft.kind !== 'goal' || !document.querySelector('#requestBody [data-mny-action="rq-goaldate"]')) bad.push('✏️ New goal does not open the goal sheet with its date');
+        rqClose();
+      } catch (e) { bad.push('threw: ' + e.message); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+  /* The month's calendar and 📅 Coming up: a planned meet whose day has come
+     opens 🏆 Tell a result for it; this month's results, meets still to come
+     and the money Dad expects are listed under it. */
+  if (want('calendarShowsComingUp')) {
+    await guSetup(); await page.evaluate(MV2_SEED_SRC);
+    checks.calendarShowsComingUp = await page.evaluate(() => {
+      const bad = [];
+      try {
+        const kid = 'jenn';
+        mv2Seed(kid);
+        mnyCalMonth = null;
+        profile = 'parent';
+        const today = String(todayKey());
+        const next = formatDayKey(today); next.setDate(next.getDate() + 7);
+        const nextKey = ctDateToKey(next);
+        setDayBlocks(nextKey, [...(getDayBlocks(nextKey, kid) || []), { id: 'mv2-soon', actId: 'competition', tag: 'swimming', compName: 'Winter Splash', startMin: 9 * 60, durationMin: 180 }], kid);
+        const recDay = today.slice(0, 8) + '01';
+        mrAddCompetition(kid, { dayKey: recDay, sport: 'skate', name: 'Club trials', points: 6 });
+        profile = kid;
+        mnyOpenMyMoney(kid);
+        const cal = document.querySelector('#mnyPage1Wrap .mv2-cal');
+        const rec = cal.querySelector('.mv2-cal-cell.rec');
+        if (!rec || !/✓ \$/.test(rec.textContent)) bad.push('a recorded result is not marked ✓ $ on its day');
+        const coming = [...cal.querySelectorAll('.mv2-comingrow')].map(r => r.textContent.replace(/\s+/g, ' ').trim());
+        if (!coming.some(t => /Club trials/.test(t) && /✓ \$6/.test(t))) bad.push('this month\'s result is not in Coming up with what it paid: ' + JSON.stringify(coming));
+        if (!coming.some(t => /Winter Splash/.test(t))) bad.push('a meet still to come is not in Coming up: ' + JSON.stringify(coming));
+        if (!coming.some(t => /Christmas/.test(t) && /Dad expects ~\$20/.test(t))) bad.push('money Dad expects is not in Coming up: ' + JSON.stringify(coming));
+        const open = cal.querySelector('[data-mny-action="cal-meet"][data-mny-id="mv2-meet"]');
+        if (!open) bad.push('a planned meet whose day has come is not a button on the calendar');
+        else {
+          open.click();
+          if (!document.getElementById('requestOverlay').classList.contains('open') || rqDraft.kind !== 'result' || !rqDraft.pick || rqDraft.pick.blockId !== 'mv2-meet') bad.push('the planned meet did not open 🏆 Tell a result for itself');
+          rqClose();
+        }
+        // The month moves, and next month carries what Dad expects.
+        cal.querySelector('[data-mny-action="cal"][data-mny-dir="1"]').click();
+        if (!/Dad expects ~\$20/.test(document.querySelector('#mnyPage1Wrap .mv2-cal .mv2-expect') ? document.querySelector('#mnyPage1Wrap .mv2-cal .mv2-expect').textContent : '')) bad.push('next month does not show the money Dad expects');
+        mnyCalMonth = null;
+      } catch (e) { bad.push('threw: ' + e.message); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+  /* 🎁 "I was given something": her gift sheet sends a gift for Dad to say yes
+     to (a deposit proposal through mnyAddDeposit) — nothing reaches her cash
+     yet. A grown-up's same button opens the Record sheet. */
+  if (want('giftSheetSendsAGiftRequest')) {
+    await guSetup();
+    checks.giftSheetSendsAGiftRequest = await page.evaluate(() => {
+      const bad = [];
+      try {
+        const kid = 'jenn';
+        const press = (sel) => { const el = document.querySelector('#requestBody ' + sel); if (!el) { bad.push('no ' + sel); return; } el.click(); };
+        profile = kid;
+        mnyOpenMyMoney(kid);
+        const cash = mnyCash(kid);
+        document.querySelector('#mnyPage1Wrap [data-mny-action="gift-add"]').click();
+        if (!document.getElementById('requestOverlay').classList.contains('open') || !/I was given something/.test(document.getElementById('rqSheetTitle').textContent)) bad.push('the gift sheet did not open');
+        press('[data-mny-action="rq-giftset"][data-mny-id="20"]');
+        const g = document.querySelector('#requestBody [data-mny-action="rq-giver"]');
+        g.focus(); g.value = 'Grandma'; g.dispatchEvent(new Event('input', { bubbles: true }));
+        if (document.querySelector('#requestBody [data-mny-action="rq-giver"]') !== g) bad.push('typing the giver redrew the sheet');
+        press('[data-mny-action="rq-giftfrom"][data-mny-id="Grandma & Grandpa"]');
+        const yest = rqGiftDays()[1];
+        press(`[data-mny-action="rq-giftday"][data-mny-id="${yest}"]`);
+        if (!/\$20 · Grandma & Grandpa from Grandma/.test(document.querySelector('#requestBody .rq-preview').textContent)) bad.push('the preview does not say what she is sending: ' + document.querySelector('#requestBody .rq-preview').textContent);
+        press('[data-mny-action="rq-send"]');
+        const dep = mnyEnsureDeposits(kid).find(d => d.addedBy && d.giver === 'Grandma');
+        if (!dep || !dep.pendingApproval || dep.amount !== 20 || dep.from !== 'Grandma & Grandpa' || dep.dayKey !== yest) bad.push('the gift did not land as a proposal with its amount, kind, giver and day: ' + JSON.stringify(dep));
+        if (mnyCash(kid) !== cash) bad.push('her cash moved before Dad said yes');
+        const q = mnyRequestsFor(kid).find(x => x.id === (dep || {}).id);
+        if (!q || q.kind !== 'gift' || !q.open) bad.push('the gift is not an open question in the one reader');
+        if (document.getElementById('requestOverlay').classList.contains('open')) bad.push('sending did not close the sheet');
+        // A grown-up records it instead.
+        profile = 'parent'; mnyKid = kid; mnyOpenMyMoney(kid);
+        document.querySelector('#mnyPage1Wrap [data-mny-action="gift-add"]').click();
+        if (!document.getElementById('recordOverlay').classList.contains('open')) bad.push('a grown-up\'s gift button does not open the Record sheet');
+        if (typeof closeSheet === 'function') closeSheet('recordOverlay');
+      } catch (e) { bad.push('threw: ' + e.message); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+  /* 🧱 A move to the loan wall (Plan v5 Deviation 25): she asks from the Move
+     sheet; Dad's yes moves nothing; Sunday's helper pays it as extra, each $1
+     counting 1 + the bonus, once. Before Sunday the yes can be taken back. */
+  if (want('aMoveToTheWallWaitsForSunday')) {
+    await guSetup(); await page.evaluate(MV2_SEED_SRC);
+    checks.aMoveToTheWallWaitsForSunday = await page.evaluate(() => {
+      const bad = [];
+      try {
+        const kid = 'jenn';
+        mv2Seed(kid);
+        const press = (sel) => { const el = document.querySelector('#requestBody ' + sel); if (!el) { bad.push('no ' + sel); return; } el.click(); };
+        profile = kid;
+        mnyOpenRequestSheet('move', { kid });
+        press('[data-mny-action="rq-to"][data-mny-id="wall"]');
+        press('[data-mny-action="rq-amt"][data-mny-d="1"]'); press('[data-mny-action="rq-amt"][data-mny-d="1"]'); press('[data-mny-action="rq-amt"][data-mny-d="1"]');
+        press('[data-mny-action="rq-why"]');
+        if (!/\$4 counts as \$4\.40 off my wall/.test(document.querySelector('#requestBody .rq-preview').textContent)) bad.push('the wall preview is not the prototype\'s: ' + document.querySelector('#requestBody .rq-preview').textContent);
+        press('[data-mny-action="rq-send"]');
+        const r = mnyEnsureMoveRequests(kid).find(x => x.to === 'wall');
+        if (!r || r.amount !== 4 || r.from !== 'ready') { bad.push('the wall move did not land: ' + JSON.stringify(r)); return bad; }
+        profile = 'parent';
+        const saved = mnySavedTotal(kid), paid = mnyTotalPaid(kid);
+        if (!mnyAnswerRequest(kid, r.id, 'yes')) bad.push('Dad could not say yes');
+        if (mnySavedTotal(kid) !== saved || mnyTotalPaid(kid) !== paid) bad.push('the yes moved money before Sunday');
+        if (rqStatusText(mnyRequestsFor(kid).find(q => q.id === r.id)) !== '✓ on the wall on Sunday') bad.push('her answer does not say Sunday');
+        if (!mnyReopenRequest(kid, r.id) || r.approvedAt) bad.push('a yes Sunday has not used could not be taken back');
+        mnyAnswerRequest(kid, r.id, 'yes');
+        const out = mnyApplyApprovedWallMoves(kid, ctThisWeekKey());
+        if (out.paid !== 4 || mnySavedTotal(kid) !== money2(saved - 4)) bad.push('Sunday did not take $4 from Savings: ' + JSON.stringify(out));
+        if (money2(mnyTotalPaid(kid) - paid) !== 4.4) bad.push('$4 did not count as $4.40 on the wall: ' + money2(mnyTotalPaid(kid) - paid));
+        if (r.appliedWeek !== ctThisWeekKey()) bad.push('the move is not stamped with its Sunday');
+        const again = mnyApplyApprovedWallMoves(kid, ctThisWeekKey());
+        if (again.applied !== 0 || mnySavedTotal(kid) !== money2(saved - 4)) bad.push('Sunday paid the same move twice');
+        if (mnyReopenRequest(kid, r.id)) bad.push('a move already on the wall was reopened');
+        if (evShadowDrift(kid).length) bad.push('the stream drifted from the wallet: ' + evShadowDrift(kid).join('; '));
+      } catch (e) { bad.push('threw: ' + e.message); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
+  /* The '?' explainer (Plan v5 §L M10): What / Why / Watch and the Chinese
+     line from MNY_CONCEPTS, the rule numbers filled in; "📚 Take me to Money
+     school" opens it at that idea, and Money school's ◀ comes back to My money. */
+  if (want('explainerGoesToMoneySchoolAndBack')) {
+    await guSetup(); await page.evaluate(MV2_SEED_SRC);
+    checks.explainerGoesToMoneySchoolAndBack = await page.evaluate(() => {
+      const bad = [];
+      try {
+        const kid = 'jenn';
+        mv2Seed(kid);
+        profile = kid;
+        mnyOpenMyMoney(kid);
+        MNY_CONCEPTS.forEach(c => {
+          const x = mnyConceptCard(c.id, kid);
+          if (/[{}]/.test(x.title + x.what + x.why + x.risk)) bad.push(c.id + ' leaves a token unfilled');
+          if (!x.cn) bad.push(c.id + ' has no Chinese line');
+        });
+        document.querySelector('#mnyPage1Wrap [data-mny-tile="gic"] [data-mny-action="ask"]').click();
+        const card = document.getElementById('mnyConceptCard');
+        const c = mnyConceptCard('gic', kid);
+        if (!card) { bad.push('the ? on Locked away opened nothing'); return bad; }
+        const t = card.textContent;
+        ['What', 'Why', 'Watch', c.what, c.why, c.risk, c.cn].forEach(x => { if (!t.includes(x)) bad.push('the explainer leaves out: ' + x.slice(0, 40)); });
+        if (!/4 weeks/.test(c.title)) bad.push('the lock is not "4 weeks": ' + c.title);
+        if (!/1\.10/.test(mnyConceptCard('debt', kid).risk)) bad.push('the loan explainer does not say $1.10 from the rules');
+        card.querySelector('#mnyConceptMore').click();
+        if (document.getElementById('mnyConceptCard')) bad.push('the explainer stayed open');
+        if (!document.getElementById('screen-moneyschool').classList.contains('active') || mnySchoolConcept !== 'gic') bad.push('📚 did not open Money school at the idea');
+        if (!mnySchoolReturn || mnySchoolReturn.screen !== 'mymoney') bad.push('no way back was remembered');
+        if (JSON.stringify(state).includes('mnySchoolReturn')) bad.push('the way back went into state');
+        const back = document.querySelector('#mnySchoolWrap [data-mny-action="backschool"]');
+        if (!back) bad.push('Money school has no ◀');
+        else {
+          back.click();
+          if (!document.getElementById('screen-mymoney').classList.contains('active')) bad.push('◀ did not come back to My money');
+        }
+      } catch (e) { bad.push('threw: ' + e.message); }
+      return bad.length ? bad : true;
+    });
+    await guTeardown();
+  }
+
   /* YOU TRAVEL TO TRAINING, AND THE PLANNER SHOULD KNOW.
      Both placement sheets started every buffer off, so a swim was planned as
      though it happened at the kitchen table and tdActionableStart — the get-
@@ -24297,7 +24678,7 @@ function findChromium() {
       mnyPending = []; mnyPendingFrom = null; mnyPendingReason = MR_DEFAULT_REASON;
       mnyRuleSearch = ''; mnyHistoryOpen = false;
       flPeriod = 'month'; flMonth = null;
-      mnyGoalFormOpen = false; mnyStoryMode = 'week'; mnySchoolConcept = 'debt';
+      mnyStoryMode = 'week'; mnySchoolConcept = 'debt'; mnySchoolReturn = null;
       // The meeting's money drafts, as mnySetMeetKid('jenn') would leave them —
       // set here rather than by calling it, which would draw the meeting a
       // third time per click and put this sweep past its budget.

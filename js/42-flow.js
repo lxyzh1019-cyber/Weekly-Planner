@@ -18,7 +18,7 @@
    out, what was put away and what is left, in that order, in one sentence
    before any bar is drawn.
 
-   `mnyWalletCard` (js/22-money-page1.js) still leads with "Everything I have",
+   `mnyEverythingCard` (js/22-money-page1.js) still leads with "Everything I have",
    and that is correct and unchanged: it is the page where she checks a figure
    before deciding something. This is the page where she finds out how it got
    there. Two questions, two screens.

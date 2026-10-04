@@ -60,7 +60,7 @@ function mnyKidTabs() {
    to choose" arrives as a number with no arithmetic behind it.
 
    FOUR callers now, deliberately one component: the kid's money page
-   (js/22-money-page1.js, mnyIncomeCard), meeting step 3, meeting step 4, and
+   (js/22-money-page1.js, mnyThisWeekCard), meeting step 3, meeting step 4, and
    the parent portal (js/24-money-parent.js, mnyWeekResults). A second thing
    that draws these three numbers is a second thing that can drift, and drift
    is the bug this was pulled in to fix.
@@ -591,7 +591,7 @@ function mnyReturnsCard(kid) {
   if (!r.rows.length) {
     return `<div class="mny-card">
         <div class="mny-label">What my money earned</div>
-        <div class="mny-note">Nothing yet — this fills in once you have money kept ready, locked away, or in a company.</div>
+        <div class="mny-note">Nothing yet — this fills in once you have money in Savings, locked away, or in Companies.</div>
       </div>`;
   }
   return `<div class="mny-card">
@@ -764,7 +764,7 @@ function mnyPaymentImpact(wk, kid, pool) {
 const MNY_SHORTFALL = [
   { id: 'pay_available',      label: 'Pay what I have' },
   { id: 'pay_nothing',        label: 'Pay nothing this month' },
-  { id: 'cover_from_savings', label: 'Take it from what I kept ready' },
+  { id: 'cover_from_savings', label: 'Take it from my Savings' },
 ];
 let mnyShortfallChoice = 'pay_available';
 function mnyPickShortfall(id) { mnyShortfallChoice = id; renderMeetingMode(); }
@@ -837,9 +837,9 @@ function mnyBucketRows(kid, split) {
       rows.push(`<div class="mny-row"><span>${escapeHtml(g.icon + ' Toward ' + g.name)}</span><b>${mnyMoney(v)}</b></div>`);
     }
   });
-  [['spend', '🛍️ Spend it', 'spend'], ['ready', '💵 Keep it ready', 'ready'],
-   ['gic', '🔒 Lock it away for a year', 'gic'],
-   ['stock', '📈 Buy a bit of a company', 'stock']].forEach(([k, label, ask]) => {
+  [['spend', '🛍️ Spend it', 'spend'], ['ready', '🏦 Savings', 'ready'],
+   ['gic', '🔒 Locked away · 4 weeks', 'gic'],
+   ['stock', '📈 Companies', 'stock']].forEach(([k, label, ask]) => {
     rows.push(`<div class="mny-row"><span>${label} ${mnyAskBtn(ask)}</span><b>${mnyMoney(split[k])}</b></div>`);
   });
   return rows.join('');
