@@ -5932,6 +5932,7 @@
   .mny-chip[disabled] { background: var(--mny-surface-disabled); color: var(--ink-light); cursor: not-allowed; }
   .mny-ask {
     width: 22px; height: 22px; min-height: 22px; flex: 0 0 auto; padding: 0; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;   /* the "?" centred in its circle (M2-5) */
     border: 2px solid var(--ink); border-radius: 50%; background: var(--paper);
     color: var(--ink); font: inherit; font-size: calc(0.72rem * var(--fs-scale, 1) * var(--text-scale, 1)); font-weight: 800; cursor: pointer;
   }
@@ -6983,6 +6984,9 @@
   #screen-mymoney .mny-step {
     position: relative;
   }
+  /* Its 44px reach must sit above the next row (Everything I have's places
+     are one-line rows now, closer than 44px apart). */
+  #screen-mymoney .mny-ask { z-index: 1; }
   #screen-mymoney .mny-ask::after,
   #screen-mymoney .mny-step::after {
     content: '';
@@ -8080,9 +8084,11 @@
 .gu-grid { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 14px; align-items: start; }
 .gu-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .gu-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.gu-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+/* Title and its line on one line, as drawn (owner's review G2-4, M8-2). */
+.gu-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: nowrap; min-width: 0; }
+.gu-head .gu-title { white-space: nowrap; flex: none; }
 .gu-title { margin: 0; font-family: var(--font-head); font-weight: var(--head-weight); font-size: calc(1.75rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
-.gu-strap { font-family: var(--font-script); font-size: calc(1.375rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--mny-v15-sub); }
+.gu-strap { font-family: var(--font-script); font-size: calc(1.25rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--mny-v15-sub); min-width: 0; line-height: 1.15; }
 .gu-cards2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
 .gu-card {
   background: var(--mny-v15-paper); border: 2.5px solid var(--mny-v15-ink); border-radius: 14px;
@@ -8110,7 +8116,8 @@
 .gu-x { font-size: calc(0.9375rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
 .gu-num { min-width: 42px; text-align: center; font-family: var(--font-round); font-variant-numeric: var(--num-variant); }
 .gu-pair { display: flex; align-items: center; gap: 3px; }
-.gu-ellip { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Was an ellipsis; a name on the money screens is never cut with "…" (owner's review, Plan v6 §M) — it wraps. */
+.gu-ellip { min-width: 0; overflow-wrap: anywhere; }
 .gu-empty { border: 2.5px dashed var(--mny-v15-ink); border-radius: 14px; padding: 24px; text-align: center; color: var(--mny-v15-sub); }
 .gu-plain { font-size: calc(0.9375rem * var(--fs-scale, 1) * var(--text-scale, 1)); line-height: 1.3; color: var(--mny-v15-muted); box-shadow: none; }
 .gu-stack { gap: 6px; }
@@ -8283,6 +8290,7 @@ button.gu-loanrow {
 .gu-sheet .gu { display: flex; flex-direction: column; gap: 10px; }
 @media (max-width: 767px) {
   .gu-grid, .gu-cards2 { grid-template-columns: minmax(0, 1fr); }
+  .gu-head { flex-wrap: wrap; }
   .gu-tabs { justify-content: flex-start; }
   .gu-formrow { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .gu-exrow { grid-template-columns: minmax(0, 1fr) 44px; }
@@ -8300,6 +8308,14 @@ button.gu-loanrow {
 .rq-sheet[data-rq-kind="result"] { width: min(960px, calc(100% - 32px)); }
 .rq-sheet[data-rq-kind="list"] { width: min(620px, calc(100% - 32px)); }
 .rq-sheet h3 { margin: 0 0 12px; font-family: var(--font-head); font-size: calc(1.875rem * var(--text-scale, 1)); }
+/* The result sheet's line beside its title (M8-2). */
+.rq-titlesub { margin-left: 8px; font-family: var(--font-body); font-weight: 400; font-size: calc(1rem * var(--text-scale, 1)); color: var(--mny-v15-muted); }
+/* Skating result rows as drawn: the question at the left, its choices beside it. */
+.rq-side { display: flex; flex-direction: column; gap: 10px; }
+.rq-side .rq-row { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 10px; align-items: center; }
+/* "It's not on my planner" checks the list first. */
+.rq-check { display: flex; flex-direction: column; gap: 6px; border: 2px dashed var(--mny-v15-dash); border-radius: 12px; padding: 8px 10px; }
+.rq-check-row { font-size: calc(0.9375rem * var(--text-scale, 1)); }
 #requestBody { display: flex; flex-direction: column; gap: 12px; }
 .rq-lead { margin: 0; font-size: calc(1rem * var(--text-scale, 1)); color: var(--mny-v15-muted); }
 .rq-result { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 14px 22px; align-items: start; }
@@ -8412,6 +8428,19 @@ button.gu-loanrow {
   --mny-v15-peach: #fff0e6;
   --mny-v15-violet: #5f4fae;
 }
+/* ── Deviation 35 (Plan v6 Rev 5): the prototype's text size on the money
+   screens at iPad width ──
+   Pop's --text-scale (1.1) is the house rule everywhere else; on My money
+   (.mv2), the Sunday money step (.sd), Grown-ups (.gu) and the sheets they
+   open (request, Dad's card, the Grown-ups fix sheets) the owner wants the
+   prototype's own sizes, so labels are not cut or wrapped. A SCOPED value of
+   the same token, not a second token: every size there still multiplies
+   --text-scale (check-look-tokens), Calm is already 1, the phone keeps the
+   house rule, and the 13px floor (kid/parent house-rules sweeps) still
+   measures the result. */
+@media (min-width: 768px) {
+  .mv2, .sd, .gu, #requestOverlay, #sundayOverlay, #grownupsOverlay { --text-scale: 1; }
+}
 .mv2 {
   display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 14px; align-items: start;
   font-family: var(--font-body); color: var(--mny-v15-ink); font-size: calc(1.125rem * var(--text-scale, 1));
@@ -8472,7 +8501,7 @@ button.gu-loanrow {
   border: 2px solid var(--mny-v15-ink); border-radius: 11px; background: var(--mny-v15-paper); padding: 2px 12px;
   font-size: calc(0.9375rem * var(--text-scale, 1)); line-height: 1.1;
 }
-.mv2-chip-text { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mv2-chip-text { min-width: 0; overflow-wrap: anywhere; line-height: 1.2; }   /* wraps, never "…" (Plan v6 §M) */
 .mv2-chip b { font-family: var(--font-round); font-size: calc(0.875rem * var(--text-scale, 1)); white-space: nowrap; color: var(--mny-v15-muted); }
 .mv2-chip--open { border-style: dashed; }
 .mv2-chip--open b { color: var(--mny-v15-red); }
@@ -8490,21 +8519,14 @@ button.gu-loanrow {
 .mv2-brick { position: relative; height: 12px; border: 1.5px dashed var(--mny-v15-ink); border-radius: 4px; background: var(--mny-v15-paper); overflow: hidden; }
 .mv2-brick.full { border-style: solid; }
 .mv2-brick i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--mny-v15-bar); }
-.mv2-flags { position: relative; height: 24px; flex: none; }
-.mv2-flag {
-  position: absolute; top: 0; transform: translateX(-50%); font-size: calc(1rem * var(--text-scale, 1)); line-height: 20px; white-space: nowrap;
-  border: 1.5px solid var(--mny-v15-ink); border-radius: 6px; padding: 0 3px; background: var(--mny-v15-paper);
-}
-.mv2-flag.open { background: var(--mny-v15-green); }
 .mv2-loanrows { display: flex; flex-direction: column; gap: 4px; }
 .mv2-loanrow { display: grid; grid-template-columns: minmax(0, 1fr) 110px 74px; gap: 8px; align-items: center; font-size: calc(0.9375rem * var(--text-scale, 1)); }
-.mv2-loanrow-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mv2-loanrow-name { min-width: 0; overflow-wrap: anywhere; line-height: 1.15; }   /* wraps, never "…" (M2-6) */
 .mv2-loanrow b { font-family: var(--font-round); text-align: right; white-space: nowrap; font-variant-numeric: var(--num-variant); }
 .mv2-bar { height: 12px; border: 2px solid var(--mny-v15-ink); border-radius: 6px; background: var(--mny-v15-paper); overflow: hidden; display: block; }
 .mv2-bar i { display: block; height: 100%; background: var(--mny-v15-bar); }
 .mv2-int { font-size: calc(0.9375rem * var(--text-scale, 1)); color: var(--mny-v15-red); }
 .mv2-late { color: var(--mny-v15-red); }
-div.mv2-late { font-size: calc(0.9375rem * var(--text-scale, 1)); font-weight: 700; }
 .mv2-keyfacts { border-top: 2px dashed var(--mny-v15-dash-soft); padding-top: 6px; display: flex; flex-direction: column; gap: 4px; }
 .mv2-bigfact { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: calc(1rem * var(--text-scale, 1)); color: var(--mny-v15-muted); }
 .mv2-bigfact b { font-family: var(--font-round); font-size: calc(1.5rem * var(--text-scale, 1)); color: var(--mny-v15-ink); }
@@ -8515,13 +8537,16 @@ div.mv2-late { font-size: calc(0.9375rem * var(--text-scale, 1)); font-weight: 7
 /* Everything I have */
 .mv2-have { background: var(--mny-v15-jess); }
 .mv2-total { font-family: var(--font-round); font-weight: 800; font-size: calc(2rem * var(--text-scale, 1)); color: var(--mny-v15-red); font-variant-numeric: var(--num-variant); line-height: 1.1; }
-.mv2-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.mv2-tile { background: var(--mny-v15-paper); border: 2px solid var(--mny-v15-ink); border-radius: 10px; padding: 4px 10px; line-height: 1.2; min-width: 0; }
+/* One row per place, as the prototype's "What I own" (owner's review M3-3):
+   icon and short name, its ?, the amount at the right; the hint under it. */
+.mv2-tiles { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.mv2-tile { background: var(--mny-v15-paper); border: 2px solid var(--mny-v15-ink); border-radius: 10px; padding: 4px 10px; line-height: 1.2; min-width: 0; min-height: 40px; box-sizing: border-box; }   /* its ? stays 44px from the next row's */
 .mv2-tile.shut { border-style: dashed; }
 .mv2-tile-top { display: flex; align-items: center; gap: 4px; font-size: calc(1rem * var(--text-scale, 1)); }
-.mv2-tile-top .mny-ask { margin-left: auto; }
+.mv2-tile-top .mv2-tile-val { margin-left: auto; }
+.mv2-tile-name { white-space: nowrap; }
 .mv2-tile-val { font-family: var(--font-round); font-weight: 800; font-size: calc(1.125rem * var(--text-scale, 1)); font-variant-numeric: var(--num-variant); }
-.mv2-tile-gate { font-size: calc(0.875rem * var(--text-scale, 1)); color: var(--mny-v15-teal-ink); }
+.mv2-tile-gate { font-size: calc(0.8125rem * var(--text-scale, 1)); color: var(--mny-v15-teal-ink); line-height: 1.25; }
 
 /* 🎯 Goal jars */
 .mv2-goals { background: var(--mny-v15-jenn); }
@@ -8536,7 +8561,7 @@ div.mv2-late { font-size: calc(0.9375rem * var(--text-scale, 1)); font-weight: 7
 .mv2-jarpic i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--mny-v15-cash); }
 .mv2-jar.shut .mv2-jarpic { border-style: dashed; }
 .mv2-jarbody { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.mv2-jarname { font-family: var(--font-head); font-size: calc(1.375rem * var(--text-scale, 1)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mv2-jarname { font-family: var(--font-head); font-size: calc(1.375rem * var(--text-scale, 1)); overflow-wrap: anywhere; line-height: 1.15; }
 .mv2-jarfig { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
 .mv2-jarfig b { font-family: var(--font-round); font-size: calc(1.5rem * var(--text-scale, 1)); color: var(--mny-v15-red); font-variant-numeric: var(--num-variant); }
 .mv2-jarfig span { font-size: calc(1rem * var(--text-scale, 1)); color: var(--mny-v15-muted); }
@@ -8598,6 +8623,13 @@ b.mv2-bookin { color: var(--mny-v15-teal-ink); }
 .mv2-booktotal { padding: 3px 0; border-top: 2px solid var(--mny-v15-ink); margin-top: 2px; }
 .mv2-booktotal > b:first-child { grid-row: 1 / 3; text-align: left; font-family: var(--font-body); font-size: calc(0.875rem * var(--text-scale, 1)); white-space: nowrap; }
 .mv2-booknote { font-size: calc(0.875rem * var(--text-scale, 1)); color: var(--mny-v15-teal-ink); line-height: 1.25; }
+/* The "all my Sundays" icon: 30px to look at, 44px to reach (::after). */
+.mv2-bookall {
+  margin-left: auto; position: relative; width: 30px; height: 30px; min-height: 30px; padding: 0;
+  border: 2px solid var(--mny-v15-ink); border-radius: 9px; background: var(--mny-v15-paper);
+  font-size: calc(1rem * var(--text-scale, 1)); line-height: 1; cursor: pointer;
+}
+.mv2-bookall::after { content: ''; position: absolute; top: 50%; left: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); }
 .mv2-bookfoot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .mv2-bookline { font-family: var(--font-script); font-size: calc(1.3125rem * var(--text-scale, 1)); color: var(--mny-v15-red); }
 
@@ -8622,7 +8654,7 @@ b.mv2-bookin { color: var(--mny-v15-teal-ink); }
 .mv2-cal-icon { font-size: calc(1rem * var(--text-scale, 1)); }
 .mv2-coming { background: var(--mny-v15-amber); border: 2px solid var(--mny-v15-ink); border-radius: 12px; padding: 6px 12px; display: flex; flex-direction: column; gap: 3px; }
 .mv2-comingrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; font-size: calc(0.9375rem * var(--text-scale, 1)); border-top: 1px dashed var(--mny-v15-dash-soft); padding: 2px 0; }
-.mv2-comingrow span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mv2-comingrow span:first-child { min-width: 0; overflow-wrap: anywhere; }
 .mv2-comingrow span:last-child { color: var(--mny-v15-muted); white-space: nowrap; }
 .mv2-comingrow--done span:last-child { color: var(--mny-v15-teal-ink); font-weight: 700; }
 
@@ -8742,7 +8774,12 @@ b.mv2-bookin { color: var(--mny-v15-teal-ink); }
 .sd-teal { color: var(--mny-v15-teal-ink); }
 .sd-violet { color: var(--sd-purple); }
 .sd-warn { display: block; color: var(--mny-v15-red); font-size: calc(0.9375rem * var(--text-scale, 1)); font-weight: 700; }
-.sd-ellip { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Was an ellipsis; on the money screens a name wraps rather than being cut with "…" (Plan v6 §M). */
+.sd-ellip { min-width: 0; overflow-wrap: anywhere; }
+/* Names on the money screens are never cut with "…" (owner's review): a
+   short name on one line; a note under it may wrap. */
+.sd-nowrap { white-space: nowrap; }
+.sd-tile-name .sd-tag { white-space: nowrap; }
 .sd-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .sd-row > .sd-note { flex: 1 1 200px; }
 .sd-row .sd-go { margin-left: auto; }
@@ -8825,7 +8862,7 @@ b.mv2-bookin { color: var(--mny-v15-teal-ink); }
 .sd-adj-row > span:first-child { flex: 1 1 120px; }
 .sd-adj-row b { min-width: 52px; text-align: center; font-family: var(--font-round); font-variant-numeric: var(--num-variant); }
 .sd-adds { display: flex; gap: 6px; flex-wrap: wrap; }
-.sd-clue { display: flex; justify-content: space-between; gap: 8px; font-size: calc(0.9375rem * var(--text-scale, 1)); border-bottom: 1px dashed var(--mny-v15-dash-faint); padding: 1px 0; }
+.sd-clue { display: flex; justify-content: space-between; gap: 8px; font-size: calc(0.8125rem * var(--text-scale, 1)); border-bottom: 1px dashed var(--mny-v15-dash-faint); padding: 1px 0; white-space: nowrap; }
 .sd-clue span:last-child { color: var(--mny-v15-muted); text-align: right; }
 .sd-bar { display: block; height: 14px; border: 2px solid var(--mny-v15-ink); border-radius: 7px; background: var(--mny-v15-paper); overflow: hidden; }
 .sd-bar i { display: block; height: 100%; background: var(--sd-steady); }
@@ -8833,7 +8870,7 @@ b.mv2-bookin { color: var(--mny-v15-teal-ink); }
 .sd-bar i.wall2 { background: var(--sd-fill-extra); }
 
 /* ── Step 2 · Payday ── */
-.sd-pay { display: grid; grid-template-columns: minmax(0, 1fr) 226px; gap: 12px; align-items: start; }
+.sd-pay { display: grid; grid-template-columns: minmax(0, 1fr) 226px; gap: 12px; align-items: stretch; }
 .sd-pay-groups { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .sd-box { border: 3px solid var(--mny-v15-ink); border-radius: 16px; background: var(--mny-v15-paper); padding: 4px 8px 8px; display: flex; flex-direction: column; gap: 6px; box-shadow: 3px 4px 0 var(--mny-v15-shadow); }
 .sd-box--off { border-width: 2.5px; border-color: var(--mny-v15-red); box-shadow: none; }
@@ -8888,15 +8925,17 @@ b.mv2-bookin { color: var(--mny-v15-teal-ink); }
 .sd-must .sd-note, .sd-must .sd-warn { flex: 1 1 100%; }
 .sd-pile {
   border: 3px solid var(--mny-v15-ink); border-radius: 18px; background: var(--mny-v15-amber); box-shadow: 3px 3px 0 var(--mny-v15-shadow);
-  padding: 10px 10px 10px 12px; display: grid; grid-template-columns: 1fr 34px; grid-template-rows: auto 330px auto; gap: 6px;
+  padding: 10px 10px 10px 12px; display: grid; grid-template-columns: 1fr 34px; grid-template-rows: auto minmax(330px, 1fr) auto; gap: 6px;
 }
+/* My pile uses the full height beside the groups, as drawn (owner's review
+   S4-5); its coins stay round however small a row gets. */
 .sd-pile-head { grid-column: 1 / 3; display: flex; align-items: baseline; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
 .sd-pile-head .sd-box-title { white-space: nowrap; }
 .sd-pile-head b { font-family: var(--font-round); font-variant-numeric: var(--num-variant); font-size: calc(1.75rem * var(--text-scale, 1)); color: var(--mny-v15-red); }
 .sd-stack { position: relative; border-bottom: 3px solid var(--mny-v15-ink); min-height: 0; }
 .sd-coin { position: absolute; width: 20%; display: flex; align-items: center; justify-content: center; }
 .sd-coin i {
-  height: 88%; aspect-ratio: 1; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-sizing: border-box; font-style: normal;
+  height: 88%; aspect-ratio: 1; min-width: 0; max-width: 100%; overflow: hidden; line-height: 1; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-sizing: border-box; font-style: normal;
   font-family: var(--font-round); font-weight: 800; font-size: calc(0.8125rem * var(--text-scale, 1)); box-shadow: inset 0 0 0 3px var(--sd-coin-shine);
 }
 .sd-coin--earned i { background: var(--sd-coin-earned); border: 2px solid var(--sd-coin-earned-edge); color: var(--sd-coin-earned-ink); }
@@ -8925,6 +8964,7 @@ b.mv2-bookin { color: var(--mny-v15-teal-ink); }
 
 /* ── Step 3 · I choose ── */
 .sd-choosehead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+@media (min-width: 768px) { .sd-choosehead { flex-wrap: nowrap; } }   /* "Hold to sign" beside the title on the iPad (S6-4) */
 .sd-pilechip { display: flex; align-items: center; gap: 8px; border: 3px solid var(--mny-v15-ink); border-radius: 14px; background: var(--mny-v15-amber); padding: 4px 12px 4px 8px; box-shadow: 3px 4px 0 var(--mny-v15-shadow); }
 .sd-pilecoins { position: relative; width: 40px; height: 36px; flex: none; }
 .sd-pilecoins i { position: absolute; width: 28px; height: 28px; border-radius: 50%; background: var(--sd-coin-given); border: 2px solid var(--sd-coin-given-edge); box-sizing: border-box; }
@@ -8943,6 +8983,8 @@ b.mv2-bookin { color: var(--mny-v15-teal-ink); }
 .sd-sign > span:last-child { position: relative; font-size: calc(0.875rem * var(--text-scale, 1)); }
 .sd-sign-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--sd-press); }
 .sd-presets { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+@media (min-width: 768px) { .sd-presets { flex-wrap: nowrap; } }   /* the starts on one line on the iPad (S6-5) */
+.sd-presets .sd-btn, .sd-presets .sd-chip { padding: 0 9px; font-size: calc(0.875rem * var(--text-scale, 1)); }
 .sd-cols { display: grid; grid-template-columns: 1.15fr 0.85fr 1.3fr; gap: 10px; }
 .sd-col { border: 3px solid var(--mny-v15-ink); border-radius: 16px; box-shadow: 4px 5px 0 var(--mny-v15-shadow); display: flex; flex-direction: column; padding: 6px 10px 10px; gap: 4px; min-width: 0; }
 .sd-col--loan { background: var(--mny-v15-loan); }
@@ -8988,10 +9030,10 @@ b.mv2-bookin { color: var(--mny-v15-teal-ink); }
 .sd-cell-label { font-size: calc(0.875rem * var(--text-scale, 1)); line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sd-cell b { font-family: var(--font-round); font-variant-numeric: var(--num-variant); font-size: calc(1.0625rem * var(--text-scale, 1)); line-height: 1.15; }
 .sd-cell-hold { position: absolute; left: 0; bottom: 0; height: 5px; background: var(--sd-hold); }
-.sd-fly {
-  position: absolute; right: 6px; top: 4px; width: 30px; height: 30px; border-radius: 50%; background: var(--sd-coin-given); border: 2px solid var(--sd-coin-given-edge);
+.sd-flycoin {
+  position: fixed; z-index: 400; width: 30px; height: 30px; border-radius: 50%; background: var(--sd-coin-given); border: 2px solid var(--sd-coin-given-edge);
   display: flex; align-items: center; justify-content: center; font-family: var(--font-round); font-weight: 800; font-size: calc(0.8125rem * var(--text-scale, 1));
-  color: var(--sd-coin-given-ink); pointer-events: none; animation: sdFly 0.8s cubic-bezier(0.3, 0.9, 0.4, 1) forwards;
+  color: var(--sd-coin-given-ink); pointer-events: none; box-sizing: border-box;
 }
 .sd-sum { font-family: var(--font-round); font-variant-numeric: var(--num-variant); font-weight: 800; font-size: calc(1rem * var(--text-scale, 1)); color: var(--mny-v15-teal-ink); text-align: center; }
 .sd-gg { border: 2.5px solid var(--mny-v15-ink); border-radius: 12px; background: var(--mny-v15-paper); padding: 8px 14px; display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: calc(1.0625rem * var(--text-scale, 1)); line-height: 1.25; align-items: baseline; }
@@ -9031,7 +9073,6 @@ b.mv2-bookin { color: var(--mny-v15-teal-ink); }
 .sd-own-d { font-family: var(--font-round); font-weight: 800; font-size: calc(0.8125rem * var(--text-scale, 1)); color: var(--mny-v15-teal-ink); text-align: right; white-space: nowrap; }
 .sd-own-d.neg { color: var(--mny-v15-red); }
 .sd-own > b { font-family: var(--font-round); font-variant-numeric: var(--num-variant); text-align: right; white-space: nowrap; }
-.sd-own-sub { grid-column: 1 / 5; font-size: calc(0.8125rem * var(--text-scale, 1)); color: var(--mny-v15-muted); }
 .sd-goaljar { flex-direction: row; align-items: center; gap: 12px; }
 .sd-jar { width: 40px; height: 54px; border: 2.5px solid var(--mny-v15-ink); border-radius: 7px 7px 14px 14px; background: var(--mny-v15-paper); position: relative; overflow: hidden; flex: none; }
 .sd-jar i { position: absolute; left: 0; right: 0; bottom: 0; transition: height 0.4s ease; }
@@ -9045,9 +9086,10 @@ b.mv2-bookin { color: var(--mny-v15-teal-ink); }
 .sd-inout { border: 2.5px solid var(--mny-v15-ink); border-radius: 12px; background: var(--mny-v15-paper); padding: 6px 12px 8px; display: flex; flex-direction: column; gap: 4px; }
 .sd-inout-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .sd-stamp { margin-left: auto; font-family: var(--font-head); font-size: calc(1.25rem * var(--text-scale, 1)); color: var(--mny-v15-red); border: 3px solid var(--mny-v15-red); border-radius: 8px; padding: 0 10px; transform: rotate(-6deg); animation: sdStamp 0.6s ease; white-space: nowrap; }
-.sd-inout-part { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 10px; align-items: start; }
+.sd-inout-part { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 10px; align-items: start; }
 .sd-flows { display: flex; flex-direction: column; min-width: 0; }
-.sd-flow { display: grid; grid-template-columns: 140px minmax(0, 1fr) minmax(0, 1fr) 36px 64px; gap: 0 6px; align-items: center; min-height: 22px; font-size: calc(0.875rem * var(--text-scale, 1)); }
+.sd-flow { display: grid; grid-template-columns: 172px minmax(0, 1fr) minmax(0, 1fr) 36px 64px; gap: 0 6px; align-items: center; min-height: 22px; font-size: calc(0.875rem * var(--text-scale, 1)); }
+.sd-flow.sub > span:first-child { padding-left: 16px; }   /* a line under its group, indented as drawn */
 .sd-flow.head { font-weight: 700; font-size: calc(0.9375rem * var(--text-scale, 1)); }
 .sd-flow > b { text-align: right; font-family: var(--font-round); font-variant-numeric: var(--num-variant); white-space: nowrap; }
 .sd-flow-out { display: flex; justify-content: flex-end; align-items: center; height: 22px; border-right: 2.5px solid var(--mny-v15-ink); }
@@ -9069,6 +9111,7 @@ b.mv2-bookin { color: var(--mny-v15-teal-ink); }
 .sd-fill--stock { background: var(--sd-fill-stock); }
 .sd-verdict { border: 2px solid var(--mny-v15-ink); border-radius: 10px; padding: 5px 10px; display: flex; flex-direction: column; gap: 3px; min-width: 0; font-size: calc(0.8125rem * var(--text-scale, 1)); line-height: 1.2; }
 .sd-verdict > b { font-size: calc(1.0625rem * var(--text-scale, 1)); line-height: 1.15; }
+.sd-more { align-self: flex-start; min-height: 44px; border: 2px solid var(--mny-v15-ink); border-radius: 9px; padding: 0 10px; background: var(--mny-v15-paper); color: var(--mny-v15-ink); font: inherit; font-size: calc(0.875rem * var(--text-scale, 1)); cursor: pointer; }
 .sd-verdict--good { background: var(--mny-v15-green); }
 .sd-verdict--good > b { color: var(--mny-v15-teal-ink); }
 .sd-verdict--warn { background: var(--mny-v15-amber); }
@@ -9100,6 +9143,7 @@ b.mv2-bookin { color: var(--mny-v15-teal-ink); }
 .sd-fw-loan b { text-align: right; font-family: var(--font-round); white-space: nowrap; }
 .sd-fw-save { display: grid; grid-template-columns: minmax(0, 1fr) 58px 52px 60px; gap: 4px; align-items: center; font-size: calc(0.875rem * var(--text-scale, 1)); text-align: right; border-top: 1px dashed var(--mny-v15-dash-faint); padding: 1px 0; }
 .sd-fw-save > :first-child { text-align: left; }
+.sd-fw-name { min-width: 0; line-height: 1.15; }   /* wraps, never cut with "…" */
 .sd-fw-save.head { color: var(--mny-v15-muted); border-top: 0; }
 .sd-fw-save.total { border-top: 2px solid var(--mny-v15-ink); }
 .sd-fw-save.dim { opacity: 0.55; }
@@ -9111,13 +9155,28 @@ b.mv2-bookin { color: var(--mny-v15-teal-ink); }
 .sd-newrow-line { display: grid; grid-template-columns: 1fr auto; gap: 10px; font-size: calc(1.0625rem * var(--text-scale, 1)); border-bottom: 1.5px dashed var(--mny-v15-dash); padding: 4px 0; }
 .sd-newrow-line b { font-family: var(--font-round); text-align: right; }
 .sd-newrow-verdict { border: 2.5px solid var(--mny-v15-ink); border-radius: 12px; background: var(--mny-v15-green); padding: 8px 12px; font-size: calc(1.0625rem * var(--text-scale, 1)); line-height: 1.3; }
+.sd-newrow-payback { border: 2px solid var(--mny-v15-ink); border-radius: 12px; background: var(--mny-v15-green); padding: 6px 12px; font-size: calc(1.0625rem * var(--text-scale, 1)); line-height: 1.3; }
+.sd-ideas { display: flex; gap: 8px; flex-wrap: wrap; }
 .sd-newrow-verdict.warn { background: var(--sd-hot); }
 .sd-newrow .sd-go { align-self: flex-end; }
 
-/* ── 🗣️ Dad's card (#sundayOverlay) ── */
+/* ── 🗣️ Dad's card (#sundayOverlay) ──
+   On the iPad the prototype's small card in the top-right corner (owner's
+   review S3-2): 380px, under the head, the meeting still visible beside it.
+   The phone keeps the house bottom sheet. */
 .sd-sheet { background: var(--mny-v15-amber); }
+#sdSheetTitle { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px; font-family: var(--font-head); font-size: calc(1.625rem * var(--text-scale, 1)); }
+.sd-dadstep { margin-left: auto; font-family: var(--font-body); font-weight: 400; font-size: calc(0.9375rem * var(--text-scale, 1)); color: var(--mny-v15-sub); }
+@media (min-width: 768px) {
+  #sundayOverlay { align-items: flex-start; justify-content: flex-end; padding: 72px 20px 0; background: var(--mny-v15-scrim); }
+  #sundayOverlay .sd-sheet {
+    width: 380px; max-height: calc(100vh - 92px); box-sizing: border-box; animation: none;
+    border: 2.5px solid var(--mny-v15-ink); border-radius: 18px; box-shadow: 3px 3px 0 var(--mny-v15-shadow); padding: 16px 18px;
+  }
+}
 .sd-dadcard { display: flex; flex-direction: column; gap: 10px; font-family: var(--font-body); color: var(--mny-v15-ink); }
 .sd-dadcard .sd-go { align-self: flex-end; }
+.sd-dadcard .sd-teal { font-size: calc(0.9375rem * var(--text-scale, 1)); }
 .sd-script-line { border: 2px solid var(--mny-v15-ink); border-radius: 10px; padding: 8px 10px; font-size: calc(1rem * var(--text-scale, 1)); line-height: 1.25; background: var(--sd-jenn); }
 .sd-script-line b { display: block; font-family: var(--font-round); font-size: calc(0.9375rem * var(--text-scale, 1)); color: var(--mny-v15-sub); margin-bottom: 2px; }
 .sd-script-line--ask { background: var(--sd-jess); }
@@ -9129,14 +9188,13 @@ b.mv2-bookin { color: var(--mny-v15-teal-ink); }
 .mv2-idea-tab.on { background: var(--mny-v15-teal); color: var(--mny-v15-white); }
 
 @keyframes sdDrop { 0% { transform: translateY(-300px); opacity: 0; } 15% { opacity: 1; } 80% { transform: translateY(5px); } 100% { transform: translateY(0); } }
-@keyframes sdFly { 0% { transform: translate(-40px, -60px) scale(1.2); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(0, 0) scale(0.85) rotate(360deg); opacity: 0; } }
 @keyframes sdGlow { 0%, 100% { box-shadow: 0 -5px 0 0 var(--sd-glow), 0 5px 0 0 var(--sd-glow), 0 0 16px 4px var(--sd-glow-soft); } 50% { box-shadow: 0 -8px 0 0 var(--sd-bonus), 0 8px 0 0 var(--sd-bonus), 0 0 30px 10px var(--sd-glow-gold); } }
 @keyframes sdBurst { 0% { transform: scale(0.3); opacity: 0; } 25% { transform: scale(1.35); opacity: 1; } 100% { transform: scale(1.7) translateY(-16px); opacity: 0; } }
 @keyframes sdShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
 @keyframes sdStamp { 0% { transform: scale(2) rotate(-20deg); opacity: 0; } 60% { transform: scale(0.95) rotate(-8deg); opacity: 1; } 100% { transform: scale(1) rotate(-6deg); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .sd-coin.drop, .sd-fly, .sd-burst, .sd-stamp, .sd-sign.shake, .sd-wall.hot, .sd-ownbox.hot, .sd-goaljar.hot { animation: none; }
-  .sd-fly, .sd-burst { display: none; }
+  .sd-coin.drop, .sd-burst, .sd-stamp, .sd-sign.shake, .sd-wall.hot, .sd-ownbox.hot, .sd-goaljar.hot { animation: none; }
+  .sd-flycoin, .sd-burst { display: none; }
   .sd-line, .sd-cat, .sd-fall-bar, .sd-brick i, .sd-ownbar i, .sd-jar i { transition: none; }
 }
 

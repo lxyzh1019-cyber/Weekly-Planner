@@ -3990,6 +3990,85 @@ above; this is the index.
 | 7 | "90/90" → 112 here and in `tests/README.md`; the four stale "6am–9pm" comments (`js/08-day-view.js`, `js/16-print.js` ×2, `css/app.css`) say 6am–10pm | — | `grep -rn "6am.9pm" js css` finds nothing |
 | 8 | Dead code removed: the drag `inviteId` guard (`js/39-block-drag.js`), the orphan 👯 aria-label entry (`js/99-main.js`), the Chores options `export` branch (`js/29-chore-options.js`); the 12 dead chore-tab branches wait for C3 | — | grep; `check-dead-actions` reverse warnings 27 → 26 |
 
+## The money week runs Sunday to Saturday — Plan v6 Deviation 34 (2026-10-04)
+
+The owner's answer to S1-6 was "Money week only": from the meeting of
+**Sun 11 Oct 2026** the meeting pays the seven FINISHED days before it —
+Sun..Sat — for chores, the routine streak, fines and club sessions. The
+planner, every stored `weekKey` and every per-day record stay Monday–Sunday.
+
+**A dated rule, not a new key.** `MR_DEFAULT_RULES.week = { startsOn:
+'sunday', from: '2026-10-11' }`, read per key through `mrRuleOr`, so a stored
+rulebook that predates it reads the same answer; `mrMoneyWeekRulePending` /
+`mrApplyMoneyWeekRule` (marker `MR_MONEY_WEEK_NOTE`, card on Grown-ups ›
+⚙️ Rules) append it as one dated version from this week's Monday, the Sunday
+rules' way. A week is Sun–Sat when its rules say `sunday` and its meeting
+Sunday (Monday + 6) is on or after `from` (`mrMoneyWeekRuleOn`). No
+`state.shared` key was added, so no merge decision was needed.
+
+**The mapping (js/18-rules.js, `mrMoneyDays`).** Storage identity is
+(planner Monday W, dayIdx 0 = Mon … 6 = Sun). The money week keyed by W is:
+
+| Rule | Days paid | Storage refs |
+|---|---|---|
+| Mon–Sun (before the switch) | Mon(W)..Sun(W+6) | (W,0)..(W,6) — exactly as before |
+| Sun–Sat | Sun(W−1)..Sat(W+5) | (W−7, 6), (W,0)..(W,5) |
+
+The meeting on Sun(W+6) still settles weekKey W (`ctThisWeekKey()` names the
+coming meeting's week on every day under either rule); that Sunday itself is
+day 0 of the next money week, W+7. `mrMoneyWeekOf(dayKey)` answers "which
+money week pays this day" for today's surfaces. Every reader asks
+`mrMoneyDays` / `mrMoneyDayKeys` instead of `mrWeekDayKeys`: `mrChoreWeek`
+(its `days[]` now carry `dayKey`, `wk`, `d`, `taken`), `mrStreakWeek`,
+`mrFinesWeek` (and `mrFineStanding`), `mrSessionsWeek` (an attendance answer
+kept at the day's planner week is still read). A Sun–Sat week has no "unticked
+Sunday counts on its own Sunday" case (owner decision #93 stays for Mon–Sun
+weeks): its meeting comes after its last day, so Sunday's step 1 no longer
+asks for the Sunday routine (`sdSundayRoutine`). Competitions, learning and
+gifts keep their Mon–Sun week.
+
+**A day is never paid twice.** `mrFreezeWeekLedger` writes the row's
+covered days (`days`). A settled week keeps exactly the days it froze; a row
+frozen before `days` existed covered its own nominal days. The only day two
+weeks can both name is the switch Sunday (Sun 4 Oct 2026: day 6 of the last
+Mon–Sun week, day 0 of the first Sun–Sat one). An open week marks `taken` any
+of its days a settled neighbour covers, so whichever of the two settles first
+pays it — normally the old week, at the meeting of 4 Oct, leaving the first
+Sun–Sat week six days (Mon 5 – Sat 10). A `taken` day is paused for the
+streak (neither kept nor missed). Held by tests/sunday.test.js (the pure
+`mrMoneyDaysPure`, all 120 settle orders over five weeks: every day paid
+exactly once) and smoke `theMoneyWeekRunsSundayToSaturday`,
+`aDayIsNeverPaidTwiceAcrossTheSwitch`.
+
+**Readers that changed** (today's day belongs to the next money week on a
+Sunday): the ☀️ countdown (`mnyCountdownData`: on a meeting Sunday, before
+her meeting, the finished week with "Sunday is today!"), Today's 🔥 streak,
+`mrChoreWouldPay` / `mnyEarnLeftToday` (through `mrChoreDay`), the chore tab's
+cap bar, earn board, header streak and free-chore marks (kid and parent), the
+parent day cards and fines list, Grown-ups › 📦 Fines (Day row =
+the coming meeting's money days, plus today when it is not one of them; each
+fine's cost from the week that pays its day), the dispute amount, Sunday's
+"My week" strip and `mnyWorking` day names. **Unchanged on purpose:** every
+`ctWeekMoney` / `mrWeekBreakdown(W)` caller that means "the meeting at the end
+of planner week W" (week view, passbook, story, meeting, stream, Approve's
+This Sunday, the club sessions sheet).
+
+`tools/money-calibrate.js` prices its modelled weeks in the rule's order
+(Sunday first); the figures do not move (day order only moves ties), which
+tests/money.test.js now asserts — nothing was re-pinned.
+
+## The money screens use the prototype's text size — Plan v6 Deviation 35
+
+On My money (`.mv2`), the Sunday money step (`.sd`), Grown-ups (`.gu`) and
+their sheets (`#requestOverlay`, `#sundayOverlay`, `#grownupsOverlay`), at
+768px and wider, `--text-scale` is set to 1 — a scoped value of the same
+token, so every size there still multiplies it and check-look-tokens passes;
+Calm was already 1; the phone keeps the house 1.1 in Pop; the 13px floor
+still measures the result. A name on those screens is never cut with "…":
+the old ellipsis rules wrap instead, and smoke `noLabelIsCutOnTheMoneyScreens`
+fails on any ellipsis-truncated element there at 1194 (seeded My money, her
+sheets, Sunday's four steps, Grown-ups' six tabs, both looks).
+
 ## Known trip hazards
 
 - Firebase config lives in **`js/03-sync.js:8`**, not `index.html`. Older docs

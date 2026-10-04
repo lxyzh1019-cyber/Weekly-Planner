@@ -216,7 +216,25 @@ const WEEKS = {
   },
 };
 
-function weekMoney(w) {
+/* ── The money week's order (Plan v6 Deviation 34) ──
+   The weeks above are written Mon..Sun (index 0 = Monday) — the shape of
+   the family's week. From `week.from` the meeting pays Sun..Sat, so the same
+   seven days are priced in that order: Sunday first. Day order only moves
+   ties (which chores are the free ones, where a forgiving day falls), so the
+   pinned figures hold — `weekMoney` prices the shipped order, and
+   tests/money.test.js checks both orders agree. */
+const SUN_FIRST = [6, 0, 1, 2, 3, 4, 5];
+function inOrder(w, startsOn) {
+  if (startsOn !== 'sunday') return w;
+  const pos = d => SUN_FIRST.indexOf(d);
+  const arr = a => SUN_FIRST.map(i => a[i]);
+  return Object.assign({}, w, {
+    graded: w.graded.map(c => Object.assign({}, c, { day: pos(c.day) })),
+    clean: arr(w.clean), sick: w.sick ? arr(w.sick) : w.sick, fines: arr(w.fines),
+  });
+}
+function weekMoney(w0, startsOn) {
+  const w = inOrder(w0, startsOn === undefined ? ((R.week || {}).startsOn || 'monday') : startsOn);
   const ch = choresPaid(w.graded);
   const le = learningPaid(w.learning);
   const st = streakPaid(w.clean, w.sick);
@@ -243,6 +261,7 @@ function report() {
   console.log('learning: ' + ((R.learning || {}).items || [])
     .filter(i => !i.xpOnly).map(i => `${i.id} ${usd(i.amount)}/${i.perUnit}${i.unit}`).join(' · '));
   console.log('routines pay nothing directly — the streak IS the routine channel');
+  console.log(`money week: ${((R.week || {}).startsOn === 'sunday') ? `Sunday–Saturday from the meeting of ${R.week.from}` : 'Monday–Sunday'} (Deviation 34)`);
   console.log('');
 
   const order = ['quiet', 'ordinary', 'strong'];

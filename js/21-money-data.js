@@ -440,12 +440,14 @@ function mnyEverything(kid) {
    "left" to speak of and the caller should say what she has earned instead. */
 function mnyEarnLeftToday(kid, weekKey) {
   const wk = weekKey || mnyWeekKey();
-  const cap = (mrRulesForWeek(wk).chores || {}).dailyCap;
-  const chores = mrChoreWeek(wk, kid);
   const today = formatDayKey(todayKey());
   const dayIdx = Math.max(0, Math.min(6,
     Math.round((today - formatDayKey(wk)) / (24 * 60 * 60 * 1000))));
-  const done = money2((chores.days[dayIdx] || {}).paid);
+  // Today's money, read in the money week that pays today (Deviation 34).
+  const cd = mrChoreDay(kid, mrWeekDayKeys(wk)[dayIdx]);
+  const cap = (mrRulesForWeek(cd.wk).chores || {}).dailyCap;
+  const chores = cd.week;
+  const done = money2(cd.day.paid);
   return {
     dayIdx, done, cap: (cap == null) ? null : money2(cap),
     left: (cap == null) ? null : money2(Math.max(0, cap - done)),

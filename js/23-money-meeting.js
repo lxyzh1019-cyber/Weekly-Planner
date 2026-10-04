@@ -69,10 +69,12 @@ function mnyStrip(wk, kid, liveIdx) {
    able to argue with it. */
 function mnyWorking(wk, kid, channel, b) {
   const line = (l, v) => `<div class="mny-row"><span>${escapeHtml(l)}</span><b>${v}</b></div>`;
-  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  // Days named from their own date: a Sun–Sat money week starts on the
+  // Sunday before its Monday (Deviation 34).
+  const dayName = (k) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][formatDayKey(k).getDay()];
   if (channel === 'chores') {
     const c = b.chores;
-    return c.days.map(d => line(dayNames[d.dayIdx], mnyMoney(d.paid))).join('')
+    return c.days.map(d => line(dayName(d.dayKey), d.taken ? 'paid the week before' : mnyMoney(d.paid))).join('')
       + (c.freeUsed.length ? `<div class="mny-note">${c.freeUsed.length} free job${c.freeUsed.length > 1 ? 's' : ''} used — always your lowest-paying ones.</div>` : '')
       + (c.overflowChores ? `<div class="mny-note">${c.overflowChores} job${c.overflowChores > 1 ? 's' : ''} past your daily most — those earned XP.</div>` : '');
   }
@@ -95,14 +97,14 @@ function mnyWorking(wk, kid, channel, b) {
   }
   if (channel === 'sessions') {
     const s = b.sessions || { sessions: [] };
-    return (s.sessions || []).map(x => line(dayNames[mrWeekDayKeys(wk).indexOf(x.dayKey)] || x.dayKey,
+    return (s.sessions || []).map(x => line(dayName(x.dayKey),
         x.attended === true ? '✓ ' + mnyMoney(s.rate) : x.attended === false ? 'missed · $0' : '? not ticked')).join('')
       || `<div class="mny-note">No club sessions this week.</div>`;
   }
   if (channel === 'fines') {
     const rows = b.fines.perDay.filter(d => d.raw > 0);
     return rows.length
-      ? rows.map(d => line(dayNames[d.dayIdx], '−' + mnyMoney(d.applied).slice(1) +
+      ? rows.map(d => line(dayName(d.dayKey), '−' + mnyMoney(d.applied).slice(1) +
           (d.applied < d.raw ? ' (a day never goes below $0)' : ''))).join('')
       : `<div class="mny-note">Nothing taken off this week.</div>`;
   }

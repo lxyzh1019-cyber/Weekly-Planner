@@ -98,6 +98,15 @@ function mnyAddRequest(kid, fields) {
       qualified: !!f.qualified, provincial: !!f.provincial,
     });
     if (!r.sport && !r.name) { showToast('Which meet was it?'); return null; }
+    /* One competition, one question (owner's review M8-4): a meet that
+       already has a result waiting for Dad, or one he said yes to, cannot be
+       told again — from the sheet, the other device or anywhere else. */
+    const same = (x) => (r.blockId && x.blockId === r.blockId)
+      || (!r.blockId && !x.blockId && String(x.dayKey) === String(r.dayKey)
+          && String(x.name || '').trim().toLowerCase() === r.name.toLowerCase());
+    if (mnyEnsureRequests(kid).some(x => x && x.kind === 'comp' && x.status !== 'no' && same(x))) {
+      showToast('Dad already has this one.'); return null;
+    }
   } else if (kind === 'goal') {
     Object.assign(r, { name: String(f.name || '').trim().slice(0, 40), icon: f.icon || '🎯',
       target: money2(f.target), keep: f.keep === 'ready' ? 'ready' : 'move',
@@ -527,9 +536,8 @@ let rqDraft = null;
 /* "$5" for whole dollars, "$5.50" otherwise — the prototype's `'$' + n`. */
 function rqDollars(v) { const n = money2(v); return '$' + (n % 1 ? n.toFixed(2) : String(n)); }
 function rqOrd(n) { return n ? ['1st', '2nd', '3rd'][n - 1] : '—'; }
-function rqDayLabel(dayKey) {
-  return formatDayKey(dayKey).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
-}
+/* "Tue 29 Sep" — the prototype's way (owner's review M13-1). */
+function rqDayLabel(dayKey) { return mnyDayName(dayKey); }
 function rqHomeShort(h) { return String(RQ_HOMES[h] || h).replace(/^\S+ /, ''); }
 
 /* `kind`: result · club · move · adv · goal · gift · prices · list
@@ -552,8 +560,7 @@ function mnyOpenRequestSheet(kind, opts) {
   if (k === 'result') {
     Object.assign(rqDraft, { pick: null });
     // Opened from a planned meet on My money's calendar: that meet, picked.
-    const x = o.blockId ? rqPlannedInMonth(kid, String(o.dayKey || todayKey()).slice(0, 7))
-      .find(p => p.blockId === o.blockId && p.st === 'open') : null;
+    const x = o.blockId ? rqPlannedRecent(kid).find(p => p.blockId === o.blockId && p.st === 'open') : null;
     if (x) rqDraft.pick = rqPickFrom(x);
   }
   if (k === 'gift') Object.assign(rqDraft, { amt: 10, giver: '', from: MNY_FROM[0], dayKey: todayKey() });
@@ -616,12 +623,9 @@ function rqResultState(kid, d) {
   const ready = !!(name && (p.sport !== 'swim' || races.some(r => (Number(r.pts) || 0) > 0 || String(r.time || '').trim())));
   return { ready, preview, pay, need: !name ? 'What was it called?' : 'Put in a race: its points or its time.' };
 }
-/* The meets on her planner this month, each with where it stands:
-   done (recorded) · sent (she already told Dad) · soon (still to come) ·
-   open (happened, no result yet). Only an open one can be picked. Any month
-   (`rqPlannedInMonth`) — My money's calendar and 📅 Coming up read the same
-   answer for the month they show. */
-function rqPlannedThisMonth(kid) { return rqPlannedInMonth(kid, String(todayKey()).slice(0, 7)); }
+/* The meets on her planner in a month, each with where it stands
+   (`rqPlannedStatus`). My money's calendar and 📅 Coming up read it for the
+   month they show; the result sheet reads `rqPlannedRecent`. */
 function rqPlannedInMonth(kid, month) {
   const today = String(todayKey());
   const out = [];
@@ -635,6 +639,12 @@ function rqPlannedInMonth(kid, month) {
     const next = formatDayKey(wk); next.setDate(next.getDate() + 7);
     wk = ctDateToKey(next);
   }
+  return rqPlannedStatus(kid, out);
+}
+/* Each planned meet with where it stands — done (recorded) · sent (she
+   already told Dad) · soon (still to come) · open (happened, no result). */
+function rqPlannedStatus(kid, out) {
+  const today = String(todayKey());
   const comps = mrCompetitions(kid);
   const asks = mnyEnsureRequests(kid).filter(r => r && r.kind === 'comp' && r.status !== 'no');
   return out.map(p => {
@@ -647,8 +657,24 @@ function rqPlannedInMonth(kid, month) {
       award: rec ? mrCompAward(rec) : 0 });
   });
 }
+/* The result sheet's list (owner's review M8-3): the meets on her planner in
+   the last 4 weeks that have already happened — a result is told after the
+   day, never before it. */
+const RQ_RECENT_DAYS = 28;
+function rqPlannedRecent(kid) {
+  const today = String(todayKey());
+  const from = mrDayKeyAdd(today, -(RQ_RECENT_DAYS - 1));
+  const out = [], seen = new Set();
+  for (let wk = ctWeekKeyForDate(from); String(wk) <= today; wk = mrDayKeyAdd(wk, 7)) {
+    mmPlannedCompetitions(wk, kid).forEach(p => {
+      const key = p.blockId || (p.dayKey + p.name);
+      if (String(p.dayKey) >= from && String(p.dayKey) <= today && !seen.has(key)) { seen.add(key); out.push(p); }
+    });
+  }
+  return rqPlannedStatus(kid, out);
+}
 function rqResultBody(kid, d) {
-  const planned = rqPlannedThisMonth(kid);
+  const planned = rqPlannedRecent(kid);
   const p = d.pick;
   const items = planned.map(x => {
     const on = !!(p && !p.custom && p.blockId === x.blockId);
@@ -658,10 +684,18 @@ function rqResultBody(kid, d) {
       : x.st === 'soon' ? `${rqDayLabel(x.dayKey)} · coming up` : `${rqDayLabel(x.dayKey)} · no result yet`;
     const why = can ? '' : (x.st === 'done' ? 'Dad already has this one.' : x.st === 'sent' ? 'Already sent to Dad.' : 'Not yet — it is still coming up.');
     return `<button type="button" class="rq-meet ${'rq-meet--' + x.st}${on ? ' on' : ''}" data-mny-action="rq-pick" data-mny-id="${escapeAttr(x.blockId || '')}"${can ? '' : ` aria-disabled="true" data-mny-why="${escapeAttr(why)}"`}><span class="rq-meet-ico">${x.icon}</span><span class="rq-meet-name">${escapeHtml(x.title)}</span><span class="rq-meet-sub">${escapeHtml(sub)}</span></button>`;
-  }).join('') || `<div class="rq-empty">Nothing on my planner this month.</div>`;
+  }).join('') || `<div class="rq-empty">Nothing on my planner in the last 4 weeks.</div>`;
   const custom = !!(p && p.custom);
-  let left = `<div class="rq-col"><div class="rq-q">① Which one? From my planner, this month</div>${items}
-    <button type="button" class="rq-custom${custom ? ' on' : ''}" data-mny-action="rq-custom">➕ It's not on my planner</button>`;
+  let left = `<div class="rq-col"><div class="rq-q">① Which one? My planner, last 4 weeks</div>${items}
+    <button type="button" class="rq-custom${custom || d.customAsk ? ' on' : ''}" data-mny-action="rq-custom">➕ It's not on my planner</button>`;
+  /* "It's not on my planner" asks her to check the list first (M8-4): one
+     competition is one question, so a meet that IS on her planner is told
+     from its own row above. */
+  if (d.customAsk && !custom) {
+    left += `<div class="rq-check"><div class="rq-q">First, is it one of these?</div>
+      ${planned.map(x => `<div class="rq-check-row">${escapeHtml(x.icon + ' ' + x.title + ' · ' + rqDayLabel(x.dayKey))}</div>`).join('')}
+      <div class="rq-opts rq-two">${rqOpt('← Yes, one of these', false, 'rq-customback')}${rqOpt('✓ No, none of these', false, 'rq-customok')}</div></div>`;
+  }
   if (custom) {
     left += `<input class="rq-input" type="text" value="${escapeAttr(p.name || '')}" placeholder="what it was called" data-mny-action="rq-name" aria-label="What it was called">
       <div class="rq-opts rq-two">${rqOpt('🏊 Swim', p.sport === 'swim', 'rq-sport', ' data-mny-id="swim"')}${rqOpt('⛸️ Skating', p.sport === 'skate', 'rq-sport', ' data-mny-id="skate"')}</div>
@@ -687,14 +721,18 @@ function rqResultBody(kid, d) {
       <div class="rq-opts">${rqOpt(`🎯 Qualified for Provincials (+${rqDollars(rules.qualifyBonus)})`, !!p.qual, 'rq-qual')}${rqOpt(`🏟️ This was Provincials (${rqDollars(rules.provincialPerPoint)}/pt)`, !!p.prov, 'rq-prov')}</div>`;
   } else {
     right += `<div class="rq-q">② My result</div>
-      ${rqRow('In my group', [0, 1, 2, 3].map(n => rqOpt(rqOrd(n), (p.grp || 0) === n, 'rq-grp', ` data-mny-id="${n}"`)).join(''))}
+      <div class="rq-side">${rqRow('In my group', [0, 1, 2, 3].map(n => rqOpt(rqOrd(n), (p.grp || 0) === n, 'rq-grp', ` data-mny-id="${n}"`)).join(''))}
       ${rqRow('Overall', [0, 1, 2, 3].map(n => rqOpt(rqOrd(n), (p.ovr || 0) === n, 'rq-ovr', ` data-mny-id="${n}"`)).join(''))}
-      ${rqRow('Points', `${rqOpt('−', false, 'rq-pts', ' data-mny-d="-1" aria-label="Fewer points"')}${rqVal((Number(p.pts) || 0) + ' pts')}${rqOpt('+', false, 'rq-pts', ' data-mny-d="1" aria-label="More points"')}`)}`;
+      ${rqRow('Points', `${rqOpt('−', false, 'rq-pts', ' data-mny-d="-1" aria-label="Fewer points"')}${rqVal((Number(p.pts) || 0) + ' pts')}${rqOpt('+', false, 'rq-pts', ' data-mny-d="1" aria-label="More points"')}`)}</div>`;
   }
   right += `${rqPreviewAndFoot()}</div>`;
   return `<div class="rq-result">${left}${right}</div>`;
 }
 
+function rqCustomPick() {
+  return { custom: true, blockId: null, compId: null, name: '', sport: null, dayKey: todayKey(),
+           races: [], pts: 0, grp: 0, ovr: 0, qual: false, prov: false };
+}
 /* A planned meet, picked: the draft the result sheet fills in. */
 function rqPickFrom(x) {
   return { custom: false, blockId: x.blockId, compId: x.compId || null, name: x.title, sport: x.sport,
@@ -893,11 +931,13 @@ function rqRender() {
   if (!host || !rqDraft) return;
   const d = rqDraft, kid = d.kid;
   const title = document.getElementById('rqSheetTitle');
-  if (title) title.textContent = d.kind === 'move' ? RQ_TITLES[d.mode] : RQ_TITLES[d.kind];
+  // The result sheet's line sits beside its title, on one line (M8-2).
+  if (title) title.innerHTML = escapeHtml(d.kind === 'move' ? RQ_TITLES[d.mode] : RQ_TITLES[d.kind])
+    + (d.kind === 'result' ? ' <span class="rq-titlesub">The official results sheet decides. Dad checks it before anything pays.</span>' : '');
   const sheet = host.closest('.sheet');
   if (sheet) sheet.setAttribute('data-rq-kind', d.kind);
   let body;
-  if (d.kind === 'result') body = `<p class="rq-lead">The official results sheet decides. Dad checks it before anything pays.</p>${rqResultBody(kid, d)}`;
+  if (d.kind === 'result') body = rqResultBody(kid, d);
   else if (d.kind === 'move') body = rqMoveBody(kid, d);
   else if (d.kind === 'adv') body = rqAdvBody(kid, d);
   else if (d.kind === 'goal') body = rqGoalBody(kid, d);
@@ -936,12 +976,17 @@ function rqHandleAction(a, el) {
   const pick = d.pick;
   if (a === 'rq-send') { rqSend(); return; }
   if (a === 'rq-pick') {
-    const x = rqPlannedThisMonth(kid).find(p => p.blockId === id && p.st === 'open');
+    const x = rqPlannedRecent(kid).find(p => p.blockId === id && p.st === 'open');
     if (!x) return;
-    d.pick = rqPickFrom(x);
+    d.pick = rqPickFrom(x); d.customAsk = false;
   } else if (a === 'rq-custom') {
-    d.pick = { custom: true, blockId: null, compId: null, name: '', sport: null, dayKey: todayKey(),
-               races: [], pts: 0, grp: 0, ovr: 0, qual: false, prov: false };
+    // With planned meets to check against, ask first; with none, straight in.
+    if (rqPlannedRecent(kid).length && !(pick && pick.custom)) { d.customAsk = true; d.pick = null; }
+    else d.pick = rqCustomPick();
+  } else if (a === 'rq-customok') {
+    d.customAsk = false; d.pick = rqCustomPick();
+  } else if (a === 'rq-customback') {
+    d.customAsk = false; d.pick = null;
   } else if (a === 'rq-sport' && pick) {
     pick.sport = id === 'swim' ? 'swim' : 'skate';
     pick.races = pick.sport === 'swim' ? [{ ev: '50 Free', time: '', pts: 0 }] : [];

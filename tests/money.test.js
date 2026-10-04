@@ -142,6 +142,13 @@ const strong = cal.weekMoney(cal.WEEKS.strong);
    Monday forgiven and counted that is a 3-day run, so $0 → $1. The ordinary
    week's run goes 5 → 6 days and stays on the 5-day tier ($11 unchanged); the
    strong week was already 7 ($24 unchanged). Term $79 → $81, Jenn 51% → 53%. */
+/* Plan v6 Deviation 34: the money week turned Sunday–Saturday. The same
+   seven days priced Sunday first come to the same figures — day order moves
+   only ties — so nothing below was re-pinned. */
+const sameInBothOrders = ['quiet', 'ordinary', 'strong'].filter(k =>
+  cal.weekMoney(cal.WEEKS[k], 'monday').net !== cal.weekMoney(cal.WEEKS[k], 'sunday').net);
+check('each modelled week nets the same Mon–Sun and Sun–Sat (Plan v6 Deviation 34)',
+  sameInBothOrders.length === 0, `differ: ${sameInBothOrders.join(', ')}`);
 check('a quiet week nets $1 — both chores are free, homework pays nothing, and the forgiving day makes a 3-day run (Plan v5 Deviation 30; was $0)',
   quiet.net === 1, `read ${quiet.net}`);
 check('an ordinary week nets $11', ordinary.net === 11, `read ${ordinary.net}`);

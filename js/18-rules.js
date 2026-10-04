@@ -114,6 +114,19 @@ const MR_DEFAULT_RULES = {
   streak: { tiers: [{ days: 3, bonus: 1 }, { days: 5, bonus: 2 }, { days: 7, bonus: 3 }],
             highestOnly: true, resetsOn: 'sunday', graceDays: 1, graceCounts: true },
 
+  /* ── THE MONEY WEEK RUNS SUNDAY TO SATURDAY (Plan v6 Deviation 34, owner
+     2026-10-04: "Money week only") ──
+     From the meeting of `from` (a Sunday) on, the meeting pays the seven
+     FINISHED days before it — Sun..Sat — for chores, the routine streak,
+     fines and club sessions. Weeks whose meeting is before `from` keep
+     Mon..Sun. The planner stays Monday–Sunday and so does every stored
+     `weekKey`: the money week keyed by Monday W is Sun(W−1)..Sat(W+5), the
+     Sunday read from the previous planner week's day 6 (`mrMoneyDays`). A
+     version without the path reads these defaults (`mrRuleOr`), and every
+     week lived before `from` is unchanged either way. Delivered to a stored
+     rulebook as one dated version by `mrApplyMoneyWeekRule`. */
+  week: { startsOn: 'sunday', from: '2026-10-11' },
+
   competition: {
     // No caps on points, by decision — the dance test is the one exception.
     swim:  { perPoint: 1, qualifyBonus: 20, provincialPerPoint: 2 },
@@ -749,6 +762,38 @@ function mrApplySundayRules() {
     { reason: MR_DEFAULT_REASON, note: MR_SUNDAY_RULES_NOTE, effectiveFrom: from });
 }
 
+/* ── THE SUNDAY–SATURDAY MONEY WEEK, FOR A RULEBOOK ALREADY ON FILE ──
+   (Plan v6 Deviation 34.) The Sunday rules' mechanism with its own marker:
+   `week.startsOn` and `week.from` arrive where absent, as one dated version
+   from this week's Monday (`mrHouseRulesFrom`), so the change log says when
+   the family's money week turned. Until it is applied the readers fall back
+   to MR_DEFAULT_RULES per key (`mrRuleOr`) — the same answer — and a week
+   whose meeting is before `from` is Mon–Sun either way. Applied once. */
+const MR_MONEY_WEEK_NOTE = 'Money week Sunday–Saturday (4 Oct)';
+const MR_MONEY_WEEK_RULES = [
+  { path: 'week.startsOn', item: '📅 Money week', field: 'starts on' },
+  { path: 'week.from',     item: '📅 Money week', field: 'first Sunday paid this way' },
+];
+function mrMoneyWeekRulePending() {
+  const r = mrRules();
+  return MR_MONEY_WEEK_RULES.filter(rule => mrGetPath(r, rule.path) == null).map(rule => ({
+    path: rule.path, value: mrGetPath(MR_DEFAULT_RULES, rule.path), from: null, item: rule.item, field: rule.field,
+    label: MR_MONEY_WEEK_NOTE + ' — ' + rule.item + ': ' + rule.field }));
+}
+function mrMoneyWeekRuleApplied() {
+  return mrLogEntries().some(e => String((e && e.note) || '').indexOf(MR_MONEY_WEEK_NOTE) === 0);
+}
+function mrApplyMoneyWeekRule() {
+  if (!isParent()) { showToast('Only parents can change the money rules 🔒'); return null; }
+  if (mrMoneyWeekRuleApplied()) return null;
+  const changes = mrMoneyWeekRulePending();
+  if (!changes.length) return null;
+  const from = mrHouseRulesFrom();
+  if (!from) { showToast('A rules change is already scheduled — this can go in once it starts'); return null; }
+  return mrApplyEdits(changes.map(c => ({ path: c.path, value: c.value, label: c.label })),
+    { reason: MR_DEFAULT_REASON, note: MR_MONEY_WEEK_NOTE, effectiveFrom: from });
+}
+
 /* A rule value, or the shipped default for that path when the stored version
    predates it — the per-key fallback `mnyStagePct` already uses. */
 function mrRuleOr(rules, path) {
@@ -1262,6 +1307,121 @@ function mrToggleSick(kid, weekKey, dayIdx) {
   saveAll();
 }
 
+/* ════════════════════════════════════════════════════════════════
+   THE MONEY WEEK (Plan v6 Deviation 34) — which days a meeting pays
+   ════════════════════════════════════════════════════════════════
+   Storage and sync keep the planner's identity: every per-day record lives
+   at (weekKey = its planner Monday, dayIdx 0 = Mon … 6 = Sun). The money
+   week is MAPPED onto that, never stored:
+
+     · a week before the switch (`week.startsOn` not 'sunday', or its
+       meeting Sunday W+6 before `week.from`) pays Mon(W)..Sun(W+6) —
+       refs (W,0)..(W,6), exactly as before;
+     · a week under the switch pays Sun(W−1)..Sat(W+5) — refs
+       (W−7, 6), (W,0)..(W,5). Its meeting on Sun(W+6) reviews only
+       finished days, and that Sunday belongs to the NEXT money week, W+7.
+
+   A DAY IS NEVER PAID TWICE. A settled week's frozen ledger records the
+   days it covered (`days`, written by `mrFreezeWeekLedger`); a row frozen
+   before that recorded nothing and covered its own nominal days. The only
+   day two weeks can both name is the switch Sunday (Sun 4 Oct 2026: day 6
+   of the last Mon–Sun week AND day 0 of the first Sun–Sat one). A week
+   still open leaves out (`taken`) any of its days a settled neighbour
+   covers; a settled week keeps what it froze. So whichever of the two
+   settles first pays that Sunday, and the other never does.
+
+   `mrMoneyDaysPure` is the arithmetic with every fact handed in, so
+   tests/sunday.test.js runs it in Node; `mrMoneyDays` hands it the app's
+   own answers (the week's rules, `mnyWeekSettled`, the frozen ledger). */
+function mrDayKeyAdd(key, n) {
+  const d = mrDayKeyDate(key);
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function mrDayKeyDate(key) { const p = String(key).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+/* Is the week keyed by Monday `weekKey` a Sunday–Saturday money week under
+   `rules` (that week's own rules)? */
+function mrMoneyWeekRuleOn(rules, weekKey) {
+  const starts = mrRuleOr(rules, 'week.startsOn'), from = mrRuleOr(rules, 'week.from');
+  return starts === 'sunday' && !!from && mrDayKeyAdd(weekKey, 6) >= String(from);
+}
+/* The week's nominal days, in order, as storage refs. */
+function mrMoneyDayRefs(weekKey, sunday) {
+  const out = [];
+  if (sunday) out.push({ wk: mrDayKeyAdd(weekKey, -7), d: 6, dayKey: mrDayKeyAdd(weekKey, -1) });
+  for (let d = 0; d < (sunday ? 6 : 7); d++) out.push({ wk: weekKey, d, dayKey: mrDayKeyAdd(weekKey, d) });
+  return out;
+}
+/* `isSunday(wk)` → that week runs Sun–Sat; `settledDays(wk)` → null while
+   the week is open, else the day keys it covered (its ledger's `days`, or
+   null-days = its nominal days). Each ref gets `pos` (0..6, her order) and
+   `taken` (already paid by another settled week). */
+function mrMoneyDaysPure(weekKey, isSunday, settledDays) {
+  const covered = (wk) => {
+    const s = settledDays(wk);
+    if (!s) return null;
+    return Array.isArray(s) ? s : mrMoneyDayRefs(wk, isSunday(wk)).map(x => x.dayKey);
+  };
+  const refs = mrMoneyDayRefs(weekKey, isSunday(weekKey));
+  const own = settledDays(weekKey);
+  let taken;
+  if (Array.isArray(own)) {
+    taken = new Set(refs.map(x => x.dayKey).filter(k => own.indexOf(k) < 0));
+  } else {
+    // Open: any settled neighbour wins. Settled without a record: the
+    // earlier week wins (it was the one paid under the older rule).
+    taken = new Set(covered(mrDayKeyAdd(weekKey, -7)) || []);
+    if (!own) (covered(mrDayKeyAdd(weekKey, 7)) || []).forEach(k => taken.add(k));
+  }
+  return refs.map((x, pos) => Object.assign(x, { pos, taken: taken.has(x.dayKey) }));
+}
+function mrMoneyWeekIsSunday(weekKey) {
+  return mrMoneyWeekRuleOn(mrRulesForWeek(weekKey), weekKey);
+}
+/* What a settled week covered, from its frozen ledger: an array of day
+   keys, `true` (settled, nothing recorded → its nominal days) or null. */
+function mrMoneySettledDays(weekKey, kid) {
+  if (typeof mnyWeekSettled !== 'function' || !mnyWeekSettled(weekKey, kid)) return null;
+  const row = ((((state.shared || {}).chore || {}).moneyLedger || {})[weekKey] || {})[kid];
+  return (row && Array.isArray(row.days)) ? row.days : true;
+}
+/* THE one answer to "which days does this week's money cover" — read by
+   mrChoreWeek, mrStreakWeek, mrFinesWeek, mrSessionsWeek and the ledger. */
+function mrMoneyDays(weekKey, kid) {
+  return mrMoneyDaysPure(weekKey, mrMoneyWeekIsSunday, wk => mrMoneySettledDays(wk, kid));
+}
+function mrMoneyDayKeys(weekKey, kid) {
+  return mrMoneyDays(weekKey, kid).filter(x => !x.taken).map(x => x.dayKey);
+}
+/* Which money week pays `dayKey` (its Monday key). A Sunday under the new
+   rule belongs to the week that starts it (the next planner week); the
+   switch Sunday, which both weeks name, belongs to the earlier one unless
+   the later one already settled it. Today's money surfaces (the chore tab's
+   day, Today, the ☀️ countdown) ask this; anything about "the coming
+   meeting" keeps asking `ctThisWeekKey()`, which is that meeting's week on
+   every day of the week under either rule. */
+function mrMoneyWeekOf(dayKey, kid) {
+  const day = String(dayKey || todayKey());
+  const wk = ctWeekKeyForDate(day);
+  if (mrDayKeyDate(day).getDay() !== 0) return wk;
+  const next = mrDayKeyAdd(wk, 7);
+  if (!mrMoneyWeekIsSunday(next)) return wk;
+  if (mrMoneyWeekIsSunday(wk)) return next;
+  // The switch Sunday: day 6 of `wk` and day 0 of `next`.
+  if (kid) {
+    const ref = mrMoneyDays(next, kid).find(x => x.dayKey === day);
+    if (ref && !ref.taken && mrMoneySettledDays(next, kid)) return next;
+  }
+  return wk;
+}
+/* One day's chore money and the money week it sits in. */
+function mrChoreDay(kid, dayKey) {
+  const wk = mrMoneyWeekOf(dayKey, kid);
+  const week = mrChoreWeek(wk, kid);
+  const day = week.days.find(x => x.dayKey === dayKey) || { paid: 0, raw: 0, dayKey };
+  return { wk, week, day };
+}
+
 /* Household chore money for a week.
 
    Order matters and is the subtle part: the free chores are deducted BEFORE
@@ -1293,16 +1453,20 @@ function mrChoreWeek(weekKey, kid) {
   const freeCount = Number(cfg.freeChoresPerWeek) || 0;
   const pickWithdrawn = !!mrHonestyEffect(kid, weekKey).losesChoices;
 
-  // Every graded chore of the week, with what it would pay.
+  // Every graded chore of the money week (Deviation 34: `mrMoneyDays`), with
+  // what it would pay. `dayIdx` is the day's place in HER week (0..6); `dayKey`
+  // names the day itself — readers that know a planner day match on it.
+  const refs = mrMoneyDays(weekKey, kid);
   const all = [];
-  for (let d = 0; d < 7; d++) {
-    const graded = mrEnsureEarnings(kid, weekKey).chores[String(d)] || {};
+  refs.forEach(ref => {
+    if (ref.taken) return;                       // paid in another settled week
+    const graded = mrEnsureEarnings(kid, ref.wk).chores[String(ref.d)] || {};
     Object.keys(graded).sort().forEach(choreId => {
       const g = Number(graded[choreId]) || 0;
       if (g <= 0) return;
-      all.push({ dayIdx: d, choreId, grade: g, value: Number(pay[g]) || 0 });
+      all.push({ dayIdx: ref.pos, dayKey: ref.dayKey, choreId, grade: g, value: Number(pay[g]) || 0 });
     });
-  }
+  });
 
   // Cheapest-first is her best arrangement; step 3 flips it to dearest-first.
   // Day and id break ties so the same week always resolves identically.
@@ -1316,7 +1480,8 @@ function mrChoreWeek(weekKey, kid) {
 
   const days = [];
   let total = 0, overflowChores = 0;
-  for (let d = 0; d < 7; d++) {
+  refs.forEach(ref => {
+    const d = ref.pos;
     let dayPaid = 0, dayRaw = 0;
     all.filter(c => c.dayIdx === d).forEach(c => {
       if (isFree[c.dayIdx + '|' + c.choreId]) return;
@@ -1327,8 +1492,9 @@ function mrChoreWeek(weekKey, kid) {
     });
     dayPaid = money2(dayPaid);
     total += dayPaid;
-    days.push({ dayIdx: d, raw: money2(dayRaw), paid: dayPaid });
-  }
+    days.push({ dayIdx: d, dayKey: ref.dayKey, wk: ref.wk, d: ref.d, taken: ref.taken,
+                raw: money2(dayRaw), paid: dayPaid });
+  });
   return { paid: money2(total), days, overflowChores, freeUsed,
            freeLeft: Math.max(0, freeCount - freeUsed.length), pickWithdrawn };
 }
@@ -1346,10 +1512,14 @@ function mrChoreWeek(weekKey, kid) {
    Lives here beside mrChoreWeek because this module owns chore pricing. Today
    reads it; it does not do this arithmetic itself. */
 function mrChoreWouldPay(kid, weekKey, dayIdx) {
-  const cfg = mrRulesForWeek(weekKey).chores || {};
+  // (weekKey, dayIdx) is the planner's day; the money week that pays it may
+  // be the next one (a Sunday under Deviation 34) — `mrChoreDay` finds it.
+  const dayKey = mrWeekDayKeys(weekKey)[dayIdx];
+  const cd = mrChoreDay(kid, dayKey);
+  const cfg = mrRulesForWeek(cd.wk).chores || {};
   const best = money2(Number((cfg.grade || {})[3]) || 0);
-  const week = mrChoreWeek(weekKey, kid);
-  const done = money2((week.days[dayIdx] || {}).paid);
+  const week = cd.week;
+  const done = money2(cd.day.paid);
   const cap = (cfg.dailyCap == null) ? null : money2(cfg.dailyCap);
   const room = (cap == null) ? best : money2(Math.max(0, cap - done));
   return {
@@ -1512,27 +1682,33 @@ function mrStreakWeek(weekKey, kid) {
      settled week is read whole, exactly as before. */
   const today = (typeof todayKey === 'function') ? String(todayKey()) : null;
   const live = !!today && !(typeof mnyWeekSettled === 'function' && mnyWeekSettled(weekKey, kid));
-  const dayKeys = live ? mrWeekDayKeys(weekKey) : [];
+  /* The money week's days (Deviation 34): Mon..Sun before the switch,
+     Sun..Sat after it. A day another settled week already paid is paused —
+     neither kept nor missed — so it is never counted twice. */
+  const sundayWeek = mrMoneyWeekIsSunday(weekKey);
   // The week's countable days, in order: true kept, false missed.
   const marks = [];
-  for (let d = 0; d < 7; d++) {
-    if (live && String(dayKeys[d]) > today) break;         // still ahead
-    if (mrIsSick(kid, weekKey, d)) continue;              // paused, not broken
+  for (const ref of mrMoneyDays(weekKey, kid)) {
+    if (live && String(ref.dayKey) > today) break;       // still ahead
+    if (ref.taken) continue;                              // paid elsewhere
+    if (mrIsSick(kid, ref.wk, ref.d)) continue;           // paused, not broken
     /* Asked ONCE per day and reused. Going through mrStreakDayDone here would
        resolve the same day's sessions a second time, and this loop already sits
        under mrWeekBreakdown, which plenty of renders call. */
-    const asked = mrRoutineSessionsFor(weekKey, kid, d);
+    const asked = mrRoutineSessionsFor(ref.wk, kid, ref.d);
     // A day the plan asked no routine of is paused too: nothing was kept and
     // nothing was missed. Under the day-type default this cannot arise; it is a
     // guard, not a behaviour — and it stops `[].every()` paying for an empty day.
     if (!asked.length) continue;
-    const kept = asked.every(s => ctGetMandatory(weekKey, d, s, kid));
-    /* Today, not done yet — except the week's own Sunday, which is payday:
-       owner decision #93 ("Sunday counts if ticked by then"). Sunday's step 1
-       asks "Did you do your Sunday routine?" and a tick keeps the day; left
-       unticked it is a miss the forgiving day may cover, so Mon–Sat kept
-       still pays the full tier at the meeting. */
-    if (live && !kept && String(dayKeys[d]) === today && d !== 6) break;
+    const kept = asked.every(s => ctGetMandatory(ref.wk, ref.d, s, kid));
+    /* Today, not done yet — except, in a Mon–Sun week, the week's own
+       Sunday, which is payday: owner decision #93 ("Sunday counts if ticked
+       by then"). Sunday's step 1 asks "Did you do your Sunday routine?" and
+       a tick keeps the day; left unticked it is a miss the forgiving day may
+       cover, so Mon–Sat kept still pays the full tier at the meeting. A
+       Sun–Sat week (Deviation 34) has no such day: its meeting comes after
+       its last day, so that special case is gone for it. */
+    if (live && !kept && String(ref.dayKey) === today && (sundayWeek || ref.d !== 6)) break;
     marks.push(kept);
   }
   let best = 0;
@@ -1894,13 +2070,19 @@ function mrSessionsWeek(weekKey, kid) {
   const paidActs = {};
   ((typeof getAllActivities === 'function') ? getAllActivities(kid, { includeArchived: true }) : [])
     .forEach(a => { if (a && a.isPaidSession) paidActs[a.id] = a; });
-  mrWeekDayKeys(weekKey).forEach(dayKey => {
+  /* The money week's days (Deviation 34). An answer lives in the money
+     week's record; one given while the day still sat in its planner week
+     (the Sunday before the week) is read from there. */
+  mrMoneyDays(weekKey, kid).filter(ref => !ref.taken).forEach(ref => {
+    const dayKey = ref.dayKey;
+    const own = ref.wk === weekKey ? {} : (mrEnsureEarnings(kid, ref.wk).sessions || {});
     (getDayBlocks(dayKey, kid) || []).forEach(b => {
       if (!b || !paidActs[b.actId] || (typeof blockIsWatching === 'function' && blockIsWatching(b))) return;
       const act = paidActs[b.actId];
-      const answered = Object.prototype.hasOwnProperty.call(answers, b.id) && answers[b.id] != null;
+      const has = (m) => Object.prototype.hasOwnProperty.call(m, b.id) && m[b.id] != null;
+      const answered = has(answers) || has(own);
       let attended = null;
-      if (answered) attended = answers[b.id] === true;
+      if (answered) attended = (has(answers) ? answers[b.id] : own[b.id]) === true;
       else if (typeof isBlockCompleted === 'function' && isBlockCompleted(b, kid)) attended = true;
       else if (typeof isBlockNotDone === 'function' && isBlockNotDone(b)) attended = false;
       sessions.push({ blockId: b.id, dayKey, name: (act && act.name) || 'Assistant job',
@@ -2021,9 +2203,10 @@ function mrFinesWeek(weekKey, kid, dayEarnings) {
      charge; only an item the rules explicitly forgive is forgiven. */
   const byId = {};
   (cfg.items || []).forEach(i => { byId[i.id] = i; });
-  const mon = formatDayKey(weekKey);
-  const keys = [];
-  for (let i = 0; i < 7; i++) { const d = new Date(mon); d.setDate(mon.getDate() + i); keys.push(ctDateToKey(d)); }
+  // The money week's days (Deviation 34), in her order; a day another
+  // settled week already paid holds no fines here.
+  const refs = mrMoneyDays(weekKey, kid);
+  const keys = refs.filter(x => !x.taken).map(x => x.dayKey);
 
   /* ── FREE REPEATS ARE COUNTED ACROSS THE WEEK, IN ORDER ──
      `freeRepeats: 2` means the first two of THAT item in THIS week cost
@@ -2053,13 +2236,14 @@ function mrFinesWeek(weekKey, kid, dayEarnings) {
 
   let total = 0;
   const perDay = [];
-  keys.forEach((k, d) => {
-    const raw = mrFines(kid).filter(f => f.dayKey === k)
+  refs.forEach((ref, d) => {
+    const k = ref.dayKey;
+    const raw = ref.taken ? 0 : mrFines(kid).filter(f => f.dayKey === k)
       .reduce((s, f) => s + (chargeable[f.id] || 0), 0);
     const earned = (dayEarnings && dayEarnings[d] != null) ? dayEarnings[d] : 0;
     const applied = cfg.dailyFloorZero ? Math.min(raw, earned) : raw;
     total += applied;
-    perDay.push({ dayIdx: d, raw: money2(raw), applied: money2(applied) });
+    perDay.push({ dayIdx: d, dayKey: k, raw: money2(raw), applied: money2(applied) });
   });
   // `chargeable` (fine id → what that one costs before the daily floor) is
   // what Grown-ups › Fines prints beside each entry: free, or its amount.
@@ -2073,7 +2257,7 @@ function mrFinesWeek(weekKey, kid, dayEarnings) {
 function mrFineStanding(weekKey, kid, itemId) {
   const cfg = (mrRulesForWeek(weekKey) || {}).fines || {};
   const item = (cfg.items || []).find(i => i.id === itemId);
-  const keys = mrWeekDayKeys(weekKey);
+  const keys = mrMoneyDayKeys(weekKey, kid);
   const count = mrFines(kid).filter(f => f && f.itemId === itemId && keys.includes(f.dayKey)).length;
   const free = item ? (Number(item.freeRepeats) || 0) : 0;
   const amount = item ? (Number(item.amount) || 0) : 1;
@@ -2224,6 +2408,10 @@ function mrFreezeWeekLedger(weekKey, kid) {
     at: Date.now(),
     rulesVersion: v.id || null,
     rulesEffectiveFrom: v.effectiveFrom || null,
+    // The days this row paid (Deviation 34): Mon..Sun before the switch,
+    // Sun..Sat after, less any day another settled week already paid. A
+    // later week reads this so a day is never paid twice.
+    days: mrMoneyDayKeys(weekKey, kid),
     chores: money2(b.chorePaid),
     choresRaw: money2(b.chores.paid),
     freeChores: (b.chores.freeUsed || []).length,
@@ -2432,5 +2620,6 @@ function mrWeeksElapsed() {
 /* Inert in the browser; lets tests/rules.test.js exercise the pure helpers. */
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { MR_DEFAULT_RULES, MR_REASONS, MR_DEFAULT_REASON,
-    MR_HOUSEHOLD_CHORES, MR_PERSONAL_CHORES, mrGetPath, mrSetPath, mrApplyCap };
+    MR_HOUSEHOLD_CHORES, MR_PERSONAL_CHORES, mrGetPath, mrSetPath, mrApplyCap,
+    mrDayKeyAdd, mrMoneyWeekRuleOn, mrMoneyDayRefs, mrMoneyDaysPure };
 }

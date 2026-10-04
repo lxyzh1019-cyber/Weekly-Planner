@@ -580,5 +580,56 @@ function fill(w, k) {
     && row('Typical week').changed && row('Most to spend').changed ? true : JSON.stringify(moved[0].rows));
 }
 
+/* ── 📅 The money week runs Sunday to Saturday (Plan v6 Deviation 34) ──
+   js/18-rules.js's `mrMoneyDaysPure`, every fact handed in: which days a
+   meeting pays, before and after the switch, and that no day is ever paid by
+   two settled weeks whatever order the weeks are settled in. */
+{
+  const r18 = require(path.join(__dirname, '..', 'js', '18-rules.js'));
+  check('the money week rule is in the shipped rulebook: Sunday–Saturday from the meeting of 11 Oct 2026',
+    R.week && R.week.startsOn === 'sunday' && R.week.from === '2026-10-11' ? true : JSON.stringify(R.week));
+  const isSun = wk => r18.mrMoneyWeekRuleOn(R, wk);
+  check('weeks whose meeting is before 11 Oct keep Mon–Sun; the week of 5 Oct is the first Sun–Sat',
+    !isSun('2026-09-21') && !isSun('2026-09-28') && isSun('2026-10-05') && isSun('2026-11-02') ? true
+      : [isSun('2026-09-28'), isSun('2026-10-05')].join(','));
+  const keysOf = refs => refs.filter(x => !x.taken).map(x => x.dayKey).join(',');
+  const none = () => null;
+  check('an old week pays Mon..Sun at (W, 0..6)',
+    keysOf(r18.mrMoneyDaysPure('2026-09-28', isSun, none)) === '2026-09-28,2026-09-29,2026-09-30,2026-10-01,2026-10-02,2026-10-03,2026-10-04');
+  const nw = r18.mrMoneyDaysPure('2026-10-12', isSun, none);
+  check('a new week pays Sun..Sat; its Sunday is read at the planner week before, day 6',
+    keysOf(nw) === '2026-10-11,2026-10-12,2026-10-13,2026-10-14,2026-10-15,2026-10-16,2026-10-17'
+      && nw[0].wk === '2026-10-05' && nw[0].d === 6 && nw[1].wk === '2026-10-12' && nw[1].d === 0 ? true : JSON.stringify(nw.slice(0, 2)));
+  // The switch: Sun 4 Oct is day 6 of the last Mon–Sun week and day 0 of the first Sun–Sat one.
+  const settledOld = wk => (wk === '2026-09-28' ? true : null);
+  const first = r18.mrMoneyDaysPure('2026-10-05', isSun, settledOld);
+  check('the switch Sunday already settled in the old week is left out of the first new week',
+    first[0].dayKey === '2026-10-04' && first[0].taken === true && keysOf(first) === '2026-10-05,2026-10-06,2026-10-07,2026-10-08,2026-10-09,2026-10-10'
+      ? true : JSON.stringify(first.map(x => x.dayKey + (x.taken ? 'x' : ''))));
+  check('while the old week is open, the first new week names the switch Sunday too (whichever settles first pays it)',
+    r18.mrMoneyDaysPure('2026-10-05', isSun, none)[0].taken === false);
+  /* Any order of settling, each settled week freezing the days it paid: no day twice, none missed. */
+  const weeks = ['2026-09-21', '2026-09-28', '2026-10-05', '2026-10-12', '2026-10-19'];
+  const perms = (a) => a.length < 2 ? [a] : a.flatMap((x, i) => perms(a.slice(0, i).concat(a.slice(i + 1))).map(p => [x].concat(p)));
+  let bad = null;
+  perms(weeks).forEach(order => {
+    if (bad) return;
+    const ledger = {};
+    const settled = wk => (wk in ledger ? ledger[wk] : null);
+    order.forEach(wk => { ledger[wk] = keysOf(r18.mrMoneyDaysPure(wk, isSun, settled)).split(','); });
+    const all = [].concat(...weeks.map(wk => ledger[wk]));
+    const dup = all.filter((k, i) => all.indexOf(k) !== i);
+    const span = new Set(all);
+    let gap = null;
+    for (let k = '2026-09-21'; k <= '2026-10-24'; k = r18.mrDayKeyAdd(k, 1)) if (!span.has(k)) gap = k;
+    if (dup.length || gap) bad = order.join(' ') + ' → dup ' + dup.join(',') + ' gap ' + gap;
+  });
+  check('settled in any of the 120 orders, every day from 21 Sep to 24 Oct is paid exactly once', bad === null ? true : bad);
+  /* A row frozen before this change recorded no days: it covered its own nominal days. */
+  const oldRow = wk => (wk === '2026-09-28' ? true : wk === '2026-10-05' ? ['2026-10-05'] : null);
+  check('a settled week keeps exactly the days its ledger froze',
+    keysOf(r18.mrMoneyDaysPure('2026-10-05', isSun, oldRow)) === '2026-10-05');
+}
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach(f => console.log('  - ' + f)); process.exit(1); }

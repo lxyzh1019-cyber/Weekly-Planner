@@ -46,6 +46,7 @@ function mnyRenderRulesTab() {
   if (!isParent()) { wrap.innerHTML = `<div class="mny-card"><div class="mny-note">Parents only 🔒</div></div>`; return; }
   if (!guIsTab(mnyParentSection)) mnyParentSection = 'approve';
   wrap.innerHTML = `<div class="gu">${guRender(mnyParentSection)}</div>`;
+  if (mnyParentSection === 'rules' && guRuleSearch) guApplyRuleSearch(wrap);   // 🔎 kept across a redraw
   if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
 }
 

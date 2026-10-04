@@ -572,7 +572,7 @@ function tdQuestHero(kid, blocks) {
      with it, so an off day never reads as a broken run here either. The level
      is a button now: it opens "My level", the privileges ladder (tdOpenLevel).
      Spans, not divs, because a <button> may only hold phrasing content. */
-  const streak = mrStreakWeek(ctThisWeekKey(), kid).days;
+  const streak = mrStreakWeek(mrMoneyWeekOf(todayKey(), kid), kid).days;   // today's money week (Deviation 34)
   return `<div class="dq-hero">
       <button type="button" class="dq-hero-level" data-td-action="level"
         aria-label="${escapeAttr(`Level ${level}. See what XP buys`)}">
