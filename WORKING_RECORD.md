@@ -21,6 +21,11 @@ Single working record for this repository. Updated by the main session at the en
 
 - **2026-10-03, R14: Plan v5 approved** (owner: "Approve Plan v5"; income groups "Use these groups"). Adds section L (the owner's 21 picks), Deviations 8/23/30 corrections, Stage 3a. Plan copy: `docs/handoff/plan-v3-sunday-v15.md`.
 
+## Where we are
+- **Plan v5 — Sunday v15 pocket-money redesign**, branch `claude/sunday-v15` (plan copy `docs/handoff/plan-v3-sunday-v15.md`; prototypes `docs/handoff/sunday-v15/`). Stages 1, 2, 3a, 3 (My money) and 4 (Sunday ritual) are committed; `npm test` is fully green at `346b1e8`, build 2026-10-04a.
+- **Next stage: 4b** — rehome the old parent money sections into Grown-ups (plan sections K and L, G2–G6), rename Grandfather rule, and fix three Stage 4 bugs (catch-up must-pay, rescale after a skipped Sunday, duplicate footer sign button). Then Stage 5 (styling, both looks, phone, emoji boxes on Windows) and the draft PR.
+- Waiting on the owner: approval of the ten small Stage 4 differences (ledger #94). Smoke on this PC needs `SMOKE_CHROMIUM="C:/Program Files/Google/Chrome/Application/chrome.exe"`. Worker instructions: `~/.cache/hz-rules/3.1.23/agents/opus-worker-instructions.md`; workers do not commit, the main session does.
+
 ## Pending
 - PR [#91](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/91) **merged** 2026-09-21 as `f4d1db5`. (This line previously said "awaiting the owner's merge" — corrected 2026-09-22.)
 - **PR [#93](https://github.com/lxyzh1019-cyber/Weekly-Planner/pull/93) — merged to `main` as `fa06ed5`** (corrected 2026-09-24; this line previously said "draft, open"). Original note: Last code change: the #34 wrong-day fix, then `main` (PR #92) merged in (#35), build 2026-09-23b. Description updated 2026-09-23 to include both. Final gate on the merged head: `npm run check` OK, smoke 347/347.
