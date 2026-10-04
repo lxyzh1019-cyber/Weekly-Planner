@@ -25,7 +25,7 @@ Single working record for this repository. Updated by the main session at the en
 
 ## Where we are
 - **R14 / Plan v3 — Sunday v15 pocket-money redesign**, branch `claude/sunday-v15` (local only, never pushed). Newest plan: **Plan v9 — approved 2026-10-04**, file `plans/mossy-gathering-dragon.md` (copy `docs/handoff/plan-v3-sunday-v15.md`); prototypes in `docs/handoff/sunday-v15/`. Stages 1–4b, 6a, 6b done (last code commit `94ce8d5`); the owner reviewed the mockups (6c, ledger #98).
-- **Next:** 6d (build section N with opus-worker) → 6e comparison page (prototype · before · after) → Stage 5/7 (looks, phone, smoke, final built-vs-prototype page) → draft PR.
+- **Next:** fix the 12 flagged items on the 6e page (Stage 5/7 scope: they make the build match the approved plan and mockups), then Stage 5/7 (looks, phone, smoke, final built-vs-prototype page) → draft PR. 6d `f50503d` and 6e page done.
 - Restart line: `Continue the current work on branch claude/sunday-v15; next: **R14 / Plan v3 — Sunday v15 pocket-money redesign** (`claude/sunday-v15`, from `main` @ `8b56fdb`).`
 - Must know: no cash account (Plan v9 Deviation 37); "Dad" → "parents" on screen (38); smoke on this PC needs `SMOKE_CHROMIUM="C:/Program Files/Google/Chrome/Application/chrome.exe"`; workers do not commit, the main session does; main session cannot Write script files (use Edit on the plan, short python -c for records).
 
@@ -303,7 +303,8 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression (1 re
 | Stage 4b — Grown-ups rehoming (section K/L: 📒 Weeks, Rules cards, Approve side cards, ✍️ Record, fix sheets, Grandfather rename) + Stage 4 bugs | COMPLETE (8 differences for owner review) | Worker Opus 5.5; `npm test` exit 0 (smoke 447, sunday 68, money 37, merge 123); bug checks failed first. Old sections → new homes table in the worker report; FEATURES v24. |
 | Stage 6a — section M fixes + Sun–Sat money week | COMPLETE (5 small points for owner review) | Worker Opus 5.5; check OK · merge 123 · money 38 · sunday 76 · stream 38 (re-run by main); smoke all pass except `thePopLookReadsEverywhere` (Today's clash note contrast, also failing on clean `0930a31`, clock-dependent) → Stage 5. Suite not yet run with the clock after 11 Oct → Stage 5. |
 | Stage 6b/6c — redesign mockups + owner review | 6b COMPLETE; 6c COMPLETE — review received (#98); Plan v9 approved | https://claude.ai/artifact/KrmHJQRu2FXUwX92yWNA6J (five redesigns, iPad; phone mockups not made) |
-| Stage 6d — build approved redesigns | NOT STARTED → in progress (opus-worker), Plan v9 section N | |
+| Stage 6d — build approved redesigns | COMPLETE | `f50503d`, build 2026-10-04b; full npm test green (worker run; sunday 90/0 and merge 128/0 re-run by main session) |
+| Stage 6e — comparison page (prototype · before · after) | COMPLETE | https://claude.ai/artifact/V2BUEwpCQzNryit3bd947t — 18 rows; 12 items flagged that do not yet match the plan/mockup (4 look like number bugs: Weeks earned-this-year, given vs gifts, money made, goal jar "of $85") | |
 | Stage 5 — CSS/looks/phone, smoke rewrite, build stamp, full gate | BLOCKED — follows 6d; includes Today's clash-note contrast and a run with the clock after 11 Oct | |
 | Draft PR + FEATURES/ARCHITECTURE | BLOCKED — follows Stage 5 | |
 
