@@ -1508,7 +1508,12 @@ function mrStreakWeek(weekKey, kid) {
     // guard, not a behaviour — and it stops `[].every()` paying for an empty day.
     if (!asked.length) continue;
     const kept = asked.every(s => ctGetMandatory(weekKey, d, s, kid));
-    if (live && !kept && String(dayKeys[d]) === today) break;   // today, not done yet
+    /* Today, not done yet — except the week's own Sunday, which is payday:
+       owner decision #93 ("Sunday counts if ticked by then"). Sunday's step 1
+       asks "Did you do your Sunday routine?" and a tick keeps the day; left
+       unticked it is a miss the forgiving day may cover, so Mon–Sat kept
+       still pays the full tier at the meeting. */
+    if (live && !kept && String(dayKeys[d]) === today && d !== 6) break;
     marks.push(kept);
   }
   let best = 0;

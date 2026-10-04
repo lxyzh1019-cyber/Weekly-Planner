@@ -445,8 +445,8 @@ function fill(w, k) {
 
 /* ── Below the 🏦 Savings gate (Plan v5 Deviation 8) ──
    At 15% paid Savings is shut with the rule's number; the wall and cash out
-   are open; the goal jar does not ask for a 🛟 line there is no Savings to
-   fill; the cents and the jar's overflow go on the loan as extra, counted at
+   are open; the goal jar waits for Savings (Deviation 31); a jar already
+   holding money still never passes its goal — the cents and the jar's overflow go on the loan as extra, counted at
    1 + bonus; crossing 20% is a milestone. */
 {
   const low = { principal: 1000, paid: 150, interest: 0, arrears: 0, weekly: 16.15 };
@@ -455,8 +455,11 @@ function fill(w, k) {
   const w = weekOf({ loan: low, lines, pots: { ready: 0, goal: 30, gic: 0, stock: 0 } });
   check('🏦 Savings is shut below 20% paid, with the rule’s number',
     s.sdCanPlace('ready', w, R).why === '🔒 opens at 20% paid' && !s.sdIsOpen('ready', w, R));
-  check('below 20%: the wall and cash out are open, and the goal jar asks no 🛟 line',
-    ['extra', 'spend', 'goal'].every(k => s.sdCanPlace(k, w, R).ok) ? true : JSON.stringify(['extra', 'spend', 'goal'].map(k => s.sdCanPlace(k, w, R))));
+  check('below 20%: the wall and cash out are open',
+    ['extra', 'spend'].every(k => s.sdCanPlace(k, w, R).ok) ? true : JSON.stringify(['extra', 'spend'].map(k => s.sdCanPlace(k, w, R))));
+  // Plan v5 Deviation 31 (owner, after Stage 3a): goal jars wait for Savings.
+  check('below 20%: the goal jar waits for Savings, with the rule’s number',
+    s.sdCanPlace('goal', w, R).why === '🔒 opens at 20% paid' ? true : JSON.stringify(s.sdCanPlace('goal', w, R)));
   const P = s.sdPile(w, R);
   check('below 20%: the pile says the cents go on the loan', P.centsTo === 'extra' && P.cents > 0 ? true : JSON.stringify(P));
   const alloc = { goal: 10, extra: P.hers - 10 };
@@ -471,8 +474,8 @@ function fill(w, k) {
     res.after.loan.paid === r2(150 + P.minNow + (alloc.extra + over) * (1 + b)) && res.signed.extra === r2(alloc.extra + over)
       ? true : JSON.stringify({ paid: res.after.loan.paid, want: r2(150 + P.minNow + (alloc.extra + over) * (1 + b)) }));
   const pre = s.sdPresets(w, R).find(p => p.id === 'saving');
-  check('below 20%: "🎯 For my goal" sends the jar’s overflow to the wall, not Savings',
-    pre && !pre.alloc.ready && pre.alloc.goal === 5 && r2(pre.alloc.goal + pre.alloc.extra) === P.hers ? true : JSON.stringify(pre));
+  check('below 20%: "🎯 For my goal" sends the shut jar’s share to the wall, not Savings',
+    pre && !pre.alloc.ready && !pre.alloc.goal && pre.alloc.extra === P.hers ? true : JSON.stringify(pre));
   const f = s.sdForecast(res, Object.assign({}, w, { alloc }), R, 4);
   check('below 20%: the forecast puts a full jar’s overflow on the loan',
     f.toReady === 0 && f.overLoan > 0 && /goes on the 🧱 loan/.test(f.fwNote) ? true : JSON.stringify([f.toReady, f.overLoan, f.fwNote]));
@@ -484,6 +487,31 @@ function fill(w, k) {
   const res20 = s.sdSign(fill(at20, 'extra'), R);
   check('at 20% the cents go to Savings again and nothing extra goes on the loan',
     P20.centsTo === 'ready' && res20.signed.overToLoan === 0 && res20.signed.ready === P20.cents ? true : JSON.stringify(res20.signed));
+}
+
+/* ── 📌 The must-pay the app priced (Stage 4) ──
+   `loan.mustPay` is this Sunday's figure from the loan's owner — a grown-up's
+   agreed-down payment included — and the pile takes exactly that, never more
+   than is owed; what it does not take is carried, never charged. */
+{
+  const base = weekOf({});
+  const P0 = s.sdPile(base, R);
+  const down = weekOf({ loan: Object.assign({}, base.loan, { mustPay: r2(P0.mustPay - 5) }) });
+  const P1 = s.sdPile(down, R);
+  check('a must-pay agreed down by $5 frees $5 for her, to the dollar',
+    P1.mustPay === r2(P0.mustPay - 5) && P1.hers === P0.hers + 5 ? true : JSON.stringify([P0.mustPay, P1.mustPay, P0.hers, P1.hers]));
+  const big = weekOf({ loan: { principal: 100, paid: 95, interest: 0, arrears: 0, weekly: 16.15, mustPay: 40 } });
+  check('a must-pay never takes more than is owed', s.sdPile(big, R).mustPay === 5 ? true : s.sdPile(big, R).mustPay);
+}
+
+/* ── A placement is never negative, never more than the pile (Stage 4) ── */
+{
+  const w = weekOf({});
+  const P = s.sdPile(w, R);
+  const neg = s.sdSign(Object.assign({}, w, { alloc: { extra: P.hers + 3, spend: -3 } }), R);
+  check('a negative box refuses the sign', !neg.ok && /\$0 or more/.test(neg.why) ? true : JSON.stringify(neg));
+  const over = s.sdSign(Object.assign({}, w, { alloc: { extra: P.hers + 2 } }), R);
+  check('placing more than the pile refuses the sign', !over.ok && /more than my pile/.test(over.why) ? true : JSON.stringify(over));
 }
 
 /* ── 🔥 The routine clue (Plan v5 Deviation 30) ── */

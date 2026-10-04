@@ -52,15 +52,11 @@ function mmStepIndex(id) {
 function mmStepId() { return (MM_STEPS[mmStep - 1] || MM_STEPS[0]).id; }
 let mmStep = 1;
 let mmSelectedDay = null;
-let mmUndo = null;
-/* Why the meeting's Undo was withdrawn, for the week it was held for:
-   { wk, why }. Session-local like mmUndo itself — see mmUndoHeld. */
-let mmUndoGone = null;
 /* ↺ Redo, one girl at a time (Plan v3 §A, §E — Rev 2). Per-kid snapshots,
    taken at her sign and sealed when it is done: { [kid]: {wk, …} }, and why
-   one was withdrawn: { [kid]: {wk, why} }. Session-local like mmUndo. The
-   meeting-wide `mmUndo` above stays what the current meeting uses until the
-   Sunday ritual switches to these (Stage 4). */
+   one was withdrawn: { [kid]: {wk, why} }. Session-local: gone when the page
+   is. The meeting-wide Undo ("puts both girls back") is retired with its
+   button in Stage 4 — ↺ Redo my plan on her Signed card is the one way back. */
 let mmUndoKid = {};
 let mmUndoKidGone = {};
 let mmAddChoreFor = null;   // "kid|dayIdx" whose add-a-chore picker is open
@@ -139,7 +135,7 @@ function mmHide() {
 function openFamilyMeeting() {
   if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
   ctEnsureShared();
-  mmStep = 1; mmMaxStep = 1; mmSelectedDay = null; mmUndo = null; mmUndoGone = null;
+  mmStep = 1; mmMaxStep = 1; mmSelectedDay = null;
   mmUndoKid = {}; mmUndoKidGone = {};
   mmClearReturn();        // a fresh sitting has nowhere to go back to
   mmExpressWeek = null;   // the full sitting, not the catch-up run
@@ -835,19 +831,16 @@ function mmHandleCatchUpClick(e) {
   if (what === 'settle') mmGoStep(4);
 }
 /* Point the meeting at another week. Everything downstream reads mmWeekKey(),
-   so this is the whole of it — except the draft plan, which belongs to one kid
-   in one week and would otherwise be re-offered against a different week's
-   money. mnyEnsureDraft re-keys itself too; clearing it here keeps step 4 from
-   rendering one stale frame first. */
+   so this is the whole of it. The Sunday draft (js/44) is keyed by girl AND
+   week, so another week opens its own. */
 function mmGoToWeek(wk) {
   if (!isParent()) { showToast('Parents run the family meeting 🔒'); return; }
   ctWeekKey = wk;
   // A context captured against another week would send the parent back to a
   // sitting that no longer exists.
   mmClearReturn();
-  mmStep = 1; mmMaxStep = 1; mmSelectedDay = null; mmUndo = null; mmUndoGone = null; mmAddChoreFor = null;
+  mmStep = 1; mmMaxStep = 1; mmSelectedDay = null; mmAddChoreFor = null;
   mmUndoKid = {}; mmUndoKidGone = {};
-  if (typeof mnyDraft !== 'undefined') mnyDraft = null;
   if (!mmIsOpen()) mmShow();
   renderMeetingMode();
 }
@@ -978,23 +971,17 @@ function renderMeetingMode() {
     return;
   }
 
-  /* Each screen is the two panels that were always about one thing. They are
-     concatenated rather than merged: mmRenderReview, mmRenderReflect,
-     mnyRenderEarned and mnyRenderDecide each still own exactly what they owned,
-     and a step is now a list of them. Rewriting four renderers into two would
-     have been four chances to lose a rule that only one of them knew. */
+  /* The week step is the two panels that were always about one thing,
+     concatenated: mmRenderReview and mmRenderReflect each still own exactly
+     what they owned. The money step is the Sunday ritual (js/44). */
   const id = mmStepId();
   let body;
   if (id === 'week') body = mmRenderReview(wk) + mmRenderReflect(wk);
   else if (id === 'money') {
-    /* ONE set of chrome for the screen, then the two panels bare. Each used to
-       draw its own page head, five-page bar and kid tabs, which stacked two
-       identical navs on the screen that exists to be less to wade through. */
-    body = `${mnyPageHead('💰 The money', 'Agree it, then decide where it goes',
-        isParent() ? [{ action: 'record-any', label: '✍️ Record something' }] : [], { back: false })}
-      ${mnyTabBar('grow')}${mnyKidTabs()}`
-      + mnyRenderEarned(wk, { chrome: false })
-      + mnyRenderDecide(wk, { chrome: false });
+    /* The money step is the Sunday ritual (js/44-sunday.js): Guess → Payday
+       → I choose → Signed for the girl on screen, its own header and kid
+       switch, and the sign (`mnyDoCommit`) behind hold-to-sign. */
+    body = sdRenderMoneyStep(wk);
   }
   else body = mmRenderPlan(wk);
 
@@ -1512,52 +1499,9 @@ function mm2bScale(wk) {
     Object.values(getWeeklyHours(k, wk).byGroup).map(v => v.planned)));
 }
 
-/* Step 3 — Confirm & record (reuses commitFamilyMeeting; offers an undo). */
-function mmRenderConfirm(wk, held) {
-  const rows = ['jenn','jess'].map(kid => {
-    const prelim = ctWeekMoney(wk, kid);
-    return `<div class="mm-pay-row"><span>${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'}</span><b>$${prelim.toFixed(2)}</b></div>`;
-  }).join('');
-  const alreadyHeld = held || !!(state.shared.chore.meetingsHeld && state.shared.chore.meetingsHeld[wk]);
-  let action;
-  if (mmUndo) {
-    action = `<div class="mm-recorded">✅ Recorded — money credited.</div>
-      <button type="button" class="pill-btn danger" onclick="mmUndoRecord()">↩️ Undo this meeting — puts both girls back</button>`;
-  } else if (alreadyHeld) {
-    action = `<div class="mm-recorded">✅ This week was already recorded.</div>`;
-  } else {
-    action = `<button type="button" class="btn-confirm" onclick="mmConfirmAndRecord()">✅ Confirm &amp; record the week</button>`;
-  }
-  // Show what recording is about to do, per kid, BEFORE it happens — the loan
-  // transfer and XP credit are irreversible-feeling to a kid, so they should
-  // never be a surprise that only shows up in a toast afterwards.
-  const preview = ['jenn','jess'].map(kid => {
-    const b = mrWeekBreakdown(wk, kid);
-    const xp = mrXpForWeek(wk, kid).total;
-    // What the schedule actually asks for today — the deposit before the
-    // monthlies, and nothing at all on the Sundays that aren't payment day.
-    // Read through mnyDueNowAll rather than loanDueNow: it already knows which
-    // months are settled, and it covers EVERY debt. This used to call
-    // loanState(kid) with no debtId, which returns list[0] in insertion order —
-    // so a kid with two loans saw one of them, and not necessarily the one the
-    // payment was about.
-    const owed = mnyDueNowAll(kid);
-    const due = money2(owed.reduce((s, x) => s + money2(x.amount), 0));
-    const dueLabel = owed.length > 1 ? 'loans'
-                   : (owed[0] && owed[0].kind === 'down') ? 'down payment' : 'loan';
-    const bits = [];
-    if (b.chorePaid) bits.push(`chores $${b.chorePaid.toFixed(2)}`);
-    if (b.learnPaid) bits.push(`learning $${b.learnPaid.toFixed(2)}`);
-    if (b.streak.bonus) bits.push(`streak $${b.streak.bonus.toFixed(2)}`);
-    if (b.compPaid) bits.push(`competition $${b.compPaid.toFixed(2)}`);
-    if (b.fines.total) bits.push(`fines −$${b.fines.total.toFixed(2)}`);
-    return `<div class="ct-meta">${CT_PROFILE_ICON[kid]} ${bits.join(' · ') || 'nothing earned'}${xp ? ` · +${xp} XP` : ''}${due ? ` · ${escapeHtml(dueLabel)} −$${due.toFixed(2)}` : ''}</div>`;
-  }).join('');
-  const explain = `This <b>confirms</b> the week. Recording credits each kid's total to cash, credits XP, opens the Sunday Box, adds a month of interest and pays out anything locked away that has reached its date. The loan payment and any overdue interest move <b>once a month</b>, not every Sunday.`;
-  return `<div class="mm-h">Confirm &amp; record</div>
-    <div class="ct-meta">${explain}</div>
-    <div class="mm-pay">${rows}</div>${preview}${mmRenderQuarterly()}${action}`;
-}
+/* `mmRenderConfirm` (the old "Confirm & record" step, unreachable since the
+   meeting became three steps) and `mmConfirmAndRecord` are retired (Sunday
+   v15 Stage 4). */
 /* Quarterly review. The rulebook promises the numbers get revisited every three
    months; this raises it at the meeting with the actual earning data beside it,
    so the re-tune is argued from what happened rather than from a hunch. */
@@ -1591,79 +1535,14 @@ function mmSkipQuarterlyReview() {
   showToast('📅 Quarterly review recorded — rates unchanged');
 }
 
-function mmConfirmAndRecord() {
-  const c = state.shared.chore;
-  const wk = ctWeekKey || ctThisWeekKey();
-  if (c.meetingsHeld && c.meetingsHeld[wk]) { showToast('Already recorded this week'); return; }
-  mmUndoHeld();              // money moved since an earlier commit? then the undo goes first
-  mmTakeUndoSnapshot(wk);
-  const parts = commitFamilyMeeting(wk);
-  mmUndoSeal();              // what the commit itself moved is not "after the meeting"
-  renderMeetingMode();
-  showToast(`💛 Recorded${parts.length ? ' · ' + parts.join(' · ') : ''}`);
-}
-
-/* ── ONE snapshot for the whole family, taken once ────────────────
-   The comment below always said what this was for, and the code did the
-   opposite: mnyDoCommit called it unconditionally, once per child. Settling
-   Jenn stored the state before Jenn; settling Jess then OVERWROTE it with the
-   state after Jenn. Undo put Jess back, left Jenn's money moved, and announced
-   "nothing was recorded" — which was false, and false in the one direction
-   that matters, because the family had no way to see the difference.
-
-   So it is idempotent per week now. The first commit of a week takes the
-   picture; every later one leaves it alone, and mmUndoRecord winds the whole
-   sitting back to before either girl was settled. */
+/* ── ↺ Redo: ONE GIRL'S snapshot, taken at her sign ─────────────────
+   Sunday v15 signs one girl at a time, and ↺ Redo my plan returns her and
+   only her (Plan v3 §A, Rev 2). The meeting-wide picture that used to sit
+   here ("puts both girls back", idempotent per week) is retired with its
+   button in Stage 4; `undoReturnsBothChildren` went with it on purpose. */
 function mmTakeUndoSnapshot(wk, kid) {
-  if (kid) return mmTakeKidUndoSnapshot(wk, kid);
-  // Already holding the pre-commit picture for this week — do not replace it.
-  if (mmUndo && mmUndo.wk === wk) return;
-  /* Withdrawn for this week (mmUndoHeld): a picture taken now, before the
-     second girl, would be offered as "puts both girls back" while the first
-     girl's week and the money that moved after it stay where they are. */
-  if (mmUndoGone && mmUndoGone.wk === wk) return;
-  mmUndoGone = null;
-  /* Both girls brought to today BEFORE the picture. The meeting's own screens
-     catch a girl up when she is shown (mnyRenderEarned, mnyRenderDecide), so
-     the second girl's interest used to arrive after the first commit — a
-     movement after the meeting, which would withdraw the undo between two
-     commits of one sitting. Caught up here it is in the picture, it is not
-     reversed by the undo, and her screen's own catch-up finds nothing to do. */
-  if (typeof mnySimCatchUp === 'function') ['jenn', 'jess'].forEach(k => mnySimCatchUp(k));
-  const c = state.shared.chore;
-  // Snapshot everything the commit mutates so the undo can fully reverse it.
-  // The commit now moves XP and the loan as well as the wallet, so the undo has
-  // to carry all of it — a partial reverse would leave credited XP or a loan
-  // payment standing against a week that was un-recorded.
-  const snap = kid => JSON.parse(JSON.stringify(mmUndoKidState(kid)));
-  mmUndo = {
-    wk,
-    jenn: snap('jenn'),
-    jess: snap('jess'),
-    marketMonth: bankConfig().marketMonth,
-    finalized: (c.finalizedWeeks && c.finalizedWeeks[wk]) ? JSON.parse(JSON.stringify(c.finalizedWeeks[wk])) : null,
-    xpAwarded: (c.xpAwardedWeeks && c.xpAwardedWeeks[wk]) ? JSON.parse(JSON.stringify(c.xpAwardedWeeks[wk])) : null,
-    ledger: (c.moneyLedger && c.moneyLedger[wk]) ? JSON.parse(JSON.stringify(c.moneyLedger[wk])) : null,
-    // What each kid decided, and whether she had agreed her week — an undo that
-    // left the plan behind would show money moved against a week with no
-    // decision recorded.
-    plans: (c.weekPlans && c.weekPlans[wk]) ? JSON.parse(JSON.stringify(c.weekPlans[wk])) : null,
-    confirms: (c.weekConfirms && c.weekConfirms[wk]) ? JSON.parse(JSON.stringify(c.weekConfirms[wk])) : null,
-    // "We sat down" is a separate record from "the money moved", and an undo
-    // that left it behind would show a week met with nothing settled.
-    met: !!((c.meetingsMet || {})[wk]),
-    heldBefore: !!((c.meetingsHeld || {})[wk]),
-    // Which girls were already committed when the picture was taken. This is
-    // what lets the message below be honest rather than assume.
-    committedBefore: ['jenn', 'jess'].filter(k => isChildMoneyCommitted(k, wk)),
-    // Every movement already on either girl's stream — see mmUndoHeld.
-    seen: mmUndoMovementIds(),
-    /* Every event id on each girl's stream at the picture, and the ones the
-       commits wrote since (filled by mmUndoSeal). The undo takes exactly those
-       back off the stream — see evWrittenSince (js/40-stream.js). */
-    streamIds: { jenn: mmStreamIdsOf('jenn'), jess: mmStreamIdsOf('jess') },
-    written: { jenn: [], jess: [] },
-  };
+  if (kid !== 'jenn' && kid !== 'jess') return;
+  mmTakeKidUndoSnapshot(wk, kid);
 }
 
 /* Everything one girl's commit can change in HER profile — the part of the
@@ -1695,6 +1574,8 @@ function mmUndoKidState(kid) {
     // Sunday v15: her questions to a grown-up are stamped `appliedWeek` at
     // sign, so they come back with everything else.
     requests: (typeof mnyEnsureRequests === 'function') ? mnyEnsureRequests(kid) : null,
+    // …and her move questions, stamped `appliedWeek` at sign too (Stage 4).
+    moveRequests: (typeof mnyEnsureMoveRequests === 'function') ? mnyEnsureMoveRequests(kid) : null,
   };
 }
 function mmStreamIdsOf(kid) {
@@ -1710,6 +1591,7 @@ function mmRestoreKidState(kid, s) {
   if (s.savingGoals) pd.savingGoals = s.savingGoals;
   if (s.boxItems) pd.boxItems = s.boxItems;
   if (s.requests) pd.requests = s.requests;
+  if (s.moveRequests) pd.moveRequests = s.moveRequests;
   if (!pd.progress) pd.progress = {};
   pd.progress.xp2 = s.xp;
   pd.progress.questXP = s.xpLegacy;
@@ -1789,114 +1671,26 @@ function mmUndoMovementIds(kids) {
    With a kid: her own ↺ Redo, asked of her own stream only — money moved
    after HER sign withdraws HER redo, and her sister's is untouched. */
 function mmUndoHeld(kid) {
-  if (kid) {
-    const u = mmUndoKid[kid];
-    if (!u) return false;
-    const seen = u.seen || {};
-    const moved = (typeof evList === 'function' ? evList(kid) : []).find(e =>
-      e && e.id && money2(e.amount) > 0 && !seen[e.id]);
-    if (!moved) return true;
-    mmUndoKidGone[kid] = { wk: u.wk, why: (moved.note || moved.kind || 'money moved') };
-    delete mmUndoKid[kid];
-    return false;
-  }
-  if (!mmUndo) return false;
-  const seen = mmUndo.seen || {};
-  let moved = null;
-  ['jenn', 'jess'].some(k => (typeof evList === 'function' ? evList(k) : []).some(e => {
-    if (!e || !e.id || !(money2(e.amount) > 0) || seen[e.id]) return false;
-    moved = (k === 'jenn' ? 'Jenn' : 'Jess') + ': ' + (e.note || e.kind || 'money moved');
-    return true;
-  }));
+  const u = mmUndoKid[kid];
+  if (!u) return false;
+  const seen = u.seen || {};
+  const moved = (typeof evList === 'function' ? evList(kid) : []).find(e =>
+    e && e.id && money2(e.amount) > 0 && !seen[e.id]);
   if (!moved) return true;
-  mmUndoGone = { wk: mmUndo.wk, why: moved };
-  mmUndo = null;
+  mmUndoKidGone[kid] = { wk: u.wk, why: (moved.note || moved.kind || 'money moved') };
+  delete mmUndoKid[kid];
   return false;
 }
 /* The end of a commit: what it moved is part of the meeting, not after it —
    and it is exactly what an undo takes back off the stream (`written`). */
 function mmUndoSeal(kid) {
-  if (kid) {
-    const u = mmUndoKid[kid];
-    if (!u) return;
-    u.seen = mmUndoMovementIds([kid]);
-    u.written = (typeof evWrittenSince === 'function') ? evWrittenSince(evList(kid), u.streamIds) : [];
-    return;
-  }
-  if (!mmUndo) return;
-  mmUndo.seen = mmUndoMovementIds();
-  if (mmUndo.streamIds && typeof evWrittenSince === 'function') {
-    ['jenn', 'jess'].forEach(k => { mmUndo.written[k] = evWrittenSince(evList(k), mmUndo.streamIds[k]); });
-  }
+  const u = mmUndoKid[kid];
+  if (!u) return;
+  u.seen = mmUndoMovementIds([kid]);
+  u.written = (typeof evWrittenSince === 'function') ? evWrittenSince(evList(kid), u.streamIds) : [];
 }
 
-function mmUndoRecord(kid) {
-  if (kid) return mmUndoKidRecord(kid);
-  /* A button drawn before the money moved (or before the other device's
-     movement arrived) can still be pressed. It refuses, and says why. */
-  if (!mmUndoHeld()) {
-    if (mmUndoGone) { showToast(MM_UNDO_GONE_SENTENCE); renderMeetingMode(); }
-    return;
-  }
-  const c = state.shared.chore; const wk = mmUndo.wk;
-  ['jenn', 'jess'].forEach(kid => {
-    mmRestoreKidState(kid, mmUndo[kid]);
-    /* The commits' own lines go too (Plan v3 §E, Undo fix): the wallet went
-       back, so a stream still carrying them would pay the week twice the
-       moment it is signed again. */
-    mmTakeBackStreamLines(kid, (mmUndo.written || {})[kid]);
-  });
-  bankConfig().marketMonth = mmUndo.marketMonth;
-  // safe-delete: ctStampWeekState(wk) at the end of this function
-  if (mmUndo.finalized) c.finalizedWeeks[wk] = mmUndo.finalized; else if (c.finalizedWeeks) delete c.finalizedWeeks[wk];
-  // Clearing the XP ledger for the week is what lets a re-record award again;
-  // without it the reversed XP could never be re-credited.
-  if (c.xpAwardedWeeks) {
-    // safe-delete: stamped at the end of mmUndoRecord
-    if (mmUndo.xpAwarded) c.xpAwardedWeeks[wk] = mmUndo.xpAwarded; else delete c.xpAwardedWeeks[wk];
-  }
-  // The frozen ledger has to go back too, or an un-recorded week keeps a
-  // history entry claiming it was settled.
-  if (c.moneyLedger) {
-    // safe-delete: stamped at the end of mmUndoRecord
-    if (mmUndo.ledger) c.moneyLedger[wk] = mmUndo.ledger; else delete c.moneyLedger[wk];
-  }
-  // The decision and the agreement go back with the money. Leaving the plan
-  // behind would leave the week showing as settled with nothing to settle.
-  // safe-delete: stamped at the end of mmUndoRecord
-  if (c.weekPlans) { if (mmUndo.plans) c.weekPlans[wk] = mmUndo.plans; else delete c.weekPlans[wk]; }
-  // safe-delete: stamped at the end of mmUndoRecord
-  if (c.weekConfirms) { if (mmUndo.confirms) c.weekConfirms[wk] = mmUndo.confirms; else delete c.weekConfirms[wk]; }
-  if (typeof mnyDraft !== 'undefined') mnyDraft = null;
-  // safe-delete: stamped at the end of mmUndoRecord
-  if (c.meetingsHeld) { if (mmUndo.heldBefore) c.meetingsHeld[wk] = true; else delete c.meetingsHeld[wk]; }
-  // "We sat down" and "the money moved" are different facts, and the undo has
-  // to put each back the way it found it rather than assume both were false.
-  // safe-delete: stamped at the end of mmUndoRecord
-  if (c.meetingsMet) { if (mmUndo.met) c.meetingsMet[wk] = true; else delete c.meetingsMet[wk]; }
-  /* One stamp for the whole undo. Every branch above either restores a week's
-     entry or REMOVES it, and a removal is an absence — which deepMergeObj
-     cannot express, so each of those deletes was undone by the next snapshot
-     from the other device. The wallet went back (profiles are arbitrated per
-     record) while the week still read as settled over there: a half-undo, and
-     the half that was wrong was the money's own paperwork. Stamping the week
-     hands it to the newer side whole, across all eight maps. */
-  ctStampWeekState(wk);
-
-  /* Say only what is true. "Nothing was recorded" was printed unconditionally,
-     including in the case it was most wrong about: after settling both girls,
-     when the snapshot had been overwritten and only the second was actually
-     reversed. It now names who went back — and if a girl was already committed
-     before this sitting began, it says that instead of claiming the week is
-     clean. */
-  const wasClean = !(mmUndo.committedBefore || []).length;
-  mmUndo = null;
-  saveAll();
-  renderMeetingMode();
-  showToast(wasClean
-    ? '↩️ Undone — nothing was recorded for either girl'
-    : '↩️ Undone — both girls are back where they were before this meeting');
-}
+function mmUndoRecord(kid) { return mmUndoKidRecord(kid); }
 
 /* ↺ Redo for one girl. Her profile, her row of every week map and her
    commit's stream lines go back; her sister's signing is not touched. The
@@ -1928,7 +1722,6 @@ function mmUndoKidRecord(kid) {
     // safe-delete: ctStampWeekState(wk) below hands the week over whole
     delete c.meetingsHeld[wk];
   }
-  if (typeof mnyDraft !== 'undefined') mnyDraft = null;
   ctStampWeekState(wk);
   delete mmUndoKid[kid];
   saveAll();
@@ -2172,46 +1965,22 @@ function mmSettledStrip(wk) {
 /* What the last button should say. A family genuinely might stop halfway and
    come back, so this names the gap rather than refusing — and keeps a way out. */
 /* ── THE MONEY STEP'S FOOTER ──────────────────────────────────────
-   The one control in the app that moves real money, put where it cannot be
-   missed and cannot be hit by accident.
-
-   It is deliberately NOT a Next. "What I earned" and "what I do with it" share
-   a screen now, and that merge must not turn scrolling to the bottom into a
-   commit — so the footer names the act, refuses with the reason when the split
-   does not add up, and only becomes a way onwards once the money has actually
-   moved.
-
-   Every refusal comes from `mnyCommitRefusal` (js/23-money-meeting.js), the
-   same one the panel above prints. A footer with its own copy of that rule is
-   how you get a button offering to commit while the panel says it cannot. */
+   Signing is hold-to-sign on Sunday's "I choose" step, so the footer is not
+   where money moves any more (Sunday v15 Stage 4). It still never offers to
+   skip a girl: until she is signed it says, disabled, what Sunday is waiting
+   for (`sdFooterWhy`, js/44 — the same answer the ritual's own buttons give);
+   once she is signed it offers her sister, then the close step. */
 function mmMoneyFooter(wk) {
   const kid = mnyMeetingKid();
   const other = kid === 'jenn' ? 'jess' : 'jenn';
-  const nextStep = `<button type="button" class="btn-confirm" onclick="mmGoTo('close')">Next ▶</button>`;
-
-  // The week has to be agreed before a split means anything — the same gate
-  // mnyRenderDecide puts over the whole panel, said on the button too.
-  if (typeof mnyIsConfirmed === 'function' && !mnyIsConfirmed(wk, kid)) {
-    return `<button type="button" class="btn-confirm" disabled>Agree ${escapeHtml(mnyKidName(kid))}'s week first</button>`;
-  }
-  if (typeof mnyIsCommitted === 'function' && mnyIsCommitted(wk, kid)) {
-    /* Done for this child. If the other one is still open the honest next move
-       is her, not the close screen — a sitting that skips a child is how a week
-       comes to be half-settled with nothing saying so. */
-    if (typeof mnyIsCommitted === 'function' && !mnyIsCommitted(wk, other)) {
+  if (mnyIsCommitted(wk, kid)) {
+    if (!mnyIsCommitted(wk, other)) {
       return `<button type="button" class="btn-confirm"
         onclick="mnySetMeetKid('${escapeJsAttr(other)}')">${escapeHtml(mnyKidName(other))}'s money ▶</button>`;
     }
-    return nextStep;
+    return `<button type="button" class="btn-confirm" onclick="mmGoTo('close')">Next ▶</button>`;
   }
-  const draft = mnyEnsureDraft(wk, kid);
-  const pool = mnyPool(wk, kid);
-  const blocked = mnyCommitRefusal(draft, pool);
-  if (blocked) {
-    return `<button type="button" class="btn-confirm" disabled>${escapeHtml(blocked)}</button>`;
-  }
-  return `<button type="button" class="btn-confirm mm-commit" onclick="mnyDoCommit()">
-      Move ${escapeHtml(mnyKidName(kid))}'s ${mnyMoney(mnySplitTotal(draft.split))}</button>`;
+  return `<button type="button" class="btn-confirm" disabled>${escapeHtml(sdFooterWhy(kid, wk))}</button>`;
 }
 
 function mmFinishButtons(wk) {
@@ -2243,8 +2012,7 @@ function mmFinishButtons(wk) {
    can settle one kid at a time — she decides what happens to her own money on
    step 4, and her sister's week is a separate conversation that may not even
    happen on the same evening. */
-function commitKidWeek(wk, kid, opts) {
-  const o = opts || {};
+function commitKidWeek(wk, kid) {
   ctEnsureShared();
   const c = state.shared.chore;
   if (!c.finalizedWeeks) c.finalizedWeeks = {};
@@ -2282,21 +2050,10 @@ function commitKidWeek(wk, kid, opts) {
     {
       const xp = mrCreditWeekXp(wk, kid);
       if (xp > 0) parts.push(`${name} +${xp} XP`);
-      // A month of overdue interest, then the scheduled transfer. Interest is
-      // charged BEFORE the payment so a kid who pays late still meets the cost
-      // of having been late, rather than escaping it by paying on the day.
-      const interest = mnyAccrueArrearsAll(kid);
-      if (interest > 0) parts.push(`${name} interest −$${interest.toFixed(2)}`);
-      // Both of these are stamped by calendar month inside the loan module —
-      // the meeting is weekly, the schedule is monthly, so most Sundays this
-      // correctly does nothing. Every debt is paid, highest bonus rate first.
-      const transfers = mnySundayTransferAll(kid, o.shortfall || 'pay_available', { weekKey: wk });
-      const t = transfers[0] || { paid: 0, shortfall: 0, kind: null };
-      transfers.forEach(r => {
-        const what = r.kind === 'down' ? 'down payment' : r.name;
-        if (r.paid > 0) parts.push(`${name} ${what} −$${r.paid.toFixed(2)}`);
-        if (r.shortfall > 0) parts.push(`${name} ${r.name} overdue $${r.shortfall.toFixed(2)}`);
-      });
+      /* The loan is no longer paid here: the Sunday sign pays the must-pay
+         and the extra through the loan's own owners after this (mnyDoCommit,
+         js/23 — Plan v3 §E step 6), and fills `ledger.loan`. The old monthly
+         transfer and arrears charge are retired (Stage 4). */
       // The box opens at the meeting, not on a calendar day.
       const released = mrReleaseBoxForMeeting(kid);
       if (released > 0) parts.push(`${name} box opened (${released})`);
@@ -2304,15 +2061,6 @@ function commitKidWeek(wk, kid, opts) {
       if (ledger) {
         ledger.xp = xp;
         ledger.boxReleased = released;
-        ledger.loan = {
-          kind: t.kind || null,
-          paid: money2(transfers.reduce((s, r) => s + (r.paid || 0), 0)),
-          shortfall: money2(transfers.reduce((s, r) => s + (r.shortfall || 0), 0)),
-          interest: money2(interest || 0),
-          // Per debt, so a week with two loans can still be read back.
-          each: transfers.map(r => ({ debtId: r.debtId, name: r.name,
-                                      paid: money2(r.paid || 0), shortfall: money2(r.shortfall || 0) })),
-        };
         c.moneyLedger[wk][kid] = ledger;
       }
     }

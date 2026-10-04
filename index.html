@@ -453,6 +453,15 @@
   </div>
 </div>
 
+<!-- 🗣️ Dad's card on Sunday — ASK / SAY / WAIT for the step (js/44-sunday.js).
+     Chrome here, body filled by JS, the recordOverlay pattern. -->
+<div class="overlay" id="sundayOverlay" onclick="overlayClick(event,'sundayOverlay')">
+  <div class="sheet sd-sheet" role="dialog" aria-modal="true" aria-labelledby="sdSheetTitle">
+    <h3 id="sdSheetTitle">🗣️ Dad's card</h3>
+    <div id="sundayBody"></div>
+  </div>
+</div>
+
 <!-- Quick profile switcher (tap the profile icon) -->
 <div class="overlay" id="profileSwitchOverlay" onclick="overlayClick(event,'profileSwitchOverlay')">
   <div class="sheet sheet--compact" role="dialog" aria-modal="true" aria-labelledby="profileSwitchTitle">
@@ -1605,6 +1614,7 @@
 <script src="js/41-record.js"></script>
 <script src="js/42-flow.js"></script>
 <script src="js/43-sunday-core.js"></script>
+<script src="js/44-sunday.js"></script>
 <script src="js/45-requests.js"></script>
 <script src="js/46-grownups.js"></script>
 <script src="js/99-main.js"></script>

@@ -40,11 +40,19 @@ function mnyOpenSchool(kid, conceptId, opts) {
   showScreen('moneyschool');
   mnyRenderSchool();
 }
-/* ◀ from Money school: back where the explainer was opened, at the same
-   place on the page. Anything else, and the default, is My money. */
+/* ◀ from Money school: back where the explainer was opened — My money at the
+   same place on the page, or the Sunday step it was asked from. Anything
+   else, and the default, is My money. */
 function mnySchoolBack() {
   const back = mnySchoolReturn;
   mnySchoolReturn = null;
+  /* From Sunday's '?' (the meeting is a screen): back to the same girl and
+     the same Sunday step — the step lives in her device-local draft. */
+  if (back && back.screen === 'meeting') {
+    showScreen('meeting');
+    renderMeetingMode();
+    return;
+  }
   mnyOpenMyMoney(mnyViewKid());
   if (back && back.screen === 'mymoney' && back.scrollY > 0) {
     try { window.scrollTo(0, back.scrollY); } catch (e) {}

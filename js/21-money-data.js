@@ -33,7 +33,7 @@
 
    THE STAGE IS THE ONE OWNER OF A GATE. Each stage has an id; its number lives
    in the rulebook (`school.stagePct`, js/18-rules.js) and is read only through
-   `mnyStagePct`. MNY_BUCKETS, MNY_PLANS and MNY_CONCEPTS name a STAGE and never
+   `mnyStagePct`. MNY_BUCKETS, SD_GATE_STAGE (js/43) and MNY_CONCEPTS name a STAGE and never
    a number. They used to carry their own copies (30 / 60 / 90 in three tables)
    and nothing made them agree, so a pot, its lesson and the ladder row could
    each have said something different about the same moment. */
@@ -59,19 +59,9 @@ const MNY_BUCKETS = [
   { key: 'stock', icon: '📈', label: 'Companies',  stage: 'stock', tint: 'var(--mny-pot-stock-tint)' },
 ];
 
-/* The ready-made plans. Fractions of what is hers to choose. */
-const MNY_PLANS = [
-  { id: 'debt',     icon: '🎿', label: 'Pay off my loan first', stage: 'start',  split: { loan: 1 } },
-  { id: 'ready',    icon: '💵', label: 'Keep some ready',       stage: 'ready',  split: { loan: 0.4, ready: 0.6 } },
-  { id: 'balanced', icon: '⚖️', label: 'A bit of everything',   stage: 'locked', split: { loan: 0.4, ready: 0.3, gic: 0.3 } },
-  { id: 'grow',     icon: '📈', label: 'Grow it more',          stage: 'stock',  split: { loan: 0.3, ready: 0.1, gic: 0.2, stock: 0.4 } },
-  { id: 'last',     icon: '🔁', label: 'Same as last week',     stage: 'start',  split: null },
-  /* Not a stage-gated idea — it is manual entry, and the "or set every number
-     yourself" steppers directly below this card are open at every stage. A
-     locked card sitting above the unlocked control that does the same thing is
-     just a lie about what the screen can do. */
-  { id: 'own',      icon: '🧩', label: "I'll choose every number myself", stage: 'start', split: null, own: true },
-];
+/* The ready-made plans (`MNY_PLANS`) are retired with the meeting's old money
+   panels (Sunday v15 Stage 4, Plan v3 §G): the three starts on Sunday's "I
+   choose" step are the core's `SD_PRESETS` (js/43). */
 
 /* Investing is a fixed menu — no typing in a ticker. A nine-year-old picking a
    company by name is the lesson; a search box is a casino. */
@@ -1491,14 +1481,18 @@ function mnySetPaymentOverride(kid, weekKey, debtId, amount) {
   saveAll();
   return true;
 }
-/* What each debt is actually being paid this week: the schedule, or the
-   agreed-down figure. One reader, so the pool, the card and the commit can't
-   disagree about the number. */
+/* What each debt is actually being paid this Sunday: its must-pay (the weekly
+   figure plus what it still owes, never more than the debt — Sunday v15
+   terms, `mnyDebtDueThisSunday`), or the agreed-down figure for this week.
+   Open rows, oldest first. One reader, so the pool, Sunday's 📌 line and the
+   payment itself (`mnyLoanSundayPayment`) can't disagree about the number. */
 function mnyDueThisWeek(kid, weekKey) {
-  return mnyDueNowAll(kid).map(d => {
-    const ov = mnyGetPaymentOverride(kid, weekKey, d.debt.id);
-    const amount = ov == null ? money2(d.amount) : money2(Math.min(ov, d.amount));
-    return Object.assign({}, d, { scheduled: money2(d.amount), amount, reduced: ov != null && amount < money2(d.amount) });
+  return mnyOpenDebtsOldestFirst(kid).map(d => {
+    // This Sunday's payment already ran: nothing more is asked of it.
+    const scheduled = d.lastSundayPaidWeek === weekKey ? 0 : mnyDebtDueThisSunday(kid, d);
+    const ov = mnyGetPaymentOverride(kid, weekKey, d.id);
+    const amount = ov == null ? scheduled : money2(Math.min(ov, scheduled));
+    return { debtId: d.id, debt: d, scheduled, amount, reduced: ov != null && amount < scheduled };
   });
 }
 
@@ -1519,8 +1513,8 @@ function mnyPool(weekKey, kid) {
   return {
     breakdown: b, deposits, lateComp, cameIn, mustPay, mine, due,
     scheduledPay: scheduledTotal,
-    // What the family agreed NOT to pay this month. It does not vanish — the
-    // debt still carries it, and arrears still apply.
+    // What the family agreed NOT to pay this Sunday. It does not vanish — the
+    // debt carries it to next Sunday (no interest on it).
     unpaid: money2(Math.max(0, scheduledTotal - dueTotal)),
     // Investing is capped at a fifth of the week: a bad month should sting,
     // not wipe out everything she earned.
@@ -1531,135 +1525,9 @@ function mnyPool(weekKey, kid) {
   };
 }
 
-/* ── Pricing a plan ──
-   Turn a plan (or a hand-built split) into dollars per bucket, then into what
-   it actually does to the debt. `split` keys are 'loan:<debtId>', 'ready',
-   'gic', 'stock'. */
-function mnySplitFor(weekKey, kid, planId, own) {
-  const pool = mnyPool(weekKey, kid);
-  const debts = mnyDebtsByPriority(kid).filter(d => loanBalance(kid, d.id) > 0);
-  const out = { ready: 0, gic: 0, stock: 0, spend: 0 };
-  debts.forEach(d => { out['loan:' + d.id] = 0; });
-  // A row per goal she is still saving for. Goals are never stage-locked —
-  // they are the reason to save, so gating them behind a lesson about saving
-  // would be backwards.
-  mnyGoals(kid).forEach(g => { out['goal:' + g.id] = 0; });
-
-  if (planId === 'own') return Object.assign(out, own || {});
-  if (planId === 'last') {
-    const prev = mnyPreviousPlan(weekKey, kid);
-    if (prev && prev.split) {
-      // Re-price last week's SHAPE against this week's money, so a smaller week
-      // does not commit more than exists.
-      const prevTotal = Object.keys(prev.split).reduce((s, k) => s + money2(prev.split[k]), 0);
-      if (prevTotal > 0) {
-        Object.keys(prev.split).forEach(k => {
-          const dollars = money2(pool.mine * (money2(prev.split[k]) / prevTotal));
-          // A debt cleared or a goal reached since last week: its share falls
-          // back to being kept ready rather than vanishing from the split.
-          if (out[k] === undefined && (k.indexOf('loan:') === 0 || k.indexOf('goal:') === 0)) {
-            out.ready = money2(out.ready + dollars);
-            return;
-          }
-          out[k] = dollars;
-        });
-        return out;
-      }
-    }
-    planId = 'ready';   // no history yet — fall back to the gentle default
-  }
-  const plan = MNY_PLANS.find(p => p.id === planId) || MNY_PLANS[0];
-  const shape = plan.split || { loan: 1 };
-  Object.keys(shape).forEach(k => {
-    let dollars = money2(pool.mine * shape[k]);
-    if (k !== 'loan') {
-      // A bucket she has not reached yet takes nothing, whatever the plan says.
-      // Its share falls back to paying the debt down, which is always open.
-      const bucket = MNY_BUCKETS.find(b => b.key === k);
-      if (bucket && !mnyIsOpen(kid, bucket.stage)) {
-        const first = debts[0];
-        if (first) out['loan:' + first.id] = money2(out['loan:' + first.id] + dollars);
-        else out.ready = money2(out.ready + dollars);
-        return;
-      }
-      out[k] = dollars;
-      return;
-    }
-    // The loan share spreads across debts, highest bonus first — that is where
-    // a dollar clears the most.
-    let left = dollars;
-    debts.forEach(d => {
-      if (!(left > 0)) return;
-      const give = money2(Math.min(left, mnyCashToClear(kid, d)));
-      out['loan:' + d.id] = money2(out['loan:' + d.id] + give);
-      left = money2(left - give);
-    });
-    if (left > 0) out.ready = money2(out.ready + left);   // everything paid off
-  });
-  return out;
-}
-function mnySplitTotal(split) {
-  return money2(Object.keys(split || {}).reduce((s, k) => s + money2(split[k]), 0));
-}
-function mnySplitToLoan(split, debtId) {
-  if (debtId) return money2((split || {})['loan:' + debtId]);
-  return money2(Object.keys(split || {}).filter(k => k.indexOf('loan:') === 0)
-    .reduce((s, k) => s + money2(split[k]), 0));
-}
-
-/* What a plan does, in the four numbers page 3 shows as tiles. */
-function mnyPricePlan(kid, split) {
-  const toLoan = mnySplitToLoan(split);
-  const before = mnyTotalOwing(kid);
-  let bonus = 0, cleared = 0, left = toLoan;
-  mnyDebtsByPriority(kid).forEach(d => {
-    if (!(left > 0)) return;
-    const owed = loanBalance(kid, d.id);
-    if (!(owed > 0)) return;
-    const rate = (Number(d.bonusRate) || 0) / 100;
-    const need = money2(owed / (1 + rate));
-    const pay = money2(Math.min(left, need));
-    cleared = money2(cleared + pay * (1 + rate));
-    bonus = money2(bonus + pay * rate);
-    left = money2(left - pay);
-  });
-  const primary = mnyDebtsByPriority(kid).find(d => loanBalance(kid, d.id) > 0);
-  const now = primary ? loanFreeDate(kid, primary.id, 0) : { months: 0 };
-  const then = primary ? loanFreeDate(kid, primary.id, mnySplitToLoan(split, primary.id)) : { months: 0 };
-  return {
-    toLoan, bonus, cleared,
-    owingAfter: money2(Math.max(0, before - cleared)),
-    cashReady: money2(money2((split || {}).ready) + money2((split || {}).gic) + money2((split || {}).stock)),
-    monthsNow: now.months, monthsThen: then.months,
-    monthsSaved: (now.months != null && then.months != null) ? Math.max(0, now.months - then.months) : 0,
-    freeDate: then.date || null,
-  };
-}
-
-/* ── The five doors ──
-   "If I put $X somewhere for a year, what happens?" — one row per choice,
-   signed, so paying late sits below the line beside the ones that grow. */
-function mnyDoors(kid, amount) {
-  const amt = money2(amount);
-  const cfg = bankConfig();
-  const d = mnyDebtsByPriority(kid)[0] || { bonusRate: 0, arrearsRatePct: 0, name: 'my loan', icon: '🎿' };
-  const bonus = (Number(d.bonusRate) || 0) / 100;
-  const arrears = (Number(d.arrearsRatePct) || 0) / 100;
-  const gic = Number((cfg.gicRates || {})[12]) || 0.04;
-  const save = Number(cfg.savingsRate) || 0.015;
-  return [
-    { id: 'early', icon: '⚡', label: 'Pay off ' + d.name + ' early', delta: money2(amt * bonus),
-      note: 'The bonus is promised — it cannot go down.' },
-    { id: 'gic',   icon: '🔒', label: 'Locked away · 4 weeks',        delta: money2(amt * gic),
-      note: 'Promised too, but you cannot touch it while it is locked.' },
-    { id: 'ready', icon: '🏦', label: 'Savings',                      delta: money2(amt * save),
-      note: 'Small, but you can have it back any day.' },
-    { id: 'stock', icon: '📈', label: 'Companies',                    delta: money2(amt * 0.07), range: true,
-      note: 'Could be a lot more. Could be less than you put in.' },
-    { id: 'late',  icon: '🐢', label: 'Pay late',                     delta: money2(-amt * arrears * 12),
-      note: 'It costs more every month you wait.' },
-  ];
-}
+/* `mnySplitFor`, `mnySplitTotal`, `mnySplitToLoan`, `mnyPricePlan` and
+   `mnyDoors` priced the retired plan cards; Sunday's "I choose" step prices
+   every placement through the core (js/43). Retired in Stage 4. */
 
 /* ════════════════════════════════════════════════════════════════
    THE TWO BARS
@@ -1719,24 +1587,6 @@ function mnyIncomeSegments(weekKey, kid) {
   out.cameIn = pool.cameIn;
   return out;
 }
-function mnyOutflowSegments(weekKey, kid, split) {
-  const pool = mnyPool(weekKey, kid);
-  const s = split || (mnyWeekPlan(weekKey, kid) || {}).split || {};
-  const rows = [{ label: 'My loan payment', value: pool.mustPay, color: 'var(--mny-out-loan)' }];
-  mnyDebtsByPriority(kid).forEach(d => {
-    rows.push({ label: 'Extra off ' + d.name, value: money2(s['loan:' + d.id]), color: 'var(--mny-out-extra)' });
-  });
-  mnyGoals(kid, true).forEach(g => {
-    const v = money2(s['goal:' + g.id]);
-    if (v > 0) rows.push({ label: 'Toward ' + g.name, value: v, color: 'var(--mny-out-goal)' });
-  });
-  rows.push({ label: 'Spent',        value: money2(s.spend), color: 'var(--mny-out-spend)' });
-  rows.push({ label: 'Savings',      value: money2(s.ready), color: 'var(--mny-out-ready)' });
-  rows.push({ label: 'Locked away',  value: money2(s.gic),   color: 'var(--mny-out-locked)' });
-  rows.push({ label: 'Companies',    value: money2(s.stock), color: 'var(--mny-out-stock)' });
-  return mnySegments(rows);
-}
-
 /* ── Lessons ──
    Which stage she is at, and what that opens. A parent can open the next one
    early — sometimes the conversation gets there before the debt does. */
@@ -2004,5 +1854,5 @@ function mnyWeekKey() {
 
 // Inert in the browser; lets tests run these helpers in Node.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { MNY_STAGES, MNY_PLANS, MNY_BUCKETS, MNY_CONCEPTS };
+  module.exports = { MNY_STAGES, MNY_BUCKETS, MNY_CONCEPTS };
 }

@@ -88,6 +88,13 @@ if (document.fonts) {
   // carry data-mm-action. Same reason as above — every step rebuilds the body.
   const meeting = document.getElementById('familyMeetingBody');
   if (meeting) meeting.addEventListener('click', mmHandleClick);
+  /* Sunday's boxes and hold-to-sign (js/44-sunday.js): tap, a 2-second hold,
+     and a held sign button, on pointer events; Enter / Space as a click with
+     no pointer. Delegated for the same reason — the body is rebuilt. */
+  if (meeting) {
+    ['pointerdown', 'pointerup', 'pointercancel', 'pointerout'].forEach(t => meeting.addEventListener(t, sdPointer));
+    meeting.addEventListener('click', sdKeyClick);
+  }
   /* The day's chore grade strip. Delegated because the strip is rebuilt on
      every render, and data attributes rather than an inline handler because a
      chore id reaches this from a world-writable document — see the escaping

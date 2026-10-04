@@ -26,7 +26,7 @@
    touched: Firestore keeps its own offline story (js/03-sync.js) and a worker
    in the middle of it would be a second cache disagreeing with the first. */
 
-const SW_VERSION = '2026-10-03a';
+const SW_VERSION = '2026-10-04a';
 const CACHE = 'wp-shell-' + SW_VERSION;
 
 const SHELL = [
@@ -77,6 +77,7 @@ const SHELL = [
   './js/41-record.js',
   './js/42-flow.js',
   './js/43-sunday-core.js',
+  './js/44-sunday.js',
   './js/45-requests.js',
   './js/46-grownups.js',
   './js/99-main.js',

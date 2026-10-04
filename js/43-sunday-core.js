@@ -178,8 +178,13 @@ function sdPaidPct(loan) {
   if (!(p > 0)) return 100;
   return Math.max(0, Math.min(100, Math.round((Number(loan.paid) || 0) / p * 100)));
 }
+/* `mustPay`, when given, is this Sunday's figure as the app already priced it
+   (each row's weekly + what it still owes, less a grown-up's agreed-down
+   payment for this week — `mnyDueThisWeek`), so the pile and the sign take
+   exactly what the loan's owner will take. Without it: weekly + arrears. */
 function sdMustPay(loan) {
   const l = loan || {};
+  if (l.mustPay != null) return sdR2(Math.min(sdLeft(l), Math.max(0, Number(l.mustPay) || 0)));
   return sdR2(Math.min(sdLeft(l), (Number(l.weekly) || 0) + (Number(l.arrears) || 0)));
 }
 /* Interest every N Sundays: the counter moves first, then on the Nth Sunday
@@ -236,9 +241,10 @@ function sdHers(w, rules) { return sdPile(w, rules).hers; }
 /* ── Step 3 · may she put money here? ──
    Loan extra and cash out: always. 🏦 Savings, 🔒 Locked away and
    📈 Companies open as the loan is paid (school.stagePct: 20 / 30 / 40). The
-   goal jar and the two growing pots need 🛟 Savings filled to the safety line
-   first — except the goal jar while Savings is still shut: there is no
-   Savings to fill yet, so the 🛟 line cannot be asked of her. */
+   🎯 goal jar opens with Savings (Plan v5 Deviation 31 — the owner's answer
+   after Stage 3a: "goal jars wait for Savings"; `mnyGoalJarRefusal` holds the
+   same rule in the jar's owner). The goal jar and the two growing pots need
+   🛟 Savings filled to the safety line first. */
 function sdSafeOk(w, rules) {
   const x = w || {};
   return sdR2(((x.pots || {}).ready || 0) - ((x.pull || {}).ready || 0) + sdAlloc(x.alloc).ready)
@@ -253,7 +259,9 @@ function sdCanPlace(k, w, rules) {
   if (k === 'extra' || k === 'spend' || k === 'adv') return { ok: true, why: null };
   const fill = `🛟 fill Savings to $${sdRule(rules, 'pots.safety')} first`;
   if (k === 'goal') {
-    if (!sdIsOpen('ready', w, rules)) return { ok: true, why: null };
+    if (!sdIsOpen('ready', w, rules)) {
+      return { ok: false, why: `🔒 opens at ${sdRule(rules, 'school.stagePct.ready')}% paid` };
+    }
     return sdSafeOk(w, rules) ? { ok: true, why: null } : { ok: false, why: fill };
   }
   if (!sdIsOpen(k, w, rules)) {
@@ -354,7 +362,8 @@ function sdPresets(w, rules) {
         const f = Math.min(fill, v); a.ready += f; used += f; fill -= f; v -= f;
       }
       // Judged against the preset's own allocation so far — Savings filled above.
-      if (k !== 'goal' && !sdCanPlace(k, Object.assign({}, x, { alloc: a }), rules).ok) {
+      // A shut jar (Savings shut, Deviation 31) sends its share to the wall too.
+      if (!sdCanPlace(k, Object.assign({}, x, { alloc: a }), rules).ok) {
         a.extra += v; used += v; return;
       }
       a[k] += v; used += v;
@@ -398,6 +407,9 @@ function sdSign(w, rules) {
   const P = sdPile(x, rules);
   if (P.pile > 0) return { ok: false, why: `place $${P.pile} first` };
   const a = sdAlloc(x.alloc);
+  // A placement is dollars put somewhere; a negative one is not a plan.
+  if (SD_ALLOC_KEYS.some(k => !(Number(a[k]) >= 0))) return { ok: false, why: 'Every box needs $0 or more — nothing was signed.' };
+  if (P.pile < 0) return { ok: false, why: `That is $${-P.pile} more than my pile — nothing was signed.` };
   const pots = Object.assign({ ready: 0, goal: 0, gic: 0, stock: 0 }, x.pots || {});
   const pull = Object.assign({ ready: 0, stock: 0, cash: 0 }, x.pull || {});
   const loan = Object.assign({ principal: 0, paid: 0, interest: 0, arrears: 0, weekly: 0 }, x.loan || {});

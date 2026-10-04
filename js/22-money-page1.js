@@ -949,8 +949,11 @@ function mnyStoryWeek(kid, r) {
    renders `record-any` and `tourpar` into #mnyRulesWrap, had two buttons
    that did nothing at all.
    `requestBody` is her request sheets' body (js/45-requests.js): their
-   `rq-…` actions are handed to `rqHandleAction` / `rqHandleInput`. */
-const MNY_CLICK_HOSTS = ['mnyPage1Wrap', 'mnyStoryWrap', 'mnySchoolWrap', 'familyMeetingBody', 'mnyRulesWrap', 'requestBody'];
+   `rq-…` actions are handed to `rqHandleAction` / `rqHandleInput`.
+   `sundayBody` is the Sunday ritual's sheet (Dad's card, js/44); the
+   ritual's `sd-…` actions, in the meeting body and that sheet, are handed to
+   `sdHandleAction`. */
+const MNY_CLICK_HOSTS = ['mnyPage1Wrap', 'mnyStoryWrap', 'mnySchoolWrap', 'familyMeetingBody', 'mnyRulesWrap', 'requestBody', 'sundayBody'];
 
 function mnyHandleClick(ev) {
   const el = ev.target.closest('[data-mny-action]');
@@ -958,10 +961,9 @@ function mnyHandleClick(ev) {
   const a = el.getAttribute('data-mny-action');
   // Her request sheets (js/45-requests.js) own every `rq-…` action.
   if (a.indexOf('rq-') === 0) { rqHandleAction(a, el); return; }
+  // The Sunday ritual (js/44-sunday.js) owns every `sd-…` action.
+  if (a.indexOf('sd-') === 0) { sdHandleAction(a, el); return; }
 
-  /* A planned meet with no result yet, in step 3. Recording it is the full
-     form; "no criteria met" is the one-tap answer that writes a real record
-     worth nothing — a different fact from no record at all. */
   if (a === 'gifts') { mnySetGiftsOpen(!mnyGiftsOpen()); mnyRenderMyMoney(); return; }
   /* My money's doors (My Money v2). A child's open her request sheets
      (js/45) — each one ASKS. A grown-up records a result, a move or a gift
@@ -1006,7 +1008,9 @@ function mnyHandleClick(ev) {
     openRecordSheet({ kid: el.closest('#mnyRulesWrap') ? mnyParentKid() : mnyViewKid() });
     return;
   }
-  if (a === 'comp-from-plan') { mnyOpenCompForPlanned(el.getAttribute('data-daykey')); return; }
+  /* A planned meet with no result yet, on Sunday's "Dad answers first" card:
+     "No criteria met · $0" writes a real record worth nothing — a different
+     fact from no record at all. */
   if (a === 'comp-zero') {
     mnyRecordCompZero(mnyMeetingKid(), el.getAttribute('data-daykey'),
       el.getAttribute('data-name'), el.getAttribute('data-sport'));
@@ -1055,19 +1059,6 @@ function mnyHandleClick(ev) {
 /* Typed fields. Kept out of mnyHandleClick and off re-render: redrawing on
    every keystroke would take the caret with it. */
 function mnyHandleInput(ev) {
-  {
-    const g = ev.target.closest('[data-mny-action="dep-giver"]');
-    if (g) { if (mnyDepDraft) mnyDepDraft.giver = g.value; return; }
-    /* The date DOES re-render, unlike the giver above: changing it can change
-       which Sunday decides the gift, and that sentence is on the card. A caret
-       is not at risk in a date input the way it is in a text one. */
-    const dk = ev.target.closest('[data-mny-action="dep-day"]');
-    if (dk) {
-      if (mnyDepDraft) mnyDepDraft.dayKey = dk.value || todayKey();
-      if (typeof renderMeetingMode === 'function') renderMeetingMode();
-      return;
-    }
-  }
   const el = ev.target.closest('[data-mny-action]');
   if (!el) return;
   const a = el.getAttribute('data-mny-action');
@@ -1081,8 +1072,12 @@ function mnyHandleInput(ev) {
    idea and remembers where to come back to (`mnySchoolReturn`, device-local).
    An idea not open for her yet still explains itself — the prototype has no
    locks here — and says when it opens. */
-function mnyShowConcept(id) {
-  const kid = mnyViewKid();
+function mnyShowConcept(id, opts) {
+  const o = opts || {};
+  /* From the meeting the girl on screen is the meeting's, and Save & grow's
+     '?' carries a tab for each of its four places (the prototype's askTabs). */
+  const fromMeeting = typeof mmIsOpen === 'function' && mmIsOpen();
+  const kid = fromMeeting ? mnyMeetingKid() : mnyViewKid();
   const c = mnyConceptCard(id, kid);
   if (!c) return;
   const existing = document.getElementById('mnyConceptCard');
@@ -1090,7 +1085,12 @@ function mnyShowConcept(id) {
   const el = document.createElement('div');
   el.id = 'mnyConceptCard';
   el.className = 'mny-concept-scrim';
+  const tabs = (o.tabs || []).map(t => {
+    const tc = mnyConceptCard(t, kid);
+    return tc ? `<button type="button" class="mv2-idea-tab${t === id ? ' on' : ''}" data-idea-tab="${escapeAttr(t)}">${escapeHtml(tc.icon + ' ' + tc.title)}</button>` : '';
+  }).join('');
   el.innerHTML = `<div class="mny-concept mv2-idea" role="dialog" aria-modal="true" aria-label="${escapeAttr(c.icon + ' ' + c.title)}">
+      ${tabs ? `<div class="mv2-idea-tabs">${tabs}</div>` : ''}
       <div class="mv2-idea-title">${escapeHtml(c.icon + ' ' + c.title)}</div>
       <div class="mv2-idea-grid">
         <b class="mv2-idea-what">What</b><span>${escapeHtml(c.what)}</span>
@@ -1106,7 +1106,11 @@ function mnyShowConcept(id) {
     </div>`;
   document.body.appendChild(el);
   const close = () => el.remove();
-  el.addEventListener('click', e => { if (e.target === el) close(); });
+  el.addEventListener('click', e => {
+    if (e.target === el) { close(); return; }
+    const t = e.target.closest('[data-idea-tab]');
+    if (t) mnyShowConcept(t.getAttribute('data-idea-tab'), o);
+  });
   el.querySelector('#mnyConceptClose').addEventListener('click', close);
   el.querySelector('#mnyConceptMore').addEventListener('click', () => {
     close();
@@ -1115,6 +1119,7 @@ function mnyShowConcept(id) {
        sheet would strand her behind a scrim she could not see past. */
     const fromMoney = document.getElementById('screen-mymoney') &&
       document.getElementById('screen-mymoney').classList.contains('active');
-    mnyOpenSchool(kid, c.id, fromMoney ? { from: 'mymoney', scrollY: window.scrollY || 0 } : null);
+    mnyOpenSchool(kid, c.id, fromMoney ? { from: 'mymoney', scrollY: window.scrollY || 0 }
+      : (fromMeeting ? { from: 'meeting' } : null));
   });
 }
