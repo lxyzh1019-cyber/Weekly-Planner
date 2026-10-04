@@ -1,6 +1,12 @@
-# Plan v6 — Sunday v15 pocket-money redesign — Awaiting approval
+# Plan v9 — Sunday v15 pocket-money redesign — Awaiting approval
+
+**🟪 Rev 8 — what changed and why (owner, 2026-10-04):** the owner keeps 💵 Cash out and 🏦 Put cash in, and removes cash as an account: her accounts are only 🏦 Savings (with her goal jars inside it), 🔒 Locked away and 📈 Companies, plus the 🧱 loan she pays. 🟧 Rev 7's 🧾 Checking box and its renames are withdrawn. Money that arrives between Sundays (an approved gift, cash from home, a lock that came back) is not an account: it waits as **"📥 Waiting for Sunday"** and joins her pile, so every dollar gets a job at the meeting. Sections touched: Summary, Deviation 37, N. 🟪
+
+**🟧 Rev 7 — what changed and why (owner's answers on Plan v7, 2026-10-04):** the owner asked where "cash" came from, since it is in neither the prototype nor the app as a place to keep money. It came from two places: the prototype's 💵 **Cash out** (money a parent hands her on Sunday, and the Move sheet's cash-out and put-cash-in modes) and the app's **Cash** tile in "Everything I have", which the owner kept (pick M3). Neither is tracked once it is handed over. Deviation 37 now says exactly this. Two things are added: the **🧾 Checking · decide later** box on "I choose" (the owner's leaning, option 1) and the prototype's "💵 Cash out" renamed **"👛 Spend · handed over"**, so the word "cash" leaves the money screens. The Weeks saving line uses **10% / 50%** (answered). Sections touched: Summary, Deviation 37, N. 🟧
 
 Planned on the session's own model (Opus 5.5); the planner hook suggested Fable for this revision.
+
+**🟩 Rev 6 — what changed and why (owner's review of the five mockups, 2026-10-04):** Rules and the header space are OK as drawn; My money, Parent › Now and Weeks are OK with changes. Two changes apply everywhere: **"Cash" becomes "🧾 Checking"** (money she has not decided on yet; physical cash is not tracked), and **"Dad" becomes "parent(s)"** in every on-screen sentence ("Send to parents", "Parents answer first"). New items: tapping a calendar day opens that day's result, or asks her to add the competition to her planner; the passbook shows what came in as well as where it went; Parent › Now gets a Jenn · Jess · Both toggle; 💬 Talk first sends a request to the Sunday meeting, where a parent sets the **agreed amount**; savings goals are shown as part of Savings; Weeks opens with a summary and its Sunday detail shows everything. After the build you get a comparison page (prototype · before · after), and a final one before the pull request. Deviation 35 is marked approved (it was in the approved Plan v6). Sections touched: Summary, N (new), Deviations (35, 37–41), Stages, Risks. 🟩
 
 **🟦 Rev 5 — what changed and why (owner's review of the built-vs-prototype page, 2026-10-04):** the owner marked 30 of the 53 open differences "Change", sent four screenshots, and asked for redesigns of five areas. New section **M** lists every item and what happens to it. Two decisions came with it: the **money week becomes Sunday–Saturday** (money only; the planner stays Monday–Sunday), and the **redesigns are shown as clickable mockups first**. Stages 5 and 6 are re-cut: 5a builds the fixes, 5b makes the mockups, 5c builds the approved redesigns. Sections touched: Summary, M (new), Stages, Deviations (rows 34–36), Risks. 🟦
 
@@ -15,10 +21,41 @@ Planned on the session's own model (Opus 5.5); the planner hook suggested Fable 
 | Summary |
 |---|
 | **What this plan does:** rebuilds the girls' pocket money around your three prototype screens. Sunday becomes a four-step ritual inside the family meeting (guess, payday, choose, sign). My money becomes the passbook, loan wall, pots, goal jar and the four "ask Dad" buttons. The parent's money page becomes Grown-ups with Approve, Commitments, Fines, Expected and Rules tabs. Underneath, the app's existing money engine, ledgers and sync stay as they are; the new club-session pay, the request queue, the goal jar, the four-week locks, cash drawn early and the new loan terms are each given a home that joins cleanly to what already exists. |
-| **What changed from the last version and why:** 🟦 Rev 5: your review is in (section M): the five bugs and every cut-off name get fixed; 21 places go back to the prototype's layout; the money week runs Sunday to Saturday; My money's layout, the Rules tab, the Weeks tab, where Approve lives and the header space on the iPad are redesigned, shown as mockups first. 🟦 🟪 Rev 4: your picks are in (section L); My money keeps today's header, tabs and "Everything I have"; goals, the loan, the calendar, past weeks, gifts, loans, what she owns, unlocking, change history and saving rules are merged; Savings opens at 20%; a forgiving day still pays $3; fines keep their day; a new way to group income is proposed. 🟪 🟧 Rev 3: features your prototype does not have (editing past weeks, the Grandfather rule, chore prices, targets, fixing a loan row, the fund picker, Dad's corrections) each get a proper place in the new screens instead of a "More" drawer; duplicates follow your prototype; Grandma rule becomes Grandfather rule; fines log on the day they are entered; the Move sheet offers the loan wall; swim says "Swim meet" and other sports "Competition results". 🟧 🟩 Rev 2: every difference from your prototypes is now listed with its approval; Redo undoes one girl only; Dad corrects a result's dollars with − / + as drawn; Savings never locks. 🟩 🟦 Rev 1: the club's twice-a-year payout is now tracked and recorded; a result is checked against the published sheet, never priced by hand; the box fine is simply replaced by the app's fines rules; two small older fixes (a settled week can still be claimed; one XP toggle has no permission check) are added to this build. 🟦 Version 1 carried your eight decisions from today: club sessions from the planner plus a one-off from Grown-ups; the app's existing fines rules kept, with the tab reminding that every behaviour gets recorded; today's chore engine kept and relabelled; the prototype's loan terms; the old cash-pool work retired; Money story and Money school kept for now; one pull request; a stacked phone layout. |
-| **What I need you to do:** approve Plan v6 (section M is the new part) and pick the first Sunday of the Sunday-to-Saturday money week, or name the rows to change. | Later: merge the pull request, then open the app on the iPad and run one Sunday with each girl so the hold-to-add, the coins and the Calm look are checked on the real device. |
+| **What changed from the last version and why:** 🟪 Rev 8: no cash account; Cash out and Put cash in stay; money arriving between Sundays shows as "📥 Waiting for Sunday" and joins her pile; the Checking box is withdrawn. 🟪 🟧 Rev 7: where "cash" came from is explained; Checking becomes a decide-later box on Sunday; "Cash out" becomes "Spend · handed over"; the saving line uses 10% / 50%. 🟧 🟩 Rev 6: your mockup review is in (section N): Rules and header as drawn; My money, Now and Weeks with your changes; Cash becomes Checking; Dad becomes parents on screen; talk-first items get an agreed amount at the Sunday meeting; comparison pages after the build. 🟩 🟦 Rev 5: your review is in (section M): the five bugs and every cut-off name get fixed; 21 places go back to the prototype's layout; the money week runs Sunday to Saturday; My money's layout, the Rules tab, the Weeks tab, where Approve lives and the header space on the iPad are redesigned, shown as mockups first. 🟦 🟪 Rev 4: your picks are in (section L); My money keeps today's header, tabs and "Everything I have"; goals, the loan, the calendar, past weeks, gifts, loans, what she owns, unlocking, change history and saving rules are merged; Savings opens at 20%; a forgiving day still pays $3; fines keep their day; a new way to group income is proposed. 🟪 🟧 Rev 3: features your prototype does not have (editing past weeks, the Grandfather rule, chore prices, targets, fixing a loan row, the fund picker, Dad's corrections) each get a proper place in the new screens instead of a "More" drawer; duplicates follow your prototype; Grandma rule becomes Grandfather rule; fines log on the day they are entered; the Move sheet offers the loan wall; swim says "Swim meet" and other sports "Competition results". 🟧 🟩 Rev 2: every difference from your prototypes is now listed with its approval; Redo undoes one girl only; Dad corrects a result's dollars with − / + as drawn; Savings never locks. 🟩 🟦 Rev 1: the club's twice-a-year payout is now tracked and recorded; a result is checked against the published sheet, never priced by hand; the box fine is simply replaced by the app's fines rules; two small older fixes (a settled week can still be claimed; one XP toggle has no permission check) are added to this build. 🟦 Version 1 carried your eight decisions from today: club sessions from the planner plus a one-off from Grown-ups; the app's existing fines rules kept, with the tab reminding that every behaviour gets recorded; today's chore engine kept and relabelled; the prototype's loan terms; the old cash-pool work retired; Money story and Money school kept for now; one pull request; a stacked phone layout. |
+| **What I need you to do:** 🟪 Rev 8: approve Plan v9 (section N and Deviation 37), or name the rows to change. 🟪 | Later: merge the pull request, then open the app on the iPad and run one Sunday with each girl so the hold-to-add, the coins and the Calm look are checked on the real device. |
 
 **Changes in this version**
+
+```diff
++ 🟪 Rev 8 — No cash account: her accounts are Savings (goal jars inside), Locked away, Companies, plus the loan
++ 🟪 Rev 8 — 💵 Cash out and 🏦 Put cash in kept as drawn in the prototype
++ 🟪 Rev 8 — Money arriving between Sundays shows as "📥 Waiting for Sunday" (not an account) and joins the pile
+- 🟪 Rev 8 — 🟧 Rev 7's 🧾 Checking · decide later box, "Spend · handed over" and the Move sheet renames
+```
+
+🟧 Rev 7 changes, kept for reference (withdrawn by 🟪 Rev 8 except the saving line):
+
+```diff
++ 🟧 Rev 7 — Deviation 37 says where "cash" came from (prototype Cash out; the app's Cash tile kept by pick M3) and what replaces it
++ 🟧 Rev 7 — "I choose" gains 🧾 Checking · decide later; money left there joins next Sunday's pile
++ 🟧 Rev 7 — "💵 Cash out" becomes "👛 Spend · handed over" on Sunday, the Move sheet and the passbook
++ 🟧 Rev 7 — Weeks saving line: under 10% a little · 10–50% steady · over 50% a lot (owner answer)
+- 🟧 Rev 7 — Section N's two open questions (both answered)
+```
+
+🟩 Rev 6 changes, kept for reference:
+
+```diff
++ 🟩 Rev 6 — New section N: the owner's mockup review and what gets built in 6d
++ 🟩 Rev 6 — Deviation 37: on-screen "Cash" becomes "🧾 Checking" (undecided money); data key wallet.cash unchanged
++ 🟩 Rev 6 — Deviation 38: on-screen "Dad" becomes "parent(s)" everywhere; data and log keys unchanged
++ 🟩 Rev 6 — Deviations 39–41: calendar day opens its result or asks to add the competition; passbook shows money in; 💬 Talk first carries to Sunday with an agreed amount
++ 🟩 Rev 6 — Deviation 35 marked approved (it was part of the approved Plan v6)
+- 🟩 Rev 6 — Deviation 35 status "proposed in 🟦 Rev 5"
++ 🟩 Rev 6 — Stages: 6b and 6c done; 6d builds section N; new 6e comparison page (prototype · before · after); Stage 7 ends with the final comparison page
+```
+
+🟦 Rev 5 changes, kept for reference:
 
 ```diff
 + 🟦 Rev 5 — New section M: every item from the owner's review, sorted into fixes (5a) and redesigns (5b mockups, 5c build)
@@ -86,7 +123,7 @@ Previous version's changes (🟩 Rev 2, 🟦 Rev 1), kept for reference:
 ```
 
 **Stages to finish**
-15 stages: one record update, ten build and design steps and one pull request by Claude, then your mockup review, your merge, your iPad check and a four-Sunday pilot. Stages 1–6 are done.
+🟩 Rev 6: 16 stages: one record update, eleven build, design and comparison steps and one pull request by Claude, then your mockup review, your merge, your iPad check and a four-Sunday pilot. Stages 1–6c are done (10 of 16). 🟩
 1. Record today's decisions and the rewrite choice in the working record — Claude · done
 2. Build the arithmetic core, rules, loan terms, request queue and their unit tests — Claude (opus-worker, Complex) · done
 3. Build the Grown-ups tabs and the kid's request sheets — Claude (opus-worker, Complex) · done
@@ -94,11 +131,12 @@ Previous version's changes (🟩 Rev 2, 🟦 Rev 1), kept for reference:
 4. Build My money v2 with section K and L items — Claude (opus-worker, Complex) · done
 5. Build the Sunday ritual and the new sign sequence with its section K and L items; retire the old meeting money panels — Claude (opus-worker, Complex) · done
 6. 🟧 Rev 3: Rehome the old parent money sections into Grown-ups (📒 Weeks, Rules cards, Approve side cards, ✍️ Record, fix sheets) and rename Grandfather rule, plus the L merges for G2–G6 — Claude (opus-worker, Complex) · done 🟧
-6a. 🟦 Rev 5: Build the section M fixes (5a list), including the Sunday-to-Saturday money week — Claude (opus-worker, Complex: rules, week model) 🟦
-6b. 🟦 Rev 5: Make clickable mockups of the five redesigns (5b list) — Claude (opus-worker, Complex: design) 🟦
-6c. 🟦 Rev 5: Review the mockups and mark what to change — You 🟦
-6d. 🟦 Rev 5: Build the approved redesigns — Claude (opus-worker, Complex) 🟦
-7. Styling for both looks and the phone, rewrite the affected smoke checks, full test run green, build stamp — Claude (opus-worker, Complex: rewrites money checks)
+6a. 🟦 Rev 5: Build the section M fixes (5a list), including the Sunday-to-Saturday money week — Claude (opus-worker, Complex: rules, week model) · done 🟦
+6b. 🟦 Rev 5: Make clickable mockups of the five redesigns (5b list) — Claude (opus-worker, Complex: design) · done 🟦
+6c. 🟦 Rev 5: Review the mockups and mark what to change — You · done (🟩 Rev 6: section N) 🟦
+6d. 🟦 Rev 5: Build the approved redesigns — Claude (opus-worker, Complex) 🟦 🟩 Rev 6: with every section N item, including 🟪 Rev 8: no cash account 🟪, the parents wording and the talk-first agreed amount (new request field with a two-device test) 🟩
+6e. 🟩 Rev 6: Publish a comparison page — prototype · before (6a) · after (6d), each money screen at iPad width — Claude (main session; screenshots by opus-worker, Complex: runs the app) 🟩
+7. Styling for both looks and the phone, rewrite the affected smoke checks, full test run green, build stamp — Claude (opus-worker, Complex: rewrites money checks) 🟩 Rev 6: ends with the final built-vs-prototype page for your review before the pull request 🟩
 8. Open the draft pull request with the regression table and the records updated, ARCHITECTURE.md brought up to date — Claude (main session)
 9. Review and merge the pull request — You
 10. Open the live app on the iPad, confirm the build stamp, run one Sunday for each girl — You
@@ -110,7 +148,7 @@ Date 2026-10-03 · branch to create: `claude/sunday-v15` from `main` @ `8b56fdb`
 
 The owner designed a replacement for the kids' pocket-money system as three iPad prototypes (Sunday v15, My Money v2, Grown-ups v2) plus a handoff. The current app has a working but differently shaped money system: a three-step family meeting with "What I earned / What I do with it" panels, a loan with monthly payments and a down payment, pots on a stage ladder, a Record sheet, a money stream (`profile.events`) from which every balance is derived, and about 100 smoke checks. The prototypes are the spec; the stream, the frozen ledgers, the effective-dated rules and the merge layer are the foundation they must be built on. The job is to make the prototype's concepts flow through the app's real data without dead or duplicated logic.
 
-**Checked against:** `WORKING_RECORD.md` request ledger rows 13, 14, 17, 24, 28–42, 46, 47, 59 (PR C cash pool — now superseded by the owner's decision of 2026-10-03), row 25 and `HANDOFF-pocket-money.md` §00/§3/§6/§9/§12 (items subsumed or still open are listed in §J); hotspot row **Pocket money**: 4 fix rounds, 2 recurrences, rewrite-vs-repair reviewed 2026-09-22 → *repair*. This plan is the owner-chosen **rewrite** of the kid-facing surfaces and the loan terms, on top of the unchanged stream/ledger/rules engine. Step 0 updates that row.
+**Checked against:** `WORKING_RECORD.md` request ledger rows 13, 14, 17, 24, 28–42, 46, 47, 59 (PR C cash pool — now superseded by the owner's decision of 2026-10-03), row 25 and `HANDOFF-pocket-money.md` §00/§3/§6/§9/§12 (items subsumed or still open are listed in §J); hotspot row **Pocket money**: 4 fix rounds, 2 recurrences, rewrite-vs-repair reviewed 2026-09-22 → *repair*. This plan is the owner-chosen **rewrite** of the kid-facing surfaces and the loan terms, on top of the unchanged stream/ledger/rules engine. Step 0 updates that row. 🟩 Rev 6: also checked against request ledger rows #82–#97 and the hotspot row Pocket money (5 fix rounds, 2 recurrences); the mockup review is a design answer, not a new fix round. 🟩
 
 ## Owner decisions taken today (settled; not reopened by this plan)
 
@@ -301,8 +339,13 @@ Rulebook: a new version appended through the house-rules pending mechanism (new 
 | 31 | Goal jar: "fill Savings to $10 first" | 🟪 Rev 4: goal jars open with Savings at 20% of the loan paid; below that, cents go on the loan 🟪 | **approved** (🟪 Rev 4 owner answer after Stage 3a) |
 | 32 | Grace spent on the first miss | 🟪 Rev 4: the forgiving day goes where it makes the longest run (weeks priced under older rules keep the old way); an unfinished day never counts as forgiven 🟪 | **approved** (🟪 Rev 4 owner answer after Stage 3a) |
 | 34 | The meeting reviews Mon–Sun, Sunday unfinished | 🟦 Rev 5: the money week (chores, routine streak, fines, club sessions) runs Sunday–Saturday from a start Sunday the owner picks, as a dated rule; a meeting reviews only finished days; weeks already settled are not re-priced; the planner's week view stays Monday–Sunday 🟦 | **approved** (🟦 Rev 5 owner answers: S1-6, "Money week only") |
-| 35 | Prototype text size | 🟦 Rev 5: My money, Sunday and Grown-ups use the prototype's text size at iPad width (no 1.1× in Pop), so names are not cut; other screens keep the house rule 🟦 | proposed in 🟦 Rev 5 (owner asked why 1.1× wraps so much) |
+| 35 | Prototype text size | 🟦 Rev 5: My money, Sunday and Grown-ups use the prototype's text size at iPad width (no 1.1× in Pop), so names are not cut; other screens keep the house rule 🟦 | **approved** (Plan v6, 2026-10-04) |
 | 36 | Approve is a Grown-ups tab | 🟦 Rev 5: "Waiting for you" lives in Parent › Now; Grown-ups keeps rules, commitments, fines, expected, weeks 🟦 | **approved** (🟦 Rev 5 owner note G1-12) |
+| 37 | The app's Cash tile (kept by pick M3) and 🟧 Rev 7's Checking idea | 🟪 Rev 8: **no cash account.** Everything I have / What I own / What she owns show 🏦 Savings (goal jars inside), 🔒 Locked away, 📈 Companies and the 🧱 loan left. 💵 Cash out (handed over on Sunday, leaves her books) and 🏦 Put cash in (cash from home, into the bank) stay as the prototype draws them. Money that arrives between Sundays (approved gift, cash from home, a lock that came back) shows as a line "📥 Waiting for Sunday $X", not a tile, and joins her pile; data key `wallet.cash` keeps carrying it, unchanged. A lock that comes back joins the pile (as built), so she decides again where it goes. 🟪 | **approved** (🟪 Rev 8 owner idea), pending Plan v9 approval |
+| 38 | 🟩 Rev 6: "Dad" in sentences ("Ask Dad", "Dad answers first", "Dad's card") | "parent(s)": "Send to parents", "Parents answer first", "🗣️ Parent's card", "a parent made it $Y", "Club owes us". Stored `by` values and old ledger notes unchanged 🟩 | **approved** (🟩 Rev 6 owner note) |
+| 39 | 🟩 Rev 6: calendar days are display only | Tapping a day: a finished competition opens 🏆 Tell a result for it (or its request's status); a planned one shows "results after the day"; a day with none asks "Add a competition on Sat 10 Oct?" and opens the planner's own add sheet on that day 🟩 | **approved** (🟩 Rev 6 owner note) |
+| 40 | 🟩 Rev 6: passbook shows where the money went | Each Sunday also shows what came in, by the four income groups (💪 earned · 🎁 given · 🌱 made · ➖ taken off) 🟩 | **approved** (🟩 Rev 6 owner note) |
+| 41 | 🟩 Rev 6: 💬 Talk first is an answer | Talk first sends the request to the next Sunday meeting; there a parent sets the **agreed amount** with − / + and agrees or says not this time; the record shows asked and agreed 🟩 | **approved** (🟩 Rev 6 owner note) |
 | 33 | No Savings milestone | 🟪 Rev 4: crossing 20% shows "🏦 Savings is open", like 30% and 40% 🟪 | **approved** (🟪 Rev 4 owner answer after Stage 3a) |
 
 Anything not in this table is built as drawn.
@@ -411,11 +454,32 @@ Everything not listed here was marked OK. "Like the prototype" means byte-close 
 | Weeks tab (G7-2) | Both girls side by side, with the passbook's bars. |
 | Header space on the iPad (screenshot 4 and other screens) | The Parent Mode bar, dashboard title, tabs, "◀ Setup · Money rules" line and the sub-tab bar collapse into one or two rows, across the parent and money screens. |
 
-**5c — build the mockups the owner approves.**
+**5c — build the mockups the owner approves.** 🟩 Rev 6: the review is in section N. 🟩
+
+### 🟩 Rev 6 — N. The owner's mockup review (2026-10-04) and what 6d builds
+
+Everything drawn on the mockups is built as drawn, except where this table changes it. Open questions the owner did not answer take what the mockup drew.
+
+| Area | Owner's mark | What 6d builds |
+|---|---|---|
+| Everywhere | two changes | 🟪 Rev 8: **No cash account** (Deviation 37): the Cash tile and every "Cash" balance line go; "📥 Waiting for Sunday" shows only when above $0. 🟪 **Parents** replaces "Dad" in every on-screen sentence (Deviation 38). |
+| My money | Change — "I like what I saw" | The mockup layout (countdown with the "This week" bar, Asked-parents list in the right pane with "see all", small sticker strip), plus: (1) **calendar day tap** (Deviation 39); (2) **passbook money in** (Deviation 40), the "all my Sundays" icon kept; (3) Savings shown with her goal jars inside it ("🏦 Savings $40 · of which 🎯 bike $12"), on Everything I have and What I own — display only, the goal holdings stay separate in the data. |
+| Parent › Now ("Waiting for you") | Change | (1) A **Jenn · Jess · Both** toggle over the requests (remembered on this device). (2) **💬 Talk first** moves the request to a "💬 To talk about on Sunday" group; in the Sunday meeting's "Parents answer first" card it shows the asked amount, an **agreed amount** − / +, and ✓ Agree / Not this time. Agree answers yes with the agreed amount through `mnyAnswerRequest` (competition → `awardedOverride`; advance, move, gift, cash from home, goal price → that request's amount); kinds with no amount (skip, dispute) show ✓ / ✗ only. Stored as `agreed {value, by, at}` on the request (rides the existing `req:`, `mvq:`, `dep:` merges; a two-device test). (3) **What she owns** shows goals inside Savings. (4) The "🚪 She told me…" button and both girls' cards stay as drawn. |
+| Rules | OK | As drawn. |
+| Weeks | Change | **A summary on top**, both girls side by side: earned this year (and vs her target), loan left, typical week (the same 4-Sunday average Commitments uses), loan payments on track (✓, or "📌 $X still owed"), and a saving line (🟧 Rev 7: answer 2 below 🟧). Then the week list, newest on top, with the passbook's bars. **Tapping a Sunday** opens both girls side by side with the full record of that week: every Payday line with its working (days, grades, streak, sessions attended, competitions with points or result, gifts, money made), fines with item and day, money drawn early, overrides with reason and who, loan paid (must pay, extra and what it counted, interest added), where every dollar went by pot (🟪 Rev 8: and Cash out 🟪), stickers, the verdict, her reflection answer, who signed and when, the rules version. Older rows show what they kept ("earned only"). |
+| Header space | OK, all questions OK | Money as its own top tab in the parent portal; My money's head and tab bar in one row; the kid's bottom bar kept. |
+| After the build | new | 6e: a comparison page with prototype · before · after for each money screen. Stage 7 ends with the final built-vs-prototype page. |
+
+**🟧 Rev 7 — Answers (go into 6d):**
+
+1. 🟪 Rev 8: **Cash:** no cash account; Cash out and Put cash in stay; money between Sundays waits for Sunday (Deviation 37). The 🧾 Checking box is withdrawn. 🟪
+2. **Weeks saving line:** over her last 4 Sundays, the share she put in Savings, goal jars, Locked away and Companies reads "a little" under 10%, "steady" from 10% to 50%, "a lot" over 50%; with "a lot" and a loan open, the line adds "extra on the loan counts $1.10 per $1" (owner answer). 🟧
 
 ### Risks and known gaps
 
 - **Size.** One PR touching ~12 files, four new, ~100 smoke checks rewritten. Mitigated by the five stages each gated by `npm test`.
+- 🟩 Rev 6: the agreed amount is a new field on three request stores; the merge layer already merges those records whole by stamp, and a two-device test proves it. 🟩
+- 🟩 Rev 6: old ledger notes saved on the iPads keep "Dad" and "Cash"; new ones use the new words. 🟩
 - Hold-to-add on iPad relies on pointer events + `touch-action:none`; verified on the device, not only headless.
 - Coin/glow animations: CSS only, disabled under `prefers-reduced-motion`.
 - Calm look: the hand-drawn prototype is Pop; Calm gets the same boxes with Calm tokens — needs a look on the iPad.
