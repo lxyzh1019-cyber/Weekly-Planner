@@ -380,6 +380,25 @@ function mrVersionForDate(dayKey) {
   }
   return found || vs[0];
 }
+/* ── Her "loan per month", the newest change in force on a week ──
+   Walks the versions live on or before `weekKey` back from the newest and
+   returns the latest one whose `loan.monthly.<kid>` differs from the version
+   before it: `{ key, from, was, now }`, or null when it never changed. `key`
+   names the version AND the figure, so a version edited in place to a second
+   figure is a second change. The Sunday rescale keys on it (js/44), which is
+   what makes it happen on the first Sunday she signs on or after the change
+   even when the Sunday it started was skipped — and only once. */
+function mrLoanMonthlyChange(kid, weekKey) {
+  const vs = mrVersions().filter(v => v && String(v.effectiveFrom) <= String(weekKey));
+  const per = v => Number(((((v && v.rules) || {}).loan || {}).monthly || {})[kid]);
+  for (let i = vs.length - 1; i > 0; i--) {
+    const now = per(vs[i]), was = per(vs[i - 1]);
+    if (now !== was && !(isNaN(now) && isNaN(was))) {
+      return { key: vs[i].id + ':' + now, from: vs[i].effectiveFrom, was, now };
+    }
+  }
+  return null;
+}
 function mrRulesFor(dayKey) {
   const v = mrVersionForDate(dayKey);
   return (v && v.rules) || MR_DEFAULT_RULES;

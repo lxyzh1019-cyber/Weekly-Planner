@@ -462,6 +462,16 @@
   </div>
 </div>
 
+<!-- ✏️ Grown-ups' fix sheets — fix a loan row, fix what she owns, every rule
+     change (js/46-grownups.js). Chrome here, body filled by JS, the
+     recordOverlay pattern; its controls are data-mnyp-action. -->
+<div class="overlay" id="grownupsOverlay" onclick="overlayClick(event,'grownupsOverlay')">
+  <div class="sheet gu-sheet" role="dialog" aria-modal="true" aria-labelledby="guSheetTitle">
+    <h3 id="guSheetTitle">✏️ Fix</h3>
+    <div id="grownupsBody"></div>
+  </div>
+</div>
+
 <!-- Quick profile switcher (tap the profile icon) -->
 <div class="overlay" id="profileSwitchOverlay" onclick="overlayClick(event,'profileSwitchOverlay')">
   <div class="sheet sheet--compact" role="dialog" aria-modal="true" aria-labelledby="profileSwitchTitle">

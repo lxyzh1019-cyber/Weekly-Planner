@@ -4391,16 +4391,8 @@
   .co-tier-n { font-variant-numeric: tabular-nums; font-weight: 800; }
   @media (max-width: 640px) { .co-head { display: none; } }
 
-  /* ── Money rules: a rail, and the version in the header ──
-     Which version you are editing is the first thing to know and used to be
-     buried in a paragraph. */
-  .mny-effect {
-    display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap;
-    padding: var(--space-2) 0;
-  }
-  .mny-effect-since { font-size: calc(max(13px, calc(0.85rem * var(--fs-scale, 1))) * var(--text-scale, 1)); color: var(--ink-light); }
-  /* The side rail (.mny-rail*) went with Grown-ups (Plan v3 §A): the More
-     sections are a chip row now (.gu-more-nav, below). */
+  /* The side rail (.mny-rail*) went with Grown-ups (Plan v3 §A), and the
+     📖 More chip row and its "in effect since" line with Stage 4b. */
 
   /* ── Step 1's day rows ──
      Confirmable in place; the two-column detail opens inside the row it belongs
@@ -5880,7 +5872,6 @@
   .mny-note { font-size: calc(0.8rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-light); margin-top: 0.4rem; line-height: 1.4; }
   .mny-total { font-size: calc(2rem * var(--text-scale, 1)); font-weight: 800; color: var(--mny-figure); line-height: 1.15; }
   .mny-total.sm { font-size: calc(1.35rem * var(--text-scale, 1)); }
-  .mny-today-big { font-size: calc(1rem * var(--text-scale, 1)); margin-top: 0.2rem; line-height: 1.45; }
 
   /* The stacked bar. Segments carry a hard divider so two similar colours
      never blur into one block. */
@@ -6025,7 +6016,6 @@
   .mny-src.amber { background: var(--mny-amber-fill); color: var(--mny-amber-ink); border-color: var(--mny-amber-border); }
   .mny-stepgrp { display: inline-flex; align-items: center; gap: 0.25rem; }
   .mny-stepgrp .mny-step { min-width: 30px; min-height: 30px; }
-  .mny-step--wide { padding-inline: 0.55rem; font-size: calc(0.85rem * var(--text-scale, 1)); }
   .mny-stepgrp .mny-step.on { background: var(--mny-amber-fill); }
 
   .mny-field { display: block; margin-top: 0.4rem; font-size: calc(0.8rem * var(--fs-scale, 1) * var(--text-scale, 1)); color: var(--ink-light); }
@@ -8256,14 +8246,41 @@
 .gu-logtitle { margin-top: 4px; font-size: calc(1.125rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
 .gu-log { font-size: calc(0.875rem * var(--fs-scale, 1) * var(--text-scale, 1)); line-height: 1.25; padding-top: 2px; border-top: 1px dashed var(--mny-v15-dash-soft); }
 .gu-log b { font-family: var(--font-round); font-size: max(13px, calc(0.75rem * var(--fs-scale, 1) * var(--text-scale, 1))); color: var(--mny-v15-sub); }
-/* 📖 More — the old rail's sections, as a chip row */
-.gu-more-nav { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
-.gu-more-chip {
-  min-height: 44px; border: 2px solid var(--ink); border-radius: 10px; padding: 0 12px; cursor: pointer;
-  background: var(--paper); color: var(--ink); font: inherit; font-size: calc(0.95rem * var(--fs-scale, 1) * var(--text-scale, 1));
+/* Stage 4b — the old sections' new homes (📖 More is retired) */
+.gu-tools { display: flex; gap: 6px; margin-right: auto; }
+.gu-tools .gu-btn { min-width: 44px; }
+.gu-record { font-size: calc(1rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
+.gu-ovtoggle { align-self: flex-start; }
+.gu-ovrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 0; border-top: 1px dashed var(--mny-v15-dash); font-size: calc(0.9375rem * var(--fs-scale, 1) * var(--text-scale, 1)); }
+.gu-was { color: var(--mny-v15-muted); }
+.gu-owns { gap: 2px; }
+.gu-bought { align-self: flex-end; background: var(--mny-v15-green); }
+.gu-warnline { color: var(--mny-v15-red); }
+.gu-why { color: var(--mny-v15-muted); }
+.gu-thisweek { align-self: flex-start; }
+.gu-date { width: auto; min-width: 0; }
+.gu-ladder { display: flex; flex-direction: column; gap: 4px; padding-top: 6px; border-top: 1px dashed var(--mny-v15-dash); }
+button.gu-loanrow {
+  width: 100%; min-height: 44px; padding: 4px 0; border: 0; border-bottom: 1px dashed var(--mny-v15-dash); background: transparent;
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
 }
-.gu-more-chip.on { background: var(--pill-on); color: var(--pill-on-ink); }
-.gu-more-body { min-width: 0; }
+.gu-loanrow .gu-bar, .gu-loanrow .gu-bar-fill { display: block; }
+.gu-loanfacts { font-size: max(13px, calc(0.8125rem * var(--fs-scale, 1) * var(--text-scale, 1))); color: var(--mny-v15-muted); line-height: 1.25; }
+.gu-late { color: var(--mny-v15-red); }
+.gu-weeks { gap: 4px; }
+.gu-weekrow { padding: 4px 0; border-bottom: 1px dashed var(--mny-v15-dash-faint); }
+.gu-weekrow--gf { background: var(--mny-v15-lav); border-radius: 6px; padding: 4px; }
+.gu-weektag { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.gu-weekfix { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; }
+#grownupsOverlay { align-items: center; justify-content: center; background: var(--mny-v15-scrim); }
+.gu-sheet {
+  width: min(640px, calc(100% - 32px)); max-height: 92vh; box-sizing: border-box; overflow-y: auto;
+  background: var(--mny-v15-paper); color: var(--mny-v15-ink); font-family: var(--font-body);
+  border: 2.5px solid var(--mny-v15-ink); border-radius: 18px; box-shadow: 3px 3px 0 var(--mny-v15-shadow);
+  padding: 18px 22px;
+}
+.gu-sheet h3 { margin: 0 0 12px; font-family: var(--font-head); font-size: calc(1.875rem * var(--text-scale, 1)); }
+.gu-sheet .gu { display: flex; flex-direction: column; gap: 10px; }
 @media (max-width: 767px) {
   .gu-grid, .gu-cards2 { grid-template-columns: minmax(0, 1fr); }
   .gu-tabs { justify-content: flex-start; }

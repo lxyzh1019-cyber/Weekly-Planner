@@ -45,13 +45,13 @@ const PARENT_LANDINGS = {
     { panel: 'options',  icon: '🧹', title: 'Chores and pay',      sub: 'The pool, due times, lanes and who does what' },
     { panel: 'routines', icon: '🌅', title: 'Routines',            sub: 'Morning, after school, evening, and your own' },
     { panel: 'tasks',    icon: '✅', title: 'Activities and sports', sub: 'The library both girls draw from' },
-    { panel: 'money',    icon: '💰', title: 'Money rules',         sub: 'Grades, caps, fines, loans and the week history' },
+    { panel: 'money',    icon: '💰', title: 'Money rules',         sub: 'Approve, loans, fines, the rules and past weeks' },
     { panel: 'rules',    icon: '⭐', title: 'Level-up',            sub: 'What earns a star on an activity' },
     { panel: 'copyweek', icon: '📋', title: 'Copy a plan',         sub: 'Put a week — or one day — onto another, or onto her sister’s' },
     { panel: 'money',    icon: '🕰️', title: 'Change history',      sub: 'Every version of the rules, when it took effect, and why',
-      section: 'changes' },
-    { panel: 'money',    icon: '👵', title: 'Grandma rule',        sub: 'A flat amount for each empty week before we started counting',
-      section: 'grandma' },
+      section: 'rules' },
+    { panel: 'money',    icon: '👴', title: 'Grandfather rule',        sub: 'A flat amount for each empty week before we started counting',
+      section: 'rules' },
   ],
   app: [
     { panel: 'access',   icon: '🔒', title: 'Access',          sub: 'The parent PIN that everything here sits behind' },
@@ -210,11 +210,12 @@ function parentHandleNavClick(e) {
   if (dest) { setParentDest(dest.getAttribute('data-parent-dest')); return; }
   const panel = e.target.closest('[data-parent-panel]');
   if (panel) {
-    /* Change history is a section of Money rules, not a panel of its own — the
-       log only makes sense next to the things it logs. The row names the
-       section so it opens where it means to. */
+    /* Change history and the 👴 Grandfather rule are parts of Grown-ups, not
+       panels of their own — the log only makes sense next to the things it
+       logs. The row names the Grown-ups tab they live on (⚙️ Rules since
+       Stage 4b), so it opens where it means to. */
     const sec = panel.getAttribute('data-parent-section');
-    if (sec && typeof mnySetParentSection === 'function') mnyParentSection = sec;
+    if (sec) mnyParentSection = sec;
     setParentTab(panel.getAttribute('data-parent-panel'));
     return;
   }

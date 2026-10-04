@@ -116,6 +116,13 @@ if (document.fonts) {
   // The parent Money rules tab has its own handler: rule paths and holding ids
   // ride on data attributes rather than being interpolated into inline
   // handlers, and its typed fields need input/change as well as click.
+  // Grown-ups' fix sheets (js/46) carry the same data-mnyp-action controls.
+  const guBody = document.getElementById('grownupsBody');
+  if (guBody) {
+    guBody.addEventListener('click', mnyParentClick);
+    guBody.addEventListener('input', mnyParentInput);
+    guBody.addEventListener('change', mnyParentInput);
+  }
   const rules = document.getElementById('mnyRulesWrap');
   if (rules) {
     rules.addEventListener('click', mnyParentClick);

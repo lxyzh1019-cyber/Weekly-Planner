@@ -610,7 +610,13 @@ function mnyCompleteGoal(kid, id) {
   const fromJar = jar ? mnyHoldingValue(jar) : 0;
   if (jar) mnyRemoveHolding(kid, jar.id);
   const rest = money2(Math.max(0, money2(g.saved) - fromJar));
-  if (rest > 0) mnyTakeFromSaved(kid, Math.min(rest, mnySavedTotal(kid)));
+  const took = rest > 0 ? mnyTakeFromSaved(kid, Math.min(rest, mnySavedTotal(kid))) : 0;
+  /* What she bought leaves her money: one line from `ready` (the jar and any
+     Savings top-up share that home) to `spent`. Without it the stream still
+     counted the jar after the holding was gone — the drift Stage 4b fixed. */
+  const spent = money2(fromJar + took);
+  if (spent > 0) evMirror(kid, { kind: 'out', from: 'ready', to: 'spent', amount: spent, ref: g.id,
+                                 note: '🎉 Bought: ' + (g.icon ? g.icon + ' ' : '') + (g.name || 'my goal') });
   g.done = true;
   g.doneAt = Date.now();
   g.updatedAt = syncNow();
@@ -835,7 +841,7 @@ function mnyGiftWeekFor(kid, dayKey) {
 
 /* Has this child's week been SETTLED — can its split no longer decide
    anything? Committed at a meeting (`mnyIsCommitted`), or credited some other
-   way: the Grandma rule, the repair, an express catch-up. Those write
+   way: the Grandfather rule, the repair, an express catch-up. Those write
    `finalizedWeeks` and never a committed plan, so asking about the plan alone
    filed a gift dated into a Grandma week under that week — a week no meeting
    will ever sit for, so its split was never offered anywhere. */
@@ -890,7 +896,7 @@ function mnyLateCompByTotal(led) {
 
    It used to. The meeting's commit was the only thing that ever paid a meet,
    and `finalizedWeeks[wk][kid] == null` refuses a second commit — so a meet
-   entered for a week already settled (at a meeting, by the Grandma rule, by
+   entered for a week already settled (at a meeting, by the Grandfather rule, by
    the repair) sat on file and was never paid. The trap the repair describes
    in js/40-stream.js, from the other side.
 
@@ -912,7 +918,7 @@ function mnyLateCompByTotal(led) {
 
    ── Why it cannot pay twice ──
    1. The week has a ledger row whose competition figure is the plain sum of
-      its meets — a meeting, the Grandma rule, the repair. The row says what
+      its meets — a meeting, the Grandfather rule, the repair. The row says what
       has been paid for meets; `mrCompetitionWeek` says what they are worth
       now; the DIFFERENCE moves and the row is brought to the new total. A
       second run finds nothing to do, and a meet that arrived from another
@@ -966,7 +972,7 @@ function mnyLateCompSync(kid, dayKey, change) {
   if (!evList(kid).some(e => e && e.id === id)) {
     const name = comp ? (comp.name || mnySportLabel(comp.sport)) : 'Competitions';
     const tail = delta < 0 ? 'taken back after the week was settled'
-      : ((led && led.defaulted && led.defaultReason === 'grandma') ? 'on top of the Grandma rule'
+      : ((led && led.defaulted && led.defaultReason === 'grandma') ? 'on top of the Grandfather rule'
                                                                    : 'paid after the week was settled');
     const common = { kind: 'latecomp', id, ref: comp ? comp.id : wk,
                      weekKey: mnyGiftWeekFor(kid, (comp && comp.dayKey) || wk),
@@ -1814,15 +1820,15 @@ const MNY_TOURS = {
   ],
   parent: [
     { icon: '⚙️', title: 'The only page that changes a number', where: 'The whole screen',
-      body: 'Prices, caps, targets, the loans, what she owns and past weeks all live here. Pages 1 to 3 only read from this page — nothing on them can be edited by a kid.' },
-    { icon: '🎿', title: 'The loans', where: 'Loans section',
-      body: 'Each debt carries its own amount, schedule, early-payment bonus and late cost. Renaming or re-rating one is written to the change history with a date, and never touches what has been paid.' },
-    { icon: '📈', title: 'What she actually holds', where: 'What she owns',
-      body: 'One record per holding. Page 1’s tiles and page 2’s returns are computed from it, so no number is typed in twice. Interest, share prices and maturity all move on real calendar time by themselves.' },
-    { icon: '🗓', title: 'Weeks arrive two ways', where: 'Week history',
-      body: 'Confirming a week at the meeting writes its row by itself and freezes it. For a week that happened before the app, "Add a week" steps back one week per tap so you can type it in.' },
-    { icon: '💾', title: 'Nothing saves until you say so', where: 'The bar at the top',
-      body: 'Edits collect and save as one dated change with one reason. Discard throws them away — no version was ever created, so there is nothing to roll back.' },
+      body: 'Answers to her questions, the loans, fines, expected money, every price and past weeks all live here. Her own pages only read from this one — nothing on them can be edited by a kid.' },
+    { icon: '✅', title: 'Answer first', where: '✅ Approve',
+      body: 'Every question she asked waits here, and nothing pays until it passes. Beside it: this Sunday for each girl (change a line, with a reason), what she owns (✏️ Fix what she owns), and anything older that still needs crediting.' },
+    { icon: '🧱', title: 'The loans', where: '➕ Commitments',
+      body: 'Each row on her wall, with what borrowing has cost so far and by payoff, and the bonus she has earned. Tap a row to fix its name or numbers — a correction is dated and never touches what she has paid.' },
+    { icon: '🗓', title: 'Weeks arrive two ways', where: '📒 Weeks',
+      body: 'Signing on Sunday writes a week by itself and freezes it. For a week that happened before the app, "Add a week" steps back one week per tap so you can type it in.' },
+    { icon: '💾', title: 'Nothing saves until you say so', where: '⚙️ Rules',
+      body: 'Steps collect and save as one dated change with one reason, from next Sunday — or this week, for a correction. ↺ Undo throws them away; 📝 Rule changes keeps every one.' },
   ],
 };
 

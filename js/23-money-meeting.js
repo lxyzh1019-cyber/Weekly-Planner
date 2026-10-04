@@ -294,14 +294,40 @@ function mnyBuyChosenFund(kid, dollars, opts) {
 function mnyToggleChecks() { mnyChecksOpen = !mnyChecksOpen; renderMeetingMode(); }
 function mnyTickCheck(id) { mnyToggleCheck(mnyWeekKeyMeeting(), mnyMeetingKid(), id); renderMeetingMode(); }
 /* One reason for the week, applied to every change made in it (Sunday's ✏️
-   on a Payday line asks for it before "Now I choose →"). */
-function mnyPickReason(id) {
-  const wk = mnyWeekKeyMeeting(), kid = mnyMeetingKid();
+   on a Payday line asks for it before "Now I choose →"). One writer, two
+   doors: Sunday passes nothing (the meeting's girl and week, and the meeting
+   redraws); Grown-ups › ✅ Approve › This Sunday passes the girl and week and
+   redraws itself. */
+function mnyPickReason(id, kidArg, wkArg) {
+  const wk = wkArg || mnyWeekKeyMeeting(), kid = kidArg || mnyMeetingKid();
   const ov = mnyOverrides(kid, wk);
   Object.keys(ov).forEach(k => { ov[k].reason = id; });
   mrStampEarnings(kid, wk);
   saveAll();
-  renderMeetingMode();
+  if (!kidArg) renderMeetingMode();
+}
+
+/* ── An express catch-up's loan (Stage 4b) ──
+   A week caught up from the hub is settled by commitKidWeek, which no longer
+   pays the loan; this pays that Sunday's must-pay through the sign's own loan
+   step (mnySundayLoanStep) and writes it on the week's record, under the names
+   the passbook reads. Nothing extra is placed: she was not there to choose.
+   Skips a week already signed on Sunday (its record has its loan) and a
+   Sunday the loan was already paid for. */
+function mnyCatchUpLoan(kid, wk) {
+  ctEnsureShared();
+  const led = ((state.shared.chore.moneyLedger || {})[wk] || {})[kid];
+  if (!led || led.loan) return null;
+  const { out, interest } = mnySundayLoanStep(kid, wk, 0);
+  if (out.already) return null;
+  Object.assign(led, {
+    loan: { kind: 'sunday', paid: out.paid, must: out.must, shortfall: out.shortfall,
+            interest, extraCredited: 0, each: out.each },
+    debtBalanceAfter: mnyTotalOwing(kid),
+    updatedAt: syncNow(),
+  });
+  saveAll();
+  return out;
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -333,7 +359,8 @@ function mnyPickReason(id) {
         baseline, mmUndoSeal(kid); both girls signed → commitMeetingShared.
 
    Returns { ok, why } — and the core's result on success. Express catch-up
-   (commitFamilyMeeting) settles a week through commitKidWeek alone, as before.
+   (commitFamilyMeeting) settles a week through commitKidWeek, then pays that
+   Sunday's must-pay through the same loan step (mnyCatchUpLoan, below).
    ════════════════════════════════════════════════════════════════ */
 function mnyDoCommit(kidArg, wkArg) {
   const kid = (kidArg === 'jenn' || kidArg === 'jess') ? kidArg : mnyMeetingKid();
@@ -346,6 +373,8 @@ function mnyDoCommit(kidArg, wkArg) {
   mmUndoHeld(kid);
   mnySimCatchUp(kid);
   mnyApplyApprovedWallMoves(kid, wk);
+  // A changed "loan per month" first, so the pile below asks the new must-pay.
+  sdRescaleLoanRows(kid, wk);
   const passive = mnyPassiveSinceLastMeeting(kid);
 
   // The input the screen drew, and what signing it does — refused before any write.
@@ -400,8 +429,7 @@ function mnyDoCommit(kidArg, wkArg) {
     });
 
   // 6 · the loan: must-pay first, then extra counted at 1 + bonus.
-  const loanOut = mnyLoanSundayPayment(kid, wk, { extra: sg.extra });
-  const interest = loanAccrueBalanceInterest(kid, wk);
+  const { out: loanOut, interest } = mnySundayLoanStep(kid, wk, sg.extra);
 
   // 7 · where the rest goes.
   const toGoals = {};

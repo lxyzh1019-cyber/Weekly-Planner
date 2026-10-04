@@ -346,6 +346,19 @@ function mnyLoanSundayPayment(kid, weekKey, opts) {
   return out;
 }
 
+/* ── One Sunday's loan step — the sign's and the catch-up's ──
+   A changed "loan per month" rescales her rows first (sdRescaleLoanRows,
+   once per rule version), then the must-pay and `extra` (mnyLoanSundayPayment),
+   then interest if this is the Nth Sunday (loanAccrueBalanceInterest). The
+   Sunday sign (mnyDoCommit) and an express catch-up (mnyCatchUpLoan, js/23)
+   both pay through here, so a caught-up week is never left unpaid. */
+function mnySundayLoanStep(kid, weekKey, extra) {
+  sdRescaleLoanRows(kid, weekKey);
+  const out = mnyLoanSundayPayment(kid, weekKey, { extra: extra || 0 });
+  const interest = loanAccrueBalanceInterest(kid, weekKey);
+  return { out, interest };
+}
+
 /* Extra off the wall: up to `amount` of her cash, oldest debt first, each
    dollar `early` with that debt's bonus, never an overpayment. The one
    writer of extra — Sunday's payment above and a 🧱 Loan wall move she asked

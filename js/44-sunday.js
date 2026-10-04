@@ -213,17 +213,21 @@ function sdOpenSunday(kid, wk) {
   mnyApplyApprovedWallMoves(kid, wk);
   sdRescaleLoanRows(kid, wk);
 }
-/* "Loan per month" changed between last week's rules and this week's: her
-   open rows are scaled in proportion so they sum to the new figure (owner
-   choice, Plan v3 §D). Stamped per row with the week, so it happens once. */
+/* "Loan per month" changed: her open rows are scaled in proportion so they
+   sum to the new figure (owner choice, Plan v3 §D), on the first Sunday she
+   opens or signs on or after the change — even when the Sunday it started was
+   skipped (Stage 4b). Keyed to the rule version (`mrLoanMonthlyChange`): each
+   row it scaled carries `monthlyRescaledFor`, and a key already on ANY of her
+   rows means this change was applied, so a later Sunday, a row added later or
+   a row paid off since never brings it back. */
 function sdRescaleLoanRows(kid, wk) {
-  const per = w => Number((((mrRulesForWeek(w) || {}).loan || {}).monthly || {})[kid]);
-  const now = per(wk), was = per(sdDayKeyAdd(wk, -7));
-  if (!(now > 0) || !(was > 0) || now === was) return 0;
-  const open = mnyOpenDebtsOldestFirst(kid).filter(x => x.monthlyRescaledWeek !== wk);
+  const ch = mrLoanMonthlyChange(kid, wk);
+  if (!ch || !(ch.now > 0) || !(ch.was > 0)) return 0;
+  if (mnyEnsureDebts(kid).some(x => x && x.monthlyRescaledFor === ch.key)) return 0;
+  const open = mnyOpenDebtsOldestFirst(kid);
   const sum = money2(open.reduce((a, x) => a + money2(x.monthly), 0));
   if (!(sum > 0)) return 0;
-  open.forEach(x => { x.monthly = money2(money2(x.monthly) * now / sum); x.monthlyRescaledWeek = wk; markItemUpdated(x); });
+  open.forEach(x => { x.monthly = money2(money2(x.monthly) * ch.now / sum); x.monthlyRescaledFor = ch.key; markItemUpdated(x); });
   saveAll();
   return open.length;
 }
@@ -254,19 +258,6 @@ function sdUnsettled(kid, wk) {
   return { asks: items.length, sessions, rows: sdNewRows(kid, wk).length,
            total: items.length + sessions + sdNewRows(kid, wk).length };
 }
-/* The footer's sentence while she is not signed (mmMoneyFooter, js/15). */
-function sdFooterWhy(kid, wk) {
-  const d = sdDraftFor(kid, wk), name = mnyKidName(kid);
-  if (d.step === 0) {
-    const u = sdUnsettled(kid, wk);
-    if (u.total) return 'Dad answers first';
-    return d.guess ? `${name}: Show me →` : `${name} guesses first`;
-  }
-  if (d.step === 1) return `${name}: Now I choose →`;
-  const c = sdContext(kid, wk);
-  return c.P.pile > 0 ? `${name}: place $${c.P.pile} first` : `${name}: hold to sign`;
-}
-
 /* ════════════════════════════════════════════════════════════════
    RENDER
    ════════════════════════════════════════════════════════════════ */

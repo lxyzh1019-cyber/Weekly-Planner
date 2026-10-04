@@ -763,7 +763,7 @@ function mmCatchUpBanner() {
      mmUnsettledWeeks stops at eight, so anything older was invisible here AND
      unsettleable: the only door to it was a card in Setup › Weeks on record
      that a parent had no reason to open, so a household with a real backlog was
-     simply told nothing. The Grandma rule belongs where the backlog is already
+     simply told nothing. The Grandfather rule belongs where the backlog is already
      being looked at — the SAME plan as its own section, from the start week
      saved there (js/24-money-parent.js). One tap, previewed, and it moves no
      money until mnyRunDefaultSweep's own confirmation; never automatic. With
@@ -774,13 +774,13 @@ function mmCatchUpBanner() {
     : older.saved
       ? `<div class="mm-catchup-row mm-catchup-more">
            <span class="mm-catchup-wk">${n} week${n === 1 ? '' : 's'} left the review window</span>
-           <span class="mm-catchup-late">no family meeting — the Grandma rule</span>
+           <span class="mm-catchup-late">no family meeting — the Grandfather rule</span>
            <button type="button" class="mm-catchup-go" data-mm-catch="sweep">Credit ${escapeHtml(mnyMoney(older.amount))} each ›</button>
          </div>`
       : `<div class="mm-catchup-row mm-catchup-more">
            <span class="mm-catchup-wk">${n} week${n === 1 ? '' : 's'} left the review window</span>
-           <span class="mm-catchup-late">enter the Grandma rule's start week first</span>
-           <button type="button" class="mm-catchup-go" data-mm-catch="grandma">👵 Grandma rule ›</button>
+           <span class="mm-catchup-late">enter the Grandfather rule's start week first</span>
+           <button type="button" class="mm-catchup-go" data-mm-catch="grandma">👴 Grandfather rule ›</button>
          </div>`;
   const cap = [
     unopened ? `${unopened} week${unopened === 1 ? '' : 's'} nobody has opened` : '',
@@ -806,7 +806,8 @@ function mmHandleCatchUpClick(e) {
     return;
   }
   if (what === 'grandma') {
-    mnyParentSection = 'grandma';
+    // Its start week is entered on Grown-ups › ⚙️ Rules › 👴 (Stage 4b).
+    mnyParentSection = 'rules';
     setParentTab('money');
     return;
   }
@@ -1966,10 +1967,11 @@ function mmSettledStrip(wk) {
    come back, so this names the gap rather than refusing — and keeps a way out. */
 /* ── THE MONEY STEP'S FOOTER ──────────────────────────────────────
    Signing is hold-to-sign on Sunday's "I choose" step, so the footer is not
-   where money moves any more (Sunday v15 Stage 4). It still never offers to
-   skip a girl: until she is signed it says, disabled, what Sunday is waiting
-   for (`sdFooterWhy`, js/44 — the same answer the ritual's own buttons give);
-   once she is signed it offers her sister, then the close step. */
+   where money moves any more (Sunday v15 Stage 4). It never offers to skip a
+   girl: until she is signed it draws nothing — the ritual's own buttons say
+   what Sunday is waiting for, and its hold to sign is the one sign control
+   (Stage 4b: a disabled copy here was a second "hold to sign" that did
+   nothing). Once she is signed it offers her sister, then the close step. */
 function mmMoneyFooter(wk) {
   const kid = mnyMeetingKid();
   const other = kid === 'jenn' ? 'jess' : 'jenn';
@@ -1980,7 +1982,7 @@ function mmMoneyFooter(wk) {
     }
     return `<button type="button" class="btn-confirm" onclick="mmGoTo('close')">Next ▶</button>`;
   }
-  return `<button type="button" class="btn-confirm" disabled>${escapeHtml(sdFooterWhy(kid, wk))}</button>`;
+  return '';
 }
 
 function mmFinishButtons(wk) {
@@ -2091,7 +2093,11 @@ function commitMeetingShared(wk) {
    week recorded. */
 function commitFamilyMeeting(wk) {
   const parts = [];
-  ['jenn', 'jess'].forEach(kid => { parts.push(...commitKidWeek(wk, kid).parts); });
+  ['jenn', 'jess'].forEach(kid => {
+    parts.push(...commitKidWeek(wk, kid).parts);
+    // That Sunday's must-pay, through the sign's own loan step (Stage 4b).
+    mnyCatchUpLoan(kid, wk);
+  });
   commitMeetingShared(wk);
   return parts;
 }

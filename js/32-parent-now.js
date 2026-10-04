@@ -428,13 +428,14 @@ function pnHandleClick(e) {
        side. Section first: setParentScope re-renders the tab it is standing
        on, so setting it afterwards would paint the money page twice — and in
        this app a render can trigger a full-document write. */
-    if (typeof mnySetParentSection === 'function') mnyParentSection = 'approve';
+    mnyParentSection = 'approve';
     setParentTab('money');
     return;
   }
   if (a === 'loans') {
-    /* Section first, for the same reason as 'answer' above. */
-    if (typeof mnySetParentSection === 'function') mnyParentSection = 'debts';
+    /* Section first, for the same reason as 'answer' above. Her loan rows
+       live on Grown-ups › ➕ Commitments (Stage 4b). */
+    mnyParentSection = 'commit';
     setParentTab('money');
     return;
   }

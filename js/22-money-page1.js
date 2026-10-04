@@ -899,7 +899,7 @@ function mnyStoryWeek(kid, r) {
        this row its bar read "Nothing came in" beside a total of $3. A meet
        paid on top is already the Competitions segment, so it is not counted
        here a second time. */
-    { label: r.defaultReason === 'grandma' ? 'Grandma rule' : 'A flat amount',
+    { label: r.defaultReason === 'grandma' ? 'Grandfather rule' : 'A flat amount',
       value: r.defaulted ? money2(money2(r.gross) - money2(r.competition)) : 0, color: 'var(--mny-flat)' },
   ]);
   inBar.fines = money2(r.fines);
@@ -922,7 +922,7 @@ function mnyStoryWeek(kid, r) {
             remembered. She is entitled to know which of her weeks those are —
             same honesty as the parent side marking a typed-in week. */''}
       ${r.defaulted ? `<div class="mny-note">${r.defaultReason === 'grandma'
-          ? '👵 Grandma rule — before we started counting, every week got the same amount.'
+          ? '👴 Grandfather rule — before we started counting, every week got the same amount.'
           : '🕰️ Nobody sat down for this week, so it got a flat amount.'}</div>` : ''}
       ${r.weeksLate ? `<div class="mny-note">🕰️ Agreed ${r.weeksLate} week${r.weeksLate > 1 ? 's' : ''} after this one finished, from what everyone remembered.</div>` : ''}
       ${edited ? `<div class="mny-note">${edited} thing${edited > 1 ? 's were' : ' was'} changed at the meeting${r.editReason ? ' — ' + escapeHtml(mnyReasonLabel(r.editReason)) : ''}.</div>` : ''}
