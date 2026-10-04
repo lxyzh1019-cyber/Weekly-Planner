@@ -309,6 +309,8 @@ const MR_REASONS = [
   { id: 'quarterly_review',   label: 'Quarterly review' },
   { id: 'new_activity',       label: 'New activity added' },
   { id: 'one_time_exception', label: 'One-time exception' },
+  // Grown-ups › ⚙️ Rules saves from next Monday under this one (Plan v3 §C).
+  { id: 'grownups',           label: 'Grown-ups › Rules' },
 ];
 const MR_DEFAULT_REASON = 'family_meeting';
 function mrReasonLabel(id) {
@@ -929,8 +931,13 @@ function mrGetPersonal(kid, weekKey, dayIdx, choreId) {
   return (e.personal[String(dayIdx)] || {})[choreId] || null;
 }
 /* Personal chores cycle none → done → done-unasked. Only the last earns XP;
-   none of the three ever earns money. */
+   none of the three ever earns money. The same guard as mrSetClaim (handoff
+   §00 item 2): a child answers for her own week only; a grown-up for either. */
 function mrCyclePersonal(kid, weekKey, dayIdx, choreId) {
+  if (!isParent() && kid !== activeProfile()) {
+    showToast('That’s not your week 🔒');
+    return false;
+  }
   const e = mrEnsureEarnings(kid, weekKey);
   const d = String(dayIdx);
   if (!e.personal[d]) e.personal[d] = {};
@@ -1106,6 +1113,15 @@ function mrSetClaim(kid, weekKey, dayIdx, choreId, quality) {
   // (she told them at the door), which is why this isn't parent-only.
   if (!isParent() && kid !== activeProfile()) {
     showToast('That’s not your week 🔒');
+    return false;
+  }
+  /* A settled week is closed to claims (handoff §00 item 1). The lock is HERE,
+     inside the writer, so no door — the Chores history picker, Today's job
+     rows, the portal's on-her-behalf card — can claim a chore in a week that
+     was settled at a meeting or credited another way (`mnyWeekSettled`). A
+     grown-up is refused too: what was agreed for that week is a record. */
+  if (typeof mnyWeekSettled === 'function' && mnyWeekSettled(weekKey, kid)) {
+    showToast('That week is already settled, so it cannot be claimed any more — tell a grown-up at the next family meeting.');
     return false;
   }
   const e = mrEnsureEarnings(kid, weekKey);
@@ -1566,16 +1582,13 @@ function mrPlaceCompetitionBlock(kid, comp) {
     setDayBlocks(comp.dayKey, blocks, kid);
     return orphan;
   }
-  const block = {
+  return mrPlaceActivityBlock(kid, 'competition', comp.dayKey, COMP_BLOCK_START, {
     id: 'cb-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-    actId: 'competition',
     compId: comp.id,
     compName: comp.name ? String(comp.name).slice(0, 40) : null,
     tag: mrTagForSport(comp.sport),
-    startMin: COMP_BLOCK_START,
     durationMin: COMP_BLOCK_DUR,
-    objectives: [], note: '', gearState: {}, checklistState: {},
-    parentPinned: true, confirmed: false,
+    gearState: {},
     // Both legs, explicitly. The symmetric pair is what every reader falls back
     // to, and the per-leg fields are what the edit sheet writes — saying both
     // means the block reads the same before and after anyone opens it.
@@ -1583,10 +1596,32 @@ function mrPlaceCompetitionBlock(kid, comp) {
     travelTo: true, travelToMin: COMP_TRAVEL_MIN,
     travelHome: true, travelHomeMin: COMP_TRAVEL_MIN,
     warmupBuffer: true, warmupBufMin: COMP_WARMUP_MIN,
+  });
+}
+
+/* ── A BLOCK A GROWN-UP PLACES ON HER DAY, FROM OUTSIDE THE DAY VIEW ──
+   The general form of the meet's block above (Plan v3 §B, decision D1): the
+   one-off ⛸️ club session from Grown-ups, and every competition block, go
+   through here. Built by hand and written with `setDayBlocks(dayKey, …, kid)`
+   for the reason given above — `placeBlock` only writes the active profile's
+   `currentDayKey`. Pinned, because a grown-up put it there. `fields` carry
+   everything particular to the block — a meet's day-long length, its legs and
+   its link; a club session's buffers from its activity's placement draft —
+   so the meet's block is exactly what it was before this was general. */
+function mrPlaceActivityBlock(kid, actId, dayKey, startMin, fields) {
+  if (!actId || !dayKey) return null;
+  const block = Object.assign({
+    id: 'ab-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+    actId,
+    startMin: Math.max(0, Math.round(Number(startMin) || 0)),
+    durationMin: 60,
+    objectives: [], note: '', checklistState: {},
+    parentPinned: true, confirmed: false,
     createdAt: syncNow(), updatedAt: syncNow(),
-  };
+  }, fields || {});
+  const blocks = (getDayBlocks(dayKey, kid) || []).slice();
   blocks.push(block);
-  setDayBlocks(comp.dayKey, blocks, kid);
+  setDayBlocks(dayKey, blocks, kid);
   return block;
 }
 
@@ -1814,9 +1849,13 @@ function mrBoxItems(kid) {
   if (!Array.isArray(p.boxItems)) p.boxItems = [];
   return p.boxItems;
 }
-function mrAddFine(kid, itemId, dayKey) {
+/* `opts.who` — who logged it (Grown-ups › Fines: Mom or Dad). Kept on the
+   record because she sees when, what and who on Sunday. */
+function mrAddFine(kid, itemId, dayKey, opts) {
   if (!isParent()) { showToast('A grown-up records these 🔒'); return null; }
   const f = { id: mrNewId('fine-'), dayKey: dayKey || todayKey(), itemId, at: Date.now() };
+  const who = String(((opts || {}).who) || '').trim().slice(0, 20);
+  if (who) f.who = who;
   mrFines(kid).push(f);
   saveAll();
   return f;
@@ -1920,7 +1959,9 @@ function mrFinesWeek(weekKey, kid, dayEarnings) {
     total += applied;
     perDay.push({ dayIdx: d, raw: money2(raw), applied: money2(applied) });
   });
-  return { total: money2(total), perDay };
+  // `chargeable` (fine id → what that one costs before the daily floor) is
+  // what Grown-ups › Fines prints beside each entry: free, or its amount.
+  return { total: money2(total), perDay, chargeable };
 }
 
 /* How many times this item has been recorded for this child this week, and

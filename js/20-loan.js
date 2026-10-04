@@ -562,9 +562,11 @@ function mnyLoanSundayPayment(kid, weekKey, opts) {
 /* Interest every N Sundays (`loan.interestEverySundays`, at
    `loan.ratePct` a year), counted per debt in `sundaysSinceInterest` and
    stamped with the week so a second call for the same Sunday does nothing.
-   On the principal still owed, never on interest already added (the loan's
-   `simpleInterest` rule), into the `arrearsInterest` bucket the loan already
-   shows. The stream gets a line from `interest` to the debt: no home moves —
+   On the WHOLE balance left — interest already added included — as the
+   prototype draws it (`left * rate / 100 * 4 / 52`, then `left += int`), the
+   same answer as `sdLoanInterest` (js/43). The old loan's `simpleInterest`
+   rule belonged to the retired arrears charge, not to these terms. Into the
+   `arrearsInterest` bucket the loan already shows. The stream gets a line from `interest` to the debt: no home moves —
    she has not paid it — but the row says the wall grew and why. Returns the
    interest added across every debt. */
 function loanAccrueBalanceInterest(kid, weekKey) {
@@ -580,8 +582,7 @@ function loanAccrueBalanceInterest(kid, weekKey) {
     d.sundaysSinceInterest = (Number(d.sundaysSinceInterest) || 0) + 1;
     if (d.sundaysSinceInterest < every) return;
     d.sundaysSinceInterest = 0;
-    const owedPrincipal = Math.max(0, money2(d.principal) - money2(d.paid));
-    const interest = money2(owedPrincipal * ratePct / 100 * every / 52);
+    const interest = money2(loanBalance(kid, d.id) * ratePct / 100 * every / 52);
     if (!(interest > 0)) return;
     d.arrearsInterest = money2(money2(d.arrearsInterest) + interest);
     d.lastInterestAdded = interest;
@@ -591,6 +592,75 @@ function loanAccrueBalanceInterest(kid, weekKey) {
   });
   saveAll();
   return total;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   GROWN-UPS › ➕ COMMITMENTS (Plan v3 §D) — a new row on her wall
+
+   🆕 A commitment: she pays `sharePct` of what it costs. 10% of her share
+   goes down at once, out of her 🏦 Savings (Savings → cash → the new row, as
+   a `down` payment, two recorded movements); the rest is the new row, paid
+   over `weeks` Sundays — written as the row's own monthly figure
+   (rest ÷ weeks × 52 ÷ 12), so `mnyWeeklyDue` gives back rest ÷ weeks.
+   🌧️ A surprise cost: nobody did anything wrong. Her Savings pays first
+   (Savings → cash → spent); whatever Savings cannot cover becomes a row with
+   no weekly figure, paid by extra. Each through the owners that already move
+   that money; each new row is `mnyAddDebt`'s. Returns the new row (or, for a
+   surprise Savings covered, `{ covered: true }`), null when refused.
+   ════════════════════════════════════════════════════════════════ */
+function mnyAddCommitment(kid, fields) {
+  if (!isParent()) { showToast('Only parents can add a loan 🔒'); return null; }
+  const f = fields || {};
+  const what = String(f.what || '').trim().slice(0, 40);
+  const cost = money2(Math.max(0, Number(f.cost) || 0));
+  const share = Math.max(0, Math.min(100, Number(f.sharePct) || 0));
+  const weeks = Math.max(1, Math.round(Number(f.weeks) || 1));
+  if (!what) { showToast('What is it for?'); return null; }
+  const her = money2(cost * share / 100);
+  if (!(her > 0)) { showToast('Her share has to be more than $0'); return null; }
+  const down = Math.round(her * 10) / 100;                 // 10% of her share, to the cent
+  const rest = money2(her - down);
+  const d = mnyAddDebt(kid, { name: what, icon: '🆕', item: what, principal: her,
+    monthly: money2(rest / weeks * 52 / 12), downPayment: 0, downPaymentDue: '' });
+  if (!d) return null;
+  /* The 10% down, out of Savings: what Savings cannot cover stays on the row
+     — the affordability card has already said so ("⚠️ under 🛟"). */
+  const fromSavings = money2(Math.min(down, mnySavedTotal(kid)));
+  if (fromSavings > 0) {
+    const w = ensureWallet(kid);
+    const before = money2(w.cash);
+    moneyWithdraw(kid, fromSavings, { note: 'Down payment on ' + what });
+    const pay = money2(Math.min(fromSavings, money2(w.cash - before), w.cash));
+    if (pay > 0) {
+      w.cash = money2(w.cash - pay);
+      evMirror(kid, { kind: 'loan', from: 'cash', to: 'loan:' + d.id, amount: pay, ref: d.id,
+                      note: '10% down on ' + what });
+      loanRecordPayment(kid, pay, 'down', d.id);
+    }
+  }
+  saveAll();
+  return d;
+}
+function mnyAddSurprise(kid, fields) {
+  if (!isParent()) { showToast('Only parents can add a loan 🔒'); return null; }
+  const f = fields || {};
+  const what = String(f.what || '').trim().slice(0, 40);
+  const cost = money2(Math.max(0, Number(f.cost) || 0));
+  if (!what) { showToast('What happened?'); return null; }
+  if (!(cost > 0)) { showToast('What did it cost?'); return null; }
+  const fromSafe = money2(Math.min(cost, mnySavedTotal(kid)));
+  let paid = 0;
+  if (fromSafe > 0) {
+    const w = ensureWallet(kid);
+    const before = money2(w.cash);
+    moneyWithdraw(kid, fromSafe, { note: '🌧️ ' + what });
+    paid = money2(Math.min(fromSafe, money2(w.cash - before)));
+    if (paid > 0) moneySpendCash(kid, paid, { note: '🌧️ ' + what });
+  }
+  const borrow = money2(cost - paid);
+  if (!(borrow > 0)) { saveAll(); return { covered: true, paid }; }
+  return mnyAddDebt(kid, { name: what, icon: '🌧️', item: what, principal: borrow,
+    monthly: 0, downPayment: 0, downPaymentDue: '' });
 }
 
 /* Pay extra, any amount — this is the one that earns the 10%.

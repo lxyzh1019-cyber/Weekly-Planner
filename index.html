@@ -443,6 +443,16 @@
   </div>
 </div>
 
+<!-- Her request sheets — Tell Dad a result, club sessions, move / cash out /
+     put in, draw in advance, a new goal, everything she asked (js/45-requests.js).
+     Chrome here, body filled by JS, the recordOverlay pattern. -->
+<div class="overlay" id="requestOverlay" onclick="overlayClick(event,'requestOverlay')">
+  <div class="sheet rq-sheet" role="dialog" aria-modal="true" aria-labelledby="rqSheetTitle">
+    <h3 id="rqSheetTitle">✋ Ask Dad</h3>
+    <div id="requestBody"></div>
+  </div>
+</div>
+
 <!-- Quick profile switcher (tap the profile icon) -->
 <div class="overlay" id="profileSwitchOverlay" onclick="overlayClick(event,'profileSwitchOverlay')">
   <div class="sheet sheet--compact" role="dialog" aria-modal="true" aria-labelledby="profileSwitchTitle">
@@ -1596,6 +1606,7 @@
 <script src="js/42-flow.js"></script>
 <script src="js/43-sunday-core.js"></script>
 <script src="js/45-requests.js"></script>
+<script src="js/46-grownups.js"></script>
 <script src="js/99-main.js"></script>
 </body>
 </html>

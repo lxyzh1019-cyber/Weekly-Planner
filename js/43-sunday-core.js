@@ -182,14 +182,15 @@ function sdMustPay(loan) {
   return sdR2(Math.min(sdLeft(l), (Number(l.weekly) || 0) + (Number(l.arrears) || 0)));
 }
 /* Interest every N Sundays: the counter moves first, then on the Nth Sunday
-   `ratePct` a year on the principal still owed is added for N weeks. */
+   `ratePct` a year on the WHOLE balance left — earlier interest included — is
+   added for N weeks. The prototype's `left * rate / 100 * 4 / 52` with
+   `left += int`, so interest compounds every N Sundays as drawn. */
 function sdLoanInterest(loan, sundaysSince, rules) {
   const every = Math.max(1, sdRule(rules, 'loan.interestEverySundays') || 1);
   const n = (Number(sundaysSince) || 0) + 1;
   const l = Object.assign({}, loan || {});
   if (n < every || !(sdLeft(l) > 0)) return { loan: l, interest: 0, sundaysSince: sdLeft(l) > 0 ? n % every : 0 };
-  const owed = Math.max(0, (Number(l.principal) || 0) - (Number(l.paid) || 0));
-  const interest = sdR2(owed * sdRule(rules, 'loan.ratePct') / 100 * every / 52);
+  const interest = sdR2(sdLeft(l) * sdRule(rules, 'loan.ratePct') / 100 * every / 52);
   l.interest = sdR2((Number(l.interest) || 0) + interest);
   return { loan: l, interest, sundaysSince: 0 };
 }

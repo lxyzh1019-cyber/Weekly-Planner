@@ -33,7 +33,11 @@ let mnyPendingReason = MR_DEFAULT_REASON;
 let mnyPendingFrom = null;  // effective date; defaults to today
 let mnyRuleSearch = '';
 let mnyHistoryOpen = false;
-let mnyParentSection = 'prices';
+/* Where Grown-ups is standing: one of its tabs (GU_TABS, js/46-grownups.js),
+   or one of the More sections below — which is how every older route that
+   named a section (Setup › 🕰️ Change history, Now's loan-season row, the
+   meeting hub's Grandma pointer) still lands on it. */
+let mnyParentSection = 'approve';
 
 const MNY_PARENT_SECTIONS = [
   { id: 'prices',   label: '💷 What things pay' },
@@ -53,19 +57,31 @@ const MNY_PARENT_SECTIONS = [
 ];
 
 function mnyParentKid() { return (parentViewing === 'jenn' || parentViewing === 'jess') ? parentViewing : 'jess'; }
-function mnySetParentSection(id) { mnyParentSection = id; mnyRenderRulesTab(); }
+function mnySetParentSection(id) {
+  mnyParentSection = id;
+  if (MNY_PARENT_SECTIONS.some(x => x.id === id)) guMoreSection = id;
+  mnyRenderRulesTab();
+}
 
+/* 👨‍👩‍👧 Grown-ups (Sunday v15). Its five tabs are js/46-grownups.js; the
+   sixth, 📖 More, is this page as it was — the old rail's eight sections,
+   moved under one tab with their own row of chips, not rewritten. */
 function mnyRenderRulesTab() {
   const wrap = document.getElementById('mnyRulesWrap');
   if (!wrap) return;
   if (!isParent()) { wrap.innerHTML = `<div class="mny-card"><div class="mny-note">Parents only 🔒</div></div>`; return; }
+  if (guIsTab(mnyParentSection)) {
+    wrap.innerHTML = `<div class="gu">${guRender(mnyParentSection)}</div>`;
+    if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
+    return;
+  }
   const kid = mnyParentKid();
   const v = mrLatestVersion();
 
-  /* A rail rather than a chip row: seven sections read as a list of places, and
-     the one you are in stays visible while you scroll the one you opened. */
+  /* The More sections, as a chip row under the Grown-ups tabs — the side rail
+     they used to sit in went with the redesign (Plan v3 §A). */
   const nav = MNY_PARENT_SECTIONS.map(s =>
-    `<button type="button" class="mny-rail-item ${mnyParentSection === s.id ? 'on' : ''}" data-mnyp-action="section" data-mnyp-id="${s.id}">${escapeHtml(s.label)}</button>`).join('');
+    `<button type="button" class="gu-more-chip ${mnyParentSection === s.id ? 'on' : ''}" aria-pressed="${mnyParentSection === s.id}" data-mnyp-action="section" data-mnyp-id="${s.id}">${escapeHtml(s.label)}</button>`).join('');
 
   let body = '';
   if (mnyParentSection === 'prices') body = mnyRulePrices();
@@ -82,7 +98,8 @@ function mnyRenderRulesTab() {
      chips, so the parent got the portal's nav, then the kids' nav, then the
      sections — three rows before a single number. */
   wrap.innerHTML =
-      `${mnyPageHead('⚙️ Money rules', 'The only page that changes a number', [
+      `<div class="gu">${guTabBar()}</div>
+       ${mnyPageHead('📖 More', 'History, loans, holdings and the older money tools', [
           { action: 'record-any', label: '✍️ Record something' },
           { action: 'tourpar', label: '? How this page works' },
         ], { back: false })}
@@ -92,12 +109,10 @@ function mnyRenderRulesTab() {
        </div>
        ${mnyPendingBar()}
        ${mnyHouseRulesCard()}
-       <div class="mny-rail-wrap">
-         <nav class="mny-rail" aria-label="Money rules sections">${nav}</nav>
-         <div class="mny-rail-body">
-           <div class="mny-note">Every change is dated and recorded. Past weeks keep the prices that were live when the work was done — changing a price today never rewrites what they already earned.</div>
-           ${body}
-         </div>
+       <nav class="gu-more-nav" aria-label="More sections">${nav}</nav>
+       <div class="gu-more-body">
+         <div class="mny-note">Every change is dated and recorded. Past weeks keep the prices that were live when the work was done — changing a price today never rewrites what they already earned.</div>
+         ${body}
        </div>
        ${mnyTargetsFooter()}`;
   if (typeof enhanceNonButtonClickables === 'function') enhanceNonButtonClickables(wrap);
@@ -1130,6 +1145,8 @@ function mnyParentClick(ev) {
   const id = el.getAttribute('data-mnyp-id');
   const kid = mnyParentKid();
 
+  // Grown-ups' own tabs and cards (js/46-grownups.js).
+  if (a.indexOf('gu') === 0) { guAction(a, el); return; }
   if (a === 'section') { mnySetParentSection(id); return; }
   if (a === 'tab')     { mnyGoTab(el.getAttribute('data-mny-tab')); return; }
   if (a === 'kid')     { setParentKid(id); mnyRenderRulesTab(); return; }
@@ -1305,6 +1322,7 @@ function mnyParentInput(ev) {
   const a = el.getAttribute('data-mnyp-action');
   const id = el.getAttribute('data-mnyp-id');
   const kid = mnyParentKid();
+  if (a.indexOf('gu') === 0) { guInput(a, el); return; }
   if (a === 'search') { mnyRuleSearch = el.value; mnyRenderRulesTab(); return; }
   if (a === 'from')   { mnyPendingFrom = el.value; return; }
   if (a === 'startweek') { mnySetStartWeek(el.value); return; }

@@ -946,13 +946,17 @@ function mnyStoryWeek(kid, r) {
    under one of these. It used to be a literal in 99-main.js that nobody had
    to keep in step with the pages — so the parent's Money rules page, which
    renders `record-any` and `tourpar` into #mnyRulesWrap, had two buttons
-   that did nothing at all. */
-const MNY_CLICK_HOSTS = ['mnyPage1Wrap', 'mnyStoryWrap', 'mnySchoolWrap', 'familyMeetingBody', 'mnyRulesWrap'];
+   that did nothing at all.
+   `requestBody` is her request sheets' body (js/45-requests.js): their
+   `rq-…` actions are handed to `rqHandleAction` / `rqHandleInput`. */
+const MNY_CLICK_HOSTS = ['mnyPage1Wrap', 'mnyStoryWrap', 'mnySchoolWrap', 'familyMeetingBody', 'mnyRulesWrap', 'requestBody'];
 
 function mnyHandleClick(ev) {
   const el = ev.target.closest('[data-mny-action]');
   if (!el) return;
   const a = el.getAttribute('data-mny-action');
+  // Her request sheets (js/45-requests.js) own every `rq-…` action.
+  if (a.indexOf('rq-') === 0) { rqHandleAction(a, el); return; }
 
   /* A planned meet with no result yet, in step 3. Recording it is the full
      form; "no criteria met" is the one-tap answer that writes a real record
@@ -1063,6 +1067,7 @@ function mnyHandleInput(ev) {
   const el = ev.target.closest('[data-mny-action]');
   if (!el) return;
   const a = el.getAttribute('data-mny-action');
+  if (a.indexOf('rq-') === 0) { rqHandleInput(a, el); return; }
   if (a === 'goalname') { mnyGoalDraft.name = el.value; return; }
   if (a === 'goaldate') { mnyGoalDraft.targetDate = el.value; mnyRenderMyMoney(); return; }
 }

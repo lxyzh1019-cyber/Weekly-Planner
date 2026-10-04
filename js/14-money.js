@@ -147,6 +147,17 @@ function moneyTakeBackCash(kid, amount, opts) {
                                 amount: money2(before - w.cash) }));
   saveAll(); return true;
 }
+/* Cash she has, spent — the one writer of cash → spent outside the Sunday
+   settlement. A 🌧️ surprise cost paid from her Savings (mnyAddSurprise,
+   js/20-loan.js) leaves through here, and so will Sunday's ⏪ advance line.
+   Only what she has: a spend is never allowed to invent a debt. */
+function moneySpendCash(kid, amount, opts) {
+  const w = ensureWallet(kid); amount = money2(Math.min(money2(amount), Math.max(0, w.cash)));
+  if (!(amount > 0)) return false;
+  w.cash = money2(w.cash - amount);
+  evMirror(kid, Object.assign({ kind: 'out' }, opts || {}, { from: 'cash', to: 'spent', amount }));
+  saveAll(); return true;
+}
 function moneyWithdraw(kid, amount, opts) {         // kept ready → cash (two-way)
   const w = ensureWallet(kid); amount = money2(Math.min(amount, mnySavedTotal(kid)));
   if (amount <= 0) return false;

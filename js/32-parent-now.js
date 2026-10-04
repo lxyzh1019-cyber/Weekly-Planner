@@ -121,15 +121,20 @@ function pnQueueRows() {
       sub: `${who.icon} ${who.name} added “${first.task.name}”`,
     });
   }
-  const moves = ['jenn', 'jess'].flatMap(k =>
-    (typeof mnyPendingMoves === 'function' ? mnyPendingMoves(k) : []).map(r => ({ kid: k, r })));
-  if (moves.length) {
-    const first = moves[0];
+  /* Everything she has asked a grown-up — a result, a goal, cash early, a
+     session she cannot make, a fine she disputes, a move, a gift or cash from
+     home — read through the ONE reader (mnyRequestsFor) and counted with the
+     Approve tab's own number. It replaces the moves-only row, which counted
+     the moves this one counts again; gifts waiting for a yes had no row. */
+  const asks = ['jenn', 'jess'].flatMap(k =>
+    (typeof mnyRequestsFor === 'function' ? mnyRequestsFor(k) : []).filter(q => q.open).map(q => ({ kid: k, q })));
+  if (asks.length) {
+    const first = asks[0];
     const who = kidLabel(first.kid);
     rows.push({
-      icon: '🔀', action: 'moves', cta: 'Answer ›',
-      title: `${moves.length} move${moves.length === 1 ? '' : 's'} she has asked about`,
-      sub: `${who.icon} ${who.name} · ${mnyMoney(first.r.amount)} to ${mnyHomeLabel(first.r.to).toLowerCase()}`,
+      icon: '✅', action: 'answer', cta: 'Answer ›',
+      title: `${asks.length} to answer`,
+      sub: `${who.icon} ${who.name} · ${first.q.icon} ${first.q.text}`,
     });
   }
   const notes = pnNoteKids();
@@ -418,22 +423,17 @@ function pnHandleClick(e) {
   /* Now COUNTS and ROUTES; it never decides. This opens the sheet with no kind
      chosen, because which record it is is the first thing the sheet asks. */
   if (a === 'record')   { openRecordSheet({ kid: parentViewing }); return; }
-  if (a === 'moves')    {
-    /* Point the portal at the child who asked, and at the section that shows
-       what she has — answering a move with another child's balances on screen
-       is how the wrong pot gets opened. */
-    const first = ['jenn', 'jess'].find(k =>
-      typeof mnyPendingMoves === 'function' && mnyPendingMoves(k).length);
-    /* Section first: setParentScope re-renders the tab it is standing on, so
-       setting it afterwards would paint the money page twice — and in this app
-       a render can trigger a full-document write. */
-    if (typeof mnySetParentSection === 'function') mnyParentSection = 'holdings';
-    if (first) setParentScope(first);
+  if (a === 'answer')   {
+    /* Grown-ups › ✅ Approve, where both girls' questions are answered side by
+       side. Section first: setParentScope re-renders the tab it is standing
+       on, so setting it afterwards would paint the money page twice — and in
+       this app a render can trigger a full-document write. */
+    if (typeof mnySetParentSection === 'function') mnyParentSection = 'approve';
     setParentTab('money');
     return;
   }
   if (a === 'loans') {
-    /* Section first, for the same reason as 'moves' above. */
+    /* Section first, for the same reason as 'answer' above. */
     if (typeof mnySetParentSection === 'function') mnyParentSection = 'debts';
     setParentTab('money');
     return;

@@ -197,8 +197,10 @@ function placeAll(rand, w) {
         if (s.sdLeft(L) > 0 && due !== (li.interest > 0)) bad.push(`${tag}: interest ${li.interest} on Sunday ${i + 1}`);
         if (li.interest > 0) {
           interestWeeks++;
-          const want = r2((L.principal - L.paid) * R.loan.ratePct / 100 * R.loan.interestEverySundays / 52);
-          if (li.interest !== want) bad.push(`${tag}: interest ${li.interest}, expected ${want} on the principal still owed`);
+          // The prototype's `left * rate / 100 * 4 / 52`, with `left += int`: on
+          // the whole balance still owed, earlier interest included.
+          const want = r2(s.sdLeft(L) * R.loan.ratePct / 100 * R.loan.interestEverySundays / 52);
+          if (li.interest !== want) bad.push(`${tag}: interest ${li.interest}, expected ${want} on the whole balance left`);
         }
         st = { weekKey: w.weekKey, week: res.after.week, loan: li.loan, pots: res.after.pots, locks: res.after.locks,
                goal: st.goal, histCat: res.after.histCat, stickers: res.after.stickers,
@@ -271,7 +273,24 @@ function fill(w, k) {
       ? true : JSON.stringify([v.income.head, v.strategy.name, v.strategy.why]));
   const li = s.sdLoanInterest(res.after.loan, 3, R);
   check('steady < must-pay: no interest on what was carried',
-    li.interest === r2((1000 - res.after.loan.paid) * R.loan.ratePct / 100 * 4 / 52) ? true : li.interest);
+    li.interest === r2(s.sdLeft(res.after.loan) * R.loan.ratePct / 100 * 4 / 52) ? true : li.interest);
+}
+
+// Interest compounds as drawn: the prototype adds `left * rate / 100 * 4 / 52`
+// to `left`, so the next interest is charged on the earlier interest too.
+{
+  const L0 = { principal: 1000, paid: 300, interest: 0, arrears: 0, weekly: 16.15 };
+  const a = s.sdLoanInterest(L0, 3, R);
+  const b = s.sdLoanInterest(a.loan, 3, R);
+  const wantA = r2(700 * R.loan.ratePct / 100 * 4 / 52);
+  const wantB = r2((700 + wantA) * R.loan.ratePct / 100 * 4 / 52);
+  check('interest is charged on the whole balance left, earlier interest included',
+    a.interest === wantA && b.interest === wantB && b.loan.interest === r2(wantA + wantB)
+      ? true : JSON.stringify({ a: a.interest, wantA, b: b.interest, wantB, total: b.loan.interest }));
+  const big = { principal: 100000, paid: 0, interest: 5000, arrears: 0, weekly: 1 };
+  const c = s.sdLoanInterest(big, 3, R);
+  check('interest on a balance that already carries interest counts that interest',
+    c.interest === r2(105000 * R.loan.ratePct / 100 * 4 / 52) ? true : c.interest);
 }
 
 // Spend cap hit.

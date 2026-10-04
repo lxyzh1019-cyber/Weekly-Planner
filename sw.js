@@ -78,6 +78,7 @@ const SHELL = [
   './js/42-flow.js',
   './js/43-sunday-core.js',
   './js/45-requests.js',
+  './js/46-grownups.js',
   './js/99-main.js',
   './assets/icons/apple-touch-icon.png',
   './assets/icons/favicon-16.png',

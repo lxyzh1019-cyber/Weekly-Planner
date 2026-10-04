@@ -19,7 +19,9 @@
 
      comp      → mrAddCompetition (or mrUpdateCompetition) — Dad's − / +
                  figure goes beside her entry as `awardedOverride`
-     goal      → mnySwitchGoal (mnyAddGoal + the jar follows)
+     goal      → nothing at approval: the jar switches ON SUNDAY (the
+                 prototype's "✓ starts Sunday") — mnyApplyApprovedGoals,
+                 called when Sunday opens, runs mnySwitchGoal
      skip      → mrSetSessionAttendance(…, false) — missed pays $0, no fine
      dispute   → mrRemoveFine
      adv       → nothing moves at approval: the cash came from Dad's pocket;
@@ -68,9 +70,12 @@ function mnyAddRequest(kid, fields) {
   if (kind === 'move') return mnyRequestMove(kid, f.from, f.to, f.amount, f.note);
   if (kind === 'gift' || kind === 'deposit') {
     const dayKey = f.dayKey || todayKey();
-    return mnyAddDeposit(kid, ctWeekKeyForDate(dayKey), {
+    const fields = {
       amount: f.amount, from: f.from || (kind === 'deposit' ? 'Cash from home' : MNY_FROM[1]),
-      giver: f.giver || '', dayKey, requestKind: kind, note: String(f.note || '').slice(0, 80) });
+      giver: f.giver || '', dayKey, requestKind: kind, note: String(f.note || '').slice(0, 80) };
+    // Her own words for the ask ("Put $5 cash in → Savings"), shown in Approve.
+    if (f.text) fields.text = String(f.text).slice(0, 120);
+    return mnyAddDeposit(kid, ctWeekKeyForDate(dayKey), fields);
   }
   if (MNY_REQUEST_KINDS.indexOf(kind) < 0) { showToast('That is not something to ask for here.'); return null; }
   const dayKey = f.dayKey || todayKey();
@@ -181,7 +186,9 @@ function mnyRequestsFor(kid) {
       open: !status || status === 'talk',
       applied: !!r.appliedWeek,
       askedAt: Number(r.askedAt || r.createdAt) || 0,
-      answeredAt: Number(r.answeredAt || r.approvedAt || r.rejectedAt) || 0,
+      // When a grown-up answered: a deposit's yes is the moment it was credited.
+      answeredAt: Number(r.answeredAt || r.approvedAt || r.rejectedAt || r.talkAt
+        || (store === 'deposits' && !r.pendingApproval ? r.appliedAt : 0)) || 0,
       weekKey: r.weekKey || null,
       record: r,
     });
@@ -267,12 +274,8 @@ function mnyRequestYes(kid, r, o, by) {
     // The week of the session's own day, not the week she asked in.
     return mrSetSessionAttendance(kid, ctWeekKeyForDate(r.dayKey || todayKey()), r.blockId, false);
   }
-  if (r.kind === 'goal') {
-    const g = mnySwitchGoal(kid, { name: r.name, icon: r.icon || '🎯', target: r.target }, r.keep);
-    if (!g) return false;
-    r.goalId = g.id;
-    return true;
-  }
+  // A new goal starts on Sunday, not at the yes: mnyApplyApprovedGoals.
+  if (r.kind === 'goal') return true;
   if (r.kind === 'comp') {
     const fields = {
       dayKey: r.dayKey, sport: r.sport, name: r.name,
@@ -289,9 +292,93 @@ function mnyRequestYes(kid, r, o, by) {
     const saved = existing ? mrUpdateCompetition(kid, existing.id, fields) : mrAddCompetition(kid, fields);
     if (!saved) return false;
     r.compId = saved.id;
+    // Whether this yes CREATED the record — the one case ↺ Undo can take back.
+    r.compCreated = !existing;
     return true;
   }
   return false;
+}
+
+/* − / + on a result's dollars, before the yes (Plan v3 §B, deviation #7):
+   Dad's figure, checked against the published sheet, kept on the request
+   until he says yes — then `mnyRequestYes` puts it beside her entry as
+   `awardedOverride`. A grown-up's; never below $0. */
+function mnySetRequestPay(kid, id, value) {
+  if (!isParent()) { showToast('A grown-up answers this 🔒'); return false; }
+  const r = mnyEnsureRequests(kid).find(x => x && x.id === id);
+  if (!r || r.kind !== 'comp' || r.status === 'yes') return false;
+  r.pay = money2(Math.max(0, Number(value) || 0));
+  markItemUpdated(r);
+  saveAll();
+  return true;
+}
+
+/* ↺ Undo on an answered card: the question goes back to waiting. A "no" or a
+   "let's talk" just reopens. A "yes" reopens only where its effect can be
+   taken back through its own owner and Sunday has not used it yet — an
+   advance (nothing moved), a goal (the jar switches on Sunday), a missed
+   session (the answer is cleared), a result this yes recorded (deleted).
+   Anything else is refused with a sentence saying where to correct it. */
+function mnyReopenRequest(kid, id) {
+  if (!isParent()) { showToast('A grown-up answers this 🔒'); return false; }
+  const mv = mnyEnsureMoveRequests(kid).find(r => r && r.id === id);
+  if (mv) {
+    if (mv.approvedAt) { showToast('That money already moved — to undo it, move it back.'); return false; }
+    if (!mv.rejectedAt && !mv.talkAt) return false;
+    delete mv.rejectedAt; delete mv.talkAt; delete mv.why;
+    markItemUpdated(mv); saveAll();
+    return true;
+  }
+  const dep = mnyEnsureDeposits(kid).find(d => d && d.id === id);
+  if (dep) {
+    if (!dep.pendingApproval) { showToast('That money is already in her bank — correct the gift itself on the Record sheet.'); return false; }
+    if (!dep.rejectedAt && !dep.talkAt) return false;
+    delete dep.rejectedAt; delete dep.talkAt; delete dep.why;
+    markItemUpdated(dep); saveAll();
+    return true;
+  }
+  const r = mnyEnsureRequests(kid).find(x => x && x.id === id);
+  if (!r || !r.status) return false;
+  if (r.status === 'yes') {
+    if (r.appliedWeek) { showToast('Sunday has already used this yes — correct it on the thing itself.'); return false; }
+    if (r.kind === 'dispute') { showToast('The fine is already gone — log it again on 📦 Fines if it was right.'); return false; }
+    if (r.kind === 'skip') {
+      mrSetSessionAttendance(kid, ctWeekKeyForDate(r.dayKey || todayKey()), r.blockId, null);
+    } else if (r.kind === 'comp') {
+      if (!r.compCreated || !r.compId) { showToast('Correct the result itself on the Record sheet.'); return false; }
+      mrDeleteCompetition(kid, r.compId);
+      r.compId = null; r.compCreated = false;
+    }
+  }
+  r.status = null; r.answeredAt = null; r.answeredBy = null;
+  delete r.talkAt;
+  markItemUpdated(r);
+  saveAll();
+  return true;
+}
+
+/* 🎯 Sunday switches the jar. Every goal a grown-up said yes to and Sunday
+   has not applied yet goes through `mnySwitchGoal` (the jar follows, or goes
+   to Savings, as she asked), oldest yes first, stamped `appliedWeek` so the
+   next Sunday — or the other device — does not switch it again. Stage 4's
+   Sunday open calls this; nothing else does. Returns how many it applied. */
+function mnyApplyApprovedGoals(kid, weekKey) {
+  if (!isParent()) return 0;
+  const wk = weekKey || ctThisWeekKey();
+  const due = mnyEnsureRequests(kid)
+    .filter(r => r && r.kind === 'goal' && r.status === 'yes' && !r.appliedWeek)
+    .sort((a, b) => (Number(a.answeredAt) || 0) - (Number(b.answeredAt) || 0));
+  let n = 0;
+  due.forEach(r => {
+    const g = mnySwitchGoal(kid, { name: r.name, icon: r.icon || '🎯', target: r.target }, r.keep);
+    if (!g) return;
+    r.goalId = g.id;
+    r.appliedWeek = wk;
+    markItemUpdated(r);
+    n++;
+  });
+  if (n) saveAll();
+  return n;
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -386,4 +473,493 @@ function mnyClubOwes(kid) {
     weeks++;
   });
   return { amount, sessions, weeks, since };
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ✋ HER REQUEST SHEETS — the prototype's sheets on My money (My Money v2)
+
+   🏆 Tell Dad a result · ⛸️ My club sessions · 🔀 Move · 💵 Cash out ·
+   🏦 Put cash in · ⏪ Draw in advance · 🎯 New goal · ⏳ Everything I asked
+   Dad. One static overlay (`#requestOverlay`, chrome in index.html, body
+   filled here — the Record sheet's shape), opened by `mnyOpenRequestSheet`
+   through `openSheet` / `closeSheet`, which own focus and Escape.
+
+   It owns no rules. "Send to Dad →" is `mnyAddRequest` — the one door, which
+   files a move with `mnyRequestMove` and cash from home with `mnyAddDeposit`
+   — and every gate it shows is the owner's: the advance maximum
+   (`advance.maxPerWeek` less `mnyAdvanceUsed`), a move's refusal
+   (`mnyMoveRefusal`, said before the tap), a result's pay
+   (`mrScoreCompetition`, the rules of its day).
+
+   The draft is module-level, like `rcDraft`, and the DOM is drawn FROM it:
+   typing a name or a race time never re-renders — only the send button and
+   the preview follow it, in place (`rqSync`), so the caret stays.
+   Actions ride on `data-mny-action="rq-…"` under `#requestBody`, one of
+   MNY_CLICK_HOSTS; `mnyHandleClick` / `mnyHandleInput` hand them here.
+   ════════════════════════════════════════════════════════════════ */
+const RQ_SWIM_EVENTS = ['50 Free', '100 Free', '200 Free', '50 Back', '100 Back', '50 Breast',
+                        '100 Breast', '50 Fly', '100 Fly', '100 IM', '200 IM'];
+const RQ_GOAL_ICONS = ['🎒', '⛸️', '🛼', '🏊', '📚', '🎧', '🎨', '🧸'];
+const RQ_MOVE_WHY = ['Something I want to buy', 'Saving for my goal', 'Loan gone sooner', 'Want it to grow'];
+const RQ_SKIP_WHY = ['🤒 Sick', '📚 School thing', '🚗 Family trip', 'Something else'];
+const RQ_ADV_WHY = ['School book fair', 'Snack with friends', 'A gift for someone', 'Something else'];
+const RQ_TITLES = { result: '🏆 Tell Dad a result', club: '⛸️ My club sessions', goal: '🎯 A new saving goal',
+                    adv: '⏪ Draw in advance', list: '⏳ Everything I asked Dad',
+                    move: '🔀 Move money', cash: '💵 Cash out', dep: '🏦 Put cash in' };
+// What each home is called on these sheets (handoff §5). The 🧱 wall is only a
+// wish on "Put cash in": there is no move route to the loan (Sunday places it).
+const RQ_HOMES = { ready: '🏦 Savings', locked: '🔒 Locked away', invest: '📈 Companies',
+                   cash: '💵 Cash out', wall: '🧱 Loan wall' };
+let rqDraft = null;
+
+/* "$5" for whole dollars, "$5.50" otherwise — the prototype's `'$' + n`. */
+function rqDollars(v) { const n = money2(v); return '$' + (n % 1 ? n.toFixed(2) : String(n)); }
+function rqOrd(n) { return n ? ['1st', '2nd', '3rd'][n - 1] : '—'; }
+function rqDayLabel(dayKey) {
+  return formatDayKey(dayKey).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+function rqHomeShort(h) { return String(RQ_HOMES[h] || h).replace(/^\S+ /, ''); }
+
+/* `kind`: result · club · move · adv · goal · list (`opts.mode` for move:
+   move · cash · dep). For her own money — a grown-up may open it for the
+   child the portal is looking at. */
+function mnyOpenRequestSheet(kind, opts) {
+  const o = opts || {};
+  const kid = (o.kid === 'jenn' || o.kid === 'jess') ? o.kid
+    : (isParent() ? (parentViewing === 'jess' ? 'jess' : 'jenn') : activeProfile());
+  const k = ['result', 'club', 'move', 'adv', 'goal', 'list'].indexOf(kind) >= 0 ? kind : 'list';
+  rqDraft = { kind: k, kid };
+  if (k === 'move') {
+    const mode = ['move', 'cash', 'dep'].indexOf(o.mode) >= 0 ? o.mode : 'move';
+    Object.assign(rqDraft, { mode, from: 'ready', to: mode === 'cash' ? 'cash' : null, amt: 1, why: '' });
+  }
+  if (k === 'adv') Object.assign(rqDraft, { amt: 1, why: '' });
+  if (k === 'goal') Object.assign(rqDraft, { name: '', icon: '🎒', amt: 30, keep: 'move' });
+  if (k === 'club') Object.assign(rqDraft, { blockId: null, why: '' });
+  if (k === 'result') Object.assign(rqDraft, { pick: null });
+  openSheet('requestOverlay');
+  rqRender();
+}
+function rqClose() { rqDraft = null; closeSheet('requestOverlay'); }
+
+/* ── One option button: the prototype's opt(label, on, pick, disabled). A
+   disabled option is still pressable and says why (data-mny-why), because a
+   greyed control with no reason is one a child works around. */
+function rqOpt(label, on, action, attrs, why) {
+  return `<button type="button" class="rq-opt${on ? ' on' : ''}${why ? ' off' : ''}" data-mny-action="${action}"${attrs || ''}${why ? ` aria-disabled="true" data-mny-why="${escapeAttr(why)}"` : ''}>${escapeHtml(label)}</button>`;
+}
+function rqVal(label) { return `<span class="rq-opt rq-val">${escapeHtml(label)}</span>`; }
+function rqRow(q, optsHtml) {
+  return `<div class="rq-row"><div class="rq-q">${escapeHtml(q)}</div><div class="rq-opts">${optsHtml}</div></div>`;
+}
+
+/* ── What each sheet asks, and whether it can be sent ─────────────── */
+function rqState() {
+  const d = rqDraft, kid = d.kid;
+  if (d.kind === 'result') return rqResultState(kid, d);
+  if (d.kind === 'move') return rqMoveState(kid, d);
+  if (d.kind === 'adv') return rqAdvState(kid, d);
+  if (d.kind === 'goal') return rqGoalState(kid, d);
+  if (d.kind === 'club') return rqClubState(kid, d);
+  return { ready: false, preview: '' };
+}
+
+/* 🏆 What she says happened, and what the rules of its day pay for it. */
+function rqResultPay(kid, d) {
+  if (!d.pick || !d.pick.sport) return 0;
+  const p = d.pick;
+  const races = p.races || [];
+  return mrScoreCompetition({
+    sport: p.sport,
+    points: p.sport === 'swim' ? races.reduce((a, r) => a + (Number(r.pts) || 0), 0) : (Number(p.pts) || 0),
+    placement: { group: p.grp || null, overall: p.ovr || null },
+    qualified: !!p.qual, provincial: !!p.prov,
+  }, mrRulesFor(p.dayKey || todayKey()));
+}
+function rqResultState(kid, d) {
+  const p = d.pick;
+  if (!p || !p.sport) return { ready: false, preview: 'Pick a competition first.', need: 'Pick a competition first.' };
+  const c = (mrRulesFor(p.dayKey || todayKey()).competition) || {};
+  const sw = c.swim || {}, sk = c.skate || {};
+  const pay = rqResultPay(kid, d);
+  const races = p.races || [];
+  const name = String(p.name || '').trim();
+  let preview;
+  if (p.sport === 'swim') {
+    const tot = races.reduce((a, r) => a + (Number(r.pts) || 0), 0);
+    preview = `${tot} points × ${rqDollars(p.prov ? sw.provincialPerPoint : sw.perPoint)}${p.qual ? ` + ${rqDollars(sw.qualifyBonus)} for qualifying` : ''} = ${rqDollars(pay)}`;
+  } else {
+    const pl = sk.placement || {};
+    preview = `${Number(p.pts) || 0} points × ${rqDollars(sk.perPoint)}${p.grp ? ` + ${rqDollars((pl.group || {})[p.grp])} group` : ''}${p.ovr ? ` + ${rqDollars((pl.overall || {})[p.ovr])} overall` : ''} = ${rqDollars(pay)}`;
+  }
+  const ready = !!(name && (p.sport !== 'swim' || races.some(r => (Number(r.pts) || 0) > 0 || String(r.time || '').trim())));
+  return { ready, preview, pay, need: !name ? 'What was it called?' : 'Put in a race: its points or its time.' };
+}
+/* The meets on her planner this month, each with where it stands:
+   done (recorded) · sent (she already told Dad) · soon (still to come) ·
+   open (happened, no result yet). Only an open one can be picked. */
+function rqPlannedThisMonth(kid) {
+  const today = String(todayKey());
+  const month = today.slice(0, 7);
+  const out = [];
+  const seen = new Set();
+  let wk = ctWeekKeyForDate(month + '-01');
+  for (let i = 0; i < 6 && String(wk) <= month + '-31'; i++) {
+    mmPlannedCompetitions(wk, kid).forEach(p => {
+      const key = p.blockId || (p.dayKey + p.name);
+      if (String(p.dayKey).slice(0, 7) === month && !seen.has(key)) { seen.add(key); out.push(p); }
+    });
+    const next = formatDayKey(wk); next.setDate(next.getDate() + 7);
+    wk = ctDateToKey(next);
+  }
+  const comps = mrCompetitions(kid);
+  const asks = mnyEnsureRequests(kid).filter(r => r && r.kind === 'comp' && r.status !== 'no');
+  return out.map(p => {
+    const rec = comps.find(c => c && ((p.compId && c.id === p.compId) || (p.blockId && c.blockId === p.blockId)));
+    const sent = asks.some(r => p.blockId && r.blockId === p.blockId);
+    const st = rec ? 'done' : sent ? 'sent' : (String(p.dayKey) > today ? 'soon' : 'open');
+    const sport = p.sport === 'swim' ? 'swim' : 'skate';
+    return Object.assign({}, p, { st, sport, icon: sport === 'swim' ? '🏊' : '⛸️',
+      title: p.name || (sport === 'swim' ? 'Swim meet' : 'Skating competition'),
+      award: rec ? mrCompAward(rec) : 0 });
+  });
+}
+function rqResultBody(kid, d) {
+  const planned = rqPlannedThisMonth(kid);
+  const p = d.pick;
+  const items = planned.map(x => {
+    const on = !!(p && !p.custom && p.blockId === x.blockId);
+    const can = x.st === 'open';
+    const sub = x.st === 'done' ? `${rqDayLabel(x.dayKey)} · ✓ recorded ${rqDollars(x.award)}`
+      : x.st === 'sent' ? `${rqDayLabel(x.dayKey)} · ⏳ sent to Dad`
+      : x.st === 'soon' ? `${rqDayLabel(x.dayKey)} · coming up` : `${rqDayLabel(x.dayKey)} · no result yet`;
+    const why = can ? '' : (x.st === 'done' ? 'Dad already has this one.' : x.st === 'sent' ? 'Already sent to Dad.' : 'Not yet — it is still coming up.');
+    return `<button type="button" class="rq-meet ${'rq-meet--' + x.st}${on ? ' on' : ''}" data-mny-action="rq-pick" data-mny-id="${escapeAttr(x.blockId || '')}"${can ? '' : ` aria-disabled="true" data-mny-why="${escapeAttr(why)}"`}><span class="rq-meet-ico">${x.icon}</span><span class="rq-meet-name">${escapeHtml(x.title)}</span><span class="rq-meet-sub">${escapeHtml(sub)}</span></button>`;
+  }).join('') || `<div class="rq-empty">Nothing on my planner this month.</div>`;
+  const custom = !!(p && p.custom);
+  let left = `<div class="rq-col"><div class="rq-q">① Which one? From my planner, this month</div>${items}
+    <button type="button" class="rq-custom${custom ? ' on' : ''}" data-mny-action="rq-custom">➕ It's not on my planner</button>`;
+  if (custom) {
+    left += `<input class="rq-input" type="text" value="${escapeAttr(p.name || '')}" placeholder="what it was called" data-mny-action="rq-name" aria-label="What it was called">
+      <div class="rq-opts rq-two">${rqOpt('🏊 Swim', p.sport === 'swim', 'rq-sport', ' data-mny-id="swim"')}${rqOpt('⛸️ Skating', p.sport === 'skate', 'rq-sport', ' data-mny-id="skate"')}</div>
+      <div class="rq-warn">Dad adds it to the planner when he says yes, so the name matches next time.</div>`;
+  }
+  left += `</div>`;
+  let right = `<div class="rq-col">`;
+  if (!p || !p.sport) {
+    right += `<div class="rq-pickfirst">Pick a competition on the left.</div>`;
+  } else if (p.sport === 'swim') {
+    const rules = (mrRulesFor(p.dayKey || todayKey()).competition || {}).swim || {};
+    const races = p.races || [];
+    right += `<div class="rq-qline"><span class="rq-q">② My races</span><span class="rq-hint">up to 4 at one meet</span></div>
+      ${races.map((r, i) => `<div class="rq-race">
+        <b class="rq-race-n">${i + 1}</b>
+        <select class="rq-select" data-mny-action="rq-ev" data-mny-i="${i}" aria-label="Race ${i + 1}">${RQ_SWIM_EVENTS.map(e =>
+          `<option value="${escapeAttr(e)}"${e === r.ev ? ' selected' : ''}>${escapeHtml(e)}</option>`).join('')}</select>
+        <input class="rq-input rq-time" type="text" value="${escapeAttr(r.time || '')}" placeholder="time 0:41.2" data-mny-action="rq-time" data-mny-i="${i}" aria-label="Race ${i + 1} time">
+        <span class="rq-step">${rqOpt('−', false, 'rq-racepts', ` data-mny-i="${i}" data-mny-d="-1" aria-label="Fewer points"`)}<b class="rq-num">${Number(r.pts) || 0} pts</b>${rqOpt('+', false, 'rq-racepts', ` data-mny-i="${i}" data-mny-d="1" aria-label="More points"`)}</span>
+        ${rqOpt('✕', false, 'rq-racedel', ` data-mny-i="${i}" aria-label="Take this race off"`, races.length > 1 ? '' : 'One race stays — change it instead.')}
+      </div>`).join('')}
+      ${races.length < 4 ? `<button type="button" class="rq-custom" data-mny-action="rq-raceadd">➕ Add a race (${4 - races.length} left)</button>` : ''}
+      <div class="rq-opts">${rqOpt(`🎯 Qualified for Provincials (+${rqDollars(rules.qualifyBonus)})`, !!p.qual, 'rq-qual')}${rqOpt(`🏟️ This was Provincials (${rqDollars(rules.provincialPerPoint)}/pt)`, !!p.prov, 'rq-prov')}</div>`;
+  } else {
+    right += `<div class="rq-q">② My result</div>
+      ${rqRow('In my group', [0, 1, 2, 3].map(n => rqOpt(rqOrd(n), (p.grp || 0) === n, 'rq-grp', ` data-mny-id="${n}"`)).join(''))}
+      ${rqRow('Overall', [0, 1, 2, 3].map(n => rqOpt(rqOrd(n), (p.ovr || 0) === n, 'rq-ovr', ` data-mny-id="${n}"`)).join(''))}
+      ${rqRow('Points', `${rqOpt('−', false, 'rq-pts', ' data-mny-d="-1" aria-label="Fewer points"')}${rqVal((Number(p.pts) || 0) + ' pts')}${rqOpt('+', false, 'rq-pts', ' data-mny-d="1" aria-label="More points"')}`)}`;
+  }
+  right += `${rqPreviewAndFoot()}</div>`;
+  return `<div class="rq-result">${left}${right}</div>`;
+}
+
+/* 🔀 💵 🏦 One sheet, three things she can ask. */
+function rqMoveState(kid, d) {
+  const max = d.mode === 'dep' ? 50 : Math.floor(money2(evHomeBalance(kid, d.from)) + 1e-9);
+  const amt = Math.min(d.amt || 1, Math.max(1, max));
+  const bonus = Number(mrRuleOr(mrRules(), 'loan.extraBonusPct')) || 0;
+  const lockWeeks = Number(mrRuleOr(mrRules(), 'pots.lockWeeks')) || 4;
+  if (d.mode === 'dep') {
+    const ready = !!d.to;
+    const preview = d.to ? `I bring $${amt} of cash to Dad on Sunday. It goes into ${rqHomeShort(d.to)}${d.to === 'ready' ? ' and earns a little' : d.to === 'wall' ? ` and counts as ${mnyMoney(amt * (1 + bonus / 100))}` : ''}.` : 'Where should the cash go?';
+    return { ready, preview, amt, max, need: 'Where should the cash go?' };
+  }
+  const to = d.mode === 'cash' ? 'cash' : d.to;
+  const refusal = (to && max >= 1) ? mnyMoveRefusal(kid, d.from, to, amt) : null;
+  const ready = !!(to && d.why && max >= 1 && !refusal);
+  const preview = max < 1 ? 'Nothing to take out of there yet.'
+    : refusal ? refusal
+    : !ready ? 'Pick the details and why.'
+    : to === 'cash' ? `Dad hands me $${amt} in real cash on Sunday. It leaves the bank — no more interest.`
+    : to === 'locked' ? `$${amt} locked for ${lockWeeks} weeks, back on a Saturday with a little extra.`
+    : to === 'invest' ? `$${amt} could go up or down. Dad talks it through first.`
+    : `$${amt} goes back where I can reach it.`;
+  return { ready, preview, amt, max, need: max < 1 ? 'Nothing to take out of there yet.' : (refusal || 'Pick the details and why.') };
+}
+function rqMoveBody(kid, d) {
+  const st = rqMoveState(kid, d);
+  const gate = (h) => mnyStagePct(evHomeNeed(h));
+  const lockWeeks = Number(mrRuleOr(mrRules(), 'pots.lockWeeks')) || 4;
+  const modeRow = rqRow('What do I want to do?', [['move', '🔀 Move'], ['cash', '💵 Cash out'], ['dep', '🏦 Put cash in']]
+    .map(([k, l]) => rqOpt(l, d.mode === k, 'rq-mode', ` data-mny-id="${k}"`)).join(''));
+  const fromRow = rqRow('① Take it from', ['ready', 'locked', 'invest'].map(h => {
+    const bal = money2(evHomeBalance(kid, h));
+    const shut = h !== 'ready' && !evHomeOpen(kid, h);
+    const why = h === 'locked' ? 'Locked money comes back on its own date.'
+      : shut ? mnyNeedLabel(evHomeNeed(h)) : (bal < 1 ? 'Nothing to take out of there yet.' : '');
+    return rqOpt(`${RQ_HOMES[h]} · ${mnyMoney(bal)}${h === 'locked' ? ` · 🔒 ${lockWeeks} weeks` : shut ? ` · 🔒${gate(h)}%` : ''}`,
+      d.from === h, 'rq-from', ` data-mny-id="${h}"`, why);
+  }).join(''));
+  const amtRow = rqRow(d.mode === 'dep' ? '① How much cash?' : '③ How much?',
+    `${rqOpt('−', false, 'rq-amt', ' data-mny-d="-1" aria-label="Less"', st.amt <= 1 ? 'That is the least.' : '')}${rqVal('$' + st.amt)}${rqOpt('+', false, 'rq-amt', ' data-mny-d="1" aria-label="More"', st.amt >= st.max ? 'That is all there is.' : '')}${d.mode === 'dep' ? '' : rqOpt('All of it', false, 'rq-amtall', '', st.max < 1 ? 'Nothing to take out of there yet.' : '')}`);
+  const whyRow = rqRow('④ Why?', RQ_MOVE_WHY.map(w => rqOpt(w, d.why === w, 'rq-why', ` data-mny-id="${escapeAttr(w)}"`)).join(''));
+  const toList = d.mode === 'dep' ? ['ready', 'wall', 'locked'] : ['locked', 'invest', 'ready'].filter(h => h !== d.from);
+  const toRow = rqRow('② Put it in', toList.map(h => {
+    const shut = (h === 'locked' || h === 'invest') && !evHomeOpen(kid, h);
+    return rqOpt(RQ_HOMES[h] + (shut ? ` 🔒${gate(h)}%` : ''), d.to === h, 'rq-to', ` data-mny-id="${h}"`, shut ? mnyNeedLabel(evHomeNeed(h)) : '');
+  }).join(''));
+  const rows = d.mode === 'dep' ? [modeRow, amtRow, toRow] : d.mode === 'cash' ? [modeRow, fromRow, amtRow, whyRow] : [modeRow, fromRow, toRow, amtRow, whyRow];
+  return rows.join('') + rqPreviewAndFoot();
+}
+
+/* ⏪ Cash now, off Sunday's payday — up to the rule, less what she drew. */
+function rqAdvState(kid, d) {
+  const wk = ctThisWeekKey();
+  const max = money2(Number(mrRuleOr(mrRulesForWeek(wk), 'advance.maxPerWeek')) || 0);
+  const used = mnyAdvanceUsed(kid, wk);
+  const left = Math.floor(money2(Math.max(0, max - used)) + 1e-9);
+  const amt = Math.min(d.amt || 1, Math.max(1, left));
+  const ready = !!(d.why && left >= 1);
+  const preview = left < 1 ? `I already drew ${rqDollars(used)} in advance this week. That's the most.`
+    : `Dad gives me $${amt} cash now and I spend it before Sunday. On payday it shows under ➖ Taken off, so my pile is $${amt} smaller.`;
+  return { ready, preview, amt, left, need: left < 1 ? preview : 'What is it for?' };
+}
+function rqAdvBody(kid, d) {
+  const st = rqAdvState(kid, d);
+  return rqRow(`① How much? (up to $${st.left} this week)`,
+      `${rqOpt('−', false, 'rq-amt', ' data-mny-d="-1" aria-label="Less"', st.amt <= 1 ? 'That is the least.' : '')}${rqVal('$' + st.amt)}${rqOpt('+', false, 'rq-amt', ' data-mny-d="1" aria-label="More"', st.amt >= st.left ? 'That is the most this week.' : '')}`)
+    + rqRow('② What for?', RQ_ADV_WHY.map(w => rqOpt(w, d.why === w, 'rq-why', ` data-mny-id="${escapeAttr(w)}"`)).join(''))
+    + rqPreviewAndFoot();
+}
+
+/* 🎯 A new goal — the jar switches on Sunday once Dad says yes. */
+function rqGoalJar(kid) {
+  const jar = mnyGoalHolding(kid);
+  const g = mnyActiveGoal(kid);
+  return { saved: jar ? money2(mnyHoldingValue(jar)) : 0, goal: g ? `${g.icon || '🎯'} ${g.name}` : 'my goal' };
+}
+function rqGoalState(kid, d) {
+  const name = String(d.name || '').trim();
+  const jar = rqGoalJar(kid);
+  const price = d.amt || 30;
+  const ready = name.length > 1;
+  const start = d.keep === 'ready' ? 0 : jar.saved;
+  const wks = Math.ceil(Math.max(0, price - start) / 3);
+  const preview = !ready ? 'Type what I want to buy, then pick a price.'
+    : `${d.icon} ${name} · $${price}. ${start ? `I start with ${mnyMoney(start)}. ` : ''}At $3 a Sunday that's about ${wks} Sundays. Dad says yes, then my jar switches.`;
+  return { ready, preview, need: 'What do I want to buy?' };
+}
+function rqGoalBody(kid, d) {
+  const jar = rqGoalJar(kid);
+  const price = d.amt || 30;
+  return `<input class="rq-input" type="text" value="${escapeAttr(d.name || '')}" placeholder="what I want to buy · e.g. new skate bag" data-mny-action="rq-goalname" aria-label="What I want to buy">`
+    + rqRow('① Pick a picture', RQ_GOAL_ICONS.map(i => rqOpt(i, d.icon === i, 'rq-icon', ` data-mny-id="${i}"`)).join(''))
+    + rqRow('② How much does it cost?', `${rqOpt('−', false, 'rq-price', ' data-mny-d="-5" aria-label="Less"', price <= 5 ? 'That is the least.' : '')}${rqVal('$' + price)}${rqOpt('+', false, 'rq-price', ' data-mny-d="5" aria-label="More"')}${[20, 35, 50, 80].map(v => rqOpt('$' + v, price === v, 'rq-priceset', ` data-mny-id="${v}"`)).join('')}`)
+    + (jar.saved > 0 ? rqRow(`③ My jar has ${mnyMoney(jar.saved)} for ${jar.goal}. What happens to it?`,
+        [['move', '➡️ Use it for the new goal'], ['ready', '🏦 Put it in Savings']].map(([k, l]) => rqOpt(l, (d.keep || 'move') === k, 'rq-keep', ` data-mny-id="${k}"`)).join('')) : '')
+    + rqPreviewAndFoot();
+}
+
+/* ⛸️ This week's assistant-job sessions — which one she can't make, and why. */
+function rqClubState(kid, d) {
+  const sw = mrSessionsWeek(ctThisWeekKey(), kid);
+  const s = sw.sessions.find(x => x.blockId === d.blockId);
+  const ready = !!(s && d.why);
+  const preview = s ? `If Dad says yes, ${rqDayLabel(s.dayKey)} shows as missed on Sunday. A missed session pays $0. It is not a fine.`
+    : sw.sessions.length ? `Each session I go to pays ${rqDollars(sw.rate)} on Sunday.` : 'No club sessions on my planner this week.';
+  return { ready, preview, need: s ? 'Why?' : 'Which one can’t I make?' };
+}
+function rqClubBody(kid, d) {
+  const sw = mrSessionsWeek(ctThisWeekKey(), kid);
+  const asked = (id) => mnyEnsureRequests(kid).some(r => r && r.kind === 'skip' && r.blockId === id && r.status !== 'no');
+  return rqRow('① Which one can’t I make?', sw.sessions.map(x =>
+      rqOpt(rqDayLabel(x.dayKey) + (asked(x.blockId) ? ' · asked ✓' : ''), d.blockId === x.blockId, 'rq-session',
+        ` data-mny-id="${escapeAttr(x.blockId)}"`, asked(x.blockId) ? 'I already asked about this one.' : '')).join(''))
+    + rqRow('② Why?', RQ_SKIP_WHY.map(w => rqOpt(w, d.why === w, 'rq-why', ` data-mny-id="${escapeAttr(w)}"`)).join(''))
+    + rqPreviewAndFoot();
+}
+
+/* ⏳ What she asked, newest first, with its answer in her words. */
+function rqStatusText(q) {
+  const r = q.record || {};
+  if (q.status === 'yes') {
+    return ({ goal: '✓ starts Sunday', skip: '✓ marked missed',
+      move: r.to === 'cash' ? '✓ cash on Sunday' : '✓ moved',
+      adv: '✓ cash given · off Sunday', deposit: '✓ in the bank' })[q.kind] || '✓ in Sunday’s payday';
+  }
+  if (q.status === 'no') return '✗ not this time';
+  if (q.status === 'talk') return '💬 Dad wants to talk';
+  return '⏳ waiting';
+}
+function rqListBody(kid) {
+  const rows = mnyRequestsFor(kid).slice().reverse().map(q => `<div class="rq-chip ${'rq-chip--' + (q.status || 'open')}"><span>${escapeHtml(q.icon)} ${escapeHtml(q.text)}</span><b>${escapeHtml(rqStatusText(q))}</b></div>`).join('')
+    || `<div class="rq-empty">Nothing asked yet.</div>`;
+  return `${rows}<button type="button" class="rq-done" data-mny-action="rq-close">Done</button>`;
+}
+
+/* The preview line and the two buttons every asking sheet ends with. */
+function rqPreviewAndFoot() {
+  const st = rqState();
+  return `<div class="rq-preview" data-rq-preview>${escapeHtml(st.preview || '')}</div>
+    <div class="rq-foot">
+      <button type="button" class="rq-notnow" data-mny-action="rq-close">Not now</button>
+      <button type="button" class="rq-send${st.ready ? ' ready' : ''}" data-mny-action="rq-send">Send to Dad →</button>
+    </div>`;
+}
+
+function rqRender() {
+  const host = document.getElementById('requestBody');
+  if (!host || !rqDraft) return;
+  const d = rqDraft, kid = d.kid;
+  const title = document.getElementById('rqSheetTitle');
+  if (title) title.textContent = d.kind === 'move' ? RQ_TITLES[d.mode] : RQ_TITLES[d.kind];
+  const sheet = host.closest('.sheet');
+  if (sheet) sheet.setAttribute('data-rq-kind', d.kind);
+  let body;
+  if (d.kind === 'result') body = `<p class="rq-lead">The official results sheet decides. Dad checks it before anything pays.</p>${rqResultBody(kid, d)}`;
+  else if (d.kind === 'move') body = rqMoveBody(kid, d);
+  else if (d.kind === 'adv') body = rqAdvBody(kid, d);
+  else if (d.kind === 'goal') body = rqGoalBody(kid, d);
+  else if (d.kind === 'club') body = rqClubBody(kid, d);
+  else body = rqListBody(kid);
+  host.innerHTML = body;
+}
+
+/* Typing changed something the button and the preview say: update those two,
+   in place, and nothing else — the input keeps its caret. */
+function rqSync() {
+  const host = document.getElementById('requestBody');
+  if (!host || !rqDraft) return;
+  const st = rqState();
+  const pv = host.querySelector('[data-rq-preview]');
+  if (pv && pv.textContent !== (st.preview || '')) pv.textContent = st.preview || '';
+  const b = host.querySelector('[data-mny-action="rq-send"]');
+  if (b) b.classList.toggle('ready', !!st.ready);
+}
+
+/* Taps, handed over by mnyHandleClick for every `rq-…` action. */
+function rqHandleAction(a, el) {
+  if (!rqDraft) return;
+  const d = rqDraft, kid = d.kid;
+  if (a === 'rq-close') { rqClose(); return; }
+  if (el.getAttribute('aria-disabled') === 'true') {
+    const why = el.getAttribute('data-mny-why');
+    if (why) showToast(why);
+    return;
+  }
+  const id = el.getAttribute('data-mny-id');
+  const i = Number(el.getAttribute('data-mny-i'));
+  const step = Number(el.getAttribute('data-mny-d')) || 0;
+  const pick = d.pick;
+  if (a === 'rq-send') { rqSend(); return; }
+  if (a === 'rq-pick') {
+    const x = rqPlannedThisMonth(kid).find(p => p.blockId === id && p.st === 'open');
+    if (!x) return;
+    d.pick = { custom: false, blockId: x.blockId, compId: x.compId || null, name: x.title, sport: x.sport,
+               dayKey: x.dayKey, races: x.sport === 'swim' ? [{ ev: '50 Free', time: '', pts: 0 }] : [],
+               pts: 0, grp: 0, ovr: 0, qual: false, prov: false };
+  } else if (a === 'rq-custom') {
+    d.pick = { custom: true, blockId: null, compId: null, name: '', sport: null, dayKey: todayKey(),
+               races: [], pts: 0, grp: 0, ovr: 0, qual: false, prov: false };
+  } else if (a === 'rq-sport' && pick) {
+    pick.sport = id === 'swim' ? 'swim' : 'skate';
+    pick.races = pick.sport === 'swim' ? [{ ev: '50 Free', time: '', pts: 0 }] : [];
+  } else if (a === 'rq-racepts' && pick && pick.races[i]) {
+    pick.races[i].pts = Math.max(0, (Number(pick.races[i].pts) || 0) + step);
+  } else if (a === 'rq-racedel' && pick && pick.races.length > 1) {
+    pick.races.splice(i, 1);
+  } else if (a === 'rq-raceadd' && pick && pick.races.length < 4) {
+    const used = pick.races.map(r => r.ev);
+    pick.races.push({ ev: RQ_SWIM_EVENTS.find(e => used.indexOf(e) < 0) || RQ_SWIM_EVENTS[0], time: '', pts: 0 });
+  } else if (a === 'rq-qual' && pick) { pick.qual = !pick.qual;
+  } else if (a === 'rq-prov' && pick) { pick.prov = !pick.prov;
+  } else if (a === 'rq-grp' && pick) { pick.grp = Number(id) || 0;
+  } else if (a === 'rq-ovr' && pick) { pick.ovr = Number(id) || 0;
+  } else if (a === 'rq-pts' && pick) { pick.pts = Math.max(0, (Number(pick.pts) || 0) + step);
+  } else if (a === 'rq-mode') {
+    const mode = ['move', 'cash', 'dep'].indexOf(id) >= 0 ? id : 'move';
+    Object.assign(d, { mode, from: 'ready', amt: 1, to: mode === 'cash' ? 'cash' : null, why: '' });
+  } else if (a === 'rq-from') {
+    d.from = id; d.amt = 1;
+    if (d.mode === 'cash') d.to = 'cash'; else if (d.to === id) d.to = null;
+  } else if (a === 'rq-to') { d.to = id;
+  } else if (a === 'rq-amt') {
+    const cap = d.kind === 'adv' ? rqAdvState(kid, d).left : rqMoveState(kid, d).max;
+    d.amt = Math.max(1, Math.min(Math.max(1, cap), (d.amt || 1) + step));
+  } else if (a === 'rq-amtall') { d.amt = Math.max(1, rqMoveState(kid, d).max);
+  } else if (a === 'rq-why') { d.why = id;
+  } else if (a === 'rq-icon') { d.icon = id;
+  } else if (a === 'rq-price') { d.amt = Math.max(5, Math.min(500, (d.amt || 30) + step));
+  } else if (a === 'rq-priceset') { d.amt = Number(id) || 30;
+  } else if (a === 'rq-keep') { d.keep = id === 'ready' ? 'ready' : 'move';
+  } else if (a === 'rq-session') { d.blockId = id;
+  } else {
+    return;
+  }
+  rqRender();
+}
+
+/* Typing, handed over by mnyHandleInput: the draft, then the button and the
+   preview in place. A select's change redraws nothing either — its new value
+   is already on screen. */
+function rqHandleInput(a, el) {
+  if (!rqDraft) return;
+  const d = rqDraft;
+  const i = Number(el.getAttribute('data-mny-i'));
+  if (a === 'rq-name' && d.pick) d.pick.name = el.value;
+  else if (a === 'rq-goalname') d.name = el.value;
+  else if (a === 'rq-time' && d.pick && d.pick.races[i]) d.pick.races[i].time = String(el.value || '').slice(0, 20);
+  else if (a === 'rq-ev' && d.pick && d.pick.races[i]) d.pick.races[i].ev = el.value;
+  else return;
+  rqSync();
+}
+
+/* "Send to Dad →": one door, `mnyAddRequest`, and the owner decides. */
+function rqSend() {
+  const d = rqDraft, kid = d.kid;
+  const st = rqState();
+  if (!st.ready) { showToast(st.need || st.preview || 'Not ready yet'); return; }
+  let rec = null;
+  if (d.kind === 'result') {
+    const p = d.pick, races = p.sport === 'swim' ? p.races : [];
+    const tot = races.reduce((a, r) => a + (Number(r.pts) || 0), 0);
+    const sum = p.sport === 'swim'
+      ? `${races.length} race${races.length === 1 ? '' : 's'} · ${tot} pts${p.qual ? ' · qualified' : ''}${p.prov ? ' · Provincials' : ''}`
+      : `group ${rqOrd(p.grp)} · overall ${rqOrd(p.ovr)} · ${Number(p.pts) || 0} pts`;
+    rec = mnyAddRequest(kid, { kind: 'comp', compId: p.compId, blockId: p.blockId, custom: !!p.custom,
+      sport: p.sport, name: String(p.name || '').trim(), dayKey: p.dayKey || todayKey(), races,
+      pts: p.sport === 'swim' ? tot : (Number(p.pts) || 0), grp: p.grp, ovr: p.ovr,
+      qualified: !!p.qual, provincial: !!p.prov, text: `${String(p.name || '').trim()} · ${sum}` });
+  } else if (d.kind === 'move' && d.mode === 'dep') {
+    rec = mnyAddRequest(kid, { kind: 'deposit', amount: st.amt, note: 'into ' + rqHomeShort(d.to),
+      text: `Put $${st.amt} cash in → ${rqHomeShort(d.to)}` });
+  } else if (d.kind === 'move') {
+    rec = mnyAddRequest(kid, { kind: 'move', from: d.from, to: d.mode === 'cash' ? 'cash' : d.to,
+      amount: st.amt, note: d.why });
+  } else if (d.kind === 'adv') {
+    rec = mnyAddRequest(kid, { kind: 'adv', amount: st.amt, why: d.why,
+      day: new Date().toLocaleDateString('en-US', { weekday: 'short' }),
+      text: `Draw $${st.amt} in advance · ${d.why}` });
+  } else if (d.kind === 'goal') {
+    const jar = rqGoalJar(kid);
+    rec = mnyAddRequest(kid, { kind: 'goal', name: String(d.name || '').trim(), icon: d.icon, target: d.amt || 30,
+      keep: jar.saved > 0 ? (d.keep || 'move') : 'move' });
+  } else if (d.kind === 'club') {
+    const s = mrSessionsWeek(ctThisWeekKey(), kid).sessions.find(x => x.blockId === d.blockId);
+    rec = mnyAddRequest(kid, { kind: 'skip', blockId: d.blockId, dayKey: s ? s.dayKey : todayKey(), why: d.why,
+      text: `Can’t make ${s ? rqDayLabel(s.dayKey) : 'a session'} · ${d.why}` });
+  }
+  if (!rec) return;
+  showToast('Sent to Dad ✋');
+  rqClose();
+  if (typeof rcRefreshSurfaces === 'function') rcRefreshSurfaces();
 }
