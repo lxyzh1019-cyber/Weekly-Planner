@@ -1,4 +1,4 @@
-# Plan v9 — Sunday v15 pocket-money redesign — Awaiting approval
+# Plan v9 — Sunday v15 pocket-money redesign — Approved 2026-10-04
 
 **🟪 Rev 8 — what changed and why (owner, 2026-10-04):** the owner keeps 💵 Cash out and 🏦 Put cash in, and removes cash as an account: her accounts are only 🏦 Savings (with her goal jars inside it), 🔒 Locked away and 📈 Companies, plus the 🧱 loan she pays. 🟧 Rev 7's 🧾 Checking box and its renames are withdrawn. Money that arrives between Sundays (an approved gift, cash from home, a lock that came back) is not an account: it waits as **"📥 Waiting for Sunday"** and joins her pile, so every dollar gets a job at the meeting. Sections touched: Summary, Deviation 37, N. 🟪
 
