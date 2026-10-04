@@ -1,4 +1,8 @@
-# Plan v3 — Sunday v15 pocket-money redesign — Awaiting approval
+# Plan v4 — Sunday v15 pocket-money redesign — Awaiting approval
+
+Planned on the session's own model (Opus 5.5); the planner hook suggested Fable for this revision.
+
+**🟧 Rev 3 — what changed and why (owner's answers after Stage 2, 2026-10-03):** the owner clarified the byte-close rule: *where an existing feature duplicates the prototype, the prototype's rule wins; where the prototype does not cover a feature, it must be integrated with a better design, not parked.* A read-only audit sorted every existing money feature into those two groups. New section **K** says where each uncovered feature now lives; the 📖 More tab is retired (its contents are rehomed); Grown-ups gains a 📒 Weeks tab for editing past weeks; the Grandma rule is renamed **Grandfather rule** on screen; the Fines form logs the day it is entered (no day picker); the Move sheet offers 🧱 Loan wall (applied on Sunday); swim keeps "Swim meet", every other sport uses "Competition results" with a skating-style form; changing a girl's "loan per month" rescales her rows; money left in her wallet at Sunday joins the pile. Stages 1–2 are done. Sections touched: Summary, A, B (wallet row), D, Deviations (rows 16–29), K (new), Stages, Risks. 🟧
 
 **🟩 Rev 2 — what changed and why (owner's rule: byte-close to the prototype unless a deviation is approved):** a new section *Deviations from the prototype* lists every departure with its approval status, so nothing is silently different. Four were put to the owner: keep the plan's placement of Sunday and Grown-ups (approved); ↺ Redo returns one girl only (changed — per-girl snapshot replaces the meeting-wide Undo); the Approve card's − / + steps the dollar amount as drawn (changed — stored as Dad's figure beside her entry); Savings is always open with no 🏦 flag on the wall (confirmed). Sections touched: Summary, A, B (result row), E (steps 2, 11), H, Deviations (new), Risks. 🟩
 
@@ -7,10 +11,25 @@
 | Summary |
 |---|
 | **What this plan does:** rebuilds the girls' pocket money around your three prototype screens. Sunday becomes a four-step ritual inside the family meeting (guess, payday, choose, sign). My money becomes the passbook, loan wall, pots, goal jar and the four "ask Dad" buttons. The parent's money page becomes Grown-ups with Approve, Commitments, Fines, Expected and Rules tabs. Underneath, the app's existing money engine, ledgers and sync stay as they are; the new club-session pay, the request queue, the goal jar, the four-week locks, cash drawn early and the new loan terms are each given a home that joins cleanly to what already exists. |
-| **What changed from the last version and why:** 🟩 Rev 2: every difference from your prototypes is now listed with its approval; Redo undoes one girl only; Dad corrects a result's dollars with − / + as drawn; Savings never locks. 🟩 🟦 Rev 1: the club's twice-a-year payout is now tracked and recorded; a result is checked against the published sheet, never priced by hand; the box fine is simply replaced by the app's fines rules; two small older fixes (a settled week can still be claimed; one XP toggle has no permission check) are added to this build. 🟦 Version 1 carried your eight decisions from today: club sessions from the planner plus a one-off from Grown-ups; the app's existing fines rules kept, with the tab reminding that every behaviour gets recorded; today's chore engine kept and relabelled; the prototype's loan terms; the old cash-pool work retired; Money story and Money school kept for now; one pull request; a stacked phone layout. |
-| **What I need you to do:** approve this plan, or name the sections to change. Later: merge the pull request, then open the app on the iPad and run one Sunday with each girl so the hold-to-add, the coins and the Calm look are checked on the real device. |
+| **What changed from the last version and why:** 🟧 Rev 3: features your prototype does not have (editing past weeks, the Grandfather rule, chore prices, targets, fixing a loan row, the fund picker, Dad's corrections) each get a proper place in the new screens instead of a "More" drawer; duplicates follow your prototype; Grandma rule becomes Grandfather rule; fines log on the day they are entered; the Move sheet offers the loan wall; swim says "Swim meet" and other sports "Competition results". 🟧 🟩 Rev 2: every difference from your prototypes is now listed with its approval; Redo undoes one girl only; Dad corrects a result's dollars with − / + as drawn; Savings never locks. 🟩 🟦 Rev 1: the club's twice-a-year payout is now tracked and recorded; a result is checked against the published sheet, never priced by hand; the box fine is simply replaced by the app's fines rules; two small older fixes (a settled week can still be claimed; one XP toggle has no permission check) are added to this build. 🟦 Version 1 carried your eight decisions from today: club sessions from the planner plus a one-off from Grown-ups; the app's existing fines rules kept, with the tab reminding that every behaviour gets recorded; today's chore engine kept and relabelled; the prototype's loan terms; the old cash-pool work retired; Money story and Money school kept for now; one pull request; a stacked phone layout. |
+| **What I need you to do:** approve Plan v4 (section K is the new part), or name the rows to change. Later: merge the pull request, then open the app on the iPad and run one Sunday with each girl so the hold-to-add, the coins and the Calm look are checked on the real device. |
 
 **Changes in this version**
+
+```diff
++ 🟧 Rev 3 — New section K: every existing money feature not in the prototype, with its new home; duplicates retired (prototype wins)
++ 🟧 Rev 3 — A: Grown-ups tabs are Approve · Commitments · Fines · Expected · Rules · 📒 Weeks; the 📖 More tab is retired
+- 🟧 Rev 3 — A: "📖 More (the old rail sections)"
++ 🟧 Rev 3 — A/K: on-screen "Grandma rule" becomes "Grandfather rule" (👴); data keys unchanged
++ 🟧 Rev 3 — B: money in her wallet at Sunday joins the pile by source; after signing her wallet holds only what she cashed out
++ 🟧 Rev 3 — D: changing "loan per month" rescales her open rows to the new total from next Sunday
++ 🟧 Rev 3 — D: Dad-only −/+ on 📌 Must pay kept; a shortfall pays what there is and carries the rest
++ 🟧 Rev 3 — Deviations 16–29 added (owner answers 2026-10-03)
++ 🟧 Rev 3 — Stages 1–2 done; Grown-ups rehoming becomes stage 5, styling stage 6
++ 🟧 Rev 3 — Risks: saved ledger notes keep the old "Grandma rule" words
+```
+
+Previous version's changes (🟩 Rev 2, 🟦 Rev 1), kept for reference:
 
 ```diff
 + 🟩 Rev 2 — New section "Deviations from the prototype": every departure, each marked approved (with the decision) or inherent
@@ -39,17 +58,18 @@
 ```
 
 **Stages to finish**
-10 stages: one record update, five build steps and one pull request by Claude, then your merge, your iPad check and a four-Sunday pilot.
-1. Record today's decisions and the rewrite choice in the working record — Claude
-2. Build the arithmetic core, rules, loan terms, request queue and their unit tests — Claude
-3. Build the Grown-ups tabs and the kid's request sheets — Claude
-4. Build My money v2 — Claude
-5. Build the Sunday ritual and the new sign sequence; retire the old meeting money panels — Claude
-6. Styling for both looks and the phone, rewrite the affected smoke checks, bump the build stamp, full test run green — Claude
-7. Open the draft pull request with the regression table and the records updated — Claude
-8. Review and merge the pull request — You
-9. Open the live app on the iPad, confirm the build stamp, run one Sunday for each girl — You
-10. Pilot for four Sundays; report anything that does not add up — You, then Claude fixes
+11 stages: one record update, six build steps and one pull request by Claude, then your merge, your iPad check and a four-Sunday pilot. Stages 1–3 are done.
+1. Record today's decisions and the rewrite choice in the working record — Claude · done
+2. Build the arithmetic core, rules, loan terms, request queue and their unit tests — Claude · done
+3. Build the Grown-ups tabs and the kid's request sheets — Claude · done
+4. Build My money v2, with its section K items — Claude
+5. Build the Sunday ritual and the new sign sequence with its section K items; retire the old meeting money panels — Claude
+6. 🟧 Rev 3: Rehome the old parent money sections into Grown-ups (📒 Weeks, Rules cards, Approve side cards, ✍️ Record, fix sheets) and rename Grandfather rule — Claude 🟧
+7. Styling for both looks and the phone, rewrite the affected smoke checks, full test run green — Claude
+8. Open the draft pull request with the regression table and the records updated — Claude
+9. Review and merge the pull request — You
+10. Open the live app on the iPad, confirm the build stamp, run one Sunday for each girl — You
+11. Pilot for four Sundays; report anything that does not add up — You, then Claude fixes
 
 Date 2026-10-03 · branch to create: `claude/sunday-v15` from `main` @ `8b56fdb` · one PR (owner's choice) · executor `opus-worker` (System Design/Redesign).
 
@@ -82,7 +102,7 @@ The prototype's three-tab strip is prototype navigation. The app has one kid nav
 |---|---|
 | 🏠 My money | Kid nav **Money** → `screen-mymoney`, `mnyRenderMyMoney` rewritten (js/22-money-page1.js). |
 | ☀️ Sunday | The family meeting's **money step** (`MM_STEPS` stays week/money/close). `mnyRenderEarned`/`mnyRenderDecide` are replaced by the four-sub-step ritual. Commit, Undo, catch-up, `canCloseWeek` and `isChildMoneyCommitted` keep working unchanged. A kid's My money shows a ☀️ countdown card (not a tab); in parent mode that card opens the meeting at the money step for that kid (`openFamilyMeeting` with the child selected). |
-| 👨‍👩‍👧 Grown-ups | Parent portal **Setup › 💰 Money rules** panel (`#ptab-money` / `#mnyRulesWrap`) becomes **Grown-ups money** with top sub-tabs ✅ Approve · ➕ Commitments · 📦 Fines · 🎁 Expected · ⚙️ Rules · 📖 More. The side rail goes; its sections (history, grandma, changes, holdings editor, repair, stream setup, missed week) live under More. Parent › Now gains one row "✅ N to answer" routing to Approve (same shape as the existing moves row). |
+| 👨‍👩‍👧 Grown-ups | Parent portal **Setup › 💰 Money rules** panel (`#ptab-money` / `#mnyRulesWrap`) becomes **Grown-ups money** with top sub-tabs ✅ Approve · ➕ Commitments · 📦 Fines · 🎁 Expected · ⚙️ Rules · 🟧 Rev 3: 📒 Weeks. The side rail and the 📖 More tab go; every old section is rehomed per section K. 🟧 Parent › Now gains one row "✅ N to answer" routing to Approve (same shape as the existing moves row). |
 | 🗣️ Dad's card | A button in the meeting head, opening a sheet through `openSheet` with the per-step ASK/SAY/WAIT script and the step checklist. |
 
 Sunday sub-steps: 1 Guess → 2 Payday → 3 I choose → 4 Signed. **Sign = commit for that kid** (hold to sign). 🟩 Rev 2: **↺ Redo returns one girl only**, as drawn: `mmTakeUndoSnapshot(wk, kid)` is taken per kid at sign and `mmUndoRecord(kid)` restores her wallet, debts, holdings, deposits, goals, XP, her ledger row, `finalizedWeeks[wk][kid]`, `weekPlans[wk][kid]` and tombstones her commit's stream lines; the shared `meetingsHeld` is cleared only when neither girl is signed. `mmUndoHeld` keeps its rule (money moved after her sign withdraws her Redo). The meeting-wide Undo button is retired. 🟩 **Next Sunday →** = the meeting's close step for the second child or `mmHide`; the per-kid "mark applied" bookkeeping happens at sign (see E), not at a separate Next Sunday action.
@@ -107,6 +127,7 @@ Rule: every write goes through the function that already owns it; no new stream 
 | ⭐ Stickers | **derived** from `moneyLedger` rows (`sdStickersFor(row)` in the pure core) — no key, same idiom as `xp2`. | — | — |
 | 🎁 Expected money | **`profile.expected[]`** `{id, month:'YYYY-MM', label, amount}` | yes | `mergeArrayById(…, 'exp:')` |
 | 📒 Passbook, histCat, timeline | `moneyLedger[wk][kid]` rows; commit adds `sessions, sessionsPaid, deposits, passive, advance, loanCash, extra, cents, goal` beside the existing `plan, spend, ready, gic, stock, passive`. Rows older than the split show earned only (handoff known item). | ledger fields | per-week stamped map, unchanged |
+| 🟧 Rev 3 — Money in her wallet (`wallet.cash`) | At Sunday, whatever is in her wallet (an approved gift, cash from home, a matured lock) is shown by source in the pile: gifts under 🎲 Bonus, home cash and locks under 🏦 From my bank, anything else as "already in my wallet". After signing, the wallet holds only what she cashed out, which Dad hands over and which leaves the bank as drawn. The first Sunday on a device with an older cash balance shows it once as "already in my wallet". 🟧 | — | — |
 | Sunday in-progress (guess, source taps, allocation, sub-step, hold) | device-local `sdDraft` keyed `kid+wk`, mirrored to `localStorage` `wp_sunday_<kid>_<wk>` in try/catch; never in `state` (same reasoning as looks). | — | — |
 | 📉 Market wobble | rule `market.wobblePct` (0 or 2). At reveal, if > 0 and no stock holding carries `wobbledWeek === wk`, `mnyRevalueStock(kid, −pct, {note:'wobble'})` writes the loss the way a holding losing value already does and stamps `wobbledWeek`. | rule + holding field | — |
 | 🎯 Earning target, year so far | `rules.targets.<kid>.annual`, `mrYearToDate` (existing) | — | — |
@@ -123,7 +144,7 @@ New or changed paths (defaults in brackets): `sessions.perSession` (6) · `advan
 
 ### D. Loan
 
-`debts[]` keep their shape. New readers in js/20: `mnyWeeklyDue(debt)` = `monthly × 12 ÷ 52`; `mnyMustPay(kid)` = Σ weekly over open debts + `arrears`, capped at the balance. Interest: `loanAccrueBalanceInterest(kid, wk)` runs at sign when `debt.sundaysSinceInterest` reaches `loan.interestEverySundays`; it adds `balance × ratePct/100 × 4/52` to the existing `arrearsInterest` bucket (shown as "interest added", the 🟥 brick) and writes an `interest`-kind stream line as the existing arrears accrual does. `loanAccrueArrears`, `loanSundayTransfer`, `mnySundayTransferAll`, `mnyDueNowAll` and the down-payment branch of `loanDueNow` are **retired** (deleted together with their smoke checks). Shortfall (total < must-pay): pay what there is, the rest is carried in `arrears` and shown next Sunday as "📌 still owed from last week" — no interest on it. Payments allocate **oldest debt first** (`createdAt`), which equals the prototype's "paid oldest first" (bonus is uniform). `mnyPaidPct` unchanged. Migration: existing debts keep `principal`/`paid`; `downPayment` is ignored.
+`debts[]` keep their shape. New readers in js/20: `mnyWeeklyDue(debt)` = `monthly × 12 ÷ 52`; `mnyMustPay(kid)` = Σ weekly over open debts + `arrears`, capped at the balance. Interest: `loanAccrueBalanceInterest(kid, wk)` runs at sign when `debt.sundaysSinceInterest` reaches `loan.interestEverySundays`; it adds `balance × ratePct/100 × 4/52` to the existing `arrearsInterest` bucket (shown as "interest added", the 🟥 brick) and writes an `interest`-kind stream line as the existing arrears accrual does. `loanAccrueArrears`, `loanSundayTransfer`, `mnySundayTransferAll`, `mnyDueNowAll` and the down-payment branch of `loanDueNow` are **retired** (deleted together with their smoke checks). Shortfall (total < must-pay): pay what there is, the rest is carried in `arrears` and shown next Sunday as "📌 still owed from last week" — no interest on it. Payments allocate **oldest debt first** (`createdAt`), which equals the prototype's "paid oldest first" (bonus is uniform). `mnyPaidPct` unchanged. Migration: existing debts keep `principal`/`paid`; `downPayment` is ignored. 🟧 Rev 3: a change to `loan.monthly.<kid>` rescales her open rows' `monthly` in proportion so they sum to the new figure, effective next Sunday (owner choice). Dad keeps a −/+ on 📌 Must pay for one week (the existing payment override, with its impact line); a shortfall pays what there is and carries the rest. 🟧
 
 Commitments (Grown-ups ➕): `mnyAddCommitment(kid, {what, cost, sharePct, weeks})` → her share = cost × share; down = 10% of her share moved `ready → cash` then `cash → loan:<id>` as a `down` payment; new debt `{principal: her share, paid: down, monthly: (share − down) ÷ weeks × 52 ÷ 12, createdAt}`; the affordability card reads `mnyMustPay` ÷ steady average (last 4 ledger rows) against the 50% limit. 🌧️ Surprise cost: `mnyAddSurprise(kid, {what, cost})` → Savings pays first (`moneyWithdraw` then `cash → spent`), the rest is a debt with `monthly: 0` paid by extra. Both feed the "🆕 New row on my wall" card on the next Sunday (read from debts with `createdAt` after the last signed week; no `planner-commit` store).
 
@@ -196,8 +217,9 @@ Rulebook: a new version appended through the house-rules pending mechanism (new 
 1. Core + rules + tests: js/43, rules paths, `mrSessionsWeek`, loan readers/interest, `moneyOpenGIC` weeks, goal holding, `requests`/`expected` merge lines (tests first), `tests/sunday.test.js`, calibration tool, Undo tombstone fix.
 2. Requests + Grown-ups: js/45, js/46, parent rules tab, Now row, `assistant_job` activity, one-off session placement 🟦 Rev 1: + club payout tally and button, `mrSetClaim` settled-week refusal, `mrCyclePersonal` guard 🟦.
 3. My money v2 (js/22).
-4. Sunday ritual (js/44) + `mnyDoCommit` rewrite + retirements (§G) + Money school/story reading the new gates and concepts.
-5. CSS tokens, both looks, phone stack, animations, reduced motion; smoke rewrite (§H v); shell lists, build stamps.
+4. Sunday ritual (js/44) + `mnyDoCommit` rewrite + retirements (§G) + Money school/story reading the new gates and concepts. 🟧 Rev 3: + the Sunday-side items of section K, the wallet rule, the loan-row rescale, and the 4 date-pinned smoke checks rewritten. 🟧
+5. 🟧 Rev 3: Grown-ups rehoming per section K (📒 Weeks, Rules cards, Approve side cards, ✍️ Record, fix-a-row and fix-what-she-owns sheets) and the Grandfather rename. 🟧
+6. CSS tokens, both looks, phone stack, animations, reduced motion; smoke rewrite (§H v); shell lists, build stamps.
 
 ### Observable success criteria
 
@@ -228,8 +250,59 @@ Rulebook: a new version appended through the house-rules pending mechanism (new 
 | 13 | "Club owes me" row present in data, not drawn | Drawn on What I own and in Grown-ups, with a "✓ Club paid" button | **approved** (🟦 Rev 1) |
 | 14 | Locked-away interest shown for 4 weeks only | Also the yearly-equivalent, as the handoff suggests | handoff item; drop on request |
 | 15 | Prototype keeps its own in-memory rules/queue/fines/expected stores | One store each in the app's synced state, with merge decisions | inherent |
+| 16 | Grown-ups shows only its 5 tabs | + 📒 Weeks tab (past weeks) and maintenance cards on Approve while something is pending | **approved** 🟧 Rev 3 (integrate, don't park) |
+| 17 | Approve keeps every answer | Shows open questions, unused yeses and the last 7 days | **approved** 🟧 Rev 3 |
+| 18 | ↺ Undo always reopens a yes | Refused with a sentence once that yes moved money | **approved** 🟧 Rev 3 |
+| 19 | Wobble any time | Refused while a later rules change is scheduled | **approved** 🟧 Rev 3 |
+| 20 | Rules row "Box fine · per thing left out" | "Box fine · left out twice in a week" (the catalog's `box_repeat`) | **approved** 🟧 Rev 3 |
+| 21 | "3 bonus for a full week" | "$3 bonus for a full week" | **approved** 🟧 Rev 3 |
+| 22 | "🔎 Whose bag was it?" | "🔎 Whose was it, and what does she say happened?" | **approved** 🟧 Rev 3 |
+| 23 | Fines form has a Day picker (starts on Sun) | Logs the day it is entered; no day picker (a missed one is entered on its day in the meeting's Week step, as today) | **approved** 🟧 Rev 3 (owner: entered every day, not on a particular day) |
+| 24 | "This Sunday" adds a goal's price to her payday | Left out (a goal is not income) | **approved** 🟧 Rev 3 |
+| 25 | Move sheet has 🧱 Loan wall | Kept as drawn; on yes it is applied on Sunday as extra (each $1 counts $1.10) | **matches** 🟧 Rev 3 |
+| 26 | Result sheet: Swim / Skating | Swim: "🏊 Swim meet" (races). Every other sport: "🏆 Competition results" in the skating-style form (group, overall, points; a star test shows silver/gold item counters in the same form) | **approved** 🟧 Rev 3 |
+| 27 | No "Grandma rule" | On-screen "👴 Grandfather rule" | **approved** 🟧 Rev 3 |
+| 28 | Sounds (beeps) | Kept as drawn, behind the Sunday sound switch | **matches** 🟧 Rev 3 |
+| 29 | Rule change log: one line per save | One line per save, as drawn | **matches** 🟧 Rev 3 |
 
 Anything not in this table is built as drawn.
+
+### 🟧 Rev 3 — K. Features the prototype does not cover, and where they now live
+
+Duplicates are retired and the prototype's version is used: the old meeting money panels, plan buttons and reflection, the stock cap, choosing which loan to pay (oldest first), the side rail and More shell, the pending bar (the Rules save card is the writer), the loans "add another" form (➕ Commitments), the move-requests card (✅ Approve), the holdings summary and its → cash / Sell buttons (kid 🔀 sheet + Approve), the stage ladder and gate steppers (🌱 Pots rows; Savings always open), the change-history card (📝 Rule changes, with "see all ▸"), and My money's old cards (today, earn board, wallet tiles, saving goals, income, my year, debt cards, competition calendar, links, concept pop-ups, page head and tab bar).
+
+| Not in the prototype (kept) | New home | Design |
+|---|---|---|
+| Chore grade prices 3/2/1, free chores, streak 3- and 5-day tiers | ⚙️ Rules › 🧹 Earning | Extra stepper rows beside "Chores · per graded day" and "Routine · 7 days" |
+| Learning items (XP only today) and Sunday check count | ⚙️ Rules › new "📘 Learning" card | Same stepper rows; Sunday shows a 📘 line only when a learning amount is above $0 |
+| 🌟 Skating star level prices | ⚙️ Rules › 🏆 Competitions | Rows under the skating rows |
+| Fine prices (all 5 items) | ⚙️ Rules › new "📦 Fines" card | One row per item with its "first 2 free" note |
+| 🎯 Yearly targets | ⚙️ Rules › new "🎯 Targets" card; a "This year vs target" row in "What this changes" | Feeds Sunday's 🎯 My earning target |
+| 🛒 What money buys | ⚙️ Rules › new "🛒 What money buys" card | Feeds Sunday's "about 2 movie tickets" |
+| Fund picker (what 📈 Companies buys) | ⚙️ Rules › 🌱 Pots, chip row | Same chips as today |
+| Open a stage early (per kid) | ⚙️ Rules › 🌱 Pots, per-kid chips | — |
+| Fix what she owns (per-holding editor) | ⚙️ Rules › 🌱 Pots › "✏️ Fix what she owns" sheet | Through `openSheet` |
+| 👴 Grandfather rule (start week, amount, preview, credit) and program start date | ⚙️ Rules › new "👴 Grandfather rule" card for the settings; preview-and-credit card on ✅ Approve's side while weeks are waiting; the meeting hub banner row stays | Rename on screen only |
+| Four house rules / Sunday rules / quarterly review | ⚙️ Rules, top, shown only while pending | One-time cards |
+| Back-dating a rule change with a reason | ⚙️ Rules save card: "Save · starts next Sunday" stays the main button; a small "fix this week instead" link with reason chips for corrections | — |
+| Week overrides with reasons | Dad-only ✏️ on each Sunday Payday line (reason chips; "Now I choose →" waits for a reason) and the same steppers in Approve's "This Sunday" card | One state, two doors, one writer (`mnySetOverride`) |
+| Line working (days, free jobs, streak tier, fines floor, honesty voids, sick days) | Tap a Payday line to unfold its working | — |
+| Planned meets not yet scored | Items in Sunday's "⏳ Dad answers first" card with "✓ result" / "No criteria met · $0" | Blocks payday like a request |
+| Must-pay override and shortfall | Dad-only −/+ on 📌 Must pay; the 🚨 path shows the impact | §D |
+| Late-meet adjustment of a settled week | A 🎲 Bonus line on the next Sunday | Existing `mnyLateCompSync` |
+| Past weeks: add a missed week, edit a hand-entered week, Grandfather rows read-only | Grown-ups › 📒 Weeks, in the passbook's style | — |
+| Repair / meets never paid / stream setup | ✅ Approve side, shown only when non-empty | Add-only, previewed |
+| Fix a loan row (name, icon, principal, paid, remove) | ➕ Commitments: tap a row → "✏️ Fix this row" sheet | — |
+| Goal bought ("take it out") | ✅ Approve side per kid: "✓ She bought it" when the jar is full | Writes a stream line (fixes the old drift) |
+| Dad records or corrects a meet, gift or chore directly | "✍️ Record" button in the Grown-ups header (the Record sheet) | Same owners |
+| Kid's "I was given money" | 🔀 Move · 💵 Cash sheet, fourth mode "🎁 I was given money" (giver, day) | A gift request |
+| 💷 What things pay (kid) | Sheet from the countdown card: "what things pay ▸" | Reads the live rules |
+| Unsettled weeks still to come | A dashed line in the countdown card | — |
+| Late costs on a loan | A red line under the loan wall's interest line when above $0 | — |
+| Recorded meets this month | 📅 Coming up rows with "✓ $18" | — |
+| 📖 Money story, 🎓 Money school (D6) | Passbook "all my Sundays ▸" and the '?' explainers' "learn more ▸" | Both pages keep working and read the new names, gates and 4-week lock |
+| Today's money card, chore money card | Kept; gain the ⛸️ sessions line and the handoff names (Savings, Companies) | — |
+| Old names ("Lock it away for a year", "Kept ready", "In companies") | Replaced everywhere by the handoff §5 names | — |
 
 ### Risks and known gaps
 
@@ -242,4 +315,5 @@ Anything not in this table is built as drawn.
 - 🟩 Rev 2: a result's stored points and Dad's dollar figure can disagree; the record shows both and the override carries who and when. 🟩
 - The 12-month GIC option disappears from the kid flow; a parent can still open one from Grown-ups › More › holdings.
 - Old passbook rows show earned only.
+- 🟧 Rev 3: ledger notes already saved on the iPads keep the words "Grandma rule"; new ones say Grandfather. 🟧
 - 🟦 Rev 1: nothing from the older pocket-money handoff stays open after this PR except its §2 editable category table, which the new Rules tab does not add (rows stay fixed, amounts editable). 🟦
