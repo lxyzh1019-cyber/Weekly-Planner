@@ -281,6 +281,9 @@ Rulebook: a new version appended through the house-rules pending mechanism (new 
 | 28 | Sounds (beeps) | Kept as drawn, behind the Sunday sound switch | **matches** 🟧 Rev 3 |
 | 29 | Rule change log: one line per save | One line per save, as drawn | **matches** 🟧 Rev 3 |
 | 30 | Routine: "7 days = $3, 6 with a grace day = $2" | 🟪 Rev 4: the forgiving day counts as kept, so 7 days, or 6 plus the forgiving day, pays $3; a second missed day ends the run. New rule `streak.graceCounts: true` in a new dated version, so lived weeks keep their old pay; the money calibration is re-pinned on purpose. 🟪 | **approved** (🟪 Rev 4 owner correction) |
+| 31 | Goal jar: "fill Savings to $10 first" | 🟪 Rev 4: goal jars open with Savings at 20% of the loan paid; below that, cents go on the loan 🟪 | **approved** (🟪 Rev 4 owner answer after Stage 3a) |
+| 32 | Grace spent on the first miss | 🟪 Rev 4: the forgiving day goes where it makes the longest run (weeks priced under older rules keep the old way); an unfinished day never counts as forgiven 🟪 | **approved** (🟪 Rev 4 owner answer after Stage 3a) |
+| 33 | No Savings milestone | 🟪 Rev 4: crossing 20% shows "🏦 Savings is open", like 30% and 40% 🟪 | **approved** (🟪 Rev 4 owner answer after Stage 3a) |
 
 Anything not in this table is built as drawn.
 
