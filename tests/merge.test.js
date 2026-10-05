@@ -1225,5 +1225,206 @@ function sync(a, b) {
     phone.state.profiles.jenn.moveRequests.length === 1);
 }
 
+/* ══ Sunday v15 — the request queue, expected money, the club payout ═══════
+   Plan v3 §B / §H. Each new store is a profile array (or one shared map) that
+   two devices can both edit; each gets its merge decision with a two-device
+   check written BEFORE the merge line, so the check is seen to fail first. */
+
+/* ── Requests to Dad: ask on the iPad, answer on the phone ──
+   `profile.requests` is the kid's queue (a result, a new goal, drawing early,
+   a session she cannot make, a fine she disputes). The answer is an EDIT to
+   the record, so newest-wins per id carries it; a withdrawn request carries a
+   'req:' tombstone so it does not come back from the other device. */
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  on(ipad,  st => { st.profiles.jess.requests = [
+    { id: 'req-1', kind: 'comp', status: null, askedAt: 10, updatedAt: 10, text: 'Swim time trial' }]; });
+  on(phone, st => { st.profiles.jess.requests = [
+    { id: 'req-2', kind: 'adv', status: null, askedAt: 20, updatedAt: 20, amount: 2 }]; });
+  sync(ipad, phone);
+  check('requests: two devices, two asks — both survive',
+    (ipad.state.profiles.jess.requests || []).length === 2 &&
+    (phone.state.profiles.jess.requests || []).length === 2);
+
+  on(phone, st => {
+    const r = st.profiles.jess.requests.find(x => x.id === 'req-1');
+    r.status = 'yes'; r.answeredAt = 100; r.updatedAt = 100;
+  });
+  sync(ipad, phone);
+  const onIpad = (ipad.state.profiles.jess.requests || []).find(r => r.id === 'req-1');
+  check('requests: an answer given on the phone is the answer on the iPad',
+    !!onIpad && onIpad.status === 'yes' && onIpad.answeredAt === 100);
+
+  on(ipad, st => {
+    st.profiles.jess.requests = st.profiles.jess.requests.filter(r => r.id !== 'req-2');
+    api.tombstoneIds('req:', ['req-2']);
+  });
+  sync(ipad, phone);
+  check('requests: a withdrawn request does not come back from the other device',
+    (ipad.state.profiles.jess.requests || []).length === 1 &&
+    (phone.state.profiles.jess.requests || []).length === 1);
+}
+
+/* ── Expected money (Grown-ups › Expected) ── */
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  on(ipad,  st => { st.profiles.jenn.expected = [
+    { id: 'exp-1', month: '2026-12', label: '🎄 Christmas', amount: 20, updatedAt: 10 }]; });
+  on(phone, st => { st.profiles.jenn.expected = [
+    { id: 'exp-2', month: '2027-02', label: '🧧 New Year', amount: 50, updatedAt: 20 }]; });
+  sync(ipad, phone);
+  check('expected: rows added on two devices both survive',
+    (ipad.state.profiles.jenn.expected || []).length === 2 &&
+    (phone.state.profiles.jenn.expected || []).length === 2);
+  on(phone, st => {
+    const e = st.profiles.jenn.expected.find(x => x.id === 'exp-1');
+    e.amount = 25; e.updatedAt = 50;
+  });
+  on(ipad, st => {
+    st.profiles.jenn.expected = st.profiles.jenn.expected.filter(x => x.id !== 'exp-2');
+    api.tombstoneIds('exp:', ['exp-2']);
+  });
+  sync(ipad, phone);
+  const exp = ipad.state.profiles.jenn.expected || [];
+  check('expected: an edit travels and a removal stays removed',
+    exp.length === 1 && exp[0].amount === 25 &&
+    (phone.state.profiles.jenn.expected || []).length === 1);
+}
+
+/* ── The club payout: one date per kid, the newer one counts ── */
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  on(phone, st => {
+    st.shared.chore.clubPaidThrough = { jenn: '2026-06-29' };
+    st.shared.chore.clubPaidThroughAt = { jenn: 100 };
+  });
+  on(ipad, st => {
+    st.shared.chore.clubPaidThrough = { jenn: '2026-12-28', jess: '2026-12-28' };
+    st.shared.chore.clubPaidThroughAt = { jenn: 900, jess: 900 };
+  });
+  sync(ipad, phone);
+  check('clubPaidThrough: the newer payout wins on the device that held the older one',
+    phone.state.shared.chore.clubPaidThrough.jenn === '2026-12-28' &&
+    phone.state.shared.chore.clubPaidThrough.jess === '2026-12-28');
+  check('clubPaidThrough: and the device that made it keeps it',
+    ipad.state.shared.chore.clubPaidThrough.jenn === '2026-12-28');
+  // The other way round: a correction made later on the phone wins on the iPad,
+  // even though it names an EARLIER week — the newer stamp is the answer.
+  on(phone, st => {
+    st.shared.chore.clubPaidThrough.jenn = '2026-12-21';
+    st.shared.chore.clubPaidThroughAt.jenn = 2000;
+  });
+  sync(ipad, phone);
+  check('clubPaidThrough: a newer correction wins both ways',
+    ipad.state.shared.chore.clubPaidThrough.jenn === '2026-12-21' &&
+    phone.state.shared.chore.clubPaidThrough.jenn === '2026-12-21' &&
+    ipad.state.shared.chore.clubPaidThrough.jess === '2026-12-28');
+}
+
+/* ── Club attendance lives in the week's earnings record ──
+   `earnings[wk].sessions[blockId]` merges with the week (mergeEarnings, newest
+   stamp takes the week). Answered on the iPad and synced, then a grade on the
+   phone: the grade's week carries the answer it was made from. */
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  on(ipad, st => {
+    st.profiles.jess.earnings = { '2026-09-28': { chores: {}, sessions: { 'b-club-1': true } } };
+    st.profiles.jess.earningsUpdatedAtByWeek = { '2026-09-28': 100 };
+  });
+  sync(ipad, phone);
+  on(phone, st => {
+    st.profiles.jess.earnings['2026-09-28'].chores = { 0: { dishes: 3 } };
+    st.profiles.jess.earningsUpdatedAtByWeek['2026-09-28'] = 200;
+  });
+  sync(ipad, phone);
+  const wkI = ipad.state.profiles.jess.earnings['2026-09-28'];
+  const wkP = phone.state.profiles.jess.earnings['2026-09-28'];
+  check('sessions: an attendance answer survives a grade made on the other device',
+    wkI.sessions['b-club-1'] === true && wkP.sessions['b-club-1'] === true &&
+    wkI.chores[0].dishes === 3);
+}
+
+/* ── The goal jar is a holding tied to a savingGoals row ── */
+{
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  on(ipad, st => {
+    st.profiles.jenn.savingGoals = [{ id: 'goal-1', name: 'Skate guards', target: 35, saved: 8, updatedAt: 10 }];
+    st.profiles.jenn.holdings = [
+      { id: 'save-jenn', kind: 'savings', units: 1, priceNow: 12, updatedAt: 10 },
+      { id: 'goal-hold-goal-1', kind: 'savings', goalId: 'goal-1', rateAnnual: 0, units: 1, priceNow: 8, updatedAt: 10 }];
+  });
+  sync(ipad, phone);
+  on(phone, st => {
+    const h = st.profiles.jenn.holdings.find(x => x.id === 'goal-hold-goal-1');
+    h.priceNow = 13; h.updatedAt = 50;
+    const g = st.profiles.jenn.savingGoals.find(x => x.id === 'goal-1');
+    g.saved = 13; g.updatedAt = 50;
+  });
+  on(ipad, st => {
+    st.profiles.jenn.savingGoals.push({ id: 'goal-2', name: 'Book set', target: 50, saved: 0, updatedAt: 60 });
+  });
+  sync(ipad, phone);
+  const hI = ipad.state.profiles.jenn.holdings.filter(h => h.goalId);
+  const gI = ipad.state.profiles.jenn.savingGoals;
+  const gP = phone.state.profiles.jenn.savingGoals;
+  check('goal jar: one goal holding per goal, its newest value on both devices',
+    hI.length === 1 && hI[0].priceNow === 13 &&
+    phone.state.profiles.jenn.holdings.filter(h => h.goalId).length === 1);
+  check('goal jar: savingGoals converge (edit + add on two devices)',
+    gI.length === 2 && gP.length === 2 && gI.find(g => g.id === 'goal-1').saved === 13);
+}
+
+/* ══ Plan v9 §N (Deviation 41) — 💬 Talk first carries an AGREED amount ═════
+   A request a grown-up wants to talk about goes to the Sunday meeting, where a
+   parent steps an agreed amount with − / + and then agrees. `agreed {value,
+   by, at}` is the one new field, written by the core's `sdWithAgreed` on a
+   record in whichever of the three stores holds it (requests `req:`,
+   moveRequests `mvq:`, deposits `dep:`). Each store merges a record whole by
+   its stamp, so the field must ride that: stepped on the iPad it is the
+   figure on the phone, and two devices stepping it converge on the newer.
+   Written BEFORE the writer existed, so it was seen to fail first. */
+{
+  const core = require('../js/43-sunday-core.js');
+  const ipad = makeDevice('ipad'), phone = makeDevice('phone');
+  on(ipad, st => {
+    st.profiles.jenn.requests = [{ id: 'req-a', kind: 'adv', status: 'talk', amount: 5, askedAt: 10, updatedAt: 10 }];
+    st.profiles.jenn.moveRequests = [{ id: 'mvq-a', from: 'ready', to: 'cash', amount: 8, talkAt: 11, updatedAt: 11 }];
+    st.profiles.jenn.deposits = [{ id: 'dep-a', amount: 20, pendingApproval: true, addedBy: 'jenn', talkAt: 12, updatedAt: 12 }];
+  });
+  sync(ipad, phone);
+  // At the meeting, on the iPad: a parent sets the agreed amount on each.
+  on(ipad, st => {
+    core.sdWithAgreed(st.profiles.jenn.requests[0], 3, 'a grown-up', 100);
+    core.sdWithAgreed(st.profiles.jenn.moveRequests[0], 6, 'a grown-up', 101);
+    core.sdWithAgreed(st.profiles.jenn.deposits[0], 15, 'a grown-up', 102);
+  });
+  sync(ipad, phone);
+  const pj = phone.state.profiles.jenn;
+  const ag = (x) => (x && x.agreed) || {};
+  check('agreed: set on the iPad, the phone has it on a request, a move and a deposit',
+    ag(pj.requests[0]).value === 3 && ag(pj.moveRequests[0]).value === 6 && ag(pj.deposits[0]).value === 15
+    && ag(pj.requests[0]).by === 'a grown-up' && ag(pj.deposits[0]).at === 102);
+  check('agreed: what she asked is left as she asked it',
+    pj.requests[0].amount === 5 && pj.moveRequests[0].amount === 8 && pj.deposits[0].amount === 20);
+  // Both devices step it while apart; the newer step is the agreed figure on both.
+  on(ipad,  st => { core.sdWithAgreed(st.profiles.jenn.requests[0], 4, 'a grown-up', 200); });
+  on(phone, st => { core.sdWithAgreed(st.profiles.jenn.requests[0], 2, 'a grown-up', 300); });
+  sync(ipad, phone);
+  check('agreed: two devices stepping it converge on the newer figure',
+    ag(ipad.state.profiles.jenn.requests[0]).value === 2 && ag(phone.state.profiles.jenn.requests[0]).value === 2);
+  // Her own copy, older, arriving later does not take the agreed figure away.
+  const stale = JSON.parse(JSON.stringify(phone.state));
+  stale.profiles.jenn.moveRequests[0] = { id: 'mvq-a', from: 'ready', to: 'cash', amount: 8, talkAt: 11, updatedAt: 11 };
+  receive(ipad, stale);
+  check('agreed: an older copy of the record does not take the agreed figure away',
+    ag(ipad.state.profiles.jenn.moveRequests[0]).value === 6);
+  // Agreeing: the effect field takes the agreed figure and what she asked is kept beside it.
+  on(ipad, st => { core.sdAgreeInto(st.profiles.jenn.moveRequests[0], 'amount', 400); });
+  sync(ipad, phone);
+  const mv = phone.state.profiles.jenn.moveRequests[0];
+  check('agreed: once agreed the record carries asked and agreed, on both devices',
+    mv.amount === 6 && ag(mv).asked === 8 && ag(mv).value === 6);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

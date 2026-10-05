@@ -87,9 +87,9 @@ const EV_SOURCE_LABELS = {
 };
 const EV_DEST_LABELS = {
   spent:  { icon: '🛍️', label: 'Spent' },
-  ready:  { icon: '💵', label: 'Kept ready' },
+  ready:  { icon: '🏦', label: 'Savings' },
   locked: { icon: '🔒', label: 'Locked away' },
-  invest: { icon: '📈', label: 'In companies' },
+  invest: { icon: '📈', label: 'Companies' },
   loan:   { icon: '🎿', label: 'Paid back' },
   fine:   { icon: '📦', label: 'Taken off' },
   returned: { icon: '↩️', label: 'Given back' },
@@ -295,6 +295,28 @@ function evSettledWeeksOf(events) {
   return out;
 }
 
+/* ── What a commit wrote, so an undo can take exactly that back ──
+   Plan v3 §E (Undo fix). The meeting's undo restores her wallet, debts and
+   holdings from a snapshot; the commit's stream lines have to go with them or
+   signing again writes them twice. They are REMOVED (and tombstoned), not
+   reversed: `evReverse` corrects something that happened, and an undone
+   commit did not. "Exactly" is the snapshot's ids against the stream at the
+   seal — every event, markers included, so the week no longer reads settled. */
+function evIdsOf(events) {
+  const ids = {};
+  (events || []).forEach(e => { if (e && e.id) ids[e.id] = true; });
+  return ids;
+}
+function evWrittenSince(events, baseIds) {
+  const seen = baseIds || {};
+  return (events || []).filter(e => e && e.id && !seen[e.id]).map(e => e.id);
+}
+function evWithout(events, ids) {
+  const gone = {};
+  (ids || []).forEach(id => { gone[id] = true; });
+  return (events || []).filter(e => !(e && gone[e.id]));
+}
+
 /* ── The app-facing wrappers ───────────────────────────────────────
    These read one child's stream off her profile. Everything above is pure. */
 
@@ -442,7 +464,9 @@ function evSettleLines(kid, weekKey, net, newModel) {
                                               note: 'Week of ' + weekKey }));
     return;
   }
-  const work = money2(money2(b.chorePaid) + money2(b.learnPaid) + money2(b.streakBonus));
+  // ⛸️ The assistant job is work like the chores, so it is in this ribbon.
+  const work = money2(money2(b.chorePaid) + money2(b.learnPaid) + money2(b.streakBonus)
+                      + money2(b.sessionsPaid));
   const prize = money2(b.compPaid);
   const gross = money2(work + prize);
   if (work > 0) {
@@ -483,7 +507,7 @@ function evShadowDrift(kid) {
   const found = [];
   const pairs = [
     ['cash',   evBalance(kid, 'cash'),   mnyCash(kid)],
-    ['ready',  evBalance(kid, 'ready'),  mnySavedTotal(kid)],
+    ['ready',  evBalance(kid, 'ready'),  mnyReadyHomeTotal(kid)],
     ['locked', evBalance(kid, 'locked'), mnyLockedTotal(kid)],
     ['invest', evBalance(kid, 'invest'), mnyInvestedTotal(kid)],
   ];
@@ -502,7 +526,7 @@ if (typeof module !== 'undefined' && module.exports) {
     EV_HOME_FOR_HOLDING, evHomeForHolding,
     evIsHome, evIsLoan, evIsSink, evDestKey,
     evSpanOf, evBalanceOf, evWorthOf, evFlowOf, evMonthsOf, evTypicalMonthOf,
-    evSettledWeeksOf,
+    evSettledWeeksOf, evIdsOf, evWrittenSince, evWithout,
   };
 }
 
@@ -637,7 +661,7 @@ function evMigrationPlanFor(kid) {
     // Events already on the stream count too, or a second run would re-open.
     return money2(n + evBalanceOf(evEnsure(kid), home));
   };
-  const stored = { cash: mnyCash(kid), ready: mnySavedTotal(kid),
+  const stored = { cash: mnyCash(kid), ready: mnyReadyHomeTotal(kid),
                    locked: mnyLockedTotal(kid), invest: mnyInvestedTotal(kid) };
   const firstDay = rows.map(r => r.dayKey).sort()[0] || todayKey();
   const openDay = evDayBefore(firstDay);
@@ -761,6 +785,7 @@ function evRepairPlanFor(kid) {
         b.streakBonus > 0 ? `routines ${mnyMoney(b.streakBonus)} (${b.streak.days} clean days)` : '',
         b.compPaid > 0 ? `competitions ${mnyMoney(b.compPaid)}` : '',
         b.learnPaid > 0 ? `learning ${mnyMoney(b.learnPaid)}` : '',
+        b.sessionsPaid > 0 ? `club sessions ${mnyMoney(b.sessionsPaid)}` : '',
       ].filter(Boolean).join(' · '),
     });
   });
@@ -800,9 +825,11 @@ function evRunRepair() {
         led.streak = money2(b.streakBonus);
         led.streakDays = b.streak.days || 0;
         led.competition = money2(b.compPaid);
+        led.sessions = (b.sessions && b.sessions.attended) || 0;
+        led.sessionsPaid = money2(b.sessionsPaid);
         led.fines = money2(b.fines.total);
         led.gross = money2(money2(b.chorePaid) + money2(b.learnPaid)
-                         + money2(b.streakBonus) + money2(b.compPaid));
+                         + money2(b.streakBonus) + money2(b.compPaid) + money2(b.sessionsPaid));
         led.net = money2(b.net);
         led.repricedAt = syncNow();
         led.updatedAt = syncNow();
@@ -918,7 +945,11 @@ function mnyMoveRefusal(kid, from, to, amount) {
 const MNY_MOVE_ROUTES = {
   'cash>ready':  (kid, amt, label) => moneyDeposit(kid, amt, label),
   'ready>cash':  (kid, amt, label) => moneyWithdraw(kid, amt, label),
-  'cash>locked': (kid, amt, label) => moneyOpenGIC(kid, amt, 12, label),
+  /* Locked away for N weeks (`pots.lockWeeks`, Plan v3 §B) — the handoff's
+     "Locked away · 4 weeks". The 12-month lock is gone from every door; a
+     12-month holding already on file still matures on its own date. */
+  'cash>locked': (kid, amt, label) => moneyOpenGIC(kid, amt,
+    { weeks: Math.max(1, Number(mrRuleOr(mrRules(), 'pots.lockWeeks')) || 4) }, label),
   'cash>invest': (kid, amt, label) => {
     const before = mnyInvestedTotal(kid);
     mnyBuyChosenFund(kid, amt, label);
@@ -985,11 +1016,27 @@ function mnyPendingMoves(kid) {
   return mnyEnsureMoveRequests(kid).filter(r => r && !r.approvedAt && !r.rejectedAt);
 }
 
+/* ── 🧱 A MOVE TO THE LOAN WALL (Plan v5 Deviation 25) ──
+   Not a home: money on the wall is paid back, it cannot come out again. So it
+   is no route in MNY_MOVE_ROUTES. She asks; a grown-up's yes moves NOTHING —
+   on Sunday it is paid as extra, each $1 counting 1 + the bonus
+   (`mnyApplyApprovedWallMoves`, which the Sunday sign calls in Stage 4). The
+   ask is refused for the same reasons the Sunday payment would fail. */
+function mnyWallMoveRefusal(kid, from, amount) {
+  const amt = money2(amount);
+  if (from !== 'ready' && from !== 'invest') return 'Money for the wall comes from Savings or Companies.';
+  if (!(amt > 0)) return 'How much?';
+  if (!(mnyTotalOwing(kid) > 0)) return 'There is nothing left on the wall.';
+  const have = evHomeBalance(kid, from);
+  if (amt > money2(have)) return 'There is only ' + mnyMoney(have) + ' there.';
+  return null;
+}
+
 /* She asks. Refused for the same reasons a parent's move would be, so a child
    is never told "ask a grown-up" about something a grown-up could not do
    either — and the reason is the same sentence, not a second opinion. */
 function mnyRequestMove(kid, from, to, amount, note) {
-  const refusal = mnyMoveRefusal(kid, from, to, amount);
+  const refusal = to === 'wall' ? mnyWallMoveRefusal(kid, from, amount) : mnyMoveRefusal(kid, from, to, amount);
   if (refusal) { showToast(refusal); return null; }
   const r = {
     id: mrNewId('mvq-'), from: String(from), to: String(to), amount: money2(amount),
@@ -1009,6 +1056,15 @@ function mnyApproveMove(kid, requestId) {
   if (!isParent()) { showToast('A grown-up approves this 🔒'); return false; }
   const r = mnyEnsureMoveRequests(kid).find(x => x && x.id === requestId);
   if (!r || r.approvedAt || r.rejectedAt) return false;
+  if (r.to === 'wall') {
+    // Nothing moves at the yes: Sunday pays it as extra.
+    const refusal = mnyWallMoveRefusal(kid, r.from, r.amount);
+    if (refusal) { showToast(refusal); return false; }
+    r.approvedAt = syncNow();
+    markItemUpdated(r);
+    saveAll();
+    return true;
+  }
   const ok = mnyMoveMoney(kid, r.from, r.to, r.amount, {
     kind: 'move', ref: r.id, note: 'She asked, a grown-up said yes' });
   if (!ok) return false;
@@ -1017,6 +1073,38 @@ function mnyApproveMove(kid, requestId) {
   saveAll();
   return true;
 }
+/* 🧱 Sunday pays the wall moves Dad said yes to (Stage 4's sign calls this,
+   after the must-pay): each one raises its amount from where she asked —
+   Savings or Companies, through the route to cash, and only what the sale
+   actually raised — then pays it as extra through `mnyLoanPayExtra`, each $1
+   counting 1 + the bonus. Stamped `appliedWeek`, once, so the next Sunday or
+   the other device does not pay it again. What the wall could not take
+   (paid off since the ask) stays in her cash. Returns what it paid. */
+function mnyApplyApprovedWallMoves(kid, weekKey) {
+  if (!isParent()) return { paid: 0, credited: 0, applied: 0 };
+  const wk = weekKey || ctThisWeekKey();
+  const out = { paid: 0, credited: 0, applied: 0 };
+  mnyEnsureMoveRequests(kid)
+    .filter(r => r && r.to === 'wall' && r.approvedAt && !r.appliedWeek)
+    .sort((a, b) => (Number(a.approvedAt) || 0) - (Number(b.approvedAt) || 0))
+    .forEach(r => {
+      const before = mnyCash(kid);
+      const route = MNY_MOVE_ROUTES[r.from + '>cash'];
+      const amt = money2(Math.min(money2(r.amount), money2(evHomeBalance(kid, r.from))));
+      if (route && amt > 0) route(kid, amt, { kind: 'move', ref: r.id, note: 'For the loan wall' });
+      const raised = money2(Math.max(0, mnyCash(kid) - before));
+      const ex = mnyLoanPayExtra(kid, raised, wk, 'Extra off the wall — she asked');
+      out.paid = money2(out.paid + ex.extra);
+      out.credited = money2(out.credited + ex.extraCredited);
+      r.appliedWeek = wk;
+      r.appliedAmount = ex.extra;
+      markItemUpdated(r);
+      out.applied++;
+    });
+  if (out.applied) saveAll();
+  return out;
+}
+
 function mnyRejectMove(kid, requestId, why) {
   if (!isParent()) { showToast('A grown-up answers this 🔒'); return false; }
   const r = mnyEnsureMoveRequests(kid).find(x => x && x.id === requestId);

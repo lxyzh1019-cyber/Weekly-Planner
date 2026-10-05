@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Gochi+Hand&family=Nunito:wght@700;800&family=Patrick+Hand&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#fef9ef;font-family:'Patrick Hand',sans-serif;color:#2a2320} a{color:#c14a24} a:hover{color:#2a2320}</style>
+</helmet>
+<div data-screen-label="iPad · My money 21b" style="width:1194px;height:834px;position:relative;overflow:hidden;background:#fef9ef;font-family:'Patrick Hand',sans-serif;font-size:18px;color:#2a2320;box-sizing:border-box">
+  <div style="height:64px;display:flex;align-items:center;gap:14px;padding:0 20px;border-bottom:3px solid #2a2320;background:#fffdf5">
+    <div style="font-family:'Gochi Hand',cursive;font-size:28px">📓 Weekly Planner</div>
+    <div data-name="kid switch" style="margin-left:auto;display:flex;gap:8px">
+      <sc-for list="{{ kids }}" as="k" hint-placeholder-count="2">
+        <button type="button" onClick="{{ k.pick }}" style="min-height:44px;border:2.5px solid #2a2320;border-radius:11px;padding:0 14px;font:inherit;font-size:18px;cursor:pointer;background:{{ k.bg }};color:#2a2320">{{ k.name }}</button>
+      </sc-for>
+    </div>
+  </div>
+  <div style="height:56px;display:flex;align-items:center;gap:8px;padding:0 16px;border-bottom:3px solid #2a2320;box-sizing:border-box">
+    <div style="min-height:40px;display:flex;align-items:center;border:2.5px solid #2a2320;border-radius:11px;padding:0 12px;background:#c14a24;color:#fff">🏠 My money</div>
+    <a href="Sunday v15 Screen.dc.html" style="min-height:40px;display:flex;align-items:center;border:2.5px solid #2a2320;border-radius:11px;padding:0 12px;background:#fffdf5;color:#2a2320;text-decoration:none">☀️ Sunday</a>
+    <a href="Grown-ups v2 Screen.dc.html" style="min-height:40px;display:flex;align-items:center;border:2.5px solid #2a2320;border-radius:11px;padding:0 12px;background:#fffdf5;color:#2a2320;text-decoration:none">👨‍👩‍👧 Grown-ups</a>
+    <div style="margin-left:auto;font-family:'Caveat',cursive;font-size:24px;color:#6b5d4f">{{ todayLabel }}</div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:14px;padding:12px 14px;height:714px;box-sizing:border-box">
+    <div style="display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0">
+      <div data-name="sunday countdown" style="background:#fff4db;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:10px 16px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 18px;align-items:center">
+        <div style="display:flex;flex-direction:column;line-height:1">
+          <span style="font-family:'Gochi Hand',cursive;font-size:30px">☀️ {{ countdown }}</span>
+          <span style="font-size:15px;color:#5a4d41;margin-top:4px">payday guessing game, together on the iPad</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">
+            <sc-for list="{{ days }}" as="d" hint-placeholder-count="7">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:2px;font-size:15px;color:#5a4d41;opacity:{{ d.op }}"><span>{{ d.d }}</span><div style="width:30px;height:30px;border-radius:50%;border:2px {{ d.ring }} #2a2320;background:{{ d.bg }};display:flex;align-items:center;justify-content:center;font-size:15px">{{ d.mark }}</div><span>{{ d.chore }}</span></div>
+            </sc-for>
+          </div>
+          <div style="font-size:15px;color:#2a5f59;text-align:right">{{ weekSoFar }}</div>
+        </div>
+      </div>
+
+      <div data-name="asked dad" style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap;overflow:hidden;height:46px">
+        <span style="font-family:'Gochi Hand',cursive;font-size:20px;color:#5a4d41;white-space:nowrap">⏳ Asked Dad</span>
+        <sc-for list="{{ chips }}" as="c" hint-placeholder-count="2">
+          <div style="min-height:44px;min-width:0;max-width:330px;flex:0 1 auto;display:flex;align-items:center;gap:6px;border:2px {{ c.style }} #2a2320;border-radius:11px;background:{{ c.bg }};padding:2px 12px;font-size:15px;line-height:1.1;box-sizing:border-box"><span style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.text }}</span><b style="font-family:'Nunito',sans-serif;font-size:14px;color:{{ c.ink }};white-space:nowrap">{{ c.status }}</b></div>
+        </sc-for>
+        <sc-if value="{{ hasMore }}" hint-placeholder-val="{{ false }}"><button type="button" data-name="see all requests" onClick="{{ openList }}" style="flex-shrink:0;min-height:44px;border:2.5px solid #2a2320;border-radius:11px;background:#2a2320;color:#fff;font:inherit;font-size:16px;cursor:pointer;padding:0 12px;white-space:nowrap">{{ moreChips }}</button></sc-if>
+        <sc-if value="{{ noChips }}" hint-placeholder-val="{{ false }}"><span style="font-size:15px;color:#5a4d41">nothing waiting</span></sc-if>
+      </div>
+
+      <div style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:12px;flex:1;min-height:0">
+        <div data-name="loan wall card" style="background:#fffdf5;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:12px 16px;display:flex;flex-direction:column;gap:8px;min-height:0;overflow:hidden">
+          <div style="display:flex;align-items:baseline;gap:8px"><div style="font-family:'Gochi Hand',cursive;font-size:26px">🧱 My loan wall</div><b style="margin-left:auto;font-family:'Nunito',sans-serif;font-size:24px;color:#6b5bb5">{{ leftAmt }}</b></div>
+          <div data-name="bricks" style="display:grid;grid-template-columns:repeat(10,1fr);gap:4px">
+            <sc-for list="{{ bricks }}" as="b" hint-placeholder-count="100">
+              <div style="position:relative;height:12px;border:1.5px {{ b.style }} #2a2320;border-radius:4px;background:#fffdf5;overflow:hidden"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ b.fill }}%;background:#95d5b2"></div></div>
+            </sc-for>
+          </div>
+          <div style="position:relative;height:24px;flex:none">
+            <sc-for list="{{ flags }}" as="f" hint-placeholder-count="3">
+              <div style="position:absolute;left:{{ f.left }}%;top:0;transform:translateX(-50%);font-size:16px;line-height:20px;white-space:nowrap;border:1.5px solid #2a2320;border-radius:6px;padding:0 3px;background:{{ f.bg }}">{{ f.label }}</div>
+            </sc-for>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:15px;color:#5a4d41"><span>{{ paidLine }}</span><span>{{ perWeek }}</span></div>
+          <div data-name="loan rows" style="display:flex;flex-direction:column;gap:4px">
+            <sc-for list="{{ loanRows }}" as="r" hint-placeholder-count="2">
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) 110px 74px;gap:8px;align-items:center;font-size:15px"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.n }}</span><div style="height:12px;border:2px solid #2a2320;border-radius:6px;background:#fffdf5;overflow:hidden"><div style="height:100%;width:{{ r.w }}%;background:#95d5b2"></div></div><b style="font-family:'Nunito',sans-serif;text-align:right;white-space:nowrap">{{ r.v }}</b></div>
+            </sc-for>
+          </div>
+          <span style="font-size:15px;color:#c14a24">{{ intLine }}</span>
+          
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:12px;min-height:0">
+          <div data-name="pots card" style="background:#e3f0fe;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:10px 14px;display:flex;flex-direction:column;gap:6px;flex:1;min-height:0;overflow:hidden">
+            <div style="display:flex;align-items:baseline;gap:8px"><div style="font-family:'Gochi Hand',cursive;font-size:22px">✅ What I own</div><b style="margin-left:auto;font-family:'Nunito',sans-serif;font-size:18px">{{ potsTotal }}</b></div>
+            <sc-for list="{{ pots }}" as="p" hint-placeholder-count="4">
+              <div style="display:grid;grid-template-columns:1fr auto;align-items:center;background:#fffdf5;border:2px {{ p.style }} #2a2320;border-radius:10px;padding:3px 10px;opacity:{{ p.op }};line-height:1.15">
+                <span style="font-size:17px">{{ p.name }}</span><b style="font-family:'Nunito',sans-serif;font-size:18px">{{ p.bal }}</b>
+                <span style="grid-column:1 / 3;font-size:14px;color:#2a5f59;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.sub }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div data-name="goal jar card" style="background:#ffe9ef;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:10px 14px;display:flex;gap:14px;align-items:center">
+            <div style="width:52px;height:68px;border:2.5px solid #2a2320;border-radius:8px 8px 16px 16px;background:#fffdf5;position:relative;overflow:hidden;flex-shrink:0"><div style="position:absolute;left:0;right:0;bottom:0;height:{{ goalPct }}%;background:#ff9eb5"></div></div>
+            <div style="min-width:0;flex:1;display:flex;flex-direction:column;gap:2px">
+              <div style="display:flex;align-items:center;gap:8px"><div style="font-family:'Gochi Hand',cursive;font-size:22px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ goalName }}</div><button type="button" data-name="new goal" onClick="{{ openGoal }}" style="margin-left:auto;flex:none;min-height:44px;border:2px solid #2a2320;border-radius:10px;background:#fffdf5;font:inherit;font-size:15px;cursor:pointer;color:#2a2320;padding:0 10px;white-space:nowrap">✏️ New goal</button></div>
+              <div style="display:flex;align-items:baseline;gap:6px"><b style="font-family:'Nunito',sans-serif;font-size:24px;color:#c14a24">{{ goalSaved }}</b><span style="font-size:16px;color:#5a4d41">of {{ goalTarget }}</span></div>
+              <div style="font-size:15px;color:#2a5f59">{{ goalLine }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div data-name="actions" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
+        <button type="button" data-name="tell a result" onClick="{{ openResult }}" style="min-height:68px;border:3px solid #2a2320;border-radius:14px;background:#ffe9ef;font:inherit;font-size:19px;cursor:pointer;color:#2a2320;box-shadow:3px 4px 0 rgba(42,35,32,0.18);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1">🏆 Tell a result<span style="font-size:14px;color:#5a4d41">from my planner</span></button>
+        <button type="button" data-name="club sessions" onClick="{{ openClub }}" style="min-height:68px;border:3px solid #2a2320;border-radius:14px;background:#eaf4ff;font:inherit;font-size:19px;cursor:pointer;color:#2a2320;box-shadow:3px 4px 0 rgba(42,35,32,0.18);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1">⛸️ Club sessions<span style="font-size:14px;color:#5a4d41">{{ clubSub }}</span></button>
+        <button type="button" data-name="ask to move" onClick="{{ openMove }}" style="min-height:68px;border:3px solid #2a2320;border-radius:14px;background:#e4f5ec;font:inherit;font-size:19px;cursor:pointer;color:#2a2320;box-shadow:3px 4px 0 rgba(42,35,32,0.18);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1">🔀 Move · 💵 Cash<span style="font-size:14px;color:#5a4d41">move · cash out · put in</span></button>
+        <button type="button" data-name="draw in advance" onClick="{{ openAdv }}" style="min-height:68px;border:3px solid #2a2320;border-radius:14px;background:#fff0e6;font:inherit;font-size:19px;cursor:pointer;color:#2a2320;box-shadow:3px 4px 0 rgba(42,35,32,0.18);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1">⏪ Draw in advance<span style="font-size:14px;color:#5a4d41">{{ advSub }}</span></button>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0">
+      <div data-name="passbook card" style="background:#fffdf5;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:8px 14px 10px;display:flex;flex-direction:column;gap:3px;flex:1;min-height:0;overflow:hidden">
+        <div style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'Gochi Hand',cursive;font-size:22px;white-space:nowrap">📒 My passbook</span></div>
+        <div data-name="passbook key" style="display:flex;flex-wrap:wrap;gap:2px 10px;font-size:13px;color:#5a4d41;line-height:1.3"><span style="white-space:nowrap"><b>💰 in</b> <span style="display:inline-block;width:10px;height:10px;background:#95d5b2;border:1.5px solid #2a2320;border-radius:2px;vertical-align:-1px;margin-right:3px"></span>steady <span style="display:inline-block;width:10px;height:10px;background:#ffd166;border:1.5px solid #2a2320;border-radius:2px;vertical-align:-1px;margin-right:3px"></span>bonus</span><span style="white-space:nowrap"><b>went to</b> <span style="display:inline-block;width:10px;height:10px;background:#b9aef0;border:1.5px solid #2a2320;border-radius:2px;vertical-align:-1px;margin-right:3px"></span>wall <span style="display:inline-block;width:10px;height:10px;background:#ffe08a;border:1.5px solid #2a2320;border-radius:2px;vertical-align:-1px;margin-right:3px"></span>saved <span style="display:inline-block;width:10px;height:10px;background:#ff9eb5;border:1.5px solid #2a2320;border-radius:2px;vertical-align:-1px;margin-right:3px"></span>cash</span></div>
+        <div style="display:grid;grid-template-columns:52px 62px repeat(3,minmax(0,1fr));gap:2px 6px;font-size:13px;color:#5a4d41;text-align:center;border-bottom:2px solid #2a2320;padding-bottom:2px;margin-top:auto"><span style="text-align:left">Sunday</span><span>💰 in</span><span style="white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;background:#b9aef0;border:1.5px solid #2a2320;border-radius:2px;vertical-align:-1px;margin-right:3px"></span>wall</span><span style="white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;background:#ffe08a;border:1.5px solid #2a2320;border-radius:2px;vertical-align:-1px;margin-right:3px"></span>saved</span><span style="white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;background:#ff9eb5;border:1.5px solid #2a2320;border-radius:2px;vertical-align:-1px;margin-right:3px"></span>cash</span></div>
+        <sc-for list="{{ book }}" as="w" hint-placeholder-count="4">
+          <div style="display:grid;grid-template-columns:52px 62px repeat(3,minmax(0,1fr));gap:2px 6px;align-items:center;padding:3px 4px;margin:0 -4px;font-size:15px;text-align:center;border-bottom:1px dashed #e8dfc3;background:{{ w.bg }};border-radius:6px">
+            <span style="grid-row:1 / 3;text-align:left;font-size:14px;color:{{ w.dInk }};font-weight:{{ w.fw }};white-space:nowrap">{{ w.date }}</span>
+            <b style="font-family:'Nunito',sans-serif;color:#2a5f59">{{ w.earned }}</b><span style="font-family:'Nunito',sans-serif;font-weight:700">{{ w.wall }}</span><span style="font-family:'Nunito',sans-serif;font-weight:700">{{ w.saved }}</span><span style="font-family:'Nunito',sans-serif;font-weight:700">{{ w.mine }}</span>
+            <div style="grid-column:2;display:{{ w.incShow }};height:8px;border:1.5px solid #2a2320;border-radius:3px;overflow:hidden;box-sizing:border-box"><div style="flex:{{ w.fSt }} 0 0;background:#95d5b2"></div><div style="flex:{{ w.fBn }} 0 0;background:#ffd166"></div></div><div style="grid-column:3 / 6;display:flex;height:8px;border:1.5px solid #2a2320;border-radius:3px;overflow:hidden;box-sizing:border-box;background:#fffdf5"><div style="flex:{{ w.fWall }} 0 0;background:#b9aef0"></div><div style="flex:{{ w.fSaved }} 0 0;background:#ffe08a"></div><div style="flex:{{ w.fCash }} 0 0;background:#ff9eb5"></div></div>
+          </div>
+        </sc-for>
+        <div data-name="passbook total" style="display:grid;grid-template-columns:52px 62px repeat(3,minmax(0,1fr));gap:2px 6px;align-items:center;padding:3px 0;font-size:15px;text-align:center;border-top:2px solid #2a2320;margin-top:2px">
+          <b style="grid-row:1 / 3;text-align:left;font-size:14px;white-space:nowrap">{{ bookN }}</b>
+          <b style="font-family:'Nunito',sans-serif;color:#2a5f59">{{ bookT.earned }}</b><b style="font-family:'Nunito',sans-serif">{{ bookT.wall }}</b><b style="font-family:'Nunito',sans-serif">{{ bookT.saved }}</b><b style="font-family:'Nunito',sans-serif">{{ bookT.mine }}</b>
+          <div style="grid-column:2;display:{{ bookT.incShow }};height:8px;border:1.5px solid #2a2320;border-radius:3px;overflow:hidden;box-sizing:border-box"><div style="flex:{{ bookT.fSt }} 0 0;background:#95d5b2"></div><div style="flex:{{ bookT.fBn }} 0 0;background:#ffd166"></div></div><div style="grid-column:3 / 6;display:flex;height:8px;border:1.5px solid #2a2320;border-radius:3px;overflow:hidden;box-sizing:border-box;background:#fffdf5"><div style="flex:{{ bookT.fWall }} 0 0;background:#b9aef0"></div><div style="flex:{{ bookT.fSaved }} 0 0;background:#ffe08a"></div><div style="flex:{{ bookT.fCash }} 0 0;background:#ff9eb5"></div></div>
+        </div>
+        <div style="font-size:14px;color:#2a5f59;line-height:1.25">{{ bookNote }}</div>
+        <div style="margin-top:auto;font-family:'Caveat',cursive;font-size:21px;color:#c14a24">{{ bookLine }}</div>
+      </div>
+      <div data-name="coming up" style="background:#fff4db;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:8px 14px;display:flex;flex-direction:column;gap:3px">
+        <div style="font-family:'Gochi Hand',cursive;font-size:22px">📅 Coming up</div>
+        <sc-for list="{{ coming }}" as="c" hint-placeholder-count="4">
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;font-size:15px;border-top:1px dashed #d9c9a3;padding:2px 0"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.n }}</span><span style="color:#5a4d41;white-space:nowrap">{{ c.d }}</span></div>
+        </sc-for>
+      </div>
+      <div data-name="sticker book" style="background:#fffdf5;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:6px 12px;display:flex;align-items:center;gap:8px">
+        <span style="font-family:'Gochi Hand',cursive;font-size:19px;white-space:nowrap">⭐ Stickers</span>
+        <div style="display:flex;gap:4px;flex:1;min-width:0;justify-content:flex-end">
+          <sc-for list="{{ stickers }}" as="t" hint-placeholder-count="6">
+            <span title="{{ t.name }}" style="width:32px;height:32px;flex:none;display:flex;align-items:center;justify-content:center;border:2px {{ t.style }} #2a2320;border-radius:9px;background:{{ t.bg }};font-size:20px;opacity:{{ t.op }}">{{ t.icon }}</span>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{ isResSheet }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;background:rgba(42,35,32,0.38);display:flex;align-items:center;justify-content:center">
+      <div data-name="result sheet" onClick="{{ stop }}" style="width:960px;max-height:800px;overflow:auto;box-sizing:border-box;background:#fffdf5;border:2.5px solid #2a2320;border-radius:18px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:18px 22px;display:grid;grid-template-columns:340px minmax(0,1fr);gap:14px 22px;align-content:start">
+        <div style="grid-column:1 / 3;display:flex;align-items:baseline;gap:12px"><div style="font-family:'Gochi Hand',cursive;font-size:30px">🏆 Tell Dad a result</div><span style="font-size:16px;color:#5a4d41">The official results sheet decides. Dad checks it before anything pays.</span></div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:17px;color:#5a4d41">① Which one? From my planner, this month</div>
+          <sc-for list="{{ planned }}" as="p" hint-placeholder-count="3">
+            <button type="button" onClick="{{ p.pick }}" style="min-height:58px;text-align:left;display:grid;grid-template-columns:34px 1fr;gap:0 8px;align-items:center;border:2.5px {{ p.style }} #2a2320;border-radius:12px;background:{{ p.bg }};color:{{ p.ink }};opacity:{{ p.op }};padding:4px 10px;font:inherit;cursor:pointer">
+              <span style="font-size:26px;grid-row:1 / 3">{{ p.icon }}</span><span style="font-size:18px;line-height:1.1">{{ p.name }}</span><span style="font-size:15px;color:{{ p.subInk }};line-height:1.1">{{ p.sub }}</span>
+            </button>
+          </sc-for>
+          <button type="button" onClick="{{ pickCustom }}" style="min-height:48px;border:2.5px dashed #2a2320;border-radius:12px;background:{{ customBg }};color:{{ customInk }};font:inherit;font-size:17px;cursor:pointer">➕ It's not on my planner</button>
+          <sc-if value="{{ isCustom }}" hint-placeholder-val="{{ false }}">
+            <input value="{{ customName }}" onChange="{{ setCustomName }}" placeholder="what it was called" style="min-height:48px;width:100%;box-sizing:border-box;border:2.5px solid #2a2320;border-radius:11px;padding:0 14px;font:inherit;font-size:18px;background:#fffdf5;color:#2a2320">
+            <div style="display:flex;gap:8px">
+              <sc-for list="{{ sportOpts }}" as="o" hint-placeholder-count="2">
+                <button type="button" onClick="{{ o.pick }}" style="flex:1;min-height:48px;border:2.5px solid #2a2320;border-radius:11px;font:inherit;font-size:17px;cursor:pointer;background:{{ o.bg }};color:{{ o.ink }}">{{ o.label }}</button>
+              </sc-for>
+            </div>
+            <div style="font-size:15px;color:#c14a24">Dad adds it to the planner when he says yes, so the name matches next time.</div>
+          </sc-if>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+          <sc-if value="{{ noPick }}" hint-placeholder-val="{{ true }}"><div style="border:2.5px dashed #b9ad98;border-radius:14px;padding:30px 20px;text-align:center;font-size:18px;color:#5a4d41">Pick a competition on the left.</div></sc-if>
+          <sc-if value="{{ isSwim }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:baseline;gap:8px"><div style="font-size:17px;color:#5a4d41">② My races</div><span style="font-size:15px;color:#5a4d41">up to 4 at one meet</span></div>
+            <sc-for list="{{ races }}" as="r" hint-placeholder-count="1">
+              <div data-name="race" style="display:grid;grid-template-columns:30px minmax(0,1fr) 124px auto 44px;gap:8px;align-items:center;border:2px solid #2a2320;border-radius:12px;background:#eaf4ff;padding:6px 8px">
+                <b style="font-family:'Nunito',sans-serif;font-size:17px;text-align:center">{{ r.n }}</b>
+                <select value="{{ r.ev }}" onChange="{{ r.setEv }}" style="min-height:44px;min-width:0;border:2px solid #2a2320;border-radius:9px;font:inherit;font-size:17px;background:#fffdf5;color:#2a2320;padding:0 8px">
+                  <sc-for list="{{ events }}" as="e" hint-placeholder-count="0"><option value="{{ e }}">{{ e }}</option></sc-for>
+                </select>
+                <input value="{{ r.time }}" onChange="{{ r.setTime }}" placeholder="time 0:41.2" style="min-height:44px;width:100%;box-sizing:border-box;border:2px solid #2a2320;border-radius:9px;padding:0 10px;font:inherit;font-size:17px;background:#fffdf5;color:#2a2320">
+                <div style="display:flex;align-items:center;gap:4px">
+                  <button type="button" onClick="{{ r.less }}" style="width:44px;height:44px;border:2px solid #2a2320;border-radius:9px;background:#fffdf5;font:inherit;font-size:20px;cursor:pointer;color:#2a2320;padding:0">−</button>
+                  <b style="min-width:62px;text-align:center;font-family:'Nunito',sans-serif;font-size:17px">{{ r.ptsLabel }}</b>
+                  <button type="button" onClick="{{ r.more }}" style="width:44px;height:44px;border:2px solid #2a2320;border-radius:9px;background:#fffdf5;font:inherit;font-size:20px;cursor:pointer;color:#2a2320;padding:0">+</button>
+                </div>
+                <button type="button" onClick="{{ r.remove }}" style="width:44px;height:44px;border:2px solid #2a2320;border-radius:9px;background:#fffdf5;font:inherit;font-size:17px;cursor:pointer;color:#2a2320;padding:0;opacity:{{ r.rmOp }}">✕</button>
+              </div>
+            </sc-for>
+            <sc-if value="{{ canAddRace }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ addRace }}" style="min-height:48px;border:2.5px dashed #2a2320;border-radius:12px;background:#fffdf5;font:inherit;font-size:17px;cursor:pointer;color:#2a2320">➕ Add a race ({{ racesLeft }} left)</button></sc-if>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <sc-for list="{{ swimToggles }}" as="o" hint-placeholder-count="2">
+                <button type="button" onClick="{{ o.pick }}" style="min-height:48px;border:2.5px solid #2a2320;border-radius:11px;padding:0 14px;font:inherit;font-size:17px;cursor:pointer;background:{{ o.bg }};color:{{ o.ink }}">{{ o.label }}</button>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isSkate }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:17px;color:#5a4d41">② My result</div>
+            <sc-for list="{{ skateRows }}" as="row" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:130px 1fr;gap:10px;align-items:center">
+                <span style="font-size:17px">{{ row.q }}</span>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <sc-for list="{{ row.opts }}" as="o" hint-placeholder-count="4">
+                    <button type="button" onClick="{{ o.pick }}" style="min-height:48px;min-width:56px;border:2.5px {{ o.style }} #2a2320;border-radius:11px;padding:0 12px;font:inherit;font-size:17px;cursor:pointer;background:{{ o.bg }};color:{{ o.ink }};opacity:{{ o.op }}">{{ o.label }}</button>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </sc-if>
+          <div style="border:2px dashed #2f7f77;border-radius:12px;padding:8px 12px;font-family:'Caveat',cursive;font-size:23px;color:#2a5f59;line-height:1.15">{{ resPreview }}</div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <button type="button" onClick="{{ closeSheet }}" style="min-height:48px;border:2.5px solid #2a2320;border-radius:11px;background:#fffdf5;font:inherit;font-size:17px;color:#2a2320;cursor:pointer;padding:0 16px">Not now</button>
+            <button type="button" data-name="send result" onClick="{{ send }}" style="margin-left:auto;min-height:52px;border:2.5px solid #2a2320;border-radius:11px;background:{{ sendBg }};color:{{ sendInk }};font:inherit;font-size:19px;cursor:pointer;padding:0 20px;box-shadow:2px 3px 0 rgba(42,35,32,0.15)">Send to Dad →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isRowSheet }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;background:rgba(42,35,32,0.38);display:flex;align-items:center;justify-content:center">
+      <div data-name="request sheet" onClick="{{ stop }}" style="width:640px;background:#fffdf5;border:2.5px solid #2a2320;border-radius:18px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:18px 22px;display:flex;flex-direction:column;gap:12px">
+        <div style="font-family:'Gochi Hand',cursive;font-size:30px">{{ sheetTitle }}</div>
+        <sc-if value="{{ sheetHasName }}" hint-placeholder-val="{{ false }}"><input value="{{ sheetName }}" onChange="{{ setSheetName }}" placeholder="what I want to buy · e.g. new skate bag" style="min-height:48px;width:100%;box-sizing:border-box;border:2.5px solid #2a2320;border-radius:11px;padding:0 14px;font:inherit;font-size:18px;background:#fffdf5;color:#2a2320"></sc-if>
+        <sc-for list="{{ sheetRows }}" as="row" hint-placeholder-count="3">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:17px;color:#5a4d41">{{ row.q }}</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <sc-for list="{{ row.opts }}" as="o" hint-placeholder-count="3">
+                <button type="button" onClick="{{ o.pick }}" style="min-height:48px;border:2.5px {{ o.style }} #2a2320;border-radius:11px;padding:0 14px;font:inherit;font-size:17px;cursor:pointer;background:{{ o.bg }};color:{{ o.ink }};opacity:{{ o.op }}">{{ o.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+        <div style="border:2px dashed #2f7f77;border-radius:12px;padding:8px 12px;font-family:'Caveat',cursive;font-size:23px;color:#2a5f59;line-height:1.15">{{ sheetPreview }}</div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button type="button" onClick="{{ closeSheet }}" style="min-height:48px;border:2.5px solid #2a2320;border-radius:11px;background:#fffdf5;font:inherit;font-size:17px;color:#2a2320;cursor:pointer;padding:0 16px">Not now</button>
+          <button type="button" data-name="send to dad" onClick="{{ send }}" style="margin-left:auto;min-height:52px;border:2.5px solid #2a2320;border-radius:11px;background:{{ sendBg }};color:{{ sendInk }};font:inherit;font-size:19px;cursor:pointer;padding:0 20px;box-shadow:2px 3px 0 rgba(42,35,32,0.15)">Send to Dad →</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isListSheet }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;background:rgba(42,35,32,0.38);display:flex;align-items:center;justify-content:center">
+      <div data-name="all requests" onClick="{{ stop }}" style="width:620px;max-height:720px;overflow:auto;box-sizing:border-box;background:#fffdf5;border:2.5px solid #2a2320;border-radius:18px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:18px 22px;display:flex;flex-direction:column;gap:10px">
+        <div style="font-family:'Gochi Hand',cursive;font-size:30px">⏳ Everything I asked Dad</div>
+        <sc-for list="{{ allReq }}" as="c" hint-placeholder-count="4">
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:2px {{ c.style }} #2a2320;border-radius:12px;background:{{ c.bg }};padding:8px 12px;font-size:17px;line-height:1.2"><span>{{ c.text }}</span><b style="font-family:'Nunito',sans-serif;font-size:15px;color:{{ c.ink }};white-space:nowrap">{{ c.status }}</b></div>
+        </sc-for>
+        <button type="button" onClick="{{ closeSheet }}" style="align-self:flex-end;min-height:48px;border:2.5px solid #2a2320;border-radius:11px;background:#c14a24;color:#fff;font:inherit;font-size:17px;cursor:pointer;padding:0 18px">Done</button>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1194,&quot;height&quot;:834}}">
+const KIDS = {
+  Jenn: { principal: 1000, left: 700, monthly: 70, pots: { ready: 12, goal: 8, gic: 5, stock: 0 }, locks: [{ amt: 5, back: 1 }], sessions: ['Tue 29 Sep', 'Thu 1 Oct'], loans: [['⛸️ Skates & boots', 600, 380], ['🏆 Fall season entries', 400, 320]], coming: [['🏆 Club time trials', 'Sun 18 Oct'], ['🏆 Winter Invitational', 'Sat 7 Nov']], events: [[0, '🏆 time trials', 10], [1, '🏆 Winter Inv.', 15], [2, '🎄 Christmas', 20], [4, '🧧 New Year', 50]], goal: { name: '🛼 New skate guards', target: 35 }, days: [3, 3, 3, 0, 3, 3, 3],
+    planned: [['j1', '⛸️', 'skate', 'Fall Classic', 'Sat 26 Sep', 'done', 18], ['j2', '⛸️', 'skate', 'Star 5 test day', 'Thu 1 Oct', 'open'], ['j3', '⛸️', 'skate', 'Club time trials', 'Sun 18 Oct', 'soon']],
+    book: [['27 Sep', 30, 16.15, 10, 3.85], ['20 Sep', 42, 20, 15, 7], ['13 Sep', 28, 16.15, 8, 3.85], ['6 Sep', 40, 18, 14, 8]], stickers: ['wall', 'saver', 'guesser'] },
+  Jess: { principal: 800, left: 560, monthly: 56, pots: { ready: 6, goal: 0, gic: 0, stock: 0 }, locks: [], sessions: ['Mon 28 Sep', 'Tue 29 Sep', 'Thu 1 Oct', 'Sat 3 Oct'], loans: [['🏊 Swim club fees', 500, 360], ['⛸️ Skates', 300, 200]], coming: [['🏊 Swim meet', 'Sat 24 Oct'], ['⛸️ Skating test day', 'Sun 15 Nov']], events: [[0, '🏊 swim meet', 12], [2, '🎄 Christmas', 20], [4, '🧧 New Year', 50]], goal: { name: '📚 Book set', target: 50 }, days: [3, 2, 3, 3, 0, 3, 2],
+    planned: [['s1', '🏊', 'swim', 'Swim time trial', 'Thu 1 Oct', 'open'], ['s2', '🏊', 'swim', 'Fall Splash Meet', 'Sat 24 Oct', 'soon'], ['s3', '⛸️', 'skate', 'Skating test day', 'Sun 25 Oct', 'soon']],
+    book: [['27 Sep', 44, 12.92, 25, 6], ['20 Sep', 33, 12.92, 15, 5], ['13 Sep', 47, 15, 22, 10], ['6 Sep', 41, 12.92, 20, 8]], stickers: ['saver'] } };
+const RULES0 = { loanRate: 1, chore: 3, swimPt: 1, swimQual: 20, swimProvPt: 2, skatePt: 1, g1: 20, g2: 10, g3: 5, o1: 20, o2: 10, o3: 5, wallBonus: 10, gReady: 20, gGic: 30, gStock: 40, rReady: 1.5, rGic: 4, rStock: 7, advMax: 5, wobble: false };
+const STICK = [['wall', '🧱', 'Wall builder'], ['saver', '🌱', 'Saver'], ['patient', '🔒', 'Patient one'], ['guesser', '🎯', 'Sharp guesser'], ['brave', '📈', 'Brave investor'], ['treat', '🍦', 'Treat yourself']];
+const EVENTS = ['50 Free', '100 Free', '200 Free', '50 Back', '100 Back', '50 Breast', '100 Breast', '50 Fly', '100 Fly', '100 IM', '200 IM'];
+const SEED = [
+  { id: 1, kid: 'Jenn', icon: '🎁', kind: 'gift', text: 'Uncle Mike · $20 birthday money', amt: 20, status: null },
+  { id: 2, kid: 'Jenn', icon: '🔀', kind: 'move', text: 'Move $5 Savings → Locked away', note: 'Want it to grow', amt: 5, from: 'ready', to: 'gic', status: null },
+  { id: 3, kid: 'Jess', icon: '🏊', kind: 'comp', compId: 's1', sport: 'swim', name: 'Swim time trial', date: 'Thu 1 Oct', races: [{ ev: '50 Free', time: '0:41.8', pts: 6 }, { ev: '50 Back', time: '0:49.2', pts: 4 }], qual: false, prov: false, amt: 10, text: 'Swim time trial · 2 races · 10 pts', status: null },
+  { id: 4, kid: 'Jess', icon: '📦', kind: 'fine', text: 'Box fine · the bag wasn’t mine', amt: 1, status: null },
+  { id: 5, kid: 'Jess', icon: '⏪', kind: 'adv', text: 'Draw $2 early · school book fair', amt: 2, day: 'Wed', status: 'yes' }];
+const sunDate = w => { const d = new Date(2026, 9, 4); d.setDate(d.getDate() + (w - 1) * 7 - 1); return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' }); };
+const POTN = { ready: '🏦 Savings', gic: '🔒 Locked away', stock: '📈 Companies', wall: '🧱 Loan wall', cash: '💵 Cash out' };
+const m = v => (v < 0 ? '−$' : '$') + Math.abs(v).toFixed(2);
+const get = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } };
+const put = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} window.dispatchEvent(new Event('planner-sync')); };
+const ord = n => n ? ['1st', '2nd', '3rd'][n - 1] : '—';
+const compPay = (R, d) => d.sport === 'swim' ? (d.races || []).reduce((a, r) => a + r.pts, 0) * (d.prov ? R.swimProvPt : R.swimPt) + (d.qual ? R.swimQual : 0)
+  : d.pts * R.skatePt + ({ 1: R.g1, 2: R.g2, 3: R.g3 }[d.grp] || 0) + ({ 1: R.o1, 2: R.o2, 3: R.o3 }[d.ovr] || 0);
+const statusOf = q => ({ yes: { goal: '✓ starts Sunday', skip: '✓ marked missed', move: q.to === 'cash' ? '✓ cash on Sunday' : '✓ moved', adv: '✓ cash given · off Sunday', deposit: '✓ in the bank' }[q.kind] || '✓ in Sunday’s payday', no: '✗ not this time', talk: '💬 Dad wants to talk' }[q.status] || '⏳ waiting');
+
+class Component extends DCLogic {
+  state = { kid: get('mymoney-kid', 'Jenn'), sheet: null, draft: {}, tick: 0 };
+  componentDidMount() { this.sync = () => this.setState(s => ({ tick: s.tick + 1 })); window.addEventListener('planner-sync', this.sync); window.addEventListener('storage', this.sync); }
+  componentWillUnmount() { window.removeEventListener('planner-sync', this.sync); window.removeEventListener('storage', this.sync); }
+  componentDidUpdate() { try { localStorage.setItem('mymoney-kid', JSON.stringify(this.state.kid)); } catch (e) {} }
+  beep(f) { try { const C = this.ac || (this.ac = new (window.AudioContext || window.webkitAudioContext)()); const o = C.createOscillator(), g = C.createGain(); o.type = 'triangle'; o.frequency.value = f; g.gain.setValueAtTime(0.06, C.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, C.currentTime + 0.18); o.connect(g).connect(C.destination); o.start(); o.stop(C.currentTime + 0.2); } catch (e) {} }
+  money(kid) { const K = KIDS[kid], sv = ((get('sunday-v13', {}).kids) || {})[kid] || {}, pots = { ...K.pots, ...(sv.pots || {}) }; return { left: sv.left ?? K.left, pots, goalSaved: pots.goal || 0, locks: sv.locks || K.locks, extraLoans: sv.extraLoans || [], lastInt: sv.lastInt ?? Math.round(K.left / 100 * 4 / 52 * 100) / 100, stickers: sv.stickers || K.stickers, book: sv.book || [], week: sv.week || 0, goalDef: sv.goalDef || null, histCat: sv.histCat || [] }; }
+  renderVals() {
+    const s = this.state, K = KIDS[s.kid], M = this.money(s.kid), R = { ...RULES0, ...get('planner-rules-v1', {}) }, Q = get('planner-queue-v2', SEED);
+    const now = new Date(), dow = (now.getDay() + 6) % 7, toSun = 6 - dow, paid = K.principal - M.left, pct = paid / K.principal * 100, b = K.principal / 100;
+    const wk = (R['m' + s.kid] ?? K.monthly) * 12 / 52, weeks = Math.ceil(M.left / wk), free = new Date(2026, 9, 4); free.setDate(free.getDate() + weeks * 7);
+    const gates = { ready: R.gReady, gic: R.gGic, stock: R.gStock }, rates = { ready: R.rReady, gic: R.rGic, stock: R.rStock }, open = k => pct >= gates[k];
+    const soFar = K.days.slice(0, dow + 1).reduce((a, v) => a + v, 0) / 3 * R.chore, GOAL = M.goalDef || K.goal, goalLeft = Math.max(0, GOAL.target - M.goalSaved);
+    const mine = Q.filter(q => q.kid === s.kid), d = s.draft || {}, sh = s.sheet;
+    const opt = (label, on, pick, dis) => ({ label, pick: dis ? () => this.beep(220) : pick, bg: on ? '#2f7f77' : '#fffdf5', ink: on ? '#fff' : '#2a2320', style: dis ? 'dashed' : 'solid', op: dis ? 0.5 : 1 });
+    const setD = o => { this.beep(600); this.setState(st => ({ draft: { ...st.draft, ...o } })); };
+    const chip = q => ({ text: `${q.icon} ${q.text}`, style: q.status ? 'solid' : 'dashed', bg: q.status === 'yes' ? '#e4f5ec' : q.status === 'no' ? '#efe8d6' : q.status === 'talk' ? '#fff4db' : '#fffdf5', ink: q.status === 'yes' ? '#2a5f59' : q.status ? '#5a4d41' : '#c14a24', status: statusOf(q) });
+    const advUsed = mine.filter(q => q.kind === 'adv' && q.status !== 'no').reduce((a, q) => a + q.amt, 0), advLeft = Math.max(0, R.advMax - advUsed);
+    let rows = [], preview = '', ready = false, title = '';
+    // result sheet
+    const isSwim = d.sport === 'swim', isSkate = d.sport === 'skate', races = d.races || [], totPts = races.reduce((a, r) => a + r.pts, 0), pay = d.sport ? compPay(R, d) : 0;
+    const updR = (i, o) => this.setState(st => ({ draft: { ...st.draft, races: st.draft.races.map((x, j) => j === i ? { ...x, ...o } : x) } }));
+    const fresh = (o) => ({ compId: null, custom: false, name: '', sport: null, date: 'this week', races: [], pts: 0, grp: 0, ovr: 0, qual: false, prov: false, ...o, races: o.sport === 'swim' ? [{ ev: '50 Free', time: '', pts: 0 }] : [] });
+    const sent = id => mine.some(q => q.kind === 'comp' && q.compId === id && q.status !== 'no');
+    if (sh === 'result') ready = !!(d.sport && (d.name || '').trim() && (isSwim ? races.some(r => r.pts > 0 || r.time) : true));
+    const resPreview = !d.sport ? 'Pick a competition first.' : isSwim ? `${totPts} points × $${d.prov ? R.swimProvPt : R.swimPt}${d.qual ? ` + $${R.swimQual} for qualifying` : ''} = $${pay}` : `${d.pts} points × $${R.skatePt}${d.grp ? ` + $${{ 1: R.g1, 2: R.g2, 3: R.g3 }[d.grp]} group` : ''}${d.ovr ? ` + $${{ 1: R.o1, 2: R.o2, 3: R.o3 }[d.ovr]} overall` : ''} = $${pay}`;
+    // move sheet
+    if (sh === 'move') {
+      const mode = d.mode || 'move', from = d.from || 'ready', bal = k => M.pots[k] || 0, fromOk = k => k === 'ready' ? bal(k) >= 1 : k === 'gic' ? false : open('stock') && bal(k) >= 1;
+      const max = mode === 'dep' ? 50 : Math.floor(bal(from)), amt = Math.min(d.amt || 1, Math.max(1, max));
+      title = { move: '🔀 Move money', cash: '💵 Cash out', dep: '🏦 Put cash in' }[mode];
+      const modeRow = { q: 'What do I want to do?', opts: [['move', '🔀 Move'], ['cash', '💵 Cash out'], ['dep', '🏦 Put cash in']].map(([k, l]) => opt(l, mode === k, () => { this.beep(600); this.setState({ draft: { mode: k, from: 'ready', amt: 1, to: k === 'cash' ? 'cash' : null } }); })) };
+      const fromRow = { q: '① Take it from', opts: ['ready', 'gic', 'stock'].map(k => opt(`${POTN[k]} · ${m(bal(k))}${k === 'gic' ? ' · 🔒 4 weeks' : k === 'stock' && !open(k) ? ` · 🔒${gates[k]}%` : ''}`, from === k, () => setD({ from: k, to: mode === 'cash' ? 'cash' : d.to === k ? null : d.to, amt: 1 }), !fromOk(k))) };
+      const amtRow = { q: mode === 'dep' ? '① How much cash?' : '③ How much?', opts: [opt('−', false, () => setD({ amt: Math.max(1, amt - 1) }), amt <= 1), { ...opt('$' + amt, true, () => {}), bg: '#fff4db', ink: '#2a2320' }, opt('+', false, () => setD({ amt: Math.min(max, amt + 1) }), amt >= max), ...(mode === 'dep' ? [] : [opt('All of it', false, () => setD({ amt: max }), max < 1)])] };
+      const whyRow = { q: '④ Why?', opts: ['Something I want to buy', 'Saving for my goal', 'Loan gone sooner', 'Want it to grow'].map(w => opt(w, d.why === w, () => setD({ why: w }))) };
+      const toRow = { q: mode === 'dep' ? '② Put it in' : '② Put it in', opts: (mode === 'dep' ? ['ready', 'wall', 'gic'] : ['wall', 'gic', 'stock', 'ready'].filter(k => k !== from)).map(k => opt(POTN[k] + (k in gates && !open(k) ? ` 🔒${gates[k]}%` : ''), d.to === k, () => setD({ to: k }), k in gates && !open(k))) };
+      rows = mode === 'dep' ? [modeRow, amtRow, toRow] : mode === 'cash' ? [modeRow, fromRow, amtRow, whyRow] : [modeRow, fromRow, toRow, amtRow, whyRow];
+      ready = mode === 'dep' ? !!d.to : !!(d.to && d.why && max >= 1);
+      preview = mode === 'dep' ? (d.to ? `I bring $${amt} of cash to Dad on Sunday. It goes into ${POTN[d.to].slice(3)}${d.to === 'ready' ? ' and earns a little' : d.to === 'wall' ? ` and counts as ${m(amt * (1 + R.wallBonus / 100))}` : ''}.` : 'Where should the cash go?')
+        : max < 1 ? 'Nothing to take out of there yet.' : !ready ? 'Pick the details and why.' : d.to === 'cash' ? `Dad hands me $${amt} in real cash on Sunday. It leaves the bank — no more interest.` : d.to === 'gic' ? `$${amt} locked for 4 weeks, back on a Saturday with a little extra.` : d.to === 'wall' ? `$${amt} counts as ${m(amt * (1 + R.wallBonus / 100))} off my wall. It can’t come back.` : d.to === 'stock' ? `$${amt} could go up or down. Dad talks it through first.` : `$${amt} goes back where I can reach it.`;
+    } else if (sh === 'goal') {
+      title = '🎯 A new saving goal';
+      const price = d.amt || 30, icon = d.icon || '🎒', name = (d.name || '').trim();
+      rows = [{ q: '① Pick a picture', opts: ['🎒', '⛸️', '🛼', '🏊', '📚', '🎧', '🎨', '🧸'].map(i => opt(i, icon === i, () => setD({ icon: i }))) },
+        { q: '② How much does it cost?', opts: [opt('−', false, () => setD({ amt: Math.max(5, price - 5) }), price <= 5), { ...opt('$' + price, true, () => {}), bg: '#fff4db', ink: '#2a2320' }, opt('+', false, () => setD({ amt: Math.min(500, price + 5) })), ...[20, 35, 50, 80].map(p => opt('$' + p, price === p, () => setD({ amt: p })))] },
+        ...(M.goalSaved > 0 ? [{ q: `③ My jar has ${m(M.goalSaved)} for ${GOAL.name}. What happens to it?`, opts: [['move', '➡️ Use it for the new goal'], ['ready', '🏦 Put it in Savings']].map(([k, l]) => opt(l, (d.keep || 'move') === k, () => setD({ keep: k }))) }] : [])];
+      ready = name.length > 1;
+      const start = d.keep === 'ready' ? 0 : M.goalSaved, wks = Math.ceil(Math.max(0, price - start) / 3);
+      preview = !ready ? 'Type what I want to buy, then pick a price.' : `${icon} ${name} · $${price}. ${start ? `I start with ${m(start)}. ` : ''}At $3 a Sunday that's about ${wks} Sundays. Dad says yes, then my jar switches.`;
+    } else if (sh === 'club') {
+      title = '⛸️ My club sessions';
+      const asked = dt => mine.some(q => q.kind === 'skip' && q.session === dt && q.status !== 'no');
+      rows = [{ q: '① Which one can’t I make?', opts: K.sessions.map(dt => opt(dt + (asked(dt) ? ' · asked ✓' : ''), d.session === dt, () => setD({ session: dt }), asked(dt))) },
+        { q: '② Why?', opts: ['🤒 Sick', '📚 School thing', '🚗 Family trip', 'Something else'].map(w => opt(w, d.why === w, () => setD({ why: w }))) }];
+      ready = !!(d.session && d.why);
+      preview = d.session ? `If Dad says yes, ${d.session} shows as missed on Sunday. A missed session pays $0. It is not a fine.` : 'Each session I go to pays $6 on Sunday.';
+    } else if (sh === 'adv') {
+      title = '⏪ Draw in advance';
+      const a = Math.min(d.amt || 1, Math.max(1, advLeft));
+      rows = [{ q: `① How much? (up to $${advLeft} this week)`, opts: [opt('−', false, () => setD({ amt: Math.max(1, a - 1) }), a <= 1), { ...opt('$' + a, true, () => {}), bg: '#fff4db', ink: '#2a2320' }, opt('+', false, () => setD({ amt: Math.min(advLeft, a + 1) }), a >= advLeft)] },
+        { q: '② What for?', opts: ['School book fair', 'Snack with friends', 'A gift for someone', 'Something else'].map(w => opt(w, d.why === w, () => setD({ why: w }))) }];
+      ready = !!(d.why && advLeft >= 1);
+      preview = advLeft < 1 ? `I already drew $${advUsed} in advance this week. That's the most.` : `Dad gives me $${a} cash now and I spend it before Sunday. On payday it shows under ➖ Taken off, so my pile is $${a} smaller.`;
+    }
+    const send = () => { if (!ready) { this.beep(220); return; } let item;
+      if (sh === 'result') { const ic = isSwim ? '🏊' : '⛸️', sum = isSwim ? `${races.length} race${races.length === 1 ? '' : 's'} · ${totPts} pts${d.qual ? ' · qualified' : ''}${d.prov ? ' · Provincials' : ''}` : `group ${ord(d.grp)} · overall ${ord(d.ovr)} · ${d.pts} pts`;
+        item = { kind: 'comp', icon: ic, compId: d.compId, sport: d.sport, name: d.name.trim(), date: d.date, races, qual: d.qual, prov: d.prov, pts: d.pts, grp: d.grp, ovr: d.ovr, custom: d.custom, amt: pay, text: `${d.name.trim()} · ${sum}` };
+      } else if (sh === 'move' && d.mode === 'dep') { const a = d.amt || 1; item = { kind: 'deposit', icon: '💵', text: `Put $${a} cash in → ${POTN[d.to].slice(3)}`, amt: a, to: d.to }; } else if (sh === 'move') { const a = d.amt || 1, from = d.from || 'ready'; item = { kind: 'move', icon: d.to === 'cash' ? '💵' : '🔀', text: `${d.to === 'cash' ? 'Cash out' : 'Move'} $${a} ${POTN[from].slice(3)} → ${POTN[d.to].slice(3)}`, note: d.why, amt: a, from, to: d.to }; }
+      else if (sh === 'goal') { const nm = (d.name || '').trim(), ic = d.icon || '🎒', pr = d.amt || 30; item = { kind: 'goal', icon: ic, name: nm, amt: pr, keep: M.goalSaved > 0 ? (d.keep || 'move') : 'move', text: `New goal: ${ic} ${nm} · $${pr}` }; }
+      else if (sh === 'club') { item = { kind: 'skip', icon: '⛸️', session: d.session, amt: 0, text: `Can’t make ${d.session} · ${d.why}` }; }
+      else { const a = Math.min(d.amt || 1, advLeft); item = { kind: 'adv', icon: '⏪', text: `Draw $${a} in advance · ${d.why}`, amt: a, day: now.toLocaleDateString('en-US', { weekday: 'short' }) }; }
+      put('planner-queue-v2', [...Q, { id: Date.now(), kid: s.kid, status: null, ...item }]); this.beep(880); setTimeout(() => this.beep(1175), 110); this.setState({ sheet: null, draft: {} }); };
+    const mk = x => x >= 100 ? '$' + Math.round(x) : m(x), hc = M.histCat, raw = [...M.book.map((b, i) => { const c = hc[hc.length - 1 - i]; return [b.date.split(', ').pop(), b.wall, b.saved, b.cash, b.earned, b.steady ?? (c ? c.cr : null), b.bonus ?? (c ? c.comp + c.gifts + c.ret : null)]; }), ...K.book.map(([date, e, wall, saved, mn]) => [date, wall, saved, mn, e])];
+    const row = ([date, w, sv, c, e, st, bn], i) => ({ date, earned: mk(e), fSt: st || 0, fBn: bn || 0, incShow: st != null ? 'flex' : 'none', wall: mk(w), saved: mk(sv), mine: mk(c), fWall: w, fSaved: sv, fCash: c, bg: i === 0 ? '#fff4db' : 'transparent', dInk: i === 0 ? '#c14a24' : '#5a4d41', fw: i === 0 ? 700 : 400 });
+    const bk = raw.map(row), last4 = raw.slice(0, 4), tW = last4.reduce((a, r) => a + r[1], 0), tS = last4.reduce((a, r) => a + r[2], 0), tC = last4.reduce((a, r) => a + r[3], 0), tAll = tW + tS + tC || 1, tE = last4.reduce((a, r) => a + r[4], 0), tSt = last4.reduce((a, r) => a + (r[5] || 0), 0), tBn = last4.reduce((a, r) => a + (r[6] || 0), 0), hasSplit = last4.some(r => r[5] != null);
+    const bookT = { earned: mk(tE), fSt: tSt, fBn: tBn, incShow: hasSplit ? 'flex' : 'none', wall: mk(tW), saved: mk(tS), mine: mk(tC), fWall: tW, fSaved: tS, fCash: tC }, bp = (() => { const v = [tW, tS, tC], raw = v.map(x => x / tAll * 100), fl = raw.map(Math.floor); let rem = 100 - fl.reduce((a, b) => a + b, 0); raw.map((x, i) => [x - fl[i], i]).sort((a, b) => b[0] - a[0]).forEach(([, i]) => { if (rem > 0 && v[i] > 0) { fl[i]++; rem--; } }); return fl; })(), pf = i => bp[i] === 0 && [tW, tS, tC][i] > 0 ? '<1%' : bp[i] + '%', bookNote = `These ${last4.length} Sundays (${last4[last4.length - 1][0]} – ${last4[0][0]}): I earned ${mk(tE)}, about ${mk(tE / last4.length)} a week${hasSplit && tSt + tBn > 0 ? ` (${Math.round(tSt / (tSt + tBn) * 100)}% steady · ${100 - Math.round(tSt / (tSt + tBn) * 100)}% bonus)` : ''}. Of what I placed, ${pf(0)} to the wall · ${pf(1)} saved · ${pf(2)} cash.`;
+    const allRows = [...K.loans.map(([n, pr, l0]) => [n, pr, l0]), ...M.extraLoans.map(l => [l.name, l.added, l.added])], owedRows = allRows.reduce((a, r) => a + r[2], 0); let paidR = Math.max(0, owedRows - M.left);
+    const loanRows = allRows.map(([n, pr, l0]) => { const t = Math.min(l0, paidR); paidR -= t; const ln = l0 - t; return { n, w: (pr - ln) / pr * 100, v: ln <= 0.005 ? '✓ done' : m(ln) }; });
+    const EV = (get('planner-expected-v1', {})[s.kid]) || K.events, mon = i => new Date(2026, 9 + i, 1).toLocaleDateString('en-US', { month: 'short' });
+    const coming = [...K.coming.map(([n, dt]) => ({ n, d: dt })), ...EV.filter(e => !/🏆|🏊|⛸️/.test(e[1])).map(e => ({ n: e[1], d: mon(e[0]) + ' · Dad expects ~$' + e[2] }))].slice(0, 5);
+    const nextLock = (M.locks || []).filter(l => l.back > M.week).sort((a, b) => a.back - b.back)[0], clubAsked = mine.filter(q => q.kind === 'skip' && q.status !== 'no').length;
+    return {
+      kids: Object.keys(KIDS).map(k => ({ name: k, bg: k === s.kid ? '#ff9eb5' : '#fffdf5', pick: () => this.setState({ kid: k, sheet: null, draft: {} }) })),
+      todayLabel: now.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short' }),
+      countdown: toSun === 0 ? 'Sunday is today!' : `Sunday in ${toSun} day${toSun === 1 ? '' : 's'}`,
+      days: ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((x, i) => { const past = i <= dow, v = K.days[i]; return { d: x, op: past ? 1 : 0.5, ring: past ? 'solid' : 'dashed', bg: past ? (v ? '#e4f5ec' : '#efe8d6') : '#fffdf5', mark: past ? (v === 3 ? '✓' : v ? '½' : '·') : '', chore: past ? (v ? m(v / 3 * R.chore).replace('.00', '') : '—') : '' }; }),
+      weekSoFar: `🧹 about ${m(soFar)} of chores so far. The guess is on Sunday.`,
+      chips: mine.slice(-2).map(chip), allReq: mine.slice().reverse().map(chip), noChips: mine.length === 0, hasMore: mine.length > 2, moreChips: `+${Math.max(0, mine.length - 2)} more · see all`,
+      openList: () => this.setState({ sheet: 'list' }),
+      leftAmt: m(M.left) + ' left',
+      bricks: Array.from({ length: 100 }, (_, i) => { const f = Math.max(0, Math.min(1, (paid - i * b) / b)); return { fill: f * 100, style: f >= 1 ? 'solid' : 'dashed' }; }),
+      flags: [['ready', '🏦'], ['gic', '🔒'], ['stock', '📈']].map(([k, ic]) => ({ left: gates[k], label: ic, bg: open(k) ? '#e4f5ec' : '#fffdf5' })),
+      paidLine: `${Math.round(pct)}% paid`, perWeek: `${m(wk)} a week · free by ${free.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`, loanRows, intLine: M.lastInt ? `🟥 +${m(M.lastInt)} interest added last time (${R.loanRate ?? 1}% a year)` : '', coming,
+      clubSub: clubAsked ? `${clubAsked} asked · $6 each I go to` : `$6 each I go to`, openClub: () => this.setState({ sheet: 'club', draft: {} }),
+      freeLine: `Free by ${free.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} at this pace. Extra on the wall makes it sooner.`,
+      goalName: GOAL.name, goalSaved: m(M.goalSaved), goalTarget: m(GOAL.target), goalPct: Math.min(100, M.goalSaved / GOAL.target * 100),
+      goalLine: (gq => gq ? (gq.status === 'yes' ? `✓ Dad said yes: ${gq.icon} ${gq.name} starts Sunday` : `⏳ asked Dad: ${gq.icon} ${gq.name} · $${gq.amt}`) : goalLeft <= 0 ? '🎉 Saved! Tell a grown-up.' : `${m(goalLeft)} to go · its own jar · earns nothing`)(mine.filter(q => q.kind === 'goal' && !q.applied && q.status !== 'no').slice(-1)[0]),
+      potsTotal: m(M.pots.ready + (M.pots.goal || 0) + M.pots.gic + M.pots.stock) + ' with 🎯',
+      pots: [...['ready', 'gic', 'stock'].map(k => ({ name: POTN[k], bal: m(M.pots[k]), style: open(k) ? 'solid' : 'dashed', op: open(k) ? 1 : 0.65,
+        sub: k === 'ready' ? (M.pots.ready >= 10 ? `🛟 $10 safety + ${m(M.pots.ready - 10)} I can use · ${rates[k]}% a year` : `🛟 fill to $10 first · ${m(10 - M.pots.ready)} to go`) : k === 'gic' && M.pots.gic ? `back ${nextLock ? sunDate(nextLock.back) : 'soon'} · ${rates[k]}% a year` : !open(k) ? `🔒 opens at ${gates[k]}% paid · ${Math.max(1, Math.ceil(gates[k] - pct))} more bricks` : `${rates[k]}% a year${k === 'stock' && R.wobble ? ' · 📉 wobbly this week' : ''}${M.pots[k] ? ` · +${m(M.pots[k] * rates[k] / 100)} a year` : ''}` }))],
+      book: bk.slice(0, 4), bookT, bookN: '= Total', bookNote, bookLine: `${s.kid} ✓ · ${bk.length} Sundays signed${bk.length > 4 ? ` · showing the latest 4` : ''}`,
+      stickers: STICK.map(([id, icon, name]) => { const got = M.stickers.includes(id); return { icon: got ? icon : '❔', name, style: got ? 'solid' : 'dashed', bg: got ? '#fffdf5' : 'transparent', op: got ? 1 : 0.55 }; }),
+      advSub: advLeft ? `up to $${advLeft} · spent before Sunday` : 'used up this week',
+      openResult: () => this.setState({ sheet: 'result', draft: {} }), openMove: () => this.setState({ sheet: 'move', draft: { mode: 'move', from: 'ready', amt: 1 } }), openAdv: () => this.setState({ sheet: 'adv', draft: { amt: 1 } }),
+      closeSheet: () => this.setState({ sheet: null, draft: {} }), stop: e => e.stopPropagation(),
+      isResSheet: sh === 'result', isRowSheet: sh === 'move' || sh === 'adv' || sh === 'club' || sh === 'goal', sheetHasName: sh === 'goal', sheetName: d.name || '', setSheetName: e => { const v = e.target.value; this.setState(st => ({ draft: { ...st.draft, name: v } })); }, openGoal: () => this.setState({ sheet: 'goal', draft: { amt: 30, icon: '🎒' } }), isListSheet: sh === 'list',
+      planned: K.planned.map(([id, icon, sport, name, date, st, amt]) => { const isSent = sent(id), can = st === 'open' && !isSent, on = d.compId === id;
+        return { icon, name, sub: st === 'done' ? `${date} · ✓ recorded $${amt}` : isSent ? `${date} · ⏳ sent to Dad` : st === 'soon' ? `${date} · coming up` : `${date} · no result yet`, style: can ? 'solid' : 'dashed', bg: on ? '#2f7f77' : can ? '#fffdf5' : 'transparent', ink: on ? '#fff' : '#2a2320', subInk: on ? '#fff' : can ? '#c14a24' : '#5a4d41', op: can ? 1 : 0.6,
+          pick: can ? () => { this.beep(600); this.setState({ draft: fresh({ compId: id, name, sport, date }) }); } : () => this.beep(220) }; }),
+      pickCustom: () => { this.beep(600); this.setState({ draft: fresh({ custom: true }) }); }, isCustom: !!d.custom, customName: d.name || '', setCustomName: e => { const v = e.target.value; this.setState(st => ({ draft: { ...st.draft, name: v } })); },
+      customBg: d.custom ? '#2f7f77' : '#fffdf5', customInk: d.custom ? '#fff' : '#2a2320',
+      sportOpts: [['swim', '🏊 Swim'], ['skate', '⛸️ Skating']].map(([k, l]) => ({ label: l, bg: d.sport === k ? '#2f7f77' : '#fffdf5', ink: d.sport === k ? '#fff' : '#2a2320', pick: () => { this.beep(600); this.setState(st => ({ draft: { ...st.draft, sport: k, races: k === 'swim' ? [{ ev: '50 Free', time: '', pts: 0 }] : [] } })); } })),
+      noPick: !d.sport, isSwim, isSkate, events: EVENTS,
+      races: races.map((r, i) => ({ n: i + 1, ev: r.ev, time: r.time, ptsLabel: r.pts + ' pts', rmOp: races.length > 1 ? 1 : 0.35,
+        setEv: e => updR(i, { ev: e.target.value }), setTime: e => updR(i, { time: e.target.value }), less: () => updR(i, { pts: Math.max(0, r.pts - 1) }), more: () => updR(i, { pts: r.pts + 1 }),
+        remove: () => { if (races.length > 1) this.setState(st => ({ draft: { ...st.draft, races: st.draft.races.filter((_, j) => j !== i) } })); } })),
+      canAddRace: isSwim && races.length < 4, racesLeft: 4 - races.length,
+      addRace: () => { const used = races.map(r => r.ev), ev = EVENTS.find(e => !used.includes(e)) || EVENTS[0]; this.beep(700); this.setState(st => ({ draft: { ...st.draft, races: [...st.draft.races, { ev, time: '', pts: 0 }] } })); },
+      swimToggles: [opt(`🎯 Qualified for Provincials (+$${R.swimQual})`, !!d.qual, () => setD({ qual: !d.qual })), opt(`🏟️ This was Provincials ($${R.swimProvPt}/pt)`, !!d.prov, () => setD({ prov: !d.prov }))],
+      skateRows: [{ q: 'In my group', opts: [0, 1, 2, 3].map(n => opt(ord(n), d.grp === n, () => setD({ grp: n }))) }, { q: 'Overall', opts: [0, 1, 2, 3].map(n => opt(ord(n), d.ovr === n, () => setD({ ovr: n }))) },
+        { q: 'Points', opts: [opt('−', false, () => setD({ pts: Math.max(0, (d.pts || 0) - 1) })), { ...opt((d.pts || 0) + ' pts', true, () => {}), bg: '#fff4db', ink: '#2a2320' }, opt('+', false, () => setD({ pts: (d.pts || 0) + 1 }))] }],
+      resPreview,
+      sheetTitle: title, sheetRows: rows, sheetPreview: preview, send, sendBg: ready ? '#c14a24' : '#e8dfc3', sendInk: ready ? '#fff' : '#5a4d41'
+    };
+  }
+}
+</script>
+</body>
+</html>

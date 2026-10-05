@@ -91,12 +91,16 @@ function ckTrainingBlockOn(kid, dayKey) {
    ckEarnBoard (R5 §5 C2, row 11), so the two cannot show different figures for
    one day. */
 function ckCapBarFor(kid, weekKey, dayIdx) {
-  const r = mrRulesForWeek(weekKey);
+  // (weekKey, dayIdx) is the planner's day; its money is read from the money
+  // week that pays it (Deviation 34 — a Sunday may pay next Sunday).
+  const dayKey = mrWeekDayKeys(weekKey)[dayIdx];
+  const cd = mrChoreDay(kid, dayKey);
+  const r = mrRulesForWeek(cd.wk);
   const cap = Number((r.chores || {}).dailyCap);
-  const chores = mrChoreWeek(weekKey, kid);
-  const day = chores.days[dayIdx] || { paid: 0, raw: 0 };
-  const fines = mrFinesWeek(weekKey, kid, chores.days.map(d => d.paid));
-  const fined = (fines.perDay[dayIdx] || {}).applied || 0;
+  const chores = cd.week;
+  const day = cd.day;
+  const fines = mrFinesWeek(cd.wk, kid, chores.days.map(d => d.paid));
+  const fined = (fines.perDay.find(x => x.dayKey === dayKey) || {}).applied || 0;
 
   // Claimed but not yet graded — what today could still become.
   const e = mrEnsureEarnings(kid, weekKey);
@@ -140,7 +144,8 @@ function ckCapBarFor(kid, weekKey, dayIdx) {
 function ckHeader(kid) {
   const info = ctWeekInfo();
   const lv = mrXpLevelInfo(kid, ctWeekKey);
-  const st = mrStreakWeek(ctWeekKey, kid);
+  // The streak of the money week the chosen day sits in (Deviation 34).
+  const st = mrStreakWeek(mrMoneyWeekOf(mrWeekDayKeys(ctWeekKey)[ctDay], kid), kid);
   const label = `${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()} – ${MONTH_SHORT[info.sun.getMonth()]} ${info.sun.getDate()}`;
   const isThisWeek = ctWeekKey === ctThisWeekKey();
   return `<div class="ck-head">
@@ -393,8 +398,9 @@ function ckChores(kid) {
   const r = mrRulesForWeek(ctWeekKey);
   const day = mrChoresForDay(kid, ctWeekKey, ctDay);
   const rows = day.rows.filter(x => x.row.lane === 'chores');
-  const wk = mrChoreWeek(ctWeekKey, kid);
-  const freeIds = new Set(wk.freeUsed.filter(f => f.dayIdx === ctDay).map(f => f.choreId));
+  const dayKey = mrWeekDayKeys(ctWeekKey)[ctDay];
+  const wk = mrChoreDay(kid, dayKey).week;
+  const freeIds = new Set(wk.freeUsed.filter(f => f.dayKey === dayKey).map(f => f.choreId));
   const cap = (r.chores || {}).dailyCap;
 
   const head = `<div class="ck-h2row"><span class="ck-h2">${CT_DAYS[ctDay]}'s chores</span>
@@ -698,7 +704,8 @@ function ckWeekGrid(kid) {
    day's ceiling bar and the ledger by channel. For a named kid, week and day —
    My money draws the same board from it (R5 §5 C2, row 11). */
 function ckEarnBoard(kid, weekKey, dayIdx) {
-  const b = mrWeekBreakdown(weekKey, kid);
+  // The money week the chosen day is paid in (Deviation 34).
+  const b = mrWeekBreakdown(mrMoneyWeekOf(mrWeekDayKeys(weekKey)[dayIdx], kid), kid);
   const ledger = [];
   if (b.chorePaid)      ledger.push({ name: 'Household chores', detail: `${CT_DAYS[dayIdx]} and the rest of the week`, amount: ckMoney(b.chorePaid), fg: 'ck-green' });
   if (b.learnPaid)      ledger.push({ name: 'Learning', detail: 'whole bundles only', amount: ckMoney(b.learnPaid), fg: 'ck-green' });

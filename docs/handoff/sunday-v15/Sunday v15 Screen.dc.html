@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Gochi+Hand&family=Nunito:wght@700;800&family=Patrick+Hand&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#fef9ef;font-family:'Patrick Hand',sans-serif;color:#2a2320} a{color:#c14a24} a:hover{color:#2a2320} @keyframes omPop{0%{transform:scale(0.6);opacity:0}70%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}} @keyframes omDrop{0%{transform:translateY(-360px);opacity:0}15%{opacity:1}80%{transform:translateY(5px)}100%{transform:translateY(0)}} @keyframes omFall{0%{transform:translateY(-40px) rotate(0)}100%{transform:translateY(760px) rotate(540deg)}} @keyframes omFly{0%{transform:translate(0,0) scale(1) rotate(0);opacity:1}75%{opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(0.85) rotate(360deg);opacity:0}} @keyframes omGlow{0%,100%{box-shadow:0 -5px 0 0 #ff8a00,0 5px 0 0 #ff8a00,0 0 16px 4px rgba(255,138,0,0.5)}50%{box-shadow:0 -8px 0 0 #ffd166,0 8px 0 0 #ffd166,0 0 30px 10px rgba(255,209,102,0.75)}} @keyframes omBurst{0%{transform:scale(0.3);opacity:0}25%{transform:scale(1.35);opacity:1}100%{transform:scale(1.7) translateY(-16px);opacity:0}} @keyframes omShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}} @keyframes omStamp{0%{transform:scale(2) rotate(-20deg);opacity:0}60%{transform:scale(0.95) rotate(-8deg);opacity:1}100%{transform:scale(1) rotate(-8deg);opacity:1}}</style>
+</helmet>
+<div data-screen-label="iPad · Sunday 23a" style="width:1194px;height:834px;position:relative;overflow:hidden;background:#fef9ef;font-family:'Patrick Hand',sans-serif;font-size:18px;color:#2a2320;box-sizing:border-box">
+  <div style="height:64px;display:flex;align-items:center;gap:14px;padding:0 20px;border-bottom:3px solid #2a2320;background:#fffdf5">
+    <div style="font-family:'Gochi Hand',cursive;font-size:28px">📓 Weekly Planner</div>
+    <button type="button" data-name="dad card button" onClick="{{ openDad }}" style="margin-left:auto;min-height:40px;border:2.5px solid #2a2320;border-radius:11px;padding:0 12px;font:inherit;font-size:16px;cursor:pointer;background:#fff4db;color:#2a2320;white-space:nowrap">🗣️ Dad's card</button>
+    <div data-name="kid switch" style="display:flex;gap:8px">
+      <sc-for list="{{ kids }}" as="k" hint-placeholder-count="2">
+        <button type="button" onClick="{{ k.pick }}" style="min-height:40px;border:2.5px solid #2a2320;border-radius:11px;padding:0 14px;font:inherit;font-size:18px;cursor:pointer;background:{{ k.bg }};color:#2a2320">{{ k.name }}</button>
+      </sc-for>
+    </div>
+  </div>
+  <div style="height:56px;display:flex;align-items:center;gap:8px;padding:0 16px;border-bottom:3px solid #2a2320;box-sizing:border-box">
+    <a href="My Money v2 Screen.dc.html" style="min-height:40px;display:flex;align-items:center;border:2.5px solid #2a2320;border-radius:11px;padding:0 12px;background:#fffdf5;color:#2a2320;text-decoration:none">🏠 My money</a>
+    <div style="min-height:40px;display:flex;align-items:center;border:2.5px solid #2a2320;border-radius:11px;padding:0 12px;background:#c14a24;color:#fff">☀️ Sunday</div>
+    <a href="Grown-ups v2 Screen.dc.html" style="min-height:40px;display:flex;align-items:center;border:2.5px solid #2a2320;border-radius:11px;padding:0 12px;background:#fffdf5;color:#2a2320;text-decoration:none">👨‍👩‍👧 Grown-ups</a>
+    <div data-name="steps" style="margin-left:auto;display:flex;gap:6px">
+      <sc-for list="{{ steps }}" as="s" hint-placeholder-count="4">
+        <div style="min-height:44px;display:flex;align-items:center;border:2.5px solid #2a2320;border-radius:11px;padding:0 12px;font-size:15px;background:{{ s.bg }};color:{{ s.ink }};white-space:nowrap">{{ s.label }}</div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:14px;padding:12px 14px;height:714px;box-sizing:border-box">
+    <div data-name="sunday card" ref="{{ cardRef }}" onClick="{{ cardClick }}" style="background:#fffdf5;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:12px 16px;display:flex;flex-direction:column;gap:10px;min-width:0;min-height:0;overflow:hidden;position:relative">
+      {{ fxLayer }}
+      <sc-if value="{{ isGuess }}" hint-placeholder-val="{{ true }}">
+        <div style="font-family:'Gochi Hand',cursive;font-size:30px">🎲 Payday guessing game!</div>
+        <div style="font-family:'Caveat',cursive;font-size:22px;color:#6b5d4f">{{ guessStory }}</div>
+        <div style="font-size:17px">① Where did money come from this week? Tick my club sessions, then tap the rest.</div>
+        <div data-name="income categories" style="display:grid;grid-template-columns:2fr repeat(4,minmax(0,1fr));gap:10px">
+          <div data-name="assistant job tile" style="border:3px solid #2a2320;border-radius:16px;background:#eaf4ff;box-shadow:4px 5px 0 rgba(42,35,32,0.18);padding:6px 8px;display:flex;flex-direction:column;gap:4px;min-width:0">
+            <div style="display:flex;align-items:center;gap:6px;min-width:0"><span style="font-size:24px;line-height:1">⛸️</span><span style="font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">Assistant job</span><b style="margin-left:auto;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;border:2px solid #2a2320;border-radius:8px;padding:0 6px;background:#fffdf5;white-space:nowrap">{{ paState }}</b></div>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px"><sc-for list="{{ attChips }}" as="a" hint-placeholder-count="2"><button type="button" onClick="{{ a.pick }}" style="min-height:44px;border:2px {{ a.bs }} #2a2320;border-radius:10px;background:{{ a.bg }};color:#2a2320;font:inherit;font-size:15px;cursor:pointer;padding:0 6px;white-space:nowrap">{{ a.label }}</button></sc-for></div>
+            <div style="font-size:13px;color:#5a4d41">✓ = $6 · missed = $0, not a fine</div>
+          </div>
+          <sc-for list="{{ cats }}" as="c" hint-placeholder-count="4">
+            <button type="button" onClick="{{ c.tap }}" style="min-height:92px;border:3px solid #2a2320;border-radius:16px;background:{{ c.bg }};font:inherit;color:#2a2320;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;box-shadow:4px 5px 0 rgba(42,35,32,0.18);transform:{{ c.rot }};transition:transform 0.2s ease">
+              <span style="font-size:30px;line-height:1">{{ c.icon }}</span>
+              <span style="font-size:17px">{{ c.name }}</span>
+              <span style="font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;border:2px solid #2a2320;border-radius:8px;padding:0 8px;background:#fffdf5">{{ c.state }}</span>
+            </button>
+          </sc-for>
+        </div>
+        <div style="font-size:17px">② Climb the stairs to my guess</div>
+        <div data-name="guess stairs" style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:4px;align-items:end;border-bottom:3px solid #2a2320;padding:0 2px">
+          <sc-for list="{{ rungs }}" as="r" hint-placeholder-count="11">
+            <button type="button" onClick="{{ r.pick }}" style="height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:stretch;border:none;background:transparent;padding:0;font:inherit;cursor:pointer;color:#2a2320">
+              <span style="font-size:15px;font-weight:700;color:#6b5bb5;text-align:center;line-height:1.05;min-height:44px;display:flex;align-items:flex-end;justify-content:center">{{ r.mark }}</span>
+              <span style="font-size:28px;line-height:1;text-align:center;min-height:30px;color:#c14a24">{{ r.pin }}</span>
+              <div style="height:{{ r.h }}%;min-height:40px;background:{{ r.bar }};border:2.5px solid #2a2320;border-bottom:none;border-radius:8px 8px 0 0;display:flex;justify-content:center;padding-top:6px;box-sizing:border-box;box-shadow:inset 0 5px 0 rgba(255,255,255,0.35)"><b style="font-family:'Nunito',sans-serif;font-size:16px;color:{{ r.ink }}">{{ r.label }}</b></div>
+            </button>
+          </sc-for>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="font-size:15px;color:#6b5d4f">{{ guessHint }}</div>
+          <button type="button" data-name="reveal" onClick="{{ reveal }}" style="margin-left:auto;min-height:48px;border:2.5px solid #2a2320;border-radius:11px;background:{{ revealBg }};color:{{ revealInk }};font:inherit;font-size:18px;cursor:pointer;padding:0 18px;box-shadow:2px 3px 0 rgba(42,35,32,0.15)">Show me →</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isPayday }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:baseline;gap:10px"><div style="font-family:'Gochi Hand',cursive;font-size:28px">☀️ My payday</div><div style="font-family:'Caveat',cursive;font-size:22px;color:#6b5d4f">{{ guessResult }}</div></div>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 226px;gap:12px;flex:1;min-height:0">
+          <div data-name="pile groups" style="display:flex;flex-direction:column;gap:12px;min-height:0;min-width:0;overflow:hidden">
+            <div data-name="money in" style="border:3px solid #2a2320;border-radius:16px;background:#fffdf5;padding:4px 8px 8px;display:flex;flex-direction:column;gap:5px;box-shadow:3px 4px 0 rgba(42,35,32,0.15)">
+              <div style="display:flex;align-items:baseline;gap:8px;padding:0 4px"><span style="font-family:'Gochi Hand',cursive;font-size:22px">💰 Money in</span><b style="margin-left:auto;font-family:'Nunito',sans-serif;font-size:22px;color:#2a5f59">{{ inTotal }}</b></div>
+              <div data-name="group: 📅 Steady" style="border:2.5px solid #2a2320;border-radius:13px;background:#e4f5ec;padding:4px 10px 7px;display:flex;flex-direction:column;gap:4px">
+                <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:17px;white-space:nowrap">📅 Steady</span><span style="font-size:14px;color:#5a4d41">every week</span><b style="margin-left:auto;font-family:'Nunito',sans-serif;font-size:18px">{{ stTot }}</b></div>
+                <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px">
+                <sc-for list="{{ steadyLines }}" as="f" hint-placeholder-count="3">
+                  <div data-name="payday line" style="position:relative;display:flex;flex-direction:column;justify-content:center;min-height:54px;min-width:0;border:{{ f.border }};border-radius:11px;background:{{ f.bg }};padding:2px 10px;opacity:{{ f.op }};transform:{{ f.rot }};box-shadow:{{ f.shadow }};transition:opacity 0.5s ease, transform 0.4s ease;box-sizing:border-box">
+                    <span style="position:absolute;right:-6px;top:-10px;font-family:'Gochi Hand',cursive;font-size:14px;background:#ffd166;border:1.5px solid #2a2320;border-radius:8px;padding:0 6px;transform:rotate(8deg);display:{{ f.badgeDisplay }}">{{ f.badge }}</span>
+                    <span style="font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">{{ f.name }}</span>
+                    <div style="display:flex;align-items:baseline;gap:6px;min-width:0"><span style="flex:1;min-width:0;font-size:13px;color:#5a4d41;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.note }}</span><b style="font-family:'Nunito',sans-serif;font-size:19px;color:{{ f.ink }};white-space:nowrap">{{ f.amt }}</b></div>
+                  </div>
+                </sc-for>
+                </div>
+              </div>
+              <div data-name="group: 🎲 Bonus" style="border:2.5px dashed #2a2320;border-radius:13px;background:#fff4db;padding:4px 10px 7px;display:flex;flex-direction:column;gap:4px">
+                <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:17px;white-space:nowrap">🎲 Bonus</span><span style="font-size:14px;color:#5a4d41">some weeks</span><b style="margin-left:auto;font-family:'Nunito',sans-serif;font-size:18px">{{ bnTot }}</b></div>
+                <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px">
+                <sc-for list="{{ bonusLines }}" as="f" hint-placeholder-count="3">
+                  <div data-name="payday line" style="position:relative;display:flex;flex-direction:column;justify-content:center;min-height:54px;min-width:0;border:{{ f.border }};border-radius:11px;background:{{ f.bg }};padding:2px 10px;opacity:{{ f.op }};transform:{{ f.rot }};box-shadow:{{ f.shadow }};transition:opacity 0.5s ease, transform 0.4s ease;box-sizing:border-box">
+                    <span style="position:absolute;right:-6px;top:-10px;font-family:'Gochi Hand',cursive;font-size:14px;background:#ffd166;border:1.5px solid #2a2320;border-radius:8px;padding:0 6px;transform:rotate(8deg);display:{{ f.badgeDisplay }}">{{ f.badge }}</span>
+                    <span style="font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">{{ f.name }}</span>
+                    <div style="display:flex;align-items:baseline;gap:6px;min-width:0"><span style="flex:1;min-width:0;font-size:13px;color:#5a4d41;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.note }}</span><b style="font-family:'Nunito',sans-serif;font-size:19px;color:{{ f.ink }};white-space:nowrap">{{ f.amt }}</b></div>
+                  </div>
+                </sc-for>
+                </div>
+              </div>
+              <div data-name="from my bank" style="border:2.5px solid #2a2320;border-radius:13px;background:#eaf4ff;padding:4px 8px 6px 10px;display:flex;flex-direction:column;gap:4px;min-width:0">
+                <div style="display:flex;align-items:baseline;gap:8px;min-width:0"><span style="font-size:17px;white-space:nowrap">🏦 From my bank</span><span style="font-size:14px;color:#5a4d41;flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ bankNote }}</span><b style="font-family:'Nunito',sans-serif;font-size:18px;flex:none">{{ bankAmt }}</b></div>
+                <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px"><sc-for list="{{ pulls }}" as="p" hint-placeholder-count="2">
+                  <div style="display:flex;align-items:center;gap:4px;min-width:0;border:2px solid #2a2320;border-radius:11px;background:#fffdf5;padding:2px 3px 2px 8px"><div style="display:flex;flex-direction:column;min-width:0;flex:1;line-height:1.1"><span style="font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</span><span style="font-size:12px;color:#5a4d41;white-space:nowrap">{{ p.sub }}</span></div><button type="button" onClick="{{ p.less }}" style="flex:none;width:44px;height:44px;border:2px solid #2a2320;border-radius:9px;background:#fffdf5;font:inherit;font-size:20px;cursor:pointer;color:#2a2320;padding:0">−</button><b style="min-width:28px;text-align:center;font-family:'Nunito',sans-serif;font-size:16px">{{ p.amt }}</b><button type="button" onClick="{{ p.more }}" style="flex:none;width:44px;height:44px;border:2px solid #2a2320;border-radius:9px;background:#ffd166;font:inherit;font-size:20px;cursor:pointer;color:#2a2320;padding:0">+</button></div>
+                </sc-for></div>
+              </div>
+            </div>
+            <div data-name="taken off" style="border:2.5px solid #c14a24;border-radius:16px;background:#fffdf5;padding:4px 8px 8px;display:flex;flex-direction:column;gap:5px">
+              <div style="display:flex;align-items:baseline;gap:8px;padding:0 4px"><span style="font-family:'Gochi Hand',cursive;font-size:21px;color:#c14a24">➖ Taken off</span><span style="font-size:14px;color:#5a4d41">fines · cash I drew before Sunday</span><b style="margin-left:auto;font-family:'Nunito',sans-serif;font-size:21px;color:#c14a24">{{ offTotal }}</b></div>
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:7px">
+                <sc-for list="{{ offLines }}" as="f" hint-placeholder-count="3">
+                  <div data-name="payday line" style="position:relative;display:flex;flex-direction:column;justify-content:center;min-height:54px;min-width:0;border:{{ f.border }};border-radius:11px;background:{{ f.bg }};padding:2px 10px;opacity:{{ f.op }};transform:{{ f.rot }};box-shadow:{{ f.shadow }};transition:opacity 0.5s ease, transform 0.4s ease;box-sizing:border-box">
+                    <span style="position:absolute;right:-6px;top:-10px;font-family:'Gochi Hand',cursive;font-size:14px;background:#ffd166;border:1.5px solid #2a2320;border-radius:8px;padding:0 6px;transform:rotate(8deg);display:{{ f.badgeDisplay }}">{{ f.badge }}</span>
+                    <span style="font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">{{ f.name }}</span>
+                    <div style="display:flex;align-items:baseline;gap:6px;min-width:0"><span style="flex:1;min-width:0;font-size:13px;color:#5a4d41;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.note }}</span><b style="font-family:'Nunito',sans-serif;font-size:19px;color:{{ f.ink }};white-space:nowrap">{{ f.amt }}</b></div>
+                  </div>
+                </sc-for>
+                <div data-name="drawn in advance" style="display:flex;align-items:center;gap:4px;min-width:0;min-height:54px;border:{{ advBorder }};border-radius:11px;background:#fff0e6;padding:2px 3px 2px 10px;box-sizing:border-box;opacity:{{ advOp }}">
+                  <div style="display:flex;flex-direction:column;min-width:0;flex:1;line-height:1.15"><div style="display:flex;align-items:baseline;gap:6px"><span style="font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">⏪ In advance</span><b style="margin-left:auto;font-family:'Nunito',sans-serif;font-size:19px;color:{{ advInk }};white-space:nowrap">{{ advAmt }}</b></div><span style="font-size:13px;color:#5a4d41;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ advNote }}</span></div>
+                  <button type="button" onClick="{{ advLess }}" style="flex:none;width:44px;height:44px;border:2px solid #2a2320;border-radius:9px;background:#fffdf5;font:inherit;font-size:20px;cursor:pointer;color:#2a2320;padding:0">−</button><button type="button" onClick="{{ advMore }}" style="flex:none;width:44px;height:44px;border:2px solid #2a2320;border-radius:9px;background:#ffb38a;font:inherit;font-size:20px;cursor:pointer;color:#2a2320;padding:0">+</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div data-name="payday pile" style="border:3px solid #2a2320;border-radius:18px;background:#fff4db;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:10px 10px 10px 12px;display:grid;grid-template-columns:1fr 34px;grid-template-rows:auto 1fr auto;gap:6px;min-height:0">
+            <div style="grid-column:1 / 3;display:flex;align-items:baseline;justify-content:space-between"><span style="font-family:'Gochi Hand',cursive;font-size:21px">💰 My pile</span><b style="font-family:'Nunito',sans-serif;font-size:30px;color:#c14a24">{{ countAmt }}</b></div>
+            <div data-name="coin stack" style="position:relative;min-height:0;border-bottom:3px solid #2a2320">
+              <sc-for list="{{ payPile }}" as="c" hint-placeholder-count="0">
+                <div style="position:absolute;left:{{ c.left }}%;bottom:{{ c.bottom }}%;width:20%;height:{{ c.h }}%;display:flex;align-items:center;justify-content:center;animation:omDrop 0.7s {{ c.delay }}ms cubic-bezier(0.3,1.2,0.5,1) backwards;opacity:{{ c.op }}">
+                  <div style="height:88%;aspect-ratio:1;border-radius:50%;background:{{ c.bg }};border:{{ c.bd }};box-shadow:{{ c.sh }};display:flex;align-items:center;justify-content:center;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;color:{{ c.ink }};box-sizing:border-box">{{ c.label }}</div>
+                </div>
+              </sc-for>
+            </div>
+            <div data-name="ruler" style="position:relative;border-left:2px solid #2a2320">
+              <sc-for list="{{ ticks }}" as="t" hint-placeholder-count="5">
+                <div style="position:absolute;left:0;bottom:{{ t.pct }}%;width:8px;border-top:2px solid #2a2320"><span style="position:absolute;left:10px;top:-9px;font-size:15px;color:#6b5d4f">{{ t.label }}</span></div>
+              </sc-for>
+              <div style="position:absolute;left:-172px;bottom:{{ ghostPct }}%;width:204px;border-top:2.5px dashed #6b5bb5;pointer-events:none"></div>
+              <div data-name="min loan line" style="position:absolute;left:-172px;bottom:{{ minPct }}%;width:204px;border-top:3px dashed #c14a24;pointer-events:none;z-index:2"><span style="position:absolute;left:2px;top:-21px;font-size:14px;color:#c14a24;background:#fff4db;border-radius:5px;padding:0 4px;white-space:nowrap">📌 loan first {{ minAmt }}</span></div>
+            </div>
+            <div style="grid-column:1 / 3;font-size:15px;color:#5a4d41;line-height:1.2">{{ countNote }}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button type="button" onClick="{{ backToGuess }}" style="min-height:48px;border:2.5px solid #2a2320;border-radius:11px;background:#fffdf5;font:inherit;font-size:17px;color:#2a2320;cursor:pointer;padding:0 14px;white-space:nowrap">◀ Guess</button>
+          <div style="font-size:16px;color:#6b5d4f">{{ minLine }}</div>
+          <button type="button" data-name="to choose" onClick="{{ toChoose }}" style="margin-left:auto;min-height:48px;border:2.5px solid #2a2320;border-radius:11px;background:#c14a24;color:#fff;font:inherit;font-size:18px;cursor:pointer;padding:0 18px;box-shadow:2px 3px 0 rgba(42,35,32,0.15);white-space:nowrap">Now I choose →</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isChoose }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div data-name="from my payday" ref="{{ pileRef }}" style="display:flex;align-items:center;gap:8px;border:3px solid #2a2320;border-radius:14px;background:#fff4db;padding:4px 12px 4px 8px;box-shadow:3px 4px 0 rgba(42,35,32,0.18)">
+            <div style="position:relative;width:40px;height:36px">
+              <div style="position:absolute;left:0;top:8px;width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff6c2 0%,#ffd862 35%,#e9a91f 70%,#a86f0c 100%);border:2px solid #7a4e00;box-sizing:border-box"></div>
+              <div style="position:absolute;left:10px;top:0;width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff6c2 0%,#ffd862 35%,#e9a91f 70%,#a86f0c 100%);border:2px solid #7a4e00;box-sizing:border-box"></div>
+            </div>
+            <div style="display:flex;flex-direction:column;line-height:1.05"><span style="font-size:15px;color:#6b5d4f;white-space:nowrap">{{ pileLabel }}</span><b style="font-family:'Nunito',sans-serif;font-size:20px">{{ paydayAmt }}</b></div>
+          </div>
+          <div style="font-family:'Gochi Hand',cursive;font-size:28px">🤝 What I do with it</div>
+          <button type="button" data-name="left or sign" onPointerDown="{{ holdStart }}" onPointerUp="{{ holdEnd }}" onPointerLeave="{{ holdEnd }}" onPointerCancel="{{ holdEnd }}" style="animation:{{ leftAnim }};margin-left:auto;position:relative;overflow:hidden;min-width:210px;min-height:56px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;border:3px solid #2a2320;border-radius:14px;background:{{ leftBg }};padding:4px 14px;box-shadow:3px 4px 0 rgba(42,35,32,0.18);line-height:1.05;font:inherit;cursor:{{ leftCursor }};user-select:none;touch-action:none">
+            <span style="position:absolute;left:0;top:0;bottom:0;width:{{ holdPct }}%;background:rgba(42,35,32,0.25)"></span>
+            <b style="position:relative;font-family:'Nunito',sans-serif;font-size:22px;color:{{ leftInk }};white-space:nowrap">{{ pileAmt }}</b><span style="position:relative;font-size:15px;color:{{ leftInk }}">{{ pileNote }}</span>
+          </button>
+        </div>
+        <div data-name="what is it for" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <button type="button" onClick="{{ backToPayday }}" style="min-height:44px;border:2.5px solid #2a2320;border-radius:11px;background:#fffdf5;font:inherit;font-size:17px;color:#2a2320;cursor:pointer;padding:0 14px;white-space:nowrap">◀ My pile</button>
+                    <sc-for list="{{ reflect }}" as="r" hint-placeholder-count="3">
+            <button type="button" onClick="{{ r.pick }}" style="min-height:40px;border:2px {{ r.borderStyle }} #2a2320;border-radius:10px;padding:0 10px;font:inherit;font-size:15px;cursor:pointer;background:{{ r.bg }};color:{{ r.ink }};opacity:{{ r.op }}">{{ r.label }}</button>
+          </sc-for>
+          <button type="button" onClick="{{ clearAll }}" style="min-height:40px;border:2px solid #2a2320;border-radius:10px;padding:0 10px;font:inherit;font-size:15px;cursor:pointer;background:#fffdf5;color:#2a2320">↺ All back</button>
+          <button type="button" data-name="show everything" onClick="{{ toggleAll }}" style="min-height:40px;border:2px solid #2a2320;border-radius:10px;padding:0 10px;font:inherit;font-size:15px;cursor:pointer;background:{{ allBg }};color:{{ allInk }}">📊 Everything</button>
+          
+        </div>
+        <div data-name="columns" style="display:grid;grid-template-columns:{{ colTracks }};gap:10px;flex:1;min-height:0">
+          <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+            <div data-name="{{ g.dataName }}" style="border:3px solid #2a2320;border-radius:16px;background:{{ g.bg }};box-shadow:4px 5px 0 rgba(42,35,32,0.18);display:flex;flex-direction:column;padding:6px 10px 10px;gap:4px;min-width:0;min-height:0;overflow:hidden">
+              <div style="display:flex;align-items:center;gap:6px;min-width:0"><span style="font-family:'Gochi Hand',cursive;font-size:23px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">{{ g.title }}</span><button type="button" data-name="what is this" onClick="{{ g.help }}" style="margin-left:auto;flex:none;width:44px;height:44px;border:2px solid #2a2320;border-radius:50%;background:#fffdf5;font:inherit;font-size:20px;cursor:pointer;color:#2a2320;padding:0">?</button></div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:-4px"><b style="font-family:'Nunito',sans-serif;font-size:22px">{{ g.amt }}</b><span style="font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;border:2px solid #2a2320;border-radius:8px;padding:0 7px;background:#fffdf5">{{ g.pct }}</span><button type="button" onClick="{{ g.less }}" style="margin-left:auto;flex:none;width:44px;height:40px;border:2px solid #2a2320;border-radius:10px;background:#fffdf5;font:inherit;font-size:22px;cursor:pointer;color:#2a2320;padding:0;opacity:{{ g.lessOp }}">−</button></div>
+              <div data-name="waterfall step" style="position:relative;flex:1;min-height:110px;margin:0 -10px;border-bottom:2.5px solid #2a2320">
+                <div style="position:absolute;left:0;right:0;bottom:{{ g.topLevel }}%;border-top:2px dashed #8a7d6b"></div>
+                <div style="position:absolute;left:18%;right:18%;bottom:{{ g.start }}%;height:{{ g.h }}%;border:{{ g.barBorder }};border-radius:6px 6px 2px 2px;overflow:hidden;display:flex;flex-direction:column-reverse;box-sizing:border-box;box-shadow:2px 2px 0 rgba(42,35,32,0.2);transition:all 0.35s ease">
+                  <sc-for list="{{ g.segs }}" as="sg" hint-placeholder-count="0"><div style="flex:{{ sg.v }} 0 0;background:{{ sg.fill }};display:flex;align-items:center;justify-content:center;font-size:16px;overflow:hidden">{{ sg.icon }}</div></sc-for>
+                </div>
+              </div>
+              <div data-name="boxes" style="height:102px;display:flex;flex-direction:column;gap:6px;margin-top:2px">
+                <div style="display:grid;grid-template-columns:{{ g.cellCols }};gap:6px">
+                  <sc-for list="{{ g.cells }}" as="c" hint-placeholder-count="2">
+                    <button type="button" ref="{{ c.ref }}" onPointerDown="{{ c.down }}" onPointerUp="{{ c.up }}" onPointerLeave="{{ c.cancel }}" onPointerCancel="{{ c.cancel }}" style="user-select:none;touch-action:none;position:relative;display:flex;flex-direction:column;justify-content:center;min-height:48px;min-width:0;border:{{ c.border }};border-radius:10px;background:{{ c.bg }};opacity:{{ c.op }};padding:3px 8px 3px 15px;font:inherit;color:#2a2320;cursor:{{ c.cursor }};text-align:left;overflow:hidden;box-sizing:border-box">
+                      <span style="position:absolute;left:0;top:0;bottom:0;width:7px;background:{{ c.fill }};border-right:1.5px solid #2a2320"></span>
+                      <span style="font-size:15px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.label }}</span>
+                      <b style="font-family:'Nunito',sans-serif;font-size:18px;line-height:1.15">{{ c.amt }}</b>
+                      <span style="position:absolute;left:0;bottom:0;height:5px;width:{{ c.holdPct }}%;background:#c14a24"></span>
+                    </button>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ g.hasNote }}" hint-placeholder-val="{{ false }}"><div style="font-size:14px;color:#5a4d41;line-height:1.2">{{ g.note }}</div></sc-if>
+              </div>
+              
+            </div>
+          </sc-for>
+        </div>
+        <div data-name="sum line" style="font-family:'Nunito',sans-serif;font-weight:800;font-size:16px;color:#2a5f59;text-align:center;margin:-4px 0">{{ sumLine }}</div>
+        <div data-name="get give up" style="border:2.5px solid #2a2320;border-radius:12px;background:{{ ggBg }};padding:8px 14px;display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:17px;line-height:1.25;align-items:baseline">
+          <b style="color:#2f7f77">{{ ggTitle }} · I get</b><span>{{ ggGet }}</span>
+          <b style="color:#c14a24;text-align:right">I give up</b><span>{{ ggGive }}</span>
+          <b style="color:#6b5d4f;text-align:right">💡 Tip</b><span style="color:#5a4d41">{{ ggHint }}</span>
+        </div>
+        </sc-if>
+
+      <sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:baseline;gap:10px"><div style="font-family:'Gochi Hand',cursive;font-size:28px">✍️ Signed. This is my plan.</div></div>
+        <sc-if value="{{ milestone }}" hint-placeholder-val="{{ false }}"><div data-name="milestone" style="border:2.5px solid #2a2320;border-radius:12px;background:#fff4db;padding:8px 14px;font-size:17px;box-shadow:2px 3px 0 rgba(42,35,32,0.15)">{{ milestoneText }}</div></sc-if>
+        <div data-name="in and out" style="flex:1;min-height:0;border:2.5px solid #2a2320;border-radius:12px;background:#fffdf5;padding:6px 12px 8px;display:flex;flex-direction:column;gap:3px;overflow:hidden">
+          <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'Gochi Hand',cursive;font-size:21px;white-space:nowrap">{{ wInOut }}</span><span style="font-size:15px;color:#5a4d41">{{ weekLabel }}</span><span style="margin-left:auto;font-family:'Gochi Hand',cursive;font-size:20px;color:#c14a24;border:3px solid #c14a24;border-radius:8px;padding:0 10px;transform:rotate(-6deg);animation:omStamp 0.6s ease;white-space:nowrap">MY PLAN</span></div>
+          <div data-name="earning section" style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:10px;align-items:start">
+            <div style="display:flex;flex-direction:column;min-width:0">
+              <div style="display:grid;grid-template-columns:150px minmax(0,1fr) minmax(0,1fr) 36px 60px;gap:0 6px;align-items:baseline"><span style="font-family:'Gochi Hand',cursive;font-size:19px">💰 Money in</span><span style="text-align:right;font-size:13px;color:#5a4d41;padding-right:4px">◀ out</span><span style="font-size:13px;color:#5a4d41;padding-left:4px">in ▶</span><span></span><b style="text-align:right;font-family:'Nunito',sans-serif;font-size:17px;color:#2a5f59">{{ flowIn }}</b></div>
+              <sc-for list="{{ earnRows }}" as="r" hint-placeholder-count="6">
+                <div style="display:grid;grid-template-columns:150px minmax(0,1fr) minmax(0,1fr) 36px 60px;gap:0 6px;align-items:center;min-height:22px;font-size:{{ r.fs }};font-weight:{{ r.fw }}">
+                  <span style="padding-left:{{ r.pad }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.k }}</span>
+                  <div style="display:flex;justify-content:flex-end;align-items:center;height:22px;border-right:2.5px solid #2a2320"><div style="width:{{ r.wOut }}%;height:14px;background:{{ r.c }};border:{{ r.bOut }};border-right:none;border-radius:4px 0 0 4px;box-sizing:border-box"></div></div>
+                  <div style="display:flex;align-items:center;height:22px"><div style="width:{{ r.wIn }}%;height:14px;background:{{ r.c }};border:{{ r.bIn }};border-left:none;border-radius:0 4px 4px 0;box-sizing:border-box"></div></div>
+                  <span style="text-align:right;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;color:#5a4d41">{{ r.pct }}</span>
+                  <b style="text-align:right;font-family:'Nunito',sans-serif;font-size:15px;white-space:nowrap;color:{{ r.ink }}">{{ r.v }}</b>
+                </div>
+              </sc-for>
+            </div>
+            <div style="border:2px solid {{ incInk }};border-radius:10px;background:{{ incBg }};padding:5px 10px;display:flex;flex-direction:column;gap:3px;min-width:0;align-self:start">
+              <b style="font-size:17px;line-height:1.15;color:{{ incInk }}">{{ incHead }}</b>
+              <sc-for list="{{ earnLines }}" as="l" hint-placeholder-count="4"><div style="font-size:13px;line-height:1.2">{{ l.t }}</div></sc-for>
+            </div>
+          </div>
+          <div style="border-top:2.5px dashed #8a7d6b;margin:3px 0"></div>
+          <div data-name="spending section" style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:10px;align-items:start">
+            <div style="display:flex;flex-direction:column;min-width:0">
+              <div style="display:grid;grid-template-columns:150px minmax(0,1fr) 60px;gap:0 6px;align-items:baseline"><span style="font-family:'Gochi Hand',cursive;font-size:19px">💸 Money out</span><span></span><b style="text-align:right;font-family:'Nunito',sans-serif;font-size:17px;white-space:nowrap">{{ flowOut }} {{ flowOk }}</b></div>
+              <sc-for list="{{ spendRows }}" as="r" hint-placeholder-count="6">
+                <div style="display:grid;grid-template-columns:150px minmax(0,1fr) minmax(0,1fr) 36px 60px;gap:0 6px;align-items:center;min-height:22px;font-size:{{ r.fs }};font-weight:{{ r.fw }}">
+                  <span style="padding-left:{{ r.pad }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.k }}</span>
+                  <div style="display:flex;justify-content:flex-end;align-items:center;height:22px;border-right:2.5px solid #2a2320"><div style="width:{{ r.wOut }}%;height:14px;background:{{ r.c }};border:{{ r.bOut }};border-right:none;border-radius:4px 0 0 4px;box-sizing:border-box"></div></div>
+                  <div style="display:flex;align-items:center;height:22px"><div style="width:{{ r.wIn }}%;height:14px;background:{{ r.c }};border:{{ r.bIn }};border-left:none;border-radius:0 4px 4px 0;box-sizing:border-box"></div></div>
+                  <span style="text-align:right;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;color:#5a4d41">{{ r.pct }}</span>
+                  <b style="text-align:right;font-family:'Nunito',sans-serif;font-size:15px;white-space:nowrap;color:{{ r.ink }}">{{ r.v }}</b>
+                </div>
+              </sc-for>
+            </div>
+            <div style="border:2px solid {{ stratEdge }};border-radius:10px;background:{{ stratBg }};padding:5px 10px;display:flex;flex-direction:column;gap:3px;min-width:0;align-self:start">
+              <b style="font-size:17px;line-height:1.15;color:{{ stratEdge }}">{{ stratHead }}</b>
+              <sc-for list="{{ spendLines }}" as="l" hint-placeholder-count="4"><div style="font-size:13px;line-height:1.2">{{ l.t }}</div></sc-for>
+            </div>
+          </div>
+          
+        </div>
+        <div data-name="say it back" style="border:2px dashed #2f7f77;border-radius:12px;padding:6px 12px;font-family:'Caveat',cursive;font-size:21px;color:#2a5f59;line-height:1.15">Say it out loud: "{{ sayItBack }}"</div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button type="button" data-name="start over" onClick="{{ redo }}" style="min-height:44px;border:2.5px solid #2a2320;border-radius:11px;background:#fffdf5;font:inherit;font-size:16px;color:#2a2320;cursor:pointer;padding:0 12px;white-space:nowrap">↺ Redo my plan</button>
+          <div style="font-family:'Caveat',cursive;font-size:26px;color:#c14a24;white-space:nowrap">{{ signature }}</div>
+          <div data-name="stickers" style="flex:1;min-width:0;border:2px solid #2a2320;border-radius:10px;background:#fff4db;padding:4px 10px;font-size:15px;line-height:1.25;transform:rotate(-1deg);box-shadow:2px 3px 0 rgba(42,35,32,0.2)"><b style="font-family:'Gochi Hand',cursive;font-size:18px">⭐ Sticker:</b> {{ stickerLine }}</div>
+          <button type="button" data-name="next sunday" onClick="{{ nextSunday }}" style="margin-left:auto;min-height:48px;border:2.5px solid #2a2320;border-radius:11px;background:#c14a24;color:#fff;font:inherit;font-size:18px;cursor:pointer;padding:0 18px;box-shadow:2px 3px 0 rgba(42,35,32,0.15)">Next Sunday →</button>
+        </div>
+      </sc-if>
+    </div>
+
+    <div data-name="right pane" style="display:flex;flex-direction:column;gap:10px;min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;padding:4px 8px 8px;margin:0 -8px">
+      <sc-if value="{{ isGuess }}" hint-placeholder-val="{{ true }}">
+                <div data-name="waiting for dad card" style="background:#fff4db;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:10px 14px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'Gochi Hand',cursive;font-size:21px">⏳ Dad answers first</span><span style="margin-left:auto;font-size:14px;color:#5a4d41">Dad taps</span></div>
+          <sc-for list="{{ pending }}" as="p" hint-placeholder-count="2">
+            <div style="display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:2px 6px;align-items:center;border:2px {{ p.borderStyle }} #2a2320;border-radius:10px;background:{{ p.bg }};padding:4px 6px 4px 8px">
+              <span style="font-size:19px">{{ p.icon }}</span>
+              <div style="display:flex;flex-direction:column;min-width:0;line-height:1.15"><span style="font-size:15px">{{ p.text }}</span><span style="font-size:14px;color:{{ p.ink }}">{{ p.status }}</span></div>
+              <sc-if value="{{ p.open }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;gap:4px"><button type="button" onClick="{{ p.yes }}" style="min-width:52px;min-height:44px;border:2px solid #2a2320;border-radius:9px;background:#e4f5ec;font:inherit;font-size:15px;cursor:pointer;color:#2a2320;padding:0 6px">✓ yes</button><button type="button" onClick="{{ p.no }}" style="min-width:52px;min-height:44px;border:2px solid #2a2320;border-radius:9px;background:#fffdf5;font:inherit;font-size:15px;cursor:pointer;color:#2a2320;padding:0 6px">✗ no</button></div>
+              </sc-if>
+            </div>
+          </sc-for>
+          <div style="font-size:15px;color:#5a4d41">{{ pendingNote }}</div>
+        </div>
+        <div data-name="how money comes in card" style="background:#fffdf5;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:10px 14px;display:flex;flex-direction:column;gap:4px">
+          <div style="font-family:'Gochi Hand',cursive;font-size:21px">💡 Clues for my guess</div>
+          <sc-for list="{{ clues }}" as="c" hint-placeholder-count="4">
+            <div style="display:flex;justify-content:space-between;gap:8px;font-size:15px;border-bottom:1px dashed #e8dfc3;padding:1px 0;white-space:nowrap"><span>{{ c.k }}</span><span style="color:#5a4d41;text-align:right;overflow:hidden;text-overflow:ellipsis">{{ c.v }}</span></div>
+          </sc-for>
+        </div>
+        <div data-name="earning target card" style="background:#e4f5ec;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:10px 14px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:baseline;gap:8px"><div style="font-family:'Gochi Hand',cursive;font-size:21px">🎯 My earning target</div><span style="margin-left:auto;font-size:15px;color:#5a4d41">set by Dad</span></div>
+          <div style="height:14px;border:2px solid #2a2320;border-radius:7px;background:#fffdf5;overflow:hidden"><div style="height:100%;width:{{ yearPctBefore }}%;background:#95d5b2"></div></div>
+          <div style="font-size:15px;color:#2a2320">{{ yearLineBefore }}</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isPayday }}" hint-placeholder-val="{{ false }}">
+        <div style="font-family:'Gochi Hand',cursive;font-size:20px;color:#6b5d4f;padding:0 4px">How I earned it</div>
+        <div data-name="my week card" style="background:#fffdf5;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:8px 14px;display:flex;flex-direction:column;gap:4px">
+          <div style="font-family:'Gochi Hand',cursive;font-size:20px">🔥 My week · chores + routine</div>
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">
+            <sc-for list="{{ weekDays }}" as="d" hint-placeholder-count="7">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:2px;font-size:15px;color:#6b5d4f"><span>{{ d.d }}</span><div style="width:24px;height:24px;border-radius:50%;border:2px solid #2a2320;background:{{ d.bg }};display:flex;align-items:center;justify-content:center;font-size:15px">{{ d.mark }}</div><span>{{ d.chore }}</span></div>
+            </sc-for>
+          </div>
+          <div style="font-size:15px;color:#2a5f59">{{ weekLine }}</div>
+        </div>
+        <div data-name="last 4 sundays card" style="background:#fffdf5;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:8px 10px;display:flex;flex-direction:column;gap:2px">
+          <div style="font-family:'Gochi Hand',cursive;font-size:20px;padding-left:4px">📊 My last 4 Sundays</div>
+          <div style="display:grid;grid-template-columns:78px repeat(6,minmax(0,1fr));font-size:15px;color:#6b5d4f;text-align:right;padding:0 2px">
+            <span></span><span>4 wk</span><span>3 wk</span><span>2 wk</span><span>last</span><span style="color:#c14a24;font-weight:700">now</span><span>avg</span>
+          </div>
+          <sc-for list="{{ histRows }}" as="r" hint-placeholder-count="6">
+            <div style="display:grid;grid-template-columns:78px repeat(6,minmax(0,1fr));align-items:center;font-size:15px;text-align:right;padding:2px;border-top:{{ r.line }};font-weight:{{ r.weight }};background:{{ r.bg }};border-radius:6px">
+              <span style="text-align:left;white-space:nowrap">{{ r.k }}</span><span>{{ r.a }}</span><span>{{ r.b }}</span><span>{{ r.c }}</span><span>{{ r.d }}</span><span style="background:#fff4db;border-radius:4px;color:{{ r.nowInk }};font-weight:800">{{ r.now }}</span><span style="color:#6b5bb5">{{ r.avg }}</span>
+            </div>
+          </sc-for>
+          <div style="font-size:15px;color:#2a5f59;padding-left:4px">{{ histNote }}</div>
+        </div>
+        <div data-name="results and gifts card" style="background:#ffe9ef;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:8px 14px;display:flex;flex-direction:column;gap:3px;min-height:0;overflow:hidden">
+          <div style="font-family:'Gochi Hand',cursive;font-size:20px;line-height:1.1">🏆 🎁 Results &amp; gifts</div>
+          <sc-for list="{{ resultsList }}" as="c" hint-placeholder-count="3">
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:0 8px;font-size:15px;line-height:1.3;align-items:baseline"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.n }}</span><span style="color:{{ c.ink }};white-space:nowrap">{{ c.short }}</span><b style="font-family:'Nunito',sans-serif;min-width:30px;text-align:right">{{ c.amt }}</b></div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isChoose }}" hint-placeholder-val="{{ false }}">
+        <div style="font-family:'Gochi Hand',cursive;font-size:21px;padding:0 4px">{{ wHave }}</div>
+        <div data-name="loan wall card" style="position:relative;background:#fffdf5;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);border:{{ wallBorder }};padding:8px 12px;display:flex;flex-direction:column;gap:5px;animation:{{ wallGlow }};opacity:{{ wallOp }};transition:opacity 0.3s ease">
+          {{ wallBurst }}
+          <div style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'Gochi Hand',cursive;font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">{{ wOwe }}</span><b style="margin-left:auto;font-family:'Nunito',sans-serif;font-size:17px;color:#6b5bb5;white-space:nowrap">{{ oweLine }}</b></div>
+          <div data-name="bricks" style="display:grid;grid-template-columns:repeat(10,1fr);gap:2px">
+            <sc-for list="{{ bricks }}" as="b" hint-placeholder-count="100">
+              <div style="position:relative;height:8px;border:1.5px {{ b.borderStyle }} #2a2320;border-radius:3px;background:#fffdf5;overflow:hidden;box-shadow:{{ b.glow }}"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ b.fill }}%;background:{{ b.color }};transition:width 0.5s ease"></div><div style="position:absolute;top:0;bottom:0;left:{{ b.fill }}%;width:{{ b.red }}%;background:#c14a24"></div></div>
+            </sc-for>
+          </div>
+          <span style="font-size:15px;color:#2a5f59">{{ wallNote }}</span>
+          <span style="font-size:15px;color:#c14a24">{{ intLine }}</span>
+        </div>
+        <div data-name="what I own" style="position:relative;background:#fffdf5;border:{{ ownBd }};border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:8px 12px;display:flex;flex-direction:column;gap:6px;min-height:0;animation:{{ ownGl }}">
+          {{ ownBurst }}
+          <div style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'Gochi Hand',cursive;font-size:20px;white-space:nowrap">{{ wOwn }}</span><b style="margin-left:auto;font-family:'Nunito',sans-serif;font-size:19px;color:#2a5f59;white-space:nowrap">{{ ownLine }}</b></div>
+          <div style="display:flex;gap:4px 10px;font-size:14px;color:#5a4d41;flex-wrap:wrap;white-space:nowrap">
+            <span style="display:flex;align-items:center;gap:5px"><span style="width:16px;height:12px;background:#8cc4ff;border:1.5px solid #2a2320;border-radius:3px"></span>now</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="width:16px;height:12px;background:#ffd166;border:1.5px solid #2a2320;border-radius:3px"></span>this plan</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="width:16px;height:12px;background:repeating-linear-gradient(45deg,#f4b8a8 0 4px,#fffdf5 4px 8px);border:1.5px solid #2a2320;border-radius:3px"></span>taken out</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="width:0;height:14px;border-left:3px solid #c14a24"></span>🛟 $10 safety</span>
+          </div>
+          <sc-for list="{{ chart }}" as="c" hint-placeholder-count="4">
+            <div data-name="chart row" style="display:grid;grid-template-columns:104px minmax(0,1fr) 50px 58px;gap:6px;align-items:center;min-height:28px;border-radius:8px;padding:0 6px;margin:0 -6px;outline:{{ c.outline }};background:{{ c.hl }};opacity:{{ c.op }};transition:opacity 0.3s ease">
+              <span style="font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span>
+              <div style="position:relative;height:16px;border:2px solid #2a2320;border-radius:6px;background:#fffdf5;overflow:hidden;display:flex"><div style="width:{{ c.w1 }}%;background:{{ c.c1 }};transition:width 0.4s ease"></div><div style="width:{{ c.w2 }}%;background:{{ c.c2 }};transition:width 0.4s ease"></div><div style="position:absolute;top:0;bottom:0;left:{{ c.safeAt }}%;border-left:3px solid #c14a24;display:{{ c.safeShow }}"></div></div>
+              <span style="font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;color:{{ c.dInk }};white-space:nowrap;text-align:right">{{ c.delta }}</span>
+              <b style="font-family:'Nunito',sans-serif;font-size:16px;white-space:nowrap;text-align:right">{{ c.v }}</b>
+            </div>
+          </sc-for>
+          <div style="font-size:15px;color:#2a5f59;line-height:1.25">{{ ownNote }}</div>
+        </div>
+        <div data-name="goal jar" style="position:relative;background:#ffe9ef;border:{{ goalBd }};border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:8px 12px;display:flex;align-items:center;gap:12px;opacity:{{ goalOp }};animation:{{ goalGl }}">
+          {{ goalBurst2 }}
+          <div style="width:40px;height:54px;border:2.5px solid #2a2320;border-radius:7px 7px 14px 14px;background:#fffdf5;position:relative;overflow:hidden;flex:none"><div style="position:absolute;left:0;right:0;bottom:0;height:{{ goalJarTo }}%;background:#ffd166;transition:height 0.4s ease"></div><div style="position:absolute;left:0;right:0;bottom:0;height:{{ goalJarNow }}%;background:#ff9eb5;transition:height 0.4s ease"></div></div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">
+            <span style="font-family:'Gochi Hand',cursive;font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ goalTitle }}</span>
+            <b style="font-family:'Nunito',sans-serif;font-size:17px;color:#c14a24;white-space:nowrap">{{ goalVal }}</b>
+            <span style="font-size:14px;color:#5a4d41">{{ goalSub }}</span>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+        <div data-name="timeline" style="background:#fffdf5;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:8px 12px;display:flex;flex-direction:column;gap:3px">
+          <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'Gochi Hand',cursive;font-size:20px;white-space:nowrap">📅 My timeline</span>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:4px;font-size:14px"><span style="width:14px;height:12px;background:#95d5b2;border:1.5px solid #2a2320"></span>steady<span style="width:14px;height:12px;background:#ffd166;border:1.5px solid #2a2320;margin-left:4px"></span>bonus<span style="width:16px;border-top:2.5px dashed #6b5bb5;margin-left:4px"></span>avg</span></div>
+          <div style="display:flex;gap:3px"><sc-for list="{{ tl }}" as="b" hint-placeholder-count="10"><span style="flex:1;text-align:center;font-size:15px;line-height:1;min-height:16px">{{ b.ev }}</span></sc-for></div>
+          <div style="position:relative;display:flex;align-items:flex-end;gap:3px;height:76px;border-bottom:2px solid #2a2320">
+            <div data-name="average line" style="position:absolute;left:0;right:0;bottom:{{ tlAvgPct }}%;border-top:2.5px dashed #6b5bb5;z-index:1;pointer-events:none"><span style="position:absolute;right:0;top:-17px;font-size:13px;color:#6b5bb5;background:#fffdf5;padding:0 3px;border-radius:4px">{{ tlAvgLbl }}</span></div>
+            <sc-for list="{{ tl }}" as="b" hint-placeholder-count="10"><div style="flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;opacity:{{ b.op }}"><div style="height:{{ b.hb }}%;background:#ffd166;border:{{ b.bd }};border-bottom:none;box-sizing:border-box;border-radius:3px 3px 0 0"></div><div style="height:{{ b.hs }}%;background:#95d5b2;border:{{ b.bd }};box-sizing:border-box;border-bottom:none"></div></div></sc-for>
+          </div>
+          <div style="display:flex;gap:3px"><sc-for list="{{ tl }}" as="b" hint-placeholder-count="10"><span style="flex:1;text-align:center;font-size:14px;line-height:1.05;color:{{ b.ink }};font-weight:{{ b.fw }}">{{ b.k }}</span></sc-for></div>
+        </div>
+        <div data-name="if every week" style="background:#fffdf5;border:2.5px solid #2a2320;border-radius:14px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:8px 12px;display:flex;flex-direction:column;gap:6px;min-height:0">
+          <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap"><span style="font-family:'Gochi Hand',cursive;font-size:20px;white-space:nowrap">🔮 If every week is like this</span>
+            <div style="margin-left:auto;display:flex;gap:4px"><sc-for list="{{ tmChoices }}" as="c" hint-placeholder-count="3"><button type="button" onClick="{{ c.pick }}" style="min-height:44px;min-width:52px;border:2px solid #2a2320;border-radius:9px;font:inherit;font-size:15px;cursor:pointer;padding:0 6px;background:{{ c.bg }};color:{{ c.ink }}">{{ c.label }}</button></sc-for></div></div>
+          <div data-name="this week earning" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 8px;align-items:baseline;background:#fff4db;border:2px solid #2a2320;border-radius:10px;padding:3px 10px"><span style="font-size:15px">💰 This week I earned</span><b style="font-family:'Nunito',sans-serif;font-size:18px;text-align:right">{{ fwEarn }}</b><span style="font-size:15px;color:#5a4d41">{{ fwTimes }}</span><b style="font-family:'Nunito',sans-serif;font-size:18px;color:#c14a24;text-align:right">{{ fwEarnT }}</b></div>
+          <div data-name="loan then" style="display:flex;flex-direction:column;gap:3px">
+            <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:16px">🧱 I owe</span><span style="margin-left:auto;font-size:14px;color:#2a5f59">{{ fwFree }}</span></div>
+            <span style="font-size:13px;color:#5a4d41;margin-top:-3px">{{ fwAssume }}</span>
+            <sc-for list="{{ fwLoan }}" as="b" hint-placeholder-count="2">
+              <div style="display:grid;grid-template-columns:62px minmax(0,1fr) 70px;gap:6px;align-items:center;font-size:15px"><span style="white-space:nowrap">{{ b.k }}</span><div style="height:14px;border:2px solid #2a2320;border-radius:7px;background:#fffdf5;overflow:hidden;display:flex"><div style="width:{{ b.w }}%;background:{{ b.c }};transition:width 0.4s ease"></div></div><b style="font-family:'Nunito',sans-serif;text-align:right;white-space:nowrap">{{ b.v }}</b></div>
+            </sc-for>
+          </div>
+          <div data-name="save then" style="display:flex;flex-direction:column;gap:2px">
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) 58px 52px 60px;gap:4px;font-size:13px;color:#5a4d41;text-align:right"><span style="text-align:left;font-size:16px;color:#2a2320">✅ I own</span><span>I put in</span><span>it earns</span><span>then</span></div>
+            <sc-for list="{{ fwSave }}" as="r" hint-placeholder-count="4">
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) 58px 52px 60px;gap:4px;align-items:center;font-size:15px;text-align:right;border-top:1px dashed #e8dfc3;padding:1px 0;opacity:{{ r.op }}"><span style="text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.k }}</span><span style="font-family:'Nunito',sans-serif;font-weight:700">{{ r.put }}</span><span style="font-family:'Nunito',sans-serif;font-weight:800;color:{{ r.eInk }}">{{ r.earn }}</span><b style="font-family:'Nunito',sans-serif">{{ r.then }}</b></div>
+            </sc-for>
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) 58px 52px 60px;gap:4px;align-items:center;font-size:15px;text-align:right;border-top:2px solid #2a2320;padding-top:2px"><b style="text-align:left">= Total</b><b style="font-family:'Nunito',sans-serif">{{ fwPutT }}</b><b style="font-family:'Nunito',sans-serif;color:#2a5f59">{{ fwEarnI }}</b><b style="font-family:'Nunito',sans-serif;font-size:17px">{{ fwThenT }}</b></div>
+          </div>
+          <div style="font-size:14px;color:#5a4d41;line-height:1.25">{{ fwNote }}</div>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+
+  <sc-if value="{{ newOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:20;background:rgba(42,35,32,0.45);display:flex;align-items:center;justify-content:center">
+      <div data-name="new on my wall" style="width:660px;background:#fffdf5;border:3px solid #2a2320;border-radius:18px;box-shadow:4px 5px 0 rgba(42,35,32,0.2);padding:18px 22px;display:flex;flex-direction:column;gap:10px">
+        <div style="font-family:'Gochi Hand',cursive;font-size:30px;line-height:1.1">{{ newHead }}</div>
+        <div style="font-size:20px">{{ newTitle }}</div>
+        <sc-for list="{{ newLines }}" as="l" hint-placeholder-count="3">
+          <div style="display:grid;grid-template-columns:1fr auto;gap:10px;font-size:18px;border-bottom:1.5px dashed #b9ad98;padding:4px 0"><span>{{ l.k }}</span><b style="font-family:'Nunito',sans-serif;font-size:18px;color:{{ l.ink }};text-align:right">{{ l.v }}</b></div>
+        </sc-for>
+        <div style="border:2.5px solid #2a2320;border-radius:12px;background:{{ newBg }};padding:8px 12px;font-size:18px;line-height:1.3">{{ newVerdict }}</div>
+        <sc-if value="{{ newPayback }}" hint-placeholder-val="{{ false }}"><div style="border:2px solid #2a2320;border-radius:12px;background:#e4f5ec;padding:6px 12px;font-size:17px;line-height:1.3">{{ newPaybackText }}</div></sc-if>
+        <sc-if value="{{ newOver }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:17px;color:#5a4d41">How could I get back under half?</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <sc-for list="{{ newIdeas }}" as="o" hint-placeholder-count="3">
+              <button type="button" onClick="{{ o.pick }}" style="min-height:48px;border:2.5px {{ o.bs }} #2a2320;border-radius:11px;padding:0 14px;font:inherit;font-size:17px;cursor:pointer;background:{{ o.bg }};color:{{ o.ink }};opacity:{{ o.op }}">{{ o.label }}</button>
+            </sc-for>
+          </div>
+        </sc-if>
+        <button type="button" data-name="i understand" onClick="{{ newOk }}" style="align-self:flex-end;min-height:52px;border:2.5px solid #2a2320;border-radius:12px;background:#c14a24;color:#fff;font:inherit;font-size:19px;cursor:pointer;padding:0 20px;box-shadow:2px 3px 0 rgba(42,35,32,0.15)">I understand →</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ askOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeAsk }}" style="position:absolute;inset:0;z-index:20;background:rgba(42,35,32,0.38);display:flex;align-items:center;justify-content:center">
+      <div data-name="idea card" onClick="{{ stop }}" style="width:560px;background:#fffdf5;border:2.5px solid #2a2320;border-radius:18px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:18px 22px;display:flex;flex-direction:column;gap:10px">
+        <sc-if value="{{ askTabsShow }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ askTabs }}" as="t" hint-placeholder-count="4"><button type="button" onClick="{{ t.pick }}" style="min-height:44px;border:2px solid #2a2320;border-radius:10px;padding:0 10px;font:inherit;font-size:16px;cursor:pointer;background:{{ t.bg }};color:{{ t.ink }}">{{ t.label }}</button></sc-for></div></sc-if>
+        <div style="font-family:'Gochi Hand',cursive;font-size:28px">{{ askTitle }}</div>
+        <div style="display:grid;grid-template-columns:90px 1fr;gap:6px 12px;font-size:17px;line-height:1.3"><b style="color:#6b5d4f">What</b><span>{{ askWhat }}</span><b style="color:#2f7f77">Why</b><span>{{ askWhy }}</span><b style="color:#c14a24">Watch</b><span>{{ askRisk }}</span></div>
+        <div style="font-family:'Caveat',cursive;font-size:21px;color:#6b5d4f">{{ askCn }}</div>
+        <button type="button" onClick="{{ closeAsk }}" style="align-self:flex-end;min-height:44px;border:2.5px solid #2a2320;border-radius:11px;background:#c14a24;color:#fff;font:inherit;font-size:17px;cursor:pointer;padding:0 16px">Got it</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ dadOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeDad }}" style="position:absolute;inset:0;z-index:20;background:rgba(42,35,32,0.38);display:flex;align-items:flex-start;justify-content:flex-end;padding:72px 20px 0">
+      <div data-name="dad card popup" onClick="{{ stop }}" style="width:380px;background:#fff4db;border:2.5px solid #2a2320;border-radius:18px;box-shadow:3px 3px 0 rgba(42,35,32,0.15);padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:baseline;gap:8px"><div style="font-family:'Gochi Hand',cursive;font-size:26px">🗣️ Dad's card</div><span style="margin-left:auto;font-size:15px;color:#6b5d4f">{{ dadStep }}</span></div>
+        <sc-for list="{{ script }}" as="l" hint-placeholder-count="3">
+          <div style="border:2px solid #2a2320;border-radius:10px;background:{{ l.bg }};padding:8px 10px;font-size:16px;line-height:1.25"><b style="font-family:'Nunito',sans-serif;font-size:15px;color:#6b5d4f;display:block;margin-bottom:2px">{{ l.k }}</b>{{ l.v }}</div>
+        </sc-for>
+        <div style="font-size:15px;color:#2a5f59">{{ scriptCheck }}</div>
+        <button type="button" onClick="{{ closeDad }}" style="align-self:flex-end;min-height:44px;border:2.5px solid #2a2320;border-radius:11px;background:#c14a24;color:#fff;font:inherit;font-size:17px;cursor:pointer;padding:0 16px">Back to her</button>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1194,&quot;height&quot;:834},&quot;targetJenn&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:1000,&quot;min&quot;:100,&quot;max&quot;:3000,&quot;step&quot;:50,&quot;unit&quot;:&quot;$/yr&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Earning target (Dad sets)&quot;},&quot;targetJess&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:800,&quot;min&quot;:100,&quot;max&quot;:3000,&quot;step&quot;:50,&quot;unit&quot;:&quot;$/yr&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Earning target (Dad sets)&quot;},&quot;sound&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Ritual&quot;}}">
+const KIDS = {
+  Jenn: { principal: 1000, left: 700, monthly: 70, target: 1000, yearSoFar: 412, histCat: [{ cr: 30, comp: 10, gifts: 0, ret: 0.02, fine: 0 }, { cr: 24, comp: 0, gifts: 5, ret: 0.02, fine: -1 }, { cr: 30, comp: 12, gifts: 0, ret: 0.03, fine: 0 }, { cr: 30, comp: 0, gifts: 0, ret: 0.03, fine: 0 }],
+    pending: [['🎁', 'Uncle Mike · $20 birthday money', 'gifts', 20], ['🔀', 'Move $5 from Savings to Locked away', 'move', 5]],
+    comp: [['Fall Classic', '$18', '✓ recorded from the results sheet · 2nd in group + 8 points', '#2a5f59'], ['Club time trials · Sun 18 Oct', '', 'coming up', '#6b5d4f'], ['Winter Invitational · Sat 7 Nov', '', 'coming up', '#6b5d4f']],
+    gift: [['Grandma · card', '$5', '✓ Dad said yes · in this payday', '#2a5f59']], pots: { ready: 12, goal: 8, gic: 5, stock: 0 }, locks: [{ amt: 5, back: 1 }], sessions: ['Tue 29 Sep', 'Thu 1 Oct'], attRate: 0.9, events: [[0, '🏆 time trials', 10], [1, '🏆 Winter Inv.', 15], [2, '🎄 Christmas', 20], [4, '🧧 New Year', 50]], loans: [['⛸️ Skates & boots', 600, 380], ['🏆 Fall season entries', 400, 320]], goal: { name: '🛼 New skate guards', target: 35 },
+    story: 'I did chores 5 days, helped at 2 club sessions, kept my routine all 7, skated at the Fall Classic, and Grandma sent a card.',
+    inf: [['jobs', '🧹 Chores', '5 days graded · most is $15', 15, '#e4f5ec'], ['streak', '🔥 Routine streak', '7 days in a row', 3, '#fff4db'], ['pa', '⛸️ Assistant job', 'sessions I went to × $6 · Dad pays now', 12, '#eaf4ff'], ['comp', '🏆 Competitions', 'Fall Classic · 2nd in group $10 + 8 points', 18, '#ffe9ef'], ['gifts', '🎁 Gifts', 'Grandma', 5, '#f1e6fb'], ['ret', '💹 My pots earned', 'money my money made', 0, '#dff3f0'], ['fine', '📦 Box fine', 'Tue + Thu · skates left in the hall · Mom logged it', -1, '#fff']],
+    days: [3, 3, 3, 0, 3, 3, 3], streakDays: 7, coming: [['Club time trials', 'Sun 18 Oct'], ['Winter Invitational', 'Sat 7 Nov']] },
+  Jess: { principal: 800, left: 560, monthly: 56, target: 800, yearSoFar: 318, histCat: [{ cr: 41, comp: 0, gifts: 0, ret: 0.01, fine: 0 }, { cr: 42, comp: 0, gifts: 5, ret: 0.01, fine: -1 }, { cr: 33, comp: 0, gifts: 0, ret: 0.01, fine: 0 }, { cr: 41, comp: 0, gifts: 3, ret: 0.01, fine: -1 }],
+    pending: [['🏆', 'Swim time trial · I think I swam a PB (+$4)', 'comp', 4], ['📦', 'Box fine · the bag wasn’t mine', 'fine', 1]],
+    comp: [['Swim meet · Sat 24 Oct', '', 'coming up', '#6b5d4f'], ['Skating test day · Sun 15 Nov', '', 'coming up', '#6b5d4f']],
+    gift: [['Auntie · visit', '$8', '✓ Dad said yes · in this payday', '#2a5f59']], pots: { ready: 6, goal: 0, gic: 0, stock: 0 }, locks: [], sessions: ['Mon 28 Sep', 'Tue 29 Sep', 'Thu 1 Oct', 'Sat 3 Oct'], attRate: 0.85, events: [[0, '🏊 swim meet', 12], [2, '🎄 Christmas', 20], [4, '🧧 New Year', 50]], loans: [['🏊 Swim club fees', 500, 360], ['⛸️ Skates', 300, 200]], goal: { name: '📚 Book set', target: 50 },
+    story: 'I did chores 4 days, helped at 4 club sessions, kept my routine 6 days, and Auntie visited.',
+    inf: [['jobs', '🧹 Chores', '4 days graded', 12, '#e4f5ec'], ['streak', '🔥 Routine streak', '6 days (grace day used)', 2, '#fff4db'], ['pa', '⛸️ Assistant job', 'sessions I went to × $6 · Dad pays now', 24, '#eaf4ff'], ['comp', '🏆 Competitions', 'none this week', 0, '#f5efe2'], ['gifts', '🎁 Gifts', 'Auntie', 8, '#f1e6fb'], ['ret', '💹 My pots earned', 'money my money made', 0, '#dff3f0'], ['fine', '📦 Box fine', 'Mon + Fri · book bag on the stairs · Dad logged it', -1, '#fff']],
+    days: [3, 2, 3, 3, 0, 3, 2], streakDays: 6, coming: [['Swim meet', 'Sat 24 Oct'], ['Skating test day', 'Sun 15 Nov']] } };
+const RULE = (k, d) => { try { const v = (JSON.parse(localStorage.getItem('planner-rules-v1')) || {})[k]; return v == null ? d : v; } catch (e) { return d; } };
+const STAGE = new Proxy({ ready: 20, gic: 30, stock: 40 }, { get: (t, k) => k in t ? RULE({ ready: 'gReady', gic: 'gGic', stock: 'gStock' }[k], t[k]) : t[k] });
+const RATES = new Proxy({ ready: 1.5, goal: 1.5, gic: 4, stock: 7 }, { get: (t, k) => k in t ? RULE({ ready: 'rReady', goal: 'rReady', gic: 'rGic', stock: 'rStock' }[k], t[k]) / 100 : t[k] });
+const spendCap = () => RULE('spendCap', 20) / 100;
+const BONUS = 0.10, PILE_MAX = 50, HOLD_MS = 2000;
+const SAFE = 10, LOCK_WEEKS = 4;
+const getLS = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } };
+const putLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} window.dispatchEvent(new Event('planner-sync')); };
+const HATCH = 'repeating-linear-gradient(45deg,#f4b8a8 0 4px,#fffdf5 4px 8px)';
+const SEED = [
+  { id: 1, kid: 'Jenn', icon: '🎁', kind: 'gift', text: 'Uncle Mike · $20 birthday money', amt: 20, status: null },
+  { id: 2, kid: 'Jenn', icon: '🔀', kind: 'move', text: 'Move $5 Savings → Locked away', note: 'Want it to grow', amt: 5, from: 'ready', to: 'gic', status: null },
+  { id: 3, kid: 'Jess', icon: '🏊', kind: 'comp', compId: 's1', sport: 'swim', name: 'Swim time trial', date: 'Thu 1 Oct', races: [{ ev: '50 Free', time: '0:41.8', pts: 6 }, { ev: '50 Back', time: '0:49.2', pts: 4 }], qual: false, prov: false, amt: 10, text: 'Swim time trial · 2 races · 10 pts', status: null },
+  { id: 4, kid: 'Jess', icon: '📦', kind: 'fine', text: 'Box fine · the bag wasn’t mine', amt: 1, status: null },
+  { id: 5, kid: 'Jess', icon: '⏪', kind: 'adv', text: 'Draw $2 early · school book fair', amt: 2, day: 'Wed', status: 'yes' }];
+const sunDate = (w, back) => { const d = new Date(2026, 9, 4); d.setDate(d.getDate() + (w - 1) * 7 - (back || 0)); return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' }); };
+const GOLD = 'radial-gradient(circle at 35% 30%,#fff6c2 0%,#ffd862 35%,#e9a91f 70%,#a86f0c 100%)';
+const BUYS = [[4, 'coffee for Mom', 'coffees for Mom'], [6, 'ice-cream cone', 'ice-cream cones'], [12, 'skate sharpening', 'skate sharpenings'], [14, 'movie ticket', 'movie tickets'], [20, 'new book', 'new books'], [35, 'big plush toy', 'big plush toys'], [40, 'pizza night', 'pizza nights']];
+const CONCEPTS = {
+  loan: { t: '🧱 My loan', what: 'Dad paid for my skates and entries now, so I did not have to wait. I pay it back a bit every week.', why: 'I get to do what I love now, not years from now.', risk: 'It costs: interest every 4 Sundays, and the payment comes first every week, even a bad week. Each extra $1 counts as $1.10.', cn: '贷款：现在就能做想做的事，不用等；代价是利息，而且每周必须先还。' },
+  spend: { t: '👛 Spending', what: 'Cash I take out to buy something I want this week.', why: 'Spending on things I love brings real happiness. That is what money is for.', risk: 'Once it is spent, it is gone, and it earns nothing. I can take up to a fifth of my share.', cn: '花钱：买喜欢的东西会开心；但花了就没了，也不生钱。' },
+  ready: { t: '🏦 Savings', what: 'Money set aside that you can still get back whenever you want.', why: 'When something goes wrong, you are not stuck.', risk: 'It grows very slowly — a little bit each year.', cn: '随时能取的钱：慢慢长，但永远在。' },
+  goal: { t: '🎯 Goal jar', what: 'Money kept for one thing I want to buy.', why: 'It stops me spending it on something else.', risk: 'It earns nothing while it waits.', cn: '目标罐：专门存给一样东西，不生利息。' },
+  gic: { t: '🔒 Locking money away for 4 weeks', what: 'You promise not to touch it for 4 weeks, and the bank pays you a bit more.', why: 'More than Savings, and the amount is promised.', risk: 'You really cannot touch it for 4 weeks. Not even if you change your mind.', cn: '锁四周：利息多一点，但四周里碰不得。' },
+  stock: { t: '📈 Owning a bit of a company', what: 'You buy a small piece of a real company.', why: 'If the company does well, your piece is worth more.', risk: 'It can go down too. In 2023 one of these fell by a third in six months.', cn: '买公司的一小块：会涨，也会跌。' } };
+const REFLECT = [
+  { id: 'sooner', label: '🧱 Loan sooner', split: { extra: 1 } },
+  { id: 'saving', label: '🎯 For my goal', split: { extra: 0.4, goal: 0.6 } },
+  { id: 'growing', label: '⚖️ Watch it grow', split: { extra: 0.4, ready: 0.3, gic: 0.3 }, stage: 'gic' }];
+const STICKERS = [['wall', '🧱', 'Wall builder', s => s.extra >= 10], ['saver', '🌱', 'Saver', s => s.ready + s.gic + s.stock >= 8], ['patient', '🔒', 'Patient one', s => s.gic >= 3], ['guesser', '🎯', 'Sharp guesser', s => s.guess != null && Math.abs(s.guess - s.payday) <= 5], ['brave', '📈', 'Brave investor', s => s.stock >= 3], ['treat', '🍦', 'Treat yourself', s => s.wallet >= 2]];
+const TKEYS = ['extra', 'ready', 'goal', 'gic', 'stock', 'spend', 'adv'];
+const COL = {
+  fixed: { name: '📌 Loan share', bg: '#f3f0fd', fill: '#b9aef0' },
+  extra: { name: '🧱 Extra on my wall', bg: '#ece8f8', fill: '#9b8ee0' },
+  ready: { name: '🏦 Savings', bg: '#fff7e3', fill: '#ffd166' },
+  goal: { name: '🎯 Goal', bg: '#ffe9ef', fill: '#ff9eb5' },
+  gic: { name: '🔒 Locked away', bg: '#eaf4ff', fill: '#8cc4ff' },
+  stock: { name: '📈 Companies', bg: '#f6eefd', fill: '#d6b4f5' },
+  spend: { name: '💵 Cash out', bg: '#ffeef3', fill: '#ff9eb5' },
+  adv: { name: '⏪ Draw in advance', bg: '#fff0e6', fill: '#ffb38a' } };
+const HINT = { extra: 'each $1 = $1.10 off the wall', spend: 'turns into real money', adv: 'comes off next Sunday', ready: 'keep 🛟 $10 · take out any time', goal: 'its own jar · counts in what I own · earns nothing', gic: 'locked 4 weeks · back on a Saturday', get stock() { return `about ${Math.round(RATES.stock * 100)}% a year · can go down`; } };
+const placedOf = a => a.extra + a.ready + (a.goal || 0) + a.gic + a.stock + a.spend;
+const m = v => (v < 0 ? '−$' : '$') + Math.abs(v).toFixed(2);
+const r2 = v => Math.round(v * 100) / 100;
+const dateIn = w => { const d = new Date(2026, 9, 4); d.setDate(d.getDate() + w * 7); return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }); };
+const buysOf = amt => { for (let i = BUYS.length - 1; i >= 0; i--) { const n = Math.floor(amt / BUYS[i][0]); if (n >= 1) return `about ${n} ${n === 1 ? BUYS[i][1] : BUYS[i][2]}`; } return 'not quite an ice-cream'; };
+const pcts = (vals, total) => { const raw = vals.map(v => total ? v / total * 100 : 0), fl = raw.map(Math.floor); let rem = 100 - fl.reduce((a, b) => a + b, 0); raw.map((v, i) => [v - fl[i], i]).sort((a, b) => b[0] - a[0]).forEach(([, i]) => { if (rem > 0 && vals[i] > 0) { fl[i]++; rem--; } }); return fl; };
+const START = kid => ({ advMan: 0, undo: null, book: [], kid, left: KIDS[kid].left, week: 0, step: 0, guess: null, cat: {}, shown: 0, alloc: { extra: 0, ready: 0, goal: 0, gic: 0, stock: 0, spend: 0, adv: 0 }, reflectId: null, stickers: [], last: null, decided: {}, grouped: true, advOwed: 0, appliedIds: [], commitsIn: 0, extraLoans: [], tmW: 4, att: {}, lastInt: r2(KIDS[kid].left / 100 * 4 / 52), need: null, advNext: 0, openG: null, focus: null, histCat: KIDS[kid].histCat.map(x => ({ ...x })),
+  pots: { ...KIDS[kid].pots }, locks: KIDS[kid].locks.map(x => ({ ...x })), clubOwes: KIDS[kid].clubOwes, pull: { ready: 0, stock: 0, cash: 0 }, goalSaved: KIDS[kid].pots.goal, lastPaid: KIDS[kid].principal - KIDS[kid].left, crossed: null, hold: 0, signed: null, before: null, tm: 6, ask: null, dad: false, confetti: false, fx: [], press: null, pressP: 0, burst: { dam: 0, goal: 0, pots: 0 } });
+const load = () => { try { return JSON.parse(localStorage.getItem('sunday-v13')) || {}; } catch (e) { return {}; } };
+const FSEED = [{ id: 'f1', kid: 'Jenn', day: 'Tue', what: '⛸️ skates left in the hall', who: 'Mom', amt: 0.5 }, { id: 'f2', kid: 'Jenn', day: 'Thu', what: '⛸️ skates left in the hall', who: 'Mom', amt: 0.5 }, { id: 'f3', kid: 'Jess', day: 'Mon', what: '🎒 book bag on the stairs', who: 'Dad', amt: 0.5 }, { id: 'f4', kid: 'Jess', day: 'Fri', what: '🎒 book bag on the stairs', who: 'Dad', amt: 0.5 }];
+const yMaxOf = v => Math.max(50, Math.ceil(v / 10) * 10);
+const TRANSIENT = { nudge: false, need: null, newIdea: null, step: 0, shown: 0, hold: 0, ask: null, dad: false, confetti: false, fx: [], press: null, pressP: 0, burst: { dam: 0, goal: 0, pots: 0 } };
+
+class Component extends DCLogic {
+  cardRef = React.createRef(); pileRef = React.createRef(); tRefs = Object.fromEntries([...TKEYS, 'fixed'].map(k => [k, React.createRef()]));
+  state = (() => { const sv = load(), kid = sv.kid || 'Jenn'; return { ...START(kid), ...((sv.kids || {})[kid] || {}), kid, ...TRANSIENT }; })();
+  componentDidMount() { this.sync = () => { this.syncQ(); this.forceUpdate(); }; window.addEventListener('planner-sync', this.sync); window.addEventListener('storage', this.sync); this.syncQ(); }
+  componentWillUnmount() { window.removeEventListener('planner-sync', this.sync); window.removeEventListener('storage', this.sync); clearInterval(this.ct); clearInterval(this.ht); clearInterval(this.pt); }
+  componentDidUpdate() { const { kid, shown, step, hold, ask, dad, confetti, fx, press, pressP, burst, ...rest } = this.state; const all = load(); all.kid = kid; all.kids = { ...(all.kids || {}), [kid]: rest }; try { localStorage.setItem('sunday-v13', JSON.stringify(all)); } catch (e) {} }
+  beep(f) { if (this.props.sound === false) return; try { const C = this.ac || (this.ac = new (window.AudioContext || window.webkitAudioContext)()); const o = C.createOscillator(), g = C.createGain(); o.type = 'triangle'; o.frequency.value = f || 880; g.gain.setValueAtTime(0.06, C.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, C.currentTime + 0.18); o.connect(g).connect(C.destination); o.start(); o.stop(C.currentTime + 0.2); } catch (e) {} }
+  weekly(s) { const R = getLS('planner-rules-v1', {}); return r2((R['m' + s.kid] ?? KIDS[s.kid].monthly) * 12 / 52); }
+  queue(s) { return getLS('planner-queue-v2', SEED).filter(q => q.kid === s.kid); }
+  syncQ() { this.setState(s => { const ids = s.appliedIds || [], add = this.queue(s).filter(q => q.status === 'yes' && !q.applied && ['move', 'deposit', 'adv', 'goal'].includes(q.kind) && !ids.includes(q.id)); if (!add.length) return null; const pots = { ...s.pots }; let left = s.left, adv = s.advOwed || 0, goalDef = s.goalDef || null;
+    add.forEach(q => { if (q.kind === 'adv') adv += q.amt; else if (q.kind === 'goal') { goalDef = { name: q.icon + ' ' + q.name, target: q.amt }; if (q.keep === 'ready') { pots.ready = r2(pots.ready + (pots.goal || 0)); pots.goal = 0; } } else { if (q.kind === 'move' && q.from in pots) pots[q.from] = r2(Math.max(0, pots[q.from] - q.amt)); if (q.to in pots) pots[q.to] = r2(pots[q.to] + q.amt); else if (q.to === 'wall') left = r2(Math.max(0, left - q.amt * (1 + BONUS))); } });
+    return { pots, left, advOwed: adv, goalDef, goalSaved: pots.goal || 0, appliedIds: [...ids, ...add.map(q => q.id)] }; }); }
+  ret(s) { return r2((s.pots.ready * RATES.ready + s.pots.gic * RATES.gic + s.pots.stock * RATES.stock) / 52); }
+  fines(s) { return getLS('planner-fines-v1', FSEED).filter(x => x.kid === s.kid && !x.applied); }
+  attOf(s, i) { const v = (s.att || {})[i]; if (v != null) return v; const d = KIDS[s.kid].sessions[i]; return this.queue(s).some(q => q.kind === 'skip' && q.status === 'yes' && !q.applied && q.session === d) ? false : null; }
+  amt(s, f) { if (f[0] === 'pa') return this.paW(s); if (f[0] === 'fine') return r2(-this.fines(s).reduce((a, x) => a + x.amt, 0) + this.bonus(s, 'fine')); return f[0] === 'ret' ? this.ret(s) : f[3] + this.bonus(s, f[0]); }
+  bonus(s, k) { const map = { comp: 'comp', gift: 'gifts', fine: 'fine' }; return this.queue(s).filter(q => q.status === 'yes' && !q.applied && map[q.kind] === k).reduce((a, q) => a + (q.pay != null ? q.pay : q.amt), 0); }
+  decide(id, yes) { this.beep(yes ? 880 : 300); putLS('planner-queue-v2', getLS('planner-queue-v2', SEED).map(q => q.id === id ? { ...q, status: yes ? 'yes' : 'no' } : q)); }
+  inf(s) { return KIDS[s.kid].inf; }
+  matured(s) { return r2((s.locks || []).filter(l => l.back <= s.week + 1).reduce((a, l) => a + l.amt, 0)); }
+  pullTot(s) { const p = s.pull || {}; return r2(this.matured(s) + (p.ready || 0) + (p.stock || 0) + (p.cash || 0)); }
+  total(s) { return r2(this.payday(s) + this.pullTot(s)); }
+  paW(s) { return KIDS[s.kid].sessions.filter((_, i) => this.attOf(s, i) === true).length * 6; }
+  attOpen(s) { return KIDS[s.kid].sessions.filter((_, i) => this.attOf(s, i) == null).length; }
+  safeOk(s) { return s.pots.ready - ((s.pull || {}).ready || 0) + s.alloc.ready >= SAFE; }
+  setPull(k, d) { let ok = false; this.setState(s => { const p = { ready: 0, stock: 0, cash: 0, ...(s.pull || {}) }, nv = Math.max(0, p[k] + d), H2 = Math.max(0, Math.floor(this.total({ ...s, pull: { ...p, [k]: nv } }) - this.minNow(s) - this.advW(s))); if (nv === p[k] || (d < 0 && H2 < placedOf(s.alloc))) return null; ok = true; p[k] = nv; return { pull: p }; }); this.beep(ok || d > 0 ? 660 : 220); }
+  advW(s) { return r2((s.advOwed || 0) + (s.advMan || 0)); }
+  setAdv(d) { let ok = false; this.setState(s => { const nv = Math.max(0, (s.advMan || 0) + d), tot = (s.advOwed || 0) + nv, H2 = Math.max(0, Math.floor(this.total(s) - this.minNow(s) - tot)); if (nv === (s.advMan || 0) || tot > this.advMax() || H2 < placedOf(s.alloc)) return null; ok = true; return { advMan: nv }; }); this.beep(ok ? 600 : 220); }
+  advMax() { try { const r = JSON.parse(localStorage.getItem('planner-rules-v1')) || {}; return r.advMax ?? 5; } catch (e) { return 5; } }
+  payday(s) { return r2(this.inf(s).reduce((a, f) => a + this.amt(s, f), 0)); }
+  minNow(s) { return r2(Math.min(s.left, this.weekly(s))); }
+  hers(s) { return Math.max(0, Math.floor(this.total(s) - this.minNow(s) - this.advW(s))); }
+  prin(s) { return KIDS[s.kid].principal + (s.extraLoans || []).reduce((a, l) => a + l.added, 0); }
+  open(s, k) { return (this.prin(s) - s.left) / this.prin(s) * 100 >= STAGE[k]; }
+  can(s, k) { if (k === 'extra' || k === 'spend' || k === 'adv' || k === 'ready') return true; if (k === 'goal') return this.safeOk(s); return this.open(s, k) && this.safeOk(s); }
+  startCount() { clearInterval(this.ct); this.setState({ shown: 0 }); this.ct = setInterval(() => this.setState(s => { const L = this.inf(s), n = L.length; if (s.shown >= n) { clearInterval(this.ct); return null; } const f = L[s.shown]; if (f[3] !== 0) this.beep(f[3] < 0 ? 300 : 660 + s.shown * 60); return { shown: s.shown + 1 }; }), 900); }
+  fly(k, n) {
+    const card = this.cardRef.current, from = this.pileRef.current, to = this.tRefs[k].current; if (!card || !from || !to) return;
+    const c = card.getBoundingClientRect(), a = from.getBoundingClientRect(), b = to.getBoundingClientRect(), sc = c.width / card.offsetWidth || 1;
+    const x0 = (a.left + 28 - c.left) / sc, y0 = (a.top + a.height / 2 - c.top) / sc, x1 = (b.left + b.width / 2 - c.left) / sc, y1 = (b.top + b.height * 0.45 - c.top) / sc;
+    const fives = Math.floor(n / 5), ones = n % 5, list = [...Array(fives).fill(true), ...Array(ones).fill(false)].slice(0, 6);
+    const items = list.map((five, i) => ({ id: Date.now() + '-' + i + Math.random(), x: x0 + i * 6, y: y0, dx: x1 - x0 + (i % 3 - 1) * 10, dy: y1 - y0 + (i % 2) * 8, delay: i * 80, five }));
+    this.setState(s => ({ fx: [...s.fx, ...items] }));
+    setTimeout(() => this.setState(s => ({ fx: s.fx.filter(f => !items.some(i => i.id === f.id)) })), 1100);
+  }
+  hit(k) { const map = { extra: ['dam'], ready: ['pots'], gic: ['pots'], stock: ['pots'], goal: ['goal'], spend: [], adv: [] }; this.setState(s => { const b = { ...s.burst }; map[k].forEach(x => b[x] = (b[x] || 0) + 1); return { burst: b }; }); }
+  bump(k, d, n) {
+    n = n || 1; let moved = 0;
+    this.setState(s => { const a = { ...s.alloc }, H = this.hers(s), placed = placedOf(a);
+      if (!this.can(s, k)) return null;
+      if (d > 0) { let room = k === 'adv' ? this.advMax() - a.adv : H - placed; if (k === 'spend') room = Math.min(room, Math.floor(H * spendCap()) - a.spend); moved = Math.max(0, Math.min(n, room)); if (!moved) return null; a[k] += moved; }
+      else { moved = Math.min(n, a[k]); if (!moved) return null; a[k] -= moved; }
+      return { alloc: a, last: { k, n: moved, d }, focus: null, tried: null }; });
+    if (d > 0 && moved) { this.fly(k, moved); setTimeout(() => this.hit(k), 600); this.beep(moved >= 5 ? 392 : (k === 'extra' ? 523 : 784)); }
+  }
+  pressDown(k) { if (this.state.step !== 2) return; clearInterval(this.pt); this.pressStart = Date.now(); this.fired = false; this.setState({ press: k, pressP: 0 });
+    this.pt = setInterval(() => { const p = Math.min(100, (Date.now() - this.pressStart) / HOLD_MS * 100); if (p >= 100 && !this.fired) { this.fired = true; clearInterval(this.pt); this.setState({ press: null, pressP: 0 }); this.bump(k, 1, 5); return; } this.setState({ pressP: p }); }, 40); }
+  pressUp(k) { clearInterval(this.pt); const was = this.state.press; this.setState({ press: null, pressP: 0 }); if (!this.fired && was === k) this.bump(k, 1, 1); this.fired = true; }
+  pressCancel() { clearInterval(this.pt); if (this.state.press) this.setState({ press: null, pressP: 0 }); this.fired = true; }
+  applyReflect(r) {
+    const s = this.state; if (r.stage && !this.open(s, r.stage)) return;
+    const H = this.hers(s), a = { extra: 0, ready: 0, goal: 0, gic: 0, stock: 0, spend: 0, adv: 0 }; let used = 0;
+    const gap = Math.max(0, Math.ceil(SAFE - (s.pots.ready - ((s.pull || {}).ready || 0)))); let fill = gap;
+    Object.keys(r.split).forEach(k => { let v = Math.floor(H * r.split[k]); if (k === 'goal') { const cap = Math.max(0, Math.ceil((s.goalDef || KIDS[s.kid].goal).target - (s.pots.goal || 0))), over = Math.max(0, v - cap - fill); if (over) { a.ready += over; used += over; v -= over; } } if (k === 'goal' || k === 'gic' || k === 'stock') { const f = Math.min(fill, v); a.ready += f; used += f; fill -= f; v -= f; } if (k !== 'goal' && k !== 'ready' && !this.can(s, k)) { a.extra += v; used += v; return; } a[k] += v; used += v; }); used += 0; a.extra += H - used;
+    this.setState({ alloc: a, reflectId: r.id, last: null });
+    TKEYS.forEach((k, i) => { if (a[k]) setTimeout(() => { this.fly(k, a[k]); setTimeout(() => this.hit(k), 600); }, i * 140); }); this.beep(523);
+  }
+  sign() {
+    clearInterval(this.ht);
+    this.setState(s => {
+      const K = { ...KIDS[s.kid], goal: s.goalDef || KIDS[s.kid].goal }, wk = this.weekly(s), P = this.payday(s), pay = r2(this.minNow(s) + s.alloc.extra * (1 + BONUS)), nl = r2(Math.max(0, s.left - pay)), paidBefore = K.principal - s.left, pct = x => x / K.principal * 100;
+      const PRS = this.prin(s), crossed = Object.keys(STAGE).filter(k => k !== 'ready').find(k => (PRS - s.left) / PRS * 100 < STAGE[k] && (PRS - nl) / PRS * 100 >= STAGE[k]) || null;
+      const AW = this.advW(s), T = this.total(s), cents = r2(T - this.minNow(s) - AW - this.hers(s)), wallet = r2(s.alloc.spend + AW);
+      const pl = s.pull || {}, mat = this.matured(s), potsAfter = { ready: r2(s.pots.ready - (pl.ready || 0) + s.alloc.ready + cents), goal: r2((s.pots.goal || 0) + (s.alloc.goal || 0)), gic: r2(s.pots.gic - mat + s.alloc.gic), stock: r2(s.pots.stock - (pl.stock || 0) + s.alloc.stock) };
+      const yr = p => r2(p.ready * RATES.ready + p.gic * RATES.gic + p.stock * RATES.stock);
+      const goalAfter = potsAfter.goal;
+      const before = { left: s.left, free: s.week + Math.ceil(s.left / wk), goal: s.goalSaved, yr: yr(s.pots) };
+      const sumK = ks => r2(K.inf.filter(f => ks.includes(f[0])).reduce((a, f) => a + this.amt(s, f), 0)); const signed = { inSteady: sumK(['jobs', 'streak', 'pa']), inBonus: sumK(['comp', 'gifts', 'ret']), outFine: sumK(['fine']), inBank: this.pullTot(s), pullReady: pl.ready || 0, loanCash: r2(this.minNow(s) + s.alloc.extra), goal: s.alloc.goal || 0, hist: s.histCat.map(o => r2(o.cr + o.comp + o.gifts + o.ret + o.fine)), week: s.week + 1, pay, extra: s.alloc.extra, ready: r2(s.alloc.ready + cents), gic: s.alloc.gic, stock: s.alloc.stock, wallet, adv: AW, guess: s.guess, payday: P, hers: this.hers(s), minW: this.minNow(s), lines: K.inf.map(f => [f[0], f[1], this.amt(s, f)]), free: s.week + 1 + Math.ceil(nl / wk), goalBal: goalAfter, yr: yr(potsAfter) };
+      signed.stickers = STICKERS.filter(([, , , ok]) => ok(signed)).map(([id]) => id);
+      const bookRow = { wk: s.week + 1, date: sunDate(s.week + 1), earned: r2(signed.inSteady + signed.inBonus + signed.outFine), steady: signed.inSteady, bonus: signed.inBonus, wall: pay, saved: r2(s.alloc.ready + cents + (s.alloc.goal || 0) + s.alloc.gic + s.alloc.stock), cash: wallet };
+      const undo = { left: s.left, pots: s.pots, locks: s.locks, week: s.week, stickers: s.stickers, histCat: s.histCat, book: s.book, goalSaved: s.goalSaved, lastPaid: s.lastPaid, advOwed: s.advOwed, advMan: s.advMan, pull: s.pull, alloc: s.alloc };
+      return { undo, book: [bookRow, ...(s.book || [])].slice(0, 8), step: 3, advNext: 0, advOwed: 0, advMan: 0, pull: { ready: 0, stock: 0, cash: 0 }, locks: [...(s.locks || []).filter(l => l.back > s.week + 1), ...(s.alloc.gic ? [{ amt: s.alloc.gic, back: s.week + 1 + LOCK_WEEKS }] : [])], left: nl, lastPaid: paidBefore, crossed, hold: 100, signed, before, confetti: true, week: s.week + 1, stickers: [...new Set([...(s.stickers || []), ...signed.stickers])], pots: potsAfter, goalSaved: goalAfter, histCat: [...s.histCat.slice(1), this.weekCat(s)] };
+    });
+    this.beep(1046); setTimeout(() => this.beep(1318), 120);
+  }
+  weekCat(s) { const v = k => KIDS[s.kid].inf.filter(f => f[0] === k).reduce((a, f) => a + this.amt(s, f), 0); return { cr: v('jobs') + v('streak') + v('pa'), comp: v('comp'), gifts: v('gifts'), ret: v('ret'), fine: v('fine') }; }
+  target(s) { return s.kid === 'Jenn' ? (this.props.targetJenn ?? KIDS.Jenn.target) : (this.props.targetJess ?? KIDS.Jess.target); }
+  renderVals() {
+    const INF = this.inf(this.state);
+    const s = this.state, K = { ...KIDS[s.kid], goal: s.goalDef || KIDS[s.kid].goal }, P = this.payday(s), PT = this.pullTot(s), T = r2(P + PT), ADVW = this.advW(s), MINW = this.minNow(s), H = this.hers(s), placed = placedOf(s.alloc), pile = H - placed, cents = r2(T - MINW - ADVW - H);
+    const paid = this.prin(s) - s.left, pct = paid / this.prin(s) * 100, wk = this.weekly(s), wMin = Math.ceil(s.left / wk), capLeft = Math.floor(H * spendCap()) - s.alloc.spend;
+    const stepOf = n => ({ bg: s.step === n ? '#c14a24' : (s.step > n ? '#e4f5ec' : '#fffdf5'), ink: s.step === n ? '#fff' : '#2a2320' });
+    const Q = this.queue(s), RL = getLS('planner-rules-v1', {}), WORDS = RL['words' + s.kid] || 1, commits = getLS('planner-commit-v1', []).filter(c => c.kid === s.kid), newC = s.step === 0 ? commits[s.commitsIn || 0] : null, PR = K.principal + (s.extraLoans || []).reduce((a, l) => a + l.added, 0);
+    const goalLeft = r2(Math.max(0, K.goal.target - (s.pots.goal || 0))), shownInf = INF.slice(0, s.shown), tot = o => r2(o.cr + o.comp + o.gifts + o.ret + o.fine), HC = s.histCat, lastWeek = Math.round(tot(HC[3])), avg = r2(HC.reduce((a, o) => a + tot(o), 0) / 4), TGT = this.target(s);
+    const earnedWeek = r2(K.inf.filter(f => ['jobs', 'streak', 'pa', 'comp'].includes(f[0])).reduce((a, f) => a + this.amt(s, f), 0)), needWeek = r2(TGT / 52);
+    const live = s.step === 2, post = s.step === 3 && s.signed;
+    const showAll = s.focus === 'all', fk = s.last ? s.last.k : null, on = k => live ? (showAll ? s.alloc[k] > 0 : fk === k) : !!(post && s.signed[k] > 0);
+    const hiExtra = on('extra'), hiGoal = on('ready'), hiPot = k => on(k), hiPots = ['ready', 'gic', 'stock'].some(hiPot);
+    const freeWithExtra = Math.ceil(s.left / (wk + s.alloc.extra * 1.1)), weeksSooner = n => Math.max(0, wMin - Math.ceil(s.left / (wk + n * 1.1)));
+    const glow = 'omGlow 1.1s ease-in-out infinite', hiBorder = '3px solid #ff8a00', hiBg = '#fff1d6';
+    const burst = (n, tag) => n ? React.createElement(React.Fragment, null,
+      React.createElement('div', { key: tag + 'a' + n, style: { position: 'absolute', right: 8, top: -14, fontSize: 30, zIndex: 3, pointerEvents: 'none', animation: 'omBurst 1.2s ease-out forwards' } }, '🎆✨'),
+      React.createElement('div', { key: tag + 'b' + n, style: { position: 'absolute', left: 8, bottom: -10, fontSize: 24, zIndex: 3, pointerEvents: 'none', animation: 'omBurst 1.2s 0.15s ease-out backwards' } }, '🎇')) : null;
+    const coinEl = (five) => ({ position: 'absolute', width: five ? 44 : 30, height: five ? 44 : 30, borderRadius: '50%', background: GOLD, border: '2px solid #7a4e00', boxShadow: 'inset 0 0 0 3px rgba(255,236,150,0.85), 1px 2px 0 rgba(42,35,32,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Nunito, sans-serif', fontWeight: 800, fontSize: five ? 14 : 10, color: '#6b3f00', boxSizing: 'border-box' });
+    const fxLayer = React.createElement('div', { style: { position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden', zIndex: 5 } },
+      ...s.fx.map(f => React.createElement('div', { key: f.id, style: { ...coinEl(f.five), left: f.x - (f.five ? 22 : 15), top: f.y - (f.five ? 22 : 15), '--dx': f.dx + 'px', '--dy': f.dy + 'px', animation: `omFly 0.8s ${f.delay}ms cubic-bezier(0.3,0.9,0.4,1) forwards` } }, f.five ? '$5' : '$1')),
+      ...(s.confetti ? Array.from({ length: 28 }, (_, i) => React.createElement('div', { key: 'c' + i, style: { position: 'absolute', left: (i * 37) % 100 + '%', top: 0, width: 10, height: 14, background: ['#ffd166', '#ff9eb5', '#95d5b2', '#6fb1fc', '#c9a6e8'][i % 5], border: '1.5px solid #2a2320', animation: `omFall ${2.2 + (i % 5) * 0.3}s ${(i % 7) * 0.12}s ease-in forwards` } })) : []));
+    // payday coin stack: $1 coins, five to a row, row = $5 = 10% of the $50 ruler
+    const YMAX = yMaxOf(Math.max(T, lastWeek, MINW)), rowH = 500 / YMAX, payPile = []; let idx = 0;
+    const CK = k => ['jobs', 'streak', 'pa'].includes(k) ? 'st' : 'bn', CS = { st: ['radial-gradient(circle at 35% 30%,#eafff0 0%,#a6e0bb 40%,#55a676 75%,#2f6b47 100%)', '2px solid #2f6b47', '#1f4d33'], bn: [GOLD, '2px solid #7a4e00', '#6b3f00'], bk: ['radial-gradient(circle at 35% 30%,#f0f8ff 0%,#acd4fb 40%,#5a9be0 75%,#2d5f99 100%)', '2px solid #2d5f99', '#1d3f66'] };
+    const addCoin = (label, delay, op, t) => { if (idx >= YMAX) return; const c = CS[t] || CS.bn; payPile.push({ left: (idx % 5) * 20, bottom: Math.floor(idx / 5) * rowH, h: rowH, label, delay, op, bg: c[0], bd: c[1], ink: c[2], sh: 'inset 0 0 0 3px rgba(255,255,255,0.45),1px 2px 0 rgba(42,35,32,0.3)' }); idx++; };
+    shownInf.forEach(f => { const nC = Math.floor(this.amt(s, f)); for (let ci = 0; ci < nC; ci++) addCoin('$1', ci * 55, 1, CK(f[0])); });
+    let ghosted = 0; const ghost = (n, label) => { for (let ci = 0; ci < n; ci++) { const j = payPile.length - 1 - ghosted - ci; if (j < 0) break; payPile[j] = { ...payPile[j], label, bg: '#fffdf5', bd: '2px dashed #c14a24', ink: '#c14a24', sh: 'none', op: 0.9 }; } ghosted += n; };
+    if (s.shown >= INF.length) { for (let ci = 0; ci < Math.floor(PT); ci++) addCoin('$1', ci * 55, 1, 'bk'); ghost(Math.ceil(ADVW - 0.001), '⏪'); }
+    ghost(Math.ceil(-Math.min(0, shownInf.filter(f => f[0] === 'fine').reduce((a, f) => a + this.amt(s, f), 0)) - 0.001), '📦');
+    const shownTotal = r2(shownInf.reduce((a, f) => a + this.amt(s, f), 0)), countDone = s.shown >= INF.length;
+    // choose cards: fixed share + five choices; waterfall from the bottom, all cards add to 100% of payday
+    const lastK = s.last ? s.last.k : null, back = s.last && s.last.d < 0 ? s.last.n : 0, ADV = this.advMax(), openG = s.openG || null;
+    const val = { fixed: MINW, extra: s.alloc.extra, ready: r2(s.alloc.ready + cents), gic: s.alloc.gic, stock: s.alloc.stock, goal: s.alloc.goal || 0, spend: s.alloc.spend, adv: ADVW };
+    const SUBS = { fixed: '📌 Must pay', extra: '🧱 Extra on my wall', spend: '💵 Cash out', adv: '⏪ Drawn in advance', ready: '🏦 Savings', goal: '🎯 ' + K.goal.name.slice(3), gic: '🔒 Locked away', stock: '📈 Companies' };
+    const TP = r2(T - ADVW), defs = [['loan', '🧱 Loan', ['fixed', 'extra'], '#f3f0fd'], ['spend', '👛 Spend', ['spend'], '#ffeef3'], ['grow', '🌱 Save & grow', ['ready', 'goal', 'gic', 'stock'], '#eaf4ff']];
+    const wv = k => val[k], gv = defs.map(d => r2(d[2].reduce((a, k) => a + wv(k), 0))), pc = pcts([...gv, pile], TP), pileP = pc[defs.length];
+    let cum = 0; const hintMap = {}, advQ0 = Q.find(q => q.kind === 'adv' && q.status === 'yes' && !q.applied);
+    const selOf = id => id === 'loan' ? 'extra' : id === 'spend' ? 'spend' : ((s.sel || {}).grow || 'ready');
+    const SHORT = { fixed: 'Must pay', extra: 'Extra', spend: 'Cash out', adv: 'In advance', ready: 'Savings', goal: 'Goal', gic: 'Locked', stock: 'Companies' };
+    const groups = defs.map(([id, name, keys, bg], i) => { const v = gv[i], start = TP ? cum / TP * 100 : 0, hh = TP ? v / TP * 100 : 0; cum += v;
+      const sk = selOf(id), skLk = !this.can(s, sk), skCap = sk === 'spend' && capLeft <= 0, canAdd = live && !skLk && !skCap && pile > 0, canLess = live && (s.alloc[sk] || 0) > 0;
+      const press = (d, n) => e => { if (e && e.stopPropagation) e.stopPropagation(); if (d > 0 && !canAdd) { this.beep(220); this.setState({ tried: sk }); return; } if (d < 0 && !canLess) { this.beep(220); return; } this.bump(sk, d, n); };
+      const shown = keys.filter(k => k !== 'adv' || ADVW > 0);
+      return { dataName: 'group: ' + id, title: name, bg, amt: m(v), pct: pc[i] + '%', start, h: hh, topLevel: Math.min(100, start + hh), barBorder: hh >= 1 ? '2px solid #2a2320' : 'none',
+        help: e => { if (e && e.stopPropagation) e.stopPropagation(); this.beep(600); this.setState({ ask: id === 'grow' ? sk : id }); },
+        segs: keys.filter(k => wv(k) > 0).map(k => ({ v: wv(k), fill: COL[k].fill, icon: wv(k) / TP > 0.06 ? SUBS[k].split(' ')[0] : '' })), cellCols: shown.length > 1 ? 'repeat(2,minmax(0,1fr))' : 'minmax(0,1fr)',
+        hasNote: id !== 'grow', note: id === 'loan' ? '🧱 each $1 extra = $1.10 off the wall' : capLeft <= 0 ? '👛 full · a fifth of my share' : `👛 up to $${Math.floor(H * spendCap())} · a fifth of my share`,
+        less: press(-1, 1), add1: press(1, 1), add5: press(1, 5), addOp: canAdd ? 1 : 0.4, lessOp: canLess ? 1 : 0.4,
+        cells: shown.map(k => { const fixed = k === 'fixed' || k === 'adv', lk = !fixed && !this.can(s, k), capHit = k === 'spend' && capLeft <= 0, isSel = (s.sel || {})[id] === k, on = isSel && !fixed, blocked = fixed || lk || capHit, hot = lastK === k && live;
+          hintMap[k] = k === 'adv' ? (advQ0 && !s.advMan ? `⏪ drawn early on ${advQ0.day} · already spent` : '⏪ drawn early · already spent') : fixed ? '📌 taken first, every week' : lk ? ((k === 'goal' || this.open(s, k)) ? '🛟 fill Savings to $10 first' : `🔒 opens at ${STAGE[k]}% paid`) : capHit ? 'full · a fifth of my share' : (isSel ? 'tap = $1 · hold 2 s = $5 · ' : 'tap to pick · ') + HINT[k];
+          return { ref: this.tRefs[k], label: SUBS[k].split(' ')[0] + ' ' + SHORT[k], amt: val[k] > 0 && val[k] < 1 ? Math.round(val[k] * 100) + '¢' : (val[k] % 1 ? m(val[k]) : '$' + val[k]), fill: COL[k].fill,
+            border: on || hot ? '3px solid #c14a24' : `2px ${lk || fixed ? 'dashed' : 'solid'} #2a2320`, bg: on ? '#fff1d6' : '#fffdf5', op: lk ? 0.6 : 1, cursor: fixed ? 'default' : 'pointer',
+            holdPct: s.press === k ? s.pressP : 0, cancel: () => this.pressCancel(), up: () => { if (this.selTap) { this.selTap = false; return; } this.pressUp(k); },
+            down: e => { if (e && e.stopPropagation) e.stopPropagation(); if (!live) return; const pick = snd => { this.beep(snd); this.selTap = true; this.setState(st => ({ sel: fixed ? st.sel : { ...(st.sel || {}), [id]: k }, tried: k })); }; if (blocked) return pick(220); if (!isSel) return pick(560); if (pile <= 0) return pick(220); this.selTap = false; this.pressDown(k); } }; }) }; });
+    const colTracks = '1.15fr 0.85fr 1.3fr';
+    const aRnow = a => r2(s.pots.ready - ((s.pull || {}).ready || 0) + a), GG = {
+      extra: a => [a ? `${m(a * 1.1)} off the wall · free ${weeksSooner(a)} weeks sooner` : 'each $1 counts as $1.10 off the wall', 'having it. It can\'t come back out.'],
+      gic: a => [`${m(a)} comes back as ${m(r2(a * (1 + RATES.gic * LOCK_WEEKS / 52)))} on ${sunDate(s.week + 1 + LOCK_WEEKS, 1)}, promised`, 'touching it for 4 weeks'],
+      stock: a => [`${m(a)} could be ${m(a * (1 + RATES.stock))} in a year`, 'knowing what it will be worth. It can go down.'],
+      ready: a => [aRnow(a) >= SAFE ? `money I can reach any time · ${m(aRnow(a))} in Savings` : `money I can reach any time · ${m(SAFE - aRnow(a))} more to fill 🛟 $10`, 'the 10% wall bonus'],
+      goal: a => [`${m(Math.max(0, goalLeft - a))} left to my goal`, 'using it for anything else until I buy it'],
+      spend: a => [a ? `${buysOf(val.spend)} this week` : `up to $${Math.floor(H * spendCap())} now — a fifth`, 'it leaves the bank. No interest, and it is gone once spent.'],
+      adv: a => [a ? `$${a} more cash today` : `up to $${ADV} early, from next Sunday`, a ? `next Sunday's payday is $${a} smaller` : 'next Sunday\'s payday gets smaller'] };
+    const gg0 = lastK && GG[lastK] ? GG[lastK](s.alloc[lastK] || 0) : null, gg = gg0 && back ? [`↩ $${back} back in my pile. ` + gg0[0], gg0[1]] : gg0;
+    const script = [
+      [{ k: 'ASK', v: 'Tick your club sessions first. That is your biggest money. Then tap the rest.' }, { k: 'SAY', v: 'Only what Dad said yes to counts today. Anything still waiting stays out of your guess.' }, { k: 'ASK', v: `Last week was $${lastWeek}. More or less this week? Why?` }],
+      [{ k: 'SAY', v: 'Watch the coins fall. Every line is something you did.' }, { k: 'ASK', v: `Look at the table: which line is bigger than your average (${m(avg)} total)?` }, { k: 'SAY', v: `The loan takes its ${m(MINW)} first — that's the deal we made.` }, { k: 'ASK', v: 'Need money from your bank, or cash from home? Use 🏦 From my bank below.' }],
+      [{ k: 'ASK', v: 'What is this money for? Pick a start, or tap a box: tap again = $1, hold = $5.' }, { k: 'SAY', v: 'Watch the tile on the right glow — that is what each coin changes.' }, { k: 'ASK', v: `The goal jar earns nothing. Why put money there instead of Savings?` }, { k: 'WAIT', v: 'Do not touch the screen. Ask "why there?" once.' }],
+      [{ k: 'ASK', v: 'Say your plan back to me in one sentence.' }, { k: 'ASK', v: 'In = Out: point to where every dollar went.' }, { k: 'ASK', v: 'Tap 5 mo. When is the loan done if every week is like this?' }]][s.step];
+    const weeks = Math.round(s.tm * 52 / 12), perWeekPay = wk + (s.signed ? s.signed.extra * 1.1 : 0);
+    const tmLeft = r2(Math.max(0, s.left - perWeekPay * weeks)), grow = (bal, add, rate) => r2(bal + add * weeks + (bal + add * weeks / 2) * rate * s.tm / 12);
+    const tmReady = grow(s.pots.ready, s.signed ? s.signed.ready : 0, RATES.ready), tmGic = grow(s.pots.gic, s.signed ? s.signed.gic : 0, RATES.gic), tmStock = grow(s.pots.stock, s.signed ? s.signed.stock : 0, RATES.stock);
+    const ask = s.ask ? CONCEPTS[s.ask] : null, stickerOf = id => STICKERS.find(x => x[0] === id), b4 = s.before, sg = s.signed;
+    const tr = (a, b, downGood) => a === b ? '➖' : (b < a ? (downGood ? '📉' : '🔻') : '📈');
+    const unsettled = Q.filter(q => !q.applied && (!q.status || q.status === 'talk')).length + (newC ? 1 : 0) + this.attOpen(s);
+    const catK = ['jobs', 'streak', 'comp', 'gifts'], catRight = catK.filter(k => s.cat[k] != null && (s.cat[k] === (this.amt(s, K.inf.find(f => f[0] === k)) > 0))).length, catAnswered = catK.filter(k => s.cat[k] != null).length;
+    const plan = live ? { extra: s.alloc.extra, spend: val.spend, ready: s.alloc.ready, goal: s.alloc.goal || 0, gic: s.alloc.gic, stock: s.alloc.stock } : sg ? { extra: sg.extra, spend: sg.wallet, ready: sg.ready, goal: sg.goal || 0, gic: sg.gic, stock: sg.stock } : { extra: 0, spend: 0, ready: 0, goal: 0, gic: 0, stock: 0 };
+    const fW = s.tmW || 4, irate = (RL.loanRate ?? 1) / 100, perPlan = wk + plan.extra * 1.1, leftNo = r2(Math.max(0, s.left * (1 + irate * fW / 52) - wk * fW)), leftPlan = r2(Math.max(0, s.left * (1 + irate * fW / 52) - perPlan * fW));
+    const freeNo = s.week + Math.ceil(s.left / wk), freePlan = s.week + Math.ceil(s.left / perPlan), pw = x => Math.max(0, x) / K.principal * 100, paidNow = K.principal - s.left;
+    const g2 = (bal, add, rate) => r2(bal + add * fW + (bal + add * fW / 2) * rate * fW / 52), potK = ['ready', 'goal', 'gic', 'stock'];
+    const wPay = Math.ceil(s.left / perPlan), spill = fW > wPay ? r2((fW - wPay) * perPlan) : 0, thenP0 = Object.fromEntries(potK.map(k => [k, r2(g2(s.pots[k] || 0, plan[k] || 0, RATES[k]) + (k === 'ready' ? spill : 0))])), gOver = Math.max(0, r2(thenP0.goal - K.goal.target)), thenP = { ...thenP0, goal: r2(thenP0.goal - gOver), ready: r2(thenP0.ready + gOver) }, maxP = Math.max(1, ...potK.map(k => thenP[k])), saveThen = r2(potK.reduce((a, k) => a + thenP[k], 0));
+    const grewSelf = r2(saveThen - potK.reduce((a, k) => a + (s.pots[k] || 0) + (plan[k] || 0) * fW, 0) - spill), cashThen = r2(plan.spend * fW);
+    const FMAP = { fixed: 'loan', extra: 'loan', spend: 'spend', adv: 'spend', ready: 'save', goal: 'save', gic: 'save', stock: 'save' }, fT = !live ? null : s.focus === 'all' ? 'all' : (s.last ? FMAP[s.last.k] : null);
+    const steadyW = r2(K.inf.filter(f => ['jobs', 'streak', 'pa'].includes(f[0])).reduce((a, f) => a + this.amt(s, f), 0)), bonusH = HC.map(o => o.comp + o.gifts), bonusAvg = bonusH.reduce((a, b) => a + b, 0) / bonusH.length, bonusMax = Math.max(...bonusH, ...K.inf.filter(f => ['comp', 'gifts'].includes(f[0])).map(f => this.amt(s, f)));
+    const eLow = r2(steadyW * fW), eLikely = r2((steadyW + bonusAvg) * fW), eHigh = r2((steadyW + bonusMax) * fW);
+    const tile = (id, o) => { const hot = fT === 'all' || fT === id, dim = fT && fT !== 'all' && fT !== id; return { ...o, dataName: 'forecast: ' + id, border: hot ? '3px solid #ff8a00' : '2.5px solid #2a2320', glow: hot ? glow : 'none', op: dim ? 0.5 : 1 }; };
+    const fc = [
+      tile('loan', { title: '🧱 Loan', big: leftPlan <= 0 ? '🎉 paid off' : m(leftPlan) + ' left', ink: '#6b5bb5', bg: '#fffdf5',
+        bars: [['now', 0, m(s.left)], ['no extra', s.left - leftNo, m(leftNo)], ['my plan', s.left - leftPlan, m(leftPlan)]].map(([k, more, v]) => ({ k, v, w1: pw(paidNow), w2: pw(more), c1: '#95d5b2', c2: k === 'my plan' ? '#9b8ee0' : '#d5cff5' })),
+        note: s.left <= 0 ? 'The wall is done.' : spill > 0 ? `Paid off in ${wPay} weeks. After that, ${m(perPlan)} a week goes to 🏦 Savings.` : plan.extra > 0 ? `Free by ${dateIn(freePlan)} · ⏪ ${freeNo - freePlan} weeks sooner` : `Free by ${dateIn(freeNo)}. Extra on the wall makes it sooner.` }),
+      tile('earn', { title: '💰 What I’ll earn', big: m(eLikely), ink: '#c14a24', bg: '#fff4db',
+        bars: [['📅 low', eLow], ['likely', eLikely], ['🏆 high', eHigh]].map(([k, v]) => ({ k, v: m(v), w1: v / Math.max(1, eHigh) * 100, w2: 0, c1: k === 'likely' ? '#ffd166' : '#f0e2b8', c2: '#fff' })),
+        note: `Low = steady only (chores, routine, assistant job: ${m(steadyW)} a week). High = a meet season. Plan on low.` }),
+      tile('save', { title: '🌱 Save & grow', big: m(saveThen), ink: '#2a5f59', bg: '#eaf4ff',
+        bars: potK.map(k => ({ k: { ready: 'Savings', goal: 'Goal', gic: 'Locked', stock: 'Companies' }[k], w1: s.pots[k] / maxP * 100, w2: Math.max(0, thenP[k] - s.pots[k]) / maxP * 100, v: (k === 'ready' || k === 'goal' || this.open(s, k)) ? m(thenP[k]) : '🔒 ' + STAGE[k] + '%', c1: '#8cc4ff', c2: '#ffd166' })),
+        note: (goalLeft <= 0 ? '🎯 Goal reached! ' : plan.goal > 0 ? (n => `🎯 ${K.goal.name.slice(3)} in ${n} Sunday${n === 1 ? '' : 's'} · `)(Math.ceil(goalLeft / plan.goal)) : `🎯 ${m(goalLeft)} to my goal · `) + `+${m(Math.max(0, grewSelf))} grows by itself` }),
+      tile('have', { title: WORDS >= 3 ? '💼 Then my assets' : '💼 Then I’d have', big: m(saveThen), ink: '#2a5f59', bg: '#e4f5ec', bars: [], note: `${WORDS >= 3 ? '✅ assets' : '✅ I’d own'} ${m(saveThen)} · ${WORDS >= 3 ? '🧱 debt' : '🧱 I’d owe'} ${m(leftPlan)} (with 1% interest)` })];
+    const mat = this.matured(s), pl = s.pull || {}, payNow = live ? r2(MINW + s.alloc.extra * 1.1) : 0, vf = (a, b) => a === b ? m(a) : `${m(a)} → ${m(b)}`;
+    const aR = r2(s.pots.ready - (pl.ready || 0) + s.alloc.ready + (live ? cents : 0)), aG = r2(s.pots.gic - mat + s.alloc.gic), aS = r2(s.pots.stock - (pl.stock || 0) + s.alloc.stock), club = s.clubOwes || 0, clubA = r2(club + this.paW(s));
+    const aGo = r2((s.pots.goal || 0) + (s.alloc.goal || 0)), ownNow = r2(s.pots.ready + (s.pots.goal || 0) + s.pots.gic + s.pots.stock), ownAfter = r2(aR + aGo + aG + aS), oweAfter = r2(Math.max(0, s.left - payNow));
+    const bf = live ? (s.focus === 'all' ? 'all' : s.last ? { fixed: 'loan', extra: 'loan', ready: 'ready', gic: 'gic', stock: 'stock', spend: 'spend', adv: 'spend' }[s.last.k] : null) : null;
+    const hotB = id => bf === 'all' || bf === id, dimB = id => !!bf && bf !== 'all' && bf !== id, fx = id => ({ border: hotB(id) ? '3px solid #ff8a00' : '2px solid #2a2320', glow: hotB(id) ? glow : 'none', op: dimB(id) ? 0.5 : 1 });
+    let paidSoFar = K.left - s.left, payLeft = payNow;
+    const loanRows = (K.loans || []).map(([name, pr, l0]) => { const take = Math.min(l0, Math.max(0, paidSoFar)); paidSoFar -= take; const ln = r2(l0 - take), t2 = Math.min(ln, payLeft); payLeft -= t2; const la = r2(ln - t2); return { name, w1: (pr - ln) / pr * 100, w2: (ln - la) / pr * 100, v: ln <= 0 ? '✓ done' : vf(ln, la) }; });
+    const safeN = Math.min(SAFE, s.pots.ready), safeA = Math.min(SAFE, aR), goalN = Math.max(0, s.pots.ready - SAFE), goalA = Math.max(0, aR - SAFE), nextLock = (s.locks || []).filter(l => l.back > s.week + 1).sort((a, b) => a.back - b.back)[0];
+    const balRows = [
+      { id: 'ready', icon: '🛟', name: 'Safety money', v: vf(safeN, safeA), sub: safeA >= SAFE ? '✓ full · always keep $10' : 'fill to $10 before locking or companies', bg: '#e4f5ec' },
+      { id: 'ready', icon: '🎯', name: K.goal.name.slice(3), v: `${vf(goalN, goalA)} of ${m(K.goal.target)}`, sub: goalA >= K.goal.target ? '🎉 reached!' : `${m(K.goal.target - goalA)} to go`, bg: '#ffe9ef' },
+      { id: 'gic', icon: '🔒', name: 'Locked away', v: vf(s.pots.gic, aG), sub: mat ? `🔓 ${m(mat)} came back · it's in my pile` : s.alloc.gic ? `back ${sunDate(s.week + 1 + LOCK_WEEKS, 1)}` : nextLock ? `back ${sunDate(nextLock.back, 1)}` : 'nothing locked · 4 weeks at a time', bg: '#eaf4ff' },
+      { id: 'stock', icon: '📈', name: 'Companies', v: vf(s.pots.stock, aS), sub: this.open(s, 'stock') ? 'can go up or down' : `🔒 opens at ${STAGE.stock}% paid`, bg: '#f6eefd' },
+      { id: 'club', icon: '🧾', name: 'Club owes me', v: vf(club, clubA), sub: 'assistant job · paid twice a year', bg: '#fffdf5' }].map(b => ({ ...b, ...fx(b.id) }));
+    const ownHot = live && (s.focus === 'all' || (s.last && ['ready', 'gic', 'stock'].includes(s.last.k))), maxA = Math.max(20, Math.ceil((Math.max(s.pots.ready, s.pots.gic, s.pots.stock) + H + 1) / 10) * 10), bmap = { ready: ['ready'], goal: ['goal'], gic: ['gic'], stock: ['stock'], fixed: ['loan'], extra: ['loan'] }, hk = live ? (s.focus === 'all' ? 'all' : s.last ? bmap[s.last.k] || null : null) : null;
+    const deco = (id, o) => { const hot = hk === 'all' || (Array.isArray(hk) && hk.includes(id)), dim = Array.isArray(hk) && !hk.includes(id); return { ...o, outline: hot ? '3px solid #ff8a00' : 'none', hl: hot ? '#fff1d6' : 'transparent', op: dim ? 0.45 : 1 }; };
+    const arow = (id, name, a0, a1, c1, sub) => { const d = r2(a1 - a0), up = d >= 0; return deco(id, { name, v: m(a1), delta: d > 0 ? '+' + m(d) : d < 0 ? m(d) : '', dInk: up ? '#2a5f59' : '#c14a24', w1: (up ? a0 : a1) / maxA * 100, w2: Math.abs(d) / maxA * 100, c1, c2: up ? '#ffd166' : HATCH, sub }); };
+    const chart = [
+      arow('ready', '🏦 Savings', s.pots.ready, aR, '#8cc4ff', aR >= SAFE ? `🛟 $10 safety + ${m(aR - SAFE)} I can use` : '🛟 fill to $10 first'),
+      arow('goal', '🎯 ' + K.goal.name.slice(3), s.pots.goal || 0, aGo, '#ff9eb5', aGo >= K.goal.target ? '🎉 reached! ask Dad to buy it' : `${m(K.goal.target - aGo)} to go of ${m(K.goal.target)}`),
+      arow('gic', '🔒 Locked away', s.pots.gic, aG, '#8cc4ff', mat ? `🔓 ${m(mat)} came back to my pile` : s.alloc.gic ? `back ${sunDate(s.week + 1 + LOCK_WEEKS, 1)}` : nextLock ? `back ${sunDate(nextLock.back, 1)}` : '4 weeks at a time'),
+      arow('stock', '📈 Companies', s.pots.stock, aS, '#8cc4ff', this.open(s, 'stock') ? (s.wobbleWk === s.week && s.wobbleAmt ? `📉 −${m(s.wobbleAmt)} this week · sell or wait?` : 'worth more or less each week') : `🔒 opens at ${STAGE.stock}% paid`)];
+    const wl = deco('loan', {}), rate = RL.loanRate ?? 1;
+    const flowRows = sg ? (() => { const rs = [['📅 Steady', sg.inSteady, '#95d5b2'], ['🎲 Bonus', sg.inBonus, '#ffd166'], ['🏦 From bank', sg.inBank, '#8cc4ff'], ['📦 Taken off', sg.outFine, '#f4b8a8'], ['🧱 Loan', -sg.loanCash, '#b9aef0'], ['💵 Cash out', -sg.wallet, '#ff9eb5'], ['🏦 Into bank', -(sg.ready + (sg.goal || 0) + sg.gic + sg.stock), '#8cc4ff']].filter(r => Math.abs(r[1] || 0) >= 0.01), mx = Math.max(1, ...rs.map(r => Math.abs(r[1])));
+      return rs.map(([k, v, c]) => ({ k, c, v: (v > 0 ? '+' : '−') + '$' + Math.abs(v).toFixed(2), ink: v > 0 ? '#2a5f59' : '#2a2320', wIn: v > 0 ? v / mx * 100 : 0, wOut: v < 0 ? -v / mx * 100 : 0, bIn: v > 0 ? '1.5px solid #2a2320' : 'none', bOut: v < 0 ? '1.5px solid #2a2320' : 'none' })); })() : [];
+    const totIn = sg ? r2((sg.inSteady || 0) + (sg.inBonus || 0) + (sg.inBank || 0)) : 0, usable = sg ? r2(sg.ready - (sg.pullReady || 0) + sg.wallet) : 0;
+    const steadyAvg = r2(HC.reduce((a, o) => a + o.cr, 0) / HC.length), EV = (getLS('planner-expected-v1', {})[s.kid]) || K.events || [];
+    const histT = sg && sg.hist ? sg.hist : HC.map(o => tot(o)), months = Array.from({ length: 5 }, (_, i) => { const d = new Date(2026, 9 + i, 1), evs = EV.filter(e => e[0] === i); return { k: d.toLocaleDateString('en-US', { month: 'short' }), v: r2(steadyAvg + evs.reduce((a, e) => a + e[2], 0) / 4.3), ev: evs.map(e => e[1]).join(' ') }; });
+    const tlRaw = [...histT.map((v, i) => ({ k: ['4 wk', '3 wk', '2 wk', 'last'][i], v, kind: 'past' })), { k: 'now', v: P, kind: 'now' }, ...months.map(x => ({ ...x, kind: 'future' }))], tlMax = Math.max(1, ...tlRaw.map(x => x.v)) * 1.1;
+    const likely5 = r2(steadyAvg * 20 + EV.filter(e => e[0] < 5).reduce((a, e) => a + e[2], 0));
+    const steadyNow = r2(K.inf.filter(f => ['jobs', 'streak'].includes(f[0])).reduce((a, f) => a + this.amt(s, f), 0) + K.sessions.length * (K.attRate || 1) * 6), p1 = wk, isSur = newC && newC.kind === 'surprise';
+    const p0 = newC && !isSur ? r2(p1 - newC.added / newC.weeks) : p1, pct0 = Math.round(p0 / steadyNow * 100), pct1 = Math.round(p1 / steadyNow * 100), lAfter = newC ? r2(s.left + (isSur ? Math.max(0, newC.cost - Math.min(newC.cost, s.pots.ready)) : newC.added + Math.max(0, r2(newC.cost * newC.share / 100 - newC.added) - Math.max(0, s.pots.ready - SAFE)))) : s.left;
+    const downC = newC && !isSur ? r2(newC.cost * newC.share / 100 - newC.added) : 0, downSave = r2(Math.min(downC, Math.max(0, s.pots.ready - SAFE))), downWall = r2(downC - downSave), fromSafe = isSur ? r2(Math.min(newC.cost, s.pots.ready)) : 0, borrow = isSur ? r2(newC.cost - fromSafe) : 0, meetAvg = (() => { const c = HC.map(o => o.comp).filter(v => v > 0); return c.length ? r2(c.reduce((a, b) => a + b, 0) / c.length) : 0; })();
+    const grp = (id, name, keys, bg, border, note, extra) => { const items = INF.map((f, i) => [f, i]).filter(([f]) => keys.includes(f[0])); if (!items.length && !extra) return null; const on = items.some(([, i]) => i < s.shown) || (!items.length && s.shown >= INF.length); const tot2 = r2(items.reduce((a, [f]) => a + this.amt(s, f), 0));
+      return { dataName: 'pile: ' + id, name, note, bg, border, op: on ? 1 : 0.2, shadow: on ? '3px 4px 0 rgba(42,35,32,0.18)' : 'none', amt: m(tot2), ink: tot2 < 0 ? '#c14a24' : '#2a2320', lines: [...items.map(([f, i]) => ({ text: `${f[1]} ${m(this.amt(s, f))}${this.bonus(s, f[0]) ? ' · Dad ✓' : ''}`, op: i < s.shown ? 1 : 0.3 })), ...(extra ? [extra] : [])] }; };
+    const V = {
+      wInOut: WORDS >= 2 ? '⇅ Cash flow' : '⇅ Money in & out', wHave: WORDS >= 3 ? '💼 Assets & debt' : '💼 What I have & owe', wOwn: WORDS >= 3 ? '✅ Assets' : '✅ What I own', wOwe: WORDS >= 3 ? '🧱 Debt' : '🧱 I owe',
+      chart, ownLine: ownNow === ownAfter ? m(ownNow) : `${m(ownNow)} → ${m(ownAfter)}`, oweLine: payNow ? `${m(s.left)} → ${m(oweAfter)}` : m(s.left), wallBorder: wl.outline !== 'none' ? '3px solid #ff8a00' : '2.5px solid #2a2320', wallGlow: wl.outline !== 'none' ? glow : 'none', wallOp: wl.op,
+      wallNote: `🟩 paid · 🟨 this plan · free by ${dateIn(s.week + Math.ceil(s.left / perPlan))} · ${[...(K.loans || []).map(l => l[0]), ...(s.extraLoans || []).map(l => l.name)].join(' · ')}`,
+      intLine: s.lastInt ? `🟥 +${m(s.lastInt)} interest added (${rate}% a year, every 4 Sundays)` : `${rate}% a year interest, added every 4 Sundays`,
+      flowRows, flowNote: sg ? (sg.outFine ? `in ${m(totIn)} − ${m(-sg.outFine)} fine = out` : 'in = out · every dollar got a job') : '', decTotal: sg ? m(r2(totIn + (sg.outFine || 0))) : '',
+      usableLine: sg ? `💡 I earned ${m(sg.payday)}. Money I can use now went ${usable >= 0 ? 'up' : 'down'} ${m(Math.abs(usable))} (🛟 savings and 💵 cash). The rest paid my loan, went to my goal, or is locked.` : '',
+      tl: tlRaw.map(x => ({ k: x.k, h: Math.max(3, x.v / tlMax * 100), bg: x.kind === 'now' ? '#c14a24' : x.kind === 'past' ? '#95d5b2' : 'repeating-linear-gradient(0deg,#ffd166 0 4px,#fff4db 4px 8px)', bs: x.kind === 'future' ? 'dashed' : 'solid', ink: x.kind === 'now' ? '#c14a24' : '#2a2320' })),
+      tlLine: steadyAvg / tlMax * 100, tlHead: `5 mo ≈ ${m(likely5)}`, tlEvents: months.filter(x => x.ev).map(x => `${x.k} ${x.ev}`).join(' · '),
+      tlNote: `🟩 last 4 Sundays · 🟥 now · dashed = likely (steady ${m(steadyAvg)} a week + money coming)`,
+      payGroups: [grp('steady', '📅 Steady', ['jobs', 'streak', 'pa'], '#e4f5ec', '3px solid #2a2320', 'every week'), grp('bonus', '🎲 Bonus', ['comp', 'gifts', 'ret'], '#fff4db', '3px dashed #2a2320', 'some weeks'), grp('off', '➖ Taken off', ['fine'], '#fffdf5', '2.5px solid #c14a24', '', ADVW ? { text: `⏪ Drew early ${m(ADVW)} · already spent, it shows in Spend`, op: 0.85 } : null)].filter(Boolean),
+      bankAmt: m(PT), bankNote: mat ? `🔓 ${m(mat)} locked money came back` : 'only if I need it',
+      backToGuess: () => { clearInterval(this.ct); this.setState({ step: 0, shown: 0 }); }, backToPayday: () => this.setState({ step: 1, shown: INF.length, need: null }),
+      needOpen: live && !!s.need, needCan: s.pots.ready - (pl.ready || 0) - 1 >= SAFE, needNoLabel: s.pots.ready - (pl.ready || 0) - 1 >= SAFE ? 'No' : 'OK',
+      needText: s.need ? (s.pots.ready - (pl.ready || 0) - 1 >= SAFE ? `Not enough left. 🏦 Take $1 from Savings? I have ${m(s.pots.ready - (pl.ready || 0) - SAFE)} above my 🛟 $10.` : `Not enough left, and Savings only has my 🛟 $${SAFE} safety money.`) : '',
+      needYes: () => { const k = s.need; this.setState({ need: null }); this.setPull('ready', 1); setTimeout(() => this.bump(k, 1, 1), 40); }, needNo: () => this.setState({ need: null }),
+      attChips: K.sessions.map((d, i) => { const v = this.attOf(s, i); return { label: `${d.split(' ').slice(0, 2).join(' ')} ${v == null ? '?' : v ? '✓' : '✗'}`, bs: v == null ? 'dashed' : 'solid', bg: v == null ? '#fffdf5' : v ? '#e4f5ec' : '#efe8d6', pick: () => { this.beep(v == null ? 700 : 500); this.setState(st => ({ att: { ...(st.att || {}), [i]: v == null ? true : v ? false : undefined } })); } }; }),
+      newOpen: !!newC, newOver: !isSur && pct1 > 50 && pct1 > pct0, newHead: isSur ? '🌧️ A surprise cost' : '🆕 New row on my wall', newTitle: newC ? (isSur ? `${newC.what} · ${m(newC.cost)}` : `${newC.what.replace('🆕 ', '')} · ${m(newC.added)} added`) : '',
+      newLines: !newC ? [] : isSur ? [['🛟 My safety money paid', m(fromSafe), '#2a5f59'], ['I had to borrow', m(borrow), borrow ? '#c14a24' : '#2a5f59'], ['Savings now', m(r2(s.pots.ready - fromSafe)), '#2a2320']].map(([k, v, ink]) => ({ k, v, ink }))
+        : [['10% down from my 🏦 Savings', downWall ? `${m(downSave)} · ${m(downWall)} on the wall` : m(downSave), downWall ? '#c14a24' : '#2a2320'], ['My loan payment a week', `${m(p0)} → ${m(p1)}`, '#2a2320'], ['Part of my steady money', `${pct0}% → ${pct1}%`, pct1 > 50 ? '#c14a24' : '#2a5f59'], ['Left for me to choose a week', `${m(steadyNow - p0)} → ${m(steadyNow - p1)}`, '#2a2320'], ['This row is paid off by', dateIn(s.week + newC.weeks), '#2a2320'], ['All my loans free by', dateIn(s.week + Math.ceil(lAfter / p1)), '#2a2320']].map(([k, v, ink]) => ({ k, v, ink })),
+      newVerdict: isSur ? (borrow ? `My safety money wasn't enough, so ${m(borrow)} went on my wall. 🏦 Savings fills first until it's back to $10.` : '🛟 My safety money covered it all. That is what it is for. It fills first until it is back to $10.') : pct1 > 50 ? `⚠️ My loan takes ${pct1}% of my steady money, more than half. Dad's limit is 50%.` : `✅ Still under half of my steady money. Dad's limit is 50%.`, newBg: isSur ? (borrow ? '#fff1d6' : '#e4f5ec') : pct1 > 50 ? '#fff1d6' : '#e4f5ec',
+      newPayback: !isSur && !!newC && meetAvg > 0, newPaybackText: newC && meetAvg ? `💡 Does it earn back? My meets pay me about ${m(meetAvg)} each. This row is paid back by about ${Math.ceil((newC.added || 0) / meetAvg)} meets.` : '',
+      newIdeas: [['club', `⛸️ One more club session → ${Math.round(p1 / (steadyNow + 6) * 100)}%`, false], ['chores', K.inf.find(f => f[0] === 'jobs')[3] >= 15 ? '🧹 More chores · already at $15' : '🧹 More chores', K.inf.find(f => f[0] === 'jobs')[3] >= 15], ['dad', '👨 Ask Dad: smaller share or longer time', false]].map(([id, label, dis]) => ({ label, bs: dis ? 'dashed' : 'solid', op: dis ? 0.5 : 1, bg: s.newIdea === id ? '#2f7f77' : '#fffdf5', ink: s.newIdea === id ? '#fff' : '#2a2320', pick: () => { if (dis) { this.beep(220); return; } this.beep(600); this.setState({ newIdea: id }); } })),
+      newOk: () => { if (!newC) return; this.beep(880); this.setState(st => { const base = { commitsIn: (st.commitsIn || 0) + 1, newIdea: null };
+        if (isSur) { const fs = Math.min(newC.cost, st.pots.ready), bw = r2(newC.cost - fs); return { ...base, pots: { ...st.pots, ready: r2(st.pots.ready - fs) }, left: r2(st.left + bw), extraLoans: bw ? [...(st.extraLoans || []), { name: '🌧️ ' + newC.what, added: bw }] : (st.extraLoans || []) }; }
+        const down = r2(newC.cost * newC.share / 100 - newC.added), ds = r2(Math.min(down, Math.max(0, st.pots.ready - SAFE))), add = r2(newC.added + down - ds); return { ...base, pots: { ...st.pots, ready: r2(st.pots.ready - ds) }, left: r2(st.left + add), extraLoans: [...(st.extraLoans || []), { name: newC.what, added: add }] }; }); },
+      fc, ownNow: m(ownNow), ownAfter: m(ownAfter), oweNow: m(s.left), oweAfter: m(oweAfter), loanRows, balRows, loanBorder: fx('loan').border, loanGlow: fx('loan').glow, loanOp: fx('loan').op,
+      loanNote: payNow ? `This plan pays ${m(payNow)}${s.alloc.extra ? ` · extra ${m(s.alloc.extra)} counts as ${m(s.alloc.extra * 1.1)}` : ''}. Oldest row first.` : '',
+      pulls: [['ready', '🏦 From Savings', Math.floor(Math.max(0, s.pots.ready - SAFE)), `$${Math.floor(Math.max(0, s.pots.ready - SAFE))} free`], ['cash', '💵 From home', 50, 'cash I bring in']].map(([k, name, mx, sub]) => { const v = pl[k] || 0; return { name, sub, amt: '$' + v, less: () => this.setPull(k, -1), more: () => { if (v + 1 > mx) { this.beep(220); return; } this.setPull(k, 1); } }; }),
+      hasBack: mat > 0, backLabel: `🔓 ${m(mat)} locked money came back`, cardClick: () => { if (this.state.step === 2 && this.state.openG) this.setState({ openG: null }); },
+      kids: Object.keys(KIDS).map(k => ({ name: k, bg: k === s.kid ? '#ff9eb5' : '#fffdf5', pick: () => { if (k === s.kid) return; const sv = load(); clearInterval(this.ct); this.setState({ ...START(k), ...((sv.kids || {})[k] || {}), kid: k, ...TRANSIENT }, () => this.syncQ()); } })),
+      steps: [['1 · Guess', 0], ['2 · Payday', 1], ['3 · I choose', 2], ['4 · Sign', 3]].map(([label, n]) => ({ label, ...stepOf(n) })),
+      cardRef: this.cardRef, pileRef: this.pileRef, fxLayer, stop: e => e.stopPropagation(),
+      isGuess: s.step === 0, isPayday: s.step === 1, isChoose: s.step === 2, isDone: s.step === 3, showWeek: s.step < 2, showImpact: s.step >= 2,
+      guessStory: K.story,
+      cats: catK.map((k, i) => { const f = K.inf.find(x => x[0] === k), v = s.cat[k]; return { icon: f[1].split(' ')[0], name: f[1].split(' ').slice(1).join(' '), state: v == null ? '? tap' : v ? '💰 yes' : '🚫 none', bg: v == null ? '#fffdf5' : v ? f[4] : '#efe8d6', rot: v == null ? 'none' : `rotate(${i % 2 ? 1.5 : -1.5}deg)`,
+        tap: () => { this.beep(v == null ? 700 : v ? 500 : 600); this.setState(st => ({ cat: { ...st.cat, [k]: st.cat[k] == null ? true : st.cat[k] ? false : null } })); } }; }),
+      rungs: Array.from({ length: 11 }, (_, i) => 10 + i * 5).map((g, i) => ({ label: '$' + g, h: 14 + i * 5.8, bar: s.guess === g ? '#c14a24' : (i % 2 ? '#e9b872' : '#f0c88a'), ink: s.guess === g ? '#fff' : '#2a2320', pin: s.guess === g ? '▼' : '',
+        mark: [Math.round(lastWeek / 5) * 5 === g ? 'last week' : '', Math.round(avg / 5) * 5 === g ? 'my avg' : ''].filter(Boolean).join(' '), pick: () => { this.beep(400 + g * 8); this.setState({ guess: g }); } })),
+      guessHint: unsettled ? (() => { const dq = unsettled - this.attOpen(s), at = this.attOpen(s); return [dq ? `Dad: ${dq} to answer` : '', at ? `my club sessions: ${at} to tick` : ''].filter(Boolean).join(' · ') + ' first →'; })() : s.guess ? `My guess: $${s.guess}${catAnswered ? ` · ${catAnswered} of 4 sources picked` : ''}. Let's see.` : `Last week was $${lastWeek}. There is no wrong guess.`, revealBg: s.guess && !unsettled ? '#c14a24' : '#e8dfc3', revealInk: s.guess && !unsettled ? '#fff' : '#6b5d4f',
+      reveal: () => { if (!s.guess || unsettled) { this.beep(220); return; } const wb = RULE('wobble', false) && s.pots.stock > 0 && s.wobbleWk !== s.week; this.setState({ step: 1, alloc: { extra: 0, ready: 0, goal: 0, gic: 0, stock: 0, spend: 0, adv: 0 }, reflectId: null, last: null, openG: null, focus: null, ...(wb ? { pots: { ...s.pots, stock: r2(s.pots.stock * 0.98) }, wobbleWk: s.week, wobbleAmt: r2(s.pots.stock * 0.02) } : {}) }); this.startCount(); },
+      guessResult: s.guess == null ? '' : (Math.abs(s.guess - P) <= 5 ? `$${s.guess} — really close!` : s.guess > P ? `$${s.guess} — it's less.` : `$${s.guess} — it's more!`) + (catAnswered ? ` · ${catRight} of ${catAnswered} sources right` : ''),
+      infAll: INF.map((f, i) => { const v = this.amt(s, f), on = i < s.shown, mine = s.cat[f[0]], right = mine != null && mine === (v > 0); return { off: f[0] === 'fine' || f[0] === 'adv', name: f[1], note: f[2] + (this.bonus(s, f[0]) ? ` · +$${this.bonus(s, f[0])} Dad said yes` : '') + (on && mine != null ? (right ? ' · ✓ I knew!' : ' · ✗ not what I thought') : ''), amt: m(v), bg: f[4], ink: v < 0 ? '#c14a24' : '#2a2320', border: v === 0 ? '2px dashed #6b5d4f' : (v < 0 ? '2px solid #c14a24' : '3px solid #2a2320'), op: on ? 1 : 0.15,
+        rot: on && v > 0 ? `rotate(${(i % 2 ? 1 : -1) * 0.6}deg)` : 'none', shadow: on && v > 0 ? '3px 4px 0 rgba(42,35,32,0.22)' : 'none', badge: ['NICE!', 'YES!', 'WOW', 'THANKS!', '', ''][i], badgeDisplay: on && v > 0 && ['NICE!', 'YES!', 'WOW', 'THANKS!'][i] ? 'block' : 'none' }; }),
+      payPile, countAmt: m(countDone ? T : shownTotal), ticks: [10, 20, 30, 40, 50].map(t => ({ pct: t / PILE_MAX * 100, label: '$' + t })), ghostPct: Math.min(100, lastWeek / PILE_MAX * 100),
+      countNote: countDone ? `Each row = $5 · dashed = last week ($${lastWeek}) · ${P > lastWeek ? `📈 $${(P - lastWeek).toFixed(0)} more` : `📉 $${(lastWeek - P).toFixed(0)} less`}` : 'coins are falling…',
+      minLine: `The loan takes its ${m(MINW)} first ($${Math.round(wk * 52 / 12)} a month). Then ${m(T - MINW - ADVW)} is mine to decide about.`,
+      toChoose: () => { clearInterval(this.ct); this.setState(st => { const a = { ...st.alloc }; let over = placedOf(a) - this.hers(st); ['spend', 'stock', 'gic', 'goal', 'ready', 'extra'].forEach(k => { const t = Math.min(a[k] || 0, Math.max(0, over)); a[k] = (a[k] || 0) - t; over -= t; }); return { step: 2, last: null, shown: INF.length, alloc: a }; }); },
+      paydayAmt: m(T), pileLabel: PT ? `payday ${m(P)} + bank ${m(PT)}` : 'from my payday', pileAmt: pile > 0 ? '$' + pile + ' left' : (s.hold > 0 ? 'Keep holding…' : '✍️ Hold to sign'), pileNote: pile > 0 ? (s.nudge ? `👇 place $${pile} first, then hold` : `${pileP}% of my week still to place`) : '100% placed ✓ · this is my plan', leftBg: pile > 0 ? (s.nudge ? '#ffe1d6' : '#fff4db') : '#c14a24', leftAnim: s.nudge ? 'omShake 0.4s ease 2' : 'none', leftInk: pile > 0 ? '#c14a24' : '#fff', leftCursor: pile > 0 ? 'default' : 'pointer',
+      reflect: REFLECT.map(r => { const lk = r.stage && !this.open(s, r.stage); return { label: r.label + (lk ? ` 🔒${STAGE[r.stage]}%` : ''), bg: s.reflectId === r.id ? '#2f7f77' : '#fffdf5', ink: s.reflectId === r.id ? '#fff' : '#2a2320', borderStyle: lk ? 'dashed' : 'solid', op: lk ? 0.55 : 1, pick: () => this.applyReflect(r) }; }),
+      clearAll: () => this.setState({ alloc: { extra: 0, ready: 0, goal: 0, gic: 0, stock: 0, spend: 0, adv: 0 }, reflectId: null, last: null }),
+      groups, colTracks, toggleAll: () => { this.beep(640); this.setState(st => ({ focus: st.focus === 'all' ? null : 'all' })); }, allBg: s.focus === 'all' ? '#2a2320' : '#fffdf5', allInk: s.focus === 'all' ? '#fff' : '#2a2320',
+      ggTitle: lastK ? SUBS[lastK] : '👆 Tap a box to pick it', ggGet: gg ? gg[0] : 'what each dollar does shows up here.', ggGive: gg ? gg[1] : 'every choice gives something up. That is the game.', ggBg: gg ? '#fffdf5' : '#f5efe2',
+      coachLine: pile > 0 ? `$${pile} still to place. When every card is filled, the last one reaches the top: 100% of my week.` : `100% placed: ${m(MINW + s.alloc.extra)} to the loan, ${m(s.alloc.ready + s.alloc.gic + s.alloc.stock)} saved, ${m(val.spend + val.adv)} as cash.`,
+      holdStart: () => { if (pile > 0) { this.beep(220); clearTimeout(this.nt); this.setState({ nudge: true }); this.nt = setTimeout(() => this.setState({ nudge: false }), 1400); return; } clearInterval(this.ht); this.ht = setInterval(() => { if (this.state.hold >= 100) { clearInterval(this.ht); this.sign(); return; } this.setState(st => ({ hold: Math.min(100, st.hold + 10) })); }, 60); },
+      holdEnd: () => { clearInterval(this.ht); if (s.step === 2) this.setState({ hold: 0 }); },
+      holdPct: s.hold, signBg: pile > 0 ? '#e8dfc3' : '#c14a24', signInk: pile > 0 ? '#6b5d4f' : '#fff', signLabel: pile > 0 ? 'Place every dollar first' : (s.hold > 0 ? 'Keep holding…' : '✍️ Hold to sign my plan'),
+      openDad: () => this.setState({ dad: true }), closeDad: () => this.setState({ dad: false }), dadOpen: s.dad, dadStep: ['Step 1 · Guess', 'Step 2 · Payday', 'Step 3 · Choose', 'Step 4 · Sign'][s.step],
+      script: (script || []).map(l => ({ ...l, bg: l.k === 'WAIT' ? '#fffdf5' : l.k === 'ASK' ? '#e3f0fe' : '#ffe9ef' })),
+      scriptCheck: [s.guess ? '✓ She picked a guess' : '○ Waiting for her guess', countDone ? '✓ Payday is all in' : '○ Let the coins finish falling', pile === 0 ? '✓ 100% placed — she can sign' : `○ $${pile} still to place`, '✓ Done — talk about next week'][s.step],
+      doneStrap: s.left <= 0 ? 'The wall is done. Every payday is all mine now.' : `${m(sg ? sg.pay : 0)} went on the wall.`,
+      milestone: !!s.crossed, milestoneText: s.crossed ? `🔓 ${STAGE[s.crossed]}% paid back! "${{ ready: 'Savings', gic: 'Locked away', stock: 'Companies' }[s.crossed]}" is open. Next Sunday I can put money there.` : '',
+      weekLabel: 'Week ' + s.week, signature: s.kid + ' ✓',
+      summary: sg ? [['🧱 Loan', m(sg.loanCash)], ...(sg.extra ? [['   ↳ my extra counts as', m(sg.extra * 1.1)]] : []), ['🏦 Savings', '+' + m(sg.ready)], ['🎯 Goal', '+' + m(sg.goal || 0)], ['🔒 Locked · back ' + sunDate(s.week + LOCK_WEEKS, 1), '+' + m(sg.gic)], ['📈 Companies', '+' + m(sg.stock)], ['⏪ Drawn in advance', m(sg.adv || 0)], ['💵 Cash today', m(r2(sg.wallet - (sg.adv || 0)))], ['🏦 Took from bank', m(sg.inBank || 0)]].filter(([k, v], i) => i === 0 || !/\$0\.00$/.test(v)).map(([k, v]) => ({ k, v })) : [],
+      changed: sg && b4 ? [
+        { k: '🧱 Loan left', v: `${m(b4.left)} → ${m(s.left)}`, trend: tr(b4.left, s.left, true) },
+        { k: '📅 Free by', v: `${dateIn(b4.free)} → ${dateIn(sg.free)}`, trend: sg.free < b4.free ? '⏪' : '➖' },
+        { k: '🎯 ' + K.goal.name.slice(3), v: `${m(b4.goal)} → ${m(sg.goal)}`, trend: tr(b4.goal, sg.goal) },
+        { k: '🌱 Pots earn a year', v: `${m(b4.yr)} → ${m(sg.yr)}`, trend: tr(b4.yr, sg.yr) },
+        { k: '💵 Cash this week', v: m(sg.wallet), trend: sg.wallet > 0 ? '🛍️' : '➖' }] : [],
+      stickerLine: sg && sg.stickers.length ? sg.stickers.map(id => stickerOf(id)[1] + ' ' + stickerOf(id)[2]).join(' · ') : 'None this week — try a bigger move next Sunday.', stickerBook: (s.stickers || []).map(id => stickerOf(id)[1]).join(' ') || '—',
+      tmChoices: [[1, '1 wk'], [4, '1 mo'], [20, '5 mo']].map(([n, label]) => ({ label, bg: (s.tmW || 4) === n ? '#2f7f77' : '#fffdf5', ink: (s.tmW || 4) === n ? '#fff' : '#2a2320', pick: () => this.setState({ tmW: n }) })),
+      tmRows: [['Loan left', tmLeft <= 0 ? '🎉 paid off' : m(tmLeft), '📉'], ['Savings', m(tmReady), tmReady > s.pots.ready ? '📈' : '➖'], ['Locked away', m(tmGic), tmGic > s.pots.gic ? '📈' : '➖'], ['Companies', m(tmStock), tmStock > s.pots.stock ? '📈❔' : '➖']].map(([k, v, t]) => ({ k, v, trend: t })),
+      tmBuys: `My pots would hold ${m(tmReady + tmGic + tmStock)} — ${buysOf(tmReady + tmGic + tmStock)}.`,
+      sayItBack: sg ? `I put ${m(sg.loanCash)} on my loan${sg.extra ? ` (it counted as ${m(sg.pay)})` : ''}, so I owe ${m(s.left)} now. ${m(sg.ready + (sg.goal || 0) + sg.gic + sg.stock)} is saved${r2(sg.wallet - (sg.adv || 0)) > 0 ? ` and ${m(r2(sg.wallet - (sg.adv || 0)))} comes out as cash today` : ', and no cash this week'}.` : '',
+      reset: () => { clearInterval(this.ct); this.setState(START(s.kid), () => this.syncQ()); }, redo: () => { if (!s.undo) return; this.beep(500); this.setState({ ...s.undo, undo: null, step: 2, signed: null, before: null, hold: 0, confetti: false, crossed: null, last: null }); }, nextSunday: () => this.nextSunday(),
+      pending: Q.filter(q => !q.applied).map(q => { const d = q.status, open = !d || d === 'talk'; return { icon: q.icon, text: q.text, open, ord: open ? 0 : 1, borderStyle: open ? 'dashed' : 'solid', bg: open ? '#fffdf5' : d === 'yes' ? '#e4f5ec' : '#f5efe2', ink: open ? '#c14a24' : '#2a5f59',
+        status: open ? (d === 'talk' ? '💬 Dad wants to talk' : '⏳ waiting for Dad') : d === 'yes' ? ({ goal: '✓ new goal set', move: q.to === 'cash' ? '✓ cash today' : '✓ moved', deposit: '✓ in the bank', adv: '✓ already spent · comes off today', skip: '✓ marked missed' }[q.kind] || `✓ yes · +$${q.pay != null ? q.pay : q.amt} today`) : '✗ not this time', yes: () => this.decide(q.id, true), no: () => this.decide(q.id, false) }; }).sort((a, b) => a.ord - b.ord).filter((p, i) => p.open || i < 3),
+      pendingNote: unsettled - this.attOpen(s) > 0 ? 'Payday opens when every request has an answer.' : unsettled ? '✓ Dad is done. Tick my club sessions next.' : '✓ All answered. Now I can guess.',
+      clues: [['🧹 Chores · ⛸️ job', '$3 a day · $6 a session'], ['🔥 Routine', '7 days = $3 · 6 with a grace day = $2'], ['🏆 Meets', 'points + placing'], ['🎁 Gifts', 'only after Dad says yes']].map(([k, v]) => ({ k, v })),
+      yearPctBefore: Math.min(100, K.yearSoFar / TGT * 100), yearLineBefore: `$${K.yearSoFar} of $${TGT} earned this year · about ${m(needWeek)} a week keeps me on pace`,
+      histRows: (() => { const f = v => v === 0 ? '—' : Math.abs(v) < 1 ? (v < 0 ? '−' : '') + Math.abs(Math.round(v * 100)) + '¢' : (v < 0 ? '−$' : '$') + Math.abs(Math.round(v)); const now = this.weekCat(s), seen = k => K.inf.slice(0, s.shown).some(x => (k === 'cr' ? ['jobs', 'streak', 'pa'] : [{ comp: 'comp', gifts: 'gifts', ret: 'ret', fine: 'fine' }[k]]).includes(x[0]));
+        const rows = [['📅 Steady', 'cr'], ['🏆 Comp', 'comp'], ['🎁 Gifts', 'gifts'], ['💹 Pots', 'ret'], ['📦 Fines', 'fine']].map(([k, key]) => { const av = HC.reduce((x, o) => x + o[key], 0) / 4; return { k, a: f(HC[0][key]), b: f(HC[1][key]), c: f(HC[2][key]), d: f(HC[3][key]), now: seen(key) ? f(now[key]) : '…', avg: f(av), nowInk: now[key] < 0 ? '#c14a24' : '#2a2320', line: 'none', weight: 400, bg: 'transparent' }; });
+        rows.push({ k: '= Total', a: f(tot(HC[0])), b: f(tot(HC[1])), c: f(tot(HC[2])), d: f(tot(HC[3])), now: countDone ? f(P) : '…', avg: f(avg), nowInk: '#c14a24', line: '2px solid #2a2320', weight: 700, bg: 'transparent' }); return rows; })(),
+      histNote: countDone ? (P >= avg ? `📈 ${m(P - avg)} above my 4-week average` : `📉 ${m(avg - P)} below my 4-week average`) : 'filling in as the coins fall…',
+      compStatus: [...Q.filter(q => q.kind === 'comp' && !q.applied).map(q => ({ n: q.name || q.text.split(' · ')[0], amt: q.status === 'yes' ? '$' + (q.pay != null ? q.pay : q.amt) : '', ink: q.status === 'yes' ? '#2a5f59' : '#c14a24', short: q.status === 'yes' ? '✓ Dad said yes' : q.status === 'no' ? '✗ not this time' : '⏳ waiting' })), ...K.comp.map(([n, amt, st, ink]) => ({ n, amt, st, ink, short: st.startsWith('✓') ? '✓ recorded' : 'coming up' }))],
+      giftStatus: [...K.gift.map(([n, amt, st, ink]) => ({ n, amt, st, ink, short: '✓ approved' })), ...Q.filter(q => q.kind === 'gift' && !q.applied).map(q => ({ n: q.text.split(' · ')[0], amt: q.status === 'yes' ? '$' + q.amt : '', ink: q.status === 'yes' ? '#2a5f59' : '#c14a24', short: q.status === 'yes' ? '✓ Dad said yes' : q.status === 'no' ? '✗ not this time' : '⏳ waiting' }))],
+      earnedWeek: m(earnedWeek), needWeek: m(needWeek), earnTrend: earnedWeek >= needWeek ? '📈' : '📉', yearPct: Math.min(100, (K.yearSoFar + earnedWeek) / TGT * 100),
+      yearLine: `${m(K.yearSoFar + earnedWeek)} of $${TGT} this year · ${earnedWeek >= needWeek ? 'ahead of pace' : 'a bit behind — that is OK'}`,
+      weekDays: ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => ({ d, mark: i < K.streakDays ? '🔥' : '·', bg: i < K.streakDays ? '#fff4db' : '#fffdf5', chore: K.days[i] ? '$' + K.days[i] : '—' })),
+      weekLine: `${K.streakDays} routine days · chores ${m(K.days.reduce((a, b) => a + b, 0))} graded`,
+      comingUp: K.coming.map(([n, d]) => ({ n, d })),
+      impactTitle: s.step === 2 ? '✨ What my choice changes' : 'What moved',
+      glowDam: hiExtra ? glow : 'none', glowGoal: hiGoal ? glow : 'none', glowPots: hiPots ? glow : 'none',
+      damBorder: hiExtra ? '#ff8a00' : '#2a2320', goalCardBorder: hiGoal ? '#ff8a00' : '#2a2320', potsCardBorder: hiPots ? '#ff8a00' : '#2a2320',
+      damBurst: hiExtra ? burst(s.burst.dam, 'd') : null, goalBurst: hiGoal ? burst(s.burst.goal, 'g') : null, potsBurst: hiPots ? burst(s.burst.pots, 'p') : null,
+      leftAmt: m(s.left) + ' left',
+      bricks: Array.from({ length: 100 }, (_, i) => { const bz = PR / 100, pd = PR - s.left, got = Math.max(0, Math.min(bz, pd - i * bz)), pend = live ? Math.max(0, Math.min(bz, pd + MINW + s.alloc.extra * 1.1 - i * bz)) : got; const ib = Math.floor(pd / bz), fl = (live ? pend : got) / bz * 100; return { red: i === ib && s.lastInt > 0 ? Math.max(10, Math.min(100 - fl, s.lastInt / bz * 100)) : 0, fill: fl, color: live && pend > got ? '#ffd166' : '#95d5b2', borderStyle: got >= bz ? 'solid' : 'dashed', glow: live && pend > got ? '0 0 0 2px #ff8a00' : 'none' }; }),
+      flags: Object.keys(STAGE).map(k => ({ left: STAGE[k], label: { ready: '🏦', gic: '🔒', stock: '📈' }[k], bg: this.open(s, k) ? '#e4f5ec' : '#fffdf5', ink: this.open(s, k) ? '#2a2320' : '#6b5d4f' })),
+      paidLine: `${Math.floor(paid / 10)} of 100 bricks · ${Math.round(pct)}% paid`,
+      finishLine: s.left <= 0 ? '🎉 Paid off!' : live && s.alloc.extra ? `✨ ⏪ Free by ${dateIn(s.week + freeWithExtra)} (was ${dateIn(s.week + wMin)})` : `Free by ${dateIn(s.week + wMin)} at $${Math.round(wk * 52 / 12)} a month`,
+      finishBorder: hiExtra ? hiBorder : '3px solid transparent', finishBg: hiExtra ? hiBg : 'transparent', finishWeight: hiExtra ? 700 : 400,
+      goalName: '🎯 ' + K.goal.name, goalSavedAmt: m(s.goalSaved), goalTargetAmt: m(K.goal.target), goalPct: Math.min(100, s.goalSaved / K.goal.target * 100), goalNextPct: Math.min(100, (s.goalSaved + (live ? s.alloc.ready : 0)) / K.goal.target * 100),
+      goalEta: goalLeft <= 0 ? '🎉 Saved! Tell a grown-up to make it real.' : (live && s.alloc.ready > 0 ? `✨ +${m(s.alloc.ready)} → ${Math.ceil(Math.max(0, goalLeft - s.alloc.ready) / s.alloc.ready)} more Sundays like this` : `${m(goalLeft)} to go · lives in Savings`),
+      goalBorder: hiGoal ? hiBorder : '3px solid transparent', goalBg: hiGoal ? hiBg : 'transparent', goalWeight: hiGoal ? 700 : 400,
+      pots: ['ready', 'gic', 'stock'].map(k => { const lk = !this.open(s, k), add = live ? s.alloc[k] : 0, on = hiPot(k); return { name: { ready: '🏦 Savings', gic: '🔒 Locked away', stock: '📈 Companies' }[k], bal: m(s.pots[k] + add), borderStyle: lk ? 'dashed' : 'solid', op: lk ? 0.7 : 1,
+        sub: lk ? `🔒 opens at ${STAGE[k]}% paid · ${Math.ceil((STAGE[k] / 100 * K.principal - paid) / 10)} more bricks` : add > 0 ? `✨ 📈 +${m(add * RATES[k])} more a year (${(RATES[k] * 100).toFixed(1).replace('.0', '')}%)` : `${(RATES[k] * 100).toFixed(1).replace('.0', '')}% a year · +${m(s.pots[k] * RATES[k])} a year`,
+        subBorder: on ? '2px solid #ff8a00' : '2px solid transparent', subBg: on ? hiBg : 'transparent', subWeight: on ? 700 : 400, ask: () => this.setState({ ask: k }) }; }),
+      askOpen: !!ask, closeAsk: () => this.setState({ ask: null }), askTitle: ask ? ask.t : '', askWhat: ask ? ask.what : '', askWhy: ask ? ask.why : '', askRisk: ask ? ask.risk : '', askCn: ask ? ask.cn : ''
+    };
+    V.haveOwn = `${WORDS >= 3 ? '✅ Assets' : '✅ I’d own'} ${m(saveThen)}`; V.haveOwe = `${WORDS >= 3 ? '🧱 Debt' : '🧱 I’d owe'} ${m(leftPlan)}`; V.fc = [V.fc[0], V.fc[2]]; V.infAll.forEach((x, i) => { const k = INF[i][0]; x.tag = ['jobs', 'streak', 'pa'].includes(k) ? '📅 steady' : ['comp', 'gifts', 'ret'].includes(k) ? '🎲 bonus' : ''; x.tagDisplay = x.tag ? 'inline-block' : 'none'; });
+    V.fc[0] = V.fc[0];
+    const BADGE = { jobs: 'NICE!', streak: 'YES!', pa: 'WOW', comp: 'BRAVO!', gifts: 'THANKS!' };
+    V.infAll.forEach((x, i) => { const k = INF[i][0], on = i < s.shown, amt = this.amt(s, INF[i]); x.badge = BADGE[k] || ''; x.badgeDisplay = on && amt > 0 && x.badge ? 'block' : 'none'; });
+    const sumK2 = ks => r2(INF.filter(f => ks.includes(f[0])).reduce((a, f) => a + this.amt(s, f), 0)), stW = sumK2(['jobs', 'streak', 'pa']), bnW = sumK2(['comp', 'gifts', 'ret']), fnW = sumK2(['fine']);
+    V.inTotal = m(r2(stW + bnW)); V.inNote = `📅 steady ${m(stW)} · 🎲 bonus ${m(bnW)}`; V.offTotal = m(fnW);
+    const advQ = Q.find(q => q.kind === 'adv' && q.status === 'yes' && !q.applied);
+    const drew = { name: '⏪ Drew early', note: ADVW ? `${advQ ? (advQ.day || '') + ' · ' + (advQ.text.split(' · ')[1] || '') : 'this week'} · already spent` : 'none this week', amt: ADVW ? m(ADVW) + ' spent' : '$0', ink: '#5a4d41', bg: '#fff0e6', border: ADVW ? '2px solid #2a2320' : '2px dashed #6b5d4f', op: countDone ? 1 : 0.15 };
+    V.takenOff = [...V.infAll.filter(x => x.off).map(x => ({ ...x, name: x.name, note: x.note.split(' · ').slice(0, 3).join(' · ') })), drew];
+    V.clubNote = `Only ✓ sessions pay $6 · a missed one pays $0, not a fine · ${this.attOpen(s) ? this.attOpen(s) + ' still to answer' : 'all answered ✓'}`;
+    if (countDone) V.countNote = `📅 ${m(stW)} + 🎲 ${m(bnW)} − 📦 ${m(-fnW)}${PT ? ' + 🏦 ' + m(PT) : ''} = ${m(T)} · dashed = last week`.replace(' − 📦 $0.00', '');
+    V.sumLine = `🧱 ${m(gv[0])} + 👛 ${m(gv[1])} + 🌱 ${m(gv[2])}${pile > 0 ? ' + 💰 $' + pile + ' left' : ''} = ${m(T)}${pile > 0 ? '' : ' ✓'}`;
+    V.chart = V.chart.map((c, i) => ({ ...c, safeAt: SAFE / maxA * 100, safeShow: i === 0 ? 'block' : 'none' }));
+    V.ownNote = `${V.chart[0].sub} · 🎯 goal jar counted in the total`;
+    const fl = this.fines(s), fDays = [...new Set(fl.map(x => x.day))].join(' + '), fNote = fl.length ? `${fDays} · ${fl[0].what.replace(/^\S+ /, '')} · ${[...new Set(fl.map(x => x.who))].join(' + ')} logged` : 'no fines this week 🎉';
+    const lineOf = i => { const f = INF[i], v = this.amt(s, f), on = i < s.shown, x = V.infAll[i]; return { name: f[1], note: f[0] === 'fine' ? fNote : x.note, amt: m(v), ink: v < 0 ? '#c14a24' : '#2a2320', bg: f[0] === 'fine' ? '#fff1ec' : f[4], border: v === 0 ? '2px dashed #6b5d4f' : v < 0 ? '2px solid #c14a24' : '2.5px solid #2a2320', op: on ? 1 : 0.15, rot: on && v > 0 ? `rotate(${i % 2 ? 1.2 : -1.2}deg)` : 'none', shadow: on && v > 0 ? '2px 3px 0 rgba(42,35,32,0.22)' : 'none', badge: x.badge, badgeDisplay: x.badgeDisplay }; };
+    const idxOf = ks => INF.map((f, i) => [f, i]).filter(([f]) => ks.includes(f[0])).map(([, i]) => i);
+    V.steadyLines = idxOf(['jobs', 'streak', 'pa']).map(lineOf); V.bonusLines = idxOf(['comp', 'gifts', 'ret']).map(lineOf);
+    V.stTot = m(stW); V.bnTot = m(bnW);
+    const advTxt = advQ ? `${advQ.day || ''} · ${(advQ.text.split(' · ')[1] || '').toLowerCase()} · already spent` : 'none this week';
+    V.offLines = [...idxOf(['fine']).map(lineOf), { name: '⏪ Drawn in advance', note: advTxt, amt: ADVW ? m(-ADVW) : '$0.00', ink: ADVW ? '#c14a24' : '#5a4d41', bg: '#fff0e6', border: ADVW ? '2px solid #c14a24' : '2px dashed #6b5d4f', op: countDone || s.shown >= INF.length - 1 ? 1 : 0.15, rot: 'none', shadow: 'none', badge: '', badgeDisplay: 'none' }];
+    V.offTotal = m(r2(fnW - ADVW));
+    V.minPct = Math.min(100, MINW / YMAX * 100); V.minAmt = m(MINW);
+    V.ticks = Array.from({ length: YMAX / (YMAX > 60 ? 20 : 10) }, (_, i) => (i + 1) * (YMAX > 60 ? 20 : 10)).map(t => ({ pct: t / YMAX * 100, label: '$' + t })); V.ghostPct = Math.min(100, lastWeek / YMAX * 100);
+    V.inTotal = m(r2(stW + bnW + PT)); V.bankAmt = m(PT); V.bankNote = mat ? `🔓 ${m(mat)} locked money came back` : 'only if I need it';
+    const advFromQ = s.advOwed || 0, advM = s.advMan || 0;
+    V.advAmt = ADVW ? m(-ADVW) : '$0.00'; V.advInk = ADVW ? '#c14a24' : '#5a4d41'; V.advBorder = ADVW ? '2px solid #c14a24' : '2px dashed #6b5d4f'; V.advOp = countDone ? 1 : 0.15;
+    V.advNote = advFromQ && advM ? `${advQ ? advQ.day + ' · ' + (advQ.text.split(' · ')[1] || '').toLowerCase() : 'asked'} + $${advM} I forgot to ask` : advFromQ ? `${advQ ? advQ.day + ' · ' + (advQ.text.split(' · ')[1] || '').toLowerCase() : 'asked Dad'} · spent` : advM ? 'I forgot to ask · Dad checks it' : `forgot to ask? tap + · up to $${ADV}`;
+    V.advLess = () => this.setAdv(-1); V.advMore = () => this.setAdv(1);
+    V.offLines = V.offLines.slice(0, 1);
+    V.sumLine = `🧱 ${m(gv[0])} + 👛 ${m(gv[1])} + 🌱 ${m(gv[2])}${pile > 0 ? ' + 💰 $' + pile + ' left' : ''} = ${m(TP)}${pile > 0 ? '' : ' ✓'}${cents ? ` · 🪙 ${Math.round(cents * 100)}¢ change → Savings` : ''}`;
+    const gd = deco('goal', {}), gNow = s.pots.goal || 0, gTo = aGo, GT = K.goal.target;
+    V.goalTitle = '🎯 ' + K.goal.name.slice(3); V.goalVal = gNow === gTo ? `${m(gTo)} of ${m(GT)}` : `${m(gNow)} → ${m(gTo)} of ${m(GT)}`; V.goalSub = gTo >= GT ? '🎉 reached! ask Dad to buy it' : `its own jar · counts in what I own · earns nothing · ${m(GT - gTo)} to go`;
+    V.goalJarNow = Math.min(100, gNow / GT * 100); V.goalJarTo = Math.min(100, gTo / GT * 100); V.goalBd = gd.outline !== 'none' ? '3px solid #ff8a00' : '2.5px solid #2a2320'; V.goalOp = gd.op; V.goalGl = gd.outline !== 'none' ? glow : 'none';
+    V.chart = V.chart.filter((c, i) => i !== 1); V.ownLine = ownNow === ownAfter ? m(ownNow) : `${m(ownNow)} → ${m(ownAfter)}`;
+    V.countAmt = countDone ? m(TP) : V.countAmt;
+    if (countDone) { const gIn = r2(stW + bnW + PT), gp = pcts([stW, bnW, PT], gIn), off = r2(ADVW - fnW); V.countNote = '🟩 ' + m(stW) + ' (' + gp[0] + '%) + 🟨 ' + m(bnW) + ' (' + gp[1] + '%)' + (PT ? ' + 🟦 ' + m(PT) + ' (' + gp[2] + '%)' : '') + (off > 0.004 ? ' − ' + m(off) + ' taken off' : '') + ' = ' + m(TP); }
+    V.paydayAmt = m(TP); V.pileLabel = PT ? `payday ${m(r2(P - ADVW))} + bank ${m(PT)}` : 'my pile';
+    if (sg) { const adv = sg.adv || 0, rs = [['📅 Steady', sg.inSteady, '#95d5b2'], ['🎲 Bonus', sg.inBonus, '#ffd166'], ['🏦 From bank', sg.inBank, '#8cc4ff'], ['📦 Fine', sg.outFine, '#f4b8a8'], ['⏪ In advance', -adv, '#ffb38a'], [sg.extra ? `🧱 Loan · counts as ${m(sg.pay)}` : '🧱 Loan', -sg.loanCash, '#b9aef0'], ['💵 Cash out', -r2(sg.wallet - adv), '#ff9eb5'], ['🏦 Savings', -sg.ready, '#ffd166'], ['🎯 ' + K.goal.name.slice(3), -(sg.goal || 0), '#ff9eb5'], ['🔒 Locked · back ' + sunDate(s.week + LOCK_WEEKS, 1), -sg.gic, '#8cc4ff'], ['📈 Companies', -sg.stock, '#d6b4f5']].filter(r => Math.abs(r[1] || 0) >= 0.01), mx = Math.max(1, ...rs.map(r => Math.abs(r[1])));
+      V.flowRows = rs.map(([k, v, c]) => ({ k, c, v: (v > 0 ? '+' : '−') + '$' + Math.abs(v).toFixed(2), ink: v > 0 ? '#2a5f59' : '#2a2320', wIn: v > 0 ? v / mx * 100 : 0, wOut: v < 0 ? -v / mx * 100 : 0, bIn: v > 0 ? '1.5px solid #2a2320' : 'none', bOut: v < 0 ? '1.5px solid #2a2320' : 'none' }));
+      const fin = r2(rs.filter(r => r[1] > 0).reduce((a, r) => a + r[1], 0)), fout = r2(-rs.filter(r => r[1] < 0).reduce((a, r) => a + r[1], 0)); V.flowIn = m(fin); V.flowOut = m(fout); V.flowOk = Math.abs(fin - fout) < 0.02 ? '✓' : ''; V.decTotal = m(r2(fin - (-sg.outFine || 0) - adv)); }
+    const histS = HC.map(o => o.cr), histB = HC.map(o => r2(o.comp + o.gifts + o.ret)), tlRows = [...histS.map((x, i) => ({ k: ['4 wk', '3 wk', '2 wk', 'last'][i], st: x, bn: histB[i], kind: 'past', ev: '' })), { k: 'now', st: stW, bn: bnW, kind: 'now', ev: '' }, ...months.map(x => ({ k: x.k, st: steadyAvg, bn: r2(x.v - steadyAvg), kind: 'future', ev: EV.filter(e => e[0] === months.indexOf(x)).map(e => e[1].split(' ')[0]).join('') }))], tMax = Math.max(1, ...tlRows.map(x => x.st + x.bn)) * 1.05;
+    const avgW = r2(tlRows.filter(x => x.kind === 'past').reduce((a, x) => a + x.st + x.bn, 0) / 4); V.tlAvgPct = avgW / tMax * 100; V.tlAvgLbl = 'avg ' + m(avgW);
+    V.tl = tlRows.map(x => ({ k: x.k, ev: x.ev, hs: x.st / tMax * 100, hb: x.bn / tMax * 100, bd: x.kind === 'now' ? '2.5px solid #c14a24' : x.kind === 'future' ? '1.5px dashed #2a2320' : '1.5px solid #2a2320', op: x.kind === 'future' ? 0.6 : 1, ink: x.kind === 'now' ? '#c14a24' : '#2a2320', fw: x.kind === 'now' ? 700 : 400 }));
+    V.wallBurst = hiExtra ? burst(s.burst.dam, 'd') : null; V.ownBurst = ownHot ? burst(s.burst.pots, 'p') : null; V.goalBurst2 = live && s.last && s.last.k === 'goal' ? burst(s.burst.goal, 'g') : null;
+    V.ownBd = ownHot ? '3px solid #ff8a00' : '2.5px solid #2a2320'; V.ownGl = ownHot ? glow : 'none';
+    if (sg) { const earnW = r2(sg.inSteady + sg.inBonus + sg.outFine), nW = fW, intr = { ready: RATES.ready, goal: 0, gic: RATES.gic, stock: RATES.stock };
+      V.fwEarn = m(earnW); V.fwTimes = nW === 1 ? 'same again next week' : `× ${nW} weeks, I'd earn`; V.fwEarnT = m(r2(earnW * nW));
+      const perP = wk + sg.extra * 1.1, leftP = r2(Math.max(0, s.left * (1 + irate * nW / 52) - perP * nW)), mxL = Math.max(1, s.left);
+      V.fwLoan = [['now', s.left, '#b9aef0'], ['my plan', leftP, '#9b8ee0']].map(([k, x, c]) => ({ k, v: m(x), w: x / mxL * 100, c }));
+      V.fwAssume = sg.extra ? `paying ${m(wk)} + my ${m(sg.extra)} extra each week` : `paying ${m(wk)} each week, no extra`;
+      V.fwFree = s.left <= 0 ? '🎉 done' : leftP <= 0 ? `🎉 paid off within ${nW === 1 ? 'a week' : nW === 4 ? 'a month' : '5 months'}` : `free by ${dateIn(s.week + Math.ceil(s.left / perP))}`;
+      const gT = K.goal.target; let toReady = 0;
+      const rows = [['ready', '🏦 Savings'], ['goal', '🎯 ' + K.goal.name.slice(3)], ['gic', '🔒 Locked'], ['stock', '📈 Companies']].map(([k, name]) => { const bal = s.pots[k] || 0; let put = r2((sg[k] || 0) * nW); if (k === 'goal' && bal + put > gT) { toReady = r2(bal + put - gT); put = r2(Math.max(0, gT - bal)); } const earn = r2((bal + put / 2) * intr[k] * nW / 52); return { k, name, bal, put, earn, lk: (k === 'gic' || k === 'stock') && !this.open(s, k) }; });
+      const loanSpill = r2(Math.max(0, perP * nW - s.left * (1 + irate * nW / 52))); rows[0].put = r2(rows[0].put + toReady + loanSpill); rows[0].earn = r2((rows[0].bal + rows[0].put / 2) * intr.ready * nW / 52);
+      const mk = x => x >= 100 ? '$' + Math.round(x) : m(x).replace('.00', '');
+      V.fwSave = rows.map(r => ({ k: r.name, put: r.put ? '+' + mk(r.put) : '—', earn: r.k === 'goal' ? 'none' : r.lk ? '🔒' : r.earn ? '+' + m(r.earn) : '$0', eInk: r.k === 'goal' ? '#6b5d4f' : '#2a5f59', then: mk(r2(r.bal + r.put + r.earn)), op: r.lk ? 0.55 : 1 }));
+      const pT = r2(rows.reduce((a, r) => a + r.put, 0)), eT = r2(rows.reduce((a, r) => a + r.earn, 0)), tT = r2(rows.reduce((a, r) => a + r.bal + r.put + r.earn, 0));
+      V.fwPutT = '+' + mk(pT); V.fwEarnI = '+' + m(eT); V.fwThenT = mk(tT);
+      V.fwNote = `🎯 The goal jar earns no interest. It waits for what I'm buying.${toReady ? ` Goal full → ${mk(toReady)} goes to 🏦 Savings.` : ''}${loanSpill ? ` Loan done → ${mk(loanSpill)} of payments goes to 🏦 Savings.` : ''}`; }
+    V.resultsList = [...V.compStatus.map(c => ({ ...c, n: '🏆 ' + c.n })), ...V.giftStatus.map(c => ({ ...c, n: '🎁 ' + c.n }))].slice(0, 4); V.inflows = V.infAll.filter(x => !x.off);
+    V.incSegs = []; V.incRows = []; V.outRows = []; V.earnRows = []; V.spendRows = []; V.earnLines = []; V.spendLines = []; V.stratHead = ''; V.incHead = ''; V.incKeep = ''; V.incBg = '#fffdf5'; V.incVerdict = ''; V.incInk = '#2a2320'; V.stratName = ''; V.stratWhy = ''; V.stratNext = ''; V.stratEdge = '#2a2320'; V.stratBg = '#fffdf5'; V.askTabsShow = ['ready', 'goal', 'gic', 'stock'].includes(s.ask);
+    if (sg) { const L = sg.lines || [], amtOf = k => r2(L.filter(x => x[0] === k).reduce((a, x) => a + x[2], 0)), incT = r2((sg.inSteady || 0) + (sg.inBonus || 0) + (sg.inBank || 0)) || 1, pc0 = v => Math.round(v / incT * 100) + '%';
+      const adv2 = sg.adv || 0, cashOut = r2(sg.wallet - adv2), outList = [['📦 Fine', -(sg.outFine || 0), '#f4b8a8'], ['⏪ Spent in advance', adv2, '#ffb38a'], [sg.extra ? '🧱 Loan · counts ' + m(sg.pay) : '🧱 Loan', sg.loanCash, '#b9aef0'], ['💵 Cash out', cashOut, '#ff9eb5'], ['🏦 Savings', sg.ready, '#ffe08a'], ['🎯 ' + K.goal.name.slice(3), sg.goal || 0, '#ff9eb5'], ['🔒 Locked · back ' + sunDate(s.week + LOCK_WEEKS, 1), sg.gic, '#8cc4ff'], ['📈 Companies', sg.stock, '#d6b4f5']].filter(x => x[1] > 0.004);
+      const inLines = L.filter(x => ['jobs', 'streak', 'pa', 'comp', 'gifts', 'ret'].includes(x[0]) && x[2] >= 0.005), mxI = Math.max(0.01, ...inLines.map(x => x[2]), sg.inBank || 0, ...outList.map(x => x[1]));
+      const RW = (k, v, c, dir, o) => ({ k, v: m(v), pct: pc0(v), wIn: dir > 0 ? v / mxI * 100 : 0, wOut: dir < 0 ? v / mxI * 100 : 0, c, bIn: dir > 0 ? '1.5px solid #2a2320' : 'none', bOut: dir < 0 ? '1.5px solid #2a2320' : 'none', fs: '15px', fw: 400, pad: '14px', ink: '#2a2320', ...(o || {}) });
+      V.earnRows = []; [['📅 Steady', ['jobs', 'streak', 'pa'], '#95d5b2', sg.inSteady], ['🎲 Bonus', ['comp', 'gifts', 'ret'], '#ffd166', sg.inBonus]].forEach(([name, ks, c, tt]) => { if (tt < 0.005) return; V.earnRows.push(RW(name, tt, c, 0, { fs: '16px', fw: 700, pad: '0', ink: '#2a5f59' })); inLines.filter(x => ks.includes(x[0])).forEach(x => V.earnRows.push(RW(x[1], x[2], c, 1))); });
+      if (sg.inBank > 0.004) V.earnRows.push(RW('🏦 From my bank', sg.inBank, '#8cc4ff', 1, { fs: '16px', fw: 700, pad: '0' }));
+      V.spendRows = outList.map(([k, v, c]) => RW(k, v, c, -1, { pad: '0' }));
+      const minW = sg.minW || wk, cover = minW ? sg.inSteady / minW : 9, bP = Math.round(sg.inBonus / incT * 100), kP = Math.round((sg.inBank || 0) / incT * 100), sP = Math.round(sg.inSteady / incT * 100);
+      const hd = cover < 1 ? ['🚨 Not safe yet', '#c14a24', '#fff1ec'] : bP >= 40 ? ['🎲 A lucky week, not every week', '#8a5a00', '#fff4db'] : cover < 1.5 ? ['⚠️ Only just enough', '#8a5a00', '#fff4db'] : ['✅ I can keep this up', '#2a5f59', '#e4f5ec'];
+      V.incHead = hd[0]; V.incInk = hd[1]; V.incBg = hd[2];
+      const gap = r2(sg.inBonus), earnedW = r2(sg.inSteady + sg.inBonus), room = Math.max(0, 15 - amtOf('jobs')), days = Math.min(Math.ceil(Math.min(gap, room) / 3), Math.floor(room / 3)), restG = r2(gap - days * 3), ses = restG > 0 ? Math.ceil(restG / 6) : 0, parts = [];
+      if (days) parts.push(days + ' more chore day' + (days > 1 ? 's' : '') + ' (+$' + days * 3 + ')'); if (ses) parts.push(ses + ' more club session' + (ses > 1 ? 's' : '') + ' (+$' + ses * 6 + ')');
+      const h4 = sg.hist || [], avg4 = h4.length ? r2(h4.reduce((a, b) => a + b, 0) / h4.length) : 0, dAvg = r2(earnedW - avg4), bonusNames = inLines.filter(x => ['comp', 'gifts', 'ret'].includes(x[0])).map(x => x[1].replace(/^\S+ /, '').toLowerCase() + ' ' + m(x[2])).join(', '), nextEv = (K.coming || [])[0];
+      V.earnLines = [
+        '📅 Steady ' + m(sg.inSteady) + ' (' + sP + '%): the money I earn every week from chores, routine and club sessions.',
+        '🧱 My loan needs ' + m(minW) + ' first, every week. Steady covers it ' + cover.toFixed(1) + '×' + (cover < 1 ? ', not enough on its own.' : cover < 1.5 ? ', with little to spare.' : '.'),
+        ...(bP > 0 ? ['🎲 Bonus ' + m(sg.inBonus) + ' (' + bP + '%) came from ' + bonusNames + '. ' + (nextEv ? 'Next chance: ' + nextEv[0] + ', ' + nextEv[1] + '.' : 'No meet planned yet.')] : []),
+        ...(avg4 ? ['📊 My 4-week average is ' + m(avg4) + '. This week is ' + (dAvg >= 0 ? m(dAvg) + ' more.' : m(-dAvg) + ' less.')] : []),
+        ...(kP >= 10 ? ['🏦 ' + kP + '% came from my bank. That is my own money moving, not earning.'] : []),
+        gap < 1 ? '👍 All from steady work. I can do this every week.' : '💪 To earn ' + m(earnedW) + ' with no bonus: ' + (parts.join(' + ') || 'keep every session') + (room < 3 ? '. Chores are already at the top.' : '.')].map(t => ({ t }));
+      
+      
+      const cash = r2(sg.wallet - (sg.adv || 0)), saveAmt = r2(sg.ready + (sg.goal || 0) + sg.gic + sg.stock), share = Math.max(1, sg.hers || r2(sg.extra + saveAmt + cash)), exP = Math.round(sg.extra / share * 100), cashP = Math.round(cash / share * 100), saveP = Math.round(saveAmt / share * 100);
+      const freeP = s.week + Math.ceil(s.left / (wk + sg.extra * 1.1)), freeN = s.week + Math.ceil(s.left / wk), sooner = Math.max(0, freeN - freeP), safeLow = s.pots.ready < SAFE;
+      const stratWhy0 = x => '👉 ' + x[1], st = s.left <= 0 ? ['🎉 Loan free', 'The wall is done. Every payday is all mine now.', 'Next: grow my pots and enjoy.', '#2a5f59', '#e4f5ec']
+        : cover < 1 ? ['🚨 Risky', `If bonus weeks stop, I can't make my ${m(minW)} payment. That is how people go broke.`, 'Next: keep 🛟 $10 safe and add steady work: chores and club sessions.', '#c14a24', '#fff1ec']
+        : exP >= 35 ? ['🚀 Fast track', `${exP}% of my choice went on the wall. Every week like this, I'm free by ${dateIn(freeP)}${sooner ? `, ${sooner} weeks sooner` : ''}. Pay now, enjoy later.`, safeLow ? 'Next: fill 🛟 $10 too, in case a week goes wrong.' : 'Next: keep the steady money coming.', '#2a5f59', '#e4f5ec']
+        : cashP >= 15 && exP < 10 ? ['🎈 Enjoy now', `I took ${m(cash)} as cash. Fun is OK! The loan still gets its ${m(minW)}, but stays till ${dateIn(freeN)}.`, 'Next: try a few $ on the wall. Each $1 counts as $1.10.', '#8a5a00', '#fff4db']
+        : saveP >= 40 ? ['🌱 Saver', `${saveP}% went into my pots. I'm building a cushion and my goal.`, 'Next: a little extra on the wall gets me free sooner.', '#2a5f59', '#eaf4ff']
+        : ['⚖️ Balanced', `${exP}% wall · ${saveP}% saved · ${cashP}% cash. A bit of everything.`, 'Next: pick one thing to push a little more.', '#2a2320', '#fffdf5'];
+      [V.stratName, V.stratWhy, V.stratNext, V.stratEdge, V.stratBg] = st; V.stratHead = '🧭 ' + st[0];
+      const goalLeft2 = r2(Math.max(0, K.goal.target - (s.pots.goal || 0))), capAmt = Math.floor((sg.hers || 0) * spendCap());
+      V.spendLines = [
+        '🧱 Loan ' + m(sg.loanCash) + ' (' + pc0(sg.loanCash) + ')' + (sg.extra ? ' = ' + m(minW) + ' must-pay + ' + m(sg.extra) + ' extra (counted ' + m(r2(sg.extra * 1.1)) + ').' : ' = must-pay only.') + ' Free by ' + dateIn(freeP) + (sooner ? ', ' + sooner + ' weeks sooner.' : '.'),
+        '🌱 Saved ' + m(saveAmt) + ' (' + pc0(saveAmt) + ')' + ((sg.goal || 0) > 0 ? ' · 🎯 ' + (goalLeft2 > 0 ? m(goalLeft2) + ' to my goal' : 'goal reached!') : '') + (s.pots.ready < SAFE ? ' · 🛟 safety $10 not full yet' : ' · 🛟 safety full') + '.',
+        '💵 Cash ' + m(r2(cashOut + adv2)) + ' (' + pc0(r2(cashOut + adv2)) + ')' + (cashOut + adv2 > 0.004 ? ' to enjoy. Fun is part of the plan.' : ', no treat this week (up to $' + capAmt + ' allowed).'),
+        st[2]].map(t => ({ t })); }
+    V.paState = this.attOpen(s) ? `${this.attOpen(s)} to tick` : (n => n ? `✓ ${n} × $6` : '$0 · missed')(KIDS[s.kid].sessions.filter((_, i) => this.attOf(s, i) === true).length);
+    V.ggHint = hintMap[s.tried] || hintMap[lastK] || 'tap a box to pick it · tap again = $1 · hold 2 s = $5';
+    V.askTabs = ['ready', 'goal', 'gic', 'stock'].map(k => ({ label: { ready: '🏦 Savings', goal: '🎯 Goal', gic: '🔒 Locked', stock: '📈 Companies' }[k], bg: s.ask === k ? '#2f7f77' : '#fffdf5', ink: s.ask === k ? '#fff' : '#2a2320', pick: e => { if (e && e.stopPropagation) e.stopPropagation(); this.setState({ ask: k }); } }));
+    return V;
+  }
+  nextSunday() { clearInterval(this.ct); putLS('planner-fines-v1', getLS('planner-fines-v1', FSEED).map(x => x.kid === this.state.kid ? { ...x, applied: true } : x)); putLS('planner-queue-v2', getLS('planner-queue-v2', SEED).map(q => q.kid === this.state.kid && q.status === 'yes' ? { ...q, applied: true } : q));
+    this.setState(s => { const R = getLS('planner-rules-v1', {}), rate = R.loanRate ?? 1, int = s.week % 4 === 0 ? r2(s.left * rate / 100 * 4 / 52) : 0;
+      return { undo: null, advMan: 0, left: r2(s.left + int), lastInt: int, att: {}, appliedIds: [], step: 0, advOwed: 0, advNext: 0, pull: { ready: 0, stock: 0, cash: 0 }, guess: null, cat: {}, decided: {}, shown: 0, hold: 0, confetti: false, crossed: null, lastPaid: KIDS[s.kid].principal - s.left, alloc: { extra: 0, ready: 0, goal: 0, gic: 0, stock: 0, spend: 0, adv: 0 }, reflectId: null, signed: null, before: null, last: null, need: null }; }); }
+}
+</script>
+</body>
+</html>

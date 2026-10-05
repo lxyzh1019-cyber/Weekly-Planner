@@ -19,12 +19,15 @@ let parentDest = 'now';  // which of the five destinations owns it
 let parentScope = 'both';   // 'both' | 'jenn' | 'jess'
 function parentScopeKid() { return parentScope === 'both' ? null : parentScope; }
 
-/* Five destinations. Each has a home panel; anything else it owns is a detail
-   reached from that home, with a back link rather than a second nav row. */
+/* Six destinations (Plan v9 §N: 💰 Money became its own top tab instead of
+   Setup › Money rules). Each has a home panel; anything else it owns is a
+   detail reached from that home, with a back link rather than a second nav
+   row. */
 const PARENT_DESTS = [
   { id: 'now',     icon: '📥', label: 'Now',     home: 'now' },
   { id: 'meeting', icon: '🧑‍🧑‍🧒', label: 'Meeting', home: 'review' },
   { id: 'history', icon: '📊', label: 'History', home: 'history' },
+  { id: 'money',   icon: '💰', label: 'Money',   home: 'money' },
   { id: 'setup',   icon: '📋', label: 'Setup',   home: 'setup' },
   { id: 'app',     icon: '⚙️', label: 'App',     home: 'app' },
 ];
@@ -32,7 +35,8 @@ const PARENT_PANEL_DEST = {
   now: 'now', chores: 'now',
   review: 'meeting',
   history: 'history', trends: 'history', analysis: 'history',   // trends/analysis are the toggle's two halves
-  setup: 'setup', options: 'setup', routines: 'setup', tasks: 'setup', money: 'setup', rules: 'setup',
+  money: 'money',
+  setup: 'setup', options: 'setup', routines: 'setup', tasks: 'setup', rules: 'setup',
   copyweek: 'setup',
   app: 'app', access: 'app', profiles: 'app', prefs: 'app', school: 'app', backup: 'app',
   conflicts: 'app',
@@ -45,13 +49,12 @@ const PARENT_LANDINGS = {
     { panel: 'options',  icon: '🧹', title: 'Chores and pay',      sub: 'The pool, due times, lanes and who does what' },
     { panel: 'routines', icon: '🌅', title: 'Routines',            sub: 'Morning, after school, evening, and your own' },
     { panel: 'tasks',    icon: '✅', title: 'Activities and sports', sub: 'The library both girls draw from' },
-    { panel: 'money',    icon: '💰', title: 'Money rules',         sub: 'Grades, caps, fines, loans and the week history' },
     { panel: 'rules',    icon: '⭐', title: 'Level-up',            sub: 'What earns a star on an activity' },
     { panel: 'copyweek', icon: '📋', title: 'Copy a plan',         sub: 'Put a week — or one day — onto another, or onto her sister’s' },
     { panel: 'money',    icon: '🕰️', title: 'Change history',      sub: 'Every version of the rules, when it took effect, and why',
-      section: 'changes' },
-    { panel: 'money',    icon: '👵', title: 'Grandma rule',        sub: 'A flat amount for each empty week before we started counting',
-      section: 'grandma' },
+      section: 'rules', group: 'log' },
+    { panel: 'money',    icon: '👴', title: 'Grandfather rule',        sub: 'A flat amount for each empty week before we started counting',
+      section: 'rules', group: 'gf' },
   ],
   app: [
     { panel: 'access',   icon: '🔒', title: 'Access',          sub: 'The parent PIN that everything here sits behind' },
@@ -141,7 +144,7 @@ function parentRenderLanding(destId) {
   if (!wrap) return;
   const dest = PARENT_DESTS.find(d => d.id === destId) || {};
   const rows = (PARENT_LANDINGS[destId] || []).map(r => `
-    <button type="button" class="pn-row" data-parent-panel="${escapeAttr(r.panel)}"${r.section ? ` data-parent-section="${escapeAttr(r.section)}"` : ''}>
+    <button type="button" class="pn-row" data-parent-panel="${escapeAttr(r.panel)}"${r.section ? ` data-parent-section="${escapeAttr(r.section)}"` : ''}${r.group ? ` data-parent-group="${escapeAttr(r.group)}"` : ''}>
       <span class="pn-ico" aria-hidden="true">${r.icon}</span>
       <span class="pn-text"><span class="pn-title">${escapeHtml(r.title)}</span>
         <span class="pn-sub">${escapeHtml(r.sub)}</span></span>
@@ -160,6 +163,10 @@ function parentRenderLanding(destId) {
 function parentRenderScope() {
   const wrap = document.getElementById('parentScopePills');
   if (!wrap) return;
+  /* Parent › Now has its own Jenn · Jess · Both (`wp_now_scope`, js/32), so
+     the portal's switcher hides there — one girl switch per screen (Plan v17
+     item 6). History and Copy a plan, which read `parentScope`, still show it. */
+  wrap.hidden = parentTab === 'now';
   const opts = [['both', 'Both'], ['jenn', '🐥 Jenn'], ['jess', '🦊 Jess']];
   wrap.innerHTML = opts.map(([id, label]) =>
     `<button type="button" class="pill-btn${parentScope === id ? ' active' : ''}"
@@ -210,11 +217,15 @@ function parentHandleNavClick(e) {
   if (dest) { setParentDest(dest.getAttribute('data-parent-dest')); return; }
   const panel = e.target.closest('[data-parent-panel]');
   if (panel) {
-    /* Change history is a section of Money rules, not a panel of its own — the
-       log only makes sense next to the things it logs. The row names the
-       section so it opens where it means to. */
+    /* Change history and the 👴 Grandfather rule are parts of Grown-ups, not
+       panels of their own — the log only makes sense next to the things it
+       logs. The row names the Grown-ups tab they live on (⚙️ Rules since
+       Stage 4b), so it opens where it means to. */
     const sec = panel.getAttribute('data-parent-section');
-    if (sec && typeof mnySetParentSection === 'function') mnyParentSection = sec;
+    if (sec) mnyParentSection = sec;
+    // ⚙️ Rules is one screen with groups (Plan v9 §N): open the row's own group.
+    const grp = panel.getAttribute('data-parent-group');
+    if (grp) guRuleOpenGroup(grp);
     setParentTab(panel.getAttribute('data-parent-panel'));
     return;
   }
@@ -278,8 +289,22 @@ function renderParentReviewHeader() {
    setKidAge. renderParentAge and onParentAgeChange targeted one input on the
    Weekly Review screen and had nothing left to point at. */
 
+/* 🔒 Parent ▾ — PIN, the look and Exit, in one small menu (§N "Header
+   space"). `open` forces it; no argument flips it. */
+function parentMenuToggle(open) {
+  const pop = document.getElementById('parentMenu');
+  const btn = document.getElementById('parentMenuBtn');
+  if (!pop || !btn) return;
+  const next = open == null ? pop.hidden : !!open;
+  pop.hidden = !next;
+  btn.setAttribute('aria-expanded', String(next));
+}
 function setParentTab(tab) {
   parentTab = tab;
+  const dateEl = document.getElementById('parentDate');
+  if (dateEl) dateEl.textContent = mnyDayName(todayKey());
+  // The one-row header's switcher, drawn with every panel (it was drawn only by renderParentHome).
+  parentRenderScope();
   parentDest = PARENT_PANEL_DEST[tab] || parentDest;
   const dest = PARENT_DESTS.find(d => d.id === parentDest);
   document.querySelectorAll('#screen-parent .parent-tab').forEach(t => {

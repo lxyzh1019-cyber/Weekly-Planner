@@ -50,6 +50,21 @@ check('7 clean days pays $3', tiers[2] && tiers[2].days === 7 && tiers[2].bonus 
 check('the streak pays the highest tier only, never the sum',
   (R.streak || {}).highestOnly === true, `read ${(R.streak || {}).highestOnly}`);
 
+/* ── The forgiving day counts (Plan v5 Deviation 30, 2026-10-03) ──────
+   `streak.graceCounts`: 7 kept days, or 6 kept + the one forgiving day, pays
+   the 7-day tier; a second miss ends the run. A rule version without the
+   field is a week lived before it, and keeps the old pay ($2 for 6 + 1). */
+const sixAndOne = [true, true, true, false, true, true, true];
+check('the forgiving day counts as kept', (R.streak || {}).graceCounts === true && (R.streak || {}).graceDays === 1,
+  `read ${JSON.stringify(R.streak)}`);
+check('6 kept + the forgiving day pays $3', cal.streakPaid(sixAndOne).bonus === 3,
+  `read ${cal.streakPaid(sixAndOne).bonus}`);
+check('a second miss ends the run', cal.streakPaid([true, true, false, true, true, false, true]).tier === 5,
+  `read ${JSON.stringify(cal.streakPaid([true, true, false, true, true, false, true]))}`);
+const lived = JSON.parse(JSON.stringify(R)); delete lived.streak.graceCounts;
+check('a week lived before the rule keeps its pay: 6 + 1 pays $2', cal.streakPaid(sixAndOne, null, lived).bonus === 2,
+  `read ${cal.streakPaid(sixAndOne, null, lived).bonus}`);
+
 check('a fine can never create debt',
   (R.fines || {}).dailyFloorZero === true, `read ${(R.fines || {}).dailyFloorZero}`);
 
@@ -119,13 +134,28 @@ const strong = cal.weekMoney(cal.WEEKS.strong);
    So these figures are lower on purpose. They are still locked, and still
    locked for the original reason: change a price and they move, and the
    failure is the prompt to re-run tools/money-calibrate.js and decide whether
-   the new shape is wanted. */
-check('a quiet week nets $0 — both chores are free and homework pays nothing now',
-  quiet.net === 0, `read ${quiet.net}`);
+   the new shape is wanted.
+
+   ── Re-pinned 2026-10-03 for Plan v5 Deviation 30 (the forgiving day counts) ──
+   The model now reads the grace day from the rules (it modelled none before).
+   Only the quiet week moves: Mon missed, Tue–Wed kept, Thu missed — with the
+   Monday forgiven and counted that is a 3-day run, so $0 → $1. The ordinary
+   week's run goes 5 → 6 days and stays on the 5-day tier ($11 unchanged); the
+   strong week was already 7 ($24 unchanged). Term $79 → $81, Jenn 51% → 53%. */
+/* Plan v6 Deviation 34: the money week turned Sunday–Saturday. The same
+   seven days priced Sunday first come to the same figures — day order moves
+   only ties — so nothing below was re-pinned. */
+const sameInBothOrders = ['quiet', 'ordinary', 'strong'].filter(k =>
+  cal.weekMoney(cal.WEEKS[k], 'monday').net !== cal.weekMoney(cal.WEEKS[k], 'sunday').net);
+check('each modelled week nets the same Mon–Sun and Sun–Sat (Plan v6 Deviation 34)',
+  sameInBothOrders.length === 0, `differ: ${sameInBothOrders.join(', ')}`);
+check('a quiet week nets $1 — both chores are free, homework pays nothing, and the forgiving day makes a 3-day run (Plan v5 Deviation 30; was $0)',
+  quiet.net === 1, `read ${quiet.net}`);
 check('an ordinary week nets $11', ordinary.net === 11, `read ${ordinary.net}`);
 check('a strong week nets $24', strong.net === 24, `read ${strong.net}`);
 
-check('a quiet week reaches no streak tier', quiet.streak.bonus === 0, `read ${quiet.streak.bonus}`);
+check('a quiet week reaches the 3-day tier with its forgiving day (Plan v5 Deviation 30; was no tier)',
+  quiet.streak.tier === 3 && quiet.streak.bonus === 1, `read ${JSON.stringify(quiet.streak)}`);
 check('an ordinary week reaches the 5-day tier', ordinary.streak.tier === 5, `read ${ordinary.streak.tier}`);
 check('a strong week reaches the 7-day tier', strong.streak.tier === 7, `read ${strong.streak.tier}`);
 
@@ -145,7 +175,7 @@ const byKind = { quiet, ordinary, strong };
 const termTotal = Math.round(TERM.reduce((s, k) => s + byKind[k].net, 0) * 100) / 100;
 const annual = Math.round((termTotal / TERM.length) * 52 * 100) / 100;
 
-check('a realistic eight-week term totals $79', termTotal === 79, `read ${termTotal}`);
+check('a realistic eight-week term totals $81 (Plan v5 Deviation 30; was $79)', termTotal === 81, `read ${termTotal}`);
 
 const jennTarget = Number(((R.targets || {}).jenn || {}).annual) || 0;
 const jessTarget = Number(((R.targets || {}).jess || {}).annual) || 0;
@@ -171,8 +201,8 @@ check('Jess\'s annual target is $800', jessTarget === 800, `read ${jessTarget}`)
    those happens, every surface that says "on track" is measuring against a
    figure these rates cannot reach. */
 const pctOfJenn = Math.round((annual / jennTarget) * 100);
-check('a realistic term reaches 51% of Jenn\'s annual target — the rates and the target disagree, on purpose, for now',
-  pctOfJenn === 51, `reached ${pctOfJenn}%`);
+check('a realistic term reaches 53% of Jenn\'s annual target — the rates and the target disagree, on purpose, for now (Plan v5 Deviation 30; was 51%)',
+  pctOfJenn === 53, `reached ${pctOfJenn}%`);
 
 console.log('');
 console.log(`${pass} passed, ${fails.length} failed`);

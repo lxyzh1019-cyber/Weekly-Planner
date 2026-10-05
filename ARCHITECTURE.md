@@ -544,8 +544,9 @@ between Money and More. Its only permanent door had been ⋯ More → 👯 "Sist
 not match the screen's name. **One destination, one door:** the More tile went
 with the change, and so did the 🎓 Money school and 📖 Money story tiles, which
 were extra doors to pages the Money tab already reaches (Money school: money
-tab 5 and My money's 🎓 button; Money story: My money's 📖 button in
-`mnyLinksCard`). More now holds 🧹 Chores · ◀ Switch and the build number.
+tab 5 and every '?' explainer's "📚 Take me to Money school"; Money story: My
+money's 📖 head button and the passbook's "all my Sundays ▸" — Sunday v15
+Stage 3 retired the `mnyLinksCard` that held them). More now holds 🧹 Chores · ◀ Switch and the build number.
 `tests/check-dead-actions.js` cannot see `data-td-more`, so a More tile and its
 `tdGoMore` branch are added and removed by hand, together. The label is "Sister
 Sync" because it fits on one line at 375px in the app's font — and, since Plan
@@ -1486,8 +1487,9 @@ and `ctMatrixCellChecked(kid, day, row, weekKey = ctWeekKey)`.
   `tdLevelSheet`): level and tier and XP from `mrXpLevelInfo`, and the WHOLE
   ladder from `mrPrivileges` — "yours" or "level N" per row. Close is its one
   control.
-- **Row 11 — Earned this week on My money** (`mnyEarnBoardCard`, after the
-  Today card): `ckEarnBoard` for the page's week and today — total kept after
+- **Row 11 — Earned this week on My money** (`mnyEarnBoardCard` — **retired in
+  Sunday v15 Stage 3**, Plan v5 §K: My Money v2's ☀️ countdown and "This week"
+  card answer it; the chore tab's rail keeps the board), after the Today card: `ckEarnBoard` for the page's week and today — total kept after
   fines, today's ceiling bar (fines, kept, waiting, → XP) with its keys, the
   "one more fine" line and the room line, and the ledger by channel. No bar
   when today is not in the week showing.
@@ -2565,10 +2567,13 @@ New user-created Claude skills for this ecosystem use the `HZ-` prefix
 existing conventions: `ct*` for chore-tracker functions, `mny*` for money,
 `wf-*` for the Full week grid, `wpp-*` for the week's print preview.
 
-## The parent portal is five destinations
+## The parent portal is six destinations
 
-`Now · Meeting · History · Setup · App`, declared in `PARENT_DESTS`
-(`js/11-parent.js`). It was ten flat tabs in a wrapping row, which on a phone
+`Now · Meeting · History · Money · Setup · App`, declared in `PARENT_DESTS`
+(`js/11-parent.js`). 💰 Money became its own destination in Plan v9 §N
+(Stage 6d, "Header space"); it was Setup › Money rules. The header is one
+row (`.parent-bar`): 🔒 Parent ▾ (`parentMenuToggle` — PIN, the look's
+`#parentLookBtn`, Exit), the destinations, the day, ⚙️ App, the switcher. It was ten flat tabs in a wrapping row, which on a phone
 was three lines and no order worth learning.
 
 **One panel renders at a time.** `renderParentHome()` used to call all ten panel
@@ -3820,8 +3825,10 @@ change is a dated, logged version; `mnyStagePctRefusal` refuses a broken order
 `theGatesComeFromOneTable` sweeps 0–100% and compares ladder row, pot (split and
 move gate), lesson card and chip, and each pot against its own lesson.
 
-**🔓 A pot opening is a moment.** On her own My money, `mnyStageOpenedCard`
-shows one card when her stage is above the stage last acknowledged on this
+**🔓 A pot opening is a moment.** *(Retired in Sunday v15 Stage 3: the Sunday
+milestone — "🔓 20% paid back! Savings is open", Plan v5 Deviation 33 — says it
+at the moment it happens, and the card would have said it twice.)* On her own My money, `mnyStageOpenedCard`
+showed one card when her stage is above the stage last acknowledged on this
 device (`localStorage`, `wp_mny_stage_seen_<kid>`, every access in try/catch,
 never synced). It names the pots and shows each new idea's what / why / watch
 through `mnyConceptCard` — never restated. First sight records the current stage
@@ -3985,6 +3992,215 @@ above; this is the index.
 | 6 | "Sister Sync" stays one line in the fallback font at 375px | Navigation, "Five places" | `sisterSyncTabFitsInTheFallbackFont` |
 | 7 | "90/90" → 112 here and in `tests/README.md`; the four stale "6am–9pm" comments (`js/08-day-view.js`, `js/16-print.js` ×2, `css/app.css`) say 6am–10pm | — | `grep -rn "6am.9pm" js css` finds nothing |
 | 8 | Dead code removed: the drag `inviteId` guard (`js/39-block-drag.js`), the orphan 👯 aria-label entry (`js/99-main.js`), the Chores options `export` branch (`js/29-chore-options.js`); the 12 dead chore-tab branches wait for C3 | — | grep; `check-dead-actions` reverse warnings 27 → 26 |
+
+## The money week runs Sunday to Saturday — Plan v6 Deviation 34 (2026-10-04)
+
+The owner's answer to S1-6 was "Money week only": from the meeting of
+**Sun 11 Oct 2026** the meeting pays the seven FINISHED days before it —
+Sun..Sat — for chores, the routine streak, fines and club sessions. The
+planner, every stored `weekKey` and every per-day record stay Monday–Sunday.
+
+**A dated rule, not a new key.** `MR_DEFAULT_RULES.week = { startsOn:
+'sunday', from: '2026-10-11' }`, read per key through `mrRuleOr`, so a stored
+rulebook that predates it reads the same answer; `mrMoneyWeekRulePending` /
+`mrApplyMoneyWeekRule` (marker `MR_MONEY_WEEK_NOTE`, card on Grown-ups ›
+⚙️ Rules) append it as one dated version from this week's Monday, the Sunday
+rules' way. A week is Sun–Sat when its rules say `sunday` and its meeting
+Sunday (Monday + 6) is on or after `from` (`mrMoneyWeekRuleOn`). No
+`state.shared` key was added, so no merge decision was needed.
+
+**The mapping (js/18-rules.js, `mrMoneyDays`).** Storage identity is
+(planner Monday W, dayIdx 0 = Mon … 6 = Sun). The money week keyed by W is:
+
+| Rule | Days paid | Storage refs |
+|---|---|---|
+| Mon–Sun (before the switch) | Mon(W)..Sun(W+6) | (W,0)..(W,6) — exactly as before |
+| Sun–Sat | Sun(W−1)..Sat(W+5) | (W−7, 6), (W,0)..(W,5) |
+
+The meeting on Sun(W+6) still settles weekKey W (`ctThisWeekKey()` names the
+coming meeting's week on every day under either rule); that Sunday itself is
+day 0 of the next money week, W+7. `mrMoneyWeekOf(dayKey)` answers "which
+money week pays this day" for today's surfaces. Every reader asks
+`mrMoneyDays` / `mrMoneyDayKeys` instead of `mrWeekDayKeys`: `mrChoreWeek`
+(its `days[]` now carry `dayKey`, `wk`, `d`, `taken`), `mrStreakWeek`,
+`mrFinesWeek` (and `mrFineStanding`), `mrSessionsWeek` (an attendance answer
+kept at the day's planner week is still read). A Sun–Sat week has no "unticked
+Sunday counts on its own Sunday" case (owner decision #93 stays for Mon–Sun
+weeks): its meeting comes after its last day, so Sunday's step 1 no longer
+asks for the Sunday routine (`sdSundayRoutine`). Competitions, learning and
+gifts keep their Mon–Sun week.
+
+**A day is never paid twice.** `mrFreezeWeekLedger` writes the row's
+covered days (`days`). A settled week keeps exactly the days it froze; a row
+frozen before `days` existed covered its own nominal days. The only day two
+weeks can both name is the switch Sunday (Sun 4 Oct 2026: day 6 of the last
+Mon–Sun week, day 0 of the first Sun–Sat one). An open week marks `taken` any
+of its days a settled neighbour covers, so whichever of the two settles first
+pays it — normally the old week, at the meeting of 4 Oct, leaving the first
+Sun–Sat week six days (Mon 5 – Sat 10). A `taken` day is paused for the
+streak (neither kept nor missed). Held by tests/sunday.test.js (the pure
+`mrMoneyDaysPure`, all 120 settle orders over five weeks: every day paid
+exactly once) and smoke `theMoneyWeekRunsSundayToSaturday`,
+`aDayIsNeverPaidTwiceAcrossTheSwitch`.
+
+**Readers that changed** (today's day belongs to the next money week on a
+Sunday): the ☀️ countdown (`mnyCountdownData`: on a meeting Sunday, before
+her meeting, the finished week with "Sunday is today!"), Today's 🔥 streak,
+`mrChoreWouldPay` / `mnyEarnLeftToday` (through `mrChoreDay`), the chore tab's
+cap bar, earn board, header streak and free-chore marks (kid and parent), the
+parent day cards and fines list, Grown-ups › 📦 Fines (Day row =
+the coming meeting's money days, plus today when it is not one of them; each
+fine's cost from the week that pays its day), the dispute amount, Sunday's
+"My week" strip and `mnyWorking` day names. **Unchanged on purpose:** every
+`ctWeekMoney` / `mrWeekBreakdown(W)` caller that means "the meeting at the end
+of planner week W" (week view, passbook, story, meeting, stream, Approve's
+This Sunday, the club sessions sheet).
+
+`tools/money-calibrate.js` prices its modelled weeks in the rule's order
+(Sunday first); the figures do not move (day order only moves ties), which
+tests/money.test.js now asserts — nothing was re-pinned.
+
+## The money screens use the prototype's text size — Plan v6 Deviation 35
+
+On My money (`.mv2`), the Sunday money step (`.sd`), Grown-ups (`.gu`) and
+their sheets (`#requestOverlay`, `#sundayOverlay`, `#grownupsOverlay`), at
+768px and wider, `--text-scale` is set to 1 — a scoped value of the same
+token, so every size there still multiplies it and check-look-tokens passes;
+Calm was already 1; the phone keeps the house 1.1 in Pop; the 13px floor
+still measures the result. A name on those screens is never cut with "…":
+the old ellipsis rules wrap instead, and smoke `noLabelIsCutOnTheMoneyScreens`
+fails on any ellipsis-truncated element there at 1194 (seeded My money, her
+sheets, Sunday's four steps, Grown-ups' six tabs, both looks).
+
+## Stage 6d — the approved redesigns (Plan v9 §N, build 2026-10-04b)
+
+- **Questions are answered on Parent › Now** (Deviation 36). Now draws
+  Grown-ups' own cards (`guQueue` / `guApproveCard`, js/46) on the one reader
+  and the one answerer; their `data-mnyp-action` taps go to `mnyParentClick`,
+  bound on `#pnWrap` as well as `#mnyRulesWrap`, and `mnyRenderRulesTab`
+  redraws Now while Now is on screen. Now still decides nothing of its own.
+  Its Jenn · Jess · Both and By girl / By kind toggles are device-local
+  (`wp_now_scope`, `wp_now_groupby`, try/catch), separate from the portal's
+  `parentScope`.
+- **No cash account** (Deviation 37). `wallet.cash` is unchanged and still
+  joins her Sunday pile; screens show it only as "📥 Waiting for Sunday"
+  above $0, never as a place. Savings is drawn with her goal jars inside it;
+  the jars stay `goalId` holdings (`mnyGoalHolding` is still their reader).
+- **`agreed {value, by, at}`** (Deviation 41) is the one new data field, on a
+  request record in its own store (`req:`, `mvq:`, `dep:`). It rides the
+  whole-record merge; tests/merge.test.js proves it two-device and the merge
+  layer did not change. The pure core writes it (`sdWithAgreed`) and agrees it
+  (`sdAgreeInto`: the owner's field takes the agreed figure, `agreed.asked`
+  keeps what she asked), so every owner keeps reading its own field.
+- **A calendar day adds through the planner's own sheet** (Deviation 39):
+  My money never places a block; `mnyCalDay` opens the day
+  (`openDayFromWeekCard`) and `pickFromSlot('competition')`.
+- **Weeks reads, never stores**: a Sunday's record is the frozen ledger row
+  plus the records that week used (fines, requests by `appliedWeek`,
+  overrides read without `mnyOverrides`' ensure). The saving line is the
+  core's `sdSavingLine`; "typical week" is `guSteady`, the Commitments reader.
+- "Dad" is "parents" in every on-screen sentence (Deviation 38); stored
+  `by` values and the fines' "Logged by Mom / Dad" stay.
+
+## Stage 6h — the money screens to the final reference (Plan v17, build 2026-10-04c)
+
+The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
+`mockups-6f9.html` beside it.
+
+- **One font for words and numbers** on My money, the Sunday money step, its
+  head and their sheets: the scoped value `--font-round: var(--font-body)`
+  (the same move as Deviation 35's `--text-scale`), so in Pop every figure is
+  Patrick Hand like the words around it, titles stay Gochi Hand and the
+  handwriting lines Caveat; Calm keeps its own fonts (Lexend everywhere,
+  tabular figures). Patrick Hand has no equal-width digits, so every money
+  column is right-aligned. No new font and no new host: the four Pop fonts
+  were already loaded by `index.html`.
+- **My money is one screen with doors.** No kid bottom bar on it
+  (`TD_NAV_SCREENS`); ◀ goes to Today. Extras open read-only information
+  sheets through the request sheet's chrome (`mnyOpenInfoSheet`,
+  `MNY_INFO_KINDS`, bodies in js/22). Which goal the card shows is
+  device-local (`wp_mny_goalcard_<kid>`). ⏪ Draw early is a mode of the
+  Move · Cash sheet; `mnyOpenRequestSheet('adv')` opens it there; the
+  `advance.maxPerWeek` cap is enforced and not shown.
+- **The meeting's head is two rows** (`mmHead`, js/15; `sdMeetingAvatars` /
+  `sdMeetingStepRow`, js/44) and the money step has **no footer**: the girls
+  switch in the head and 3·Close is a pill. `mmWeekBar` and `mmMoneyFooter`
+  are gone.
+- **The owe-vs-own chart reads the ledger, it stores nothing new in
+  `state.shared`.** The past is each signed row's `debtBalanceAfter` (loan
+  left) and `ownedAfter` (what she owned — a field the sign now writes on the
+  frozen row, which rides the existing ledger merge). A row without both is
+  left out and the chart says so. The forecast rule and the label thinning
+  are pure (`sdOweOwnForecast`, `sdOweOwnSeries`, `sdThinLabels`, js/43, with
+  tests in tests/sunday.test.js).
+- **"Money my money made" has one reader**, `mnyPassiveSinceLastMeeting`:
+  the stream's value-change lines into her pots since the baseline
+  (`baselineAt` on her holdings, stamped by `mnyStampPassiveBaseline`).
+  It used to be the change in each holding's value, which counted every
+  dollar moved in or out between Sundays as "made".
+- **Cash from home is her bank, never a gift** (`sdIsHomeCash`): the sign
+  writes it to `groups.bank`, not `deposits` / `groups.given`.
+- **"Earned this year" is the ledger's** (`guEarnedThisYear`, js/46), the
+  same rows the Weeks list shows; Sunday's earning target reads it too.
+
+## Stage 7 — the comparison fixes, three rules, Calm and the phone (Plan v18 §W, build 2026-10-05c)
+
+- **Every money question is answered in Parent › Now, with its tag.** Now
+  already read all three stores through the one reader (`mnyRequestsFor` →
+  `guQueue`) and answered through the one answerer (`mnyAnswerRequest`);
+  each card now carries its category tag, `sdRequestTag(kind, to)` (js/43:
+  🏆 Result · ⛸️ Club · 🔀 Move · 💵 Cash out · 🏦 Cash in · ⏪ Draw early ·
+  🎁 Gift · 🎯 Goal · 📦 Fine — a move to `cash` is a cash out). Held by smoke
+  `everyMoneyRequestIsAnsweredInNow` (one of each kind, tag, answered there).
+- **Taken off is always negative.** A fine, money drawn early and early cash
+  agreed at the meeting go through `sdOff$(v, fmt)` (js/43): a minus whatever
+  sign the caller holds, never "−$0.00". Payday, My last 4 Sundays, Signed's
+  money out, the passbook's "This week so far", Weeks' record (one line per
+  early draw: "Drawn early −$1.00 · School book fair (asked $2, agreed $1)"),
+  Now's card and the meeting's agree card. Smoke `takenOffIsAlwaysNegative`.
+- **Spare room → bigger text.** Where a card has height to fill, its rows'
+  text grows first (Coming up by row count `mv2-coming--n*`, the passbook by
+  Sundays `mv2-booktable--n*`), within the house sizes; the passbook keeps
+  the reference's 426px and Coming up takes the rest (≥1100px).
+- **Lines wrap in Calm instead of spilling.** Calm's Lexend is wider than
+  Patrick Hand, so a label that fits in Pop must be allowed to wrap (payday
+  tiles, From Savings / From home, the legend chips, What I own's names, the
+  column notes, Coming up's dates). No look-specific layout rule was added;
+  in Calm the money step can grow past 834px and scrolls in `.mm-body`.
+- **The "gap $X" label is placed, not assumed** (`sdGapLabelSpot` /
+  `sdSegHitsBox`, js/43): in the shaded gap of the newest past segment that
+  fits, else beside or above/below the signed point, box-checked against
+  every line. **The own line is the reference green**, `--sd-own` (#2f7f62).
+- **The request sheet closes with its ×** (`.rq-x`, drawn by `rqRender`
+  inside `#requestBody` so the delegated listener hears it); the doors'
+  sheets have no "Done", the Move · Cash sheet has no "Not now" and one title
+  for its four modes. ⏪ Draw early is the reference's compact body
+  (`rqAdvBody`: one plain line, How much −/+, three reasons).
+- **Calm's tight labels read a fit factor, not a second layout.** `--mny-fit`
+  (Pop 1, Calm 0.82) multiplies the font size of the money screens' tight
+  labels, always as `max(13px, calc(<size> * var(--mny-fit, 1) *
+  var(--text-scale, 1)))`, so Pop is unchanged, Calm's wider Lexend fits the
+  same boxes and the 13px floor holds. Two widths are look tokens too
+  (`--sd-legend-w`, `--sd-own-name-w`). A new tight label on these screens
+  takes the same form.
+- **Phone heads are two rows; a describing word is `.ph-word`.** Under 768px
+  it hides and the icon, number or picture stays; the control carries its
+  full name in `aria-label`. My money's head breaks into rows with an
+  `::after` row break and `order`.
+- **A floored fine says so.** Fines can zero a day, never create debt, so a
+  fine listed at its cost (−$1.00) can take nothing; the row keeps the minus
+  and adds `sdFineFloorNote` ("nothing taken — the day was $0"), read through
+  `mnyFineFloorNote` from the week that pays the day.
+- **Now's count has one reader**, `pnOpenCount(kids)` (js/32): the badge and
+  "N open" agree.
+- **Clock- and calendar-dependent smoke checks are pinned.**
+  `todayIsWhereTheDayGetsDone` pins `new Date()` to midday (its "always
+  ahead" block was clamped at 11pm, so it failed between 11pm and midnight).
+  `sundaySundayRoutineCounts`, `theFourHouseRulesHold`,
+  `grownupsFinesLogEvenWhenFree` and `anUnfinishedDayIsNeverForgiven` test
+  the Monday–Sunday money week and pin it (`pinMonSunMoneyWeek`, which
+  stands `mrMoneyWeekRuleOn` down for the check): from the week of Sun 11 Oct
+  2026 the current week is Sunday–Saturday and they failed by the date.
 
 ## Known trip hazards
 

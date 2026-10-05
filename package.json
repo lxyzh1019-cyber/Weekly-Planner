@@ -10,9 +10,10 @@
     "test:stream": "node tests/stream.test.js",
     "test:smoke": "node tests/smoke.js",
     "test:cleanup": "node tests/cleanup-tool.test.js",
-    "test": "npm run check && npm run test:merge && npm run test:buffers && npm run test:stream && npm run test:cleanup && npm run test:xp && npm run test:money && npm run test:smoke",
+    "test": "npm run check && npm run test:merge && npm run test:buffers && npm run test:stream && npm run test:cleanup && npm run test:xp && npm run test:money && npm run test:sunday && npm run test:smoke",
     "test:xp": "node tests/xp.test.js",
-    "test:money": "node tests/money.test.js"
+    "test:money": "node tests/money.test.js",
+    "test:sunday": "node tests/sunday.test.js"
   },
   "devDependencies": {
     "playwright-core": "1.62.1"

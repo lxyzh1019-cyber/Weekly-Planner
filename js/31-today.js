@@ -572,7 +572,7 @@ function tdQuestHero(kid, blocks) {
      with it, so an off day never reads as a broken run here either. The level
      is a button now: it opens "My level", the privileges ladder (tdOpenLevel).
      Spans, not divs, because a <button> may only hold phrasing content. */
-  const streak = mrStreakWeek(ctThisWeekKey(), kid).days;
+  const streak = mrStreakWeek(mrMoneyWeekOf(todayKey(), kid), kid).days;   // today's money week (Deviation 34)
   return `<div class="dq-hero">
       <button type="button" class="dq-hero-level" data-td-action="level"
         aria-label="${escapeAttr(`Level ${level}. See what XP buys`)}">
@@ -1704,8 +1704,8 @@ function tdRenderToday() {
    Still to earn $1.50" — which is a table, and a table is the slowest way to
    answer "how am I doing". Two pictures instead:
 
-   A stacked bar for where her money IS right now (cash · kept ready · locked ·
-   invested), because the shape of that bar is the whole financial-literacy
+   A stacked bar for where her money IS right now (cash · Savings · locked away ·
+   Companies), because the shape of that bar is the whole financial-literacy
    lesson — a bar that is all cash looks different from one that is mostly
    saved, and she can see which is which without reading a number.
 
@@ -1717,10 +1717,11 @@ function tdRenderToday() {
    mnyTotalOwing are the same accessors My money uses, so the two can never
    disagree; the row taps through to that page, and nothing here moves money. */
 const TD_MONEY_SEGMENTS = [
-  { key: 'cash',   label: 'Cash',       colour: 'var(--cat-daily)' },
-  { key: 'saved',  label: 'Kept ready', colour: 'var(--cat-free)' },
-  { key: 'locked', label: 'Locked',     colour: 'var(--cat-school)' },
-  { key: 'stock',  label: 'Invested',   colour: 'var(--cat-custom)' },
+  // Not an account (Plan v9 Deviation 37): money that came in between Sundays, shown only while there is some.
+  { key: 'cash',   label: '📥 Waiting for Sunday', colour: 'var(--cat-daily)' },
+  { key: 'saved',  label: 'Savings',    colour: 'var(--cat-free)' },
+  { key: 'locked', label: 'Locked away', colour: 'var(--cat-school)' },
+  { key: 'stock',  label: 'Companies',  colour: 'var(--cat-custom)' },
 ];
 
 /* Everything she has, per pot. */
@@ -2020,7 +2021,9 @@ const TD_NAV = [
 /* Screens that belong to a child. The nav is hidden everywhere else — a parent
    in the portal does not need a child's bottom bar, and the profile picker is
    where you go to stop being a child. */
-const TD_NAV_SCREENS = ['screen-today', 'screen-week', 'screen-mymoney', 'screen-chore',
+/* Not on 💰 My money (Plan v17 §1): its one-row head has ◀ back to Today and
+   the page needs the height. */
+const TD_NAV_SCREENS = ['screen-today', 'screen-week', 'screen-chore',
                         'screen-day', 'screen-sync', 'screen-moneystory',
                         'screen-moneyschool'];
 

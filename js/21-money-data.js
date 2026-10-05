@@ -33,13 +33,13 @@
 
    THE STAGE IS THE ONE OWNER OF A GATE. Each stage has an id; its number lives
    in the rulebook (`school.stagePct`, js/18-rules.js) and is read only through
-   `mnyStagePct`. MNY_BUCKETS, MNY_PLANS and MNY_CONCEPTS name a STAGE and never
+   `mnyStagePct`. MNY_BUCKETS, SD_GATE_STAGE (js/43) and MNY_CONCEPTS name a STAGE and never
    a number. They used to carry their own copies (30 / 60 / 90 in three tables)
    and nothing made them agree, so a pot, its lesson and the ladder row could
    each have said something different about the same moment. */
 const MNY_STAGES = [
   { id: 'start',  icon: '🎿', title: 'What I owe, and what I keep' },
-  { id: 'ready',  icon: '💵', title: 'Keeping money ready' },
+  { id: 'ready',  icon: '🏦', title: 'Savings' },
   { id: 'locked', icon: '🔒', title: 'Locking money away' },
   { id: 'stock',  icon: '📈', title: 'Trying it with stocks' },
   { id: 'mix',    icon: '🧩', title: 'Building my own mix' },
@@ -54,24 +54,14 @@ const MNY_BUCKETS = [
   // the first week — but capped at a fifth, so a whole week can never vanish
   // into one afternoon.
   { key: 'spend', icon: '🛍️', label: 'Spend it',       stage: 'start', tint: 'var(--mny-pot-spend-tint)' },
-  { key: 'ready', icon: '💵', label: 'Keep it ready',  stage: 'ready', tint: 'var(--mny-pot-ready-tint)' },
-  { key: 'gic',   icon: '🔒', label: 'Lock it away for a year', stage: 'locked', tint: 'var(--mny-pot-gic-tint)' },
-  { key: 'stock', icon: '📈', label: 'Buy a bit of a company',  stage: 'stock', tint: 'var(--mny-pot-stock-tint)' },
+  { key: 'ready', icon: '🏦', label: 'Savings',  stage: 'ready', tint: 'var(--mny-pot-ready-tint)' },
+  { key: 'gic',   icon: '🔒', label: 'Locked away · 4 weeks', stage: 'locked', tint: 'var(--mny-pot-gic-tint)' },
+  { key: 'stock', icon: '📈', label: 'Companies',  stage: 'stock', tint: 'var(--mny-pot-stock-tint)' },
 ];
 
-/* The ready-made plans. Fractions of what is hers to choose. */
-const MNY_PLANS = [
-  { id: 'debt',     icon: '🎿', label: 'Pay off my loan first', stage: 'start',  split: { loan: 1 } },
-  { id: 'ready',    icon: '💵', label: 'Keep some ready',       stage: 'ready',  split: { loan: 0.4, ready: 0.6 } },
-  { id: 'balanced', icon: '⚖️', label: 'A bit of everything',   stage: 'locked', split: { loan: 0.4, ready: 0.3, gic: 0.3 } },
-  { id: 'grow',     icon: '📈', label: 'Grow it more',          stage: 'stock',  split: { loan: 0.3, ready: 0.1, gic: 0.2, stock: 0.4 } },
-  { id: 'last',     icon: '🔁', label: 'Same as last week',     stage: 'start',  split: null },
-  /* Not a stage-gated idea — it is manual entry, and the "or set every number
-     yourself" steppers directly below this card are open at every stage. A
-     locked card sitting above the unlocked control that does the same thing is
-     just a lie about what the screen can do. */
-  { id: 'own',      icon: '🧩', label: "I'll choose every number myself", stage: 'start', split: null, own: true },
-];
+/* The ready-made plans (`MNY_PLANS`) are retired with the meeting's old money
+   panels (Sunday v15 Stage 4, Plan v3 §G): the three starts on Sunday's "I
+   choose" step are the core's `SD_PRESETS` (js/43). */
 
 /* Investing is a fixed menu — no typing in a ticker. A nine-year-old picking a
    company by name is the lesson; a search box is a casino. */
@@ -153,48 +143,70 @@ const MNY_UNPAID = [
 ];
 
 /* The ideas Money school teaches, in the order they open. `stage` is the
-   MNY_STAGES id that opens it; the debt card names the real debt at render time. */
+   MNY_STAGES id that opens it; the debt card names the real debt at render time.
+
+   ONE statement of each idea (Plan v3 §G): Money school's cards and every '?'
+   explainer read these same lines. Where Sunday v15 draws an idea (its
+   CONCEPTS: the loan, spending, Savings, the goal jar, the 4-week lock, a bit
+   of a company) the words are the prototype's, with its Chinese line (`cn`);
+   the others keep the app's own words and gain a Chinese line in the same
+   voice. Numbers a rule decides are tokens, filled from the live rules by
+   `mnyConceptCard` — {every} (Sundays between interest), {bonus1} (what an
+   extra $1 counts as), {lockWeeks}, {cap} (the spend share in words) — so a
+   rule changed in Grown-ups never leaves an explainer saying the old one. */
 const MNY_CONCEPTS = [
   /* {debt} is filled in with the real name from her debt record, so this reads
      as being about her week rather than about money in general. */
-  { id: 'debt', icon: '🎿', title: 'Owing money', stage: 'start',
-    what: 'We paid for {debt} up front, and you pay us back a bit at a time.',
-    why: 'You got it straight away instead of waiting years to save up for it.',
-    risk: 'Until {debt} is paid off, part of every week is already spoken for.' },
+  { id: 'debt', icon: '🧱', title: 'My loan', stage: 'start',
+    what: 'My parents paid for {debt} now, so I did not have to wait. I pay it back a bit every week.',
+    why: 'I get to do what I love now, not years from now.',
+    risk: 'It costs: interest every {every} Sundays, and the payment comes first every week, even a bad week. Each extra $1 counts as {bonus1}.',
+    cn: '贷款：现在就能做想做的事，不用等；代价是利息，而且每周必须先还。' },
   { id: 'cash', icon: '💵', title: 'Cash', stage: 'start',
     what: 'Money you can use today, sitting in your wallet.',
     why: 'It is ready the moment you need it.',
-    risk: 'It does not grow at all while it sits there.' },
-  { id: 'spend', icon: '🛍️', title: 'Spending some of it', stage: 'start',
-    what: 'Money you decide to actually use, on something you want.',
-    why: 'Money is for something. Choosing what, and living with the choice, is the whole skill.',
-    risk: 'It is gone once it is spent, and it never comes back as more. That is why only a fifth of a week can go here.',
-    whyLabel: 'The good side', riskLabel: 'The other side' },
+    risk: 'It does not grow at all while it sits there.',
+    cn: '现金：马上能用，但放着不会长。' },
+  { id: 'spend', icon: '👛', title: 'Spending', stage: 'start',
+    what: 'Cash I take out to buy something I want this week.',
+    why: 'Spending on things I love brings real happiness. That is what money is for.',
+    risk: 'Once it is spent, it is gone, and it earns nothing. I can take up to {cap} of my share.',
+    cn: '花钱：买喜欢的东西会开心；但花了就没了，也不生钱。' },
   { id: 'extra', icon: '⚡', title: 'Paying early', stage: 'start',
     what: 'Paying more off {debt} than you have to, before it is due.',
-    why: 'You earn a bonus for it, and {debt} is gone sooner.',
+    why: 'You earn a bonus for it — each extra $1 counts as {bonus1} — and {debt} is gone sooner.',
     risk: 'That money has gone into {debt} — you cannot get it back out.',
-    whyLabel: 'The good side', riskLabel: 'The other side' },
-  { id: 'ready', icon: '🏦', title: 'Keeping money ready', stage: 'ready',
+    cn: '提前还：每多还一块钱算得更多，贷款早点还完；但还进去就拿不回来了。' },
+  { id: 'ready', icon: '🏦', title: 'Savings', stage: 'ready',
     what: 'Money set aside that you can still get back whenever you want.',
     why: 'When something goes wrong, you are not stuck.',
-    risk: 'It grows very slowly — a little bit each year.' },
+    risk: 'It grows very slowly — a little bit each year.',
+    cn: '随时能取的钱：慢慢长，但永远在。' },
+  { id: 'goal', icon: '🎯', title: 'Goal jar', stage: 'ready',
+    what: 'Money kept for one thing I want to buy.',
+    why: 'It stops me spending it on something else.',
+    risk: 'It earns nothing while it waits.',
+    cn: '目标罐：专门存给一样东西，不生利息。' },
   { id: 'save', icon: '💰', title: 'Interest', stage: 'ready',
     what: 'The bank pays you a small amount each year for keeping money there.',
     why: 'Money you leave alone quietly makes a bit more money.',
-    risk: 'It is small. It will not make you rich on its own.' },
-  { id: 'gic', icon: '🔒', title: 'Locking money away for a year', stage: 'locked',
-    what: 'You promise not to touch it for a year, and the bank pays you more.',
-    why: 'More than just keeping it ready, and the amount is promised.',
-    risk: 'You really cannot touch it. Not even if you change your mind.' },
+    risk: 'It is small. It will not make you rich on its own.',
+    cn: '利息：钱放着不动，会慢慢多一点；但不多，靠它发不了财。' },
+  { id: 'gic', icon: '🔒', title: 'Locking money away for {lockWeeks} weeks', stage: 'locked',
+    what: 'You promise not to touch it for {lockWeeks} weeks, and the bank pays you a bit more.',
+    why: 'More than Savings, and the amount is promised.',
+    risk: 'You really cannot touch it for {lockWeeks} weeks. Not even if you change your mind.',
+    cn: '锁四周：利息多一点，但四周里碰不得。' },
   { id: 'stock', icon: '📈', title: 'Owning a bit of a company', stage: 'stock',
     what: 'You buy a small piece of a real company.',
     why: 'If the company does well, your piece is worth more.',
-    risk: 'It can go down too. In 2023 one of these fell by a third in six months.' },
+    risk: 'It can go down too. In 2023 one of these fell by a third in six months.',
+    cn: '买公司的一小块：会涨，也会跌。' },
   { id: 'mix', icon: '🧩', title: 'Not putting it all in one place', stage: 'mix',
     what: 'Splitting your money so it is not all doing the same job.',
     why: 'If one part has a bad year, the others carry you.',
-    risk: 'You will never make as much as if you had guessed right and put it all in one.' },
+    risk: 'You will never make as much as if you had guessed right and put it all in one.',
+    cn: '分开放：一处不好，别处撑着；但永远赚不到全押对的那么多。' },
 ];
 function mnyConceptById(id) { return MNY_CONCEPTS.find(c => c.id === id) || null; }
 /* The `?` on any bucket, tile or row → the idea behind it. */
@@ -230,10 +242,10 @@ function mnyNormalizeHolding(h) {
   if (h.rateAnnual == null) h.rateAnnual = 0;      // 0.015 = 1.5% a year
   if (!h.openedOn) h.openedOn = todayKey();
   if (h.maturesOn == null) h.maturesOn = '';
-  // The last day this holding's growth was worked out, and what it was worth at
-  // the last settled Sunday. Both drive the simulation below.
+  // The last day this holding's growth was worked out — it drives the
+  // simulation below. (What it made since the last settled Sunday is read
+  // from the stream: `mnyPassiveSinceLastMeeting`.)
   if (!h.lastAccruedOn) h.lastAccruedOn = h.openedOn || todayKey();
-  if (h.valueAtLastMeeting == null) h.valueAtLastMeeting = money2(h.units * h.priceNow);
   if (!h.createdAt) h.createdAt = syncNow();
   return h;
 }
@@ -282,7 +294,8 @@ function mnySimCatchUp(kid, opts) {
     // it was promised for the term. It is the one holding that ends by itself.
     if (h.kind === 'gic' && h.maturesOn && String(h.maturesOn) <= String(today)) {
       const value = mnyHoldingValue(h);
-      const term = (Number(h.termMonths) || 12) / 12;
+      // A Sunday v15 lock is counted in weeks; a year-long one in months.
+      const term = (Number(h.termWeeks) > 0) ? Number(h.termWeeks) / 52 : (Number(h.termMonths) || 12) / 12;
       const payout = money2(value * (1 + (Number(h.rateAnnual) || 0) * term));
       w.cash = money2(w.cash + payout);
       /* The whole payout comes back, principal and the interest it was promised
@@ -340,15 +353,40 @@ function mnySimCatchUp(kid, opts) {
 /* What her money made on its own since the last settled Sunday — interest
    credited plus any change in what her companies are worth. This is real
    income, it just was not earned by working, and a week's bar that leaves it
-   out does not add up. */
+   out does not add up.
+
+   Read from the stream's value-change lines into (and out of) her pots
+   (`evMirrorValueChange`: from `interest` to Savings, Locked away or
+   Companies), after the baseline — not from the change in each holding's
+   value. A value change also counted every dollar MOVED in or out between
+   Sundays (a move to the wall, cash put into Savings, a goal jar filled), so
+   Payday and the Weeks record of the same Sunday disagreed (Plan v17 item
+   11: $5.00 vs $2.00). One reader now: Payday, the week's bar and the
+   ledger's `passive` at the sign all ask this. A lock's interest comes back
+   as cash and joins her pile, so it is not counted here twice. */
 function mnyPassiveSinceLastMeeting(kid) {
   mnySimCatchUp(kid);
-  return money2(mnyEnsureHoldings(kid)
-    .reduce((s, h) => s + (mnyHoldingValue(h) - money2(h.valueAtLastMeeting)), 0));
+  const since = mnyPassiveBaselineAt(kid);
+  const pots = Object.keys(EV_HOME_FOR_HOLDING).map(k => EV_HOME_FOR_HOLDING[k]);
+  return money2(evList(kid).reduce((s, e) => {
+    if (!e || !(Number(e.at) > since)) return s;
+    if (e.from === 'interest' && pots.indexOf(e.to) >= 0) return s + money2(e.amount);
+    if (e.to === 'interest' && pots.indexOf(e.from) >= 0) return s - money2(e.amount);
+    return s;
+  }, 0));
+}
+/* When the last baseline was stamped: the newest `baselineAt` on her
+   holdings, else her last signed Sunday's ledger row. */
+function mnyPassiveBaselineAt(kid) {
+  const t = Math.max(0, ...mnyEnsureHoldings(kid).map(h => Number(h && h.baselineAt) || 0));
+  if (t) return t;
+  const r = (typeof mnyLedgerRows === 'function') ? mnyLedgerRows(kid)[0] : null;
+  return r ? (Number(r.updatedAt || r.at) || 0) : 0;
 }
 /* Called once the week is settled: this Sunday becomes the new baseline. */
 function mnyStampPassiveBaseline(kid) {
-  mnyEnsureHoldings(kid).forEach(h => { h.valueAtLastMeeting = mnyHoldingValue(h); });
+  const at = syncNow();
+  mnyEnsureHoldings(kid).forEach(h => { h.baselineAt = at; });
   saveAll();
 }
 
@@ -397,13 +435,24 @@ function mnyHoldingValue(h) { return money2((Number(h.units) || 0) * money2(h.pr
 function mnyKindTotal(kid, kind) {
   return money2(mnyHoldingsOfKind(kid, kind).reduce((s, h) => s + mnyHoldingValue(h), 0));
 }
-function mnySavedTotal(kid) { return mnyKindTotal(kid, 'savings'); }
+/* 🏦 Savings is the plain Savings-kind holdings. The 🎯 goal jar is a
+   Savings-kind holding too (same stream home, `ready`) but it is kept for one
+   thing, so it is NOT what Savings can spend, move or cover a loan from —
+   `mnyGoalHolding` is its one reader. `mnyReadyHomeTotal` is both together:
+   what the stream's `ready` home holds. */
+function mnyIsGoalHolding(h) { return !!(h && h.goalId); }
+function mnySavedTotal(kid) {
+  return money2(mnyHoldingsOfKind(kid, 'savings').filter(h => !mnyIsGoalHolding(h))
+    .reduce((s, h) => s + mnyHoldingValue(h), 0));
+}
+function mnyReadyHomeTotal(kid) { return mnyKindTotal(kid, 'savings'); }
 function mnyLockedTotal(kid) { return mnyKindTotal(kid, 'gic'); }
 function mnyInvestedTotal(kid) { return mnyKindTotal(kid, 'stock'); }
 function mnyCash(kid) { return money2(ensureWallet(kid).cash); }
 /* Everything she has, in one number. */
 function mnyEverything(kid) {
-  return money2(mnyCash(kid) + mnySavedTotal(kid) + mnyLockedTotal(kid) + mnyInvestedTotal(kid));
+  // The goal jar counts in what she owns (mnyReadyHomeTotal includes it).
+  return money2(mnyCash(kid) + mnyReadyHomeTotal(kid) + mnyLockedTotal(kid) + mnyInvestedTotal(kid));
 }
 
 /* ── What is still on the table today ──
@@ -416,12 +465,14 @@ function mnyEverything(kid) {
    "left" to speak of and the caller should say what she has earned instead. */
 function mnyEarnLeftToday(kid, weekKey) {
   const wk = weekKey || mnyWeekKey();
-  const cap = (mrRulesForWeek(wk).chores || {}).dailyCap;
-  const chores = mrChoreWeek(wk, kid);
   const today = formatDayKey(todayKey());
   const dayIdx = Math.max(0, Math.min(6,
     Math.round((today - formatDayKey(wk)) / (24 * 60 * 60 * 1000))));
-  const done = money2((chores.days[dayIdx] || {}).paid);
+  // Today's money, read in the money week that pays today (Deviation 34).
+  const cd = mrChoreDay(kid, mrWeekDayKeys(wk)[dayIdx]);
+  const cap = (mrRulesForWeek(cd.wk).chores || {}).dailyCap;
+  const chores = cd.week;
+  const done = money2(cd.day.paid);
   return {
     dayIdx, done, cap: (cap == null) ? null : money2(cap),
     left: (cap == null) ? null : money2(Math.max(0, cap - done)),
@@ -465,7 +516,7 @@ function mnyRemoveHolding(kid, holdingId) {
 function mnyAddToSaved(kid, amount) {
   const amt = money2(amount);
   if (!(amt > 0)) return false;
-  const existing = mnyHoldingsOfKind(kid, 'savings')[0];
+  const existing = mnyHoldingsOfKind(kid, 'savings').filter(h => !mnyIsGoalHolding(h))[0];
   if (existing) {
     existing.units = 1;
     existing.priceNow = money2(mnyHoldingValue(existing) + amt);
@@ -483,7 +534,7 @@ function mnyTakeFromSaved(kid, amount) {
   let left = money2(amount);
   if (!(left > 0)) return 0;
   let took = 0;
-  mnyHoldingsOfKind(kid, 'savings').forEach(h => {
+  mnyHoldingsOfKind(kid, 'savings').filter(h => !mnyIsGoalHolding(h)).forEach(h => {
     if (!(left > 0)) return;
     const have = mnyHoldingValue(h);
     const take = money2(Math.min(have, left));
@@ -580,12 +631,128 @@ function mnyCompleteGoal(kid, id) {
   if (!isParent()) { showToast('Tell a grown-up — they will mark it 🎉'); return false; }
   const g = mnyGoalById(kid, id);
   if (!g || g.done) return false;
-  mnyTakeFromSaved(kid, Math.min(money2(g.saved), mnySavedTotal(kid)));
+  /* The money for it is in its goal jar when it has one; anything recorded
+     beyond the jar comes out of Savings as before. */
+  const jar = mnyEnsureHoldings(kid).find(h => h.kind === 'savings' && h.goalId === g.id);
+  const fromJar = jar ? mnyHoldingValue(jar) : 0;
+  if (jar) mnyRemoveHolding(kid, jar.id);
+  const rest = money2(Math.max(0, money2(g.saved) - fromJar));
+  const took = rest > 0 ? mnyTakeFromSaved(kid, Math.min(rest, mnySavedTotal(kid))) : 0;
+  /* What she bought leaves her money: one line from `ready` (the jar and any
+     Savings top-up share that home) to `spent`. Without it the stream still
+     counted the jar after the holding was gone — the drift Stage 4b fixed. */
+  const spent = money2(fromJar + took);
+  if (spent > 0) evMirror(kid, { kind: 'out', from: 'ready', to: 'spent', amount: spent, ref: g.id,
+                                 note: '🎉 Bought: ' + (g.icon ? g.icon + ' ' : '') + (g.name || 'my goal') });
   g.done = true;
   g.doneAt = Date.now();
   g.updatedAt = syncNow();
   saveAll();
   return true;
+}
+
+/* ── 🎯 THE GOAL JAR (Plan v3 §B, §I) ─────────────────────────────
+   Its own jar: a Savings-kind holding `{kind:'savings', goalId, rateAnnual:0}`
+   tied to the active goal — it counts in what she owns and earns nothing, and
+   it is not Savings (mnySavedTotal / mnyTakeFromSaved leave it out). Same
+   stream home as Savings (`ready`), so filling it from Savings or emptying it
+   back is no stream line at all.
+
+   The active goal is the newest one not done. The holding's id is derived
+   from the goal's (`goal-hold-<goalId>`), so two devices that each create it
+   create ONE record. A goal that already had money set aside (`saved > 0`)
+   from before the jar existed gets its jar on first read, filled from Savings
+   up to what is there — idempotent by that id. */
+function mnyActiveGoal(kid) {
+  const open = mnyGoals(kid);
+  if (!open.length) return null;
+  return open.slice().sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0))[0];
+}
+function mnyGoalHoldingId(goalId) { return 'goal-hold-' + goalId; }
+function mnyGoalHolding(kid) {
+  const g = mnyActiveGoal(kid);
+  return g ? mnyGoalJarFor(kid, g.id) : null;
+}
+/* ── Several goals, each its own jar (Plan v5 §L M4) ──
+   Every open goal can have a jar, found by its derived id; `mnyGoalHolding`
+   is the newest goal's. Made on first need the same way: a goal's earlier
+   `saved` comes out of Savings, as far as Savings has it. */
+function mnyGoalJarFor(kid, goalId) {
+  const g = mnyGoalById(kid, goalId);
+  if (!g || g.done) return null;
+  const list = mnyEnsureHoldings(kid);
+  const have = list.find(h => h.kind === 'savings' && h.goalId === g.id);
+  if (have) return have;
+  const took = money2(g.saved) > 0 ? mnyTakeFromSaved(kid, Math.min(money2(g.saved), mnySavedTotal(kid))) : 0;
+  return mnyAddHolding(kid, { id: mnyGoalHoldingId(g.id), kind: 'savings', goalId: g.id,
+    name: '🎯 ' + (g.name || 'My goal'), units: 1, priceNow: money2(took), costBasis: money2(took),
+    rateAnnual: 0 });
+}
+/* What a goal's jar holds, READ ONLY — never makes the jar, so drawing the
+   page moves no money. Before its jar exists, a goal's own `saved`. */
+function mnyGoalJarValue(kid, goal) {
+  if (!goal) return 0;
+  const jar = mnyEnsureHoldings(kid).find(h => h.kind === 'savings' && h.goalId === goal.id);
+  return jar ? money2(mnyHoldingValue(jar)) : money2(goal.saved);
+}
+/* 🎯 Which goal Sunday's goal box asks about first: the nearest date first,
+   goals with no date after them (newest first), done goals never. Stage 4's
+   Sunday 🎯 box reads this; My money draws the jars in the same order. */
+function mnyGoalsNearestFirst(kid) {
+  return mnyGoals(kid).slice().sort((a, b) => {
+    const da = a.targetDate || '', db = b.targetDate || '';
+    if (da && db && da !== db) return da < db ? -1 : 1;
+    if (!!da !== !!db) return da ? -1 : 1;
+    return (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0);
+  });
+}
+/* Goal jars wait for Savings (Plan v5 Deviation 31): below the Savings gate
+   no money goes INTO a jar, from any door. A sentence, or null when it can. */
+function mnyGoalJarRefusal(kid) {
+  return mnyIsOpen(kid, 'ready') ? null
+    : '🔒 Goal jars open with Savings, at ' + mnyStagePct('ready') + '% paid off.';
+}
+/* Money into a jar, holding-level (the stream line is the caller's — see
+   moneyDepositGoal). The goal's `saved` moves with it. `goalId` picks the
+   jar; without it, the newest goal's. Refused while Savings is shut. */
+function mnyAddToGoal(kid, amount, goalId) {
+  const amt = money2(amount);
+  if (!(amt > 0)) return false;
+  if (mnyGoalJarRefusal(kid)) return false;
+  const h = goalId ? mnyGoalJarFor(kid, goalId) : mnyGoalHolding(kid);
+  if (!h) return false;
+  h.units = 1;
+  h.priceNow = money2(mnyHoldingValue(h) + amt);
+  h.costBasis = money2(money2(h.costBasis) + amt);
+  h.updatedAt = syncNow();
+  const g = mnyGoalById(kid, h.goalId);
+  if (g) { g.saved = money2(money2(g.saved) + amt); g.updatedAt = syncNow(); }
+  saveAll();
+  return true;
+}
+/* A new goal takes over the jar (a 'goal' request answered yes). The old goal
+   is marked done; what is in its jar either MOVES to the new goal
+   (`keep:'move'`) or goes back to Savings (`keep:'ready'`). Same stream home
+   either way, so nothing is written to the stream. Returns the new goal. */
+function mnySwitchGoal(kid, fields, keep) {
+  const prev = mnyActiveGoal(kid);
+  const jar = prev ? mnyGoalHolding(kid) : null;
+  const inJar = jar ? mnyHoldingValue(jar) : 0;
+  const g = mnyAddGoal(kid, Object.assign({}, fields || {}, { saved: 0 }));
+  if (!g) return null;
+  if (prev) { prev.done = true; prev.doneAt = Date.now(); prev.replacedBy = g.id; markItemUpdated(prev); }
+  if (jar) mnyRemoveHolding(kid, jar.id);
+  if (inJar > 0 && keep !== 'ready') {
+    g.saved = money2(inJar);
+    mnyAddHolding(kid, { id: mnyGoalHoldingId(g.id), kind: 'savings', goalId: g.id,
+      name: '🎯 ' + (g.name || 'My goal'), units: 1, priceNow: money2(inJar), costBasis: money2(inJar),
+      rateAnnual: 0 });
+  } else if (inJar > 0) {
+    mnyAddToSaved(kid, inJar);
+  }
+  g.updatedAt = syncNow();
+  saveAll();
+  return g;
 }
 
 /* Am I going to make it? Answered in dollars per week, because "you need 34%
@@ -701,7 +868,7 @@ function mnyGiftWeekFor(kid, dayKey) {
 
 /* Has this child's week been SETTLED — can its split no longer decide
    anything? Committed at a meeting (`mnyIsCommitted`), or credited some other
-   way: the Grandma rule, the repair, an express catch-up. Those write
+   way: the Grandfather rule, the repair, an express catch-up. Those write
    `finalizedWeeks` and never a committed plan, so asking about the plan alone
    filed a gift dated into a Grandma week under that week — a week no meeting
    will ever sit for, so its split was never offered anywhere. */
@@ -756,7 +923,7 @@ function mnyLateCompByTotal(led) {
 
    It used to. The meeting's commit was the only thing that ever paid a meet,
    and `finalizedWeeks[wk][kid] == null` refuses a second commit — so a meet
-   entered for a week already settled (at a meeting, by the Grandma rule, by
+   entered for a week already settled (at a meeting, by the Grandfather rule, by
    the repair) sat on file and was never paid. The trap the repair describes
    in js/40-stream.js, from the other side.
 
@@ -778,7 +945,7 @@ function mnyLateCompByTotal(led) {
 
    ── Why it cannot pay twice ──
    1. The week has a ledger row whose competition figure is the plain sum of
-      its meets — a meeting, the Grandma rule, the repair. The row says what
+      its meets — a meeting, the Grandfather rule, the repair. The row says what
       has been paid for meets; `mrCompetitionWeek` says what they are worth
       now; the DIFFERENCE moves and the row is brought to the new total. A
       second run finds nothing to do, and a meet that arrived from another
@@ -832,7 +999,7 @@ function mnyLateCompSync(kid, dayKey, change) {
   if (!evList(kid).some(e => e && e.id === id)) {
     const name = comp ? (comp.name || mnySportLabel(comp.sport)) : 'Competitions';
     const tail = delta < 0 ? 'taken back after the week was settled'
-      : ((led && led.defaulted && led.defaultReason === 'grandma') ? 'on top of the Grandma rule'
+      : ((led && led.defaulted && led.defaultReason === 'grandma') ? 'on top of the Grandfather rule'
                                                                    : 'paid after the week was settled');
     const common = { kind: 'latecomp', id, ref: comp ? comp.id : wk,
                      weekKey: mnyGiftWeekFor(kid, (comp && comp.dayKey) || wk),
@@ -1086,7 +1253,9 @@ function mnyRemoveDeposit(kid, depositId) {
 /* Waiting on a grown-up. Read by the gifts section and by the parent's pending
    list, the same shape pendingApprovalActs and pendingApprovalTasks have. */
 function mnyPendingDeposits(kid) {
-  return mnyEnsureDeposits(kid).filter(d => d && d.pendingApproval);
+  // A proposal a grown-up said no to stays on record (she sees "not this
+  // time") but is no longer waiting, and never reaches her money.
+  return mnyEnsureDeposits(kid).filter(d => d && d.pendingApproval && !d.rejectedAt);
 }
 /* What actually came in. A gift a child has PROPOSED is not money yet — nobody
    has agreed it — so it is left out of the pool and out of the caps the pool
@@ -1345,14 +1514,18 @@ function mnySetPaymentOverride(kid, weekKey, debtId, amount) {
   saveAll();
   return true;
 }
-/* What each debt is actually being paid this week: the schedule, or the
-   agreed-down figure. One reader, so the pool, the card and the commit can't
-   disagree about the number. */
+/* What each debt is actually being paid this Sunday: its must-pay (the weekly
+   figure plus what it still owes, never more than the debt — Sunday v15
+   terms, `mnyDebtDueThisSunday`), or the agreed-down figure for this week.
+   Open rows, oldest first. One reader, so the pool, Sunday's 📌 line and the
+   payment itself (`mnyLoanSundayPayment`) can't disagree about the number. */
 function mnyDueThisWeek(kid, weekKey) {
-  return mnyDueNowAll(kid).map(d => {
-    const ov = mnyGetPaymentOverride(kid, weekKey, d.debt.id);
-    const amount = ov == null ? money2(d.amount) : money2(Math.min(ov, d.amount));
-    return Object.assign({}, d, { scheduled: money2(d.amount), amount, reduced: ov != null && amount < money2(d.amount) });
+  return mnyOpenDebtsOldestFirst(kid).map(d => {
+    // This Sunday's payment already ran: nothing more is asked of it.
+    const scheduled = d.lastSundayPaidWeek === weekKey ? 0 : mnyDebtDueThisSunday(kid, d);
+    const ov = mnyGetPaymentOverride(kid, weekKey, d.id);
+    const amount = ov == null ? scheduled : money2(Math.min(ov, scheduled));
+    return { debtId: d.id, debt: d, scheduled, amount, reduced: ov != null && amount < scheduled };
   });
 }
 
@@ -1373,146 +1546,21 @@ function mnyPool(weekKey, kid) {
   return {
     breakdown: b, deposits, lateComp, cameIn, mustPay, mine, due,
     scheduledPay: scheduledTotal,
-    // What the family agreed NOT to pay this month. It does not vanish — the
-    // debt still carries it, and arrears still apply.
+    // What the family agreed NOT to pay this Sunday. It does not vanish — the
+    // debt carries it to next Sunday (no interest on it).
     unpaid: money2(Math.max(0, scheduledTotal - dueTotal)),
     // Investing is capped at a fifth of the week: a bad month should sting,
     // not wipe out everything she earned.
     stockCap: money2(mine * 0.2),
-    // Spending is capped the same way — see MNY_BUCKETS 'spend'.
-    spendCap: money2(mine * 0.2),
+    // Spending is capped by the week's rule (`spend.capPct`, 20 by default) —
+    // see MNY_BUCKETS 'spend'.
+    spendCap: money2(mine * (Number(mrRuleOr(mrRulesForWeek(weekKey), 'spend.capPct')) || 0) / 100),
   };
 }
 
-/* ── Pricing a plan ──
-   Turn a plan (or a hand-built split) into dollars per bucket, then into what
-   it actually does to the debt. `split` keys are 'loan:<debtId>', 'ready',
-   'gic', 'stock'. */
-function mnySplitFor(weekKey, kid, planId, own) {
-  const pool = mnyPool(weekKey, kid);
-  const debts = mnyDebtsByPriority(kid).filter(d => loanBalance(kid, d.id) > 0);
-  const out = { ready: 0, gic: 0, stock: 0, spend: 0 };
-  debts.forEach(d => { out['loan:' + d.id] = 0; });
-  // A row per goal she is still saving for. Goals are never stage-locked —
-  // they are the reason to save, so gating them behind a lesson about saving
-  // would be backwards.
-  mnyGoals(kid).forEach(g => { out['goal:' + g.id] = 0; });
-
-  if (planId === 'own') return Object.assign(out, own || {});
-  if (planId === 'last') {
-    const prev = mnyPreviousPlan(weekKey, kid);
-    if (prev && prev.split) {
-      // Re-price last week's SHAPE against this week's money, so a smaller week
-      // does not commit more than exists.
-      const prevTotal = Object.keys(prev.split).reduce((s, k) => s + money2(prev.split[k]), 0);
-      if (prevTotal > 0) {
-        Object.keys(prev.split).forEach(k => {
-          const dollars = money2(pool.mine * (money2(prev.split[k]) / prevTotal));
-          // A debt cleared or a goal reached since last week: its share falls
-          // back to being kept ready rather than vanishing from the split.
-          if (out[k] === undefined && (k.indexOf('loan:') === 0 || k.indexOf('goal:') === 0)) {
-            out.ready = money2(out.ready + dollars);
-            return;
-          }
-          out[k] = dollars;
-        });
-        return out;
-      }
-    }
-    planId = 'ready';   // no history yet — fall back to the gentle default
-  }
-  const plan = MNY_PLANS.find(p => p.id === planId) || MNY_PLANS[0];
-  const shape = plan.split || { loan: 1 };
-  Object.keys(shape).forEach(k => {
-    let dollars = money2(pool.mine * shape[k]);
-    if (k !== 'loan') {
-      // A bucket she has not reached yet takes nothing, whatever the plan says.
-      // Its share falls back to paying the debt down, which is always open.
-      const bucket = MNY_BUCKETS.find(b => b.key === k);
-      if (bucket && !mnyIsOpen(kid, bucket.stage)) {
-        const first = debts[0];
-        if (first) out['loan:' + first.id] = money2(out['loan:' + first.id] + dollars);
-        else out.ready = money2(out.ready + dollars);
-        return;
-      }
-      out[k] = dollars;
-      return;
-    }
-    // The loan share spreads across debts, highest bonus first — that is where
-    // a dollar clears the most.
-    let left = dollars;
-    debts.forEach(d => {
-      if (!(left > 0)) return;
-      const give = money2(Math.min(left, mnyCashToClear(kid, d)));
-      out['loan:' + d.id] = money2(out['loan:' + d.id] + give);
-      left = money2(left - give);
-    });
-    if (left > 0) out.ready = money2(out.ready + left);   // everything paid off
-  });
-  return out;
-}
-function mnySplitTotal(split) {
-  return money2(Object.keys(split || {}).reduce((s, k) => s + money2(split[k]), 0));
-}
-function mnySplitToLoan(split, debtId) {
-  if (debtId) return money2((split || {})['loan:' + debtId]);
-  return money2(Object.keys(split || {}).filter(k => k.indexOf('loan:') === 0)
-    .reduce((s, k) => s + money2(split[k]), 0));
-}
-
-/* What a plan does, in the four numbers page 3 shows as tiles. */
-function mnyPricePlan(kid, split) {
-  const toLoan = mnySplitToLoan(split);
-  const before = mnyTotalOwing(kid);
-  let bonus = 0, cleared = 0, left = toLoan;
-  mnyDebtsByPriority(kid).forEach(d => {
-    if (!(left > 0)) return;
-    const owed = loanBalance(kid, d.id);
-    if (!(owed > 0)) return;
-    const rate = (Number(d.bonusRate) || 0) / 100;
-    const need = money2(owed / (1 + rate));
-    const pay = money2(Math.min(left, need));
-    cleared = money2(cleared + pay * (1 + rate));
-    bonus = money2(bonus + pay * rate);
-    left = money2(left - pay);
-  });
-  const primary = mnyDebtsByPriority(kid).find(d => loanBalance(kid, d.id) > 0);
-  const now = primary ? loanFreeDate(kid, primary.id, 0) : { months: 0 };
-  const then = primary ? loanFreeDate(kid, primary.id, mnySplitToLoan(split, primary.id)) : { months: 0 };
-  return {
-    toLoan, bonus, cleared,
-    owingAfter: money2(Math.max(0, before - cleared)),
-    cashReady: money2(money2((split || {}).ready) + money2((split || {}).gic) + money2((split || {}).stock)),
-    monthsNow: now.months, monthsThen: then.months,
-    monthsSaved: (now.months != null && then.months != null) ? Math.max(0, now.months - then.months) : 0,
-    freeDate: then.date || null,
-  };
-}
-
-/* ── The five doors ──
-   "If I put $X somewhere for a year, what happens?" — one row per choice,
-   signed, so paying late sits below the line beside the ones that grow. */
-function mnyDoors(kid, amount) {
-  const amt = money2(amount);
-  const cfg = bankConfig();
-  const d = mnyDebtsByPriority(kid)[0] || { bonusRate: 0, arrearsRatePct: 0, name: 'my loan', icon: '🎿' };
-  const bonus = (Number(d.bonusRate) || 0) / 100;
-  const arrears = (Number(d.arrearsRatePct) || 0) / 100;
-  const gic = Number((cfg.gicRates || {})[12]) || 0.04;
-  const save = Number(cfg.savingsRate) || 0.015;
-  return [
-    { id: 'early', icon: '⚡', label: 'Pay off ' + d.name + ' early', delta: money2(amt * bonus),
-      note: 'The bonus is promised — it cannot go down.' },
-    { id: 'gic',   icon: '🔒', label: 'Lock it away for a year',      delta: money2(amt * gic),
-      note: 'Promised too, but you cannot touch it for a year.' },
-    { id: 'ready', icon: '💵', label: 'Keep it ready',                delta: money2(amt * save),
-      note: 'Small, but you can have it back any day.' },
-    { id: 'stock', icon: '📈', label: 'Buy a bit of a company',       delta: money2(amt * 0.07), range: true,
-      note: 'Could be a lot more. Could be less than you put in.' },
-    { id: 'late',  icon: '🐢', label: 'Pay late',                     delta: money2(-amt * arrears * 12),
-      note: 'It costs more every month you wait.' },
-  ];
-}
+/* `mnySplitFor`, `mnySplitTotal`, `mnySplitToLoan`, `mnyPricePlan` and
+   `mnyDoors` priced the retired plan cards; Sunday's "I choose" step prices
+   every placement through the core (js/43). Retired in Stage 4. */
 
 /* ════════════════════════════════════════════════════════════════
    THE TWO BARS
@@ -1548,6 +1596,9 @@ function mnyIncomeSegments(weekKey, kid) {
     { label: 'Jobs',           value: b.chorePaid,    color: 'var(--mny-chores)' },
     { label: 'Learning',       value: b.learnPaid,    color: 'var(--mny-learning)' },
     { label: 'Routines kept',  value: b.streakBonus,  color: 'var(--mny-streak)' },
+    // ⛸️ The assistant job — in the week's net (mrWeekBreakdown), so in the
+    // bar too, or the identity below breaks on any week with a session.
+    { label: 'My club job',    value: b.sessionsPaid, color: 'var(--mny-sessions)' },
     { label: 'Competitions',   value: b.compPaid,     color: 'var(--mny-comp)' },
     { label: 'From outside',   value: pool.deposits,  color: 'var(--mny-outside)' },
     { label: 'Made on its own', value: Math.max(0, passive), color: 'var(--mny-passive)' },
@@ -1569,24 +1620,6 @@ function mnyIncomeSegments(weekKey, kid) {
   out.cameIn = pool.cameIn;
   return out;
 }
-function mnyOutflowSegments(weekKey, kid, split) {
-  const pool = mnyPool(weekKey, kid);
-  const s = split || (mnyWeekPlan(weekKey, kid) || {}).split || {};
-  const rows = [{ label: 'My loan payment', value: pool.mustPay, color: 'var(--mny-out-loan)' }];
-  mnyDebtsByPriority(kid).forEach(d => {
-    rows.push({ label: 'Extra off ' + d.name, value: money2(s['loan:' + d.id]), color: 'var(--mny-out-extra)' });
-  });
-  mnyGoals(kid, true).forEach(g => {
-    const v = money2(s['goal:' + g.id]);
-    if (v > 0) rows.push({ label: 'Toward ' + g.name, value: v, color: 'var(--mny-out-goal)' });
-  });
-  rows.push({ label: 'Spent',        value: money2(s.spend), color: 'var(--mny-out-spend)' });
-  rows.push({ label: 'Kept ready',   value: money2(s.ready), color: 'var(--mny-out-ready)' });
-  rows.push({ label: 'Locked away',  value: money2(s.gic),   color: 'var(--mny-out-locked)' });
-  rows.push({ label: 'Bit of a company', value: money2(s.stock), color: 'var(--mny-out-stock)' });
-  return mnySegments(rows);
-}
-
 /* ── Lessons ──
    Which stage she is at, and what that opens. A parent can open the next one
    early — sometimes the conversation gets there before the debt does. */
@@ -1626,17 +1659,29 @@ function mnyIsOpen(kid, stageId) {
 }
 function mnyNeedLabel(stageId) { return 'Opens at ' + mnyStagePct(stageId) + '% paid off'; }
 
-/* The concept card, with the real debt named in it. */
+/* The concept card, with the real debt named in it and every number a rule
+   decides read from today's rules. */
 function mnyConceptCard(id, kid) {
   const c = mnyConceptById(id);
   if (!c) return null;
   const names = mnyDebts(kid).map(d => d.name);
-  const naming = names.length ? names.join(' and ') : 'your loan';
-  const swap = (s) => String(s || '').replace(/\{debt\}/g, naming);
+  const naming = names.length ? names.join(' and ') : 'my loan';
+  const r = mrRules();
+  const num = (path, dflt) => { const n = Number(mrRuleOr(r, path)); return isFinite(n) && n > 0 ? n : dflt; };
+  const bonus = Number(mrRuleOr(r, 'loan.extraBonusPct')) || 0;
+  const one = money2(1 + bonus / 100);
+  const tokens = {
+    debt: naming,
+    every: String(num('loan.interestEverySundays', 4)),
+    bonus1: '$' + one.toFixed(2),
+    lockWeeks: String(num('pots.lockWeeks', 4)),
+    cap: (typeof sdCapWords === 'function') ? sdCapWords(num('spend.capPct', 20)) : num('spend.capPct', 20) + '%',
+  };
+  const swap = (s) => String(s || '').replace(/\{(debt|every|bonus1|lockWeeks|cap)\}/g, (m, k) => tokens[k]);
   return {
-    id: c.id, icon: c.icon, title: c.title, stage: c.stage,
+    id: c.id, icon: c.icon, title: swap(c.title), stage: c.stage,
     open: mnyIsOpen(kid, c.stage),
-    what: swap(c.what), why: swap(c.why), risk: swap(c.risk),
+    what: swap(c.what), why: swap(c.why), risk: swap(c.risk), cn: c.cn || '',
     whyLabel: c.whyLabel || 'Why it helps', riskLabel: c.riskLabel || 'What to watch',
   };
 }
@@ -1765,7 +1810,9 @@ function mnyTabsFor() {
   if (parentish) return MNY_TABS;
   return MNY_TABS.filter(t => t.who === 'kid' || t.who === 'optional');
 }
-function mnyTabBar(cur) {
+function mnyTabBar(cur, opts) {
+  // `compact`: the one-row head (My money, §N) draws the names without numbers, as the mockup does.
+  const compact = !!(opts && opts.compact);
   const tabs = mnyTabsFor();
   // Numbering comes from the full table, so "1" and "5" mean the same thing to a
   // kid and a parent looking at the same system.
@@ -1774,8 +1821,8 @@ function mnyTabBar(cur) {
     const sel = t.id === cur;
     const n = MNY_TABS.indexOf(t) + 1;
     return `<button type="button" class="mny-tab${sel ? ' on' : ''}"${sel ? ' aria-current="page"' : ''}
-        data-mny-action="tab" data-mny-tab="${t.id}">
-        <span>${n} ${t.icon} ${escapeHtml(t.label)}</span>
+        data-mny-action="tab" data-mny-tab="${t.id}"${compact ? ` aria-label="${escapeAttr(t.label)}"` : ''}>
+        <span>${compact ? `${t.icon}<span class="ph-word"> ${escapeHtml(t.label)}</span>` : `${n} ${t.icon} ${escapeHtml(t.label)}`}</span>
         ${t.who === 'kid' || t.who === 'optional' ? '' : `<span class="mny-tab-tag">${escapeHtml(t.who)}</span>`}
       </button>`;
   }).join('')}</nav>`;
@@ -1788,27 +1835,29 @@ function mnyTabBar(cur) {
 const MNY_TOURS = {
   kid: [
     { icon: '💰', title: 'This page is yours', where: 'The whole screen',
-      body: 'Everything here is yours to look at any time, without asking. Nothing on this page can take money away from you — a number only changes at the Sunday meeting, with a grown-up sitting next to you.' },
-    { icon: '🧹', title: 'What you can still earn today', where: 'Top left',
-      body: 'The first card is today only. It says how much of today is still open, and how many of your free jobs are left.' },
-    { icon: '🏦', title: 'The four places your money sits', where: 'Left column',
-      body: 'Cash you can spend, money kept ready, money locked away for a year, and money in companies. Add the four together and that is everything you have.' },
-    { icon: '🎯', title: 'What you are saving for', where: 'Left column',
-      body: 'Make a goal for something you want. Put in what it costs and when you want it by, and I will tell you how much a week that takes.' },
-    { icon: '📖', title: 'Every week you have ever done', where: 'Top right button',
-      body: 'My money story opens your past weeks — one at a time or a whole month, and how much of your loan was left at the end of each.' },
+      body: 'Everything here is yours to look at any time, without asking. Nothing on this page can take money away from you — a number only changes on Sunday, with a parent sitting next to you, or when your parents say yes to something you asked.' },
+    { icon: '☀️', title: 'How long until Sunday', where: 'Top card',
+      body: 'Seven circles, one for each day. Each shows what your chores have earned so far, and the line under them says about how much that is. On Sunday you guess the total together.' },
+    { icon: '🏦', title: 'The three places your money sits', where: 'Everything I have',
+      body: 'Savings (your goal jars are inside it), money Locked away for 4 weeks, and money in Companies. Add them together and that is everything you have. Money that came in since Sunday shows as 📥 Waiting for Sunday until you choose where it goes. A place that is not open yet says when it opens. Tap any ? to find out what it is.' },
+    { icon: '🎯', title: 'What you are saving for', where: 'Goal jars',
+      body: 'Each goal is its own jar. It shows how full it is, the day you want it by, and about how much a week that takes. ✏️ New goal asks your parents.' },
+    { icon: '🧱', title: 'Your loan wall', where: 'Loan wall',
+      body: 'One hundred bricks. Each one you fill is a bit more paid back. The big numbers say how much is left and when it is paid off; 📋 My loans shows each one.' },
+    { icon: '📒', title: 'Your last four Sundays', where: 'Passbook',
+      body: 'What came in each Sunday — earned, given, made, and taken off — and where it went: to the wall, saved, or cash. Tap a Sunday for its numbers. 📖 opens your whole money story.' },
   ],
   parent: [
     { icon: '⚙️', title: 'The only page that changes a number', where: 'The whole screen',
-      body: 'Prices, caps, targets, the loans, what she owns and past weeks all live here. Pages 1 to 3 only read from this page — nothing on them can be edited by a kid.' },
-    { icon: '🎿', title: 'The loans', where: 'Loans section',
-      body: 'Each debt carries its own amount, schedule, early-payment bonus and late cost. Renaming or re-rating one is written to the change history with a date, and never touches what has been paid.' },
-    { icon: '📈', title: 'What she actually holds', where: 'What she owns',
-      body: 'One record per holding. Page 1’s tiles and page 2’s returns are computed from it, so no number is typed in twice. Interest, share prices and maturity all move on real calendar time by themselves.' },
-    { icon: '🗓', title: 'Weeks arrive two ways', where: 'Week history',
-      body: 'Confirming a week at the meeting writes its row by itself and freezes it. For a week that happened before the app, "Add a week" steps back one week per tap so you can type it in.' },
-    { icon: '💾', title: 'Nothing saves until you say so', where: 'The bar at the top',
-      body: 'Edits collect and save as one dated change with one reason. Discard throws them away — no version was ever created, so there is nothing to roll back.' },
+      body: 'The loans, fines, expected money, every price and past weeks all live here; her questions are answered on Now. Her own pages only read from these — nothing on them can be edited by a kid.' },
+    { icon: '✅', title: 'Answer first', where: 'Now › Waiting for you',
+      body: 'Every question she asked waits on Now, and nothing pays until it passes. Beside it: this Sunday for each girl (change a line, with a reason), what they own (✏️ Fix), and 🔧 Tidy-up when something older needs crediting. 💬 Talk first saves it for the Sunday meeting.' },
+    { icon: '🧱', title: 'The loans', where: '➕ Commitments',
+      body: 'Each row on her wall, with what borrowing has cost so far and by payoff, and the bonus she has earned. Tap a row to fix its name or numbers — a correction is dated and never touches what she has paid.' },
+    { icon: '🗓', title: 'Weeks arrive two ways', where: '📒 Weeks',
+      body: 'Both girls side by side, with a summary on top. Signing on Sunday writes a week by itself and freezes it — tap a Sunday for its whole record. For a week that happened before the app, "Add a week" steps back one week per tap so you can type it in.' },
+    { icon: '💾', title: 'Nothing saves until you say so', where: '⚙️ Rules',
+      body: 'Pick a group on the left. Steps collect in the strip at the bottom and save as one dated change with one reason, from next Sunday — or this week, for a correction. ↺ Undo throws them away; 📝 Rule changes keeps every one.' },
   ],
 };
 
@@ -1840,5 +1889,5 @@ function mnyWeekKey() {
 
 // Inert in the browser; lets tests run these helpers in Node.
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { MNY_STAGES, MNY_PLANS, MNY_BUCKETS, MNY_CONCEPTS };
+  module.exports = { MNY_STAGES, MNY_BUCKETS, MNY_CONCEPTS };
 }

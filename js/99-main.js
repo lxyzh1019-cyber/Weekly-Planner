@@ -88,6 +88,13 @@ if (document.fonts) {
   // carry data-mm-action. Same reason as above — every step rebuilds the body.
   const meeting = document.getElementById('familyMeetingBody');
   if (meeting) meeting.addEventListener('click', mmHandleClick);
+  /* Sunday's boxes and hold-to-sign (js/44-sunday.js): tap, a 2-second hold,
+     and a held sign button, on pointer events; Enter / Space as a click with
+     no pointer. Delegated for the same reason — the body is rebuilt. */
+  if (meeting) {
+    ['pointerdown', 'pointerup', 'pointercancel', 'pointerout'].forEach(t => meeting.addEventListener(t, sdPointer));
+    meeting.addEventListener('click', sdKeyClick);
+  }
   /* The day's chore grade strip. Delegated because the strip is rebuilt on
      every render, and data attributes rather than an inline handler because a
      chore id reaches this from a world-writable document — see the escaping
@@ -109,6 +116,13 @@ if (document.fonts) {
   // The parent Money rules tab has its own handler: rule paths and holding ids
   // ride on data attributes rather than being interpolated into inline
   // handlers, and its typed fields need input/change as well as click.
+  // Grown-ups' fix sheets (js/46) carry the same data-mnyp-action controls.
+  const guBody = document.getElementById('grownupsBody');
+  if (guBody) {
+    guBody.addEventListener('click', mnyParentClick);
+    guBody.addEventListener('input', mnyParentInput);
+    guBody.addEventListener('change', mnyParentInput);
+  }
   const rules = document.getElementById('mnyRulesWrap');
   if (rules) {
     rules.addEventListener('click', mnyParentClick);
@@ -149,6 +163,12 @@ if (document.fonts) {
   // and the container holds the listener.
   const now = document.getElementById('pnWrap');
   if (now) now.addEventListener('click', pnHandleClick);
+  /* ✅ Waiting for you on Now carries Grown-ups' own answer cards
+     (data-mnyp-action, Plan v9 §N): the Money tab's handler, here too. */
+  if (now) now.addEventListener('click', mnyParentClick);
+  // 🚪 "She told me…": the On-her-behalf card in its sheet.
+  const told = document.getElementById('pnToldBody');
+  if (told) told.addEventListener('click', pnHandleClick);
   // Copy a week: the pickers and the preview are rebuilt on every change, so
   // the wrap holds the listener rather than the buttons.
   const copyweek = document.getElementById('pcwWrap');

@@ -1,66 +1,48 @@
-// Weekly-Planner — the Sunday meeting's two money steps: what I earned, and
-// what I do with it. Classic script, declarations only (MODULARIZATION_PLAN.md).
+// Weekly-Planner — the Sunday meeting's money: who is on screen, the working
+// behind a payday line, planned meets, and THE SIGN — the one place money
+// moves. Classic script, declarations only (MODULARIZATION_PLAN.md).
 /* ════════════════════════════════════════════════════════════════
-   PAGES 2 AND 3 · THE SUNDAY MEETING
+   THE MONEY STEP · SUNDAY v15 (Plan v3 §A, §E)
 
-   These two are deliberately not screens a kid can open alone. They are the
-   ten minutes on a Sunday when the week gets agreed and the money moves, with
-   her in the room. That is why competition results and money from outside are
-   entered HERE and not on a parent-only screen — the entering is the
-   conversation.
+   The meeting's money step is the Sunday ritual — Guess → Payday → I choose
+   → Signed, one girl at a time — drawn by js/44-sunday.js over the pure core
+   (js/43-sunday-core.js). This file keeps what the ritual shares with the
+   rest of the meeting: whose money is on screen (`mnyMeetingKid`), the strip
+   My money and the parent page still draw (`mnyStrip`), the working behind a
+   payday line (`mnyWorking`), the planned meets a week must answer
+   (`mmPlannedCompetitions` / `mmUnrecordedCompetitions`) and the one-tap
+   "No criteria met · $0", the parent's before-we-start list — and the sign,
+   `mnyDoCommit`, rewritten in Stage 4 so every dollar moves through the
+   function that owns it, In = Out asserted before anything is written.
 
-   The order is fixed and it matters:
-
-     Step 3  What I earned        agree the numbers          → a confirm stamp
-     Step 4  What I do with it    decide where it goes       → the money moves
-
-   CONFIRM IS NOT COMMIT. Confirming records that the family agrees the week is
-   right; nothing moves. Because nothing has moved, changing a number afterwards
-   costs nothing — the week simply reopens and step 4 re-locks. If confirming
-   had moved money, every correction would need to be unwound, and the honest
-   version of that is a system nobody dares correct.
-
-   Step 4 opens with last week's plan already applied and priced. A normal week
-   is: read the numbers, answer the question, done. Everything that lets her
-   change the plan lives behind one button, because most weeks she will not
-   want to, and a screen that asks eleven questions every Sunday is a screen
-   that turns the meeting into a chore.
+   Retired in Stage 4 (deleted with their CSS and actions): "What I earned"
+   and "What I do with it" (`mnyRenderEarned`, `mnyRenderDecide`), the
+   earnings, income-bar, pool, plan, bucket, change-plan, door, reflect,
+   commit and committed cards, the inline competition and money-from-outside
+   forms, the confirm bar, the three shortfall choices (`MNY_SHORTFALL`) and
+   the meeting-wide Undo button. A result or a gift is entered at the table
+   through the Record sheet (Dad's ➕ on Sunday's "Dad answers first" card) or
+   asked for by her (js/45) — one writer each.
    ════════════════════════════════════════════════════════════════ */
 
-let mnyMeetKid = 'jess';       // whose money the two steps are showing
-let mnyEditOn = false;         // parent-edit steppers revealed
-let mnyExpandRow = null;       // which channel's day-by-day working is open
-let mnyCompOpen = false;       // the competition form
-let mnyDepOpen = false;        // the money-from-outside form
-let mnyCompDraft = null;
-let mnyDepDraft = null;
-let mnyPlanOpen = false;       // "change the plan" revealed
-let mnyDraft = null;           // {planId, split, extra, extraTarget, reflect}
-let mnyDoorAmt = null;         // the "if I put $X somewhere" amount
+let mnyMeetKid = 'jess';       // whose money the step is showing
+let mnyExpandRow = null;       // which channel's day-by-day working is open (Payday)
 let mnyChecksOpen = false;
 
 function mnyMeetingKid() { return (mnyMeetKid === 'jenn' || mnyMeetKid === 'jess') ? mnyMeetKid : 'jess'; }
 function mnySetMeetKid(kid) {
   mnyMeetKid = kid;
-  mnyExpandRow = null; mnyCompDraft = null; mnyDepDraft = null;
-  mnyDraft = null; mnyDoorAmt = null;
+  mnyExpandRow = null;
   renderMeetingMode();
 }
-
-/* The tabs at the top of both steps. The meeting covers both kids in one
-   sitting, so this is a switch, not a filter. */
-function mnyKidTabs() {
-  const cur = mnyMeetingKid();
-  return `<div class="mny-chiprow">${['jenn', 'jess'].map(k =>
-    `<button type="button" class="mny-chip ${k === cur ? 'on' : ''}" onclick="mnySetMeetKid('${escapeJsAttr(k)}')">${CT_PROFILE_ICON[k]} ${k === 'jenn' ? 'Jenn' : 'Jess'}</button>`).join('')}</div>`;
-}
+function mnyWeekKeyMeeting() { return ctWeekKey || ctThisWeekKey(); }
 
 /* ── Money in → what has to go out → what is hers ──
    Three cells, and the one the current step is about is lit. Without it, "mine
    to choose" arrives as a number with no arithmetic behind it.
 
    FOUR callers now, deliberately one component: the kid's money page
-   (js/22-money-page1.js, mnyIncomeCard), meeting step 3, meeting step 4, and
+   (js/22-money-page1.js, mnyThisWeekCard), meeting step 3, meeting step 4, and
    the parent portal (js/24-money-parent.js, mnyWeekResults). A second thing
    that draws these three numbers is a second thing that can drift, and drift
    is the bug this was pulled in to fix.
@@ -81,132 +63,18 @@ function mnyStrip(wk, kid, liveIdx) {
      </div>`).join('<span class="mny-strip-arrow">→</span>')}</div>`;
 }
 
-/* ════════════════════════════════════════════════════════════════
-   STEP 3 · WHAT I EARNED
-   ════════════════════════════════════════════════════════════════ */
-/* `opts.chrome === false` drops the page head, the five-page bar and the kid
-   tabs — the caller is stacking this panel with another and owns them.
-
-   That option exists because the meeting's three-screen shape puts "what I
-   earned" and "what I do with it" on ONE screen, and each panel was rendering
-   its own nav: two identical five-tab bars, one above the other, on a screen
-   whose whole purpose was to be less to wade through. Exactly the defect
-   CLAUDE.md records about the six-button shortcut row that sat in three
-   topbars. The panels are otherwise untouched — a chrome flag is not a second
-   renderer. */
-function mnyRenderEarned(wk, opts) {
-  const chrome = !(opts && opts.chrome === false);
-  const kid = mnyMeetingKid();
-  /* This used to swap the WHOLE of step 3 for the legacy confirm screen on any
-     week before `moneyModelStartWeek` — which, on a freshly-seeded clock, was
-     every week the family had lived. The competition form and the gift form
-     were simply not on the page, with nothing to say why. One model now, so
-     step 3 is step 3 for every week. */
-  mnySimCatchUp(kid);          // the world moves whether or not we met last week
-
-  const confirmed = mnyIsConfirmed(wk, kid);
-  return `${chrome
-      ? `${mnyPageHead('💪 What I earned', 'Agree the week before anything moves',
-          isParent() ? [{ action: 'record-any', label: '✍️ Record something' }] : [], { back: false })}
-         ${mnyTabBar('grow')}
-         ${mnyKidTabs()}`
-      : `<div class="mm-h">💪 What ${escapeHtml(mnyKidName(kid))} earned</div>`}
-    ${mnyStrip(wk, kid, 0)}
-    ${mmRenderQuarterly()}
-    <div class="mny-cols two">
-      <div class="mny-col">${mnyEarningsCard(wk, kid)}${mnyIncomeBarCard(wk, kid)}</div>
-      <div class="mny-col">${mnyCompetitionForm(wk, kid)}${mnyDepositForm(wk, kid)}</div>
-    </div>
-    ${mnyConfirmBar(wk, kid)}
-    ${confirmed ? mnyReturnsCard(kid) : mnyReturnsLocked()}`;
-}
-
-/* The week, channel by channel. Each row carries where its number came from —
-   the planner, or a grown-up who changed it — because "it says $15" is not the
-   same claim as "Mom made it $15", and a kid is entitled to know which. */
-function mnyEarningsCard(wk, kid) {
-  const b = mrWeekBreakdown(wk, kid);
-  const missing = mnyMissing(kid, wk);
-  const values = { chores: b.chorePaid, learning: b.learnPaid, streak: b.streakBonus,
-                   comp: b.compPaid, fines: b.fines.total };
-
-  const rows = MNY_CHANNELS.map(ch => {
-    const ov = b.overrides[ch.key];
-    const value = money2(values[ch.key]);
-    const isMissing = missing.indexOf(ch.key) >= 0;
-    const chip = isMissing
-      ? `<span class="mny-src amber">Not counted yet</span>`
-      : (ov ? `<span class="mny-src edited">Changed by a grown-up</span>`
-            : `<span class="mny-src">From the planner</span>`);
-    const struck = ov
-      ? `<s class="mny-was">${mnyMoney(b.original[ch.key])}</s> ` : '';
-    const steppers = mnyEditOn
-      ? `<span class="mny-stepgrp">
-           <button type="button" class="mny-step" onclick="mnyBumpChannel('${escapeJsAttr(ch.key)}',-0.5)" aria-label="Less">−</button>
-           <button type="button" class="mny-step" onclick="mnyBumpChannel('${escapeJsAttr(ch.key)}',0.5)" aria-label="More">+</button>
-           ${ov ? `<button type="button" class="mny-step" onclick="mnyResetChannel('${escapeJsAttr(ch.key)}')" aria-label="Back to the planner's number">↺</button>` : ''}
-           <button type="button" class="mny-step${isMissing ? ' on' : ''}" onclick="mnyFlagMissing('${escapeJsAttr(ch.key)}')" aria-label="Nothing this week">∅</button>
-         </span>` : '';
-    // Only show a minus when something was actually taken off: "−$0.00" reads
-    // as a penalty on a week that had none.
-    const shown = (ch.key === 'fines' && value > 0)
-      ? '−' + mnyMoney(value).slice(1) : mnyMoney(value);
-    return `<div class="mny-erow">
-        <button type="button" class="mny-erow-label" onclick="mnyToggleRow('${escapeJsAttr(ch.key)}')" aria-expanded="${mnyExpandRow === ch.key}">
-          ${ch.icon} ${escapeHtml(ch.label)} <span class="mny-mag">🔍</span>
-        </button>
-        <div class="mny-erow-right">${chip}<b>${struck}${shown}</b>${steppers}</div>
-        ${mnyExpandRow === ch.key ? `<div class="mny-working">${mnyWorking(wk, kid, ch.key, b)}</div>` : ''}
-      </div>`;
-  }).join('');
-
-  const reason = mnyWeekReason(kid, wk);
-  const reasonRow = mnyAnyEdited(kid, wk)
-    ? `<div class="mny-note">Why: ${MNY_REASONS.map(r =>
-        `<button type="button" class="mny-chip ${reason === r.id ? 'on' : ''}" onclick="mnyPickReason('${escapeJsAttr(r.id)}')">${escapeHtml(r.label)}</button>`).join(' ')}</div>`
-    : '';
-
-  return `<div class="mny-card">
-      <div class="mny-week-head">
-        <span class="mny-label">What ${kid === 'jenn' ? 'Jenn' : 'Jess'} earned this week</span>
-        <button type="button" class="mny-chip ${mnyEditOn ? 'on' : ''}" onclick="mnyToggleEdit()">✏️ Change a number</button>
-      </div>
-      ${rows}
-      <div class="mny-row total"><span>Earned for her work</span><b>${mnyMoney(b.net)}</b></div>
-      ${reasonRow}
-    </div>`;
-}
-
-/* The bar lives in its own card rather than under the earnings rows, because it
-   counts money from outside as well: sitting it directly beneath "earned for
-   her work" made two different totals look like one disagreeing with itself.
-
-   It carries no total of its own. Step 3 already shows mnyStrip directly above
-   it, and the strip's first cell is pool.cameIn — a different number from this
-   bar's sum, because the bar counts fines separately and includes holding
-   growth. Printing both, side by side, labelled as if they were the same thing,
-   is precisely the disagreement the comment above was written about. The
-   legend under the bar still names every segment in dollars. */
-function mnyIncomeBarCard(wk, kid) {
-  const data = mnyIncomeSegments(wk, kid);
-  return `<div class="mny-card">
-      <div class="mny-week-head">
-        <span class="mny-label">Where this week's money came from</span>
-      </div>
-      ${mnyBarHtml(data, { empty: 'Nothing counted yet' })}
-    </div>`;
-}
-
 /* Tapping a row opens the working behind it — the six days, the bundles, the
    run of clean days, the date of each fine. An amount nobody can take apart is
    an amount nobody can argue with, and this whole system runs on her being
    able to argue with it. */
 function mnyWorking(wk, kid, channel, b) {
   const line = (l, v) => `<div class="mny-row"><span>${escapeHtml(l)}</span><b>${v}</b></div>`;
-  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  // Days named from their own date: a Sun–Sat money week starts on the
+  // Sunday before its Monday (Deviation 34).
+  const dayName = (k) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][formatDayKey(k).getDay()];
   if (channel === 'chores') {
     const c = b.chores;
-    return c.days.map(d => line(dayNames[d.dayIdx], mnyMoney(d.paid))).join('')
+    return c.days.map(d => line(dayName(d.dayKey), d.taken ? 'paid the week before' : mnyMoney(d.paid))).join('')
       + (c.freeUsed.length ? `<div class="mny-note">${c.freeUsed.length} free job${c.freeUsed.length > 1 ? 's' : ''} used — always your lowest-paying ones.</div>` : '')
       + (c.overflowChores ? `<div class="mny-note">${c.overflowChores} job${c.overflowChores > 1 ? 's' : ''} past your daily most — those earned XP.</div>` : '');
   }
@@ -227,24 +95,27 @@ function mnyWorking(wk, kid, channel, b) {
       ? entries.map(c => line(mnySportIcon(c.sport) + ' ' + (c.name || mnySportLabel(c.sport)) + ' · ' + mnyShortDate(c.dayKey), mnyMoney(c.awarded))).join('')
       : `<div class="mny-note">No competition days this week.</div>`;
   }
+  if (channel === 'sessions') {
+    const s = b.sessions || { sessions: [] };
+    return (s.sessions || []).map(x => line(dayName(x.dayKey),
+        x.attended === true ? '✓ ' + mnyMoney(s.rate) : x.attended === false ? 'missed · $0' : '? not ticked')).join('')
+      || `<div class="mny-note">No club sessions this week.</div>`;
+  }
   if (channel === 'fines') {
     const rows = b.fines.perDay.filter(d => d.raw > 0);
     return rows.length
-      ? rows.map(d => line(dayNames[d.dayIdx], '−' + mnyMoney(d.applied).slice(1) +
+      ? rows.map(d => line(dayName(d.dayKey), '−' + mnyMoney(d.applied).slice(1) +
           (d.applied < d.raw ? ' (a day never goes below $0)' : ''))).join('')
       : `<div class="mny-note">Nothing taken off this week.</div>`;
   }
   return '';
 }
+
 function mnyWeekEnd(wk) {
   const d = formatDayKey(wk); d.setDate(d.getDate() + 6);
   return ctDateToKey(d);
 }
 
-/* ── Competition day ──
-   Entered here, at the table, with the results sheet in hand. The rules engine
-   already knows what a result is worth (mrScoreCompetition), so this form only
-   has to collect it honestly. */
 /* ── The planner arranged it; the meeting pays for it ──
    The competition form asked a parent to retype the name of a meet that was
    already sitting on the week's plan. Two records of one afternoon, kept in
@@ -344,51 +215,6 @@ function mmUnrecordedCompetitions(wk, kid) {
   });
 }
 
-/* Fill a fresh draft from the plan when the plan has something to say. */
-function mmSeedCompDraft(wk, kid) {
-  const base = { sport: 'swim', dayKey: todayKey(), name: '', points: 0, qualified: false,
-                 provincial: false, group: 0, overall: 0, silver: 0, gold: 0, allGold: false };
-  const from = mmUnrecordedCompetitions(wk, kid)[0];
-  if (!from) return base;
-  /* `blockId` rides along so saving LINKS the record to the very block it was
-     seeded from — which is what makes correcting the name here safe. `sport`
-     still falls back to the base only when the plan genuinely could not say;
-     that fallback used to swallow every dance meet and every dryland block,
-     because the tag map knew only swimming and skating. */
-  return Object.assign(base, {
-    dayKey: from.dayKey,
-    name: from.name,
-    sport: from.sport || base.sport,
-    blockId: from.blockId || null,
-    fromPlan: true,
-  });
-}
-
-/* ── A PLANNED meet with no result is an unanswered question ────────
-   A competition could be planned and then never scored, and nothing asked.
-   Worse, the answer was unsayable: $0 in the totals reads identically for "no
-   meet", "a meet worth nothing", "a voided channel" and "an override to zero",
-   so a parent had no way to record that she swam and no criterion was met.
-
-   mrAddCompetition already persists a zero-award entry cleanly — unlike
-   mrSetChoreGrade, which DELETES at zero — so the record can exist. What was
-   missing is a way to ask for it and a one-tap way to give it. A parent should
-   not have to fake their way through a points form to say nothing was won. */
-function mnyUnrecordedCompRows(wk, kid) {
-  const pending = (typeof mmUnrecordedCompetitions === 'function')
-    ? mmUnrecordedCompetitions(wk, kid) : [];
-  if (!pending.length) return '';
-  return pending.map(p => `<div class="mny-row mny-row--todo">
-      <span>${p.icon || '🏆'} ${escapeHtml(p.name || mnySportLabel(p.sport) || 'Competition')} · ${mnyShortDate(p.dayKey)}
-        <small class="mny-note">planned — no result yet</small></span>
-      <button type="button" class="mny-chip" data-mny-action="comp-from-plan"
-        data-daykey="${escapeAttr(p.dayKey)}">Record it</button>
-      <button type="button" class="mny-chip" data-mny-action="comp-zero"
-        data-daykey="${escapeAttr(p.dayKey)}" data-name="${escapeAttr(p.name || '')}"
-        data-sport="${escapeAttr(p.sport || 'swim')}">No criteria met · $0</button>
-    </div>`).join('');
-}
-
 /* The one-tap answer. A real record, worth nothing, which is a different fact
    from no record at all — and it is what unblocks the settle gate below. */
 function mnyRecordCompZero(kid, dayKey, name, sport) {
@@ -399,272 +225,6 @@ function mnyRecordCompZero(kid, dayKey, name, sport) {
   saveAll();
   renderMeetingMode();
   showToast(`Recorded — ${mnyMoney(0)}, no criteria met`);
-}
-
-function mnyCompetitionForm(wk, kid) {
-  const entries = mrCompetitions(kid).filter(c => String(c.dayKey) >= wk && String(c.dayKey) <= mnyWeekEnd(wk));
-  if (!mnyCompOpen) {
-    return `<div class="mny-card">
-        <div class="mny-week-head">
-          <span class="mny-label">🏆 Competition day</span>
-          <button type="button" class="mny-chip" onclick="mnyToggleComp()">${entries.length ? 'Add another' : 'Add one'}</button>
-        </div>
-        ${entries.length
-          ? entries.map(c => `<div class="mny-row"><span>${mnySportIcon(c.sport)} ${escapeHtml(c.name || mnySportLabel(c.sport))} · ${mnyShortDate(c.dayKey)}</span>
-              <b>${mnyMoney(c.awarded)}</b>
-              <button type="button" class="mny-step" onclick="mnyDeleteComp('${escapeJsAttr(c.id)}')" aria-label="Remove">✕</button></div>`).join('')
-          : ''}
-        ${mnyUnrecordedCompRows(wk, kid)}
-        ${(!entries.length && !mmUnrecordedCompetitions(wk, kid).length)
-          ? `<div class="mny-note">No competition this week.</div>` : ''}
-      </div>`;
-  }
-  const d = mnyCompDraft || (mnyCompDraft = mmSeedCompDraft(wk, kid));
-  const preview = mrScoreCompetition({
-    sport: d.sport, dayKey: d.dayKey, points: d.points, qualified: d.qualified, provincial: d.provincial,
-    placement: { group: d.group || undefined, overall: d.overall || undefined },
-    danceItems: { silver: d.silver, gold: d.gold, allGold: d.allGold },
-  }, mrRulesFor(d.dayKey));
-
-  const sportChips = [['swim', '🏊 Swim'], ['skate', '⛸️ Skating'], ['dance', '🌟 Skating star level']].map(([id, label]) =>
-    `<button type="button" class="mny-chip ${d.sport === id ? 'on' : ''}" onclick="mnyCompSet('sport','${escapeJsAttr(id)}')">${label}</button>`).join('');
-
-  let detail = '';
-  if (d.sport === 'swim') {
-    detail = `<div class="mny-chiprow">
-        <button type="button" class="mny-chip ${d.qualified ? 'on' : ''}" onclick="mnyCompSet('qualified',${!d.qualified})">Qualified for Provincials</button>
-        <button type="button" class="mny-chip ${d.provincial ? 'on' : ''}" onclick="mnyCompSet('provincial',${!d.provincial})">This was Provincials</button>
-      </div>`;
-  } else if (d.sport === 'skate') {
-    detail = `<div class="mny-label">In her group</div><div class="mny-chiprow">
-        ${[0, 1, 2, 3].map(n => `<button type="button" class="mny-chip ${d.group === n ? 'on' : ''}" onclick="mnyCompSet('group',${n})">${n === 0 ? '—' : n + (['st','nd','rd'][n - 1])}</button>`).join('')}
-      </div>
-      <div class="mny-label">Overall</div><div class="mny-chiprow">
-        ${[0, 1, 2, 3].map(n => `<button type="button" class="mny-chip ${d.overall === n ? 'on' : ''}" onclick="mnyCompSet('overall',${n})">${n === 0 ? '—' : n + (['st','nd','rd'][n - 1])}</button>`).join('')}
-      </div>
-      <div class="mny-note">Both of these count. First in her group <b>and</b> first overall pays for both.</div>`;
-  } else {
-    detail = `<div class="mny-row"><span>Silver items</span>${mnyStepper('silver', d.silver, 'comp')}</div>
-      <div class="mny-row"><span>Gold items</span>${mnyStepper('gold', d.gold, 'comp')}</div>
-      <div class="mny-chiprow"><button type="button" class="mny-chip ${d.allGold ? 'on' : ''}" onclick="mnyCompSet('allGold',${!d.allGold})">Every item was Gold</button></div>`;
-  }
-
-  /* Where this came from, and the other meets the plan holds. One planned
-     competition fills the form; several offer themselves. */
-  const planned = mmUnrecordedCompetitions(wk, kid);
-  const fromPlan = planned.length
-    ? `<div class="mny-note">📋 From the plan for this week${planned.length > 1 ? ' — pick one' : ''}.</div>
-       <div class="mny-chiprow">${planned.map((c, i) => {
-          const lbl = `${c.icon || '🏆'} ${c.name || 'Competition'} · ${mnyShortDate(c.dayKey)}`;
-          return `<button type="button" class="mny-chip ${c.dayKey === d.dayKey ? 'on' : ''}" onclick="mmUsePlannedComp(${i})">${escapeHtml(lbl)}</button>`;
-        }).join('')}</div>`
-    : '';
-
-  return `<div class="mny-card">
-      <div class="mny-label">🏆 Competition day</div>
-      ${fromPlan}
-      <div class="mny-chiprow">${sportChips}</div>
-      <label class="mny-field"><span>What it was called</span>
-        <input type="text" data-mm-field="comp-name" value="${escapeAttr(d.name)}"
-          oninput="mnyCompSetQuiet('name', this.value)" placeholder="Winter Invitational"></label>
-      <label class="mny-field"><span>Which day</span>
-        <input type="date" data-mm-field="comp-day" value="${escapeAttr(d.dayKey)}"
-          onchange="mnyCompSet('dayKey', this.value)"></label>
-      ${d.sport !== 'dance' ? `<div class="mny-row"><span>Points</span>${mnyStepper('points', d.points, 'comp')}</div>` : ''}
-      ${detail}
-      <div class="mny-row total"><span>That comes to</span><b>${mnyMoney(preview)}</b></div>
-      ${/* A settled week does not block a meet — the gift's words, because it is the gift's mechanism. */''}
-      ${mnyGiftDecidedElsewhere(kid, d.dayKey) ? `<div class="mny-note">${escapeHtml(MNY_SETTLED_WEEK_SENTENCE)}</div>` : ''}
-      <div class="mny-chiprow">
-        <button type="button" class="mny-btn primary" onclick="mnySaveComp()">Save it</button>
-        <button type="button" class="mny-btn" onclick="mnyToggleComp()">Cancel</button>
-      </div>
-      <div class="mny-note">The official results sheet decides — not Mom, not Dad, not you.</div>
-    </div>`;
-}
-
-/* ── Money from outside ──
-   Birthday money, a gift, something sold. It is hers, but where it lands is
-   still a decision, so the destinations are gated by the same lessons as
-   everything else. */
-function mnyDepositForm(wk, kid) {
-  const saved = mnyDepositsForWeek(kid, wk);
-  if (!mnyDepOpen) {
-    return `<div class="mny-card">
-        <div class="mny-week-head">
-          <span class="mny-label">🎁 Money from outside</span>
-          <button type="button" class="mny-chip" onclick="mnyToggleDep()">${saved.length ? 'Add another' : 'Add some'}</button>
-        </div>
-        ${saved.length
-          ? saved.map(s => `<div class="mny-row"><span>🎁 ${escapeHtml(s.from)}${
-                s.giver ? ' · from ' + escapeHtml(s.giver) : ''}${
-                s.pendingApproval ? ' <small class="mny-note">waiting for a grown-up</small>' : ''}</span>
-              <b>${mnyMoney(s.amount)}</b>
-              <button type="button" class="mny-step" onclick="mnyDeleteDep('${escapeJsAttr(s.id)}')" aria-label="Remove">✕</button></div>`).join('')
-          : `<div class="mny-note">Nothing from outside this week.</div>`}
-        ${saved.length ? `<div class="mny-note">One-offs stay one-offs — this does not change what any week pays.</div>` : ''}
-      </div>`;
-  }
-  const d = mnyDepDraft || (mnyDepDraft = { amount: 20, from: MNY_FROM[0], giver: '', dayKey: todayKey() });
-  if (!d.dayKey) d.dayKey = todayKey();
-  // Which Sunday will decide it, when that is not the week it arrived in.
-  const elsewhere = (typeof mnyGiftDecidedElsewhere === 'function')
-    ? mnyGiftDecidedElsewhere(kid, d.dayKey) : null;
-  return `<div class="mny-card">
-      <div class="mny-label">🎁 Money from outside</div>
-      <div class="mny-row"><span>How much</span>${mnyStepper('amount', d.amount, 'dep', 5)}</div>
-      <div class="mny-chiprow">${MNY_DEPOSIT_CHIPS.map(v =>
-        `<button type="button" class="mny-chip ${d.amount === v ? 'on' : ''}" onclick="mnyDepSet('amount',${v})">$${v}</button>`).join('')}</div>
-      <div class="mny-label">Where it came from</div>
-      <div class="mny-chiprow">${MNY_FROM.map(f =>
-        `<button type="button" class="mny-chip ${d.from === f ? 'on' : ''}" onclick="mnyDepSet('from','${escapeJsAttr(f)}')">${escapeHtml(f)}</button>`).join('')}</div>
-      <label class="mny-field"><span>Which day</span>
-        <input type="date" value="${escapeAttr(d.dayKey || '')}" data-mny-action="dep-day"></label>
-      <div class="mny-note">The day it actually arrived. A red pocket comes at New
-        Year, not on a Sunday — and the money story reads by the day it came in.</div>
-      ${elsewhere ? `<div class="mny-note">That week is already settled, so this is
-        yours to decide at the meeting for <b>${escapeHtml(mnyShortDate(elsewhere))}</b>.</div>` : ''}
-      <label class="mny-field"><span>Who gave it</span>
-        <input type="text" maxlength="40" placeholder="Grandma, Uncle Ming…"
-          value="${escapeAttr(d.giver || '')}" data-mny-action="dep-giver"></label>
-      <div class="mny-note">A name, not a category — a red pocket is from somebody, and that is worth keeping.</div>
-      <div class="mny-note">This goes into the same pile as everything else you earned. You decide where all of it goes on the next step.</div>
-      <div class="mny-chiprow">
-        <button type="button" class="mny-btn primary" onclick="mnySaveDep()">Save it</button>
-        <button type="button" class="mny-btn" onclick="mnyToggleDep()">Cancel</button>
-      </div>
-    </div>`;
-}
-
-/* The confirm bar. Total on the left, what is in the way in the middle, the
-   button on the right — and the button says what is missing rather than just
-   refusing. */
-function mnyConfirmBar(wk, kid) {
-  const b = mrWeekBreakdown(wk, kid);
-  const missing = mnyMissing(kid, wk);
-  const stamp = mnyConfirmStamp(wk, kid);
-  const confirmed = mnyIsConfirmed(wk, kid);
-  const committed = mnyIsCommitted(wk, kid);
-  const needsReason = mnyAnyEdited(kid, wk) && !mnyWeekReason(kid, wk);
-  /* A meet that was planned and never scored blocks settling, the same way the
-     "not counted yet" flag already does. A week must not settle over a
-     competition nobody answered — and answering can be a real result OR an
-     explicit "no criteria met", which saves a record worth nothing and clears
-     this. The record is what counts here, never the amount. */
-  const unscored = (typeof mmUnrecordedCompetitions === 'function')
-    ? mmUnrecordedCompetitions(wk, kid) : [];
-  const blocked = missing.length ? `${missing.length} thing${missing.length > 1 ? 's are' : ' is'} not counted yet`
-                : (unscored.length ? `${unscored.length} competition${unscored.length > 1 ? 's have' : ' has'} no result yet`
-                : (needsReason ? 'Pick why a number was changed' : ''));
-
-  let button;
-  if (committed) {
-    button = `<span class="mny-src">The money has already moved</span>`;
-  } else if (blocked) {
-    button = `<button type="button" class="mny-btn" disabled>${escapeHtml(blocked)}</button>`;
-  } else if (confirmed) {
-    button = `<button type="button" class="mny-btn" onclick="mmGoStep(4)">Next — what to do with it ▶</button>`;
-  } else {
-    button = `<button type="button" class="mny-btn primary" onclick="mnyDoConfirm()">That's right — save it</button>`;
-  }
-  return `<div class="mny-confirmbar">
-      <!-- "earned for the week": b.net, no gifts. The strip at the top of this
-           step carries the pool's figure, and two numbers on one screen must
-           not both read as "the week". -->
-      <span><b>${mnyMoney(b.net)}</b> earned for the week</span>
-      <span class="mny-note">${escapeHtml(blocked || stamp)}</span>
-      ${button}
-    </div>`;
-}
-
-function mnyReturnsLocked() {
-  return `<div class="mny-card locked">
-      <div class="mny-label">What my money earned</div>
-      <div class="mny-note">🔒 This opens once you have agreed the week above.</div>
-    </div>`;
-}
-/* The other half of the lesson: the money that arrived without her doing any
-   work for it. Separated from earnings on purpose — a nine-year-old should be
-   able to see that these are two different kinds of money. */
-function mnyReturnsCard(kid) {
-  const r = mnyReturns(kid);
-  if (!r.rows.length) {
-    return `<div class="mny-card">
-        <div class="mny-label">What my money earned</div>
-        <div class="mny-note">Nothing yet — this fills in once you have money kept ready, locked away, or in a company.</div>
-      </div>`;
-  }
-  return `<div class="mny-card">
-      <div class="mny-label">What my money earned</div>
-      <div class="mny-total sm">${mnySigned(r.gain)}</div>
-      <div class="mny-note">Everything above this you worked for. This part arrived on its own. ${mnyAskBtn('save')}</div>
-      <div class="mny-rows">
-        ${r.rows.map(row => `<div class="mny-row">
-            <span>${row.icon} ${escapeHtml(row.name)}${row.maturesOn ? ' · unlocks ' + mnyShortDate(row.maturesOn) : ''}</span>
-            <b>${mnyMoney(row.value)} ${row.gain ? `<small>${mnySigned(row.gain)}${row.onPaper ? ' on paper' : ''}</small>` : ''}</b>
-          </div>`).join('')}
-        ${r.yearAhead > 0 ? `<div class="mny-row total"><span>If nothing changes, in a year</span><b>${mnySigned(r.yearAhead)}</b></div>` : ''}
-      </div>
-      ${r.rows.some(x => x.onPaper)
-        ? `<div class="mny-note">The company part is <b>on paper</b> — it is not yours until you sell it, and it can go down.</div>` : ''}
-    </div>`;
-}
-
-/* ════════════════════════════════════════════════════════════════
-   STEP 4 · WHAT I DO WITH IT
-   ════════════════════════════════════════════════════════════════ */
-function mnyRenderDecide(wk, opts) {
-  const chrome = !(opts && opts.chrome === false);
-  const kid = mnyMeetingKid();
-  mnySimCatchUp(kid);
-  const head = chrome
-    ? `${mnyPageHead('🤝 What I do with it', 'Decide once, for every dollar', [], { back: false })}
-       ${mnyTabBar('where')}${mnyKidTabs()}`
-    : `<div class="mm-h">🤝 What ${escapeHtml(mnyKidName(kid))} does with it</div>`;
-
-  // The gate covers the WHOLE step, not one column: deciding what to do with a
-  // number nobody has agreed to is not a decision, it is a guess.
-  if (!mnyIsConfirmed(wk, kid)) {
-    return `${head}
-      <div class="mny-card locked">
-        <div class="mny-label">Not yet</div>
-        <div class="mny-note">🔒 ${escapeHtml(mnyConfirmStamp(wk, kid) || 'Agree the week on the step before this one first.')}</div>
-        <button type="button" class="mny-btn wide" onclick="mmGoStep(3)">◀ Back to what she earned</button>
-      </div>`;
-  }
-  if (mnyIsCommitted(wk, kid)) return `${head}${mnyCommittedCard(wk, kid)}`;
-
-  const draft = mnyEnsureDraft(wk, kid);
-  const pool = mnyPool(wk, kid);
-  return `${head}
-    ${mnyStrip(wk, kid, 2)}
-    <div class="mny-cols two">
-      <div class="mny-col">
-        ${mnyPoolCard(wk, kid, pool)}
-        ${mnyPlanCard(wk, kid, draft, pool)}
-      </div>
-      <div class="mny-col">
-        ${mnyPlanOpen ? mnyChangePlanCards(wk, kid, draft, pool) : ''}
-        ${mnyReflectCard(draft)}
-        ${mnyCommitBar(wk, kid, draft, pool)}
-      </div>
-    </div>`;
-}
-
-/* The draft plan. Opens as last week's shape, re-priced against this week's
-   money — so a smaller week never commits more than exists. */
-function mnyEnsureDraft(wk, kid) {
-  if (mnyDraft && mnyDraft.wk === wk && mnyDraft.kid === kid) return mnyDraft;
-  const prev = mnyPreviousPlan(wk, kid);
-  const planId = (prev && prev.planId) ? 'last' : 'debt';
-  mnyDraft = {
-    wk, kid, planId,
-    split: mnySplitFor(wk, kid, planId),
-    reflect: null,
-    own: null,
-  };
-  mnyPlanOpen = false;
-  return mnyDraft;
 }
 
 /* The parent's before-we-start list. Collapsed, because on a good week it is
@@ -688,240 +248,6 @@ function mnyChecklist(wk, kid) {
     </div>`;
 }
 
-/* What there is to decide about, and what was never up for decision. The loan
-   payment is one locked line inside this card rather than a card of its own:
-   it is not a choice, and giving it its own card made it look like one. */
-function mnyPoolCard(wk, kid, pool) {
-  const b = pool.breakdown;
-  const due = pool.due;
-  const w = ensureWallet(kid);
-  const short = pool.mustPay > 0 && money2(w.cash + b.net) < pool.mustPay;
-  // The payment can be argued with, at the table, with the consequence on
-  // screen while you argue. Parent-only: it is a change to the agreement.
-  const payRow = (d) => {
-    const stepper = isParent()
-      ? `<span class="mny-stepgrp">
-           <button type="button" class="mny-step" onclick="mnyBumpPayment('${escapeJsAttr(d.debt.id)}',-1)" aria-label="Pay less">−</button>
-           <button type="button" class="mny-step" onclick="mnyBumpPayment('${escapeJsAttr(d.debt.id)}',1)" aria-label="Pay more">+</button>
-           ${d.reduced ? `<button type="button" class="mny-step" onclick="mnyResetPayment('${escapeJsAttr(d.debt.id)}')" aria-label="Back to the scheduled payment">↺</button>` : ''}
-         </span>`
-      : '';
-    const was = d.reduced ? `<s class="mny-was">${mnyMoney(d.scheduled)}</s> ` : '';
-    return `<div class="mny-row">
-        <span>🔒 ${escapeHtml(d.debt.icon + ' ' + d.debt.name)} — ${d.kind === 'down' ? 'deposit' : 'this month'}</span>
-        <b>${was}−${mnyMoney(d.amount).slice(1)}</b>${stepper}
-      </div>`;
-  };
-  return `<div class="mny-card">
-      <div class="mny-label">Where this week's money stands</div>
-      <div class="mny-rows">
-        <div class="mny-row"><span>Money that came in</span><b>${mnyMoney(pool.cameIn)}</b></div>
-        ${pool.deposits > 0 ? `<div class="mny-row"><span class="mny-sub-row">…including 🎁 ${mnyMoney(pool.deposits)} from outside</span></div>` : ''}
-        ${pool.lateComp > 0 ? `<div class="mny-row"><span class="mny-sub-row">…including 🏆 ${mnyMoney(pool.lateComp)} from a meet whose week was already settled</span></div>`
-          : (pool.lateComp < 0 ? `<div class="mny-row"><span class="mny-sub-row">…less 🏆 ${mnyMoney(-pool.lateComp)} taken back from a meet whose week was already settled</span></div>` : '')}
-        ${due.map(payRow).join('')}
-        <div class="mny-row total"><span>Mine to choose</span><b>${mnyMoney(pool.mine)}</b></div>
-      </div>
-      ${mnyPaymentImpact(wk, kid, pool)}
-      ${mnyBuysNote(pool.mine)}
-      <div class="mny-note">Corrections to what she earned happen on the step before this one.</div>
-      ${short ? `<div class="mny-note warn">There is not enough to cover the payment. ${MNY_SHORTFALL.map(s =>
-        `<button type="button" class="mny-chip" onclick="mnyPickShortfall('${escapeJsAttr(s.id)}')">${escapeHtml(s.label)}</button>`).join(' ')}</div>` : ''}
-    </div>`;
-}
-/* What paying less actually costs, in the two units that mean something to a
-   nine-year-old: dollars added by arrears, and months added to the date she is
-   free of it. Silent when the family is paying the schedule, because then
-   there is nothing to weigh up. */
-function mnyPaymentImpact(wk, kid, pool) {
-  if (!(pool.unpaid > 0)) return '';
-  const primary = mnyDebtsByPriority(kid).find(d => loanBalance(kid, d.id) > 0);
-  const rate = primary ? (Number(primary.arrearsRatePct) || 0) / 100 : 0;
-  const cost = money2(pool.unpaid * rate);
-  // The months are the half a nine-year-old can actually feel. loanFreeDate
-  // already answers "when am I free of this at the current rate", so asking it
-  // twice — once as if the shortfall had been paid — gives the delta without a
-  // second formula to keep in step with the first.
-  let later = '';
-  if (primary) {
-    const now = loanFreeDate(kid, primary.id, 0);
-    const ifPaid = loanFreeDate(kid, primary.id, pool.unpaid);
-    if (now.months != null && ifPaid.months != null) {
-      const slip = now.months - ifPaid.months;
-      if (slip > 0) later = ` It also pushes being free of ${escapeHtml(primary.name)} out by about `
-        + `${slip} month${slip === 1 ? '' : 's'}.`;
-    }
-  }
-  return `<div class="mny-note warn">
-      Paying ${mnyMoney(pool.unpaid)} less than the schedule frees ${mnyMoney(pool.unpaid)} to choose with now,
-      and costs ${mnyMoney(cost)} a month in late fees until it is caught up.${later}
-      It is not forgiven — the loan still carries it.
-    </div>`;
-}
-
-/* The three ways a short week can be settled. All three have a price, and the
-   price is the lesson. */
-const MNY_SHORTFALL = [
-  { id: 'pay_available',      label: 'Pay what I have' },
-  { id: 'pay_nothing',        label: 'Pay nothing this month' },
-  { id: 'cover_from_savings', label: 'Take it from what I kept ready' },
-];
-let mnyShortfallChoice = 'pay_available';
-function mnyPickShortfall(id) { mnyShortfallChoice = id; renderMeetingMode(); }
-
-/* Nudge a debt's payment for this week. Never above the schedule (paying extra
-   is a choice made below, out of what's hers) and never below zero. */
-function mnyBumpPayment(debtId, dir) {
-  const wk = mnyWeekKeyMeeting(), kid = mnyMeetingKid();
-  const row = mnyDueThisWeek(kid, wk).find(d => d.debt.id === debtId);
-  if (!row) return;
-  const next = money2(Math.max(0, Math.min(row.scheduled, row.amount + dir)));
-  mnySetPaymentOverride(kid, wk, debtId, next >= row.scheduled ? null : next);
-  mnyDraft = null;   // the pool changed, so the draft split has to be re-priced
-  renderMeetingMode();
-}
-function mnyResetPayment(debtId) {
-  mnySetPaymentOverride(mnyMeetingKid(), mnyWeekKeyMeeting(), debtId, null);
-  mnyDraft = null;
-  renderMeetingMode();
-}
-
-/* The plan, already applied and priced. On a normal week this is the whole of
-   step 4: read it, answer the question, done. */
-function mnyPlanCard(wk, kid, draft, pool) {
-  const plan = MNY_PLANS.find(p => p.id === draft.planId) || MNY_PLANS[0];
-  const priced = mnyPricePlan(kid, draft.split);
-  const rows = mnyBucketRows(kid, draft.split);
-  const out = mnyOutflowSegments(wk, kid, draft.split);
-  return `<div class="mny-card">
-      <div class="mny-week-head">
-        <span class="mny-label">${draft.planId === 'last' ? "Last week's plan, applied" : escapeHtml(plan.label)}</span>
-        <b>${mnyMoney(mnySplitTotal(draft.split))}</b>
-      </div>
-      <div class="mny-rows">${rows}</div>
-      ${priced.bonus > 0 ? `<div class="mny-note">Paying early earns you <b>${mnyMoney(priced.bonus)}</b> on top${priced.monthsSaved > 0 ? `, and finishes ${priced.monthsSaved} month${priced.monthsSaved > 1 ? 's' : ''} sooner` : ''}.</div>` : ''}
-      <div class="mny-sub">Where it all goes</div>
-      ${mnyBarHtml(out, { empty: 'Nothing to move' })}
-      ${mnyGhostBar(wk, kid)}
-      <button type="button" class="mny-btn wide${mnyPlanOpen ? '' : ' primary'}" onclick="mnyTogglePlan()">${
-        mnyPlanOpen ? 'Done changing ▾' : '✏️ Change the plan — pick a different one, or set your own amounts ▸'}</button>
-    </div>`;
-}
-/* Last week's shape, ghosted under this week's. Two bars side by side would be
-   a comparison; one under the other, faded, is the same shape asked about
-   again — which is the actual question at the meeting. Absent on the first
-   week, because a ghost of nothing is just a puzzle. */
-function mnyGhostBar(wk, kid) {
-  const prev = mnyPreviousPlan(wk, kid);
-  if (!prev || !prev.split) return '';
-  const ghost = mnyOutflowSegments(wk, kid, prev.split);
-  if (!ghost.segs.length) return '';
-  return `<div class="mny-ghost">
-      <div class="mny-ghost-label">Last week</div>
-      <div class="mny-bar ghost" role="img" aria-label="Last week's plan for comparison">${ghost.segs.map(g =>
-        `<div class="mny-seg" style="width:${g.w};background:${g.color}"></div>`).join('')}</div>
-    </div>`;
-}
-
-function mnyBucketRows(kid, split) {
-  const rows = [];
-  mnyDebtsByPriority(kid).forEach(d => {
-    const v = money2(split['loan:' + d.id]);
-    if (v > 0 || split['loan:' + d.id] != null) {
-      rows.push(`<div class="mny-row"><span>${escapeHtml(d.icon + ' Pay off ' + d.name)} ${mnyAskBtn('extra')}</span><b>${mnyMoney(v)}</b></div>`);
-    }
-  });
-  mnyGoals(kid).forEach(g => {
-    const v = money2(split['goal:' + g.id]);
-    if (v > 0 || split['goal:' + g.id] != null) {
-      rows.push(`<div class="mny-row"><span>${escapeHtml(g.icon + ' Toward ' + g.name)}</span><b>${mnyMoney(v)}</b></div>`);
-    }
-  });
-  [['spend', '🛍️ Spend it', 'spend'], ['ready', '💵 Keep it ready', 'ready'],
-   ['gic', '🔒 Lock it away for a year', 'gic'],
-   ['stock', '📈 Buy a bit of a company', 'stock']].forEach(([k, label, ask]) => {
-    rows.push(`<div class="mny-row"><span>${label} ${mnyAskBtn(ask)}</span><b>${mnyMoney(split[k])}</b></div>`);
-  });
-  return rows.join('');
-}
-
-/* Everything that lets her change the plan, behind one button. */
-function mnyChangePlanCards(wk, kid, draft, pool) {
-  const cards = MNY_PLANS.map(p => {
-    const open = mnyIsOpen(kid, p.stage);
-    return `<button type="button" class="mny-plan ${draft.planId === p.id ? 'on' : ''}" ${open ? '' : 'disabled'}
-      onclick="mnyPickPlan('${escapeJsAttr(p.id)}')">
-      <span class="mny-plan-icon">${p.icon}</span>
-      <span>${escapeHtml(p.label)}</span>
-      ${open ? '' : `<small>🔒 ${escapeHtml(mnyNeedLabel(p.stage))}</small>`}
-    </button>`;
-  }).join('');
-
-  const steppers = mnyDebtsByPriority(kid).map(d =>
-    `<div class="mny-row"><span>${escapeHtml(d.icon + ' ' + d.name)}</span>${mnyBucketStepper('loan:' + d.id, draft.split['loan:' + d.id])}</div>`).join('')
-    + mnyGoals(kid).map(g => {
-      const pace = mnyGoalPace(kid, g);
-      return `<div class="mny-row"><span>${escapeHtml(g.icon + ' ' + g.name)}
-        ${pace.neededPerWeek != null ? `<small class="mny-sub-row">${mnyMoney(pace.neededPerWeek)} a week keeps it on track</small>` : ''}</span>
-        ${mnyBucketStepper('goal:' + g.id, draft.split['goal:' + g.id])}</div>`;
-    }).join('')
-    + MNY_BUCKETS.filter(b => b.key !== 'loan').map(b => {
-      const open = mnyIsOpen(kid, b.stage);
-      return `<div class="mny-row"><span>${b.icon} ${escapeHtml(b.label)}${open ? '' : ' 🔒 ' + mnyNeedLabel(b.stage)}</span>
-        ${open ? mnyBucketStepper(b.key, draft.split[b.key]) : '<b>—</b>'}</div>`;
-    }).join('');
-
-  const spent = mnySplitTotal(draft.split);
-  const left = money2(pool.mine - spent);
-  const overStock = money2(draft.split.stock) > pool.stockCap;
-  const overSpend = money2(draft.split.spend) > pool.spendCap;
-  const msg = overStock
-    ? `<span class="warn">A bit of a company is capped at ${mnyMoney(pool.stockCap)} — a fifth of the week.</span>`
-    : overSpend
-    ? `<span class="warn">Spending is capped at ${mnyMoney(pool.spendCap)} — a fifth of the week.</span>`
-    : (Math.abs(left) < 0.005 ? 'Every dollar has a job ✓'
-       : (left > 0 ? `${mnyMoney(left)} still has no job.` : `That is ${mnyMoney(-left)} more than you have.`));
-
-  const doorAmt = (mnyDoorAmt == null) ? pool.mine : mnyDoorAmt;
-  const doors = mnyDoors(kid, doorAmt);
-  const maxAbs = Math.max(1, ...doors.map(d => Math.abs(d.delta)));
-
-  return `<div class="mny-card">
-      <div class="mny-label">Pick a plan</div>
-      <div class="mny-plans">${cards}</div>
-      <div class="mny-sub">Or set every number yourself</div>
-      <div class="mny-rows">${steppers}</div>
-      <div class="mny-note">${msg}</div>
-    </div>
-    <div class="mny-card">
-      <div class="mny-label">If I put ${mnyMoney(doorAmt)} somewhere for a year</div>
-      <div class="mny-chiprow">
-        ${[10, 50, 100].map(v => `<button type="button" class="mny-chip ${doorAmt === v ? 'on' : ''}" onclick="mnySetDoor(${v})">$${v}</button>`).join('')}
-        <button type="button" class="mny-chip ${mnyDoorAmt == null ? 'on' : ''}" onclick="mnySetDoor(null)">What I actually have</button>
-      </div>
-      <div class="mny-doors">${doors.map(d => {
-        const w = Math.round((Math.abs(d.delta) / maxAbs) * 50);
-        const neg = d.delta < 0;
-        return `<div class="mny-door">
-            <span class="mny-door-label">${d.icon} ${escapeHtml(d.label)}</span>
-            <span class="mny-door-track">
-              <i class="${neg ? 'neg' : 'pos'}" style="width:${w}%"></i>
-            </span>
-            <b class="${neg ? 'neg' : ''}">${mnySigned(d.delta)}${d.range ? ' or so' : ''}</b>
-          </div>`;
-      }).join('')}</div>
-      <div class="mny-note">${escapeHtml(doors.map(d => d.note)[3])}</div>
-    </div>
-    ${mnyIsOpen(kid, 'stock') ? mnyStockChart() : ''}`;
-}
-function mnyBucketStepper(key, value) {
-  return `<span class="mny-stepgrp">
-      <button type="button" class="mny-step" onclick="mnyTuneBucket('${escapeJsAttr(key)}',-1)" aria-label="Less">−</button>
-      <b>${mnyMoney(value)}</b>
-      <button type="button" class="mny-step" onclick="mnyTuneBucket('${escapeJsAttr(key)}',1)" aria-label="More">+</button>
-    </span>`;
-}
-
 /* One real year, drawn from real prices. A company that only ever goes up is
    not a lesson about companies. */
 function mnyStockChart() {
@@ -937,397 +263,6 @@ function mnyStockChart() {
       </svg>
       <div class="mny-note">This really happened, back in 2023. One company fell ${Math.abs(drop)}% in three months, then went back up. Nobody knew it would. ${mnyAskBtn('stock')}</div>
     </div>`;
-}
-
-/* One question, and it gates the commit. Not because the answer is checked,
-   but because a decision she cannot say a reason for is not hers yet. */
-function mnyReflectCard(draft) {
-  const chosen = MNY_REFLECT.chips.find(c => c.id === draft.reflect);
-  return `<div class="mny-card">
-      <div class="mny-label">One question</div>
-      <div class="mny-today-big">${escapeHtml(MNY_REFLECT.question)}</div>
-      <div class="mny-chiprow">${MNY_REFLECT.chips.map(c =>
-        `<button type="button" class="mny-chip ${draft.reflect === c.id ? 'on' : ''}" onclick="mnyPickReflect('${escapeJsAttr(c.id)}')">${escapeHtml(c.label)}</button>`).join('')}</div>
-      ${chosen
-        ? `<div class="mny-note">${escapeHtml(chosen.effect)} The plan above has moved to match — change any number if you disagree with it.</div>`
-        : `<div class="mny-note">Pick one. Your answer shapes the plan above, and it goes into the record of this week.</div>`}
-    </div>`;
-}
-
-/* Why this split cannot be committed yet, as a sentence, or null when it can.
-
-   ONE OWNER, because two things ask it now: the panel says it where the plan
-   is being edited, and the meeting's footer says it on the button itself
-   (mmMoneyFooter, js/15-meeting.js). Two copies of a rule about moving money is
-   the defect this repo keeps recording — and the failure mode here is the worst
-   kind, a button that offers to commit while the panel above it says it cannot. */
-function mnyCommitRefusal(draft, pool) {
-  const left = money2(pool.mine - mnySplitTotal(draft.split));
-  if (!draft.reflect) return 'Answer the question first';
-  if (left < -0.005) return 'That is more than you have';
-  if (left > 0.005) return `${mnyMoney(left)} still has no job`;
-  if (money2(draft.split.stock) > pool.stockCap) return 'Too much into one company';
-  if (money2(draft.split.spend) > pool.spendCap) return `Spending is capped at ${mnyMoney(pool.spendCap)}`;
-  return null;
-}
-
-/* What the plan comes to, and what is standing in the way. It carried the
-   commit BUTTON until the meeting became three screens; the button lives in the
-   footer now, where it is always visible instead of somewhere in the middle of
-   a long panel. This bar still says the figure and the reason, because that is
-   where a parent is looking while they change a number. */
-function mnyCommitBar(wk, kid, draft, pool) {
-  const spent = mnySplitTotal(draft.split);
-  const blocked = mnyCommitRefusal(draft, pool);
-  return `<div class="mny-confirmbar">
-      <span><b>${mnyMoney(spent)}</b> to move</span>
-      <span class="mny-note">${blocked
-        ? escapeHtml(blocked)
-        : 'Ready — the button at the bottom of the screen moves it.'}</span>
-    </div>`;
-}
-
-function mnyCommittedCard(wk, kid) {
-  const plan = mnyWeekPlan(wk, kid) || {};
-  const out = mnyOutflowSegments(wk, kid, plan.split);
-  return `<div class="mny-card">
-      <div class="mny-label">Done for this week</div>
-      <div class="mny-today-big">The money has moved. ${escapeHtml(plan.label || '')}</div>
-      ${mnyBarHtml(out, { empty: '' })}
-      ${/* Asked, not read: mmUndoHeld drops an undo that money moving after
-            the meeting has made unsafe, and the note takes the button's place. */''}
-      ${mmUndoHeld() ? `<button type="button" class="mny-btn wide" onclick="mmUndoRecord()">↩️ Undo this meeting — puts both girls back</button>`
-        : (mmUndoGone && mmUndoGone.wk === wk
-          ? `<div class="mny-note">${escapeHtml(MM_UNDO_GONE_SENTENCE)} (${escapeHtml(mmUndoGone.why)})</div>` : '')}
-    </div>`;
-}
-
-/* ════════════════════════════════════════════════════════════════
-   ACTIONS
-   ════════════════════════════════════════════════════════════════ */
-function mnyToggleEdit() {
-  if (!isParent()) { showToast('A grown-up changes the numbers 🔒'); return; }
-  mnyEditOn = !mnyEditOn; renderMeetingMode();
-}
-function mnyToggleRow(key) { mnyExpandRow = (mnyExpandRow === key) ? null : key; renderMeetingMode(); }
-function mnyToggleComp() {
-  mnyCompOpen = !mnyCompOpen;
-  // Opening builds the draft from the plan; closing throws it away.
-  mnyCompDraft = mnyCompOpen ? mmSeedCompDraft(mnyWeekKeyMeeting(), mnyMeetingKid()) : null;
-  renderMeetingMode();
-}
-/* Switch the form to another competition the plan holds. */
-/* Open the full form already seeded from THIS planned meet. mmUsePlannedComp
-   takes a position in the pending list, which is fine for its own picker and
-   wrong from a row that names a specific day — the list is rebuilt on every
-   render, so a position can point at a different meet than the one tapped. */
-function mnyOpenCompForPlanned(dayKey) {
-  const wk = mnyWeekKeyMeeting();
-  const kid = mnyMeetingKid();
-  const hit = mmUnrecordedCompetitions(wk, kid).find(p => String(p.dayKey) === String(dayKey));
-  mnyCompOpen = true;
-  mnyCompDraft = mmSeedCompDraft(wk, kid);
-  if (hit) {
-    mnyCompDraft.dayKey = hit.dayKey;
-    mnyCompDraft.name = hit.name;
-    if (hit.sport) mnyCompDraft.sport = hit.sport;
-    mnyCompDraft.blockId = hit.blockId || null;
-    mnyCompDraft.fromPlan = true;
-  }
-  renderMeetingMode();
-}
-
-function mmUsePlannedComp(i) {
-  const list = mmUnrecordedCompetitions(mnyWeekKeyMeeting(), mnyMeetingKid());
-  const c = list[i];
-  if (!c || !mnyCompDraft) return;
-  mnyCompDraft.dayKey = c.dayKey;
-  mnyCompDraft.name = c.name;
-  if (c.sport) mnyCompDraft.sport = c.sport;
-  renderMeetingMode();
-}
-function mnyToggleDep() { mnyDepOpen = !mnyDepOpen; if (!mnyDepOpen) mnyDepDraft = null; renderMeetingMode(); }
-function mnyToggleChecks() { mnyChecksOpen = !mnyChecksOpen; renderMeetingMode(); }
-function mnyTogglePlan() { mnyPlanOpen = !mnyPlanOpen; renderMeetingMode(); }
-function mnyTickCheck(id) { mnyToggleCheck(mnyWeekKeyMeeting(), mnyMeetingKid(), id); renderMeetingMode(); }
-function mnyWeekKeyMeeting() { return ctWeekKey || ctThisWeekKey(); }
-
-function mnyBumpChannel(channel, delta) {
-  const wk = mnyWeekKeyMeeting(), kid = mnyMeetingKid();
-  const b = mrWeekBreakdown(wk, kid);
-  const cur = { chores: b.chorePaid, learning: b.learnPaid, streak: b.streakBonus,
-                comp: b.compPaid, fines: b.fines.total }[channel];
-  mnySetOverride(kid, wk, channel, Math.max(0, money2(cur + delta)), mnyWeekReason(kid, wk));
-  renderMeetingMode();
-}
-function mnyResetChannel(channel) {
-  mnyClearOverride(mnyMeetingKid(), mnyWeekKeyMeeting(), channel);
-  renderMeetingMode();
-}
-function mnyFlagMissing(channel) {
-  mnyToggleMissing(mnyMeetingKid(), mnyWeekKeyMeeting(), channel);
-  renderMeetingMode();
-}
-/* One reason for the week, applied to every change made in it. */
-function mnyPickReason(id) {
-  const wk = mnyWeekKeyMeeting(), kid = mnyMeetingKid();
-  const ov = mnyOverrides(kid, wk);
-  Object.keys(ov).forEach(k => { ov[k].reason = id; });
-  saveAll();
-  renderMeetingMode();
-}
-
-function mnyStepper(field, value, which, step) {
-  const s = step || 1;
-  const fn = which === 'comp' ? 'mnyCompBump' : 'mnyDepBump';
-  return `<span class="mny-stepgrp">
-      <button type="button" class="mny-step" onclick="${fn}('${escapeJsAttr(field)}',${-s})" aria-label="Less">−</button>
-      <b>${which === 'dep' ? mnyMoney(value) : value}</b>
-      <button type="button" class="mny-step" onclick="${fn}('${escapeJsAttr(field)}',${s})" aria-label="More">+</button>
-    </span>`;
-}
-/* Typed fields mutate the draft WITHOUT redrawing. A chip or a stepper changes
-   what the rest of the card says (the score preview, which detail rows apply),
-   so those still re-render; a name being typed changes nothing else on screen,
-   and redrawing on each letter is what threw the caret out of the box. The
-   value is already in the draft, so the next real render picks it up. */
-function mnyCompSetQuiet(field, value) { if (mnyCompDraft) mnyCompDraft[field] = value; }
-function mnyCompSet(field, value) { if (!mnyCompDraft) return; mnyCompDraft[field] = value; renderMeetingMode(); }
-function mnyCompBump(field, delta) { if (!mnyCompDraft) return; mnyCompDraft[field] = Math.max(0, (Number(mnyCompDraft[field]) || 0) + delta); renderMeetingMode(); }
-function mnyDepSet(field, value) { if (!mnyDepDraft) return; mnyDepDraft[field] = value; renderMeetingMode(); }
-function mnyDepBump(field, delta) { if (!mnyDepDraft) return; mnyDepDraft[field] = Math.max(0, money2((Number(mnyDepDraft[field]) || 0) + delta)); renderMeetingMode(); }
-
-function mnySaveComp() {
-  const d = mnyCompDraft; if (!d) return;
-  const kid = mnyMeetingKid();
-  const saved = mrAddCompetition(kid, {
-    sport: d.sport, name: d.name, dayKey: d.dayKey, points: d.points,
-    blockId: d.blockId || null,
-    qualified: d.qualified, provincial: d.provincial,
-    placement: { group: d.group || undefined, overall: d.overall || undefined },
-    danceItems: { silver: d.silver, gold: d.gold, allGold: d.allGold },
-  });
-  if (!saved) return;
-  // A competition entered after the week was agreed changes what the week is
-  // worth, so the week has to be agreed again.
-  mnyReopenWeek(kid, mnyWeekKeyMeeting());
-  mnyCompOpen = false; mnyCompDraft = null;
-  showToast(`${mnySportIcon(saved.sport)} Saved — ${mnyMoney(saved.awarded)}`);
-  renderMeetingMode();
-}
-function mnyDeleteComp(id) {
-  mrDeleteCompetition(mnyMeetingKid(), id);
-  mnyReopenWeek(mnyMeetingKid(), mnyWeekKeyMeeting());
-  renderMeetingMode();
-}
-function mnySaveDep() {
-  const d = mnyDepDraft; if (!d) return;
-  /* The week is derived from the gift's own day inside mnyAddDeposit, so the
-     week passed here is only the fallback for a draft with no date. */
-  const saved = mnyAddDeposit(mnyMeetingKid(), mnyWeekKeyMeeting(), d);
-  if (!saved) { showToast('Put in an amount first'); return; }
-  mnyDepOpen = false; mnyDepDraft = null;
-  showToast(`🎁 Saved — ${mnyMoney(saved.amount)}`);
-  renderMeetingMode();
-}
-function mnyDeleteDep(id) { mnyRemoveDeposit(mnyMeetingKid(), id); renderMeetingMode(); }
-
-function mnyDoConfirm() {
-  const wk = mnyWeekKeyMeeting(), kid = mnyMeetingKid();
-  if (!mnyConfirmWeek(wk, kid, 'a grown-up')) return;
-  mnyDraft = null;
-  showToast('✅ Agreed — now what to do with it');
-  renderMeetingMode();
-}
-
-function mnyPickPlan(id) {
-  const d = mnyDraft; if (!d) return;
-  const plan = MNY_PLANS.find(p => p.id === id);
-  // The card is already disabled, but the gate belongs on the action too: a
-  // lesson that can be skipped by a stale click is not a lesson.
-  if (!plan || !mnyIsOpen(d.kid, plan.stage)) { showToast(`🔒 ${mnyNeedLabel(plan ? plan.stage : 'mix')}`); return; }
-  d.planId = id;
-  d.split = mnySplitFor(d.wk, d.kid, id, d.own);
-  renderMeetingMode();
-}
-/* Answering the question is not a formality — it re-shapes the plan toward
-   what she just said the money is for. Three identical-feeling buttons that
-   only unlocked a commit taught that the question was a toll booth; a plan
-   that visibly moves teaches that the answer is a decision. Every number is
-   still hers to override afterwards. */
-function mnyPickReflect(id) {
-  const d = mnyDraft;
-  if (!d) return;
-  d.reflect = id;
-  // ...except once she has set the numbers by hand. At that point the split is
-  // an answer in its own right, and overwriting it because she then named a
-  // reason would throw away the more considered of the two.
-  if (d.planId === 'own') { renderMeetingMode(); return; }
-  const chip = MNY_REFLECT.chips.find(c => c.id === id);
-  if (chip && chip.planId) {
-    const open = mnyIsOpen(d.kid, (MNY_PLANS.find(p => p.id === chip.planId) || {}).stage);
-    if (open) {
-      d.planId = chip.planId;
-      d.split = mnySplitFor(d.wk, d.kid, chip.planId, d.own);
-    }
-  }
-  renderMeetingMode();
-}
-function mnySetDoor(v) { mnyDoorAmt = v; renderMeetingMode(); }
-/* Touching any stepper turns the plan into a hand-built one, seeded from
-   wherever it already was — so nudging one number never silently discards the
-   other three. */
-/* The cash that clears a debt outright: with a 10% bonus, $100 clears $110, so
-   the balance divided by 1 + bonus. mnyDefaultSplit and the commit both ask. */
-function mnyCashToClear(kid, debt) {
-  const bonus = (Number(debt.bonusRate) || 0) / 100;
-  return money2(loanBalance(kid, debt.id) / (1 + bonus));
-}
-function mnyTuneBucket(key, dir) {
-  const d = mnyDraft; if (!d) return;
-  const pool = mnyPool(d.wk, d.kid);
-  const next = Math.max(0, money2(money2(d.split[key]) + dir));
-  if (key.indexOf('loan:') === 0) {
-    const debt = mnyDebtById(d.kid, key.slice(5));
-    if (debt && next > mnyCashToClear(d.kid, debt) + 0.005) { showToast(`${mnyMoney(mnyCashToClear(d.kid, debt))} clears ${debt.name} — no need for more`); return; }
-  }
-  if (key === 'stock' && next > pool.stockCap) { showToast(`A fifth of the week is the most — ${mnyMoney(pool.stockCap)}`); return; }
-  if (key === 'spend' && next > pool.spendCap) { showToast(`A fifth of the week is the most to spend — ${mnyMoney(pool.spendCap)}`); return; }
-  const others = money2(mnySplitTotal(d.split) - money2(d.split[key]));
-  if (money2(others + next) > pool.mine + 0.005) { showToast('That is more than you have'); return; }
-  d.split[key] = next;
-  d.planId = 'own';
-  d.own = Object.assign({}, d.split);
-  renderMeetingMode();
-}
-
-/* ════════════════════════════════════════════════════════════════
-   THE COMMIT — the one place money actually moves
-   ════════════════════════════════════════════════════════════════ */
-function mnyDoCommit() {
-  const wk = mnyWeekKeyMeeting(), kid = mnyMeetingKid();
-  const d = mnyDraft;
-  if (!d || !mnyIsConfirmed(wk, kid) || mnyIsCommitted(wk, kid)) return;
-  if (!isParent()) { showToast('A grown-up moves the money 🔒'); return; }
-
-  /* The start of the commit's bracket (js/15-meeting.js, mmUndoHeld): money
-     that moved since the previous girl's commit withdraws the undo HERE,
-     before this commit writes anything; mmUndoSeal at the end claims what
-     this one moved as the meeting's own. */
-  mmUndoHeld();
-
-  // Catch the world up first: interest earned and prices moved since the last
-  // meeting are part of this week, and the ledger has to record them.
-  mnySimCatchUp(kid);
-  const passive = mnyPassiveSinceLastMeeting(kid);
-
-  /* Idempotent per week, and that is the whole fix: this ran once per child,
-     so settling Jess overwrote the picture taken before Jenn and the undo
-     could only ever reverse the second girl. */
-  mmTakeUndoSnapshot(wk);
-
-  // 1 · money from outside joins the pool FIRST. It carries no destination —
-  //     the plan below decides where every dollar goes, whichever door it came
-  //     in through — and it has to be in the wallet before the schedule runs.
-  //     Crediting it afterwards would send a week to arrears for want of money
-  //     that was sitting on the table the whole time.
-  mnyDepositsForWeek(kid, wk).forEach(dep => {
-    if (dep.appliedAt) return;
-    /* A gift a CHILD proposed has not been approved yet, so it must not slip
-       into the wallet through the commit — that would be the approval gate
-       working on one screen and not on the other. It waits. */
-    if (dep.pendingApproval) return;
-    moneyAddCash(kid, dep.amount, mnyGiftMirror(dep));
-    dep.appliedAt = Date.now();
-    dep.updatedAt = syncNow();
-  });
-
-  // 2 · the week itself: freeze the ledger, credit what she earned, credit XP,
-  //     run the scheduled loan payment against the whole pool, open the box.
-  const res = commitKidWeek(wk, kid, { shortfall: mnyShortfallChoice });
-  const parts = res.parts;
-
-  // 3 · the plan. Cash is already in the wallet from step 1, so each bucket
-  //     just moves it on.
-  const split = d.split;
-  let toLoan = 0;
-  mnyDebtsByPriority(kid).forEach(debt => {
-    const amt = money2(split['loan:' + debt.id]);
-    if (!(amt > 0)) return;
-    const w = ensureWallet(kid);
-    // Never hand over more than clears the debt: loanRecordPayment credits at
-    // most what is owed, but the cash was already gone from the wallet, so a
-    // split bumped past the balance simply lost the difference.
-    const pay = money2(Math.min(amt, w.cash, mnyCashToClear(kid, debt)));
-    if (!(pay > 0)) return;
-    w.cash = money2(w.cash - pay);
-    evMirror(kid, { kind: 'loan', from: 'cash', to: 'loan:' + debt.id, amount: pay,
-                    ref: debt.id, weekKey: wk,
-                    note: 'Off ' + (debt.name || 'her loan') + ' — her choice' });
-    const rec = loanRecordPayment(kid, pay, 'early', debt.id);
-    toLoan = money2(toLoan + pay);
-    if (rec) parts.push(`${debt.name} −$${pay.toFixed(2)} (cleared $${rec.credited.toFixed(2)})`);
-  });
-  // Goal money is real kept-ready money with a name on it — it moves into
-  // savings like anything else, and the goal records that this much of it is
-  // spoken for. Keeping goals as a separate pot would have meant a kid could
-  // not change her mind, which is not a thing savings should do.
-  const toGoals = {};
-  mnyGoals(kid).forEach(g => {
-    const amt = money2(split['goal:' + g.id]);
-    if (!(amt > 0)) return;
-    if (!moneyDeposit(kid, amt)) return;
-    g.saved = money2(money2(g.saved) + amt);
-    g.updatedAt = syncNow();
-    toGoals[g.id] = amt;
-    parts.push(`${g.icon} ${g.name} +$${amt.toFixed(2)}`);
-  });
-  // Spending leaves it exactly where it is: cash in the wallet is money she can
-  // spend. The record of the decision is the plan and the ledger line below.
-  /* Spending leaves the cash where it is, so nothing in the wallet moves — but
-     the DECISION is the whole point of this screen, and a flow with no "spent"
-     ribbon would teach that money only ever goes into pots. Recorded as
-     cash → spent; the wallet catches up when she actually spends it, which the
-     stream will own outright once `wallet.cash` is retired. */
-  if (money2(split.spend) > 0) parts.push(`🛍️ to spend $${money2(split.spend).toFixed(2)}`);
-  if (money2(split.gic) > 0) moneyOpenGIC(kid, money2(split.gic), 12);
-  if (money2(split.stock) > 0) mnyBuyChosenFund(kid, money2(split.stock));
-  if (money2(split.ready) > 0) moneyDeposit(kid, money2(split.ready));
-
-  // 4 · write it down: what was decided, and what the ledger should say.
-  const plan = MNY_PLANS.find(p => p.id === d.planId) || MNY_PLANS[0];
-  mnySavePlan(wk, kid, {
-    planId: d.planId, label: plan.label, split, reflect: d.reflect,
-    committedAt: syncNow(),
-  });
-  const c = state.shared.chore;
-  const ledger = ((c.moneyLedger || {})[wk] || {})[kid];
-  if (ledger) {
-    const stamp = mnyWeekConfirm(wk, kid) || {};
-    ledger.confirmedBy = stamp.by || 'a grown-up';
-    ledger.plan = { id: d.planId, label: plan.label };
-    ledger.outside = mnyDepositTotal(kid, wk);
-    ledger.debtExtra = toLoan;
-    ledger.spend = money2(split.spend);
-    ledger.ready = money2(split.ready);
-    ledger.gic = money2(split.gic);
-    ledger.stock = money2(split.stock);
-    ledger.reflect = d.reflect;
-    ledger.passive = passive;
-    ledger.goals = toGoals;
-    ledger.debtBalanceAfter = mnyTotalOwing(kid);
-  }
-  // This Sunday becomes the new baseline for "made on its own".
-  mnyStampPassiveBaseline(kid);
-
-  // 5 · the shared half of the meeting, once BOTH kids are settled.
-  if (['jenn', 'jess'].every(k => mnyIsCommitted(wk, k))) commitMeetingShared(wk);
-  mmUndoSeal();
-
-  saveAll();
-  mnyDraft = null; mnyPlanOpen = false;
-  showToast(`💛 Done${parts.length ? ' · ' + parts.slice(0, 3).join(' · ') : ''}`);
-  renderMeetingMode();
 }
 
 /* Buy whichever fund the rules currently name. A fixed menu, never a text box
@@ -1357,4 +292,228 @@ function mnyBuyChosenFund(kid, dollars, opts) {
                          rateAnnual: MNY_FUND_RATES[fund.id] || 0 });
   }
   saveAll();
+}
+function mnyToggleChecks() { mnyChecksOpen = !mnyChecksOpen; renderMeetingMode(); }
+function mnyTickCheck(id) { mnyToggleCheck(mnyWeekKeyMeeting(), mnyMeetingKid(), id); renderMeetingMode(); }
+/* One reason for the week, applied to every change made in it (Sunday's ✏️
+   on a Payday line asks for it before "Now I choose →"). One writer, two
+   doors: Sunday passes nothing (the meeting's girl and week, and the meeting
+   redraws); Grown-ups › ✅ Approve › This Sunday passes the girl and week and
+   redraws itself. */
+function mnyPickReason(id, kidArg, wkArg) {
+  const wk = wkArg || mnyWeekKeyMeeting(), kid = kidArg || mnyMeetingKid();
+  const ov = mnyOverrides(kid, wk);
+  Object.keys(ov).forEach(k => { ov[k].reason = id; });
+  mrStampEarnings(kid, wk);
+  saveAll();
+  if (!kidArg) renderMeetingMode();
+}
+
+/* ── An express catch-up's loan (Stage 4b) ──
+   A week caught up from the hub is settled by commitKidWeek, which no longer
+   pays the loan; this pays that Sunday's must-pay through the sign's own loan
+   step (mnySundayLoanStep) and writes it on the week's record, under the names
+   the passbook reads. Nothing extra is placed: she was not there to choose.
+   Skips a week already signed on Sunday (its record has its loan) and a
+   Sunday the loan was already paid for. */
+function mnyCatchUpLoan(kid, wk) {
+  ctEnsureShared();
+  const led = ((state.shared.chore.moneyLedger || {})[wk] || {})[kid];
+  if (!led || led.loan) return null;
+  const { out, interest } = mnySundayLoanStep(kid, wk, 0);
+  if (out.already) return null;
+  Object.assign(led, {
+    loan: { kind: 'sunday', paid: out.paid, must: out.must, shortfall: out.shortfall,
+            interest, extraCredited: 0, each: out.each },
+    debtBalanceAfter: mnyTotalOwing(kid),
+    updatedAt: syncNow(),
+  });
+  saveAll();
+  return out;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   THE SIGN — the one place money actually moves (Plan v3 §E)
+
+   Hold to sign on Sunday's "I choose" step calls this for ONE girl. Her
+   choices are the device-local Sunday draft (js/44); the arithmetic is the
+   core's `sdSign` over the same input the screen drew (`sdBuildInput`), and
+   In = Out is asserted (`sdCheckInOut`) BEFORE anything is written — a
+   mismatch refuses with a sentence and moves nothing. Then, in order, each
+   movement through the function that owns it:
+
+     1  mmUndoHeld(kid) · mnySimCatchUp · approved 🧱 wall moves · passive
+     2  mmTakeUndoSnapshot(wk, kid) — this girl only (↺ Redo)
+     3  money from outside: cash brought from home (mnyAddDeposit), 🏦 From
+        my Savings (moneyWithdraw), any approved gift not yet credited
+     4  commitKidWeek — the frozen ledger, net to cash, XP, the box
+     5  ⏪ advances: a "forgot to ask" becomes a yes through mnyAddRequest,
+        then each yes is spent (moneySpendCash), stamped `appliedWeek`
+     6  the loan: must-pay oldest first, then extra × (1 + bonus)
+        (mnyLoanSundayPayment → mnyLoanPayExtra), interest every N Sundays
+        (loanAccrueBalanceInterest)
+     7  placement: 🎯 goal jars nearest date first (moneyDepositGoal,
+        {goalId}), 🔒 Locked away for `pots.lockWeeks` weeks (moneyOpenGIC),
+        📈 Companies (mnyBuyChosenFund), 🏦 Savings with the cents and any
+        overflow (moneyDeposit), 💵 cash out handed over (moneySpendCash)
+     8  the ledger row under the names the passbook reads, the questions she
+        asked stamped `appliedWeek`, the plan (`committedAt`), the passive
+        baseline, mmUndoSeal(kid); both girls signed → commitMeetingShared.
+
+   Returns { ok, why } — and the core's result on success. Express catch-up
+   (commitFamilyMeeting) settles a week through commitKidWeek, then pays that
+   Sunday's must-pay through the same loan step (mnyCatchUpLoan, below).
+   ════════════════════════════════════════════════════════════════ */
+function mnyDoCommit(kidArg, wkArg) {
+  const kid = (kidArg === 'jenn' || kidArg === 'jess') ? kidArg : mnyMeetingKid();
+  const wk = wkArg || mnyWeekKeyMeeting();
+  if (!isParent()) { showToast('A grown-up moves the money 🔒'); return { ok: false, why: 'A grown-up moves the money 🔒' }; }
+  if (mnyIsCommitted(wk, kid)) return { ok: false, why: 'This week is already signed.' };
+
+  // 1 · the world brought up to today; approved wall moves go first (they were
+  //     answered before this Sunday — Plan v5 Deviation 25).
+  mmUndoHeld(kid);
+  mnySimCatchUp(kid);
+  mnyApplyApprovedWallMoves(kid, wk);
+  // A changed "loan per month" first, so the pile below asks the new must-pay.
+  sdRescaleLoanRows(kid, wk);
+  const passive = mnyPassiveSinceLastMeeting(kid);
+
+  // The input the screen drew, and what signing it does — refused before any write.
+  const ctx = sdBuildInput(kid, wk);
+  const res = sdSign(ctx.w, ctx.rules);
+  if (!res.ok) { showToast(res.why); return { ok: false, why: res.why }; }
+  const io = sdCheckInOut(res.signed);
+  if (!io.ok) { showToast(io.why); return { ok: false, why: io.why }; }
+  const sg = res.signed, f = ctx.f, alloc = sdAlloc(ctx.w.alloc);
+  const readyOpen = sdIsOpen('ready', ctx.w, ctx.rules);
+
+  // 2 · her own snapshot (↺ Redo returns her and only her).
+  mmTakeUndoSnapshot(wk, kid);
+
+  // 3 · money from outside joins the pile through its owners.
+  if (f.homeCash > 0) {
+    mnyAddDeposit(kid, wk, { amount: f.homeCash, from: 'Cash from home', dayKey: todayKey(),
+                             requestKind: 'deposit', note: 'Brought from home on Sunday' });
+  }
+  if (f.pullReady > 0) moneyWithdraw(kid, f.pullReady, { note: '🏦 From my Savings — Sunday', weekKey: wk });
+  mnyDepositsForWeek(kid, wk).forEach(dep => {
+    if (dep.appliedAt || dep.pendingApproval || dep.rejectedAt) return;
+    moneyAddCash(kid, dep.amount, mnyGiftMirror(dep));
+    dep.appliedAt = Date.now();
+    dep.updatedAt = syncNow();
+  });
+
+  // 4 · the week itself.
+  commitKidWeek(wk, kid);
+
+  // 5 · ⏪ drawn in advance: it was spent before Sunday, so it leaves now.
+  if (f.advManual > 0) {
+    mnyAddRequest(kid, { kind: 'adv', amount: f.advManual, status: 'yes', dayKey: mnyWeekEnd(wk),
+                         why: 'Forgot to ask — added on payday',
+                         text: `Drew ${mnyMoney(f.advManual)} early · added on payday` });
+  }
+  let advLeft = money2(sg.adv);
+  mnyEnsureRequests(kid)
+    .filter(r => r && r.kind === 'adv' && r.status === 'yes' && !r.appliedWeek)
+    .sort((a, b) => (Number(a.answeredAt) || 0) - (Number(b.answeredAt) || 0))
+    .forEach(r => {
+      const owe = money2(money2(r.amount) - money2(r.appliedAmount));
+      const pay = money2(Math.min(owe, advLeft));
+      if (pay > 0) {
+        moneySpendCash(kid, pay, { kind: 'advance', note: '⏪ Drawn in advance' + (r.why ? ' · ' + r.why : ''),
+                                   ref: r.id, weekKey: wk });
+        advLeft = money2(advLeft - pay);
+        r.appliedAmount = money2(money2(r.appliedAmount) + pay);
+      }
+      if (money2(r.appliedAmount) >= money2(r.amount)) r.appliedWeek = wk;
+      markItemUpdated(r);
+    });
+
+  // 6 · the loan: must-pay first, then extra counted at 1 + bonus.
+  const { out: loanOut, interest } = mnySundayLoanStep(kid, wk, sg.extra);
+
+  // 7 · where the rest goes.
+  const toGoals = {};
+  let goalLeft = money2(sg.goal);
+  f.goalOrder.forEach(g => {
+    if (!(goalLeft > 0)) return;
+    const room = money2(Math.max(0, money2(g.target) - mnyGoalJarValue(kid, g)));
+    const put = money2(Math.min(goalLeft, room));
+    if (!(put > 0)) return;
+    if (moneyDepositGoal(kid, put, { goalId: g.id, note: '🎯 Into my goal jar — Sunday', weekKey: wk })) {
+      toGoals[g.id] = put;
+      goalLeft = money2(goalLeft - put);
+    }
+  });
+  const lockWeeks = Math.max(1, Number(mrRuleOr(ctx.rules, 'pots.lockWeeks')) || 4);
+  if (sg.gic > 0) moneyOpenGIC(kid, sg.gic, { weeks: lockWeeks, weekKey: wk });
+  if (sg.stock > 0) mnyBuyChosenFund(kid, sg.stock, { weekKey: wk });
+  if (sg.ready > 0) moneyDeposit(kid, sg.ready, { note: '🏦 Savings — Sunday', weekKey: wk });
+  if (alloc.spend > 0) moneySpendCash(kid, alloc.spend, { note: '💵 Cash out — handed over on Sunday', weekKey: wk });
+  /* Whatever a cent of rounding left in her wallet (two debts each rounding
+     their clearing figure) goes where the core sends cents — never left loose. */
+  const loose = mnyCash(kid);
+  let swept = 0;
+  if (loose > 0.004) {
+    if (readyOpen) { if (moneyDeposit(kid, loose, { note: '🪙 Change → Savings', weekKey: wk })) swept = loose; }
+    else swept = mnyLoanPayExtra(kid, loose, wk, '🪙 Change on the wall').extra;
+  }
+
+  // 8 · the record.
+  const c = state.shared.chore;
+  const ledger = ((c.moneyLedger || {})[wk] || {})[kid];
+  if (ledger) {
+    // Cash from home is her own money, not a gift (Plan v17 item 10): it is
+    // in 🏦 From my bank (`groups.bank`), never in 🎁 given.
+    const given = money2(f.giftsIn);
+    const extraPaid = money2(loanOut.extra + (readyOpen ? 0 : swept));
+    Object.assign(ledger, {
+      confirmedBy: 'a grown-up',
+      plan: { id: 'sunday', label: 'Signed on Sunday' },
+      deposits: given, outside: given,
+      extra: extraPaid, debtExtra: extraPaid,
+      loan: { kind: 'sunday', paid: loanOut.paid, must: loanOut.must, shortfall: loanOut.shortfall,
+              interest, extraCredited: loanOut.extraCredited, each: loanOut.each },
+      loanCash: sg.loanCash, advance: sg.adv, cashOut: alloc.spend,
+      // `spend` is what the passbook reads as cash: cash out + advance (the prototype's wallet).
+      spend: sg.wallet,
+      goal: sg.goal, goals: toGoals,
+      ready: money2(sg.ready + (readyOpen ? swept : 0)),
+      gic: sg.gic, stock: sg.stock, cents: sg.cents,
+      passive, guess: sg.guess, payday: sg.payday, hers: sg.hers, mustPay: sg.mustPay,
+      groups: { earned: money2(sg.inSteady + f.compIn), given, made: Math.max(0, passive),
+                bank: money2(sg.inBank), takenOff: money2(-sg.outFine + sg.adv) },
+      sunday: { signed: sg, after: { left: res.after.left, pots: res.after.pots, loan: res.after.loan },
+                crossed: res.crossed, w: f.lite },
+      debtBalanceAfter: mnyTotalOwing(kid),
+      // What she owns after this Sunday (Savings with the goal jars, Locked
+      // away, Companies) — the Signed step's owe-vs-own chart reads it beside
+      // `debtBalanceAfter` (Plan v17 §4). A row signed before it has neither
+      // figure for the chart and is left out there.
+      ownedAfter: money2(mnyReadyHomeTotal(kid) + mnyLockedTotal(kid) + mnyInvestedTotal(kid)),
+      updatedAt: syncNow(),
+    });
+  }
+  // Every question she asked that this Sunday used, stamped so no later
+  // Sunday (or the other device) uses it again.
+  mnyEnsureRequests(kid).forEach(r => {
+    if (r && r.status === 'yes' && !r.appliedWeek && r.kind !== 'adv') { r.appliedWeek = wk; markItemUpdated(r); }
+  });
+  mnyEnsureMoveRequests(kid).forEach(r => {
+    if (r && r.approvedAt && !r.appliedWeek) { r.appliedWeek = wk; markItemUpdated(r); }
+  });
+  mnyEnsureDeposits(kid).forEach(dep => {
+    if (dep && dep.addedBy && !dep.pendingApproval && !dep.rejectedAt && dep.appliedAt && !dep.appliedWeek) {
+      dep.appliedWeek = wk; markItemUpdated(dep);
+    }
+  });
+  mnyConfirmWeek(wk, kid, 'signed on Sunday');
+  mnySavePlan(wk, kid, { planId: 'sunday', label: 'Signed on Sunday', split: alloc,
+                         presetId: f.presetId || null, guess: sg.guess, committedAt: syncNow() });
+  mnyStampPassiveBaseline(kid);
+  mmUndoSeal(kid);
+  if (['jenn', 'jess'].every(k => mnyIsCommitted(wk, k))) commitMeetingShared(wk);
+  saveAll();
+  return { ok: true, res, ctx };
 }

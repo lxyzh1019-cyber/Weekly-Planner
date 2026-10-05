@@ -64,13 +64,21 @@ function pnBacklog() {
   return (typeof mmUnsettledWeeks === 'function') ? mmUnsettledWeeks(8) : [];
 }
 
-/* The badge on the destination itself. Four possible things, counted once. */
-function pnWaitingCount() {
+/* The badge on the destination itself: four possible things, counted once,
+   and every question the girls asked that is still open (`guWaitingCount`,
+   the one number) — they are answered on Now (Deviation 36). */
+function pnWaitingCount() { return pnOpenCount(['jenn', 'jess']); }
+/* The one count (Plan v18 Stage 7): the badge, and "N open" over ✅ Waiting
+   for you, read the same — one for each line above the cards (a backlog,
+   chores to grade, activities, a note) and one for each open question of the
+   girls in scope (💬 talk-first included: it still blocks payday). */
+function pnOpenCount(kids) {
   const c = pnClaimCounts();
   return (pnBacklog().length ? 1 : 0)
        + (c.total ? 1 : 0)
        + (pnPendingActs().length ? 1 : 0)
-       + (pnNoteKids().length ? 1 : 0);
+       + (pnNoteKids().length ? 1 : 0)
+       + kids.reduce((n, k) => n + mnyRequestsFor(k).filter(q => q.open).length, 0);
 }
 
 /* ── The queue ──
@@ -121,17 +129,8 @@ function pnQueueRows() {
       sub: `${who.icon} ${who.name} added “${first.task.name}”`,
     });
   }
-  const moves = ['jenn', 'jess'].flatMap(k =>
-    (typeof mnyPendingMoves === 'function' ? mnyPendingMoves(k) : []).map(r => ({ kid: k, r })));
-  if (moves.length) {
-    const first = moves[0];
-    const who = kidLabel(first.kid);
-    rows.push({
-      icon: '🔀', action: 'moves', cta: 'Answer ›',
-      title: `${moves.length} move${moves.length === 1 ? '' : 's'} she has asked about`,
-      sub: `${who.icon} ${who.name} · ${mnyMoney(first.r.amount)} to ${mnyHomeLabel(first.r.to).toLowerCase()}`,
-    });
-  }
+  /* Her questions are not a row any more: they are answered right here, in
+     ✅ Waiting for you (Plan v9 §N, Deviation 36). */
   const notes = pnNoteKids();
   if (notes.length) {
     rows.push({
@@ -170,27 +169,105 @@ function pnLoanSeason() {
   };
 }
 
-/* A card must never render blank. An empty queue is the good case and should
-   read as one, not as a box that failed to load. */
+/* ════════════════════════════════════════════════════════════════
+   ✅ WAITING FOR YOU (Plan v9 §M 5b / §N, Deviation 36 — Stage 6d)
+   Every question the girls asked a grown-up is answered HERE, on Now, not
+   on a Money tab: the list on the left, and three side panes, each with one
+   stated purpose — ☀️ This Sunday (is payday ready, what still blocks it),
+   💬 Her answer last week (read before the meeting) and 👛 What they own
+   (check before a yes to a move or a cash-out). Under them ✍️ Record and
+   🚪 She told me…, and 🔧 Tidy-up only when there is something to tidy.
+
+   It still owns nothing. The cards are Grown-ups' own (`guApproveCard`,
+   js/46) on the ONE reader (`mnyRequestsFor`) and the ONE answerer
+   (`mnyAnswerRequest`); their `data-mnyp-action` taps go to `mnyParentClick`
+   (bound on #pnWrap too, js/99-main.js), exactly as on the Money tab.
+   ════════════════════════════════════════════════════════════════ */
+const PN_SCOPE_LS_KEY = 'wp_now_scope';      // Jenn · Jess · Both on this device (§N 5a)
+const PN_GROUP_LS_KEY = 'wp_now_groupby';    // By girl · By kind on this device
+let pnSheetOpen = false;                     // 🚪 "She told me…" sheet showing
+function pnLsGet(key, ok, dflt) {
+  try { const v = localStorage.getItem(key); return ok.indexOf(v) >= 0 ? v : dflt; } catch (e) { return dflt; }
+}
+function pnLsSet(key, v) { try { localStorage.setItem(key, v); } catch (e) {} }
+function pnScope() { return pnLsGet(PN_SCOPE_LS_KEY, ['jenn', 'jess', 'both'], 'both'); }
+function pnGroupBy() { return pnLsGet(PN_GROUP_LS_KEY, ['girl', 'kind'], 'girl'); }
+function pnScopeKids() { const s = pnScope(); return s === 'both' ? ['jenn', 'jess'] : [s]; }
+
+/* The kinds, in the order "By kind" lists them (the mockup's groups). */
+const PN_KIND_GROUPS = [
+  ['coming', '🎁 Money coming in', ['gift', 'deposit']],
+  ['early', '⏪ Early cash', ['adv']],
+  ['goals', '🎯 Goals', ['goal']],
+  ['results', '🏆 Results', ['comp']],
+  ['club', '⛸️ Club', ['skip']],
+  ['moves', '🔀 Moves', ['move']],
+  ['fines', '📦 Fines', ['dispute']],
+];
+/* A segmented toggle, remembered on this device. */
+function pnSeg(label, action, opts, cur) {
+  return `<div class="pn-seg" role="group" aria-label="${escapeAttr(label)}">${opts.map(([id, text]) =>
+    `<button type="button" class="pn-segbtn${cur === id ? ' on' : ''}" aria-pressed="${cur === id}" data-pn-action="${action}" data-kid="${id}">${escapeHtml(text)}</button>`).join('')}</div>`;
+}
+/* Everything that is not a question she asked — a backlog, chores to grade,
+   activities to approve, a note, the loan season — as one compact line each
+   (the mockup's "4 weeks still open · Catch up ›" line). */
 function pnQueueCard() {
   const rows = pnQueueRows();
-  if (!rows.length) {
-    return `<div class="pn-card pn-clear">✅ Nothing is waiting on you. Every chore has a grade,
-      every activity has an answer, and no week is open.</div>`;
-  }
-  return `<div class="pn-card">${rows.map(r => `
-    <button type="button" class="pn-row" data-pn-action="${r.action}">
+  if (!rows.length) return '';
+  return `<div class="pn-lines">${rows.map(r => `
+    <button type="button" class="pn-line" data-pn-action="${r.action}">
       <span class="pn-ico" aria-hidden="true">${r.icon}</span>
       <span class="pn-text"><span class="pn-title">${escapeHtml(r.title)}</span>
         <span class="pn-sub">${escapeHtml(r.sub)}</span></span>
       <span class="pn-cta${r.go ? ' go' : ''}">${escapeHtml(r.cta)}</span>
     </button>`).join('')}</div>`;
 }
-
-/* ── This week ──
-   The rail that used to be a whole tab. Read-only status plus the one button
-   that opens the meeting; it settles nothing itself. */
-function pnWeekRail() {
+/* 🎯 A full jar — "did she buy it?" — a card in the list only when due. */
+function pnBoughtCards(kids) {
+  return kids.flatMap(kid => mnyGoalsNearestFirst(kid).filter(g => {
+    const saved = mnyGoalJarValue(kid, g);
+    return mnyGoalPace(kid, Object.assign({}, g, { saved })).reached;
+  }).map(g => `<div class="gu-req gu-req--open">
+      <div class="gu-req-top">${guKidChip(kid)}<span class="gu-kind">jar is full</span><span class="gu-amt"><b>${escapeHtml(guMoney$(mnyGoalJarValue(kid, g)))}</b></span></div>
+      <div class="gu-req-text">${escapeHtml((g.icon || '🎯') + ' ' + g.name)} — did she buy it?</div>
+      <div class="gu-check">🔎 Takes it out of the jar and writes a line</div>
+      <div class="gu-answer"><button type="button" class="gu-yes" data-mnyp-action="guboughtit" data-mnyp-kid="${kid}" data-mnyp-id="${escapeAttr(g.id)}">✓ She bought it</button></div>
+    </div>`));
+}
+/* The questions: open ones, yeses Sunday has not used, and the last 7 days'
+   answers (`guQueue`, js/46), for the girls in scope. 💬 Talk-first ones are
+   their own group, "To talk about on Sunday" (§N 5b): the meeting's "Parents
+   answer first" card is where they are agreed. Then by girl or by kind. */
+function pnRequestsHtml() {
+  const kids = pnScopeKids();
+  const all = guQueue().filter(q => kids.indexOf(q.kid) >= 0);
+  const talk = all.filter(q => q.status === 'talk');
+  const rest = all.filter(q => q.status !== 'talk');
+  const group = (title, list, extra) => (list.length || extra) ? `<div class="pn-group">
+      <div class="pn-group-head"><span class="pn-group-title">${escapeHtml(title)}</span><span class="pn-group-n">${list.filter(q => q.open).length} open</span></div>
+      <div class="gu-cards2">${list.map(guApproveCard).join('')}${extra || ''}</div></div>` : '';
+  let body;
+  if (pnGroupBy() === 'kind') {
+    body = PN_KIND_GROUPS.map(([id, title, kinds]) => group(title, rest.filter(q => kinds.indexOf(q.kind) >= 0),
+      id === 'goals' ? pnBoughtCards(kids).join('') : '')).join('');
+  } else {
+    body = kids.map(kid => group(mnyKidName(kid), rest.filter(q => q.kid === kid), pnBoughtCards([kid]).join(''))).join('');
+  }
+  const talkHtml = talk.length ? `<div class="pn-group pn-group--talk">
+      <div class="pn-group-head"><span class="pn-group-title">💬 To talk about on Sunday</span><span class="pn-group-n">${talk.length}</span></div>
+      <div class="pn-talknote">Agreed at the family meeting, in “Parents answer first”: set the amount there, then ✓ Agree or Not this time.</div>
+      <div class="gu-cards2">${talk.map(guApproveCard).join('')}</div></div>` : '';
+  const gf = guGrandfatherCreditCard();
+  const empty = !all.length && !gf && !pnBoughtCards(kids).length
+    ? `<div class="gu-empty">Nothing waiting. When they tap 🏆 or 🔀 on My money, it lands here.</div>` : '';
+  return `${body}${talkHtml}${gf ? `<div class="pn-group"><div class="pn-group-head"><span class="pn-group-title">👴 Grandfather rule</span></div>${gf}</div>` : ''}${empty}`;
+}
+/* ☀️ This Sunday — is payday ready, what still blocks it. Per girl: what is
+   still to answer, then came in → loan → hers (`mnyPool`, the meeting's own
+   figures) and ✏️ Change a line (`guOverrideRows`, the one writer); the days
+   confirmed, the meeting's button and her full week. */
+function pnSundayCard() {
   ctPrepareRead();
   const wk = ctWeekKey || ctThisWeekKey();
   const info = ctWeekInfo();
@@ -200,33 +277,106 @@ function pnWeekRail() {
   for (let d = 0; d < 7; d++) {
     const date = new Date(info.mon); date.setDate(info.mon.getDate() + d);
     const k = ctDateToKey(date);
-    const confirmed = mmIsDayConfirmed(d);
-    days += `<button type="button" class="pn-day${confirmed ? ' ok' : ''}${k === todayKey() ? ' now' : ''}"
+    days += `<button type="button" class="pn-day${mmIsDayConfirmed(d) ? ' ok' : ''}${k === todayKey() ? ' now' : ''}"
         data-pn-action="day" data-day="${d}" aria-label="${escapeAttr(DAY_SHORT[d] + ' ' + date.getDate())}">
         <span class="pn-day-dow">${DAY_SHORT[d]}</span>
         <span class="pn-day-date">${date.getDate()}</span></button>`;
   }
-  const weekLabel = `${MONTH_SHORT[info.mon.getMonth()]} ${info.mon.getDate()} – ${MONTH_SHORT[info.sun.getMonth()]} ${info.sun.getDate()}`;
-  /* pool.cameIn, not the earnings net. This line says "pocket money so far",
-     and reading it net once made a birthday cheque already sitting in the week
-     invisible here and then appear out of nowhere at the table. */
-  const money = ['jenn', 'jess'].map(kid =>
-    `<div class="pn-kv"><span>${CT_PROFILE_ICON[kid]} ${kid === 'jenn' ? 'Jenn' : 'Jess'}</span>
-       <span class="pn-n">${ckMoney(mnyPool(wk, kid).cameIn)}</span></div>`).join('');
+  const sunday = new Date(info.sun);
+  const kids = ['jenn', 'jess'].map(kid => {
+    const pool = mnyPool(wk, kid);
+    const wait = mnyRequestsFor(kid).filter(q => q.open).length;
+    return `<div class="pn-sunkid ${'gu-tint--' + kid}">
+        <div class="pn-sunkid-head"><b>${escapeHtml(mnyKidName(kid))}</b>
+          <span class="pn-sunkid-wait${wait ? '' : ' ok'}">${wait ? `⏳ ${wait} to answer` : '✓ payday can open'}</span></div>
+        <div class="pn-sunkid-flow">came in <b>${escapeHtml(mnyMoney(pool.cameIn))}</b> → loan <b>${escapeHtml(mnyMoney(pool.mustPay))}</b> → hers <b class="pn-hers">${escapeHtml(mnyMoney(pool.mine))}</b></div>
+        <div class="gu">${guOverrideRows(kid)}</div>
+      </div>`;
+  }).join('');
   const cta = held
     ? `<button type="button" class="pill-btn pn-wide" data-pn-action="meeting">🧑‍🧑‍🧒 Re-open the meeting</button>`
-    : `<button type="button" class="btn-confirm" data-pn-action="meeting">🧑‍🧑‍🧒 ${nConfirmed > 0 ? 'Continue the' : 'Run'} family meeting</button>`;
-  return `<div class="pn-card pn-rail">
-      <div class="pn-rail-wk">${escapeHtml(weekLabel)}</div>
+    : `<button type="button" class="btn-confirm pn-wide" data-pn-action="meeting">🧑‍🧑‍🧒 ${nConfirmed > 0 ? 'Continue the' : 'Run'} family meeting</button>`;
+  return `<div class="pn-card pn-side-card pn-sun">
+      <div class="pn-side-head"><span class="pn-side-title">☀️ This Sunday · ${escapeHtml(sunday.getDate() + ' ' + MONTH_SHORT[sunday.getMonth()])}</span>
+        <span class="pn-side-meta">${nConfirmed} of 7 days confirmed</span></div>
+      <p class="pn-purpose">Is payday ready? What still blocks it.</p>
+      ${kids}
       <div class="pn-days">${days}</div>
-      <div class="pn-kv"><span>Days confirmed</span><span class="pn-n">${nConfirmed} of 7</span></div>
-      ${money}
-      <p class="pn-note">${held
-        ? '✅ This week is recorded — pocket money was credited at the meeting.'
-        : 'Nothing is paid until the week is settled at the meeting.'}</p>
       ${cta}
       <button type="button" class="pill-btn pn-wide" data-pn-action="fullweek">📋 Open her full week ›</button>
     </div>`;
+}
+/* 💬 Her answer last week — read before the meeting (`sdLastAnswer`, the
+   Sunday step's own reader). */
+function pnLastAnswerCard() {
+  const wk = ctThisWeekKey();
+  const rows = ['jenn', 'jess'].map(kid => {
+    const a = sdLastAnswer(kid, wk);
+    return a && a.said ? `<div class="pn-said">${guKidChip(kid)} “${escapeHtml(a.said)}”${a.guess != null ? ` <span class="pn-sub">guessed $${escapeHtml(String(a.guess))}</span>` : ''}</div>` : '';
+  }).join('');
+  if (!rows) return '';
+  return `<div class="pn-card pn-side-card">
+      <div class="pn-side-head"><span class="pn-side-title">💬 Her answer last week</span></div>
+      <p class="pn-purpose">Read it before the meeting.</p>
+      ${rows}
+    </div>`;
+}
+/* 👛 What they own — both girls in one table (Deviation 37: no cash
+   account). 🏦 Savings holds her 🎯 goal jars ("of which …", display only);
+   then 🔒 Locked away, 📈 Companies, 🧱 the loan left; "📥 Waiting for
+   Sunday" only while either girl has some. Check it before a yes to a move
+   or a cash-out. ✏️ Fix opens Grown-ups' fix sheet for that girl. */
+function pnOwnsCard() {
+  const K = ['jenn', 'jess'];
+  const parts = {};
+  K.forEach(k => { parts[k] = mnyEverythingParts(k); });
+  const row = (label, f, cls) => `<tr class="${cls || ''}"><th scope="row">${escapeHtml(label)}</th>${K.map(k => `<td>${escapeHtml(f(k))}</td>`).join('')}</tr>`;
+  const tile = (k, id) => parts[k].tiles.find(t => t.k === id).value;
+  const jarRows = K.some(k => parts[k].jars.length)
+    ? row('of which 🎯 goal jars', k => mnyMoney(parts[k].jarTotal), 'pn-owns-sub') : '';
+  // The next lock to come back, either girl's (the day a parent hands it back to her pile).
+  const back = K.flatMap(k => mnyHoldingsOfKind(k, 'gic').map(h => String(h.maturesOn || ''))).filter(Boolean).sort()[0] || '';
+  const waiting = K.some(k => parts[k].waiting > 0) ? row('📥 Waiting for Sunday', k => mnyMoney(parts[k].waiting)) : '';
+  return `<div class="pn-card pn-side-card pn-owns">
+      <div class="pn-side-head"><span class="pn-side-title">👛 What they own</span></div>
+      <p class="pn-purpose">Check before you say yes to a move or a cash-out.</p>
+      <table class="pn-owns-table">
+        <thead><tr><td></td>${K.map(k => `<th scope="col">${guKidChip(k)}</th>`).join('')}</tr></thead>
+        <tbody>
+          ${row('🏦 Savings', k => mnyMoney(tile(k, 'ready')))}
+          ${jarRows}
+          ${row(`🔒 Locked away${back ? ' · back ' + mnyDayName(back) : ''}`, k => mnyMoney(tile(k, 'gic')))}
+          ${row('📈 Companies', k => mnyMoney(tile(k, 'stock')))}
+          ${waiting}
+          ${row('Total', k => mnyMoney(parts[k].total), 'pn-owns-total')}
+          ${row('🧱 Loan left', k => mnyMoney(mnyTotalOwing(k)))}
+        </tbody>
+      </table>
+      <div class="pn-owns-fix">${K.map(k => `<button type="button" class="gu-btn" data-mnyp-action="gufixowns" data-mnyp-kid="${k}">✏️ Fix ${escapeHtml(mnyKidName(k))}’s</button>`).join('')}</div>
+    </div>`;
+}
+/* 🔧 Tidy-up — one-time and repair jobs (the stream set-up, weeks the
+   retired branch short-changed, meets never paid), shown only while one has
+   something to do; each still previews and confirms through its own runner. */
+let pnTidyOpen = false;
+function pnTidyCard() {
+  const cards = [guStreamCard(), guRepairCard(), guMeetsCard()].filter(Boolean);
+  if (!cards.length) return '';
+  return `<div class="pn-tidy">
+      <button type="button" class="pn-tidybtn" data-pn-action="tidy" aria-expanded="${pnTidyOpen}">🔧 Tidy-up · ${cards.length} ${pnTidyOpen ? '▾' : '▸'}</button>
+      ${pnTidyOpen ? `<div class="gu">${cards.join('')}</div>` : ''}
+    </div>`;
+}
+/* 🚪 "She told me…": the On-her-behalf card, in a sheet (§N 5d). */
+function pnOpenToldSheet() {
+  pnSheetOpen = true;
+  openSheet('pnToldOverlay');
+  pnRenderToldSheet();
+}
+function pnRenderToldSheet() {
+  const body = document.getElementById('pnToldBody');
+  if (!body || !pnSheetOpen) return;
+  body.innerHTML = `${pnAnswerCard()}<button type="button" class="btn-confirm pn-wide" data-pn-action="told-close">Done</button>`;
 }
 
 /* ── On her behalf (R5 §5 rows 7 and 8, C1 — 2026-09-24) ─────────────────
@@ -374,18 +524,36 @@ function pnRenderNow() {
   if (!isParent()) { wrap.innerHTML = `<div class="pn-card">Parents only 🔒</div>`; return; }
   ctPrepareRead();
   if (!ctWeekKey) ctSetCurrentWeekFromPlanner();
-  /* The queue's backlog row is the only representation of the backlog here.
-     Rendering mmCatchUpBanner underneath it as well put the same fact on the
-     same screen twice — a row saying "3 weeks still open" above a list of the
-     same three weeks — which is exactly the duplication this screen exists to
-     stop. The row is the notification; the catch-up screen is where the work
-     happens; the meeting hub still lists the weeks. */
-  wrap.innerHTML = `<div class="pn-cols">
-      <div><p class="pn-cap">Waiting on you</p>${pnQueueCard()}
-        <button type="button" class="pn-record" data-pn-action="record">✍️ Record something</button>
-        <p class="pn-cap pn-answer-cap">On her behalf — she told you at the door</p>${pnAnswerCard()}</div>
-      <div><p class="pn-cap">This week</p>${pnWeekRail()}</div>
+  /* The queue's backlog line is the only representation of the backlog here
+     (the catch-up screen is where that work happens; the meeting hub still
+     lists the weeks). */
+  const open = pnOpenCount(pnScopeKids());
+  wrap.innerHTML = `<div class="pn-grid">
+      <div class="pn-main">
+        <div class="pn-wait-head">
+          <h2 class="pn-wait-title">✅ Waiting for you</h2>
+          <span class="pn-count">${open} open</span>
+          <span class="pn-strap">Nothing pays until it passes here.</span>
+          <span class="pn-wait-toggles">
+            ${pnSeg('Whose questions', 'scope', [['jenn', 'Jenn'], ['jess', 'Jess'], ['both', 'Both']], pnScope())}
+            ${pnSeg('Group them', 'groupby', [['girl', 'By girl'], ['kind', 'By kind']], pnGroupBy())}
+          </span>
+        </div>
+        ${pnQueueCard()}
+        ${pnRequestsHtml()}
+      </div>
+      <div class="pn-side">
+        ${pnSundayCard()}
+        ${pnLastAnswerCard()}
+        ${pnOwnsCard()}
+        <div class="pn-sidebtns">
+          <button type="button" class="pn-sidebtn" data-pn-action="record">✍️ Record</button>
+          <button type="button" class="pn-sidebtn" data-pn-action="told">🚪 She told me…</button>
+        </div>
+        ${pnTidyCard()}
+      </div>
     </div>`;
+  pnRenderToldSheet();
   // The count on the tab itself, so a parent sees there is work without opening.
   const badge = document.getElementById('pnTabBadge');
   if (badge) {
@@ -418,23 +586,18 @@ function pnHandleClick(e) {
   /* Now COUNTS and ROUTES; it never decides. This opens the sheet with no kind
      chosen, because which record it is is the first thing the sheet asks. */
   if (a === 'record')   { openRecordSheet({ kid: parentViewing }); return; }
-  if (a === 'moves')    {
-    /* Point the portal at the child who asked, and at the section that shows
-       what she has — answering a move with another child's balances on screen
-       is how the wrong pot gets opened. */
-    const first = ['jenn', 'jess'].find(k =>
-      typeof mnyPendingMoves === 'function' && mnyPendingMoves(k).length);
-    /* Section first: setParentScope re-renders the tab it is standing on, so
-       setting it afterwards would paint the money page twice — and in this app
-       a render can trigger a full-document write. */
-    if (typeof mnySetParentSection === 'function') mnyParentSection = 'holdings';
-    if (first) setParentScope(first);
-    setParentTab('money');
-    return;
-  }
+  /* ✅ Waiting for you's own controls (§N 5): whose questions and how they
+     are grouped, remembered on this device; 🚪 She told me…; 🔧 Tidy-up. */
+  if (a === 'scope')   { pnLsSet(PN_SCOPE_LS_KEY, el.getAttribute('data-kid')); pnRenderNow(); return; }
+  if (a === 'groupby') { pnLsSet(PN_GROUP_LS_KEY, el.getAttribute('data-kid')); pnRenderNow(); return; }
+  if (a === 'told')       { pnOpenToldSheet(); return; }
+  if (a === 'told-close') { pnSheetOpen = false; closeSheet('pnToldOverlay'); return; }
+  if (a === 'tidy')       { pnTidyOpen = !pnTidyOpen; pnRenderNow(); return; }
   if (a === 'loans') {
-    /* Section first, for the same reason as 'moves' above. */
-    if (typeof mnySetParentSection === 'function') mnyParentSection = 'debts';
+    /* Section first: setParentScope re-renders the tab it is standing on, so
+       setting it afterwards would paint the money page twice. Her loan rows
+       live on Money › ➕ Commitments (Stage 4b). */
+    mnyParentSection = 'commit';
     setParentTab('money');
     return;
   }

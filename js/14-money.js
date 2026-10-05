@@ -147,6 +147,17 @@ function moneyTakeBackCash(kid, amount, opts) {
                                 amount: money2(before - w.cash) }));
   saveAll(); return true;
 }
+/* Cash she has, spent — the one writer of cash → spent outside the Sunday
+   settlement. A 🌧️ surprise cost paid from her Savings (mnyAddSurprise,
+   js/20-loan.js) leaves through here, and so will Sunday's ⏪ advance line.
+   Only what she has: a spend is never allowed to invent a debt. */
+function moneySpendCash(kid, amount, opts) {
+  const w = ensureWallet(kid); amount = money2(Math.min(money2(amount), Math.max(0, w.cash)));
+  if (!(amount > 0)) return false;
+  w.cash = money2(w.cash - amount);
+  evMirror(kid, Object.assign({ kind: 'out' }, opts || {}, { from: 'cash', to: 'spent', amount }));
+  saveAll(); return true;
+}
 function moneyWithdraw(kid, amount, opts) {         // kept ready → cash (two-way)
   const w = ensureWallet(kid); amount = money2(Math.min(amount, mnySavedTotal(kid)));
   if (amount <= 0) return false;
@@ -157,6 +168,26 @@ function moneyWithdraw(kid, amount, opts) {         // kept ready → cash (two-
 }
 function moneyOpenGIC(kid, amount, termMonths, opts) {   // cash → locked away
   const w = ensureWallet(kid); amount = money2(Math.min(amount, w.cash));
+  /* ── Sunday v15: locked for N WEEKS (Plan v3 §B) ──
+     `moneyOpenGIC(kid, amt, { weeks: 4 })` or `opts.weeks`. It comes back on
+     the Saturday before the Nth-next meeting Sunday, counted from the week's
+     Monday (`opts.weekKey`, default this week) — `sdLockMaturesOn`, the one
+     statement of that date, which the Sunday core uses too. The rate is the
+     week's `pots.rates.gic`. A 12-month lock below is unchanged. */
+  const weeks = Math.floor(Number((termMonths && typeof termMonths === 'object')
+    ? termMonths.weeks : (opts && opts.weeks)) || 0);
+  if (weeks > 0) {
+    if (amount <= 0) return false;
+    const wk = (opts && opts.weekKey) || ctThisWeekKey();
+    const rate = (Number(mrRuleOr(mrRulesForWeek(wk), 'pots.rates.gic')) || 0) / 100;
+    w.cash = money2(w.cash - amount);
+    mnyAddHolding(kid, { kind: 'gic', name: 'Locked away for ' + weeks + ' weeks', units: 1,
+                         priceNow: amount, costBasis: amount, rateAnnual: rate,
+                         termWeeks: weeks, maturesOn: sdLockMaturesOn(wk, weeks) });
+    evMirror(kid, Object.assign({ kind: 'locked', note: weeks + '-week lock' },
+                                opts || {}, { from: 'cash', to: 'locked', amount }));
+    saveAll(); return true;
+  }
   const term = termMonths || 12;
   if (amount <= 0 || ![3, 6, 12].includes(term)) return false;
   const cfg = bankConfig();
@@ -169,6 +200,26 @@ function moneyOpenGIC(kid, amount, termMonths, opts) {   // cash → locked away
                        termMonths: term, maturesOn: ctDateToKey(matures) });
   evMirror(kid, Object.assign({ kind: 'locked', note: term + '-month lock' },
                               opts || {}, { from: 'cash', to: 'locked', amount }));
+  saveAll(); return true;
+}
+/* 🎯 Cash into the goal jar: the same movement as `moneyDeposit` on the
+   stream (cash → ready — the jar is a Savings-kind holding), kept apart from
+   plain Savings by its own holding (`mnyGoalHolding`), and the goal's
+   `saved` moves with it. `opts.goalId` picks which goal's jar (several goals,
+   Plan v5 §L M4); without it, the newest goal's. Refused while Savings is shut
+   (Plan v5 Deviation 31 — `mnyGoalJarRefusal`). */
+function moneyDepositGoal(kid, amount, opts) {
+  const w = ensureWallet(kid); amount = money2(Math.min(amount, w.cash));
+  if (amount <= 0) return false;
+  if (mnyGoalJarRefusal(kid)) return false;
+  const goalId = opts && opts.goalId;
+  const h = goalId ? mnyGoalJarFor(kid, goalId) : mnyGoalHolding(kid);
+  if (!h) return false;
+  w.cash = money2(w.cash - amount);
+  mnyAddToGoal(kid, amount, h.goalId);
+  const label = Object.assign({}, opts || {}); delete label.goalId;   // a choice, not a stream field
+  evMirror(kid, Object.assign({ kind: 'ready', note: 'Into the goal jar' }, label,
+                              { from: 'cash', to: 'ready', amount }));
   saveAll(); return true;
 }
 function moneyBuyStock(kid, ticker, dollars, opts) {     // cash → a bit of a company
@@ -214,6 +265,34 @@ function moneySellStock(kid, ref, shares, opts) {        // a bit of a company �
   evMirror(kid, Object.assign({ kind: 'move', note: 'Sold ' + (held.name || 'a company') },
                               opts || {}, { from: 'invest', to: 'cash', amount: proceeds }));
   saveAll(); return true;
+}
+
+/* 📉 A company holding loses (or gains) `pct` % of what it is worth — the
+   "Companies dip" practice on a Sunday (`market.wobblePct`). Written the way
+   a holding losing value already is (`evMirrorValueChange`: a loss is money
+   leaving the home), and stamped `wobbledWeek` so it happens once a week
+   however many times the screen asks. Returns the change in dollars. */
+function mnyRevalueStock(kid, pct, opts) {
+  const o = opts || {};
+  const p = Number(pct) || 0;
+  if (!p) return 0;
+  const wk = o.weekKey || null;
+  let total = 0;
+  mnyHoldingsOfKind(kid, 'stock').forEach(h => {
+    if (wk && h.wobbledWeek === wk) return;
+    const was = mnyHoldingValue(h);
+    if (!(was > 0)) return;
+    if (h.ticker) h.priceNow = money2(money2(h.priceNow) * (1 + p / 100));
+    else { h.units = 1; h.priceNow = money2(was * (1 + p / 100)); }
+    const delta = money2(mnyHoldingValue(h) - was);
+    if (wk) h.wobbledWeek = wk;
+    h.updatedAt = syncNow();
+    evMirrorValueChange(kid, 'stock', delta,
+      { ref: h.id, note: o.note || ((h.name || 'A company') + (delta < 0 ? ' dipped' : ' rose')) });
+    total = money2(total + delta);
+  });
+  saveAll();
+  return total;
 }
 
 /* Bring the world up to today. The simulation runs on real calendar time

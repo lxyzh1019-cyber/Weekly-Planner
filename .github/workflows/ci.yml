@@ -62,6 +62,13 @@ jobs:
       - name: Money-stream unit tests
         run: npm run test:stream
 
+      # The Sunday ritual's pure core (js/43-sunday-core.js): 8–20 Sundays for
+      # both girls over random but valid choices, In = Out every week, and the
+      # handoff's edge cases. No browser. Listed here for the same reason as the
+      # steps above — tests/check-ci-scripts.js fails a suite CI never runs.
+      - name: Sunday core unit tests
+        run: npm run test:sunday
+
   # Boots the app over file:// in headless Chromium and drives the main flows,
   # including the chore -> money hand-off that is the most valuable join in the
   # suite. Runs on pull requests too: it is the only check that would catch a

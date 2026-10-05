@@ -26,7 +26,11 @@
      · the first freeChoresPerWeek chores are unpaid, and they are the CHEAPEST
        ones, which is her best arrangement (mrChoreWeek ranks them that way)
      · the daily cap bites per day, not per week
-     · the streak pays the LONGEST run at the HIGHEST tier only, never the sum
+     · the streak pays the LONGEST run at the HIGHEST tier only, never the sum,
+       with the week's grace day read from the rules: `streak.graceDays`, and
+       `streak.graceCounts` (Plan v5 Deviation 30) — the forgiving day counts
+       as kept, so 6 kept + the forgiving day is a 7-day run. Mirrors
+       mrStreakWeek (js/18) both ways
      · fines are floored at what that day actually earned, so a fine cannot
        create debt
      · routines pay NOTHING directly. In the new model ctWeekMoney returns
@@ -92,13 +96,36 @@ function learningPaid(units) {
 }
 
 /* Streak. `cleanDays` is a 7-long boolean array; `sick` pauses rather than
-   breaks. Longest run, highest tier only. */
-function streakPaid(cleanDays, sick) {
-  const tiers = ((R.streak || {}).tiers || []).slice().sort((a, b) => a.days - b.days);
-  let run = 0, best = 0;
+   breaks. Longest run, highest tier only. The grace day is read from the
+   rules, as mrStreakWeek reads it: with `graceCounts` the longest stretch
+   holding no more misses than `graceDays`, every day in it counted (nothing
+   kept, no run); without it the grace carries the run across a miss without
+   counting the day. `rules` defaults to the shipped rulebook. */
+function streakPaid(cleanDays, sick, rules) {
+  const st = (rules || R).streak || {};
+  const tiers = (st.tiers || []).slice().sort((a, b) => a.days - b.days);
+  const grace = Math.max(0, Number(st.graceDays) || 0);
+  const marks = [];
   for (let d = 0; d < 7; d++) {
     if (sick && sick[d]) continue;
-    if (cleanDays[d]) { run++; best = Math.max(best, run); } else run = 0;
+    marks.push(!!cleanDays[d]);
+  }
+  let best = 0;
+  if (st.graceCounts === true) {
+    let lo = 0, missed = 0;
+    for (let hi = 0; hi < marks.length; hi++) {
+      if (!marks[hi]) missed++;
+      while (missed > grace) { if (!marks[lo]) missed--; lo++; }
+      best = Math.max(best, hi - lo + 1);
+    }
+    if (!marks.some(Boolean)) best = 0;
+  } else {
+    let left = grace, run = 0;
+    marks.forEach(kept => {
+      if (kept) { run++; best = Math.max(best, run); }
+      else if (left > 0) left--;
+      else run = 0;
+    });
   }
   let bonus = 0, tier = 0;
   tiers.forEach(t => { if (best >= t.days) { bonus = Number(t.bonus) || 0; tier = t.days; } });
@@ -113,6 +140,16 @@ function competitionPaid(comp) {
   let total = (Number(comp.points) || 0) * perPoint;
   if (comp.qualified) total += Number(s.qualifyBonus) || 0;
   return { paid: money2(total) };
+}
+
+/* ⛸️ The assistant job (Sunday v15). Mirrors mrSessionsWeek: each session she
+   ATTENDED pays rules.sessions.perSession; a missed one pays nothing. The
+   three modelled weeks hold 0 sessions on purpose — the pinned figures in
+   tests/money.test.js predate the channel and must not move. */
+function sessionsPaid(attended) {
+  const rate = Number((R.sessions || {}).perSession) || 0;
+  const n = Math.max(0, Math.floor(Number(attended) || 0));
+  return { attended: n, rate: money2(rate), paid: money2(n * rate) };
 }
 
 /* The week's fines, modelled as REPEATS OF ONE BEHAVIOUR — which is what the
@@ -151,6 +188,7 @@ const WEEKS = {
     clean: [false, true, true, false, false, false, false],
     sick: [false, false, false, false, false, false, false],
     comp: null,
+    sessions: 0,
     fines: [0, 1, 0, 0, 1, 0, 0],
   },
   ordinary: {
@@ -161,6 +199,7 @@ const WEEKS = {
     clean: [true, true, true, true, true, false, false],
     sick: [false, false, false, false, false, false, false],
     comp: null,
+    sessions: 0,
     fines: [0, 0, 1, 0, 0, 0, 0],
   },
   strong: {
@@ -172,19 +211,39 @@ const WEEKS = {
     clean: [true, true, true, true, true, true, true],
     sick: [false, false, false, false, false, false, false],
     comp: { points: 6, qualified: false },
+    sessions: 0,
     fines: [0, 0, 0, 0, 0, 0, 0],
   },
 };
 
-function weekMoney(w) {
+/* ── The money week's order (Plan v6 Deviation 34) ──
+   The weeks above are written Mon..Sun (index 0 = Monday) — the shape of
+   the family's week. From `week.from` the meeting pays Sun..Sat, so the same
+   seven days are priced in that order: Sunday first. Day order only moves
+   ties (which chores are the free ones, where a forgiving day falls), so the
+   pinned figures hold — `weekMoney` prices the shipped order, and
+   tests/money.test.js checks both orders agree. */
+const SUN_FIRST = [6, 0, 1, 2, 3, 4, 5];
+function inOrder(w, startsOn) {
+  if (startsOn !== 'sunday') return w;
+  const pos = d => SUN_FIRST.indexOf(d);
+  const arr = a => SUN_FIRST.map(i => a[i]);
+  return Object.assign({}, w, {
+    graded: w.graded.map(c => Object.assign({}, c, { day: pos(c.day) })),
+    clean: arr(w.clean), sick: w.sick ? arr(w.sick) : w.sick, fines: arr(w.fines),
+  });
+}
+function weekMoney(w0, startsOn) {
+  const w = inOrder(w0, startsOn === undefined ? ((R.week || {}).startsOn || 'monday') : startsOn);
   const ch = choresPaid(w.graded);
   const le = learningPaid(w.learning);
   const st = streakPaid(w.clean, w.sick);
   const co = competitionPaid(w.comp);
+  const se = sessionsPaid(w.sessions);
   const fi = finesApplied(w.fines, ch.days);
-  const gross = money2(ch.paid + le.paid + st.bonus + co.paid);
+  const gross = money2(ch.paid + le.paid + st.bonus + co.paid + se.paid);
   const net = money2(Math.max(0, gross - fi.total));
-  return { chores: ch, learning: le, streak: st, comp: co, fines: fi, gross, net };
+  return { chores: ch, learning: le, streak: st, comp: co, sessions: se, fines: fi, gross, net };
 }
 
 /* ── Report ───────────────────────────────────────────────────────
@@ -197,10 +256,12 @@ function report() {
   console.log(`chores: grade 3 ${usd(cfg.grade[3])} · 2 ${usd(cfg.grade[2])} · 1 ${usd(cfg.grade[1])}`
     + ` · cap ${usd(cfg.dailyCap)}/day · first ${cfg.freeChoresPerWeek} free`);
   console.log('streak: ' + ((R.streak || {}).tiers || [])
-    .map(t => `${t.days}d ${usd(t.bonus)}`).join(' · ') + ' · highest tier only');
+    .map(t => `${t.days}d ${usd(t.bonus)}`).join(' · ') + ' · highest tier only'
+    + ` · ${Number((R.streak || {}).graceDays) || 0} forgiving day${(R.streak || {}).graceCounts === true ? ', counted as kept' : ', not counted'}`);
   console.log('learning: ' + ((R.learning || {}).items || [])
     .filter(i => !i.xpOnly).map(i => `${i.id} ${usd(i.amount)}/${i.perUnit}${i.unit}`).join(' · '));
   console.log('routines pay nothing directly — the streak IS the routine channel');
+  console.log(`money week: ${((R.week || {}).startsOn === 'sunday') ? `Sunday–Saturday from the meeting of ${R.week.from}` : 'Monday–Sunday'} (Deviation 34)`);
   console.log('');
 
   const order = ['quiet', 'ordinary', 'strong'];
@@ -217,6 +278,7 @@ function report() {
     console.log(`   streak       ${usd(m.streak.bonus).padStart(7)}   (longest run ${m.streak.days} days`
       + `${m.streak.tier ? `, ${m.streak.tier}-day tier` : ', no tier reached'})`);
     console.log(`   competition  ${usd(m.comp.paid).padStart(7)}`);
+    console.log(`   club job     ${usd(m.sessions.paid).padStart(7)}   (${m.sessions.attended} sessions × ${usd(m.sessions.rate)})`);
     console.log(`   fines       -${usd(m.fines.total).padStart(7)}`);
     console.log(`   ─────────────────────`);
     console.log(`   net          ${usd(m.net).padStart(7)}`);
@@ -253,4 +315,4 @@ function report() {
 if (require.main === module) report();
 
 module.exports = { weekMoney, WEEKS, report,
-  choresPaid, learningPaid, streakPaid, competitionPaid, finesApplied };
+  choresPaid, learningPaid, streakPaid, competitionPaid, sessionsPaid, finesApplied };

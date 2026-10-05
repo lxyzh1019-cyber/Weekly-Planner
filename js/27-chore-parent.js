@@ -105,8 +105,8 @@ function cpSettleCard() {
 /* ── Both girls, this day ── */
 function cpDayCards() {
   const cards = ['jenn', 'jess'].map(k => {
-    const chores = mrChoreWeek(ctWeekKey, k);
-    const day = chores.days[cpDay] || { paid: 0 };
+    // The day's money from the money week that pays it (Deviation 34).
+    const day = mrChoreDay(k, mrWeekDayKeys(ctWeekKey)[cpDay]).day;
     const waiting = mrClaimQueue(ctWeekKey, k).filter(q => q.dayIdx === cpDay).length;
     /* Out of what the day ASKED for, not out of three. A Saturday plans two
        routines, so "1/3 routines closed" read as a failing day forever. */
@@ -161,8 +161,9 @@ function cpGraded() {
   const e = mrEnsureEarnings(kid, ctWeekKey);
   const graded = Object.keys(e.chores[String(cpDay)] || {});
   if (!graded.length) return '';
-  const wk = mrChoreWeek(ctWeekKey, kid);
-  const freeIds = new Set(wk.freeUsed.filter(f => f.dayIdx === cpDay).map(f => f.choreId));
+  const dayKey = mrWeekDayKeys(ctWeekKey)[cpDay];
+  const wk = mrChoreDay(kid, dayKey).week;
+  const freeIds = new Set(wk.freeUsed.filter(f => f.dayKey === dayKey).map(f => f.choreId));
   const body = graded.map(id => {
     const g = mrGetChoreGrade(kid, ctWeekKey, cpDay, id);
     const claim = mrGetClaim(kid, ctWeekKey, cpDay, id);
@@ -249,7 +250,7 @@ function cpFines() {
   const btns = items.map(f => `<button type="button" class="cp-fine" data-cp-action="fine" data-fine="${escapeAttr(f.id)}">
       ${escapeHtml(f.label)} <b>−${ckMoney(f.amount)}</b></button>`).join('');
   const names = {}; ((r.fines || {}).items || []).forEach(i => { names[i.id] = i.label; });
-  const applied = mrFines(kid).filter(f => mrWeekDayKeys(ctWeekKey).includes(f.dayKey)).slice(-6).reverse()
+  const applied = mrFines(kid).filter(f => mrMoneyDayKeys(ctWeekKey, kid).includes(f.dayKey)).slice(-6).reverse()
     .map(f => `<div class="cp-applied">
       <span class="cp-plan-name">${escapeHtml(names[f.itemId] || f.itemId)}<span class="ck-item-due">${escapeHtml(f.dayKey)}</span></span>
       <span class="ck-red">−${ckMoney(1)}</span>
