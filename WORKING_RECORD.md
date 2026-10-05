@@ -24,8 +24,8 @@ Single working record for this repository. Updated by the main session at the en
 - **2026-10-04, R14: Plan v6 approved** (owner: "Approve Plan v6"; first Sunday–Saturday money week "Sun 11 Oct"). Section M: fixes (6a), mockups (6b), owner review (6c), build redesigns (6d).
 
 ## Where we are
-- **R14 / Plan v3 — Sunday v15 pocket-money redesign**, branch `claude/sunday-v15` (local only, never pushed). Newest plan: **Plan v9 — approved 2026-10-04**, file `plans/mossy-gathering-dragon.md` (copy `docs/handoff/plan-v3-sunday-v15.md`); prototypes in `docs/handoff/sunday-v15/`. Stages 1–4b, 6a, 6b done (last code commit `94ce8d5`); the owner reviewed the mockups (6c, ledger #98).
-- **Next:** fix the 12 flagged items on the 6e page (Stage 5/7 scope: they make the build match the approved plan and mockups), then Stage 5/7 (looks, phone, smoke, final built-vs-prototype page) → draft PR. 6d `f50503d` and 6e page done.
+- **R14 / Plan v3 — Sunday v15 pocket-money redesign**, branch `claude/sunday-v15` (local only, never pushed). Newest plan: **Plan v10 — awaiting approval** (Rev 9, section O; owner confirmed its three decisions 2026-10-04), file `plans/mossy-gathering-dragon.md` (copy `docs/handoff/plan-v3-sunday-v15.md`); prototypes in `docs/handoff/sunday-v15/`. Stages 1–4b, 6a, 6b done (last code commit `94ce8d5`); the owner reviewed the mockups (6c, ledger #98).
+- **Next:** owner reviews the round-2 mockups (6g) → 6h build (approved mockups, My money and meeting headers back to 6a, the 12 items flagged on the 6e page) → Stage 5/7 → draft PR.
 - Restart line: `Continue the current work on branch claude/sunday-v15; next: **R14 / Plan v3 — Sunday v15 pocket-money redesign** (`claude/sunday-v15`, from `main` @ `8b56fdb`).`
 - Must know: no cash account (Plan v9 Deviation 37); "Dad" → "parents" on screen (38); smoke on this PC needs `SMOKE_CHROMIUM="C:/Program Files/Google/Chrome/Application/chrome.exe"`; workers do not commit, the main session does; main session cannot Write script files (use Edit on the plan, short python -c for records).
 
@@ -139,6 +139,7 @@ Single working record for this repository. Updated by the main session at the en
 | 96 | R14 2026-10-04 | Owner's built-vs-prototype answers: OK on all except 30 Change items; fix the five bugs and cut-off names; passbook, move sheet, guess pane order, header space redesign; money week Sun–Sat ("Money week only"); redesigns as "Mockups first" | **done — Plan v6 approved 2026-10-04**; first Sun–Sat money week = the meeting of Sun 11 Oct (pays Sun 4 – Sat 10) | Plan section M. Hotspot: +1 fix round (5). Redesigns: My money layout, Approve → Now, Rules tab, Weeks side by side, header space. |
 | 97 | R14 2026-10-04 | (6b) mockups of the five redesigns | done — published | https://claude.ai/artifact/KrmHJQRu2FXUwX92yWNA6J; 14 open questions on the page, two need explicit OK (Money as its own top tab; My money head in one row). |
 | 98 | R14 2026-10-04 | (6c) Mockup review: Rules and header OK; My money, Now, Weeks changes; "Cash" → no cash account ("cash as an account is not [correct] … the account only for saving, locked saving, investment"); "Dad" → parents; comparison pages after the build | done — **Plan v9 approved 2026-10-04** ("Approve Plan v9") | Plan section N; saving line 10% / 50% (owner answer). |
+| 99 | R14 2026-10-04 | 6e review: "I prefer the Prototype" on My money; Payday comparison "apple to orange"; 6d header "degrading … I will reject"; I choose crowded; "Confirm all three, write Plan v10 and show me the prototype and mockup side by side" | done — Plan v10 written; 6f mockups published | Section O. Hotspot +1 round, +1 regression. |
 
 ## Hotspot counter
 | Area / feature | Fix rounds | Recurrences | Regressions caused | Workarounds/exceptions | Last symptom | Rewrite-vs-repair reviewed? |
@@ -305,6 +306,8 @@ Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression (1 re
 | Stage 6b/6c — redesign mockups + owner review | 6b COMPLETE; 6c COMPLETE — review received (#98); Plan v9 approved | https://claude.ai/artifact/KrmHJQRu2FXUwX92yWNA6J (five redesigns, iPad; phone mockups not made) |
 | Stage 6d — build approved redesigns | COMPLETE | `f50503d`, build 2026-10-04b; full npm test green (worker run; sunday 90/0 and merge 128/0 re-run by main session) |
 | Stage 6e — comparison page (prototype · before · after) | COMPLETE | https://claude.ai/artifact/V2BUEwpCQzNryit3bd947t — 18 rows; 12 items flagged that do not yet match the plan/mockup (4 look like number bugs: Weeks earned-this-year, given vs gifts, money made, goal jar "of $85") | |
+| Stage 6f — round-2 mockups (My money, Payday, I choose, Signed) beside the prototype | COMPLETE | https://claude.ai/artifact/47ScVjvCJmyPQDwx6zmgo1 — prototype sample week; 9 open questions |
+| Stage 6g/6h — owner review of round-2 mockups, then build + 6a headers + 12 flagged items | BLOCKED — waiting on the owner's mockup reply | Plan v10 section O |
 | Stage 5 — CSS/looks/phone, smoke rewrite, build stamp, full gate | BLOCKED — follows 6d; includes Today's clash-note contrast and a run with the clock after 11 Oct | |
 | Draft PR + FEATURES/ARCHITECTURE | BLOCKED — follows Stage 5 | |
 
