@@ -863,7 +863,8 @@ function mnyInfoSheetBody(d) {
       .map(([label, k]) => `<tr><td>${escapeHtml(label)}</td>${f.rows.map(r => `<td>${escapeHtml(k ? mnyMoney(r[k]) : by(r))}</td>`).join('')}<td class="mv2-all">${escapeHtml(k ? mnyMoney(all[k]) : freeAll)}</td></tr>`).join('');
     const scale = Math.max(1, ...f.rows.map(r => r.principal));
     const bars = f.rows.map(r => `<div class="mv2-li"><span>${escapeHtml(r.icon + ' ' + r.name)}</span><span class="mv2-sbar"><i class="mv2-sw--earned" style="width:${(money2(r.principal - Math.max(0, r.left)) / scale * 100).toFixed(1)}%"></i><i class="mv2-sw--wall" style="width:${(Math.max(0, r.left) / scale * 100).toFixed(1)}%"></i></span><b>${escapeHtml(mnyMoney(r.left))}</b></div>`).join('');
-    return `<div class="mv2-tablewrap"><table class="mv2-loantable">${head}${rows}</table></div>
+    // On the phone the names stay put while the table scrolls sideways, with a hint and a fade (Plan v18, last round).
+    return `<div class="mv2-scrollhint" aria-hidden="true">scroll →</div><div class="mv2-tablebox"><div class="mv2-tablewrap"><table class="mv2-loantable">${head}${rows}</table></div></div>
       <div class="mv2-title mv2-title--sm">Left and paid on each loan</div>${bars}
       <div class="mv2-line"><i class="mv2-sw mv2-sw--earned"></i>paid <i class="mv2-sw mv2-sw--wall"></i>left · bars drawn to the same scale (${escapeHtml(mnyShort$(scale))})</div>`;
   }
@@ -907,12 +908,21 @@ function mnyFineRows(kid, weekKey) {
   const charged = (mrFinesWeek(weekKey, kid, null) || {}).chargeable || {};   // the same week as the ➖ total above
   return fines.map(f => {
     const cost = money2(charged[f.id] || 0);
+    const floor = cost > 0 ? mnyFineFloorNote(kid, f, weekKey) : '';
     const q = mnyFineDispute(kid, f.id);
     const right = q ? `<span class="mv2-finestate${q.open ? ' wait' : ''}">${escapeHtml(rqStatusText(q))}</span>`
       : `<button type="button" class="mv2-finebtn" data-mny-action="fine-dispute" data-mny-id="${escapeAttr(f.id)}">📦 This fine is wrong</button>`;
     return `<div class="mv2-li mv2-fine"><span>&nbsp;&nbsp;📦 ${escapeHtml(guFineLabel(f.itemId))} <span class="mv2-note">${escapeHtml(mnyDayName(f.dayKey))}</span></span>
-        <b class="${cost > 0 ? 'mv2-late' : ''}">${escapeHtml(cost > 0 ? sdOff$(cost, mnyMoney) : 'free')}</b>${right}</div>`;
+        <b class="${cost > 0 ? 'mv2-late' : ''}">${escapeHtml(cost > 0 ? sdOff$(cost, mnyMoney) : 'free')}${floor ? `<span class="mv2-floor"> · ${escapeHtml(floor)}</span>` : ''}</b>${right}</div>`;
   }).join('');
+}
+/* What the daily floor did to one fine's day (`sdFineFloorNote`), read from
+   the week that pays the day — or the week a screen is showing. '' when the
+   day's fines were taken in full. */
+function mnyFineFloorNote(kid, f, weekKey) {
+  const wk = weekKey || mrMoneyWeekOf(f.dayKey, kid);
+  const day = ((((mrWeekBreakdown(wk, kid) || {}).fines) || {}).perDay || []).find(x => x.dayKey === f.dayKey);
+  return day ? sdFineFloorNote(day.raw, day.applied, mnyMoney) : '';
 }
 
 /* What everything pays, straight from the rules — Money school's copy of the

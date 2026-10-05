@@ -25453,6 +25453,9 @@ function findChromium() {
         if (!btn(fine.id)) bad.push('the fine has no "This fine is wrong" button in This week so far');
         else {
           if (!/−\$/.test(row(fine.id).textContent)) bad.push('the fine row does not show its amount negative: ' + row(fine.id).textContent.replace(/\s+/g, ' '));
+          // Plan v18 (last round): a fine the daily floor took less of says so, beside its minus.
+          const pd = ((mrWeekBreakdown(mnyWeekKey(), kid).fines || {}).perDay || []).find(x => x.dayKey === fine.dayKey);
+          if (pd && pd.applied < pd.raw && !/nothing taken|only .* taken/.test(row(fine.id).textContent)) bad.push('a floored fine does not say what was taken: ' + row(fine.id).textContent.replace(/\s+/g, ' '));
           const r = btn(fine.id).getBoundingClientRect();
           if (r.height < 44) bad.push('the button is ' + Math.round(r.height) + 'px tall, under 44');
         }

@@ -872,6 +872,18 @@ function sdOff$(v, fmt) {
   return a > 0.004 ? '−' + f(a) : f(0);
 }
 
+/* ── A fine the daily floor took less of (Plan v18, last round) ──
+   Fines can zero a day, never create debt (`fines.dailyFloorZero`), so a
+   fine listed at "−$1.00" can take nothing when its day earned $0. The row
+   keeps its minus and says so, so it never contradicts the ➖ total:
+   `raw` is what the day's fines cost, `applied` what was actually taken. */
+function sdFineFloorNote(raw, applied, fmt) {
+  const f = typeof fmt === 'function' ? fmt : sdMoney;
+  const r = sdR2(raw), a = Math.max(0, sdR2(applied));
+  if (!(r > 0) || a >= r - 0.004) return '';
+  return a <= 0.004 ? 'nothing taken — the day was $0' : `only ${f(a)} taken — the day earned ${f(a)}`;
+}
+
 // Inert in the browser; lets tests/sunday.test.js hold the pure core in Node.
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -883,6 +895,6 @@ if (typeof module !== 'undefined' && module.exports) {
     sdVerdicts, sdForecast, sdNewGoal, sdWhole$, sdStreakForgiving, sdStreakClue, sdClues,
     sdImpactWeek, sdImpactWeekly, sdImpact, sdWithAgreed, sdAgreeInto, sdSavingLine,
     sdOweOwnForecast, sdOweOwnSeries, sdThinLabels, SD_CHART_LABELS,
-    sdSegHitsBox, sdGapLabelSpot, SD_REQUEST_TAGS, sdRequestTag, sdOff$,
+    sdSegHitsBox, sdGapLabelSpot, SD_REQUEST_TAGS, sdRequestTag, sdOff$, sdFineFloorNote,
   };
 }

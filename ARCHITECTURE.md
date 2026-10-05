@@ -4143,7 +4143,7 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
 - **"Earned this year" is the ledger's** (`guEarnedThisYear`, js/46), the
   same rows the Weeks list shows; Sunday's earning target reads it too.
 
-## Stage 7 — the comparison fixes, three rules, Calm and the phone (Plan v18 §W, build 2026-10-05b)
+## Stage 7 — the comparison fixes, three rules, Calm and the phone (Plan v18 §W, build 2026-10-05c)
 
 - **Every money question is answered in Parent › Now, with its tag.** Now
   already read all three stores through the one reader (`mnyRequestsFor` →
@@ -4187,6 +4187,10 @@ The contract is `docs/handoff/sunday-v15/final/BUILD-SPEC.md`; the picture is
   it hides and the icon, number or picture stays; the control carries its
   full name in `aria-label`. My money's head breaks into rows with an
   `::after` row break and `order`.
+- **A floored fine says so.** Fines can zero a day, never create debt, so a
+  fine listed at its cost (−$1.00) can take nothing; the row keeps the minus
+  and adds `sdFineFloorNote` ("nothing taken — the day was $0"), read through
+  `mnyFineFloorNote` from the week that pays the day.
 - **Now's count has one reader**, `pnOpenCount(kids)` (js/32): the badge and
   "N open" agree.
 - **Clock- and calendar-dependent smoke checks are pinned.**

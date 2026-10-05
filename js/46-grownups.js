@@ -285,6 +285,11 @@ function guDisputeAmount(kid, r) {
   const wk = mrMoneyWeekOf(f.dayKey, kid);   // the money week that pays its day (Deviation 34)
   return money2((mrFinesWeek(wk, kid, null).chargeable || {})[f.id] || 0);
 }
+/* The daily floor's note for a disputed fine ('' when it was taken in full). */
+function guDisputeFloor(kid, r) {
+  const f = mrFines(kid).find(x => x && x.id === r.fineId);
+  return f ? mnyFineFloorNote(kid, f) : '';
+}
 function guCardValues(q) {
   const r = q.record || {}, kid = q.kid;
   const rules = mrRules();
@@ -300,6 +305,7 @@ function guCardValues(q) {
     : q.kind === 'deposit' ? 'Cash from home goes into the bank. Count it with her on Sunday.'
     : q.kind === 'adv' ? `Cash now; it comes off Sunday’s payday. Her limit is ${guMoney$(mrRuleOr(rules, 'advance.maxPerWeek'))} a week.`
     : q.kind === 'skip' ? 'Yes marks it missed on Sunday. It pays $0. It is not a fine.'
+    : amt > 0 && q.kind === 'dispute' && guDisputeFloor(kid, r) ? `${guDisputeFloor(kid, r).replace(/^./, c => c.toUpperCase())}, so nothing comes back — yes takes it off her record.`
     : amt > 0 ? `Yes gives back ${mnyMoney(amt)} in Sunday’s payday.` : 'It was a free one, so nothing comes back — yes takes it off her record.';
   const fromName = { ready: 'Savings', locked: 'Locked away', invest: 'Companies', cash: 'cash' }[r.from] || r.from;
   const check = q.kind === 'goal' ? '🔎 Is it something she really wants? Is the price right?'

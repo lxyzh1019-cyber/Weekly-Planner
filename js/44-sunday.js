@@ -689,6 +689,9 @@ function sdPaydayMain(c) {
   const needReason = mnyAnyEdited(c.kid, c.wk) && !mnyWeekReason(c.kid, c.wk);
   const monthly = money2(f.debts.filter(x => loanBalance(c.kid, x.id) > 0).reduce((a, x) => a + money2(x.monthly), 0));
   const fineDays = sdFinesDays(c);
+  // The daily floor (Plan v18, last round): fines that took less than they cost say so.
+  const fineRaw = money2(((c.f.b.fines || {}).perDay || []).reduce((a, x) => a + (Number(x.raw) || 0), 0));
+  const fineFloor = sdFineFloorNote(fineRaw, money2((c.f.b.fines || {}).total), sdM);
   return `<div class="sd-titlerow"><span class="sd-title">☀️ My payday</span><span class="sd-script">${escapeHtml(sdGuessResult(c))}</span></div>
     <div class="sd-pay">
       <div class="sd-pay-groups">
@@ -714,7 +717,7 @@ function sdPaydayMain(c) {
           <div class="sd-box-head"><span class="sd-box-title">➖ Taken off</span><span class="sd-note">fines · cash I drew before Sunday</span><b class="sd-red">${escapeHtml(sdOff$(takenOff))}</b></div>
           <div class="sd-offs">
             <button type="button" class="sd-off" data-mny-action="sd-line" data-sd-tile="fines"><span>📦 ${escapeHtml(fineDays ? 'Box fine' : 'Fines')}</span>
-              <span class="sd-off-foot"><span class="sd-note">${escapeHtml(fineDays || tile('fines').note)}</span>${-P.income.fine > 0.004 ? `<b class="sd-red">${escapeHtml(sdOff$(P.income.fine))}</b>` : ''}</span></button>
+              <span class="sd-off-foot"><span class="sd-note">${escapeHtml(fineDays || tile('fines').note)}${fineFloor ? ' · ' + escapeHtml(fineFloor) : ''}</span>${-P.income.fine > 0.004 || fineFloor ? `<b class="sd-red">${escapeHtml(sdOff$(fineFloor ? fineRaw : P.income.fine))}</b>` : ''}</span></button>
             <div class="sd-off sd-off--adv">
               <div class="sd-pull-name"><span class="sd-nowrap">⏪ Drawn early <b${adv ? ' class="sd-red"' : ''}>${escapeHtml(sdOff$(adv))}</b></span><span class="sd-note">${escapeHtml(advNote)}</span></div>
               <button type="button" class="sd-step" data-mny-action="sd-adv" data-sd-d="-1" aria-label="Less">−</button>

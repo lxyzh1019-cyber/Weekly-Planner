@@ -741,6 +741,10 @@ function fill(w, k) {
   check('request tags: a move to cash is a cash out', T('move', 'cash') === '💵 Cash out' && T('move', 'wall') === '🔀 Move');
   check('request tags: an unknown kind has none', T('nope') === null);
 
+  const F = s.sdFineFloorNote;
+  check('floor note: a fine on a $0 day says nothing was taken', F(1, 0) === 'nothing taken — the day was $0');
+  check('floor note: a partly floored day says what was taken', F(2, 0.5) === 'only $0.50 taken — the day earned $0.50');
+  check('floor note: a fine taken in full says nothing', F(1, 1) === '' && F(0, 0) === '');
   const O = s.sdOff$;
   check('taken off: a positive amount shows with a minus', O(1) === '−$1.00');
   check('taken off: a negative amount shows with one minus', O(-2.5) === '−$2.50');
